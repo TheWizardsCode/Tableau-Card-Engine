@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import path from 'path';
 
@@ -17,5 +18,10 @@ export default defineConfig({
   server: {
     port: 3000,
     open: false,
+  },
+  test: {
+    globals: true,
+    environment: 'node',
+    include: ['tests/**/*.test.ts'],
   },
 });
