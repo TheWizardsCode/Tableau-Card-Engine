@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="140" height="190" viewBox="0 0 140 190">
+  <!-- Card background -->
+  <rect x="2" y="2" width="136" height="186" rx="10" ry="10" fill="white" stroke="#333" stroke-width="2"/>
+  <!-- Suit symbol (spade) -->
+  <text x="70" y="110" font-family="serif" font-size="72" text-anchor="middle" fill="#333">&#9824;</text>
+  <!-- Rank top-left -->
+  <text x="14" y="30" font-family="serif" font-size="22" fill="#333">A</text>
+  <!-- Suit top-left -->
+  <text x="14" y="50" font-family="serif" font-size="18" fill="#333">&#9824;</text>
+  <!-- Rank bottom-right (inverted) -->
+  <text x="126" y="170" font-family="serif" font-size="22" fill="#333" text-anchor="end" transform="rotate(180,126,160)">A</text>
+  <!-- Suit bottom-right (inverted) -->
+  <text x="126" y="150" font-family="serif" font-size="18" fill="#333" text-anchor="end" transform="rotate(180,126,142)">&#9824;</text>
+</svg>

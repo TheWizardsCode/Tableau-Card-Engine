@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="140" height="190" viewBox="0 0 140 190">
+  <!-- Card back pattern -->
+  <rect x="2" y="2" width="136" height="186" rx="10" ry="10" fill="#1a5276" stroke="#333" stroke-width="2"/>
+  <rect x="10" y="10" width="120" height="170" rx="6" ry="6" fill="none" stroke="#d4ac0d" stroke-width="2"/>
+  <!-- Diamond pattern -->
+  <line x1="10" y1="10" x2="130" y2="180" stroke="#d4ac0d" stroke-width="0.5" opacity="0.4"/>
+  <line x1="130" y1="10" x2="10" y2="180" stroke="#d4ac0d" stroke-width="0.5" opacity="0.4"/>
+  <line x1="70" y1="10" x2="70" y2="180" stroke="#d4ac0d" stroke-width="0.5" opacity="0.4"/>
+  <line x1="10" y1="95" x2="130" y2="95" stroke="#d4ac0d" stroke-width="0.5" opacity="0.4"/>
+  <!-- Center emblem -->
+  <circle cx="70" cy="95" r="20" fill="none" stroke="#d4ac0d" stroke-width="1.5"/>
+  <text x="70" y="102" font-family="serif" font-size="20" text-anchor="middle" fill="#d4ac0d">&#9830;</text>
+</svg>
