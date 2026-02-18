@@ -1,0 +1,75 @@
+##################################
+# Node.js
+##################################
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+##################################
+# Build Output
+##################################
+dist/
+build/
+*.js.map
+*.tsbuildinfo
+
+##################################
+# Vite
+##################################
+.vite/
+*.local
+
+##################################
+# TypeScript
+##################################
+*.tsbuildinfo
+
+##################################
+# IDE / Editor Files
+##################################
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+##################################
+# OS Files
+##################################
+.DS_Store
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+
+##################################
+# Environment / Secrets
+##################################
+.env
+.env.local
+.env.*.local
+
+##################################
+# Test / Coverage
+##################################
+coverage/
+
+##################################
+Worklog Specific Ignores
+##################################
+
+# Ignore Worklog directory by default
+.worklog/
+
+# Keep defaults and plugins tracked
+!.worklog/config.defaults.yaml
+!.worklog/plugins/
+!.worklog/plugins/**
+
+# opencode temporary files
+.opencode/tmp/
+
+### End of Worklog Specific Ignores
