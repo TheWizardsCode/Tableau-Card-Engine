@@ -96,6 +96,27 @@ The project defines path aliases for engine modules in both `tsconfig.json` and 
 
 All assets and code used in this project must be open and freely available for commercial use. Licenses must be permissive (MIT, Apache 2.0, CC0, or similar). Asset attribution is documented in `public/assets/CREDITS.md`.
 
+## Documentation
+
+- **`README.md`** -- Project overview, quick-start commands, repository layout, and contribution summary. This is the first thing a new developer or contributor should read.
+- **`docs/DEVELOPER.md`** -- Detailed developer guide covering environment setup, running/building/testing, adding example games, managing assets, path aliases, troubleshooting, and the doc-update policy.
+- **`AGENTS.md`** (this file) -- Agent/producer guidance, project architecture, tech stack, and Worklog rules.
+
+### Doc-Update Policy
+
+Any change that alters developer workflows **must** include a corresponding documentation update. This includes changes to:
+
+- npm scripts, dependencies, or `package.json` structure
+- `tsconfig.json`, `vite.config.ts`, or build/test configuration
+- Directory structure or path aliases
+- New tooling, CI/CD pipelines, or developer-facing infrastructure
+
+**Enforcement:**
+
+1. Update `docs/DEVELOPER.md` and the relevant section of this file (`AGENTS.md`) in the same commit or PR as the infrastructure change.
+2. If the doc update cannot be included in the same commit, create a **child work item** in Worklog for the doc update. The parent work item **cannot be closed** until the doc-update child is also closed.
+3. Reviewers should verify that docs are updated before approving any PR that touches infrastructure or workflow files.
+
 <!-- Start base Worklog AGENTS.md file -->
 
 ## work-item Tracking with Worklog (wl)
