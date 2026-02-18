@@ -6,6 +6,6 @@ describe('Smoke Test', () => {
   });
 
   it('should verify basic string operations', () => {
-    expect('Card Game Engine').toContain('Card');
+    expect('Tableau Card Engine').toContain('Card');
   });
 });

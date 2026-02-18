@@ -31,7 +31,7 @@ export class HelloWorldScene extends Phaser.Scene {
       .text(
         this.scale.width / 2,
         40,
-        'Card Game Engine - Hello World',
+        'Tableau Card Engine - Hello World',
         {
           fontSize: '24px',
           color: '#ffffff',

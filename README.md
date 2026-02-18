@@ -1,4 +1,4 @@
-# Card Game Spikes
+# Tableau Card Engine (TCE)
 
 A modular, spike-driven game engine for building single-player tableau card games with **Phaser 3.x**, **TypeScript**, **Vite**, and **Vitest**.
 
@@ -14,14 +14,14 @@ npm run preview      # serve production build locally
 
 ## What Is This?
 
-This project builds increasingly complex card games as "spikes" to validate gameplay mechanics and engine APIs. Reusable components are extracted from each spike into shared engine modules. The end goal is a fully modular card-game engine that others can use to build their own tableau card games.
+The Tableau Card Engine (TCE) builds increasingly complex card games as "spikes" to validate gameplay mechanics and engine APIs. Reusable components are extracted from each spike into shared engine modules. The end goal is a fully modular engine that others can use to build their own tableau card games.
 
 The project is organized as a **flat monorepo** -- a single `package.json` at the root, shared engine code under `src/`, and standalone example games under `example-games/`.
 
 ## Repository Layout
 
 ```
-cardGameSpikes/
+tableau-card-engine/
 ├── src/                   Engine modules
 │   ├── core-engine/       Game loop, state management, rendering helpers
 │   ├── card-system/       Card, Deck, Hand, Pile abstractions

@@ -2,7 +2,7 @@ Follow the global AGENTS.md in addition to the rules below. The local rules belo
 
 ## Project Overview
 
-You are a producer for a Game Engine designed to support building single-player Tableau Card Games. Your primary goal is to create a fully modular and reusable engine. You achieve this through building increasingly complex card games and extracting reusable components from each.
+You are a producer for the Tableau Card Engine (TCE), a game engine designed to support building single-player tableau card games. Your primary goal is to create a fully modular and reusable engine. You achieve this through building increasingly complex card games and extracting reusable components from each.
 
 This project follows a **spike-driven development** approach: example games are built first to validate gameplay mechanics and engine APIs, then reusable components are extracted and refined into the shared engine modules. The project is organized as a **flat monorepo** with a single `package.json` at the root.
 
@@ -17,7 +17,7 @@ This project follows a **spike-driven development** approach: example games are 
 ## Directory Structure
 
 ```
-cardGameSpikes/
+tableau-card-engine/
 ├── src/
 │   ├── core-engine/       # Game loop, state management, rendering helpers
 │   │   └── index.ts       # Barrel file / public API

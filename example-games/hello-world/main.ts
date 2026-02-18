@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { HelloWorldScene } from './scenes/HelloWorldScene';
 
 /**
- * Hello World - Card Game Engine
+ * Hello World - Tableau Card Engine (TCE)
  *
  * A minimal Phaser 3.x game demonstrating the toolchain works:
  * Vite dev server, TypeScript compilation, Phaser initialization,

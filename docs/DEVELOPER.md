@@ -1,6 +1,6 @@
 # Developer Guide
 
-This document covers everything you need to develop, test, and build the Card Game Engine project. For a high-level overview, see the [README](../README.md).
+This document covers everything you need to develop, test, and build the Tableau Card Engine (TCE) project. For a high-level overview, see the [README](../README.md).
 
 ## Table of Contents
 
