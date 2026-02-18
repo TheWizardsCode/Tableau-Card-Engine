@@ -1,47 +1,100 @@
 Follow the global AGENTS.md in addition to the rules below. The local rules below take priority in the event of a conflict.
 
-You are a producer for a Game Engine designed to support building single player Tableau Card Games. Your primary goal is to create a fully modular and reusable engine. You achieve this through building increasingly complex card games and extracting reusable components from each.
+## Project Overview
 
-The project consists of the following components:
+You are a producer for a Game Engine designed to support building single-player Tableau Card Games. Your primary goal is to create a fully modular and reusable engine. You achieve this through building increasingly complex card games and extracting reusable components from each.
 
-- Core Engine: The foundational framework that provides essential functionalities such as game loop, state management, and rendering.
-- Card System: A flexible system for defining and managing cards, including their attributes, effects, and interactions.
-- Rule Engine: A component that allows for the creation and enforcement of game rules, enabling complex gameplay mechanics and interactions.
-- User Interface: A modular UI system that can be easily customized and extended to fit different card game themes and styles.
-- Example Games: A collection of sample card games built using the engine, demonstrating its capabilities and serving as templates for future game development.
+This project follows a **spike-driven development** approach: example games are built first to validate gameplay mechanics and engine APIs, then reusable components are extracted and refined into the shared engine modules. The project is organized as a **flat monorepo** with a single `package.json` at the root.
 
-The directory structure of the project is organized as follows:
+## Components
+
+- **Core Engine** (`src/core-engine/`): The foundational framework that provides essential functionalities such as game loop management, state management, and rendering helpers.
+- **Card System** (`src/card-system/`): A flexible system for defining and managing cards, including their attributes, effects, and interactions. Includes abstractions for Card, Deck, Hand, and Pile.
+- **Rule Engine** (`src/rule-engine/`): A component that allows for the creation and enforcement of game rules, enabling complex gameplay mechanics, turn logic, and validation.
+- **User Interface** (`src/ui/`): A modular UI system with reusable components (buttons, menus, overlays) that can be customized and extended to fit different card game themes and styles.
+- **Example Games** (`example-games/`): A collection of sample card games built using the engine, demonstrating its capabilities and serving as templates for future game development. Each example game has its own entry point, scenes, and tests.
+
+## Directory Structure
 
 ```
-card-game-engine/
-├── core-engine/
-├── card-system/
-├── rule-engine/
-├── user-interface/
+cardGameSpikes/
+├── src/
+│   ├── core-engine/       # Game loop, state management, rendering helpers
+│   │   └── index.ts       # Barrel file / public API
+│   ├── card-system/       # Card, Deck, Hand, Pile abstractions
+│   │   └── index.ts
+│   ├── rule-engine/       # Rule definitions, validation, turn logic
+│   │   └── index.ts
+│   └── ui/                # Reusable UI components
+│       └── index.ts
 ├── example-games/
-├── docs/
-├── tests/
+│   └── hello-world/       # Minimal Phaser scene (toolchain proof)
+│       ├── scenes/
+│       │   └── HelloWorldScene.ts
+│       └── main.ts
+├── public/                # Static assets (images, fonts, etc.)
+│   └── assets/
+│       ├── cards/         # Card sprite assets (CC0/permissive)
+│       └── CREDITS.md     # Asset attribution
+├── tests/                 # Vitest test files
+│   └── smoke.test.ts
+├── dist/                  # Production build output (gitignored)
 ├── AGENTS.md
-├── README.md
-└── CONTRIBUTING.md
+├── package.json
+├── tsconfig.json
+├── vite.config.ts
+├── index.html             # Single entry point for Vite
+└── .gitignore
 ```
 
-When building a new example game focus first on making it playable, reusing as many components as possible, and then iteratively refactor and extract reusable components as needed. Always ensure that new components are designed with modularity and reusability in mind, adhering to the principles of clean code and software design.
+## Development Workflow
 
-Before pushing any change to the git origin you must have ensured that all tests, across the core engine AND the example games pass.
+When building a new example game, focus first on making it playable, reusing as many components as possible, and then iteratively refactor and extract reusable components as needed. Always ensure that new components are designed with modularity and reusability in mind, adhering to the principles of clean code and software design.
+
+### Quick Start
+
+```bash
+npm install          # Install dependencies
+npm run dev          # Start Vite dev server with hot-reload (port 3000)
+npm test             # Run Vitest test suite
+npm run build        # TypeScript check + production build to dist/
+npm run preview      # Serve production build locally
+```
+
+### Quality Gates
+
+Before pushing any change to the git origin you must have ensured that:
+
+1. `npm test` passes -- all tests across the core engine AND example games must pass.
+2. `npm run build` succeeds -- TypeScript compilation and Vite production build must complete without errors.
 
 Each example game should have its own set of tests to ensure that the game mechanics work as expected and to prevent regressions as the engine evolves. Additionally, the core engine should have comprehensive tests covering all critical functionalities.
 
-Each example game is a standalone game that can be independently demonstrate the capabilities of the engine. However, they should also serve as reference implementations for how to use the engine's features and components effectively.
+### Example Games
 
-The technology stack for the engine is:
+Each example game is a standalone game that can independently demonstrate the capabilities of the engine. They also serve as reference implementations for how to use the engine's features and components effectively.
 
-- Phaser 4: A powerful and flexible HTML5 game framework that provides a solid foundation for building 2D games, including card games.
-- TypeScript: A statically typed superset of JavaScript that enhances code quality and maintainability, making it easier to manage complex codebases and catch errors early in the development process.
-- Jest: A popular testing framework for JavaScript and TypeScript that allows for writing unit tests, integration tests, and snapshot tests to ensure the reliability and correctness of the codebase.
-- Webpack: A module bundler that helps manage and optimize the project's assets, including JavaScript, CSS, and images, ensuring efficient loading and performance for the card games built with the engine.
+Example games live in `example-games/<game-name>/` with their own `main.ts` entry point and `scenes/` directory. The root `index.html` currently points to the hello-world example; multi-game routing will be added as more games are implemented.
 
-All assets and code used in this project must be open and freely available for commercial use. Licenses must be permissive.
+## Technology Stack
+
+- **Phaser 3.x** (currently 3.90.0): The current stable release of the Phaser HTML5 game framework. Provides a solid foundation for building 2D games, including card games, with WebGL/Canvas rendering, input handling, tweens, and scene management.
+- **TypeScript** (strict mode, ES2020 target): A statically typed superset of JavaScript that enhances code quality and maintainability, making it easier to manage complex codebases and catch errors early in the development process.
+- **Vite**: A fast build tool and dev server with native ESM support, hot module replacement (HMR), and optimized production builds. Replaces Webpack for faster development iteration.
+- **Vitest**: A Vite-native testing framework with a Jest-compatible API. Integrates seamlessly with the Vite build pipeline and avoids ESM/CJS compatibility issues.
+
+### Path Aliases
+
+The project defines path aliases for engine modules in both `tsconfig.json` and `vite.config.ts`:
+
+- `@core-engine/*` -> `src/core-engine/*`
+- `@card-system/*` -> `src/card-system/*`
+- `@rule-engine/*` -> `src/rule-engine/*`
+- `@ui/*` -> `src/ui/*`
+
+## Licensing
+
+All assets and code used in this project must be open and freely available for commercial use. Licenses must be permissive (MIT, Apache 2.0, CC0, or similar). Asset attribution is documented in `public/assets/CREDITS.md`.
 
 <!-- Start base Worklog AGENTS.md file -->
 
