@@ -19,6 +19,8 @@ import { scoreGrid, scoreVisibleCards } from '../GolfScoring';
 import { AiPlayer, GreedyStrategy, RandomStrategy } from '../AiStrategy';
 import type { AiStrategy } from '../AiStrategy';
 import { TranscriptRecorder } from '../GameTranscript';
+import type { GameTranscript } from '../GameTranscript';
+import { TranscriptStore } from '../../../src/core-engine/TranscriptStore';
 import { HelpPanel, HelpButton } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
 import helpContent from '../help-content.json';
@@ -58,6 +60,9 @@ type TurnPhase =
   | 'round-ended'; // game over
 
 // ── Scene ───────────────────────────────────────────────────
+
+/** Shared TranscriptStore instance for the Golf game. */
+const transcriptStore = new TranscriptStore();
 
 export class GolfScene extends Phaser.Scene {
   // Game state
@@ -674,6 +679,29 @@ export class GolfScene extends Phaser.Scene {
     this.helpButton?.destroy();
   }
 
+  // ── Transcript persistence ──────────────────────────────
+
+  /**
+   * Auto-save a finalized transcript to browser storage.
+   * Fires and forgets -- errors are logged but do not disrupt gameplay.
+   */
+  private autoSaveTranscript(transcript: GameTranscript): void {
+    transcriptStore.save('golf', transcript).then(
+      (stored) => {
+        if (stored) {
+          console.info(
+            `[GolfScene] Transcript saved (${stored.id}) via ${stored.gameType}`,
+          );
+        } else {
+          console.warn('[GolfScene] Transcript not saved -- no storage backend available');
+        }
+      },
+      (err) => {
+        console.error('[GolfScene] Failed to auto-save transcript:', err);
+      },
+    );
+  }
+
   // ── End screen ──────────────────────────────────────────
 
   private showEndScreen(): void {
@@ -690,6 +718,9 @@ export class GolfScene extends Phaser.Scene {
 
     const transcript = this.recorder.finalize();
     const results = transcript.results!;
+
+    // Auto-save transcript to browser storage
+    this.autoSaveTranscript(transcript);
 
     // Overlay
     // Full-screen input blocker to prevent clicks reaching objects behind

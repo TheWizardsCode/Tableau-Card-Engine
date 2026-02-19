@@ -25,3 +25,7 @@ export {
 // Undo/Redo system
 export type { Command } from './UndoRedoManager';
 export { CompoundCommand, UndoRedoManager } from './UndoRedoManager';
+
+// Transcript persistence
+export type { StoredTranscript, TranscriptStoreOptions } from './TranscriptStore';
+export { TranscriptStore } from './TranscriptStore';
