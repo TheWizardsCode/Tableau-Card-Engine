@@ -21,6 +21,8 @@ import type { AiStrategy } from '../AiStrategy';
 import { TranscriptRecorder } from '../GameTranscript';
 import type { GameTranscript } from '../GameTranscript';
 import { TranscriptStore } from '../../../src/core-engine/TranscriptStore';
+import { GameEventEmitter } from '../../../src/core-engine/GameEventEmitter';
+import { PhaserEventBridge } from '../../../src/core-engine/PhaserEventBridge';
 import { HelpPanel, HelpButton } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
 import helpContent from '../help-content.json';
@@ -73,6 +75,10 @@ export class GolfScene extends Phaser.Scene {
   private drawnCard: Card | null = null;
   private drawSource: DrawSource | null = null;
   private aiStrategyName: string = 'greedy';
+
+  // Event system
+  private gameEvents!: GameEventEmitter;
+  private eventBridge!: PhaserEventBridge;
 
   // Display objects -- grids
   private humanCardSprites: Phaser.GameObjects.Image[] = [];
@@ -141,6 +147,12 @@ export class GolfScene extends Phaser.Scene {
     const strategy: AiStrategy =
       this.aiStrategyName === 'random' ? RandomStrategy : GreedyStrategy;
 
+    // Event system: create emitter and bridge to Phaser scene events
+    this.gameEvents = new GameEventEmitter();
+    this.eventBridge = new PhaserEventBridge(this.gameEvents, this.events);
+    (window as unknown as Record<string, unknown>).__GAME_EVENTS__ =
+      this.gameEvents;
+
     // Setup game
     this.session = setupGolfGame({
       playerNames: ['You', 'AI'],
@@ -162,6 +174,7 @@ export class GolfScene extends Phaser.Scene {
 
     // Initial render
     this.refreshAll();
+    this.emitTurnStarted();
     this.setPhase('waiting-for-draw');
   }
 
@@ -511,16 +524,21 @@ export class GolfScene extends Phaser.Scene {
 
     const result = executeTurn(this.session, action);
     this.recorder.recordTurn(result, action.drawSource);
+    this.emitTurnCompleted(result);
 
     // Animate, then proceed
     this.animateTurn(result, () => {
       this.refreshAll();
+      this.emitAnimationComplete();
       this.drawnCard = null;
       this.drawSource = null;
 
       if (result.roundEnded) {
+        this.emitStateSettled();
         this.setPhase('round-ended');
       } else {
+        this.emitStateSettled();
+        this.emitTurnStarted();
         this.checkNextTurn();
       }
     });
@@ -553,13 +571,18 @@ export class GolfScene extends Phaser.Scene {
         this.setPhase('animating');
         const result = executeTurn(this.session, action);
         this.recorder.recordTurn(result, action.drawSource);
+        this.emitTurnCompleted(result);
 
         this.animateTurn(result, () => {
           this.refreshAll();
+          this.emitAnimationComplete();
 
           if (result.roundEnded) {
+            this.emitStateSettled();
             this.setPhase('round-ended');
           } else {
+            this.emitStateSettled();
+            this.emitTurnStarted();
             this.checkNextTurn();
           }
         });
@@ -673,8 +696,61 @@ export class GolfScene extends Phaser.Scene {
     this.helpButton = new HelpButton(this, this.helpPanel);
   }
 
-  /** Clean up help panel resources when the scene shuts down. */
+  // ── Engine event emission ─────────────────────────────────
+
+  /** Emit turn-started for the current player. */
+  private emitTurnStarted(): void {
+    const idx = this.session.gameState.currentPlayerIndex;
+    const player = this.session.gameState.players[idx];
+    this.gameEvents.emit('turn-started', {
+      turnNumber: this.session.gameState.turnNumber,
+      playerIndex: idx,
+      playerName: player.name,
+      isAI: player.isAI,
+    });
+  }
+
+  /** Emit turn-completed after a move is resolved and recorded. */
+  private emitTurnCompleted(result: TurnResult): void {
+    this.gameEvents.emit('turn-completed', {
+      turnNumber: this.session.gameState.turnNumber,
+      playerIndex: result.playerIndex,
+      playerName: this.session.gameState.players[result.playerIndex].name,
+      phase: this.session.gameState.phase,
+    });
+  }
+
+  /** Emit animation-complete after all tweens for the turn finish. */
+  private emitAnimationComplete(): void {
+    this.gameEvents.emit('animation-complete', {
+      turnNumber: this.session.gameState.turnNumber,
+    });
+  }
+
+  /**
+   * Emit state-settled when the board is visually stable and safe
+   * to screenshot. Called after animations complete and display is refreshed.
+   */
+  private emitStateSettled(): void {
+    this.gameEvents.emit('state-settled', {
+      turnNumber: this.session.gameState.turnNumber,
+      phase: this.session.gameState.phase,
+    });
+  }
+
+  /** Emit game-ended with final results. */
+  private emitGameEnded(winnerIndex: number, reason?: string): void {
+    this.gameEvents.emit('game-ended', {
+      finalTurnNumber: this.session.gameState.turnNumber,
+      winnerIndex,
+      reason,
+    });
+  }
+
+  /** Clean up resources when the scene shuts down. */
   shutdown(): void {
+    this.eventBridge?.destroy();
+    this.gameEvents?.removeAllListeners();
     this.helpPanel?.destroy();
     this.helpButton?.destroy();
   }
@@ -721,6 +797,14 @@ export class GolfScene extends Phaser.Scene {
 
     // Auto-save transcript to browser storage
     this.autoSaveTranscript(transcript);
+
+    // Emit game-ended event
+    const winnerIdx = results.winnerIndex;
+    const winnerName = this.session.gameState.players[winnerIdx].name;
+    this.emitGameEnded(
+      winnerIdx,
+      `${winnerName} wins (${results.scores[winnerIdx]} pts)`,
+    );
 
     // Overlay
     // Full-screen input blocker to prevent clicks reaching objects behind
