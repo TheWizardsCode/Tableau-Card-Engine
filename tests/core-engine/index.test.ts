@@ -10,6 +10,8 @@ import {
   transitionTo,
   startGame,
   endGame,
+  UndoRedoManager,
+  CompoundCommand,
 } from '../../src/core-engine/index';
 
 describe('core-engine barrel exports', () => {
@@ -30,6 +32,11 @@ describe('core-engine barrel exports', () => {
     expect(typeof transitionTo).toBe('function');
     expect(typeof startGame).toBe('function');
     expect(typeof endGame).toBe('function');
+  });
+
+  it('should export UndoRedoManager and CompoundCommand', () => {
+    expect(typeof UndoRedoManager).toBe('function');
+    expect(typeof CompoundCommand).toBe('function');
   });
 
   it('should work end-to-end through barrel exports', () => {
