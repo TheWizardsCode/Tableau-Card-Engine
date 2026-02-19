@@ -155,6 +155,20 @@ export class GolfScene extends Phaser.Scene {
   // ── UI creation ─────────────────────────────────────────
 
   private createLabels(): void {
+    // Menu button (top-left) -- returns to game selector
+    const menuBtn = this.add
+      .text(30, 14, '[ Menu ]', {
+        fontSize: '12px',
+        color: '#aaccaa',
+        fontFamily: FONT_FAMILY,
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+
+    menuBtn.on('pointerdown', () => this.scene.start('GameSelectorScene'));
+    menuBtn.on('pointerover', () => menuBtn.setColor('#88ff88'));
+    menuBtn.on('pointerout', () => menuBtn.setColor('#aaccaa'));
+
     this.add
       .text(GAME_W / 2, 14, '9-Card Golf', {
         fontSize: '18px',
@@ -695,7 +709,7 @@ export class GolfScene extends Phaser.Scene {
 
     // Play again button
     const btn = this.add
-      .text(GAME_W / 2, GAME_H / 2 + 55, '[ Play Again ]', {
+      .text(GAME_W / 2 - 55, GAME_H / 2 + 55, '[ Play Again ]', {
         fontSize: '14px',
         color: '#88ff88',
         fontFamily: FONT_FAMILY,
@@ -710,5 +724,20 @@ export class GolfScene extends Phaser.Scene {
 
     btn.on('pointerover', () => btn.setColor('#aaffaa'));
     btn.on('pointerout', () => btn.setColor('#88ff88'));
+
+    // Menu button
+    const menuBtn = this.add
+      .text(GAME_W / 2 + 55, GAME_H / 2 + 55, '[ Menu ]', {
+        fontSize: '14px',
+        color: '#88ff88',
+        fontFamily: FONT_FAMILY,
+      })
+      .setOrigin(0.5)
+      .setDepth(11)
+      .setInteractive({ useHandCursor: true });
+
+    menuBtn.on('pointerdown', () => this.scene.start('GameSelectorScene'));
+    menuBtn.on('pointerover', () => menuBtn.setColor('#aaffaa'));
+    menuBtn.on('pointerout', () => menuBtn.setColor('#88ff88'));
   }
 }

@@ -310,6 +310,20 @@ export class BeleagueredCastleScene extends Phaser.Scene {
   // ── UI creation ─────────────────────────────────────────
 
   private createTitle(): void {
+    // Menu button (top-left) -- returns to game selector
+    const menuBtn = this.add
+      .text(30, TITLE_Y, '[ Menu ]', {
+        fontSize: '12px',
+        color: '#aaccaa',
+        fontFamily: FONT_FAMILY,
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+
+    menuBtn.on('pointerdown', () => this.scene.start('GameSelectorScene'));
+    menuBtn.on('pointerover', () => menuBtn.setColor('#88ff88'));
+    menuBtn.on('pointerout', () => menuBtn.setColor('#aaccaa'));
+
     this.add
       .text(GAME_W / 2, TITLE_Y, 'Beleaguered Castle', {
         fontSize: '18px',
@@ -1086,7 +1100,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
 
     // New Game button
     const newGameBtn = this.createOverlayButton(
-      GAME_W / 2 - 70, GAME_H / 2 + 35,
+      GAME_W / 2 - 110, GAME_H / 2 + 35,
       '[ New Game ]',
     );
     newGameBtn.on('pointerdown', () => {
@@ -1097,13 +1111,21 @@ export class BeleagueredCastleScene extends Phaser.Scene {
 
     // Restart button
     const restartBtn = this.createOverlayButton(
-      GAME_W / 2 + 70, GAME_H / 2 + 35,
+      GAME_W / 2, GAME_H / 2 + 35,
       '[ Restart ]',
     );
     restartBtn.on('pointerdown', () => {
       this.scene.restart();
     });
     container.add(restartBtn);
+
+    // Menu button
+    const menuBtn = this.createOverlayButton(
+      GAME_W / 2 + 110, GAME_H / 2 + 35,
+      '[ Menu ]',
+    );
+    menuBtn.on('pointerdown', () => this.scene.start('GameSelectorScene'));
+    container.add(menuBtn);
 
     this.overlayContainer = container;
   }
@@ -1136,7 +1158,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
 
     // Undo Last button (dismiss overlay, undo, resume play)
     const undoBtn = this.createOverlayButton(
-      GAME_W / 2 - 100, GAME_H / 2 + 20,
+      GAME_W / 2 - 130, GAME_H / 2 + 20,
       '[ Undo Last ]',
     );
     undoBtn.on('pointerdown', () => {
@@ -1150,25 +1172,33 @@ export class BeleagueredCastleScene extends Phaser.Scene {
     container.add(undoBtn);
 
     // New Game button
-    const newGameBtn = this.createOverlayButton(
-      GAME_W / 2 + 10, GAME_H / 2 + 20,
+    const noMovesNewGameBtn = this.createOverlayButton(
+      GAME_W / 2 - 15, GAME_H / 2 + 20,
       '[ New Game ]',
     );
-    newGameBtn.on('pointerdown', () => {
+    noMovesNewGameBtn.on('pointerdown', () => {
       this.seed = Date.now();
       this.scene.restart();
     });
-    container.add(newGameBtn);
+    container.add(noMovesNewGameBtn);
 
     // Restart button
-    const restartBtn = this.createOverlayButton(
-      GAME_W / 2 + 110, GAME_H / 2 + 20,
+    const noMovesRestartBtn = this.createOverlayButton(
+      GAME_W / 2 + 85, GAME_H / 2 + 20,
       '[ Restart ]',
     );
-    restartBtn.on('pointerdown', () => {
+    noMovesRestartBtn.on('pointerdown', () => {
       this.scene.restart();
     });
-    container.add(restartBtn);
+    container.add(noMovesRestartBtn);
+
+    // Menu button
+    const noMovesMenuBtn = this.createOverlayButton(
+      GAME_W / 2 + 170, GAME_H / 2 + 20,
+      '[ Menu ]',
+    );
+    noMovesMenuBtn.on('pointerdown', () => this.scene.start('GameSelectorScene'));
+    container.add(noMovesMenuBtn);
 
     this.overlayContainer = container;
   }
