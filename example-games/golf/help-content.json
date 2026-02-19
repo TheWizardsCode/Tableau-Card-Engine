@@ -1,0 +1,30 @@
+[
+  {
+    "heading": "9-Card Golf",
+    "body": "A two-player card game where the goal is to score the fewest points. Each player has a 3x3 grid of cards. Take turns drawing and swapping cards to lower your score before the round ends."
+  },
+  {
+    "heading": "Setup",
+    "body": "Each player receives 9 cards arranged in a 3x3 grid, all face-down. Before the first turn, each player flips 3 of their cards face-up. The remaining cards form the stock pile, and one card is turned face-up to start the discard pile."
+  },
+  {
+    "heading": "Turn Flow",
+    "body": "On your turn:\n\n1. Draw a card from either the stock pile (face-down) or the discard pile (face-up).\n\n2. Then choose one of two actions:\n   a) Swap the drawn card with any card in your grid. The replaced card goes to the discard pile.\n   b) Discard the drawn card and flip one of your face-down cards face-up."
+  },
+  {
+    "heading": "Round End",
+    "body": "When any player's grid is fully face-up (all 9 cards revealed), every other player gets one final turn. After those final turns, the round ends and all remaining face-down cards are revealed for scoring."
+  },
+  {
+    "heading": "Scoring",
+    "body": "Lower scores are better.\n\nCard values:\n  A = 1 point\n  2 = -2 points (subtract!)\n  3 through 10 = face value\n  J, Q = 10 points\n  K = 0 points\n\nColumn bonus: If all three cards in a column have the same rank, that entire column scores 0 points regardless of the individual card values. Use this to your advantage!"
+  },
+  {
+    "heading": "Tips",
+    "body": "- Kings are free (0 points) -- keep them.\n- Twos subtract 2 points -- very valuable.\n- Try to match three of the same rank in a column for a 0-point column bonus.\n- Drawing from the discard pile lets you see the card first -- less risky.\n- Pay attention to what the AI discards for clues about its strategy."
+  },
+  {
+    "heading": "Controls",
+    "body": "Click the stock pile or discard pile to draw a card. Then click a card in your grid to swap, or click the discard pile to discard and choose a face-down card to flip.\n\nPress ? to toggle this help panel."
+  }
+]

@@ -19,6 +19,9 @@ import { scoreGrid, scoreVisibleCards } from '../GolfScoring';
 import { AiPlayer, GreedyStrategy, RandomStrategy } from '../AiStrategy';
 import type { AiStrategy } from '../AiStrategy';
 import { TranscriptRecorder } from '../GameTranscript';
+import { HelpPanel, HelpButton } from '../../../src/ui';
+import type { HelpSection } from '../../../src/ui';
+import helpContent from '../help-content.json';
 
 // ── Constants ───────────────────────────────────────────────
 
@@ -82,6 +85,10 @@ export class GolfScene extends Phaser.Scene {
   private humanLabel!: Phaser.GameObjects.Text;
   private aiLabel!: Phaser.GameObjects.Text;
 
+  // Help panel
+  private helpPanel!: HelpPanel;
+  private helpButton!: HelpButton;
+
   constructor() {
     super({ key: 'GolfScene' });
   }
@@ -137,6 +144,7 @@ export class GolfScene extends Phaser.Scene {
     this.createGrids();
     this.createScoreDisplay();
     this.createInstructions();
+    this.createHelpPanel();
 
     // Initial render
     this.refreshAll();
@@ -611,6 +619,21 @@ export class GolfScene extends Phaser.Scene {
       this.drawnCardSprite.destroy();
       this.drawnCardSprite = null;
     }
+  }
+
+  // ── Help panel ─────────────────────────────────────────────
+
+  private createHelpPanel(): void {
+    this.helpPanel = new HelpPanel(this, {
+      sections: helpContent as HelpSection[],
+    });
+    this.helpButton = new HelpButton(this, this.helpPanel);
+  }
+
+  /** Clean up help panel resources when the scene shuts down. */
+  shutdown(): void {
+    this.helpPanel?.destroy();
+    this.helpButton?.destroy();
   }
 
   // ── End screen ──────────────────────────────────────────
