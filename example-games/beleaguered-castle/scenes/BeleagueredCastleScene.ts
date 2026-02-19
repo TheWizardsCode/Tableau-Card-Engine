@@ -22,9 +22,10 @@ import {
   isLegalFoundationMove,
   isLegalTableauMove,
   getLegalMoves,
+  findSafeAutoMoves,
 } from '../BeleagueredCastleRules';
 import type { Command } from '../../../src/core-engine/UndoRedoManager';
-import { UndoRedoManager } from '../../../src/core-engine/UndoRedoManager';
+import { UndoRedoManager, CompoundCommand } from '../../../src/core-engine/UndoRedoManager';
 
 // ── Constants ───────────────────────────────────────────────
 
@@ -100,6 +101,38 @@ class MoveCommand implements Command {
 
   undo(): void {
     undoMove(this.state, this.move);
+  }
+}
+
+/**
+ * A reversible command for auto-moves to foundations.
+ * Unlike MoveCommand, this does NOT count toward the player's move counter.
+ * It calls applyMove (which increments moveCount) then decrements it back,
+ * and does the reverse on undo.
+ */
+class AutoMoveCommand implements Command {
+  readonly description: string;
+
+  constructor(
+    private readonly state: BeleagueredCastleState,
+    private readonly move: BCMove,
+  ) {
+    this.description =
+      move.kind === 'tableau-to-foundation'
+        ? `Auto-move column ${move.fromCol} -> foundation ${move.toFoundation}`
+        : `Auto-move column ${move.fromCol} -> column ${move.toCol}`;
+  }
+
+  execute(): void {
+    applyMove(this.state, this.move);
+    // Compensate: auto-moves don't count as player moves
+    this.state.moveCount--;
+  }
+
+  undo(): void {
+    undoMove(this.state, this.move);
+    // Compensate: undoMove decrements, but we didn't increment, so restore
+    this.state.moveCount++;
   }
 }
 
@@ -475,9 +508,40 @@ export class BeleagueredCastleScene extends Phaser.Scene {
     }
 
     if (move) {
-      // Execute the move via undo manager
-      const cmd = new MoveCommand(this.gameState, move);
-      this.undoManager.execute(cmd);
+      // Build the player move command
+      const playerCmd = new MoveCommand(this.gameState, move);
+
+      // Tentatively apply the player move to discover auto-moves
+      applyMove(this.gameState, move);
+
+      // Collect all safe auto-moves by looping until none remain
+      const autoMoves: BCMove[] = [];
+      let safe = findSafeAutoMoves(this.gameState);
+      while (safe.length > 0) {
+        for (const am of safe) {
+          applyMove(this.gameState, am);
+          autoMoves.push(am);
+        }
+        safe = findSafeAutoMoves(this.gameState);
+      }
+
+      // Undo everything in reverse to restore original state
+      for (let i = autoMoves.length - 1; i >= 0; i--) {
+        undoMove(this.gameState, autoMoves[i]);
+      }
+      undoMove(this.gameState, move);
+
+      // Build the command (compound if auto-moves exist, simple if not)
+      if (autoMoves.length > 0) {
+        const allCmds: Command[] = [playerCmd];
+        for (const am of autoMoves) {
+          allCmds.push(new AutoMoveCommand(this.gameState, am));
+        }
+        const compound = new CompoundCommand(allCmds, playerCmd.description);
+        this.undoManager.execute(compound);
+      } else {
+        this.undoManager.execute(playerCmd);
+      }
 
       // Start timer on first move
       if (!this.timerStarted) {
@@ -485,7 +549,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
         this.startTimer();
       }
 
-      // Refresh everything
+      // Refresh everything (instant for now; auto-move animation is handled by refreshAll)
       this.refreshAll();
     } else {
       // Invalid drop: snap back
