@@ -48,7 +48,7 @@ export interface GameState<T> {
  * Options for creating a new GameState.
  */
 export interface GameStateOptions<T> {
-  /** Player info (must have at least 2 entries). */
+  /** Player info (must have at least 1 entry). */
   players: PlayerInfo[];
   /** Initial per-player state factory. Called once per player. */
   createPlayerState: (playerIndex: number) => T;
@@ -61,7 +61,7 @@ export interface GameStateOptions<T> {
 /**
  * Create a new GameState from options.
  *
- * @throws If fewer than 2 players are provided.
+ * @throws If fewer than 1 player is provided.
  * @throws If `firstPlayerIndex` is out of bounds.
  */
 export function createGameState<T>(options: GameStateOptions<T>): GameState<T> {
@@ -72,9 +72,9 @@ export function createGameState<T>(options: GameStateOptions<T>): GameState<T> {
     firstPlayerIndex = 0,
   } = options;
 
-  if (players.length < 2) {
+  if (players.length < 1) {
     throw new Error(
-      `A game requires at least 2 players, got ${players.length}`,
+      `A game requires at least 1 player, got ${players.length}`,
     );
   }
 

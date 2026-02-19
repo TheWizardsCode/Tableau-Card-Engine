@@ -272,4 +272,79 @@ describe('TurnSequencer', () => {
       expect(() => advanceTurn(state)).toThrow();
     });
   });
+
+  describe('single-player support', () => {
+    /** Helper: single-player game in playing phase. */
+    function singlePlayerGame(): GameState<number> {
+      return createGameState<number>({
+        players: [{ name: 'Solo', isAI: false }],
+        createPlayerState: () => 0,
+        initialPhase: 'playing',
+      });
+    }
+
+    it('should keep currentPlayerIndex at 0 after advanceTurn', () => {
+      const state = singlePlayerGame();
+      advanceTurn(state);
+      expect(state.currentPlayerIndex).toBe(0);
+    });
+
+    it('should increment turn counter for single player', () => {
+      const state = singlePlayerGame();
+      expect(state.turnNumber).toBe(0);
+
+      advanceTurn(state);
+      expect(state.turnNumber).toBe(1);
+
+      advanceTurn(state);
+      expect(state.turnNumber).toBe(2);
+
+      advanceTurn(state);
+      expect(state.turnNumber).toBe(3);
+    });
+
+    it('should return the solo player from getCurrentPlayer', () => {
+      const state = singlePlayerGame();
+      expect(getCurrentPlayer(state).name).toBe('Solo');
+
+      advanceTurn(state);
+      expect(getCurrentPlayer(state).name).toBe('Solo');
+    });
+
+    it('should return the solo player state from getCurrentPlayerState', () => {
+      const state = createGameState<string>({
+        players: [{ name: 'Solo', isAI: false }],
+        createPlayerState: () => 'solo-state',
+        initialPhase: 'playing',
+      });
+
+      expect(getCurrentPlayerState(state)).toBe('solo-state');
+
+      advanceTurn(state);
+      expect(getCurrentPlayerState(state)).toBe('solo-state');
+    });
+
+    it('should support full single-player game lifecycle', () => {
+      const state = createGameState<number>({
+        players: [{ name: 'Solo', isAI: false }],
+        createPlayerState: () => 0,
+      });
+
+      // Setup -> Playing
+      startGame(state);
+      expect(isPlaying(state)).toBe(true);
+
+      // Several turns
+      advanceTurn(state);
+      advanceTurn(state);
+      advanceTurn(state);
+      expect(state.currentPlayerIndex).toBe(0);
+      expect(state.turnNumber).toBe(3);
+
+      // End game
+      endGame(state);
+      expect(isGameOver(state)).toBe(true);
+      expect(() => advanceTurn(state)).toThrow('game has ended');
+    });
+  });
 });
