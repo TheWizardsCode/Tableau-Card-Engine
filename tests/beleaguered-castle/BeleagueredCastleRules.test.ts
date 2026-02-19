@@ -16,6 +16,8 @@ import {
   createSeededRng,
   findSafeAutoMoves,
   foundationTopRank,
+  isTriviallyWinnable,
+  getAutoCompleteMoves,
 } from '../../example-games/beleaguered-castle/BeleagueredCastleRules';
 import {
   FOUNDATION_COUNT,
@@ -936,5 +938,297 @@ describe('findSafeAutoMoves', () => {
     // 0 >= 2-1=1? No => not safe
     const moves2 = findSafeAutoMoves(state);
     expect(moves2.length).toBe(0);
+  });
+});
+
+// ── Auto-complete detection ─────────────────────────────────
+
+describe('isTriviallyWinnable', () => {
+  it('should return true when all tableau columns are empty', () => {
+    const state = testState(
+      [[card('A', 'clubs')], [card('A', 'diamonds')], [card('A', 'hearts')], [card('A', 'spades')]],
+      [[], [], [], [], [], [], [], []],
+    );
+    expect(isTriviallyWinnable(state)).toBe(true);
+  });
+
+  it('should return true when each column has cards in strictly descending rank order', () => {
+    // Foundations at A (rank 0). Column 0 has K, Q (bottom-to-top: K then Q).
+    // K=12, Q=11 => strictly descending. Both ranks > 0 (foundation top).
+    // Column 1 has 5, 4, 3, 2 => strictly descending. All > 0.
+    const state = testState(
+      [[card('A', 'clubs')], [card('A', 'diamonds')], [card('A', 'hearts')], [card('A', 'spades')]],
+      [
+        [card('K', 'clubs'), card('Q', 'clubs')],
+        [card('5', 'diamonds'), card('4', 'diamonds'), card('3', 'diamonds'), card('2', 'diamonds')],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+      ],
+    );
+    expect(isTriviallyWinnable(state)).toBe(true);
+  });
+
+  it('should return false when a column has cards NOT in descending order', () => {
+    // Column 0 has Q, K (bottom-to-top: Q=11, K=12) => ascending, not descending
+    const state = testState(
+      [[card('A', 'clubs')], [card('A', 'diamonds')], [card('A', 'hearts')], [card('A', 'spades')]],
+      [
+        [card('Q', 'clubs'), card('K', 'clubs')],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+      ],
+    );
+    expect(isTriviallyWinnable(state)).toBe(false);
+  });
+
+  it('should return false when a column has equal-ranked cards', () => {
+    // Column 0 has 5 of clubs, 5 of hearts (same rank) => not strictly descending
+    const state = testState(
+      [[card('A', 'clubs')], [card('A', 'diamonds')], [card('A', 'hearts')], [card('A', 'spades')]],
+      [
+        [card('5', 'clubs'), card('5', 'hearts')],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+      ],
+    );
+    expect(isTriviallyWinnable(state)).toBe(false);
+  });
+
+  it('should return true for single-card columns', () => {
+    const state = testState(
+      [[card('A', 'clubs')], [card('A', 'diamonds')], [card('A', 'hearts')], [card('A', 'spades')]],
+      [
+        [card('2', 'clubs')],
+        [card('3', 'diamonds')],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+      ],
+    );
+    expect(isTriviallyWinnable(state)).toBe(true);
+  });
+
+  it('should return false when a card rank is <= its foundation top rank', () => {
+    // Clubs foundation has A, 2, 3 (top rank = 2). Column has 3 of clubs (rank 2).
+    // 2 <= 2 => false (foundation already has this rank)
+    const state = testState(
+      [
+        [card('A', 'clubs'), card('2', 'clubs'), card('3', 'clubs')],
+        [card('A', 'diamonds')],
+        [card('A', 'hearts')],
+        [card('A', 'spades')],
+      ],
+      [
+        [card('3', 'clubs')],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+      ],
+    );
+    // The 3 of clubs has rankValue 2, foundation top rank is also 2 => 2 <= 2 => false
+    expect(isTriviallyWinnable(state)).toBe(false);
+  });
+
+  it('should return true with mixed suits in descending order across columns', () => {
+    // Column has clubs and hearts interleaved but all in descending rank
+    const state = testState(
+      [[card('A', 'clubs')], [card('A', 'diamonds')], [card('A', 'hearts')], [card('A', 'spades')]],
+      [
+        [card('5', 'clubs'), card('4', 'hearts'), card('3', 'clubs'), card('2', 'hearts')],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+      ],
+    );
+    expect(isTriviallyWinnable(state)).toBe(true);
+  });
+
+  it('should return true when foundations are partially built up and remaining cards are ordered', () => {
+    // Clubs foundation at 5, remaining clubs in column: 8, 7, 6 (descending, all > 4)
+    const state = testState(
+      [
+        [card('A', 'clubs'), card('2', 'clubs'), card('3', 'clubs'), card('4', 'clubs'), card('5', 'clubs')],
+        [card('A', 'diamonds')],
+        [card('A', 'hearts')],
+        [card('A', 'spades')],
+      ],
+      [
+        [card('8', 'clubs'), card('7', 'clubs'), card('6', 'clubs')],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+      ],
+    );
+    expect(isTriviallyWinnable(state)).toBe(true);
+  });
+});
+
+describe('getAutoCompleteMoves', () => {
+  it('should return empty array when game is not trivially winnable', () => {
+    const state = testState(
+      [[card('A', 'clubs')], [card('A', 'diamonds')], [card('A', 'hearts')], [card('A', 'spades')]],
+      [
+        [card('Q', 'clubs'), card('K', 'clubs')], // Not descending
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+      ],
+    );
+    expect(getAutoCompleteMoves(state)).toEqual([]);
+  });
+
+  it('should return empty array when tableau is already empty', () => {
+    const state = testState(
+      [[card('A', 'clubs')], [card('A', 'diamonds')], [card('A', 'hearts')], [card('A', 'spades')]],
+      [[], [], [], [], [], [], [], []],
+    );
+    expect(getAutoCompleteMoves(state)).toEqual([]);
+  });
+
+  it('should return the correct sequence for a single column', () => {
+    // Column 0 has 3, 2 (bottom-to-top). Foundation clubs at A.
+    // Should play 2 first, then 3.
+    const state = testState(
+      [[card('A', 'clubs')], [card('A', 'diamonds')], [card('A', 'hearts')], [card('A', 'spades')]],
+      [
+        [card('3', 'clubs'), card('2', 'clubs')],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+      ],
+    );
+    const moves = getAutoCompleteMoves(state);
+    expect(moves.length).toBe(2);
+    expect(moves[0]).toEqual({ kind: 'tableau-to-foundation', fromCol: 0, toFoundation: 0 });
+    expect(moves[1]).toEqual({ kind: 'tableau-to-foundation', fromCol: 0, toFoundation: 0 });
+  });
+
+  it('should interleave moves across columns correctly', () => {
+    // Column 0: 3 of clubs, 2 of clubs (top=2)
+    // Column 1: 3 of diamonds, 2 of diamonds (top=2)
+    // All foundations at A.
+    // Should play: 2c, 2d (in some order), then 3c, 3d (in some order)
+    const state = testState(
+      [[card('A', 'clubs')], [card('A', 'diamonds')], [card('A', 'hearts')], [card('A', 'spades')]],
+      [
+        [card('3', 'clubs'), card('2', 'clubs')],
+        [card('3', 'diamonds'), card('2', 'diamonds')],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+      ],
+    );
+    const moves = getAutoCompleteMoves(state);
+    expect(moves.length).toBe(4);
+
+    // All moves should be foundation moves
+    expect(moves.every((m) => m.kind === 'tableau-to-foundation')).toBe(true);
+
+    // Verify applying all moves in order produces a valid result
+    // (moves are in correct dependency order)
+    for (const move of moves) {
+      applyMove(state, move);
+    }
+    // Clubs and diamonds foundations should now have A, 2, 3
+    expect(state.foundations[0].size()).toBe(3); // clubs
+    expect(state.foundations[1].size()).toBe(3); // diamonds
+  });
+
+  it('should handle mixed suits in a single column', () => {
+    // Column 0: 3 of hearts, 2 of clubs (top=2c)
+    // Foundations: clubs at A, hearts at A+2=hearts at 2
+    // Wait, let me make hearts at A so 2 of clubs goes first, then 3 of hearts needs hearts at 2
+    // Actually: foundations clubs at A, hearts at A,2
+    // Column: 3 of hearts (bottom), 2 of clubs (top)
+    // Step 1: play 2 of clubs to clubs foundation
+    // Step 2: play 3 of hearts to hearts foundation (hearts is at 2)
+    const state = testState(
+      [
+        [card('A', 'clubs')],
+        [card('A', 'diamonds')],
+        [card('A', 'hearts'), card('2', 'hearts')],
+        [card('A', 'spades')],
+      ],
+      [
+        [card('3', 'hearts'), card('2', 'clubs')],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+      ],
+    );
+    const moves = getAutoCompleteMoves(state);
+    expect(moves.length).toBe(2);
+    // First move: 2 of clubs -> clubs foundation (index 0)
+    expect(moves[0]).toEqual({ kind: 'tableau-to-foundation', fromCol: 0, toFoundation: 0 });
+    // Second move: 3 of hearts -> hearts foundation (index 2)
+    expect(moves[1]).toEqual({ kind: 'tableau-to-foundation', fromCol: 0, toFoundation: 2 });
+  });
+
+  it('should not mutate the original game state', () => {
+    const state = testState(
+      [[card('A', 'clubs')], [card('A', 'diamonds')], [card('A', 'hearts')], [card('A', 'spades')]],
+      [
+        [card('3', 'clubs'), card('2', 'clubs')],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+      ],
+    );
+
+    const originalSize = state.tableau[0].size();
+    const originalFoundationSize = state.foundations[0].size();
+
+    getAutoCompleteMoves(state);
+
+    expect(state.tableau[0].size()).toBe(originalSize);
+    expect(state.foundations[0].size()).toBe(originalFoundationSize);
   });
 });

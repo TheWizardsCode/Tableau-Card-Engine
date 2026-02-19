@@ -457,3 +457,120 @@ export function findSafeAutoMoves(
 
   return safeMovs;
 }
+
+// ── Auto-complete detection ─────────────────────────────────
+
+/**
+ * Check if the game is trivially winnable from the current state.
+ *
+ * **Heuristic:** The remaining game is trivially winnable when every
+ * non-empty tableau column has its cards in descending rank order
+ * (top card has the lowest rank, bottom card has the highest rank)
+ * AND each column's top card can eventually reach its foundation
+ * given the current foundation tops.
+ *
+ * More specifically:
+ * 1. Every non-empty column must have cards in strictly descending rank
+ *    order from bottom to top (bottom = highest rank, top = lowest rank).
+ * 2. For each card in each column, its rank must be > the current top of
+ *    its foundation (i.e. it hasn't already been passed over).
+ *
+ * If both conditions are met, all cards can be played to foundations by
+ * repeatedly taking the lowest-ranked available card for each foundation.
+ */
+export function isTriviallyWinnable(state: BeleagueredCastleState): boolean {
+  // If there are no cards left in the tableau, the game is already won (or about to be)
+  const allEmpty = state.tableau.every((col) => col.isEmpty());
+  if (allEmpty) return true;
+
+  for (let col = 0; col < TABLEAU_COUNT; col++) {
+    const cards = state.tableau[col].toArray(); // bottom-to-top order
+    if (cards.length === 0) continue;
+
+    // Check that cards are in strictly descending rank order (bottom = highest)
+    for (let i = 1; i < cards.length; i++) {
+      if (rankValue(cards[i].rank) >= rankValue(cards[i - 1].rank)) {
+        // Not strictly descending: this column blocks auto-complete
+        return false;
+      }
+    }
+
+    // Check that every card in this column is above its foundation top rank
+    // (meaning the foundation hasn't already passed this card's rank)
+    for (const card of cards) {
+      const fi = foundationIndex(card.suit);
+      const fTopRank = foundationTopRank(state, fi);
+      if (rankValue(card.rank) <= fTopRank) {
+        // Foundation has already passed this rank -- impossible to place
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Compute the complete sequence of foundation moves to finish the game,
+ * assuming the game is trivially winnable.
+ *
+ * Iteratively finds the lowest-ranked card across all tableau column tops
+ * that is the next expected card on its foundation, and adds it to the
+ * move sequence. Repeats until all columns are empty.
+ *
+ * This function does NOT mutate the state -- it works on a snapshot of
+ * column arrays and foundation rank trackers.
+ *
+ * @returns An ordered array of tableau-to-foundation moves, or an empty
+ *          array if the state is not trivially winnable.
+ */
+export function getAutoCompleteMoves(
+  state: BeleagueredCastleState,
+): BCMove[] {
+  if (!isTriviallyWinnable(state)) return [];
+
+  const moves: BCMove[] = [];
+
+  // Create mutable copies of column card arrays (as stacks: last = top)
+  const columns: { rank: number; suit: Suit }[][] = [];
+  for (let col = 0; col < TABLEAU_COUNT; col++) {
+    columns.push(
+      state.tableau[col].toArray().map((c) => ({
+        rank: rankValue(c.rank),
+        suit: c.suit,
+      })),
+    );
+  }
+
+  // Track current foundation top ranks
+  const fRanks: number[] = [];
+  for (let fi = 0; fi < FOUNDATION_COUNT; fi++) {
+    fRanks.push(foundationTopRank(state, fi));
+  }
+
+  // Repeatedly find and move the next playable card
+  let moved = true;
+  while (moved) {
+    moved = false;
+    for (let col = 0; col < TABLEAU_COUNT; col++) {
+      if (columns[col].length === 0) continue;
+
+      const top = columns[col][columns[col].length - 1];
+      const fi = foundationIndex(top.suit);
+
+      if (top.rank === fRanks[fi] + 1) {
+        // This card is next on its foundation
+        moves.push({
+          kind: 'tableau-to-foundation',
+          fromCol: col,
+          toFoundation: fi,
+        });
+        columns[col].pop();
+        fRanks[fi] = top.rank;
+        moved = true;
+      }
+    }
+  }
+
+  return moves;
+}
