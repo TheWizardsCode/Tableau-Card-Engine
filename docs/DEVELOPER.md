@@ -63,16 +63,66 @@ npm run preview
 ## Testing
 
 ```bash
-npm test            # run all tests once
+npm test            # run all tests once (unit + browser)
 ```
 
-Tests use [Vitest](https://vitest.dev/) configured inline in `vite.config.ts`. Test files live under `tests/` and follow the pattern `*.test.ts`.
+Tests use [Vitest](https://vitest.dev/) configured inline in `vite.config.ts` with two test projects:
 
-**Writing tests:**
+| Project | Environment | File Pattern | Purpose |
+|---------|-------------|-------------|---------|
+| `unit` | Node.js | `tests/**/*.test.ts` | Logic, data, and integration tests |
+| `browser` | Chromium (Playwright) | `tests/**/*.browser.test.ts` | Phaser UI and rendering tests |
 
-- Place test files in `tests/` (engine-level) or alongside example game code
+Both projects run together via `npm test`. The browser project runs in headless Chromium using `@vitest/browser` with the Playwright provider.
+
+### Writing unit tests
+
+- Place test files in `tests/` following the `*.test.ts` pattern
 - Import from `vitest` directly: `import { describe, it, expect } from 'vitest'`
 - Vitest globals are enabled -- `describe`, `it`, `expect` are available without imports in test files
+
+### Writing browser tests
+
+Browser tests verify Phaser UI rendering and interactions in a real browser environment. Phaser requires WebGL/Canvas and cannot run in JSDOM or happy-dom.
+
+- Use the `*.browser.test.ts` pattern to mark tests for the browser project
+- Tests run in headless Chromium via Playwright -- no visible browser window
+- Import `createGolfGame` from the game's factory module to boot Phaser inside the test
+- Wait for the scene to become active before making assertions
+- Clean up the game instance in `afterEach` to avoid resource leaks
+- Access Phaser game objects via `game.scene.getScene('SceneKey').children.list`
+
+**Example:**
+
+```typescript
+import { describe, it, expect, afterEach } from 'vitest';
+import Phaser from 'phaser';
+import { createGolfGame } from '../../example-games/golf/createGolfGame';
+
+describe('MyScene browser tests', () => {
+  let game: Phaser.Game | null = null;
+
+  afterEach(() => {
+    if (game) game.destroy(true, false);
+    game = null;
+  });
+
+  it('should render a canvas', async () => {
+    const container = document.createElement('div');
+    container.id = 'game-container';
+    document.body.appendChild(container);
+
+    game = createGolfGame();
+    // wait for scene, then assert...
+  });
+});
+```
+
+**Browser test dependencies:**
+
+- `@vitest/browser` (matches vitest version)
+- `playwright` (provides Chromium browser)
+- Install Chromium: `npx playwright install chromium`
 
 ## Project Structure
 
@@ -97,6 +147,7 @@ example-games/
 │       └── HelloWorldScene.ts  Phaser.Scene subclass
 └── golf/
     ├── main.ts                 Game entry point (Phaser.Game config)
+    ├── createGolfGame.ts       Factory function (used by main.ts and tests)
     ├── GolfGrid.ts             3x3 grid type and utilities
     ├── GolfRules.ts            Turn legality, move application, round-end detection
     ├── GolfScoring.ts          Card point values, grid scoring, column matching
@@ -114,7 +165,7 @@ tests/
 ├── smoke.test.ts           Toolchain smoke test
 ├── card-system/            Card, Deck, Pile unit tests
 ├── core-engine/            GameState, TurnSequencer unit tests
-└── golf/                   Golf game unit + integration tests
+└── golf/                   Golf game unit + integration + browser tests
 ```
 
 Each `src/` module has a barrel file (`index.ts`) that serves as its public API. Import engine modules using path aliases (see below).
@@ -171,6 +222,7 @@ Open `http://localhost:3000` -- the Golf game loads by default. Click the stock 
 | File | Purpose |
 |------|---------|
 | `example-games/golf/main.ts` | Phaser game config entry point |
+| `example-games/golf/createGolfGame.ts` | Factory function to create a Golf game instance |
 | `example-games/golf/GolfGrid.ts` | 3x3 grid type and utilities |
 | `example-games/golf/GolfRules.ts` | Turn legality, move application, round-end detection |
 | `example-games/golf/GolfScoring.ts` | Scoring rules (card values, column matching) |
@@ -192,6 +244,7 @@ Tests are in `tests/golf/`:
 | `AiStrategy.test.ts` | RandomStrategy, GreedyStrategy, AiPlayer |
 | `GameTranscript.test.ts` | Transcript recording, snapshots, finalization |
 | `Integration.test.ts` | Full AI-vs-AI games, transcript validation, game invariants |
+| `GolfScene.browser.test.ts` | Phaser UI rendering, canvas, game objects, interactions (browser) |
 
 ## Managing Assets
 
@@ -243,8 +296,15 @@ See the Worklog section in `AGENTS.md` for full documentation.
 - Check that path aliases match between `tsconfig.json` and `vite.config.ts`
 
 **Tests fail to find modules:**
-- Ensure Vitest config in `vite.config.ts` includes the `test` block
-- Verify the test file pattern matches `tests/**/*.test.ts`
+- Ensure Vitest config in `vite.config.ts` includes the `test.projects` block
+- Verify unit test files match `tests/**/*.test.ts`
+- Verify browser test files match `tests/**/*.browser.test.ts`
+
+**Browser tests fail or time out:**
+- Ensure Playwright's Chromium is installed: `npx playwright install chromium`
+- Check that `@vitest/browser` version matches `vitest` version
+- Browser tests boot a real Phaser game and may take 8-10 seconds each
+- If tests hang, check for unresolved game instances (ensure `afterEach` destroys the game)
 
 **Large bundle warning:**
 - The Phaser library is ~1.4 MB minified -- this is expected
