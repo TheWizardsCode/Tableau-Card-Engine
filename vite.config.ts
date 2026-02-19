@@ -2,7 +2,10 @@
 import { defineConfig } from 'vite';
 import path from 'path';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  // Use the repo sub-path for production builds (GitHub Pages);
+  // keep '/' for local development so localhost:3000 works as expected.
+  base: mode === 'production' ? '/Tableau-Card-Engine/' : '/',
   resolve: {
     alias: {
       '@core-engine': path.resolve(__dirname, 'src/core-engine'),
@@ -51,4 +54,4 @@ export default defineConfig({
       },
     ],
   },
-});
+}));
