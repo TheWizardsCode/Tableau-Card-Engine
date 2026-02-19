@@ -40,7 +40,18 @@ This installs Phaser 3.x as a runtime dependency and TypeScript, Vite, and Vites
 npm run dev
 ```
 
-Starts the Vite dev server at `http://localhost:3000` with hot module replacement (HMR). The root `index.html` currently loads the 9-Card Golf example game.
+Starts the Vite dev server at `http://localhost:3000` with hot module replacement (HMR). The root `index.html` loads the **Game Selector** landing page, which displays all available example games as clickable cards. Click a game to launch it.
+
+### Multi-Game Routing
+
+The project uses a unified entry point (`main.ts` at the project root) that registers a `GameSelectorScene` as the initial Phaser scene alongside all example game scenes. Navigation works as follows:
+
+- **Game Selector -> Game**: Clicking a game card calls `scene.start(sceneKey)` to transition to the selected game's scene.
+- **Game -> Game Selector**: Each game scene has a `[ Menu ]` button in its title bar (top-left) and in its end-game overlays that calls `scene.start('GameSelectorScene')` to return to the selector.
+
+The game catalogue is stored in the Phaser registry (key: `gameSelector.games`) via a `preBoot` callback, so game scenes don't need to know about the catalogue to return to the selector.
+
+Each example game also retains its own standalone `main.ts` entry point and `createXxxGame.ts` factory function for independent testing and browser test use.
 
 ## Building for Production
 
@@ -138,7 +149,11 @@ src/
 │   ├── Pile.ts             Pile class (push, pop, peek, isEmpty, size)
 │   └── index.ts            Barrel file / public API
 ├── rule-engine/index.ts    Rule definitions (stub -- game-specific rules live with games)
-└── ui/index.ts             Reusable UI components (stub)
+└── ui/
+    ├── GameSelectorScene.ts Game selector landing page (GameEntry, REGISTRY_KEY_GAMES)
+    ├── HelpPanel.ts         Reusable help panel component
+    ├── HelpButton.ts        Help button component
+    └── index.ts             Barrel file / public API
 
 example-games/
 ├── hello-world/
@@ -200,13 +215,18 @@ import { ENGINE_VERSION } from '@core-engine/index';
 ## Adding an Example Game
 
 1. Create a directory: `example-games/<game-name>/`
-2. Add an entry point: `example-games/<game-name>/main.ts`
-3. Add scenes: `example-games/<game-name>/scenes/<SceneName>.ts` (extend `Phaser.Scene`)
-4. Place assets in `public/assets/<game-name>/` and document attribution in `public/assets/CREDITS.md`
-5. Add game-specific tests under `tests/` or alongside the game code
-6. Update `index.html` or implement multi-game routing as needed
+2. Add a standalone entry point: `example-games/<game-name>/main.ts`
+3. Add a factory function: `example-games/<game-name>/createXxxGame.ts` (for browser tests)
+4. Add scenes: `example-games/<game-name>/scenes/<SceneName>.ts` (extend `Phaser.Scene`)
+5. Place assets in `public/assets/<game-name>/` and document attribution in `public/assets/CREDITS.md`
+6. Add game-specific tests under `tests/<game-name>/`
+7. Register the game in the unified entry point (`main.ts` at the project root):
+   - Import the scene class
+   - Add it to the `scene` array in the Phaser config
+   - Add a `GameEntry` to the `GAMES` catalogue array
+8. Add a `[ Menu ]` button to the game scene that calls `this.scene.start('GameSelectorScene')` for navigation back to the selector
 
-Follow the `hello-world` example as a reference implementation.
+Follow the Golf and Beleaguered Castle examples as reference implementations.
 
 ## 9-Card Golf
 
@@ -225,7 +245,7 @@ The Golf game is the first full spike built on the engine. It demonstrates:
 npm run dev
 ```
 
-Open `http://localhost:3000` -- the Golf game loads by default. Click the stock or discard pile to draw, click a grid card to swap, or click the discard pile after drawing to discard and flip a face-down card.
+Open `http://localhost:3000` and click the **9-Card Golf** card on the game selector page. Click the stock or discard pile to draw, click a grid card to swap, or click the discard pile after drawing to discard and flip a face-down card. Use the `[ Menu ]` button in the top-left to return to the game selector.
 
 ### Golf game files
 
@@ -272,11 +292,11 @@ Beleaguered Castle is the second full spike. It is a single-player open solitair
 
 ### Running Beleaguered Castle
 
-To play Beleaguered Castle, update the `index.html` entry point to import from `example-games/beleaguered-castle/main.ts` instead of the Golf game, then:
-
 ```bash
 npm run dev
 ```
+
+Open `http://localhost:3000` and click the **Beleaguered Castle** card on the game selector page. Use the `[ Menu ]` button in the top-left to return to the game selector.
 
 ### Beleaguered Castle game files
 

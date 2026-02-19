@@ -1,0 +1,62 @@
+/**
+ * Tableau Card Engine -- Unified Entry Point
+ *
+ * Boots a single Phaser.Game with the GameSelectorScene as the
+ * landing page.  All example game scenes are registered so that
+ * the selector can transition to them and they can return to
+ * the selector via scene.start('GameSelectorScene').
+ *
+ * The game catalogue is stored in the Phaser registry so that
+ * game scenes can return to the selector without needing to
+ * know the catalogue themselves.
+ */
+import Phaser from 'phaser';
+import { GameSelectorScene, REGISTRY_KEY_GAMES } from './src/ui/GameSelectorScene';
+import type { GameEntry } from './src/ui/GameSelectorScene';
+import { GolfScene } from './example-games/golf/scenes/GolfScene';
+import { BeleagueredCastleScene } from './example-games/beleaguered-castle/scenes/BeleagueredCastleScene';
+
+// ── Game catalogue ─────────────────────────────────────────
+
+const GAMES: GameEntry[] = [
+  {
+    sceneKey: 'GolfScene',
+    title: '9-Card Golf',
+    description:
+      'Single-round Golf (human vs. AI). Flip cards, swap from the draw or discard pile, and try to get the lowest score.',
+  },
+  {
+    sceneKey: 'BeleagueredCastleScene',
+    title: 'Beleaguered Castle',
+    description:
+      'Open solitaire. Move cards between 8 tableau columns and build foundations up by suit from Ace to King.',
+  },
+];
+
+// ── Phaser boot ────────────────────────────────────────────
+
+const config: Phaser.Types.Core.GameConfig = {
+  type: Phaser.AUTO,
+  parent: 'game-container',
+  width: 800,
+  height: 600,
+  backgroundColor: '#1a2a1a',
+  // Register all scenes; GameSelectorScene is first so it auto-starts.
+  scene: [GameSelectorScene, GolfScene, BeleagueredCastleScene],
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+  },
+  callbacks: {
+    preBoot: (game: Phaser.Game) => {
+      // Store catalogue in registry before any scene starts,
+      // so GameSelectorScene.init() can read it.
+      game.registry.set(REGISTRY_KEY_GAMES, GAMES);
+    },
+  },
+};
+
+const game = new Phaser.Game(config);
+
+// Expose for browser testing and debugging
+(window as unknown as Record<string, unknown>).__PHASER_GAME__ = game;
