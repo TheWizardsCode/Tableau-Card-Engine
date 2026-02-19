@@ -34,7 +34,8 @@ const GRID_ROWS = 3;
 const GAME_W = 800;
 const GAME_H = 600;
 
-const AI_DELAY = 600; // ms before AI plays
+const AI_DELAY = 600; // ms before AI chooses
+const AI_SHOW_DRAW_DELAY = 1000; // ms to show drawn card before moving
 const ANIM_DURATION = 300; // ms for animations
 
 // Layout positions (designed to fit two 3x3 grids + piles in 600px height)
@@ -508,18 +509,33 @@ export class GolfScene extends Phaser.Scene {
       const ps = this.session.gameState.playerStates[idx];
       const action = this.aiPlayer.chooseAction(ps, this.session.shared);
 
-      this.setPhase('animating');
-      const result = executeTurn(this.session, action);
-      this.recorder.recordTurn(result, action.drawSource);
+      // Show which pile the AI draws from and the drawn card
+      const peekCard = action.drawSource === 'stock'
+        ? this.session.shared.stockPile[this.session.shared.stockPile.length - 1]
+        : this.session.shared.discardPile.peek() ?? null;
 
-      this.animateTurn(result, () => {
-        this.refreshAll();
+      if (peekCard) {
+        this.showDrawnCard(peekCard);
+      }
+      const sourceLabel = action.drawSource === 'stock' ? 'Stock pile' : 'Discard pile';
+      this.instructionText.setText(`AI drew from ${sourceLabel}`);
 
-        if (result.roundEnded) {
-          this.setPhase('round-ended');
-        } else {
-          this.checkNextTurn();
-        }
+      // Pause so the player can see the drawn card, then execute the move
+      this.time.delayedCall(AI_SHOW_DRAW_DELAY, () => {
+        this.hideDrawnCard();
+        this.setPhase('animating');
+        const result = executeTurn(this.session, action);
+        this.recorder.recordTurn(result, action.drawSource);
+
+        this.animateTurn(result, () => {
+          this.refreshAll();
+
+          if (result.roundEnded) {
+            this.setPhase('round-ended');
+          } else {
+            this.checkNextTurn();
+          }
+        });
       });
     });
   }
