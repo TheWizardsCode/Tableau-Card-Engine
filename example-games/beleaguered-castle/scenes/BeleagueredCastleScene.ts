@@ -206,7 +206,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
 
   // Game-end state
   private gameEnded: boolean = false;
-  private overlayContainer: Phaser.GameObjects.Container | null = null;
+  private overlayObjects: Phaser.GameObjects.GameObject[] = [];
 
   // Auto-complete state
   private autoCompleting: boolean = false;
@@ -275,7 +275,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
     this.dealComplete = false;
     this.timerStarted = false;
     this.gameEnded = false;
-    this.overlayContainer = null;
+    this.overlayObjects = [];
     this.autoCompleting = false;
     this.autoCompleteTimers = [];
     this.elapsedSeconds = 0;
@@ -1055,15 +1055,19 @@ export class BeleagueredCastleScene extends Phaser.Scene {
    */
   private showWinOverlay(): void {
     const OVERLAY_DEPTH = 2000;
-    const container = this.add.container(0, 0).setDepth(OVERLAY_DEPTH);
+    const BUTTON_DEPTH = OVERLAY_DEPTH + 1;
+    const overlayObjects: Phaser.GameObjects.GameObject[] = [];
 
-    // Semi-transparent background covering the full scene
+    // Semi-transparent background covering the full scene.
+    // Made interactive to block clicks on objects behind the overlay.
     const bg = this.add.rectangle(
       GAME_W / 2, GAME_H / 2,
       GAME_W, GAME_H,
       0x000000, 0.75,
     );
-    container.add(bg);
+    bg.setDepth(OVERLAY_DEPTH);
+    bg.setInteractive();
+    overlayObjects.push(bg);
 
     // Format elapsed time
     const minutes = Math.floor(this.elapsedSeconds / 60);
@@ -1079,8 +1083,9 @@ export class BeleagueredCastleScene extends Phaser.Scene {
         fontFamily: FONT_FAMILY,
         fontStyle: 'bold',
       })
-      .setOrigin(0.5);
-    container.add(title);
+      .setOrigin(0.5)
+      .setDepth(BUTTON_DEPTH);
+    overlayObjects.push(title);
 
     // Stats
     const stats = this.add
@@ -1095,39 +1100,43 @@ export class BeleagueredCastleScene extends Phaser.Scene {
           align: 'center',
         },
       )
-      .setOrigin(0.5);
-    container.add(stats);
+      .setOrigin(0.5)
+      .setDepth(BUTTON_DEPTH);
+    overlayObjects.push(stats);
 
     // New Game button
     const newGameBtn = this.createOverlayButton(
       GAME_W / 2 - 110, GAME_H / 2 + 35,
       '[ New Game ]',
+      BUTTON_DEPTH,
     );
     newGameBtn.on('pointerdown', () => {
       this.seed = Date.now();
       this.scene.restart();
     });
-    container.add(newGameBtn);
+    overlayObjects.push(newGameBtn);
 
     // Restart button
     const restartBtn = this.createOverlayButton(
       GAME_W / 2, GAME_H / 2 + 35,
       '[ Restart ]',
+      BUTTON_DEPTH,
     );
     restartBtn.on('pointerdown', () => {
       this.scene.restart();
     });
-    container.add(restartBtn);
+    overlayObjects.push(restartBtn);
 
     // Menu button
     const menuBtn = this.createOverlayButton(
       GAME_W / 2 + 110, GAME_H / 2 + 35,
       '[ Menu ]',
+      BUTTON_DEPTH,
     );
     menuBtn.on('pointerdown', () => this.scene.start('GameSelectorScene'));
-    container.add(menuBtn);
+    overlayObjects.push(menuBtn);
 
-    this.overlayContainer = container;
+    this.overlayObjects = overlayObjects;
   }
 
   /**
@@ -1135,15 +1144,19 @@ export class BeleagueredCastleScene extends Phaser.Scene {
    */
   private showNoMovesOverlay(): void {
     const OVERLAY_DEPTH = 2000;
-    const container = this.add.container(0, 0).setDepth(OVERLAY_DEPTH);
+    const BUTTON_DEPTH = OVERLAY_DEPTH + 1;
+    const overlayObjects: Phaser.GameObjects.GameObject[] = [];
 
-    // Semi-transparent background
+    // Semi-transparent background.
+    // Made interactive to block clicks on objects behind the overlay.
     const bg = this.add.rectangle(
       GAME_W / 2, GAME_H / 2,
       GAME_W, GAME_H,
       0x000000, 0.75,
     );
-    container.add(bg);
+    bg.setDepth(OVERLAY_DEPTH);
+    bg.setInteractive();
+    overlayObjects.push(bg);
 
     // Title
     const title = this.add
@@ -1153,13 +1166,15 @@ export class BeleagueredCastleScene extends Phaser.Scene {
         fontFamily: FONT_FAMILY,
         fontStyle: 'bold',
       })
-      .setOrigin(0.5);
-    container.add(title);
+      .setOrigin(0.5)
+      .setDepth(BUTTON_DEPTH);
+    overlayObjects.push(title);
 
     // Undo Last button (dismiss overlay, undo, resume play)
     const undoBtn = this.createOverlayButton(
       GAME_W / 2 - 130, GAME_H / 2 + 20,
       '[ Undo Last ]',
+      BUTTON_DEPTH,
     );
     undoBtn.on('pointerdown', () => {
       if (!this.undoManager.canUndo()) return;
@@ -1169,38 +1184,41 @@ export class BeleagueredCastleScene extends Phaser.Scene {
       this.undoManager.undo();
       this.refreshAll();
     });
-    container.add(undoBtn);
+    overlayObjects.push(undoBtn);
 
     // New Game button
     const noMovesNewGameBtn = this.createOverlayButton(
       GAME_W / 2 - 15, GAME_H / 2 + 20,
       '[ New Game ]',
+      BUTTON_DEPTH,
     );
     noMovesNewGameBtn.on('pointerdown', () => {
       this.seed = Date.now();
       this.scene.restart();
     });
-    container.add(noMovesNewGameBtn);
+    overlayObjects.push(noMovesNewGameBtn);
 
     // Restart button
     const noMovesRestartBtn = this.createOverlayButton(
       GAME_W / 2 + 85, GAME_H / 2 + 20,
       '[ Restart ]',
+      BUTTON_DEPTH,
     );
     noMovesRestartBtn.on('pointerdown', () => {
       this.scene.restart();
     });
-    container.add(noMovesRestartBtn);
+    overlayObjects.push(noMovesRestartBtn);
 
     // Menu button
     const noMovesMenuBtn = this.createOverlayButton(
       GAME_W / 2 + 170, GAME_H / 2 + 20,
       '[ Menu ]',
+      BUTTON_DEPTH,
     );
     noMovesMenuBtn.on('pointerdown', () => this.scene.start('GameSelectorScene'));
-    container.add(noMovesMenuBtn);
+    overlayObjects.push(noMovesMenuBtn);
 
-    this.overlayContainer = container;
+    this.overlayObjects = overlayObjects;
   }
 
   /**
@@ -1210,6 +1228,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
     x: number,
     y: number,
     label: string,
+    depth: number,
   ): Phaser.GameObjects.Text {
     const btn = this.add
       .text(x, y, label, {
@@ -1218,6 +1237,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
         fontFamily: FONT_FAMILY,
       })
       .setOrigin(0.5)
+      .setDepth(depth)
       .setInteractive({ useHandCursor: true });
 
     btn.on('pointerover', () => btn.setColor('#aaffaa'));
@@ -1230,10 +1250,10 @@ export class BeleagueredCastleScene extends Phaser.Scene {
    * Dismiss the current overlay and destroy its container.
    */
   private dismissOverlay(): void {
-    if (this.overlayContainer) {
-      this.overlayContainer.destroy();
-      this.overlayContainer = null;
+    for (const obj of this.overlayObjects) {
+      obj.destroy();
     }
+    this.overlayObjects = [];
   }
 
   // ── Help Panel ──────────────────────────────────────────
