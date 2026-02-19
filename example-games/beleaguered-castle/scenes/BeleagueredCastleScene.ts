@@ -32,6 +32,11 @@ import {
 } from '../BeleagueredCastleRules';
 import type { Command } from '../../../src/core-engine/UndoRedoManager';
 import { UndoRedoManager, CompoundCommand } from '../../../src/core-engine/UndoRedoManager';
+import { BCTranscriptRecorder } from '../GameTranscript';
+import type { BCGameTranscript } from '../GameTranscript';
+import { HelpPanel, HelpButton } from '../../../src/ui';
+import type { HelpSection } from '../../../src/ui';
+import helpContent from '../help-content.json';
 
 // ── Constants ───────────────────────────────────────────────
 
@@ -207,6 +212,14 @@ export class BeleagueredCastleScene extends Phaser.Scene {
   private autoCompleting: boolean = false;
   private autoCompleteTimers: Phaser.Time.TimerEvent[] = [];
 
+  // Transcript recording
+  private recorder!: BCTranscriptRecorder;
+  private transcript: BCGameTranscript | null = null;
+
+  // Help panel
+  private helpPanel!: HelpPanel;
+  private helpButton!: HelpButton;
+
   constructor() {
     super({ key: 'BeleagueredCastleScene' });
   }
@@ -266,12 +279,17 @@ export class BeleagueredCastleScene extends Phaser.Scene {
     this.autoCompleting = false;
     this.autoCompleteTimers = [];
     this.elapsedSeconds = 0;
+    this.transcript = null;
+
+    // Initialize transcript recorder
+    this.recorder = new BCTranscriptRecorder(this.seed, this.gameState);
 
     // Create static UI elements
     this.createTitle();
     this.createFoundationSlots();
     this.createTableauDropZones();
     this.createHUD();
+    this.createHelpPanel();
 
     // Render foundations (aces already placed)
     this.refreshFoundations();
@@ -595,6 +613,12 @@ export class BeleagueredCastleScene extends Phaser.Scene {
       this.undoManager.execute(playerCmd);
     }
 
+    // Record to transcript: player move + auto-moves
+    this.recorder.recordMove(move, this.gameState.moveCount);
+    for (const am of autoMoves) {
+      this.recorder.recordAutoMove(am);
+    }
+
     // Start timer on first move
     if (!this.timerStarted) {
       this.timerStarted = true;
@@ -846,6 +870,11 @@ export class BeleagueredCastleScene extends Phaser.Scene {
           this.performRedo();
         }
       }
+
+      // Escape key closes the help panel
+      if (event.key === 'Escape' && this.helpPanel?.isOpen) {
+        this.helpPanel.close();
+      }
     });
   }
 
@@ -855,6 +884,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
       this.cancelAutoComplete();
       if (this.undoManager.canUndo()) {
         this.undoManager.undo();
+        this.recorder.recordUndo(this.gameState.moveCount);
         this.refreshAll();
       }
       return;
@@ -865,6 +895,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
 
     this.deselectColumn();
     this.undoManager.undo();
+    this.recorder.recordUndo(this.gameState.moveCount);
     this.refreshAll();
   }
 
@@ -874,6 +905,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
 
     this.deselectColumn();
     this.undoManager.redo();
+    this.recorder.recordRedo(this.gameState.moveCount);
     this.refreshAll();
   }
 
@@ -893,12 +925,22 @@ export class BeleagueredCastleScene extends Phaser.Scene {
     if (isWon(this.gameState)) {
       this.gameEnded = true;
       this.stopTimer();
+      this.transcript = this.recorder.finalize(
+        'win',
+        this.gameState.moveCount,
+        this.elapsedSeconds,
+      );
       this.showWinOverlay();
     } else if (isTriviallyWinnable(this.gameState)) {
       this.startAutoComplete();
     } else if (hasNoMoves(this.gameState)) {
       this.gameEnded = true;
       this.stopTimer();
+      this.transcript = this.recorder.finalize(
+        'loss',
+        this.gameState.moveCount,
+        this.elapsedSeconds,
+      );
       this.showNoMovesOverlay();
     }
   }
@@ -968,6 +1010,11 @@ export class BeleagueredCastleScene extends Phaser.Scene {
         if (isWon(this.gameState)) {
           this.gameEnded = true;
           this.stopTimer();
+          this.transcript = this.recorder.finalize(
+            'win',
+            this.gameState.moveCount,
+            this.elapsedSeconds,
+          );
           this.showWinOverlay();
         }
       },
@@ -1157,6 +1204,15 @@ export class BeleagueredCastleScene extends Phaser.Scene {
       this.overlayContainer.destroy();
       this.overlayContainer = null;
     }
+  }
+
+  // ── Help Panel ──────────────────────────────────────────
+
+  private createHelpPanel(): void {
+    this.helpPanel = new HelpPanel(this, {
+      sections: helpContent as HelpSection[],
+    });
+    this.helpButton = new HelpButton(this, this.helpPanel);
   }
 
   // ── Foundation rendering ────────────────────────────────
@@ -1462,6 +1518,16 @@ export class BeleagueredCastleScene extends Phaser.Scene {
     return this.gameEnded;
   }
 
+  /** Get the finalized transcript, or null if the game is still in progress. */
+  getTranscript(): BCGameTranscript | null {
+    return this.transcript;
+  }
+
+  /** Get the transcript recorder (for access to in-progress transcript). */
+  getRecorder(): BCTranscriptRecorder {
+    return this.recorder;
+  }
+
   // ── Cleanup ─────────────────────────────────────────────
 
   shutdown(): void {
@@ -1472,5 +1538,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
     this.cancelAutoComplete();
     this.clearDropHighlights();
     this.dismissOverlay();
+    this.helpPanel?.destroy();
+    this.helpButton?.destroy();
   }
 }

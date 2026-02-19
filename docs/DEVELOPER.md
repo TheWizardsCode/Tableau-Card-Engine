@@ -145,17 +145,26 @@ example-games/
 │   ├── main.ts                 Game entry point (Phaser.Game config)
 │   └── scenes/
 │       └── HelloWorldScene.ts  Phaser.Scene subclass
-└── golf/
-    ├── main.ts                 Game entry point (Phaser.Game config)
-    ├── createGolfGame.ts       Factory function (used by main.ts and tests)
-    ├── GolfGrid.ts             3x3 grid type and utilities
-    ├── GolfRules.ts            Turn legality, move application, round-end detection
-    ├── GolfScoring.ts          Card point values, grid scoring, column matching
-    ├── GolfGame.ts             Game orchestration (session setup, turn execution)
-    ├── AiStrategy.ts           AI strategies (RandomStrategy, GreedyStrategy)
-    ├── GameTranscript.ts       Transcript recording (TranscriptRecorder)
+├── golf/
+│   ├── main.ts                 Game entry point (Phaser.Game config)
+│   ├── createGolfGame.ts       Factory function (used by main.ts and tests)
+│   ├── GolfGrid.ts             3x3 grid type and utilities
+│   ├── GolfRules.ts            Turn legality, move application, round-end detection
+│   ├── GolfScoring.ts          Card point values, grid scoring, column matching
+│   ├── GolfGame.ts             Game orchestration (session setup, turn execution)
+│   ├── AiStrategy.ts           AI strategies (RandomStrategy, GreedyStrategy)
+│   ├── GameTranscript.ts       Transcript recording (TranscriptRecorder)
+│   └── scenes/
+│       └── GolfScene.ts        Phaser scene (full visual interface)
+└── beleaguered-castle/
+    ├── main.ts                         Game entry point
+    ├── createBeleagueredCastleGame.ts   Factory function (used by main.ts)
+    ├── BeleagueredCastleState.ts        State types, move types, constants
+    ├── BeleagueredCastleRules.ts        Pure game logic (deal, moves, win/loss)
+    ├── GameTranscript.ts               Transcript recording (BCTranscriptRecorder)
+    ├── help-content.json               Help panel content (rules, controls, tips)
     └── scenes/
-        └── GolfScene.ts        Phaser scene (full visual interface)
+        └── BeleagueredCastleScene.ts   Phaser scene (full visual interface)
 
 public/assets/
 ├── cards/                  52 card face SVGs + card_back.svg (140x190px, CC0)
@@ -164,8 +173,9 @@ public/assets/
 tests/
 ├── smoke.test.ts           Toolchain smoke test
 ├── card-system/            Card, Deck, Pile unit tests
-├── core-engine/            GameState, TurnSequencer unit tests
-└── golf/                   Golf game unit + integration + browser tests
+├── core-engine/            GameState, TurnSequencer, UndoRedoManager unit tests
+├── golf/                   Golf game unit + integration + browser tests
+└── beleaguered-castle/     Beleaguered Castle unit + integration tests
 ```
 
 Each `src/` module has a barrel file (`index.ts`) that serves as its public API. Import engine modules using path aliases (see below).
@@ -245,6 +255,49 @@ Tests are in `tests/golf/`:
 | `GameTranscript.test.ts` | Transcript recording, snapshots, finalization |
 | `Integration.test.ts` | Full AI-vs-AI games, transcript validation, game invariants |
 | `GolfScene.browser.test.ts` | Phaser UI rendering, canvas, game objects, interactions (browser) |
+
+## Beleaguered Castle
+
+Beleaguered Castle is the second full spike. It is a single-player open solitaire game demonstrating:
+
+- **Single-player support**: Core engine's `createGameState()` now accepts 1 player
+- **Undo/Redo**: Reusable `UndoRedoManager` in `src/core-engine/` with Command pattern and compound commands
+- **Drag-and-drop**: Phaser drag events with drop zone highlighting and snap-back animation
+- **Click-to-move**: Select a card then click a destination; co-exists with drag-and-drop
+- **Auto-move to foundations**: Safe-move heuristic automatically plays cards to foundations when no tableau column needs them
+- **Auto-complete**: Detects trivially winnable states and plays all remaining moves to completion
+- **Win/loss detection**: Recognises when all 52 cards are on foundations (win) or no legal moves remain (loss)
+- **Game transcript**: JSON transcript recording compatible with the Visual Replay Dev Tool
+- **Help panel**: In-game rules and keyboard shortcut reference using the reusable HelpPanel/HelpButton components
+
+### Running Beleaguered Castle
+
+To play Beleaguered Castle, update the `index.html` entry point to import from `example-games/beleaguered-castle/main.ts` instead of the Golf game, then:
+
+```bash
+npm run dev
+```
+
+### Beleaguered Castle game files
+
+| File | Purpose |
+|------|---------|
+| `example-games/beleaguered-castle/main.ts` | Phaser game config entry point |
+| `example-games/beleaguered-castle/createBeleagueredCastleGame.ts` | Factory function to create a BC game instance |
+| `example-games/beleaguered-castle/BeleagueredCastleState.ts` | State types, move types, constants (FOUNDATION_COUNT, TABLEAU_COUNT, etc.) |
+| `example-games/beleaguered-castle/BeleagueredCastleRules.ts` | Pure game logic: deal, applyMove, undoMove, getLegalMoves, isWon, hasNoMoves, findSafeAutoMoves, isTriviallyWinnable, getAutoCompleteMoves |
+| `example-games/beleaguered-castle/GameTranscript.ts` | Transcript types and BCTranscriptRecorder |
+| `example-games/beleaguered-castle/help-content.json` | Help panel content (8 sections: overview, setup, foundations, tableau, winning/losing, controls, keyboard shortcuts, tips) |
+| `example-games/beleaguered-castle/scenes/BeleagueredCastleScene.ts` | Phaser scene with drag-and-drop, click-to-move, undo/redo, auto-move, auto-complete, win/loss overlays, help panel, and transcript recording |
+
+### Beleaguered Castle tests
+
+Tests are in `tests/beleaguered-castle/`:
+
+| File | Tests |
+|------|-------|
+| `BeleagueredCastleRules.test.ts` | Deal correctness, move legality, foundation builds, win/loss detection, undo, auto-move heuristics, auto-complete (70 tests) |
+| `Integration.test.ts` | Full greedy game play across seeds, game invariants, undo/redo across moves, transcript recording and validation, auto-complete verification, snapshot utilities (30 tests) |
 
 ## Managing Assets
 

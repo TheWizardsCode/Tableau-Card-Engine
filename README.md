@@ -29,7 +29,8 @@ tableau-card-engine/
 │   └── ui/                Reusable UI components
 ├── example-games/         Standalone example games
 │   ├── hello-world/       Minimal Phaser scene (toolchain proof)
-│   └── golf/              9-Card Golf (human vs. AI)
+│   ├── golf/              9-Card Golf (human vs. AI)
+│   └── beleaguered-castle/ Beleaguered Castle (open solitaire)
 ├── public/assets/         Static assets (cards, fonts, images)
 │   └── cards/             52 card face SVGs + card back (140x190px)
 ├── tests/                 Vitest test files
@@ -59,8 +60,9 @@ tableau-card-engine/
 |------|----------|-------------|
 | Hello World | `example-games/hello-world/` | Minimal Phaser scene with card sprites -- proves the toolchain works |
 | 9-Card Golf | `example-games/golf/` | Single-round 9-Card Golf (human vs. AI) with card flip animations, greedy/random AI strategies, and JSON game transcripts |
+| Beleaguered Castle | `example-games/beleaguered-castle/` | Open solitaire with drag-and-drop, click-to-move, undo/redo, auto-move to foundations, auto-complete, win/loss detection, help panel, and JSON game transcripts |
 
-More games are planned: Beleaguered Castle, Sushi Go!, Splendor, Lost Cities, The Mind, and Coloretto.
+More games are planned: Sushi Go!, Splendor, Lost Cities, The Mind, and Coloretto.
 
 ## Contributing
 
