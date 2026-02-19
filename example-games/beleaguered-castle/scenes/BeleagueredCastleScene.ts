@@ -281,6 +281,15 @@ export class BeleagueredCastleScene extends Phaser.Scene {
     this.elapsedSeconds = 0;
     this.transcript = null;
 
+    // Reset display object arrays (stale refs from previous run on restart)
+    this.foundationSprites = [];
+    this.foundationLabels = [];
+    this.foundationDropZones = [];
+    this.tableauSprites = [];
+    this.tableauDropZones = [];
+    this.highlightRects = [];
+    this.selectedCol = null;
+
     // Initialize transcript recorder
     this.recorder = new BCTranscriptRecorder(this.seed, this.gameState);
 
