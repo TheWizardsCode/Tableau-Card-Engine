@@ -61,7 +61,7 @@ describe('GameState', () => {
           players: [{ name: 'Solo', isAI: false }],
           createPlayerState: () => 0,
         }),
-      ).toThrow('at least 2 players');
+      ).not.toThrow();
     });
 
     it('should throw if no players', () => {
@@ -70,7 +70,7 @@ describe('GameState', () => {
           players: [],
           createPlayerState: () => 0,
         }),
-      ).toThrow('at least 2 players');
+      ).toThrow('at least 1 player');
     });
 
     it('should throw if firstPlayerIndex is out of bounds', () => {
@@ -118,6 +118,30 @@ describe('GameState', () => {
       expect(state.players[0].isAI).toBe(false);
       expect(state.players[1].name).toBe('Bot');
       expect(state.players[1].isAI).toBe(true);
+    });
+
+    it('should create state with a single player', () => {
+      const state = createGameState<number>({
+        players: [{ name: 'Solo', isAI: false }],
+        createPlayerState: () => 42,
+      });
+
+      expect(state.players).toHaveLength(1);
+      expect(state.playerStates).toHaveLength(1);
+      expect(state.playerStates[0]).toBe(42);
+      expect(state.currentPlayerIndex).toBe(0);
+      expect(state.phase).toBe('setup');
+      expect(state.turnNumber).toBe(0);
+    });
+
+    it('should preserve single player info', () => {
+      const state = createGameState<number>({
+        players: [{ name: 'Solo', isAI: false }],
+        createPlayerState: () => 0,
+      });
+
+      expect(state.players[0].name).toBe('Solo');
+      expect(state.players[0].isAI).toBe(false);
     });
   });
 });
