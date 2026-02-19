@@ -22,9 +22,9 @@ import { TranscriptRecorder } from '../GameTranscript';
 
 // ── Constants ───────────────────────────────────────────────
 
-const CARD_W = 70;
-const CARD_H = 95;
-const CARD_GAP = 8;
+const CARD_W = 48;
+const CARD_H = 65;
+const CARD_GAP = 5;
 const GRID_COLS = 3;
 const GRID_ROWS = 3;
 
@@ -34,12 +34,12 @@ const GAME_H = 600;
 const AI_DELAY = 600; // ms before AI plays
 const ANIM_DURATION = 300; // ms for animations
 
-// Layout positions
-const HUMAN_GRID_Y = 420; // center Y of human grid
-const AI_GRID_Y = 140; // center Y of AI grid
-const PILE_Y = 280; // center Y of stock/discard
-const STOCK_X = GAME_W / 2 - 60;
-const DISCARD_X = GAME_W / 2 + 60;
+// Layout positions (designed to fit two 3x3 grids + piles in 600px height)
+const AI_GRID_Y = 105; // center Y of AI grid
+const HUMAN_GRID_Y = 480; // center Y of human grid
+const PILE_Y = 295; // center Y of stock/discard
+const STOCK_X = GAME_W / 2 - 50;
+const DISCARD_X = GAME_W / 2 + 50;
 
 const FONT_FAMILY = 'Arial, sans-serif';
 
@@ -147,25 +147,25 @@ export class GolfScene extends Phaser.Scene {
 
   private createLabels(): void {
     this.add
-      .text(GAME_W / 2, 16, '9-Card Golf', {
-        fontSize: '22px',
-        color: '#ffffff',
-        fontFamily: FONT_FAMILY,
-      })
-      .setOrigin(0.5);
-
-    this.humanLabel = this.add
-      .text(GAME_W / 2, HUMAN_GRID_Y - 75, 'You', {
-        fontSize: '16px',
+      .text(GAME_W / 2, 14, '9-Card Golf', {
+        fontSize: '18px',
         color: '#ffffff',
         fontFamily: FONT_FAMILY,
       })
       .setOrigin(0.5);
 
     this.aiLabel = this.add
-      .text(GAME_W / 2, AI_GRID_Y - 75, 'AI', {
-        fontSize: '16px',
+      .text(GAME_W / 2 - 130, AI_GRID_Y, 'AI', {
+        fontSize: '14px',
         color: '#cccccc',
+        fontFamily: FONT_FAMILY,
+      })
+      .setOrigin(0.5);
+
+    this.humanLabel = this.add
+      .text(GAME_W / 2 - 130, HUMAN_GRID_Y, 'You', {
+        fontSize: '14px',
+        color: '#ffffff',
         fontFamily: FONT_FAMILY,
       })
       .setOrigin(0.5);
@@ -178,8 +178,8 @@ export class GolfScene extends Phaser.Scene {
     this.stockSprite.on('pointerdown', () => this.onStockClick());
 
     this.add
-      .text(STOCK_X, PILE_Y + CARD_H / 2 + 12, 'Stock', {
-        fontSize: '11px',
+      .text(STOCK_X, PILE_Y + CARD_H / 2 + 10, 'Stock', {
+        fontSize: '10px',
         color: '#aaccaa',
         fontFamily: FONT_FAMILY,
       })
@@ -191,8 +191,8 @@ export class GolfScene extends Phaser.Scene {
     this.discardSprite.on('pointerdown', () => this.onDiscardClick());
 
     this.add
-      .text(DISCARD_X, PILE_Y + CARD_H / 2 + 12, 'Discard', {
-        fontSize: '11px',
+      .text(DISCARD_X, PILE_Y + CARD_H / 2 + 10, 'Discard', {
+        fontSize: '10px',
         color: '#aaccaa',
         fontFamily: FONT_FAMILY,
       })
@@ -219,24 +219,24 @@ export class GolfScene extends Phaser.Scene {
 
   private createScoreDisplay(): void {
     this.humanScoreText = this.add
-      .text(GAME_W / 2 + 180, HUMAN_GRID_Y, 'Score: 0', {
-        fontSize: '14px',
+      .text(GAME_W / 2 + 130, HUMAN_GRID_Y, 'Score: 0', {
+        fontSize: '13px',
         color: '#ffffff',
         fontFamily: FONT_FAMILY,
       })
       .setOrigin(0, 0.5);
 
     this.aiScoreText = this.add
-      .text(GAME_W / 2 + 180, AI_GRID_Y, 'Score: 0', {
-        fontSize: '14px',
+      .text(GAME_W / 2 + 130, AI_GRID_Y, 'Score: 0', {
+        fontSize: '13px',
         color: '#cccccc',
         fontFamily: FONT_FAMILY,
       })
       .setOrigin(0, 0.5);
 
     this.turnText = this.add
-      .text(GAME_W / 2, PILE_Y - CARD_H / 2 - 18, '', {
-        fontSize: '13px',
+      .text(GAME_W / 2, PILE_Y - CARD_H / 2 - 14, '', {
+        fontSize: '12px',
         color: '#ffdd44',
         fontFamily: FONT_FAMILY,
       })
@@ -245,8 +245,8 @@ export class GolfScene extends Phaser.Scene {
 
   private createInstructions(): void {
     this.instructionText = this.add
-      .text(GAME_W / 2, GAME_H - 20, '', {
-        fontSize: '12px',
+      .text(GAME_W / 2, GAME_H - 10, '', {
+        fontSize: '11px',
         color: '#88aa88',
         fontFamily: FONT_FAMILY,
       })
@@ -588,8 +588,9 @@ export class GolfScene extends Phaser.Scene {
   // ── Drawn card display ──────────────────────────────────
 
   private showDrawnCard(card: Card): void {
-    const x = GAME_W / 2;
-    const y = PILE_Y + CARD_H + 20;
+    // Show drawn card to the right of the discard pile
+    const x = DISCARD_X + CARD_W + 20;
+    const y = PILE_Y;
     const texture = this.cardTextureKey(card.rank, card.suit);
 
     this.drawnCardSprite = this.add.image(x, y, texture);
@@ -632,8 +633,8 @@ export class GolfScene extends Phaser.Scene {
     // Overlay
     const overlay = this.add.rectangle(
       GAME_W / 2, GAME_H / 2,
-      400, 200,
-      0x000000, 0.8,
+      350, 180,
+      0x000000, 0.85,
     );
     overlay.setDepth(10);
 
@@ -641,10 +642,10 @@ export class GolfScene extends Phaser.Scene {
     this.add
       .text(
         GAME_W / 2,
-        GAME_H / 2 - 30,
+        GAME_H / 2 - 25,
         `${winnerText}\n\nYou: ${results.scores[0]} pts\nAI: ${results.scores[1]} pts`,
         {
-          fontSize: '20px',
+          fontSize: '18px',
           color: '#ffffff',
           fontFamily: FONT_FAMILY,
           align: 'center',
@@ -655,8 +656,8 @@ export class GolfScene extends Phaser.Scene {
 
     // Play again button
     const btn = this.add
-      .text(GAME_W / 2, GAME_H / 2 + 60, '[ Play Again ]', {
-        fontSize: '16px',
+      .text(GAME_W / 2, GAME_H / 2 + 55, '[ Play Again ]', {
+        fontSize: '14px',
         color: '#88ff88',
         fontFamily: FONT_FAMILY,
       })
