@@ -71,6 +71,50 @@ npm run preview
 
 **Note:** The Phaser library produces a ~1.4 MB chunk. This is expected and can be addressed with code-splitting when needed.
 
+## Deployment
+
+The project deploys automatically to **GitHub Pages** at:
+
+> **https://thewizardscode.github.io/Tableau-Card-Engine/**
+
+### How it works
+
+A GitHub Actions workflow (`.github/workflows/deploy.yml`) runs on every push to `main`:
+
+1. Installs dependencies (`npm ci`)
+2. Installs Playwright Chromium (required for browser tests)
+3. Runs `npm test` -- deployment stops if any test fails
+4. Runs `npm run build` -- deployment stops if the build fails
+5. Uploads the `dist/` directory as a Pages artifact
+6. Deploys to GitHub Pages via the `actions/deploy-pages@v4` action
+
+Only one deployment runs at a time; if a new push arrives while a deployment is in progress, the previous run is cancelled.
+
+### Vite base path
+
+GitHub Pages serves the site at `/<repo>/` rather than `/`. The Vite config sets the `base` option conditionally:
+
+- **Production** (`npm run build`): `base: '/Tableau-Card-Engine/'`
+- **Development** (`npm run dev`): `base: '/'`
+
+This is handled automatically via Vite's `mode` parameter in `vite.config.ts`. Game scenes use relative asset paths (e.g., `assets/cards/card_back.svg`), which resolve correctly under either base.
+
+### First-time setup
+
+A repository administrator must enable GitHub Pages once:
+
+1. Go to **Settings > Pages** in the repository
+2. Under **Source**, select **GitHub Actions**
+3. No custom domain is needed -- the default URL is used
+
+After this, every push to `main` will automatically deploy.
+
+### Verifying a deployment
+
+1. Check the **Actions** tab in the repository for the latest workflow run
+2. Visit `https://thewizardscode.github.io/Tableau-Card-Engine/` to confirm the site loads
+3. Verify both games (9-Card Golf, Beleaguered Castle) are playable and card assets load correctly
+
 ## Testing
 
 ```bash

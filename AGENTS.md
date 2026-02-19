@@ -74,7 +74,7 @@ Each example game should have its own set of tests to ensure that the game mecha
 
 Each example game is a standalone game that can independently demonstrate the capabilities of the engine. They also serve as reference implementations for how to use the engine's features and components effectively.
 
-Example games live in `example-games/<game-name>/` with their own `main.ts` entry point and `scenes/` directory. The root `index.html` currently points to the hello-world example; multi-game routing will be added as more games are implemented.
+Example games live in `example-games/<game-name>/` with their own `main.ts` entry point and `scenes/` directory. The root `index.html` loads a unified entry point (`main.ts`) that boots the **Game Selector** landing page, allowing players to choose between available games. The games are deployed to GitHub Pages at `https://thewizardscode.github.io/Tableau-Card-Engine/` via a GitHub Actions workflow that runs on every push to `main`.
 
 ## Technology Stack
 
