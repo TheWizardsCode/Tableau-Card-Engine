@@ -385,3 +385,75 @@ export function getLegalMoves(state: BeleagueredCastleState): BCMove[] {
 export function hasNoMoves(state: BeleagueredCastleState): boolean {
   return getLegalMoves(state).length === 0;
 }
+
+// ── Auto-move heuristic ─────────────────────────────────────
+
+/**
+ * Get the rank value of the top card on a foundation (0=A, 12=K).
+ * Returns -1 if the foundation is empty (shouldn't happen in classic deal
+ * since aces are pre-placed, but handled for safety).
+ */
+export function foundationTopRank(state: BeleagueredCastleState, fi: number): number {
+  const top = state.foundations[fi].peek();
+  return top ? rankValue(top.rank) : -1;
+}
+
+/**
+ * Find all cards that are safe to auto-move to their foundations.
+ *
+ * **Heuristic:** A card of rank R on top of a tableau column is safe to
+ * auto-move to its foundation if the minimum foundation rank across all
+ * four foundations is >= R - 1.
+ *
+ * Rationale: tableau columns build *down regardless of suit*. A card of
+ * rank R could be a build target for a card of rank R + 1 in any column.
+ * However, if every foundation already has at least rank R - 1 (meaning
+ * all cards of rank R - 1 and below are on foundations), then no card
+ * remaining in the tableau needs this card as a build target, because
+ * any card that could build on it (rank R + 1) would itself have lower
+ * ranked cards already on foundations.
+ *
+ * This is intentionally conservative: it will never auto-move a card
+ * that the player might need for tableau building.
+ *
+ * @returns An array of tableau-to-foundation moves that are safe to execute.
+ */
+export function findSafeAutoMoves(
+  state: BeleagueredCastleState,
+): BCMove[] {
+  const safeMovs: BCMove[] = [];
+
+  // Compute minimum foundation rank across all 4 foundations
+  let minFoundationRank = Infinity;
+  for (let fi = 0; fi < FOUNDATION_COUNT; fi++) {
+    const topRank = foundationTopRank(state, fi);
+    if (topRank < minFoundationRank) {
+      minFoundationRank = topRank;
+    }
+  }
+
+  // Check each tableau column's top card
+  for (let col = 0; col < TABLEAU_COUNT; col++) {
+    const topCard = state.tableau[col].peek();
+    if (!topCard) continue;
+
+    const fi = foundationIndex(topCard.suit);
+
+    // Check if this card is the next expected on its foundation
+    if (!isLegalFoundationMove(state, col, fi)) continue;
+
+    const cardRank = rankValue(topCard.rank);
+
+    // Safe if min foundation rank >= cardRank - 1
+    // (i.e., all cards of rank below this one are already on foundations)
+    if (minFoundationRank >= cardRank - 1) {
+      safeMovs.push({
+        kind: 'tableau-to-foundation',
+        fromCol: col,
+        toFoundation: fi,
+      });
+    }
+  }
+
+  return safeMovs;
+}

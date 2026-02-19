@@ -14,6 +14,8 @@ import {
   nextRank,
   foundationIndex,
   createSeededRng,
+  findSafeAutoMoves,
+  foundationTopRank,
 } from '../../example-games/beleaguered-castle/BeleagueredCastleRules';
 import {
   FOUNDATION_COUNT,
@@ -692,5 +694,247 @@ describe('getLegalMoves', () => {
       ],
     );
     expect(getLegalMoves(stuckState)).toEqual([]);
+  });
+});
+
+// ── Auto-move heuristic ─────────────────────────────────────
+
+describe('foundationTopRank', () => {
+  it('should return 0 for a foundation with only an ace', () => {
+    const state = testState(
+      [[card('A', 'clubs')], [card('A', 'diamonds')], [card('A', 'hearts')], [card('A', 'spades')]],
+      [[], [], [], [], [], [], [], []],
+    );
+    expect(foundationTopRank(state, 0)).toBe(0); // A = 0
+  });
+
+  it('should return correct rank value for built-up foundation', () => {
+    const state = testState(
+      [
+        [card('A', 'clubs'), card('2', 'clubs'), card('3', 'clubs')],
+        [card('A', 'diamonds')],
+        [card('A', 'hearts')],
+        [card('A', 'spades')],
+      ],
+      [[], [], [], [], [], [], [], []],
+    );
+    expect(foundationTopRank(state, 0)).toBe(2); // 3 has value 2
+  });
+
+  it('should return -1 for an empty foundation', () => {
+    const state = testState(
+      [[], [card('A', 'diamonds')], [card('A', 'hearts')], [card('A', 'spades')]],
+      [[], [], [], [], [], [], [], []],
+    );
+    expect(foundationTopRank(state, 0)).toBe(-1);
+  });
+
+  it('should return 12 for a complete foundation (King on top)', () => {
+    const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'] as const;
+    const state = testState(
+      [
+        ranks.map((r) => card(r, 'clubs')),
+        [card('A', 'diamonds')],
+        [card('A', 'hearts')],
+        [card('A', 'spades')],
+      ],
+      [[], [], [], [], [], [], [], []],
+    );
+    expect(foundationTopRank(state, 0)).toBe(12); // K = 12
+  });
+});
+
+describe('findSafeAutoMoves', () => {
+  it('should return 2s as safe when all foundations have only aces', () => {
+    // All foundations at rank 0 (A). A 2 has rank value 1.
+    // minFoundationRank = 0 >= 1 - 1 = 0 => safe
+    const state = testState(
+      [[card('A', 'clubs')], [card('A', 'diamonds')], [card('A', 'hearts')], [card('A', 'spades')]],
+      [
+        [card('2', 'clubs')],
+        [card('2', 'diamonds')],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+      ],
+    );
+    const moves = findSafeAutoMoves(state);
+    expect(moves.length).toBe(2);
+    expect(moves.every((m) => m.kind === 'tableau-to-foundation')).toBe(true);
+  });
+
+  it('should not return a card when foundations are uneven and card rank is too high', () => {
+    // Clubs foundation at 2 (rank value 1), others at A (rank value 0)
+    // minFoundationRank = 0. A 3 of clubs has rank value 2.
+    // Safe check: 0 >= 2 - 1 = 1 => false, NOT safe
+    const state = testState(
+      [
+        [card('A', 'clubs'), card('2', 'clubs')],
+        [card('A', 'diamonds')],
+        [card('A', 'hearts')],
+        [card('A', 'spades')],
+      ],
+      [
+        [card('3', 'clubs')],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+      ],
+    );
+    const moves = findSafeAutoMoves(state);
+    expect(moves.length).toBe(0);
+  });
+
+  it('should return a card when all foundations are high enough', () => {
+    // All foundations at 2 (rank value 1). A 3 of clubs has rank value 2.
+    // minFoundationRank = 1 >= 2 - 1 = 1 => safe
+    const state = testState(
+      [
+        [card('A', 'clubs'), card('2', 'clubs')],
+        [card('A', 'diamonds'), card('2', 'diamonds')],
+        [card('A', 'hearts'), card('2', 'hearts')],
+        [card('A', 'spades'), card('2', 'spades')],
+      ],
+      [
+        [card('3', 'clubs')],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+      ],
+    );
+    const moves = findSafeAutoMoves(state);
+    expect(moves.length).toBe(1);
+    expect(moves[0]).toEqual({
+      kind: 'tableau-to-foundation',
+      fromCol: 0,
+      toFoundation: 0,
+    });
+  });
+
+  it('should return empty array when no legal foundation moves exist', () => {
+    // No tableau cards can go on any foundation
+    const state = testState(
+      [[card('A', 'clubs')], [card('A', 'diamonds')], [card('A', 'hearts')], [card('A', 'spades')]],
+      [
+        [card('5', 'clubs')],
+        [card('7', 'diamonds')],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+      ],
+    );
+    const moves = findSafeAutoMoves(state);
+    expect(moves.length).toBe(0);
+  });
+
+  it('should return empty array when tableau is empty', () => {
+    const state = testState(
+      [[card('A', 'clubs')], [card('A', 'diamonds')], [card('A', 'hearts')], [card('A', 'spades')]],
+      [[], [], [], [], [], [], [], []],
+    );
+    const moves = findSafeAutoMoves(state);
+    expect(moves.length).toBe(0);
+  });
+
+  it('should find multiple safe auto-moves across different columns', () => {
+    // All foundations at 3 (rank value 2). Cards of rank 4 (value 3) are safe.
+    // minFoundationRank = 2 >= 3 - 1 = 2 => safe
+    const state = testState(
+      [
+        [card('A', 'clubs'), card('2', 'clubs'), card('3', 'clubs')],
+        [card('A', 'diamonds'), card('2', 'diamonds'), card('3', 'diamonds')],
+        [card('A', 'hearts'), card('2', 'hearts'), card('3', 'hearts')],
+        [card('A', 'spades'), card('2', 'spades'), card('3', 'spades')],
+      ],
+      [
+        [card('4', 'clubs')],
+        [card('4', 'hearts')],
+        [card('4', 'spades')],
+        [],
+        [],
+        [],
+        [],
+        [],
+      ],
+    );
+    const moves = findSafeAutoMoves(state);
+    expect(moves.length).toBe(3);
+    // All should be foundation moves
+    expect(moves.every((m) => m.kind === 'tableau-to-foundation')).toBe(true);
+  });
+
+  it('should not auto-move a card that is not the next expected on its foundation', () => {
+    // Even if it passes the rank threshold, a card that does not match
+    // the foundation's next expected rank should not appear
+    const state = testState(
+      [
+        [card('A', 'clubs'), card('2', 'clubs')],
+        [card('A', 'diamonds'), card('2', 'diamonds')],
+        [card('A', 'hearts'), card('2', 'hearts')],
+        [card('A', 'spades'), card('2', 'spades')],
+      ],
+      [
+        [card('4', 'clubs')], // Needs 3 on clubs foundation first
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+      ],
+    );
+    const moves = findSafeAutoMoves(state);
+    expect(moves.length).toBe(0);
+  });
+
+  it('should handle chained auto-moves (call repeatedly until empty)', () => {
+    // Simulate iterative auto-move: first pass finds 2 of clubs,
+    // after applying it, second pass finds 3 of clubs (if exposed)
+    const state = testState(
+      [[card('A', 'clubs')], [card('A', 'diamonds')], [card('A', 'hearts')], [card('A', 'spades')]],
+      [
+        [card('3', 'clubs'), card('2', 'clubs')], // 2 on top, 3 underneath
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+      ],
+    );
+
+    // First pass: 2 of clubs is safe (minFoundationRank=0 >= 1-1=0)
+    const moves1 = findSafeAutoMoves(state);
+    expect(moves1.length).toBe(1);
+    expect(moves1[0]).toEqual({
+      kind: 'tableau-to-foundation',
+      fromCol: 0,
+      toFoundation: 0,
+    });
+
+    // Apply the move
+    applyMove(state, moves1[0]);
+    // Now foundations: clubs=[A,2], others=[A]
+    // Tableau col 0: [3 of clubs]
+    // 3 of clubs: rank value 2, minFoundationRank=0 (others still at A)
+    // 0 >= 2-1=1? No => not safe
+    const moves2 = findSafeAutoMoves(state);
+    expect(moves2.length).toBe(0);
   });
 });
