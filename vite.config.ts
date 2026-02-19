@@ -36,6 +36,10 @@ export default defineConfig({
         test: {
           name: 'browser',
           include: ['tests/**/*.browser.test.ts'],
+          sequence: {
+            concurrent: false,
+          },
+          testTimeout: 30_000,
           browser: {
             enabled: true,
             provider: 'playwright',
