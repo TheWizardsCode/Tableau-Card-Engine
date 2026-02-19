@@ -193,9 +193,11 @@ export class HelpPanel {
       x: 0,
       duration: this.config.animationDuration,
       ease: 'Cubic.easeOut',
+      onUpdate: () => this.updateMask(),
       onComplete: () => {
         this._isAnimating = false;
         this.currentTween = null;
+        this.updateMask();
       },
     });
   }
@@ -219,6 +221,7 @@ export class HelpPanel {
       x: -this.panelWidth,
       duration: this.config.animationDuration,
       ease: 'Cubic.easeIn',
+      onUpdate: () => this.updateMask(),
       onComplete: () => {
         this._isAnimating = false;
         this.currentTween = null;
@@ -368,15 +371,7 @@ export class HelpPanel {
     this.contentContainer.setY(contentTopY - this.scrollOffset);
 
     // Update mask position to follow container x (for slide animation)
-    if (this.maskGraphics) {
-      this.maskGraphics.clear();
-      this.maskGraphics.fillStyle(0xffffff);
-      const maskX = this.container.x;
-      const visibleHeight =
-        (this as unknown as Record<string, number>)._visibleHeight ??
-        this.canvasHeight - contentTopY - PADDING;
-      this.maskGraphics.fillRect(maskX, contentTopY, this.panelWidth, visibleHeight);
-    }
+    this.updateMask();
 
     // Update track bar position
     if (this.trackBar && this.maxScroll > 0) {
@@ -398,16 +393,25 @@ export class HelpPanel {
       this.trackBar.setY(contentTopY);
     }
 
-    // Update mask to match container's current position
-    if (this.maskGraphics) {
-      this.maskGraphics.clear();
-      this.maskGraphics.fillStyle(0xffffff);
-      const maskX = this.container.x;
-      const visibleHeight =
-        (this as unknown as Record<string, number>)._visibleHeight ??
-        this.canvasHeight - contentTopY - PADDING;
-      this.maskGraphics.fillRect(maskX, contentTopY, this.panelWidth, visibleHeight);
-    }
+    this.updateMask();
+  }
+
+  /**
+   * Redraw the geometry mask at the container's current world-x position.
+   * Must be called on every frame during the slide animation so the mask
+   * tracks the panel and content remains visible.
+   */
+  private updateMask(): void {
+    if (!this.maskGraphics) return;
+
+    const contentTopY = (this as unknown as Record<string, number>)._contentTopY ?? PADDING + 10;
+    const visibleHeight =
+      (this as unknown as Record<string, number>)._visibleHeight ??
+      this.canvasHeight - contentTopY - PADDING;
+
+    this.maskGraphics.clear();
+    this.maskGraphics.fillStyle(0xffffff);
+    this.maskGraphics.fillRect(this.container.x, contentTopY, this.panelWidth, visibleHeight);
   }
 
   // ── Private: Input blocking ───────────────────────────────
