@@ -684,6 +684,16 @@ export class GolfScene extends Phaser.Scene {
     const results = transcript.results!;
 
     // Overlay
+    // Full-screen input blocker to prevent clicks reaching objects behind
+    const blocker = this.add.rectangle(
+      GAME_W / 2, GAME_H / 2,
+      GAME_W, GAME_H,
+      0x000000, 0.01,
+    );
+    blocker.setDepth(10);
+    blocker.setInteractive();
+
+    // Visible overlay box
     const overlay = this.add.rectangle(
       GAME_W / 2, GAME_H / 2,
       350, 180,
