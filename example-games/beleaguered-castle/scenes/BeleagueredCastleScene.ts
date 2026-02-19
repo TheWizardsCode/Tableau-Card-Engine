@@ -27,6 +27,8 @@ import {
   findSafeAutoMoves,
   isWon,
   hasNoMoves,
+  isTriviallyWinnable,
+  getAutoCompleteMoves,
 } from '../BeleagueredCastleRules';
 import type { Command } from '../../../src/core-engine/UndoRedoManager';
 import { UndoRedoManager, CompoundCommand } from '../../../src/core-engine/UndoRedoManager';
@@ -43,6 +45,7 @@ const GAME_H = 600;
 const ANIM_DURATION = 300; // ms per card deal animation
 const DEAL_STAGGER = 40; // ms between successive card deal tweens
 const SNAP_BACK_DURATION = 200; // ms to snap card back on invalid drop
+const AUTO_COMPLETE_DELAY = 150; // ms between auto-complete card animations
 
 /** Vertical overlap offset between cascaded cards in a tableau column. */
 const CASCADE_OFFSET_Y = 18;
@@ -200,8 +203,20 @@ export class BeleagueredCastleScene extends Phaser.Scene {
   private gameEnded: boolean = false;
   private overlayContainer: Phaser.GameObjects.Container | null = null;
 
+  // Auto-complete state
+  private autoCompleting: boolean = false;
+  private autoCompleteTimers: Phaser.Time.TimerEvent[] = [];
+
   constructor() {
     super({ key: 'BeleagueredCastleScene' });
+  }
+
+  /**
+   * Whether user interactions should be blocked
+   * (during deal animation, game end, or auto-complete).
+   */
+  private get interactionBlocked(): boolean {
+    return !this.dealComplete || this.gameEnded || this.autoCompleting;
   }
 
   // ── Preload ─────────────────────────────────────────────
@@ -248,6 +263,8 @@ export class BeleagueredCastleScene extends Phaser.Scene {
     this.timerStarted = false;
     this.gameEnded = false;
     this.overlayContainer = null;
+    this.autoCompleting = false;
+    this.autoCompleteTimers = [];
     this.elapsedSeconds = 0;
 
     // Create static UI elements
@@ -427,7 +444,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
     this.input.on(
       'dragstart',
       (_pointer: Phaser.Input.Pointer, gameObject: Phaser.GameObjects.Image) => {
-        if (!this.dealComplete || this.gameEnded) return;
+        if (this.interactionBlocked) return;
         const data = gameObject.getData('cardData') as CardSpriteData | undefined;
         if (!data) return;
 
@@ -455,7 +472,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
         dragX: number,
         dragY: number,
       ) => {
-        if (!this.dealComplete || this.gameEnded) return;
+        if (this.interactionBlocked) return;
         gameObject.x = dragX;
         gameObject.y = dragY;
       },
@@ -468,7 +485,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
         gameObject: Phaser.GameObjects.Image,
         dropped: boolean,
       ) => {
-        if (!this.dealComplete || this.gameEnded) return;
+        if (this.interactionBlocked) return;
 
         // Clear highlights
         this.clearDropHighlights();
@@ -487,7 +504,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
         gameObject: Phaser.GameObjects.Image,
         dropZone: Phaser.GameObjects.Zone,
       ) => {
-        if (!this.dealComplete || this.gameEnded) return;
+        if (this.interactionBlocked) return;
         this.handleDrop(gameObject, dropZone);
       },
     );
@@ -694,7 +711,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
       const zone = this.foundationDropZones[fi];
       zone.setInteractive({ useHandCursor: true });
       zone.on('pointerdown', () => {
-        if (!this.dealComplete || this.gameEnded) return;
+        if (this.interactionBlocked) return;
         if (this.selectedCol === null) return;
 
         // Try to move the selected card to this foundation
@@ -718,7 +735,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
       const zone = this.tableauDropZones[col];
       zone.setInteractive({ useHandCursor: false });
       zone.on('pointerdown', () => {
-        if (!this.dealComplete || this.gameEnded) return;
+        if (this.interactionBlocked) return;
         if (this.selectedCol === null) return;
 
         // Don't move to the same column
@@ -749,7 +766,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
    * Called from makeDraggable() where top cards get their click handlers.
    */
   private handleCardClick(colIndex: number): void {
-    if (!this.dealComplete || this.gameEnded) return;
+    if (this.interactionBlocked) return;
 
     if (this.selectedCol === colIndex) {
       // Clicking the same card: toggle off
@@ -833,7 +850,17 @@ export class BeleagueredCastleScene extends Phaser.Scene {
   }
 
   private performUndo(): void {
-    if (!this.dealComplete || this.gameEnded) return;
+    // Allow undo during auto-complete to cancel it
+    if (this.autoCompleting) {
+      this.cancelAutoComplete();
+      if (this.undoManager.canUndo()) {
+        this.undoManager.undo();
+        this.refreshAll();
+      }
+      return;
+    }
+
+    if (this.interactionBlocked) return;
     if (!this.undoManager.canUndo()) return;
 
     this.deselectColumn();
@@ -842,7 +869,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
   }
 
   private performRedo(): void {
-    if (!this.dealComplete || this.gameEnded) return;
+    if (this.interactionBlocked) return;
     if (!this.undoManager.canRedo()) return;
 
     this.deselectColumn();
@@ -858,20 +885,108 @@ export class BeleagueredCastleScene extends Phaser.Scene {
   // ── Game End Detection ──────────────────────────────────
 
   /**
-   * Check if the game has ended (win or no moves) after a player move.
+   * Check if the game has ended (win, no moves, or trivially winnable) after a player move.
    */
   private checkGameEnd(): void {
-    if (this.gameEnded) return;
+    if (this.gameEnded || this.autoCompleting) return;
 
     if (isWon(this.gameState)) {
       this.gameEnded = true;
       this.stopTimer();
       this.showWinOverlay();
+    } else if (isTriviallyWinnable(this.gameState)) {
+      this.startAutoComplete();
     } else if (hasNoMoves(this.gameState)) {
       this.gameEnded = true;
       this.stopTimer();
       this.showNoMovesOverlay();
     }
+  }
+
+  /**
+   * Start the auto-complete animation sequence.
+   *
+   * Computes all remaining foundation moves, wraps them in a CompoundCommand
+   * of AutoMoveCommands, then animates them one at a time with delays.
+   * The compound is executed up-front (state is applied immediately) and
+   * the animation is purely visual. Undo during animation cancels remaining
+   * animations and undoes the compound.
+   */
+  private startAutoComplete(): void {
+    const moves = getAutoCompleteMoves(this.gameState);
+    if (moves.length === 0) return;
+
+    this.autoCompleting = true;
+
+    // Build compound command of AutoMoveCommands
+    const cmds: Command[] = moves.map(
+      (m) => new AutoMoveCommand(this.gameState, m),
+    );
+    const compound = new CompoundCommand(cmds, 'Auto-complete');
+    this.undoManager.execute(compound);
+
+    // Refresh display state immediately (all cards moved logically)
+    this.refreshAll();
+
+    // Schedule visual animations for each card flying to its foundation
+    // The cards are already in their final positions in game state,
+    // so we create temporary sprite animations on top.
+    for (let i = 0; i < moves.length; i++) {
+      const move = moves[i];
+      if (move.kind !== 'tableau-to-foundation') continue;
+
+      const timer = this.time.delayedCall(
+        i * AUTO_COMPLETE_DELAY,
+        () => {
+          if (!this.autoCompleting) return; // cancelled by undo
+
+          // Flash the foundation sprite to indicate a card landing
+          const fSprite = this.foundationSprites[move.toFoundation];
+          this.tweens.add({
+            targets: fSprite,
+            alpha: { from: 0.5, to: 1 },
+            duration: 100,
+            yoyo: false,
+          });
+
+          // Update foundation display to show current top card
+          this.refreshFoundations();
+        },
+      );
+      this.autoCompleteTimers.push(timer);
+    }
+
+    // After all animations, trigger win check
+    const finalTimer = this.time.delayedCall(
+      moves.length * AUTO_COMPLETE_DELAY + 100,
+      () => {
+        if (!this.autoCompleting) return;
+        this.autoCompleting = false;
+        this.autoCompleteTimers = [];
+
+        // Now check for win (should be won)
+        if (isWon(this.gameState)) {
+          this.gameEnded = true;
+          this.stopTimer();
+          this.showWinOverlay();
+        }
+      },
+    );
+    this.autoCompleteTimers.push(finalTimer);
+  }
+
+  /**
+   * Cancel any in-progress auto-complete animation.
+   * Does NOT undo the compound command -- the caller is responsible for that.
+   */
+  private cancelAutoComplete(): void {
+    if (!this.autoCompleting) return;
+    this.autoCompleting = false;
+
+    for (const timer of this.autoCompleteTimers) {
+      timer.destroy();
+    }
+    this.autoCompleteTimers = [];
   }
 
   /**
@@ -1354,6 +1469,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
       this.timerEvent.destroy();
       this.timerEvent = null;
     }
+    this.cancelAutoComplete();
     this.clearDropHighlights();
     this.dismissOverlay();
   }
