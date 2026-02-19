@@ -124,6 +124,14 @@ export class GolfScene extends Phaser.Scene {
   create(): void {
     this.cameras.main.setBackgroundColor('#2d572c');
 
+    // Reset display object arrays (stale refs from previous run on restart)
+    this.humanCardSprites = [];
+    this.aiCardSprites = [];
+    this.drawnCardSprite = null;
+    this.turnPhase = 'waiting-for-draw';
+    this.drawnCard = null;
+    this.drawSource = null;
+
     // Select AI strategy
     const strategy: AiStrategy =
       this.aiStrategyName === 'random' ? RandomStrategy : GreedyStrategy;
