@@ -29,3 +29,20 @@ export { CompoundCommand, UndoRedoManager } from './UndoRedoManager';
 // Transcript persistence
 export type { StoredTranscript, TranscriptStoreOptions } from './TranscriptStore';
 export { TranscriptStore } from './TranscriptStore';
+
+// Game event system
+export type {
+  TurnStartedPayload,
+  TurnCompletedPayload,
+  AnimationCompletePayload,
+  StateSettledPayload,
+  GameEndedPayload,
+  GameEventMap,
+  GameEventName,
+  GameEventListener,
+} from './GameEventEmitter';
+export { GameEventEmitter } from './GameEventEmitter';
+
+// Phaser event bridge
+export type { PhaserLikeEventEmitter } from './PhaserEventBridge';
+export { PhaserEventBridge } from './PhaserEventBridge';
