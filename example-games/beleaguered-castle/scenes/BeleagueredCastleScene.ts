@@ -25,6 +25,8 @@ import {
   isLegalTableauMove,
   getLegalMoves,
   findSafeAutoMoves,
+  isWon,
+  hasNoMoves,
 } from '../BeleagueredCastleRules';
 import type { Command } from '../../../src/core-engine/UndoRedoManager';
 import { UndoRedoManager, CompoundCommand } from '../../../src/core-engine/UndoRedoManager';
@@ -194,6 +196,10 @@ export class BeleagueredCastleScene extends Phaser.Scene {
   private timerEvent: Phaser.Time.TimerEvent | null = null;
   private timerStarted: boolean = false;
 
+  // Game-end state
+  private gameEnded: boolean = false;
+  private overlayContainer: Phaser.GameObjects.Container | null = null;
+
   constructor() {
     super({ key: 'BeleagueredCastleScene' });
   }
@@ -240,6 +246,9 @@ export class BeleagueredCastleScene extends Phaser.Scene {
     this.undoManager = new UndoRedoManager();
     this.dealComplete = false;
     this.timerStarted = false;
+    this.gameEnded = false;
+    this.overlayContainer = null;
+    this.elapsedSeconds = 0;
 
     // Create static UI elements
     this.createTitle();
@@ -418,7 +427,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
     this.input.on(
       'dragstart',
       (_pointer: Phaser.Input.Pointer, gameObject: Phaser.GameObjects.Image) => {
-        if (!this.dealComplete) return;
+        if (!this.dealComplete || this.gameEnded) return;
         const data = gameObject.getData('cardData') as CardSpriteData | undefined;
         if (!data) return;
 
@@ -446,7 +455,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
         dragX: number,
         dragY: number,
       ) => {
-        if (!this.dealComplete) return;
+        if (!this.dealComplete || this.gameEnded) return;
         gameObject.x = dragX;
         gameObject.y = dragY;
       },
@@ -459,7 +468,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
         gameObject: Phaser.GameObjects.Image,
         dropped: boolean,
       ) => {
-        if (!this.dealComplete) return;
+        if (!this.dealComplete || this.gameEnded) return;
 
         // Clear highlights
         this.clearDropHighlights();
@@ -478,7 +487,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
         gameObject: Phaser.GameObjects.Image,
         dropZone: Phaser.GameObjects.Zone,
       ) => {
-        if (!this.dealComplete) return;
+        if (!this.dealComplete || this.gameEnded) return;
         this.handleDrop(gameObject, dropZone);
       },
     );
@@ -577,6 +586,9 @@ export class BeleagueredCastleScene extends Phaser.Scene {
 
     // Refresh everything
     this.refreshAll();
+
+    // Check for win or no-moves conditions
+    this.checkGameEnd();
   }
 
   /**
@@ -682,7 +694,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
       const zone = this.foundationDropZones[fi];
       zone.setInteractive({ useHandCursor: true });
       zone.on('pointerdown', () => {
-        if (!this.dealComplete) return;
+        if (!this.dealComplete || this.gameEnded) return;
         if (this.selectedCol === null) return;
 
         // Try to move the selected card to this foundation
@@ -706,7 +718,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
       const zone = this.tableauDropZones[col];
       zone.setInteractive({ useHandCursor: false });
       zone.on('pointerdown', () => {
-        if (!this.dealComplete) return;
+        if (!this.dealComplete || this.gameEnded) return;
         if (this.selectedCol === null) return;
 
         // Don't move to the same column
@@ -737,7 +749,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
    * Called from makeDraggable() where top cards get their click handlers.
    */
   private handleCardClick(colIndex: number): void {
-    if (!this.dealComplete) return;
+    if (!this.dealComplete || this.gameEnded) return;
 
     if (this.selectedCol === colIndex) {
       // Clicking the same card: toggle off
@@ -821,7 +833,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
   }
 
   private performUndo(): void {
-    if (!this.dealComplete) return;
+    if (!this.dealComplete || this.gameEnded) return;
     if (!this.undoManager.canUndo()) return;
 
     this.deselectColumn();
@@ -830,7 +842,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
   }
 
   private performRedo(): void {
-    if (!this.dealComplete) return;
+    if (!this.dealComplete || this.gameEnded) return;
     if (!this.undoManager.canRedo()) return;
 
     this.deselectColumn();
@@ -841,6 +853,195 @@ export class BeleagueredCastleScene extends Phaser.Scene {
   private refreshUndoRedoButtons(): void {
     this.undoButton.setColor(this.undoManager.canUndo() ? '#aaccaa' : '#557755');
     this.redoButton.setColor(this.undoManager.canRedo() ? '#aaccaa' : '#557755');
+  }
+
+  // ── Game End Detection ──────────────────────────────────
+
+  /**
+   * Check if the game has ended (win or no moves) after a player move.
+   */
+  private checkGameEnd(): void {
+    if (this.gameEnded) return;
+
+    if (isWon(this.gameState)) {
+      this.gameEnded = true;
+      this.stopTimer();
+      this.showWinOverlay();
+    } else if (hasNoMoves(this.gameState)) {
+      this.gameEnded = true;
+      this.stopTimer();
+      this.showNoMovesOverlay();
+    }
+  }
+
+  /**
+   * Show a win overlay with moves, elapsed time, and action buttons.
+   */
+  private showWinOverlay(): void {
+    const OVERLAY_DEPTH = 2000;
+    const container = this.add.container(0, 0).setDepth(OVERLAY_DEPTH);
+
+    // Semi-transparent background covering the full scene
+    const bg = this.add.rectangle(
+      GAME_W / 2, GAME_H / 2,
+      GAME_W, GAME_H,
+      0x000000, 0.75,
+    );
+    container.add(bg);
+
+    // Format elapsed time
+    const minutes = Math.floor(this.elapsedSeconds / 60);
+    const seconds = this.elapsedSeconds % 60;
+    const mm = String(minutes).padStart(2, '0');
+    const ss = String(seconds).padStart(2, '0');
+
+    // Title
+    const title = this.add
+      .text(GAME_W / 2, GAME_H / 2 - 60, 'You Win!', {
+        fontSize: '28px',
+        color: '#88ff88',
+        fontFamily: FONT_FAMILY,
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5);
+    container.add(title);
+
+    // Stats
+    const stats = this.add
+      .text(
+        GAME_W / 2,
+        GAME_H / 2 - 15,
+        `Moves: ${this.gameState.moveCount}    Time: ${mm}:${ss}`,
+        {
+          fontSize: '14px',
+          color: '#aaccaa',
+          fontFamily: FONT_FAMILY,
+          align: 'center',
+        },
+      )
+      .setOrigin(0.5);
+    container.add(stats);
+
+    // New Game button
+    const newGameBtn = this.createOverlayButton(
+      GAME_W / 2 - 70, GAME_H / 2 + 35,
+      '[ New Game ]',
+    );
+    newGameBtn.on('pointerdown', () => {
+      this.seed = Date.now();
+      this.scene.restart();
+    });
+    container.add(newGameBtn);
+
+    // Restart button
+    const restartBtn = this.createOverlayButton(
+      GAME_W / 2 + 70, GAME_H / 2 + 35,
+      '[ Restart ]',
+    );
+    restartBtn.on('pointerdown', () => {
+      this.scene.restart();
+    });
+    container.add(restartBtn);
+
+    this.overlayContainer = container;
+  }
+
+  /**
+   * Show a no-moves overlay with action buttons.
+   */
+  private showNoMovesOverlay(): void {
+    const OVERLAY_DEPTH = 2000;
+    const container = this.add.container(0, 0).setDepth(OVERLAY_DEPTH);
+
+    // Semi-transparent background
+    const bg = this.add.rectangle(
+      GAME_W / 2, GAME_H / 2,
+      GAME_W, GAME_H,
+      0x000000, 0.75,
+    );
+    container.add(bg);
+
+    // Title
+    const title = this.add
+      .text(GAME_W / 2, GAME_H / 2 - 50, 'No Moves Available', {
+        fontSize: '22px',
+        color: '#ff8888',
+        fontFamily: FONT_FAMILY,
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5);
+    container.add(title);
+
+    // Undo Last button (dismiss overlay, undo, resume play)
+    const undoBtn = this.createOverlayButton(
+      GAME_W / 2 - 100, GAME_H / 2 + 20,
+      '[ Undo Last ]',
+    );
+    undoBtn.on('pointerdown', () => {
+      if (!this.undoManager.canUndo()) return;
+      this.dismissOverlay();
+      this.gameEnded = false;
+      this.resumeTimer();
+      this.undoManager.undo();
+      this.refreshAll();
+    });
+    container.add(undoBtn);
+
+    // New Game button
+    const newGameBtn = this.createOverlayButton(
+      GAME_W / 2 + 10, GAME_H / 2 + 20,
+      '[ New Game ]',
+    );
+    newGameBtn.on('pointerdown', () => {
+      this.seed = Date.now();
+      this.scene.restart();
+    });
+    container.add(newGameBtn);
+
+    // Restart button
+    const restartBtn = this.createOverlayButton(
+      GAME_W / 2 + 110, GAME_H / 2 + 20,
+      '[ Restart ]',
+    );
+    restartBtn.on('pointerdown', () => {
+      this.scene.restart();
+    });
+    container.add(restartBtn);
+
+    this.overlayContainer = container;
+  }
+
+  /**
+   * Create a styled button text for use in overlays.
+   */
+  private createOverlayButton(
+    x: number,
+    y: number,
+    label: string,
+  ): Phaser.GameObjects.Text {
+    const btn = this.add
+      .text(x, y, label, {
+        fontSize: '14px',
+        color: '#88ff88',
+        fontFamily: FONT_FAMILY,
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+
+    btn.on('pointerover', () => btn.setColor('#aaffaa'));
+    btn.on('pointerout', () => btn.setColor('#88ff88'));
+
+    return btn;
+  }
+
+  /**
+   * Dismiss the current overlay and destroy its container.
+   */
+  private dismissOverlay(): void {
+    if (this.overlayContainer) {
+      this.overlayContainer.destroy();
+      this.overlayContainer = null;
+    }
   }
 
   // ── Foundation rendering ────────────────────────────────
@@ -1075,6 +1276,24 @@ export class BeleagueredCastleScene extends Phaser.Scene {
     this.timerText.setText(`${mm}:${ss}`);
   }
 
+  /**
+   * Stop the timer (pauses the repeating timer event).
+   */
+  private stopTimer(): void {
+    if (this.timerEvent) {
+      this.timerEvent.paused = true;
+    }
+  }
+
+  /**
+   * Resume the timer after it was stopped (e.g. after dismissing no-moves overlay).
+   */
+  private resumeTimer(): void {
+    if (this.timerEvent) {
+      this.timerEvent.paused = false;
+    }
+  }
+
   // ── Texture helpers ─────────────────────────────────────
 
   private cardTextureKey(rank: Rank, suit: Suit): string {
@@ -1123,6 +1342,11 @@ export class BeleagueredCastleScene extends Phaser.Scene {
     return this.dealComplete;
   }
 
+  /** Whether the game has ended (win or no moves). */
+  isGameEnded(): boolean {
+    return this.gameEnded;
+  }
+
   // ── Cleanup ─────────────────────────────────────────────
 
   shutdown(): void {
@@ -1131,5 +1355,6 @@ export class BeleagueredCastleScene extends Phaser.Scene {
       this.timerEvent = null;
     }
     this.clearDropHighlights();
+    this.dismissOverlay();
   }
 }
