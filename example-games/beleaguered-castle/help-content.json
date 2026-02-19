@@ -1,0 +1,34 @@
+[
+  {
+    "heading": "Beleaguered Castle",
+    "body": "A single-player solitaire card game. Build all four foundations up from Ace to King by suit, using strategic moves across eight tableau columns. All cards are visible from the start -- pure skill, no luck!"
+  },
+  {
+    "heading": "Setup",
+    "body": "The four Aces are placed on the foundations (one per suit). The remaining 48 cards are dealt face-up into 8 columns of 6 cards each. All cards are visible throughout the game."
+  },
+  {
+    "heading": "Foundations",
+    "body": "The four foundation piles build up by suit from Ace to King:\n\nA, 2, 3, 4, 5, 6, 7, 8, 9, 10, J, Q, K\n\nOnly the next card in sequence for each suit can be placed on its foundation."
+  },
+  {
+    "heading": "Tableau Rules",
+    "body": "Only the top card (last card) of each tableau column can be moved.\n\nTableau columns build down regardless of suit. For example, a 7 can be placed on any 8.\n\nAn empty column can accept any single card."
+  },
+  {
+    "heading": "Winning & Losing",
+    "body": "You win when all 52 cards are on the foundations (13 per suit).\n\nYou lose when no legal moves remain and the foundations are not complete.\n\nWhen the game detects the remaining cards can be trivially completed, it will auto-complete for you."
+  },
+  {
+    "heading": "Controls",
+    "body": "Drag and drop: Drag a top card to a valid destination (tableau column or foundation).\n\nClick to move: Click a top card to select it (highlighted green), then click a valid destination. Click the same card again to deselect.\n\nBoth input methods work simultaneously."
+  },
+  {
+    "heading": "Keyboard Shortcuts",
+    "body": "Ctrl+Z -- Undo last move\nCtrl+Y -- Redo\nCtrl+Shift+Z -- Redo\n? -- Toggle this help panel\nEsc -- Close this help panel"
+  },
+  {
+    "heading": "Tips",
+    "body": "- Focus on freeing cards that are blocking foundation builds.\n- Empty columns are very valuable -- use them strategically as temporary storage.\n- Try to keep columns sorted in descending order when possible.\n- Use Undo freely to explore different move sequences.\n- Watch for auto-moves: safe cards are automatically sent to foundations after each move."
+  }
+]
