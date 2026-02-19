@@ -7,7 +7,9 @@
  *   - Deal animation on scene start
  *   - HUD: move counter, timer, seed display
  *   - Drag-and-drop card interaction with visual feedback
+ *   - Click-to-select then click-to-place card interaction
  *   - Undo/Redo via keyboard (Ctrl+Z / Ctrl+Y or Ctrl+Shift+Z)
+ *   - Auto-move safe cards to foundations after each player move
  *   - Each move recorded as a Command in UndoRedoManager
  */
 
@@ -75,6 +77,9 @@ const SUIT_COLOR: Record<Suit, string> = {
 
 const HIGHLIGHT_VALID = 0x44ff44;
 const HIGHLIGHT_ALPHA = 0.3;
+
+/** Tint applied to the selected card for click-to-move. */
+const SELECTION_TINT = 0xaaffaa;
 
 // ── MoveCommand ─────────────────────────────────────────────
 
@@ -174,6 +179,9 @@ export class BeleagueredCastleScene extends Phaser.Scene {
   // Highlight rectangles for valid drop targets
   private highlightRects: Phaser.GameObjects.Rectangle[] = [];
 
+  // Click-to-move selection state
+  private selectedCol: number | null = null;
+
   // Display objects -- HUD
   private moveCountText!: Phaser.GameObjects.Text;
   private timerText!: Phaser.GameObjects.Text;
@@ -247,6 +255,9 @@ export class BeleagueredCastleScene extends Phaser.Scene {
 
     // Setup drag-and-drop event handlers
     this.setupDragAndDrop();
+
+    // Setup click-to-move event handlers
+    this.setupClickToMove();
 
     // Setup keyboard shortcuts
     this.setupKeyboard();
@@ -411,6 +422,9 @@ export class BeleagueredCastleScene extends Phaser.Scene {
         const data = gameObject.getData('cardData') as CardSpriteData | undefined;
         if (!data) return;
 
+        // Clear any click-to-move selection when starting a drag
+        this.deselectColumn();
+
         // Save origin position and depth
         data.originX = gameObject.x;
         data.originY = gameObject.y;
@@ -508,53 +522,61 @@ export class BeleagueredCastleScene extends Phaser.Scene {
     }
 
     if (move) {
-      // Build the player move command
-      const playerCmd = new MoveCommand(this.gameState, move);
-
-      // Tentatively apply the player move to discover auto-moves
-      applyMove(this.gameState, move);
-
-      // Collect all safe auto-moves by looping until none remain
-      const autoMoves: BCMove[] = [];
-      let safe = findSafeAutoMoves(this.gameState);
-      while (safe.length > 0) {
-        for (const am of safe) {
-          applyMove(this.gameState, am);
-          autoMoves.push(am);
-        }
-        safe = findSafeAutoMoves(this.gameState);
-      }
-
-      // Undo everything in reverse to restore original state
-      for (let i = autoMoves.length - 1; i >= 0; i--) {
-        undoMove(this.gameState, autoMoves[i]);
-      }
-      undoMove(this.gameState, move);
-
-      // Build the command (compound if auto-moves exist, simple if not)
-      if (autoMoves.length > 0) {
-        const allCmds: Command[] = [playerCmd];
-        for (const am of autoMoves) {
-          allCmds.push(new AutoMoveCommand(this.gameState, am));
-        }
-        const compound = new CompoundCommand(allCmds, playerCmd.description);
-        this.undoManager.execute(compound);
-      } else {
-        this.undoManager.execute(playerCmd);
-      }
-
-      // Start timer on first move
-      if (!this.timerStarted) {
-        this.timerStarted = true;
-        this.startTimer();
-      }
-
-      // Refresh everything (instant for now; auto-move animation is handled by refreshAll)
-      this.refreshAll();
+      this.executePlayerMove(move);
     } else {
       // Invalid drop: snap back
       this.snapBack(sprite);
     }
+  }
+
+  /**
+   * Execute a player move with auto-move detection and CompoundCommand support.
+   * Shared by both drag-and-drop and click-to-move input methods.
+   */
+  private executePlayerMove(move: BCMove): void {
+    // Build the player move command
+    const playerCmd = new MoveCommand(this.gameState, move);
+
+    // Tentatively apply the player move to discover auto-moves
+    applyMove(this.gameState, move);
+
+    // Collect all safe auto-moves by looping until none remain
+    const autoMoves: BCMove[] = [];
+    let safe = findSafeAutoMoves(this.gameState);
+    while (safe.length > 0) {
+      for (const am of safe) {
+        applyMove(this.gameState, am);
+        autoMoves.push(am);
+      }
+      safe = findSafeAutoMoves(this.gameState);
+    }
+
+    // Undo everything in reverse to restore original state
+    for (let i = autoMoves.length - 1; i >= 0; i--) {
+      undoMove(this.gameState, autoMoves[i]);
+    }
+    undoMove(this.gameState, move);
+
+    // Build the command (compound if auto-moves exist, simple if not)
+    if (autoMoves.length > 0) {
+      const allCmds: Command[] = [playerCmd];
+      for (const am of autoMoves) {
+        allCmds.push(new AutoMoveCommand(this.gameState, am));
+      }
+      const compound = new CompoundCommand(allCmds, playerCmd.description);
+      this.undoManager.execute(compound);
+    } else {
+      this.undoManager.execute(playerCmd);
+    }
+
+    // Start timer on first move
+    if (!this.timerStarted) {
+      this.timerStarted = true;
+      this.startTimer();
+    }
+
+    // Refresh everything
+    this.refreshAll();
   }
 
   /**
@@ -636,6 +658,145 @@ export class BeleagueredCastleScene extends Phaser.Scene {
     this.highlightRects = [];
   }
 
+  // ── Click-to-Move ──────────────────────────────────────
+
+  /**
+   * Setup click-to-move event handlers.
+   *
+   * Click-to-move works as follows:
+   * 1. Click a top card to select it (tinted green, valid targets highlighted).
+   * 2. Click a valid destination (tableau column or foundation) to move the card.
+   * 3. Click the same card again or an invalid destination to deselect.
+   *
+   * This works alongside drag-and-drop without conflict because:
+   * - Phaser fires 'pointerdown' before drag events start
+   * - We use a small drag threshold to distinguish clicks from drags
+   * - Starting a drag clears any existing selection
+   */
+  private setupClickToMove(): void {
+    // Set a small drag distance threshold so short clicks are not treated as drags
+    this.input.dragDistanceThreshold = 5;
+
+    // Foundation zones respond to clicks when a card is selected
+    for (let fi = 0; fi < FOUNDATION_COUNT; fi++) {
+      const zone = this.foundationDropZones[fi];
+      zone.setInteractive({ useHandCursor: true });
+      zone.on('pointerdown', () => {
+        if (!this.dealComplete) return;
+        if (this.selectedCol === null) return;
+
+        // Try to move the selected card to this foundation
+        if (isLegalFoundationMove(this.gameState, this.selectedCol, fi)) {
+          const move: BCMove = {
+            kind: 'tableau-to-foundation',
+            fromCol: this.selectedCol,
+            toFoundation: fi,
+          };
+          this.deselectColumn();
+          this.executePlayerMove(move);
+        } else {
+          // Invalid target: deselect
+          this.deselectColumn();
+        }
+      });
+    }
+
+    // Tableau column zones respond to clicks when a card is selected
+    for (let col = 0; col < TABLEAU_COUNT; col++) {
+      const zone = this.tableauDropZones[col];
+      zone.setInteractive({ useHandCursor: false });
+      zone.on('pointerdown', () => {
+        if (!this.dealComplete) return;
+        if (this.selectedCol === null) return;
+
+        // Don't move to the same column
+        if (col === this.selectedCol) {
+          this.deselectColumn();
+          return;
+        }
+
+        // Try to move the selected card to this column
+        if (isLegalTableauMove(this.gameState, this.selectedCol, col)) {
+          const move: BCMove = {
+            kind: 'tableau-to-tableau',
+            fromCol: this.selectedCol,
+            toCol: col,
+          };
+          this.deselectColumn();
+          this.executePlayerMove(move);
+        } else {
+          // Invalid target: deselect
+          this.deselectColumn();
+        }
+      });
+    }
+  }
+
+  /**
+   * Handle a click on a top card sprite for click-to-move selection.
+   * Called from makeDraggable() where top cards get their click handlers.
+   */
+  private handleCardClick(colIndex: number): void {
+    if (!this.dealComplete) return;
+
+    if (this.selectedCol === colIndex) {
+      // Clicking the same card: toggle off
+      this.deselectColumn();
+      return;
+    }
+
+    if (this.selectedCol !== null) {
+      // A card is already selected; try to move it to this column
+      if (isLegalTableauMove(this.gameState, this.selectedCol, colIndex)) {
+        const move: BCMove = {
+          kind: 'tableau-to-tableau',
+          fromCol: this.selectedCol,
+          toCol: colIndex,
+        };
+        this.deselectColumn();
+        this.executePlayerMove(move);
+        return;
+      }
+      // Invalid target: deselect old and select new
+      this.deselectColumn();
+    }
+
+    // Select this card
+    this.selectColumn(colIndex);
+  }
+
+  /**
+   * Visually select a column's top card for click-to-move.
+   * Applies a tint and shows valid move target highlights.
+   */
+  private selectColumn(colIndex: number): void {
+    this.selectedCol = colIndex;
+
+    // Tint the selected card
+    const colSprites = this.tableauSprites[colIndex];
+    if (colSprites.length > 0) {
+      colSprites[colSprites.length - 1].setTint(SELECTION_TINT);
+    }
+
+    // Show valid drop target highlights (reuses the drag highlight system)
+    this.showValidDropHighlights(colIndex);
+  }
+
+  /**
+   * Clear the click-to-move selection state and visual indicators.
+   */
+  private deselectColumn(): void {
+    if (this.selectedCol !== null) {
+      // Clear tint on the previously selected card
+      const colSprites = this.tableauSprites[this.selectedCol];
+      if (colSprites.length > 0) {
+        colSprites[colSprites.length - 1].clearTint();
+      }
+    }
+    this.selectedCol = null;
+    this.clearDropHighlights();
+  }
+
   // ── Undo / Redo ─────────────────────────────────────────
 
   private setupKeyboard(): void {
@@ -663,6 +824,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
     if (!this.dealComplete) return;
     if (!this.undoManager.canUndo()) return;
 
+    this.deselectColumn();
     this.undoManager.undo();
     this.refreshAll();
   }
@@ -671,6 +833,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
     if (!this.dealComplete) return;
     if (!this.undoManager.canRedo()) return;
 
+    this.deselectColumn();
     this.undoManager.redo();
     this.refreshAll();
   }
@@ -821,6 +984,9 @@ export class BeleagueredCastleScene extends Phaser.Scene {
       const rowIndex = colSprites.length - 1;
 
       topSprite.setInteractive({ useHandCursor: true, draggable: true });
+
+      // Click-to-move: clicking a top card selects or acts on it
+      topSprite.on('pointerdown', () => this.handleCardClick(col));
 
       // Attach metadata for drag handlers
       const cardData: CardSpriteData = {
