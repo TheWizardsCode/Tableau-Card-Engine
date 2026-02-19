@@ -21,3 +21,7 @@ export {
   startGame,
   endGame,
 } from './TurnSequencer';
+
+// Undo/Redo system
+export type { Command } from './UndoRedoManager';
+export { CompoundCommand, UndoRedoManager } from './UndoRedoManager';
