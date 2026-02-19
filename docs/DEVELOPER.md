@@ -40,7 +40,7 @@ This installs Phaser 3.x as a runtime dependency and TypeScript, Vite, and Vites
 npm run dev
 ```
 
-Starts the Vite dev server at `http://localhost:3000` with hot module replacement (HMR). The root `index.html` currently loads the hello-world example game.
+Starts the Vite dev server at `http://localhost:3000` with hot module replacement (HMR). The root `index.html` currently loads the 9-Card Golf example game.
 
 ## Building for Production
 
@@ -78,23 +78,43 @@ Tests use [Vitest](https://vitest.dev/) configured inline in `vite.config.ts`. T
 
 ```
 src/
-├── core-engine/index.ts    Game loop, state management, rendering helpers
-├── card-system/index.ts    Card, Deck, Hand, Pile abstractions
-├── rule-engine/index.ts    Rule definitions, validation, turn logic
-└── ui/index.ts             Reusable UI components (buttons, menus, overlays)
+├── core-engine/            Game loop, state management, turn sequencing
+│   ├── GameState.ts        GameState<T>, createGameState
+│   ├── TurnSequencer.ts    advanceTurn, getCurrentPlayer, startGame, endGame
+│   └── index.ts            Barrel file / public API
+├── card-system/            Card, Deck, Pile abstractions
+│   ├── Card.ts             Rank, Suit, Card type, createCard
+│   ├── Deck.ts             createStandardDeck, shuffle, draw, drawOrThrow
+│   ├── Pile.ts             Pile class (push, pop, peek, isEmpty, size)
+│   └── index.ts            Barrel file / public API
+├── rule-engine/index.ts    Rule definitions (stub -- game-specific rules live with games)
+└── ui/index.ts             Reusable UI components (stub)
 
 example-games/
-└── hello-world/
+├── hello-world/
+│   ├── main.ts                 Game entry point (Phaser.Game config)
+│   └── scenes/
+│       └── HelloWorldScene.ts  Phaser.Scene subclass
+└── golf/
     ├── main.ts                 Game entry point (Phaser.Game config)
+    ├── GolfGrid.ts             3x3 grid type and utilities
+    ├── GolfRules.ts            Turn legality, move application, round-end detection
+    ├── GolfScoring.ts          Card point values, grid scoring, column matching
+    ├── GolfGame.ts             Game orchestration (session setup, turn execution)
+    ├── AiStrategy.ts           AI strategies (RandomStrategy, GreedyStrategy)
+    ├── GameTranscript.ts       Transcript recording (TranscriptRecorder)
     └── scenes/
-        └── HelloWorldScene.ts  Phaser.Scene subclass
+        └── GolfScene.ts        Phaser scene (full visual interface)
 
 public/assets/
-├── cards/                  Card sprite assets (SVG, CC0)
+├── cards/                  52 card face SVGs + card_back.svg (140x190px, CC0)
 └── CREDITS.md              Asset attribution
 
 tests/
-└── smoke.test.ts           Toolchain smoke test
+├── smoke.test.ts           Toolchain smoke test
+├── card-system/            Card, Deck, Pile unit tests
+├── core-engine/            GameState, TurnSequencer unit tests
+└── golf/                   Golf game unit + integration tests
 ```
 
 Each `src/` module has a barrel file (`index.ts`) that serves as its public API. Import engine modules using path aliases (see below).
@@ -126,6 +146,52 @@ import { ENGINE_VERSION } from '@core-engine/index';
 6. Update `index.html` or implement multi-game routing as needed
 
 Follow the `hello-world` example as a reference implementation.
+
+## 9-Card Golf
+
+The Golf game is the first full spike built on the engine. It demonstrates:
+
+- **Card system**: Card, Deck, and Pile abstractions from `src/card-system/`
+- **Core engine**: GameState and TurnSequencer from `src/core-engine/`
+- **Game rules**: Golf-specific scoring (A=1, 2=-2, 3-10=face, J/Q=10, K=0, column-of-three=0), turn legality, and round-end detection
+- **AI strategies**: RandomStrategy (uniform random legal moves) and GreedyStrategy (minimizes total score)
+- **Transcript recording**: JSON game transcripts capturing all turns, board states, and results
+- **Phaser UI**: Full visual interface with 3x3 grids, draw/discard piles, card flip animations, score display, and end-of-round screen
+
+### Running the Golf game
+
+```bash
+npm run dev
+```
+
+Open `http://localhost:3000` -- the Golf game loads by default. Click the stock or discard pile to draw, click a grid card to swap, or click the discard pile after drawing to discard and flip a face-down card.
+
+### Golf game files
+
+| File | Purpose |
+|------|---------|
+| `example-games/golf/main.ts` | Phaser game config entry point |
+| `example-games/golf/GolfGrid.ts` | 3x3 grid type and utilities |
+| `example-games/golf/GolfRules.ts` | Turn legality, move application, round-end detection |
+| `example-games/golf/GolfScoring.ts` | Scoring rules (card values, column matching) |
+| `example-games/golf/GolfGame.ts` | Game orchestration (setup, turn execution, move enumeration) |
+| `example-games/golf/AiStrategy.ts` | AI strategies and AiPlayer wrapper |
+| `example-games/golf/GameTranscript.ts` | Transcript types and TranscriptRecorder |
+| `example-games/golf/scenes/GolfScene.ts` | Phaser scene (visual interface) |
+
+### Golf game tests
+
+Tests are in `tests/golf/`:
+
+| File | Tests |
+|------|-------|
+| `GolfGrid.test.ts` | Grid creation, indexing, face-up counting |
+| `GolfRules.test.ts` | Turn legality, move application, round-end detection |
+| `GolfScoring.test.ts` | Card values, grid scoring, column matching |
+| `GolfGame.test.ts` | Game setup, legal move enumeration, turn execution |
+| `AiStrategy.test.ts` | RandomStrategy, GreedyStrategy, AiPlayer |
+| `GameTranscript.test.ts` | Transcript recording, snapshots, finalization |
+| `Integration.test.ts` | Full AI-vs-AI games, transcript validation, game invariants |
 
 ## Managing Assets
 

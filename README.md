@@ -23,13 +23,15 @@ The project is organized as a **flat monorepo** -- a single `package.json` at th
 ```
 tableau-card-engine/
 ├── src/                   Engine modules
-│   ├── core-engine/       Game loop, state management, rendering helpers
-│   ├── card-system/       Card, Deck, Hand, Pile abstractions
+│   ├── core-engine/       Game loop, state management, turn sequencing
+│   ├── card-system/       Card, Deck, Pile abstractions
 │   ├── rule-engine/       Rule definitions, validation, turn logic
 │   └── ui/                Reusable UI components
 ├── example-games/         Standalone example games
-│   └── hello-world/       Minimal Phaser scene (toolchain proof)
+│   ├── hello-world/       Minimal Phaser scene (toolchain proof)
+│   └── golf/              9-Card Golf (human vs. AI)
 ├── public/assets/         Static assets (cards, fonts, images)
+│   └── cards/             52 card face SVGs + card back (140x190px)
 ├── tests/                 Vitest test files
 ├── docs/                  Developer documentation
 │   └── DEVELOPER.md       Detailed developer guide
@@ -56,8 +58,9 @@ tableau-card-engine/
 | Game | Location | Description |
 |------|----------|-------------|
 | Hello World | `example-games/hello-world/` | Minimal Phaser scene with card sprites -- proves the toolchain works |
+| 9-Card Golf | `example-games/golf/` | Single-round 9-Card Golf (human vs. AI) with card flip animations, greedy/random AI strategies, and JSON game transcripts |
 
-More games are planned: 9-Card Golf, Beleaguered Castle, Sushi Go!, Splendor, Lost Cities, The Mind, and Coloretto.
+More games are planned: Beleaguered Castle, Sushi Go!, Splendor, Lost Cities, The Mind, and Coloretto.
 
 ## Contributing
 
