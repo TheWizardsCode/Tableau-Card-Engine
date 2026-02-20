@@ -732,7 +732,10 @@ export class GolfScene extends Phaser.Scene {
       const checkDone = () => {
         completed++;
         if (completed === 2) {
-          // Restore grid card depth after transit
+          // Snap the grid sprite back to its slot (it was tweened to the
+          // discard pile). refreshAll() will update its texture to the new
+          // card that now occupies this slot in game state.
+          sprite.setPosition(gridSlotPos.x, gridSlotPos.y);
           sprite.setDepth(0);
           wrappedOnComplete();
         }
