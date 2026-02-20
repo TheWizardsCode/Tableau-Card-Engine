@@ -41,6 +41,7 @@ const GAME_H = 600;
 const AI_DELAY = 600; // ms before AI chooses
 const AI_SHOW_DRAW_DELAY = 1000; // ms to show drawn card before moving
 const ANIM_DURATION = 300; // ms for animations
+const SWAP_ANIM_DURATION = ANIM_DURATION * 1.5; // ms for swap/discard-and-flip
 
 // Layout positions (designed to fit two 3x3 grids + piles in 600px height)
 const AI_GRID_Y = 105; // center Y of AI grid
@@ -722,23 +723,63 @@ export class GolfScene extends Phaser.Scene {
       const sprite = sprites[idx];
       const grid = this.session.gameState.playerStates[result.playerIndex].grid;
 
-      // Flip animation: scale X to 0, change texture, scale back
+      // Compute destination positions
+      const gridSlotPos = this.gridCellPosition(idx, playerKey);
+      const discardPos = { x: DISCARD_X, y: PILE_Y };
+
+      // Track completion of both parallel tweens
+      let completed = 0;
+      const checkDone = () => {
+        completed++;
+        if (completed === 2) {
+          // Restore grid card depth after transit
+          sprite.setDepth(0);
+          wrappedOnComplete();
+        }
+      };
+
+      // Raise grid card depth so it renders above other grid cards during transit
+      sprite.setDepth(10);
+
+      // 1. Grid card: flip (reveal face) + translate to discard pile
+      //    First half: scaleX → 0 while moving halfway to discard
       this.tweens.add({
         targets: sprite,
         scaleX: 0,
-        duration: ANIM_DURATION / 2,
+        x: (sprite.x + discardPos.x) / 2,
+        y: (sprite.y + discardPos.y) / 2,
+        duration: SWAP_ANIM_DURATION / 2,
         ease: 'Power2',
         onComplete: () => {
+          // Reveal the card's actual face at the midpoint of the flip
           sprite.setTexture(this.getCardTexture(grid[idx]));
+          // Second half: scaleX → 1 while completing movement to discard
           this.tweens.add({
             targets: sprite,
             scaleX: 1,
-            duration: ANIM_DURATION / 2,
+            x: discardPos.x,
+            y: discardPos.y,
+            duration: SWAP_ANIM_DURATION / 2,
             ease: 'Power2',
-            onComplete: wrappedOnComplete,
+            onComplete: checkDone,
           });
         },
       });
+
+      // 2. Drawn card: translate from display position to vacated grid slot
+      if (this.drawnCardSprite) {
+        this.tweens.add({
+          targets: this.drawnCardSprite,
+          x: gridSlotPos.x,
+          y: gridSlotPos.y,
+          duration: SWAP_ANIM_DURATION,
+          ease: 'Power2',
+          onComplete: checkDone,
+        });
+      } else {
+        // Edge case: no drawn card sprite (shouldn't happen, but be safe)
+        checkDone();
+      }
     } else {
       // Discard-and-flip: flip the target card
       const idx = result.move.row * 3 + result.move.col;
