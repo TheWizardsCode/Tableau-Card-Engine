@@ -28,12 +28,9 @@ import http from 'node:http';
 
 // ── Types ───────────────────────────────────────────────────
 
+import type { CardSnapshot } from '../src/core-engine/TranscriptTypes';
+
 /** Minimal transcript types matching GameTranscript.ts schema. */
-interface CardSnapshot {
-  rank: string;
-  suit: string;
-  faceUp: boolean;
-}
 
 interface BoardSnapshot {
   grid: CardSnapshot[];

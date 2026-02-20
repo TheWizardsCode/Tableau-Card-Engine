@@ -9,20 +9,18 @@
  * after each `executeTurn()`, and `finalize()` after the game ends.
  */
 
-import type { Card } from '../../src/card-system/Card';
 import type { GolfGrid } from './GolfGrid';
 import type { DrawSource, GolfMove } from './GolfRules';
 import type { GolfSession, TurnResult } from './GolfGame';
 import { scoreGrid, scoreVisibleCards } from './GolfScoring';
+import { snapshotCard } from '../../src/core-engine/TranscriptTypes';
+import type { CardSnapshot } from '../../src/core-engine/TranscriptTypes';
+
+// Re-export so existing consumers that import from this module still work.
+export { snapshotCard };
+export type { CardSnapshot };
 
 // ── Snapshot types ──────────────────────────────────────────
-
-/** Serializable card snapshot (no methods). */
-export interface CardSnapshot {
-  rank: string;
-  suit: string;
-  faceUp: boolean;
-}
 
 /** Snapshot of a player's board state at a point in time. */
 export interface BoardSnapshot {
@@ -105,15 +103,6 @@ export interface GameTranscript {
 }
 
 // ── Helpers ─────────────────────────────────────────────────
-
-/** Create a serializable snapshot of a card. */
-export function snapshotCard(card: Card): CardSnapshot {
-  return {
-    rank: card.rank,
-    suit: card.suit,
-    faceUp: card.faceUp,
-  };
-}
 
 /** Create a board snapshot for a player's grid. */
 export function snapshotBoard(grid: GolfGrid): BoardSnapshot {
