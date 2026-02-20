@@ -28,6 +28,7 @@ import {
   CARD_W, CARD_H, GAME_W, GAME_H, FONT_FAMILY,
   cardTextureKey, getCardTexture, preloadCardAssets,
   createOverlayBackground, createOverlayButton, createOverlayMenuButton,
+  createSceneTitle, createSceneMenuButton,
 } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
 import helpContent from '../help-content.json';
@@ -254,27 +255,10 @@ export class GolfScene extends Phaser.Scene {
   private createLabels(): void {
     // Menu button (top-left) -- returns to game selector
     if (!this.replayMode) {
-      const menuBtn = this.add
-        .text(30, 14, '[ Menu ]', {
-          fontSize: '12px',
-          color: '#aaccaa',
-          fontFamily: FONT_FAMILY,
-        })
-        .setOrigin(0.5)
-        .setInteractive({ useHandCursor: true });
-
-      menuBtn.on('pointerdown', () => this.scene.start('GameSelectorScene'));
-      menuBtn.on('pointerover', () => menuBtn.setColor('#88ff88'));
-      menuBtn.on('pointerout', () => menuBtn.setColor('#aaccaa'));
+      createSceneMenuButton(this);
     }
 
-    this.add
-      .text(GAME_W / 2, 14, '9-Card Golf', {
-        fontSize: '18px',
-        color: '#ffffff',
-        fontFamily: FONT_FAMILY,
-      })
-      .setOrigin(0.5);
+    createSceneTitle(this, '9-Card Golf');
 
     this.aiLabel = this.add
       .text(GAME_W / 2 - 130, AI_GRID_Y, 'AI', {
