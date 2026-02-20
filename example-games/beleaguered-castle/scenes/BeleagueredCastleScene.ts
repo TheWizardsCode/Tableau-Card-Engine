@@ -36,6 +36,7 @@ import { BCTranscriptRecorder } from '../GameTranscript';
 import type { BCGameTranscript } from '../GameTranscript';
 import {
   HelpPanel, HelpButton,
+  SettingsPanel, SettingsButton,
   CARD_W, CARD_H, GAME_W, GAME_H, FONT_FAMILY,
   cardTextureKey, preloadCardAssets,
   createOverlayBackground, dismissOverlay as sharedDismissOverlay,
@@ -43,7 +44,30 @@ import {
   createSceneTitle, createSceneMenuButton,
 } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
+import { GameEventEmitter } from '../../../src/core-engine/GameEventEmitter';
+import { PhaserEventBridge } from '../../../src/core-engine/PhaserEventBridge';
+import { SoundManager } from '../../../src/core-engine/SoundManager';
+import type { SoundPlayer, EventSoundMapping } from '../../../src/core-engine/SoundManager';
 import helpContent from '../help-content.json';
+
+// ── Audio asset keys ────────────────────────────────────────
+
+const SFX_KEYS = {
+  CARD_PICKUP: 'bc-sfx-card-pickup',
+  CARD_TO_FOUNDATION: 'bc-sfx-card-to-foundation',
+  CARD_TO_TABLEAU: 'bc-sfx-card-to-tableau',
+  CARD_SNAP_BACK: 'bc-sfx-card-snap-back',
+  DEAL_CARD: 'bc-sfx-deal-card',
+  WIN_FANFARE: 'bc-sfx-win-fanfare',
+  LOSS_SOUND: 'bc-sfx-loss-sound',
+  AUTO_COMPLETE_START: 'bc-sfx-auto-complete-start',
+  AUTO_COMPLETE_CARD: 'bc-sfx-auto-complete-card',
+  UNDO: 'bc-sfx-undo',
+  REDO: 'bc-sfx-redo',
+  CARD_SELECT: 'bc-sfx-card-select',
+  CARD_DESELECT: 'bc-sfx-card-deselect',
+  UI_CLICK: 'bc-sfx-ui-click',
+} as const;
 
 // ── Constants ───────────────────────────────────────────────
 
@@ -220,6 +244,13 @@ export class BeleagueredCastleScene extends Phaser.Scene {
   private helpPanel!: HelpPanel;
   private helpButton!: HelpButton;
 
+  // Sound system
+  private gameEvents!: GameEventEmitter;
+  private eventBridge!: PhaserEventBridge;
+  private soundManager: SoundManager | null = null;
+  private settingsPanel!: SettingsPanel;
+  private settingsButton!: SettingsButton;
+
   constructor() {
     super({ key: 'BeleagueredCastleScene' });
   }
@@ -236,6 +267,23 @@ export class BeleagueredCastleScene extends Phaser.Scene {
 
   preload(): void {
     preloadCardAssets(this);
+
+    // Audio assets (medieval-themed SFX)
+    const audioDir = 'assets/audio/beleaguered-castle';
+    this.load.audio(SFX_KEYS.CARD_PICKUP, `${audioDir}/card-pickup.wav`);
+    this.load.audio(SFX_KEYS.CARD_TO_FOUNDATION, `${audioDir}/card-to-foundation.wav`);
+    this.load.audio(SFX_KEYS.CARD_TO_TABLEAU, `${audioDir}/card-to-tableau.wav`);
+    this.load.audio(SFX_KEYS.CARD_SNAP_BACK, `${audioDir}/card-snap-back.wav`);
+    this.load.audio(SFX_KEYS.DEAL_CARD, `${audioDir}/deal-card.wav`);
+    this.load.audio(SFX_KEYS.WIN_FANFARE, `${audioDir}/win-fanfare.wav`);
+    this.load.audio(SFX_KEYS.LOSS_SOUND, `${audioDir}/loss-sound.wav`);
+    this.load.audio(SFX_KEYS.AUTO_COMPLETE_START, `${audioDir}/auto-complete-start.wav`);
+    this.load.audio(SFX_KEYS.AUTO_COMPLETE_CARD, `${audioDir}/auto-complete-card.wav`);
+    this.load.audio(SFX_KEYS.UNDO, `${audioDir}/undo.wav`);
+    this.load.audio(SFX_KEYS.REDO, `${audioDir}/redo.wav`);
+    this.load.audio(SFX_KEYS.CARD_SELECT, `${audioDir}/card-select.wav`);
+    this.load.audio(SFX_KEYS.CARD_DESELECT, `${audioDir}/card-deselect.wav`);
+    this.load.audio(SFX_KEYS.UI_CLICK, `${audioDir}/ui-click.wav`);
   }
 
   // ── Create ──────────────────────────────────────────────
@@ -278,6 +326,44 @@ export class BeleagueredCastleScene extends Phaser.Scene {
     this.createTableauDropZones();
     this.createHUD();
     this.createHelpPanel();
+
+    // Sound system: event emitter, bridge, sound manager, settings
+    this.gameEvents = new GameEventEmitter();
+    this.eventBridge = new PhaserEventBridge(this.gameEvents, this.events);
+
+    const phaserSound = this.sound;
+    const player: SoundPlayer = {
+      play: (key: string) => { phaserSound.play(key); },
+      stop: (key: string) => { phaserSound.stopByKey(key); },
+      setVolume: (v: number) => { phaserSound.volume = v; },
+      setMute: (m: boolean) => { phaserSound.mute = m; },
+    };
+    this.soundManager = new SoundManager(player);
+
+    // Register all SFX keys
+    for (const sfxKey of Object.values(SFX_KEYS)) {
+      this.soundManager.register(sfxKey);
+    }
+
+    // Declarative event-to-sound mapping
+    const mapping: EventSoundMapping = {
+      'card-pickup': SFX_KEYS.CARD_PICKUP,
+      'card-to-foundation': SFX_KEYS.CARD_TO_FOUNDATION,
+      'card-to-tableau': SFX_KEYS.CARD_TO_TABLEAU,
+      'card-snap-back': SFX_KEYS.CARD_SNAP_BACK,
+      'deal-card': SFX_KEYS.DEAL_CARD,
+      'game-ended': SFX_KEYS.LOSS_SOUND, // default; win overrides with direct play
+      'auto-complete-start': SFX_KEYS.AUTO_COMPLETE_START,
+      'auto-complete-card': SFX_KEYS.AUTO_COMPLETE_CARD,
+      'undo': SFX_KEYS.UNDO,
+      'redo': SFX_KEYS.REDO,
+      'card-selected': SFX_KEYS.CARD_SELECT,
+      'card-deselected': SFX_KEYS.CARD_DESELECT,
+      'ui-interaction': SFX_KEYS.UI_CLICK,
+    };
+    this.soundManager.connectToEvents(this.gameEvents, mapping);
+
+    this.createSettingsPanel();
 
     // Render foundations (aces already placed)
     this.refreshFoundations();
@@ -460,6 +546,17 @@ export class BeleagueredCastleScene extends Phaser.Scene {
         // Raise card above everything during drag
         gameObject.setDepth(DRAG_DEPTH);
 
+        // Emit card-pickup event
+        const col = this.gameState.tableau[data.colIndex];
+        const topCard = col.peek();
+        if (topCard) {
+          this.gameEvents.emit('card-pickup', {
+            suit: topCard.suit,
+            rank: topCard.rank,
+            source: 'tableau' as const,
+          });
+        }
+
         // Show valid drop target highlights
         this.showValidDropHighlights(data.colIndex);
       },
@@ -602,6 +699,29 @@ export class BeleagueredCastleScene extends Phaser.Scene {
       this.recorder.recordAutoMove(am);
     }
 
+    // Emit sound events for the player move
+    if (move.kind === 'tableau-to-foundation') {
+      const fPile = this.gameState.foundations[move.toFoundation];
+      const topCard = fPile.peek();
+      if (topCard) {
+        this.gameEvents.emit('card-to-foundation', {
+          suit: topCard.suit,
+          rank: topCard.rank,
+          foundationIndex: move.toFoundation,
+        });
+      }
+    } else if (move.kind === 'tableau-to-tableau') {
+      const tCol = this.gameState.tableau[move.toCol];
+      const topCard = tCol.peek();
+      if (topCard) {
+        this.gameEvents.emit('card-to-tableau', {
+          suit: topCard.suit,
+          rank: topCard.rank,
+          columnIndex: move.toCol,
+        });
+      }
+    }
+
     // Start timer on first move
     if (!this.timerStarted) {
       this.timerStarted = true;
@@ -621,6 +741,9 @@ export class BeleagueredCastleScene extends Phaser.Scene {
   private snapBack(sprite: Phaser.GameObjects.Image): void {
     const data = sprite.getData('cardData') as CardSpriteData | undefined;
     if (!data) return;
+
+    // Emit snap-back event
+    this.gameEvents.emit('card-snap-back', { reason: 'invalid-drop' });
 
     this.tweens.add({
       targets: sprite,
@@ -814,6 +937,17 @@ export class BeleagueredCastleScene extends Phaser.Scene {
       colSprites[colSprites.length - 1].setTint(SELECTION_TINT);
     }
 
+    // Emit card-selected event
+    const col = this.gameState.tableau[colIndex];
+    const topCard = col.peek();
+    if (topCard) {
+      this.gameEvents.emit('card-selected', {
+        suit: topCard.suit,
+        rank: topCard.rank,
+        columnIndex: colIndex,
+      });
+    }
+
     // Show valid drop target highlights (reuses the drag highlight system)
     this.showValidDropHighlights(colIndex);
   }
@@ -828,6 +962,9 @@ export class BeleagueredCastleScene extends Phaser.Scene {
       if (colSprites.length > 0) {
         colSprites[colSprites.length - 1].clearTint();
       }
+
+      // Emit card-deselected event
+      this.gameEvents.emit('card-deselected', { reason: 'click-away' });
     }
     this.selectedCol = null;
     this.clearDropHighlights();
@@ -868,6 +1005,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
       if (this.undoManager.canUndo()) {
         this.undoManager.undo();
         this.recorder.recordUndo(this.gameState.moveCount);
+        this.gameEvents.emit('undo', {});
         this.refreshAll();
       }
       return;
@@ -879,6 +1017,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
     this.deselectColumn();
     this.undoManager.undo();
     this.recorder.recordUndo(this.gameState.moveCount);
+    this.gameEvents.emit('undo', {});
     this.refreshAll();
   }
 
@@ -889,6 +1028,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
     this.deselectColumn();
     this.undoManager.redo();
     this.recorder.recordRedo(this.gameState.moveCount);
+    this.gameEvents.emit('redo', {});
     this.refreshAll();
   }
 
@@ -943,6 +1083,31 @@ export class BeleagueredCastleScene extends Phaser.Scene {
 
     this.autoCompleting = true;
 
+    // Capture card info before moves are applied (for sound events).
+    // We simulate each move in sequence to get the correct top card,
+    // then undo everything to restore the original state.
+    const moveCards: { suit: string; rank: string; foundationIndex: number }[] = [];
+    for (const m of moves) {
+      if (m.kind === 'tableau-to-foundation') {
+        const topCard = this.gameState.tableau[m.fromCol].peek();
+        moveCards.push({
+          suit: topCard?.suit ?? '',
+          rank: topCard?.rank ?? '',
+          foundationIndex: m.toFoundation,
+        });
+      } else {
+        moveCards.push({ suit: '', rank: '', foundationIndex: -1 });
+      }
+      applyMove(this.gameState, m);
+    }
+    // Undo all in reverse to restore state
+    for (let i = moves.length - 1; i >= 0; i--) {
+      undoMove(this.gameState, moves[i]);
+    }
+
+    // Emit auto-complete-start event
+    this.gameEvents.emit('auto-complete-start', { cardCount: moves.length });
+
     // Build compound command of AutoMoveCommands
     const cmds: Command[] = moves.map(
       (m) => new AutoMoveCommand(this.gameState, m),
@@ -960,10 +1125,20 @@ export class BeleagueredCastleScene extends Phaser.Scene {
       const move = moves[i];
       if (move.kind !== 'tableau-to-foundation') continue;
 
+      const cardInfo = moveCards[i];
       const timer = this.time.delayedCall(
         i * AUTO_COMPLETE_DELAY,
         () => {
           if (!this.autoCompleting) return; // cancelled by undo
+
+          // Emit auto-complete-card event
+          if (cardInfo) {
+            this.gameEvents.emit('auto-complete-card', {
+              suit: cardInfo.suit,
+              rank: cardInfo.rank,
+              foundationIndex: cardInfo.foundationIndex,
+            });
+          }
 
           // Flash the foundation sprite to indicate a card landing
           const fSprite = this.foundationSprites[move.toFoundation];
@@ -1026,6 +1201,9 @@ export class BeleagueredCastleScene extends Phaser.Scene {
     const OVERLAY_DEPTH = 2000;
     const BUTTON_DEPTH = OVERLAY_DEPTH + 1;
 
+    // Play win fanfare directly (overrides the default game-ended mapping)
+    this.soundManager?.play(SFX_KEYS.WIN_FANFARE);
+
     // Semi-transparent background covering the full scene
     const { objects: overlayObjects } = createOverlayBackground(this, {
       depth: OVERLAY_DEPTH,
@@ -1072,6 +1250,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
       this, GAME_W / 2 - 110, GAME_H / 2 + 35, '[ New Game ]', BUTTON_DEPTH,
     );
     newGameBtn.on('pointerdown', () => {
+      this.gameEvents.emit('ui-interaction', { elementId: 'new-game', action: 'click' });
       this.seed = Date.now();
       this.scene.restart();
     });
@@ -1082,6 +1261,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
       this, GAME_W / 2, GAME_H / 2 + 35, '[ Restart ]', BUTTON_DEPTH,
     );
     restartBtn.on('pointerdown', () => {
+      this.gameEvents.emit('ui-interaction', { elementId: 'restart', action: 'click' });
       this.scene.restart();
     });
     overlayObjects.push(restartBtn);
@@ -1101,6 +1281,13 @@ export class BeleagueredCastleScene extends Phaser.Scene {
   private showNoMovesOverlay(): void {
     const OVERLAY_DEPTH = 2000;
     const BUTTON_DEPTH = OVERLAY_DEPTH + 1;
+
+    // Emit game-ended event for loss (triggers loss sound via mapping)
+    this.gameEvents.emit('game-ended', {
+      finalTurnNumber: this.gameState.moveCount,
+      winnerIndex: -1,
+      reason: 'no-moves',
+    });
 
     // Semi-transparent background
     const { objects: overlayObjects } = createOverlayBackground(this, {
@@ -1126,6 +1313,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
     );
     undoBtn.on('pointerdown', () => {
       if (!this.undoManager.canUndo()) return;
+      this.gameEvents.emit('ui-interaction', { elementId: 'undo-last', action: 'click' });
       this.dismissOverlay();
       this.gameEnded = false;
       this.resumeTimer();
@@ -1139,6 +1327,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
       this, GAME_W / 2 - 15, GAME_H / 2 + 20, '[ New Game ]', BUTTON_DEPTH,
     );
     noMovesNewGameBtn.on('pointerdown', () => {
+      this.gameEvents.emit('ui-interaction', { elementId: 'new-game', action: 'click' });
       this.seed = Date.now();
       this.scene.restart();
     });
@@ -1149,6 +1338,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
       this, GAME_W / 2 + 85, GAME_H / 2 + 20, '[ Restart ]', BUTTON_DEPTH,
     );
     noMovesRestartBtn.on('pointerdown', () => {
+      this.gameEvents.emit('ui-interaction', { elementId: 'restart', action: 'click' });
       this.scene.restart();
     });
     overlayObjects.push(noMovesRestartBtn);
@@ -1177,6 +1367,17 @@ export class BeleagueredCastleScene extends Phaser.Scene {
       sections: helpContent as HelpSection[],
     });
     this.helpButton = new HelpButton(this, this.helpPanel);
+  }
+
+  // ── Settings Panel ─────────────────────────────────────
+
+  /** Create the settings panel with sound controls (mute toggle + volume slider). */
+  private createSettingsPanel(): void {
+    if (!this.soundManager) return;
+    this.settingsPanel = new SettingsPanel(this, {
+      soundManager: this.soundManager,
+    });
+    this.settingsButton = new SettingsButton(this, this.settingsPanel);
   }
 
   // ── Foundation rendering ────────────────────────────────
@@ -1259,6 +1460,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
 
         // Stagger the animation for each card
         const delay = dealIndex * DEAL_STAGGER;
+        const currentDealIndex = dealIndex;
         this.tweens.add({
           targets: sprite,
           x: targetX,
@@ -1267,6 +1469,13 @@ export class BeleagueredCastleScene extends Phaser.Scene {
           duration: ANIM_DURATION,
           delay,
           ease: 'Power2',
+          onStart: () => {
+            // Emit deal-card event for each card as it starts moving
+            this.gameEvents.emit('deal-card', {
+              cardIndex: currentDealIndex,
+              totalCards,
+            });
+          },
           onComplete: () => {
             // After deal animation, set depth based on row
             sprite.setDepth(row);
@@ -1483,5 +1692,13 @@ export class BeleagueredCastleScene extends Phaser.Scene {
     this.dismissOverlay();
     this.helpPanel?.destroy();
     this.helpButton?.destroy();
+
+    // Sound system cleanup
+    this.soundManager?.destroy();
+    this.soundManager = null;
+    this.eventBridge?.destroy();
+    this.gameEvents?.removeAllListeners();
+    this.settingsPanel?.destroy();
+    this.settingsButton?.destroy();
   }
 }
