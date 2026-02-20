@@ -32,6 +32,9 @@ export function createGolfGame(options: GolfGameOptions = {}): Phaser.Game {
       mode: Phaser.Scale.FIT,
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
+    audio: {
+      disableWebAudio: false,
+    },
   };
 
   return new Phaser.Game(config);

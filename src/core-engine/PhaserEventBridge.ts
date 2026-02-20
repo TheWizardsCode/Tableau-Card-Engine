@@ -47,6 +47,11 @@ const ALL_EVENTS: GameEventName[] = [
   'animation-complete',
   'state-settled',
   'game-ended',
+  'card-drawn',
+  'card-flipped',
+  'card-swapped',
+  'card-discarded',
+  'ui-interaction',
 ];
 
 /**

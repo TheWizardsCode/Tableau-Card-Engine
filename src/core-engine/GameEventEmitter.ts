@@ -75,6 +75,58 @@ export interface GameEndedPayload {
   readonly reason?: string;
 }
 
+// ── Card-level Event Payloads ───────────────────────────────
+
+/**
+ * Emitted when a card is drawn from a pile.
+ */
+export interface CardDrawnPayload {
+  /** Where the card was drawn from: 'stock' or 'discard'. */
+  readonly source: 'stock' | 'discard';
+  /** Index of the player who drew the card. */
+  readonly playerIndex: number;
+}
+
+/**
+ * Emitted when a card is flipped face-up in a player's grid.
+ */
+export interface CardFlippedPayload {
+  /** Grid position (row * cols + col) of the flipped card. */
+  readonly position: number;
+  /** Index of the player whose card was flipped. */
+  readonly playerIndex: number;
+}
+
+/**
+ * Emitted when a drawn card is swapped with a grid card.
+ */
+export interface CardSwappedPayload {
+  /** Grid position (row * cols + col) where the swap occurred. */
+  readonly position: number;
+  /** Where the replacement card was drawn from: 'stock' or 'discard'. */
+  readonly drawnFrom: 'stock' | 'discard';
+  /** Index of the player who performed the swap. */
+  readonly playerIndex: number;
+}
+
+/**
+ * Emitted when a drawn card is discarded (not swapped into the grid).
+ */
+export interface CardDiscardedPayload {
+  /** Index of the player who discarded. */
+  readonly playerIndex: number;
+}
+
+/**
+ * Emitted when a UI element is interacted with.
+ */
+export interface UIInteractionPayload {
+  /** Identifier of the UI element (e.g. 'play-again', 'menu'). */
+  readonly elementId: string;
+  /** The type of interaction (e.g. 'click', 'hover'). */
+  readonly action: string;
+}
+
 // ── Event Map ───────────────────────────────────────────────
 
 /**
@@ -89,6 +141,11 @@ export interface GameEventMap {
   'animation-complete': AnimationCompletePayload;
   'state-settled': StateSettledPayload;
   'game-ended': GameEndedPayload;
+  'card-drawn': CardDrawnPayload;
+  'card-flipped': CardFlippedPayload;
+  'card-swapped': CardSwappedPayload;
+  'card-discarded': CardDiscardedPayload;
+  'ui-interaction': UIInteractionPayload;
 }
 
 /** Union of all valid game event names. */
