@@ -677,13 +677,14 @@ describe('Integration: Auto-complete', () => {
 // ── Snapshot helpers ─────────────────────────────────────────
 
 describe('Integration: Snapshot utilities', () => {
-  it('snapshotCard captures rank and suit', () => {
+  it('snapshotCard captures rank, suit, and faceUp', () => {
     const state = deal(42);
     const topCard = state.tableau[0].peek()!;
     const snap = snapshotCard(topCard);
 
     expect(snap.rank).toBe(topCard.rank);
     expect(snap.suit).toBe(topCard.suit);
+    expect(snap.faceUp).toBe(topCard.faceUp);
   });
 
   it('snapshotBoard captures complete state', () => {

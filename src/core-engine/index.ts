@@ -43,6 +43,10 @@ export type {
 } from './GameEventEmitter';
 export { GameEventEmitter } from './GameEventEmitter';
 
+// Shared transcript snapshot types
+export type { CardSnapshot } from './TranscriptTypes';
+export { snapshotCard } from './TranscriptTypes';
+
 // Phaser event bridge
 export type { PhaserLikeEventEmitter } from './PhaserEventBridge';
 export { PhaserEventBridge } from './PhaserEventBridge';

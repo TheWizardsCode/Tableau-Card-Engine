@@ -18,20 +18,20 @@
  *   const transcript = recorder.finalize('win', moveCount, elapsedSeconds);
  */
 
-import type { Card, Rank, Suit } from '../../src/card-system/Card';
+import type { Rank, Suit } from '../../src/card-system/Card';
 import type {
   BeleagueredCastleState,
   BCMove,
 } from './BeleagueredCastleState';
 import { FOUNDATION_COUNT, TABLEAU_COUNT } from './BeleagueredCastleState';
+import { snapshotCard } from '../../src/core-engine/TranscriptTypes';
+import type { CardSnapshot } from '../../src/core-engine/TranscriptTypes';
+
+// Re-export so existing consumers that import from this module still work.
+export { snapshotCard };
+export type { CardSnapshot };
 
 // ── Snapshot types ──────────────────────────────────────────
-
-/** Serializable card snapshot (no methods). */
-export interface CardSnapshot {
-  rank: Rank;
-  suit: Suit;
-}
 
 /** Snapshot of a single foundation pile. */
 export interface FoundationSnapshot {
@@ -129,14 +129,6 @@ export interface BCGameTranscript {
 }
 
 // ── Helpers ─────────────────────────────────────────────────
-
-/** Create a serializable snapshot of a card. */
-export function snapshotCard(card: Card): CardSnapshot {
-  return {
-    rank: card.rank,
-    suit: card.suit,
-  };
-}
 
 /** Create a board snapshot from the current game state. */
 export function snapshotBoard(state: BeleagueredCastleState): BoardSnapshot {
