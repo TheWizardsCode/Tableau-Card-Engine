@@ -14,3 +14,15 @@ export type { HelpButtonConfig } from './HelpButton';
 
 export { GameSelectorScene, REGISTRY_KEY_GAMES } from './GameSelectorScene';
 export type { GameEntry } from './GameSelectorScene';
+
+// Shared constants
+export { CARD_W, CARD_H, GAME_W, GAME_H, FONT_FAMILY } from './constants';
+
+// Card texture helpers
+export {
+  rankFileName,
+  cardTextureKey,
+  cardFileName,
+  getCardTexture,
+  preloadCardAssets,
+} from './CardTextureHelpers';
