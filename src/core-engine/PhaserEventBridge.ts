@@ -52,6 +52,17 @@ const ALL_EVENTS: GameEventName[] = [
   'card-swapped',
   'card-discarded',
   'ui-interaction',
+  'card-to-foundation',
+  'card-to-tableau',
+  'card-pickup',
+  'card-snap-back',
+  'auto-complete-start',
+  'auto-complete-card',
+  'undo',
+  'redo',
+  'card-selected',
+  'card-deselected',
+  'deal-card',
 ];
 
 /**

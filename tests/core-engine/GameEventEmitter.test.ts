@@ -11,6 +11,17 @@ import {
   type CardSwappedPayload,
   type CardDiscardedPayload,
   type UIInteractionPayload,
+  type CardToFoundationPayload,
+  type CardToTableauPayload,
+  type CardPickupPayload,
+  type CardSnapBackPayload,
+  type AutoCompleteStartPayload,
+  type AutoCompleteCardPayload,
+  type UndoPayload,
+  type RedoPayload,
+  type CardSelectedPayload,
+  type CardDeselectedPayload,
+  type DealCardPayload,
 } from '../../src/core-engine/GameEventEmitter';
 
 describe('GameEventEmitter', () => {
@@ -249,6 +260,205 @@ describe('GameEventEmitter', () => {
         action: 'click',
       };
       emitter.emit('ui-interaction', payload);
+      expect(listener).toHaveBeenCalledWith(payload);
+    });
+  });
+
+  // ── Solitaire event types ────────────────────────────
+
+  describe('solitaire event types', () => {
+    it('should emit card-to-foundation events', () => {
+      const listener = vi.fn();
+      emitter.on('card-to-foundation', listener);
+
+      const payload: CardToFoundationPayload = {
+        suit: 'hearts',
+        rank: 'A',
+        foundationIndex: 0,
+        playerIndex: 0,
+      };
+      emitter.emit('card-to-foundation', payload);
+      expect(listener).toHaveBeenCalledWith(payload);
+    });
+
+    it('should emit card-to-foundation without optional playerIndex', () => {
+      const listener = vi.fn();
+      emitter.on('card-to-foundation', listener);
+
+      const payload: CardToFoundationPayload = {
+        suit: 'spades',
+        rank: 'K',
+        foundationIndex: 3,
+      };
+      emitter.emit('card-to-foundation', payload);
+      expect(listener).toHaveBeenCalledWith(payload);
+    });
+
+    it('should emit card-to-tableau events', () => {
+      const listener = vi.fn();
+      emitter.on('card-to-tableau', listener);
+
+      const payload: CardToTableauPayload = {
+        suit: 'diamonds',
+        rank: '7',
+        columnIndex: 3,
+      };
+      emitter.emit('card-to-tableau', payload);
+      expect(listener).toHaveBeenCalledWith(payload);
+    });
+
+    it('should emit card-pickup events', () => {
+      const listener = vi.fn();
+      emitter.on('card-pickup', listener);
+
+      const payload: CardPickupPayload = {
+        suit: 'clubs',
+        rank: 'Q',
+        source: 'tableau',
+      };
+      emitter.emit('card-pickup', payload);
+      expect(listener).toHaveBeenCalledWith(payload);
+    });
+
+    it('should emit card-pickup from different sources', () => {
+      const listener = vi.fn();
+      emitter.on('card-pickup', listener);
+
+      const payload: CardPickupPayload = {
+        suit: 'hearts',
+        rank: '3',
+        source: 'waste',
+      };
+      emitter.emit('card-pickup', payload);
+      expect(listener).toHaveBeenCalledWith(payload);
+    });
+
+    it('should emit card-snap-back events', () => {
+      const listener = vi.fn();
+      emitter.on('card-snap-back', listener);
+
+      const payload: CardSnapBackPayload = {
+        reason: 'Invalid move: card must be one rank lower',
+      };
+      emitter.emit('card-snap-back', payload);
+      expect(listener).toHaveBeenCalledWith(payload);
+    });
+
+    it('should emit card-snap-back without optional reason', () => {
+      const listener = vi.fn();
+      emitter.on('card-snap-back', listener);
+
+      const payload: CardSnapBackPayload = {};
+      emitter.emit('card-snap-back', payload);
+      expect(listener).toHaveBeenCalledWith(payload);
+    });
+
+    it('should emit auto-complete-start events', () => {
+      const listener = vi.fn();
+      emitter.on('auto-complete-start', listener);
+
+      const payload: AutoCompleteStartPayload = {
+        cardCount: 12,
+      };
+      emitter.emit('auto-complete-start', payload);
+      expect(listener).toHaveBeenCalledWith(payload);
+    });
+
+    it('should emit auto-complete-card events', () => {
+      const listener = vi.fn();
+      emitter.on('auto-complete-card', listener);
+
+      const payload: AutoCompleteCardPayload = {
+        suit: 'hearts',
+        rank: '5',
+        foundationIndex: 0,
+      };
+      emitter.emit('auto-complete-card', payload);
+      expect(listener).toHaveBeenCalledWith(payload);
+    });
+
+    it('should emit undo events', () => {
+      const listener = vi.fn();
+      emitter.on('undo', listener);
+
+      const payload: UndoPayload = {
+        moveDescription: 'Move 7H from column 3 to foundation',
+      };
+      emitter.emit('undo', payload);
+      expect(listener).toHaveBeenCalledWith(payload);
+    });
+
+    it('should emit undo without optional moveDescription', () => {
+      const listener = vi.fn();
+      emitter.on('undo', listener);
+
+      const payload: UndoPayload = {};
+      emitter.emit('undo', payload);
+      expect(listener).toHaveBeenCalledWith(payload);
+    });
+
+    it('should emit redo events', () => {
+      const listener = vi.fn();
+      emitter.on('redo', listener);
+
+      const payload: RedoPayload = {
+        moveDescription: 'Move 7H from column 3 to foundation',
+      };
+      emitter.emit('redo', payload);
+      expect(listener).toHaveBeenCalledWith(payload);
+    });
+
+    it('should emit redo without optional moveDescription', () => {
+      const listener = vi.fn();
+      emitter.on('redo', listener);
+
+      const payload: RedoPayload = {};
+      emitter.emit('redo', payload);
+      expect(listener).toHaveBeenCalledWith(payload);
+    });
+
+    it('should emit card-selected events', () => {
+      const listener = vi.fn();
+      emitter.on('card-selected', listener);
+
+      const payload: CardSelectedPayload = {
+        suit: 'spades',
+        rank: 'J',
+        columnIndex: 5,
+      };
+      emitter.emit('card-selected', payload);
+      expect(listener).toHaveBeenCalledWith(payload);
+    });
+
+    it('should emit card-deselected events', () => {
+      const listener = vi.fn();
+      emitter.on('card-deselected', listener);
+
+      const payload: CardDeselectedPayload = {
+        reason: 'new-selection',
+      };
+      emitter.emit('card-deselected', payload);
+      expect(listener).toHaveBeenCalledWith(payload);
+    });
+
+    it('should emit card-deselected without optional reason', () => {
+      const listener = vi.fn();
+      emitter.on('card-deselected', listener);
+
+      const payload: CardDeselectedPayload = {};
+      emitter.emit('card-deselected', payload);
+      expect(listener).toHaveBeenCalledWith(payload);
+    });
+
+    it('should emit deal-card events', () => {
+      const listener = vi.fn();
+      emitter.on('deal-card', listener);
+
+      const payload: DealCardPayload = {
+        cardIndex: 0,
+        totalCards: 48,
+      };
+      emitter.emit('deal-card', payload);
       expect(listener).toHaveBeenCalledWith(payload);
     });
   });
