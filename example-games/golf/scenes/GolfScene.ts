@@ -27,6 +27,7 @@ import { SoundManager } from '../../../src/core-engine/SoundManager';
 import type { SoundPlayer, EventSoundMapping } from '../../../src/core-engine/SoundManager';
 import {
   HelpPanel, HelpButton,
+  SettingsPanel, SettingsButton,
   CARD_W, CARD_H, GAME_W, GAME_H, FONT_FAMILY,
   cardTextureKey, getCardTexture, preloadCardAssets,
   createOverlayBackground, createOverlayButton, createOverlayMenuButton,
@@ -119,6 +120,10 @@ export class GolfScene extends Phaser.Scene {
   // Help panel
   private helpPanel!: HelpPanel;
   private helpButton!: HelpButton;
+
+  // Settings panel
+  private settingsPanel!: SettingsPanel;
+  private settingsButton!: SettingsButton;
 
   constructor() {
     super({ key: 'GolfScene' });
@@ -214,6 +219,7 @@ export class GolfScene extends Phaser.Scene {
     this.createInstructions();
     if (!this.replayMode) {
       this.createHelpPanel();
+      this.createSettingsPanel();
     }
 
     // Initial render
@@ -905,6 +911,15 @@ export class GolfScene extends Phaser.Scene {
     this.helpButton = new HelpButton(this, this.helpPanel);
   }
 
+  /** Create the settings panel with sound controls (mute toggle + volume slider). */
+  private createSettingsPanel(): void {
+    if (!this.soundManager) return;
+    this.settingsPanel = new SettingsPanel(this, {
+      soundManager: this.soundManager,
+    });
+    this.settingsButton = new SettingsButton(this, this.settingsPanel);
+  }
+
   // ── Engine event emission ─────────────────────────────────
 
   /** Emit turn-started for the current player. */
@@ -964,6 +979,8 @@ export class GolfScene extends Phaser.Scene {
     this.gameEvents?.removeAllListeners();
     this.helpPanel?.destroy();
     this.helpButton?.destroy();
+    this.settingsPanel?.destroy();
+    this.settingsButton?.destroy();
   }
 
   // ── Transcript persistence ──────────────────────────────
