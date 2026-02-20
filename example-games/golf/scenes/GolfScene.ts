@@ -781,27 +781,51 @@ export class GolfScene extends Phaser.Scene {
         checkDone();
       }
     } else {
-      // Discard-and-flip: flip the target card
+      // Discard-and-flip: two sequential phases
+      // Phase 1: drawn card animates to discard pile
+      // Phase 2: selected grid card flips in place to reveal its face
       const idx = result.move.row * 3 + result.move.col;
       const sprite = sprites[idx];
       const grid = this.session.gameState.playerStates[result.playerIndex].grid;
+      const discardPos = { x: DISCARD_X, y: PILE_Y };
 
-      this.tweens.add({
-        targets: sprite,
-        scaleX: 0,
-        duration: ANIM_DURATION / 2,
-        ease: 'Power2',
-        onComplete: () => {
-          sprite.setTexture(this.getCardTexture(grid[idx]));
-          this.tweens.add({
-            targets: sprite,
-            scaleX: 1,
-            duration: ANIM_DURATION / 2,
-            ease: 'Power2',
-            onComplete: wrappedOnComplete,
-          });
-        },
-      });
+      const phase2 = () => {
+        // Clean up drawn card after it arrives at discard pile
+        this.hideDrawnCard();
+
+        // Phase 2: flip the grid card in place
+        this.tweens.add({
+          targets: sprite,
+          scaleX: 0,
+          duration: SWAP_ANIM_DURATION / 4,
+          ease: 'Power2',
+          onComplete: () => {
+            sprite.setTexture(this.getCardTexture(grid[idx]));
+            this.tweens.add({
+              targets: sprite,
+              scaleX: 1,
+              duration: SWAP_ANIM_DURATION / 4,
+              ease: 'Power2',
+              onComplete: onComplete, // Skip wrappedOnComplete; drawn card already hidden
+            });
+          },
+        });
+      };
+
+      // Phase 1: animate drawn card to discard pile
+      if (this.drawnCardSprite) {
+        this.tweens.add({
+          targets: this.drawnCardSprite,
+          x: discardPos.x,
+          y: discardPos.y,
+          duration: SWAP_ANIM_DURATION / 2,
+          ease: 'Power2',
+          onComplete: phase2,
+        });
+      } else {
+        // Edge case: no drawn card sprite, skip directly to flip
+        phase2();
+      }
     }
   }
 
