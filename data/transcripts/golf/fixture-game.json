@@ -1,0 +1,2018 @@
+{
+  "version": 1,
+  "metadata": {
+    "startedAt": "2026-01-01T00:00:00.000Z",
+    "endedAt": "2026-01-01T00:05:00.000Z",
+    "players": [
+      {
+        "name": "You",
+        "isAI": false
+      },
+      {
+        "name": "AI",
+        "isAI": true,
+        "strategy": "greedy"
+      }
+    ]
+  },
+  "initialState": {
+    "boardStates": [
+      {
+        "grid": [
+          {
+            "rank": "A",
+            "suit": "diamonds",
+            "faceUp": true
+          },
+          {
+            "rank": "5",
+            "suit": "clubs",
+            "faceUp": true
+          },
+          {
+            "rank": "3",
+            "suit": "hearts",
+            "faceUp": true
+          },
+          {
+            "rank": "J",
+            "suit": "clubs",
+            "faceUp": false
+          },
+          {
+            "rank": "6",
+            "suit": "diamonds",
+            "faceUp": false
+          },
+          {
+            "rank": "2",
+            "suit": "clubs",
+            "faceUp": false
+          },
+          {
+            "rank": "8",
+            "suit": "diamonds",
+            "faceUp": false
+          },
+          {
+            "rank": "6",
+            "suit": "clubs",
+            "faceUp": false
+          },
+          {
+            "rank": "K",
+            "suit": "hearts",
+            "faceUp": false
+          }
+        ],
+        "faceUpCount": 3,
+        "visibleScore": 9,
+        "totalScore": 37
+      },
+      {
+        "grid": [
+          {
+            "rank": "4",
+            "suit": "spades",
+            "faceUp": true
+          },
+          {
+            "rank": "10",
+            "suit": "hearts",
+            "faceUp": true
+          },
+          {
+            "rank": "7",
+            "suit": "spades",
+            "faceUp": true
+          },
+          {
+            "rank": "K",
+            "suit": "diamonds",
+            "faceUp": false
+          },
+          {
+            "rank": "8",
+            "suit": "hearts",
+            "faceUp": false
+          },
+          {
+            "rank": "10",
+            "suit": "diamonds",
+            "faceUp": false
+          },
+          {
+            "rank": "4",
+            "suit": "clubs",
+            "faceUp": false
+          },
+          {
+            "rank": "6",
+            "suit": "spades",
+            "faceUp": false
+          },
+          {
+            "rank": "5",
+            "suit": "spades",
+            "faceUp": false
+          }
+        ],
+        "faceUpCount": 3,
+        "visibleScore": 21,
+        "totalScore": 54
+      }
+    ],
+    "discardTop": {
+      "rank": "6",
+      "suit": "hearts",
+      "faceUp": true
+    },
+    "stockRemaining": 33
+  },
+  "turns": [
+    {
+      "turnNumber": 0,
+      "playerIndex": 0,
+      "playerName": "You",
+      "drawSource": "discard",
+      "drawnCard": {
+        "rank": "6",
+        "suit": "hearts",
+        "faceUp": true
+      },
+      "move": {
+        "kind": "swap",
+        "row": 0,
+        "col": 1
+      },
+      "discardedCard": {
+        "rank": "5",
+        "suit": "clubs",
+        "faceUp": true
+      },
+      "boardStates": [
+        {
+          "grid": [
+            {
+              "rank": "A",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "3",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "J",
+              "suit": "clubs",
+              "faceUp": false
+            },
+            {
+              "rank": "6",
+              "suit": "diamonds",
+              "faceUp": false
+            },
+            {
+              "rank": "2",
+              "suit": "clubs",
+              "faceUp": false
+            },
+            {
+              "rank": "8",
+              "suit": "diamonds",
+              "faceUp": false
+            },
+            {
+              "rank": "6",
+              "suit": "clubs",
+              "faceUp": false
+            },
+            {
+              "rank": "K",
+              "suit": "hearts",
+              "faceUp": false
+            }
+          ],
+          "faceUpCount": 3,
+          "visibleScore": 10,
+          "totalScore": 20
+        },
+        {
+          "grid": [
+            {
+              "rank": "4",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "10",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "7",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "K",
+              "suit": "diamonds",
+              "faceUp": false
+            },
+            {
+              "rank": "8",
+              "suit": "hearts",
+              "faceUp": false
+            },
+            {
+              "rank": "10",
+              "suit": "diamonds",
+              "faceUp": false
+            },
+            {
+              "rank": "4",
+              "suit": "clubs",
+              "faceUp": false
+            },
+            {
+              "rank": "6",
+              "suit": "spades",
+              "faceUp": false
+            },
+            {
+              "rank": "5",
+              "suit": "spades",
+              "faceUp": false
+            }
+          ],
+          "faceUpCount": 3,
+          "visibleScore": 21,
+          "totalScore": 54
+        }
+      ],
+      "discardTop": {
+        "rank": "5",
+        "suit": "clubs",
+        "faceUp": true
+      },
+      "stockRemaining": 33,
+      "roundEnded": false
+    },
+    {
+      "turnNumber": 1,
+      "playerIndex": 1,
+      "playerName": "AI",
+      "drawSource": "stock",
+      "drawnCard": {
+        "rank": "4",
+        "suit": "hearts",
+        "faceUp": true
+      },
+      "move": {
+        "kind": "swap",
+        "row": 1,
+        "col": 0
+      },
+      "discardedCard": {
+        "rank": "K",
+        "suit": "diamonds",
+        "faceUp": true
+      },
+      "boardStates": [
+        {
+          "grid": [
+            {
+              "rank": "A",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "3",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "J",
+              "suit": "clubs",
+              "faceUp": false
+            },
+            {
+              "rank": "6",
+              "suit": "diamonds",
+              "faceUp": false
+            },
+            {
+              "rank": "2",
+              "suit": "clubs",
+              "faceUp": false
+            },
+            {
+              "rank": "8",
+              "suit": "diamonds",
+              "faceUp": false
+            },
+            {
+              "rank": "6",
+              "suit": "clubs",
+              "faceUp": false
+            },
+            {
+              "rank": "K",
+              "suit": "hearts",
+              "faceUp": false
+            }
+          ],
+          "faceUpCount": 3,
+          "visibleScore": 10,
+          "totalScore": 20
+        },
+        {
+          "grid": [
+            {
+              "rank": "4",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "10",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "7",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "4",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "8",
+              "suit": "hearts",
+              "faceUp": false
+            },
+            {
+              "rank": "10",
+              "suit": "diamonds",
+              "faceUp": false
+            },
+            {
+              "rank": "4",
+              "suit": "clubs",
+              "faceUp": false
+            },
+            {
+              "rank": "6",
+              "suit": "spades",
+              "faceUp": false
+            },
+            {
+              "rank": "5",
+              "suit": "spades",
+              "faceUp": false
+            }
+          ],
+          "faceUpCount": 4,
+          "visibleScore": 25,
+          "totalScore": 46
+        }
+      ],
+      "discardTop": {
+        "rank": "K",
+        "suit": "diamonds",
+        "faceUp": true
+      },
+      "stockRemaining": 32,
+      "roundEnded": false
+    },
+    {
+      "turnNumber": 2,
+      "playerIndex": 0,
+      "playerName": "You",
+      "drawSource": "discard",
+      "drawnCard": {
+        "rank": "K",
+        "suit": "diamonds",
+        "faceUp": true
+      },
+      "move": {
+        "kind": "swap",
+        "row": 1,
+        "col": 0
+      },
+      "discardedCard": {
+        "rank": "J",
+        "suit": "clubs",
+        "faceUp": true
+      },
+      "boardStates": [
+        {
+          "grid": [
+            {
+              "rank": "A",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "3",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "K",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "diamonds",
+              "faceUp": false
+            },
+            {
+              "rank": "2",
+              "suit": "clubs",
+              "faceUp": false
+            },
+            {
+              "rank": "8",
+              "suit": "diamonds",
+              "faceUp": false
+            },
+            {
+              "rank": "6",
+              "suit": "clubs",
+              "faceUp": false
+            },
+            {
+              "rank": "K",
+              "suit": "hearts",
+              "faceUp": false
+            }
+          ],
+          "faceUpCount": 4,
+          "visibleScore": 10,
+          "totalScore": 10
+        },
+        {
+          "grid": [
+            {
+              "rank": "4",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "10",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "7",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "4",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "8",
+              "suit": "hearts",
+              "faceUp": false
+            },
+            {
+              "rank": "10",
+              "suit": "diamonds",
+              "faceUp": false
+            },
+            {
+              "rank": "4",
+              "suit": "clubs",
+              "faceUp": false
+            },
+            {
+              "rank": "6",
+              "suit": "spades",
+              "faceUp": false
+            },
+            {
+              "rank": "5",
+              "suit": "spades",
+              "faceUp": false
+            }
+          ],
+          "faceUpCount": 4,
+          "visibleScore": 25,
+          "totalScore": 46
+        }
+      ],
+      "discardTop": {
+        "rank": "J",
+        "suit": "clubs",
+        "faceUp": true
+      },
+      "stockRemaining": 32,
+      "roundEnded": false
+    },
+    {
+      "turnNumber": 3,
+      "playerIndex": 1,
+      "playerName": "AI",
+      "drawSource": "stock",
+      "drawnCard": {
+        "rank": "5",
+        "suit": "diamonds",
+        "faceUp": true
+      },
+      "move": {
+        "kind": "swap",
+        "row": 0,
+        "col": 1
+      },
+      "discardedCard": {
+        "rank": "10",
+        "suit": "hearts",
+        "faceUp": true
+      },
+      "boardStates": [
+        {
+          "grid": [
+            {
+              "rank": "A",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "3",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "K",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "diamonds",
+              "faceUp": false
+            },
+            {
+              "rank": "2",
+              "suit": "clubs",
+              "faceUp": false
+            },
+            {
+              "rank": "8",
+              "suit": "diamonds",
+              "faceUp": false
+            },
+            {
+              "rank": "6",
+              "suit": "clubs",
+              "faceUp": false
+            },
+            {
+              "rank": "K",
+              "suit": "hearts",
+              "faceUp": false
+            }
+          ],
+          "faceUpCount": 4,
+          "visibleScore": 10,
+          "totalScore": 10
+        },
+        {
+          "grid": [
+            {
+              "rank": "4",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "5",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "7",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "4",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "8",
+              "suit": "hearts",
+              "faceUp": false
+            },
+            {
+              "rank": "10",
+              "suit": "diamonds",
+              "faceUp": false
+            },
+            {
+              "rank": "4",
+              "suit": "clubs",
+              "faceUp": false
+            },
+            {
+              "rank": "6",
+              "suit": "spades",
+              "faceUp": false
+            },
+            {
+              "rank": "5",
+              "suit": "spades",
+              "faceUp": false
+            }
+          ],
+          "faceUpCount": 4,
+          "visibleScore": 20,
+          "totalScore": 41
+        }
+      ],
+      "discardTop": {
+        "rank": "10",
+        "suit": "hearts",
+        "faceUp": true
+      },
+      "stockRemaining": 31,
+      "roundEnded": false
+    },
+    {
+      "turnNumber": 4,
+      "playerIndex": 0,
+      "playerName": "You",
+      "drawSource": "stock",
+      "drawnCard": {
+        "rank": "3",
+        "suit": "spades",
+        "faceUp": true
+      },
+      "move": {
+        "kind": "swap",
+        "row": 2,
+        "col": 0
+      },
+      "discardedCard": {
+        "rank": "8",
+        "suit": "diamonds",
+        "faceUp": true
+      },
+      "boardStates": [
+        {
+          "grid": [
+            {
+              "rank": "A",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "3",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "K",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "diamonds",
+              "faceUp": false
+            },
+            {
+              "rank": "2",
+              "suit": "clubs",
+              "faceUp": false
+            },
+            {
+              "rank": "3",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "clubs",
+              "faceUp": false
+            },
+            {
+              "rank": "K",
+              "suit": "hearts",
+              "faceUp": false
+            }
+          ],
+          "faceUpCount": 5,
+          "visibleScore": 13,
+          "totalScore": 5
+        },
+        {
+          "grid": [
+            {
+              "rank": "4",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "5",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "7",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "4",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "8",
+              "suit": "hearts",
+              "faceUp": false
+            },
+            {
+              "rank": "10",
+              "suit": "diamonds",
+              "faceUp": false
+            },
+            {
+              "rank": "4",
+              "suit": "clubs",
+              "faceUp": false
+            },
+            {
+              "rank": "6",
+              "suit": "spades",
+              "faceUp": false
+            },
+            {
+              "rank": "5",
+              "suit": "spades",
+              "faceUp": false
+            }
+          ],
+          "faceUpCount": 4,
+          "visibleScore": 20,
+          "totalScore": 41
+        }
+      ],
+      "discardTop": {
+        "rank": "8",
+        "suit": "diamonds",
+        "faceUp": true
+      },
+      "stockRemaining": 30,
+      "roundEnded": false
+    },
+    {
+      "turnNumber": 5,
+      "playerIndex": 1,
+      "playerName": "AI",
+      "drawSource": "stock",
+      "drawnCard": {
+        "rank": "4",
+        "suit": "diamonds",
+        "faceUp": true
+      },
+      "move": {
+        "kind": "swap",
+        "row": 1,
+        "col": 2
+      },
+      "discardedCard": {
+        "rank": "10",
+        "suit": "diamonds",
+        "faceUp": true
+      },
+      "boardStates": [
+        {
+          "grid": [
+            {
+              "rank": "A",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "3",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "K",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "diamonds",
+              "faceUp": false
+            },
+            {
+              "rank": "2",
+              "suit": "clubs",
+              "faceUp": false
+            },
+            {
+              "rank": "3",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "clubs",
+              "faceUp": false
+            },
+            {
+              "rank": "K",
+              "suit": "hearts",
+              "faceUp": false
+            }
+          ],
+          "faceUpCount": 5,
+          "visibleScore": 13,
+          "totalScore": 5
+        },
+        {
+          "grid": [
+            {
+              "rank": "4",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "5",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "7",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "4",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "8",
+              "suit": "hearts",
+              "faceUp": false
+            },
+            {
+              "rank": "4",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "4",
+              "suit": "clubs",
+              "faceUp": false
+            },
+            {
+              "rank": "6",
+              "suit": "spades",
+              "faceUp": false
+            },
+            {
+              "rank": "5",
+              "suit": "spades",
+              "faceUp": false
+            }
+          ],
+          "faceUpCount": 5,
+          "visibleScore": 24,
+          "totalScore": 35
+        }
+      ],
+      "discardTop": {
+        "rank": "10",
+        "suit": "diamonds",
+        "faceUp": true
+      },
+      "stockRemaining": 29,
+      "roundEnded": false
+    },
+    {
+      "turnNumber": 6,
+      "playerIndex": 0,
+      "playerName": "You",
+      "drawSource": "stock",
+      "drawnCard": {
+        "rank": "8",
+        "suit": "clubs",
+        "faceUp": true
+      },
+      "move": {
+        "kind": "discard-and-flip",
+        "row": 2,
+        "col": 1
+      },
+      "discardedCard": {
+        "rank": "8",
+        "suit": "clubs",
+        "faceUp": true
+      },
+      "boardStates": [
+        {
+          "grid": [
+            {
+              "rank": "A",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "3",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "K",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "diamonds",
+              "faceUp": false
+            },
+            {
+              "rank": "2",
+              "suit": "clubs",
+              "faceUp": false
+            },
+            {
+              "rank": "3",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "clubs",
+              "faceUp": true
+            },
+            {
+              "rank": "K",
+              "suit": "hearts",
+              "faceUp": false
+            }
+          ],
+          "faceUpCount": 6,
+          "visibleScore": 19,
+          "totalScore": 5
+        },
+        {
+          "grid": [
+            {
+              "rank": "4",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "5",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "7",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "4",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "8",
+              "suit": "hearts",
+              "faceUp": false
+            },
+            {
+              "rank": "4",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "4",
+              "suit": "clubs",
+              "faceUp": false
+            },
+            {
+              "rank": "6",
+              "suit": "spades",
+              "faceUp": false
+            },
+            {
+              "rank": "5",
+              "suit": "spades",
+              "faceUp": false
+            }
+          ],
+          "faceUpCount": 5,
+          "visibleScore": 24,
+          "totalScore": 35
+        }
+      ],
+      "discardTop": {
+        "rank": "8",
+        "suit": "clubs",
+        "faceUp": true
+      },
+      "stockRemaining": 28,
+      "roundEnded": false
+    },
+    {
+      "turnNumber": 7,
+      "playerIndex": 1,
+      "playerName": "AI",
+      "drawSource": "stock",
+      "drawnCard": {
+        "rank": "A",
+        "suit": "hearts",
+        "faceUp": true
+      },
+      "move": {
+        "kind": "swap",
+        "row": 1,
+        "col": 1
+      },
+      "discardedCard": {
+        "rank": "8",
+        "suit": "hearts",
+        "faceUp": true
+      },
+      "boardStates": [
+        {
+          "grid": [
+            {
+              "rank": "A",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "3",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "K",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "diamonds",
+              "faceUp": false
+            },
+            {
+              "rank": "2",
+              "suit": "clubs",
+              "faceUp": false
+            },
+            {
+              "rank": "3",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "clubs",
+              "faceUp": true
+            },
+            {
+              "rank": "K",
+              "suit": "hearts",
+              "faceUp": false
+            }
+          ],
+          "faceUpCount": 6,
+          "visibleScore": 19,
+          "totalScore": 5
+        },
+        {
+          "grid": [
+            {
+              "rank": "4",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "5",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "7",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "4",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "A",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "4",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "4",
+              "suit": "clubs",
+              "faceUp": false
+            },
+            {
+              "rank": "6",
+              "suit": "spades",
+              "faceUp": false
+            },
+            {
+              "rank": "5",
+              "suit": "spades",
+              "faceUp": false
+            }
+          ],
+          "faceUpCount": 6,
+          "visibleScore": 25,
+          "totalScore": 28
+        }
+      ],
+      "discardTop": {
+        "rank": "8",
+        "suit": "hearts",
+        "faceUp": true
+      },
+      "stockRemaining": 27,
+      "roundEnded": false
+    },
+    {
+      "turnNumber": 8,
+      "playerIndex": 0,
+      "playerName": "You",
+      "drawSource": "stock",
+      "drawnCard": {
+        "rank": "Q",
+        "suit": "hearts",
+        "faceUp": true
+      },
+      "move": {
+        "kind": "discard-and-flip",
+        "row": 1,
+        "col": 1
+      },
+      "discardedCard": {
+        "rank": "Q",
+        "suit": "hearts",
+        "faceUp": true
+      },
+      "boardStates": [
+        {
+          "grid": [
+            {
+              "rank": "A",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "3",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "K",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "2",
+              "suit": "clubs",
+              "faceUp": false
+            },
+            {
+              "rank": "3",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "clubs",
+              "faceUp": true
+            },
+            {
+              "rank": "K",
+              "suit": "hearts",
+              "faceUp": false
+            }
+          ],
+          "faceUpCount": 7,
+          "visibleScore": 7,
+          "totalScore": 5
+        },
+        {
+          "grid": [
+            {
+              "rank": "4",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "5",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "7",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "4",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "A",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "4",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "4",
+              "suit": "clubs",
+              "faceUp": false
+            },
+            {
+              "rank": "6",
+              "suit": "spades",
+              "faceUp": false
+            },
+            {
+              "rank": "5",
+              "suit": "spades",
+              "faceUp": false
+            }
+          ],
+          "faceUpCount": 6,
+          "visibleScore": 25,
+          "totalScore": 28
+        }
+      ],
+      "discardTop": {
+        "rank": "Q",
+        "suit": "hearts",
+        "faceUp": true
+      },
+      "stockRemaining": 26,
+      "roundEnded": false
+    },
+    {
+      "turnNumber": 9,
+      "playerIndex": 1,
+      "playerName": "AI",
+      "drawSource": "discard",
+      "drawnCard": {
+        "rank": "Q",
+        "suit": "hearts",
+        "faceUp": true
+      },
+      "move": {
+        "kind": "discard-and-flip",
+        "row": 2,
+        "col": 1
+      },
+      "discardedCard": {
+        "rank": "Q",
+        "suit": "hearts",
+        "faceUp": true
+      },
+      "boardStates": [
+        {
+          "grid": [
+            {
+              "rank": "A",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "3",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "K",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "2",
+              "suit": "clubs",
+              "faceUp": false
+            },
+            {
+              "rank": "3",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "clubs",
+              "faceUp": true
+            },
+            {
+              "rank": "K",
+              "suit": "hearts",
+              "faceUp": false
+            }
+          ],
+          "faceUpCount": 7,
+          "visibleScore": 7,
+          "totalScore": 5
+        },
+        {
+          "grid": [
+            {
+              "rank": "4",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "5",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "7",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "4",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "A",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "4",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "4",
+              "suit": "clubs",
+              "faceUp": false
+            },
+            {
+              "rank": "6",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "5",
+              "suit": "spades",
+              "faceUp": false
+            }
+          ],
+          "faceUpCount": 7,
+          "visibleScore": 31,
+          "totalScore": 28
+        }
+      ],
+      "discardTop": {
+        "rank": "Q",
+        "suit": "hearts",
+        "faceUp": true
+      },
+      "stockRemaining": 26,
+      "roundEnded": false
+    },
+    {
+      "turnNumber": 10,
+      "playerIndex": 0,
+      "playerName": "You",
+      "drawSource": "stock",
+      "drawnCard": {
+        "rank": "Q",
+        "suit": "spades",
+        "faceUp": true
+      },
+      "move": {
+        "kind": "discard-and-flip",
+        "row": 2,
+        "col": 2
+      },
+      "discardedCard": {
+        "rank": "Q",
+        "suit": "spades",
+        "faceUp": true
+      },
+      "boardStates": [
+        {
+          "grid": [
+            {
+              "rank": "A",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "3",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "K",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "2",
+              "suit": "clubs",
+              "faceUp": false
+            },
+            {
+              "rank": "3",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "clubs",
+              "faceUp": true
+            },
+            {
+              "rank": "K",
+              "suit": "hearts",
+              "faceUp": true
+            }
+          ],
+          "faceUpCount": 8,
+          "visibleScore": 7,
+          "totalScore": 5
+        },
+        {
+          "grid": [
+            {
+              "rank": "4",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "5",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "7",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "4",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "A",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "4",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "4",
+              "suit": "clubs",
+              "faceUp": false
+            },
+            {
+              "rank": "6",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "5",
+              "suit": "spades",
+              "faceUp": false
+            }
+          ],
+          "faceUpCount": 7,
+          "visibleScore": 31,
+          "totalScore": 28
+        }
+      ],
+      "discardTop": {
+        "rank": "Q",
+        "suit": "spades",
+        "faceUp": true
+      },
+      "stockRemaining": 25,
+      "roundEnded": false
+    },
+    {
+      "turnNumber": 11,
+      "playerIndex": 1,
+      "playerName": "AI",
+      "drawSource": "stock",
+      "drawnCard": {
+        "rank": "2",
+        "suit": "spades",
+        "faceUp": true
+      },
+      "move": {
+        "kind": "swap",
+        "row": 0,
+        "col": 2
+      },
+      "discardedCard": {
+        "rank": "7",
+        "suit": "spades",
+        "faceUp": true
+      },
+      "boardStates": [
+        {
+          "grid": [
+            {
+              "rank": "A",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "3",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "K",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "2",
+              "suit": "clubs",
+              "faceUp": false
+            },
+            {
+              "rank": "3",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "clubs",
+              "faceUp": true
+            },
+            {
+              "rank": "K",
+              "suit": "hearts",
+              "faceUp": true
+            }
+          ],
+          "faceUpCount": 8,
+          "visibleScore": 7,
+          "totalScore": 5
+        },
+        {
+          "grid": [
+            {
+              "rank": "4",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "5",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "2",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "4",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "A",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "4",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "4",
+              "suit": "clubs",
+              "faceUp": false
+            },
+            {
+              "rank": "6",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "5",
+              "suit": "spades",
+              "faceUp": false
+            }
+          ],
+          "faceUpCount": 7,
+          "visibleScore": 22,
+          "totalScore": 19
+        }
+      ],
+      "discardTop": {
+        "rank": "7",
+        "suit": "spades",
+        "faceUp": true
+      },
+      "stockRemaining": 24,
+      "roundEnded": false
+    },
+    {
+      "turnNumber": 12,
+      "playerIndex": 0,
+      "playerName": "You",
+      "drawSource": "stock",
+      "drawnCard": {
+        "rank": "Q",
+        "suit": "clubs",
+        "faceUp": true
+      },
+      "move": {
+        "kind": "discard-and-flip",
+        "row": 1,
+        "col": 2
+      },
+      "discardedCard": {
+        "rank": "Q",
+        "suit": "clubs",
+        "faceUp": true
+      },
+      "boardStates": [
+        {
+          "grid": [
+            {
+              "rank": "A",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "3",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "K",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "2",
+              "suit": "clubs",
+              "faceUp": true
+            },
+            {
+              "rank": "3",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "clubs",
+              "faceUp": true
+            },
+            {
+              "rank": "K",
+              "suit": "hearts",
+              "faceUp": true
+            }
+          ],
+          "faceUpCount": 9,
+          "visibleScore": 5,
+          "totalScore": 5
+        },
+        {
+          "grid": [
+            {
+              "rank": "4",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "5",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "2",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "4",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "A",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "4",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "4",
+              "suit": "clubs",
+              "faceUp": false
+            },
+            {
+              "rank": "6",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "5",
+              "suit": "spades",
+              "faceUp": false
+            }
+          ],
+          "faceUpCount": 7,
+          "visibleScore": 22,
+          "totalScore": 19
+        }
+      ],
+      "discardTop": {
+        "rank": "Q",
+        "suit": "clubs",
+        "faceUp": true
+      },
+      "stockRemaining": 23,
+      "roundEnded": false
+    },
+    {
+      "turnNumber": 13,
+      "playerIndex": 1,
+      "playerName": "AI",
+      "drawSource": "discard",
+      "drawnCard": {
+        "rank": "Q",
+        "suit": "clubs",
+        "faceUp": true
+      },
+      "move": {
+        "kind": "discard-and-flip",
+        "row": 2,
+        "col": 0
+      },
+      "discardedCard": {
+        "rank": "Q",
+        "suit": "clubs",
+        "faceUp": true
+      },
+      "boardStates": [
+        {
+          "grid": [
+            {
+              "rank": "A",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "3",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "K",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "2",
+              "suit": "clubs",
+              "faceUp": true
+            },
+            {
+              "rank": "3",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "clubs",
+              "faceUp": true
+            },
+            {
+              "rank": "K",
+              "suit": "hearts",
+              "faceUp": true
+            }
+          ],
+          "faceUpCount": 9,
+          "visibleScore": 5,
+          "totalScore": 5
+        },
+        {
+          "grid": [
+            {
+              "rank": "4",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "5",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "2",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "4",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "A",
+              "suit": "hearts",
+              "faceUp": true
+            },
+            {
+              "rank": "4",
+              "suit": "diamonds",
+              "faceUp": true
+            },
+            {
+              "rank": "4",
+              "suit": "clubs",
+              "faceUp": true
+            },
+            {
+              "rank": "6",
+              "suit": "spades",
+              "faceUp": true
+            },
+            {
+              "rank": "5",
+              "suit": "spades",
+              "faceUp": false
+            }
+          ],
+          "faceUpCount": 8,
+          "visibleScore": 14,
+          "totalScore": 19
+        }
+      ],
+      "discardTop": {
+        "rank": "Q",
+        "suit": "clubs",
+        "faceUp": true
+      },
+      "stockRemaining": 23,
+      "roundEnded": true
+    }
+  ],
+  "results": {
+    "scores": [
+      5,
+      19
+    ],
+    "winnerIndex": 0,
+    "winnerName": "You"
+  }
+}

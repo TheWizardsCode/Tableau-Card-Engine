@@ -58,6 +58,11 @@ ehthumbs.db
 coverage/
 
 ##################################
+# Replay Tool Output
+##################################
+data/screenshots/
+
+##################################
 Worklog Specific Ignores
 ##################################
 
