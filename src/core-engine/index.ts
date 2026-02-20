@@ -55,3 +55,7 @@ export { snapshotCard } from './TranscriptTypes';
 // Phaser event bridge
 export type { PhaserLikeEventEmitter } from './PhaserEventBridge';
 export { PhaserEventBridge } from './PhaserEventBridge';
+
+// Sound management
+export type { SoundPlayer, EventSoundMapping, StorageLike, SoundManagerOptions } from './SoundManager';
+export { SoundManager } from './SoundManager';
