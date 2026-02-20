@@ -44,3 +44,22 @@ export type {
 } from './Overlay';
 
 export { createOverlayMenuButton } from './MenuButton';
+
+// Scene header scaffolding
+export {
+  createSceneTitle,
+  createSceneMenuButton,
+  createSceneHeader,
+  SCENE_HEADER_Y,
+  SCENE_MENU_BUTTON_X,
+  SCENE_TITLE_FONT_SIZE,
+  SCENE_TITLE_COLOR,
+  SCENE_MENU_BUTTON_FONT_SIZE,
+  SCENE_MENU_BUTTON_COLOR,
+  SCENE_MENU_BUTTON_HOVER_COLOR,
+} from './SceneHeader';
+export type {
+  SceneTitleConfig,
+  SceneMenuButtonConfig,
+  SceneHeaderResult,
+} from './SceneHeader';

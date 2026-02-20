@@ -40,6 +40,7 @@ import {
   cardTextureKey, preloadCardAssets,
   createOverlayBackground, dismissOverlay as sharedDismissOverlay,
   createOverlayButton, createOverlayMenuButton,
+  createSceneTitle, createSceneMenuButton,
 } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
 import helpContent from '../help-content.json';
@@ -297,27 +298,8 @@ export class BeleagueredCastleScene extends Phaser.Scene {
   // ── UI creation ─────────────────────────────────────────
 
   private createTitle(): void {
-    // Menu button (top-left) -- returns to game selector
-    const menuBtn = this.add
-      .text(30, TITLE_Y, '[ Menu ]', {
-        fontSize: '12px',
-        color: '#aaccaa',
-        fontFamily: FONT_FAMILY,
-      })
-      .setOrigin(0.5)
-      .setInteractive({ useHandCursor: true });
-
-    menuBtn.on('pointerdown', () => this.scene.start('GameSelectorScene'));
-    menuBtn.on('pointerover', () => menuBtn.setColor('#88ff88'));
-    menuBtn.on('pointerout', () => menuBtn.setColor('#aaccaa'));
-
-    this.add
-      .text(GAME_W / 2, TITLE_Y, 'Beleaguered Castle', {
-        fontSize: '18px',
-        color: '#ffffff',
-        fontFamily: FONT_FAMILY,
-      })
-      .setOrigin(0.5);
+    createSceneMenuButton(this, { y: TITLE_Y });
+    createSceneTitle(this, 'Beleaguered Castle', { y: TITLE_Y });
   }
 
   /**
