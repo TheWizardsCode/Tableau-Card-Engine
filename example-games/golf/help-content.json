@@ -9,7 +9,7 @@
   },
   {
     "heading": "Turn Flow",
-    "body": "On your turn:\n\n1. Draw a card from either the stock pile (face-down) or the discard pile (face-up).\n\n2. Then choose one of two actions:\n   a) Swap the drawn card with any card in your grid. The replaced card goes to the discard pile.\n   b) Discard the drawn card and flip one of your face-down cards face-up."
+    "body": "Each turn has two phases:\n\n1. Draw -- click the stock pile (face-down, unknown card) or the discard pile (face-up, known card) to draw a card. The drawn card appears next to the discard pile.\n\n2. Act -- choose one of two actions:\n   a) Swap: click any card in your grid to replace it with the drawn card. The replaced card goes to the discard pile.\n   b) Discard & flip: click the discard pile to throw away the drawn card, then click a face-down grid card to flip it face-up in place."
   },
   {
     "heading": "Round End",
@@ -25,6 +25,6 @@
   },
   {
     "heading": "Controls",
-    "body": "Click the stock pile or discard pile to draw a card. Then click a card in your grid to swap, or click the discard pile to discard and choose a face-down card to flip.\n\nPress ? to toggle this help panel."
+    "body": "1. Draw phase: click the stock pile or discard pile to draw a card.\n2. Move phase: click a card in your grid to swap it with the drawn card, or click the discard pile to discard the drawn card and then click a face-down card to flip it.\n\nThe discard pile serves a dual role: it is a draw source during step 1 and the discard action during step 2.\n\nPress ? to toggle this help panel."
   }
 ]
