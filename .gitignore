@@ -56,6 +56,7 @@ ehthumbs.db
 # Test / Coverage
 ##################################
 coverage/
+test-results/
 
 ##################################
 # Replay Tool Output
