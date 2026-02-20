@@ -1,0 +1,22 @@
+[
+  {
+    "heading": "Sushi Go!",
+    "body": "A two-player card drafting game where you pick sushi dishes to build the highest-scoring meal. Each round, choose a card from your hand and pass the rest to your opponent. After 3 rounds, the player with the most points wins!"
+  },
+  {
+    "heading": "How to Play",
+    "body": "Each round:\n1. You are dealt 10 cards.\n2. Pick one card from your hand by clicking it.\n3. Your chosen card is added to your tableau (collection).\n4. Your remaining hand is passed to your opponent (and vice versa).\n5. Repeat until all cards are picked (10 turns per round).\n6. Score the round, then start the next.\n\nAfter 3 rounds, pudding bonuses are applied and the final winner is determined."
+  },
+  {
+    "heading": "Card Types & Scoring",
+    "body": "Tempura: Collect pairs for 5 pts each. One leftover = 0.\n\nSashimi: Collect sets of 3 for 10 pts each. 1-2 leftover = 0.\n\nDumpling: 1=1, 2=3, 3=6, 4=10, 5+=15 pts.\n\nNigiri: Egg=1, Salmon=2, Squid=3 pts.\n\nWasabi: Triples the next nigiri you collect (0 pts alone).\n\nMaki Rolls: Icons shown (1-3 per card). Most total icons = 6 pts, 2nd most = 3 pts. Ties split evenly.\n\nPudding: Scored at game end. Most puddings = +6 pts, fewest = -6 pts. Ties split.\n\nChopsticks: 0 pts. Lets you pick 2 cards in a future turn (not yet enabled in this version)."
+  },
+  {
+    "heading": "Tips",
+    "body": "- Sashimi is risky: you need exactly 3 to score, and opponents can see what you're collecting.\n- Dumplings scale well: collecting 5+ gives the maximum 15 pts.\n- Wasabi is most valuable with Squid Nigiri (3 x 3 = 9 pts).\n- Watch the maki race: if you're behind, it may not be worth investing more.\n- Pudding is a long game: spread your picks across all 3 rounds.\n- Pay attention to what your opponent is collecting to deny them key cards."
+  },
+  {
+    "heading": "Controls",
+    "body": "Click a card in your hand (bottom row) to pick it.\n\nYour collected cards appear in the tableau area above your hand, grouped by type.\n\nThe AI opponent picks automatically after a short delay.\n\nPress ? to toggle this help panel."
+  }
+]
