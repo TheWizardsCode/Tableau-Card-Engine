@@ -16,6 +16,7 @@ import type { GameEntry } from './src/ui/GameSelectorScene';
 import { GolfScene } from './example-games/golf/scenes/GolfScene';
 import { BeleagueredCastleScene } from './example-games/beleaguered-castle/scenes/BeleagueredCastleScene';
 import { SushiGoScene } from './example-games/sushi-go/scenes/SushiGoScene';
+import { SplendorScene } from './example-games/splendor/scenes/SplendorScene';
 
 // ── Game catalogue ─────────────────────────────────────────
 
@@ -38,6 +39,12 @@ const GAMES: GameEntry[] = [
     description:
       'Card drafting game (human vs. AI). Pick and pass hands over 3 rounds, collect sets, and score the most points.',
   },
+  {
+    sceneKey: 'SplendorScene',
+    title: 'Splendor',
+    description:
+      'Engine-building card game (human vs. AI). Collect gem tokens, purchase cards for bonuses, attract nobles, and reach 15 prestige to win.',
+  },
 ];
 
 // ── Phaser boot ────────────────────────────────────────────
@@ -49,7 +56,7 @@ const config: Phaser.Types.Core.GameConfig = {
   height: 600,
   backgroundColor: '#1a2a1a',
   // Register all scenes; GameSelectorScene is first so it auto-starts.
-  scene: [GameSelectorScene, GolfScene, BeleagueredCastleScene, SushiGoScene],
+  scene: [GameSelectorScene, GolfScene, BeleagueredCastleScene, SushiGoScene, SplendorScene],
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,

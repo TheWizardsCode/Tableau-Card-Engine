@@ -1,0 +1,30 @@
+[
+  {
+    "heading": "Splendor",
+    "body": "A two-player engine-building card game where you collect gem tokens, purchase development cards, and attract noble visitors to earn prestige points. The first player to reach 15 prestige triggers the final round. The player with the most prestige wins!"
+  },
+  {
+    "heading": "How to Play",
+    "body": "Each turn, choose ONE action:\n\n1. Take Tokens: Click 'Take Tokens' then select up to 3 different gem colors from the supply. You must take 3 if 3+ colors are available.\n\n2. Take 2 Same: Click a colored gem button in the 'Take 2' row to take 2 tokens of one color (requires 4+ of that color in the supply).\n\n3. Reserve a Card: Click a market card and choose 'Reserve' to add it to your hand (max 3). You also receive 1 gold (wild) token. You can also click a deck to reserve the top card blind.\n\n4. Purchase a Card: Click a market card and choose 'Buy', or click a reserved card to purchase it. Pay the gem cost minus your card bonuses. Gold tokens can substitute for any color."
+  },
+  {
+    "heading": "Card Market",
+    "body": "The market shows 3 tiers of development cards (4 visible per tier):\n\nTier 1 (bottom): Cheap cards with small or no prestige.\nTier 2 (middle): Mid-range cards, 1-3 prestige.\nTier 3 (top): Expensive cards, 3-5 prestige.\n\nEach card shows:\n- Colored bar: the gem bonus you gain when purchased.\n- Number (top-left): prestige points.\n- Cost (bottom): gems required to purchase.\n\nWhen a card is purchased or reserved, a new card is drawn from the deck to replace it."
+  },
+  {
+    "heading": "Gem Tokens",
+    "body": "There are 5 gem colors (4 tokens each for 2 players) plus 5 gold (wild) tokens.\n\nGem abbreviations:\nG = Emerald (green)\nU = Sapphire (blue)\nR = Ruby (red)\nW = Diamond (white)\nK = Onyx (black)\n$ = Gold (wild)\n\nYou can hold a maximum of 10 tokens. If you exceed this limit after taking tokens, you must discard down to 10."
+  },
+  {
+    "heading": "Nobles",
+    "body": "Noble tiles are displayed on the left side. Each requires a certain number of card bonuses (not tokens!) and awards 3 prestige points.\n\nNobles visit automatically at the end of your turn if you meet their requirements. You cannot choose to delay a noble visit."
+  },
+  {
+    "heading": "Winning",
+    "body": "When any player reaches 15+ prestige points, the current round is completed so both players have equal turns. The player with the most prestige wins.\n\nTiebreaker: The player with fewer purchased development cards wins."
+  },
+  {
+    "heading": "Strategy Tips",
+    "body": "- Focus on cards whose bonuses help you buy other cards cheaply (engine building).\n- Tier 1 cards are cheap and provide bonuses that discount future purchases.\n- Track which nobles you're closest to — 3 free prestige is valuable.\n- Gold tokens are powerful wildcards — reserve strategically to earn them.\n- Don't hoard tokens you don't need — you'll hit the 10-token limit.\n- Watch what your opponent is collecting and consider blocking key cards."
+  }
+]
