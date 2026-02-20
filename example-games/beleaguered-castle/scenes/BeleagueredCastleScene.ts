@@ -14,7 +14,7 @@
  */
 
 import Phaser from 'phaser';
-import type { Rank, Suit } from '../../../src/card-system/Card';
+import type { Suit } from '../../../src/card-system/Card';
 import type { BeleagueredCastleState, BCMove } from '../BeleagueredCastleState';
 import { FOUNDATION_COUNT, TABLEAU_COUNT, FOUNDATION_SUITS } from '../BeleagueredCastleState';
 import {
@@ -34,18 +34,17 @@ import type { Command } from '../../../src/core-engine/UndoRedoManager';
 import { UndoRedoManager, CompoundCommand } from '../../../src/core-engine/UndoRedoManager';
 import { BCTranscriptRecorder } from '../GameTranscript';
 import type { BCGameTranscript } from '../GameTranscript';
-import { HelpPanel, HelpButton } from '../../../src/ui';
+import {
+  HelpPanel, HelpButton,
+  CARD_W, CARD_H, GAME_W, GAME_H, FONT_FAMILY,
+  cardTextureKey, preloadCardAssets,
+} from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
 import helpContent from '../help-content.json';
 
 // ── Constants ───────────────────────────────────────────────
 
-const CARD_W = 48;
-const CARD_H = 65;
 const CARD_GAP = 6;
-
-const GAME_W = 800;
-const GAME_H = 600;
 
 const ANIM_DURATION = 300; // ms per card deal animation
 const DEAL_STAGGER = 40; // ms between successive card deal tweens
@@ -64,8 +63,6 @@ const TABLEAU_TOP_Y = 135;
 
 /** Z-depth for a card being dragged. */
 const DRAG_DEPTH = 1000;
-
-const FONT_FAMILY = 'Arial, sans-serif';
 
 // ── Suit symbol mapping for foundation labels ───────────────
 
@@ -235,28 +232,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
   // ── Preload ─────────────────────────────────────────────
 
   preload(): void {
-    // Load card back
-    this.load.svg('card_back', 'assets/cards/card_back.svg', {
-      width: CARD_W,
-      height: CARD_H,
-    });
-
-    // Load all 52 card faces
-    const suits: Suit[] = ['clubs', 'diamonds', 'hearts', 'spades'];
-    const ranks: Rank[] = [
-      'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K',
-    ];
-
-    for (const suit of suits) {
-      for (const rank of ranks) {
-        const key = this.cardTextureKey(rank, suit);
-        const fileName = this.cardFileName(rank, suit);
-        this.load.svg(key, `assets/cards/${fileName}`, {
-          width: CARD_W,
-          height: CARD_H,
-        });
-      }
-    }
+    preloadCardAssets(this);
   }
 
   // ── Create ──────────────────────────────────────────────
@@ -1282,7 +1258,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
       const topCard = foundation.peek();
 
       if (topCard) {
-        const texture = this.cardTextureKey(topCard.rank, topCard.suit);
+        const texture = cardTextureKey(topCard.rank, topCard.suit);
         this.foundationSprites[i].setTexture(texture).setVisible(true);
       } else {
         this.foundationSprites[i].setVisible(false);
@@ -1342,7 +1318,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
         const card = cards[row];
         const targetX = this.tableauColumnX(col);
         const targetY = this.tableauCardY(row);
-        const texture = this.cardTextureKey(card.rank, card.suit);
+        const texture = cardTextureKey(card.rank, card.suit);
 
         // Create the sprite at the deal origin (center), invisible initially
         const sprite = this.add
@@ -1465,7 +1441,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
         const card = cards[row];
         const x = this.tableauColumnX(col);
         const y = this.tableauCardY(row);
-        const texture = this.cardTextureKey(card.rank, card.suit);
+        const texture = cardTextureKey(card.rank, card.suit);
 
         const sprite = this.add
           .image(x, y, texture)
@@ -1521,27 +1497,6 @@ export class BeleagueredCastleScene extends Phaser.Scene {
   private resumeTimer(): void {
     if (this.timerEvent) {
       this.timerEvent.paused = false;
-    }
-  }
-
-  // ── Texture helpers ─────────────────────────────────────
-
-  private cardTextureKey(rank: Rank, suit: Suit): string {
-    const rankName = this.rankFileName(rank);
-    return `${rankName}_of_${suit}`;
-  }
-
-  private cardFileName(rank: Rank, suit: Suit): string {
-    return `${this.rankFileName(rank)}_of_${suit}.svg`;
-  }
-
-  private rankFileName(rank: Rank): string {
-    switch (rank) {
-      case 'A': return 'ace';
-      case 'J': return 'jack';
-      case 'Q': return 'queen';
-      case 'K': return 'king';
-      default: return rank; // 2-10
     }
   }
 

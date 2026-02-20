@@ -23,20 +23,19 @@ import type { GameTranscript, BoardSnapshot, CardSnapshot } from '../GameTranscr
 import { TranscriptStore } from '../../../src/core-engine/TranscriptStore';
 import { GameEventEmitter } from '../../../src/core-engine/GameEventEmitter';
 import { PhaserEventBridge } from '../../../src/core-engine/PhaserEventBridge';
-import { HelpPanel, HelpButton } from '../../../src/ui';
+import {
+  HelpPanel, HelpButton,
+  CARD_W, CARD_H, GAME_W, GAME_H, FONT_FAMILY,
+  cardTextureKey, getCardTexture, preloadCardAssets,
+} from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
 import helpContent from '../help-content.json';
 
 // ── Constants ───────────────────────────────────────────────
 
-const CARD_W = 48;
-const CARD_H = 65;
 const CARD_GAP = 5;
 const GRID_COLS = 3;
 const GRID_ROWS = 3;
-
-const GAME_W = 800;
-const GAME_H = 600;
 
 const AI_DELAY = 600; // ms before AI chooses
 const AI_SHOW_DRAW_DELAY = 1000; // ms to show drawn card before moving
@@ -49,8 +48,6 @@ const HUMAN_GRID_Y = 480; // center Y of human grid
 const PILE_Y = 295; // center Y of stock/discard
 const STOCK_X = GAME_W / 2 - 50;
 const DISCARD_X = GAME_W / 2 + 50;
-
-const FONT_FAMILY = 'Arial, sans-serif';
 
 // ── Turn state machine ──────────────────────────────────────
 
@@ -112,26 +109,7 @@ export class GolfScene extends Phaser.Scene {
   // ── Preload ─────────────────────────────────────────────
 
   preload(): void {
-    // Load card back
-    this.load.svg('card_back', 'assets/cards/card_back.svg', {
-      width: CARD_W,
-      height: CARD_H,
-    });
-
-    // Load all 52 card faces
-    const suits: Suit[] = ['clubs', 'diamonds', 'hearts', 'spades'];
-    const ranks: Rank[] = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
-
-    for (const suit of suits) {
-      for (const rank of ranks) {
-        const key = this.cardTextureKey(rank, suit);
-        const fileName = this.cardFileName(rank, suit);
-        this.load.svg(key, `assets/cards/${fileName}`, {
-          width: CARD_W,
-          height: CARD_H,
-        });
-      }
-    }
+    preloadCardAssets(this);
   }
 
   // ── Create ──────────────────────────────────────────────
@@ -424,32 +402,6 @@ export class GolfScene extends Phaser.Scene {
     };
   }
 
-  // ── Texture helpers ─────────────────────────────────────
-
-  private cardTextureKey(rank: Rank, suit: Suit): string {
-    const rankName = this.rankFileName(rank);
-    return `${rankName}_of_${suit}`;
-  }
-
-  private cardFileName(rank: Rank, suit: Suit): string {
-    return `${this.rankFileName(rank)}_of_${suit}.svg`;
-  }
-
-  private rankFileName(rank: Rank): string {
-    switch (rank) {
-      case 'A': return 'ace';
-      case 'J': return 'jack';
-      case 'Q': return 'queen';
-      case 'K': return 'king';
-      default: return rank; // 2-10
-    }
-  }
-
-  private getCardTexture(card: Card): string {
-    if (!card.faceUp) return 'card_back';
-    return this.cardTextureKey(card.rank, card.suit);
-  }
-
   // ── Refresh display ─────────────────────────────────────
 
   private refreshAll(): void {
@@ -466,7 +418,7 @@ export class GolfScene extends Phaser.Scene {
     const sprites = player === 'human' ? this.humanCardSprites : this.aiCardSprites;
 
     for (let i = 0; i < 9; i++) {
-      sprites[i].setTexture(this.getCardTexture(grid[i]));
+      sprites[i].setTexture(getCardTexture(grid[i]));
     }
   }
 
@@ -483,7 +435,7 @@ export class GolfScene extends Phaser.Scene {
     const top = this.session.shared.discardPile.peek();
     if (top) {
       this.discardSprite.setVisible(true);
-      this.discardSprite.setTexture(this.getCardTexture(top));
+      this.discardSprite.setTexture(getCardTexture(top));
     } else {
       this.discardSprite.setVisible(false);
     }
@@ -755,7 +707,7 @@ export class GolfScene extends Phaser.Scene {
         ease: 'Power2',
         onComplete: () => {
           // Reveal the card's actual face at the midpoint of the flip
-          sprite.setTexture(this.getCardTexture(grid[idx]));
+          sprite.setTexture(getCardTexture(grid[idx]));
           // Second half: scaleX → 1 while completing movement to discard
           this.tweens.add({
             targets: sprite,
@@ -803,7 +755,7 @@ export class GolfScene extends Phaser.Scene {
           duration: SWAP_ANIM_DURATION / 4,
           ease: 'Power2',
           onComplete: () => {
-            sprite.setTexture(this.getCardTexture(grid[idx]));
+            sprite.setTexture(getCardTexture(grid[idx]));
             this.tweens.add({
               targets: sprite,
               scaleX: 1,
@@ -838,7 +790,7 @@ export class GolfScene extends Phaser.Scene {
     // Show drawn card to the right of the discard pile
     const x = DISCARD_X + CARD_W + 20;
     const y = PILE_Y;
-    const texture = this.cardTextureKey(card.rank, card.suit);
+    const texture = cardTextureKey(card.rank, card.suit);
 
     this.drawnCardSprite = this.add.image(x, y, texture);
     this.drawnCardSprite.setAlpha(0);
