@@ -6,6 +6,11 @@ import {
   type AnimationCompletePayload,
   type StateSettledPayload,
   type GameEndedPayload,
+  type CardDrawnPayload,
+  type CardFlippedPayload,
+  type CardSwappedPayload,
+  type CardDiscardedPayload,
+  type UIInteractionPayload,
 } from '../../src/core-engine/GameEventEmitter';
 
 describe('GameEventEmitter', () => {
@@ -172,6 +177,78 @@ describe('GameEventEmitter', () => {
         winnerIndex: -1,
       };
       emitter.emit('game-ended', payload);
+      expect(listener).toHaveBeenCalledWith(payload);
+    });
+
+    it('should emit card-drawn events', () => {
+      const listener = vi.fn();
+      emitter.on('card-drawn', listener);
+
+      const payload: CardDrawnPayload = {
+        source: 'stock',
+        playerIndex: 0,
+      };
+      emitter.emit('card-drawn', payload);
+      expect(listener).toHaveBeenCalledWith(payload);
+    });
+
+    it('should emit card-drawn from discard', () => {
+      const listener = vi.fn();
+      emitter.on('card-drawn', listener);
+
+      const payload: CardDrawnPayload = {
+        source: 'discard',
+        playerIndex: 1,
+      };
+      emitter.emit('card-drawn', payload);
+      expect(listener).toHaveBeenCalledWith(payload);
+    });
+
+    it('should emit card-flipped events', () => {
+      const listener = vi.fn();
+      emitter.on('card-flipped', listener);
+
+      const payload: CardFlippedPayload = {
+        position: 4,
+        playerIndex: 0,
+      };
+      emitter.emit('card-flipped', payload);
+      expect(listener).toHaveBeenCalledWith(payload);
+    });
+
+    it('should emit card-swapped events', () => {
+      const listener = vi.fn();
+      emitter.on('card-swapped', listener);
+
+      const payload: CardSwappedPayload = {
+        position: 2,
+        drawnFrom: 'stock',
+        playerIndex: 1,
+      };
+      emitter.emit('card-swapped', payload);
+      expect(listener).toHaveBeenCalledWith(payload);
+    });
+
+    it('should emit card-discarded events', () => {
+      const listener = vi.fn();
+      emitter.on('card-discarded', listener);
+
+      const payload: CardDiscardedPayload = {
+        playerIndex: 0,
+      };
+      emitter.emit('card-discarded', payload);
+      expect(listener).toHaveBeenCalledWith(payload);
+    });
+
+    it('should emit ui-interaction events', () => {
+      const listener = vi.fn();
+      emitter.on('ui-interaction', listener);
+
+      const payload: UIInteractionPayload = {
+        elementId: 'play-again',
+        action: 'click',
+      };
+      emitter.emit('ui-interaction', payload);
       expect(listener).toHaveBeenCalledWith(payload);
     });
   });
