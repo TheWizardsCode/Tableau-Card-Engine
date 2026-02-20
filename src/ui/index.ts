@@ -12,6 +12,12 @@ export type { HelpSection, HelpPanelConfig } from './HelpPanel';
 export { HelpButton } from './HelpButton';
 export type { HelpButtonConfig } from './HelpButton';
 
+export { SettingsPanel, DEPTH_SETTINGS_BUTTON } from './SettingsPanel';
+export type { SettingsPanelConfig } from './SettingsPanel';
+
+export { SettingsButton } from './SettingsButton';
+export type { SettingsButtonConfig } from './SettingsButton';
+
 export { GameSelectorScene, REGISTRY_KEY_GAMES } from './GameSelectorScene';
 export type { GameEntry } from './GameSelectorScene';
 
