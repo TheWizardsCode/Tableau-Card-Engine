@@ -28,6 +28,7 @@
     "src/**/*.ts",
     "example-games/**/*.ts",
     "tests/**/*.ts",
+    "scripts/**/*.ts",
     "vite.config.ts"
   ],
   "exclude": [
