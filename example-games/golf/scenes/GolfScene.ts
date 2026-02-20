@@ -619,7 +619,6 @@ export class GolfScene extends Phaser.Scene {
 
     const action: GolfAction = { drawSource: this.drawSource, move };
     this.setPhase('animating');
-    this.hideDrawnCard();
 
     const result = executeTurn(this.session, action);
     this.recorder.recordTurn(result, action.drawSource);
@@ -666,7 +665,6 @@ export class GolfScene extends Phaser.Scene {
 
       // Pause so the player can see the drawn card, then execute the move
       this.time.delayedCall(AI_SHOW_DRAW_DELAY, () => {
-        this.hideDrawnCard();
         this.setPhase('animating');
         const result = executeTurn(this.session, action);
         this.recorder.recordTurn(result, action.drawSource);
@@ -711,6 +709,14 @@ export class GolfScene extends Phaser.Scene {
     const playerKey = result.playerIndex === 0 ? 'human' : 'ai';
     const sprites = playerKey === 'human' ? this.humanCardSprites : this.aiCardSprites;
 
+    // Wrap the caller's onComplete to clean up the drawn card sprite first.
+    // The drawn card persists on-screen during the animation so that future
+    // animation improvements can tween it to its destination.
+    const wrappedOnComplete = () => {
+      this.hideDrawnCard();
+      onComplete();
+    };
+
     if (result.move.kind === 'swap') {
       const idx = result.move.row * 3 + result.move.col;
       const sprite = sprites[idx];
@@ -729,7 +735,7 @@ export class GolfScene extends Phaser.Scene {
             scaleX: 1,
             duration: ANIM_DURATION / 2,
             ease: 'Power2',
-            onComplete,
+            onComplete: wrappedOnComplete,
           });
         },
       });
@@ -751,7 +757,7 @@ export class GolfScene extends Phaser.Scene {
             scaleX: 1,
             duration: ANIM_DURATION / 2,
             ease: 'Power2',
-            onComplete,
+            onComplete: wrappedOnComplete,
           });
         },
       });
