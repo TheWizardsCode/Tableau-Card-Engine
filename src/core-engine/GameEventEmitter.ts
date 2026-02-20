@@ -127,6 +127,120 @@ export interface UIInteractionPayload {
   readonly action: string;
 }
 
+// ── Solitaire Event Payloads ────────────────────────────────
+
+/**
+ * Emitted when a card is placed on a foundation pile.
+ */
+export interface CardToFoundationPayload {
+  /** Suit of the card (e.g. 'hearts', 'spades'). */
+  readonly suit: string;
+  /** Rank of the card (e.g. 'A', '2', 'K'). */
+  readonly rank: string;
+  /** Index of the foundation pile (0-based). */
+  readonly foundationIndex: number;
+  /** Index of the player who placed the card (optional for single-player). */
+  readonly playerIndex?: number;
+}
+
+/**
+ * Emitted when a card is placed on a tableau column.
+ */
+export interface CardToTableauPayload {
+  /** Suit of the card. */
+  readonly suit: string;
+  /** Rank of the card. */
+  readonly rank: string;
+  /** Index of the tableau column (0-based). */
+  readonly columnIndex: number;
+}
+
+/**
+ * Emitted when a card is picked up (drag start or click-to-move selection).
+ */
+export interface CardPickupPayload {
+  /** Suit of the card. */
+  readonly suit: string;
+  /** Rank of the card. */
+  readonly rank: string;
+  /** Where the card was picked up from. */
+  readonly source: 'tableau' | 'waste' | 'stock' | 'foundation';
+}
+
+/**
+ * Emitted when an invalid move causes a card to snap back to its origin.
+ */
+export interface CardSnapBackPayload {
+  /** Optional human-readable reason for the snap-back. */
+  readonly reason?: string;
+}
+
+/**
+ * Emitted when the auto-complete cascade begins.
+ */
+export interface AutoCompleteStartPayload {
+  /** Number of cards to be auto-completed. */
+  readonly cardCount: number;
+}
+
+/**
+ * Emitted when an individual card is auto-completed to a foundation.
+ */
+export interface AutoCompleteCardPayload {
+  /** Suit of the card. */
+  readonly suit: string;
+  /** Rank of the card. */
+  readonly rank: string;
+  /** Index of the foundation pile the card was placed on. */
+  readonly foundationIndex: number;
+}
+
+/**
+ * Emitted when an undo action is performed.
+ */
+export interface UndoPayload {
+  /** Optional description of the move that was undone. */
+  readonly moveDescription?: string;
+}
+
+/**
+ * Emitted when a redo action is performed.
+ */
+export interface RedoPayload {
+  /** Optional description of the move that was redone. */
+  readonly moveDescription?: string;
+}
+
+/**
+ * Emitted when a card is selected via click-to-move.
+ */
+export interface CardSelectedPayload {
+  /** Suit of the card. */
+  readonly suit: string;
+  /** Rank of the card. */
+  readonly rank: string;
+  /** Index of the column the card is in. */
+  readonly columnIndex: number;
+}
+
+/**
+ * Emitted when a previously selected card is deselected.
+ */
+export interface CardDeselectedPayload {
+  /** Reason the card was deselected. */
+  readonly reason?: 'click-away' | 'new-selection' | 'move-completed';
+}
+
+/**
+ * Emitted when a card is dealt during the initial deal animation.
+ */
+export interface DealCardPayload {
+  /** 0-based index of the card being dealt. */
+  readonly cardIndex: number;
+  /** Total number of cards being dealt. */
+  readonly totalCards: number;
+}
+
 // ── Event Map ───────────────────────────────────────────────
 
 /**
@@ -146,6 +260,18 @@ export interface GameEventMap {
   'card-swapped': CardSwappedPayload;
   'card-discarded': CardDiscardedPayload;
   'ui-interaction': UIInteractionPayload;
+  // Solitaire events
+  'card-to-foundation': CardToFoundationPayload;
+  'card-to-tableau': CardToTableauPayload;
+  'card-pickup': CardPickupPayload;
+  'card-snap-back': CardSnapBackPayload;
+  'auto-complete-start': AutoCompleteStartPayload;
+  'auto-complete-card': AutoCompleteCardPayload;
+  'undo': UndoPayload;
+  'redo': RedoPayload;
+  'card-selected': CardSelectedPayload;
+  'card-deselected': CardDeselectedPayload;
+  'deal-card': DealCardPayload;
 }
 
 /** Union of all valid game event names. */
