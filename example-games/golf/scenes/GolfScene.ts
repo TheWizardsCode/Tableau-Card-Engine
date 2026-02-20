@@ -23,6 +23,8 @@ import type { GameTranscript, BoardSnapshot, CardSnapshot } from '../GameTranscr
 import { TranscriptStore } from '../../../src/core-engine/TranscriptStore';
 import { GameEventEmitter } from '../../../src/core-engine/GameEventEmitter';
 import { PhaserEventBridge } from '../../../src/core-engine/PhaserEventBridge';
+import { SoundManager } from '../../../src/core-engine/SoundManager';
+import type { SoundPlayer, EventSoundMapping } from '../../../src/core-engine/SoundManager';
 import {
   HelpPanel, HelpButton,
   CARD_W, CARD_H, GAME_W, GAME_H, FONT_FAMILY,
@@ -61,6 +63,19 @@ type TurnPhase =
   | 'ai-thinking' // AI's turn, waiting for delay
   | 'round-ended'; // game over
 
+// ── Audio asset keys ────────────────────────────────────────
+
+const SFX_KEYS = {
+  CARD_DRAW: 'sfx-card-draw',
+  CARD_FLIP: 'sfx-card-flip',
+  CARD_SWAP: 'sfx-card-swap',
+  CARD_DISCARD: 'sfx-card-discard',
+  TURN_CHANGE: 'sfx-turn-change',
+  ROUND_END: 'sfx-round-end',
+  SCORE_REVEAL: 'sfx-score-reveal',
+  UI_CLICK: 'sfx-ui-click',
+} as const;
+
 // ── Scene ───────────────────────────────────────────────────
 
 /** Shared TranscriptStore instance for the Golf game. */
@@ -82,6 +97,7 @@ export class GolfScene extends Phaser.Scene {
   // Event system
   private gameEvents!: GameEventEmitter;
   private eventBridge!: PhaserEventBridge;
+  private soundManager: SoundManager | null = null;
 
   // Display objects -- grids
   private humanCardSprites: Phaser.GameObjects.Image[] = [];
@@ -112,6 +128,16 @@ export class GolfScene extends Phaser.Scene {
 
   preload(): void {
     preloadCardAssets(this);
+
+    // Audio SFX assets
+    this.load.audio(SFX_KEYS.CARD_DRAW, 'assets/audio/card-draw.wav');
+    this.load.audio(SFX_KEYS.CARD_FLIP, 'assets/audio/card-flip.wav');
+    this.load.audio(SFX_KEYS.CARD_SWAP, 'assets/audio/card-swap.wav');
+    this.load.audio(SFX_KEYS.CARD_DISCARD, 'assets/audio/card-discard.wav');
+    this.load.audio(SFX_KEYS.TURN_CHANGE, 'assets/audio/turn-change.wav');
+    this.load.audio(SFX_KEYS.ROUND_END, 'assets/audio/round-end.wav');
+    this.load.audio(SFX_KEYS.SCORE_REVEAL, 'assets/audio/score-reveal.wav');
+    this.load.audio(SFX_KEYS.UI_CLICK, 'assets/audio/ui-click.wav');
   }
 
   // ── Create ──────────────────────────────────────────────
@@ -140,6 +166,34 @@ export class GolfScene extends Phaser.Scene {
     this.eventBridge = new PhaserEventBridge(this.gameEvents, this.events);
     (window as unknown as Record<string, unknown>).__GAME_EVENTS__ =
       this.gameEvents;
+
+    // Sound system: wrap Phaser's sound manager as a SoundPlayer
+    if (!this.replayMode) {
+      const phaserSound = this.sound;
+      const player: SoundPlayer = {
+        play: (key: string) => { phaserSound.play(key); },
+        stop: (key: string) => { phaserSound.stopByKey(key); },
+        setVolume: (v: number) => { phaserSound.volume = v; },
+        setMute: (m: boolean) => { phaserSound.mute = m; },
+      };
+      this.soundManager = new SoundManager(player);
+
+      // Register all SFX keys
+      for (const sfxKey of Object.values(SFX_KEYS)) {
+        this.soundManager.register(sfxKey);
+      }
+
+      // Declarative event-to-sound mapping
+      const mapping: EventSoundMapping = {
+        'card-drawn': SFX_KEYS.CARD_DRAW,
+        'card-flipped': SFX_KEYS.CARD_FLIP,
+        'card-swapped': SFX_KEYS.CARD_SWAP,
+        'card-discarded': SFX_KEYS.CARD_DISCARD,
+        'turn-started': SFX_KEYS.TURN_CHANGE,
+        'game-ended': SFX_KEYS.ROUND_END,
+      };
+      this.soundManager.connectToEvents(this.gameEvents, mapping);
+    }
 
     // Setup game
     this.session = setupGolfGame({
@@ -547,6 +601,12 @@ export class GolfScene extends Phaser.Scene {
 
     if (!this.drawnCard) return;
 
+    // Emit card-drawn event
+    this.gameEvents.emit('card-drawn', {
+      source,
+      playerIndex: 0,
+    });
+
     // Show the drawn card next to the human grid
     this.showDrawnCard(this.drawnCard);
     this.setPhase('waiting-for-move');
@@ -560,6 +620,23 @@ export class GolfScene extends Phaser.Scene {
 
     const result = executeTurn(this.session, action);
     this.recorder.recordTurn(result, action.drawSource);
+
+    // Emit card-level events based on the move type
+    if (move.kind === 'swap') {
+      this.gameEvents.emit('card-swapped', {
+        position: move.row * 3 + move.col,
+        drawnFrom: this.drawSource,
+        playerIndex: 0,
+      });
+    } else {
+      // discard-and-flip: emit both discard and flip events
+      this.gameEvents.emit('card-discarded', { playerIndex: 0 });
+      this.gameEvents.emit('card-flipped', {
+        position: move.row * 3 + move.col,
+        playerIndex: 0,
+      });
+    }
+
     this.emitTurnCompleted(result);
 
     // Animate, then proceed
@@ -601,11 +678,33 @@ export class GolfScene extends Phaser.Scene {
       const sourceLabel = action.drawSource === 'stock' ? 'Stock pile' : 'Discard pile';
       this.instructionText.setText(`AI drew from ${sourceLabel}`);
 
+      // Emit card-drawn event for AI
+      this.gameEvents.emit('card-drawn', {
+        source: action.drawSource,
+        playerIndex: idx,
+      });
+
       // Pause so the player can see the drawn card, then execute the move
       this.time.delayedCall(AI_SHOW_DRAW_DELAY, () => {
         this.setPhase('animating');
         const result = executeTurn(this.session, action);
         this.recorder.recordTurn(result, action.drawSource);
+
+        // Emit card-level events based on the AI's move type
+        if (action.move.kind === 'swap') {
+          this.gameEvents.emit('card-swapped', {
+            position: action.move.row * 3 + action.move.col,
+            drawnFrom: action.drawSource,
+            playerIndex: idx,
+          });
+        } else {
+          this.gameEvents.emit('card-discarded', { playerIndex: idx });
+          this.gameEvents.emit('card-flipped', {
+            position: action.move.row * 3 + action.move.col,
+            playerIndex: idx,
+          });
+        }
+
         this.emitTurnCompleted(result);
 
         this.animateTurn(result, () => {
@@ -859,6 +958,8 @@ export class GolfScene extends Phaser.Scene {
 
   /** Clean up resources when the scene shuts down. */
   shutdown(): void {
+    this.soundManager?.destroy();
+    this.soundManager = null;
     this.eventBridge?.destroy();
     this.gameEvents?.removeAllListeners();
     this.helpPanel?.destroy();
@@ -908,6 +1009,9 @@ export class GolfScene extends Phaser.Scene {
     // Auto-save transcript to browser storage
     this.autoSaveTranscript(transcript);
 
+    // Play score-reveal sound directly (not event-mapped)
+    this.soundManager?.play(SFX_KEYS.SCORE_REVEAL);
+
     // Emit game-ended event
     const winnerIdx = results.winnerIndex;
     const winnerName = this.session.gameState.players[winnerIdx].name;
@@ -944,6 +1048,11 @@ export class GolfScene extends Phaser.Scene {
       this, GAME_W / 2 - 55, GAME_H / 2 + 55, '[ Play Again ]',
     );
     btn.on('pointerdown', () => {
+      this.soundManager?.play(SFX_KEYS.UI_CLICK);
+      this.gameEvents.emit('ui-interaction', {
+        elementId: 'play-again',
+        action: 'click',
+      });
       this.scene.restart();
     });
 
