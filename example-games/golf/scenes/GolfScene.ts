@@ -27,6 +27,7 @@ import {
   HelpPanel, HelpButton,
   CARD_W, CARD_H, GAME_W, GAME_H, FONT_FAMILY,
   cardTextureKey, getCardTexture, preloadCardAssets,
+  createOverlayBackground, createOverlayButton, createOverlayMenuButton,
 } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
 import helpContent from '../help-content.json';
@@ -931,23 +932,12 @@ export class GolfScene extends Phaser.Scene {
       `${winnerName} wins (${results.scores[winnerIdx]} pts)`,
     );
 
-    // Overlay
-    // Full-screen input blocker to prevent clicks reaching objects behind
-    const blocker = this.add.rectangle(
-      GAME_W / 2, GAME_H / 2,
-      GAME_W, GAME_H,
-      0x000000, 0.01,
+    // Overlay -- near-invisible blocker + visible box
+    createOverlayBackground(
+      this,
+      { depth: 10, alpha: 0.01 },
+      { width: 350, height: 180, alpha: 0.85 },
     );
-    blocker.setDepth(10);
-    blocker.setInteractive();
-
-    // Visible overlay box
-    const overlay = this.add.rectangle(
-      GAME_W / 2, GAME_H / 2,
-      350, 180,
-      0x000000, 0.85,
-    );
-    overlay.setDepth(10);
 
     const winnerText = results.winnerIndex === 0 ? 'You Win!' : 'AI Wins!';
     this.add
@@ -966,36 +956,14 @@ export class GolfScene extends Phaser.Scene {
       .setDepth(11);
 
     // Play again button
-    const btn = this.add
-      .text(GAME_W / 2 - 55, GAME_H / 2 + 55, '[ Play Again ]', {
-        fontSize: '14px',
-        color: '#88ff88',
-        fontFamily: FONT_FAMILY,
-      })
-      .setOrigin(0.5)
-      .setDepth(11)
-      .setInteractive({ useHandCursor: true });
-
+    const btn = createOverlayButton(
+      this, GAME_W / 2 - 55, GAME_H / 2 + 55, '[ Play Again ]',
+    );
     btn.on('pointerdown', () => {
       this.scene.restart();
     });
 
-    btn.on('pointerover', () => btn.setColor('#aaffaa'));
-    btn.on('pointerout', () => btn.setColor('#88ff88'));
-
     // Menu button
-    const menuBtn = this.add
-      .text(GAME_W / 2 + 55, GAME_H / 2 + 55, '[ Menu ]', {
-        fontSize: '14px',
-        color: '#88ff88',
-        fontFamily: FONT_FAMILY,
-      })
-      .setOrigin(0.5)
-      .setDepth(11)
-      .setInteractive({ useHandCursor: true });
-
-    menuBtn.on('pointerdown', () => this.scene.start('GameSelectorScene'));
-    menuBtn.on('pointerover', () => menuBtn.setColor('#aaffaa'));
-    menuBtn.on('pointerout', () => menuBtn.setColor('#88ff88'));
+    createOverlayMenuButton(this, GAME_W / 2 + 55, GAME_H / 2 + 55);
   }
 }

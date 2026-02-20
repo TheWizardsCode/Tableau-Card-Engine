@@ -26,3 +26,21 @@ export {
   getCardTexture,
   preloadCardAssets,
 } from './CardTextureHelpers';
+
+// Overlay system
+export {
+  createOverlayButton,
+  OVERLAY_BUTTON_COLOR,
+  OVERLAY_BUTTON_HOVER_COLOR,
+  OVERLAY_BUTTON_FONT_SIZE,
+} from './OverlayButton';
+export type { OverlayButtonConfig } from './OverlayButton';
+
+export { createOverlayBackground, dismissOverlay } from './Overlay';
+export type {
+  OverlayBackgroundOptions,
+  OverlayBoxOptions,
+  OverlayResult,
+} from './Overlay';
+
+export { createOverlayMenuButton } from './MenuButton';
