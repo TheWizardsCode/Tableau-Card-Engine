@@ -19,7 +19,7 @@ import { scoreGrid, scoreVisibleCards } from '../GolfScoring';
 import { AiPlayer, GreedyStrategy, RandomStrategy } from '../AiStrategy';
 import type { AiStrategy } from '../AiStrategy';
 import { TranscriptRecorder } from '../GameTranscript';
-import type { GameTranscript } from '../GameTranscript';
+import type { GameTranscript, BoardSnapshot, CardSnapshot } from '../GameTranscript';
 import { TranscriptStore } from '../../../src/core-engine/TranscriptStore';
 import { GameEventEmitter } from '../../../src/core-engine/GameEventEmitter';
 import { PhaserEventBridge } from '../../../src/core-engine/PhaserEventBridge';
@@ -75,6 +75,9 @@ export class GolfScene extends Phaser.Scene {
   private drawnCard: Card | null = null;
   private drawSource: DrawSource | null = null;
   private aiStrategyName: string = 'greedy';
+
+  /** When true, the scene suppresses all input and AI turns for replay use. */
+  private replayMode: boolean = false;
 
   // Event system
   private gameEvents!: GameEventEmitter;
@@ -143,6 +146,10 @@ export class GolfScene extends Phaser.Scene {
     this.drawnCard = null;
     this.drawSource = null;
 
+    // Check for replay mode via URL parameter (?mode=replay)
+    this.replayMode =
+      new URLSearchParams(window.location.search).get('mode') === 'replay';
+
     // Select AI strategy
     const strategy: AiStrategy =
       this.aiStrategyName === 'random' ? RandomStrategy : GreedyStrategy;
@@ -170,30 +177,116 @@ export class GolfScene extends Phaser.Scene {
     this.createGrids();
     this.createScoreDisplay();
     this.createInstructions();
-    this.createHelpPanel();
+    if (!this.replayMode) {
+      this.createHelpPanel();
+    }
 
     // Initial render
     this.refreshAll();
-    this.emitTurnStarted();
-    this.setPhase('waiting-for-draw');
+
+    if (this.replayMode) {
+      // In replay mode: clear instruction text and emit state-settled
+      // so the replay tool knows the scene is ready for state injection.
+      this.instructionText.setText('');
+      this.emitStateSettled();
+    } else {
+      this.emitTurnStarted();
+      this.setPhase('waiting-for-draw');
+    }
+  }
+
+  // ── Replay API ──────────────────────────────────────────
+
+  /**
+   * Inject an arbitrary board state from transcript snapshot data and
+   * refresh the visual display. Intended for use by the replay tool
+   * via `page.evaluate()`.
+   *
+   * Only operational in replay mode (?mode=replay). Throws if called
+   * outside of replay mode.
+   *
+   * After updating the internal state and refreshing all sprites,
+   * emits a `state-settled` event so the caller can synchronize
+   * screenshot capture.
+   *
+   * @param boardStates  Per-player board snapshots (grid cards, scores).
+   * @param discardTop   The card on top of the discard pile, or null if empty.
+   * @param stockRemaining  Number of cards left in the stock pile.
+   */
+  loadBoardState(
+    boardStates: BoardSnapshot[],
+    discardTop: CardSnapshot | null,
+    stockRemaining: number,
+  ): void {
+    if (!this.replayMode) {
+      throw new Error(
+        'loadBoardState() is only available in replay mode (?mode=replay)',
+      );
+    }
+
+    // Update each player's grid from the snapshot data
+    for (let p = 0; p < boardStates.length; p++) {
+      const snapshot = boardStates[p];
+      const grid = this.session.gameState.playerStates[p].grid;
+      for (let i = 0; i < snapshot.grid.length; i++) {
+        const cs = snapshot.grid[i];
+        // Cards have readonly rank/suit, so we replace the card object
+        (grid as Card[])[i] = {
+          rank: cs.rank as Rank,
+          suit: cs.suit as Suit,
+          faceUp: cs.faceUp,
+        };
+      }
+    }
+
+    // Update the discard pile: clear and push the top card if present
+    this.session.shared.discardPile.clear();
+    if (discardTop) {
+      const card: Card = {
+        rank: discardTop.rank as Rank,
+        suit: discardTop.suit as Suit,
+        faceUp: true,
+      };
+      this.session.shared.discardPile.push(card);
+    }
+
+    // Update the stock pile length to match the snapshot.
+    // We don't need real card data -- just enough entries so
+    // refreshPiles() shows/hides the stock sprite correctly.
+    this.session.shared.stockPile.length = 0;
+    for (let i = 0; i < stockRemaining; i++) {
+      this.session.shared.stockPile.push({
+        rank: 'A',
+        suit: 'spades',
+        faceUp: false,
+      });
+    }
+
+    // Refresh all visual elements
+    this.refreshAll();
+
+    // Signal that the board is visually stable and ready for screenshot
+    this.emitStateSettled();
   }
 
   // ── UI creation ─────────────────────────────────────────
 
   private createLabels(): void {
     // Menu button (top-left) -- returns to game selector
-    const menuBtn = this.add
-      .text(30, 14, '[ Menu ]', {
-        fontSize: '12px',
-        color: '#aaccaa',
-        fontFamily: FONT_FAMILY,
-      })
-      .setOrigin(0.5)
-      .setInteractive({ useHandCursor: true });
+    if (!this.replayMode) {
+      const menuBtn = this.add
+        .text(30, 14, '[ Menu ]', {
+          fontSize: '12px',
+          color: '#aaccaa',
+          fontFamily: FONT_FAMILY,
+        })
+        .setOrigin(0.5)
+        .setInteractive({ useHandCursor: true });
 
-    menuBtn.on('pointerdown', () => this.scene.start('GameSelectorScene'));
-    menuBtn.on('pointerover', () => menuBtn.setColor('#88ff88'));
-    menuBtn.on('pointerout', () => menuBtn.setColor('#aaccaa'));
+      menuBtn.on('pointerdown', () => this.scene.start('GameSelectorScene'));
+      menuBtn.on('pointerover', () => menuBtn.setColor('#88ff88'));
+      menuBtn.on('pointerout', () => menuBtn.setColor('#aaccaa'));
+    }
 
     this.add
       .text(GAME_W / 2, 14, '9-Card Golf', {
@@ -223,8 +316,10 @@ export class GolfScene extends Phaser.Scene {
   private createPiles(): void {
     // Stock pile
     this.stockSprite = this.add.image(STOCK_X, PILE_Y, 'card_back');
-    this.stockSprite.setInteractive({ useHandCursor: true });
-    this.stockSprite.on('pointerdown', () => this.onStockClick());
+    if (!this.replayMode) {
+      this.stockSprite.setInteractive({ useHandCursor: true });
+      this.stockSprite.on('pointerdown', () => this.onStockClick());
+    }
 
     this.add
       .text(STOCK_X, PILE_Y + CARD_H / 2 + 10, 'Stock', {
@@ -236,8 +331,10 @@ export class GolfScene extends Phaser.Scene {
 
     // Discard pile
     this.discardSprite = this.add.image(DISCARD_X, PILE_Y, 'card_back');
-    this.discardSprite.setInteractive({ useHandCursor: true });
-    this.discardSprite.on('pointerdown', () => this.onDiscardClick());
+    if (!this.replayMode) {
+      this.discardSprite.setInteractive({ useHandCursor: true });
+      this.discardSprite.on('pointerdown', () => this.onDiscardClick());
+    }
 
     this.add
       .text(DISCARD_X, PILE_Y + CARD_H / 2 + 10, 'Discard', {
@@ -253,8 +350,10 @@ export class GolfScene extends Phaser.Scene {
     for (let i = 0; i < 9; i++) {
       const { x, y } = this.gridCellPosition(i, 'human');
       const sprite = this.add.image(x, y, 'card_back');
-      sprite.setInteractive({ useHandCursor: true });
-      sprite.on('pointerdown', () => this.onHumanCardClick(i));
+      if (!this.replayMode) {
+        sprite.setInteractive({ useHandCursor: true });
+        sprite.on('pointerdown', () => this.onHumanCardClick(i));
+      }
       this.humanCardSprites.push(sprite);
     }
 
