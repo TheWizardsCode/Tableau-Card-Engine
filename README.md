@@ -2,6 +2,8 @@
 
 A modular, spike-driven game engine for building single-player tableau card games with **Phaser 3.x**, **TypeScript**, **Vite**, and **Vitest**.
 
+**[Play Alpha Game Now](https://thewizardscode.github.io/Tableau-Card-Engine/)**
+
 ## Quick Start
 
 ```bash
