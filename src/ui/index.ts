@@ -51,6 +51,9 @@ export type {
 
 export { createOverlayMenuButton } from './MenuButton';
 
+// Hi-DPI text rendering (side-effect import for patching)
+export { TEXT_DPR } from './hiDpiText';
+
 // Scene header scaffolding
 export {
   createSceneTitle,

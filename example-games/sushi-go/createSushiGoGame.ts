@@ -3,6 +3,7 @@
  * Used by both main.ts and browser tests.
  */
 import Phaser from 'phaser';
+import '../../src/ui/hiDpiText'; // side-effect: crisp text on HiDPI displays
 import { SushiGoScene } from './scenes/SushiGoScene';
 
 export interface SushiGoGameOptions {
@@ -31,6 +32,10 @@ export function createSushiGoGame(options: SushiGoGameOptions = {}): Phaser.Game
     scale: {
       mode: Phaser.Scale.FIT,
       autoCenter: Phaser.Scale.CENTER_BOTH,
+    },
+    render: {
+      antialias: false,
+      roundPixels: true,
     },
     audio: {
       disableWebAudio: false,

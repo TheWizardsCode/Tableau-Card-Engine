@@ -48,7 +48,7 @@ const ANIM_DURATION = 300; // ms for animations
 const SWAP_ANIM_DURATION = ANIM_DURATION * 1.5; // ms for swap/discard-and-flip
 
 // Layout positions (designed to fit two 3x3 grids + piles in 720px height)
-const AI_GRID_Y = 126; // center Y of AI grid
+const AI_GRID_Y = 138; // center Y of AI grid (clearance below scene title)
 const HUMAN_GRID_Y = 575; // center Y of human grid
 const PILE_Y = 350; // center Y of stock/discard
 const STOCK_X = GAME_W / 2 - 70;

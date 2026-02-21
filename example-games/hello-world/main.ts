@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import '../../src/ui/hiDpiText'; // side-effect: crisp text on HiDPI displays
 import { HelloWorldScene } from './scenes/HelloWorldScene';
 
 /**
@@ -18,6 +19,10 @@ const config: Phaser.Types.Core.GameConfig = {
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
+  },
+  render: {
+    antialias: false,
+    roundPixels: true,
   },
 };
 
