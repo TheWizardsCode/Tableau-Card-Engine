@@ -92,10 +92,10 @@ const TABLEAU_MAX_Y = GAME_H - 40 - BC_CARD_H / 2; // ~613
 
 /** Top area: title + foundations */
 const TITLE_Y = 20;
-const FOUNDATION_Y = 90;
+const FOUNDATION_Y = 110;
 
 /** Tableau starts below the foundations. */
-const TABLEAU_TOP_Y = 248;
+const TABLEAU_TOP_Y = 290;
 
 /** Z-depth for a card being dragged. */
 const DRAG_DEPTH = 1000;
@@ -425,7 +425,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
 
       // Suit label beneath the slot
       const label = this.add
-        .text(x, FOUNDATION_Y + BC_CARD_H / 2 + 14, SUIT_SYMBOL[suit], {
+        .text(x, FOUNDATION_Y + BC_CARD_H / 2 + 18, SUIT_SYMBOL[suit], {
           fontSize: '22px',
           color: SUIT_COLOR[suit],
           fontFamily: FONT_FAMILY,
