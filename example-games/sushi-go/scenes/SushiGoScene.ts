@@ -118,6 +118,12 @@ export class SushiGoScene extends Phaser.Scene {
   private aiPlayer!: SushiGoAiPlayer;
   private turnPhase: TurnPhase = 'picking';
   private pendingHumanPick: number | null = null;
+  private pendingHumanSecondPick: number | null = null;
+
+  // Chopsticks mode state
+  private chopsticksMode = false;
+  private chopsticksFirstPick: number | null = null;
+  private chopsticksButton: Phaser.GameObjects.Text | null = null;
 
   // Event system
   private gameEvents!: GameEventEmitter;
@@ -173,6 +179,10 @@ export class SushiGoScene extends Phaser.Scene {
     // Reset state
     this.turnPhase = 'picking';
     this.pendingHumanPick = null;
+    this.pendingHumanSecondPick = null;
+    this.chopsticksMode = false;
+    this.chopsticksFirstPick = null;
+    this.chopsticksButton = null;
     this.overlayObjects = [];
 
     // Event system
@@ -218,6 +228,13 @@ export class SushiGoScene extends Phaser.Scene {
     // Initial render
     this.refreshAll();
     this.setPhase('picking');
+
+    // Keyboard: Escape cancels chopsticks mode
+    this.input.keyboard?.on('keydown-ESC', () => {
+      if (this.chopsticksMode) {
+        this.cancelChopsticksMode();
+      }
+    });
   }
 
   // ── UI creation ─────────────────────────────────────────
@@ -401,6 +418,7 @@ export class SushiGoScene extends Phaser.Scene {
     this.refreshTableau('ai');
     this.refreshScores();
     this.refreshRoundInfo();
+    this.refreshChopsticksButton();
   }
 
   private refreshHand(): void {
@@ -414,12 +432,24 @@ export class SushiGoScene extends Phaser.Scene {
 
     for (let i = 0; i < hand.length; i++) {
       const x = startX + i * (HAND_CARD_W + HAND_GAP);
+      const isInteractive = this.turnPhase === 'picking';
       const cardContainer = this.createCardRect(
         x, HAND_Y, HAND_CARD_W, HAND_CARD_H,
         hand[i],
-        this.turnPhase === 'picking',
+        isInteractive,
         i,
       );
+
+      // Highlight the first selected card in chopsticks mode
+      if (this.chopsticksMode && this.chopsticksFirstPick === i) {
+        const highlight = this.add.rectangle(
+          0, 0, HAND_CARD_W + 6, HAND_CARD_H + 6,
+        );
+        highlight.setStrokeStyle(3, 0x00ff88);
+        highlight.setFillStyle(0x00ff88, 0.15);
+        cardContainer.addAt(highlight, 0); // behind the card
+      }
+
       this.handContainer.add(cardContainer);
     }
   }
@@ -558,7 +588,11 @@ export class SushiGoScene extends Phaser.Scene {
 
     switch (phase) {
       case 'picking':
-        this.instructionText.setText('Click a card from your hand to pick it');
+        if (this.chopsticksMode) {
+          this.instructionText.setText('Chopsticks: click your 1st card');
+        } else {
+          this.instructionText.setText('Click a card from your hand to pick it');
+        }
         this.refreshHand(); // re-enable interactivity
         break;
       case 'animating':
@@ -581,12 +615,122 @@ export class SushiGoScene extends Phaser.Scene {
   private onHandCardClick(handIndex: number): void {
     if (this.turnPhase !== 'picking') return;
 
-    this.pendingHumanPick = handIndex;
-    // Play card-pick sound directly (Sushi Go drafts from hand,
-    // which doesn't match the stock/discard source of 'card-drawn')
-    this.soundManager?.play(SFX_KEYS.CARD_PICK);
+    if (this.chopsticksMode) {
+      if (this.chopsticksFirstPick === null) {
+        // First card selected in chopsticks mode
+        this.chopsticksFirstPick = handIndex;
+        this.instructionText.setText('Chopsticks: click your 2nd card (Esc to cancel)');
+        this.soundManager?.play(SFX_KEYS.CARD_PICK);
+        this.refreshHand(); // re-render to show highlight on first pick
+      } else {
+        // Second card selected -- execute the dual pick
+        if (handIndex === this.chopsticksFirstPick) {
+          // Can't pick the same card twice; ignore
+          return;
+        }
+        this.pendingHumanPick = this.chopsticksFirstPick;
+        this.pendingHumanSecondPick = handIndex;
+        this.soundManager?.play(SFX_KEYS.CARD_PICK);
+        this.chopsticksMode = false;
+        this.chopsticksFirstPick = null;
+        this.executeTurn();
+      }
+    } else {
+      // Normal single-card pick
+      this.pendingHumanPick = handIndex;
+      this.soundManager?.play(SFX_KEYS.CARD_PICK);
+      this.executeTurn();
+    }
+  }
 
-    this.executeTurn();
+  // ── Chopsticks mode ─────────────────────────────────────
+
+  /**
+   * Check whether the human player currently has chopsticks in their tableau.
+   */
+  private humanHasChopsticks(): boolean {
+    return this.session.players[0].tableau.some(
+      (c) => c.type === 'chopsticks',
+    );
+  }
+
+  /**
+   * Refresh the "Use Chopsticks" button visibility and state.
+   * The button is shown only during the picking phase when the human
+   * player has chopsticks in their tableau and the hand has 2+ cards.
+   */
+  private refreshChopsticksButton(): void {
+    // Destroy existing button
+    if (this.chopsticksButton) {
+      this.chopsticksButton.destroy();
+      this.chopsticksButton = null;
+    }
+
+    const shouldShow =
+      this.turnPhase === 'picking' &&
+      this.humanHasChopsticks() &&
+      this.session.players[0].hand.length >= 2;
+
+    if (!shouldShow) {
+      // Also cancel mode if it was active and conditions are no longer met
+      if (this.chopsticksMode) {
+        this.chopsticksMode = false;
+        this.chopsticksFirstPick = null;
+      }
+      return;
+    }
+
+    const label = this.chopsticksMode ? '[ Cancel Chopsticks ]' : '[ Use Chopsticks ]';
+    const color = this.chopsticksMode ? '#ff8888' : '#88ddff';
+
+    this.chopsticksButton = this.add
+      .text(GAME_W / 2, HAND_Y - HAND_CARD_H / 2 - 25, label, {
+        fontSize: '16px',
+        color,
+        fontFamily: FONT_FAMILY,
+        backgroundColor: '#2a3a4a',
+        padding: { x: 12, y: 6 },
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => {
+        this.soundManager?.play(SFX_KEYS.UI_CLICK);
+        if (this.chopsticksMode) {
+          this.cancelChopsticksMode();
+        } else {
+          this.enterChopsticksMode();
+        }
+      })
+      .on('pointerover', () => {
+        this.chopsticksButton?.setStyle({ color: '#ffffff' });
+      })
+      .on('pointerout', () => {
+        this.chopsticksButton?.setStyle({
+          color: this.chopsticksMode ? '#ff8888' : '#88ddff',
+        });
+      });
+  }
+
+  /**
+   * Enter chopsticks mode: the player will pick 2 cards from their hand.
+   */
+  private enterChopsticksMode(): void {
+    this.chopsticksMode = true;
+    this.chopsticksFirstPick = null;
+    this.instructionText.setText('Chopsticks: click your 1st card');
+    this.refreshHand();
+    this.refreshChopsticksButton();
+  }
+
+  /**
+   * Cancel chopsticks mode and revert to normal single-card picking.
+   */
+  private cancelChopsticksMode(): void {
+    this.chopsticksMode = false;
+    this.chopsticksFirstPick = null;
+    this.instructionText.setText('Click a card from your hand to pick it');
+    this.refreshHand();
+    this.refreshChopsticksButton();
   }
 
   // ── Turn execution ──────────────────────────────────────
@@ -597,6 +741,9 @@ export class SushiGoScene extends Phaser.Scene {
     this.setPhase('animating');
 
     const humanPick: PickAction = { cardIndex: this.pendingHumanPick };
+    if (this.pendingHumanSecondPick !== null) {
+      humanPick.secondCardIndex = this.pendingHumanSecondPick;
+    }
 
     // AI picks simultaneously
     const aiPick = this.aiPlayer.choosePick(this.session.players[1]);
@@ -605,6 +752,7 @@ export class SushiGoScene extends Phaser.Scene {
     executeAllPicks(this.session, [humanPick, aiPick]);
 
     this.pendingHumanPick = null;
+    this.pendingHumanSecondPick = null;
 
     // Animate card moving from hand to tableau
     this.animatePickThen(() => {
@@ -858,6 +1006,10 @@ export class SushiGoScene extends Phaser.Scene {
     this.helpButton?.destroy();
     this.settingsPanel?.destroy();
     this.settingsButton?.destroy();
+    if (this.chopsticksButton) {
+      this.chopsticksButton.destroy();
+      this.chopsticksButton = null;
+    }
     this.dismissOverlay();
   }
 }

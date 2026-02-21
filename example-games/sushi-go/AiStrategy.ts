@@ -38,17 +38,29 @@ export interface SushiGoAiStrategy {
 
 /**
  * Picks a uniformly random card from the hand.
- * Never uses chopsticks (for simplicity).
+ * Has a 50% chance to use chopsticks when available and hand has 2+ cards.
  */
 export const RandomStrategy: SushiGoAiStrategy = {
   name: 'random',
 
   choosePick(
     hand: SushiGoCard[],
-    _tableau: SushiGoCard[],
+    tableau: SushiGoCard[],
     rng: () => number,
   ): PickAction {
     const cardIndex = Math.floor(rng() * hand.length);
+
+    // 50% chance to use chopsticks when available and hand has 2+ cards
+    const hasChopsticks = tableau.some((c) => c.type === 'chopsticks');
+    if (hasChopsticks && hand.length >= 2 && rng() < 0.5) {
+      let secondCardIndex = Math.floor(rng() * hand.length);
+      // Ensure second card is different from first
+      if (secondCardIndex === cardIndex) {
+        secondCardIndex = (secondCardIndex + 1) % hand.length;
+      }
+      return { cardIndex, secondCardIndex };
+    }
+
     return { cardIndex };
   },
 };
@@ -59,6 +71,10 @@ export const RandomStrategy: SushiGoAiStrategy = {
  * Evaluates each card in the hand by the marginal score increase
  * it would produce if added to the current tableau. Picks the
  * card with the highest marginal value.
+ *
+ * When chopsticks are available in the tableau, also evaluates all
+ * pairs of cards. If the best pair yields a higher marginal score
+ * than the best single card, uses chopsticks to pick both.
  *
  * This is a simple heuristic -- it doesn't account for future
  * drafting opportunities or opponent strategies.
@@ -79,24 +95,78 @@ export const GreedyStrategy: SushiGoAiStrategy = {
 
     const currentScore = scoreTableau(tableau);
 
-    interface Candidate {
+    // Evaluate single-card picks
+    interface SingleCandidate {
       index: number;
       marginalScore: number;
     }
 
-    const candidates: Candidate[] = hand.map((card, index) => {
-      // Simulate adding this card to the tableau
+    const singleCandidates: SingleCandidate[] = hand.map((card, index) => {
       const simTableau = [...tableau, card];
       const simScore = scoreTableau(simTableau);
       return { index, marginalScore: simScore - currentScore };
     });
 
-    // Find the max marginal score
-    const maxMarginal = Math.max(...candidates.map((c) => c.marginalScore));
-    const best = candidates.filter((c) => c.marginalScore === maxMarginal);
+    const maxSingleMarginal = Math.max(
+      ...singleCandidates.map((c) => c.marginalScore),
+    );
+    const bestSingles = singleCandidates.filter(
+      (c) => c.marginalScore === maxSingleMarginal,
+    );
 
-    // Break ties randomly
-    const chosen = best[Math.floor(rng() * best.length)];
+    // Check if chopsticks usage is possible
+    const hasChopsticks = tableau.some((c) => c.type === 'chopsticks');
+
+    if (hasChopsticks && hand.length >= 2) {
+      // Build tableau without the first chopsticks card (it will be returned to hand)
+      const chopIdx = tableau.findIndex((c) => c.type === 'chopsticks');
+      const tableauWithoutChopsticks = [
+        ...tableau.slice(0, chopIdx),
+        ...tableau.slice(chopIdx + 1),
+      ];
+      const baseScoreWithoutChopsticks = scoreTableau(tableauWithoutChopsticks);
+
+      // Evaluate all pairs
+      interface PairCandidate {
+        firstIndex: number;
+        secondIndex: number;
+        marginalScore: number;
+      }
+
+      const pairCandidates: PairCandidate[] = [];
+      for (let i = 0; i < hand.length; i++) {
+        for (let j = i + 1; j < hand.length; j++) {
+          const simTableau = [...tableauWithoutChopsticks, hand[i], hand[j]];
+          const simScore = scoreTableau(simTableau);
+          pairCandidates.push({
+            firstIndex: i,
+            secondIndex: j,
+            marginalScore: simScore - baseScoreWithoutChopsticks,
+          });
+        }
+      }
+
+      if (pairCandidates.length > 0) {
+        const maxPairMarginal = Math.max(
+          ...pairCandidates.map((c) => c.marginalScore),
+        );
+
+        // Use chopsticks if the best pair is strictly better than the best single
+        if (maxPairMarginal > maxSingleMarginal) {
+          const bestPairs = pairCandidates.filter(
+            (c) => c.marginalScore === maxPairMarginal,
+          );
+          const chosenPair = bestPairs[Math.floor(rng() * bestPairs.length)];
+          return {
+            cardIndex: chosenPair.firstIndex,
+            secondCardIndex: chosenPair.secondIndex,
+          };
+        }
+      }
+    }
+
+    // Fall back to best single card
+    const chosen = bestSingles[Math.floor(rng() * bestSingles.length)];
     return { cardIndex: chosen.index };
   },
 };
