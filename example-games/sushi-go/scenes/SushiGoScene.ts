@@ -42,21 +42,21 @@ import helpContent from '../help-content.json';
 const ANIM_DURATION = 300;      // ms for card pick animation
 
 // Layout regions
-const HAND_Y = 555;             // center Y for hand cards
+const HAND_Y = 600;             // center Y for hand cards
 const HAND_CARD_W = 110;        // card rect width in hand
 const HAND_CARD_H = 145;        // card rect height in hand
 const HAND_GAP = 8;             // gap between hand cards
 
-const PLAYER_TABLEAU_Y = 350;   // center Y for player tableau
-const AI_TABLEAU_Y = 155;       // center Y for AI tableau
+const PLAYER_TABLEAU_Y = 395;   // center Y for player tableau
+const AI_TABLEAU_Y = 200;       // center Y for AI tableau
 const TABLEAU_CARD_W = 72;      // card rect width in tableau
 const TABLEAU_CARD_H = 48;      // card rect height in tableau
 const TABLEAU_GROUP_GAP = 24;   // gap between type groups
 const TABLEAU_CARD_GAP = 6;     // gap between cards in a group
 
 const SCORE_AREA_X = GAME_W - 15;
-const PLAYER_SCORE_Y = 440;
-const AI_SCORE_Y = 55;
+const PLAYER_SCORE_Y = 485;
+const AI_SCORE_Y = 100;
 
 // Card type display config: label, fill color, text color
 const CARD_STYLES: Record<SushiGoCardType, { bg: number; text: string; short: string }> = {
@@ -220,7 +220,7 @@ export class SushiGoScene extends Phaser.Scene {
 
   private createScoreDisplay(): void {
     this.roundText = this.add
-      .text(GAME_W / 2, 42, '', {
+      .text(GAME_W / 2, 87, '', {
         fontSize: '20px',
         color: '#ffdd44',
         fontFamily: FONT_FAMILY,
@@ -228,7 +228,7 @@ export class SushiGoScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.turnText = this.add
-      .text(GAME_W / 2, 66, '', {
+      .text(GAME_W / 2, 111, '', {
         fontSize: '16px',
         color: '#aaccaa',
         fontFamily: FONT_FAMILY,
@@ -236,7 +236,7 @@ export class SushiGoScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.cardsLeftText = this.add
-      .text(GAME_W / 2, 86, '', {
+      .text(GAME_W / 2, 131, '', {
         fontSize: '14px',
         color: '#889988',
         fontFamily: FONT_FAMILY,
