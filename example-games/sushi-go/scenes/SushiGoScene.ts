@@ -42,7 +42,7 @@ import helpContent from '../help-content.json';
 const ANIM_DURATION = 300;      // ms for card pick animation
 
 // Layout regions
-const HAND_Y = 648;             // center Y for hand cards
+const HAND_Y = 636;             // center Y for hand cards (clearance above instruction text)
 const HAND_CARD_W = 82;         // card rect width in hand
 const HAND_CARD_H = 108;        // card rect height in hand
 const HAND_GAP = 6;             // gap between hand cards
