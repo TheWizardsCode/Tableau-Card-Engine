@@ -108,9 +108,16 @@ export class SettingsPanel {
   private sliderTrackWidth: number;
   private isDraggingSlider = false;
 
+  // Tooltip toggle
+  private tooltipToggleBg: Phaser.GameObjects.Rectangle;
+  private tooltipToggleKnob: Phaser.GameObjects.Graphics;
+  private tooltipLabel: Phaser.GameObjects.Text;
+  private tooltipStatusText: Phaser.GameObjects.Text;
+
   // State
   private _isOpen = false;
   private _isAnimating = false;
+  private _showTooltips = true;
   private currentTween: Phaser.Tweens.Tween | null = null;
   private destroyed = false;
 
@@ -305,6 +312,71 @@ export class SettingsPanel {
     });
     this.container.add(this.sliderHitArea);
 
+    // ── Display section ─────────────────────────────────
+
+    const displaySectionY = sliderY + 40;
+
+    const displayHeading = scene.add.text(
+      PADDING,
+      displaySectionY,
+      'Display',
+      { ...HEADING_STYLE, fontSize: '16px' },
+    );
+    displayHeading.setDepth(DEPTH_PANEL_CONTENT);
+    this.container.add(displayHeading);
+
+    // ── Tooltip toggle ──────────────────────────────────
+
+    const tooltipY = displaySectionY + 40;
+
+    this.tooltipLabel = scene.add.text(PADDING, tooltipY, 'Tooltips', LABEL_STYLE);
+    this.tooltipLabel.setOrigin(0, 0.5);
+    this.tooltipLabel.setDepth(DEPTH_PANEL_CONTENT);
+    this.container.add(this.tooltipLabel);
+
+    // Toggle background (same pill style as mute toggle)
+    const tooltipToggleX = this.panelWidth - PADDING - TOGGLE_SIZE * 1.8;
+
+    this.tooltipToggleBg = scene.add.rectangle(
+      tooltipToggleX,
+      tooltipY,
+      TOGGLE_SIZE * 1.8,
+      TOGGLE_SIZE,
+      this._showTooltips ? TOGGLE_ON_COLOR : TOGGLE_OFF_COLOR,
+    );
+    this.tooltipToggleBg.setOrigin(0, 0.5);
+    this.tooltipToggleBg.setDepth(DEPTH_PANEL_CONTENT);
+    this.container.add(this.tooltipToggleBg);
+
+    // Toggle knob
+    this.tooltipToggleKnob = scene.add.graphics();
+    this.tooltipToggleKnob.setDepth(DEPTH_PANEL_CONTENT);
+    this.drawTooltipKnob(this._showTooltips);
+    this.container.add(this.tooltipToggleKnob);
+
+    // Tooltip status text
+    this.tooltipStatusText = scene.add.text(
+      tooltipToggleX + TOGGLE_SIZE * 1.8 + 8,
+      tooltipY,
+      this._showTooltips ? 'ON' : 'OFF',
+      VALUE_STYLE,
+    );
+    this.tooltipStatusText.setOrigin(0, 0.5);
+    this.tooltipStatusText.setDepth(DEPTH_PANEL_CONTENT);
+    this.container.add(this.tooltipStatusText);
+
+    // Tooltip hit area
+    const tooltipHitArea = scene.add.zone(
+      tooltipToggleX + TOGGLE_SIZE * 0.9,
+      tooltipY,
+      TOGGLE_SIZE * 2.5,
+      TOGGLE_SIZE + 10,
+    );
+    tooltipHitArea.setDepth(DEPTH_PANEL_CONTENT);
+    tooltipHitArea.setInteractive({ useHandCursor: true });
+    tooltipHitArea.on('pointerdown', () => this.handleTooltipToggle());
+    this.container.add(tooltipHitArea);
+
     // Scene-level pointer events for slider dragging
     scene.input.on('pointermove', this.handlePointerMove, this);
     scene.input.on('pointerup', this.handlePointerUp, this);
@@ -324,6 +396,11 @@ export class SettingsPanel {
   /** Whether the panel is currently animating. */
   get isAnimating(): boolean {
     return this._isAnimating;
+  }
+
+  /** Whether scoring-rule tooltips are enabled. Default: true. */
+  get showTooltips(): boolean {
+    return this._showTooltips;
   }
 
   /** Open the settings panel with slide-in animation from the right. */
@@ -448,6 +525,34 @@ export class SettingsPanel {
 
     this.muteToggleKnob.fillStyle(0xffffff, 1);
     this.muteToggleKnob.fillCircle(knobX, muteY, knobRadius);
+  }
+
+  // ── Private: Tooltip toggle ─────────────────────────────
+
+  private handleTooltipToggle(): void {
+    if (this.destroyed) return;
+    this._showTooltips = !this._showTooltips;
+    this.updateTooltipVisuals(this._showTooltips);
+  }
+
+  private updateTooltipVisuals(enabled: boolean): void {
+    this.tooltipToggleBg.setFillStyle(enabled ? TOGGLE_ON_COLOR : TOGGLE_OFF_COLOR);
+    this.drawTooltipKnob(enabled);
+    this.tooltipStatusText.setText(enabled ? 'ON' : 'OFF');
+  }
+
+  private drawTooltipKnob(enabled: boolean): void {
+    this.tooltipToggleKnob.clear();
+
+    const toggleX = this.panelWidth - PADDING - TOGGLE_SIZE * 1.8;
+    const knobRadius = TOGGLE_SIZE / 2 - 3;
+    const knobX = enabled
+      ? toggleX + TOGGLE_SIZE * 1.8 - knobRadius - 3
+      : toggleX + knobRadius + 3;
+    const tooltipY = this.tooltipLabel.y;
+
+    this.tooltipToggleKnob.fillStyle(0xffffff, 1);
+    this.tooltipToggleKnob.fillCircle(knobX, tooltipY, knobRadius);
   }
 
   // ── Private: Volume slider ───────────────────────────────
