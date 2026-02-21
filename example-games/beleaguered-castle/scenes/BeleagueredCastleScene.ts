@@ -79,14 +79,14 @@ const SNAP_BACK_DURATION = 200; // ms to snap card back on invalid drop
 const AUTO_COMPLETE_DELAY = 150; // ms between auto-complete card animations
 
 /** Vertical overlap offset between cascaded cards in a tableau column. */
-const CASCADE_OFFSET_Y = 18;
+const CASCADE_OFFSET_Y = 22;
 
 /** Top area: title + foundations */
 const TITLE_Y = 14;
-const FOUNDATION_Y = 55;
+const FOUNDATION_Y = 66;
 
 /** Tableau starts below the foundations. */
-const TABLEAU_TOP_Y = 135;
+const TABLEAU_TOP_Y = 162;
 
 /** Z-depth for a card being dragged. */
 const DRAG_DEPTH = 1000;
@@ -395,11 +395,11 @@ export class BeleagueredCastleScene extends Phaser.Scene {
    */
   private createFoundationSlots(): void {
     const totalW =
-      FOUNDATION_COUNT * CARD_W + (FOUNDATION_COUNT - 1) * (CARD_GAP + 12);
+      FOUNDATION_COUNT * CARD_W + (FOUNDATION_COUNT - 1) * (CARD_GAP + 20);
     const startX = (GAME_W - totalW) / 2 + CARD_W / 2;
 
     for (let i = 0; i < FOUNDATION_COUNT; i++) {
-      const x = startX + i * (CARD_W + CARD_GAP + 12);
+      const x = startX + i * (CARD_W + CARD_GAP + 20);
       const suit = FOUNDATION_SUITS[i];
 
       // Empty slot background (rounded rect outline)
@@ -415,8 +415,8 @@ export class BeleagueredCastleScene extends Phaser.Scene {
 
       // Suit label beneath the slot
       const label = this.add
-        .text(x, FOUNDATION_Y + CARD_H / 2 + 8, SUIT_SYMBOL[suit], {
-          fontSize: '14px',
+        .text(x, FOUNDATION_Y + CARD_H / 2 + 10, SUIT_SYMBOL[suit], {
+          fontSize: '16px',
           color: SUIT_COLOR[suit],
           fontFamily: FONT_FAMILY,
         })
@@ -466,8 +466,8 @@ export class BeleagueredCastleScene extends Phaser.Scene {
   private createHUD(): void {
     // Move counter (bottom-left)
     this.moveCountText = this.add
-      .text(15, GAME_H - 20, 'Moves: 0', {
-        fontSize: '12px',
+      .text(20, GAME_H - 24, 'Moves: 0', {
+        fontSize: '14px',
         color: '#aaccaa',
         fontFamily: FONT_FAMILY,
       })
@@ -475,8 +475,8 @@ export class BeleagueredCastleScene extends Phaser.Scene {
 
     // Timer (bottom-center)
     this.timerText = this.add
-      .text(GAME_W / 2, GAME_H - 20, '00:00', {
-        fontSize: '12px',
+      .text(GAME_W / 2, GAME_H - 24, '00:00', {
+        fontSize: '14px',
         color: '#aaccaa',
         fontFamily: FONT_FAMILY,
       })
@@ -484,8 +484,8 @@ export class BeleagueredCastleScene extends Phaser.Scene {
 
     // Seed display (bottom-right)
     this.seedText = this.add
-      .text(GAME_W - 15, GAME_H - 20, `Seed: ${this.seed}`, {
-        fontSize: '12px',
+      .text(GAME_W - 20, GAME_H - 24, `Seed: ${this.seed}`, {
+        fontSize: '14px',
         color: '#668866',
         fontFamily: FONT_FAMILY,
       })
@@ -493,8 +493,8 @@ export class BeleagueredCastleScene extends Phaser.Scene {
 
     // Undo button
     this.undoButton = this.add
-      .text(GAME_W - 90, TITLE_Y, '[ Undo ]', {
-        fontSize: '12px',
+      .text(GAME_W - 110, TITLE_Y, '[ Undo ]', {
+        fontSize: '14px',
         color: '#557755',
         fontFamily: FONT_FAMILY,
       })
@@ -508,8 +508,8 @@ export class BeleagueredCastleScene extends Phaser.Scene {
 
     // Redo button
     this.redoButton = this.add
-      .text(GAME_W - 30, TITLE_Y, '[ Redo ]', {
-        fontSize: '12px',
+      .text(GAME_W - 35, TITLE_Y, '[ Redo ]', {
+        fontSize: '14px',
         color: '#557755',
         fontFamily: FONT_FAMILY,
       })
@@ -1218,8 +1218,8 @@ export class BeleagueredCastleScene extends Phaser.Scene {
 
     // Title
     const title = this.add
-      .text(GAME_W / 2, GAME_H / 2 - 60, 'You Win!', {
-        fontSize: '28px',
+      .text(GAME_W / 2, GAME_H / 2 - 70, 'You Win!', {
+        fontSize: '32px',
         color: '#88ff88',
         fontFamily: FONT_FAMILY,
         fontStyle: 'bold',
@@ -1232,10 +1232,10 @@ export class BeleagueredCastleScene extends Phaser.Scene {
     const stats = this.add
       .text(
         GAME_W / 2,
-        GAME_H / 2 - 15,
+        GAME_H / 2 - 20,
         `Moves: ${this.gameState.moveCount}    Time: ${mm}:${ss}`,
         {
-          fontSize: '14px',
+          fontSize: '16px',
           color: '#aaccaa',
           fontFamily: FONT_FAMILY,
           align: 'center',
@@ -1247,7 +1247,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
 
     // New Game button
     const newGameBtn = createOverlayButton(
-      this, GAME_W / 2 - 110, GAME_H / 2 + 35, '[ New Game ]', BUTTON_DEPTH,
+      this, GAME_W / 2 - 130, GAME_H / 2 + 40, '[ New Game ]', BUTTON_DEPTH,
     );
     newGameBtn.on('pointerdown', () => {
       this.gameEvents.emit('ui-interaction', { elementId: 'new-game', action: 'click' });
@@ -1258,7 +1258,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
 
     // Restart button
     const restartBtn = createOverlayButton(
-      this, GAME_W / 2, GAME_H / 2 + 35, '[ Restart ]', BUTTON_DEPTH,
+      this, GAME_W / 2, GAME_H / 2 + 40, '[ Restart ]', BUTTON_DEPTH,
     );
     restartBtn.on('pointerdown', () => {
       this.gameEvents.emit('ui-interaction', { elementId: 'restart', action: 'click' });
@@ -1268,7 +1268,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
 
     // Menu button
     const menuBtn = createOverlayMenuButton(
-      this, GAME_W / 2 + 110, GAME_H / 2 + 35, BUTTON_DEPTH,
+      this, GAME_W / 2 + 130, GAME_H / 2 + 40, BUTTON_DEPTH,
     );
     overlayObjects.push(menuBtn);
 
@@ -1297,8 +1297,8 @@ export class BeleagueredCastleScene extends Phaser.Scene {
 
     // Title
     const title = this.add
-      .text(GAME_W / 2, GAME_H / 2 - 50, 'No Moves Available', {
-        fontSize: '22px',
+      .text(GAME_W / 2, GAME_H / 2 - 55, 'No Moves Available', {
+        fontSize: '26px',
         color: '#ff8888',
         fontFamily: FONT_FAMILY,
         fontStyle: 'bold',
@@ -1309,7 +1309,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
 
     // Undo Last button (dismiss overlay, undo, resume play)
     const undoBtn = createOverlayButton(
-      this, GAME_W / 2 - 130, GAME_H / 2 + 20, '[ Undo Last ]', BUTTON_DEPTH,
+      this, GAME_W / 2 - 155, GAME_H / 2 + 25, '[ Undo Last ]', BUTTON_DEPTH,
     );
     undoBtn.on('pointerdown', () => {
       if (!this.undoManager.canUndo()) return;
@@ -1324,7 +1324,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
 
     // New Game button
     const noMovesNewGameBtn = createOverlayButton(
-      this, GAME_W / 2 - 15, GAME_H / 2 + 20, '[ New Game ]', BUTTON_DEPTH,
+      this, GAME_W / 2 - 20, GAME_H / 2 + 25, '[ New Game ]', BUTTON_DEPTH,
     );
     noMovesNewGameBtn.on('pointerdown', () => {
       this.gameEvents.emit('ui-interaction', { elementId: 'new-game', action: 'click' });
@@ -1335,7 +1335,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
 
     // Restart button
     const noMovesRestartBtn = createOverlayButton(
-      this, GAME_W / 2 + 85, GAME_H / 2 + 20, '[ Restart ]', BUTTON_DEPTH,
+      this, GAME_W / 2 + 100, GAME_H / 2 + 25, '[ Restart ]', BUTTON_DEPTH,
     );
     noMovesRestartBtn.on('pointerdown', () => {
       this.gameEvents.emit('ui-interaction', { elementId: 'restart', action: 'click' });
@@ -1345,7 +1345,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
 
     // Menu button
     const noMovesMenuBtn = createOverlayMenuButton(
-      this, GAME_W / 2 + 170, GAME_H / 2 + 20, BUTTON_DEPTH,
+      this, GAME_W / 2 + 200, GAME_H / 2 + 25, BUTTON_DEPTH,
     );
     overlayObjects.push(noMovesMenuBtn);
 
