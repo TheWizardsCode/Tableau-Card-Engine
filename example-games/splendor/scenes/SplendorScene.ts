@@ -271,7 +271,7 @@ export class SplendorScene extends Phaser.Scene {
 
   private createInstructions(): void {
     this.instructionText = this.add
-      .text(GAME_W / 2, GAME_H - 10, '', {
+      .text(GAME_W / 2, GAME_H - 18, '', {
         fontSize: '16px',
         color: '#88aa88',
         fontFamily: FONT_FAMILY,
@@ -281,7 +281,7 @@ export class SplendorScene extends Phaser.Scene {
 
   private createPrestigeDisplay(): void {
     this.playerPrestigeText = this.add
-      .text(PLAYER_AREA_X + 260, PLAYER_AREA_Y - 2, '', {
+      .text(PLAYER_AREA_X + 260, PLAYER_AREA_Y - 6, '', {
         fontSize: '18px',
         fontStyle: 'bold',
         color: '#ffdd44',
