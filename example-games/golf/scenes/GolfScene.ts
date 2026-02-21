@@ -2,8 +2,8 @@
  * GolfScene -- the main Phaser scene for 9-Card Golf.
  *
  * Implements the full visual interface:
- *   - Two 3x3 player grids (human at bottom, AI at top)
- *   - Stock and discard piles in the center
+ *   - Two 3x3 player grids in a horizontal layout (human on left, AI on right)
+ *   - Stock and discard piles stacked vertically in the center
  *   - Click/tap input for drawing, swapping, and discarding
  *   - Card flip and swap animations via Phaser tweens
  *   - Score display, turn indicator, and end-of-round screen
@@ -52,12 +52,13 @@ const AI_SHOW_DRAW_DELAY = 1000; // ms to show drawn card before moving
 const ANIM_DURATION = 300; // ms for animations
 const SWAP_ANIM_DURATION = ANIM_DURATION * 1.5; // ms for swap/discard-and-flip
 
-// Layout positions (designed to fit two 3x3 grids + piles in 1280x720)
-const AI_GRID_Y = 190; // center Y of AI grid (clearance below scene title)
-const HUMAN_GRID_Y = 545; // center Y of human grid
-const PILE_Y = 368; // center Y of stock/discard (between grids)
-const STOCK_X = GAME_W / 2 - 100;
-const DISCARD_X = GAME_W / 2 + 100;
+// Layout positions (horizontal: human grid left, piles center, AI grid right)
+const GRID_CENTER_Y = 390; // shared center Y for both grids
+const HUMAN_GRID_X = 250;  // center X of human grid (left side)
+const AI_GRID_X = 1030;    // center X of AI grid (right side)
+const PILE_X = GAME_W / 2; // center X of stock/discard (center column)
+const STOCK_Y = 330;       // center Y of stock pile (upper)
+const DISCARD_Y = 450;     // center Y of discard pile (lower)
 
 // ── Turn state machine ──────────────────────────────────────
 
@@ -325,48 +326,51 @@ export class GolfScene extends Phaser.Scene {
 
     createSceneTitle(this, '9-Card Golf');
 
-    this.aiLabel = this.add
-      .text(GAME_W / 2 - 200, AI_GRID_Y, 'AI', {
+    // Player labels above each grid
+    const gridH = GRID_ROWS * GOLF_CARD_H + (GRID_ROWS - 1) * CARD_GAP;
+
+    this.humanLabel = this.add
+      .text(HUMAN_GRID_X, GRID_CENTER_Y - gridH / 2 - 20, 'You', {
         fontSize: '20px',
-        color: '#cccccc',
+        color: '#ffffff',
         fontFamily: FONT_FAMILY,
       })
       .setOrigin(0.5);
 
-    this.humanLabel = this.add
-      .text(GAME_W / 2 - 200, HUMAN_GRID_Y, 'You', {
+    this.aiLabel = this.add
+      .text(AI_GRID_X, GRID_CENTER_Y - gridH / 2 - 20, 'AI', {
         fontSize: '20px',
-        color: '#ffffff',
+        color: '#cccccc',
         fontFamily: FONT_FAMILY,
       })
       .setOrigin(0.5);
   }
 
   private createPiles(): void {
-    // Stock pile
-    this.stockSprite = this.add.image(STOCK_X, PILE_Y, 'card_back');
+    // Stock pile (upper center)
+    this.stockSprite = this.add.image(PILE_X, STOCK_Y, 'card_back');
     if (!this.replayMode) {
       this.stockSprite.setInteractive({ useHandCursor: true });
       this.stockSprite.on('pointerdown', () => this.onStockClick());
     }
 
     this.add
-      .text(STOCK_X, PILE_Y + GOLF_CARD_H / 2 + 14, 'Stock', {
+      .text(PILE_X, STOCK_Y + GOLF_CARD_H / 2 + 14, 'Stock', {
         fontSize: '14px',
         color: '#aaccaa',
         fontFamily: FONT_FAMILY,
       })
       .setOrigin(0.5);
 
-    // Discard pile
-    this.discardSprite = this.add.image(DISCARD_X, PILE_Y, 'card_back');
+    // Discard pile (lower center)
+    this.discardSprite = this.add.image(PILE_X, DISCARD_Y, 'card_back');
     if (!this.replayMode) {
       this.discardSprite.setInteractive({ useHandCursor: true });
       this.discardSprite.on('pointerdown', () => this.onDiscardClick());
     }
 
     this.add
-      .text(DISCARD_X, PILE_Y + GOLF_CARD_H / 2 + 14, 'Discard', {
+      .text(PILE_X, DISCARD_Y + GOLF_CARD_H / 2 + 14, 'Discard', {
         fontSize: '14px',
         color: '#aaccaa',
         fontFamily: FONT_FAMILY,
@@ -395,24 +399,28 @@ export class GolfScene extends Phaser.Scene {
   }
 
   private createScoreDisplay(): void {
+    // Scores below each grid
+    const gridH = GRID_ROWS * GOLF_CARD_H + (GRID_ROWS - 1) * CARD_GAP;
+
     this.humanScoreText = this.add
-      .text(GAME_W / 2 + 200, HUMAN_GRID_Y, 'Score: 0', {
+      .text(HUMAN_GRID_X, GRID_CENTER_Y + gridH / 2 + 22, 'Score: 0', {
         fontSize: '18px',
         color: '#ffffff',
         fontFamily: FONT_FAMILY,
       })
-      .setOrigin(0, 0.5);
+      .setOrigin(0.5);
 
     this.aiScoreText = this.add
-      .text(GAME_W / 2 + 200, AI_GRID_Y, 'Score: 0', {
+      .text(AI_GRID_X, GRID_CENTER_Y + gridH / 2 + 22, 'Score: 0', {
         fontSize: '18px',
         color: '#cccccc',
         fontFamily: FONT_FAMILY,
       })
-      .setOrigin(0, 0.5);
+      .setOrigin(0.5);
 
+    // Turn indicator above the piles in center
     this.turnText = this.add
-      .text(GAME_W / 2, PILE_Y - GOLF_CARD_H / 2 - 18, '', {
+      .text(PILE_X, STOCK_Y - GOLF_CARD_H / 2 - 22, '', {
         fontSize: '16px',
         color: '#ffdd44',
         fontFamily: FONT_FAMILY,
@@ -442,9 +450,9 @@ export class GolfScene extends Phaser.Scene {
     const gridW = GRID_COLS * GOLF_CARD_W + (GRID_COLS - 1) * CARD_GAP;
     const gridH = GRID_ROWS * GOLF_CARD_H + (GRID_ROWS - 1) * CARD_GAP;
 
-    const centerY = player === 'human' ? HUMAN_GRID_Y : AI_GRID_Y;
-    const startX = (GAME_W - gridW) / 2 + GOLF_CARD_W / 2;
-    const startY = centerY - gridH / 2 + GOLF_CARD_H / 2;
+    const centerX = player === 'human' ? HUMAN_GRID_X : AI_GRID_X;
+    const startX = centerX - gridW / 2 + GOLF_CARD_W / 2;
+    const startY = GRID_CENTER_Y - gridH / 2 + GOLF_CARD_H / 2;
 
     return {
       x: startX + col * (GOLF_CARD_W + CARD_GAP),
@@ -772,7 +780,7 @@ export class GolfScene extends Phaser.Scene {
 
       // Compute destination positions
       const gridSlotPos = this.gridCellPosition(idx, playerKey);
-      const discardPos = { x: DISCARD_X, y: PILE_Y };
+      const discardPos = { x: PILE_X, y: DISCARD_Y };
 
       // Track completion of both parallel tweens
       let completed = 0;
@@ -837,7 +845,7 @@ export class GolfScene extends Phaser.Scene {
       const idx = result.move.row * 3 + result.move.col;
       const sprite = sprites[idx];
       const grid = this.session.gameState.playerStates[result.playerIndex].grid;
-      const discardPos = { x: DISCARD_X, y: PILE_Y };
+      const discardPos = { x: PILE_X, y: DISCARD_Y };
 
       const phase2 = () => {
         // Clean up drawn card after it arrives at discard pile
@@ -882,9 +890,9 @@ export class GolfScene extends Phaser.Scene {
   // ── Drawn card display ──────────────────────────────────
 
   private showDrawnCard(card: Card): void {
-    // Show drawn card to the right of the discard pile
-    const x = DISCARD_X + GOLF_CARD_W + 24;
-    const y = PILE_Y;
+    // Show drawn card below the discard pile in the center column
+    const x = PILE_X;
+    const y = DISCARD_Y + GOLF_CARD_H + 20;
     const texture = cardTextureKey(card.rank, card.suit);
 
     this.drawnCardSprite = this.add.image(x, y, texture);
