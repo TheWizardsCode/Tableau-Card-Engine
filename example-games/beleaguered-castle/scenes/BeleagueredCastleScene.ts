@@ -491,9 +491,9 @@ export class BeleagueredCastleScene extends Phaser.Scene {
       })
       .setOrigin(1, 0.5);
 
-    // Undo button
+    // Undo button (offset leftward to clear Help/Settings buttons in top-right)
     this.undoButton = this.add
-      .text(GAME_W - 110, TITLE_Y, '[ Undo ]', {
+      .text(GAME_W - 210, TITLE_Y, '[ Undo ]', {
         fontSize: '14px',
         color: '#557755',
         fontFamily: FONT_FAMILY,
@@ -506,9 +506,9 @@ export class BeleagueredCastleScene extends Phaser.Scene {
       })
       .on('pointerout', () => this.refreshUndoRedoButtons());
 
-    // Redo button
+    // Redo button (offset leftward to clear Help/Settings buttons in top-right)
     this.redoButton = this.add
-      .text(GAME_W - 35, TITLE_Y, '[ Redo ]', {
+      .text(GAME_W - 140, TITLE_Y, '[ Redo ]', {
         fontSize: '14px',
         color: '#557755',
         fontFamily: FONT_FAMILY,
