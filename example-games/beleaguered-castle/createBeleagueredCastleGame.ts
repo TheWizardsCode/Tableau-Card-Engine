@@ -36,7 +36,6 @@ export function createBeleagueredCastleGame(
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
     render: {
-      antialias: false,
       roundPixels: true,
     },
     audio: {

@@ -34,7 +34,6 @@ export function createSushiGoGame(options: SushiGoGameOptions = {}): Phaser.Game
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
     render: {
-      antialias: false,
       roundPixels: true,
     },
     audio: {

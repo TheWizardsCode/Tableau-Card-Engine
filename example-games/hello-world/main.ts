@@ -21,7 +21,6 @@ const config: Phaser.Types.Core.GameConfig = {
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
   render: {
-    antialias: false,
     roundPixels: true,
   },
 };

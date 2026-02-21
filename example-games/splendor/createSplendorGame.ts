@@ -34,7 +34,6 @@ export function createSplendorGame(options: SplendorGameOptions = {}): Phaser.Ga
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
     render: {
-      antialias: false,
       roundPixels: true,
     },
     audio: {
