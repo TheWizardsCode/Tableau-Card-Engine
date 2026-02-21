@@ -97,19 +97,16 @@ const UPPER_TOP = 52;          // top of the upper band (below header + nobles t
 const UPPER_BOT = 440;         // bottom of the upper band
 const UPPER_MID = (UPPER_TOP + UPPER_BOT) / 2;  // vertical centre = 240
 
-// Noble tiles — left column, vertically centred
-const NOBLE_W = 68;
-const NOBLE_H = 72;
-const NOBLE_GAP = 8;
-const NOBLES_TOTAL_H = 5 * NOBLE_H + 4 * NOBLE_GAP;      // 392
+// Noble tiles — left column, vertically aligned with market tier rows
+const NOBLE_W = 100;           // wider to fit requirements comfortably
+const NOBLE_H = 115;           // same height as market cards (MARKET_CARD_H)
 const NOBLE_X = 10;            // left margin
-const NOBLE_Y = UPPER_MID - NOBLES_TOTAL_H / 2;           // ≈ 44
 
 // Token supply — right column, vertically centred
 const SUPPLY_TOKEN_R = 28;
 const SUPPLY_GAP = 62;         // vertical spacing between token centres
 const SUPPLY_TOTAL_H = 5 * SUPPLY_GAP;                    // 310 (6 tokens)
-const SUPPLY_X = 1150;         // circle centre X (near right edge, room for labels)
+const SUPPLY_X = 1170;         // circle centre X (near right edge, room for labels)
 const SUPPLY_Y = UPPER_MID - SUPPLY_TOTAL_H / 2;          // ≈ 85
 
 // Card market — centred horizontally between nobles and supply
@@ -121,16 +118,20 @@ const MARKET_TOTAL_H = 3 * MARKET_CARD_H + 2 * MARKET_TIER_GAP;  // 365
 const MARKET_Y = UPPER_MID - MARKET_TOTAL_H / 2;          // ≈ 58 — vertically centred
 
 // Deck column sits just left of the visible market cards
-// Available horizontal zone: nobles right (78) … supply labels left (~1060)
-// Market cards: 4 × 155 + 3 × 14 = 662.  Deck: 100 + 16 gap = 116.  Tier label: ~40.
-// Total content: 40 + 116 + 662 = 818.
-// Centre of available = (78 + 1060) / 2 ≈ 569.
-// Content left edge ≈ 569 − 818/2 ≈ 160.  Tier label ~160, deck centre ~230, market ~296.
-const DECK_X = 220;            // deck back centre X
+// Available horizontal zone: nobles right (~120) … supply labels left (~1090)
+const DECK_X = 240;            // deck back centre X (shifted right for wider nobles)
 const MARKET_X = DECK_X + 50 + 16;  // first card left edge (deck half-width + gap)
 
+// ── Section box styling ────────────────────────────────────
+const SECTION_BOX_STROKE = 0x445544;   // border colour
+const SECTION_BOX_ALPHA = 0.4;         // border alpha
+const SECTION_BOX_FILL = 0x1a2a1a;     // fill colour (matches background)
+const SECTION_BOX_FILL_ALPHA = 0.3;    // subtle fill
+const SECTION_BOX_RADIUS = 8;          // corner rounding
+const SECTION_BOX_PAD = 8;             // padding around content
+
 // ── Lower-band layout ──────────────────────────────────────
-const LOWER_TOP = 460;         // top of lower band
+const LOWER_TOP = 452;         // top of lower band (slightly higher for more room)
 
 // Player area — left half of lower band
 const PLAYER_AREA_X = 20;
@@ -188,6 +189,7 @@ export class SplendorScene extends Phaser.Scene {
   private soundManager: SoundManager | null = null;
 
   // Display containers
+  private sectionBoxContainer!: Phaser.GameObjects.Container;
   private marketContainer!: Phaser.GameObjects.Container;
   private nobleContainer!: Phaser.GameObjects.Container;
   private supplyContainer!: Phaser.GameObjects.Container;
@@ -289,6 +291,7 @@ export class SplendorScene extends Phaser.Scene {
   }
 
   private createContainers(): void {
+    this.sectionBoxContainer = this.add.container(0, 0);
     this.marketContainer = this.add.container(0, 0);
     this.nobleContainer = this.add.container(0, 0);
     this.supplyContainer = this.add.container(0, 0);
@@ -346,9 +349,74 @@ export class SplendorScene extends Phaser.Scene {
     this.settingsButton = new SettingsButton(this, this.settingsPanel);
   }
 
+  // ── Section boxes ────────────────────────────────────────
+
+  private drawSectionBox(
+    x: number, y: number, w: number, h: number,
+    label?: string,
+  ): void {
+    const gfx = this.add.graphics();
+    gfx.fillStyle(SECTION_BOX_FILL, SECTION_BOX_FILL_ALPHA);
+    gfx.fillRoundedRect(x, y, w, h, SECTION_BOX_RADIUS);
+    gfx.lineStyle(1, SECTION_BOX_STROKE, SECTION_BOX_ALPHA);
+    gfx.strokeRoundedRect(x, y, w, h, SECTION_BOX_RADIUS);
+    this.sectionBoxContainer.add(gfx);
+
+    if (label) {
+      const txt = this.add.text(
+        x + w / 2, y + 2, label,
+        { fontSize: '12px', fontStyle: 'bold', color: '#667766', fontFamily: FONT_FAMILY },
+      ).setOrigin(0.5, 0);
+      this.sectionBoxContainer.add(txt);
+    }
+  }
+
+  private refreshSectionBoxes(): void {
+    this.sectionBoxContainer.removeAll(true);
+
+    const p = SECTION_BOX_PAD;
+
+    // Nobles box — around all noble tiles
+    const noblesBoxX = NOBLE_X - p;
+    const noblesBoxY = MARKET_Y - p - 16;  // extra space for section label
+    const noblesBoxW = NOBLE_W + p * 2;
+    const noblesBoxH = MARKET_TOTAL_H + p * 2 + 16;
+    this.drawSectionBox(noblesBoxX, noblesBoxY, noblesBoxW, noblesBoxH, 'Nobles');
+
+    // Market box — around tier labels, decks, and cards
+    const marketBoxX = DECK_X - 90 - p;
+    const lastCardRight = MARKET_X + 4 * (MARKET_CARD_W + MARKET_CARD_GAP) - MARKET_CARD_GAP;
+    const marketBoxW = lastCardRight - marketBoxX + p;
+    const marketBoxY = MARKET_Y - p - 16;
+    const marketBoxH = MARKET_TOTAL_H + p * 2 + 16;
+    this.drawSectionBox(marketBoxX, marketBoxY, marketBoxW, marketBoxH, 'Market');
+
+    // Supply box — around token circles and labels
+    const supplyBoxX = SUPPLY_X - SUPPLY_TOKEN_R - 70 - p;
+    const supplyBoxY = SUPPLY_Y - SUPPLY_TOKEN_R - p - 16;
+    const supplyBoxW = SUPPLY_TOKEN_R + 70 + SUPPLY_TOKEN_R + p * 2;
+    const supplyBoxH = SUPPLY_TOTAL_H + SUPPLY_TOKEN_R * 2 + p * 2 + 16;
+    this.drawSectionBox(supplyBoxX, supplyBoxY, supplyBoxW, supplyBoxH, 'Supply');
+
+    // Player area box
+    const playerBoxX = PLAYER_AREA_X - p;
+    const playerBoxY = LOWER_TOP - p;
+    const playerBoxW = DIVIDER_X - PLAYER_AREA_X;
+    const playerBoxH = ACTION_Y - LOWER_TOP - 4;
+    this.drawSectionBox(playerBoxX, playerBoxY, playerBoxW, playerBoxH);
+
+    // AI area box
+    const aiBoxX = DIVIDER_X + p;
+    const aiBoxY = LOWER_TOP - p;
+    const aiBoxW = AI_AREA_X - DIVIDER_X + p;
+    const aiBoxH = ACTION_Y - LOWER_TOP - 4;
+    this.drawSectionBox(aiBoxX, aiBoxY, aiBoxW, aiBoxH);
+  }
+
   // ── Refresh display ─────────────────────────────────────
 
   private refreshAll(): void {
+    this.refreshSectionBoxes();
     this.refreshMarket();
     this.refreshNobles();
     this.refreshSupply();
@@ -505,15 +573,13 @@ export class SplendorScene extends Phaser.Scene {
   private refreshNobles(): void {
     this.nobleContainer.removeAll(true);
 
-    const label = this.add.text(
-      NOBLE_X + NOBLE_W / 2, NOBLE_Y - 4, 'Nobles',
-      { fontSize: '13px', fontStyle: 'bold', color: '#aa88cc', fontFamily: FONT_FAMILY },
-    ).setOrigin(0.5, 1);
-    this.nobleContainer.add(label);
-
+    // Nobles are aligned vertically with market tier rows (bottom to top: T1, T2, T3)
+    // Market tiers go: row 0 = T3 (top), row 1 = T2, row 2 = T1 (bottom)
+    // We place nobles aligned to the same Y positions
     for (let i = 0; i < this.session.nobles.length; i++) {
       const noble = this.session.nobles[i];
-      const y = NOBLE_Y + i * (NOBLE_H + NOBLE_GAP);
+      // Align with market tier row i
+      const y = MARKET_Y + i * (MARKET_CARD_H + MARKET_TIER_GAP);
 
       const bg = this.add.rectangle(
         NOBLE_X + NOBLE_W / 2, y + NOBLE_H / 2,
@@ -522,29 +588,38 @@ export class SplendorScene extends Phaser.Scene {
       bg.setStrokeStyle(1, 0x9966cc);
       this.nobleContainer.add(bg);
 
-      // Points
+      // Points — centred near top
       const pts = this.add.text(
-        NOBLE_X + NOBLE_W / 2, y + 16,
+        NOBLE_X + NOBLE_W / 2, y + 20,
         '3 pt',
-        { fontSize: '16px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY },
+        { fontSize: '20px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY },
       ).setOrigin(0.5);
       this.nobleContainer.add(pts);
 
-      // Requirements — show as small gem chips
+      // "Noble" label
+      const nobleLabel = this.add.text(
+        NOBLE_X + NOBLE_W / 2, y + 42,
+        'Noble',
+        { fontSize: '13px', color: '#ccaaee', fontFamily: FONT_FAMILY },
+      ).setOrigin(0.5);
+      this.nobleContainer.add(nobleLabel);
+
+      // Requirements — show as gem chips in a row near bottom
       const reqs: { color: GemColor; count: number }[] = [];
       for (const c of GEM_COLORS) {
         const n = noble.requirements[c] ?? 0;
         if (n > 0) reqs.push({ color: c, count: n });
       }
-      const reqStartX = NOBLE_X + NOBLE_W / 2 - (reqs.length - 1) * 13;
+      const chipSpacing = 30;
+      const reqStartX = NOBLE_X + NOBLE_W / 2 - (reqs.length - 1) * chipSpacing / 2;
       for (let j = 0; j < reqs.length; j++) {
-        const rx = reqStartX + j * 26;
-        const ry = y + NOBLE_H - 18;
-        const chip = this.add.circle(rx, ry, 11, GEM_FILL[reqs[j].color], 0.9);
+        const rx = reqStartX + j * chipSpacing;
+        const ry = y + NOBLE_H - 26;
+        const chip = this.add.circle(rx, ry, 13, GEM_FILL[reqs[j].color], 0.9);
         chip.setStrokeStyle(1, 0x888888);
         this.nobleContainer.add(chip);
         const ct = this.add.text(rx, ry, `${reqs[j].count}`, {
-          fontSize: '13px', fontStyle: 'bold',
+          fontSize: '15px', fontStyle: 'bold',
           color: GEM_TEXT_COLOR[reqs[j].color], fontFamily: FONT_FAMILY,
         }).setOrigin(0.5);
         this.nobleContainer.add(ct);
@@ -620,65 +695,88 @@ export class SplendorScene extends Phaser.Scene {
     const player = this.session.players[0];
     const prestige = getPrestige(player);
 
-    // Section header with integrated prestige
+    // ── Row 0: Header + prominent prestige score ──
+    const row0Y = PLAYER_AREA_Y + 4;
+
     const label = this.add.text(
-      PLAYER_AREA_X, PLAYER_AREA_Y, 'Your Tableau',
-      { fontSize: '20px', fontStyle: 'bold', color: '#ffffff', fontFamily: FONT_FAMILY },
+      PLAYER_AREA_X, row0Y, 'Your Tableau',
+      { fontSize: '18px', fontStyle: 'bold', color: '#ffffff', fontFamily: FONT_FAMILY },
     );
     this.playerContainer.add(label);
 
-    const prestigeLabel = this.add.text(
-      PLAYER_AREA_X + 175, PLAYER_AREA_Y + 2,
-      `★ ${prestige}`,
-      { fontSize: '20px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY },
+    // Prominent prestige display — large star + score
+    const prestigeBg = this.add.rectangle(
+      PLAYER_AREA_X + 200, row0Y + 10,
+      90, 24, 0x443300, 0.6,
     );
+    prestigeBg.setStrokeStyle(1, 0x887744);
+    this.playerContainer.add(prestigeBg);
+
+    const prestigeLabel = this.add.text(
+      PLAYER_AREA_X + 200, row0Y + 10,
+      `★ ${prestige} / 15`,
+      { fontSize: '16px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY },
+    ).setOrigin(0.5);
     this.playerContainer.add(prestigeLabel);
 
-    // Tokens row
+    // Nobles collected (inline with header if any)
+    if (player.nobles.length > 0) {
+      const nobleLabel = this.add.text(
+        PLAYER_AREA_X + 260, row0Y + 2,
+        `Nobles: ${player.nobles.length}`,
+        { fontSize: '14px', color: '#aa88cc', fontFamily: FONT_FAMILY },
+      );
+      this.playerContainer.add(nobleLabel);
+    }
+
+    // ── Row 1: Tokens ──
+    const row1Y = row0Y + 30;
+
     const tokLabel = this.add.text(
-      PLAYER_AREA_X, PLAYER_AREA_Y + 32, 'Tokens:',
-      { fontSize: '16px', color: '#aaaaaa', fontFamily: FONT_FAMILY },
+      PLAYER_AREA_X, row1Y + 4, 'Tokens:',
+      { fontSize: '15px', color: '#aaaaaa', fontFamily: FONT_FAMILY },
     );
     this.playerContainer.add(tokLabel);
 
-    let tx = PLAYER_AREA_X + 85;
-    const tokY = PLAYER_AREA_Y + 36;
+    let tx = PLAYER_AREA_X + 80;
+    const tokCenterY = row1Y + 18;   // enough vertical space for radius-16 circles
     for (const c of ALL_TOKEN_COLORS) {
       const n = tokenCount(player.tokens, c);
       if (n === 0) continue;
 
-      const circle = this.add.circle(tx + 16, tokY, 16, GEM_FILL[c]);
+      const circle = this.add.circle(tx, tokCenterY, 16, GEM_FILL[c]);
       circle.setStrokeStyle(1, 0xffffff);
       this.playerContainer.add(circle);
 
       const ct = this.add.text(
-        tx + 16, tokY, `${n}`,
+        tx, tokCenterY, `${n}`,
         { fontSize: '15px', fontStyle: 'bold', color: GEM_TEXT_COLOR[c], fontFamily: FONT_FAMILY },
       ).setOrigin(0.5);
       this.playerContainer.add(ct);
 
-      tx += 42;
+      tx += 40;
     }
 
     if (totalTokens(player.tokens) === 0) {
       const noTok = this.add.text(
-        tx + 5, tokY, '(none)',
+        tx + 5, tokCenterY, '(none)',
         { fontSize: '15px', color: '#666666', fontFamily: FONT_FAMILY },
       ).setOrigin(0, 0.5);
       this.playerContainer.add(noTok);
     }
 
-    // Purchased cards grouped by bonus color
+    // ── Row 2: Bonuses ──
+    const row2Y = row1Y + 40;
+
     const bonuses = getBonuses(player);
     let bx = PLAYER_AREA_X;
-    const bonusY = PLAYER_AREA_Y + 68;
 
     const bonusLabel = this.add.text(
-      bx, bonusY - 2, 'Bonuses:',
-      { fontSize: '16px', color: '#aaaaaa', fontFamily: FONT_FAMILY },
+      bx, row2Y + 4, 'Bonuses:',
+      { fontSize: '15px', color: '#aaaaaa', fontFamily: FONT_FAMILY },
     );
     this.playerContainer.add(bonusLabel);
-    bx += 90;
+    bx += 85;
 
     let hasBonuses = false;
     for (const c of GEM_COLORS) {
@@ -686,12 +784,12 @@ export class SplendorScene extends Phaser.Scene {
       if (count === 0) continue;
       hasBonuses = true;
 
-      const chip = this.add.rectangle(bx + 16, bonusY, 32, 26, GEM_FILL[c], 0.8);
+      const chip = this.add.rectangle(bx + 16, row2Y + 16, 32, 26, GEM_FILL[c], 0.8);
       chip.setStrokeStyle(1, 0x888888);
       this.playerContainer.add(chip);
 
       const chipText = this.add.text(
-        bx + 16, bonusY, `${count}`,
+        bx + 16, row2Y + 16, `${count}`,
         { fontSize: '16px', fontStyle: 'bold', color: GEM_TEXT_COLOR[c], fontFamily: FONT_FAMILY },
       ).setOrigin(0.5);
       this.playerContainer.add(chipText);
@@ -701,48 +799,28 @@ export class SplendorScene extends Phaser.Scene {
 
     if (!hasBonuses) {
       const noneText = this.add.text(
-        bx + 5, bonusY - 2, '(none)',
+        bx + 5, row2Y + 6, '(none)',
         { fontSize: '15px', color: '#666666', fontFamily: FONT_FAMILY },
       );
       this.playerContainer.add(noneText);
     }
 
-    // Reserved cards
+    // ── Row 3: Reserved cards (conditional) ──
+    const row3Y = row2Y + 38;
     if (player.reservedCards.length > 0) {
-      const resY = PLAYER_AREA_Y + 100;
       const resLabel = this.add.text(
-        PLAYER_AREA_X, resY, `Reserved (${player.reservedCards.length}):`,
-        { fontSize: '16px', color: '#ccaa66', fontFamily: FONT_FAMILY },
+        PLAYER_AREA_X, row3Y + 4, `Reserved (${player.reservedCards.length}):`,
+        { fontSize: '15px', color: '#ccaa66', fontFamily: FONT_FAMILY },
       );
       this.playerContainer.add(resLabel);
 
-      let rx = PLAYER_AREA_X + 155;
+      let rx = PLAYER_AREA_X + 150;
       for (const card of player.reservedCards) {
-        const cardContainer = this.createSmallCard(rx, resY - 2, card, true);
+        const cardContainer = this.createSmallCard(rx, row3Y - 2, card, true);
         this.playerContainer.add(cardContainer);
         rx += 100;
       }
     }
-
-    // Nobles collected
-    if (player.nobles.length > 0) {
-      const nobleY = player.reservedCards.length > 0
-        ? PLAYER_AREA_Y + 132
-        : PLAYER_AREA_Y + 100;
-      const nobleLabel = this.add.text(
-        PLAYER_AREA_X, nobleY, `Nobles: ${player.nobles.length}`,
-        { fontSize: '16px', color: '#aa88cc', fontFamily: FONT_FAMILY },
-      );
-      this.playerContainer.add(nobleLabel);
-    }
-
-    // ── Divider line between player and AI ──
-    const dividerTop = PLAYER_AREA_Y + 4;
-    const dividerBot = ACTION_Y - 14;
-    const divider = this.add.graphics();
-    divider.lineStyle(1, 0x445544, 0.5);
-    divider.lineBetween(DIVIDER_X, dividerTop, DIVIDER_X, dividerBot);
-    this.playerContainer.add(divider);
   }
 
   private createSmallCard(
@@ -804,37 +882,82 @@ export class SplendorScene extends Phaser.Scene {
     const bonuses = getBonuses(ai);
     const prestige = getPrestige(ai);
 
-    // AI header with integrated prestige — right-aligned
-    const prestigeLabel = this.add.text(
-      AI_AREA_X, AI_AREA_Y + 2,
-      `★ ${prestige}`,
-      { fontSize: '20px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY },
-    ).setOrigin(1, 0);
-    this.aiContainer.add(prestigeLabel);
+    // ── Row 0: Header + prominent prestige score — right-aligned ──
+    const row0Y = AI_AREA_Y + 4;
 
     const label = this.add.text(
-      AI_AREA_X - 60, AI_AREA_Y, 'AI Opponent',
-      { fontSize: '20px', fontStyle: 'bold', color: '#aabbcc', fontFamily: FONT_FAMILY },
+      AI_AREA_X, row0Y, 'AI Opponent',
+      { fontSize: '18px', fontStyle: 'bold', color: '#aabbcc', fontFamily: FONT_FAMILY },
     ).setOrigin(1, 0);
     this.aiContainer.add(label);
 
-    // Token + card counts — right-aligned
-    const tokCount = totalTokens(ai.tokens);
-    const cardCount = ai.purchasedCards.length;
-    const cardText = this.add.text(
-      AI_AREA_X, AI_AREA_Y + 32, `Cards: ${cardCount}`,
-      { fontSize: '16px', color: '#888888', fontFamily: FONT_FAMILY },
-    ).setOrigin(1, 0);
-    this.aiContainer.add(cardText);
+    // Prominent prestige display — matches player side
+    const prestigeBg = this.add.rectangle(
+      AI_AREA_X - 170, row0Y + 10,
+      90, 24, 0x443300, 0.6,
+    );
+    prestigeBg.setStrokeStyle(1, 0x887744);
+    this.aiContainer.add(prestigeBg);
 
-    const tokText = this.add.text(
-      AI_AREA_X - 120, AI_AREA_Y + 32, `Tokens: ${tokCount}`,
-      { fontSize: '16px', color: '#888888', fontFamily: FONT_FAMILY },
-    ).setOrigin(1, 0);
-    this.aiContainer.add(tokText);
+    const prestigeLabel = this.add.text(
+      AI_AREA_X - 170, row0Y + 10,
+      `★ ${prestige} / 15`,
+      { fontSize: '16px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY },
+    ).setOrigin(0.5);
+    this.aiContainer.add(prestigeLabel);
 
-    // Bonuses summary — right-aligned, chips grow leftward
-    const bonusY = AI_AREA_Y + 64;
+    // Nobles collected (inline with header if any)
+    if (ai.nobles.length > 0) {
+      const nobleLabel = this.add.text(
+        AI_AREA_X - 230, row0Y + 2,
+        `Nobles: ${ai.nobles.length}`,
+        { fontSize: '14px', color: '#aa88cc', fontFamily: FONT_FAMILY },
+      ).setOrigin(1, 0);
+      this.aiContainer.add(nobleLabel);
+    }
+
+    // ── Row 1: Tokens — show actual token circles (matching player layout) ──
+    const row1Y = row0Y + 30;
+
+    const tokLabel = this.add.text(
+      AI_AREA_X, row1Y + 4, 'Tokens:',
+      { fontSize: '15px', color: '#aaaaaa', fontFamily: FONT_FAMILY },
+    ).setOrigin(1, 0);
+    this.aiContainer.add(tokLabel);
+
+    let tx = AI_AREA_X - 80;
+    const tokCenterY = row1Y + 18;
+    let hasTokens = false;
+    // Draw right-to-left
+    const tokenColors = [...ALL_TOKEN_COLORS].reverse();
+    for (const c of tokenColors) {
+      const n = tokenCount(ai.tokens, c);
+      if (n === 0) continue;
+      hasTokens = true;
+
+      const circle = this.add.circle(tx, tokCenterY, 16, GEM_FILL[c]);
+      circle.setStrokeStyle(1, 0xffffff);
+      this.aiContainer.add(circle);
+
+      const ct = this.add.text(
+        tx, tokCenterY, `${n}`,
+        { fontSize: '15px', fontStyle: 'bold', color: GEM_TEXT_COLOR[c], fontFamily: FONT_FAMILY },
+      ).setOrigin(0.5);
+      this.aiContainer.add(ct);
+
+      tx -= 40;
+    }
+
+    if (!hasTokens) {
+      const noTok = this.add.text(
+        AI_AREA_X - 80, tokCenterY, '(none)',
+        { fontSize: '15px', color: '#666666', fontFamily: FONT_FAMILY },
+      ).setOrigin(1, 0.5);
+      this.aiContainer.add(noTok);
+    }
+
+    // ── Row 2: Bonuses — right-aligned, chips grow leftward ──
+    const row2Y = row1Y + 40;
 
     let hasBonuses = false;
     let bx = AI_AREA_X;
@@ -847,48 +970,48 @@ export class SplendorScene extends Phaser.Scene {
 
     // Draw chips right-to-left
     for (let i = bonusChips.length - 1; i >= 0; i--) {
-      bx -= 18;
-      const chip = this.add.circle(bx, bonusY, 14, GEM_FILL[bonusChips[i].color]);
+      bx -= 16;
+      const chip = this.add.rectangle(bx, row2Y + 16, 32, 26, GEM_FILL[bonusChips[i].color], 0.8);
+      chip.setStrokeStyle(1, 0x888888);
       this.aiContainer.add(chip);
       const ct = this.add.text(
-        bx, bonusY, `${bonusChips[i].count}`,
-        { fontSize: '14px', fontStyle: 'bold', color: GEM_TEXT_COLOR[bonusChips[i].color], fontFamily: FONT_FAMILY },
+        bx, row2Y + 16, `${bonusChips[i].count}`,
+        { fontSize: '16px', fontStyle: 'bold', color: GEM_TEXT_COLOR[bonusChips[i].color], fontFamily: FONT_FAMILY },
       ).setOrigin(0.5);
       this.aiContainer.add(ct);
-      bx -= 20;
+      bx -= 28;
     }
 
     if (hasBonuses) {
       const bonusLabel = this.add.text(
-        bx - 5, bonusY - 2, 'Bonuses:',
-        { fontSize: '16px', color: '#aaaaaa', fontFamily: FONT_FAMILY },
+        bx - 5, row2Y + 4, 'Bonuses:',
+        { fontSize: '15px', color: '#aaaaaa', fontFamily: FONT_FAMILY },
       ).setOrigin(1, 0);
       this.aiContainer.add(bonusLabel);
     } else {
       const bonusLabelNone = this.add.text(
-        AI_AREA_X, bonusY - 2, 'Bonuses: (none)',
-        { fontSize: '16px', color: '#666666', fontFamily: FONT_FAMILY },
+        AI_AREA_X, row2Y + 4, 'Bonuses: (none)',
+        { fontSize: '15px', color: '#666666', fontFamily: FONT_FAMILY },
       ).setOrigin(1, 0);
       this.aiContainer.add(bonusLabelNone);
     }
 
-    // Reserved count — right-aligned
+    // ── Row 3: Reserved + Cards counts ──
+    const row3Y = row2Y + 38;
+
+    const cardCount = ai.purchasedCards.length;
+    const cardText = this.add.text(
+      AI_AREA_X, row3Y + 4, `Cards: ${cardCount}`,
+      { fontSize: '15px', color: '#888888', fontFamily: FONT_FAMILY },
+    ).setOrigin(1, 0);
+    this.aiContainer.add(cardText);
+
     if (ai.reservedCards.length > 0) {
       const resText = this.add.text(
-        AI_AREA_X, AI_AREA_Y + 96, `Reserved: ${ai.reservedCards.length}`,
-        { fontSize: '16px', color: '#ccaa66', fontFamily: FONT_FAMILY },
+        AI_AREA_X - 110, row3Y + 4, `Reserved: ${ai.reservedCards.length}`,
+        { fontSize: '15px', color: '#ccaa66', fontFamily: FONT_FAMILY },
       ).setOrigin(1, 0);
       this.aiContainer.add(resText);
-    }
-
-    // Nobles — right-aligned
-    if (ai.nobles.length > 0) {
-      const ny = ai.reservedCards.length > 0 ? AI_AREA_Y + 126 : AI_AREA_Y + 96;
-      const nobleText = this.add.text(
-        AI_AREA_X, ny, `Nobles: ${ai.nobles.length}`,
-        { fontSize: '16px', color: '#aa88cc', fontFamily: FONT_FAMILY },
-      ).setOrigin(1, 0);
-      this.aiContainer.add(nobleText);
     }
   }
 
