@@ -11,6 +11,7 @@
  * know the catalogue themselves.
  */
 import Phaser from 'phaser';
+import './src/ui/hiDpiText'; // side-effect: crisp text on HiDPI displays
 import { GameSelectorScene, REGISTRY_KEY_GAMES } from './src/ui/GameSelectorScene';
 import type { GameEntry } from './src/ui/GameSelectorScene';
 import { GolfScene } from './example-games/golf/scenes/GolfScene';
@@ -60,6 +61,10 @@ const config: Phaser.Types.Core.GameConfig = {
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
+  },
+  render: {
+    antialias: false,
+    roundPixels: true,
   },
   callbacks: {
     preBoot: (game: Phaser.Game) => {
