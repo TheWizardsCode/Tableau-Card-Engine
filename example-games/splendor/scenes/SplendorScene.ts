@@ -79,55 +79,73 @@ const GEM_TEXT_COLOR: Record<GemOrGold, string> = {
 };
 
 // ── Layout regions ──────────────────────────────────────────
-// The game canvas is 1280 x 720. Layout is split into:
-//   Top band (y 40–440):  Nobles | Card Market (3 tiers) | Token Supply
-//   Bottom band (y 452–710): Player area (left) | AI summary (right) | Actions
+// The game canvas is 1280 × 720.  The design aims for visual symmetry:
 //
-// Horizontal zones (left to right):
-//   Nobles:  X 10–78    (W 68)
-//   Deck:    X 112–206  (tier labels + deck backs centred at 152)
-//   Market:  X 210–918  (4 cards × 165 + 3 gaps × 16)
-//   Supply:  X 932–960  (token circles r=28 centred at 960)
-//   Labels:  X 994+     (gem names / counts)
+//   Upper band (Y 40–440, 400 px):
+//     Left edge  – Nobles column (vertically centred)
+//     Centre     – Card market (3 tiers, deck column + 4 visible cards)
+//     Right edge – Token supply column (vertically centred)
+//
+//   Lower band (Y 460–720, 260 px):
+//     Left half  – Player tableau (left-aligned)
+//     Right half – AI opponent   (right-aligned / mirrored)
+//     Centre     – Action buttons, then instruction text at bottom
+//
 
-// Noble tiles — left column
-const NOBLE_X = 10;            // noble tiles X start
-const NOBLE_Y = 55;            // below header row (avoids Menu button overlap)
-const NOBLE_W = 68;            // noble tile width
-const NOBLE_H = 72;            // noble tile height (5×72 + 4×8 = 392, fits in 405px)
-const NOBLE_GAP = 8;           // vertical gap between nobles
+// ── Upper-band vertical zone ───────────────────────────────
+const UPPER_TOP = 52;          // top of the upper band (below header + nobles title)
+const UPPER_BOT = 440;         // bottom of the upper band
+const UPPER_MID = (UPPER_TOP + UPPER_BOT) / 2;  // vertical centre = 240
 
-// Card market — centre of the upper band
-const MARKET_X = 210;          // left edge of first visible card
-const MARKET_Y = 46;           // top of tier-3 row
-const MARKET_CARD_W = 165;     // card width (widened from 148 to fill horizontal gap)
-const MARKET_CARD_H = 120;     // card height
-const MARKET_CARD_GAP = 16;    // horizontal gap between cards
+// Noble tiles — left column, vertically centred
+const NOBLE_W = 68;
+const NOBLE_H = 72;
+const NOBLE_GAP = 8;
+const NOBLES_TOTAL_H = 5 * NOBLE_H + 4 * NOBLE_GAP;      // 392
+const NOBLE_X = 10;            // left margin
+const NOBLE_Y = UPPER_MID - NOBLES_TOTAL_H / 2;           // ≈ 44
+
+// Token supply — right column, vertically centred
+const SUPPLY_TOKEN_R = 28;
+const SUPPLY_GAP = 62;         // vertical spacing between token centres
+const SUPPLY_TOTAL_H = 5 * SUPPLY_GAP;                    // 310 (6 tokens)
+const SUPPLY_X = 1150;         // circle centre X (near right edge, room for labels)
+const SUPPLY_Y = UPPER_MID - SUPPLY_TOTAL_H / 2;          // ≈ 85
+
+// Card market — centred horizontally between nobles and supply
+const MARKET_CARD_W = 155;     // card width (slightly narrower to fit centred layout)
+const MARKET_CARD_H = 115;     // card height
+const MARKET_CARD_GAP = 14;    // horizontal gap between cards
 const MARKET_TIER_GAP = 10;    // vertical gap between tier rows
+const MARKET_TOTAL_H = 3 * MARKET_CARD_H + 2 * MARKET_TIER_GAP;  // 365
+const MARKET_Y = UPPER_MID - MARKET_TOTAL_H / 2;          // ≈ 58 — vertically centred
 
-// Deck column sits just left of the market
-const DECK_X = 152;            // fixed position clear of nobles (right edge ~78)
+// Deck column sits just left of the visible market cards
+// Available horizontal zone: nobles right (78) … supply labels left (~1060)
+// Market cards: 4 × 155 + 3 × 14 = 662.  Deck: 100 + 16 gap = 116.  Tier label: ~40.
+// Total content: 40 + 116 + 662 = 818.
+// Centre of available = (78 + 1060) / 2 ≈ 569.
+// Content left edge ≈ 569 − 818/2 ≈ 160.  Tier label ~160, deck centre ~230, market ~296.
+const DECK_X = 220;            // deck back centre X
+const MARKET_X = DECK_X + 50 + 16;  // first card left edge (deck half-width + gap)
 
-// Token supply — right column
-const SUPPLY_X = 960;          // token supply circle centre X
-const SUPPLY_Y = 55;           // first token Y (aligned with nobles/market)
-const SUPPLY_TOKEN_R = 28;     // token circle radius
-const SUPPLY_GAP = 66;         // vertical gap between tokens (spreads to Y≈385)
+// ── Lower-band layout ──────────────────────────────────────
+const LOWER_TOP = 460;         // top of lower band
 
-// Player area — full-width bottom band
-const PLAYER_AREA_Y = 452;     // player area top
-const PLAYER_AREA_X = 20;      // left margin
+// Player area — left half of lower band
+const PLAYER_AREA_X = 20;
+const PLAYER_AREA_Y = LOWER_TOP;
 
-// AI summary — right side of bottom band
-const AI_AREA_X = 660;         // AI area left edge
-const AI_AREA_Y = PLAYER_AREA_Y;
+// AI area — right half of lower band (right-aligned / mirrored)
+const AI_AREA_X = 1260;        // RIGHT edge for right-aligned text
+const AI_AREA_Y = LOWER_TOP;
 
 // Divider between player and AI areas
-const DIVIDER_X = 640;         // vertical divider line X (centred)
+const DIVIDER_X = 640;
 
-// Action buttons and instructions
-const ACTION_Y = 608;          // action buttons Y (tightened to reduce dead space)
-const INSTRUCTION_Y = 652;     // instruction text Y
+// Action buttons and instructions — centred at bottom
+const ACTION_Y = 618;          // action buttons Y
+const INSTRUCTION_Y = 664;     // instruction text Y (centred horizontally)
 
 // ── Audio asset keys ────────────────────────────────────────
 
@@ -488,9 +506,9 @@ export class SplendorScene extends Phaser.Scene {
     this.nobleContainer.removeAll(true);
 
     const label = this.add.text(
-      NOBLE_X + NOBLE_W / 2, NOBLE_Y - 20, 'Nobles',
-      { fontSize: '16px', fontStyle: 'bold', color: '#aa88cc', fontFamily: FONT_FAMILY },
-    ).setOrigin(0.5);
+      NOBLE_X + NOBLE_W / 2, NOBLE_Y - 4, 'Nobles',
+      { fontSize: '13px', fontStyle: 'bold', color: '#aa88cc', fontFamily: FONT_FAMILY },
+    ).setOrigin(0.5, 1);
     this.nobleContainer.add(label);
 
     for (let i = 0; i < this.session.nobles.length; i++) {
@@ -539,11 +557,10 @@ export class SplendorScene extends Phaser.Scene {
   private refreshSupply(): void {
     this.supplyContainer.removeAll(true);
 
-    // "Supply" heading above the token column — positioned above the
-    // first circle (Emerald, top at SUPPLY_Y − SUPPLY_TOKEN_R = 27)
+    // "Supply" heading — tucked just above the first token circle
     const label = this.add.text(
-      SUPPLY_X, SUPPLY_Y - SUPPLY_TOKEN_R - 4, 'Supply',
-      { fontSize: '14px', fontStyle: 'bold', color: '#99bb99', fontFamily: FONT_FAMILY },
+      SUPPLY_X, SUPPLY_Y - SUPPLY_TOKEN_R - 8, 'Supply',
+      { fontSize: '13px', fontStyle: 'bold', color: '#99bb99', fontFamily: FONT_FAMILY },
     ).setOrigin(0.5, 1);
     this.supplyContainer.add(label);
 
@@ -568,12 +585,12 @@ export class SplendorScene extends Phaser.Scene {
       ).setOrigin(0.5);
       this.supplyContainer.add(countText);
 
-      // Color abbreviation
+      // Color abbreviation — left of circle so it doesn't clip the canvas edge
       const abbr = this.add.text(
-        SUPPLY_X + SUPPLY_TOKEN_R + 14, y,
+        SUPPLY_X - SUPPLY_TOKEN_R - 8, y,
         gemDisplayName(color),
         { fontSize: '15px', color: '#aaaaaa', fontFamily: FONT_FAMILY },
-      ).setOrigin(0, 0.5);
+      ).setOrigin(1, 0.5);
       this.supplyContainer.add(abbr);
 
       // Interactivity for gem colors (not gold) during token selection
@@ -584,13 +601,13 @@ export class SplendorScene extends Phaser.Scene {
         circle.on('pointerout', () => circle.setStrokeStyle(2, 0xffffff));
       }
 
-      // Check mark for selected tokens
+      // Check mark for selected tokens — right of circle
       if (this.selectedTokens.includes(color as GemColor)) {
         const check = this.add.text(
-          SUPPLY_X - SUPPLY_TOKEN_R - 12, y,
+          SUPPLY_X + SUPPLY_TOKEN_R + 10, y,
           '✓',
           { fontSize: '22px', fontStyle: 'bold', color: '#44ff44', fontFamily: FONT_FAMILY },
-        ).setOrigin(1, 0.5);
+        ).setOrigin(0, 0.5);
         this.supplyContainer.add(check);
       }
     }
@@ -787,84 +804,90 @@ export class SplendorScene extends Phaser.Scene {
     const bonuses = getBonuses(ai);
     const prestige = getPrestige(ai);
 
-    // AI header with integrated prestige
-    const label = this.add.text(
-      AI_AREA_X, AI_AREA_Y, 'AI Opponent',
-      { fontSize: '20px', fontStyle: 'bold', color: '#aabbcc', fontFamily: FONT_FAMILY },
-    );
-    this.aiContainer.add(label);
-
+    // AI header with integrated prestige — right-aligned
     const prestigeLabel = this.add.text(
-      AI_AREA_X + 175, AI_AREA_Y + 2,
+      AI_AREA_X, AI_AREA_Y + 2,
       `★ ${prestige}`,
       { fontSize: '20px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY },
-    );
+    ).setOrigin(1, 0);
     this.aiContainer.add(prestigeLabel);
 
-    // Token + card counts on one line
+    const label = this.add.text(
+      AI_AREA_X - 60, AI_AREA_Y, 'AI Opponent',
+      { fontSize: '20px', fontStyle: 'bold', color: '#aabbcc', fontFamily: FONT_FAMILY },
+    ).setOrigin(1, 0);
+    this.aiContainer.add(label);
+
+    // Token + card counts — right-aligned
     const tokCount = totalTokens(ai.tokens);
     const cardCount = ai.purchasedCards.length;
-    const tokText = this.add.text(
-      AI_AREA_X, AI_AREA_Y + 32, `Tokens: ${tokCount}`,
-      { fontSize: '16px', color: '#888888', fontFamily: FONT_FAMILY },
-    );
-    this.aiContainer.add(tokText);
-
     const cardText = this.add.text(
-      AI_AREA_X + 130, AI_AREA_Y + 32, `Cards: ${cardCount}`,
+      AI_AREA_X, AI_AREA_Y + 32, `Cards: ${cardCount}`,
       { fontSize: '16px', color: '#888888', fontFamily: FONT_FAMILY },
-    );
+    ).setOrigin(1, 0);
     this.aiContainer.add(cardText);
 
-    // Bonuses summary
-    let bx = AI_AREA_X;
+    const tokText = this.add.text(
+      AI_AREA_X - 120, AI_AREA_Y + 32, `Tokens: ${tokCount}`,
+      { fontSize: '16px', color: '#888888', fontFamily: FONT_FAMILY },
+    ).setOrigin(1, 0);
+    this.aiContainer.add(tokText);
+
+    // Bonuses summary — right-aligned, chips grow leftward
     const bonusY = AI_AREA_Y + 64;
 
-    const bonusLabel = this.add.text(
-      bx, bonusY - 2, 'Bonuses:',
-      { fontSize: '16px', color: '#aaaaaa', fontFamily: FONT_FAMILY },
-    );
-    this.aiContainer.add(bonusLabel);
-    bx += 90;
-
     let hasBonuses = false;
+    let bx = AI_AREA_X;
+    const bonusChips: { color: GemColor; count: number }[] = [];
     for (const c of GEM_COLORS) {
       if (bonuses[c] === 0) continue;
       hasBonuses = true;
-      const chip = this.add.circle(bx + 14, bonusY, 14, GEM_FILL[c]);
+      bonusChips.push({ color: c, count: bonuses[c] });
+    }
+
+    // Draw chips right-to-left
+    for (let i = bonusChips.length - 1; i >= 0; i--) {
+      bx -= 18;
+      const chip = this.add.circle(bx, bonusY, 14, GEM_FILL[bonusChips[i].color]);
       this.aiContainer.add(chip);
       const ct = this.add.text(
-        bx + 14, bonusY, `${bonuses[c]}`,
-        { fontSize: '14px', fontStyle: 'bold', color: GEM_TEXT_COLOR[c], fontFamily: FONT_FAMILY },
+        bx, bonusY, `${bonusChips[i].count}`,
+        { fontSize: '14px', fontStyle: 'bold', color: GEM_TEXT_COLOR[bonusChips[i].color], fontFamily: FONT_FAMILY },
       ).setOrigin(0.5);
       this.aiContainer.add(ct);
-      bx += 38;
+      bx -= 20;
     }
 
-    if (!hasBonuses) {
-      const noneText = this.add.text(
-        bx + 5, bonusY - 2, '(none)',
-        { fontSize: '15px', color: '#666666', fontFamily: FONT_FAMILY },
-      );
-      this.aiContainer.add(noneText);
+    if (hasBonuses) {
+      const bonusLabel = this.add.text(
+        bx - 5, bonusY - 2, 'Bonuses:',
+        { fontSize: '16px', color: '#aaaaaa', fontFamily: FONT_FAMILY },
+      ).setOrigin(1, 0);
+      this.aiContainer.add(bonusLabel);
+    } else {
+      const bonusLabelNone = this.add.text(
+        AI_AREA_X, bonusY - 2, 'Bonuses: (none)',
+        { fontSize: '16px', color: '#666666', fontFamily: FONT_FAMILY },
+      ).setOrigin(1, 0);
+      this.aiContainer.add(bonusLabelNone);
     }
 
-    // Reserved count
+    // Reserved count — right-aligned
     if (ai.reservedCards.length > 0) {
       const resText = this.add.text(
         AI_AREA_X, AI_AREA_Y + 96, `Reserved: ${ai.reservedCards.length}`,
         { fontSize: '16px', color: '#ccaa66', fontFamily: FONT_FAMILY },
-      );
+      ).setOrigin(1, 0);
       this.aiContainer.add(resText);
     }
 
-    // Nobles
+    // Nobles — right-aligned
     if (ai.nobles.length > 0) {
       const ny = ai.reservedCards.length > 0 ? AI_AREA_Y + 126 : AI_AREA_Y + 96;
       const nobleText = this.add.text(
         AI_AREA_X, ny, `Nobles: ${ai.nobles.length}`,
         { fontSize: '16px', color: '#aa88cc', fontFamily: FONT_FAMILY },
-      );
+      ).setOrigin(1, 0);
       this.aiContainer.add(nobleText);
     }
   }
@@ -883,10 +906,21 @@ export class SplendorScene extends Phaser.Scene {
 
     if (this.turnPhase !== 'player-turn' && this.turnPhase !== 'selecting-tokens') return;
 
-    let bx = PLAYER_AREA_X;
     const by = ACTION_Y;
+    const centerX = GAME_W / 2;  // 640
 
     if (this.turnPhase === 'player-turn') {
+      // Calculate total width to centre the action bar
+      const availSame = GEM_COLORS.filter(
+        c => tokenCount(this.session.tokenSupply, c) >= 4,
+      );
+      // Take Tokens button (155) + gap (30) + Take2 label (80) + circles (54 each)
+      let totalW = 155;  // Take Tokens button
+      if (availSame.length > 0) {
+        totalW += 30 + 80 + availSame.length * 54;
+      }
+      let bx = centerX - totalW / 2;
+
       // Take Tokens button
       const takeBtn = this.createActionButton(bx, by, 'Take Tokens', () => {
         this.soundManager?.play(SFX_KEYS.UI_CLICK);
@@ -896,10 +930,7 @@ export class SplendorScene extends Phaser.Scene {
       this.actionContainer.add(takeBtn);
       bx += 185;
 
-      // Take 2 Same buttons — show only if any color has 4+
-      const availSame = GEM_COLORS.filter(
-        c => tokenCount(this.session.tokenSupply, c) >= 4,
-      );
+      // Take 2 Same buttons
       if (availSame.length > 0) {
         const take2Label = this.add.text(
           bx, by - 2, 'Take 2:',
@@ -929,6 +960,11 @@ export class SplendorScene extends Phaser.Scene {
         }
       }
     } else if (this.turnPhase === 'selecting-tokens') {
+      // Calculate total width: selected label (290) + confirm (155+gap) + cancel (155)
+      const canConfirm = this.isValidTokenSelection();
+      let totalW = 290 + (canConfirm ? 155 : 0) + 155;
+      let bx = centerX - totalW / 2;
+
       // Show selected tokens and confirm/cancel buttons
       const selLabel = this.add.text(
         bx, by - 2, `Selected: ${this.selectedTokens.map(c => gemAbbrev(c)).join(' ') || '(none)'}`,
@@ -938,14 +974,13 @@ export class SplendorScene extends Phaser.Scene {
       bx += 290;
 
       // Confirm button (enabled when valid selection)
-      const canConfirm = this.isValidTokenSelection();
       if (canConfirm) {
         const confirmBtn = this.createActionButton(bx, by, 'Confirm', () => {
           this.soundManager?.play(SFX_KEYS.TOKEN_TAKE);
           this.executeTakeDifferent();
         });
         this.actionContainer.add(confirmBtn);
-        bx += 140;
+        bx += 155;
       }
 
       // Cancel button
