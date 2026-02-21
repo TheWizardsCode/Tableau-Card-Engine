@@ -10,6 +10,7 @@
  * The registry key used is exported as `REGISTRY_KEY_GAMES`.
  */
 import Phaser from 'phaser';
+import { GAME_W, GAME_H } from './constants';
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -29,8 +30,6 @@ const SCENE_KEY = 'GameSelectorScene';
 /** Registry key where the game catalogue is stored. */
 export const REGISTRY_KEY_GAMES = 'gameSelector.games';
 
-const GAME_W = 800;
-const GAME_H = 600;
 const FONT_FAMILY = 'monospace';
 
 /** Maximum card dimensions -- actual size may shrink to fit the grid. */

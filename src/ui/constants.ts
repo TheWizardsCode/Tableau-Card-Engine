@@ -13,10 +13,10 @@ export const CARD_W = 48;
 export const CARD_H = 65;
 
 /** Default game viewport width (pixels). */
-export const GAME_W = 800;
+export const GAME_W = 1280;
 
 /** Default game viewport height (pixels). */
-export const GAME_H = 600;
+export const GAME_H = 720;
 
 /** Default font family used for in-game text. */
 export const FONT_FAMILY = 'Arial, sans-serif';
