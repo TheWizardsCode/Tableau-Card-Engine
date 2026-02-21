@@ -594,6 +594,7 @@ export class SushiGoScene extends Phaser.Scene {
           this.instructionText.setText('Click a card from your hand to pick it');
         }
         this.refreshHand(); // re-enable interactivity
+        this.refreshChopsticksButton(); // show/hide chopsticks button
         break;
       case 'animating':
         this.instructionText.setText('');
