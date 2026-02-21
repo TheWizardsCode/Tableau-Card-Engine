@@ -38,12 +38,13 @@ import helpContent from '../help-content.json';
 
 // ── Constants ───────────────────────────────────────────────
 
-// Card dimensions -- larger than the shared 48x65 defaults so cards are
-// easy to read on the 1280x720 canvas (same aspect ratio, ~1.42x scale).
-const GOLF_CARD_W = 68;
-const GOLF_CARD_H = 93;
+// Card dimensions -- sized to fill the 1280x720 canvas in the horizontal
+// layout.  Standard playing-card aspect ratio (5:7), roughly 2.5× the
+// shared 48x65 defaults.
+const GOLF_CARD_W = 120;
+const GOLF_CARD_H = 168;
 
-const CARD_GAP = 8;
+const CARD_GAP = 10;
 const GRID_COLS = 3;
 const GRID_ROWS = 3;
 
@@ -53,12 +54,24 @@ const ANIM_DURATION = 300; // ms for animations
 const SWAP_ANIM_DURATION = ANIM_DURATION * 1.5; // ms for swap/discard-and-flip
 
 // Layout positions (horizontal: human grid left, piles center, AI grid right)
-const GRID_CENTER_Y = 390; // shared center Y for both grids
-const HUMAN_GRID_X = 250;  // center X of human grid (left side)
-const AI_GRID_X = 1030;    // center X of AI grid (right side)
-const PILE_X = GAME_W / 2; // center X of stock/discard (center column)
-const STOCK_Y = 330;       // center Y of stock pile (upper)
-const DISCARD_Y = 450;     // center Y of discard pile (lower)
+//
+// Grid dimensions at 120x168 with 10px gap:
+//   width  = 3×120 + 2×10 = 380px
+//   height = 3×168 + 2×10 = 524px
+//
+// Vertical: title ~50px top, instructions ~20px bottom → ~650px play area.
+// Grids are vertically centred in that area (center Y ≈ 385).
+// Labels 24px above grids, scores 24px below.
+//
+// Horizontal: left grid centred at X=230, right grid at X=1050,
+// piles in the centre column at X=640.  Stock and discard are stacked
+// vertically with enough gap for pile labels and the drawn-card display.
+const GRID_CENTER_Y = 385;
+const HUMAN_GRID_X = 230;
+const AI_GRID_X = 1050;
+const PILE_X = GAME_W / 2; // 640
+const STOCK_Y = 295;       // center Y of stock pile
+const DISCARD_Y = 490;     // center Y of discard pile
 
 // ── Turn state machine ──────────────────────────────────────
 
@@ -330,16 +343,16 @@ export class GolfScene extends Phaser.Scene {
     const gridH = GRID_ROWS * GOLF_CARD_H + (GRID_ROWS - 1) * CARD_GAP;
 
     this.humanLabel = this.add
-      .text(HUMAN_GRID_X, GRID_CENTER_Y - gridH / 2 - 20, 'You', {
-        fontSize: '20px',
+      .text(HUMAN_GRID_X, GRID_CENTER_Y - gridH / 2 - 24, 'You', {
+        fontSize: '24px',
         color: '#ffffff',
         fontFamily: FONT_FAMILY,
       })
       .setOrigin(0.5);
 
     this.aiLabel = this.add
-      .text(AI_GRID_X, GRID_CENTER_Y - gridH / 2 - 20, 'AI', {
-        fontSize: '20px',
+      .text(AI_GRID_X, GRID_CENTER_Y - gridH / 2 - 24, 'AI', {
+        fontSize: '24px',
         color: '#cccccc',
         fontFamily: FONT_FAMILY,
       })
@@ -355,8 +368,8 @@ export class GolfScene extends Phaser.Scene {
     }
 
     this.add
-      .text(PILE_X, STOCK_Y + GOLF_CARD_H / 2 + 14, 'Stock', {
-        fontSize: '14px',
+      .text(PILE_X, STOCK_Y + GOLF_CARD_H / 2 + 16, 'Stock', {
+        fontSize: '16px',
         color: '#aaccaa',
         fontFamily: FONT_FAMILY,
       })
@@ -370,8 +383,8 @@ export class GolfScene extends Phaser.Scene {
     }
 
     this.add
-      .text(PILE_X, DISCARD_Y + GOLF_CARD_H / 2 + 14, 'Discard', {
-        fontSize: '14px',
+      .text(PILE_X, DISCARD_Y + GOLF_CARD_H / 2 + 16, 'Discard', {
+        fontSize: '16px',
         color: '#aaccaa',
         fontFamily: FONT_FAMILY,
       })
@@ -403,25 +416,25 @@ export class GolfScene extends Phaser.Scene {
     const gridH = GRID_ROWS * GOLF_CARD_H + (GRID_ROWS - 1) * CARD_GAP;
 
     this.humanScoreText = this.add
-      .text(HUMAN_GRID_X, GRID_CENTER_Y + gridH / 2 + 22, 'Score: 0', {
-        fontSize: '18px',
+      .text(HUMAN_GRID_X, GRID_CENTER_Y + gridH / 2 + 24, 'Score: 0', {
+        fontSize: '22px',
         color: '#ffffff',
         fontFamily: FONT_FAMILY,
       })
       .setOrigin(0.5);
 
     this.aiScoreText = this.add
-      .text(AI_GRID_X, GRID_CENTER_Y + gridH / 2 + 22, 'Score: 0', {
-        fontSize: '18px',
+      .text(AI_GRID_X, GRID_CENTER_Y + gridH / 2 + 24, 'Score: 0', {
+        fontSize: '22px',
         color: '#cccccc',
         fontFamily: FONT_FAMILY,
       })
       .setOrigin(0.5);
 
-    // Turn indicator above the piles in center
+    // Turn indicator above the stock pile in center
     this.turnText = this.add
-      .text(PILE_X, STOCK_Y - GOLF_CARD_H / 2 - 22, '', {
-        fontSize: '16px',
+      .text(PILE_X, STOCK_Y - GOLF_CARD_H / 2 - 24, '', {
+        fontSize: '20px',
         color: '#ffdd44',
         fontFamily: FONT_FAMILY,
       })
@@ -430,8 +443,8 @@ export class GolfScene extends Phaser.Scene {
 
   private createInstructions(): void {
     this.instructionText = this.add
-      .text(GAME_W / 2, GAME_H - 16, '', {
-        fontSize: '15px',
+      .text(GAME_W / 2, GAME_H - 18, '', {
+        fontSize: '18px',
         color: '#88aa88',
         fontFamily: FONT_FAMILY,
       })
@@ -890,9 +903,9 @@ export class GolfScene extends Phaser.Scene {
   // ── Drawn card display ──────────────────────────────────
 
   private showDrawnCard(card: Card): void {
-    // Show drawn card below the discard pile in the center column
-    const x = PILE_X;
-    const y = DISCARD_Y + GOLF_CARD_H + 20;
+    // Show drawn card to the right of the discard pile, between piles and AI grid
+    const x = PILE_X + GOLF_CARD_W + 24;
+    const y = DISCARD_Y;
     const texture = cardTextureKey(card.rank, card.suit);
 
     this.drawnCardSprite = this.add.image(x, y, texture);
@@ -1054,17 +1067,17 @@ export class GolfScene extends Phaser.Scene {
     createOverlayBackground(
       this,
       { depth: 10, alpha: 0.01 },
-      { width: 460, height: 250, alpha: 0.85 },
+      { width: 520, height: 300, alpha: 0.85 },
     );
 
     const winnerText = results.winnerIndex === 0 ? 'You Win!' : 'AI Wins!';
     this.add
       .text(
         GAME_W / 2,
-        GAME_H / 2 - 40,
+        GAME_H / 2 - 50,
         `${winnerText}\n\nYou: ${results.scores[0]} pts\nAI: ${results.scores[1]} pts`,
         {
-          fontSize: '24px',
+          fontSize: '28px',
           color: '#ffffff',
           fontFamily: FONT_FAMILY,
           align: 'center',
@@ -1075,7 +1088,7 @@ export class GolfScene extends Phaser.Scene {
 
     // Play again button
     const btn = createOverlayButton(
-      this, GAME_W / 2 - 75, GAME_H / 2 + 75, '[ Play Again ]',
+      this, GAME_W / 2 - 85, GAME_H / 2 + 85, '[ Play Again ]',
     );
     btn.on('pointerdown', () => {
       this.soundManager?.play(SFX_KEYS.UI_CLICK);
@@ -1087,6 +1100,6 @@ export class GolfScene extends Phaser.Scene {
     });
 
     // Menu button
-    createOverlayMenuButton(this, GAME_W / 2 + 75, GAME_H / 2 + 75);
+    createOverlayMenuButton(this, GAME_W / 2 + 85, GAME_H / 2 + 85);
   }
 }
