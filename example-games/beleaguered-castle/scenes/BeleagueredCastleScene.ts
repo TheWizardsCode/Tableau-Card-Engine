@@ -82,8 +82,13 @@ const DEAL_STAGGER = 40; // ms between successive card deal tweens
 const SNAP_BACK_DURATION = 200; // ms to snap card back on invalid drop
 const AUTO_COMPLETE_DELAY = 150; // ms between auto-complete card animations
 
-/** Vertical overlap offset between cascaded cards in a tableau column. */
-const CASCADE_OFFSET_Y = 30;
+/** Preferred vertical overlap offset between cascaded cards in a tableau column.
+ *  Dynamically compressed when a column has many cards (see tableauCardY). */
+const CASCADE_OFFSET_Y = 48;
+
+/** Maximum Y for the center of the bottom card in a tableau column.
+ *  Leaves room for the HUD bar at the bottom of the canvas. */
+const TABLEAU_MAX_Y = GAME_H - 40 - BC_CARD_H / 2; // ~613
 
 /** Top area: title + foundations */
 const TITLE_Y = 20;
@@ -449,12 +454,14 @@ export class BeleagueredCastleScene extends Phaser.Scene {
    * The drop zone covers the full column area.
    */
   private createTableauDropZones(): void {
-    // Maximum column height: 13 cards * CASCADE_OFFSET_Y + BC_CARD_H
-    const maxColHeight = 13 * CASCADE_OFFSET_Y + BC_CARD_H;
+    // Drop zone spans from top of first card to TABLEAU_MAX_Y + half card height
+    const zoneTop = TABLEAU_TOP_Y - BC_CARD_H / 2;
+    const zoneBottom = TABLEAU_MAX_Y + BC_CARD_H / 2;
+    const maxColHeight = zoneBottom - zoneTop;
+    const zoneCenterY = (zoneTop + zoneBottom) / 2;
 
     for (let col = 0; col < TABLEAU_COUNT; col++) {
       const x = this.tableauColumnX(col);
-      const zoneCenterY = TABLEAU_TOP_Y + maxColHeight / 2 - BC_CARD_H / 2;
 
       const zone = this.add
         .zone(x, zoneCenterY, BC_CARD_W + 4, maxColHeight)
@@ -793,8 +800,8 @@ export class BeleagueredCastleScene extends Phaser.Scene {
         const col = move.toCol;
         const cards = this.gameState.tableau[col].toArray();
         const dropY = cards.length > 0
-          ? this.tableauCardY(cards.length - 1)
-          : this.tableauCardY(0);
+          ? this.tableauCardY(cards.length - 1, cards.length)
+          : this.tableauCardY(0, 1);
         const x = this.tableauColumnX(col);
 
         const rect = this.add
@@ -1416,9 +1423,20 @@ export class BeleagueredCastleScene extends Phaser.Scene {
 
   /**
    * Calculate the y position for a card at a given row within a tableau column.
+   * When a column has many cards, the cascade offset is compressed so the
+   * bottom card stays above the HUD area (TABLEAU_MAX_Y).
    */
-  private tableauCardY(rowIndex: number): number {
-    return TABLEAU_TOP_Y + rowIndex * CASCADE_OFFSET_Y;
+  private tableauCardY(rowIndex: number, columnSize: number): number {
+    const maxOffsets = columnSize - 1;
+    let offset = CASCADE_OFFSET_Y;
+    if (maxOffsets > 0) {
+      const maxTotalHeight = TABLEAU_MAX_Y - TABLEAU_TOP_Y;
+      const idealHeight = maxOffsets * CASCADE_OFFSET_Y;
+      if (idealHeight > maxTotalHeight) {
+        offset = maxTotalHeight / maxOffsets;
+      }
+    }
+    return TABLEAU_TOP_Y + rowIndex * offset;
   }
 
   /**
@@ -1452,8 +1470,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
       for (let row = 0; row < cards.length; row++) {
         const card = cards[row];
         const targetX = this.tableauColumnX(col);
-        const targetY = this.tableauCardY(row);
-        const texture = cardTextureKey(card.rank, card.suit);
+        const targetY = this.tableauCardY(row, cards.length);        const texture = cardTextureKey(card.rank, card.suit);
 
         // Create the sprite at the deal origin (center), invisible initially
         const sprite = this.add
@@ -1583,8 +1600,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
       for (let row = 0; row < cards.length; row++) {
         const card = cards[row];
         const x = this.tableauColumnX(col);
-        const y = this.tableauCardY(row);
-        const texture = cardTextureKey(card.rank, card.suit);
+        const y = this.tableauCardY(row, cards.length);        const texture = cardTextureKey(card.rank, card.suit);
 
         const sprite = this.add
           .image(x, y, texture)
