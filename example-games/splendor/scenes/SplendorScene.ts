@@ -80,43 +80,50 @@ const GEM_TEXT_COLOR: Record<GemOrGold, string> = {
 
 // ── Layout regions ──────────────────────────────────────────
 // The game canvas is 1280 x 720. Layout is split into:
-//   Top band (y 34–430):  Nobles | Card Market (3 tiers) | Token Supply
-//   Bottom band (y 440–710): Player area (left) | AI summary (right) | Actions
+//   Top band (y 40–435):  Nobles | Card Market (3 tiers) | Token Supply
+//   Bottom band (y 450–710): Player area (left) | AI summary (right) | Actions
+//
+// Horizontal zones (left to right):
+//   Nobles:  X 10–78    (W 68)
+//   Deck:    X 112–216  (tier labels at 112 + deck backs centred at 152)
+//   Market:  X 210–850  (4 cards × 148 + 3 gaps × 12)
+//   Supply:  X 892–948  (token circles r=28 centred at 920)
+//   Labels:  X 962+     (gem names)
+
+// Noble tiles — left column
+const NOBLE_X = 10;            // noble tiles X start
+const NOBLE_Y = 55;            // below header row (avoids Menu button overlap)
+const NOBLE_W = 68;            // noble tile width
+const NOBLE_H = 72;            // noble tile height (5×72 + 4×8 = 392, fits in 405px)
+const NOBLE_GAP = 8;           // vertical gap between nobles
 
 // Card market — centre of the upper band
-const MARKET_X = 230;          // left edge of first visible card
-const MARKET_Y = 44;           // top of tier-3 row
-const MARKET_CARD_W = 140;     // card width  (was 125)
-const MARKET_CARD_H = 125;     // card height (was 115)
-const MARKET_CARD_GAP = 14;    // horizontal gap between cards
+const MARKET_X = 210;          // left edge of first visible card
+const MARKET_Y = 46;           // top of tier-3 row
+const MARKET_CARD_W = 148;     // card width
+const MARKET_CARD_H = 120;     // card height
+const MARKET_CARD_GAP = 12;    // horizontal gap between cards
 const MARKET_TIER_GAP = 10;    // vertical gap between tier rows
 
 // Deck column sits just left of the market
-const DECK_X = MARKET_X - MARKET_CARD_W / 2 - 25;
-
-// Noble tiles — left column
-const NOBLE_X = 15;            // noble tiles X start
-const NOBLE_Y = MARKET_Y;      // align with market top
-const NOBLE_W = 82;            // noble tile width  (was 72)
-const NOBLE_H = 86;            // noble tile height (was 78)
-const NOBLE_GAP = 12;
+const DECK_X = 152;            // fixed position clear of nobles (right edge ~78)
 
 // Token supply — right column
-const SUPPLY_X = 1100;         // token supply circle centre X (was 1070)
-const SUPPLY_Y = 65;           // first token Y
-const SUPPLY_TOKEN_R = 30;     // token circle radius (was 26)
-const SUPPLY_GAP = 60;         // vertical gap between tokens (was 55)
+const SUPPLY_X = 920;          // token supply circle centre X
+const SUPPLY_Y = 68;           // first token Y
+const SUPPLY_TOKEN_R = 28;     // token circle radius
+const SUPPLY_GAP = 58;         // vertical gap between tokens
 
 // Player area — full-width bottom band
-const PLAYER_AREA_Y = 440;     // player area top (was 460)
+const PLAYER_AREA_Y = 460;     // player area top
 const PLAYER_AREA_X = 20;      // left margin
 
 // AI summary — right side of bottom band
-const AI_AREA_X = 780;         // AI area left edge (was 800)
+const AI_AREA_X = 700;         // AI area left edge
 const AI_AREA_Y = PLAYER_AREA_Y;
 
 // Action buttons
-const ACTION_Y = 665;
+const ACTION_Y = 670;
 
 // ── Audio asset keys ────────────────────────────────────────
 
@@ -347,7 +354,7 @@ export class SplendorScene extends Phaser.Scene {
 
       // Deck back (shows remaining count)
       const deckCount = market.deck.length;
-      const deckW = MARKET_CARD_W - 20;
+      const deckW = MARKET_CARD_W - 40;
       const deckH = MARKET_CARD_H - 16;
       const deckBg = this.add.rectangle(
         DECK_X, y + MARKET_CARD_H / 2,
