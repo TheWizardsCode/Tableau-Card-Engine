@@ -79,44 +79,44 @@ const GEM_TEXT_COLOR: Record<GemOrGold, string> = {
 };
 
 // ── Layout regions ──────────────────────────────────────────
-// The game canvas is 800 x 600. Layout is split into:
-//   Top band (y 34–370):  Nobles | Card Market (3 tiers) | Token Supply
-//   Bottom band (y 380–590): Player area (left) | AI summary (right) | Actions
+// The game canvas is 1280 x 720. Layout is split into:
+//   Top band (y 34–450):  Nobles | Card Market (3 tiers) | Token Supply
+//   Bottom band (y 460–710): Player area (left) | AI summary (right) | Actions
 
 // Card market — centre of the upper band
-const MARKET_X = 130;          // left edge of first visible card
-const MARKET_Y = 40;           // top of tier-3 row
-const MARKET_CARD_W = 105;     // card width
-const MARKET_CARD_H = 100;     // card height
-const MARKET_CARD_GAP = 10;    // horizontal gap between cards
-const MARKET_TIER_GAP = 10;    // vertical gap between tier rows
+const MARKET_X = 220;          // left edge of first visible card
+const MARKET_Y = 44;           // top of tier-3 row
+const MARKET_CARD_W = 125;     // card width
+const MARKET_CARD_H = 115;     // card height
+const MARKET_CARD_GAP = 14;    // horizontal gap between cards
+const MARKET_TIER_GAP = 12;    // vertical gap between tier rows
 
 // Deck column sits just left of the market
-const DECK_X = MARKET_X - MARKET_CARD_W / 2 - 20;
+const DECK_X = MARKET_X - MARKET_CARD_W / 2 - 25;
 
 // Noble tiles — left column
-const NOBLE_X = 10;            // noble tiles X start
+const NOBLE_X = 15;            // noble tiles X start
 const NOBLE_Y = MARKET_Y;      // align with market top
-const NOBLE_W = 60;
-const NOBLE_H = 65;
-const NOBLE_GAP = 10;
+const NOBLE_W = 72;
+const NOBLE_H = 78;
+const NOBLE_GAP = 12;
 
 // Token supply — right column
-const SUPPLY_X = 670;          // token supply circle centre X
-const SUPPLY_Y = 60;           // first token Y
-const SUPPLY_TOKEN_R = 22;     // token circle radius
-const SUPPLY_GAP = 48;         // vertical gap between tokens
+const SUPPLY_X = 1070;         // token supply circle centre X
+const SUPPLY_Y = 65;           // first token Y
+const SUPPLY_TOKEN_R = 26;     // token circle radius
+const SUPPLY_GAP = 55;         // vertical gap between tokens
 
 // Player area — full-width bottom band
-const PLAYER_AREA_Y = 390;     // player area top
-const PLAYER_AREA_X = 15;      // left margin
+const PLAYER_AREA_Y = 460;     // player area top
+const PLAYER_AREA_X = 20;      // left margin
 
 // AI summary — right side of bottom band
-const AI_AREA_X = 500;
+const AI_AREA_X = 800;
 const AI_AREA_Y = PLAYER_AREA_Y;
 
 // Action buttons
-const ACTION_Y = 555;
+const ACTION_Y = 660;
 
 // ── Audio asset keys ────────────────────────────────────────
 
@@ -271,8 +271,8 @@ export class SplendorScene extends Phaser.Scene {
 
   private createInstructions(): void {
     this.instructionText = this.add
-      .text(GAME_W / 2, GAME_H - 8, '', {
-        fontSize: '14px',
+      .text(GAME_W / 2, GAME_H - 10, '', {
+        fontSize: '16px',
         color: '#88aa88',
         fontFamily: FONT_FAMILY,
       })
@@ -281,8 +281,8 @@ export class SplendorScene extends Phaser.Scene {
 
   private createPrestigeDisplay(): void {
     this.playerPrestigeText = this.add
-      .text(PLAYER_AREA_X + 200, PLAYER_AREA_Y - 2, '', {
-        fontSize: '16px',
+      .text(PLAYER_AREA_X + 260, PLAYER_AREA_Y - 2, '', {
+        fontSize: '18px',
         fontStyle: 'bold',
         color: '#ffdd44',
         fontFamily: FONT_FAMILY,
@@ -290,8 +290,8 @@ export class SplendorScene extends Phaser.Scene {
       .setOrigin(0, 0);
 
     this.aiPrestigeText = this.add
-      .text(AI_AREA_X + 170, AI_AREA_Y - 2, '', {
-        fontSize: '14px',
+      .text(AI_AREA_X + 220, AI_AREA_Y - 2, '', {
+        fontSize: '16px',
         color: '#aabbcc',
         fontFamily: FONT_FAMILY,
       })
@@ -339,9 +339,9 @@ export class SplendorScene extends Phaser.Scene {
 
       // Tier label (left of deck)
       const tierLabel = this.add.text(
-        DECK_X - 30, y + MARKET_CARD_H / 2,
+        DECK_X - 35, y + MARKET_CARD_H / 2,
         `T${tier}`,
-        { fontSize: '14px', fontStyle: 'bold', color: '#888888', fontFamily: FONT_FAMILY },
+        { fontSize: '16px', fontStyle: 'bold', color: '#888888', fontFamily: FONT_FAMILY },
       ).setOrigin(0.5);
       this.marketContainer.add(tierLabel);
 
@@ -360,7 +360,7 @@ export class SplendorScene extends Phaser.Scene {
       if (deckCount > 0) {
         const deckText = this.add.text(
           DECK_X, y + MARKET_CARD_H / 2,
-          `${deckCount}`, { fontSize: '16px', fontStyle: 'bold', color: '#aaddaa', fontFamily: FONT_FAMILY },
+          `${deckCount}`, { fontSize: '18px', fontStyle: 'bold', color: '#aaddaa', fontFamily: FONT_FAMILY },
         ).setOrigin(0.5);
         this.marketContainer.add(deckText);
 
@@ -417,7 +417,7 @@ export class SplendorScene extends Phaser.Scene {
       const pts = this.add.text(
         -MARKET_CARD_W / 2 + 8, -MARKET_CARD_H / 2 + 22,
         `${card.points}`,
-        { fontSize: '18px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY },
+        { fontSize: '20px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY },
       );
       container.add(pts);
     }
@@ -426,7 +426,7 @@ export class SplendorScene extends Phaser.Scene {
     const bonusLetter = this.add.text(
       MARKET_CARD_W / 2 - 8, -MARKET_CARD_H / 2 + 22,
       gemAbbrev(card.bonus),
-      { fontSize: '13px', fontStyle: 'bold', color: GEM_TEXT_COLOR[card.bonus], fontFamily: FONT_FAMILY },
+      { fontSize: '14px', fontStyle: 'bold', color: GEM_TEXT_COLOR[card.bonus], fontFamily: FONT_FAMILY },
     ).setOrigin(1, 0);
     container.add(bonusLetter);
 
@@ -436,15 +436,15 @@ export class SplendorScene extends Phaser.Scene {
       const n = card.cost[c] ?? 0;
       if (n > 0) costEntries.push({ color: c, count: n });
     }
-    const costStartX = -(costEntries.length - 1) * 11;
+    const costStartX = -(costEntries.length - 1) * 13;
     for (let i = 0; i < costEntries.length; i++) {
-      const cx = costStartX + i * 22;
-      const cy = MARKET_CARD_H / 2 - 16;
-      const chip = this.add.circle(cx, cy, 9, GEM_FILL[costEntries[i].color], 0.9);
+      const cx = costStartX + i * 26;
+      const cy = MARKET_CARD_H / 2 - 18;
+      const chip = this.add.circle(cx, cy, 11, GEM_FILL[costEntries[i].color], 0.9);
       chip.setStrokeStyle(1, 0x888888);
       container.add(chip);
       const ct = this.add.text(cx, cy, `${costEntries[i].count}`, {
-        fontSize: '11px', fontStyle: 'bold',
+        fontSize: '12px', fontStyle: 'bold',
         color: GEM_TEXT_COLOR[costEntries[i].color], fontFamily: FONT_FAMILY,
       }).setOrigin(0.5);
       container.add(ct);
@@ -473,8 +473,8 @@ export class SplendorScene extends Phaser.Scene {
     this.nobleContainer.removeAll(true);
 
     const label = this.add.text(
-      NOBLE_X + NOBLE_W / 2, NOBLE_Y - 18, 'Nobles',
-      { fontSize: '13px', fontStyle: 'bold', color: '#aa88cc', fontFamily: FONT_FAMILY },
+      NOBLE_X + NOBLE_W / 2, NOBLE_Y - 20, 'Nobles',
+      { fontSize: '14px', fontStyle: 'bold', color: '#aa88cc', fontFamily: FONT_FAMILY },
     ).setOrigin(0.5);
     this.nobleContainer.add(label);
 
@@ -491,9 +491,9 @@ export class SplendorScene extends Phaser.Scene {
 
       // Points
       const pts = this.add.text(
-        NOBLE_X + NOBLE_W / 2, y + 12,
+        NOBLE_X + NOBLE_W / 2, y + 14,
         '3 pt',
-        { fontSize: '12px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY },
+        { fontSize: '14px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY },
       ).setOrigin(0.5);
       this.nobleContainer.add(pts);
 
@@ -503,15 +503,15 @@ export class SplendorScene extends Phaser.Scene {
         const n = noble.requirements[c] ?? 0;
         if (n > 0) reqs.push({ color: c, count: n });
       }
-      const reqStartX = NOBLE_X + NOBLE_W / 2 - (reqs.length - 1) * 9;
+      const reqStartX = NOBLE_X + NOBLE_W / 2 - (reqs.length - 1) * 11;
       for (let j = 0; j < reqs.length; j++) {
-        const rx = reqStartX + j * 18;
-        const ry = y + NOBLE_H - 16;
-        const chip = this.add.circle(rx, ry, 7, GEM_FILL[reqs[j].color], 0.9);
+        const rx = reqStartX + j * 22;
+        const ry = y + NOBLE_H - 18;
+        const chip = this.add.circle(rx, ry, 8, GEM_FILL[reqs[j].color], 0.9);
         chip.setStrokeStyle(1, 0x888888);
         this.nobleContainer.add(chip);
         const ct = this.add.text(rx, ry, `${reqs[j].count}`, {
-          fontSize: '9px', fontStyle: 'bold',
+          fontSize: '10px', fontStyle: 'bold',
           color: GEM_TEXT_COLOR[reqs[j].color], fontFamily: FONT_FAMILY,
         }).setOrigin(0.5);
         this.nobleContainer.add(ct);
@@ -525,8 +525,8 @@ export class SplendorScene extends Phaser.Scene {
     this.supplyContainer.removeAll(true);
 
     const label = this.add.text(
-      SUPPLY_X, SUPPLY_Y - 22, 'Gems',
-      { fontSize: '13px', fontStyle: 'bold', color: '#888888', fontFamily: FONT_FAMILY },
+      SUPPLY_X, SUPPLY_Y - 26, 'Gems',
+      { fontSize: '14px', fontStyle: 'bold', color: '#888888', fontFamily: FONT_FAMILY },
     ).setOrigin(0.5);
     this.supplyContainer.add(label);
 
@@ -547,15 +547,15 @@ export class SplendorScene extends Phaser.Scene {
       const countText = this.add.text(
         SUPPLY_X, y,
         `${count}`,
-        { fontSize: '16px', fontStyle: 'bold', color: GEM_TEXT_COLOR[color], fontFamily: FONT_FAMILY },
+        { fontSize: '18px', fontStyle: 'bold', color: GEM_TEXT_COLOR[color], fontFamily: FONT_FAMILY },
       ).setOrigin(0.5);
       this.supplyContainer.add(countText);
 
       // Color abbreviation
       const abbr = this.add.text(
-        SUPPLY_X + SUPPLY_TOKEN_R + 10, y,
+        SUPPLY_X + SUPPLY_TOKEN_R + 12, y,
         gemDisplayName(color),
-        { fontSize: '12px', color: '#aaaaaa', fontFamily: FONT_FAMILY },
+        { fontSize: '14px', color: '#aaaaaa', fontFamily: FONT_FAMILY },
       ).setOrigin(0, 0.5);
       this.supplyContainer.add(abbr);
 
@@ -570,9 +570,9 @@ export class SplendorScene extends Phaser.Scene {
       // Check mark for selected tokens
       if (this.selectedTokens.includes(color as GemColor)) {
         const check = this.add.text(
-          SUPPLY_X - SUPPLY_TOKEN_R - 8, y,
+          SUPPLY_X - SUPPLY_TOKEN_R - 10, y,
           '✓',
-          { fontSize: '18px', fontStyle: 'bold', color: '#44ff44', fontFamily: FONT_FAMILY },
+          { fontSize: '20px', fontStyle: 'bold', color: '#44ff44', fontFamily: FONT_FAMILY },
         ).setOrigin(1, 0.5);
         this.supplyContainer.add(check);
       }
@@ -588,34 +588,34 @@ export class SplendorScene extends Phaser.Scene {
     // Section label
     const label = this.add.text(
       PLAYER_AREA_X, PLAYER_AREA_Y, 'Your Tableau',
-      { fontSize: '14px', fontStyle: 'bold', color: '#ffffff', fontFamily: FONT_FAMILY },
+      { fontSize: '16px', fontStyle: 'bold', color: '#ffffff', fontFamily: FONT_FAMILY },
     );
     this.playerContainer.add(label);
 
     // Tokens row
     let tx = PLAYER_AREA_X;
-    const tokY = PLAYER_AREA_Y + 24;
+    const tokY = PLAYER_AREA_Y + 28;
     for (const c of ALL_TOKEN_COLORS) {
       const n = tokenCount(player.tokens, c);
       if (n === 0) continue;
 
-      const circle = this.add.circle(tx + 12, tokY, 12, GEM_FILL[c]);
+      const circle = this.add.circle(tx + 14, tokY, 14, GEM_FILL[c]);
       circle.setStrokeStyle(1, 0xffffff);
       this.playerContainer.add(circle);
 
       const ct = this.add.text(
-        tx + 12, tokY, `${n}`,
-        { fontSize: '12px', fontStyle: 'bold', color: GEM_TEXT_COLOR[c], fontFamily: FONT_FAMILY },
+        tx + 14, tokY, `${n}`,
+        { fontSize: '14px', fontStyle: 'bold', color: GEM_TEXT_COLOR[c], fontFamily: FONT_FAMILY },
       ).setOrigin(0.5);
       this.playerContainer.add(ct);
 
-      tx += 32;
+      tx += 38;
     }
 
     if (totalTokens(player.tokens) === 0) {
       const noTok = this.add.text(
         tx + 5, tokY, '(no tokens)',
-        { fontSize: '12px', color: '#666666', fontFamily: FONT_FAMILY },
+        { fontSize: '14px', color: '#666666', fontFamily: FONT_FAMILY },
       ).setOrigin(0, 0.5);
       this.playerContainer.add(noTok);
     }
@@ -623,57 +623,57 @@ export class SplendorScene extends Phaser.Scene {
     // Purchased cards grouped by bonus color
     const bonuses = getBonuses(player);
     let bx = PLAYER_AREA_X;
-    const bonusY = PLAYER_AREA_Y + 50;
+    const bonusY = PLAYER_AREA_Y + 60;
 
     const bonusLabel = this.add.text(
       bx, bonusY - 2, 'Bonuses:',
-      { fontSize: '12px', color: '#aaaaaa', fontFamily: FONT_FAMILY },
+      { fontSize: '14px', color: '#aaaaaa', fontFamily: FONT_FAMILY },
     );
     this.playerContainer.add(bonusLabel);
-    bx += 65;
+    bx += 80;
 
     for (const c of GEM_COLORS) {
       const count = bonuses[c];
       if (count === 0) continue;
 
-      const chip = this.add.rectangle(bx + 12, bonusY, 24, 18, GEM_FILL[c], 0.8);
+      const chip = this.add.rectangle(bx + 14, bonusY, 28, 22, GEM_FILL[c], 0.8);
       chip.setStrokeStyle(1, 0x888888);
       this.playerContainer.add(chip);
 
       const chipText = this.add.text(
-        bx + 12, bonusY, `${count}`,
-        { fontSize: '12px', fontStyle: 'bold', color: GEM_TEXT_COLOR[c], fontFamily: FONT_FAMILY },
+        bx + 14, bonusY, `${count}`,
+        { fontSize: '14px', fontStyle: 'bold', color: GEM_TEXT_COLOR[c], fontFamily: FONT_FAMILY },
       ).setOrigin(0.5);
       this.playerContainer.add(chipText);
 
-      bx += 32;
+      bx += 38;
     }
 
     // Reserved cards
     if (player.reservedCards.length > 0) {
-      const resY = PLAYER_AREA_Y + 74;
+      const resY = PLAYER_AREA_Y + 90;
       const resLabel = this.add.text(
         PLAYER_AREA_X, resY, `Reserved (${player.reservedCards.length}):`,
-        { fontSize: '12px', color: '#ccaa66', fontFamily: FONT_FAMILY },
+        { fontSize: '14px', color: '#ccaa66', fontFamily: FONT_FAMILY },
       );
       this.playerContainer.add(resLabel);
 
-      let rx = PLAYER_AREA_X + 110;
+      let rx = PLAYER_AREA_X + 135;
       for (const card of player.reservedCards) {
         const cardContainer = this.createSmallCard(rx, resY + 2, card, true);
         this.playerContainer.add(cardContainer);
-        rx += 70;
+        rx += 85;
       }
     }
 
     // Nobles collected
     if (player.nobles.length > 0) {
       const nobleY = player.reservedCards.length > 0
-        ? PLAYER_AREA_Y + 110
-        : PLAYER_AREA_Y + 74;
+        ? PLAYER_AREA_Y + 130
+        : PLAYER_AREA_Y + 90;
       const nobleLabel = this.add.text(
         PLAYER_AREA_X, nobleY, `Nobles: ${player.nobles.length}`,
-        { fontSize: '12px', color: '#aa88cc', fontFamily: FONT_FAMILY },
+        { fontSize: '14px', color: '#aa88cc', fontFamily: FONT_FAMILY },
       );
       this.playerContainer.add(nobleLabel);
     }
@@ -685,8 +685,8 @@ export class SplendorScene extends Phaser.Scene {
     card: DevelopmentCard,
     interactive: boolean = false,
   ): Phaser.GameObjects.Container {
-    const w = 56;
-    const h = 36;
+    const w = 66;
+    const h = 42;
     const container = this.add.container(x + w / 2, y + h / 2);
 
     const bg = this.add.rectangle(0, 0, w, h, 0x1a1a1a);
@@ -694,14 +694,14 @@ export class SplendorScene extends Phaser.Scene {
     container.add(bg);
 
     // Bonus color dot
-    const dot = this.add.circle(-w / 2 + 8, -h / 2 + 8, 5, GEM_FILL[card.bonus]);
+    const dot = this.add.circle(-w / 2 + 10, -h / 2 + 10, 6, GEM_FILL[card.bonus]);
     container.add(dot);
 
     // Points
     if (card.points > 0) {
       const pts = this.add.text(
-        -w / 2 + 18, -h / 2 + 2, `${card.points}`,
-        { fontSize: '11px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY },
+        -w / 2 + 22, -h / 2 + 3, `${card.points}`,
+        { fontSize: '12px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY },
       );
       container.add(pts);
     }
@@ -709,8 +709,8 @@ export class SplendorScene extends Phaser.Scene {
     // Cost
     const costStr = formatCost(card.cost);
     const costText = this.add.text(
-      0, 6, costStr,
-      { fontSize: '8px', color: '#aaaaaa', fontFamily: FONT_FAMILY, align: 'center' },
+      0, 7, costStr,
+      { fontSize: '10px', color: '#aaaaaa', fontFamily: FONT_FAMILY, align: 'center' },
     ).setOrigin(0.5);
     container.add(costText);
 
@@ -740,64 +740,64 @@ export class SplendorScene extends Phaser.Scene {
     // AI label
     const label = this.add.text(
       AI_AREA_X, AI_AREA_Y, 'AI Opponent',
-      { fontSize: '14px', fontStyle: 'bold', color: '#aabbcc', fontFamily: FONT_FAMILY },
+      { fontSize: '16px', fontStyle: 'bold', color: '#aabbcc', fontFamily: FONT_FAMILY },
     );
     this.aiContainer.add(label);
 
     // Token count
     const tokCount = totalTokens(ai.tokens);
     const tokText = this.add.text(
-      AI_AREA_X, AI_AREA_Y + 22, `Tokens: ${tokCount}`,
-      { fontSize: '12px', color: '#888888', fontFamily: FONT_FAMILY },
+      AI_AREA_X, AI_AREA_Y + 26, `Tokens: ${tokCount}`,
+      { fontSize: '14px', color: '#888888', fontFamily: FONT_FAMILY },
     );
     this.aiContainer.add(tokText);
 
     // Cards count
     const cardCount = ai.purchasedCards.length;
     const cardText = this.add.text(
-      AI_AREA_X + 100, AI_AREA_Y + 22, `Cards: ${cardCount}`,
-      { fontSize: '12px', color: '#888888', fontFamily: FONT_FAMILY },
+      AI_AREA_X + 130, AI_AREA_Y + 26, `Cards: ${cardCount}`,
+      { fontSize: '14px', color: '#888888', fontFamily: FONT_FAMILY },
     );
     this.aiContainer.add(cardText);
 
     // Bonuses summary
     let bx = AI_AREA_X;
-    const bonusY = AI_AREA_Y + 46;
+    const bonusY = AI_AREA_Y + 55;
 
     const bonusLabel = this.add.text(
       bx, bonusY - 2, 'Bonuses:',
-      { fontSize: '12px', color: '#aaaaaa', fontFamily: FONT_FAMILY },
+      { fontSize: '14px', color: '#aaaaaa', fontFamily: FONT_FAMILY },
     );
     this.aiContainer.add(bonusLabel);
-    bx += 65;
+    bx += 80;
 
     for (const c of GEM_COLORS) {
       if (bonuses[c] === 0) continue;
-      const chip = this.add.circle(bx + 8, bonusY, 8, GEM_FILL[c]);
+      const chip = this.add.circle(bx + 10, bonusY, 10, GEM_FILL[c]);
       this.aiContainer.add(chip);
       const ct = this.add.text(
-        bx + 8, bonusY, `${bonuses[c]}`,
-        { fontSize: '10px', fontStyle: 'bold', color: GEM_TEXT_COLOR[c], fontFamily: FONT_FAMILY },
+        bx + 10, bonusY, `${bonuses[c]}`,
+        { fontSize: '11px', fontStyle: 'bold', color: GEM_TEXT_COLOR[c], fontFamily: FONT_FAMILY },
       ).setOrigin(0.5);
       this.aiContainer.add(ct);
-      bx += 24;
+      bx += 30;
     }
 
     // Reserved count
     if (ai.reservedCards.length > 0) {
       const resText = this.add.text(
-        AI_AREA_X, AI_AREA_Y + 68, `Reserved: ${ai.reservedCards.length}`,
-        { fontSize: '12px', color: '#ccaa66', fontFamily: FONT_FAMILY },
+        AI_AREA_X, AI_AREA_Y + 82, `Reserved: ${ai.reservedCards.length}`,
+        { fontSize: '14px', color: '#ccaa66', fontFamily: FONT_FAMILY },
       );
       this.aiContainer.add(resText);
     }
 
     // Nobles
     if (ai.nobles.length > 0) {
-      const ny = ai.reservedCards.length > 0 ? AI_AREA_Y + 88 : AI_AREA_Y + 68;
+      const ny = ai.reservedCards.length > 0 ? AI_AREA_Y + 106 : AI_AREA_Y + 82;
       const nobleText = this.add.text(
         AI_AREA_X, ny, `Nobles: ${ai.nobles.length}`,
-        { fontSize: '12px', color: '#aa88cc', fontFamily: FONT_FAMILY },
+        { fontSize: '14px', color: '#aa88cc', fontFamily: FONT_FAMILY },
       );
       this.aiContainer.add(nobleText);
     }
@@ -828,7 +828,7 @@ export class SplendorScene extends Phaser.Scene {
         this.setPhase('selecting-tokens');
       });
       this.actionContainer.add(takeBtn);
-      bx += 130;
+      bx += 155;
 
       // Take 2 Same buttons — show only if any color has 4+
       const availSame = GEM_COLORS.filter(
@@ -837,13 +837,13 @@ export class SplendorScene extends Phaser.Scene {
       if (availSame.length > 0) {
         const take2Label = this.add.text(
           bx, by - 2, 'Take 2:',
-          { fontSize: '12px', color: '#aaaaaa', fontFamily: FONT_FAMILY },
+          { fontSize: '14px', color: '#aaaaaa', fontFamily: FONT_FAMILY },
         );
         this.actionContainer.add(take2Label);
-        bx += 55;
+        bx += 68;
 
         for (const c of availSame) {
-          const circle = this.add.circle(bx, by, 14, GEM_FILL[c]);
+          const circle = this.add.circle(bx, by, 16, GEM_FILL[c]);
           circle.setStrokeStyle(1, 0xffffff);
           circle.setInteractive({ useHandCursor: true });
           circle.on('pointerdown', () => {
@@ -856,20 +856,20 @@ export class SplendorScene extends Phaser.Scene {
 
           const abbr = this.add.text(
             bx, by, gemAbbrev(c),
-            { fontSize: '11px', fontStyle: 'bold', color: GEM_TEXT_COLOR[c], fontFamily: FONT_FAMILY },
+            { fontSize: '12px', fontStyle: 'bold', color: GEM_TEXT_COLOR[c], fontFamily: FONT_FAMILY },
           ).setOrigin(0.5);
           this.actionContainer.add(abbr);
-          bx += 35;
+          bx += 42;
         }
       }
     } else if (this.turnPhase === 'selecting-tokens') {
       // Show selected tokens and confirm/cancel buttons
       const selLabel = this.add.text(
         bx, by - 2, `Selected: ${this.selectedTokens.map(c => gemAbbrev(c)).join(' ') || '(none)'}`,
-        { fontSize: '14px', color: '#44ff44', fontFamily: FONT_FAMILY },
+        { fontSize: '16px', color: '#44ff44', fontFamily: FONT_FAMILY },
       );
       this.actionContainer.add(selLabel);
-      bx += 220;
+      bx += 270;
 
       // Confirm button (enabled when valid selection)
       const canConfirm = this.isValidTokenSelection();
@@ -879,7 +879,7 @@ export class SplendorScene extends Phaser.Scene {
           this.executeTakeDifferent();
         });
         this.actionContainer.add(confirmBtn);
-        bx += 100;
+        bx += 140;
       }
 
       // Cancel button
@@ -898,15 +898,15 @@ export class SplendorScene extends Phaser.Scene {
     text: string,
     callback: () => void,
   ): Phaser.GameObjects.Container {
-    const btnW = 100;
-    const btnH = 28;
+    const btnW = 120;
+    const btnH = 32;
     const container = this.add.container(x + btnW / 2, y);
     const bg = this.add.rectangle(0, 0, btnW, btnH, 0x335533, 0.8);
     bg.setStrokeStyle(1, 0x55aa55);
     container.add(bg);
 
     const label = this.add.text(0, 0, text, {
-      fontSize: '13px',
+      fontSize: '14px',
       color: '#88ff88',
       fontFamily: FONT_FAMILY,
     }).setOrigin(0.5);
@@ -941,23 +941,23 @@ export class SplendorScene extends Phaser.Scene {
     const overlay = createOverlayBackground(
       this,
       { depth: 10, alpha: 0.7 },
-      { width: 460, height: 240, alpha: 0.9 },
+      { width: 550, height: 280, alpha: 0.9 },
     );
     this.discardContainer.add(overlay.objects);
 
     // Title
     const title = this.add.text(
-      GAME_W / 2, GAME_H / 2 - 85,
+      GAME_W / 2, GAME_H / 2 - 100,
       `Discard ${this.discardNeeded} token${this.discardNeeded > 1 ? 's' : ''} (${selectedCount}/${this.discardNeeded})`,
-      { fontSize: '16px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY },
+      { fontSize: '18px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY },
     ).setOrigin(0.5).setDepth(11);
     this.discardContainer.add(title);
 
     // Token buttons
     const allColors: GemOrGold[] = [...GEM_COLORS, 'gold'];
     const activeColors = allColors.filter(c => tokenCount(player.tokens, c) > 0);
-    const totalW = activeColors.length * 50;
-    let tx = GAME_W / 2 - totalW / 2 + 25;
+    const totalW = activeColors.length * 60;
+    let tx = GAME_W / 2 - totalW / 2 + 30;
     const ty = GAME_H / 2 - 25;
 
     for (const c of activeColors) {
@@ -965,20 +965,20 @@ export class SplendorScene extends Phaser.Scene {
       const selected = this.discardSelection[c] ?? 0;
       const available = have - selected;
 
-      const circle = this.add.circle(tx, ty, 20, GEM_FILL[c]);
+      const circle = this.add.circle(tx, ty, 24, GEM_FILL[c]);
       circle.setStrokeStyle(selected > 0 ? 2 : 1, selected > 0 ? 0xff4444 : 0xffffff);
       circle.setDepth(11);
       this.discardContainer.add(circle);
 
       const countText = this.add.text(
         tx, ty, `${have - selected}`,
-        { fontSize: '14px', fontStyle: 'bold', color: GEM_TEXT_COLOR[c], fontFamily: FONT_FAMILY },
+        { fontSize: '16px', fontStyle: 'bold', color: GEM_TEXT_COLOR[c], fontFamily: FONT_FAMILY },
       ).setOrigin(0.5).setDepth(11);
       this.discardContainer.add(countText);
 
       const selText = this.add.text(
-        tx, ty + 28, selected > 0 ? `-${selected}` : '',
-        { fontSize: '12px', color: '#ff6666', fontFamily: FONT_FAMILY },
+        tx, ty + 32, selected > 0 ? `-${selected}` : '',
+        { fontSize: '14px', color: '#ff6666', fontFamily: FONT_FAMILY },
       ).setOrigin(0.5).setDepth(11);
       this.discardContainer.add(selText);
 
@@ -990,14 +990,14 @@ export class SplendorScene extends Phaser.Scene {
         });
       }
 
-      tx += 50;
+      tx += 60;
     }
 
     // Undo last discard selection
     if (selectedCount > 0) {
       const undoBtn = this.add.text(
-        GAME_W / 2 - 60, GAME_H / 2 + 50, '[ Undo ]',
-        { fontSize: '14px', color: '#88aaff', fontFamily: FONT_FAMILY },
+        GAME_W / 2 - 70, GAME_H / 2 + 60, '[ Undo ]',
+        { fontSize: '16px', color: '#88aaff', fontFamily: FONT_FAMILY },
       ).setOrigin(0.5).setDepth(11).setInteractive({ useHandCursor: true });
       undoBtn.on('pointerdown', () => {
         this.discardSelection = {};
@@ -1009,8 +1009,8 @@ export class SplendorScene extends Phaser.Scene {
     // Confirm button (when exactly enough selected)
     if (selectedCount === this.discardNeeded) {
       const confirmBtn = this.add.text(
-        GAME_W / 2 + 60, GAME_H / 2 + 50, '[ Confirm ]',
-        { fontSize: '14px', fontStyle: 'bold', color: '#44ff44', fontFamily: FONT_FAMILY },
+        GAME_W / 2 + 70, GAME_H / 2 + 60, '[ Confirm ]',
+        { fontSize: '16px', fontStyle: 'bold', color: '#44ff44', fontFamily: FONT_FAMILY },
       ).setOrigin(0.5).setDepth(11).setInteractive({ useHandCursor: true });
       confirmBtn.on('pointerdown', () => {
         this.executeDiscard();
@@ -1135,7 +1135,7 @@ export class SplendorScene extends Phaser.Scene {
     const overlay = createOverlayBackground(
       this,
       { depth: 10, alpha: 0.5 },
-      { width: 320, height: 180, alpha: 0.9 },
+      { width: 380, height: 210, alpha: 0.9 },
     );
     this.overlayObjects.push(...overlay.objects);
 
@@ -1143,35 +1143,35 @@ export class SplendorScene extends Phaser.Scene {
     const pts = card.points > 0 ? `${card.points} pt, ` : '';
     const info = `T${card.tier} ${gemDisplayName(card.bonus)} bonus\n${pts}Cost: ${formatCost(card.cost)}`;
     const infoText = this.add.text(
-      GAME_W / 2, GAME_H / 2 - 45, info,
-      { fontSize: '14px', color: '#ffffff', fontFamily: FONT_FAMILY, align: 'center' },
+      GAME_W / 2, GAME_H / 2 - 50, info,
+      { fontSize: '16px', color: '#ffffff', fontFamily: FONT_FAMILY, align: 'center' },
     ).setOrigin(0.5).setDepth(11);
     this.overlayObjects.push(infoText);
 
-    let bx = GAME_W / 2 - 90;
+    let bx = GAME_W / 2 - 105;
 
     if (canBuy) {
-      const buyBtn = createOverlayButton(this, bx, GAME_H / 2 + 35, '[ Buy ]');
+      const buyBtn = createOverlayButton(this, bx, GAME_H / 2 + 40, '[ Buy ]');
       buyBtn.on('pointerdown', () => {
         this.dismissOverlay();
         this.executePurchase(card.id);
       });
       this.overlayObjects.push(buyBtn);
-      bx += 90;
+      bx += 105;
     }
 
     const player = this.session.players[0];
     if (player.reservedCards.length < 3) {
-      const resBtn = createOverlayButton(this, bx, GAME_H / 2 + 35, '[ Reserve ]');
+      const resBtn = createOverlayButton(this, bx, GAME_H / 2 + 40, '[ Reserve ]');
       resBtn.on('pointerdown', () => {
         this.dismissOverlay();
         this.executeReserve(card.id);
       });
       this.overlayObjects.push(resBtn);
-      bx += 90;
+      bx += 105;
     }
 
-    const cancelBtn = createOverlayButton(this, bx, GAME_H / 2 + 35, '[ Cancel ]');
+    const cancelBtn = createOverlayButton(this, bx, GAME_H / 2 + 40, '[ Cancel ]');
     cancelBtn.on('pointerdown', () => {
       this.soundManager?.play(SFX_KEYS.UI_CLICK);
       this.dismissOverlay();
@@ -1340,7 +1340,7 @@ export class SplendorScene extends Phaser.Scene {
     const overlay = createOverlayBackground(
       this,
       { depth: 10, alpha: 0.01 },
-      { width: 400, height: 280, alpha: 0.9 },
+      { width: 480, height: 320, alpha: 0.9 },
     );
     this.overlayObjects.push(...overlay.objects);
 
@@ -1362,12 +1362,12 @@ export class SplendorScene extends Phaser.Scene {
     ];
 
     const text = this.add
-      .text(GAME_W / 2, GAME_H / 2 - 40, lines.join('\n'), {
-        fontSize: '16px',
+      .text(GAME_W / 2, GAME_H / 2 - 50, lines.join('\n'), {
+        fontSize: '18px',
         color: '#ffffff',
         fontFamily: FONT_FAMILY,
         align: 'center',
-        lineSpacing: 4,
+        lineSpacing: 5,
       })
       .setOrigin(0.5)
       .setDepth(11);
@@ -1375,7 +1375,7 @@ export class SplendorScene extends Phaser.Scene {
 
     // Play again
     const playBtn = createOverlayButton(
-      this, GAME_W / 2 - 60, GAME_H / 2 + 90, '[ Play Again ]',
+      this, GAME_W / 2 - 70, GAME_H / 2 + 105, '[ Play Again ]',
     );
     playBtn.on('pointerdown', () => {
       this.soundManager?.play(SFX_KEYS.UI_CLICK);
@@ -1385,7 +1385,7 @@ export class SplendorScene extends Phaser.Scene {
     this.overlayObjects.push(playBtn);
 
     // Menu
-    const menuBtn = createOverlayMenuButton(this, GAME_W / 2 + 60, GAME_H / 2 + 90);
+    const menuBtn = createOverlayMenuButton(this, GAME_W / 2 + 70, GAME_H / 2 + 105);
     this.overlayObjects.push(menuBtn);
   }
 
@@ -1393,13 +1393,13 @@ export class SplendorScene extends Phaser.Scene {
 
   private showToast(message: string): void {
     const toast = this.add.text(
-      GAME_W / 2, GAME_H / 2 + 150, message,
+      GAME_W / 2, GAME_H / 2 + 180, message,
       {
-        fontSize: '14px',
+        fontSize: '16px',
         color: '#ffdd44',
         fontFamily: FONT_FAMILY,
         backgroundColor: '#333333',
-        padding: { left: 10, right: 10, top: 6, bottom: 6 },
+        padding: { left: 12, right: 12, top: 7, bottom: 7 },
       },
     ).setOrigin(0.5).setDepth(20);
 

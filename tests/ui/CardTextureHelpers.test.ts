@@ -114,12 +114,12 @@ describe('shared UI constants', () => {
     expect(CARD_H).toBe(65);
   });
 
-  it('should export GAME_W as 800', () => {
-    expect(GAME_W).toBe(800);
+  it('should export GAME_W as 1280', () => {
+    expect(GAME_W).toBe(1280);
   });
 
-  it('should export GAME_H as 600', () => {
-    expect(GAME_H).toBe(600);
+  it('should export GAME_H as 720', () => {
+    expect(GAME_H).toBe(720);
   });
 
   it('should export FONT_FAMILY as a non-empty string', () => {

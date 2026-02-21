@@ -42,21 +42,21 @@ import helpContent from '../help-content.json';
 const ANIM_DURATION = 300;      // ms for card pick animation
 
 // Layout regions
-const HAND_Y = 540;             // center Y for hand cards
-const HAND_CARD_W = 68;         // card rect width in hand
-const HAND_CARD_H = 90;         // card rect height in hand
-const HAND_GAP = 4;             // gap between hand cards
+const HAND_Y = 648;             // center Y for hand cards
+const HAND_CARD_W = 82;         // card rect width in hand
+const HAND_CARD_H = 108;        // card rect height in hand
+const HAND_GAP = 6;             // gap between hand cards
 
-const PLAYER_TABLEAU_Y = 350;   // center Y for player tableau
-const AI_TABLEAU_Y = 130;       // center Y for AI tableau
-const TABLEAU_CARD_W = 42;      // card rect width in tableau
-const TABLEAU_CARD_H = 28;      // card rect height in tableau
-const TABLEAU_GROUP_GAP = 14;   // gap between type groups
-const TABLEAU_CARD_GAP = 3;     // gap between cards in a group
+const PLAYER_TABLEAU_Y = 420;   // center Y for player tableau
+const AI_TABLEAU_Y = 155;       // center Y for AI tableau
+const TABLEAU_CARD_W = 52;      // card rect width in tableau
+const TABLEAU_CARD_H = 34;      // card rect height in tableau
+const TABLEAU_GROUP_GAP = 18;   // gap between type groups
+const TABLEAU_CARD_GAP = 4;     // gap between cards in a group
 
-const SCORE_AREA_X = GAME_W - 10;
-const PLAYER_SCORE_Y = 440;
-const AI_SCORE_Y = 50;
+const SCORE_AREA_X = GAME_W - 15;
+const PLAYER_SCORE_Y = 528;
+const AI_SCORE_Y = 55;
 
 // Card type display config: label, fill color, text color
 const CARD_STYLES: Record<SushiGoCardType, { bg: number; text: string; short: string }> = {
@@ -205,14 +205,14 @@ export class SushiGoScene extends Phaser.Scene {
   }
 
   private createLabels(): void {
-    this.add.text(20, PLAYER_TABLEAU_Y - 70, 'Your Tableau', {
-      fontSize: '13px',
+    this.add.text(25, PLAYER_TABLEAU_Y - 80, 'Your Tableau', {
+      fontSize: '15px',
       color: '#ffffff',
       fontFamily: FONT_FAMILY,
     });
 
-    this.add.text(20, AI_TABLEAU_Y - 55, 'AI Tableau', {
-      fontSize: '13px',
+    this.add.text(25, AI_TABLEAU_Y - 60, 'AI Tableau', {
+      fontSize: '15px',
       color: '#cccccc',
       fontFamily: FONT_FAMILY,
     });
@@ -220,24 +220,24 @@ export class SushiGoScene extends Phaser.Scene {
 
   private createScoreDisplay(): void {
     this.roundText = this.add
-      .text(GAME_W / 2, 38, '', {
-        fontSize: '13px',
+      .text(GAME_W / 2, 40, '', {
+        fontSize: '15px',
         color: '#ffdd44',
         fontFamily: FONT_FAMILY,
       })
       .setOrigin(0.5);
 
     this.turnText = this.add
-      .text(GAME_W / 2, 56, '', {
-        fontSize: '11px',
+      .text(GAME_W / 2, 60, '', {
+        fontSize: '13px',
         color: '#aaccaa',
         fontFamily: FONT_FAMILY,
       })
       .setOrigin(0.5);
 
     this.cardsLeftText = this.add
-      .text(GAME_W / 2, 72, '', {
-        fontSize: '10px',
+      .text(GAME_W / 2, 78, '', {
+        fontSize: '12px',
         color: '#889988',
         fontFamily: FONT_FAMILY,
       })
@@ -245,7 +245,7 @@ export class SushiGoScene extends Phaser.Scene {
 
     this.playerScoreText = this.add
       .text(SCORE_AREA_X, PLAYER_SCORE_Y, 'Score: 0', {
-        fontSize: '14px',
+        fontSize: '16px',
         color: '#ffffff',
         fontFamily: FONT_FAMILY,
       })
@@ -253,7 +253,7 @@ export class SushiGoScene extends Phaser.Scene {
 
     this.aiScoreText = this.add
       .text(SCORE_AREA_X, AI_SCORE_Y, 'Score: 0', {
-        fontSize: '14px',
+        fontSize: '16px',
         color: '#cccccc',
         fontFamily: FONT_FAMILY,
       })
@@ -262,8 +262,8 @@ export class SushiGoScene extends Phaser.Scene {
 
   private createInstructions(): void {
     this.instructionText = this.add
-      .text(GAME_W / 2, GAME_H - 12, '', {
-        fontSize: '11px',
+      .text(GAME_W / 2, GAME_H - 14, '', {
+        fontSize: '13px',
         color: '#88aa88',
         fontFamily: FONT_FAMILY,
       })
@@ -318,7 +318,7 @@ export class SushiGoScene extends Phaser.Scene {
     // Card label (short for tableau, full for hand)
     const isHand = handIndex !== undefined;
     const labelText = isHand ? this.getHandCardLabel(card) : this.getTableauCardLabel(card);
-    const fontSize = isHand ? '11px' : '8px';
+    const fontSize = isHand ? '13px' : '9px';
 
     const label = this.add.text(0, 0, labelText, {
       fontSize,
@@ -403,7 +403,7 @@ export class SushiGoScene extends Phaser.Scene {
 
     if (tableau.length === 0) {
       const empty = this.add.text(GAME_W / 2, baseY, '(no cards yet)', {
-        fontSize: '11px',
+        fontSize: '13px',
         color: '#666666',
         fontFamily: FONT_FAMILY,
       }).setOrigin(0.5);
@@ -616,7 +616,7 @@ export class SushiGoScene extends Phaser.Scene {
     const overlay = createOverlayBackground(
       this,
       { depth: 10, alpha: 0.01 },
-      { width: 380, height: 250, alpha: 0.9 },
+      { width: 440, height: 290, alpha: 0.9 },
     );
     this.overlayObjects.push(...overlay.objects);
 
@@ -634,8 +634,8 @@ export class SushiGoScene extends Phaser.Scene {
     ];
 
     const text = this.add
-      .text(GAME_W / 2, GAME_H / 2 - 30, lines.join('\n'), {
-        fontSize: '14px',
+      .text(GAME_W / 2, GAME_H / 2 - 35, lines.join('\n'), {
+        fontSize: '16px',
         color: '#ffffff',
         fontFamily: FONT_FAMILY,
         align: 'center',
@@ -647,7 +647,7 @@ export class SushiGoScene extends Phaser.Scene {
 
     // Next round button
     const btn = createOverlayButton(
-      this, GAME_W / 2, GAME_H / 2 + 90, '[ Next Round ]',
+      this, GAME_W / 2, GAME_H / 2 + 105, '[ Next Round ]',
     );
     btn.on('pointerdown', () => {
       this.soundManager?.play(SFX_KEYS.UI_CLICK);
@@ -670,7 +670,7 @@ export class SushiGoScene extends Phaser.Scene {
     const overlay = createOverlayBackground(
       this,
       { depth: 10, alpha: 0.01 },
-      { width: 420, height: 320, alpha: 0.9 },
+      { width: 480, height: 370, alpha: 0.9 },
     );
     this.overlayObjects.push(...overlay.objects);
 
@@ -706,8 +706,8 @@ export class SushiGoScene extends Phaser.Scene {
     );
 
     const text = this.add
-      .text(GAME_W / 2, GAME_H / 2 - 40, lines.join('\n'), {
-        fontSize: '14px',
+      .text(GAME_W / 2, GAME_H / 2 - 50, lines.join('\n'), {
+        fontSize: '16px',
         color: '#ffffff',
         fontFamily: FONT_FAMILY,
         align: 'center',
@@ -719,7 +719,7 @@ export class SushiGoScene extends Phaser.Scene {
 
     // Play again button
     const playBtn = createOverlayButton(
-      this, GAME_W / 2 - 60, GAME_H / 2 + 120, '[ Play Again ]',
+      this, GAME_W / 2 - 70, GAME_H / 2 + 140, '[ Play Again ]',
     );
     playBtn.on('pointerdown', () => {
       this.soundManager?.play(SFX_KEYS.UI_CLICK);
@@ -728,7 +728,7 @@ export class SushiGoScene extends Phaser.Scene {
     this.overlayObjects.push(playBtn);
 
     // Menu button
-    const menuBtn = createOverlayMenuButton(this, GAME_W / 2 + 60, GAME_H / 2 + 120);
+    const menuBtn = createOverlayMenuButton(this, GAME_W / 2 + 70, GAME_H / 2 + 140);
     this.overlayObjects.push(menuBtn);
   }
 

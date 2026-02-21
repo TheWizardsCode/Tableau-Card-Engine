@@ -8,9 +8,9 @@ import { BeleagueredCastleScene } from './scenes/BeleagueredCastleScene';
 export interface BeleagueredCastleGameOptions {
   /** DOM element ID to parent the game canvas to. Default: 'game-container' */
   parent?: string;
-  /** Game width in pixels. Default: 800 */
+  /** Game width in pixels. Default: 1280 */
   width?: number;
-  /** Game height in pixels. Default: 600 */
+  /** Game height in pixels. Default: 720 */
   height?: number;
 }
 
@@ -19,8 +19,8 @@ export function createBeleagueredCastleGame(
 ): Phaser.Game {
   const {
     parent = 'game-container',
-    width = 800,
-    height = 600,
+    width = 1280,
+    height = 720,
   } = options;
 
   const config: Phaser.Types.Core.GameConfig = {
