@@ -70,6 +70,26 @@ const CARD_STYLES: Record<SushiGoCardType, { bg: number; text: string; short: st
   chopsticks: { bg: 0xC0C0C0, text: '#333333', short: 'CHP' },
 };
 
+// Scoring-rule tooltip text per card type
+const SCORING_TOOLTIPS: Record<SushiGoCardType, string> = {
+  tempura:    '5 pts per pair (incomplete pair = 0)',
+  sashimi:    '10 pts per set of 3 (incomplete set = 0)',
+  dumpling:   '1/3/6/10/15 pts for 1/2/3/4/5+ dumplings',
+  maki:       'Most maki icons = 6 pts, 2nd most = 3 pts (ties split)',
+  nigiri:     'Egg 1 pt, Salmon 2 pts, Squid 3 pts (x3 if on wasabi)',
+  wasabi:     'Triples the next nigiri played on it',
+  pudding:    'End of game: most = +6 pts, fewest = -6 pts (ties split)',
+  chopsticks: 'Pick 2 cards in one turn (return chopsticks to hand)',
+};
+
+// Tooltip styling
+const TOOLTIP_BG_COLOR = 0x000000;
+const TOOLTIP_BG_ALPHA = 0.85;
+const TOOLTIP_PADDING = 8;
+const TOOLTIP_FONT_SIZE = '13px';
+const TOOLTIP_MAX_WIDTH = 280;
+const TOOLTIP_DEPTH = 800; // Below settings panel (900+) but above game content
+
 // ── Audio asset keys ────────────────────────────────────────
 
 const SFX_KEYS = {
@@ -122,6 +142,9 @@ export class SushiGoScene extends Phaser.Scene {
   private helpButton!: HelpButton;
   private settingsPanel!: SettingsPanel;
   private settingsButton!: SettingsButton;
+
+  // Tooltip
+  private tooltipContainer: Phaser.GameObjects.Container | null = null;
 
   // Overlay cleanup
   private overlayObjects: Phaser.GameObjects.GameObject[] = [];
@@ -329,18 +352,27 @@ export class SushiGoScene extends Phaser.Scene {
     }).setOrigin(0.5);
     container.add(label);
 
+    // Make the card interactive for tooltip and/or clicking
+    bg.setInteractive({ useHandCursor: interactive });
+
     if (interactive && handIndex !== undefined) {
-      bg.setInteractive({ useHandCursor: true });
       bg.on('pointerdown', () => this.onHandCardClick(handIndex));
-      bg.on('pointerover', () => {
+    }
+
+    bg.on('pointerover', () => {
+      if (interactive) {
         bg.setStrokeStyle(3, 0xffdd44);
         container.setScale(1.08);
-      });
-      bg.on('pointerout', () => {
+      }
+      this.showCardTooltip(card, container);
+    });
+    bg.on('pointerout', () => {
+      if (interactive) {
         bg.setStrokeStyle(2, 0x333333);
         container.setScale(1.0);
-      });
-    }
+      }
+      this.hideCardTooltip();
+    });
 
     return container;
   }
@@ -363,6 +395,7 @@ export class SushiGoScene extends Phaser.Scene {
   // ── Refresh display ─────────────────────────────────────
 
   private refreshAll(): void {
+    this.hideCardTooltip();
     this.refreshHand();
     this.refreshTableau('player');
     this.refreshTableau('ai');
@@ -750,9 +783,73 @@ export class SushiGoScene extends Phaser.Scene {
     });
   }
 
+  // ── Tooltip ──────────────────────────────────────────────
+
+  /**
+   * Show a scoring-rule tooltip near the given card container.
+   * The tooltip is clamped within the canvas boundaries.
+   */
+  private showCardTooltip(card: SushiGoCard, cardContainer: Phaser.GameObjects.Container): void {
+    if (!this.settingsPanel?.showTooltips) return;
+    this.hideCardTooltip();
+
+    const tooltipText = SCORING_TOOLTIPS[card.type];
+
+    // Create tooltip text first to measure it
+    const text = this.add.text(0, 0, tooltipText, {
+      fontSize: TOOLTIP_FONT_SIZE,
+      color: '#ffffff',
+      fontFamily: FONT_FAMILY,
+      wordWrap: { width: TOOLTIP_MAX_WIDTH - TOOLTIP_PADDING * 2 },
+    }).setOrigin(0, 0);
+
+    const textW = text.width;
+    const textH = text.height;
+    const boxW = textW + TOOLTIP_PADDING * 2;
+    const boxH = textH + TOOLTIP_PADDING * 2;
+
+    // Position tooltip below the card, centered horizontally
+    let tooltipX = cardContainer.x - boxW / 2;
+    let tooltipY = cardContainer.y + 40; // below the card
+
+    // Clamp within canvas bounds
+    tooltipX = Phaser.Math.Clamp(tooltipX, 4, GAME_W - boxW - 4);
+    tooltipY = Phaser.Math.Clamp(tooltipY, 4, GAME_H - boxH - 4);
+
+    // If the tooltip would overlap the card, place it above instead
+    if (tooltipY < cardContainer.y + 30 && tooltipY + boxH > cardContainer.y - 30) {
+      tooltipY = cardContainer.y - 40 - boxH;
+      tooltipY = Phaser.Math.Clamp(tooltipY, 4, GAME_H - boxH - 4);
+    }
+
+    // Background
+    const bg = this.add.rectangle(
+      boxW / 2, boxH / 2,
+      boxW, boxH,
+      TOOLTIP_BG_COLOR, TOOLTIP_BG_ALPHA,
+    );
+    bg.setStrokeStyle(1, 0x888888);
+
+    // Position text inside the box
+    text.setPosition(TOOLTIP_PADDING, TOOLTIP_PADDING);
+
+    // Assemble container
+    this.tooltipContainer = this.add.container(tooltipX, tooltipY, [bg, text]);
+    this.tooltipContainer.setDepth(TOOLTIP_DEPTH);
+  }
+
+  /** Hide the currently visible tooltip, if any. */
+  private hideCardTooltip(): void {
+    if (this.tooltipContainer) {
+      this.tooltipContainer.destroy();
+      this.tooltipContainer = null;
+    }
+  }
+
   // ── Help / Settings cleanup ────────────────────────────
 
   shutdown(): void {
+    this.hideCardTooltip();
     this.soundManager?.destroy();
     this.soundManager = null;
     this.eventBridge?.destroy();
