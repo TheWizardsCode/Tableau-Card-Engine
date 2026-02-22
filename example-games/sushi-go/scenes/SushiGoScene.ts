@@ -1066,30 +1066,43 @@ export class SushiGoScene extends Phaser.Scene {
     const human = this.session.players[0];
     const ai = this.session.players[1];
 
+    // Compute per-category breakdown for the final round tableaux so we
+    // can display a clear category-level score breakdown in the game
+    // over dialog. Use the scoring helper which accounts for wasabi
+    // pairing within the tableau.
+    const humanBreak = scoreTableauBreakdown(human.tableau);
+    const aiBreak = scoreTableauBreakdown(ai.tableau);
+
+    const humanMakiCount = result.makiCounts ? result.makiCounts[0] : 0;
+    const aiMakiCount = result.makiCounts ? result.makiCounts[1] : 0;
+    const humanMakiBonus = result.makiBonuses ? result.makiBonuses[0] : 0;
+    const aiMakiBonus = result.makiBonuses ? result.makiBonuses[1] : 0;
+    const humanPuddingBonus = result.puddingBonuses ? result.puddingBonuses[0] : 0;
+    const aiPuddingBonus = result.puddingBonuses ? result.puddingBonuses[1] : 0;
+
     const lines = [
       winnerText,
       '',
       `Final Round -- You: ${result.roundScores[0]}, AI: ${result.roundScores[1]}`,
-    ];
-
-    if (result.puddingBonuses) {
-      lines.push(
-        `Pudding -- You: ${result.puddingBonuses[0] >= 0 ? '+' : ''}${result.puddingBonuses[0]}, ` +
-        `AI: ${result.puddingBonuses[1] >= 0 ? '+' : ''}${result.puddingBonuses[1]}`,
-      );
-    }
-
-    lines.push(
+      '',
+      'Breakdown (this round):',
+      `You:  Cards ${humanBreak.tempura + humanBreak.sashimi + humanBreak.dumpling + humanBreak.nigiri} ` +
+        `(Tmp:${humanBreak.tempura} Ssh:${humanBreak.sashimi} Dmp:${humanBreak.dumpling} Nig:${humanBreak.nigiri})`,
+      `      Maki: ${humanMakiCount} (bonus ${humanMakiBonus >= 0 ? '+' : ''}${humanMakiBonus})`,
+      `      Pudding: ${humanBreak.puddingCount} (bonus ${humanPuddingBonus >= 0 ? '+' : ''}${humanPuddingBonus})`,
+      '',
+      `AI:   Cards ${aiBreak.tempura + aiBreak.sashimi + aiBreak.dumpling + aiBreak.nigiri} ` +
+        `(Tmp:${aiBreak.tempura} Ssh:${aiBreak.sashimi} Dmp:${aiBreak.dumpling} Nig:${aiBreak.nigiri})`,
+      `      Maki: ${aiMakiCount} (bonus ${aiMakiBonus >= 0 ? '+' : ''}${aiMakiBonus})`,
+      `      Pudding: ${aiBreak.puddingCount} (bonus ${aiPuddingBonus >= 0 ? '+' : ''}${aiPuddingBonus})`,
       '',
       'Round-by-round:',
-    );
+    ];
+
     for (let r = 0; r < human.roundScores.length; r++) {
       lines.push(`  R${r + 1}: You ${human.roundScores[r]} -- AI ${ai.roundScores[r]}`);
     }
-    lines.push(
-      '',
-      `Final: You ${human.totalScore} -- AI ${ai.totalScore}`,
-    );
+    lines.push('', `Final: You ${human.totalScore} -- AI ${ai.totalScore}`);
 
     const text = this.add
       .text(GAME_W / 2, GAME_H / 2 - 50, lines.join('\n'), {
