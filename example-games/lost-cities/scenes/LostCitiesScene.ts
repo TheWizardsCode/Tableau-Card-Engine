@@ -95,17 +95,19 @@ function laneX(index: number): number {
 
 const TABLEAU_RIGHT = TABLEAU_LEFT + 5 * LANE_STEP - LANE_GAP + CARD_W / 2;
 
-// ── Right column: Player hand ─────────────────────────────
-// Positioned at far right of canvas
+// ── Middle column: Player hand ────────────────────────────
+// Positioned between left column and right column
 const HAND_COL_W = 200;
-const HAND_COL_X = GAME_W - HAND_COL_W - 16;
-const HAND_COL_CENTER = HAND_COL_X + HAND_COL_W / 2;
 
-// ── Middle column: Scores, Draw pile, Round ───────────────
-// Centered horizontally between left column right edge and hand column left edge
+// ── Right column: Scores, Draw pile, Round ────────────────
+// Positioned at far right of canvas
 const MID_COL_W = 190;
-const MID_COL_X = TABLEAU_RIGHT + Math.floor((HAND_COL_X - TABLEAU_RIGHT - MID_COL_W) / 2);
+const MID_COL_X = GAME_W - MID_COL_W - 16;
 const MID_COL_CENTER = MID_COL_X + MID_COL_W / 2;
+
+// Hand column centered between left play area and right info column
+const HAND_COL_X = TABLEAU_RIGHT + Math.floor((MID_COL_X - TABLEAU_RIGHT - HAND_COL_W) / 2);
+const HAND_COL_CENTER = HAND_COL_X + HAND_COL_W / 2;
 
 // Header
 const HEADER_H = 48;
@@ -439,7 +441,7 @@ export class LostCitiesScene extends Phaser.Scene {
       'Your Expeditions',
     );
 
-    // ── Middle column boxes ──────────────────────────────
+    // ── Right column boxes (scores, draw, round) ──────────
     // Opponent score
     this.drawSectionBox(
       MID_COL_X - BOX_PAD, OPP_SCORE_Y - BOX_PAD,
@@ -458,13 +460,13 @@ export class LostCitiesScene extends Phaser.Scene {
       CARD_H + BOX_LABEL_H + 2 * BOX_PAD + 16,
       'Draw Pile',
     );
-    // Player score (bottom of middle column)
+    // Player score (bottom of right column)
     this.drawSectionBox(
       MID_COL_X - BOX_PAD, PLR_SCORE_Y - BOX_PAD,
       MID_COL_W + 2 * BOX_PAD, SCORE_BOX_H + 2 * BOX_PAD, '',
     );
 
-    // ── Right column box: Hand ───────────────────────────
+    // ── Middle column box: Hand ────────────────────────────
     const handTotalH = HAND_CARD_H + (HAND_SIZE - 1) * HAND_OVERLAP;
     this.drawSectionBox(
       HAND_COL_X - BOX_PAD,
@@ -518,9 +520,9 @@ export class LostCitiesScene extends Phaser.Scene {
     }
   }
 
-  // ── Middle column (scores, draw pile, round) ────────────
+  // ── Right column (scores, draw pile, round) ─────────────
   private createRightColumn(): void {
-    // Opponent score (top of middle column)
+    // Opponent score (top of right column)
     this.add
       .text(MID_COL_CENTER, OPP_SCORE_Y + 6, 'Opponent', LABEL_STYLE)
       .setOrigin(0.5, 0);
@@ -551,7 +553,7 @@ export class LostCitiesScene extends Phaser.Scene {
       .text(MID_COL_CENTER, DRAW_PILE_Y + CARD_H + 4, '44 remaining', SMALL_LABEL)
       .setOrigin(0.5, 0);
 
-    // Player score (bottom of middle column)
+    // Player score (bottom of right column)
     this.add
       .text(MID_COL_CENTER, PLR_SCORE_Y + 6, 'You', LABEL_STYLE)
       .setOrigin(0.5, 0);
