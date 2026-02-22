@@ -24,6 +24,7 @@
 import Phaser from 'phaser';
 import type {
   ExpeditionColor,
+  LostCitiesCard,
 } from '../LostCitiesCards';
 import {
   EXPEDITION_COLORS,
@@ -623,6 +624,29 @@ export class LostCitiesScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Compare two cards for hand display order:
+   *   1. Group by expedition color (EXPEDITION_COLORS order)
+   *   2. Investment cards before numbered cards within each color
+   *   3. Ascending investmentIndex / rank within each type
+   */
+  private static handSortCompare(a: LostCitiesCard, b: LostCitiesCard): number {
+    const colorA = EXPEDITION_COLORS.indexOf(a.color);
+    const colorB = EXPEDITION_COLORS.indexOf(b.color);
+    if (colorA !== colorB) return colorA - colorB;
+    // Investments before numbered
+    if (a.type !== b.type) return a.type === 'investment' ? -1 : 1;
+    // Both investment: sort by investmentIndex
+    if (a.type === 'investment' && b.type === 'investment') {
+      return a.investmentIndex - b.investmentIndex;
+    }
+    // Both numbered: sort ascending by rank
+    if (a.type === 'numbered' && b.type === 'numbered') {
+      return a.rank - b.rank;
+    }
+    return 0;
+  }
+
   private refreshHand(): void {
     // Clear old hand sprites
     this.handSprites.forEach(s => s.destroy());
@@ -632,7 +656,9 @@ export class LostCitiesScene extends Phaser.Scene {
       this.selectionHighlight = null;
     }
 
+    // Sort hand in-place for consistent display grouping
     const hand = this.session.players[0].hand;
+    hand.sort(LostCitiesScene.handSortCompare);
     for (let c = 0; c < hand.length; c++) {
       const x = HAND_COL_CENTER;
       const y = HAND_TOP + c * HAND_OVERLAP + HAND_CARD_H / 2;
