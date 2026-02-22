@@ -278,8 +278,10 @@ export class SushiGoScene extends Phaser.Scene {
   }
 
   private createScoreDisplay(): void {
+    // Moved the round/turn/cards info block upward by ~2 line heights
+    // to reduce overlap with header and provide clearer spacing.
     this.roundText = this.add
-      .text(GAME_W / 2, 87, '', {
+      .text(GAME_W / 2, 51, '', {
         fontSize: '20px',
         color: '#ffdd44',
         fontFamily: FONT_FAMILY,
@@ -287,7 +289,7 @@ export class SushiGoScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.turnText = this.add
-      .text(GAME_W / 2, 111, '', {
+      .text(GAME_W / 2, 75, '', {
         fontSize: '16px',
         color: '#aaccaa',
         fontFamily: FONT_FAMILY,
@@ -295,7 +297,7 @@ export class SushiGoScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.cardsLeftText = this.add
-      .text(GAME_W / 2, 131, '', {
+      .text(GAME_W / 2, 95, '', {
         fontSize: '14px',
         color: '#889988',
         fontFamily: FONT_FAMILY,
