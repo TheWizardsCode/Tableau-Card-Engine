@@ -763,9 +763,12 @@ export class LostCitiesScene extends Phaser.Scene {
     const p1Round = p1Detailed.total;
     const [p0Cum, p1Cum] = this.session.cumulativeScores;
 
+    const p0Total = p0Cum + p0Round;
+    const p1Total = p1Cum + p1Round;
+
     if (this.session.roundNumber > 1 || p0Cum !== 0 || p1Cum !== 0) {
-      this.plrScoreText.setText(`Round: ${p0Round}  Total: ${p0Cum}`);
-      this.oppScoreText.setText(`Round: ${p1Round}  Total: ${p1Cum}`);
+      this.plrScoreText.setText(`Round: ${p0Round}  Total: ${p0Total}`);
+      this.oppScoreText.setText(`Round: ${p1Round}  Total: ${p1Total}`);
     } else {
       this.plrScoreText.setText(`Score: ${p0Round}`);
       this.oppScoreText.setText(`Score: ${p1Round}`);
