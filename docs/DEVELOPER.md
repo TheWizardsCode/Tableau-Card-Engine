@@ -113,7 +113,7 @@ After this, every push to `main` will automatically deploy.
 
 1. Check the **Actions** tab in the repository for the latest workflow run
 2. Visit `https://thewizardscode.github.io/Tableau-Card-Engine/` to confirm the site loads
-3. Verify both games (9-Card Golf, Beleaguered Castle) are playable and card assets load correctly
+3. Verify all games (9-Card Golf, Beleaguered Castle, Sushi Go!, Splendor, Lost Cities) are playable and card assets load correctly
 
 ## Testing
 
@@ -215,18 +215,49 @@ example-games/
 │   ├── GameTranscript.ts       Transcript recording (TranscriptRecorder)
 │   └── scenes/
 │       └── GolfScene.ts        Phaser scene (full visual interface)
-└── beleaguered-castle/
-    ├── main.ts                         Game entry point
-    ├── createBeleagueredCastleGame.ts   Factory function (used by main.ts)
-    ├── BeleagueredCastleState.ts        State types, move types, constants
-    ├── BeleagueredCastleRules.ts        Pure game logic (deal, moves, win/loss)
-    ├── GameTranscript.ts               Transcript recording (BCTranscriptRecorder)
-    ├── help-content.json               Help panel content (rules, controls, tips)
+├── beleaguered-castle/
+│   ├── main.ts                         Game entry point
+│   ├── createBeleagueredCastleGame.ts   Factory function (used by main.ts)
+│   ├── BeleagueredCastleState.ts        State types, move types, constants
+│   ├── BeleagueredCastleRules.ts        Pure game logic (deal, moves, win/loss)
+│   ├── GameTranscript.ts               Transcript recording (BCTranscriptRecorder)
+│   ├── help-content.json               Help panel content (rules, controls, tips)
+│   └── scenes/
+│       └── BeleagueredCastleScene.ts   Phaser scene (full visual interface)
+├── sushi-go/
+│   ├── main.ts                 Game entry point
+│   ├── createSushiGoGame.ts    Factory function (used by main.ts and tests)
+│   ├── SushiGoCards.ts         Card types, deck creation, card-back texture generation
+│   ├── SushiGoGame.ts          Game orchestration (drafting rounds, scoring)
+│   ├── SushiGoScoring.ts       Set-collection scoring rules (Maki, Tempura, etc.)
+│   ├── AiStrategy.ts           AI strategies (RandomStrategy, GreedyStrategy)
+│   ├── help-content.json       Help panel content
+│   └── scenes/
+│       └── SushiGoScene.ts     Phaser scene (drafting UI, card picking)
+├── splendor/
+│   ├── main.ts                 Game entry point
+│   ├── createSplendorGame.ts   Factory function (used by main.ts and tests)
+│   ├── SplendorCards.ts        Development cards, nobles, gem types, tier data
+│   ├── SplendorGame.ts         Game orchestration (token collection, purchases, nobles)
+│   ├── AiStrategy.ts           AI strategies (RandomStrategy, GreedyStrategy)
+│   ├── help-content.json       Help panel content
+│   └── scenes/
+│       └── SplendorScene.ts    Phaser scene (gem tokens, card market, purchases)
+└── lost-cities/
+    ├── LostCitiesCards.ts      Card types, deck factory, 5 expedition colors, card helpers
+    ├── LostCitiesRules.ts      Two-phase turn model, ascending-play validation, legality checks
+    ├── LostCitiesScoring.ts    Expedition scoring (-20 base, investments, 8-card bonus)
+    ├── LostCitiesGame.ts       Match manager (3-round session, executeAction, state queries)
+    ├── AiStrategy.ts           AI strategies (RandomStrategy, GreedyStrategy)
+    ├── GameTranscript.ts       Transcript recording (LCTranscriptRecorder)
+    ├── help-content.json       Help panel content (rules, scoring, controls)
     └── scenes/
-        └── BeleagueredCastleScene.ts   Phaser scene (full visual interface)
+        ├── LostCitiesMockScene.ts  Static layout mockup (development aid)
+        └── LostCitiesScene.ts      Phaser scene (interactive play with animations)
 
 public/assets/
-├── cards/                  52 card face SVGs + card_back.svg (140x190px, CC0)
+├── cards/                  52 standard card SVGs + card_back.svg (140x190px, CC0)
+│   └── lost-cities/        60 Lost Cities expedition card SVGs + lc-back.svg (140x190px)
 └── CREDITS.md              Asset attribution
 
 tests/
@@ -234,7 +265,11 @@ tests/
 ├── card-system/            Card, Deck, Pile unit tests
 ├── core-engine/            GameState, TurnSequencer, UndoRedoManager unit tests
 ├── golf/                   Golf game unit + integration + browser tests
-└── beleaguered-castle/     Beleaguered Castle unit + integration tests
+├── beleaguered-castle/     Beleaguered Castle unit + integration tests
+├── sushi-go/               Sushi Go! cards, scoring, game, AI tests
+├── splendor/               Splendor cards, game, AI tests
+├── lost-cities/            Lost Cities cards, scoring, rules, game, AI, transcript tests
+└── replay/                 Replay CLI validation tests
 ```
 
 Each `src/` module has a barrel file (`index.ts`) that serves as its public API. Import engine modules using path aliases (see below).
@@ -362,6 +397,146 @@ Tests are in `tests/beleaguered-castle/`:
 |------|-------|
 | `BeleagueredCastleRules.test.ts` | Deal correctness, move legality, foundation builds, win/loss detection, undo, auto-move heuristics, auto-complete (70 tests) |
 | `Integration.test.ts` | Full greedy game play across seeds, game invariants, undo/redo across moves, transcript recording and validation, auto-complete verification, snapshot utilities (30 tests) |
+
+## Sushi Go!
+
+Sushi Go! is a card drafting game demonstrating:
+
+- **Card drafting**: Pick one card from a hand, pass the rest, repeat until hands are exhausted
+- **Custom card types**: Non-standard cards representing sushi dishes (Tempura, Sashimi, Maki Rolls, Nigiri, Wasabi, Dumplings, Pudding, Chopsticks)
+- **Multi-round match**: 3-round game with inter-round scoring and Pudding scored only at game end
+- **Set-collection scoring**: Different scoring functions per card type
+- **AI strategies**: Random (valid picks) and Greedy (highest-value pick)
+
+### Running Sushi Go!
+
+```bash
+npm run dev
+```
+
+Open `http://localhost:3000` and click the **Sushi Go!** card on the game selector page.
+
+### Sushi Go! game files
+
+| File | Purpose |
+|------|---------|
+| `example-games/sushi-go/main.ts` | Phaser game config entry point |
+| `example-games/sushi-go/createSushiGoGame.ts` | Factory function for tests |
+| `example-games/sushi-go/SushiGoCards.ts` | Card types, deck creation, procedural card-back textures |
+| `example-games/sushi-go/SushiGoGame.ts` | Game orchestration (drafting rounds, hand passing, scoring) |
+| `example-games/sushi-go/SushiGoScoring.ts` | Set-collection scoring rules per card type |
+| `example-games/sushi-go/AiStrategy.ts` | AI strategies (RandomStrategy, GreedyStrategy) |
+| `example-games/sushi-go/help-content.json` | Help panel content |
+| `example-games/sushi-go/scenes/SushiGoScene.ts` | Phaser scene (drafting interface) |
+
+### Sushi Go! tests
+
+Tests are in `tests/sushi-go/`:
+
+| File | Tests |
+|------|-------|
+| `SushiGoCards.test.ts` | Card types, deck creation, card counts (19 tests) |
+| `SushiGoScoring.test.ts` | All card type scoring rules (56 tests) |
+| `SushiGoGame.test.ts` | Game setup, drafting, round progression (21 tests) |
+| `AiStrategy.test.ts` | Random and Greedy strategy validation (15 tests) |
+
+## Splendor
+
+Splendor is an engine-building card game demonstrating:
+
+- **Resource management**: Collect gem tokens to purchase development cards
+- **Custom card types**: Development cards with costs, gem bonuses, and prestige points across 3 tiers
+- **Noble attraction**: Automatically attract noble tiles when development card bonuses meet thresholds
+- **Multi-action turns**: Take gems, reserve cards, or purchase developments
+- **AI strategies**: Random (valid actions) and Greedy (prioritizes purchases and high-value cards)
+
+### Running Splendor
+
+```bash
+npm run dev
+```
+
+Open `http://localhost:3000` and click the **Splendor** card on the game selector page.
+
+### Splendor game files
+
+| File | Purpose |
+|------|---------|
+| `example-games/splendor/main.ts` | Phaser game config entry point |
+| `example-games/splendor/createSplendorGame.ts` | Factory function for tests |
+| `example-games/splendor/SplendorCards.ts` | Development cards, nobles, gem types, tier data |
+| `example-games/splendor/SplendorGame.ts` | Game orchestration (token collection, purchases, nobles, win detection) |
+| `example-games/splendor/AiStrategy.ts` | AI strategies (RandomStrategy, GreedyStrategy) |
+| `example-games/splendor/help-content.json` | Help panel content |
+| `example-games/splendor/scenes/SplendorScene.ts` | Phaser scene (gem market, card tiers, token UI) |
+
+### Splendor tests
+
+Tests are in `tests/splendor/`:
+
+| File | Tests |
+|------|-------|
+| `SplendorCards.test.ts` | Card data, noble data, gem types (50 tests) |
+| `SplendorGame.test.ts` | Game setup, turn execution, win detection, noble attraction (55 tests) |
+| `AiStrategy.test.ts` | Random and Greedy strategy validation (14 tests) |
+
+## Lost Cities
+
+Lost Cities is a two-player expedition card game demonstrating:
+
+- **Custom card types**: 60 cards across 5 expedition colors (yellow, blue, white, green, red) with investment cards and ranks 2-10
+- **Custom SVG assets**: 61 procedurally generated SVG card images (60 cards + card back) at 140x190px
+- **Two-phase turn model**: Each turn consists of a play/discard phase followed by a draw phase
+- **Ascending-play rules**: Cards must be played in ascending order on expedition lanes; investment cards must be played before any numbered cards
+- **Multi-round match**: 3-round match with cumulative scoring across rounds
+- **Investment multipliers**: 1/2/3 investment cards multiply expedition score by x2/x3/x4
+- **AI strategies**: Random (valid moves) and Greedy (discard-aware, avoids giving opponent useful cards)
+- **Transcript recording**: Multi-round JSON transcripts capturing all actions and board states
+
+### Running Lost Cities
+
+```bash
+npm run dev
+```
+
+Open `http://localhost:3000` and click the **Lost Cities** card on the game selector page. Select a card from your hand, then click an expedition lane to play or a discard pile to discard. Draw from the draw pile or a discard pile to complete your turn. The AI opponent plays automatically between your turns.
+
+### Lost Cities game files
+
+| File | Purpose |
+|------|---------|
+| `example-games/lost-cities/LostCitiesCards.ts` | Card types, deck factory, expedition colors, card helpers |
+| `example-games/lost-cities/LostCitiesRules.ts` | Two-phase turn model, ascending-play validation, legality checks |
+| `example-games/lost-cities/LostCitiesScoring.ts` | Expedition scoring (-20 base, card values, investment multiplier, 8-card bonus) |
+| `example-games/lost-cities/LostCitiesGame.ts` | Match manager (3-round session, executeAction, visible state, match lifecycle) |
+| `example-games/lost-cities/AiStrategy.ts` | AI strategies (RandomStrategy, GreedyStrategy, LostCitiesAiPlayer wrapper) |
+| `example-games/lost-cities/GameTranscript.ts` | Transcript recording (LCTranscriptRecorder, multi-round structure) |
+| `example-games/lost-cities/help-content.json` | Help panel content (8 sections: overview, scoring, controls, strategy tips) |
+| `example-games/lost-cities/scenes/LostCitiesScene.ts` | Phaser scene (interactive play with two-phase turns, animations, overlays) |
+| `example-games/lost-cities/scenes/LostCitiesMockScene.ts` | Static layout mockup (development aid) |
+
+### Lost Cities card assets
+
+The 61 SVG card images are generated by `scripts/generate-lost-cities-cards.ts`:
+
+```bash
+npx tsx scripts/generate-lost-cities-cards.ts
+```
+
+Assets are output to `public/assets/cards/lost-cities/` and documented in `public/assets/CREDITS.md`.
+
+### Lost Cities tests
+
+Tests are in `tests/lost-cities/`:
+
+| File | Tests |
+|------|-------|
+| `lost-cities-cards.test.ts` | Card types, deck factory, helpers, uniqueness (44 tests) |
+| `lost-cities-scoring.test.ts` | Expedition scoring, round scoring, match scoring (26 tests) |
+| `lost-cities-rules.test.ts` | Turn phases, legality checks, legal action enumeration (32 tests) |
+| `lost-cities-game.test.ts` | Session setup, executeAction, round/match lifecycle (40 tests) |
+| `lost-cities-ai.test.ts` | Random and Greedy strategies, AI player wrapper (22 tests) |
+| `lost-cities-transcript.test.ts` | Transcript recording, full AI-vs-AI match validation (21 tests) |
 
 ## Managing Assets
 

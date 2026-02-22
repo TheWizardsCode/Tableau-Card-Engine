@@ -32,9 +32,12 @@ tableau-card-engine/
 ├── example-games/         Standalone example games
 │   ├── hello-world/       Minimal Phaser scene (toolchain proof)
 │   ├── golf/              9-Card Golf (human vs. AI)
-│   └── beleaguered-castle/ Beleaguered Castle (open solitaire)
+│   ├── beleaguered-castle/ Beleaguered Castle (open solitaire)
+│   ├── sushi-go/          Sushi Go! (card drafting, human vs. AI)
+│   ├── splendor/          Splendor (engine-building, human vs. AI)
+│   └── lost-cities/       Lost Cities (2-player expedition lanes, human vs. AI)
 ├── public/assets/         Static assets (cards, fonts, images)
-│   └── cards/             52 card face SVGs + card back (140x190px)
+│   └── cards/             52 standard card SVGs + card back + game-specific cards (140x190px)
 ├── tests/                 Vitest test files
 ├── docs/                  Developer documentation
 │   └── DEVELOPER.md       Detailed developer guide
@@ -63,8 +66,11 @@ tableau-card-engine/
 | Hello World | `example-games/hello-world/` | Minimal Phaser scene with card sprites -- proves the toolchain works |
 | 9-Card Golf | `example-games/golf/` | Single-round 9-Card Golf (human vs. AI) with card flip animations, greedy/random AI strategies, and JSON game transcripts |
 | Beleaguered Castle | `example-games/beleaguered-castle/` | Open solitaire with drag-and-drop, click-to-move, undo/redo, auto-move to foundations, auto-complete, win/loss detection, help panel, and JSON game transcripts |
+| Sushi Go! | `example-games/sushi-go/` | Card drafting game (human vs. AI). Pick and pass hands over 3 rounds, collect sets of sushi dishes, and score the most points |
+| Splendor | `example-games/splendor/` | Engine-building card game (human vs. AI). Collect gem tokens, purchase development cards for bonuses, attract nobles, and reach 15 prestige to win |
+| Lost Cities | `example-games/lost-cities/` | Two-player expedition card game (human vs. AI). Bet on up to 5 colored expeditions across a 3-round match with investment multipliers, ascending-play rules, and cumulative scoring |
 
-More games are planned: Sushi Go!, Splendor, Lost Cities, The Mind, and Coloretto.
+More games are planned: The Mind and Coloretto.
 
 ## Contributing
 
