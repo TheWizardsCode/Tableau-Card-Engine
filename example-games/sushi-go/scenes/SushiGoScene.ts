@@ -395,14 +395,16 @@ export class SushiGoScene extends Phaser.Scene {
 
       // Keep the card text label visible for accessibility and clarity.
       // Place it below the icon; for small tableau cards use the smaller font.
-      const labelY = isHand ? h * 0.42 : h * 0.45;
-      const label = this.add.text(0, labelY, labelText, {
+      // Position label flush above the bottom edge with a small padding so
+      // it never gets clipped when the card resizes or changes shape.
+      const bottomPadding = isHand ? 8 : 6;
+      const label = this.add.text(0, h / 2 - bottomPadding, labelText, {
         fontSize,
         color: style.text,
         fontFamily: FONT_FAMILY,
         align: 'center',
         wordWrap: { width: w - 6 },
-      }).setOrigin(0.5, 0);
+      }).setOrigin(0.5, 1); // origin y=1 so text sits above the given y coordinate
       container.add(label);
     } else {
       const label = this.add.text(0, 0, labelText, {
