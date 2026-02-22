@@ -87,15 +87,17 @@ function laneX(index: number): number {
 
 const TABLEAU_RIGHT = TABLEAU_LEFT + 5 * LANE_STEP - LANE_GAP + CARD_W / 2;
 
-// ── Middle column: Scores, Draw pile, Round ───────────────
-const MID_COL_X = TABLEAU_RIGHT + 40;
-const MID_COL_W = 190;
-const MID_COL_CENTER = MID_COL_X + MID_COL_W / 2;
-
 // ── Right column: Player hand ─────────────────────────────
-const HAND_COL_X = MID_COL_X + MID_COL_W + 20;
-const HAND_COL_W = GAME_W - HAND_COL_X - 16;
+// Positioned at far right of canvas
+const HAND_COL_W = 200;
+const HAND_COL_X = GAME_W - HAND_COL_W - 16;
 const HAND_COL_CENTER = HAND_COL_X + HAND_COL_W / 2;
+
+// ── Middle column: Scores, Draw pile, Round ───────────────
+// Centered horizontally between left column right edge and hand column left edge
+const MID_COL_W = 190;
+const MID_COL_X = TABLEAU_RIGHT + Math.floor((HAND_COL_X - TABLEAU_RIGHT - MID_COL_W) / 2);
+const MID_COL_CENTER = MID_COL_X + MID_COL_W / 2;
 
 // Header
 const HEADER_H = 48;
@@ -103,21 +105,26 @@ const HEADER_H = 48;
 // Section box label height — labels sit inside the top of each box
 const BOX_LABEL_H = 16;
 
-// Opponent expeditions (top) — content starts below the box label
-const OPP_EXP_TOP = HEADER_H + BOX_LABEL_H + 12;
+// Color column headers sit above the opponent expeditions
+const COLOR_LABEL_H = 16;
+
+// Opponent expeditions (top) — content starts below header + color labels
+const OPP_EXP_TOP = HEADER_H + COLOR_LABEL_H + BOX_LABEL_H + 12;
 const EXP_OVERLAP = 26;
 const EXP_SLOTS = 5;
 const EXP_HEIGHT = CARD_H + (EXP_SLOTS - 1) * EXP_OVERLAP;
 
-// Discard piles (center row) — add extra gap for color labels
-const DISCARD_GAP = 20;
-const DISCARD_Y = OPP_EXP_TOP + EXP_HEIGHT + DISCARD_GAP;
+// Player expeditions — positioned from the bottom up
+const PLR_EXP_BOTTOM = GAME_H - 16;
+const PLR_EXP_TOP = PLR_EXP_BOTTOM - EXP_HEIGHT;
+
+// Discard piles — centered vertically between opponent and player expeditions
 const DISCARD_CARD_H = Math.round(CARD_H * 0.8);
 const DISCARD_CARD_W = Math.round(CARD_W * 0.8);
-
-// Player expeditions (below discard) — extra gap so labels don't overlap
-const PLR_EXP_GAP = 28;
-const PLR_EXP_TOP = DISCARD_Y + DISCARD_CARD_H + PLR_EXP_GAP + BOX_LABEL_H;
+const OPP_EXP_BOTTOM = OPP_EXP_TOP + EXP_HEIGHT;
+const PLR_BOX_TOP = PLR_EXP_TOP - BOX_LABEL_H;  // top of player expeditions box (including label)
+const DISCARD_AVAIL = PLR_BOX_TOP - OPP_EXP_BOTTOM;
+const DISCARD_Y = OPP_EXP_BOTTOM + Math.floor((DISCARD_AVAIL - DISCARD_CARD_H) / 2);
 
 // Middle column vertical layout
 const SCORE_BOX_H = 50;
@@ -331,6 +338,17 @@ export class LostCitiesScene extends Phaser.Scene {
   private createSectionBoxes(): void {
     const tabW = 5 * LANE_STEP - LANE_GAP + 2 * BOX_PAD;
 
+    // Color column headers above the opponent expeditions box
+    for (let i = 0; i < 5; i++) {
+      const color = EXPEDITION_COLORS[i];
+      this.add
+        .text(laneX(i), OPP_EXP_TOP - BOX_LABEL_H - BOX_PAD - 2, color.toUpperCase(), {
+          ...SMALL_LABEL,
+          fontSize: '11px',
+        })
+        .setOrigin(0.5, 1);
+    }
+
     // Opponent expeditions — box includes label above card content
     this.drawSectionBox(
       TABLEAU_LEFT - BOX_PAD,
@@ -340,7 +358,7 @@ export class LostCitiesScene extends Phaser.Scene {
       'Opponent Expeditions',
     );
 
-    // Discard piles — no label (color headers added separately)
+    // Discard piles — no label, centered between expedition areas
     this.drawSectionBox(
       TABLEAU_LEFT - BOX_PAD,
       DISCARD_Y - BOX_PAD,
@@ -348,17 +366,6 @@ export class LostCitiesScene extends Phaser.Scene {
       DISCARD_CARD_H + 2 * BOX_PAD,
       '',
     );
-
-    // Color column headers between opponent expeditions and discard piles
-    for (let i = 0; i < 5; i++) {
-      const color = EXPEDITION_COLORS[i];
-      this.add
-        .text(laneX(i), DISCARD_Y - BOX_PAD - 2, color.toUpperCase(), {
-          ...SMALL_LABEL,
-          fontSize: '11px',
-        })
-        .setOrigin(0.5, 1);
-    }
 
     // Player expeditions — box includes label above card content
     this.drawSectionBox(
