@@ -169,6 +169,10 @@ export class SushiGoScene extends Phaser.Scene {
     this.load.audio(SFX_KEYS.ROUND_END, 'assets/audio/round-end.wav');
     this.load.audio(SFX_KEYS.SCORE_REVEAL, 'assets/audio/score-reveal.wav');
     this.load.audio(SFX_KEYS.UI_CLICK, 'assets/audio/ui-click.wav');
+
+    // Sushi Go icon assets
+    // Load only the reference icon we added; full set to be added later.
+    this.load.svg('icon-nigiri-salmon', 'assets/sushi-go/icon-nigiri-salmon.svg');
   }
 
   // ── Create ──────────────────────────────────────────────
@@ -360,14 +364,33 @@ export class SushiGoScene extends Phaser.Scene {
     const labelText = isHand ? this.getHandCardLabel(card) : this.getTableauCardLabel(card);
     const fontSize = isHand ? '16px' : '12px';
 
-    const label = this.add.text(0, 0, labelText, {
-      fontSize,
-      color: style.text,
-      fontFamily: FONT_FAMILY,
-      align: 'center',
-      wordWrap: { width: w - 6 },
-    }).setOrigin(0.5);
-    container.add(label);
+    // Try to render an icon if available for this card type.
+    const iconKey = this.getIconKeyForCard(card);
+    if (iconKey && this.textures.exists(iconKey)) {
+      const img = this.add.image(0, -h * 0.06, iconKey);
+      img.setOrigin(0.5, 0);
+      img.setDisplaySize(Math.min(w * 0.85, h * 0.6), Math.min(h * 0.6, w * 0.85));
+      container.add(img);
+
+      // Add a small type label below the icon for clarity at small sizes
+      const label = this.add.text(0, h * 0.36, labelText, {
+        fontSize,
+        color: style.text,
+        fontFamily: FONT_FAMILY,
+        align: 'center',
+        wordWrap: { width: w - 6 },
+      }).setOrigin(0.5, 0);
+      container.add(label);
+    } else {
+      const label = this.add.text(0, 0, labelText, {
+        fontSize,
+        color: style.text,
+        fontFamily: FONT_FAMILY,
+        align: 'center',
+        wordWrap: { width: w - 6 },
+      }).setOrigin(0.5);
+      container.add(label);
+    }
 
     // Make the card interactive for tooltip and/or clicking
     bg.setInteractive({ useHandCursor: interactive });
@@ -406,6 +429,25 @@ export class SushiGoScene extends Phaser.Scene {
         return card.variant.charAt(0).toUpperCase();
       default:
         return CARD_STYLES[card.type].short;
+    }
+  }
+
+  /** Return the icon texture key for a card if available. */
+  private getIconKeyForCard(card: SushiGoCard): string | null {
+    switch (card.type) {
+      case 'nigiri':
+        if (card.variant === 'salmon') return 'icon-nigiri-salmon';
+        return null;
+      case 'maki':
+      case 'tempura':
+      case 'sashimi':
+      case 'dumpling':
+      case 'wasabi':
+      case 'pudding':
+      case 'chopsticks':
+        return null;
+      default:
+        return null;
     }
   }
 

@@ -72,6 +72,14 @@ Files (in `cards/lost-cities/`):
 - `lc-back.svg` — card back with expedition theme
 - Colors: yellow (compass), blue (ship), white (mountain), green (torch), red (crystal)
 
+## Sushi Go! Icons (in-house)
+
+- **Source**: In-house authored SVG icons for Sushi Go! example game
+- **Files**: `public/assets/sushi-go/icon-*.svg`
+- **License**: MIT (see project LICENSE)
+
+Notes: Icons are vector SVGs authored for the project. See `public/assets/sushi-go/STYLE.md` for style and regeneration notes.
+
 ## Audio Sound Effects — Lost Cities
 
 12 expedition-themed WAV sound effects generated for the Lost Cities game:
