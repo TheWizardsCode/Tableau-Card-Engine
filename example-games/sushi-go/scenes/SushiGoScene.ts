@@ -999,22 +999,37 @@ export class SushiGoScene extends Phaser.Scene {
     this.soundManager?.play(SFX_KEYS.SCORE_REVEAL);
 
     // Create overlay
+    // Increase overlay height to accommodate per-category breakdown
     const overlay = createOverlayBackground(
       this,
       { depth: 10, alpha: 0.01 },
-      { width: 500, height: 330, alpha: 0.9 },
+      { width: 560, height: 460, alpha: 0.9 },
     );
     this.overlayObjects.push(...overlay.objects);
 
     const roundNum = result.round + 1;
 
+    // Compute per-category breakdown for the round so players can see
+    // how each category contributed to the round score.
+    const human = this.session.players[0];
+    const ai = this.session.players[1];
+    const humanBreak = scoreTableauBreakdown(human.tableau);
+    const aiBreak = scoreTableauBreakdown(ai.tableau);
+
+    const humanMakiCount = result.makiCounts ? result.makiCounts[0] : 0;
+    const aiMakiCount = result.makiCounts ? result.makiCounts[1] : 0;
+    const humanMakiBonus = result.makiBonuses ? result.makiBonuses[0] : 0;
+    const aiMakiBonus = result.makiBonuses ? result.makiBonuses[1] : 0;
+
     const lines = [
       `Round ${roundNum} Complete!`,
       '',
       `You: ${result.roundScores[0]} pts`,
-      `  (Cards: ${result.tableauScores[0]}, Maki: ${result.makiBonuses[0]})`,
+      `  (Tmp:${humanBreak.tempura} Ssh:${humanBreak.sashimi} Dmp:${humanBreak.dumpling} Nig:${humanBreak.nigiri})`,
+      `  Maki: ${humanMakiCount} → ${humanMakiBonus >= 0 ? '+' : ''}${humanMakiBonus} pts`,
       `AI: ${result.roundScores[1]} pts`,
-      `  (Cards: ${result.tableauScores[1]}, Maki: ${result.makiBonuses[1]})`,
+      `  (Tmp:${aiBreak.tempura} Ssh:${aiBreak.sashimi} Dmp:${aiBreak.dumpling} Nig:${aiBreak.nigiri})`,
+      `  Maki: ${aiMakiCount} → ${aiMakiBonus >= 0 ? '+' : ''}${aiMakiBonus} pts`,
       '',
       `Total -- You: ${this.session.players[0].totalScore}  AI: ${this.session.players[1].totalScore}`,
     ];
@@ -1053,10 +1068,12 @@ export class SushiGoScene extends Phaser.Scene {
       winnerIndex: getWinnerIndex(this.session),
     });
 
+    // Make final game-over dialog taller to avoid overlap with buttons
+    // when including the per-category breakdown.
     const overlay = createOverlayBackground(
       this,
       { depth: 10, alpha: 0.01 },
-      { width: 540, height: 410, alpha: 0.9 },
+      { width: 560, height: 520, alpha: 0.9 },
     );
     this.overlayObjects.push(...overlay.objects);
 
@@ -1073,6 +1090,8 @@ export class SushiGoScene extends Phaser.Scene {
     const humanBreak = scoreTableauBreakdown(human.tableau);
     const aiBreak = scoreTableauBreakdown(ai.tableau);
 
+    // Use the round makiCounts and makiBonuses computed in scoreRound
+    // to display both the raw maki icon counts and the awarded bonuses.
     const humanMakiCount = result.makiCounts ? result.makiCounts[0] : 0;
     const aiMakiCount = result.makiCounts ? result.makiCounts[1] : 0;
     const humanMakiBonus = result.makiBonuses ? result.makiBonuses[0] : 0;
