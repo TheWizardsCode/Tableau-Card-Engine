@@ -117,7 +117,7 @@ const COLOR_LABEL_H = 16;
 
 // Opponent expeditions (top) — content starts below header + color labels
 const OPP_EXP_TOP = HEADER_H + COLOR_LABEL_H + BOX_LABEL_H + 12;
-const EXP_OVERLAP = 26;
+const EXP_OVERLAP = 30;
 const EXP_SLOTS = 5;
 const EXP_HEIGHT = CARD_H + (EXP_SLOTS - 1) * EXP_OVERLAP;
 
@@ -126,8 +126,8 @@ const PLR_EXP_BOTTOM = GAME_H - 16;
 const PLR_EXP_TOP = PLR_EXP_BOTTOM - EXP_HEIGHT;
 
 // Discard piles — centered vertically between opponent and player expeditions
-const DISCARD_CARD_H = Math.round(CARD_H * 0.8);
-const DISCARD_CARD_W = Math.round(CARD_W * 0.8);
+const DISCARD_CARD_H = Math.round(CARD_H * 0.6);
+const DISCARD_CARD_W = Math.round(CARD_W * 0.6);
 const OPP_EXP_BOTTOM = OPP_EXP_TOP + EXP_HEIGHT;
 const PLR_BOX_TOP = PLR_EXP_TOP - BOX_LABEL_H;  // top of player expeditions box (including label)
 const DISCARD_AVAIL = PLR_BOX_TOP - OPP_EXP_BOTTOM;
