@@ -1,0 +1,1286 @@
+/**
+ * LostCitiesScene — Full interactive Phaser scene for Lost Cities.
+ *
+ * Layout (1280x720):
+ *   Left area (~920px):
+ *     - Opponent expeditions (5 lanes, top)
+ *     - Discard piles (5, center row)
+ *     - Player expeditions (5 lanes, bottom)
+ *
+ *   Right column (~340px):
+ *     - Opponent score (top)
+ *     - Draw pile + round indicator (middle)
+ *     - Player hand (8 cards, vertical stack)
+ *     - Player score (bottom)
+ *
+ * Two-phase turn state machine:
+ *   Phase 1 — select a card from hand, then click expedition lane or discard pile
+ *   Phase 2 — click draw pile or discard pile to draw
+ *   AI plays automatically with configurable delay
+ */
+import Phaser from 'phaser';
+import type {
+  ExpeditionColor,
+} from '../LostCitiesCards';
+import {
+  EXPEDITION_COLORS,
+  cardAssetKey,
+  CARD_BACK_KEY,
+  HAND_SIZE,
+} from '../LostCitiesCards';
+import type {
+  LostCitiesSession,
+  PlayerId,
+  RoundScoreResult,
+} from '../LostCitiesGame';
+import {
+  setupLostCitiesGame,
+  executeAction,
+  getVisibleState,
+  isMatchOver,
+  getMatchWinner,
+} from '../LostCitiesGame';
+import type {
+  Phase1Action,
+  Phase2Action,
+} from '../LostCitiesRules';
+import { checkPhase1Legality } from '../LostCitiesRules';
+import { scoreRoundDetailed } from '../LostCitiesScoring';
+import {
+  LostCitiesAiPlayer,
+  GreedyStrategy,
+} from '../AiStrategy';
+import {
+  LCTranscriptRecorder,
+} from '../GameTranscript';
+import { TranscriptStore } from '../../../src/core-engine/TranscriptStore';
+import {
+  HelpPanel,
+  HelpButton,
+  GAME_W,
+  GAME_H,
+  FONT_FAMILY,
+  createSceneHeader,
+  createOverlayBackground,
+  createOverlayButton,
+  createOverlayMenuButton,
+  dismissOverlay,
+} from '../../../src/ui';
+import type { HelpSection } from '../../../src/ui';
+import helpContent from '../help-content.json';
+
+// ── Layout constants (matching revised mockup) ─────────────
+const CARD_W = 95;
+const CARD_H = 130;
+
+// Main tableau area (left)
+const TABLEAU_LEFT = 40;
+const LANE_GAP = 18;
+const LANE_STEP = CARD_W + LANE_GAP;
+
+function laneX(index: number): number {
+  return TABLEAU_LEFT + index * LANE_STEP + CARD_W / 2;
+}
+
+const TABLEAU_RIGHT = TABLEAU_LEFT + 5 * LANE_STEP - LANE_GAP + CARD_W / 2;
+
+// Right column
+const RIGHT_COL_X = TABLEAU_RIGHT + 60;
+const RIGHT_COL_W = GAME_W - RIGHT_COL_X - 20;
+const RIGHT_COL_CENTER = RIGHT_COL_X + RIGHT_COL_W / 2;
+
+// Header
+const HEADER_H = 48;
+
+// Opponent expeditions (top)
+const OPP_EXP_TOP = HEADER_H + 16;
+const EXP_OVERLAP = 26;
+const EXP_SLOTS = 5;
+const EXP_HEIGHT = CARD_H + (EXP_SLOTS - 1) * EXP_OVERLAP;
+
+// Discard piles (center row)
+const DISCARD_GAP = 24;
+const DISCARD_Y = OPP_EXP_TOP + EXP_HEIGHT + DISCARD_GAP;
+const DISCARD_CARD_H = Math.round(CARD_H * 0.8);
+const DISCARD_CARD_W = Math.round(CARD_W * 0.8);
+
+// Player expeditions (below discard)
+const PLR_EXP_TOP = DISCARD_Y + DISCARD_CARD_H + DISCARD_GAP;
+
+// Right column vertical layout
+const SCORE_BOX_H = 50;
+const OPP_SCORE_Y = HEADER_H + 16;
+
+const DRAW_PILE_Y = OPP_SCORE_Y + SCORE_BOX_H + 24;
+
+const ROUND_Y = DRAW_PILE_Y + CARD_H + 16;
+const ROUND_BOX_H = 52;
+
+const HAND_TOP = ROUND_Y + ROUND_BOX_H + 20;
+const HAND_CARD_W = 60;
+const HAND_CARD_H = 82;
+const HAND_OVERLAP = 30;
+
+const PLR_SCORE_Y = GAME_H - SCORE_BOX_H - 16;
+
+// Animation timing
+const AI_DELAY = 800;
+const ANIM_DURATION = 300;
+
+// Text styles
+const LABEL_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
+  fontFamily: FONT_FAMILY,
+  fontSize: '11px',
+  color: '#aaccaa',
+  align: 'center',
+};
+
+const SCORE_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
+  fontFamily: FONT_FAMILY,
+  fontSize: '16px',
+  color: '#ffffff',
+  align: 'center',
+};
+
+const SMALL_LABEL: Phaser.Types.GameObjects.Text.TextStyle = {
+  fontFamily: FONT_FAMILY,
+  fontSize: '10px',
+  color: '#88aa88',
+  align: 'center',
+};
+
+// Section box styling
+const BOX_STROKE = 0x445544;
+const BOX_STROKE_ALPHA = 0.6;
+const BOX_FILL = 0x1a2a1a;
+const BOX_FILL_ALPHA = 0.25;
+const BOX_RADIUS = 6;
+const BOX_PAD = 6;
+
+// ── Turn state machine ────────────────────────────────────
+type SceneTurnPhase =
+  | 'waiting-for-card-select'  // Player must select a card from hand
+  | 'waiting-for-target'       // Player selected a card, must choose expedition or discard
+  | 'waiting-for-draw'         // Player must draw (phase 2)
+  | 'animating'                // Animation in progress
+  | 'ai-thinking'              // AI is deciding
+  | 'round-over'               // Round summary shown
+  | 'match-over';              // Match summary shown
+
+// ── Transcript store ──────────────────────────────────────
+const transcriptStore = new TranscriptStore();
+
+// ═══════════════════════════════════════════════════════════
+export class LostCitiesScene extends Phaser.Scene {
+  // Game state
+  private session!: LostCitiesSession;
+  private aiPlayer!: LostCitiesAiPlayer;
+  private recorder!: LCTranscriptRecorder;
+  private turnPhase: SceneTurnPhase = 'waiting-for-card-select';
+  private selectedCardIndex: number = -1;
+
+  // Graphics layer for section boxes
+  private gfx!: Phaser.GameObjects.Graphics;
+
+  // Card sprites — expeditions
+  private playerExpSprites: Map<ExpeditionColor, Phaser.GameObjects.Image[]> = new Map();
+  private oppExpSprites: Map<ExpeditionColor, Phaser.GameObjects.Image[]> = new Map();
+
+  // Card sprites — discard piles (one sprite per color showing top card)
+  private discardSprites: Map<ExpeditionColor, Phaser.GameObjects.Image> = new Map();
+  /** Invisible hit areas for discard pile clicks (always present). */
+  private discardHitAreas: Map<ExpeditionColor, Phaser.GameObjects.Rectangle> = new Map();
+
+  // Card sprites — hand
+  private handSprites: Phaser.GameObjects.Image[] = [];
+  /** Highlight rectangle around the selected hand card. */
+  private selectionHighlight: Phaser.GameObjects.Rectangle | null = null;
+
+  // Draw pile sprite
+  private drawPileSprite!: Phaser.GameObjects.Image;
+  private drawPileCountText!: Phaser.GameObjects.Text;
+  /** Invisible hit area for expedition lane clicks (one per color). */
+  private playerExpHitAreas: Map<ExpeditionColor, Phaser.GameObjects.Rectangle> = new Map();
+
+  // UI text
+  private oppScoreText!: Phaser.GameObjects.Text;
+  private plrScoreText!: Phaser.GameObjects.Text;
+  private roundText!: Phaser.GameObjects.Text;
+  private turnIndicatorText!: Phaser.GameObjects.Text;
+  private instructionText!: Phaser.GameObjects.Text;
+
+  // Overlay cleanup
+  private overlayObjects: Phaser.GameObjects.GameObject[] = [];
+
+  // Help panel
+  private helpPanel!: HelpPanel;
+  private helpButton!: HelpButton;
+
+  constructor() {
+    super({ key: 'LostCitiesScene' });
+  }
+
+  // ── Preload ─────────────────────────────────────────────
+  preload(): void {
+    // Load all 60 LC card SVGs + card back
+    for (const color of EXPEDITION_COLORS) {
+      for (let inv = 1; inv <= 3; inv++) {
+        const key = `lc-${color}-inv${inv}`;
+        this.load.svg(key, `assets/cards/lost-cities/${key}.svg`, {
+          width: CARD_W,
+          height: CARD_H,
+        });
+      }
+      for (let rank = 2; rank <= 10; rank++) {
+        const key = `lc-${color}-${rank}`;
+        this.load.svg(key, `assets/cards/lost-cities/${key}.svg`, {
+          width: CARD_W,
+          height: CARD_H,
+        });
+      }
+    }
+    this.load.svg(CARD_BACK_KEY, `assets/cards/lost-cities/${CARD_BACK_KEY}.svg`, {
+      width: CARD_W,
+      height: CARD_H,
+    });
+  }
+
+  // ── Create ──────────────────────────────────────────────
+  create(): void {
+    this.cameras.main.setBackgroundColor('#1a2a1a');
+
+    // Reset state
+    this.turnPhase = 'waiting-for-card-select';
+    this.selectedCardIndex = -1;
+    this.overlayObjects = [];
+    this.playerExpSprites = new Map();
+    this.oppExpSprites = new Map();
+    this.discardSprites = new Map();
+    this.discardHitAreas = new Map();
+    this.playerExpHitAreas = new Map();
+    this.handSprites = [];
+    this.selectionHighlight = null;
+
+    // Initialize game state
+    this.session = setupLostCitiesGame({
+      playerNames: ['You', 'AI'],
+      isAI: [false, true],
+    });
+    this.aiPlayer = new LostCitiesAiPlayer(GreedyStrategy);
+    this.recorder = new LCTranscriptRecorder(this.session, [undefined, 'Greedy']);
+
+    // Header
+    createSceneHeader(this, 'Lost Cities');
+
+    // Graphics for section boxes
+    this.gfx = this.add.graphics();
+
+    // Build all UI zones
+    this.createSectionBoxes();
+    this.createExpeditionZones();
+    this.createDiscardZones();
+    this.createRightColumn();
+    this.createInstructionBar();
+    this.createHelpPanel();
+
+    // Initial render
+    this.refreshAll();
+    this.setPhase('waiting-for-card-select');
+  }
+
+  // ── Section box helpers ─────────────────────────────────
+  private drawSectionBox(
+    x: number, y: number, w: number, h: number, label: string,
+  ): void {
+    this.gfx.lineStyle(1, BOX_STROKE, BOX_STROKE_ALPHA);
+    this.gfx.fillStyle(BOX_FILL, BOX_FILL_ALPHA);
+    this.gfx.fillRoundedRect(x, y, w, h, BOX_RADIUS);
+    this.gfx.strokeRoundedRect(x, y, w, h, BOX_RADIUS);
+    if (label) {
+      this.add
+        .text(x + 6, y - 1, label, {
+          ...SMALL_LABEL,
+          fontSize: '9px',
+          color: '#667766',
+        })
+        .setOrigin(0, 1);
+    }
+  }
+
+  private createSectionBoxes(): void {
+    const tabW = 5 * LANE_STEP - LANE_GAP + 2 * BOX_PAD;
+
+    // Opponent expeditions
+    this.drawSectionBox(
+      TABLEAU_LEFT - BOX_PAD, OPP_EXP_TOP - BOX_PAD,
+      tabW, EXP_HEIGHT + 2 * BOX_PAD,
+      'Opponent Expeditions',
+    );
+
+    // Discard piles
+    this.drawSectionBox(
+      TABLEAU_LEFT - BOX_PAD, DISCARD_Y - BOX_PAD,
+      tabW, DISCARD_CARD_H + 2 * BOX_PAD + 14,
+      'Discard Piles',
+    );
+
+    // Player expeditions
+    this.drawSectionBox(
+      TABLEAU_LEFT - BOX_PAD, PLR_EXP_TOP - BOX_PAD,
+      tabW, EXP_HEIGHT + 2 * BOX_PAD,
+      'Your Expeditions',
+    );
+
+    // Right column boxes
+    // Opponent score
+    this.drawSectionBox(
+      RIGHT_COL_X - BOX_PAD, OPP_SCORE_Y - BOX_PAD,
+      RIGHT_COL_W + 2 * BOX_PAD, SCORE_BOX_H + 2 * BOX_PAD, '',
+    );
+    // Draw pile
+    this.drawSectionBox(
+      RIGHT_COL_X - BOX_PAD, DRAW_PILE_Y - BOX_PAD,
+      RIGHT_COL_W + 2 * BOX_PAD, CARD_H + 2 * BOX_PAD + 16,
+      'Draw Pile',
+    );
+    // Round indicator
+    this.drawSectionBox(
+      RIGHT_COL_X - BOX_PAD, ROUND_Y - BOX_PAD,
+      RIGHT_COL_W + 2 * BOX_PAD, ROUND_BOX_H + 2 * BOX_PAD, '',
+    );
+    // Hand
+    const handTotalH = HAND_CARD_H + (HAND_SIZE - 1) * HAND_OVERLAP;
+    this.drawSectionBox(
+      RIGHT_COL_X - BOX_PAD, HAND_TOP - BOX_PAD,
+      RIGHT_COL_W + 2 * BOX_PAD, handTotalH + 2 * BOX_PAD,
+      'Your Hand',
+    );
+    // Player score
+    this.drawSectionBox(
+      RIGHT_COL_X - BOX_PAD, PLR_SCORE_Y - BOX_PAD,
+      RIGHT_COL_W + 2 * BOX_PAD, SCORE_BOX_H + 2 * BOX_PAD, '',
+    );
+  }
+
+  // ── Expedition zones ────────────────────────────────────
+  private createExpeditionZones(): void {
+    for (let i = 0; i < 5; i++) {
+      const color = EXPEDITION_COLORS[i];
+
+      // Color labels above lanes
+      this.add
+        .text(laneX(i), OPP_EXP_TOP - 2, color.toUpperCase(), SMALL_LABEL)
+        .setOrigin(0.5, 1);
+      this.add
+        .text(laneX(i), PLR_EXP_TOP - 2, color.toUpperCase(), SMALL_LABEL)
+        .setOrigin(0.5, 1);
+
+      // Init sprite arrays
+      this.oppExpSprites.set(color, []);
+      this.playerExpSprites.set(color, []);
+
+      // Player expedition hit area — covers the full lane area for drop targets
+      const hitArea = this.add.rectangle(
+        laneX(i), PLR_EXP_TOP + EXP_HEIGHT / 2,
+        CARD_W + 4, EXP_HEIGHT + 4,
+        0x000000, 0,
+      );
+      hitArea.setInteractive({ useHandCursor: true });
+      hitArea.on('pointerdown', () => this.onExpeditionClick(color));
+      this.playerExpHitAreas.set(color, hitArea);
+    }
+  }
+
+  // ── Discard zones ───────────────────────────────────────
+  private createDiscardZones(): void {
+    for (let i = 0; i < 5; i++) {
+      const color = EXPEDITION_COLORS[i];
+
+      // Discard label
+      this.add
+        .text(laneX(i), DISCARD_Y + DISCARD_CARD_H + 2, 'Discard', SMALL_LABEL)
+        .setOrigin(0.5, 0);
+
+      // Hit area (always present, even when pile is empty)
+      const hitArea = this.add.rectangle(
+        laneX(i), DISCARD_Y + DISCARD_CARD_H / 2,
+        DISCARD_CARD_W + 4, DISCARD_CARD_H + 4,
+        0x000000, 0,
+      );
+      hitArea.setInteractive({ useHandCursor: true });
+      hitArea.on('pointerdown', () => this.onDiscardClick(color));
+      this.discardHitAreas.set(color, hitArea);
+    }
+  }
+
+  // ── Right column ────────────────────────────────────────
+  private createRightColumn(): void {
+    // Opponent score
+    this.add
+      .text(RIGHT_COL_CENTER, OPP_SCORE_Y + 6, 'Opponent', LABEL_STYLE)
+      .setOrigin(0.5, 0);
+    this.oppScoreText = this.add
+      .text(RIGHT_COL_CENTER, OPP_SCORE_Y + 26, 'Score: 0', SCORE_STYLE)
+      .setOrigin(0.5, 0);
+
+    // Draw pile
+    this.drawPileSprite = this.add.image(
+      RIGHT_COL_CENTER, DRAW_PILE_Y + CARD_H / 2, CARD_BACK_KEY,
+    );
+    this.drawPileSprite.setInteractive({ useHandCursor: true });
+    this.drawPileSprite.on('pointerdown', () => this.onDrawPileClick());
+
+    this.drawPileCountText = this.add
+      .text(RIGHT_COL_CENTER, DRAW_PILE_Y + CARD_H + 4, '44 remaining', SMALL_LABEL)
+      .setOrigin(0.5, 0);
+
+    // Round / turn indicator
+    this.roundText = this.add
+      .text(RIGHT_COL_CENTER, ROUND_Y + 6, 'Round 1 / 3', SCORE_STYLE)
+      .setOrigin(0.5, 0);
+    this.turnIndicatorText = this.add
+      .text(RIGHT_COL_CENTER, ROUND_Y + 30, 'Your Turn', {
+        ...LABEL_STYLE,
+        fontSize: '13px',
+        color: '#66dd66',
+      })
+      .setOrigin(0.5, 0);
+
+    // Player score
+    this.add
+      .text(RIGHT_COL_CENTER, PLR_SCORE_Y + 6, 'You', LABEL_STYLE)
+      .setOrigin(0.5, 0);
+    this.plrScoreText = this.add
+      .text(RIGHT_COL_CENTER, PLR_SCORE_Y + 26, 'Score: 0', SCORE_STYLE)
+      .setOrigin(0.5, 0);
+  }
+
+  private createInstructionBar(): void {
+    this.instructionText = this.add
+      .text(GAME_W / 2, GAME_H - 6, '', {
+        ...SMALL_LABEL,
+        fontSize: '13px',
+        color: '#88cc88',
+      })
+      .setOrigin(0.5, 1);
+  }
+
+  private createHelpPanel(): void {
+    this.helpPanel = new HelpPanel(this, {
+      sections: helpContent as HelpSection[],
+    });
+    this.helpButton = new HelpButton(this, this.helpPanel);
+  }
+
+  // ── Phase management ────────────────────────────────────
+  private setPhase(phase: SceneTurnPhase): void {
+    this.turnPhase = phase;
+
+    switch (phase) {
+      case 'waiting-for-card-select':
+        this.instructionText.setText(
+          'Select a card from your hand to play or discard',
+        );
+        this.turnIndicatorText.setText('Your Turn — Play/Discard');
+        this.turnIndicatorText.setColor('#66dd66');
+        break;
+      case 'waiting-for-target':
+        this.instructionText.setText(
+          'Click an expedition lane to play, or a discard pile to discard',
+        );
+        break;
+      case 'waiting-for-draw':
+        this.instructionText.setText(
+          'Draw a card: click the draw pile or a discard pile',
+        );
+        this.turnIndicatorText.setText('Your Turn — Draw');
+        this.turnIndicatorText.setColor('#66dd66');
+        break;
+      case 'animating':
+        this.instructionText.setText('');
+        break;
+      case 'ai-thinking':
+        this.instructionText.setText('AI is thinking...');
+        this.turnIndicatorText.setText("AI's Turn");
+        this.turnIndicatorText.setColor('#ddaa44');
+        break;
+      case 'round-over':
+        this.instructionText.setText('');
+        break;
+      case 'match-over':
+        this.instructionText.setText('');
+        break;
+    }
+  }
+
+  // ── Refresh display ─────────────────────────────────────
+  private refreshAll(): void {
+    this.refreshExpeditions();
+    this.refreshDiscardPiles();
+    this.refreshHand();
+    this.refreshDrawPile();
+    this.refreshScores();
+    this.refreshRoundIndicator();
+  }
+
+  private refreshExpeditions(): void {
+    // Clear old sprites
+    for (const sprites of this.oppExpSprites.values()) {
+      sprites.forEach(s => s.destroy());
+    }
+    for (const sprites of this.playerExpSprites.values()) {
+      sprites.forEach(s => s.destroy());
+    }
+
+    for (let i = 0; i < 5; i++) {
+      const color = EXPEDITION_COLORS[i];
+
+      // Opponent expeditions — show card backs (cards hidden)
+      const oppCards = this.session.players[1].expeditions.get(color) ?? [];
+      const oppSprites: Phaser.GameObjects.Image[] = [];
+      for (let c = 0; c < oppCards.length; c++) {
+        const x = laneX(i);
+        const y = OPP_EXP_TOP + c * EXP_OVERLAP + CARD_H / 2;
+        const sprite = this.add.image(x, y, cardAssetKey(oppCards[c]));
+        sprite.setDisplaySize(CARD_W, CARD_H);
+        sprite.setDepth(c);
+        oppSprites.push(sprite);
+      }
+      this.oppExpSprites.set(color, oppSprites);
+
+      // Player expeditions — show face up
+      const plrCards = this.session.players[0].expeditions.get(color) ?? [];
+      const plrSprites: Phaser.GameObjects.Image[] = [];
+      for (let c = 0; c < plrCards.length; c++) {
+        const x = laneX(i);
+        const y = PLR_EXP_TOP + c * EXP_OVERLAP + CARD_H / 2;
+        const sprite = this.add.image(x, y, cardAssetKey(plrCards[c]));
+        sprite.setDisplaySize(CARD_W, CARD_H);
+        sprite.setDepth(c);
+        plrSprites.push(sprite);
+      }
+      this.playerExpSprites.set(color, plrSprites);
+    }
+  }
+
+  private refreshDiscardPiles(): void {
+    // Clear old discard sprites
+    for (const sprite of this.discardSprites.values()) {
+      sprite.destroy();
+    }
+    this.discardSprites.clear();
+
+    for (let i = 0; i < 5; i++) {
+      const color = EXPEDITION_COLORS[i];
+      const pile = this.session.round.discardPiles.get(color) ?? [];
+
+      if (pile.length > 0) {
+        const topCard = pile[pile.length - 1];
+        const sprite = this.add.image(
+          laneX(i), DISCARD_Y + DISCARD_CARD_H / 2,
+          cardAssetKey(topCard),
+        );
+        sprite.setDisplaySize(DISCARD_CARD_W, DISCARD_CARD_H);
+        this.discardSprites.set(color, sprite);
+      }
+    }
+  }
+
+  private refreshHand(): void {
+    // Clear old hand sprites
+    this.handSprites.forEach(s => s.destroy());
+    this.handSprites = [];
+    if (this.selectionHighlight) {
+      this.selectionHighlight.destroy();
+      this.selectionHighlight = null;
+    }
+
+    const hand = this.session.players[0].hand;
+    for (let c = 0; c < hand.length; c++) {
+      const x = RIGHT_COL_CENTER;
+      const y = HAND_TOP + c * HAND_OVERLAP + HAND_CARD_H / 2;
+      const sprite = this.add.image(x, y, cardAssetKey(hand[c]));
+      sprite.setDisplaySize(HAND_CARD_W, HAND_CARD_H);
+      sprite.setDepth(c + 1);
+      sprite.setInteractive({ useHandCursor: true });
+      sprite.on('pointerdown', () => this.onHandCardClick(c));
+      this.handSprites.push(sprite);
+    }
+  }
+
+  private refreshDrawPile(): void {
+    const remaining = this.session.round.drawPile.length;
+    this.drawPileCountText.setText(`${remaining} remaining`);
+    this.drawPileSprite.setVisible(remaining > 0);
+  }
+
+  private refreshScores(): void {
+    // Show current round live scores + cumulative
+    const p0Detailed = scoreRoundDetailed(this.session.players[0].expeditions);
+    const p1Detailed = scoreRoundDetailed(this.session.players[1].expeditions);
+
+    const p0Round = p0Detailed.total;
+    const p1Round = p1Detailed.total;
+    const [p0Cum, p1Cum] = this.session.cumulativeScores;
+
+    if (this.session.roundNumber > 1 || p0Cum !== 0 || p1Cum !== 0) {
+      this.plrScoreText.setText(`Round: ${p0Round}  Total: ${p0Cum}`);
+      this.oppScoreText.setText(`Round: ${p1Round}  Total: ${p1Cum}`);
+    } else {
+      this.plrScoreText.setText(`Score: ${p0Round}`);
+      this.oppScoreText.setText(`Score: ${p1Round}`);
+    }
+  }
+
+  private refreshRoundIndicator(): void {
+    this.roundText.setText(`Round ${this.session.roundNumber} / 3`);
+  }
+
+  // ── Selection highlight ─────────────────────────────────
+  private showSelectionHighlight(handIndex: number): void {
+    this.clearSelectionHighlight();
+    const sprite = this.handSprites[handIndex];
+    if (!sprite) return;
+
+    this.selectionHighlight = this.add.rectangle(
+      sprite.x, sprite.y,
+      HAND_CARD_W + 6, HAND_CARD_H + 6,
+      0xffdd44, 0,
+    );
+    this.selectionHighlight.setStrokeStyle(3, 0xffdd44, 1);
+    this.selectionHighlight.setDepth(handIndex + 0.5);
+  }
+
+  private clearSelectionHighlight(): void {
+    if (this.selectionHighlight) {
+      this.selectionHighlight.destroy();
+      this.selectionHighlight = null;
+    }
+  }
+
+  // ── Input handlers ──────────────────────────────────────
+
+  private onHandCardClick(handIndex: number): void {
+    if (this.turnPhase !== 'waiting-for-card-select' && this.turnPhase !== 'waiting-for-target') {
+      return;
+    }
+
+    if (this.selectedCardIndex === handIndex) {
+      // Deselect
+      this.selectedCardIndex = -1;
+      this.clearSelectionHighlight();
+      this.setPhase('waiting-for-card-select');
+      return;
+    }
+
+    this.selectedCardIndex = handIndex;
+    this.showSelectionHighlight(handIndex);
+    this.setPhase('waiting-for-target');
+  }
+
+  private onExpeditionClick(color: ExpeditionColor): void {
+    if (this.turnPhase !== 'waiting-for-target') return;
+    if (this.selectedCardIndex < 0) return;
+
+    const hand = this.session.players[0].hand;
+    const card = hand[this.selectedCardIndex];
+    if (!card) return;
+
+    // Must match color
+    if (card.color !== color) {
+      this.showIllegalMoveFlash(this.handSprites[this.selectedCardIndex]);
+      return;
+    }
+
+    const action: Phase1Action = {
+      kind: 'play-to-expedition',
+      card,
+      color,
+    };
+
+    // Validate
+    const view = {
+      playerExpeditions: this.session.players[0].expeditions,
+      discardPiles: this.session.round.discardPiles,
+      drawPileSize: this.session.round.drawPile.length,
+      justDiscardedColor: this.session.round.justDiscardedColor,
+    };
+    const legality = checkPhase1Legality(action, hand, view);
+    if (!legality.legal) {
+      this.showIllegalMoveFlash(this.handSprites[this.selectedCardIndex]);
+      return;
+    }
+
+    this.executePlayerPhase1(action);
+  }
+
+  private onDiscardClick(color: ExpeditionColor): void {
+    // Phase 1: discard a card
+    if (this.turnPhase === 'waiting-for-target') {
+      if (this.selectedCardIndex < 0) return;
+
+      const hand = this.session.players[0].hand;
+      const card = hand[this.selectedCardIndex];
+      if (!card) return;
+
+      // Must match color
+      if (card.color !== color) {
+        this.showIllegalMoveFlash(this.handSprites[this.selectedCardIndex]);
+        return;
+      }
+
+      const action: Phase1Action = {
+        kind: 'discard',
+        card,
+        color,
+      };
+
+      this.executePlayerPhase1(action);
+      return;
+    }
+
+    // Phase 2: draw from discard
+    if (this.turnPhase === 'waiting-for-draw') {
+      const pile = this.session.round.discardPiles.get(color) ?? [];
+      if (pile.length === 0) return;
+
+      // Can't draw from just-discarded color
+      if (this.session.round.justDiscardedColor === color) {
+        this.instructionText.setText("Can't draw from the pile you just discarded to!");
+        this.time.delayedCall(1500, () => {
+          if (this.turnPhase === 'waiting-for-draw') {
+            this.instructionText.setText(
+              'Draw a card: click the draw pile or a discard pile',
+            );
+          }
+        });
+        return;
+      }
+
+      const action: Phase2Action = {
+        kind: 'draw-from-discard',
+        color,
+      };
+
+      this.executePlayerPhase2(action);
+    }
+  }
+
+  private onDrawPileClick(): void {
+    if (this.turnPhase !== 'waiting-for-draw') return;
+
+    if (this.session.round.drawPile.length === 0) return;
+
+    const action: Phase2Action = { kind: 'draw-from-pile' };
+    this.executePlayerPhase2(action);
+  }
+
+  // ── Player turn execution ───────────────────────────────
+
+  private executePlayerPhase1(action: Phase1Action): void {
+    this.setPhase('animating');
+    this.clearSelectionHighlight();
+    this.selectedCardIndex = -1;
+
+    const phase = this.session.round.turnPhase;
+    const result = executeAction(this.session, action);
+    this.recorder.recordAction(this.session, result, action, phase);
+
+    // Animate card moving from hand to target
+    this.animatePhase1(action, () => {
+      this.refreshAll();
+
+      // Now in Draw phase
+      this.setPhase('waiting-for-draw');
+    });
+  }
+
+  private executePlayerPhase2(action: Phase2Action): void {
+    this.setPhase('animating');
+
+    // Track draw from discard for AI opponent tracking
+    if (action.kind === 'draw-from-discard') {
+      this.aiPlayer.recordOpponentDiscardDraw(action.color);
+    }
+
+    const phase = this.session.round.turnPhase;
+    const result = executeAction(this.session, action);
+    this.recorder.recordAction(this.session, result, action, phase);
+
+    // Animate draw
+    this.animatePhase2(action, () => {
+      this.refreshAll();
+
+      if (result.roundEnded) {
+        if (result.matchEnded) {
+          this.showMatchSummary(result.roundScore!);
+        } else {
+          this.showRoundSummary(result.roundScore!);
+        }
+      } else {
+        // AI's turn
+        this.runAiTurn();
+      }
+    });
+  }
+
+  // ── AI turn ─────────────────────────────────────────────
+
+  private runAiTurn(): void {
+    this.setPhase('ai-thinking');
+
+    this.time.delayedCall(AI_DELAY, () => {
+      if (this.session.matchPhase !== 'playing') return;
+
+      const aiId: PlayerId = 1;
+      const state = getVisibleState(this.session, aiId);
+
+      // Phase 1: Play or Discard
+      const phase1Action = this.aiPlayer.choosePhase1(state);
+      const phase1Phase = this.session.round.turnPhase;
+      const phase1Result = executeAction(this.session, phase1Action);
+      this.recorder.recordAction(this.session, phase1Result, phase1Action, phase1Phase);
+
+      this.refreshAll();
+
+      // Short delay before Phase 2
+      this.time.delayedCall(AI_DELAY / 2, () => {
+        if (this.session.matchPhase !== 'playing') return;
+
+        const state2 = getVisibleState(this.session, aiId);
+        const phase2Action = this.aiPlayer.choosePhase2(state2);
+
+        // Track AI discard draws for player info
+        if (phase2Action.kind === 'draw-from-discard') {
+          // We don't track our own draws (the AI tracks the player's)
+        }
+
+        const phase2Phase = this.session.round.turnPhase;
+        const phase2Result = executeAction(this.session, phase2Action);
+        this.recorder.recordAction(this.session, phase2Result, phase2Action, phase2Phase);
+
+        this.refreshAll();
+
+        if (phase2Result.roundEnded) {
+          if (phase2Result.matchEnded) {
+            this.showMatchSummary(phase2Result.roundScore!);
+          } else {
+            this.showRoundSummary(phase2Result.roundScore!);
+          }
+        } else {
+          // Human's turn
+          this.setPhase('waiting-for-card-select');
+        }
+      });
+    });
+  }
+
+  // ── Animations ──────────────────────────────────────────
+
+  private animatePhase1(action: Phase1Action, onComplete: () => void): void {
+    // Find the hand sprite that was selected (it should still be in handSprites)
+    // Since we already executed the action, the card is no longer in hand,
+    // but the sprite array hasn't been refreshed yet.
+    const handSprites = this.handSprites;
+    if (handSprites.length === 0) {
+      onComplete();
+      return;
+    }
+
+    // Find which sprite corresponds to the played card
+    // The card was already removed from hand by executeAction, but
+    // handSprites still has the old set. Search by texture key.
+    const targetKey = cardAssetKey(action.card);
+    let spriteIdx = -1;
+    for (let i = 0; i < handSprites.length; i++) {
+      if (handSprites[i].texture.key === targetKey) {
+        spriteIdx = i;
+        break;
+      }
+    }
+
+    if (spriteIdx < 0) {
+      onComplete();
+      return;
+    }
+
+    const sprite = handSprites[spriteIdx];
+    sprite.setDepth(100); // Bring to front during animation
+
+    let targetX: number;
+    let targetY: number;
+
+    if (action.kind === 'play-to-expedition') {
+      const colorIdx = EXPEDITION_COLORS.indexOf(action.color);
+      const lane = this.session.players[0].expeditions.get(action.color) ?? [];
+      const cardIdx = Math.max(0, lane.length - 1);
+      targetX = laneX(colorIdx);
+      targetY = PLR_EXP_TOP + cardIdx * EXP_OVERLAP + CARD_H / 2;
+    } else {
+      // Discard
+      const colorIdx = EXPEDITION_COLORS.indexOf(action.color);
+      targetX = laneX(colorIdx);
+      targetY = DISCARD_Y + DISCARD_CARD_H / 2;
+    }
+
+    this.tweens.add({
+      targets: sprite,
+      x: targetX,
+      y: targetY,
+      scaleX: action.kind === 'discard' ? DISCARD_CARD_W / HAND_CARD_W : CARD_W / HAND_CARD_W,
+      scaleY: action.kind === 'discard' ? DISCARD_CARD_H / HAND_CARD_H : CARD_H / HAND_CARD_H,
+      duration: ANIM_DURATION,
+      ease: 'Power2',
+      onComplete: () => {
+        sprite.destroy();
+        onComplete();
+      },
+    });
+  }
+
+  private animatePhase2(action: Phase2Action, onComplete: () => void): void {
+    // Create a temporary sprite at the source location and animate to hand
+    let sourceX: number;
+    let sourceY: number;
+    let textureKey: string;
+
+    if (action.kind === 'draw-from-pile') {
+      sourceX = RIGHT_COL_CENTER;
+      sourceY = DRAW_PILE_Y + CARD_H / 2;
+      textureKey = CARD_BACK_KEY;
+    } else {
+      const colorIdx = EXPEDITION_COLORS.indexOf(action.color);
+      sourceX = laneX(colorIdx);
+      sourceY = DISCARD_Y + DISCARD_CARD_H / 2;
+      // The card was already drawn, so get it from the player's hand (last card added)
+      const hand = this.session.players[0].hand;
+      const drawnCard = hand[hand.length - 1];
+      textureKey = cardAssetKey(drawnCard);
+    }
+
+    const tempSprite = this.add.image(sourceX, sourceY, textureKey);
+    tempSprite.setDisplaySize(
+      action.kind === 'draw-from-pile' ? CARD_W : DISCARD_CARD_W,
+      action.kind === 'draw-from-pile' ? CARD_H : DISCARD_CARD_H,
+    );
+    tempSprite.setDepth(100);
+
+    // Animate to hand area
+    const hand = this.session.players[0].hand;
+    const targetIdx = hand.length - 1;
+    const targetX = RIGHT_COL_CENTER;
+    const targetY = HAND_TOP + targetIdx * HAND_OVERLAP + HAND_CARD_H / 2;
+
+    this.tweens.add({
+      targets: tempSprite,
+      x: targetX,
+      y: targetY,
+      scaleX: HAND_CARD_W / (action.kind === 'draw-from-pile' ? CARD_W : DISCARD_CARD_W),
+      scaleY: HAND_CARD_H / (action.kind === 'draw-from-pile' ? CARD_H : DISCARD_CARD_H),
+      duration: ANIM_DURATION,
+      ease: 'Power2',
+      onComplete: () => {
+        tempSprite.destroy();
+        onComplete();
+      },
+    });
+  }
+
+  // ── Illegal move feedback ───────────────────────────────
+  private showIllegalMoveFlash(sprite: Phaser.GameObjects.Image): void {
+    if (!sprite) return;
+
+    sprite.setTint(0xff4444);
+    this.tweens.add({
+      targets: sprite,
+      x: sprite.x - 5,
+      duration: 50,
+      yoyo: true,
+      repeat: 2,
+      ease: 'Sine.inOut',
+      onComplete: () => {
+        sprite.clearTint();
+      },
+    });
+
+    this.instructionText.setText('Illegal move!');
+    this.time.delayedCall(1200, () => {
+      if (this.turnPhase === 'waiting-for-target') {
+        this.instructionText.setText(
+          'Click an expedition lane to play, or a discard pile to discard',
+        );
+      }
+    });
+  }
+
+  // ── Round summary overlay ───────────────────────────────
+  private showRoundSummary(roundScore: RoundScoreResult): void {
+    this.setPhase('round-over');
+    this.aiPlayer.resetRoundHistory();
+
+    const overlay = createOverlayBackground(
+      this,
+      { depth: 10, alpha: 0.8 },
+      { width: 600, height: 450, alpha: 0.92 },
+    );
+    this.overlayObjects.push(...overlay.objects);
+
+    const cx = GAME_W / 2;
+    const topY = GAME_H / 2 - 200;
+
+    const title = this.add
+      .text(cx, topY, `Round ${this.session.roundNumber - 1} Complete`, {
+        fontSize: '28px',
+        color: '#f0c040',
+        fontFamily: FONT_FAMILY,
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5, 0)
+      .setDepth(11);
+    this.overlayObjects.push(title);
+
+    // Score breakdown table
+    const [p0Details, p1Details] = roundScore.details;
+    const [p0Total, p1Total] = roundScore.totals;
+
+    let y = topY + 50;
+
+    // Header row
+    const header = this.add
+      .text(cx, y, 'Color             You     AI', {
+        fontSize: '14px',
+        color: '#aaaaaa',
+        fontFamily: FONT_FAMILY,
+      })
+      .setOrigin(0.5, 0)
+      .setDepth(11);
+    this.overlayObjects.push(header);
+    y += 26;
+
+    // Per-expedition rows
+    for (let i = 0; i < EXPEDITION_COLORS.length; i++) {
+      const color = EXPEDITION_COLORS[i];
+      const p0Bd = p0Details.find(b => b.color === color);
+      const p1Bd = p1Details.find(b => b.color === color);
+      const p0Score = p0Bd ? p0Bd.score : 0;
+      const p1Score = p1Bd ? p1Bd.score : 0;
+      const p0Cards = p0Bd ? p0Bd.cardCount : 0;
+      const p1Cards = p1Bd ? p1Bd.cardCount : 0;
+
+      const colorName = color.charAt(0).toUpperCase() + color.slice(1);
+      const p0Str = p0Cards > 0 ? `${p0Score}` : '-';
+      const p1Str = p1Cards > 0 ? `${p1Score}` : '-';
+
+      const row = this.add
+        .text(cx, y, `${colorName.padEnd(14)}${p0Str.padStart(8)}${p1Str.padStart(8)}`, {
+          fontSize: '14px',
+          color: '#dddddd',
+          fontFamily: FONT_FAMILY,
+        })
+        .setOrigin(0.5, 0)
+        .setDepth(11);
+      this.overlayObjects.push(row);
+      y += 22;
+    }
+
+    // Totals
+    y += 8;
+    const totalRow = this.add
+      .text(cx, y, `Round Total${String(p0Total).padStart(11)}${String(p1Total).padStart(8)}`, {
+        fontSize: '16px',
+        color: '#ffffff',
+        fontFamily: FONT_FAMILY,
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5, 0)
+      .setDepth(11);
+    this.overlayObjects.push(totalRow);
+
+    y += 30;
+    const [cum0, cum1] = this.session.cumulativeScores;
+    const cumRow = this.add
+      .text(cx, y, `Cumulative${String(cum0).padStart(12)}${String(cum1).padStart(8)}`, {
+        fontSize: '16px',
+        color: '#f0c040',
+        fontFamily: FONT_FAMILY,
+      })
+      .setOrigin(0.5, 0)
+      .setDepth(11);
+    this.overlayObjects.push(cumRow);
+
+    // Next round button
+    y += 50;
+    const btn = createOverlayButton(this, cx, y, '[ Next Round ]');
+    btn.on('pointerdown', () => {
+      this.dismissCurrentOverlay();
+      this.refreshAll();
+      this.checkNextTurn();
+    });
+    this.overlayObjects.push(btn);
+  }
+
+  // ── Match summary overlay ───────────────────────────────
+  private showMatchSummary(lastRoundScore: RoundScoreResult): void {
+    this.setPhase('match-over');
+
+    // Finalize transcript
+    const transcript = this.recorder.finalize(this.session);
+    this.autoSaveTranscript(transcript);
+
+    const overlay = createOverlayBackground(
+      this,
+      { depth: 10, alpha: 0.85 },
+      { width: 600, height: 480, alpha: 0.92 },
+    );
+    this.overlayObjects.push(...overlay.objects);
+
+    const cx = GAME_W / 2;
+    const topY = GAME_H / 2 - 215;
+
+    const winnerId = getMatchWinner(this.session);
+    const winnerText = winnerId === 0 ? 'You Win!' : winnerId === 1 ? 'AI Wins!' : "It's a Tie!";
+
+    const title = this.add
+      .text(cx, topY, winnerText, {
+        fontSize: '32px',
+        color: '#f0c040',
+        fontFamily: FONT_FAMILY,
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5, 0)
+      .setDepth(11);
+    this.overlayObjects.push(title);
+
+    let y = topY + 55;
+
+    // Per-round scores table
+    const header = this.add
+      .text(cx, y, 'Round             You     AI', {
+        fontSize: '14px',
+        color: '#aaaaaa',
+        fontFamily: FONT_FAMILY,
+      })
+      .setOrigin(0.5, 0)
+      .setDepth(11);
+    this.overlayObjects.push(header);
+    y += 26;
+
+    for (let r = 0; r < this.session.roundScores.length; r++) {
+      const rs = this.session.roundScores[r];
+      const row = this.add
+        .text(
+          cx, y,
+          `Round ${r + 1}${String(rs.totals[0]).padStart(14)}${String(rs.totals[1]).padStart(8)}`,
+          {
+            fontSize: '14px',
+            color: '#dddddd',
+            fontFamily: FONT_FAMILY,
+          },
+        )
+        .setOrigin(0.5, 0)
+        .setDepth(11);
+      this.overlayObjects.push(row);
+      y += 22;
+    }
+
+    y += 10;
+    const [cum0, cum1] = this.session.cumulativeScores;
+    const totalRow = this.add
+      .text(cx, y, `Final Total${String(cum0).padStart(11)}${String(cum1).padStart(8)}`, {
+        fontSize: '18px',
+        color: '#ffffff',
+        fontFamily: FONT_FAMILY,
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5, 0)
+      .setDepth(11);
+    this.overlayObjects.push(totalRow);
+
+    // Last round details (expandable — show inline)
+    y += 40;
+    const detailsTitle = this.add
+      .text(cx, y, `Round 3 Breakdown`, {
+        fontSize: '14px',
+        color: '#aaccaa',
+        fontFamily: FONT_FAMILY,
+      })
+      .setOrigin(0.5, 0)
+      .setDepth(11);
+    this.overlayObjects.push(detailsTitle);
+    y += 22;
+
+    const [p0Details, p1Details] = lastRoundScore.details;
+    for (const color of EXPEDITION_COLORS) {
+      const p0Bd = p0Details.find(b => b.color === color);
+      const p1Bd = p1Details.find(b => b.color === color);
+      const p0Score = p0Bd && p0Bd.cardCount > 0 ? `${p0Bd.score}` : '-';
+      const p1Score = p1Bd && p1Bd.cardCount > 0 ? `${p1Bd.score}` : '-';
+      const colorName = color.charAt(0).toUpperCase() + color.slice(1);
+
+      const row = this.add
+        .text(cx, y, `${colorName.padEnd(14)}${p0Score.padStart(8)}${p1Score.padStart(8)}`, {
+          fontSize: '12px',
+          color: '#bbbbbb',
+          fontFamily: FONT_FAMILY,
+        })
+        .setOrigin(0.5, 0)
+        .setDepth(11);
+      this.overlayObjects.push(row);
+      y += 18;
+    }
+
+    // Buttons
+    y += 20;
+    const newMatchBtn = createOverlayButton(this, cx - 85, y, '[ New Match ]');
+    newMatchBtn.on('pointerdown', () => {
+      this.dismissCurrentOverlay();
+      this.scene.restart();
+    });
+    this.overlayObjects.push(newMatchBtn);
+
+    const menuBtn = createOverlayMenuButton(this, cx + 85, y);
+    this.overlayObjects.push(menuBtn);
+  }
+
+  // ── Overlay helpers ─────────────────────────────────────
+  private dismissCurrentOverlay(): void {
+    dismissOverlay(this.overlayObjects);
+    this.overlayObjects = [];
+  }
+
+  // ── Turn flow ───────────────────────────────────────────
+  private checkNextTurn(): void {
+    if (isMatchOver(this.session)) {
+      this.setPhase('match-over');
+      return;
+    }
+
+    const current = this.session.round.currentPlayer;
+    if (this.session.players[current].isAI) {
+      this.runAiTurn();
+    } else {
+      this.setPhase('waiting-for-card-select');
+    }
+  }
+
+  // ── Transcript persistence ──────────────────────────────
+  private autoSaveTranscript(transcript: ReturnType<LCTranscriptRecorder['finalize']>): void {
+    transcriptStore.save('lost-cities', transcript).then(
+      (stored) => {
+        if (stored) {
+          console.info(`[LostCitiesScene] Transcript saved (${stored.id})`);
+        }
+      },
+      (err) => {
+        console.error('[LostCitiesScene] Failed to auto-save transcript:', err);
+      },
+    );
+  }
+
+  // ── Cleanup ─────────────────────────────────────────────
+  shutdown(): void {
+    this.helpPanel?.destroy();
+    this.helpButton?.destroy();
+    this.dismissCurrentOverlay();
+  }
+}

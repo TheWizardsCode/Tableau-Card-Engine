@@ -18,7 +18,7 @@ import { GolfScene } from './example-games/golf/scenes/GolfScene';
 import { BeleagueredCastleScene } from './example-games/beleaguered-castle/scenes/BeleagueredCastleScene';
 import { SushiGoScene } from './example-games/sushi-go/scenes/SushiGoScene';
 import { SplendorScene } from './example-games/splendor/scenes/SplendorScene';
-import { LostCitiesMockScene } from './example-games/lost-cities/scenes/LostCitiesMockScene';
+import { LostCitiesScene } from './example-games/lost-cities/scenes/LostCitiesScene';
 
 // ── Game catalogue ─────────────────────────────────────────
 
@@ -48,10 +48,10 @@ const GAMES: GameEntry[] = [
       'Engine-building card game (human vs. AI). Collect gem tokens, purchase cards for bonuses, attract nobles, and reach 15 prestige to win.',
   },
   {
-    sceneKey: 'LostCitiesMockScene',
-    title: 'Lost Cities (mockup)',
+    sceneKey: 'LostCitiesScene',
+    title: 'Lost Cities',
     description:
-      'Static layout mockup for Lost Cities. Validates zone placement at 1280x720 before interactive implementation.',
+      'Two-player expedition card game (human vs. AI). Bet on up to 5 expeditions across a 3-round match, manage risk with investment cards, and outscore the AI.',
   },
 ];
 
@@ -64,7 +64,7 @@ const config: Phaser.Types.Core.GameConfig = {
   height: 720,
   backgroundColor: '#1a2a1a',
   // Register all scenes; GameSelectorScene is first so it auto-starts.
-  scene: [GameSelectorScene, GolfScene, BeleagueredCastleScene, SushiGoScene, SplendorScene, LostCitiesMockScene],
+  scene: [GameSelectorScene, GolfScene, BeleagueredCastleScene, SushiGoScene, SplendorScene, LostCitiesScene],
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
