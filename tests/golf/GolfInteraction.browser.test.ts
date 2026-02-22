@@ -129,23 +129,23 @@ function clickGameObject(obj: Phaser.GameObjects.Image): void {
 }
 
 /**
- * Wait for the scene's turnPhase to change to a specific value,
- * or until timeout.
+ * Wait for the scene's turnPhase to match any of the given phases.
+ * Returns the matched phase, or throws on timeout.
  */
-async function waitForPhase(
+async function waitForAnyPhase(
   scene: Phaser.Scene,
-  phase: string,
+  phases: string[],
   timeoutMs: number = 5000,
-): Promise<void> {
+): Promise<string> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     const internals = getSceneInternals(scene);
-    if (internals.turnPhase === phase) return;
+    if (phases.includes(internals.turnPhase)) return internals.turnPhase;
     await wait(50);
   }
   const internals = getSceneInternals(scene);
   throw new Error(
-    `Timed out waiting for phase "${phase}". Current phase: "${internals.turnPhase}"`,
+    `Timed out waiting for any of phases [${phases.join(', ')}]. Current phase: "${internals.turnPhase}"`,
   );
 }
 
@@ -190,25 +190,26 @@ describe('GolfScene interaction tests', () => {
     const stockSprite = internals.stockSprite;
     const discardSprite = internals.discardSprite;
 
-    // AI grid should be fully above the stock/discard piles
-    const aiBottomEdge = Math.max(
-      ...aiSprites.map((s) => s.y + s.displayHeight / 2),
+    // Horizontal layout: human grid (left), piles (center), AI grid (right).
+    // Human grid right edge should be to the left of the piles' left edge.
+    const humanRightEdge = Math.max(
+      ...humanSprites.map((s) => s.x + s.displayWidth / 2),
     );
-    const pileTopEdge =
-      Math.min(stockSprite.y, discardSprite.y) -
-      stockSprite.displayHeight / 2;
-    expect(aiBottomEdge).toBeLessThan(pileTopEdge);
+    const pileLeftEdge =
+      Math.min(stockSprite.x, discardSprite.x) -
+      stockSprite.displayWidth / 2;
+    expect(humanRightEdge).toBeLessThan(pileLeftEdge);
 
-    // Human grid should be fully below the stock/discard piles
-    const humanTopEdge = Math.min(
-      ...humanSprites.map((s) => s.y - s.displayHeight / 2),
+    // AI grid left edge should be to the right of the piles' right edge.
+    const aiLeftEdge = Math.min(
+      ...aiSprites.map((s) => s.x - s.displayWidth / 2),
     );
-    const pileBottomEdge =
-      Math.max(stockSprite.y, discardSprite.y) +
-      stockSprite.displayHeight / 2;
-    expect(humanTopEdge).toBeGreaterThan(pileBottomEdge);
+    const pileRightEdge =
+      Math.max(stockSprite.x, discardSprite.x) +
+      stockSprite.displayWidth / 2;
+    expect(aiLeftEdge).toBeGreaterThan(pileRightEdge);
 
-    // All card sprites should be within the game canvas
+    // All card sprites should be within the game canvas (1280x720 viewport)
     const allSprites = [
       ...aiSprites,
       ...humanSprites,
@@ -217,9 +218,9 @@ describe('GolfScene interaction tests', () => {
     ];
     for (const sprite of allSprites) {
       expect(sprite.x - sprite.displayWidth / 2).toBeGreaterThanOrEqual(0);
-      expect(sprite.x + sprite.displayWidth / 2).toBeLessThanOrEqual(800);
+      expect(sprite.x + sprite.displayWidth / 2).toBeLessThanOrEqual(1280);
       expect(sprite.y - sprite.displayHeight / 2).toBeGreaterThanOrEqual(0);
-      expect(sprite.y + sprite.displayHeight / 2).toBeLessThanOrEqual(600);
+      expect(sprite.y + sprite.displayHeight / 2).toBeLessThanOrEqual(720);
     }
 
     // Cards within each grid should not overlap
@@ -462,24 +463,17 @@ describe('GolfScene interaction tests', () => {
     const maxTurns = 20; // safety limit
 
     while (turnsPlayed < maxTurns) {
-      // Wait for human turn
-      try {
-        await waitForPhase(scene, 'waiting-for-draw', 3000);
-      } catch {
-        // Game may have ended or still in AI turn
-        if (internals.turnPhase === 'round-ended') break;
-        // Wait more for AI to finish
-        await wait(2000);
-        if (internals.turnPhase === 'round-ended') break;
-        if (internals.turnPhase !== 'waiting-for-draw') {
-          // Unexpected state — fail informatively
-          throw new Error(
-            `Unexpected phase after waiting: "${internals.turnPhase}" after ${turnsPlayed} turns`,
-          );
-        }
-      }
+      // Wait for human turn.  A full turn cycle (human animation + AI delay +
+      // AI animation) can take several seconds of game-loop time, and the
+      // game loop may run slower than wall-clock in CI.  Use a generous
+      // polling loop that accepts either 'waiting-for-draw' or 'round-ended'.
+      const settled = await waitForAnyPhase(
+        scene,
+        ['waiting-for-draw', 'round-ended'],
+        15_000,
+      );
 
-      if (internals.turnPhase === 'round-ended') break;
+      if (settled === 'round-ended') break;
 
       // Human turn: draw from stock, swap with first available card
       clickGameObject(internals.stockSprite);
@@ -498,9 +492,6 @@ describe('GolfScene interaction tests', () => {
 
       clickGameObject(internals.humanCardSprites[targetIdx]);
       turnsPlayed++;
-
-      // Wait for animation + AI turn
-      await wait(2000);
     }
 
     // We should have played at least a few turns
@@ -508,5 +499,5 @@ describe('GolfScene interaction tests', () => {
 
     // Game should have progressed
     expect(internals.session.gameState.turnNumber).toBeGreaterThan(0);
-  }, 60_000); // long timeout for multi-turn game
+  }, 120_000); // long timeout for multi-turn game
 });

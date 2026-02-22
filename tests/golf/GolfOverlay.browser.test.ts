@@ -257,9 +257,9 @@ describe('Golf overlay button tests', () => {
     // Should have at least 2 rectangles at depth 10: the full-screen blocker and the visible overlay
     expect(rects.length).toBeGreaterThanOrEqual(2);
 
-    // The full-screen blocker should be interactive
+    // The full-screen blocker should be interactive (1280x720 viewport)
     const fullScreenBlocker = rects.find(
-      (r) => r.width === 800 && r.height === 600 && r.input?.enabled,
+      (r) => r.width === 1280 && r.height === 720 && r.input?.enabled,
     );
     expect(fullScreenBlocker).toBeDefined();
   });
