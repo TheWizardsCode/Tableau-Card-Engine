@@ -651,7 +651,10 @@ export class SushiGoScene extends Phaser.Scene {
       // Small wasabi icon slightly beneath the card (subtle cue)
       if (this.textures.exists('icon-wasabi')) {
         const iconSize = Math.round(TABLEAU_CARD_W * 0.36);
-        const wasabiImg = this.add.image(0, TABLEAU_CARD_H / 2 - 6, 'icon-wasabi');
+        // Move the wasabi icon up so it doesn't overlap the label; use
+        // a modest upward offset (~1 character height)
+        const wasabiY = TABLEAU_CARD_H / 2 - 26;
+        const wasabiImg = this.add.image(0, wasabiY, 'icon-wasabi');
         wasabiImg.setDisplaySize(iconSize, iconSize);
         wasabiImg.setOrigin(0.5, 1);
         // Place below the card content but above the background
