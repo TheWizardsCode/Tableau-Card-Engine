@@ -33,6 +33,10 @@ describe('Sushi Go! - Wasabi pairing & Chopsticks selection order', () => {
       { id: 12, type: 'dumpling' },
     ] as any;
 
+    // Ensure the player has chopsticks in their tableau so chopsticks
+    // usage is allowed. Place a chopsticks card before executing picks.
+    p.tableau = [{ id: 99, type: 'chopsticks' }] as any;
+
     // Simulate chopsticks pick: first pick index 0 then index 2
     const action: PickAction = { cardIndex: 0, secondCardIndex: 2 } as any;
     // applyPick is internal; call executeAllPicks to exercise the public flow
