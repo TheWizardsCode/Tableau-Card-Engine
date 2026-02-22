@@ -9,7 +9,7 @@
   },
   {
     "heading": "Turn Flow",
-    "body": "Each turn has two mandatory phases:\n\n1. Play or Discard -- you must play one card from your hand:\n   a) Play to expedition: click a card in your hand, then click one of your expedition lanes to place it there.\n   b) Discard: click a card in your hand, then click the matching discard pile in the center row.\n\n2. Draw -- you must draw one card:\n   a) Draw pile: click the draw pile (top-right) for an unknown card.\n   b) Discard pile: click any non-empty discard pile to take the top card.\n   Note: You cannot draw from the pile you just discarded to."
+    "body": "Each turn has two mandatory phases:\n\n1. Play or Discard -- you must play one card from your hand:\n   a) Play to expedition: click a card in your hand, then click one of your expedition lanes to place it there.\n   b) Discard: click a card in your hand, then click the matching discard pile to discard it.\n\n2. Draw -- you must draw one card:\n   a) Draw pile: click the draw pile for an unknown card.\n   b) Discard pile: click any non-empty discard pile to take the top card.\n   Note: You cannot draw from the pile you just discarded to."
   },
   {
     "heading": "Expedition Rules",
@@ -29,6 +29,6 @@
   },
   {
     "heading": "Controls",
-    "body": "1. Select a card from your hand (right side) by clicking it.\n2. Click an expedition lane or discard pile to place the selected card.\n3. Click the draw pile or a discard pile to draw your next card.\n\nThe AI opponent plays automatically after your turn.\n\nPress ? to toggle this help panel."
+    "body": "1. Select a card from your hand by clicking it.\n2. Click an expedition lane or discard pile to place the selected card.\n3. Click the draw pile or a discard pile to draw your next card.\n\nThe AI opponent plays automatically after your turn.\n\nPress ? to toggle this help panel."
   }
 ]
