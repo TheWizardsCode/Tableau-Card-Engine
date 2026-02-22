@@ -71,3 +71,26 @@ Files (in `cards/lost-cities/`):
 - `lc-{color}-inv{1-3}.svg` — investment/wager cards (15 total, 3 per color)
 - `lc-back.svg` — card back with expedition theme
 - Colors: yellow (compass), blue (ship), white (mountain), green (torch), red (crystal)
+
+## Audio Sound Effects — Lost Cities
+
+12 expedition-themed WAV sound effects generated for the Lost Cities game:
+
+- **Source**: Procedurally generated using `scripts/generate-lost-cities-sfx.mjs` with Tone.js frequency utilities
+- **License**: CC0 / Public Domain (original procedural synthesis, no external samples used)
+- **Format**: 16-bit PCM WAV, 22050 Hz, mono
+- **Generator**: Run `node scripts/generate-lost-cities-sfx.mjs` to regenerate
+
+Files (in `audio/lost-cities/`):
+- `card-select.wav` — compass click when selecting a card from hand
+- `card-deselect.wav` — soft click when deselecting a card
+- `card-play.wav` — map stamp when playing a card to an expedition
+- `card-discard.wav` — parchment toss when discarding a card
+- `card-draw.wav` — scroll unfurl when drawing a card
+- `illegal-move.wav` — locked chest rattle for invalid moves
+- `turn-change.wav` — ship's bell for turn transitions
+- `round-end.wav` — journal close when a round ends
+- `match-win.wav` — discovery fanfare on match victory
+- `match-lose.wav` — sandstorm loss on match defeat
+- `score-reveal.wav` — artifact chimes when scores are displayed
+- `ui-click.wav` — map pin click for UI button presses

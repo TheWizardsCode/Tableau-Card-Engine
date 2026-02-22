@@ -58,9 +58,15 @@ import {
   LCTranscriptRecorder,
 } from '../GameTranscript';
 import { TranscriptStore } from '../../../src/core-engine/TranscriptStore';
+import { GameEventEmitter } from '../../../src/core-engine/GameEventEmitter';
+import { PhaserEventBridge } from '../../../src/core-engine/PhaserEventBridge';
+import { SoundManager } from '../../../src/core-engine/SoundManager';
+import type { SoundPlayer, EventSoundMapping } from '../../../src/core-engine/SoundManager';
 import {
   HelpPanel,
   HelpButton,
+  SettingsPanel,
+  SettingsButton,
   GAME_W,
   GAME_H,
   FONT_FAMILY,
@@ -156,6 +162,22 @@ const HAND_OVERLAP = Math.floor((HAND_BOTTOM - HAND_TOP - HAND_CARD_H) / (HAND_S
 const AI_DELAY = 800;
 const ANIM_DURATION = 300;
 
+// ── Audio asset keys ──────────────────────────────────────
+const SFX_KEYS = {
+  CARD_SELECT: 'lc-sfx-card-select',
+  CARD_DESELECT: 'lc-sfx-card-deselect',
+  CARD_PLAY: 'lc-sfx-card-play',
+  CARD_DISCARD: 'lc-sfx-card-discard',
+  CARD_DRAW: 'lc-sfx-card-draw',
+  ILLEGAL_MOVE: 'lc-sfx-illegal-move',
+  TURN_CHANGE: 'lc-sfx-turn-change',
+  ROUND_END: 'lc-sfx-round-end',
+  MATCH_WIN: 'lc-sfx-match-win',
+  MATCH_LOSE: 'lc-sfx-match-lose',
+  SCORE_REVEAL: 'lc-sfx-score-reveal',
+  UI_CLICK: 'lc-sfx-ui-click',
+} as const;
+
 // Text styles
 const LABEL_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
   fontFamily: FONT_FAMILY,
@@ -245,6 +267,13 @@ export class LostCitiesScene extends Phaser.Scene {
   private helpPanel!: HelpPanel;
   private helpButton!: HelpButton;
 
+  // Sound system
+  private gameEvents!: GameEventEmitter;
+  private eventBridge!: PhaserEventBridge;
+  private soundManager: SoundManager | null = null;
+  private settingsPanel!: SettingsPanel;
+  private settingsButton!: SettingsButton;
+
   constructor() {
     super({ key: 'LostCitiesScene' });
   }
@@ -272,6 +301,20 @@ export class LostCitiesScene extends Phaser.Scene {
       width: CARD_W,
       height: CARD_H,
     });
+
+    // Load expedition-themed sound effects
+    this.load.audio(SFX_KEYS.CARD_SELECT, 'assets/audio/lost-cities/card-select.wav');
+    this.load.audio(SFX_KEYS.CARD_DESELECT, 'assets/audio/lost-cities/card-deselect.wav');
+    this.load.audio(SFX_KEYS.CARD_PLAY, 'assets/audio/lost-cities/card-play.wav');
+    this.load.audio(SFX_KEYS.CARD_DISCARD, 'assets/audio/lost-cities/card-discard.wav');
+    this.load.audio(SFX_KEYS.CARD_DRAW, 'assets/audio/lost-cities/card-draw.wav');
+    this.load.audio(SFX_KEYS.ILLEGAL_MOVE, 'assets/audio/lost-cities/illegal-move.wav');
+    this.load.audio(SFX_KEYS.TURN_CHANGE, 'assets/audio/lost-cities/turn-change.wav');
+    this.load.audio(SFX_KEYS.ROUND_END, 'assets/audio/lost-cities/round-end.wav');
+    this.load.audio(SFX_KEYS.MATCH_WIN, 'assets/audio/lost-cities/match-win.wav');
+    this.load.audio(SFX_KEYS.MATCH_LOSE, 'assets/audio/lost-cities/match-lose.wav');
+    this.load.audio(SFX_KEYS.SCORE_REVEAL, 'assets/audio/lost-cities/score-reveal.wav');
+    this.load.audio(SFX_KEYS.UI_CLICK, 'assets/audio/lost-cities/ui-click.wav');
   }
 
   // ── Create ──────────────────────────────────────────────
@@ -310,6 +353,7 @@ export class LostCitiesScene extends Phaser.Scene {
     this.createRightColumn();
     this.createInstructionBar();
     this.createHelpPanel();
+    this.createSoundSystem();
 
     // Initial render
     this.refreshAll();
@@ -512,6 +556,35 @@ export class LostCitiesScene extends Phaser.Scene {
       sections: helpContent as HelpSection[],
     });
     this.helpButton = new HelpButton(this, this.helpPanel);
+  }
+
+  private createSoundSystem(): void {
+    // Event system
+    this.gameEvents = new GameEventEmitter();
+    this.eventBridge = new PhaserEventBridge(this.gameEvents, this.events);
+
+    // Sound system
+    const phaserSound = this.sound;
+    const player: SoundPlayer = {
+      play: (key: string) => { phaserSound.play(key); },
+      stop: (key: string) => { phaserSound.stopByKey(key); },
+      setVolume: (v: number) => { phaserSound.volume = v; },
+      setMute: (m: boolean) => { phaserSound.mute = m; },
+    };
+    this.soundManager = new SoundManager(player);
+    for (const sfxKey of Object.values(SFX_KEYS)) {
+      this.soundManager.register(sfxKey);
+    }
+    const mapping: EventSoundMapping = {
+      'turn-started': SFX_KEYS.TURN_CHANGE,
+    };
+    this.soundManager.connectToEvents(this.gameEvents, mapping);
+
+    // Settings UI
+    this.settingsPanel = new SettingsPanel(this, {
+      soundManager: this.soundManager,
+    });
+    this.settingsButton = new SettingsButton(this, this.settingsPanel);
   }
 
   // ── Phase management ────────────────────────────────────
@@ -736,12 +809,14 @@ export class LostCitiesScene extends Phaser.Scene {
       // Deselect
       this.selectedCardIndex = -1;
       this.clearSelectionHighlight();
+      this.soundManager?.play(SFX_KEYS.CARD_DESELECT);
       this.setPhase('waiting-for-card-select');
       return;
     }
 
     this.selectedCardIndex = handIndex;
     this.showSelectionHighlight(handIndex);
+    this.soundManager?.play(SFX_KEYS.CARD_SELECT);
     this.setPhase('waiting-for-target');
   }
 
@@ -804,6 +879,7 @@ export class LostCitiesScene extends Phaser.Scene {
 
       // Can't draw from just-discarded color
       if (this.session.round.justDiscardedColor === color) {
+        this.soundManager?.play(SFX_KEYS.ILLEGAL_MOVE);
         this.instructionText.setText("Can't draw from the pile you just discarded to!");
         this.time.delayedCall(1500, () => {
           if (this.turnPhase === 'waiting-for-draw') {
@@ -840,6 +916,13 @@ export class LostCitiesScene extends Phaser.Scene {
     this.clearSelectionHighlight();
     this.selectedCardIndex = -1;
 
+    // Play sound for card action
+    if (action.kind === 'play-to-expedition') {
+      this.soundManager?.play(SFX_KEYS.CARD_PLAY);
+    } else {
+      this.soundManager?.play(SFX_KEYS.CARD_DISCARD);
+    }
+
     const phase = this.session.round.turnPhase;
     const result = executeAction(this.session, action);
     this.recorder.recordAction(this.session, result, action, phase);
@@ -855,6 +938,8 @@ export class LostCitiesScene extends Phaser.Scene {
 
   private executePlayerPhase2(action: Phase2Action): void {
     this.setPhase('animating');
+
+    this.soundManager?.play(SFX_KEYS.CARD_DRAW);
 
     // Track draw from discard for AI opponent tracking
     if (action.kind === 'draw-from-discard') {
@@ -886,6 +971,7 @@ export class LostCitiesScene extends Phaser.Scene {
 
   private runAiTurn(): void {
     this.setPhase('ai-thinking');
+    this.soundManager?.play(SFX_KEYS.TURN_CHANGE);
 
     this.time.delayedCall(AI_DELAY, () => {
       if (this.session.matchPhase !== 'playing') return;
@@ -927,6 +1013,7 @@ export class LostCitiesScene extends Phaser.Scene {
           }
         } else {
           // Human's turn
+          this.soundManager?.play(SFX_KEYS.TURN_CHANGE);
           this.setPhase('waiting-for-card-select');
         }
       });
@@ -1050,6 +1137,8 @@ export class LostCitiesScene extends Phaser.Scene {
   private showIllegalMoveFlash(sprite: Phaser.GameObjects.Image): void {
     if (!sprite) return;
 
+    this.soundManager?.play(SFX_KEYS.ILLEGAL_MOVE);
+
     sprite.setTint(0xff4444);
     this.tweens.add({
       targets: sprite,
@@ -1077,6 +1166,10 @@ export class LostCitiesScene extends Phaser.Scene {
   private showRoundSummary(roundScore: RoundScoreResult): void {
     this.setPhase('round-over');
     this.aiPlayer.resetRoundHistory();
+    this.soundManager?.play(SFX_KEYS.ROUND_END);
+    this.time.delayedCall(400, () => {
+      this.soundManager?.play(SFX_KEYS.SCORE_REVEAL);
+    });
 
     const overlay = createOverlayBackground(
       this,
@@ -1172,6 +1265,7 @@ export class LostCitiesScene extends Phaser.Scene {
     y += 50;
     const btn = createOverlayButton(this, cx, y, '[ Next Round ]');
     btn.on('pointerdown', () => {
+      this.soundManager?.play(SFX_KEYS.UI_CLICK);
       this.dismissCurrentOverlay();
       this.refreshAll();
       this.checkNextTurn();
@@ -1199,6 +1293,16 @@ export class LostCitiesScene extends Phaser.Scene {
 
     const winnerId = getMatchWinner(this.session);
     const winnerText = winnerId === 0 ? 'You Win!' : winnerId === 1 ? 'AI Wins!' : "It's a Tie!";
+
+    // Play win/lose sound followed by score reveal
+    if (winnerId === 0) {
+      this.soundManager?.play(SFX_KEYS.MATCH_WIN);
+    } else {
+      this.soundManager?.play(SFX_KEYS.MATCH_LOSE);
+    }
+    this.time.delayedCall(600, () => {
+      this.soundManager?.play(SFX_KEYS.SCORE_REVEAL);
+    });
 
     const title = this.add
       .text(cx, topY, winnerText, {
@@ -1293,6 +1397,7 @@ export class LostCitiesScene extends Phaser.Scene {
     y += 20;
     const newMatchBtn = createOverlayButton(this, cx - 85, y, '[ New Match ]');
     newMatchBtn.on('pointerdown', () => {
+      this.soundManager?.play(SFX_KEYS.UI_CLICK);
       this.dismissCurrentOverlay();
       this.scene.restart();
     });
@@ -1339,8 +1444,14 @@ export class LostCitiesScene extends Phaser.Scene {
 
   // ── Cleanup ─────────────────────────────────────────────
   shutdown(): void {
+    this.soundManager?.destroy();
+    this.soundManager = null;
+    this.eventBridge?.destroy();
+    this.gameEvents?.removeAllListeners();
     this.helpPanel?.destroy();
     this.helpButton?.destroy();
+    this.settingsPanel?.destroy();
+    this.settingsButton?.destroy();
     this.dismissCurrentOverlay();
   }
 }
