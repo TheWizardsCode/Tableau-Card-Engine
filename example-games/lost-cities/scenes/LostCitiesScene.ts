@@ -50,7 +50,7 @@ import type {
   Phase2Action,
 } from '../LostCitiesRules';
 import { checkPhase1Legality } from '../LostCitiesRules';
-import { scoreRoundDetailed } from '../LostCitiesScoring';
+import { scoreRoundDetailed, scoreExpeditionDetailed } from '../LostCitiesScoring';
 import {
   LostCitiesAiPlayer,
   GreedyStrategy,
@@ -211,6 +211,13 @@ const BOX_FILL_ALPHA = 0.25;
 const BOX_RADIUS = 6;
 const BOX_PAD = 6;
 
+// Tooltip styling
+const TOOLTIP_BG_COLOR = 0x000000;
+const TOOLTIP_BG_ALPHA = 0.9;
+const TOOLTIP_PAD = 10;
+const TOOLTIP_DEPTH = 800;
+const TOOLTIP_MAX_W = 260;
+
 // ── Turn state machine ────────────────────────────────────
 type SceneTurnPhase =
   | 'waiting-for-card-select'  // Player must select a card from hand
@@ -274,6 +281,9 @@ export class LostCitiesScene extends Phaser.Scene {
   private soundManager: SoundManager | null = null;
   private settingsPanel!: SettingsPanel;
   private settingsButton!: SettingsButton;
+
+  // Tooltip
+  private tooltipContainer: Phaser.GameObjects.Container | null = null;
 
   constructor() {
     super({ key: 'LostCitiesScene' });
@@ -349,6 +359,7 @@ export class LostCitiesScene extends Phaser.Scene {
     this.discardSprites = new Map();
     this.handSprites = [];
     this.selectionHighlight = null;
+    this.tooltipContainer = null;
 
     // Initialize game state
     this.session = setupLostCitiesGame({
@@ -403,12 +414,18 @@ export class LostCitiesScene extends Phaser.Scene {
     // Color column headers above the opponent expeditions box
     for (let i = 0; i < 5; i++) {
       const color = EXPEDITION_COLORS[i];
-      this.add
+      const label = this.add
         .text(laneX(i), OPP_EXP_TOP - BOX_LABEL_H - BOX_PAD - 2, color.toUpperCase(), {
           ...SMALL_LABEL,
           fontSize: '11px',
         })
         .setOrigin(0.5, 1);
+
+      // Make the label wider for easier hover targeting
+      label.setPadding(8, 4, 8, 4);
+      label.setInteractive({ useHandCursor: true });
+      label.on('pointerover', () => this.showExpeditionTooltip(color, label));
+      label.on('pointerout', () => this.hideExpeditionTooltip());
     }
 
     // Opponent expeditions — box includes label above card content
@@ -795,6 +812,94 @@ export class LostCitiesScene extends Phaser.Scene {
       this.plrScoreText.setText(`Score: ${p0Round}`);
       this.oppScoreText.setText(`Score: ${p1Round}`);
     }
+  }
+
+  // ── Expedition scoring tooltip ──────────────────────────
+  private showExpeditionTooltip(
+    color: ExpeditionColor,
+    anchor: Phaser.GameObjects.Text,
+  ): void {
+    if (this.settingsPanel && !this.settingsPanel.showTooltips) return;
+    this.hideExpeditionTooltip();
+
+    const plrCards = this.session.players[0].expeditions.get(color) ?? [];
+    const oppCards = this.session.players[1].expeditions.get(color) ?? [];
+    const plr = scoreExpeditionDetailed(color, plrCards);
+    const opp = scoreExpeditionDetailed(color, oppCards);
+
+    // Build tooltip lines
+    const lines: string[] = [`${color.toUpperCase()} Expedition`];
+    lines.push('');
+    lines.push(this.formatExpBreakdown('You', plr));
+    lines.push(this.formatExpBreakdown('Opp', opp));
+
+    const bodyText = lines.join('\n');
+
+    // Create text element to measure
+    const text = this.add.text(0, 0, bodyText, {
+      fontSize: '12px',
+      color: '#dddddd',
+      fontFamily: FONT_FAMILY,
+      lineSpacing: 4,
+      wordWrap: { width: TOOLTIP_MAX_W - TOOLTIP_PAD * 2 },
+    }).setOrigin(0, 0);
+
+    // Title is the first line — style it differently
+    // We'll use a separate title text for bold/color styling
+    const title = this.add.text(TOOLTIP_PAD, TOOLTIP_PAD, `${color.toUpperCase()} Expedition`, {
+      fontSize: '13px',
+      color: '#f0c040',
+      fontFamily: FONT_FAMILY,
+      fontStyle: 'bold',
+    }).setOrigin(0, 0);
+
+    // Rewrite body text without the title + blank line
+    const detailLines = [
+      this.formatExpBreakdown('You', plr),
+      this.formatExpBreakdown('Opp', opp),
+    ];
+    text.setText(detailLines.join('\n'));
+    text.setPosition(TOOLTIP_PAD, TOOLTIP_PAD + title.height + 6);
+
+    const boxW = Math.max(text.width, title.width) + TOOLTIP_PAD * 2;
+    const boxH = TOOLTIP_PAD + title.height + 6 + text.height + TOOLTIP_PAD;
+
+    // Position tooltip below the anchor label
+    let tooltipX = anchor.x - boxW / 2;
+    let tooltipY = anchor.y + 6;
+
+    // Clamp within canvas bounds
+    tooltipX = Phaser.Math.Clamp(tooltipX, 4, GAME_W - boxW - 4);
+    tooltipY = Phaser.Math.Clamp(tooltipY, 4, GAME_H - boxH - 4);
+
+    // Background
+    const bg = this.add.rectangle(
+      boxW / 2, boxH / 2,
+      boxW, boxH,
+      TOOLTIP_BG_COLOR, TOOLTIP_BG_ALPHA,
+    );
+    bg.setStrokeStyle(1, 0x888888);
+
+    this.tooltipContainer = this.add.container(tooltipX, tooltipY, [bg, title, text]);
+    this.tooltipContainer.setDepth(TOOLTIP_DEPTH);
+  }
+
+  private hideExpeditionTooltip(): void {
+    if (this.tooltipContainer) {
+      this.tooltipContainer.destroy();
+      this.tooltipContainer = null;
+    }
+  }
+
+  /** Format a one-line scoring breakdown for an expedition. */
+  private formatExpBreakdown(
+    label: string,
+    b: ReturnType<typeof scoreExpeditionDetailed>,
+  ): string {
+    if (b.cardCount === 0) return `${label}: no cards`;
+    const inv = b.investmentCount > 0 ? `, ${b.investmentCount} inv (x${b.multiplier})` : '';
+    const bonus = b.bonusEarned ? ', +20 bonus' : '';
+    return `${label}: ${b.cardCount} cards${inv}${bonus} = ${b.score}`;
   }
 
   private refreshRoundIndicator(): void {
