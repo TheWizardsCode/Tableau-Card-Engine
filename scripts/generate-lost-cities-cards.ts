@@ -60,7 +60,7 @@ const TEXT_COLOR: Record<ExpeditionColor, string> = {
 /** Expedition icon SVG path data for each color. */
 const ICON_PATH: Record<ExpeditionColor, string> = {
   // Compass rose (yellow - desert expedition)
-  yellow: `<g transform="translate(70,100) scale(0.6)">
+  yellow: `<g transform="translate(70,95) scale(1.0)">
     <circle cx="0" cy="0" r="28" fill="none" stroke="currentColor" stroke-width="2"/>
     <polygon points="0,-24 6,-6 0,0 -6,-6" fill="currentColor"/>
     <polygon points="0,24 6,6 0,0 -6,6" fill="currentColor" opacity="0.5"/>
@@ -68,25 +68,25 @@ const ICON_PATH: Record<ExpeditionColor, string> = {
     <polygon points="24,0 6,-6 0,0 6,6" fill="currentColor"/>
   </g>`,
   // Ship/sail (blue - ocean expedition)
-  blue: `<g transform="translate(70,100) scale(0.6)">
+  blue: `<g transform="translate(70,95) scale(1.0)">
     <path d="M-5,20 L-20,20 Q0,-5 5,-25 Q10,-5 20,20 L5,20 Z" fill="currentColor" opacity="0.8"/>
     <line x1="0" y1="-28" x2="0" y2="22" stroke="currentColor" stroke-width="2.5"/>
     <path d="M-22,22 Q0,30 22,22" fill="none" stroke="currentColor" stroke-width="2.5"/>
   </g>`,
   // Mountain/tent (white - alpine expedition)
-  white: `<g transform="translate(70,100) scale(0.6)">
+  white: `<g transform="translate(70,95) scale(1.0)">
     <polygon points="0,-25 22,20 -22,20" fill="none" stroke="currentColor" stroke-width="2.5"/>
     <polygon points="0,-10 12,20 -12,20" fill="currentColor" opacity="0.3"/>
     <line x1="-30" y1="20" x2="30" y2="20" stroke="currentColor" stroke-width="2"/>
   </g>`,
   // Torch/flame (green - jungle expedition)
-  green: `<g transform="translate(70,100) scale(0.6)">
+  green: `<g transform="translate(70,95) scale(1.0)">
     <rect x="-4" y="0" width="8" height="22" rx="2" fill="currentColor" opacity="0.7"/>
     <path d="M0,-22 Q12,-10 6,0 Q3,-5 0,-2 Q-3,-5 -6,0 Q-12,-10 0,-22 Z" fill="currentColor"/>
     <rect x="-8" y="22" width="16" height="3" rx="1" fill="currentColor"/>
   </g>`,
   // Crystal/gem (red - volcano expedition)
-  red: `<g transform="translate(70,100) scale(0.6)">
+  red: `<g transform="translate(70,95) scale(1.0)">
     <polygon points="0,-25 18,-5 12,22 -12,22 -18,-5" fill="none" stroke="currentColor" stroke-width="2.5"/>
     <polygon points="0,-25 8,-5 0,22 -8,-5" fill="currentColor" opacity="0.3"/>
     <line x1="-18" y1="-5" x2="18" y2="-5" stroke="currentColor" stroke-width="1.5"/>
@@ -94,7 +94,7 @@ const ICON_PATH: Record<ExpeditionColor, string> = {
 };
 
 /** Investment/wager symbol — handshake-like icon. */
-const INVESTMENT_ICON = `<g transform="translate(70,95) scale(0.55)">
+const INVESTMENT_ICON = `<g transform="translate(70,90) scale(0.9)">
   <circle cx="0" cy="0" r="22" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="4,3"/>
   <text x="0" y="8" font-family="serif" font-size="28" font-weight="bold"
         text-anchor="middle" fill="currentColor">$</text>
@@ -118,15 +118,15 @@ function innerFrame(stroke: string): string {
   return `  <rect x="8" y="8" width="${CARD_W - 16}" height="${CARD_H - 16}" rx="6" ry="6" fill="none" stroke="${stroke}" stroke-width="0.8" opacity="0.5"/>`;
 }
 
-function rankText(rank: string, color: string, fontSize = 22): string {
+function rankText(rank: string, color: string, fontSize = 36): string {
   // Top-left and bottom-right rank indicators
-  return `  <text x="16" y="30" font-family="Arial, sans-serif" font-size="${fontSize}" font-weight="bold" text-anchor="middle" fill="${color}">${rank}</text>
-  <text x="${CARD_W - 16}" y="${CARD_H - 14}" font-family="Arial, sans-serif" font-size="${fontSize}" font-weight="bold" text-anchor="middle" fill="${color}" transform="rotate(180,${CARD_W - 16},${CARD_H - 22})">${rank}</text>`;
+  return `  <text x="18" y="38" font-family="Arial, sans-serif" font-size="${fontSize}" font-weight="bold" text-anchor="middle" fill="${color}">${rank}</text>
+  <text x="${CARD_W - 18}" y="${CARD_H - 18}" font-family="Arial, sans-serif" font-size="${fontSize}" font-weight="bold" text-anchor="middle" fill="${color}" transform="rotate(180,${CARD_W - 18},${CARD_H - 28})">${rank}</text>`;
 }
 
 function colorLabel(name: string, textColor: string): string {
   const displayName = name.charAt(0).toUpperCase() + name.slice(1);
-  return `  <text x="${CARD_W / 2}" y="${CARD_H - 12}" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="${textColor}" opacity="0.7">${displayName}</text>`;
+  return `  <text x="${CARD_W / 2}" y="${CARD_H - 10}" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="${textColor}" opacity="0.7">${displayName}</text>`;
 }
 
 // ── Card generators ────────────────────────────────────────
@@ -155,15 +155,15 @@ function generateInvestmentCard(color: ExpeditionColor, index: number): string {
 
   // Show multiplier indicator (number of handshake icons = investment index)
   const dots = Array.from({ length: index }, (_, i) => {
-    const x = CARD_W / 2 + (i - (index - 1) / 2) * 14;
-    return `  <circle cx="${x}" cy="145" r="4" fill="${accent}" opacity="0.6"/>`;
+    const x = CARD_W / 2 + (i - (index - 1) / 2) * 20;
+    return `  <circle cx="${x}" cy="140" r="6" fill="${accent}" opacity="0.6"/>`;
   }).join('\n');
 
   return `${svgHeader()}
 ${cardBackground(bg)}
 ${cardBorder(accent)}
 ${innerFrame(accent)}
-${rankText('×', text, 20)}
+${rankText('×', text, 32)}
 ${investIcon}
 ${dots}
 ${colorLabel(color, text)}
@@ -190,10 +190,10 @@ ${cardBackground(bg)}
 ${cardBorder(accent)}
   <rect x="6" y="6" width="${CARD_W - 12}" height="${CARD_H - 12}" rx="7" ry="7" fill="none" stroke="${accent}" stroke-width="1.5"/>
 ${diamonds.join('\n')}
-  <circle cx="${CARD_W / 2}" cy="${CARD_H / 2}" r="28" fill="none" stroke="${accent}" stroke-width="2"/>
-  <circle cx="${CARD_W / 2}" cy="${CARD_H / 2}" r="22" fill="${accent}" opacity="0.2"/>
-  <text x="${CARD_W / 2}" y="${CARD_H / 2 + 5}" font-family="serif" font-size="16" font-weight="bold" text-anchor="middle" fill="${accent}">LC</text>
-  <text x="${CARD_W / 2}" y="${CARD_H / 2 + 18}" font-family="serif" font-size="8" text-anchor="middle" fill="${accent}" opacity="0.8">EXPEDITION</text>
+  <circle cx="${CARD_W / 2}" cy="${CARD_H / 2}" r="35" fill="none" stroke="${accent}" stroke-width="2.5"/>
+  <circle cx="${CARD_W / 2}" cy="${CARD_H / 2}" r="28" fill="${accent}" opacity="0.2"/>
+  <text x="${CARD_W / 2}" y="${CARD_H / 2 + 7}" font-family="serif" font-size="26" font-weight="bold" text-anchor="middle" fill="${accent}">LC</text>
+  <text x="${CARD_W / 2}" y="${CARD_H / 2 + 24}" font-family="serif" font-size="12" text-anchor="middle" fill="${accent}" opacity="0.8">EXPEDITION</text>
 </svg>`;
 }
 

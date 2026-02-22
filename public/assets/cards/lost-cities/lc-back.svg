@@ -44,8 +44,8 @@
   <polygon points="80,156 87,164 80,172 73,164" fill="#c9a96e" opacity="0.15"/>
   <polygon points="100,156 107,164 100,172 93,164" fill="#c9a96e" opacity="0.15"/>
   <polygon points="120,156 127,164 120,172 113,164" fill="#c9a96e" opacity="0.15"/>
-  <circle cx="70" cy="95" r="28" fill="none" stroke="#c9a96e" stroke-width="2"/>
-  <circle cx="70" cy="95" r="22" fill="#c9a96e" opacity="0.2"/>
-  <text x="70" y="100" font-family="serif" font-size="16" font-weight="bold" text-anchor="middle" fill="#c9a96e">LC</text>
-  <text x="70" y="113" font-family="serif" font-size="8" text-anchor="middle" fill="#c9a96e" opacity="0.8">EXPEDITION</text>
+  <circle cx="70" cy="95" r="35" fill="none" stroke="#c9a96e" stroke-width="2.5"/>
+  <circle cx="70" cy="95" r="28" fill="#c9a96e" opacity="0.2"/>
+  <text x="70" y="102" font-family="serif" font-size="26" font-weight="bold" text-anchor="middle" fill="#c9a96e">LC</text>
+  <text x="70" y="119" font-family="serif" font-size="12" text-anchor="middle" fill="#c9a96e" opacity="0.8">EXPEDITION</text>
 </svg>
