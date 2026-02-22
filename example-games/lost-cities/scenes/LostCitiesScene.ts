@@ -124,9 +124,17 @@ const SCORE_BOX_H = 50;
 const OPP_SCORE_Y = HEADER_H + 16;
 const PLR_SCORE_Y = GAME_H - SCORE_BOX_H - 16;
 
-const DRAW_PILE_Y = OPP_SCORE_Y + SCORE_BOX_H + 30 + BOX_LABEL_H;
-const ROUND_Y = DRAW_PILE_Y + CARD_H + 20;
+// Center the round indicator + draw pile vertically between score boxes.
+// Stacking order (top→bottom): Round indicator → Draw pile.
 const ROUND_BOX_H = 52;
+const MID_GROUP_GAP = 16;                       // gap between round box and draw pile box
+const DRAW_BOX_H = BOX_LABEL_H + CARD_H + 16;  // draw pile box inner height (label + card + count text)
+const MID_GROUP_TOTAL = ROUND_BOX_H + MID_GROUP_GAP + DRAW_BOX_H;
+const MID_AVAIL_TOP = OPP_SCORE_Y + SCORE_BOX_H + 12; // below opponent score box
+const MID_AVAIL_BOT = PLR_SCORE_Y - 12;               // above player score box
+const MID_GROUP_TOP = MID_AVAIL_TOP + Math.floor((MID_AVAIL_BOT - MID_AVAIL_TOP - MID_GROUP_TOTAL) / 2);
+const ROUND_Y = MID_GROUP_TOP;
+const DRAW_PILE_Y = ROUND_Y + ROUND_BOX_H + MID_GROUP_GAP + BOX_LABEL_H;
 
 // Right column: Hand — uses nearly full vertical height
 // Content starts below the "Your Hand" label
@@ -367,6 +375,11 @@ export class LostCitiesScene extends Phaser.Scene {
       MID_COL_X - BOX_PAD, OPP_SCORE_Y - BOX_PAD,
       MID_COL_W + 2 * BOX_PAD, SCORE_BOX_H + 2 * BOX_PAD, '',
     );
+    // Round indicator (above draw pile)
+    this.drawSectionBox(
+      MID_COL_X - BOX_PAD, ROUND_Y - BOX_PAD,
+      MID_COL_W + 2 * BOX_PAD, ROUND_BOX_H + 2 * BOX_PAD, '',
+    );
     // Draw pile — box includes label
     this.drawSectionBox(
       MID_COL_X - BOX_PAD,
@@ -374,11 +387,6 @@ export class LostCitiesScene extends Phaser.Scene {
       MID_COL_W + 2 * BOX_PAD,
       CARD_H + BOX_LABEL_H + 2 * BOX_PAD + 16,
       'Draw Pile',
-    );
-    // Round indicator
-    this.drawSectionBox(
-      MID_COL_X - BOX_PAD, ROUND_Y - BOX_PAD,
-      MID_COL_W + 2 * BOX_PAD, ROUND_BOX_H + 2 * BOX_PAD, '',
     );
     // Player score (bottom of middle column)
     this.drawSectionBox(
@@ -445,18 +453,7 @@ export class LostCitiesScene extends Phaser.Scene {
       .text(MID_COL_CENTER, OPP_SCORE_Y + 26, 'Score: 0', SCORE_STYLE)
       .setOrigin(0.5, 0);
 
-    // Draw pile (center of middle column)
-    this.drawPileSprite = this.add.image(
-      MID_COL_CENTER, DRAW_PILE_Y + CARD_H / 2, CARD_BACK_KEY,
-    );
-    this.drawPileSprite.setInteractive({ useHandCursor: true });
-    this.drawPileSprite.on('pointerdown', () => this.onDrawPileClick());
-
-    this.drawPileCountText = this.add
-      .text(MID_COL_CENTER, DRAW_PILE_Y + CARD_H + 4, '44 remaining', SMALL_LABEL)
-      .setOrigin(0.5, 0);
-
-    // Round / turn indicator
+    // Round / turn indicator (above draw pile)
     this.roundText = this.add
       .text(MID_COL_CENTER, ROUND_Y + 6, 'Round 1 / 3', SCORE_STYLE)
       .setOrigin(0.5, 0);
@@ -466,6 +463,17 @@ export class LostCitiesScene extends Phaser.Scene {
         fontSize: '13px',
         color: '#66dd66',
       })
+      .setOrigin(0.5, 0);
+
+    // Draw pile (below round indicator)
+    this.drawPileSprite = this.add.image(
+      MID_COL_CENTER, DRAW_PILE_Y + CARD_H / 2, CARD_BACK_KEY,
+    );
+    this.drawPileSprite.setInteractive({ useHandCursor: true });
+    this.drawPileSprite.on('pointerdown', () => this.onDrawPileClick());
+
+    this.drawPileCountText = this.add
+      .text(MID_COL_CENTER, DRAW_PILE_Y + CARD_H + 4, '44 remaining', SMALL_LABEL)
       .setOrigin(0.5, 0);
 
     // Player score (bottom of middle column)
