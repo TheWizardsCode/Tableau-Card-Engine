@@ -242,8 +242,6 @@ export class LostCitiesScene extends Phaser.Scene {
 
   // Card sprites — discard piles (one sprite per color showing top card)
   private discardSprites: Map<ExpeditionColor, Phaser.GameObjects.Image> = new Map();
-  /** Invisible hit areas for discard pile clicks (always present). */
-  private discardHitAreas: Map<ExpeditionColor, Phaser.GameObjects.Rectangle> = new Map();
 
   // Card sprites — hand
   private handSprites: Phaser.GameObjects.Image[] = [];
@@ -349,7 +347,6 @@ export class LostCitiesScene extends Phaser.Scene {
     this.playerExpSprites = new Map();
     this.oppExpSprites = new Map();
     this.discardSprites = new Map();
-    this.discardHitAreas = new Map();
     this.handSprites = [];
     this.selectionHighlight = null;
 
@@ -505,19 +502,23 @@ export class LostCitiesScene extends Phaser.Scene {
 
   // ── Discard zones ───────────────────────────────────────
   private createDiscardZones(): void {
-    for (let i = 0; i < 5; i++) {
-      const color = EXPEDITION_COLORS[i];
-
-      // Hit area (always present, even when pile is empty)
-      const hitArea = this.add.rectangle(
-        laneX(i), DISCARD_Y + DISCARD_CARD_H / 2,
-        DISCARD_CARD_W + 4, DISCARD_CARD_H + 4,
-        0x000000, 0,
-      );
-      hitArea.setInteractive({ useHandCursor: true });
-      hitArea.on('pointerdown', () => this.onDiscardClick(color));
-      this.discardHitAreas.set(color, hitArea);
-    }
+    // Single row-wide hit area spanning all 5 discard piles.
+    // Phase 1 (discard): color is auto-routed from selected card, so any
+    // click in the row works. Phase 2 (draw): nearest non-empty pile is
+    // found based on pointer X position.
+    const areaLeft = laneX(0) - CARD_W / 2 - 2;
+    const areaRight = laneX(4) + CARD_W / 2 + 2;
+    const areaWidth = areaRight - areaLeft;
+    const areaCenterX = areaLeft + areaWidth / 2;
+    const hitArea = this.add.rectangle(
+      areaCenterX, DISCARD_Y + DISCARD_CARD_H / 2,
+      areaWidth, DISCARD_CARD_H + 4,
+      0x000000, 0,
+    );
+    hitArea.setInteractive({ useHandCursor: true });
+    hitArea.on('pointerdown', (pointer: Phaser.Input.Pointer) =>
+      this.onDiscardRowClick(pointer),
+    );
   }
 
   // ── Right column (scores, draw pile, round) ─────────────
@@ -877,7 +878,7 @@ export class LostCitiesScene extends Phaser.Scene {
     this.executePlayerPhase1(action);
   }
 
-  private onDiscardClick(color: ExpeditionColor): void {
+  private onDiscardRowClick(pointer: Phaser.Input.Pointer): void {
     // Phase 1: discard a card — auto-route to the card's own color pile
     if (this.turnPhase === 'waiting-for-target') {
       if (this.selectedCardIndex < 0) return;
@@ -896,15 +897,30 @@ export class LostCitiesScene extends Phaser.Scene {
       return;
     }
 
-    // Phase 2: draw from discard
+    // Phase 2: draw from discard — find nearest non-empty pile
     if (this.turnPhase === 'waiting-for-draw') {
-      const pile = this.session.round.discardPiles.get(color) ?? [];
-      if (pile.length === 0) return;
+      const clickX = pointer.x;
 
-      // Can't draw from just-discarded color
-      if (this.session.round.justDiscardedColor === color) {
+      // Find the nearest non-empty, non-just-discarded pile
+      let bestColor: ExpeditionColor | null = null;
+      let bestDist = Infinity;
+
+      for (let i = 0; i < 5; i++) {
+        const color = EXPEDITION_COLORS[i];
+        const pile = this.session.round.discardPiles.get(color) ?? [];
+        if (pile.length === 0) continue;
+        if (this.session.round.justDiscardedColor === color) continue;
+        const dist = Math.abs(clickX - laneX(i));
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestColor = color;
+        }
+      }
+
+      if (!bestColor) {
+        // All piles empty or all blocked — show feedback
         this.soundManager?.play(SFX_KEYS.ILLEGAL_MOVE);
-        this.instructionText.setText("Can't draw from the pile you just discarded to!");
+        this.instructionText.setText('No discard piles available to draw from');
         this.time.delayedCall(1500, () => {
           if (this.turnPhase === 'waiting-for-draw') {
             this.instructionText.setText(
@@ -917,7 +933,7 @@ export class LostCitiesScene extends Phaser.Scene {
 
       const action: Phase2Action = {
         kind: 'draw-from-discard',
-        color,
+        color: bestColor,
       };
 
       this.executePlayerPhase2(action);
