@@ -24,6 +24,7 @@ import {
   getWinnerIndex,
 } from '../SushiGoGame';
 import { SushiGoAiPlayer, GreedyStrategy } from '../AiStrategy';
+import { scoreTableauBreakdown } from '../SushiGoScoring';
 import { GameEventEmitter } from '../../../src/core-engine/GameEventEmitter';
 import { PhaserEventBridge } from '../../../src/core-engine/PhaserEventBridge';
 import { SoundManager } from '../../../src/core-engine/SoundManager';
@@ -594,10 +595,55 @@ export class SushiGoScene extends Phaser.Scene {
 
       // Type label above the group
       const groupW = cards.length * (TABLEAU_CARD_W + TABLEAU_CARD_GAP) - TABLEAU_CARD_GAP;
+      // Determine label text using score breakdown when available
+      let labelText = this.getTypeGroupLabel(type, cards);
+      if (type !== 'maki' && type !== 'pudding') {
+        // For categories that score within a single tableau, compute
+        // the score and show it instead of the raw card count.
+        // Use the full-player tableau breakdown so that cross-group
+        // interactions (e.g. wasabi consuming a later nigiri) are
+        // reflected in the displayed per-category score. The scoring
+        // helper is imported statically at module load to avoid stale
+        // dynamic require paths and TypeScript/LSP warnings.
+        try {
+          const breakdown = scoreTableauBreakdown(tableau);
+          switch (type) {
+            case 'tempura':
+              labelText = `Tmp(${breakdown.tempura})`;
+              break;
+            case 'sashimi':
+              labelText = `Ssh(${breakdown.sashimi})`;
+              break;
+            case 'dumpling':
+              labelText = `Dmp(${breakdown.dumpling})`;
+              break;
+            case 'nigiri':
+              labelText = `Nig(${breakdown.nigiri})`;
+              break;
+            case 'wasabi':
+              // wasabi has no direct score in isolation
+              labelText = `Wsb(${cards.length})`;
+              break;
+            case 'chopsticks':
+              labelText = `Chp(${breakdown.chopsticks})`;
+              break;
+            default:
+              break;
+          }
+        } catch (e) {
+          // If anything goes wrong, fall back to the simple label
+          // computed from the group's cards to keep UI stable.
+          // (This should not normally happen.)
+          // eslint-disable-next-line no-console
+          console.warn('Failed to compute breakdown for tableau labels', e);
+          labelText = this.getTypeGroupLabel(type, cards);
+        }
+      }
+
       const typeLabel = this.add.text(
         curX + groupW / 2,
         baseY - TABLEAU_CARD_H / 2 - 16,
-        this.getTypeGroupLabel(type, cards),
+        labelText,
         {
           fontSize: '11px',
           color: who === 'player' ? '#aaccaa' : '#99aabb',
