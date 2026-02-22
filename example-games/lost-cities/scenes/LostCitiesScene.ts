@@ -229,7 +229,7 @@ export class LostCitiesScene extends Phaser.Scene {
   private drawPileSprite!: Phaser.GameObjects.Image;
   private drawPileCountText!: Phaser.GameObjects.Text;
   /** Invisible hit area for expedition lane clicks (one per color). */
-  private playerExpHitAreas: Map<ExpeditionColor, Phaser.GameObjects.Rectangle> = new Map();
+
 
   // UI text
   private oppScoreText!: Phaser.GameObjects.Text;
@@ -286,7 +286,6 @@ export class LostCitiesScene extends Phaser.Scene {
     this.oppExpSprites = new Map();
     this.discardSprites = new Map();
     this.discardHitAreas = new Map();
-    this.playerExpHitAreas = new Map();
     this.handSprites = [];
     this.selectionHighlight = null;
 
@@ -421,17 +420,22 @@ export class LostCitiesScene extends Phaser.Scene {
       // Init sprite arrays
       this.oppExpSprites.set(color, []);
       this.playerExpSprites.set(color, []);
-
-      // Player expedition hit area — covers the full lane area for drop targets
-      const hitArea = this.add.rectangle(
-        laneX(i), PLR_EXP_TOP + EXP_HEIGHT / 2,
-        CARD_W + 4, EXP_HEIGHT + 4,
-        0x000000, 0,
-      );
-      hitArea.setInteractive({ useHandCursor: true });
-      hitArea.on('pointerdown', () => this.onExpeditionClick(color));
-      this.playerExpHitAreas.set(color, hitArea);
     }
+
+    // Single hit area covering the entire player expedition region.
+    // onExpeditionClick auto-routes to the selected card's color,
+    // so the player can click anywhere in the expedition area.
+    const areaLeft = laneX(0) - CARD_W / 2 - 2;
+    const areaRight = laneX(4) + CARD_W / 2 + 2;
+    const areaWidth = areaRight - areaLeft;
+    const areaCenterX = areaLeft + areaWidth / 2;
+    const hitArea = this.add.rectangle(
+      areaCenterX, PLR_EXP_TOP + EXP_HEIGHT / 2,
+      areaWidth, EXP_HEIGHT + 4,
+      0x000000, 0,
+    );
+    hitArea.setInteractive({ useHandCursor: true });
+    hitArea.on('pointerdown', () => this.onExpeditionClick(EXPEDITION_COLORS[0]));
   }
 
   // ── Discard zones ───────────────────────────────────────
@@ -741,7 +745,7 @@ export class LostCitiesScene extends Phaser.Scene {
     this.setPhase('waiting-for-target');
   }
 
-  private onExpeditionClick(color: ExpeditionColor): void {
+  private onExpeditionClick(_clickedColor: ExpeditionColor): void {
     if (this.turnPhase !== 'waiting-for-target') return;
     if (this.selectedCardIndex < 0) return;
 
@@ -749,11 +753,8 @@ export class LostCitiesScene extends Phaser.Scene {
     const card = hand[this.selectedCardIndex];
     if (!card) return;
 
-    // Must match color
-    if (card.color !== color) {
-      this.showIllegalMoveFlash(this.handSprites[this.selectedCardIndex]);
-      return;
-    }
+    // Auto-route: always play to the card's own color expedition
+    const color = card.color;
 
     const action: Phase1Action = {
       kind: 'play-to-expedition',
@@ -778,7 +779,7 @@ export class LostCitiesScene extends Phaser.Scene {
   }
 
   private onDiscardClick(color: ExpeditionColor): void {
-    // Phase 1: discard a card
+    // Phase 1: discard a card — auto-route to the card's own color pile
     if (this.turnPhase === 'waiting-for-target') {
       if (this.selectedCardIndex < 0) return;
 
@@ -786,16 +787,10 @@ export class LostCitiesScene extends Phaser.Scene {
       const card = hand[this.selectedCardIndex];
       if (!card) return;
 
-      // Must match color
-      if (card.color !== color) {
-        this.showIllegalMoveFlash(this.handSprites[this.selectedCardIndex]);
-        return;
-      }
-
       const action: Phase1Action = {
         kind: 'discard',
         card,
-        color,
+        color: card.color,
       };
 
       this.executePlayerPhase1(action);

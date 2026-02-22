@@ -94,9 +94,9 @@ const ICON_PATH: Record<ExpeditionColor, string> = {
 };
 
 /** Investment/wager symbol — handshake-like icon. */
-const INVESTMENT_ICON = `<g transform="translate(70,90) scale(0.9)">
-  <circle cx="0" cy="0" r="22" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="4,3"/>
-  <text x="0" y="8" font-family="serif" font-size="28" font-weight="bold"
+const INVESTMENT_ICON = `<g transform="translate(70,88) scale(1.3)">
+  <circle cx="0" cy="0" r="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-dasharray="5,3"/>
+  <text x="0" y="10" font-family="serif" font-size="34" font-weight="bold"
         text-anchor="middle" fill="currentColor">$</text>
 </g>`;
 
