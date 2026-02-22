@@ -378,20 +378,16 @@ export class SushiGoScene extends Phaser.Scene {
     const iconMeta = getIconKeyForCard(card);
     const iconKey = iconMeta?.key ?? null;
     if (iconKey && this.textures.exists(iconKey)) {
-      const img = this.add.image(0, -h * 0.06, iconKey);
-      img.setOrigin(0.5, 0);
-      img.setDisplaySize(Math.min(w * 0.85, h * 0.6), Math.min(h * 0.6, w * 0.85));
+      // Center the icon and scale it to occupy more of the card while preserving
+      // a small padding so it remains legible when card shapes change.
+      const img = this.add.image(0, 0, iconKey);
+      img.setOrigin(0.5, 0.5);
+      // Use larger footprint for icons in both hand and tableau; hand cards are taller
+      const iconMaxW = w * (isHand ? 0.9 : 0.85);
+      const iconMaxH = h * (isHand ? 0.7 : 0.85);
+      const iconSize = Math.min(iconMaxW, iconMaxH);
+      img.setDisplaySize(iconSize, iconSize);
       container.add(img);
-
-      // Add a small type label below the icon for clarity at small sizes
-      const label = this.add.text(0, h * 0.36, labelText, {
-        fontSize,
-        color: style.text,
-        fontFamily: FONT_FAMILY,
-        align: 'center',
-        wordWrap: { width: w - 6 },
-      }).setOrigin(0.5, 0);
-      container.add(label);
     } else {
       const label = this.add.text(0, 0, labelText, {
         fontSize,
