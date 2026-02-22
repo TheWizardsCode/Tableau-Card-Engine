@@ -56,3 +56,18 @@ Files (in `audio/beleaguered-castle/`):
 - `card-select.wav` — soft metallic click when selecting a card (click-to-move)
 - `card-deselect.wav` — softer inverse click when deselecting a card
 - `ui-click.wav` — castle-themed button press (stone/iron)
+
+## Lost Cities Card Assets
+
+61 SVG card images (60 expedition cards + 1 card back) generated for the Lost Cities game:
+
+- **Source**: Procedurally generated using `scripts/generate-lost-cities-cards.ts`
+- **License**: MIT (original procedural generation, no external assets used)
+- **Format**: SVG, 140x190px
+- **Generator**: Run `npx tsx scripts/generate-lost-cities-cards.ts` to regenerate
+
+Files (in `cards/lost-cities/`):
+- `lc-{color}-{2-10}.svg` — numbered expedition cards (45 total, 9 per color)
+- `lc-{color}-inv{1-3}.svg` — investment/wager cards (15 total, 3 per color)
+- `lc-back.svg` — card back with expedition theme
+- Colors: yellow (compass), blue (ship), white (mountain), green (torch), red (crystal)

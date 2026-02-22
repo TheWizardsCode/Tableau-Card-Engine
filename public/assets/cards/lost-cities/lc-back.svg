@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="140" height="190" viewBox="0 0 140 190">
+  <rect width="140" height="190" rx="10" ry="10" fill="#2c3e50"/>
+  <rect x="1" y="1" width="138" height="188" rx="9" ry="9" fill="none" stroke="#c9a96e" stroke-width="1.5"/>
+  <rect x="6" y="6" width="128" height="178" rx="7" ry="7" fill="none" stroke="#c9a96e" stroke-width="1.5"/>
+  <polygon points="20,12 27,20 20,28 13,20" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="40,12 47,20 40,28 33,20" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="60,12 67,20 60,28 53,20" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="80,12 87,20 80,28 73,20" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="100,12 107,20 100,28 93,20" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="120,12 127,20 120,28 113,20" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="20,36 27,44 20,52 13,44" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="40,36 47,44 40,52 33,44" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="60,36 67,44 60,52 53,44" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="80,36 87,44 80,52 73,44" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="100,36 107,44 100,52 93,44" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="120,36 127,44 120,52 113,44" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="20,60 27,68 20,76 13,68" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="40,60 47,68 40,76 33,68" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="60,60 67,68 60,76 53,68" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="80,60 87,68 80,76 73,68" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="100,60 107,68 100,76 93,68" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="120,60 127,68 120,76 113,68" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="20,84 27,92 20,100 13,92" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="40,84 47,92 40,100 33,92" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="60,84 67,92 60,100 53,92" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="80,84 87,92 80,100 73,92" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="100,84 107,92 100,100 93,92" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="120,84 127,92 120,100 113,92" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="20,108 27,116 20,124 13,116" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="40,108 47,116 40,124 33,116" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="60,108 67,116 60,124 53,116" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="80,108 87,116 80,124 73,116" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="100,108 107,116 100,124 93,116" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="120,108 127,116 120,124 113,116" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="20,132 27,140 20,148 13,140" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="40,132 47,140 40,148 33,140" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="60,132 67,140 60,148 53,140" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="80,132 87,140 80,148 73,140" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="100,132 107,140 100,148 93,140" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="120,132 127,140 120,148 113,140" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="20,156 27,164 20,172 13,164" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="40,156 47,164 40,172 33,164" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="60,156 67,164 60,172 53,164" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="80,156 87,164 80,172 73,164" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="100,156 107,164 100,172 93,164" fill="#c9a96e" opacity="0.15"/>
+  <polygon points="120,156 127,164 120,172 113,164" fill="#c9a96e" opacity="0.15"/>
+  <circle cx="70" cy="95" r="28" fill="none" stroke="#c9a96e" stroke-width="2"/>
+  <circle cx="70" cy="95" r="22" fill="#c9a96e" opacity="0.2"/>
+  <text x="70" y="100" font-family="serif" font-size="16" font-weight="bold" text-anchor="middle" fill="#c9a96e">LC</text>
+  <text x="70" y="113" font-family="serif" font-size="8" text-anchor="middle" fill="#c9a96e" opacity="0.8">EXPEDITION</text>
+</svg>
