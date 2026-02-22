@@ -439,6 +439,11 @@ export class SushiGoScene extends Phaser.Scene {
       this.hideCardTooltip();
     });
 
+    // Store the underlying card id on the container so callers can
+    // reliably find containers for specific cards when rendering
+    // overlays (e.g. wasabi underline for paired nigiri).
+    container.setData('cardId', card.id);
+
     return container;
   }
 
@@ -525,6 +530,25 @@ export class SushiGoScene extends Phaser.Scene {
       return;
     }
 
+    // Build wasabi <-> nigiri pairing maps (based on play order).
+    // Each wasabi pairs with the first subsequent nigiri. We record
+    // by card id so groups (which reorder cards) can still determine
+    // whether a wasabi is "consumed" and whether a nigiri is paired.
+    const wasabiToNigiri = new Map<number, number>();
+    const nigiriToWasabi = new Map<number, number>();
+    const wasabiQueue: number[] = [];
+    for (const c of tableau) {
+      if (c.type === 'wasabi') {
+        wasabiQueue.push(c.id);
+      } else if (c.type === 'nigiri') {
+        if (wasabiQueue.length > 0) {
+          const wId = wasabiQueue.shift()!;
+          wasabiToNigiri.set(wId, c.id);
+          nigiriToWasabi.set(c.id, wId);
+        }
+      }
+    }
+
     // Group cards by type (groups preserve tableau play order)
     const groups = this.groupByType(tableau);
 
@@ -557,8 +581,16 @@ export class SushiGoScene extends Phaser.Scene {
     let curX = (GAME_W - totalWidth) / 2;
 
     for (const type of typeOrder) {
-      const cards = groups.get(type);
+      let cards = groups.get(type);
       if (!cards || cards.length === 0) continue;
+
+      // If rendering the wasabi group, remove any wasabi that has
+      // been paired with a nigiri so it will be displayed beneath
+      // its paired nigiri instead of as a separate card.
+      if (type === 'wasabi') {
+        cards = cards.filter((c) => !wasabiToNigiri.has(c.id));
+        if (cards.length === 0) continue;
+      }
 
       // Type label above the group
       const groupW = cards.length * (TABLEAU_CARD_W + TABLEAU_CARD_GAP) - TABLEAU_CARD_GAP;
@@ -584,6 +616,65 @@ export class SushiGoScene extends Phaser.Scene {
       }
 
       curX += groupW + TABLEAU_GROUP_GAP;
+    }
+
+    // Now render paired nigiri on top of their wasabi: for each nigiri
+    // that has a pairing, find its position (we'll render the wasabi
+    // as a small underline beneath the nigiri to make the relationship
+    // visually explicit). This keeps tableau grouping intact while
+    // providing a clear indication of pairing.
+    for (const [nigiriId] of nigiriToWasabi.entries()) {
+      // Find the card container we created for this nigiri
+      const children = container.getAll();
+      let nigiriContainer: Phaser.GameObjects.Container | null = null;
+      for (const child of children) {
+        // Our card containers are Phaser Containers with a text/image child
+        if (!(child instanceof Phaser.GameObjects.Container)) continue;
+        const inner = child.list.find((l: any) => l && l.type === 'Text') as Phaser.GameObjects.Text | undefined;
+        if (!inner) continue;
+        // The label text for nigiri is a single letter (E/S/Q) or 'NG' for group labels.
+        // We can compare the underlying card id by checking data stored on the container
+        // when created. To keep this lightweight, rely on matching the displayed label
+        // and proximity of types. (If ambiguous, skip.)
+        const possible = child.getData && child.getData('cardId') === nigiriId;
+        if (possible) {
+          nigiriContainer = child as Phaser.GameObjects.Container;
+          break;
+        }
+      }
+
+      if (!nigiriContainer) continue;
+
+      // Avoid adding duplicate overlays on repeated refreshes
+      if (nigiriContainer.getData('wasabiOverlay')) continue;
+
+      // Small wasabi icon slightly beneath the card (subtle cue)
+      if (this.textures.exists('icon-wasabi')) {
+        const iconSize = Math.round(TABLEAU_CARD_W * 0.36);
+        const wasabiImg = this.add.image(0, TABLEAU_CARD_H / 2 - 6, 'icon-wasabi');
+        wasabiImg.setDisplaySize(iconSize, iconSize);
+        wasabiImg.setOrigin(0.5, 1);
+        // Place below the card content but above the background
+        nigiriContainer.addAt(wasabiImg, 1);
+      }
+
+      // Prominent badge indicating x3 multiplier (top-right corner)
+      const badgeW = 32;
+      const badgeH = 18;
+      const badgeX = TABLEAU_CARD_W / 2 - badgeW / 2 - 6;
+      const badgeY = -TABLEAU_CARD_H / 2 + badgeH / 2 + 6;
+      const badgeBg = this.add.rectangle(badgeX, badgeY, badgeW, badgeH, 0x90EE90, 1);
+      badgeBg.setStrokeStyle(1, 0x336633);
+      badgeBg.setOrigin(0.5);
+      const badgeText = this.add.text(badgeX, badgeY, 'x3', {
+        fontSize: '12px',
+        color: '#1a3a1a',
+        fontFamily: FONT_FAMILY,
+      }).setOrigin(0.5);
+      // Add badge on top of card visuals
+      nigiriContainer.add(badgeBg);
+      nigiriContainer.add(badgeText);
+      nigiriContainer.setData('wasabiOverlay', true);
     }
   }
 
