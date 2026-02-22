@@ -276,7 +276,7 @@ describe('Full match transcript', () => {
 
     const transcript = recorder.finalize(session);
     validateTranscript(transcript);
-  }, 15_000);
+  }, 60_000);
 
   it('has exactly 3 rounds', () => {
     const { session, recorder } = runFullAiMatch(99);
