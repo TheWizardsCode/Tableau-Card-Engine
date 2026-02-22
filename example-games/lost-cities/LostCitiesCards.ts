@@ -149,6 +149,19 @@ export function cardAssetKey(card: LostCitiesCard): string {
   return `lc-${card.color}-${card.rank}`;
 }
 
+/**
+ * Asset key for the compact (small) variant of a card image.
+ * Used when displaying cards at small sizes (discard piles, etc.)
+ * where the full SVG detail is unreadable.
+ * Follows the naming convention: `lc-{color}-{type}-sm`.
+ */
+export function compactAssetKey(card: LostCitiesCard): string {
+  if (card.type === 'investment') {
+    return `lc-${card.color}-inv${card.investmentIndex}-sm`;
+  }
+  return `lc-${card.color}-${card.rank}-sm`;
+}
+
 /** Asset key for the card back image. */
 export const CARD_BACK_KEY = 'lc-back';
 

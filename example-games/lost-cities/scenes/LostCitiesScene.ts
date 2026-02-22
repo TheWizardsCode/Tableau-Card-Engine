@@ -29,6 +29,7 @@ import type {
 import {
   EXPEDITION_COLORS,
   cardAssetKey,
+  compactAssetKey,
   CARD_BACK_KEY,
   HAND_SIZE,
 } from '../LostCitiesCards';
@@ -301,6 +302,24 @@ export class LostCitiesScene extends Phaser.Scene {
       width: CARD_W,
       height: CARD_H,
     });
+
+    // Load compact (small) card variants for discard piles
+    for (const color of EXPEDITION_COLORS) {
+      for (let inv = 1; inv <= 3; inv++) {
+        const key = `lc-${color}-inv${inv}-sm`;
+        this.load.svg(key, `assets/cards/lost-cities/${key}.svg`, {
+          width: DISCARD_CARD_W,
+          height: DISCARD_CARD_H,
+        });
+      }
+      for (let rank = 2; rank <= 10; rank++) {
+        const key = `lc-${color}-${rank}-sm`;
+        this.load.svg(key, `assets/cards/lost-cities/${key}.svg`, {
+          width: DISCARD_CARD_W,
+          height: DISCARD_CARD_H,
+        });
+      }
+    }
 
     // Load expedition-themed sound effects
     this.load.audio(SFX_KEYS.CARD_SELECT, 'assets/audio/lost-cities/card-select.wav');
@@ -693,7 +712,7 @@ export class LostCitiesScene extends Phaser.Scene {
         const topCard = pile[pile.length - 1];
         const sprite = this.add.image(
           laneX(i), DISCARD_Y + DISCARD_CARD_H / 2,
-          cardAssetKey(topCard),
+          compactAssetKey(topCard),
         );
         sprite.setDisplaySize(DISCARD_CARD_W, DISCARD_CARD_H);
         this.discardSprites.set(color, sprite);

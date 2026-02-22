@@ -196,6 +196,35 @@ ${diamonds.join('\n')}
 </svg>`;
 }
 
+// ── Compact card generators (for small display sizes) ──────
+
+const SM_W = 60;
+const SM_H = 82;
+const SM_R = 6;
+
+function generateCompactNumbered(color: ExpeditionColor, rank: number): string {
+  const bg = BG[color];
+  const text = TEXT_COLOR[color];
+  const accent = ACCENT[color];
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${SM_W}" height="${SM_H}" viewBox="0 0 ${SM_W} ${SM_H}">
+  <rect width="${SM_W}" height="${SM_H}" rx="${SM_R}" ry="${SM_R}" fill="${bg}"/>
+  <rect x="1" y="1" width="${SM_W - 2}" height="${SM_H - 2}" rx="${SM_R - 1}" ry="${SM_R - 1}" fill="none" stroke="${accent}" stroke-width="1.5"/>
+  <text x="${SM_W / 2}" y="${SM_H / 2 + 12}" font-family="Arial, sans-serif" font-size="34" font-weight="bold" text-anchor="middle" fill="${text}">${rank}</text>
+</svg>`;
+}
+
+function generateCompactInvestment(color: ExpeditionColor, index: number): string {
+  const bg = BG[color];
+  const text = TEXT_COLOR[color];
+  const accent = ACCENT[color];
+  // Show $ symbol for investment cards
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${SM_W}" height="${SM_H}" viewBox="0 0 ${SM_W} ${SM_H}">
+  <rect width="${SM_W}" height="${SM_H}" rx="${SM_R}" ry="${SM_R}" fill="${bg}"/>
+  <rect x="1" y="1" width="${SM_W - 2}" height="${SM_H - 2}" rx="${SM_R - 1}" ry="${SM_R - 1}" fill="none" stroke="${accent}" stroke-width="1.5" stroke-dasharray="4,2"/>
+  <text x="${SM_W / 2}" y="${SM_H / 2 + 10}" font-family="serif" font-size="30" font-weight="bold" text-anchor="middle" fill="${text}">$${index}</text>
+</svg>`;
+}
+
 // ── Main ───────────────────────────────────────────────────
 
 function main(): void {
@@ -228,6 +257,26 @@ function main(): void {
   const backSvg = generateCardBack();
   writeFileSync(join(OUT_DIR, 'lc-back.svg'), backSvg);
   count++;
+
+  // Generate compact numbered cards (5 colors × 9 ranks = 45 cards)
+  for (const color of COLORS) {
+    for (let rank = 2; rank <= 10; rank++) {
+      const key = `lc-${color}-${rank}-sm`;
+      const svg = generateCompactNumbered(color, rank);
+      writeFileSync(join(OUT_DIR, `${key}.svg`), svg);
+      count++;
+    }
+  }
+
+  // Generate compact investment cards (5 colors × 3 investments = 15 cards)
+  for (const color of COLORS) {
+    for (let idx = 1; idx <= 3; idx++) {
+      const key = `lc-${color}-inv${idx}-sm`;
+      const svg = generateCompactInvestment(color, idx);
+      writeFileSync(join(OUT_DIR, `${key}.svg`), svg);
+      count++;
+    }
+  }
 
   console.log(`Generated ${count} SVG card images in ${OUT_DIR}`);
 }
