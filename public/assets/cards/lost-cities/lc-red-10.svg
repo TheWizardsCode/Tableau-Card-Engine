@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="140" height="190" viewBox="0 0 140 190">
+  <rect width="140" height="190" rx="10" ry="10" fill="#e04040"/>
+  <rect x="1" y="1" width="138" height="188" rx="9" ry="9" fill="none" stroke="#6b1a1a" stroke-width="1.5"/>
+  <rect x="8" y="8" width="124" height="174" rx="6" ry="6" fill="none" stroke="#6b1a1a" stroke-width="0.8" opacity="0.5"/>
+  <text x="16" y="30" font-family="Arial, sans-serif" font-size="22" font-weight="bold" text-anchor="middle" fill="#ffffff">10</text>
+  <text x="124" y="176" font-family="Arial, sans-serif" font-size="22" font-weight="bold" text-anchor="middle" fill="#ffffff" transform="rotate(180,124,168)">10</text>
+<g transform="translate(70,100) scale(0.6)">
+    <polygon points="0,-25 18,-5 12,22 -12,22 -18,-5" fill="none" stroke="#6b1a1a" stroke-width="2.5"/>
+    <polygon points="0,-25 8,-5 0,22 -8,-5" fill="#6b1a1a" opacity="0.3"/>
+    <line x1="-18" y1="-5" x2="18" y2="-5" stroke="#6b1a1a" stroke-width="1.5"/>
+  </g>
+  <text x="70" y="178" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#ffffff" opacity="0.7">Red</text>
+</svg>
