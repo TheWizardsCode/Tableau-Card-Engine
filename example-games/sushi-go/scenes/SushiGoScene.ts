@@ -14,6 +14,7 @@
 import Phaser from 'phaser';
 import type { SushiGoCard, SushiGoCardType } from '../SushiGoCards';
 import { cardLabel } from '../SushiGoCards';
+import { getIconKeyForCard } from '../IconMap';
 import type { SushiGoSession, RoundResult, PickAction } from '../SushiGoGame';
 import {
   setupSushiGoGame,
@@ -170,9 +171,18 @@ export class SushiGoScene extends Phaser.Scene {
     this.load.audio(SFX_KEYS.SCORE_REVEAL, 'assets/audio/score-reveal.wav');
     this.load.audio(SFX_KEYS.UI_CLICK, 'assets/audio/ui-click.wav');
 
-    // Sushi Go icon assets
-    // Load only the reference icon we added; full set to be added later.
-    this.load.svg('icon-nigiri-salmon', 'assets/sushi-go/icon-nigiri-salmon.svg');
+    // Sushi Go icon assets: preload all icon files present in public/assets/sushi-go
+    // We list the known filenames here to avoid dynamic FS lookups at runtime.
+    const icons = [
+      'icon-nigiri-salmon.svg', 'icon-nigiri-egg.svg', 'icon-nigiri-squid.svg',
+      'icon-maki-1.svg', 'icon-maki-2.svg', 'icon-maki-3.svg',
+      'icon-tempura.svg', 'icon-sashimi.svg', 'icon-dumpling.svg',
+      'icon-wasabi.svg', 'icon-pudding.svg', 'icon-chopsticks.svg',
+    ];
+    for (const fn of icons) {
+      const key = fn.replace(/\.svg$/, '');
+      this.load.svg(key, `assets/sushi-go/${fn}`);
+    }
   }
 
   // ── Create ──────────────────────────────────────────────
@@ -365,7 +375,8 @@ export class SushiGoScene extends Phaser.Scene {
     const fontSize = isHand ? '16px' : '12px';
 
     // Try to render an icon if available for this card type.
-    const iconKey = this.getIconKeyForCard(card);
+    const iconMeta = getIconKeyForCard(card);
+    const iconKey = iconMeta?.key ?? null;
     if (iconKey && this.textures.exists(iconKey)) {
       const img = this.add.image(0, -h * 0.06, iconKey);
       img.setOrigin(0.5, 0);
@@ -433,23 +444,7 @@ export class SushiGoScene extends Phaser.Scene {
   }
 
   /** Return the icon texture key for a card if available. */
-  private getIconKeyForCard(card: SushiGoCard): string | null {
-    switch (card.type) {
-      case 'nigiri':
-        if (card.variant === 'salmon') return 'icon-nigiri-salmon';
-        return null;
-      case 'maki':
-      case 'tempura':
-      case 'sashimi':
-      case 'dumpling':
-      case 'wasabi':
-      case 'pudding':
-      case 'chopsticks':
-        return null;
-      default:
-        return null;
-    }
-  }
+  // Deprecated: use example-games/sushi-go/IconMap.ts instead.
 
   // ── Refresh display ─────────────────────────────────────
 
