@@ -525,12 +525,22 @@ export class SushiGoScene extends Phaser.Scene {
       return;
     }
 
-    // Group cards by type
+    // Group cards by type (groups preserve tableau play order)
     const groups = this.groupByType(tableau);
-    const typeOrder: SushiGoCardType[] = [
-      'maki', 'tempura', 'sashimi', 'dumpling',
-      'nigiri', 'wasabi', 'pudding', 'chopsticks',
-    ];
+
+    // Determine the horizontal order of type groups based on the
+    // first appearance of each type in the tableau (play order).
+    // This preserves the visual left-to-right play order so that
+    // effects dependent on play order (like Wasabi -> Nigiri) match
+    // what the player expects to see.
+    const seenTypes = new Set<SushiGoCardType>();
+    const typeOrder: SushiGoCardType[] = [];
+    for (const c of tableau) {
+      if (!seenTypes.has(c.type)) {
+        seenTypes.add(c.type);
+        typeOrder.push(c.type);
+      }
+    }
 
     // Calculate total width to center
     let totalWidth = 0;
@@ -602,13 +612,14 @@ export class SushiGoScene extends Phaser.Scene {
 
   private groupByType(tableau: SushiGoCard[]): Map<SushiGoCardType, SushiGoCard[]> {
     const groups = new Map<SushiGoCardType, SushiGoCard[]>();
+    // Preserve the original play order when grouping so that the
+    // relative order of cards of different types reflects tableau
+    // insertion order. We iterate through tableau and append cards
+    // to their type group in encountered order.
     for (const card of tableau) {
       const existing = groups.get(card.type);
-      if (existing) {
-        existing.push(card);
-      } else {
-        groups.set(card.type, [card]);
-      }
+      if (existing) existing.push(card);
+      else groups.set(card.type, [card]);
     }
     return groups;
   }
