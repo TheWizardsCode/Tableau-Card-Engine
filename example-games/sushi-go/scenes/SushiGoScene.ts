@@ -14,6 +14,7 @@
 import Phaser from 'phaser';
 import type { SushiGoCard, SushiGoCardType } from '../SushiGoCards';
 import { cardLabel } from '../SushiGoCards';
+import { getIconKeyForCard } from '../IconMap';
 import type { SushiGoSession, RoundResult, PickAction } from '../SushiGoGame';
 import {
   setupSushiGoGame,
@@ -49,8 +50,12 @@ const HAND_GAP = 8;             // gap between hand cards
 
 const PLAYER_TABLEAU_Y = 395;   // center Y for player tableau
 const AI_TABLEAU_Y = 200;       // center Y for AI tableau
-const TABLEAU_CARD_W = 72;      // card rect width in tableau
-const TABLEAU_CARD_H = 48;      // card rect height in tableau
+// Tableau cards should keep the same aspect ratio as hand cards so icons
+// and labels stay consistent between hand and tableau. Compute them here
+// as a scaled version of the hand card size.
+const TABLEAU_SCALE = 0.62; // scale factor relative to hand card (tweakable)
+const TABLEAU_CARD_W = Math.round(HAND_CARD_W * TABLEAU_SCALE);
+const TABLEAU_CARD_H = Math.round(HAND_CARD_H * TABLEAU_SCALE);
 const TABLEAU_GROUP_GAP = 24;   // gap between type groups
 const TABLEAU_CARD_GAP = 6;     // gap between cards in a group
 
@@ -169,6 +174,19 @@ export class SushiGoScene extends Phaser.Scene {
     this.load.audio(SFX_KEYS.ROUND_END, 'assets/audio/round-end.wav');
     this.load.audio(SFX_KEYS.SCORE_REVEAL, 'assets/audio/score-reveal.wav');
     this.load.audio(SFX_KEYS.UI_CLICK, 'assets/audio/ui-click.wav');
+
+    // Sushi Go icon assets: preload all icon files present in public/assets/sushi-go
+    // We list the known filenames here to avoid dynamic FS lookups at runtime.
+    const icons = [
+      'icon-nigiri-salmon.svg', 'icon-nigiri-egg.svg', 'icon-nigiri-squid.svg',
+      'icon-maki-1.svg', 'icon-maki-2.svg', 'icon-maki-3.svg',
+      'icon-tempura.svg', 'icon-sashimi.svg', 'icon-dumpling.svg',
+      'icon-wasabi.svg', 'icon-pudding.svg', 'icon-chopsticks.svg',
+    ];
+    for (const fn of icons) {
+      const key = fn.replace(/\.svg$/, '');
+      this.load.svg(key, `assets/sushi-go/${fn}`);
+    }
   }
 
   // ── Create ──────────────────────────────────────────────
@@ -360,14 +378,44 @@ export class SushiGoScene extends Phaser.Scene {
     const labelText = isHand ? this.getHandCardLabel(card) : this.getTableauCardLabel(card);
     const fontSize = isHand ? '16px' : '12px';
 
-    const label = this.add.text(0, 0, labelText, {
-      fontSize,
-      color: style.text,
-      fontFamily: FONT_FAMILY,
-      align: 'center',
-      wordWrap: { width: w - 6 },
-    }).setOrigin(0.5);
-    container.add(label);
+    // Try to render an icon if available for this card type.
+    const iconMeta = getIconKeyForCard(card);
+    const iconKey = iconMeta?.key ?? null;
+    if (iconKey && this.textures.exists(iconKey)) {
+      // Center the icon and scale it to occupy more of the card while preserving
+      // a small padding so it remains legible when card shapes change.
+      const img = this.add.image(0, 0, iconKey);
+      img.setOrigin(0.5, 0.5);
+      // Use larger footprint for icons in both hand and tableau; hand cards are taller
+      const iconMaxW = w * (isHand ? 0.9 : 0.85);
+      const iconMaxH = h * (isHand ? 0.7 : 0.85);
+      const iconSize = Math.min(iconMaxW, iconMaxH);
+      img.setDisplaySize(iconSize, iconSize);
+      container.add(img);
+
+      // Keep the card text label visible for accessibility and clarity.
+      // Place it below the icon; for small tableau cards use the smaller font.
+      // Position label flush above the bottom edge with a small padding so
+      // it never gets clipped when the card resizes or changes shape.
+      const bottomPadding = isHand ? 8 : 6;
+      const label = this.add.text(0, h / 2 - bottomPadding, labelText, {
+        fontSize,
+        color: style.text,
+        fontFamily: FONT_FAMILY,
+        align: 'center',
+        wordWrap: { width: w - 6 },
+      }).setOrigin(0.5, 1); // origin y=1 so text sits above the given y coordinate
+      container.add(label);
+    } else {
+      const label = this.add.text(0, 0, labelText, {
+        fontSize,
+        color: style.text,
+        fontFamily: FONT_FAMILY,
+        align: 'center',
+        wordWrap: { width: w - 6 },
+      }).setOrigin(0.5);
+      container.add(label);
+    }
 
     // Make the card interactive for tooltip and/or clicking
     bg.setInteractive({ useHandCursor: interactive });
@@ -408,6 +456,9 @@ export class SushiGoScene extends Phaser.Scene {
         return CARD_STYLES[card.type].short;
     }
   }
+
+  /** Return the icon texture key for a card if available. */
+  // Deprecated: use example-games/sushi-go/IconMap.ts instead.
 
   // ── Refresh display ─────────────────────────────────────
 

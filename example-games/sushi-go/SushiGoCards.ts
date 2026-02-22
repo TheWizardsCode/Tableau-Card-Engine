@@ -52,11 +52,14 @@ export interface MakiCard extends BaseCard {
   readonly type: 'maki';
   /** Number of maki roll icons (1, 2, or 3). */
   readonly icons: 1 | 2 | 3;
+  /** Optional icon key for UI rendering */
+  readonly iconKey?: string;
 }
 
 export interface NigiriCard extends BaseCard {
   readonly type: 'nigiri';
   readonly variant: NigiriVariant;
+  readonly iconKey?: string;
 }
 
 export interface WasabiCard extends BaseCard {
@@ -69,6 +72,7 @@ export interface PuddingCard extends BaseCard {
 
 export interface ChopsticksCard extends BaseCard {
   readonly type: 'chopsticks';
+  readonly iconKey?: string;
 }
 
 /** Discriminated union of all Sushi Go! card types. */
@@ -154,7 +158,38 @@ export function createSushiGoDeck(): SushiGoCard[] {
 
   for (const entry of DECK_COMPOSITION) {
     for (let i = 0; i < entry.count; i++) {
-      deck.push(entry.factory(nextId++));
+      const card = entry.factory(nextId++);
+      // Attach iconKey property if the card type maps to an icon filename
+      // (we keep this logic simple and conservative)
+      switch (card.type) {
+        case 'nigiri':
+          (card as any).iconKey = `icon-nigiri-${(card as any).variant}`;
+          break;
+        case 'maki':
+          (card as any).iconKey = `icon-maki-${(card as any).icons}`;
+          break;
+        case 'tempura':
+          (card as any).iconKey = 'icon-tempura';
+          break;
+        case 'sashimi':
+          (card as any).iconKey = 'icon-sashimi';
+          break;
+        case 'dumpling':
+          (card as any).iconKey = 'icon-dumpling';
+          break;
+        case 'wasabi':
+          (card as any).iconKey = 'icon-wasabi';
+          break;
+        case 'pudding':
+          (card as any).iconKey = 'icon-pudding';
+          break;
+        case 'chopsticks':
+          (card as any).iconKey = 'icon-chopsticks';
+          break;
+        default:
+          break;
+      }
+      deck.push(card);
     }
   }
 
