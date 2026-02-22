@@ -1,17 +1,20 @@
 /**
  * LostCitiesScene — Full interactive Phaser scene for Lost Cities.
  *
- * Layout (1280x720):
- *   Left area (~920px):
+ * Layout (1280x720, 3-column):
+ *   Left column (~600px):
  *     - Opponent expeditions (5 lanes, top)
  *     - Discard piles (5, center row)
  *     - Player expeditions (5 lanes, bottom)
  *
- *   Right column (~340px):
+ *   Middle column (~200px):
  *     - Opponent score (top)
- *     - Draw pile + round indicator (middle)
- *     - Player hand (8 cards, vertical stack)
- *     - Player score (bottom)
+ *     - Draw pile + round indicator (center)
+ *     - Player score (bottom, mirroring opponent score)
+ *
+ *   Right column (~300px):
+ *     - Player hand (8 cards, vertical fan, large cards)
+ *     - Uses nearly the full vertical height
  *
  * Two-phase turn state machine:
  *   Phase 1 — select a card from hand, then click expedition lane or discard pile
@@ -69,11 +72,11 @@ import {
 import type { HelpSection } from '../../../src/ui';
 import helpContent from '../help-content.json';
 
-// ── Layout constants (matching revised mockup) ─────────────
+// ── Layout constants (3-column layout) ────────────────────
 const CARD_W = 95;
 const CARD_H = 130;
 
-// Main tableau area (left)
+// ── Left column: Expeditions + Discards ───────────────────
 const TABLEAU_LEFT = 40;
 const LANE_GAP = 18;
 const LANE_STEP = CARD_W + LANE_GAP;
@@ -84,44 +87,54 @@ function laneX(index: number): number {
 
 const TABLEAU_RIGHT = TABLEAU_LEFT + 5 * LANE_STEP - LANE_GAP + CARD_W / 2;
 
-// Right column
-const RIGHT_COL_X = TABLEAU_RIGHT + 60;
-const RIGHT_COL_W = GAME_W - RIGHT_COL_X - 20;
-const RIGHT_COL_CENTER = RIGHT_COL_X + RIGHT_COL_W / 2;
+// ── Middle column: Scores, Draw pile, Round ───────────────
+const MID_COL_X = TABLEAU_RIGHT + 40;
+const MID_COL_W = 190;
+const MID_COL_CENTER = MID_COL_X + MID_COL_W / 2;
+
+// ── Right column: Player hand ─────────────────────────────
+const HAND_COL_X = MID_COL_X + MID_COL_W + 20;
+const HAND_COL_W = GAME_W - HAND_COL_X - 16;
+const HAND_COL_CENTER = HAND_COL_X + HAND_COL_W / 2;
 
 // Header
 const HEADER_H = 48;
 
-// Opponent expeditions (top)
-const OPP_EXP_TOP = HEADER_H + 16;
+// Section box label height — labels sit inside the top of each box
+const BOX_LABEL_H = 16;
+
+// Opponent expeditions (top) — content starts below the box label
+const OPP_EXP_TOP = HEADER_H + BOX_LABEL_H + 12;
 const EXP_OVERLAP = 26;
 const EXP_SLOTS = 5;
 const EXP_HEIGHT = CARD_H + (EXP_SLOTS - 1) * EXP_OVERLAP;
 
-// Discard piles (center row)
-const DISCARD_GAP = 24;
+// Discard piles (center row) — add extra gap for color labels
+const DISCARD_GAP = 20;
 const DISCARD_Y = OPP_EXP_TOP + EXP_HEIGHT + DISCARD_GAP;
 const DISCARD_CARD_H = Math.round(CARD_H * 0.8);
 const DISCARD_CARD_W = Math.round(CARD_W * 0.8);
 
-// Player expeditions (below discard)
-const PLR_EXP_TOP = DISCARD_Y + DISCARD_CARD_H + DISCARD_GAP;
+// Player expeditions (below discard) — extra gap so labels don't overlap
+const PLR_EXP_GAP = 28;
+const PLR_EXP_TOP = DISCARD_Y + DISCARD_CARD_H + PLR_EXP_GAP + BOX_LABEL_H;
 
-// Right column vertical layout
+// Middle column vertical layout
 const SCORE_BOX_H = 50;
 const OPP_SCORE_Y = HEADER_H + 16;
+const PLR_SCORE_Y = GAME_H - SCORE_BOX_H - 16;
 
-const DRAW_PILE_Y = OPP_SCORE_Y + SCORE_BOX_H + 24;
-
-const ROUND_Y = DRAW_PILE_Y + CARD_H + 16;
+const DRAW_PILE_Y = OPP_SCORE_Y + SCORE_BOX_H + 30 + BOX_LABEL_H;
+const ROUND_Y = DRAW_PILE_Y + CARD_H + 20;
 const ROUND_BOX_H = 52;
 
-const HAND_TOP = ROUND_Y + ROUND_BOX_H + 20;
-const HAND_CARD_W = 60;
-const HAND_CARD_H = 82;
-const HAND_OVERLAP = 30;
-
-const PLR_SCORE_Y = GAME_H - SCORE_BOX_H - 16;
+// Right column: Hand — uses nearly full vertical height
+// Content starts below the "Your Hand" label
+const HAND_TOP = HEADER_H + BOX_LABEL_H + 16;
+const HAND_BOTTOM = GAME_H - 30;
+const HAND_CARD_W = 100;
+const HAND_CARD_H = 137;
+const HAND_OVERLAP = Math.floor((HAND_BOTTOM - HAND_TOP - HAND_CARD_H) / (HAND_SIZE - 1));
 
 // Animation timing
 const AI_DELAY = 800;
@@ -298,67 +311,89 @@ export class LostCitiesScene extends Phaser.Scene {
     this.gfx.strokeRoundedRect(x, y, w, h, BOX_RADIUS);
     if (label) {
       this.add
-        .text(x + 6, y - 1, label, {
+        .text(x + 8, y + 4, label, {
           ...SMALL_LABEL,
           fontSize: '9px',
           color: '#667766',
         })
-        .setOrigin(0, 1);
+        .setOrigin(0, 0.5);
     }
   }
 
   private createSectionBoxes(): void {
     const tabW = 5 * LANE_STEP - LANE_GAP + 2 * BOX_PAD;
 
-    // Opponent expeditions
+    // Opponent expeditions — box includes label above card content
     this.drawSectionBox(
-      TABLEAU_LEFT - BOX_PAD, OPP_EXP_TOP - BOX_PAD,
-      tabW, EXP_HEIGHT + 2 * BOX_PAD,
+      TABLEAU_LEFT - BOX_PAD,
+      OPP_EXP_TOP - BOX_LABEL_H - BOX_PAD,
+      tabW,
+      EXP_HEIGHT + BOX_LABEL_H + 2 * BOX_PAD,
       'Opponent Expeditions',
     );
 
-    // Discard piles
+    // Discard piles — no label (color headers added separately)
     this.drawSectionBox(
-      TABLEAU_LEFT - BOX_PAD, DISCARD_Y - BOX_PAD,
-      tabW, DISCARD_CARD_H + 2 * BOX_PAD + 14,
-      'Discard Piles',
+      TABLEAU_LEFT - BOX_PAD,
+      DISCARD_Y - BOX_PAD,
+      tabW,
+      DISCARD_CARD_H + 2 * BOX_PAD,
+      '',
     );
 
-    // Player expeditions
+    // Color column headers between opponent expeditions and discard piles
+    for (let i = 0; i < 5; i++) {
+      const color = EXPEDITION_COLORS[i];
+      this.add
+        .text(laneX(i), DISCARD_Y - BOX_PAD - 2, color.toUpperCase(), {
+          ...SMALL_LABEL,
+          fontSize: '11px',
+        })
+        .setOrigin(0.5, 1);
+    }
+
+    // Player expeditions — box includes label above card content
     this.drawSectionBox(
-      TABLEAU_LEFT - BOX_PAD, PLR_EXP_TOP - BOX_PAD,
-      tabW, EXP_HEIGHT + 2 * BOX_PAD,
+      TABLEAU_LEFT - BOX_PAD,
+      PLR_EXP_TOP - BOX_LABEL_H - BOX_PAD,
+      tabW,
+      EXP_HEIGHT + BOX_LABEL_H + 2 * BOX_PAD,
       'Your Expeditions',
     );
 
-    // Right column boxes
+    // ── Middle column boxes ──────────────────────────────
     // Opponent score
     this.drawSectionBox(
-      RIGHT_COL_X - BOX_PAD, OPP_SCORE_Y - BOX_PAD,
-      RIGHT_COL_W + 2 * BOX_PAD, SCORE_BOX_H + 2 * BOX_PAD, '',
+      MID_COL_X - BOX_PAD, OPP_SCORE_Y - BOX_PAD,
+      MID_COL_W + 2 * BOX_PAD, SCORE_BOX_H + 2 * BOX_PAD, '',
     );
-    // Draw pile
+    // Draw pile — box includes label
     this.drawSectionBox(
-      RIGHT_COL_X - BOX_PAD, DRAW_PILE_Y - BOX_PAD,
-      RIGHT_COL_W + 2 * BOX_PAD, CARD_H + 2 * BOX_PAD + 16,
+      MID_COL_X - BOX_PAD,
+      DRAW_PILE_Y - BOX_LABEL_H - BOX_PAD,
+      MID_COL_W + 2 * BOX_PAD,
+      CARD_H + BOX_LABEL_H + 2 * BOX_PAD + 16,
       'Draw Pile',
     );
     // Round indicator
     this.drawSectionBox(
-      RIGHT_COL_X - BOX_PAD, ROUND_Y - BOX_PAD,
-      RIGHT_COL_W + 2 * BOX_PAD, ROUND_BOX_H + 2 * BOX_PAD, '',
+      MID_COL_X - BOX_PAD, ROUND_Y - BOX_PAD,
+      MID_COL_W + 2 * BOX_PAD, ROUND_BOX_H + 2 * BOX_PAD, '',
     );
-    // Hand
+    // Player score (bottom of middle column)
+    this.drawSectionBox(
+      MID_COL_X - BOX_PAD, PLR_SCORE_Y - BOX_PAD,
+      MID_COL_W + 2 * BOX_PAD, SCORE_BOX_H + 2 * BOX_PAD, '',
+    );
+
+    // ── Right column box: Hand ───────────────────────────
     const handTotalH = HAND_CARD_H + (HAND_SIZE - 1) * HAND_OVERLAP;
     this.drawSectionBox(
-      RIGHT_COL_X - BOX_PAD, HAND_TOP - BOX_PAD,
-      RIGHT_COL_W + 2 * BOX_PAD, handTotalH + 2 * BOX_PAD,
+      HAND_COL_X - BOX_PAD,
+      HAND_TOP - BOX_LABEL_H - BOX_PAD,
+      HAND_COL_W + 2 * BOX_PAD,
+      handTotalH + BOX_LABEL_H + 2 * BOX_PAD,
       'Your Hand',
-    );
-    // Player score
-    this.drawSectionBox(
-      RIGHT_COL_X - BOX_PAD, PLR_SCORE_Y - BOX_PAD,
-      RIGHT_COL_W + 2 * BOX_PAD, SCORE_BOX_H + 2 * BOX_PAD, '',
     );
   }
 
@@ -366,14 +401,6 @@ export class LostCitiesScene extends Phaser.Scene {
   private createExpeditionZones(): void {
     for (let i = 0; i < 5; i++) {
       const color = EXPEDITION_COLORS[i];
-
-      // Color labels above lanes
-      this.add
-        .text(laneX(i), OPP_EXP_TOP - 2, color.toUpperCase(), SMALL_LABEL)
-        .setOrigin(0.5, 1);
-      this.add
-        .text(laneX(i), PLR_EXP_TOP - 2, color.toUpperCase(), SMALL_LABEL)
-        .setOrigin(0.5, 1);
 
       // Init sprite arrays
       this.oppExpSprites.set(color, []);
@@ -396,11 +423,6 @@ export class LostCitiesScene extends Phaser.Scene {
     for (let i = 0; i < 5; i++) {
       const color = EXPEDITION_COLORS[i];
 
-      // Discard label
-      this.add
-        .text(laneX(i), DISCARD_Y + DISCARD_CARD_H + 2, 'Discard', SMALL_LABEL)
-        .setOrigin(0.5, 0);
-
       // Hit area (always present, even when pile is empty)
       const hitArea = this.add.rectangle(
         laneX(i), DISCARD_Y + DISCARD_CARD_H / 2,
@@ -413,45 +435,45 @@ export class LostCitiesScene extends Phaser.Scene {
     }
   }
 
-  // ── Right column ────────────────────────────────────────
+  // ── Middle column (scores, draw pile, round) ────────────
   private createRightColumn(): void {
-    // Opponent score
+    // Opponent score (top of middle column)
     this.add
-      .text(RIGHT_COL_CENTER, OPP_SCORE_Y + 6, 'Opponent', LABEL_STYLE)
+      .text(MID_COL_CENTER, OPP_SCORE_Y + 6, 'Opponent', LABEL_STYLE)
       .setOrigin(0.5, 0);
     this.oppScoreText = this.add
-      .text(RIGHT_COL_CENTER, OPP_SCORE_Y + 26, 'Score: 0', SCORE_STYLE)
+      .text(MID_COL_CENTER, OPP_SCORE_Y + 26, 'Score: 0', SCORE_STYLE)
       .setOrigin(0.5, 0);
 
-    // Draw pile
+    // Draw pile (center of middle column)
     this.drawPileSprite = this.add.image(
-      RIGHT_COL_CENTER, DRAW_PILE_Y + CARD_H / 2, CARD_BACK_KEY,
+      MID_COL_CENTER, DRAW_PILE_Y + CARD_H / 2, CARD_BACK_KEY,
     );
     this.drawPileSprite.setInteractive({ useHandCursor: true });
     this.drawPileSprite.on('pointerdown', () => this.onDrawPileClick());
 
     this.drawPileCountText = this.add
-      .text(RIGHT_COL_CENTER, DRAW_PILE_Y + CARD_H + 4, '44 remaining', SMALL_LABEL)
+      .text(MID_COL_CENTER, DRAW_PILE_Y + CARD_H + 4, '44 remaining', SMALL_LABEL)
       .setOrigin(0.5, 0);
 
     // Round / turn indicator
     this.roundText = this.add
-      .text(RIGHT_COL_CENTER, ROUND_Y + 6, 'Round 1 / 3', SCORE_STYLE)
+      .text(MID_COL_CENTER, ROUND_Y + 6, 'Round 1 / 3', SCORE_STYLE)
       .setOrigin(0.5, 0);
     this.turnIndicatorText = this.add
-      .text(RIGHT_COL_CENTER, ROUND_Y + 30, 'Your Turn', {
+      .text(MID_COL_CENTER, ROUND_Y + 30, 'Your Turn', {
         ...LABEL_STYLE,
         fontSize: '13px',
         color: '#66dd66',
       })
       .setOrigin(0.5, 0);
 
-    // Player score
+    // Player score (bottom of middle column)
     this.add
-      .text(RIGHT_COL_CENTER, PLR_SCORE_Y + 6, 'You', LABEL_STYLE)
+      .text(MID_COL_CENTER, PLR_SCORE_Y + 6, 'You', LABEL_STYLE)
       .setOrigin(0.5, 0);
     this.plrScoreText = this.add
-      .text(RIGHT_COL_CENTER, PLR_SCORE_Y + 26, 'Score: 0', SCORE_STYLE)
+      .text(MID_COL_CENTER, PLR_SCORE_Y + 26, 'Score: 0', SCORE_STYLE)
       .setOrigin(0.5, 0);
   }
 
@@ -597,7 +619,7 @@ export class LostCitiesScene extends Phaser.Scene {
 
     const hand = this.session.players[0].hand;
     for (let c = 0; c < hand.length; c++) {
-      const x = RIGHT_COL_CENTER;
+      const x = HAND_COL_CENTER;
       const y = HAND_TOP + c * HAND_OVERLAP + HAND_CARD_H / 2;
       const sprite = this.add.image(x, y, cardAssetKey(hand[c]));
       sprite.setDisplaySize(HAND_CARD_W, HAND_CARD_H);
@@ -945,7 +967,7 @@ export class LostCitiesScene extends Phaser.Scene {
     let textureKey: string;
 
     if (action.kind === 'draw-from-pile') {
-      sourceX = RIGHT_COL_CENTER;
+      sourceX = MID_COL_CENTER;
       sourceY = DRAW_PILE_Y + CARD_H / 2;
       textureKey = CARD_BACK_KEY;
     } else {
@@ -968,7 +990,7 @@ export class LostCitiesScene extends Phaser.Scene {
     // Animate to hand area
     const hand = this.session.players[0].hand;
     const targetIdx = hand.length - 1;
-    const targetX = RIGHT_COL_CENTER;
+    const targetX = HAND_COL_CENTER;
     const targetY = HAND_TOP + targetIdx * HAND_OVERLAP + HAND_CARD_H / 2;
 
     this.tweens.add({
