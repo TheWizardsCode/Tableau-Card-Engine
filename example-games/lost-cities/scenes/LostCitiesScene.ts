@@ -1002,6 +1002,9 @@ export class LostCitiesScene extends Phaser.Scene {
     let sourceY: number;
     let textureKey: string;
 
+    const hand = this.session.players[0].hand;
+    const drawnCard = hand[hand.length - 1];
+
     if (action.kind === 'draw-from-pile') {
       sourceX = MID_COL_CENTER;
       sourceY = DRAW_PILE_Y + CARD_H / 2;
@@ -1010,9 +1013,6 @@ export class LostCitiesScene extends Phaser.Scene {
       const colorIdx = EXPEDITION_COLORS.indexOf(action.color);
       sourceX = laneX(colorIdx);
       sourceY = DISCARD_Y + DISCARD_CARD_H / 2;
-      // The card was already drawn, so get it from the player's hand (last card added)
-      const hand = this.session.players[0].hand;
-      const drawnCard = hand[hand.length - 1];
       textureKey = cardAssetKey(drawnCard);
     }
 
@@ -1023,9 +1023,11 @@ export class LostCitiesScene extends Phaser.Scene {
     );
     tempSprite.setDepth(100);
 
-    // Animate to hand area
-    const hand = this.session.players[0].hand;
-    const targetIdx = hand.length - 1;
+    // Animate to the position the drawn card will occupy after hand sorting.
+    // The card was already added to the hand by executeAction, so we sort a
+    // copy and find where this card ends up.
+    const sorted = [...hand].sort(LostCitiesScene.handSortCompare);
+    const targetIdx = sorted.findIndex(c => c.id === drawnCard.id);
     const targetX = HAND_COL_CENTER;
     const targetY = HAND_TOP + targetIdx * HAND_OVERLAP + HAND_CARD_H / 2;
 
