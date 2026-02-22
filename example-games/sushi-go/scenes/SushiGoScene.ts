@@ -50,8 +50,12 @@ const HAND_GAP = 8;             // gap between hand cards
 
 const PLAYER_TABLEAU_Y = 395;   // center Y for player tableau
 const AI_TABLEAU_Y = 200;       // center Y for AI tableau
-const TABLEAU_CARD_W = 72;      // card rect width in tableau
-const TABLEAU_CARD_H = 48;      // card rect height in tableau
+// Tableau cards should keep the same aspect ratio as hand cards so icons
+// and labels stay consistent between hand and tableau. Compute them here
+// as a scaled version of the hand card size.
+const TABLEAU_SCALE = 0.62; // scale factor relative to hand card (tweakable)
+const TABLEAU_CARD_W = Math.round(HAND_CARD_W * TABLEAU_SCALE);
+const TABLEAU_CARD_H = Math.round(HAND_CARD_H * TABLEAU_SCALE);
 const TABLEAU_GROUP_GAP = 24;   // gap between type groups
 const TABLEAU_CARD_GAP = 6;     // gap between cards in a group
 
@@ -388,6 +392,18 @@ export class SushiGoScene extends Phaser.Scene {
       const iconSize = Math.min(iconMaxW, iconMaxH);
       img.setDisplaySize(iconSize, iconSize);
       container.add(img);
+
+      // Keep the card text label visible for accessibility and clarity.
+      // Place it below the icon; for small tableau cards use the smaller font.
+      const labelY = isHand ? h * 0.42 : h * 0.45;
+      const label = this.add.text(0, labelY, labelText, {
+        fontSize,
+        color: style.text,
+        fontFamily: FONT_FAMILY,
+        align: 'center',
+        wordWrap: { width: w - 6 },
+      }).setOrigin(0.5, 0);
+      container.add(label);
     } else {
       const label = this.add.text(0, 0, labelText, {
         fontSize,
