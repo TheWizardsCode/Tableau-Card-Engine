@@ -29,6 +29,6 @@
   },
   {
     "heading": "Controls",
-    "body": "1. Select a card from your hand by clicking it.\n2. Click an expedition lane or discard pile to place the selected card.\n3. Click the draw pile or a discard pile to draw your next card.\n\nThe AI opponent plays automatically after your turn.\n\nPress ? to toggle this help panel."
+    "body": "1. Select a card from your hand by clicking it.\n2. Click an expedition lane or discard pile to place the selected card.\n3. Click the draw pile or a discard pile to draw your next card.\n\nHover over a column header (YELLOW, BLUE, etc.) to see a live scoring breakdown for that expedition.\n\nThe AI opponent plays automatically after your turn.\n\nPress ? to toggle this help panel."
   }
 ]
