@@ -192,8 +192,7 @@ ${cardBorder(accent)}
 ${diamonds.join('\n')}
   <circle cx="${CARD_W / 2}" cy="${CARD_H / 2}" r="35" fill="none" stroke="${accent}" stroke-width="2.5"/>
   <circle cx="${CARD_W / 2}" cy="${CARD_H / 2}" r="28" fill="${accent}" opacity="0.2"/>
-  <text x="${CARD_W / 2}" y="${CARD_H / 2 + 7}" font-family="serif" font-size="26" font-weight="bold" text-anchor="middle" fill="${accent}">LC</text>
-  <text x="${CARD_W / 2}" y="${CARD_H / 2 + 24}" font-family="serif" font-size="12" text-anchor="middle" fill="${accent}" opacity="0.8">EXPEDITION</text>
+  <text x="${CARD_W / 2}" y="${CARD_H / 2 + 10}" font-family="serif" font-size="26" font-weight="bold" text-anchor="middle" fill="${accent}">LC</text>
 </svg>`;
 }
 
