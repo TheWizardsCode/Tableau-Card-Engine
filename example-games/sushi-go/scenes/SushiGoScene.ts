@@ -651,7 +651,13 @@ export class SushiGoScene extends Phaser.Scene {
         const totalIcons = cards.reduce((sum, c) => sum + (c.type === 'maki' ? c.icons : 0), 0);
         // Find this player's maki bonus (for 2-player game, playerIdx indicates player)
         const playerMakiBonus = allMakiBonuses[playerIdx] ?? 0;
-        labelText = `Maki(${totalIcons} → ${playerMakiBonus >= 0 ? '+' : ''}${playerMakiBonus})`;
+        // If a bonus was awarded (including split ties), show the awarded
+        // score prominently. Otherwise show the raw icon count.
+        if (playerMakiBonus !== 0) {
+          labelText = `Maki(${playerMakiBonus >= 0 ? '+' : ''}${playerMakiBonus})`;
+        } else {
+          labelText = `Maki(${totalIcons})`;
+        }
       }
 
       const typeLabel = this.add.text(
