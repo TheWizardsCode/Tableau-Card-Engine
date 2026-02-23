@@ -88,6 +88,7 @@ function destroyGame(game: Phaser.Game | null): void {
 function getSceneInternals(scene: Phaser.Scene): {
   replayMode: boolean;
   turnPhase: string;
+  boardStateInjected: boolean;
   session: {
     gameState: {
       currentPlayerIndex: number;
@@ -107,11 +108,14 @@ function getSceneInternals(scene: Phaser.Scene): {
   discardSprite: Phaser.GameObjects.Image;
   gameEvents: GameEventEmitter;
   instructionText: Phaser.GameObjects.Text;
+  takeoverOverlayObjects: Phaser.GameObjects.GameObject[];
   loadBoardState: (
     boardStates: BoardSnapshot[],
     discardTop: CardSnapshot | null,
     stockRemaining: number,
   ) => void;
+  enableInteractiveMode: (options: { nextPlayer: number }) => void;
+  showTakeoverOverlay: (options: { turnNumber: number; lastAction: string }) => void;
 } {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return scene as any;
@@ -177,6 +181,12 @@ describe('GolfScene replay mode', () => {
     ) as Phaser.GameObjects.Image[];
     const interactiveImages = images.filter((img) => img.input?.enabled);
     expect(interactiveImages.length).toBe(0);
+
+    // ── enableInteractiveMode() before loadBoardState() should throw ──
+    expect(internals.boardStateInjected).toBe(false);
+    expect(() => {
+      internals.enableInteractiveMode({ nextPlayer: 0 });
+    }).toThrow('enableInteractiveMode() requires loadBoardState() to be called first');
 
     // ── loadBoardState() ──
 
@@ -245,6 +255,47 @@ describe('GolfScene replay mode', () => {
 
     // state-settled emitted again
     expect(settledEvents.length).toBeGreaterThanOrEqual(1);
+
+    // ── enableInteractiveMode() ──
+
+    // Reload a valid board state first (stock > 0 so game can proceed)
+    internals.loadBoardState(testStates, testDiscardTop, 20);
+    await nextFrame();
+
+    // Verify boardStateInjected is true
+    expect(internals.boardStateInjected).toBe(true);
+
+    // Verify still in replay mode before enabling interactive
+    expect(internals.replayMode).toBe(true);
+
+    // Call enableInteractiveMode with nextPlayer = 0 (human)
+    internals.enableInteractiveMode({ nextPlayer: 0 });
+    await nextFrame();
+
+    // replayMode should now be false
+    expect(internals.replayMode).toBe(false);
+
+    // turnPhase should be 'waiting-for-draw' (human's turn)
+    expect(internals.turnPhase).toBe('waiting-for-draw');
+
+    // currentPlayerIndex should be 0
+    expect(internals.session.gameState.currentPlayerIndex).toBe(0);
+
+    // Input handlers should be registered on stock, discard, and human grid sprites
+    expect(internals.stockSprite.input?.enabled).toBe(true);
+    expect(internals.discardSprite.input?.enabled).toBe(true);
+    for (const sprite of internals.humanCardSprites) {
+      expect(sprite.input?.enabled).toBe(true);
+    }
+
+    // Instruction text should show the draw prompt
+    expect(internals.instructionText.text).toContain('Stock');
+    expect(internals.instructionText.text).toContain('Discard');
+
+    // ── enableInteractiveMode() throws when not in replay mode ──
+    expect(() => {
+      internals.enableInteractiveMode({ nextPlayer: 0 });
+    }).toThrow('enableInteractiveMode() can only be called in replay mode');
   });
 
   // ── Test 2: Normal mode rejects loadBoardState ──
@@ -263,5 +314,10 @@ describe('GolfScene replay mode', () => {
     expect(() => {
       internals.loadBoardState(testStates, null, 10);
     }).toThrow('loadBoardState() is only available in replay mode');
+
+    // enableInteractiveMode should throw (not in replay mode)
+    expect(() => {
+      internals.enableInteractiveMode({ nextPlayer: 0 });
+    }).toThrow('enableInteractiveMode() can only be called in replay mode');
   });
 });

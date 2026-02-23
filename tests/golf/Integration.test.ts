@@ -77,7 +77,7 @@ describe('Integration: AI-vs-AI full game (RandomStrategy)', () => {
     const { transcript, turnCount } = runFullGame(RandomStrategy, 42);
 
     // Version
-    expect(transcript.version).toBe(1);
+    expect(transcript.version).toBe(2);
 
     // Metadata
     expect(transcript.metadata.startedAt).toBeTruthy();
@@ -167,7 +167,7 @@ describe('Integration: AI-vs-AI full game (GreedyStrategy)', () => {
   it('produces a valid transcript', () => {
     const { transcript, turnCount } = runFullGame(GreedyStrategy, 42);
 
-    expect(transcript.version).toBe(1);
+    expect(transcript.version).toBe(2);
     expect(transcript.metadata.players[0].strategy).toBe('greedy');
     expect(transcript.turns).toHaveLength(turnCount);
     expect(transcript.results).not.toBeNull();
@@ -302,7 +302,7 @@ describe('Integration: Transcript structure validation', () => {
     const json = JSON.stringify(transcript);
     const parsed = JSON.parse(json);
 
-    expect(parsed.version).toBe(1);
+    expect(parsed.version).toBe(2);
     expect(parsed.metadata).toBeDefined();
     expect(parsed.initialState).toBeDefined();
     expect(parsed.turns).toBeInstanceOf(Array);

@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "metadata": {
     "startedAt": "2026-01-01T00:00:00.000Z",
     "endedAt": "2026-01-01T00:05:00.000Z",
@@ -127,7 +127,174 @@
       "suit": "hearts",
       "faceUp": true
     },
-    "stockRemaining": 33
+    "stockRemaining": 33,
+    "stockPileCards": [
+      {
+        "rank": "5",
+        "suit": "hearts",
+        "faceUp": false
+      },
+      {
+        "rank": "9",
+        "suit": "spades",
+        "faceUp": false
+      },
+      {
+        "rank": "9",
+        "suit": "clubs",
+        "faceUp": false
+      },
+      {
+        "rank": "J",
+        "suit": "spades",
+        "faceUp": false
+      },
+      {
+        "rank": "3",
+        "suit": "clubs",
+        "faceUp": false
+      },
+      {
+        "rank": "2",
+        "suit": "diamonds",
+        "faceUp": false
+      },
+      {
+        "rank": "9",
+        "suit": "hearts",
+        "faceUp": false
+      },
+      {
+        "rank": "J",
+        "suit": "hearts",
+        "faceUp": false
+      },
+      {
+        "rank": "2",
+        "suit": "hearts",
+        "faceUp": false
+      },
+      {
+        "rank": "9",
+        "suit": "diamonds",
+        "faceUp": false
+      },
+      {
+        "rank": "A",
+        "suit": "spades",
+        "faceUp": false
+      },
+      {
+        "rank": "Q",
+        "suit": "diamonds",
+        "faceUp": false
+      },
+      {
+        "rank": "K",
+        "suit": "spades",
+        "faceUp": false
+      },
+      {
+        "rank": "3",
+        "suit": "diamonds",
+        "faceUp": false
+      },
+      {
+        "rank": "10",
+        "suit": "spades",
+        "faceUp": false
+      },
+      {
+        "rank": "10",
+        "suit": "clubs",
+        "faceUp": false
+      },
+      {
+        "rank": "7",
+        "suit": "clubs",
+        "faceUp": false
+      },
+      {
+        "rank": "K",
+        "suit": "clubs",
+        "faceUp": false
+      },
+      {
+        "rank": "7",
+        "suit": "diamonds",
+        "faceUp": false
+      },
+      {
+        "rank": "7",
+        "suit": "hearts",
+        "faceUp": false
+      },
+      {
+        "rank": "J",
+        "suit": "diamonds",
+        "faceUp": false
+      },
+      {
+        "rank": "A",
+        "suit": "clubs",
+        "faceUp": false
+      },
+      {
+        "rank": "8",
+        "suit": "spades",
+        "faceUp": false
+      },
+      {
+        "rank": "Q",
+        "suit": "clubs",
+        "faceUp": false
+      },
+      {
+        "rank": "2",
+        "suit": "spades",
+        "faceUp": false
+      },
+      {
+        "rank": "Q",
+        "suit": "spades",
+        "faceUp": false
+      },
+      {
+        "rank": "Q",
+        "suit": "hearts",
+        "faceUp": false
+      },
+      {
+        "rank": "A",
+        "suit": "hearts",
+        "faceUp": false
+      },
+      {
+        "rank": "8",
+        "suit": "clubs",
+        "faceUp": false
+      },
+      {
+        "rank": "4",
+        "suit": "diamonds",
+        "faceUp": false
+      },
+      {
+        "rank": "3",
+        "suit": "spades",
+        "faceUp": false
+      },
+      {
+        "rank": "5",
+        "suit": "diamonds",
+        "faceUp": false
+      },
+      {
+        "rank": "4",
+        "suit": "hearts",
+        "faceUp": false
+      }
+    ]
   },
   "turns": [
     {
@@ -262,6 +429,173 @@
         "faceUp": true
       },
       "stockRemaining": 33,
+      "stockPileCards": [
+        {
+          "rank": "5",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "3",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "K",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "3",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "10",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "10",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "K",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "8",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "8",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "4",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "3",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "5",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "4",
+          "suit": "hearts",
+          "faceUp": false
+        }
+      ],
       "roundEnded": false
     },
     {
@@ -396,6 +730,168 @@
         "faceUp": true
       },
       "stockRemaining": 32,
+      "stockPileCards": [
+        {
+          "rank": "5",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "3",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "K",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "3",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "10",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "10",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "K",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "8",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "8",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "4",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "3",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "5",
+          "suit": "diamonds",
+          "faceUp": false
+        }
+      ],
       "roundEnded": false
     },
     {
@@ -530,6 +1026,168 @@
         "faceUp": true
       },
       "stockRemaining": 32,
+      "stockPileCards": [
+        {
+          "rank": "5",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "3",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "K",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "3",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "10",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "10",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "K",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "8",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "8",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "4",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "3",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "5",
+          "suit": "diamonds",
+          "faceUp": false
+        }
+      ],
       "roundEnded": false
     },
     {
@@ -664,6 +1322,163 @@
         "faceUp": true
       },
       "stockRemaining": 31,
+      "stockPileCards": [
+        {
+          "rank": "5",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "3",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "K",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "3",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "10",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "10",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "K",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "8",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "8",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "4",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "3",
+          "suit": "spades",
+          "faceUp": false
+        }
+      ],
       "roundEnded": false
     },
     {
@@ -798,6 +1613,158 @@
         "faceUp": true
       },
       "stockRemaining": 30,
+      "stockPileCards": [
+        {
+          "rank": "5",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "3",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "K",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "3",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "10",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "10",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "K",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "8",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "8",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "4",
+          "suit": "diamonds",
+          "faceUp": false
+        }
+      ],
       "roundEnded": false
     },
     {
@@ -932,6 +1899,153 @@
         "faceUp": true
       },
       "stockRemaining": 29,
+      "stockPileCards": [
+        {
+          "rank": "5",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "3",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "K",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "3",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "10",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "10",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "K",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "8",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "8",
+          "suit": "clubs",
+          "faceUp": false
+        }
+      ],
       "roundEnded": false
     },
     {
@@ -1066,6 +2180,148 @@
         "faceUp": true
       },
       "stockRemaining": 28,
+      "stockPileCards": [
+        {
+          "rank": "5",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "3",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "K",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "3",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "10",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "10",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "K",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "8",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "hearts",
+          "faceUp": false
+        }
+      ],
       "roundEnded": false
     },
     {
@@ -1200,6 +2456,143 @@
         "faceUp": true
       },
       "stockRemaining": 27,
+      "stockPileCards": [
+        {
+          "rank": "5",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "3",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "K",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "3",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "10",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "10",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "K",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "8",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "hearts",
+          "faceUp": false
+        }
+      ],
       "roundEnded": false
     },
     {
@@ -1334,6 +2727,138 @@
         "faceUp": true
       },
       "stockRemaining": 26,
+      "stockPileCards": [
+        {
+          "rank": "5",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "3",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "K",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "3",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "10",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "10",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "K",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "8",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "spades",
+          "faceUp": false
+        }
+      ],
       "roundEnded": false
     },
     {
@@ -1468,6 +2993,138 @@
         "faceUp": true
       },
       "stockRemaining": 26,
+      "stockPileCards": [
+        {
+          "rank": "5",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "3",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "K",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "3",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "10",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "10",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "K",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "8",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "spades",
+          "faceUp": false
+        }
+      ],
       "roundEnded": false
     },
     {
@@ -1602,6 +3259,133 @@
         "faceUp": true
       },
       "stockRemaining": 25,
+      "stockPileCards": [
+        {
+          "rank": "5",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "3",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "K",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "3",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "10",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "10",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "K",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "8",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "spades",
+          "faceUp": false
+        }
+      ],
       "roundEnded": false
     },
     {
@@ -1736,6 +3520,128 @@
         "faceUp": true
       },
       "stockRemaining": 24,
+      "stockPileCards": [
+        {
+          "rank": "5",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "3",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "K",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "3",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "10",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "10",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "K",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "8",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "clubs",
+          "faceUp": false
+        }
+      ],
       "roundEnded": false
     },
     {
@@ -1870,6 +3776,123 @@
         "faceUp": true
       },
       "stockRemaining": 23,
+      "stockPileCards": [
+        {
+          "rank": "5",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "3",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "K",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "3",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "10",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "10",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "K",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "8",
+          "suit": "spades",
+          "faceUp": false
+        }
+      ],
       "roundEnded": false
     },
     {
@@ -2004,6 +4027,123 @@
         "faceUp": true
       },
       "stockRemaining": 23,
+      "stockPileCards": [
+        {
+          "rank": "5",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "3",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "2",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "9",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "Q",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "K",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "3",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "10",
+          "suit": "spades",
+          "faceUp": false
+        },
+        {
+          "rank": "10",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "K",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "7",
+          "suit": "hearts",
+          "faceUp": false
+        },
+        {
+          "rank": "J",
+          "suit": "diamonds",
+          "faceUp": false
+        },
+        {
+          "rank": "A",
+          "suit": "clubs",
+          "faceUp": false
+        },
+        {
+          "rank": "8",
+          "suit": "spades",
+          "faceUp": false
+        }
+      ],
       "roundEnded": true
     }
   ],
