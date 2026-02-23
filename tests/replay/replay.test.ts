@@ -277,3 +277,125 @@ describe('Replay CLI -- --stop-at argument validation', () => {
     20_000,
   );
 });
+
+// ── V1 Transcript Backward Compatibility Tests ──────────────
+
+describe('Replay CLI -- v1 transcript handling', () => {
+  let tmpDir: string;
+
+  beforeAll(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'replay-v1-test-'));
+  });
+
+  afterAll(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  /**
+   * Create a minimal v1 transcript file. Has valid structure but no
+   * stockPileCards (the key v1 limitation). Contains enough data to
+   * pass basic CLI validation (version, initialState, turns array).
+   */
+  function createV1TranscriptFile(filename: string): string {
+    const filePath = path.join(tmpDir, filename);
+    const v1Transcript = {
+      version: 1,
+      metadata: {
+        startedAt: '2026-01-01T00:00:00.000Z',
+        endedAt: '2026-01-01T00:01:00.000Z',
+        players: [
+          { name: 'Player 0', isAI: true, strategy: 'random' },
+          { name: 'Player 1', isAI: true, strategy: 'random' },
+        ],
+      },
+      initialState: {
+        boardStates: [
+          {
+            grid: Array.from({ length: 9 }, () => ({ rank: '5', suit: 'hearts', faceUp: false })),
+            faceUpCount: 0,
+            visibleScore: 0,
+            totalScore: 45,
+          },
+          {
+            grid: Array.from({ length: 9 }, () => ({ rank: '6', suit: 'clubs', faceUp: false })),
+            faceUpCount: 0,
+            visibleScore: 0,
+            totalScore: 54,
+          },
+        ],
+        discardTop: { rank: '3', suit: 'spades', faceUp: true },
+        stockRemaining: 33,
+        // NOTE: no stockPileCards — this is what makes it v1
+      },
+      turns: [
+        {
+          turnNumber: 0,
+          playerIndex: 0,
+          playerName: 'Player 0',
+          drawSource: 'stock',
+          drawnCard: { rank: '7', suit: 'diamonds', faceUp: true },
+          move: { kind: 'swap', row: 0, col: 0 },
+          discardedCard: { rank: '5', suit: 'hearts', faceUp: true },
+          boardStates: [
+            {
+              grid: Array.from({ length: 9 }, (_, i) =>
+                i === 0
+                  ? { rank: '7', suit: 'diamonds', faceUp: true }
+                  : { rank: '5', suit: 'hearts', faceUp: false },
+              ),
+              faceUpCount: 1,
+              visibleScore: 7,
+              totalScore: 47,
+            },
+            {
+              grid: Array.from({ length: 9 }, () => ({ rank: '6', suit: 'clubs', faceUp: false })),
+              faceUpCount: 0,
+              visibleScore: 0,
+              totalScore: 54,
+            },
+          ],
+          stockRemaining: 32,
+          roundEnded: false,
+        },
+      ],
+      results: null,
+    };
+    fs.writeFileSync(filePath, JSON.stringify(v1Transcript));
+    return filePath;
+  }
+
+  it(
+    'should reject v1 transcript when --stop-at is used',
+    () => {
+      const filePath = createV1TranscriptFile('v1-stop-at.json');
+      const result = runReplay([filePath, '--stop-at', '0']);
+
+      expect(result.exitCode).toBe(1);
+      const output = result.stdout + result.stderr;
+      expect(output).toContain('--stop-at requires a v2 transcript');
+      expect(output).toContain('Re-record the game');
+    },
+    20_000,
+  );
+
+  it(
+    'should accept v1 transcript for regular replay (no --stop-at)',
+    () => {
+      const filePath = createV1TranscriptFile('v1-regular.json');
+      // Run with a very short timeout -- we only need to verify the CLI
+      // gets past transcript validation. It will fail later trying to
+      // start the dev server / Playwright, which is fine.
+      const result = runReplay([filePath], 10_000);
+      const output = result.stdout + result.stderr;
+
+      // Should NOT contain the v1 rejection error
+      expect(output).not.toContain('--stop-at requires a v2 transcript');
+      // Should NOT contain a version error
+      expect(output).not.toContain('Unsupported transcript version');
+      // Should show transcript info (proving it passed validation)
+      expect(output).toContain('Version: 1');
+      expect(output).toContain('Turns: 1');
+    },
+    20_000,
+  );
+});

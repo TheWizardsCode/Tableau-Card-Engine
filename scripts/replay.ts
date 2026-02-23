@@ -46,6 +46,7 @@ interface TurnRecord {
   boardStates: BoardSnapshot[];
   discardTop: CardSnapshot | null;
   stockRemaining: number;
+  stockPileCards?: CardSnapshot[];
   roundEnded: boolean;
 }
 
@@ -60,6 +61,7 @@ interface GameTranscript {
     boardStates: BoardSnapshot[];
     discardTop: CardSnapshot | null;
     stockRemaining: number;
+    stockPileCards?: CardSnapshot[];
   };
   turns: TurnRecord[];
   results: { scores: number[]; winnerIndex: number; winnerName: string } | null;
@@ -175,9 +177,9 @@ function loadTranscript(filePath: string): GameTranscript {
     process.exit(1);
   }
 
-  if (transcript.version !== 1) {
+  if (transcript.version !== 1 && transcript.version !== 2) {
     console.error(
-      `Unsupported transcript version: ${transcript.version}. Expected: 1`,
+      `Unsupported transcript version: ${transcript.version}. Expected: 1 or 2`,
     );
     process.exit(1);
   }
@@ -256,9 +258,11 @@ async function injectBoardStateAndWait(
   discardTop: CardSnapshot | null,
   stockRemaining: number,
   timeoutMs: number,
+  stockPileCards?: CardSnapshot[],
 ): Promise<void> {
   const bsJson = JSON.stringify(boardStates);
   const dtJson = JSON.stringify(discardTop);
+  const spcJson = stockPileCards ? JSON.stringify(stockPileCards) : 'undefined';
   await page.evaluate(`
     new Promise((resolve, reject) => {
       const timer = setTimeout(
@@ -284,7 +288,7 @@ async function injectBoardStateAndWait(
         reject(new Error('GolfScene not found'));
         return;
       }
-      scene.loadBoardState(${bsJson}, ${dtJson}, ${stockRemaining});
+      scene.loadBoardState(${bsJson}, ${dtJson}, ${stockRemaining}, ${spcJson});
     })
   `);
 }
@@ -305,6 +309,14 @@ async function captureScreenshot(
 async function main(): Promise<void> {
   const { transcriptPath, outputDir, stopAt } = parseArgs();
   const transcript = loadTranscript(transcriptPath);
+
+  // Reject v1 transcripts when --stop-at is used (no stock pile data for interactive play)
+  if (stopAt !== undefined && transcript.version < 2) {
+    console.error(
+      'Error: --stop-at requires a v2 transcript with stock pile data. Re-record the game to generate a v2 transcript.',
+    );
+    process.exit(1);
+  }
 
   console.log(`Transcript: ${transcriptPath}`);
   console.log(`  Version: ${transcript.version}`);
@@ -375,6 +387,7 @@ async function main(): Promise<void> {
         transcript.initialState.discardTop,
         transcript.initialState.stockRemaining,
         STATE_SETTLED_TIMEOUT,
+        transcript.initialState.stockPileCards,
       );
       // Allow a frame for rendering to complete
       await page.waitForTimeout(100);
@@ -414,6 +427,7 @@ async function main(): Promise<void> {
           turn.discardTop,
           turn.stockRemaining,
           STATE_SETTLED_TIMEOUT,
+          turn.stockPileCards,
         );
         await page.waitForTimeout(100);
 
@@ -470,6 +484,7 @@ async function main(): Promise<void> {
           targetTurn.discardTop,
           targetTurn.stockRemaining,
           STATE_SETTLED_TIMEOUT,
+          targetTurn.stockPileCards,
         );
       }
       // If --stop-at 0, the initial state is already loaded
@@ -588,6 +603,7 @@ async function main(): Promise<void> {
               turn.discardTop,
               turn.stockRemaining,
               STATE_SETTLED_TIMEOUT,
+              turn.stockPileCards,
             );
             await page.waitForTimeout(100);
 

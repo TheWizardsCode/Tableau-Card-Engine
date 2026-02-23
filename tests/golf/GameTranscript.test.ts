@@ -7,6 +7,7 @@ import {
   TranscriptRecorder,
   snapshotCard,
   snapshotBoard,
+  isV2Transcript,
 } from '../../example-games/golf/GameTranscript';
 import type {
   GameTranscript,
@@ -87,12 +88,13 @@ describe('TranscriptRecorder', () => {
     const recorder = new TranscriptRecorder(session, ['random', 'greedy']);
     const transcript = recorder.getTranscript();
 
-    expect(transcript.version).toBe(1);
+    expect(transcript.version).toBe(2);
     expect(transcript.metadata.players).toHaveLength(2);
     expect(transcript.metadata.players[0].strategy).toBe('random');
     expect(transcript.metadata.players[1].strategy).toBe('greedy');
     expect(transcript.initialState.boardStates).toHaveLength(2);
     expect(transcript.initialState.stockRemaining).toBe(33);
+    expect(transcript.initialState.stockPileCards).toHaveLength(33);
     expect(transcript.initialState.discardTop).not.toBeNull();
     expect(transcript.turns).toHaveLength(0);
     expect(transcript.results).toBeNull();
@@ -218,7 +220,7 @@ describe('Full game transcript', () => {
     const json = JSON.stringify(transcript);
     const parsed: GameTranscript = JSON.parse(json);
 
-    expect(parsed.version).toBe(1);
+    expect(parsed.version).toBe(2);
     expect(parsed.turns.length).toBe(transcript.turns.length);
     expect(parsed.results).toEqual(transcript.results);
     expect(parsed.metadata).toEqual(transcript.metadata);
@@ -229,7 +231,7 @@ describe('Full game transcript', () => {
 
 function validateTranscript(t: GameTranscript): void {
   // Version
-  expect(t.version).toBe(1);
+  expect(t.version).toBe(2);
 
   // Metadata
   expect(t.metadata.startedAt).toBeTruthy();
@@ -246,6 +248,9 @@ function validateTranscript(t: GameTranscript): void {
     validateBoardSnapshot(bs);
   }
   expect(typeof t.initialState.stockRemaining).toBe('number');
+  // v2: stockPileCards must be present and consistent with stockRemaining
+  expect(Array.isArray(t.initialState.stockPileCards)).toBe(true);
+  expect(t.initialState.stockPileCards!.length).toBe(t.initialState.stockRemaining);
 
   // Turns
   expect(t.turns.length).toBeGreaterThan(0);
@@ -295,6 +300,9 @@ function validateTurnRecord(
     validateBoardSnapshot(bs);
   }
   expect(typeof turn.stockRemaining).toBe('number');
+  // v2: stockPileCards must be present and consistent with stockRemaining
+  expect(Array.isArray(turn.stockPileCards)).toBe(true);
+  expect(turn.stockPileCards!.length).toBe(turn.stockRemaining);
   expect(typeof turn.roundEnded).toBe('boolean');
 }
 
@@ -303,3 +311,60 @@ function validateCardSnapshot(cs: CardSnapshot): void {
   expect(typeof cs.suit).toBe('string');
   expect(typeof cs.faceUp).toBe('boolean');
 }
+
+// ── isV2Transcript type guard tests ─────────────────────────
+
+describe('isV2Transcript', () => {
+  it('returns true for a v2 transcript', () => {
+    const session = setupGolfGame({ rng: createTestRng() });
+    const recorder = new TranscriptRecorder(session, ['random', 'greedy']);
+    const transcript = recorder.getTranscript();
+
+    expect(transcript.version).toBe(2);
+    expect(isV2Transcript(transcript)).toBe(true);
+  });
+
+  it('returns false for a v1 transcript', () => {
+    const session = setupGolfGame({ rng: createTestRng() });
+    const recorder = new TranscriptRecorder(session, ['random', 'greedy']);
+    const transcript = recorder.getTranscript();
+
+    // Downgrade to v1 to simulate a legacy transcript
+    const v1Transcript: GameTranscript = {
+      ...transcript,
+      version: 1 as 1 | 2,
+    };
+
+    expect(isV2Transcript(v1Transcript)).toBe(false);
+  });
+
+  it('returns true for version > 2 (future-proofing)', () => {
+    const session = setupGolfGame({ rng: createTestRng() });
+    const recorder = new TranscriptRecorder(session, ['random', 'greedy']);
+    const transcript = recorder.getTranscript();
+
+    // Simulate a hypothetical future version
+    const v3Transcript: GameTranscript = {
+      ...transcript,
+      version: 3 as 1 | 2,
+    };
+
+    expect(isV2Transcript(v3Transcript)).toBe(true);
+  });
+
+  it('narrows type to include stockPileCards on initialState', () => {
+    const session = setupGolfGame({ rng: createTestRng() });
+    const recorder = new TranscriptRecorder(session, ['random', 'greedy']);
+    const transcript = recorder.getTranscript();
+
+    if (isV2Transcript(transcript)) {
+      // TypeScript should allow direct access to stockPileCards without optional chaining
+      const cards = transcript.initialState.stockPileCards;
+      expect(Array.isArray(cards)).toBe(true);
+      expect(cards.length).toBe(transcript.initialState.stockRemaining);
+    } else {
+      // Should not reach here for a v2 transcript
+      expect.unreachable('Expected isV2Transcript to return true');
+    }
+  });
+});

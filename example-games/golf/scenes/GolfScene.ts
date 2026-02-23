@@ -275,15 +275,18 @@ export class GolfScene extends Phaser.Scene {
    * emits a `state-settled` event so the caller can synchronize
    * screenshot capture.
    *
-   * @param boardStates  Per-player board snapshots (grid cards, scores).
-   * @param discardTop   The card on top of the discard pile, or null if empty.
-   * @param stockRemaining  Number of cards left in the stock pile.
-   */
-  loadBoardState(
-    boardStates: BoardSnapshot[],
-    discardTop: CardSnapshot | null,
-    stockRemaining: number,
-  ): void {
+    * @param boardStates  Per-player board snapshots (grid cards, scores).
+    * @param discardTop   The card on top of the discard pile, or null if empty.
+    * @param stockRemaining  Number of cards left in the stock pile.
+    * @param stockPileCards  Optional full stock pile card data (v2 transcripts).
+    *                        When provided, real cards are used instead of dummies.
+    */
+   loadBoardState(
+     boardStates: BoardSnapshot[],
+     discardTop: CardSnapshot | null,
+     stockRemaining: number,
+     stockPileCards?: CardSnapshot[],
+   ): void {
     if (!this.replayMode) {
       throw new Error(
         'loadBoardState() is only available in replay mode (?mode=replay)',
@@ -316,16 +319,27 @@ export class GolfScene extends Phaser.Scene {
       this.session.shared.discardPile.push(card);
     }
 
-    // Update the stock pile length to match the snapshot.
-    // We don't need real card data -- just enough entries so
-    // refreshPiles() shows/hides the stock sprite correctly.
+    // Update the stock pile from the snapshot.
+    // If real card data is available (v2 transcript), use it so that
+    // interactive takeover draws actual cards.  Otherwise fall back to
+    // dummy entries -- enough for refreshPiles() to show/hide the sprite.
     this.session.shared.stockPile.length = 0;
-    for (let i = 0; i < stockRemaining; i++) {
-      this.session.shared.stockPile.push({
-        rank: 'A',
-        suit: 'spades',
-        faceUp: false,
-      });
+    if (stockPileCards && stockPileCards.length > 0) {
+      for (const cs of stockPileCards) {
+        this.session.shared.stockPile.push({
+          rank: cs.rank as Rank,
+          suit: cs.suit as Suit,
+          faceUp: false,
+        });
+      }
+    } else {
+      for (let i = 0; i < stockRemaining; i++) {
+        this.session.shared.stockPile.push({
+          rank: 'A',
+          suit: 'spades',
+          faceUp: false,
+        });
+      }
     }
 
     // Refresh all visual elements

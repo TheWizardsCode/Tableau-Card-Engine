@@ -57,6 +57,11 @@ export interface TurnRecord {
   discardTop: CardSnapshot | null;
   /** Number of cards remaining in the stock pile. */
   stockRemaining: number;
+  /**
+   * Full stock pile contents after the move (top card last).
+   * Present in v2 transcripts; absent in v1.
+   */
+  stockPileCards?: CardSnapshot[];
   /** Whether the round ended after this turn. */
   roundEnded: boolean;
 }
@@ -88,7 +93,7 @@ export interface GameResults {
 /** A complete game transcript. */
 export interface GameTranscript {
   /** Format version for future compatibility. */
-  version: 1;
+  version: 1 | 2;
   /** Game metadata. */
   metadata: GameMetadata;
   /** Board state at the start (after deal + initial reveal, before first turn). */
@@ -96,11 +101,31 @@ export interface GameTranscript {
     boardStates: BoardSnapshot[];
     discardTop: CardSnapshot | null;
     stockRemaining: number;
+    /**
+     * Full stock pile contents after deal (top card last).
+     * Present in v2 transcripts; absent in v1.
+     */
+    stockPileCards?: CardSnapshot[];
   };
   /** All turns in order. */
   turns: TurnRecord[];
   /** Final results (set on finalize). */
   results: GameResults | null;
+}
+
+/**
+ * Type guard that checks whether a transcript is v2 or later,
+ * meaning it includes `stockPileCards` data.
+ */
+export function isV2Transcript(
+  t: GameTranscript,
+): t is GameTranscript & {
+  version: 2;
+  initialState: GameTranscript['initialState'] & {
+    stockPileCards: CardSnapshot[];
+  };
+} {
+  return t.version >= 2;
 }
 
 // ── Helpers ─────────────────────────────────────────────────
@@ -141,7 +166,7 @@ export class TranscriptRecorder extends TranscriptRecorderBase<GameTranscript> {
     }));
 
     super({
-      version: 1,
+      version: 2,
       metadata: {
         startedAt: new Date().toISOString(),
         endedAt: '',
@@ -155,6 +180,7 @@ export class TranscriptRecorder extends TranscriptRecorderBase<GameTranscript> {
           ? snapshotCard(session.shared.discardPile.peek()!)
           : null,
         stockRemaining: session.shared.stockPile.length,
+        stockPileCards: session.shared.stockPile.map(snapshotCard),
       },
       turns: [],
       results: null,
@@ -190,6 +216,7 @@ export class TranscriptRecorder extends TranscriptRecorderBase<GameTranscript> {
       boardStates,
       discardTop,
       stockRemaining: shared.stockPile.length,
+      stockPileCards: shared.stockPile.map(snapshotCard),
       roundEnded: turnResult.roundEnded,
     };
 
