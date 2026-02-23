@@ -11,6 +11,7 @@ This document covers everything you need to develop, test, and build the Tableau
 - [Project Structure](#project-structure)
 - [Path Aliases](#path-aliases)
 - [Adding an Example Game](#adding-an-example-game)
+- [Transcript Persistence](#transcript-persistence)
 - [Managing Assets](#managing-assets)
 - [Keeping Docs Up to Date](#keeping-docs-up-to-date)
 - [Work-Item Tracking](#work-item-tracking)
@@ -545,6 +546,50 @@ Tests are in `tests/lost-cities/`:
 | `lost-cities-game.test.ts` | Session setup, executeAction, round/match lifecycle (40 tests) |
 | `lost-cities-ai.test.ts` | Random and Greedy strategies, AI player wrapper (22 tests) |
 | `lost-cities-transcript.test.ts` | Transcript recording, full AI-vs-AI match validation (21 tests) |
+
+## Transcript Persistence
+
+Game transcripts are automatically recorded by the engine's `TranscriptStore` and saved to the browser's IndexedDB. Two additional mechanisms allow transcripts to be persisted to disk for debugging, replay, and analysis.
+
+### Automatic Disk Persistence (Dev Server)
+
+When running `npm run dev`, a Vite plugin intercepts `POST /api/transcripts` requests and writes each transcript as a timestamped JSON file:
+
+```
+data/transcripts/<gameType>/<gameType>-<ISO-timestamp>.json
+```
+
+This happens via a fire-and-forget POST from `TranscriptStore.save()`. If the POST fails (e.g. the production build is being served instead of the dev server), a `console.warn` is emitted but gameplay is not disrupted.
+
+The `data/` directory is gitignored, so persisted transcripts remain local to your machine.
+
+### CLI Batch Export
+
+To export all transcripts currently stored in IndexedDB to disk, use:
+
+```bash
+npm run transcripts:export -- <game>
+```
+
+For example:
+
+```bash
+npm run transcripts:export -- golf
+```
+
+This launches a headless Chromium browser via Playwright, navigates to the game, reads all transcripts from IndexedDB, and writes them to `data/transcripts/<game>/`. The dev server is started automatically if it is not already running.
+
+**Requirements:** Playwright's Chromium must be installed (`npx playwright install chromium`).
+
+### Transcript Fixture Location
+
+The test fixture transcript used by replay tests lives at:
+
+```
+tests/fixtures/transcripts/golf/fixture-game.json
+```
+
+This file is checked into version control and is referenced by `scripts/replay.ts` and `scripts/generate-fixture-transcript.ts`.
 
 ## Managing Assets
 
