@@ -741,18 +741,29 @@ export class GolfScene extends Phaser.Scene {
     if (this.session.shared.stockPile.length > 0) {
       this.stockSprite.setVisible(true);
       this.stockSprite.setTexture('card_back');
+      this.stockSprite.setAlpha(1);
     } else {
       this.stockSprite.setVisible(false);
     }
 
-    // Discard: shows top card face-up
+    // Discard: shows top card face-up, or a dimmed placeholder when empty
+    // so the player can always click it to discard their drawn card.
     const top = this.session.shared.discardPile.peek();
     if (top) {
       this.discardSprite.setVisible(true);
       this.discardSprite.setTexture(getCardTexture(top));
+      this.discardSprite.setAlpha(1);
     } else {
-      this.discardSprite.setVisible(false);
+      this.showDiscardPlaceholder();
     }
+  }
+
+  /** Show a dimmed card-back as an empty-pile placeholder so the discard
+   *  area remains visible and clickable even when no cards are on it. */
+  private showDiscardPlaceholder(): void {
+    this.discardSprite.setVisible(true);
+    this.discardSprite.setTexture('card_back');
+    this.discardSprite.setAlpha(0.25);
   }
 
   private refreshScores(): void {
@@ -1227,14 +1238,15 @@ export class GolfScene extends Phaser.Scene {
   private updateDiscardPileAfterDraw(): void {
     const pile = this.session.shared.discardPile;
     if (pile.size() <= 1) {
-      // Only one card (the one being taken) — pile will be empty.
-      this.discardSprite.setVisible(false);
+      // Only one card (the one being taken) — show empty placeholder.
+      this.showDiscardPlaceholder();
     } else {
       // Show the card below the top. toArray() returns bottom-to-top order,
       // so the second-to-last element is the next top after the draw.
       const arr = pile.toArray();
       const nextTop = arr[arr.length - 2];
       this.discardSprite.setTexture(getCardTexture(nextTop));
+      this.discardSprite.setAlpha(1);
     }
   }
 
