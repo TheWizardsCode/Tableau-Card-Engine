@@ -70,12 +70,12 @@ const SFX_KEYS = {
 } as const;
 
 // ── Local card dimensions (5:7 aspect ratio, sized to fit 8 columns) ──
-const BC_CARD_W = 75;
-const BC_CARD_H = 105;
+const BC_CARD_W = 90;
+const BC_CARD_H = 126;
 
 // ── Constants ───────────────────────────────────────────────
 
-const CARD_GAP = 16;
+const CARD_GAP = 14;
 
 const ANIM_DURATION = 300; // ms per card deal animation
 const DEAL_STAGGER = 40; // ms between successive card deal tweens
@@ -84,11 +84,11 @@ const AUTO_COMPLETE_DELAY = 150; // ms between auto-complete card animations
 
 /** Preferred vertical overlap offset between cascaded cards in a tableau column.
  *  Dynamically compressed when a column has many cards (see tableauCardY). */
-const CASCADE_OFFSET_Y = 36;
+const CASCADE_OFFSET_Y = 44;
 
 /** Maximum Y for the center of the bottom card in a tableau column.
  *  Leaves room for the HUD bar at the bottom of the canvas. */
-const TABLEAU_MAX_Y = GAME_H - 40 - BC_CARD_H / 2; // ~627
+const TABLEAU_MAX_Y = GAME_H - 40 - BC_CARD_H / 2; // ~617
 
 /** Top area: title + foundations */
 const TITLE_Y = 20;
@@ -425,8 +425,8 @@ export class BeleagueredCastleScene extends Phaser.Scene {
 
       // Suit label beneath the slot
       const label = this.add
-        .text(x, FOUNDATION_Y + BC_CARD_H / 2 + 12, SUIT_SYMBOL[suit], {
-          fontSize: '18px',
+        .text(x, FOUNDATION_Y + BC_CARD_H / 2 + 14, SUIT_SYMBOL[suit], {
+          fontSize: '20px',
           color: SUIT_COLOR[suit],
           fontFamily: FONT_FAMILY,
         })
