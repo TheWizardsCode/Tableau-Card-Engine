@@ -3,6 +3,8 @@
  *
  * AI opponent strategies for Splendor.
  * All strategies operate on pure game state — no Phaser dependency.
+ *
+ * Uses shared AI module (`@ai`) for base types and utility functions.
  */
 
 import {
@@ -22,13 +24,14 @@ import {
   effectiveCost,
   getAvailableCards,
 } from './SplendorGame';
+import type { AiStrategyBase } from '../../src/ai';
+import { AiPlayer as AiPlayerBase, pickRandom } from '../../src/ai';
 
 // ---------------------------------------------------------------------------
 // Strategy interface
 // ---------------------------------------------------------------------------
 
-export interface SplendorAiStrategy {
-  readonly name: string;
+export interface SplendorAiStrategy extends AiStrategyBase {
   chooseTurn(session: SplendorSession, playerIndex: number, rng: () => number): TurnAction;
   chooseDiscard(
     session: SplendorSession,
@@ -50,7 +53,7 @@ export const RandomStrategy: SplendorAiStrategy = {
     if (actions.length === 0) {
       throw new Error('No legal actions available');
     }
-    return actions[Math.floor(rng() * actions.length)];
+    return pickRandom(actions, rng);
   },
 
   chooseDiscard(session, playerIndex, excess, rng) {
@@ -173,7 +176,7 @@ export const GreedyStrategy: SplendorAiStrategy = {
     }
 
     // Fallback: random action
-    return actions[Math.floor(rng() * actions.length)];
+    return pickRandom(actions, rng);
   },
 
   chooseDiscard(session, playerIndex, excess, _rng) {
@@ -186,11 +189,13 @@ export const GreedyStrategy: SplendorAiStrategy = {
 // AI Player class
 // ---------------------------------------------------------------------------
 
-export class SplendorAiPlayer {
+export class SplendorAiPlayer extends AiPlayerBase<SplendorAiStrategy> {
   constructor(
-    private strategy: SplendorAiStrategy = GreedyStrategy,
-    private rng: () => number = Math.random,
-  ) {}
+    strategy: SplendorAiStrategy = GreedyStrategy,
+    rng: () => number = Math.random,
+  ) {
+    super(strategy, rng);
+  }
 
   chooseTurn(session: SplendorSession, playerIndex: number): TurnAction {
     return this.strategy.chooseTurn(session, playerIndex, this.rng);
@@ -202,10 +207,6 @@ export class SplendorAiPlayer {
     excess: number,
   ): TokenDiscard {
     return this.strategy.chooseDiscard(session, playerIndex, excess, this.rng);
-  }
-
-  get strategyName(): string {
-    return this.strategy.name;
   }
 }
 

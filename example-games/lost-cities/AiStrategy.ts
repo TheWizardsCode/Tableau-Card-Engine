@@ -9,6 +9,8 @@
  *  - GreedyStrategy: prefers extending committed expeditions, avoids
  *    discarding cards the opponent has been collecting (inferred from
  *    visible expedition lanes and discard-pile draw history)
+ *
+ * Uses shared AI module (`@ai`) for base types and utility functions.
  */
 
 import type {
@@ -29,13 +31,14 @@ import {
   getLegalPhase1Actions,
   getLegalPhase2Actions,
 } from './LostCitiesRules';
+import type { AiStrategyBase } from '../../src/ai';
+import { AiPlayer as AiPlayerBase, pickRandom } from '../../src/ai';
 
 // ---------------------------------------------------------------------------
 // Strategy interface
 // ---------------------------------------------------------------------------
 
-export interface LostCitiesAiStrategy {
-  readonly name: string;
+export interface LostCitiesAiStrategy extends AiStrategyBase {
 
   /**
    * Choose a Phase 1 action (play-to-expedition or discard).
@@ -109,7 +112,7 @@ export const RandomStrategy: LostCitiesAiStrategy = {
     if (actions.length === 0) {
       throw new Error('No legal Phase 1 actions available');
     }
-    return actions[Math.floor(rng() * actions.length)];
+    return pickRandom(actions, rng);
   },
 
   choosePhase2(state, rng) {
@@ -117,7 +120,7 @@ export const RandomStrategy: LostCitiesAiStrategy = {
     if (actions.length === 0) {
       throw new Error('No legal Phase 2 actions available');
     }
-    return actions[Math.floor(rng() * actions.length)];
+    return pickRandom(actions, rng);
   },
 };
 
@@ -312,13 +315,14 @@ function greedyChoosePhase2(state: VisibleState): Phase2Action {
 // AI Player class — wraps a strategy + maintains draw history
 // ---------------------------------------------------------------------------
 
-export class LostCitiesAiPlayer {
+export class LostCitiesAiPlayer extends AiPlayerBase<LostCitiesAiStrategy> {
   private drawHistory: OpponentDrawHistory;
 
   constructor(
-    private strategy: LostCitiesAiStrategy = GreedyStrategy,
-    private rng: () => number = Math.random,
+    strategy: LostCitiesAiStrategy = GreedyStrategy,
+    rng: () => number = Math.random,
   ) {
+    super(strategy, rng);
     this.drawHistory = createOpponentDrawHistory();
   }
 
@@ -350,9 +354,5 @@ export class LostCitiesAiPlayer {
   /** Reset draw history (call at start of each round). */
   resetRoundHistory(): void {
     this.drawHistory = createOpponentDrawHistory();
-  }
-
-  get strategyName(): string {
-    return this.strategy.name;
   }
 }

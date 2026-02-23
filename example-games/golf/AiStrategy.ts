@@ -6,6 +6,8 @@
  *   - RandomStrategy: uniformly random legal action
  *   - GreedyStrategy: minimizes visible score after the move
  *   - AiPlayer: wrapper that binds a strategy and RNG
+ *
+ * Uses shared AI module (`@ai`) for base types and utility functions.
  */
 
 import type { Card } from '../../src/card-system/Card';
@@ -20,16 +22,15 @@ import type {
   GolfAction,
 } from './GolfGame';
 import { enumerateLegalMoves, enumerateDrawSources } from './GolfGame';
+import type { AiStrategyBase } from '../../src/ai';
+import { AiPlayer as AiPlayerBase, pickRandom } from '../../src/ai';
 
 // ── Strategy interface ──────────────────────────────────────
 
 /**
  * An AI strategy chooses a GolfAction given the current state.
  */
-export interface AiStrategy {
-  /** Human-readable strategy name. */
-  readonly name: string;
-
+export interface AiStrategy extends AiStrategyBase {
   /**
    * Choose an action (draw source + move) for the current player.
    *
@@ -58,14 +59,13 @@ export const RandomStrategy: AiStrategy = {
     shared: GolfSharedState,
     rng: () => number,
   ): GolfAction {
-    const drawSources = enumerateDrawSources(shared);
-    const drawSource = drawSources[Math.floor(rng() * drawSources.length)];
+    const drawSource = pickRandom(enumerateDrawSources(shared), rng);
 
     const legalMoves = enumerateLegalMoves(playerState.grid);
     if (legalMoves.length === 0) {
       throw new Error('No legal moves available');
     }
-    const move = legalMoves[Math.floor(rng() * legalMoves.length)];
+    const move = pickRandom(legalMoves, rng);
 
     return { drawSource, move };
   },
@@ -143,7 +143,7 @@ export const GreedyStrategy: AiStrategy = {
     const best = candidates.filter((c) => c.score === minScore);
 
     // Break ties randomly
-    const chosen = best[Math.floor(rng() * best.length)];
+    const chosen = pickRandom(best, rng);
     return { drawSource: chosen.drawSource, move: chosen.move };
   },
 };
@@ -176,16 +176,11 @@ function simulateMoveScore(
 
 /**
  * An AI player that wraps a strategy and RNG for convenient use.
+ *
+ * Extends the shared {@link AiPlayerBase} to inherit strategy
+ * binding and the `strategyName` getter.
  */
-export class AiPlayer {
-  readonly strategy: AiStrategy;
-  private readonly rng: () => number;
-
-  constructor(strategy: AiStrategy, rng: () => number = Math.random) {
-    this.strategy = strategy;
-    this.rng = rng;
-  }
-
+export class AiPlayer extends AiPlayerBase<AiStrategy> {
   /**
    * Choose an action for the current game state.
    */
