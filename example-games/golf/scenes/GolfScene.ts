@@ -850,8 +850,11 @@ export class GolfScene extends Phaser.Scene {
     if (this.turnPhase === 'waiting-for-draw' && this.isHumanTurn()) {
       this.humanDraw('discard');
     } else if (this.turnPhase === 'waiting-for-move' && this.isHumanTurn()) {
-      // Player chose to discard the drawn card and flip a face-down card
-      this.setPhase('waiting-for-flip-target');
+      // Player chose to discard the drawn card — animate it to the discard
+      // pile now, then prompt for the face-down card to flip.
+      this.animateDrawnCardToDiscard(() => {
+        this.setPhase('waiting-for-flip-target');
+      });
     }
   }
 
@@ -1248,6 +1251,42 @@ export class GolfScene extends Phaser.Scene {
       this.discardSprite.setTexture(getCardTexture(nextTop));
       this.discardSprite.setAlpha(1);
     }
+  }
+
+  /**
+   * Animate the drawn card sprite from its current (held) position to the
+   * discard pile.  Called when the player clicks the discard pile to discard
+   * their drawn card, so the visual feedback happens immediately rather than
+   * waiting until the flip-target is chosen.
+   */
+  private animateDrawnCardToDiscard(onComplete: () => void): void {
+    if (!this.drawnCardSprite) {
+      onComplete();
+      return;
+    }
+
+    // Block further input while the card is in transit
+    this.setPhase('animating');
+    this.drawnCardSprite.setDepth(15);
+
+    this.tweens.add({
+      targets: this.drawnCardSprite,
+      x: PILE_X,
+      y: DISCARD_Y,
+      duration: SWAP_ANIM_DURATION / 2,
+      ease: 'Power2',
+      onComplete: () => {
+        this.hideDrawnCard();
+        // Update the discard sprite to show the card that was just visually
+        // discarded (state hasn't mutated yet, so we use the peeked card).
+        if (this.drawnCard) {
+          this.discardSprite.setTexture(getCardTexture(this.drawnCard));
+          this.discardSprite.setAlpha(1);
+          this.discardSprite.setVisible(true);
+        }
+        onComplete();
+      },
+    });
   }
 
   private hideDrawnCard(): void {
