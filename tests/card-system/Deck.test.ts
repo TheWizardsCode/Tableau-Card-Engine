@@ -3,6 +3,7 @@ import {
   createStandardDeck,
   createDeckFrom,
   shuffle,
+  shuffleArray,
   draw,
   drawOrThrow,
 } from '../../src/card-system/Deck';
@@ -110,6 +111,56 @@ describe('Deck', () => {
       const order1 = deck1.map((c) => `${c.rank}-${c.suit}`);
       const order2 = deck2.map((c) => `${c.rank}-${c.suit}`);
       expect(order1).toEqual(order2);
+    });
+  });
+
+  describe('shuffleArray', () => {
+    it('should be the same function as shuffle', () => {
+      expect(shuffleArray).toBe(shuffle);
+    });
+
+    it('should work with non-Card arrays (generic)', () => {
+      const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+      let seed = 42;
+      const rng = (): number => {
+        seed = (seed * 16807) % 2147483647;
+        return (seed - 1) / 2147483646;
+      };
+
+      const result = shuffleArray(numbers, rng);
+
+      // Returns the same reference
+      expect(result).toBe(numbers);
+      // Preserves all elements
+      expect([...result].sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    });
+
+    it('should produce deterministic results with string arrays', () => {
+      const makeRng = (): (() => number) => {
+        let seed = 99;
+        return () => {
+          seed = (seed * 16807) % 2147483647;
+          return (seed - 1) / 2147483646;
+        };
+      };
+
+      const a = shuffleArray(['a', 'b', 'c', 'd', 'e'], makeRng());
+      const b = shuffleArray(['a', 'b', 'c', 'd', 'e'], makeRng());
+      expect(a).toEqual(b);
+    });
+
+    it('should handle empty arrays', () => {
+      const arr: number[] = [];
+      const result = shuffleArray(arr);
+      expect(result).toBe(arr);
+      expect(result).toHaveLength(0);
+    });
+
+    it('should handle single-element arrays', () => {
+      const arr = [42];
+      const result = shuffleArray(arr);
+      expect(result).toBe(arr);
+      expect(result).toEqual([42]);
     });
   });
 

@@ -233,15 +233,12 @@ export function createLostCitiesDeck(): LostCitiesCard[] {
 /**
  * Fisher-Yates shuffle (in-place) with optional RNG.
  *
+ * Re-exports `shuffleArray` from the shared card-system module,
+ * aliased as `shuffleDeck` for backward compatibility with existing
+ * consumer code.
+ *
  * @returns The same array reference (mutated).
  */
-export function shuffleDeck(
-  deck: LostCitiesCard[],
-  rng: () => number = Math.random,
-): LostCitiesCard[] {
-  for (let i = deck.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [deck[i], deck[j]] = [deck[j], deck[i]];
-  }
-  return deck;
-}
+import { shuffleArray } from '../../src/card-system/Deck';
+
+export const shuffleDeck: typeof shuffleArray = shuffleArray;

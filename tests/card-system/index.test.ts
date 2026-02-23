@@ -7,6 +7,7 @@ import {
   createStandardDeck,
   createDeckFrom,
   shuffle,
+  shuffleArray,
   draw,
   drawOrThrow,
   Pile,
@@ -32,8 +33,13 @@ describe('card-system barrel exports', () => {
     expect(typeof createStandardDeck).toBe('function');
     expect(typeof createDeckFrom).toBe('function');
     expect(typeof shuffle).toBe('function');
+    expect(typeof shuffleArray).toBe('function');
     expect(typeof draw).toBe('function');
     expect(typeof drawOrThrow).toBe('function');
+  });
+
+  it('shuffle and shuffleArray should be the same function', () => {
+    expect(shuffle).toBe(shuffleArray);
   });
 
   it('should export Pile class', () => {

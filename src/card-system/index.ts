@@ -16,6 +16,7 @@ export { RANKS, SUITS, createCard } from './Card';
 export {
   createStandardDeck,
   createDeckFrom,
+  shuffleArray,
   shuffle,
   draw,
   drawOrThrow,

@@ -34,30 +34,31 @@ export function createDeckFrom(
 }
 
 /**
- * Shuffle a deck in place using the Fisher-Yates algorithm.
- *
- * An optional random number generator can be supplied for
- * deterministic testing. The generator must return a value
- * in [0, 1) (same contract as Math.random).
- *
- * @returns The same array reference (mutated).
- */
-/**
  * Generic Fisher-Yates shuffle that operates on any array of T.
  *
  * An optional random number generator can be supplied for
  * deterministic testing. The generator must return a value
  * in [0, 1) (same contract as Math.random).
  *
- * @returns The same array reference (mutated).
+ * @returns The same array reference (mutated in place).
  */
-export function shuffle<T>(deck: T[], rng: () => number = Math.random): T[] {
-  for (let i = deck.length - 1; i > 0; i--) {
+export function shuffleArray<T>(
+  arr: T[],
+  rng: () => number = Math.random,
+): T[] {
+  for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
-    [deck[i], deck[j]] = [deck[j], deck[i]];
+    [arr[i], arr[j]] = [arr[j], arr[i]];
   }
-  return deck;
+  return arr;
 }
+
+/**
+ * Alias for {@link shuffleArray} — kept for backward compatibility.
+ *
+ * @deprecated Prefer `shuffleArray` for clarity in generic contexts.
+ */
+export const shuffle: typeof shuffleArray = shuffleArray;
 
 /**
  * Draw the top card (last element) from a deck.
