@@ -24,6 +24,7 @@ import {
   getWinnerIndex,
 } from '../SushiGoGame';
 import { SushiGoAiPlayer, GreedyStrategy } from '../AiStrategy';
+import { scoreTableauBreakdown, countMakiIcons, scoreMaki } from '../SushiGoScoring';
 import { GameEventEmitter } from '../../../src/core-engine/GameEventEmitter';
 import { PhaserEventBridge } from '../../../src/core-engine/PhaserEventBridge';
 import { SoundManager } from '../../../src/core-engine/SoundManager';
@@ -277,8 +278,10 @@ export class SushiGoScene extends Phaser.Scene {
   }
 
   private createScoreDisplay(): void {
+    // Moved the round/turn/cards info block upward by ~2 line heights
+    // to reduce overlap with header and provide clearer spacing.
     this.roundText = this.add
-      .text(GAME_W / 2, 87, '', {
+      .text(GAME_W / 2, 51, '', {
         fontSize: '20px',
         color: '#ffdd44',
         fontFamily: FONT_FAMILY,
@@ -286,7 +289,7 @@ export class SushiGoScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.turnText = this.add
-      .text(GAME_W / 2, 111, '', {
+      .text(GAME_W / 2, 75, '', {
         fontSize: '16px',
         color: '#aaccaa',
         fontFamily: FONT_FAMILY,
@@ -294,7 +297,7 @@ export class SushiGoScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.cardsLeftText = this.add
-      .text(GAME_W / 2, 131, '', {
+      .text(GAME_W / 2, 95, '', {
         fontSize: '14px',
         color: '#889988',
         fontFamily: FONT_FAMILY,
@@ -439,6 +442,11 @@ export class SushiGoScene extends Phaser.Scene {
       this.hideCardTooltip();
     });
 
+    // Store the underlying card id on the container so callers can
+    // reliably find containers for specific cards when rendering
+    // overlays (e.g. wasabi underline for paired nigiri).
+    container.setData('cardId', card.id);
+
     return container;
   }
 
@@ -525,12 +533,46 @@ export class SushiGoScene extends Phaser.Scene {
       return;
     }
 
-    // Group cards by type
+    // Build wasabi <-> nigiri pairing maps (based on play order).
+    // Each wasabi pairs with the first subsequent nigiri. We record
+    // by card id so groups (which reorder cards) can still determine
+    // whether a wasabi is "consumed" and whether a nigiri is paired.
+    const wasabiToNigiri = new Map<number, number>();
+    const nigiriToWasabi = new Map<number, number>();
+    const wasabiQueue: number[] = [];
+    for (const c of tableau) {
+      if (c.type === 'wasabi') {
+        wasabiQueue.push(c.id);
+      } else if (c.type === 'nigiri') {
+        if (wasabiQueue.length > 0) {
+          const wId = wasabiQueue.shift()!;
+          wasabiToNigiri.set(wId, c.id);
+          nigiriToWasabi.set(c.id, wId);
+        }
+      }
+    }
+
+    // Group cards by type (groups preserve tableau play order)
     const groups = this.groupByType(tableau);
-    const typeOrder: SushiGoCardType[] = [
-      'maki', 'tempura', 'sashimi', 'dumpling',
-      'nigiri', 'wasabi', 'pudding', 'chopsticks',
-    ];
+
+    // Compute maki counts & bonuses across all players so the tableau
+    // can display the awarded maki bonus (important in tie cases).
+    const allMakiCounts = this.session.players.map((p) => countMakiIcons(p.tableau));
+    const allMakiBonuses = scoreMaki(allMakiCounts);
+
+    // Determine the horizontal order of type groups based on the
+    // first appearance of each type in the tableau (play order).
+    // This preserves the visual left-to-right play order so that
+    // effects dependent on play order (like Wasabi -> Nigiri) match
+    // what the player expects to see.
+    const seenTypes = new Set<SushiGoCardType>();
+    const typeOrder: SushiGoCardType[] = [];
+    for (const c of tableau) {
+      if (!seenTypes.has(c.type)) {
+        seenTypes.add(c.type);
+        typeOrder.push(c.type);
+      }
+    }
 
     // Calculate total width to center
     let totalWidth = 0;
@@ -547,15 +589,81 @@ export class SushiGoScene extends Phaser.Scene {
     let curX = (GAME_W - totalWidth) / 2;
 
     for (const type of typeOrder) {
-      const cards = groups.get(type);
+      let cards = groups.get(type);
       if (!cards || cards.length === 0) continue;
+
+      // If rendering the wasabi group, remove any wasabi that has
+      // been paired with a nigiri so it will be displayed beneath
+      // its paired nigiri instead of as a separate card.
+      if (type === 'wasabi') {
+        cards = cards.filter((c) => !wasabiToNigiri.has(c.id));
+        if (cards.length === 0) continue;
+      }
 
       // Type label above the group
       const groupW = cards.length * (TABLEAU_CARD_W + TABLEAU_CARD_GAP) - TABLEAU_CARD_GAP;
+        // Determine label text using score breakdown when available
+        let labelText = this.getTypeGroupLabel(type, cards);
+      if (type !== 'pudding') {
+        // For categories that score within a single tableau, compute
+        // the score and show it instead of the raw card count.
+        // Use the full-player tableau breakdown so that cross-group
+        // interactions (e.g. wasabi consuming a later nigiri) are
+        // reflected in the displayed per-category score. The scoring
+        // helper is imported statically at module load to avoid stale
+        // dynamic require paths and TypeScript/LSP warnings.
+        try {
+          const breakdown = scoreTableauBreakdown(tableau);
+          switch (type) {
+            case 'tempura':
+              labelText = `Tmp(${breakdown.tempura})`;
+              break;
+            case 'sashimi':
+              labelText = `Ssh(${breakdown.sashimi})`;
+              break;
+            case 'dumpling':
+              labelText = `Dmp(${breakdown.dumpling})`;
+              break;
+            case 'nigiri':
+              labelText = `Nig(${breakdown.nigiri})`;
+              break;
+            case 'wasabi':
+              // wasabi has no direct score in isolation
+              labelText = `Wsb(${cards.length})`;
+              break;
+            case 'chopsticks':
+              labelText = `Chp(${breakdown.chopsticks})`;
+              break;
+            default:
+              break;
+          }
+        } catch (e) {
+          // If anything goes wrong, fall back to the simple label
+          // computed from the group's cards to keep UI stable.
+          // (This should not normally happen.)
+          // eslint-disable-next-line no-console
+          console.warn('Failed to compute breakdown for tableau labels', e);
+          labelText = this.getTypeGroupLabel(type, cards);
+        }
+      }
+      // Special handling for maki: show both icon count and awarded bonus
+      if (type === 'maki') {
+        const totalIcons = cards.reduce((sum, c) => sum + (c.type === 'maki' ? c.icons : 0), 0);
+        // Find this player's maki bonus (for 2-player game, playerIdx indicates player)
+        const playerMakiBonus = allMakiBonuses[playerIdx] ?? 0;
+        // If a bonus was awarded (including split ties), show the awarded
+        // score prominently. Otherwise show the raw icon count.
+        if (playerMakiBonus !== 0) {
+          labelText = `Maki(${playerMakiBonus >= 0 ? '+' : ''}${playerMakiBonus})`;
+        } else {
+          labelText = `Maki(${totalIcons})`;
+        }
+      }
+
       const typeLabel = this.add.text(
         curX + groupW / 2,
         baseY - TABLEAU_CARD_H / 2 - 16,
-        this.getTypeGroupLabel(type, cards),
+        labelText,
         {
           fontSize: '11px',
           color: who === 'player' ? '#aaccaa' : '#99aabb',
@@ -574,6 +682,68 @@ export class SushiGoScene extends Phaser.Scene {
       }
 
       curX += groupW + TABLEAU_GROUP_GAP;
+    }
+
+    // Now render paired nigiri on top of their wasabi: for each nigiri
+    // that has a pairing, find its position (we'll render the wasabi
+    // as a small underline beneath the nigiri to make the relationship
+    // visually explicit). This keeps tableau grouping intact while
+    // providing a clear indication of pairing.
+    for (const [nigiriId] of nigiriToWasabi.entries()) {
+      // Find the card container we created for this nigiri
+      const children = container.getAll();
+      let nigiriContainer: Phaser.GameObjects.Container | null = null;
+      for (const child of children) {
+        // Our card containers are Phaser Containers with a text/image child
+        if (!(child instanceof Phaser.GameObjects.Container)) continue;
+        const inner = child.list.find((l: any) => l && l.type === 'Text') as Phaser.GameObjects.Text | undefined;
+        if (!inner) continue;
+        // The label text for nigiri is a single letter (E/S/Q) or 'NG' for group labels.
+        // We can compare the underlying card id by checking data stored on the container
+        // when created. To keep this lightweight, rely on matching the displayed label
+        // and proximity of types. (If ambiguous, skip.)
+        const possible = child.getData && child.getData('cardId') === nigiriId;
+        if (possible) {
+          nigiriContainer = child as Phaser.GameObjects.Container;
+          break;
+        }
+      }
+
+      if (!nigiriContainer) continue;
+
+      // Avoid adding duplicate overlays on repeated refreshes
+      if (nigiriContainer.getData('wasabiOverlay')) continue;
+
+      // Small wasabi icon slightly beneath the card (subtle cue)
+      if (this.textures.exists('icon-wasabi')) {
+        const iconSize = Math.round(TABLEAU_CARD_W * 0.36);
+        // Move the wasabi icon up so it doesn't overlap the label; use
+        // a modest upward offset (~1 character height)
+        const wasabiY = TABLEAU_CARD_H / 2 - 26;
+        const wasabiImg = this.add.image(0, wasabiY, 'icon-wasabi');
+        wasabiImg.setDisplaySize(iconSize, iconSize);
+        wasabiImg.setOrigin(0.5, 1);
+        // Place below the card content but above the background
+        nigiriContainer.addAt(wasabiImg, 1);
+      }
+
+      // Prominent badge indicating x3 multiplier (top-right corner)
+      const badgeW = 32;
+      const badgeH = 18;
+      const badgeX = TABLEAU_CARD_W / 2 - badgeW / 2 - 6;
+      const badgeY = -TABLEAU_CARD_H / 2 + badgeH / 2 + 6;
+      const badgeBg = this.add.rectangle(badgeX, badgeY, badgeW, badgeH, 0x90EE90, 1);
+      badgeBg.setStrokeStyle(1, 0x336633);
+      badgeBg.setOrigin(0.5);
+      const badgeText = this.add.text(badgeX, badgeY, 'x3', {
+        fontSize: '12px',
+        color: '#1a3a1a',
+        fontFamily: FONT_FAMILY,
+      }).setOrigin(0.5);
+      // Add badge on top of card visuals
+      nigiriContainer.add(badgeBg);
+      nigiriContainer.add(badgeText);
+      nigiriContainer.setData('wasabiOverlay', true);
     }
   }
 
@@ -602,13 +772,14 @@ export class SushiGoScene extends Phaser.Scene {
 
   private groupByType(tableau: SushiGoCard[]): Map<SushiGoCardType, SushiGoCard[]> {
     const groups = new Map<SushiGoCardType, SushiGoCard[]>();
+    // Preserve the original play order when grouping so that the
+    // relative order of cards of different types reflects tableau
+    // insertion order. We iterate through tableau and append cards
+    // to their type group in encountered order.
     for (const card of tableau) {
       const existing = groups.get(card.type);
-      if (existing) {
-        existing.push(card);
-      } else {
-        groups.set(card.type, [card]);
-      }
+      if (existing) existing.push(card);
+      else groups.set(card.type, [card]);
     }
     return groups;
   }
@@ -846,42 +1017,75 @@ export class SushiGoScene extends Phaser.Scene {
     this.soundManager?.play(SFX_KEYS.SCORE_REVEAL);
 
     // Create overlay
+    // Increase overlay height to accommodate per-category breakdown
     const overlay = createOverlayBackground(
       this,
       { depth: 10, alpha: 0.01 },
-      { width: 500, height: 330, alpha: 0.9 },
+      { width: 560, height: 460, alpha: 0.9 },
     );
     this.overlayObjects.push(...overlay.objects);
 
     const roundNum = result.round + 1;
 
+    // The scoring step may have cleared player tableaux when starting
+    // the next round, so prefer the breakdown computed during scoring
+    // (stored on the RoundResult) if available. Fall back to recomputing
+    // from the current tableau only as a last resort.
+    const human = this.session.players[0];
+    const ai = this.session.players[1];
+    const humanBreak = result.tableauBreakdowns?.[0] ?? scoreTableauBreakdown(human.tableau);
+    const aiBreak = result.tableauBreakdowns?.[1] ?? scoreTableauBreakdown(ai.tableau);
+
+    const humanMakiCount = result.makiCounts ? result.makiCounts[0] : 0;
+    const aiMakiCount = result.makiCounts ? result.makiCounts[1] : 0;
+    const humanMakiBonus = result.makiBonuses ? result.makiBonuses[0] : 0;
+    const aiMakiBonus = result.makiBonuses ? result.makiBonuses[1] : 0;
+
     const lines = [
       `Round ${roundNum} Complete!`,
       '',
       `You: ${result.roundScores[0]} pts`,
-      `  (Cards: ${result.tableauScores[0]}, Maki: ${result.makiBonuses[0]})`,
+      `  (Tmp:${humanBreak.tempura} Ssh:${humanBreak.sashimi} Dmp:${humanBreak.dumpling} Nig:${humanBreak.nigiri})`,
+      `  Maki: ${humanMakiCount} → ${humanMakiBonus >= 0 ? '+' : ''}${humanMakiBonus} pts`,
       `AI: ${result.roundScores[1]} pts`,
-      `  (Cards: ${result.tableauScores[1]}, Maki: ${result.makiBonuses[1]})`,
+      `  (Tmp:${aiBreak.tempura} Ssh:${aiBreak.sashimi} Dmp:${aiBreak.dumpling} Nig:${aiBreak.nigiri})`,
+      `  Maki: ${aiMakiCount} → ${aiMakiBonus >= 0 ? '+' : ''}${aiMakiBonus} pts`,
       '',
       `Total -- You: ${this.session.players[0].totalScore}  AI: ${this.session.players[1].totalScore}`,
     ];
 
+    // Position content relative to the visible overlay box when available
+    const box = overlay.box;
+    const padding = 24;
+    let textY: number;
+    let buttonY: number;
+    if (box) {
+      const boxTop = box.y - (box.height / 2);
+      const boxBottom = box.y + (box.height / 2);
+      textY = boxTop + padding; // align text to top region of box
+      buttonY = boxBottom - 40; // buttons sit near bottom of box
+    } else {
+      // Fallback to previous absolute positioning
+      const overlayHeight = 460;
+      const overlayHalf = overlayHeight / 2;
+      textY = GAME_H / 2 - overlayHalf + 48;
+      buttonY = GAME_H / 2 + overlayHalf - 40;
+    }
+
     const text = this.add
-      .text(GAME_W / 2, GAME_H / 2 - 35, lines.join('\n'), {
+      .text(GAME_W / 2, textY, lines.join('\n'), {
         fontSize: '18px',
         color: '#ffffff',
         fontFamily: FONT_FAMILY,
         align: 'center',
         lineSpacing: 3,
       })
-      .setOrigin(0.5)
+      .setOrigin(0.5, 0) // anchor at top center so top padding is respected
       .setDepth(11);
     this.overlayObjects.push(text);
 
-    // Next round button
-    const btn = createOverlayButton(
-      this, GAME_W / 2, GAME_H / 2 + 125, '[ Next Round ]',
-    );
+    // Next round button (position computed above)
+    const btn = createOverlayButton(this, GAME_W / 2, buttonY, '[ Next Round ]');
     btn.on('pointerdown', () => {
       this.soundManager?.play(SFX_KEYS.UI_CLICK);
       this.dismissOverlay();
@@ -900,10 +1104,12 @@ export class SushiGoScene extends Phaser.Scene {
       winnerIndex: getWinnerIndex(this.session),
     });
 
+    // Make final game-over dialog taller to avoid overlap with buttons
+    // when including the per-category breakdown.
     const overlay = createOverlayBackground(
       this,
       { depth: 10, alpha: 0.01 },
-      { width: 540, height: 410, alpha: 0.9 },
+      { width: 560, height: 520, alpha: 0.9 },
     );
     this.overlayObjects.push(...overlay.objects);
 
@@ -913,56 +1119,89 @@ export class SushiGoScene extends Phaser.Scene {
     const human = this.session.players[0];
     const ai = this.session.players[1];
 
+    // Compute per-category breakdown for the final round tableaux so we
+    // can display a clear category-level score breakdown in the game
+    // over dialog. Use the scoring helper which accounts for wasabi
+    // pairing within the tableau.
+    const humanBreak = scoreTableauBreakdown(human.tableau);
+    const aiBreak = scoreTableauBreakdown(ai.tableau);
+
+    // Use the round makiCounts and makiBonuses computed in scoreRound
+    // to display both the raw maki icon counts and the awarded bonuses.
+    const humanMakiCount = result.makiCounts ? result.makiCounts[0] : 0;
+    const aiMakiCount = result.makiCounts ? result.makiCounts[1] : 0;
+    const humanMakiBonus = result.makiBonuses ? result.makiBonuses[0] : 0;
+    const aiMakiBonus = result.makiBonuses ? result.makiBonuses[1] : 0;
+    const humanPuddingBonus = result.puddingBonuses ? result.puddingBonuses[0] : 0;
+    const aiPuddingBonus = result.puddingBonuses ? result.puddingBonuses[1] : 0;
+
     const lines = [
       winnerText,
       '',
       `Final Round -- You: ${result.roundScores[0]}, AI: ${result.roundScores[1]}`,
-    ];
-
-    if (result.puddingBonuses) {
-      lines.push(
-        `Pudding -- You: ${result.puddingBonuses[0] >= 0 ? '+' : ''}${result.puddingBonuses[0]}, ` +
-        `AI: ${result.puddingBonuses[1] >= 0 ? '+' : ''}${result.puddingBonuses[1]}`,
-      );
-    }
-
-    lines.push(
+      '',
+      'Breakdown (this round):',
+      `You:  Cards ${humanBreak.tempura + humanBreak.sashimi + humanBreak.dumpling + humanBreak.nigiri} ` +
+        `(Tmp:${humanBreak.tempura} Ssh:${humanBreak.sashimi} Dmp:${humanBreak.dumpling} Nig:${humanBreak.nigiri})`,
+      `      Maki: ${humanMakiCount} (bonus ${humanMakiBonus >= 0 ? '+' : ''}${humanMakiBonus})`,
+      `      Pudding: ${humanBreak.puddingCount} (bonus ${humanPuddingBonus >= 0 ? '+' : ''}${humanPuddingBonus})`,
+      '',
+      `AI:   Cards ${aiBreak.tempura + aiBreak.sashimi + aiBreak.dumpling + aiBreak.nigiri} ` +
+        `(Tmp:${aiBreak.tempura} Ssh:${aiBreak.sashimi} Dmp:${aiBreak.dumpling} Nig:${aiBreak.nigiri})`,
+      `      Maki: ${aiMakiCount} (bonus ${aiMakiBonus >= 0 ? '+' : ''}${aiMakiBonus})`,
+      `      Pudding: ${aiBreak.puddingCount} (bonus ${aiPuddingBonus >= 0 ? '+' : ''}${aiPuddingBonus})`,
       '',
       'Round-by-round:',
-    );
+    ];
+
     for (let r = 0; r < human.roundScores.length; r++) {
       lines.push(`  R${r + 1}: You ${human.roundScores[r]} -- AI ${ai.roundScores[r]}`);
     }
-    lines.push(
-      '',
-      `Final: You ${human.totalScore} -- AI ${ai.totalScore}`,
-    );
+    lines.push('', `Final: You ${human.totalScore} -- AI ${ai.totalScore}`);
 
-    const text = this.add
-      .text(GAME_W / 2, GAME_H / 2 - 50, lines.join('\n'), {
-        fontSize: '18px',
-        color: '#ffffff',
-        fontFamily: FONT_FAMILY,
-        align: 'center',
-        lineSpacing: 3,
-      })
-      .setOrigin(0.5)
-      .setDepth(11);
-    this.overlayObjects.push(text);
+    // Position content relative to the visible overlay box when available
+    {
+      const box = overlay.box;
+      const padding = 24;
+      let gTextY: number;
+      let gButtonY: number;
+      if (box) {
+        const boxTop = box.y - (box.height / 2);
+        const boxBottom = box.y + (box.height / 2);
+        gTextY = boxTop + padding;
+        gButtonY = boxBottom - 48;
+      } else {
+        // fallback to previous absolute positioning
+        const overlayHeight = 520;
+        const overlayHalf = overlayHeight / 2;
+        gTextY = GAME_H / 2 - overlayHalf + 56;
+        gButtonY = GAME_H / 2 + overlayHalf - 48;
+      }
 
-    // Play again button
-    const playBtn = createOverlayButton(
-      this, GAME_W / 2 - 80, GAME_H / 2 + 160, '[ Play Again ]',
-    );
-    playBtn.on('pointerdown', () => {
-      this.soundManager?.play(SFX_KEYS.UI_CLICK);
-      this.scene.restart();
-    });
-    this.overlayObjects.push(playBtn);
+      const text = this.add
+        .text(GAME_W / 2, gTextY, lines.join('\n'), {
+          fontSize: '18px',
+          color: '#ffffff',
+          fontFamily: FONT_FAMILY,
+          align: 'center',
+          lineSpacing: 3,
+        })
+        .setOrigin(0.5, 0)
+        .setDepth(11);
+      this.overlayObjects.push(text);
 
-    // Menu button
-    const menuBtn = createOverlayMenuButton(this, GAME_W / 2 + 80, GAME_H / 2 + 160);
-    this.overlayObjects.push(menuBtn);
+      // Play again button
+      const playBtn = createOverlayButton(this, GAME_W / 2 - 80, gButtonY, '[ Play Again ]');
+      playBtn.on('pointerdown', () => {
+        this.soundManager?.play(SFX_KEYS.UI_CLICK);
+        this.scene.restart();
+      });
+      this.overlayObjects.push(playBtn);
+
+      // Menu button
+      const menuBtn = createOverlayMenuButton(this, GAME_W / 2 + 80, gButtonY);
+      this.overlayObjects.push(menuBtn);
+    }
   }
 
   private dismissOverlay(): void {

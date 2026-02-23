@@ -126,6 +126,76 @@ export function scoreTableau(tableau: SushiGoCard[]): number {
   return score;
 }
 
+/**
+ * Return a per-category breakdown for a tableau.
+ *
+ * The breakdown contains scores for categories that can be computed
+ * from a single tableau (tempura, sashimi, dumpling, nigiri) and
+ * counts for maki icons / pudding which are scored across players or
+ * at game end.
+ */
+export function scoreTableauBreakdown(tableau: SushiGoCard[]) {
+  let tempuraCount = 0;
+  let sashimiCount = 0;
+  let dumplingCount = 0;
+  let nigiriScore = 0;
+  let unpairedWasabi = 0;
+  let makiIcons = 0;
+  let puddingCount = 0;
+  let chopsticksCount = 0;
+
+  for (const card of tableau) {
+    switch (card.type) {
+      case 'tempura':
+        tempuraCount++;
+        break;
+      case 'sashimi':
+        sashimiCount++;
+        break;
+      case 'dumpling':
+        dumplingCount++;
+        break;
+      case 'nigiri': {
+        const base = nigiriBaseValue(card.variant);
+        if (unpairedWasabi > 0) {
+          nigiriScore += base * 3;
+          unpairedWasabi--;
+        } else {
+          nigiriScore += base;
+        }
+        break;
+      }
+      case 'wasabi':
+        unpairedWasabi++;
+        break;
+      case 'maki':
+        makiIcons += card.icons;
+        break;
+      case 'pudding':
+        puddingCount++;
+        break;
+      case 'chopsticks':
+        chopsticksCount++;
+        break;
+    }
+  }
+
+  const tempuraScore = Math.floor(tempuraCount / 2) * 5;
+  const sashimiScore = Math.floor(sashimiCount / 3) * 10;
+  const dumplingPts = dumplingScore(dumplingCount);
+
+  return {
+    tempura: tempuraScore,
+    sashimi: sashimiScore,
+    dumpling: dumplingPts,
+    nigiri: nigiriScore,
+    wasabi: 0,
+    makiIcons,
+    puddingCount,
+    chopsticks: chopsticksCount,
+  } as const;
+}
+
 // ── Maki scoring (across all players) ───────────────────────
 
 /**

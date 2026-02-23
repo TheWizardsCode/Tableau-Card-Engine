@@ -24,11 +24,11 @@ import {
   ROUND_COUNT,
 } from './SushiGoCards';
 import {
-  scoreTableau,
   countMakiIcons,
   countPudding,
   scoreMaki,
   scorePudding,
+  scoreTableauBreakdown,
 } from './SushiGoScoring';
 
 // ── Player state ────────────────────────────────────────────
@@ -259,15 +259,28 @@ export function executeAllPicks(
 function applyPick(player: SushiGoPlayerState, action: PickAction): void {
   if (action.secondCardIndex !== undefined) {
     // Chopsticks: pick two cards, return chopsticks to hand
-    // Remove cards in reverse index order to avoid shifting issues
-    const indices = [action.cardIndex, action.secondCardIndex].sort(
-      (a, b) => b - a,
-    );
-    const pickedCards: SushiGoCard[] = [];
-    for (const idx of indices) {
-      pickedCards.push(player.hand.splice(idx, 1)[0]);
+    // Chopsticks: the action.cardIndex is the first card selected and
+    // action.secondCardIndex is the second. We must preserve the
+    // selection order when appending to the tableau so that effects
+    // like Wasabi -> Nigiri pairing behave correctly. To avoid index
+    // shifting problems when removing from the hand, capture the
+    // selected card objects first, then remove both by index (larger
+    // index first) and finally append them in the original selection
+    // order.
+    const firstIdx = action.cardIndex;
+    const secondIdx = action.secondCardIndex;
+    const firstCard = player.hand[firstIdx];
+    const secondCard = player.hand[secondIdx];
+
+    // Remove by descending indices so the smaller index stays valid
+    // after the first removal.
+    const toRemove = [firstIdx, secondIdx].sort((a, b) => b - a);
+    for (const idx of toRemove) {
+      player.hand.splice(idx, 1);
     }
-    player.tableau.push(...pickedCards);
+
+    // Preserve selection order: firstCard then secondCard
+    player.tableau.push(firstCard, secondCard);
 
     // Return one chopsticks from tableau to hand
     const chopIdx = player.tableau.findIndex((c) => c.type === 'chopsticks');
@@ -343,8 +356,12 @@ export function scoreRound(session: SushiGoSession): RoundResult {
 
   const { players, currentRound } = session;
 
-  // Score each player's tableau
-  const tableauScores = players.map((p) => scoreTableau(p.tableau));
+  // Score each player's tableau and compute a per-category breakdown
+  const tableauBreakdowns = players.map((p) => scoreTableauBreakdown(p.tableau));
+  const tableauScores = tableauBreakdowns.map((b) => (
+    // Sum of per-category points excludes maki/pudding (these are handled separately)
+    b.tempura + b.sashimi + b.dumpling + b.nigiri
+  ));
 
   // Score maki bonuses
   const makiCounts = players.map((p) => countMakiIcons(p.tableau));
@@ -366,6 +383,7 @@ export function scoreRound(session: SushiGoSession): RoundResult {
   const result: RoundResult = {
     round: currentRound,
     tableauScores,
+    tableauBreakdowns,
     makiCounts,
     makiBonuses,
     roundScores,
@@ -399,6 +417,8 @@ export function scoreRound(session: SushiGoSession): RoundResult {
 export interface RoundResult {
   round: number;
   tableauScores: number[];
+  /** Per-player per-category breakdown computed at scoring time. */
+  tableauBreakdowns?: ReturnType<typeof scoreTableauBreakdown>[];
   makiCounts: number[];
   makiBonuses: number[];
   roundScores: number[];
