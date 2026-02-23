@@ -29,6 +29,7 @@ import type {
 import type {
   LostCitiesAction,
 } from './LostCitiesRules';
+import { TranscriptRecorderBase } from '../../src/core-engine/TranscriptRecorder';
 
 // ── Card snapshot ──────────────────────────────────────────
 
@@ -230,8 +231,7 @@ export interface LostCitiesTranscript {
  *   // after match ends:
  *   const transcript = recorder.finalize(session);
  */
-export class LCTranscriptRecorder {
-  private readonly transcript: LostCitiesTranscript;
+export class LCTranscriptRecorder extends TranscriptRecorderBase<LostCitiesTranscript> {
   private currentRound: RoundRecord;
   private actionCounter = 0;
 
@@ -245,13 +245,7 @@ export class LCTranscriptRecorder {
       strategy: playerStrategies?.[i],
     }));
 
-    this.currentRound = {
-      roundNumber: 1,
-      actions: [],
-      scores: null,
-    };
-
-    this.transcript = {
+    super({
       version: 1,
       gameType: 'lost-cities',
       metadata: {
@@ -268,6 +262,12 @@ export class LCTranscriptRecorder {
       },
       rounds: [],
       results: null,
+    });
+
+    this.currentRound = {
+      roundNumber: 1,
+      actions: [],
+      scores: null,
     };
   }
 
@@ -395,8 +395,4 @@ export class LCTranscriptRecorder {
     return this.transcript;
   }
 
-  /** Get the transcript in its current state (may not be finalized). */
-  getTranscript(): LostCitiesTranscript {
-    return this.transcript;
-  }
 }

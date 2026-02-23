@@ -15,6 +15,7 @@ import type { GolfSession, TurnResult } from './GolfGame';
 import { scoreGrid, scoreVisibleCards } from './GolfScoring';
 import { snapshotCard } from '../../src/core-engine/TranscriptTypes';
 import type { CardSnapshot } from '../../src/core-engine/TranscriptTypes';
+import { TranscriptRecorderBase } from '../../src/core-engine/TranscriptRecorder';
 
 // Re-export so existing consumers that import from this module still work.
 export { snapshotCard };
@@ -126,23 +127,20 @@ export function snapshotBoard(grid: GolfGrid): BoardSnapshot {
  *   // ... after game ends ...
  *   const transcript = recorder.finalize();
  */
-export class TranscriptRecorder {
-  private readonly transcript: GameTranscript;
+export class TranscriptRecorder extends TranscriptRecorderBase<GameTranscript> {
   private readonly session: GolfSession;
 
   constructor(
     session: GolfSession,
     playerStrategies?: Array<string | undefined>,
   ) {
-    this.session = session;
-
     const players = session.gameState.players.map((p, i) => ({
       name: p.name,
       isAI: p.isAI,
       strategy: playerStrategies?.[i],
     }));
 
-    this.transcript = {
+    super({
       version: 1,
       metadata: {
         startedAt: new Date().toISOString(),
@@ -160,7 +158,9 @@ export class TranscriptRecorder {
       },
       turns: [],
       results: null,
-    };
+    });
+
+    this.session = session;
   }
 
   /**
@@ -219,13 +219,6 @@ export class TranscriptRecorder {
       winnerName: this.session.gameState.players[winnerIndex].name,
     };
 
-    return this.transcript;
-  }
-
-  /**
-   * Get the transcript in its current state (may not be finalized).
-   */
-  getTranscript(): GameTranscript {
     return this.transcript;
   }
 }
