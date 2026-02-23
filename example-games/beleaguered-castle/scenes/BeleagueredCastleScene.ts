@@ -69,13 +69,13 @@ const SFX_KEYS = {
   UI_CLICK: 'bc-sfx-ui-click',
 } as const;
 
-// ── Local card dimensions (5:7 aspect ratio, ~2× default) ──
-const BC_CARD_W = 96;
-const BC_CARD_H = 134;
+// ── Local card dimensions (5:7 aspect ratio, sized to fit 8 columns) ──
+const BC_CARD_W = 75;
+const BC_CARD_H = 105;
 
 // ── Constants ───────────────────────────────────────────────
 
-const CARD_GAP = 10;
+const CARD_GAP = 16;
 
 const ANIM_DURATION = 300; // ms per card deal animation
 const DEAL_STAGGER = 40; // ms between successive card deal tweens
@@ -84,18 +84,18 @@ const AUTO_COMPLETE_DELAY = 150; // ms between auto-complete card animations
 
 /** Preferred vertical overlap offset between cascaded cards in a tableau column.
  *  Dynamically compressed when a column has many cards (see tableauCardY). */
-const CASCADE_OFFSET_Y = 48;
+const CASCADE_OFFSET_Y = 36;
 
 /** Maximum Y for the center of the bottom card in a tableau column.
  *  Leaves room for the HUD bar at the bottom of the canvas. */
-const TABLEAU_MAX_Y = GAME_H - 40 - BC_CARD_H / 2; // ~613
+const TABLEAU_MAX_Y = GAME_H - 40 - BC_CARD_H / 2; // ~627
 
 /** Top area: title + foundations */
 const TITLE_Y = 20;
-const FOUNDATION_Y = 110;
+const FOUNDATION_Y = 95;
 
-/** Tableau starts below the foundations. */
-const TABLEAU_TOP_Y = 290;
+/** Tableau starts below the foundations (with room for suit labels). */
+const TABLEAU_TOP_Y = 240;
 
 /** Z-depth for a card being dragged. */
 const DRAG_DEPTH = 1000;
@@ -425,8 +425,8 @@ export class BeleagueredCastleScene extends Phaser.Scene {
 
       // Suit label beneath the slot
       const label = this.add
-        .text(x, FOUNDATION_Y + BC_CARD_H / 2 + 18, SUIT_SYMBOL[suit], {
-          fontSize: '22px',
+        .text(x, FOUNDATION_Y + BC_CARD_H / 2 + 12, SUIT_SYMBOL[suit], {
+          fontSize: '18px',
           color: SUIT_COLOR[suit],
           fontFamily: FONT_FAMILY,
         })
