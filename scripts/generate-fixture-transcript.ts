@@ -3,7 +3,7 @@
  * Generate a deterministic fixture transcript for replay testing.
  *
  * Runs a short AI-vs-AI Golf game with fixed seeds and writes
- * the resulting transcript JSON to data/transcripts/golf/fixture-game.json.
+ * the resulting transcript JSON to tests/fixtures/transcripts/golf/fixture-game.json.
  *
  * Usage:
  *   npx tsx scripts/generate-fixture-transcript.ts
@@ -58,7 +58,7 @@ const transcript = recorder.finalize();
 transcript.metadata.startedAt = '2026-01-01T00:00:00.000Z';
 transcript.metadata.endedAt = '2026-01-01T00:05:00.000Z';
 
-const outPath = resolve('data/transcripts/golf/fixture-game.json');
+const outPath = resolve('tests/fixtures/transcripts/golf/fixture-game.json');
 mkdirSync(dirname(outPath), { recursive: true });
 writeFileSync(outPath, JSON.stringify(transcript, null, 2) + '\n');
 

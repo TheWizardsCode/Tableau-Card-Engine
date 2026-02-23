@@ -103,8 +103,8 @@ Arguments:
   --output <dir>      Output directory for screenshots (default: data/screenshots/<basename>/)
 
 Examples:
-  npm run replay -- data/transcripts/golf/fixture-game.json
-  npm run replay -- data/transcripts/golf/fixture-game.json --output data/screenshots/golf/test/
+  npm run replay -- tests/fixtures/transcripts/golf/fixture-game.json
+  npm run replay -- tests/fixtures/transcripts/golf/fixture-game.json --output data/screenshots/golf/test/
 `);
     process.exit(0);
   }
