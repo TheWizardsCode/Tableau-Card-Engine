@@ -104,13 +104,11 @@ export interface NobleTile {
 // Deck / shuffle utilities
 // ---------------------------------------------------------------------------
 
-export function shuffleArray<T>(arr: T[], rng: () => number = Math.random): T[] {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
+import { shuffleArray } from '../../src/card-system/Deck';
+
+// Re-export so existing consumers (tests, other modules) can still import
+// shuffleArray from this file without breaking.
+export { shuffleArray } from '../../src/card-system/Deck';
 
 // ---------------------------------------------------------------------------
 // Token supply initialization

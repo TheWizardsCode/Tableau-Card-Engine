@@ -198,17 +198,14 @@ export function createSushiGoDeck(): SushiGoCard[] {
 
 /**
  * Fisher-Yates shuffle (in-place) with optional RNG.
+ *
+ * Re-exports `shuffleArray` from the shared card-system module,
+ * aliased as `shuffleDeck` for backward compatibility with existing
+ * consumer code.
  */
-export function shuffleDeck(
-  deck: SushiGoCard[],
-  rng: () => number = Math.random,
-): SushiGoCard[] {
-  for (let i = deck.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [deck[i], deck[j]] = [deck[j], deck[i]];
-  }
-  return deck;
-}
+import { shuffleArray } from '../../src/card-system/Deck';
+
+export const shuffleDeck: typeof shuffleArray = shuffleArray;
 
 /**
  * Number of cards dealt per player based on player count.
