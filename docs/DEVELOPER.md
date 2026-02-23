@@ -186,6 +186,7 @@ src/
 ├── core-engine/            Game loop, state management, turn sequencing, utilities
 │   ├── GameState.ts        GameState<T>, createGameState
 │   ├── SeededRng.ts        createSeededRng — deterministic PRNG (LCG) for shuffles and AI
+│   ├── TranscriptRecorder.ts BaseTranscript interface, TranscriptRecorderBase<T> abstract base class
 │   ├── TurnSequencer.ts    advanceTurn, getCurrentPlayer, startGame, endGame
 │   └── index.ts            Barrel file / public API
 ├── card-system/            Card, Deck, Pile abstractions
@@ -269,7 +270,7 @@ tests/
 ├── smoke.test.ts           Toolchain smoke test
 ├── ai/                     AiPlayer, pickRandom, pickBest, barrel export tests
 ├── card-system/            Card, Deck, Pile unit tests
-├── core-engine/            GameState, TurnSequencer, UndoRedoManager, SeededRng unit tests
+├── core-engine/            GameState, TurnSequencer, UndoRedoManager, SeededRng, TranscriptRecorder unit tests
 ├── golf/                   Golf game unit + integration + browser tests
 ├── beleaguered-castle/     Beleaguered Castle unit + integration tests
 ├── sushi-go/               Sushi Go! cards, scoring, game, AI tests

@@ -8,7 +8,7 @@ This project follows a **spike-driven development** approach: example games are 
 
 ## Components
 
-- **Core Engine** (`src/core-engine/`): The foundational framework that provides essential functionalities such as game loop management, state management, rendering helpers, and shared utilities (e.g. deterministic seeded RNG).
+- **Core Engine** (`src/core-engine/`): The foundational framework that provides essential functionalities such as game loop management, state management, rendering helpers, and shared utilities (e.g. deterministic seeded RNG, `TranscriptRecorderBase<T>` for game transcript recording).
 - **Card System** (`src/card-system/`): A flexible system for defining and managing cards, including their attributes, effects, and interactions. Includes abstractions for Card, Deck, Hand, and Pile.
 - **Rule Engine** (`src/rule-engine/`): A component that allows for the creation and enforcement of game rules, enabling complex gameplay mechanics, turn logic, and validation.
 - **AI** (`src/ai/`): Shared AI strategy abstractions and utility functions. Provides `AiStrategyBase` (base interface), `AiPlayer<TStrategy>` (generic player wrapper that binds a strategy to an RNG), `pickRandom<T>()` (uniform random selection), and `pickBest<T>()` (scored selection with random tie-breaking). Game-specific strategies extend the base types.

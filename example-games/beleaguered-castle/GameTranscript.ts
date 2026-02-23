@@ -26,6 +26,7 @@ import type {
 import { FOUNDATION_COUNT, TABLEAU_COUNT } from './BeleagueredCastleState';
 import { snapshotCard } from '../../src/core-engine/TranscriptTypes';
 import type { CardSnapshot } from '../../src/core-engine/TranscriptTypes';
+import { TranscriptRecorderBase } from '../../src/core-engine/TranscriptRecorder';
 
 // Re-export so existing consumers that import from this module still work.
 export { snapshotCard };
@@ -166,11 +167,9 @@ export function snapshotBoard(state: BeleagueredCastleState): BoardSnapshot {
  *   recorder.recordRedo(state.moveCount);
  *   const transcript = recorder.finalize('win', moveCount, elapsed);
  */
-export class BCTranscriptRecorder {
-  private readonly transcript: BCGameTranscript;
-
+export class BCTranscriptRecorder extends TranscriptRecorderBase<BCGameTranscript> {
   constructor(seed: number, initialState: BeleagueredCastleState) {
-    this.transcript = {
+    super({
       version: 1,
       game: 'beleaguered-castle',
       seed,
@@ -179,7 +178,7 @@ export class BCTranscriptRecorder {
       initialState: snapshotBoard(initialState),
       moves: [],
       result: null,
-    };
+    });
   }
 
   /** Record a player-initiated move. */
@@ -234,10 +233,4 @@ export class BCTranscriptRecorder {
     return this.transcript;
   }
 
-  /**
-   * Get the transcript in its current state (may not be finalized).
-   */
-  getTranscript(): BCGameTranscript {
-    return this.transcript;
-  }
 }
