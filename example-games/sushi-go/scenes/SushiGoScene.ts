@@ -1036,8 +1036,13 @@ export class SushiGoScene extends Phaser.Scene {
       `Total -- You: ${this.session.players[0].totalScore}  AI: ${this.session.players[1].totalScore}`,
     ];
 
+    const overlayHeight = 460;
+    const overlayHalf = overlayHeight / 2;
+    // Place main text a little below the top edge of the overlay
+    const textY = GAME_H / 2 - overlayHalf + 48; // pushed down ~2 lines
+
     const text = this.add
-      .text(GAME_W / 2, GAME_H / 2 - 35, lines.join('\n'), {
+      .text(GAME_W / 2, textY, lines.join('\n'), {
         fontSize: '18px',
         color: '#ffffff',
         fontFamily: FONT_FAMILY,
@@ -1049,8 +1054,9 @@ export class SushiGoScene extends Phaser.Scene {
     this.overlayObjects.push(text);
 
     // Next round button
+    const buttonY = GAME_H / 2 + overlayHalf - 40; // sit near bottom of overlay
     const btn = createOverlayButton(
-      this, GAME_W / 2, GAME_H / 2 + 125, '[ Next Round ]',
+      this, GAME_W / 2, buttonY, '[ Next Round ]',
     );
     btn.on('pointerdown', () => {
       this.soundManager?.play(SFX_KEYS.UI_CLICK);
@@ -1125,8 +1131,13 @@ export class SushiGoScene extends Phaser.Scene {
     }
     lines.push('', `Final: You ${human.totalScore} -- AI ${ai.totalScore}`);
 
+    const overlayHeight = 520;
+    const overlayHalf = overlayHeight / 2;
+    // Move the main content down ~2 lines so it sits fully inside overlay
+    const textY = GAME_H / 2 - overlayHalf + 56;
+
     const text = this.add
-      .text(GAME_W / 2, GAME_H / 2 - 50, lines.join('\n'), {
+      .text(GAME_W / 2, textY, lines.join('\n'), {
         fontSize: '18px',
         color: '#ffffff',
         fontFamily: FONT_FAMILY,
@@ -1137,9 +1148,10 @@ export class SushiGoScene extends Phaser.Scene {
       .setDepth(11);
     this.overlayObjects.push(text);
 
+    const buttonY = GAME_H / 2 + overlayHalf - 48; // sit near bottom of overlay
     // Play again button
     const playBtn = createOverlayButton(
-      this, GAME_W / 2 - 80, GAME_H / 2 + 160, '[ Play Again ]',
+      this, GAME_W / 2 - 80, buttonY, '[ Play Again ]',
     );
     playBtn.on('pointerdown', () => {
       this.soundManager?.play(SFX_KEYS.UI_CLICK);
@@ -1148,7 +1160,7 @@ export class SushiGoScene extends Phaser.Scene {
     this.overlayObjects.push(playBtn);
 
     // Menu button
-    const menuBtn = createOverlayMenuButton(this, GAME_W / 2 + 80, GAME_H / 2 + 160);
+    const menuBtn = createOverlayMenuButton(this, GAME_W / 2 + 80, buttonY);
     this.overlayObjects.push(menuBtn);
   }
 
