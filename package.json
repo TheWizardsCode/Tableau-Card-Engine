@@ -9,7 +9,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "replay": "tsx scripts/replay.ts"
+    "replay": "tsx scripts/replay.ts",
+    "transcripts:export": "tsx scripts/export-transcripts.ts"
   },
   "dependencies": {
     "phaser": "^3.90.0"
