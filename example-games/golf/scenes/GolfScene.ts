@@ -876,14 +876,21 @@ export class GolfScene extends Phaser.Scene {
 
     if (!this.drawnCard) return;
 
+    // When drawing from discard, update the pile visual immediately so the
+    // taken card disappears from the top. We peek at the card below by
+    // temporarily treating the pile's underlying array.
+    if (source === 'discard') {
+      this.updateDiscardPileAfterDraw();
+    }
+
     // Emit card-drawn event
     this.gameEvents.emit('card-drawn', {
       source,
       playerIndex: 0,
     });
 
-    // Show the drawn card next to the human grid
-    this.showDrawnCard(this.drawnCard);
+    // Show the drawn card animating from the source pile to the held position
+    this.showDrawnCard(this.drawnCard, source);
     this.setPhase('waiting-for-move');
   }
 
@@ -947,8 +954,13 @@ export class GolfScene extends Phaser.Scene {
         ? this.session.shared.stockPile[this.session.shared.stockPile.length - 1]
         : this.session.shared.discardPile.peek() ?? null;
 
+      // When AI draws from discard, update the pile visual immediately
+      if (action.drawSource === 'discard') {
+        this.updateDiscardPileAfterDraw();
+      }
+
       if (peekCard) {
-        this.showDrawnCard(peekCard);
+        this.showDrawnCard(peekCard, action.drawSource);
       }
       const sourceLabel = action.drawSource === 'stock' ? 'Stock pile' : 'Discard pile';
       this.instructionText.setText(`AI drew from ${sourceLabel}`);
@@ -1145,23 +1157,85 @@ export class GolfScene extends Phaser.Scene {
 
   // ── Drawn card display ──────────────────────────────────
 
-  private showDrawnCard(card: Card): void {
-    // Show drawn card to the right of the discard pile, between piles and AI grid
-    const x = PILE_X + GOLF_CARD_W + 24;
-    const y = DISCARD_Y;
-    const texture = cardTextureKey(card.rank, card.suit);
+  private showDrawnCard(card: Card, source: DrawSource = 'stock'): void {
+    // Destination: to the right of the discard pile, between piles and AI grid
+    const destX = PILE_X + GOLF_CARD_W + 24;
+    const destY = DISCARD_Y;
+    const faceTexture = cardTextureKey(card.rank, card.suit);
 
-    this.drawnCardSprite = this.add.image(x, y, texture);
-    this.drawnCardSprite.setAlpha(0);
+    // Start at the source pile position
+    const startX = PILE_X;
+    const startY = source === 'stock' ? STOCK_Y : DISCARD_Y;
 
-    this.tweens.add({
-      targets: this.drawnCardSprite,
-      alpha: 1,
-      duration: 200,
-    });
+    if (source === 'stock') {
+      // Stock draw: start face-down, flip to reveal during transit
+      this.drawnCardSprite = this.add.image(startX, startY, 'card_back');
+      this.drawnCardSprite.setDepth(15);
 
-    // Add "Drawn" label
+      // First half: move halfway + flip (scaleX → 0)
+      this.tweens.add({
+        targets: this.drawnCardSprite,
+        x: (startX + destX) / 2,
+        y: (startY + destY) / 2,
+        scaleX: 0,
+        duration: ANIM_DURATION / 2,
+        ease: 'Power2',
+        onComplete: () => {
+          if (!this.drawnCardSprite) return;
+          // Reveal face at midpoint
+          this.drawnCardSprite.setTexture(faceTexture);
+          // Second half: complete move + flip back (scaleX → 1)
+          this.tweens.add({
+            targets: this.drawnCardSprite,
+            x: destX,
+            y: destY,
+            scaleX: 1,
+            duration: ANIM_DURATION / 2,
+            ease: 'Power2',
+            onComplete: () => {
+              if (this.drawnCardSprite) this.drawnCardSprite.setDepth(0);
+            },
+          });
+        },
+      });
+    } else {
+      // Discard draw: card is already face-up, slide to held position
+      this.drawnCardSprite = this.add.image(startX, startY, faceTexture);
+      this.drawnCardSprite.setDepth(15);
+
+      this.tweens.add({
+        targets: this.drawnCardSprite,
+        x: destX,
+        y: destY,
+        duration: ANIM_DURATION,
+        ease: 'Power2',
+        onComplete: () => {
+          if (this.drawnCardSprite) this.drawnCardSprite.setDepth(0);
+        },
+      });
+    }
+
+    // Update turn label
     this.turnText.setText(`Drew: ${card.rank} of ${card.suit}`);
+  }
+
+  /**
+   * Visually update the discard pile to show the card beneath the one being
+   * drawn.  Called during the preview phase (before `executeTurn()` pops
+   * the card) so the taken card disappears from the pile immediately.
+   */
+  private updateDiscardPileAfterDraw(): void {
+    const pile = this.session.shared.discardPile;
+    if (pile.size() <= 1) {
+      // Only one card (the one being taken) — pile will be empty.
+      this.discardSprite.setVisible(false);
+    } else {
+      // Show the card below the top. toArray() returns bottom-to-top order,
+      // so the second-to-last element is the next top after the draw.
+      const arr = pile.toArray();
+      const nextTop = arr[arr.length - 2];
+      this.discardSprite.setTexture(getCardTexture(nextTop));
+    }
   }
 
   private hideDrawnCard(): void {
