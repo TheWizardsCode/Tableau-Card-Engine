@@ -24,11 +24,11 @@ import {
   ROUND_COUNT,
 } from './SushiGoCards';
 import {
-  scoreTableau,
   countMakiIcons,
   countPudding,
   scoreMaki,
   scorePudding,
+  scoreTableauBreakdown,
 } from './SushiGoScoring';
 
 // ── Player state ────────────────────────────────────────────
@@ -356,8 +356,12 @@ export function scoreRound(session: SushiGoSession): RoundResult {
 
   const { players, currentRound } = session;
 
-  // Score each player's tableau
-  const tableauScores = players.map((p) => scoreTableau(p.tableau));
+  // Score each player's tableau and compute a per-category breakdown
+  const tableauBreakdowns = players.map((p) => scoreTableauBreakdown(p.tableau));
+  const tableauScores = tableauBreakdowns.map((b) => (
+    // Sum of per-category points excludes maki/pudding (these are handled separately)
+    b.tempura + b.sashimi + b.dumpling + b.nigiri
+  ));
 
   // Score maki bonuses
   const makiCounts = players.map((p) => countMakiIcons(p.tableau));
@@ -379,6 +383,7 @@ export function scoreRound(session: SushiGoSession): RoundResult {
   const result: RoundResult = {
     round: currentRound,
     tableauScores,
+    tableauBreakdowns,
     makiCounts,
     makiBonuses,
     roundScores,
@@ -412,6 +417,8 @@ export function scoreRound(session: SushiGoSession): RoundResult {
 export interface RoundResult {
   round: number;
   tableauScores: number[];
+  /** Per-player per-category breakdown computed at scoring time. */
+  tableauBreakdowns?: ReturnType<typeof scoreTableauBreakdown>[];
   makiCounts: number[];
   makiBonuses: number[];
   roundScores: number[];
