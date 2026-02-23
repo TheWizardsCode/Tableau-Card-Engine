@@ -1054,10 +1054,23 @@ export class SushiGoScene extends Phaser.Scene {
       `Total -- You: ${this.session.players[0].totalScore}  AI: ${this.session.players[1].totalScore}`,
     ];
 
-    const overlayHeight = 460;
-    const overlayHalf = overlayHeight / 2;
-    // Place main text a little below the top edge of the overlay
-    const textY = GAME_H / 2 - overlayHalf + 48; // pushed down ~2 lines
+    // Position content relative to the visible overlay box when available
+    const box = overlay.box;
+    const padding = 24;
+    let textY: number;
+    let buttonY: number;
+    if (box) {
+      const boxTop = box.y - (box.height / 2);
+      const boxBottom = box.y + (box.height / 2);
+      textY = boxTop + padding; // align text to top region of box
+      buttonY = boxBottom - 40; // buttons sit near bottom of box
+    } else {
+      // Fallback to previous absolute positioning
+      const overlayHeight = 460;
+      const overlayHalf = overlayHeight / 2;
+      textY = GAME_H / 2 - overlayHalf + 48;
+      buttonY = GAME_H / 2 + overlayHalf - 40;
+    }
 
     const text = this.add
       .text(GAME_W / 2, textY, lines.join('\n'), {
@@ -1067,15 +1080,12 @@ export class SushiGoScene extends Phaser.Scene {
         align: 'center',
         lineSpacing: 3,
       })
-      .setOrigin(0.5)
+      .setOrigin(0.5, 0) // anchor at top center so top padding is respected
       .setDepth(11);
     this.overlayObjects.push(text);
 
-    // Next round button
-    const buttonY = GAME_H / 2 + overlayHalf - 40; // sit near bottom of overlay
-    const btn = createOverlayButton(
-      this, GAME_W / 2, buttonY, '[ Next Round ]',
-    );
+    // Next round button (position computed above)
+    const btn = createOverlayButton(this, GAME_W / 2, buttonY, '[ Next Round ]');
     btn.on('pointerdown', () => {
       this.soundManager?.play(SFX_KEYS.UI_CLICK);
       this.dismissOverlay();
@@ -1149,37 +1159,49 @@ export class SushiGoScene extends Phaser.Scene {
     }
     lines.push('', `Final: You ${human.totalScore} -- AI ${ai.totalScore}`);
 
-    const overlayHeight = 520;
-    const overlayHalf = overlayHeight / 2;
-    // Move the main content down ~2 lines so it sits fully inside overlay
-    const textY = GAME_H / 2 - overlayHalf + 56;
+    // Position content relative to the visible overlay box when available
+    {
+      const box = overlay.box;
+      const padding = 24;
+      let gTextY: number;
+      let gButtonY: number;
+      if (box) {
+        const boxTop = box.y - (box.height / 2);
+        const boxBottom = box.y + (box.height / 2);
+        gTextY = boxTop + padding;
+        gButtonY = boxBottom - 48;
+      } else {
+        // fallback to previous absolute positioning
+        const overlayHeight = 520;
+        const overlayHalf = overlayHeight / 2;
+        gTextY = GAME_H / 2 - overlayHalf + 56;
+        gButtonY = GAME_H / 2 + overlayHalf - 48;
+      }
 
-    const text = this.add
-      .text(GAME_W / 2, textY, lines.join('\n'), {
-        fontSize: '18px',
-        color: '#ffffff',
-        fontFamily: FONT_FAMILY,
-        align: 'center',
-        lineSpacing: 3,
-      })
-      .setOrigin(0.5)
-      .setDepth(11);
-    this.overlayObjects.push(text);
+      const text = this.add
+        .text(GAME_W / 2, gTextY, lines.join('\n'), {
+          fontSize: '18px',
+          color: '#ffffff',
+          fontFamily: FONT_FAMILY,
+          align: 'center',
+          lineSpacing: 3,
+        })
+        .setOrigin(0.5, 0)
+        .setDepth(11);
+      this.overlayObjects.push(text);
 
-    const buttonY = GAME_H / 2 + overlayHalf - 48; // sit near bottom of overlay
-    // Play again button
-    const playBtn = createOverlayButton(
-      this, GAME_W / 2 - 80, buttonY, '[ Play Again ]',
-    );
-    playBtn.on('pointerdown', () => {
-      this.soundManager?.play(SFX_KEYS.UI_CLICK);
-      this.scene.restart();
-    });
-    this.overlayObjects.push(playBtn);
+      // Play again button
+      const playBtn = createOverlayButton(this, GAME_W / 2 - 80, gButtonY, '[ Play Again ]');
+      playBtn.on('pointerdown', () => {
+        this.soundManager?.play(SFX_KEYS.UI_CLICK);
+        this.scene.restart();
+      });
+      this.overlayObjects.push(playBtn);
 
-    // Menu button
-    const menuBtn = createOverlayMenuButton(this, GAME_W / 2 + 80, buttonY);
-    this.overlayObjects.push(menuBtn);
+      // Menu button
+      const menuBtn = createOverlayMenuButton(this, GAME_W / 2 + 80, gButtonY);
+      this.overlayObjects.push(menuBtn);
+    }
   }
 
   private dismissOverlay(): void {
