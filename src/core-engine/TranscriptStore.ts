@@ -355,6 +355,10 @@ export class TranscriptStore {
   /**
    * Save a transcript, enforcing the rolling window limit.
    *
+   * After persisting to the browser storage backend, fires a non-blocking
+   * POST to `/api/transcripts` so the Vite dev-server plugin can write
+   * the transcript to disk (when running in dev mode).
+   *
    * @param gameType - Game identifier (e.g. 'golf')
    * @param transcript - The transcript data to store
    * @returns The stored transcript wrapper, or null if storage is unavailable
@@ -375,6 +379,10 @@ export class TranscriptStore {
 
     // Enforce rolling window: evict oldest if over limit
     await this.evict(gameType);
+
+    // Fire-and-forget POST to dev server plugin for disk persistence.
+    // This is intentionally not awaited so it never blocks the return value.
+    this.postToDisk(gameType, transcript);
 
     return entry;
   }
@@ -422,6 +430,34 @@ export class TranscriptStore {
   async getBackendName(): Promise<string | null> {
     await this.init();
     return this.backend?.name ?? null;
+  }
+
+  /**
+   * Fire-and-forget POST to the Vite dev-server transcript plugin.
+   *
+   * Sends { gameType, transcript } to /api/transcripts so the plugin
+   * can write the transcript to disk during development. Errors are
+   * logged as warnings but never propagate -- this must never break
+   * the save() return path.
+   */
+  private postToDisk<T>(gameType: string, transcript: T): void {
+    if (typeof fetch === 'undefined') return;
+
+    fetch('/api/transcripts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gameType, transcript }),
+    })
+      .then((res) => {
+        if (!res.ok) {
+          console.warn(
+            `[TranscriptStore] Disk persistence POST returned HTTP ${res.status}`,
+          );
+        }
+      })
+      .catch((err) => {
+        console.warn('[TranscriptStore] Disk persistence POST failed:', err);
+      });
   }
 
   /**

@@ -45,6 +45,15 @@ describe('TranscriptStore', () => {
 
     // Provide a working localStorage mock
     vi.stubGlobal('localStorage', mockStorage);
+
+    // Stub fetch to a no-op so the fire-and-forget POST in save() doesn't
+    // produce noisy ERR_INVALID_URL warnings under Node (relative URLs are
+    // not supported by Node's native fetch). Individual tests in the
+    // "disk persistence POST" describe block override this with their own mocks.
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200 }));
+
+    // Silence console.warn from postToDisk in tests that don't care about it
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -288,6 +297,85 @@ describe('TranscriptStore', () => {
       expect(stored!.savedAt).toEqual(expect.any(String));
       // Validate ISO 8601
       expect(new Date(stored!.savedAt).toISOString()).toBe(stored!.savedAt);
+    });
+  });
+
+  describe('disk persistence POST', () => {
+    it('should fire a POST to /api/transcripts after saving', async () => {
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const store = new TranscriptStore();
+      const transcript = fakeTranscript(1);
+      await store.save('golf', transcript);
+
+      // Allow the fire-and-forget promise to settle
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+      expect(fetchMock).toHaveBeenCalledWith('/api/transcripts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameType: 'golf', transcript }),
+      });
+    });
+
+    it('should still return StoredTranscript when POST returns HTTP 500', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 500 });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const store = new TranscriptStore();
+      const transcript = fakeTranscript(1);
+      const result = await store.save('golf', transcript);
+
+      expect(result).not.toBeNull();
+      expect(result!.gameType).toBe('golf');
+
+      // Allow the fire-and-forget promise to settle and check warning
+      await vi.waitFor(() => expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Disk persistence POST returned HTTP 500'),
+      ));
+
+      warnSpy.mockRestore();
+    });
+
+    it('should still return StoredTranscript when POST throws a network error', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const fetchMock = vi.fn().mockRejectedValue(new Error('Network error'));
+      vi.stubGlobal('fetch', fetchMock);
+
+      const store = new TranscriptStore();
+      const transcript = fakeTranscript(1);
+      const result = await store.save('golf', transcript);
+
+      expect(result).not.toBeNull();
+      expect(result!.gameType).toBe('golf');
+
+      // Allow the fire-and-forget promise to settle and check warning
+      await vi.waitFor(() => expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Disk persistence POST failed'),
+        expect.any(Error),
+      ));
+
+      warnSpy.mockRestore();
+    });
+
+    it('should not call fetch when fetch is undefined', async () => {
+      // In environments without fetch (e.g. older Node), the POST should be skipped
+      const originalFetch = globalThis.fetch;
+      vi.stubGlobal('fetch', undefined);
+
+      const store = new TranscriptStore();
+      const transcript = fakeTranscript(1);
+      const result = await store.save('golf', transcript);
+
+      expect(result).not.toBeNull();
+      expect(result!.gameType).toBe('golf');
+
+      // Restore fetch
+      if (originalFetch) {
+        vi.stubGlobal('fetch', originalFetch);
+      }
     });
   });
 });
