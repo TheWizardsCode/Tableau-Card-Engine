@@ -114,6 +114,12 @@ export class GolfScene extends Phaser.Scene {
   /** When true, the scene suppresses all input and AI turns for replay use. */
   private replayMode: boolean = false;
 
+  /** Tracks whether loadBoardState() has been called (required before enableInteractiveMode). */
+  private boardStateInjected: boolean = false;
+
+  /** Game objects belonging to the takeover overlay (for cleanup). */
+  private takeoverOverlayObjects: Phaser.GameObjects.GameObject[] = [];
+
   // Event system
   private gameEvents!: GameEventEmitter;
   private eventBridge!: PhaserEventBridge;
@@ -325,8 +331,231 @@ export class GolfScene extends Phaser.Scene {
     // Refresh all visual elements
     this.refreshAll();
 
+    // Mark that a board state has been injected
+    this.boardStateInjected = true;
+
     // Signal that the board is visually stable and ready for screenshot
     this.emitStateSettled();
+  }
+
+  /**
+   * Transition from replay mode to interactive play.
+   *
+   * After `loadBoardState()` has injected a board snapshot, this method
+   * re-enables input handlers on the stock pile, discard pile, and human
+   * grid cards so the developer can play from the current game state.
+   *
+   * **Preconditions:**
+   * - Must be in replay mode (`replayMode === true`).
+   * - `loadBoardState()` must have been called at least once
+   *   (`boardStateInjected === true`).
+   *
+   * **Behaviour:**
+   * - Flips `replayMode` to `false`.
+   * - Registers `setInteractive()` + `pointerdown` handlers on the stock
+   *   pile, discard pile, and all 9 human grid card sprites.
+   * - Sets `currentPlayerIndex` to `nextPlayer`.
+   * - Starts the turn system: human → `waiting-for-draw`, AI → `runAiTurn()`.
+   * - Does **not** initialize sounds, help panel, settings panel, or menu button.
+   *
+   * Designed for future extraction to a generic replay→interactive adapter
+   * (see CG-0MLTFUL061DWDGA2).
+   *
+   * @param options.nextPlayer - Index of the player who takes the next
+   *   turn (0 = human, 1 = AI).
+   */
+  enableInteractiveMode(options: { nextPlayer: number }): void {
+    if (!this.replayMode) {
+      throw new Error(
+        'enableInteractiveMode() can only be called in replay mode',
+      );
+    }
+    if (!this.boardStateInjected) {
+      throw new Error(
+        'enableInteractiveMode() requires loadBoardState() to be called first',
+      );
+    }
+
+    // Transition out of replay mode
+    this.replayMode = false;
+
+    // Register input handlers on stock pile
+    this.stockSprite.setInteractive({ useHandCursor: true });
+    this.stockSprite.on('pointerdown', () => this.onStockClick());
+
+    // Register input handlers on discard pile
+    this.discardSprite.setInteractive({ useHandCursor: true });
+    this.discardSprite.on('pointerdown', () => this.onDiscardClick());
+
+    // Register input handlers on human grid cards
+    for (let i = 0; i < this.humanCardSprites.length; i++) {
+      const sprite = this.humanCardSprites[i];
+      sprite.setInteractive({ useHandCursor: true });
+      const idx = i; // capture for closure
+      sprite.on('pointerdown', () => this.onHumanCardClick(idx));
+    }
+
+    // Set the next player and start the turn system
+    this.session.gameState.currentPlayerIndex = options.nextPlayer;
+
+    // Reset turn state
+    this.drawnCard = null;
+    this.drawSource = null;
+
+    // Update display
+    this.refreshTurnIndicator();
+
+    // Start the turn based on which player is next
+    if (options.nextPlayer === 0) {
+      // Human's turn
+      this.emitTurnStarted();
+      this.setPhase('waiting-for-draw');
+    } else {
+      // AI's turn
+      this.emitTurnStarted();
+      this.runAiTurn();
+    }
+  }
+
+  /**
+   * Display a takeover overlay with debug info and action buttons.
+   *
+   * Shows the current game state (turn number, per-player scores,
+   * face-up/face-down card counts, last action) and three buttons:
+   * - "Human plays next" → calls `enableInteractiveMode({ nextPlayer: 0 })`
+   * - "AI plays next" → calls `enableInteractiveMode({ nextPlayer: 1 })`
+   * - "Resume replay" → emits `resume-replay` event for CLI to continue
+   *
+   * The overlay blocks all input until a button is clicked.
+   *
+   * @param options.turnNumber - The turn number where replay was paused.
+   * @param options.lastAction - Human-readable description of the last action.
+   */
+  showTakeoverOverlay(options: { turnNumber: number; lastAction: string }): void {
+    // Clean up any previous overlay
+    for (const obj of this.takeoverOverlayObjects) {
+      obj.destroy();
+    }
+    this.takeoverOverlayObjects = [];
+
+    // Create the overlay background + box
+    const overlay = createOverlayBackground(
+      this,
+      { depth: 20, alpha: 0.75 },
+      { width: 620, height: 420, alpha: 0.9, depth: 20 },
+    );
+    this.takeoverOverlayObjects.push(...overlay.objects);
+
+    const centerX = GAME_W / 2;
+    const boxTop = GAME_H / 2 - 210;
+
+    // Title
+    const title = this.add
+      .text(centerX, boxTop + 30, 'Interactive Takeover', {
+        fontSize: '26px',
+        color: '#ffdd44',
+        fontFamily: FONT_FAMILY,
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5)
+      .setDepth(21);
+    this.takeoverOverlayObjects.push(title);
+
+    // Gather debug info
+    const humanGrid = this.session.gameState.playerStates[0].grid;
+    const aiGrid = this.session.gameState.playerStates[1].grid;
+    const humanVisibleScore = scoreVisibleCards(humanGrid);
+    const aiVisibleScore = scoreVisibleCards(aiGrid);
+    const humanFaceUp = humanGrid.filter((c) => c.faceUp).length;
+    const humanFaceDown = humanGrid.filter((c) => !c.faceUp).length;
+    const aiFaceUp = aiGrid.filter((c) => c.faceUp).length;
+    const aiFaceDown = aiGrid.filter((c) => !c.faceUp).length;
+
+    const infoLines = [
+      `Paused at turn: ${options.turnNumber}`,
+      ``,
+      `You:  Score ${humanVisibleScore}  (${humanFaceUp} face-up, ${humanFaceDown} face-down)`,
+      `AI:   Score ${aiVisibleScore}  (${aiFaceUp} face-up, ${aiFaceDown} face-down)`,
+      ``,
+      `Last action: ${options.lastAction}`,
+    ];
+
+    const info = this.add
+      .text(centerX, boxTop + 90, infoLines.join('\n'), {
+        fontSize: '16px',
+        color: '#cccccc',
+        fontFamily: FONT_FAMILY,
+        align: 'center',
+        lineSpacing: 6,
+      })
+      .setOrigin(0.5, 0)
+      .setDepth(21);
+    this.takeoverOverlayObjects.push(info);
+
+    // Helper to destroy overlay and mark interactive mode
+    const dismissAndAct = (action: () => void) => {
+      // Destroy all overlay objects
+      for (const obj of this.takeoverOverlayObjects) {
+        obj.destroy();
+      }
+      this.takeoverOverlayObjects = [];
+
+      // Mark interactive mode flag for auto-capture
+      (window as unknown as Record<string, unknown>).__REPLAY_INTERACTIVE_MODE__ = true;
+
+      action();
+    };
+
+    const buttonY = boxTop + 310;
+    const buttonSpacing = 170;
+
+    // "Human plays next" button
+    const humanBtn = createOverlayButton(
+      this,
+      centerX - buttonSpacing,
+      buttonY,
+      '[ Human plays next ]',
+      21,
+      { fontSize: '16px' },
+    );
+    humanBtn.on('pointerdown', () => {
+      dismissAndAct(() => this.enableInteractiveMode({ nextPlayer: 0 }));
+    });
+    this.takeoverOverlayObjects.push(humanBtn);
+
+    // "AI plays next" button
+    const aiBtn = createOverlayButton(
+      this,
+      centerX,
+      buttonY,
+      '[ AI plays next ]',
+      21,
+      { fontSize: '16px' },
+    );
+    aiBtn.on('pointerdown', () => {
+      dismissAndAct(() => this.enableInteractiveMode({ nextPlayer: 1 }));
+    });
+    this.takeoverOverlayObjects.push(aiBtn);
+
+    // "Resume replay" button
+    const resumeBtn = createOverlayButton(
+      this,
+      centerX + buttonSpacing,
+      buttonY,
+      '[ Resume replay ]',
+      21,
+      { fontSize: '16px' },
+    );
+    resumeBtn.on('pointerdown', () => {
+      dismissAndAct(() => {
+        // Emit resume-replay event for the CLI to catch
+        this.gameEvents.emit(
+          'resume-replay' as Parameters<typeof this.gameEvents.emit>[0],
+          {} as never,
+        );
+      });
+    });
+    this.takeoverOverlayObjects.push(resumeBtn);
   }
 
   // ── UI creation ─────────────────────────────────────────

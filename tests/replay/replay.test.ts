@@ -16,6 +16,10 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 
 const PROJECT_ROOT = path.resolve(__dirname, '../..');
+const FIXTURE_TRANSCRIPT = path.join(
+  PROJECT_ROOT,
+  'tests/fixtures/transcripts/golf/fixture-game.json',
+);
 
 // ── Helpers ─────────────────────────────────────────────────
 
@@ -224,5 +228,52 @@ describe('Replay CLI -- summary report structure', () => {
 
       expect(summary.totalDurationMs).toBeGreaterThan(0);
     },
+  );
+});
+
+// ── --stop-at Argument Validation Tests ─────────────────────
+
+describe('Replay CLI -- --stop-at argument validation', () => {
+  it(
+    'should exit with error when --stop-at has no value',
+    () => {
+      const result = runReplay([FIXTURE_TRANSCRIPT, '--stop-at']);
+      expect(result.exitCode).not.toBe(0);
+      const output = result.stdout + result.stderr;
+      expect(output).toContain('non-negative integer');
+    },
+    20_000,
+  );
+
+  it(
+    'should exit with error when --stop-at is negative',
+    () => {
+      const result = runReplay([FIXTURE_TRANSCRIPT, '--stop-at', '-1']);
+      expect(result.exitCode).not.toBe(0);
+      const output = result.stdout + result.stderr;
+      expect(output).toContain('non-negative integer');
+    },
+    20_000,
+  );
+
+  it(
+    'should exit with error when --stop-at is a decimal',
+    () => {
+      const result = runReplay([FIXTURE_TRANSCRIPT, '--stop-at', '3.5']);
+      expect(result.exitCode).not.toBe(0);
+      const output = result.stdout + result.stderr;
+      expect(output).toContain('non-negative integer');
+    },
+    20_000,
+  );
+
+  it(
+    'should show --stop-at in help text',
+    () => {
+      const result = runReplay(['--help']);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain('--stop-at');
+    },
+    20_000,
   );
 });
