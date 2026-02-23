@@ -24,7 +24,7 @@ import {
   getWinnerIndex,
 } from '../SushiGoGame';
 import { SushiGoAiPlayer, GreedyStrategy } from '../AiStrategy';
-import { scoreTableauBreakdown } from '../SushiGoScoring';
+import { scoreTableauBreakdown, countMakiIcons, scoreMaki } from '../SushiGoScoring';
 import { GameEventEmitter } from '../../../src/core-engine/GameEventEmitter';
 import { PhaserEventBridge } from '../../../src/core-engine/PhaserEventBridge';
 import { SoundManager } from '../../../src/core-engine/SoundManager';
@@ -555,6 +555,11 @@ export class SushiGoScene extends Phaser.Scene {
     // Group cards by type (groups preserve tableau play order)
     const groups = this.groupByType(tableau);
 
+    // Compute maki counts & bonuses across all players so the tableau
+    // can display the awarded maki bonus (important in tie cases).
+    const allMakiCounts = this.session.players.map((p) => countMakiIcons(p.tableau));
+    const allMakiBonuses = scoreMaki(allMakiCounts);
+
     // Determine the horizontal order of type groups based on the
     // first appearance of each type in the tableau (play order).
     // This preserves the visual left-to-right play order so that
@@ -597,9 +602,9 @@ export class SushiGoScene extends Phaser.Scene {
 
       // Type label above the group
       const groupW = cards.length * (TABLEAU_CARD_W + TABLEAU_CARD_GAP) - TABLEAU_CARD_GAP;
-      // Determine label text using score breakdown when available
-      let labelText = this.getTypeGroupLabel(type, cards);
-      if (type !== 'maki' && type !== 'pudding') {
+        // Determine label text using score breakdown when available
+        let labelText = this.getTypeGroupLabel(type, cards);
+      if (type !== 'pudding') {
         // For categories that score within a single tableau, compute
         // the score and show it instead of the raw card count.
         // Use the full-player tableau breakdown so that cross-group
@@ -640,6 +645,13 @@ export class SushiGoScene extends Phaser.Scene {
           console.warn('Failed to compute breakdown for tableau labels', e);
           labelText = this.getTypeGroupLabel(type, cards);
         }
+      }
+      // Special handling for maki: show both icon count and awarded bonus
+      if (type === 'maki') {
+        const totalIcons = cards.reduce((sum, c) => sum + (c.type === 'maki' ? c.icons : 0), 0);
+        // Find this player's maki bonus (for 2-player game, playerIdx indicates player)
+        const playerMakiBonus = allMakiBonuses[playerIdx] ?? 0;
+        labelText = `Maki(${totalIcons} → ${playerMakiBonus >= 0 ? '+' : ''}${playerMakiBonus})`;
       }
 
       const typeLabel = this.add.text(
