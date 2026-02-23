@@ -12,6 +12,7 @@ import {
   endGame,
   UndoRedoManager,
   CompoundCommand,
+  createSeededRng,
 } from '../../src/core-engine/index';
 
 describe('core-engine barrel exports', () => {
@@ -37,6 +38,14 @@ describe('core-engine barrel exports', () => {
   it('should export UndoRedoManager and CompoundCommand', () => {
     expect(typeof UndoRedoManager).toBe('function');
     expect(typeof CompoundCommand).toBe('function');
+  });
+
+  it('should export createSeededRng', () => {
+    expect(typeof createSeededRng).toBe('function');
+    const rng = createSeededRng(42);
+    const val = rng();
+    expect(val).toBeGreaterThanOrEqual(0);
+    expect(val).toBeLessThan(1);
   });
 
   it('should work end-to-end through barrel exports', () => {

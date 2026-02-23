@@ -17,17 +17,9 @@ import { TranscriptRecorder } from '../../example-games/golf/GameTranscript';
 import type { GameTranscript } from '../../example-games/golf/GameTranscript';
 import { scoreGrid } from '../../example-games/golf/GolfScoring';
 import { isGridFullyRevealed } from '../../example-games/golf/GolfGrid';
+import { createSeededRng } from '../../src/core-engine/SeededRng';
 
 // ── Helpers ─────────────────────────────────────────────────
-
-/** Deterministic LCG RNG for reproducible tests. */
-function createTestRng(seed: number = 42): () => number {
-  let s = seed;
-  return () => {
-    s = (s * 1664525 + 1013904223) % 4294967296;
-    return s / 4294967296;
-  };
-}
 
 /** Maximum number of turns before we consider the game stuck. */
 const MAX_TURNS = 200;
@@ -39,15 +31,15 @@ function runFullGame(
   strategy: AiStrategy,
   seed: number = 42,
 ): { session: GolfSession; transcript: GameTranscript; turnCount: number } {
-  const rng = createTestRng(seed);
+  const rng = createSeededRng(seed);
   const session = setupGolfGame({
     playerNames: ['AI-1', 'AI-2'],
     isAI: [true, true],
     rng,
   });
 
-  const ai1 = new AiPlayer(strategy, createTestRng(seed + 1));
-  const ai2 = new AiPlayer(strategy, createTestRng(seed + 2));
+  const ai1 = new AiPlayer(strategy, createSeededRng(seed + 1));
+  const ai2 = new AiPlayer(strategy, createSeededRng(seed + 2));
   const ais = [ai1, ai2];
 
   const recorder = new TranscriptRecorder(session, [
@@ -321,7 +313,7 @@ describe('Integration: Transcript structure validation', () => {
 
 describe('Integration: Game invariants', () => {
   it('total cards in play remain constant (52)', () => {
-    const rng = createTestRng(42);
+    const rng = createSeededRng(42);
     const session = setupGolfGame({
       playerNames: ['AI-1', 'AI-2'],
       isAI: [true, true],
@@ -342,7 +334,7 @@ describe('Integration: Game invariants', () => {
     // Before play: should be 52
     expect(countTotalCards(session)).toBe(52);
 
-    const ai = new AiPlayer(RandomStrategy, createTestRng(43));
+    const ai = new AiPlayer(RandomStrategy, createSeededRng(43));
 
     let turns = 0;
     while (session.gameState.phase !== 'ended' && turns < MAX_TURNS) {
@@ -369,7 +361,7 @@ describe('Integration: Game invariants', () => {
   });
 
   it('discard pile top card is always face-up', () => {
-    const rng = createTestRng(42);
+    const rng = createSeededRng(42);
     const session = setupGolfGame({
       playerNames: ['AI-1', 'AI-2'],
       isAI: [true, true],
@@ -381,7 +373,7 @@ describe('Integration: Game invariants', () => {
     expect(initialTop).toBeDefined();
     expect(initialTop!.faceUp).toBe(true);
 
-    const ai = new AiPlayer(RandomStrategy, createTestRng(43));
+    const ai = new AiPlayer(RandomStrategy, createSeededRng(43));
 
     let turns = 0;
     while (session.gameState.phase !== 'ended' && turns < MAX_TURNS) {

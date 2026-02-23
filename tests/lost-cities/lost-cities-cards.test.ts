@@ -20,6 +20,7 @@ import {
   EXPEDITION_HEX,
   colorDisplayName,
 } from '../../example-games/lost-cities/LostCitiesCards';
+import { createSeededRng } from '../../src/core-engine/SeededRng';
 
 // ── Constants ──────────────────────────────────────────────
 
@@ -383,27 +384,11 @@ describe('shuffleDeck', () => {
   });
 
   it('produces deterministic results with seeded RNG', () => {
-    // Simple seeded RNG for reproducibility
-    const seededRng = (() => {
-      let seed = 42;
-      return () => {
-        seed = (seed * 16807 + 0) % 2147483647;
-        return seed / 2147483647;
-      };
-    })();
+    const rng1 = createSeededRng(42);
+    const deck1 = shuffleDeck(createLostCitiesDeck(), rng1);
 
-    const deck1 = shuffleDeck(createLostCitiesDeck(), seededRng);
-
-    // Reset seed
-    const seededRng2 = (() => {
-      let seed = 42;
-      return () => {
-        seed = (seed * 16807 + 0) % 2147483647;
-        return seed / 2147483647;
-      };
-    })();
-
-    const deck2 = shuffleDeck(createLostCitiesDeck(), seededRng2);
+    const rng2 = createSeededRng(42);
+    const deck2 = shuffleDeck(createLostCitiesDeck(), rng2);
 
     expect(deck1.map((c) => c.id)).toEqual(deck2.map((c) => c.id));
   });

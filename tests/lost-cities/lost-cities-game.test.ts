@@ -27,23 +27,13 @@ import type {
   Phase1Action,
   Phase2Action,
 } from '../../example-games/lost-cities/LostCitiesRules';
-
-// ── Deterministic RNG ──────────────────────────────────────
-
-/** Simple seeded RNG for reproducible tests. */
-function seededRng(seed = 42): () => number {
-  let s = seed;
-  return () => {
-    s = (s * 16807 + 0) % 2147483647;
-    return s / 2147483647;
-  };
-}
+import { createSeededRng } from '../../src/core-engine/SeededRng';
 
 // ── Setup tests ────────────────────────────────────────────
 
 describe('setupLostCitiesGame', () => {
   it('should create a valid initial session', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
 
     expect(session.roundNumber).toBe(1);
     expect(session.matchPhase).toBe('playing');
@@ -53,21 +43,21 @@ describe('setupLostCitiesGame', () => {
   });
 
   it('should deal HAND_SIZE cards to each player', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
 
     expect(session.players[0].hand).toHaveLength(HAND_SIZE);
     expect(session.players[1].hand).toHaveLength(HAND_SIZE);
   });
 
   it('should leave the correct number of cards in the draw pile', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
     const expectedDrawPile = DECK_SIZE - HAND_SIZE * 2;
 
     expect(session.round.drawPile).toHaveLength(expectedDrawPile);
   });
 
   it('should start with empty expedition lanes for both players', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
 
     for (const player of session.players) {
       for (const color of EXPEDITION_COLORS) {
@@ -77,7 +67,7 @@ describe('setupLostCitiesGame', () => {
   });
 
   it('should start with empty discard piles', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
 
     for (const color of EXPEDITION_COLORS) {
       expect(session.round.discardPiles.get(color)).toHaveLength(0);
@@ -88,7 +78,7 @@ describe('setupLostCitiesGame', () => {
     const session = setupLostCitiesGame({
       playerNames: ['Alice', 'Bob'],
       isAI: [false, false],
-      rng: seededRng(),
+      rng: createSeededRng(),
     });
 
     expect(session.players[0].name).toBe('Alice');
@@ -98,7 +88,7 @@ describe('setupLostCitiesGame', () => {
   });
 
   it('should use default names and AI flags', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
 
     expect(session.players[0].name).toBe('Player');
     expect(session.players[1].name).toBe('AI');
@@ -107,14 +97,14 @@ describe('setupLostCitiesGame', () => {
   });
 
   it('should start in PlayOrDiscard phase with player 0', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
 
     expect(session.round.turnPhase).toBe('PlayOrDiscard');
     expect(session.round.currentPlayer).toBe(0);
   });
 
   it('should have all cards face-up in hands', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
 
     for (const player of session.players) {
       for (const card of player.hand) {
@@ -124,7 +114,7 @@ describe('setupLostCitiesGame', () => {
   });
 
   it('should have unique card IDs across all locations', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
     const allIds = new Set<number>();
 
     // Hands
@@ -153,7 +143,7 @@ describe('executeAction', () => {
   }
 
   it('should execute a discard action in Phase 1', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
     const action = setupForDiscard(session);
     const cardId = action.card.id;
 
@@ -173,7 +163,7 @@ describe('executeAction', () => {
   });
 
   it('should execute a draw-from-pile action in Phase 2', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
     const discardAction = setupForDiscard(session);
     executeAction(session, discardAction);
 
@@ -191,7 +181,7 @@ describe('executeAction', () => {
   });
 
   it('should play to expedition when legal', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
     const player = getCurrentPlayer(session);
 
     // Find a card that can start an expedition (any card works on empty lane)
@@ -217,7 +207,7 @@ describe('executeAction', () => {
   });
 
   it('should throw when executing Phase 2 action during Phase 1', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
     const drawAction: Phase2Action = { kind: 'draw-from-pile' };
 
     expect(() => executeAction(session, drawAction)).toThrow(
@@ -226,7 +216,7 @@ describe('executeAction', () => {
   });
 
   it('should throw when executing Phase 1 action during Phase 2', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
     const discardAction = setupForDiscard(session);
     executeAction(session, discardAction);
 
@@ -243,7 +233,7 @@ describe('executeAction', () => {
   });
 
   it('should prevent drawing from just-discarded color', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
     const player = getCurrentPlayer(session);
     const card = player.hand[0];
 
@@ -262,7 +252,7 @@ describe('executeAction', () => {
   });
 
   it('should allow drawing from a discard pile of different color', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
     const player = getCurrentPlayer(session);
 
     // First, seed a discard pile by playing a full turn
@@ -295,7 +285,7 @@ describe('executeAction', () => {
   });
 
   it('should throw if match is not in playing phase', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
     session.matchPhase = 'match-over';
 
     const card = session.players[0].hand[0];
@@ -309,14 +299,14 @@ describe('executeAction', () => {
 
 describe('getCurrentPlayer / getOpponent', () => {
   it('should return the correct current player', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
 
     expect(getCurrentPlayer(session)).toBe(session.players[0]);
     expect(getOpponent(session)).toBe(session.players[1]);
   });
 
   it('should update after turn ends', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
     const card = session.players[0].hand[0];
 
     executeAction(session, { kind: 'discard', card, color: card.color });
@@ -329,7 +319,7 @@ describe('getCurrentPlayer / getOpponent', () => {
 
 describe('getVisibleState', () => {
   it('should return the correct visible state for player 0', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
     const visible = getVisibleState(session, 0);
 
     expect(visible.hand).toBe(session.players[0].hand);
@@ -342,7 +332,7 @@ describe('getVisibleState', () => {
   });
 
   it('should show discard tops correctly', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
 
     // Initially all discard tops should be null
     const visible = getVisibleState(session, 0);
@@ -359,7 +349,7 @@ describe('getVisibleState', () => {
   });
 
   it('should not expose opponent hand or draw pile order', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
     const visible = getVisibleState(session, 0);
 
     // visible state should only have hand (own), not opponent hand
@@ -369,7 +359,7 @@ describe('getVisibleState', () => {
   });
 
   it('should not alias cumulative scores (should be a copy)', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
     const visible = getVisibleState(session, 0);
 
     visible.cumulativeScores[0] = 9999;
@@ -379,7 +369,7 @@ describe('getVisibleState', () => {
 
 describe('getLegalActions', () => {
   it('should return Phase 1 actions in PlayOrDiscard phase', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
     const actions = getLegalActions(session);
 
     expect(actions.length).toBeGreaterThan(0);
@@ -389,7 +379,7 @@ describe('getLegalActions', () => {
   });
 
   it('should return Phase 2 actions in Draw phase', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
     const card = session.players[0].hand[0];
     executeAction(session, { kind: 'discard', card, color: card.color });
 
@@ -403,7 +393,7 @@ describe('getLegalActions', () => {
 
 describe('buildRulesGameView', () => {
   it('should build a valid RulesGameView for the current player', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
     const view = buildRulesGameView(session);
 
     expect(view.playerExpeditions).toBe(session.players[0].expeditions);
@@ -425,7 +415,7 @@ describe('round progression', () => {
   }
 
   it('should detect when a round ends (draw pile exhausted)', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
 
     // Drain the draw pile by playing discard+draw turns
     let lastResult: TurnResult | null = null;
@@ -440,7 +430,7 @@ describe('round progression', () => {
   });
 
   it('should score the round correctly when it ends', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
 
     let lastResult: TurnResult | null = null;
     while (session.matchPhase === 'playing' && session.roundNumber === 1) {
@@ -461,7 +451,7 @@ describe('round progression', () => {
   });
 
   it('should advance to round 2 after round 1 ends', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
 
     while (session.roundNumber === 1 && session.matchPhase === 'playing') {
       playTurn(session);
@@ -473,7 +463,7 @@ describe('round progression', () => {
   });
 
   it('should alternate starting player each round', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
     expect(session.startingPlayer).toBe(0);
 
     // Play through round 1
@@ -486,7 +476,7 @@ describe('round progression', () => {
   });
 
   it('should reset hands and expeditions for new round', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
 
     // Play through round 1
     while (session.roundNumber === 1 && session.matchPhase === 'playing') {
@@ -511,7 +501,7 @@ describe('round progression', () => {
   });
 
   it('should update cumulative scores after each round', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
 
     // Play through round 1
     while (session.roundNumber === 1 && session.matchPhase === 'playing') {
@@ -542,7 +532,7 @@ describe('full match', () => {
   }
 
   it('should complete a 3-round match', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
 
     let turnCount = 0;
     while (session.matchPhase === 'playing') {
@@ -557,7 +547,7 @@ describe('full match', () => {
   });
 
   it('should determine a winner based on cumulative scores', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
 
     while (session.matchPhase === 'playing') {
       playTurn(session);
@@ -576,7 +566,7 @@ describe('full match', () => {
   });
 
   it('should not allow actions after match ends', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
 
     while (session.matchPhase === 'playing') {
       playTurn(session);
@@ -589,7 +579,7 @@ describe('full match', () => {
   });
 
   it('getMatchWinner returns null if match not over', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
     expect(getMatchWinner(session)).toBeNull();
   });
 });
@@ -598,7 +588,7 @@ describe('full match', () => {
 
 describe('expedition play integration', () => {
   it('should enforce ascending order across multiple plays', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
 
     // Manually set up a controlled hand for player 0
     const color: ExpeditionColor = 'yellow';
@@ -666,12 +656,12 @@ describe('expedition play integration', () => {
 
 describe('isCurrentRoundOver', () => {
   it('should return false at start of game', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
     expect(isCurrentRoundOver(session)).toBe(false);
   });
 
   it('should return true when draw pile is empty', () => {
-    const session = setupLostCitiesGame({ rng: seededRng() });
+    const session = setupLostCitiesGame({ rng: createSeededRng() });
     session.round.drawPile = [];
     expect(isCurrentRoundOver(session)).toBe(true);
   });

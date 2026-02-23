@@ -8,7 +8,7 @@ This project follows a **spike-driven development** approach: example games are 
 
 ## Components
 
-- **Core Engine** (`src/core-engine/`): The foundational framework that provides essential functionalities such as game loop management, state management, and rendering helpers.
+- **Core Engine** (`src/core-engine/`): The foundational framework that provides essential functionalities such as game loop management, state management, rendering helpers, and shared utilities (e.g. deterministic seeded RNG).
 - **Card System** (`src/card-system/`): A flexible system for defining and managing cards, including their attributes, effects, and interactions. Includes abstractions for Card, Deck, Hand, and Pile.
 - **Rule Engine** (`src/rule-engine/`): A component that allows for the creation and enforcement of game rules, enabling complex gameplay mechanics, turn logic, and validation.
 - **User Interface** (`src/ui/`): A modular UI system with reusable components (buttons, menus, overlays) that can be customized and extended to fit different card game themes and styles.
