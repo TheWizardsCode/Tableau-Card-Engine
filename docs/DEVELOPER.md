@@ -183,8 +183,9 @@ describe('MyScene browser tests', () => {
 
 ```
 src/
-├── core-engine/            Game loop, state management, turn sequencing
+├── core-engine/            Game loop, state management, turn sequencing, utilities
 │   ├── GameState.ts        GameState<T>, createGameState
+│   ├── SeededRng.ts        createSeededRng — deterministic PRNG (LCG) for shuffles and AI
 │   ├── TurnSequencer.ts    advanceTurn, getCurrentPlayer, startGame, endGame
 │   └── index.ts            Barrel file / public API
 ├── card-system/            Card, Deck, Pile abstractions
@@ -263,7 +264,7 @@ public/assets/
 tests/
 ├── smoke.test.ts           Toolchain smoke test
 ├── card-system/            Card, Deck, Pile unit tests
-├── core-engine/            GameState, TurnSequencer, UndoRedoManager unit tests
+├── core-engine/            GameState, TurnSequencer, UndoRedoManager, SeededRng unit tests
 ├── golf/                   Golf game unit + integration + browser tests
 ├── beleaguered-castle/     Beleaguered Castle unit + integration tests
 ├── sushi-go/               Sushi Go! cards, scoring, game, AI tests

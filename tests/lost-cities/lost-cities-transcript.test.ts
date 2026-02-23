@@ -34,19 +34,7 @@ import {
   RandomStrategy,
   LostCitiesAiPlayer,
 } from '../../example-games/lost-cities/AiStrategy';
-
-// ── Deterministic RNG ──────────────────────────────────────
-
-function seededRng(seed = 42): () => number {
-  let s = seed;
-  const rng = () => {
-    s = (s * 16807 + 0) % 2147483647;
-    return s / 2147483647;
-  };
-  // Warm up to avoid correlated first outputs for sequential seeds
-  for (let i = 0; i < 5; i++) rng();
-  return rng;
-}
+import { createSeededRng } from '../../src/core-engine/SeededRng';
 
 // ── Test card factories ────────────────────────────────────
 
@@ -78,7 +66,7 @@ function runFullAiMatch(
   seed = 42,
   strategies: [string, string] = ['random', 'random'],
 ): { session: LostCitiesSession; recorder: LCTranscriptRecorder } {
-  const rng = seededRng(seed);
+  const rng = createSeededRng(seed);
   const session = setupLostCitiesGame({
     playerNames: ['AI-0', 'AI-1'],
     isAI: [true, true],
@@ -86,8 +74,8 @@ function runFullAiMatch(
   });
   const recorder = new LCTranscriptRecorder(session, strategies);
 
-  const ai0 = new LostCitiesAiPlayer(RandomStrategy, seededRng(seed + 100));
-  const ai1 = new LostCitiesAiPlayer(RandomStrategy, seededRng(seed + 200));
+  const ai0 = new LostCitiesAiPlayer(RandomStrategy, createSeededRng(seed + 100));
+  const ai1 = new LostCitiesAiPlayer(RandomStrategy, createSeededRng(seed + 200));
 
   const maxActions = 2000; // Safety limit
   let actionCount = 0;
@@ -173,7 +161,7 @@ describe('LCTranscriptRecorder', () => {
     const session = setupLostCitiesGame({
       playerNames: ['Alice', 'Bob'],
       isAI: [false, true],
-      rng: seededRng(42),
+      rng: createSeededRng(42),
     });
     const recorder = new LCTranscriptRecorder(session, ['human', 'greedy']);
     const transcript = recorder.getTranscript();
@@ -210,11 +198,11 @@ describe('LCTranscriptRecorder', () => {
     const session = setupLostCitiesGame({
       playerNames: ['P0', 'P1'],
       isAI: [true, true],
-      rng: seededRng(42),
+      rng: createSeededRng(42),
     });
     const recorder = new LCTranscriptRecorder(session);
 
-    const ai = new LostCitiesAiPlayer(RandomStrategy, seededRng(100));
+    const ai = new LostCitiesAiPlayer(RandomStrategy, createSeededRng(100));
     const state = getVisibleState(session, session.round.currentPlayer);
     const action = ai.choosePhase1(state);
     const phase = session.round.turnPhase;
@@ -237,10 +225,10 @@ describe('LCTranscriptRecorder', () => {
     const session = setupLostCitiesGame({
       playerNames: ['P0', 'P1'],
       isAI: [true, true],
-      rng: seededRng(42),
+      rng: createSeededRng(42),
     });
     const recorder = new LCTranscriptRecorder(session);
-    const ai = new LostCitiesAiPlayer(RandomStrategy, seededRng(100));
+    const ai = new LostCitiesAiPlayer(RandomStrategy, createSeededRng(100));
 
     // Phase 1
     const state1 = getVisibleState(session, session.round.currentPlayer);

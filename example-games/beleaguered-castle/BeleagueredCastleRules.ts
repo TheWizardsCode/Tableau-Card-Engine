@@ -20,6 +20,7 @@ import type { Card, Rank, Suit } from '../../src/card-system/Card';
 import { RANKS } from '../../src/card-system/Card';
 import { createStandardDeck, shuffle } from '../../src/card-system/Deck';
 import { Pile } from '../../src/card-system/Pile';
+import { createSeededRng } from '../../src/core-engine/SeededRng';
 import type {
   BeleagueredCastleState,
   BCMove,
@@ -63,18 +64,9 @@ export function foundationIndex(suit: Suit): number {
 
 // ── Seeded RNG ──────────────────────────────────────────────
 
-/**
- * Create a deterministic RNG from a numeric seed.
- * Uses a simple linear congruential generator (LCG) compatible
- * with the shuffle() function's () => number contract.
- */
-export function createSeededRng(seed: number): () => number {
-  let s = seed;
-  return () => {
-    s = (s * 1664525 + 1013904223) % 4294967296;
-    return s / 4294967296;
-  };
-}
+// Shared deterministic RNG factory from core-engine.
+// Re-exported here for backward compatibility with existing consumers.
+export { createSeededRng } from '../../src/core-engine/SeededRng';
 
 // ── Deal ────────────────────────────────────────────────────
 

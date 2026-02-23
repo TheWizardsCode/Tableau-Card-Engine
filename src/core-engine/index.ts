@@ -70,3 +70,6 @@ export { PhaserEventBridge } from './PhaserEventBridge';
 // Sound management
 export type { SoundPlayer, EventSoundMapping, StorageLike, SoundManagerOptions } from './SoundManager';
 export { SoundManager } from './SoundManager';
+
+// Seeded RNG factory
+export { createSeededRng } from './SeededRng';

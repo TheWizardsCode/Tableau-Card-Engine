@@ -19,21 +19,7 @@ import {
   LostCitiesAiPlayer,
   createOpponentDrawHistory,
 } from '../../example-games/lost-cities/AiStrategy';
-
-// ── Deterministic RNG ──────────────────────────────────────
-
-function seededRng(seed = 42): () => number {
-  let s = seed;
-  const rng = () => {
-    s = (s * 16807 + 0) % 2147483647;
-    return s / 2147483647;
-  };
-  // Warm up: the LCG's first output for small seeds is near zero,
-  // causing correlated residues across sequential seeds.
-  // A few iterations mix the state sufficiently.
-  for (let i = 0; i < 5; i++) rng();
-  return rng;
-}
+import { createSeededRng } from '../../src/core-engine/SeededRng';
 
 // ── Helpers ─────────────────────────────────────────────────
 
@@ -90,7 +76,7 @@ describe('RandomStrategy', () => {
       makeNumbered('red', 7),
     ];
     const state = makeTestVisibleState({ hand });
-    const rng = seededRng(1);
+    const rng = createSeededRng(1);
 
     const action = RandomStrategy.choosePhase1(state, rng);
 
@@ -105,7 +91,7 @@ describe('RandomStrategy', () => {
       turnPhase: 'Draw',
       drawPileSize: 30,
     });
-    const rng = seededRng(1);
+    const rng = createSeededRng(1);
 
     const action = RandomStrategy.choosePhase2(state, rng);
 
@@ -128,8 +114,8 @@ describe('RandomStrategy', () => {
 
     // Run many times to verify randomness covers discard draws
     let drewFromDiscard = false;
-    for (let seed = 1; seed <= 100; seed++) {
-      const action = RandomStrategy.choosePhase2(state, seededRng(seed));
+    for (let seed = 1; seed <= 500; seed++) {
+      const action = RandomStrategy.choosePhase2(state, createSeededRng(seed));
       if (action.kind === 'draw-from-discard') {
         drewFromDiscard = true;
         expect(action.color).toBe('green');
@@ -149,8 +135,8 @@ describe('RandomStrategy', () => {
 
     let playCount = 0;
     let discardCount = 0;
-    for (let seed = 1; seed <= 200; seed++) {
-      const action = RandomStrategy.choosePhase1(state, seededRng(seed));
+    for (let seed = 1; seed <= 500; seed++) {
+      const action = RandomStrategy.choosePhase1(state, createSeededRng(seed));
       if (action.kind === 'play-to-expedition') playCount++;
       else discardCount++;
     }
@@ -163,7 +149,7 @@ describe('RandomStrategy', () => {
   it('should throw when no Phase 1 actions available', () => {
     // Empty hand — no legal actions
     const state = makeTestVisibleState({ hand: [] });
-    const rng = seededRng(1);
+    const rng = createSeededRng(1);
 
     expect(() => RandomStrategy.choosePhase1(state, rng)).toThrow(
       'No legal Phase 1 actions available',
@@ -193,7 +179,7 @@ describe('GreedyStrategy', () => {
     myExpeditions.set('yellow', [makeNumbered('yellow', 3, 10)]);
 
     const state = makeTestVisibleState({ hand, myExpeditions });
-    const rng = seededRng(1);
+    const rng = createSeededRng(1);
 
     const action = GreedyStrategy.choosePhase1(state, rng);
 
@@ -207,7 +193,7 @@ describe('GreedyStrategy', () => {
       makeNumbered('red', 4, 1),
     ];
     const state = makeTestVisibleState({ hand });
-    const rng = seededRng(1);
+    const rng = createSeededRng(1);
 
     const action = GreedyStrategy.choosePhase1(state, rng);
 
@@ -250,7 +236,7 @@ describe('GreedyStrategy', () => {
       myExpeditions,
       opponentExpeditions,
     });
-    const rng = seededRng(1);
+    const rng = createSeededRng(1);
 
     const action = GreedyStrategy.choosePhase1(state, rng);
 
@@ -280,7 +266,7 @@ describe('GreedyStrategy', () => {
       myExpeditions,
       drawPileSize: 30,
     });
-    const rng = seededRng(1);
+    const rng = createSeededRng(1);
 
     const action = GreedyStrategy.choosePhase2(state, rng);
 
@@ -295,7 +281,7 @@ describe('GreedyStrategy', () => {
       turnPhase: 'Draw',
       drawPileSize: 30,
     });
-    const rng = seededRng(1);
+    const rng = createSeededRng(1);
 
     const action = GreedyStrategy.choosePhase2(state, rng);
 
@@ -304,7 +290,7 @@ describe('GreedyStrategy', () => {
 
   it('should throw when no Phase 1 actions available', () => {
     const state = makeTestVisibleState({ hand: [] });
-    const rng = seededRng(1);
+    const rng = createSeededRng(1);
 
     expect(() => GreedyStrategy.choosePhase1(state, rng)).toThrow(
       'No legal Phase 1 actions available',
@@ -323,12 +309,12 @@ describe('LostCitiesAiPlayer', () => {
   });
 
   it('should use random strategy when specified', () => {
-    const ai = new LostCitiesAiPlayer(RandomStrategy, seededRng());
+    const ai = new LostCitiesAiPlayer(RandomStrategy, createSeededRng(42));
     expect(ai.strategyName).toBe('Random');
   });
 
   it('should track opponent discard draws for greedy inference', () => {
-    const ai = new LostCitiesAiPlayer(GreedyStrategy, seededRng());
+    const ai = new LostCitiesAiPlayer(GreedyStrategy, createSeededRng(42));
 
     // Record that opponent drew from yellow discard twice
     ai.recordOpponentDiscardDraw('yellow');
@@ -356,7 +342,7 @@ describe('LostCitiesAiPlayer', () => {
   });
 
   it('should reset draw history between rounds', () => {
-    const ai = new LostCitiesAiPlayer(GreedyStrategy, seededRng());
+    const ai = new LostCitiesAiPlayer(GreedyStrategy, createSeededRng(42));
 
     ai.recordOpponentDiscardDraw('yellow');
     ai.recordOpponentDiscardDraw('yellow');
@@ -406,18 +392,18 @@ describe('createOpponentDrawHistory', () => {
 
 describe('AI-vs-AI integration', () => {
   it('should complete a full 3-round match with Random vs Random', () => {
-    const rng = seededRng(123);
+    const rng = createSeededRng(123);
     const session = setupLostCitiesGame({
       playerNames: ['AI-Random-1', 'AI-Random-2'],
       isAI: [true, true],
       rng,
     });
 
-    const ai0 = new LostCitiesAiPlayer(RandomStrategy, seededRng(456));
-    const ai1 = new LostCitiesAiPlayer(RandomStrategy, seededRng(789));
+    const ai0 = new LostCitiesAiPlayer(RandomStrategy, createSeededRng(456));
+    const ai1 = new LostCitiesAiPlayer(RandomStrategy, createSeededRng(789));
 
     let turnCount = 0;
-    const maxTurns = 1000; // safety limit
+    const maxTurns = 3000; // safety limit (RandomStrategy can take many turns)
 
     while (!isMatchOver(session) && turnCount < maxTurns) {
       const currentPlayer = session.round.currentPlayer;
@@ -445,15 +431,15 @@ describe('AI-vs-AI integration', () => {
   });
 
   it('should complete a full 3-round match with Greedy vs Greedy', () => {
-    const rng = seededRng(100);
+    const rng = createSeededRng(100);
     const session = setupLostCitiesGame({
       playerNames: ['AI-Greedy-1', 'AI-Greedy-2'],
       isAI: [true, true],
       rng,
     });
 
-    const ai0 = new LostCitiesAiPlayer(GreedyStrategy, seededRng(200));
-    const ai1 = new LostCitiesAiPlayer(GreedyStrategy, seededRng(300));
+    const ai0 = new LostCitiesAiPlayer(GreedyStrategy, createSeededRng(200));
+    const ai1 = new LostCitiesAiPlayer(GreedyStrategy, createSeededRng(300));
 
     let turnCount = 0;
     const maxTurns = 1000;
@@ -483,15 +469,15 @@ describe('AI-vs-AI integration', () => {
   });
 
   it('should complete a full 3-round match with Random vs Greedy', () => {
-    const rng = seededRng(55);
+    const rng = createSeededRng(55);
     const session = setupLostCitiesGame({
       playerNames: ['AI-Random', 'AI-Greedy'],
       isAI: [true, true],
       rng,
     });
 
-    const ai0 = new LostCitiesAiPlayer(RandomStrategy, seededRng(66));
-    const ai1 = new LostCitiesAiPlayer(GreedyStrategy, seededRng(77));
+    const ai0 = new LostCitiesAiPlayer(RandomStrategy, createSeededRng(66));
+    const ai1 = new LostCitiesAiPlayer(GreedyStrategy, createSeededRng(77));
 
     let turnCount = 0;
     const maxTurns = 1000;
@@ -553,15 +539,15 @@ function countOpponentColorDiscards(
   seed: number,
   strategy: typeof RandomStrategy | typeof GreedyStrategy,
 ): number {
-  const rng = seededRng(seed);
+  const rng = createSeededRng(seed);
   const session = setupLostCitiesGame({
     playerNames: ['P0', 'P1'],
     isAI: [true, true],
     rng,
   });
 
-  const ai0 = new LostCitiesAiPlayer(strategy, seededRng(seed + 1));
-  const ai1 = new LostCitiesAiPlayer(RandomStrategy, seededRng(seed + 2));
+  const ai0 = new LostCitiesAiPlayer(strategy, createSeededRng(seed + 1));
+  const ai1 = new LostCitiesAiPlayer(RandomStrategy, createSeededRng(seed + 2));
 
   let opponentColorDiscards = 0;
   let turns = 0;

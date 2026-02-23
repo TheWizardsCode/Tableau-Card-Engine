@@ -27,24 +27,18 @@ import {
   MAX_RESERVED,
   MARKET_SIZE,
 } from '../../example-games/splendor/SplendorCards';
+import { createSeededRng } from '../../src/core-engine/SeededRng';
 
 // ---------------------------------------------------------------------------
 // Deterministic RNG
 // ---------------------------------------------------------------------------
-function makeRng(seed: number): () => number {
-  let s = seed;
-  return () => {
-    s = (s * 1664525 + 1013904223) & 0x7fffffff;
-    return s / 0x7fffffff;
-  };
-}
 
 function createTestSession(seed = 42): SplendorSession {
   return setupSplendorGame({
     playerCount: 2,
     playerNames: ['Alice', 'Bot'],
     isAI: [false, true],
-    rng: makeRng(seed),
+    rng: createSeededRng(seed),
   });
 }
 
@@ -737,7 +731,7 @@ describe('SplendorGame', () => {
   describe('full game flow', () => {
     it('can play a complete game using only legal actions', () => {
       const session = createTestSession(123);
-      const rng = makeRng(456);
+      const rng = createSeededRng(456);
       let turns = 0;
       const maxTurns = 500; // safety limit
 
