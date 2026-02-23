@@ -8,36 +8,35 @@
  * and any other ordered collection of cards in a game.
  */
 
-import { Card } from './Card';
+import type { Card } from './Card';
 
-export class Pile {
-  private readonly cards: Card[];
+/**
+ * Generic Pile abstraction (LIFO) that can contain any T.
+ * Defaults and examples use Card but games may use custom card types.
+ */
+export class Pile<T = Card> {
+  private readonly cards: T[];
 
   /**
-   * Create a Pile, optionally pre-populated with cards.
+   * Create a Pile, optionally pre-populated with items.
    * The last element of the array is treated as the top of the pile.
    */
-  constructor(cards: Card[] = []) {
+  constructor(cards: T[] = []) {
     this.cards = [...cards];
   }
 
-  /** Push one or more cards onto the top of the pile. */
-  push(...newCards: Card[]): void {
+  /** Push one or more items onto the top of the pile. */
+  push(...newCards: T[]): void {
     this.cards.push(...newCards);
   }
 
-  /**
-   * Remove and return the top card.
-   * @returns The top card, or `undefined` if the pile is empty.
-   */
-  pop(): Card | undefined {
+  /** Remove and return the top item, or `undefined` if empty. */
+  pop(): T | undefined {
     return this.cards.pop();
   }
 
-  /**
-   * Remove and return the top card, throwing if the pile is empty.
-   */
-  popOrThrow(): Card {
+  /** Remove and return the top item, throwing if empty. */
+  popOrThrow(): T {
     const card = this.cards.pop();
     if (card === undefined) {
       throw new Error('Cannot pop from an empty pile');
@@ -45,35 +44,27 @@ export class Pile {
     return card;
   }
 
-  /**
-   * Look at the top card without removing it.
-   * @returns The top card, or `undefined` if the pile is empty.
-   */
-  peek(): Card | undefined {
-    return this.cards.length > 0
-      ? this.cards[this.cards.length - 1]
-      : undefined;
+  /** Look at the top item without removing it. */
+  peek(): T | undefined {
+    return this.cards.length > 0 ? this.cards[this.cards.length - 1] : undefined;
   }
 
-  /** Whether the pile contains no cards. */
+  /** Whether the pile contains no items. */
   isEmpty(): boolean {
     return this.cards.length === 0;
   }
 
-  /** The number of cards in the pile. */
+  /** The number of items in the pile. */
   size(): number {
     return this.cards.length;
   }
 
-  /**
-   * Return a shallow copy of all cards in the pile (bottom to top).
-   * Useful for inspection and serialization.
-   */
-  toArray(): Card[] {
+  /** Return a shallow copy of all items (bottom to top). */
+  toArray(): T[] {
     return [...this.cards];
   }
 
-  /** Clear all cards from the pile. */
+  /** Clear all items from the pile. */
   clear(): void {
     this.cards.length = 0;
   }
