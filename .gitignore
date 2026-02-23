@@ -59,9 +59,9 @@ coverage/
 test-results/
 
 ##################################
-# Replay Tool Output
+# Runtime Data (transcripts, screenshots, etc.)
 ##################################
-data/screenshots/
+data/
 
 ##################################
 Worklog Specific Ignores
