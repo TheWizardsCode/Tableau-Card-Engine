@@ -42,10 +42,16 @@ export function createDeckFrom(
  *
  * @returns The same array reference (mutated).
  */
-export function shuffle(
-  deck: Card[],
-  rng: () => number = Math.random,
-): Card[] {
+/**
+ * Generic Fisher-Yates shuffle that operates on any array of T.
+ *
+ * An optional random number generator can be supplied for
+ * deterministic testing. The generator must return a value
+ * in [0, 1) (same contract as Math.random).
+ *
+ * @returns The same array reference (mutated).
+ */
+export function shuffle<T>(deck: T[], rng: () => number = Math.random): T[] {
   for (let i = deck.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
     [deck[i], deck[j]] = [deck[j], deck[i]];
@@ -59,7 +65,7 @@ export function shuffle(
  * @returns The drawn card, or `undefined` if the deck is empty.
  *          The card is removed from the deck array.
  */
-export function draw(deck: Card[]): Card | undefined {
+export function draw<T>(deck: T[]): T | undefined {
   return deck.pop();
 }
 
@@ -69,7 +75,7 @@ export function draw(deck: Card[]): Card | undefined {
  * Use this when an empty deck indicates a logic error (e.g.
  * dealing should never exhaust the deck).
  */
-export function drawOrThrow(deck: Card[]): Card {
+export function drawOrThrow<T>(deck: T[]): T {
   const card = deck.pop();
   if (card === undefined) {
     throw new Error('Cannot draw from an empty deck');
