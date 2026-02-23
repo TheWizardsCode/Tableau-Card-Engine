@@ -1009,12 +1009,14 @@ export class SushiGoScene extends Phaser.Scene {
 
     const roundNum = result.round + 1;
 
-    // Compute per-category breakdown for the round so players can see
-    // how each category contributed to the round score.
+    // The scoring step may have cleared player tableaux when starting
+    // the next round, so prefer the breakdown computed during scoring
+    // (stored on the RoundResult) if available. Fall back to recomputing
+    // from the current tableau only as a last resort.
     const human = this.session.players[0];
     const ai = this.session.players[1];
-    const humanBreak = scoreTableauBreakdown(human.tableau);
-    const aiBreak = scoreTableauBreakdown(ai.tableau);
+    const humanBreak = result.tableauBreakdowns?.[0] ?? scoreTableauBreakdown(human.tableau);
+    const aiBreak = result.tableauBreakdowns?.[1] ?? scoreTableauBreakdown(ai.tableau);
 
     const humanMakiCount = result.makiCounts ? result.makiCounts[0] : 0;
     const aiMakiCount = result.makiCounts ? result.makiCounts[1] : 0;
