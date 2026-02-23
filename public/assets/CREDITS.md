@@ -102,3 +102,16 @@ Files (in `audio/lost-cities/`):
 - `match-lose.wav` — sandstorm loss on match defeat
 - `score-reveal.wav` — artifact chimes when scores are displayed
 - `ui-click.wav` — map pin click for UI button presses
+
+## The Mind Card Assets
+
+101 SVG card images (100 numbered cards + 1 card back) generated for The Mind game:
+
+- **Source**: Procedurally generated using `scripts/generate-mind-cards.ts`
+- **License**: MIT (original procedural generation, no external assets used)
+- **Format**: SVG, 140x190px
+- **Generator**: Run `npx tsx scripts/generate-mind-cards.ts` to regenerate
+
+Files (in `cards/the-mind/`):
+- `mind-{1-100}.svg` — numbered cards (dark teal background, gold accents, white number)
+- `mind-back.svg` — card back with mystery theme (radiating lines, "?" symbol)
