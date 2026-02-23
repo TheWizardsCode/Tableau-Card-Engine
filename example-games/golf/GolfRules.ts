@@ -21,8 +21,11 @@
  */
 
 import type { Card } from '../../src/card-system/Card';
+import type { LegalityResult } from '../../src/rule-engine/index';
 import type { GolfGrid } from './GolfGrid';
 import { gridIndex, isGridFullyRevealed } from './GolfGrid';
+
+export type { LegalityResult } from '../../src/rule-engine/index';
 
 // ── Draw source ─────────────────────────────────────────────
 
@@ -57,13 +60,6 @@ export interface DiscardAndFlipMove {
 export type GolfMove = SwapMove | DiscardAndFlipMove;
 
 // ── Legality checks ─────────────────────────────────────────
-
-/**
- * Result of a legality check: either legal or illegal with a reason.
- */
-export type LegalityResult =
-  | { legal: true }
-  | { legal: false; reason: string };
 
 /**
  * Check whether a move is legal given the current grid state.

@@ -24,6 +24,9 @@
 import type { LostCitiesCard, ExpeditionColor } from './LostCitiesCards';
 import { EXPEDITION_COLORS, canPlayAfter } from './LostCitiesCards';
 
+import type { LegalityResult } from '../../src/rule-engine/index';
+export type { LegalityResult } from '../../src/rule-engine/index';
+
 // ── Turn phases ─────────────────────────────────────────────
 
 /** The two mandatory phases of a Lost Cities turn. */
@@ -72,9 +75,7 @@ export type LostCitiesAction = Phase1Action | Phase2Action;
 
 // ── Legality results ────────────────────────────────────────
 
-export type LegalityResult =
-  | { legal: true }
-  | { legal: false; reason: string };
+// LegalityResult imported and re-exported from @rule-engine above.
 
 // ── Game state view for rules checking ──────────────────────
 
