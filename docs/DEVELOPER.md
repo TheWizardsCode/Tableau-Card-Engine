@@ -194,6 +194,10 @@ src/
 │   ├── Pile.ts             Pile class (push, pop, peek, isEmpty, size)
 │   └── index.ts            Barrel file / public API
 ├── rule-engine/index.ts    Rule definitions (stub -- game-specific rules live with games)
+├── ai/                     Shared AI strategy abstractions and utilities
+│   ├── AiStrategy.ts       AiStrategyBase interface, AiPlayer<TStrategy> generic base class
+│   ├── AiUtils.ts          pickRandom<T>, pickBest<T> utility functions
+│   └── index.ts            Barrel file / public API
 └── ui/
     ├── GameSelectorScene.ts Game selector landing page (GameEntry, REGISTRY_KEY_GAMES)
     ├── HelpPanel.ts         Reusable help panel component
@@ -263,6 +267,7 @@ public/assets/
 
 tests/
 ├── smoke.test.ts           Toolchain smoke test
+├── ai/                     AiPlayer, pickRandom, pickBest, barrel export tests
 ├── card-system/            Card, Deck, Pile unit tests
 ├── core-engine/            GameState, TurnSequencer, UndoRedoManager, SeededRng unit tests
 ├── golf/                   Golf game unit + integration + browser tests
@@ -284,6 +289,7 @@ The project defines path aliases in both `tsconfig.json` and `vite.config.ts`:
 | `@core-engine/*` | `src/core-engine/*` |
 | `@card-system/*` | `src/card-system/*` |
 | `@rule-engine/*` | `src/rule-engine/*` |
+| `@ai/*` | `src/ai/*` |
 | `@ui/*` | `src/ui/*` |
 
 Usage in code:

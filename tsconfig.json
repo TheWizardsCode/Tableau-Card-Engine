@@ -21,7 +21,8 @@
       "@core-engine/*": ["src/core-engine/*"],
       "@card-system/*": ["src/card-system/*"],
       "@rule-engine/*": ["src/rule-engine/*"],
-      "@ui/*": ["src/ui/*"]
+      "@ui/*": ["src/ui/*"],
+      "@ai/*": ["src/ai/*"]
     }
   },
   "include": [

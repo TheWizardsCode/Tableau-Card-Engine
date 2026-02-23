@@ -6,6 +6,8 @@
  *   - RandomStrategy: uniformly random legal card pick
  *   - GreedyStrategy: evaluates each card by expected point value
  *   - SushiGoAiPlayer: wrapper binding strategy and RNG
+ *
+ * Uses shared AI module (`@ai`) for base types and utility functions.
  */
 
 import type { SushiGoCard } from './SushiGoCards';
@@ -13,11 +15,12 @@ import type { SushiGoPlayerState, PickAction } from './SushiGoGame';
 import {
   scoreTableau,
 } from './SushiGoScoring';
+import type { AiStrategyBase } from '../../src/ai';
+import { AiPlayer as AiPlayerBase, pickRandom } from '../../src/ai';
 
 // ── Strategy interface ──────────────────────────────────────
 
-export interface SushiGoAiStrategy {
-  readonly name: string;
+export interface SushiGoAiStrategy extends AiStrategyBase {
 
   /**
    * Choose which card to pick from the hand.
@@ -156,7 +159,7 @@ export const GreedyStrategy: SushiGoAiStrategy = {
           const bestPairs = pairCandidates.filter(
             (c) => c.marginalScore === maxPairMarginal,
           );
-          const chosenPair = bestPairs[Math.floor(rng() * bestPairs.length)];
+          const chosenPair = pickRandom(bestPairs, rng);
           return {
             cardIndex: chosenPair.firstIndex,
             secondCardIndex: chosenPair.secondIndex,
@@ -166,7 +169,7 @@ export const GreedyStrategy: SushiGoAiStrategy = {
     }
 
     // Fall back to best single card
-    const chosen = bestSingles[Math.floor(rng() * bestSingles.length)];
+    const chosen = pickRandom(bestSingles, rng);
     return { cardIndex: chosen.index };
   },
 };
@@ -175,17 +178,16 @@ export const GreedyStrategy: SushiGoAiStrategy = {
 
 /**
  * Wrapper that binds a strategy and RNG for convenient use.
+ *
+ * Extends the shared {@link AiPlayerBase} to inherit strategy
+ * binding and the `strategyName` getter.
  */
-export class SushiGoAiPlayer {
-  readonly strategy: SushiGoAiStrategy;
-  private readonly rng: () => number;
-
+export class SushiGoAiPlayer extends AiPlayerBase<SushiGoAiStrategy> {
   constructor(
     strategy: SushiGoAiStrategy = GreedyStrategy,
     rng: () => number = Math.random,
   ) {
-    this.strategy = strategy;
-    this.rng = rng;
+    super(strategy, rng);
   }
 
   /**

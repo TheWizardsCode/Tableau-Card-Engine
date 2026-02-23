@@ -12,6 +12,7 @@ export default defineConfig(({ mode }) => ({
       '@card-system': path.resolve(__dirname, 'src/card-system'),
       '@rule-engine': path.resolve(__dirname, 'src/rule-engine'),
       '@ui': path.resolve(__dirname, 'src/ui'),
+      '@ai': path.resolve(__dirname, 'src/ai'),
     },
   },
   build: {
