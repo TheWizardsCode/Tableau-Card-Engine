@@ -95,7 +95,7 @@ const TITLE_Y = 20;
 const FOUNDATION_Y = 95;
 
 /** Tableau starts below the foundations (with room for suit labels). */
-const TABLEAU_TOP_Y = 240;
+const TABLEAU_TOP_Y = 282;
 
 /** Z-depth for a card being dragged. */
 const DRAG_DEPTH = 1000;
