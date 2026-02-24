@@ -25,7 +25,7 @@ import {
   getPileTopValue,
   MAX_LEVEL,
 } from '../TheMindGameState';
-import { MindAiPlayer } from '../AiStrategy';
+import { MindAiPlayer, computeEffectiveDelay } from '../AiStrategy';
 import {
   preloadMindCardAssets,
   getMindCardTexture,
@@ -416,7 +416,12 @@ export class TheMindScene extends Phaser.Scene {
     if (!nextCard) return;
 
     const elapsed = Date.now() - this.aiLevelStartTime;
-    const delay = Math.max(nextCard.delay - elapsed, 100);
+    const delay = computeEffectiveDelay(
+      nextCard.delay,
+      elapsed,
+      this.session.players[0].hand.length, // human-AI (this player)
+      this.session.players[1].hand.length, // AI (opponent)
+    );
 
     this.humanAiTimer = this.time.delayedCall(delay, () => {
       if (this.phase !== 'playing') return;
@@ -1309,9 +1314,13 @@ export class TheMindScene extends Phaser.Scene {
     const nextCard = this.aiPlayer.getNextCard();
     if (!nextCard) return;
 
-    // Calculate delay from now: the committed delay is relative to level start
     const elapsed = Date.now() - this.aiLevelStartTime;
-    const delay = Math.max(nextCard.delay - elapsed, 100);
+    const delay = computeEffectiveDelay(
+      nextCard.delay,
+      elapsed,
+      this.session.players[1].hand.length, // AI (this player)
+      this.session.players[0].hand.length, // human (opponent)
+    );
 
     this.aiTimer = this.time.delayedCall(delay, () => {
       if (this.phase !== 'playing') return;

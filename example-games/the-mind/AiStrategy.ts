@@ -35,6 +35,33 @@ export const DEFAULT_JITTER_RANGE = 800;
 /** Minimum delay in ms — prevents the AI from playing instantly. */
 export const MIN_PLAY_DELAY = 1500;
 
+/**
+ * Short delay (ms) used when a player has only one card left and the
+ * other player's hand is already empty.  There is no decision to make in
+ * this situation so a long wait feels unnatural.
+ */
+export const AI_LAST_CARD_DELAY = 400;
+
+/**
+ * Compute the effective AI play delay for a scheduled card.
+ *
+ * When the opponent's hand is empty and this player has exactly one card
+ * remaining, returns {@link AI_LAST_CARD_DELAY} so the obvious play happens
+ * quickly.  Otherwise falls back to the normal elapsed-time calculation
+ * (clamped to a 100 ms floor).
+ */
+export function computeEffectiveDelay(
+  committedDelay: number,
+  elapsedSinceLevelStart: number,
+  playerHandSize: number,
+  opponentHandSize: number,
+): number {
+  if (opponentHandSize === 0 && playerHandSize === 1) {
+    return AI_LAST_CARD_DELAY;
+  }
+  return Math.max(committedDelay - elapsedSinceLevelStart, 100);
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
