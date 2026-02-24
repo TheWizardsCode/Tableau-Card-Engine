@@ -128,6 +128,10 @@ export class TheMindScene extends Phaser.Scene {
   private gameEvents!: GameEventEmitter;
   private eventBridge!: PhaserEventBridge;
 
+  // Replay mode
+  private replayMode = false;
+  private replayStepIndex = 0;
+
   // Sound system
   private soundManager: SoundManager | null = null;
   private settingsPanel!: SettingsPanel;
@@ -194,13 +198,35 @@ export class TheMindScene extends Phaser.Scene {
     this.turnCounter = 0;
     this.aiCountText = null;
 
-    // Check URL parameter for auto-play
+    // Check URL parameters
     const urlParams = new URLSearchParams(window.location.search);
     this.autoPlayEnabled = urlParams.get('autoplay') === 'true';
+    this.replayMode = urlParams.get('mode') === 'replay';
 
     // Event system
     this.gameEvents = new GameEventEmitter();
     this.eventBridge = new PhaserEventBridge(this.gameEvents, this.events);
+    // Expose for replay tool (page.evaluate can listen for state-settled)
+    (window as unknown as Record<string, unknown>).__GAME_EVENTS__ =
+      this.gameEvents;
+
+    if (this.replayMode) {
+      // In replay mode: create minimal UI, skip game setup.
+      // The replay tool will call loadBoardState() to inject state.
+      this.createHeader();
+      this.createStatusDisplay();
+      this.createPile();
+      this.createInstruction();
+      this.instructionText.setText('');
+
+      // Set default status display for replay mode
+      this.levelText.setText('Level 1 / 8');
+      this.livesText.setText('Lives: \u2764\u2764');
+
+      // Emit state-settled so the replay tool knows the scene is ready
+      this.emitStateSettled();
+      return;
+    }
 
     // Sound system
     this.createSoundSystem();
@@ -1027,12 +1053,23 @@ export class TheMindScene extends Phaser.Scene {
     this.cancelAiTimer();
     this.cancelHumanAiTimer();
 
-    // Record level completion in transcript
+    // Record level completion in transcript.
+    // If the game is not over, playCard has already dealt new hands.
+    const completedLevel = this.session.currentLevel - (result.levelComplete ? 1 : 0);
+    const handsDealt: [readonly number[], readonly number[]] | undefined =
+      !(isGameOver(this.session) && this.session.outcome === 'win')
+        ? [
+            this.session.players[0].hand.map((c) => c.value),
+            this.session.players[1].hand.map((c) => c.value),
+          ]
+        : undefined;
+
     this.recorder.recordLevelComplete(
       timestamp,
-      this.session.currentLevel - (result.levelComplete ? 1 : 0),
+      completedLevel,
       result.bonusLifeAwarded,
       this.session.lives,
+      handsDealt,
     );
 
     // Check for game win (playCard auto-advances, so if outcome is 'win'
@@ -1049,7 +1086,6 @@ export class TheMindScene extends Phaser.Scene {
     // Play level-complete chime
     this.soundManager?.play(SFX_KEYS.LEVEL_COMPLETE);
 
-    const completedLevel = this.session.currentLevel - 1;
     const bonusText = result.bonusLifeAwarded
       ? '\nBonus life awarded!'
       : '';
@@ -1383,10 +1419,161 @@ export class TheMindScene extends Phaser.Scene {
     return new MindTranscriptRecorder(initialState);
   }
 
-  // ── Event emission helpers ─────────────────────────────
+  // ── Replay API ─────────────────────────────────────────
 
-  // Note: The Mind has no turns, so we adapt the event system
-  // to emit state-settled after each card play settles.
+  /**
+   * Board state snapshot for replay state injection.
+   *
+   * The replay adapter reconstructs this snapshot from the transcript
+   * events and passes it to this method via `page.evaluate()`.
+   */
+  public loadBoardState(state: {
+    humanHand: number[];
+    aiHand: number[];
+    pileTop: number;
+    pileSize: number;
+    currentLevel: number;
+    lives: number;
+    stepIndex?: number;
+  }): void {
+    if (!this.replayMode) {
+      throw new Error(
+        'loadBoardState() is only available in replay mode (?mode=replay)',
+      );
+    }
+
+    // Destroy existing card sprites
+    for (const sprite of this.humanCardSprites) sprite.destroy();
+    this.humanCardSprites = [];
+    for (const sprite of this.aiCardSprites) sprite.destroy();
+    this.aiCardSprites = [];
+
+    // Render human hand (face-up)
+    this.renderReplayHand(
+      state.humanHand,
+      HUMAN_HAND_Y,
+      true,
+      this.humanCardSprites,
+      'Your Hand',
+      '#88ff88',
+    );
+
+    // Render AI hand (face-down)
+    this.renderReplayHand(
+      state.aiHand,
+      AI_HAND_Y,
+      false,
+      this.aiCardSprites,
+      'AI Hand',
+      '#ffaa44',
+    );
+
+    // Render AI count text
+    if (this.aiCountText) this.aiCountText.destroy();
+    if (state.aiHand.length > 0) {
+      this.aiCountText = this.add
+        .text(GAME_W / 2, AI_HAND_Y + CARD_H / 2 + 14, '', {
+          fontSize: '12px',
+          color: '#aaaaaa',
+          fontFamily: FONT_FAMILY,
+        })
+        .setOrigin(0.5)
+        .setDepth(DEPTH_UI);
+      this.aiCountText.setText(
+        `AI: ${state.aiHand.length} card${state.aiHand.length !== 1 ? 's' : ''}`,
+      );
+    } else {
+      this.aiCountText = null;
+    }
+
+    // Update pile display
+    if (state.pileTop > 0) {
+      const faceUpCard: MindCard = { value: state.pileTop, faceUp: true };
+      this.pileSprite.setTexture(getMindCardTexture(faceUpCard));
+      this.pileSprite.setAlpha(1);
+      this.pileValueText.setText(`${state.pileTop}`);
+    } else {
+      this.pileSprite.setTexture(CARD_BACK_KEY);
+      this.pileSprite.setAlpha(0.3);
+      this.pileValueText.setText('Empty');
+    }
+    this.pileCountText.setText(
+      state.pileSize > 0
+        ? `${state.pileSize} card${state.pileSize !== 1 ? 's' : ''}`
+        : '',
+    );
+
+    // Update level and lives display
+    this.levelText.setText(`Level ${state.currentLevel} / ${MAX_LEVEL}`);
+    const hearts = '\u2764'.repeat(Math.max(0, state.lives));
+    this.livesText.setText(`Lives: ${hearts}`);
+
+    // Track replay step for state-settled payload
+    if (state.stepIndex !== undefined) {
+      this.replayStepIndex = state.stepIndex;
+    }
+
+    // Signal board is visually stable and ready for screenshot
+    this.emitStateSettled();
+  }
+
+  /**
+   * Render a hand of cards at the given Y position for replay mode.
+   * Cards are non-interactive static images.
+   */
+  private renderReplayHand(
+    cardValues: number[],
+    y: number,
+    faceUp: boolean,
+    spriteArray: Phaser.GameObjects.Image[],
+    label: string,
+    labelColor: string,
+  ): void {
+    if (cardValues.length === 0) return;
+
+    // Dynamic spacing (same algorithm as renderHumanHand)
+    const idealWidth = cardValues.length * CARD_W + (cardValues.length - 1) * CARD_GAP;
+    const step = idealWidth <= MAX_HAND_WIDTH
+      ? CARD_W + CARD_GAP
+      : (MAX_HAND_WIDTH - CARD_W) / (cardValues.length - 1 || 1);
+    const actualWidth = cardValues.length === 1
+      ? CARD_W
+      : CARD_W + (cardValues.length - 1) * step;
+    const startX = (GAME_W - actualWidth) / 2 + CARD_W / 2;
+
+    for (let i = 0; i < cardValues.length; i++) {
+      const x = startX + i * step;
+      const card: MindCard = { value: cardValues[i], faceUp };
+      const texture = faceUp ? getMindCardTexture(card) : CARD_BACK_KEY;
+      const sprite = this.add
+        .image(x, y, texture)
+        .setDisplaySize(CARD_W, CARD_H)
+        .setDepth(DEPTH_CARDS + i);
+      spriteArray.push(sprite);
+    }
+
+    // Label above the hand
+    this.add
+      .text(GAME_W / 2, y - CARD_H / 2 - 14, label, {
+        fontSize: '12px',
+        color: labelColor,
+        fontFamily: FONT_FAMILY,
+      })
+      .setOrigin(0.5)
+      .setDepth(DEPTH_UI);
+  }
+
+  /**
+   * Emit state-settled when the board is visually stable and safe
+   * to screenshot. Uses the replay step index as the turn number
+   * (since The Mind is event-based rather than turn-based).
+   */
+  private emitStateSettled(): void {
+    this.gameEvents.emit('state-settled', {
+      turnNumber: this.replayStepIndex,
+      phase: 'playing' as const,
+    });
+  }
 
   // ── Shutdown ────────────────────────────────────────────
 

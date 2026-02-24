@@ -197,11 +197,22 @@ export function runGame(config?: HeadlessGameConfig): HeadlessGameResult {
         ? session.currentLevel
         : session.currentLevel - 1;
 
+      // If the game is not over, dealLevel has already been called and
+      // the session now holds the new hands for the next level.
+      const handsDealt: [readonly number[], readonly number[]] | undefined =
+        !isGameOver(session)
+          ? [
+              session.players[0].hand.map((c) => c.value),
+              session.players[1].hand.map((c) => c.value),
+            ]
+          : undefined;
+
       recorder.recordLevelComplete(
         timestamp,
         completedLevel,
         result.bonusLifeAwarded,
         session.lives,
+        handsDealt,
       );
 
       if (isGameOver(session)) {

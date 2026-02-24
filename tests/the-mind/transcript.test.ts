@@ -38,9 +38,9 @@ describe('MindTranscriptRecorder', () => {
   });
 
   describe('construction', () => {
-    it('creates a transcript with version 1', () => {
+    it('creates a transcript with version 2', () => {
       const t = recorder.getTranscript();
-      expect(t.version).toBe(1);
+      expect(t.version).toBe(2);
     });
 
     it('creates a transcript with gameType "the-mind"', () => {
@@ -266,7 +266,7 @@ describe('MindTranscriptRecorder', () => {
       expect(() => JSON.parse(json)).not.toThrow();
 
       const parsed = JSON.parse(json) as MindTranscript;
-      expect(parsed.version).toBe(1);
+      expect(parsed.version).toBe(2);
       expect(parsed.gameType).toBe('the-mind');
       expect(parsed.events).toHaveLength(4); // play + penalty + level + game-over
       expect(parsed.results).not.toBeNull();
@@ -327,7 +327,7 @@ describe('MindTranscriptRecorder', () => {
       const t = recorder.finalize(200, 'loss', 4, 0);
 
       // Verify structure
-      expect(t.version).toBe(1);
+      expect(t.version).toBe(2);
       expect(t.gameType).toBe('the-mind');
       expect(t.events).toHaveLength(
         // Level 1: 2 plays + 1 level-complete = 3

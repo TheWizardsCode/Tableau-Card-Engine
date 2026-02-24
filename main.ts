@@ -62,6 +62,7 @@ const GAMES: GameEntry[] = [
     title: 'The Mind',
     description:
       'Cooperative real-time card game (human + AI). Play numbered cards 1-100 onto a shared ascending pile without communicating. Survive 8 levels without losing all lives.',
+    thumbnail: 'games/the-mind/thumbnail',
   },
 ];
 

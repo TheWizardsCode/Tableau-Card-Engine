@@ -63,6 +63,13 @@ export interface MindLevelCompleteEvent {
   readonly bonusLifeAwarded: boolean;
   /** Lives remaining after any bonus award. */
   readonly livesAfter: number;
+  /**
+   * Cards dealt to each player for the NEXT level (values only).
+   * Undefined when the completed level is the final level (game won)
+   * since no new cards are dealt. Added in version 2 to support
+   * multi-level replay state reconstruction.
+   */
+  readonly handsDealt?: [readonly number[], readonly number[]];
 }
 
 /** The final game outcome event. */
@@ -127,8 +134,8 @@ export interface MindGameResults {
 
 /** A complete The Mind game transcript. */
 export interface MindTranscript {
-  /** Format version. */
-  readonly version: 1;
+  /** Format version. Version 2 adds handsDealt to level-complete events. */
+  readonly version: 1 | 2;
   /** Game identifier. */
   readonly gameType: 'the-mind';
   /** ISO 8601 timestamp when the game started. */
@@ -166,7 +173,7 @@ export class MindTranscriptRecorder extends TranscriptRecorderBase<MindTranscrip
 
   constructor(initialState: MindInitialState) {
     super({
-      version: 1,
+      version: 2,
       gameType: 'the-mind',
       startedAt: new Date().toISOString(),
       endedAt: '',
@@ -238,22 +245,27 @@ export class MindTranscriptRecorder extends TranscriptRecorderBase<MindTranscrip
    * @param level - The level that was completed.
    * @param bonusLifeAwarded - Whether a bonus life was awarded.
    * @param livesAfter - Lives remaining after any bonus.
+   * @param handsDealt - Cards dealt for the next level (omit for final level).
    */
   recordLevelComplete(
     timestamp: number,
     level: number,
     bonusLifeAwarded: boolean,
     livesAfter: number,
+    handsDealt?: [readonly number[], readonly number[]],
   ): void {
     if (this.sealed) return;
 
-    this.transcript.events.push({
+    const event: MindLevelCompleteEvent = {
       type: 'level-complete',
       timestamp,
       level,
       bonusLifeAwarded,
       livesAfter,
-    });
+      ...(handsDealt ? { handsDealt } : {}),
+    };
+
+    this.transcript.events.push(event);
   }
 
   /**

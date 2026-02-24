@@ -280,7 +280,7 @@ describe('Integration: Transcript structure invariants', () => {
     const json = JSON.stringify(result.transcript);
     const parsed: MindTranscript = JSON.parse(json);
 
-    expect(parsed.version).toBe(1);
+    expect(parsed.version).toBe(2);
     expect(parsed.gameType).toBe('the-mind');
     expect(parsed.startedAt).toBeTruthy();
     expect(parsed.endedAt).toBeTruthy();
@@ -364,7 +364,7 @@ describe('Integration: Game invariants across seeds', () => {
       const t = result.transcript;
 
       // Required fields
-      expect(t.version).toBe(1);
+      expect(t.version).toBe(2);
       expect(t.gameType).toBe('the-mind');
       expect(t.startedAt).toBeTruthy();
       expect(t.endedAt).toBeTruthy();

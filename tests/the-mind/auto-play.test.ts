@@ -198,9 +198,9 @@ describe('headless runGame — configuration', () => {
 // ---------------------------------------------------------------------------
 
 describe('headless runGame — transcript', () => {
-  it('transcript version is 1', () => {
+  it('transcript version is 2', () => {
     const result = runSeeded(42);
-    expect(result.transcript.version).toBe(1);
+    expect(result.transcript.version).toBe(2);
   });
 
   it('transcript gameType is "the-mind"', () => {
