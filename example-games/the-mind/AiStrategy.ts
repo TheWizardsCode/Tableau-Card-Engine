@@ -27,10 +27,13 @@ import { AiPlayer as AiPlayerBase } from '../../src/ai';
 // ---------------------------------------------------------------------------
 
 /** Default base duration in milliseconds. */
-export const DEFAULT_BASE_DURATION = 5000;
+export const DEFAULT_BASE_DURATION = 10000;
 
 /** Default jitter range (±ms). */
-export const DEFAULT_JITTER_RANGE = 500;
+export const DEFAULT_JITTER_RANGE = 800;
+
+/** Minimum delay in ms — prevents the AI from playing instantly. */
+export const MIN_PLAY_DELAY = 1500;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -118,7 +121,9 @@ export const LinearTimingStrategy: MindAiStrategy = {
     return hand.map((card) => {
       // jitter ∈ [−jitterRange, +jitterRange]
       const jitter = (rng() * 2 - 1) * config.jitterRange;
-      const delay = (card.value / 100) * config.baseDuration + jitter;
+      const raw = (card.value / 100) * config.baseDuration + jitter;
+      // Enforce minimum delay so the AI never plays instantly
+      const delay = Math.max(raw, MIN_PLAY_DELAY);
       return { card, delay };
     });
   },

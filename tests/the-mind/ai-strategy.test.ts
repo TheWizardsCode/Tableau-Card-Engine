@@ -6,6 +6,7 @@ import {
   MindAiPlayer,
   DEFAULT_BASE_DURATION,
   DEFAULT_JITTER_RANGE,
+  MIN_PLAY_DELAY,
 } from '../../example-games/the-mind/AiStrategy';
 import type { MindCard } from '../../example-games/the-mind/MindCard';
 import { createSeededRng } from '../../src/core-engine/SeededRng';
@@ -35,12 +36,16 @@ const ZERO_JITTER_CONFIG: MindAiTimingConfig = {
 // ---------------------------------------------------------------------------
 
 describe('Constants', () => {
-  it('DEFAULT_BASE_DURATION is 5000ms', () => {
-    expect(DEFAULT_BASE_DURATION).toBe(5000);
+  it('DEFAULT_BASE_DURATION is 10000ms', () => {
+    expect(DEFAULT_BASE_DURATION).toBe(10000);
   });
 
-  it('DEFAULT_JITTER_RANGE is 500ms', () => {
-    expect(DEFAULT_JITTER_RANGE).toBe(500);
+  it('DEFAULT_JITTER_RANGE is 800ms', () => {
+    expect(DEFAULT_JITTER_RANGE).toBe(800);
+  });
+
+  it('MIN_PLAY_DELAY is 1500ms', () => {
+    expect(MIN_PLAY_DELAY).toBe(1500);
   });
 });
 
@@ -87,13 +92,14 @@ describe('LinearTimingStrategy', () => {
         rng,
       );
 
-      expect(delays[0].delay).toBeCloseTo(1250, 5); // 25/100 * 5000
+      // 25/100 * 5000 = 1250, clamped to MIN_PLAY_DELAY (1500)
+      expect(delays[0].delay).toBeCloseTo(MIN_PLAY_DELAY, 5);
       expect(delays[1].delay).toBeCloseTo(2500, 5); // 50/100 * 5000
       expect(delays[2].delay).toBeCloseTo(3750, 5); // 75/100 * 5000
       expect(delays[3].delay).toBeCloseTo(5000, 5); // 100/100 * 5000
     });
 
-    it('card value 1 has a very small delay', () => {
+    it('card value 1 is clamped to MIN_PLAY_DELAY', () => {
       const h = hand(1);
       const rng = createSeededRng(103);
       const delays = LinearTimingStrategy.computeDelays(
@@ -101,7 +107,8 @@ describe('LinearTimingStrategy', () => {
         ZERO_JITTER_CONFIG,
         rng,
       );
-      expect(delays[0].delay).toBeCloseTo(50, 5); // 1/100 * 5000
+      // Raw delay = 1/100 * 5000 = 50, clamped to MIN_PLAY_DELAY
+      expect(delays[0].delay).toBe(MIN_PLAY_DELAY);
     });
 
     it('scales linearly with baseDuration', () => {
@@ -204,6 +211,47 @@ describe('LinearTimingStrategy', () => {
       expect(delays).toHaveLength(0);
     });
 
+    // ── MIN_PLAY_DELAY clamping ──
+
+    it('clamps delays below MIN_PLAY_DELAY to the minimum', () => {
+      // With baseDuration=5000, cards with value ≤ 30 produce raw delays ≤ 1500
+      // Card value 10 → raw 500, Card value 20 → raw 1000, Card value 29 → raw 1450
+      const h = hand(10, 20, 29);
+      const rng = createSeededRng(200);
+      const delays = LinearTimingStrategy.computeDelays(
+        h,
+        ZERO_JITTER_CONFIG,
+        rng,
+      );
+      for (const d of delays) {
+        expect(d.delay).toBe(MIN_PLAY_DELAY);
+      }
+    });
+
+    it('does not clamp delays already above MIN_PLAY_DELAY', () => {
+      // Card value 50 → raw 2500 (above 1500)
+      const h = hand(50);
+      const rng = createSeededRng(201);
+      const delays = LinearTimingStrategy.computeDelays(
+        h,
+        ZERO_JITTER_CONFIG,
+        rng,
+      );
+      expect(delays[0].delay).toBeCloseTo(2500, 5);
+    });
+
+    it('clamps at exactly MIN_PLAY_DELAY boundary', () => {
+      // Card value 30 → raw 30/100 * 5000 = 1500 = MIN_PLAY_DELAY exactly
+      const h = hand(30);
+      const rng = createSeededRng(202);
+      const delays = LinearTimingStrategy.computeDelays(
+        h,
+        ZERO_JITTER_CONFIG,
+        rng,
+      );
+      expect(delays[0].delay).toBe(MIN_PLAY_DELAY);
+    });
+
     // ── Determinism ──
 
     it('produces identical delays with the same seed', () => {
@@ -232,7 +280,9 @@ describe('LinearTimingStrategy', () => {
     // ── Independence ──
 
     it('each card gets its own independent delay', () => {
-      const h = hand(10, 20, 30);
+      // Use values well above MIN_PLAY_DELAY threshold to ensure distinct delays
+      // 50/100*5000=2500, 60/100*5000=3000, 70/100*5000=3500 (all > 1500)
+      const h = hand(50, 60, 70);
       const rng = createSeededRng(109);
       const config: MindAiTimingConfig = {
         baseDuration: 5000,
@@ -548,21 +598,39 @@ describe('MindAiPlayer', () => {
   // ── Lowest-delay card plays first ──
 
   describe('lowest-delay card plays first', () => {
-    it('lowest-value card has the earliest delay (no jitter)', () => {
+    it('lowest-value card above MIN_PLAY_DELAY threshold has the earliest delay (no jitter)', () => {
       const rng = createSeededRng(130);
       const player = new MindAiPlayer(LinearTimingStrategy, rng, {
         baseDuration: 5000,
         jitterRange: 0,
       });
-      player.commitLevel(hand(99, 1, 50, 25, 75));
+      // Use values where the lowest is still above the MIN_PLAY_DELAY threshold
+      // 40/100 * 5000 = 2000 > 1500
+      player.commitLevel(hand(99, 40, 50, 75));
 
       const next = player.getNextCard()!;
-      expect(next.card.value).toBe(1);
+      expect(next.card.value).toBe(40);
+    });
+
+    it('cards clamped to MIN_PLAY_DELAY all share the same delay', () => {
+      const rng = createSeededRng(132);
+      const player = new MindAiPlayer(LinearTimingStrategy, rng, {
+        baseDuration: 5000,
+        jitterRange: 0,
+      });
+      // Cards 1, 10, 25 all produce raw delays < 1500, so all clamp to MIN_PLAY_DELAY
+      player.commitLevel(hand(1, 10, 25));
+
+      const delays = player.getCardDelays();
+      for (const d of delays) {
+        expect(d.delay).toBe(MIN_PLAY_DELAY);
+      }
     });
 
     it('with small jitter, lower cards generally fire before higher cards', () => {
-      // Small jitter (50ms) relative to baseDuration (5000ms) means
-      // ordering is almost always preserved
+      // Card 10: raw ≈ 500±50, clamped to MIN_PLAY_DELAY (1500)
+      // Card 90: raw ≈ 4500±50, well above MIN_PLAY_DELAY
+      // Order is preserved since 1500 < ~4450
       const rng = createSeededRng(131);
       const player = new MindAiPlayer(LinearTimingStrategy, rng, {
         baseDuration: 5000,
@@ -571,8 +639,6 @@ describe('MindAiPlayer', () => {
       player.commitLevel(hand(10, 90));
 
       const delays = player.getCardDelays();
-      // Card 10 delay ≈ 500±50, card 90 delay ≈ 4500±50
-      // They should never overlap with such small jitter
       expect(delays[0].card.value).toBe(10);
       expect(delays[1].card.value).toBe(90);
     });
