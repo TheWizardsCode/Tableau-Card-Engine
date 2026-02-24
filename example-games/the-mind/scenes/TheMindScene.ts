@@ -142,7 +142,7 @@ export class TheMindScene extends Phaser.Scene {
 
   // Display objects -- AI hand
   private aiCardSprites: Phaser.GameObjects.Image[] = [];
-  private aiCountText!: Phaser.GameObjects.Text;
+  private aiCountText: Phaser.GameObjects.Text | null = null;
 
   // Display objects -- pile
   private pileSprite!: Phaser.GameObjects.Image;
@@ -183,7 +183,8 @@ export class TheMindScene extends Phaser.Scene {
     // Register shutdown lifecycle so custom cleanup runs on scene.restart()
     this.events.on('shutdown', this.shutdown, this);
 
-    // Reset state for scene restart
+    // Reset state for scene restart (clear stale refs from previous run;
+    // Phaser destroys game objects on restart but class fields survive).
     this.phase = 'dealing';
     this.humanCardSprites = [];
     this.aiCardSprites = [];
@@ -191,6 +192,7 @@ export class TheMindScene extends Phaser.Scene {
     this.aiTimer = null;
     this.humanAiTimer = null;
     this.turnCounter = 0;
+    this.aiCountText = null;
 
     // Check URL parameter for auto-play
     const urlParams = new URLSearchParams(window.location.search);
@@ -574,17 +576,19 @@ export class TheMindScene extends Phaser.Scene {
       this.aiCardSprites.push(sprite);
     }
 
-    // Count indicator
-    if (!this.aiCountText) {
-      this.aiCountText = this.add
-        .text(GAME_W / 2, AI_HAND_Y + CARD_H / 2 + 14, '', {
-          fontSize: '12px',
-          color: '#aaaaaa',
-          fontFamily: FONT_FAMILY,
-        })
-        .setOrigin(0.5)
-        .setDepth(DEPTH_UI);
+    // Count indicator — always recreate (previous instance is destroyed on
+    // scene restart, leaving a stale reference).
+    if (this.aiCountText) {
+      this.aiCountText.destroy();
     }
+    this.aiCountText = this.add
+      .text(GAME_W / 2, AI_HAND_Y + CARD_H / 2 + 14, '', {
+        fontSize: '12px',
+        color: '#aaaaaa',
+        fontFamily: FONT_FAMILY,
+      })
+      .setOrigin(0.5)
+      .setDepth(DEPTH_UI);
 
     this.aiCountText.setText(
       `AI: ${hand.length} card${hand.length !== 1 ? 's' : ''}`,

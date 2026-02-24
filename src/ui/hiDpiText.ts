@@ -49,11 +49,13 @@ if (!TextProto[PATCHED]) {
     this: Phaser.GameObjects.Text,
   ) {
     // Upgrade resolution only when it's still at the Phaser default.
+    // Only set style.resolution here -- Phaser's updateText will
+    // propagate it to the frame/source internally after it renders
+    // the text canvas. Setting frame.source.resolution directly
+    // before updateText can cause a null-source crash when Phaser
+    // tries to resize the frame before the canvas is ready.
     if (this.style.resolution === 1) {
       this.style.resolution = TEXT_DPR;
-      if (this.frame?.source) {
-        this.frame.source.resolution = TEXT_DPR;
-      }
     }
 
     return origUpdateText.call(this);
