@@ -67,6 +67,12 @@ const GAMES: GameEntry[] = [
 
 // ── Phaser boot ────────────────────────────────────────────
 
+// In replay mode we need `preserveDrawingBuffer: true` so that
+// `canvas.toDataURL()` returns real content.  Without this flag
+// WebGL clears the drawing buffer after compositing each frame
+// and toDataURL() returns a black image.
+const isReplayMode = new URLSearchParams(window.location.search).get('mode') === 'replay';
+
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
   parent: 'game-container',
@@ -84,6 +90,7 @@ const config: Phaser.Types.Core.GameConfig = {
   },
   render: {
     roundPixels: true,
+    ...(isReplayMode ? { preserveDrawingBuffer: true } : {}),
   },
   callbacks: {
     preBoot: (game: Phaser.Game) => {
