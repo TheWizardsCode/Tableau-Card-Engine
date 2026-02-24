@@ -47,7 +47,11 @@ import {
   createSceneHeader,
   SettingsPanel,
   SettingsButton,
+  HelpPanel,
+  HelpButton,
 } from '../../../src/ui';
+import type { HelpSection } from '../../../src/ui';
+import helpContent from '../help-content.json';
 
 // ── Audio asset keys ────────────────────────────────────────
 const SFX_KEYS = {
@@ -61,18 +65,19 @@ const SFX_KEYS = {
 
 // ── Constants ───────────────────────────────────────────────
 
-// Card display dimensions (larger than default for playability)
-const CARD_W = 80;
-const CARD_H = 109;
+// Card display dimensions (~50% larger than default for readability)
+const CARD_W = 120;
+const CARD_H = 164;
 
 // Layout
 const PILE_X = GAME_W / 2;
-const PILE_Y = GAME_H / 2 - 30;
+const PILE_Y = GAME_H / 2 - 10;
 
-const HUMAN_HAND_Y = GAME_H - 90;
-const AI_HAND_Y = 80;
+const HUMAN_HAND_Y = GAME_H - 110;
+const AI_HAND_Y = 150;
 
 const CARD_GAP = 8;
+const MAX_HAND_WIDTH = GAME_W - 80; // leave 40px margin each side
 
 // Timing
 const LEVEL_COMPLETE_DELAY = 2000;
@@ -128,6 +133,10 @@ export class TheMindScene extends Phaser.Scene {
   private soundManager: SoundManager | null = null;
   private settingsPanel!: SettingsPanel;
   private settingsButton!: SettingsButton;
+
+  // Help system
+  private helpPanel!: HelpPanel;
+  private helpButton!: HelpButton;
 
   // Display objects -- human hand
   private humanCardSprites: Phaser.GameObjects.Image[] = [];
@@ -205,6 +214,7 @@ export class TheMindScene extends Phaser.Scene {
     this.createPile();
     this.createInstruction();
     this.createAutoPlayButton();
+    this.createHelpPanel();
 
     // Initial render
     this.renderHumanHand();
@@ -223,24 +233,24 @@ export class TheMindScene extends Phaser.Scene {
   }
 
   private createStatusDisplay(): void {
-    // Level indicator (top-right area)
+    // Level indicator (top-right area, clear of settings/help buttons)
     this.levelText = this.add
-      .text(GAME_W - 20, 10, '', {
+      .text(GAME_W - 100, 10, '', {
         fontSize: '16px',
         color: '#aaccff',
         fontFamily: FONT_FAMILY,
       })
-      .setOrigin(1, 0)
+      .setOrigin(0.5, 0)
       .setDepth(DEPTH_UI);
 
     // Lives display (below level)
     this.livesText = this.add
-      .text(GAME_W - 20, 34, '', {
+      .text(GAME_W - 100, 34, '', {
         fontSize: '16px',
         color: '#ff6666',
         fontFamily: FONT_FAMILY,
       })
-      .setOrigin(1, 0)
+      .setOrigin(0.5, 0)
       .setDepth(DEPTH_UI);
   }
 
@@ -320,6 +330,15 @@ export class TheMindScene extends Phaser.Scene {
       soundManager: this.soundManager,
     });
     this.settingsButton = new SettingsButton(this, this.settingsPanel);
+  }
+
+  // ── Help panel ─────────────────────────────────────────
+
+  private createHelpPanel(): void {
+    this.helpPanel = new HelpPanel(this, {
+      sections: helpContent as HelpSection[],
+    });
+    this.helpButton = new HelpButton(this, this.helpPanel);
   }
 
   // ── Auto-play spectator mode ───────────────────────────
@@ -451,18 +470,25 @@ export class TheMindScene extends Phaser.Scene {
     const hand = this.session.players[0].hand;
     if (hand.length === 0) return;
 
-    const totalWidth = hand.length * CARD_W + (hand.length - 1) * CARD_GAP;
-    const startX = (GAME_W - totalWidth) / 2 + CARD_W / 2;
+    // Dynamic spacing: overlap cards if they exceed MAX_HAND_WIDTH
+    const idealWidth = hand.length * CARD_W + (hand.length - 1) * CARD_GAP;
+    const step = idealWidth <= MAX_HAND_WIDTH
+      ? CARD_W + CARD_GAP
+      : (MAX_HAND_WIDTH - CARD_W) / (hand.length - 1 || 1);
+    const actualWidth = hand.length === 1
+      ? CARD_W
+      : CARD_W + (hand.length - 1) * step;
+    const startX = (GAME_W - actualWidth) / 2 + CARD_W / 2;
 
     for (let i = 0; i < hand.length; i++) {
       const card = hand[i];
       // Human cards are always face-up
       const displayCard = { ...card, faceUp: true };
-      const x = startX + i * (CARD_W + CARD_GAP);
+      const x = startX + i * step;
       const sprite = this.add
         .image(x, HUMAN_HAND_Y, getMindCardTexture(displayCard))
         .setDisplaySize(CARD_W, CARD_H)
-        .setDepth(DEPTH_CARDS)
+        .setDepth(DEPTH_CARDS + i) // later cards render on top when overlapping
         .setInteractive({ useHandCursor: true });
 
       // Click handler
@@ -525,15 +551,22 @@ export class TheMindScene extends Phaser.Scene {
       return;
     }
 
-    const totalWidth = hand.length * CARD_W + (hand.length - 1) * CARD_GAP;
-    const startX = (GAME_W - totalWidth) / 2 + CARD_W / 2;
+    // Dynamic spacing: overlap cards if they exceed MAX_HAND_WIDTH
+    const idealWidth = hand.length * CARD_W + (hand.length - 1) * CARD_GAP;
+    const step = idealWidth <= MAX_HAND_WIDTH
+      ? CARD_W + CARD_GAP
+      : (MAX_HAND_WIDTH - CARD_W) / (hand.length - 1 || 1);
+    const actualWidth = hand.length === 1
+      ? CARD_W
+      : CARD_W + (hand.length - 1) * step;
+    const startX = (GAME_W - actualWidth) / 2 + CARD_W / 2;
 
     for (let i = 0; i < hand.length; i++) {
-      const x = startX + i * (CARD_W + CARD_GAP);
+      const x = startX + i * step;
       const sprite = this.add
         .image(x, AI_HAND_Y, CARD_BACK_KEY)
         .setDisplaySize(CARD_W, CARD_H)
-        .setDepth(DEPTH_CARDS);
+        .setDepth(DEPTH_CARDS + i); // later cards render on top when overlapping
 
       this.aiCardSprites.push(sprite);
     }
@@ -1309,6 +1342,8 @@ export class TheMindScene extends Phaser.Scene {
     this.gameEvents?.removeAllListeners();
     this.settingsPanel?.destroy();
     this.settingsButton?.destroy();
+    this.helpPanel?.destroy();
+    this.helpButton?.destroy();
 
     // Clean up overlay objects
     for (const obj of this.overlayObjects) {
