@@ -21,6 +21,8 @@ export interface GameEntry {
   title: string;
   /** Short description (1-2 sentences). */
   description: string;
+  /** Optional Phaser asset key for a thumbnail image shown on the card. */
+  thumbnail?: string;
 }
 
 // ── Constants ──────────────────────────────────────────────
@@ -41,6 +43,12 @@ const CARD_BG = 0x1a3a1a;
 const CARD_BG_HOVER = 0x2a5a2a;
 const CARD_BORDER = 0x4a8a4a;
 const CARD_BORDER_HOVER = 0x88ff88;
+
+/** Thumbnail dimensions (16:9 aspect ratio, fits within card right side). */
+const THUMB_W = 120;
+const THUMB_H = 68;
+/** Padding between description text and thumbnail. */
+const THUMB_PAD = 8;
 
 /** Vertical space reserved for the heading area (title + subtitle). */
 const HEADER_H = 110;
@@ -66,6 +74,14 @@ export class GameSelectorScene extends Phaser.Scene {
       const fromRegistry = this.registry.get(REGISTRY_KEY_GAMES);
       if (Array.isArray(fromRegistry)) {
         this.games = fromRegistry as GameEntry[];
+      }
+    }
+  }
+
+  preload(): void {
+    for (const entry of this.games) {
+      if (entry.thumbnail) {
+        this.load.image(entry.thumbnail, `assets/${entry.thumbnail}.png`);
       }
     }
   }
@@ -146,6 +162,15 @@ export class GameSelectorScene extends Phaser.Scene {
 
   // ── Card rendering ─────────────────────────────────────
 
+  /**
+   * Check whether a thumbnail texture is available in the texture manager.
+   * Returns false if the entry has no thumbnail key or the texture was not loaded.
+   */
+  private hasThumbnail(entry: GameEntry): boolean {
+    if (!entry.thumbnail) return false;
+    return this.textures.exists(entry.thumbnail);
+  }
+
   private createGameCard(
     x: number,
     y: number,
@@ -156,7 +181,15 @@ export class GameSelectorScene extends Phaser.Scene {
     const bg = this.add.graphics();
     this.drawCard(bg, x, y, cardW, cardH, CARD_BG, CARD_BORDER);
 
-    const textWrap = cardW - 32;
+    const showThumb = this.hasThumbnail(entry);
+
+    // When thumbnail is present, reserve space on the right for the image.
+    // Description text is left-aligned in the remaining space.
+    const thumbAreaW = showThumb ? THUMB_W + THUMB_PAD : 0;
+    const textAreaW = cardW - 32 - thumbAreaW;
+    const textAlign = showThumb ? 'left' : 'center';
+    const textOriginX = showThumb ? 0 : 0.5;
+    const textX = showThumb ? x - cardW / 2 + 16 : x;
 
     // Title
     const title = this.add
@@ -166,27 +199,35 @@ export class GameSelectorScene extends Phaser.Scene {
         fontFamily: FONT_FAMILY,
         fontStyle: 'bold',
         align: 'center',
-        wordWrap: { width: textWrap },
+        wordWrap: { width: cardW - 32 },
       })
       .setOrigin(0.5, 0);
 
     // Description -- vertically centered between title bottom and play button top
     const descY = y + 4;
     const desc = this.add
-      .text(x, descY, entry.description, {
+      .text(textX, descY, entry.description, {
         fontSize: '11px',
         color: '#aaddaa',
         fontFamily: FONT_FAMILY,
-        align: 'center',
-        wordWrap: { width: textWrap },
+        align: textAlign,
+        wordWrap: { width: textAreaW },
         lineSpacing: 2,
       })
-      .setOrigin(0.5);
+      .setOrigin(textOriginX, 0.5);
 
     // Crop description if it overflows the card body
     const maxDescH = cardH - 80; // leave room for title + play button
     if (desc.height > maxDescH) {
       desc.setCrop(0, 0, desc.width, maxDescH);
+    }
+
+    // Thumbnail image (right side of card)
+    if (showThumb && entry.thumbnail) {
+      const thumbX = x + cardW / 2 - 16 - THUMB_W / 2;
+      const thumbY = y;
+      const thumb = this.add.image(thumbX, thumbY, entry.thumbnail);
+      thumb.setDisplaySize(THUMB_W, THUMB_H);
     }
 
     // Play button

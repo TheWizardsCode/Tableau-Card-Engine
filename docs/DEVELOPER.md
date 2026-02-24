@@ -598,6 +598,44 @@ This file is checked into version control and is referenced by `scripts/replay.t
 - Document every asset source and license in `public/assets/CREDITS.md`
 - Prefer SVG for card art (resolution-independent, small file size)
 
+### Game Thumbnails
+
+Each game can have a thumbnail image displayed on its card in the Game Selector. Thumbnails are committed to the repo at:
+
+```
+public/assets/games/<game-name>/thumbnail.png
+```
+
+**Generating a thumbnail from replay screenshots:**
+
+```bash
+npx tsx scripts/generate-thumbnail.ts <game-name> [source-dir]
+```
+
+- `game-name` -- The game identifier (e.g. `golf`)
+- `source-dir` -- Optional path to a directory containing `turn-NNN.png` replay screenshots. Defaults to `data/screenshots/<game-name>/`
+
+The script selects the midpoint frame from the replay output, resizes it to 120x68 PNG, and writes it to `public/assets/games/<game-name>/thumbnail.png`.
+
+**Wiring up a thumbnail:**
+
+After generating the thumbnail PNG, add a `thumbnail` field to the game's entry in `main.ts`:
+
+```typescript
+{
+  sceneKey: 'GolfScene',
+  title: '9-Card Golf',
+  description: '...',
+  thumbnail: 'games/golf/thumbnail',  // asset key (no .png extension)
+}
+```
+
+The `GameSelectorScene` will preload and display the thumbnail automatically. Games without a `thumbnail` field fall back to the text-only card layout.
+
+**When to regenerate thumbnails:**
+
+Thumbnails are static assets. Regenerate them when a game's visual appearance changes significantly. This is a manual step -- there is no automated CI pipeline for thumbnail generation.
+
 ## Keeping Docs Up to Date
 
 **Policy:** Any change that alters developer workflows must include a documentation update. Specifically:

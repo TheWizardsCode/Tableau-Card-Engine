@@ -29,6 +29,7 @@ const GAMES: GameEntry[] = [
     title: '9-Card Golf',
     description:
       'Single-round Golf (human vs. AI). Flip cards, swap from the draw or discard pile, and try to get the lowest score.',
+    thumbnail: 'games/golf/thumbnail',
   },
   {
     sceneKey: 'BeleagueredCastleScene',

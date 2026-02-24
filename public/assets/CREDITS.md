@@ -132,3 +132,15 @@ Files (in `audio/the-mind/`):
 - `game-win.wav` — triumphant ascending bell cascade on victory
 - `game-lost.wav` — descending minor tones with fading heartbeat on defeat
 - `ui-click.wav` — zen wooden tap for UI button presses
+
+## Game Thumbnails
+
+Thumbnail images displayed on the Game Selector landing page:
+
+- **Source**: Screenshots captured from the project's own example games via the replay pipeline or manual capture
+- **License**: MIT (screenshots of the project's own games, no external content)
+- **Format**: PNG, 120x68px (16:9 aspect ratio)
+- **Generator**: Run `npx tsx scripts/generate-thumbnail.ts <game-name>` to regenerate from replay screenshots
+
+Files (in `games/<game-name>/`):
+- `games/golf/thumbnail.png` — Mid-game screenshot of 9-Card Golf
