@@ -43,7 +43,6 @@ import {
   FONT_FAMILY,
   createOverlayBackground,
   createOverlayButton,
-  createOverlayMenuButton,
   createSceneHeader,
   SettingsPanel,
   SettingsButton,
@@ -181,7 +180,11 @@ export class TheMindScene extends Phaser.Scene {
   create(): void {
     this.cameras.main.setBackgroundColor('#1a1a2e');
 
+    // Register shutdown lifecycle so custom cleanup runs on scene.restart()
+    this.events.on('shutdown', this.shutdown, this);
+
     // Reset state for scene restart
+    this.phase = 'dealing';
     this.humanCardSprites = [];
     this.aiCardSprites = [];
     this.overlayObjects = [];
@@ -1162,6 +1165,7 @@ export class TheMindScene extends Phaser.Scene {
       GAME_H / 2 + 60,
       '[ Play Again ]',
       DEPTH_OVERLAY_CONTENT,
+      { fontSize: '18px' },
     );
     playAgainBtn.on('pointerdown', () => {
       this.soundManager?.play(SFX_KEYS.UI_CLICK);
@@ -1169,17 +1173,31 @@ export class TheMindScene extends Phaser.Scene {
         elementId: 'play-again',
         action: 'click',
       });
-      this.scene.restart();
+      // Defer restart to next tick so Phaser finishes input dispatch
+      this.time.delayedCall(0, () => this.scene.restart());
     });
     this.overlayObjects.push(playAgainBtn);
 
     // Menu button
-    const menuBtn = createOverlayMenuButton(
+    const menuBtn = createOverlayButton(
       this,
       GAME_W / 2 + 90,
       GAME_H / 2 + 60,
+      '[ Menu ]',
       DEPTH_OVERLAY_CONTENT,
+      { fontSize: '18px' },
     );
+    menuBtn.on('pointerdown', () => {
+      this.soundManager?.play(SFX_KEYS.UI_CLICK);
+      this.gameEvents.emit('ui-interaction', {
+        elementId: 'menu',
+        action: 'click',
+      });
+      // Defer scene transition to next tick so Phaser finishes input dispatch
+      this.time.delayedCall(0, () =>
+        this.scene.start('GameSelectorScene'),
+      );
+    });
     this.overlayObjects.push(menuBtn);
   }
 
@@ -1232,6 +1250,7 @@ export class TheMindScene extends Phaser.Scene {
       GAME_H / 2 + 60,
       '[ Try Again ]',
       DEPTH_OVERLAY_CONTENT,
+      { fontSize: '18px' },
     );
     tryAgainBtn.on('pointerdown', () => {
       this.soundManager?.play(SFX_KEYS.UI_CLICK);
@@ -1239,17 +1258,31 @@ export class TheMindScene extends Phaser.Scene {
         elementId: 'try-again',
         action: 'click',
       });
-      this.scene.restart();
+      // Defer restart to next tick so Phaser finishes input dispatch
+      this.time.delayedCall(0, () => this.scene.restart());
     });
     this.overlayObjects.push(tryAgainBtn);
 
     // Menu button
-    const menuBtn = createOverlayMenuButton(
+    const menuBtn = createOverlayButton(
       this,
       GAME_W / 2 + 90,
       GAME_H / 2 + 60,
+      '[ Menu ]',
       DEPTH_OVERLAY_CONTENT,
+      { fontSize: '18px' },
     );
+    menuBtn.on('pointerdown', () => {
+      this.soundManager?.play(SFX_KEYS.UI_CLICK);
+      this.gameEvents.emit('ui-interaction', {
+        elementId: 'menu',
+        action: 'click',
+      });
+      // Defer scene transition to next tick so Phaser finishes input dispatch
+      this.time.delayedCall(0, () =>
+        this.scene.start('GameSelectorScene'),
+      );
+    });
     this.overlayObjects.push(menuBtn);
   }
 
@@ -1334,6 +1367,9 @@ export class TheMindScene extends Phaser.Scene {
   // ── Shutdown ────────────────────────────────────────────
 
   shutdown(): void {
+    // Deregister lifecycle listener to prevent double-registration on restart
+    this.events.off('shutdown', this.shutdown, this);
+
     this.cancelAiTimer();
     this.cancelHumanAiTimer();
     this.soundManager?.destroy();
