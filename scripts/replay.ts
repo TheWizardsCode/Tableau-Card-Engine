@@ -127,12 +127,6 @@ Examples:
     process.exit(1);
   }
 
-  // Default output directory derived from transcript filename
-  if (!outputDir) {
-    const basename = path.basename(transcriptPath, path.extname(transcriptPath));
-    outputDir = path.join('data', 'screenshots', basename);
-  }
-
   return { transcriptPath, outputDir, stopAt, gameType };
 }
 
@@ -206,7 +200,7 @@ async function captureScreenshot(
 // ── Main ────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
-  const { transcriptPath, outputDir, stopAt, gameType } = parseArgs();
+  const { transcriptPath, outputDir: explicitOutputDir, stopAt, gameType } = parseArgs();
   const rawTranscript = loadRawTranscript(transcriptPath);
 
   // ── Resolve adapter ──
@@ -217,6 +211,10 @@ async function main(): Promise<void> {
     console.error(`Error: ${(err as Error).message}`);
     process.exit(1);
   }
+
+  // Default output directory derived from adapter game type (matches
+  // generate-thumbnail.ts convention: data/screenshots/<game-type>/).
+  const outputDir = explicitOutputDir || path.join('data', 'screenshots', adapter.gameType);
 
   // ── Validate transcript ──
   const validation = adapter.validateTranscript(rawTranscript);
