@@ -96,12 +96,29 @@ function makeBCTranscript(overrides: Record<string, unknown> = {}): Record<strin
     seed: 42,
     startedAt: '2026-01-15T10:00:00.000Z',
     endedAt: '2026-01-15T10:30:00.000Z',
-    initialState: { columns: [], foundations: [] },
+    initialState: {
+      foundations: [
+        { suit: 'spades', size: 0, topRank: null },
+        { suit: 'hearts', size: 0, topRank: null },
+        { suit: 'diamonds', size: 0, topRank: null },
+        { suit: 'clubs', size: 0, topRank: null },
+      ],
+      tableau: [
+        { cards: [{ rank: '3', suit: 'spades', faceUp: true }] },
+        { cards: [{ rank: '5', suit: 'hearts', faceUp: true }] },
+        { cards: [{ rank: 'A', suit: 'diamonds', faceUp: true }] },
+        { cards: [] },
+        { cards: [] },
+        { cards: [] },
+        { cards: [] },
+        { cards: [] },
+      ],
+    },
     moves: [
-      { kind: 'column-to-column', from: 0, to: 3 },
-      { kind: 'column-to-foundation', from: 2, to: 1 },
+      { kind: 'player-move', move: { kind: 'tableau-to-tableau', fromCol: 0, toCol: 3 }, moveCount: 1 },
+      { kind: 'player-move', move: { kind: 'tableau-to-foundation', fromCol: 2, toFoundation: 2 }, moveCount: 2 },
     ],
-    result: { won: true, moveCount: 2 },
+    result: { outcome: 'win', moveCount: 2, elapsedSeconds: 120 },
     ...overrides,
   };
 }
@@ -370,33 +387,63 @@ describe('BeleagueredCastleReplayAdapter', () => {
     });
   });
 
-  describe('stub methods should throw', () => {
-    it('startScene should throw', async () => {
-      await expect(adapter.startScene({} as never)).rejects.toThrow('not yet supported');
+  describe('scene interaction methods', () => {
+    it('startScene should call page.evaluate', async () => {
+      let evaluatedScript = '';
+      const fakePage = {
+        evaluate: async (script: string) => { evaluatedScript = script; },
+      } as unknown as import('playwright').Page;
+      await adapter.startScene(fakePage);
+      expect(evaluatedScript).toContain('BeleagueredCastleScene');
     });
 
-    it('waitForSceneReady should throw', async () => {
-      await expect(adapter.waitForSceneReady({} as never, 1000)).rejects.toThrow('not yet supported');
+    it('waitForSceneReady should call page.waitForFunction', async () => {
+      let called = false;
+      const fakePage = {
+        waitForFunction: async () => { called = true; },
+      } as unknown as import('playwright').Page;
+      await adapter.waitForSceneReady(fakePage, 5000);
+      expect(called).toBe(true);
     });
 
-    it('injectInitialState should throw', async () => {
-      await expect(adapter.injectInitialState({} as never, {}, 1000)).rejects.toThrow('not yet supported');
+    it('injectInitialState should call page.evaluate with snapshot', async () => {
+      let evaluatedScript = '';
+      const fakePage = {
+        evaluate: async (script: string) => { evaluatedScript = script; },
+      } as unknown as import('playwright').Page;
+      await adapter.injectInitialState(fakePage, makeBCTranscript(), 5000);
+      expect(evaluatedScript).toContain('loadBoardState');
+      expect(evaluatedScript).toContain('state-settled');
     });
 
-    it('injectTurnState should throw', async () => {
-      await expect(adapter.injectTurnState({} as never, {}, 0, 1000)).rejects.toThrow('not yet supported');
+    it('injectTurnState should call page.evaluate with reconstructed state', async () => {
+      let evaluatedScript = '';
+      const fakePage = {
+        evaluate: async (script: string) => { evaluatedScript = script; },
+      } as unknown as import('playwright').Page;
+      await adapter.injectTurnState(fakePage, makeBCTranscript(), 0, 5000);
+      expect(evaluatedScript).toContain('loadBoardState');
+      expect(evaluatedScript).toContain('state-settled');
     });
 
-    it('showTakeoverOverlay should throw', async () => {
-      await expect(adapter.showTakeoverOverlay({} as never, { turnNumber: 0, lastAction: 'test' })).rejects.toThrow('not support');
+    it('showTakeoverOverlay should throw (not supported)', async () => {
+      await expect(adapter.showTakeoverOverlay({} as never, { turnNumber: 0, lastAction: 'test' })).rejects.toThrow('does not support');
     });
   });
 
   describe('describeTurn', () => {
-    it('should describe a move', () => {
+    it('should describe a tableau-to-tableau move', () => {
       const desc = adapter.describeTurn(makeBCTranscript(), 0);
       expect(desc).toContain('Move 1');
-      expect(desc).toContain('column-to-column');
+      expect(desc).toContain('col 0');
+      expect(desc).toContain('col 3');
+    });
+
+    it('should describe a tableau-to-foundation move', () => {
+      const desc = adapter.describeTurn(makeBCTranscript(), 1);
+      expect(desc).toContain('Move 2');
+      expect(desc).toContain('col 2');
+      expect(desc).toContain('foundation 2');
     });
   });
 
@@ -406,7 +453,10 @@ describe('BeleagueredCastleReplayAdapter', () => {
     });
 
     it('should describe a specific move', () => {
-      expect(adapter.describeLastAction(makeBCTranscript(), 1)).toContain('Move 2');
+      const desc = adapter.describeLastAction(makeBCTranscript(), 1);
+      expect(desc).toContain('Move 2');
+      expect(desc).toContain('col 2');
+      expect(desc).toContain('foundation 2');
     });
   });
 });

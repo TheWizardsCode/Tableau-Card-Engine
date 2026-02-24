@@ -14,7 +14,8 @@
  */
 
 import Phaser from 'phaser';
-import type { Suit } from '../../../src/card-system/Card';
+import type { Rank, Suit } from '../../../src/card-system/Card';
+import { createCard, RANKS } from '../../../src/card-system/Card';
 import type { BeleagueredCastleState, BCMove } from '../BeleagueredCastleState';
 import { FOUNDATION_COUNT, TABLEAU_COUNT, FOUNDATION_SUITS } from '../BeleagueredCastleState';
 import {
@@ -33,7 +34,7 @@ import {
 import type { Command } from '../../../src/core-engine/UndoRedoManager';
 import { UndoRedoManager, CompoundCommand } from '../../../src/core-engine/UndoRedoManager';
 import { BCTranscriptRecorder } from '../GameTranscript';
-import type { BCGameTranscript } from '../GameTranscript';
+import type { BCGameTranscript, BoardSnapshot } from '../GameTranscript';
 import {
   HelpPanel, HelpButton,
   SettingsPanel, SettingsButton,
@@ -207,6 +208,9 @@ export class BeleagueredCastleScene extends Phaser.Scene {
   private seed: number = Date.now();
   private undoManager!: UndoRedoManager;
 
+  /** When true, the scene suppresses all input and sound for replay use. */
+  private replayMode: boolean = false;
+
   // Whether the deal animation has finished (interactions blocked until then)
   private dealComplete: boolean = false;
 
@@ -305,6 +309,10 @@ export class BeleagueredCastleScene extends Phaser.Scene {
     const seedParam = params.get('seed');
     this.seed = seedParam ? parseInt(seedParam, 10) : Date.now();
 
+    // Check for replay mode via URL parameter (?mode=replay)
+    this.replayMode =
+      params.get('mode') === 'replay';
+
     // Deal the game
     this.gameState = deal(this.seed);
     this.undoManager = new UndoRedoManager();
@@ -334,60 +342,75 @@ export class BeleagueredCastleScene extends Phaser.Scene {
     this.createFoundationSlots();
     this.createTableauDropZones();
     this.createHUD();
-    this.createHelpPanel();
+    if (!this.replayMode) {
+      this.createHelpPanel();
+    }
 
     // Sound system: event emitter, bridge, sound manager, settings
     this.gameEvents = new GameEventEmitter();
     this.eventBridge = new PhaserEventBridge(this.gameEvents, this.events);
+    (window as unknown as Record<string, unknown>).__GAME_EVENTS__ =
+      this.gameEvents;
 
-    const phaserSound = this.sound;
-    const player: SoundPlayer = {
-      play: (key: string) => { phaserSound.play(key); },
-      stop: (key: string) => { phaserSound.stopByKey(key); },
-      setVolume: (v: number) => { phaserSound.volume = v; },
-      setMute: (m: boolean) => { phaserSound.mute = m; },
-    };
-    this.soundManager = new SoundManager(player);
+    if (!this.replayMode) {
+      const phaserSound = this.sound;
+      const player: SoundPlayer = {
+        play: (key: string) => { phaserSound.play(key); },
+        stop: (key: string) => { phaserSound.stopByKey(key); },
+        setVolume: (v: number) => { phaserSound.volume = v; },
+        setMute: (m: boolean) => { phaserSound.mute = m; },
+      };
+      this.soundManager = new SoundManager(player);
 
-    // Register all SFX keys
-    for (const sfxKey of Object.values(SFX_KEYS)) {
-      this.soundManager.register(sfxKey);
+      // Register all SFX keys
+      for (const sfxKey of Object.values(SFX_KEYS)) {
+        this.soundManager.register(sfxKey);
+      }
+
+      // Declarative event-to-sound mapping
+      const mapping: EventSoundMapping = {
+        'card-pickup': SFX_KEYS.CARD_PICKUP,
+        'card-to-foundation': SFX_KEYS.CARD_TO_FOUNDATION,
+        'card-to-tableau': SFX_KEYS.CARD_TO_TABLEAU,
+        'card-snap-back': SFX_KEYS.CARD_SNAP_BACK,
+        'deal-card': SFX_KEYS.DEAL_CARD,
+        'game-ended': SFX_KEYS.LOSS_SOUND, // default; win overrides with direct play
+        'auto-complete-start': SFX_KEYS.AUTO_COMPLETE_START,
+        'auto-complete-card': SFX_KEYS.AUTO_COMPLETE_CARD,
+        'undo': SFX_KEYS.UNDO,
+        'redo': SFX_KEYS.REDO,
+        'card-selected': SFX_KEYS.CARD_SELECT,
+        'card-deselected': SFX_KEYS.CARD_DESELECT,
+        'ui-interaction': SFX_KEYS.UI_CLICK,
+      };
+      this.soundManager.connectToEvents(this.gameEvents, mapping);
+
+      this.createSettingsPanel();
     }
-
-    // Declarative event-to-sound mapping
-    const mapping: EventSoundMapping = {
-      'card-pickup': SFX_KEYS.CARD_PICKUP,
-      'card-to-foundation': SFX_KEYS.CARD_TO_FOUNDATION,
-      'card-to-tableau': SFX_KEYS.CARD_TO_TABLEAU,
-      'card-snap-back': SFX_KEYS.CARD_SNAP_BACK,
-      'deal-card': SFX_KEYS.DEAL_CARD,
-      'game-ended': SFX_KEYS.LOSS_SOUND, // default; win overrides with direct play
-      'auto-complete-start': SFX_KEYS.AUTO_COMPLETE_START,
-      'auto-complete-card': SFX_KEYS.AUTO_COMPLETE_CARD,
-      'undo': SFX_KEYS.UNDO,
-      'redo': SFX_KEYS.REDO,
-      'card-selected': SFX_KEYS.CARD_SELECT,
-      'card-deselected': SFX_KEYS.CARD_DESELECT,
-      'ui-interaction': SFX_KEYS.UI_CLICK,
-    };
-    this.soundManager.connectToEvents(this.gameEvents, mapping);
-
-    this.createSettingsPanel();
 
     // Render foundations (aces already placed)
     this.refreshFoundations();
 
-    // Deal cards to tableau with animation
-    this.dealTableauAnimated();
+    if (this.replayMode) {
+      // In replay mode: skip deal animation, skip input handlers,
+      // mark deal as complete, and emit state-settled for the replay tool.
+      this.dealComplete = true;
+      this.refreshTableau();
+      this.refreshHUD();
+      this.emitStateSettled();
+    } else {
+      // Deal cards to tableau with animation
+      this.dealTableauAnimated();
 
-    // Setup drag-and-drop event handlers
-    this.setupDragAndDrop();
+      // Setup drag-and-drop event handlers
+      this.setupDragAndDrop();
 
-    // Setup click-to-move event handlers
-    this.setupClickToMove();
+      // Setup click-to-move event handlers
+      this.setupClickToMove();
 
-    // Setup keyboard shortcuts
-    this.setupKeyboard();
+      // Setup keyboard shortcuts
+      this.setupKeyboard();
+    }
   }
 
   // ── UI creation ─────────────────────────────────────────
@@ -1699,6 +1722,75 @@ export class BeleagueredCastleScene extends Phaser.Scene {
   /** Get the transcript recorder (for access to in-progress transcript). */
   getRecorder(): BCTranscriptRecorder {
     return this.recorder;
+  }
+
+  // ── Replay API ──────────────────────────────────────────
+
+  /**
+   * Inject an arbitrary board state from a transcript snapshot and
+   * refresh the visual display. Intended for use by the replay tool
+   * via `page.evaluate()`.
+   *
+   * Only operational in replay mode (?mode=replay). Throws if called
+   * outside of replay mode.
+   *
+   * After updating the internal state and refreshing all sprites,
+   * emits a `state-settled` event so the caller can synchronize
+   * screenshot capture.
+   *
+   * @param snapshot  A BoardSnapshot containing foundations and tableau state.
+   */
+  loadBoardState(snapshot: BoardSnapshot): void {
+    if (!this.replayMode) {
+      throw new Error(
+        'loadBoardState() is only available in replay mode (?mode=replay)',
+      );
+    }
+
+    // Rebuild foundation piles from the snapshot
+    for (let i = 0; i < FOUNDATION_COUNT; i++) {
+      const fs = snapshot.foundations[i];
+      this.gameState.foundations[i].clear();
+      // Push cards A through topRank for this foundation's suit
+      if (fs.size > 0 && fs.topRank !== null) {
+        const topIdx = RANKS.indexOf(fs.topRank);
+        for (let ri = 0; ri <= topIdx; ri++) {
+          this.gameState.foundations[i].push(
+            createCard(RANKS[ri], fs.suit, true),
+          );
+        }
+      }
+    }
+
+    // Rebuild tableau piles from the snapshot
+    for (let col = 0; col < TABLEAU_COUNT; col++) {
+      this.gameState.tableau[col].clear();
+      const cs = snapshot.tableau[col];
+      for (const cardSnap of cs.cards) {
+        this.gameState.tableau[col].push(
+          createCard(cardSnap.rank as Rank, cardSnap.suit as Suit, true),
+        );
+      }
+    }
+
+    // Refresh all visual elements
+    this.refreshFoundations();
+    this.refreshTableau();
+    this.refreshHUD();
+
+    // Signal that the board is visually stable and ready for screenshot
+    this.emitStateSettled();
+  }
+
+  /**
+   * Emit state-settled when the board is visually stable and safe
+   * to screenshot. Called after state injection and display refresh.
+   */
+  private emitStateSettled(): void {
+    this.gameEvents.emit('state-settled', {
+      turnNumber: this.gameState.moveCount,
+      phase: (this.gameEnded ? 'ended' : 'playing') as 'setup' | 'playing' | 'ended',
+    });
   }
 
   // ── Cleanup ─────────────────────────────────────────────
