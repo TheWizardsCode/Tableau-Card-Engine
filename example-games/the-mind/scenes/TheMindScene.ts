@@ -89,8 +89,8 @@ const DEPTH_CARDS = 1;
 const DEPTH_PILE = 2;
 const DEPTH_PLAYED_CARD = 3;
 const DEPTH_UI = 5;
-const DEPTH_OVERLAY = 10;
-const DEPTH_OVERLAY_CONTENT = 11;
+const DEPTH_OVERLAY = 2000;
+const DEPTH_OVERLAY_CONTENT = DEPTH_OVERLAY + 1;
 
 // ── Phase state machine ─────────────────────────────────────
 
@@ -1087,6 +1087,7 @@ export class TheMindScene extends Phaser.Scene {
   private handleGameOver(): void {
     this.cancelAiTimer();
     this.cancelHumanAiTimer();
+    this.disableGameInteraction();
 
     const timestamp = Date.now() - this.levelStartTime;
     const outcome = this.session.outcome as 'win' | 'loss';
@@ -1113,6 +1114,16 @@ export class TheMindScene extends Phaser.Scene {
       this.showWinOverlay();
     } else {
       this.showLossOverlay();
+    }
+  }
+
+  /** Disable all game-element interactivity so the overlay buttons receive clicks. */
+  private disableGameInteraction(): void {
+    for (const sprite of this.humanCardSprites) {
+      sprite.disableInteractive();
+    }
+    if (this.autoPlayButton) {
+      this.autoPlayButton.disableInteractive();
     }
   }
 
