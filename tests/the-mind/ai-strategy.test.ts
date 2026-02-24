@@ -722,7 +722,7 @@ describe('MindAiPlayer', () => {
 });
 
 // ---------------------------------------------------------------------------
-// computeEffectiveDelay — fast-play when last card & opponent empty
+// computeEffectiveDelay — fast-play when opponent hand is empty
 // ---------------------------------------------------------------------------
 
 describe('computeEffectiveDelay', () => {
@@ -751,15 +751,14 @@ describe('computeEffectiveDelay', () => {
     expect(result).toBe(6000);
   });
 
-  it('returns normal delay when player has more than 1 card (even if opponent hand is empty)', () => {
+  it('returns AI_LAST_CARD_DELAY when opponent hand is empty and player has multiple cards', () => {
     const result = computeEffectiveDelay(
       /* committedDelay */ 8000,
       /* elapsed */ 2000,
       /* playerHandSize */ 3,
       /* opponentHandSize */ 0,
     );
-    // Normal: max(8000 - 2000, 100) = 6000
-    expect(result).toBe(6000);
+    expect(result).toBe(AI_LAST_CARD_DELAY);
   });
 
   it('returns normal delay when both players have cards', () => {
@@ -796,14 +795,14 @@ describe('computeEffectiveDelay', () => {
     expect(result).toBe(AI_LAST_CARD_DELAY);
   });
 
-  it('returns normal delay when both hands are empty (edge case)', () => {
+  it('returns AI_LAST_CARD_DELAY when both hands are empty (edge case)', () => {
     const result = computeEffectiveDelay(
       /* committedDelay */ 5000,
       /* elapsed */ 1000,
       /* playerHandSize */ 0,
       /* opponentHandSize */ 0,
     );
-    // playerHandSize is 0, not 1, so normal path
-    expect(result).toBe(4000);
+    // opponentHandSize is 0, so fast-play path
+    expect(result).toBe(AI_LAST_CARD_DELAY);
   });
 });
