@@ -35,6 +35,8 @@ import { MindTranscriptRecorder } from '../GameTranscript';
 import type { MindInitialState } from '../GameTranscript';
 import { GameEventEmitter } from '../../../src/core-engine/GameEventEmitter';
 import { PhaserEventBridge } from '../../../src/core-engine/PhaserEventBridge';
+import { SoundManager } from '../../../src/core-engine/SoundManager';
+import type { SoundPlayer, EventSoundMapping } from '../../../src/core-engine/SoundManager';
 import {
   GAME_W,
   GAME_H,
@@ -43,7 +45,19 @@ import {
   createOverlayButton,
   createOverlayMenuButton,
   createSceneHeader,
+  SettingsPanel,
+  SettingsButton,
 } from '../../../src/ui';
+
+// ── Audio asset keys ────────────────────────────────────────
+const SFX_KEYS = {
+  CARD_PLAY: 'mind-sfx-card-play',
+  LIFE_LOST: 'mind-sfx-life-lost',
+  LEVEL_COMPLETE: 'mind-sfx-level-complete',
+  GAME_WIN: 'mind-sfx-game-win',
+  GAME_LOST: 'mind-sfx-game-lost',
+  UI_CLICK: 'mind-sfx-ui-click',
+} as const;
 
 // ── Constants ───────────────────────────────────────────────
 
@@ -109,6 +123,11 @@ export class TheMindScene extends Phaser.Scene {
   private gameEvents!: GameEventEmitter;
   private eventBridge!: PhaserEventBridge;
 
+  // Sound system
+  private soundManager: SoundManager | null = null;
+  private settingsPanel!: SettingsPanel;
+  private settingsButton!: SettingsButton;
+
   // Display objects -- human hand
   private humanCardSprites: Phaser.GameObjects.Image[] = [];
 
@@ -137,6 +156,14 @@ export class TheMindScene extends Phaser.Scene {
 
   preload(): void {
     preloadMindCardAssets(this, CARD_W, CARD_H);
+
+    // Load zen/pulse-themed sound effects
+    this.load.audio(SFX_KEYS.CARD_PLAY, 'assets/audio/the-mind/card-play.wav');
+    this.load.audio(SFX_KEYS.LIFE_LOST, 'assets/audio/the-mind/life-lost.wav');
+    this.load.audio(SFX_KEYS.LEVEL_COMPLETE, 'assets/audio/the-mind/level-complete.wav');
+    this.load.audio(SFX_KEYS.GAME_WIN, 'assets/audio/the-mind/game-win.wav');
+    this.load.audio(SFX_KEYS.GAME_LOST, 'assets/audio/the-mind/game-lost.wav');
+    this.load.audio(SFX_KEYS.UI_CLICK, 'assets/audio/the-mind/ui-click.wav');
   }
 
   // ── Create ──────────────────────────────────────────────
@@ -159,6 +186,9 @@ export class TheMindScene extends Phaser.Scene {
     // Event system
     this.gameEvents = new GameEventEmitter();
     this.eventBridge = new PhaserEventBridge(this.gameEvents, this.events);
+
+    // Sound system
+    this.createSoundSystem();
 
     // Setup game
     this.session = setupTheMindGame();
@@ -263,6 +293,34 @@ export class TheMindScene extends Phaser.Scene {
       .setDepth(DEPTH_UI);
   }
 
+  // ── Sound system ────────────────────────────────────────
+
+  private createSoundSystem(): void {
+    const phaserSound = this.sound;
+    const player: SoundPlayer = {
+      play: (key: string) => { phaserSound.play(key); },
+      stop: (key: string) => { phaserSound.stopByKey(key); },
+      setVolume: (v: number) => { phaserSound.volume = v; },
+      setMute: (m: boolean) => { phaserSound.mute = m; },
+    };
+    this.soundManager = new SoundManager(player);
+    for (const sfxKey of Object.values(SFX_KEYS)) {
+      this.soundManager.register(sfxKey);
+    }
+
+    // Declarative event-to-sound mapping
+    const mapping: EventSoundMapping = {
+      'game-ended': SFX_KEYS.UI_CLICK,
+    };
+    this.soundManager.connectToEvents(this.gameEvents, mapping);
+
+    // Settings UI (mute toggle + volume slider)
+    this.settingsPanel = new SettingsPanel(this, {
+      soundManager: this.soundManager,
+    });
+    this.settingsButton = new SettingsButton(this, this.settingsPanel);
+  }
+
   // ── Auto-play spectator mode ───────────────────────────
 
   private createAutoPlayButton(): void {
@@ -290,6 +348,9 @@ export class TheMindScene extends Phaser.Scene {
 
   private toggleAutoPlay(): void {
     this.autoPlayEnabled = !this.autoPlayEnabled;
+
+    // Play UI click sound
+    this.soundManager?.play(SFX_KEYS.UI_CLICK);
 
     // Update button appearance
     this.autoPlayButton.setText(
@@ -598,6 +659,9 @@ export class TheMindScene extends Phaser.Scene {
 
     this.turnCounter++;
 
+    // Play card sound
+    this.soundManager?.play(SFX_KEYS.CARD_PLAY);
+
     // Record card play in transcript
     this.recorder.recordCardPlay(
       timestamp,
@@ -618,6 +682,9 @@ export class TheMindScene extends Phaser.Scene {
       this.cancelAiTimer();
       this.cancelHumanAiTimer();
       this.setPhase('penalty');
+
+      // Play life-lost warning sound
+      this.soundManager?.play(SFX_KEYS.LIFE_LOST);
 
       // Record penalty in transcript
       this.recorder.recordPenalty(
@@ -816,6 +883,9 @@ export class TheMindScene extends Phaser.Scene {
     this.setPhase('level-complete');
     this.refreshAll();
 
+    // Play level-complete chime
+    this.soundManager?.play(SFX_KEYS.LEVEL_COMPLETE);
+
     const completedLevel = this.session.currentLevel - 1;
     const bonusText = result.bonusLifeAwarded
       ? '\nBonus life awarded!'
@@ -897,6 +967,9 @@ export class TheMindScene extends Phaser.Scene {
   private showWinOverlay(): void {
     this.setPhase('game-won');
 
+    // Play victory fanfare
+    this.soundManager?.play(SFX_KEYS.GAME_WIN);
+
     const overlay = createOverlayBackground(
       this,
       { depth: DEPTH_OVERLAY, alpha: 0.75 },
@@ -940,6 +1013,7 @@ export class TheMindScene extends Phaser.Scene {
       DEPTH_OVERLAY_CONTENT,
     );
     playAgainBtn.on('pointerdown', () => {
+      this.soundManager?.play(SFX_KEYS.UI_CLICK);
       this.gameEvents.emit('ui-interaction', {
         elementId: 'play-again',
         action: 'click',
@@ -962,6 +1036,9 @@ export class TheMindScene extends Phaser.Scene {
 
   private showLossOverlay(): void {
     this.setPhase('game-lost');
+
+    // Play defeat sound
+    this.soundManager?.play(SFX_KEYS.GAME_LOST);
 
     const overlay = createOverlayBackground(
       this,
@@ -1006,6 +1083,7 @@ export class TheMindScene extends Phaser.Scene {
       DEPTH_OVERLAY_CONTENT,
     );
     tryAgainBtn.on('pointerdown', () => {
+      this.soundManager?.play(SFX_KEYS.UI_CLICK);
       this.gameEvents.emit('ui-interaction', {
         elementId: 'try-again',
         action: 'click',
@@ -1107,8 +1185,12 @@ export class TheMindScene extends Phaser.Scene {
   shutdown(): void {
     this.cancelAiTimer();
     this.cancelHumanAiTimer();
+    this.soundManager?.destroy();
+    this.soundManager = null;
     this.eventBridge?.destroy();
     this.gameEvents?.removeAllListeners();
+    this.settingsPanel?.destroy();
+    this.settingsButton?.destroy();
 
     // Clean up overlay objects
     for (const obj of this.overlayObjects) {
