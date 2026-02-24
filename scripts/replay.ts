@@ -4,18 +4,23 @@
  * screenshots via headless Playwright, and produces a JSON summary report.
  *
  * Usage:
- *   npm run replay -- <transcript.json> [--output <dir>]
+ *   npm run replay -- <transcript.json> [--output <dir>] [--game <type>]
  *
  * The tool:
- *   1. Parses CLI args (transcript path, --output dir)
- *   2. Validates the transcript file (exists, valid JSON, version 1)
- *   3. Ensures a dev server is running at localhost:3000 (auto-starts if needed)
- *   4. Boots headless Chromium via Playwright at ?mode=replay
- *   5. Waits for GolfScene to emit state-settled (scene ready)
- *   6. Loads initial state + each turn via loadBoardState(), capturing screenshots
- *   7. Writes a replay-summary.json report
+ *   1. Parses CLI args (transcript path, --output dir, --game type)
+ *   2. Loads the transcript and resolves the appropriate game adapter
+ *   3. Validates the transcript via the adapter
+ *   4. Ensures a dev server is running at localhost:3000 (auto-starts if needed)
+ *   5. Boots headless Chromium via Playwright at the adapter's replay URL
+ *   6. Waits for the game scene to boot and become active
+ *   7. Loads initial state + each turn via the adapter, capturing screenshots
+ *   8. Writes a replay-summary.json report
+ *
+ * Game-specific logic is isolated in ReplayAdapter implementations.
+ * See scripts/adapters/ for available adapters.
  *
  * See CG-0MLTFTD0B0B3EL3W for full requirements.
+ * See CG-0MLTFUL061DWDGA2 for the adapter pattern refactoring.
  */
 
 import * as fs from 'node:fs';
@@ -23,49 +28,10 @@ import * as path from 'node:path';
 import { chromium } from 'playwright';
 import type { Browser, Page } from 'playwright';
 import { DEV_SERVER_URL, ensureDevServer, killDevServer } from './dev-server-utils';
+import { adapterRegistry } from './adapters';
+import type { ReplayAdapter } from './adapters';
 
 // ── Types ───────────────────────────────────────────────────
-
-import type { CardSnapshot } from '../src/core-engine/TranscriptTypes';
-
-/** Minimal transcript types matching GameTranscript.ts schema. */
-
-interface BoardSnapshot {
-  grid: CardSnapshot[];
-  faceUpCount: number;
-  visibleScore: number;
-  totalScore: number;
-}
-
-interface TurnRecord {
-  turnNumber: number;
-  playerIndex: number;
-  playerName: string;
-  drawSource: 'stock' | 'discard';
-  move: { kind: 'swap' | 'discard-and-flip'; row: number; col: number };
-  boardStates: BoardSnapshot[];
-  discardTop: CardSnapshot | null;
-  stockRemaining: number;
-  stockPileCards?: CardSnapshot[];
-  roundEnded: boolean;
-}
-
-interface GameTranscript {
-  version: number;
-  metadata: {
-    startedAt: string;
-    endedAt: string;
-    players: Array<{ name: string; isAI: boolean; strategy?: string }>;
-  };
-  initialState: {
-    boardStates: BoardSnapshot[];
-    discardTop: CardSnapshot | null;
-    stockRemaining: number;
-    stockPileCards?: CardSnapshot[];
-  };
-  turns: TurnRecord[];
-  results: { scores: number[]; winnerIndex: number; winnerName: string } | null;
-}
 
 interface TurnSummary {
   turn: number;
@@ -78,6 +44,7 @@ interface TurnSummary {
 interface ReplaySummary {
   transcriptPath: string;
   outputDir: string;
+  gameType: string;
   turnsReplayed: number;
   screenshots: TurnSummary[];
   totalDurationMs: number;
@@ -92,23 +59,34 @@ const STATE_SETTLED_TIMEOUT = 10_000;
 
 // ── CLI Arg Parsing ─────────────────────────────────────────
 
-function parseArgs(): { transcriptPath: string; outputDir: string; stopAt: number | undefined } {
+interface ParsedArgs {
+  transcriptPath: string;
+  outputDir: string;
+  stopAt: number | undefined;
+  gameType: string | undefined;
+}
+
+function parseArgs(): ParsedArgs {
   const args = process.argv.slice(2);
+  const availableTypes = adapterRegistry.getRegisteredTypes().join(', ');
 
   if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
     console.log(`
-Usage: npm run replay -- <transcript.json> [--output <dir>] [--stop-at <turn>]
+Usage: npm run replay -- <transcript.json> [--output <dir>] [--stop-at <turn>] [--game <type>]
 
 Arguments:
   <transcript.json>   Path to the game transcript JSON file
   --output <dir>      Output directory for screenshots (default: data/screenshots/<basename>/)
   --stop-at <turn>    Pause replay at the specified turn (0-based) and launch a headed
                       browser for interactive debugging. Turn 0 = initial state.
+  --game <type>       Force a specific game adapter instead of auto-detection.
+                      Available: ${availableTypes || 'none'}
 
 Examples:
   npm run replay -- tests/fixtures/transcripts/golf/fixture-game.json
   npm run replay -- tests/fixtures/transcripts/golf/fixture-game.json --output data/screenshots/golf/test/
   npm run replay -- tests/fixtures/transcripts/golf/fixture-game.json --stop-at 5
+  npm run replay -- tests/fixtures/transcripts/golf/fixture-game.json --game golf
 `);
     process.exit(0);
   }
@@ -116,6 +94,7 @@ Examples:
   let transcriptPath = '';
   let outputDir = '';
   let stopAt: number | undefined;
+  let gameType: string | undefined;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--output' || args[i] === '-o') {
@@ -132,6 +111,12 @@ Examples:
         process.exit(1);
       }
       stopAt = parsed;
+    } else if (args[i] === '--game' || args[i] === '-g') {
+      gameType = args[++i];
+      if (!gameType) {
+        console.error(`Error: --game requires a game type. Available: ${availableTypes || 'none'}`);
+        process.exit(1);
+      }
     } else if (!args[i].startsWith('-')) {
       transcriptPath = args[i];
     }
@@ -148,12 +133,17 @@ Examples:
     outputDir = path.join('data', 'screenshots', basename);
   }
 
-  return { transcriptPath, outputDir, stopAt };
+  return { transcriptPath, outputDir, stopAt, gameType };
 }
 
-// ── Transcript Validation ───────────────────────────────────
+// ── Transcript Loading ──────────────────────────────────────
 
-function loadTranscript(filePath: string): GameTranscript {
+/**
+ * Load and parse a transcript file as raw JSON.
+ *
+ * Validation is deferred to the adapter's `validateTranscript()` method.
+ */
+function loadRawTranscript(filePath: string): unknown {
   const resolved = path.resolve(filePath);
 
   if (!fs.existsSync(resolved)) {
@@ -169,32 +159,12 @@ function loadTranscript(filePath: string): GameTranscript {
     process.exit(1);
   }
 
-  let transcript: GameTranscript;
   try {
-    transcript = JSON.parse(rawContent) as GameTranscript;
+    return JSON.parse(rawContent) as unknown;
   } catch {
     console.error('Error: Transcript file contains invalid JSON.');
     process.exit(1);
   }
-
-  if (transcript.version !== 1 && transcript.version !== 2) {
-    console.error(
-      `Unsupported transcript version: ${transcript.version}. Expected: 1 or 2`,
-    );
-    process.exit(1);
-  }
-
-  if (!Array.isArray(transcript.turns)) {
-    console.error('Error: Transcript has no turns array.');
-    process.exit(1);
-  }
-
-  if (!transcript.initialState) {
-    console.error('Error: Transcript has no initialState.');
-    process.exit(1);
-  }
-
-  return transcript;
 }
 
 // ── Playwright Automation ───────────────────────────────────
@@ -214,86 +184,6 @@ async function waitForGameBoot(page: Page, timeoutMs: number): Promise<void> {
 }
 
 /**
- * Start GolfScene from the unified entry point. The entry point boots
- * GameSelectorScene by default; we need to programmatically transition
- * to GolfScene in replay mode.
- */
-async function startGolfScene(page: Page): Promise<void> {
-  await page.evaluate(`
-    (() => {
-      const game = window.__PHASER_GAME__;
-      game.scene.start('GolfScene');
-    })()
-  `);
-}
-
-/**
- * Wait for the GolfScene to become active (loaded assets and running).
- */
-async function waitForSceneReady(page: Page, timeoutMs: number): Promise<void> {
-  await page.waitForFunction(
-    `(() => {
-      const game = window.__PHASER_GAME__;
-      if (!game) return false;
-      const scene = game.scene.getScene('GolfScene');
-      return scene && scene.sys.isActive();
-    })()`,
-    { timeout: timeoutMs },
-  );
-}
-
-/**
- * Inject a board state into GolfScene via loadBoardState() and wait
- * for the state-settled event to fire.
- *
- * Registers the state-settled listener BEFORE calling loadBoardState()
- * to avoid missing the synchronous event emission. Both operations
- * happen in a single page.evaluate call.
- *
- * Uses string expressions to avoid esbuild transformation issues.
- */
-async function injectBoardStateAndWait(
-  page: Page,
-  boardStates: BoardSnapshot[],
-  discardTop: CardSnapshot | null,
-  stockRemaining: number,
-  timeoutMs: number,
-  stockPileCards?: CardSnapshot[],
-): Promise<void> {
-  const bsJson = JSON.stringify(boardStates);
-  const dtJson = JSON.stringify(discardTop);
-  const spcJson = stockPileCards ? JSON.stringify(stockPileCards) : 'undefined';
-  await page.evaluate(`
-    new Promise((resolve, reject) => {
-      const timer = setTimeout(
-        () => reject(new Error('Timed out waiting for state-settled after loadBoardState')),
-        ${timeoutMs},
-      );
-      const emitter = window.__GAME_EVENTS__;
-      if (!emitter) {
-        clearTimeout(timer);
-        reject(new Error('__GAME_EVENTS__ not found on window'));
-        return;
-      }
-      // Register a one-time listener BEFORE calling loadBoardState so
-      // we don't miss the synchronous state-settled emission.
-      emitter.once('state-settled', () => {
-        clearTimeout(timer);
-        resolve();
-      });
-      const game = window.__PHASER_GAME__;
-      const scene = game.scene.getScene('GolfScene');
-      if (!scene) {
-        clearTimeout(timer);
-        reject(new Error('GolfScene not found'));
-        return;
-      }
-      scene.loadBoardState(${bsJson}, ${dtJson}, ${stockRemaining}, ${spcJson});
-    })
-  `);
-}
-
-/**
  * Capture a screenshot of the Phaser canvas.
  */
 async function captureScreenshot(
@@ -307,27 +197,51 @@ async function captureScreenshot(
 // ── Main ────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
-  const { transcriptPath, outputDir, stopAt } = parseArgs();
-  const transcript = loadTranscript(transcriptPath);
+  const { transcriptPath, outputDir, stopAt, gameType } = parseArgs();
+  const rawTranscript = loadRawTranscript(transcriptPath);
 
-  // Reject v1 transcripts when --stop-at is used (no stock pile data for interactive play)
-  if (stopAt !== undefined && transcript.version < 2) {
+  // ── Resolve adapter ──
+  let adapter: ReplayAdapter;
+  try {
+    adapter = adapterRegistry.resolve(rawTranscript, gameType);
+  } catch (err) {
+    console.error(`Error: ${(err as Error).message}`);
+    process.exit(1);
+  }
+
+  // ── Validate transcript ──
+  const validation = adapter.validateTranscript(rawTranscript);
+  if (!validation.valid) {
+    console.error(`Error: ${validation.error}`);
+    process.exit(1);
+  }
+
+  const turnCount = adapter.getTurnCount(rawTranscript);
+  const version = adapter.getVersion(rawTranscript);
+  const summaryLine = adapter.getSummaryLine(rawTranscript);
+
+  // Reject interactive takeover if the adapter doesn't support it
+  if (stopAt !== undefined && !adapter.supportsInteractiveTakeover(rawTranscript)) {
     console.error(
-      'Error: --stop-at requires a v2 transcript with stock pile data. Re-record the game to generate a v2 transcript.',
+      'Error: --stop-at is not supported for this transcript. ' +
+        (adapter.gameType === 'golf'
+          ? 'Re-record the game to generate a v2 transcript with stock pile data.'
+          : `The ${adapter.gameType} adapter does not support interactive takeover.`),
     );
     process.exit(1);
   }
 
   console.log(`Transcript: ${transcriptPath}`);
-  console.log(`  Version: ${transcript.version}`);
-  console.log(`  Turns: ${transcript.turns.length}`);
-  console.log(`  Players: ${transcript.metadata.players.map((p) => p.name).join(', ')}`);
+  console.log(`  Game: ${adapter.gameType}`);
+  console.log(`  Version: ${version}`);
+  console.log(`  Turns: ${turnCount}`);
+  console.log(`  ${summaryLine}`);
   console.log(`  Output: ${outputDir}`);
 
   // Validate --stop-at against total turns (warning if exceeds)
   let effectiveStopAt: number | undefined = stopAt;
-  if (stopAt !== undefined && stopAt > transcript.turns.length) {
-    console.log(`Warning: --stop-at ${stopAt} exceeds total turns (${transcript.turns.length}). Replayed all turns.`);
+  if (stopAt !== undefined && stopAt > turnCount) {
+    console.log(`Warning: --stop-at ${stopAt} exceeds total turns (${turnCount}). Replayed all turns.`);
     effectiveStopAt = undefined; // replay all turns
   }
 
@@ -341,6 +255,7 @@ async function main(): Promise<void> {
   const summary: ReplaySummary = {
     transcriptPath: path.resolve(transcriptPath),
     outputDir: path.resolve(outputDir),
+    gameType: adapter.gameType,
     turnsReplayed: 0,
     screenshots: [],
     totalDurationMs: 0,
@@ -359,7 +274,7 @@ async function main(): Promise<void> {
     const page = await context.newPage();
 
     // Navigate to the game in replay mode
-    const gameUrl = `${DEV_SERVER_URL}?mode=replay`;
+    const gameUrl = adapter.getReplayUrl(DEV_SERVER_URL);
     console.log(`Navigating to ${gameUrl}`);
     await page.goto(gameUrl, { waitUntil: 'domcontentloaded' });
 
@@ -367,28 +282,20 @@ async function main(): Promise<void> {
     console.log('Waiting for Phaser game to boot...');
     await waitForGameBoot(page, SCENE_READY_TIMEOUT);
 
-    // Programmatically start GolfScene (the unified entry boots
-    // GameSelectorScene by default; we transition to GolfScene).
-    console.log('Starting GolfScene in replay mode...');
-    await startGolfScene(page);
+    // Start the game scene via the adapter
+    console.log(`Starting ${adapter.sceneKey} in replay mode...`);
+    await adapter.startScene(page);
 
-    // Wait for GolfScene to finish loading assets and become active
-    console.log('Waiting for GolfScene to become active...');
-    await waitForSceneReady(page, SCENE_READY_TIMEOUT);
-    console.log('GolfScene is active.');
+    // Wait for the scene to finish loading and become active
+    console.log(`Waiting for ${adapter.sceneKey} to become active...`);
+    await adapter.waitForSceneReady(page, SCENE_READY_TIMEOUT);
+    console.log(`${adapter.sceneKey} is active.`);
 
     // ── Initial state screenshot ──
     console.log('Loading initial state...');
     const initStart = Date.now();
     try {
-      await injectBoardStateAndWait(
-        page,
-        transcript.initialState.boardStates,
-        transcript.initialState.discardTop,
-        transcript.initialState.stockRemaining,
-        STATE_SETTLED_TIMEOUT,
-        transcript.initialState.stockPileCards,
-      );
+      await adapter.injectInitialState(page, rawTranscript, STATE_SETTLED_TIMEOUT);
       // Allow a frame for rendering to complete
       await page.waitForTimeout(100);
 
@@ -411,24 +318,16 @@ async function main(): Promise<void> {
 
     // Determine how many turns to replay
     const turnsToReplay = effectiveStopAt !== undefined
-      ? Math.min(effectiveStopAt, transcript.turns.length)
-      : transcript.turns.length;
+      ? Math.min(effectiveStopAt, turnCount)
+      : turnCount;
 
     // ── Per-turn screenshots ──
     for (let i = 0; i < turnsToReplay; i++) {
-      const turn = transcript.turns[i];
       const turnLabel = String(i + 1).padStart(3, '0');
       const turnStart = Date.now();
 
       try {
-        await injectBoardStateAndWait(
-          page,
-          turn.boardStates,
-          turn.discardTop,
-          turn.stockRemaining,
-          STATE_SETTLED_TIMEOUT,
-          turn.stockPileCards,
-        );
+        await adapter.injectTurnState(page, rawTranscript, i, STATE_SETTLED_TIMEOUT);
         await page.waitForTimeout(100);
 
         const ssPath = path.join(outputDir, `turn-${turnLabel}.png`);
@@ -443,8 +342,8 @@ async function main(): Promise<void> {
         });
         summary.turnsReplayed++;
 
-        const playerLabel = `${turn.playerName} (P${turn.playerIndex})`;
-        console.log(`  turn-${turnLabel}.png [${playerLabel}] [${turnDuration}ms]`);
+        const turnDesc = adapter.describeTurn(rawTranscript, i);
+        console.log(`  turn-${turnLabel}.png [${turnDesc}] [${turnDuration}ms]`);
       } catch (err) {
         const msg = `Turn ${i + 1} error: ${(err as Error).message}`;
         summary.errors.push(msg);
@@ -461,30 +360,18 @@ async function main(): Promise<void> {
 
     // ── Interactive takeover (--stop-at) ──
     if (effectiveStopAt !== undefined) {
-      // Determine the last action description for the overlay
-      let lastAction = 'N/A (initial state)';
-      if (effectiveStopAt > 0 && effectiveStopAt <= transcript.turns.length) {
-        const lastTurn = transcript.turns[effectiveStopAt - 1];
-        const playerName = lastTurn.playerName;
-        const move = lastTurn.move;
-        if (move.kind === 'swap') {
-          lastAction = `${playerName} drew from ${lastTurn.drawSource}, swapped at row ${move.row} col ${move.col}`;
-        } else {
-          lastAction = `${playerName} drew from ${lastTurn.drawSource}, discarded & flipped at row ${move.row} col ${move.col}`;
-        }
-      }
+      // Determine the last action description via the adapter
+      const lastActionIndex = effectiveStopAt > 0 ? effectiveStopAt - 1 : -1;
+      const lastAction = adapter.describeLastAction(rawTranscript, lastActionIndex);
 
       // If --stop-at is beyond the replayed turns (but within bounds),
       // inject the stop-at turn's board state
-      if (effectiveStopAt > 0 && effectiveStopAt <= transcript.turns.length) {
-        const targetTurn = transcript.turns[effectiveStopAt - 1];
-        await injectBoardStateAndWait(
+      if (effectiveStopAt > 0 && effectiveStopAt <= turnCount) {
+        await adapter.injectTurnState(
           page,
-          targetTurn.boardStates,
-          targetTurn.discardTop,
-          targetTurn.stockRemaining,
+          rawTranscript,
+          effectiveStopAt - 1,
           STATE_SETTLED_TIMEOUT,
-          targetTurn.stockPileCards,
         );
       }
       // If --stop-at 0, the initial state is already loaded
@@ -552,19 +439,11 @@ async function main(): Promise<void> {
         })()
       `);
 
-      // Show the takeover overlay in the browser
-      await page.evaluate(`
-        (() => {
-          const game = window.__PHASER_GAME__;
-          const scene = game.scene.getScene('GolfScene');
-          if (scene && scene.showTakeoverOverlay) {
-            scene.showTakeoverOverlay({
-              turnNumber: ${effectiveStopAt},
-              lastAction: ${JSON.stringify(lastAction)},
-            });
-          }
-        })()
-      `);
+      // Show the takeover overlay via the adapter
+      await adapter.showTakeoverOverlay(page, {
+        turnNumber: effectiveStopAt,
+        lastAction,
+      });
 
       // Wait for either: browser close, resume-replay signal, or SIGINT/SIGTERM
       const browserClosed = new Promise<'closed'>((resolve) => {
@@ -590,21 +469,13 @@ async function main(): Promise<void> {
         // Set flag to stop auto-capture during resumed replay
         await page.evaluate('window.__REPLAY_INTERACTIVE_MODE__ = false');
 
-        // Continue replaying remaining turns
-        for (let i = turnsToReplay; i < transcript.turns.length; i++) {
-          const turn = transcript.turns[i];
+        // Continue replaying remaining turns via the adapter
+        for (let i = turnsToReplay; i < turnCount; i++) {
           const turnLabel = String(i + 1).padStart(3, '0');
           const turnStart = Date.now();
 
           try {
-            await injectBoardStateAndWait(
-              page,
-              turn.boardStates,
-              turn.discardTop,
-              turn.stockRemaining,
-              STATE_SETTLED_TIMEOUT,
-              turn.stockPileCards,
-            );
+            await adapter.injectTurnState(page, rawTranscript, i, STATE_SETTLED_TIMEOUT);
             await page.waitForTimeout(100);
 
             const ssPath = path.join(outputDir, `turn-${turnLabel}.png`);
@@ -619,8 +490,8 @@ async function main(): Promise<void> {
             });
             summary.turnsReplayed++;
 
-            const playerLabel = `${turn.playerName} (P${turn.playerIndex})`;
-            console.log(`  turn-${turnLabel}.png [${playerLabel}] [${turnDuration}ms]`);
+            const turnDesc = adapter.describeTurn(rawTranscript, i);
+            console.log(`  turn-${turnLabel}.png [${turnDesc}] [${turnDuration}ms]`);
           } catch (err) {
             const msg = `Turn ${i + 1} error: ${(err as Error).message}`;
             summary.errors.push(msg);

@@ -146,7 +146,9 @@ describe('Replay CLI -- transcript validation', () => {
           }),
         );
 
-        const result = runReplay([filePath]);
+        // Use --game golf to force the Golf adapter (without initialState
+        // the auto-detection can't recognise the transcript as Golf).
+        const result = runReplay([filePath, '--game', 'golf']);
         expect(result.exitCode).not.toBe(0);
         const output = result.stdout + result.stderr;
         expect(output).toContain('initialState');
@@ -372,7 +374,7 @@ describe('Replay CLI -- v1 transcript handling', () => {
 
       expect(result.exitCode).toBe(1);
       const output = result.stdout + result.stderr;
-      expect(output).toContain('--stop-at requires a v2 transcript');
+      expect(output).toContain('--stop-at is not supported');
       expect(output).toContain('Re-record the game');
     },
     20_000,
