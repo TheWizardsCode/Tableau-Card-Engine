@@ -238,9 +238,9 @@ export class TheMindScene extends Phaser.Scene {
   }
 
   private createStatusDisplay(): void {
-    // Level indicator (top-right area, clear of settings/help buttons)
+    // Level indicator (top-right area, below settings/help buttons)
     this.levelText = this.add
-      .text(GAME_W - 100, 10, '', {
+      .text(GAME_W - 100, 55, '', {
         fontSize: '16px',
         color: '#aaccff',
         fontFamily: FONT_FAMILY,
@@ -250,7 +250,7 @@ export class TheMindScene extends Phaser.Scene {
 
     // Lives display (below level)
     this.livesText = this.add
-      .text(GAME_W - 100, 34, '', {
+      .text(GAME_W - 100, 79, '', {
         fontSize: '16px',
         color: '#ff6666',
         fontFamily: FONT_FAMILY,
