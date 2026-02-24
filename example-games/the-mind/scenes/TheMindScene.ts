@@ -99,6 +99,12 @@ export class TheMindScene extends Phaser.Scene {
   private aiTimer: Phaser.Time.TimerEvent | null = null;
   private aiLevelStartTime = 0;
 
+  // Auto-play spectator mode
+  private autoPlayEnabled = false;
+  private humanAiPlayer!: MindAiPlayer;
+  private humanAiTimer: Phaser.Time.TimerEvent | null = null;
+  private autoPlayButton!: Phaser.GameObjects.Text;
+
   // Event system
   private gameEvents!: GameEventEmitter;
   private eventBridge!: PhaserEventBridge;
@@ -143,7 +149,12 @@ export class TheMindScene extends Phaser.Scene {
     this.aiCardSprites = [];
     this.overlayObjects = [];
     this.aiTimer = null;
+    this.humanAiTimer = null;
     this.turnCounter = 0;
+
+    // Check URL parameter for auto-play
+    const urlParams = new URLSearchParams(window.location.search);
+    this.autoPlayEnabled = urlParams.get('autoplay') === 'true';
 
     // Event system
     this.gameEvents = new GameEventEmitter();
@@ -152,6 +163,7 @@ export class TheMindScene extends Phaser.Scene {
     // Setup game
     this.session = setupTheMindGame();
     this.aiPlayer = new MindAiPlayer();
+    this.humanAiPlayer = new MindAiPlayer();
 
     // Create transcript recorder
     this.recorder = this.createRecorder();
@@ -161,6 +173,7 @@ export class TheMindScene extends Phaser.Scene {
     this.createStatusDisplay();
     this.createPile();
     this.createInstruction();
+    this.createAutoPlayButton();
 
     // Initial render
     this.renderHumanHand();
@@ -248,6 +261,88 @@ export class TheMindScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setDepth(DEPTH_UI);
+  }
+
+  // ── Auto-play spectator mode ───────────────────────────
+
+  private createAutoPlayButton(): void {
+    const label = this.autoPlayEnabled ? '[ Auto-Play: ON ]' : '[ Auto-Play: OFF ]';
+    this.autoPlayButton = this.add
+      .text(20, GAME_H - 20, label, {
+        fontSize: '12px',
+        color: this.autoPlayEnabled ? '#88ff88' : '#888888',
+        fontFamily: FONT_FAMILY,
+      })
+      .setOrigin(0, 1)
+      .setDepth(DEPTH_UI)
+      .setInteractive({ useHandCursor: true });
+
+    this.autoPlayButton.on('pointerdown', () => this.toggleAutoPlay());
+    this.autoPlayButton.on('pointerover', () =>
+      this.autoPlayButton.setColor('#ffffff'),
+    );
+    this.autoPlayButton.on('pointerout', () =>
+      this.autoPlayButton.setColor(
+        this.autoPlayEnabled ? '#88ff88' : '#888888',
+      ),
+    );
+  }
+
+  private toggleAutoPlay(): void {
+    this.autoPlayEnabled = !this.autoPlayEnabled;
+
+    // Update button appearance
+    this.autoPlayButton.setText(
+      this.autoPlayEnabled ? '[ Auto-Play: ON ]' : '[ Auto-Play: OFF ]',
+    );
+    this.autoPlayButton.setColor(
+      this.autoPlayEnabled ? '#88ff88' : '#888888',
+    );
+
+    if (this.autoPlayEnabled) {
+      // Enabling: commit human AI delays for current hand and schedule
+      this.humanAiPlayer.commitLevel(this.session.players[0].hand);
+      this.instructionText.setText('Spectator mode — watching AI play');
+      if (this.phase === 'playing') {
+        this.scheduleHumanAiPlay();
+      }
+    } else {
+      // Disabling: cancel human AI timer
+      this.cancelHumanAiTimer();
+      if (this.phase === 'playing') {
+        this.instructionText.setText(
+          'Click a card to play it onto the pile',
+        );
+      }
+    }
+
+    this.gameEvents.emit('ui-interaction', {
+      elementId: 'auto-play-toggle',
+      action: this.autoPlayEnabled ? 'enabled' : 'disabled',
+    });
+  }
+
+  private scheduleHumanAiPlay(): void {
+    this.cancelHumanAiTimer();
+    if (!this.autoPlayEnabled) return;
+
+    const nextCard = this.humanAiPlayer.getNextCard();
+    if (!nextCard) return;
+
+    const elapsed = Date.now() - this.aiLevelStartTime;
+    const delay = Math.max(nextCard.delay - elapsed, 100);
+
+    this.humanAiTimer = this.time.delayedCall(delay, () => {
+      if (this.phase !== 'playing') return;
+      this.performPlay(0, nextCard.card.value);
+    });
+  }
+
+  private cancelHumanAiTimer(): void {
+    if (this.humanAiTimer) {
+      this.humanAiTimer.destroy();
+      this.humanAiTimer = null;
+    }
   }
 
   // ── Status refresh ─────────────────────────────────────
@@ -434,8 +529,17 @@ export class TheMindScene extends Phaser.Scene {
     // Commit AI delays for this level
     this.aiPlayer.commitLevel(this.session.players[1].hand);
 
+    // If auto-play is active, commit human AI delays too
+    if (this.autoPlayEnabled) {
+      this.humanAiPlayer.commitLevel(this.session.players[0].hand);
+    }
+
     this.setPhase('playing');
     this.scheduleAiPlay();
+
+    if (this.autoPlayEnabled) {
+      this.scheduleHumanAiPlay();
+    }
   }
 
   private setPhase(phase: GamePhase): void {
@@ -444,7 +548,9 @@ export class TheMindScene extends Phaser.Scene {
     switch (phase) {
       case 'playing':
         this.instructionText.setText(
-          'Click a card to play it onto the pile',
+          this.autoPlayEnabled
+            ? 'Spectator mode \u2014 watching AI play'
+            : 'Click a card to play it onto the pile',
         );
         break;
       case 'animating':
@@ -471,6 +577,7 @@ export class TheMindScene extends Phaser.Scene {
 
   private onHumanCardClick(card: MindCard): void {
     if (this.phase !== 'playing') return;
+    if (this.autoPlayEnabled) return; // Auto-play: ignore manual clicks
 
     this.performPlay(0, card.value);
   }
@@ -482,8 +589,8 @@ export class TheMindScene extends Phaser.Scene {
     const result = playCard(this.session, playerId, cardValue);
 
     if (!result.success) {
-      // Invalid play: shake feedback for human
-      if (playerId === 0) {
+      // Invalid play: shake feedback for human (only in manual mode)
+      if (playerId === 0 && !this.autoPlayEnabled) {
         this.showInvalidPlayFeedback(cardValue);
       }
       return;
@@ -500,12 +607,16 @@ export class TheMindScene extends Phaser.Scene {
       this.session.pile.size(),
     );
 
-    // Remove from AI committed delays if applicable
+    // Remove from both AI committed delays
     this.aiPlayer.removeCard(cardValue);
+    if (this.autoPlayEnabled) {
+      this.humanAiPlayer.removeCard(cardValue);
+    }
 
     // Handle penalty
     if (result.lifeLost) {
       this.cancelAiTimer();
+      this.cancelHumanAiTimer();
       this.setPhase('penalty');
 
       // Record penalty in transcript
@@ -518,9 +629,12 @@ export class TheMindScene extends Phaser.Scene {
         })),
       );
 
-      // Remove penalty cards from AI
+      // Remove penalty cards from both AI players
       for (const pc of result.penaltyCards) {
         this.aiPlayer.removeCard(pc.card.value);
+        if (this.autoPlayEnabled) {
+          this.humanAiPlayer.removeCard(pc.card.value);
+        }
       }
 
       // Flash lives display
@@ -545,6 +659,9 @@ export class TheMindScene extends Phaser.Scene {
         // Resume playing
         this.setPhase('playing');
         this.scheduleAiPlay();
+        if (this.autoPlayEnabled) {
+          this.scheduleHumanAiPlay();
+        }
       });
       return;
     }
@@ -563,6 +680,7 @@ export class TheMindScene extends Phaser.Scene {
       // Resume playing
       this.setPhase('playing');
       this.rescheduleAiIfNeeded();
+      this.rescheduleHumanAiIfNeeded();
     });
   }
 
@@ -677,6 +795,7 @@ export class TheMindScene extends Phaser.Scene {
 
   private handleLevelComplete(result: PlayResult, timestamp: number): void {
     this.cancelAiTimer();
+    this.cancelHumanAiTimer();
 
     // Record level completion in transcript
     this.recorder.recordLevelComplete(
@@ -743,6 +862,7 @@ export class TheMindScene extends Phaser.Scene {
 
   private handleGameOver(): void {
     this.cancelAiTimer();
+    this.cancelHumanAiTimer();
 
     const timestamp = Date.now() - this.levelStartTime;
     const outcome = this.session.outcome as 'win' | 'loss';
@@ -929,6 +1049,16 @@ export class TheMindScene extends Phaser.Scene {
     }
   }
 
+  private rescheduleHumanAiIfNeeded(): void {
+    if (
+      this.autoPlayEnabled &&
+      this.humanAiPlayer.hasCards() &&
+      this.phase === 'playing'
+    ) {
+      this.scheduleHumanAiPlay();
+    }
+  }
+
   private cancelAiTimer(): void {
     if (this.aiTimer) {
       this.aiTimer.destroy();
@@ -976,6 +1106,7 @@ export class TheMindScene extends Phaser.Scene {
 
   shutdown(): void {
     this.cancelAiTimer();
+    this.cancelHumanAiTimer();
     this.eventBridge?.destroy();
     this.gameEvents?.removeAllListeners();
 
