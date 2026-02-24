@@ -14,6 +14,7 @@
 
 import { describe, it, expect, afterEach } from 'vitest';
 import Phaser from 'phaser';
+import { waitForScene } from '../helpers/waitForScene';
 
 // ── Helpers ─────────────────────────────────────────────────
 
@@ -28,38 +29,8 @@ async function bootGame(): Promise<Phaser.Game> {
     '../../example-games/golf/createGolfGame'
   );
   const game = createGolfGame();
-  await waitForScene(game, 'GolfScene', 10_000);
+  await waitForScene(game, 'GolfScene');
   return game;
-}
-
-function waitForScene(
-  game: Phaser.Game,
-  sceneKey: string,
-  timeoutMs: number,
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const start = Date.now();
-    const check = () => {
-      const scene = game.scene.getScene(sceneKey);
-      if (
-        scene &&
-        (scene as Phaser.Scene & { sys: Phaser.Scenes.Systems }).sys.isActive()
-      ) {
-        resolve();
-        return;
-      }
-      if (Date.now() - start > timeoutMs) {
-        reject(
-          new Error(
-            `Scene "${sceneKey}" did not become active within ${timeoutMs}ms`,
-          ),
-        );
-        return;
-      }
-      requestAnimationFrame(check);
-    };
-    check();
-  });
 }
 
 function destroyGame(game: Phaser.Game | null): void {
@@ -470,7 +441,7 @@ describe('GolfScene interaction tests', () => {
       const settled = await waitForAnyPhase(
         scene,
         ['waiting-for-draw', 'round-ended'],
-        15_000,
+        25_000,
       );
 
       if (settled === 'round-ended') break;

@@ -9,6 +9,7 @@
 
 import { describe, it, expect, afterEach } from 'vitest';
 import Phaser from 'phaser';
+import { waitForScene } from '../helpers/waitForScene';
 
 // Helper: create a game container div and boot the golf game
 async function bootGame(): Promise<Phaser.Game> {
@@ -26,33 +27,9 @@ async function bootGame(): Promise<Phaser.Game> {
   const game = createGolfGame();
 
   // Wait for the game to boot and the scene to become active
-  await waitForScene(game, 'GolfScene', 10_000);
+  await waitForScene(game, 'GolfScene');
 
   return game;
-}
-
-// Helper: wait for a specific scene to reach the 'running' status
-function waitForScene(
-  game: Phaser.Game,
-  sceneKey: string,
-  timeoutMs: number,
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const start = Date.now();
-    const check = () => {
-      const scene = game.scene.getScene(sceneKey);
-      if (scene && (scene as Phaser.Scene & { sys: Phaser.Scenes.Systems }).sys.isActive()) {
-        resolve();
-        return;
-      }
-      if (Date.now() - start > timeoutMs) {
-        reject(new Error(`Scene "${sceneKey}" did not become active within ${timeoutMs}ms`));
-        return;
-      }
-      requestAnimationFrame(check);
-    };
-    check();
-  });
 }
 
 // Helper: destroy the game cleanly after each test

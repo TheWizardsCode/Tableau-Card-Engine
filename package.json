@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "vitest run",
+    "test": "vitest run --project unit && vitest run --project browser",
     "replay": "tsx scripts/replay.ts",
     "transcripts:export": "tsx scripts/export-transcripts.ts"
   },

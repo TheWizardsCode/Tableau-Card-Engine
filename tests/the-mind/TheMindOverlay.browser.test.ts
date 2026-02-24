@@ -16,6 +16,7 @@
 
 import { describe, it, expect, afterEach } from 'vitest';
 import Phaser from 'phaser';
+import { waitForScene } from '../helpers/waitForScene';
 
 // ── Helpers ─────────────────────────────────────────────────
 
@@ -30,38 +31,8 @@ async function bootGame(): Promise<Phaser.Game> {
     '../../example-games/the-mind/createTheMindGame'
   );
   const game = createTheMindGame();
-  await waitForScene(game, 'TheMindScene', 10_000);
+  await waitForScene(game, 'TheMindScene');
   return game;
-}
-
-function waitForScene(
-  game: Phaser.Game,
-  sceneKey: string,
-  timeoutMs: number,
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const start = Date.now();
-    const check = () => {
-      const scene = game.scene.getScene(sceneKey);
-      if (
-        scene &&
-        (scene as Phaser.Scene & { sys: Phaser.Scenes.Systems }).sys.isActive()
-      ) {
-        resolve();
-        return;
-      }
-      if (Date.now() - start > timeoutMs) {
-        reject(
-          new Error(
-            `Scene "${sceneKey}" did not become active within ${timeoutMs}ms`,
-          ),
-        );
-        return;
-      }
-      requestAnimationFrame(check);
-    };
-    check();
-  });
 }
 
 function destroyGame(game: Phaser.Game | null): void {
@@ -225,7 +196,7 @@ describe('The Mind overlay button tests', () => {
     // Wait for restart: Phaser queues scene restart for next frame
     await waitFrames(3);
     // scene.restart() destroys and recreates; wait for re-activation
-    await waitForScene(game, 'TheMindScene', 10_000);
+    await waitForScene(game, 'TheMindScene');
     await waitFrames(3);
 
     // Verify: new session was created (different object reference)
@@ -272,7 +243,7 @@ describe('The Mind overlay button tests', () => {
 
     // Wait for restart
     await waitFrames(3);
-    await waitForScene(game, 'TheMindScene', 10_000);
+    await waitForScene(game, 'TheMindScene');
     await waitFrames(3);
 
     // Verify: new session was created

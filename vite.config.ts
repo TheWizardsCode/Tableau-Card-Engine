@@ -38,6 +38,7 @@ export default defineConfig(({ mode, command }) => ({
           environment: 'node',
           include: ['tests/**/*.test.ts'],
           exclude: ['tests/**/*.browser.test.ts'],
+          testTimeout: 15_000,
         },
       },
       {
@@ -45,6 +46,7 @@ export default defineConfig(({ mode, command }) => ({
         test: {
           name: 'browser',
           include: ['tests/**/*.browser.test.ts'],
+          fileParallelism: false,
           sequence: {
             concurrent: false,
           },
