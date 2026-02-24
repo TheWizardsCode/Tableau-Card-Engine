@@ -27,11 +27,15 @@ export { adapterRegistry } from './AdapterRegistry';
 // Import and register adapters
 // Order matters: explicit-field adapters first, structural-match last
 import { BeleagueredCastleReplayAdapter } from './BeleagueredCastleReplayAdapter';
+import { LostCitiesReplayAdapter } from './LostCitiesReplayAdapter';
 import { GolfReplayAdapter } from './GolfReplayAdapter';
 import { adapterRegistry } from './AdapterRegistry';
 
 // BC has an explicit `game: 'beleaguered-castle'` field -- register first
 adapterRegistry.register(new BeleagueredCastleReplayAdapter());
+
+// LC has an explicit `gameType: 'lost-cities'` field -- register before Golf
+adapterRegistry.register(new LostCitiesReplayAdapter());
 
 // Golf uses structural detection (no `gameType` field) -- register last
 adapterRegistry.register(new GolfReplayAdapter());

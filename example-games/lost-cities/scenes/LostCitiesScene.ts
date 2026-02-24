@@ -240,6 +240,9 @@ export class LostCitiesScene extends Phaser.Scene {
   private turnPhase: SceneTurnPhase = 'waiting-for-card-select';
   private selectedCardIndex: number = -1;
 
+  /** When true, the scene suppresses all input and AI turns for replay use. */
+  private replayMode: boolean = false;
+
   // Graphics layer for section boxes
   private gfx!: Phaser.GameObjects.Graphics;
 
@@ -361,6 +364,18 @@ export class LostCitiesScene extends Phaser.Scene {
     this.selectionHighlight = null;
     this.tooltipContainer = null;
 
+    // Check for replay mode via URL parameter (?mode=replay)
+    this.replayMode =
+      new URLSearchParams(window.location.search).get('mode') === 'replay';
+
+    // Event system: create emitter and bridge to Phaser scene events.
+    // Must be created before help/sound systems and exposed on window
+    // for the replay tool.
+    this.gameEvents = new GameEventEmitter();
+    this.eventBridge = new PhaserEventBridge(this.gameEvents, this.events);
+    (window as unknown as Record<string, unknown>).__GAME_EVENTS__ =
+      this.gameEvents;
+
     // Initialize game state
     this.session = setupLostCitiesGame({
       playerNames: ['You', 'AI'],
@@ -381,12 +396,22 @@ export class LostCitiesScene extends Phaser.Scene {
     this.createDiscardZones();
     this.createRightColumn();
     this.createInstructionBar();
-    this.createHelpPanel();
-    this.createSoundSystem();
+    if (!this.replayMode) {
+      this.createHelpPanel();
+      this.createSoundSystem();
+    }
 
     // Initial render
     this.refreshAll();
-    this.setPhase('waiting-for-card-select');
+
+    if (this.replayMode) {
+      // In replay mode: clear instruction text and emit state-settled
+      // so the replay tool knows the scene is ready for state injection.
+      this.instructionText.setText('');
+      this.emitStateSettled();
+    } else {
+      this.setPhase('waiting-for-card-select');
+    }
   }
 
   // ── Section box helpers ─────────────────────────────────
@@ -598,10 +623,6 @@ export class LostCitiesScene extends Phaser.Scene {
   }
 
   private createSoundSystem(): void {
-    // Event system
-    this.gameEvents = new GameEventEmitter();
-    this.eventBridge = new PhaserEventBridge(this.gameEvents, this.events);
-
     // Sound system
     const phaserSound = this.sound;
     const player: SoundPlayer = {
@@ -624,6 +645,127 @@ export class LostCitiesScene extends Phaser.Scene {
       soundManager: this.soundManager,
     });
     this.settingsButton = new SettingsButton(this, this.settingsPanel);
+  }
+
+  // ── Replay API ──────────────────────────────────────────
+
+  /**
+   * Inject an arbitrary board state from transcript snapshot data and
+   * refresh the visual display. Intended for use by the replay tool
+   * via `page.evaluate()`.
+   *
+   * Only operational in replay mode (?mode=replay). Throws if called
+   * outside of replay mode.
+   *
+   * After updating the internal state and refreshing all sprites,
+   * emits a `state-settled` event so the caller can synchronize
+   * screenshot capture.
+   *
+   * @param boardStates  Per-player board snapshots (hand + expeditions).
+   * @param tableState   Table state (discard tops + draw pile size).
+   */
+  loadBoardState(
+    boardStates: [
+      { hand: Array<{ id: number; color: string; type: string; rank: number; faceUp: boolean }>;
+        expeditions: Record<string, Array<{ id: number; color: string; type: string; rank: number; faceUp: boolean }>> },
+      { hand: Array<{ id: number; color: string; type: string; rank: number; faceUp: boolean }>;
+        expeditions: Record<string, Array<{ id: number; color: string; type: string; rank: number; faceUp: boolean }>> },
+    ],
+    tableState: {
+      discardTops: Record<string, { id: number; color: string; type: string; rank: number; faceUp: boolean } | null>;
+      drawPileSize: number;
+    },
+  ): void {
+    if (!this.replayMode) {
+      throw new Error(
+        'loadBoardState() is only available in replay mode (?mode=replay)',
+      );
+    }
+
+    // Reconstruct each player's hand and expeditions from snapshot data
+    for (let p = 0; p < 2; p++) {
+      const snapshot = boardStates[p];
+
+      // Rebuild hand
+      this.session.players[p as 0 | 1].hand = snapshot.hand.map(
+        (cs) => this.snapshotToCard(cs),
+      );
+
+      // Rebuild expeditions
+      const expeditions = this.session.players[p as 0 | 1].expeditions;
+      for (const color of EXPEDITION_COLORS) {
+        const cards = (snapshot.expeditions[color] ?? []).map(
+          (cs) => this.snapshotToCard(cs),
+        );
+        expeditions.set(color, cards);
+      }
+    }
+
+    // Rebuild discard piles (only top card available from transcript)
+    for (const color of EXPEDITION_COLORS) {
+      const topSnap = tableState.discardTops[color];
+      if (topSnap) {
+        const card = this.snapshotToCard(topSnap);
+        card.faceUp = true;
+        this.session.round.discardPiles.set(color, [card]);
+      } else {
+        this.session.round.discardPiles.set(color, []);
+      }
+    }
+
+    // Rebuild draw pile (fill with dummy face-down cards since we don't
+    // have actual draw pile data — only the size is recorded)
+    this.session.round.drawPile.length = 0;
+    for (let i = 0; i < tableState.drawPileSize; i++) {
+      this.session.round.drawPile.push({
+        id: -1,
+        color: 'yellow' as ExpeditionColor,
+        type: 'numbered',
+        rank: 2 as 2,
+        faceUp: false,
+      });
+    }
+
+    // Refresh all visual elements
+    this.refreshAll();
+
+    // Signal that the board is visually stable and ready for screenshot
+    this.emitStateSettled();
+  }
+
+  /**
+   * Convert a card snapshot (from the transcript) into a LostCitiesCard.
+   */
+  private snapshotToCard(
+    cs: { id: number; color: string; type: string; rank: number; faceUp: boolean },
+  ): LostCitiesCard {
+    if (cs.type === 'investment') {
+      return {
+        id: cs.id,
+        color: cs.color as ExpeditionColor,
+        type: 'investment',
+        investmentIndex: cs.rank as 1 | 2 | 3,
+        faceUp: cs.faceUp,
+      };
+    }
+    return {
+      id: cs.id,
+      color: cs.color as ExpeditionColor,
+      type: 'numbered',
+      rank: cs.rank as 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10,
+      faceUp: cs.faceUp,
+    };
+  }
+
+  /**
+   * Emit state-settled when the board is visually stable and safe
+   * to screenshot. Called after animations complete and display is refreshed.
+   */
+  private emitStateSettled(): void {
+    this.gameEvents.emit('state-settled', {
+      turnNumber: this.session.round.turnNumber,
+      phase: this.session.matchPhase === 'playing' ? 'playing' : 'ended',
+    });
   }
 
   // ── Phase management ────────────────────────────────────
