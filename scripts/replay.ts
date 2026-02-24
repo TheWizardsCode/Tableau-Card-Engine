@@ -185,13 +185,22 @@ async function waitForGameBoot(page: Page, timeoutMs: number): Promise<void> {
 
 /**
  * Capture a screenshot of the Phaser canvas.
+ *
+ * Uses canvas.toDataURL() inside the browser to avoid the slow
+ * Playwright element-screenshot path (GPU readback via CDP).
+ * The base-64 PNG is transferred to Node and written to disk.
  */
 async function captureScreenshot(
   page: Page,
   filePath: string,
 ): Promise<void> {
-  const canvas = page.locator('canvas').first();
-  await canvas.screenshot({ path: filePath });
+  const dataUrl: string = await page.evaluate(() => {
+    const canvas = document.querySelector('canvas');
+    if (!canvas) throw new Error('No <canvas> element found');
+    return canvas.toDataURL('image/png');
+  });
+  const base64 = dataUrl.replace(/^data:image\/png;base64,/, '');
+  fs.writeFileSync(filePath, Buffer.from(base64, 'base64'));
 }
 
 // ── Main ────────────────────────────────────────────────────
@@ -296,8 +305,6 @@ async function main(): Promise<void> {
     const initStart = Date.now();
     try {
       await adapter.injectInitialState(page, rawTranscript, STATE_SETTLED_TIMEOUT);
-      // Allow a frame for rendering to complete
-      await page.waitForTimeout(100);
 
       const ssPath = path.join(outputDir, 'turn-000.png');
       await captureScreenshot(page, ssPath);
@@ -328,7 +335,6 @@ async function main(): Promise<void> {
 
       try {
         await adapter.injectTurnState(page, rawTranscript, i, STATE_SETTLED_TIMEOUT);
-        await page.waitForTimeout(100);
 
         const ssPath = path.join(outputDir, `turn-${turnLabel}.png`);
         await captureScreenshot(page, ssPath);
@@ -476,7 +482,6 @@ async function main(): Promise<void> {
 
           try {
             await adapter.injectTurnState(page, rawTranscript, i, STATE_SETTLED_TIMEOUT);
-            await page.waitForTimeout(100);
 
             const ssPath = path.join(outputDir, `turn-${turnLabel}.png`);
             await captureScreenshot(page, ssPath);

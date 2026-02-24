@@ -632,9 +632,19 @@ After generating the thumbnail PNG, add a `thumbnail` field to the game's entry 
 
 The `GameSelectorScene` will preload and display the thumbnail automatically. Games without a `thumbnail` field fall back to the text-only card layout.
 
+**Refreshing all thumbnails at once:**
+
+Use the `scripts/refresh-thumbnails.sh` script to replay fixture transcripts and regenerate thumbnails for all supported games in a single command:
+
+```bash
+bash scripts/refresh-thumbnails.sh
+```
+
+The script iterates over every game in `example-games/`, runs the replay tool to capture screenshots, then invokes the thumbnail generator. Games that lack a fixture transcript or replay adapter are skipped with a warning (not a failure). A summary table is printed at the end showing which games were refreshed and which were skipped. The script exits non-zero if any supported game fails during replay or thumbnail generation.
+
 **When to regenerate thumbnails:**
 
-Thumbnails are static assets. Regenerate them when a game's visual appearance changes significantly. This is a manual step -- there is no automated CI pipeline for thumbnail generation.
+Thumbnails are static assets. Regenerate them when a game's visual appearance changes significantly. Use `scripts/refresh-thumbnails.sh` to regenerate all thumbnails at once, or use the individual commands above for a single game.
 
 ## Keeping Docs Up to Date
 
