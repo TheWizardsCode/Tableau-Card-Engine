@@ -180,21 +180,18 @@ async function waitForGameBoot(page: Page, timeoutMs: number): Promise<void> {
 /**
  * Capture a screenshot of the Phaser canvas.
  *
- * Uses canvas.toDataURL() inside the browser to avoid the slow
- * Playwright element-screenshot path (GPU readback via CDP).
- * The base-64 PNG is transferred to Node and written to disk.
+ * Uses Playwright's element screenshot (CDP-based) which reads directly
+ * from the compositor, bypassing the WebGL drawing buffer.  This is
+ * necessary because Phaser's WebGL context has
+ * `preserveDrawingBuffer: false` by default, which causes
+ * `canvas.toDataURL()` to return a blank (black) image.
  */
 async function captureScreenshot(
   page: Page,
   filePath: string,
 ): Promise<void> {
-  const dataUrl: string = await page.evaluate(() => {
-    const canvas = document.querySelector('canvas');
-    if (!canvas) throw new Error('No <canvas> element found');
-    return canvas.toDataURL('image/png');
-  });
-  const base64 = dataUrl.replace(/^data:image\/png;base64,/, '');
-  fs.writeFileSync(filePath, Buffer.from(base64, 'base64'));
+  const canvas = page.locator('canvas');
+  await canvas.screenshot({ path: filePath });
 }
 
 // ── Main ────────────────────────────────────────────────────

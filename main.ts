@@ -36,6 +36,7 @@ const GAMES: GameEntry[] = [
     title: 'Beleaguered Castle',
     description:
       'Open solitaire. Move cards between 8 tableau columns and build foundations up by suit from Ace to King.',
+    thumbnail: 'games/beleaguered-castle/thumbnail',
   },
   {
     sceneKey: 'SushiGoScene',
@@ -54,6 +55,7 @@ const GAMES: GameEntry[] = [
     title: 'Lost Cities',
     description:
       'Two-player expedition card game (human vs. AI). Bet on up to 5 expeditions across a 3-round match, manage risk with investment cards, and outscore the AI.',
+    thumbnail: 'games/lost-cities/thumbnail',
   },
   {
     sceneKey: 'TheMindScene',
