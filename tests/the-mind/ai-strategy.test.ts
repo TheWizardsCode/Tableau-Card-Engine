@@ -7,6 +7,8 @@ import {
   DEFAULT_BASE_DURATION,
   DEFAULT_JITTER_RANGE,
   MIN_PLAY_DELAY,
+  AI_LAST_CARD_DELAY,
+  computeEffectiveDelay,
 } from '../../example-games/the-mind/AiStrategy';
 import type { MindCard } from '../../example-games/the-mind/MindCard';
 import { createSeededRng } from '../../src/core-engine/SeededRng';
@@ -716,5 +718,92 @@ describe('MindAiPlayer', () => {
         }
       }
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeEffectiveDelay — fast-play when last card & opponent empty
+// ---------------------------------------------------------------------------
+
+describe('computeEffectiveDelay', () => {
+  it('AI_LAST_CARD_DELAY is 400ms', () => {
+    expect(AI_LAST_CARD_DELAY).toBe(400);
+  });
+
+  it('returns AI_LAST_CARD_DELAY when opponent hand is empty and player has 1 card', () => {
+    const result = computeEffectiveDelay(
+      /* committedDelay */ 8000,
+      /* elapsed */ 2000,
+      /* playerHandSize */ 1,
+      /* opponentHandSize */ 0,
+    );
+    expect(result).toBe(AI_LAST_CARD_DELAY);
+  });
+
+  it('returns normal delay when opponent still has cards (even if player has 1 card)', () => {
+    const result = computeEffectiveDelay(
+      /* committedDelay */ 8000,
+      /* elapsed */ 2000,
+      /* playerHandSize */ 1,
+      /* opponentHandSize */ 2,
+    );
+    // Normal: max(8000 - 2000, 100) = 6000
+    expect(result).toBe(6000);
+  });
+
+  it('returns normal delay when player has more than 1 card (even if opponent hand is empty)', () => {
+    const result = computeEffectiveDelay(
+      /* committedDelay */ 8000,
+      /* elapsed */ 2000,
+      /* playerHandSize */ 3,
+      /* opponentHandSize */ 0,
+    );
+    // Normal: max(8000 - 2000, 100) = 6000
+    expect(result).toBe(6000);
+  });
+
+  it('returns normal delay when both players have cards', () => {
+    const result = computeEffectiveDelay(
+      /* committedDelay */ 5000,
+      /* elapsed */ 1000,
+      /* playerHandSize */ 2,
+      /* opponentHandSize */ 3,
+    );
+    // Normal: max(5000 - 1000, 100) = 4000
+    expect(result).toBe(4000);
+  });
+
+  it('clamps normal delay to 100ms minimum', () => {
+    const result = computeEffectiveDelay(
+      /* committedDelay */ 3000,
+      /* elapsed */ 5000,
+      /* playerHandSize */ 2,
+      /* opponentHandSize */ 1,
+    );
+    // Normal: max(3000 - 5000, 100) = max(-2000, 100) = 100
+    expect(result).toBe(100);
+  });
+
+  it('does not clamp to 100ms in fast-play scenario (AI_LAST_CARD_DELAY is used directly)', () => {
+    // Even if the committed delay minus elapsed would be negative,
+    // the fast-play path returns AI_LAST_CARD_DELAY, not 100.
+    const result = computeEffectiveDelay(
+      /* committedDelay */ 1000,
+      /* elapsed */ 5000,
+      /* playerHandSize */ 1,
+      /* opponentHandSize */ 0,
+    );
+    expect(result).toBe(AI_LAST_CARD_DELAY);
+  });
+
+  it('returns normal delay when both hands are empty (edge case)', () => {
+    const result = computeEffectiveDelay(
+      /* committedDelay */ 5000,
+      /* elapsed */ 1000,
+      /* playerHandSize */ 0,
+      /* opponentHandSize */ 0,
+    );
+    // playerHandSize is 0, not 1, so normal path
+    expect(result).toBe(4000);
   });
 });
