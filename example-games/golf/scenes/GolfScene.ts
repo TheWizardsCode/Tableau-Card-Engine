@@ -753,6 +753,8 @@ export class GolfScene extends Phaser.Scene {
       this.discardSprite.setVisible(true);
       this.discardSprite.setTexture(getCardTexture(top));
       this.discardSprite.setAlpha(1);
+    } else if (this.replayMode) {
+      this.discardSprite.setVisible(false);
     } else {
       this.showDiscardPlaceholder();
     }

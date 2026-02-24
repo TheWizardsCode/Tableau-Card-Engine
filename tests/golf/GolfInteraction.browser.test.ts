@@ -347,7 +347,7 @@ describe('GolfScene interaction tests', () => {
 
     // Discard the drawn card
     clickGameObject(internals.discardSprite);
-    await nextFrame();
+    await waitForPhaseChange(scene, 'animating', 3000);
 
     expect(internals.turnPhase).toBe('waiting-for-flip-target');
     expect(internals.instructionText.text).toContain('face-down');
