@@ -78,6 +78,7 @@ const CARD_GAP = 8;
 const LEVEL_COMPLETE_DELAY = 2000;
 const PENALTY_REVEAL_DELAY = 1000;
 const ANIM_DURATION = 250;
+const PRE_PENALTY_PAUSE = 800;
 
 // Depths
 const DEPTH_CARDS = 1;
@@ -707,28 +708,37 @@ export class TheMindScene extends Phaser.Scene {
       // Flash lives display
       this.flashLives();
 
-      // Briefly reveal penalty cards, then discard
-      this.showPenaltyCards(result, () => {
+      // First animate the played card to the pile so the player can see
+      // what was played, then pause before showing the penalty cards.
+      this.animateCardTowardsPile(playerId, cardValue, () => {
         this.refreshAll();
 
-        // Check for game loss
-        if (isGameOver(this.session)) {
-          this.handleGameOver();
-          return;
-        }
+        // Pause so the played card is visible on the pile before penalty
+        this.time.delayedCall(PRE_PENALTY_PAUSE, () => {
+          // Briefly reveal penalty cards, then discard
+          this.showPenaltyCards(result, () => {
+            this.refreshAll();
 
-        // Check for level completion (penalty may have cleared remaining cards)
-        if (result.levelComplete) {
-          this.handleLevelComplete(result, timestamp);
-          return;
-        }
+            // Check for game loss
+            if (isGameOver(this.session)) {
+              this.handleGameOver();
+              return;
+            }
 
-        // Resume playing
-        this.setPhase('playing');
-        this.scheduleAiPlay();
-        if (this.autoPlayEnabled) {
-          this.scheduleHumanAiPlay();
-        }
+            // Check for level completion (penalty may have cleared remaining cards)
+            if (result.levelComplete) {
+              this.handleLevelComplete(result, timestamp);
+              return;
+            }
+
+            // Resume playing
+            this.setPhase('playing');
+            this.scheduleAiPlay();
+            if (this.autoPlayEnabled) {
+              this.scheduleHumanAiPlay();
+            }
+          });
+        });
       });
       return;
     }
@@ -847,15 +857,123 @@ export class TheMindScene extends Phaser.Scene {
 
   // ── Card animation ─────────────────────────────────────
 
+  /**
+   * Animate a played card from its hand position to the central pile.
+   *
+   * For human plays the matching sprite is identified by position and
+   * tweened directly. For AI plays a temporary sprite is created
+   * (starting face-down) which flips face-up halfway through the
+   * flight.
+   */
   private animateCardTowardsPile(
-    _playerId: PlayerId,
-    _cardValue: number,
+    playerId: PlayerId,
+    cardValue: number,
     onComplete: () => void,
   ): void {
-    // Simple visual: just delay briefly then refresh
-    this.time.delayedCall(ANIM_DURATION, () => {
-      onComplete();
-    });
+    // The card has already been removed from game-state by playCard(),
+    // but the hand sprites still reflect the *previous* state until
+    // refreshAll() is called in the callback.
+
+    if (playerId === 0) {
+      // ── Human card ────────────────────────────────────
+      // Find the sprite whose texture matches the played card value.
+      const displayCard: MindCard = { value: cardValue, faceUp: true };
+      const targetTex = getMindCardTexture(displayCard);
+      let sprite: Phaser.GameObjects.Image | undefined;
+      let spriteIdx = -1;
+
+      for (let i = 0; i < this.humanCardSprites.length; i++) {
+        if (this.humanCardSprites[i].texture.key === targetTex) {
+          sprite = this.humanCardSprites[i];
+          spriteIdx = i;
+          break;
+        }
+      }
+
+      if (!sprite) {
+        // Fallback: if sprite not found, use the simple delay path
+        this.time.delayedCall(ANIM_DURATION, onComplete);
+        return;
+      }
+
+      // Remove from array so refreshAll() won't destroy it mid-tween
+      this.humanCardSprites.splice(spriteIdx, 1);
+
+      sprite.disableInteractive();
+      sprite.setDepth(DEPTH_PLAYED_CARD);
+
+      this.tweens.add({
+        targets: sprite,
+        x: PILE_X,
+        y: PILE_Y,
+        duration: ANIM_DURATION,
+        ease: 'Cubic.easeOut',
+        onComplete: () => {
+          sprite!.destroy();
+          onComplete();
+        },
+      });
+    } else {
+      // ── AI card ───────────────────────────────────────
+      // Find the rightmost AI hand sprite (AI always plays its lowest
+      // card which is first in the sorted hand, but visually any
+      // face-down card works — pick the last sprite).
+      let sourceX = PILE_X;
+      let sourceY = AI_HAND_Y;
+
+      if (this.aiCardSprites.length > 0) {
+        const lastIdx = this.aiCardSprites.length - 1;
+        const srcSprite = this.aiCardSprites[lastIdx];
+        sourceX = srcSprite.x;
+        sourceY = srcSprite.y;
+
+        // Remove it so refreshAll() won't destroy it
+        this.aiCardSprites.splice(lastIdx, 1);
+        srcSprite.destroy();
+      }
+
+      // Create a temporary card sprite starting face-down
+      const tempSprite = this.add
+        .image(sourceX, sourceY, CARD_BACK_KEY)
+        .setDisplaySize(CARD_W, CARD_H)
+        .setDepth(DEPTH_PLAYED_CARD);
+
+      const faceUpTex = getMindCardTexture({ value: cardValue, faceUp: true });
+      const halfDuration = ANIM_DURATION / 2;
+
+      // Tween to pile position; flip to face-up at the midpoint
+      this.tweens.add({
+        targets: tempSprite,
+        x: PILE_X,
+        y: PILE_Y,
+        duration: ANIM_DURATION,
+        ease: 'Cubic.easeOut',
+      });
+
+      // Midpoint flip: scale X to 0 then back to 1 with the face-up texture
+      this.tweens.add({
+        targets: tempSprite,
+        scaleX: 0,
+        duration: halfDuration,
+        ease: 'Cubic.easeIn',
+        onComplete: () => {
+          tempSprite.setTexture(faceUpTex);
+          tempSprite.setDisplaySize(CARD_W, CARD_H);
+          this.tweens.add({
+            targets: tempSprite,
+            scaleX: 1,
+            duration: halfDuration,
+            ease: 'Cubic.easeOut',
+          });
+        },
+      });
+
+      // After the full animation completes, clean up
+      this.time.delayedCall(ANIM_DURATION, () => {
+        tempSprite.destroy();
+        onComplete();
+      });
+    }
   }
 
   // ── Level completion ───────────────────────────────────
