@@ -19,6 +19,7 @@ import { BeleagueredCastleScene } from './example-games/beleaguered-castle/scene
 import { SushiGoScene } from './example-games/sushi-go/scenes/SushiGoScene';
 import { SplendorScene } from './example-games/splendor/scenes/SplendorScene';
 import { LostCitiesScene } from './example-games/lost-cities/scenes/LostCitiesScene';
+import { TheMindScene } from './example-games/the-mind/scenes/TheMindScene';
 
 // ── Game catalogue ─────────────────────────────────────────
 
@@ -53,6 +54,12 @@ const GAMES: GameEntry[] = [
     description:
       'Two-player expedition card game (human vs. AI). Bet on up to 5 expeditions across a 3-round match, manage risk with investment cards, and outscore the AI.',
   },
+  {
+    sceneKey: 'TheMindScene',
+    title: 'The Mind',
+    description:
+      'Cooperative real-time card game (human + AI). Play numbered cards 1-100 onto a shared ascending pile without communicating. Survive 8 levels without losing all lives.',
+  },
 ];
 
 // ── Phaser boot ────────────────────────────────────────────
@@ -64,7 +71,7 @@ const config: Phaser.Types.Core.GameConfig = {
   height: 720,
   backgroundColor: '#1a2a1a',
   // Register all scenes; GameSelectorScene is first so it auto-starts.
-  scene: [GameSelectorScene, GolfScene, BeleagueredCastleScene, SushiGoScene, SplendorScene, LostCitiesScene],
+  scene: [GameSelectorScene, GolfScene, BeleagueredCastleScene, SushiGoScene, SplendorScene, LostCitiesScene, TheMindScene],
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
