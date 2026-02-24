@@ -43,6 +43,7 @@ const GAMES: GameEntry[] = [
     title: 'Sushi Go!',
     description:
       'Card drafting game (human vs. AI). Pick and pass hands over 3 rounds, collect sets, and score the most points.',
+    thumbnail: 'games/sushi-go/thumbnail',
   },
   {
     sceneKey: 'SplendorScene',

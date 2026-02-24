@@ -29,6 +29,7 @@ export { adapterRegistry } from './AdapterRegistry';
 import { BeleagueredCastleReplayAdapter } from './BeleagueredCastleReplayAdapter';
 import { LostCitiesReplayAdapter } from './LostCitiesReplayAdapter';
 import { TheMindReplayAdapter } from './TheMindReplayAdapter';
+import { SushiGoReplayAdapter } from './SushiGoReplayAdapter';
 import { GolfReplayAdapter } from './GolfReplayAdapter';
 import { adapterRegistry } from './AdapterRegistry';
 
@@ -40,6 +41,9 @@ adapterRegistry.register(new LostCitiesReplayAdapter());
 
 // The Mind has an explicit `gameType: 'the-mind'` field -- register before Golf
 adapterRegistry.register(new TheMindReplayAdapter());
+
+// Sushi Go has an explicit `gameType: 'sushi-go'` field -- register before Golf
+adapterRegistry.register(new SushiGoReplayAdapter());
 
 // Golf uses structural detection (no `gameType` field) -- register last
 adapterRegistry.register(new GolfReplayAdapter());

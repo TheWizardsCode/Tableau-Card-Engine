@@ -25,6 +25,9 @@ import {
 } from '../SushiGoGame';
 import { SushiGoAiPlayer, GreedyStrategy } from '../AiStrategy';
 import { scoreTableauBreakdown, countMakiIcons, scoreMaki } from '../SushiGoScoring';
+import { SushiGoTranscriptRecorder } from '../GameTranscript';
+import type { SushiGoCardSnapshot, PlayerSnapshot } from '../GameTranscript';
+import { TranscriptStore } from '../../../src/core-engine/TranscriptStore';
 import { GameEventEmitter } from '../../../src/core-engine/GameEventEmitter';
 import { PhaserEventBridge } from '../../../src/core-engine/PhaserEventBridge';
 import { SoundManager } from '../../../src/core-engine/SoundManager';
@@ -118,6 +121,9 @@ type TurnPhase =
 
 // ── Scene ───────────────────────────────────────────────────
 
+/** Shared TranscriptStore instance for the Sushi Go! game. */
+const transcriptStore = new TranscriptStore();
+
 export class SushiGoScene extends Phaser.Scene {
   // Game state
   private session!: SushiGoSession;
@@ -130,6 +136,15 @@ export class SushiGoScene extends Phaser.Scene {
   private chopsticksMode = false;
   private chopsticksFirstPick: number | null = null;
   private chopsticksButton: Phaser.GameObjects.Text | null = null;
+
+  // Transcript recording
+  private recorder: SushiGoTranscriptRecorder | null = null;
+
+  /** When true, the scene suppresses all input and AI turns for replay use. */
+  private replayMode: boolean = false;
+
+  /** Tracks the replay step index for state-settled payloads. */
+  private replayStepIndex: number = -1;
 
   // Event system
   private gameEvents!: GameEventEmitter;
@@ -203,10 +218,39 @@ export class SushiGoScene extends Phaser.Scene {
     this.chopsticksFirstPick = null;
     this.chopsticksButton = null;
     this.overlayObjects = [];
+    this.recorder = null;
+    this.replayStepIndex = -1;
+
+    // Check URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    this.replayMode = urlParams.get('mode') === 'replay';
 
     // Event system
     this.gameEvents = new GameEventEmitter();
     this.eventBridge = new PhaserEventBridge(this.gameEvents, this.events);
+    // Expose for replay tool (page.evaluate can listen for state-settled)
+    (window as unknown as Record<string, unknown>).__GAME_EVENTS__ =
+      this.gameEvents;
+
+    if (this.replayMode) {
+      // In replay mode: create minimal UI, skip game setup.
+      // The replay tool will call loadBoardState() to inject state.
+      this.createHeader();
+      this.createLabels();
+      this.createScoreDisplay();
+      this.createInstructions();
+      this.createContainers();
+
+      // Set default display for replay mode
+      this.roundText.setText('Round 1 of 3');
+      this.turnText.setText('Turn 0 of 10');
+      this.cardsLeftText.setText('');
+      this.instructionText.setText('');
+
+      // Emit state-settled so the replay tool knows the scene is ready
+      this.emitStateSettled();
+      return;
+    }
 
     // Sound system
     const phaserSound = this.sound;
@@ -234,6 +278,9 @@ export class SushiGoScene extends Phaser.Scene {
       isAI: [false, true],
     });
     this.aiPlayer = new SushiGoAiPlayer(GreedyStrategy);
+
+    // Create transcript recorder
+    this.recorder = new SushiGoTranscriptRecorder(this.session);
 
     // Create UI
     this.createHeader();
@@ -974,6 +1021,9 @@ export class SushiGoScene extends Phaser.Scene {
     // Execute both picks
     executeAllPicks(this.session, [humanPick, aiPick]);
 
+    // Record the turn in the transcript
+    this.recorder?.recordTurn([humanPick, aiPick]);
+
     this.pendingHumanPick = null;
     this.pendingHumanSecondPick = null;
 
@@ -1002,6 +1052,9 @@ export class SushiGoScene extends Phaser.Scene {
     this.soundManager?.play(SFX_KEYS.ROUND_END);
 
     const result = scoreRound(this.session);
+
+    // Record the round result in the transcript
+    this.recorder?.recordRoundResult(result);
 
     this.refreshScores();
 
@@ -1099,9 +1152,17 @@ export class SushiGoScene extends Phaser.Scene {
     this.setPhase('game-over');
     this.soundManager?.play(SFX_KEYS.SCORE_REVEAL);
 
+    const winnerIdx = getWinnerIndex(this.session);
+
+    // Finalize and auto-save the transcript
+    if (this.recorder && !this.recorder.isSealed()) {
+      const transcript = this.recorder.finalize(winnerIdx);
+      this.autoSaveTranscript(transcript);
+    }
+
     this.gameEvents.emit('game-ended', {
       finalTurnNumber: this.session.currentTurn,
-      winnerIndex: getWinnerIndex(this.session),
+      winnerIndex: winnerIdx,
     });
 
     // Make final game-over dialog taller to avoid overlap with buttons
@@ -1113,7 +1174,6 @@ export class SushiGoScene extends Phaser.Scene {
     );
     this.overlayObjects.push(...overlay.objects);
 
-    const winnerIdx = getWinnerIndex(this.session);
     const winnerText = winnerIdx === 0 ? 'You Win!' : 'AI Wins!';
 
     const human = this.session.players[0];
@@ -1283,6 +1343,119 @@ export class SushiGoScene extends Phaser.Scene {
       this.tooltipContainer.destroy();
       this.tooltipContainer = null;
     }
+  }
+
+  // ── Replay: load board state ─────────────────────────────
+
+  /**
+   * Inject a board state snapshot for the replay tool.
+   *
+   * Called by the replay adapter via `page.evaluate()`.
+   * Updates all visual elements to reflect the given state,
+   * then emits `state-settled` so the replay tool can take a
+   * screenshot.
+   *
+   * Only available when `?mode=replay` is in the URL.
+   */
+  public loadBoardState(state: {
+    players: PlayerSnapshot[];
+    currentRound: number;
+    currentTurn: number;
+    cardsPerPlayer: number;
+    stepIndex?: number;
+  }): void {
+    if (!this.replayMode) {
+      throw new Error(
+        'loadBoardState() is only available in replay mode (?mode=replay)',
+      );
+    }
+
+    // Build a minimal session object for the rendering helpers
+    // (they read from this.session to display scores, tableaux, etc.)
+    const playerStates = state.players.map((p) => ({
+      name: p.name,
+      isAI: p.isAI,
+      hand: p.hand.map((c) => this.rehydrateCard(c)),
+      tableau: p.tableau.map((c) => this.rehydrateCard(c)),
+      puddingCount: p.puddingCount,
+      roundScores: [...p.roundScores],
+      totalScore: p.totalScore,
+    }));
+
+    this.session = {
+      players: playerStates,
+      phase: 'picking',
+      currentRound: state.currentRound,
+      currentTurn: state.currentTurn,
+      cardsPerPlayer: state.cardsPerPlayer,
+      totalRounds: 3,
+      rng: Math.random,
+    } as SushiGoSession;
+
+    // Update all visuals
+    this.refreshAll();
+
+    // Track replay step for state-settled payload
+    if (state.stepIndex !== undefined) {
+      this.replayStepIndex = state.stepIndex;
+    }
+
+    // Signal board is visually stable
+    this.emitStateSettled();
+  }
+
+  /**
+   * Rehydrate a card snapshot into a SushiGoCard-compatible object.
+   *
+   * The snapshot is a plain JSON object with `id`, `type`, and optional
+   * type-specific fields. We cast it back to the discriminated union
+   * shape so rendering helpers can use `card.type` discriminators.
+   */
+  private rehydrateCard(snap: SushiGoCardSnapshot): SushiGoCard {
+    const base = { id: snap.id, type: snap.type };
+    if (snap.type === 'maki' && snap.icons !== undefined) {
+      return { ...base, type: 'maki', icons: snap.icons } as SushiGoCard;
+    }
+    if (snap.type === 'nigiri' && snap.variant !== undefined) {
+      return { ...base, type: 'nigiri', variant: snap.variant } as unknown as SushiGoCard;
+    }
+    return base as SushiGoCard;
+  }
+
+  // ── Transcript persistence ──────────────────────────────
+
+  /**
+   * Auto-save a finalized transcript to browser storage.
+   * Fires and forgets -- errors are logged but do not disrupt gameplay.
+   */
+  private autoSaveTranscript(transcript: import('../GameTranscript').SushiGoTranscript): void {
+    transcriptStore.save('sushi-go', transcript).then(
+      (stored) => {
+        if (stored) {
+          console.info(
+            `[SushiGoScene] Transcript saved (${stored.id}) via ${stored.gameType}`,
+          );
+        } else {
+          console.warn('[SushiGoScene] Transcript not saved -- no storage backend available');
+        }
+      },
+      (err) => {
+        console.error('[SushiGoScene] Failed to auto-save transcript:', err);
+      },
+    );
+  }
+
+  // ── State-settled emission ──────────────────────────────
+
+  /**
+   * Emit state-settled when the board is visually stable and safe
+   * to screenshot. Uses the replay step index as the turn number.
+   */
+  private emitStateSettled(): void {
+    this.gameEvents.emit('state-settled', {
+      turnNumber: this.replayStepIndex,
+      phase: 'playing' as const,
+    });
   }
 
   // ── Help / Settings cleanup ────────────────────────────
