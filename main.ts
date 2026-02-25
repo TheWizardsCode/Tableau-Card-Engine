@@ -50,6 +50,7 @@ const GAMES: GameEntry[] = [
     title: 'Splendor',
     description:
       'Engine-building card game (human vs. AI). Collect gem tokens, purchase cards for bonuses, attract nobles, and reach 15 prestige to win.',
+    thumbnail: 'games/splendor/thumbnail',
   },
   {
     sceneKey: 'LostCitiesScene',

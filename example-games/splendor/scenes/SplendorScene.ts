@@ -14,7 +14,7 @@
  */
 
 import Phaser from 'phaser';
-import type { GemColor, GemOrGold, DevelopmentCard, Tier } from '../SplendorCards';
+import type { GemColor, GemOrGold, GemTokens, DevelopmentCard, NobleTile, Tier } from '../SplendorCards';
 import {
   GEM_COLORS,
   ALL_TOKEN_COLORS,
@@ -26,6 +26,7 @@ import {
 } from '../SplendorCards';
 import type {
   SplendorSession,
+  SplendorPhase,
   TurnAction,
   TurnResult,
 } from '../SplendorGame';
@@ -40,6 +41,9 @@ import {
   getWinnerIndex,
 } from '../SplendorGame';
 import { SplendorAiPlayer, GreedyStrategy } from '../AiStrategy';
+import { SplendorTranscriptRecorder } from '../GameTranscript';
+import type { MarketSnapshot, PlayerSnapshot } from '../GameTranscript';
+import { TranscriptStore } from '../../../src/core-engine/TranscriptStore';
 import { GameEventEmitter } from '../../../src/core-engine/GameEventEmitter';
 import { PhaserEventBridge } from '../../../src/core-engine/PhaserEventBridge';
 import { SoundManager } from '../../../src/core-engine/SoundManager';
@@ -57,6 +61,9 @@ import helpContent from '../help-content.json';
 // ── Constants ───────────────────────────────────────────────
 
 const ANIM_DURATION = 400;
+
+/** Shared transcript store for auto-saving completed transcripts. */
+const transcriptStore = new TranscriptStore();
 
 // Gem color to hex fill
 const GEM_FILL: Record<GemOrGold, number> = {
@@ -183,6 +190,20 @@ export class SplendorScene extends Phaser.Scene {
   private discardSelection: Partial<Record<GemOrGold, number>> = {};
   private discardNeeded = 0;
 
+  // Transcript recording
+  private recorder: SplendorTranscriptRecorder | null = null;
+
+  /** When true, the scene suppresses all input and AI turns for replay use. */
+  private replayMode: boolean = false;
+
+  /** Tracks the replay step index for state-settled payloads. */
+  private replayStepIndex: number = -1;
+
+  // Pending turn state for recording (deferred across discard step)
+  private pendingPlayerIndex: number = -1;
+  private pendingAction: TurnAction | null = null;
+  private pendingResult: TurnResult | null = null;
+
   // Event system
   private gameEvents!: GameEventEmitter;
   private eventBridge!: PhaserEventBridge;
@@ -238,10 +259,35 @@ export class SplendorScene extends Phaser.Scene {
     this.discardSelection = {};
     this.discardNeeded = 0;
     this.overlayObjects = [];
+    this.recorder = null;
+    this.replayStepIndex = -1;
+    this.pendingPlayerIndex = -1;
+    this.pendingAction = null;
+    this.pendingResult = null;
+
+    // Check URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    this.replayMode = urlParams.get('mode') === 'replay';
 
     // Event system
     this.gameEvents = new GameEventEmitter();
     this.eventBridge = new PhaserEventBridge(this.gameEvents, this.events);
+    // Expose for replay tool (page.evaluate can listen for state-settled)
+    (window as unknown as Record<string, unknown>).__GAME_EVENTS__ =
+      this.gameEvents;
+
+    if (this.replayMode) {
+      // In replay mode: create minimal UI, skip game setup.
+      // The replay tool will call loadBoardState() to inject state.
+      this.createHeader();
+      this.createContainers();
+      this.createInstructions();
+      this.createPrestigeDisplay();
+
+      // Emit state-settled so the replay tool knows the scene is ready
+      this.emitStateSettled();
+      return;
+    }
 
     // Sound system
     const phaserSound = this.sound;
@@ -269,6 +315,9 @@ export class SplendorScene extends Phaser.Scene {
       isAI: [false, true],
     });
     this.aiPlayer = new SplendorAiPlayer(GreedyStrategy);
+
+    // Create transcript recorder
+    this.recorder = new SplendorTranscriptRecorder(this.session);
 
     // Create UI
     this.createHeader();
@@ -1434,6 +1483,7 @@ export class SplendorScene extends Phaser.Scene {
   }
 
   private executeAction(action: TurnAction): void {
+    const playerIndex = this.session.currentPlayerIndex;
     try {
       const result = executeTurn(this.session, action);
 
@@ -1444,12 +1494,17 @@ export class SplendorScene extends Phaser.Scene {
       }
 
       if (result.tokensOverLimit > 0) {
-        // Need to discard tokens
+        // Need to discard tokens — defer recording until after discard
+        this.pendingPlayerIndex = playerIndex;
+        this.pendingAction = action;
+        this.pendingResult = result;
         this.refreshAll();
         this.showDiscardDialog(result.tokensOverLimit);
         return;
       }
 
+      // No discard needed — record immediately
+      this.recorder?.recordTurn(playerIndex, action, result, null);
       this.afterTurnComplete(result);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Invalid action';
@@ -1460,8 +1515,23 @@ export class SplendorScene extends Phaser.Scene {
 
   private executeDiscard(): void {
     try {
-      const result = discardTokens(this.session, { tokens: this.discardSelection as Record<string, number> });
+      const tokenDiscard = { tokens: this.discardSelection as Record<string, number> };
+      const result = discardTokens(this.session, tokenDiscard);
       this.discardContainer.removeAll(true);
+
+      // Record the deferred turn (action + discard)
+      if (this.pendingAction && this.pendingResult) {
+        this.recorder?.recordTurn(
+          this.pendingPlayerIndex,
+          this.pendingAction,
+          this.pendingResult,
+          tokenDiscard,
+        );
+      }
+      this.pendingPlayerIndex = -1;
+      this.pendingAction = null;
+      this.pendingResult = null;
+
       this.afterTurnComplete(result);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Invalid discard';
@@ -1509,12 +1579,17 @@ export class SplendorScene extends Phaser.Scene {
       const result = executeTurn(this.session, action);
 
       // Handle AI discard
+      let tokenDiscard = null;
       if (result.tokensOverLimit > 0) {
         const discard = this.aiPlayer.chooseDiscard(
           this.session, aiIndex, result.tokensOverLimit,
         );
+        tokenDiscard = discard;
         discardTokens(this.session, discard);
       }
+
+      // Record AI turn
+      this.recorder?.recordTurn(aiIndex, action, result, tokenDiscard);
 
       if (result.nobleVisit) {
         this.showToast(`AI earns a noble visit! +3 prestige`);
@@ -1557,9 +1632,17 @@ export class SplendorScene extends Phaser.Scene {
     this.setPhase('game-over');
     this.soundManager?.play(SFX_KEYS.GAME_END);
 
+    const winnerIdx = getWinnerIndex(this.session);
+
+    // Finalize and auto-save the transcript
+    if (this.recorder && !this.recorder.isSealed()) {
+      const transcript = this.recorder.finalize(winnerIdx);
+      this.autoSaveTranscript(transcript);
+    }
+
     this.gameEvents.emit('game-ended', {
       finalTurnNumber: 0,
-      winnerIndex: getWinnerIndex(this.session),
+      winnerIndex: winnerIdx,
     });
 
     const overlay = createOverlayBackground(
@@ -1569,7 +1652,6 @@ export class SplendorScene extends Phaser.Scene {
     );
     this.overlayObjects.push(...overlay.objects);
 
-    const winnerIdx = getWinnerIndex(this.session);
     const winnerText = winnerIdx === 0 ? 'You Win!' : 'AI Wins!';
 
     const human = this.session.players[0];
@@ -1640,6 +1722,115 @@ export class SplendorScene extends Phaser.Scene {
       obj.destroy();
     }
     this.overlayObjects = [];
+  }
+
+  // ── Replay: load board state ─────────────────────────────
+
+  /**
+   * Inject a board state snapshot for the replay tool.
+   *
+   * Called by the replay adapter via `page.evaluate()`.
+   * Updates all visual elements to reflect the given state,
+   * then emits `state-settled` so the replay tool can take a
+   * screenshot.
+   *
+   * Only available when `?mode=replay` is in the URL.
+   */
+  public loadBoardState(state: {
+    playerStates: PlayerSnapshot[];
+    market: MarketSnapshot;
+    tokenSupply: GemTokens;
+    nobles: NobleTile[];
+    phase: SplendorPhase;
+    currentPlayerIndex: number;
+    stepIndex?: number;
+  }): void {
+    if (!this.replayMode) {
+      throw new Error(
+        'loadBoardState() is only available in replay mode (?mode=replay)',
+      );
+    }
+
+    // Reconstruct market as Record<Tier, MarketRow> from snapshot
+    const market = {} as Record<Tier, { visible: (DevelopmentCard | null)[]; deck: DevelopmentCard[] }>;
+    for (const tierSnap of state.market) {
+      market[tierSnap.tier] = {
+        visible: tierSnap.visible,
+        // Deck contents aren't visible — only length matters for display.
+        // refreshMarket() reads market.deck.length for the deck-back count.
+        deck: new Array(tierSnap.deckCount).fill(null),
+      };
+    }
+
+    // Reconstruct player states
+    const players = state.playerStates.map((ps) => ({
+      name: ps.name,
+      isAI: ps.isAI,
+      tokens: { ...ps.tokens },
+      purchasedCards: [...ps.purchasedCards],
+      reservedCards: [...ps.reservedCards],
+      nobles: [...ps.nobles],
+    }));
+
+    // Build a minimal session for rendering
+    this.session = {
+      players,
+      market,
+      tokenSupply: { ...state.tokenSupply },
+      nobles: [...state.nobles],
+      phase: state.phase,
+      currentPlayerIndex: state.currentPlayerIndex,
+      startingPlayerIndex: 0,
+      triggerPlayerIndex: -1,
+      rng: Math.random,
+    } as SplendorSession;
+
+    // Update all visuals
+    this.refreshAll();
+
+    // Track replay step for state-settled payload
+    if (state.stepIndex !== undefined) {
+      this.replayStepIndex = state.stepIndex;
+    }
+
+    // Signal board is visually stable
+    this.emitStateSettled();
+  }
+
+  // ── Transcript persistence ──────────────────────────────
+
+  /**
+   * Auto-save a finalized transcript to browser storage.
+   * Fires and forgets -- errors are logged but do not disrupt gameplay.
+   */
+  private autoSaveTranscript(transcript: import('../GameTranscript').SplendorTranscript): void {
+    transcriptStore.save('splendor', transcript).then(
+      (stored) => {
+        if (stored) {
+          console.info(
+            `[SplendorScene] Transcript saved (${stored.id}) via ${stored.gameType}`,
+          );
+        } else {
+          console.warn('[SplendorScene] Transcript not saved -- no storage backend available');
+        }
+      },
+      (err) => {
+        console.error('[SplendorScene] Failed to auto-save transcript:', err);
+      },
+    );
+  }
+
+  // ── State-settled emission ──────────────────────────────
+
+  /**
+   * Emit state-settled when the board is visually stable and safe
+   * to screenshot. Uses the replay step index as the turn number.
+   */
+  private emitStateSettled(): void {
+    this.gameEvents.emit('state-settled', {
+      turnNumber: this.replayStepIndex,
+      phase: 'playing' as const,
+    });
   }
 
   // ── Lifecycle cleanup ───────────────────────────────────
