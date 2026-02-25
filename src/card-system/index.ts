@@ -22,5 +22,8 @@ export {
   drawOrThrow,
 } from './Deck';
 
+// Rank value utility
+export { rankValue } from './rankValue';
+
 // Pile abstraction
 export { Pile } from './Pile';

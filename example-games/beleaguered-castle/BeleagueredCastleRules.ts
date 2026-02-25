@@ -20,6 +20,7 @@ import type { Card, Rank, Suit } from '../../src/card-system/Card';
 import { RANKS } from '../../src/card-system/Card';
 import { createStandardDeck, shuffle } from '../../src/card-system/Deck';
 import { Pile } from '../../src/card-system/Pile';
+import { rankValue } from '../../src/card-system/rankValue';
 import { createSeededRng } from '../../src/core-engine/SeededRng';
 import type {
   BeleagueredCastleState,
@@ -32,27 +33,19 @@ import {
   FOUNDATION_SUITS,
 } from './BeleagueredCastleState';
 
+// Re-export rankValue so existing consumers importing from this file
+// continue to work without import-path changes.
+export { rankValue } from '../../src/card-system/rankValue';
+
 // ── Rank utilities ──────────────────────────────────────────
-
-/** Map of rank -> numeric value for ordering (A=0, 2=1, ..., K=12). */
-const RANK_VALUE: Record<Rank, number> = Object.fromEntries(
-  RANKS.map((r, i) => [r, i]),
-) as Record<Rank, number>;
-
-/**
- * Get the numeric value of a rank (A=0, K=12).
- */
-export function rankValue(rank: Rank): number {
-  return RANK_VALUE[rank];
-}
 
 /**
  * Return the next rank in the foundation build sequence,
  * or undefined if the rank is King (sequence complete).
  */
 export function nextRank(rank: Rank): Rank | undefined {
-  const idx = RANK_VALUE[rank];
-  return idx < 12 ? RANKS[idx + 1] : undefined;
+  const idx = RANKS.indexOf(rank);
+  return idx >= 0 && idx < 12 ? RANKS[idx + 1] : undefined;
 }
 
 /**
