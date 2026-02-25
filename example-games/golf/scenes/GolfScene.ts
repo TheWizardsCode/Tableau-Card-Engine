@@ -29,6 +29,7 @@ import {
   dismissOverlay,
   createSceneTitle, createSceneMenuButton,
   PhaseManager,
+  flipCard,
 } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
 import helpContent from '../help-content.json';
@@ -1024,28 +1025,15 @@ export class GolfScene extends CardGameScene {
       sprite.setDepth(10);
 
       // 1. Grid card: flip (reveal face) + translate to discard pile
-      //    First half: scaleX → 0 while moving halfway to discard
-      this.tweens.add({
-        targets: sprite,
-        scaleX: 0,
-        x: (sprite.x + discardPos.x) / 2,
-        y: (sprite.y + discardPos.y) / 2,
-        duration: SWAP_ANIM_DURATION / 2,
-        ease: 'Power2',
-        onComplete: () => {
-          // Reveal the card's actual face at the midpoint of the flip
-          sprite.setTexture(getCardTexture(grid[idx]));
-          // Second half: scaleX → 1 while completing movement to discard
-          this.tweens.add({
-            targets: sprite,
-            scaleX: 1,
-            x: discardPos.x,
-            y: discardPos.y,
-            duration: SWAP_ANIM_DURATION / 2,
-            ease: 'Power2',
-            onComplete: checkDone,
-          });
-        },
+      flipCard({
+        scene: this,
+        target: sprite,
+        newTexture: getCardTexture(grid[idx]),
+        duration: SWAP_ANIM_DURATION,
+        easeClose: 'Power2',
+        destX: discardPos.x,
+        destY: discardPos.y,
+        onComplete: checkDone,
       });
 
       // 2. Drawn card: translate from display position to vacated grid slot
@@ -1076,21 +1064,13 @@ export class GolfScene extends CardGameScene {
         this.hideDrawnCard();
 
         // Phase 2: flip the grid card in place
-        this.tweens.add({
-          targets: sprite,
-          scaleX: 0,
-          duration: SWAP_ANIM_DURATION / 4,
-          ease: 'Power2',
-          onComplete: () => {
-            sprite.setTexture(getCardTexture(grid[idx]));
-            this.tweens.add({
-              targets: sprite,
-              scaleX: 1,
-              duration: SWAP_ANIM_DURATION / 4,
-              ease: 'Power2',
-              onComplete: onComplete, // Skip wrappedOnComplete; drawn card already hidden
-            });
-          },
+        flipCard({
+          scene: this,
+          target: sprite,
+          newTexture: getCardTexture(grid[idx]),
+          duration: SWAP_ANIM_DURATION / 2,
+          easeClose: 'Power2',
+          onComplete: onComplete, // Skip wrappedOnComplete; drawn card already hidden
         });
       };
 
@@ -1128,30 +1108,16 @@ export class GolfScene extends CardGameScene {
       this.drawnCardSprite = this.add.image(startX, startY, 'card_back');
       this.drawnCardSprite.setDepth(15);
 
-      // First half: move halfway + flip (scaleX → 0)
-      this.tweens.add({
-        targets: this.drawnCardSprite,
-        x: (startX + destX) / 2,
-        y: (startY + destY) / 2,
-        scaleX: 0,
-        duration: ANIM_DURATION / 2,
-        ease: 'Power2',
+      flipCard({
+        scene: this,
+        target: this.drawnCardSprite,
+        newTexture: faceTexture,
+        duration: ANIM_DURATION,
+        easeClose: 'Power2',
+        destX,
+        destY,
         onComplete: () => {
-          if (!this.drawnCardSprite) return;
-          // Reveal face at midpoint
-          this.drawnCardSprite.setTexture(faceTexture);
-          // Second half: complete move + flip back (scaleX → 1)
-          this.tweens.add({
-            targets: this.drawnCardSprite,
-            x: destX,
-            y: destY,
-            scaleX: 1,
-            duration: ANIM_DURATION / 2,
-            ease: 'Power2',
-            onComplete: () => {
-              if (this.drawnCardSprite) this.drawnCardSprite.setDepth(0);
-            },
-          });
+          if (this.drawnCardSprite) this.drawnCardSprite.setDepth(0);
         },
       });
     } else {

@@ -13,6 +13,10 @@ export { CardGameScene } from './CardGameScene';
 export { PhaseManager } from './PhaseManager';
 export type { PhaseManagerConfig } from './PhaseManager';
 
+// Card flip animation
+export { flipCard } from './flipCard';
+export type { FlipCardOptions } from './flipCard';
+
 // Card layout helpers
 export { layoutCardPositions } from './layoutCardPositions';
 export type {
