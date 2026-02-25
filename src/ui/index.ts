@@ -9,6 +9,10 @@ export const UI_VERSION = '0.1.0';
 // Card game scene base class
 export { CardGameScene } from './CardGameScene';
 
+// Card game factory helper
+export { createCardGame } from './createCardGame';
+export type { CardGameOptions } from './createCardGame';
+
 export { HelpPanel, DEPTH_HELP_BUTTON } from './HelpPanel';
 export type { HelpSection, HelpPanelConfig } from './HelpPanel';
 
