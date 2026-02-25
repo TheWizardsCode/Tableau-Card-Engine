@@ -10,8 +10,7 @@
  * game scenes can return to the selector without needing to
  * know the catalogue themselves.
  */
-import Phaser from 'phaser';
-import './src/ui/hiDpiText'; // side-effect: crisp text on HiDPI displays
+import { createCardGame } from './src/ui/createCardGame';
 import { GameSelectorScene, REGISTRY_KEY_GAMES } from './src/ui/GameSelectorScene';
 import type { GameEntry } from './src/ui/GameSelectorScene';
 import { GolfScene } from './example-games/golf/scenes/GolfScene';
@@ -76,25 +75,11 @@ const GAMES: GameEntry[] = [
 // and toDataURL() returns a black image.
 const isReplayMode = new URLSearchParams(window.location.search).get('mode') === 'replay';
 
-const config: Phaser.Types.Core.GameConfig = {
-  type: Phaser.AUTO,
-  parent: 'game-container',
-  width: 1280,
-  height: 720,
+createCardGame({
   backgroundColor: '#1a2a1a',
   // Register all scenes; GameSelectorScene is first so it auto-starts.
-  scene: [GameSelectorScene, GolfScene, BeleagueredCastleScene, SushiGoScene, SplendorScene, LostCitiesScene, TheMindScene],
-  scale: {
-    mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH,
-  },
-  audio: {
-    disableWebAudio: false,
-  },
-  render: {
-    roundPixels: true,
-    ...(isReplayMode ? { preserveDrawingBuffer: true } : {}),
-  },
+  scenes: [GameSelectorScene, GolfScene, BeleagueredCastleScene, SushiGoScene, SplendorScene, LostCitiesScene, TheMindScene],
+  render: isReplayMode ? { preserveDrawingBuffer: true } : undefined,
   callbacks: {
     preBoot: (game: Phaser.Game) => {
       // Store catalogue in registry before any scene starts,
@@ -102,9 +87,5 @@ const config: Phaser.Types.Core.GameConfig = {
       game.registry.set(REGISTRY_KEY_GAMES, GAMES);
     },
   },
-};
-
-const game = new Phaser.Game(config);
-
-// Expose for browser testing and debugging
-(window as unknown as Record<string, unknown>).__PHASER_GAME__ = game;
+  exposeOnWindow: true,
+});
