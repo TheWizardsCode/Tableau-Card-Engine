@@ -25,6 +25,7 @@ import {
 } from './TheMindGameState';
 import { MindAiPlayer } from './AiStrategy';
 import type { MindAiTimingConfig } from './AiStrategy';
+import { PROXIMITY_MIN_DELAY, PROXIMITY_THRESHOLD } from './AiStrategy';
 import { MindTranscriptRecorder } from './GameTranscript';
 import type { MindTranscript, MindInitialState } from './GameTranscript';
 
@@ -135,7 +136,7 @@ export function runGame(config?: HeadlessGameConfig): HeadlessGameResult {
   // Main simulation loop
   while (!isGameOver(session)) {
     // Build queue of pending plays from both players
-    const queue = buildPlayQueue(aiPlayers, levelStartTime);
+    const queue = buildPlayQueue(aiPlayers, levelStartTime, getPileTopValue(session));
 
     if (queue.length === 0) {
       // No cards left but game not over — shouldn't happen, but guard
@@ -269,10 +270,16 @@ function commitLevelDelays(
 /**
  * Build a sorted queue of pending plays from both AI players.
  * Returns plays sorted by fire time (earliest first).
+ *
+ * When a card is close in value to the pile top (within
+ * {@link PROXIMITY_THRESHOLD}), its fire time is raised to at least
+ * `levelStartTime + PROXIMITY_MIN_DELAY` so the AI hesitates before
+ * playing a card right after a close value.
  */
 function buildPlayQueue(
   aiPlayers: [MindAiPlayer, MindAiPlayer],
   levelStartTime: number,
+  pileTopValue: number,
 ): PendingPlay[] {
   const queue: PendingPlay[] = [];
 
@@ -280,10 +287,23 @@ function buildPlayQueue(
     const playerId = p as PlayerId;
     const delays = aiPlayers[p].getCardDelays();
     for (const d of delays) {
+      let fireTime = levelStartTime + Math.max(d.delay, 0);
+
+      // Enforce proximity delay for cards close to the pile top
+      if (
+        pileTopValue > 0 &&
+        d.card.value - pileTopValue <= PROXIMITY_THRESHOLD
+      ) {
+        const minFireTime = levelStartTime + PROXIMITY_MIN_DELAY;
+        if (fireTime < minFireTime) {
+          fireTime = minFireTime;
+        }
+      }
+
       queue.push({
         playerId,
         cardValue: d.card.value,
-        fireTime: levelStartTime + Math.max(d.delay, 0),
+        fireTime,
       });
     }
   }

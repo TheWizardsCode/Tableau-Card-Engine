@@ -8,6 +8,8 @@ import {
   DEFAULT_JITTER_RANGE,
   MIN_PLAY_DELAY,
   AI_LAST_CARD_DELAY,
+  PROXIMITY_MIN_DELAY,
+  PROXIMITY_THRESHOLD,
   computeEffectiveDelay,
 } from '../../example-games/the-mind/AiStrategy';
 import type { MindCard } from '../../example-games/the-mind/MindCard';
@@ -664,11 +666,9 @@ describe('MindAiPlayer', () => {
       expect(delays[2].delay).toBeCloseTo(2550, 5);
     });
 
-    it('jitter can reorder cards with similar values', () => {
-      // With large jitter relative to the value gap, ordering can flip
-      // Card 50 base = 2500, Card 51 base = 2550, gap = 50
-      // jitterRange = 200 can easily flip them
-      let flipped = false;
+    it('jitter does NOT reorder cards -- monotonic ordering is enforced', () => {
+      // With the monotonic enforcement in commitLevel, a higher-value card
+      // can never fire before a lower-value card, regardless of jitter.
       for (let seed = 0; seed < 50; seed++) {
         const rng = createSeededRng(seed);
         const player = new MindAiPlayer(LinearTimingStrategy, rng, {
@@ -678,12 +678,84 @@ describe('MindAiPlayer', () => {
         player.commitLevel(hand(50, 51));
 
         const delays = player.getCardDelays();
-        if (delays[0].card.value === 51) {
-          flipped = true;
-          break;
+        // Card 50 must always come first (lower value = earlier delay)
+        expect(delays[0].card.value).toBe(50);
+        expect(delays[1].card.value).toBe(51);
+        expect(delays[1].delay).toBeGreaterThanOrEqual(delays[0].delay);
+      }
+    });
+  });
+
+  // ── Monotonic delay ordering ──
+
+  describe('monotonic delay ordering', () => {
+    it('enforces monotonically increasing delays by card value', () => {
+      // Even with high jitter, lower-value cards must always have
+      // delays <= higher-value cards
+      for (let seed = 0; seed < 100; seed++) {
+        const rng = createSeededRng(seed);
+        const player = new MindAiPlayer(LinearTimingStrategy, rng, {
+          baseDuration: 5000,
+          jitterRange: 2000, // Very high jitter
+        });
+        player.commitLevel(hand(10, 20, 30, 40, 50, 60, 70, 80, 90));
+
+        const delays = player.getCardDelays();
+        for (let i = 1; i < delays.length; i++) {
+          expect(delays[i].delay).toBeGreaterThanOrEqual(delays[i - 1].delay);
+          expect(delays[i].card.value).toBeGreaterThan(delays[i - 1].card.value);
         }
       }
-      expect(flipped).toBe(true);
+    });
+
+    it('getNextCard always returns the lowest-value card', () => {
+      for (let seed = 0; seed < 50; seed++) {
+        const rng = createSeededRng(seed);
+        const player = new MindAiPlayer(LinearTimingStrategy, rng, {
+          baseDuration: 5000,
+          jitterRange: 1000,
+        });
+        player.commitLevel(hand(15, 30, 45, 60));
+
+        const next = player.getNextCard()!;
+        expect(next.card.value).toBe(15);
+      }
+    });
+
+    it('after removing lowest card, next card is the second-lowest', () => {
+      const rng = createSeededRng(42);
+      const player = new MindAiPlayer(LinearTimingStrategy, rng, {
+        baseDuration: 5000,
+        jitterRange: 1000,
+      });
+      player.commitLevel(hand(5, 25, 50, 75));
+
+      player.removeCard(5);
+      expect(player.getNextCard()!.card.value).toBe(25);
+      player.removeCard(25);
+      expect(player.getNextCard()!.card.value).toBe(50);
+      player.removeCard(50);
+      expect(player.getNextCard()!.card.value).toBe(75);
+    });
+
+    it('bumps higher-value card delay when jitter would place it before lower-value card', () => {
+      // Use a custom strategy that gives a higher-value card a lower delay
+      const reverseStrategy: MindAiStrategy = {
+        name: 'Reverse',
+        computeDelays: (h, _config, _rng) =>
+          h.map((c) => ({ card: c, delay: (101 - c.value) * 100 })),
+      };
+      const player = new MindAiPlayer(reverseStrategy);
+      // Card 10 → raw delay 9100, Card 90 → raw delay 1100
+      // Without monotonic enforcement, card 90 would fire first
+      player.commitLevel(hand(10, 90));
+
+      const delays = player.getCardDelays();
+      // After enforcement, card 10 must still come first
+      expect(delays[0].card.value).toBe(10);
+      expect(delays[1].card.value).toBe(90);
+      // Card 90's delay must be >= Card 10's delay
+      expect(delays[1].delay).toBeGreaterThanOrEqual(delays[0].delay);
     });
   });
 
@@ -804,5 +876,123 @@ describe('computeEffectiveDelay', () => {
     );
     // opponentHandSize is 0, so fast-play path
     expect(result).toBe(AI_LAST_CARD_DELAY);
+  });
+
+  // ── Proximity delay ──
+
+  describe('proximity delay', () => {
+    it('PROXIMITY_MIN_DELAY is 1000ms', () => {
+      expect(PROXIMITY_MIN_DELAY).toBe(1000);
+    });
+
+    it('PROXIMITY_THRESHOLD is 5', () => {
+      expect(PROXIMITY_THRESHOLD).toBe(5);
+    });
+
+    it('enforces PROXIMITY_MIN_DELAY when card is within threshold of pile top', () => {
+      // Card 53, pile top 50 → gap = 3, within threshold of 5
+      // Normal delay would be max(3000 - 2500, 100) = 500
+      const result = computeEffectiveDelay(
+        /* committedDelay */ 3000,
+        /* elapsed */ 2500,
+        /* playerHandSize */ 2,
+        /* opponentHandSize */ 2,
+        /* cardValue */ 53,
+        /* pileTopValue */ 50,
+      );
+      expect(result).toBe(PROXIMITY_MIN_DELAY);
+    });
+
+    it('enforces PROXIMITY_MIN_DELAY when card is exactly at threshold', () => {
+      // Card 55, pile top 50 → gap = 5, exactly at threshold
+      const result = computeEffectiveDelay(
+        /* committedDelay */ 2000,
+        /* elapsed */ 1900,
+        /* playerHandSize */ 2,
+        /* opponentHandSize */ 2,
+        /* cardValue */ 55,
+        /* pileTopValue */ 50,
+      );
+      expect(result).toBe(PROXIMITY_MIN_DELAY);
+    });
+
+    it('does NOT enforce proximity delay when card is beyond threshold', () => {
+      // Card 56, pile top 50 → gap = 6, beyond threshold of 5
+      const result = computeEffectiveDelay(
+        /* committedDelay */ 2000,
+        /* elapsed */ 1900,
+        /* playerHandSize */ 2,
+        /* opponentHandSize */ 2,
+        /* cardValue */ 56,
+        /* pileTopValue */ 50,
+      );
+      // Normal: max(2000 - 1900, 100) = 100
+      expect(result).toBe(100);
+    });
+
+    it('keeps normal delay when it already exceeds PROXIMITY_MIN_DELAY', () => {
+      // Card 52, pile top 50 → gap = 2, within threshold
+      // But normal delay is already 4000 > 1000
+      const result = computeEffectiveDelay(
+        /* committedDelay */ 5000,
+        /* elapsed */ 1000,
+        /* playerHandSize */ 2,
+        /* opponentHandSize */ 2,
+        /* cardValue */ 52,
+        /* pileTopValue */ 50,
+      );
+      // Normal: max(5000 - 1000, 100) = 4000
+      expect(result).toBe(4000);
+    });
+
+    it('does NOT enforce proximity delay when pile is empty (pileTopValue = 0)', () => {
+      const result = computeEffectiveDelay(
+        /* committedDelay */ 2000,
+        /* elapsed */ 1900,
+        /* playerHandSize */ 2,
+        /* opponentHandSize */ 2,
+        /* cardValue */ 3,
+        /* pileTopValue */ 0,
+      );
+      // Normal: max(2000 - 1900, 100) = 100
+      expect(result).toBe(100);
+    });
+
+    it('works correctly when cardValue and pileTopValue are omitted (backward compat)', () => {
+      const result = computeEffectiveDelay(
+        /* committedDelay */ 5000,
+        /* elapsed */ 1000,
+        /* playerHandSize */ 2,
+        /* opponentHandSize */ 2,
+      );
+      // Normal: max(5000 - 1000, 100) = 4000
+      expect(result).toBe(4000);
+    });
+
+    it('proximity delay does NOT apply in fast-play mode (opponent hand empty)', () => {
+      // Even if card is close to pile top, fast-play takes priority
+      const result = computeEffectiveDelay(
+        /* committedDelay */ 5000,
+        /* elapsed */ 1000,
+        /* playerHandSize */ 2,
+        /* opponentHandSize */ 0,
+        /* cardValue */ 51,
+        /* pileTopValue */ 50,
+      );
+      expect(result).toBe(AI_LAST_CARD_DELAY);
+    });
+
+    it('enforces proximity delay for card value 1 above pile top', () => {
+      // Card 51, pile top 50 → gap = 1
+      const result = computeEffectiveDelay(
+        /* committedDelay */ 2000,
+        /* elapsed */ 1950,
+        /* playerHandSize */ 3,
+        /* opponentHandSize */ 3,
+        /* cardValue */ 51,
+        /* pileTopValue */ 50,
+      );
+      expect(result).toBe(PROXIMITY_MIN_DELAY);
+    });
   });
 });

@@ -43,22 +43,54 @@ export const MIN_PLAY_DELAY = 1500;
 export const AI_LAST_CARD_DELAY = 400;
 
 /**
+ * Minimum delay (ms) enforced when the card to play is close in value
+ * to the pile top.  Creates a natural hesitation for tight sequences.
+ */
+export const PROXIMITY_MIN_DELAY = 1000;
+
+/**
+ * Maximum value gap between the card and the pile top for the proximity
+ * delay to apply.  Cards within this distance of the pile top will
+ * always wait at least {@link PROXIMITY_MIN_DELAY}.
+ */
+export const PROXIMITY_THRESHOLD = 5;
+
+/**
  * Compute the effective AI play delay for a scheduled card.
  *
  * When the opponent's hand is empty, returns {@link AI_LAST_CARD_DELAY}
  * so the remaining cards are played quickly.  Otherwise falls back to the
  * normal elapsed-time calculation (clamped to a 100 ms floor).
+ *
+ * If `cardValue` and `pileTopValue` are provided and the card is within
+ * {@link PROXIMITY_THRESHOLD} of the pile top, the delay is raised to at
+ * least {@link PROXIMITY_MIN_DELAY} so the AI visibly hesitates before
+ * playing a card close in value to the last one laid.
  */
 export function computeEffectiveDelay(
   committedDelay: number,
   elapsedSinceLevelStart: number,
   _playerHandSize: number,
   opponentHandSize: number,
+  cardValue?: number,
+  pileTopValue?: number,
 ): number {
   if (opponentHandSize === 0) {
     return AI_LAST_CARD_DELAY;
   }
-  return Math.max(committedDelay - elapsedSinceLevelStart, 100);
+  let delay = Math.max(committedDelay - elapsedSinceLevelStart, 100);
+
+  // Enforce proximity delay when the card is close to the pile top
+  if (
+    cardValue !== undefined &&
+    pileTopValue !== undefined &&
+    pileTopValue > 0 &&
+    cardValue - pileTopValue <= PROXIMITY_THRESHOLD
+  ) {
+    delay = Math.max(delay, PROXIMITY_MIN_DELAY);
+  }
+
+  return delay;
 }
 
 // ---------------------------------------------------------------------------
@@ -199,12 +231,33 @@ export class MindAiPlayer extends AiPlayerBase<MindAiStrategy> {
    * and locks them in for the duration of the level. Must be called
    * once at the start of each level.
    *
+   * After computing raw delays (which include jitter), the delays are
+   * adjusted to enforce **monotonic ordering by card value**: a card
+   * with a higher value will never have a shorter delay than a card
+   * with a lower value. This prevents the AI from playing cards out
+   * of ascending order from its own hand.
+   *
    * @param hand - The AI's dealt hand for this level.
    */
   commitLevel(hand: ReadonlyArray<MindCard>): void {
     const raw = this.strategy.computeDelays(hand, this.config, this.rng);
-    // Sort by delay ascending (earliest first)
-    this.committedDelays = raw.sort((a, b) => a.delay - b.delay);
+
+    // Sort by card value ascending first, so we can enforce monotonicity
+    raw.sort((a, b) => a.card.value - b.card.value);
+
+    // Enforce monotonic delays: each card's delay must be >= the previous
+    // card's delay. If jitter caused a higher-value card to have a shorter
+    // delay, bump it up. This guarantees the AI always plays its lowest
+    // card first.
+    for (let i = 1; i < raw.length; i++) {
+      if (raw[i].delay < raw[i - 1].delay) {
+        raw[i] = { card: raw[i].card, delay: raw[i - 1].delay };
+      }
+    }
+
+    // Result is already sorted by delay ascending (since card-value order
+    // now equals delay order after monotonic enforcement).
+    this.committedDelays = raw;
   }
 
   /**
