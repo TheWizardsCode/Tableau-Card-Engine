@@ -43,6 +43,7 @@ import {
   dismissOverlay,
   createSceneHeader,
   layoutCardPositions,
+  flipCard,
 } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
 import helpContent from '../help-content.json';
@@ -960,9 +961,8 @@ export class TheMindScene extends CardGameScene {
         .setDepth(DEPTH_PLAYED_CARD);
 
       const faceUpTex = getMindCardTexture({ value: cardValue, faceUp: true });
-      const halfDuration = ANIM_DURATION / 2;
 
-      // Tween to pile position; flip to face-up at the midpoint
+      // Tween to pile position (translation runs in parallel with flip)
       this.tweens.add({
         targets: tempSprite,
         x: PILE_X,
@@ -972,20 +972,15 @@ export class TheMindScene extends CardGameScene {
       });
 
       // Midpoint flip: scale X to 0 then back to 1 with the face-up texture
-      this.tweens.add({
-        targets: tempSprite,
-        scaleX: 0,
-        duration: halfDuration,
-        ease: 'Cubic.easeIn',
-        onComplete: () => {
-          tempSprite.setTexture(faceUpTex);
+      flipCard({
+        scene: this,
+        target: tempSprite,
+        newTexture: faceUpTex,
+        duration: ANIM_DURATION,
+        easeClose: 'Cubic.easeIn',
+        easeOpen: 'Cubic.easeOut',
+        onMidpoint: () => {
           tempSprite.setDisplaySize(CARD_W, CARD_H);
-          this.tweens.add({
-            targets: tempSprite,
-            scaleX: 1,
-            duration: halfDuration,
-            ease: 'Cubic.easeOut',
-          });
         },
       });
 
