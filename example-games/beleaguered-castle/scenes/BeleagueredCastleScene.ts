@@ -71,12 +71,12 @@ const SFX_KEYS = {
 } as const;
 
 // ── Local card dimensions (5:7 aspect ratio, sized to fit 8 columns) ──
-const BC_CARD_W = 90;
-const BC_CARD_H = 126;
+const BC_CARD_W = 68;
+const BC_CARD_H = 95;
 
 // ── Constants ───────────────────────────────────────────────
 
-const CARD_GAP = 14;
+const CARD_GAP = 18;
 
 const ANIM_DURATION = 300; // ms per card deal animation
 const DEAL_STAGGER = 40; // ms between successive card deal tweens
@@ -85,7 +85,7 @@ const AUTO_COMPLETE_DELAY = 150; // ms between auto-complete card animations
 
 /** Preferred vertical overlap offset between cascaded cards in a tableau column.
  *  Dynamically compressed when a column has many cards (see tableauCardY). */
-const CASCADE_OFFSET_Y = 44;
+const CASCADE_OFFSET_Y = 33;
 
 /** Maximum Y for the center of the bottom card in a tableau column.
  *  Leaves room for the HUD bar at the bottom of the canvas. */
@@ -96,7 +96,7 @@ const TITLE_Y = 20;
 const FOUNDATION_Y = 95;
 
 /** Tableau starts below the foundations (with room for suit labels). */
-const TABLEAU_TOP_Y = 282;
+const TABLEAU_TOP_Y = 220;
 
 /** Z-depth for a card being dragged. */
 const DRAG_DEPTH = 1000;
