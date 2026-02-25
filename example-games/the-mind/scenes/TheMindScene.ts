@@ -447,6 +447,8 @@ export class TheMindScene extends Phaser.Scene {
       elapsed,
       this.session.players[0].hand.length, // human-AI (this player)
       this.session.players[1].hand.length, // AI (opponent)
+      nextCard.card.value,
+      getPileTopValue(this.session),
     );
 
     this.humanAiTimer = this.time.delayedCall(delay, () => {
@@ -1356,6 +1358,8 @@ export class TheMindScene extends Phaser.Scene {
       elapsed,
       this.session.players[1].hand.length, // AI (this player)
       this.session.players[0].hand.length, // human (opponent)
+      nextCard.card.value,
+      getPileTopValue(this.session),
     );
 
     this.aiTimer = this.time.delayedCall(delay, () => {
