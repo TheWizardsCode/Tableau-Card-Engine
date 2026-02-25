@@ -28,6 +28,7 @@ import {
   createOverlayBackground, createOverlayButton, createOverlayMenuButton,
   dismissOverlay,
   createSceneTitle, createSceneMenuButton,
+  PhaseManager,
 } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
 import helpContent from '../help-content.json';
@@ -102,7 +103,7 @@ export class GolfScene extends CardGameScene {
   private session!: GolfSession;
   private recorder!: TranscriptRecorder;
   private aiPlayer!: AiPlayer;
-  private turnPhase: TurnPhase = 'waiting-for-draw';
+  private phaseManager!: PhaseManager<TurnPhase>;
   private drawnCard: Card | null = null;
   private drawSource: DrawSource | null = null;
   private aiStrategyName: string = 'greedy';
@@ -159,7 +160,22 @@ export class GolfScene extends CardGameScene {
     this.humanCardSprites = [];
     this.aiCardSprites = [];
     this.drawnCardSprite = null;
-    this.turnPhase = 'waiting-for-draw';
+    this.phaseManager = new PhaseManager<TurnPhase>({
+      initialPhase: 'waiting-for-draw',
+      phaseTextMap: {
+        'waiting-for-draw': 'Click the Stock or Discard pile to draw a card',
+        'waiting-for-move': 'Click a grid card to swap, or click Discard to discard & flip',
+        'waiting-for-flip-target': 'Click a face-down card to flip it',
+        'animating': '',
+        'ai-thinking': 'AI is thinking...',
+        'round-ended': '',
+      },
+      onPhaseChange: (phase) => {
+        if (phase === 'round-ended') {
+          this.showEndScreen();
+        }
+      },
+    });
     this.drawnCard = null;
     this.drawSource = null;
 
@@ -203,6 +219,7 @@ export class GolfScene extends CardGameScene {
     this.createGrids();
     this.createScoreDisplay();
     this.createInstructions();
+    this.phaseManager.setTextObject(this.instructionText);
     if (!this.replayMode) {
       this.initHelpPanel(helpContent as HelpSection[]);
       this.initSettingsPanel();
@@ -218,7 +235,7 @@ export class GolfScene extends CardGameScene {
       this.emitStateSettled(this.session.gameState.turnNumber, this.session.gameState.phase);
     } else {
       this.emitTurnStarted();
-      this.setPhase('waiting-for-draw');
+      this.phaseManager.set('waiting-for-draw');
     }
   }
 
@@ -384,7 +401,7 @@ export class GolfScene extends CardGameScene {
     if (options.nextPlayer === 0) {
       // Human's turn
       this.emitTurnStarted();
-      this.setPhase('waiting-for-draw');
+      this.phaseManager.set('waiting-for-draw');
     } else {
       // AI's turn
       this.emitTurnStarted();
@@ -763,65 +780,31 @@ export class GolfScene extends CardGameScene {
     }
   }
 
-  // ── Phase management ────────────────────────────────────
-
-  private setPhase(phase: TurnPhase): void {
-    this.turnPhase = phase;
-
-    switch (phase) {
-      case 'waiting-for-draw':
-        this.instructionText.setText(
-          'Click the Stock or Discard pile to draw a card',
-        );
-        break;
-      case 'waiting-for-move':
-        this.instructionText.setText(
-          'Click a grid card to swap, or click Discard to discard & flip',
-        );
-        break;
-      case 'waiting-for-flip-target':
-        this.instructionText.setText(
-          'Click a face-down card to flip it',
-        );
-        break;
-      case 'animating':
-        this.instructionText.setText('');
-        break;
-      case 'ai-thinking':
-        this.instructionText.setText('AI is thinking...');
-        break;
-      case 'round-ended':
-        this.instructionText.setText('');
-        this.showEndScreen();
-        break;
-    }
-  }
-
   // ── Human input handlers ────────────────────────────────
 
   private onStockClick(): void {
-    if (this.turnPhase === 'waiting-for-draw' && this.isHumanTurn()) {
+    if (this.phaseManager.current === 'waiting-for-draw' && this.isHumanTurn()) {
       this.humanDraw('stock');
     }
   }
 
   private onDiscardClick(): void {
-    if (this.turnPhase === 'waiting-for-draw' && this.isHumanTurn()) {
+    if (this.phaseManager.current === 'waiting-for-draw' && this.isHumanTurn()) {
       this.humanDraw('discard');
-    } else if (this.turnPhase === 'waiting-for-move' && this.isHumanTurn()) {
+    } else if (this.phaseManager.current === 'waiting-for-move' && this.isHumanTurn()) {
       // Player chose to discard the drawn card — animate it to the discard
       // pile now, then prompt for the face-down card to flip.
       this.animateDrawnCardToDiscard(() => {
-        this.setPhase('waiting-for-flip-target');
+        this.phaseManager.set('waiting-for-flip-target');
       });
     }
   }
 
   private onHumanCardClick(gridIndex: number): void {
-    if (this.turnPhase === 'waiting-for-move' && this.isHumanTurn()) {
+    if (this.phaseManager.current === 'waiting-for-move' && this.isHumanTurn()) {
       // Swap: replace grid card with drawn card
       this.humanMove({ kind: 'swap', row: Math.floor(gridIndex / 3), col: gridIndex % 3 });
-    } else if (this.turnPhase === 'waiting-for-flip-target' && this.isHumanTurn()) {
+    } else if (this.phaseManager.current === 'waiting-for-flip-target' && this.isHumanTurn()) {
       // Discard-and-flip: must click a face-down card
       const grid = this.session.gameState.playerStates[0].grid;
       if (!grid[gridIndex].faceUp) {
@@ -864,14 +847,14 @@ export class GolfScene extends CardGameScene {
 
     // Show the drawn card animating from the source pile to the held position
     this.showDrawnCard(this.drawnCard, source);
-    this.setPhase('waiting-for-move');
+    this.phaseManager.set('waiting-for-move');
   }
 
   private humanMove(move: GolfMove): void {
     if (!this.drawSource) return;
 
     const action: GolfAction = { drawSource: this.drawSource, move };
-    this.setPhase('animating');
+    this.phaseManager.set('animating');
 
     const result = executeTurn(this.session, action);
     this.recorder.recordTurn(result, action.drawSource);
@@ -903,7 +886,7 @@ export class GolfScene extends CardGameScene {
 
       if (result.roundEnded) {
         this.emitStateSettled(this.session.gameState.turnNumber, this.session.gameState.phase);
-        this.setPhase('round-ended');
+        this.phaseManager.set('round-ended');
       } else {
         this.emitStateSettled(this.session.gameState.turnNumber, this.session.gameState.phase);
         this.emitTurnStarted();
@@ -915,7 +898,7 @@ export class GolfScene extends CardGameScene {
   // ── AI turn ─────────────────────────────────────────────
 
   private runAiTurn(): void {
-    this.setPhase('ai-thinking');
+    this.phaseManager.set('ai-thinking');
 
     this.time.delayedCall(AI_DELAY, () => {
       const idx = this.session.gameState.currentPlayerIndex;
@@ -946,7 +929,7 @@ export class GolfScene extends CardGameScene {
 
       // Pause so the player can see the drawn card, then execute the move
       this.time.delayedCall(AI_SHOW_DRAW_DELAY, () => {
-        this.setPhase('animating');
+        this.phaseManager.set('animating');
         const result = executeTurn(this.session, action);
         this.recorder.recordTurn(result, action.drawSource);
 
@@ -973,7 +956,7 @@ export class GolfScene extends CardGameScene {
 
           if (result.roundEnded) {
             this.emitStateSettled(this.session.gameState.turnNumber, this.session.gameState.phase);
-            this.setPhase('round-ended');
+            this.phaseManager.set('round-ended');
           } else {
             this.emitStateSettled(this.session.gameState.turnNumber, this.session.gameState.phase);
             this.emitTurnStarted();
@@ -992,9 +975,9 @@ export class GolfScene extends CardGameScene {
 
   private checkNextTurn(): void {
     if (this.session.gameState.phase === 'ended') {
-      this.setPhase('round-ended');
+      this.phaseManager.set('round-ended');
     } else if (this.isHumanTurn()) {
-      this.setPhase('waiting-for-draw');
+      this.phaseManager.set('waiting-for-draw');
     } else {
       this.runAiTurn();
     }
@@ -1225,7 +1208,7 @@ export class GolfScene extends CardGameScene {
     }
 
     // Block further input while the card is in transit
-    this.setPhase('animating');
+    this.phaseManager.set('animating');
     this.drawnCardSprite.setDepth(15);
 
     this.tweens.add({
