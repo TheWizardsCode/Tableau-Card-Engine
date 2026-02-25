@@ -12,6 +12,7 @@ This document covers everything you need to develop, test, and build the Tableau
 - [Path Aliases](#path-aliases)
 - [Adding an Example Game](#adding-an-example-game)
 - [Transcript Persistence](#transcript-persistence)
+- [Replay Tool](#replay-tool)
 - [Managing Assets](#managing-assets)
 - [Keeping Docs Up to Date](#keeping-docs-up-to-date)
 - [Work-Item Tracking](#work-item-tracking)
@@ -114,7 +115,7 @@ After this, every push to `main` will automatically deploy.
 
 1. Check the **Actions** tab in the repository for the latest workflow run
 2. Visit `https://thewizardscode.github.io/Tableau-Card-Engine/` to confirm the site loads
-3. Verify all games (9-Card Golf, Beleaguered Castle, Sushi Go!, Splendor, Lost Cities) are playable and card assets load correctly
+3. Verify all games (9-Card Golf, Beleaguered Castle, Sushi Go!, Splendor, Lost Cities, The Mind) are playable and card assets load correctly
 
 ## Testing
 
@@ -261,14 +262,47 @@ example-games/
     └── scenes/
         ├── LostCitiesMockScene.ts  Static layout mockup (development aid)
         └── LostCitiesScene.ts      Phaser scene (interactive play with animations)
+├── the-mind/
+    ├── MindCards.ts                Card types and deck creation
+    ├── MindGame.ts                 Game orchestration (levels, lives, card play, penalties)
+    ├── AiStrategy.ts               AI strategies (timing-based play decisions)
+    ├── GameTranscript.ts           Transcript types and MindTranscriptRecorder (event-based)
+    ├── headlessGame.ts             Headless AI-vs-AI runner for fixture generation
+    ├── help-content.json           Help panel content
+    └── scenes/
+        └── TheMindScene.ts         Phaser scene (real-time card play interface)
+
+scripts/
+├── replay.ts                       Replay CLI (Playwright-driven transcript replay + screenshots)
+├── generate-thumbnail.ts           Thumbnail generator (midpoint frame -> 120x68 PNG)
+├── refresh-thumbnails.sh           Batch thumbnail refresh for all games
+├── generate-*-fixture-transcript.ts  Per-game fixture transcript generators
+└── adapters/
+    ├── ReplayAdapter.ts            ReplayAdapter interface (contract for all adapters)
+    ├── AdapterRegistry.ts          Singleton adapter registry
+    ├── index.ts                    Barrel file (imports and registers all adapters)
+    ├── BeleagueredCastleReplayAdapter.ts
+    ├── LostCitiesReplayAdapter.ts
+    ├── TheMindReplayAdapter.ts
+    ├── SushiGoReplayAdapter.ts
+    ├── SplendorReplayAdapter.ts
+    └── GolfReplayAdapter.ts        (structural detection fallback -- registered last)
 
 public/assets/
 ├── cards/                  52 standard card SVGs + card_back.svg (140x190px, CC0)
 │   └── lost-cities/        60 Lost Cities expedition card SVGs + lc-back.svg (140x190px)
+├── games/                  Per-game assets (thumbnails)
+│   ├── golf/thumbnail.png
+│   ├── beleaguered-castle/thumbnail.png
+│   ├── lost-cities/thumbnail.png
+│   ├── the-mind/thumbnail.png
+│   ├── sushi-go/thumbnail.png
+│   └── splendor/thumbnail.png
 └── CREDITS.md              Asset attribution
 
 tests/
 ├── smoke.test.ts           Toolchain smoke test
+├── fixtures/transcripts/   Fixture transcripts for replay tests (one per game)
 ├── ai/                     AiPlayer, pickRandom, pickBest, barrel export tests
 ├── card-system/            Card, Deck, Pile unit tests
 ├── core-engine/            GameState, TurnSequencer, UndoRedoManager, SeededRng, TranscriptRecorder unit tests
@@ -276,6 +310,7 @@ tests/
 ├── beleaguered-castle/     Beleaguered Castle unit + integration tests
 ├── sushi-go/               Sushi Go! cards, scoring, game, AI tests
 ├── splendor/               Splendor cards, game, AI tests
+├── the-mind/               The Mind cards, game state, AI, transcript, auto-play, integration tests
 ├── lost-cities/            Lost Cities cards, scoring, rules, game, AI, transcript tests
 └── replay/                 Replay CLI validation tests
 ```
@@ -311,10 +346,26 @@ import { ENGINE_VERSION } from '@core-engine/index';
 7. Register the game in the unified entry point (`main.ts` at the project root):
    - Import the scene class
    - Add it to the `scene` array in the Phaser config
-   - Add a `GameEntry` to the `GAMES` catalogue array
+   - Add a `GameEntry` to the `GAMES` catalogue array (include `thumbnail` once available)
 8. Add a `[ Menu ]` button to the game scene that calls `this.scene.start('GameSelectorScene')` for navigation back to the selector
+9. Add transcript recording:
+   - Create `example-games/<game-name>/GameTranscript.ts` with transcript types and a `TranscriptRecorder` extending `TranscriptRecorderBase<T>` from `src/core-engine/TranscriptRecorder.ts`
+   - Integrate recording into the scene: create the recorder after game setup, record each turn/action, finalize on game over, and auto-save to `TranscriptStore`
+10. Add replay support:
+    - Add `loadBoardState(stateJson: string)` to the scene to reconstruct visual state from a transcript snapshot
+    - Emit a `state-settled` event (via `GameEventEmitter`) after `loadBoardState()` completes rendering
+    - Handle `?mode=replay` URL parameter in the scene to skip normal game initialization
+    - Expose `window.__GAME_EVENTS__` in replay mode for adapter communication
+11. Create a replay adapter:
+    - Create `scripts/adapters/<GameName>ReplayAdapter.ts` implementing the `ReplayAdapter` interface
+    - Register the adapter in `scripts/adapters/index.ts` (before Golf, which uses structural detection)
+    - Include a `gameType` field in the transcript for explicit adapter matching
+12. Generate fixture and thumbnail:
+    - Create a fixture generator script at `scripts/generate-<game>-fixture-transcript.ts`
+    - Generate and commit the fixture transcript at `tests/fixtures/transcripts/<game-name>/fixture-game.json`
+    - Generate and commit the thumbnail at `public/assets/games/<game-name>/thumbnail.png` using `./scripts/refresh-thumbnails.sh <game-name>`
 
-Follow the Golf and Beleaguered Castle examples as reference implementations.
+Follow the Golf (original reference) and Sushi Go (most recent) examples as reference implementations.
 
 ## 9-Card Golf
 
@@ -435,6 +486,7 @@ Open `http://localhost:3000` and click the **Sushi Go!** card on the game select
 | `example-games/sushi-go/SushiGoGame.ts` | Game orchestration (drafting rounds, hand passing, scoring) |
 | `example-games/sushi-go/SushiGoScoring.ts` | Set-collection scoring rules per card type |
 | `example-games/sushi-go/AiStrategy.ts` | AI strategies (RandomStrategy, GreedyStrategy) |
+| `example-games/sushi-go/GameTranscript.ts` | Transcript types and SushiGoTranscriptRecorder |
 | `example-games/sushi-go/help-content.json` | Help panel content |
 | `example-games/sushi-go/scenes/SushiGoScene.ts` | Phaser scene (drafting interface) |
 
@@ -476,6 +528,7 @@ Open `http://localhost:3000` and click the **Splendor** card on the game selecto
 | `example-games/splendor/SplendorCards.ts` | Development cards, nobles, gem types, tier data |
 | `example-games/splendor/SplendorGame.ts` | Game orchestration (token collection, purchases, nobles, win detection) |
 | `example-games/splendor/AiStrategy.ts` | AI strategies (RandomStrategy, GreedyStrategy) |
+| `example-games/splendor/GameTranscript.ts` | Transcript types and SplendorTranscriptRecorder |
 | `example-games/splendor/help-content.json` | Help panel content |
 | `example-games/splendor/scenes/SplendorScene.ts` | Phaser scene (gem market, card tiers, token UI) |
 
@@ -547,6 +600,52 @@ Tests are in `tests/lost-cities/`:
 | `lost-cities-ai.test.ts` | Random and Greedy strategies, AI player wrapper (22 tests) |
 | `lost-cities-transcript.test.ts` | Transcript recording, full AI-vs-AI match validation (21 tests) |
 
+## The Mind
+
+The Mind is a cooperative real-time card game demonstrating:
+
+- **Real-time gameplay**: Players play numbered cards (1-100) onto a shared ascending pile without communicating
+- **Event-based transcript**: Unlike turn-based games, The Mind records real-time events (card plays, penalties, level completions) rather than discrete turns
+- **Cooperative AI**: AI players use timing-based strategies to decide when to play cards
+- **Level progression**: Survive 8 levels with increasing card counts per player
+- **Headless runner**: `headlessGame.ts` enables AI-vs-AI games without Phaser for fixture generation
+
+### Running The Mind
+
+```bash
+npm run dev
+```
+
+Open `http://localhost:3000` and click the **The Mind** card on the game selector page. Click your cards to play them onto the shared pile. The AI partner plays automatically based on timing. Survive all 8 levels to win.
+
+### The Mind game files
+
+| File | Purpose |
+|------|---------|
+| `example-games/the-mind/main.ts` | Phaser game config entry point |
+| `example-games/the-mind/createTheMindGame.ts` | Factory function for tests |
+| `example-games/the-mind/MindCards.ts` | Card types and deck creation |
+| `example-games/the-mind/MindGame.ts` | Game orchestration (levels, lives, card play, penalties) |
+| `example-games/the-mind/AiStrategy.ts` | AI strategies (timing-based play decisions) |
+| `example-games/the-mind/GameTranscript.ts` | Transcript types and MindTranscriptRecorder (event-based) |
+| `example-games/the-mind/headlessGame.ts` | Headless AI-vs-AI runner for fixture generation |
+| `example-games/the-mind/help-content.json` | Help panel content |
+| `example-games/the-mind/scenes/TheMindScene.ts` | Phaser scene (real-time card play interface) |
+
+### The Mind tests
+
+Tests are in `tests/the-mind/`:
+
+| File | Tests |
+|------|-------|
+| `mind-card.test.ts` | Card types and deck creation (27 tests) |
+| `mind-card-renderer.test.ts` | Card rendering utilities (37 tests) |
+| `game-state.test.ts` | Game state, level progression, lives (72 tests) |
+| `ai-strategy.test.ts` | AI timing strategies (56 tests) |
+| `transcript.test.ts` | Event-based transcript recording (32 tests) |
+| `auto-play.test.ts` | Headless auto-play across seeds (33 tests) |
+| `integration.test.ts` | Full game invariants across seeds (33 tests) |
+
 ## Transcript Persistence
 
 Game transcripts are automatically recorded by the engine's `TranscriptStore` and saved to the browser's IndexedDB. Two additional mechanisms allow transcripts to be persisted to disk for debugging, replay, and analysis.
@@ -583,13 +682,81 @@ This launches a headless Chromium browser via Playwright, navigates to the game,
 
 ### Transcript Fixture Location
 
-The test fixture transcript used by replay tests lives at:
+Each game has a fixture transcript used by replay tests and thumbnail generation:
 
 ```
-tests/fixtures/transcripts/golf/fixture-game.json
+tests/fixtures/transcripts/<game-name>/fixture-game.json
 ```
 
-This file is checked into version control and is referenced by `scripts/replay.ts` and `scripts/generate-fixture-transcript.ts`.
+All six games have fixture transcripts checked into version control:
+
+| Game | Fixture Path |
+|------|-------------|
+| Golf | `tests/fixtures/transcripts/golf/fixture-game.json` |
+| Beleaguered Castle | `tests/fixtures/transcripts/beleaguered-castle/fixture-game.json` |
+| Lost Cities | `tests/fixtures/transcripts/lost-cities/fixture-game.json` |
+| The Mind | `tests/fixtures/transcripts/the-mind/fixture-game.json` |
+| Sushi Go | `tests/fixtures/transcripts/sushi-go/fixture-game.json` |
+| Splendor | `tests/fixtures/transcripts/splendor/fixture-game.json` |
+
+These are generated by game-specific fixture generator scripts (e.g. `scripts/generate-golf-fixture-transcript.ts`) that run deterministic AI-vs-AI games using a fixed seed.
+
+## Replay Tool
+
+The replay tool (`scripts/replay.ts`) replays a fixture transcript through the game's Phaser scene in a headless browser, capturing per-turn screenshots. It is the foundation for thumbnail generation and visual regression testing.
+
+### Running a Replay
+
+```bash
+npm run replay -- <transcript-path> [--output <dir>] [--stop-at <turn>]
+```
+
+- `transcript-path` -- Path to a fixture transcript JSON file
+- `--output <dir>` -- Output directory for screenshots (defaults to `data/screenshots/<game-type>/`)
+- `--stop-at <turn>` -- Stop replay at a specific turn number (for interactive takeover in headed mode)
+
+**Examples:**
+
+```bash
+# Replay Golf fixture and capture all screenshots
+npm run replay -- tests/fixtures/transcripts/golf/fixture-game.json
+
+# Replay Splendor with custom output directory
+npm run replay -- tests/fixtures/transcripts/splendor/fixture-game.json --output data/screenshots/splendor-test
+```
+
+Screenshots are written as `turn-000.png`, `turn-001.png`, etc. in the output directory. A `replay-summary.json` is also written with metadata.
+
+### How It Works
+
+1. The replay tool parses the transcript and resolves a `ReplayAdapter` from the adapter registry (`scripts/adapters/index.ts`)
+2. It launches a headless Chromium browser via Playwright and navigates to the game with `?mode=replay&game=<game-type>`
+3. For each turn in the transcript, it calls `adapter._injectBoardState()` which uses `page.evaluate()` to call the scene's `loadBoardState(stateJson)` method
+4. The scene reconstructs visual state from the snapshot and emits a `state-settled` event when rendering is complete
+5. The tool captures a screenshot of the canvas after each `state-settled` event
+
+### Replay Adapters
+
+Each game has a `ReplayAdapter` implementation in `scripts/adapters/` that bridges the replay tool to the game's scene:
+
+| Game | Adapter | Game Type |
+|------|---------|-----------|
+| Beleaguered Castle | `BeleagueredCastleReplayAdapter` | `beleaguered-castle` |
+| Lost Cities | `LostCitiesReplayAdapter` | `lost-cities` |
+| The Mind | `TheMindReplayAdapter` | `the-mind` |
+| Sushi Go | `SushiGoReplayAdapter` | `sushi-go` |
+| Splendor | `SplendorReplayAdapter` | `splendor` |
+| Golf | `GolfReplayAdapter` | (structural detection) |
+
+Adapters are registered in `scripts/adapters/index.ts`. Registration order matters: adapters with explicit `gameType` fields are registered before Golf, which uses structural shape-matching as a fallback.
+
+### Adding a New Replay Adapter
+
+1. Create `scripts/adapters/<GameName>ReplayAdapter.ts` implementing the `ReplayAdapter` interface from `scripts/adapters/ReplayAdapter.ts`
+2. Implement all 14 interface methods (see `SushiGoReplayAdapter` as the most recent reference)
+3. Register the adapter in `scripts/adapters/index.ts` before the Golf adapter
+4. Ensure the game scene implements `loadBoardState()` and emits `state-settled` events
+5. Test with: `npm run replay -- tests/fixtures/transcripts/<game>/fixture-game.json`
 
 ## Managing Assets
 
