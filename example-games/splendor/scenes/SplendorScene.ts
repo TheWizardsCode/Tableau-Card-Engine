@@ -44,6 +44,7 @@ import { SplendorAiPlayer, GreedyStrategy } from '../AiStrategy';
 import { SplendorTranscriptRecorder } from '../GameTranscript';
 import type { MarketSnapshot, PlayerSnapshot } from '../GameTranscript';
 import { TranscriptStore } from '../../../src/core-engine/TranscriptStore';
+import { autoSaveTranscript } from '../../../src/core-engine/autoSaveTranscript';
 import { GameEventEmitter } from '../../../src/core-engine/GameEventEmitter';
 import { PhaserEventBridge } from '../../../src/core-engine/PhaserEventBridge';
 import { SoundManager } from '../../../src/core-engine/SoundManager';
@@ -1641,7 +1642,7 @@ export class SplendorScene extends Phaser.Scene {
     // Finalize and auto-save the transcript
     if (this.recorder && !this.recorder.isSealed()) {
       const transcript = this.recorder.finalize(winnerIdx);
-      this.autoSaveTranscript(transcript);
+      autoSaveTranscript(transcriptStore, 'splendor', transcript, '[SplendorScene]');
     }
 
     this.gameEvents.emit('game-ended', {
@@ -1791,29 +1792,6 @@ export class SplendorScene extends Phaser.Scene {
 
     // Signal board is visually stable
     this.emitStateSettled();
-  }
-
-  // ── Transcript persistence ──────────────────────────────
-
-  /**
-   * Auto-save a finalized transcript to browser storage.
-   * Fires and forgets -- errors are logged but do not disrupt gameplay.
-   */
-  private autoSaveTranscript(transcript: import('../GameTranscript').SplendorTranscript): void {
-    transcriptStore.save('splendor', transcript).then(
-      (stored) => {
-        if (stored) {
-          console.info(
-            `[SplendorScene] Transcript saved (${stored.id}) via ${stored.gameType}`,
-          );
-        } else {
-          console.warn('[SplendorScene] Transcript not saved -- no storage backend available');
-        }
-      },
-      (err) => {
-        console.error('[SplendorScene] Failed to auto-save transcript:', err);
-      },
-    );
   }
 
   // ── State-settled emission ──────────────────────────────

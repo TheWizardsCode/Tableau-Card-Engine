@@ -28,6 +28,7 @@ import { scoreTableauBreakdown, countMakiIcons, scoreMaki } from '../SushiGoScor
 import { SushiGoTranscriptRecorder } from '../GameTranscript';
 import type { SushiGoCardSnapshot, PlayerSnapshot } from '../GameTranscript';
 import { TranscriptStore } from '../../../src/core-engine/TranscriptStore';
+import { autoSaveTranscript } from '../../../src/core-engine/autoSaveTranscript';
 import { GameEventEmitter } from '../../../src/core-engine/GameEventEmitter';
 import { PhaserEventBridge } from '../../../src/core-engine/PhaserEventBridge';
 import { SoundManager } from '../../../src/core-engine/SoundManager';
@@ -1156,7 +1157,7 @@ export class SushiGoScene extends Phaser.Scene {
     // Finalize and auto-save the transcript
     if (this.recorder && !this.recorder.isSealed()) {
       const transcript = this.recorder.finalize(winnerIdx);
-      this.autoSaveTranscript(transcript);
+      autoSaveTranscript(transcriptStore, 'sushi-go', transcript, '[SushiGoScene]');
     }
 
     this.gameEvents.emit('game-ended', {
@@ -1412,29 +1413,6 @@ export class SushiGoScene extends Phaser.Scene {
       return { ...base, type: 'nigiri', variant: snap.variant } as unknown as SushiGoCard;
     }
     return base as SushiGoCard;
-  }
-
-  // ── Transcript persistence ──────────────────────────────
-
-  /**
-   * Auto-save a finalized transcript to browser storage.
-   * Fires and forgets -- errors are logged but do not disrupt gameplay.
-   */
-  private autoSaveTranscript(transcript: import('../GameTranscript').SushiGoTranscript): void {
-    transcriptStore.save('sushi-go', transcript).then(
-      (stored) => {
-        if (stored) {
-          console.info(
-            `[SushiGoScene] Transcript saved (${stored.id}) via ${stored.gameType}`,
-          );
-        } else {
-          console.warn('[SushiGoScene] Transcript not saved -- no storage backend available');
-        }
-      },
-      (err) => {
-        console.error('[SushiGoScene] Failed to auto-save transcript:', err);
-      },
-    );
   }
 
   // ── State-settled emission ──────────────────────────────
