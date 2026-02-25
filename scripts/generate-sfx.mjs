@@ -84,42 +84,42 @@ function sine(freq, t) { return Math.sin(2 * Math.PI * freq * t); }
 
 // ── Sound Generators ─────────────────────────────────────────────────────────
 
-/** 1. card-draw: short swoosh (filtered noise sweep). */
+/** 1. card-draw: gentle swoosh (filtered noise sweep). */
 function generateCardDraw() {
-  const duration = 0.25;
+  const duration = 0.3;
   const numSamples = Math.floor(SAMPLE_RATE * duration);
   const samples = new Float64Array(numSamples);
 
   for (let i = 0; i < numSamples; i++) {
     const t = i / SAMPLE_RATE;
-    const env = envelope(t, 0.01, 0.05, 0.19, duration);
-    // Swoosh: noise modulated with a descending sine
-    const freq = lerp(2000, 400, t / duration);
+    const env = envelope(t, 0.03, 0.05, 0.22, duration);
+    // Swoosh: noise modulated with a descending sine, lower freq range
+    const freq = lerp(1400, 350, t / duration);
     const mod = sine(freq, t);
-    samples[i] = noise() * mod * env * 0.5;
+    samples[i] = noise() * mod * env * 0.25;
   }
   return samples;
 }
 
-/** 2. card-flip: quick snap/click with short tonal tail. */
+/** 2. card-flip: soft snap with gentle tonal tail. */
 function generateCardFlip() {
-  const duration = 0.2;
+  const duration = 0.22;
   const numSamples = Math.floor(SAMPLE_RATE * duration);
   const samples = new Float64Array(numSamples);
 
   for (let i = 0; i < numSamples; i++) {
     const t = i / SAMPLE_RATE;
-    // Initial click (noise burst)
-    const click = t < 0.01 ? noise() * (1 - t / 0.01) : 0;
-    // Tonal tail
-    const env = envelope(t, 0.005, 0.02, 0.175, duration);
-    const tone = sine(lerp(1200, 800, t / duration), t) * env * 0.3;
-    samples[i] = click * 0.7 + tone;
+    // Softer initial click (noise burst with longer fade)
+    const click = t < 0.015 ? noise() * (1 - t / 0.015) : 0;
+    // Tonal tail — lower frequency range
+    const env = envelope(t, 0.015, 0.03, 0.175, duration);
+    const tone = sine(lerp(900, 600, t / duration), t) * env * 0.15;
+    samples[i] = click * 0.3 + tone;
   }
   return samples;
 }
 
-/** 3. card-swap: two-part sound — slide out + slide in. */
+/** 3. card-swap: gentle two-part sound — slide out + slide in. */
 function generateCardSwap() {
   const duration = 0.35;
   const numSamples = Math.floor(SAMPLE_RATE * duration);
@@ -129,22 +129,22 @@ function generateCardSwap() {
   for (let i = 0; i < numSamples; i++) {
     const t = i / SAMPLE_RATE;
     if (t < half) {
-      // Slide out: ascending swoosh
-      const env = envelope(t, 0.01, 0.05, half - 0.06, half);
-      const freq = lerp(300, 1200, t / half);
-      samples[i] = noise() * sine(freq, t) * env * 0.4;
+      // Slide out: ascending swoosh, softer
+      const env = envelope(t, 0.02, 0.05, half - 0.07, half);
+      const freq = lerp(300, 900, t / half);
+      samples[i] = noise() * sine(freq, t) * env * 0.2;
     } else {
-      // Slide in: descending swoosh
+      // Slide in: descending swoosh, softer
       const t2 = t - half;
-      const env = envelope(t2, 0.01, 0.05, half - 0.06, half);
-      const freq = lerp(1200, 300, t2 / half);
-      samples[i] = noise() * sine(freq, t2) * env * 0.4;
+      const env = envelope(t2, 0.02, 0.05, half - 0.07, half);
+      const freq = lerp(900, 300, t2 / half);
+      samples[i] = noise() * sine(freq, t2) * env * 0.2;
     }
   }
   return samples;
 }
 
-/** 4. card-discard: soft thud with tonal drop. */
+/** 4. card-discard: gentle thud with tonal drop. */
 function generateCardDiscard() {
   const duration = 0.3;
   const numSamples = Math.floor(SAMPLE_RATE * duration);
@@ -152,50 +152,50 @@ function generateCardDiscard() {
 
   for (let i = 0; i < numSamples; i++) {
     const t = i / SAMPLE_RATE;
-    const env = envelope(t, 0.005, 0.03, 0.265, duration);
+    const env = envelope(t, 0.015, 0.04, 0.245, duration);
     // Low thud with descending pitch
-    const freq = lerp(400, 120, t / duration);
+    const freq = lerp(350, 100, t / duration);
     const tone = sine(freq, t);
-    // Bit of noise for texture
-    const n = noise() * 0.15 * Math.max(0, 1 - t * 8);
-    samples[i] = (tone * 0.5 + n) * env;
+    // Reduced noise for texture
+    const n = noise() * 0.08 * Math.max(0, 1 - t * 10);
+    samples[i] = (tone * 0.3 + n) * env;
   }
   return samples;
 }
 
-/** 5. turn-change: gentle two-tone chime (ascending). */
+/** 5. turn-change: soft two-tone chime (ascending). */
 function generateTurnChange() {
-  const duration = 0.5;
+  const duration = 0.55;
   const numSamples = Math.floor(SAMPLE_RATE * duration);
   const samples = new Float64Array(numSamples);
 
   for (let i = 0; i < numSamples; i++) {
     const t = i / SAMPLE_RATE;
-    // First note: C5 (523 Hz) for 0–0.25s
-    if (t < 0.25) {
-      const env = envelope(t, 0.01, 0.1, 0.14, 0.25);
-      samples[i] = sine(523, t) * env * 0.4;
+    // First note: C5 (523 Hz) for 0–0.28s
+    if (t < 0.28) {
+      const env = envelope(t, 0.025, 0.1, 0.155, 0.28);
+      samples[i] = sine(523, t) * env * 0.2;
     }
-    // Second note: E5 (659 Hz) for 0.2–0.5s (slight overlap)
-    if (t >= 0.2) {
-      const t2 = t - 0.2;
-      const env = envelope(t2, 0.01, 0.1, 0.19, 0.3);
-      samples[i] += sine(659, t) * env * 0.4;
+    // Second note: E5 (659 Hz) for 0.22–0.55s (slight overlap)
+    if (t >= 0.22) {
+      const t2 = t - 0.22;
+      const env = envelope(t2, 0.025, 0.1, 0.205, 0.33);
+      samples[i] += sine(659, t) * env * 0.2;
     }
   }
   return samples;
 }
 
-/** 6. round-end: short rising three-note fanfare. */
+/** 6. round-end: gentle rising three-note fanfare. */
 function generateRoundEnd() {
-  const duration = 0.8;
+  const duration = 0.9;
   const numSamples = Math.floor(SAMPLE_RATE * duration);
   const samples = new Float64Array(numSamples);
 
   const notes = [
-    { freq: 523, start: 0.0, len: 0.25 },   // C5
-    { freq: 659, start: 0.2, len: 0.25 },   // E5
-    { freq: 784, start: 0.4, len: 0.4 },    // G5 (longer sustain)
+    { freq: 523, start: 0.0, len: 0.3 },   // C5
+    { freq: 659, start: 0.22, len: 0.3 },   // E5
+    { freq: 784, start: 0.45, len: 0.45 },  // G5 (longer sustain)
   ];
 
   for (let i = 0; i < numSamples; i++) {
@@ -203,51 +203,51 @@ function generateRoundEnd() {
     for (const note of notes) {
       if (t >= note.start && t < note.start + note.len) {
         const nt = t - note.start;
-        const env = envelope(nt, 0.01, note.len * 0.4, note.len * 0.59, note.len);
-        // Add a slight harmonic for richness
-        samples[i] += (sine(note.freq, t) * 0.5 + sine(note.freq * 2, t) * 0.15) * env * 0.4;
+        const env = envelope(nt, 0.025, note.len * 0.35, note.len * 0.625, note.len);
+        // Softer harmonic blend
+        samples[i] += (sine(note.freq, t) * 0.3 + sine(note.freq * 2, t) * 0.07) * env * 0.25;
       }
     }
   }
   return samples;
 }
 
-/** 7. score-reveal: sparkle/shimmer — rapid arpeggiated tones. */
+/** 7. score-reveal: soft sparkle/shimmer — gentle arpeggiated tones. */
 function generateScoreReveal() {
-  const duration = 0.6;
+  const duration = 0.65;
   const numSamples = Math.floor(SAMPLE_RATE * duration);
   const samples = new Float64Array(numSamples);
 
-  // Rapid ascending arpeggio: C6, E6, G6, C7
-  const freqs = [1047, 1319, 1568, 2093];
-  const noteLen = 0.15;
+  // Lower-pitched ascending arpeggio: C5, E5, G5, C6
+  const freqs = [523, 659, 784, 1047];
+  const noteLen = 0.18;
 
   for (let i = 0; i < numSamples; i++) {
     const t = i / SAMPLE_RATE;
     for (let n = 0; n < freqs.length; n++) {
-      const start = n * 0.1;
+      const start = n * 0.12;
       if (t >= start && t < start + noteLen) {
         const nt = t - start;
-        const env = envelope(nt, 0.005, 0.03, noteLen - 0.035, noteLen);
-        samples[i] += sine(freqs[n], t) * env * 0.3;
+        const env = envelope(nt, 0.02, 0.04, noteLen - 0.06, noteLen);
+        samples[i] += sine(freqs[n], t) * env * 0.15;
       }
     }
   }
   return samples;
 }
 
-/** 8. ui-click: crisp short click. */
+/** 8. ui-click: soft, brief click. */
 function generateUIClick() {
-  const duration = 0.08;
+  const duration = 0.09;
   const numSamples = Math.floor(SAMPLE_RATE * duration);
   const samples = new Float64Array(numSamples);
 
   for (let i = 0; i < numSamples; i++) {
     const t = i / SAMPLE_RATE;
-    const env = envelope(t, 0.002, 0.008, 0.07, duration);
-    // Short click: mix of mid-frequency tone and noise burst
-    const tone = sine(1000, t) * 0.6;
-    const n = noise() * 0.3 * Math.max(0, 1 - t * 30);
+    const env = envelope(t, 0.005, 0.01, 0.075, duration);
+    // Short click: softer tone and reduced noise
+    const tone = sine(800, t) * 0.35;
+    const n = noise() * 0.12 * Math.max(0, 1 - t * 25);
     samples[i] = (tone + n) * env;
   }
   return samples;

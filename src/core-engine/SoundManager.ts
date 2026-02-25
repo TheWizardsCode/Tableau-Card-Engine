@@ -143,7 +143,7 @@ export class SoundManager {
 
     // Restore persisted preferences
     this._muted = loadBoolean(this.storage, STORAGE_KEY_MUTE, false);
-    this._volume = loadNumber(this.storage, STORAGE_KEY_VOLUME, 1.0);
+    this._volume = loadNumber(this.storage, STORAGE_KEY_VOLUME, 0.5);
 
     // Apply initial state to the player
     this.player.setMute(this._muted);
