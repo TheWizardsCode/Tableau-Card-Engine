@@ -13,6 +13,13 @@ export { CardGameScene } from './CardGameScene';
 export { PhaseManager } from './PhaseManager';
 export type { PhaseManagerConfig } from './PhaseManager';
 
+// Card layout helpers
+export { layoutCardPositions } from './layoutCardPositions';
+export type {
+  LayoutCardPositionsOptions,
+  LayoutCardPositionsResult,
+} from './layoutCardPositions';
+
 // Card game factory helper
 export { createCardGame } from './createCardGame';
 export type { CardGameOptions } from './createCardGame';

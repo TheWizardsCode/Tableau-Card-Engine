@@ -42,6 +42,7 @@ import {
   createOverlayButton,
   dismissOverlay,
   createSceneHeader,
+  layoutCardPositions,
 } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
 import helpContent from '../help-content.json';
@@ -458,20 +459,19 @@ export class TheMindScene extends CardGameScene {
     if (hand.length === 0) return;
 
     // Dynamic spacing: overlap cards if they exceed MAX_HAND_WIDTH
-    const idealWidth = hand.length * CARD_W + (hand.length - 1) * CARD_GAP;
-    const step = idealWidth <= MAX_HAND_WIDTH
-      ? CARD_W + CARD_GAP
-      : (MAX_HAND_WIDTH - CARD_W) / (hand.length - 1 || 1);
-    const actualWidth = hand.length === 1
-      ? CARD_W
-      : CARD_W + (hand.length - 1) * step;
-    const startX = (GAME_W - actualWidth) / 2 + CARD_W / 2;
+    const { positions } = layoutCardPositions({
+      count: hand.length,
+      cardWidth: CARD_W,
+      gap: CARD_GAP,
+      centerX: GAME_W / 2,
+      maxWidth: MAX_HAND_WIDTH,
+    });
 
     for (let i = 0; i < hand.length; i++) {
       const card = hand[i];
       // Human cards are always face-up
       const displayCard = { ...card, faceUp: true };
-      const x = startX + i * step;
+      const x = positions[i];
       const sprite = this.add
         .image(x, HUMAN_HAND_Y, getMindCardTexture(displayCard))
         .setDisplaySize(CARD_W, CARD_H)
@@ -539,17 +539,16 @@ export class TheMindScene extends CardGameScene {
     }
 
     // Dynamic spacing: overlap cards if they exceed MAX_HAND_WIDTH
-    const idealWidth = hand.length * CARD_W + (hand.length - 1) * CARD_GAP;
-    const step = idealWidth <= MAX_HAND_WIDTH
-      ? CARD_W + CARD_GAP
-      : (MAX_HAND_WIDTH - CARD_W) / (hand.length - 1 || 1);
-    const actualWidth = hand.length === 1
-      ? CARD_W
-      : CARD_W + (hand.length - 1) * step;
-    const startX = (GAME_W - actualWidth) / 2 + CARD_W / 2;
+    const { positions } = layoutCardPositions({
+      count: hand.length,
+      cardWidth: CARD_W,
+      gap: CARD_GAP,
+      centerX: GAME_W / 2,
+      maxWidth: MAX_HAND_WIDTH,
+    });
 
     for (let i = 0; i < hand.length; i++) {
-      const x = startX + i * step;
+      const x = positions[i];
       const sprite = this.add
         .image(x, AI_HAND_Y, CARD_BACK_KEY)
         .setDisplaySize(CARD_W, CARD_H)
@@ -1485,17 +1484,16 @@ export class TheMindScene extends CardGameScene {
     if (cardValues.length === 0) return;
 
     // Dynamic spacing (same algorithm as renderHumanHand)
-    const idealWidth = cardValues.length * CARD_W + (cardValues.length - 1) * CARD_GAP;
-    const step = idealWidth <= MAX_HAND_WIDTH
-      ? CARD_W + CARD_GAP
-      : (MAX_HAND_WIDTH - CARD_W) / (cardValues.length - 1 || 1);
-    const actualWidth = cardValues.length === 1
-      ? CARD_W
-      : CARD_W + (cardValues.length - 1) * step;
-    const startX = (GAME_W - actualWidth) / 2 + CARD_W / 2;
+    const { positions } = layoutCardPositions({
+      count: cardValues.length,
+      cardWidth: CARD_W,
+      gap: CARD_GAP,
+      centerX: GAME_W / 2,
+      maxWidth: MAX_HAND_WIDTH,
+    });
 
     for (let i = 0; i < cardValues.length; i++) {
-      const x = startX + i * step;
+      const x = positions[i];
       const card: MindCard = { value: cardValues[i], faceUp };
       const texture = faceUp ? getMindCardTexture(card) : CARD_BACK_KEY;
       const sprite = this.add
