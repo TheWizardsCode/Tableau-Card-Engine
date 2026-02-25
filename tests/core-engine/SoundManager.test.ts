@@ -43,7 +43,7 @@ describe('SoundManager', () => {
   describe('constructor', () => {
     it('should apply default volume and mute state to player', () => {
       expect(player.setMute).toHaveBeenCalledWith(false);
-      expect(player.setVolume).toHaveBeenCalledWith(1.0);
+      expect(player.setVolume).toHaveBeenCalledWith(0.5);
     });
 
     it('should restore muted state from storage', () => {
@@ -67,7 +67,7 @@ describe('SoundManager', () => {
     it('should handle null storage gracefully', () => {
       const p = createMockPlayer();
       const mgr = new SoundManager(p, { storage: null });
-      expect(mgr.volume).toBe(1.0);
+      expect(mgr.volume).toBe(0.5);
       expect(mgr.muted).toBe(false);
     });
 
@@ -76,7 +76,7 @@ describe('SoundManager', () => {
       s.setItem('tce-sound-volume', 'not-a-number');
       const p = createMockPlayer();
       const mgr = new SoundManager(p, { storage: s });
-      expect(mgr.volume).toBe(1.0);
+      expect(mgr.volume).toBe(0.5);
     });
   });
 
@@ -134,8 +134,8 @@ describe('SoundManager', () => {
   // ── Volume ──────────────────────────────────────────────
 
   describe('volume', () => {
-    it('should default to 1.0', () => {
-      expect(sm.volume).toBe(1.0);
+    it('should default to 0.5', () => {
+      expect(sm.volume).toBe(0.5);
     });
 
     it('should set volume and forward to player', () => {
