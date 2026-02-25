@@ -15,7 +15,6 @@
  *   - Overlays for level complete, win, loss
  */
 
-import Phaser from 'phaser';
 import type { MindCard } from '../MindCard';
 import type { PlayResult, PlayerId, TheMindSession } from '../TheMindGameState';
 import {
@@ -33,21 +32,15 @@ import {
 import { CARD_BACK_KEY } from '../MindCard';
 import { MindTranscriptRecorder } from '../GameTranscript';
 import type { MindInitialState } from '../GameTranscript';
-import { GameEventEmitter } from '../../../src/core-engine/GameEventEmitter';
-import { PhaserEventBridge } from '../../../src/core-engine/PhaserEventBridge';
-import { SoundManager } from '../../../src/core-engine/SoundManager';
-import type { SoundPlayer, EventSoundMapping } from '../../../src/core-engine/SoundManager';
+import type { EventSoundMapping } from '../../../src/core-engine/SoundManager';
 import {
   GAME_W,
   GAME_H,
   FONT_FAMILY,
+  CardGameScene,
   createOverlayBackground,
   createOverlayButton,
   createSceneHeader,
-  SettingsPanel,
-  SettingsButton,
-  HelpPanel,
-  HelpButton,
 } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
 import helpContent from '../help-content.json';
@@ -105,7 +98,7 @@ type GamePhase =
 
 // ── Scene ───────────────────────────────────────────────────
 
-export class TheMindScene extends Phaser.Scene {
+export class TheMindScene extends CardGameScene {
   // Game state
   private session!: TheMindSession;
   private aiPlayer!: MindAiPlayer;
@@ -124,22 +117,8 @@ export class TheMindScene extends Phaser.Scene {
   private humanAiTimer: Phaser.Time.TimerEvent | null = null;
   private autoPlayButton!: Phaser.GameObjects.Text;
 
-  // Event system
-  private gameEvents!: GameEventEmitter;
-  private eventBridge!: PhaserEventBridge;
-
   // Replay mode
-  private replayMode = false;
   private replayStepIndex = 0;
-
-  // Sound system
-  private soundManager: SoundManager | null = null;
-  private settingsPanel!: SettingsPanel;
-  private settingsButton!: SettingsButton;
-
-  // Help system
-  private helpPanel!: HelpPanel;
-  private helpButton!: HelpButton;
 
   // Display objects -- human hand
   private humanCardSprites: Phaser.GameObjects.Image[] = [];
@@ -201,14 +180,10 @@ export class TheMindScene extends Phaser.Scene {
     // Check URL parameters
     const urlParams = new URLSearchParams(window.location.search);
     this.autoPlayEnabled = urlParams.get('autoplay') === 'true';
-    this.replayMode = urlParams.get('mode') === 'replay';
+    this.detectReplayMode();
 
     // Event system
-    this.gameEvents = new GameEventEmitter();
-    this.eventBridge = new PhaserEventBridge(this.gameEvents, this.events);
-    // Expose for replay tool (page.evaluate can listen for state-settled)
-    (window as unknown as Record<string, unknown>).__GAME_EVENTS__ =
-      this.gameEvents;
+    this.initEventSystem();
 
     if (this.replayMode) {
       // In replay mode: create minimal UI, skip game setup.
@@ -224,7 +199,7 @@ export class TheMindScene extends Phaser.Scene {
       this.livesText.setText('Lives: \u2764\u2764');
 
       // Emit state-settled so the replay tool knows the scene is ready
-      this.emitStateSettled();
+      this.emitStateSettled(this.replayStepIndex, 'playing');
       return;
     }
 
@@ -245,7 +220,7 @@ export class TheMindScene extends Phaser.Scene {
     this.createPile();
     this.createInstruction();
     this.createAutoPlayButton();
-    this.createHelpPanel();
+    this.initHelpPanel(helpContent as HelpSection[]);
 
     // Initial render
     this.renderHumanHand();
@@ -338,38 +313,11 @@ export class TheMindScene extends Phaser.Scene {
   // ── Sound system ────────────────────────────────────────
 
   private createSoundSystem(): void {
-    const phaserSound = this.sound;
-    const player: SoundPlayer = {
-      play: (key: string) => { phaserSound.play(key); },
-      stop: (key: string) => { phaserSound.stopByKey(key); },
-      setVolume: (v: number) => { phaserSound.volume = v; },
-      setMute: (m: boolean) => { phaserSound.mute = m; },
-    };
-    this.soundManager = new SoundManager(player);
-    for (const sfxKey of Object.values(SFX_KEYS)) {
-      this.soundManager.register(sfxKey);
-    }
-
-    // Declarative event-to-sound mapping
     const mapping: EventSoundMapping = {
       'game-ended': SFX_KEYS.UI_CLICK,
     };
-    this.soundManager.connectToEvents(this.gameEvents, mapping);
-
-    // Settings UI (mute toggle + volume slider)
-    this.settingsPanel = new SettingsPanel(this, {
-      soundManager: this.soundManager,
-    });
-    this.settingsButton = new SettingsButton(this, this.settingsPanel);
-  }
-
-  // ── Help panel ─────────────────────────────────────────
-
-  private createHelpPanel(): void {
-    this.helpPanel = new HelpPanel(this, {
-      sections: helpContent as HelpSection[],
-    });
-    this.helpButton = new HelpButton(this, this.helpPanel);
+    this.initSoundSystem(Object.values(SFX_KEYS), mapping);
+    this.initSettingsPanel();
   }
 
   // ── Auto-play spectator mode ───────────────────────────
@@ -1518,7 +1466,7 @@ export class TheMindScene extends Phaser.Scene {
     }
 
     // Signal board is visually stable and ready for screenshot
-    this.emitStateSettled();
+    this.emitStateSettled(this.replayStepIndex, 'playing');
   }
 
   /**
@@ -1567,18 +1515,6 @@ export class TheMindScene extends Phaser.Scene {
       .setDepth(DEPTH_UI);
   }
 
-  /**
-   * Emit state-settled when the board is visually stable and safe
-   * to screenshot. Uses the replay step index as the turn number
-   * (since The Mind is event-based rather than turn-based).
-   */
-  private emitStateSettled(): void {
-    this.gameEvents.emit('state-settled', {
-      turnNumber: this.replayStepIndex,
-      phase: 'playing' as const,
-    });
-  }
-
   // ── Shutdown ────────────────────────────────────────────
 
   shutdown(): void {
@@ -1587,14 +1523,7 @@ export class TheMindScene extends Phaser.Scene {
 
     this.cancelAiTimer();
     this.cancelHumanAiTimer();
-    this.soundManager?.destroy();
-    this.soundManager = null;
-    this.eventBridge?.destroy();
-    this.gameEvents?.removeAllListeners();
-    this.settingsPanel?.destroy();
-    this.settingsButton?.destroy();
-    this.helpPanel?.destroy();
-    this.helpButton?.destroy();
+    this.shutdownBase();
 
     // Clean up overlay objects
     for (const obj of this.overlayObjects) {

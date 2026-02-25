@@ -10,7 +10,6 @@
  *   - AI opponent plays automatically with a short delay
  */
 
-import Phaser from 'phaser';
 import type { Card, Rank, Suit } from '../../../src/card-system/Card';
 import type { GolfMove, DrawSource } from '../GolfRules';
 import type { GolfSession, GolfAction, TurnResult } from '../GolfGame';
@@ -21,13 +20,9 @@ import type { AiStrategy } from '../AiStrategy';
 import { TranscriptRecorder } from '../GameTranscript';
 import type { GameTranscript, BoardSnapshot, CardSnapshot } from '../GameTranscript';
 import { TranscriptStore } from '../../../src/core-engine/TranscriptStore';
-import { GameEventEmitter } from '../../../src/core-engine/GameEventEmitter';
-import { PhaserEventBridge } from '../../../src/core-engine/PhaserEventBridge';
-import { SoundManager } from '../../../src/core-engine/SoundManager';
-import type { SoundPlayer, EventSoundMapping } from '../../../src/core-engine/SoundManager';
+import type { EventSoundMapping } from '../../../src/core-engine/SoundManager';
 import {
-  HelpPanel, HelpButton,
-  SettingsPanel, SettingsButton,
+  CardGameScene,
   GAME_W, GAME_H, FONT_FAMILY,
   cardTextureKey, getCardTexture, preloadCardAssets,
   createOverlayBackground, createOverlayButton, createOverlayMenuButton,
@@ -101,7 +96,7 @@ const SFX_KEYS = {
 /** Shared TranscriptStore instance for the Golf game. */
 const transcriptStore = new TranscriptStore();
 
-export class GolfScene extends Phaser.Scene {
+export class GolfScene extends CardGameScene {
   // Game state
   private session!: GolfSession;
   private recorder!: TranscriptRecorder;
@@ -111,19 +106,11 @@ export class GolfScene extends Phaser.Scene {
   private drawSource: DrawSource | null = null;
   private aiStrategyName: string = 'greedy';
 
-  /** When true, the scene suppresses all input and AI turns for replay use. */
-  private replayMode: boolean = false;
-
   /** Tracks whether loadBoardState() has been called (required before enableInteractiveMode). */
   private boardStateInjected: boolean = false;
 
   /** Game objects belonging to the takeover overlay (for cleanup). */
   private takeoverOverlayObjects: Phaser.GameObjects.GameObject[] = [];
-
-  // Event system
-  private gameEvents!: GameEventEmitter;
-  private eventBridge!: PhaserEventBridge;
-  private soundManager: SoundManager | null = null;
 
   // Display objects -- grids
   private humanCardSprites: Phaser.GameObjects.Image[] = [];
@@ -141,14 +128,6 @@ export class GolfScene extends Phaser.Scene {
   private instructionText!: Phaser.GameObjects.Text;
   private humanLabel!: Phaser.GameObjects.Text;
   private aiLabel!: Phaser.GameObjects.Text;
-
-  // Help panel
-  private helpPanel!: HelpPanel;
-  private helpButton!: HelpButton;
-
-  // Settings panel
-  private settingsPanel!: SettingsPanel;
-  private settingsButton!: SettingsButton;
 
   constructor() {
     super({ key: 'GolfScene' });
@@ -184,36 +163,17 @@ export class GolfScene extends Phaser.Scene {
     this.drawSource = null;
 
     // Check for replay mode via URL parameter (?mode=replay)
-    this.replayMode =
-      new URLSearchParams(window.location.search).get('mode') === 'replay';
+    this.detectReplayMode();
 
     // Select AI strategy
     const strategy: AiStrategy =
       this.aiStrategyName === 'random' ? RandomStrategy : GreedyStrategy;
 
     // Event system: create emitter and bridge to Phaser scene events
-    this.gameEvents = new GameEventEmitter();
-    this.eventBridge = new PhaserEventBridge(this.gameEvents, this.events);
-    (window as unknown as Record<string, unknown>).__GAME_EVENTS__ =
-      this.gameEvents;
+    this.initEventSystem();
 
     // Sound system: wrap Phaser's sound manager as a SoundPlayer
     if (!this.replayMode) {
-      const phaserSound = this.sound;
-      const player: SoundPlayer = {
-        play: (key: string) => { phaserSound.play(key); },
-        stop: (key: string) => { phaserSound.stopByKey(key); },
-        setVolume: (v: number) => { phaserSound.volume = v; },
-        setMute: (m: boolean) => { phaserSound.mute = m; },
-      };
-      this.soundManager = new SoundManager(player);
-
-      // Register all SFX keys
-      for (const sfxKey of Object.values(SFX_KEYS)) {
-        this.soundManager.register(sfxKey);
-      }
-
-      // Declarative event-to-sound mapping
       const mapping: EventSoundMapping = {
         'card-drawn': SFX_KEYS.CARD_DRAW,
         'card-flipped': SFX_KEYS.CARD_FLIP,
@@ -222,7 +182,7 @@ export class GolfScene extends Phaser.Scene {
         'turn-started': SFX_KEYS.TURN_CHANGE,
         'game-ended': SFX_KEYS.ROUND_END,
       };
-      this.soundManager.connectToEvents(this.gameEvents, mapping);
+      this.initSoundSystem(Object.values(SFX_KEYS), mapping);
     }
 
     // Setup game
@@ -243,8 +203,8 @@ export class GolfScene extends Phaser.Scene {
     this.createScoreDisplay();
     this.createInstructions();
     if (!this.replayMode) {
-      this.createHelpPanel();
-      this.createSettingsPanel();
+      this.initHelpPanel(helpContent as HelpSection[]);
+      this.initSettingsPanel();
     }
 
     // Initial render
@@ -254,7 +214,7 @@ export class GolfScene extends Phaser.Scene {
       // In replay mode: clear instruction text and emit state-settled
       // so the replay tool knows the scene is ready for state injection.
       this.instructionText.setText('');
-      this.emitStateSettled();
+      this.emitStateSettled(this.session.gameState.turnNumber, this.session.gameState.phase);
     } else {
       this.emitTurnStarted();
       this.setPhase('waiting-for-draw');
@@ -349,7 +309,7 @@ export class GolfScene extends Phaser.Scene {
     this.boardStateInjected = true;
 
     // Signal that the board is visually stable and ready for screenshot
-    this.emitStateSettled();
+    this.emitStateSettled(this.session.gameState.turnNumber, this.session.gameState.phase);
   }
 
   /**
@@ -945,10 +905,10 @@ export class GolfScene extends Phaser.Scene {
       this.drawSource = null;
 
       if (result.roundEnded) {
-        this.emitStateSettled();
+        this.emitStateSettled(this.session.gameState.turnNumber, this.session.gameState.phase);
         this.setPhase('round-ended');
       } else {
-        this.emitStateSettled();
+        this.emitStateSettled(this.session.gameState.turnNumber, this.session.gameState.phase);
         this.emitTurnStarted();
         this.checkNextTurn();
       }
@@ -1015,10 +975,10 @@ export class GolfScene extends Phaser.Scene {
           this.emitAnimationComplete();
 
           if (result.roundEnded) {
-            this.emitStateSettled();
+            this.emitStateSettled(this.session.gameState.turnNumber, this.session.gameState.phase);
             this.setPhase('round-ended');
           } else {
-            this.emitStateSettled();
+            this.emitStateSettled(this.session.gameState.turnNumber, this.session.gameState.phase);
             this.emitTurnStarted();
             this.checkNextTurn();
           }
@@ -1298,24 +1258,6 @@ export class GolfScene extends Phaser.Scene {
     }
   }
 
-  // ── Help panel ─────────────────────────────────────────────
-
-  private createHelpPanel(): void {
-    this.helpPanel = new HelpPanel(this, {
-      sections: helpContent as HelpSection[],
-    });
-    this.helpButton = new HelpButton(this, this.helpPanel);
-  }
-
-  /** Create the settings panel with sound controls (mute toggle + volume slider). */
-  private createSettingsPanel(): void {
-    if (!this.soundManager) return;
-    this.settingsPanel = new SettingsPanel(this, {
-      soundManager: this.soundManager,
-    });
-    this.settingsButton = new SettingsButton(this, this.settingsPanel);
-  }
-
   // ── Engine event emission ─────────────────────────────────
 
   /** Emit turn-started for the current player. */
@@ -1347,17 +1289,6 @@ export class GolfScene extends Phaser.Scene {
     });
   }
 
-  /**
-   * Emit state-settled when the board is visually stable and safe
-   * to screenshot. Called after animations complete and display is refreshed.
-   */
-  private emitStateSettled(): void {
-    this.gameEvents.emit('state-settled', {
-      turnNumber: this.session.gameState.turnNumber,
-      phase: this.session.gameState.phase,
-    });
-  }
-
   /** Emit game-ended with final results. */
   private emitGameEnded(winnerIndex: number, reason?: string): void {
     this.gameEvents.emit('game-ended', {
@@ -1369,14 +1300,7 @@ export class GolfScene extends Phaser.Scene {
 
   /** Clean up resources when the scene shuts down. */
   shutdown(): void {
-    this.soundManager?.destroy();
-    this.soundManager = null;
-    this.eventBridge?.destroy();
-    this.gameEvents?.removeAllListeners();
-    this.helpPanel?.destroy();
-    this.helpButton?.destroy();
-    this.settingsPanel?.destroy();
-    this.settingsButton?.destroy();
+    this.shutdownBase();
   }
 
   // ── Transcript persistence ──────────────────────────────
