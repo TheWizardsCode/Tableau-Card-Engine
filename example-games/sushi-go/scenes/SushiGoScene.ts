@@ -39,6 +39,7 @@ import {
   createOverlayBackground, createOverlayButton, createOverlayMenuButton,
   dismissOverlay,
   PhaseManager,
+  layoutCardPositions,
   createSceneTitle, createSceneMenuButton,
 } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
@@ -556,11 +557,15 @@ export class SushiGoScene extends Phaser.Scene {
     const hand = this.session.players[0].hand;
     if (hand.length === 0) return;
 
-    const totalW = hand.length * HAND_CARD_W + (hand.length - 1) * HAND_GAP;
-    const startX = (GAME_W - totalW) / 2 + HAND_CARD_W / 2;
+    const { positions } = layoutCardPositions({
+      count: hand.length,
+      cardWidth: HAND_CARD_W,
+      gap: HAND_GAP,
+      centerX: GAME_W / 2,
+    });
 
     for (let i = 0; i < hand.length; i++) {
-      const x = startX + i * (HAND_CARD_W + HAND_GAP);
+      const x = positions[i];
       const isInteractive = this.phaseManager.current === 'picking';
       const cardContainer = this.createCardRect(
         x, HAND_Y, HAND_CARD_W, HAND_CARD_H,
