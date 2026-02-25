@@ -53,6 +53,7 @@ import {
   SettingsPanel, SettingsButton,
   GAME_W, GAME_H, FONT_FAMILY,
   createOverlayBackground, createOverlayButton, createOverlayMenuButton,
+  dismissOverlay,
   createSceneTitle, createSceneMenuButton,
 } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
@@ -1427,7 +1428,8 @@ export class SplendorScene extends Phaser.Scene {
     if (canBuy) {
       const buyBtn = createOverlayButton(this, bx, GAME_H / 2 + 40, '[ Buy ]');
       buyBtn.on('pointerdown', () => {
-        this.dismissOverlay();
+        dismissOverlay(this.overlayObjects);
+        this.overlayObjects = [];
         this.executePurchase(card.id);
       });
       this.overlayObjects.push(buyBtn);
@@ -1438,7 +1440,8 @@ export class SplendorScene extends Phaser.Scene {
     if (player.reservedCards.length < 3) {
       const resBtn = createOverlayButton(this, bx, GAME_H / 2 + 40, '[ Reserve ]');
       resBtn.on('pointerdown', () => {
-        this.dismissOverlay();
+        dismissOverlay(this.overlayObjects);
+        this.overlayObjects = [];
         this.executeReserve(card.id);
       });
       this.overlayObjects.push(resBtn);
@@ -1448,7 +1451,8 @@ export class SplendorScene extends Phaser.Scene {
     const cancelBtn = createOverlayButton(this, bx, GAME_H / 2 + 40, '[ Cancel ]');
     cancelBtn.on('pointerdown', () => {
       this.soundManager?.play(SFX_KEYS.UI_CLICK);
-      this.dismissOverlay();
+      dismissOverlay(this.overlayObjects);
+      this.overlayObjects = [];
       this.setPhase('player-turn');
     });
     this.overlayObjects.push(cancelBtn);
@@ -1686,7 +1690,8 @@ export class SplendorScene extends Phaser.Scene {
     );
     playBtn.on('pointerdown', () => {
       this.soundManager?.play(SFX_KEYS.UI_CLICK);
-      this.dismissOverlay();
+      dismissOverlay(this.overlayObjects);
+      this.overlayObjects = [];
       this.scene.restart();
     });
     this.overlayObjects.push(playBtn);
@@ -1713,15 +1718,6 @@ export class SplendorScene extends Phaser.Scene {
     this.time.delayedCall(2000, () => {
       toast.destroy();
     });
-  }
-
-  // ── Overlay cleanup ─────────────────────────────────────
-
-  private dismissOverlay(): void {
-    for (const obj of this.overlayObjects) {
-      obj.destroy();
-    }
-    this.overlayObjects = [];
   }
 
   // ── Replay: load board state ─────────────────────────────
@@ -1844,7 +1840,8 @@ export class SplendorScene extends Phaser.Scene {
     this.helpButton?.destroy();
     this.settingsPanel?.destroy();
     this.settingsButton?.destroy();
-    this.dismissOverlay();
+    dismissOverlay(this.overlayObjects);
+    this.overlayObjects = [];
     this.discardContainer?.removeAll(true);
   }
 }

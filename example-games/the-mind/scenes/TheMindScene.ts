@@ -40,6 +40,7 @@ import {
   CardGameScene,
   createOverlayBackground,
   createOverlayButton,
+  dismissOverlay,
   createSceneHeader,
 } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
@@ -1526,11 +1527,7 @@ export class TheMindScene extends CardGameScene {
     this.shutdownBase();
 
     // Clean up overlay objects
-    for (const obj of this.overlayObjects) {
-      if (obj && obj.active) {
-        obj.destroy();
-      }
-    }
+    dismissOverlay(this.overlayObjects);
     this.overlayObjects = [];
   }
 }

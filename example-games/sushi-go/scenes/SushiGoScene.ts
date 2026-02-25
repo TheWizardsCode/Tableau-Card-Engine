@@ -37,6 +37,7 @@ import {
   SettingsPanel, SettingsButton,
   GAME_W, GAME_H, FONT_FAMILY,
   createOverlayBackground, createOverlayButton, createOverlayMenuButton,
+  dismissOverlay,
   createSceneTitle, createSceneMenuButton,
 } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
@@ -1141,7 +1142,8 @@ export class SushiGoScene extends Phaser.Scene {
     const btn = createOverlayButton(this, GAME_W / 2, buttonY, '[ Next Round ]');
     btn.on('pointerdown', () => {
       this.soundManager?.play(SFX_KEYS.UI_CLICK);
-      this.dismissOverlay();
+      dismissOverlay(this.overlayObjects);
+      this.overlayObjects = [];
       this.refreshAll();
       this.setPhase('picking');
     });
@@ -1262,13 +1264,6 @@ export class SushiGoScene extends Phaser.Scene {
       const menuBtn = createOverlayMenuButton(this, GAME_W / 2 + 80, gButtonY);
       this.overlayObjects.push(menuBtn);
     }
-  }
-
-  private dismissOverlay(): void {
-    for (const obj of this.overlayObjects) {
-      obj.destroy();
-    }
-    this.overlayObjects = [];
   }
 
   // ── Animation ───────────────────────────────────────────
@@ -1474,6 +1469,7 @@ export class SushiGoScene extends Phaser.Scene {
       this.chopsticksButton.destroy();
       this.chopsticksButton = null;
     }
-    this.dismissOverlay();
+    dismissOverlay(this.overlayObjects);
+    this.overlayObjects = [];
   }
 }

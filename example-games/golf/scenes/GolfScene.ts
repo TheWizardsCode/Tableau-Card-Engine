@@ -26,6 +26,7 @@ import {
   GAME_W, GAME_H, FONT_FAMILY,
   cardTextureKey, getCardTexture, preloadCardAssets,
   createOverlayBackground, createOverlayButton, createOverlayMenuButton,
+  dismissOverlay,
   createSceneTitle, createSceneMenuButton,
 } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
@@ -407,9 +408,7 @@ export class GolfScene extends CardGameScene {
    */
   showTakeoverOverlay(options: { turnNumber: number; lastAction: string }): void {
     // Clean up any previous overlay
-    for (const obj of this.takeoverOverlayObjects) {
-      obj.destroy();
-    }
+    dismissOverlay(this.takeoverOverlayObjects);
     this.takeoverOverlayObjects = [];
 
     // Create the overlay background + box
@@ -469,9 +468,7 @@ export class GolfScene extends CardGameScene {
     // Helper to destroy overlay and mark interactive mode
     const dismissAndAct = (action: () => void) => {
       // Destroy all overlay objects
-      for (const obj of this.takeoverOverlayObjects) {
-        obj.destroy();
-      }
+      dismissOverlay(this.takeoverOverlayObjects);
       this.takeoverOverlayObjects = [];
 
       // Mark interactive mode flag for auto-capture
