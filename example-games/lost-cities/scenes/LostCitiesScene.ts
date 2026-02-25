@@ -59,6 +59,7 @@ import {
   LCTranscriptRecorder,
 } from '../GameTranscript';
 import { TranscriptStore } from '../../../src/core-engine/TranscriptStore';
+import { autoSaveTranscript } from '../../../src/core-engine/autoSaveTranscript';
 import { GameEventEmitter } from '../../../src/core-engine/GameEventEmitter';
 import { PhaserEventBridge } from '../../../src/core-engine/PhaserEventBridge';
 import { SoundManager } from '../../../src/core-engine/SoundManager';
@@ -1566,7 +1567,7 @@ export class LostCitiesScene extends Phaser.Scene {
 
     // Finalize transcript
     const transcript = this.recorder.finalize(this.session);
-    this.autoSaveTranscript(transcript);
+    autoSaveTranscript(transcriptStore, 'lost-cities', transcript, '[LostCitiesScene]');
 
     const overlay = createOverlayBackground(
       this,
@@ -1713,20 +1714,6 @@ export class LostCitiesScene extends Phaser.Scene {
     } else {
       this.setPhase('waiting-for-card-select');
     }
-  }
-
-  // ── Transcript persistence ──────────────────────────────
-  private autoSaveTranscript(transcript: ReturnType<LCTranscriptRecorder['finalize']>): void {
-    transcriptStore.save('lost-cities', transcript).then(
-      (stored) => {
-        if (stored) {
-          console.info(`[LostCitiesScene] Transcript saved (${stored.id})`);
-        }
-      },
-      (err) => {
-        console.error('[LostCitiesScene] Failed to auto-save transcript:', err);
-      },
-    );
   }
 
   // ── Cleanup ─────────────────────────────────────────────

@@ -77,3 +77,6 @@ export { SoundManager } from './SoundManager';
 
 // Seeded RNG factory
 export { createSeededRng } from './SeededRng';
+
+// Transcript auto-save helper
+export { autoSaveTranscript } from './autoSaveTranscript';

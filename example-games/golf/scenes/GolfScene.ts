@@ -18,8 +18,9 @@ import { scoreGrid, scoreVisibleCards } from '../GolfScoring';
 import { AiPlayer, GreedyStrategy, RandomStrategy } from '../AiStrategy';
 import type { AiStrategy } from '../AiStrategy';
 import { TranscriptRecorder } from '../GameTranscript';
-import type { GameTranscript, BoardSnapshot, CardSnapshot } from '../GameTranscript';
+import type { BoardSnapshot, CardSnapshot } from '../GameTranscript';
 import { TranscriptStore } from '../../../src/core-engine/TranscriptStore';
+import { autoSaveTranscript } from '../../../src/core-engine/autoSaveTranscript';
 import type { EventSoundMapping } from '../../../src/core-engine/SoundManager';
 import {
   CardGameScene,
@@ -1249,29 +1250,6 @@ export class GolfScene extends CardGameScene {
     this.shutdownBase();
   }
 
-  // ── Transcript persistence ──────────────────────────────
-
-  /**
-   * Auto-save a finalized transcript to browser storage.
-   * Fires and forgets -- errors are logged but do not disrupt gameplay.
-   */
-  private autoSaveTranscript(transcript: GameTranscript): void {
-    transcriptStore.save('golf', transcript).then(
-      (stored) => {
-        if (stored) {
-          console.info(
-            `[GolfScene] Transcript saved (${stored.id}) via ${stored.gameType}`,
-          );
-        } else {
-          console.warn('[GolfScene] Transcript not saved -- no storage backend available');
-        }
-      },
-      (err) => {
-        console.error('[GolfScene] Failed to auto-save transcript:', err);
-      },
-    );
-  }
-
   // ── End screen ──────────────────────────────────────────
 
   private showEndScreen(): void {
@@ -1290,7 +1268,7 @@ export class GolfScene extends CardGameScene {
     const results = transcript.results!;
 
     // Auto-save transcript to browser storage
-    this.autoSaveTranscript(transcript);
+    autoSaveTranscript(transcriptStore, 'golf', transcript, '[GolfScene]');
 
     // Play score-reveal sound directly (not event-mapped)
     this.soundManager?.play(SFX_KEYS.SCORE_REVEAL);
