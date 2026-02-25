@@ -9,6 +9,10 @@ export const UI_VERSION = '0.1.0';
 // Card game scene base class
 export { CardGameScene } from './CardGameScene';
 
+// Phase state machine
+export { PhaseManager } from './PhaseManager';
+export type { PhaseManagerConfig } from './PhaseManager';
+
 // Card game factory helper
 export { createCardGame } from './createCardGame';
 export type { CardGameOptions } from './createCardGame';

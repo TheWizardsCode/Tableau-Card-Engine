@@ -38,6 +38,7 @@ import {
   GAME_W, GAME_H, FONT_FAMILY,
   createOverlayBackground, createOverlayButton, createOverlayMenuButton,
   dismissOverlay,
+  PhaseManager,
   createSceneTitle, createSceneMenuButton,
 } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
@@ -129,7 +130,7 @@ export class SushiGoScene extends Phaser.Scene {
   // Game state
   private session!: SushiGoSession;
   private aiPlayer!: SushiGoAiPlayer;
-  private turnPhase: TurnPhase = 'picking';
+  private phaseManager!: PhaseManager<TurnPhase>;
   private pendingHumanPick: number | null = null;
   private pendingHumanSecondPick: number | null = null;
 
@@ -212,7 +213,27 @@ export class SushiGoScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor('#1a2a3a');
 
     // Reset state
-    this.turnPhase = 'picking';
+    this.phaseManager = new PhaseManager<TurnPhase>({
+      initialPhase: 'picking',
+      phaseTextMap: {
+        picking: 'Click a card from your hand to pick it',
+        animating: '',
+        'ai-thinking': 'AI is thinking...',
+        'round-scored': '',
+        'game-over': '',
+      },
+      onPhaseChange: (phase) => {
+        if (phase === 'picking') {
+          if (this.chopsticksMode) {
+            this.phaseManager.setPhaseText('picking', 'Chopsticks: click your 1st card');
+          } else {
+            this.phaseManager.setPhaseText('picking', 'Click a card from your hand to pick it');
+          }
+          this.refreshHand();
+          this.refreshChopsticksButton();
+        }
+      },
+    });
     this.pendingHumanPick = null;
     this.pendingHumanSecondPick = null;
     this.chopsticksMode = false;
@@ -294,7 +315,8 @@ export class SushiGoScene extends Phaser.Scene {
 
     // Initial render
     this.refreshAll();
-    this.setPhase('picking');
+    this.phaseManager.setTextObject(this.instructionText);
+    this.phaseManager.set('picking');
 
     // Keyboard: Escape cancels chopsticks mode
     this.input.keyboard?.on('keydown-ESC', () => {
@@ -539,7 +561,7 @@ export class SushiGoScene extends Phaser.Scene {
 
     for (let i = 0; i < hand.length; i++) {
       const x = startX + i * (HAND_CARD_W + HAND_GAP);
-      const isInteractive = this.turnPhase === 'picking';
+      const isInteractive = this.phaseManager.current === 'picking';
       const cardContainer = this.createCardRect(
         x, HAND_Y, HAND_CARD_W, HAND_CARD_H,
         hand[i],
@@ -851,40 +873,10 @@ export class SushiGoScene extends Phaser.Scene {
     this.cardsLeftText.setText(`${cardsInHand} cards in hand`);
   }
 
-  // ── Phase management ────────────────────────────────────
-
-  private setPhase(phase: TurnPhase): void {
-    this.turnPhase = phase;
-
-    switch (phase) {
-      case 'picking':
-        if (this.chopsticksMode) {
-          this.instructionText.setText('Chopsticks: click your 1st card');
-        } else {
-          this.instructionText.setText('Click a card from your hand to pick it');
-        }
-        this.refreshHand(); // re-enable interactivity
-        this.refreshChopsticksButton(); // show/hide chopsticks button
-        break;
-      case 'animating':
-        this.instructionText.setText('');
-        break;
-      case 'ai-thinking':
-        this.instructionText.setText('AI is thinking...');
-        break;
-      case 'round-scored':
-        this.instructionText.setText('');
-        break;
-      case 'game-over':
-        this.instructionText.setText('');
-        break;
-    }
-  }
-
   // ── Human input ─────────────────────────────────────────
 
   private onHandCardClick(handIndex: number): void {
-    if (this.turnPhase !== 'picking') return;
+    if (this.phaseManager.current !== 'picking') return;
 
     if (this.chopsticksMode) {
       if (this.chopsticksFirstPick === null) {
@@ -938,7 +930,7 @@ export class SushiGoScene extends Phaser.Scene {
     }
 
     const shouldShow =
-      this.turnPhase === 'picking' &&
+      this.phaseManager.current === 'picking' &&
       this.humanHasChopsticks() &&
       this.session.players[0].hand.length >= 2;
 
@@ -1009,7 +1001,7 @@ export class SushiGoScene extends Phaser.Scene {
   private executeTurn(): void {
     if (this.pendingHumanPick === null) return;
 
-    this.setPhase('animating');
+    this.phaseManager.set('animating');
 
     const humanPick: PickAction = { cardIndex: this.pendingHumanPick };
     if (this.pendingHumanSecondPick !== null) {
@@ -1042,7 +1034,7 @@ export class SushiGoScene extends Phaser.Scene {
           playerName: 'You',
           isAI: false,
         });
-        this.setPhase('picking');
+        this.phaseManager.set('picking');
       }
     });
   }
@@ -1067,7 +1059,7 @@ export class SushiGoScene extends Phaser.Scene {
   }
 
   private showRoundScoreOverlay(result: RoundResult): void {
-    this.setPhase('round-scored');
+    this.phaseManager.set('round-scored');
     this.soundManager?.play(SFX_KEYS.SCORE_REVEAL);
 
     // Create overlay
@@ -1145,13 +1137,13 @@ export class SushiGoScene extends Phaser.Scene {
       dismissOverlay(this.overlayObjects);
       this.overlayObjects = [];
       this.refreshAll();
-      this.setPhase('picking');
+      this.phaseManager.set('picking');
     });
     this.overlayObjects.push(btn);
   }
 
   private showGameOverOverlay(result: RoundResult): void {
-    this.setPhase('game-over');
+    this.phaseManager.set('game-over');
     this.soundManager?.play(SFX_KEYS.SCORE_REVEAL);
 
     const winnerIdx = getWinnerIndex(this.session);
