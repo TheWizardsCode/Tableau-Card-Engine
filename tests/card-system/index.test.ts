@@ -10,6 +10,7 @@ import {
   shuffleArray,
   draw,
   drawOrThrow,
+  rankValue,
   Pile,
 } from '../../src/card-system/index';
 
@@ -45,5 +46,11 @@ describe('card-system barrel exports', () => {
   it('should export Pile class', () => {
     const pile = new Pile();
     expect(pile.isEmpty()).toBe(true);
+  });
+
+  it('should export rankValue function', () => {
+    expect(typeof rankValue).toBe('function');
+    expect(rankValue('A')).toBe(0);
+    expect(rankValue('K')).toBe(12);
   });
 });
