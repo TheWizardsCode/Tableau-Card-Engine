@@ -9,7 +9,12 @@
  *   npx tsx scripts/generate-fixture-transcript.ts
  */
 
-import { setupGolfGame, executeTurn } from '../example-games/golf/GolfGame';
+import {
+  setupGolfGame,
+  executeTurn,
+  createAiVisibleSharedState,
+  createAiVisiblePlayerState,
+} from '../example-games/golf/GolfGame';
 import { TranscriptRecorder } from '../example-games/golf/GameTranscript';
 import { AiPlayer, GreedyStrategy } from '../example-games/golf/AiStrategy';
 import { writeFileSync, mkdirSync } from 'fs';
@@ -41,7 +46,10 @@ while (session.gameState.phase !== 'ended' && turnCount < maxTurns) {
   const ps = session.gameState.playerStates[idx];
   const ai = idx === 0 ? ai0 : ai1;
 
-  const action = ai.chooseAction(ps, session.shared);
+  const action = ai.chooseAction(
+    createAiVisiblePlayerState(ps),
+    createAiVisibleSharedState(session.shared),
+  );
   const result = executeTurn(session, action);
   recorder.recordTurn(result, action.drawSource);
   turnCount++;

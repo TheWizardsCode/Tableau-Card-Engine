@@ -15,7 +15,12 @@ import type {
   BoardSnapshot,
   CardSnapshot,
 } from '../../example-games/golf/GameTranscript';
-import { setupGolfGame, executeTurn } from '../../example-games/golf/GolfGame';
+import {
+  setupGolfGame,
+  executeTurn,
+  createAiVisibleSharedState,
+  createAiVisiblePlayerState,
+} from '../../example-games/golf/GolfGame';
 import type { GolfAction } from '../../example-games/golf/GolfGame';
 import { AiPlayer, RandomStrategy, GreedyStrategy } from '../../example-games/golf/AiStrategy';
 import { createCard } from '../../src/card-system/Card';
@@ -163,7 +168,10 @@ describe('Full game transcript', () => {
       const ps = session.gameState.playerStates[idx];
       const ai = idx === 0 ? ai0 : ai1;
 
-      const action = ai.chooseAction(ps, session.shared);
+      const action = ai.chooseAction(
+        createAiVisiblePlayerState(ps),
+        createAiVisibleSharedState(session.shared),
+      );
       const result = executeTurn(session, action);
       recorder.recordTurn(result, action.drawSource);
       turnCount++;
@@ -189,7 +197,10 @@ describe('Full game transcript', () => {
       const ps = session.gameState.playerStates[idx];
       const ai = idx === 0 ? ai0 : ai1;
 
-      const action = ai.chooseAction(ps, session.shared);
+      const action = ai.chooseAction(
+        createAiVisiblePlayerState(ps),
+        createAiVisibleSharedState(session.shared),
+      );
       const result = executeTurn(session, action);
       recorder.recordTurn(result, action.drawSource);
       turnCount++;
@@ -210,7 +221,10 @@ describe('Full game transcript', () => {
     while (session.gameState.phase !== 'ended' && turnCount < 200) {
       const idx = session.gameState.currentPlayerIndex;
       const ps = session.gameState.playerStates[idx];
-      const action = ai.chooseAction(ps, session.shared);
+      const action = ai.chooseAction(
+        createAiVisiblePlayerState(ps),
+        createAiVisibleSharedState(session.shared),
+      );
       const result = executeTurn(session, action);
       recorder.recordTurn(result, action.drawSource);
       turnCount++;

@@ -9,7 +9,12 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { setupGolfGame, executeTurn } from '../../example-games/golf/GolfGame';
+import {
+  setupGolfGame,
+  executeTurn,
+  createAiVisibleSharedState,
+  createAiVisiblePlayerState,
+} from '../../example-games/golf/GolfGame';
 import type { GolfSession } from '../../example-games/golf/GolfGame';
 import { AiPlayer, RandomStrategy, GreedyStrategy } from '../../example-games/golf/AiStrategy';
 import type { AiStrategy } from '../../example-games/golf/AiStrategy';
@@ -52,7 +57,10 @@ function runFullGame(
   while (session.gameState.phase !== 'ended' && turnCount < MAX_TURNS) {
     const idx = session.gameState.currentPlayerIndex;
     const ps = session.gameState.playerStates[idx];
-    const action = ais[idx].chooseAction(ps, session.shared);
+    const action = ais[idx].chooseAction(
+      createAiVisiblePlayerState(ps),
+      createAiVisibleSharedState(session.shared),
+    );
 
     const result = executeTurn(session, action);
     recorder.recordTurn(result, action.drawSource);
@@ -340,7 +348,10 @@ describe('Integration: Game invariants', () => {
     while (session.gameState.phase !== 'ended' && turns < MAX_TURNS) {
       const idx = session.gameState.currentPlayerIndex;
       const ps = session.gameState.playerStates[idx];
-      const action = ai.chooseAction(ps, session.shared);
+      const action = ai.chooseAction(
+        createAiVisiblePlayerState(ps),
+        createAiVisibleSharedState(session.shared),
+      );
       executeTurn(session, action);
 
       // After each turn, total cards should still be 52
@@ -379,7 +390,10 @@ describe('Integration: Game invariants', () => {
     while (session.gameState.phase !== 'ended' && turns < MAX_TURNS) {
       const idx = session.gameState.currentPlayerIndex;
       const ps = session.gameState.playerStates[idx];
-      const action = ai.chooseAction(ps, session.shared);
+      const action = ai.chooseAction(
+        createAiVisiblePlayerState(ps),
+        createAiVisibleSharedState(session.shared),
+      );
       executeTurn(session, action);
 
       // Discard pile top should always be face-up

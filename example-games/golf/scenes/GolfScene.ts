@@ -13,7 +13,12 @@
 import type { Card, Rank, Suit } from '../../../src/card-system/Card';
 import type { GolfMove, DrawSource } from '../GolfRules';
 import type { GolfSession, GolfAction, TurnResult } from '../GolfGame';
-import { setupGolfGame, executeTurn } from '../GolfGame';
+import {
+  setupGolfGame,
+  executeTurn,
+  createAiVisibleSharedState,
+  createAiVisiblePlayerState,
+} from '../GolfGame';
 import { scoreGrid, scoreVisibleCards } from '../GolfScoring';
 import { AiPlayer, GreedyStrategy, RandomStrategy } from '../AiStrategy';
 import type { AiStrategy } from '../AiStrategy';
@@ -899,39 +904,72 @@ export class GolfScene extends CardGameScene {
 
   // ── AI turn ─────────────────────────────────────────────
 
+  /**
+   * Run an AI turn using a fair two-phase decision process:
+   *
+   * Phase 1: AI chooses draw source using only visible information
+   *          (filtered state projection — no stock peek, no face-down peek).
+   * Phase 2: Scene performs the actual draw, then AI evaluates moves
+   *          using the now-known drawn card and fair AI-visible scoring.
+   */
   private runAiTurn(): void {
     this.phaseManager.set('ai-thinking');
 
     this.time.delayedCall(AI_DELAY, () => {
       const idx = this.session.gameState.currentPlayerIndex;
       const ps = this.session.gameState.playerStates[idx];
-      const action = this.aiPlayer.chooseAction(ps, this.session.shared);
 
-      // Show which pile the AI draws from and the drawn card
-      const peekCard = action.drawSource === 'stock'
-        ? this.session.shared.stockPile[this.session.shared.stockPile.length - 1]
-        : this.session.shared.discardPile.peek() ?? null;
+      // Create AI-visible state projections (information boundary)
+      const aiShared = createAiVisibleSharedState(this.session.shared);
+      const aiPlayer = createAiVisiblePlayerState(ps);
+
+      // Phase 1: AI chooses draw source without peeking at stock
+      const drawSource = this.aiPlayer.chooseDrawSource(aiPlayer, aiShared);
+
+      // Scene performs the actual draw from raw game state
+      let drawnCard: Card;
+      if (drawSource === 'stock') {
+        drawnCard = this.session.shared.stockPile.pop()!;
+      } else {
+        drawnCard = this.session.shared.discardPile.popOrThrow();
+      }
 
       // When AI draws from discard, update the pile visual immediately
-      if (action.drawSource === 'discard') {
+      if (drawSource === 'discard') {
         this.updateDiscardPileAfterDraw();
       }
 
-      if (peekCard) {
-        this.showDrawnCard(peekCard, action.drawSource);
-      }
-      const sourceLabel = action.drawSource === 'stock' ? 'Stock pile' : 'Discard pile';
+      // Show the drawn card to the player
+      this.showDrawnCard(drawnCard, drawSource);
+      const sourceLabel = drawSource === 'stock' ? 'Stock pile' : 'Discard pile';
       this.instructionText.setText(`AI drew from ${sourceLabel}`);
 
       // Emit card-drawn event for AI
       this.gameEvents.emit('card-drawn', {
-        source: action.drawSource,
+        source: drawSource,
         playerIndex: idx,
       });
+
+      // Phase 2: AI sees the drawn card and chooses the best move
+      // Re-create the AI-visible grid (in case draw source was discard,
+      // state hasn't changed, but this ensures consistency)
+      const aiGridForMove = createAiVisiblePlayerState(ps).grid;
+      const move = this.aiPlayer.chooseMoveForCard(aiGridForMove, drawnCard);
+
+      const action: GolfAction = { drawSource, move };
 
       // Pause so the player can see the drawn card, then execute the move
       this.time.delayedCall(AI_SHOW_DRAW_DELAY, () => {
         this.phaseManager.set('animating');
+
+        // Put the drawn card back for executeTurn to draw it again
+        // (executeTurn expects to do the draw itself)
+        if (drawSource === 'stock') {
+          this.session.shared.stockPile.push(drawnCard);
+        } else {
+          this.session.shared.discardPile.push(drawnCard);
+        }
+
         const result = executeTurn(this.session, action);
         this.recorder.recordTurn(result, action.drawSource);
 
