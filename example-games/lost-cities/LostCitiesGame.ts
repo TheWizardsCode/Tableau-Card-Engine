@@ -249,7 +249,18 @@ export function setupLostCitiesGame(
 // Query helpers
 // ---------------------------------------------------------------------------
 
-/** Get the current active player. */
+/**
+ * Get the current active player.
+ *
+ * NOTE: This remains game-specific rather than using the shared
+ * {@link import('../../src/core-engine/TurnSequencer').getCurrentPlayer}
+ * because Lost Cities nests the current player index inside
+ * `session.round.currentPlayer` (a `PlayerId`), whereas the shared
+ * helper expects `currentPlayerIndex` at the top level of the state
+ * object. Restructuring `LostCitiesSession` to move the index out of
+ * `RoundState` would be a larger change affecting the entire game's
+ * round-management logic.
+ */
 export function getCurrentPlayer(
   session: LostCitiesSession,
 ): LostCitiesPlayer {

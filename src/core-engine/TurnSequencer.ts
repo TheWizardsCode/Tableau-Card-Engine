@@ -8,14 +8,50 @@
  * if needed.
  */
 
-import type { GamePhase, GameState, PlayerInfo } from './GameState';
+import type { GamePhase, GameState } from './GameState';
+
+// ── Structural interfaces ───────────────────────────────────
+
+/**
+ * Minimal structural interface for any object that tracks a
+ * current player within an indexed player list.
+ *
+ * Both {@link GameState} and game-specific session types
+ * (e.g. `SplendorSession`) satisfy this interface, so
+ * {@link getCurrentPlayer} can be used with any of them
+ * without requiring games to adopt `GameState<T>`.
+ *
+ * @typeParam P  The player type stored in the `players` array
+ *               (e.g. `PlayerInfo`, `SplendorPlayerState`).
+ */
+export interface HasCurrentPlayer<P> {
+  /** Indexed list of players. */
+  readonly players: readonly P[] | P[];
+  /** Index into `players` for the currently active player. */
+  readonly currentPlayerIndex: number;
+}
 
 // ── Query functions ─────────────────────────────────────────
 
 /**
- * Get the currently active player's info.
+ * Get the currently active player from any object that satisfies
+ * {@link HasCurrentPlayer}.
+ *
+ * Works with `GameState<T>` (returns `PlayerInfo`), as well as
+ * game-specific session types like `SplendorSession` (returns
+ * `SplendorPlayerState`). The return type is inferred from the
+ * player array element type.
+ *
+ * @example
+ * ```ts
+ * // With GameState<T>:
+ * const player: PlayerInfo = getCurrentPlayer(gameState);
+ *
+ * // With a game-specific session:
+ * const splendorPlayer: SplendorPlayerState = getCurrentPlayer(session);
+ * ```
  */
-export function getCurrentPlayer<T>(state: GameState<T>): PlayerInfo {
+export function getCurrentPlayer<P>(state: HasCurrentPlayer<P>): P {
   return state.players[state.currentPlayerIndex];
 }
 

@@ -29,6 +29,10 @@ import {
 
 import type { MultiplayerSetupOptions } from '../../src/core-engine/SetupOptions';
 import { resolveSetupOptions } from '../../src/core-engine/SetupOptions';
+import { getCurrentPlayer } from '../../src/core-engine/TurnSequencer';
+
+// Re-export getCurrentPlayer so consumers can import from SplendorGame
+export { getCurrentPlayer };
 
 // ---------------------------------------------------------------------------
 // Session types
@@ -175,10 +179,6 @@ export function setupSplendorGame(options?: SplendorSetupOptions): SplendorSessi
 // ---------------------------------------------------------------------------
 // Query helpers
 // ---------------------------------------------------------------------------
-
-export function getCurrentPlayer(session: SplendorSession): SplendorPlayerState {
-  return session.players[session.currentPlayerIndex];
-}
 
 export function getPrestige(player: SplendorPlayerState): number {
   let pts = 0;
