@@ -141,7 +141,7 @@ const SECTION_BOX_PAD = 8;             // padding around content
 
 // ── Lower-band layout ──────────────────────────────────────
 const LOWER_TOP = 452;         // top of lower band (slightly higher for more room)
-const LOWER_BOX_H = 156;      // fixed height for player/AI section boxes
+const LOWER_BOX_H = 186;      // fixed height for player/AI section boxes (room for reserved cards)
 
 // Player area — left half of lower band
 const PLAYER_AREA_X = 20;
@@ -156,8 +156,8 @@ const DIVIDER_X = 640;
 
 // Action buttons and instructions — centred at bottom
 // ACTION_Y must ensure button top (ACTION_Y - 21) is well below section box bottom
-// Section box bottom = (LOWER_TOP - SECTION_BOX_PAD) + LOWER_BOX_H = 600
-const ACTION_Y = 660;          // action buttons Y (top edge at 639, ~39px below box bottom 600)
+// Section box bottom = (LOWER_TOP - SECTION_BOX_PAD) + LOWER_BOX_H = 630
+const ACTION_Y = 660;          // action buttons Y (top edge at 639, ~9px below box bottom 630)
 const INSTRUCTION_Y = 696;     // instruction text Y (centred horizontally)
 
 // ── Audio asset keys ────────────────────────────────────────
