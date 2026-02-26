@@ -22,6 +22,8 @@ import { createStandardDeck, shuffle } from '../../src/card-system/Deck';
 import { Pile } from '../../src/card-system/Pile';
 import { rankValue } from '../../src/card-system/rankValue';
 import { createSeededRng } from '../../src/core-engine/SeededRng';
+import type { BaseSetupOptions } from '../../src/core-engine/SetupOptions';
+import { resolveBaseSetupOptions } from '../../src/core-engine/SetupOptions';
 import type {
   BeleagueredCastleState,
   BCMove,
@@ -66,15 +68,31 @@ export { createSeededRng } from '../../src/core-engine/SeededRng';
 /**
  * Deal a new Beleaguered Castle game.
  *
- * 1. Create and shuffle a standard 52-card deck with seeded RNG.
+ * 1. Create and shuffle a standard 52-card deck.
  * 2. Remove the 4 aces and place them on their respective foundations.
  * 3. Deal the remaining 48 cards into 8 columns of 6, all face-up.
  *
- * @param seed  Numeric seed for deterministic shuffling.
- * @returns     A fresh BeleagueredCastleState.
+ * @param seedOrOptions  Numeric seed for deterministic shuffling,
+ *                       or a `BaseSetupOptions` object with an injected RNG.
+ *                       When omitted, uses `Math.random`.
+ * @returns              A fresh BeleagueredCastleState.
  */
-export function deal(seed: number): BeleagueredCastleState {
-  const rng = createSeededRng(seed);
+export function deal(seed: number): BeleagueredCastleState;
+export function deal(options?: BaseSetupOptions): BeleagueredCastleState;
+export function deal(
+  seedOrOptions?: number | BaseSetupOptions,
+): BeleagueredCastleState {
+  let rng: () => number;
+  let seed: number;
+
+  if (typeof seedOrOptions === 'number') {
+    seed = seedOrOptions;
+    rng = createSeededRng(seed);
+  } else {
+    seed = 0;
+    rng = resolveBaseSetupOptions(seedOrOptions ?? {}).rng;
+  }
+
   const deck = shuffle(createStandardDeck(), rng);
 
   // All cards face-up in Beleaguered Castle

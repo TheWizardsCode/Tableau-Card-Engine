@@ -26,6 +26,7 @@ import {
   FOUNDATION_SUITS,
 } from '../../example-games/beleaguered-castle/BeleagueredCastleState';
 import type { BeleagueredCastleState } from '../../example-games/beleaguered-castle/BeleagueredCastleState';
+import type { BaseSetupOptions } from '../../src/core-engine/SetupOptions';
 import { Pile } from '../../src/card-system/Pile';
 import { createCard } from '../../src/card-system/Card';
 import type { Card } from '../../src/card-system/Card';
@@ -206,6 +207,48 @@ describe('deal', () => {
   it('should start with moveCount at 0', () => {
     const state = deal(42);
     expect(state.moveCount).toBe(0);
+  });
+
+  it('should accept BaseSetupOptions with injected RNG', () => {
+    const rng = createSeededRng(42);
+    const options: BaseSetupOptions = { rng };
+    const state = deal(options);
+
+    // Should produce a valid game state
+    expect(state.foundations.length).toBe(FOUNDATION_COUNT);
+    expect(state.tableau.length).toBe(TABLEAU_COUNT);
+    for (const col of state.tableau) {
+      expect(col.size()).toBe(CARDS_PER_COLUMN);
+    }
+    expect(state.moveCount).toBe(0);
+  });
+
+  it('should produce identical deals with same seeded RNG via BaseSetupOptions', () => {
+    const state1 = deal({ rng: createSeededRng(42) });
+    const state2 = deal({ rng: createSeededRng(42) });
+
+    for (let col = 0; col < TABLEAU_COUNT; col++) {
+      const cards1 = state1.tableau[col].toArray();
+      const cards2 = state2.tableau[col].toArray();
+      expect(cards1.length).toBe(cards2.length);
+      for (let i = 0; i < cards1.length; i++) {
+        expect(cards1[i].rank).toBe(cards2[i].rank);
+        expect(cards1[i].suit).toBe(cards2[i].suit);
+      }
+    }
+  });
+
+  it('should default to Math.random when called with no arguments', () => {
+    const state = deal();
+    // Should still produce a valid game state
+    expect(state.foundations.length).toBe(FOUNDATION_COUNT);
+    expect(state.tableau.length).toBe(TABLEAU_COUNT);
+    expect(state.seed).toBe(0);
+  });
+
+  it('should set seed to 0 when using BaseSetupOptions overload', () => {
+    const state = deal({ rng: createSeededRng(99) });
+    expect(state.seed).toBe(0);
   });
 });
 
