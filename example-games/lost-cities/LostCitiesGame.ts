@@ -37,6 +37,9 @@ import {
   isRoundOver,
 } from './LostCitiesRules';
 import { scoreRound, scoreRoundDetailed } from './LostCitiesScoring';
+
+import type { MultiplayerSetupOptions } from '../../src/core-engine/SetupOptions';
+import { resolveSetupOptions } from '../../src/core-engine/SetupOptions';
 import type { ExpeditionScoreBreakdown } from './LostCitiesScoring';
 
 // ---------------------------------------------------------------------------
@@ -147,11 +150,7 @@ export interface TurnResult {
 // Setup options
 // ---------------------------------------------------------------------------
 
-export interface LostCitiesSetupOptions {
-  playerNames?: [string, string];
-  isAI?: [boolean, boolean];
-  rng?: () => number;
-}
+export type LostCitiesSetupOptions = MultiplayerSetupOptions;
 
 // ---------------------------------------------------------------------------
 // Setup
@@ -204,20 +203,21 @@ function dealRound(
 export function setupLostCitiesGame(
   options?: LostCitiesSetupOptions,
 ): LostCitiesSession {
-  const names = options?.playerNames ?? ['Player', 'AI'];
-  const isAI = options?.isAI ?? [false, true];
-  const rng = options?.rng ?? Math.random;
+  const { players: playerInfos, rng } = resolveSetupOptions({
+    ...options,
+    playerCount: 2,
+  });
 
   const players: [LostCitiesPlayer, LostCitiesPlayer] = [
     {
-      name: names[0],
-      isAI: isAI[0],
+      name: playerInfos[0].name,
+      isAI: playerInfos[0].isAI,
       hand: [],
       expeditions: createEmptyExpeditions(),
     },
     {
-      name: names[1],
-      isAI: isAI[1],
+      name: playerInfos[1].name,
+      isAI: playerInfos[1].isAI,
       hand: [],
       expeditions: createEmptyExpeditions(),
     },

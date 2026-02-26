@@ -90,8 +90,8 @@ describe('setupLostCitiesGame', () => {
   it('should use default names and AI flags', () => {
     const session = setupLostCitiesGame({ rng: createSeededRng() });
 
-    expect(session.players[0].name).toBe('Player');
-    expect(session.players[1].name).toBe('AI');
+    expect(session.players[0].name).toBe('Player 1');
+    expect(session.players[1].name).toBe('Player 2');
     expect(session.players[0].isAI).toBe(false);
     expect(session.players[1].isAI).toBe(true);
   });
