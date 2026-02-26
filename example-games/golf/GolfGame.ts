@@ -12,7 +12,8 @@
 
 import type { Card } from '../../src/card-system/Card';
 import type { GameState } from '../../src/core-engine/GameState';
-import { createGameState } from '../../src/core-engine/GameState';
+import type { MultiplayerSetupOptions } from '../../src/core-engine/SetupOptions';
+import { resolveSetupOptions } from '../../src/core-engine/SetupOptions';
 import {
   advanceTurn,
   startGame,
@@ -146,34 +147,22 @@ export interface GolfAction {
 
 // ── Setup ───────────────────────────────────────────────────
 
-export interface GolfSetupOptions {
-  /** Number of players (default 2). */
-  playerCount?: number;
-  /** Player names (defaults to "Player 1", "Player 2", etc.). */
-  playerNames?: string[];
-  /** Which players are AI-controlled (defaults to [false, true]). */
-  isAI?: boolean[];
-  /** RNG for shuffling (default Math.random). */
-  rng?: () => number;
+export type GolfSetupOptions = MultiplayerSetupOptions & {
   /**
    * Initial reveal positions per player (each must be 3 positions).
    * If omitted, the first 3 grid positions are revealed by default.
    */
   initialReveals?: Array<Array<{ row: number; col: number }>>;
-}
+};
 
 /**
  * Set up a new Golf game session: deal cards, do initial reveals,
  * transition to playing phase.
  */
 export function setupGolfGame(options: GolfSetupOptions = {}): GolfSession {
-  const {
-    playerCount = 2,
-    playerNames,
-    isAI,
-    rng = Math.random,
-    initialReveals,
-  } = options;
+  const { players, rng } = resolveSetupOptions(options);
+  const { initialReveals } = options;
+  const playerCount = players.length;
 
   // Create and shuffle a standard deck
   const deck = createStandardDeck();
@@ -194,16 +183,16 @@ export function setupGolfGame(options: GolfSetupOptions = {}): GolfSession {
   firstDiscard.faceUp = true;
   const discardPile = new Pile([firstDiscard]);
 
-  // Create game state
-  const names = playerNames ?? Array.from({ length: playerCount }, (_, i) => `Player ${i + 1}`);
-  const aiFlags = isAI ?? Array.from({ length: playerCount }, (_, i) => i > 0);
-
-  const gameState = createGameState<GolfPlayerState>({
-    players: names.map((name, i) => ({ name, isAI: aiFlags[i] })),
-    createPlayerState: (i) => ({
+  // Create game state using resolved player info
+  const gameState: GolfGameState = {
+    players,
+    playerStates: players.map((_, i) => ({
       grid: createGolfGrid(playerGridCards[i]),
-    }),
-  });
+    })),
+    currentPlayerIndex: 0,
+    phase: 'setup',
+    turnNumber: 0,
+  };
 
   // Initial reveal: each player flips 3 cards
   const defaultReveal = [
