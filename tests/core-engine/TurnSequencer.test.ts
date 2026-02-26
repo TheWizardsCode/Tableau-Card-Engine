@@ -51,6 +51,30 @@ describe('TurnSequencer', () => {
       expect(player.name).toBe('Bot');
       expect(player.isAI).toBe(true);
     });
+
+    it('should work with any HasCurrentPlayer-compatible object', () => {
+      // Simulate a game-specific session with custom player types
+      const session = {
+        players: [
+          { name: 'Alice', isAI: false, score: 10, tokens: 3 },
+          { name: 'Bob', isAI: true, score: 20, tokens: 5 },
+        ],
+        currentPlayerIndex: 1,
+      };
+      const player = getCurrentPlayer(session);
+      expect(player.name).toBe('Bob');
+      expect(player.score).toBe(20);
+      expect(player.tokens).toBe(5);
+    });
+
+    it('should infer correct type from custom player arrays', () => {
+      const session = {
+        players: ['alpha', 'beta', 'gamma'] as const,
+        currentPlayerIndex: 2,
+      };
+      const player = getCurrentPlayer(session);
+      expect(player).toBe('gamma');
+    });
   });
 
   describe('getCurrentPlayerState', () => {

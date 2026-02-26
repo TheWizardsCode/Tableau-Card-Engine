@@ -15,6 +15,7 @@ export type { GamePhase, PlayerInfo, GameState, GameStateOptions } from './GameS
 export { createGameState } from './GameState';
 
 // Turn sequencer functions
+export type { HasCurrentPlayer } from './TurnSequencer';
 export {
   getCurrentPlayer,
   getCurrentPlayerState,
