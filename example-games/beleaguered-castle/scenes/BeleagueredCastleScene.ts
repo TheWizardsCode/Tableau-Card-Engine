@@ -17,7 +17,7 @@ import Phaser from 'phaser';
 import type { Rank, Suit } from '../../../src/card-system/Card';
 import { createCard, RANKS } from '../../../src/card-system/Card';
 import type { BeleagueredCastleState, BCMove } from '../BeleagueredCastleState';
-import { FOUNDATION_COUNT, TABLEAU_COUNT, FOUNDATION_SUITS } from '../BeleagueredCastleState';
+import { FOUNDATION_COUNT, TABLEAU_COUNT } from '../BeleagueredCastleState';
 import {
   deal,
   applyMove,
@@ -95,27 +95,11 @@ const TABLEAU_MAX_Y = GAME_H - 40 - BC_CARD_H / 2; // ~617
 const TITLE_Y = 20;
 const FOUNDATION_Y = 95;
 
-/** Tableau starts below the foundations (with room for suit labels). */
-const TABLEAU_TOP_Y = 248;
+/** Tableau starts below the foundations. */
+const TABLEAU_TOP_Y = 225;
 
 /** Z-depth for a card being dragged. */
 const DRAG_DEPTH = 1000;
-
-// ── Suit symbol mapping for foundation labels ───────────────
-
-const SUIT_SYMBOL: Record<Suit, string> = {
-  clubs: '\u2663',    // ♣
-  diamonds: '\u2666', // ♦
-  hearts: '\u2665',   // ♥
-  spades: '\u2660',   // ♠
-};
-
-const SUIT_COLOR: Record<Suit, string> = {
-  clubs: '#ffffff',
-  diamonds: '#ff4444',
-  hearts: '#ff4444',
-  spades: '#ffffff',
-};
 
 // ── Highlight colours ───────────────────────────────────────
 
@@ -216,7 +200,6 @@ export class BeleagueredCastleScene extends Phaser.Scene {
 
   // Display objects -- foundations
   private foundationSprites: Phaser.GameObjects.Image[] = [];
-  private foundationLabels: Phaser.GameObjects.Text[] = [];
   private foundationDropZones: Phaser.GameObjects.Zone[] = [];
 
   // Display objects -- tableau (array of arrays, one per column)
@@ -327,7 +310,6 @@ export class BeleagueredCastleScene extends Phaser.Scene {
 
     // Reset display object arrays (stale refs from previous run on restart)
     this.foundationSprites = [];
-    this.foundationLabels = [];
     this.foundationDropZones = [];
     this.tableauSprites = [];
     this.tableauDropZones = [];
@@ -433,7 +415,6 @@ export class BeleagueredCastleScene extends Phaser.Scene {
 
     for (let i = 0; i < FOUNDATION_COUNT; i++) {
       const x = startX + i * (BC_CARD_W + FOUNDATION_GAP);
-      const suit = FOUNDATION_SUITS[i];
 
       // Empty slot background (rounded rect outline)
       const slotGraphics = this.add.graphics();
@@ -445,16 +426,6 @@ export class BeleagueredCastleScene extends Phaser.Scene {
         BC_CARD_H,
         6,
       );
-
-      // Suit label beneath the slot
-      const label = this.add
-        .text(x, FOUNDATION_Y + BC_CARD_H / 2 + 14, SUIT_SYMBOL[suit], {
-          fontSize: '20px',
-          color: SUIT_COLOR[suit],
-          fontFamily: FONT_FAMILY,
-        })
-        .setOrigin(0.5);
-      this.foundationLabels.push(label);
 
       // Card sprite (will show ace on initial render)
       const sprite = this.add
