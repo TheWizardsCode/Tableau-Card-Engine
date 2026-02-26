@@ -44,6 +44,7 @@ import {
   createSceneHeader,
   layoutCardPositions,
   flipCard,
+  shakeIllegalMove,
 } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
 import helpContent from '../help-content.json';
@@ -860,21 +861,9 @@ export class TheMindScene extends CardGameScene {
     if (idx === -1 || idx >= this.humanCardSprites.length) return;
 
     const sprite = this.humanCardSprites[idx];
-    const originalX = sprite.x;
 
     // Red tint + shake
-    sprite.setTint(0xff4444);
-    this.tweens.add({
-      targets: sprite,
-      x: originalX - 5,
-      duration: 50,
-      yoyo: true,
-      repeat: 2,
-      onComplete: () => {
-        sprite.clearTint();
-        sprite.setX(originalX);
-      },
-    });
+    shakeIllegalMove({ scene: this, target: sprite });
   }
 
   // ── Card animation ─────────────────────────────────────

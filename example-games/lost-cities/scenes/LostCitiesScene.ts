@@ -77,6 +77,7 @@ import {
   createOverlayButton,
   createOverlayMenuButton,
   dismissOverlay,
+  shakeIllegalMove,
 } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
 import helpContent from '../help-content.json';
@@ -1427,18 +1428,7 @@ export class LostCitiesScene extends Phaser.Scene {
 
     this.soundManager?.play(SFX_KEYS.ILLEGAL_MOVE);
 
-    sprite.setTint(0xff4444);
-    this.tweens.add({
-      targets: sprite,
-      x: sprite.x - 5,
-      duration: 50,
-      yoyo: true,
-      repeat: 2,
-      ease: 'Sine.inOut',
-      onComplete: () => {
-        sprite.clearTint();
-      },
-    });
+    shakeIllegalMove({ scene: this, target: sprite });
 
     this.instructionText.setText('Illegal move!');
     this.time.delayedCall(1200, () => {
