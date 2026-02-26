@@ -155,10 +155,10 @@ const AI_AREA_Y = LOWER_TOP;
 const DIVIDER_X = 640;
 
 // Action buttons and instructions — centred at bottom
-// ACTION_Y must ensure button top (ACTION_Y - 21) is below section box bottom
+// ACTION_Y must ensure button top (ACTION_Y - 21) is well below section box bottom
 // Section box bottom = (LOWER_TOP - SECTION_BOX_PAD) + LOWER_BOX_H = 600
-const ACTION_Y = 626;          // action buttons Y (top edge at 605, below box bottom 600)
-const INSTRUCTION_Y = 660;     // instruction text Y (centred horizontally)
+const ACTION_Y = 660;          // action buttons Y (top edge at 639, ~39px below box bottom 600)
+const INSTRUCTION_Y = 696;     // instruction text Y (centred horizontally)
 
 // ── Audio asset keys ────────────────────────────────────────
 
