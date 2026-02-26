@@ -30,6 +30,8 @@ import {
   scorePudding,
   scoreTableauBreakdown,
 } from './SushiGoScoring';
+import type { MultiplayerSetupOptions } from '../../src/core-engine/SetupOptions';
+import { resolveSetupOptions } from '../../src/core-engine/SetupOptions';
 
 // ── Player state ────────────────────────────────────────────
 
@@ -75,16 +77,12 @@ export interface SushiGoSession {
 
 // ── Setup ───────────────────────────────────────────────────
 
-export interface SushiGoSetupOptions {
-  /** Player count (default 2). */
-  playerCount?: number;
-  /** Player names. */
-  playerNames?: string[];
-  /** Which players are AI. */
-  isAI?: boolean[];
-  /** RNG for shuffling (default Math.random). */
-  rng?: () => number;
-}
+/**
+ * Sushi Go! setup options.
+ *
+ * Currently no game-specific fields beyond the shared multiplayer options.
+ */
+export type SushiGoSetupOptions = MultiplayerSetupOptions;
 
 /**
  * Create a new Sushi Go! game session and deal the first round.
@@ -92,24 +90,12 @@ export interface SushiGoSetupOptions {
 export function setupSushiGoGame(
   options: SushiGoSetupOptions = {},
 ): SushiGoSession {
-  const {
-    playerCount = 2,
-    playerNames,
-    isAI,
-    rng = Math.random,
-  } = options;
+  const { players: playerInfos, rng } = resolveSetupOptions(options);
+  const playerCount = playerInfos.length;
 
-  const names =
-    playerNames ??
-    Array.from({ length: playerCount }, (_, i) =>
-      i === 0 ? 'You' : `AI ${i}`,
-    );
-  const aiFlags =
-    isAI ?? Array.from({ length: playerCount }, (_, i) => i > 0);
-
-  const players: SushiGoPlayerState[] = names.map((name, i) => ({
-    name,
-    isAI: aiFlags[i],
+  const players: SushiGoPlayerState[] = playerInfos.map((info) => ({
+    name: info.name,
+    isAI: info.isAI,
     hand: [],
     tableau: [],
     puddingCount: 0,
