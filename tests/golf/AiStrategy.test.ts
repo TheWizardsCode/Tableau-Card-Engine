@@ -1,5 +1,8 @@
 /**
  * Tests for AiStrategy -- RandomStrategy, GreedyStrategy, and AiPlayer.
+ *
+ * All tests operate through the AI-visible state projections, verifying
+ * that the fair-play information boundary is maintained.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -7,12 +10,19 @@ import {
   RandomStrategy,
   GreedyStrategy,
   AiPlayer,
+  chooseDrawSource,
+  chooseMoveForCard,
 } from '../../example-games/golf/AiStrategy';
 import {
   setupGolfGame,
   executeTurn,
+  createAiVisibleSharedState,
+  createAiVisiblePlayerState,
 } from '../../example-games/golf/GolfGame';
-import type { GolfSharedState } from '../../example-games/golf/GolfGame';
+import type {
+  GolfSharedState,
+  AiVisibleSharedState,
+} from '../../example-games/golf/GolfGame';
 import { isLegalMove } from '../../example-games/golf/GolfRules';
 import { createCard } from '../../src/card-system/Card';
 import { createGolfGrid } from '../../example-games/golf/GolfGrid';
@@ -28,6 +38,13 @@ function createTestRng(seed: number = 42): () => number {
   };
 }
 
+/**
+ * Helper: build a GolfSharedState and project it to AiVisibleSharedState.
+ */
+function buildAiShared(raw: GolfSharedState): AiVisibleSharedState {
+  return createAiVisibleSharedState(raw);
+}
+
 describe('RandomStrategy', () => {
   it('has the name "random"', () => {
     expect(RandomStrategy.name).toBe('random');
@@ -37,8 +54,10 @@ describe('RandomStrategy', () => {
     const rng = createTestRng();
     const session = setupGolfGame({ rng: createTestRng(1) });
     const ps = session.gameState.playerStates[0];
+    const aiPs = createAiVisiblePlayerState(ps);
+    const aiShared = createAiVisibleSharedState(session.shared);
 
-    const action = RandomStrategy.chooseAction(ps, session.shared, rng);
+    const action = RandomStrategy.chooseAction(aiPs, aiShared, rng);
 
     expect(['stock', 'discard']).toContain(action.drawSource);
     expect(isLegalMove(ps.grid, action.move)).toBe(true);
@@ -47,12 +66,14 @@ describe('RandomStrategy', () => {
   it('produces different moves with different RNG seeds', () => {
     const session = setupGolfGame({ rng: createTestRng(1) });
     const ps = session.gameState.playerStates[0];
+    const aiPs = createAiVisiblePlayerState(ps);
+    const aiShared = createAiVisibleSharedState(session.shared);
 
     const actions = new Set<string>();
     for (let seed = 0; seed < 50; seed++) {
       const action = RandomStrategy.chooseAction(
-        ps,
-        session.shared,
+        aiPs,
+        aiShared,
         createTestRng(seed),
       );
       actions.add(`${action.drawSource}:${action.move.kind}:${action.move.row}:${action.move.col}`);
@@ -74,7 +95,10 @@ describe('RandomStrategy', () => {
       roundEnd: createRoundEndState(2),
     };
 
-    const action = RandomStrategy.chooseAction(ps, shared, createTestRng());
+    const aiPs = createAiVisiblePlayerState(ps);
+    const aiShared = buildAiShared(shared);
+
+    const action = RandomStrategy.chooseAction(aiPs, aiShared, createTestRng());
     expect(action.move.kind).toBe('swap');
     expect(isLegalMove(grid, action.move)).toBe(true);
   });
@@ -89,8 +113,10 @@ describe('GreedyStrategy', () => {
     const rng = createTestRng();
     const session = setupGolfGame({ rng: createTestRng(1) });
     const ps = session.gameState.playerStates[0];
+    const aiPs = createAiVisiblePlayerState(ps);
+    const aiShared = createAiVisibleSharedState(session.shared);
 
-    const action = GreedyStrategy.chooseAction(ps, session.shared, rng);
+    const action = GreedyStrategy.chooseAction(aiPs, aiShared, rng);
 
     expect(['stock', 'discard']).toContain(action.drawSource);
     expect(isLegalMove(ps.grid, action.move)).toBe(true);
@@ -121,9 +147,12 @@ describe('GreedyStrategy', () => {
       roundEnd: createRoundEndState(2),
     };
 
-    const action = GreedyStrategy.chooseAction(ps, shared, createTestRng());
+    const aiPs = createAiVisiblePlayerState(ps);
+    const aiShared = buildAiShared(shared);
 
-    // Should draw from discard (Ace is better than 7)
+    const action = GreedyStrategy.chooseAction(aiPs, aiShared, createTestRng());
+
+    // Should draw from discard (Ace is better than unknown stock)
     // and swap with Q or J (both 10 pts, swapping saves the most)
     expect(action.drawSource).toBe('discard');
     expect(action.move.kind).toBe('swap');
@@ -155,10 +184,12 @@ describe('GreedyStrategy', () => {
       roundEnd: createRoundEndState(2),
     };
 
-    const action = GreedyStrategy.chooseAction(ps, shared, createTestRng());
+    const aiPs = createAiVisiblePlayerState(ps);
+    const aiShared = buildAiShared(shared);
+
+    const action = GreedyStrategy.chooseAction(aiPs, aiShared, createTestRng());
 
     // The greedy strategy should evaluate all options and pick the best.
-    // With a King (0 pts) from stock, it could swap with any position.
     // The key thing is the action must be legal.
     expect(isLegalMove(grid, action.move)).toBe(true);
   });
@@ -185,7 +216,10 @@ describe('GreedyStrategy', () => {
       roundEnd: createRoundEndState(2),
     };
 
-    const action = GreedyStrategy.chooseAction(ps, shared, createTestRng());
+    const aiPs = createAiVisiblePlayerState(ps);
+    const aiShared = buildAiShared(shared);
+
+    const action = GreedyStrategy.chooseAction(aiPs, aiShared, createTestRng());
     expect(isLegalMove(grid, action.move)).toBe(true);
   });
 });
@@ -198,8 +232,10 @@ describe('AiPlayer', () => {
 
     const session = setupGolfGame({ rng: createTestRng(1) });
     const ps = session.gameState.playerStates[0];
+    const aiPs = createAiVisiblePlayerState(ps);
+    const aiShared = createAiVisibleSharedState(session.shared);
 
-    const action = ai.chooseAction(ps, session.shared);
+    const action = ai.chooseAction(aiPs, aiShared);
     expect(isLegalMove(ps.grid, action.move)).toBe(true);
   });
 
@@ -207,9 +243,33 @@ describe('AiPlayer', () => {
     const ai = new AiPlayer(GreedyStrategy, createTestRng());
     const session = setupGolfGame({ rng: createTestRng(1) });
     const ps = session.gameState.playerStates[0];
+    const aiPs = createAiVisiblePlayerState(ps);
+    const aiShared = createAiVisibleSharedState(session.shared);
 
-    const action = ai.chooseAction(ps, session.shared);
+    const action = ai.chooseAction(aiPs, aiShared);
     expect(isLegalMove(ps.grid, action.move)).toBe(true);
+  });
+
+  it('exposes chooseDrawSource for two-phase flow', () => {
+    const ai = new AiPlayer(GreedyStrategy, createTestRng());
+    const session = setupGolfGame({ rng: createTestRng(1) });
+    const ps = session.gameState.playerStates[0];
+    const aiPs = createAiVisiblePlayerState(ps);
+    const aiShared = createAiVisibleSharedState(session.shared);
+
+    const source = ai.chooseDrawSource(aiPs, aiShared);
+    expect(['stock', 'discard']).toContain(source);
+  });
+
+  it('exposes chooseMoveForCard for two-phase flow', () => {
+    const ai = new AiPlayer(GreedyStrategy, createTestRng());
+    const session = setupGolfGame({ rng: createTestRng(1) });
+    const ps = session.gameState.playerStates[0];
+    const aiPs = createAiVisiblePlayerState(ps);
+    const drawnCard = createCard('5', 'hearts', true);
+
+    const move = ai.chooseMoveForCard(aiPs.grid, drawnCard);
+    expect(isLegalMove(ps.grid, move)).toBe(true);
   });
 });
 
@@ -228,7 +288,9 @@ describe('Full game simulation', () => {
       const ps = session.gameState.playerStates[currentIdx];
       const ai = currentIdx === 0 ? ai0 : ai1;
 
-      const action = ai.chooseAction(ps, session.shared);
+      const aiPs = createAiVisiblePlayerState(ps);
+      const aiShared = createAiVisibleSharedState(session.shared);
+      const action = ai.chooseAction(aiPs, aiShared);
       const result = executeTurn(session, action);
 
       expect(result.playerIndex).toBe(currentIdx);
@@ -254,7 +316,9 @@ describe('Full game simulation', () => {
       const ps = session.gameState.playerStates[currentIdx];
       const ai = currentIdx === 0 ? ai0 : ai1;
 
-      const action = ai.chooseAction(ps, session.shared);
+      const aiPs = createAiVisiblePlayerState(ps);
+      const aiShared = createAiVisibleSharedState(session.shared);
+      const action = ai.chooseAction(aiPs, aiShared);
       const result = executeTurn(session, action);
 
       expect(result.playerIndex).toBe(currentIdx);
@@ -279,12 +343,122 @@ describe('Full game simulation', () => {
       const ps = session.gameState.playerStates[currentIdx];
       const ai = currentIdx === 0 ? ai0 : ai1;
 
-      const action = ai.chooseAction(ps, session.shared);
+      const aiPs = createAiVisiblePlayerState(ps);
+      const aiShared = createAiVisibleSharedState(session.shared);
+      const action = ai.chooseAction(aiPs, aiShared);
       executeTurn(session, action);
       turnCount++;
     }
 
     expect(session.gameState.phase).toBe('ended');
     expect(turnCount).toBeLessThan(maxTurns);
+  });
+});
+
+describe('Fair play: information boundary', () => {
+  it('AiVisibleSharedState does not expose stock pile cards', () => {
+    const session = setupGolfGame({ rng: createTestRng(1) });
+    const aiShared = createAiVisibleSharedState(session.shared);
+
+    // The AI-visible state should only have discardTop and stockHasCards
+    expect(aiShared).toHaveProperty('discardTop');
+    expect(aiShared).toHaveProperty('stockHasCards');
+    expect(aiShared).not.toHaveProperty('stockPile');
+    expect(aiShared.stockHasCards).toBe(true);
+  });
+
+  it('AiVisiblePlayerState hides face-down card values', () => {
+    const cards = [
+      createCard('K', 'clubs', true),   // face-up: visible
+      createCard('Q', 'hearts', false), // face-down: hidden
+      createCard('J', 'spades', true),  // face-up: visible
+      createCard('10', 'clubs', false),
+      createCard('9', 'hearts', false),
+      createCard('8', 'spades', false),
+      createCard('7', 'clubs', false),
+      createCard('6', 'hearts', false),
+      createCard('5', 'spades', false),
+    ];
+    const grid = createGolfGrid(cards);
+    const aiPs = createAiVisiblePlayerState({ grid });
+
+    // Face-up cards should have rank and suit
+    const slot0 = aiPs.grid[0];
+    expect(slot0.faceUp).toBe(true);
+    expect('rank' in slot0).toBe(true);
+    expect('suit' in slot0).toBe(true);
+
+    // Face-down cards should only have faceUp: false, no rank/suit
+    const slot1 = aiPs.grid[1];
+    expect(slot1.faceUp).toBe(false);
+    expect('rank' in slot1).toBe(false);
+    expect('suit' in slot1).toBe(false);
+  });
+
+  it('chooseDrawSource cannot peek at stock pile cards', () => {
+    // Create two identical game states but with different stock pile top cards.
+    // The AI should make the same draw source decision because it cannot see
+    // the stock pile contents.
+    const cards = Array.from({ length: 9 }, () =>
+      createCard('5', 'hearts', true),
+    );
+    const grid = createGolfGrid(cards);
+    const ps = { grid };
+
+    // Same discard top, different stock piles
+    const shared1: GolfSharedState = {
+      stockPile: [createCard('A', 'clubs')], // Ace (1 pt) -- great card
+      discardPile: new Pile([createCard('7', 'diamonds', true)]),
+      roundEnd: createRoundEndState(2),
+    };
+    const shared2: GolfSharedState = {
+      stockPile: [createCard('K', 'spades')], // King (0 pts) -- even better
+      discardPile: new Pile([createCard('7', 'diamonds', true)]),
+      roundEnd: createRoundEndState(2),
+    };
+
+    const aiPs = createAiVisiblePlayerState(ps);
+    const aiShared1 = createAiVisibleSharedState(shared1);
+    const aiShared2 = createAiVisibleSharedState(shared2);
+
+    // Both AI-visible states should look identical
+    expect(aiShared1.stockHasCards).toBe(aiShared2.stockHasCards);
+    expect(aiShared1.discardTop).toEqual(aiShared2.discardTop);
+
+    // Same input → same output for a deterministic RNG
+    const rng1 = createTestRng(42);
+    const rng2 = createTestRng(42);
+    const source1 = chooseDrawSource(aiPs, aiShared1, rng1);
+    const source2 = chooseDrawSource(aiPs, aiShared2, rng2);
+    expect(source1).toBe(source2);
+  });
+
+  it('chooseMoveForCard scores face-down cards at average value', () => {
+    // Grid with one face-up high-value card and one face-down card.
+    // The AI should prefer swapping the face-up high card rather than
+    // the face-down card (which might be low).
+    const cards = [
+      createCard('Q', 'hearts', true),  // 10 pts -- visible, high
+      createCard('A', 'clubs', true),   // 1 pt -- visible, low
+      createCard('2', 'spades', true),  // -2 pts -- visible, good
+      createCard('5', 'clubs', false),  // hidden -- avg ~5.46 pts
+      createCard('5', 'hearts', false),
+      createCard('5', 'spades', false),
+      createCard('5', 'diamonds', false),
+      createCard('5', 'clubs', false),
+      createCard('5', 'hearts', false),
+    ];
+    const grid = createGolfGrid(cards);
+    const aiPs = createAiVisiblePlayerState({ grid });
+
+    // Drawing an Ace (1 pt)
+    const drawnCard = createCard('A', 'diamonds', true);
+    const move = chooseMoveForCard(aiPs.grid, drawnCard, createTestRng());
+
+    // Should swap with the Queen (10 pts) at position (0,0)
+    // because that gives the best score improvement
+    expect(move.kind).toBe('swap');
+    expect(move.row).toBe(0);
+    expect(move.col).toBe(0);
   });
 });

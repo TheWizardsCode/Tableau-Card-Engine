@@ -60,6 +60,79 @@ export interface GolfSession {
   shared: GolfSharedState;
 }
 
+// ── AI-visible state (information boundary) ────────────────
+
+/**
+ * Shared game state as visible to the AI.
+ *
+ * Enforces the information boundary: the AI can see only the
+ * discard pile top card and whether the stock has cards. It
+ * cannot access the full stock pile array or discard pile contents.
+ */
+export interface AiVisibleSharedState {
+  /** The top card of the discard pile (visible to all players), or undefined if empty. */
+  discardTop: Card | undefined;
+  /** Whether the stock pile has cards remaining (AI cannot see which cards). */
+  stockHasCards: boolean;
+  /** Round-end state (public information). */
+  roundEnd: RoundEndState;
+}
+
+/**
+ * A card slot in the AI's view of its own grid.
+ *
+ * Face-up cards are fully visible; face-down cards are represented
+ * as `{ faceUp: false }` with no rank/suit information.
+ */
+export type AiVisibleCardSlot = Card | { faceUp: false };
+
+/**
+ * The AI's view of a player's 3x3 grid.
+ * Face-down cards have their rank and suit hidden.
+ */
+export type AiVisibleGrid = [
+  AiVisibleCardSlot, AiVisibleCardSlot, AiVisibleCardSlot,
+  AiVisibleCardSlot, AiVisibleCardSlot, AiVisibleCardSlot,
+  AiVisibleCardSlot, AiVisibleCardSlot, AiVisibleCardSlot,
+];
+
+/** AI-visible per-player state. */
+export interface AiVisiblePlayerState {
+  grid: AiVisibleGrid;
+}
+
+/**
+ * Create an AI-visible projection of the shared game state.
+ *
+ * This filters out all hidden information:
+ * - Stock pile contents are replaced with a boolean flag.
+ * - Only the discard pile top card is exposed.
+ */
+export function createAiVisibleSharedState(
+  shared: GolfSharedState,
+): AiVisibleSharedState {
+  return {
+    discardTop: shared.discardPile.peek(),
+    stockHasCards: shared.stockPile.length > 0,
+    roundEnd: shared.roundEnd,
+  };
+}
+
+/**
+ * Create an AI-visible projection of a player's grid.
+ *
+ * Face-up cards are copied as-is; face-down cards are replaced
+ * with opaque `{ faceUp: false }` objects.
+ */
+export function createAiVisiblePlayerState(
+  playerState: GolfPlayerState,
+): AiVisiblePlayerState {
+  const visibleGrid = playerState.grid.map((card) =>
+    card.faceUp ? { ...card } : { faceUp: false as const },
+  ) as AiVisibleGrid;
+  return { grid: visibleGrid };
+}
+
 // ── Action types ────────────────────────────────────────────
 
 /**
@@ -185,6 +258,31 @@ export function enumerateLegalMoves(grid: GolfGrid): GolfMove[] {
 }
 
 /**
+ * Enumerate all legal moves using the AI-visible grid.
+ *
+ * Swap is legal at any position. Discard-and-flip is legal only
+ * at face-down positions (slots where `faceUp === false`).
+ */
+export function enumerateAiLegalMoves(grid: AiVisibleGrid): GolfMove[] {
+  const moves: GolfMove[] = [];
+
+  for (let row = 0; row < 3; row++) {
+    for (let col = 0; col < 3; col++) {
+      // Swap is always legal at any position
+      moves.push({ kind: 'swap', row, col });
+
+      // Discard-and-flip is only legal at face-down positions
+      const slot = grid[row * 3 + col];
+      if (!slot.faceUp) {
+        moves.push({ kind: 'discard-and-flip', row, col });
+      }
+    }
+  }
+
+  return moves;
+}
+
+/**
  * Enumerate possible draw sources.
  * Stock is always available (in a well-formed game).
  * Discard is available when the discard pile is not empty.
@@ -192,6 +290,24 @@ export function enumerateLegalMoves(grid: GolfGrid): GolfMove[] {
 export function enumerateDrawSources(shared: GolfSharedState): DrawSource[] {
   const sources: DrawSource[] = ['stock'];
   if (!shared.discardPile.isEmpty()) {
+    sources.push('discard');
+  }
+  return sources;
+}
+
+/**
+ * Enumerate possible draw sources using only AI-visible state.
+ * Stock is available if the stock pile has cards.
+ * Discard is available when there is a visible discard top card.
+ */
+export function enumerateAiDrawSources(
+  shared: AiVisibleSharedState,
+): DrawSource[] {
+  const sources: DrawSource[] = [];
+  if (shared.stockHasCards) {
+    sources.push('stock');
+  }
+  if (shared.discardTop !== undefined) {
     sources.push('discard');
   }
   return sources;
