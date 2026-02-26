@@ -141,6 +141,7 @@ const SECTION_BOX_PAD = 8;             // padding around content
 
 // ── Lower-band layout ──────────────────────────────────────
 const LOWER_TOP = 452;         // top of lower band (slightly higher for more room)
+const LOWER_BOX_H = 156;      // fixed height for player/AI section boxes
 
 // Player area — left half of lower band
 const PLAYER_AREA_X = 20;
@@ -154,8 +155,10 @@ const AI_AREA_Y = LOWER_TOP;
 const DIVIDER_X = 640;
 
 // Action buttons and instructions — centred at bottom
-const ACTION_Y = 618;          // action buttons Y
-const INSTRUCTION_Y = 664;     // instruction text Y (centred horizontally)
+// ACTION_Y must ensure button top (ACTION_Y - 21) is below section box bottom
+// Section box bottom = (LOWER_TOP - SECTION_BOX_PAD) + LOWER_BOX_H = 600
+const ACTION_Y = 626;          // action buttons Y (top edge at 605, below box bottom 600)
+const INSTRUCTION_Y = 660;     // instruction text Y (centred horizontally)
 
 // ── Audio asset keys ────────────────────────────────────────
 
@@ -453,14 +456,14 @@ export class SplendorScene extends Phaser.Scene {
     const playerBoxX = PLAYER_AREA_X - p;
     const playerBoxY = LOWER_TOP - p;
     const playerBoxW = DIVIDER_X - PLAYER_AREA_X;
-    const playerBoxH = ACTION_Y - LOWER_TOP - 4;
+    const playerBoxH = LOWER_BOX_H;
     this.drawSectionBox(playerBoxX, playerBoxY, playerBoxW, playerBoxH);
 
     // AI area box
     const aiBoxX = DIVIDER_X + p;
     const aiBoxY = LOWER_TOP - p;
     const aiBoxW = AI_AREA_X - DIVIDER_X + p;
-    const aiBoxH = ACTION_Y - LOWER_TOP - 4;
+    const aiBoxH = LOWER_BOX_H;
     this.drawSectionBox(aiBoxX, aiBoxY, aiBoxW, aiBoxH);
   }
 
@@ -1805,6 +1808,74 @@ export class SplendorScene extends Phaser.Scene {
       turnNumber: this.replayStepIndex,
       phase: 'playing' as const,
     });
+  }
+
+  // ── Test accessors ──────────────────────────────────────
+
+  /**
+   * Returns the computed section box rectangles for layout testing.
+   * Each rectangle is { x, y, w, h } representing the top-left origin box.
+   */
+  getSectionBoxRects(): {
+    nobles: { x: number; y: number; w: number; h: number };
+    market: { x: number; y: number; w: number; h: number };
+    supply: { x: number; y: number; w: number; h: number };
+    player: { x: number; y: number; w: number; h: number };
+    ai: { x: number; y: number; w: number; h: number };
+  } {
+    const p = SECTION_BOX_PAD;
+    const lastCardRight = MARKET_X + 4 * (MARKET_CARD_W + MARKET_CARD_GAP) - MARKET_CARD_GAP;
+    return {
+      nobles: {
+        x: NOBLE_X - p,
+        y: MARKET_Y - p - 16,
+        w: NOBLE_W + p * 2,
+        h: MARKET_TOTAL_H + p * 2 + 16,
+      },
+      market: {
+        x: DECK_X - 90 - p,
+        y: MARKET_Y - p - 16,
+        w: lastCardRight - (DECK_X - 90 - p) + p,
+        h: MARKET_TOTAL_H + p * 2 + 16,
+      },
+      supply: {
+        x: SUPPLY_X - SUPPLY_TOKEN_R - 70 - p,
+        y: SUPPLY_Y - SUPPLY_TOKEN_R - p - 16,
+        w: SUPPLY_TOKEN_R + 70 + SUPPLY_TOKEN_R + p * 2,
+        h: SUPPLY_TOTAL_H + SUPPLY_TOKEN_R * 2 + p * 2 + 16,
+      },
+      player: {
+        x: PLAYER_AREA_X - p,
+        y: LOWER_TOP - p,
+        w: DIVIDER_X - PLAYER_AREA_X,
+        h: LOWER_BOX_H,
+      },
+      ai: {
+        x: DIVIDER_X + p,
+        y: LOWER_TOP - p,
+        w: AI_AREA_X - DIVIDER_X + p,
+        h: LOWER_BOX_H,
+      },
+    };
+  }
+
+  /**
+   * Returns the layout constants relevant for action/instruction positioning.
+   */
+  getLayoutConstants(): {
+    actionY: number;
+    instructionY: number;
+    gameW: number;
+    gameH: number;
+    actionButtonH: number;
+  } {
+    return {
+      actionY: ACTION_Y,
+      instructionY: INSTRUCTION_Y,
+      gameW: GAME_W,
+      gameH: GAME_H,
+      actionButtonH: 42,
+    };
   }
 
   // ── Lifecycle cleanup ───────────────────────────────────
