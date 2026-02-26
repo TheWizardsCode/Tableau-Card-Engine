@@ -60,8 +60,8 @@ describe('setupTheMindGame', () => {
 
   it('uses default player names', () => {
     const session = setupTheMindGame({ rng: createSeededRng(1) });
-    expect(session.players[0].name).toBe('Player');
-    expect(session.players[1].name).toBe('AI');
+    expect(session.players[0].name).toBe('Player 1');
+    expect(session.players[1].name).toBe('Player 2');
   });
 
   it('uses custom player names', () => {

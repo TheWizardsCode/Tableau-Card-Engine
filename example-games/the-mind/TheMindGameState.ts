@@ -17,6 +17,9 @@ import { Pile } from '../../src/card-system/Pile';
 import type { MindCard } from './MindCard';
 import { createMindDeck, shuffleDeck } from './MindCard';
 
+import type { MultiplayerSetupOptions } from '../../src/core-engine/SetupOptions';
+import { resolveSetupOptions } from '../../src/core-engine/SetupOptions';
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -60,14 +63,7 @@ export interface PlayResult {
 }
 
 /** Setup options for creating a new game session. */
-export interface TheMindSetupOptions {
-  /** Names for the two players. Defaults to ['Player', 'AI']. */
-  playerNames?: [string, string];
-  /** Which players are AI-controlled. Defaults to [false, true]. */
-  isAI?: [boolean, boolean];
-  /** Random number generator (injectable for tests). */
-  rng?: () => number;
-}
+export type TheMindSetupOptions = MultiplayerSetupOptions;
 
 /** Per-player state. */
 export interface MindPlayerState {
@@ -103,14 +99,15 @@ export interface TheMindSession {
 export function setupTheMindGame(
   options?: TheMindSetupOptions,
 ): TheMindSession {
-  const names = options?.playerNames ?? ['Player', 'AI'];
-  const isAI = options?.isAI ?? [false, true];
-  const rng = options?.rng ?? Math.random;
+  const { players: playerInfos, rng } = resolveSetupOptions({
+    ...options,
+    playerCount: 2,
+  });
 
   const session: TheMindSession = {
     players: [
-      { name: names[0], isAI: isAI[0], hand: [] },
-      { name: names[1], isAI: isAI[1], hand: [] },
+      { name: playerInfos[0].name, isAI: playerInfos[0].isAI, hand: [] },
+      { name: playerInfos[1].name, isAI: playerInfos[1].isAI, hand: [] },
     ],
     pile: new Pile<MindCard>(),
     currentLevel: 0, // Will be set by dealLevel
