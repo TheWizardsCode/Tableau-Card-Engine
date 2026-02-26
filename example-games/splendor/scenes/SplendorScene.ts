@@ -748,129 +748,121 @@ export class SplendorScene extends Phaser.Scene {
     this.playerContainer.removeAll(true);
     const player = this.session.players[0];
     const prestige = getPrestige(player);
+    const bonuses = getBonuses(player);
 
-    // ── Row 0: Header + prominent prestige score ──
-    const row0Y = PLAYER_AREA_Y + 4;
+    // ── Row 0: Prestige badge + tokens ──
+    const row0Y = PLAYER_AREA_Y;
 
-    const label = this.add.text(
-      PLAYER_AREA_X, row0Y, 'Your Tableau',
-      { fontSize: '18px', fontStyle: 'bold', color: '#ffffff', fontFamily: FONT_FAMILY },
-    );
-    this.playerContainer.add(label);
-
-    // Prominent prestige display — large star + score
+    // Prominent prestige display
     const prestigeBg = this.add.rectangle(
-      PLAYER_AREA_X + 200, row0Y + 10,
+      PLAYER_AREA_X + 44, row0Y + 10,
       90, 24, 0x443300, 0.6,
     );
     prestigeBg.setStrokeStyle(1, 0x887744);
     this.playerContainer.add(prestigeBg);
 
     const prestigeLabel = this.add.text(
-      PLAYER_AREA_X + 200, row0Y + 10,
+      PLAYER_AREA_X + 44, row0Y + 10,
       `★ ${prestige} / 15`,
       { fontSize: '16px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY },
     ).setOrigin(0.5);
     this.playerContainer.add(prestigeLabel);
 
-    // Nobles collected (inline with header if any)
+    // Nobles collected
     if (player.nobles.length > 0) {
       const nobleLabel = this.add.text(
-        PLAYER_AREA_X + 260, row0Y + 2,
+        PLAYER_AREA_X + 100, row0Y + 2,
         `Nobles: ${player.nobles.length}`,
         { fontSize: '14px', color: '#aa88cc', fontFamily: FONT_FAMILY },
       );
       this.playerContainer.add(nobleLabel);
     }
 
-    // ── Row 1: Tokens ──
-    const row1Y = row0Y + 30;
-
+    // Tokens (right of prestige)
     const tokLabel = this.add.text(
-      PLAYER_AREA_X, row1Y + 4, 'Tokens:',
+      PLAYER_AREA_X + 200, row0Y + 4, 'Tokens:',
       { fontSize: '15px', color: '#aaaaaa', fontFamily: FONT_FAMILY },
     );
     this.playerContainer.add(tokLabel);
 
-    let tx = PLAYER_AREA_X + 80;
-    const tokCenterY = row1Y + 18;   // enough vertical space for radius-16 circles
+    let tx = PLAYER_AREA_X + 280;
+    const tokCenterY = row0Y + 14;
     for (const c of ALL_TOKEN_COLORS) {
       const n = tokenCount(player.tokens, c);
       if (n === 0) continue;
 
-      const circle = this.add.circle(tx, tokCenterY, 16, GEM_FILL[c]);
+      const circle = this.add.circle(tx, tokCenterY, 14, GEM_FILL[c]);
       circle.setStrokeStyle(1, 0xffffff);
       this.playerContainer.add(circle);
 
       const ct = this.add.text(
         tx, tokCenterY, `${n}`,
-        { fontSize: '15px', fontStyle: 'bold', color: GEM_TEXT_COLOR[c], fontFamily: FONT_FAMILY },
+        { fontSize: '13px', fontStyle: 'bold', color: GEM_TEXT_COLOR[c], fontFamily: FONT_FAMILY },
       ).setOrigin(0.5);
       this.playerContainer.add(ct);
 
-      tx += 40;
+      tx += 34;
     }
 
     if (totalTokens(player.tokens) === 0) {
       const noTok = this.add.text(
         tx + 5, tokCenterY, '(none)',
-        { fontSize: '15px', color: '#666666', fontFamily: FONT_FAMILY },
+        { fontSize: '14px', color: '#666666', fontFamily: FONT_FAMILY },
       ).setOrigin(0, 0.5);
       this.playerContainer.add(noTok);
     }
 
-    // ── Row 2: Bonuses ──
-    const row2Y = row1Y + 40;
+    // ── Row 1: Gem placeholder sprites (all 5 always shown) ──
+    const row1Y = row0Y + 32;
+    const SLOT_W = 38;
+    const SLOT_H = 50;
+    const SLOT_GAP = 8;
 
-    const bonuses = getBonuses(player);
-    let bx = PLAYER_AREA_X;
-
-    const bonusLabel = this.add.text(
-      bx, row2Y + 4, 'Bonuses:',
-      { fontSize: '15px', color: '#aaaaaa', fontFamily: FONT_FAMILY },
-    );
-    this.playerContainer.add(bonusLabel);
-    bx += 85;
-
-    let hasBonuses = false;
+    let sx = PLAYER_AREA_X;
     for (const c of GEM_COLORS) {
       const count = bonuses[c];
-      if (count === 0) continue;
-      hasBonuses = true;
+      const hasCards = count > 0;
+      const alpha = hasCards ? 0.7 : 0.15;
 
-      const chip = this.add.rectangle(bx + 16, row2Y + 16, 32, 26, GEM_FILL[c], 0.8);
-      chip.setStrokeStyle(1, 0x888888);
-      this.playerContainer.add(chip);
-
-      const chipText = this.add.text(
-        bx + 16, row2Y + 16, `${count}`,
-        { fontSize: '16px', fontStyle: 'bold', color: GEM_TEXT_COLOR[c], fontFamily: FONT_FAMILY },
-      ).setOrigin(0.5);
-      this.playerContainer.add(chipText);
-
-      bx += 44;
-    }
-
-    if (!hasBonuses) {
-      const noneText = this.add.text(
-        bx + 5, row2Y + 6, '(none)',
-        { fontSize: '15px', color: '#666666', fontFamily: FONT_FAMILY },
+      // Card-shaped placeholder
+      const slot = this.add.rectangle(
+        sx + SLOT_W / 2, row1Y + SLOT_H / 2,
+        SLOT_W, SLOT_H, GEM_FILL[c], alpha,
       );
-      this.playerContainer.add(noneText);
+      slot.setStrokeStyle(1, hasCards ? 0xaaaaaa : 0x555555, hasCards ? 0.8 : 0.3);
+      this.playerContainer.add(slot);
+
+      // Gem abbreviation at top
+      const abbr = this.add.text(
+        sx + SLOT_W / 2, row1Y + 10,
+        gemAbbrev(c),
+        { fontSize: '11px', fontStyle: 'bold', color: hasCards ? GEM_TEXT_COLOR[c] : '#666666', fontFamily: FONT_FAMILY },
+      ).setOrigin(0.5);
+      this.playerContainer.add(abbr);
+
+      // Count
+      const countText = this.add.text(
+        sx + SLOT_W / 2, row1Y + SLOT_H / 2 + 6,
+        `${count}`,
+        { fontSize: '18px', fontStyle: 'bold', color: hasCards ? '#ffffff' : '#444444', fontFamily: FONT_FAMILY },
+      ).setOrigin(0.5);
+      this.playerContainer.add(countText);
+
+      sx += SLOT_W + SLOT_GAP;
     }
 
-    // ── Row 3: Reserved cards (conditional) ──
-    const row3Y = row2Y + 38;
+    // ── Row 2: Reserved cards (conditional) ──
+    const row2Y = row1Y + SLOT_H + 6;
     if (player.reservedCards.length > 0) {
       const resLabel = this.add.text(
-        PLAYER_AREA_X, row3Y + 4, `Reserved (${player.reservedCards.length}):`,
+        PLAYER_AREA_X, row2Y + 4, `Reserved (${player.reservedCards.length}):`,
         { fontSize: '15px', color: '#ccaa66', fontFamily: FONT_FAMILY },
       );
       this.playerContainer.add(resLabel);
 
       let rx = PLAYER_AREA_X + 150;
       for (const card of player.reservedCards) {
-        const cardContainer = this.createSmallCard(rx, row3Y - 2, card, true);
+        const cardContainer = this.createSmallCard(rx, row2Y - 2, card, true);
         this.playerContainer.add(cardContainer);
         rx += 100;
       }
@@ -936,133 +928,124 @@ export class SplendorScene extends Phaser.Scene {
     const bonuses = getBonuses(ai);
     const prestige = getPrestige(ai);
 
-    // ── Row 0: Header + prominent prestige score — right-aligned ──
-    const row0Y = AI_AREA_Y + 4;
+    // ── Row 0: Prestige badge + tokens — right-aligned ──
+    const row0Y = AI_AREA_Y;
 
-    const label = this.add.text(
-      AI_AREA_X, row0Y, 'AI Opponent',
-      { fontSize: '18px', fontStyle: 'bold', color: '#aabbcc', fontFamily: FONT_FAMILY },
-    ).setOrigin(1, 0);
-    this.aiContainer.add(label);
-
-    // Prominent prestige display — matches player side
+    // Prominent prestige display
     const prestigeBg = this.add.rectangle(
-      AI_AREA_X - 170, row0Y + 10,
+      AI_AREA_X - 44, row0Y + 10,
       90, 24, 0x443300, 0.6,
     );
     prestigeBg.setStrokeStyle(1, 0x887744);
     this.aiContainer.add(prestigeBg);
 
     const prestigeLabel = this.add.text(
-      AI_AREA_X - 170, row0Y + 10,
+      AI_AREA_X - 44, row0Y + 10,
       `★ ${prestige} / 15`,
       { fontSize: '16px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY },
     ).setOrigin(0.5);
     this.aiContainer.add(prestigeLabel);
 
-    // Nobles collected (inline with header if any)
+    // Nobles collected
     if (ai.nobles.length > 0) {
       const nobleLabel = this.add.text(
-        AI_AREA_X - 230, row0Y + 2,
+        AI_AREA_X - 100, row0Y + 2,
         `Nobles: ${ai.nobles.length}`,
         { fontSize: '14px', color: '#aa88cc', fontFamily: FONT_FAMILY },
       ).setOrigin(1, 0);
       this.aiContainer.add(nobleLabel);
     }
 
-    // ── Row 1: Tokens — show actual token circles (matching player layout) ──
-    const row1Y = row0Y + 30;
-
+    // Tokens (left of prestige)
     const tokLabel = this.add.text(
-      AI_AREA_X, row1Y + 4, 'Tokens:',
+      AI_AREA_X - 200, row0Y + 4, 'Tokens:',
       { fontSize: '15px', color: '#aaaaaa', fontFamily: FONT_FAMILY },
     ).setOrigin(1, 0);
     this.aiContainer.add(tokLabel);
 
-    let tx = AI_AREA_X - 80;
-    const tokCenterY = row1Y + 18;
+    let tx = AI_AREA_X - 220;
+    const tokCenterY = row0Y + 14;
     let hasTokens = false;
-    // Draw right-to-left
     const tokenColors = [...ALL_TOKEN_COLORS].reverse();
     for (const c of tokenColors) {
       const n = tokenCount(ai.tokens, c);
       if (n === 0) continue;
       hasTokens = true;
 
-      const circle = this.add.circle(tx, tokCenterY, 16, GEM_FILL[c]);
+      const circle = this.add.circle(tx, tokCenterY, 14, GEM_FILL[c]);
       circle.setStrokeStyle(1, 0xffffff);
       this.aiContainer.add(circle);
 
       const ct = this.add.text(
         tx, tokCenterY, `${n}`,
-        { fontSize: '15px', fontStyle: 'bold', color: GEM_TEXT_COLOR[c], fontFamily: FONT_FAMILY },
+        { fontSize: '13px', fontStyle: 'bold', color: GEM_TEXT_COLOR[c], fontFamily: FONT_FAMILY },
       ).setOrigin(0.5);
       this.aiContainer.add(ct);
 
-      tx -= 40;
+      tx -= 34;
     }
 
     if (!hasTokens) {
       const noTok = this.add.text(
-        AI_AREA_X - 80, tokCenterY, '(none)',
-        { fontSize: '15px', color: '#666666', fontFamily: FONT_FAMILY },
+        AI_AREA_X - 220, tokCenterY, '(none)',
+        { fontSize: '14px', color: '#666666', fontFamily: FONT_FAMILY },
       ).setOrigin(1, 0.5);
       this.aiContainer.add(noTok);
     }
 
-    // ── Row 2: Bonuses — right-aligned, chips grow leftward ──
-    const row2Y = row1Y + 40;
+    // ── Row 1: Gem placeholder sprites (all 5 always shown) — right-aligned ──
+    const row1Y = row0Y + 32;
+    const SLOT_W = 38;
+    const SLOT_H = 50;
+    const SLOT_GAP = 8;
 
-    let hasBonuses = false;
-    let bx = AI_AREA_X;
-    const bonusChips: { color: GemColor; count: number }[] = [];
-    for (const c of GEM_COLORS) {
-      if (bonuses[c] === 0) continue;
-      hasBonuses = true;
-      bonusChips.push({ color: c, count: bonuses[c] });
-    }
+    // Draw right-to-left so rightmost gem is near AI_AREA_X
+    let sx = AI_AREA_X - SLOT_W;
+    const gemColorsReversed = [...GEM_COLORS].reverse();
+    for (const c of gemColorsReversed) {
+      const count = bonuses[c];
+      const hasCards = count > 0;
+      const alpha = hasCards ? 0.7 : 0.15;
 
-    // Draw chips right-to-left
-    for (let i = bonusChips.length - 1; i >= 0; i--) {
-      bx -= 16;
-      const chip = this.add.rectangle(bx, row2Y + 16, 32, 26, GEM_FILL[bonusChips[i].color], 0.8);
-      chip.setStrokeStyle(1, 0x888888);
-      this.aiContainer.add(chip);
-      const ct = this.add.text(
-        bx, row2Y + 16, `${bonusChips[i].count}`,
-        { fontSize: '16px', fontStyle: 'bold', color: GEM_TEXT_COLOR[bonusChips[i].color], fontFamily: FONT_FAMILY },
+      const slot = this.add.rectangle(
+        sx + SLOT_W / 2, row1Y + SLOT_H / 2,
+        SLOT_W, SLOT_H, GEM_FILL[c], alpha,
+      );
+      slot.setStrokeStyle(1, hasCards ? 0xaaaaaa : 0x555555, hasCards ? 0.8 : 0.3);
+      this.aiContainer.add(slot);
+
+      // Gem abbreviation at top
+      const abbr = this.add.text(
+        sx + SLOT_W / 2, row1Y + 10,
+        gemAbbrev(c),
+        { fontSize: '11px', fontStyle: 'bold', color: hasCards ? GEM_TEXT_COLOR[c] : '#666666', fontFamily: FONT_FAMILY },
       ).setOrigin(0.5);
-      this.aiContainer.add(ct);
-      bx -= 28;
+      this.aiContainer.add(abbr);
+
+      // Count
+      const countText = this.add.text(
+        sx + SLOT_W / 2, row1Y + SLOT_H / 2 + 6,
+        `${count}`,
+        { fontSize: '18px', fontStyle: 'bold', color: hasCards ? '#ffffff' : '#444444', fontFamily: FONT_FAMILY },
+      ).setOrigin(0.5);
+      this.aiContainer.add(countText);
+
+      sx -= (SLOT_W + SLOT_GAP);
     }
 
-    if (hasBonuses) {
-      const bonusLabel = this.add.text(
-        bx - 5, row2Y + 4, 'Bonuses:',
-        { fontSize: '15px', color: '#aaaaaa', fontFamily: FONT_FAMILY },
-      ).setOrigin(1, 0);
-      this.aiContainer.add(bonusLabel);
-    } else {
-      const bonusLabelNone = this.add.text(
-        AI_AREA_X, row2Y + 4, 'Bonuses: (none)',
-        { fontSize: '15px', color: '#666666', fontFamily: FONT_FAMILY },
-      ).setOrigin(1, 0);
-      this.aiContainer.add(bonusLabelNone);
-    }
-
-    // ── Row 3: Reserved + Cards counts ──
-    const row3Y = row2Y + 38;
+    // ── Row 2: Reserved + Cards counts ──
+    const row2Y = row1Y + SLOT_H + 6;
 
     const cardCount = ai.purchasedCards.length;
     const cardText = this.add.text(
-      AI_AREA_X, row3Y + 4, `Cards: ${cardCount}`,
+      AI_AREA_X, row2Y + 4, `Cards: ${cardCount}`,
       { fontSize: '15px', color: '#888888', fontFamily: FONT_FAMILY },
     ).setOrigin(1, 0);
     this.aiContainer.add(cardText);
 
     if (ai.reservedCards.length > 0) {
       const resText = this.add.text(
-        AI_AREA_X - 110, row3Y + 4, `Reserved: ${ai.reservedCards.length}`,
+        AI_AREA_X - 110, row2Y + 4, `Reserved: ${ai.reservedCards.length}`,
         { fontSize: '15px', color: '#ccaa66', fontFamily: FONT_FAMILY },
       ).setOrigin(1, 0);
       this.aiContainer.add(resText);
@@ -1231,6 +1214,51 @@ export class SplendorScene extends Phaser.Scene {
       { fontSize: '20px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY },
     ).setOrigin(0.5).setDepth(11);
     this.discardContainer.add(title);
+
+    // Bonus gem placeholder sprites (show permanent bonuses for context)
+    const bonuses = getBonuses(player);
+    const DSLOT_W = 32;
+    const DSLOT_H = 42;
+    const DSLOT_GAP = 6;
+    const totalSlotsW = GEM_COLORS.length * DSLOT_W + (GEM_COLORS.length - 1) * DSLOT_GAP;
+    let dsx = GAME_W / 2 - totalSlotsW / 2;
+    const dsY = GAME_H / 2 - 76;
+
+    const bonusLabel = this.add.text(
+      GAME_W / 2 - totalSlotsW / 2 - 60, dsY + DSLOT_H / 2,
+      'Bonuses:',
+      { fontSize: '12px', color: '#888888', fontFamily: FONT_FAMILY },
+    ).setOrigin(0, 0.5).setDepth(11);
+    this.discardContainer.add(bonusLabel);
+
+    for (const c of GEM_COLORS) {
+      const count = bonuses[c];
+      const hasCards = count > 0;
+      const alpha = hasCards ? 0.7 : 0.15;
+
+      const slot = this.add.rectangle(
+        dsx + DSLOT_W / 2, dsY + DSLOT_H / 2,
+        DSLOT_W, DSLOT_H, GEM_FILL[c], alpha,
+      ).setDepth(11);
+      slot.setStrokeStyle(1, hasCards ? 0xaaaaaa : 0x555555, hasCards ? 0.8 : 0.3);
+      this.discardContainer.add(slot);
+
+      const abbr = this.add.text(
+        dsx + DSLOT_W / 2, dsY + 8,
+        gemAbbrev(c),
+        { fontSize: '10px', fontStyle: 'bold', color: hasCards ? GEM_TEXT_COLOR[c] : '#666666', fontFamily: FONT_FAMILY },
+      ).setOrigin(0.5).setDepth(11);
+      this.discardContainer.add(abbr);
+
+      const countText = this.add.text(
+        dsx + DSLOT_W / 2, dsY + DSLOT_H / 2 + 5,
+        `${count}`,
+        { fontSize: '15px', fontStyle: 'bold', color: hasCards ? '#ffffff' : '#444444', fontFamily: FONT_FAMILY },
+      ).setOrigin(0.5).setDepth(11);
+      this.discardContainer.add(countText);
+
+      dsx += DSLOT_W + DSLOT_GAP;
+    }
 
     // Token buttons
     const allColors: GemOrGold[] = [...GEM_COLORS, 'gold'];
