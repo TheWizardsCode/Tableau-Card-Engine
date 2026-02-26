@@ -27,6 +27,9 @@ import {
   MAX_TOKENS,
 } from './SplendorCards';
 
+import type { MultiplayerSetupOptions } from '../../src/core-engine/SetupOptions';
+import { resolveSetupOptions } from '../../src/core-engine/SetupOptions';
+
 // ---------------------------------------------------------------------------
 // Session types
 // ---------------------------------------------------------------------------
@@ -119,36 +122,23 @@ export interface TurnResult {
 // Setup options
 // ---------------------------------------------------------------------------
 
-export interface SplendorSetupOptions {
-  playerCount?: number; // 2-4, default 2
-  playerNames?: string[];
-  isAI?: boolean[]; // which players are AI
-  rng?: () => number;
-}
+export type SplendorSetupOptions = MultiplayerSetupOptions;
 
 // ---------------------------------------------------------------------------
 // Setup
 // ---------------------------------------------------------------------------
 
 export function setupSplendorGame(options?: SplendorSetupOptions): SplendorSession {
-  const playerCount = options?.playerCount ?? 2;
+  const { players: playerInfos, rng } = resolveSetupOptions(options ?? {});
+  const playerCount = playerInfos.length;
+
   if (playerCount < 2 || playerCount > 4) {
     throw new Error(`Invalid player count: ${playerCount}. Must be 2-4.`);
   }
 
-  const rng = options?.rng ?? Math.random;
-  const names = options?.playerNames ?? Array.from(
-    { length: playerCount },
-    (_, i) => i === 0 ? 'Player' : `AI ${i}`,
-  );
-  const isAI = options?.isAI ?? Array.from(
-    { length: playerCount },
-    (_, i) => i > 0,
-  );
-
-  const players: SplendorPlayerState[] = names.map((name, i) => ({
-    name,
-    isAI: isAI[i] ?? true,
+  const players: SplendorPlayerState[] = playerInfos.map((info) => ({
+    name: info.name,
+    isAI: info.isAI,
     tokens: {},
     purchasedCards: [],
     reservedCards: [],
