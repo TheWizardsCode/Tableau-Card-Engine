@@ -61,6 +61,13 @@ export interface GameStateOptions<T> {
 /**
  * Create a new GameState from options.
  *
+ * @deprecated Use {@link resolveSetupOptions} from `SetupOptions.ts` for game
+ * initialization instead. Each game's `setup*Game()` function should call
+ * `resolveSetupOptions()` (or `resolveBaseSetupOptions()` for solitaire games)
+ * to resolve player configuration and RNG, then build game-specific state
+ * directly. `createGameState` remains functional but is no longer the
+ * recommended setup path.
+ *
  * @throws If fewer than 1 player is provided.
  * @throws If `firstPlayerIndex` is out of bounds.
  */

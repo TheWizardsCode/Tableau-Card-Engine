@@ -186,7 +186,8 @@ describe('MyScene browser tests', () => {
 ```
 src/
 ├── core-engine/            Game loop, state management, turn sequencing, utilities
-│   ├── GameState.ts        GameState<T>, createGameState
+│   ├── GameState.ts        GameState<T>, createGameState (deprecated for setup — use SetupOptions)
+│   ├── SetupOptions.ts     BaseSetupOptions, MultiplayerSetupOptions, resolveSetupOptions
 │   ├── SeededRng.ts        createSeededRng — deterministic PRNG (LCG) for shuffles and AI
 │   ├── TranscriptRecorder.ts BaseTranscript interface, TranscriptRecorderBase<T> abstract base class
 │   ├── TurnSequencer.ts    advanceTurn, getCurrentPlayer, startGame, endGame
@@ -419,7 +420,7 @@ Tests are in `tests/golf/`:
 
 Beleaguered Castle is the second full spike. It is a single-player open solitaire game demonstrating:
 
-- **Single-player support**: Core engine's `createGameState()` now accepts 1 player
+- **Single-player support**: Core engine's `createGameState()` accepts 1 player (deprecated for setup — use `resolveSetupOptions()` or `resolveBaseSetupOptions()` from `SetupOptions.ts` instead)
 - **Undo/Redo**: Reusable `UndoRedoManager` in `src/core-engine/` with Command pattern and compound commands
 - **Drag-and-drop**: Phaser drag events with drop zone highlighting and snap-back animation
 - **Click-to-move**: Select a card then click a destination; co-exists with drag-and-drop
