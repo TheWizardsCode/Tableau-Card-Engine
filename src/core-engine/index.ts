@@ -6,8 +6,9 @@
  */
 export const ENGINE_VERSION = '0.1.0';
 
-// Shared setup option types
-export type { BaseSetupOptions, MultiplayerSetupOptions } from './SetupOptions';
+// Shared setup option types and helpers
+export type { BaseSetupOptions, MultiplayerSetupOptions, ResolvedBaseSetup, ResolvedSetup } from './SetupOptions';
+export { resolveBaseSetupOptions, resolveSetupOptions } from './SetupOptions';
 
 // Game state types and factory
 export type { GamePhase, PlayerInfo, GameState, GameStateOptions } from './GameState';
