@@ -17,6 +17,10 @@ export type { PhaseManagerConfig } from './PhaseManager';
 export { flipCard } from './flipCard';
 export type { FlipCardOptions } from './flipCard';
 
+// Illegal move shake animation
+export { shakeIllegalMove } from './shakeIllegalMove';
+export type { ShakeIllegalMoveOptions } from './shakeIllegalMove';
+
 // Card layout helpers
 export { layoutCardPositions } from './layoutCardPositions';
 export type {
