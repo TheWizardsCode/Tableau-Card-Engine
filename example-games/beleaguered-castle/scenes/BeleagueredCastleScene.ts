@@ -71,8 +71,8 @@ const SFX_KEYS = {
 } as const;
 
 // ── Local card dimensions (5:7 aspect ratio, sized to fit 8 columns) ──
-const BC_CARD_W = 68;
-const BC_CARD_H = 95;
+const BC_CARD_W = 80;
+const BC_CARD_H = 112;
 
 // ── Constants ───────────────────────────────────────────────
 
@@ -85,18 +85,18 @@ const AUTO_COMPLETE_DELAY = 150; // ms between auto-complete card animations
 
 /** Preferred vertical overlap offset between cascaded cards in a tableau column.
  *  Dynamically compressed when a column has many cards (see tableauCardY). */
-const CASCADE_OFFSET_Y = 33;
+const CASCADE_OFFSET_Y = 38;
 
 /** Maximum Y for the center of the bottom card in a tableau column.
  *  Leaves room for the HUD bar at the bottom of the canvas. */
-const TABLEAU_MAX_Y = GAME_H - 40 - BC_CARD_H / 2; // ~617
+const TABLEAU_MAX_Y = GAME_H - 40 - BC_CARD_H / 2; // ~624
 
 /** Top area: title + foundations */
 const TITLE_Y = 20;
 const FOUNDATION_Y = 95;
 
 /** Tableau starts below the foundations (with room for suit labels). */
-const TABLEAU_TOP_Y = 220;
+const TABLEAU_TOP_Y = 232;
 
 /** Z-depth for a card being dragged. */
 const DRAG_DEPTH = 1000;
