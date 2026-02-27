@@ -456,7 +456,7 @@ export class LostCitiesScene extends Phaser.Scene {
       'Opponent Expeditions',
     );
 
-    // Placeholder card slots for opponent expeditions
+    // Placeholder card slots for opponent expeditions (interactive for scoring tooltip)
     for (let i = 0; i < 5; i++) {
       const color = EXPEDITION_COLORS[i];
       const hex = Phaser.Display.Color.HexStringToColor(EXPEDITION_HEX[color]).color;
@@ -464,6 +464,16 @@ export class LostCitiesScene extends Phaser.Scene {
         laneX(i) - CARD_W / 2, OPP_EXP_TOP,
         CARD_W, CARD_H, hex, 0.15,
       );
+
+      // Interactive zone over the placeholder for scoring tooltip
+      const zone = this.add.rectangle(
+        laneX(i), OPP_EXP_TOP + CARD_H / 2,
+        CARD_W + 8, CARD_H + 4,
+        0x000000, 0,
+      );
+      zone.setInteractive({ useHandCursor: false });
+      zone.on('pointerover', () => this.showExpeditionTooltip(color, zone, 'below'));
+      zone.on('pointerout', () => this.hideExpeditionTooltip());
     }
 
     // Discard piles — no label, centered between expedition areas
@@ -475,7 +485,7 @@ export class LostCitiesScene extends Phaser.Scene {
       '',
     );
 
-    // Placeholder card slots for discard piles
+    // Placeholder card slots for discard piles (interactive for scoring tooltip)
     for (let i = 0; i < 5; i++) {
       const color = EXPEDITION_COLORS[i];
       const hex = Phaser.Display.Color.HexStringToColor(EXPEDITION_HEX[color]).color;
@@ -483,6 +493,16 @@ export class LostCitiesScene extends Phaser.Scene {
         laneX(i) - DISCARD_CARD_W / 2, DISCARD_Y,
         DISCARD_CARD_W, DISCARD_CARD_H, hex, 0.2,
       );
+
+      // Interactive zone over the placeholder for scoring tooltip
+      const zone = this.add.rectangle(
+        laneX(i), DISCARD_Y + DISCARD_CARD_H / 2,
+        DISCARD_CARD_W + 8, DISCARD_CARD_H + 4,
+        0x000000, 0,
+      );
+      zone.setInteractive({ useHandCursor: false });
+      zone.on('pointerover', () => this.showExpeditionTooltip(color, zone, 'below'));
+      zone.on('pointerout', () => this.hideExpeditionTooltip());
     }
 
     // Player expeditions — box includes label above card content
@@ -510,7 +530,7 @@ export class LostCitiesScene extends Phaser.Scene {
         0x000000, 0,
       );
       zone.setInteractive({ useHandCursor: true });
-      zone.on('pointerover', () => this.showExpeditionTooltip(color, zone));
+      zone.on('pointerover', () => this.showExpeditionTooltip(color, zone, 'above'));
       zone.on('pointerout', () => this.hideExpeditionTooltip());
     }
 
@@ -994,6 +1014,7 @@ export class LostCitiesScene extends Phaser.Scene {
   private showExpeditionTooltip(
     color: ExpeditionColor,
     anchor: Phaser.GameObjects.Components.Transform & { width?: number; height?: number },
+    position: 'above' | 'below' = 'above',
   ): void {
     if (this.settingsPanel && !this.settingsPanel.showTooltips) return;
     this.hideExpeditionTooltip();
@@ -1040,9 +1061,14 @@ export class LostCitiesScene extends Phaser.Scene {
     const boxW = Math.max(text.width, title.width) + TOOLTIP_PAD * 2;
     const boxH = TOOLTIP_PAD + title.height + 6 + text.height + TOOLTIP_PAD;
 
-    // Position tooltip above the anchor (player expedition area is near the bottom)
+    // Position tooltip relative to anchor based on position hint
     let tooltipX = anchor.x - boxW / 2;
-    let tooltipY = anchor.y - (anchor.height ?? 0) / 2 - boxH - 6;
+    let tooltipY: number;
+    if (position === 'below') {
+      tooltipY = anchor.y + (anchor.height ?? 0) / 2 + 6;
+    } else {
+      tooltipY = anchor.y - (anchor.height ?? 0) / 2 - boxH - 6;
+    }
 
     // Clamp within canvas bounds
     tooltipX = Phaser.Math.Clamp(tooltipX, 4, GAME_W - boxW - 4);
