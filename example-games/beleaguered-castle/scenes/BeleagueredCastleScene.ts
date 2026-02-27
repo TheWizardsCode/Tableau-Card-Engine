@@ -92,8 +92,8 @@ const TABLEAU_MAX_Y = GAME_H - 40 - BC_CARD_H / 2; // ~617
 const TITLE_Y = 20;
 const FOUNDATION_Y = 95;
 
-/** Tableau starts below the foundations. */
-const TABLEAU_TOP_Y = 225;
+/** Tableau starts below the foundations (with ~1/3 card-height gap). */
+const TABLEAU_TOP_Y = 267;
 
 /** Z-depth for a card being dragged. */
 const DRAG_DEPTH = 1000;
