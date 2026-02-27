@@ -61,15 +61,9 @@ import {
 } from '../GameTranscript';
 import { TranscriptStore } from '../../../src/core-engine/TranscriptStore';
 import { autoSaveTranscript } from '../../../src/core-engine/autoSaveTranscript';
-import { GameEventEmitter } from '../../../src/core-engine/GameEventEmitter';
-import { PhaserEventBridge } from '../../../src/core-engine/PhaserEventBridge';
-import { SoundManager } from '../../../src/core-engine/SoundManager';
-import type { SoundPlayer, EventSoundMapping } from '../../../src/core-engine/SoundManager';
+import type { EventSoundMapping } from '../../../src/core-engine/SoundManager';
 import {
-  HelpPanel,
-  HelpButton,
-  SettingsPanel,
-  SettingsButton,
+  CardGameScene,
   GAME_W,
   GAME_H,
   FONT_FAMILY,
@@ -232,16 +226,13 @@ type SceneTurnPhase =
 const transcriptStore = new TranscriptStore();
 
 // ═══════════════════════════════════════════════════════════
-export class LostCitiesScene extends Phaser.Scene {
+export class LostCitiesScene extends CardGameScene {
   // Game state
   private session!: LostCitiesSession;
   private aiPlayer!: LostCitiesAiPlayer;
   private recorder!: LCTranscriptRecorder;
   private turnPhase: SceneTurnPhase = 'waiting-for-card-select';
   private selectedCardIndex: number = -1;
-
-  /** When true, the scene suppresses all input and AI turns for replay use. */
-  private replayMode: boolean = false;
 
   // Graphics layer for section boxes
   private gfx!: Phaser.GameObjects.Graphics;
@@ -273,17 +264,6 @@ export class LostCitiesScene extends Phaser.Scene {
 
   // Overlay cleanup
   private overlayObjects: Phaser.GameObjects.GameObject[] = [];
-
-  // Help panel
-  private helpPanel!: HelpPanel;
-  private helpButton!: HelpButton;
-
-  // Sound system
-  private gameEvents!: GameEventEmitter;
-  private eventBridge!: PhaserEventBridge;
-  private soundManager: SoundManager | null = null;
-  private settingsPanel!: SettingsPanel;
-  private settingsButton!: SettingsButton;
 
   // Tooltip
   private tooltipContainer: Phaser.GameObjects.Container | null = null;
@@ -367,16 +347,12 @@ export class LostCitiesScene extends Phaser.Scene {
     this.tooltipContainer = null;
 
     // Check for replay mode via URL parameter (?mode=replay)
-    this.replayMode =
-      new URLSearchParams(window.location.search).get('mode') === 'replay';
+    this.detectReplayMode();
 
     // Event system: create emitter and bridge to Phaser scene events.
     // Must be created before help/sound systems and exposed on window
     // for the replay tool.
-    this.gameEvents = new GameEventEmitter();
-    this.eventBridge = new PhaserEventBridge(this.gameEvents, this.events);
-    (window as unknown as Record<string, unknown>).__GAME_EVENTS__ =
-      this.gameEvents;
+    this.initEventSystem();
 
     // Initialize game state
     this.session = setupLostCitiesGame({
@@ -410,7 +386,10 @@ export class LostCitiesScene extends Phaser.Scene {
       // In replay mode: clear instruction text and emit state-settled
       // so the replay tool knows the scene is ready for state injection.
       this.instructionText.setText('');
-      this.emitStateSettled();
+      this.emitStateSettled(
+        this.session.round.turnNumber,
+        this.session.matchPhase === 'playing' ? 'playing' : 'ended',
+      );
     } else {
       this.setPhase('waiting-for-card-select');
     }
@@ -678,35 +657,15 @@ export class LostCitiesScene extends Phaser.Scene {
   }
 
   private createHelpPanel(): void {
-    this.helpPanel = new HelpPanel(this, {
-      sections: helpContent as HelpSection[],
-    });
-    this.helpButton = new HelpButton(this, this.helpPanel);
+    this.initHelpPanel(helpContent as HelpSection[]);
   }
 
   private createSoundSystem(): void {
-    // Sound system
-    const phaserSound = this.sound;
-    const player: SoundPlayer = {
-      play: (key: string) => { phaserSound.play(key); },
-      stop: (key: string) => { phaserSound.stopByKey(key); },
-      setVolume: (v: number) => { phaserSound.volume = v; },
-      setMute: (m: boolean) => { phaserSound.mute = m; },
-    };
-    this.soundManager = new SoundManager(player);
-    for (const sfxKey of Object.values(SFX_KEYS)) {
-      this.soundManager.register(sfxKey);
-    }
     const mapping: EventSoundMapping = {
       'turn-started': SFX_KEYS.TURN_CHANGE,
     };
-    this.soundManager.connectToEvents(this.gameEvents, mapping);
-
-    // Settings UI
-    this.settingsPanel = new SettingsPanel(this, {
-      soundManager: this.soundManager,
-    });
-    this.settingsButton = new SettingsButton(this, this.settingsPanel);
+    this.initSoundSystem(Object.values(SFX_KEYS), mapping);
+    this.initSettingsPanel();
   }
 
   // ── Replay API ──────────────────────────────────────────
@@ -792,7 +751,10 @@ export class LostCitiesScene extends Phaser.Scene {
     this.refreshAll();
 
     // Signal that the board is visually stable and ready for screenshot
-    this.emitStateSettled();
+    this.emitStateSettled(
+      this.session.round.turnNumber,
+      this.session.matchPhase === 'playing' ? 'playing' : 'ended',
+    );
   }
 
   /**
@@ -817,17 +779,6 @@ export class LostCitiesScene extends Phaser.Scene {
       rank: cs.rank as 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10,
       faceUp: cs.faceUp,
     };
-  }
-
-  /**
-   * Emit state-settled when the board is visually stable and safe
-   * to screenshot. Called after animations complete and display is refreshed.
-   */
-  private emitStateSettled(): void {
-    this.gameEvents.emit('state-settled', {
-      turnNumber: this.session.round.turnNumber,
-      phase: this.session.matchPhase === 'playing' ? 'playing' : 'ended',
-    });
   }
 
   // ── Phase management ────────────────────────────────────
@@ -1786,14 +1737,7 @@ export class LostCitiesScene extends Phaser.Scene {
 
   // ── Cleanup ─────────────────────────────────────────────
   shutdown(): void {
-    this.soundManager?.destroy();
-    this.soundManager = null;
-    this.eventBridge?.destroy();
-    this.gameEvents?.removeAllListeners();
-    this.helpPanel?.destroy();
-    this.helpButton?.destroy();
-    this.settingsPanel?.destroy();
-    this.settingsButton?.destroy();
     this.dismissCurrentOverlay();
+    this.shutdownBase();
   }
 }
