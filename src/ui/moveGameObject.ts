@@ -58,7 +58,7 @@ export function moveGameObject(opts: MoveGameObjectOptions): Phaser.Tweens.Tween
     target,
     destX,
     destY,
-    duration = 350,
+    duration = 700,
     ease = 'Quad.easeOut',
     onComplete,
   } = opts;

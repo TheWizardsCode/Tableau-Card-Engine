@@ -61,10 +61,10 @@ import helpContent from '../help-content.json';
 const ANIM_DURATION = 400;
 
 /** Duration of card/noble movement tweens in ms. */
-const MOVE_DURATION = 350;
+const MOVE_DURATION = 700;
 
 /** Pre-pause before AI action animations in ms. */
-const AI_PRE_PAUSE = 500;
+const AI_PRE_PAUSE = 1000;
 
 /** Shared transcript store for auto-saving completed transcripts. */
 const transcriptStore = new TranscriptStore();
