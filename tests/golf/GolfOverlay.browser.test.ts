@@ -128,8 +128,8 @@ function clickAtGameCoords(
  */
 function forceEndScreen(scene: Phaser.Scene): void {
   const internals = getSceneInternals(scene);
-  // Calling setPhase('round-ended') triggers showEndScreen() internally
-  internals.setPhase('round-ended');
+  // Calling phaseManager.set('round-ended') triggers showEndScreen() internally
+  internals.phaseManager.set('round-ended');
 }
 
 // ── Tests ───────────────────────────────────────────────────
@@ -198,7 +198,7 @@ describe('Golf overlay button tests', () => {
     expect(newSession).not.toBe(originalSession);
 
     // Verify: the scene is in initial state, not in round-ended
-    expect(getSceneInternals(newScene).turnPhase).toBe('waiting-for-draw');
+    expect(getSceneInternals(newScene).phaseManager.current).toBe('waiting-for-draw');
 
     // Verify: overlay buttons no longer exist
     const newTexts = newScene.children.list.filter(

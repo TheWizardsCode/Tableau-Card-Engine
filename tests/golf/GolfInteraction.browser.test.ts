@@ -56,7 +56,7 @@ function nextFrame(): Promise<void> {
  * GolfScene stores state in private fields; we access them for testing.
  */
 function getSceneInternals(scene: Phaser.Scene): {
-  turnPhase: string;
+  phaseManager: { current: string; set: (phase: string) => void };
   drawnCard: unknown;
   drawSource: unknown;
   session: {
@@ -111,12 +111,12 @@ async function waitForAnyPhase(
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     const internals = getSceneInternals(scene);
-    if (phases.includes(internals.turnPhase)) return internals.turnPhase;
+    if (phases.includes(internals.phaseManager.current)) return internals.phaseManager.current;
     await wait(50);
   }
   const internals = getSceneInternals(scene);
   throw new Error(
-    `Timed out waiting for any of phases [${phases.join(', ')}]. Current phase: "${internals.turnPhase}"`,
+    `Timed out waiting for any of phases [${phases.join(', ')}]. Current phase: "${internals.phaseManager.current}"`,
   );
 }
 
@@ -131,7 +131,7 @@ async function waitForPhaseChange(
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     const internals = getSceneInternals(scene);
-    if (internals.turnPhase !== fromPhase) return internals.turnPhase;
+    if (internals.phaseManager.current !== fromPhase) return internals.phaseManager.current;
     await wait(50);
   }
   throw new Error(`Timed out waiting for phase to change from "${fromPhase}"`);
@@ -221,7 +221,7 @@ describe('GolfScene interaction tests', () => {
 
     // Game should start with human player (index 0)
     expect(internals.session.gameState.currentPlayerIndex).toBe(0);
-    expect(internals.turnPhase).toBe('waiting-for-draw');
+    expect(internals.phaseManager.current).toBe('waiting-for-draw');
     expect(internals.instructionText.text).toContain('Stock');
     expect(internals.instructionText.text).toContain('Discard');
 
@@ -229,7 +229,7 @@ describe('GolfScene interaction tests', () => {
     clickGameObject(internals.stockSprite);
     await nextFrame();
 
-    expect(internals.turnPhase).toBe('waiting-for-move');
+    expect(internals.phaseManager.current).toBe('waiting-for-move');
     expect(internals.drawnCard).not.toBeNull();
     expect(internals.drawSource).toBe('stock');
     expect(internals.instructionText.text).toContain('swap');
@@ -241,13 +241,13 @@ describe('GolfScene interaction tests', () => {
     const scene = game.scene.getScene('GolfScene')!;
     const internals = getSceneInternals(scene);
 
-    expect(internals.turnPhase).toBe('waiting-for-draw');
+    expect(internals.phaseManager.current).toBe('waiting-for-draw');
 
     // Click the discard pile
     clickGameObject(internals.discardSprite);
     await nextFrame();
 
-    expect(internals.turnPhase).toBe('waiting-for-move');
+    expect(internals.phaseManager.current).toBe('waiting-for-move');
     expect(internals.drawnCard).not.toBeNull();
     expect(internals.drawSource).toBe('discard');
 
@@ -276,7 +276,7 @@ describe('GolfScene interaction tests', () => {
     clickGameObject(internals.stockSprite);
     await nextFrame();
 
-    expect(internals.turnPhase).toBe('waiting-for-move');
+    expect(internals.phaseManager.current).toBe('waiting-for-move');
 
     // Click a human grid card to swap (index 0 = top-left)
     clickGameObject(internals.humanCardSprites[0]);
@@ -320,13 +320,13 @@ describe('GolfScene interaction tests', () => {
     clickGameObject(internals.discardSprite);
     await waitForPhaseChange(scene, 'animating', 3000);
 
-    expect(internals.turnPhase).toBe('waiting-for-flip-target');
+    expect(internals.phaseManager.current).toBe('waiting-for-flip-target');
     expect(internals.instructionText.text).toContain('face-down');
 
     // Click a face-up card -- should be ignored
     clickGameObject(internals.humanCardSprites[faceUpIdx]);
     await nextFrame();
-    expect(internals.turnPhase).toBe('waiting-for-flip-target');
+    expect(internals.phaseManager.current).toBe('waiting-for-flip-target');
 
     // Click the face-down card to flip it
     clickGameObject(internals.humanCardSprites[faceDownIdx]);
@@ -367,7 +367,7 @@ describe('GolfScene interaction tests', () => {
     await wait(3000);
 
     // After AI turn, it should be human's turn again (or round ended)
-    const phase = internals.turnPhase;
+    const phase = internals.phaseManager.current;
     const turnNum = internals.session.gameState.turnNumber;
 
     expect(
@@ -410,7 +410,7 @@ describe('GolfScene interaction tests', () => {
     await wait(100);
 
     // During AI turn, clicking stock should do nothing
-    const phaseBeforeClick = internals.turnPhase;
+    const phaseBeforeClick = internals.phaseManager.current;
     if (
       phaseBeforeClick === 'ai-thinking' ||
       phaseBeforeClick === 'animating'
@@ -419,7 +419,7 @@ describe('GolfScene interaction tests', () => {
       await nextFrame();
 
       // Phase should not have changed to waiting-for-move
-      expect(internals.turnPhase).not.toBe('waiting-for-move');
+      expect(internals.phaseManager.current).not.toBe('waiting-for-move');
     }
     // If we missed the AI window, that's ok — the test is best-effort
   });
@@ -450,9 +450,9 @@ describe('GolfScene interaction tests', () => {
       clickGameObject(internals.stockSprite);
       await nextFrame();
 
-      if (internals.turnPhase !== 'waiting-for-move') {
+      if (internals.phaseManager.current !== 'waiting-for-move') {
         throw new Error(
-          `Expected waiting-for-move after stock click, got "${internals.turnPhase}"`,
+          `Expected waiting-for-move after stock click, got "${internals.phaseManager.current}"`,
         );
       }
 
