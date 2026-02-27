@@ -389,6 +389,96 @@ export function hasNoMoves(state: BeleagueredCastleState): boolean {
   return getLegalMoves(state).length === 0;
 }
 
+// ── Valuable-move detection ─────────────────────────────────
+
+/**
+ * Return a unique string key for a card, suitable for Set membership.
+ */
+function cardKey(rank: Rank, suit: Suit): string {
+  return `${rank}-${suit}`;
+}
+
+/**
+ * Collect the set of card keys that are *involved* in a list of legal moves.
+ *
+ * "Involved" means the card is the top of the source column (`fromCol`)
+ * for any move in the list.  These are the cards the player can currently
+ * interact with.
+ */
+function involvedCardKeys(
+  state: BeleagueredCastleState,
+  moves: BCMove[],
+): Set<string> {
+  const keys = new Set<string>();
+  for (const move of moves) {
+    const card = state.tableau[move.fromCol].peek();
+    if (card) {
+      keys.add(cardKey(card.rank, card.suit));
+    }
+  }
+  return keys;
+}
+
+/**
+ * Check whether the current state has at least one **valuable** move.
+ *
+ * A move is considered *valuable* if, after executing it, at least one
+ * new legal move becomes available that involves a card (as source) not
+ * involved in any legal move before the move was made.
+ *
+ * Foundation moves are always considered valuable: they permanently
+ * advance the game and expose the card beneath.
+ *
+ * When no legal moves exist at all the function returns `false` (no
+ * valuable moves, consistent with `hasNoMoves`).
+ *
+ * **Performance note:** This performs a one-ply lookahead for each legal
+ * move (apply, enumerate, undo).  With at most ~30 legal moves in
+ * Beleaguered Castle and ~30 moves to enumerate after each, the cost
+ * is negligible.
+ *
+ * @returns `true` if at least one valuable move exists.
+ */
+export function hasValuableMoves(
+  state: BeleagueredCastleState,
+): boolean {
+  const currentMoves = getLegalMoves(state);
+  if (currentMoves.length === 0) return false;
+
+  // Foundation moves are always valuable -- they permanently advance the
+  // game and always expose a new card (or win).
+  if (currentMoves.some((m) => m.kind === 'tableau-to-foundation')) {
+    return true;
+  }
+
+  // Only tableau-to-tableau moves remain.  Check each one via lookahead.
+  const currentKeys = involvedCardKeys(state, currentMoves);
+
+  for (const move of currentMoves) {
+    // Apply the move (mutates state, but we undo it afterwards)
+    applyMove(state, move);
+
+    const newMoves = getLegalMoves(state);
+    const newKeys = involvedCardKeys(state, newMoves);
+
+    // Check for any card newly involved that wasn't before
+    let valuable = false;
+    for (const key of newKeys) {
+      if (!currentKeys.has(key)) {
+        valuable = true;
+        break;
+      }
+    }
+
+    // Undo the move to restore original state
+    undoMove(state, move);
+
+    if (valuable) return true;
+  }
+
+  return false;
+}
+
 // ── Auto-move heuristic ─────────────────────────────────────
 
 /**

@@ -9,6 +9,7 @@ import {
   undoMove,
   isWon,
   hasNoMoves,
+  hasValuableMoves,
   getLegalMoves,
   rankValue,
   nextRank,
@@ -1273,5 +1274,210 @@ describe('getAutoCompleteMoves', () => {
 
     expect(state.tableau[0].size()).toBe(originalSize);
     expect(state.foundations[0].size()).toBe(originalFoundationSize);
+  });
+});
+
+// ── hasValuableMoves ────────────────────────────────────────
+
+describe('hasValuableMoves', () => {
+  it('should return false when no legal moves exist', () => {
+    // Same stuck state as hasNoMoves test: Kings and 4s can't interact
+    const stuckState = testState(
+      [[card('A', 'clubs')], [card('A', 'diamonds')], [card('A', 'hearts')], [card('A', 'spades')]],
+      [
+        [card('K', 'clubs')],
+        [card('K', 'diamonds')],
+        [card('K', 'hearts')],
+        [card('K', 'spades')],
+        [card('4', 'clubs')],
+        [card('4', 'diamonds')],
+        [card('4', 'hearts')],
+        [card('4', 'spades')],
+      ],
+    );
+    expect(hasValuableMoves(stuckState)).toBe(false);
+  });
+
+  it('should return true when a foundation move is available', () => {
+    // Column 0 has 2 of clubs which can go to the clubs foundation (A -> 2)
+    const state = testState(
+      [[card('A', 'clubs')], [card('A', 'diamonds')], [card('A', 'hearts')], [card('A', 'spades')]],
+      [[card('2', 'clubs')], [], [], [], [], [], [], []],
+    );
+    expect(hasValuableMoves(state)).toBe(true);
+  });
+
+  it('should return true for a fresh deal', () => {
+    // A freshly dealt game should always have at least one valuable move
+    const state = deal(42);
+    expect(hasValuableMoves(state)).toBe(true);
+  });
+
+  it('should return true when a tableau move exposes a new card', () => {
+    // Column 0: 3-clubs (bottom), 5-hearts (top)
+    // Column 1: 6-diamonds (single card)
+    // All other columns empty.
+    // Moving 5-hearts to column 1 (rank 5 on 6) is valuable because it
+    // exposes 3-clubs which wasn't involved in any move before.
+    const state = testState(
+      [[card('A', 'clubs')], [card('A', 'diamonds')], [card('A', 'hearts')], [card('A', 'spades')]],
+      [
+        [card('3', 'clubs'), card('5', 'hearts')],
+        [card('6', 'diamonds')],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+      ],
+    );
+    expect(hasValuableMoves(state)).toBe(true);
+  });
+
+  it('should return false when only non-valuable tableau shuffles exist', () => {
+    // Two single-card columns with cards that can move between them
+    // but moving doesn't expose any new cards (both are single).
+    // Column 0: 5-clubs, Column 1: 6-diamonds -- 5 can go on 6
+    // After move: Column 0: empty, Column 1: 6-diamonds, 5-clubs
+    // New moves: 5-clubs can go to any empty column (0, 2-7) and also to
+    // columns with 6s. But the only cards involved are still 5-clubs and
+    // 6-diamonds -- no NEW cards are exposed.
+    //
+    // BUT we also need to prevent foundation moves from triggering true.
+    // Foundations have aces; next expected are 2s. 5-clubs and 6-diamonds
+    // are not 2s, so no foundation moves.
+    //
+    // Also need to ensure 6-diamonds can go on 5-clubs via empty col:
+    // Actually, moving 5 to col 1 (on 6) is legal. After move, 5 is on
+    // top of col 1. Legal moves: 5-clubs from col 1 to any of 6 empty
+    // cols. But involved cards are still just 5-clubs (from col 1).
+    // Since 5-clubs was already involved before, this is NOT valuable.
+    //
+    // The reverse: 6-diamonds can go to any empty column. After that move,
+    // col 1 is empty, col X has 6-diamonds. Legal moves: 5-clubs to col 1
+    // (empty) or to col X (on 6). Involved: 5-clubs and 6-diamonds -- same.
+    //
+    // Wait -- when we move 5 onto 6, the NEW moves include 6-diamonds
+    // being able to move to empty cols (but 6-diamonds is on the bottom
+    // not the top). Actually no: after moving 5-clubs onto 6-diamonds,
+    // the top of col 1 is 5-clubs. Only 5-clubs can move. So involved
+    // cards after: {5-clubs}. Before: {5-clubs, 6-diamonds}. This is a
+    // SUBSET, no NEW cards. Good.
+    //
+    // When 6-diamonds moves to an empty col: col 1 empty, col X has 6.
+    // Moves: 5 to col X (on 6), 5 to col 1 (empty), 6 to any empty col.
+    // Involved: {5-clubs, 6-diamonds}. Before: {5-clubs, 6-diamonds}. Same.
+    //
+    // So this should be false.
+    const state = testState(
+      [[card('A', 'clubs')], [card('A', 'diamonds')], [card('A', 'hearts')], [card('A', 'spades')]],
+      [
+        [card('5', 'clubs')],
+        [card('6', 'diamonds')],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+      ],
+    );
+    expect(hasValuableMoves(state)).toBe(false);
+  });
+
+  it('should handle single-card columns where moving creates an empty column', () => {
+    // Column 0: 3-clubs (bottom), 2-hearts (top)
+    // Column 1: 3-diamonds (single card)
+    // All others empty.
+    // Moving 2-hearts onto 3-diamonds is legal (2 on 3).
+    // After: col 0 has 3-clubs exposed (new card!). Valuable.
+    const state = testState(
+      [[card('A', 'clubs')], [card('A', 'diamonds')], [card('A', 'hearts')], [card('A', 'spades')]],
+      [
+        [card('3', 'clubs'), card('2', 'hearts')],
+        [card('3', 'diamonds')],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+      ],
+    );
+    expect(hasValuableMoves(state)).toBe(true);
+  });
+
+  it('should return true when a foundation move exists among mixed moves', () => {
+    // Column 0: 2-clubs (can go to foundation), Column 1: 5-hearts
+    // Even if tableau shuffles are valueless, the foundation move makes it valuable
+    const state = testState(
+      [[card('A', 'clubs')], [card('A', 'diamonds')], [card('A', 'hearts')], [card('A', 'spades')]],
+      [
+        [card('2', 'clubs')],
+        [card('5', 'hearts')],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+      ],
+    );
+    expect(hasValuableMoves(state)).toBe(true);
+  });
+
+  it('should not mutate the game state', () => {
+    const state = testState(
+      [[card('A', 'clubs')], [card('A', 'diamonds')], [card('A', 'hearts')], [card('A', 'spades')]],
+      [
+        [card('3', 'clubs'), card('5', 'hearts')],
+        [card('6', 'diamonds')],
+        [card('4', 'spades')],
+        [],
+        [],
+        [],
+        [],
+        [],
+      ],
+    );
+
+    // Snapshot sizes before
+    const tableauSizes = state.tableau.map((col) => col.size());
+    const foundationSizes = state.foundations.map((f) => f.size());
+    const moveCountBefore = state.moveCount;
+
+    hasValuableMoves(state);
+
+    // Verify sizes after
+    for (let i = 0; i < state.tableau.length; i++) {
+      expect(state.tableau[i].size()).toBe(tableauSizes[i]);
+    }
+    for (let i = 0; i < state.foundations.length; i++) {
+      expect(state.foundations[i].size()).toBe(foundationSizes[i]);
+    }
+    expect(state.moveCount).toBe(moveCountBefore);
+  });
+
+  it('should return false for all-empty tableau', () => {
+    // All columns empty -- no legal moves at all
+    const state = testState(
+      [
+        [card('A', 'clubs'), card('2', 'clubs')],
+        [card('A', 'diamonds')],
+        [card('A', 'hearts')],
+        [card('A', 'spades')],
+      ],
+      [[], [], [], [], [], [], [], []],
+    );
+    expect(hasValuableMoves(state)).toBe(false);
+  });
+
+  it('should detect valuable moves across multiple seeds', () => {
+    // Fresh deals should always have valuable moves
+    for (const seed of [1, 17, 42, 100, 999]) {
+      const state = deal(seed);
+      expect(hasValuableMoves(state)).toBe(true);
+    }
   });
 });

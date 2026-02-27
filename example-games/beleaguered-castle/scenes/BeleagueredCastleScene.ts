@@ -28,6 +28,7 @@ import {
   findSafeAutoMoves,
   isWon,
   hasNoMoves,
+  hasValuableMoves,
   isTriviallyWinnable,
   getAutoCompleteMoves,
 } from '../BeleagueredCastleRules';
@@ -1028,7 +1029,7 @@ export class BeleagueredCastleScene extends CardGameScene {
       this.showWinOverlay();
     } else if (isTriviallyWinnable(this.gameState)) {
       this.startAutoComplete();
-    } else if (hasNoMoves(this.gameState)) {
+    } else if (hasNoMoves(this.gameState) || !hasValuableMoves(this.gameState)) {
       this.gameEnded = true;
       this.stopTimer();
       this.transcript = this.recorder.finalize(
