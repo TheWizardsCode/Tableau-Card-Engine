@@ -287,6 +287,8 @@ export class LostCitiesScene extends Phaser.Scene {
 
   // Tooltip
   private tooltipContainer: Phaser.GameObjects.Container | null = null;
+  /** Track which color tooltip is currently showing to avoid redundant re-creation. */
+  private tooltipColor: ExpeditionColor | null = null;
 
   constructor() {
     super({ key: 'LostCitiesScene' });
@@ -485,7 +487,7 @@ export class LostCitiesScene extends Phaser.Scene {
       '',
     );
 
-    // Placeholder card slots for discard piles (interactive for scoring tooltip)
+    // Placeholder card slots for discard piles
     for (let i = 0; i < 5; i++) {
       const color = EXPEDITION_COLORS[i];
       const hex = Phaser.Display.Color.HexStringToColor(EXPEDITION_HEX[color]).color;
@@ -493,16 +495,6 @@ export class LostCitiesScene extends Phaser.Scene {
         laneX(i) - DISCARD_CARD_W / 2, DISCARD_Y,
         DISCARD_CARD_W, DISCARD_CARD_H, hex, 0.2,
       );
-
-      // Interactive zone over the placeholder for scoring tooltip
-      const zone = this.add.rectangle(
-        laneX(i), DISCARD_Y + DISCARD_CARD_H / 2,
-        DISCARD_CARD_W + 8, DISCARD_CARD_H + 4,
-        0x000000, 0,
-      );
-      zone.setInteractive({ useHandCursor: false });
-      zone.on('pointerover', () => this.showExpeditionTooltip(color, zone, 'below'));
-      zone.on('pointerout', () => this.hideExpeditionTooltip());
     }
 
     // Player expeditions — box includes label above card content
@@ -514,7 +506,7 @@ export class LostCitiesScene extends Phaser.Scene {
       'Your Expeditions',
     );
 
-    // Placeholder card slots for player expeditions (interactive for scoring tooltip)
+    // Placeholder card slots for player expeditions
     for (let i = 0; i < 5; i++) {
       const color = EXPEDITION_COLORS[i];
       const hex = Phaser.Display.Color.HexStringToColor(EXPEDITION_HEX[color]).color;
@@ -522,16 +514,6 @@ export class LostCitiesScene extends Phaser.Scene {
         laneX(i) - CARD_W / 2, PLR_EXP_TOP,
         CARD_W, CARD_H, hex, 0.15,
       );
-
-      // Interactive zone over the placeholder for scoring tooltip
-      const zone = this.add.rectangle(
-        laneX(i), PLR_EXP_TOP + CARD_H / 2,
-        CARD_W + 8, CARD_H + 4,
-        0x000000, 0,
-      );
-      zone.setInteractive({ useHandCursor: true });
-      zone.on('pointerover', () => this.showExpeditionTooltip(color, zone, 'above'));
-      zone.on('pointerout', () => this.hideExpeditionTooltip());
     }
 
     // ── Right column boxes (scores, draw, round) ──────────
@@ -594,6 +576,19 @@ export class LostCitiesScene extends Phaser.Scene {
     );
     hitArea.setInteractive({ useHandCursor: true });
     hitArea.on('pointerdown', () => this.onExpeditionClick(EXPEDITION_COLORS[0]));
+
+    // Scoring tooltip: track pointer across lanes within the hit area
+    hitArea.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      const color = this.colorAtPointerX(pointer.x);
+      if (!color) { this.hideExpeditionTooltip(); return; }
+      if (color === this.tooltipColor) return;     // already showing this color
+      this.showExpeditionTooltip(color, {
+        x: laneX(EXPEDITION_COLORS.indexOf(color)),
+        y: PLR_EXP_TOP + CARD_H / 2,
+        height: CARD_H,
+      } as Phaser.GameObjects.Components.Transform & { height: number }, 'above');
+    });
+    hitArea.on('pointerout', () => this.hideExpeditionTooltip());
   }
 
   // ── Discard zones ───────────────────────────────────────
@@ -615,6 +610,19 @@ export class LostCitiesScene extends Phaser.Scene {
     hitArea.on('pointerdown', (pointer: Phaser.Input.Pointer) =>
       this.onDiscardRowClick(pointer),
     );
+
+    // Scoring tooltip: track pointer across lanes within the hit area
+    hitArea.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      const color = this.colorAtPointerX(pointer.x);
+      if (!color) { this.hideExpeditionTooltip(); return; }
+      if (color === this.tooltipColor) return;     // already showing this color
+      this.showExpeditionTooltip(color, {
+        x: laneX(EXPEDITION_COLORS.indexOf(color)),
+        y: DISCARD_Y + DISCARD_CARD_H / 2,
+        height: DISCARD_CARD_H,
+      } as Phaser.GameObjects.Components.Transform & { height: number }, 'below');
+    });
+    hitArea.on('pointerout', () => this.hideExpeditionTooltip());
   }
 
   // ── Right column (scores, draw pile, round) ─────────────
@@ -1018,6 +1026,7 @@ export class LostCitiesScene extends Phaser.Scene {
   ): void {
     if (this.settingsPanel && !this.settingsPanel.showTooltips) return;
     this.hideExpeditionTooltip();
+    this.tooltipColor = color;
 
     const plrCards = this.session.players[0].expeditions.get(color) ?? [];
     const oppCards = this.session.players[1].expeditions.get(color) ?? [];
@@ -1091,6 +1100,7 @@ export class LostCitiesScene extends Phaser.Scene {
       this.tooltipContainer.destroy();
       this.tooltipContainer = null;
     }
+    this.tooltipColor = null;
   }
 
   /** Format a one-line scoring breakdown for an expedition. */
@@ -1102,6 +1112,16 @@ export class LostCitiesScene extends Phaser.Scene {
     const inv = b.investmentCount > 0 ? `, ${b.investmentCount} inv (x${b.multiplier})` : '';
     const bonus = b.bonusEarned ? ', +20 bonus' : '';
     return `${label}: ${b.cardCount} cards${inv}${bonus} = ${b.score}`;
+  }
+
+  /** Resolve which expedition color lane a pointer X coordinate falls in, or null if outside all lanes. */
+  private colorAtPointerX(px: number): ExpeditionColor | null {
+    const half = CARD_W / 2 + 4;          // small margin around each lane
+    for (let i = 0; i < 5; i++) {
+      const cx = laneX(i);
+      if (px >= cx - half && px <= cx + half) return EXPEDITION_COLORS[i];
+    }
+    return null;
   }
 
   private refreshRoundIndicator(): void {
