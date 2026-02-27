@@ -29,13 +29,9 @@ import { SushiGoTranscriptRecorder } from '../GameTranscript';
 import type { SushiGoCardSnapshot, PlayerSnapshot } from '../GameTranscript';
 import { TranscriptStore } from '../../../src/core-engine/TranscriptStore';
 import { autoSaveTranscript } from '../../../src/core-engine/autoSaveTranscript';
-import { GameEventEmitter } from '../../../src/core-engine/GameEventEmitter';
-import { PhaserEventBridge } from '../../../src/core-engine/PhaserEventBridge';
-import { SoundManager } from '../../../src/core-engine/SoundManager';
-import type { SoundPlayer, EventSoundMapping } from '../../../src/core-engine/SoundManager';
+import type { EventSoundMapping } from '../../../src/core-engine/SoundManager';
 import {
-  HelpPanel, HelpButton,
-  SettingsPanel, SettingsButton,
+  CardGameScene,
   GAME_W, GAME_H, FONT_FAMILY,
   createOverlayBackground, createOverlayButton, createOverlayMenuButton,
   dismissOverlay,
@@ -128,7 +124,7 @@ type TurnPhase =
 /** Shared TranscriptStore instance for the Sushi Go! game. */
 const transcriptStore = new TranscriptStore();
 
-export class SushiGoScene extends Phaser.Scene {
+export class SushiGoScene extends CardGameScene {
   // Game state
   private session!: SushiGoSession;
   private aiPlayer!: SushiGoAiPlayer;
@@ -144,16 +140,8 @@ export class SushiGoScene extends Phaser.Scene {
   // Transcript recording
   private recorder: SushiGoTranscriptRecorder | null = null;
 
-  /** When true, the scene suppresses all input and AI turns for replay use. */
-  private replayMode: boolean = false;
-
   /** Tracks the replay step index for state-settled payloads. */
   private replayStepIndex: number = -1;
-
-  // Event system
-  private gameEvents!: GameEventEmitter;
-  private eventBridge!: PhaserEventBridge;
-  private soundManager: SoundManager | null = null;
 
   // Display containers
   private handContainer!: Phaser.GameObjects.Container;
@@ -167,12 +155,6 @@ export class SushiGoScene extends Phaser.Scene {
   private aiScoreText!: Phaser.GameObjects.Text;
   private instructionText!: Phaser.GameObjects.Text;
   private cardsLeftText!: Phaser.GameObjects.Text;
-
-  // Help / settings panels
-  private helpPanel!: HelpPanel;
-  private helpButton!: HelpButton;
-  private settingsPanel!: SettingsPanel;
-  private settingsButton!: SettingsButton;
 
   // Tooltip
   private tooltipContainer: Phaser.GameObjects.Container | null = null;
@@ -246,15 +228,10 @@ export class SushiGoScene extends Phaser.Scene {
     this.replayStepIndex = -1;
 
     // Check URL parameters
-    const urlParams = new URLSearchParams(window.location.search);
-    this.replayMode = urlParams.get('mode') === 'replay';
+    this.detectReplayMode();
 
     // Event system
-    this.gameEvents = new GameEventEmitter();
-    this.eventBridge = new PhaserEventBridge(this.gameEvents, this.events);
-    // Expose for replay tool (page.evaluate can listen for state-settled)
-    (window as unknown as Record<string, unknown>).__GAME_EVENTS__ =
-      this.gameEvents;
+    this.initEventSystem();
 
     if (this.replayMode) {
       // In replay mode: create minimal UI, skip game setup.
@@ -272,28 +249,17 @@ export class SushiGoScene extends Phaser.Scene {
       this.instructionText.setText('');
 
       // Emit state-settled so the replay tool knows the scene is ready
-      this.emitStateSettled();
+      this.emitStateSettled(this.replayStepIndex, 'playing');
       return;
     }
 
     // Sound system
-    const phaserSound = this.sound;
-    const player: SoundPlayer = {
-      play: (key: string) => { phaserSound.play(key); },
-      stop: (key: string) => { phaserSound.stopByKey(key); },
-      setVolume: (v: number) => { phaserSound.volume = v; },
-      setMute: (m: boolean) => { phaserSound.mute = m; },
-    };
-    this.soundManager = new SoundManager(player);
-    for (const sfxKey of Object.values(SFX_KEYS)) {
-      this.soundManager.register(sfxKey);
-    }
     const mapping: EventSoundMapping = {
       'card-drawn': SFX_KEYS.CARD_PICK,
       'turn-started': SFX_KEYS.TURN_CHANGE,
       'game-ended': SFX_KEYS.ROUND_END,
     };
-    this.soundManager.connectToEvents(this.gameEvents, mapping);
+    this.initSoundSystem(Object.values(SFX_KEYS), mapping);
 
     // Setup game
     this.session = setupSushiGoGame({
@@ -312,8 +278,8 @@ export class SushiGoScene extends Phaser.Scene {
     this.createScoreDisplay();
     this.createInstructions();
     this.createContainers();
-    this.createHelpPanel();
-    this.createSettingsPanel();
+    this.initHelpPanel(helpContent as HelpSection[]);
+    this.initSettingsPanel();
 
     // Initial render
     this.refreshAll();
@@ -407,21 +373,6 @@ export class SushiGoScene extends Phaser.Scene {
     this.handContainer = this.add.container(0, 0);
     this.playerTableauContainer = this.add.container(0, 0);
     this.aiTableauContainer = this.add.container(0, 0);
-  }
-
-  private createHelpPanel(): void {
-    this.helpPanel = new HelpPanel(this, {
-      sections: helpContent as HelpSection[],
-    });
-    this.helpButton = new HelpButton(this, this.helpPanel);
-  }
-
-  private createSettingsPanel(): void {
-    if (!this.soundManager) return;
-    this.settingsPanel = new SettingsPanel(this, {
-      soundManager: this.soundManager,
-    });
-    this.settingsButton = new SettingsButton(this, this.settingsPanel);
   }
 
   // ── Card rendering helpers ──────────────────────────────
@@ -1394,7 +1345,7 @@ export class SushiGoScene extends Phaser.Scene {
     }
 
     // Signal board is visually stable
-    this.emitStateSettled();
+    this.emitStateSettled(this.replayStepIndex, 'playing');
   }
 
   /**
@@ -1415,36 +1366,19 @@ export class SushiGoScene extends Phaser.Scene {
     return base as SushiGoCard;
   }
 
-  // ── State-settled emission ──────────────────────────────
-
-  /**
-   * Emit state-settled when the board is visually stable and safe
-   * to screenshot. Uses the replay step index as the turn number.
-   */
-  private emitStateSettled(): void {
-    this.gameEvents.emit('state-settled', {
-      turnNumber: this.replayStepIndex,
-      phase: 'playing' as const,
-    });
-  }
-
-  // ── Help / Settings cleanup ────────────────────────────
+  // ── Cleanup ─────────────────────────────────────────────
 
   shutdown(): void {
+    // Game-specific cleanup
     this.hideCardTooltip();
-    this.soundManager?.destroy();
-    this.soundManager = null;
-    this.eventBridge?.destroy();
-    this.gameEvents?.removeAllListeners();
-    this.helpPanel?.destroy();
-    this.helpButton?.destroy();
-    this.settingsPanel?.destroy();
-    this.settingsButton?.destroy();
     if (this.chopsticksButton) {
       this.chopsticksButton.destroy();
       this.chopsticksButton = null;
     }
     dismissOverlay(this.overlayObjects);
     this.overlayObjects = [];
+
+    // Shared base-class cleanup (sound, events, panels)
+    this.shutdownBase();
   }
 }
