@@ -58,7 +58,7 @@ function destroyGame(game: Phaser.Game | null): void {
 
 function getSceneInternals(scene: Phaser.Scene): {
   replayMode: boolean;
-  turnPhase: string;
+  phaseManager: { current: string; set: (phase: string) => void };
   boardStateInjected: boolean;
   session: {
     gameState: {
@@ -247,7 +247,7 @@ describe('GolfScene replay mode', () => {
     expect(internals.replayMode).toBe(false);
 
     // turnPhase should be 'waiting-for-draw' (human's turn)
-    expect(internals.turnPhase).toBe('waiting-for-draw');
+    expect(internals.phaseManager.current).toBe('waiting-for-draw');
 
     // currentPlayerIndex should be 0
     expect(internals.session.gameState.currentPlayerIndex).toBe(0);

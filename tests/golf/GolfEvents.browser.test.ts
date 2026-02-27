@@ -52,7 +52,7 @@ function nextFrame(): Promise<void> {
 }
 
 function getSceneInternals(scene: Phaser.Scene): {
-  turnPhase: string;
+  phaseManager: { current: string; set: (phase: string) => void };
   session: {
     gameState: {
       currentPlayerIndex: number;
@@ -229,7 +229,7 @@ describe('GolfScene event integration', () => {
     }
 
     // Force turn phase to trigger showEndScreen
-    sceneAny.setPhase('round-ended');
+    sceneAny.phaseManager.set('round-ended');
     await wait(500);
 
     expect(gameEndedPayload).not.toBeNull();
