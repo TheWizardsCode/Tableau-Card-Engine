@@ -21,6 +21,10 @@ export type { FlipCardOptions } from './flipCard';
 export { shakeIllegalMove } from './shakeIllegalMove';
 export type { ShakeIllegalMoveOptions } from './shakeIllegalMove';
 
+// Positional movement animation
+export { moveGameObject } from './moveGameObject';
+export type { MoveGameObjectOptions } from './moveGameObject';
+
 // Card layout helpers
 export { layoutCardPositions } from './layoutCardPositions';
 export type {

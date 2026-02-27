@@ -51,6 +51,7 @@ import {
   createOverlayBackground, createOverlayButton, createOverlayMenuButton,
   dismissOverlay,
   createSceneTitle, createSceneMenuButton,
+  moveGameObject,
 } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
 import helpContent from '../help-content.json';
@@ -58,6 +59,12 @@ import helpContent from '../help-content.json';
 // ── Constants ───────────────────────────────────────────────
 
 const ANIM_DURATION = 400;
+
+/** Duration of card/noble movement tweens in ms. */
+const MOVE_DURATION = 350;
+
+/** Pre-pause before AI action animations in ms. */
+const AI_PRE_PAUSE = 500;
 
 /** Shared transcript store for auto-saving completed transcripts. */
 const transcriptStore = new TranscriptStore();
@@ -1440,6 +1447,356 @@ export class SplendorScene extends CardGameScene {
     this.overlayObjects.push(cancelBtn);
   }
 
+  // ── Animation helpers ────────────────────────────────────
+
+  /**
+   * Returns the centre (x, y) of a market card slot given its tier and
+   * column index (0-3).
+   */
+  private getMarketCardCenter(tier: Tier, col: number): { x: number; y: number } {
+    const tiers: Tier[] = [3, 2, 1];
+    const row = tiers.indexOf(tier);
+    const y = MARKET_Y + row * (MARKET_CARD_H + MARKET_TIER_GAP) + MARKET_CARD_H / 2;
+    const x = MARKET_X + col * (MARKET_CARD_W + MARKET_CARD_GAP) + MARKET_CARD_W / 2;
+    return { x, y };
+  }
+
+  /**
+   * Returns the centre (x, y) of a deck back for the given tier.
+   */
+  private getDeckCenter(tier: Tier): { x: number; y: number } {
+    const tiers: Tier[] = [3, 2, 1];
+    const row = tiers.indexOf(tier);
+    const y = MARKET_Y + row * (MARKET_CARD_H + MARKET_TIER_GAP) + MARKET_CARD_H / 2;
+    return { x: DECK_X, y };
+  }
+
+  /**
+   * Returns the destination centre (x, y) for a card moving to the
+   * given player's card area.  playerIndex 0 = human, 1 = AI.
+   */
+  private getPlayerCardDest(playerIndex: number): { x: number; y: number } {
+    if (playerIndex === 0) {
+      // Player gem slots area — centre of the Row 1 slot band
+      const row1Y = PLAYER_AREA_Y + 32;
+      const SLOT_W = 38;
+      const SLOT_H = 50;
+      const SLOT_GAP = 8;
+      const totalW = GEM_COLORS.length * SLOT_W + (GEM_COLORS.length - 1) * SLOT_GAP;
+      return {
+        x: PLAYER_AREA_X + totalW / 2,
+        y: row1Y + SLOT_H / 2,
+      };
+    }
+    // AI area — centre of the AI gem slots band (right-aligned)
+    const row1Y = AI_AREA_Y + 32;
+    const SLOT_W = 38;
+    const SLOT_H = 50;
+    const SLOT_GAP = 8;
+    const totalW = GEM_COLORS.length * SLOT_W + (GEM_COLORS.length - 1) * SLOT_GAP;
+    return {
+      x: AI_AREA_X - totalW / 2,
+      y: row1Y + SLOT_H / 2,
+    };
+  }
+
+  /**
+   * Returns the destination centre (x, y) for a card moving to the
+   * given player's reserved area.
+   */
+  private getPlayerReserveDest(playerIndex: number): { x: number; y: number } {
+    if (playerIndex === 0) {
+      const row2Y = PLAYER_AREA_Y + 32 + 50 + 6;  // row1Y + SLOT_H + gap
+      return {
+        x: PLAYER_AREA_X + 150 + 40,   // first reserved card centre
+        y: row2Y + 26 - 2,             // centre of small card
+      };
+    }
+    // AI reserved area — right side
+    const row2Y = AI_AREA_Y + 32 + 50 + 6;
+    return {
+      x: AI_AREA_X - 80,
+      y: row2Y + 14,
+    };
+  }
+
+  /**
+   * Returns the centre (x, y) of a noble tile at the given index in the
+   * noble display (before it was removed from session).
+   */
+  private getNobleCenter(nobleIndex: number): { x: number; y: number } {
+    const y = MARKET_Y + nobleIndex * (MARKET_CARD_H + MARKET_TIER_GAP) + NOBLE_H / 2;
+    return { x: NOBLE_X + NOBLE_W / 2, y };
+  }
+
+  /**
+   * Returns the destination for a noble tile earned by the given player.
+   */
+  private getPlayerNobleDest(playerIndex: number): { x: number; y: number } {
+    if (playerIndex === 0) {
+      return { x: PLAYER_AREA_X + 120, y: PLAYER_AREA_Y + 10 };
+    }
+    return { x: AI_AREA_X - 120, y: AI_AREA_Y + 10 };
+  }
+
+  /**
+   * Find the column index of a card in the market by its id.
+   * Must be called BEFORE executeTurn() removes the card from the market.
+   */
+  private findCardMarketSlot(cardId: number): { tier: Tier; col: number } | null {
+    for (const tier of [3, 2, 1] as Tier[]) {
+      const visible = this.session.market[tier].visible;
+      for (let col = 0; col < visible.length; col++) {
+        if (visible[col]?.id === cardId) {
+          return { tier, col };
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Create a temporary "flying" card sprite for animation.
+   * Returns a container placed at (cx, cy) with depth 15 so it sits
+   * above the refreshed scene.
+   */
+  private createFlyingCard(
+    cx: number, cy: number, card: DevelopmentCard,
+  ): Phaser.GameObjects.Container {
+    const container = this.add.container(cx, cy).setDepth(15);
+    const bonusFill = GEM_FILL[card.bonus];
+
+    const bg = this.add.rectangle(0, 0, MARKET_CARD_W, MARKET_CARD_H, 0x1a1a1a);
+    bg.setStrokeStyle(2, 0xffdd44);
+    container.add(bg);
+
+    // Bonus color bar at top
+    const bonusBar = this.add.rectangle(
+      0, -MARKET_CARD_H / 2 + 12, MARKET_CARD_W - 4, 22, bonusFill,
+    );
+    container.add(bonusBar);
+
+    // Points (top-left)
+    if (card.points > 0) {
+      const pts = this.add.text(
+        -MARKET_CARD_W / 2 + 10, -MARKET_CARD_H / 2 + 26,
+        `${card.points}`,
+        { fontSize: '24px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY },
+      );
+      container.add(pts);
+    }
+
+    // Bonus letter (top-right)
+    const bonusLetter = this.add.text(
+      MARKET_CARD_W / 2 - 10, -MARKET_CARD_H / 2 + 26,
+      gemAbbrev(card.bonus),
+      { fontSize: '16px', fontStyle: 'bold', color: GEM_TEXT_COLOR[card.bonus], fontFamily: FONT_FAMILY },
+    ).setOrigin(1, 0);
+    container.add(bonusLetter);
+
+    // Cost chips
+    const costEntries: { color: GemColor; count: number }[] = [];
+    for (const c of GEM_COLORS) {
+      const n = card.cost[c] ?? 0;
+      if (n > 0) costEntries.push({ color: c, count: n });
+    }
+    const costStartX = -(costEntries.length - 1) * 15;
+    for (let i = 0; i < costEntries.length; i++) {
+      const chipX = costStartX + i * 30;
+      const chipY = MARKET_CARD_H / 2 - 22;
+      const chip = this.add.circle(chipX, chipY, 13, GEM_FILL[costEntries[i].color], 0.9);
+      chip.setStrokeStyle(1, 0x888888);
+      container.add(chip);
+      const ct = this.add.text(chipX, chipY, `${costEntries[i].count}`, {
+        fontSize: '14px', fontStyle: 'bold',
+        color: GEM_TEXT_COLOR[costEntries[i].color], fontFamily: FONT_FAMILY,
+      }).setOrigin(0.5);
+      container.add(ct);
+    }
+
+    return container;
+  }
+
+  /**
+   * Create a temporary "flying" noble sprite for animation.
+   */
+  private createFlyingNoble(
+    cx: number, cy: number, noble: NobleTile,
+  ): Phaser.GameObjects.Container {
+    const container = this.add.container(cx, cy).setDepth(15);
+
+    const bg = this.add.rectangle(0, 0, NOBLE_W, NOBLE_H, 0x6633aa, 0.9);
+    bg.setStrokeStyle(2, 0xffdd44);
+    container.add(bg);
+
+    const pts = this.add.text(0, -20, '3 pt', {
+      fontSize: '20px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY,
+    }).setOrigin(0.5);
+    container.add(pts);
+
+    const label = this.add.text(0, 2, 'Noble', {
+      fontSize: '13px', color: '#ccaaee', fontFamily: FONT_FAMILY,
+    }).setOrigin(0.5);
+    container.add(label);
+
+    // Requirements
+    const reqs: { color: GemColor; count: number }[] = [];
+    for (const c of GEM_COLORS) {
+      const n = noble.requirements[c] ?? 0;
+      if (n > 0) reqs.push({ color: c, count: n });
+    }
+    const chipSpacing = 30;
+    const reqStartX = -(reqs.length - 1) * chipSpacing / 2;
+    for (let j = 0; j < reqs.length; j++) {
+      const rx = reqStartX + j * chipSpacing;
+      const ry = NOBLE_H / 2 - 26;
+      const chip = this.add.circle(rx, ry, 13, GEM_FILL[reqs[j].color], 0.9);
+      chip.setStrokeStyle(1, 0x888888);
+      container.add(chip);
+      const ct = this.add.text(rx, ry, `${reqs[j].count}`, {
+        fontSize: '15px', fontStyle: 'bold',
+        color: GEM_TEXT_COLOR[reqs[j].color], fontFamily: FONT_FAMILY,
+      }).setOrigin(0.5);
+      container.add(ct);
+    }
+
+    return container;
+  }
+
+  /**
+   * Create a temporary deck-back sprite for the market refill animation.
+   */
+  private createFlyingDeckBack(
+    cx: number, cy: number, tier: Tier,
+  ): Phaser.GameObjects.Container {
+    const container = this.add.container(cx, cy).setDepth(15);
+    const deckW = 100;
+    const deckH = MARKET_CARD_H - 16;
+
+    const bg = this.add.rectangle(0, 0, deckW, deckH, 0x334433, 0.8);
+    bg.setStrokeStyle(1, 0x556655);
+    container.add(bg);
+
+    const text = this.add.text(0, 0, `T${tier}`, {
+      fontSize: '18px', fontStyle: 'bold', color: '#aaddaa', fontFamily: FONT_FAMILY,
+    }).setOrigin(0.5);
+    container.add(text);
+
+    return container;
+  }
+
+  /**
+   * Play the complete animation sequence for a card action.
+   *
+   * 1. Card flies from source to destination.
+   * 2. If the card came from a market slot with a replacement, the
+   *    replacement slides from the deck to the vacated slot.
+   * 3. If a noble was earned, the noble flies to the player area.
+   * 4. On complete, the provided callback fires.
+   */
+  private playCardAnimation(
+    sourcePos: { x: number; y: number },
+    destPos: { x: number; y: number },
+    card: DevelopmentCard,
+    marketSlot: { tier: Tier; col: number } | null,
+    nobleVisit: NobleTile | null,
+    nobleSourceIndex: number,
+    playerIndex: number,
+    onAllComplete: () => void,
+  ): void {
+    const flyingCard = this.createFlyingCard(sourcePos.x, sourcePos.y, card);
+
+    moveGameObject({
+      scene: this,
+      target: flyingCard,
+      destX: destPos.x,
+      destY: destPos.y,
+      duration: MOVE_DURATION,
+      onComplete: () => {
+        flyingCard.destroy();
+
+        // Chain: market refill animation
+        if (marketSlot) {
+          this.playMarketRefillAnimation(marketSlot.tier, marketSlot.col, () => {
+            this.chainNobleAnimation(nobleVisit, nobleSourceIndex, playerIndex, onAllComplete);
+          });
+        } else {
+          this.chainNobleAnimation(nobleVisit, nobleSourceIndex, playerIndex, onAllComplete);
+        }
+      },
+    });
+  }
+
+  /**
+   * Play the market refill animation: a card-back slides from the deck
+   * position into the vacated market slot.
+   */
+  private playMarketRefillAnimation(
+    tier: Tier, col: number, onComplete: () => void,
+  ): void {
+    // Check if there is now a card in this slot (replacement was dealt)
+    const slotCard = this.session.market[tier].visible[col];
+    if (!slotCard) {
+      onComplete();
+      return;
+    }
+
+    const deckPos = this.getDeckCenter(tier);
+    const slotPos = this.getMarketCardCenter(tier, col);
+
+    const flyingBack = this.createFlyingDeckBack(deckPos.x, deckPos.y, tier);
+
+    moveGameObject({
+      scene: this,
+      target: flyingBack,
+      destX: slotPos.x,
+      destY: slotPos.y,
+      duration: MOVE_DURATION * 0.7,
+      onComplete: () => {
+        flyingBack.destroy();
+        // Refresh market to show the actual card in the slot
+        this.refreshMarket();
+        onComplete();
+      },
+    });
+  }
+
+  /**
+   * Chain a noble visit animation if one occurred, otherwise fire onComplete.
+   */
+  private chainNobleAnimation(
+    nobleVisit: NobleTile | null,
+    nobleSourceIndex: number,
+    playerIndex: number,
+    onComplete: () => void,
+  ): void {
+    if (!nobleVisit || nobleSourceIndex < 0) {
+      onComplete();
+      return;
+    }
+
+    const nobleSource = this.getNobleCenter(nobleSourceIndex);
+    const nobleDest = this.getPlayerNobleDest(playerIndex);
+    const flyingNoble = this.createFlyingNoble(nobleSource.x, nobleSource.y, nobleVisit);
+
+    moveGameObject({
+      scene: this,
+      target: flyingNoble,
+      destX: nobleDest.x,
+      destY: nobleDest.y,
+      duration: MOVE_DURATION,
+      onComplete: () => {
+        flyingNoble.destroy();
+        // Refresh to show the updated noble display and player area
+        this.refreshNobles();
+        this.refreshPlayerArea();
+        this.refreshAiArea();
+        this.refreshPrestige();
+        onComplete();
+      },
+    });
+  }
+
   // ── Action execution ────────────────────────────────────
 
   private executeTakeDifferent(): void {
@@ -1470,6 +1827,43 @@ export class SplendorScene extends CardGameScene {
 
   private executeAction(action: TurnAction): void {
     const playerIndex = this.session.currentPlayerIndex;
+
+    // Capture source positions BEFORE executeTurn modifies the session
+    let marketSlot: { tier: Tier; col: number } | null = null;
+    let sourcePos: { x: number; y: number } | null = null;
+    let card: DevelopmentCard | null = null;
+
+    if (action.type === 'purchase' && action.cardId != null) {
+      // Find card in market or reserved
+      marketSlot = this.findCardMarketSlot(action.cardId);
+      if (marketSlot) {
+        sourcePos = this.getMarketCardCenter(marketSlot.tier, marketSlot.col);
+        card = this.session.market[marketSlot.tier].visible[marketSlot.col] ?? null;
+      } else {
+        // Purchased from reserved — find it
+        const reserved = this.session.players[playerIndex].reservedCards;
+        card = reserved.find(c => c.id === action.cardId) ?? null;
+        // Reserved cards animate from the player's reserved area
+        if (card) {
+          sourcePos = this.getPlayerReserveDest(playerIndex);
+        }
+      }
+    } else if (action.type === 'reserve' && action.cardId != null) {
+      marketSlot = this.findCardMarketSlot(action.cardId);
+      if (marketSlot) {
+        sourcePos = this.getMarketCardCenter(marketSlot.tier, marketSlot.col);
+        card = this.session.market[marketSlot.tier].visible[marketSlot.col] ?? null;
+      }
+    } else if (action.type === 'reserve' && action.cardId == null) {
+      // Reserve from deck — source is deck position
+      const tier = action.tier!;
+      sourcePos = this.getDeckCenter(tier);
+      // We'll get the actual card from the result (it's the top of the deck)
+    }
+
+    // Capture noble indices before they change
+    const noblesBefore = this.session.nobles.map(n => n.id);
+
     try {
       const result = executeTurn(this.session, action);
 
@@ -1491,7 +1885,37 @@ export class SplendorScene extends CardGameScene {
 
       // No discard needed — record immediately
       this.recorder?.recordTurn(playerIndex, action, result, null);
-      this.afterTurnComplete(result);
+
+      // Determine noble source index (if noble was earned)
+      let nobleSourceIndex = -1;
+      if (result.nobleVisit) {
+        nobleSourceIndex = noblesBefore.indexOf(result.nobleVisit.id);
+      }
+
+      // For reserve-from-deck, get the reserved card from the player's hand
+      if (action.type === 'reserve' && action.cardId == null && !card) {
+        const reserved = this.session.players[playerIndex].reservedCards;
+        card = reserved[reserved.length - 1] ?? null;
+      }
+
+      // Play animation if we have a card to animate
+      if (sourcePos && card && (action.type === 'purchase' || action.type === 'reserve')) {
+        const destPos = action.type === 'purchase'
+          ? this.getPlayerCardDest(playerIndex)
+          : this.getPlayerReserveDest(playerIndex);
+
+        this.setPhase('animating');
+        this.refreshAll();
+
+        this.playCardAnimation(
+          sourcePos, destPos, card, marketSlot, result.nobleVisit,
+          nobleSourceIndex, playerIndex,
+          () => this.afterTurnComplete(result),
+        );
+      } else {
+        // No animation (e.g. token actions) — proceed directly
+        this.afterTurnComplete(result);
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Invalid action';
       this.showToast(msg);
@@ -1561,54 +1985,138 @@ export class SplendorScene extends CardGameScene {
     const aiIndex = this.session.currentPlayerIndex;
     const action = this.aiPlayer.chooseTurn(this.session, aiIndex);
 
-    try {
-      const result = executeTurn(this.session, action);
+    // Describe the AI action for the pre-pause toast
+    const toastMsg = this.describeAiAction(action);
 
-      // Handle AI discard
-      let tokenDiscard = null;
-      if (result.tokensOverLimit > 0) {
-        const discard = this.aiPlayer.chooseDiscard(
-          this.session, aiIndex, result.tokensOverLimit,
-        );
-        tokenDiscard = discard;
-        discardTokens(this.session, discard);
-      }
+    // Capture source positions BEFORE executeTurn modifies the session
+    let marketSlot: { tier: Tier; col: number } | null = null;
+    let sourcePos: { x: number; y: number } | null = null;
+    let card: DevelopmentCard | null = null;
 
-      // Record AI turn
-      this.recorder?.recordTurn(aiIndex, action, result, tokenDiscard);
-
-      if (result.nobleVisit) {
-        this.showToast(`AI earns a noble visit! +3 prestige`);
-      }
-
-      this.refreshAll();
-
-      if (result.gameOver || isGameOver(this.session)) {
-        this.time.delayedCall(ANIM_DURATION, () => {
-          this.showGameOverOverlay();
-        });
-        return;
-      }
-
-      // Next player's turn
-      if (this.session.players[this.session.currentPlayerIndex].isAI) {
-        // Another AI turn (shouldn't happen in 2-player but safe)
-        this.time.delayedCall(ANIM_DURATION, () => this.executeAiTurn());
+    if (action.type === 'purchase' && action.cardId != null) {
+      marketSlot = this.findCardMarketSlot(action.cardId);
+      if (marketSlot) {
+        sourcePos = this.getMarketCardCenter(marketSlot.tier, marketSlot.col);
+        card = this.session.market[marketSlot.tier].visible[marketSlot.col] ?? null;
       } else {
-        this.time.delayedCall(ANIM_DURATION, () => {
-          this.gameEvents.emit('turn-started', {
-            turnNumber: 0,
-            playerIndex: 0,
-            playerName: 'You',
-            isAI: false,
-          });
-          this.setPhase('player-turn');
-        });
+        const reserved = this.session.players[aiIndex].reservedCards;
+        card = reserved.find(c => c.id === action.cardId) ?? null;
+        if (card) {
+          sourcePos = this.getPlayerReserveDest(aiIndex);
+        }
       }
-    } catch (err) {
-      // AI error — skip turn (shouldn't happen)
-      console.error('AI error:', err);
-      this.setPhase('player-turn');
+    } else if (action.type === 'reserve' && action.cardId != null) {
+      marketSlot = this.findCardMarketSlot(action.cardId);
+      if (marketSlot) {
+        sourcePos = this.getMarketCardCenter(marketSlot.tier, marketSlot.col);
+        card = this.session.market[marketSlot.tier].visible[marketSlot.col] ?? null;
+      }
+    } else if (action.type === 'reserve' && action.cardId == null) {
+      const tier = action.tier!;
+      sourcePos = this.getDeckCenter(tier);
+    }
+
+    const noblesBefore = this.session.nobles.map(n => n.id);
+
+    // Show pre-pause toast, then execute
+    this.showToast(toastMsg);
+
+    this.time.delayedCall(AI_PRE_PAUSE, () => {
+      try {
+        const result = executeTurn(this.session, action);
+
+        // Handle AI discard
+        let tokenDiscard = null;
+        if (result.tokensOverLimit > 0) {
+          const discard = this.aiPlayer.chooseDiscard(
+            this.session, aiIndex, result.tokensOverLimit,
+          );
+          tokenDiscard = discard;
+          discardTokens(this.session, discard);
+        }
+
+        // Record AI turn
+        this.recorder?.recordTurn(aiIndex, action, result, tokenDiscard);
+
+        if (result.nobleVisit) {
+          this.showToast(`AI earns a noble visit! +3 prestige`);
+        }
+
+        // Determine noble source index
+        let nobleSourceIndex = -1;
+        if (result.nobleVisit) {
+          nobleSourceIndex = noblesBefore.indexOf(result.nobleVisit.id);
+        }
+
+        // For reserve-from-deck, get the reserved card
+        if (action.type === 'reserve' && action.cardId == null && !card) {
+          const reserved = this.session.players[aiIndex].reservedCards;
+          card = reserved[reserved.length - 1] ?? null;
+        }
+
+        // Callback after all animations complete
+        const afterAnim = () => {
+          if (result.gameOver || isGameOver(this.session)) {
+            this.time.delayedCall(ANIM_DURATION, () => {
+              this.showGameOverOverlay();
+            });
+            return;
+          }
+
+          if (this.session.players[this.session.currentPlayerIndex].isAI) {
+            this.time.delayedCall(ANIM_DURATION, () => this.executeAiTurn());
+          } else {
+            this.time.delayedCall(ANIM_DURATION, () => {
+              this.gameEvents.emit('turn-started', {
+                turnNumber: 0,
+                playerIndex: 0,
+                playerName: 'You',
+                isAI: false,
+              });
+              this.setPhase('player-turn');
+            });
+          }
+        };
+
+        // Play animation if we have a card to animate
+        if (sourcePos && card && (action.type === 'purchase' || action.type === 'reserve')) {
+          const destPos = action.type === 'purchase'
+            ? this.getPlayerCardDest(aiIndex)
+            : this.getPlayerReserveDest(aiIndex);
+
+          this.refreshAll();
+
+          this.playCardAnimation(
+            sourcePos, destPos, card, marketSlot, result.nobleVisit,
+            nobleSourceIndex, aiIndex, afterAnim,
+          );
+        } else {
+          // No card animation (token actions) — refresh and transition
+          this.refreshAll();
+          afterAnim();
+        }
+      } catch (err) {
+        console.error('AI error:', err);
+        this.setPhase('player-turn');
+      }
+    });
+  }
+
+  /**
+   * Generate a short description of an AI action for the pre-pause toast.
+   */
+  private describeAiAction(action: TurnAction): string {
+    switch (action.type) {
+      case 'purchase':
+        return 'AI buys a card...';
+      case 'reserve':
+        return action.cardId != null ? 'AI reserves a card...' : 'AI reserves from deck...';
+      case 'take-different':
+        return `AI takes ${action.colors.map(c => gemAbbrev(c)).join(', ')} tokens...`;
+      case 'take-same':
+        return `AI takes 2 ${gemDisplayName(action.color)} tokens...`;
+      default:
+        return 'AI takes an action...';
     }
   }
 
