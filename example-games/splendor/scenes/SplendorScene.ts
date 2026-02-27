@@ -13,7 +13,6 @@
  *   - Help panel and settings panel integration
  */
 
-import Phaser from 'phaser';
 import type { GemColor, GemOrGold, GemTokens, DevelopmentCard, NobleTile, Tier } from '../SplendorCards';
 import {
   GEM_COLORS,
@@ -45,13 +44,9 @@ import { SplendorTranscriptRecorder } from '../GameTranscript';
 import type { MarketSnapshot, PlayerSnapshot } from '../GameTranscript';
 import { TranscriptStore } from '../../../src/core-engine/TranscriptStore';
 import { autoSaveTranscript } from '../../../src/core-engine/autoSaveTranscript';
-import { GameEventEmitter } from '../../../src/core-engine/GameEventEmitter';
-import { PhaserEventBridge } from '../../../src/core-engine/PhaserEventBridge';
-import { SoundManager } from '../../../src/core-engine/SoundManager';
-import type { SoundPlayer, EventSoundMapping } from '../../../src/core-engine/SoundManager';
+import type { EventSoundMapping } from '../../../src/core-engine/SoundManager';
 import {
-  HelpPanel, HelpButton,
-  SettingsPanel, SettingsButton,
+  CardGameScene,
   GAME_W, GAME_H, FONT_FAMILY,
   createOverlayBackground, createOverlayButton, createOverlayMenuButton,
   dismissOverlay,
@@ -184,7 +179,7 @@ type TurnPhase =
 
 // ── Scene ───────────────────────────────────────────────────
 
-export class SplendorScene extends Phaser.Scene {
+export class SplendorScene extends CardGameScene {
   // Game state
   private session!: SplendorSession;
   private aiPlayer!: SplendorAiPlayer;
@@ -198,9 +193,6 @@ export class SplendorScene extends Phaser.Scene {
   // Transcript recording
   private recorder: SplendorTranscriptRecorder | null = null;
 
-  /** When true, the scene suppresses all input and AI turns for replay use. */
-  private replayMode: boolean = false;
-
   /** Tracks the replay step index for state-settled payloads. */
   private replayStepIndex: number = -1;
 
@@ -208,11 +200,6 @@ export class SplendorScene extends Phaser.Scene {
   private pendingPlayerIndex: number = -1;
   private pendingAction: TurnAction | null = null;
   private pendingResult: TurnResult | null = null;
-
-  // Event system
-  private gameEvents!: GameEventEmitter;
-  private eventBridge!: PhaserEventBridge;
-  private soundManager: SoundManager | null = null;
 
   // Display containers
   private sectionBoxContainer!: Phaser.GameObjects.Container;
@@ -228,12 +215,6 @@ export class SplendorScene extends Phaser.Scene {
   private instructionText!: Phaser.GameObjects.Text;
   private playerPrestigeText!: Phaser.GameObjects.Text;
   private aiPrestigeText!: Phaser.GameObjects.Text;
-
-  // Help / settings panels
-  private helpPanel!: HelpPanel;
-  private helpButton!: HelpButton;
-  private settingsPanel!: SettingsPanel;
-  private settingsButton!: SettingsButton;
 
   // Overlay cleanup
   private overlayObjects: Phaser.GameObjects.GameObject[] = [];
@@ -271,15 +252,10 @@ export class SplendorScene extends Phaser.Scene {
     this.pendingResult = null;
 
     // Check URL parameters
-    const urlParams = new URLSearchParams(window.location.search);
-    this.replayMode = urlParams.get('mode') === 'replay';
+    this.detectReplayMode();
 
     // Event system
-    this.gameEvents = new GameEventEmitter();
-    this.eventBridge = new PhaserEventBridge(this.gameEvents, this.events);
-    // Expose for replay tool (page.evaluate can listen for state-settled)
-    (window as unknown as Record<string, unknown>).__GAME_EVENTS__ =
-      this.gameEvents;
+    this.initEventSystem();
 
     if (this.replayMode) {
       // In replay mode: create minimal UI, skip game setup.
@@ -290,28 +266,17 @@ export class SplendorScene extends Phaser.Scene {
       this.createPrestigeDisplay();
 
       // Emit state-settled so the replay tool knows the scene is ready
-      this.emitStateSettled();
+      this.emitStateSettled(this.replayStepIndex, 'playing');
       return;
     }
 
     // Sound system
-    const phaserSound = this.sound;
-    const player: SoundPlayer = {
-      play: (key: string) => { phaserSound.play(key); },
-      stop: (key: string) => { phaserSound.stopByKey(key); },
-      setVolume: (v: number) => { phaserSound.volume = v; },
-      setMute: (m: boolean) => { phaserSound.mute = m; },
-    };
-    this.soundManager = new SoundManager(player);
-    for (const sfxKey of Object.values(SFX_KEYS)) {
-      this.soundManager.register(sfxKey);
-    }
     const mapping: EventSoundMapping = {
       'card-drawn': SFX_KEYS.TOKEN_TAKE,
       'turn-started': SFX_KEYS.TURN_CHANGE,
       'game-ended': SFX_KEYS.GAME_END,
     };
-    this.soundManager.connectToEvents(this.gameEvents, mapping);
+    this.initSoundSystem(Object.values(SFX_KEYS), mapping);
 
     // Setup game
     this.session = setupSplendorGame({
@@ -329,8 +294,8 @@ export class SplendorScene extends Phaser.Scene {
     this.createContainers();
     this.createInstructions();
     this.createPrestigeDisplay();
-    this.createHelpPanel();
-    this.createSettingsPanel();
+    this.initHelpPanel(helpContent as HelpSection[]);
+    this.initSettingsPanel();
 
     // Initial render
     this.refreshAll();
@@ -386,21 +351,6 @@ export class SplendorScene extends Phaser.Scene {
       })
       .setOrigin(0, 0)
       .setVisible(false);   // hidden; prestige shown inline
-  }
-
-  private createHelpPanel(): void {
-    this.helpPanel = new HelpPanel(this, {
-      sections: helpContent as HelpSection[],
-    });
-    this.helpButton = new HelpButton(this, this.helpPanel);
-  }
-
-  private createSettingsPanel(): void {
-    if (!this.soundManager) return;
-    this.settingsPanel = new SettingsPanel(this, {
-      soundManager: this.soundManager,
-    });
-    this.settingsButton = new SettingsButton(this, this.settingsPanel);
   }
 
   // ── Section boxes ────────────────────────────────────────
@@ -1822,20 +1772,7 @@ export class SplendorScene extends Phaser.Scene {
     }
 
     // Signal board is visually stable
-    this.emitStateSettled();
-  }
-
-  // ── State-settled emission ──────────────────────────────
-
-  /**
-   * Emit state-settled when the board is visually stable and safe
-   * to screenshot. Uses the replay step index as the turn number.
-   */
-  private emitStateSettled(): void {
-    this.gameEvents.emit('state-settled', {
-      turnNumber: this.replayStepIndex,
-      phase: 'playing' as const,
-    });
+    this.emitStateSettled(this.replayStepIndex, 'playing');
   }
 
   // ── Test accessors ──────────────────────────────────────
@@ -1909,16 +1846,9 @@ export class SplendorScene extends Phaser.Scene {
   // ── Lifecycle cleanup ───────────────────────────────────
 
   shutdown(): void {
-    this.soundManager?.destroy();
-    this.soundManager = null;
-    this.eventBridge?.destroy();
-    this.gameEvents?.removeAllListeners();
-    this.helpPanel?.destroy();
-    this.helpButton?.destroy();
-    this.settingsPanel?.destroy();
-    this.settingsButton?.destroy();
     dismissOverlay(this.overlayObjects);
     this.overlayObjects = [];
     this.discardContainer?.removeAll(true);
+    this.shutdownBase();
   }
 }
