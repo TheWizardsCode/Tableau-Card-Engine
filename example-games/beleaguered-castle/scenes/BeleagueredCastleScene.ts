@@ -36,19 +36,15 @@ import { UndoRedoManager, CompoundCommand } from '../../../src/core-engine/UndoR
 import { BCTranscriptRecorder } from '../GameTranscript';
 import type { BCGameTranscript, BoardSnapshot } from '../GameTranscript';
 import {
-  HelpPanel, HelpButton,
-  SettingsPanel, SettingsButton,
+  CardGameScene,
   GAME_W, GAME_H, FONT_FAMILY,
   cardTextureKey, preloadCardAssets,
   createOverlayBackground, dismissOverlay as sharedDismissOverlay,
   createOverlayButton, createOverlayMenuButton,
   createSceneTitle, createSceneMenuButton,
 } from '../../../src/ui';
+import type { EventSoundMapping } from '../../../src/core-engine/SoundManager';
 import type { HelpSection } from '../../../src/ui';
-import { GameEventEmitter } from '../../../src/core-engine/GameEventEmitter';
-import { PhaserEventBridge } from '../../../src/core-engine/PhaserEventBridge';
-import { SoundManager } from '../../../src/core-engine/SoundManager';
-import type { SoundPlayer, EventSoundMapping } from '../../../src/core-engine/SoundManager';
 import helpContent from '../help-content.json';
 
 // ── Audio asset keys ────────────────────────────────────────
@@ -186,14 +182,11 @@ interface CardSpriteData {
 
 // ── Scene ───────────────────────────────────────────────────
 
-export class BeleagueredCastleScene extends Phaser.Scene {
+export class BeleagueredCastleScene extends CardGameScene {
   // Game state
   private gameState!: BeleagueredCastleState;
   private seed: number = Date.now();
   private undoManager!: UndoRedoManager;
-
-  /** When true, the scene suppresses all input and sound for replay use. */
-  private replayMode: boolean = false;
 
   // Whether the deal animation has finished (interactions blocked until then)
   private dealComplete: boolean = false;
@@ -235,17 +228,6 @@ export class BeleagueredCastleScene extends Phaser.Scene {
   // Transcript recording
   private recorder!: BCTranscriptRecorder;
   private transcript: BCGameTranscript | null = null;
-
-  // Help panel
-  private helpPanel!: HelpPanel;
-  private helpButton!: HelpButton;
-
-  // Sound system
-  private gameEvents!: GameEventEmitter;
-  private eventBridge!: PhaserEventBridge;
-  private soundManager: SoundManager | null = null;
-  private settingsPanel!: SettingsPanel;
-  private settingsButton!: SettingsButton;
 
   constructor() {
     super({ key: 'BeleagueredCastleScene' });
@@ -293,8 +275,7 @@ export class BeleagueredCastleScene extends Phaser.Scene {
     this.seed = seedParam ? parseInt(seedParam, 10) : Date.now();
 
     // Check for replay mode via URL parameter (?mode=replay)
-    this.replayMode =
-      params.get('mode') === 'replay';
+    this.detectReplayMode();
 
     // Deal the game
     this.gameState = deal(this.seed);
@@ -324,32 +305,15 @@ export class BeleagueredCastleScene extends Phaser.Scene {
     this.createFoundationSlots();
     this.createTableauDropZones();
     this.createHUD();
-    if (!this.replayMode) {
-      this.createHelpPanel();
-    }
 
-    // Sound system: event emitter, bridge, sound manager, settings
-    this.gameEvents = new GameEventEmitter();
-    this.eventBridge = new PhaserEventBridge(this.gameEvents, this.events);
-    (window as unknown as Record<string, unknown>).__GAME_EVENTS__ =
-      this.gameEvents;
+    // Event system (must come before sound)
+    this.initEventSystem();
 
     if (!this.replayMode) {
-      const phaserSound = this.sound;
-      const player: SoundPlayer = {
-        play: (key: string) => { phaserSound.play(key); },
-        stop: (key: string) => { phaserSound.stopByKey(key); },
-        setVolume: (v: number) => { phaserSound.volume = v; },
-        setMute: (m: boolean) => { phaserSound.mute = m; },
-      };
-      this.soundManager = new SoundManager(player);
+      // Help panel
+      this.initHelpPanel(helpContent as HelpSection[]);
 
-      // Register all SFX keys
-      for (const sfxKey of Object.values(SFX_KEYS)) {
-        this.soundManager.register(sfxKey);
-      }
-
-      // Declarative event-to-sound mapping
+      // Sound system + settings panel
       const mapping: EventSoundMapping = {
         'card-pickup': SFX_KEYS.CARD_PICKUP,
         'card-to-foundation': SFX_KEYS.CARD_TO_FOUNDATION,
@@ -365,9 +329,8 @@ export class BeleagueredCastleScene extends Phaser.Scene {
         'card-deselected': SFX_KEYS.CARD_DESELECT,
         'ui-interaction': SFX_KEYS.UI_CLICK,
       };
-      this.soundManager.connectToEvents(this.gameEvents, mapping);
-
-      this.createSettingsPanel();
+      this.initSoundSystem(Object.values(SFX_KEYS), mapping);
+      this.initSettingsPanel();
     }
 
     // Render foundations (aces already placed)
@@ -379,7 +342,10 @@ export class BeleagueredCastleScene extends Phaser.Scene {
       this.dealComplete = true;
       this.refreshTableau();
       this.refreshHUD();
-      this.emitStateSettled();
+      this.emitStateSettled(
+        this.gameState.moveCount,
+        this.gameEnded ? 'ended' : 'playing',
+      );
     } else {
       // Deal cards to tableau with animation
       this.dealTableauAnimated();
@@ -1366,26 +1332,6 @@ export class BeleagueredCastleScene extends Phaser.Scene {
     this.overlayObjects = [];
   }
 
-  // ── Help Panel ──────────────────────────────────────────
-
-  private createHelpPanel(): void {
-    this.helpPanel = new HelpPanel(this, {
-      sections: helpContent as HelpSection[],
-    });
-    this.helpButton = new HelpButton(this, this.helpPanel);
-  }
-
-  // ── Settings Panel ─────────────────────────────────────
-
-  /** Create the settings panel with sound controls (mute toggle + volume slider). */
-  private createSettingsPanel(): void {
-    if (!this.soundManager) return;
-    this.settingsPanel = new SettingsPanel(this, {
-      soundManager: this.soundManager,
-    });
-    this.settingsButton = new SettingsButton(this, this.settingsPanel);
-  }
-
   // ── Foundation rendering ────────────────────────────────
 
   private refreshFoundations(): void {
@@ -1750,18 +1696,10 @@ export class BeleagueredCastleScene extends Phaser.Scene {
     this.refreshHUD();
 
     // Signal that the board is visually stable and ready for screenshot
-    this.emitStateSettled();
-  }
-
-  /**
-   * Emit state-settled when the board is visually stable and safe
-   * to screenshot. Called after state injection and display refresh.
-   */
-  private emitStateSettled(): void {
-    this.gameEvents.emit('state-settled', {
-      turnNumber: this.gameState.moveCount,
-      phase: (this.gameEnded ? 'ended' : 'playing') as 'setup' | 'playing' | 'ended',
-    });
+    this.emitStateSettled(
+      this.gameState.moveCount,
+      this.gameEnded ? 'ended' : 'playing',
+    );
   }
 
   // ── Cleanup ─────────────────────────────────────────────
@@ -1774,15 +1712,6 @@ export class BeleagueredCastleScene extends Phaser.Scene {
     this.cancelAutoComplete();
     this.clearDropHighlights();
     this.dismissOverlay();
-    this.helpPanel?.destroy();
-    this.helpButton?.destroy();
-
-    // Sound system cleanup
-    this.soundManager?.destroy();
-    this.soundManager = null;
-    this.eventBridge?.destroy();
-    this.gameEvents?.removeAllListeners();
-    this.settingsPanel?.destroy();
-    this.settingsButton?.destroy();
+    this.shutdownBase();
   }
 }
