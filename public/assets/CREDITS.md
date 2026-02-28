@@ -144,3 +144,12 @@ Thumbnail images displayed on the Game Selector landing page:
 
 Files (in `games/<game-name>/`):
 - `games/golf/thumbnail.png` — Mid-game screenshot of 9-Card Golf
+
+## Feudalism Crop Icons
+
+Programmatic crop-themed icons drawn on resource tokens in the Feudalism game:
+
+- **Source**: Drawn at runtime using Phaser 3 Graphics primitives in `example-games/feudalism/scenes/CropIconRenderer.ts`
+- **License**: MIT (original procedural art, no external assets used)
+- **Format**: Generated as in-memory Phaser textures (no static image files)
+- **Icons**: Oats (grain heads), Flax (five-petal flower), Wheat (chevron ear), Barley (awned ear), Turnip (root bulb), Mead (honeycomb)
