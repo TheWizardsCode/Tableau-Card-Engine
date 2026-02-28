@@ -6,7 +6,7 @@ import {
   getBonuses,
   effectiveCost,
   canAfford,
-  nobleQualifies,
+  patronQualifies,
   getLegalActions,
   isGameOver,
   getWinnerIndex,
@@ -18,7 +18,7 @@ import {
 } from '../../example-games/feudalism/FeudalismGame';
 import {
   type DevelopmentCard,
-  type NobleTile,
+  type PatronTile,
   type ResourceTokens,
   tokenCount,
   totalTokens,
@@ -62,13 +62,13 @@ describe('FeudalismGame', () => {
         expect(totalTokens(p.tokens)).toBe(0);
         expect(p.purchasedCards).toHaveLength(0);
         expect(p.reservedCards).toHaveLength(0);
-        expect(p.nobles).toHaveLength(0);
+        expect(p.patrons).toHaveLength(0);
       }
     });
 
-    it('sets up 3 noble tiles for 2 players', () => {
+    it('sets up 3 patron tiles for 2 players', () => {
       const session = createTestSession();
-      expect(session.nobles).toHaveLength(3);
+      expect(session.patrons).toHaveLength(3);
     });
 
     it('sets up market with 4 visible cards per tier', () => {
@@ -121,14 +121,14 @@ describe('FeudalismGame', () => {
       expect(getPrestige(session.players[0])).toBe(0);
     });
 
-    it('getPrestige sums card points and noble points', () => {
+    it('getPrestige sums card points and patron points', () => {
       const session = createTestSession();
       const player = session.players[0];
       player.purchasedCards.push(
         { id: 999, tier: 1, cost: {}, bonus: 'wheat', points: 2 },
         { id: 998, tier: 2, cost: {}, bonus: 'oats', points: 3 },
       );
-      player.nobles.push({ id: 100, requirements: {}, points: 3 });
+      player.patrons.push({ id: 100, requirements: {}, points: 3 });
       expect(getPrestige(player)).toBe(8);
     });
 
@@ -164,7 +164,7 @@ describe('FeudalismGame', () => {
           { id: 999, tier: 1, cost: {}, bonus: 'wheat', points: 0 },
         ],
         reservedCards: [],
-        nobles: [],
+        patrons: [],
       };
       const card: DevelopmentCard = {
         id: 100, tier: 1, cost: { wheat: 3, flax: 1 }, bonus: 'oats', points: 0,
@@ -179,7 +179,7 @@ describe('FeudalismGame', () => {
         tokens: { wheat: 1, mead: 2 },
         purchasedCards: [],
         reservedCards: [],
-        nobles: [],
+        patrons: [],
       };
       const card: DevelopmentCard = {
         id: 100, tier: 1, cost: { wheat: 3 }, bonus: 'oats', points: 0,
@@ -194,7 +194,7 @@ describe('FeudalismGame', () => {
         tokens: { wheat: 1 },
         purchasedCards: [],
         reservedCards: [],
-        nobles: [],
+        patrons: [],
       };
       const card: DevelopmentCard = {
         id: 100, tier: 1, cost: { wheat: 3 }, bonus: 'oats', points: 0,
@@ -202,7 +202,7 @@ describe('FeudalismGame', () => {
       expect(canAfford(player, card)).toBe(false);
     });
 
-    it('nobleQualifies checks bonus requirements', () => {
+    it('patronQualifies checks bonus requirements', () => {
       const player: FeudalismPlayerState = {
         name: 'Test',
         isAI: false,
@@ -218,13 +218,13 @@ describe('FeudalismGame', () => {
           { id: 8, tier: 1, cost: {}, bonus: 'flax', points: 0 },
         ],
         reservedCards: [],
-        nobles: [],
+        patrons: [],
       };
-      const noble: NobleTile = { id: 1, requirements: { barley: 4, flax: 4 }, points: 3 };
-      expect(nobleQualifies(player, noble)).toBe(true);
+      const patron: PatronTile = { id: 1, requirements: { barley: 4, flax: 4 }, points: 3 };
+      expect(patronQualifies(player, patron)).toBe(true);
     });
 
-    it('nobleQualifies returns false when requirements not met', () => {
+    it('patronQualifies returns false when requirements not met', () => {
       const player: FeudalismPlayerState = {
         name: 'Test',
         isAI: false,
@@ -234,10 +234,10 @@ describe('FeudalismGame', () => {
           { id: 2, tier: 1, cost: {}, bonus: 'barley', points: 0 },
         ],
         reservedCards: [],
-        nobles: [],
+        patrons: [],
       };
-      const noble: NobleTile = { id: 1, requirements: { barley: 4, flax: 4 }, points: 3 };
-      expect(nobleQualifies(player, noble)).toBe(false);
+      const patron: PatronTile = { id: 1, requirements: { barley: 4, flax: 4 }, points: 3 };
+      expect(patronQualifies(player, patron)).toBe(false);
     });
   });
 
@@ -531,14 +531,14 @@ describe('FeudalismGame', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Noble visits
+  // Patron visits
   // -------------------------------------------------------------------------
-  describe('noble visits', () => {
-    it('noble visits player when requirements met after purchase', () => {
+  describe('patron visits', () => {
+    it('patron visits player when requirements met after purchase', () => {
       const session = createTestSession();
       const player = session.players[0];
-      // Set up a noble requiring 4 barley + 4 flax
-      session.nobles = [{ id: 100, requirements: { barley: 4, flax: 4 }, points: 3 }];
+      // Set up a patron requiring 4 barley + 4 flax
+      session.patrons = [{ id: 100, requirements: { barley: 4, flax: 4 }, points: 3 }];
       // Give player 3 barley + 4 flax bonuses
       for (let i = 0; i < 3; i++) {
         player.purchasedCards.push(
@@ -556,21 +556,21 @@ describe('FeudalismGame', () => {
       };
       player.reservedCards.push(barleyCard);
       const result = executeTurn(session, { type: 'purchase', cardId: 800 });
-      expect(result.nobleVisit).not.toBeNull();
-      expect(result.nobleVisit!.id).toBe(100);
-      expect(player.nobles).toHaveLength(1);
-      expect(session.nobles).toHaveLength(0);
+      expect(result.patronVisit).not.toBeNull();
+      expect(result.patronVisit!.id).toBe(100);
+      expect(player.patrons).toHaveLength(1);
+      expect(session.patrons).toHaveLength(0);
     });
 
-    it('no noble visit when requirements not met', () => {
+    it('no patron visit when requirements not met', () => {
       const session = createTestSession();
-      session.nobles = [{ id: 100, requirements: { barley: 4, flax: 4 }, points: 3 }];
+      session.patrons = [{ id: 100, requirements: { barley: 4, flax: 4 }, points: 3 }];
       // Just take some tokens — no purchase, no bonuses
       const result = executeTurn(session, {
         type: 'take-different',
         colors: ['wheat', 'oats', 'flax'],
       });
-      expect(result.nobleVisit).toBeNull();
+      expect(result.patronVisit).toBeNull();
     });
   });
 

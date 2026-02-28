@@ -3,12 +3,12 @@ import {
   RESOURCE_TYPES,
   ALL_RESOURCE_TYPES,
   ALL_DEVELOPMENT_CARDS,
-  ALL_NOBLES,
+  ALL_PATRONS,
   TIER_1_COUNT,
   TIER_2_COUNT,
   TIER_3_COUNT,
   TOTAL_CARD_COUNT,
-  TOTAL_NOBLE_COUNT,
+  TOTAL_PATRON_COUNT,
   MARKET_SIZE,
   WIN_THRESHOLD,
   MAX_RESERVED,
@@ -18,12 +18,12 @@ import {
   addTokens,
   subtractTokens,
   createTokenSupply,
-  selectNobles,
+  selectPatrons,
   createTierDecks,
   shuffleArray,
   formatCost,
   cardLabel,
-  nobleLabel,
+  patronLabel,
   resourceAbbrev,
   resourceDisplayName,
   type ResourceTokens,
@@ -178,27 +178,27 @@ describe('FeudalismCards', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Noble tiles
+  // Patron tiles
   // -------------------------------------------------------------------------
-  describe('noble tiles', () => {
-    it('has exactly 10 nobles', () => {
-      expect(ALL_NOBLES).toHaveLength(TOTAL_NOBLE_COUNT);
-      expect(TOTAL_NOBLE_COUNT).toBe(10);
+  describe('patron tiles', () => {
+    it('has exactly 10 patrons', () => {
+      expect(ALL_PATRONS).toHaveLength(TOTAL_PATRON_COUNT);
+      expect(TOTAL_PATRON_COUNT).toBe(10);
     });
 
-    it('all nobles have unique IDs', () => {
-      const ids = ALL_NOBLES.map(n => n.id);
+    it('all patrons have unique IDs', () => {
+      const ids = ALL_PATRONS.map(n => n.id);
       expect(new Set(ids).size).toBe(ids.length);
     });
 
-    it('all nobles give exactly 3 prestige points', () => {
-      for (const n of ALL_NOBLES) {
+    it('all patrons give exactly 3 prestige points', () => {
+      for (const n of ALL_PATRONS) {
         expect(n.points).toBe(3);
       }
     });
 
-    it('all noble requirements use only resource types (no mead)', () => {
-      for (const n of ALL_NOBLES) {
+    it('all patron requirements use only resource types (no mead)', () => {
+      for (const n of ALL_PATRONS) {
         expect(n.requirements).not.toHaveProperty('mead');
         for (const color of RESOURCE_TYPES) {
           const val = n.requirements[color];
@@ -209,8 +209,8 @@ describe('FeudalismCards', () => {
       }
     });
 
-    it('nobles require either 2 colors at 4 each or 3 colors at 3 each', () => {
-      for (const n of ALL_NOBLES) {
+    it('patrons require either 2 colors at 4 each or 3 colors at 3 each', () => {
+      for (const n of ALL_PATRONS) {
         const values = RESOURCE_TYPES.map(c => n.requirements[c] ?? 0).filter(v => v > 0);
         const isType1 = values.length === 2 && values.every(v => v === 4);
         const isType2 = values.length === 3 && values.every(v => v === 3);
@@ -290,33 +290,33 @@ describe('FeudalismCards', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Noble selection
+  // Patron selection
   // -------------------------------------------------------------------------
-  describe('selectNobles', () => {
-    it('selects n+1 nobles for 2 players', () => {
-      const nobles = selectNobles(2, makeRng(42));
-      expect(nobles).toHaveLength(3);
+  describe('selectPatrons', () => {
+    it('selects n+1 patrons for 2 players', () => {
+      const patrons = selectPatrons(2, makeRng(42));
+      expect(patrons).toHaveLength(3);
     });
 
-    it('selects n+1 nobles for 3 players', () => {
-      const nobles = selectNobles(3, makeRng(42));
-      expect(nobles).toHaveLength(4);
+    it('selects n+1 patrons for 3 players', () => {
+      const patrons = selectPatrons(3, makeRng(42));
+      expect(patrons).toHaveLength(4);
     });
 
-    it('selects n+1 nobles for 4 players', () => {
-      const nobles = selectNobles(4, makeRng(42));
-      expect(nobles).toHaveLength(5);
+    it('selects n+1 patrons for 4 players', () => {
+      const patrons = selectPatrons(4, makeRng(42));
+      expect(patrons).toHaveLength(5);
     });
 
-    it('selected nobles have unique IDs', () => {
-      const nobles = selectNobles(4, makeRng(99));
-      const ids = nobles.map(n => n.id);
+    it('selected patrons have unique IDs', () => {
+      const patrons = selectPatrons(4, makeRng(99));
+      const ids = patrons.map(n => n.id);
       expect(new Set(ids).size).toBe(ids.length);
     });
 
     it('different seeds produce different selections', () => {
-      const a = selectNobles(2, makeRng(1));
-      const b = selectNobles(2, makeRng(999));
+      const a = selectPatrons(2, makeRng(1));
+      const b = selectPatrons(2, makeRng(999));
       const aIds = a.map(n => n.id).sort();
       const bIds = b.map(n => n.id).sort();
       // Very unlikely to be identical with different seeds
@@ -414,10 +414,10 @@ describe('FeudalismCards', () => {
       expect(label).toContain('pt');
     });
 
-    it('nobleLabel includes 3pt and requirements', () => {
-      const label = nobleLabel(ALL_NOBLES[0]);
+    it('patronLabel includes 3pt and requirements', () => {
+      const label = patronLabel(ALL_PATRONS[0]);
       expect(label).toContain('3pt');
-      expect(label).toContain('Noble');
+      expect(label).toContain('Patron');
     });
   });
 });

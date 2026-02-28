@@ -41,8 +41,8 @@ interface SPCardSnapshot {
   points: number;
 }
 
-/** Minimal noble snapshot. */
-interface SPNobleSnapshot {
+/** Minimal patron snapshot. */
+interface SPPatronSnapshot {
   id: number;
   requirements: Record<string, number>;
   points: number;
@@ -58,7 +58,7 @@ interface SPPlayerSnapshot {
   tokens: SPResourceTokens;
   purchasedCards: SPCardSnapshot[];
   reservedCards: SPCardSnapshot[];
-  nobles: SPNobleSnapshot[];
+  patrons: SPPatronSnapshot[];
   prestige: number;
   bonuses: Record<string, number>;
 }
@@ -68,14 +68,14 @@ interface SPTurnRecord {
   turnNumber: number;
   playerIndex: number;
   action: { type: string; [key: string]: unknown };
-  nobleVisit: SPNobleSnapshot | null;
+  patronVisit: SPPatronSnapshot | null;
   tokenDiscard: { tokens: SPResourceTokens } | null;
   phase: string;
   gameOver: boolean;
   playerStates: SPPlayerSnapshot[];
   market: SPMarketTierSnapshot[];
   tokenSupply: SPResourceTokens;
-  nobles: SPNobleSnapshot[];
+  patrons: SPPatronSnapshot[];
 }
 
 /** Initial state. */
@@ -83,7 +83,7 @@ interface SPInitialState {
   playerStates: SPPlayerSnapshot[];
   market: SPMarketTierSnapshot[];
   tokenSupply: SPResourceTokens;
-  nobles: SPNobleSnapshot[];
+  patrons: SPPatronSnapshot[];
   playerCount: number;
 }
 
@@ -150,7 +150,7 @@ function describeTurnRecord(turn: SPTurnRecord): string {
   }
 
   const parts = [`${playerName} ${actionDesc}`];
-  if (turn.nobleVisit) parts.push(`noble #${turn.nobleVisit.id} visits`);
+  if (turn.patronVisit) parts.push(`patron #${turn.patronVisit.id} visits`);
   if (turn.tokenDiscard) parts.push('discards tokens');
   if (turn.gameOver) parts.push('(game ends)');
 
@@ -266,7 +266,7 @@ export class FeudalismReplayAdapter implements ReplayAdapter {
       playerStates: t.initialState.playerStates,
       market: t.initialState.market,
       tokenSupply: t.initialState.tokenSupply,
-      nobles: t.initialState.nobles,
+      patrons: t.initialState.patrons,
       phase: 'playing',
       currentPlayerIndex: 0,
       stepIndex: -1,
@@ -286,7 +286,7 @@ export class FeudalismReplayAdapter implements ReplayAdapter {
       playerStates: turn.playerStates,
       market: turn.market,
       tokenSupply: turn.tokenSupply,
-      nobles: turn.nobles,
+      patrons: turn.patrons,
       phase: turn.phase,
       currentPlayerIndex: turn.playerIndex,
       stepIndex: turnIndex,
@@ -328,7 +328,7 @@ export class FeudalismReplayAdapter implements ReplayAdapter {
       playerStates: SPPlayerSnapshot[];
       market: SPMarketTierSnapshot[];
       tokenSupply: SPResourceTokens;
-      nobles: SPNobleSnapshot[];
+      patrons: SPPatronSnapshot[];
       phase: string;
       currentPlayerIndex: number;
       stepIndex: number;

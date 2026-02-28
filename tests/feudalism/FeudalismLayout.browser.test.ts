@@ -1,7 +1,7 @@
 /**
  * FeudalismScene layout regression tests.
  *
- * Guards against layout regressions where UI sections (nobles, market,
+ * Guards against layout regressions where UI sections (patrons, market,
  * supply, player/AI areas, action buttons, instruction text) overlap
  * each other or extend beyond the game viewport.
  *
@@ -66,7 +66,7 @@ function destroyGame(game: Phaser.Game | null): void {
  */
 function getSceneInternals(scene: Phaser.Scene): {
   // Containers for containerBounds() measurement
-  nobleContainer: Phaser.GameObjects.Container;
+  patronContainer: Phaser.GameObjects.Container;
   marketContainer: Phaser.GameObjects.Container;
   supplyContainer: Phaser.GameObjects.Container;
   playerContainer: Phaser.GameObjects.Container;
@@ -75,7 +75,7 @@ function getSceneInternals(scene: Phaser.Scene): {
   instructionText: Phaser.GameObjects.Text;
   // Test accessor methods
   getSectionBoxRects: () => {
-    nobles: { x: number; y: number; w: number; h: number };
+    patrons: { x: number; y: number; w: number; h: number };
     market: { x: number; y: number; w: number; h: number };
     supply: { x: number; y: number; w: number; h: number };
     player: { x: number; y: number; w: number; h: number };
@@ -201,21 +201,21 @@ describe('FeudalismScene layout regression tests', () => {
   });
 
   // ── Test 1: Upper band sections do not overlap each other ──
-  it('should have non-overlapping upper band sections (nobles, market, supply)', async () => {
+  it('should have non-overlapping upper band sections (patrons, market, supply)', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('FeudalismScene')!;
     const internals = getSceneInternals(scene);
 
     // Use section box rects for accurate geometry (includes drawn backgrounds)
     const boxes = internals.getSectionBoxRects();
-    const nobles = toRect(boxes.nobles, 'Nobles');
+    const patrons = toRect(boxes.patrons, 'Patrons');
     const market = toRect(boxes.market, 'Market');
     const supply = toRect(boxes.supply, 'Supply');
 
-    // Nobles should be to the left of market
+    // Patrons should be to the left of market
     expect(
-      nobles.x + nobles.w,
-      `Nobles right edge (${nobles.x + nobles.w}) should be left of Market left edge (${market.x})`,
+      patrons.x + patrons.w,
+      `Patrons right edge (${patrons.x + patrons.w}) should be left of Market left edge (${market.x})`,
     ).toBeLessThanOrEqual(market.x);
 
     // Market should be to the left of supply
@@ -225,7 +225,7 @@ describe('FeudalismScene layout regression tests', () => {
     ).toBeLessThanOrEqual(supply.x);
 
     // Verify all upper band section boxes are within viewport
-    for (const section of [nobles, market, supply]) {
+    for (const section of [patrons, market, supply]) {
       expect(
         section.x,
         `${section.label} left edge (${section.x}) should be >= 0`,

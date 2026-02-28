@@ -84,9 +84,9 @@ export const GreedyStrategy: FeudalismAiStrategy = {
         const card = getAvailableCards(session, playerIndex).find(
           c => c.id === (a as { cardId: number }).cardId,
         )!;
-        // Prefer high points, then noble-progress bonus
-        const nobleBonus = scoreNobleProgress(session, player, card.bonus);
-        return { action: a, score: card.points * 10 + nobleBonus + card.tier };
+        // Prefer high points, then patron-progress bonus
+        const patronBonus = scorePatronProgress(session, player, card.bonus);
+        return { action: a, score: card.points * 10 + patronBonus + card.tier };
       });
       scored.sort((a, b) => b.score - a.score);
       return scored[0].action;
@@ -214,23 +214,23 @@ export class FeudalismAiPlayer extends AiPlayerBase<FeudalismAiStrategy> {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Score how much a bonus color helps toward visiting a noble. */
-function scoreNobleProgress(
+/** Score how much a bonus color helps toward visiting a patron. */
+function scorePatronProgress(
   session: FeudalismSession,
   player: FeudalismPlayerState,
   bonusColor: ResourceType,
 ): number {
   const bonuses = getBonuses(player);
   let bestScore = 0;
-  for (const noble of session.nobles) {
-    const req = noble.requirements[bonusColor] ?? 0;
+  for (const patron of session.patrons) {
+    const req = patron.requirements[bonusColor] ?? 0;
     const have = bonuses[bonusColor];
     if (req > 0 && have < req) {
-      // This bonus brings us closer to this noble
+      // This bonus brings us closer to this patron
       let totalProgress = 0;
       let totalReq = 0;
       for (const c of RESOURCE_TYPES) {
-        const r = noble.requirements[c] ?? 0;
+        const r = patron.requirements[c] ?? 0;
         totalReq += r;
         totalProgress += Math.min(bonuses[c] + (c === bonusColor ? 1 : 0), r);
       }

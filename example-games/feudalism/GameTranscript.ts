@@ -4,11 +4,11 @@
  * Transcript types and recorder for Feudalism.
  *
  * Records a replay-ready JSON transcript capturing every turn action,
- * noble visits, token discards, and the final game outcome.  The
+ * patron visits, token discards, and the final game outcome.  The
  * transcript stores full board-state snapshots after each turn so that
  * the replay adapter can inject any state without reconstruction.
  *
- * Feudalism cards and nobles are already plain serializable objects
+ * Feudalism cards and patrons are already plain serializable objects
  * (readonly properties with `id`, `tier`, `cost`, `bonus`, `points`
  * etc.) so they can be snapshot directly without transformation.
  *
@@ -20,7 +20,7 @@
  */
 
 import { TranscriptRecorderBase } from '../../src/core-engine/TranscriptRecorder';
-import type { DevelopmentCard, NobleTile, ResourceTokens, Tier } from './FeudalismCards';
+import type { DevelopmentCard, PatronTile, ResourceTokens, Tier } from './FeudalismCards';
 import type {
   FeudalismSession,
   FeudalismPhase,
@@ -62,14 +62,14 @@ export interface PlayerSnapshot {
   readonly tokens: ResourceTokens;
   readonly purchasedCards: DevelopmentCard[];
   readonly reservedCards: DevelopmentCard[];
-  readonly nobles: NobleTile[];
+  readonly patrons: PatronTile[];
   readonly prestige: number;
   readonly bonuses: Record<string, number>;
 }
 
 /** Create a serializable snapshot of a player's state. */
 export function snapshotPlayer(
-  player: { name: string; isAI: boolean; tokens: ResourceTokens; purchasedCards: DevelopmentCard[]; reservedCards: DevelopmentCard[]; nobles: NobleTile[] },
+  player: { name: string; isAI: boolean; tokens: ResourceTokens; purchasedCards: DevelopmentCard[]; reservedCards: DevelopmentCard[]; patrons: PatronTile[] },
 ): PlayerSnapshot {
   // Calculate prestige and bonuses using the game helpers
   const prestige = getPrestige(player as Parameters<typeof getPrestige>[0]);
@@ -81,7 +81,7 @@ export function snapshotPlayer(
     tokens: { ...player.tokens },
     purchasedCards: player.purchasedCards.map((c) => ({ ...c })),
     reservedCards: player.reservedCards.map((c) => ({ ...c })),
-    nobles: player.nobles.map((n) => ({ ...n })),
+    patrons: player.patrons.map((n) => ({ ...n })),
     prestige,
     bonuses: { ...bonuses },
   };
@@ -97,8 +97,8 @@ export interface FeudalismTurnRecord {
   readonly playerIndex: number;
   /** The action that was executed. */
   readonly action: TurnAction;
-  /** Noble that visited as a result of this turn, if any. */
-  readonly nobleVisit: NobleTile | null;
+  /** Patron that visited as a result of this turn, if any. */
+  readonly patronVisit: PatronTile | null;
   /** Tokens discarded if the player was over the limit. */
   readonly tokenDiscard: TokenDiscard | null;
   /** Game phase after this turn. */
@@ -111,8 +111,8 @@ export interface FeudalismTurnRecord {
   readonly market: MarketSnapshot;
   /** Token supply AFTER the turn. */
   readonly tokenSupply: ResourceTokens;
-  /** Remaining nobles AFTER the turn. */
-  readonly nobles: NobleTile[];
+  /** Remaining patrons AFTER the turn. */
+  readonly patrons: PatronTile[];
 }
 
 // ── Transcript ─────────────────────────────────────────────
@@ -125,8 +125,8 @@ export interface FeudalismInitialState {
   readonly market: MarketSnapshot;
   /** Token supply after setup. */
   readonly tokenSupply: ResourceTokens;
-  /** Noble tiles available. */
-  readonly nobles: NobleTile[];
+  /** Patron tiles available. */
+  readonly patrons: PatronTile[];
   /** Number of players. */
   readonly playerCount: number;
 }
@@ -187,7 +187,7 @@ export class FeudalismTranscriptRecorder extends TranscriptRecorderBase<Feudalis
         playerStates: session.players.map(snapshotPlayer),
         market: snapshotMarket(session),
         tokenSupply: { ...session.tokenSupply },
-        nobles: session.nobles.map((n) => ({ ...n })),
+        patrons: session.patrons.map((n) => ({ ...n })),
         playerCount: session.players.length,
       },
       turns: [],
@@ -220,14 +220,14 @@ export class FeudalismTranscriptRecorder extends TranscriptRecorderBase<Feudalis
       turnNumber: this.turnCounter++,
       playerIndex,
       action: { ...action } as TurnAction,
-      nobleVisit: result.nobleVisit ? { ...result.nobleVisit } : null,
+      patronVisit: result.patronVisit ? { ...result.patronVisit } : null,
       tokenDiscard: tokenDiscard ? { tokens: { ...tokenDiscard.tokens } } : null,
       phase: this.session.phase,
       gameOver: result.gameOver,
       playerStates: this.session.players.map(snapshotPlayer),
       market: snapshotMarket(this.session),
       tokenSupply: { ...this.session.tokenSupply },
-      nobles: this.session.nobles.map((n) => ({ ...n })),
+      patrons: this.session.patrons.map((n) => ({ ...n })),
     };
 
     this.transcript.turns.push(turnRecord);
