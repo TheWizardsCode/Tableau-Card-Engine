@@ -14,6 +14,15 @@
  * Related work items:
  * - CG-0MM0GQZA915EXA9K (Feudalism transcript pipeline)
  * - CG-0MLTFUL061DWDGA2 (adapter pattern)
+ *
+ * BREAKING CHANGE (CG-0MM5KBHTD0Y5Q5JV -- crop re-theme, Feb 2026):
+ * Transcripts generated before the crop re-theme used gem-based field
+ * names (emerald, sapphire, ruby, diamond, onyx, gold) and types
+ * (GemColor, GemOrGold, NobleTile, prestige). These old transcripts
+ * are incompatible with the current adapter, which expects crop-based
+ * names (oats, flax, wheat, barley, turnip, mead) and types
+ * (ResourceType, ResourceOrWild, PatronTile, influence). Old
+ * transcripts must be regenerated or discarded.
  */
 
 import type { Page } from 'playwright';
