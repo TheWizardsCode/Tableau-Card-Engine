@@ -193,7 +193,7 @@ describe('FeudalismCards', () => {
       expect(new Set(ids).size).toBe(ids.length);
     });
 
-    it('all patrons give exactly 3 prestige points', () => {
+    it('all patrons give exactly 3 influence points', () => {
       for (const n of ALL_PATRONS) {
         expect(n.points).toBe(3);
       }

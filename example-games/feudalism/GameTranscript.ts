@@ -28,7 +28,7 @@ import type {
   TurnResult,
   TokenDiscard,
 } from './FeudalismGame';
-import { getPrestige, getBonuses } from './FeudalismGame';
+import { getInfluence, getBonuses } from './FeudalismGame';
 
 // ── Market snapshot ────────────────────────────────────────
 
@@ -63,7 +63,7 @@ export interface PlayerSnapshot {
   readonly purchasedCards: DevelopmentCard[];
   readonly reservedCards: DevelopmentCard[];
   readonly patrons: PatronTile[];
-  readonly prestige: number;
+  readonly influence: number;
   readonly bonuses: Record<string, number>;
 }
 
@@ -71,8 +71,8 @@ export interface PlayerSnapshot {
 export function snapshotPlayer(
   player: { name: string; isAI: boolean; tokens: ResourceTokens; purchasedCards: DevelopmentCard[]; reservedCards: DevelopmentCard[]; patrons: PatronTile[] },
 ): PlayerSnapshot {
-  // Calculate prestige and bonuses using the game helpers
-  const prestige = getPrestige(player as Parameters<typeof getPrestige>[0]);
+  // Calculate influence and bonuses using the game helpers
+  const influence = getInfluence(player as Parameters<typeof getInfluence>[0]);
   const bonuses = getBonuses(player as Parameters<typeof getBonuses>[0]);
 
   return {
@@ -82,7 +82,7 @@ export function snapshotPlayer(
     purchasedCards: player.purchasedCards.map((c) => ({ ...c })),
     reservedCards: player.reservedCards.map((c) => ({ ...c })),
     patrons: player.patrons.map((n) => ({ ...n })),
-    prestige,
+    influence,
     bonuses: { ...bonuses },
   };
 }
@@ -133,8 +133,8 @@ export interface FeudalismInitialState {
 
 /** Final game results. */
 export interface FeudalismGameResults {
-  /** Final prestige per player. */
-  readonly finalPrestige: number[];
+  /** Final influence per player. */
+  readonly finalInfluence: number[];
   /** Final card counts per player. */
   readonly finalCardCounts: number[];
   /** Index of the winning player. */
@@ -244,7 +244,7 @@ export class FeudalismTranscriptRecorder extends TranscriptRecorderBase<Feudalis
 
     this.transcript.endedAt = new Date().toISOString();
     this.transcript.results = {
-      finalPrestige: this.session.players.map((p) => getPrestige(p)),
+      finalInfluence: this.session.players.map((p) => getInfluence(p)),
       finalCardCounts: this.session.players.map((p) => p.purchasedCards.length),
       winnerIndex,
       winnerName: this.session.players[winnerIndex].name,

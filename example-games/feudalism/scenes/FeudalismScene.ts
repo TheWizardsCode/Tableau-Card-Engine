@@ -5,7 +5,7 @@
  *   - Card market (3 tiers x 4 visible cards + deck backs)
  *   - Resource token supply (clickable to take tokens)
  *   - Patron tiles display
- *   - Player area (tokens, purchased cards, reserved cards, prestige)
+ *   - Player area (tokens, purchased cards, reserved cards, influence)
  *   - AI area (summary info)
  *   - Turn action UI with phase-based state machine
  *   - Resource discard dialog when over 10 tokens
@@ -35,7 +35,7 @@ import {
   setupFeudalismGame,
   executeTurn,
   discardTokens,
-  getPrestige,
+  getInfluence,
   getBonuses,
   canAfford,
   isGameOver,
@@ -222,8 +222,8 @@ export class FeudalismScene extends CardGameScene {
 
   // UI text
   private instructionText!: Phaser.GameObjects.Text;
-  private playerPrestigeText!: Phaser.GameObjects.Text;
-  private aiPrestigeText!: Phaser.GameObjects.Text;
+  private playerInfluenceText!: Phaser.GameObjects.Text;
+  private aiInfluenceText!: Phaser.GameObjects.Text;
 
   // Overlay cleanup
   private overlayObjects: Phaser.GameObjects.GameObject[] = [];
@@ -272,7 +272,7 @@ export class FeudalismScene extends CardGameScene {
       this.createHeader();
       this.createContainers();
       this.createInstructions();
-      this.createPrestigeDisplay();
+      this.createInfluenceDisplay();
 
       // Emit state-settled so the replay tool knows the scene is ready
       this.emitStateSettled(this.replayStepIndex, 'playing');
@@ -302,7 +302,7 @@ export class FeudalismScene extends CardGameScene {
     this.createHeader();
     this.createContainers();
     this.createInstructions();
-    this.createPrestigeDisplay();
+    this.createInfluenceDisplay();
     this.initHelpPanel(helpContent as HelpSection[]);
     this.initSettingsPanel();
 
@@ -339,10 +339,10 @@ export class FeudalismScene extends CardGameScene {
       .setOrigin(0.5);
   }
 
-  private createPrestigeDisplay(): void {
-    // Prestige is now rendered inline in refreshPlayerArea / refreshAiArea
-    // These text objects are updated by refreshPrestige() for mid-frame updates
-    this.playerPrestigeText = this.add
+  private createInfluenceDisplay(): void {
+    // Influence is now rendered inline in refreshPlayerArea / refreshAiArea
+    // These text objects are updated by refreshInfluence() for mid-frame updates
+    this.playerInfluenceText = this.add
       .text(0, 0, '', {
         fontSize: '20px',
         fontStyle: 'bold',
@@ -350,16 +350,16 @@ export class FeudalismScene extends CardGameScene {
         fontFamily: FONT_FAMILY,
       })
       .setOrigin(0, 0)
-      .setVisible(false);   // hidden; prestige shown inline
+      .setVisible(false);   // hidden; influence shown inline
 
-    this.aiPrestigeText = this.add
+    this.aiInfluenceText = this.add
       .text(0, 0, '', {
         fontSize: '18px',
         color: '#aabbcc',
         fontFamily: FONT_FAMILY,
       })
       .setOrigin(0, 0)
-      .setVisible(false);   // hidden; prestige shown inline
+      .setVisible(false);   // hidden; influence shown inline
   }
 
   // ── Section boxes ────────────────────────────────────────
@@ -435,7 +435,7 @@ export class FeudalismScene extends CardGameScene {
     this.refreshSupply();
     this.refreshPlayerArea();
     this.refreshAiArea();
-    this.refreshPrestige();
+    this.refreshInfluence();
     this.refreshActionButtons();
   }
 
@@ -706,26 +706,26 @@ export class FeudalismScene extends CardGameScene {
   private refreshPlayerArea(): void {
     this.playerContainer.removeAll(true);
     const player = this.session.players[0];
-    const prestige = getPrestige(player);
+    const influence = getInfluence(player);
     const bonuses = getBonuses(player);
 
-    // ── Row 0: Prestige badge + tokens ──
+    // ── Row 0: Influence badge + tokens ──
     const row0Y = PLAYER_AREA_Y;
 
-    // Prominent prestige display
-    const prestigeBg = this.add.rectangle(
+    // Prominent influence display
+    const influenceBg = this.add.rectangle(
       PLAYER_AREA_X + 44, row0Y + 10,
       90, 24, 0x443300, 0.6,
     );
-    prestigeBg.setStrokeStyle(1, 0x887744);
-    this.playerContainer.add(prestigeBg);
+    influenceBg.setStrokeStyle(1, 0x887744);
+    this.playerContainer.add(influenceBg);
 
-    const prestigeLabel = this.add.text(
+    const influenceLabel = this.add.text(
       PLAYER_AREA_X + 44, row0Y + 10,
-      `★ ${prestige} / 15`,
+      `★ ${influence} / 15`,
       { fontSize: '16px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY },
     ).setOrigin(0.5);
-    this.playerContainer.add(prestigeLabel);
+    this.playerContainer.add(influenceLabel);
 
     // Patrons collected
     if (player.patrons.length > 0) {
@@ -737,7 +737,7 @@ export class FeudalismScene extends CardGameScene {
       this.playerContainer.add(patronLabel);
     }
 
-    // Tokens (right of prestige)
+    // Tokens (right of influence)
     const tokLabel = this.add.text(
       PLAYER_AREA_X + 200, row0Y + 4, 'Tokens:',
       { fontSize: '15px', color: '#aaaaaa', fontFamily: FONT_FAMILY },
@@ -885,25 +885,25 @@ export class FeudalismScene extends CardGameScene {
     this.aiContainer.removeAll(true);
     const ai = this.session.players[1];
     const bonuses = getBonuses(ai);
-    const prestige = getPrestige(ai);
+    const influence = getInfluence(ai);
 
-    // ── Row 0: Prestige badge + tokens — right-aligned ──
+    // ── Row 0: Influence badge + tokens — right-aligned ──
     const row0Y = AI_AREA_Y;
 
-    // Prominent prestige display
-    const prestigeBg = this.add.rectangle(
+    // Prominent influence display
+    const influenceBg = this.add.rectangle(
       AI_AREA_X - 44, row0Y + 10,
       90, 24, 0x443300, 0.6,
     );
-    prestigeBg.setStrokeStyle(1, 0x887744);
-    this.aiContainer.add(prestigeBg);
+    influenceBg.setStrokeStyle(1, 0x887744);
+    this.aiContainer.add(influenceBg);
 
-    const prestigeLabel = this.add.text(
+    const influenceLabel = this.add.text(
       AI_AREA_X - 44, row0Y + 10,
-      `★ ${prestige} / 15`,
+      `★ ${influence} / 15`,
       { fontSize: '16px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY },
     ).setOrigin(0.5);
-    this.aiContainer.add(prestigeLabel);
+    this.aiContainer.add(influenceLabel);
 
     // Patrons collected
     if (ai.patrons.length > 0) {
@@ -915,7 +915,7 @@ export class FeudalismScene extends CardGameScene {
       this.aiContainer.add(patronLabel);
     }
 
-    // Tokens (left of prestige)
+    // Tokens (left of influence)
     const tokLabel = this.add.text(
       AI_AREA_X - 200, row0Y + 4, 'Tokens:',
       { fontSize: '15px', color: '#aaaaaa', fontFamily: FONT_FAMILY },
@@ -1011,11 +1011,11 @@ export class FeudalismScene extends CardGameScene {
     }
   }
 
-  private refreshPrestige(): void {
-    const playerPrestige = getPrestige(this.session.players[0]);
-    const aiPrestige = getPrestige(this.session.players[1]);
-    this.playerPrestigeText.setText(`Prestige: ${playerPrestige}`);
-    this.aiPrestigeText.setText(`AI Prestige: ${aiPrestige}`);
+  private refreshInfluence(): void {
+    const playerInfluence = getInfluence(this.session.players[0]);
+    const aiInfluence = getInfluence(this.session.players[1]);
+    this.playerInfluenceText.setText(`Influence: ${playerInfluence}`);
+    this.aiInfluenceText.setText(`AI Influence: ${aiInfluence}`);
   }
 
   // ── Action buttons ──────────────────────────────────────
@@ -1793,7 +1793,7 @@ export class FeudalismScene extends CardGameScene {
         this.refreshPatrons();
         this.refreshPlayerArea();
         this.refreshAiArea();
-        this.refreshPrestige();
+        this.refreshInfluence();
         onComplete();
       },
     });
@@ -2152,14 +2152,14 @@ export class FeudalismScene extends CardGameScene {
 
     const human = this.session.players[0];
     const ai = this.session.players[1];
-    const humanPrestige = getPrestige(human);
-    const aiPrestige = getPrestige(ai);
+    const humanInfluence = getInfluence(human);
+    const aiInfluence = getInfluence(ai);
 
     const lines = [
       winnerText,
       '',
-      `You: ${humanPrestige} prestige (${human.purchasedCards.length} cards, ${human.patrons.length} patrons)`,
-      `AI: ${aiPrestige} prestige (${ai.purchasedCards.length} cards, ${ai.patrons.length} patrons)`,
+      `You: ${humanInfluence} influence (${human.purchasedCards.length} cards, ${human.patrons.length} patrons)`,
+      `AI: ${aiInfluence} influence (${ai.purchasedCards.length} cards, ${ai.patrons.length} patrons)`,
       '',
       `Tiebreak: fewest cards wins`,
     ];

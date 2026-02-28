@@ -342,7 +342,7 @@ export function createTierDecks(rng: () => number = Math.random): {
 /** Number of visible cards per tier in the market. */
 export const MARKET_SIZE = 4;
 
-/** Prestige points needed to trigger end of game. */
+/** Influence points needed to trigger end of game. */
 export const WIN_THRESHOLD = 15;
 
 /** Maximum number of reserved cards a player can hold. */

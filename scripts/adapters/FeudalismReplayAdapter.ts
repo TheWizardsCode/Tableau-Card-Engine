@@ -59,7 +59,7 @@ interface SPPlayerSnapshot {
   purchasedCards: SPCardSnapshot[];
   reservedCards: SPCardSnapshot[];
   patrons: SPPatronSnapshot[];
-  prestige: number;
+  influence: number;
   bonuses: Record<string, number>;
 }
 
@@ -89,7 +89,7 @@ interface SPInitialState {
 
 /** Final results. */
 interface SPGameResults {
-  finalPrestige: number[];
+  finalInfluence: number[];
   finalCardCounts: number[];
   winnerIndex: number;
   winnerName: string;
@@ -227,7 +227,7 @@ export class FeudalismReplayAdapter implements ReplayAdapter {
     const players = t.initialState.playerStates.map((p) => p.name).join(', ');
     const totalTurns = t.turns.length;
     const outcome = t.results
-      ? `Winner: ${t.results.winnerName} (prestige: ${t.results.finalPrestige.join('-')})`
+      ? `Winner: ${t.results.winnerName} (influence: ${t.results.finalInfluence.join('-')})`
       : 'in-progress';
     return `Players: ${players}, Turns: ${totalTurns}, ${outcome}`;
   }

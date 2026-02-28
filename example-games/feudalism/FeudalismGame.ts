@@ -180,7 +180,7 @@ export function setupFeudalismGame(options?: FeudalismSetupOptions): FeudalismSe
 // Query helpers
 // ---------------------------------------------------------------------------
 
-export function getPrestige(player: FeudalismPlayerState): number {
+export function getInfluence(player: FeudalismPlayerState): number {
   let pts = 0;
   for (const card of player.purchasedCards) pts += card.points;
   for (const patron of player.patrons) pts += patron.points;
@@ -285,18 +285,18 @@ export function isGameOver(session: FeudalismSession): boolean {
   return session.phase === 'game-over';
 }
 
-/** Get the winner index (most prestige, tiebreak: fewest cards). */
+/** Get the winner index (most influence, tiebreak: fewest cards). */
 export function getWinnerIndex(session: FeudalismSession): number {
   let bestIdx = 0;
-  let bestPrestige = -1;
+  let bestInfluence = -1;
   let bestCards = Infinity;
 
   for (let i = 0; i < session.players.length; i++) {
-    const p = getPrestige(session.players[i]);
+    const p = getInfluence(session.players[i]);
     const c = session.players[i].purchasedCards.length;
-    if (p > bestPrestige || (p === bestPrestige && c < bestCards)) {
+    if (p > bestInfluence || (p === bestInfluence && c < bestCards)) {
       bestIdx = i;
-      bestPrestige = p;
+      bestInfluence = p;
       bestCards = c;
     }
   }
@@ -639,10 +639,10 @@ function finishTurn(
   patronVisit: PatronTile | null,
 ): TurnResult {
   const player = getCurrentPlayer(session);
-  const prestige = getPrestige(player);
+  const influence = getInfluence(player);
 
   // Check if this player triggered the end
-  if (session.triggerPlayerIndex === -1 && prestige >= WIN_THRESHOLD) {
+  if (session.triggerPlayerIndex === -1 && influence >= WIN_THRESHOLD) {
     session.triggerPlayerIndex = session.currentPlayerIndex;
     session.phase = 'final-round';
   }

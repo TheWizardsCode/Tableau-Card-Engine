@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   setupFeudalismGame,
   getCurrentPlayer,
-  getPrestige,
+  getInfluence,
   getBonuses,
   effectiveCost,
   canAfford,
@@ -116,12 +116,12 @@ describe('FeudalismGame', () => {
       expect(getCurrentPlayer(session).name).toBe('Alice');
     });
 
-    it('getPrestige returns 0 for a fresh player', () => {
+    it('getInfluence returns 0 for a fresh player', () => {
       const session = createTestSession();
-      expect(getPrestige(session.players[0])).toBe(0);
+      expect(getInfluence(session.players[0])).toBe(0);
     });
 
-    it('getPrestige sums card points and patron points', () => {
+    it('getInfluence sums card points and patron points', () => {
       const session = createTestSession();
       const player = session.players[0];
       player.purchasedCards.push(
@@ -129,7 +129,7 @@ describe('FeudalismGame', () => {
         { id: 998, tier: 2, cost: {}, bonus: 'oats', points: 3 },
       );
       player.patrons.push({ id: 100, requirements: {}, points: 3 });
-      expect(getPrestige(player)).toBe(8);
+      expect(getInfluence(player)).toBe(8);
     });
 
     it('getBonuses counts purchased card bonuses', () => {
@@ -578,10 +578,10 @@ describe('FeudalismGame', () => {
   // End of game
   // -------------------------------------------------------------------------
   describe('end of game', () => {
-    it('triggers final round when player reaches 15 prestige', () => {
+    it('triggers final round when player reaches 15 influence', () => {
       const session = createTestSession();
       const player = session.players[0];
-      // Give player 14 prestige from cards
+      // Give player 14 influence from cards
       for (let i = 0; i < 14; i++) {
         player.purchasedCards.push(
           { id: 600 + i, tier: 1, cost: {}, bonus: 'wheat', points: 1 },
@@ -600,7 +600,7 @@ describe('FeudalismGame', () => {
     it('game ends after all players complete the round', () => {
       const session = createTestSession();
       const player = session.players[0];
-      // Give player 15 prestige
+      // Give player 15 influence
       for (let i = 0; i < 15; i++) {
         player.purchasedCards.push(
           { id: 600 + i, tier: 1, cost: {}, bonus: 'wheat', points: 1 },
@@ -643,7 +643,7 @@ describe('FeudalismGame', () => {
   // Winner determination
   // -------------------------------------------------------------------------
   describe('getWinnerIndex', () => {
-    it('player with most prestige wins', () => {
+    it('player with most influence wins', () => {
       const session = createTestSession();
       session.players[0].purchasedCards.push(
         { id: 1, tier: 1, cost: {}, bonus: 'wheat', points: 5 },
@@ -656,7 +656,7 @@ describe('FeudalismGame', () => {
 
     it('tiebreaker: fewer purchased cards wins', () => {
       const session = createTestSession();
-      // Both have 5 prestige
+      // Both have 5 influence
       session.players[0].purchasedCards.push(
         { id: 1, tier: 1, cost: {}, bonus: 'wheat', points: 5 },
       );
