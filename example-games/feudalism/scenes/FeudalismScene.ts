@@ -44,6 +44,7 @@ import {
 import { FeudalismAiPlayer, GreedyStrategy } from '../AiStrategy';
 import { FeudalismTranscriptRecorder } from '../GameTranscript';
 import type { MarketSnapshot, PlayerSnapshot } from '../GameTranscript';
+import { addCropIcon, cssColorToNumber } from './CropIconRenderer';
 import { TranscriptStore } from '../../../src/core-engine/TranscriptStore';
 import { autoSaveTranscript } from '../../../src/core-engine/autoSaveTranscript';
 import type { EventSoundMapping } from '../../../src/core-engine/SoundManager';
@@ -667,6 +668,14 @@ export class FeudalismScene extends CardGameScene {
       if (count === 0) circle.setAlpha(0.3);
       this.supplyContainer.add(circle);
 
+      // Crop icon overlay
+      const supplyIcon = addCropIcon(
+        this, SUPPLY_X, y, color, SUPPLY_TOKEN_R,
+        cssColorToNumber(RESOURCE_TEXT_COLOR[color]),
+      );
+      if (count === 0) supplyIcon.setAlpha(0.3);
+      this.supplyContainer.add(supplyIcon);
+
       // Count text
       const countText = this.add.text(
         SUPPLY_X, y,
@@ -755,6 +764,13 @@ export class FeudalismScene extends CardGameScene {
       const circle = this.add.circle(tx, tokCenterY, 14, RESOURCE_FILL[c]);
       circle.setStrokeStyle(1, 0xffffff);
       this.playerContainer.add(circle);
+
+      // Crop icon overlay
+      const pIcon = addCropIcon(
+        this, tx, tokCenterY, c, 14,
+        cssColorToNumber(RESOURCE_TEXT_COLOR[c]),
+      );
+      this.playerContainer.add(pIcon);
 
       const ct = this.add.text(
         tx, tokCenterY, `${n}`,
@@ -937,6 +953,13 @@ export class FeudalismScene extends CardGameScene {
       circle.setStrokeStyle(1, 0xffffff);
       this.aiContainer.add(circle);
 
+      // Crop icon overlay
+      const aiIcon = addCropIcon(
+        this, tx, tokCenterY, c, 14,
+        cssColorToNumber(RESOURCE_TEXT_COLOR[c]),
+      );
+      this.aiContainer.add(aiIcon);
+
       const ct = this.add.text(
         tx, tokCenterY, `${n}`,
         { fontSize: '13px', fontStyle: 'bold', color: RESOURCE_TEXT_COLOR[c], fontFamily: FONT_FAMILY },
@@ -1071,6 +1094,13 @@ export class FeudalismScene extends CardGameScene {
           circle.on('pointerover', () => circle.setStrokeStyle(2, 0xffdd44));
           circle.on('pointerout', () => circle.setStrokeStyle(1, 0xffffff));
           this.actionContainer.add(circle);
+
+          // Crop icon overlay
+          const actIcon = addCropIcon(
+            this, bx, by, c, 22,
+            cssColorToNumber(RESOURCE_TEXT_COLOR[c]),
+          );
+          this.actionContainer.add(actIcon);
 
           const abbr = this.add.text(
             bx, by, resourceAbbrev(c),
@@ -1237,6 +1267,14 @@ export class FeudalismScene extends CardGameScene {
       circle.setStrokeStyle(selected > 0 ? 2 : 1, selected > 0 ? 0xff4444 : 0xffffff);
       circle.setDepth(11);
       this.discardContainer.add(circle);
+
+      // Crop icon overlay
+      const discIcon = addCropIcon(
+        this, tx, ty, c, 28,
+        cssColorToNumber(RESOURCE_TEXT_COLOR[c]),
+      );
+      discIcon.setDepth(11);
+      this.discardContainer.add(discIcon);
 
       const countText = this.add.text(
         tx, ty, `${have - selected}`,
