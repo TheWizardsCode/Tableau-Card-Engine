@@ -21,8 +21,8 @@
 
 import type { ResourceOrWild } from '../FeudalismCards';
 
-/** Icon alpha — subtle enough that overlaid count text stays readable. */
-const ICON_ALPHA = 0.28;
+/** Icon alpha — visible but not so heavy that overlaid count text is unreadable. */
+const ICON_ALPHA = 0.38;
 
 // ── Helper: draw a filled ellipse ──────────────────────────
 // Phaser 3.x Graphics has no fillEllipse(). We draw an ellipse
@@ -75,21 +75,21 @@ function drawOats(
   r: number,
   color: number,
 ): void {
-  const headR = r * 0.18;
-  const spread = r * 0.35;
+  const headR = r * 0.24;
+  const spread = r * 0.55;
 
   // Three stalks with slight droop
   for (const dx of [-spread, 0, spread]) {
-    const baseY = cy + r * 0.35;
-    const topY = cy - r * 0.35 + Math.abs(dx) * 0.3;
+    const baseY = cy + r * 0.65;
+    const topY = cy - r * 0.45 + Math.abs(dx) * 0.25;
     // Stalk
-    g.lineStyle(Math.max(1, r * 0.06), color, ICON_ALPHA);
+    g.lineStyle(Math.max(1, r * 0.08), color, ICON_ALPHA);
     g.beginPath();
-    g.moveTo(cx + dx * 0.5, baseY);
+    g.moveTo(cx + dx * 0.4, baseY);
     g.lineTo(cx + dx, topY);
     g.strokePath();
     // Grain head (oval)
-    fillEllipse(g, cx + dx, topY - headR, headR * 1.4, headR * 2.2);
+    fillEllipse(g, cx + dx, topY - headR, headR * 1.6, headR * 2.6);
   }
 }
 
@@ -101,8 +101,8 @@ function drawFlax(
   r: number,
   _color: number,
 ): void {
-  const petalR = r * 0.28;
-  const dist = r * 0.32;
+  const petalR = r * 0.38;
+  const dist = r * 0.48;
   const petals = 5;
 
   for (let i = 0; i < petals; i++) {
@@ -112,7 +112,7 @@ function drawFlax(
     g.fillCircle(px, py, petalR);
   }
   // Centre dot
-  g.fillCircle(cx, cy, r * 0.15);
+  g.fillCircle(cx, cy, r * 0.22);
 }
 
 /** Wheat — upright ear with chevron kernels. */
@@ -123,22 +123,22 @@ function drawWheat(
   r: number,
   color: number,
 ): void {
-  const lineW = Math.max(1, r * 0.07);
+  const lineW = Math.max(1, r * 0.10);
   g.lineStyle(lineW, color, ICON_ALPHA);
 
   // Central stalk
-  const top = cy - r * 0.55;
-  const bottom = cy + r * 0.45;
+  const top = cy - r * 0.85;
+  const bottom = cy + r * 0.85;
   g.beginPath();
   g.moveTo(cx, bottom);
   g.lineTo(cx, top);
   g.strokePath();
 
   // Chevron kernels (alternating left-right)
-  const kernelCount = 4;
-  const kernelSpan = r * 0.32;
-  const startY = cy - r * 0.4;
-  const gap = r * 0.22;
+  const kernelCount = 5;
+  const kernelSpan = r * 0.55;
+  const startY = cy - r * 0.7;
+  const gap = r * 0.3;
 
   for (let i = 0; i < kernelCount; i++) {
     const ky = startY + i * gap;
@@ -163,22 +163,22 @@ function drawBarley(
   r: number,
   color: number,
 ): void {
-  const lineW = Math.max(1, r * 0.06);
+  const lineW = Math.max(1, r * 0.08);
   g.lineStyle(lineW, color, ICON_ALPHA);
 
   // Central stalk
-  const top = cy - r * 0.55;
-  const bottom = cy + r * 0.5;
+  const top = cy - r * 0.85;
+  const bottom = cy + r * 0.85;
   g.beginPath();
   g.moveTo(cx, bottom);
   g.lineTo(cx, top);
   g.strokePath();
 
   // Awns — long diagonal lines
-  const awnCount = 5;
-  const awnLen = r * 0.4;
-  const startY = cy - r * 0.45;
-  const gap = r * 0.18;
+  const awnCount = 6;
+  const awnLen = r * 0.65;
+  const startY = cy - r * 0.7;
+  const gap = r * 0.25;
 
   for (let i = 0; i < awnCount; i++) {
     const ky = startY + i * gap;
@@ -198,23 +198,23 @@ function drawTurnip(
   r: number,
   color: number,
 ): void {
-  // Root bulb (slightly flattened ellipse, lower half)
-  const bulbR = r * 0.4;
-  fillEllipse(g, cx, cy + r * 0.08, bulbR * 2, bulbR * 1.8);
+  // Root bulb (large slightly flattened ellipse, lower half)
+  const bulbR = r * 0.55;
+  fillEllipse(g, cx, cy + r * 0.15, bulbR * 2, bulbR * 1.8);
 
   // Tapered root tip
-  const lineW = Math.max(1, r * 0.07);
+  const lineW = Math.max(1, r * 0.09);
   g.lineStyle(lineW, color, ICON_ALPHA);
   g.beginPath();
-  g.moveTo(cx, cy + r * 0.08 + bulbR * 0.7);
-  g.lineTo(cx, cy + r * 0.5);
+  g.moveTo(cx, cy + r * 0.15 + bulbR * 0.75);
+  g.lineTo(cx, cy + r * 0.85);
   g.strokePath();
 
-  // Two small leaf shapes sprouting upward
-  const leafH = r * 0.35;
-  const leafW = r * 0.18;
+  // Two leaf shapes sprouting upward
+  const leafH = r * 0.5;
+  const leafW = r * 0.24;
   for (const side of [-1, 1]) {
-    fillEllipse(g, cx + side * leafW * 0.8, cy - r * 0.25 - leafH * 0.3, leafW, leafH);
+    fillEllipse(g, cx + side * leafW * 0.9, cy - r * 0.35 - leafH * 0.2, leafW, leafH);
   }
 }
 
@@ -226,8 +226,8 @@ function drawMead(
   r: number,
   color: number,
 ): void {
-  const hexR = r * 0.22;
-  const lineW = Math.max(1, r * 0.06);
+  const hexR = r * 0.30;
+  const lineW = Math.max(1, r * 0.08);
   g.lineStyle(lineW, color, ICON_ALPHA);
 
   // Draw a single hexagon outline
@@ -303,7 +303,7 @@ export function generateCropIconTexture(
   // Draw the icon centred in the texture area
   const cx = tokenRadius;
   const cy = tokenRadius;
-  const drawR = tokenRadius * 0.7; // inset from edge
+  const drawR = tokenRadius * 0.92; // fill nearly the full token
 
   CROP_DRAW_FN[resource](g, cx, cy, drawR, strokeColor);
 
