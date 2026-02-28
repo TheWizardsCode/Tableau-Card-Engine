@@ -45,18 +45,18 @@ describe('FeudalismCards', () => {
   // Constants
   // -------------------------------------------------------------------------
   describe('constants', () => {
-    it('has 5 gem colors', () => {
+    it('has 5 resource types', () => {
       expect(RESOURCE_TYPES).toHaveLength(5);
-      expect(RESOURCE_TYPES).toContain('emerald');
-      expect(RESOURCE_TYPES).toContain('sapphire');
-      expect(RESOURCE_TYPES).toContain('ruby');
-      expect(RESOURCE_TYPES).toContain('diamond');
-      expect(RESOURCE_TYPES).toContain('onyx');
+      expect(RESOURCE_TYPES).toContain('oats');
+      expect(RESOURCE_TYPES).toContain('flax');
+      expect(RESOURCE_TYPES).toContain('wheat');
+      expect(RESOURCE_TYPES).toContain('barley');
+      expect(RESOURCE_TYPES).toContain('turnip');
     });
 
-    it('has 6 token colors (gems + gold)', () => {
+    it('has 6 token colors (resources + mead)', () => {
       expect(ALL_RESOURCE_TYPES).toHaveLength(6);
-      expect(ALL_RESOURCE_TYPES).toContain('gold');
+      expect(ALL_RESOURCE_TYPES).toContain('mead');
     });
 
     it('has correct game constants', () => {
@@ -105,7 +105,7 @@ describe('FeudalismCards', () => {
       }
     });
 
-    it('every card has a valid bonus color (not gold)', () => {
+    it('every card has a valid bonus color (not mead)', () => {
       for (const c of ALL_DEVELOPMENT_CARDS) {
         expect(RESOURCE_TYPES).toContain(c.bonus);
       }
@@ -117,9 +117,9 @@ describe('FeudalismCards', () => {
       }
     });
 
-    it('every card cost uses only gem colors (no gold)', () => {
+    it('every card cost uses only resource types (no mead)', () => {
       for (const c of ALL_DEVELOPMENT_CARDS) {
-        expect(c.cost).not.toHaveProperty('gold');
+        expect(c.cost).not.toHaveProperty('mead');
         for (const color of RESOURCE_TYPES) {
           const val = c.cost[color];
           if (val !== undefined) {
@@ -197,9 +197,9 @@ describe('FeudalismCards', () => {
       }
     });
 
-    it('all noble requirements use only gem colors (no gold)', () => {
+    it('all noble requirements use only resource types (no mead)', () => {
       for (const n of ALL_NOBLES) {
-        expect(n.requirements).not.toHaveProperty('gold');
+        expect(n.requirements).not.toHaveProperty('mead');
         for (const color of RESOURCE_TYPES) {
           const val = n.requirements[color];
           if (val !== undefined) {
@@ -224,34 +224,34 @@ describe('FeudalismCards', () => {
   // -------------------------------------------------------------------------
   describe('token utilities', () => {
     it('tokenCount returns 0 for missing colors', () => {
-      expect(tokenCount({}, 'ruby')).toBe(0);
-      expect(tokenCount({ emerald: 3 }, 'ruby')).toBe(0);
+      expect(tokenCount({}, 'wheat')).toBe(0);
+      expect(tokenCount({ oats: 3 }, 'wheat')).toBe(0);
     });
 
     it('tokenCount returns stored value', () => {
-      expect(tokenCount({ ruby: 5 }, 'ruby')).toBe(5);
+      expect(tokenCount({ wheat: 5 }, 'wheat')).toBe(5);
     });
 
     it('totalTokens sums all colors', () => {
       expect(totalTokens({})).toBe(0);
-      expect(totalTokens({ ruby: 2, emerald: 3, gold: 1 })).toBe(6);
+      expect(totalTokens({ wheat: 2, oats: 3, mead: 1 })).toBe(6);
     });
 
     it('addTokens combines two bags', () => {
-      const a: ResourceTokens = { ruby: 2, emerald: 1 };
-      const b: ResourceTokens = { ruby: 1, sapphire: 3 };
+      const a: ResourceTokens = { wheat: 2, oats: 1 };
+      const b: ResourceTokens = { wheat: 1, flax: 3 };
       const result = addTokens(a, b);
-      expect(result.ruby).toBe(3);
-      expect(result.emerald).toBe(1);
-      expect(result.sapphire).toBe(3);
+      expect(result.wheat).toBe(3);
+      expect(result.oats).toBe(1);
+      expect(result.flax).toBe(3);
     });
 
     it('subtractTokens subtracts b from a', () => {
-      const a: ResourceTokens = { ruby: 5, emerald: 3 };
-      const b: ResourceTokens = { ruby: 2, emerald: 1 };
+      const a: ResourceTokens = { wheat: 5, oats: 3 };
+      const b: ResourceTokens = { wheat: 2, oats: 1 };
       const result = subtractTokens(a, b);
-      expect(result.ruby).toBe(3);
-      expect(result.emerald).toBe(2);
+      expect(result.wheat).toBe(3);
+      expect(result.oats).toBe(2);
     });
   });
 
@@ -259,28 +259,28 @@ describe('FeudalismCards', () => {
   // Token supply
   // -------------------------------------------------------------------------
   describe('createTokenSupply', () => {
-    it('2-player supply has 4 of each gem + 5 gold', () => {
+    it('2-player supply has 4 of each resource + 5 mead', () => {
       const supply = createTokenSupply(2);
       for (const c of RESOURCE_TYPES) {
         expect(supply[c]).toBe(4);
       }
-      expect(supply.gold).toBe(5);
+      expect(supply.mead).toBe(5);
     });
 
-    it('3-player supply has 5 of each gem + 5 gold', () => {
+    it('3-player supply has 5 of each resource + 5 mead', () => {
       const supply = createTokenSupply(3);
       for (const c of RESOURCE_TYPES) {
         expect(supply[c]).toBe(5);
       }
-      expect(supply.gold).toBe(5);
+      expect(supply.mead).toBe(5);
     });
 
-    it('4-player supply has 7 of each gem + 5 gold', () => {
+    it('4-player supply has 7 of each resource + 5 mead', () => {
       const supply = createTokenSupply(4);
       for (const c of RESOURCE_TYPES) {
         expect(supply[c]).toBe(7);
       }
-      expect(supply.gold).toBe(5);
+      expect(supply.mead).toBe(5);
     });
 
     it('throws for invalid player counts', () => {
@@ -381,22 +381,22 @@ describe('FeudalismCards', () => {
   // -------------------------------------------------------------------------
   describe('label helpers', () => {
     it('resourceAbbrev returns correct abbreviations', () => {
-      expect(resourceAbbrev('emerald')).toBe('G');
-      expect(resourceAbbrev('sapphire')).toBe('U');
-      expect(resourceAbbrev('ruby')).toBe('R');
-      expect(resourceAbbrev('diamond')).toBe('W');
-      expect(resourceAbbrev('onyx')).toBe('K');
-      expect(resourceAbbrev('gold')).toBe('$');
+      expect(resourceAbbrev('oats')).toBe('O');
+      expect(resourceAbbrev('flax')).toBe('F');
+      expect(resourceAbbrev('wheat')).toBe('W');
+      expect(resourceAbbrev('barley')).toBe('B');
+      expect(resourceAbbrev('turnip')).toBe('T');
+      expect(resourceAbbrev('mead')).toBe('M');
     });
 
     it('resourceDisplayName capitalizes first letter', () => {
-      expect(resourceDisplayName('emerald')).toBe('Emerald');
-      expect(resourceDisplayName('gold')).toBe('Gold');
+      expect(resourceDisplayName('oats')).toBe('Oats');
+      expect(resourceDisplayName('mead')).toBe('Mead');
     });
 
     it('formatCost renders cost components', () => {
-      expect(formatCost({ ruby: 3, emerald: 2 })).toContain('3R');
-      expect(formatCost({ ruby: 3, emerald: 2 })).toContain('2G');
+      expect(formatCost({ wheat: 3, oats: 2 })).toContain('3W');
+      expect(formatCost({ wheat: 3, oats: 2 })).toContain('2O');
     });
 
     it('formatCost returns "Free" for empty cost', () => {

@@ -71,22 +71,22 @@ const transcriptStore = new TranscriptStore();
 
 // Resource color to hex fill
 const RESOURCE_FILL: Record<ResourceOrWild, number> = {
-  emerald:  0x2ecc71,
-  sapphire: 0x3498db,
-  ruby:     0xe74c3c,
-  diamond:  0xecf0f1,
-  onyx:     0x2c3e50,
-  gold:     0xf1c40f,
+  oats:     0x2ecc71,
+  flax:     0x3498db,
+  wheat:    0xe74c3c,
+  barley:   0xecf0f1,
+  turnip:   0x2c3e50,
+  mead:     0xf1c40f,
 };
 
 // Resource color to text color
 const RESOURCE_TEXT_COLOR: Record<ResourceOrWild, string> = {
-  emerald:  '#ffffff',
-  sapphire: '#ffffff',
-  ruby:     '#ffffff',
-  diamond:  '#2c3e50',
-  onyx:     '#ffffff',
-  gold:     '#2c3e50',
+  oats:     '#ffffff',
+  flax:     '#ffffff',
+  wheat:    '#ffffff',
+  barley:   '#2c3e50',
+  turnip:   '#ffffff',
+  mead:     '#2c3e50',
 };
 
 // ── Layout regions ──────────────────────────────────────────
@@ -650,7 +650,7 @@ export class FeudalismScene extends CardGameScene {
     ).setOrigin(0.5, 1);
     this.supplyContainer.add(label);
 
-    const allColors: ResourceOrWild[] = [...RESOURCE_TYPES, 'gold'];
+    const allColors: ResourceOrWild[] = [...RESOURCE_TYPES, 'mead'];
 
     for (let i = 0; i < allColors.length; i++) {
       const color = allColors[i];
@@ -679,8 +679,8 @@ export class FeudalismScene extends CardGameScene {
       ).setOrigin(1, 0.5);
       this.supplyContainer.add(abbr);
 
-      // Interactivity for resource types (not gold) during token selection
-      if (color !== 'gold' && count > 0 && this.turnPhase === 'selecting-tokens') {
+      // Interactivity for resource types (not mead) during token selection
+      if (color !== 'mead' && count > 0 && this.turnPhase === 'selecting-tokens') {
         circle.setInteractive({ useHandCursor: true });
         circle.on('pointerdown', () => this.onSupplyTokenClick(color));
         circle.on('pointerover', () => circle.setStrokeStyle(3, 0xffdd44));
@@ -1218,7 +1218,7 @@ export class FeudalismScene extends CardGameScene {
     }
 
     // Token buttons
-    const allColors: ResourceOrWild[] = [...RESOURCE_TYPES, 'gold'];
+    const allColors: ResourceOrWild[] = [...RESOURCE_TYPES, 'mead'];
     const activeColors = allColors.filter(c => tokenCount(player.tokens, c) > 0);
     const totalW = activeColors.length * 70;
     let tx = GAME_W / 2 - totalW / 2 + 35;

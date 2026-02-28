@@ -295,8 +295,8 @@ function buildSmartDiscard(
       }
     }
   }
-  // Gold is always useful
-  usefulness.gold = 100;
+  // Mead is always useful
+  usefulness.mead = 100;
 
   // Discard least useful tokens
   const tokens: ResourceTokens = {};
