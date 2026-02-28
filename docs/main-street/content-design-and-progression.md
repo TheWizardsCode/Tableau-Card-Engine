@@ -1,0 +1,121 @@
+# Main Street: Content Design and Progression
+
+---
+
+## 1. Card Pool / Content Inventory
+
+The **Main Street** game uses three distinct card families. Below is the current inventory of cards used in the prototype. The list is intentionally small for rapid iteration; additional cards can be added as the design evolves.
+
+### 1.1 Business Cards
+| Name | Cost (coins) | Base Income (coins/turn) | Synergy Types | Upgrade Path | Description |
+|------|--------------|--------------------------|----------------|--------------|-------------|
+| Bakery | 3 | 2 | Food | Bakery → Patisserie | Provides warm pastries. Gains +1 coin for each adjacent Food business. |
+| Diner | 4 | 3 | Food | Diner → Bistro | Serves quick meals. Gains +1 coin per adjacent Food business. |
+| Bookshop | 4 | 2 | Culture | Bookshop → Library | Sells books. Gains +1 coin per adjacent Culture business. |
+| Park | 2 | 1 | Culture | Park → Garden | Offers leisure. Gains +1 coin per adjacent Culture business. |
+| Hardware Store | 5 | 3 | Commerce | Hardware Store → Home Improvement | Supplies tools. Gains +1 coin per adjacent Commerce business. |
+| ... *(additional business cards may be added later)* |
+
+### 1.2 Event Cards
+| Name | Trigger | Effect |
+|------|---------|--------|
+| Local Festival | Night | +2 coins to all Culture businesses this turn. |
+| Rainy Night | Night | -1 coin to all Food businesses this turn. |
+| Tax Audit | Day | Lose 3 coins unless you have a Bank card. |
+| ... *(expandable event pool)* |
+
+### 1.3 Upgrade Cards
+| Name | Target Business | Cost (coins) | Income Bonus | Synergy Range Bonus | Description |
+|------|----------------|--------------|--------------|----------------------|-------------|
+| Upgrade to Patisserie | Bakery | 4 | +1 | +1 (adjacency range) | Turns a Bakery into a Patisserie, increasing income and allowing synergy with businesses two slots away. |
+| Upgrade to Bistro | Diner | 4 | +1 | +1 | Turns a Diner into a Bistro with higher foot‑traffic. |
+| Upgrade to Library | Bookshop | 3 | +1 | 0 | Adds a cultural boost to adjacent Culture businesses. |
+| ... *(more upgrades as new businesses are introduced)* |
+
+---
+
+## 2. Recipes / Blueprints
+
+Main Street does **not** feature crafting or combination mechanics. The game revolves around purchasing, placing, and upgrading business cards. Therefore, the **Recipes / Blueprints** section is **N/A** for this title.
+
+---
+
+## 3. Resource Economy
+
+The core economic loop consists of two primary resources:
+
+1. **Coins** – the spendable currency used to purchase Business, Event, and Upgrade cards from the market.
+2. **Reputation** – a score multiplier that is increased by completing challenges or by positive events. Reputation is applied at final‑score calculation (`finalScore = coins + reputation * 5 + challengeBonuses`).
+
+**Flow of Resources**:
+- At the start of each **Day Phase**, the player may spend coins to acquire cards.
+- During the **Income Phase**, each placed Business generates `baseIncome + synergyBonus` coins. Synergy is computed as `+1` coin per adjacent Business sharing a Synergy Type.
+- **Event Cards** may grant or remove coins/reputation immediately.
+- **Upgrade Cards** increase future income and may extend synergy range.
+- At the end of each turn, the player's **coin balance** and **reputation** are persisted in the **ResourceBank**.
+
+---
+
+## 4. Difficulty and Balance
+
+Main Street is intended to be approachable for 10‑15‑minute play sessions while still offering strategic depth. Difficulty is managed through the following levers:
+
+| Lever | Effect |
+|-------|--------|
+| **Slot Count** | The base game uses 10 slots; increasing to 12 slots adds decision space without extending playtime significantly. |
+| **Coin Starting Amount** | Adjusting the initial budget (e.g., 8 → 10 coins) can make early rounds easier or tighter. |
+| **Synergy Bonus Value** | Changing the synergy bonus from `+1` to `+2` per matching neighbor raises the impact of placement decisions. |
+| **Event Frequency** | Adding more Night‑only events increases variance and potential swing moments. |
+| **Challenge Targets** | Scaling challenge thresholds (e.g., “Build a Foodie Row” requiring 3 Food businesses) adjusts difficulty. |
+
+Balancing targets are defined in the **GameState** type (`MAX_TURNS = 20`, `WIN_THRESHOLD = 150`). Playtesting should verify that a typical run ends near the turn limit with a final score around the win threshold.
+
+---
+
+## 5. Scoring System
+
+The final score is calculated at the end of the **Night Phase** using the formula:
+
+```
+finalScore = resourceBank.coins + (resourceBank.reputation * 5) + challengeBonus
+```
+
+- **Coins** contribute directly.
+- **Reputation** is multiplied by 5 to give it meaningful weight.
+- **Challenge Bonus** adds `10` points per completed challenge (e.g., *Foodie Row*, *Cultural District*).
+
+Victory conditions (see Core Rules) require `finalScore >= 150` **or** all primary challenges completed.
+
+---
+
+## 6. Progression / Unlockables
+
+Main Street features both **in‑run progression** and **meta‑progression** across runs.
+
+### 6.1 In‑run Progression
+- **Business Upgrades**: Spend coins to transform a Business (e.g., Bakery → Patisserie) increasing income and synergy range.
+- **Challenges**: Dynamic objectives such as “Build a Foodie Row” provide immediate bonus points when satisfied.
+
+### 6.2 Meta‑progression (Run‑to‑Run)
+- After each run, players unlock new Business types from a larger pool, expanding the strategic palette for subsequent runs.
+- Reputation carries over as a **persistent unlock tier**; reaching certain reputation milestones unlocks special Upgrade cards.
+- A **Roguelike run structure** (one street per run) encourages repeated play to discover new combinations and improve the final score.
+
+---
+
+## 7. Replayability Hooks
+
+To encourage multiple play‑throughs, Main Street incorporates:
+
+- **Themed Street Challenges** (e.g., *Foodie Row*, *Cultural District*) that vary each run.
+- **Event Cards with Meaningful Choices** (e.g., choose between a Festival that boosts Culture or a Market Fair that boosts Food).
+- **Randomized Market** each turn, ensuring different acquisition opportunities.
+- **Meta‑progression Unlocks** that gradually increase the card pool and upgrade options.
+
+These hooks create emergent strategies while keeping the core loop short and satisfying.
+
+---
+
+*Document status*: AWAITING PRODUCER REVIEW.
+
+*Prepared by*: `opencode` – implementation of work item **CG-0MM4RCE861AQ7PGW**.
