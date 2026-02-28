@@ -116,6 +116,12 @@ function isFeudalismTranscript(raw: unknown): raw is FeudalismTranscript {
 
 // ── Helpers ────────────────────────────────────────────────
 
+/** Thematic tier display name for replay logs. */
+function tierName(tier: number): string {
+  const names: Record<number, string> = { 1: 'Smallholding', 2: 'Farm', 3: 'Estate' };
+  return names[tier] ?? `Tier ${tier}`;
+}
+
 /**
  * Describe a turn record in human-readable format.
  */
@@ -138,7 +144,7 @@ function describeTurnRecord(turn: SPTurnRecord): string {
       const cardId = action.cardId;
       actionDesc = cardId != null
         ? `reserves card #${cardId}`
-        : `reserves from T${action.tier as number} deck`;
+        : `reserves from ${tierName(action.tier as number)} deck`;
       break;
     }
     case 'purchase': {

@@ -22,6 +22,8 @@ import {
   resourceAbbrev,
   resourceDisplayName,
   formatCost,
+  tierDisplayName,
+  tierShortName,
 } from '../FeudalismCards';
 import type {
   FeudalismSession,
@@ -452,7 +454,7 @@ export class FeudalismScene extends CardGameScene {
       // Tier label (left of deck)
       const tierLabel = this.add.text(
         DECK_X - 40, y + MARKET_CARD_H / 2,
-        `T${tier}`,
+        `${tierShortName(tier)}`,
         { fontSize: '18px', fontStyle: 'bold', color: '#888888', fontFamily: FONT_FAMILY },
       ).setOrigin(0.5);
       this.marketContainer.add(tierLabel);
@@ -1405,7 +1407,7 @@ export class FeudalismScene extends CardGameScene {
 
     // Card info
     const pts = card.points > 0 ? `${card.points} pt, ` : '';
-    const info = `T${card.tier} ${resourceDisplayName(card.bonus)} bonus\n${pts}Cost: ${formatCost(card.cost)}`;
+    const info = `${tierDisplayName(card.tier)} ${resourceDisplayName(card.bonus)} bonus\n${pts}Cost: ${formatCost(card.cost)}`;
     const infoText = this.add.text(
       GAME_W / 2, GAME_H / 2 - 55, info,
       { fontSize: '18px', color: '#ffffff', fontFamily: FONT_FAMILY, align: 'center' },
@@ -1677,7 +1679,7 @@ export class FeudalismScene extends CardGameScene {
     bg.setStrokeStyle(1, 0x556655);
     container.add(bg);
 
-    const text = this.add.text(0, 0, `T${tier}`, {
+    const text = this.add.text(0, 0, `${tierShortName(tier)}`, {
       fontSize: '18px', fontStyle: 'bold', color: '#aaddaa', fontFamily: FONT_FAMILY,
     }).setOrigin(0.5);
     container.add(text);

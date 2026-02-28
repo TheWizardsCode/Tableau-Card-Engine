@@ -382,10 +382,22 @@ export function formatCost(cost: ResourceCost): string {
   return parts.join(' ') || 'Free';
 }
 
+/** Full thematic display name for a tier (shown to players). */
+export function tierDisplayName(tier: Tier): string {
+  const names: Record<Tier, string> = { 1: 'Smallholding', 2: 'Farm', 3: 'Estate' };
+  return names[tier];
+}
+
+/** Short thematic label for compact UI (deck backs, tier labels). */
+export function tierShortName(tier: Tier): string {
+  const names: Record<Tier, string> = { 1: 'Sml', 2: 'Frm', 3: 'Est' };
+  return names[tier];
+}
+
 /** Format a card as a display label. */
 export function cardLabel(card: DevelopmentCard): string {
   const pts = card.points > 0 ? ` [${card.points}pt]` : '';
-  return `T${card.tier} ${resourceAbbrev(card.bonus)}${pts} (${formatCost(card.cost)})`;
+  return `${tierDisplayName(card.tier)} ${resourceAbbrev(card.bonus)}${pts} (${formatCost(card.cost)})`;
 }
 
 /** Format a patron tile as a display label. */

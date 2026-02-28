@@ -26,6 +26,8 @@ import {
   patronLabel,
   resourceAbbrev,
   resourceDisplayName,
+  tierDisplayName,
+  tierShortName,
   type ResourceTokens,
 } from '../../example-games/feudalism/FeudalismCards';
 
@@ -405,7 +407,7 @@ describe('FeudalismCards', () => {
 
     it('cardLabel includes tier, bonus, and cost', () => {
       const label = cardLabel(ALL_DEVELOPMENT_CARDS[0]);
-      expect(label).toContain('T1');
+      expect(label).toContain('Smallholding');
     });
 
     it('cardLabel includes points when > 0', () => {
@@ -418,6 +420,18 @@ describe('FeudalismCards', () => {
       const label = patronLabel(ALL_PATRONS[0]);
       expect(label).toContain('3pt');
       expect(label).toContain('Patron');
+    });
+
+    it('tierDisplayName maps tiers to thematic names', () => {
+      expect(tierDisplayName(1)).toBe('Smallholding');
+      expect(tierDisplayName(2)).toBe('Farm');
+      expect(tierDisplayName(3)).toBe('Estate');
+    });
+
+    it('tierShortName maps tiers to short labels', () => {
+      expect(tierShortName(1)).toBe('Sml');
+      expect(tierShortName(2)).toBe('Frm');
+      expect(tierShortName(3)).toBe('Est');
     });
   });
 });
