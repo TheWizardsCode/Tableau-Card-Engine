@@ -22,7 +22,7 @@
 import type { ResourceOrWild } from '../FeudalismCards';
 
 /** Icon alpha — visible but not so heavy that overlaid count text is unreadable. */
-const ICON_ALPHA = 0.38;
+const ICON_ALPHA = 0.34;
 
 // ── Helper: draw a filled ellipse ──────────────────────────
 // Phaser 3.x Graphics has no fillEllipse(). We draw an ellipse
