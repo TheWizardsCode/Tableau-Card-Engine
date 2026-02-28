@@ -71,24 +71,26 @@ const AI_PRE_PAUSE = 1000;
 /** Shared transcript store for auto-saving completed transcripts. */
 const transcriptStore = new TranscriptStore();
 
-// Resource color to hex fill
+// Colourblind-accessible crop palette (Wong 2011).
+// Each fill is chosen to evoke its crop while maintaining deltaE > 20
+// between all pairs under simulated protanopia, deuteranopia, and tritanopia.
+// Text colours meet WCAG AA 4.5:1 contrast ratio against their fill.
 const RESOURCE_FILL: Record<ResourceOrWild, number> = {
-  oats:     0x2ecc71,
-  flax:     0x3498db,
-  wheat:    0xe74c3c,
-  barley:   0xecf0f1,
-  turnip:   0x2c3e50,
-  mead:     0xf1c40f,
+  oats:     0xE69F00,  // golden oat grain
+  flax:     0x56B4E9,  // blue flax flowers
+  wheat:    0xD55E00,  // amber wheat fields
+  barley:   0xF0E442,  // pale barley ears
+  turnip:   0x009E73,  // green turnip leaves
+  mead:     0xCC79A7,  // pinkish honey mead
 };
 
-// Resource color to text color
 const RESOURCE_TEXT_COLOR: Record<ResourceOrWild, string> = {
-  oats:     '#ffffff',
-  flax:     '#ffffff',
-  wheat:    '#ffffff',
-  barley:   '#2c3e50',
-  turnip:   '#ffffff',
-  mead:     '#2c3e50',
+  oats:     '#000000',
+  flax:     '#000000',
+  wheat:    '#000000',  // black (5.43:1) meets WCAG AA; white was only 3.87:1
+  barley:   '#000000',
+  turnip:   '#000000',  // black (6.14:1) meets WCAG AA; white was only 3.42:1
+  mead:     '#000000',
 };
 
 // ── Layout regions ──────────────────────────────────────────
