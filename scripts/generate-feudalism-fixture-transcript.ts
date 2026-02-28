@@ -84,5 +84,5 @@ console.log(`  Version: ${transcript.version}`);
 console.log(`  Game type: ${transcript.gameType}`);
 console.log(`  Turns: ${transcript.turns.length}`);
 console.log(`  Winner: ${transcript.results?.winnerName} (index ${transcript.results?.winnerIndex})`);
-console.log(`  Final prestige: ${transcript.results?.finalPrestige.join(' - ')}`);
+console.log(`  Final influence: ${transcript.results?.finalInfluence.join(' - ')}`);
 console.log(`  Final card counts: ${transcript.results?.finalCardCounts.join(' - ')}`);

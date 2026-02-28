@@ -2,7 +2,7 @@
  * FeudalismGame.ts
  *
  * Pure game orchestration for Feudalism — no Phaser dependency.
- * Manages session state, turn actions, validation, noble visits, and end-game.
+ * Manages session state, turn actions, validation, patron visits, and end-game.
  */
 
 import {
@@ -10,7 +10,7 @@ import {
   type ResourceTokens,
   type ResourceCost,
   type DevelopmentCard,
-  type NobleTile,
+  type PatronTile,
   type Tier,
   RESOURCE_TYPES,
   ALL_RESOURCE_TYPES,
@@ -19,7 +19,7 @@ import {
   addTokens,
   subtractTokens,
   createTokenSupply,
-  selectNobles,
+  selectPatrons,
   createTierDecks,
   MARKET_SIZE,
   WIN_THRESHOLD,
@@ -44,7 +44,7 @@ export interface FeudalismPlayerState {
   tokens: ResourceTokens;
   purchasedCards: DevelopmentCard[];
   reservedCards: DevelopmentCard[];
-  nobles: NobleTile[];
+  patrons: PatronTile[];
 }
 
 export type FeudalismPhase =
@@ -61,7 +61,7 @@ export interface FeudalismSession {
   players: FeudalismPlayerState[];
   market: Record<Tier, MarketRow>;
   tokenSupply: ResourceTokens;
-  nobles: NobleTile[];
+  patrons: PatronTile[];
   phase: FeudalismPhase;
   currentPlayerIndex: number;
   /** Which player index started the game (for round-completion logic). */
@@ -114,8 +114,8 @@ export interface TokenDiscard {
 /** Result of executing a turn. */
 export interface TurnResult {
   action: TurnAction;
-  /** Noble that visited this turn, if any. */
-  nobleVisit: NobleTile | null;
+  /** Patron that visited this turn, if any. */
+  patronVisit: PatronTile | null;
   /** Whether the game has ended after this turn. */
   gameOver: boolean;
   /** Tokens the player needs to discard (empty if within limit). */
@@ -146,7 +146,7 @@ export function setupFeudalismGame(options?: FeudalismSetupOptions): FeudalismSe
     tokens: {},
     purchasedCards: [],
     reservedCards: [],
-    nobles: [],
+    patrons: [],
   }));
 
   const decks = createTierDecks(rng);
@@ -167,7 +167,7 @@ export function setupFeudalismGame(options?: FeudalismSetupOptions): FeudalismSe
     players,
     market,
     tokenSupply: createTokenSupply(playerCount),
-    nobles: selectNobles(playerCount, rng),
+    patrons: selectPatrons(playerCount, rng),
     phase: 'playing',
     currentPlayerIndex: 0,
     startingPlayerIndex: 0,
@@ -180,10 +180,10 @@ export function setupFeudalismGame(options?: FeudalismSetupOptions): FeudalismSe
 // Query helpers
 // ---------------------------------------------------------------------------
 
-export function getPrestige(player: FeudalismPlayerState): number {
+export function getInfluence(player: FeudalismPlayerState): number {
   let pts = 0;
   for (const card of player.purchasedCards) pts += card.points;
-  for (const noble of player.nobles) pts += noble.points;
+  for (const patron of player.patrons) pts += patron.points;
   return pts;
 }
 
@@ -226,11 +226,11 @@ export function canAfford(player: FeudalismPlayerState, card: DevelopmentCard): 
   return goldNeeded <= tokenCount(player.tokens, 'mead');
 }
 
-/** Check if a noble's requirements are met by the player's bonuses. */
-export function nobleQualifies(player: FeudalismPlayerState, noble: NobleTile): boolean {
+/** Check if a patron's requirements are met by the player's bonuses. */
+export function patronQualifies(player: FeudalismPlayerState, patron: PatronTile): boolean {
   const bonuses = getBonuses(player);
   for (const c of RESOURCE_TYPES) {
-    if ((noble.requirements[c] ?? 0) > bonuses[c]) return false;
+    if ((patron.requirements[c] ?? 0) > bonuses[c]) return false;
   }
   return true;
 }
@@ -285,18 +285,18 @@ export function isGameOver(session: FeudalismSession): boolean {
   return session.phase === 'game-over';
 }
 
-/** Get the winner index (most prestige, tiebreak: fewest cards). */
+/** Get the winner index (most influence, tiebreak: fewest cards). */
 export function getWinnerIndex(session: FeudalismSession): number {
   let bestIdx = 0;
-  let bestPrestige = -1;
+  let bestInfluence = -1;
   let bestCards = Infinity;
 
   for (let i = 0; i < session.players.length; i++) {
-    const p = getPrestige(session.players[i]);
+    const p = getInfluence(session.players[i]);
     const c = session.players[i].purchasedCards.length;
-    if (p > bestPrestige || (p === bestPrestige && c < bestCards)) {
+    if (p > bestInfluence || (p === bestInfluence && c < bestCards)) {
       bestIdx = i;
-      bestPrestige = p;
+      bestInfluence = p;
       bestCards = c;
     }
   }
@@ -470,17 +470,17 @@ export function executeTurn(
   // Check token limit
   const overLimit = totalTokens(player.tokens) - MAX_TOKENS;
 
-  // Check noble visit
-  const nobleVisit = checkNobleVisit(session, player);
+  // Check patron visit
+  const patronVisit = checkPatronVisit(session, player);
 
   // If player is within token limit, advance turn
   if (overLimit <= 0) {
-    return finishTurn(session, action, nobleVisit);
+    return finishTurn(session, action, patronVisit);
   }
 
   return {
     action,
-    nobleVisit,
+    patronVisit,
     gameOver: false,
     tokensOverLimit: overLimit,
   };
@@ -514,7 +514,7 @@ export function discardTokens(
   player.tokens = subtractTokens(player.tokens, discard.tokens);
   session.tokenSupply = addTokens(session.tokenSupply, discard.tokens);
 
-  // Noble visit already happened in executeTurn, so just advance
+  // Patron visit already happened in executeTurn, so just advance
   return finishTurn(session, { type: 'take-different', colors: [] }, null);
 }
 
@@ -611,19 +611,19 @@ function executePurchase(
 }
 
 // ---------------------------------------------------------------------------
-// Noble visit
+// Patron visit
 // ---------------------------------------------------------------------------
 
-function checkNobleVisit(
+function checkPatronVisit(
   session: FeudalismSession,
   player: FeudalismPlayerState,
-): NobleTile | null {
-  for (let i = 0; i < session.nobles.length; i++) {
-    if (nobleQualifies(player, session.nobles[i])) {
-      const noble = session.nobles[i];
-      player.nobles.push(noble);
-      session.nobles.splice(i, 1);
-      return noble;
+): PatronTile | null {
+  for (let i = 0; i < session.patrons.length; i++) {
+    if (patronQualifies(player, session.patrons[i])) {
+      const patron = session.patrons[i];
+      player.patrons.push(patron);
+      session.patrons.splice(i, 1);
+      return patron;
     }
   }
   return null;
@@ -636,13 +636,13 @@ function checkNobleVisit(
 function finishTurn(
   session: FeudalismSession,
   action: TurnAction,
-  nobleVisit: NobleTile | null,
+  patronVisit: PatronTile | null,
 ): TurnResult {
   const player = getCurrentPlayer(session);
-  const prestige = getPrestige(player);
+  const influence = getInfluence(player);
 
   // Check if this player triggered the end
-  if (session.triggerPlayerIndex === -1 && prestige >= WIN_THRESHOLD) {
+  if (session.triggerPlayerIndex === -1 && influence >= WIN_THRESHOLD) {
     session.triggerPlayerIndex = session.currentPlayerIndex;
     session.phase = 'final-round';
   }
@@ -658,7 +658,7 @@ function finishTurn(
     session.phase = 'game-over';
     return {
       action,
-      nobleVisit,
+      patronVisit,
       gameOver: true,
       tokensOverLimit: 0,
     };
@@ -668,7 +668,7 @@ function finishTurn(
 
   return {
     action,
-    nobleVisit,
+    patronVisit,
     gameOver: false,
     tokensOverLimit: 0,
   };

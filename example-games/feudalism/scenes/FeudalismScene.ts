@@ -4,8 +4,8 @@
  * Implements the full visual interface:
  *   - Card market (3 tiers x 4 visible cards + deck backs)
  *   - Resource token supply (clickable to take tokens)
- *   - Noble tiles display
- *   - Player area (tokens, purchased cards, reserved cards, prestige)
+ *   - Patron tiles display
+ *   - Player area (tokens, purchased cards, reserved cards, influence)
  *   - AI area (summary info)
  *   - Turn action UI with phase-based state machine
  *   - Resource discard dialog when over 10 tokens
@@ -13,7 +13,7 @@
  *   - Help panel and settings panel integration
  */
 
-import type { ResourceType, ResourceOrWild, ResourceTokens, DevelopmentCard, NobleTile, Tier } from '../FeudalismCards';
+import type { ResourceType, ResourceOrWild, ResourceTokens, DevelopmentCard, PatronTile, Tier } from '../FeudalismCards';
 import {
   RESOURCE_TYPES,
   ALL_RESOURCE_TYPES,
@@ -22,6 +22,8 @@ import {
   resourceAbbrev,
   resourceDisplayName,
   formatCost,
+  tierDisplayName,
+  tierShortName,
 } from '../FeudalismCards';
 import type {
   FeudalismSession,
@@ -33,7 +35,7 @@ import {
   setupFeudalismGame,
   executeTurn,
   discardTokens,
-  getPrestige,
+  getInfluence,
   getBonuses,
   canAfford,
   isGameOver,
@@ -60,7 +62,7 @@ import helpContent from '../help-content.json';
 
 const ANIM_DURATION = 400;
 
-/** Duration of card/noble movement tweens in ms. */
+/** Duration of card/patron movement tweens in ms. */
 const MOVE_DURATION = 700;
 
 /** Pre-pause before AI action animations in ms. */
@@ -93,7 +95,7 @@ const RESOURCE_TEXT_COLOR: Record<ResourceOrWild, string> = {
 // The game canvas is 1280 × 720.  The design aims for visual symmetry:
 //
 //   Upper band (Y 40–440, 400 px):
-//     Left edge  – Nobles column (vertically centred)
+//     Left edge  – Patrons column (vertically centred)
 //     Centre     – Card market (3 tiers, deck column + 4 visible cards)
 //     Right edge – Token supply column (vertically centred)
 //
@@ -104,14 +106,14 @@ const RESOURCE_TEXT_COLOR: Record<ResourceOrWild, string> = {
 //
 
 // ── Upper-band vertical zone ───────────────────────────────
-const UPPER_TOP = 52;          // top of the upper band (below header + nobles title)
+const UPPER_TOP = 52;          // top of the upper band (below header + patrons title)
 const UPPER_BOT = 440;         // bottom of the upper band
 const UPPER_MID = (UPPER_TOP + UPPER_BOT) / 2;  // vertical centre = 240
 
-// Noble tiles — left column, vertically aligned with market tier rows
-const NOBLE_W = 100;           // wider to fit requirements comfortably
-const NOBLE_H = 115;           // same height as market cards (MARKET_CARD_H)
-const NOBLE_X = 10;            // left margin
+// Patron tiles — left column, vertically aligned with market tier rows
+const PATRON_W = 100;           // wider to fit requirements comfortably
+const PATRON_H = 115;           // same height as market cards (MARKET_CARD_H)
+const PATRON_X = 10;            // left margin
 
 // Token supply — right column, vertically centred
 const SUPPLY_TOKEN_R = 28;
@@ -120,7 +122,7 @@ const SUPPLY_TOTAL_H = 5 * SUPPLY_GAP;                    // 310 (6 tokens)
 const SUPPLY_X = 1170;         // circle centre X (near right edge, room for labels)
 const SUPPLY_Y = UPPER_MID - SUPPLY_TOTAL_H / 2;          // ≈ 85
 
-// Card market — centred horizontally between nobles and supply
+// Card market — centred horizontally between patrons and supply
 const MARKET_CARD_W = 155;     // card width (slightly narrower to fit centred layout)
 const MARKET_CARD_H = 115;     // card height
 const MARKET_CARD_GAP = 14;    // horizontal gap between cards
@@ -129,8 +131,8 @@ const MARKET_TOTAL_H = 3 * MARKET_CARD_H + 2 * MARKET_TIER_GAP;  // 365
 const MARKET_Y = UPPER_MID - MARKET_TOTAL_H / 2;          // ≈ 58 — vertically centred
 
 // Deck column sits just left of the visible market cards
-// Available horizontal zone: nobles right (~120) … supply labels left (~1090)
-const DECK_X = 240;            // deck back centre X (shifted right for wider nobles)
+// Available horizontal zone: patrons right (~120) … supply labels left (~1090)
+const DECK_X = 240;            // deck back centre X (shifted right for wider patrons)
 const MARKET_X = DECK_X + 50 + 16;  // first card left edge (deck half-width + gap)
 
 // ── Section box styling ────────────────────────────────────
@@ -168,7 +170,7 @@ const SFX_KEYS = {
   TOKEN_TAKE: 'sfx-card-draw',
   CARD_PURCHASE: 'sfx-card-flip',
   CARD_RESERVE: 'sfx-card-draw',
-  NOBLE_VISIT: 'sfx-score-reveal',
+  PATRON_VISIT: 'sfx-score-reveal',
   TURN_CHANGE: 'sfx-turn-change',
   GAME_END: 'sfx-round-end',
   UI_CLICK: 'sfx-ui-click',
@@ -211,7 +213,7 @@ export class FeudalismScene extends CardGameScene {
   // Display containers
   private sectionBoxContainer!: Phaser.GameObjects.Container;
   private marketContainer!: Phaser.GameObjects.Container;
-  private nobleContainer!: Phaser.GameObjects.Container;
+  private patronContainer!: Phaser.GameObjects.Container;
   private supplyContainer!: Phaser.GameObjects.Container;
   private playerContainer!: Phaser.GameObjects.Container;
   private aiContainer!: Phaser.GameObjects.Container;
@@ -220,8 +222,8 @@ export class FeudalismScene extends CardGameScene {
 
   // UI text
   private instructionText!: Phaser.GameObjects.Text;
-  private playerPrestigeText!: Phaser.GameObjects.Text;
-  private aiPrestigeText!: Phaser.GameObjects.Text;
+  private playerInfluenceText!: Phaser.GameObjects.Text;
+  private aiInfluenceText!: Phaser.GameObjects.Text;
 
   // Overlay cleanup
   private overlayObjects: Phaser.GameObjects.GameObject[] = [];
@@ -235,7 +237,7 @@ export class FeudalismScene extends CardGameScene {
   preload(): void {
     this.load.audio(SFX_KEYS.TOKEN_TAKE, 'assets/audio/card-draw.wav');
     this.load.audio(SFX_KEYS.CARD_PURCHASE, 'assets/audio/card-flip.wav');
-    this.load.audio(SFX_KEYS.NOBLE_VISIT, 'assets/audio/score-reveal.wav');
+    this.load.audio(SFX_KEYS.PATRON_VISIT, 'assets/audio/score-reveal.wav');
     this.load.audio(SFX_KEYS.TURN_CHANGE, 'assets/audio/turn-change.wav');
     this.load.audio(SFX_KEYS.GAME_END, 'assets/audio/round-end.wav');
     this.load.audio(SFX_KEYS.UI_CLICK, 'assets/audio/ui-click.wav');
@@ -270,7 +272,7 @@ export class FeudalismScene extends CardGameScene {
       this.createHeader();
       this.createContainers();
       this.createInstructions();
-      this.createPrestigeDisplay();
+      this.createInfluenceDisplay();
 
       // Emit state-settled so the replay tool knows the scene is ready
       this.emitStateSettled(this.replayStepIndex, 'playing');
@@ -300,7 +302,7 @@ export class FeudalismScene extends CardGameScene {
     this.createHeader();
     this.createContainers();
     this.createInstructions();
-    this.createPrestigeDisplay();
+    this.createInfluenceDisplay();
     this.initHelpPanel(helpContent as HelpSection[]);
     this.initSettingsPanel();
 
@@ -319,7 +321,7 @@ export class FeudalismScene extends CardGameScene {
   private createContainers(): void {
     this.sectionBoxContainer = this.add.container(0, 0);
     this.marketContainer = this.add.container(0, 0);
-    this.nobleContainer = this.add.container(0, 0);
+    this.patronContainer = this.add.container(0, 0);
     this.supplyContainer = this.add.container(0, 0);
     this.playerContainer = this.add.container(0, 0);
     this.aiContainer = this.add.container(0, 0);
@@ -337,10 +339,10 @@ export class FeudalismScene extends CardGameScene {
       .setOrigin(0.5);
   }
 
-  private createPrestigeDisplay(): void {
-    // Prestige is now rendered inline in refreshPlayerArea / refreshAiArea
-    // These text objects are updated by refreshPrestige() for mid-frame updates
-    this.playerPrestigeText = this.add
+  private createInfluenceDisplay(): void {
+    // Influence is now rendered inline in refreshPlayerArea / refreshAiArea
+    // These text objects are updated by refreshInfluence() for mid-frame updates
+    this.playerInfluenceText = this.add
       .text(0, 0, '', {
         fontSize: '20px',
         fontStyle: 'bold',
@@ -348,16 +350,16 @@ export class FeudalismScene extends CardGameScene {
         fontFamily: FONT_FAMILY,
       })
       .setOrigin(0, 0)
-      .setVisible(false);   // hidden; prestige shown inline
+      .setVisible(false);   // hidden; influence shown inline
 
-    this.aiPrestigeText = this.add
+    this.aiInfluenceText = this.add
       .text(0, 0, '', {
         fontSize: '18px',
         color: '#aabbcc',
         fontFamily: FONT_FAMILY,
       })
       .setOrigin(0, 0)
-      .setVisible(false);   // hidden; prestige shown inline
+      .setVisible(false);   // hidden; influence shown inline
   }
 
   // ── Section boxes ────────────────────────────────────────
@@ -387,12 +389,12 @@ export class FeudalismScene extends CardGameScene {
 
     const p = SECTION_BOX_PAD;
 
-    // Nobles box — around all noble tiles
-    const noblesBoxX = NOBLE_X - p;
-    const noblesBoxY = MARKET_Y - p - 16;  // extra space for section label
-    const noblesBoxW = NOBLE_W + p * 2;
-    const noblesBoxH = MARKET_TOTAL_H + p * 2 + 16;
-    this.drawSectionBox(noblesBoxX, noblesBoxY, noblesBoxW, noblesBoxH, 'Nobles');
+    // Patrons box — around all patron tiles
+    const patronsBoxX = PATRON_X - p;
+    const patronsBoxY = MARKET_Y - p - 16;  // extra space for section label
+    const patronsBoxW = PATRON_W + p * 2;
+    const patronsBoxH = MARKET_TOTAL_H + p * 2 + 16;
+    this.drawSectionBox(patronsBoxX, patronsBoxY, patronsBoxW, patronsBoxH, 'Patrons');
 
     // Market box — around tier labels, decks, and cards
     const marketBoxX = DECK_X - 90 - p;
@@ -429,11 +431,11 @@ export class FeudalismScene extends CardGameScene {
   private refreshAll(): void {
     this.refreshSectionBoxes();
     this.refreshMarket();
-    this.refreshNobles();
+    this.refreshPatrons();
     this.refreshSupply();
     this.refreshPlayerArea();
     this.refreshAiArea();
-    this.refreshPrestige();
+    this.refreshInfluence();
     this.refreshActionButtons();
   }
 
@@ -452,14 +454,14 @@ export class FeudalismScene extends CardGameScene {
       // Tier label (left of deck)
       const tierLabel = this.add.text(
         DECK_X - 40, y + MARKET_CARD_H / 2,
-        `T${tier}`,
+        `${tierShortName(tier)}`,
         { fontSize: '18px', fontStyle: 'bold', color: '#888888', fontFamily: FONT_FAMILY },
       ).setOrigin(0.5);
       this.marketContainer.add(tierLabel);
 
       // Deck back (shows remaining count)
       const deckCount = market.deck.length;
-      const deckW = 100;           // fixed width to fit between nobles and market
+      const deckW = 100;           // fixed width to fit between patrons and market
       const deckH = MARKET_CARD_H - 16;
       const deckBg = this.add.rectangle(
         DECK_X, y + MARKET_CARD_H / 2,
@@ -579,61 +581,61 @@ export class FeudalismScene extends CardGameScene {
     return container;
   }
 
-  // ── Noble display ───────────────────────────────────────
+  // ── Patron display ───────────────────────────────────────
 
-  private refreshNobles(): void {
-    this.nobleContainer.removeAll(true);
+  private refreshPatrons(): void {
+    this.patronContainer.removeAll(true);
 
-    // Nobles are aligned vertically with market tier rows (bottom to top: T1, T2, T3)
+    // Patrons are aligned vertically with market tier rows (bottom to top: T1, T2, T3)
     // Market tiers go: row 0 = T3 (top), row 1 = T2, row 2 = T1 (bottom)
-    // We place nobles aligned to the same Y positions
-    for (let i = 0; i < this.session.nobles.length; i++) {
-      const noble = this.session.nobles[i];
+    // We place patrons aligned to the same Y positions
+    for (let i = 0; i < this.session.patrons.length; i++) {
+      const patron = this.session.patrons[i];
       // Align with market tier row i
       const y = MARKET_Y + i * (MARKET_CARD_H + MARKET_TIER_GAP);
 
       const bg = this.add.rectangle(
-        NOBLE_X + NOBLE_W / 2, y + NOBLE_H / 2,
-        NOBLE_W, NOBLE_H, 0x6633aa, 0.7,
+        PATRON_X + PATRON_W / 2, y + PATRON_H / 2,
+        PATRON_W, PATRON_H, 0x6633aa, 0.7,
       );
       bg.setStrokeStyle(1, 0x9966cc);
-      this.nobleContainer.add(bg);
+      this.patronContainer.add(bg);
 
       // Points — centred near top
       const pts = this.add.text(
-        NOBLE_X + NOBLE_W / 2, y + 20,
+        PATRON_X + PATRON_W / 2, y + 20,
         '3 pt',
         { fontSize: '20px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY },
       ).setOrigin(0.5);
-      this.nobleContainer.add(pts);
+      this.patronContainer.add(pts);
 
-      // "Noble" label
-      const nobleLabel = this.add.text(
-        NOBLE_X + NOBLE_W / 2, y + 42,
-        'Noble',
+      // "Patron" label
+      const patronLabel = this.add.text(
+        PATRON_X + PATRON_W / 2, y + 42,
+        'Patron',
         { fontSize: '13px', color: '#ccaaee', fontFamily: FONT_FAMILY },
       ).setOrigin(0.5);
-      this.nobleContainer.add(nobleLabel);
+      this.patronContainer.add(patronLabel);
 
       // Requirements — show as resource chips in a row near bottom
       const reqs: { color: ResourceType; count: number }[] = [];
       for (const c of RESOURCE_TYPES) {
-        const n = noble.requirements[c] ?? 0;
+        const n = patron.requirements[c] ?? 0;
         if (n > 0) reqs.push({ color: c, count: n });
       }
       const chipSpacing = 30;
-      const reqStartX = NOBLE_X + NOBLE_W / 2 - (reqs.length - 1) * chipSpacing / 2;
+      const reqStartX = PATRON_X + PATRON_W / 2 - (reqs.length - 1) * chipSpacing / 2;
       for (let j = 0; j < reqs.length; j++) {
         const rx = reqStartX + j * chipSpacing;
-        const ry = y + NOBLE_H - 26;
+        const ry = y + PATRON_H - 26;
         const chip = this.add.circle(rx, ry, 13, RESOURCE_FILL[reqs[j].color], 0.9);
         chip.setStrokeStyle(1, 0x888888);
-        this.nobleContainer.add(chip);
+        this.patronContainer.add(chip);
         const ct = this.add.text(rx, ry, `${reqs[j].count}`, {
           fontSize: '15px', fontStyle: 'bold',
           color: RESOURCE_TEXT_COLOR[reqs[j].color], fontFamily: FONT_FAMILY,
         }).setOrigin(0.5);
-        this.nobleContainer.add(ct);
+        this.patronContainer.add(ct);
       }
     }
   }
@@ -704,38 +706,38 @@ export class FeudalismScene extends CardGameScene {
   private refreshPlayerArea(): void {
     this.playerContainer.removeAll(true);
     const player = this.session.players[0];
-    const prestige = getPrestige(player);
+    const influence = getInfluence(player);
     const bonuses = getBonuses(player);
 
-    // ── Row 0: Prestige badge + tokens ──
+    // ── Row 0: Influence badge + tokens ──
     const row0Y = PLAYER_AREA_Y;
 
-    // Prominent prestige display
-    const prestigeBg = this.add.rectangle(
+    // Prominent influence display
+    const influenceBg = this.add.rectangle(
       PLAYER_AREA_X + 44, row0Y + 10,
       90, 24, 0x443300, 0.6,
     );
-    prestigeBg.setStrokeStyle(1, 0x887744);
-    this.playerContainer.add(prestigeBg);
+    influenceBg.setStrokeStyle(1, 0x887744);
+    this.playerContainer.add(influenceBg);
 
-    const prestigeLabel = this.add.text(
+    const influenceLabel = this.add.text(
       PLAYER_AREA_X + 44, row0Y + 10,
-      `★ ${prestige} / 15`,
+      `★ ${influence} / 15`,
       { fontSize: '16px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY },
     ).setOrigin(0.5);
-    this.playerContainer.add(prestigeLabel);
+    this.playerContainer.add(influenceLabel);
 
-    // Nobles collected
-    if (player.nobles.length > 0) {
-      const nobleLabel = this.add.text(
+    // Patrons collected
+    if (player.patrons.length > 0) {
+      const patronLabel = this.add.text(
         PLAYER_AREA_X + 100, row0Y + 2,
-        `Nobles: ${player.nobles.length}`,
+        `Patrons: ${player.patrons.length}`,
         { fontSize: '14px', color: '#aa88cc', fontFamily: FONT_FAMILY },
       );
-      this.playerContainer.add(nobleLabel);
+      this.playerContainer.add(patronLabel);
     }
 
-    // Tokens (right of prestige)
+    // Tokens (right of influence)
     const tokLabel = this.add.text(
       PLAYER_AREA_X + 200, row0Y + 4, 'Tokens:',
       { fontSize: '15px', color: '#aaaaaa', fontFamily: FONT_FAMILY },
@@ -883,37 +885,37 @@ export class FeudalismScene extends CardGameScene {
     this.aiContainer.removeAll(true);
     const ai = this.session.players[1];
     const bonuses = getBonuses(ai);
-    const prestige = getPrestige(ai);
+    const influence = getInfluence(ai);
 
-    // ── Row 0: Prestige badge + tokens — right-aligned ──
+    // ── Row 0: Influence badge + tokens — right-aligned ──
     const row0Y = AI_AREA_Y;
 
-    // Prominent prestige display
-    const prestigeBg = this.add.rectangle(
+    // Prominent influence display
+    const influenceBg = this.add.rectangle(
       AI_AREA_X - 44, row0Y + 10,
       90, 24, 0x443300, 0.6,
     );
-    prestigeBg.setStrokeStyle(1, 0x887744);
-    this.aiContainer.add(prestigeBg);
+    influenceBg.setStrokeStyle(1, 0x887744);
+    this.aiContainer.add(influenceBg);
 
-    const prestigeLabel = this.add.text(
+    const influenceLabel = this.add.text(
       AI_AREA_X - 44, row0Y + 10,
-      `★ ${prestige} / 15`,
+      `★ ${influence} / 15`,
       { fontSize: '16px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY },
     ).setOrigin(0.5);
-    this.aiContainer.add(prestigeLabel);
+    this.aiContainer.add(influenceLabel);
 
-    // Nobles collected
-    if (ai.nobles.length > 0) {
-      const nobleLabel = this.add.text(
+    // Patrons collected
+    if (ai.patrons.length > 0) {
+      const patronLabel = this.add.text(
         AI_AREA_X - 100, row0Y + 2,
-        `Nobles: ${ai.nobles.length}`,
+        `Patrons: ${ai.patrons.length}`,
         { fontSize: '14px', color: '#aa88cc', fontFamily: FONT_FAMILY },
       ).setOrigin(1, 0);
-      this.aiContainer.add(nobleLabel);
+      this.aiContainer.add(patronLabel);
     }
 
-    // Tokens (left of prestige)
+    // Tokens (left of influence)
     const tokLabel = this.add.text(
       AI_AREA_X - 200, row0Y + 4, 'Tokens:',
       { fontSize: '15px', color: '#aaaaaa', fontFamily: FONT_FAMILY },
@@ -1009,11 +1011,11 @@ export class FeudalismScene extends CardGameScene {
     }
   }
 
-  private refreshPrestige(): void {
-    const playerPrestige = getPrestige(this.session.players[0]);
-    const aiPrestige = getPrestige(this.session.players[1]);
-    this.playerPrestigeText.setText(`Prestige: ${playerPrestige}`);
-    this.aiPrestigeText.setText(`AI Prestige: ${aiPrestige}`);
+  private refreshInfluence(): void {
+    const playerInfluence = getInfluence(this.session.players[0]);
+    const aiInfluence = getInfluence(this.session.players[1]);
+    this.playerInfluenceText.setText(`Influence: ${playerInfluence}`);
+    this.aiInfluenceText.setText(`AI Influence: ${aiInfluence}`);
   }
 
   // ── Action buttons ──────────────────────────────────────
@@ -1405,7 +1407,7 @@ export class FeudalismScene extends CardGameScene {
 
     // Card info
     const pts = card.points > 0 ? `${card.points} pt, ` : '';
-    const info = `T${card.tier} ${resourceDisplayName(card.bonus)} bonus\n${pts}Cost: ${formatCost(card.cost)}`;
+    const info = `${tierDisplayName(card.tier)} ${resourceDisplayName(card.bonus)} bonus\n${pts}Cost: ${formatCost(card.cost)}`;
     const infoText = this.add.text(
       GAME_W / 2, GAME_H / 2 - 55, info,
       { fontSize: '18px', color: '#ffffff', fontFamily: FONT_FAMILY, align: 'center' },
@@ -1521,18 +1523,18 @@ export class FeudalismScene extends CardGameScene {
   }
 
   /**
-   * Returns the centre (x, y) of a noble tile at the given index in the
-   * noble display (before it was removed from session).
+   * Returns the centre (x, y) of a patron tile at the given index in the
+   * patron display (before it was removed from session).
    */
-  private getNobleCenter(nobleIndex: number): { x: number; y: number } {
-    const y = MARKET_Y + nobleIndex * (MARKET_CARD_H + MARKET_TIER_GAP) + NOBLE_H / 2;
-    return { x: NOBLE_X + NOBLE_W / 2, y };
+  private getPatronCenter(patronIndex: number): { x: number; y: number } {
+    const y = MARKET_Y + patronIndex * (MARKET_CARD_H + MARKET_TIER_GAP) + PATRON_H / 2;
+    return { x: PATRON_X + PATRON_W / 2, y };
   }
 
   /**
-   * Returns the destination for a noble tile earned by the given player.
+   * Returns the destination for a patron tile earned by the given player.
    */
-  private getPlayerNobleDest(playerIndex: number): { x: number; y: number } {
+  private getPlayerPatronDest(playerIndex: number): { x: number; y: number } {
     if (playerIndex === 0) {
       return { x: PLAYER_AREA_X + 120, y: PLAYER_AREA_Y + 10 };
     }
@@ -1618,14 +1620,14 @@ export class FeudalismScene extends CardGameScene {
   }
 
   /**
-   * Create a temporary "flying" noble sprite for animation.
+   * Create a temporary "flying" patron sprite for animation.
    */
-  private createFlyingNoble(
-    cx: number, cy: number, noble: NobleTile,
+  private createFlyingPatron(
+    cx: number, cy: number, patron: PatronTile,
   ): Phaser.GameObjects.Container {
     const container = this.add.container(cx, cy).setDepth(15);
 
-    const bg = this.add.rectangle(0, 0, NOBLE_W, NOBLE_H, 0x6633aa, 0.9);
+    const bg = this.add.rectangle(0, 0, PATRON_W, PATRON_H, 0x6633aa, 0.9);
     bg.setStrokeStyle(2, 0xffdd44);
     container.add(bg);
 
@@ -1634,7 +1636,7 @@ export class FeudalismScene extends CardGameScene {
     }).setOrigin(0.5);
     container.add(pts);
 
-    const label = this.add.text(0, 2, 'Noble', {
+    const label = this.add.text(0, 2, 'Patron', {
       fontSize: '13px', color: '#ccaaee', fontFamily: FONT_FAMILY,
     }).setOrigin(0.5);
     container.add(label);
@@ -1642,14 +1644,14 @@ export class FeudalismScene extends CardGameScene {
     // Requirements
     const reqs: { color: ResourceType; count: number }[] = [];
     for (const c of RESOURCE_TYPES) {
-      const n = noble.requirements[c] ?? 0;
+      const n = patron.requirements[c] ?? 0;
       if (n > 0) reqs.push({ color: c, count: n });
     }
     const chipSpacing = 30;
     const reqStartX = -(reqs.length - 1) * chipSpacing / 2;
     for (let j = 0; j < reqs.length; j++) {
       const rx = reqStartX + j * chipSpacing;
-      const ry = NOBLE_H / 2 - 26;
+      const ry = PATRON_H / 2 - 26;
       const chip = this.add.circle(rx, ry, 13, RESOURCE_FILL[reqs[j].color], 0.9);
       chip.setStrokeStyle(1, 0x888888);
       container.add(chip);
@@ -1677,7 +1679,7 @@ export class FeudalismScene extends CardGameScene {
     bg.setStrokeStyle(1, 0x556655);
     container.add(bg);
 
-    const text = this.add.text(0, 0, `T${tier}`, {
+    const text = this.add.text(0, 0, `${tierShortName(tier)}`, {
       fontSize: '18px', fontStyle: 'bold', color: '#aaddaa', fontFamily: FONT_FAMILY,
     }).setOrigin(0.5);
     container.add(text);
@@ -1691,7 +1693,7 @@ export class FeudalismScene extends CardGameScene {
    * 1. Card flies from source to destination.
    * 2. If the card came from a market slot with a replacement, the
    *    replacement slides from the deck to the vacated slot.
-   * 3. If a noble was earned, the noble flies to the player area.
+   * 3. If a patron was earned, the patron flies to the player area.
    * 4. On complete, the provided callback fires.
    */
   private playCardAnimation(
@@ -1699,8 +1701,8 @@ export class FeudalismScene extends CardGameScene {
     destPos: { x: number; y: number },
     card: DevelopmentCard,
     marketSlot: { tier: Tier; col: number } | null,
-    nobleVisit: NobleTile | null,
-    nobleSourceIndex: number,
+    patronVisit: PatronTile | null,
+    patronSourceIndex: number,
     playerIndex: number,
     onAllComplete: () => void,
   ): void {
@@ -1718,10 +1720,10 @@ export class FeudalismScene extends CardGameScene {
         // Chain: market refill animation
         if (marketSlot) {
           this.playMarketRefillAnimation(marketSlot.tier, marketSlot.col, () => {
-            this.chainNobleAnimation(nobleVisit, nobleSourceIndex, playerIndex, onAllComplete);
+            this.chainPatronAnimation(patronVisit, patronSourceIndex, playerIndex, onAllComplete);
           });
         } else {
-          this.chainNobleAnimation(nobleVisit, nobleSourceIndex, playerIndex, onAllComplete);
+          this.chainPatronAnimation(patronVisit, patronSourceIndex, playerIndex, onAllComplete);
         }
       },
     });
@@ -1762,36 +1764,36 @@ export class FeudalismScene extends CardGameScene {
   }
 
   /**
-   * Chain a noble visit animation if one occurred, otherwise fire onComplete.
+   * Chain a patron visit animation if one occurred, otherwise fire onComplete.
    */
-  private chainNobleAnimation(
-    nobleVisit: NobleTile | null,
-    nobleSourceIndex: number,
+  private chainPatronAnimation(
+    patronVisit: PatronTile | null,
+    patronSourceIndex: number,
     playerIndex: number,
     onComplete: () => void,
   ): void {
-    if (!nobleVisit || nobleSourceIndex < 0) {
+    if (!patronVisit || patronSourceIndex < 0) {
       onComplete();
       return;
     }
 
-    const nobleSource = this.getNobleCenter(nobleSourceIndex);
-    const nobleDest = this.getPlayerNobleDest(playerIndex);
-    const flyingNoble = this.createFlyingNoble(nobleSource.x, nobleSource.y, nobleVisit);
+    const patronSource = this.getPatronCenter(patronSourceIndex);
+    const patronDest = this.getPlayerPatronDest(playerIndex);
+    const flyingPatron = this.createFlyingPatron(patronSource.x, patronSource.y, patronVisit);
 
     moveGameObject({
       scene: this,
-      target: flyingNoble,
-      destX: nobleDest.x,
-      destY: nobleDest.y,
+      target: flyingPatron,
+      destX: patronDest.x,
+      destY: patronDest.y,
       duration: MOVE_DURATION,
       onComplete: () => {
-        flyingNoble.destroy();
-        // Refresh to show the updated noble display and player area
-        this.refreshNobles();
+        flyingPatron.destroy();
+        // Refresh to show the updated patron display and player area
+        this.refreshPatrons();
         this.refreshPlayerArea();
         this.refreshAiArea();
-        this.refreshPrestige();
+        this.refreshInfluence();
         onComplete();
       },
     });
@@ -1861,16 +1863,16 @@ export class FeudalismScene extends CardGameScene {
       // We'll get the actual card from the result (it's the top of the deck)
     }
 
-    // Capture noble indices before they change
-    const noblesBefore = this.session.nobles.map(n => n.id);
+    // Capture patron indices before they change
+    const patronsBefore = this.session.patrons.map(n => n.id);
 
     try {
       const result = executeTurn(this.session, action);
 
-      // Play noble visit sound
-      if (result.nobleVisit) {
-        this.soundManager?.play(SFX_KEYS.NOBLE_VISIT);
-        this.showToast(`Noble visits you! +3 prestige`);
+      // Play patron visit sound
+      if (result.patronVisit) {
+        this.soundManager?.play(SFX_KEYS.PATRON_VISIT);
+        this.showToast(`Patron visits you! +3 influence`);
       }
 
       if (result.tokensOverLimit > 0) {
@@ -1886,10 +1888,10 @@ export class FeudalismScene extends CardGameScene {
       // No discard needed — record immediately
       this.recorder?.recordTurn(playerIndex, action, result, null);
 
-      // Determine noble source index (if noble was earned)
-      let nobleSourceIndex = -1;
-      if (result.nobleVisit) {
-        nobleSourceIndex = noblesBefore.indexOf(result.nobleVisit.id);
+      // Determine patron source index (if patron was earned)
+      let patronSourceIndex = -1;
+      if (result.patronVisit) {
+        patronSourceIndex = patronsBefore.indexOf(result.patronVisit.id);
       }
 
       // For reserve-from-deck, get the reserved card from the player's hand
@@ -1908,8 +1910,8 @@ export class FeudalismScene extends CardGameScene {
         this.refreshAll();
 
         this.playCardAnimation(
-          sourcePos, destPos, card, marketSlot, result.nobleVisit,
-          nobleSourceIndex, playerIndex,
+          sourcePos, destPos, card, marketSlot, result.patronVisit,
+          patronSourceIndex, playerIndex,
           () => this.afterTurnComplete(result),
         );
       } else {
@@ -2016,7 +2018,7 @@ export class FeudalismScene extends CardGameScene {
       sourcePos = this.getDeckCenter(tier);
     }
 
-    const noblesBefore = this.session.nobles.map(n => n.id);
+    const patronsBefore = this.session.patrons.map(n => n.id);
 
     // Show pre-pause toast, then execute
     this.showToast(toastMsg);
@@ -2038,14 +2040,14 @@ export class FeudalismScene extends CardGameScene {
         // Record AI turn
         this.recorder?.recordTurn(aiIndex, action, result, tokenDiscard);
 
-        if (result.nobleVisit) {
-          this.showToast(`AI earns a noble visit! +3 prestige`);
+        if (result.patronVisit) {
+          this.showToast(`AI earns a patron visit! +3 influence`);
         }
 
-        // Determine noble source index
-        let nobleSourceIndex = -1;
-        if (result.nobleVisit) {
-          nobleSourceIndex = noblesBefore.indexOf(result.nobleVisit.id);
+        // Determine patron source index
+        let patronSourceIndex = -1;
+        if (result.patronVisit) {
+          patronSourceIndex = patronsBefore.indexOf(result.patronVisit.id);
         }
 
         // For reserve-from-deck, get the reserved card
@@ -2087,8 +2089,8 @@ export class FeudalismScene extends CardGameScene {
           this.refreshAll();
 
           this.playCardAnimation(
-            sourcePos, destPos, card, marketSlot, result.nobleVisit,
-            nobleSourceIndex, aiIndex, afterAnim,
+            sourcePos, destPos, card, marketSlot, result.patronVisit,
+            patronSourceIndex, aiIndex, afterAnim,
           );
         } else {
           // No card animation (token actions) — refresh and transition
@@ -2150,14 +2152,14 @@ export class FeudalismScene extends CardGameScene {
 
     const human = this.session.players[0];
     const ai = this.session.players[1];
-    const humanPrestige = getPrestige(human);
-    const aiPrestige = getPrestige(ai);
+    const humanInfluence = getInfluence(human);
+    const aiInfluence = getInfluence(ai);
 
     const lines = [
       winnerText,
       '',
-      `You: ${humanPrestige} prestige (${human.purchasedCards.length} cards, ${human.nobles.length} nobles)`,
-      `AI: ${aiPrestige} prestige (${ai.purchasedCards.length} cards, ${ai.nobles.length} nobles)`,
+      `You: ${humanInfluence} influence (${human.purchasedCards.length} cards, ${human.patrons.length} patrons)`,
+      `AI: ${aiInfluence} influence (${ai.purchasedCards.length} cards, ${ai.patrons.length} patrons)`,
       '',
       `Tiebreak: fewest cards wins`,
     ];
@@ -2226,7 +2228,7 @@ export class FeudalismScene extends CardGameScene {
     playerStates: PlayerSnapshot[];
     market: MarketSnapshot;
     tokenSupply: ResourceTokens;
-    nobles: NobleTile[];
+    patrons: PatronTile[];
     phase: FeudalismPhase;
     currentPlayerIndex: number;
     stepIndex?: number;
@@ -2255,7 +2257,7 @@ export class FeudalismScene extends CardGameScene {
       tokens: { ...ps.tokens },
       purchasedCards: [...ps.purchasedCards],
       reservedCards: [...ps.reservedCards],
-      nobles: [...ps.nobles],
+      patrons: [...ps.patrons],
     }));
 
     // Build a minimal session for rendering
@@ -2263,7 +2265,7 @@ export class FeudalismScene extends CardGameScene {
       players,
       market,
       tokenSupply: { ...state.tokenSupply },
-      nobles: [...state.nobles],
+      patrons: [...state.patrons],
       phase: state.phase,
       currentPlayerIndex: state.currentPlayerIndex,
       startingPlayerIndex: 0,
@@ -2290,7 +2292,7 @@ export class FeudalismScene extends CardGameScene {
    * Each rectangle is { x, y, w, h } representing the top-left origin box.
    */
   getSectionBoxRects(): {
-    nobles: { x: number; y: number; w: number; h: number };
+    patrons: { x: number; y: number; w: number; h: number };
     market: { x: number; y: number; w: number; h: number };
     supply: { x: number; y: number; w: number; h: number };
     player: { x: number; y: number; w: number; h: number };
@@ -2299,10 +2301,10 @@ export class FeudalismScene extends CardGameScene {
     const p = SECTION_BOX_PAD;
     const lastCardRight = MARKET_X + 4 * (MARKET_CARD_W + MARKET_CARD_GAP) - MARKET_CARD_GAP;
     return {
-      nobles: {
-        x: NOBLE_X - p,
+      patrons: {
+        x: PATRON_X - p,
         y: MARKET_Y - p - 16,
-        w: NOBLE_W + p * 2,
+        w: PATRON_W + p * 2,
         h: MARKET_TOTAL_H + p * 2 + 16,
       },
       market: {

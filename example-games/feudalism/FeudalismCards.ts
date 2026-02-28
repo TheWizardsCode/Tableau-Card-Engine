@@ -4,7 +4,7 @@
  * Type definitions and data for the Feudalism card game:
  * - Resource types and token types
  * - Development cards (90 total across 3 tiers)
- * - Noble tiles (10 total)
+ * - Patron tiles (10 total)
  * - Supply initialization
  *
  * Card data sourced from the official Feudalism rulebook.
@@ -90,10 +90,10 @@ export interface DevelopmentCard {
 }
 
 // ---------------------------------------------------------------------------
-// Noble tiles
+// Patron tiles
 // ---------------------------------------------------------------------------
 
-export interface NobleTile {
+export interface PatronTile {
   readonly id: number;
   /** The resource bonus counts required from purchased cards. */
   readonly requirements: ResourceCost;
@@ -133,15 +133,15 @@ export function createTokenSupply(playerCount: number): ResourceTokens {
 }
 
 // ---------------------------------------------------------------------------
-// Noble tile selection
+// Patron tile selection
 // ---------------------------------------------------------------------------
 
-/** Select n+1 random noble tiles for the game. */
-export function selectNobles(
+/** Select n+1 random patron tiles for the game. */
+export function selectPatrons(
   playerCount: number,
   rng: () => number = Math.random,
-): NobleTile[] {
-  const shuffled = shuffleArray([...ALL_NOBLES], rng);
+): PatronTile[] {
+  const shuffled = shuffleArray([...ALL_PATRONS], rng);
   return shuffled.slice(0, playerCount + 1);
 }
 
@@ -298,29 +298,29 @@ export const TIER_3_COUNT = 20;
 export const TOTAL_CARD_COUNT = 90;
 
 // ---------------------------------------------------------------------------
-// Noble tile data — Official Feudalism 10-noble set
-// Each noble requires a certain number of card bonuses and gives 3 prestige.
+// Patron tile data — Official Feudalism 10-patron set
+// Each patron requires a certain number of card bonuses and gives 3 influence.
 // ---------------------------------------------------------------------------
 
-let nobleId = 1;
-function noble(requirements: ResourceCost): NobleTile {
-  return { id: nobleId++, requirements, points: 3 };
+let patronId = 1;
+function patron(requirements: ResourceCost): PatronTile {
+  return { id: patronId++, requirements, points: 3 };
 }
 
-export const ALL_NOBLES: readonly NobleTile[] = [
-  noble({ barley: 4, flax: 4 }),
-  noble({ flax: 4, oats: 4 }),
-  noble({ oats: 4, wheat: 4 }),
-  noble({ wheat: 4, turnip: 4 }),
-  noble({ barley: 4, turnip: 4 }),
-  noble({ barley: 3, flax: 3, turnip: 3 }),
-  noble({ flax: 3, oats: 3, wheat: 3 }),
-  noble({ oats: 3, wheat: 3, turnip: 3 }),
-  noble({ barley: 3, flax: 3, oats: 3 }),
-  noble({ barley: 3, oats: 3, turnip: 3 }),
+export const ALL_PATRONS: readonly PatronTile[] = [
+  patron({ barley: 4, flax: 4 }),
+  patron({ flax: 4, oats: 4 }),
+  patron({ oats: 4, wheat: 4 }),
+  patron({ wheat: 4, turnip: 4 }),
+  patron({ barley: 4, turnip: 4 }),
+  patron({ barley: 3, flax: 3, turnip: 3 }),
+  patron({ flax: 3, oats: 3, wheat: 3 }),
+  patron({ oats: 3, wheat: 3, turnip: 3 }),
+  patron({ barley: 3, flax: 3, oats: 3 }),
+  patron({ barley: 3, oats: 3, turnip: 3 }),
 ];
 
-export const TOTAL_NOBLE_COUNT = 10;
+export const TOTAL_PATRON_COUNT = 10;
 
 // ---------------------------------------------------------------------------
 // Deck creation helpers
@@ -342,7 +342,7 @@ export function createTierDecks(rng: () => number = Math.random): {
 /** Number of visible cards per tier in the market. */
 export const MARKET_SIZE = 4;
 
-/** Prestige points needed to trigger end of game. */
+/** Influence points needed to trigger end of game. */
 export const WIN_THRESHOLD = 15;
 
 /** Maximum number of reserved cards a player can hold. */
@@ -382,18 +382,30 @@ export function formatCost(cost: ResourceCost): string {
   return parts.join(' ') || 'Free';
 }
 
+/** Full thematic display name for a tier (shown to players). */
+export function tierDisplayName(tier: Tier): string {
+  const names: Record<Tier, string> = { 1: 'Smallholding', 2: 'Farm', 3: 'Estate' };
+  return names[tier];
+}
+
+/** Short thematic label for compact UI (deck backs, tier labels). */
+export function tierShortName(tier: Tier): string {
+  const names: Record<Tier, string> = { 1: 'Sml', 2: 'Frm', 3: 'Est' };
+  return names[tier];
+}
+
 /** Format a card as a display label. */
 export function cardLabel(card: DevelopmentCard): string {
   const pts = card.points > 0 ? ` [${card.points}pt]` : '';
-  return `T${card.tier} ${resourceAbbrev(card.bonus)}${pts} (${formatCost(card.cost)})`;
+  return `${tierDisplayName(card.tier)} ${resourceAbbrev(card.bonus)}${pts} (${formatCost(card.cost)})`;
 }
 
-/** Format a noble tile as a display label. */
-export function nobleLabel(noble: NobleTile): string {
+/** Format a patron tile as a display label. */
+export function patronLabel(patron: PatronTile): string {
   const reqs: string[] = [];
   for (const c of RESOURCE_TYPES) {
-    const n = noble.requirements[c];
+    const n = patron.requirements[c];
     if (n && n > 0) reqs.push(`${n}${resourceAbbrev(c)}`);
   }
-  return `Noble [3pt] (${reqs.join(' ')})`;
+  return `Patron [3pt] (${reqs.join(' ')})`;
 }

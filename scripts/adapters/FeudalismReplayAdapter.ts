@@ -41,8 +41,8 @@ interface SPCardSnapshot {
   points: number;
 }
 
-/** Minimal noble snapshot. */
-interface SPNobleSnapshot {
+/** Minimal patron snapshot. */
+interface SPPatronSnapshot {
   id: number;
   requirements: Record<string, number>;
   points: number;
@@ -58,8 +58,8 @@ interface SPPlayerSnapshot {
   tokens: SPResourceTokens;
   purchasedCards: SPCardSnapshot[];
   reservedCards: SPCardSnapshot[];
-  nobles: SPNobleSnapshot[];
-  prestige: number;
+  patrons: SPPatronSnapshot[];
+  influence: number;
   bonuses: Record<string, number>;
 }
 
@@ -68,14 +68,14 @@ interface SPTurnRecord {
   turnNumber: number;
   playerIndex: number;
   action: { type: string; [key: string]: unknown };
-  nobleVisit: SPNobleSnapshot | null;
+  patronVisit: SPPatronSnapshot | null;
   tokenDiscard: { tokens: SPResourceTokens } | null;
   phase: string;
   gameOver: boolean;
   playerStates: SPPlayerSnapshot[];
   market: SPMarketTierSnapshot[];
   tokenSupply: SPResourceTokens;
-  nobles: SPNobleSnapshot[];
+  patrons: SPPatronSnapshot[];
 }
 
 /** Initial state. */
@@ -83,13 +83,13 @@ interface SPInitialState {
   playerStates: SPPlayerSnapshot[];
   market: SPMarketTierSnapshot[];
   tokenSupply: SPResourceTokens;
-  nobles: SPNobleSnapshot[];
+  patrons: SPPatronSnapshot[];
   playerCount: number;
 }
 
 /** Final results. */
 interface SPGameResults {
-  finalPrestige: number[];
+  finalInfluence: number[];
   finalCardCounts: number[];
   winnerIndex: number;
   winnerName: string;
@@ -116,6 +116,12 @@ function isFeudalismTranscript(raw: unknown): raw is FeudalismTranscript {
 
 // ── Helpers ────────────────────────────────────────────────
 
+/** Thematic tier display name for replay logs. */
+function tierName(tier: number): string {
+  const names: Record<number, string> = { 1: 'Smallholding', 2: 'Farm', 3: 'Estate' };
+  return names[tier] ?? `Tier ${tier}`;
+}
+
 /**
  * Describe a turn record in human-readable format.
  */
@@ -138,7 +144,7 @@ function describeTurnRecord(turn: SPTurnRecord): string {
       const cardId = action.cardId;
       actionDesc = cardId != null
         ? `reserves card #${cardId}`
-        : `reserves from T${action.tier as number} deck`;
+        : `reserves from ${tierName(action.tier as number)} deck`;
       break;
     }
     case 'purchase': {
@@ -150,7 +156,7 @@ function describeTurnRecord(turn: SPTurnRecord): string {
   }
 
   const parts = [`${playerName} ${actionDesc}`];
-  if (turn.nobleVisit) parts.push(`noble #${turn.nobleVisit.id} visits`);
+  if (turn.patronVisit) parts.push(`patron #${turn.patronVisit.id} visits`);
   if (turn.tokenDiscard) parts.push('discards tokens');
   if (turn.gameOver) parts.push('(game ends)');
 
@@ -221,7 +227,7 @@ export class FeudalismReplayAdapter implements ReplayAdapter {
     const players = t.initialState.playerStates.map((p) => p.name).join(', ');
     const totalTurns = t.turns.length;
     const outcome = t.results
-      ? `Winner: ${t.results.winnerName} (prestige: ${t.results.finalPrestige.join('-')})`
+      ? `Winner: ${t.results.winnerName} (influence: ${t.results.finalInfluence.join('-')})`
       : 'in-progress';
     return `Players: ${players}, Turns: ${totalTurns}, ${outcome}`;
   }
@@ -266,7 +272,7 @@ export class FeudalismReplayAdapter implements ReplayAdapter {
       playerStates: t.initialState.playerStates,
       market: t.initialState.market,
       tokenSupply: t.initialState.tokenSupply,
-      nobles: t.initialState.nobles,
+      patrons: t.initialState.patrons,
       phase: 'playing',
       currentPlayerIndex: 0,
       stepIndex: -1,
@@ -286,7 +292,7 @@ export class FeudalismReplayAdapter implements ReplayAdapter {
       playerStates: turn.playerStates,
       market: turn.market,
       tokenSupply: turn.tokenSupply,
-      nobles: turn.nobles,
+      patrons: turn.patrons,
       phase: turn.phase,
       currentPlayerIndex: turn.playerIndex,
       stepIndex: turnIndex,
@@ -328,7 +334,7 @@ export class FeudalismReplayAdapter implements ReplayAdapter {
       playerStates: SPPlayerSnapshot[];
       market: SPMarketTierSnapshot[];
       tokenSupply: SPResourceTokens;
-      nobles: SPNobleSnapshot[];
+      patrons: SPPatronSnapshot[];
       phase: string;
       currentPlayerIndex: number;
       stepIndex: number;
