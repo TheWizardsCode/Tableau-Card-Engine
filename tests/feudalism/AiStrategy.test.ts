@@ -53,7 +53,7 @@ describe('AiStrategy', () => {
     it('chooseDiscard returns correct number of tokens', () => {
       const session = createTestSession();
       session.players[0].tokens = {
-        ruby: 3, emerald: 3, sapphire: 3, diamond: 3,
+        wheat: 3, oats: 3, flax: 3, barley: 3,
       }; // 12 tokens
       const discard = RandomStrategy.chooseDiscard(session, 0, 2, createSeededRng(42));
       expect(totalTokens(discard.tokens)).toBe(2);
@@ -78,7 +78,7 @@ describe('AiStrategy', () => {
       const player = session.players[0];
       // Add a free card to reserved
       player.reservedCards.push({
-        id: 800, tier: 1, cost: {}, bonus: 'emerald', points: 1,
+        id: 800, tier: 1, cost: {}, bonus: 'oats', points: 1,
       });
       const action = GreedyStrategy.chooseTurn(session, 0, createSeededRng(42));
       expect(action.type).toBe('purchase');
@@ -89,8 +89,8 @@ describe('AiStrategy', () => {
       const player = session.players[0];
       // Add two free cards to reserved
       player.reservedCards.push(
-        { id: 800, tier: 1, cost: {}, bonus: 'emerald', points: 1 },
-        { id: 801, tier: 2, cost: {}, bonus: 'ruby', points: 3 },
+        { id: 800, tier: 1, cost: {}, bonus: 'oats', points: 1 },
+        { id: 801, tier: 2, cost: {}, bonus: 'wheat', points: 3 },
       );
       const action = GreedyStrategy.chooseTurn(session, 0, createSeededRng(42));
       expect(action.type).toBe('purchase');
@@ -109,7 +109,7 @@ describe('AiStrategy', () => {
     it('chooseDiscard returns correct number of tokens', () => {
       const session = createTestSession();
       session.players[0].tokens = {
-        ruby: 4, emerald: 3, sapphire: 3, diamond: 2,
+        wheat: 4, oats: 3, flax: 3, barley: 2,
       }; // 12 tokens
       const discard = GreedyStrategy.chooseDiscard(session, 0, 2, createSeededRng(42));
       expect(totalTokens(discard.tokens)).toBe(2);
@@ -141,7 +141,7 @@ describe('AiStrategy', () => {
       const ai = new FeudalismAiPlayer(GreedyStrategy, createSeededRng(42));
       const session = createTestSession();
       session.players[0].tokens = {
-        ruby: 3, emerald: 3, sapphire: 3, diamond: 3,
+        wheat: 3, oats: 3, flax: 3, barley: 3,
       };
       const discard = ai.chooseDiscard(session, 0, 2);
       expect(totalTokens(discard.tokens)).toBe(2);

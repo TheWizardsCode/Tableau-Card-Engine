@@ -190,7 +190,7 @@ export function getPrestige(player: FeudalismPlayerState): number {
 /** Count card bonuses by color. */
 export function getBonuses(player: FeudalismPlayerState): Record<ResourceType, number> {
   const bonuses: Record<ResourceType, number> = {
-    emerald: 0, sapphire: 0, ruby: 0, diamond: 0, onyx: 0,
+    oats: 0, flax: 0, wheat: 0, barley: 0, turnip: 0,
   };
   for (const card of player.purchasedCards) {
     bonuses[card.bonus]++;
@@ -211,7 +211,7 @@ export function effectiveCost(
   return result;
 }
 
-/** Check if a player can afford a card (using tokens + bonuses + gold). */
+/** Check if a player can afford a card (using tokens + bonuses + mead). */
 export function canAfford(player: FeudalismPlayerState, card: DevelopmentCard): boolean {
   const bonuses = getBonuses(player);
   const eff = effectiveCost(card.cost, bonuses);
@@ -223,7 +223,7 @@ export function canAfford(player: FeudalismPlayerState, card: DevelopmentCard): 
       goldNeeded += need - have;
     }
   }
-  return goldNeeded <= tokenCount(player.tokens, 'gold');
+  return goldNeeded <= tokenCount(player.tokens, 'mead');
 }
 
 /** Check if a noble's requirements are met by the player's bonuses. */
@@ -342,7 +342,7 @@ function validateTakeDifferent(
     return 'Colors must be unique when taking different tokens';
   }
 
-  // Check each color is a valid resource type (not gold)
+  // Check each color is a valid resource type (not mead)
   for (const c of colors) {
     if (!RESOURCE_TYPES.includes(c)) {
       return `Invalid resource type: ${c}`;
@@ -559,10 +559,10 @@ function executeReserve(
 
   player.reservedCards.push(card);
 
-  // Gain a gold token if available
-  if (tokenCount(session.tokenSupply, 'gold') > 0) {
-    player.tokens = addTokens(player.tokens, { gold: 1 });
-    session.tokenSupply = subtractTokens(session.tokenSupply, { gold: 1 });
+  // Gain a mead token if available
+  if (tokenCount(session.tokenSupply, 'mead') > 0) {
+    player.tokens = addTokens(player.tokens, { mead: 1 });
+    session.tokenSupply = subtractTokens(session.tokenSupply, { mead: 1 });
   }
 }
 
@@ -600,7 +600,7 @@ function executePurchase(
     const shortfall = need - fromTokens;
     if (shortfall > 0) goldUsed += shortfall;
   }
-  if (goldUsed > 0) payment.gold = goldUsed;
+  if (goldUsed > 0) payment.mead = goldUsed;
 
   // Pay tokens
   player.tokens = subtractTokens(player.tokens, payment);

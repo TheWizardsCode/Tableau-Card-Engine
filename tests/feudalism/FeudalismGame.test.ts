@@ -86,12 +86,12 @@ describe('FeudalismGame', () => {
       expect(session.market[3].deck.length).toBe(20 - 4);
     });
 
-    it('sets up token supply for 2 players (4 each gem + 5 gold)', () => {
+    it('sets up token supply for 2 players (4 each resource + 5 mead)', () => {
       const session = createTestSession();
       for (const c of RESOURCE_TYPES) {
         expect(tokenCount(session.tokenSupply, c)).toBe(4);
       }
-      expect(tokenCount(session.tokenSupply, 'gold')).toBe(5);
+      expect(tokenCount(session.tokenSupply, 'mead')).toBe(5);
     });
 
     it('starts in playing phase with player 0', () => {
@@ -125,8 +125,8 @@ describe('FeudalismGame', () => {
       const session = createTestSession();
       const player = session.players[0];
       player.purchasedCards.push(
-        { id: 999, tier: 1, cost: {}, bonus: 'ruby', points: 2 },
-        { id: 998, tier: 2, cost: {}, bonus: 'emerald', points: 3 },
+        { id: 999, tier: 1, cost: {}, bonus: 'wheat', points: 2 },
+        { id: 998, tier: 2, cost: {}, bonus: 'oats', points: 3 },
       );
       player.nobles.push({ id: 100, requirements: {}, points: 3 });
       expect(getPrestige(player)).toBe(8);
@@ -136,53 +136,53 @@ describe('FeudalismGame', () => {
       const session = createTestSession();
       const player = session.players[0];
       player.purchasedCards.push(
-        { id: 999, tier: 1, cost: {}, bonus: 'ruby', points: 0 },
-        { id: 998, tier: 1, cost: {}, bonus: 'ruby', points: 0 },
-        { id: 997, tier: 1, cost: {}, bonus: 'emerald', points: 0 },
+        { id: 999, tier: 1, cost: {}, bonus: 'wheat', points: 0 },
+        { id: 998, tier: 1, cost: {}, bonus: 'wheat', points: 0 },
+        { id: 997, tier: 1, cost: {}, bonus: 'oats', points: 0 },
       );
       const bonuses = getBonuses(player);
-      expect(bonuses.ruby).toBe(2);
-      expect(bonuses.emerald).toBe(1);
-      expect(bonuses.sapphire).toBe(0);
+      expect(bonuses.wheat).toBe(2);
+      expect(bonuses.oats).toBe(1);
+      expect(bonuses.flax).toBe(0);
     });
 
     it('effectiveCost subtracts bonuses from cost', () => {
-      const cost = { ruby: 3, emerald: 2, sapphire: 1 };
-      const bonuses = { ruby: 1, emerald: 2, sapphire: 0, diamond: 0, onyx: 0 };
+      const cost = { wheat: 3, oats: 2, flax: 1 };
+      const bonuses = { wheat: 1, oats: 2, flax: 0, barley: 0, turnip: 0 };
       const eff = effectiveCost(cost, bonuses);
-      expect(eff.ruby).toBe(2);
-      expect(eff.emerald).toBeUndefined();
-      expect(eff.sapphire).toBe(1);
+      expect(eff.wheat).toBe(2);
+      expect(eff.oats).toBeUndefined();
+      expect(eff.flax).toBe(1);
     });
 
     it('canAfford returns true when player has enough tokens + bonuses', () => {
       const player: FeudalismPlayerState = {
         name: 'Test',
         isAI: false,
-        tokens: { ruby: 2, sapphire: 1 },
+        tokens: { wheat: 2, flax: 1 },
         purchasedCards: [
-          { id: 999, tier: 1, cost: {}, bonus: 'ruby', points: 0 },
+          { id: 999, tier: 1, cost: {}, bonus: 'wheat', points: 0 },
         ],
         reservedCards: [],
         nobles: [],
       };
       const card: DevelopmentCard = {
-        id: 100, tier: 1, cost: { ruby: 3, sapphire: 1 }, bonus: 'emerald', points: 0,
+        id: 100, tier: 1, cost: { wheat: 3, flax: 1 }, bonus: 'oats', points: 0,
       };
       expect(canAfford(player, card)).toBe(true);
     });
 
-    it('canAfford uses gold as wild', () => {
+    it('canAfford uses mead as wild', () => {
       const player: FeudalismPlayerState = {
         name: 'Test',
         isAI: false,
-        tokens: { ruby: 1, gold: 2 },
+        tokens: { wheat: 1, mead: 2 },
         purchasedCards: [],
         reservedCards: [],
         nobles: [],
       };
       const card: DevelopmentCard = {
-        id: 100, tier: 1, cost: { ruby: 3 }, bonus: 'emerald', points: 0,
+        id: 100, tier: 1, cost: { wheat: 3 }, bonus: 'oats', points: 0,
       };
       expect(canAfford(player, card)).toBe(true);
     });
@@ -191,13 +191,13 @@ describe('FeudalismGame', () => {
       const player: FeudalismPlayerState = {
         name: 'Test',
         isAI: false,
-        tokens: { ruby: 1 },
+        tokens: { wheat: 1 },
         purchasedCards: [],
         reservedCards: [],
         nobles: [],
       };
       const card: DevelopmentCard = {
-        id: 100, tier: 1, cost: { ruby: 3 }, bonus: 'emerald', points: 0,
+        id: 100, tier: 1, cost: { wheat: 3 }, bonus: 'oats', points: 0,
       };
       expect(canAfford(player, card)).toBe(false);
     });
@@ -208,19 +208,19 @@ describe('FeudalismGame', () => {
         isAI: false,
         tokens: {},
         purchasedCards: [
-          { id: 1, tier: 1, cost: {}, bonus: 'diamond', points: 0 },
-          { id: 2, tier: 1, cost: {}, bonus: 'diamond', points: 0 },
-          { id: 3, tier: 1, cost: {}, bonus: 'diamond', points: 0 },
-          { id: 4, tier: 1, cost: {}, bonus: 'diamond', points: 0 },
-          { id: 5, tier: 1, cost: {}, bonus: 'sapphire', points: 0 },
-          { id: 6, tier: 1, cost: {}, bonus: 'sapphire', points: 0 },
-          { id: 7, tier: 1, cost: {}, bonus: 'sapphire', points: 0 },
-          { id: 8, tier: 1, cost: {}, bonus: 'sapphire', points: 0 },
+          { id: 1, tier: 1, cost: {}, bonus: 'barley', points: 0 },
+          { id: 2, tier: 1, cost: {}, bonus: 'barley', points: 0 },
+          { id: 3, tier: 1, cost: {}, bonus: 'barley', points: 0 },
+          { id: 4, tier: 1, cost: {}, bonus: 'barley', points: 0 },
+          { id: 5, tier: 1, cost: {}, bonus: 'flax', points: 0 },
+          { id: 6, tier: 1, cost: {}, bonus: 'flax', points: 0 },
+          { id: 7, tier: 1, cost: {}, bonus: 'flax', points: 0 },
+          { id: 8, tier: 1, cost: {}, bonus: 'flax', points: 0 },
         ],
         reservedCards: [],
         nobles: [],
       };
-      const noble: NobleTile = { id: 1, requirements: { diamond: 4, sapphire: 4 }, points: 3 };
+      const noble: NobleTile = { id: 1, requirements: { barley: 4, flax: 4 }, points: 3 };
       expect(nobleQualifies(player, noble)).toBe(true);
     });
 
@@ -230,13 +230,13 @@ describe('FeudalismGame', () => {
         isAI: false,
         tokens: {},
         purchasedCards: [
-          { id: 1, tier: 1, cost: {}, bonus: 'diamond', points: 0 },
-          { id: 2, tier: 1, cost: {}, bonus: 'diamond', points: 0 },
+          { id: 1, tier: 1, cost: {}, bonus: 'barley', points: 0 },
+          { id: 2, tier: 1, cost: {}, bonus: 'barley', points: 0 },
         ],
         reservedCards: [],
         nobles: [],
       };
-      const noble: NobleTile = { id: 1, requirements: { diamond: 4, sapphire: 4 }, points: 3 };
+      const noble: NobleTile = { id: 1, requirements: { barley: 4, flax: 4 }, points: 3 };
       expect(nobleQualifies(player, noble)).toBe(false);
     });
   });
@@ -245,19 +245,19 @@ describe('FeudalismGame', () => {
   // Take different tokens
   // -------------------------------------------------------------------------
   describe('take different tokens', () => {
-    it('takes 3 different gem tokens', () => {
+    it('takes 3 different resource tokens', () => {
       const session = createTestSession();
       const result = executeTurn(session, {
         type: 'take-different',
-        colors: ['ruby', 'emerald', 'sapphire'],
+        colors: ['wheat', 'oats', 'flax'],
       });
       expect(result.tokensOverLimit).toBe(0);
       // Player got tokens
-      expect(tokenCount(session.players[0].tokens, 'ruby')).toBe(1);
-      expect(tokenCount(session.players[0].tokens, 'emerald')).toBe(1);
-      expect(tokenCount(session.players[0].tokens, 'sapphire')).toBe(1);
+      expect(tokenCount(session.players[0].tokens, 'wheat')).toBe(1);
+      expect(tokenCount(session.players[0].tokens, 'oats')).toBe(1);
+      expect(tokenCount(session.players[0].tokens, 'flax')).toBe(1);
       // Supply decreased
-      expect(tokenCount(session.tokenSupply, 'ruby')).toBe(3);
+      expect(tokenCount(session.tokenSupply, 'wheat')).toBe(3);
       // Turn advanced
       expect(session.currentPlayerIndex).toBe(1);
     });
@@ -266,7 +266,7 @@ describe('FeudalismGame', () => {
       const session = createTestSession();
       const error = validateAction(session, {
         type: 'take-different',
-        colors: ['ruby', 'emerald', 'sapphire', 'diamond'] as any,
+        colors: ['wheat', 'oats', 'flax', 'barley'] as any,
       });
       expect(error).toBeTruthy();
     });
@@ -275,7 +275,7 @@ describe('FeudalismGame', () => {
       const session = createTestSession();
       const error = validateAction(session, {
         type: 'take-different',
-        colors: ['ruby', 'ruby', 'emerald'],
+        colors: ['wheat', 'wheat', 'oats'],
       });
       expect(error).toBeTruthy();
     });
@@ -284,7 +284,7 @@ describe('FeudalismGame', () => {
       const session = createTestSession();
       const error = validateAction(session, {
         type: 'take-different',
-        colors: ['ruby', 'emerald'],
+        colors: ['wheat', 'oats'],
       });
       expect(error).toBeTruthy();
     });
@@ -292,24 +292,24 @@ describe('FeudalismGame', () => {
     it('allows fewer than 3 when supply is limited', () => {
       const session = createTestSession();
       // Empty all but 2 colors
-      session.tokenSupply.ruby = 0;
-      session.tokenSupply.diamond = 0;
-      session.tokenSupply.onyx = 0;
+      session.tokenSupply.wheat = 0;
+      session.tokenSupply.barley = 0;
+      session.tokenSupply.turnip = 0;
       const error = validateAction(session, {
         type: 'take-different',
-        colors: ['emerald', 'sapphire'],
+        colors: ['oats', 'flax'],
       });
       expect(error).toBeNull();
     });
 
     it('rejects taking from empty supply color', () => {
       const session = createTestSession();
-      session.tokenSupply.ruby = 0;
-      session.tokenSupply.diamond = 0;
-      session.tokenSupply.onyx = 0;
+      session.tokenSupply.wheat = 0;
+      session.tokenSupply.barley = 0;
+      session.tokenSupply.turnip = 0;
       const error = validateAction(session, {
         type: 'take-different',
-        colors: ['emerald', 'ruby'],
+        colors: ['oats', 'wheat'],
       });
       expect(error).toBeTruthy();
     });
@@ -321,15 +321,15 @@ describe('FeudalismGame', () => {
   describe('take same tokens', () => {
     it('takes 2 tokens of the same color when >= 4 in supply', () => {
       const session = createTestSession();
-      executeTurn(session, { type: 'take-same', color: 'ruby' });
-      expect(tokenCount(session.players[0].tokens, 'ruby')).toBe(2);
-      expect(tokenCount(session.tokenSupply, 'ruby')).toBe(2);
+      executeTurn(session, { type: 'take-same', color: 'wheat' });
+      expect(tokenCount(session.players[0].tokens, 'wheat')).toBe(2);
+      expect(tokenCount(session.tokenSupply, 'wheat')).toBe(2);
     });
 
     it('rejects when fewer than 4 in supply', () => {
       const session = createTestSession();
-      session.tokenSupply.ruby = 3;
-      const error = validateAction(session, { type: 'take-same', color: 'ruby' });
+      session.tokenSupply.wheat = 3;
+      const error = validateAction(session, { type: 'take-same', color: 'wheat' });
       expect(error).toBeTruthy();
     });
   });
@@ -338,7 +338,7 @@ describe('FeudalismGame', () => {
   // Reserve card
   // -------------------------------------------------------------------------
   describe('reserve card', () => {
-    it('reserves a card from market and gains gold token', () => {
+    it('reserves a card from market and gains mead token', () => {
       const session = createTestSession();
       const cardToReserve = session.market[1].visible[0]!;
       executeTurn(session, {
@@ -347,8 +347,8 @@ describe('FeudalismGame', () => {
       });
       expect(session.players[0].reservedCards).toHaveLength(1);
       expect(session.players[0].reservedCards[0].id).toBe(cardToReserve.id);
-      expect(tokenCount(session.players[0].tokens, 'gold')).toBe(1);
-      expect(tokenCount(session.tokenSupply, 'gold')).toBe(4);
+      expect(tokenCount(session.players[0].tokens, 'mead')).toBe(1);
+      expect(tokenCount(session.tokenSupply, 'mead')).toBe(4);
       // Market slot refilled
       expect(session.market[1].visible[0]).not.toBeNull();
     });
@@ -366,7 +366,7 @@ describe('FeudalismGame', () => {
       // Fill up reserved cards
       for (let i = 0; i < MAX_RESERVED; i++) {
         session.players[0].reservedCards.push(
-          { id: 900 + i, tier: 1, cost: {}, bonus: 'ruby', points: 0 },
+          { id: 900 + i, tier: 1, cost: {}, bonus: 'wheat', points: 0 },
         );
       }
       const error = validateAction(session, {
@@ -376,12 +376,12 @@ describe('FeudalismGame', () => {
       expect(error).toBeTruthy();
     });
 
-    it('does not gain gold when supply is empty', () => {
+    it('does not gain mead when supply is empty', () => {
       const session = createTestSession();
-      session.tokenSupply.gold = 0;
+      session.tokenSupply.mead = 0;
       const card = session.market[1].visible[0]!;
       executeTurn(session, { type: 'reserve', cardId: card.id });
-      expect(tokenCount(session.players[0].tokens, 'gold')).toBe(0);
+      expect(tokenCount(session.players[0].tokens, 'mead')).toBe(0);
     });
 
     it('rejects reserving non-existent card', () => {
@@ -418,14 +418,14 @@ describe('FeudalismGame', () => {
     it('purchases using card bonuses to discount', () => {
       const session = createTestSession();
       const player = session.players[0];
-      // Give player ruby bonus cards
+      // Give player wheat bonus cards
       player.purchasedCards.push(
-        { id: 900, tier: 1, cost: {}, bonus: 'ruby', points: 0 },
-        { id: 901, tier: 1, cost: {}, bonus: 'ruby', points: 0 },
+        { id: 900, tier: 1, cost: {}, bonus: 'wheat', points: 0 },
+        { id: 901, tier: 1, cost: {}, bonus: 'wheat', points: 0 },
       );
-      // Find a card that costs ruby
+      // Find a card that costs wheat
       const card = session.market[1].visible.find(
-        c => c && (c.cost.ruby ?? 0) > 0,
+        c => c && (c.cost.wheat ?? 0) > 0,
       );
       if (card) {
         // Give just enough tokens for the discounted cost
@@ -445,7 +445,7 @@ describe('FeudalismGame', () => {
       const player = session.players[0];
       // Put a free card in reserved
       const freeCard: DevelopmentCard = {
-        id: 800, tier: 1, cost: {}, bonus: 'emerald', points: 1,
+        id: 800, tier: 1, cost: {}, bonus: 'oats', points: 1,
       };
       player.reservedCards.push(freeCard);
       executeTurn(session, { type: 'purchase', cardId: 800 });
@@ -453,17 +453,17 @@ describe('FeudalismGame', () => {
       expect(player.purchasedCards.find(c => c.id === 800)).toBeTruthy();
     });
 
-    it('uses gold tokens when needed', () => {
+    it('uses mead tokens when needed', () => {
       const session = createTestSession();
       const player = session.players[0];
-      player.tokens = { ruby: 1, gold: 2 };
+      player.tokens = { wheat: 1, mead: 2 };
       const card: DevelopmentCard = {
-        id: 800, tier: 1, cost: { ruby: 3 }, bonus: 'emerald', points: 0,
+        id: 800, tier: 1, cost: { wheat: 3 }, bonus: 'oats', points: 0,
       };
       player.reservedCards.push(card);
       executeTurn(session, { type: 'purchase', cardId: 800 });
-      expect(tokenCount(player.tokens, 'ruby')).toBe(0);
-      expect(tokenCount(player.tokens, 'gold')).toBe(0);
+      expect(tokenCount(player.tokens, 'wheat')).toBe(0);
+      expect(tokenCount(player.tokens, 'mead')).toBe(0);
     });
 
     it('rejects purchase of card not in market or reserved', () => {
@@ -488,11 +488,11 @@ describe('FeudalismGame', () => {
     it('reports tokens over limit when exceeding 10', () => {
       const session = createTestSession();
       session.players[0].tokens = {
-        ruby: 2, emerald: 2, sapphire: 2, diamond: 2, onyx: 1,
+        wheat: 2, oats: 2, flax: 2, barley: 2, turnip: 1,
       }; // 9 tokens
       const result = executeTurn(session, {
         type: 'take-different',
-        colors: ['ruby', 'emerald', 'sapphire'],
+        colors: ['wheat', 'oats', 'flax'],
       });
       // Now has 12 tokens, 2 over limit
       expect(result.tokensOverLimit).toBe(2);
@@ -503,15 +503,15 @@ describe('FeudalismGame', () => {
     it('discardTokens resolves over-limit and advances turn', () => {
       const session = createTestSession();
       session.players[0].tokens = {
-        ruby: 2, emerald: 2, sapphire: 2, diamond: 2, onyx: 1,
+        wheat: 2, oats: 2, flax: 2, barley: 2, turnip: 1,
       };
       executeTurn(session, {
         type: 'take-different',
-        colors: ['ruby', 'emerald', 'sapphire'],
+        colors: ['wheat', 'oats', 'flax'],
       });
       // Discard 2 tokens
       discardTokens(session, {
-        tokens: { ruby: 2 },
+        tokens: { wheat: 2 },
       });
       expect(totalTokens(session.players[0].tokens)).toBeLessThanOrEqual(MAX_TOKENS);
       expect(session.currentPlayerIndex).toBe(1);
@@ -520,13 +520,13 @@ describe('FeudalismGame', () => {
     it('discardTokens rejects wrong amount', () => {
       const session = createTestSession();
       session.players[0].tokens = {
-        ruby: 2, emerald: 2, sapphire: 2, diamond: 2, onyx: 1,
+        wheat: 2, oats: 2, flax: 2, barley: 2, turnip: 1,
       };
       executeTurn(session, {
         type: 'take-different',
-        colors: ['ruby', 'emerald', 'sapphire'],
+        colors: ['wheat', 'oats', 'flax'],
       });
-      expect(() => discardTokens(session, { tokens: { ruby: 1 } })).toThrow();
+      expect(() => discardTokens(session, { tokens: { wheat: 1 } })).toThrow();
     });
   });
 
@@ -537,24 +537,24 @@ describe('FeudalismGame', () => {
     it('noble visits player when requirements met after purchase', () => {
       const session = createTestSession();
       const player = session.players[0];
-      // Set up a noble requiring 4 diamond + 4 sapphire
-      session.nobles = [{ id: 100, requirements: { diamond: 4, sapphire: 4 }, points: 3 }];
-      // Give player 3 diamond + 4 sapphire bonuses
+      // Set up a noble requiring 4 barley + 4 flax
+      session.nobles = [{ id: 100, requirements: { barley: 4, flax: 4 }, points: 3 }];
+      // Give player 3 barley + 4 flax bonuses
       for (let i = 0; i < 3; i++) {
         player.purchasedCards.push(
-          { id: 700 + i, tier: 1, cost: {}, bonus: 'diamond', points: 0 },
+          { id: 700 + i, tier: 1, cost: {}, bonus: 'barley', points: 0 },
         );
       }
       for (let i = 0; i < 4; i++) {
         player.purchasedCards.push(
-          { id: 710 + i, tier: 1, cost: {}, bonus: 'sapphire', points: 0 },
+          { id: 710 + i, tier: 1, cost: {}, bonus: 'flax', points: 0 },
         );
       }
-      // Purchase a card with diamond bonus (the 4th diamond)
-      const diamondCard: DevelopmentCard = {
-        id: 800, tier: 1, cost: {}, bonus: 'diamond', points: 0,
+      // Purchase a card with barley bonus (the 4th barley)
+      const barleyCard: DevelopmentCard = {
+        id: 800, tier: 1, cost: {}, bonus: 'barley', points: 0,
       };
-      player.reservedCards.push(diamondCard);
+      player.reservedCards.push(barleyCard);
       const result = executeTurn(session, { type: 'purchase', cardId: 800 });
       expect(result.nobleVisit).not.toBeNull();
       expect(result.nobleVisit!.id).toBe(100);
@@ -564,11 +564,11 @@ describe('FeudalismGame', () => {
 
     it('no noble visit when requirements not met', () => {
       const session = createTestSession();
-      session.nobles = [{ id: 100, requirements: { diamond: 4, sapphire: 4 }, points: 3 }];
+      session.nobles = [{ id: 100, requirements: { barley: 4, flax: 4 }, points: 3 }];
       // Just take some tokens — no purchase, no bonuses
       const result = executeTurn(session, {
         type: 'take-different',
-        colors: ['ruby', 'emerald', 'sapphire'],
+        colors: ['wheat', 'oats', 'flax'],
       });
       expect(result.nobleVisit).toBeNull();
     });
@@ -584,12 +584,12 @@ describe('FeudalismGame', () => {
       // Give player 14 prestige from cards
       for (let i = 0; i < 14; i++) {
         player.purchasedCards.push(
-          { id: 600 + i, tier: 1, cost: {}, bonus: 'ruby', points: 1 },
+          { id: 600 + i, tier: 1, cost: {}, bonus: 'wheat', points: 1 },
         );
       }
       // Purchase a card worth 1 point to reach 15
       const card: DevelopmentCard = {
-        id: 500, tier: 1, cost: {}, bonus: 'emerald', points: 1,
+        id: 500, tier: 1, cost: {}, bonus: 'oats', points: 1,
       };
       player.reservedCards.push(card);
       executeTurn(session, { type: 'purchase', cardId: 500 });
@@ -603,11 +603,11 @@ describe('FeudalismGame', () => {
       // Give player 15 prestige
       for (let i = 0; i < 15; i++) {
         player.purchasedCards.push(
-          { id: 600 + i, tier: 1, cost: {}, bonus: 'ruby', points: 1 },
+          { id: 600 + i, tier: 1, cost: {}, bonus: 'wheat', points: 1 },
         );
       }
       const card: DevelopmentCard = {
-        id: 500, tier: 1, cost: {}, bonus: 'emerald', points: 0,
+        id: 500, tier: 1, cost: {}, bonus: 'oats', points: 0,
       };
       player.reservedCards.push(card);
       // Player 0 reaches threshold
@@ -616,7 +616,7 @@ describe('FeudalismGame', () => {
       // Player 1 takes their turn
       const result = executeTurn(session, {
         type: 'take-different',
-        colors: ['ruby', 'emerald', 'sapphire'],
+        colors: ['wheat', 'oats', 'flax'],
       });
       expect(result.gameOver).toBe(true);
       expect(session.phase).toBe('game-over');
@@ -633,7 +633,7 @@ describe('FeudalismGame', () => {
       session.phase = 'game-over';
       const error = validateAction(session, {
         type: 'take-different',
-        colors: ['ruby', 'emerald', 'sapphire'],
+        colors: ['wheat', 'oats', 'flax'],
       });
       expect(error).toBeTruthy();
     });
@@ -646,10 +646,10 @@ describe('FeudalismGame', () => {
     it('player with most prestige wins', () => {
       const session = createTestSession();
       session.players[0].purchasedCards.push(
-        { id: 1, tier: 1, cost: {}, bonus: 'ruby', points: 5 },
+        { id: 1, tier: 1, cost: {}, bonus: 'wheat', points: 5 },
       );
       session.players[1].purchasedCards.push(
-        { id: 2, tier: 1, cost: {}, bonus: 'ruby', points: 3 },
+        { id: 2, tier: 1, cost: {}, bonus: 'wheat', points: 3 },
       );
       expect(getWinnerIndex(session)).toBe(0);
     });
@@ -658,11 +658,11 @@ describe('FeudalismGame', () => {
       const session = createTestSession();
       // Both have 5 prestige
       session.players[0].purchasedCards.push(
-        { id: 1, tier: 1, cost: {}, bonus: 'ruby', points: 5 },
+        { id: 1, tier: 1, cost: {}, bonus: 'wheat', points: 5 },
       );
       session.players[1].purchasedCards.push(
-        { id: 2, tier: 1, cost: {}, bonus: 'ruby', points: 3 },
-        { id: 3, tier: 1, cost: {}, bonus: 'ruby', points: 2 },
+        { id: 2, tier: 1, cost: {}, bonus: 'wheat', points: 3 },
+        { id: 3, tier: 1, cost: {}, bonus: 'wheat', points: 2 },
       );
       // P0: 5pts, 1 card. P1: 5pts, 2 cards. P0 wins.
       expect(getWinnerIndex(session)).toBe(0);
@@ -705,7 +705,7 @@ describe('FeudalismGame', () => {
       const player = session.players[0];
       for (let i = 0; i < MAX_RESERVED; i++) {
         player.reservedCards.push(
-          { id: 900 + i, tier: 1, cost: {}, bonus: 'ruby', points: 0 },
+          { id: 900 + i, tier: 1, cost: {}, bonus: 'wheat', points: 0 },
         );
       }
       const actions = getLegalActions(session);
@@ -717,7 +717,7 @@ describe('FeudalismGame', () => {
       const player = session.players[0];
       // Give player a free reserved card
       player.reservedCards.push(
-        { id: 800, tier: 1, cost: {}, bonus: 'emerald', points: 0 },
+        { id: 800, tier: 1, cost: {}, bonus: 'oats', points: 0 },
       );
       const actions = getLegalActions(session);
       const purchases = actions.filter(a => a.type === 'purchase');
@@ -749,7 +749,7 @@ describe('FeudalismGame', () => {
           // Discard excess tokens (pick randomly)
           const discard: ResourceTokens = {};
           let remaining = result.tokensOverLimit;
-          for (const c of [...RESOURCE_TYPES, 'gold' as const]) {
+          for (const c of [...RESOURCE_TYPES, 'mead' as const]) {
             if (remaining <= 0) break;
             const have = tokenCount(player.tokens, c);
             const toDrop = Math.min(have, remaining);
