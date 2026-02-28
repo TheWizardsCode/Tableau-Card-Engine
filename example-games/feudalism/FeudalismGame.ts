@@ -6,14 +6,14 @@
  */
 
 import {
-  type GemColor,
-  type GemTokens,
-  type GemCost,
+  type ResourceType,
+  type ResourceTokens,
+  type ResourceCost,
   type DevelopmentCard,
   type NobleTile,
   type Tier,
-  GEM_COLORS,
-  ALL_TOKEN_COLORS,
+  RESOURCE_TYPES,
+  ALL_RESOURCE_TYPES,
   tokenCount,
   totalTokens,
   addTokens,
@@ -41,7 +41,7 @@ export { getCurrentPlayer };
 export interface FeudalismPlayerState {
   name: string;
   isAI: boolean;
-  tokens: GemTokens;
+  tokens: ResourceTokens;
   purchasedCards: DevelopmentCard[];
   reservedCards: DevelopmentCard[];
   nobles: NobleTile[];
@@ -60,7 +60,7 @@ export interface MarketRow {
 export interface FeudalismSession {
   players: FeudalismPlayerState[];
   market: Record<Tier, MarketRow>;
-  tokenSupply: GemTokens;
+  tokenSupply: ResourceTokens;
   nobles: NobleTile[];
   phase: FeudalismPhase;
   currentPlayerIndex: number;
@@ -77,12 +77,12 @@ export interface FeudalismSession {
 
 export interface TakeDifferentTokensAction {
   type: 'take-different';
-  colors: GemColor[];
+  colors: ResourceType[];
 }
 
 export interface TakeSameTokensAction {
   type: 'take-same';
-  color: GemColor;
+  color: ResourceType;
 }
 
 export interface ReserveCardAction {
@@ -97,7 +97,7 @@ export interface PurchaseCardAction {
   type: 'purchase';
   cardId: number;
   /** Gold tokens to spend (and which colors they substitute for). */
-  goldAllocation?: Partial<Record<GemColor, number>>;
+  goldAllocation?: Partial<Record<ResourceType, number>>;
 }
 
 export type TurnAction =
@@ -108,7 +108,7 @@ export type TurnAction =
 
 /** Tokens the player must return when exceeding MAX_TOKENS after a turn. */
 export interface TokenDiscard {
-  tokens: GemTokens;
+  tokens: ResourceTokens;
 }
 
 /** Result of executing a turn. */
@@ -188,8 +188,8 @@ export function getPrestige(player: FeudalismPlayerState): number {
 }
 
 /** Count card bonuses by color. */
-export function getBonuses(player: FeudalismPlayerState): Record<GemColor, number> {
-  const bonuses: Record<GemColor, number> = {
+export function getBonuses(player: FeudalismPlayerState): Record<ResourceType, number> {
+  const bonuses: Record<ResourceType, number> = {
     emerald: 0, sapphire: 0, ruby: 0, diamond: 0, onyx: 0,
   };
   for (const card of player.purchasedCards) {
@@ -200,11 +200,11 @@ export function getBonuses(player: FeudalismPlayerState): Record<GemColor, numbe
 
 /** Calculate the effective cost after subtracting bonuses. */
 export function effectiveCost(
-  cost: GemCost,
-  bonuses: Record<GemColor, number>,
-): GemCost {
-  const result: GemCost = {};
-  for (const c of GEM_COLORS) {
+  cost: ResourceCost,
+  bonuses: Record<ResourceType, number>,
+): ResourceCost {
+  const result: ResourceCost = {};
+  for (const c of RESOURCE_TYPES) {
     const needed = (cost[c] ?? 0) - bonuses[c];
     if (needed > 0) result[c] = needed;
   }
@@ -216,7 +216,7 @@ export function canAfford(player: FeudalismPlayerState, card: DevelopmentCard): 
   const bonuses = getBonuses(player);
   const eff = effectiveCost(card.cost, bonuses);
   let goldNeeded = 0;
-  for (const c of GEM_COLORS) {
+  for (const c of RESOURCE_TYPES) {
     const need = eff[c] ?? 0;
     const have = tokenCount(player.tokens, c);
     if (have < need) {
@@ -229,7 +229,7 @@ export function canAfford(player: FeudalismPlayerState, card: DevelopmentCard): 
 /** Check if a noble's requirements are met by the player's bonuses. */
 export function nobleQualifies(player: FeudalismPlayerState, noble: NobleTile): boolean {
   const bonuses = getBonuses(player);
-  for (const c of GEM_COLORS) {
+  for (const c of RESOURCE_TYPES) {
     if ((noble.requirements[c] ?? 0) > bonuses[c]) return false;
   }
   return true;
@@ -342,10 +342,10 @@ function validateTakeDifferent(
     return 'Colors must be unique when taking different tokens';
   }
 
-  // Check each color is a valid gem (not gold)
+  // Check each color is a valid resource type (not gold)
   for (const c of colors) {
-    if (!GEM_COLORS.includes(c)) {
-      return `Invalid gem color: ${c}`;
+    if (!RESOURCE_TYPES.includes(c)) {
+      return `Invalid resource type: ${c}`;
     }
   }
 
@@ -358,7 +358,7 @@ function validateTakeDifferent(
 
   // Special rule: can only take fewer than 3 if there are fewer than 3 colors available
   if (colors.length < 3) {
-    const availableColors = GEM_COLORS.filter(
+    const availableColors = RESOURCE_TYPES.filter(
       c => tokenCount(session.tokenSupply, c) > 0,
     );
     if (availableColors.length >= 3) {
@@ -375,8 +375,8 @@ function validateTakeSame(
   action: TakeSameTokensAction,
 ): string | null {
   const { color } = action;
-  if (!GEM_COLORS.includes(color)) {
-    return `Invalid gem color: ${color}`;
+  if (!RESOURCE_TYPES.includes(color)) {
+    return `Invalid resource type: ${color}`;
   }
   if (tokenCount(session.tokenSupply, color) < 4) {
     return `Need at least 4 ${color} tokens in supply to take 2 (only ${tokenCount(session.tokenSupply, color)} available)`;
@@ -503,7 +503,7 @@ export function discardTokens(
   }
 
   // Validate player has these tokens
-  for (const c of ALL_TOKEN_COLORS) {
+  for (const c of ALL_RESOURCE_TYPES) {
     const amount = tokenCount(discard.tokens, c);
     if (amount > 0 && amount > tokenCount(player.tokens, c)) {
       throw new Error(`Cannot discard ${amount} ${c} tokens (only have ${tokenCount(player.tokens, c)})`);
@@ -589,10 +589,10 @@ function executePurchase(
   // Calculate payment
   const bonuses = getBonuses(player);
   const eff = effectiveCost(card.cost, bonuses);
-  const payment: GemTokens = {};
+  const payment: ResourceTokens = {};
   let goldUsed = 0;
 
-  for (const c of GEM_COLORS) {
+  for (const c of RESOURCE_TYPES) {
     const need = eff[c] ?? 0;
     if (need <= 0) continue;
     const fromTokens = Math.min(need, tokenCount(player.tokens, c));
@@ -685,7 +685,7 @@ export function getLegalActions(session: FeudalismSession): TurnAction[] {
   const actions: TurnAction[] = [];
 
   // 1. Take 3 different tokens
-  const availColors = GEM_COLORS.filter(
+  const availColors = RESOURCE_TYPES.filter(
     c => tokenCount(session.tokenSupply, c) > 0,
   );
 
@@ -711,7 +711,7 @@ export function getLegalActions(session: FeudalismSession): TurnAction[] {
   }
 
   // 2. Take 2 same tokens
-  for (const c of GEM_COLORS) {
+  for (const c of RESOURCE_TYPES) {
     if (tokenCount(session.tokenSupply, c) >= 4) {
       actions.push({ type: 'take-same', color: c });
     }

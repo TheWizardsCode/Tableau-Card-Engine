@@ -191,7 +191,7 @@ A 2-player card-drafting game with 108 custom-typed cards (8 types). Players sim
 A 2-player engine-building game with 90 development cards across 3 tiers, gem tokens, noble tiles, and a 15-prestige win threshold. **The closest existing example to a "buildy" resource-management game.**
 
 - **Engine APIs used:** `shuffleArray`, `MultiplayerSetupOptions`, `resolveSetupOptions`, `getCurrentPlayer`, `CardGameScene`, `AiPlayer`, `pickRandom`, `TranscriptRecorderBase`, overlay helpers, `createSceneHeader`, `HelpPanel`, `SettingsPanel`
-- **Notable patterns:** Resource economy system (`GemTokens` with add/subtract helpers); market system (3 tier decks with 4 visible each); purchase validation with bonus discounts and gold wildcards; token limit (10) with discard mechanic; noble auto-visit; final-round trigger; `GreedyStrategy` AI with noble-progress scoring. Most relevant precedent for "The Build."
+- **Notable patterns:** Resource economy system (`ResourceTokens` with add/subtract helpers); market system (3 tier decks with 4 visible each); purchase validation with bonus discounts and gold wildcards; token limit (10) with discard mechanic; noble auto-visit; final-round trigger; `GreedyStrategy` AI with noble-progress scoring. Most relevant precedent for "The Build."
 
 ### Lost Cities (`example-games/lost-cities/`)
 A 2-player expedition card game with 60 custom cards (5 colors, investment multipliers + numbered 2-10), played over 3 rounds. Features two-phase turns and ascending-play constraints.
@@ -210,7 +210,7 @@ A 2-player cooperative real-time card game where players simultaneously play num
 ## 3. Minor Extensions (< 1 day each)
 
 ### 3.1 Generic Resource/Token Container
-**What:** Extract Feudalism's `GemTokens` helper (add/subtract/canAfford/total) into a generic `ResourceBank<K extends string>` class in `src/core-engine/` that works with any set of named resource types.
+**What:** Extract Feudalism's `ResourceTokens` helper (add/subtract/canAfford/total) into a generic `ResourceBank<K extends string>` class in `src/core-engine/` that works with any set of named resource types.
 **How it helps "The Build":** A crafty/buildy game needs resource tracking (wood, stone, iron, food, etc.). A generic container avoids every game re-implementing arithmetic and validation for named resources.
 **Effort:** ~4 hours.
 

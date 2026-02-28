@@ -2,7 +2,7 @@
  * FeudalismCards.ts
  *
  * Type definitions and data for the Feudalism card game:
- * - Gem colors and token types
+ * - Resource types and token types
  * - Development cards (90 total across 3 tiers)
  * - Noble tiles (10 total)
  * - Supply initialization
@@ -11,14 +11,14 @@
  */
 
 // ---------------------------------------------------------------------------
-// Gem types
+// Resource types
 // ---------------------------------------------------------------------------
 
-/** The five gem colors plus gold (wild). */
-export type GemColor = 'emerald' | 'sapphire' | 'ruby' | 'diamond' | 'onyx';
-export type GemOrGold = GemColor | 'gold';
+/** The five resource types plus gold (wild). */
+export type ResourceType = 'emerald' | 'sapphire' | 'ruby' | 'diamond' | 'onyx';
+export type ResourceOrWild = ResourceType | 'gold';
 
-export const GEM_COLORS: readonly GemColor[] = [
+export const RESOURCE_TYPES: readonly ResourceType[] = [
   'emerald',
   'sapphire',
   'ruby',
@@ -26,39 +26,39 @@ export const GEM_COLORS: readonly GemColor[] = [
   'onyx',
 ] as const;
 
-export const ALL_TOKEN_COLORS: readonly GemOrGold[] = [
-  ...GEM_COLORS,
+export const ALL_RESOURCE_TYPES: readonly ResourceOrWild[] = [
+  ...RESOURCE_TYPES,
   'gold',
 ] as const;
 
-/** A bag of gem/gold token counts. Missing keys imply 0. */
-export type GemTokens = Partial<Record<GemOrGold, number>>;
+/** A bag of resource/gold token counts. Missing keys imply 0. */
+export type ResourceTokens = Partial<Record<ResourceOrWild, number>>;
 
-/** Shorthand: cost uses only gem colors (no gold in costs). */
-export type GemCost = Partial<Record<GemColor, number>>;
+/** Shorthand: cost uses only resource types (no gold in costs). */
+export type ResourceCost = Partial<Record<ResourceType, number>>;
 
 // ---------------------------------------------------------------------------
 // Helper to read token counts safely
 // ---------------------------------------------------------------------------
 
 /** Return the count for a color, defaulting to 0. */
-export function tokenCount(tokens: GemTokens, color: GemOrGold): number {
+export function tokenCount(tokens: ResourceTokens, color: ResourceOrWild): number {
   return tokens[color] ?? 0;
 }
 
 /** Return the total number of tokens. */
-export function totalTokens(tokens: GemTokens): number {
+export function totalTokens(tokens: ResourceTokens): number {
   let sum = 0;
-  for (const c of ALL_TOKEN_COLORS) {
+  for (const c of ALL_RESOURCE_TYPES) {
     sum += tokenCount(tokens, c);
   }
   return sum;
 }
 
 /** Add two token bags together (returns new object). */
-export function addTokens(a: GemTokens, b: GemTokens): GemTokens {
-  const result: GemTokens = {};
-  for (const c of ALL_TOKEN_COLORS) {
+export function addTokens(a: ResourceTokens, b: ResourceTokens): ResourceTokens {
+  const result: ResourceTokens = {};
+  for (const c of ALL_RESOURCE_TYPES) {
     const val = tokenCount(a, c) + tokenCount(b, c);
     if (val !== 0) result[c] = val;
   }
@@ -66,9 +66,9 @@ export function addTokens(a: GemTokens, b: GemTokens): GemTokens {
 }
 
 /** Subtract b from a (returns new object). Does NOT check for negatives. */
-export function subtractTokens(a: GemTokens, b: GemTokens): GemTokens {
-  const result: GemTokens = {};
-  for (const c of ALL_TOKEN_COLORS) {
+export function subtractTokens(a: ResourceTokens, b: ResourceTokens): ResourceTokens {
+  const result: ResourceTokens = {};
+  for (const c of ALL_RESOURCE_TYPES) {
     const val = tokenCount(a, c) - tokenCount(b, c);
     if (val !== 0) result[c] = val;
   }
@@ -84,8 +84,8 @@ export type Tier = 1 | 2 | 3;
 export interface DevelopmentCard {
   readonly id: number;
   readonly tier: Tier;
-  readonly cost: GemCost;
-  readonly bonus: GemColor;
+  readonly cost: ResourceCost;
+  readonly bonus: ResourceType;
   readonly points: number;
 }
 
@@ -95,8 +95,8 @@ export interface DevelopmentCard {
 
 export interface NobleTile {
   readonly id: number;
-  /** The gem bonus counts required from purchased cards. */
-  readonly requirements: GemCost;
+  /** The resource bonus counts required from purchased cards. */
+  readonly requirements: ResourceCost;
   readonly points: number; // always 3
 }
 
@@ -115,18 +115,18 @@ export { shuffleArray } from '../../src/card-system/Deck';
 // ---------------------------------------------------------------------------
 
 /**
- * Token counts per gem color based on player count:
- * - 2 players: 4 of each gem, 5 gold
- * - 3 players: 5 of each gem, 5 gold
- * - 4 players: 7 of each gem, 5 gold
+ * Token counts per resource type based on player count:
+ * - 2 players: 4 of each resource, 5 gold
+ * - 3 players: 5 of each resource, 5 gold
+ * - 4 players: 7 of each resource, 5 gold
  */
-export function createTokenSupply(playerCount: number): GemTokens {
+export function createTokenSupply(playerCount: number): ResourceTokens {
   if (playerCount < 2 || playerCount > 4) {
     throw new Error(`Invalid player count: ${playerCount}. Must be 2-4.`);
   }
   const gemCount = playerCount === 2 ? 4 : playerCount === 3 ? 5 : 7;
-  const supply: GemTokens = { gold: 5 };
-  for (const color of GEM_COLORS) {
+  const supply: ResourceTokens = { gold: 5 };
+  for (const color of RESOURCE_TYPES) {
     supply[color] = gemCount;
   }
   return supply;
@@ -150,7 +150,7 @@ export function selectNobles(
 // ---------------------------------------------------------------------------
 
 let nextId = 1;
-function card(tier: Tier, bonus: GemColor, points: number, cost: GemCost): DevelopmentCard {
+function card(tier: Tier, bonus: ResourceType, points: number, cost: ResourceCost): DevelopmentCard {
   return { id: nextId++, tier, cost, bonus, points };
 }
 
@@ -303,7 +303,7 @@ export const TOTAL_CARD_COUNT = 90;
 // ---------------------------------------------------------------------------
 
 let nobleId = 1;
-function noble(requirements: GemCost): NobleTile {
+function noble(requirements: ResourceCost): NobleTile {
   return { id: nobleId++, requirements, points: 3 };
 }
 
@@ -352,11 +352,11 @@ export const MAX_RESERVED = 3;
 export const MAX_TOKENS = 10;
 
 // ---------------------------------------------------------------------------
-// Card label helpers (for UI display)
+// Resource label helpers (for UI display)
 // ---------------------------------------------------------------------------
 
-/** Short abbreviation for a gem color. */
-export function gemAbbrev(color: GemOrGold): string {
+/** Short abbreviation for a resource type. */
+export function resourceAbbrev(color: ResourceOrWild): string {
   switch (color) {
     case 'emerald': return 'G';
     case 'sapphire': return 'U';
@@ -367,17 +367,17 @@ export function gemAbbrev(color: GemOrGold): string {
   }
 }
 
-/** Display name for a gem color. */
-export function gemDisplayName(color: GemOrGold): string {
+/** Display name for a resource type. */
+export function resourceDisplayName(color: ResourceOrWild): string {
   return color.charAt(0).toUpperCase() + color.slice(1);
 }
 
 /** Format a cost object as a short string, e.g. "2W 3R 1K". */
-export function formatCost(cost: GemCost): string {
+export function formatCost(cost: ResourceCost): string {
   const parts: string[] = [];
-  for (const c of GEM_COLORS) {
+  for (const c of RESOURCE_TYPES) {
     const n = cost[c];
-    if (n && n > 0) parts.push(`${n}${gemAbbrev(c)}`);
+    if (n && n > 0) parts.push(`${n}${resourceAbbrev(c)}`);
   }
   return parts.join(' ') || 'Free';
 }
@@ -385,15 +385,15 @@ export function formatCost(cost: GemCost): string {
 /** Format a card as a display label. */
 export function cardLabel(card: DevelopmentCard): string {
   const pts = card.points > 0 ? ` [${card.points}pt]` : '';
-  return `T${card.tier} ${gemAbbrev(card.bonus)}${pts} (${formatCost(card.cost)})`;
+  return `T${card.tier} ${resourceAbbrev(card.bonus)}${pts} (${formatCost(card.cost)})`;
 }
 
 /** Format a noble tile as a display label. */
 export function nobleLabel(noble: NobleTile): string {
   const reqs: string[] = [];
-  for (const c of GEM_COLORS) {
+  for (const c of RESOURCE_TYPES) {
     const n = noble.requirements[c];
-    if (n && n > 0) reqs.push(`${n}${gemAbbrev(c)}`);
+    if (n && n > 0) reqs.push(`${n}${resourceAbbrev(c)}`);
   }
   return `Noble [3pt] (${reqs.join(' ')})`;
 }

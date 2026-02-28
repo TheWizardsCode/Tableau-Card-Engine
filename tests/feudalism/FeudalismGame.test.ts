@@ -19,10 +19,10 @@ import {
 import {
   type DevelopmentCard,
   type NobleTile,
-  type GemTokens,
+  type ResourceTokens,
   tokenCount,
   totalTokens,
-  GEM_COLORS,
+  RESOURCE_TYPES,
   MAX_TOKENS,
   MAX_RESERVED,
   MARKET_SIZE,
@@ -88,7 +88,7 @@ describe('FeudalismGame', () => {
 
     it('sets up token supply for 2 players (4 each gem + 5 gold)', () => {
       const session = createTestSession();
-      for (const c of GEM_COLORS) {
+      for (const c of RESOURCE_TYPES) {
         expect(tokenCount(session.tokenSupply, c)).toBe(4);
       }
       expect(tokenCount(session.tokenSupply, 'gold')).toBe(5);
@@ -401,7 +401,7 @@ describe('FeudalismGame', () => {
       const card = session.market[1].visible[0]!;
       const player = session.players[0];
       // Set player tokens to cover cost
-      for (const c of GEM_COLORS) {
+      for (const c of RESOURCE_TYPES) {
         const need = card.cost[c] ?? 0;
         if (need > 0) {
           player.tokens[c] = need;
@@ -430,7 +430,7 @@ describe('FeudalismGame', () => {
       if (card) {
         // Give just enough tokens for the discounted cost
         const bonuses = getBonuses(player);
-        for (const c of GEM_COLORS) {
+        for (const c of RESOURCE_TYPES) {
           const eff = Math.max(0, (card.cost[c] ?? 0) - bonuses[c]);
           if (eff > 0) player.tokens[c] = eff;
         }
@@ -747,9 +747,9 @@ describe('FeudalismGame', () => {
         if (result.tokensOverLimit > 0) {
           const player = getCurrentPlayer(session);
           // Discard excess tokens (pick randomly)
-          const discard: GemTokens = {};
+          const discard: ResourceTokens = {};
           let remaining = result.tokensOverLimit;
-          for (const c of [...GEM_COLORS, 'gold' as const]) {
+          for (const c of [...RESOURCE_TYPES, 'gold' as const]) {
             if (remaining <= 0) break;
             const have = tokenCount(player.tokens, c);
             const toDrop = Math.min(have, remaining);

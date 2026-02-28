@@ -49,13 +49,13 @@ interface SPNobleSnapshot {
 }
 
 /** Token counts. */
-type SPGemTokens = Record<string, number>;
+type SPResourceTokens = Record<string, number>;
 
 /** Snapshot of a single player's state. */
 interface SPPlayerSnapshot {
   name: string;
   isAI: boolean;
-  tokens: SPGemTokens;
+  tokens: SPResourceTokens;
   purchasedCards: SPCardSnapshot[];
   reservedCards: SPCardSnapshot[];
   nobles: SPNobleSnapshot[];
@@ -69,12 +69,12 @@ interface SPTurnRecord {
   playerIndex: number;
   action: { type: string; [key: string]: unknown };
   nobleVisit: SPNobleSnapshot | null;
-  tokenDiscard: { tokens: SPGemTokens } | null;
+  tokenDiscard: { tokens: SPResourceTokens } | null;
   phase: string;
   gameOver: boolean;
   playerStates: SPPlayerSnapshot[];
   market: SPMarketTierSnapshot[];
-  tokenSupply: SPGemTokens;
+  tokenSupply: SPResourceTokens;
   nobles: SPNobleSnapshot[];
 }
 
@@ -82,7 +82,7 @@ interface SPTurnRecord {
 interface SPInitialState {
   playerStates: SPPlayerSnapshot[];
   market: SPMarketTierSnapshot[];
-  tokenSupply: SPGemTokens;
+  tokenSupply: SPResourceTokens;
   nobles: SPNobleSnapshot[];
   playerCount: number;
 }
@@ -327,7 +327,7 @@ export class FeudalismReplayAdapter implements ReplayAdapter {
     state: {
       playerStates: SPPlayerSnapshot[];
       market: SPMarketTierSnapshot[];
-      tokenSupply: SPGemTokens;
+      tokenSupply: SPResourceTokens;
       nobles: SPNobleSnapshot[];
       phase: string;
       currentPlayerIndex: number;

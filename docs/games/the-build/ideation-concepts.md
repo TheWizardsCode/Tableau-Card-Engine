@@ -46,7 +46,7 @@ Combines the universally familiar tri-peaks solitaire with spatial grid building
 | Seeded RNG | Existing | `createSeededRng()` |
 | Grid/spatial placement | **NEW** | Need a `Grid<T>` abstraction for the cottage layout |
 | Adjacency evaluation | **NEW** | Need adjacency-based synergy resolver |
-| Resource tracking | Minor extension | Generalize Feudalism's `GemTokens` into `ResourceBank` |
+| Resource tracking | Minor extension | Generalize Feudalism's `ResourceTokens` into `ResourceBank` |
 | Market row | **NEW** | Need reusable `Market<T>` component |
 | Seasonal/round timer | Minor extension | `PhaseManager` can handle this with some extension |
 | Scoring system | Game-specific | Build on existing patterns |

@@ -3,24 +3,24 @@
  *
  * Implements the full visual interface:
  *   - Card market (3 tiers x 4 visible cards + deck backs)
- *   - Gem token supply (clickable to take tokens)
+ *   - Resource token supply (clickable to take tokens)
  *   - Noble tiles display
  *   - Player area (tokens, purchased cards, reserved cards, prestige)
  *   - AI area (summary info)
  *   - Turn action UI with phase-based state machine
- *   - Gem discard dialog when over 10 tokens
+ *   - Resource discard dialog when over 10 tokens
  *   - Game-over overlay with scores and replay/menu buttons
  *   - Help panel and settings panel integration
  */
 
-import type { GemColor, GemOrGold, GemTokens, DevelopmentCard, NobleTile, Tier } from '../FeudalismCards';
+import type { ResourceType, ResourceOrWild, ResourceTokens, DevelopmentCard, NobleTile, Tier } from '../FeudalismCards';
 import {
-  GEM_COLORS,
-  ALL_TOKEN_COLORS,
+  RESOURCE_TYPES,
+  ALL_RESOURCE_TYPES,
   tokenCount,
   totalTokens,
-  gemAbbrev,
-  gemDisplayName,
+  resourceAbbrev,
+  resourceDisplayName,
   formatCost,
 } from '../FeudalismCards';
 import type {
@@ -69,8 +69,8 @@ const AI_PRE_PAUSE = 1000;
 /** Shared transcript store for auto-saving completed transcripts. */
 const transcriptStore = new TranscriptStore();
 
-// Gem color to hex fill
-const GEM_FILL: Record<GemOrGold, number> = {
+// Resource color to hex fill
+const RESOURCE_FILL: Record<ResourceOrWild, number> = {
   emerald:  0x2ecc71,
   sapphire: 0x3498db,
   ruby:     0xe74c3c,
@@ -79,8 +79,8 @@ const GEM_FILL: Record<GemOrGold, number> = {
   gold:     0xf1c40f,
 };
 
-// Gem color to text color
-const GEM_TEXT_COLOR: Record<GemOrGold, string> = {
+// Resource color to text color
+const RESOURCE_TEXT_COLOR: Record<ResourceOrWild, string> = {
   emerald:  '#ffffff',
   sapphire: '#ffffff',
   ruby:     '#ffffff',
@@ -193,8 +193,8 @@ export class FeudalismScene extends CardGameScene {
   private turnPhase: TurnPhase = 'player-turn';
 
   // Token selection state
-  private selectedTokens: GemColor[] = [];
-  private discardSelection: Partial<Record<GemOrGold, number>> = {};
+  private selectedTokens: ResourceType[] = [];
+  private discardSelection: Partial<Record<ResourceOrWild, number>> = {};
   private discardNeeded = 0;
 
   // Transcript recording
@@ -513,7 +513,7 @@ export class FeudalismScene extends CardGameScene {
     card: DevelopmentCard,
   ): Phaser.GameObjects.Container {
     const container = this.add.container(x + MARKET_CARD_W / 2, y + MARKET_CARD_H / 2);
-    const bonusFill = GEM_FILL[card.bonus];
+    const bonusFill = RESOURCE_FILL[card.bonus];
 
     // Card background
     const bg = this.add.rectangle(0, 0, MARKET_CARD_W, MARKET_CARD_H, 0x1a1a1a);
@@ -537,14 +537,14 @@ export class FeudalismScene extends CardGameScene {
     // Bonus letter (top-right)
     const bonusLetter = this.add.text(
       MARKET_CARD_W / 2 - 10, -MARKET_CARD_H / 2 + 26,
-      gemAbbrev(card.bonus),
-      { fontSize: '16px', fontStyle: 'bold', color: GEM_TEXT_COLOR[card.bonus], fontFamily: FONT_FAMILY },
+      resourceAbbrev(card.bonus),
+      { fontSize: '16px', fontStyle: 'bold', color: RESOURCE_TEXT_COLOR[card.bonus], fontFamily: FONT_FAMILY },
     ).setOrigin(1, 0);
     container.add(bonusLetter);
 
-    // Cost (bottom area) — show as gem-colored cost chips
-    const costEntries: { color: GemColor; count: number }[] = [];
-    for (const c of GEM_COLORS) {
+    // Cost (bottom area) — show as resource-colored cost chips
+    const costEntries: { color: ResourceType; count: number }[] = [];
+    for (const c of RESOURCE_TYPES) {
       const n = card.cost[c] ?? 0;
       if (n > 0) costEntries.push({ color: c, count: n });
     }
@@ -552,12 +552,12 @@ export class FeudalismScene extends CardGameScene {
     for (let i = 0; i < costEntries.length; i++) {
       const cx = costStartX + i * 30;
       const cy = MARKET_CARD_H / 2 - 22;
-      const chip = this.add.circle(cx, cy, 13, GEM_FILL[costEntries[i].color], 0.9);
+      const chip = this.add.circle(cx, cy, 13, RESOURCE_FILL[costEntries[i].color], 0.9);
       chip.setStrokeStyle(1, 0x888888);
       container.add(chip);
       const ct = this.add.text(cx, cy, `${costEntries[i].count}`, {
         fontSize: '14px', fontStyle: 'bold',
-        color: GEM_TEXT_COLOR[costEntries[i].color], fontFamily: FONT_FAMILY,
+        color: RESOURCE_TEXT_COLOR[costEntries[i].color], fontFamily: FONT_FAMILY,
       }).setOrigin(0.5);
       container.add(ct);
     }
@@ -615,9 +615,9 @@ export class FeudalismScene extends CardGameScene {
       ).setOrigin(0.5);
       this.nobleContainer.add(nobleLabel);
 
-      // Requirements — show as gem chips in a row near bottom
-      const reqs: { color: GemColor; count: number }[] = [];
-      for (const c of GEM_COLORS) {
+      // Requirements — show as resource chips in a row near bottom
+      const reqs: { color: ResourceType; count: number }[] = [];
+      for (const c of RESOURCE_TYPES) {
         const n = noble.requirements[c] ?? 0;
         if (n > 0) reqs.push({ color: c, count: n });
       }
@@ -626,12 +626,12 @@ export class FeudalismScene extends CardGameScene {
       for (let j = 0; j < reqs.length; j++) {
         const rx = reqStartX + j * chipSpacing;
         const ry = y + NOBLE_H - 26;
-        const chip = this.add.circle(rx, ry, 13, GEM_FILL[reqs[j].color], 0.9);
+        const chip = this.add.circle(rx, ry, 13, RESOURCE_FILL[reqs[j].color], 0.9);
         chip.setStrokeStyle(1, 0x888888);
         this.nobleContainer.add(chip);
         const ct = this.add.text(rx, ry, `${reqs[j].count}`, {
           fontSize: '15px', fontStyle: 'bold',
-          color: GEM_TEXT_COLOR[reqs[j].color], fontFamily: FONT_FAMILY,
+          color: RESOURCE_TEXT_COLOR[reqs[j].color], fontFamily: FONT_FAMILY,
         }).setOrigin(0.5);
         this.nobleContainer.add(ct);
       }
@@ -650,7 +650,7 @@ export class FeudalismScene extends CardGameScene {
     ).setOrigin(0.5, 1);
     this.supplyContainer.add(label);
 
-    const allColors: GemOrGold[] = [...GEM_COLORS, 'gold'];
+    const allColors: ResourceOrWild[] = [...RESOURCE_TYPES, 'gold'];
 
     for (let i = 0; i < allColors.length; i++) {
       const color = allColors[i];
@@ -658,7 +658,7 @@ export class FeudalismScene extends CardGameScene {
       const count = tokenCount(this.session.tokenSupply, color);
 
       // Token circle
-      const circle = this.add.circle(SUPPLY_X, y, SUPPLY_TOKEN_R, GEM_FILL[color]);
+      const circle = this.add.circle(SUPPLY_X, y, SUPPLY_TOKEN_R, RESOURCE_FILL[color]);
       circle.setStrokeStyle(2, 0xffffff);
       if (count === 0) circle.setAlpha(0.3);
       this.supplyContainer.add(circle);
@@ -667,19 +667,19 @@ export class FeudalismScene extends CardGameScene {
       const countText = this.add.text(
         SUPPLY_X, y,
         `${count}`,
-        { fontSize: '20px', fontStyle: 'bold', color: GEM_TEXT_COLOR[color], fontFamily: FONT_FAMILY },
+        { fontSize: '20px', fontStyle: 'bold', color: RESOURCE_TEXT_COLOR[color], fontFamily: FONT_FAMILY },
       ).setOrigin(0.5);
       this.supplyContainer.add(countText);
 
       // Color abbreviation — left of circle so it doesn't clip the canvas edge
       const abbr = this.add.text(
         SUPPLY_X - SUPPLY_TOKEN_R - 8, y,
-        gemDisplayName(color),
+        resourceDisplayName(color),
         { fontSize: '15px', color: '#aaaaaa', fontFamily: FONT_FAMILY },
       ).setOrigin(1, 0.5);
       this.supplyContainer.add(abbr);
 
-      // Interactivity for gem colors (not gold) during token selection
+      // Interactivity for resource types (not gold) during token selection
       if (color !== 'gold' && count > 0 && this.turnPhase === 'selecting-tokens') {
         circle.setInteractive({ useHandCursor: true });
         circle.on('pointerdown', () => this.onSupplyTokenClick(color));
@@ -688,7 +688,7 @@ export class FeudalismScene extends CardGameScene {
       }
 
       // Check mark for selected tokens — right of circle
-      if (this.selectedTokens.includes(color as GemColor)) {
+      if (this.selectedTokens.includes(color as ResourceType)) {
         const check = this.add.text(
           SUPPLY_X + SUPPLY_TOKEN_R + 10, y,
           '✓',
@@ -744,17 +744,17 @@ export class FeudalismScene extends CardGameScene {
 
     let tx = PLAYER_AREA_X + 280;
     const tokCenterY = row0Y + 14;
-    for (const c of ALL_TOKEN_COLORS) {
+    for (const c of ALL_RESOURCE_TYPES) {
       const n = tokenCount(player.tokens, c);
       if (n === 0) continue;
 
-      const circle = this.add.circle(tx, tokCenterY, 14, GEM_FILL[c]);
+      const circle = this.add.circle(tx, tokCenterY, 14, RESOURCE_FILL[c]);
       circle.setStrokeStyle(1, 0xffffff);
       this.playerContainer.add(circle);
 
       const ct = this.add.text(
         tx, tokCenterY, `${n}`,
-        { fontSize: '13px', fontStyle: 'bold', color: GEM_TEXT_COLOR[c], fontFamily: FONT_FAMILY },
+        { fontSize: '13px', fontStyle: 'bold', color: RESOURCE_TEXT_COLOR[c], fontFamily: FONT_FAMILY },
       ).setOrigin(0.5);
       this.playerContainer.add(ct);
 
@@ -769,14 +769,14 @@ export class FeudalismScene extends CardGameScene {
       this.playerContainer.add(noTok);
     }
 
-    // ── Row 1: Gem placeholder sprites (all 5 always shown) ──
+    // ── Row 1: Resource placeholder sprites (all 5 always shown) ──
     const row1Y = row0Y + 32;
     const SLOT_W = 38;
     const SLOT_H = 50;
     const SLOT_GAP = 8;
 
     let sx = PLAYER_AREA_X;
-    for (const c of GEM_COLORS) {
+    for (const c of RESOURCE_TYPES) {
       const count = bonuses[c];
       const hasCards = count > 0;
       const alpha = hasCards ? 0.7 : 0.15;
@@ -784,16 +784,16 @@ export class FeudalismScene extends CardGameScene {
       // Card-shaped placeholder
       const slot = this.add.rectangle(
         sx + SLOT_W / 2, row1Y + SLOT_H / 2,
-        SLOT_W, SLOT_H, GEM_FILL[c], alpha,
+        SLOT_W, SLOT_H, RESOURCE_FILL[c], alpha,
       );
       slot.setStrokeStyle(1, hasCards ? 0xaaaaaa : 0x555555, hasCards ? 0.8 : 0.3);
       this.playerContainer.add(slot);
 
-      // Gem abbreviation at top
+      // Resource abbreviation at top
       const abbr = this.add.text(
         sx + SLOT_W / 2, row1Y + 10,
-        gemAbbrev(c),
-        { fontSize: '11px', fontStyle: 'bold', color: hasCards ? GEM_TEXT_COLOR[c] : '#666666', fontFamily: FONT_FAMILY },
+        resourceAbbrev(c),
+        { fontSize: '11px', fontStyle: 'bold', color: hasCards ? RESOURCE_TEXT_COLOR[c] : '#666666', fontFamily: FONT_FAMILY },
       ).setOrigin(0.5);
       this.playerContainer.add(abbr);
 
@@ -841,7 +841,7 @@ export class FeudalismScene extends CardGameScene {
     container.add(bg);
 
     // Bonus color dot
-    const dot = this.add.circle(-w / 2 + 12, -h / 2 + 12, 7, GEM_FILL[card.bonus]);
+    const dot = this.add.circle(-w / 2 + 12, -h / 2 + 12, 7, RESOURCE_FILL[card.bonus]);
     container.add(dot);
 
     // Points
@@ -923,19 +923,19 @@ export class FeudalismScene extends CardGameScene {
     let tx = AI_AREA_X - 220;
     const tokCenterY = row0Y + 14;
     let hasTokens = false;
-    const tokenColors = [...ALL_TOKEN_COLORS].reverse();
+    const tokenColors = [...ALL_RESOURCE_TYPES].reverse();
     for (const c of tokenColors) {
       const n = tokenCount(ai.tokens, c);
       if (n === 0) continue;
       hasTokens = true;
 
-      const circle = this.add.circle(tx, tokCenterY, 14, GEM_FILL[c]);
+      const circle = this.add.circle(tx, tokCenterY, 14, RESOURCE_FILL[c]);
       circle.setStrokeStyle(1, 0xffffff);
       this.aiContainer.add(circle);
 
       const ct = this.add.text(
         tx, tokCenterY, `${n}`,
-        { fontSize: '13px', fontStyle: 'bold', color: GEM_TEXT_COLOR[c], fontFamily: FONT_FAMILY },
+        { fontSize: '13px', fontStyle: 'bold', color: RESOURCE_TEXT_COLOR[c], fontFamily: FONT_FAMILY },
       ).setOrigin(0.5);
       this.aiContainer.add(ct);
 
@@ -950,32 +950,32 @@ export class FeudalismScene extends CardGameScene {
       this.aiContainer.add(noTok);
     }
 
-    // ── Row 1: Gem placeholder sprites (all 5 always shown) — right-aligned ──
+    // ── Row 1: Resource placeholder sprites (all 5 always shown) — right-aligned ──
     const row1Y = row0Y + 32;
     const SLOT_W = 38;
     const SLOT_H = 50;
     const SLOT_GAP = 8;
 
-    // Draw right-to-left so rightmost gem is near AI_AREA_X
+    // Draw right-to-left so rightmost resource is near AI_AREA_X
     let sx = AI_AREA_X - SLOT_W;
-    const gemColorsReversed = [...GEM_COLORS].reverse();
-    for (const c of gemColorsReversed) {
+    const resourceTypesReversed = [...RESOURCE_TYPES].reverse();
+    for (const c of resourceTypesReversed) {
       const count = bonuses[c];
       const hasCards = count > 0;
       const alpha = hasCards ? 0.7 : 0.15;
 
       const slot = this.add.rectangle(
         sx + SLOT_W / 2, row1Y + SLOT_H / 2,
-        SLOT_W, SLOT_H, GEM_FILL[c], alpha,
+        SLOT_W, SLOT_H, RESOURCE_FILL[c], alpha,
       );
       slot.setStrokeStyle(1, hasCards ? 0xaaaaaa : 0x555555, hasCards ? 0.8 : 0.3);
       this.aiContainer.add(slot);
 
-      // Gem abbreviation at top
+      // Resource abbreviation at top
       const abbr = this.add.text(
         sx + SLOT_W / 2, row1Y + 10,
-        gemAbbrev(c),
-        { fontSize: '11px', fontStyle: 'bold', color: hasCards ? GEM_TEXT_COLOR[c] : '#666666', fontFamily: FONT_FAMILY },
+        resourceAbbrev(c),
+        { fontSize: '11px', fontStyle: 'bold', color: hasCards ? RESOURCE_TEXT_COLOR[c] : '#666666', fontFamily: FONT_FAMILY },
       ).setOrigin(0.5);
       this.aiContainer.add(abbr);
 
@@ -1028,7 +1028,7 @@ export class FeudalismScene extends CardGameScene {
 
     if (this.turnPhase === 'player-turn') {
       // Calculate total width to centre the action bar
-      const availSame = GEM_COLORS.filter(
+      const availSame = RESOURCE_TYPES.filter(
         c => tokenCount(this.session.tokenSupply, c) >= 4,
       );
       // Take Tokens button (155) + gap (30) + Take2 label (80) + circles (54 each)
@@ -1057,7 +1057,7 @@ export class FeudalismScene extends CardGameScene {
         bx += 80;
 
         for (const c of availSame) {
-          const circle = this.add.circle(bx, by, 22, GEM_FILL[c]);
+          const circle = this.add.circle(bx, by, 22, RESOURCE_FILL[c]);
           circle.setStrokeStyle(1, 0xffffff);
           circle.setInteractive({ useHandCursor: true });
           circle.on('pointerdown', () => {
@@ -1069,8 +1069,8 @@ export class FeudalismScene extends CardGameScene {
           this.actionContainer.add(circle);
 
           const abbr = this.add.text(
-            bx, by, gemAbbrev(c),
-            { fontSize: '15px', fontStyle: 'bold', color: GEM_TEXT_COLOR[c], fontFamily: FONT_FAMILY },
+            bx, by, resourceAbbrev(c),
+            { fontSize: '15px', fontStyle: 'bold', color: RESOURCE_TEXT_COLOR[c], fontFamily: FONT_FAMILY },
           ).setOrigin(0.5);
           this.actionContainer.add(abbr);
           bx += 54;
@@ -1084,7 +1084,7 @@ export class FeudalismScene extends CardGameScene {
 
       // Show selected tokens and confirm/cancel buttons
       const selLabel = this.add.text(
-        bx, by - 2, `Selected: ${this.selectedTokens.map(c => gemAbbrev(c)).join(' ') || '(none)'}`,
+        bx, by - 2, `Selected: ${this.selectedTokens.map(c => resourceAbbrev(c)).join(' ') || '(none)'}`,
         { fontSize: '19px', fontStyle: 'bold', color: '#44ff44', fontFamily: FONT_FAMILY },
       );
       this.actionContainer.add(selLabel);
@@ -1172,12 +1172,12 @@ export class FeudalismScene extends CardGameScene {
     ).setOrigin(0.5).setDepth(11);
     this.discardContainer.add(title);
 
-    // Bonus gem placeholder sprites (show permanent bonuses for context)
+    // Bonus resource placeholder sprites (show permanent bonuses for context)
     const bonuses = getBonuses(player);
     const DSLOT_W = 32;
     const DSLOT_H = 42;
     const DSLOT_GAP = 6;
-    const totalSlotsW = GEM_COLORS.length * DSLOT_W + (GEM_COLORS.length - 1) * DSLOT_GAP;
+    const totalSlotsW = RESOURCE_TYPES.length * DSLOT_W + (RESOURCE_TYPES.length - 1) * DSLOT_GAP;
     let dsx = GAME_W / 2 - totalSlotsW / 2;
     const dsY = GAME_H / 2 - 76;
 
@@ -1188,22 +1188,22 @@ export class FeudalismScene extends CardGameScene {
     ).setOrigin(0, 0.5).setDepth(11);
     this.discardContainer.add(bonusLabel);
 
-    for (const c of GEM_COLORS) {
+    for (const c of RESOURCE_TYPES) {
       const count = bonuses[c];
       const hasCards = count > 0;
       const alpha = hasCards ? 0.7 : 0.15;
 
       const slot = this.add.rectangle(
         dsx + DSLOT_W / 2, dsY + DSLOT_H / 2,
-        DSLOT_W, DSLOT_H, GEM_FILL[c], alpha,
+        DSLOT_W, DSLOT_H, RESOURCE_FILL[c], alpha,
       ).setDepth(11);
       slot.setStrokeStyle(1, hasCards ? 0xaaaaaa : 0x555555, hasCards ? 0.8 : 0.3);
       this.discardContainer.add(slot);
 
       const abbr = this.add.text(
         dsx + DSLOT_W / 2, dsY + 8,
-        gemAbbrev(c),
-        { fontSize: '10px', fontStyle: 'bold', color: hasCards ? GEM_TEXT_COLOR[c] : '#666666', fontFamily: FONT_FAMILY },
+        resourceAbbrev(c),
+        { fontSize: '10px', fontStyle: 'bold', color: hasCards ? RESOURCE_TEXT_COLOR[c] : '#666666', fontFamily: FONT_FAMILY },
       ).setOrigin(0.5).setDepth(11);
       this.discardContainer.add(abbr);
 
@@ -1218,7 +1218,7 @@ export class FeudalismScene extends CardGameScene {
     }
 
     // Token buttons
-    const allColors: GemOrGold[] = [...GEM_COLORS, 'gold'];
+    const allColors: ResourceOrWild[] = [...RESOURCE_TYPES, 'gold'];
     const activeColors = allColors.filter(c => tokenCount(player.tokens, c) > 0);
     const totalW = activeColors.length * 70;
     let tx = GAME_W / 2 - totalW / 2 + 35;
@@ -1229,14 +1229,14 @@ export class FeudalismScene extends CardGameScene {
       const selected = this.discardSelection[c] ?? 0;
       const available = have - selected;
 
-      const circle = this.add.circle(tx, ty, 28, GEM_FILL[c]);
+      const circle = this.add.circle(tx, ty, 28, RESOURCE_FILL[c]);
       circle.setStrokeStyle(selected > 0 ? 2 : 1, selected > 0 ? 0xff4444 : 0xffffff);
       circle.setDepth(11);
       this.discardContainer.add(circle);
 
       const countText = this.add.text(
         tx, ty, `${have - selected}`,
-        { fontSize: '18px', fontStyle: 'bold', color: GEM_TEXT_COLOR[c], fontFamily: FONT_FAMILY },
+        { fontSize: '18px', fontStyle: 'bold', color: RESOURCE_TEXT_COLOR[c], fontFamily: FONT_FAMILY },
       ).setOrigin(0.5).setDepth(11);
       this.discardContainer.add(countText);
 
@@ -1294,7 +1294,7 @@ export class FeudalismScene extends CardGameScene {
         this.refreshAll();
         break;
       case 'selecting-tokens':
-        this.instructionText.setText('Click gems in the supply to select (up to 3 different)');
+        this.instructionText.setText('Click resources in the supply to select (up to 3 different)');
         this.refreshSupply();
         this.refreshActionButtons();
         break;
@@ -1315,7 +1315,7 @@ export class FeudalismScene extends CardGameScene {
 
   // ── Token selection logic ───────────────────────────────
 
-  private onSupplyTokenClick(color: GemColor): void {
+  private onSupplyTokenClick(color: ResourceType): void {
     if (this.turnPhase !== 'selecting-tokens') return;
 
     // Toggle selection
@@ -1345,7 +1345,7 @@ export class FeudalismScene extends CardGameScene {
 
     // If fewer than 3, must have fewer than 3 colors available
     if (this.selectedTokens.length < 3) {
-      const available = GEM_COLORS.filter(
+      const available = RESOURCE_TYPES.filter(
         c => tokenCount(this.session.tokenSupply, c) > 0,
       );
       if (available.length >= 3) return false;
@@ -1405,7 +1405,7 @@ export class FeudalismScene extends CardGameScene {
 
     // Card info
     const pts = card.points > 0 ? `${card.points} pt, ` : '';
-    const info = `T${card.tier} ${gemDisplayName(card.bonus)} bonus\n${pts}Cost: ${formatCost(card.cost)}`;
+    const info = `T${card.tier} ${resourceDisplayName(card.bonus)} bonus\n${pts}Cost: ${formatCost(card.cost)}`;
     const infoText = this.add.text(
       GAME_W / 2, GAME_H / 2 - 55, info,
       { fontSize: '18px', color: '#ffffff', fontFamily: FONT_FAMILY, align: 'center' },
@@ -1477,23 +1477,23 @@ export class FeudalismScene extends CardGameScene {
    */
   private getPlayerCardDest(playerIndex: number): { x: number; y: number } {
     if (playerIndex === 0) {
-      // Player gem slots area — centre of the Row 1 slot band
+      // Player resource slots area — centre of the Row 1 slot band
       const row1Y = PLAYER_AREA_Y + 32;
       const SLOT_W = 38;
       const SLOT_H = 50;
       const SLOT_GAP = 8;
-      const totalW = GEM_COLORS.length * SLOT_W + (GEM_COLORS.length - 1) * SLOT_GAP;
+      const totalW = RESOURCE_TYPES.length * SLOT_W + (RESOURCE_TYPES.length - 1) * SLOT_GAP;
       return {
         x: PLAYER_AREA_X + totalW / 2,
         y: row1Y + SLOT_H / 2,
       };
     }
-    // AI area — centre of the AI gem slots band (right-aligned)
+    // AI area — centre of the AI resource slots band (right-aligned)
     const row1Y = AI_AREA_Y + 32;
     const SLOT_W = 38;
     const SLOT_H = 50;
     const SLOT_GAP = 8;
-    const totalW = GEM_COLORS.length * SLOT_W + (GEM_COLORS.length - 1) * SLOT_GAP;
+    const totalW = RESOURCE_TYPES.length * SLOT_W + (RESOURCE_TYPES.length - 1) * SLOT_GAP;
     return {
       x: AI_AREA_X - totalW / 2,
       y: row1Y + SLOT_H / 2,
@@ -1564,7 +1564,7 @@ export class FeudalismScene extends CardGameScene {
     cx: number, cy: number, card: DevelopmentCard,
   ): Phaser.GameObjects.Container {
     const container = this.add.container(cx, cy).setDepth(15);
-    const bonusFill = GEM_FILL[card.bonus];
+    const bonusFill = RESOURCE_FILL[card.bonus];
 
     const bg = this.add.rectangle(0, 0, MARKET_CARD_W, MARKET_CARD_H, 0x1a1a1a);
     bg.setStrokeStyle(2, 0xffdd44);
@@ -1589,14 +1589,14 @@ export class FeudalismScene extends CardGameScene {
     // Bonus letter (top-right)
     const bonusLetter = this.add.text(
       MARKET_CARD_W / 2 - 10, -MARKET_CARD_H / 2 + 26,
-      gemAbbrev(card.bonus),
-      { fontSize: '16px', fontStyle: 'bold', color: GEM_TEXT_COLOR[card.bonus], fontFamily: FONT_FAMILY },
+      resourceAbbrev(card.bonus),
+      { fontSize: '16px', fontStyle: 'bold', color: RESOURCE_TEXT_COLOR[card.bonus], fontFamily: FONT_FAMILY },
     ).setOrigin(1, 0);
     container.add(bonusLetter);
 
     // Cost chips
-    const costEntries: { color: GemColor; count: number }[] = [];
-    for (const c of GEM_COLORS) {
+    const costEntries: { color: ResourceType; count: number }[] = [];
+    for (const c of RESOURCE_TYPES) {
       const n = card.cost[c] ?? 0;
       if (n > 0) costEntries.push({ color: c, count: n });
     }
@@ -1604,12 +1604,12 @@ export class FeudalismScene extends CardGameScene {
     for (let i = 0; i < costEntries.length; i++) {
       const chipX = costStartX + i * 30;
       const chipY = MARKET_CARD_H / 2 - 22;
-      const chip = this.add.circle(chipX, chipY, 13, GEM_FILL[costEntries[i].color], 0.9);
+      const chip = this.add.circle(chipX, chipY, 13, RESOURCE_FILL[costEntries[i].color], 0.9);
       chip.setStrokeStyle(1, 0x888888);
       container.add(chip);
       const ct = this.add.text(chipX, chipY, `${costEntries[i].count}`, {
         fontSize: '14px', fontStyle: 'bold',
-        color: GEM_TEXT_COLOR[costEntries[i].color], fontFamily: FONT_FAMILY,
+        color: RESOURCE_TEXT_COLOR[costEntries[i].color], fontFamily: FONT_FAMILY,
       }).setOrigin(0.5);
       container.add(ct);
     }
@@ -1640,8 +1640,8 @@ export class FeudalismScene extends CardGameScene {
     container.add(label);
 
     // Requirements
-    const reqs: { color: GemColor; count: number }[] = [];
-    for (const c of GEM_COLORS) {
+    const reqs: { color: ResourceType; count: number }[] = [];
+    for (const c of RESOURCE_TYPES) {
       const n = noble.requirements[c] ?? 0;
       if (n > 0) reqs.push({ color: c, count: n });
     }
@@ -1650,12 +1650,12 @@ export class FeudalismScene extends CardGameScene {
     for (let j = 0; j < reqs.length; j++) {
       const rx = reqStartX + j * chipSpacing;
       const ry = NOBLE_H / 2 - 26;
-      const chip = this.add.circle(rx, ry, 13, GEM_FILL[reqs[j].color], 0.9);
+      const chip = this.add.circle(rx, ry, 13, RESOURCE_FILL[reqs[j].color], 0.9);
       chip.setStrokeStyle(1, 0x888888);
       container.add(chip);
       const ct = this.add.text(rx, ry, `${reqs[j].count}`, {
         fontSize: '15px', fontStyle: 'bold',
-        color: GEM_TEXT_COLOR[reqs[j].color], fontFamily: FONT_FAMILY,
+        color: RESOURCE_TEXT_COLOR[reqs[j].color], fontFamily: FONT_FAMILY,
       }).setOrigin(0.5);
       container.add(ct);
     }
@@ -1808,7 +1808,7 @@ export class FeudalismScene extends CardGameScene {
     this.executeAction(action);
   }
 
-  private executeTakeSame(color: GemColor): void {
+  private executeTakeSame(color: ResourceType): void {
     const action: TurnAction = { type: 'take-same', color };
     this.executeAction(action);
   }
@@ -2112,9 +2112,9 @@ export class FeudalismScene extends CardGameScene {
       case 'reserve':
         return action.cardId != null ? 'AI reserves a card...' : 'AI reserves from deck...';
       case 'take-different':
-        return `AI takes ${action.colors.map(c => gemAbbrev(c)).join(', ')} tokens...`;
+        return `AI takes ${action.colors.map(c => resourceAbbrev(c)).join(', ')} tokens...`;
       case 'take-same':
-        return `AI takes 2 ${gemDisplayName(action.color)} tokens...`;
+        return `AI takes 2 ${resourceDisplayName(action.color)} tokens...`;
       default:
         return 'AI takes an action...';
     }
@@ -2225,7 +2225,7 @@ export class FeudalismScene extends CardGameScene {
   public loadBoardState(state: {
     playerStates: PlayerSnapshot[];
     market: MarketSnapshot;
-    tokenSupply: GemTokens;
+    tokenSupply: ResourceTokens;
     nobles: NobleTile[];
     phase: FeudalismPhase;
     currentPlayerIndex: number;

@@ -20,7 +20,7 @@
  */
 
 import { TranscriptRecorderBase } from '../../src/core-engine/TranscriptRecorder';
-import type { DevelopmentCard, NobleTile, GemTokens, Tier } from './FeudalismCards';
+import type { DevelopmentCard, NobleTile, ResourceTokens, Tier } from './FeudalismCards';
 import type {
   FeudalismSession,
   FeudalismPhase,
@@ -59,7 +59,7 @@ export function snapshotMarket(session: FeudalismSession): MarketSnapshot {
 export interface PlayerSnapshot {
   readonly name: string;
   readonly isAI: boolean;
-  readonly tokens: GemTokens;
+  readonly tokens: ResourceTokens;
   readonly purchasedCards: DevelopmentCard[];
   readonly reservedCards: DevelopmentCard[];
   readonly nobles: NobleTile[];
@@ -69,7 +69,7 @@ export interface PlayerSnapshot {
 
 /** Create a serializable snapshot of a player's state. */
 export function snapshotPlayer(
-  player: { name: string; isAI: boolean; tokens: GemTokens; purchasedCards: DevelopmentCard[]; reservedCards: DevelopmentCard[]; nobles: NobleTile[] },
+  player: { name: string; isAI: boolean; tokens: ResourceTokens; purchasedCards: DevelopmentCard[]; reservedCards: DevelopmentCard[]; nobles: NobleTile[] },
 ): PlayerSnapshot {
   // Calculate prestige and bonuses using the game helpers
   const prestige = getPrestige(player as Parameters<typeof getPrestige>[0]);
@@ -110,7 +110,7 @@ export interface FeudalismTurnRecord {
   /** Market snapshot AFTER the turn. */
   readonly market: MarketSnapshot;
   /** Token supply AFTER the turn. */
-  readonly tokenSupply: GemTokens;
+  readonly tokenSupply: ResourceTokens;
   /** Remaining nobles AFTER the turn. */
   readonly nobles: NobleTile[];
 }
@@ -124,7 +124,7 @@ export interface FeudalismInitialState {
   /** Market snapshot after setup. */
   readonly market: MarketSnapshot;
   /** Token supply after setup. */
-  readonly tokenSupply: GemTokens;
+  readonly tokenSupply: ResourceTokens;
   /** Noble tiles available. */
   readonly nobles: NobleTile[];
   /** Number of players. */

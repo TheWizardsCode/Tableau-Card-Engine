@@ -8,10 +8,10 @@
  */
 
 import {
-  type GemColor,
-  type GemTokens,
-  GEM_COLORS,
-  ALL_TOKEN_COLORS,
+  type ResourceType,
+  type ResourceTokens,
+  RESOURCE_TYPES,
+  ALL_RESOURCE_TYPES,
   tokenCount,
 } from './FeudalismCards';
 import {
@@ -109,7 +109,7 @@ export const GreedyStrategy: FeudalismAiStrategy = {
 
         const eff = effectiveCost(card.cost, bonuses);
         let totalNeeded = 0;
-        for (const c of GEM_COLORS) {
+        for (const c of RESOURCE_TYPES) {
           totalNeeded += Math.max(0, (eff[c] ?? 0) - tokenCount(player.tokens, c));
         }
         const score = card.points * 10 - totalNeeded;
@@ -139,7 +139,7 @@ export const GreedyStrategy: FeudalismAiStrategy = {
       for (const card of allCards) {
         const eff = effectiveCost(card.cost, bonuses);
         let shortfall = 0;
-        for (const c of GEM_COLORS) {
+        for (const c of RESOURCE_TYPES) {
           shortfall += Math.max(0, (eff[c] ?? 0) - tokenCount(player.tokens, c));
         }
         const value = card.points * 10 - shortfall;
@@ -218,7 +218,7 @@ export class FeudalismAiPlayer extends AiPlayerBase<FeudalismAiStrategy> {
 function scoreNobleProgress(
   session: FeudalismSession,
   player: FeudalismPlayerState,
-  bonusColor: GemColor,
+  bonusColor: ResourceType,
 ): number {
   const bonuses = getBonuses(player);
   let bestScore = 0;
@@ -229,7 +229,7 @@ function scoreNobleProgress(
       // This bonus brings us closer to this noble
       let totalProgress = 0;
       let totalReq = 0;
-      for (const c of GEM_COLORS) {
+      for (const c of RESOURCE_TYPES) {
         const r = noble.requirements[c] ?? 0;
         totalReq += r;
         totalProgress += Math.min(bonuses[c] + (c === bonusColor ? 1 : 0), r);
@@ -247,9 +247,9 @@ function buildRandomDiscard(
   excess: number,
   rng: () => number,
 ): TokenDiscard {
-  const tokens: GemTokens = {};
+  const tokens: ResourceTokens = {};
   let remaining = excess;
-  const colors = [...ALL_TOKEN_COLORS].filter(c => tokenCount(player.tokens, c) > 0);
+  const colors = [...ALL_RESOURCE_TYPES].filter(c => tokenCount(player.tokens, c) > 0);
 
   while (remaining > 0 && colors.length > 0) {
     const idx = Math.floor(rng() * colors.length);
@@ -279,13 +279,13 @@ function buildSmartDiscard(
 
   // Calculate usefulness of each color
   const usefulness: Record<string, number> = {};
-  for (const c of ALL_TOKEN_COLORS) {
+  for (const c of ALL_RESOURCE_TYPES) {
     usefulness[c] = 0;
   }
 
   for (const card of allCards) {
     const eff = effectiveCost(card.cost, bonuses);
-    for (const c of GEM_COLORS) {
+    for (const c of RESOURCE_TYPES) {
       const need = (eff[c] ?? 0) - tokenCount(player.tokens, c);
       if (need < 0) {
         // We have more than needed — this color is less useful per excess token
@@ -299,10 +299,10 @@ function buildSmartDiscard(
   usefulness.gold = 100;
 
   // Discard least useful tokens
-  const tokens: GemTokens = {};
+  const tokens: ResourceTokens = {};
   let remaining = excess;
 
-  const sortedColors = [...ALL_TOKEN_COLORS]
+  const sortedColors = [...ALL_RESOURCE_TYPES]
     .filter(c => tokenCount(player.tokens, c) > 0)
     .sort((a, b) => usefulness[a] - usefulness[b]);
 

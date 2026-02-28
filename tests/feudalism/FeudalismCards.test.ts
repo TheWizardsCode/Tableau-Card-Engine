@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  GEM_COLORS,
-  ALL_TOKEN_COLORS,
+  RESOURCE_TYPES,
+  ALL_RESOURCE_TYPES,
   ALL_DEVELOPMENT_CARDS,
   ALL_NOBLES,
   TIER_1_COUNT,
@@ -24,9 +24,9 @@ import {
   formatCost,
   cardLabel,
   nobleLabel,
-  gemAbbrev,
-  gemDisplayName,
-  type GemTokens,
+  resourceAbbrev,
+  resourceDisplayName,
+  type ResourceTokens,
 } from '../../example-games/feudalism/FeudalismCards';
 
 // ---------------------------------------------------------------------------
@@ -46,17 +46,17 @@ describe('FeudalismCards', () => {
   // -------------------------------------------------------------------------
   describe('constants', () => {
     it('has 5 gem colors', () => {
-      expect(GEM_COLORS).toHaveLength(5);
-      expect(GEM_COLORS).toContain('emerald');
-      expect(GEM_COLORS).toContain('sapphire');
-      expect(GEM_COLORS).toContain('ruby');
-      expect(GEM_COLORS).toContain('diamond');
-      expect(GEM_COLORS).toContain('onyx');
+      expect(RESOURCE_TYPES).toHaveLength(5);
+      expect(RESOURCE_TYPES).toContain('emerald');
+      expect(RESOURCE_TYPES).toContain('sapphire');
+      expect(RESOURCE_TYPES).toContain('ruby');
+      expect(RESOURCE_TYPES).toContain('diamond');
+      expect(RESOURCE_TYPES).toContain('onyx');
     });
 
     it('has 6 token colors (gems + gold)', () => {
-      expect(ALL_TOKEN_COLORS).toHaveLength(6);
-      expect(ALL_TOKEN_COLORS).toContain('gold');
+      expect(ALL_RESOURCE_TYPES).toHaveLength(6);
+      expect(ALL_RESOURCE_TYPES).toContain('gold');
     });
 
     it('has correct game constants', () => {
@@ -107,7 +107,7 @@ describe('FeudalismCards', () => {
 
     it('every card has a valid bonus color (not gold)', () => {
       for (const c of ALL_DEVELOPMENT_CARDS) {
-        expect(GEM_COLORS).toContain(c.bonus);
+        expect(RESOURCE_TYPES).toContain(c.bonus);
       }
     });
 
@@ -120,7 +120,7 @@ describe('FeudalismCards', () => {
     it('every card cost uses only gem colors (no gold)', () => {
       for (const c of ALL_DEVELOPMENT_CARDS) {
         expect(c.cost).not.toHaveProperty('gold');
-        for (const color of GEM_COLORS) {
+        for (const color of RESOURCE_TYPES) {
           const val = c.cost[color];
           if (val !== undefined) {
             expect(val).toBeGreaterThan(0);
@@ -131,7 +131,7 @@ describe('FeudalismCards', () => {
 
     it('tier 1 has 8 cards of each bonus color', () => {
       const tier1 = ALL_DEVELOPMENT_CARDS.filter(c => c.tier === 1);
-      for (const color of GEM_COLORS) {
+      for (const color of RESOURCE_TYPES) {
         const count = tier1.filter(c => c.bonus === color).length;
         expect(count).toBe(8);
       }
@@ -139,7 +139,7 @@ describe('FeudalismCards', () => {
 
     it('tier 2 has 6 cards of each bonus color', () => {
       const tier2 = ALL_DEVELOPMENT_CARDS.filter(c => c.tier === 2);
-      for (const color of GEM_COLORS) {
+      for (const color of RESOURCE_TYPES) {
         const count = tier2.filter(c => c.bonus === color).length;
         expect(count).toBe(6);
       }
@@ -147,7 +147,7 @@ describe('FeudalismCards', () => {
 
     it('tier 3 has 4 cards of each bonus color', () => {
       const tier3 = ALL_DEVELOPMENT_CARDS.filter(c => c.tier === 3);
-      for (const color of GEM_COLORS) {
+      for (const color of RESOURCE_TYPES) {
         const count = tier3.filter(c => c.bonus === color).length;
         expect(count).toBe(4);
       }
@@ -200,7 +200,7 @@ describe('FeudalismCards', () => {
     it('all noble requirements use only gem colors (no gold)', () => {
       for (const n of ALL_NOBLES) {
         expect(n.requirements).not.toHaveProperty('gold');
-        for (const color of GEM_COLORS) {
+        for (const color of RESOURCE_TYPES) {
           const val = n.requirements[color];
           if (val !== undefined) {
             expect(val).toBeGreaterThan(0);
@@ -211,7 +211,7 @@ describe('FeudalismCards', () => {
 
     it('nobles require either 2 colors at 4 each or 3 colors at 3 each', () => {
       for (const n of ALL_NOBLES) {
-        const values = GEM_COLORS.map(c => n.requirements[c] ?? 0).filter(v => v > 0);
+        const values = RESOURCE_TYPES.map(c => n.requirements[c] ?? 0).filter(v => v > 0);
         const isType1 = values.length === 2 && values.every(v => v === 4);
         const isType2 = values.length === 3 && values.every(v => v === 3);
         expect(isType1 || isType2).toBe(true);
@@ -238,8 +238,8 @@ describe('FeudalismCards', () => {
     });
 
     it('addTokens combines two bags', () => {
-      const a: GemTokens = { ruby: 2, emerald: 1 };
-      const b: GemTokens = { ruby: 1, sapphire: 3 };
+      const a: ResourceTokens = { ruby: 2, emerald: 1 };
+      const b: ResourceTokens = { ruby: 1, sapphire: 3 };
       const result = addTokens(a, b);
       expect(result.ruby).toBe(3);
       expect(result.emerald).toBe(1);
@@ -247,8 +247,8 @@ describe('FeudalismCards', () => {
     });
 
     it('subtractTokens subtracts b from a', () => {
-      const a: GemTokens = { ruby: 5, emerald: 3 };
-      const b: GemTokens = { ruby: 2, emerald: 1 };
+      const a: ResourceTokens = { ruby: 5, emerald: 3 };
+      const b: ResourceTokens = { ruby: 2, emerald: 1 };
       const result = subtractTokens(a, b);
       expect(result.ruby).toBe(3);
       expect(result.emerald).toBe(2);
@@ -261,7 +261,7 @@ describe('FeudalismCards', () => {
   describe('createTokenSupply', () => {
     it('2-player supply has 4 of each gem + 5 gold', () => {
       const supply = createTokenSupply(2);
-      for (const c of GEM_COLORS) {
+      for (const c of RESOURCE_TYPES) {
         expect(supply[c]).toBe(4);
       }
       expect(supply.gold).toBe(5);
@@ -269,7 +269,7 @@ describe('FeudalismCards', () => {
 
     it('3-player supply has 5 of each gem + 5 gold', () => {
       const supply = createTokenSupply(3);
-      for (const c of GEM_COLORS) {
+      for (const c of RESOURCE_TYPES) {
         expect(supply[c]).toBe(5);
       }
       expect(supply.gold).toBe(5);
@@ -277,7 +277,7 @@ describe('FeudalismCards', () => {
 
     it('4-player supply has 7 of each gem + 5 gold', () => {
       const supply = createTokenSupply(4);
-      for (const c of GEM_COLORS) {
+      for (const c of RESOURCE_TYPES) {
         expect(supply[c]).toBe(7);
       }
       expect(supply.gold).toBe(5);
@@ -380,18 +380,18 @@ describe('FeudalismCards', () => {
   // Label helpers
   // -------------------------------------------------------------------------
   describe('label helpers', () => {
-    it('gemAbbrev returns correct abbreviations', () => {
-      expect(gemAbbrev('emerald')).toBe('G');
-      expect(gemAbbrev('sapphire')).toBe('U');
-      expect(gemAbbrev('ruby')).toBe('R');
-      expect(gemAbbrev('diamond')).toBe('W');
-      expect(gemAbbrev('onyx')).toBe('K');
-      expect(gemAbbrev('gold')).toBe('$');
+    it('resourceAbbrev returns correct abbreviations', () => {
+      expect(resourceAbbrev('emerald')).toBe('G');
+      expect(resourceAbbrev('sapphire')).toBe('U');
+      expect(resourceAbbrev('ruby')).toBe('R');
+      expect(resourceAbbrev('diamond')).toBe('W');
+      expect(resourceAbbrev('onyx')).toBe('K');
+      expect(resourceAbbrev('gold')).toBe('$');
     });
 
-    it('gemDisplayName capitalizes first letter', () => {
-      expect(gemDisplayName('emerald')).toBe('Emerald');
-      expect(gemDisplayName('gold')).toBe('Gold');
+    it('resourceDisplayName capitalizes first letter', () => {
+      expect(resourceDisplayName('emerald')).toBe('Emerald');
+      expect(resourceDisplayName('gold')).toBe('Gold');
     });
 
     it('formatCost renders cost components', () => {
