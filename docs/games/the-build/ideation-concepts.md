@@ -41,12 +41,12 @@ Combines the universally familiar tri-peaks solitaire with spatial grid building
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Card System (custom room cards) | Minor extension | Need custom card types beyond standard playing cards (already proven by Sushi Go, Splendor) |
+| Card System (custom room cards) | Minor extension | Need custom card types beyond standard playing cards (already proven by Sushi Go, Feudalism) |
 | Standard deck for solitaire | Existing | `createStandardDeck()`, `shuffleArray()`, `rankValue()` |
 | Seeded RNG | Existing | `createSeededRng()` |
 | Grid/spatial placement | **NEW** | Need a `Grid<T>` abstraction for the cottage layout |
 | Adjacency evaluation | **NEW** | Need adjacency-based synergy resolver |
-| Resource tracking | Minor extension | Generalize Splendor's `GemTokens` into `ResourceBank` |
+| Resource tracking | Minor extension | Generalize Feudalism's `GemTokens` into `ResourceBank` |
 | Market row | **NEW** | Need reusable `Market<T>` component |
 | Seasonal/round timer | Minor extension | `PhaseManager` can handle this with some extension |
 | Scoring system | Game-specific | Build on existing patterns |

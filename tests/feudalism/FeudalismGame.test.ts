@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  setupSplendorGame,
+  setupFeudalismGame,
   getCurrentPlayer,
   getPrestige,
   getBonuses,
@@ -13,9 +13,9 @@ import {
   executeTurn,
   discardTokens,
   validateAction,
-  type SplendorSession,
-  type SplendorPlayerState,
-} from '../../example-games/splendor/SplendorGame';
+  type FeudalismSession,
+  type FeudalismPlayerState,
+} from '../../example-games/feudalism/FeudalismGame';
 import {
   type DevelopmentCard,
   type NobleTile,
@@ -26,15 +26,15 @@ import {
   MAX_TOKENS,
   MAX_RESERVED,
   MARKET_SIZE,
-} from '../../example-games/splendor/SplendorCards';
+} from '../../example-games/feudalism/FeudalismCards';
 import { createSeededRng } from '../../src/core-engine/SeededRng';
 
 // ---------------------------------------------------------------------------
 // Deterministic RNG
 // ---------------------------------------------------------------------------
 
-function createTestSession(seed = 42): SplendorSession {
-  return setupSplendorGame({
+function createTestSession(seed = 42): FeudalismSession {
+  return setupFeudalismGame({
     playerCount: 2,
     playerNames: ['Alice', 'Bot'],
     isAI: [false, true],
@@ -42,11 +42,11 @@ function createTestSession(seed = 42): SplendorSession {
   });
 }
 
-describe('SplendorGame', () => {
+describe('FeudalismGame', () => {
   // -------------------------------------------------------------------------
   // Setup
   // -------------------------------------------------------------------------
-  describe('setupSplendorGame', () => {
+  describe('setupFeudalismGame', () => {
     it('creates a 2-player session with correct defaults', () => {
       const session = createTestSession();
       expect(session.players).toHaveLength(2);
@@ -102,8 +102,8 @@ describe('SplendorGame', () => {
     });
 
     it('throws for invalid player count', () => {
-      expect(() => setupSplendorGame({ playerCount: 1 })).toThrow();
-      expect(() => setupSplendorGame({ playerCount: 5 })).toThrow();
+      expect(() => setupFeudalismGame({ playerCount: 1 })).toThrow();
+      expect(() => setupFeudalismGame({ playerCount: 5 })).toThrow();
     });
   });
 
@@ -156,7 +156,7 @@ describe('SplendorGame', () => {
     });
 
     it('canAfford returns true when player has enough tokens + bonuses', () => {
-      const player: SplendorPlayerState = {
+      const player: FeudalismPlayerState = {
         name: 'Test',
         isAI: false,
         tokens: { ruby: 2, sapphire: 1 },
@@ -173,7 +173,7 @@ describe('SplendorGame', () => {
     });
 
     it('canAfford uses gold as wild', () => {
-      const player: SplendorPlayerState = {
+      const player: FeudalismPlayerState = {
         name: 'Test',
         isAI: false,
         tokens: { ruby: 1, gold: 2 },
@@ -188,7 +188,7 @@ describe('SplendorGame', () => {
     });
 
     it('canAfford returns false when insufficient', () => {
-      const player: SplendorPlayerState = {
+      const player: FeudalismPlayerState = {
         name: 'Test',
         isAI: false,
         tokens: { ruby: 1 },
@@ -203,7 +203,7 @@ describe('SplendorGame', () => {
     });
 
     it('nobleQualifies checks bonus requirements', () => {
-      const player: SplendorPlayerState = {
+      const player: FeudalismPlayerState = {
         name: 'Test',
         isAI: false,
         tokens: {},
@@ -225,7 +225,7 @@ describe('SplendorGame', () => {
     });
 
     it('nobleQualifies returns false when requirements not met', () => {
-      const player: SplendorPlayerState = {
+      const player: FeudalismPlayerState = {
         name: 'Test',
         isAI: false,
         tokens: {},

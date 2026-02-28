@@ -1,14 +1,14 @@
 /**
  * GameTranscript.ts
  *
- * Transcript types and recorder for Splendor.
+ * Transcript types and recorder for Feudalism.
  *
  * Records a replay-ready JSON transcript capturing every turn action,
  * noble visits, token discards, and the final game outcome.  The
  * transcript stores full board-state snapshots after each turn so that
  * the replay adapter can inject any state without reconstruction.
  *
- * Splendor cards and nobles are already plain serializable objects
+ * Feudalism cards and nobles are already plain serializable objects
  * (readonly properties with `id`, `tier`, `cost`, `bonus`, `points`
  * etc.) so they can be snapshot directly without transformation.
  *
@@ -20,15 +20,15 @@
  */
 
 import { TranscriptRecorderBase } from '../../src/core-engine/TranscriptRecorder';
-import type { DevelopmentCard, NobleTile, GemTokens, Tier } from './SplendorCards';
+import type { DevelopmentCard, NobleTile, GemTokens, Tier } from './FeudalismCards';
 import type {
-  SplendorSession,
-  SplendorPhase,
+  FeudalismSession,
+  FeudalismPhase,
   TurnAction,
   TurnResult,
   TokenDiscard,
-} from './SplendorGame';
-import { getPrestige, getBonuses } from './SplendorGame';
+} from './FeudalismGame';
+import { getPrestige, getBonuses } from './FeudalismGame';
 
 // ── Market snapshot ────────────────────────────────────────
 
@@ -45,7 +45,7 @@ export interface MarketTierSnapshot {
 export type MarketSnapshot = MarketTierSnapshot[];
 
 /** Create a serializable snapshot of the market. */
-export function snapshotMarket(session: SplendorSession): MarketSnapshot {
+export function snapshotMarket(session: FeudalismSession): MarketSnapshot {
   return ([1, 2, 3] as Tier[]).map((tier) => ({
     tier,
     visible: session.market[tier].visible.map((c) => (c ? { ...c } : null)),
@@ -89,8 +89,8 @@ export function snapshotPlayer(
 
 // ── Turn record ────────────────────────────────────────────
 
-/** Record of a single turn in a Splendor game. */
-export interface SplendorTurnRecord {
+/** Record of a single turn in a Feudalism game. */
+export interface FeudalismTurnRecord {
   /** Global turn number (0-based). */
   readonly turnNumber: number;
   /** Index of the player who took this turn. */
@@ -102,7 +102,7 @@ export interface SplendorTurnRecord {
   /** Tokens discarded if the player was over the limit. */
   readonly tokenDiscard: TokenDiscard | null;
   /** Game phase after this turn. */
-  readonly phase: SplendorPhase;
+  readonly phase: FeudalismPhase;
   /** Whether the game ended after this turn. */
   readonly gameOver: boolean;
   /** Full player state snapshots AFTER the turn. */
@@ -118,7 +118,7 @@ export interface SplendorTurnRecord {
 // ── Transcript ─────────────────────────────────────────────
 
 /** Initial state snapshot (after setup, before first turn). */
-export interface SplendorInitialState {
+export interface FeudalismInitialState {
   /** Player state snapshots after setup. */
   readonly playerStates: PlayerSnapshot[];
   /** Market snapshot after setup. */
@@ -132,7 +132,7 @@ export interface SplendorInitialState {
 }
 
 /** Final game results. */
-export interface SplendorGameResults {
+export interface FeudalismGameResults {
   /** Final prestige per player. */
   readonly finalPrestige: number[];
   /** Final card counts per player. */
@@ -143,44 +143,44 @@ export interface SplendorGameResults {
   readonly winnerName: string;
 }
 
-/** A complete Splendor game transcript. */
-export interface SplendorTranscript {
+/** A complete Feudalism game transcript. */
+export interface FeudalismTranscript {
   /** Format version. */
   readonly version: 1;
   /** Game type identifier for adapter matching. */
-  readonly gameType: 'splendor';
+  readonly gameType: 'feudalism';
   /** ISO 8601 timestamp when the game started. */
   startedAt: string;
   /** ISO 8601 timestamp when the game ended (empty until finalized). */
   endedAt: string;
   /** Initial state snapshot. */
-  readonly initialState: SplendorInitialState;
+  readonly initialState: FeudalismInitialState;
   /** All turn records in chronological order. */
-  readonly turns: SplendorTurnRecord[];
+  readonly turns: FeudalismTurnRecord[];
   /** Final results (null until finalized). */
-  results: SplendorGameResults | null;
+  results: FeudalismGameResults | null;
 }
 
 // ── Recorder ───────────────────────────────────────────────
 
 /**
- * Records a Splendor game transcript by capturing state after each turn.
+ * Records a Feudalism game transcript by capturing state after each turn.
  *
  * Usage:
- * 1. Create after `setupSplendorGame()`.
+ * 1. Create after `setupFeudalismGame()`.
  * 2. Call `recordTurn(action, result, tokenDiscard?)` after each
  *    completed turn (including any discard step).
  * 3. Call `finalize(winnerIndex)` when the game ends.
  */
-export class SplendorTranscriptRecorder extends TranscriptRecorderBase<SplendorTranscript> {
-  private readonly session: SplendorSession;
+export class FeudalismTranscriptRecorder extends TranscriptRecorderBase<FeudalismTranscript> {
+  private readonly session: FeudalismSession;
   private sealed = false;
   private turnCounter = 0;
 
-  constructor(session: SplendorSession) {
+  constructor(session: FeudalismSession) {
     super({
       version: 1,
-      gameType: 'splendor',
+      gameType: 'feudalism',
       startedAt: new Date().toISOString(),
       endedAt: '',
       initialState: {
@@ -216,7 +216,7 @@ export class SplendorTranscriptRecorder extends TranscriptRecorderBase<SplendorT
   ): void {
     if (this.sealed) return;
 
-    const turnRecord: SplendorTurnRecord = {
+    const turnRecord: FeudalismTurnRecord = {
       turnNumber: this.turnCounter++,
       playerIndex,
       action: { ...action } as TurnAction,
@@ -239,7 +239,7 @@ export class SplendorTranscriptRecorder extends TranscriptRecorderBase<SplendorT
    * @param winnerIndex - Index of the winning player.
    * @returns The sealed transcript.
    */
-  finalize(winnerIndex: number): SplendorTranscript {
+  finalize(winnerIndex: number): FeudalismTranscript {
     if (this.sealed) return this.transcript;
 
     this.transcript.endedAt = new Date().toISOString();

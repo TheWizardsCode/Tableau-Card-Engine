@@ -115,7 +115,7 @@ After this, every push to `main` will automatically deploy.
 
 1. Check the **Actions** tab in the repository for the latest workflow run
 2. Visit `https://thewizardscode.github.io/Tableau-Card-Engine/` to confirm the site loads
-3. Verify all games (9-Card Golf, Beleaguered Castle, Sushi Go!, Splendor, Lost Cities, The Mind) are playable and card assets load correctly
+3. Verify all games (9-Card Golf, Beleaguered Castle, Sushi Go!, Feudalism, Lost Cities, The Mind) are playable and card assets load correctly
 
 ## Testing
 
@@ -243,15 +243,15 @@ example-games/
 │   ├── help-content.json       Help panel content
 │   └── scenes/
 │       └── SushiGoScene.ts     Phaser scene (drafting UI, card picking)
-├── splendor/
+├── feudalism/
 │   ├── main.ts                 Game entry point
-│   ├── createSplendorGame.ts   Factory function (used by main.ts and tests)
-│   ├── SplendorCards.ts        Development cards, nobles, gem types, tier data
-│   ├── SplendorGame.ts         Game orchestration (token collection, purchases, nobles)
+│   ├── createFeudalismGame.ts   Factory function (used by main.ts and tests)
+│   ├── FeudalismCards.ts        Development cards, nobles, gem types, tier data
+│   ├── FeudalismGame.ts         Game orchestration (token collection, purchases, nobles)
 │   ├── AiStrategy.ts           AI strategies (RandomStrategy, GreedyStrategy)
 │   ├── help-content.json       Help panel content
 │   └── scenes/
-│       └── SplendorScene.ts    Phaser scene (gem tokens, card market, purchases)
+│       └── FeudalismScene.ts    Phaser scene (gem tokens, card market, purchases)
 └── lost-cities/
     ├── LostCitiesCards.ts      Card types, deck factory, 5 expedition colors, card helpers
     ├── LostCitiesRules.ts      Two-phase turn model, ascending-play validation, legality checks
@@ -286,7 +286,7 @@ scripts/
     ├── LostCitiesReplayAdapter.ts
     ├── TheMindReplayAdapter.ts
     ├── SushiGoReplayAdapter.ts
-    ├── SplendorReplayAdapter.ts
+    ├── FeudalismReplayAdapter.ts
     └── GolfReplayAdapter.ts        (structural detection fallback -- registered last)
 
 public/assets/
@@ -298,7 +298,7 @@ public/assets/
 │   ├── lost-cities/thumbnail.png
 │   ├── the-mind/thumbnail.png
 │   ├── sushi-go/thumbnail.png
-│   └── splendor/thumbnail.png
+│   └── feudalism/thumbnail.png
 └── CREDITS.md              Asset attribution
 
 tests/
@@ -310,7 +310,7 @@ tests/
 ├── golf/                   Golf game unit + integration + browser tests
 ├── beleaguered-castle/     Beleaguered Castle unit + integration tests
 ├── sushi-go/               Sushi Go! cards, scoring, game, AI tests
-├── splendor/               Splendor cards, game, AI tests
+├── feudalism/               Feudalism cards, game, AI tests
 ├── the-mind/               The Mind cards, game state, AI, transcript, auto-play, integration tests
 ├── lost-cities/            Lost Cities cards, scoring, rules, game, AI, transcript tests
 └── replay/                 Replay CLI validation tests
@@ -502,9 +502,9 @@ Tests are in `tests/sushi-go/`:
 | `SushiGoGame.test.ts` | Game setup, drafting, round progression (21 tests) |
 | `AiStrategy.test.ts` | Random and Greedy strategy validation (15 tests) |
 
-## Splendor
+## Feudalism
 
-Splendor is an engine-building card game demonstrating:
+Feudalism is an engine-building card game demonstrating:
 
 - **Resource management**: Collect gem tokens to purchase development cards
 - **Custom card types**: Development cards with costs, gem bonuses, and prestige points across 3 tiers
@@ -512,35 +512,35 @@ Splendor is an engine-building card game demonstrating:
 - **Multi-action turns**: Take gems, reserve cards, or purchase developments
 - **AI strategies**: Random (valid actions) and Greedy (prioritizes purchases and high-value cards)
 
-### Running Splendor
+### Running Feudalism
 
 ```bash
 npm run dev
 ```
 
-Open `http://localhost:3000` and click the **Splendor** card on the game selector page.
+Open `http://localhost:3000` and click the **Feudalism** card on the game selector page.
 
-### Splendor game files
+### Feudalism game files
 
 | File | Purpose |
 |------|---------|
-| `example-games/splendor/main.ts` | Phaser game config entry point |
-| `example-games/splendor/createSplendorGame.ts` | Factory function for tests |
-| `example-games/splendor/SplendorCards.ts` | Development cards, nobles, gem types, tier data |
-| `example-games/splendor/SplendorGame.ts` | Game orchestration (token collection, purchases, nobles, win detection) |
-| `example-games/splendor/AiStrategy.ts` | AI strategies (RandomStrategy, GreedyStrategy) |
-| `example-games/splendor/GameTranscript.ts` | Transcript types and SplendorTranscriptRecorder |
-| `example-games/splendor/help-content.json` | Help panel content |
-| `example-games/splendor/scenes/SplendorScene.ts` | Phaser scene (gem market, card tiers, token UI) |
+| `example-games/feudalism/main.ts` | Phaser game config entry point |
+| `example-games/feudalism/createFeudalismGame.ts` | Factory function for tests |
+| `example-games/feudalism/FeudalismCards.ts` | Development cards, nobles, gem types, tier data |
+| `example-games/feudalism/FeudalismGame.ts` | Game orchestration (token collection, purchases, nobles, win detection) |
+| `example-games/feudalism/AiStrategy.ts` | AI strategies (RandomStrategy, GreedyStrategy) |
+| `example-games/feudalism/GameTranscript.ts` | Transcript types and FeudalismTranscriptRecorder |
+| `example-games/feudalism/help-content.json` | Help panel content |
+| `example-games/feudalism/scenes/FeudalismScene.ts` | Phaser scene (gem market, card tiers, token UI) |
 
-### Splendor tests
+### Feudalism tests
 
-Tests are in `tests/splendor/`:
+Tests are in `tests/feudalism/`:
 
 | File | Tests |
 |------|-------|
-| `SplendorCards.test.ts` | Card data, noble data, gem types (50 tests) |
-| `SplendorGame.test.ts` | Game setup, turn execution, win detection, noble attraction (55 tests) |
+| `FeudalismCards.test.ts` | Card data, noble data, gem types (50 tests) |
+| `FeudalismGame.test.ts` | Game setup, turn execution, win detection, noble attraction (55 tests) |
 | `AiStrategy.test.ts` | Random and Greedy strategy validation (14 tests) |
 
 ## Lost Cities
@@ -698,7 +698,7 @@ All six games have fixture transcripts checked into version control:
 | Lost Cities | `tests/fixtures/transcripts/lost-cities/fixture-game.json` |
 | The Mind | `tests/fixtures/transcripts/the-mind/fixture-game.json` |
 | Sushi Go | `tests/fixtures/transcripts/sushi-go/fixture-game.json` |
-| Splendor | `tests/fixtures/transcripts/splendor/fixture-game.json` |
+| Feudalism | `tests/fixtures/transcripts/feudalism/fixture-game.json` |
 
 These are generated by game-specific fixture generator scripts (e.g. `scripts/generate-golf-fixture-transcript.ts`) that run deterministic AI-vs-AI games using a fixed seed.
 
@@ -722,8 +722,8 @@ npm run replay -- <transcript-path> [--output <dir>] [--stop-at <turn>]
 # Replay Golf fixture and capture all screenshots
 npm run replay -- tests/fixtures/transcripts/golf/fixture-game.json
 
-# Replay Splendor with custom output directory
-npm run replay -- tests/fixtures/transcripts/splendor/fixture-game.json --output data/screenshots/splendor-test
+# Replay Feudalism with custom output directory
+npm run replay -- tests/fixtures/transcripts/feudalism/fixture-game.json --output data/screenshots/feudalism-test
 ```
 
 Screenshots are written as `turn-000.png`, `turn-001.png`, etc. in the output directory. A `replay-summary.json` is also written with metadata.
@@ -746,7 +746,7 @@ Each game has a `ReplayAdapter` implementation in `scripts/adapters/` that bridg
 | Lost Cities | `LostCitiesReplayAdapter` | `lost-cities` |
 | The Mind | `TheMindReplayAdapter` | `the-mind` |
 | Sushi Go | `SushiGoReplayAdapter` | `sushi-go` |
-| Splendor | `SplendorReplayAdapter` | `splendor` |
+| Feudalism | `FeudalismReplayAdapter` | `feudalism` |
 | Golf | `GolfReplayAdapter` | (structural detection) |
 
 Adapters are registered in `scripts/adapters/index.ts`. Registration order matters: adapters with explicit `gameType` fields are registered before Golf, which uses structural shape-matching as a fallback.

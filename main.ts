@@ -16,7 +16,7 @@ import type { GameEntry } from './src/ui/GameSelectorScene';
 import { GolfScene } from './example-games/golf/scenes/GolfScene';
 import { BeleagueredCastleScene } from './example-games/beleaguered-castle/scenes/BeleagueredCastleScene';
 import { SushiGoScene } from './example-games/sushi-go/scenes/SushiGoScene';
-import { SplendorScene } from './example-games/splendor/scenes/SplendorScene';
+import { FeudalismScene } from './example-games/feudalism/scenes/FeudalismScene';
 import { LostCitiesScene } from './example-games/lost-cities/scenes/LostCitiesScene';
 import { TheMindScene } from './example-games/the-mind/scenes/TheMindScene';
 
@@ -45,11 +45,11 @@ const GAMES: GameEntry[] = [
     thumbnail: 'games/sushi-go/thumbnail',
   },
   {
-    sceneKey: 'SplendorScene',
-    title: 'Splendor',
+    sceneKey: 'FeudalismScene',
+    title: 'Feudalism',
     description:
       'Engine-building card game (human vs. AI). Collect gem tokens, purchase cards for bonuses, attract nobles, and reach 15 prestige to win.',
-    thumbnail: 'games/splendor/thumbnail',
+    thumbnail: 'games/feudalism/thumbnail',
   },
   {
     sceneKey: 'LostCitiesScene',
@@ -78,7 +78,7 @@ const isReplayMode = new URLSearchParams(window.location.search).get('mode') ===
 createCardGame({
   backgroundColor: '#1a2a1a',
   // Register all scenes; GameSelectorScene is first so it auto-starts.
-  scenes: [GameSelectorScene, GolfScene, BeleagueredCastleScene, SushiGoScene, SplendorScene, LostCitiesScene, TheMindScene],
+  scenes: [GameSelectorScene, GolfScene, BeleagueredCastleScene, SushiGoScene, FeudalismScene, LostCitiesScene, TheMindScene],
   render: isReplayMode ? { preserveDrawingBuffer: true } : undefined,
   callbacks: {
     preBoot: (game: Phaser.Game) => {

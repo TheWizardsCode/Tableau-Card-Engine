@@ -1,5 +1,5 @@
 /**
- * SplendorScene layout regression tests.
+ * FeudalismScene layout regression tests.
  *
  * Guards against layout regressions where UI sections (nobles, market,
  * supply, player/AI areas, action buttons, instruction text) overlap
@@ -10,7 +10,7 @@
  *     player/AI status section boxes (bottom edge at ~606)
  *
  * These tests run inside a real Chromium browser via Vitest browser mode
- * and Playwright. They boot the Splendor scene and verify that all UI
+ * and Playwright. They boot the Feudalism scene and verify that all UI
  * sections are correctly positioned without overlaps.
  *
  * NOTE: Each test boots a fresh Phaser game which creates a WebGL context.
@@ -21,7 +21,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import Phaser from 'phaser';
 import { waitForScene } from '../helpers/waitForScene';
 
-// ── Constants (must match SplendorScene / ui constants) ────
+// ── Constants (must match FeudalismScene / ui constants) ────
 const GAME_W = 1280;
 const GAME_H = 720;
 
@@ -44,11 +44,11 @@ async function bootGame(): Promise<Phaser.Game> {
   container.id = 'game-container';
   document.body.appendChild(container);
 
-  const { createSplendorGame } = await import(
-    '../../example-games/splendor/createSplendorGame'
+  const { createFeudalismGame } = await import(
+    '../../example-games/feudalism/createFeudalismGame'
   );
-  const game = createSplendorGame();
-  await waitForScene(game, 'SplendorScene');
+  const game = createFeudalismGame();
+  await waitForScene(game, 'FeudalismScene');
   return game;
 }
 
@@ -61,7 +61,7 @@ function destroyGame(game: Phaser.Game | null): void {
 }
 
 /**
- * Get scene typed as SplendorScene so we can call test accessors
+ * Get scene typed as FeudalismScene so we can call test accessors
  * and access containers.
  */
 function getSceneInternals(scene: Phaser.Scene): {
@@ -192,7 +192,7 @@ function rectsOverlap(a: Rect, b: Rect): boolean {
 
 // ── Tests ───────────────────────────────────────────────────
 
-describe('SplendorScene layout regression tests', () => {
+describe('FeudalismScene layout regression tests', () => {
   let game: Phaser.Game | null = null;
 
   afterEach(() => {
@@ -203,7 +203,7 @@ describe('SplendorScene layout regression tests', () => {
   // ── Test 1: Upper band sections do not overlap each other ──
   it('should have non-overlapping upper band sections (nobles, market, supply)', async () => {
     game = await bootGame();
-    const scene = game.scene.getScene('SplendorScene')!;
+    const scene = game.scene.getScene('FeudalismScene')!;
     const internals = getSceneInternals(scene);
 
     // Use section box rects for accurate geometry (includes drawn backgrounds)
@@ -248,7 +248,7 @@ describe('SplendorScene layout regression tests', () => {
   // ── Test 2: Player/AI section boxes do not overlap action buttons or instruction text ──
   it('should not overlap player/AI section boxes with action buttons or instruction text', async () => {
     game = await bootGame();
-    const scene = game.scene.getScene('SplendorScene')!;
+    const scene = game.scene.getScene('FeudalismScene')!;
     const internals = getSceneInternals(scene);
 
     // Section box rects give us the actual drawn background geometry
@@ -340,7 +340,7 @@ describe('SplendorScene layout regression tests', () => {
   // ── Test 3: Action bar and instruction text do not overlap each other ──
   it('should not overlap action buttons with instruction text', async () => {
     game = await bootGame();
-    const scene = game.scene.getScene('SplendorScene')!;
+    const scene = game.scene.getScene('FeudalismScene')!;
     const internals = getSceneInternals(scene);
 
     const actions = containerBounds(internals.actionContainer, 'Actions');

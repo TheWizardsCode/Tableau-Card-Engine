@@ -27,7 +27,7 @@ import {
   gemAbbrev,
   gemDisplayName,
   type GemTokens,
-} from '../../example-games/splendor/SplendorCards';
+} from '../../example-games/feudalism/FeudalismCards';
 
 // ---------------------------------------------------------------------------
 // Deterministic RNG for reproducible tests
@@ -40,7 +40,7 @@ function makeRng(seed: number): () => number {
   };
 }
 
-describe('SplendorCards', () => {
+describe('FeudalismCards', () => {
   // -------------------------------------------------------------------------
   // Constants
   // -------------------------------------------------------------------------

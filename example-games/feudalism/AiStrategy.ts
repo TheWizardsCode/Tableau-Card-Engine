@@ -1,7 +1,7 @@
 /**
  * AiStrategy.ts
  *
- * AI opponent strategies for Splendor.
+ * AI opponent strategies for Feudalism.
  * All strategies operate on pure game state — no Phaser dependency.
  *
  * Uses shared AI module (`@ai`) for base types and utility functions.
@@ -13,17 +13,17 @@ import {
   GEM_COLORS,
   ALL_TOKEN_COLORS,
   tokenCount,
-} from './SplendorCards';
+} from './FeudalismCards';
 import {
-  type SplendorSession,
-  type SplendorPlayerState,
+  type FeudalismSession,
+  type FeudalismPlayerState,
   type TurnAction,
   type TokenDiscard,
   getLegalActions,
   getBonuses,
   effectiveCost,
   getAvailableCards,
-} from './SplendorGame';
+} from './FeudalismGame';
 import type { AiStrategyBase } from '../../src/ai';
 import { AiPlayer as AiPlayerBase, pickRandom } from '../../src/ai';
 
@@ -31,10 +31,10 @@ import { AiPlayer as AiPlayerBase, pickRandom } from '../../src/ai';
 // Strategy interface
 // ---------------------------------------------------------------------------
 
-export interface SplendorAiStrategy extends AiStrategyBase {
-  chooseTurn(session: SplendorSession, playerIndex: number, rng: () => number): TurnAction;
+export interface FeudalismAiStrategy extends AiStrategyBase {
+  chooseTurn(session: FeudalismSession, playerIndex: number, rng: () => number): TurnAction;
   chooseDiscard(
-    session: SplendorSession,
+    session: FeudalismSession,
     playerIndex: number,
     excess: number,
     rng: () => number,
@@ -45,7 +45,7 @@ export interface SplendorAiStrategy extends AiStrategyBase {
 // Random strategy — picks any legal action at random
 // ---------------------------------------------------------------------------
 
-export const RandomStrategy: SplendorAiStrategy = {
+export const RandomStrategy: FeudalismAiStrategy = {
   name: 'Random',
 
   chooseTurn(session, _playerIndex, rng) {
@@ -66,7 +66,7 @@ export const RandomStrategy: SplendorAiStrategy = {
 // Greedy strategy — prioritizes purchasing high-value cards
 // ---------------------------------------------------------------------------
 
-export const GreedyStrategy: SplendorAiStrategy = {
+export const GreedyStrategy: FeudalismAiStrategy = {
   name: 'Greedy',
 
   chooseTurn(session, playerIndex, rng) {
@@ -189,20 +189,20 @@ export const GreedyStrategy: SplendorAiStrategy = {
 // AI Player class
 // ---------------------------------------------------------------------------
 
-export class SplendorAiPlayer extends AiPlayerBase<SplendorAiStrategy> {
+export class FeudalismAiPlayer extends AiPlayerBase<FeudalismAiStrategy> {
   constructor(
-    strategy: SplendorAiStrategy = GreedyStrategy,
+    strategy: FeudalismAiStrategy = GreedyStrategy,
     rng: () => number = Math.random,
   ) {
     super(strategy, rng);
   }
 
-  chooseTurn(session: SplendorSession, playerIndex: number): TurnAction {
+  chooseTurn(session: FeudalismSession, playerIndex: number): TurnAction {
     return this.strategy.chooseTurn(session, playerIndex, this.rng);
   }
 
   chooseDiscard(
-    session: SplendorSession,
+    session: FeudalismSession,
     playerIndex: number,
     excess: number,
   ): TokenDiscard {
@@ -216,8 +216,8 @@ export class SplendorAiPlayer extends AiPlayerBase<SplendorAiStrategy> {
 
 /** Score how much a bonus color helps toward visiting a noble. */
 function scoreNobleProgress(
-  session: SplendorSession,
-  player: SplendorPlayerState,
+  session: FeudalismSession,
+  player: FeudalismPlayerState,
   bonusColor: GemColor,
 ): number {
   const bonuses = getBonuses(player);
@@ -243,7 +243,7 @@ function scoreNobleProgress(
 
 /** Build a random token discard. */
 function buildRandomDiscard(
-  player: SplendorPlayerState,
+  player: FeudalismPlayerState,
   excess: number,
   rng: () => number,
 ): TokenDiscard {
@@ -269,8 +269,8 @@ function buildRandomDiscard(
 
 /** Build a smart discard — drop tokens least useful toward target cards. */
 function buildSmartDiscard(
-  session: SplendorSession,
-  player: SplendorPlayerState,
+  session: FeudalismSession,
+  player: FeudalismPlayerState,
   playerIndex: number,
   excess: number,
 ): TokenDiscard {

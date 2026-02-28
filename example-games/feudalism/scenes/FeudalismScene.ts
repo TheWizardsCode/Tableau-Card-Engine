@@ -1,5 +1,5 @@
 /**
- * SplendorScene -- the main Phaser scene for Splendor.
+ * FeudalismScene -- the main Phaser scene for Feudalism.
  *
  * Implements the full visual interface:
  *   - Card market (3 tiers x 4 visible cards + deck backs)
@@ -13,7 +13,7 @@
  *   - Help panel and settings panel integration
  */
 
-import type { GemColor, GemOrGold, GemTokens, DevelopmentCard, NobleTile, Tier } from '../SplendorCards';
+import type { GemColor, GemOrGold, GemTokens, DevelopmentCard, NobleTile, Tier } from '../FeudalismCards';
 import {
   GEM_COLORS,
   ALL_TOKEN_COLORS,
@@ -22,15 +22,15 @@ import {
   gemAbbrev,
   gemDisplayName,
   formatCost,
-} from '../SplendorCards';
+} from '../FeudalismCards';
 import type {
-  SplendorSession,
-  SplendorPhase,
+  FeudalismSession,
+  FeudalismPhase,
   TurnAction,
   TurnResult,
-} from '../SplendorGame';
+} from '../FeudalismGame';
 import {
-  setupSplendorGame,
+  setupFeudalismGame,
   executeTurn,
   discardTokens,
   getPrestige,
@@ -38,9 +38,9 @@ import {
   canAfford,
   isGameOver,
   getWinnerIndex,
-} from '../SplendorGame';
-import { SplendorAiPlayer, GreedyStrategy } from '../AiStrategy';
-import { SplendorTranscriptRecorder } from '../GameTranscript';
+} from '../FeudalismGame';
+import { FeudalismAiPlayer, GreedyStrategy } from '../AiStrategy';
+import { FeudalismTranscriptRecorder } from '../GameTranscript';
 import type { MarketSnapshot, PlayerSnapshot } from '../GameTranscript';
 import { TranscriptStore } from '../../../src/core-engine/TranscriptStore';
 import { autoSaveTranscript } from '../../../src/core-engine/autoSaveTranscript';
@@ -186,10 +186,10 @@ type TurnPhase =
 
 // ── Scene ───────────────────────────────────────────────────
 
-export class SplendorScene extends CardGameScene {
+export class FeudalismScene extends CardGameScene {
   // Game state
-  private session!: SplendorSession;
-  private aiPlayer!: SplendorAiPlayer;
+  private session!: FeudalismSession;
+  private aiPlayer!: FeudalismAiPlayer;
   private turnPhase: TurnPhase = 'player-turn';
 
   // Token selection state
@@ -198,7 +198,7 @@ export class SplendorScene extends CardGameScene {
   private discardNeeded = 0;
 
   // Transcript recording
-  private recorder: SplendorTranscriptRecorder | null = null;
+  private recorder: FeudalismTranscriptRecorder | null = null;
 
   /** Tracks the replay step index for state-settled payloads. */
   private replayStepIndex: number = -1;
@@ -227,7 +227,7 @@ export class SplendorScene extends CardGameScene {
   private overlayObjects: Phaser.GameObjects.GameObject[] = [];
 
   constructor() {
-    super({ key: 'SplendorScene' });
+    super({ key: 'FeudalismScene' });
   }
 
   // ── Preload ─────────────────────────────────────────────
@@ -286,15 +286,15 @@ export class SplendorScene extends CardGameScene {
     this.initSoundSystem(Object.values(SFX_KEYS), mapping);
 
     // Setup game
-    this.session = setupSplendorGame({
+    this.session = setupFeudalismGame({
       playerCount: 2,
       playerNames: ['You', 'AI'],
       isAI: [false, true],
     });
-    this.aiPlayer = new SplendorAiPlayer(GreedyStrategy);
+    this.aiPlayer = new FeudalismAiPlayer(GreedyStrategy);
 
     // Create transcript recorder
-    this.recorder = new SplendorTranscriptRecorder(this.session);
+    this.recorder = new FeudalismTranscriptRecorder(this.session);
 
     // Create UI
     this.createHeader();
@@ -313,7 +313,7 @@ export class SplendorScene extends CardGameScene {
 
   private createHeader(): void {
     createSceneMenuButton(this);
-    createSceneTitle(this, 'Splendor');
+    createSceneTitle(this, 'Feudalism');
   }
 
   private createContainers(): void {
@@ -2131,7 +2131,7 @@ export class SplendorScene extends CardGameScene {
     // Finalize and auto-save the transcript
     if (this.recorder && !this.recorder.isSealed()) {
       const transcript = this.recorder.finalize(winnerIdx);
-      autoSaveTranscript(transcriptStore, 'splendor', transcript, '[SplendorScene]');
+      autoSaveTranscript(transcriptStore, 'feudalism', transcript, '[FeudalismScene]');
     }
 
     this.gameEvents.emit('game-ended', {
@@ -2227,7 +2227,7 @@ export class SplendorScene extends CardGameScene {
     market: MarketSnapshot;
     tokenSupply: GemTokens;
     nobles: NobleTile[];
-    phase: SplendorPhase;
+    phase: FeudalismPhase;
     currentPlayerIndex: number;
     stepIndex?: number;
   }): void {
@@ -2269,7 +2269,7 @@ export class SplendorScene extends CardGameScene {
       startingPlayerIndex: 0,
       triggerPlayerIndex: -1,
       rng: Math.random,
-    } as SplendorSession;
+    } as FeudalismSession;
 
     // Update all visuals
     this.refreshAll();

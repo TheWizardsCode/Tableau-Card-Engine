@@ -1,13 +1,13 @@
 /**
- * SplendorCards.ts
+ * FeudalismCards.ts
  *
- * Type definitions and data for the Splendor card game:
+ * Type definitions and data for the Feudalism card game:
  * - Gem colors and token types
  * - Development cards (90 total across 3 tiers)
  * - Noble tiles (10 total)
  * - Supply initialization
  *
- * Card data sourced from the official Splendor rulebook.
+ * Card data sourced from the official Feudalism rulebook.
  */
 
 // ---------------------------------------------------------------------------
@@ -146,7 +146,7 @@ export function selectNobles(
 }
 
 // ---------------------------------------------------------------------------
-// Development card data — Official Splendor 90-card set
+// Development card data — Official Feudalism 90-card set
 // ---------------------------------------------------------------------------
 
 let nextId = 1;
@@ -298,7 +298,7 @@ export const TIER_3_COUNT = 20;
 export const TOTAL_CARD_COUNT = 90;
 
 // ---------------------------------------------------------------------------
-// Noble tile data — Official Splendor 10-noble set
+// Noble tile data — Official Feudalism 10-noble set
 // Each noble requires a certain number of card bonuses and gives 3 prestige.
 // ---------------------------------------------------------------------------
 

@@ -2,27 +2,27 @@ import { describe, it, expect } from 'vitest';
 import {
   RandomStrategy,
   GreedyStrategy,
-  SplendorAiPlayer,
-} from '../../example-games/splendor/AiStrategy';
+  FeudalismAiPlayer,
+} from '../../example-games/feudalism/AiStrategy';
 import {
-  setupSplendorGame,
+  setupFeudalismGame,
   executeTurn,
   discardTokens,
   validateAction,
   isGameOver,
-  type SplendorSession,
-} from '../../example-games/splendor/SplendorGame';
+  type FeudalismSession,
+} from '../../example-games/feudalism/FeudalismGame';
 import {
   totalTokens,
-} from '../../example-games/splendor/SplendorCards';
+} from '../../example-games/feudalism/FeudalismCards';
 import { createSeededRng } from '../../src/core-engine/SeededRng';
 
 // ---------------------------------------------------------------------------
 // Deterministic RNG
 // ---------------------------------------------------------------------------
 
-function createTestSession(seed = 42): SplendorSession {
-  return setupSplendorGame({
+function createTestSession(seed = 42): FeudalismSession {
+  return setupFeudalismGame({
     playerCount: 2,
     playerNames: ['Human', 'AI'],
     isAI: [false, true],
@@ -117,28 +117,28 @@ describe('AiStrategy', () => {
   });
 
   // -------------------------------------------------------------------------
-  // SplendorAiPlayer
+  // FeudalismAiPlayer
   // -------------------------------------------------------------------------
-  describe('SplendorAiPlayer', () => {
+  describe('FeudalismAiPlayer', () => {
     it('defaults to greedy strategy', () => {
-      const ai = new SplendorAiPlayer();
+      const ai = new FeudalismAiPlayer();
       expect(ai.strategyName).toBe('Greedy');
     });
 
     it('can use random strategy', () => {
-      const ai = new SplendorAiPlayer(RandomStrategy);
+      const ai = new FeudalismAiPlayer(RandomStrategy);
       expect(ai.strategyName).toBe('Random');
     });
 
     it('chooseTurn returns a valid action', () => {
-      const ai = new SplendorAiPlayer(GreedyStrategy, createSeededRng(42));
+      const ai = new FeudalismAiPlayer(GreedyStrategy, createSeededRng(42));
       const session = createTestSession();
       const action = ai.chooseTurn(session, 0);
       expect(validateAction(session, action)).toBeNull();
     });
 
     it('chooseDiscard returns valid discard', () => {
-      const ai = new SplendorAiPlayer(GreedyStrategy, createSeededRng(42));
+      const ai = new FeudalismAiPlayer(GreedyStrategy, createSeededRng(42));
       const session = createTestSession();
       session.players[0].tokens = {
         ruby: 3, emerald: 3, sapphire: 3, diamond: 3,
@@ -153,15 +153,15 @@ describe('AiStrategy', () => {
   // -------------------------------------------------------------------------
   describe('AI-vs-AI game', () => {
     it('completes a full game without errors', () => {
-      const session = setupSplendorGame({
+      const session = setupFeudalismGame({
         playerCount: 2,
         playerNames: ['Greedy-1', 'Greedy-2'],
         isAI: [true, true],
         rng: createSeededRng(42),
       });
 
-      const ai1 = new SplendorAiPlayer(GreedyStrategy, createSeededRng(100));
-      const ai2 = new SplendorAiPlayer(GreedyStrategy, createSeededRng(200));
+      const ai1 = new FeudalismAiPlayer(GreedyStrategy, createSeededRng(100));
+      const ai2 = new FeudalismAiPlayer(GreedyStrategy, createSeededRng(200));
       const ais = [ai1, ai2];
 
       let turns = 0;
@@ -188,14 +188,14 @@ describe('AiStrategy', () => {
 
     it('greedy AI finishes games faster than random AI', () => {
       function playGame(strategy1: typeof GreedyStrategy, strategy2: typeof GreedyStrategy, seed: number): number {
-        const session = setupSplendorGame({
+        const session = setupFeudalismGame({
           playerCount: 2,
           isAI: [true, true],
           rng: createSeededRng(seed),
         });
         const ais = [
-          new SplendorAiPlayer(strategy1, createSeededRng(seed + 1)),
-          new SplendorAiPlayer(strategy2, createSeededRng(seed + 2)),
+          new FeudalismAiPlayer(strategy1, createSeededRng(seed + 1)),
+          new FeudalismAiPlayer(strategy2, createSeededRng(seed + 2)),
         ];
         let turns = 0;
         while (!isGameOver(session) && turns < 500) {

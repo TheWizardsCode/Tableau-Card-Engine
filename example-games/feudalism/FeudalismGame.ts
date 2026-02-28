@@ -1,7 +1,7 @@
 /**
- * SplendorGame.ts
+ * FeudalismGame.ts
  *
- * Pure game orchestration for Splendor — no Phaser dependency.
+ * Pure game orchestration for Feudalism — no Phaser dependency.
  * Manages session state, turn actions, validation, noble visits, and end-game.
  */
 
@@ -25,20 +25,20 @@ import {
   WIN_THRESHOLD,
   MAX_RESERVED,
   MAX_TOKENS,
-} from './SplendorCards';
+} from './FeudalismCards';
 
 import type { MultiplayerSetupOptions } from '../../src/core-engine/SetupOptions';
 import { resolveSetupOptions } from '../../src/core-engine/SetupOptions';
 import { getCurrentPlayer } from '../../src/core-engine/TurnSequencer';
 
-// Re-export getCurrentPlayer so consumers can import from SplendorGame
+// Re-export getCurrentPlayer so consumers can import from FeudalismGame
 export { getCurrentPlayer };
 
 // ---------------------------------------------------------------------------
 // Session types
 // ---------------------------------------------------------------------------
 
-export interface SplendorPlayerState {
+export interface FeudalismPlayerState {
   name: string;
   isAI: boolean;
   tokens: GemTokens;
@@ -47,7 +47,7 @@ export interface SplendorPlayerState {
   nobles: NobleTile[];
 }
 
-export type SplendorPhase =
+export type FeudalismPhase =
   | 'playing'
   | 'final-round'
   | 'game-over';
@@ -57,12 +57,12 @@ export interface MarketRow {
   deck: DevelopmentCard[];
 }
 
-export interface SplendorSession {
-  players: SplendorPlayerState[];
+export interface FeudalismSession {
+  players: FeudalismPlayerState[];
   market: Record<Tier, MarketRow>;
   tokenSupply: GemTokens;
   nobles: NobleTile[];
-  phase: SplendorPhase;
+  phase: FeudalismPhase;
   currentPlayerIndex: number;
   /** Which player index started the game (for round-completion logic). */
   startingPlayerIndex: number;
@@ -126,13 +126,13 @@ export interface TurnResult {
 // Setup options
 // ---------------------------------------------------------------------------
 
-export type SplendorSetupOptions = MultiplayerSetupOptions;
+export type FeudalismSetupOptions = MultiplayerSetupOptions;
 
 // ---------------------------------------------------------------------------
 // Setup
 // ---------------------------------------------------------------------------
 
-export function setupSplendorGame(options?: SplendorSetupOptions): SplendorSession {
+export function setupFeudalismGame(options?: FeudalismSetupOptions): FeudalismSession {
   const { players: playerInfos, rng } = resolveSetupOptions(options ?? {});
   const playerCount = playerInfos.length;
 
@@ -140,7 +140,7 @@ export function setupSplendorGame(options?: SplendorSetupOptions): SplendorSessi
     throw new Error(`Invalid player count: ${playerCount}. Must be 2-4.`);
   }
 
-  const players: SplendorPlayerState[] = playerInfos.map((info) => ({
+  const players: FeudalismPlayerState[] = playerInfos.map((info) => ({
     name: info.name,
     isAI: info.isAI,
     tokens: {},
@@ -180,7 +180,7 @@ export function setupSplendorGame(options?: SplendorSetupOptions): SplendorSessi
 // Query helpers
 // ---------------------------------------------------------------------------
 
-export function getPrestige(player: SplendorPlayerState): number {
+export function getPrestige(player: FeudalismPlayerState): number {
   let pts = 0;
   for (const card of player.purchasedCards) pts += card.points;
   for (const noble of player.nobles) pts += noble.points;
@@ -188,7 +188,7 @@ export function getPrestige(player: SplendorPlayerState): number {
 }
 
 /** Count card bonuses by color. */
-export function getBonuses(player: SplendorPlayerState): Record<GemColor, number> {
+export function getBonuses(player: FeudalismPlayerState): Record<GemColor, number> {
   const bonuses: Record<GemColor, number> = {
     emerald: 0, sapphire: 0, ruby: 0, diamond: 0, onyx: 0,
   };
@@ -212,7 +212,7 @@ export function effectiveCost(
 }
 
 /** Check if a player can afford a card (using tokens + bonuses + gold). */
-export function canAfford(player: SplendorPlayerState, card: DevelopmentCard): boolean {
+export function canAfford(player: FeudalismPlayerState, card: DevelopmentCard): boolean {
   const bonuses = getBonuses(player);
   const eff = effectiveCost(card.cost, bonuses);
   let goldNeeded = 0;
@@ -227,7 +227,7 @@ export function canAfford(player: SplendorPlayerState, card: DevelopmentCard): b
 }
 
 /** Check if a noble's requirements are met by the player's bonuses. */
-export function nobleQualifies(player: SplendorPlayerState, noble: NobleTile): boolean {
+export function nobleQualifies(player: FeudalismPlayerState, noble: NobleTile): boolean {
   const bonuses = getBonuses(player);
   for (const c of GEM_COLORS) {
     if ((noble.requirements[c] ?? 0) > bonuses[c]) return false;
@@ -237,7 +237,7 @@ export function nobleQualifies(player: SplendorPlayerState, noble: NobleTile): b
 
 /** Find a card in the market by ID. Returns { tier, index } or null. */
 export function findCardInMarket(
-  session: SplendorSession,
+  session: FeudalismSession,
   cardId: number,
 ): { tier: Tier; index: number } | null {
   for (const tier of [1, 2, 3] as Tier[]) {
@@ -251,7 +251,7 @@ export function findCardInMarket(
 
 /** Find a card in a player's reserved cards by ID. */
 export function findReservedCard(
-  player: SplendorPlayerState,
+  player: FeudalismPlayerState,
   cardId: number,
 ): number {
   return player.reservedCards.findIndex(c => c.id === cardId);
@@ -259,7 +259,7 @@ export function findReservedCard(
 
 /** Get all cards available for purchase (market + reserved). */
 export function getAvailableCards(
-  session: SplendorSession,
+  session: FeudalismSession,
   playerIndex: number,
 ): DevelopmentCard[] {
   const cards: DevelopmentCard[] = [];
@@ -274,19 +274,19 @@ export function getAvailableCards(
 
 /** Get all affordable cards for a player. */
 export function getAffordableCards(
-  session: SplendorSession,
+  session: FeudalismSession,
   playerIndex: number,
 ): DevelopmentCard[] {
   const player = session.players[playerIndex];
   return getAvailableCards(session, playerIndex).filter(c => canAfford(player, c));
 }
 
-export function isGameOver(session: SplendorSession): boolean {
+export function isGameOver(session: FeudalismSession): boolean {
   return session.phase === 'game-over';
 }
 
 /** Get the winner index (most prestige, tiebreak: fewest cards). */
-export function getWinnerIndex(session: SplendorSession): number {
+export function getWinnerIndex(session: FeudalismSession): number {
   let bestIdx = 0;
   let bestPrestige = -1;
   let bestCards = Infinity;
@@ -308,7 +308,7 @@ export function getWinnerIndex(session: SplendorSession): number {
 // ---------------------------------------------------------------------------
 
 export function validateAction(
-  session: SplendorSession,
+  session: FeudalismSession,
   action: TurnAction,
 ): string | null {
   if (session.phase === 'game-over') return 'Game is over';
@@ -328,8 +328,8 @@ export function validateAction(
 }
 
 function validateTakeDifferent(
-  session: SplendorSession,
-  _player: SplendorPlayerState,
+  session: FeudalismSession,
+  _player: FeudalismPlayerState,
   action: TakeDifferentTokensAction,
 ): string | null {
   const { colors } = action;
@@ -370,8 +370,8 @@ function validateTakeDifferent(
 }
 
 function validateTakeSame(
-  session: SplendorSession,
-  _player: SplendorPlayerState,
+  session: FeudalismSession,
+  _player: FeudalismPlayerState,
   action: TakeSameTokensAction,
 ): string | null {
   const { color } = action;
@@ -385,8 +385,8 @@ function validateTakeSame(
 }
 
 function validateReserve(
-  session: SplendorSession,
-  player: SplendorPlayerState,
+  session: FeudalismSession,
+  player: FeudalismPlayerState,
   action: ReserveCardAction,
 ): string | null {
   if (player.reservedCards.length >= MAX_RESERVED) {
@@ -410,8 +410,8 @@ function validateReserve(
 }
 
 function validatePurchase(
-  session: SplendorSession,
-  player: SplendorPlayerState,
+  session: FeudalismSession,
+  player: FeudalismPlayerState,
   action: PurchaseCardAction,
 ): string | null {
   const { cardId } = action;
@@ -444,7 +444,7 @@ function validatePurchase(
  * Note: if tokensOverLimit > 0, the caller must follow up with discardTokens().
  */
 export function executeTurn(
-  session: SplendorSession,
+  session: FeudalismSession,
   action: TurnAction,
 ): TurnResult {
   const error = validateAction(session, action);
@@ -491,7 +491,7 @@ export function executeTurn(
  * if tokensOverLimit > 0.
  */
 export function discardTokens(
-  session: SplendorSession,
+  session: FeudalismSession,
   discard: TokenDiscard,
 ): TurnResult {
   const player = getCurrentPlayer(session);
@@ -519,8 +519,8 @@ export function discardTokens(
 }
 
 function executeTakeDifferent(
-  session: SplendorSession,
-  player: SplendorPlayerState,
+  session: FeudalismSession,
+  player: FeudalismPlayerState,
   action: TakeDifferentTokensAction,
 ): void {
   for (const c of action.colors) {
@@ -530,8 +530,8 @@ function executeTakeDifferent(
 }
 
 function executeTakeSame(
-  session: SplendorSession,
-  player: SplendorPlayerState,
+  session: FeudalismSession,
+  player: FeudalismPlayerState,
   action: TakeSameTokensAction,
 ): void {
   player.tokens = addTokens(player.tokens, { [action.color]: 2 });
@@ -539,8 +539,8 @@ function executeTakeSame(
 }
 
 function executeReserve(
-  session: SplendorSession,
-  player: SplendorPlayerState,
+  session: FeudalismSession,
+  player: FeudalismPlayerState,
   action: ReserveCardAction,
 ): void {
   let card: DevelopmentCard;
@@ -567,8 +567,8 @@ function executeReserve(
 }
 
 function executePurchase(
-  session: SplendorSession,
-  player: SplendorPlayerState,
+  session: FeudalismSession,
+  player: FeudalismPlayerState,
   action: PurchaseCardAction,
 ): void {
   const { cardId } = action;
@@ -615,8 +615,8 @@ function executePurchase(
 // ---------------------------------------------------------------------------
 
 function checkNobleVisit(
-  session: SplendorSession,
-  player: SplendorPlayerState,
+  session: FeudalismSession,
+  player: FeudalismPlayerState,
 ): NobleTile | null {
   for (let i = 0; i < session.nobles.length; i++) {
     if (nobleQualifies(player, session.nobles[i])) {
@@ -634,7 +634,7 @@ function checkNobleVisit(
 // ---------------------------------------------------------------------------
 
 function finishTurn(
-  session: SplendorSession,
+  session: FeudalismSession,
   action: TurnAction,
   nobleVisit: NobleTile | null,
 ): TurnResult {
@@ -678,7 +678,7 @@ function finishTurn(
 // Utility: list legal actions for a player (used by AI)
 // ---------------------------------------------------------------------------
 
-export function getLegalActions(session: SplendorSession): TurnAction[] {
+export function getLegalActions(session: FeudalismSession): TurnAction[] {
   if (session.phase === 'game-over') return [];
 
   const player = getCurrentPlayer(session);

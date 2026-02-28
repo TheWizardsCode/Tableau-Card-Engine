@@ -191,7 +191,7 @@ All dimensions are weighted equally (1x) except:
 | 1x8 grid (degenerate Grid<T>) | 1-2 days | High -- generalizes to NxM |
 | Left/right adjacency resolver | 1-2 days | High -- generalizes to 4/8-directional |
 | Market row (4 visible + deck) | 2-3 days | Very high -- used by most card games |
-| ResourceBank (coins, reputation) | 1-2 days | Very high -- generalizes Splendor's gems |
+| ResourceBank (coins, reputation) | 1-2 days | Very high -- generalizes Feudalism's gems |
 | Event card system | 1 day | Moderate -- game-specific but pattern is reusable |
 | **Total new engine work** | **6-10 days** | |
 

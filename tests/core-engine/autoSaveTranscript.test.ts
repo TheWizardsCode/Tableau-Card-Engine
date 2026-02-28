@@ -70,7 +70,7 @@ describe('autoSaveTranscript', () => {
     const store = createMockStore(null);
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    autoSaveTranscript(store, 'splendor', {});
+    autoSaveTranscript(store, 'feudalism', {});
 
     await vi.waitFor(() => {
       expect(warnSpy).toHaveBeenCalledOnce();

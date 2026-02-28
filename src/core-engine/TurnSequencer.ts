@@ -17,12 +17,12 @@ import type { GamePhase, GameState } from './GameState';
  * current player within an indexed player list.
  *
  * Both {@link GameState} and game-specific session types
- * (e.g. `SplendorSession`) satisfy this interface, so
+ * (e.g. `FeudalismSession`) satisfy this interface, so
  * {@link getCurrentPlayer} can be used with any of them
  * without requiring games to adopt `GameState<T>`.
  *
  * @typeParam P  The player type stored in the `players` array
- *               (e.g. `PlayerInfo`, `SplendorPlayerState`).
+ *               (e.g. `PlayerInfo`, `FeudalismPlayerState`).
  */
 export interface HasCurrentPlayer<P> {
   /** Indexed list of players. */
@@ -38,8 +38,8 @@ export interface HasCurrentPlayer<P> {
  * {@link HasCurrentPlayer}.
  *
  * Works with `GameState<T>` (returns `PlayerInfo`), as well as
- * game-specific session types like `SplendorSession` (returns
- * `SplendorPlayerState`). The return type is inferred from the
+ * game-specific session types like `FeudalismSession` (returns
+ * `FeudalismPlayerState`). The return type is inferred from the
  * player array element type.
  *
  * @example
@@ -48,7 +48,7 @@ export interface HasCurrentPlayer<P> {
  * const player: PlayerInfo = getCurrentPlayer(gameState);
  *
  * // With a game-specific session:
- * const splendorPlayer: SplendorPlayerState = getCurrentPlayer(session);
+ * const feudalismPlayer: FeudalismPlayerState = getCurrentPlayer(session);
  * ```
  */
 export function getCurrentPlayer<P>(state: HasCurrentPlayer<P>): P {

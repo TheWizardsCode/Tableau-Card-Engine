@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "gameType": "splendor",
+  "gameType": "feudalism",
   "startedAt": "2026-01-01T00:00:00.000Z",
   "endedAt": "2026-01-01T00:10:00.000Z",
   "initialState": {

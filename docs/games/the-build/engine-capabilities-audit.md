@@ -187,7 +187,7 @@ A 2-player card-drafting game with 108 custom-typed cards (8 types). Players sim
 - **Engine APIs used:** `shuffleArray`, `MultiplayerSetupOptions`, `resolveSetupOptions`, `CardGameScene`, `PhaseManager`, `layoutCardPositions`, `TranscriptRecorderBase`, `TranscriptStore`, `autoSaveTranscript`, `SoundManager`, `AiPlayer`, `pickRandom`, `HelpPanel`, `SettingsPanel`, overlay/button helpers, `createSceneHeader`
 - **Notable patterns:** Completely custom card types (not standard `Card` interface); custom card rendering as colored rectangles with icons; chopsticks two-card pick mechanic; tooltip system; first game to use `PhaseManager` for multi-phase turns. Demonstrates that the engine supports arbitrary card types beyond standard playing cards.
 
-### Splendor (`example-games/splendor/`)
+### Feudalism (`example-games/feudalism/`)
 A 2-player engine-building game with 90 development cards across 3 tiers, gem tokens, noble tiles, and a 15-prestige win threshold. **The closest existing example to a "buildy" resource-management game.**
 
 - **Engine APIs used:** `shuffleArray`, `MultiplayerSetupOptions`, `resolveSetupOptions`, `getCurrentPlayer`, `CardGameScene`, `AiPlayer`, `pickRandom`, `TranscriptRecorderBase`, overlay helpers, `createSceneHeader`, `HelpPanel`, `SettingsPanel`
@@ -210,7 +210,7 @@ A 2-player cooperative real-time card game where players simultaneously play num
 ## 3. Minor Extensions (< 1 day each)
 
 ### 3.1 Generic Resource/Token Container
-**What:** Extract Splendor's `GemTokens` helper (add/subtract/canAfford/total) into a generic `ResourceBank<K extends string>` class in `src/core-engine/` that works with any set of named resource types.
+**What:** Extract Feudalism's `GemTokens` helper (add/subtract/canAfford/total) into a generic `ResourceBank<K extends string>` class in `src/core-engine/` that works with any set of named resource types.
 **How it helps "The Build":** A crafty/buildy game needs resource tracking (wood, stone, iron, food, etc.). A generic container avoids every game re-implementing arithmetic and validation for named resources.
 **Effort:** ~4 hours.
 
@@ -260,7 +260,7 @@ A 2-player cooperative real-time card game where players simultaneously play num
 
 ### 4.4 Market / Supply Row with Dynamic Replenishment
 **What:** A reusable `Market<T>` component managing a row of N visible cards from a supply deck, with configurable replenishment, purchase/acquisition rules, and optional pricing. Includes both data model and UI renderer.
-**Why "The Build" needs it:** Splendor hard-codes its 3-tier market. A buildy game needs a central market where players acquire cards. This needs to be configurable and reusable.
+**Why "The Build" needs it:** Feudalism hard-codes its 3-tier market. A buildy game needs a central market where players acquire cards. This needs to be configurable and reusable.
 **Effort:** ~3-4 days.
 
 ### 4.5 Save/Load & Campaign Persistence
@@ -284,10 +284,10 @@ A 2-player cooperative real-time card game where players simultaneously play num
 
 | Gap | Effort | Games That Benefit | Rationale |
 |-----|--------|--------------------|-----------|
-| **Resource Economy & Production Engine** | 3-5 days | 4-6 future games | Any game with crafting, engine-building, or resource conversion. Retroactively simplifies Splendor's gem system. |
+| **Resource Economy & Production Engine** | 3-5 days | 4-6 future games | Any game with crafting, engine-building, or resource conversion. Retroactively simplifies Feudalism's gem system. |
 | **Declarative Rule Engine** | 4-6 days | All future games | Every card game needs move validation. Replaces scattered `if` statements in all existing and future games. Highest reuse potential. |
 | **Tableau / Persistent-Card-Area System** | 5-8 days | 3-5 future games | Core to any tableau-builder (the engine's namesake): Wingspan-like, Race for the Galaxy-like, Imperial Settlers-like. |
-| **Market / Supply Row** | 3-4 days | 4-5 future games | Central to most modern card games. Retroactively cleans up Splendor's hard-coded market. |
+| **Market / Supply Row** | 3-4 days | 4-5 future games | Central to most modern card games. Retroactively cleans up Feudalism's hard-coded market. |
 | **Save/Load & Campaign Persistence** | 4-6 days | All future games | Every game benefits from save/resume. Campaign persistence enables roguelike deck-builders. |
 | **Card-Effect / Modifier Pipeline** | 5-7 days | 3-4 future games | Essential for any game where cards have ongoing effects, triggers, or modifiers. |
 | **Multiplayer Scaling (3-4+ Players)** | 3-5 days | 5-6 future games | Most tabletop card games support 3-4 players. Unlocks the majority of board-game adaptations. |

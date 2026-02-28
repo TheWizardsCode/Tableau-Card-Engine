@@ -1,18 +1,18 @@
 /**
- * SplendorReplayAdapter -- replay adapter for Splendor.
+ * FeudalismReplayAdapter -- replay adapter for Feudalism.
  *
- * Handles Splendor transcript validation, state injection (via
- * `SplendorScene.loadBoardState()`), and scene management for
+ * Handles Feudalism transcript validation, state injection (via
+ * `FeudalismScene.loadBoardState()`), and scene management for
  * the replay tool.
  *
- * Splendor transcripts store full board-state snapshots after
+ * Feudalism transcripts store full board-state snapshots after
  * each turn, so no state reconstruction is needed.
  *
  * @see ReplayAdapter  -- interface definition
- * @see example-games/splendor/GameTranscript.ts  -- transcript types
+ * @see example-games/feudalism/GameTranscript.ts  -- transcript types
  *
  * Related work items:
- * - CG-0MM0GQZA915EXA9K (Splendor transcript pipeline)
+ * - CG-0MM0GQZA915EXA9K (Feudalism transcript pipeline)
  * - CG-0MLTFUL061DWDGA2 (adapter pattern)
  */
 
@@ -23,7 +23,7 @@ import type {
   TakeoverOptions,
 } from './ReplayAdapter';
 
-// ── Splendor transcript types (minimal, for adapter) ───────
+// ── Feudalism transcript types (minimal, for adapter) ───────
 
 /** Snapshot of a single market tier. */
 interface SPMarketTierSnapshot {
@@ -95,10 +95,10 @@ interface SPGameResults {
   winnerName: string;
 }
 
-/** A complete Splendor transcript. */
-interface SplendorTranscript {
+/** A complete Feudalism transcript. */
+interface FeudalismTranscript {
   version: 1;
-  gameType: 'splendor';
+  gameType: 'feudalism';
   startedAt: string;
   endedAt: string;
   initialState: SPInitialState;
@@ -108,10 +108,10 @@ interface SplendorTranscript {
 
 // ── Type guard ─────────────────────────────────────────────
 
-function isSplendorTranscript(raw: unknown): raw is SplendorTranscript {
+function isFeudalismTranscript(raw: unknown): raw is FeudalismTranscript {
   if (typeof raw !== 'object' || raw === null) return false;
   const obj = raw as Record<string, unknown>;
-  return obj.gameType === 'splendor';
+  return obj.gameType === 'feudalism';
 }
 
 // ── Helpers ────────────────────────────────────────────────
@@ -159,26 +159,26 @@ function describeTurnRecord(turn: SPTurnRecord): string {
 
 // ── Adapter implementation ─────────────────────────────────
 
-export class SplendorReplayAdapter implements ReplayAdapter {
-  readonly gameType = 'splendor';
-  readonly sceneKey = 'SplendorScene';
+export class FeudalismReplayAdapter implements ReplayAdapter {
+  readonly gameType = 'feudalism';
+  readonly sceneKey = 'FeudalismScene';
 
   canHandle(raw: unknown): boolean {
-    return isSplendorTranscript(raw);
+    return isFeudalismTranscript(raw);
   }
 
   validateTranscript(raw: unknown): ValidationResult {
-    if (!isSplendorTranscript(raw)) {
+    if (!isFeudalismTranscript(raw)) {
       return {
         valid: false,
-        error: 'Transcript does not match Splendor schema.',
+        error: 'Transcript does not match Feudalism schema.',
       };
     }
 
     if (raw.version !== 1) {
       return {
         valid: false,
-        error: `Unsupported Splendor transcript version: ${raw.version}. Expected: 1`,
+        error: `Unsupported Feudalism transcript version: ${raw.version}. Expected: 1`,
       };
     }
 
@@ -208,16 +208,16 @@ export class SplendorReplayAdapter implements ReplayAdapter {
   }
 
   getTurnCount(transcript: unknown): number {
-    const t = transcript as SplendorTranscript;
+    const t = transcript as FeudalismTranscript;
     return t.turns.length;
   }
 
   getVersion(transcript: unknown): number {
-    return (transcript as SplendorTranscript).version;
+    return (transcript as FeudalismTranscript).version;
   }
 
   getSummaryLine(transcript: unknown): string {
-    const t = transcript as SplendorTranscript;
+    const t = transcript as FeudalismTranscript;
     const players = t.initialState.playerStates.map((p) => p.name).join(', ');
     const totalTurns = t.turns.length;
     const outcome = t.results
@@ -227,19 +227,19 @@ export class SplendorReplayAdapter implements ReplayAdapter {
   }
 
   supportsInteractiveTakeover(_transcript: unknown): boolean {
-    // Splendor does not yet support interactive takeover.
+    // Feudalism does not yet support interactive takeover.
     return false;
   }
 
   getReplayUrl(baseUrl: string): string {
-    return `${baseUrl}?mode=replay&game=splendor`;
+    return `${baseUrl}?mode=replay&game=feudalism`;
   }
 
   async startScene(page: Page): Promise<void> {
     await page.evaluate(`
       (() => {
         const game = window.__PHASER_GAME__;
-        game.scene.start('SplendorScene');
+        game.scene.start('FeudalismScene');
       })()
     `);
   }
@@ -249,7 +249,7 @@ export class SplendorReplayAdapter implements ReplayAdapter {
       `(() => {
         const game = window.__PHASER_GAME__;
         if (!game) return false;
-        const scene = game.scene.getScene('SplendorScene');
+        const scene = game.scene.getScene('FeudalismScene');
         return scene && scene.sys.isActive();
       })()`,
       { timeout: timeoutMs },
@@ -261,7 +261,7 @@ export class SplendorReplayAdapter implements ReplayAdapter {
     transcript: unknown,
     timeoutMs: number,
   ): Promise<void> {
-    const t = transcript as SplendorTranscript;
+    const t = transcript as FeudalismTranscript;
     const state = {
       playerStates: t.initialState.playerStates,
       market: t.initialState.market,
@@ -280,7 +280,7 @@ export class SplendorReplayAdapter implements ReplayAdapter {
     turnIndex: number,
     timeoutMs: number,
   ): Promise<void> {
-    const t = transcript as SplendorTranscript;
+    const t = transcript as FeudalismTranscript;
     const turn = t.turns[turnIndex];
     const state = {
       playerStates: turn.playerStates,
@@ -295,7 +295,7 @@ export class SplendorReplayAdapter implements ReplayAdapter {
   }
 
   describeTurn(transcript: unknown, turnIndex: number): string {
-    const t = transcript as SplendorTranscript;
+    const t = transcript as FeudalismTranscript;
     const turn = t.turns[turnIndex];
     if (!turn) return `Turn ${turnIndex + 1} (unknown)`;
     return `Turn ${turnIndex + 1}: ${describeTurnRecord(turn)}`;
@@ -311,15 +311,15 @@ export class SplendorReplayAdapter implements ReplayAdapter {
     _options: TakeoverOptions,
   ): Promise<void> {
     throw new Error(
-      'Splendor does not support interactive takeover yet.',
+      'Feudalism does not support interactive takeover yet.',
     );
   }
 
   // ── Private helpers ──────────────────────────────────────
 
   /**
-   * Inject a Splendor board state via
-   * `SplendorScene.loadBoardState()` and wait for the
+   * Inject a Feudalism board state via
+   * `FeudalismScene.loadBoardState()` and wait for the
    * `state-settled` event.
    */
   private async _injectBoardState(
@@ -354,10 +354,10 @@ export class SplendorReplayAdapter implements ReplayAdapter {
           resolve();
         });
         const game = window.__PHASER_GAME__;
-        const scene = game.scene.getScene('SplendorScene');
+        const scene = game.scene.getScene('FeudalismScene');
         if (!scene) {
           clearTimeout(timer);
-          reject(new Error('SplendorScene not found'));
+          reject(new Error('FeudalismScene not found'));
           return;
         }
         scene.loadBoardState(${stateJson});
