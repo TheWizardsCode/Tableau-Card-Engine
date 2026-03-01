@@ -73,6 +73,8 @@ import {
   createOverlayMenuButton,
   dismissOverlay,
   shakeIllegalMove,
+  flipCard,
+  moveGameObject,
 } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
 import helpContent from '../help-content.json';
@@ -163,6 +165,7 @@ const HAND_OVERLAP = Math.floor((HAND_BOTTOM - HAND_TOP - HAND_CARD_H) / (HAND_S
 // Animation timing
 const AI_DELAY = 800;
 const ANIM_DURATION = 300;
+const AI_ANIM_DURATION = 450;
 
 // ── Audio asset keys ──────────────────────────────────────
 const SFX_KEYS = {
@@ -1335,19 +1338,18 @@ export class LostCitiesScene extends CardGameScene {
       const phase1Result = executeAction(this.session, phase1Action);
       this.recorder.recordAction(this.session, phase1Result, phase1Action, phase1Phase);
 
-      this.refreshAll();
+      // Refresh non-AI-hand elements so expedition/discard targets are up to date
+      this.refreshExpeditions();
+      this.refreshDiscardPiles();
+      this.refreshScores();
+      this.refreshDrawPile();
 
-      // Short delay before Phase 2
-      this.time.delayedCall(AI_DELAY / 2, () => {
+      // Animate the AI playing/discarding a card
+      this.animateAiPhase1(phase1Action, () => {
         if (this.session.matchPhase !== 'playing') return;
 
         const state2 = getVisibleState(this.session, aiId);
         const phase2Action = this.aiPlayer.choosePhase2(state2);
-
-        // Track AI discard draws for player info
-        if (phase2Action.kind === 'draw-from-discard') {
-          // We don't track our own draws (the AI tracks the player's)
-        }
 
         const phase2Phase = this.session.round.turnPhase;
         const phase2Result = executeAction(this.session, phase2Action);
@@ -1478,6 +1480,79 @@ export class LostCitiesScene extends CardGameScene {
       ease: 'Power2',
       onComplete: () => {
         tempSprite.destroy();
+        onComplete();
+      },
+    });
+  }
+
+  /**
+   * Animate the AI playing or discarding a card (Phase 1).
+   *
+   * Picks a random face-down sprite from `aiHandSprites`, flips it to
+   * reveal the played card texture, and moves it to the correct expedition
+   * lane or discard pile.  Remaining AI hand sprites slide to close the gap.
+   */
+  private animateAiPhase1(action: Phase1Action, onComplete: () => void): void {
+    const sprites = this.aiHandSprites;
+    if (sprites.length === 0) {
+      onComplete();
+      return;
+    }
+
+    // Pick a random sprite index (AI hand is face-down so any will do)
+    const spriteIdx = Math.floor(Math.random() * sprites.length);
+    const sprite = sprites.splice(spriteIdx, 1)[0];
+    sprite.setDepth(100);
+
+    // Determine target position
+    const colorIdx = EXPEDITION_COLORS.indexOf(action.color);
+    let targetX: number;
+    let targetY: number;
+
+    if (action.kind === 'play-to-expedition') {
+      // AI expeditions are shown in the opponent row
+      const lane = this.session.players[1].expeditions.get(action.color) ?? [];
+      const cardIdx = Math.max(0, lane.length - 1);
+      targetX = laneX(colorIdx);
+      targetY = OPP_EXP_TOP + cardIdx * EXP_OVERLAP + CARD_H / 2;
+    } else {
+      // Discard — shared discard row
+      targetX = laneX(colorIdx);
+      targetY = DISCARD_Y + DISCARD_CARD_H / 2;
+    }
+
+    const isDiscard = action.kind === 'discard';
+    const finalW = isDiscard ? DISCARD_CARD_W : CARD_W;
+    const finalH = isDiscard ? DISCARD_CARD_H : CARD_H;
+
+    flipCard({
+      scene: this,
+      target: sprite,
+      newTexture: cardAssetKey(action.card),
+      duration: AI_ANIM_DURATION,
+      destX: targetX,
+      destY: targetY,
+      onMidpoint: () => {
+        sprite.setDisplaySize(finalW, finalH);
+      },
+      onComplete: () => {
+        sprite.destroy();
+
+        // Slide remaining AI hand sprites to close the gap
+        for (let i = 0; i < sprites.length; i++) {
+          const newY = HAND_TOP + i * HAND_OVERLAP + HAND_CARD_H / 2;
+          if (sprites[i].y !== newY) {
+            moveGameObject({
+              scene: this,
+              target: sprites[i],
+              destX: AI_HAND_CENTER,
+              destY: newY,
+              duration: 200,
+            });
+          }
+          sprites[i].setDepth(i + 1);
+        }
+
         onComplete();
       },
     });
