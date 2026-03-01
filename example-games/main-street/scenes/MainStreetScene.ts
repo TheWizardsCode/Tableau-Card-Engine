@@ -83,8 +83,8 @@ const MARKET_CARD_GAP = 12;
 const MARKET_LABEL_W = 90;
 
 // Action area
-const ACTION_Y = 580;
-const INSTRUCTION_Y = 560;
+const INSTRUCTION_Y = 580;
+const ACTION_Y = 640;
 
 // Section box styling
 const BOX_STROKE = 0x665544;
