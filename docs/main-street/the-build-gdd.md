@@ -1,11 +1,16 @@
 # The Build: Game Design Document (GDD)
 
+## Executive Summary
+
+**Main Street** (working title: *The Build*) is a single-player, turn-based tableau card game where the player revitalises a 10-slot linear street by purchasing and placing business cards from a market. Adjacent businesses sharing synergy types generate bonus income. The player manages two resources (Coins and Reputation) across 20 day/night turns, aiming to reach a score threshold of 150 or complete all challenges. The game is built on the Tableau Card Engine using Phaser 3, TypeScript, and seeded deterministic RNG for reproducible sessions.
+
 ## Table of Contents
 1. [Core Rules and Mechanics](#core-rules-and-mechanics)
 2. [Content Design and Progression](#content-design-and-progression)
 3. [UX, Visual Design, and Audio Direction](#ux-visual-design-and-audio-direction)
 4. [AI Strategy and Hint System](#ai-strategy-and-hint-system)
 5. [Glossary](#glossary)
+6. [Milestone PRDs](#milestone-prds)
 
 ---
 
@@ -425,6 +430,30 @@ A formal GDD section covering The Build's AI design with enough detail for an en
 - **Challenge** – Optional meta‑goal that provides bonus points.
 - **AI Strategy** – Algorithm used by the computer to decide actions.
 - **Hint** – Suggested move presented to the player.
+
+---
+
+## Milestone PRDs
+
+The GDD is implemented through incremental milestones, each with its own PRD:
+
+| Milestone | PRD Document | Work Item | Status |
+|-----------|-------------|-----------|--------|
+| **M1: Playable Core Loop (Walking Skeleton)** | [prd-milestone-1.md](prd-milestone-1.md) | CG-0MM4RDYAU1DY4OG8 | Draft |
+
+---
+
+## Test Plan
+
+Testing is defined per-milestone in each PRD. The overall test strategy:
+
+1. **Unit tests** for all game logic (state, rules, adjacency, income, win/loss).
+2. **Integration tests** for full-turn and full-game flows.
+3. **Determinism tests** verifying that identical seeds produce identical outcomes.
+4. **Demo scripts** for headless deterministic runs producing JSON transcripts.
+5. **Playtest checklists** for manual verification of fun factor and UX.
+
+All tests are run via `npm test` (Vitest). Build validation via `npm run build`. See [prd-milestone-1.md](prd-milestone-1.md) Section 7 for the Milestone 1 test plan.
 
 ---
 
