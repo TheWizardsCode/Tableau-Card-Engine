@@ -95,24 +95,23 @@ function laneX(index: number): number {
 
 const TABLEAU_RIGHT = TABLEAU_LEFT + 5 * LANE_STEP - LANE_GAP + CARD_W / 2;
 
-// ── Middle column: Player hand + AI hand ──────────────────
-// Positioned between left column and right column.
-// Split into two sub-columns: player (left) and AI (right).
-const HAND_COL_W = 200;
-const HAND_SUB_COL_W = 95;   // width of each sub-column (≈ card width)
-const HAND_COL_GAP = HAND_COL_W - 2 * HAND_SUB_COL_W; // gap between sub-columns
-
 // ── Right column: Scores, Draw pile, Round ────────────────
 // Positioned at far right of canvas
 const MID_COL_W = 190;
 const MID_COL_X = GAME_W - MID_COL_W - 16;
 const MID_COL_CENTER = MID_COL_X + MID_COL_W / 2;
 
-// Hand column centered between left play area and right info column
-const HAND_COL_X = TABLEAU_RIGHT + Math.floor((MID_COL_X - TABLEAU_RIGHT - HAND_COL_W) / 2);
-const PLAYER_HAND_CENTER = HAND_COL_X + HAND_SUB_COL_W / 2;
-// Used by AI hand face-down display
-const AI_HAND_CENTER = HAND_COL_X + HAND_SUB_COL_W + HAND_COL_GAP + HAND_SUB_COL_W / 2;
+// ── Middle column: Player hand + AI hand ──────────────────
+// Two separate bordered boxes, centered between left play area and right info column.
+const HAND_BOX_W = 112;        // card width (100) + 2 * BOX_PAD (6) per box
+const HAND_SECTION_GAP = 20;   // gap between the two hand boxes
+const HAND_PAIR_W = 2 * HAND_BOX_W + HAND_SECTION_GAP; // total width of both boxes
+const HAND_AVAIL = MID_COL_X - TABLEAU_RIGHT;           // available horizontal space
+const HAND_MARGIN = Math.floor((HAND_AVAIL - HAND_PAIR_W) / 2);
+const PLAYER_HAND_BOX_X = TABLEAU_RIGHT + HAND_MARGIN;  // left edge of player box
+const AI_HAND_BOX_X = PLAYER_HAND_BOX_X + HAND_BOX_W + HAND_SECTION_GAP; // left edge of AI box
+const PLAYER_HAND_CENTER = PLAYER_HAND_BOX_X + HAND_BOX_W / 2;
+const AI_HAND_CENTER = AI_HAND_BOX_X + HAND_BOX_W / 2;
 
 // Header
 const HEADER_H = 48;
@@ -532,14 +531,27 @@ export class LostCitiesScene extends CardGameScene {
       MID_COL_W + 2 * BOX_PAD, SCORE_BOX_H + 2 * BOX_PAD, '',
     );
 
-    // ── Middle column box: Hand ────────────────────────────
+    // ── Middle column: separate hand boxes ───────────────────
     const handTotalH = HAND_CARD_H + (HAND_SIZE - 1) * HAND_OVERLAP;
+    const handBoxH = handTotalH + BOX_LABEL_H + 2 * BOX_PAD;
+    const handBoxY = HAND_TOP - BOX_LABEL_H - BOX_PAD;
+
+    // Player hand box
     this.drawSectionBox(
-      HAND_COL_X - BOX_PAD,
-      HAND_TOP - BOX_LABEL_H - BOX_PAD,
-      HAND_COL_W + 2 * BOX_PAD,
-      handTotalH + BOX_LABEL_H + 2 * BOX_PAD,
+      PLAYER_HAND_BOX_X - BOX_PAD,
+      handBoxY,
+      HAND_BOX_W + 2 * BOX_PAD,
+      handBoxH,
       'Your Hand',
+    );
+
+    // AI hand box
+    this.drawSectionBox(
+      AI_HAND_BOX_X - BOX_PAD,
+      handBoxY,
+      HAND_BOX_W + 2 * BOX_PAD,
+      handBoxH,
+      'AI Hand',
     );
   }
 
