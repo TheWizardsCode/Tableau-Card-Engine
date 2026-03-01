@@ -33,6 +33,7 @@ import {
   compactAssetKey,
   CARD_BACK_KEY,
   HAND_SIZE,
+  colorDisplayName,
 } from '../LostCitiesCards';
 import type {
   LostCitiesSession,
@@ -1355,19 +1356,26 @@ export class LostCitiesScene extends CardGameScene {
         const phase2Result = executeAction(this.session, phase2Action);
         this.recorder.recordAction(this.session, phase2Result, phase2Action, phase2Phase);
 
-        this.refreshAll();
+        // Refresh draw pile and discards so the source shows updated state
+        this.refreshDiscardPiles();
+        this.refreshDrawPile();
 
-        if (phase2Result.roundEnded) {
-          if (phase2Result.matchEnded) {
-            this.showMatchSummary(phase2Result.roundScore!);
+        // Animate the AI drawing a card
+        this.animateAiPhase2(phase2Action, () => {
+          this.refreshAll();
+
+          if (phase2Result.roundEnded) {
+            if (phase2Result.matchEnded) {
+              this.showMatchSummary(phase2Result.roundScore!);
+            } else {
+              this.showRoundSummary(phase2Result.roundScore!);
+            }
           } else {
-            this.showRoundSummary(phase2Result.roundScore!);
+            // Human's turn
+            this.soundManager?.play(SFX_KEYS.TURN_CHANGE);
+            this.setPhase('waiting-for-card-select');
           }
-        } else {
-          // Human's turn
-          this.soundManager?.play(SFX_KEYS.TURN_CHANGE);
-          this.setPhase('waiting-for-card-select');
-        }
+        });
       });
     });
   }
@@ -1553,6 +1561,80 @@ export class LostCitiesScene extends CardGameScene {
           sprites[i].setDepth(i + 1);
         }
 
+        onComplete();
+      },
+    });
+  }
+
+  /**
+   * Animate the AI drawing a card (Phase 2).
+   *
+   * Creates a face-down temporary sprite at the draw source and slides it to
+   * the AI hand.  A floating text annotation ("Drew from pile" or
+   * "Drew [Color]") appears near the source and fades out over 1000ms.
+   */
+  private animateAiPhase2(action: Phase2Action, onComplete: () => void): void {
+    // Determine draw source position
+    let sourceX: number;
+    let sourceY: number;
+    let annotationText: string;
+
+    if (action.kind === 'draw-from-pile') {
+      sourceX = MID_COL_CENTER;
+      sourceY = DRAW_PILE_Y + CARD_H / 2;
+      annotationText = 'Drew from pile';
+    } else {
+      const colorIdx = EXPEDITION_COLORS.indexOf(action.color);
+      sourceX = laneX(colorIdx);
+      sourceY = DISCARD_Y + DISCARD_CARD_H / 2;
+      annotationText = `Drew ${colorDisplayName(action.color)}`;
+    }
+
+    // Create temporary face-down sprite at the draw source
+    const tempSprite = this.add.image(sourceX, sourceY, CARD_BACK_KEY);
+    tempSprite.setDisplaySize(
+      action.kind === 'draw-from-pile' ? CARD_W : DISCARD_CARD_W,
+      action.kind === 'draw-from-pile' ? CARD_H : DISCARD_CARD_H,
+    );
+    tempSprite.setDepth(100);
+
+    // Target: last position in the AI hand column
+    const aiHandSize = this.session.players[1].hand.length;
+    const targetIdx = aiHandSize - 1;
+    const targetX = AI_HAND_CENTER;
+    const targetY = HAND_TOP + targetIdx * HAND_OVERLAP + HAND_CARD_H / 2;
+
+    // Floating annotation text near the draw source
+    const annotation = this.add.text(sourceX, sourceY - 40, annotationText, {
+      fontFamily: FONT_FAMILY,
+      fontSize: '16px',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 3,
+      align: 'center',
+    });
+    annotation.setOrigin(0.5);
+    annotation.setDepth(101);
+    // Fade out the annotation over 1000ms
+    this.tweens.add({
+      targets: annotation,
+      alpha: 0,
+      duration: 1000,
+      ease: 'Power2',
+      onComplete: () => {
+        annotation.destroy();
+      },
+    });
+
+    // Animate the face-down sprite to the AI hand
+    moveGameObject({
+      scene: this,
+      target: tempSprite,
+      destX: targetX,
+      destY: targetY,
+      duration: AI_ANIM_DURATION,
+      onComplete: () => {
+        tempSprite.destroy();
         onComplete();
       },
     });
