@@ -102,14 +102,13 @@ const MID_COL_X = GAME_W - MID_COL_W - 16;
 const MID_COL_CENTER = MID_COL_X + MID_COL_W / 2;
 
 // ── Middle column: Player hand + AI hand ──────────────────
-// Two separate bordered boxes, centered between left play area and right info column.
+// Two separate bordered boxes evenly spaced between the tableau and the info column.
+// The left margin, center gap, and right margin are all equal.
 const HAND_BOX_W = 112;        // card width (100) + 2 * BOX_PAD (6) per box
-const HAND_SECTION_GAP = 20;   // gap between the two hand boxes
-const HAND_PAIR_W = 2 * HAND_BOX_W + HAND_SECTION_GAP; // total width of both boxes
-const HAND_AVAIL = MID_COL_X - TABLEAU_RIGHT;           // available horizontal space
-const HAND_MARGIN = Math.floor((HAND_AVAIL - HAND_PAIR_W) / 2);
-const PLAYER_HAND_BOX_X = TABLEAU_RIGHT + HAND_MARGIN;  // left edge of player box
-const AI_HAND_BOX_X = PLAYER_HAND_BOX_X + HAND_BOX_W + HAND_SECTION_GAP; // left edge of AI box
+const HAND_AVAIL = MID_COL_X - TABLEAU_RIGHT;                     // total horizontal space
+const HAND_EVEN_GAP = Math.floor((HAND_AVAIL - 2 * HAND_BOX_W) / 3); // equal spacing
+const PLAYER_HAND_BOX_X = TABLEAU_RIGHT + HAND_EVEN_GAP;          // left edge of player box
+const AI_HAND_BOX_X = PLAYER_HAND_BOX_X + HAND_BOX_W + HAND_EVEN_GAP; // left edge of AI box
 const PLAYER_HAND_CENTER = PLAYER_HAND_BOX_X + HAND_BOX_W / 2;
 const AI_HAND_CENTER = AI_HAND_BOX_X + HAND_BOX_W / 2;
 
