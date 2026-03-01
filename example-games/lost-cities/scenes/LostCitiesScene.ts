@@ -108,9 +108,8 @@ const MID_COL_CENTER = MID_COL_X + MID_COL_W / 2;
 // Hand column centered between left play area and right info column
 const HAND_COL_X = TABLEAU_RIGHT + Math.floor((MID_COL_X - TABLEAU_RIGHT - HAND_COL_W) / 2);
 const PLAYER_HAND_CENTER = HAND_COL_X + HAND_SUB_COL_W / 2;
-// Used by AI Hand Face-Down Display feature (CG-0MM7BCU830SLKPYF)
+// Used by AI hand face-down display
 const AI_HAND_CENTER = HAND_COL_X + HAND_SUB_COL_W + HAND_COL_GAP + HAND_SUB_COL_W / 2;
-void AI_HAND_CENTER; // suppress noUnusedLocals until AI hand rendering is added
 
 // Header
 const HEADER_H = 48;
@@ -254,6 +253,9 @@ export class LostCitiesScene extends CardGameScene {
   private handSprites: Phaser.GameObjects.Image[] = [];
   /** Highlight rectangle around the selected hand card. */
   private selectionHighlight: Phaser.GameObjects.Rectangle | null = null;
+
+  // Card sprites — AI hand (face-down)
+  private aiHandSprites: Phaser.GameObjects.Image[] = [];
 
   // Draw pile sprite
   private drawPileSprite!: Phaser.GameObjects.Image;
@@ -833,6 +835,7 @@ export class LostCitiesScene extends CardGameScene {
     this.refreshExpeditions();
     this.refreshDiscardPiles();
     this.refreshHand();
+    this.refreshAiHand();
     this.refreshDrawPile();
     this.refreshScores();
     this.refreshRoundIndicator();
@@ -945,6 +948,29 @@ export class LostCitiesScene extends CardGameScene {
       sprite.setInteractive({ useHandCursor: true });
       sprite.on('pointerdown', () => this.onHandCardClick(c));
       this.handSprites.push(sprite);
+    }
+  }
+
+  /**
+   * Render the AI's hand as face-down card sprites in the right sub-column.
+   * Sprite count always matches the AI's actual hand size.
+   */
+  private refreshAiHand(): void {
+    // Destroy old sprites
+    for (const sprite of this.aiHandSprites) {
+      sprite.destroy();
+    }
+    this.aiHandSprites = [];
+
+    const aiHand = this.session.players[1].hand;
+    for (let c = 0; c < aiHand.length; c++) {
+      const x = AI_HAND_CENTER;
+      const y = HAND_TOP + c * HAND_OVERLAP + HAND_CARD_H / 2;
+      const sprite = this.add.image(x, y, CARD_BACK_KEY);
+      sprite.setDisplaySize(HAND_CARD_W, HAND_CARD_H);
+      sprite.setDepth(c + 1);
+      // AI hand sprites are non-interactive (no setInteractive)
+      this.aiHandSprites.push(sprite);
     }
   }
 
