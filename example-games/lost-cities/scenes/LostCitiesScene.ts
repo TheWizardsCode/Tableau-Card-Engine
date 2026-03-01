@@ -92,9 +92,12 @@ function laneX(index: number): number {
 
 const TABLEAU_RIGHT = TABLEAU_LEFT + 5 * LANE_STEP - LANE_GAP + CARD_W / 2;
 
-// ── Middle column: Player hand ────────────────────────────
-// Positioned between left column and right column
+// ── Middle column: Player hand + AI hand ──────────────────
+// Positioned between left column and right column.
+// Split into two sub-columns: player (left) and AI (right).
 const HAND_COL_W = 200;
+const HAND_SUB_COL_W = 95;   // width of each sub-column (≈ card width)
+const HAND_COL_GAP = HAND_COL_W - 2 * HAND_SUB_COL_W; // gap between sub-columns
 
 // ── Right column: Scores, Draw pile, Round ────────────────
 // Positioned at far right of canvas
@@ -104,7 +107,10 @@ const MID_COL_CENTER = MID_COL_X + MID_COL_W / 2;
 
 // Hand column centered between left play area and right info column
 const HAND_COL_X = TABLEAU_RIGHT + Math.floor((MID_COL_X - TABLEAU_RIGHT - HAND_COL_W) / 2);
-const HAND_COL_CENTER = HAND_COL_X + HAND_COL_W / 2;
+const PLAYER_HAND_CENTER = HAND_COL_X + HAND_SUB_COL_W / 2;
+// Used by AI Hand Face-Down Display feature (CG-0MM7BCU830SLKPYF)
+const AI_HAND_CENTER = HAND_COL_X + HAND_SUB_COL_W + HAND_COL_GAP + HAND_SUB_COL_W / 2;
+void AI_HAND_CENTER; // suppress noUnusedLocals until AI hand rendering is added
 
 // Header
 const HEADER_H = 48;
@@ -931,7 +937,7 @@ export class LostCitiesScene extends CardGameScene {
     const hand = this.session.players[0].hand;
     hand.sort(LostCitiesScene.handSortCompare);
     for (let c = 0; c < hand.length; c++) {
-      const x = HAND_COL_CENTER;
+      const x = PLAYER_HAND_CENTER;
       const y = HAND_TOP + c * HAND_OVERLAP + HAND_CARD_H / 2;
       const sprite = this.add.image(x, y, cardAssetKey(hand[c]));
       sprite.setDisplaySize(HAND_CARD_W, HAND_CARD_H);
@@ -1433,7 +1439,7 @@ export class LostCitiesScene extends CardGameScene {
     // copy and find where this card ends up.
     const sorted = [...hand].sort(LostCitiesScene.handSortCompare);
     const targetIdx = sorted.findIndex(c => c.id === drawnCard.id);
-    const targetX = HAND_COL_CENTER;
+    const targetX = PLAYER_HAND_CENTER;
     const targetY = HAND_TOP + targetIdx * HAND_OVERLAP + HAND_CARD_H / 2;
 
     this.tweens.add({
