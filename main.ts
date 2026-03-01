@@ -19,6 +19,7 @@ import { SushiGoScene } from './example-games/sushi-go/scenes/SushiGoScene';
 import { FeudalismScene } from './example-games/feudalism/scenes/FeudalismScene';
 import { LostCitiesScene } from './example-games/lost-cities/scenes/LostCitiesScene';
 import { TheMindScene } from './example-games/the-mind/scenes/TheMindScene';
+import { MainStreetScene } from './example-games/main-street/scenes/MainStreetScene';
 
 // ── Game catalogue ─────────────────────────────────────────
 
@@ -65,6 +66,13 @@ const GAMES: GameEntry[] = [
       'Cooperative real-time card game (human + AI). Play numbered cards 1-100 onto a shared ascending pile without communicating. Survive 8 levels without losing all lives.',
     thumbnail: 'games/the-mind/thumbnail',
   },
+  {
+    sceneKey: 'MainStreetScene',
+    title: 'Main Street',
+    description:
+      'Single-player tableau builder. Purchase businesses, place them along a 10-slot street for synergy bonuses, manage coins and reputation, and build the highest-scoring Main Street in 20 turns.',
+    thumbnail: 'games/main-street/thumbnail',
+  },
 ];
 
 // ── Phaser boot ────────────────────────────────────────────
@@ -78,7 +86,7 @@ const isReplayMode = new URLSearchParams(window.location.search).get('mode') ===
 createCardGame({
   backgroundColor: '#1a2a1a',
   // Register all scenes; GameSelectorScene is first so it auto-starts.
-  scenes: [GameSelectorScene, GolfScene, BeleagueredCastleScene, SushiGoScene, FeudalismScene, LostCitiesScene, TheMindScene],
+  scenes: [GameSelectorScene, GolfScene, BeleagueredCastleScene, SushiGoScene, FeudalismScene, LostCitiesScene, TheMindScene, MainStreetScene],
   render: isReplayMode ? { preserveDrawingBuffer: true } : undefined,
   callbacks: {
     preBoot: (game: Phaser.Game) => {
