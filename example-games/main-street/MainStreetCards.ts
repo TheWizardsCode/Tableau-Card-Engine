@@ -93,7 +93,7 @@ export const WIN_THRESHOLD = 150;
 export const STARTING_COINS = 8;
 
 /** Starting reputation. */
-export const STARTING_REPUTATION = 0;
+export const STARTING_REPUTATION = 3;
 
 /** Number of Business card slots visible in the market. */
 export const MARKET_BUSINESS_SLOTS = 4;
@@ -190,11 +190,11 @@ const EVENT_TEMPLATES: EventCard[] = [
     id: 'evt-festival',
     name: 'Local Festival',
     trigger: 'Night',
-    effect: '+2 coins to all Culture businesses this turn.',
+    effect: '+2 coins to all Culture businesses and +1 reputation.',
     target: 'SpecificSynergy',
     targetSynergy: 'Culture',
     coinDelta: 2,
-    reputationDelta: 0,
+    reputationDelta: 1,
   },
   {
     family: 'event',
@@ -216,6 +216,27 @@ const EVENT_TEMPLATES: EventCard[] = [
     target: 'All',
     coinDelta: -3,
     reputationDelta: 0,
+  },
+  {
+    family: 'event',
+    id: 'evt-award',
+    name: 'Community Award',
+    trigger: 'Night',
+    effect: 'Gain 2 reputation from community recognition.',
+    target: 'All',
+    coinDelta: 0,
+    reputationDelta: 2,
+  },
+  {
+    family: 'event',
+    id: 'evt-inspection',
+    name: 'Health Inspection',
+    trigger: 'Day',
+    effect: '-2 coins per Food business and -1 reputation.',
+    target: 'SpecificSynergy',
+    targetSynergy: 'Food',
+    coinDelta: -2,
+    reputationDelta: -1,
   },
 ];
 
