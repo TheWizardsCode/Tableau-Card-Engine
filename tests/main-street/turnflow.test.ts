@@ -25,6 +25,7 @@ import {
 } from '../../example-games/main-street/MainStreetEngine';
 import {
   MAX_TURNS,
+  STARTING_COINS,
   WIN_THRESHOLD,
   type BusinessCard,
   type EventCard,
@@ -197,7 +198,8 @@ describe('MainStreetEngine', () => {
       state.resourceBank.coins = 100;
 
       // Place a target business
-      const upgrade = state.market.upgrade[0];
+      const upgrade = state.market.investments.find(c => c.family === 'upgrade') as import('../../example-games/main-street/MainStreetCards').UpgradeCard;
+      expect(upgrade).toBeDefined();
       const biz = state.decks.business.find(b => b.name === upgrade.targetBusiness);
       expect(biz).toBeDefined();
       state.streetGrid[0] = { ...biz! };
@@ -215,9 +217,9 @@ describe('MainStreetEngine', () => {
       const state = createTestState();
       state.phase = 'MarketPhase';
 
-      // Put an Investment event in the market
+      // Put an Investment event in the investments row
       const investmentEvent = makeInvestmentEvent({ id: 'inv-evt-1' });
-      state.market.event = [investmentEvent];
+      state.market.investments = [investmentEvent];
 
       const result = executeAction(state, {
         type: 'buy-event',
@@ -343,30 +345,102 @@ describe('MainStreetEngine', () => {
   });
 
   describe('resolveIncident', () => {
-    it('should draw an Incident event from the deck and resolve it', () => {
+    it('should resolve the front Incident event from the queue', () => {
       const state = createTestState();
-      // Ensure there's an Incident event in the deck
+      // Set up incident queue with a known event at the front
       const incidentEvt = makeIncidentEvent({ coinDelta: -2 });
-      state.decks.event = [incidentEvt, ...state.decks.event];
+      state.incidentQueue = [incidentEvt];
       const coinsBefore = state.resourceBank.coins;
-      const deckSizeBefore = state.decks.event.length;
 
       const result = resolveIncident(state);
 
       expect(result).not.toBeNull();
       expect(result!.trigger).toBe('Incident');
       expect(state.resourceBank.coins).toBe(coinsBefore - 2);
-      expect(state.decks.event.length).toBe(deckSizeBefore - 1);
     });
 
-    it('should return null when no Incident events are in the deck', () => {
+    it('should return null when the incident queue is empty', () => {
       const state = createTestState();
-      // Remove all Incident events from deck
-      state.decks.event = state.decks.event.filter(e => e.trigger !== 'Incident');
+      state.incidentQueue = [];
 
       const result = resolveIncident(state);
 
       expect(result).toBeNull();
+    });
+
+    it('should refill the queue from the deck after resolving', () => {
+      const state = createTestState();
+      const incidentEvt = makeIncidentEvent({ id: 'front-incident', coinDelta: -1 });
+      const deckIncident = makeIncidentEvent({ id: 'deck-incident', coinDelta: -2 });
+      state.incidentQueue = [incidentEvt];
+      state.decks.event = [deckIncident];
+
+      resolveIncident(state);
+
+      // Queue should have been refilled with the deck incident
+      expect(state.incidentQueue.length).toBe(1);
+      expect(state.incidentQueue[0].id).toBe('deck-incident');
+      expect(state.decks.event.length).toBe(0);
+    });
+
+    it('should not refill when deck has no Incident cards', () => {
+      const state = createTestState();
+      const incidentEvt = makeIncidentEvent({ coinDelta: -1 });
+      state.incidentQueue = [incidentEvt];
+      // Only Investment events in deck
+      state.decks.event = state.decks.event.filter(e => e.trigger !== 'Incident');
+
+      resolveIncident(state);
+
+      expect(state.incidentQueue.length).toBe(0);
+    });
+
+    it('should resolve multiple items in FIFO order (A -> B -> C)', () => {
+      const state = createTestState();
+      const evtA = makeIncidentEvent({ id: 'inc-A', coinDelta: -1 });
+      const evtB = makeIncidentEvent({ id: 'inc-B', coinDelta: -2 });
+      const evtC = makeIncidentEvent({ id: 'inc-C', coinDelta: -3 });
+      state.incidentQueue = [evtA, evtB, evtC];
+      state.decks.event = []; // No refills
+      state.resourceBank.coins = 100;
+
+      const first = resolveIncident(state);
+      expect(first!.id).toBe('inc-A');
+      expect(state.incidentQueue.length).toBe(2);
+
+      const second = resolveIncident(state);
+      expect(second!.id).toBe('inc-B');
+      expect(state.incidentQueue.length).toBe(1);
+
+      const third = resolveIncident(state);
+      expect(third!.id).toBe('inc-C');
+      expect(state.incidentQueue.length).toBe(0);
+
+      // Cumulative effect: -1 + -2 + -3 = -6
+      expect(state.resourceBank.coins).toBe(100 - 6);
+    });
+
+    it('should refill queue back to INCIDENT_QUEUE_SIZE after resolution', () => {
+      const state = createTestState();
+      state.incidentQueue = [
+        makeIncidentEvent({ id: 'front-1', coinDelta: -1 }),
+        makeIncidentEvent({ id: 'front-2', coinDelta: -1 }),
+      ];
+      // Stock the deck with enough Incident cards
+      state.decks.event = [
+        makeIncidentEvent({ id: 'deck-1', coinDelta: -1 }),
+        makeIncidentEvent({ id: 'deck-2', coinDelta: -1 }),
+      ];
+      state.resourceBank.coins = 100;
+
+      // Resolve the front item
+      resolveIncident(state);
+
+      // Queue should be back to INCIDENT_QUEUE_SIZE (2)
+      expect(state.incidentQueue.length).toBe(2);
+      // Front should now be 'front-2', back should be 'deck-1'
+      expect(state.incidentQueue[0].id).toBe('front-2');
+      expect(state.incidentQueue[1].id).toBe('deck-1');
     });
   });
 
@@ -575,12 +649,12 @@ describe('MainStreetEngine', () => {
 
     it('should execute a turn with no purchases', () => {
       const state = createTestState();
-      const coinsBefore = state.resourceBank.coins;
 
       const result = executeFullTurn(state, [{ type: 'end-turn' }]);
 
       expect(result.gameResult).toBe('playing');
-      expect(state.resourceBank.coins).toBe(coinsBefore); // No income (empty grid), possibly night event
+      // Coins may change due to Incident event resolution (seed-dependent)
+      expect(state.resourceBank.coins).toBeLessThanOrEqual(STARTING_COINS);
       expect(state.turn).toBe(2);
     });
 

@@ -17,8 +17,8 @@ import {
   STARTING_COINS,
   STARTING_REPUTATION,
   MARKET_BUSINESS_SLOTS,
-  MARKET_EVENT_SLOTS,
-  MARKET_UPGRADE_SLOTS,
+  MARKET_INVESTMENT_SLOTS,
+  INCIDENT_QUEUE_SIZE,
   createBusinessDeck,
   createEventDeck,
   createUpgradeDeck,
@@ -136,20 +136,21 @@ describe('MainStreetState', () => {
       const state = createTestState();
       expect(state.market.business.length).toBeLessThanOrEqual(MARKET_BUSINESS_SLOTS);
       expect(state.market.business.length).toBeGreaterThan(0);
-      expect(state.market.event.length).toBeLessThanOrEqual(MARKET_EVENT_SLOTS);
-      expect(state.market.event.length).toBeGreaterThan(0);
-      expect(state.market.upgrade.length).toBeLessThanOrEqual(MARKET_UPGRADE_SLOTS);
-      expect(state.market.upgrade.length).toBeGreaterThan(0);
+      expect(state.market.investments.length).toBeLessThanOrEqual(MARKET_INVESTMENT_SLOTS);
+      expect(state.market.investments.length).toBeGreaterThan(0);
     });
 
     it('should have non-empty decks after market fill', () => {
       const state = createTestState();
       // Business: 15 total - 4 market = 11 remaining
       expect(state.decks.business.length).toBe(15 - MARKET_BUSINESS_SLOTS);
-      // Event: 15 total - 2 market = 13 remaining
-      expect(state.decks.event.length).toBe(15 - MARKET_EVENT_SLOTS);
-      // Upgrade: 6 total - 2 market = 4 remaining
-      expect(state.decks.upgrade.length).toBe(6 - MARKET_UPGRADE_SLOTS);
+      // Event: 15 total - investment events in market - incident queue = remaining in deck
+      const investmentEventsInMarket = state.market.investments.filter(c => c.family === 'event').length;
+      const eventAccountedFor = investmentEventsInMarket + state.decks.event.length + state.incidentQueue.length;
+      expect(eventAccountedFor).toBe(15);
+      // Upgrade: 6 total - upgrades in investments row = remaining
+      const upgradesInMarket = state.market.investments.filter(c => c.family === 'upgrade').length;
+      expect(state.decks.upgrade.length).toBe(6 - upgradesInMarket);
     });
 
     it('should have no challenges completed initially', () => {
@@ -160,6 +161,15 @@ describe('MainStreetState', () => {
     it('should have no held event initially', () => {
       const state = createTestState();
       expect(state.heldEvent).toBeNull();
+    });
+
+    it('should have incident queue pre-filled with Incident-trigger events', () => {
+      const state = createTestState();
+      expect(state.incidentQueue.length).toBe(INCIDENT_QUEUE_SIZE);
+      for (const card of state.incidentQueue) {
+        expect(card.family).toBe('event');
+        expect(card.trigger).toBe('Incident');
+      }
     });
 
     it('should be in playing state', () => {
@@ -203,11 +213,8 @@ describe('MainStreetState', () => {
       expect(state1.market.business.map(c => c.id)).toEqual(
         state2.market.business.map(c => c.id),
       );
-      expect(state1.market.event.map(c => c.id)).toEqual(
-        state2.market.event.map(c => c.id),
-      );
-      expect(state1.market.upgrade.map(c => c.id)).toEqual(
-        state2.market.upgrade.map(c => c.id),
+      expect(state1.market.investments.map(c => c.id)).toEqual(
+        state2.market.investments.map(c => c.id),
       );
 
       // Decks should have same card order
@@ -219,6 +226,11 @@ describe('MainStreetState', () => {
       );
       expect(state1.decks.upgrade.map(c => c.id)).toEqual(
         state2.decks.upgrade.map(c => c.id),
+      );
+
+      // Incident queue should have same cards in same order
+      expect(state1.incidentQueue.map(c => c.id)).toEqual(
+        state2.incidentQueue.map(c => c.id),
       );
     });
 
@@ -261,27 +273,29 @@ describe('MainStreetState', () => {
       expect(total).toBe(15); // 5 templates * 3 copies
     });
 
-    it('should have all market + deck cards equal total deck size (event)', () => {
+    it('should have all market + deck + queue cards equal total deck size (event)', () => {
       const state = createTestState();
-      const total = state.market.event.length + state.decks.event.length;
+      const investmentEventsInMarket = state.market.investments.filter(c => c.family === 'event').length;
+      const total = investmentEventsInMarket + state.decks.event.length + state.incidentQueue.length;
       expect(total).toBe(15); // 5 templates * 3 copies
     });
 
     it('should have all market + deck cards equal total deck size (upgrade)', () => {
       const state = createTestState();
-      const total = state.market.upgrade.length + state.decks.upgrade.length;
+      const upgradesInMarket = state.market.investments.filter(c => c.family === 'upgrade').length;
+      const total = upgradesInMarket + state.decks.upgrade.length;
       expect(total).toBe(6); // 3 templates * 2 copies
     });
 
-    it('should have all unique card IDs across market and decks', () => {
+    it('should have all unique card IDs across market, decks, and queues', () => {
       const state = createTestState();
       const allIds = [
         ...state.market.business.map(c => c.id),
-        ...state.market.event.map(c => c.id),
-        ...state.market.upgrade.map(c => c.id),
+        ...state.market.investments.map(c => c.id),
         ...state.decks.business.map(c => c.id),
         ...state.decks.event.map(c => c.id),
         ...state.decks.upgrade.map(c => c.id),
+        ...state.incidentQueue.map(c => c.id),
       ];
       const uniqueIds = new Set(allIds);
       expect(uniqueIds.size).toBe(allIds.length);

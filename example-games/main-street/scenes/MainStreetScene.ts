@@ -21,8 +21,8 @@ import {
   synergyColor,
   cardLabel,
   MARKET_BUSINESS_SLOTS,
-  MARKET_EVENT_SLOTS,
-  MARKET_UPGRADE_SLOTS,
+  MARKET_INVESTMENT_SLOTS,
+  INCIDENT_QUEUE_SIZE,
 } from '../MainStreetCards';
 import {
   executeAction,
@@ -60,8 +60,9 @@ const BG_COLOR = '#2a1f14';
 // Top bar (y 0-40):  header (title + menu button)
 // HUD band (y 44-78):  Turn/phase, coins, reputation, score
 // Street (y 90-220):  10 grid slots, horizontally centered
-// Market (y 240-540): 3 rows (business, event, upgrade)
-// Actions (y 560-710): instruction text + action buttons
+// Market (y 240-440): 2 rows (business, investments)
+// Incident queue (y 450-530): face-up upcoming incidents
+// Bottom bar (y 550-710): player hand (left), actions (right)
 
 const HUD_Y = 50;
 
@@ -82,7 +83,19 @@ const MARKET_CARD_H = 80;
 const MARKET_CARD_GAP = 12;
 const MARKET_LABEL_W = 90;
 
-// Action area
+// Incident queue (below market)
+const QUEUE_TOP = 455;
+const QUEUE_CARD_W = 140;
+const QUEUE_CARD_H = 70;
+const QUEUE_CARD_GAP = 12;
+const QUEUE_LABEL_W = 130;
+
+// Player hand (bottom-left)
+const HAND_Y = 570;
+const HAND_CARD_W = 150;
+const HAND_CARD_H = 90;
+
+// Action area (right-aligned)
 const INSTRUCTION_Y = 580;
 const ACTION_Y = 640;
 
@@ -133,6 +146,8 @@ export class MainStreetScene extends CardGameScene {
   private hudContainer!: Phaser.GameObjects.Container;
   private streetContainer!: Phaser.GameObjects.Container;
   private marketContainer!: Phaser.GameObjects.Container;
+  private incidentQueueContainer!: Phaser.GameObjects.Container;
+  private handContainer!: Phaser.GameObjects.Container;
   private actionContainer!: Phaser.GameObjects.Container;
 
   // Activity Log panel
@@ -194,10 +209,11 @@ export class MainStreetScene extends CardGameScene {
       {
         heading: 'Events',
         body:
-          'Investment events (brown) can be purchased and held (max 1 at a time).\n' +
-          'Play your held Investment during the market phase for a one-time effect.\n' +
-          'Incident events (blue) trigger automatically at end of turn -- you cannot\n' +
-          'buy them, but you can see upcoming ones in the market.\n' +
+          'Investment events (brown) can be purchased from the Investments row\n' +
+          'and held in your hand (max 1 at a time). Click the held card in\n' +
+          'your hand (bottom-left) to play it for a one-time effect.\n' +
+          'Incident events (blue) appear in the Upcoming Incidents queue and\n' +
+          'trigger automatically at the end of each turn -- plan around them!\n' +
           'Check the Activity Log to see what events fired and their effects.',
       },
       {
@@ -233,6 +249,8 @@ export class MainStreetScene extends CardGameScene {
     this.hudContainer = this.add.container(0, 0);
     this.streetContainer = this.add.container(0, 0);
     this.marketContainer = this.add.container(0, 0);
+    this.incidentQueueContainer = this.add.container(0, 0);
+    this.handContainer = this.add.container(0, 0);
     this.actionContainer = this.add.container(0, 0);
 
     // Activity Log panel (persistent, not rebuilt each refresh)
@@ -274,12 +292,12 @@ export class MainStreetScene extends CardGameScene {
 
   private createInstructions(): void {
     this.instructionText = this.add
-      .text(GAME_W / 2, INSTRUCTION_Y, '', {
+      .text(GAME_W - 40, INSTRUCTION_Y, '', {
         fontSize: '16px',
         color: '#ccaa77',
         fontFamily: FONT_FAMILY,
       })
-      .setOrigin(0.5);
+      .setOrigin(1, 0.5);
   }
 
   // ── Day flow ────────────────────────────────────────────
@@ -328,6 +346,8 @@ export class MainStreetScene extends CardGameScene {
     this.refreshHud();
     this.refreshStreetGrid();
     this.refreshMarket();
+    this.refreshIncidentQueue();
+    this.refreshPlayerHand();
     this.refreshActionButtons();
     this.refreshLog();
   }
@@ -481,8 +501,8 @@ export class MainStreetScene extends CardGameScene {
   private refreshMarket(): void {
     this.marketContainer.removeAll(true);
 
-    // Section background
-    const totalH = 3 * MARKET_ROW_H + 2 * MARKET_ROW_GAP + 20;
+    // Section background (2 rows: business + investments)
+    const totalH = 2 * MARKET_ROW_H + MARKET_ROW_GAP + 20;
     const bgBox = this.add.graphics();
     bgBox.fillStyle(BOX_FILL, 0.3);
     bgBox.fillRoundedRect(20, MARKET_TOP - 10, GAME_W - 40, totalH, BOX_RADIUS);
@@ -504,22 +524,19 @@ export class MainStreetScene extends CardGameScene {
       (card) => this.onBusinessCardClick(card as BusinessCard),
     );
 
-    // Event row
+    // Investments row (mixed upgrades + investment events)
     this.drawMarketRow(
       MARKET_TOP + 6 + MARKET_ROW_H + MARKET_ROW_GAP,
-      'Events',
-      this.state.market.event,
-      MARKET_EVENT_SLOTS,
-      (card) => this.onEventCardClick(card as EventCard),
-    );
-
-    // Upgrade row
-    this.drawMarketRow(
-      MARKET_TOP + 6 + 2 * (MARKET_ROW_H + MARKET_ROW_GAP),
-      'Upgrades',
-      this.state.market.upgrade,
-      MARKET_UPGRADE_SLOTS,
-      (card) => this.onUpgradeCardClick(card as UpgradeCard),
+      'Investments',
+      this.state.market.investments,
+      MARKET_INVESTMENT_SLOTS,
+      (card) => {
+        if (card.family === 'upgrade') {
+          this.onUpgradeCardClick(card as UpgradeCard);
+        } else {
+          this.onEventCardClick(card as EventCard);
+        }
+      },
     );
   }
 
@@ -557,13 +574,24 @@ export class MainStreetScene extends CardGameScene {
     }
 
     // Deck count (right side)
-    const deckKey = rowLabel === 'Business' ? 'business' : rowLabel === 'Events' ? 'event' : 'upgrade';
-    const deckCount = this.state.decks[deckKey].length;
     const deckX = startX + maxSlots * (MARKET_CARD_W + MARKET_CARD_GAP) + 10;
-    const deckText = this.add.text(deckX, y + MARKET_CARD_H / 2, `Deck: ${deckCount}`, {
-      fontSize: '12px', color: '#776655', fontFamily: FONT_FAMILY,
-    }).setOrigin(0, 0.5);
-    this.marketContainer.add(deckText);
+    if (rowLabel === 'Business') {
+      const deckCount = this.state.decks.business.length;
+      const deckText = this.add.text(deckX, y + MARKET_CARD_H / 2, `Deck: ${deckCount}`, {
+        fontSize: '12px', color: '#776655', fontFamily: FONT_FAMILY,
+      }).setOrigin(0, 0.5);
+      this.marketContainer.add(deckText);
+    } else {
+      // Investments row: show both upgrade and event deck counts
+      const upgCount = this.state.decks.upgrade.length;
+      const evtCount = this.state.decks.event.length;
+      const deckText = this.add.text(
+        deckX, y + MARKET_CARD_H / 2,
+        `Upg: ${upgCount}  Evt: ${evtCount}`,
+        { fontSize: '11px', color: '#776655', fontFamily: FONT_FAMILY },
+      ).setOrigin(0, 0.5);
+      this.marketContainer.add(deckText);
+    }
   }
 
   private drawMarketCard(
@@ -657,13 +685,212 @@ export class MainStreetScene extends CardGameScene {
     return container;
   }
 
+  // ── Incident Queue ───────────────────────────────────────
+
+  private refreshIncidentQueue(): void {
+    this.incidentQueueContainer.removeAll(true);
+
+    const queue = this.state.incidentQueue;
+    const deckRemaining = this.state.decks.event.length;
+
+    // Section background
+    const queueW = QUEUE_LABEL_W + INCIDENT_QUEUE_SIZE * (QUEUE_CARD_W + QUEUE_CARD_GAP) + 100;
+    const queueH = QUEUE_CARD_H + 24;
+    const bgBox = this.add.graphics();
+    bgBox.fillStyle(0x1a1830, 0.35);
+    bgBox.fillRoundedRect(20, QUEUE_TOP - 10, queueW, queueH, BOX_RADIUS);
+    bgBox.lineStyle(1, 0x445577, 0.5);
+    bgBox.strokeRoundedRect(20, QUEUE_TOP - 10, queueW, queueH, BOX_RADIUS);
+    this.incidentQueueContainer.add(bgBox);
+
+    // Section label
+    const label = this.add.text(40, QUEUE_TOP + QUEUE_CARD_H / 2 - 2, 'Upcoming\nIncidents', {
+      fontSize: '13px', fontStyle: 'bold', color: '#7788aa', fontFamily: FONT_FAMILY,
+      align: 'center',
+    }).setOrigin(0, 0.5);
+    this.incidentQueueContainer.add(label);
+
+    const startX = QUEUE_LABEL_W + 30;
+
+    for (let i = 0; i < INCIDENT_QUEUE_SIZE; i++) {
+      const cx = startX + i * (QUEUE_CARD_W + QUEUE_CARD_GAP);
+      const card = queue[i];
+
+      if (card) {
+        const cardContainer = this.drawIncidentCard(cx, QUEUE_TOP, card);
+        this.incidentQueueContainer.add(cardContainer);
+      } else {
+        // Empty queue slot
+        const empty = this.add.rectangle(
+          cx + QUEUE_CARD_W / 2, QUEUE_TOP + QUEUE_CARD_H / 2,
+          QUEUE_CARD_W, QUEUE_CARD_H, 0x111122, 0.3,
+        );
+        empty.setStrokeStyle(1, 0x223344);
+        this.incidentQueueContainer.add(empty);
+      }
+    }
+
+    // Deck count
+    const deckX = startX + INCIDENT_QUEUE_SIZE * (QUEUE_CARD_W + QUEUE_CARD_GAP) + 10;
+    const deckText = this.add.text(deckX, QUEUE_TOP + QUEUE_CARD_H / 2, `Deck: ${deckRemaining}`, {
+      fontSize: '11px', color: '#556677', fontFamily: FONT_FAMILY,
+    }).setOrigin(0, 0.5);
+    this.incidentQueueContainer.add(deckText);
+  }
+
+  private drawIncidentCard(
+    x: number,
+    y: number,
+    card: EventCard,
+  ): Phaser.GameObjects.Container {
+    const container = this.add.container(x + QUEUE_CARD_W / 2, y + QUEUE_CARD_H / 2);
+
+    // Indigo background (non-interactive)
+    const bg = this.add.rectangle(0, 0, QUEUE_CARD_W, QUEUE_CARD_H, 0x2B3A67, 0.5);
+    bg.setStrokeStyle(1, 0x556688);
+    container.add(bg);
+
+    // Card name
+    const nameText = this.add.text(0, -QUEUE_CARD_H / 2 + 8, cardLabel(card), {
+      fontSize: '11px', fontStyle: 'bold', color: '#8899bb',
+      fontFamily: FONT_FAMILY,
+      wordWrap: { width: QUEUE_CARD_W - 12 },
+      align: 'center',
+    }).setOrigin(0.5, 0);
+    container.add(nameText);
+
+    // Effect summary
+    const parts: string[] = [];
+    if (card.coinDelta !== 0) parts.push(`${card.coinDelta > 0 ? '+' : ''}${card.coinDelta} coins`);
+    if (card.reputationDelta !== 0) parts.push(`${card.reputationDelta > 0 ? '+' : ''}${card.reputationDelta} rep`);
+    const infoStr = parts.join(', ') || card.effect;
+
+    const infoText = this.add.text(0, QUEUE_CARD_H / 2 - 12, infoStr, {
+      fontSize: '10px', color: '#7788aa',
+      fontFamily: FONT_FAMILY,
+      wordWrap: { width: QUEUE_CARD_W - 12 },
+      align: 'center',
+    }).setOrigin(0.5, 1);
+    container.add(infoText);
+
+    return container;
+  }
+
+  // ── Player Hand ────────────────────────────────────────────
+
+  private refreshPlayerHand(): void {
+    this.handContainer.removeAll(true);
+
+    const held = this.state.heldEvent;
+
+    // Section label
+    const label = this.add.text(40, HAND_Y - 10, 'Your Hand', {
+      fontSize: '13px', fontStyle: 'bold', color: '#aa9944', fontFamily: FONT_FAMILY,
+    }).setOrigin(0, 1);
+    this.handContainer.add(label);
+
+    if (held) {
+      const cardContainer = this.drawHeldEventCard(40, HAND_Y, held);
+      this.handContainer.add(cardContainer);
+    } else {
+      // Empty hand slot
+      const empty = this.add.rectangle(
+        40 + HAND_CARD_W / 2, HAND_Y + HAND_CARD_H / 2,
+        HAND_CARD_W, HAND_CARD_H, 0x222211, 0.2,
+      );
+      empty.setStrokeStyle(1, 0x333322, 0.4);
+      this.handContainer.add(empty);
+
+      const emptyText = this.add.text(
+        40 + HAND_CARD_W / 2, HAND_Y + HAND_CARD_H / 2,
+        'No held event',
+        { fontSize: '11px', color: '#555544', fontFamily: FONT_FAMILY },
+      ).setOrigin(0.5);
+      this.handContainer.add(emptyText);
+    }
+  }
+
+  private drawHeldEventCard(
+    x: number,
+    y: number,
+    card: EventCard,
+  ): Phaser.GameObjects.Container {
+    const container = this.add.container(x + HAND_CARD_W / 2, y + HAND_CARD_H / 2);
+
+    // Warm brown background (Investment)
+    const bg = this.add.rectangle(0, 0, HAND_CARD_W, HAND_CARD_H, 0x8B4513, 0.7);
+    bg.setStrokeStyle(2, 0xcc9944);
+    container.add(bg);
+
+    // Card name
+    const nameText = this.add.text(0, -HAND_CARD_H / 2 + 10, cardLabel(card), {
+      fontSize: '12px', fontStyle: 'bold', color: '#ffffff',
+      fontFamily: FONT_FAMILY,
+      wordWrap: { width: HAND_CARD_W - 12 },
+      align: 'center',
+    }).setOrigin(0.5, 0);
+    container.add(nameText);
+
+    // Effect summary
+    const parts: string[] = [];
+    if (card.coinDelta !== 0) parts.push(`${card.coinDelta > 0 ? '+' : ''}${card.coinDelta} coins`);
+    if (card.reputationDelta !== 0) parts.push(`${card.reputationDelta > 0 ? '+' : ''}${card.reputationDelta} rep`);
+    const infoStr = parts.join(', ') || card.effect;
+
+    const infoText = this.add.text(0, HAND_CARD_H / 2 - 14, infoStr, {
+      fontSize: '11px', color: '#ddddcc',
+      fontFamily: FONT_FAMILY,
+      wordWrap: { width: HAND_CARD_W - 12 },
+      align: 'center',
+    }).setOrigin(0.5, 1);
+    container.add(infoText);
+
+    // "Click to play" hint
+    const hint = this.add.text(0, HAND_CARD_H / 2 - 2, 'Click to play', {
+      fontSize: '9px', fontStyle: 'italic', color: '#ccaa66',
+      fontFamily: FONT_FAMILY,
+    }).setOrigin(0.5, 1);
+    container.add(hint);
+
+    // Interactivity (only during market phase)
+    if (this.uiPhase === 'market') {
+      bg.setInteractive({ useHandCursor: true });
+      bg.on('pointerdown', () => this.onPlayHeldEvent());
+      bg.on('pointerover', () => {
+        bg.setStrokeStyle(3, 0xffdd44);
+        container.setScale(1.05);
+      });
+      bg.on('pointerout', () => {
+        bg.setStrokeStyle(2, 0xcc9944);
+        container.setScale(1.0);
+      });
+    }
+
+    return container;
+  }
+
+  private onPlayHeldEvent(): void {
+    if (this.uiPhase !== 'market') return;
+    if (!this.state.heldEvent) return;
+
+    const action: PlayerAction = { type: 'play-event' };
+    try {
+      executeAction(this.state, action);
+      this.instructionText.setText('Played held Investment event!');
+    } catch (e) {
+      this.instructionText.setText(`Error: ${(e as Error).message}`);
+    }
+
+    this.refreshAll();
+  }
+
   // ── Action buttons ──────────────────────────────────────
 
   private refreshActionButtons(): void {
     this.actionContainer.removeAll(true);
 
     if (this.uiPhase === 'market') {
-      const centerX = GAME_W / 2;
+      const rightX = GAME_W - 40;
       const by = ACTION_Y;
 
       // Affordable summary
@@ -682,29 +909,31 @@ export class MainStreetScene extends CardGameScene {
         ? `Can buy: ${summaryParts.join(', ')}`
         : 'No affordable cards';
 
-      const summary = this.add.text(centerX, by - 8, summaryStr, {
+      const summary = this.add.text(rightX, by - 8, summaryStr, {
         fontSize: '13px', color: '#887766', fontFamily: FONT_FAMILY,
-      }).setOrigin(0.5, 1);
+      }).setOrigin(1, 1);
       this.actionContainer.add(summary);
 
-      // End Turn button
-      const endBtn = this.createActionButton(centerX - 80, by + 8, 160, 'End Turn', () => {
+      // End Turn button (right-aligned)
+      const btnW = 160;
+      const endBtn = this.createActionButton(rightX - btnW, by + 8, btnW, 'End Turn', () => {
         this.endTurn();
       });
       this.actionContainer.add(endBtn);
 
     } else if (this.uiPhase === 'placing-business') {
-      const centerX = GAME_W / 2;
+      const rightX = GAME_W - 40;
       const by = ACTION_Y;
 
       const cardName = this.pendingBusinessCard?.name ?? '???';
-      const hint = this.add.text(centerX, by - 8, `Place "${cardName}" -- click an empty slot`, {
+      const hint = this.add.text(rightX, by - 8, `Place "${cardName}" -- click an empty slot`, {
         fontSize: '15px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY,
-      }).setOrigin(0.5, 1);
+      }).setOrigin(1, 1);
       this.actionContainer.add(hint);
 
-      // Cancel button
-      const cancelBtn = this.createActionButton(centerX - 80, by + 8, 160, 'Cancel', () => {
+      // Cancel button (right-aligned)
+      const btnW = 160;
+      const cancelBtn = this.createActionButton(rightX - btnW, by + 8, btnW, 'Cancel', () => {
         this.pendingBusinessCard = null;
         this.uiPhase = 'market';
         this.refreshAll();

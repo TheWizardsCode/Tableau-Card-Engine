@@ -156,9 +156,9 @@ describe('Activity Log', () => {
       const state = createTestState();
       executeDayStart(state);
 
-      // Inject an Investment event into the market
+      // Inject an Investment event into the investments row
       const investmentEvent = makeInvestmentEvent({ id: 'inv-evt-1', name: 'Test Fest' });
-      state.market.event = [investmentEvent];
+      state.market.investments = [investmentEvent];
       purchaseEvent(state, 'inv-evt-1');
 
       const entry = lastLog(state);
@@ -177,7 +177,7 @@ describe('Activity Log', () => {
       const biz = makeBiz({ id: 'bakery-1', name: 'Bakery', maxLevel: 3 });
       state.streetGrid[0] = biz;
 
-      // Inject an upgrade into the market
+      // Inject an upgrade into the investments row
       const upgrade: UpgradeCard = {
         family: 'upgrade',
         id: 'upg-1',
@@ -188,7 +188,7 @@ describe('Activity Log', () => {
         incomeBonus: 1,
         synergyRangeBonus: 0,
       };
-      state.market.upgrade = [upgrade];
+      state.market.investments = [upgrade];
       state.resourceBank.coins = 20;
 
       purchaseUpgrade(state, 'upg-1');
@@ -287,9 +287,9 @@ describe('Activity Log', () => {
       const state = createTestState();
       executeDayStart(state);
 
-      // Inject an Incident event into the deck
-      state.decks.event = [
-        makeIncidentEvent({ id: 'ne-1', name: 'Rainy Night', coinDelta: -1, reputationDelta: 0 }),
+      // Inject an Incident event into the queue
+      state.incidentQueue = [
+        makeIncidentEvent({ id: 'ne-1', name: 'Rainy Day', coinDelta: -1, reputationDelta: 0 }),
       ];
 
       state.phase = 'IncidentPhase';
@@ -298,16 +298,16 @@ describe('Activity Log', () => {
 
       const entry = state.activityLog[logBefore];
       expect(entry.text).toContain('Incident:');
-      expect(entry.text).toContain('Rainy Night');
+      expect(entry.text).toContain('Rainy Day');
       expect(entry.type).toBe('loss');
     });
 
-    it('should not log when no Incident events are available', () => {
+    it('should not log when the incident queue is empty', () => {
       const state = createTestState();
       executeDayStart(state);
 
-      // Remove all Incident events
-      state.decks.event = state.decks.event.filter(e => e.trigger !== 'Incident');
+      // Empty the incident queue
+      state.incidentQueue = [];
 
       state.phase = 'IncidentPhase';
       const logBefore = state.activityLog.length;

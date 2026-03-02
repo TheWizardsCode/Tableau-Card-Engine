@@ -17,12 +17,21 @@ The **Main Street** game uses three distinct card families. Below is the current
 | ... *(additional business cards may be added later)* |
 
 ### 1.2 Event Cards
+
+Event cards are split into two trigger types:
+
+- **Investment** events are purchased from the Investments market row, held by the player, and played (or auto-resolved) during the turn. They are generally positive.
+- **Incident** events populate a visible FIFO queue and resolve automatically at the start of each turn's Incident Phase. They are generally negative or disruptive.
+
 | Name | Trigger | Effect |
 |------|---------|--------|
-| Local Festival | Incident | +2 coins to all Culture businesses this turn. |
-| Rainy Night | Incident | -1 coin to all Food businesses this turn. |
-| Tax Audit | Investment | Lose 3 coins unless you have a Bank card. |
-| ... *(expandable event pool)* |
+| Local Festival | Investment | +2 coins per Culture business and +1 reputation. |
+| Tax Audit | Incident | Lose 3 coins. |
+| Rainy Day | Incident | -1 coin per Food business this turn. |
+| Community Award | Incident | +2 reputation from community recognition. |
+| Health Inspection | Incident | -2 coins per Food business and -1 reputation. |
+
+**Deck composition:** 5 event templates × 3 copies = 15 cards total (3 Investment, 12 Incident). At game start, the Investments market row draws 1 Investment event and the incident queue draws 2 Incidents from the shuffled event deck.
 
 ### 1.3 Upgrade Cards
 | Name | Target Business | Cost (coins) | Income Bonus | Synergy Range Bonus | Description |
@@ -65,7 +74,7 @@ Main Street is intended to be approachable for 10‑15‑minute play sessions wh
 | **Slot Count** | The base game uses 10 slots; increasing to 12 slots adds decision space without extending playtime significantly. |
 | **Coin Starting Amount** | Adjusting the initial budget (e.g., 8 → 10 coins) can make early rounds easier or tighter. |
 | **Synergy Bonus Value** | Changing the synergy bonus from `+1` to `+2` per matching neighbor raises the impact of placement decisions. |
-| **Event Frequency** | Adding more Incident events increases variance and potential swing moments. |
+| **Event Frequency** | Adding more Incident events to the deck increases variance. The visible incident queue (2 cards) lets the player plan ahead. |
 | **Challenge Targets** | Scaling challenge thresholds (e.g., “Build a Foodie Row” requiring 3 Food businesses) adjusts difficulty. |
 
 Balancing targets are defined in the **GameState** type (`MAX_TURNS = 20`, `WIN_THRESHOLD = 150`). Playtesting should verify that a typical run ends near the turn limit with a final score around the win threshold.

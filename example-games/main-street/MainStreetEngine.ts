@@ -27,6 +27,7 @@ import {
   purchaseUpgrade,
   purchaseEvent,
   refillAllMarkets,
+  refillIncidentQueue,
   type PurchaseResult,
 } from './MainStreetMarket';
 
@@ -285,17 +286,15 @@ export function resolveHeldInvestment(state: MainStreetState): EventCard | null 
 }
 
 /**
- * Draws and resolves one Incident event from the event deck.
- * Incident events are drawn automatically (not purchased).
- * Returns the drawn event or null if the deck is empty.
+ * Resolves the front Incident event from the incident queue (FIFO).
+ * After resolving, draws a replacement Incident from the event deck.
+ * Returns the resolved event or null if the queue is empty.
  */
 export function resolveIncident(state: MainStreetState): EventCard | null {
-  // Find an Incident-trigger event in the deck
-  const incidentIdx = state.decks.event.findIndex(e => e.trigger === 'Incident');
-  if (incidentIdx === -1) return null;
+  // Pop front of the incident queue
+  if (state.incidentQueue.length === 0) return null;
+  const event = state.incidentQueue.shift()!;
 
-  // Remove from deck
-  const [event] = state.decks.event.splice(incidentIdx, 1);
   const coinsBefore = state.resourceBank.coins;
   const repBefore = state.resourceBank.reputation;
   resolveEvent(state, event);
@@ -306,6 +305,10 @@ export function resolveIncident(state: MainStreetState): EventCard | null {
     `Incident: ${event.name} (${describeEventEffects(coinChange, repChange)})`,
     classifyEffect(coinChange, repChange),
   );
+
+  // Draw replacement from deck (only Incident-trigger cards)
+  refillIncidentQueue(state);
+
   return event;
 }
 
