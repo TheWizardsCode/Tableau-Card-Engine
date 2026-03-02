@@ -315,20 +315,21 @@ describe('MainStreetMarket', () => {
       // Ensure we have an Investment event by manipulating the market
       const investmentTemplate = {
         family: 'event' as const,
-        id: 'evt-tax-test',
-        name: 'Tax Audit',
+        id: 'evt-festival-test',
+        name: 'Local Festival',
         trigger: 'Investment' as const,
-        effect: 'Lose 3 coins.',
-        target: 'All' as const,
-        coinDelta: -3,
-        reputationDelta: 0,
+        effect: '+2 coins to all Culture businesses and +1 reputation.',
+        target: 'SpecificSynergy' as const,
+        targetSynergy: 'Culture' as const,
+        coinDelta: 2,
+        reputationDelta: 1,
       };
       state.market.event = [investmentTemplate];
 
-      purchaseEvent(state, 'evt-tax-test');
+      purchaseEvent(state, 'evt-festival-test');
 
       expect(state.heldEvent).not.toBeNull();
-      expect(state.heldEvent!.id).toBe('evt-tax-test');
+      expect(state.heldEvent!.id).toBe('evt-festival-test');
     });
   });
 

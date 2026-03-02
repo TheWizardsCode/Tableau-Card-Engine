@@ -289,7 +289,7 @@ describe('Activity Log', () => {
 
       // Inject an Incident event into the deck
       state.decks.event = [
-        makeIncidentEvent({ id: 'ne-1', name: 'Rainy Night', coinDelta: -1, reputationDelta: 0 }),
+        makeIncidentEvent({ id: 'ne-1', name: 'Rainy Day', coinDelta: -1, reputationDelta: 0 }),
       ];
 
       state.phase = 'IncidentPhase';
@@ -298,7 +298,7 @@ describe('Activity Log', () => {
 
       const entry = state.activityLog[logBefore];
       expect(entry.text).toContain('Incident:');
-      expect(entry.text).toContain('Rainy Night');
+      expect(entry.text).toContain('Rainy Day');
       expect(entry.type).toBe('loss');
     });
 
