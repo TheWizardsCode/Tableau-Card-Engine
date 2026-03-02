@@ -146,9 +146,10 @@ export function canPurchaseEvent(
     return { legal: false, reason: 'Already holding an Investment event. Play or discard it before buying another.' };
   }
 
-  // Events in the walking skeleton are free (cost = coinDelta applied on resolution),
-  // but purchasing still requires being in the right phase.
-  // No coin check needed for event purchase itself.
+  // Check coins
+  if (state.resourceBank.coins < card.cost) {
+    return { legal: false, reason: `Not enough coins. Need ${card.cost}, have ${state.resourceBank.coins}.` };
+  }
 
   return { legal: true };
 }
@@ -343,6 +344,9 @@ export function purchaseEvent(
   );
   const card = state.market.investments[marketIndex] as EventCard;
 
+  // Deduct cost
+  state.resourceBank.coins -= card.cost;
+
   // Remove from market
   state.market.investments.splice(marketIndex, 1);
 
@@ -353,9 +357,10 @@ export function purchaseEvent(
   const refilled = state.decks.event.some(e => e.trigger === 'Investment');
   refillInvestmentsMarket(state);
 
-  addLog(state, `Bought event: ${card.name} (held)`, 'neutral');
+  const costLabel = card.cost > 0 ? ` (-$${card.cost})` : '';
+  addLog(state, `Bought event: ${card.name}${costLabel} (held)`, 'neutral');
 
-  return { card, cost: 0, refilled };
+  return { card, cost: card.cost, refilled };
 }
 
 /**

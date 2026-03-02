@@ -292,6 +292,7 @@ describe('MainStreetMarket', () => {
         target: 'All',
         coinDelta: 0,
         reputationDelta: 0,
+        cost: 0,
       };
       // Find an Investment event in investments row
       const investmentEvent = state.market.investments.find(
@@ -321,6 +322,7 @@ describe('MainStreetMarket', () => {
         targetSynergy: 'Culture' as const,
         coinDelta: 2,
         reputationDelta: 1,
+        cost: 3,
       };
       state.market.investments = [investmentTemplate];
 
@@ -423,6 +425,7 @@ describe('MainStreetMarket', () => {
         target: 'All' as const,
         coinDelta: 1,
         reputationDelta: 0,
+        cost: 3,
       };
       // Replace any existing event in the investments row
       state.market.investments = state.market.investments.filter(c => c.family !== 'event');
@@ -439,6 +442,7 @@ describe('MainStreetMarket', () => {
         targetSynergy: 'Culture',
         coinDelta: 2,
         reputationDelta: 1,
+        cost: 3,
       });
 
       purchaseEvent(state, 'evt-test-purchase');

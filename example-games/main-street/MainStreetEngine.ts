@@ -7,6 +7,9 @@
  * The walking skeleton uses a simplified 6-phase turn structure:
  *   DayStart -> MarketPhase -> InvestmentResolution -> IncomePhase -> IncidentPhase -> EndCheck
  *
+ * Held Investment events are NOT auto-resolved. The player must actively play
+ * them by clicking during the MarketPhase. Unplayed events persist across turns.
+ *
  * All functions mutate state in-place (following engine conventions).
  *
  * @module
@@ -261,9 +264,12 @@ export function playHeldEvent(state: MainStreetState): void {
 }
 
 /**
- * Resolves any remaining held Investment event at the InvestmentResolution phase.
- * If the player did not play their held event during MarketPhase, it is
- * auto-resolved here and cleared.
+ * Resolves any remaining held Investment event.
+ *
+ * NOTE: This is no longer called automatically during processEndOfTurn.
+ * Held events persist across turns until the player actively plays them
+ * via the 'play-event' action during the MarketPhase. This function is
+ * retained for programmatic / test use.
  *
  * @returns The resolved event, or null if no event was held.
  */
@@ -432,9 +438,11 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
     throw new Error(`Cannot end turn during ${state.phase}. Must be in MarketPhase.`);
   }
 
-  // Phase: InvestmentResolution (auto-resolve any held Investment)
+  // Phase: InvestmentResolution
+  // Held Investment events are NO LONGER auto-resolved. The player must
+  // actively play them by clicking during the MarketPhase. Unplayed events
+  // persist across turns.
   state.phase = 'InvestmentResolution';
-  resolveHeldInvestment(state);
 
   // Check for immediate loss after events
   if (checkImmediateLoss(state)) {

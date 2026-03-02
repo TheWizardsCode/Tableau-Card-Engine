@@ -88,7 +88,7 @@ const QUEUE_TOP = 455;
 const QUEUE_CARD_W = 140;
 const QUEUE_CARD_H = 70;
 const QUEUE_CARD_GAP = 12;
-const QUEUE_LABEL_W = 130;
+const QUEUE_LABEL_W = MARKET_LABEL_W;
 
 // Player hand (bottom-left)
 const HAND_Y = 570;
@@ -212,6 +212,7 @@ export class MainStreetScene extends CardGameScene {
           'Investment events (brown) can be purchased from the Investments row\n' +
           'and held in your hand (max 1 at a time). Click the held card in\n' +
           'your hand (bottom-left) to play it for a one-time effect.\n' +
+          'Held events persist across turns until you choose to play them.\n' +
           'Incident events (blue) appear in the Upcoming Incidents queue and\n' +
           'trigger automatically at the end of each turn -- plan around them!\n' +
           'Check the Activity Log to see what events fired and their effects.',
@@ -710,7 +711,7 @@ export class MainStreetScene extends CardGameScene {
     }).setOrigin(0, 0.5);
     this.incidentQueueContainer.add(label);
 
-    const startX = QUEUE_LABEL_W + 30;
+    const startX = QUEUE_LABEL_W + 50;
 
     for (let i = 0; i < INCIDENT_QUEUE_SIZE; i++) {
       const cx = startX + i * (QUEUE_CARD_W + QUEUE_CARD_GAP);
