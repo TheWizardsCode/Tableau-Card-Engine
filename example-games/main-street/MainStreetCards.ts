@@ -104,6 +104,9 @@ export const MARKET_EVENT_SLOTS = 2;
 /** Number of Upgrade card slots visible in the market. */
 export const MARKET_UPGRADE_SLOTS = 2;
 
+/** Number of Incident cards visible in the incident queue at game start. */
+export const INCIDENT_QUEUE_SIZE = 2;
+
 /** Coins earned per adjacent business sharing a synergy type. */
 export const SYNERGY_BONUS_PER_NEIGHBOR = 1;
 

@@ -344,30 +344,54 @@ describe('MainStreetEngine', () => {
   });
 
   describe('resolveIncident', () => {
-    it('should draw an Incident event from the deck and resolve it', () => {
+    it('should resolve the front Incident event from the queue', () => {
       const state = createTestState();
-      // Ensure there's an Incident event in the deck
+      // Set up incident queue with a known event at the front
       const incidentEvt = makeIncidentEvent({ coinDelta: -2 });
-      state.decks.event = [incidentEvt, ...state.decks.event];
+      state.incidentQueue = [incidentEvt];
       const coinsBefore = state.resourceBank.coins;
-      const deckSizeBefore = state.decks.event.length;
 
       const result = resolveIncident(state);
 
       expect(result).not.toBeNull();
       expect(result!.trigger).toBe('Incident');
       expect(state.resourceBank.coins).toBe(coinsBefore - 2);
-      expect(state.decks.event.length).toBe(deckSizeBefore - 1);
     });
 
-    it('should return null when no Incident events are in the deck', () => {
+    it('should return null when the incident queue is empty', () => {
       const state = createTestState();
-      // Remove all Incident events from deck
-      state.decks.event = state.decks.event.filter(e => e.trigger !== 'Incident');
+      state.incidentQueue = [];
 
       const result = resolveIncident(state);
 
       expect(result).toBeNull();
+    });
+
+    it('should refill the queue from the deck after resolving', () => {
+      const state = createTestState();
+      const incidentEvt = makeIncidentEvent({ id: 'front-incident', coinDelta: -1 });
+      const deckIncident = makeIncidentEvent({ id: 'deck-incident', coinDelta: -2 });
+      state.incidentQueue = [incidentEvt];
+      state.decks.event = [deckIncident];
+
+      resolveIncident(state);
+
+      // Queue should have been refilled with the deck incident
+      expect(state.incidentQueue.length).toBe(1);
+      expect(state.incidentQueue[0].id).toBe('deck-incident');
+      expect(state.decks.event.length).toBe(0);
+    });
+
+    it('should not refill when deck has no Incident cards', () => {
+      const state = createTestState();
+      const incidentEvt = makeIncidentEvent({ coinDelta: -1 });
+      state.incidentQueue = [incidentEvt];
+      // Only Investment events in deck
+      state.decks.event = state.decks.event.filter(e => e.trigger !== 'Incident');
+
+      resolveIncident(state);
+
+      expect(state.incidentQueue.length).toBe(0);
     });
   });
 

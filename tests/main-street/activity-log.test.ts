@@ -287,8 +287,8 @@ describe('Activity Log', () => {
       const state = createTestState();
       executeDayStart(state);
 
-      // Inject an Incident event into the deck
-      state.decks.event = [
+      // Inject an Incident event into the queue
+      state.incidentQueue = [
         makeIncidentEvent({ id: 'ne-1', name: 'Rainy Day', coinDelta: -1, reputationDelta: 0 }),
       ];
 
@@ -302,12 +302,12 @@ describe('Activity Log', () => {
       expect(entry.type).toBe('loss');
     });
 
-    it('should not log when no Incident events are available', () => {
+    it('should not log when the incident queue is empty', () => {
       const state = createTestState();
       executeDayStart(state);
 
-      // Remove all Incident events
-      state.decks.event = state.decks.event.filter(e => e.trigger !== 'Incident');
+      // Empty the incident queue
+      state.incidentQueue = [];
 
       state.phase = 'IncidentPhase';
       const logBefore = state.activityLog.length;

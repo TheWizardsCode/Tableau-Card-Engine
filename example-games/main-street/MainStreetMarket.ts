@@ -16,7 +16,7 @@ import type { LegalityResult } from '../../src/rule-engine';
 import type { MainStreetState } from './MainStreetState';
 import { addLog } from './MainStreetState';
 import type { BusinessCard, UpgradeCard, AnyCard } from './MainStreetCards';
-import { GRID_SIZE } from './MainStreetCards';
+import { GRID_SIZE, INCIDENT_QUEUE_SIZE } from './MainStreetCards';
 
 // ── Result Types ────────────────────────────────────────────
 
@@ -182,6 +182,19 @@ export function refillAllMarkets(state: MainStreetState): void {
   refillBusinessMarket(state);
   refillEventMarket(state);
   refillUpgradeMarket(state);
+}
+
+/**
+ * Tops up the incident queue to INCIDENT_QUEUE_SIZE by drawing
+ * Incident-trigger cards from the event deck. If the deck has no
+ * remaining Incident cards, the queue stays at its current size.
+ */
+export function refillIncidentQueue(state: MainStreetState): void {
+  while (state.incidentQueue.length < INCIDENT_QUEUE_SIZE) {
+    const idx = state.decks.event.findIndex(e => e.trigger === 'Incident');
+    if (idx === -1) break;
+    state.incidentQueue.push(state.decks.event.splice(idx, 1)[0]);
+  }
 }
 
 // ── Purchase Execution ──────────────────────────────────────

@@ -23,6 +23,7 @@ import {
   MARKET_BUSINESS_SLOTS,
   MARKET_EVENT_SLOTS,
   MARKET_UPGRADE_SLOTS,
+  INCIDENT_QUEUE_SIZE,
 } from './MainStreetCards';
 
 // ── Activity Log ────────────────────────────────────────────
@@ -150,6 +151,8 @@ export interface MainStreetState {
   challengesCompleted: string[];
   /** Held Investment event awaiting play (max 1 at a time, null = none). */
   heldEvent: EventCard | null;
+  /** Visible FIFO queue of upcoming Incident events (front = next to resolve). */
+  incidentQueue: EventCard[];
   /** Current game result. */
   gameResult: GameResult;
   /** Reason the game ended (null while playing). */
@@ -244,6 +247,14 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     upgrade: fillMarketSlots(upgradeDeck, MARKET_UPGRADE_SLOTS),
   };
 
+  // Pre-draw incident cards into the visible FIFO queue
+  const incidentQueue: EventCard[] = [];
+  for (let i = 0; i < INCIDENT_QUEUE_SIZE; i++) {
+    const idx = eventDeck.findIndex(e => e.trigger === 'Incident');
+    if (idx === -1) break;
+    incidentQueue.push(eventDeck.splice(idx, 1)[0]);
+  }
+
   // Build initial state
   const state: MainStreetState = {
     turn: 1,
@@ -261,6 +272,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     },
     challengesCompleted: [],
     heldEvent: null,
+    incidentQueue,
     gameResult: 'playing',
     endReason: null,
     finalScore: 0,
