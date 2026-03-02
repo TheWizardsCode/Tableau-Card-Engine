@@ -18,7 +18,7 @@
 | **Market** | The face‑up row of cards the player may purchase each turn. It draws from three decks: **Business**, **Event**, and **Upgrade**.
 | **Resource Bank** | Holds the player’s **Coins** (currency) and **Reputation** (score multiplier). Both start at a defined amount and change each turn.
 | **Turn** | A full day/night cycle consisting of several phases (see Section 5). Turn number increments after the **Night Phase**.
-| **Event Card** | A card that triggers a one‑off effect (e.g., Festival, Tax, Storm) after the player’s actions for the day.
+| **Event Card** | A card that triggers a one‑off effect (e.g., Festival, Tax, Storm). **Investment** events are player‑bought and held until played; **Incident** events happen automatically.
 | **Upgrade Card** | A card that modifies a specific Business card (e.g., upgrade a Bakery to a Patisserie, increasing income and synergy range).
 | **Challenge** | A optional meta‑goal (e.g., *Build a Foodie Row*) that grants a bonus score at the end of the game if satisfied.
 
@@ -55,7 +55,7 @@
 | Field | Type | Description |
 |-------|------|-------------|
 | **Name** | string | Title of the event (e.g., *Local Festival*). |
-| **Trigger** | enum {`Day`, `Night`} | When the event resolves. |
+| **Trigger** | enum {`Investment`, `Incident`} | When the event resolves. **Investment** events are player‑bought (generally positive) and held until played. **Incident** events happen automatically (generally negative). |
 | **Effect** | string (DSL) | Human‑readable description of the effect (e.g., `+2 coins to all Food businesses`). |
 | **Target** | enum {`All`, `SpecificSynergy`, `RandomBusiness`} | Scope of the effect. |
 
@@ -63,7 +63,7 @@
 ```json
 {
   "name": "Local Festival",
-  "trigger": "Night",
+  "trigger": "Incident",
   "effect": "+2 coins to all Culture businesses for this turn.",
   "target": "SpecificSynergy"
 }
@@ -134,12 +134,12 @@ stateDiagram-v2
     [*] --> DayStart
     DayStart --> MarketPhase: Show market (4 Business, 2 Event, 2 Upgrade)
     MarketPhase --> ActionPhase: Player purchases/places/upgrades
-    ActionPhase --> EventResolution: Resolve any Event cards drawn this day
-    EventResolution --> IncomePhase: Collect Base Income + Synergy Bonuses
+    ActionPhase --> InvestmentResolution: Auto‑resolve held Investment if not played
+    InvestmentResolution --> IncomePhase: Collect Base Income + Synergy Bonuses
     IncomePhase --> ReputationPhase: Apply Reputation gain/loss (if any)
     ReputationPhase --> NightStart: Increment turn counter
-    NightStart --> NightEventPhase: Draw Night‑only Event cards
-    NightEventPhase --> NightIncome: Apply Night‑specific income modifiers
+    NightStart --> IncidentPhase: Draw Incident event cards
+    IncidentPhase --> NightIncome: Apply Incident‑specific income modifiers
     NightIncome --> DayStart: Loop to next Day
 ```
 
@@ -149,15 +149,16 @@ stateDiagram-v2
 3. **ActionPhase** – The player resolves purchases:
    - **Buy Business** → `resourceBank.coins -= cost` → place card into a chosen empty slot.
    - **Buy Upgrade** → `resourceBank.coins -= cost` → apply upgrade effects to the targeted Business.
-   - **Buy Event** → `resourceBank.coins -= cost` → schedule the event for immediate resolution.
-4. **EventResolution** – All Event cards purchased this day trigger their effects.
+   - **Buy Event (Investment)** → `resourceBank.coins -= cost` → hold the event (max 1 held at a time). The player may play the held Investment during MarketPhase via a `play-event` action.
+   - **Play Held Investment** → resolve the held Investment event immediately and clear it.
+4. **InvestmentResolution** – If the player still holds an Investment event, it auto‑resolves here.
 5. **IncomePhase** – For each placed Business, compute:
    - `totalIncome = baseIncome + synergyBonus` where `synergyBonus = countMatchingNeighbors * 1`.
    - `resourceBank.coins += totalIncome`.
 6. **ReputationPhase** – Certain actions (e.g., completing a Challenge) increase `reputation`. Negative events may decrease it.
 7. **NightStart** – Marks the transition to the Night.
-8. **NightEventPhase** – Draw a single Night‑only Event card from the Event deck and resolve it.
-9. **NightIncome** – Some Night events modify income (e.g., *Rainy Night* reduces Food income by 1).
+8. **IncidentPhase** – Draw a single Incident event card from the Event deck and resolve it immediately.
+9. **NightIncome** – Some Incident events modify income (e.g., *Rainy Night* reduces Food income by 1).
 10. Loop back to **DayStart** for the next turn.
 
 The turn ends when either:
@@ -173,7 +174,8 @@ The turn ends when either:
 |--------|-------------|---------------|--------|
 | **Buy Business** | Spend coins to acquire a Business card from the market and place it on an empty slot. | Market contains Business card; `resourceBank.coins >= cost`; at least one empty slot. | Business placed; coins deducted; slot becomes occupied. |
 | **Buy Upgrade** | Spend coins to upgrade an existing Business card. | Market contains Upgrade card targeting a placed Business; `resourceBank.coins >= cost`. | Business card upgraded (income bonus and/or synergy range increased); coins deducted. |
-| **Buy Event** | Spend coins to trigger a one‑off Event card immediately. | Market contains Event card; `resourceBank.coins >= cost`. | Event effect applied; coins deducted. |
+| **Buy Event** | Spend coins to acquire an Investment event card and hold it. | Market contains Investment event card; `resourceBank.coins >= cost`; no event currently held (`heldEvent === null`). | Event held; coins deducted. Player may play it during MarketPhase or it auto‑resolves during InvestmentResolution. |
+| **Play Held Event** | Play the held Investment event during MarketPhase. | Player holds an Investment event (`heldEvent !== null`); current phase is MarketPhase. | Held event resolved; `heldEvent` cleared to null. |
 | **Place Business** | Choose an empty slot and put the purchased Business card there. | Business card in hand; slot is empty. | Card is now part of `streetGrid`. |
 | **Resolve Event** | Apply the effect described on an Event card. | Event card active. | Game state mutated per effect (coins, reputation, temporary modifiers). |
 | **End Turn** | Transition to the next phase/state. | All desired actions for the day are complete. | Turn counter increments, flow moves to Night or next Day. |
@@ -213,7 +215,7 @@ Loss conditions are evaluated at the end of the **Night Income** phase before ch
 | Aspect | Random Source | Visibility |
 |--------|----------------|------------|
 | **Market Draw** | Seeded RNG draws the top card from each of the three decks. | Face‑up – player sees all options before purchasing.
-| **Event Cards** | Night‑only events are drawn after the player’s actions and are revealed before resolution. | Face‑up – player can react with upgrades (if any are pending) before the effect applies.
+| **Event Cards** | Incident events are drawn automatically after the player’s actions and revealed before resolution. Investment events are purchased from the market and held until played. | Incidents: face‑up after draw. Investments: face‑up in market, then held.
 | **Challenge Generation** | Fixed set defined in `challenges.md`; no randomness.
 | **RNG Seed** | Determined by the **Game Engine** on startup (`Math.seedrandom(seedString)`). | The seed is displayed on the title screen for reproducibility.
 
@@ -230,12 +232,12 @@ flowchart TD
     Start((Start Game)) --> TurnStart[Turn Start]
     TurnStart --> Market[Show Market]
     Market --> Actions[Player Actions]
-    Actions --> ResolveEvents[Resolve Day Events]
-    ResolveEvents --> Income[Collect Income & Synergy]
+    Actions --> ResolveInvestment[Resolve Held Investment]
+    ResolveInvestment --> Income[Collect Income & Synergy]
     Income --> Reputation[Apply Reputation Effects]
     Reputation --> NightStart[Night Phase]
-    NightStart --> NightEvent[Draw Night Event]
-    NightEvent --> NightIncome[Apply Night Modifiers]
+    NightStart --> DrawIncident[Draw Incident]
+    DrawIncident --> NightIncome[Apply Incident Modifiers]
     NightIncome --> EndCheck{Win/Loss Check}
     EndCheck -->|Win| EndWin((Victory))
     EndCheck -->|Loss| EndLoss((Defeat))

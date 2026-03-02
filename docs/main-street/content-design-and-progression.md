@@ -19,9 +19,9 @@ The **Main Street** game uses three distinct card families. Below is the current
 ### 1.2 Event Cards
 | Name | Trigger | Effect |
 |------|---------|--------|
-| Local Festival | Night | +2 coins to all Culture businesses this turn. |
-| Rainy Night | Night | -1 coin to all Food businesses this turn. |
-| Tax Audit | Day | Lose 3 coins unless you have a Bank card. |
+| Local Festival | Incident | +2 coins to all Culture businesses this turn. |
+| Rainy Night | Incident | -1 coin to all Food businesses this turn. |
+| Tax Audit | Investment | Lose 3 coins unless you have a Bank card. |
 | ... *(expandable event pool)* |
 
 ### 1.3 Upgrade Cards
@@ -65,7 +65,7 @@ Main Street is intended to be approachable for 10‑15‑minute play sessions wh
 | **Slot Count** | The base game uses 10 slots; increasing to 12 slots adds decision space without extending playtime significantly. |
 | **Coin Starting Amount** | Adjusting the initial budget (e.g., 8 → 10 coins) can make early rounds easier or tighter. |
 | **Synergy Bonus Value** | Changing the synergy bonus from `+1` to `+2` per matching neighbor raises the impact of placement decisions. |
-| **Event Frequency** | Adding more Night‑only events increases variance and potential swing moments. |
+| **Event Frequency** | Adding more Incident events increases variance and potential swing moments. |
 | **Challenge Targets** | Scaling challenge thresholds (e.g., “Build a Foodie Row” requiring 3 Food businesses) adjusts difficulty. |
 
 Balancing targets are defined in the **GameState** type (`MAX_TURNS = 20`, `WIN_THRESHOLD = 150`). Playtesting should verify that a typical run ends near the turn limit with a final score around the win threshold.

@@ -40,7 +40,7 @@ Deliver a playable walking skeleton of Main Street that a human player can compl
 |------|---------|
 | **Game State Model** | TypeScript types/interfaces for `MainStreetState` including street grid (10 slots), resource bank (coins + reputation), market, deck state, turn counter, day/night phase, and challenges completed. |
 | **Card Types** | 5 Business cards (Bakery, Diner, Bookshop, Park, Hardware Store), 3 Event cards (Local Festival, Rainy Night, Tax Audit), 3 Upgrade cards (Patisserie, Bistro, Library). Defined as typed JSON fixtures. |
-| **Turn Structure** | 10-phase day/night cycle: DayStart -> MarketPhase -> ActionPhase -> EventResolution -> IncomePhase -> ReputationPhase -> NightStart -> NightEventPhase -> NightIncome -> EndCheck. Implemented via `PhaseManager`. |
+| **Turn Structure** | 10-phase day/night cycle: DayStart -> MarketPhase -> ActionPhase -> InvestmentResolution -> IncomePhase -> ReputationPhase -> NightStart -> IncidentPhase -> NightIncome -> EndCheck. Implemented via `PhaseManager`. |
 | **Core Actions** | Buy Business, Buy Upgrade, Buy Event, Place Business, End Turn. All with legality validation returning `LegalityResult`. |
 | **Win/Loss Detection** | Score threshold (>=150), all-challenges-complete, turn-limit victory (turn 20 with reputation > 0 and coins >= 0). Loss: bankruptcy (coins < 0), reputation collapse (reputation <= 0), turn exhaustion without victory. |
 | **Adjacency & Income** | `AdjacencyResolver` computing synergy bonuses for the linear 1x10 grid. `computeIncome()` summing base income + synergy bonuses. Upgrades extending adjacency range. |
@@ -130,8 +130,8 @@ Deliver a playable walking skeleton of Main Street that a human player can compl
 **so that** the game has variety and I must adapt my strategy.
 
 **Acceptance Criteria:**
-- [ ] AC-5.1: Day-trigger events purchased from the market resolve during EventResolution phase.
-- [ ] AC-5.2: Night-trigger events are drawn automatically during NightEventPhase.
+- [ ] AC-5.1: Investment events purchased from the market are held and can be played during MarketPhase, or auto-resolve during InvestmentResolution phase.
+- [ ] AC-5.2: Incident events are drawn automatically during IncidentPhase.
 - [ ] AC-5.3: Event effects modify coins and/or reputation as described on the card.
 - [ ] AC-5.4: Event resolution is visible to the player (effect text displayed briefly).
 
@@ -207,7 +207,7 @@ example-games/main-street/
 ```ts
 // Card type definitions
 type SynergyType = 'Food' | 'Culture' | 'Commerce';
-type EventTrigger = 'Day' | 'Night';
+type EventTrigger = 'Investment' | 'Incident';
 type EventTarget = 'All' | 'SpecificSynergy' | 'RandomBusiness';
 
 interface BusinessCard {
@@ -252,11 +252,11 @@ type DayPhase =
   | 'DayStart'
   | 'MarketPhase'
   | 'ActionPhase'
-  | 'EventResolution'
+  | 'InvestmentResolution'
   | 'IncomePhase'
   | 'ReputationPhase'
   | 'NightStart'
-  | 'NightEventPhase'
+  | 'IncidentPhase'
   | 'NightIncome'
   | 'EndCheck';
 
@@ -283,7 +283,7 @@ interface MainStreetState {
     upgrade: UpgradeCard[];
   };
   challengesCompleted: string[];
-  pendingEvents: EventCard[];              // Events purchased this day, awaiting resolution
+  heldEvent: EventCard | null;              // Held Investment event awaiting play or auto-resolution
   gameResult: 'playing' | 'win' | 'loss';
   finalScore: number;
   seed: string;
@@ -343,12 +343,12 @@ The walking skeleton simplifies the 10-phase GDD turn structure to reduce implem
 
 1. **DayStart** -- Increment turn, replenish market.
 2. **MarketPhase / ActionPhase** (combined) -- Player buys/places/upgrades. Multiple purchases allowed per turn. Player clicks "End Turn" when done.
-3. **EventResolution** -- Resolve any day-trigger events purchased this turn.
+3. **InvestmentResolution** -- Auto-resolve held Investment event if not played during MarketPhase.
 4. **IncomePhase** -- Compute and add income from all placed businesses.
-5. **NightEventPhase** -- Draw and resolve one night-only event from the event deck.
+5. **IncidentPhase** -- Draw and resolve one Incident event from the event deck.
 6. **EndCheck** -- Evaluate win/loss conditions.
 
-The ReputationPhase and NightIncome phases are folded into EventResolution and NightEventPhase respectively, since reputation changes and night income modifiers are event-driven effects in the current card pool.
+The ReputationPhase and NightIncome phases are folded into InvestmentResolution and IncidentPhase respectively, since reputation changes and night income modifiers are event-driven effects in the current card pool.
 
 ---
 
@@ -414,7 +414,7 @@ The layout stacks vertically: Market on top, Street grid in middle (2 rows of 5)
 | `income.test.ts` | Base income only, income + synergy, income after upgrade, income with empty grid |
 | `market.test.ts` | Market replenishment, purchase removes card, refill from deck, deck exhaustion |
 | `rules.test.ts` | Buy business legality (enough coins, has slot), buy upgrade legality (target exists), buy event legality, place business legality |
-| `events.test.ts` | Day event resolution, night event draw and resolution, event coin/reputation effects |
+| `events.test.ts` | Investment event hold/play/auto-resolve, Incident event draw and resolution, event coin/reputation effects |
 | `win-loss.test.ts` | Score threshold win, all-challenges win, turn-limit victory, bankruptcy loss, reputation collapse loss, turn exhaustion loss |
 | `determinism.test.ts` | Same seed + same actions = same final state |
 
@@ -484,7 +484,7 @@ Using three-point estimation (Optimistic / Most Likely / Pessimistic):
 
 | Risk | Likelihood | Impact | Mitigation |
 |------|-----------|--------|------------|
-| GDD turn structure too complex for walking skeleton | Medium | Medium | Simplify to 6 phases (Section 4.6); defer Night-specific income to event effects |
+| GDD turn structure too complex for walking skeleton | Medium | Medium | Simplify to 6 phases (Section 4.6); defer Incident-specific income to event effects |
 | Balance issues make game unwinnable or trivially easy | Medium | Low | Use fixed seed for playtest; tune constants after first playtest; all constants are configurable |
 | Engine `PhaseManager` doesn't support 10+ phases cleanly | Low | Medium | Walking skeleton uses 6 phases; can extend later |
 | Placeholder art insufficient for evaluating fun factor | Medium | Medium | Ensure card labels are clear; synergy colors are distinct; income feedback is immediate and visible |
@@ -549,9 +549,9 @@ The walking skeleton emits the following events through the `GameEventEmitter` f
 
 | ID | Name | Trigger | Effect | Target | Coin Delta | Rep Delta |
 |----|------|---------|--------|--------|-----------|-----------|
-| `evt-festival` | Local Festival | Night | +2 coins to all Culture businesses | SpecificSynergy (Culture) | +2 per Culture biz | 0 |
-| `evt-rainy` | Rainy Night | Night | -1 coin to all Food businesses | SpecificSynergy (Food) | -1 per Food biz | 0 |
-| `evt-tax` | Tax Audit | Day | Lose 3 coins | All | -3 | 0 |
+| `evt-festival` | Local Festival | Incident | +2 coins to all Culture businesses | SpecificSynergy (Culture) | +2 per Culture biz | 0 |
+| `evt-rainy` | Rainy Night | Incident | -1 coin to all Food businesses | SpecificSynergy (Food) | -1 per Food biz | 0 |
+| `evt-tax` | Tax Audit | Investment | Lose 3 coins | All | -3 | 0 |
 
 ### Upgrade Cards
 
