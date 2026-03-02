@@ -54,6 +54,7 @@ export interface EventCard {
   readonly id: string;
   readonly name: string;
   readonly trigger: EventTrigger;
+  readonly cost: number;
   readonly effect: string;
   readonly target: EventTarget;
   readonly targetSynergy?: SynergyType;
@@ -208,6 +209,7 @@ const EVENT_TEMPLATES: EventCard[] = [
     id: 'evt-festival',
     name: 'Local Festival',
     trigger: 'Investment',
+    cost: 3,
     effect: '+2 coins to all Culture businesses and +1 reputation.',
     target: 'SpecificSynergy',
     targetSynergy: 'Culture',
@@ -219,6 +221,7 @@ const EVENT_TEMPLATES: EventCard[] = [
     id: 'evt-rainy',
     name: 'Rainy Day',
     trigger: 'Incident',
+    cost: 0,
     effect: '-1 coin to all Food businesses this turn.',
     target: 'SpecificSynergy',
     targetSynergy: 'Food',
@@ -230,6 +233,7 @@ const EVENT_TEMPLATES: EventCard[] = [
     id: 'evt-tax',
     name: 'Tax Audit',
     trigger: 'Incident',
+    cost: 0,
     effect: 'Lose 3 coins.',
     target: 'All',
     coinDelta: -3,
@@ -240,6 +244,7 @@ const EVENT_TEMPLATES: EventCard[] = [
     id: 'evt-award',
     name: 'Community Award',
     trigger: 'Incident',
+    cost: 0,
     effect: 'Gain 2 reputation from community recognition.',
     target: 'All',
     coinDelta: 0,
@@ -250,6 +255,7 @@ const EVENT_TEMPLATES: EventCard[] = [
     id: 'evt-inspection',
     name: 'Health Inspection',
     trigger: 'Incident',
+    cost: 0,
     effect: '-2 coins per Food business and -1 reputation.',
     target: 'SpecificSynergy',
     targetSynergy: 'Food',
@@ -351,7 +357,7 @@ export function synergyColor(type: SynergyType): number {
 export function cardLabel(card: AnyCard): string {
   switch (card.family) {
     case 'business': return `${card.name} ($${card.cost})`;
-    case 'event':    return card.name;
+    case 'event':    return card.cost > 0 ? `${card.name} ($${card.cost})` : card.name;
     case 'upgrade':  return `${card.name} ($${card.cost})`;
   }
 }

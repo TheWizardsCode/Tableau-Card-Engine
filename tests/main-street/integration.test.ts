@@ -205,7 +205,7 @@ describe('Integration: Full Game', () => {
     state.resourceBank.coins = 1;
     state.resourceBank.reputation = 5; // Avoid rep collapse
 
-    // Put a tax event into heldEvent to trigger bankruptcy during InvestmentResolution
+    // Put a tax event into heldEvent to trigger bankruptcy when played
     state.heldEvent = {
       family: 'event',
       id: 'evt-tax-test',
@@ -215,9 +215,12 @@ describe('Integration: Full Game', () => {
       target: 'All',
       coinDelta: -10,
       reputationDelta: 0,
+      cost: 0,
     };
 
     executeDayStart(state);
+    // Player actively plays the held event during MarketPhase
+    executeAction(state, { type: 'play-event' });
     processEndOfTurn(state);
 
     expect(state.gameResult).toBe('loss');
@@ -240,9 +243,12 @@ describe('Integration: Full Game', () => {
       target: 'All',
       coinDelta: 0,
       reputationDelta: -1,
+      cost: 0,
     };
 
     executeDayStart(state);
+    // Player actively plays the held event during MarketPhase
+    executeAction(state, { type: 'play-event' });
     processEndOfTurn(state);
 
     expect(state.gameResult).toBe('loss');
@@ -440,6 +446,7 @@ describe('Integration: Incident Queue', () => {
       target: 'All',
       coinDelta: -1,
       reputationDelta: 0,
+      cost: 0,
     };
     state.incidentQueue = [incident];
     state.decks.event = [
@@ -452,6 +459,7 @@ describe('Integration: Incident Queue', () => {
         target: 'All',
         coinDelta: 1,
         reputationDelta: 0,
+        cost: 3,
       },
     ];
 
@@ -468,7 +476,7 @@ describe('Integration: Incident Queue', () => {
 // ── Held Event Integration ──────────────────────────────────
 
 describe('Integration: Held Investment Event', () => {
-  it('held event auto-resolves during InvestmentResolution if not played', () => {
+  it('held event persists across turns when not played', () => {
     const state = setupMainStreetGame({ seed: 'held-auto' });
     state.resourceBank.coins = 50;
     state.resourceBank.reputation = 5;
@@ -483,19 +491,18 @@ describe('Integration: Held Investment Event', () => {
       target: 'All',
       coinDelta: 3,
       reputationDelta: 0,
+      cost: 3,
     };
 
     executeDayStart(state);
     // Don't play the event during MarketPhase — just end turn
     const result = processEndOfTurn(state);
 
-    // heldEvent should have been auto-resolved and cleared
-    expect(state.heldEvent).toBeNull();
-    // Coins should reflect the +3 from the auto-resolved event (plus any income, minus any incident)
-    // We can't check exact coins due to income/incident variance, but we can verify
-    // the event was applied by checking the result or that coins increased by at least 3
-    // relative to pre-endOfTurn (adjusted for other phase effects)
-    // At minimum, the game should still be valid
+    // heldEvent should NOT have been auto-resolved — it persists
+    expect(state.heldEvent).not.toBeNull();
+    expect(state.heldEvent!.id).toBe('evt-held-auto');
+    // Coins should NOT include the +3 from the event (event was not played)
+    // Income and incident effects still apply, but the event delta should not
     expect(result).toBeDefined();
   });
 
@@ -514,6 +521,7 @@ describe('Integration: Held Investment Event', () => {
       target: 'All',
       coinDelta: 5,
       reputationDelta: 0,
+      cost: 3,
     };
 
     executeDayStart(state);
@@ -550,6 +558,7 @@ describe('Integration: Held Investment Event', () => {
       target: 'All',
       coinDelta: 4,
       reputationDelta: 0,
+      cost: 3,
     };
     state.market.investments.push(investmentEvt);
 
@@ -559,9 +568,22 @@ describe('Integration: Held Investment Event', () => {
     expect(state.heldEvent).not.toBeNull();
     expect(state.heldEvent!.id).toBe('evt-buy-then-play');
 
-    // End turn 1 — the held event will auto-resolve during InvestmentResolution
+    // End turn 1 — held event persists (no longer auto-resolved)
     const result1 = processEndOfTurn(state);
-    expect(state.heldEvent).toBeNull(); // Auto-resolved
+    expect(state.heldEvent).not.toBeNull(); // Persists across turns
+    expect(state.heldEvent!.id).toBe('evt-buy-then-play');
     expect(result1).toBeDefined();
+
+    if (state.gameResult !== 'playing') return; // Game ended
+
+    // Turn 2: play the held event manually
+    executeDayStart(state);
+    const coinsBeforePlay = state.resourceBank.coins;
+    executeAction(state, { type: 'play-event' });
+    expect(state.heldEvent).toBeNull(); // Now resolved
+    expect(state.resourceBank.coins).toBe(coinsBeforePlay + 4); // +4 from event
+
+    const result2 = processEndOfTurn(state);
+    expect(result2).toBeDefined();
   });
 });
