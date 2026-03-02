@@ -91,6 +91,25 @@ const BOX_STROKE = 0x665544;
 const BOX_FILL = 0x2a1f14;
 const BOX_RADIUS = 6;
 
+// Activity Log panel layout
+const LOG_X = 810;
+const LOG_Y = 240;
+const LOG_W = 440;
+const LOG_H = 290;
+const LOG_TITLE_H = 22;
+const LOG_PAD = 8;
+const LOG_FONT_SIZE = 13;
+const LOG_LINE_H = 18;
+const LOG_SCROLL_SPEED = 24;
+
+// Log entry colors by type
+const LOG_COLORS: Record<string, string> = {
+  gain: '#44ff44',
+  loss: '#ff4444',
+  neutral: '#ccbbaa',
+  'turn-header': '#ffdd44',
+};
+
 // ── UI Phase (scene-level interaction state) ────────────────
 
 type UIPhase =
@@ -115,6 +134,17 @@ export class MainStreetScene extends CardGameScene {
   private streetContainer!: Phaser.GameObjects.Container;
   private marketContainer!: Phaser.GameObjects.Container;
   private actionContainer!: Phaser.GameObjects.Container;
+
+  // Activity Log panel
+  private logContainer!: Phaser.GameObjects.Container;
+  private logContentContainer!: Phaser.GameObjects.Container;
+  private logMaskGraphics: Phaser.GameObjects.Graphics | null = null;
+  private logContentMask: Phaser.Display.Masks.GeometryMask | null = null;
+  private logScrollOffset = 0;
+  private logMaxScroll = 0;
+  private logTotalContentH = 0;
+  private logAutoScroll = true;
+  private logPrevEntryCount = 0;
 
   // Instruction text
   private instructionText!: Phaser.GameObjects.Text;
@@ -195,6 +225,42 @@ export class MainStreetScene extends CardGameScene {
     this.streetContainer = this.add.container(0, 0);
     this.marketContainer = this.add.container(0, 0);
     this.actionContainer = this.add.container(0, 0);
+
+    // Activity Log panel (persistent, not rebuilt each refresh)
+    this.logContainer = this.add.container(LOG_X, LOG_Y);
+
+    // Panel background
+    const bg = this.add.graphics();
+    bg.fillStyle(0x1a1408, 0.85);
+    bg.fillRoundedRect(0, 0, LOG_W, LOG_H, 4);
+    bg.lineStyle(1, BOX_STROKE, 0.5);
+    bg.strokeRoundedRect(0, 0, LOG_W, LOG_H, 4);
+    this.logContainer.add(bg);
+
+    // Title bar
+    const titleBg = this.add.graphics();
+    titleBg.fillStyle(0x332816, 0.9);
+    titleBg.fillRoundedRect(0, 0, LOG_W, LOG_TITLE_H, { tl: 4, tr: 4, bl: 0, br: 0 });
+    this.logContainer.add(titleBg);
+
+    const titleText = this.add.text(LOG_W / 2, LOG_TITLE_H / 2, 'Activity Log', {
+      fontSize: '12px', fontStyle: 'bold', color: '#aa9977', fontFamily: FONT_FAMILY,
+    }).setOrigin(0.5);
+    this.logContainer.add(titleText);
+
+    // Scrollable content container
+    this.logContentContainer = this.add.container(0, LOG_TITLE_H + 2);
+    this.logContainer.add(this.logContentContainer);
+
+    // Geometry mask for clipping scrollable content
+    this.logMaskGraphics = this.add.graphics();
+    this.logMaskGraphics.setVisible(false);
+    this.logContentMask = new Phaser.Display.Masks.GeometryMask(this, this.logMaskGraphics);
+    this.logContentContainer.setMask(this.logContentMask);
+    this.updateLogMask();
+
+    // Mouse-wheel scroll for the log panel
+    this.input.on('wheel', this.handleLogWheel, this);
   }
 
   private createInstructions(): void {
@@ -254,6 +320,7 @@ export class MainStreetScene extends CardGameScene {
     this.refreshStreetGrid();
     this.refreshMarket();
     this.refreshActionButtons();
+    this.refreshLog();
   }
 
   // ── HUD ─────────────────────────────────────────────────
@@ -742,6 +809,116 @@ export class MainStreetScene extends CardGameScene {
     }
 
     this.refreshAll();
+  }
+
+  // ── Activity Log ─────────────────────────────────────────
+
+  /**
+   * Rebuilds the log panel content from state.activityLog.
+   * Only re-renders when entries have been added since the last call.
+   */
+  private refreshLog(): void {
+    const entries = this.state.activityLog;
+    const newCount = entries.length;
+
+    // Skip rebuild if nothing changed
+    if (newCount === this.logPrevEntryCount) return;
+
+    const hadAutoScroll = this.logAutoScroll;
+    this.logPrevEntryCount = newCount;
+
+    // Clear existing content
+    this.logContentContainer.removeAll(true);
+
+    const contentW = LOG_W - LOG_PAD * 2;
+    let yOff = 0;
+
+    for (const entry of entries) {
+      const color = LOG_COLORS[entry.type] ?? LOG_COLORS.neutral;
+      const isTurnHeader = entry.type === 'turn-header';
+
+      if (isTurnHeader) {
+        // Subtle background bar for turn headers
+        const barBg = this.add.graphics();
+        barBg.fillStyle(0x443311, 0.5);
+        barBg.fillRect(0, yOff, LOG_W, LOG_LINE_H);
+        this.logContentContainer.add(barBg);
+      }
+
+      const txt = this.add.text(LOG_PAD, yOff, entry.text, {
+        fontSize: `${LOG_FONT_SIZE}px`,
+        fontStyle: isTurnHeader ? 'bold' : 'normal',
+        color,
+        fontFamily: FONT_FAMILY,
+        wordWrap: { width: contentW },
+      });
+      this.logContentContainer.add(txt);
+
+      // Use actual rendered height to handle word-wrapped lines
+      yOff += Math.max(LOG_LINE_H, txt.height + 2);
+    }
+
+    this.logTotalContentH = yOff;
+
+    // Visible area inside the panel (below title bar, above bottom edge)
+    const visibleH = LOG_H - LOG_TITLE_H - 4;
+    this.logMaxScroll = Math.max(0, this.logTotalContentH - visibleH);
+
+    // Auto-scroll to bottom if we were already at the bottom
+    if (hadAutoScroll && this.logMaxScroll > 0) {
+      this.logScrollOffset = this.logMaxScroll;
+    }
+
+    this.applyLogScroll();
+  }
+
+  /** Updates the geometry mask rectangle to clip log content. */
+  private updateLogMask(): void {
+    if (!this.logMaskGraphics) return;
+    this.logMaskGraphics.clear();
+    this.logMaskGraphics.fillStyle(0xffffff);
+    // Mask is in world coordinates
+    this.logMaskGraphics.fillRect(
+      LOG_X,
+      LOG_Y + LOG_TITLE_H,
+      LOG_W,
+      LOG_H - LOG_TITLE_H - 2,
+    );
+  }
+
+  /** Handles mouse wheel events over the log panel area. */
+  private handleLogWheel = (
+    pointer: Phaser.Input.Pointer,
+    _gameObjects: Phaser.GameObjects.GameObject[],
+    _deltaX: number,
+    deltaY: number,
+  ): void => {
+    // Only scroll when pointer is inside the log panel bounds
+    if (
+      pointer.x < LOG_X || pointer.x > LOG_X + LOG_W ||
+      pointer.y < LOG_Y || pointer.y > LOG_Y + LOG_H
+    ) {
+      return;
+    }
+    if (this.logMaxScroll <= 0) return;
+
+    this.logScrollOffset = Phaser.Math.Clamp(
+      this.logScrollOffset + (deltaY > 0 ? LOG_SCROLL_SPEED : -LOG_SCROLL_SPEED),
+      0,
+      this.logMaxScroll,
+    );
+
+    // Update auto-scroll flag: re-enable if scrolled to bottom
+    const BOTTOM_THRESHOLD = 4;
+    this.logAutoScroll = this.logScrollOffset >= this.logMaxScroll - BOTTOM_THRESHOLD;
+
+    this.applyLogScroll();
+  };
+
+  /** Applies the current scroll offset to the log content container. */
+  private applyLogScroll(): void {
+    this.logContentContainer.setY(LOG_TITLE_H + 2 - this.logScrollOffset);
+    this.updateLogMask();
   }
 
   // ── Game Over Overlay ───────────────────────────────────

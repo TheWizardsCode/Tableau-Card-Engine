@@ -13,7 +13,7 @@
  */
 
 import type { MainStreetState, DayPhase } from './MainStreetState';
-import { PHASE_ORDER } from './MainStreetState';
+import { PHASE_ORDER, addLog } from './MainStreetState';
 import type { EventCard, SynergyType } from './MainStreetCards';
 import {
   MAX_TURNS,
@@ -165,6 +165,26 @@ export function executeAction(
 // ── Event Resolution ────────────────────────────────────────
 
 /**
+ * Builds a human-readable effect description for event log entries.
+ */
+function describeEventEffects(coinChange: number, repChange: number): string {
+  const parts: string[] = [];
+  if (coinChange !== 0) parts.push(`${coinChange > 0 ? '+' : ''}${coinChange} coins`);
+  if (repChange !== 0) parts.push(`${repChange > 0 ? '+' : ''}${repChange} rep`);
+  return parts.length > 0 ? parts.join(', ') : 'no effect';
+}
+
+/**
+ * Classifies a coin/rep change as gain, loss, or neutral for log coloring.
+ */
+function classifyEffect(coinChange: number, repChange: number): 'gain' | 'loss' | 'neutral' {
+  const net = coinChange + repChange;
+  if (net > 0) return 'gain';
+  if (net < 0) return 'loss';
+  return 'neutral';
+}
+
+/**
  * Resolves a single event card's effects on the game state.
  *
  * For the walking skeleton, events have direct coin/reputation deltas.
@@ -212,7 +232,16 @@ export function resolveEvent(state: MainStreetState, event: EventCard): void {
 export function resolveDayEvents(state: MainStreetState): EventCard[] {
   const resolved = [...state.pendingEvents];
   for (const event of resolved) {
+    const coinsBefore = state.resourceBank.coins;
+    const repBefore = state.resourceBank.reputation;
     resolveEvent(state, event);
+    const coinChange = state.resourceBank.coins - coinsBefore;
+    const repChange = state.resourceBank.reputation - repBefore;
+    addLog(
+      state,
+      `Day: ${event.name} (${describeEventEffects(coinChange, repChange)})`,
+      classifyEffect(coinChange, repChange),
+    );
   }
   state.pendingEvents = [];
   return resolved;
@@ -230,7 +259,16 @@ export function resolveNightEvent(state: MainStreetState): EventCard | null {
 
   // Remove from deck
   const [event] = state.decks.event.splice(nightIdx, 1);
+  const coinsBefore = state.resourceBank.coins;
+  const repBefore = state.resourceBank.reputation;
   resolveEvent(state, event);
+  const coinChange = state.resourceBank.coins - coinsBefore;
+  const repChange = state.resourceBank.reputation - repBefore;
+  addLog(
+    state,
+    `Night: ${event.name} (${describeEventEffects(coinChange, repChange)})`,
+    classifyEffect(coinChange, repChange),
+  );
   return event;
 }
 
@@ -248,6 +286,7 @@ export function checkImmediateLoss(state: MainStreetState): boolean {
     state.gameResult = 'loss';
     state.endReason = 'bankruptcy';
     updateScore(state);
+    addLog(state, `Game Over: Bankruptcy (coins: ${state.resourceBank.coins})`, 'loss');
     return true;
   }
 
@@ -256,6 +295,7 @@ export function checkImmediateLoss(state: MainStreetState): boolean {
     state.gameResult = 'loss';
     state.endReason = 'reputation_collapse';
     updateScore(state);
+    addLog(state, `Game Over: Reputation collapse (rep: ${state.resourceBank.reputation})`, 'loss');
     return true;
   }
 
@@ -288,6 +328,7 @@ export function checkEndConditions(state: MainStreetState): boolean {
   if (state.finalScore >= WIN_THRESHOLD) {
     state.gameResult = 'win';
     state.endReason = 'score_threshold';
+    addLog(state, `Victory: Score threshold reached (${state.finalScore} pts)`, 'gain');
     return true;
   }
 
@@ -300,12 +341,14 @@ export function checkEndConditions(state: MainStreetState): boolean {
     if (state.resourceBank.reputation > 0 && state.resourceBank.coins >= 0) {
       state.gameResult = 'win';
       state.endReason = 'turn_limit_victory';
+      addLog(state, `Victory: Survived ${MAX_TURNS} turns (${state.finalScore} pts)`, 'gain');
       return true;
     }
 
     // Turn exhaustion: no win condition met
     state.gameResult = 'loss';
     state.endReason = 'turn_exhaustion';
+    addLog(state, `Game Over: Turn limit exhausted`, 'loss');
     return true;
   }
 
@@ -330,6 +373,9 @@ export function executeDayStart(state: MainStreetState): void {
     // Refill market at start of each day
     refillAllMarkets(state);
   }
+
+  // Log turn header
+  addLog(state, `Turn ${state.turn}`, 'turn-header');
 
   state.phase = 'MarketPhase';
 }

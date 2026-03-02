@@ -25,6 +25,40 @@ import {
   MARKET_UPGRADE_SLOTS,
 } from './MainStreetCards';
 
+// ── Activity Log ────────────────────────────────────────────
+
+/** Classification of a log entry for color coding in the UI. */
+export type LogEntryType = 'gain' | 'loss' | 'neutral' | 'turn-header';
+
+/**
+ * A single entry in the game activity log.
+ *
+ * Stored in `MainStreetState.activityLog` and rendered by the UI
+ * to give the player a history of what happened each turn.
+ */
+export interface LogEntry {
+  /** The turn number when this entry was created. */
+  turn: number;
+  /** Human-readable summary of the action (one line). */
+  text: string;
+  /** Classification for UI color coding. */
+  type: LogEntryType;
+}
+
+/**
+ * Appends a log entry to the activity log.
+ *
+ * Convenience helper so engine/market functions don't need to
+ * construct the object themselves.
+ */
+export function addLog(
+  state: MainStreetState,
+  text: string,
+  type: LogEntryType,
+): void {
+  state.activityLog.push({ turn: state.turn, text, type });
+}
+
 // ── Phase Types ─────────────────────────────────────────────
 
 /**
@@ -126,6 +160,8 @@ export interface MainStreetState {
   seed: string;
   /** The RNG function for this game (seeded, deterministic). */
   rng: () => number;
+  /** Chronological log of game activities for the UI activity log panel. */
+  activityLog: LogEntry[];
 }
 
 // ── Setup Options ───────────────────────────────────────────
@@ -230,6 +266,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     finalScore: 0,
     seed,
     rng,
+    activityLog: [],
   };
 
   return state;
