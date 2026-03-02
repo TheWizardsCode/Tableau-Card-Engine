@@ -35,7 +35,7 @@ export const REGISTRY_KEY_GAMES = 'gameSelector.games';
 const FONT_FAMILY = 'monospace';
 
 /** Maximum card dimensions -- actual size may shrink to fit the grid. */
-const MAX_CARD_W = 340;
+const MAX_CARD_W = 400;
 const MAX_CARD_H = 180;
 const CARD_GAP = 24;
 const CARD_RADIUS = 12;
@@ -51,9 +51,9 @@ const THUMB_H = 68;
 const THUMB_PAD = 8;
 
 /** Vertical space reserved for the heading area (title + subtitle). */
-const HEADER_H = 110;
+const HEADER_H = 80;
 /** Horizontal and bottom margin around the card grid. */
-const GRID_MARGIN = 30;
+const GRID_MARGIN = 20;
 
 // ── Scene ──────────────────────────────────────────────────
 
@@ -92,7 +92,7 @@ export class GameSelectorScene extends Phaser.Scene {
 
     // Title
     this.add
-      .text(GAME_W / 2, 50, 'Tableau Card Engine', {
+      .text(GAME_W / 2, 30, 'Tableau Card Engine', {
         fontSize: '32px',
         color: '#88ff88',
         fontFamily: FONT_FAMILY,
@@ -102,7 +102,7 @@ export class GameSelectorScene extends Phaser.Scene {
 
     // Subtitle
     this.add
-      .text(GAME_W / 2, 85, 'Select a game to play', {
+      .text(GAME_W / 2, 58, 'Select a game to play', {
         fontSize: '16px',
         color: '#669966',
         fontFamily: FONT_FAMILY,
@@ -123,8 +123,8 @@ export class GameSelectorScene extends Phaser.Scene {
   private computeGrid(count: number): { cols: number; rows: number } {
     if (count <= 2) return { cols: count, rows: 1 };
     if (count <= 4) return { cols: 2, rows: Math.ceil(count / 2) };
-    if (count <= 6) return { cols: 3, rows: Math.ceil(count / 3) };
-    // 7+ games: 4 columns
+    if (count <= 9) return { cols: 3, rows: Math.ceil(count / 3) };
+    // 10+ games: 4 columns
     return { cols: 4, rows: Math.ceil(count / 4) };
   }
 
