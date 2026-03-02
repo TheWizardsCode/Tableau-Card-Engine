@@ -362,7 +362,7 @@ describe('MainStreetEngine', () => {
       expect(state.endReason).toBe('reputation_collapse');
     });
 
-    it('should not detect reputation collapse on turn 1 (reputation starts at 0)', () => {
+    it('should not detect reputation collapse on turn 1 (turn-1 guard)', () => {
       const state = createTestState();
       state.turn = 1;
       state.resourceBank.reputation = 0;

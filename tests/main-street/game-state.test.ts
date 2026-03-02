@@ -64,9 +64,9 @@ describe('MainStreetCards', () => {
   });
 
   describe('createEventDeck', () => {
-    it('should create 9 cards with 3 copies of 3 templates', () => {
+    it('should create 15 cards with 3 copies of 5 templates', () => {
       const deck = createEventDeck(3);
-      expect(deck).toHaveLength(9);
+      expect(deck).toHaveLength(15);
     });
 
     it('should create cards with correct family', () => {
@@ -146,8 +146,8 @@ describe('MainStreetState', () => {
       const state = createTestState();
       // Business: 15 total - 4 market = 11 remaining
       expect(state.decks.business.length).toBe(15 - MARKET_BUSINESS_SLOTS);
-      // Event: 9 total - 2 market = 7 remaining
-      expect(state.decks.event.length).toBe(9 - MARKET_EVENT_SLOTS);
+      // Event: 15 total - 2 market = 13 remaining
+      expect(state.decks.event.length).toBe(15 - MARKET_EVENT_SLOTS);
       // Upgrade: 6 total - 2 market = 4 remaining
       expect(state.decks.upgrade.length).toBe(6 - MARKET_UPGRADE_SLOTS);
     });
@@ -264,7 +264,7 @@ describe('MainStreetState', () => {
     it('should have all market + deck cards equal total deck size (event)', () => {
       const state = createTestState();
       const total = state.market.event.length + state.decks.event.length;
-      expect(total).toBe(9); // 3 templates * 3 copies
+      expect(total).toBe(15); // 5 templates * 3 copies
     });
 
     it('should have all market + deck cards equal total deck size (upgrade)', () => {
