@@ -394,6 +394,54 @@ describe('MainStreetEngine', () => {
 
       expect(state.incidentQueue.length).toBe(0);
     });
+
+    it('should resolve multiple items in FIFO order (A -> B -> C)', () => {
+      const state = createTestState();
+      const evtA = makeIncidentEvent({ id: 'inc-A', coinDelta: -1 });
+      const evtB = makeIncidentEvent({ id: 'inc-B', coinDelta: -2 });
+      const evtC = makeIncidentEvent({ id: 'inc-C', coinDelta: -3 });
+      state.incidentQueue = [evtA, evtB, evtC];
+      state.decks.event = []; // No refills
+      state.resourceBank.coins = 100;
+
+      const first = resolveIncident(state);
+      expect(first!.id).toBe('inc-A');
+      expect(state.incidentQueue.length).toBe(2);
+
+      const second = resolveIncident(state);
+      expect(second!.id).toBe('inc-B');
+      expect(state.incidentQueue.length).toBe(1);
+
+      const third = resolveIncident(state);
+      expect(third!.id).toBe('inc-C');
+      expect(state.incidentQueue.length).toBe(0);
+
+      // Cumulative effect: -1 + -2 + -3 = -6
+      expect(state.resourceBank.coins).toBe(100 - 6);
+    });
+
+    it('should refill queue back to INCIDENT_QUEUE_SIZE after resolution', () => {
+      const state = createTestState();
+      state.incidentQueue = [
+        makeIncidentEvent({ id: 'front-1', coinDelta: -1 }),
+        makeIncidentEvent({ id: 'front-2', coinDelta: -1 }),
+      ];
+      // Stock the deck with enough Incident cards
+      state.decks.event = [
+        makeIncidentEvent({ id: 'deck-1', coinDelta: -1 }),
+        makeIncidentEvent({ id: 'deck-2', coinDelta: -1 }),
+      ];
+      state.resourceBank.coins = 100;
+
+      // Resolve the front item
+      resolveIncident(state);
+
+      // Queue should be back to INCIDENT_QUEUE_SIZE (2)
+      expect(state.incidentQueue.length).toBe(2);
+      // Front should now be 'front-2', back should be 'deck-1'
+      expect(state.incidentQueue[0].id).toBe('front-2');
+      expect(state.incidentQueue[1].id).toBe('deck-1');
+    });
   });
 
   // ── Win/Loss Detection ────────────────────────────────────

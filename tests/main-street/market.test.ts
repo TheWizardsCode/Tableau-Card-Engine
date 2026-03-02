@@ -366,6 +366,117 @@ describe('MainStreetMarket', () => {
       refillBusinessMarket(state);
       expect(state.market.business).toHaveLength(2);
     });
+
+    it('should produce exactly MARKET_INVESTMENT_UPGRADE_COUNT upgrades + MARKET_INVESTMENT_EVENT_COUNT events', () => {
+      const state = createTestState();
+      state.market.investments = [];
+      // Ensure decks have enough cards
+      expect(state.decks.upgrade.length).toBeGreaterThanOrEqual(MARKET_INVESTMENT_UPGRADE_COUNT);
+      expect(state.decks.event.filter(e => e.trigger === 'Investment').length).toBeGreaterThanOrEqual(MARKET_INVESTMENT_EVENT_COUNT);
+
+      refillInvestmentsMarket(state);
+
+      const upgrades = state.market.investments.filter(c => c.family === 'upgrade');
+      const events = state.market.investments.filter(c => c.family === 'event');
+      expect(upgrades.length).toBe(MARKET_INVESTMENT_UPGRADE_COUNT);
+      expect(events.length).toBe(MARKET_INVESTMENT_EVENT_COUNT);
+      expect(state.market.investments.length).toBe(MARKET_INVESTMENT_SLOTS);
+    });
+
+    it('should maintain 2+1 ratio after purchasing an upgrade', () => {
+      const state = createTestState();
+      const upgrade = state.market.investments.find(c => c.family === 'upgrade') as UpgradeCard | undefined;
+      if (!upgrade) return;
+      const targetName = upgrade.targetBusiness;
+
+      // Place a matching business so the upgrade purchase is legal
+      const biz = state.decks.business.find(b => b.name === targetName);
+      if (!biz) return;
+      state.streetGrid[0] = { ...biz };
+      state.resourceBank.coins = 100;
+
+      purchaseUpgrade(state, upgrade.id);
+
+      // After purchase + auto-refill, check composition
+      const upgrades = state.market.investments.filter(c => c.family === 'upgrade');
+      const events = state.market.investments.filter(c => c.family === 'event');
+      // Should still have 2 upgrades if deck has cards, or fewer if exhausted
+      expect(upgrades.length).toBeLessThanOrEqual(MARKET_INVESTMENT_UPGRADE_COUNT);
+      expect(events.length).toBeLessThanOrEqual(MARKET_INVESTMENT_EVENT_COUNT);
+      // Total should be at most MARKET_INVESTMENT_SLOTS
+      expect(state.market.investments.length).toBeLessThanOrEqual(MARKET_INVESTMENT_SLOTS);
+      // If upgrade deck still has cards, should be exactly 2 upgrades
+      if (state.decks.upgrade.length > 0 || upgrades.length === MARKET_INVESTMENT_UPGRADE_COUNT) {
+        expect(upgrades.length).toBe(MARKET_INVESTMENT_UPGRADE_COUNT);
+      }
+    });
+
+    it('should maintain 2+1 ratio after purchasing an event', () => {
+      const state = createTestState();
+      // Inject a known Investment event into the investments row
+      const investmentEvt = {
+        family: 'event' as const,
+        id: 'evt-test-purchase',
+        name: 'Test Festival',
+        trigger: 'Investment' as const,
+        effect: '+1 coin',
+        target: 'All' as const,
+        coinDelta: 1,
+        reputationDelta: 0,
+      };
+      // Replace any existing event in the investments row
+      state.market.investments = state.market.investments.filter(c => c.family !== 'event');
+      state.market.investments.push(investmentEvt);
+
+      // Ensure deck has replacement Investment events
+      state.decks.event.push({
+        family: 'event',
+        id: 'evt-festival-replacement',
+        name: 'Local Festival',
+        trigger: 'Investment',
+        effect: '+2 coins',
+        target: 'SpecificSynergy',
+        targetSynergy: 'Culture',
+        coinDelta: 2,
+        reputationDelta: 1,
+      });
+
+      purchaseEvent(state, 'evt-test-purchase');
+
+      // heldEvent should be set
+      expect(state.heldEvent).not.toBeNull();
+      expect(state.heldEvent!.id).toBe('evt-test-purchase');
+
+      // Market should have been refilled
+      const events = state.market.investments.filter(c => c.family === 'event');
+      expect(events.length).toBe(MARKET_INVESTMENT_EVENT_COUNT);
+    });
+
+    it('should partially fill investments row when upgrade deck is exhausted', () => {
+      const state = createTestState();
+      state.market.investments = [];
+      state.decks.upgrade = []; // No upgrades available
+      // Keep Investment events in event deck
+      refillInvestmentsMarket(state);
+
+      const upgrades = state.market.investments.filter(c => c.family === 'upgrade');
+      const events = state.market.investments.filter(c => c.family === 'event');
+      expect(upgrades.length).toBe(0);
+      expect(events.length).toBeLessThanOrEqual(MARKET_INVESTMENT_EVENT_COUNT);
+    });
+
+    it('should partially fill investments row when event deck has no Investment cards', () => {
+      const state = createTestState();
+      state.market.investments = [];
+      // Remove all Investment-trigger events from the deck
+      state.decks.event = state.decks.event.filter(e => e.trigger !== 'Investment');
+      refillInvestmentsMarket(state);
+
+      const upgrades = state.market.investments.filter(c => c.family === 'upgrade');
+      const events = state.market.investments.filter(c => c.family === 'event');
+      expect(upgrades.length).toBe(MARKET_INVESTMENT_UPGRADE_COUNT);
+      expect(events.length).toBe(0);
+    });
   });
 
   // ── Query Helpers ─────────────────────────────────────────
