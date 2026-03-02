@@ -231,7 +231,7 @@ const EVENT_TEMPLATES: EventCard[] = [
     family: 'event',
     id: 'evt-inspection',
     name: 'Health Inspection',
-    trigger: 'Day',
+    trigger: 'Night',
     effect: '-2 coins per Food business and -1 reputation.',
     target: 'SpecificSynergy',
     targetSynergy: 'Food',
