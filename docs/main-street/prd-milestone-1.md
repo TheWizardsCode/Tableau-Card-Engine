@@ -39,12 +39,12 @@ Deliver a playable walking skeleton of Main Street that a human player can compl
 | Area | Details |
 |------|---------|
 | **Game State Model** | TypeScript types/interfaces for `MainStreetState` including street grid (10 slots), resource bank (coins + reputation), market, deck state, turn counter, day/night phase, and challenges completed. |
-| **Card Types** | 5 Business cards (Bakery, Diner, Bookshop, Park, Hardware Store), 3 Event cards (Local Festival, Rainy Night, Tax Audit), 3 Upgrade cards (Patisserie, Bistro, Library). Defined as typed JSON fixtures. |
-| **Turn Structure** | 10-phase day/night cycle: DayStart -> MarketPhase -> ActionPhase -> InvestmentResolution -> IncomePhase -> ReputationPhase -> NightStart -> IncidentPhase -> NightIncome -> EndCheck. Implemented via `PhaseManager`. |
+| **Card Types** | 5 Business cards (Bakery, Diner, Bookshop, Park, Hardware Store), 5 Event cards (Local Festival, Rainy Day, Tax Audit, Community Award, Health Inspection), 3 Upgrade cards (Patisserie, Bistro, Library). Defined as typed JSON fixtures. |
+| **Turn Structure** | 6-phase day cycle: DayStart -> MarketPhase -> InvestmentResolution -> IncomePhase -> IncidentPhase -> EndCheck. Implemented via `PhaseManager`. |
 | **Core Actions** | Buy Business, Buy Upgrade, Buy Event, Place Business, End Turn. All with legality validation returning `LegalityResult`. |
 | **Win/Loss Detection** | Score threshold (>=150), all-challenges-complete, turn-limit victory (turn 20 with reputation > 0 and coins >= 0). Loss: bankruptcy (coins < 0), reputation collapse (reputation <= 0), turn exhaustion without victory. |
 | **Adjacency & Income** | `AdjacencyResolver` computing synergy bonuses for the linear 1x10 grid. `computeIncome()` summing base income + synergy bonuses. Upgrades extending adjacency range. |
-| **Minimal UI** | Phaser scene with: 10-slot street grid, market display (business/event/upgrade rows), resource bank display (coins, reputation, turn, score), buy/place/upgrade click flow, end-turn button, game-over overlay. Placeholder art (colored rectangles with text labels). Responsive layout for desktop and mobile. |
+| **Minimal UI** | Phaser scene with: 10-slot street grid, market display (business row + investments row), incident queue area (2 face-up incidents), resource bank display (coins, reputation, turn, score), player hand area (held event), buy/place/upgrade click flow, end-turn button, game-over overlay. Placeholder art (colored rectangles with text labels). Responsive layout for desktop and mobile. |
 | **Seeded RNG** | Deterministic randomness using `createSeededRng()` from `@core-engine`. Seed displayed on title screen and usable for reproducible games. |
 | **Test Suite** | Unit tests for: game state creation, adjacency/synergy, income calculation, buy/place/upgrade legality, event resolution, win/loss detection, deterministic replay. Integration test for a full scripted turn. |
 | **Transcript Recording** | Game transcript using `TranscriptRecorderBase<T>` recording all actions and state transitions for replay and debugging. |
@@ -77,8 +77,8 @@ Deliver a playable walking skeleton of Main Street that a human player can compl
 **so that** I can begin building my street and optionally replay specific scenarios.
 
 **Acceptance Criteria:**
-- [ ] AC-1.1: Game initialises with turn 1, Day phase, 8 coins, 0 reputation, empty 10-slot street grid.
-- [ ] AC-1.2: Market displays up to 4 Business, 2 Event, and 2 Upgrade cards drawn from shuffled decks.
+- [ ] AC-1.1: Game initialises with turn 1, Day phase, 8 coins, 3 reputation, empty 10-slot street grid, and a 2-card incident queue.
+- [ ] AC-1.2: Market displays up to 4 Business cards and 3 Investments (2 Upgrade + 1 Investment event). Incident queue shows 2 face-up Incident cards.
 - [ ] AC-1.3: Seed is displayed on the game screen.
 - [ ] AC-1.4: Providing the same seed produces an identical initial market and deck order.
 - [ ] AC-1.5: Game appears in the Game Selector landing page alongside existing example games.
@@ -131,7 +131,7 @@ Deliver a playable walking skeleton of Main Street that a human player can compl
 
 **Acceptance Criteria:**
 - [ ] AC-5.1: Investment events purchased from the market are held and can be played during MarketPhase, or auto-resolve during InvestmentResolution phase.
-- [ ] AC-5.2: Incident events are drawn automatically during IncidentPhase.
+- [ ] AC-5.2: Incident events resolve automatically each turn from the visible FIFO incident queue (front card resolves, replacement drawn from deck).
 - [ ] AC-5.3: Event effects modify coins and/or reputation as described on the card.
 - [ ] AC-5.4: Event resolution is visible to the player (effect text displayed briefly).
 
@@ -145,7 +145,7 @@ Deliver a playable walking skeleton of Main Street that a human player can compl
 - [ ] AC-6.1: Win triggers when `finalScore >= 150` at end of Night Phase.
 - [ ] AC-6.2: Win triggers when all primary challenges are completed.
 - [ ] AC-6.3: Loss triggers immediately when coins < 0 (bankruptcy).
-- [ ] AC-6.4: Loss triggers immediately when reputation <= 0 (reputation collapse, except turn 1 where reputation starts at 0).
+- [ ] AC-6.4: Loss triggers immediately when reputation <= 0 (reputation collapse).
 - [ ] AC-6.5: Loss triggers at turn 20 if win conditions are not met (turn exhaustion).
 - [ ] AC-6.6: Game-over overlay displays win/loss status, final score breakdown, and a "Play Again" button.
 - [ ] AC-6.7: Final score formula: `coins + (reputation * 5) + (challengesCompleted * 10)`.
@@ -261,14 +261,13 @@ type DayPhase =
   | 'EndCheck';
 
 interface MarketState {
-  business: BusinessCard[];    // Up to 4 face-up
-  event: EventCard[];          // Up to 2 face-up
-  upgrade: UpgradeCard[];      // Up to 2 face-up
+  business: BusinessCard[];                   // Up to 4 face-up
+  investments: (UpgradeCard | EventCard)[];   // 2 upgrades + 1 investment event = 3 slots
 }
 
 interface ResourceBank {
   coins: number;      // Starting: 8
-  reputation: number; // Starting: 0
+  reputation: number; // Starting: 3
 }
 
 interface MainStreetState {
@@ -284,6 +283,7 @@ interface MainStreetState {
   };
   challengesCompleted: string[];
   heldEvent: EventCard | null;              // Held Investment event awaiting play or auto-resolution
+  incidentQueue: EventCard[];               // Visible FIFO queue of upcoming Incidents (size 2)
   gameResult: 'playing' | 'win' | 'loss';
   finalScore: number;
   seed: string;
@@ -297,10 +297,12 @@ const GRID_SIZE = 10;
 const MAX_TURNS = 20;
 const WIN_THRESHOLD = 150;
 const STARTING_COINS = 8;
-const STARTING_REPUTATION = 0;
+const STARTING_REPUTATION = 3;
 const MARKET_BUSINESS_SLOTS = 4;
-const MARKET_EVENT_SLOTS = 2;
-const MARKET_UPGRADE_SLOTS = 2;
+const MARKET_INVESTMENT_SLOTS = 3;       // Total investment row slots
+const MARKET_INVESTMENT_UPGRADE_COUNT = 2; // Upgrades in investment row
+const MARKET_INVESTMENT_EVENT_COUNT = 1;   // Investment events in investment row
+const INCIDENT_QUEUE_SIZE = 2;           // Visible FIFO incident queue size
 const SYNERGY_BONUS_PER_NEIGHBOR = 1;
 const REPUTATION_SCORE_MULTIPLIER = 5;
 const CHALLENGE_BONUS_POINTS = 10;
@@ -342,10 +344,10 @@ function computeSynergyBonus(grid: (BusinessCard | null)[], index: number): numb
 The walking skeleton simplifies the 10-phase GDD turn structure to reduce implementation complexity while preserving the core loop:
 
 1. **DayStart** -- Increment turn, replenish market.
-2. **MarketPhase / ActionPhase** (combined) -- Player buys/places/upgrades. Multiple purchases allowed per turn. Player clicks "End Turn" when done.
+2. **MarketPhase / ActionPhase** (combined) -- Player buys/places/upgrades. Market shows 4 Business + 3 Investments (2 Upgrades + 1 Investment event). Multiple purchases allowed per turn. Player clicks "End Turn" when done.
 3. **InvestmentResolution** -- Auto-resolve held Investment event if not played during MarketPhase.
 4. **IncomePhase** -- Compute and add income from all placed businesses.
-5. **IncidentPhase** -- Draw and resolve one Incident event from the event deck.
+5. **IncidentPhase** -- Resolve the front Incident from the visible FIFO queue. Draw a replacement from the event deck to the back of the queue.
 6. **EndCheck** -- Evaluate win/loss conditions.
 
 The ReputationPhase and NightIncome phases are folded into InvestmentResolution and IncidentPhase respectively, since reputation changes and night income modifiers are event-driven effects in the current card pool.
@@ -380,9 +382,13 @@ No external image assets are required for Milestone 1. All visuals are programma
 +--------------------------------------------------------------------+
 |                                                                      |
 |  MARKET                                                              |
-|  Business: [Card1] [Card2] [Card3] [Card4]                         |
-|  Events:   [Evt1]  [Evt2]                                          |
-|  Upgrades: [Upg1]  [Upg2]                                          |
+|  Business:    [Card1] [Card2] [Card3] [Card4]                       |
+|  Investments: [Upg1]  [Upg2]  [Evt1]     Upg: N  Evt: M            |
+|                                                                      |
++--------------------------------------------------------------------+
+|                                                                      |
+|  INCIDENT QUEUE (upcoming)                                           |
+|  [Incident1] [Incident2]                                            |
 |                                                                      |
 +--------------------------------------------------------------------+
 |                                                                      |
@@ -392,14 +398,14 @@ No external image assets are required for Milestone 1. All visuals are programma
 |                                                                      |
 +--------------------------------------------------------------------+
 |                                                                      |
-|  Coins: 8 | Reputation: 0 | Turn: 1/20 | Score: 0   [End Turn]   |
+|  [Held Event]  Coins: 8 | Rep: 3 | Turn: 1/20 | Score: 0 [End Turn]|
 |                                                                      |
 +--------------------------------------------------------------------+
 ```
 
 ### Mobile Layout (Portrait, ~400px width)
 
-The layout stacks vertically: Market on top, Street grid in middle (2 rows of 5), Resource bank and End Turn button at bottom. Cards scale down proportionally.
+The layout stacks vertically: Market on top (business row + investments row), incident queue below, street grid in middle (2 rows of 5), player hand area (held event) and resource bank with End Turn button at bottom. Cards scale down proportionally.
 
 ---
 
@@ -522,7 +528,7 @@ The walking skeleton emits the following events through the `GameEventEmitter` f
 
 | Event | Payload | When |
 |-------|---------|------|
-| `market.view` | `{ turn, businessCount, eventCount, upgradeCount }` | Market is displayed |
+| `market.view` | `{ turn, businessCount, investmentCount, incidentQueueSize }` | Market is displayed |
 | `market.purchase` | `{ turn, cardType, cardName, cost }` | Player purchases a card |
 | `action.place` | `{ turn, cardName, slotIndex, synergyTypes }` | Business placed on street |
 | `income.compute` | `{ turn, totalIncome, businessCount, synergyBonusTotal }` | Income phase completes |
@@ -549,9 +555,11 @@ The walking skeleton emits the following events through the `GameEventEmitter` f
 
 | ID | Name | Trigger | Effect | Target | Coin Delta | Rep Delta |
 |----|------|---------|--------|--------|-----------|-----------|
-| `evt-festival` | Local Festival | Incident | +2 coins to all Culture businesses | SpecificSynergy (Culture) | +2 per Culture biz | 0 |
-| `evt-rainy` | Rainy Night | Incident | -1 coin to all Food businesses | SpecificSynergy (Food) | -1 per Food biz | 0 |
-| `evt-tax` | Tax Audit | Investment | Lose 3 coins | All | -3 | 0 |
+| `evt-festival` | Local Festival | Investment | +2 coins per Culture business and +1 reputation | SpecificSynergy (Culture) | +2 per Culture biz | +1 |
+| `evt-rainy` | Rainy Day | Incident | -1 coin per Food business | SpecificSynergy (Food) | -1 per Food biz | 0 |
+| `evt-tax` | Tax Audit | Incident | Lose 3 coins | All | -3 | 0 |
+| `evt-award` | Community Award | Incident | +2 reputation from community recognition | All | 0 | +2 |
+| `evt-inspection` | Health Inspection | Incident | -2 coins per Food business and -1 reputation | SpecificSynergy (Food) | -2 per Food biz | -1 |
 
 ### Upgrade Cards
 
@@ -563,7 +571,7 @@ The walking skeleton emits the following events through the `GameEventEmitter` f
 
 ### Deck Composition (for shuffling)
 
-To ensure adequate supply for 20 turns, each Business card appears **3 times** in the Business deck (15 cards total), each Event card appears **3 times** in the Event deck (9 cards total), and each Upgrade card appears **2 times** in the Upgrade deck (6 cards total).
+To ensure adequate supply for 20 turns, each Business card appears **3 times** in the Business deck (15 cards total), each Event card appears **3 times** in the Event deck (15 cards total: 3 Investment + 12 Incident), and each Upgrade card appears **2 times** in the Upgrade deck (6 cards total). At game start, the incident queue draws 2 Incidents and the Investments row draws 1 Investment event from the event deck.
 
 ---
 

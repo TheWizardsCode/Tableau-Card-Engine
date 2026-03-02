@@ -45,6 +45,7 @@ interface TurnRecord {
   actions: { type: string; detail: string }[];
   income: number | null;
   incident: string | null;
+  incidentQueueSize: number;
   coinsAfter: number;
   reputationAfter: number;
   score: number;
@@ -176,6 +177,7 @@ while (state.gameResult === 'playing' && state.turn <= 20) {
     actions: executedActions,
     income: turnResult.income ? turnResult.income.total : null,
     incident: turnResult.incident ? turnResult.incident.name : null,
+    incidentQueueSize: state.incidentQueue.length,
     coinsAfter: state.resourceBank.coins,
     reputationAfter: state.resourceBank.reputation,
     score: computeScore(state),
@@ -210,3 +212,4 @@ process.stderr.write(`  Turns:   ${turns.length}\n`);
 process.stderr.write(`  Result:  ${state.gameResult} (${state.endReason})\n`);
 process.stderr.write(`  Score:   ${state.finalScore}\n`);
 process.stderr.write(`  Grid:    ${state.streetGrid.filter(s => s !== null).length}/10 occupied\n`);
+process.stderr.write(`  Queue:   ${state.incidentQueue.length} incident(s) remaining\n`);

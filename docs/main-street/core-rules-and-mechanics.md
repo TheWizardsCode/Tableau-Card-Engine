@@ -15,10 +15,11 @@
 | **Slot** | A single cell in the 10‑slot linear **Street Grid** where a Business card may be placed. Slots are indexed 0‑9.
 | **Business Card** | A card representing a shop or service. It has a cost, a base income, one or more **Synergy Types**, and optional **Upgrade Paths**.
 | **Synergy Type** | A tag (e.g., *Food*, *Culture*, *Commerce*) that determines adjacency bonuses. When two adjacent businesses share a synergy type, each gains a **Synergy Bonus** of +1 coin per turn per matching neighbor.
-| **Market** | The face‑up row of cards the player may purchase each turn. It draws from three decks: **Business**, **Event**, and **Upgrade**.
-| **Resource Bank** | Holds the player’s **Coins** (currency) and **Reputation** (score multiplier). Both start at a defined amount and change each turn.
-| **Turn** | A full day/night cycle consisting of several phases (see Section 5). Turn number increments after the **Night Phase**.
-| **Event Card** | A card that triggers a one‑off effect (e.g., Festival, Tax, Storm). **Investment** events are player‑bought and held until played; **Incident** events happen automatically.
+| **Market** | The face‑up cards the player may purchase each turn. It has two rows: a **Business** row (4 slots) and a mixed **Investments** row (2 Upgrade cards + 1 Investment event card = 3 slots). Incidents are not purchasable; they populate a visible FIFO **Incident Queue** instead.
+| **Resource Bank** | Holds the player's **Coins** (currency) and **Reputation** (score multiplier). Coins start at 8 and Reputation starts at 3.
+| **Turn** | A full day/night cycle consisting of several phases (see Section 5). Turn number increments after the **Night Phase**.
+| **Event Card** | A card that triggers a one‑off effect (e.g., Festival, Tax, Storm). **Investment** events are player‑bought from the Investments row and held until played; **Incident** events resolve automatically from the incident queue.
+| **Incident Queue** | A visible FIFO queue of 2 face‑up Incident cards. Each turn the front card is resolved and a replacement is drawn from the event deck. The player can see upcoming incidents and plan accordingly.
 | **Upgrade Card** | A card that modifies a specific Business card (e.g., upgrade a Bakery to a Patisserie, increasing income and synergy range).
 | **Challenge** | A optional meta‑goal (e.g., *Build a Foodie Row*) that grants a bonus score at the end of the game if satisfied.
 
@@ -63,8 +64,8 @@
 ```json
 {
   "name": "Local Festival",
-  "trigger": "Incident",
-  "effect": "+2 coins to all Culture businesses for this turn.",
+  "trigger": "Investment",
+  "effect": "+2 coins to all Culture businesses and +1 reputation.",
   "target": "SpecificSynergy"
 }
 ```
@@ -103,25 +104,31 @@ interface GameState {
   turn: number; // starts at 1
   dayPhase: 'Day' | 'Night';
   streetGrid: (BusinessCard | null)[]; // length = GRID_SIZE (default 10)
-  market: MarketRow; // 4 visible slots per deck type
+  market: {
+    business: BusinessCard[];                   // 4 face-up slots
+    investments: (UpgradeCard | EventCard)[];   // 2 upgrades + 1 investment event = 3 slots
+  };
+  incidentQueue: EventCard[];  // Visible FIFO queue of upcoming Incidents (size 2)
   resourceBank: {
     coins: number; // start = 8
-    reputation: number; // start = 0
+    reputation: number; // start = 3
   };
   deck: {
     business: CardDeck<BusinessCard>;
-    event: CardDeck<EventCard>;
+    event: CardDeck<EventCard>;    // Contains both Investment and Incident cards
     upgrade: CardDeck<UpgradeCard>;
   };
+  heldEvent: EventCard | null;  // Held Investment event awaiting play (max 1)
   challengesCompleted: Set<string>; // IDs of achieved challenges
 }
 ```
 
 **Key components**
 - **Grid<T>** – generic NxM grid (used here as 1x10). Provides `place(card, index)`, `neighbors(index)` utilities.
-- **AdjacencyResolver** – computes synergy bonuses based on shared `synergyTypes` and proximity (default range 1, can be extended by upgrades).
-- **MarketRow** – draws the top card from each deck to a face‑up row of 4 cards; cards are replenished after purchase.
-- **ResourceBank** – tracks `coins` and `reputation`. Reputation is a multiplier applied at final score calculation (`finalScore = coins + reputation * 5 + challengeBonuses`).
+- **AdjacencyResolver** – computes synergy bonuses based on shared `synergyTypes` and proximity (default range 1, can be extended by upgrades).
+- **Market** – two rows: Business row (4 face‑up cards from the Business deck) and Investments row (2 Upgrades + 1 Investment event = 3 slots). Cards are replenished after purchase.
+- **Incident Queue** – visible FIFO queue of 2 Incident cards drawn from the event deck. The front card resolves each turn during IncidentPhase; a replacement is drawn from the deck afterward. If the deck runs out, the queue shrinks naturally.
+- **ResourceBank** – tracks `coins` (start 8) and `reputation` (start 3). Reputation is a multiplier applied at final score calculation (`finalScore = coins + reputation * 5 + challengeBonuses`).
 
 ---
 
@@ -132,34 +139,30 @@ The turn follows a deterministic state‑machine that repeats each day/night cyc
 ```mermaid
 stateDiagram-v2
     [*] --> DayStart
-    DayStart --> MarketPhase: Show market (4 Business, 2 Event, 2 Upgrade)
-    MarketPhase --> ActionPhase: Player purchases/places/upgrades
+    DayStart --> MarketPhase: Show market (4 Business, 2 Upgrade + 1 Investment event)
+    MarketPhase --> ActionPhase: Player purchases/places/upgrades (+ play held Investment)
     ActionPhase --> InvestmentResolution: Auto‑resolve held Investment if not played
     InvestmentResolution --> IncomePhase: Collect Base Income + Synergy Bonuses
-    IncomePhase --> ReputationPhase: Apply Reputation gain/loss (if any)
-    ReputationPhase --> NightStart: Increment turn counter
-    NightStart --> IncidentPhase: Draw Incident event cards
-    IncidentPhase --> NightIncome: Apply Incident‑specific income modifiers
-    NightIncome --> DayStart: Loop to next Day
+    IncomePhase --> IncidentPhase: Resolve front of incident queue (FIFO)
+    IncidentPhase --> EndCheck: Evaluate win/loss conditions
+    EndCheck --> DayStart: Loop to next turn
 ```
 
 **Phase details**
-1. **DayStart** – Increment `turn` counter, reset temporary flags.
-2. **MarketPhase** – The market draws up to four Business cards, two Event cards, and two Upgrade cards. The player may purchase any combination as long as they have enough coins.
+1. **DayStart** – Increment `turn` counter, reset temporary flags, replenish market.
+2. **MarketPhase** – The market shows 4 Business cards and 3 Investments (2 Upgrades + 1 Investment event). The player may purchase any combination as long as they have enough coins.
 3. **ActionPhase** – The player resolves purchases:
    - **Buy Business** → `resourceBank.coins -= cost` → place card into a chosen empty slot.
    - **Buy Upgrade** → `resourceBank.coins -= cost` → apply upgrade effects to the targeted Business.
-   - **Buy Event (Investment)** → `resourceBank.coins -= cost` → hold the event (max 1 held at a time). The player may play the held Investment during MarketPhase via a `play-event` action.
+   - **Buy Event (Investment)** → hold the event (max 1 held at a time). The player may play the held Investment during MarketPhase via a `play-event` action.
    - **Play Held Investment** → resolve the held Investment event immediately and clear it.
 4. **InvestmentResolution** – If the player still holds an Investment event, it auto‑resolves here.
 5. **IncomePhase** – For each placed Business, compute:
    - `totalIncome = baseIncome + synergyBonus` where `synergyBonus = countMatchingNeighbors * 1`.
    - `resourceBank.coins += totalIncome`.
-6. **ReputationPhase** – Certain actions (e.g., completing a Challenge) increase `reputation`. Negative events may decrease it.
-7. **NightStart** – Marks the transition to the Night.
-8. **IncidentPhase** – Draw a single Incident event card from the Event deck and resolve it immediately.
-9. **NightIncome** – Some Incident events modify income (e.g., *Rainy Night* reduces Food income by 1).
-10. Loop back to **DayStart** for the next turn.
+6. **IncidentPhase** – Resolve the front Incident card from the visible FIFO incident queue. After resolution, draw a replacement Incident from the event deck to the back of the queue (maintaining queue size of 2). If the deck has no more Incidents, the queue shrinks naturally.
+7. **EndCheck** – Evaluate win/loss conditions.
+8. Loop back to **DayStart** for the next turn.
 
 The turn ends when either:
 - The predefined maximum turn count (`MAX_TURNS = 20`) is reached, **or**
@@ -214,8 +217,8 @@ Loss conditions are evaluated at the end of the **Night Income** phase before ch
 
 | Aspect | Random Source | Visibility |
 |--------|----------------|------------|
-| **Market Draw** | Seeded RNG draws the top card from each of the three decks. | Face‑up – player sees all options before purchasing.
-| **Event Cards** | Incident events are drawn automatically after the player’s actions and revealed before resolution. Investment events are purchased from the market and held until played. | Incidents: face‑up after draw. Investments: face‑up in market, then held.
+| **Market Draw** | Seeded RNG draws from the Business, Upgrade, and Event decks to fill the Business row (4 slots) and Investments row (2 Upgrades + 1 Investment event). | Face‑up – player sees all options before purchasing.
+| **Event Cards** | Incident events populate a visible FIFO queue (2 cards, face‑up) so the player can plan ahead. Investment events appear in the Investments market row and are purchased/held until played. | Incidents: face‑up in queue. Investments: face‑up in market, then held.
 | **Challenge Generation** | Fixed set defined in `challenges.md`; no randomness.
 | **RNG Seed** | Determined by the **Game Engine** on startup (`Math.seedrandom(seedString)`). | The seed is displayed on the title screen for reproducibility.
 
@@ -230,15 +233,12 @@ Below is a high‑level flowchart that captures the complete game loop, useful f
 ```mermaid
 flowchart TD
     Start((Start Game)) --> TurnStart[Turn Start]
-    TurnStart --> Market[Show Market]
+    TurnStart --> Market[Show Market: Business + Investments rows]
     Market --> Actions[Player Actions]
     Actions --> ResolveInvestment[Resolve Held Investment]
     ResolveInvestment --> Income[Collect Income & Synergy]
-    Income --> Reputation[Apply Reputation Effects]
-    Reputation --> NightStart[Night Phase]
-    NightStart --> DrawIncident[Draw Incident]
-    DrawIncident --> NightIncome[Apply Incident Modifiers]
-    NightIncome --> EndCheck{Win/Loss Check}
+    Income --> Incident[Resolve Front of Incident Queue]
+    Incident --> EndCheck{Win/Loss Check}
     EndCheck -->|Win| EndWin((Victory))
     EndCheck -->|Loss| EndLoss((Defeat))
     EndCheck -->|Continue| TurnStart
