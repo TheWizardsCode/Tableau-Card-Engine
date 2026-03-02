@@ -11,6 +11,7 @@
 import type { BusinessCard, SynergyType } from './MainStreetCards';
 import { GRID_SIZE, SYNERGY_BONUS_PER_NEIGHBOR } from './MainStreetCards';
 import type { MainStreetState } from './MainStreetState';
+import { addLog } from './MainStreetState';
 
 // ── Adjacency Resolver ──────────────────────────────────────
 
@@ -138,6 +139,11 @@ export function computeIncome(grid: (BusinessCard | null)[]): IncomeResult {
 export function applyIncome(state: MainStreetState): IncomeResult {
   const result = computeIncome(state.streetGrid);
   state.resourceBank.coins += result.total;
+  if (result.total > 0) {
+    addLog(state, `Income: +${result.total} coins`, 'gain');
+  } else {
+    addLog(state, `Income: +0 coins`, 'neutral');
+  }
   return result;
 }
 

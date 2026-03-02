@@ -14,6 +14,7 @@
 
 import type { LegalityResult } from '../../src/rule-engine';
 import type { MainStreetState } from './MainStreetState';
+import { addLog } from './MainStreetState';
 import type { BusinessCard, UpgradeCard, AnyCard } from './MainStreetCards';
 import { GRID_SIZE } from './MainStreetCards';
 
@@ -215,6 +216,8 @@ export function purchaseBusiness(
   const refilled = state.decks.business.length > 0;
   refillBusinessMarket(state);
 
+  addLog(state, `Placed ${card.name} in slot ${slotIndex} (-$${card.cost})`, 'loss');
+
   return { card, cost: card.cost, refilled };
 }
 
@@ -273,6 +276,8 @@ export function purchaseUpgrade(
   const refilled = state.decks.upgrade.length > 0;
   refillUpgradeMarket(state);
 
+  addLog(state, `Upgraded ${business.name} with ${card.name} (-$${card.cost})`, 'loss');
+
   return { card, cost: card.cost, refilled };
 }
 
@@ -306,6 +311,8 @@ export function purchaseEvent(
   // Refill market
   const refilled = state.decks.event.length > 0;
   refillEventMarket(state);
+
+  addLog(state, `Bought event: ${card.name}`, 'neutral');
 
   return { card, cost: 0, refilled };
 }
