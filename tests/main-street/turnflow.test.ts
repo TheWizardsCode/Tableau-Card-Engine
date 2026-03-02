@@ -198,7 +198,8 @@ describe('MainStreetEngine', () => {
       state.resourceBank.coins = 100;
 
       // Place a target business
-      const upgrade = state.market.upgrade[0];
+      const upgrade = state.market.investments.find(c => c.family === 'upgrade') as import('../../example-games/main-street/MainStreetCards').UpgradeCard;
+      expect(upgrade).toBeDefined();
       const biz = state.decks.business.find(b => b.name === upgrade.targetBusiness);
       expect(biz).toBeDefined();
       state.streetGrid[0] = { ...biz! };
@@ -216,9 +217,9 @@ describe('MainStreetEngine', () => {
       const state = createTestState();
       state.phase = 'MarketPhase';
 
-      // Put an Investment event in the market
+      // Put an Investment event in the investments row
       const investmentEvent = makeInvestmentEvent({ id: 'inv-evt-1' });
-      state.market.event = [investmentEvent];
+      state.market.investments = [investmentEvent];
 
       const result = executeAction(state, {
         type: 'buy-event',

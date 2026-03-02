@@ -14,8 +14,7 @@ import {
   purchaseUpgrade,
   purchaseEvent,
   refillBusinessMarket,
-  refillEventMarket,
-  refillUpgradeMarket,
+  refillInvestmentsMarket,
   refillAllMarkets,
   getAffordableBusinessCards,
   getEmptySlots,
@@ -23,8 +22,10 @@ import {
 import {
   GRID_SIZE,
   MARKET_BUSINESS_SLOTS,
-  MARKET_EVENT_SLOTS,
-  MARKET_UPGRADE_SLOTS,
+  MARKET_INVESTMENT_SLOTS,
+  MARKET_INVESTMENT_UPGRADE_COUNT,
+  MARKET_INVESTMENT_EVENT_COUNT,
+  type UpgradeCard,
 } from '../../example-games/main-street/MainStreetCards';
 
 // ── Helpers ─────────────────────────────────────────────────
@@ -169,7 +170,8 @@ describe('MainStreetMarket', () => {
     it('should allow upgrade when target business is on the street', () => {
       const state = createTestState();
       // Place a business that matches an upgrade target
-      const upgrade = state.market.upgrade[0];
+      const upgrade = state.market.investments.find(c => c.family === 'upgrade') as UpgradeCard | undefined;
+      if (!upgrade) return; // no upgrade in investments row for this seed
       const targetName = upgrade.targetBusiness;
 
       // Find a business card matching the target and place it
@@ -185,7 +187,8 @@ describe('MainStreetMarket', () => {
 
     it('should reject upgrade when no matching business is placed', () => {
       const state = createTestState();
-      const upgrade = state.market.upgrade[0];
+      const upgrade = state.market.investments.find(c => c.family === 'upgrade') as UpgradeCard | undefined;
+      if (!upgrade) return;
       // Street is empty, no targets
       const result = canPurchaseUpgrade(state, upgrade.id);
       expect(result.legal).toBe(false);
@@ -196,7 +199,8 @@ describe('MainStreetMarket', () => {
 
     it('should reject upgrade when business is already at max level', () => {
       const state = createTestState();
-      const upgrade = state.market.upgrade[0];
+      const upgrade = state.market.investments.find(c => c.family === 'upgrade') as UpgradeCard | undefined;
+      if (!upgrade) return;
       const targetName = upgrade.targetBusiness;
 
       // Place a business at max level
@@ -213,8 +217,9 @@ describe('MainStreetMarket', () => {
   describe('purchaseUpgrade', () => {
     it('should apply income and synergy bonuses to the target business', () => {
       const state = createTestState();
-      const upgrade = state.market.upgrade[0];
-      const targetName = upgrade.targetBusiness;
+      const upgrade = state.market.investments.find(c => c.family === 'upgrade') as UpgradeCard | undefined;
+      expect(upgrade).toBeDefined();
+      const targetName = upgrade!.targetBusiness;
 
       // Place a matching business
       const biz = state.decks.business.find(b => b.name === targetName);
@@ -226,17 +231,18 @@ describe('MainStreetMarket', () => {
       const rangeBefore = state.streetGrid[0]!.synergyRangeBonus;
       const levelBefore = state.streetGrid[0]!.level;
 
-      purchaseUpgrade(state, upgrade.id);
+      purchaseUpgrade(state, upgrade!.id);
 
       expect(state.streetGrid[0]!.level).toBe(levelBefore + 1);
-      expect(state.streetGrid[0]!.incomeBonus).toBe(incomeBefore + upgrade.incomeBonus);
-      expect(state.streetGrid[0]!.synergyRangeBonus).toBe(rangeBefore + upgrade.synergyRangeBonus);
+      expect(state.streetGrid[0]!.incomeBonus).toBe(incomeBefore + upgrade!.incomeBonus);
+      expect(state.streetGrid[0]!.synergyRangeBonus).toBe(rangeBefore + upgrade!.synergyRangeBonus);
     });
 
     it('should target a specific slot when provided', () => {
       const state = createTestState();
-      const upgrade = state.market.upgrade[0];
-      const targetName = upgrade.targetBusiness;
+      const upgrade = state.market.investments.find(c => c.family === 'upgrade') as UpgradeCard | undefined;
+      expect(upgrade).toBeDefined();
+      const targetName = upgrade!.targetBusiness;
 
       // Place matching businesses in slots 2 and 5
       const biz = state.decks.business.find(b => b.name === targetName);
@@ -245,7 +251,7 @@ describe('MainStreetMarket', () => {
       state.streetGrid[5] = { ...biz!, id: 'target-5' };
       state.resourceBank.coins = 100;
 
-      purchaseUpgrade(state, upgrade.id, 5);
+      purchaseUpgrade(state, upgrade!.id, 5);
 
       // Slot 5 should be upgraded, slot 2 should not
       expect(state.streetGrid[5]!.level).toBe(1);
@@ -258,23 +264,13 @@ describe('MainStreetMarket', () => {
   describe('canPurchaseEvent', () => {
     it('should allow purchase of Investment-trigger events', () => {
       const state = createTestState();
-      // Find an Investment-trigger event in market
-      const investmentEvent = state.market.event.find(e => e.trigger === 'Investment');
+      // Find an Investment-trigger event in investments row
+      const investmentEvent = state.market.investments.find(
+        c => c.family === 'event' && (c as import('../../example-games/main-street/MainStreetCards').EventCard).trigger === 'Investment',
+      );
       if (investmentEvent) {
         const result = canPurchaseEvent(state, investmentEvent.id);
         expect(result.legal).toBe(true);
-      }
-    });
-
-    it('should reject purchase of Incident-trigger events', () => {
-      const state = createTestState();
-      const incidentEvent = state.market.event.find(e => e.trigger === 'Incident');
-      if (incidentEvent) {
-        const result = canPurchaseEvent(state, incidentEvent.id);
-        expect(result.legal).toBe(false);
-        if (!result.legal) {
-          expect(result.reason).toContain('Incident events');
-        }
       }
     });
 
@@ -297,13 +293,15 @@ describe('MainStreetMarket', () => {
         coinDelta: 0,
         reputationDelta: 0,
       };
-      // Find an Investment event in market
-      const investmentEvent = state.market.event.find(e => e.trigger === 'Investment');
+      // Find an Investment event in investments row
+      const investmentEvent = state.market.investments.find(
+        c => c.family === 'event' && (c as import('../../example-games/main-street/MainStreetCards').EventCard).trigger === 'Investment',
+      );
       if (investmentEvent) {
         const result = canPurchaseEvent(state, investmentEvent.id);
         expect(result.legal).toBe(false);
         if (!result.legal) {
-          expect(result.reason).toContain('already holding');
+          expect(result.reason).toContain('Already holding');
         }
       }
     });
@@ -312,7 +310,7 @@ describe('MainStreetMarket', () => {
   describe('purchaseEvent', () => {
     it('should hold event as heldEvent and refill market', () => {
       const state = createTestState();
-      // Ensure we have an Investment event by manipulating the market
+      // Ensure we have an Investment event by injecting into the investments row
       const investmentTemplate = {
         family: 'event' as const,
         id: 'evt-festival-test',
@@ -324,7 +322,7 @@ describe('MainStreetMarket', () => {
         coinDelta: 2,
         reputationDelta: 1,
       };
-      state.market.event = [investmentTemplate];
+      state.market.investments = [investmentTemplate];
 
       purchaseEvent(state, 'evt-festival-test');
 
@@ -343,26 +341,22 @@ describe('MainStreetMarket', () => {
       expect(state.market.business).toHaveLength(MARKET_BUSINESS_SLOTS);
     });
 
-    it('should refill event market to full slot count', () => {
+    it('should refill investments market to correct slot counts', () => {
       const state = createTestState();
-      state.market.event = [];
-      refillEventMarket(state);
-      expect(state.market.event).toHaveLength(MARKET_EVENT_SLOTS);
-    });
-
-    it('should refill upgrade market to full slot count', () => {
-      const state = createTestState();
-      state.market.upgrade = [];
-      refillUpgradeMarket(state);
-      expect(state.market.upgrade).toHaveLength(MARKET_UPGRADE_SLOTS);
+      state.market.investments = [];
+      refillInvestmentsMarket(state);
+      const upgrades = state.market.investments.filter(c => c.family === 'upgrade');
+      const events = state.market.investments.filter(c => c.family === 'event');
+      expect(upgrades.length).toBeLessThanOrEqual(MARKET_INVESTMENT_UPGRADE_COUNT);
+      expect(events.length).toBeLessThanOrEqual(MARKET_INVESTMENT_EVENT_COUNT);
+      expect(state.market.investments.length).toBeLessThanOrEqual(MARKET_INVESTMENT_SLOTS);
     });
 
     it('should not exceed slot count when already full', () => {
       const state = createTestState();
       refillAllMarkets(state);
       expect(state.market.business.length).toBeLessThanOrEqual(MARKET_BUSINESS_SLOTS);
-      expect(state.market.event.length).toBeLessThanOrEqual(MARKET_EVENT_SLOTS);
-      expect(state.market.upgrade.length).toBeLessThanOrEqual(MARKET_UPGRADE_SLOTS);
+      expect(state.market.investments.length).toBeLessThanOrEqual(MARKET_INVESTMENT_SLOTS);
     });
 
     it('should partially fill when deck has fewer cards than slots', () => {

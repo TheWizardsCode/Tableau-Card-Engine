@@ -98,11 +98,26 @@ export const STARTING_REPUTATION = 3;
 /** Number of Business card slots visible in the market. */
 export const MARKET_BUSINESS_SLOTS = 4;
 
-/** Number of Event card slots visible in the market. */
-export const MARKET_EVENT_SLOTS = 2;
+/** Total number of Investment row slots (upgrades + investment events). */
+export const MARKET_INVESTMENT_SLOTS = 3;
 
-/** Number of Upgrade card slots visible in the market. */
-export const MARKET_UPGRADE_SLOTS = 2;
+/** Number of upgrade cards in the investment row. */
+export const MARKET_INVESTMENT_UPGRADE_COUNT = 2;
+
+/** Number of investment event cards in the investment row. */
+export const MARKET_INVESTMENT_EVENT_COUNT = 1;
+
+/**
+ * @deprecated Use MARKET_INVESTMENT_SLOTS-related constants instead.
+ * Kept temporarily for backward-compat during UI migration.
+ */
+export const MARKET_EVENT_SLOTS = MARKET_INVESTMENT_EVENT_COUNT;
+
+/**
+ * @deprecated Use MARKET_INVESTMENT_SLOTS-related constants instead.
+ * Kept temporarily for backward-compat during UI migration.
+ */
+export const MARKET_UPGRADE_SLOTS = MARKET_INVESTMENT_UPGRADE_COUNT;
 
 /** Number of Incident cards visible in the incident queue at game start. */
 export const INCIDENT_QUEUE_SIZE = 2;

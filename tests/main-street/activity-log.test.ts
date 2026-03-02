@@ -156,9 +156,9 @@ describe('Activity Log', () => {
       const state = createTestState();
       executeDayStart(state);
 
-      // Inject an Investment event into the market
+      // Inject an Investment event into the investments row
       const investmentEvent = makeInvestmentEvent({ id: 'inv-evt-1', name: 'Test Fest' });
-      state.market.event = [investmentEvent];
+      state.market.investments = [investmentEvent];
       purchaseEvent(state, 'inv-evt-1');
 
       const entry = lastLog(state);
@@ -177,7 +177,7 @@ describe('Activity Log', () => {
       const biz = makeBiz({ id: 'bakery-1', name: 'Bakery', maxLevel: 3 });
       state.streetGrid[0] = biz;
 
-      // Inject an upgrade into the market
+      // Inject an upgrade into the investments row
       const upgrade: UpgradeCard = {
         family: 'upgrade',
         id: 'upg-1',
@@ -188,7 +188,7 @@ describe('Activity Log', () => {
         incomeBonus: 1,
         synergyRangeBonus: 0,
       };
-      state.market.upgrade = [upgrade];
+      state.market.investments = [upgrade];
       state.resourceBank.coins = 20;
 
       purchaseUpgrade(state, 'upg-1');

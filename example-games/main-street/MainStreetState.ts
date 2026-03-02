@@ -21,8 +21,8 @@ import {
   STARTING_COINS,
   STARTING_REPUTATION,
   MARKET_BUSINESS_SLOTS,
-  MARKET_EVENT_SLOTS,
-  MARKET_UPGRADE_SLOTS,
+  MARKET_INVESTMENT_UPGRADE_COUNT,
+  MARKET_INVESTMENT_EVENT_COUNT,
   INCIDENT_QUEUE_SIZE,
 } from './MainStreetCards';
 
@@ -95,8 +95,11 @@ export const PHASE_ORDER: readonly DayPhase[] = [
 /** The face-up cards available for purchase. */
 export interface MarketState {
   business: BusinessCard[];
-  event: EventCard[];
-  upgrade: UpgradeCard[];
+  /**
+   * Mixed investment row: upgrade cards and Investment-trigger event cards.
+   * Typically 2 upgrades + 1 investment event = 3 slots.
+   */
+  investments: (UpgradeCard | EventCard)[];
 }
 
 // ── Resource Bank ───────────────────────────────────────────
@@ -241,10 +244,22 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
   shuffleArray(upgradeDeck, rng);
 
   // Populate initial market
+  // Investments row: 2 upgrades + 1 investment event
+  const investments: (import('./MainStreetCards').UpgradeCard | import('./MainStreetCards').EventCard)[] = [];
+  // Draw upgrades
+  for (let i = 0; i < MARKET_INVESTMENT_UPGRADE_COUNT && upgradeDeck.length > 0; i++) {
+    investments.push(upgradeDeck.pop()!);
+  }
+  // Draw investment event(s)
+  for (let i = 0; i < MARKET_INVESTMENT_EVENT_COUNT; i++) {
+    const idx = eventDeck.findIndex(e => e.trigger === 'Investment');
+    if (idx === -1) break;
+    investments.push(eventDeck.splice(idx, 1)[0]);
+  }
+
   const market: MarketState = {
     business: fillMarketSlots(businessDeck, MARKET_BUSINESS_SLOTS),
-    event: fillMarketSlots(eventDeck, MARKET_EVENT_SLOTS),
-    upgrade: fillMarketSlots(upgradeDeck, MARKET_UPGRADE_SLOTS),
+    investments,
   };
 
   // Pre-draw incident cards into the visible FIFO queue

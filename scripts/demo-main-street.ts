@@ -97,10 +97,11 @@ function chooseActions(state: MainStreetState): PlayerAction[] {
   }
 
   // Try to buy an affordable event (if not already holding one)
-  for (const eventCard of state.market.event) {
-    const result = canPurchaseEvent(state, eventCard.id);
+  for (const card of state.market.investments) {
+    if (card.family !== 'event') continue;
+    const result = canPurchaseEvent(state, card.id);
     if (result.legal) {
-      actions.push({ type: 'buy-event', cardId: eventCard.id });
+      actions.push({ type: 'buy-event', cardId: card.id });
       break;
     }
   }

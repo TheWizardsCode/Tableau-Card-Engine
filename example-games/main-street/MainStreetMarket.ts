@@ -15,8 +15,13 @@
 import type { LegalityResult } from '../../src/rule-engine';
 import type { MainStreetState } from './MainStreetState';
 import { addLog } from './MainStreetState';
-import type { BusinessCard, UpgradeCard, AnyCard } from './MainStreetCards';
-import { GRID_SIZE, INCIDENT_QUEUE_SIZE } from './MainStreetCards';
+import type { BusinessCard, UpgradeCard, EventCard, AnyCard } from './MainStreetCards';
+import {
+  GRID_SIZE,
+  INCIDENT_QUEUE_SIZE,
+  MARKET_INVESTMENT_UPGRADE_COUNT,
+  MARKET_INVESTMENT_EVENT_COUNT,
+} from './MainStreetCards';
 
 // ── Result Types ────────────────────────────────────────────
 
@@ -74,16 +79,20 @@ export function canPurchaseBusiness(
  * Checks whether the player can purchase an Upgrade card and apply it
  * to a matching business on the street.
  *
+ * Searches the mixed investments row for upgrade-family cards.
+ *
  * @param state   Current game state.
- * @param cardId  ID of the Upgrade card in the market.
+ * @param cardId  ID of the Upgrade card in the investments row.
  * @returns LegalityResult indicating whether the action is permitted.
  */
 export function canPurchaseUpgrade(
   state: MainStreetState,
   cardId: string,
 ): LegalityResult {
-  // Find card in market
-  const card = state.market.upgrade.find(c => c.id === cardId);
+  // Find card in investments row (must be an upgrade)
+  const card = state.market.investments.find(
+    c => c.id === cardId && c.family === 'upgrade',
+  ) as UpgradeCard | undefined;
   if (!card) {
     return { legal: false, reason: 'Card not found in the upgrade market.' };
   }
@@ -119,8 +128,10 @@ export function canPurchaseEvent(
   state: MainStreetState,
   cardId: string,
 ): LegalityResult {
-  // Find card in market
-  const card = state.market.event.find(c => c.id === cardId);
+  // Find card in investments row (must be an event)
+  const card = state.market.investments.find(
+    c => c.id === cardId && c.family === 'event',
+  ) as EventCard | undefined;
   if (!card) {
     return { legal: false, reason: 'Card not found in the event market.' };
   }
@@ -156,22 +167,30 @@ export function refillBusinessMarket(state: MainStreetState): void {
 }
 
 /**
- * Refills all empty slots in the event market from the event deck.
+ * Refills the mixed investments row to MARKET_INVESTMENT_SLOTS
+ * (MARKET_INVESTMENT_UPGRADE_COUNT upgrades + MARKET_INVESTMENT_EVENT_COUNT
+ * investment events). Upgrades are drawn from the upgrade deck; investment
+ * events are found by searching the event deck for Investment-trigger cards.
  */
-export function refillEventMarket(state: MainStreetState): void {
+export function refillInvestmentsMarket(state: MainStreetState): void {
   const { market, decks } = state;
-  while (market.event.length < 2 && decks.event.length > 0) {
-    market.event.push(decks.event.pop()!);
-  }
-}
 
-/**
- * Refills all empty slots in the upgrade market from the upgrade deck.
- */
-export function refillUpgradeMarket(state: MainStreetState): void {
-  const { market, decks } = state;
-  while (market.upgrade.length < 2 && decks.upgrade.length > 0) {
-    market.upgrade.push(decks.upgrade.pop()!);
+  // Count current upgrades and investment events in the row
+  let upgradeCount = market.investments.filter(c => c.family === 'upgrade').length;
+  let eventCount = market.investments.filter(c => c.family === 'event').length;
+
+  // Top up upgrades
+  while (upgradeCount < MARKET_INVESTMENT_UPGRADE_COUNT && decks.upgrade.length > 0) {
+    market.investments.push(decks.upgrade.pop()!);
+    upgradeCount++;
+  }
+
+  // Top up investment events (only Investment-trigger cards)
+  while (eventCount < MARKET_INVESTMENT_EVENT_COUNT) {
+    const idx = decks.event.findIndex(e => e.trigger === 'Investment');
+    if (idx === -1) break;
+    market.investments.push(decks.event.splice(idx, 1)[0]);
+    eventCount++;
   }
 }
 
@@ -180,8 +199,7 @@ export function refillUpgradeMarket(state: MainStreetState): void {
  */
 export function refillAllMarkets(state: MainStreetState): void {
   refillBusinessMarket(state);
-  refillEventMarket(state);
-  refillUpgradeMarket(state);
+  refillInvestmentsMarket(state);
 }
 
 /**
@@ -261,8 +279,10 @@ export function purchaseUpgrade(
     throw new Error(legality.reason);
   }
 
-  const marketIndex = state.market.upgrade.findIndex(c => c.id === cardId);
-  const card = state.market.upgrade[marketIndex];
+  const marketIndex = state.market.investments.findIndex(
+    c => c.id === cardId && c.family === 'upgrade',
+  );
+  const card = state.market.investments[marketIndex] as UpgradeCard;
 
   // Find the target business
   let businessIndex: number;
@@ -284,7 +304,7 @@ export function purchaseUpgrade(
   state.resourceBank.coins -= card.cost;
 
   // Remove from market
-  state.market.upgrade.splice(marketIndex, 1);
+  state.market.investments.splice(marketIndex, 1);
 
   // Apply upgrade to business
   business.level += 1;
@@ -293,7 +313,7 @@ export function purchaseUpgrade(
 
   // Refill market
   const refilled = state.decks.upgrade.length > 0;
-  refillUpgradeMarket(state);
+  refillInvestmentsMarket(state);
 
   addLog(state, `Upgraded ${business.name} with ${card.name} (-$${card.cost})`, 'loss');
 
@@ -318,18 +338,20 @@ export function purchaseEvent(
     throw new Error(legality.reason);
   }
 
-  const marketIndex = state.market.event.findIndex(c => c.id === cardId);
-  const card = state.market.event[marketIndex];
+  const marketIndex = state.market.investments.findIndex(
+    c => c.id === cardId && c.family === 'event',
+  );
+  const card = state.market.investments[marketIndex] as EventCard;
 
   // Remove from market
-  state.market.event.splice(marketIndex, 1);
+  state.market.investments.splice(marketIndex, 1);
 
   // Hold the Investment event (max 1)
   state.heldEvent = card;
 
   // Refill market
-  const refilled = state.decks.event.length > 0;
-  refillEventMarket(state);
+  const refilled = state.decks.event.some(e => e.trigger === 'Investment');
+  refillInvestmentsMarket(state);
 
   addLog(state, `Bought event: ${card.name} (held)`, 'neutral');
 
@@ -349,7 +371,7 @@ export function getAffordableBusinessCards(state: MainStreetState): BusinessCard
  * currently afford and has a valid target for.
  */
 export function getAffordableUpgradeCards(state: MainStreetState): UpgradeCard[] {
-  return state.market.upgrade.filter(card => {
+  return (state.market.investments.filter(c => c.family === 'upgrade') as UpgradeCard[]).filter(card => {
     if (card.cost > state.resourceBank.coins) return false;
     return state.streetGrid.some(
       b => b !== null && b.name === card.targetBusiness && b.level < b.maxLevel,

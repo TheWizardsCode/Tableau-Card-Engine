@@ -21,8 +21,7 @@ import {
   synergyColor,
   cardLabel,
   MARKET_BUSINESS_SLOTS,
-  MARKET_EVENT_SLOTS,
-  MARKET_UPGRADE_SLOTS,
+  MARKET_INVESTMENT_SLOTS,
 } from '../MainStreetCards';
 import {
   executeAction,
@@ -504,22 +503,19 @@ export class MainStreetScene extends CardGameScene {
       (card) => this.onBusinessCardClick(card as BusinessCard),
     );
 
-    // Event row
+    // Investments row (mixed upgrades + investment events)
     this.drawMarketRow(
       MARKET_TOP + 6 + MARKET_ROW_H + MARKET_ROW_GAP,
-      'Events',
-      this.state.market.event,
-      MARKET_EVENT_SLOTS,
-      (card) => this.onEventCardClick(card as EventCard),
-    );
-
-    // Upgrade row
-    this.drawMarketRow(
-      MARKET_TOP + 6 + 2 * (MARKET_ROW_H + MARKET_ROW_GAP),
-      'Upgrades',
-      this.state.market.upgrade,
-      MARKET_UPGRADE_SLOTS,
-      (card) => this.onUpgradeCardClick(card as UpgradeCard),
+      'Investments',
+      this.state.market.investments,
+      MARKET_INVESTMENT_SLOTS,
+      (card) => {
+        if (card.family === 'upgrade') {
+          this.onUpgradeCardClick(card as UpgradeCard);
+        } else {
+          this.onEventCardClick(card as EventCard);
+        }
+      },
     );
   }
 
