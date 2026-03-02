@@ -256,24 +256,24 @@ describe('MainStreetMarket', () => {
   // ── Event Purchase ─────────────────────────────────────────
 
   describe('canPurchaseEvent', () => {
-    it('should allow purchase of Day-trigger events', () => {
+    it('should allow purchase of Investment-trigger events', () => {
       const state = createTestState();
-      // Find a Day-trigger event in market
-      const dayEvent = state.market.event.find(e => e.trigger === 'Day');
-      if (dayEvent) {
-        const result = canPurchaseEvent(state, dayEvent.id);
+      // Find an Investment-trigger event in market
+      const investmentEvent = state.market.event.find(e => e.trigger === 'Investment');
+      if (investmentEvent) {
+        const result = canPurchaseEvent(state, investmentEvent.id);
         expect(result.legal).toBe(true);
       }
     });
 
-    it('should reject purchase of Night-trigger events', () => {
+    it('should reject purchase of Incident-trigger events', () => {
       const state = createTestState();
-      const nightEvent = state.market.event.find(e => e.trigger === 'Night');
-      if (nightEvent) {
-        const result = canPurchaseEvent(state, nightEvent.id);
+      const incidentEvent = state.market.event.find(e => e.trigger === 'Incident');
+      if (incidentEvent) {
+        const result = canPurchaseEvent(state, incidentEvent.id);
         expect(result.legal).toBe(false);
         if (!result.legal) {
-          expect(result.reason).toContain('Night events');
+          expect(result.reason).toContain('Incident events');
         }
       }
     });
@@ -283,28 +283,52 @@ describe('MainStreetMarket', () => {
       const result = canPurchaseEvent(state, 'nonexistent');
       expect(result.legal).toBe(false);
     });
+
+    it('should reject purchase when heldEvent is already occupied', () => {
+      const state = createTestState();
+      // Set a held event
+      state.heldEvent = {
+        family: 'event',
+        id: 'held-evt',
+        name: 'Held Event',
+        trigger: 'Investment',
+        effect: 'test',
+        target: 'All',
+        coinDelta: 0,
+        reputationDelta: 0,
+      };
+      // Find an Investment event in market
+      const investmentEvent = state.market.event.find(e => e.trigger === 'Investment');
+      if (investmentEvent) {
+        const result = canPurchaseEvent(state, investmentEvent.id);
+        expect(result.legal).toBe(false);
+        if (!result.legal) {
+          expect(result.reason).toContain('already holding');
+        }
+      }
+    });
   });
 
   describe('purchaseEvent', () => {
-    it('should add event to pending events and refill market', () => {
+    it('should hold event as heldEvent and refill market', () => {
       const state = createTestState();
-      // Ensure we have a Day event by manipulating the market
-      const dayTemplate = {
+      // Ensure we have an Investment event by manipulating the market
+      const investmentTemplate = {
         family: 'event' as const,
         id: 'evt-tax-test',
         name: 'Tax Audit',
-        trigger: 'Day' as const,
+        trigger: 'Investment' as const,
         effect: 'Lose 3 coins.',
         target: 'All' as const,
         coinDelta: -3,
         reputationDelta: 0,
       };
-      state.market.event = [dayTemplate];
+      state.market.event = [investmentTemplate];
 
       purchaseEvent(state, 'evt-tax-test');
 
-      expect(state.pendingEvents).toHaveLength(1);
-      expect(state.pendingEvents[0].id).toBe('evt-tax-test');
+      expect(state.heldEvent).not.toBeNull();
+      expect(state.heldEvent!.id).toBe('evt-tax-test');
     });
   });
 

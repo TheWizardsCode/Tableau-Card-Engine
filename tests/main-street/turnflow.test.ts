@@ -13,8 +13,9 @@ import {
   advancePhase,
   executeAction,
   resolveEvent,
-  resolveDayEvents,
-  resolveNightEvent,
+  resolveHeldInvestment,
+  resolveIncident,
+  playHeldEvent,
   checkImmediateLoss,
   checkEndConditions,
   executeDayStart,
@@ -51,12 +52,12 @@ function makeBiz(overrides: Partial<BusinessCard> = {}): BusinessCard {
   };
 }
 
-function makeDayEvent(overrides: Partial<EventCard> = {}): EventCard {
+function makeInvestmentEvent(overrides: Partial<EventCard> = {}): EventCard {
   return {
     family: 'event',
-    id: overrides.id ?? 'test-day-event',
-    name: overrides.name ?? 'Test Day Event',
-    trigger: 'Day',
+    id: overrides.id ?? 'test-investment-event',
+    name: overrides.name ?? 'Test Investment Event',
+    trigger: 'Investment',
     effect: overrides.effect ?? '+1 coin',
     target: overrides.target ?? 'All',
     targetSynergy: overrides.targetSynergy,
@@ -65,12 +66,12 @@ function makeDayEvent(overrides: Partial<EventCard> = {}): EventCard {
   };
 }
 
-function makeNightEvent(overrides: Partial<EventCard> = {}): EventCard {
+function makeIncidentEvent(overrides: Partial<EventCard> = {}): EventCard {
   return {
     family: 'event',
-    id: overrides.id ?? 'test-night-event',
-    name: overrides.name ?? 'Test Night Event',
-    trigger: 'Night',
+    id: overrides.id ?? 'test-incident-event',
+    name: overrides.name ?? 'Test Incident Event',
+    trigger: 'Incident',
     effect: overrides.effect ?? '-1 coin',
     target: overrides.target ?? 'All',
     targetSynergy: overrides.targetSynergy,
@@ -131,9 +132,9 @@ describe('MainStreetEngine', () => {
       const state = createTestState();
       const expectedPhases = [
         'MarketPhase',
-        'EventResolution',
+        'InvestmentResolution',
         'IncomePhase',
-        'NightEventPhase',
+        'IncidentPhase',
         'EndCheck',
         'DayStart', // wraps around
       ];
@@ -210,21 +211,42 @@ describe('MainStreetEngine', () => {
       expect(state.streetGrid[0]!.level).toBe(1);
     });
 
-    it('should execute buy-event action for Day events', () => {
+    it('should execute buy-event action for Investment events', () => {
       const state = createTestState();
       state.phase = 'MarketPhase';
 
-      // Put a day event in the market
-      const dayEvent = makeDayEvent({ id: 'day-evt-1' });
-      state.market.event = [dayEvent];
+      // Put an Investment event in the market
+      const investmentEvent = makeInvestmentEvent({ id: 'inv-evt-1' });
+      state.market.event = [investmentEvent];
 
       const result = executeAction(state, {
         type: 'buy-event',
-        cardId: 'day-evt-1',
+        cardId: 'inv-evt-1',
       });
 
       expect(result).not.toBeNull();
-      expect(state.pendingEvents).toHaveLength(1);
+      expect(state.heldEvent).not.toBeNull();
+      expect(state.heldEvent!.id).toBe('inv-evt-1');
+    });
+
+    it('should execute play-event action when an Investment is held', () => {
+      const state = createTestState();
+      state.phase = 'MarketPhase';
+      state.heldEvent = makeInvestmentEvent({ id: 'play-action-1', coinDelta: 4 });
+      const coinsBefore = state.resourceBank.coins;
+
+      const result = executeAction(state, { type: 'play-event' });
+
+      expect(result).toBeNull();
+      expect(state.heldEvent).toBeNull();
+      expect(state.resourceBank.coins).toBe(coinsBefore + 4);
+    });
+
+    it('should throw play-event action when no Investment is held', () => {
+      const state = createTestState();
+      state.phase = 'MarketPhase';
+
+      expect(() => executeAction(state, { type: 'play-event' })).toThrow('No Investment event');
     });
   });
 
@@ -233,7 +255,7 @@ describe('MainStreetEngine', () => {
   describe('resolveEvent', () => {
     it('should apply coinDelta for All-target events', () => {
       const state = createTestState();
-      const event = makeDayEvent({ target: 'All', coinDelta: -3 });
+      const event = makeInvestmentEvent({ target: 'All', coinDelta: -3 });
       const coinsBefore = state.resourceBank.coins;
 
       resolveEvent(state, event);
@@ -248,7 +270,7 @@ describe('MainStreetEngine', () => {
       state.streetGrid[5] = makeBiz({ id: 'culture-1', synergyTypes: ['Culture'] });
       const coinsBefore = state.resourceBank.coins;
 
-      const event = makeDayEvent({
+      const event = makeInvestmentEvent({
         target: 'SpecificSynergy',
         targetSynergy: 'Food',
         coinDelta: 2,
@@ -261,7 +283,7 @@ describe('MainStreetEngine', () => {
 
     it('should apply reputationDelta', () => {
       const state = createTestState();
-      const event = makeDayEvent({ target: 'All', coinDelta: 0, reputationDelta: 3 });
+      const event = makeInvestmentEvent({ target: 'All', coinDelta: 0, reputationDelta: 3 });
       const repBefore = state.resourceBank.reputation;
 
       resolveEvent(state, event);
@@ -274,59 +296,75 @@ describe('MainStreetEngine', () => {
       state.streetGrid[0] = makeBiz({ id: 'biz-1' });
       const coinsBefore = state.resourceBank.coins;
 
-      const event = makeDayEvent({ target: 'RandomBusiness', coinDelta: -2 });
+      const event = makeInvestmentEvent({ target: 'RandomBusiness', coinDelta: -2 });
       resolveEvent(state, event);
 
       expect(state.resourceBank.coins).toBe(coinsBefore - 2);
     });
   });
 
-  describe('resolveDayEvents', () => {
-    it('should resolve all pending events and clear the list', () => {
+  describe('resolveHeldInvestment', () => {
+    it('should resolve the held Investment event and clear it', () => {
       const state = createTestState();
-      state.pendingEvents = [
-        makeDayEvent({ id: 'e1', coinDelta: 5 }),
-        makeDayEvent({ id: 'e2', coinDelta: -2 }),
-      ];
+      state.heldEvent = makeInvestmentEvent({ id: 'e1', coinDelta: 5 });
       const coinsBefore = state.resourceBank.coins;
 
-      const resolved = resolveDayEvents(state);
+      const resolved = resolveHeldInvestment(state);
 
-      expect(resolved).toHaveLength(2);
-      expect(state.pendingEvents).toHaveLength(0);
-      expect(state.resourceBank.coins).toBe(coinsBefore + 5 - 2);
+      expect(resolved).not.toBeNull();
+      expect(resolved!.id).toBe('e1');
+      expect(state.heldEvent).toBeNull();
+      expect(state.resourceBank.coins).toBe(coinsBefore + 5);
     });
 
-    it('should return empty array when no pending events', () => {
+    it('should return null when no event is held', () => {
       const state = createTestState();
-      const resolved = resolveDayEvents(state);
-      expect(resolved).toHaveLength(0);
+      const resolved = resolveHeldInvestment(state);
+      expect(resolved).toBeNull();
     });
   });
 
-  describe('resolveNightEvent', () => {
-    it('should draw a Night event from the deck and resolve it', () => {
+  describe('playHeldEvent', () => {
+    it('should resolve the held event and clear it', () => {
       const state = createTestState();
-      // Ensure there's a night event in the deck
-      const nightEvt = makeNightEvent({ coinDelta: -2 });
-      state.decks.event = [nightEvt, ...state.decks.event];
+      state.heldEvent = makeInvestmentEvent({ id: 'play-1', coinDelta: 3 });
+      const coinsBefore = state.resourceBank.coins;
+
+      playHeldEvent(state);
+
+      expect(state.heldEvent).toBeNull();
+      expect(state.resourceBank.coins).toBe(coinsBefore + 3);
+    });
+
+    it('should throw when no event is held', () => {
+      const state = createTestState();
+      expect(() => playHeldEvent(state)).toThrow('No Investment event');
+    });
+  });
+
+  describe('resolveIncident', () => {
+    it('should draw an Incident event from the deck and resolve it', () => {
+      const state = createTestState();
+      // Ensure there's an Incident event in the deck
+      const incidentEvt = makeIncidentEvent({ coinDelta: -2 });
+      state.decks.event = [incidentEvt, ...state.decks.event];
       const coinsBefore = state.resourceBank.coins;
       const deckSizeBefore = state.decks.event.length;
 
-      const result = resolveNightEvent(state);
+      const result = resolveIncident(state);
 
       expect(result).not.toBeNull();
-      expect(result!.trigger).toBe('Night');
+      expect(result!.trigger).toBe('Incident');
       expect(state.resourceBank.coins).toBe(coinsBefore - 2);
       expect(state.decks.event.length).toBe(deckSizeBefore - 1);
     });
 
-    it('should return null when no Night events are in the deck', () => {
+    it('should return null when no Incident events are in the deck', () => {
       const state = createTestState();
-      // Remove all Night events from deck
-      state.decks.event = state.decks.event.filter(e => e.trigger !== 'Night');
+      // Remove all Incident events from deck
+      state.decks.event = state.decks.event.filter(e => e.trigger !== 'Incident');
 
-      const result = resolveNightEvent(state);
+      const result = resolveIncident(state);
 
       expect(result).toBeNull();
     });
@@ -569,8 +607,8 @@ describe('MainStreetEngine', () => {
     it('should detect loss from events causing bankruptcy', () => {
       const state = createTestState();
       state.resourceBank.coins = 1;
-      // Add a day event that costs 5 coins
-      state.pendingEvents = [makeDayEvent({ coinDelta: -5 })];
+      // Add a held Investment event that costs 5 coins
+      state.heldEvent = makeInvestmentEvent({ coinDelta: -5 });
       state.phase = 'MarketPhase';
 
       const result = processEndOfTurn(state);

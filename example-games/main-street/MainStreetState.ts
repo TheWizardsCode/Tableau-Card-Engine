@@ -64,28 +64,28 @@ export function addLog(
 /**
  * The phases of a Main Street turn (simplified for walking skeleton).
  *
- * DayStart       -> MarketPhase (combined with ActionPhase)
- * MarketPhase    -> EventResolution
- * EventResolution -> IncomePhase
- * IncomePhase    -> NightEventPhase
- * NightEventPhase -> EndCheck
- * EndCheck       -> DayStart (next turn) | GameOver
+ * DayStart              -> MarketPhase (combined with ActionPhase)
+ * MarketPhase           -> InvestmentResolution
+ * InvestmentResolution  -> IncomePhase
+ * IncomePhase           -> IncidentPhase
+ * IncidentPhase         -> EndCheck
+ * EndCheck              -> DayStart (next turn) | GameOver
  */
 export type DayPhase =
   | 'DayStart'
   | 'MarketPhase'
-  | 'EventResolution'
+  | 'InvestmentResolution'
   | 'IncomePhase'
-  | 'NightEventPhase'
+  | 'IncidentPhase'
   | 'EndCheck';
 
 /** All phases in order for the PhaseManager. */
 export const PHASE_ORDER: readonly DayPhase[] = [
   'DayStart',
   'MarketPhase',
-  'EventResolution',
+  'InvestmentResolution',
   'IncomePhase',
-  'NightEventPhase',
+  'IncidentPhase',
   'EndCheck',
 ] as const;
 
@@ -148,8 +148,8 @@ export interface MainStreetState {
   };
   /** IDs of completed challenges. */
   challengesCompleted: string[];
-  /** Events purchased this turn awaiting resolution. */
-  pendingEvents: EventCard[];
+  /** Held Investment event awaiting play (max 1 at a time, null = none). */
+  heldEvent: EventCard | null;
   /** Current game result. */
   gameResult: GameResult;
   /** Reason the game ended (null while playing). */
@@ -260,7 +260,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
       upgrade: upgradeDeck,
     },
     challengesCompleted: [],
-    pendingEvents: [],
+    heldEvent: null,
     gameResult: 'playing',
     endReason: null,
     finalScore: 0,

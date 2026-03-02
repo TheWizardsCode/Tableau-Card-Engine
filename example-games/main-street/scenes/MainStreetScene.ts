@@ -188,14 +188,15 @@ export class MainStreetScene extends CardGameScene {
           'Buy businesses from the market and place them on the street grid.\n' +
           'Adjacent businesses with matching synergy types earn bonus income.\n' +
           'Buy upgrades to improve existing businesses.\n' +
-          'Buy day events for one-time effects.\n' +
+          'Buy Investment events and play them for one-time effects.\n' +
           'Earn coins and reputation each turn to reach the score threshold.',
       },
       {
         heading: 'Events',
         body:
-          'Day events (brown) can be purchased and resolve during your turn.\n' +
-          'Night events (blue) trigger automatically at end of turn -- you cannot\n' +
+          'Investment events (brown) can be purchased and held (max 1 at a time).\n' +
+          'Play your held Investment during the market phase for a one-time effect.\n' +
+          'Incident events (blue) trigger automatically at end of turn -- you cannot\n' +
           'buy them, but you can see upcoming ones in the market.\n' +
           'Check the Activity Log to see what events fired and their effects.',
       },
@@ -310,10 +311,10 @@ export class MainStreetScene extends CardGameScene {
         if (result.income && result.income.total > 0) {
           this.instructionText.setText(
             `Income: +${result.income.total} coins` +
-            (result.nightEvent ? ` | Night: ${result.nightEvent.name}` : ''),
+            (result.incident ? ` | Incident: ${result.incident.name}` : ''),
           );
-        } else if (result.nightEvent) {
-          this.instructionText.setText(`Night: ${result.nightEvent.name}`);
+        } else if (result.incident) {
+          this.instructionText.setText(`Incident: ${result.incident.name}`);
         }
         this.refreshAll();
         this.time.delayedCall(800, () => this.startDayPhase());
@@ -573,30 +574,30 @@ export class MainStreetScene extends CardGameScene {
   ): Phaser.GameObjects.Container {
     const container = this.add.container(x + MARKET_CARD_W / 2, y + MARKET_CARD_H / 2);
 
-    // Determine if this is a non-purchasable Night event
-    const isNightEvent = card.family === 'event' && (card as EventCard).trigger === 'Night';
+    // Determine if this is a non-purchasable Incident event
+    const isIncidentEvent = card.family === 'event' && (card as EventCard).trigger === 'Incident';
 
     // Determine card color
     let fillColor = 0x333322;
     if (card.family === 'business') {
       fillColor = synergyColor((card as BusinessCard).synergyTypes[0]);
     } else if (card.family === 'event') {
-      fillColor = isNightEvent ? 0x2B3A67 : 0x8B4513;  // Indigo for Night, Brown for Day
+      fillColor = isIncidentEvent ? 0x2B3A67 : 0x8B4513;  // Indigo for Incident, Brown for Investment
     } else if (card.family === 'upgrade') {
       fillColor = 0x6B4C9A;  // Purple for upgrades
     }
 
     // Background
-    const fillAlpha = isNightEvent ? 0.5 : 0.7;
+    const fillAlpha = isIncidentEvent ? 0.5 : 0.7;
     const bg = this.add.rectangle(0, 0, MARKET_CARD_W, MARKET_CARD_H, fillColor, fillAlpha);
-    bg.setStrokeStyle(1, isNightEvent ? 0x556688 : 0x888877);
+    bg.setStrokeStyle(1, isIncidentEvent ? 0x556688 : 0x888877);
     container.add(bg);
 
     // Card label (name + cost for business/upgrade)
     const labelStr = cardLabel(card);
     const nameText = this.add.text(0, -MARKET_CARD_H / 2 + 10, labelStr, {
       fontSize: '12px', fontStyle: 'bold',
-      color: isNightEvent ? '#8899bb' : '#ffffff',
+      color: isIncidentEvent ? '#8899bb' : '#ffffff',
       fontFamily: FONT_FAMILY,
       wordWrap: { width: MARKET_CARD_W - 12 },
       align: 'center',
@@ -606,7 +607,7 @@ export class MainStreetScene extends CardGameScene {
     // Trigger label for event cards (top-right corner)
     if (card.family === 'event') {
       const evt = card as EventCard;
-      const triggerColor = isNightEvent ? '#6688bb' : '#cc9944';
+      const triggerColor = isIncidentEvent ? '#6688bb' : '#cc9944';
       const triggerLabel = this.add.text(
         MARKET_CARD_W / 2 - 4, -MARKET_CARD_H / 2 + 4,
         evt.trigger,
@@ -632,15 +633,15 @@ export class MainStreetScene extends CardGameScene {
     }
 
     const infoText = this.add.text(0, MARKET_CARD_H / 2 - 18, infoStr, {
-      fontSize: '11px', color: isNightEvent ? '#7788aa' : '#ddddcc',
+      fontSize: '11px', color: isIncidentEvent ? '#7788aa' : '#ddddcc',
       fontFamily: FONT_FAMILY,
       wordWrap: { width: MARKET_CARD_W - 12 },
       align: 'center',
     }).setOrigin(0.5, 1);
     container.add(infoText);
 
-    // Interactivity (only during market phase, and not for Night events)
-    if (this.uiPhase === 'market' && !isNightEvent) {
+    // Interactivity (only during market phase, and not for Incident events)
+    if (this.uiPhase === 'market' && !isIncidentEvent) {
       bg.setInteractive({ useHandCursor: true });
       bg.on('pointerdown', () => onClick(card));
       bg.on('pointerover', () => {

@@ -63,6 +63,7 @@ interface ParsedArgs {
   transcriptPath: string;
   outputDir: string;
   stopAt: number | undefined;
+  skipTo: number | undefined;
   gameType: string | undefined;
 }
 
@@ -94,6 +95,7 @@ Examples:
   let transcriptPath = '';
   let outputDir = '';
   let stopAt: number | undefined;
+  let skipTo: number | undefined;
   let gameType: string | undefined;
 
   for (let i = 0; i < args.length; i++) {
@@ -111,6 +113,18 @@ Examples:
         process.exit(1);
       }
       stopAt = parsed;
+    } else if (args[i] === '--skip-to') {
+      const rawValue = args[++i];
+      if (rawValue === undefined || rawValue === '') {
+        console.error('Error: --skip-to requires a non-negative integer value.');
+        process.exit(1);
+      }
+      const parsed = Number(rawValue);
+      if (!Number.isInteger(parsed) || parsed < 0) {
+        console.error(`Error: --skip-to requires a non-negative integer value. Got: ${rawValue}`);
+        process.exit(1);
+      }
+      skipTo = parsed;
     } else if (args[i] === '--game' || args[i] === '-g') {
       gameType = args[++i];
       if (!gameType) {
@@ -127,7 +141,7 @@ Examples:
     process.exit(1);
   }
 
-  return { transcriptPath, outputDir, stopAt, gameType };
+  return { transcriptPath, outputDir, stopAt, skipTo, gameType };
 }
 
 // ── Transcript Loading ──────────────────────────────────────
@@ -204,7 +218,7 @@ async function captureScreenshot(
 // ── Main ────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
-  const { transcriptPath, outputDir: explicitOutputDir, stopAt, gameType } = parseArgs();
+  const { transcriptPath, outputDir: explicitOutputDir, stopAt, skipTo, gameType } = parseArgs();
   const rawTranscript = loadRawTranscript(transcriptPath);
 
   // ── Resolve adapter ──
@@ -256,6 +270,13 @@ async function main(): Promise<void> {
     effectiveStopAt = undefined; // replay all turns
   }
 
+  // Validate --skip-to (fast-forward target)
+  let effectiveSkipTo: number | undefined = skipTo;
+  if (effectiveSkipTo !== undefined && effectiveSkipTo > turnCount) {
+    console.log(`Warning: --skip-to ${effectiveSkipTo} exceeds total turns (${turnCount}). No skipping will occur.`);
+    effectiveSkipTo = undefined;
+  }
+
   // Ensure output directory exists
   fs.mkdirSync(outputDir, { recursive: true });
 
@@ -276,6 +297,26 @@ async function main(): Promise<void> {
   const totalStart = Date.now();
 
   try {
+    // If --skip-to is provided, fast-forward logically without starting
+    // the visual/browser. We record replay-only summary entries for the
+    // skipped steps (no screenshot files). The visual browser will be
+    // started at `replayStartAt` and screenshots captured from there.
+    const replayStartAt = effectiveSkipTo !== undefined ? effectiveSkipTo : 0;
+    if (replayStartAt > 0) {
+      console.log(`Fast-forwarding ${replayStartAt} step(s) without visuals...`);
+      for (let j = 0; j < replayStartAt; j++) {
+        const turnNum = j; // 0 = initial state, 1.. = after each turn
+        const turnDesc = j === 0 ? 'initial state' : adapter.describeTurn(rawTranscript, j - 1);
+        summary.screenshots.push({
+          turn: turnNum,
+          screenshotPath: '',
+          durationMs: 0,
+          phase: 'replay',
+        });
+        console.log(`  skipped turn-${String(turnNum).padStart(3, '0')}.png [${turnDesc}]`);
+      }
+    }
+
     // Launch Chromium -- headed when --stop-at is specified
     const headless = effectiveStopAt === undefined;
     browser = await chromium.launch({ headless });
@@ -302,27 +343,58 @@ async function main(): Promise<void> {
     await adapter.waitForSceneReady(page, SCENE_READY_TIMEOUT);
     console.log(`${adapter.sceneKey} is active.`);
 
-    // ── Initial state screenshot ──
-    console.log('Loading initial state...');
-    const initStart = Date.now();
-    try {
-      await adapter.injectInitialState(page, rawTranscript, STATE_SETTLED_TIMEOUT);
+    // If we started visual capture at a non-zero turn, inject that turn's
+    // board state and capture its screenshot now. Otherwise capture the
+    // initial state as before.
+    if (replayStartAt > 0) {
+      console.log(`Injecting state for visual start at turn ${replayStartAt}...`);
+      const injectStart = Date.now();
+      try {
+        // State after `replayStartAt` turns corresponds to turnIndex = replayStartAt - 1
+        await adapter.injectTurnState(page, rawTranscript, replayStartAt - 1, STATE_SETTLED_TIMEOUT);
 
-      const ssPath = path.join(outputDir, 'turn-000.png');
-      await captureScreenshot(page, ssPath);
-      const initDuration = Date.now() - initStart;
+        const ssPath = path.join(outputDir, `turn-${String(replayStartAt).padStart(3, '0')}.png`);
+        await captureScreenshot(page, ssPath);
+        const dur = Date.now() - injectStart;
 
-      summary.screenshots.push({
-        turn: 0,
-        screenshotPath: path.resolve(ssPath),
-        durationMs: initDuration,
-        phase: 'replay',
-      });
-      console.log(`  turn-000.png (initial state) [${initDuration}ms]`);
-    } catch (err) {
-      const msg = `Initial state error: ${(err as Error).message}`;
-      summary.errors.push(msg);
-      console.error(`  ${msg}`);
+        // Replace the previously pushed empty summary entry for this turn
+        summary.screenshots.push({
+          turn: replayStartAt,
+          screenshotPath: path.resolve(ssPath),
+          durationMs: dur,
+          phase: 'replay',
+        });
+        summary.turnsReplayed++;
+        console.log(`  turn-${String(replayStartAt).padStart(3, '0')}.png [${dur}ms]`);
+      } catch (err) {
+        const msg = `Inject start state error: ${(err as Error).message}`;
+        summary.errors.push(msg);
+        console.error(`  ${msg}`);
+      }
+    } else {
+      // ── Initial state screenshot ──
+      console.log('Loading initial state...');
+      const initStart = Date.now();
+      try {
+        await adapter.injectInitialState(page, rawTranscript, STATE_SETTLED_TIMEOUT);
+
+        const ssPath = path.join(outputDir, 'turn-000.png');
+        await captureScreenshot(page, ssPath);
+        const initDuration = Date.now() - initStart;
+
+        summary.screenshots.push({
+          turn: 0,
+          screenshotPath: path.resolve(ssPath),
+          durationMs: initDuration,
+          phase: 'replay',
+        });
+        summary.turnsReplayed++;
+        console.log(`  turn-000.png (initial state) [${initDuration}ms]`);
+      } catch (err) {
+        const msg = `Initial state error: ${(err as Error).message}`;
+        summary.errors.push(msg);
+        console.error(`  ${msg}`);
+      }
     }
 
     // Determine how many turns to replay

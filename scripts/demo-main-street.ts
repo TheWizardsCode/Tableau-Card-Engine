@@ -44,7 +44,7 @@ interface TurnRecord {
   turn: number;
   actions: { type: string; detail: string }[];
   income: number | null;
-  nightEvent: string | null;
+  incident: string | null;
   coinsAfter: number;
   reputationAfter: number;
   score: number;
@@ -91,7 +91,12 @@ function chooseActions(state: MainStreetState): PlayerAction[] {
     break; // One business per turn is a safe strategy
   }
 
-  // Try to buy an affordable event (cheapest)
+  // Play held Investment event if we have one
+  if (state.heldEvent !== null) {
+    actions.push({ type: 'play-event' });
+  }
+
+  // Try to buy an affordable event (if not already holding one)
   for (const eventCard of state.market.event) {
     const result = canPurchaseEvent(state, eventCard.id);
     if (result.legal) {
@@ -169,7 +174,7 @@ while (state.gameResult === 'playing' && state.turn <= 20) {
     turn: turns.length + 1,
     actions: executedActions,
     income: turnResult.income ? turnResult.income.total : null,
-    nightEvent: turnResult.nightEvent ? turnResult.nightEvent.name : null,
+    incident: turnResult.incident ? turnResult.incident.name : null,
     coinsAfter: state.resourceBank.coins,
     reputationAfter: state.resourceBank.reputation,
     score: computeScore(state),

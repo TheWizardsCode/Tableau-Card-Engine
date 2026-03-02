@@ -200,17 +200,17 @@ describe('Integration: Full Game', () => {
     state.resourceBank.coins = 1;
     state.resourceBank.reputation = 5; // Avoid rep collapse
 
-    // Put a tax event into pending events to trigger bankruptcy
-    state.pendingEvents.push({
+    // Put a tax event into heldEvent to trigger bankruptcy during InvestmentResolution
+    state.heldEvent = {
       family: 'event',
       id: 'evt-tax-test',
       name: 'Heavy Tax',
-      trigger: 'Day',
+      trigger: 'Investment',
       effect: 'Lose 10 coins.',
       target: 'All',
       coinDelta: -10,
       reputationDelta: 0,
-    });
+    };
 
     executeDayStart(state);
     processEndOfTurn(state);
@@ -226,16 +226,16 @@ describe('Integration: Full Game', () => {
     state.turn = 2; // Must be past turn 1 for rep collapse check
 
     // Add an event that drops reputation to 0
-    state.pendingEvents.push({
+    state.heldEvent = {
       family: 'event',
       id: 'evt-scandal-test',
       name: 'Scandal',
-      trigger: 'Day',
+      trigger: 'Investment',
       effect: 'Lose 1 reputation.',
       target: 'All',
       coinDelta: 0,
       reputationDelta: -1,
-    });
+    };
 
     executeDayStart(state);
     processEndOfTurn(state);

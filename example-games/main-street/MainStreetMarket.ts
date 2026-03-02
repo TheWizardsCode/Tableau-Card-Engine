@@ -107,8 +107,9 @@ export function canPurchaseUpgrade(
 /**
  * Checks whether the player can purchase an Event card from the market.
  *
- * Day events are purchased from the market and scheduled for resolution.
- * Night events are drawn automatically (not purchased).
+ * Investment events are purchased from the market and held (max 1 at a time)
+ * until the player chooses to play them during the MarketPhase.
+ * Incident events are drawn automatically (not purchased).
  *
  * @param state   Current game state.
  * @param cardId  ID of the Event card in the market.
@@ -124,9 +125,14 @@ export function canPurchaseEvent(
     return { legal: false, reason: 'Card not found in the event market.' };
   }
 
-  // Only Day-trigger events can be purchased
-  if (card.trigger !== 'Day') {
-    return { legal: false, reason: 'Night events cannot be purchased; they are drawn automatically.' };
+  // Only Investment-trigger events can be purchased
+  if (card.trigger !== 'Investment') {
+    return { legal: false, reason: 'Incident events cannot be purchased; they are drawn automatically.' };
+  }
+
+  // Only one held Investment at a time
+  if (state.heldEvent !== null) {
+    return { legal: false, reason: 'Already holding an Investment event. Play or discard it before buying another.' };
   }
 
   // Events in the walking skeleton are free (cost = coinDelta applied on resolution),
@@ -282,8 +288,8 @@ export function purchaseUpgrade(
 }
 
 /**
- * Purchases a Day-trigger Event card from the market and adds it to
- * the pending events list for resolution.
+ * Purchases an Investment-trigger Event card from the market and holds it
+ * for the player to play later during the MarketPhase.
  *
  * @param state   Current game state (mutated in-place).
  * @param cardId  ID of the Event card in the market.
@@ -305,14 +311,14 @@ export function purchaseEvent(
   // Remove from market
   state.market.event.splice(marketIndex, 1);
 
-  // Add to pending events for resolution
-  state.pendingEvents.push(card);
+  // Hold the Investment event (max 1)
+  state.heldEvent = card;
 
   // Refill market
   const refilled = state.decks.event.length > 0;
   refillEventMarket(state);
 
-  addLog(state, `Bought event: ${card.name}`, 'neutral');
+  addLog(state, `Bought event: ${card.name} (held)`, 'neutral');
 
   return { card, cost: 0, refilled };
 }

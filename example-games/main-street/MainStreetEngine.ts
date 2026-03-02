@@ -5,7 +5,7 @@
  * event resolution, win/loss detection, and score calculation.
  *
  * The walking skeleton uses a simplified 6-phase turn structure:
- *   DayStart -> MarketPhase -> EventResolution -> IncomePhase -> NightEventPhase -> EndCheck
+ *   DayStart -> MarketPhase -> InvestmentResolution -> IncomePhase -> IncidentPhase -> EndCheck
  *
  * All functions mutate state in-place (following engine conventions).
  *
@@ -46,10 +46,15 @@ export interface BuyUpgradeAction {
   targetSlot?: number;
 }
 
-/** Buy a day-trigger event card. */
+/** Buy an Investment-trigger event card (held until played). */
 export interface BuyEventAction {
   type: 'buy-event';
   cardId: string;
+}
+
+/** Play the currently held Investment event. */
+export interface PlayEventAction {
+  type: 'play-event';
 }
 
 /** End the current market/action phase. */
@@ -62,6 +67,7 @@ export type PlayerAction =
   | BuyBusinessAction
   | BuyUpgradeAction
   | BuyEventAction
+  | PlayEventAction
   | EndTurnAction;
 
 // ── Turn Result ─────────────────────────────────────────────
@@ -70,8 +76,8 @@ export type PlayerAction =
 export interface TurnResult {
   /** Income earned during the income phase. */
   income: IncomeResult | null;
-  /** Night event drawn and resolved (if any). */
-  nightEvent: EventCard | null;
+  /** Incident event drawn and resolved (if any). */
+  incident: EventCard | null;
   /** Current game result after the turn. */
   gameResult: 'playing' | 'win' | 'loss';
   /** Current final score. */
@@ -128,7 +134,7 @@ export function setPhase(state: MainStreetState, phase: DayPhase): void {
  *
  * @param state   Current game state (mutated in-place).
  * @param action  The player action to execute.
- * @returns PurchaseResult for buy actions, or null for end-turn.
+ * @returns PurchaseResult for buy actions, or null for end-turn / play-event.
  * @throws Error if the action is illegal or out of phase.
  */
 export function executeAction(
@@ -157,6 +163,9 @@ export function executeAction(
       return purchaseUpgrade(state, action.cardId, action.targetSlot);
     case 'buy-event':
       return purchaseEvent(state, action.cardId);
+    case 'play-event':
+      playHeldEvent(state);
+      return null;
     default:
       throw new Error(`Unknown action type: ${(action as PlayerAction).type}`);
   }
@@ -226,39 +235,17 @@ export function resolveEvent(state: MainStreetState, event: EventCard): void {
 }
 
 /**
- * Resolves all pending day events (purchased during MarketPhase).
- * Clears the pendingEvents array afterward.
+ * Plays and resolves the currently held Investment event.
+ * Can only be called during the MarketPhase.
+ *
+ * @throws Error if no Investment event is held.
  */
-export function resolveDayEvents(state: MainStreetState): EventCard[] {
-  const resolved = [...state.pendingEvents];
-  for (const event of resolved) {
-    const coinsBefore = state.resourceBank.coins;
-    const repBefore = state.resourceBank.reputation;
-    resolveEvent(state, event);
-    const coinChange = state.resourceBank.coins - coinsBefore;
-    const repChange = state.resourceBank.reputation - repBefore;
-    addLog(
-      state,
-      `Day: ${event.name} (${describeEventEffects(coinChange, repChange)})`,
-      classifyEffect(coinChange, repChange),
-    );
+export function playHeldEvent(state: MainStreetState): void {
+  if (state.heldEvent === null) {
+    throw new Error('No Investment event is currently held.');
   }
-  state.pendingEvents = [];
-  return resolved;
-}
 
-/**
- * Draws and resolves one night event from the event deck.
- * Night events are drawn automatically (not purchased).
- * Returns the drawn event or null if the deck is empty.
- */
-export function resolveNightEvent(state: MainStreetState): EventCard | null {
-  // Find a Night-trigger event in the deck
-  const nightIdx = state.decks.event.findIndex(e => e.trigger === 'Night');
-  if (nightIdx === -1) return null;
-
-  // Remove from deck
-  const [event] = state.decks.event.splice(nightIdx, 1);
+  const event = state.heldEvent;
   const coinsBefore = state.resourceBank.coins;
   const repBefore = state.resourceBank.reputation;
   resolveEvent(state, event);
@@ -266,7 +253,57 @@ export function resolveNightEvent(state: MainStreetState): EventCard | null {
   const repChange = state.resourceBank.reputation - repBefore;
   addLog(
     state,
-    `Night: ${event.name} (${describeEventEffects(coinChange, repChange)})`,
+    `Investment: ${event.name} (${describeEventEffects(coinChange, repChange)})`,
+    classifyEffect(coinChange, repChange),
+  );
+  state.heldEvent = null;
+}
+
+/**
+ * Resolves any remaining held Investment event at the InvestmentResolution phase.
+ * If the player did not play their held event during MarketPhase, it is
+ * auto-resolved here and cleared.
+ *
+ * @returns The resolved event, or null if no event was held.
+ */
+export function resolveHeldInvestment(state: MainStreetState): EventCard | null {
+  if (state.heldEvent === null) return null;
+
+  const event = state.heldEvent;
+  const coinsBefore = state.resourceBank.coins;
+  const repBefore = state.resourceBank.reputation;
+  resolveEvent(state, event);
+  const coinChange = state.resourceBank.coins - coinsBefore;
+  const repChange = state.resourceBank.reputation - repBefore;
+  addLog(
+    state,
+    `Investment (auto): ${event.name} (${describeEventEffects(coinChange, repChange)})`,
+    classifyEffect(coinChange, repChange),
+  );
+  state.heldEvent = null;
+  return event;
+}
+
+/**
+ * Draws and resolves one Incident event from the event deck.
+ * Incident events are drawn automatically (not purchased).
+ * Returns the drawn event or null if the deck is empty.
+ */
+export function resolveIncident(state: MainStreetState): EventCard | null {
+  // Find an Incident-trigger event in the deck
+  const incidentIdx = state.decks.event.findIndex(e => e.trigger === 'Incident');
+  if (incidentIdx === -1) return null;
+
+  // Remove from deck
+  const [event] = state.decks.event.splice(incidentIdx, 1);
+  const coinsBefore = state.resourceBank.coins;
+  const repBefore = state.resourceBank.reputation;
+  resolveEvent(state, event);
+  const coinChange = state.resourceBank.coins - coinsBefore;
+  const repChange = state.resourceBank.reputation - repBefore;
+  addLog(
+    state,
+    `Incident: ${event.name} (${describeEventEffects(coinChange, repChange)})`,
     classifyEffect(coinChange, repChange),
   );
   return event;
@@ -383,24 +420,24 @@ export function executeDayStart(state: MainStreetState): void {
 /**
  * Processes the end of the MarketPhase (after player clicks End Turn).
  * Runs through all remaining phases automatically:
- *   EventResolution -> IncomePhase -> NightEventPhase -> EndCheck
+ *   InvestmentResolution -> IncomePhase -> IncidentPhase -> EndCheck
  *
- * @returns TurnResult with income, night event, and game result.
+ * @returns TurnResult with income, incident, and game result.
  */
 export function processEndOfTurn(state: MainStreetState): TurnResult {
   if (state.phase !== 'MarketPhase') {
     throw new Error(`Cannot end turn during ${state.phase}. Must be in MarketPhase.`);
   }
 
-  // Phase: EventResolution
-  state.phase = 'EventResolution';
-  resolveDayEvents(state);
+  // Phase: InvestmentResolution (auto-resolve any held Investment)
+  state.phase = 'InvestmentResolution';
+  resolveHeldInvestment(state);
 
   // Check for immediate loss after events
   if (checkImmediateLoss(state)) {
     return {
       income: null,
-      nightEvent: null,
+      incident: null,
       gameResult: state.gameResult,
       finalScore: state.finalScore,
     };
@@ -410,15 +447,15 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
   state.phase = 'IncomePhase';
   const income = applyIncome(state);
 
-  // Phase: NightEventPhase
-  state.phase = 'NightEventPhase';
-  const nightEvent = resolveNightEvent(state);
+  // Phase: IncidentPhase
+  state.phase = 'IncidentPhase';
+  const incident = resolveIncident(state);
 
-  // Check for immediate loss after night event
+  // Check for immediate loss after incident
   if (checkImmediateLoss(state)) {
     return {
       income,
-      nightEvent,
+      incident,
       gameResult: state.gameResult,
       finalScore: state.finalScore,
     };
@@ -436,7 +473,7 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
 
   return {
     income,
-    nightEvent,
+    incident,
     gameResult: state.gameResult,
     finalScore: state.finalScore,
   };

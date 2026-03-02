@@ -15,8 +15,8 @@ import {
   executeDayStart,
   processEndOfTurn,
   executeFullTurn,
-  resolveDayEvents,
-  resolveNightEvent,
+  resolveHeldInvestment,
+  resolveIncident,
   checkImmediateLoss,
   checkEndConditions,
 } from '../../example-games/main-street/MainStreetEngine';
@@ -56,12 +56,12 @@ function makeBiz(overrides: Partial<BusinessCard> = {}): BusinessCard {
   };
 }
 
-function makeDayEvent(overrides: Partial<EventCard> = {}): EventCard {
+function makeInvestmentEvent(overrides: Partial<EventCard> = {}): EventCard {
   return {
     family: 'event',
-    id: overrides.id ?? 'test-day-event',
-    name: overrides.name ?? 'Test Day Event',
-    trigger: 'Day',
+    id: overrides.id ?? 'test-investment-event',
+    name: overrides.name ?? 'Test Investment Event',
+    trigger: 'Investment',
     effect: overrides.effect ?? '+1 coin',
     coinDelta: overrides.coinDelta ?? 1,
     reputationDelta: overrides.reputationDelta ?? 0,
@@ -70,12 +70,12 @@ function makeDayEvent(overrides: Partial<EventCard> = {}): EventCard {
   };
 }
 
-function makeNightEvent(overrides: Partial<EventCard> = {}): EventCard {
+function makeIncidentEvent(overrides: Partial<EventCard> = {}): EventCard {
   return {
     family: 'event',
-    id: overrides.id ?? 'test-night-event',
-    name: overrides.name ?? 'Test Night Event',
-    trigger: 'Night',
+    id: overrides.id ?? 'test-incident-event',
+    name: overrides.name ?? 'Test Incident Event',
+    trigger: 'Incident',
     effect: overrides.effect ?? '-1 coin',
     coinDelta: overrides.coinDelta ?? -1,
     reputationDelta: overrides.reputationDelta ?? 0,
@@ -152,14 +152,14 @@ describe('Activity Log', () => {
   });
 
   describe('event purchase', () => {
-    it('should log a neutral entry when a day event is purchased', () => {
+    it('should log a neutral entry when an Investment event is purchased', () => {
       const state = createTestState();
       executeDayStart(state);
 
-      // Inject a Day event into the market
-      const dayEvent = makeDayEvent({ id: 'day-evt-1', name: 'Test Fest' });
-      state.market.event = [dayEvent];
-      purchaseEvent(state, 'day-evt-1');
+      // Inject an Investment event into the market
+      const investmentEvent = makeInvestmentEvent({ id: 'inv-evt-1', name: 'Test Fest' });
+      state.market.event = [investmentEvent];
+      purchaseEvent(state, 'inv-evt-1');
 
       const entry = lastLog(state);
       expect(entry.type).toBe('neutral');
@@ -202,48 +202,50 @@ describe('Activity Log', () => {
     });
   });
 
-  describe('day event resolution', () => {
-    it('should log entries for each resolved day event', () => {
+  describe('Investment event resolution', () => {
+    it('should log entry when held Investment event is auto-resolved', () => {
       const state = createTestState();
       executeDayStart(state);
 
-      // Add pending events
-      state.pendingEvents = [
-        makeDayEvent({ id: 'de-1', name: 'Tax Audit', coinDelta: -3, reputationDelta: 0 }),
-        makeDayEvent({ id: 'de-2', name: 'Festival', coinDelta: 2, reputationDelta: 1 }),
-      ];
+      // Set held event
+      state.heldEvent = makeInvestmentEvent({ id: 'de-1', name: 'Tax Audit', coinDelta: -3, reputationDelta: 0 });
 
       const logBefore = state.activityLog.length;
-      state.phase = 'EventResolution';
-      resolveDayEvents(state);
+      state.phase = 'InvestmentResolution';
+      resolveHeldInvestment(state);
 
       const newEntries = state.activityLog.slice(logBefore);
-      expect(newEntries).toHaveLength(2);
+      expect(newEntries).toHaveLength(1);
 
       // Tax Audit: -3 coins = loss
       expect(newEntries[0].text).toContain('Tax Audit');
-      expect(newEntries[0].text).toContain('Day:');
+      expect(newEntries[0].text).toContain('Investment (auto):');
       expect(newEntries[0].type).toBe('loss');
-
-      // Festival: +2 coins, +1 rep = gain
-      expect(newEntries[1].text).toContain('Festival');
-      expect(newEntries[1].type).toBe('gain');
     });
 
     it('should log neutral for zero-effect events', () => {
       const state = createTestState();
       executeDayStart(state);
 
-      state.pendingEvents = [
-        makeDayEvent({ id: 'de-n', name: 'Nothing Happens', coinDelta: 0, reputationDelta: 0 }),
-      ];
+      state.heldEvent = makeInvestmentEvent({ id: 'de-n', name: 'Nothing Happens', coinDelta: 0, reputationDelta: 0 });
 
-      state.phase = 'EventResolution';
-      resolveDayEvents(state);
+      state.phase = 'InvestmentResolution';
+      resolveHeldInvestment(state);
 
       const entry = lastLog(state);
       expect(entry.type).toBe('neutral');
       expect(entry.text).toContain('Nothing Happens');
+    });
+
+    it('should not log when no event is held', () => {
+      const state = createTestState();
+      executeDayStart(state);
+
+      state.phase = 'InvestmentResolution';
+      const logBefore = state.activityLog.length;
+      resolveHeldInvestment(state);
+
+      expect(state.activityLog.length).toBe(logBefore);
     });
   });
 
@@ -280,36 +282,36 @@ describe('Activity Log', () => {
     });
   });
 
-  describe('night event resolution', () => {
-    it('should log an entry when a night event is resolved', () => {
+  describe('Incident event resolution', () => {
+    it('should log an entry when an Incident event is resolved', () => {
       const state = createTestState();
       executeDayStart(state);
 
-      // Inject a night event into the deck
+      // Inject an Incident event into the deck
       state.decks.event = [
-        makeNightEvent({ id: 'ne-1', name: 'Rainy Night', coinDelta: -1, reputationDelta: 0 }),
+        makeIncidentEvent({ id: 'ne-1', name: 'Rainy Night', coinDelta: -1, reputationDelta: 0 }),
       ];
 
-      state.phase = 'NightEventPhase';
+      state.phase = 'IncidentPhase';
       const logBefore = state.activityLog.length;
-      resolveNightEvent(state);
+      resolveIncident(state);
 
       const entry = state.activityLog[logBefore];
-      expect(entry.text).toContain('Night:');
+      expect(entry.text).toContain('Incident:');
       expect(entry.text).toContain('Rainy Night');
       expect(entry.type).toBe('loss');
     });
 
-    it('should not log when no night events are available', () => {
+    it('should not log when no Incident events are available', () => {
       const state = createTestState();
       executeDayStart(state);
 
-      // Remove all night events
-      state.decks.event = state.decks.event.filter(e => e.trigger !== 'Night');
+      // Remove all Incident events
+      state.decks.event = state.decks.event.filter(e => e.trigger !== 'Incident');
 
-      state.phase = 'NightEventPhase';
+      state.phase = 'IncidentPhase';
       const logBefore = state.activityLog.length;
-      resolveNightEvent(state);
+      resolveIncident(state);
 
       expect(state.activityLog.length).toBe(logBefore);
     });

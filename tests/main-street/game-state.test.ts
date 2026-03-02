@@ -157,9 +157,9 @@ describe('MainStreetState', () => {
       expect(state.challengesCompleted).toHaveLength(0);
     });
 
-    it('should have no pending events initially', () => {
+    it('should have no held event initially', () => {
       const state = createTestState();
-      expect(state.pendingEvents).toHaveLength(0);
+      expect(state.heldEvent).toBeNull();
     });
 
     it('should be in playing state', () => {
@@ -300,7 +300,7 @@ describe('MainStreetState', () => {
 
     it('should have event cards with valid triggers', () => {
       const deck = createEventDeck(1);
-      const validTriggers = new Set(['Day', 'Night']);
+      const validTriggers = new Set(['Investment', 'Incident']);
       for (const card of deck) {
         expect(validTriggers.has(card.trigger)).toBe(true);
       }

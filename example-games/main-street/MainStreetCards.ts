@@ -13,7 +13,7 @@
 export type SynergyType = 'Food' | 'Culture' | 'Commerce';
 
 /** When an Event card resolves. */
-export type EventTrigger = 'Day' | 'Night';
+export type EventTrigger = 'Investment' | 'Incident';
 
 /** Scope of an Event card's effect. */
 export type EventTarget = 'All' | 'SpecificSynergy' | 'RandomBusiness';
@@ -47,7 +47,7 @@ export interface BusinessCard {
 
 /**
  * An Event card that triggers a one-off effect.
- * Day events are purchased; Night events are drawn automatically.
+ * Investment events are purchased and held until played; Incident events are drawn automatically.
  */
 export interface EventCard {
   readonly family: 'event';
@@ -189,7 +189,7 @@ const EVENT_TEMPLATES: EventCard[] = [
     family: 'event',
     id: 'evt-festival',
     name: 'Local Festival',
-    trigger: 'Night',
+    trigger: 'Incident',
     effect: '+2 coins to all Culture businesses and +1 reputation.',
     target: 'SpecificSynergy',
     targetSynergy: 'Culture',
@@ -200,7 +200,7 @@ const EVENT_TEMPLATES: EventCard[] = [
     family: 'event',
     id: 'evt-rainy',
     name: 'Rainy Night',
-    trigger: 'Night',
+    trigger: 'Incident',
     effect: '-1 coin to all Food businesses this turn.',
     target: 'SpecificSynergy',
     targetSynergy: 'Food',
@@ -211,7 +211,7 @@ const EVENT_TEMPLATES: EventCard[] = [
     family: 'event',
     id: 'evt-tax',
     name: 'Tax Audit',
-    trigger: 'Day',
+    trigger: 'Investment',
     effect: 'Lose 3 coins.',
     target: 'All',
     coinDelta: -3,
@@ -221,7 +221,7 @@ const EVENT_TEMPLATES: EventCard[] = [
     family: 'event',
     id: 'evt-award',
     name: 'Community Award',
-    trigger: 'Night',
+    trigger: 'Incident',
     effect: 'Gain 2 reputation from community recognition.',
     target: 'All',
     coinDelta: 0,
@@ -231,7 +231,7 @@ const EVENT_TEMPLATES: EventCard[] = [
     family: 'event',
     id: 'evt-inspection',
     name: 'Health Inspection',
-    trigger: 'Night',
+    trigger: 'Incident',
     effect: '-2 coins per Food business and -1 reputation.',
     target: 'SpecificSynergy',
     targetSynergy: 'Food',
