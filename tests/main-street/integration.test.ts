@@ -28,8 +28,13 @@ import {
 } from '../../example-games/main-street/MainStreetMarket';
 import {
   INCIDENT_QUEUE_SIZE,
+  CHALLENGE_BONUS_POINTS,
   type EventCard,
 } from '../../example-games/main-street/MainStreetCards';
+import {
+  DEFAULT_CHALLENGES_PER_RUN,
+  CHALLENGE_TEMPLATES,
+} from '../../example-games/main-street/MainStreetChallenges';
 
 // ── Helpers ─────────────────────────────────────────────────
 
@@ -585,5 +590,158 @@ describe('Integration: Held Investment Event', () => {
 
     const result2 = processEndOfTurn(state);
     expect(result2).toBeDefined();
+  });
+});
+
+// ── Challenge System Integration ────────────────────────────
+
+describe('Integration: Challenge System', () => {
+  it('challenges are selected at game setup and persist through a full game', () => {
+    const state = setupMainStreetGame({ seed: 'challenge-persist-1' });
+
+    // Challenges populated at setup
+    expect(state.activeChallenges).toHaveLength(DEFAULT_CHALLENGES_PER_RUN);
+    const initialIds = state.activeChallenges.map(ac => ac.challenge.id);
+
+    // Run a full game
+    const { totalTurns } = playFullGame(state);
+    expect(totalTurns).toBeGreaterThanOrEqual(1);
+    expect(state.gameResult).not.toBe('playing');
+
+    // All original challenges are still present (never removed)
+    const finalIds = state.activeChallenges.map(ac => ac.challenge.id);
+    expect(finalIds).toEqual(initialIds);
+  });
+
+  it('challenge determinism: same seed produces same completions in a full game', () => {
+    const seed = 'challenge-determinism-99';
+
+    const state1 = setupMainStreetGame({ seed });
+    playFullGame(state1);
+
+    const state2 = setupMainStreetGame({ seed });
+    playFullGame(state2);
+
+    // Same challenge IDs
+    expect(state1.activeChallenges.map(ac => ac.challenge.id))
+      .toEqual(state2.activeChallenges.map(ac => ac.challenge.id));
+
+    // Same completion status
+    expect(state1.activeChallenges.map(ac => ac.completed))
+      .toEqual(state2.activeChallenges.map(ac => ac.completed));
+
+    // Same challengesCompleted list
+    expect(state1.challengesCompleted).toEqual(state2.challengesCompleted);
+  });
+
+  it('computeScore includes CHALLENGE_BONUS_POINTS per completed challenge', () => {
+    const state = setupMainStreetGame({ seed: 'challenge-score-bonus' });
+    state.resourceBank.coins = 100;
+    state.resourceBank.reputation = 10;
+
+    // Manually complete one challenge
+    const ac = state.activeChallenges[0];
+    ac.completed = true;
+    state.challengesCompleted.push(ac.challenge.id);
+
+    const score = computeScore(state);
+    const expectedBase = state.resourceBank.coins + (state.resourceBank.reputation * 5);
+    const expectedChallengeBonus = state.challengesCompleted.length * CHALLENGE_BONUS_POINTS;
+    expect(score).toBe(expectedBase + expectedChallengeBonus);
+  });
+
+  it('challenges can complete during a multi-turn game via EndCheck evaluation', () => {
+    const state = setupMainStreetGame({ seed: 'challenge-multi-turn-eval' });
+    state.resourceBank.coins = 100;
+    state.resourceBank.reputation = 10;
+
+    // Run up to 10 turns and track challenge completions per turn
+    const completionTimeline: number[] = [];
+    for (let i = 0; i < 10 && state.gameResult === 'playing'; i++) {
+      playGreedyTurn(state);
+      completionTimeline.push(state.challengesCompleted.length);
+    }
+
+    // Completion count should be monotonically non-decreasing (no revocation)
+    for (let i = 1; i < completionTimeline.length; i++) {
+      expect(completionTimeline[i]).toBeGreaterThanOrEqual(completionTimeline[i - 1]);
+    }
+  });
+
+  it('all-challenges win triggers before turn limit in a rigged scenario', () => {
+    const state = setupMainStreetGame({ seed: 'challenge-all-win' });
+    state.resourceBank.coins = 200;
+    state.resourceBank.reputation = 30;
+
+    // Pre-complete all but one challenge
+    for (let i = 0; i < state.activeChallenges.length - 1; i++) {
+      state.activeChallenges[i].completed = true;
+      state.challengesCompleted.push(state.activeChallenges[i].challenge.id);
+    }
+
+    // Force the last challenge to be Deep Pockets (coins >= 25)
+    const lastAc = state.activeChallenges[state.activeChallenges.length - 1];
+    const deepPockets = CHALLENGE_TEMPLATES.find(t => t.id === 'ch-deep-pockets')!;
+    // Replace with Deep Pockets if different
+    if (lastAc.challenge.id !== 'ch-deep-pockets') {
+      state.activeChallenges[state.activeChallenges.length - 1] = {
+        challenge: deepPockets,
+        completed: false,
+      };
+    }
+
+    // With 200 coins, Deep Pockets (>= 25 coins) should complete on next EndCheck
+    executeDayStart(state);
+    const result = processEndOfTurn(state);
+
+    expect(state.gameResult).toBe('win');
+    expect(state.endReason).toBe('all_challenges');
+    expect(result.gameResult).toBe('win');
+  });
+
+  it('challenge completions survive across turns (no revocation)', () => {
+    const state = setupMainStreetGame({ seed: 'challenge-no-revoke' });
+    state.resourceBank.coins = 200;
+    state.resourceBank.reputation = 20;
+
+    // Find and rig a Deep Pockets challenge
+    const deepPockets = CHALLENGE_TEMPLATES.find(t => t.id === 'ch-deep-pockets')!;
+    state.activeChallenges = [{ challenge: deepPockets, completed: false }];
+
+    // Turn 1: coins >= 25, should complete
+    executeDayStart(state);
+    processEndOfTurn(state);
+
+    if (state.gameResult !== 'playing') return;
+
+    expect(state.activeChallenges[0].completed).toBe(true);
+    expect(state.challengesCompleted).toContain('ch-deep-pockets');
+
+    // Drain coins below threshold
+    state.resourceBank.coins = 5;
+
+    // Turn 2: challenge should remain completed despite coins < 25
+    executeDayStart(state);
+    processEndOfTurn(state);
+
+    expect(state.activeChallenges[0].completed).toBe(true);
+    expect(state.challengesCompleted.filter(id => id === 'ch-deep-pockets')).toHaveLength(1);
+  });
+
+  it('zero active challenges does not trigger all-challenges win', () => {
+    const state = setupMainStreetGame({ seed: 'challenge-zero-no-win' });
+    state.resourceBank.coins = 200;
+    state.resourceBank.reputation = 20;
+    state.activeChallenges = [];
+
+    executeDayStart(state);
+    const result = processEndOfTurn(state);
+
+    // Game should not end with all_challenges when there are 0 challenges
+    if (state.endReason === 'all_challenges') {
+      throw new Error('all_challenges win should not trigger with 0 active challenges');
+    }
+    // Game either continues or ends for another reason
+    expect(result).toBeDefined();
   });
 });
