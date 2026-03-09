@@ -27,9 +27,13 @@ import {
   MAX_TURNS,
   STARTING_COINS,
   WIN_THRESHOLD,
+  CHALLENGE_BONUS_POINTS,
   type BusinessCard,
   type EventCard,
 } from '../../example-games/main-street/MainStreetCards';
+import {
+  CHALLENGE_TEMPLATES,
+} from '../../example-games/main-street/MainStreetChallenges';
 
 // ── Helpers ─────────────────────────────────────────────────
 
@@ -776,6 +780,131 @@ describe('MainStreetEngine', () => {
       expect(s1.streetGrid.map(b => b?.id ?? null)).toEqual(
         s2.streetGrid.map(b => b?.id ?? null),
       );
+    });
+  });
+
+  // ── Challenge Evaluation During EndCheck ───────────────────
+
+  describe('challenge evaluation during EndCheck', () => {
+    it('should evaluate challenges during processEndOfTurn', () => {
+      const state = createTestState('challenge-endcheck');
+      // Give the state an active challenge that will pass: ch-deep-pockets requires coins >= 25
+      // Set coins high enough to survive income/incident phases
+      state.activeChallenges = [
+        {
+          challenge: CHALLENGE_TEMPLATES.find(c => c.id === 'ch-deep-pockets')!,
+          completed: false,
+        },
+      ];
+      state.resourceBank.coins = 100;
+
+      // Run a turn
+      executeDayStart(state);
+      processEndOfTurn(state);
+
+      // Challenge should have been evaluated and completed (coins should still be >= 25 after a turn)
+      expect(state.activeChallenges[0].completed).toBe(true);
+      expect(state.challengesCompleted).toContain('ch-deep-pockets');
+    });
+
+    it('should not complete a challenge when its condition is not met', () => {
+      const state = createTestState('challenge-fail');
+      state.activeChallenges = [
+        {
+          challenge: CHALLENGE_TEMPLATES.find(c => c.id === 'ch-deep-pockets')!,
+          completed: false,
+        },
+      ];
+      state.resourceBank.coins = 5; // Below 25 threshold
+
+      executeDayStart(state);
+      processEndOfTurn(state);
+
+      expect(state.activeChallenges[0].completed).toBe(false);
+      expect(state.challengesCompleted).not.toContain('ch-deep-pockets');
+    });
+
+    it('should include challenge bonus in score after evaluation', () => {
+      const state = createTestState('challenge-score');
+      state.activeChallenges = [
+        {
+          challenge: CHALLENGE_TEMPLATES.find(c => c.id === 'ch-deep-pockets')!,
+          completed: false,
+        },
+      ];
+      state.resourceBank.coins = 100;
+
+      const scoreBefore = computeScore(state);
+      executeDayStart(state);
+      processEndOfTurn(state);
+
+      // Score should now include the challenge bonus
+      // Note: income/incidents may change coins/rep, but challengesCompleted.length changed by 1
+      expect(state.challengesCompleted).toHaveLength(1);
+      // Score formula: coins + (rep * 5) + (challengesCompleted.length * CHALLENGE_BONUS_POINTS)
+      // The bonus should be reflected
+      expect(state.finalScore).toBe(computeScore(state));
+      expect(state.finalScore).toBeGreaterThanOrEqual(scoreBefore + CHALLENGE_BONUS_POINTS - 20);
+      // More precisely: at minimum, 1 challenge = +10 bonus points
+      expect(state.challengesCompleted.length * CHALLENGE_BONUS_POINTS).toBe(CHALLENGE_BONUS_POINTS);
+    });
+
+    it('should persist completed challenges across multiple turns', () => {
+      const state = createTestState('challenge-persist');
+      state.activeChallenges = [
+        {
+          challenge: CHALLENGE_TEMPLATES.find(c => c.id === 'ch-deep-pockets')!,
+          completed: false,
+        },
+      ];
+      state.resourceBank.coins = 100;
+
+      // Turn 1: complete the challenge
+      executeDayStart(state);
+      processEndOfTurn(state);
+      expect(state.activeChallenges[0].completed).toBe(true);
+      expect(state.challengesCompleted).toContain('ch-deep-pockets');
+
+      // Turn 2: even if coins drop below threshold, challenge stays completed
+      if (state.gameResult === 'playing') {
+        state.resourceBank.coins = 5;
+        executeDayStart(state);
+        processEndOfTurn(state);
+        expect(state.activeChallenges[0].completed).toBe(true);
+        expect(state.challengesCompleted.filter(id => id === 'ch-deep-pockets')).toHaveLength(1);
+      }
+    });
+
+    it('should add activity log entry when challenge completes during EndCheck', () => {
+      const state = createTestState('challenge-log');
+      state.activeChallenges = [
+        {
+          challenge: CHALLENGE_TEMPLATES.find(c => c.id === 'ch-deep-pockets')!,
+          completed: false,
+        },
+      ];
+      state.resourceBank.coins = 100;
+
+      executeDayStart(state);
+      processEndOfTurn(state);
+
+      const challengeLog = state.activityLog.find(
+        entry => entry.text.includes('Challenge completed') && entry.text.includes('Deep Pockets'),
+      );
+      expect(challengeLog).toBeDefined();
+      expect(challengeLog!.type).toBe('gain');
+    });
+
+    it('should handle game with no active challenges gracefully', () => {
+      const state = createTestState('no-challenges');
+      state.activeChallenges = [];
+
+      executeDayStart(state);
+      const result = processEndOfTurn(state);
+
+      // Should not crash; game continues
+      expect(result.gameResult).toBeDefined();
+      expect(state.challengesCompleted).toHaveLength(0);
     });
   });
 });

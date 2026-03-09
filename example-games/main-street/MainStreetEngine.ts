@@ -33,6 +33,7 @@ import {
   refillIncidentQueue,
   type PurchaseResult,
 } from './MainStreetMarket';
+import { evaluateChallenges } from './MainStreetChallenges';
 
 // ── Action Types ────────────────────────────────────────────
 
@@ -474,6 +475,10 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
 
   // Phase: EndCheck
   state.phase = 'EndCheck';
+
+  // Evaluate challenges before checking end conditions (so score includes any new bonus points)
+  evaluateChallenges(state.activeChallenges, state);
+
   checkEndConditions(state);
 
   // If game continues, advance to next turn
