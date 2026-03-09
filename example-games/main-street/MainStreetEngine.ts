@@ -353,8 +353,8 @@ export function checkImmediateLoss(state: MainStreetState): boolean {
  * Checks for end-of-turn win/loss conditions (at EndCheck phase).
  *
  * Win conditions (checked in order):
- * 1. Score threshold: finalScore >= WIN_THRESHOLD
- * 2. All challenges complete (not implemented in walking skeleton)
+ * 1. All challenges complete (activeChallenges.length > 0 and all completed)
+ * 2. Score threshold: finalScore >= WIN_THRESHOLD
  * 3. Turn 20 with positive reputation and coins >= 0
  *
  * Loss conditions:
@@ -371,6 +371,17 @@ export function checkEndConditions(state: MainStreetState): boolean {
   // Compute current score
   updateScore(state);
 
+  // Win: all challenges complete (only if there are active challenges)
+  if (
+    state.activeChallenges.length > 0 &&
+    state.activeChallenges.every(ac => ac.completed)
+  ) {
+    state.gameResult = 'win';
+    state.endReason = 'all_challenges';
+    addLog(state, 'Victory: All challenges completed!', 'gain');
+    return true;
+  }
+
   // Win: score threshold
   if (state.finalScore >= WIN_THRESHOLD) {
     state.gameResult = 'win';
@@ -378,9 +389,6 @@ export function checkEndConditions(state: MainStreetState): boolean {
     addLog(state, `Victory: Score threshold reached (${state.finalScore} pts)`, 'gain');
     return true;
   }
-
-  // Win: all challenges complete (walking skeleton has no challenges yet)
-  // if (state.challengesCompleted.length >= TOTAL_CHALLENGES) { ... }
 
   // Turn limit reached
   if (state.turn >= MAX_TURNS) {
