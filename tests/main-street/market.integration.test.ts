@@ -15,9 +15,7 @@ import { setupMainStreetGame, type MainStreetState } from '../../example-games/m
 import {
   refillBusinessMarket,
   refillInvestmentsMarket,
-  refillAllMarkets,
   refillIncidentQueue,
-  purchaseBusiness,
   getAffordableBusinessCards,
   getEmptySlots,
 } from '../../example-games/main-street/MainStreetMarket';
@@ -25,13 +23,10 @@ import {
   executeDayStart,
   processEndOfTurn,
   executeAction,
-  type PlayerAction,
 } from '../../example-games/main-street/MainStreetEngine';
 import {
   MARKET_BUSINESS_SLOTS,
   MARKET_INVESTMENT_SLOTS,
-  MARKET_INVESTMENT_UPGRADE_COUNT,
-  MARKET_INVESTMENT_EVENT_COUNT,
   INCIDENT_QUEUE_SIZE,
   createBusinessDeck,
   createEventDeck,
