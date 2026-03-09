@@ -123,13 +123,13 @@ const LOG_COLORS: Record<string, string> = {
   'turn-header': '#ffdd44',
 };
 
-// Challenge Tracker panel layout (right side, between HUD and Activity Log)
-const CHALLENGE_X = 810;
-const CHALLENGE_Y = 75;
-const CHALLENGE_W = 440;
-const CHALLENGE_LINE_H = 22;
-const CHALLENGE_PAD = 8;
-const CHALLENGE_TITLE_H = 22;
+// Challenge Tracker panel layout (bottom section, between hand and actions)
+const CHALLENGE_X = 230;
+const CHALLENGE_Y = 550;
+const CHALLENGE_W = 560;
+const CHALLENGE_LINE_H = 20;
+const CHALLENGE_PAD = 6;
+const CHALLENGE_TITLE_H = 20;
 
 // ── UI Phase (scene-level interaction state) ────────────────
 
@@ -441,11 +441,11 @@ export class MainStreetScene extends CardGameScene {
     const titleText = this.add.text(
       CHALLENGE_W / 2, CHALLENGE_TITLE_H / 2,
       `Challenges (${completedCount}/${challenges.length})`,
-      { fontSize: '12px', fontStyle: 'bold', color: '#aa9977', fontFamily: FONT_FAMILY },
+      { fontSize: '11px', fontStyle: 'bold', color: '#aa9977', fontFamily: FONT_FAMILY },
     ).setOrigin(0.5);
     this.challengeContainer.add(titleText);
 
-    // Challenge list
+    // Challenge list -- compact single-line rows: indicator + title + description
     let yOff = CHALLENGE_TITLE_H + CHALLENGE_PAD;
     for (const ac of challenges) {
       const isComplete = ac.completed;
@@ -455,16 +455,16 @@ export class MainStreetScene extends CardGameScene {
 
       // Indicator
       const indicatorText = this.add.text(CHALLENGE_PAD, yOff, indicator, {
-        fontSize: '14px', fontStyle: 'bold', color, fontFamily: FONT_FAMILY,
+        fontSize: '13px', fontStyle: 'bold', color, fontFamily: FONT_FAMILY,
       }).setOrigin(0, 0);
       this.challengeContainer.add(indicatorText);
 
       // Challenge title
       const challengeText = this.add.text(
-        CHALLENGE_PAD + 20, yOff,
+        CHALLENGE_PAD + 16, yOff,
         ac.challenge.title,
         {
-          fontSize: '12px',
+          fontSize: '11px',
           fontStyle: isComplete ? 'italic' : 'normal',
           color: nameColor,
           fontFamily: FONT_FAMILY,
@@ -472,15 +472,15 @@ export class MainStreetScene extends CardGameScene {
       ).setOrigin(0, 0);
       this.challengeContainer.add(challengeText);
 
-      // Description (compact)
+      // Description (right portion of the row)
       const descText = this.add.text(
-        CHALLENGE_W / 2 + 20, yOff,
+        CHALLENGE_W * 0.42, yOff,
         ac.challenge.description,
         {
-          fontSize: '11px',
+          fontSize: '10px',
           color: isComplete ? '#558855' : '#998877',
           fontFamily: FONT_FAMILY,
-          wordWrap: { width: CHALLENGE_W / 2 - 30 },
+          wordWrap: { width: CHALLENGE_W * 0.56 },
         },
       ).setOrigin(0, 0);
       this.challengeContainer.add(descText);
