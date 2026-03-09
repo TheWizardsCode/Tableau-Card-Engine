@@ -24,6 +24,8 @@ import {
   createUpgradeDeck,
 } from '../../example-games/main-street/MainStreetCards';
 
+import { DEFAULT_CHALLENGES_PER_RUN } from '../../example-games/main-street/MainStreetChallenges';
+
 // ── Template Counts (M1 + M2) ──────────────────────────────
 // Business: 5 (M1) + 12 (M2) = 17 templates
 // Event:    5 (M1) + 12 (M2) = 17 templates
@@ -172,6 +174,17 @@ describe('MainStreetState', () => {
       expect(state.challengesCompleted).toHaveLength(0);
     });
 
+    it('should populate activeChallenges with DEFAULT_CHALLENGES_PER_RUN items', () => {
+      const state = createTestState();
+      expect(state.activeChallenges).toHaveLength(DEFAULT_CHALLENGES_PER_RUN);
+      for (const ac of state.activeChallenges) {
+        expect(ac.completed).toBe(false);
+        expect(ac.challenge).toBeDefined();
+        expect(ac.challenge.id).toBeDefined();
+        expect(ac.challenge.title).toBeDefined();
+      }
+    });
+
     it('should have no held event initially', () => {
       const state = createTestState();
       expect(state.heldEvent).toBeNull();
@@ -246,6 +259,11 @@ describe('MainStreetState', () => {
       expect(state1.incidentQueue.map(c => c.id)).toEqual(
         state2.incidentQueue.map(c => c.id),
       );
+
+      // Active challenges should be identical for same seed
+      expect(state1.activeChallenges.map(ac => ac.challenge.id)).toEqual(
+        state2.activeChallenges.map(ac => ac.challenge.id),
+      );
     });
 
     it('should produce different initial states for different seeds', () => {
@@ -256,6 +274,22 @@ describe('MainStreetState', () => {
       const ids1 = state1.decks.business.map(c => c.id).join(',');
       const ids2 = state2.decks.business.map(c => c.id).join(',');
       expect(ids1).not.toBe(ids2);
+    });
+
+    it('should select different activeChallenges for different seeds (statistical)', () => {
+      // With 12 templates choosing 3, different seeds should usually produce different sets.
+      // Test across several seed pairs to guard against false negatives.
+      let diffCount = 0;
+      const pairs = [['cA', 'cB'], ['cC', 'cD'], ['cE', 'cF'], ['cG', 'cH']];
+      for (const [seedA, seedB] of pairs) {
+        const s1 = createTestState(seedA);
+        const s2 = createTestState(seedB);
+        const ids1 = s1.activeChallenges.map(ac => ac.challenge.id).join(',');
+        const ids2 = s2.activeChallenges.map(ac => ac.challenge.id).join(',');
+        if (ids1 !== ids2) diffCount++;
+      }
+      // At least half of the pairs should differ
+      expect(diffCount).toBeGreaterThanOrEqual(2);
     });
 
     it('should produce identical RNG sequences for the same seed', () => {

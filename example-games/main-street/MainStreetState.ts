@@ -25,6 +25,12 @@ import {
   MARKET_INVESTMENT_EVENT_COUNT,
   INCIDENT_QUEUE_SIZE,
 } from './MainStreetCards';
+import {
+  type ActiveChallenge,
+  CHALLENGE_TEMPLATES,
+  DEFAULT_CHALLENGES_PER_RUN,
+  selectChallenges,
+} from './MainStreetChallenges';
 
 // ── Activity Log ────────────────────────────────────────────
 
@@ -152,6 +158,8 @@ export interface MainStreetState {
   };
   /** IDs of completed challenges. */
   challengesCompleted: string[];
+  /** Active challenges for this run (selected at setup, evaluated each EndCheck). */
+  activeChallenges: ActiveChallenge[];
   /** Held Investment event awaiting play (max 1 at a time, null = none). */
   heldEvent: EventCard | null;
   /** Visible FIFO queue of upcoming Incident events (front = next to resolve). */
@@ -286,6 +294,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
       upgrade: upgradeDeck,
     },
     challengesCompleted: [],
+    activeChallenges: [],
     heldEvent: null,
     incidentQueue,
     gameResult: 'playing',
@@ -295,6 +304,13 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     rng,
     activityLog: [],
   };
+
+  // Select challenges for this run using seeded RNG
+  const selectedChallenges = selectChallenges(CHALLENGE_TEMPLATES, DEFAULT_CHALLENGES_PER_RUN, rng);
+  state.activeChallenges = selectedChallenges.map(ch => ({
+    challenge: ch,
+    completed: false,
+  }));
 
   return state;
 }
