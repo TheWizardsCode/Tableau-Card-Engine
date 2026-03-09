@@ -245,7 +245,9 @@ export class MainStreetScene extends CardGameScene {
         body:
           'Food (orange) -- restaurants, cafes\n' +
           'Culture (blue) -- galleries, theaters\n' +
-          'Commerce (green) -- shops, services',
+          'Commerce (green) -- shops, services\n' +
+          'Service (purple) -- salons, clinics\n' +
+          'Entertainment (red) -- cinemas, arcades',
       },
       {
         heading: 'Win / Loss',
