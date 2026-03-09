@@ -215,7 +215,19 @@ export class MainStreetScene extends CardGameScene {
           'Adjacent businesses with matching synergy types earn bonus income.\n' +
           'Buy upgrades to improve existing businesses.\n' +
           'Buy Investment events and play them for one-time effects.\n' +
+          'Complete challenges for bonus points.\n' +
           'Earn coins and reputation each turn to reach the score threshold.',
+      },
+      {
+        heading: 'Challenges',
+        body:
+          'Each run selects 3 random challenges for you to complete.\n' +
+          'Challenges have goals like earning coins, placing businesses,\n' +
+          'or building synergy combos. Progress is checked at the end of\n' +
+          'each turn -- once completed, a challenge stays completed.\n' +
+          'Each completed challenge adds 10 bonus points to your score.\n' +
+          'Complete all 3 challenges to win immediately!\n' +
+          'Track your progress in the challenge panel at the bottom.',
       },
       {
         heading: 'Events',
@@ -239,6 +251,7 @@ export class MainStreetScene extends CardGameScene {
         heading: 'Win / Loss',
         body:
           `Reach ${150} points to win (coins + reputation*5 + challenges*10).\n` +
+          'Complete all 3 challenges for an instant win.\n' +
           `Survive ${MAX_TURNS} turns with positive reputation for a turn-limit victory.\n` +
           'Bankruptcy (coins < 0) or reputation collapse (rep <= 0 after turn 1) loses.',
       },
