@@ -14,10 +14,11 @@
 
 import type { MainStreetState } from '../MainStreetState';
 import { setupMainStreetGame } from '../MainStreetState';
+import type { DifficultyName } from '../MainStreetDifficulty';
+import { DIFFICULTY_NAMES } from '../MainStreetDifficulty';
 import type { BusinessCard, EventCard, UpgradeCard } from '../MainStreetCards';
 import {
   GRID_SIZE,
-  MAX_TURNS,
   synergyColor,
   cardLabel,
   MARKET_BUSINESS_SLOTS,
@@ -147,6 +148,9 @@ export class MainStreetScene extends CardGameScene {
   private state!: MainStreetState;
   private uiPhase: UIPhase = 'idle';
 
+  // Selected difficulty (persisted across replays)
+  private selectedDifficulty: DifficultyName = 'Medium';
+
   // Pending selection for placing a business
   private pendingBusinessCard: BusinessCard | null = null;
 
@@ -199,7 +203,10 @@ export class MainStreetScene extends CardGameScene {
     this.initSoundSystem([], {});
 
     // Game setup
-    this.state = setupMainStreetGame({ seed: 'main-street-demo' });
+    this.state = setupMainStreetGame({
+      seed: 'main-street-demo',
+      difficulty: this.selectedDifficulty,
+    });
 
     // UI scaffolding
     this.createHeader();
@@ -221,12 +228,12 @@ export class MainStreetScene extends CardGameScene {
       {
         heading: 'Challenges',
         body:
-          'Each run selects 3 random challenges for you to complete.\n' +
+          `Each run selects ${this.state.config.challengesPerRun} random challenges for you to complete.\n` +
           'Challenges have goals like earning coins, placing businesses,\n' +
           'or building synergy combos. Progress is checked at the end of\n' +
           'each turn -- once completed, a challenge stays completed.\n' +
-          'Each completed challenge adds 10 bonus points to your score.\n' +
-          'Complete all 3 challenges to win immediately!\n' +
+          `Each completed challenge adds ${this.state.config.challengeBonusPoints} bonus points to your score.\n` +
+          `Complete all ${this.state.config.challengesPerRun} challenges to win immediately!\n` +
           'Track your progress in the challenge panel at the bottom.',
       },
       {
@@ -250,9 +257,9 @@ export class MainStreetScene extends CardGameScene {
       {
         heading: 'Win / Loss',
         body:
-          `Reach ${150} points to win (coins + reputation*5 + challenges*10).\n` +
-          'Complete all 3 challenges for an instant win.\n' +
-          `Survive ${MAX_TURNS} turns with positive reputation for a turn-limit victory.\n` +
+          `Reach ${this.state.config.winThreshold} points to win (coins + reputation*${this.state.config.reputationScoreMultiplier} + challenges*${this.state.config.challengeBonusPoints}).\n` +
+          `Complete all ${this.state.config.challengesPerRun} challenges for an instant win.\n` +
+          `Survive ${this.state.config.maxTurns} turns with positive reputation for a turn-limit victory.\n` +
           'Bankruptcy (coins < 0) or reputation collapse (rep <= 0 after turn 1) loses.',
       },
     ];
@@ -336,7 +343,7 @@ export class MainStreetScene extends CardGameScene {
     this.uiPhase = 'market';
     this.refreshAll();
     this.instructionText.setText(
-      `Turn ${this.state.turn} / ${MAX_TURNS} -- Buy cards from the market or End Turn`,
+      `Turn ${this.state.turn} / ${this.state.config.maxTurns} -- Buy cards from the market or End Turn`,
     );
   }
 
@@ -395,7 +402,7 @@ export class MainStreetScene extends CardGameScene {
     this.hudContainer.add(strip);
 
     // Turn
-    const turnText = this.add.text(40, HUD_Y, `Turn ${this.state.turn}/${MAX_TURNS}`, {
+    const turnText = this.add.text(40, HUD_Y, `Turn ${this.state.turn}/${this.state.config.maxTurns}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#ffdd88', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0.5);
     this.hudContainer.add(turnText);
@@ -405,6 +412,12 @@ export class MainStreetScene extends CardGameScene {
       fontSize: '14px', color: '#aa9977', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0.5);
     this.hudContainer.add(phaseText);
+
+    // Difficulty
+    const diffText = this.add.text(420, HUD_Y, `[${this.state.config.difficultyName}]`, {
+      fontSize: '13px', color: '#999977', fontFamily: FONT_FAMILY,
+    }).setOrigin(0, 0.5);
+    this.hudContainer.add(diffText);
 
     // Coins
     const coinText = this.add.text(GAME_W / 2 - 100, HUD_Y, `Coins: ${coins}`, {
@@ -1044,7 +1057,7 @@ export class MainStreetScene extends CardGameScene {
         this.uiPhase = 'market';
         this.refreshAll();
         this.instructionText.setText(
-          `Turn ${this.state.turn} / ${MAX_TURNS} -- Buy cards from the market or End Turn`,
+          `Turn ${this.state.turn} / ${this.state.config.maxTurns} -- Buy cards from the market or End Turn`,
         );
       });
       this.actionContainer.add(cancelBtn);
@@ -1299,7 +1312,7 @@ export class MainStreetScene extends CardGameScene {
     const challengeLineCount = activeChallenges.length;
     // Extra height: section header + one line per challenge
     const challengeExtraH = challengeLineCount > 0 ? 24 + challengeLineCount * 20 : 0;
-    const panelH = 320 + challengeExtraH;
+    const panelH = 360 + challengeExtraH; // extra 40px for difficulty selector
 
     // Overlay background
     const overlay = createOverlayBackground(
@@ -1330,10 +1343,11 @@ export class MainStreetScene extends CardGameScene {
     // Score breakdown
     const { coins, reputation } = this.state.resourceBank;
     const challenges = this.state.challengesCompleted.length;
+    const cfg = this.state.config;
     const lines = [
       `Coins: ${coins}`,
-      `Reputation: ${reputation} (x5 = ${reputation * 5})`,
-      `Challenges: ${challenges} (x10 = ${challenges * 10})`,
+      `Reputation: ${reputation} (x${cfg.reputationScoreMultiplier} = ${reputation * cfg.reputationScoreMultiplier})`,
+      `Challenges: ${challenges} (x${cfg.challengeBonusPoints} = ${challenges * cfg.challengeBonusPoints})`,
       `Final Score: ${result.finalScore}`,
     ];
     const breakdownY = panelTop + 110;
@@ -1367,6 +1381,27 @@ export class MainStreetScene extends CardGameScene {
         challengeBottomY += 20;
       }
     }
+
+    // Difficulty selector
+    const diffY = panelTop + panelH - 80;
+    const diffLabel = this.add.text(
+      GAME_W / 2 - 80, diffY,
+      `Difficulty: ${this.selectedDifficulty}`,
+      { fontSize: '14px', color: '#ccbbaa', fontFamily: FONT_FAMILY },
+    ).setOrigin(0, 0.5).setDepth(101);
+    this.overlayObjects.push(diffLabel);
+
+    const cycleBtn = this.add.text(
+      GAME_W / 2 + 90, diffY,
+      '[ Change ]',
+      { fontSize: '14px', color: '#ffdd88', fontFamily: FONT_FAMILY },
+    ).setOrigin(0, 0.5).setDepth(101).setInteractive({ useHandCursor: true });
+    cycleBtn.on('pointerdown', () => {
+      const idx = DIFFICULTY_NAMES.indexOf(this.selectedDifficulty);
+      this.selectedDifficulty = DIFFICULTY_NAMES[(idx + 1) % DIFFICULTY_NAMES.length];
+      diffLabel.setText(`Difficulty: ${this.selectedDifficulty}`);
+    });
+    this.overlayObjects.push(cycleBtn);
 
     // Buttons (positioned relative to panel bottom)
     const btnY = panelTop + panelH - 40;

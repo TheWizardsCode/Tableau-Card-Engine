@@ -39,17 +39,19 @@ export function neighbors(index: number, range: number = 1): number[] {
 /**
  * Computes the synergy bonus for a single business at a given slot.
  *
- * A business earns +SYNERGY_BONUS_PER_NEIGHBOR coins for each neighboring
+ * A business earns +bonusPerNeighbor coins for each neighboring
  * slot that contains a business sharing at least one SynergyType.
  * The range considered is 1 + business.synergyRangeBonus (from upgrades).
  *
- * @param grid   The street grid.
- * @param index  The slot index of the business.
+ * @param grid               The street grid.
+ * @param index              The slot index of the business.
+ * @param bonusPerNeighbor   Coins per matching neighbor (defaults to SYNERGY_BONUS_PER_NEIGHBOR for backward compat).
  * @returns The synergy bonus in coins.
  */
 export function computeSynergyBonus(
   grid: (BusinessCard | null)[],
   index: number,
+  bonusPerNeighbor: number = SYNERGY_BONUS_PER_NEIGHBOR,
 ): number {
   const business = grid[index];
   if (!business) return 0;
@@ -67,7 +69,7 @@ export function computeSynergyBonus(
       (st: SynergyType) => neighbor.synergyTypes.includes(st),
     );
     if (hasSharedSynergy) {
-      bonus += SYNERGY_BONUS_PER_NEIGHBOR;
+      bonus += bonusPerNeighbor;
     }
   }
 
@@ -79,19 +81,21 @@ export function computeSynergyBonus(
  *
  * totalIncome = baseIncome + incomeBonus (from upgrades) + synergyBonus
  *
- * @param grid   The street grid.
- * @param index  The slot index of the business.
+ * @param grid               The street grid.
+ * @param index              The slot index of the business.
+ * @param bonusPerNeighbor   Coins per matching neighbor (defaults to SYNERGY_BONUS_PER_NEIGHBOR).
  * @returns The total income in coins for this business.
  */
 export function computeBusinessIncome(
   grid: (BusinessCard | null)[],
   index: number,
+  bonusPerNeighbor: number = SYNERGY_BONUS_PER_NEIGHBOR,
 ): number {
   const business = grid[index];
   if (!business) return 0;
 
   const base = business.baseIncome + business.incomeBonus;
-  const synergy = computeSynergyBonus(grid, index);
+  const synergy = computeSynergyBonus(grid, index, bonusPerNeighbor);
   return base + synergy;
 }
 
@@ -100,10 +104,14 @@ export function computeBusinessIncome(
  *
  * Returns both the total and a per-slot breakdown for UI display.
  *
- * @param grid  The street grid.
+ * @param grid               The street grid.
+ * @param bonusPerNeighbor   Coins per matching neighbor (defaults to SYNERGY_BONUS_PER_NEIGHBOR).
  * @returns Object with `total` income and `breakdown` per slot.
  */
-export function computeIncome(grid: (BusinessCard | null)[]): IncomeResult {
+export function computeIncome(
+  grid: (BusinessCard | null)[],
+  bonusPerNeighbor: number = SYNERGY_BONUS_PER_NEIGHBOR,
+): IncomeResult {
   const breakdown: SlotIncome[] = [];
   let total = 0;
 
@@ -112,7 +120,7 @@ export function computeIncome(grid: (BusinessCard | null)[]): IncomeResult {
     if (!business) continue;
 
     const base = business.baseIncome + business.incomeBonus;
-    const synergy = computeSynergyBonus(grid, i);
+    const synergy = computeSynergyBonus(grid, i, bonusPerNeighbor);
     const slotTotal = base + synergy;
 
     breakdown.push({
@@ -131,13 +139,14 @@ export function computeIncome(grid: (BusinessCard | null)[]): IncomeResult {
 
 /**
  * Applies income to the player's resource bank.
- * Mutates state in-place.
+ * Mutates state in-place. Uses config.synergyBonusPerNeighbor from the
+ * active difficulty preset.
  *
  * @param state  Current game state (mutated).
  * @returns The IncomeResult for UI display.
  */
 export function applyIncome(state: MainStreetState): IncomeResult {
-  const result = computeIncome(state.streetGrid);
+  const result = computeIncome(state.streetGrid, state.config.synergyBonusPerNeighbor);
   state.resourceBank.coins += result.total;
   if (result.total > 0) {
     addLog(state, `Income: +${result.total} coins`, 'gain');
