@@ -24,6 +24,17 @@ import {
   createUpgradeDeck,
 } from '../../example-games/main-street/MainStreetCards';
 
+// ── Template Counts (M1 + M2) ──────────────────────────────
+// Business: 5 (M1) + 12 (M2) = 17 templates
+// Event:    5 (M1) + 12 (M2) = 17 templates
+// Upgrade:  3 (M1) + 14 (M2) = 17 templates
+const BUSINESS_TEMPLATE_COUNT = 17;
+const EVENT_TEMPLATE_COUNT = 17;
+const UPGRADE_TEMPLATE_COUNT = 17;
+const DEFAULT_BUSINESS_COPIES = 3;
+const DEFAULT_EVENT_COPIES = 3;
+const DEFAULT_UPGRADE_COPIES = 2;
+
 // ── Helpers ─────────────────────────────────────────────────
 
 function createTestState(seed: string = 'test42'): MainStreetState {
@@ -34,9 +45,9 @@ function createTestState(seed: string = 'test42'): MainStreetState {
 
 describe('MainStreetCards', () => {
   describe('createBusinessDeck', () => {
-    it('should create 15 cards with 3 copies of 5 templates', () => {
-      const deck = createBusinessDeck(3);
-      expect(deck).toHaveLength(15);
+    it('should create correct number of cards from templates and copies', () => {
+      const deck = createBusinessDeck(DEFAULT_BUSINESS_COPIES);
+      expect(deck).toHaveLength(BUSINESS_TEMPLATE_COUNT * DEFAULT_BUSINESS_COPIES);
     });
 
     it('should create cards with correct family', () => {
@@ -47,10 +58,10 @@ describe('MainStreetCards', () => {
     });
 
     it('should create cards with unique IDs per copy', () => {
-      const deck = createBusinessDeck(3);
+      const deck = createBusinessDeck(DEFAULT_BUSINESS_COPIES);
       const ids = deck.map(c => c.id);
       const uniqueIds = new Set(ids);
-      expect(uniqueIds.size).toBe(15);
+      expect(uniqueIds.size).toBe(BUSINESS_TEMPLATE_COUNT * DEFAULT_BUSINESS_COPIES);
     });
 
     it('should create cards with initial level 0 and no bonuses', () => {
@@ -64,9 +75,9 @@ describe('MainStreetCards', () => {
   });
 
   describe('createEventDeck', () => {
-    it('should create 15 cards with 3 copies of 5 templates', () => {
-      const deck = createEventDeck(3);
-      expect(deck).toHaveLength(15);
+    it('should create correct number of cards from templates and copies', () => {
+      const deck = createEventDeck(DEFAULT_EVENT_COPIES);
+      expect(deck).toHaveLength(EVENT_TEMPLATE_COUNT * DEFAULT_EVENT_COPIES);
     });
 
     it('should create cards with correct family', () => {
@@ -78,9 +89,9 @@ describe('MainStreetCards', () => {
   });
 
   describe('createUpgradeDeck', () => {
-    it('should create 6 cards with 2 copies of 3 templates', () => {
-      const deck = createUpgradeDeck(2);
-      expect(deck).toHaveLength(6);
+    it('should create correct number of cards from templates and copies', () => {
+      const deck = createUpgradeDeck(DEFAULT_UPGRADE_COPIES);
+      expect(deck).toHaveLength(UPGRADE_TEMPLATE_COUNT * DEFAULT_UPGRADE_COPIES);
     });
 
     it('should create cards with correct family', () => {
@@ -142,15 +153,18 @@ describe('MainStreetState', () => {
 
     it('should have non-empty decks after market fill', () => {
       const state = createTestState();
-      // Business: 15 total - 4 market = 11 remaining
-      expect(state.decks.business.length).toBe(15 - MARKET_BUSINESS_SLOTS);
-      // Event: 15 total - investment events in market - incident queue = remaining in deck
+      const totalBusiness = BUSINESS_TEMPLATE_COUNT * DEFAULT_BUSINESS_COPIES;
+      const totalEvent = EVENT_TEMPLATE_COUNT * DEFAULT_EVENT_COPIES;
+      const totalUpgrade = UPGRADE_TEMPLATE_COUNT * DEFAULT_UPGRADE_COPIES;
+      // Business: total - market slots = remaining
+      expect(state.decks.business.length).toBe(totalBusiness - MARKET_BUSINESS_SLOTS);
+      // Event: total - investment events in market - incident queue = remaining in deck
       const investmentEventsInMarket = state.market.investments.filter(c => c.family === 'event').length;
       const eventAccountedFor = investmentEventsInMarket + state.decks.event.length + state.incidentQueue.length;
-      expect(eventAccountedFor).toBe(15);
-      // Upgrade: 6 total - upgrades in investments row = remaining
+      expect(eventAccountedFor).toBe(totalEvent);
+      // Upgrade: total - upgrades in investments row = remaining
       const upgradesInMarket = state.market.investments.filter(c => c.family === 'upgrade').length;
-      expect(state.decks.upgrade.length).toBe(6 - upgradesInMarket);
+      expect(state.decks.upgrade.length).toBe(totalUpgrade - upgradesInMarket);
     });
 
     it('should have no challenges completed initially', () => {
@@ -270,21 +284,21 @@ describe('MainStreetState', () => {
     it('should have all market + deck cards equal total deck size (business)', () => {
       const state = createTestState();
       const total = state.market.business.length + state.decks.business.length;
-      expect(total).toBe(15); // 5 templates * 3 copies
+      expect(total).toBe(BUSINESS_TEMPLATE_COUNT * DEFAULT_BUSINESS_COPIES);
     });
 
     it('should have all market + deck + queue cards equal total deck size (event)', () => {
       const state = createTestState();
       const investmentEventsInMarket = state.market.investments.filter(c => c.family === 'event').length;
       const total = investmentEventsInMarket + state.decks.event.length + state.incidentQueue.length;
-      expect(total).toBe(15); // 5 templates * 3 copies
+      expect(total).toBe(EVENT_TEMPLATE_COUNT * DEFAULT_EVENT_COPIES);
     });
 
     it('should have all market + deck cards equal total deck size (upgrade)', () => {
       const state = createTestState();
       const upgradesInMarket = state.market.investments.filter(c => c.family === 'upgrade').length;
       const total = upgradesInMarket + state.decks.upgrade.length;
-      expect(total).toBe(6); // 3 templates * 2 copies
+      expect(total).toBe(UPGRADE_TEMPLATE_COUNT * DEFAULT_UPGRADE_COPIES);
     });
 
     it('should have all unique card IDs across market, decks, and queues', () => {
@@ -303,7 +317,7 @@ describe('MainStreetState', () => {
 
     it('should have business cards with valid synergy types', () => {
       const deck = createBusinessDeck(1);
-      const validTypes = new Set(['Food', 'Culture', 'Commerce']);
+      const validTypes = new Set(['Food', 'Culture', 'Commerce', 'Service', 'Entertainment']);
       for (const card of deck) {
         expect(card.synergyTypes.length).toBeGreaterThan(0);
         for (const st of card.synergyTypes) {

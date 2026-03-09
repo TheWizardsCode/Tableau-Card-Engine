@@ -683,8 +683,20 @@ describe('MainStreetEngine', () => {
     it('should detect loss from events causing bankruptcy', () => {
       const state = createTestState();
       state.resourceBank.coins = 1;
-      // Add a held Investment event that costs 5 coins
-      state.heldEvent = makeInvestmentEvent({ coinDelta: -5 });
+      // Ensure the incident queue has a negative event that causes bankruptcy
+      state.incidentQueue = [
+        {
+          family: 'event',
+          id: 'evt-bankruptcy-test',
+          name: 'Bankruptcy Event',
+          trigger: 'Incident',
+          cost: 0,
+          effect: 'Lose 5 coins.',
+          target: 'All',
+          coinDelta: -5,
+          reputationDelta: 0,
+        },
+      ];
       state.phase = 'MarketPhase';
 
       const result = processEndOfTurn(state);
