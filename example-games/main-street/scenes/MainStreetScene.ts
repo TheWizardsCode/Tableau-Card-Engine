@@ -123,6 +123,14 @@ const LOG_COLORS: Record<string, string> = {
   'turn-header': '#ffdd44',
 };
 
+// Challenge Tracker panel layout (right side, between HUD and Activity Log)
+const CHALLENGE_X = 810;
+const CHALLENGE_Y = 75;
+const CHALLENGE_W = 440;
+const CHALLENGE_LINE_H = 22;
+const CHALLENGE_PAD = 8;
+const CHALLENGE_TITLE_H = 22;
+
 // ── UI Phase (scene-level interaction state) ────────────────
 
 type UIPhase =
@@ -160,6 +168,9 @@ export class MainStreetScene extends CardGameScene {
   private logTotalContentH = 0;
   private logAutoScroll = true;
   private logPrevEntryCount = 0;
+
+  // Challenge Tracker panel
+  private challengeContainer!: Phaser.GameObjects.Container;
 
   // Instruction text
   private instructionText!: Phaser.GameObjects.Text;
@@ -253,6 +264,9 @@ export class MainStreetScene extends CardGameScene {
     this.incidentQueueContainer = this.add.container(0, 0);
     this.handContainer = this.add.container(0, 0);
     this.actionContainer = this.add.container(0, 0);
+
+    // Challenge Tracker panel
+    this.challengeContainer = this.add.container(CHALLENGE_X, CHALLENGE_Y);
 
     // Activity Log panel (persistent, not rebuilt each refresh)
     this.logContainer = this.add.container(LOG_X, LOG_Y);
@@ -350,6 +364,7 @@ export class MainStreetScene extends CardGameScene {
     this.refreshIncidentQueue();
     this.refreshPlayerHand();
     this.refreshActionButtons();
+    this.refreshChallengeTracker();
     this.refreshLog();
   }
 
@@ -395,6 +410,83 @@ export class MainStreetScene extends CardGameScene {
       fontSize: '16px', fontStyle: 'bold', color: '#ff8844', fontFamily: FONT_FAMILY,
     }).setOrigin(1, 0.5);
     this.hudContainer.add(scoreText);
+  }
+
+  // ── Challenge Tracker ───────────────────────────────────
+
+  private refreshChallengeTracker(): void {
+    this.challengeContainer.removeAll(true);
+
+    const challenges = this.state.activeChallenges;
+    if (challenges.length === 0) return;
+
+    // Dynamic height based on number of challenges
+    const panelH = CHALLENGE_TITLE_H + challenges.length * CHALLENGE_LINE_H + CHALLENGE_PAD * 2;
+
+    // Panel background
+    const bg = this.add.graphics();
+    bg.fillStyle(0x1a1408, 0.85);
+    bg.fillRoundedRect(0, 0, CHALLENGE_W, panelH, 4);
+    bg.lineStyle(1, BOX_STROKE, 0.5);
+    bg.strokeRoundedRect(0, 0, CHALLENGE_W, panelH, 4);
+    this.challengeContainer.add(bg);
+
+    // Title bar
+    const titleBg = this.add.graphics();
+    titleBg.fillStyle(0x332816, 0.9);
+    titleBg.fillRoundedRect(0, 0, CHALLENGE_W, CHALLENGE_TITLE_H, { tl: 4, tr: 4, bl: 0, br: 0 });
+    this.challengeContainer.add(titleBg);
+
+    const completedCount = challenges.filter(ac => ac.completed).length;
+    const titleText = this.add.text(
+      CHALLENGE_W / 2, CHALLENGE_TITLE_H / 2,
+      `Challenges (${completedCount}/${challenges.length})`,
+      { fontSize: '12px', fontStyle: 'bold', color: '#aa9977', fontFamily: FONT_FAMILY },
+    ).setOrigin(0.5);
+    this.challengeContainer.add(titleText);
+
+    // Challenge list
+    let yOff = CHALLENGE_TITLE_H + CHALLENGE_PAD;
+    for (const ac of challenges) {
+      const isComplete = ac.completed;
+      const indicator = isComplete ? '\u2713' : '\u2022';  // checkmark or bullet
+      const color = isComplete ? '#44ff44' : '#ccbbaa';
+      const nameColor = isComplete ? '#66aa66' : '#ddccbb';
+
+      // Indicator
+      const indicatorText = this.add.text(CHALLENGE_PAD, yOff, indicator, {
+        fontSize: '14px', fontStyle: 'bold', color, fontFamily: FONT_FAMILY,
+      }).setOrigin(0, 0);
+      this.challengeContainer.add(indicatorText);
+
+      // Challenge title
+      const challengeText = this.add.text(
+        CHALLENGE_PAD + 20, yOff,
+        ac.challenge.title,
+        {
+          fontSize: '12px',
+          fontStyle: isComplete ? 'italic' : 'normal',
+          color: nameColor,
+          fontFamily: FONT_FAMILY,
+        },
+      ).setOrigin(0, 0);
+      this.challengeContainer.add(challengeText);
+
+      // Description (compact)
+      const descText = this.add.text(
+        CHALLENGE_W / 2 + 20, yOff,
+        ac.challenge.description,
+        {
+          fontSize: '11px',
+          color: isComplete ? '#558855' : '#998877',
+          fontFamily: FONT_FAMILY,
+          wordWrap: { width: CHALLENGE_W / 2 - 30 },
+        },
+      ).setOrigin(0, 0);
+      this.challengeContainer.add(descText);
+
+      yOff += CHALLENGE_LINE_H;
+    }
   }
 
   // ── Street Grid ─────────────────────────────────────────
@@ -1189,16 +1281,26 @@ export class MainStreetScene extends CardGameScene {
     const title = isWin ? 'You Win!' : 'Game Over';
     const color = isWin ? '#44ff44' : '#ff4444';
 
+    // Per-challenge breakdown lines (rendered below score breakdown)
+    const activeChallenges = this.state.activeChallenges;
+    const challengeLineCount = activeChallenges.length;
+    // Extra height: section header + one line per challenge
+    const challengeExtraH = challengeLineCount > 0 ? 24 + challengeLineCount * 20 : 0;
+    const panelH = 320 + challengeExtraH;
+
     // Overlay background
     const overlay = createOverlayBackground(
       this,
       { depth: 100, alpha: 0.75 },
-      { width: 500, height: 320, alpha: 0.95 },
+      { width: 500, height: panelH, alpha: 0.95 },
     );
     this.overlayObjects.push(...overlay.objects);
 
+    // Vertical anchor: centre of the panel
+    const panelTop = GAME_H / 2 - panelH / 2;
+
     // Title
-    const titleText = this.add.text(GAME_W / 2, GAME_H / 2 - 120, title, {
+    const titleText = this.add.text(GAME_W / 2, panelTop + 30, title, {
       fontSize: '36px', fontStyle: 'bold', color, fontFamily: FONT_FAMILY,
     }).setOrigin(0.5).setDepth(101);
     this.overlayObjects.push(titleText);
@@ -1206,7 +1308,7 @@ export class MainStreetScene extends CardGameScene {
     // End reason
     const reason = this.state.endReason ?? 'unknown';
     const reasonText = this.add.text(
-      GAME_W / 2, GAME_H / 2 - 70,
+      GAME_W / 2, panelTop + 72,
       reason.replace(/_/g, ' '),
       { fontSize: '18px', color: '#ccbbaa', fontFamily: FONT_FAMILY },
     ).setOrigin(0.5).setDepth(101);
@@ -1221,15 +1323,42 @@ export class MainStreetScene extends CardGameScene {
       `Challenges: ${challenges} (x10 = ${challenges * 10})`,
       `Final Score: ${result.finalScore}`,
     ];
-    const breakdown = this.add.text(GAME_W / 2, GAME_H / 2 - 20, lines.join('\n'), {
+    const breakdownY = panelTop + 110;
+    const breakdown = this.add.text(GAME_W / 2, breakdownY, lines.join('\n'), {
       fontSize: '16px', color: '#ddccbb', fontFamily: FONT_FAMILY,
       align: 'center', lineSpacing: 6,
     }).setOrigin(0.5, 0).setDepth(101);
     this.overlayObjects.push(breakdown);
 
-    // Buttons
+    // Per-challenge breakdown (below score breakdown)
+    let challengeBottomY = breakdownY + 100; // approximate height of score breakdown text
+    if (challengeLineCount > 0) {
+      const sectionTitle = this.add.text(
+        GAME_W / 2, challengeBottomY,
+        'Challenge Details:',
+        { fontSize: '14px', fontStyle: 'bold', color: '#aa9977', fontFamily: FONT_FAMILY },
+      ).setOrigin(0.5, 0).setDepth(101);
+      this.overlayObjects.push(sectionTitle);
+      challengeBottomY += 22;
+
+      for (const ac of activeChallenges) {
+        const done = ac.completed;
+        const icon = done ? '\u2713' : '\u2717'; // checkmark or cross
+        const lineColor = done ? '#44ff44' : '#ff6666';
+        const challengeLine = this.add.text(
+          GAME_W / 2, challengeBottomY,
+          `${icon}  ${ac.challenge.title}`,
+          { fontSize: '13px', color: lineColor, fontFamily: FONT_FAMILY },
+        ).setOrigin(0.5, 0).setDepth(101);
+        this.overlayObjects.push(challengeLine);
+        challengeBottomY += 20;
+      }
+    }
+
+    // Buttons (positioned relative to panel bottom)
+    const btnY = panelTop + panelH - 40;
     const playAgainBtn = createOverlayButton(
-      this, GAME_W / 2 - 110, GAME_H / 2 + 110,
+      this, GAME_W / 2 - 110, btnY,
       '[ Play Again ]', 101,
     );
     playAgainBtn.on('pointerdown', () => {
@@ -1240,7 +1369,7 @@ export class MainStreetScene extends CardGameScene {
     this.overlayObjects.push(playAgainBtn);
 
     const menuBtn = createOverlayMenuButton(
-      this, GAME_W / 2 + 30, GAME_H / 2 + 110, 101,
+      this, GAME_W / 2 + 30, btnY, 101,
     );
     this.overlayObjects.push(menuBtn);
   }

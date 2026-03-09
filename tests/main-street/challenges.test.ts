@@ -652,4 +652,44 @@ describe('MainStreetChallenges', () => {
       expect(state.challengesCompleted.filter(id => id === 'ch-deep-pockets')).toHaveLength(1);
     });
   });
+
+  // ── Challenge HUD Tracker smoke tests ─────────────────────
+
+  describe('Challenge HUD Tracker data contract', () => {
+    it('activeChallenges on a fresh game state have the fields needed by the tracker', () => {
+      const state = setupMainStreetGame({ seed: 'tracker-smoke-1' });
+      const acs = state.activeChallenges;
+      expect(acs.length).toBe(DEFAULT_CHALLENGES_PER_RUN);
+
+      for (const ac of acs) {
+        // ActiveChallenge fields
+        expect(ac).toHaveProperty('challenge');
+        expect(ac).toHaveProperty('completed');
+        expect(ac.completed).toBe(false);
+        // Challenge fields used by the tracker
+        expect(ac.challenge).toHaveProperty('id');
+        expect(ac.challenge).toHaveProperty('title');
+        expect(ac.challenge).toHaveProperty('description');
+        expect(typeof ac.challenge.title).toBe('string');
+        expect(typeof ac.challenge.description).toBe('string');
+        expect(ac.challenge.title.length).toBeGreaterThan(0);
+        expect(ac.challenge.description.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('completed challenges retain all fields for the game-over overlay', () => {
+      const state = createEmptyState('overlay-smoke');
+      const ac: ActiveChallenge = {
+        challenge: CHALLENGE_TEMPLATES.find(t => t.id === 'ch-deep-pockets')!,
+        completed: false,
+      };
+      state.resourceBank.coins = 30;
+      evaluateChallenges([ac], state);
+
+      // After completion, fields still present
+      expect(ac.completed).toBe(true);
+      expect(ac.challenge.title).toBe('Deep Pockets');
+      expect(ac.challenge.description).toBeDefined();
+    });
+  });
 });
