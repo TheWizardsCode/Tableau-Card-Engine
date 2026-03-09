@@ -18,12 +18,6 @@
 import type { MainStreetState, DayPhase } from './MainStreetState';
 import { PHASE_ORDER, addLog } from './MainStreetState';
 import type { EventCard, SynergyType } from './MainStreetCards';
-import {
-  MAX_TURNS,
-  WIN_THRESHOLD,
-  REPUTATION_SCORE_MULTIPLIER,
-  CHALLENGE_BONUS_POINTS,
-} from './MainStreetCards';
 import { applyIncome, type IncomeResult } from './MainStreetAdjacency';
 import {
   purchaseBusiness,
@@ -93,13 +87,13 @@ export interface TurnResult {
 
 /**
  * Computes the final score.
- * Formula: coins + (reputation * 5) + (challengesCompleted * 10)
+ * Formula: coins + (reputation * reputationScoreMultiplier) + (challengesCompleted * challengeBonusPoints)
  */
 export function computeScore(state: MainStreetState): number {
   return (
     state.resourceBank.coins +
-    state.resourceBank.reputation * REPUTATION_SCORE_MULTIPLIER +
-    state.challengesCompleted.length * CHALLENGE_BONUS_POINTS
+    state.resourceBank.reputation * state.config.reputationScoreMultiplier +
+    state.challengesCompleted.length * state.config.challengeBonusPoints
   );
 }
 
@@ -383,7 +377,7 @@ export function checkEndConditions(state: MainStreetState): boolean {
   }
 
   // Win: score threshold
-  if (state.finalScore >= WIN_THRESHOLD) {
+  if (state.finalScore >= state.config.winThreshold) {
     state.gameResult = 'win';
     state.endReason = 'score_threshold';
     addLog(state, `Victory: Score threshold reached (${state.finalScore} pts)`, 'gain');
@@ -391,12 +385,12 @@ export function checkEndConditions(state: MainStreetState): boolean {
   }
 
   // Turn limit reached
-  if (state.turn >= MAX_TURNS) {
+  if (state.turn >= state.config.maxTurns) {
     // Turn-limit victory: positive reputation and coins >= 0
     if (state.resourceBank.reputation > 0 && state.resourceBank.coins >= 0) {
       state.gameResult = 'win';
       state.endReason = 'turn_limit_victory';
-      addLog(state, `Victory: Survived ${MAX_TURNS} turns (${state.finalScore} pts)`, 'gain');
+      addLog(state, `Victory: Survived ${state.config.maxTurns} turns (${state.finalScore} pts)`, 'gain');
       return true;
     }
 

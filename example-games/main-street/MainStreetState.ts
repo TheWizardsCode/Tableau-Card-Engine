@@ -18,8 +18,6 @@ import {
   createEventDeck,
   createUpgradeDeck,
   GRID_SIZE,
-  STARTING_COINS,
-  STARTING_REPUTATION,
   MARKET_BUSINESS_SLOTS,
   MARKET_INVESTMENT_UPGRADE_COUNT,
   MARKET_INVESTMENT_EVENT_COUNT,
@@ -28,9 +26,13 @@ import {
 import {
   type ActiveChallenge,
   CHALLENGE_TEMPLATES,
-  DEFAULT_CHALLENGES_PER_RUN,
   selectChallenges,
 } from './MainStreetChallenges';
+import {
+  type GameConfig,
+  type DifficultyName,
+  getPreset,
+} from './MainStreetDifficulty';
 
 // ── Activity Log ────────────────────────────────────────────
 
@@ -140,7 +142,9 @@ export type EndReason =
  * All game logic operates on and returns this state.
  */
 export interface MainStreetState {
-  /** Current turn number (1-based, max MAX_TURNS). */
+  /** Runtime configuration derived from the selected difficulty preset. */
+  config: GameConfig;
+  /** Current turn number (1-based, max config.maxTurns). */
   turn: number;
   /** Current phase within the turn. */
   phase: DayPhase;
@@ -184,6 +188,8 @@ export interface MainStreetState {
 export interface MainStreetSetupOptions {
   /** Seed string for deterministic RNG. If omitted, a random seed is generated. */
   seed?: string;
+  /** Difficulty preset name. Defaults to 'Medium' if omitted. */
+  difficulty?: DifficultyName;
 }
 
 // ── Seed Helpers ────────────────────────────────────────────
@@ -242,6 +248,9 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
   const numericSeed = seedToNumber(seed);
   const rng = createSeededRng(numericSeed);
 
+  // Resolve difficulty preset into runtime config
+  const config = getPreset(options.difficulty);
+
   // Create and shuffle decks
   const businessDeck = createBusinessDeck();
   const eventDeck = createEventDeck();
@@ -278,15 +287,16 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     incidentQueue.push(eventDeck.splice(idx, 1)[0]);
   }
 
-  // Build initial state
+  // Build initial state -- use config values instead of hard-coded constants
   const state: MainStreetState = {
+    config,
     turn: 1,
     phase: 'DayStart',
     streetGrid: new Array<BusinessCard | null>(GRID_SIZE).fill(null),
     market,
     resourceBank: {
-      coins: STARTING_COINS,
-      reputation: STARTING_REPUTATION,
+      coins: config.startingCoins,
+      reputation: config.startingReputation,
     },
     decks: {
       business: businessDeck,
@@ -305,8 +315,8 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     activityLog: [],
   };
 
-  // Select challenges for this run using seeded RNG
-  const selectedChallenges = selectChallenges(CHALLENGE_TEMPLATES, DEFAULT_CHALLENGES_PER_RUN, rng);
+  // Select challenges for this run using seeded RNG and config count
+  const selectedChallenges = selectChallenges(CHALLENGE_TEMPLATES, config.challengesPerRun, rng);
   state.activeChallenges = selectedChallenges.map(ch => ({
     challenge: ch,
     completed: false,
