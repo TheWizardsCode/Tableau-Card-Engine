@@ -1,0 +1,189 @@
+# Main Street: Playtest Scenarios
+
+> **Work item:** CG-0MMJCMVMQ1TGTM0R (Playtest Scenarios & Balance Tasks)
+> **Last updated:** M2 Expanded Card Pool
+
+This document defines curated playtest scenarios for validating the M2 expanded card pool. Each scenario uses a deterministic seed so results are exactly reproducible. Designers can run these scenarios to verify balance expectations after any card or rule changes.
+
+## Running Scenarios
+
+```bash
+# Run a single scenario by seed
+npx tsx scripts/demo-main-street.ts --seed "sweep-63"
+
+# Run all 5 curated scenarios and compare results
+npx tsx scripts/playtest-scenarios.ts
+
+# Run the Monte Carlo sweep (200 seeds, in test suite)
+npx vitest run --project unit -t "Monte Carlo"
+```
+
+---
+
+## Scenario 1: "Quick Bankruptcy" (seed: `sweep-63`)
+
+**Category:** Loss -- Bankruptcy
+**Expected outcome:** Loss on turn 1 (bankruptcy)
+**Score:** 14 | **Turns:** 1
+
+### What happens
+
+The player buys an Art Gallery (cost 4) and Block Party investment (cost 4), spending all 8 starting coins. The Tax Audit incident then hits for -3 coins, pushing the balance to -1. Bankruptcy is declared immediately.
+
+### Balance observations
+
+- This demonstrates the "greed trap" -- spending everything on turn 1 with no reserve leaves the player fully exposed to any negative incident.
+- The greedy strategy has no concept of risk management; a smarter player would hold 3+ coins as a buffer.
+- **Pass criteria:** Loss occurs. Score < 20.
+
+### Turn log
+
+| Turn | Coins | Rep | Score | Grid | Actions | Incident |
+|------|-------|-----|-------|------|---------|----------|
+| 1 | -1 | 3 | 14 | 1/10 | buy Art Gallery, buy Block Party | Tax Audit |
+
+---
+
+## Scenario 2: "Reputation Collapse" (seed: `sweep-75`)
+
+**Category:** Loss -- Reputation collapse
+**Expected outcome:** Loss on turn 5 (reputation hits 0)
+**Score:** 13 | **Turns:** 5
+
+### What happens
+
+The player builds a street of low-cost businesses (Food Trucks, Cafe, Diner) but faces a barrage of reputation-damaging incidents: Noise Complaint (-1 rep), Vandalism (-1 rep), and Health Inspection (-1 rep) over turns 3-5. Reputation drops from 3 to 0.
+
+### Balance observations
+
+- Demonstrates that reputation is a real loss vector, not just a scoring bonus.
+- Entertainment and Food businesses are especially vulnerable when paired with Noise Complaint + Health Inspection sequences.
+- The greedy strategy never prioritises reputation-building investments (Charity Drive, Block Party) which could have prevented collapse.
+- **Pass criteria:** Loss by reputation_collapse. Turns <= 6.
+
+### Turn log
+
+| Turn | Coins | Rep | Score | Grid | Actions | Incident |
+|------|-------|-----|-------|------|---------|----------|
+| 1 | 2 | 3 | 17 | 1/10 | buy Food Truck, buy Grand Opening | Tax Audit |
+| 2 | 3 | 3 | 18 | 2/10 | buy Food Truck | Road Construction |
+| 3 | 6 | 2 | 16 | 3/10 | buy Cafe | Noise Complaint |
+| 4 | 14 | 1 | 19 | 4/10 | buy Diner | Vandalism |
+| 5 | 13 | 0 | 13 | 5/10 | buy Bookshop, buy Block Party | Health Inspection |
+
+---
+
+## Scenario 3: "Slow Grind" (seed: `sweep-14`)
+
+**Category:** Win -- Late threshold (turn 17 of 20)
+**Expected outcome:** Win, barely, with tight economy through mid-game
+**Score:** 155 | **Turns:** 17
+
+### What happens
+
+The player opens with Florist (cost 2) and invests in Block Party but then faces two turns of inactivity (no affordable actions). Income is very low until turn 8-9 when Service synergies finally kick in with Pawn Shop + Laundromat + Barbershop. The win doesn't arrive until turn 17 -- dangerously close to the 20-turn limit.
+
+### Balance observations
+
+- This is a "near-miss" scenario -- any additional negative incident could push it into a time-out loss.
+- Demonstrates that low-cost openings (Florist at $2, Food Truck at $2) produce slower income curves.
+- The grid fills by turn 15 and the final turns are pure income accumulation with no purchases.
+- Service synergy cluster (Laundromat + Barbershop) provides steady mid-game income.
+- **Pass criteria:** Win. Score in range 150-165. Turns >= 15.
+
+---
+
+## Scenario 4: "Comfortable Win" (seed: `Scenario-FoodFocus`)
+
+**Category:** Win -- Mid-game threshold (turn 13)
+**Expected outcome:** Solid win with mixed synergy strategy
+**Score:** 158 | **Turns:** 13
+
+### What happens
+
+The player builds a diverse street: Park, Food Truck, Park, Bakery, Pawn Shop, Bookshop, Florist, Pawn Shop, Laundromat, Bookshop. Bridge cards (Food Truck, Florist) connect Culture and Commerce clusters. Income ramps steadily after turn 7 when the grid passes 50% capacity.
+
+### Balance observations
+
+- Bridge cards (Food Truck: Food+Entertainment, Florist: Commerce+Culture) provide adjacency bonuses from multiple synergy types.
+- Two Parks provide cheap Culture filler that boosts Bookshop adjacency.
+- The player absorbs several negative incidents (Shoplifting, Power Outage, Health Inspection) without crisis.
+- **Pass criteria:** Win. Score in range 150-170. Turns in range 10-15.
+
+---
+
+## Scenario 5: "Bridge Synergy Powerhouse" (seed: `Bridge-Master-7`)
+
+**Category:** Win -- Fast threshold (turn 10)
+**Expected outcome:** Dominant win driven by multi-synergy bridge cards
+**Score:** 169 | **Turns:** 10
+
+### What happens
+
+The player opens with two Parks and two Cafes (Food+Culture bridges), creating a dense Culture adjacency cluster. By turn 5, the base income from synergies alone is substantial. Art Gallery (Culture+Entertainment) and Boutique (Commerce) round out the grid. The 150-point threshold is hit by turn 10 with 129 coins.
+
+### Balance observations
+
+- This is the highest-scoring curated scenario, showing the upper bound of the greedy strategy with favourable draws.
+- Multi-synergy bridge cards are the star: Cafe bridges Food+Culture, creating double adjacency potential.
+- The Culture-heavy cluster (Park, Park, Cafe, Cafe, Bookshop, Bookshop, Art Gallery) generates massive synergy income.
+- **Pass criteria:** Win. Score >= 165. Turns <= 12.
+
+---
+
+## Balance Heuristics Checklist
+
+Use these heuristics when evaluating card changes or rule adjustments:
+
+### Win Rate
+
+- **Target:** Greedy strategy should win 90-97% of games (currently ~96.5% over 200 seeds).
+- **If win rate drops below 85%:** Negative incidents may be too harsh; reduce coin penalties or incident frequency.
+- **If win rate exceeds 99%:** Consider increasing difficulty (lower starting coins, higher win threshold, more incidents).
+
+### Loss Vectors
+
+- **Bankruptcy** should account for ~50-60% of losses (currently ~57%).
+- **Reputation collapse** should account for ~30-40% of losses (currently ~29%).
+- **Timeout** (turn 20 without reaching 150) should be rare (~10% of losses).
+
+### Score Distribution
+
+- **Median score:** 160-170 range (with greedy strategy).
+- **Fast wins** (turn <= 10): ~30% of wins -- indicates strong early draws.
+- **Late wins** (turn >= 15): ~15% of wins -- indicates tough early game.
+
+### Synergy Balance
+
+- No single synergy type should dominate >40% of wins.
+- Bridge cards should appear in >50% of winning strategies (by grid composition).
+- All 5 synergy types should appear in the grid at least occasionally (>20% of runs).
+
+### Economy Curve
+
+- Players should have at least 2 turns of "can't afford anything" per run on average.
+- Grid should reach 50% capacity (5/10) by turn 7-9 on average.
+- Grid should fill (10/10) by turn 12-15 on average.
+
+---
+
+## Running Custom Sweeps
+
+For more thorough balance testing, use the Monte Carlo test:
+
+```bash
+# Run the 200-seed sweep
+npx vitest run --project unit -t "Monte Carlo"
+```
+
+For custom sweep sizes, modify the `SEED_COUNT` constant in `tests/main-street/market.integration.test.ts`.
+
+To run a batch of seeds with full transcripts:
+
+```bash
+for i in $(seq 0 49); do
+  npx tsx scripts/demo-main-street.ts --seed "batch-$i" > "transcripts/batch-$i.json" 2>/dev/null
+done
+```
+
+Then analyse transcripts with standard JSON tools (`jq`, Python, etc.) to extract aggregate statistics.
