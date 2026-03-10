@@ -309,13 +309,7 @@ export function purchaseUpgrade(
     }
     businessIndex = targetSlot;
   } else {
-    businessIndex = state.streetGrid.findIndex(
-      b =>
-        b !== null &&
-        b.name === card.targetBusiness &&
-        b.level === requiredLevel &&
-        b.level < b.maxLevel,
-    );
+    businessIndex = findTargetBusinessSlot(state, card);
   }
 
   const business = state.streetGrid[businessIndex]!;
@@ -416,6 +410,33 @@ export function getEmptySlots(state: MainStreetState): number[] {
     if (state.streetGrid[i] === null) slots.push(i);
   }
   return slots;
+}
+
+/**
+ * Finds the first street grid slot containing a business that is a valid
+ * target for `card` — i.e. the business name matches, the business level
+ * equals the card's `requiredLevel` (defaulting to 0), and the business is
+ * below its `maxLevel`.
+ *
+ * Used by both the market logic and the UI to locate the default target
+ * slot without duplicating the matching conditions.
+ *
+ * @param state Current game state.
+ * @param card  The UpgradeCard to match.
+ * @returns The slot index of the first eligible business, or -1 if none.
+ */
+export function findTargetBusinessSlot(
+  state: MainStreetState,
+  card: UpgradeCard,
+): number {
+  const requiredLevel = card.requiredLevel ?? 0;
+  return state.streetGrid.findIndex(
+    b =>
+      b !== null &&
+      b.name === card.targetBusiness &&
+      b.level === requiredLevel &&
+      b.level < b.maxLevel,
+  );
 }
 
 /**

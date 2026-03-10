@@ -38,6 +38,7 @@ import {
   getAffordableUpgradeCards,
   getEmptySlots,
   getUpgradeBranchesForBusiness,
+  findTargetBusinessSlot,
   canPurchaseBusiness,
   canPurchaseUpgrade,
   canPurchaseEvent,
@@ -1178,13 +1179,7 @@ export class MainStreetScene extends CardGameScene {
     }
 
     // Determine which business slot this upgrade targets (first eligible match)
-    const targetSlot = this.state.streetGrid.findIndex(
-      b =>
-        b !== null &&
-        b.name === card.targetBusiness &&
-        b.level === card.requiredLevel &&
-        b.level < b.maxLevel,
-    );
+    const targetSlot = findTargetBusinessSlot(this.state, card);
 
     // If there are multiple upgrade branches for that business, show a choice modal
     const branches = getUpgradeBranchesForBusiness(this.state, targetSlot);
@@ -1193,7 +1188,7 @@ export class MainStreetScene extends CardGameScene {
       return;
     }
 
-    // Single upgrade available — apply immediately
+    // Single upgrade available — apply immediately with the resolved slot
     const action: PlayerAction = { type: 'buy-upgrade', cardId: card.id, targetSlot };
     try {
       executeAction(this.state, action);
