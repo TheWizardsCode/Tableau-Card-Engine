@@ -47,6 +47,14 @@ export interface BusinessCard {
   incomeBonus: number;
   /** Cumulative synergy range extension from applied upgrades. */
   synergyRangeBonus: number;
+  /**
+   * IDs of upgrade cards that have been applied to this business instance,
+   * in application order. Used to enforce multi-level chain requirements and
+   * to prevent the same branch being applied twice.
+   *
+   * Omitting this field is treated as an empty array.
+   */
+  appliedUpgrades?: string[];
 }
 
 /**
@@ -68,6 +76,13 @@ export interface EventCard {
 
 /**
  * An Upgrade card that enhances a specific Business card.
+ *
+ * Branching upgrades: multiple `UpgradeCard` entries may share the same
+ * `targetBusiness` and `requiredLevel`, giving the player a choice of which
+ * upgrade branch to take.
+ *
+ * Multi-level chains: set `requiredLevel > 0` so the card can only be applied
+ * after the business has already been upgraded that many times.
  */
 export interface UpgradeCard {
   readonly family: 'upgrade';
@@ -78,6 +93,14 @@ export interface UpgradeCard {
   readonly incomeBonus: number;
   readonly synergyRangeBonus: number;
   readonly description: string;
+  /**
+   * Minimum business level required before this upgrade may be applied.
+   * 0 (default) = can be applied to the base (un-upgraded) business.
+   * 1 = can only be applied after the business has been upgraded once, etc.
+   *
+   * Omitting this field is equivalent to setting it to 0.
+   */
+  readonly requiredLevel?: number;
 }
 
 /** Union of all card types in Main Street. */
@@ -140,14 +163,15 @@ export const CHALLENGE_BONUS_POINTS = 10;
 
 /**
  * Creates a fresh copy of a BusinessCard from template data.
- * Mutable fields (level, incomeBonus, synergyRangeBonus) are reset.
+ * Mutable fields (level, incomeBonus, synergyRangeBonus, appliedUpgrades) are reset.
  */
-function makeBusiness(template: Omit<BusinessCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus'>): BusinessCard {
+function makeBusiness(template: Omit<BusinessCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'appliedUpgrades'>): BusinessCard {
   return {
     family: 'business',
     level: 0,
     incomeBonus: 0,
     synergyRangeBonus: 0,
+    appliedUpgrades: [],
     ...template,
   };
 }
@@ -161,7 +185,7 @@ const BUSINESS_TEMPLATES: Omit<BusinessCard, 'family' | 'level' | 'incomeBonus' 
     baseIncome: 2,
     synergyTypes: ['Food'],
     upgradePath: 'Bakery',
-    maxLevel: 1,
+    maxLevel: 2,
     description: 'Provides warm pastries. Gains +1 coin for each adjacent Food business.',
   },
   {
@@ -171,7 +195,7 @@ const BUSINESS_TEMPLATES: Omit<BusinessCard, 'family' | 'level' | 'incomeBonus' 
     baseIncome: 3,
     synergyTypes: ['Food'],
     upgradePath: 'Diner',
-    maxLevel: 1,
+    maxLevel: 2,
     description: 'Serves quick meals. Gains +1 coin per adjacent Food business.',
   },
   {
@@ -265,7 +289,7 @@ const BUSINESS_TEMPLATES: Omit<BusinessCard, 'family' | 'level' | 'incomeBonus' 
     baseIncome: 3,
     synergyTypes: ['Entertainment'],
     upgradePath: 'Cinema',
-    maxLevel: 1,
+    maxLevel: 2,
     description: 'Shows the latest films. Gains +1 coin per adjacent Entertainment business.',
   },
   // Multi-synergy bridge cards (belong to two synergy types)
@@ -306,7 +330,7 @@ const BUSINESS_TEMPLATES: Omit<BusinessCard, 'family' | 'level' | 'incomeBonus' 
     baseIncome: 3,
     synergyTypes: ['Service', 'Entertainment'],
     upgradePath: 'Day Spa',
-    maxLevel: 1,
+    maxLevel: 2,
     description: 'Relaxation and pampering. Bridges Service and Entertainment synergies.',
   },
   // Additional variety
@@ -538,6 +562,7 @@ const EVENT_TEMPLATES: EventCard[] = [
 
 /** Template data for all Upgrade cards (M1 + M2 pool). */
 const UPGRADE_TEMPLATES: UpgradeCard[] = [
+  // ── M1 Base Upgrades (requiredLevel: 0) ─────────────────────
   {
     family: 'upgrade',
     id: 'upg-patisserie',
@@ -546,6 +571,7 @@ const UPGRADE_TEMPLATES: UpgradeCard[] = [
     cost: 4,
     incomeBonus: 1,
     synergyRangeBonus: 1,
+    requiredLevel: 0,
     description: 'Turns a Bakery into a Patisserie, increasing income and synergy range.',
   },
   {
@@ -556,6 +582,7 @@ const UPGRADE_TEMPLATES: UpgradeCard[] = [
     cost: 4,
     incomeBonus: 1,
     synergyRangeBonus: 1,
+    requiredLevel: 0,
     description: 'Turns a Diner into a Bistro with higher foot-traffic.',
   },
   {
@@ -566,6 +593,7 @@ const UPGRADE_TEMPLATES: UpgradeCard[] = [
     cost: 3,
     incomeBonus: 1,
     synergyRangeBonus: 0,
+    requiredLevel: 0,
     description: 'Adds a cultural boost to the Bookshop.',
   },
   // ── M2 Expanded Upgrade Templates ───────────────────────────
@@ -577,6 +605,7 @@ const UPGRADE_TEMPLATES: UpgradeCard[] = [
     cost: 3,
     incomeBonus: 1,
     synergyRangeBonus: 1,
+    requiredLevel: 0,
     description: 'Expands the Park into a Garden with extended cultural reach.',
   },
   {
@@ -587,6 +616,7 @@ const UPGRADE_TEMPLATES: UpgradeCard[] = [
     cost: 4,
     incomeBonus: 1,
     synergyRangeBonus: 1,
+    requiredLevel: 0,
     description: 'Transforms the Hardware Store into a Home Improvement center.',
   },
   {
@@ -597,6 +627,7 @@ const UPGRADE_TEMPLATES: UpgradeCard[] = [
     cost: 3,
     incomeBonus: 1,
     synergyRangeBonus: 0,
+    requiredLevel: 0,
     description: 'Rebrands the Pawn Shop as a trendy Vintage Shop.',
   },
   {
@@ -607,6 +638,7 @@ const UPGRADE_TEMPLATES: UpgradeCard[] = [
     cost: 4,
     incomeBonus: 1,
     synergyRangeBonus: 1,
+    requiredLevel: 0,
     description: 'Elevates the Boutique to a Designer Store with premium clientele.',
   },
   {
@@ -617,6 +649,7 @@ const UPGRADE_TEMPLATES: UpgradeCard[] = [
     cost: 3,
     incomeBonus: 1,
     synergyRangeBonus: 0,
+    requiredLevel: 0,
     description: 'Upgrades the Laundromat to a full-service Dry Cleaners.',
   },
   {
@@ -627,6 +660,7 @@ const UPGRADE_TEMPLATES: UpgradeCard[] = [
     cost: 3,
     incomeBonus: 1,
     synergyRangeBonus: 1,
+    requiredLevel: 0,
     description: 'Expands the Barbershop into a modern Salon.',
   },
   {
@@ -637,6 +671,7 @@ const UPGRADE_TEMPLATES: UpgradeCard[] = [
     cost: 4,
     incomeBonus: 1,
     synergyRangeBonus: 1,
+    requiredLevel: 0,
     description: 'Transforms the Arcade into a state-of-the-art Gaming Lounge.',
   },
   {
@@ -647,6 +682,7 @@ const UPGRADE_TEMPLATES: UpgradeCard[] = [
     cost: 5,
     incomeBonus: 2,
     synergyRangeBonus: 1,
+    requiredLevel: 0,
     description: 'Upgrades the Cinema to an IMAX Theater with premium experience.',
   },
   {
@@ -657,6 +693,7 @@ const UPGRADE_TEMPLATES: UpgradeCard[] = [
     cost: 3,
     incomeBonus: 1,
     synergyRangeBonus: 1,
+    requiredLevel: 0,
     description: 'Turns the Cafe into a specialty Roastery with artisan appeal.',
   },
   {
@@ -667,6 +704,7 @@ const UPGRADE_TEMPLATES: UpgradeCard[] = [
     cost: 2,
     incomeBonus: 1,
     synergyRangeBonus: 0,
+    requiredLevel: 0,
     description: 'Elevates the Food Truck with gourmet offerings.',
   },
   {
@@ -677,6 +715,7 @@ const UPGRADE_TEMPLATES: UpgradeCard[] = [
     cost: 4,
     incomeBonus: 1,
     synergyRangeBonus: 1,
+    requiredLevel: 0,
     description: 'Expands the Art Gallery into a full Museum.',
   },
   {
@@ -687,6 +726,7 @@ const UPGRADE_TEMPLATES: UpgradeCard[] = [
     cost: 5,
     incomeBonus: 2,
     synergyRangeBonus: 1,
+    requiredLevel: 0,
     description: 'Transforms the Day Spa into a luxurious Resort Spa.',
   },
   {
@@ -697,6 +737,7 @@ const UPGRADE_TEMPLATES: UpgradeCard[] = [
     cost: 3,
     incomeBonus: 1,
     synergyRangeBonus: 1,
+    requiredLevel: 0,
     description: 'Expands the Florist into a full Garden Center.',
   },
   {
@@ -707,7 +748,106 @@ const UPGRADE_TEMPLATES: UpgradeCard[] = [
     cost: 5,
     incomeBonus: 2,
     synergyRangeBonus: 1,
+    requiredLevel: 0,
     description: 'Upgrades the Clinic to a comprehensive Medical Center.',
+  },
+  // ── Branching Upgrades (alternative level-0 paths) ──────────
+  // Bakery branches: Patisserie (above, food-artisan) vs Bread Factory (volume)
+  {
+    family: 'upgrade',
+    id: 'upg-bread-factory',
+    name: 'Upgrade to Bread Factory',
+    targetBusiness: 'Bakery',
+    cost: 3,
+    incomeBonus: 2,
+    synergyRangeBonus: 0,
+    requiredLevel: 0,
+    description: 'Scales the Bakery into a high-volume Bread Factory. More income, no range boost.',
+  },
+  // Diner branches: Bistro (above, quality) vs Fast Food (volume)
+  {
+    family: 'upgrade',
+    id: 'upg-fast-food',
+    name: 'Upgrade to Fast Food',
+    targetBusiness: 'Diner',
+    cost: 3,
+    incomeBonus: 2,
+    synergyRangeBonus: 0,
+    requiredLevel: 0,
+    description: 'Converts the Diner to a Fast Food outlet. Higher income, smaller synergy radius.',
+  },
+  // Cinema branches: IMAX (above, premium) vs Drive-In (community)
+  {
+    family: 'upgrade',
+    id: 'upg-drive-in',
+    name: 'Upgrade to Drive-In Theater',
+    targetBusiness: 'Cinema',
+    cost: 4,
+    incomeBonus: 1,
+    synergyRangeBonus: 2,
+    requiredLevel: 0,
+    description: 'Turns the Cinema into a Drive-In Theater with a much wider community reach.',
+  },
+  // Day Spa branches: Resort Spa (above, premium) vs Wellness Center (service-range)
+  {
+    family: 'upgrade',
+    id: 'upg-wellness-center',
+    name: 'Upgrade to Wellness Center',
+    targetBusiness: 'Day Spa',
+    cost: 4,
+    incomeBonus: 1,
+    synergyRangeBonus: 2,
+    requiredLevel: 0,
+    description: 'Expands the Day Spa into a Wellness Center with a broader service footprint.',
+  },
+  // ── Multi-Level Upgrades (requiredLevel: 1) ──────────────────
+  // Level-2 upgrade for Bakery (after Patisserie or Bread Factory)
+  {
+    family: 'upgrade',
+    id: 'upg-grand-bakehouse',
+    name: 'Upgrade to Grand Bakehouse',
+    targetBusiness: 'Bakery',
+    cost: 5,
+    incomeBonus: 2,
+    synergyRangeBonus: 1,
+    requiredLevel: 1,
+    description: 'The pinnacle of baking craft — a Grand Bakehouse drawing visitors from afar.',
+  },
+  // Level-2 upgrade for Diner (after Bistro or Fast Food)
+  {
+    family: 'upgrade',
+    id: 'upg-restaurant',
+    name: 'Upgrade to Restaurant',
+    targetBusiness: 'Diner',
+    cost: 5,
+    incomeBonus: 2,
+    synergyRangeBonus: 1,
+    requiredLevel: 1,
+    description: 'Elevates the Diner all the way to a full-service Restaurant.',
+  },
+  // Level-2 upgrade for Cinema (after IMAX or Drive-In)
+  {
+    family: 'upgrade',
+    id: 'upg-multiplex',
+    name: 'Upgrade to Multiplex',
+    targetBusiness: 'Cinema',
+    cost: 6,
+    incomeBonus: 3,
+    synergyRangeBonus: 1,
+    requiredLevel: 1,
+    description: 'A massive Multiplex complex — the entertainment heart of Main Street.',
+  },
+  // Level-2 upgrade for Day Spa (after Resort Spa or Wellness Center)
+  {
+    family: 'upgrade',
+    id: 'upg-luxury-retreat',
+    name: 'Upgrade to Luxury Retreat',
+    targetBusiness: 'Day Spa',
+    cost: 6,
+    incomeBonus: 3,
+    synergyRangeBonus: 1,
+    requiredLevel: 1,
+    description: 'A destination Luxury Retreat — the most prestigious business on the street.',
   },
 ];
 

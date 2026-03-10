@@ -29,10 +29,10 @@ import { DEFAULT_CHALLENGES_PER_RUN } from '../../example-games/main-street/Main
 // ── Template Counts (M1 + M2) ──────────────────────────────
 // Business: 5 (M1) + 12 (M2) = 17 templates
 // Event:    5 (M1) + 12 (M2) = 17 templates
-// Upgrade:  3 (M1) + 14 (M2) = 17 templates
+// Upgrade:  3 (M1) + 14 (M2) + 4 branching + 4 level-2 = 25 templates
 const BUSINESS_TEMPLATE_COUNT = 17;
 const EVENT_TEMPLATE_COUNT = 17;
-const UPGRADE_TEMPLATE_COUNT = 17;
+const UPGRADE_TEMPLATE_COUNT = 25;
 const DEFAULT_BUSINESS_COPIES = 3;
 const DEFAULT_EVENT_COPIES = 3;
 const DEFAULT_UPGRADE_COPIES = 2;
