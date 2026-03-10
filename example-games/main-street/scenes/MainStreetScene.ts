@@ -37,6 +37,7 @@ import {
   getAffordableBusinessCards,
   getAffordableUpgradeCards,
   getEmptySlots,
+  getUpgradeBranchesForBusiness,
   canPurchaseBusiness,
   canPurchaseUpgrade,
   canPurchaseEvent,
@@ -1176,7 +1177,24 @@ export class MainStreetScene extends CardGameScene {
       return;
     }
 
-    const action: PlayerAction = { type: 'buy-upgrade', cardId: card.id };
+    // Determine which business slot this upgrade targets (first eligible match)
+    const targetSlot = this.state.streetGrid.findIndex(
+      b =>
+        b !== null &&
+        b.name === card.targetBusiness &&
+        b.level === card.requiredLevel &&
+        b.level < b.maxLevel,
+    );
+
+    // If there are multiple upgrade branches for that business, show a choice modal
+    const branches = getUpgradeBranchesForBusiness(this.state, targetSlot);
+    if (branches.length > 1) {
+      this.showUpgradeChoiceModal(branches, targetSlot);
+      return;
+    }
+
+    // Single upgrade available — apply immediately
+    const action: PlayerAction = { type: 'buy-upgrade', cardId: card.id, targetSlot };
     try {
       executeAction(this.state, action);
       this.instructionText.setText(`Applied upgrade: "${card.name}"`);
@@ -1185,6 +1203,110 @@ export class MainStreetScene extends CardGameScene {
     }
 
     this.refreshAll();
+  }
+
+  /**
+   * Shows a modal overlay that lets the player choose between multiple
+   * upgrade branches available for the business at `targetSlot`.
+   *
+   * When a branch button is clicked the modal is dismissed, the chosen
+   * upgrade is applied via `executeAction`, and the scene is refreshed.
+   *
+   * @param branches   Eligible UpgradeCards the player may choose from.
+   * @param targetSlot Street grid slot of the business to be upgraded.
+   */
+  private showUpgradeChoiceModal(branches: UpgradeCard[], targetSlot: number): void {
+    const MODAL_DEPTH = 20;
+    const MODAL_W = 500;
+    const BTN_H = 60;
+    const HEADER_H = 60;
+    const FOOTER_H = 50;
+    const MODAL_H = HEADER_H + branches.length * BTN_H + FOOTER_H;
+
+    const overlay = createOverlayBackground(
+      this,
+      { depth: MODAL_DEPTH, alpha: 0.8 },
+      { width: MODAL_W, height: MODAL_H, color: 0x1a1208, alpha: 0.95, depth: MODAL_DEPTH },
+    );
+    this.overlayObjects.push(...overlay.objects);
+
+    const cx = GAME_W / 2;
+    const cy = GAME_H / 2;
+    const top = cy - MODAL_H / 2;
+
+    // Title
+    const title = this.add
+      .text(cx, top + 24, 'Choose an Upgrade Path', {
+        fontSize: '18px', fontStyle: 'bold', color: '#ffdd88', fontFamily: FONT_FAMILY,
+      })
+      .setOrigin(0.5, 0.5)
+      .setDepth(MODAL_DEPTH + 1);
+    this.overlayObjects.push(title);
+
+    // Branch buttons
+    branches.forEach((branch, idx) => {
+      const btnY = top + HEADER_H + idx * BTN_H + BTN_H / 2;
+
+      // Button background
+      const btnBg = this.add.rectangle(cx, btnY, MODAL_W - 40, BTN_H - 8, 0x2a1f14, 0.9)
+        .setDepth(MODAL_DEPTH + 1)
+        .setStrokeStyle(1, 0x665544)
+        .setInteractive({ useHandCursor: true });
+      this.overlayObjects.push(btnBg);
+
+      // Branch label
+      const costLabel = `$${branch.cost}`;
+      const bonusLabel = `+${branch.incomeBonus} income, +${branch.synergyRangeBonus} range`;
+      const btnText = this.add
+        .text(cx, btnY - 8, branch.name, {
+          fontSize: '14px', fontStyle: 'bold', color: '#ffffff', fontFamily: FONT_FAMILY,
+        })
+        .setOrigin(0.5, 0.5)
+        .setDepth(MODAL_DEPTH + 2);
+      this.overlayObjects.push(btnText);
+
+      const detailText = this.add
+        .text(cx, btnY + 10, `${costLabel} — ${bonusLabel}`, {
+          fontSize: '11px', color: '#aaaaaa', fontFamily: FONT_FAMILY,
+        })
+        .setOrigin(0.5, 0.5)
+        .setDepth(MODAL_DEPTH + 2);
+      this.overlayObjects.push(detailText);
+
+      const onChoose = (): void => {
+        // Dismiss modal first
+        dismissOverlay(this.overlayObjects);
+        this.overlayObjects = [];
+
+        const action: PlayerAction = { type: 'buy-upgrade', cardId: branch.id, targetSlot };
+        try {
+          executeAction(this.state, action);
+          this.instructionText.setText(`Applied upgrade: "${branch.name}"`);
+        } catch (e) {
+          this.instructionText.setText(`Error: ${(e as Error).message}`);
+        }
+        this.refreshAll();
+      };
+
+      btnBg.on('pointerdown', onChoose);
+      btnBg.on('pointerover', () => btnBg.setFillStyle(0x3a2f24, 0.95));
+      btnBg.on('pointerout', () => btnBg.setFillStyle(0x2a1f14, 0.9));
+    });
+
+    // Cancel button
+    const cancelBtn = createOverlayButton(
+      this,
+      cx,
+      top + MODAL_H - FOOTER_H / 2,
+      '[ Cancel ]',
+      MODAL_DEPTH + 2,
+      { color: '#ff8888', hoverColor: '#ffaaaa' },
+    );
+    this.overlayObjects.push(cancelBtn);
+    cancelBtn.on('pointerdown', () => {
+      dismissOverlay(this.overlayObjects);
+      this.overlayObjects = [];
+    });
   }
 
   // ── Activity Log ─────────────────────────────────────────
