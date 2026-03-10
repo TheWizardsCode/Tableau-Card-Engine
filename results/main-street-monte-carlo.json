@@ -1,0 +1,2028 @@
+{
+  "generatedAt": "2026-03-10T22:04:18.561Z",
+  "runsRequested": 200,
+  "runsExecuted": 200,
+  "seedPrefix": "mc-balance",
+  "maxTurns": 25,
+  "strategy": "market-greedy",
+  "metrics": {
+    "runs": 200,
+    "wins": 173,
+    "losses": 27,
+    "winRate": 0.865,
+    "medianScore": 158,
+    "averageScore": 144.7,
+    "averageTurns": 10.68,
+    "averageNoActionTurns": 1.26,
+    "averageTurnWhenGridHalf": 5.052631578947368,
+    "averageTurnWhenGridFull": 10.053254437869823,
+    "lossReasons": {
+      "reputation_collapse": 27
+    },
+    "lossReasonRates": {
+      "reputation_collapse": 1
+    }
+  },
+  "runs": [
+    {
+      "seed": "mc-balance-0",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 168,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-1",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 182,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-2",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 165,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-3",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 161,
+      "turns": 10,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-4",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 171,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-5",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 13,
+      "turns": 4,
+      "turnWhenGridHalf": null,
+      "turnWhenGridFull": null,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-6",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 168,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-7",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 178,
+      "turns": 13,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 3
+    },
+    {
+      "seed": "mc-balance-8",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 154,
+      "turns": 9,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": null,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-9",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 12,
+      "turns": 3,
+      "turnWhenGridHalf": null,
+      "turnWhenGridFull": null,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-10",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 178,
+      "turns": 11,
+      "turnWhenGridHalf": 6,
+      "turnWhenGridFull": 11,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-11",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 159,
+      "turns": 10,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-12",
+      "result": "win",
+      "endReason": "all_challenges",
+      "finalScore": 157,
+      "turns": 10,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-13",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 154,
+      "turns": 13,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 3
+    },
+    {
+      "seed": "mc-balance-14",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 160,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-15",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 155,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-16",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 152,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-17",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 154,
+      "turns": 10,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-18",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 174,
+      "turns": 15,
+      "turnWhenGridHalf": 6,
+      "turnWhenGridFull": 11,
+      "noActionTurns": 5
+    },
+    {
+      "seed": "mc-balance-19",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 150,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-20",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 178,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-21",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 161,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-22",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 155,
+      "turns": 10,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-23",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 153,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-24",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 166,
+      "turns": 13,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 3
+    },
+    {
+      "seed": "mc-balance-25",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 172,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-26",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 164,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-27",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 153,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-28",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 168,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-29",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 154,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-30",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 156,
+      "turns": 10,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-31",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 164,
+      "turns": 13,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 3
+    },
+    {
+      "seed": "mc-balance-32",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 166,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-33",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 161,
+      "turns": 14,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 4
+    },
+    {
+      "seed": "mc-balance-34",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 169,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-35",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 157,
+      "turns": 13,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 3
+    },
+    {
+      "seed": "mc-balance-36",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 170,
+      "turns": 10,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-37",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 152,
+      "turns": 13,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 3
+    },
+    {
+      "seed": "mc-balance-38",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 164,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-39",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 167,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-40",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 158,
+      "turns": 13,
+      "turnWhenGridHalf": 7,
+      "turnWhenGridFull": 12,
+      "noActionTurns": 3
+    },
+    {
+      "seed": "mc-balance-41",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 11,
+      "turns": 4,
+      "turnWhenGridHalf": null,
+      "turnWhenGridFull": null,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-42",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 162,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-43",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 175,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-44",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 169,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-45",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 55,
+      "turns": 8,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": null,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-46",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 171,
+      "turns": 9,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": null,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-47",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 173,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-48",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 22,
+      "turns": 5,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": null,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-49",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 167,
+      "turns": 10,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-50",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 176,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-51",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 157,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-52",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 166,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-53",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 157,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-54",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 166,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-55",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 155,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-56",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 165,
+      "turns": 13,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 3
+    },
+    {
+      "seed": "mc-balance-57",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 154,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-58",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 164,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-59",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 164,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-60",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 169,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-61",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 169,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-62",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 154,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-63",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 152,
+      "turns": 13,
+      "turnWhenGridHalf": 6,
+      "turnWhenGridFull": 11,
+      "noActionTurns": 3
+    },
+    {
+      "seed": "mc-balance-64",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 157,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-65",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 156,
+      "turns": 10,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-66",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 153,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-67",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 17,
+      "turns": 5,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": null,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-68",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 169,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-69",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 156,
+      "turns": 10,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-70",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 156,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-71",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 151,
+      "turns": 10,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-72",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 151,
+      "turns": 10,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-73",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 155,
+      "turns": 10,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-74",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 161,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-75",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 158,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-76",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 150,
+      "turns": 14,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 4
+    },
+    {
+      "seed": "mc-balance-77",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 157,
+      "turns": 10,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-78",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 134,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-79",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 162,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-80",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 162,
+      "turns": 13,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 3
+    },
+    {
+      "seed": "mc-balance-81",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 170,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-82",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 158,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-83",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 16,
+      "turns": 4,
+      "turnWhenGridHalf": null,
+      "turnWhenGridFull": null,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-84",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 153,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-85",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 165,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-86",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 158,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-87",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 164,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-88",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 157,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-89",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 12,
+      "turns": 4,
+      "turnWhenGridHalf": null,
+      "turnWhenGridFull": null,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-90",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 172,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-91",
+      "result": "win",
+      "endReason": "all_challenges",
+      "finalScore": 95,
+      "turns": 8,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": null,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-92",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 153,
+      "turns": 10,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-93",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 163,
+      "turns": 10,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-94",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 156,
+      "turns": 13,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 3
+    },
+    {
+      "seed": "mc-balance-95",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 151,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-96",
+      "result": "win",
+      "endReason": "all_challenges",
+      "finalScore": 110,
+      "turns": 8,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": null,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-97",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 163,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-98",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 159,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-99",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 159,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-100",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 164,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-101",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 153,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-102",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 56,
+      "turns": 7,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": null,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-103",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 158,
+      "turns": 10,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-104",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 173,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-105",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 151,
+      "turns": 13,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 3
+    },
+    {
+      "seed": "mc-balance-106",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 169,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-107",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 151,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-108",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 162,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-109",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 159,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-110",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 11,
+      "turns": 3,
+      "turnWhenGridHalf": null,
+      "turnWhenGridFull": null,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-111",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 173,
+      "turns": 13,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 3
+    },
+    {
+      "seed": "mc-balance-112",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 160,
+      "turns": 10,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-113",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 11,
+      "turns": 3,
+      "turnWhenGridHalf": null,
+      "turnWhenGridFull": null,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-114",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 158,
+      "turns": 12,
+      "turnWhenGridHalf": 6,
+      "turnWhenGridFull": 11,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-115",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 151,
+      "turns": 15,
+      "turnWhenGridHalf": 6,
+      "turnWhenGridFull": 11,
+      "noActionTurns": 5
+    },
+    {
+      "seed": "mc-balance-116",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 168,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-117",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 158,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-118",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 20,
+      "turns": 5,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": null,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-119",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 166,
+      "turns": 15,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 5
+    },
+    {
+      "seed": "mc-balance-120",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 163,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-121",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 168,
+      "turns": 9,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": null,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-122",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 161,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-123",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 174,
+      "turns": 13,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 3
+    },
+    {
+      "seed": "mc-balance-124",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 165,
+      "turns": 10,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-125",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 153,
+      "turns": 9,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": null,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-126",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 11,
+      "turns": 3,
+      "turnWhenGridHalf": null,
+      "turnWhenGridFull": null,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-127",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 157,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-128",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 165,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-129",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 154,
+      "turns": 13,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 3
+    },
+    {
+      "seed": "mc-balance-130",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 166,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-131",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 167,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-132",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 165,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-133",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 154,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-134",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 158,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-135",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 179,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-136",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 153,
+      "turns": 9,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": null,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-137",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 172,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-138",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 170,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-139",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 168,
+      "turns": 10,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-140",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 160,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-141",
+      "result": "win",
+      "endReason": "all_challenges",
+      "finalScore": 111,
+      "turns": 10,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-142",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 154,
+      "turns": 14,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 4
+    },
+    {
+      "seed": "mc-balance-143",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 9,
+      "turns": 4,
+      "turnWhenGridHalf": null,
+      "turnWhenGridFull": null,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-144",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 163,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-145",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 160,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-146",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 154,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-147",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 160,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-148",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 103,
+      "turns": 9,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": null,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-149",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 154,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-150",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 10,
+      "turns": 4,
+      "turnWhenGridHalf": null,
+      "turnWhenGridFull": null,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-151",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 168,
+      "turns": 10,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-152",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 156,
+      "turns": 14,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 4
+    },
+    {
+      "seed": "mc-balance-153",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 154,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-154",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 168,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-155",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 175,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-156",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 49,
+      "turns": 8,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": null,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-157",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 164,
+      "turns": 13,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 3
+    },
+    {
+      "seed": "mc-balance-158",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 165,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-159",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 174,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-160",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 163,
+      "turns": 10,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-161",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 161,
+      "turns": 10,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-162",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 180,
+      "turns": 10,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-163",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 152,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-164",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 159,
+      "turns": 10,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-165",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 174,
+      "turns": 13,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 3
+    },
+    {
+      "seed": "mc-balance-166",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 153,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-167",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 170,
+      "turns": 15,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 5
+    },
+    {
+      "seed": "mc-balance-168",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 159,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-169",
+      "result": "win",
+      "endReason": "all_challenges",
+      "finalScore": 135,
+      "turns": 8,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": null,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-170",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 156,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-171",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 156,
+      "turns": 13,
+      "turnWhenGridHalf": 6,
+      "turnWhenGridFull": 11,
+      "noActionTurns": 3
+    },
+    {
+      "seed": "mc-balance-172",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 33,
+      "turns": 8,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": null,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-173",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 159,
+      "turns": 14,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 4
+    },
+    {
+      "seed": "mc-balance-174",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 19,
+      "turns": 6,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": null,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-175",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 24,
+      "turns": 7,
+      "turnWhenGridHalf": 6,
+      "turnWhenGridFull": null,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-176",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 154,
+      "turns": 10,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-177",
+      "result": "win",
+      "endReason": "all_challenges",
+      "finalScore": 172,
+      "turns": 10,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-178",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 155,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-179",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 167,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-180",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 164,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-181",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 87,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-182",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 156,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-183",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 166,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-184",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 156,
+      "turns": 10,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-185",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 128,
+      "turns": 13,
+      "turnWhenGridHalf": 6,
+      "turnWhenGridFull": 11,
+      "noActionTurns": 3
+    },
+    {
+      "seed": "mc-balance-186",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 151,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-187",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 155,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-188",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 170,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-189",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 152,
+      "turns": 10,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-190",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 167,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-191",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 161,
+      "turns": 13,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 3
+    },
+    {
+      "seed": "mc-balance-192",
+      "result": "win",
+      "endReason": "all_challenges",
+      "finalScore": 111,
+      "turns": 7,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": null,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-193",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 48,
+      "turns": 7,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": null,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-194",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 101,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-195",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 152,
+      "turns": 11,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-196",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 53,
+      "turns": 8,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": null,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-197",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 156,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-198",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 151,
+      "turns": 10,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-199",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 163,
+      "turns": 12,
+      "turnWhenGridHalf": 5,
+      "turnWhenGridFull": 10,
+      "noActionTurns": 2
+    }
+  ]
+}

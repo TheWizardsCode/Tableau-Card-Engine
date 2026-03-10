@@ -16,6 +16,9 @@ npx tsx scripts/playtest-scenarios.ts
 
 # Run the Monte Carlo sweep (200 seeds, in test suite)
 npx vitest run --project unit -t "Monte Carlo"
+
+# Run the dedicated Monte Carlo harness (JSON + CSV output)
+npm run monte-carlo
 ```
 
 ---
@@ -175,6 +178,18 @@ For more thorough balance testing, use the Monte Carlo test:
 # Run the 200-seed sweep
 npx vitest run --project unit -t "Monte Carlo"
 ```
+
+For deterministic balance reports with persisted artifacts:
+
+```bash
+# Default harness run (200 seeds, market-greedy strategy)
+npm run monte-carlo
+
+# Custom run size and output files
+npx tsx scripts/monte-carlo.ts --runs 100 --seed-prefix "mc-balance" --max-turns 25 --strategy market-greedy --out results/main-street-monte-carlo-100.json --csv-out results/main-street-monte-carlo-100.csv
+```
+
+Latest baseline interpretation is tracked in `docs/main-street/monte-carlo-sample-results.md`.
 
 For custom sweep sizes, modify the `SEED_COUNT` constant in `tests/main-street/market.integration.test.ts`.
 

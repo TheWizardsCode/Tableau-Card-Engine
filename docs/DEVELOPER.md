@@ -121,6 +121,7 @@ After this, every push to `main` will automatically deploy.
 
 ```bash
 npm test            # run all tests once (unit + browser)
+npm run monte-carlo # run Main Street Monte Carlo harness (JSON + CSV outputs)
 ```
 
 Tests use [Vitest](https://vitest.dev/) configured inline in `vite.config.ts` with two test projects:
