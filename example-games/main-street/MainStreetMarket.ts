@@ -80,6 +80,7 @@ export function canPurchaseBusiness(
  * to a matching business on the street.
  *
  * Searches the mixed investments row for upgrade-family cards.
+ * The upgrade's `requiredLevel` must be ≤ the target business's current `level`.
  *
  * @param state   Current game state.
  * @param cardId  ID of the Upgrade card in the investments row.
@@ -102,12 +103,20 @@ export function canPurchaseUpgrade(
     return { legal: false, reason: `Not enough coins. Need ${card.cost}, have ${state.resourceBank.coins}.` };
   }
 
-  // Check a matching business is placed on the street
+  // Check a matching business is placed on the street at the required level
+  const requiredLevel = card.requiredLevel ?? 0;
   const hasTarget = state.streetGrid.some(
-    b => b !== null && b.name === card.targetBusiness && b.level < b.maxLevel,
+    b =>
+      b !== null &&
+      b.name === card.targetBusiness &&
+      b.level === requiredLevel &&
+      b.level < b.maxLevel,
   );
   if (!hasTarget) {
-    return { legal: false, reason: `No eligible ${card.targetBusiness} on the street to upgrade.` };
+    return {
+      legal: false,
+      reason: `No eligible ${card.targetBusiness} on the street to upgrade (requires level ${requiredLevel}, below max level).`,
+    };
   }
 
   return { legal: true };
@@ -286,17 +295,21 @@ export function purchaseUpgrade(
   const card = state.market.investments[marketIndex] as UpgradeCard;
 
   // Find the target business
+  const requiredLevel = card.requiredLevel ?? 0;
   let businessIndex: number;
   if (targetSlot !== undefined) {
     const biz = state.streetGrid[targetSlot];
-    if (!biz || biz.name !== card.targetBusiness || biz.level >= biz.maxLevel) {
+    if (
+      !biz ||
+      biz.name !== card.targetBusiness ||
+      biz.level !== requiredLevel ||
+      biz.level >= biz.maxLevel
+    ) {
       throw new Error(`Business at slot ${targetSlot} is not a valid target for this upgrade.`);
     }
     businessIndex = targetSlot;
   } else {
-    businessIndex = state.streetGrid.findIndex(
-      b => b !== null && b.name === card.targetBusiness && b.level < b.maxLevel,
-    );
+    businessIndex = findTargetBusinessSlot(state, card);
   }
 
   const business = state.streetGrid[businessIndex]!;
@@ -311,6 +324,10 @@ export function purchaseUpgrade(
   business.level += 1;
   business.incomeBonus += card.incomeBonus;
   business.synergyRangeBonus += card.synergyRangeBonus;
+  if (!business.appliedUpgrades) {
+    business.appliedUpgrades = [];
+  }
+  business.appliedUpgrades.push(card.id);
 
   // Refill market
   const refilled = state.decks.upgrade.length > 0;
@@ -393,4 +410,59 @@ export function getEmptySlots(state: MainStreetState): number[] {
     if (state.streetGrid[i] === null) slots.push(i);
   }
   return slots;
+}
+
+/**
+ * Finds the first street grid slot containing a business that is a valid
+ * target for `card` — i.e. the business name matches, the business level
+ * equals the card's `requiredLevel` (defaulting to 0), and the business is
+ * below its `maxLevel`.
+ *
+ * Used by both the market logic and the UI to locate the default target
+ * slot without duplicating the matching conditions.
+ *
+ * @param state Current game state.
+ * @param card  The UpgradeCard to match.
+ * @returns The slot index of the first eligible business, or -1 if none.
+ */
+export function findTargetBusinessSlot(
+  state: MainStreetState,
+  card: UpgradeCard,
+): number {
+  const requiredLevel = card.requiredLevel ?? 0;
+  return state.streetGrid.findIndex(
+    b =>
+      b !== null &&
+      b.name === card.targetBusiness &&
+      b.level === requiredLevel &&
+      b.level < b.maxLevel,
+  );
+}
+
+/**
+ * Returns all upgrade cards currently in the market that are valid for
+ * the business occupying `slotIndex` — i.e. cards whose `targetBusiness`
+ * matches and whose `requiredLevel` equals the business's current level.
+ *
+ * This is the set of upgrade *branches* the player can choose from for
+ * that business. When the set has more than one entry the UI should
+ * present an upgrade-choice modal so the player can pick a branch.
+ *
+ * @param state     Current game state.
+ * @param slotIndex Street grid slot index of the target business.
+ * @returns Array of eligible UpgradeCards (may be empty or have multiple entries).
+ */
+export function getUpgradeBranchesForBusiness(
+  state: MainStreetState,
+  slotIndex: number,
+): UpgradeCard[] {
+  const business = state.streetGrid[slotIndex];
+  if (!business) return [];
+  if (business.level >= business.maxLevel) return [];
+
+  return (state.market.investments.filter(c => c.family === 'upgrade') as UpgradeCard[]).filter(
+    card =>
+      card.targetBusiness === business.name &&
+      (card.requiredLevel ?? 0) === business.level,
+  );
 }
