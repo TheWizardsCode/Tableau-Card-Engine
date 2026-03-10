@@ -62,6 +62,7 @@ npm run dev          # Start Vite dev server with hot-reload (port 3000)
 npm test             # Run Vitest test suite
 npm run build        # TypeScript check + production build to dist/
 npm run preview      # Serve production build locally
+npm run monte-carlo  # Run Main Street Monte Carlo harness (JSON + CSV)
 ```
 
 ### Quality Gates

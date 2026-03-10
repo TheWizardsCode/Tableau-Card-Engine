@@ -77,7 +77,28 @@ Main Street is intended to be approachable for 10‑15‑minute play sessions wh
 | **Event Frequency** | Adding more Incident events to the deck increases variance. The visible incident queue (2 cards) lets the player plan ahead. |
 | **Challenge Targets** | Scaling challenge thresholds (e.g., “Build a Foodie Row” requiring 3 Food businesses) adjusts difficulty. |
 
-Balancing targets are defined in the **GameState** type (`MAX_TURNS = 20`, `WIN_THRESHOLD = 150`). Playtesting should verify that a typical run ends near the turn limit with a final score around the win threshold.
+Balancing targets are defined in the runtime difficulty config (Medium defaults: `maxTurns = 20`, `winThreshold = 150`, `startingCoins = 8`, `synergyBonusPerNeighbor = 1`). Playtesting should verify that a typical run reaches the score threshold in the mid-to-late game with meaningful risk from incidents.
+
+### 4.1 Provisional Numeric Balance Targets (Medium)
+
+These are draft targets for iterative tuning and are validated using deterministic Monte Carlo sweeps:
+
+| Metric | Target (draft) | Notes |
+|-------|-----------------|-------|
+| Win rate | 85%-97% over 100 deterministic seeds | Greedy market strategy baseline (`market-greedy`) |
+| Median final score | 150-170 | Should stay near the score-threshold band |
+| Dominant loss reason share | >= 50% of losses | Ensures one primary failure mode remains measurable |
+| Avg no-action turns | >= 0.75 turns/run | Confirms meaningful affordability tension |
+| Avg turn street reaches 5/10 slots | 4.5-7.5 | Early/mid-game growth checkpoint |
+| Avg turn street reaches 10/10 slots | 9-12 | Mid/late-game saturation checkpoint |
+
+### 4.2 Tuning Levers
+
+- `startingCoins`: early purchasing power and bankruptcy risk.
+- `winThreshold`: pacing pressure for score-based wins.
+- `synergyBonusPerNeighbor`: strength of adjacency strategy.
+- `maxTurns`: upper bound for pacing and turn-exhaustion pressure.
+- incident/event card composition and penalties: volatility and loss-vector mix.
 
 ---
 

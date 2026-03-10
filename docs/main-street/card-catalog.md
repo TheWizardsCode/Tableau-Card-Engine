@@ -203,3 +203,13 @@ The sweep verifies:
 - The game terminates normally for every seed
 
 To add custom balance checks, extend the `Monte Carlo stability sweep` describe block in `market.integration.test.ts`.
+
+For the dedicated balance harness and report outputs, use:
+
+```bash
+npm run monte-carlo
+```
+
+This writes per-run and aggregate metrics to:
+- `results/main-street-monte-carlo.json`
+- `results/main-street-monte-carlo.csv`
