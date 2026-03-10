@@ -974,6 +974,14 @@ export class GolfScene extends CardGameScene {
           this.session.shared.discardPile.push(drawnCard);
         }
 
+        // After restoring the drawn card to the pile, ensure the discard
+        // pile visual is in sync with the underlying state. There is a
+        // short window between temporarily removing the top card and
+        // restoring it where the discard sprite may show a placeholder
+        // (card_back). Refresh the piles now so tests and viewers see the
+        // correct texture immediately.
+        this.refreshPiles();
+
         const result = executeTurn(this.session, action);
         this.recorder.recordTurn(result, action.drawSource);
 
