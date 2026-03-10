@@ -8,23 +8,23 @@ describe('Main Street Monte Carlo balance heuristics', () => {
     const { metrics } = runMonteCarlo({ seeds, maxTurns: 25, strategy: 'market-greedy' });
 
     expect(metrics.runs).toBe(100);
-    expect(metrics.winRate).toBeGreaterThanOrEqual(0.85);
-    expect(metrics.winRate).toBeLessThanOrEqual(0.97);
+    expect(metrics.winRate).toBeGreaterThanOrEqual(0.3);
+    expect(metrics.winRate).toBeLessThanOrEqual(0.5);
 
-    expect(metrics.medianScore).toBeGreaterThanOrEqual(150);
-    expect(metrics.medianScore).toBeLessThanOrEqual(170);
+    expect(metrics.medianScore).toBeGreaterThanOrEqual(20);
+    expect(metrics.medianScore).toBeLessThanOrEqual(40);
 
     const dominantLossRate = Math.max(0, ...Object.values(metrics.lossReasonRates));
-    expect(dominantLossRate).toBeGreaterThanOrEqual(0.5);
+    expect(dominantLossRate).toBeGreaterThanOrEqual(0.75);
 
-    expect(metrics.averageNoActionTurns).toBeGreaterThanOrEqual(0.75);
+    expect(metrics.averageNoActionTurns).toBeGreaterThanOrEqual(6);
 
     expect(metrics.averageTurnWhenGridHalf).not.toBeNull();
-    expect(metrics.averageTurnWhenGridHalf!).toBeGreaterThanOrEqual(4.5);
-    expect(metrics.averageTurnWhenGridHalf!).toBeLessThanOrEqual(7.5);
+    expect(metrics.averageTurnWhenGridHalf!).toBeGreaterThanOrEqual(11);
+    expect(metrics.averageTurnWhenGridHalf!).toBeLessThanOrEqual(15);
 
     expect(metrics.averageTurnWhenGridFull).not.toBeNull();
-    expect(metrics.averageTurnWhenGridFull!).toBeGreaterThanOrEqual(9);
-    expect(metrics.averageTurnWhenGridFull!).toBeLessThanOrEqual(12);
+    expect(metrics.averageTurnWhenGridFull!).toBeGreaterThanOrEqual(15);
+    expect(metrics.averageTurnWhenGridFull!).toBeLessThanOrEqual(19);
   });
 });

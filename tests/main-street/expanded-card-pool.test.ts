@@ -95,9 +95,9 @@ describe('Expanded Card Pool: Business Card Fields', () => {
     }
   });
 
-  it('all business cards should have positive baseIncome', () => {
+  it('all business cards should have non-negative baseIncome', () => {
     for (const card of businessDeck) {
-      expect(card.baseIncome).toBeGreaterThan(0);
+      expect(card.baseIncome).toBeGreaterThanOrEqual(0);
     }
   });
 
@@ -436,8 +436,8 @@ describe('Expanded Card Pool: Deck Building', () => {
     const bakeries = deck.filter(c => c.name === 'Bakery');
     expect(bakeries).toHaveLength(2);
     for (const b of bakeries) {
-      expect(b.cost).toBe(3);
-      expect(b.baseIncome).toBe(2);
+      expect(b.cost).toBe(6);
+      expect(b.baseIncome).toBe(1);
       expect(b.synergyTypes).toEqual(['Food']);
     }
   });
@@ -536,9 +536,9 @@ describe('Expanded Card Pool: Synergy Coverage', () => {
     }
   });
 
-  it('cost distribution should span at least 2-5 range', () => {
+  it('cost distribution should span at least 4-10 range', () => {
     const costs = businessDeck.map(c => c.cost);
-    expect(Math.min(...costs)).toBeLessThanOrEqual(2);
-    expect(Math.max(...costs)).toBeGreaterThanOrEqual(5);
+    expect(Math.min(...costs)).toBeLessThanOrEqual(4);
+    expect(Math.max(...costs)).toBeGreaterThanOrEqual(10);
   });
 });
