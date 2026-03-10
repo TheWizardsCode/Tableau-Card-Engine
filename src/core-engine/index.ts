@@ -35,6 +35,20 @@ export { CompoundCommand, UndoRedoManager } from './UndoRedoManager';
 export type { StoredTranscript, TranscriptStoreOptions } from './TranscriptStore';
 export { TranscriptStore } from './TranscriptStore';
 
+// Save/load persistence
+export type {
+  SaveDomain,
+  StoredSave,
+  SaveLoadStoreOptions,
+  VersionedPayload,
+  SaveSerializer,
+} from './SaveLoad';
+export {
+  SaveLoadStore,
+  serializeWithVersion,
+  deserializeWithVersion,
+} from './SaveLoad';
+
 // Game event system
 export type {
   TurnStartedPayload,
