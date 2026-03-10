@@ -176,10 +176,51 @@ export interface MainStreetState {
   finalScore: number;
   /** The seed string used for this game. */
   seed: string;
+  /** Numeric seed derived from the seed string (used for restore). */
+  numericSeed: number;
+  /** Number of RNG draws consumed so far (used for deterministic restore). */
+  rngCalls: number;
   /** The RNG function for this game (seeded, deterministic). */
   rng: () => number;
   /** Chronological log of game activities for the UI activity log panel. */
   activityLog: LogEntry[];
+}
+
+export interface MainStreetSerializedState {
+  config: GameConfig;
+  turn: number;
+  phase: DayPhase;
+  streetGrid: (BusinessCard | null)[];
+  market: MarketState;
+  resourceBank: ResourceBank;
+  decks: {
+    business: BusinessCard[];
+    event: EventCard[];
+    upgrade: UpgradeCard[];
+  };
+  challengesCompleted: string[];
+  activeChallenges: {
+    challengeId: string;
+    completed: boolean;
+  }[];
+  heldEvent: EventCard | null;
+  incidentQueue: EventCard[];
+  gameResult: GameResult;
+  endReason: EndReason;
+  finalScore: number;
+  seed: string;
+  numericSeed: number;
+  rngCalls: number;
+  activityLog: LogEntry[];
+}
+
+export interface MainStreetCampaignProgress {
+  unlockedTiers: string[];
+  persistentReputation: number;
+  highestScore: number;
+  totalRuns: number;
+  totalWins: number;
+  lastUpdatedAt: string;
 }
 
 // ── Setup Options ───────────────────────────────────────────
@@ -246,7 +287,16 @@ function fillMarketSlots<T>(deck: T[], count: number): T[] {
 export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainStreetState {
   const seed = options.seed ?? generateSeedString();
   const numericSeed = seedToNumber(seed);
-  const rng = createSeededRng(numericSeed);
+  const baseRng = createSeededRng(numericSeed);
+  let rngCalls = 0;
+  let state!: MainStreetState;
+  const rng = (): number => {
+    rngCalls += 1;
+    if (state) {
+      state.rngCalls = rngCalls;
+    }
+    return baseRng();
+  };
 
   // Resolve difficulty preset into runtime config
   const config = getPreset(options.difficulty);
@@ -288,7 +338,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
   }
 
   // Build initial state -- use config values instead of hard-coded constants
-  const state: MainStreetState = {
+  state = {
     config,
     turn: 1,
     phase: 'DayStart',
@@ -311,6 +361,8 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     endReason: null,
     finalScore: 0,
     seed,
+    numericSeed,
+    rngCalls,
     rng,
     activityLog: [],
   };
@@ -321,6 +373,86 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     challenge: ch,
     completed: false,
   }));
+
+  return state;
+}
+
+/**
+ * Serializes Main Street runtime state into a JSON-safe checkpoint shape.
+ */
+export function serializeMainStreetState(state: MainStreetState): MainStreetSerializedState {
+  return {
+    config: structuredClone(state.config),
+    turn: state.turn,
+    phase: state.phase,
+    streetGrid: structuredClone(state.streetGrid),
+    market: structuredClone(state.market),
+    resourceBank: structuredClone(state.resourceBank),
+    decks: structuredClone(state.decks),
+    challengesCompleted: [...state.challengesCompleted],
+    activeChallenges: state.activeChallenges.map((ac) => ({
+      challengeId: ac.challenge.id,
+      completed: ac.completed,
+    })),
+    heldEvent: structuredClone(state.heldEvent),
+    incidentQueue: structuredClone(state.incidentQueue),
+    gameResult: state.gameResult,
+    endReason: state.endReason,
+    finalScore: state.finalScore,
+    seed: state.seed,
+    numericSeed: state.numericSeed,
+    rngCalls: state.rngCalls,
+    activityLog: structuredClone(state.activityLog),
+  };
+}
+
+/**
+ * Rehydrates runtime state from a serialized checkpoint.
+ */
+export function deserializeMainStreetState(saved: MainStreetSerializedState): MainStreetState {
+  const baseRng = createSeededRng(saved.numericSeed);
+  for (let i = 0; i < saved.rngCalls; i++) {
+    baseRng();
+  }
+
+  let rngCalls = saved.rngCalls;
+  let state!: MainStreetState;
+  const rng = (): number => {
+    rngCalls += 1;
+    state.rngCalls = rngCalls;
+    return baseRng();
+  };
+
+  state = {
+    config: structuredClone(saved.config),
+    turn: saved.turn,
+    phase: saved.phase,
+    streetGrid: structuredClone(saved.streetGrid),
+    market: structuredClone(saved.market),
+    resourceBank: structuredClone(saved.resourceBank),
+    decks: structuredClone(saved.decks),
+    challengesCompleted: [...saved.challengesCompleted],
+    activeChallenges: saved.activeChallenges.map((ac) => {
+      const challenge = CHALLENGE_TEMPLATES.find((tpl) => tpl.id === ac.challengeId);
+      if (!challenge) {
+        throw new Error(`Unknown challenge id in save: ${ac.challengeId}`);
+      }
+      return {
+        challenge,
+        completed: ac.completed,
+      };
+    }),
+    heldEvent: structuredClone(saved.heldEvent),
+    incidentQueue: structuredClone(saved.incidentQueue),
+    gameResult: saved.gameResult,
+    endReason: saved.endReason,
+    finalScore: saved.finalScore,
+    seed: saved.seed,
+    numericSeed: saved.numericSeed,
+    rngCalls: saved.rngCalls,
+    rng,
+    activityLog: structuredClone(saved.activityLog),
+  };
 
   return state;
 }

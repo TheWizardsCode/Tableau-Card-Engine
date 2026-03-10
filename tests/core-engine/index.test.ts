@@ -13,6 +13,9 @@ import {
   UndoRedoManager,
   CompoundCommand,
   createSeededRng,
+  SaveLoadStore,
+  serializeWithVersion,
+  deserializeWithVersion,
 } from '../../src/core-engine/index';
 
 describe('core-engine barrel exports', () => {
@@ -46,6 +49,12 @@ describe('core-engine barrel exports', () => {
     const val = rng();
     expect(val).toBeGreaterThanOrEqual(0);
     expect(val).toBeLessThan(1);
+  });
+
+  it('should export save/load infrastructure', () => {
+    expect(typeof SaveLoadStore).toBe('function');
+    expect(typeof serializeWithVersion).toBe('function');
+    expect(typeof deserializeWithVersion).toBe('function');
   });
 
   it('should work end-to-end through barrel exports', () => {
