@@ -934,9 +934,13 @@ export class GolfScene extends CardGameScene {
         drawnCard = this.session.shared.discardPile.popOrThrow();
       }
 
-      // When AI draws from discard, update the pile visual immediately
+      // When AI draws from discard, refresh the pile display to show the new
+      // top card (or empty placeholder). The card has already been popped, so
+      // we use refreshPiles() — updateDiscardPileAfterDraw() is designed for
+      // the human peek-not-pop path and would incorrectly compute the display
+      // when the card is already removed from the pile.
       if (drawSource === 'discard') {
-        this.updateDiscardPileAfterDraw();
+        this.refreshPiles();
       }
 
       // Show the drawn card to the player
