@@ -363,8 +363,10 @@ describe('GolfScene interaction tests', () => {
     // Swap with grid card 0
     clickGameObject(internals.humanCardSprites[0]);
 
-    // Wait for AI to take its turn (AI_DELAY = 600ms + animation time)
-    await wait(3000);
+    // Wait for both the human animation and the full AI turn to complete.
+    // Using a phase-based wait is more reliable than a fixed timeout in CI,
+    // as it polls until the game returns to a stable state.
+    await waitForAnyPhase(scene, ['waiting-for-draw', 'round-ended'], 15000);
 
     // After AI turn, it should be human's turn again (or round ended)
     const phase = internals.phaseManager.current;
