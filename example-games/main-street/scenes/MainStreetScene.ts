@@ -198,6 +198,13 @@ export class MainStreetScene extends CardGameScene {
     this.pendingBusinessCard = null;
     this.overlayObjects = [];
 
+    // Reset activity-log panel state in case this scene instance is restarted.
+    this.logScrollOffset = 0;
+    this.logMaxScroll = 0;
+    this.logTotalContentH = 0;
+    this.logAutoScroll = true;
+    this.logPrevEntryCount = 0;
+
     this.detectReplayMode();
     this.initEventSystem();
 
@@ -323,6 +330,7 @@ export class MainStreetScene extends CardGameScene {
     this.updateLogMask();
 
     // Mouse-wheel scroll for the log panel
+    this.input.off('wheel', this.handleLogWheel, this);
     this.input.on('wheel', this.handleLogWheel, this);
   }
 
@@ -1356,9 +1364,13 @@ export class MainStreetScene extends CardGameScene {
     const visibleH = LOG_H - LOG_TITLE_H - 4;
     this.logMaxScroll = Math.max(0, this.logTotalContentH - visibleH);
 
-    // Auto-scroll to bottom if we were already at the bottom
-    if (hadAutoScroll && this.logMaxScroll > 0) {
+    // Keep scroll position valid for the current content height.
+    // On scene restart we can transition from a long previous run to a short
+    // new log; without clamping, stale offsets can hide all entries.
+    if (hadAutoScroll) {
       this.logScrollOffset = this.logMaxScroll;
+    } else {
+      this.logScrollOffset = Phaser.Math.Clamp(this.logScrollOffset, 0, this.logMaxScroll);
     }
 
     this.applyLogScroll();
