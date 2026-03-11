@@ -856,11 +856,23 @@ const UPGRADE_TEMPLATES: UpgradeCard[] = [
 /**
  * Creates the full Business deck for a game (each template repeated
  * `copies` times to ensure adequate supply for 20 turns).
+ *
+ * @param copies          Number of copies per template (default 3).
+ * @param unlockedCardIds Optional list of unlocked card IDs for tier filtering.
+ *                        When provided, only templates whose ID is in this list
+ *                        are included. When omitted, the full pool is used.
  */
-export function createBusinessDeck(copies: number = 3): BusinessCard[] {
+export function createBusinessDeck(
+  copies: number = 3,
+  unlockedCardIds?: string[],
+): BusinessCard[] {
+  const templates = unlockedCardIds
+    ? BUSINESS_TEMPLATES.filter((t) => unlockedCardIds.includes(t.id))
+    : BUSINESS_TEMPLATES;
+
   const deck: BusinessCard[] = [];
   for (let c = 0; c < copies; c++) {
-    for (const template of BUSINESS_TEMPLATES) {
+    for (const template of templates) {
       deck.push(makeBusiness({ ...template, id: `${template.id}-${c}` }));
     }
   }
@@ -869,11 +881,23 @@ export function createBusinessDeck(copies: number = 3): BusinessCard[] {
 
 /**
  * Creates the full Event deck for a game.
+ *
+ * @param copies          Number of copies per template (default 3).
+ * @param unlockedCardIds Optional list of unlocked card IDs for tier filtering.
+ *                        When provided, only templates whose ID is in this list
+ *                        are included. When omitted, the full pool is used.
  */
-export function createEventDeck(copies: number = 3): EventCard[] {
+export function createEventDeck(
+  copies: number = 3,
+  unlockedCardIds?: string[],
+): EventCard[] {
+  const templates = unlockedCardIds
+    ? EVENT_TEMPLATES.filter((t) => unlockedCardIds.includes(t.id))
+    : EVENT_TEMPLATES;
+
   const deck: EventCard[] = [];
   for (let c = 0; c < copies; c++) {
-    for (const template of EVENT_TEMPLATES) {
+    for (const template of templates) {
       deck.push({ ...template, id: `${template.id}-${c}` });
     }
   }
@@ -882,11 +906,23 @@ export function createEventDeck(copies: number = 3): EventCard[] {
 
 /**
  * Creates the full Upgrade deck for a game.
+ *
+ * @param copies          Number of copies per template (default 2).
+ * @param unlockedCardIds Optional list of unlocked card IDs for tier filtering.
+ *                        When provided, only templates whose ID is in this list
+ *                        are included. When omitted, the full pool is used.
  */
-export function createUpgradeDeck(copies: number = 2): UpgradeCard[] {
+export function createUpgradeDeck(
+  copies: number = 2,
+  unlockedCardIds?: string[],
+): UpgradeCard[] {
+  const templates = unlockedCardIds
+    ? UPGRADE_TEMPLATES.filter((t) => unlockedCardIds.includes(t.id))
+    : UPGRADE_TEMPLATES;
+
   const deck: UpgradeCard[] = [];
   for (let c = 0; c < copies; c++) {
-    for (const template of UPGRADE_TEMPLATES) {
+    for (const template of templates) {
       deck.push({ ...template, id: `${template.id}-${c}` });
     }
   }

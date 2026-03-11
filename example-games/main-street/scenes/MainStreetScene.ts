@@ -51,6 +51,13 @@ import {
   createSceneTitle, createSceneMenuButton,
 } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
+import { SaveLoadStore } from '../../../src/core-engine';
+import type { MainStreetCampaignProgress } from '../MainStreetState';
+import {
+  createDefaultCampaignProgress,
+  loadCampaignProgress,
+  updateCampaignAfterRun,
+} from '../MainStreetSaveLoad';
 
 // ── Constants ───────────────────────────────────────────────
 
@@ -150,6 +157,10 @@ export class MainStreetScene extends CardGameScene {
   private state!: MainStreetState;
   private uiPhase: UIPhase = 'idle';
 
+  // Campaign / meta-progression
+  private campaign: MainStreetCampaignProgress | null = null;
+  private saveStore: SaveLoadStore | null = null;
+
   // Selected difficulty (persisted across replays)
   private selectedDifficulty: DifficultyName = 'Medium';
 
@@ -211,10 +222,9 @@ export class MainStreetScene extends CardGameScene {
     // Sound (re-use existing audio assets)
     this.initSoundSystem([], {});
 
-    // Game setup
-    this.state = setupMainStreetGame({
-      difficulty: this.selectedDifficulty,
-    });
+    // Game setup -- load campaign for tier-filtered deck building
+    this.saveStore = new SaveLoadStore();
+    this.loadCampaignAndSetup();
 
     // UI scaffolding
     this.createHeader();
@@ -344,6 +354,50 @@ export class MainStreetScene extends CardGameScene {
       .setOrigin(1, 0.5);
   }
 
+  // ── Campaign / Meta-Progression ─────────────────────────
+
+  /**
+   * Loads campaign progress (or creates defaults) and sets up the game
+   * with tier-filtered decks. Campaign loading is async but the scene
+   * continues with default progress if the load is still pending.
+   */
+  private loadCampaignAndSetup(): void {
+    // Synchronously set up with defaults first (so UI can render immediately)
+    this.campaign = createDefaultCampaignProgress();
+    this.state = setupMainStreetGame({
+      difficulty: this.selectedDifficulty,
+      unlockedCardIds: this.campaign.unlockedCardIds,
+    });
+
+    // Async: attempt to load saved campaign and re-setup if found
+    if (this.saveStore) {
+      loadCampaignProgress(this.saveStore).then((saved) => {
+        if (saved) {
+          this.campaign = saved;
+          // Re-setup with the loaded campaign's unlocked cards
+          this.state = setupMainStreetGame({
+            difficulty: this.selectedDifficulty,
+            unlockedCardIds: this.campaign.unlockedCardIds,
+          });
+          this.refreshAll();
+        }
+      }).catch(() => {
+        // If load fails, continue with defaults (already set up above)
+      });
+    }
+  }
+
+  /**
+   * Updates campaign progress after a completed run (win or loss).
+   * Evaluates tier unlocks and persists the updated campaign.
+   */
+  private updateCampaignProgress(): void {
+    if (!this.campaign || !this.saveStore) return;
+    updateCampaignAfterRun(this.campaign, this.state, this.saveStore).catch(() => {
+      // Silently ignore save failures -- campaign will be retried next run
+    });
+  }
+
   // ── Day flow ────────────────────────────────────────────
 
   private startDayPhase(): void {
@@ -367,6 +421,8 @@ export class MainStreetScene extends CardGameScene {
     // Brief delay then show result / advance
     this.time.delayedCall(400, () => {
       if (result.gameResult !== 'playing') {
+        // Update campaign progress (tier evaluation + persistence)
+        this.updateCampaignProgress();
         this.showGameOverOverlay(result);
       } else {
         // Show income feedback briefly then start next turn
