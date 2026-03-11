@@ -206,7 +206,6 @@ export class MainStreetScene extends CardGameScene {
 
     // Game setup
     this.state = setupMainStreetGame({
-      seed: 'main-street-demo',
       difficulty: this.selectedDifficulty,
     });
 
