@@ -103,6 +103,21 @@ describe('Activity Log', () => {
       const state = createTestState();
       expect(state.activityLog).toEqual([]);
     });
+
+    it('should start a new game with a fresh log and then add new entries', () => {
+      const firstGame = createTestState('activity-log-first-game');
+      executeDayStart(firstGame);
+      processEndOfTurn(firstGame);
+      expect(firstGame.activityLog.length).toBeGreaterThan(0);
+
+      const secondGame = createTestState('activity-log-second-game');
+      expect(secondGame.activityLog).toEqual([]);
+
+      executeDayStart(secondGame);
+      expect(secondGame.activityLog).toHaveLength(1);
+      expect(secondGame.activityLog[0].type).toBe('turn-header');
+      expect(secondGame.activityLog[0].text).toBe('Turn 1');
+    });
   });
 
   describe('turn headers', () => {
