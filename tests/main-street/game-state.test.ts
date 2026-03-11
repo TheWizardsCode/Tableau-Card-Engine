@@ -23,6 +23,7 @@ import {
   createEventDeck,
   createUpgradeDeck,
 } from '../../example-games/main-street/MainStreetCards';
+import { createSeededRng } from '../../src/core-engine';
 
 import { DEFAULT_CHALLENGES_PER_RUN } from '../../example-games/main-street/MainStreetChallenges';
 
@@ -78,12 +79,12 @@ describe('MainStreetCards', () => {
 
   describe('createEventDeck', () => {
     it('should create correct number of cards from templates and copies', () => {
-      const deck = createEventDeck(DEFAULT_EVENT_COPIES);
+      const deck = createEventDeck(DEFAULT_EVENT_COPIES, undefined, createSeededRng(42));
       expect(deck).toHaveLength(EVENT_TEMPLATE_COUNT * DEFAULT_EVENT_COPIES);
     });
 
     it('should create cards with correct family', () => {
-      const deck = createEventDeck(1);
+      const deck = createEventDeck(1, undefined, createSeededRng(42));
       for (const card of deck) {
         expect(card.family).toBe('event');
       }
@@ -156,14 +157,17 @@ describe('MainStreetState', () => {
     it('should have non-empty decks after market fill', () => {
       const state = createTestState();
       const totalBusiness = BUSINESS_TEMPLATE_COUNT * DEFAULT_BUSINESS_COPIES;
-      const totalEvent = EVENT_TEMPLATE_COUNT * DEFAULT_EVENT_COPIES;
       const totalUpgrade = UPGRADE_TEMPLATE_COUNT * DEFAULT_UPGRADE_COPIES;
       // Business: total - market slots = remaining
       expect(state.decks.business.length).toBe(totalBusiness - MARKET_BUSINESS_SLOTS);
       // Event: total - investment events in market - incident queue = remaining in deck
       const investmentEventsInMarket = state.market.investments.filter(c => c.family === 'event').length;
       const eventAccountedFor = investmentEventsInMarket + state.decks.event.length + state.incidentQueue.length;
-      expect(eventAccountedFor).toBe(totalEvent);
+      // Account for positiveIncidentMultiplier in runtime preset
+      const multiplier = (state.config && 'positiveIncidentMultiplier' in state.config)
+        ? state.config.positiveIncidentMultiplier
+        : 1;
+      expect(eventAccountedFor).toBe(createEventDeck(DEFAULT_EVENT_COPIES, undefined, createSeededRng(42), multiplier).length);
       // Upgrade: total - upgrades in investments row = remaining
       const upgradesInMarket = state.market.investments.filter(c => c.family === 'upgrade').length;
       expect(state.decks.upgrade.length).toBe(totalUpgrade - upgradesInMarket);
@@ -325,7 +329,10 @@ describe('MainStreetState', () => {
       const state = createTestState();
       const investmentEventsInMarket = state.market.investments.filter(c => c.family === 'event').length;
       const total = investmentEventsInMarket + state.decks.event.length + state.incidentQueue.length;
-      expect(total).toBe(EVENT_TEMPLATE_COUNT * DEFAULT_EVENT_COPIES);
+      const multiplier = (state.config && 'positiveIncidentMultiplier' in state.config)
+        ? state.config.positiveIncidentMultiplier
+        : 1;
+      expect(total).toBe(createEventDeck(DEFAULT_EVENT_COPIES, undefined, createSeededRng(42), multiplier).length);
     });
 
     it('should have all market + deck cards equal total deck size (upgrade)', () => {
@@ -361,7 +368,7 @@ describe('MainStreetState', () => {
     });
 
     it('should have event cards with valid triggers', () => {
-      const deck = createEventDeck(1);
+      const deck = createEventDeck(1, undefined, createSeededRng(42));
       const validTriggers = new Set(['Investment', 'Incident']);
       for (const card of deck) {
         expect(validTriggers.has(card.trigger)).toBe(true);

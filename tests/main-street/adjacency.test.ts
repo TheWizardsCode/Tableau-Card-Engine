@@ -277,7 +277,9 @@ describe('MainStreetAdjacency', () => {
       // food-1: 3 + 1 synergy = 4
       // food-2: 2 + 1 synergy = 3
       expect(result.total).toBe(7);
-      expect(state.resourceBank.coins).toBe(coinsBefore + 7);
+      // Reputation multiplier: rep=3 (Medium default), divisor=20 → 1 + 3/20 = 1.15
+      // floor(7 * 1.15) = floor(8.05) = 8
+      expect(state.resourceBank.coins).toBe(coinsBefore + 8);
     });
 
     it('should not change coins for empty grid', () => {

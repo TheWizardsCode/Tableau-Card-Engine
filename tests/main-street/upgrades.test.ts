@@ -72,6 +72,14 @@ function injectUpgrade(state: MainStreetState, card: UpgradeCard): void {
   state.market.investments.push(card);
 }
 
+// Helper to clear any pre-existing upgrades from the investments row to
+// ensure tests inject an isolated set of upgrade cards and don't get
+// surprised by setup-populated market contents (deterministic but irrelevant
+// to the unit test intent).
+function clearInvestmentsUpgrades(state: MainStreetState): void {
+  state.market.investments = state.market.investments.filter(c => c.family !== 'upgrade');
+}
+
 // ── requiredLevel enforcement ─────────────────────────────────
 
 describe('requiredLevel enforcement', () => {
@@ -241,6 +249,9 @@ describe('purchaseUpgrade state persistence', () => {
 describe('branching upgrades', () => {
   it('getUpgradeBranchesForBusiness returns all eligible branches for a slot', () => {
     const state = createTestState();
+    // Ensure the investments row has no pre-existing upgrade cards so our
+    // injected fixtures are the only ones considered.
+    clearInvestmentsUpgrades(state);
     const biz = makeBiz({ level: 0 });
     state.streetGrid[4] = biz;
     state.resourceBank.coins = 100;
@@ -270,6 +281,9 @@ describe('branching upgrades', () => {
     const biz = makeBiz({ level: 1, maxLevel: 1 });
     state.streetGrid[0] = biz;
 
+    // Clear any pre-existing upgrades and inject a matching upgrade so the
+    // test focuses on requiredLevel behaviour only.
+    clearInvestmentsUpgrades(state);
     const upg = makeUpg({ requiredLevel: 1 });
     injectUpgrade(state, upg);
 
@@ -280,6 +294,7 @@ describe('branching upgrades', () => {
 
   it('only returns branches whose requiredLevel matches business level', () => {
     const state = createTestState();
+    clearInvestmentsUpgrades(state);
     const biz = makeBiz({ level: 0 });
     state.streetGrid[2] = biz;
 

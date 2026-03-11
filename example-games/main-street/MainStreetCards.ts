@@ -887,20 +887,90 @@ export function createBusinessDeck(
  *                        When provided, only templates whose ID is in this list
  *                        are included. When omitted, the full pool is used.
  */
+/**
+ * Creates the full Event deck for a game.
+ *
+ * Supports an optional `positiveIncidentMultiplier` to increase the
+ * relative frequency of positive Incident events by duplicating positive
+ * Incident templates before deck assembly. This keeps selection deterministic
+ * under the seeded RNG used throughout Main Street while allowing tuning
+ * without changing core selection logic.
+ *
+ * @param copies          Number of copies per template (default 3).
+ * @param unlockedCardIds Optional list of unlocked card IDs for tier filtering.
+ * @param positiveIncidentMultiplier Multiplier applied to positive Incident templates (>=1).
+ */
 export function createEventDeck(
   copies: number = 3,
-  unlockedCardIds?: string[],
+  unlockedCardIds: string[] | undefined,
+  rng: () => number,
+  positiveIncidentMultiplier: number = 1,
 ): EventCard[] {
   const templates = unlockedCardIds
     ? EVENT_TEMPLATES.filter((t) => unlockedCardIds.includes(t.id))
     : EVENT_TEMPLATES;
 
+  // If multiplier > 1, positive Incident templates should appear more often.
+  // Implement fractional multipliers deterministically without introducing
+  // a seeded RNG dependency: we give every positive Incident template
+  // `baseDup = floor(multiplier)` repeats, then distribute the fractional
+  // remainder by granting one extra repeat to `extraCount` templates. The
+  // selection is deterministic (first N positive templates in template
+  // order) so behavior is stable across runs.
   const deck: EventCard[] = [];
-  for (let c = 0; c < copies; c++) {
-    for (const template of templates) {
-      deck.push({ ...template, id: `${template.id}-${c}` });
+  let serial = 0;
+
+  const mult = Math.max(1, positiveIncidentMultiplier);
+  const baseDup = Math.floor(mult);
+  const fraction = mult - baseDup;
+
+  // Identify positions (indices) of positive Incident templates in the
+  // `templates` array so we can select which ones receive the fractional
+  // extra duplicates.
+  const positiveIndices: number[] = [];
+  for (let i = 0; i < templates.length; i++) {
+    const t = templates[i];
+    if (t.trigger === 'Incident' && (t.coinDelta + t.reputationDelta) > 0) {
+      positiveIndices.push(i);
     }
   }
+
+  const positiveCount = positiveIndices.length;
+  const extraCount = Math.round(fraction * positiveCount);
+
+  // Decide which positive template indices receive the extra +1 duplicate.
+  // Always use the provided seeded RNG to shuffle and choose extraCount
+  // indices. This makes the fractional distribution deterministic per-game
+  // seed and removes order bias.
+  const extraSet = new Set<number>();
+  if (extraCount > 0 && positiveCount > 0) {
+    // Shuffle a copy of positiveIndices using Fisher-Yates with provided RNG
+    const idxs = positiveIndices.slice();
+    for (let i = idxs.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      const tmp = idxs[i]; idxs[i] = idxs[j]; idxs[j] = tmp;
+    }
+    for (let k = 0; k < extraCount; k++) extraSet.add(idxs[k]);
+  }
+
+  // Iterate templates and assign duplicates. For positive templates, add
+  // `baseDup` plus 1 if the template's index is in extraSet. For all others, use 1.
+  for (let i = 0; i < templates.length; i++) {
+    const template = templates[i];
+    const net = template.coinDelta + template.reputationDelta;
+    const isPositiveIncident = template.trigger === 'Incident' && net > 0;
+    let dupCount = 1;
+    if (isPositiveIncident) {
+      dupCount = baseDup + (extraSet.has(i) ? 1 : 0);
+    }
+
+    const repeat = copies * dupCount;
+    for (let r = 0; r < repeat; r++) {
+      deck.push({ ...template, id: `${template.id}-${serial}` });
+      serial += 1;
+    }
+  }
+
   return deck;
 }
 

@@ -28,6 +28,10 @@ import {
   type PurchaseResult,
 } from './MainStreetMarket';
 import { evaluateChallenges } from './MainStreetChallenges';
+import { applyReputationMultiplier, reputationCoinMultiplier } from './MainStreetDifficulty';
+
+// Re-export for convenience (tests import from the engine module).
+export { reputationCoinMultiplier, applyReputationMultiplier };
 
 // ── Action Types ────────────────────────────────────────────
 
@@ -199,21 +203,29 @@ function classifyEffect(coinChange: number, repChange: number): 'gain' | 'loss' 
  * SpecificSynergy events apply their coinDelta to each matching business
  * (simplified: apply delta once per matching placed business).
  * All/other events apply the delta directly to the resource bank.
+ *
+ * Positive coin deltas are scaled by the reputation coin multiplier
+ * (CG-0MMLR38NJ1N11DOS). Negative deltas (penalties) pass through
+ * unchanged.
  */
 export function resolveEvent(state: MainStreetState, event: EventCard): void {
+  const rep = state.resourceBank.reputation;
+  const cfg = state.config;
+
   switch (event.target) {
     case 'SpecificSynergy': {
       // Count matching businesses and apply coinDelta per match
       const matchCount = state.streetGrid.filter(
         b => b !== null && b.synergyTypes.includes(event.targetSynergy as SynergyType),
       ).length;
-      state.resourceBank.coins += event.coinDelta * matchCount;
+      const rawDelta = event.coinDelta * matchCount;
+      state.resourceBank.coins += applyReputationMultiplier(rawDelta, rep, cfg);
       state.resourceBank.reputation += event.reputationDelta;
       break;
     }
     case 'All': {
       // Apply to all -- direct delta on resource bank
-      state.resourceBank.coins += event.coinDelta;
+      state.resourceBank.coins += applyReputationMultiplier(event.coinDelta, rep, cfg);
       state.resourceBank.reputation += event.reputationDelta;
       break;
     }
@@ -225,7 +237,7 @@ export function resolveEvent(state: MainStreetState, event: EventCard): void {
         // Consume RNG for deterministic selection (used in future milestones)
         const _targetIdx = Math.floor(state.rng() * placed.length);
         void _targetIdx;
-        state.resourceBank.coins += event.coinDelta;
+        state.resourceBank.coins += applyReputationMultiplier(event.coinDelta, rep, cfg);
       }
       state.resourceBank.reputation += event.reputationDelta;
       break;

@@ -21,6 +21,7 @@ import {
   type BusinessCard,
   type SynergyType,
 } from '../../example-games/main-street/MainStreetCards';
+import { getPreset } from '../../example-games/main-street/MainStreetDifficulty';
 import { computeSynergyBonus, computeBusinessIncome } from '../../example-games/main-street/MainStreetAdjacency';
 import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
 import { GRID_SIZE } from '../../example-games/main-street/MainStreetCards';
@@ -44,9 +45,11 @@ function makeBiz(overrides: Partial<BusinessCard> & { name: string; synergyTypes
   };
 }
 
-// Build decks once for template validation
+// Build decks once for template validation (use multiplier=1 to test raw templates)
+import { createSeededRng } from '../../src/core-engine';
+const _rng = createSeededRng(42);
 const businessDeck = createBusinessDeck(1); // 1 copy = template count
-const eventDeck = createEventDeck(1);
+const eventDeck = createEventDeck(1, undefined, _rng, 1); // template-only view
 const upgradeDeck = createUpgradeDeck(1);
 
 // ── Template Completeness ───────────────────────────────────
@@ -417,8 +420,8 @@ describe('Expanded Card Pool: Deck Building', () => {
     expect(createBusinessDeck(3)).toHaveLength(51);
   });
 
-  it('event deck with 3 copies should have 51 cards', () => {
-    expect(createEventDeck(3)).toHaveLength(51);
+    it('event deck with 3 copies should have 51 cards', () => {
+    expect(createEventDeck(3, undefined, _rng, 1)).toHaveLength(51);
   });
 
   it('upgrade deck with 2 copies should have 50 cards', () => {
@@ -509,7 +512,8 @@ describe('Expanded Card Pool: Seeded Deck Resolution', () => {
       + state.decks.event.length
       + state.incidentQueue.length
       + (state.heldEvent ? 1 : 0);
-    expect(eventTotal).toBe(createEventDeck().length);
+    const multiplier = getPreset(undefined).positiveIncidentMultiplier;
+    expect(eventTotal).toBe(createEventDeck(3, undefined, _rng, multiplier).length);
 
     const upgTotal = state.market.investments.filter(c => c.family === 'upgrade').length
       + state.decks.upgrade.length;
