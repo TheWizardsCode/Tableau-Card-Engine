@@ -952,3 +952,22 @@ export function cardLabel(card: AnyCard): string {
     case 'upgrade':  return `${card.name} ($${card.cost})`;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Card template ID → display-name lookup
+// ---------------------------------------------------------------------------
+
+/**
+ * Read-only map from card template ID (e.g. `'biz-cafe'`) to its display name
+ * (e.g. `'Cafe'`). Built once at module load from the private template arrays.
+ *
+ * This is used by the meta-progression UI to show which cards a newly unlocked
+ * tier adds to the player's card pool.
+ */
+export const CARD_TEMPLATE_NAMES: ReadonlyMap<string, string> = (() => {
+  const m = new Map<string, string>();
+  for (const t of BUSINESS_TEMPLATES) m.set(t.id, t.name);
+  for (const t of EVENT_TEMPLATES)   m.set(t.id, t.name);
+  for (const t of UPGRADE_TEMPLATES) m.set(t.id, t.name);
+  return m;
+})();

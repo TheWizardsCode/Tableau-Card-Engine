@@ -233,3 +233,18 @@ export function deriveUnlockedCardIds(unlockedTiers: string[]): string[] {
   }
   return [...allCardIds];
 }
+
+/**
+ * Returns the highest-order `TierDefinition` among the given unlocked tier IDs,
+ * or `undefined` if `unlockedTiers` is empty / contains no valid IDs.
+ */
+export function highestUnlockedTier(
+  unlockedTiers: string[],
+): TierDefinition | undefined {
+  let best: TierDefinition | undefined;
+  for (const id of unlockedTiers) {
+    const def = TIER_DEFINITIONS[id];
+    if (def && (!best || def.order > best.order)) best = def;
+  }
+  return best;
+}
