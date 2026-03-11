@@ -10,8 +10,27 @@
  * All engine, adjacency, scoring, and challenge code reads from the config
  * rather than module-level constants.
  *
+ * ## Engine Component Adapter (CG-0MMJ8S9850MV4L0A)
+ *
+ * This module's `GameConfig` interface extends the generic
+ * `DifficultyConfig` from `@core-engine`. The preset registry and
+ * lookup function conform to the generic `DifficultyPresetRegistry`
+ * and `createPresetLookup` patterns.
+ *
+ * **M6 Extraction TODO:** When extracting to a shared engine module,
+ * the generic `DifficultyConfig`, `DifficultyPresetRegistry`, and
+ * `createPresetLookup` are already in `@core-engine/DifficultyPresets`.
+ * Game-specific code keeps only the concrete `GameConfig` definition,
+ * preset objects, and the registry. The `getPreset` function can be
+ * replaced with `createPresetLookup(DIFFICULTY_PRESETS, MEDIUM_PRESET)`.
+ *
  * @module
  */
+
+import type {
+  DifficultyConfig,
+  DifficultyPresetRegistry,
+} from '../../src/core-engine/DifficultyPresets';
 
 // ── Difficulty Names ────────────────────────────────────────
 
@@ -23,11 +42,14 @@ export type DifficultyName = 'Easy' | 'Medium' | 'Hard';
 /**
  * Runtime configuration for a Main Street game.
  *
+ * Extends the generic `DifficultyConfig` from `@core-engine` with
+ * Main Street-specific game parameters.
+ *
  * Created from a `DifficultyPreset` at setup time and stored on the
  * game state so that engine logic can read values without importing
  * module-level constants.
  */
-export interface GameConfig {
+export interface GameConfig extends DifficultyConfig {
   /** Human-readable difficulty name (for UI display). */
   readonly difficultyName: DifficultyName;
 
@@ -110,8 +132,12 @@ export const HARD_PRESET: Readonly<GameConfig> = {
 
 // ── Preset Registry ─────────────────────────────────────────
 
-/** Map of all available presets by name. */
-export const DIFFICULTY_PRESETS: Readonly<Record<DifficultyName, Readonly<GameConfig>>> = {
+/**
+ * Map of all available presets by name.
+ *
+ * Conforms to `DifficultyPresetRegistry<GameConfig>` from `@core-engine`.
+ */
+export const DIFFICULTY_PRESETS: DifficultyPresetRegistry<GameConfig> = {
   Easy: EASY_PRESET,
   Medium: MEDIUM_PRESET,
   Hard: HARD_PRESET,

@@ -12,16 +12,39 @@
  *   - upgrade:      Rewards upgrading businesses
  *   - cross-cutting: Rewards diversity or multi-category achievements
  *
+ * ## Engine Component Adapter (CG-0MMJ8S9850MV4L0A)
+ *
+ * This module's types implement the generic `ChallengeDefinition<TState>`
+ * and `ActiveChallengeRecord<TState>` interfaces from `@core-engine`.
+ * The `Challenge` type is a `ChallengeDefinition<MainStreetState>` and
+ * `ActiveChallenge` is an `ActiveChallengeRecord<MainStreetState>`.
+ *
+ * Selection and evaluation delegate to the generic `@core-engine`
+ * functions, with Main Street-specific wrappers for backward compatibility.
+ *
+ * **M6 Extraction TODO:** When extracting to a shared engine module,
+ * remove the game-specific re-exports and import directly from
+ * `@core-engine/ChallengeSystem`. The evaluator functions, template
+ * catalog, and helper functions remain game-specific.
+ *
  * @module
  */
 
 import type { MainStreetState } from './MainStreetState';
 import type { SynergyType } from './MainStreetCards';
 import { CHALLENGE_BONUS_POINTS } from './MainStreetCards';
+import type {
+  ChallengeDefinition,
+  ActiveChallengeRecord,
+} from '../../src/core-engine/ChallengeSystem';
+import {
+  selectChallenges as genericSelectChallenges,
+  evaluateChallenges as genericEvaluateChallenges,
+} from '../../src/core-engine/ChallengeSystem';
 
 // ── Challenge Types ─────────────────────────────────────────
 
-/** Categories for organizing challenges. */
+/** Categories for organizing Main Street challenges. */
 export type ChallengeCategory =
   | 'synergy'
   | 'placement'
@@ -30,37 +53,25 @@ export type ChallengeCategory =
   | 'cross-cutting';
 
 /**
- * A challenge template: a meta-goal that can be selected for a run.
+ * A Main Street challenge template: a meta-goal that can be selected for a run.
  *
+ * Implements `ChallengeDefinition<MainStreetState>` from the core engine.
  * Each challenge has a pure evaluator function that returns true
  * when the challenge condition is met based on the current game state.
  */
-export interface Challenge {
-  /** Unique identifier for the challenge. */
-  readonly id: string;
-  /** Short human-readable title. */
-  readonly title: string;
-  /** Longer description of what the player needs to accomplish. */
-  readonly description: string;
-  /** Category for organization and UI display. */
+export interface Challenge extends ChallengeDefinition<MainStreetState> {
+  /** Category narrowed to Main Street's challenge categories. */
   readonly category: ChallengeCategory;
-  /**
-   * Pure evaluator function. Returns true when the challenge condition
-   * is satisfied by the current game state.
-   */
-  readonly evaluator: (state: MainStreetState) => boolean;
-  /** Bonus points awarded when the challenge is completed. */
-  readonly rewardPoints: number;
 }
 
 /**
  * An active challenge during a game run, tracking completion state.
+ *
+ * Implements `ActiveChallengeRecord<MainStreetState>` from the core engine.
  */
-export interface ActiveChallenge {
-  /** The challenge template. */
+export interface ActiveChallenge extends ActiveChallengeRecord<MainStreetState> {
+  /** The challenge template (narrowed to Main Street's Challenge type). */
   readonly challenge: Challenge;
-  /** Whether this challenge has been completed in the current run. */
-  completed: boolean;
 }
 
 // ── Evaluator Helpers ───────────────────────────────────────
@@ -294,9 +305,9 @@ export const DEFAULT_CHALLENGES_PER_RUN = 3;
 /**
  * Selects N challenges from the template pool using seeded RNG.
  *
- * Uses Fisher-Yates shuffle on a copy of the templates array,
- * then takes the first `count` elements. This ensures deterministic
- * selection: same seed + same templates = same challenges.
+ * Delegates to the generic `selectChallenges` from `@core-engine`.
+ * This wrapper preserves the Main Street `Challenge` return type
+ * for backward compatibility.
  *
  * Edge cases:
  * - count > templates.length -> returns all templates
@@ -312,19 +323,10 @@ export function selectChallenges(
   count: number,
   rng: () => number,
 ): Challenge[] {
-  if (count <= 0) return [];
-
-  // Work on a mutable copy
-  const pool = [...templates];
-  const n = Math.min(count, pool.length);
-
-  // Fisher-Yates shuffle (full shuffle for uniform distribution)
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
-  }
-
-  return pool.slice(0, n);
+  // Delegate to the generic core-engine implementation.
+  // The cast is safe because Challenge extends ChallengeDefinition<MainStreetState>
+  // and the generic function preserves element identity (no transformation).
+  return genericSelectChallenges(templates, count, rng) as Challenge[];
 }
 
 // ── Evaluation ──────────────────────────────────────────────
@@ -332,10 +334,10 @@ export function selectChallenges(
 /**
  * Evaluates all active challenges against the current game state.
  *
- * For each active challenge that is not yet completed, runs its
- * evaluator function. If the evaluator returns true, marks the
- * challenge as completed, pushes its ID to `state.challengesCompleted`,
- * and adds an activity log entry.
+ * Delegates to the generic `evaluateChallenges` from `@core-engine`
+ * with a Main Street-specific completion callback that:
+ * - Pushes the challenge ID to `state.challengesCompleted`
+ * - Adds an activity log entry
  *
  * Once a challenge is marked complete it stays complete (no revocation).
  *
@@ -347,22 +349,16 @@ export function evaluateChallenges(
   activeChallenges: ActiveChallenge[],
   state: MainStreetState,
 ): string[] {
-  const newlyCompleted: string[] = [];
-
-  for (const ac of activeChallenges) {
-    if (ac.completed) continue;
-
-    if (ac.challenge.evaluator(state)) {
-      ac.completed = true;
-      state.challengesCompleted.push(ac.challenge.id);
-      newlyCompleted.push(ac.challenge.id);
-      state.activityLog.push({
-        turn: state.turn,
-        text: `Challenge completed: ${ac.challenge.title} (+${ac.challenge.rewardPoints} pts)`,
+  return genericEvaluateChallenges(
+    activeChallenges,
+    state,
+    (challenge, s) => {
+      s.challengesCompleted.push(challenge.id);
+      s.activityLog.push({
+        turn: s.turn,
+        text: `Challenge completed: ${challenge.title} (+${challenge.rewardPoints} pts)`,
         type: 'gain',
       });
-    }
-  }
-
-  return newlyCompleted;
+    },
+  );
 }

@@ -20,6 +20,15 @@ import {
   getPreset,
 } from '../../example-games/main-street/MainStreetDifficulty';
 
+import type {
+  DifficultyConfig,
+  DifficultyPresetRegistry,
+} from '../../src/core-engine/DifficultyPresets';
+import {
+  createPresetLookup,
+  getPresetNames,
+} from '../../src/core-engine/DifficultyPresets';
+
 import {
   setupMainStreetGame,
   type MainStreetState,
@@ -467,5 +476,58 @@ describe('Adjacency uses config.synergyBonusPerNeighbor', () => {
     // Middle business has 2 neighbors with matching synergy
     expect(computeSynergyBonus(grid, 4, 1)).toBe(2); // 2 neighbors * 1
     expect(computeSynergyBonus(grid, 4, 2)).toBe(4); // 2 neighbors * 2
+  });
+});
+
+// ── Adapter Conformance Tests (CG-0MMJ8S9850MV4L0A) ────────
+
+describe('Difficulty adapter conformance to core-engine generics', () => {
+  it('GameConfig satisfies DifficultyConfig interface', () => {
+    // Type-level conformance: GameConfig extends DifficultyConfig.
+    // If this compiles, the structural subtype relationship holds.
+    const config: GameConfig = MEDIUM_PRESET;
+    const generic: DifficultyConfig = config;
+
+    expect(generic.difficultyName).toBe('Medium');
+  });
+
+  it('all presets satisfy DifficultyConfig', () => {
+    const presets: Readonly<GameConfig>[] = [EASY_PRESET, MEDIUM_PRESET, HARD_PRESET];
+    for (const preset of presets) {
+      const generic: DifficultyConfig = preset;
+      expect(typeof generic.difficultyName).toBe('string');
+      expect(generic.difficultyName.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('DIFFICULTY_PRESETS is assignable to DifficultyPresetRegistry<GameConfig>', () => {
+    // Type-level conformance: the Main Street registry satisfies the generic registry type.
+    const generic: DifficultyPresetRegistry<GameConfig> = DIFFICULTY_PRESETS;
+    expect(Object.keys(generic)).toHaveLength(3);
+  });
+
+  it('createPresetLookup works with Main Street DIFFICULTY_PRESETS', () => {
+    const lookup = createPresetLookup(DIFFICULTY_PRESETS, MEDIUM_PRESET);
+    expect(lookup('Easy')).toBe(EASY_PRESET);
+    expect(lookup('Medium')).toBe(MEDIUM_PRESET);
+    expect(lookup('Hard')).toBe(HARD_PRESET);
+    expect(lookup(undefined)).toBe(MEDIUM_PRESET);
+    expect(lookup('Unknown')).toBe(MEDIUM_PRESET);
+  });
+
+  it('getPresetNames returns the same names as DIFFICULTY_NAMES', () => {
+    const names = getPresetNames(DIFFICULTY_PRESETS);
+    for (const dn of DIFFICULTY_NAMES) {
+      expect(names).toContain(dn);
+    }
+    expect(names).toHaveLength(DIFFICULTY_NAMES.length);
+  });
+
+  it('getPreset and createPresetLookup produce equivalent results', () => {
+    const lookup = createPresetLookup(DIFFICULTY_PRESETS, MEDIUM_PRESET);
+    for (const name of DIFFICULTY_NAMES) {
+      expect(lookup(name)).toBe(getPreset(name));
+    }
+    expect(lookup(undefined)).toBe(getPreset(undefined));
   });
 });

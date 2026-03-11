@@ -99,3 +99,24 @@ export { createSeededRng } from './SeededRng';
 
 // Transcript auto-save helper
 export { autoSaveTranscript } from './autoSaveTranscript';
+
+// Challenge system generic API (CG-0MMJ8S9850MV4L0A)
+export type {
+  ChallengeDefinition,
+  ActiveChallengeRecord,
+  ChallengeCompletionCallback,
+} from './ChallengeSystem';
+export {
+  selectChallenges,
+  evaluateChallenges,
+} from './ChallengeSystem';
+
+// Difficulty presets generic API (CG-0MMJ8S9850MV4L0A)
+export type {
+  DifficultyConfig,
+  DifficultyPresetRegistry,
+} from './DifficultyPresets';
+export {
+  createPresetLookup,
+  getPresetNames,
+} from './DifficultyPresets';
