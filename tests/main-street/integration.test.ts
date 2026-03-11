@@ -536,7 +536,9 @@ describe('Integration: Held Investment Event', () => {
     expect(state.heldEvent).toBeNull();
 
     const coinsAfterPlay = state.resourceBank.coins;
-    expect(coinsAfterPlay).toBe(50 + 5); // Only the event delta applied
+    // Reputation multiplier: rep=5, divisor=20 → 1 + 5/20 = 1.25
+    // floor(5 * 1.25) = floor(6.25) = 6
+    expect(coinsAfterPlay).toBe(50 + 6); // Event delta scaled by reputation multiplier
 
     // End turn — InvestmentResolution should have nothing to auto-resolve
     const result = processEndOfTurn(state);
@@ -586,7 +588,9 @@ describe('Integration: Held Investment Event', () => {
     const coinsBeforePlay = state.resourceBank.coins;
     executeAction(state, { type: 'play-event' });
     expect(state.heldEvent).toBeNull(); // Now resolved
-    expect(state.resourceBank.coins).toBe(coinsBeforePlay + 4); // +4 from event
+    // Reputation multiplier: rep=5, divisor=20 → 1 + 5/20 = 1.25
+    // floor(4 * 1.25) = floor(5.0) = 5
+    expect(state.resourceBank.coins).toBe(coinsBeforePlay + 5); // +4 base scaled to +5 by rep
 
     const result2 = processEndOfTurn(state);
     expect(result2).toBeDefined();

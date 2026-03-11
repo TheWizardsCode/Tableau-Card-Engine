@@ -12,6 +12,7 @@ import type { BusinessCard, SynergyType } from './MainStreetCards';
 import { GRID_SIZE, SYNERGY_BONUS_PER_NEIGHBOR } from './MainStreetCards';
 import type { MainStreetState } from './MainStreetState';
 import { addLog } from './MainStreetState';
+import { applyReputationMultiplier } from './MainStreetDifficulty';
 
 // ── Adjacency Resolver ──────────────────────────────────────
 
@@ -142,14 +143,23 @@ export function computeIncome(
  * Mutates state in-place. Uses config.synergyBonusPerNeighbor from the
  * active difficulty preset.
  *
+ * Income is scaled by the reputation coin multiplier (CG-0MMLR38NJ1N11DOS)
+ * so that higher reputation yields proportionally more income.
+ *
  * @param state  Current game state (mutated).
- * @returns The IncomeResult for UI display.
+ * @returns The IncomeResult for UI display (pre-multiplier breakdown,
+ *          but total reflects the multiplied amount actually credited).
  */
 export function applyIncome(state: MainStreetState): IncomeResult {
   const result = computeIncome(state.streetGrid, state.config.synergyBonusPerNeighbor);
-  state.resourceBank.coins += result.total;
-  if (result.total > 0) {
-    addLog(state, `Income: +${result.total} coins`, 'gain');
+  const multiplied = applyReputationMultiplier(
+    result.total,
+    state.resourceBank.reputation,
+    state.config,
+  );
+  state.resourceBank.coins += multiplied;
+  if (multiplied > 0) {
+    addLog(state, `Income: +${multiplied} coins`, 'gain');
   } else {
     addLog(state, `Income: +0 coins`, 'neutral');
   }

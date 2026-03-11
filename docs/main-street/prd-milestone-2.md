@@ -612,7 +612,7 @@ loadCampaignProgress(store) -> campaign (or createDefaultCampaignProgress())
     |
     v
 createBusinessDeck(3, campaign.unlockedCardIds)
-createEventDeck(3, campaign.unlockedCardIds)
+createEventDeck(3, campaign.unlockedCardIds, createSeededRng(42) /* rng is required for deterministic fractional allocation; use createSeededRng(seed) in tests/runtime */)
 createUpgradeDeck(2, campaign.unlockedCardIds)
     |
     v

@@ -78,6 +78,24 @@ export interface GameConfig extends DifficultyConfig {
   // ── Challenges ──────────────────────────────────────────
   /** Number of challenges selected per run. */
   readonly challengesPerRun: number;
+  /** Multiplier to increase positive Incident frequency (1.0 = baseline). */
+  readonly positiveIncidentMultiplier: number;
+
+  // ── Reputation-based Coin Multiplier ───────────────────
+  /**
+   * Divisor used in the reputation coin multiplier formula:
+   *   multiplier = 1 + (reputation / reputationCoinDivisor)
+   *
+   * Higher values make reputation less impactful on coin rewards.
+   * Default 20 means rep=20 yields a 2x multiplier.
+   */
+  readonly reputationCoinDivisor: number;
+  /**
+   * Maximum value the reputation coin multiplier can reach.
+   * Prevents runaway scaling in long or lucky games.
+   * Default 3.0 means coin rewards can at most triple.
+   */
+  readonly maxReputationCoinMultiplier: number;
 }
 
 // ── Preset Definitions ──────────────────────────────────────
@@ -96,6 +114,9 @@ export const EASY_PRESET: Readonly<GameConfig> = {
   challengeBonusPoints: 15,
   synergyBonusPerNeighbor: 2,
   challengesPerRun: 2,
+  positiveIncidentMultiplier: 1.2,
+  reputationCoinDivisor: 20,
+  maxReputationCoinMultiplier: 3.0,
 };
 
 /**
@@ -112,6 +133,11 @@ export const MEDIUM_PRESET: Readonly<GameConfig> = {
   challengeBonusPoints: 10,
   synergyBonusPerNeighbor: 1,
   challengesPerRun: 3,
+  // Increase positive incident frequency by 50% for the Medium baseline
+  // as requested by work item CG-0MMLR20XP1IPPD03.
+  positiveIncidentMultiplier: 1.5,
+  reputationCoinDivisor: 20,
+  maxReputationCoinMultiplier: 3.0,
 };
 
 /**
@@ -128,6 +154,9 @@ export const HARD_PRESET: Readonly<GameConfig> = {
   challengeBonusPoints: 8,
   synergyBonusPerNeighbor: 1,
   challengesPerRun: 4,
+  positiveIncidentMultiplier: 1,
+  reputationCoinDivisor: 20,
+  maxReputationCoinMultiplier: 3.0,
 };
 
 // ── Preset Registry ─────────────────────────────────────────
@@ -156,3 +185,57 @@ export function getPreset(name: DifficultyName | undefined): Readonly<GameConfig
 
 /** All available difficulty names in display order. */
 export const DIFFICULTY_NAMES: readonly DifficultyName[] = ['Easy', 'Medium', 'Hard'];
+
+// ── Reputation-based Coin Multiplier ────────────────────────
+
+/**
+ * Computes the reputation-based coin multiplier.
+ *
+ * Formula: min(1 + reputation / divisor, cap)
+ *
+ * Uses the additive formula so that reputation=0 still yields a 1x
+ * baseline (no reward lost). The multiplier is capped to prevent
+ * runaway scaling in long or lucky games.
+ *
+ * - reputation=0  -> 1.0x (baseline preserved)
+ * - reputation=10 -> 1.5x (with divisor=20)
+ * - reputation=20 -> 2.0x
+ * - reputation=40 -> 3.0x (capped at maxMultiplier=3.0)
+ * - reputation=60 -> 3.0x (capped)
+ *
+ * Negative reputation clamps the multiplier at 1.0 (no penalty via
+ * this channel -- reputation collapse is handled elsewhere).
+ *
+ * @param reputation  Current player reputation.
+ * @param config      Game config with reputationCoinDivisor and maxReputationCoinMultiplier.
+ * @returns The multiplier to apply to coin rewards (always >= 1.0).
+ */
+export function reputationCoinMultiplier(
+  reputation: number,
+  config: Pick<GameConfig, 'reputationCoinDivisor' | 'maxReputationCoinMultiplier'>,
+): number {
+  if (!Number.isFinite(reputation) || reputation <= 0) return 1.0;
+  const raw = 1 + reputation / config.reputationCoinDivisor;
+  return Math.min(raw, config.maxReputationCoinMultiplier);
+}
+
+/**
+ * Applies the reputation coin multiplier to a raw coin delta.
+ *
+ * Only positive coin deltas are scaled -- negative deltas (penalties)
+ * pass through unchanged so that reputation does not amplify losses.
+ * The result is rounded down (floored) to keep coin amounts integral.
+ *
+ * @param rawCoinDelta  The base coin amount (positive = gain, negative = penalty).
+ * @param reputation    Current player reputation.
+ * @param config        Game config with multiplier tuning constants.
+ * @returns The adjusted coin delta.
+ */
+export function applyReputationMultiplier(
+  rawCoinDelta: number,
+  reputation: number,
+  config: Pick<GameConfig, 'reputationCoinDivisor' | 'maxReputationCoinMultiplier'>,
+): number {
+  if (rawCoinDelta <= 0) return rawCoinDelta;
+  return Math.floor(rawCoinDelta * reputationCoinMultiplier(reputation, config));
+}

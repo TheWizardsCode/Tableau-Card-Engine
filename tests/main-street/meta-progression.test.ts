@@ -40,6 +40,7 @@ import {
   createUpgradeDeck,
   CARD_TEMPLATE_NAMES,
 } from '../../example-games/main-street/MainStreetCards';
+import { createSeededRng } from '../../src/core-engine';
 import { CHALLENGE_TEMPLATES } from '../../example-games/main-street/MainStreetChallenges';
 
 // ── Test Helpers ────────────────────────────────────────────
@@ -205,7 +206,7 @@ describe('Meta-Progression System', () => {
     it('all card IDs in tier definitions reference valid template IDs', () => {
       // Build the set of template IDs from unfiltered deck builders (1 copy each)
       const allBizIds = createBusinessDeck(1).map((c) => c.id.replace(/-\d+$/, ''));
-      const allEvtIds = createEventDeck(1).map((c) => c.id.replace(/-\d+$/, ''));
+      const allEvtIds = createEventDeck(1, undefined, createSeededRng(42)).map((c) => c.id.replace(/-\d+$/, ''));
       const allUpgIds = createUpgradeDeck(1).map((c) => c.id.replace(/-\d+$/, ''));
       const allTemplateIds = new Set([...allBizIds, ...allEvtIds, ...allUpgIds]);
 
@@ -628,7 +629,7 @@ describe('Meta-Progression System', () => {
 
     it('createEventDeck with tier-1 IDs returns only tier-1 event cards', () => {
       const tier1CardIds = TIER_DEFINITIONS['tier-1'].cumulativeCardIds;
-      const deck = createEventDeck(1, tier1CardIds);
+      const deck = createEventDeck(1, tier1CardIds, createSeededRng(42));
       const tier1EvtIds = tier1CardIds.filter((id) => id.startsWith('evt-'));
 
       for (const card of deck) {
@@ -692,7 +693,7 @@ describe('Meta-Progression System', () => {
       const tier5CardIds = TIER_DEFINITIONS['tier-5'].cumulativeCardIds;
 
       const bizDeck = createBusinessDeck(1, tier5CardIds);
-      const evtDeck = createEventDeck(1, tier5CardIds);
+      const evtDeck = createEventDeck(1, tier5CardIds, createSeededRng(42));
       const upgDeck = createUpgradeDeck(1, tier5CardIds);
 
       const allBaseIds = new Set([
@@ -868,8 +869,8 @@ describe('Meta-Progression System', () => {
     });
 
     it('createEventDeck without unlockedCardIds includes more cards than tier-1 alone', () => {
-      const fullDeck = createEventDeck(1);
-      const tier1Deck = createEventDeck(1, TIER_DEFINITIONS['tier-1'].cumulativeCardIds);
+      const fullDeck = createEventDeck(1, undefined, createSeededRng(42));
+      const tier1Deck = createEventDeck(1, TIER_DEFINITIONS['tier-1'].cumulativeCardIds, createSeededRng(42));
       expect(fullDeck.length).toBeGreaterThan(tier1Deck.length);
     });
 

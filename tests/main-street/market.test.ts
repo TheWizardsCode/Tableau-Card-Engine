@@ -178,7 +178,8 @@ describe('MainStreetMarket', () => {
       const biz = state.market.business.find(b => b.name === targetName)
         || state.decks.business.find(b => b.name === targetName);
       if (biz) {
-        state.streetGrid[0] = { ...biz };
+        // Ensure the placed business meets the upgrade's requiredLevel
+        state.streetGrid[0] = { ...biz, level: (upgrade.requiredLevel ?? 0) };
         state.resourceBank.coins = 100; // Ensure enough coins
         const result = canPurchaseUpgrade(state, upgrade.id);
         expect(result.legal).toBe(true);
@@ -224,7 +225,8 @@ describe('MainStreetMarket', () => {
       // Place a matching business
       const biz = state.decks.business.find(b => b.name === targetName);
       expect(biz).toBeDefined();
-      state.streetGrid[0] = { ...biz! };
+      // Ensure the placed business meets the upgrade's requiredLevel
+      state.streetGrid[0] = { ...biz!, level: (upgrade!.requiredLevel ?? 0) };
       state.resourceBank.coins = 100;
 
       const incomeBefore = state.streetGrid[0]!.incomeBonus;
@@ -247,15 +249,20 @@ describe('MainStreetMarket', () => {
       // Place matching businesses in slots 2 and 5
       const biz = state.decks.business.find(b => b.name === targetName);
       expect(biz).toBeDefined();
-      state.streetGrid[2] = { ...biz!, id: 'target-2' };
-      state.streetGrid[5] = { ...biz!, id: 'target-5' };
+      // Ensure placed businesses meet the upgrade's requiredLevel so the
+      // purchase is legal regardless of which upgrade variant appears in the market.
+      state.streetGrid[2] = { ...biz!, id: 'target-2', level: (upgrade!.requiredLevel ?? 0) };
+      state.streetGrid[5] = { ...biz!, id: 'target-5', level: (upgrade!.requiredLevel ?? 0) };
       state.resourceBank.coins = 100;
+
+      const level2Before = state.streetGrid[2]!.level;
+      const level5Before = state.streetGrid[5]!.level;
 
       purchaseUpgrade(state, upgrade!.id, 5);
 
-      // Slot 5 should be upgraded, slot 2 should not
-      expect(state.streetGrid[5]!.level).toBe(1);
-      expect(state.streetGrid[2]!.level).toBe(0);
+      // Slot 5 should be incremented by 1, slot 2 should remain unchanged
+      expect(state.streetGrid[5]!.level).toBe(level5Before + 1);
+      expect(state.streetGrid[2]!.level).toBe(level2Before);
     });
   });
 
@@ -394,7 +401,8 @@ describe('MainStreetMarket', () => {
       // Place a matching business so the upgrade purchase is legal
       const biz = state.decks.business.find(b => b.name === targetName);
       if (!biz) return;
-      state.streetGrid[0] = { ...biz };
+      // Ensure the placed business meets the upgrade's requiredLevel
+      state.streetGrid[0] = { ...biz, level: (upgrade.requiredLevel ?? 0) };
       state.resourceBank.coins = 100;
 
       purchaseUpgrade(state, upgrade.id);

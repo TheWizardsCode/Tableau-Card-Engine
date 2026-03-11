@@ -12,6 +12,7 @@
 import { describe, it, expect } from 'vitest';
 
 import { setupMainStreetGame, type MainStreetState } from '../../example-games/main-street/MainStreetState';
+import { createSeededRng } from '../../src/core-engine';
 import {
   refillBusinessMarket,
   refillInvestmentsMarket,
@@ -32,6 +33,7 @@ import {
   createEventDeck,
   createUpgradeDeck,
 } from '../../example-games/main-street/MainStreetCards';
+import { getPreset } from '../../example-games/main-street/MainStreetDifficulty';
 
 // ── Helpers ─────────────────────────────────────────────────
 
@@ -175,7 +177,9 @@ describe('Market Refill Integration (Expanded Pool)', () => {
 
     it('event deck has correct count (templates x 3 copies minus queue/market)', () => {
       const state = createState('deck-size-evt');
-      const totalEventCards = createEventDeck().length;
+    const multiplier = getPreset(undefined).positiveIncidentMultiplier;
+    const _rng = createSeededRng(42);
+    const totalEventCards = createEventDeck(3, undefined, _rng, multiplier).length;
       const inDeck = state.decks.event.length;
       const inQueue = state.incidentQueue.length;
       const investmentEvents = state.market.investments.filter(c => c.family === 'event').length;
