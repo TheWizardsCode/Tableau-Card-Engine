@@ -13,6 +13,7 @@ import {
   evaluateChallenges,
   type ChallengeCategory,
   type ActiveChallenge,
+  type Challenge,
 } from '../../example-games/main-street/MainStreetChallenges';
 
 import {
@@ -23,6 +24,10 @@ import {
 import type { BusinessCard, SynergyType } from '../../example-games/main-street/MainStreetCards';
 import { CHALLENGE_BONUS_POINTS, GRID_SIZE } from '../../example-games/main-street/MainStreetCards';
 import { createSeededRng } from '../../src/core-engine';
+import type {
+  ChallengeDefinition,
+  ActiveChallengeRecord,
+} from '../../src/core-engine/ChallengeSystem';
 
 // ── Helpers ─────────────────────────────────────────────────
 
@@ -691,5 +696,68 @@ describe('MainStreetChallenges', () => {
       expect(ac.challenge.title).toBe('Deep Pockets');
       expect(ac.challenge.description).toBeDefined();
     });
+  });
+});
+
+// ── Adapter Conformance Tests (CG-0MMJ8S9850MV4L0A) ────────
+
+describe('Challenge adapter conformance to core-engine generics', () => {
+  it('Challenge satisfies ChallengeDefinition<MainStreetState> interface', () => {
+    // Type-level conformance: Challenge extends ChallengeDefinition<MainStreetState>.
+    // If this compiles, the structural subtype relationship holds.
+    const template: Challenge = CHALLENGE_TEMPLATES[0];
+    const generic: ChallengeDefinition<MainStreetState> = template;
+
+    // Runtime field presence checks
+    expect(generic.id).toBe(template.id);
+    expect(generic.title).toBe(template.title);
+    expect(generic.description).toBe(template.description);
+    expect(generic.category).toBe(template.category);
+    expect(generic.rewardPoints).toBe(template.rewardPoints);
+    expect(typeof generic.evaluator).toBe('function');
+  });
+
+  it('ActiveChallenge satisfies ActiveChallengeRecord<MainStreetState> interface', () => {
+    const ac: ActiveChallenge = {
+      challenge: CHALLENGE_TEMPLATES[0],
+      completed: false,
+    };
+    const generic: ActiveChallengeRecord<MainStreetState> = ac;
+
+    expect(generic.challenge.id).toBe(CHALLENGE_TEMPLATES[0].id);
+    expect(generic.completed).toBe(false);
+  });
+
+  it('all CHALLENGE_TEMPLATES are assignable to ChallengeDefinition<MainStreetState>[]', () => {
+    // Structural subtyping: readonly Challenge[] assignable to readonly ChallengeDefinition<MainStreetState>[]
+    const generics: readonly ChallengeDefinition<MainStreetState>[] = CHALLENGE_TEMPLATES;
+    expect(generics).toHaveLength(CHALLENGE_TEMPLATES.length);
+    for (const g of generics) {
+      expect(g).toHaveProperty('id');
+      expect(g).toHaveProperty('evaluator');
+      expect(g).toHaveProperty('rewardPoints');
+    }
+  });
+
+  it('selectChallenges returns results assignable to ChallengeDefinition<MainStreetState>[]', () => {
+    const rng = createSeededRng(42);
+    const selected = selectChallenges(CHALLENGE_TEMPLATES, 3, rng);
+    const generics: ChallengeDefinition<MainStreetState>[] = selected;
+    expect(generics).toHaveLength(3);
+  });
+
+  it('evaluateChallenges works with ActiveChallenge[] (adapter delegation)', () => {
+    const state = createEmptyState('conformance');
+    state.resourceBank.coins = 30;
+    const ac: ActiveChallenge = {
+      challenge: CHALLENGE_TEMPLATES.find(t => t.id === 'ch-deep-pockets')!,
+      completed: false,
+    };
+    const result = evaluateChallenges([ac], state);
+    expect(result).toContain('ch-deep-pockets');
+    expect(ac.completed).toBe(true);
+    // Verify the Main Street-specific side effects from the onComplete callback
+    expect(state.challengesCompleted).toContain('ch-deep-pockets');
+    expect(state.activityLog.length).toBeGreaterThan(0);
   });
 });

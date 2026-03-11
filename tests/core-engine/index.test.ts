@@ -16,6 +16,10 @@ import {
   SaveLoadStore,
   serializeWithVersion,
   deserializeWithVersion,
+  selectChallenges,
+  evaluateChallenges,
+  createPresetLookup,
+  getPresetNames,
 } from '../../src/core-engine/index';
 
 describe('core-engine barrel exports', () => {
@@ -55,6 +59,16 @@ describe('core-engine barrel exports', () => {
     expect(typeof SaveLoadStore).toBe('function');
     expect(typeof serializeWithVersion).toBe('function');
     expect(typeof deserializeWithVersion).toBe('function');
+  });
+
+  it('should export challenge system functions', () => {
+    expect(typeof selectChallenges).toBe('function');
+    expect(typeof evaluateChallenges).toBe('function');
+  });
+
+  it('should export difficulty presets functions', () => {
+    expect(typeof createPresetLookup).toBe('function');
+    expect(typeof getPresetNames).toBe('function');
   });
 
   it('should work end-to-end through barrel exports', () => {
