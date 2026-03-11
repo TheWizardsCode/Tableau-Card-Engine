@@ -214,12 +214,48 @@ export interface MainStreetSerializedState {
   activityLog: LogEntry[];
 }
 
+/** Record of a single milestone (tier unlock) achievement. */
+export interface MilestoneRecord {
+  /** Tier ID that was unlocked, e.g. 'tier-3'. */
+  tierId: string;
+  /** Which trigger path caused the unlock. */
+  triggerType: 'reputation' | 'challenge';
+  /** For reputation triggers: the reputation value at end-of-run. For challenge triggers: null. */
+  reputationAtUnlock: number | null;
+  /** For challenge triggers: the IDs of challenges completed that satisfied the condition. For reputation triggers: null. */
+  challengeIdsAtUnlock: string[] | null;
+  /** The final score of the run that triggered the unlock. */
+  runFinalScore: number;
+  /** The seed of the run that triggered the unlock. */
+  runSeed: string;
+  /** ISO 8601 timestamp when the milestone was achieved. */
+  unlockedAt: string;
+}
+
 export interface MainStreetCampaignProgress {
+  /** Schema version for forward-compatible deserialization. */
+  schemaVersion: number;
+  /** List of unlocked tier IDs, e.g. ['tier-1', 'tier-2']. Always includes 'tier-1'. */
   unlockedTiers: string[];
+  /**
+   * IDs of all cards unlocked via tier progression. Derived from unlockedTiers
+   * at runtime, but persisted for fast lookup and offline validation.
+   */
+  unlockedCardIds: string[];
+  /**
+   * History of milestone achievements. Each entry records when a tier was
+   * unlocked, which trigger path was used, and the run context.
+   */
+  milestoneHistory: MilestoneRecord[];
+  /** Highest single-run reputation achieved across all runs. */
   persistentReputation: number;
+  /** Highest final score achieved across all runs. */
   highestScore: number;
+  /** Total number of completed runs (win or loss). */
   totalRuns: number;
+  /** Total number of winning runs. */
   totalWins: number;
+  /** ISO 8601 timestamp of the last update to this campaign data. */
   lastUpdatedAt: string;
 }
 
@@ -231,6 +267,12 @@ export interface MainStreetSetupOptions {
   seed?: string;
   /** Difficulty preset name. Defaults to 'Medium' if omitted. */
   difficulty?: DifficultyName;
+  /**
+   * Card IDs unlocked via campaign tier progression. When provided, deck builders
+   * filter templates to include only cards whose IDs are in this list. When omitted,
+   * the full card pool is used (non-campaign / backward-compatible mode).
+   */
+  unlockedCardIds?: string[];
 }
 
 // ── Seed Helpers ────────────────────────────────────────────
@@ -302,9 +344,9 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
   const config = getPreset(options.difficulty);
 
   // Create and shuffle decks
-  const businessDeck = createBusinessDeck();
-  const eventDeck = createEventDeck();
-  const upgradeDeck = createUpgradeDeck();
+  const businessDeck = createBusinessDeck(3, options.unlockedCardIds);
+  const eventDeck = createEventDeck(3, options.unlockedCardIds);
+  const upgradeDeck = createUpgradeDeck(2, options.unlockedCardIds);
 
   shuffleArray(businessDeck, rng);
   shuffleArray(eventDeck, rng);
