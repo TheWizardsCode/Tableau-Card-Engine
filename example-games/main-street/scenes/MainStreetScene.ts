@@ -385,7 +385,12 @@ export class MainStreetScene extends CardGameScene {
             difficulty: this.selectedDifficulty,
             unlockedCardIds: this.campaign.unlockedCardIds,
           });
-          this.refreshAll();
+          // Must call startDayPhase() (not just refreshAll) so the new
+          // state transitions from DayStart -> MarketPhase and the UI
+          // phase is synchronised.  Without this, the engine stays in
+          // DayStart while the UI shows market controls, blocking all
+          // player actions and causing End Turn to hang.
+          this.startDayPhase();
         }
       }).catch(() => {
         // If load fails, continue with defaults (already set up above)
@@ -426,7 +431,19 @@ export class MainStreetScene extends CardGameScene {
     this.refreshActionButtons();
 
     // Process end-of-turn phases (events, income, night, end check)
-    const result: TurnResult = processEndOfTurn(this.state);
+    let result: TurnResult;
+    try {
+      result = processEndOfTurn(this.state);
+    } catch (e) {
+      // Defensive: if processEndOfTurn throws (e.g. phase mismatch from
+      // async state replacement), recover gracefully instead of hanging
+      // with a permanent "Processing end of turn..." message.
+      console.error('[MainStreet] endTurn failed:', e);
+      this.uiPhase = 'market';
+      this.instructionText.setText(`Error: ${(e as Error).message}`);
+      this.refreshAll();
+      return;
+    }
 
     // Brief delay then show result / advance
     this.time.delayedCall(400, () => {
