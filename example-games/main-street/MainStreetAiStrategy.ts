@@ -4,6 +4,8 @@
  * Provides:
  *   - MainStreetAiStrategy interface: chooseAction(state, rng)
  *   - enumerateLegalActions(state): all valid PlayerAction options
+ *   - scoreAction(state, action): score a single action using heuristics
+ *   - enumerateAndScoreActions(state): enumerate and score all legal actions
  *   - RandomStrategy: uniformly random legal action
  *   - GreedyStrategy: heuristic priority chain
  *   - MainStreetAiPlayer: wrapper binding a strategy and RNG
@@ -37,17 +39,8 @@ import { computeSynergyBonus } from './MainStreetAdjacency';
 
 // ── Scoring constants ───────────────────────────────────────
 
-/** Weight applied to upgrade income bonus in scoring (higher = prefer better income). */
-const UPGRADE_INCOME_WEIGHT = 10;
-
-/** Weight applied to base income when scoring business placement. */
-const BASE_INCOME_WEIGHT = 5;
-
-/** Weight applied to synergy gain when scoring business placement. */
-const SYNERGY_WEIGHT = 10;
-
-/** Coins-equivalent value of one reputation point when scoring events. */
-const REPUTATION_COIN_WEIGHT = 2;
+/** Fixed score for playing a held event (ensures it is preferred over end-turn). */
+const PLAY_EVENT_SCORE = 5;
 
 // ── Strategy Interface ──────────────────────────────────────
 
@@ -271,9 +264,11 @@ export class MainStreetAiPlayer extends AiPlayerBase<MainStreetAiStrategy> {
 // ── Scoring Helpers ─────────────────────────────────────────
 
 /**
- * Score an upgrade action by the net income gain per coin spent.
+ * Score an upgrade action using the PRD Appendix A formula:
+ *   score = incomeBonus * remainingTurns - cost
  *
- * Higher income bonus upgrades are preferred over cheaper ones.
+ * Higher income bonus upgrades are preferred; `remainingTurns` scales the
+ * value of future income so early upgrades score higher.
  */
 function scoreUpgradeAction(
   state: MainStreetState,
@@ -284,17 +279,16 @@ function scoreUpgradeAction(
   ) as UpgradeCard | undefined;
   if (!card) return 0;
 
-  // Prefer upgrades with higher income bonus; use cost as tiebreaker (cheaper is better)
-  return card.incomeBonus * UPGRADE_INCOME_WEIGHT - card.cost;
+  const remainingTurns = state.config.maxTurns - state.turn;
+  return card.incomeBonus * remainingTurns - card.cost;
 }
 
 /**
- * Score a business placement by the synergy bonus gained at the target slot.
+ * Score a business placement using the PRD Appendix A formula:
+ *   score = (baseIncome + projectedSynergyBonus) * remainingTurns - cost
  *
- * Considers both the new business's synergy with existing neighbors and the
- * increase in neighbor synergies caused by placing the new business.
- *
- * Higher scores indicate better placement (more synergy gained minus cost).
+ * `projectedSynergyBonus` is evaluated at `candidateSlot` as if the business
+ * were already placed there.  Higher scores favour early high-synergy placements.
  */
 function scoreBusinessAction(
   state: MainStreetState,
@@ -303,38 +297,26 @@ function scoreBusinessAction(
   const card = state.market.business.find(c => c.id === action.cardId) as BusinessCard | undefined;
   if (!card) return 0;
 
-  // Simulate placement: clone the grid row, place card, compute synergy gain
+  // Simulate placement: shallow-clone the grid and insert the new card
   const simulatedGrid = [...state.streetGrid];
   simulatedGrid[action.slotIndex] = card;
 
-  // Synergy for the new card itself
-  const newCardSynergy = computeSynergyBonus(
+  // Projected synergy bonus for the new card at the candidate slot
+  const projectedSynergyBonus = computeSynergyBonus(
     simulatedGrid,
     action.slotIndex,
     state.config.synergyBonusPerNeighbor,
   );
 
-  // Increase in synergy for existing neighbors
-  let neighborSynergyGain = 0;
-  for (let i = 0; i < GRID_SIZE; i++) {
-    if (i === action.slotIndex) continue;
-    if (state.streetGrid[i] === null) continue;
-    const before = computeSynergyBonus(state.streetGrid, i, state.config.synergyBonusPerNeighbor);
-    const after = computeSynergyBonus(simulatedGrid, i, state.config.synergyBonusPerNeighbor);
-    neighborSynergyGain += after - before;
-  }
-
-  const totalSynergyGain = newCardSynergy + neighborSynergyGain;
-
-  // Also weight by base income and subtract cost
-  return card.baseIncome * BASE_INCOME_WEIGHT + totalSynergyGain * SYNERGY_WEIGHT - card.cost;
+  const remainingTurns = state.config.maxTurns - state.turn;
+  return (card.baseIncome + projectedSynergyBonus) * remainingTurns - card.cost;
 }
 
 /**
- * Score an event purchase by its expected net coin return.
+ * Score an event purchase using the PRD Appendix A formula:
+ *   score = coinDelta + (reputationDelta * config.reputationScoreMultiplier) - cost
  *
- * Investment events with positive coinDelta (relative to cost) are preferred.
- * A score > 0 means the event is worth buying.
+ * A score > 0 means the event has positive expected value and is worth buying.
  */
 function scoreEventAction(
   state: MainStreetState,
@@ -345,6 +327,57 @@ function scoreEventAction(
   ) as EventCard | undefined;
   if (!card) return 0;
 
-  // Net value: coinDelta (expected return) minus cost to buy, plus reputation bonus
-  return card.coinDelta - card.cost + card.reputationDelta * REPUTATION_COIN_WEIGHT;
+  return card.coinDelta + card.reputationDelta * state.config.reputationScoreMultiplier - card.cost;
+}
+
+// ── Public Scoring API ──────────────────────────────────────
+
+/**
+ * Score a single PlayerAction for the given state using the Greedy heuristics
+ * defined in PRD Appendix A.
+ *
+ * Scores are in "net coin-equivalent value" units:
+ *   - `buy-upgrade`:  `incomeBonus * remainingTurns - cost`
+ *   - `buy-business`: `(baseIncome + projectedSynergyBonus) * remainingTurns - cost`
+ *   - `buy-event`:    `coinDelta + reputationDelta * reputationScoreMultiplier - cost`
+ *   - `play-event`:   fixed bonus of 5 (prefer playing over end-turn)
+ *   - `end-turn`:     0 (baseline / fallback)
+ *
+ * @param state  Current game state (read-only by convention).
+ * @param action The action to score.
+ * @returns Numeric score (higher is better).
+ */
+export function scoreAction(state: MainStreetState, action: PlayerAction): number {
+  switch (action.type) {
+    case 'buy-upgrade':
+      return scoreUpgradeAction(state, action);
+    case 'buy-business':
+      return scoreBusinessAction(state, action);
+    case 'buy-event':
+      return scoreEventAction(state, action);
+    case 'play-event':
+      return PLAY_EVENT_SCORE;
+    case 'end-turn':
+      return 0;
+  }
+}
+
+/**
+ * Enumerate all legal actions for the given state and compute a heuristic
+ * score for each one.
+ *
+ * This is the primary building block for the Greedy strategy and the hint
+ * system.  Callers can sort by score descending or pass the results directly
+ * to `pickBest` to select the highest-scoring action with tie-breaking.
+ *
+ * @param state Current game state.
+ * @returns Array of `{ action, score }` pairs for every legal action.
+ */
+export function enumerateAndScoreActions(
+  state: MainStreetState,
+): Array<{ action: PlayerAction; score: number }> {
+  return enumerateLegalActions(state).map(action => ({
+    action,
+    score: scoreAction(state, action),
+  }));
 }

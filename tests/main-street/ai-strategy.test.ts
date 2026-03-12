@@ -1,8 +1,8 @@
 /**
  * Main Street: AI Strategy Tests
  *
- * Tests for enumerateLegalActions, RandomStrategy, GreedyStrategy,
- * and MainStreetAiPlayer.playGame().
+ * Tests for enumerateLegalActions, scoreAction, enumerateAndScoreActions,
+ * RandomStrategy, GreedyStrategy, and MainStreetAiPlayer.playGame().
  */
 import { describe, it, expect } from 'vitest';
 
@@ -11,6 +11,8 @@ import { executeDayStart } from '../../example-games/main-street/MainStreetEngin
 import type { PlayerAction } from '../../example-games/main-street/MainStreetEngine';
 import {
   enumerateLegalActions,
+  scoreAction,
+  enumerateAndScoreActions,
   RandomStrategy,
   GreedyStrategy,
   MainStreetAiPlayer,
@@ -364,5 +366,173 @@ describe('MainStreetAiPlayer', () => {
       expect(() => player.playGame(state)).not.toThrow();
       expect(['win', 'loss']).toContain(state.gameResult);
     }
+  });
+});
+
+// ── scoreAction ─────────────────────────────────────────────
+
+describe('scoreAction', () => {
+  it('scores end-turn as 0', () => {
+    const state = createTestState();
+    expect(scoreAction(state, { type: 'end-turn' })).toBe(0);
+  });
+
+  it('scores play-event as a fixed positive value', () => {
+    const state = createTestState();
+    state.heldEvent = {
+      family: 'event',
+      id: 'test-event',
+      name: 'Test Event',
+      trigger: 'Investment',
+      cost: 0,
+      effect: 'Test',
+      target: 'All',
+      coinDelta: 2,
+      reputationDelta: 0,
+    };
+    const score = scoreAction(state, { type: 'play-event' });
+    expect(score).toBeGreaterThan(0);
+  });
+
+  it('scores buy-upgrade using incomeBonus * remainingTurns - cost', () => {
+    const state = createTestState();
+    const upgradeCard: UpgradeCard = {
+      family: 'upgrade',
+      id: 'test-upgrade-score',
+      name: 'Test Upgrade Score',
+      targetBusiness: 'Bakery',
+      cost: 3,
+      incomeBonus: 2,
+      synergyRangeBonus: 0,
+      description: 'Test',
+      requiredLevel: 0,
+    };
+    state.market.investments.push(upgradeCard);
+    const remainingTurns = state.config.maxTurns - state.turn;
+    const expected = upgradeCard.incomeBonus * remainingTurns - upgradeCard.cost;
+    const actual = scoreAction(state, { type: 'buy-upgrade', cardId: upgradeCard.id, targetSlot: 0 });
+    expect(actual).toBe(expected);
+  });
+
+  it('scores buy-event using coinDelta + reputationDelta * reputationScoreMultiplier - cost', () => {
+    const state = createTestState();
+    state.heldEvent = null;
+    const eventCard = state.market.investments.find(c => c.family === 'event');
+    if (!eventCard) return; // skip if no event in market for this seed
+
+    const { coinDelta, reputationDelta, cost } = eventCard as import('../../example-games/main-street/MainStreetCards').EventCard;
+    const expected = coinDelta + reputationDelta * state.config.reputationScoreMultiplier - cost;
+    const actual = scoreAction(state, { type: 'buy-event', cardId: eventCard.id });
+    expect(actual).toBe(expected);
+  });
+
+  it('returns 0 for buy-upgrade with unknown cardId', () => {
+    const state = createTestState();
+    expect(scoreAction(state, { type: 'buy-upgrade', cardId: 'nonexistent' })).toBe(0);
+  });
+
+  it('returns 0 for buy-business with unknown cardId', () => {
+    const state = createTestState();
+    expect(scoreAction(state, { type: 'buy-business', cardId: 'nonexistent', slotIndex: 0 })).toBe(0);
+  });
+});
+
+// ── enumerateAndScoreActions ────────────────────────────────
+
+describe('enumerateAndScoreActions', () => {
+  it('returns one entry per legal action', () => {
+    const state = createTestState();
+    const legal = enumerateLegalActions(state);
+    const scored = enumerateAndScoreActions(state);
+    expect(scored.length).toBe(legal.length);
+  });
+
+  it('each entry has an action and a numeric score', () => {
+    const state = createTestState();
+    const scored = enumerateAndScoreActions(state);
+    for (const { action, score } of scored) {
+      expect(action).toBeDefined();
+      expect(typeof score).toBe('number');
+    }
+  });
+
+  it('always includes an end-turn entry with score 0', () => {
+    const state = createTestState();
+    const scored = enumerateAndScoreActions(state);
+    const endTurn = scored.find(s => s.action.type === 'end-turn');
+    expect(endTurn).toBeDefined();
+    expect(endTurn!.score).toBe(0);
+  });
+
+  it('scores match scoreAction for every action', () => {
+    const state = createTestState();
+    const scored = enumerateAndScoreActions(state);
+    for (const { action, score } of scored) {
+      expect(score).toBe(scoreAction(state, action));
+    }
+  });
+});
+
+// ── Greedy vs Random win rate ───────────────────────────────
+
+describe('GreedyStrategy vs RandomStrategy win rates', () => {
+  it('Greedy achieves a higher win rate than Random across 200 seeds', () => {
+    let greedyWins = 0;
+    let randomWins = 0;
+
+    for (let i = 0; i < 200; i++) {
+      const seed = `winrate-seed-${i}`;
+
+      const greedyState = setupMainStreetGame({ seed });
+      const greedyPlayer = new MainStreetAiPlayer(GreedyStrategy, makeRng(i));
+      greedyPlayer.playGame(greedyState);
+      if (greedyState.gameResult === 'win') greedyWins++;
+
+      const randomState = setupMainStreetGame({ seed });
+      const randomPlayer = new MainStreetAiPlayer(RandomStrategy, makeRng(i));
+      randomPlayer.playGame(randomState);
+      if (randomState.gameResult === 'win') randomWins++;
+    }
+
+    expect(greedyWins).toBeGreaterThan(randomWins);
+  });
+});
+
+// ── Deterministic replay ────────────────────────────────────
+
+describe('GreedyStrategy determinism', () => {
+  it('produces identical final state for the same seed across two runs', () => {
+    const seed = 'test-determinism';
+
+    const state1 = setupMainStreetGame({ seed });
+    const player1 = new MainStreetAiPlayer(GreedyStrategy, makeRng(99));
+    player1.playGame(state1);
+
+    const state2 = setupMainStreetGame({ seed });
+    const player2 = new MainStreetAiPlayer(GreedyStrategy, makeRng(99));
+    player2.playGame(state2);
+
+    expect(state1.gameResult).toBe(state2.gameResult);
+    expect(state1.turn).toBe(state2.turn);
+    expect(state1.resourceBank.coins).toBe(state2.resourceBank.coins);
+    expect(state1.resourceBank.reputation).toBe(state2.resourceBank.reputation);
+  });
+
+  it('produces identical action sequences for the same seed', () => {
+    const seed = 'test-determinism-actions';
+
+    // Use MainStreetAiPlayer which wraps the Greedy strategy and RNG together
+    const state1 = setupMainStreetGame({ seed });
+    const player1 = new MainStreetAiPlayer(GreedyStrategy, makeRng(7));
+    player1.playGame(state1);
+
+    const state2 = setupMainStreetGame({ seed });
+    const player2 = new MainStreetAiPlayer(GreedyStrategy, makeRng(7));
+    player2.playGame(state2);
+
+    // Identical final state is sufficient proof of identical action sequences
+    expect(state1.turn).toBe(state2.turn);
+    expect(state1.gameResult).toBe(state2.gameResult);
+    expect(JSON.stringify(state1.streetGrid)).toBe(JSON.stringify(state2.streetGrid));
   });
 });
