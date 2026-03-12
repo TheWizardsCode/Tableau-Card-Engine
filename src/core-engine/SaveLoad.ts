@@ -4,6 +4,24 @@
  * Persists versioned payloads to IndexedDB (preferred) with a localStorage
  * fallback. Supports separate save domains for run checkpoints and campaign
  * progression data.
+ *
+ * ## Design Notes for M6 Extraction
+ *
+ * This module is designed to be fully game-agnostic. The `SaveSerializer<TState, TSerialized>`
+ * interface parameterizes over both the in-memory state type and the serialized
+ * wire format, allowing any game to plug in its own serializer with schema
+ * versioning. The `SaveLoadStore` class handles all storage backend concerns
+ * (IndexedDB with localStorage fallback, domain separation, slot management).
+ *
+ * At M6, this module should be published as part of the `@core-engine` package
+ * without modification. Game-specific code (e.g., `MainStreetSaveLoad.ts`)
+ * provides only the concrete serializer and state types.
+ *
+ * Key API surface for extraction:
+ * - `SaveSerializer<TState, TSerialized>` — game implements this interface
+ * - `SaveLoadStore` — instantiated with optional config, shared across games
+ * - `SaveDomain` — `'run-checkpoint'` | `'campaign'` for data isolation
+ * - `serializeWithVersion` / `deserializeWithVersion` — versioning helpers
  */
 
 export type SaveDomain = 'run-checkpoint' | 'campaign';

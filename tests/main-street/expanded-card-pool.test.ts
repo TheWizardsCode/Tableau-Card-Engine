@@ -326,6 +326,15 @@ describe('Expanded Card Pool: Upgrade Coverage', () => {
     }
   });
 
+  it('every business with maxLevel >= 1 has at least one upgrade targeting it (US-10 AC#1)', () => {
+    const upgradeable = businessDeck.filter(b => b.maxLevel >= 1);
+    expect(upgradeable.length).toBeGreaterThan(0);
+    for (const biz of upgradeable) {
+      const matchingUpgrades = upgradeDeck.filter(u => u.targetBusiness === biz.name);
+      expect(matchingUpgrades.length, `${biz.name} (${biz.id}) has no upgrades`).toBeGreaterThanOrEqual(1);
+    }
+  });
+
   it('every upgrade card should reference a valid business name', () => {
     const businessNames = new Set(businessDeck.map(b => b.name));
     for (const upg of upgradeDeck) {
@@ -410,6 +419,20 @@ describe('Expanded Card Pool: Event Card Fields', () => {
       const events = eventDeck.filter(e => e.targetSynergy === st);
       expect(events.length).toBeGreaterThanOrEqual(1);
     }
+  });
+
+  it('at least 25% of incident templates are positive (US-9 AC#3)', () => {
+    const incidents = eventDeck.filter(e => e.trigger === 'Incident');
+    const positive = incidents.filter(i => i.coinDelta > 0 || i.reputationDelta > 0);
+    // Template pool intentionally skews negative; positiveIncidentMultiplier
+    // boosts positive frequency at runtime per difficulty preset.
+    expect(positive.length / incidents.length).toBeGreaterThanOrEqual(0.25);
+  });
+
+  it('at least 25% of incident templates are positive (US-21 AC#1)', () => {
+    const incidents = eventDeck.filter(e => e.trigger === 'Incident');
+    const positive = incidents.filter(i => i.coinDelta > 0 || i.reputationDelta > 0);
+    expect(positive.length / incidents.length).toBeGreaterThanOrEqual(0.25);
   });
 });
 

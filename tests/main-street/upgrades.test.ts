@@ -394,3 +394,35 @@ describe('multi-level chain with real upgrade templates', () => {
     expect(luxuryRetreat!.targetBusiness).toBe('Day Spa');
   });
 });
+
+// ── US-18 / US-19: Template Pool Assertions ──────────────────
+
+describe('branching & multi-level template pool (US-18, US-19)', () => {
+  const state = createTestState('template-pool');
+  const allUpgrades = state.decks.upgrade;
+
+  it('Bakery has at least 2 level-0 upgrade options (US-18 AC#1)', () => {
+    const bakeryL0 = allUpgrades.filter(
+      u => u.targetBusiness === 'Bakery' && (u.requiredLevel ?? 0) === 0,
+    );
+    expect(bakeryL0.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('Diner has at least 2 level-0 upgrade options (US-18 AC#1)', () => {
+    const dinerL0 = allUpgrades.filter(
+      u => u.targetBusiness === 'Diner' && (u.requiredLevel ?? 0) === 0,
+    );
+    expect(dinerL0.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('at least 2 businesses support multi-level chains (maxLevel >= 2) (US-19 AC#1)', () => {
+    const businesses = state.decks.business;
+    const multiLevel = businesses.filter(b => b.maxLevel >= 2);
+    expect(multiLevel.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('at least 2 upgrade templates require level >= 1 (US-19 AC#2)', () => {
+    const advanced = allUpgrades.filter(u => (u.requiredLevel ?? 0) >= 1);
+    expect(advanced.length).toBeGreaterThanOrEqual(2);
+  });
+});
