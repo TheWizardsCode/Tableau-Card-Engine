@@ -353,4 +353,16 @@ describe('MainStreetAiPlayer', () => {
       expect(['win', 'loss']).toContain(state.gameResult);
     }
   });
+
+  it('RandomStrategy completes 100 seeds without error, using seeded RNG, never making illegal actions', () => {
+    for (let i = 0; i < 100; i++) {
+      const seed = `random-strategy-seed-${i}`;
+      const state = setupMainStreetGame({ seed });
+      const player = new MainStreetAiPlayer(RandomStrategy, makeRng(i));
+      // playGame calls executeAction which throws on any illegal action;
+      // enumerateLegalActions guarantees only legal actions are returned.
+      expect(() => player.playGame(state)).not.toThrow();
+      expect(['win', 'loss']).toContain(state.gameResult);
+    }
+  });
 });
