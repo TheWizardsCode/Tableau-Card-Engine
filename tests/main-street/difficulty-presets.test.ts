@@ -229,6 +229,20 @@ describe('DifficultyPresets Module', () => {
     });
   });
 
+  describe('positiveIncidentMultiplier across presets (US-21 AC#3)', () => {
+    it('Easy should have a higher positiveIncidentMultiplier than Hard', () => {
+      expect(EASY_PRESET.positiveIncidentMultiplier).toBeGreaterThan(
+        HARD_PRESET.positiveIncidentMultiplier,
+      );
+    });
+
+    it('all presets should have positiveIncidentMultiplier >= 1', () => {
+      for (const preset of [EASY_PRESET, MEDIUM_PRESET, HARD_PRESET]) {
+        expect(preset.positiveIncidentMultiplier).toBeGreaterThanOrEqual(1);
+      }
+    });
+  });
+
   describe('getPreset()', () => {
     it('should return the correct preset for each difficulty name', () => {
       expect(getPreset('Easy')).toBe(EASY_PRESET);

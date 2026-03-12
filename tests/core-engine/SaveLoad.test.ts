@@ -104,3 +104,19 @@ describe('versioned serializer helpers', () => {
     ).toThrow(/Incompatible save version/);
   });
 });
+
+// ── Module Isolation (US-24) ────────────────────────────────
+
+describe('SaveLoad module isolation', () => {
+  it('SaveLoad.ts has no example-games imports (US-24 AC#5)', async () => {
+    const fs = await import('fs');
+    const source = fs.readFileSync('src/core-engine/SaveLoad.ts', 'utf-8');
+    expect(source).not.toMatch(/example-games/);
+  });
+
+  it('SaveLoad.ts contains M6 extraction design notes (US-24 AC#6)', async () => {
+    const fs = await import('fs');
+    const source = fs.readFileSync('src/core-engine/SaveLoad.ts', 'utf-8');
+    expect(source).toMatch(/Design Notes.*M6|M6.*Design Notes|M6 Extraction/i);
+  });
+});

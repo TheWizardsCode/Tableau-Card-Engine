@@ -11,7 +11,7 @@ This document lists every card template in the Main Street card pool, organised 
 |----------|-----------|-------------|-------------|
 | Business | 17        | 3           | 51          |
 | Event    | 17        | 3           | 51          |
-| Upgrade  | 17        | 2           | 34          |
+| Upgrade  | 25        | 2           | 50          |
 
 **Synergy types:** Food, Culture, Commerce, Service (M2), Entertainment (M2)
 
@@ -136,7 +136,7 @@ Each Upgrade targets a specific Business by name. Applying an upgrade increments
 | `upg-bistro` | Upgrade to Bistro | Diner | 4 | +1 | +1 | Diner -> Bistro. | Matches Patisserie in cost/power. |
 | `upg-library` | Upgrade to Library | Bookshop | 3 | +1 | +0 | Bookshop -> Library. | Cheaper; income only, no range. |
 
-### M2 Upgrade Templates (14)
+### M2 Standard Upgrade Templates (14)
 
 | ID | Name | Target | Cost | Income+ | Range+ | Description | Rationale |
 |----|------|--------|------|---------|--------|-------------|-----------|
@@ -147,7 +147,7 @@ Each Upgrade targets a specific Business by name. Applying an upgrade increments
 | `upg-dry-cleaners` | Upgrade to Dry Cleaners | Laundromat | 3 | +1 | +0 | Laundromat -> Dry Cleaners. | Service entry-level upgrade. |
 | `upg-salon` | Upgrade to Salon | Barbershop | 3 | +1 | +1 | Barbershop -> Salon. | Service upgrade with range. |
 | `upg-gaming-lounge` | Upgrade to Gaming Lounge | Arcade | 4 | +1 | +1 | Arcade -> Gaming Lounge. | Entertainment mid-tier upgrade. |
-| `upg-imax` | Upgrade to IMAX Theater | Cinema | 5 | +2 | +1 | Cinema -> IMAX Theater. | Most expensive upgrade; highest income bonus. |
+| `upg-imax` | Upgrade to IMAX Theater | Cinema | 5 | +2 | +1 | Cinema -> IMAX Theater. | Premium upgrade; highest income bonus (tied). |
 | `upg-roastery` | Upgrade to Roastery | Cafe | 3 | +1 | +1 | Cafe -> Roastery. | Bridge card upgrade; maintains dual synergy. |
 | `upg-gourmet-truck` | Upgrade to Gourmet Truck | Food Truck | 2 | +1 | +0 | Food Truck -> Gourmet Truck. | Cheapest upgrade in the pool. |
 | `upg-museum` | Upgrade to Museum | Art Gallery | 4 | +1 | +1 | Art Gallery -> Museum. | Premium bridge upgrade. |
@@ -155,14 +155,37 @@ Each Upgrade targets a specific Business by name. Applying an upgrade increments
 | `upg-garden-center` | Upgrade to Garden Center | Florist | 3 | +1 | +1 | Florist -> Garden Center. | Budget bridge upgrade with range. |
 | `upg-medical-center` | Upgrade to Medical Center | Clinic | 5 | +2 | +1 | Clinic -> Medical Center. | Premium Service upgrade. |
 
+### M2 Branching Upgrade Templates (4)
+
+Branching upgrades offer an alternative Level-1 path for businesses that already have a standard upgrade. Where the standard upgrade typically provides balanced income + range, branching upgrades favour one stat over the other, creating meaningful upgrade decisions. All branching upgrades have `requiredLevel: 0`.
+
+| ID | Name | Target | Cost | Income+ | Range+ | Description | Rationale |
+|----|------|--------|------|---------|--------|-------------|-----------|
+| `upg-bread-factory` | Upgrade to Bread Factory | Bakery | 3 | +2 | +0 | Scales into high-volume Bread Factory. More income, no range. | Volume-over-reach alternative to Patisserie (+1/+1). |
+| `upg-fast-food` | Upgrade to Fast Food | Diner | 3 | +2 | +0 | Converts to a Fast Food outlet. Higher income, no range. | Volume alternative to Bistro (+1/+1). |
+| `upg-drive-in` | Upgrade to Drive-In Theater | Cinema | 4 | +1 | +2 | Turns Cinema into a Drive-In with wider community reach. | Reach-over-income alternative to IMAX (+2/+1). |
+| `upg-wellness-center` | Upgrade to Wellness Center | Day Spa | 4 | +1 | +2 | Expands into a Wellness Center with broader service footprint. | Reach alternative to Resort Spa (+2/+1). |
+
+### M2 Multi-Level Upgrade Templates (4)
+
+Multi-level upgrades require the business to already be at Level 1 (`requiredLevel: 1`). They represent a second upgrade step, available only after a Level-1 upgrade (standard or branching) has been applied. These are the most powerful upgrades in the pool and serve as late-game progression rewards.
+
+| ID | Name | Target | Cost | Income+ | Range+ | Req Level | Description | Rationale |
+|----|------|--------|------|---------|--------|-----------|-------------|-----------|
+| `upg-grand-bakehouse` | Upgrade to Grand Bakehouse | Bakery | 5 | +2 | +1 | 1 | Pinnacle of baking — draws visitors from afar. | Level-2 capstone for Bakery chain. |
+| `upg-restaurant` | Upgrade to Restaurant | Diner | 5 | +2 | +1 | 1 | Elevates to a full-service Restaurant. | Level-2 capstone for Diner chain. |
+| `upg-multiplex` | Upgrade to Multiplex | Cinema | 6 | +3 | +1 | 1 | Massive entertainment complex — heart of Main Street. | Highest income bonus in pool (+3). |
+| `upg-luxury-retreat` | Upgrade to Luxury Retreat | Day Spa | 6 | +3 | +1 | 1 | Destination Luxury Retreat — most prestigious business. | Tied with Multiplex for highest income bonus. |
+
 ### Upgrade Cost Distribution
 
 | Cost | Count | Cards |
 |------|-------|-------|
 | 2 | 1 | Gourmet Truck |
-| 3 | 7 | Library, Garden, Vintage Shop, Dry Cleaners, Salon, Roastery, Garden Center |
-| 4 | 5 | Patisserie, Bistro, Designer Store, Gaming Lounge, Museum |
-| 5 | 4 | Home Improvement, IMAX Theater, Resort Spa, Medical Center |
+| 3 | 9 | Library, Garden, Vintage Shop, Dry Cleaners, Salon, Roastery, Garden Center, Bread Factory, Fast Food |
+| 4 | 7 | Patisserie, Bistro, Designer Store, Gaming Lounge, Museum, Drive-In Theater, Wellness Center |
+| 5 | 6 | Home Improvement, IMAX Theater, Resort Spa, Medical Center, Grand Bakehouse, Restaurant |
+| 6 | 2 | Multiplex, Luxury Retreat |
 
 ---
 
@@ -183,6 +206,21 @@ M2 introduces 5 bridge cards that belong to two synergy types simultaneously. Th
 | Entertainment | 2 (Arcade, Cinema) | 3 (Food Truck, Art Gallery, Day Spa) | 5 |
 
 Culture and Entertainment have the most bridge-card representation, making them easiest to chain synergies with. Commerce and Service rely more on dedicated single-type cards.
+
+### Branching & Multi-Level Upgrades
+
+M2 introduces two new upgrade mechanics that deepen progression decisions:
+
+**Branching Upgrades** — Four businesses (Bakery, Diner, Cinema, Day Spa) now have two Level-1 upgrade options instead of one. The player must choose between them since applying one locks out the other. Each pair offers a different trade-off:
+
+| Business | Standard Path | Branching Path | Trade-off |
+|----------|--------------|----------------|-----------|
+| Bakery | Patisserie (+1/+1) | Bread Factory (+2/+0) | Income vs. range |
+| Diner | Bistro (+1/+1) | Fast Food (+2/+0) | Income vs. range |
+| Cinema | IMAX (+2/+1) | Drive-In (+1/+2) | Income vs. range |
+| Day Spa | Resort Spa (+2/+1) | Wellness Center (+1/+2) | Income vs. range |
+
+**Multi-Level Upgrades** — Four Level-2 upgrades require the target business to already be at Level 1 (`requiredLevel: 1`). These apply after any Level-1 path (standard or branching), creating 2-step upgrade chains. The multi-level upgrades are the most expensive and powerful cards in the pool (cost 5-6, income +2 to +3).
 
 ### Running the Monte Carlo Balance Sweep
 

@@ -872,3 +872,362 @@ Challenge-based unlock paths are designed to be achievable by skilled players wh
 | 5 | Diversified challenge | Specific high-difficulty challenge requiring all 5 synergy types. Only achievable at Tier 4+ (when Entertainment is unlocked). |
 
 > **Note:** These thresholds are initial estimates based on analysis of the current game parameters. Balance tuning is deferred to Milestone 3 (CG-0MM4REQ4C01X8C08), where AI auto-play will validate achievement rates across difficulty presets and suggest adjustments.
+
+---
+
+## 8. User Stories: Expanded Card Pool
+
+### US-8: Diverse Business Card Pool
+
+**As a player**, I want a wider variety of Business cards with different synergy types and costs **so that** each run presents unique strategic opportunities and the street feels varied.
+
+**Acceptance Criteria:**
+
+1. The game includes at least 10 distinct Business card templates (up from 5 in M1).
+2. Each Business template has all required fields: id, name, cost, baseIncome, synergyTypes, maxLevel, and description.
+3. Every synergy type (Food, Culture, Commerce, Service, Entertainment) is represented by at least 2 single-type Business cards.
+4. `createBusinessDeck(3)` produces 3 copies of each template and all cards are valid BusinessCard instances.
+5. The market refill logic draws from the expanded Business deck without errors or infinite loops across 200+ seeded runs.
+6. All existing M1 Business cards remain in the pool with unchanged attributes.
+
+**Testable Conditions:**
+
+- `BUSINESS_TEMPLATES.length >= 10`.
+- Given `createBusinessDeck(3)`, the resulting deck has `BUSINESS_TEMPLATES.length * 3` cards.
+- Every Business template has non-empty `id`, `name`, `description`; `cost > 0`; `baseIncome >= 0`; `synergyTypes.length >= 1`.
+- For each synergy type S in `['Food', 'Culture', 'Commerce', 'Service', 'Entertainment']`, at least 2 Business templates have S in their `synergyTypes` (counting bridge cards).
+- Monte Carlo sweep of 200 seeds over 25 turns completes with no deck starvation or refill errors.
+
+### US-9: Diverse Event Card Pool
+
+**As a player**, I want a wider variety of Events including both Investment opportunities and Incident disruptions **so that** each run feels unpredictable and rewards adaptive strategy.
+
+**Acceptance Criteria:**
+
+1. The game includes at least 10 distinct Event card templates (up from 5 in M1).
+2. The Event pool includes both Investment (purchased, positive) and Incident (auto-drawn, mixed) event types.
+3. The M2 incident pool has a healthier balance than M1: at least 25% of Incident templates are positive (coinDelta > 0 or reputationDelta > 0). The template pool intentionally skews negative because the `positiveIncidentMultiplier` in `GameConfig` boosts positive incident frequency at runtime per difficulty preset.
+4. Each Event template has required fields: id, name, trigger (Investment/Incident), cost, coinDelta, reputationDelta, and description.
+5. `createEventDeck(3)` produces a valid deck and market refill operates correctly with the expanded pool.
+6. All existing M1 Event cards remain in the pool with unchanged attributes.
+
+**Testable Conditions:**
+
+- `EVENT_TEMPLATES.length >= 10`.
+- `EVENT_TEMPLATES.filter(e => e.trigger === 'Investment').length >= 4` (at least 4 Investment events).
+- `EVENT_TEMPLATES.filter(e => e.trigger === 'Incident').length >= 8` (at least 8 Incident events).
+- Among Incident templates, at least 25% are positive (coinDelta > 0 or reputationDelta > 0), i.e. `positive.length / incidents.length >= 0.25`.
+- Given `createEventDeck(3, undefined, rng)`, the resulting deck has the expected card count.
+- Monte Carlo sweep of 200 seeds confirms no event-draw starvation.
+
+### US-10: Corresponding Upgrade Cards
+
+**As a player**, I want every Business type to have at least one Upgrade path **so that** I can invest in improving any business on my street.
+
+**Acceptance Criteria:**
+
+1. Every Business template with `maxLevel >= 1` has at least one Upgrade card that targets it.
+2. Each Upgrade template has required fields: id, name, targetBusiness, cost, incomeBonus, synergyRangeBonus, requiredLevel, and description.
+3. `createUpgradeDeck(2)` produces a valid deck with 2 copies of each Upgrade template.
+4. Upgrade cards are purchasable in the market and apply correctly to their target businesses, increasing `level`, adding `incomeBonus`, and extending `synergyRangeBonus`.
+5. All existing M1 Upgrade cards remain in the pool with unchanged attributes.
+
+**Testable Conditions:**
+
+- For every Business template B with `maxLevel >= 1`, `UPGRADE_TEMPLATES.filter(u => u.targetBusiness === B.name).length >= 1`.
+- `createUpgradeDeck(2).length === UPGRADE_TEMPLATES.length * 2`.
+- Given a Business at level 0 and a matching level-0 Upgrade, applying the upgrade increments business level to 1 and adds the income/range bonuses.
+
+---
+
+## 9. User Stories: New Synergy Types & Bridge Cards
+
+### US-11: New Synergy Types
+
+**As a player**, I want new synergy types beyond Food, Culture, and Commerce **so that** I have more strategic axes for building my street and creating adjacency combos.
+
+**Acceptance Criteria:**
+
+1. The `SynergyType` union includes at least 2 new types beyond the M1 set of Food, Culture, Commerce.
+2. New synergy types are used by at least 2 dedicated single-type Business cards each.
+3. The adjacency resolver correctly awards synergy bonuses when businesses of the new synergy types are placed adjacent to each other.
+4. Existing M1 synergy bonuses are unaffected by the addition of new types.
+
+**Testable Conditions:**
+
+- `SynergyType` union includes `'Service'` and `'Entertainment'`.
+- At least 2 Business templates have `synergyTypes: ['Service']` (single-type Service cards).
+- At least 2 Business templates have `synergyTypes: ['Entertainment']` (single-type Entertainment cards).
+- Given two adjacent Service businesses, `computeSynergyBonus()` returns `synergyBonusPerNeighbor` (1 on Medium).
+- Given two adjacent Entertainment businesses, `computeSynergyBonus()` returns `synergyBonusPerNeighbor`.
+- Given an M1-only street (Food, Culture, Commerce businesses), synergy bonuses are unchanged from M1 values.
+
+### US-12: Multi-Synergy Bridge Cards
+
+**As a player**, I want some Business cards that belong to two synergy types simultaneously **so that** I can bridge different synergy clusters and create more flexible adjacency strategies.
+
+**Acceptance Criteria:**
+
+1. At least 3 Business cards have 2 entries in their `synergyTypes` array (bridge cards).
+2. The adjacency resolver treats bridge cards as matching either synergy type: a bridge card with `['Food', 'Culture']` earns bonuses from both Food and Culture neighbors.
+3. Bridge cards earn at most one synergy bonus per neighbor, even if they share multiple synergy types with that neighbor.
+4. Bridge cards are available in the market and function identically to single-type cards in all other respects (purchase, placement, upgrade).
+
+**Testable Conditions:**
+
+- `BUSINESS_TEMPLATES.filter(b => b.synergyTypes.length === 2).length >= 3`.
+- Given a Cafe (`['Food', 'Culture']`) placed between a Bakery (`['Food']`) and a Bookshop (`['Culture']`), `computeSynergyBonus()` for the Cafe slot returns `2 * synergyBonusPerNeighbor` (bonus from each side).
+- Given a Cafe placed between two Diners (both `['Food']`), `computeSynergyBonus()` for the Cafe slot returns `2 * synergyBonusPerNeighbor` (one bonus per Food neighbor, not double for shared types).
+- Given a Cafe placed next to a Park (`['Culture']`), `computeSynergyBonus()` for the Cafe slot returns `synergyBonusPerNeighbor` (matches on Culture).
+
+---
+
+## 10. User Stories: Challenge System
+
+### US-13: Challenge Pool and Definitions
+
+**As a player**, I want a pool of challenge goals available each run **so that** I have meaningful secondary objectives beyond the score threshold.
+
+**Acceptance Criteria:**
+
+1. At least 10 challenge templates are defined, each with a unique id, title, description, category, evaluator function, and reward points.
+2. Challenge categories include synergy, placement, resource, upgrade, and cross-cutting, with at least 2 challenges per category.
+3. Each challenge evaluator is a pure function of `MainStreetState` that returns `true` when the challenge condition is met.
+4. Every evaluator returns `false` for an empty street grid state (negative baseline).
+
+**Testable Conditions:**
+
+- `CHALLENGE_TEMPLATES.length >= 10`.
+- For each category in `['synergy', 'placement', 'resource', 'upgrade', 'cross-cutting']`, `CHALLENGE_TEMPLATES.filter(c => c.category === cat).length >= 2`.
+- Given an initial state with no businesses placed, every `CHALLENGE_TEMPLATES[i].evaluator(emptyState)` returns `false`.
+- Given a state with 3 adjacent Food businesses, the `ch-foodie-row` evaluator returns `true`.
+- Given a state with exactly 4 Culture businesses, the `ch-culture-district` evaluator returns `true`.
+
+### US-14: Deterministic Challenge Selection
+
+**As a player**, I want the same game seed to always produce the same set of challenges **so that** deterministic replays are possible and run outcomes are reproducible.
+
+**Acceptance Criteria:**
+
+1. `selectChallenges(templates, count, rng)` selects `count` challenges from the template pool using the seeded RNG.
+2. Same seed produces the same challenge set every time (determinism).
+3. When `count > templates.length`, all templates are returned.
+4. When `count <= 0`, an empty array is returned.
+5. Given a pool of 12 templates and 100 distinct seeds with `count=3`, every template is selected at least once (uniform distribution).
+
+**Testable Conditions:**
+
+- Call `selectChallenges(CHALLENGE_TEMPLATES, 3, createSeededRng('test-seed'))` twice; results are identical.
+- Call `selectChallenges(CHALLENGE_TEMPLATES, 3, createSeededRng('seed-A'))` and `selectChallenges(CHALLENGE_TEMPLATES, 3, createSeededRng('seed-B'))`; results differ (with overwhelming probability).
+- `selectChallenges(CHALLENGE_TEMPLATES, 0, rng).length === 0`.
+- `selectChallenges(CHALLENGE_TEMPLATES, 999, rng).length === CHALLENGE_TEMPLATES.length`.
+
+### US-15: Challenge Evaluation at EndCheck
+
+**As a player**, I want challenges to be evaluated at the end of each turn's EndCheck phase **so that** completed challenges contribute bonus points to my score before win/loss is determined.
+
+**Acceptance Criteria:**
+
+1. `evaluateChallenges(activeChallenges, state)` is called during the EndCheck phase, before `checkEndConditions`.
+2. When a challenge evaluator returns `true` for the current state and the challenge is not yet completed, it is marked `completed: true` and its ID is added to `state.challengesCompleted`.
+3. The score formula includes `challengesCompleted.length * config.challengeBonusPoints`.
+4. Completing all active challenges triggers an `'all_challenges'` win condition.
+
+**Testable Conditions:**
+
+- Given 3 active challenges where 1 evaluator returns `true`, after `evaluateChallenges()` exactly 1 challenge has `completed: true` and `state.challengesCompleted.length === 1`.
+- Given `challengesCompleted.length = 2` and `config.challengeBonusPoints = 10`, `computeScore()` includes +20 from challenges.
+- Given all active challenges completed, `checkEndConditions()` sets `state.gameResult = 'win'` and `state.endReason = 'all_challenges'`.
+
+---
+
+## 11. User Stories: Difficulty Presets
+
+### US-16: Difficulty Preset Selection
+
+**As a player**, I want to choose from at least 3 difficulty presets (Easy, Medium, Hard) **so that** I can adjust the challenge to my skill level.
+
+**Acceptance Criteria:**
+
+1. At least 3 named difficulty presets exist: Easy, Medium, Hard.
+2. Each preset configures the game via a `GameConfig` object that adjusts: startingCoins, maxTurns, winThreshold, synergyBonusPerNeighbor, and challengesPerRun.
+3. The selected preset's configuration is stored in `state.config` and used by the engine throughout the run.
+4. Presets produce measurably different game experiences (e.g., Easy has more starting coins and turns than Hard).
+
+**Testable Conditions:**
+
+- `getPresetNames(MAIN_STREET_PRESETS)` returns an array containing `'easy'`, `'medium'`, and `'hard'`.
+- `EASY_CONFIG.startingCoins > MEDIUM_CONFIG.startingCoins > HARD_CONFIG.startingCoins` (12 > 8 > 5).
+- `EASY_CONFIG.maxTurns > MEDIUM_CONFIG.maxTurns > HARD_CONFIG.maxTurns` (25 > 20 > 15).
+- `EASY_CONFIG.winThreshold < MEDIUM_CONFIG.winThreshold < HARD_CONFIG.winThreshold` (120 < 150 < 180).
+- Given a game initialized with `difficulty: 'easy'`, `state.config.startingCoins === 12` and `state.config.maxTurns === 25`.
+
+### US-17: Difficulty Affects Gameplay
+
+**As a player**, I want the difficulty preset to meaningfully change the game's economy and win conditions **so that** Easy feels relaxed and Hard feels tense.
+
+**Acceptance Criteria:**
+
+1. Easy mode gives more starting resources (coins and reputation) and more turns than Medium.
+2. Hard mode gives fewer starting resources, fewer turns, and a higher win threshold than Medium.
+3. Easy mode awards higher synergy bonuses per neighbor (2 vs 1) and higher challenge bonus points (15 vs 10).
+4. Hard mode assigns more challenges per run (4 vs 3) to increase the difficulty of the `all_challenges` win condition.
+5. The game engine reads all configured values from `state.config` rather than hardcoded constants.
+
+**Testable Conditions:**
+
+- `EASY_CONFIG.synergyBonusPerNeighbor === 2` and `MEDIUM_CONFIG.synergyBonusPerNeighbor === 1`.
+- `EASY_CONFIG.challengeBonusPoints === 15` and `HARD_CONFIG.challengeBonusPoints === 8`.
+- `HARD_CONFIG.challengesPerRun === 4` and `EASY_CONFIG.challengesPerRun === 2`.
+- Given an Easy game, `computeScore()` uses `config.reputationScoreMultiplier` (5) and `config.challengeBonusPoints` (15) -- not hardcoded values.
+- Given two adjacent matching-synergy businesses on Easy, the synergy bonus is 2 coins (not 1).
+
+---
+
+## 12. User Stories: Branching & Multi-Level Upgrades
+
+### US-18: Branching Upgrade Paths
+
+**As a player**, I want some businesses to offer a choice between two different upgrade paths **so that** I can customize my strategy based on the current game state.
+
+**Acceptance Criteria:**
+
+1. At least 2 Business types have 2 different level-0 Upgrade cards targeting them (branching choice).
+2. When multiple upgrade options exist for a business, the UI presents a choice modal allowing the player to select one.
+3. Once one branch is chosen, the other branch remains available in the market for the same business type in another slot (branches are per-card-instance, not per-type).
+4. `getUpgradeBranchesForBusiness(state, slotIndex)` returns all eligible Upgrade cards for the business at that slot.
+
+**Testable Conditions:**
+
+- `UPGRADE_TEMPLATES.filter(u => u.targetBusiness === 'Bakery' && (u.requiredLevel ?? 0) === 0).length >= 2` (Patisserie and Bread Factory).
+- `UPGRADE_TEMPLATES.filter(u => u.targetBusiness === 'Diner' && (u.requiredLevel ?? 0) === 0).length >= 2` (Bistro and Fast Food).
+- Given a market containing both Patisserie and Bread Factory upgrades, and a level-0 Bakery on the street, `getUpgradeBranchesForBusiness(state, bakerySlot)` returns both upgrade cards.
+- After applying Patisserie to a Bakery (level becomes 1), `getUpgradeBranchesForBusiness(state, bakerySlot)` no longer returns level-0 upgrades.
+
+### US-19: Multi-Level Upgrade Chains
+
+**As a player**, I want some businesses to support multi-level upgrade chains (Level 0 -> Level 1 -> Level 2) **so that** long-term investment in a single business is rewarded.
+
+**Acceptance Criteria:**
+
+1. At least 2 Business types have `maxLevel >= 2`, enabling a Level 0 -> Level 1 -> Level 2 chain.
+2. Level-2 Upgrade cards have `requiredLevel: 1`, preventing purchase until the business has been upgraded once.
+3. `canPurchaseUpgrade()` enforces that the business's current level equals the upgrade's `requiredLevel`.
+4. Applying a level-2 upgrade increments the business to level 2 and adds the appropriate bonuses.
+5. A business at `maxLevel` cannot be upgraded further.
+
+**Testable Conditions:**
+
+- `BUSINESS_TEMPLATES.filter(b => b.maxLevel >= 2).length >= 2`.
+- `UPGRADE_TEMPLATES.filter(u => u.requiredLevel === 1).length >= 2` (at least 2 level-2 upgrades).
+- Given a level-0 Bakery and a Grand Bakehouse upgrade (`requiredLevel: 1`), `canPurchaseUpgrade()` returns `{ legal: false }`.
+- Given a level-1 Bakery (after applying Patisserie) and a Grand Bakehouse upgrade, `canPurchaseUpgrade()` returns `{ legal: true }`.
+- After applying Grand Bakehouse to the level-1 Bakery, the business is at level 2 and `canPurchaseUpgrade()` returns `{ legal: false }` for any further upgrades (at maxLevel).
+
+---
+
+## 13. User Stories: Economy Rebalance & Balance Targets
+
+### US-20: Economy Supports Expanded Content
+
+**As a player**, I want the game's economy to remain balanced with the expanded card pool **so that** new synergy types and bridge cards integrate smoothly without making the game too easy or too hard.
+
+Economy balance is verified via a two-tier Monte Carlo approach:
+
+- **CI guardrail** (`tests/main-street/monte-carlo-balance.test.ts`): A fast Vitest test that runs 100 deterministic seeds with the `market-greedy` strategy over 25 turns. This catches regressions in win rate, score distribution, grid fill pacing, and loss-reason dominance. It runs on every `npm test` invocation.
+- **Balance harness** (`npm run monte-carlo`): A standalone script that runs 200 seeds (configurable via `--runs`) and writes detailed JSON and CSV output to `results/`. This is used for manual analysis and tuning, not enforced in CI.
+
+**Acceptance Criteria:**
+
+1. The CI guardrail test passes: 100 seeds complete without errors, and all metric assertions hold.
+2. The win rate on Medium difficulty (market-greedy, 25 turns) is between 30% and 60%.
+3. The median final score is within [20, 65] — reflecting the market-greedy strategy's conservative play pattern on the Medium preset.
+4. No single loss reason dominates below 75% of all losses (the dominant loss path must account for at least 75% of losses, ensuring a consistent primary end condition).
+5. Grid fill pacing is stable: average turn-when-half-full in [11, 15], average turn-when-full in [15, 19].
+
+**Testable Conditions:**
+
+- `npm test` runs the CI guardrail (`monte-carlo-balance.test.ts`) which asserts: `winRate` in [0.30, 0.60], `medianScore` in [20, 65], dominant loss reason rate >= 0.75, average no-action turns >= 6, grid-half in [11, 15], grid-full in [15, 19].
+- `npm run monte-carlo` completes without errors and writes results to `results/main-street-monte-carlo.json` and `results/main-street-monte-carlo.csv`.
+- The balance harness JSON output contains `metrics.winRate`, `metrics.medianScore`, `metrics.averageScore`, `metrics.lossReasonRates` for manual review.
+- The balance harness runs 200 seeds over 25 turns with no deck starvation, no infinite loops, and no coin-negative anomalies.
+
+### US-21: Positive Incident Frequency
+
+**As a player**, I want a healthier balance of positive and negative incidents **so that** the game feels less punishing than M1 while maintaining strategic tension.
+
+**Acceptance Criteria:**
+
+1. Positive incidents (coinDelta > 0 or reputationDelta > 0) make up at least 25% of the total Incident event pool.
+2. The `positiveIncidentMultiplier` in `GameConfig` scales the frequency of positive incidents per difficulty preset.
+3. Easy mode has a higher positive incident multiplier than Hard mode.
+
+**Testable Conditions:**
+
+- Among all Incident events in `EVENT_TEMPLATES`, at least 25% have positive coin or reputation effects.
+- `EASY_CONFIG.positiveIncidentMultiplier > HARD_CONFIG.positiveIncidentMultiplier` (1.2 > 1.0).
+- The event deck construction respects the positive incident multiplier when building Incident sub-decks.
+
+---
+
+## 14. User Stories: Reusable Engine Components
+
+### US-22: Generic ChallengeSystem API
+
+**As an engine developer**, I want a generic ChallengeSystem module in `@core-engine` **so that** future games can define, select, and evaluate challenges without reimplementing the core logic.
+
+**Acceptance Criteria:**
+
+1. `src/core-engine/ChallengeSystem.ts` exports a generic `ChallengeDefinition<TState>` interface parameterized over game state type.
+2. `selectChallenges<TState>(templates, count, rng)` uses Fisher-Yates shuffle with a seeded RNG and is game-agnostic.
+3. `evaluateChallenges<TState>(activeChallenges, state)` evaluates each challenge's evaluator against the provided state and returns newly completed challenge IDs.
+4. The module contains no imports from `example-games/` or any game-specific code.
+5. The module includes M6 extraction design notes documenting the intended API surface.
+6. All types and functions are re-exported from `src/core-engine/index.ts`.
+
+**Testable Conditions:**
+
+- `import { ChallengeDefinition, selectChallenges, evaluateChallenges } from '@core-engine/ChallengeSystem'` resolves successfully.
+- `ChallengeSystem.ts` contains no import paths matching `example-games/`.
+- `selectChallenges` accepts a generic `TState` type parameter and compiles with any state type.
+- The file contains a `## Design Notes for M6 Extraction` section.
+
+### US-23: Generic DifficultyPresets API
+
+**As an engine developer**, I want a generic DifficultyPresets module in `@core-engine` **so that** future games can define named presets with configurable game constants.
+
+**Acceptance Criteria:**
+
+1. `src/core-engine/DifficultyPresets.ts` exports a `DifficultyConfig` base interface and a `DifficultyPresetRegistry<TConfig>` type.
+2. `createPresetLookup<TConfig>(registry, defaultConfig)` returns a closure that resolves preset names to configurations with a fallback default.
+3. `getPresetNames<TConfig>(registry)` returns the list of available preset names for UI population.
+4. The module contains no imports from `example-games/` or any game-specific code.
+5. The module includes M6 extraction design notes.
+6. All types and functions are re-exported from `src/core-engine/index.ts`.
+
+**Testable Conditions:**
+
+- `import { DifficultyConfig, createPresetLookup, getPresetNames } from '@core-engine/DifficultyPresets'` resolves successfully.
+- `DifficultyPresets.ts` contains no import paths matching `example-games/`.
+- `createPresetLookup(registry, default)('nonexistent')` returns the default config.
+- The file contains a `## Design Notes for M6 Extraction` section.
+
+### US-24: Save/Load Engine Infrastructure
+
+**As an engine developer**, I want a generic Save/Load module in `@core-engine` **so that** any game can persist state with schema versioning, multiple storage backends, and domain separation.
+
+**Acceptance Criteria:**
+
+1. `src/core-engine/SaveLoad.ts` exports `SaveSerializer<TState, TSerialized>`, `SaveLoadStore`, and supporting types.
+2. `SaveLoadStore` supports IndexedDB with localStorage fallback and graceful degradation.
+3. The `saveSerialized`/`loadSerialized` pattern handles schema versioning via the serializer.
+4. Domain separation (`'run-checkpoint'` vs `'campaign'`) ensures different data categories don't interfere.
+5. The module contains no imports from `example-games/` or any game-specific code.
+6. All types and functions are re-exported from `src/core-engine/index.ts`.
+
+**Testable Conditions:**
+
+- `import { SaveLoadStore, SaveSerializer } from '@core-engine/SaveLoad'` resolves successfully.
+- `SaveLoad.ts` contains no import paths matching `example-games/`.
+- A round-trip test: `saveSerialized(domain, type, slot, serializer, state)` followed by `loadSerialized(domain, type, slot, serializer)` returns the original state.
+- Saving to `'campaign'` domain and loading from `'run-checkpoint'` domain returns `null` (domain isolation).

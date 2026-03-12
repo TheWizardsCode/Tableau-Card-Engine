@@ -158,3 +158,19 @@ describe('DifficultyConfig interface', () => {
     expect(config.maxTurns).toBe(15);
   });
 });
+
+// ── Module Isolation (US-23) ────────────────────────────────
+
+describe('DifficultyPresets module isolation', () => {
+  it('DifficultyPresets.ts has no example-games imports (US-23 AC#4)', async () => {
+    const fs = await import('fs');
+    const source = fs.readFileSync('src/core-engine/DifficultyPresets.ts', 'utf-8');
+    expect(source).not.toMatch(/example-games/);
+  });
+
+  it('DifficultyPresets.ts contains M6 extraction design notes (US-23 AC#5)', async () => {
+    const fs = await import('fs');
+    const source = fs.readFileSync('src/core-engine/DifficultyPresets.ts', 'utf-8');
+    expect(source).toMatch(/Design Notes.*M6|M6.*Design Notes|M6 Extraction/i);
+  });
+});

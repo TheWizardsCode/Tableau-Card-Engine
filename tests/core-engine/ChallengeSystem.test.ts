@@ -282,3 +282,19 @@ describe('evaluateChallenges (generic)', () => {
     expect(active[0].completed).toBe(true);
   });
 });
+
+// ── Module Isolation (US-22) ────────────────────────────────
+
+describe('ChallengeSystem module isolation', () => {
+  it('ChallengeSystem.ts has no example-games imports (US-22 AC#4)', async () => {
+    const fs = await import('fs');
+    const source = fs.readFileSync('src/core-engine/ChallengeSystem.ts', 'utf-8');
+    expect(source).not.toMatch(/example-games/);
+  });
+
+  it('ChallengeSystem.ts contains M6 extraction design notes (US-22 AC#5)', async () => {
+    const fs = await import('fs');
+    const source = fs.readFileSync('src/core-engine/ChallengeSystem.ts', 'utf-8');
+    expect(source).toMatch(/Design Notes.*M6|M6.*Design Notes|M6 Extraction/i);
+  });
+});
