@@ -1,6 +1,8 @@
-import { setupMainStreetGame, type MainStreetState } from './MainStreetState';
+import { createSeededRng } from '../../src/core-engine';
+import { setupMainStreetGame, seedToNumber, type MainStreetState } from './MainStreetState';
 import { executeAction, executeDayStart, processEndOfTurn, type PlayerAction } from './MainStreetEngine';
 import { canPurchaseEvent, getAffordableBusinessCards, getAffordableUpgradeCards, getEmptySlots } from './MainStreetMarket';
+import { GreedyStrategy, RandomStrategy, MainStreetAiPlayer } from './MainStreetAiStrategy';
 
 export interface MonteCarloRunSummary {
   seed: string;
@@ -39,7 +41,7 @@ export interface RunMonteCarloOptions {
   strategy?: MonteCarloStrategy;
 }
 
-export type MonteCarloStrategy = 'market-greedy' | 'demo-greedy';
+export type MonteCarloStrategy = 'market-greedy' | 'demo-greedy' | 'greedy' | 'random';
 
 function chooseMarketGreedyActions(state: MainStreetState): PlayerAction[] {
   const actions: PlayerAction[] = [];
@@ -123,8 +125,25 @@ function chooseActionsForStrategy(state: MainStreetState, strategy: MonteCarloSt
   return chooseMarketGreedyActions(state);
 }
 
+/**
+ * Creates a `MainStreetAiPlayer` bound to the named strategy and a deterministic
+ * RNG derived from the run seed.  Returns a `MainStreetAiPlayer` for `greedy` and
+ * `random` strategies, or `null` for legacy harness strategies (`market-greedy`,
+ * `demo-greedy`) that use their own action choosers.
+ */
+function createAiPlayerForStrategy(strategy: MonteCarloStrategy, seed: string): MainStreetAiPlayer | null {
+  if (strategy === 'greedy') {
+    return new MainStreetAiPlayer(GreedyStrategy, createSeededRng(seedToNumber(`${seed}-ai`)));
+  }
+  if (strategy === 'random') {
+    return new MainStreetAiPlayer(RandomStrategy, createSeededRng(seedToNumber(`${seed}-ai`)));
+  }
+  return null;
+}
+
 function runSeed(seed: string, maxTurns: number, strategy: MonteCarloStrategy): MonteCarloRunSummary {
   const state = setupMainStreetGame({ seed });
+  const aiPlayer = createAiPlayerForStrategy(strategy, seed);
 
   let turns = 0;
   let noActionTurns = 0;
@@ -133,16 +152,27 @@ function runSeed(seed: string, maxTurns: number, strategy: MonteCarloStrategy): 
 
   while (state.gameResult === 'playing' && turns < maxTurns) {
     executeDayStart(state);
-    const planned = chooseActionsForStrategy(state, strategy);
     let executedAction = false;
 
-    for (const action of planned) {
-      if (action.type === 'end-turn') break;
-      try {
+    if (aiPlayer !== null) {
+      // AI strategy: choose actions one at a time until end-turn or game ends.
+      let action = aiPlayer.chooseAction(state);
+      while (action.type !== 'end-turn' && state.gameResult === 'playing') {
         executeAction(state, action);
         executedAction = true;
-      } catch {
-        // Ignore illegal actions selected by greedy strategy.
+        action = aiPlayer.chooseAction(state);
+      }
+    } else {
+      // Legacy harness strategies: plan a list of actions upfront.
+      const planned = chooseActionsForStrategy(state, strategy);
+      for (const action of planned) {
+        if (action.type === 'end-turn') break;
+        try {
+          executeAction(state, action);
+          executedAction = true;
+        } catch {
+          // Ignore illegal actions selected by legacy strategy.
+        }
       }
     }
 
