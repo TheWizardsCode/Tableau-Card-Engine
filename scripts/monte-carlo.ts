@@ -22,23 +22,24 @@ function parseArgs(argv: readonly string[]): CliArgs {
     return args[idx + 1];
   };
 
-  const runs = Number.parseInt(get('--runs') ?? '200', 10);
+  const runs = Number.parseInt(get('--seeds') ?? get('--runs') ?? '200', 10);
   const out = get('--out') ?? 'results/main-street-monte-carlo.json';
   const csvOut = get('--csv-out');
   const seedPrefix = get('--seed-prefix') ?? 'mc-balance';
-  const maxTurns = Number.parseInt(get('--max-turns') ?? '30', 10);
+  const maxTurns = Number.parseInt(get('--maxTurns') ?? get('--max-turns') ?? '25', 10);
   const seedFile = get('--seed-file');
-  const strategyArg = (get('--strategy') ?? 'market-greedy') as MonteCarloStrategy;
+  const strategyArg = (get('--strategy') ?? 'greedy') as MonteCarloStrategy;
 
   if (!Number.isFinite(runs) || runs <= 0) {
-    throw new Error('--runs must be a positive integer');
+    throw new Error('--seeds/--runs must be a positive integer');
   }
   if (!Number.isFinite(maxTurns) || maxTurns <= 0) {
-    throw new Error('--max-turns must be a positive integer');
+    throw new Error('--maxTurns/--max-turns must be a positive integer');
   }
 
-  if (strategyArg !== 'market-greedy' && strategyArg !== 'demo-greedy') {
-    throw new Error('--strategy must be one of: market-greedy, demo-greedy');
+  const validStrategies: MonteCarloStrategy[] = ['market-greedy', 'demo-greedy', 'greedy', 'random'];
+  if (!validStrategies.includes(strategyArg)) {
+    throw new Error(`--strategy must be one of: ${validStrategies.join(', ')}`);
   }
 
   return { runs, out, csvOut, seedPrefix, maxTurns, seedFile, strategy: strategyArg };
