@@ -45,15 +45,18 @@ export interface HintResult {
  * Returns null if the game is not in MarketPhase (hints are only valid
  * during the player's market/action turn).
  *
- * @param state Current game state (read-only by convention).
+ * Note: This function advances `state.rng` for tie-breaking (via GreedyStrategy).
+ * Callers should be aware that the RNG position changes after calling this function.
+ *
+ * @param state Current game state.
  * @returns HintResult with the recommended action and rationale, or null.
  */
-export function generateHint(state: Readonly<MainStreetState>): HintResult | null {
+export function generateHint(state: MainStreetState): HintResult | null {
   if (state.phase !== 'MarketPhase') return null;
 
   // Delegate to GreedyStrategy so the hint is always consistent with AI play.
-  const action = GreedyStrategy.chooseAction(state as MainStreetState, state.rng);
-  const score = scoreAction(state as MainStreetState, action);
+  const action = GreedyStrategy.chooseAction(state, state.rng);
+  const score = scoreAction(state, action);
   const rationale = buildRationale(action, score, state);
 
   return { action, rationale, score };
@@ -79,7 +82,7 @@ export function generateHint(state: Readonly<MainStreetState>): HintResult | nul
 export function buildRationale(
   action: PlayerAction,
   _score: number,
-  state: Readonly<MainStreetState>,
+  state: MainStreetState,
 ): string {
   switch (action.type) {
     case 'buy-business': {

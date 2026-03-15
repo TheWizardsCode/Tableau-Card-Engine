@@ -46,7 +46,10 @@ function actionsEqual(a: PlayerAction, b: PlayerAction): boolean {
   if (a.type === 'buy-event' && b.type === 'buy-event') {
     return a.cardId === b.cardId;
   }
-  return true; // play-event and end-turn have no extra fields
+  // play-event and end-turn have no additional fields; matching type is sufficient
+  if (a.type === 'play-event' && b.type === 'play-event') return true;
+  if (a.type === 'end-turn' && b.type === 'end-turn') return true;
+  return false;
 }
 
 // ── generateHint tests ───────────────────────────────────────
