@@ -67,6 +67,10 @@ jobs:
 
       - name: Run tests
         run: npm test
+        env:
+          MONTE_SEEDS: 200
+          MONTE_MIN_WIN_RATE: 0.30
+          MONTE_MAX_WIN_RATE: 0.60
 
       - name: Build
         run: npm run build

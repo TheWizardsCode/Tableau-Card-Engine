@@ -1134,20 +1134,20 @@ Challenge-based unlock paths are designed to be achievable by skilled players wh
 
 Economy balance is verified via a two-tier Monte Carlo approach:
 
-- **CI guardrail** (`tests/main-street/monte-carlo-balance.test.ts`): A fast Vitest test that runs 100 deterministic seeds with the `market-greedy` strategy over 25 turns. This catches regressions in win rate, score distribution, grid fill pacing, and loss-reason dominance. It runs on every `npm test` invocation.
-- **Balance harness** (`npm run monte-carlo`): A standalone script that runs 200 seeds (configurable via `--runs`) and writes detailed JSON and CSV output to `results/`. This is used for manual analysis and tuning, not enforced in CI.
+- **CI guardrail** (`tests/main-street/monte-carlo-balance.test.ts`): A Vitest test that runs a configurable number of deterministic seeds with the `market-greedy` strategy over 25 turns. Seed count and win-rate thresholds are controlled via environment variables (`MONTE_SEEDS`, `MONTE_MIN_WIN_RATE`, `MONTE_MAX_WIN_RATE`). PR CI uses 20 seeds with wide bounds (0.20–0.80) for fast feedback; main branch CI uses 200 seeds with strict bounds (0.30–0.60). Detailed pacing metrics (median score, grid fill, loss-reason dominance) are only asserted for runs of 50+ seeds. It runs on every `npm test` invocation.
+- **Balance harness** (`npm run monte-carlo`): A standalone script that runs 200 seeds by default (configurable via `--seeds`/`MONTE_SEEDS`) and writes detailed JSON and CSV output to `results/`. This is used for manual analysis and tuning, not enforced in CI.
 
 **Acceptance Criteria:**
 
-1. The CI guardrail test passes: 100 seeds complete without errors, and all metric assertions hold.
-2. The win rate on Medium difficulty (market-greedy, 25 turns) is between 30% and 60%.
-3. The median final score is within [20, 65] — reflecting the market-greedy strategy's conservative play pattern on the Medium preset.
-4. No single loss reason dominates below 75% of all losses (the dominant loss path must account for at least 75% of losses, ensuring a consistent primary end condition).
-5. Grid fill pacing is stable: average turn-when-half-full in [11, 15], average turn-when-full in [15, 19].
+1. The CI guardrail test passes: seeds complete without errors, and all metric assertions hold.
+2. The win rate on Medium difficulty (market-greedy, 25 turns) is between `MONTE_MIN_WIN_RATE` and `MONTE_MAX_WIN_RATE` (main CI: 30%–60%).
+3. For runs of 50+ seeds: the median final score is within [20, 65] and pacing metrics hold.
+4. No single loss reason dominates below 75% of all losses (for 50+ seed runs).
+5. Grid fill pacing is stable for 50+ seed runs: average turn-when-half-full in [11, 15], average turn-when-full in [15, 19].
 
 **Testable Conditions:**
 
-- `npm test` runs the CI guardrail (`monte-carlo-balance.test.ts`) which asserts: `winRate` in [0.30, 0.60], `medianScore` in [20, 65], dominant loss reason rate >= 0.75, average no-action turns >= 6, grid-half in [11, 15], grid-full in [15, 19].
+- `npm test` runs the CI guardrail (`monte-carlo-balance.test.ts`). With `MONTE_SEEDS=200 MONTE_MIN_WIN_RATE=0.30 MONTE_MAX_WIN_RATE=0.60` (main branch CI), asserts: `winRate` in [0.30, 0.60], `medianScore` in [20, 65], dominant loss reason rate >= 0.75, average no-action turns >= 6, grid-half in [11, 15], grid-full in [15, 19].
 - `npm run monte-carlo` completes without errors and writes results to `results/main-street-monte-carlo.json` and `results/main-street-monte-carlo.csv`.
 - The balance harness JSON output contains `metrics.winRate`, `metrics.medianScore`, `metrics.averageScore`, `metrics.lossReasonRates` for manual review.
 - The balance harness runs 200 seeds over 25 turns with no deck starvation, no infinite loops, and no coin-negative anomalies.

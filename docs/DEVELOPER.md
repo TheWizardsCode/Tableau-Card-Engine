@@ -124,6 +124,37 @@ npm test            # run all tests once (unit + browser)
 npm run monte-carlo # run Main Street Monte Carlo harness (JSON + CSV outputs)
 ```
 
+### Monte Carlo environment variables
+
+The Main Street balance guardrail (`tests/main-street/monte-carlo-balance.test.ts`) and harness
+script (`scripts/monte-carlo.ts`) are configurable via environment variables so that PR CI runs
+quickly while the main branch retains full, strict checks:
+
+| Variable | Default | PR value | Main value | Description |
+|---|---|---|---|---|
+| `MONTE_SEEDS` | 20 | 20 | 200 | Number of deterministic seeds to simulate |
+| `MONTE_MIN_WIN_RATE` | 0.20 | 0.20 | 0.30 | Minimum acceptable win rate |
+| `MONTE_MAX_WIN_RATE` | 0.80 | 0.80 | 0.60 | Maximum acceptable win rate |
+
+Detailed pacing metrics (median score, grid fill timing, loss-reason dominance) are only asserted
+when `MONTE_SEEDS >= 50`, since they are not statistically meaningful for small sample sizes.
+
+**Examples:**
+
+```bash
+# Fast local run (default — same as PR CI):
+npm test
+
+# Reproduce main branch CI conditions locally:
+MONTE_SEEDS=200 MONTE_MIN_WIN_RATE=0.30 MONTE_MAX_WIN_RATE=0.60 npm test
+
+# Run the harness script with a custom seed count:
+MONTE_SEEDS=50 npm run monte-carlo
+
+# Fully explicit override:
+MONTE_SEEDS=200 MONTE_MIN_WIN_RATE=0.20 MONTE_MAX_WIN_RATE=0.80 npm test
+```
+
 Tests use [Vitest](https://vitest.dev/) configured inline in `vite.config.ts` with two test projects:
 
 | Project | Environment | File Pattern | Purpose |
