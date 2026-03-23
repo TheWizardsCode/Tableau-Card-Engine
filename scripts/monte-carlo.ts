@@ -22,7 +22,8 @@ function parseArgs(argv: readonly string[]): CliArgs {
     return args[idx + 1];
   };
 
-  const runs = Number.parseInt(get('--seeds') ?? get('--runs') ?? '200', 10);
+  // Precedence: --seeds / --runs CLI arg > MONTE_SEEDS env var > default 200
+  const runs = Number.parseInt(get('--seeds') ?? get('--runs') ?? process.env['MONTE_SEEDS'] ?? '200', 10);
   const out = get('--out') ?? 'results/main-street-monte-carlo.json';
   const csvOut = get('--csv-out');
   const seedPrefix = get('--seed-prefix') ?? 'mc-balance';
