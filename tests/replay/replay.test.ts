@@ -280,6 +280,53 @@ describe('Replay CLI -- --stop-at argument validation', () => {
   );
 });
 
+// ── --skip-to Argument Validation Tests ─────────────────────
+
+describe('Replay CLI -- --skip-to argument validation', () => {
+  it(
+    'should exit with error when --skip-to has no value',
+    () => {
+      const result = runReplay([FIXTURE_TRANSCRIPT, '--skip-to']);
+      expect(result.exitCode).not.toBe(0);
+      const output = result.stdout + result.stderr;
+      expect(output).toContain('non-negative integer');
+    },
+    20_000,
+  );
+
+  it(
+    'should exit with error when --skip-to is negative',
+    () => {
+      const result = runReplay([FIXTURE_TRANSCRIPT, '--skip-to', '-1']);
+      expect(result.exitCode).not.toBe(0);
+      const output = result.stdout + result.stderr;
+      expect(output).toContain('non-negative integer');
+    },
+    20_000,
+  );
+
+  it(
+    'should exit with error when --skip-to is a decimal',
+    () => {
+      const result = runReplay([FIXTURE_TRANSCRIPT, '--skip-to', '3.5']);
+      expect(result.exitCode).not.toBe(0);
+      const output = result.stdout + result.stderr;
+      expect(output).toContain('non-negative integer');
+    },
+    20_000,
+  );
+
+  it(
+    'should show --skip-to in help text',
+    () => {
+      const result = runReplay(['--help']);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain('--skip-to');
+    },
+    20_000,
+  );
+});
+
 // ── V1 Transcript Backward Compatibility Tests ──────────────
 
 describe('Replay CLI -- v1 transcript handling', () => {
