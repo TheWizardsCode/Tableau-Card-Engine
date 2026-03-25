@@ -73,13 +73,15 @@ function parseArgs(): ParsedArgs {
 
   if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
     console.log(`
-Usage: npm run replay -- <transcript.json> [--output <dir>] [--stop-at <turn>] [--game <type>]
+Usage: npm run replay -- <transcript.json> [--output <dir>] [--stop-at <turn>] [--skip-to <turn>] [--game <type>]
 
 Arguments:
   <transcript.json>   Path to the game transcript JSON file
   --output <dir>      Output directory for screenshots (default: data/screenshots/<basename>/)
   --stop-at <turn>    Pause replay at the specified turn (0-based) and launch a headed
                       browser for interactive debugging. Turn 0 = initial state.
+  --skip-to <turn>    Fast-forward replay to the specified turn (0-based) without
+                      capturing screenshots, then resume visual replay from that turn.
   --game <type>       Force a specific game adapter instead of auto-detection.
                       Available: ${availableTypes || 'none'}
 
@@ -87,6 +89,8 @@ Examples:
   npm run replay -- tests/fixtures/transcripts/golf/fixture-game.json
   npm run replay -- tests/fixtures/transcripts/golf/fixture-game.json --output data/screenshots/golf/test/
   npm run replay -- tests/fixtures/transcripts/golf/fixture-game.json --stop-at 5
+  npm run replay -- tests/fixtures/transcripts/golf/fixture-game.json --skip-to 10
+  npm run replay -- tests/fixtures/transcripts/golf/fixture-game.json --skip-to 10 --stop-at 15
   npm run replay -- tests/fixtures/transcripts/golf/fixture-game.json --game golf
 `);
     process.exit(0);
@@ -297,28 +301,96 @@ async function main(): Promise<void> {
   const totalStart = Date.now();
 
   try {
-    // If --skip-to is provided, fast-forward logically without starting
-    // the visual/browser. We record replay-only summary entries for the
-    // skipped steps (no screenshot files). The visual browser will be
-    // started at `replayStartAt` and screenshots captured from there.
-    const replayStartAt = effectiveSkipTo !== undefined ? effectiveSkipTo : 0;
-    if (replayStartAt > 0) {
-      console.log(`Fast-forwarding ${replayStartAt} step(s) without visuals...`);
-      for (let j = 0; j < replayStartAt; j++) {
-        const turnNum = j; // 0 = initial state, 1.. = after each turn
-        const turnDesc = j === 0 ? 'initial state' : adapter.describeTurn(rawTranscript, j - 1);
+    // ── Phase 1: Headless fast-forward (when --skip-to is used) ─────────
+    // If --skip-to is provided and > 0, we first run headlessly to reach
+    // the goal turn without capturing screenshots, then close the browser.
+    let skipToTurnState: { turnIndex: number } | null = null;
+    
+    if (effectiveSkipTo !== undefined && effectiveSkipTo > 0) {
+      console.log(`\n── Fast-forwarding to turn ${effectiveSkipTo} (headless) ──`);
+      
+      let headlessBrowser: Browser | null = null;
+      try {
+        // Launch headless browser for fast-forward phase
+        headlessBrowser = await chromium.launch({ headless: true });
+        const headlessContext = await headlessBrowser.newContext({ viewport: VIEWPORT });
+        const headlessPage = await headlessContext.newPage();
+        
+        // Navigate to the game in replay mode
+        const gameUrl = adapter.getReplayUrl(DEV_SERVER_URL);
+        await headlessPage.goto(gameUrl, { waitUntil: 'domcontentloaded' });
+        
+        // Wait for Phaser to boot
+        await waitForGameBoot(headlessPage, SCENE_READY_TIMEOUT);
+        
+        // Start the game scene
+        await adapter.startScene(headlessPage);
+        await adapter.waitForSceneReady(headlessPage, SCENE_READY_TIMEOUT);
+        
+        // Inject initial state (turn 0)
+        console.log('  Injecting initial state (turn 0)...');
+        await adapter.injectInitialState(headlessPage, rawTranscript, STATE_SETTLED_TIMEOUT);
+        
+        // Record summary entry for turn 0 (skipped, no screenshot)
         summary.screenshots.push({
-          turn: turnNum,
+          turn: 0,
           screenshotPath: '',
           durationMs: 0,
           phase: 'replay',
         });
-        console.log(`  skipped turn-${String(turnNum).padStart(3, '0')}.png [${turnDesc}]`);
+        console.log(`  skipped turn-000.png [initial state]`);
+        
+        // Fast-forward through turns 0 to skipTo-2 (which gives us states for turns 1 to skipTo-1)
+        // injectTurnState(turnIndex) injects the state AFTER that turn completes
+        // So to get to turn N, we need to inject turn states 0 through N-2
+        const fastForwardTurns = Math.min(effectiveSkipTo - 1, turnCount);
+        for (let i = 0; i < fastForwardTurns; i++) {
+          const turnLabel = String(i + 1).padStart(3, '0');
+          const turnDesc = adapter.describeTurn(rawTranscript, i);
+          
+          try {
+            await adapter.injectTurnState(headlessPage, rawTranscript, i, STATE_SETTLED_TIMEOUT);
+            
+            // Record summary entry for skipped turn (no screenshot)
+            summary.screenshots.push({
+              turn: i + 1,
+              screenshotPath: '',
+              durationMs: 0,
+              phase: 'replay',
+            });
+            console.log(`  skipped turn-${turnLabel}.png [${turnDesc}]`);
+          } catch (err) {
+            const msg = `Fast-forward turn ${i + 1} error: ${(err as Error).message}`;
+            summary.errors.push(msg);
+            console.error(`  ${msg}`);
+          }
+        }
+        
+        // Save the turn index we reached (we're now at state for turn effectiveSkipTo)
+        skipToTurnState = { turnIndex: effectiveSkipTo - 1 };
+        
+        console.log(`  Fast-forward complete. Closing headless browser.`);
+      } catch (err) {
+        const msg = `Fast-forward phase error: ${(err as Error).message}`;
+        summary.errors.push(msg);
+        console.error(`  ${msg}`);
+      } finally {
+        if (headlessBrowser) {
+          await headlessBrowser.close();
+        }
       }
     }
 
-    // Launch Chromium -- headed when --stop-at is specified
-    const headless = effectiveStopAt === undefined;
+    // ── Phase 2: Visual replay (headed browser) ─────────────────────────
+    // Launch Chromium -- headed when --stop-at is specified OR when we're
+    // resuming from a --skip-to fast-forward point
+    const useHeadedBrowser = effectiveStopAt !== undefined || (effectiveSkipTo !== undefined && effectiveSkipTo > 0);
+    const headless = !useHeadedBrowser;
+    
+    if (effectiveSkipTo !== undefined && effectiveSkipTo > 0) {
+      console.log(`\n── Launching headed browser at turn ${effectiveSkipTo} ──`);
+    }
+    
     browser = await chromium.launch({ headless });
     const context = await browser.newContext({
       viewport: VIEWPORT,
@@ -343,36 +415,36 @@ async function main(): Promise<void> {
     await adapter.waitForSceneReady(page, SCENE_READY_TIMEOUT);
     console.log(`${adapter.sceneKey} is active.`);
 
-    // If we started visual capture at a non-zero turn, inject that turn's
-    // board state and capture its screenshot now. Otherwise capture the
-    // initial state as before.
-    if (replayStartAt > 0) {
-      console.log(`Injecting state for visual start at turn ${replayStartAt}...`);
+    // If we skipped to a turn, inject that turn's state and capture screenshot
+    // Otherwise, start from initial state (turn 0)
+    if (skipToTurnState !== null && effectiveSkipTo !== undefined && effectiveSkipTo > 0) {
+      // We're resuming from --skip-to
+      console.log(`Injecting state for turn ${effectiveSkipTo}...`);
       const injectStart = Date.now();
       try {
-        // State after `replayStartAt` turns corresponds to turnIndex = replayStartAt - 1
-        await adapter.injectTurnState(page, rawTranscript, replayStartAt - 1, STATE_SETTLED_TIMEOUT);
+        // injectTurnState(turnIndex) injects the state AFTER that turn
+        // So to show turn N, we inject state from turn N-1
+        await adapter.injectTurnState(page, rawTranscript, effectiveSkipTo - 1, STATE_SETTLED_TIMEOUT);
 
-        const ssPath = path.join(outputDir, `turn-${String(replayStartAt).padStart(3, '0')}.png`);
+        const ssPath = path.join(outputDir, `turn-${String(effectiveSkipTo).padStart(3, '0')}.png`);
         await captureScreenshot(page, ssPath);
         const dur = Date.now() - injectStart;
 
-        // Replace the previously pushed empty summary entry for this turn
         summary.screenshots.push({
-          turn: replayStartAt,
+          turn: effectiveSkipTo,
           screenshotPath: path.resolve(ssPath),
           durationMs: dur,
           phase: 'replay',
         });
         summary.turnsReplayed++;
-        console.log(`  turn-${String(replayStartAt).padStart(3, '0')}.png [${dur}ms]`);
+        console.log(`  turn-${String(effectiveSkipTo).padStart(3, '0')}.png [${dur}ms]`);
       } catch (err) {
-        const msg = `Inject start state error: ${(err as Error).message}`;
+        const msg = `Inject state error for turn ${effectiveSkipTo}: ${(err as Error).message}`;
         summary.errors.push(msg);
         console.error(`  ${msg}`);
       }
     } else {
-      // ── Initial state screenshot ──
+      // ── Initial state screenshot (normal replay) ──
       console.log('Loading initial state...');
       const initStart = Date.now();
       try {
@@ -397,13 +469,16 @@ async function main(): Promise<void> {
       }
     }
 
-    // Determine how many turns to replay
-    const turnsToReplay = effectiveStopAt !== undefined
+    // Determine range of turns to replay visually
+    // If --skip-to was used, we start from that turn
+    // If --stop-at is specified, we stop there
+    const visualStartTurn = (effectiveSkipTo !== undefined && effectiveSkipTo > 0) ? effectiveSkipTo : 0;
+    const visualEndTurn = effectiveStopAt !== undefined
       ? Math.min(effectiveStopAt, turnCount)
       : turnCount;
 
     // ── Per-turn screenshots ──
-    for (let i = 0; i < turnsToReplay; i++) {
+    for (let i = visualStartTurn; i < visualEndTurn; i++) {
       const turnLabel = String(i + 1).padStart(3, '0');
       const turnStart = Date.now();
 
@@ -464,7 +539,7 @@ async function main(): Promise<void> {
       console.log(`  Press Ctrl+C or close the browser to exit.\n`);
 
       // Expose a function for the browser to signal screenshot capture
-      let interactiveTurnNumber = turnsToReplay + 1; // Continue numbering after replay
+      let interactiveTurnNumber = visualEndTurn + 1; // Continue numbering after replay
       const captureInteractiveScreenshot = async () => {
         const turnLabel = String(interactiveTurnNumber).padStart(3, '0');
         const ssPath = path.join(outputDir, `turn-${turnLabel}.png`);
@@ -550,7 +625,7 @@ async function main(): Promise<void> {
         await page.evaluate('window.__REPLAY_INTERACTIVE_MODE__ = false');
 
         // Continue replaying remaining turns via the adapter
-        for (let i = turnsToReplay; i < turnCount; i++) {
+        for (let i = visualEndTurn; i < turnCount; i++) {
           const turnLabel = String(i + 1).padStart(3, '0');
           const turnStart = Date.now();
 
