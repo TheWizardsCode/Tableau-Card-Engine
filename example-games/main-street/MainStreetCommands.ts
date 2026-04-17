@@ -18,16 +18,30 @@ interface MarketActionSnapshot {
   activityLog: any | null;
 }
 
+/** Safe cloning helper that uses structuredClone when available, else falls back to JSON clone. */
+function safeClone<T>(obj: T): T {
+  try {
+    const sc = (globalThis as any).structuredClone;
+    if (typeof sc === 'function') {
+      return sc(obj);
+    }
+  } catch (_) {
+    // fall back
+  }
+  // JSON fallback (sufficient for our snapshotuses: arrays/objects of primitives)
+  return JSON.parse(JSON.stringify(obj));
+}
+
 /** Helper to capture a shallow snapshot of mutable market-related fields. */
 function captureSnapshot(state: MainStreetState): MarketActionSnapshot {
   return {
-    streetGrid: structuredClone(state.streetGrid),
-    market: structuredClone(state.market),
-    decks: structuredClone(state.decks),
-    resourceBank: structuredClone(state.resourceBank),
-    heldEvent: structuredClone(state.heldEvent),
-    incidentQueue: structuredClone(state.incidentQueue),
-    activityLog: structuredClone(state.activityLog),
+    streetGrid: safeClone(state.streetGrid),
+    market: safeClone(state.market),
+    decks: safeClone(state.decks),
+    resourceBank: safeClone(state.resourceBank),
+    heldEvent: safeClone(state.heldEvent),
+    incidentQueue: safeClone(state.incidentQueue),
+    activityLog: safeClone(state.activityLog),
   };
 }
 
