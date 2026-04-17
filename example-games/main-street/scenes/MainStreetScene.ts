@@ -8,6 +8,7 @@
  *   - Turn / phase indicator
  *   - Click-to-buy flow (select card -> select empty slot for businesses)
  *   - End Turn button to advance through remaining phases
+ *   - Hint button (1 use per turn) that highlights the Greedy AI's recommended move
  *   - Game-over overlay with score and replay/menu buttons
  *   - Help panel and settings integration
  */
@@ -64,6 +65,10 @@ import {
   ORDERED_TIER_DEFINITIONS,
   highestUnlockedTier,
 } from '../MainStreetTiers';
+import {
+  generateHint,
+  type HintResult,
+} from '../MainStreetHint';
 
 // ── Constants ───────────────────────────────────────────────
 
@@ -201,6 +206,14 @@ export class MainStreetScene extends CardGameScene {
   // Overlay objects
   private overlayObjects: Phaser.GameObjects.GameObject[] = [];
 
+  // Hint system
+  /** True after the player has used their one hint for this turn. */
+  private hintUsedThisTurn = false;
+  /** Card ID of the card highlighted by the current hint (null = none). */
+  private hintedCardId: string | null = null;
+  /** Grid slot index highlighted by the current hint (null = none). */
+  private hintedSlotIndex: number | null = null;
+
   constructor() {
     super({ key: 'MainStreetScene' });
   }
@@ -214,6 +227,11 @@ export class MainStreetScene extends CardGameScene {
     this.uiPhase = 'idle';
     this.pendingBusinessCard = null;
     this.overlayObjects = [];
+
+    // Reset hint state
+    this.hintUsedThisTurn = false;
+    this.hintedCardId = null;
+    this.hintedSlotIndex = null;
 
     // Reset activity-log panel state in case this scene instance is restarted.
     this.logScrollOffset = 0;
@@ -421,6 +439,12 @@ export class MainStreetScene extends CardGameScene {
     // Execute DayStart (refills market, transitions to MarketPhase)
     executeDayStart(this.state);
     this.uiPhase = 'market';
+
+    // Reset hint state for the new turn
+    this.hintUsedThisTurn = false;
+    this.hintedCardId = null;
+    this.hintedSlotIndex = null;
+
     this.refreshAll();
     this.instructionText.setText(
       `Turn ${this.state.turn} / ${this.state.config.maxTurns} -- Buy cards from the market or End Turn`,
@@ -648,13 +672,15 @@ export class MainStreetScene extends CardGameScene {
 
   private drawBusinessSlot(x: number, y: number, _index: number, biz: BusinessCard): void {
     const primaryColor = synergyColor(biz.synergyTypes[0]);
+    const isHinted = this.hintedSlotIndex === _index;
 
     // Card background
     const bg = this.add.rectangle(
       x + SLOT_W / 2, y + SLOT_H / 2,
       SLOT_W, SLOT_H, primaryColor, 0.7,
     );
-    bg.setStrokeStyle(2, 0xffffff, 0.4);
+    // Highlight the slot if it is the hint target (e.g., upgrade target)
+    bg.setStrokeStyle(isHinted ? 3 : 2, isHinted ? 0x44ffff : 0xffffff, isHinted ? 1.0 : 0.4);
     this.streetContainer.add(bg);
 
     // Name
@@ -696,19 +722,21 @@ export class MainStreetScene extends CardGameScene {
 
   private drawEmptySlot(x: number, y: number, index: number): void {
     const isSelectable = this.uiPhase === 'placing-business';
-    const fillAlpha = isSelectable ? 0.4 : 0.2;
-    const strokeColor = isSelectable ? 0xffdd44 : 0x555544;
+    const isHinted = this.hintedSlotIndex === index && !isSelectable;
+    const fillAlpha = isSelectable ? 0.4 : isHinted ? 0.35 : 0.2;
+    const strokeColor = isSelectable ? 0xffdd44 : isHinted ? 0x44ffff : 0x555544;
+    const strokeWidth = (isSelectable || isHinted) ? 2 : 1;
 
     const bg = this.add.rectangle(
       x + SLOT_W / 2, y + SLOT_H / 2,
       SLOT_W, SLOT_H, 0x333322, fillAlpha,
     );
-    bg.setStrokeStyle(isSelectable ? 2 : 1, strokeColor);
+    bg.setStrokeStyle(strokeWidth, strokeColor);
     this.streetContainer.add(bg);
 
     // Slot number
     const idxText = this.add.text(x + SLOT_W / 2, y + SLOT_H / 2, `${index}`, {
-      fontSize: '18px', color: isSelectable ? '#ffdd44' : '#666655',
+      fontSize: '18px', color: (isSelectable || isHinted) ? '#ffdd44' : '#666655',
       fontFamily: FONT_FAMILY,
     }).setOrigin(0.5);
     this.streetContainer.add(idxText);
@@ -831,6 +859,9 @@ export class MainStreetScene extends CardGameScene {
     // Determine if this is a non-purchasable Incident event
     const isIncidentEvent = card.family === 'event' && (card as EventCard).trigger === 'Incident';
 
+    // Determine if this card is the hint recommendation
+    const isHinted = this.hintedCardId !== null && card.id === this.hintedCardId;
+
     // Determine card color
     let fillColor = 0x333322;
     if (card.family === 'business') {
@@ -844,7 +875,10 @@ export class MainStreetScene extends CardGameScene {
     // Background
     const fillAlpha = isIncidentEvent ? 0.5 : 0.7;
     const bg = this.add.rectangle(0, 0, MARKET_CARD_W, MARKET_CARD_H, fillColor, fillAlpha);
-    bg.setStrokeStyle(1, isIncidentEvent ? 0x556688 : 0x888877);
+    // Hinted cards get a bright cyan border; incident events use their normal border
+    const strokeColor = isHinted ? 0x44ffff : (isIncidentEvent ? 0x556688 : 0x888877);
+    const strokeWidth = isHinted ? 3 : 1;
+    bg.setStrokeStyle(strokeWidth, strokeColor);
     container.add(bg);
 
     // Card label (name + cost for business/upgrade)
@@ -903,7 +937,8 @@ export class MainStreetScene extends CardGameScene {
         container.setScale(1.05);
       });
       bg.on('pointerout', () => {
-        bg.setStrokeStyle(1, 0x888877);
+        // Restore hint border if this card is hinted; otherwise use normal border
+        bg.setStrokeStyle(isHinted ? 3 : 1, isHinted ? 0x44ffff : 0x888877);
         container.setScale(1.0);
       });
     }
@@ -1042,10 +1077,11 @@ export class MainStreetScene extends CardGameScene {
     card: EventCard,
   ): Phaser.GameObjects.Container {
     const container = this.add.container(x + HAND_CARD_W / 2, y + HAND_CARD_H / 2);
+    const isHinted = this.hintedCardId !== null && card.id === this.hintedCardId;
 
     // Warm brown background (Investment)
     const bg = this.add.rectangle(0, 0, HAND_CARD_W, HAND_CARD_H, 0x8B4513, 0.7);
-    bg.setStrokeStyle(2, 0xcc9944);
+    bg.setStrokeStyle(isHinted ? 3 : 2, isHinted ? 0x44ffff : 0xcc9944);
     container.add(bg);
 
     // Card name
@@ -1087,7 +1123,7 @@ export class MainStreetScene extends CardGameScene {
         container.setScale(1.05);
       });
       bg.on('pointerout', () => {
-        bg.setStrokeStyle(2, 0xcc9944);
+        bg.setStrokeStyle(isHinted ? 3 : 2, isHinted ? 0x44ffff : 0xcc9944);
         container.setScale(1.0);
       });
     }
@@ -1147,6 +1183,11 @@ export class MainStreetScene extends CardGameScene {
       });
       this.actionContainer.add(endBtn);
 
+      // Hint button (to the left of End Turn)
+      const hintBtnW = 130;
+      const hintBtn = this.createHintButton(rightX - btnW - 12 - hintBtnW, by + 8, hintBtnW);
+      this.actionContainer.add(hintBtn);
+
     } else if (this.uiPhase === 'placing-business') {
       const rightX = GAME_W - 40;
       const by = ACTION_Y;
@@ -1204,7 +1245,93 @@ export class MainStreetScene extends CardGameScene {
     return container;
   }
 
-  // ── Click handlers ──────────────────────────────────────
+  /**
+   * Creates a "Hint" button that is disabled after first use per turn.
+   * When clicked, queries the Greedy strategy and highlights the recommended
+   * card/slot with a one-line rationale in the instruction text area.
+   */
+  private createHintButton(
+    x: number,
+    y: number,
+    width: number,
+  ): Phaser.GameObjects.Container {
+    const btnH = 40;
+    const isDisabled = this.hintUsedThisTurn;
+
+    const container = this.add.container(x + width / 2, y + btnH / 2);
+
+    const fillColor = isDisabled ? 0x2a2a2a : 0x224455;
+    const strokeColor = isDisabled ? 0x444444 : 0x4488aa;
+    const textColor = isDisabled ? '#666666' : '#88ccff';
+
+    const bg = this.add.rectangle(0, 0, width, btnH, fillColor, 0.8);
+    bg.setStrokeStyle(1, strokeColor);
+    container.add(bg);
+
+    const label = this.add.text(0, 0, isDisabled ? 'Hint ✓' : 'Hint', {
+      fontSize: '16px', fontStyle: 'bold', color: textColor, fontFamily: FONT_FAMILY,
+    }).setOrigin(0.5);
+    container.add(label);
+
+    if (!isDisabled) {
+      bg.setInteractive({ useHandCursor: true });
+      bg.on('pointerdown', () => this.onHintClick());
+      bg.on('pointerover', () => {
+        bg.setStrokeStyle(2, 0x88ddff);
+        container.setScale(1.05);
+      });
+      bg.on('pointerout', () => {
+        bg.setStrokeStyle(1, strokeColor);
+        container.setScale(1.0);
+      });
+    }
+
+    return container;
+  }
+
+  /** Handles the Hint button click: generates and displays the hint. */
+  private onHintClick(): void {
+    if (this.hintUsedThisTurn) return;
+    if (this.uiPhase !== 'market') return;
+
+    const hint: HintResult | null = generateHint(this.state);
+    if (!hint) {
+      this.instructionText.setText('Hint not available right now.');
+      return;
+    }
+
+    // Record usage and store highlight targets
+    this.hintUsedThisTurn = true;
+
+    // Determine which card and slot to highlight based on the action type
+    if (hint.action.type === 'buy-business') {
+      this.hintedCardId = hint.action.cardId;
+      this.hintedSlotIndex = hint.action.slotIndex;
+    } else if (hint.action.type === 'buy-upgrade') {
+      this.hintedCardId = hint.action.cardId;
+      this.hintedSlotIndex = hint.action.targetSlot ?? null;
+    } else if (hint.action.type === 'buy-event') {
+      this.hintedCardId = hint.action.cardId;
+      this.hintedSlotIndex = null;
+    } else if (hint.action.type === 'play-event') {
+      this.hintedCardId = this.state.heldEvent?.id ?? null;
+      this.hintedSlotIndex = null;
+    } else {
+      this.hintedCardId = null;
+      this.hintedSlotIndex = null;
+    }
+
+    // Show rationale in instruction text
+    this.instructionText.setText(`Hint: ${hint.rationale}`);
+
+    // Refresh buttons (to disable the hint button) and visual highlights
+    this.refreshActionButtons();
+    this.refreshStreetGrid();
+    this.refreshMarket();
+    this.refreshPlayerHand();
+  }
+
+
 
   private onBusinessCardClick(card: BusinessCard): void {
     if (this.uiPhase !== 'market') return;

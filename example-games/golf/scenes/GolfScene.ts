@@ -916,6 +916,8 @@ export class GolfScene extends CardGameScene {
     this.phaseManager.set('ai-thinking');
 
     this.time.delayedCall(AI_DELAY, () => {
+      // If the game ended while this callback was pending, bail out early.
+      if (this.session.gameState.phase === 'ended') return;
       const idx = this.session.gameState.currentPlayerIndex;
       const ps = this.session.gameState.playerStates[idx];
 
@@ -964,6 +966,8 @@ export class GolfScene extends CardGameScene {
 
       // Pause so the player can see the drawn card, then execute the move
       this.time.delayedCall(AI_SHOW_DRAW_DELAY, () => {
+        // Guard against the game ending while waiting for the AI-show delay.
+        if (this.session.gameState.phase === 'ended') return;
         this.phaseManager.set('animating');
 
         // Put the drawn card back for executeTurn to draw it again
