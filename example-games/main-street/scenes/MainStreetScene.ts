@@ -28,11 +28,9 @@ import {
   INCIDENT_QUEUE_SIZE,
 } from '../MainStreetCards';
 import {
-  executeAction,
   executeDayStart,
   processEndOfTurn,
   computeScore,
-  type PlayerAction,
   type TurnResult,
 } from '../MainStreetEngine';
 import {
@@ -69,6 +67,8 @@ import {
   generateHint,
   type HintResult,
 } from '../MainStreetHint';
+import { UndoRedoManager } from '../../../src/core-engine';
+import { BuyBusinessCommand, BuyUpgradeCommand, BuyEventCommand, PlayEventCommand } from '../MainStreetCommands';
 
 // ── Constants ───────────────────────────────────────────────
 
@@ -214,6 +214,9 @@ export class MainStreetScene extends CardGameScene {
   /** Grid slot index highlighted by the current hint (null = none). */
   private hintedSlotIndex: number | null = null;
 
+  // Undo/Redo manager for market actions (per-scene)
+  private undoManager!: UndoRedoManager;
+
   constructor() {
     super({ key: 'MainStreetScene' });
   }
@@ -249,6 +252,9 @@ export class MainStreetScene extends CardGameScene {
     // Game setup -- load campaign for tier-filtered deck building
     this.saveStore = new SaveLoadStore();
     this.loadCampaignAndSetup();
+
+    // Undo/Redo manager (per-scene)
+    this.undoManager = new UndoRedoManager();
 
     // UI scaffolding
     this.createHeader();
@@ -1138,11 +1144,14 @@ export class MainStreetScene extends CardGameScene {
     if (this.uiPhase !== 'market') return;
     if (!this.state.heldEvent) return;
 
+    console.debug('[MS] onPlayHeldEvent: attempting PlayEvent', { heldEventId: this.state.heldEvent?.id, coinsBefore: this.state.resourceBank.coins });
     try {
       this.undoManager.execute(new PlayEventCommand(this.state));
       this.instructionText.setText('Played held Investment event!');
       addLog(this.state, 'Played held event (via UI)', 'neutral');
+      console.debug('[MS] PlayEvent executed', { coinsAfter: this.state.resourceBank.coins, heldEventAfter: this.state.heldEvent?.id ?? null });
     } catch (e) {
+      console.error('[MS] PlayEvent failed', e);
       this.instructionText.setText(`Error: ${(e as Error).message}`);
     }
 
@@ -1401,12 +1410,15 @@ export class MainStreetScene extends CardGameScene {
   private onSlotClick(slotIndex: number): void {
     if (this.uiPhase !== 'placing-business' || !this.pendingBusinessCard) return;
 
+    console.debug('[MS] onSlotClick: attempting BuyBusiness', { cardId: this.pendingBusinessCard?.id, slotIndex, coinsBefore: this.state.resourceBank.coins, marketBefore: this.state.market.business.map(c=>c.id) });
     try {
       this.undoManager.execute(new BuyBusinessCommand(this.state, this.pendingBusinessCard.id, slotIndex));
       this.instructionText.setText(
         `Placed "${this.pendingBusinessCard.name}" on slot ${slotIndex}`,
       );
+      console.debug('[MS] BuyBusiness executed successfully', { coinsAfter: this.state.resourceBank.coins, marketAfter: this.state.market.business.map(c=>c.id), street: this.state.streetGrid.map(s=>s?.id ?? null) });
     } catch (e) {
+      console.error('[MS] BuyBusiness failed', e);
       this.instructionText.setText(`Error: ${(e as Error).message}`);
     }
 
@@ -1424,10 +1436,13 @@ export class MainStreetScene extends CardGameScene {
       return;
     }
 
+    console.debug('[MS] onEventCardClick: attempting BuyEvent', { cardId: card.id, coinsBefore: this.state.resourceBank.coins, marketBefore: this.state.market.investments.map(c=>c.id) });
     try {
       this.undoManager.execute(new BuyEventCommand(this.state, card.id));
       this.instructionText.setText(`Bought event: "${card.name}"`);
+      console.debug('[MS] BuyEvent executed', { coinsAfter: this.state.resourceBank.coins, heldEvent: this.state.heldEvent?.id ?? null, marketAfter: this.state.market.investments.map(c=>c.id) });
     } catch (e) {
+      console.error('[MS] BuyEvent failed', e);
       this.instructionText.setText(`Error: ${(e as Error).message}`);
     }
 
@@ -1454,10 +1469,13 @@ export class MainStreetScene extends CardGameScene {
     }
 
     // Single upgrade available — apply immediately with the resolved slot
+    console.debug('[MS] onUpgradeCardClick: attempting BuyUpgrade', { cardId: card.id, targetSlot, coinsBefore: this.state.resourceBank.coins, marketBefore: this.state.market.investments.map(c=>c.id), streetBefore: this.state.streetGrid.map(s=>s?.id ?? null) });
     try {
       this.undoManager.execute(new BuyUpgradeCommand(this.state, card.id, targetSlot));
       this.instructionText.setText(`Applied upgrade: "${card.name}"`);
+      console.debug('[MS] BuyUpgrade executed', { coinsAfter: this.state.resourceBank.coins, marketAfter: this.state.market.investments.map(c=>c.id), streetAfter: this.state.streetGrid.map(s=>s?.id ?? null) });
     } catch (e) {
+      console.error('[MS] BuyUpgrade failed', e);
       this.instructionText.setText(`Error: ${(e as Error).message}`);
     }
 
