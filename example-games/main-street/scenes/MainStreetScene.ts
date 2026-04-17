@@ -471,6 +471,9 @@ export class MainStreetScene extends CardGameScene {
       return;
     }
 
+    // Clear undo stack on end-of-turn (per acceptance criteria)
+    try { this.undoManager.clear(); } catch (e) { /* ignore */ }
+
     // Brief delay then show result / advance
     this.time.delayedCall(400, () => {
       if (result.gameResult !== 'playing') {
@@ -1135,10 +1138,10 @@ export class MainStreetScene extends CardGameScene {
     if (this.uiPhase !== 'market') return;
     if (!this.state.heldEvent) return;
 
-    const action: PlayerAction = { type: 'play-event' };
     try {
-      executeAction(this.state, action);
+      this.undoManager.execute(new PlayEventCommand(this.state));
       this.instructionText.setText('Played held Investment event!');
+      addLog(this.state, 'Played held event (via UI)', 'neutral');
     } catch (e) {
       this.instructionText.setText(`Error: ${(e as Error).message}`);
     }
@@ -1178,15 +1181,24 @@ export class MainStreetScene extends CardGameScene {
 
       // End Turn button (right-aligned)
       const btnW = 160;
+      const hintBtnW = 130;
+      const smallW = 80;
+
       const endBtn = this.createActionButton(rightX - btnW, by + 8, btnW, 'End Turn', () => {
         this.endTurn();
       });
       this.actionContainer.add(endBtn);
 
       // Hint button (to the left of End Turn)
-      const hintBtnW = 130;
       const hintBtn = this.createHintButton(rightX - btnW - 12 - hintBtnW, by + 8, hintBtnW);
       this.actionContainer.add(hintBtn);
+
+      // Undo / Redo buttons (to the left of Hint)
+      const undoBaseX = rightX - btnW - 12 - hintBtnW - 12 - smallW - 12 - smallW;
+      const undoBtn = this.createActionButton(undoBaseX, by + 8, smallW, 'Undo', () => this.performUndo());
+      this.actionContainer.add(undoBtn);
+      const redoBtn = this.createActionButton(undoBaseX + smallW + 12, by + 8, smallW, 'Redo', () => this.performRedo());
+      this.actionContainer.add(redoBtn);
 
     } else if (this.uiPhase === 'placing-business') {
       const rightX = GAME_W - 40;
@@ -1334,6 +1346,31 @@ export class MainStreetScene extends CardGameScene {
     this.refreshPlayerHand();
   }
 
+  private performUndo(): void {
+    if (this.uiPhase === 'animating' || this.uiPhase === 'game-over') return;
+    if (!this.undoManager || !this.undoManager.canUndo()) return;
+
+    try {
+      this.undoManager.undo();
+      addLog(this.state, 'Undo', 'neutral');
+      this.refreshAll();
+    } catch (e) {
+      console.error('Undo failed:', e);
+    }
+  }
+
+  private performRedo(): void {
+    if (this.uiPhase === 'animating' || this.uiPhase === 'game-over') return;
+    if (!this.undoManager || !this.undoManager.canRedo()) return;
+
+    try {
+      this.undoManager.redo();
+      addLog(this.state, 'Redo', 'neutral');
+      this.refreshAll();
+    } catch (e) {
+      console.error('Redo failed:', e);
+    }
+  }
 
 
   private onBusinessCardClick(card: BusinessCard): void {
@@ -1364,14 +1401,8 @@ export class MainStreetScene extends CardGameScene {
   private onSlotClick(slotIndex: number): void {
     if (this.uiPhase !== 'placing-business' || !this.pendingBusinessCard) return;
 
-    const action: PlayerAction = {
-      type: 'buy-business',
-      cardId: this.pendingBusinessCard.id,
-      slotIndex,
-    };
-
     try {
-      executeAction(this.state, action);
+      this.undoManager.execute(new BuyBusinessCommand(this.state, this.pendingBusinessCard.id, slotIndex));
       this.instructionText.setText(
         `Placed "${this.pendingBusinessCard.name}" on slot ${slotIndex}`,
       );
@@ -1393,9 +1424,8 @@ export class MainStreetScene extends CardGameScene {
       return;
     }
 
-    const action: PlayerAction = { type: 'buy-event', cardId: card.id };
     try {
-      executeAction(this.state, action);
+      this.undoManager.execute(new BuyEventCommand(this.state, card.id));
       this.instructionText.setText(`Bought event: "${card.name}"`);
     } catch (e) {
       this.instructionText.setText(`Error: ${(e as Error).message}`);
@@ -1424,9 +1454,8 @@ export class MainStreetScene extends CardGameScene {
     }
 
     // Single upgrade available — apply immediately with the resolved slot
-    const action: PlayerAction = { type: 'buy-upgrade', cardId: card.id, targetSlot };
     try {
-      executeAction(this.state, action);
+      this.undoManager.execute(new BuyUpgradeCommand(this.state, card.id, targetSlot));
       this.instructionText.setText(`Applied upgrade: "${card.name}"`);
     } catch (e) {
       this.instructionText.setText(`Error: ${(e as Error).message}`);
@@ -1508,9 +1537,8 @@ export class MainStreetScene extends CardGameScene {
         dismissOverlay(this.overlayObjects);
         this.overlayObjects = [];
 
-        const action: PlayerAction = { type: 'buy-upgrade', cardId: branch.id, targetSlot };
         try {
-          executeAction(this.state, action);
+          this.undoManager.execute(new BuyUpgradeCommand(this.state, branch.id, targetSlot));
           this.instructionText.setText(`Applied upgrade: "${branch.name}"`);
         } catch (e) {
           this.instructionText.setText(`Error: ${(e as Error).message}`);

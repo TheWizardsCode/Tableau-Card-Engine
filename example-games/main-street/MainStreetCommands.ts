@@ -1,0 +1,139 @@
+import type { Command } from '../../src/core-engine/UndoRedoManager';
+import type { MainStreetState } from './MainStreetState';
+import {
+  purchaseBusiness,
+  purchaseUpgrade,
+  purchaseEvent,
+} from './MainStreetMarket';
+import { playHeldEvent } from './MainStreetEngine';
+
+/** Snapshot of the portions of state affected by market actions. */
+interface MarketActionSnapshot {
+  streetGrid: any | null;
+  market: any | null;
+  decks: any | null;
+  resourceBank: any | null;
+  heldEvent: any | null;
+  incidentQueue: any | null;
+  activityLog: any | null;
+}
+
+/** Helper to capture a shallow snapshot of mutable market-related fields. */
+function captureSnapshot(state: MainStreetState): MarketActionSnapshot {
+  return {
+    streetGrid: structuredClone(state.streetGrid),
+    market: structuredClone(state.market),
+    decks: structuredClone(state.decks),
+    resourceBank: structuredClone(state.resourceBank),
+    heldEvent: structuredClone(state.heldEvent),
+    incidentQueue: structuredClone(state.incidentQueue),
+    activityLog: structuredClone(state.activityLog),
+  };
+}
+
+/** Helper to restore a previously captured snapshot. */
+function restoreSnapshot(state: MainStreetState, snap: MarketActionSnapshot): void {
+  if (!snap.streetGrid || !snap.market || !snap.decks || !snap.resourceBank || !snap.activityLog) {
+    throw new Error('Invalid snapshot');
+  }
+  state.streetGrid = snap.streetGrid as any;
+  state.market = snap.market as any;
+  state.decks = snap.decks as any;
+  state.resourceBank = snap.resourceBank as any;
+  state.heldEvent = snap.heldEvent as any;
+  state.incidentQueue = snap.incidentQueue as any;
+  state.activityLog = snap.activityLog as any;
+}
+
+/** Command: Buy Business */
+export class BuyBusinessCommand implements Command {
+  readonly description?: string;
+  private pre: MarketActionSnapshot | null = null;
+
+  constructor(
+    private readonly state: MainStreetState,
+    private readonly cardId: string,
+    private readonly slotIndex: number,
+  ) {
+    this.description = `BuyBusiness ${cardId} -> slot ${slotIndex}`;
+  }
+
+  execute(): void {
+    if (this.pre === null) {
+      this.pre = captureSnapshot(this.state);
+    }
+    purchaseBusiness(this.state, this.cardId, this.slotIndex);
+  }
+
+  undo(): void {
+    if (this.pre === null) return;
+    restoreSnapshot(this.state, this.pre);
+  }
+}
+
+/** Command: Buy Upgrade */
+export class BuyUpgradeCommand implements Command {
+  readonly description?: string;
+  private pre: MarketActionSnapshot | null = null;
+
+  constructor(
+    private readonly state: MainStreetState,
+    private readonly cardId: string,
+    private readonly targetSlot?: number,
+  ) {
+    this.description = `BuyUpgrade ${cardId} -> slot ${targetSlot ?? 'auto'}`;
+  }
+
+  execute(): void {
+    if (this.pre === null) this.pre = captureSnapshot(this.state);
+    purchaseUpgrade(this.state, this.cardId, this.targetSlot);
+  }
+
+  undo(): void {
+    if (this.pre === null) return;
+    restoreSnapshot(this.state, this.pre);
+  }
+}
+
+/** Command: Buy Event (Investment) */
+export class BuyEventCommand implements Command {
+  readonly description?: string;
+  private pre: MarketActionSnapshot | null = null;
+
+  constructor(
+    private readonly state: MainStreetState,
+    private readonly cardId: string,
+  ) {
+    this.description = `BuyEvent ${cardId}`;
+  }
+
+  execute(): void {
+    if (this.pre === null) this.pre = captureSnapshot(this.state);
+    purchaseEvent(this.state, this.cardId);
+  }
+
+  undo(): void {
+    if (this.pre === null) return;
+    restoreSnapshot(this.state, this.pre);
+  }
+}
+
+/** Command: Play Held Investment Event */
+export class PlayEventCommand implements Command {
+  readonly description?: string;
+  private pre: MarketActionSnapshot | null = null;
+
+  constructor(private readonly state: MainStreetState) {
+    this.description = `PlayHeldEvent`;
+  }
+
+  execute(): void {
+    if (this.pre === null) this.pre = captureSnapshot(this.state);
+    playHeldEvent(this.state);
+  }
+
+  undo(): void {
+    if (this.pre === null) return;
+    restoreSnapshot(this.state, this.pre);
+  }
+}
