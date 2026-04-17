@@ -14,7 +14,7 @@
  */
 
 import type { MainStreetState } from '../MainStreetState';
-import { setupMainStreetGame } from '../MainStreetState';
+import { setupMainStreetGame, addLog } from '../MainStreetState';
 import type { DifficultyName } from '../MainStreetDifficulty';
 import { DIFFICULTY_NAMES } from '../MainStreetDifficulty';
 import type { BusinessCard, EventCard, UpgradeCard } from '../MainStreetCards';
@@ -1323,6 +1323,9 @@ export class MainStreetScene extends CardGameScene {
 
     // Show rationale in instruction text
     this.instructionText.setText(`Hint: ${hint.rationale}`);
+
+    // Record the hint request in the activity log / transcript
+    addLog(this.state, `Hint: ${hint.rationale}`, 'neutral');
 
     // Refresh buttons (to disable the hint button) and visual highlights
     this.refreshActionButtons();
