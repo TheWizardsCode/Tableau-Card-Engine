@@ -17,6 +17,7 @@
 
 import type { AiStrategyBase } from '../../src/ai';
 import { AiPlayer as AiPlayerBase, pickRandom, pickBest } from '../../src/ai';
+import { recordMainStreetEvent } from './MainStreetTranscript';
 import type { MainStreetState } from './MainStreetState';
 import {
   executeDayStart,
@@ -252,6 +253,10 @@ export class MainStreetAiPlayer extends AiPlayerBase<MainStreetAiStrategy> {
       let action = this.chooseAction(state);
       while (action.type !== 'end-turn') {
         executeAction(state, action);
+        // Record AI action for transcript if recorder is present
+        try {
+          recordMainStreetEvent({ type: 'ai-action', turn: state.turn, strategy: this.strategy.name, action });
+        } catch (_) {}
         if (state.gameResult !== 'playing') break;
         action = this.chooseAction(state);
       }

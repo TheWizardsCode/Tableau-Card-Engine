@@ -1,0 +1,77 @@
+{
+  "game": "main-street",
+  "version": "1.0.0",
+  "seed": "e2e-1776467740991",
+  "startedAt": "2026-04-17T23:15:41.888Z",
+  "endedAt": "2026-04-17T23:15:41.890Z",
+  "totalTurns": 4,
+  "result": "loss",
+  "endReason": "reputation_collapse",
+  "finalScore": 1,
+  "turns": [
+    {
+      "turn": 1,
+      "actions": [
+        {
+          "type": "buy-business",
+          "detail": "biz-arcade-0 -> slot 0"
+        }
+      ],
+      "income": 1,
+      "incident": "Noise Complaint",
+      "incidentQueueSize": 2,
+      "coinsAfter": 0,
+      "reputationAfter": 2,
+      "score": 10,
+      "gridOccupied": 1
+    },
+    {
+      "turn": 2,
+      "actions": [
+        {
+          "type": "skip",
+          "detail": "No affordable actions"
+        }
+      ],
+      "income": 1,
+      "incident": "Shoplifting Spree",
+      "incidentQueueSize": 2,
+      "coinsAfter": 1,
+      "reputationAfter": 2,
+      "score": 11,
+      "gridOccupied": 1
+    },
+    {
+      "turn": 3,
+      "actions": [
+        {
+          "type": "skip",
+          "detail": "No affordable actions"
+        }
+      ],
+      "income": 1,
+      "incident": "Vandalism",
+      "incidentQueueSize": 2,
+      "coinsAfter": 1,
+      "reputationAfter": 1,
+      "score": 6,
+      "gridOccupied": 1
+    },
+    {
+      "turn": 4,
+      "actions": [
+        {
+          "type": "skip",
+          "detail": "No affordable actions"
+        }
+      ],
+      "income": 1,
+      "incident": "Vandalism",
+      "incidentQueueSize": 2,
+      "coinsAfter": 1,
+      "reputationAfter": 0,
+      "score": 1,
+      "gridOccupied": 1
+    }
+  ]
+}

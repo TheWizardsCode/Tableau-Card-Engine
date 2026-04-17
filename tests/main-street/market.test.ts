@@ -117,16 +117,18 @@ describe('MainStreetMarket', () => {
       expect(state.streetGrid[0]!.id).toBe(card.id);
     });
 
-    it('should refill the market slot from the deck', () => {
+    it('should not refill the market slot immediately (refill occurs at start of next turn)', () => {
       const state = createTestState();
       const deckSizeBefore = state.decks.business.length;
       const card = state.market.business[0];
 
       const result = purchaseBusiness(state, card.id, 0);
 
-      expect(result.refilled).toBe(true);
-      expect(state.market.business).toHaveLength(MARKET_BUSINESS_SLOTS);
-      expect(state.decks.business.length).toBe(deckSizeBefore - 1);
+      expect(result.refilled).toBe(false);
+      // Market should have one fewer visible card until end of turn
+      expect(state.market.business).toHaveLength(MARKET_BUSINESS_SLOTS - 1);
+      // Deck should be unchanged until refill
+      expect(state.decks.business.length).toBe(deckSizeBefore);
     });
 
     it('should not refill when deck is empty', () => {
@@ -146,7 +148,7 @@ describe('MainStreetMarket', () => {
       expect(() => purchaseBusiness(state, 'nonexistent', 0)).toThrow('not found');
     });
 
-    it('should deterministically refill after purchase', () => {
+    it('should deterministically update markets after purchase (no immediate refill)', () => {
       const state1 = createTestState('deterministic-market');
       const state2 = createTestState('deterministic-market');
 
@@ -157,7 +159,7 @@ describe('MainStreetMarket', () => {
       purchaseBusiness(state1, card1.id, 0);
       purchaseBusiness(state2, card2.id, 0);
 
-      // After purchase and refill, markets should be identical
+      // After purchase, visible markets (with one slot removed) should be identical
       expect(state1.market.business.map(c => c.id)).toEqual(
         state2.market.business.map(c => c.id),
       );
@@ -316,7 +318,7 @@ describe('MainStreetMarket', () => {
   });
 
   describe('purchaseEvent', () => {
-    it('should hold event as heldEvent and refill market', () => {
+    it('should hold event as heldEvent and not refill market immediately', () => {
       const state = createTestState();
       // Ensure we have an Investment event by injecting into the investments row
       const investmentTemplate = {
@@ -333,10 +335,14 @@ describe('MainStreetMarket', () => {
       };
       state.market.investments = [investmentTemplate];
 
+      const beforeLen = state.market.investments.length;
+
       purchaseEvent(state, 'evt-festival-test');
 
       expect(state.heldEvent).not.toBeNull();
       expect(state.heldEvent!.id).toBe('evt-festival-test');
+      // Market should have one fewer visible investment until end of turn
+      expect(state.market.investments).toHaveLength(beforeLen - 1);
     });
   });
 
@@ -392,7 +398,7 @@ describe('MainStreetMarket', () => {
       expect(state.market.investments.length).toBe(MARKET_INVESTMENT_SLOTS);
     });
 
-    it('should maintain 2+1 ratio after purchasing an upgrade', () => {
+    it('should decrease investments row size by one after purchasing an upgrade (no immediate refill)', () => {
       const state = createTestState();
       const upgrade = state.market.investments.find(c => c.family === 'upgrade') as UpgradeCard | undefined;
       if (!upgrade) return;
@@ -405,23 +411,14 @@ describe('MainStreetMarket', () => {
       state.streetGrid[0] = { ...biz, level: (upgrade.requiredLevel ?? 0) };
       state.resourceBank.coins = 100;
 
+      const beforeLen = state.market.investments.length;
       purchaseUpgrade(state, upgrade.id);
 
-      // After purchase + auto-refill, check composition
-      const upgrades = state.market.investments.filter(c => c.family === 'upgrade');
-      const events = state.market.investments.filter(c => c.family === 'event');
-      // Should still have 2 upgrades if deck has cards, or fewer if exhausted
-      expect(upgrades.length).toBeLessThanOrEqual(MARKET_INVESTMENT_UPGRADE_COUNT);
-      expect(events.length).toBeLessThanOrEqual(MARKET_INVESTMENT_EVENT_COUNT);
-      // Total should be at most MARKET_INVESTMENT_SLOTS
-      expect(state.market.investments.length).toBeLessThanOrEqual(MARKET_INVESTMENT_SLOTS);
-      // If upgrade deck still has cards, should be exactly 2 upgrades
-      if (state.decks.upgrade.length > 0 || upgrades.length === MARKET_INVESTMENT_UPGRADE_COUNT) {
-        expect(upgrades.length).toBe(MARKET_INVESTMENT_UPGRADE_COUNT);
-      }
+      // After purchase, investments row should have one fewer visible card
+      expect(state.market.investments.length).toBe(beforeLen - 1);
     });
 
-    it('should maintain 2+1 ratio after purchasing an event', () => {
+    it('should remove the purchased event from the investments row (no immediate refill)', () => {
       const state = createTestState();
       // Inject a known Investment event into the investments row
       const investmentEvt = {
@@ -453,15 +450,18 @@ describe('MainStreetMarket', () => {
         cost: 3,
       });
 
+      const beforeLen = state.market.investments.length;
+
       purchaseEvent(state, 'evt-test-purchase');
 
       // heldEvent should be set
       expect(state.heldEvent).not.toBeNull();
       expect(state.heldEvent!.id).toBe('evt-test-purchase');
 
-      // Market should have been refilled
+      // Market should have one fewer visible event until end of turn
       const events = state.market.investments.filter(c => c.family === 'event');
-      expect(events.length).toBe(MARKET_INVESTMENT_EVENT_COUNT);
+      expect(state.market.investments.length).toBe(beforeLen - 1);
+      expect(events.length).toBeLessThanOrEqual(MARKET_INVESTMENT_EVENT_COUNT);
     });
 
     it('should partially fill investments row when upgrade deck is exhausted', () => {

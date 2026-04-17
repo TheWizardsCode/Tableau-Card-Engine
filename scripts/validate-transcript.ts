@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
-import Ajv from 'ajv';
+import Ajv, { type ErrorObject } from 'ajv';
 
-export function validateTranscriptFile(schemaPath: string, transcriptPath: string): { valid: boolean; errors?: Ajv.ErrorObject[] | null } {
+export function validateTranscriptFile(schemaPath: string, transcriptPath: string): { valid: boolean; errors?: ErrorObject[] | null } {
   const absSchema = path.resolve(schemaPath);
   const absTranscript = path.resolve(transcriptPath);
 

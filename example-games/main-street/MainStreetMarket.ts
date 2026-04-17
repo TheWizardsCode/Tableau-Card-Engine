@@ -259,9 +259,8 @@ export function purchaseBusiness(
   // Place on grid
   state.streetGrid[slotIndex] = card;
 
-  // Refill market
-  const refilled = state.decks.business.length > 0;
-  refillBusinessMarket(state);
+  // Note: market is not refilled immediately. Replenishment occurs at start of next turn.
+  const refilled = false;
 
   addLog(state, `Placed ${card.name} in slot ${slotIndex} (-$${card.cost})`, 'loss');
 
@@ -329,9 +328,8 @@ export function purchaseUpgrade(
   }
   business.appliedUpgrades.push(card.id);
 
-  // Refill market
-  const refilled = state.decks.upgrade.length > 0;
-  refillInvestmentsMarket(state);
+  // Note: market is not refilled immediately. Replenishment occurs at start of next turn.
+  const refilled = false;
 
   addLog(state, `Upgraded ${business.name} with ${card.name} (-$${card.cost})`, 'loss');
 
@@ -370,9 +368,8 @@ export function purchaseEvent(
   // Hold the Investment event (max 1)
   state.heldEvent = card;
 
-  // Refill market
-  const refilled = state.decks.event.some(e => e.trigger === 'Investment');
-  refillInvestmentsMarket(state);
+  // Note: market is not refilled immediately. Replenishment occurs at start of next turn.
+  const refilled = false;
 
   const costLabel = card.cost > 0 ? ` (-$${card.cost})` : '';
   addLog(state, `Bought event: ${card.name}${costLabel} (held)`, 'neutral');

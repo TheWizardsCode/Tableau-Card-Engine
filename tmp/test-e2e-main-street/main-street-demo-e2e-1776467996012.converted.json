@@ -1,0 +1,193 @@
+{
+  "version": 1,
+  "gameType": "main-street",
+  "startedAt": "2026-04-17T23:19:57.302Z",
+  "endedAt": "2026-04-17T23:19:57.309Z",
+  "initialState": {
+    "seed": "e2e-1776467996012"
+  },
+  "events": [
+    {
+      "type": "action",
+      "turn": 1,
+      "action": {
+        "type": "buy-business",
+        "detail": "biz-barbershop-2 -> slot 0"
+      }
+    },
+    {
+      "type": "turn-end",
+      "turn": 1
+    },
+    {
+      "type": "action",
+      "turn": 2,
+      "action": {
+        "type": "skip",
+        "detail": "No affordable actions"
+      }
+    },
+    {
+      "type": "turn-end",
+      "turn": 2
+    },
+    {
+      "type": "action",
+      "turn": 3,
+      "action": {
+        "type": "skip",
+        "detail": "No affordable actions"
+      }
+    },
+    {
+      "type": "turn-end",
+      "turn": 3
+    },
+    {
+      "type": "action",
+      "turn": 4,
+      "action": {
+        "type": "skip",
+        "detail": "No affordable actions"
+      }
+    },
+    {
+      "type": "turn-end",
+      "turn": 4
+    },
+    {
+      "type": "action",
+      "turn": 5,
+      "action": {
+        "type": "buy-event",
+        "detail": "evt-block-party-26"
+      }
+    },
+    {
+      "type": "turn-end",
+      "turn": 5
+    },
+    {
+      "type": "action",
+      "turn": 6,
+      "action": {
+        "type": "skip",
+        "detail": "No affordable actions"
+      }
+    },
+    {
+      "type": "turn-end",
+      "turn": 6
+    },
+    {
+      "type": "action",
+      "turn": 7,
+      "action": {
+        "type": "buy-event",
+        "detail": "evt-charity-drive-29"
+      }
+    },
+    {
+      "type": "turn-end",
+      "turn": 7
+    },
+    {
+      "type": "action",
+      "turn": 8,
+      "action": {
+        "type": "skip",
+        "detail": "No affordable actions"
+      }
+    },
+    {
+      "type": "turn-end",
+      "turn": 8
+    },
+    {
+      "type": "action",
+      "turn": 9,
+      "action": {
+        "type": "buy-event",
+        "detail": "evt-wellness-fair-23"
+      }
+    },
+    {
+      "type": "turn-end",
+      "turn": 9
+    },
+    {
+      "type": "action",
+      "turn": 10,
+      "action": {
+        "type": "skip",
+        "detail": "No affordable actions"
+      }
+    },
+    {
+      "type": "turn-end",
+      "turn": 10
+    },
+    {
+      "type": "action",
+      "turn": 11,
+      "action": {
+        "type": "skip",
+        "detail": "No affordable actions"
+      }
+    },
+    {
+      "type": "turn-end",
+      "turn": 11
+    },
+    {
+      "type": "action",
+      "turn": 12,
+      "action": {
+        "type": "skip",
+        "detail": "No affordable actions"
+      }
+    },
+    {
+      "type": "turn-end",
+      "turn": 12
+    },
+    {
+      "type": "action",
+      "turn": 13,
+      "action": {
+        "type": "skip",
+        "detail": "No affordable actions"
+      }
+    },
+    {
+      "type": "turn-end",
+      "turn": 13
+    },
+    {
+      "type": "action",
+      "turn": 14,
+      "action": {
+        "type": "skip",
+        "detail": "No affordable actions"
+      }
+    },
+    {
+      "type": "turn-end",
+      "turn": 14
+    },
+    {
+      "type": "game-end",
+      "turn": 14,
+      "finalScore": 59,
+      "result": {
+        "outcome": "loss"
+      },
+      "endReason": "bankruptcy"
+    }
+  ],
+  "results": {
+    "finalScore": 59,
+    "result": "loss",
+    "endReason": "bankruptcy"
+  }
+}

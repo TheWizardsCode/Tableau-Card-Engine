@@ -69,6 +69,7 @@ import {
 } from '../MainStreetHint';
 import { UndoRedoManager } from '../../../src/core-engine';
 import { BuyBusinessCommand, BuyUpgradeCommand, BuyEventCommand, PlayEventCommand } from '../MainStreetCommands';
+import { MainStreetTranscriptRecorder, setMainStreetRecorder, recordMainStreetEvent } from '../MainStreetTranscript';
 
 // ── Constants ───────────────────────────────────────────────
 
@@ -255,6 +256,16 @@ export class MainStreetScene extends CardGameScene {
 
     // Undo/Redo manager (per-scene)
     this.undoManager = new UndoRedoManager();
+
+    // Transcript recorder (optional) — attach global recorder so other modules
+    // (AI, Monte Carlo runner) can emit events without direct wiring.
+    try {
+      const initialSnapshot = { seed: this.state.seed ?? null, snapshotAtTurn: this.state.turn };
+      const recorder = new MainStreetTranscriptRecorder(initialSnapshot);
+      setMainStreetRecorder(recorder);
+    } catch (_) {
+      // ignore if recorder cannot be created
+    }
 
     // UI scaffolding
     this.createHeader();
@@ -1146,7 +1157,10 @@ export class MainStreetScene extends CardGameScene {
 
     console.debug('[MS] onPlayHeldEvent: attempting PlayEvent', { heldEventId: this.state.heldEvent?.id, coinsBefore: this.state.resourceBank.coins });
     try {
-      this.undoManager.execute(new PlayEventCommand(this.state));
+      const cmd = new PlayEventCommand(this.state);
+      this.undoManager.execute(cmd);
+      // Record action event
+      try { recordMainStreetEvent({ type: 'action', turn: this.state.turn, action: { type: 'play-event' }, description: cmd.description }); } catch (_) {}
       this.instructionText.setText('Played held Investment event!');
       addLog(this.state, 'Played held event (via UI)', 'neutral');
       console.debug('[MS] PlayEvent executed', { coinsAfter: this.state.resourceBank.coins, heldEventAfter: this.state.heldEvent?.id ?? null });
@@ -1347,6 +1361,7 @@ export class MainStreetScene extends CardGameScene {
 
     // Record the hint request in the activity log / transcript
     addLog(this.state, `Hint: ${hint.rationale}`, 'neutral');
+    try { recordMainStreetEvent({ type: 'hint', turn: this.state.turn, recommendedAction: hint.action, rationale: hint.rationale }); } catch (_) {}
 
     // Refresh buttons (to disable the hint button) and visual highlights
     this.refreshActionButtons();
@@ -1360,8 +1375,9 @@ export class MainStreetScene extends CardGameScene {
     if (!this.undoManager || !this.undoManager.canUndo()) return;
 
     try {
-      this.undoManager.undo();
+      const cmd = this.undoManager.undo();
       addLog(this.state, 'Undo', 'neutral');
+      try { if (cmd) recordMainStreetEvent({ type: 'undo', turn: this.state.turn, reversedAction: { description: cmd.description } }); } catch (_) {}
       this.refreshAll();
     } catch (e) {
       console.error('Undo failed:', e);
@@ -1373,8 +1389,9 @@ export class MainStreetScene extends CardGameScene {
     if (!this.undoManager || !this.undoManager.canRedo()) return;
 
     try {
-      this.undoManager.redo();
+      const cmd = this.undoManager.redo();
       addLog(this.state, 'Redo', 'neutral');
+      try { if (cmd) recordMainStreetEvent({ type: 'redo', turn: this.state.turn, reappliedAction: { description: cmd.description } }); } catch (_) {}
       this.refreshAll();
     } catch (e) {
       console.error('Redo failed:', e);
@@ -1412,7 +1429,10 @@ export class MainStreetScene extends CardGameScene {
 
     console.debug('[MS] onSlotClick: attempting BuyBusiness', { cardId: this.pendingBusinessCard?.id, slotIndex, coinsBefore: this.state.resourceBank.coins, marketBefore: this.state.market.business.map(c=>c.id) });
     try {
-      this.undoManager.execute(new BuyBusinessCommand(this.state, this.pendingBusinessCard.id, slotIndex));
+      const cmd = new BuyBusinessCommand(this.state, this.pendingBusinessCard.id, slotIndex);
+      this.undoManager.execute(cmd);
+      // Record action event
+      try { recordMainStreetEvent({ type: 'action', turn: this.state.turn, action: { type: 'buy-business', cardId: this.pendingBusinessCard.id, slotIndex }, description: cmd.description }); } catch (_) {}
       this.instructionText.setText(
         `Placed "${this.pendingBusinessCard.name}" on slot ${slotIndex}`,
       );
@@ -1438,7 +1458,9 @@ export class MainStreetScene extends CardGameScene {
 
     console.debug('[MS] onEventCardClick: attempting BuyEvent', { cardId: card.id, coinsBefore: this.state.resourceBank.coins, marketBefore: this.state.market.investments.map(c=>c.id) });
     try {
-      this.undoManager.execute(new BuyEventCommand(this.state, card.id));
+      const cmd = new BuyEventCommand(this.state, card.id);
+      this.undoManager.execute(cmd);
+      try { recordMainStreetEvent({ type: 'action', turn: this.state.turn, action: { type: 'buy-event', cardId: card.id }, description: cmd.description }); } catch (_) {}
       this.instructionText.setText(`Bought event: "${card.name}"`);
       console.debug('[MS] BuyEvent executed', { coinsAfter: this.state.resourceBank.coins, heldEvent: this.state.heldEvent?.id ?? null, marketAfter: this.state.market.investments.map(c=>c.id) });
     } catch (e) {
@@ -1471,7 +1493,9 @@ export class MainStreetScene extends CardGameScene {
     // Single upgrade available — apply immediately with the resolved slot
     console.debug('[MS] onUpgradeCardClick: attempting BuyUpgrade', { cardId: card.id, targetSlot, coinsBefore: this.state.resourceBank.coins, marketBefore: this.state.market.investments.map(c=>c.id), streetBefore: this.state.streetGrid.map(s=>s?.id ?? null) });
     try {
-      this.undoManager.execute(new BuyUpgradeCommand(this.state, card.id, targetSlot));
+      const cmd = new BuyUpgradeCommand(this.state, card.id, targetSlot);
+      this.undoManager.execute(cmd);
+      try { recordMainStreetEvent({ type: 'action', turn: this.state.turn, action: { type: 'buy-upgrade', cardId: card.id, targetSlot }, description: cmd.description }); } catch (_) {}
       this.instructionText.setText(`Applied upgrade: "${card.name}"`);
       console.debug('[MS] BuyUpgrade executed', { coinsAfter: this.state.resourceBank.coins, marketAfter: this.state.market.investments.map(c=>c.id), streetAfter: this.state.streetGrid.map(s=>s?.id ?? null) });
     } catch (e) {

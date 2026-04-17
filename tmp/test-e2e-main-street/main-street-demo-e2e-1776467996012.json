@@ -1,0 +1,237 @@
+{
+  "game": "main-street",
+  "version": "1.0.0",
+  "seed": "e2e-1776467996012",
+  "startedAt": "2026-04-17T23:19:57.302Z",
+  "endedAt": "2026-04-17T23:19:57.309Z",
+  "totalTurns": 14,
+  "result": "loss",
+  "endReason": "bankruptcy",
+  "finalScore": 59,
+  "turns": [
+    {
+      "turn": 1,
+      "actions": [
+        {
+          "type": "buy-business",
+          "detail": "biz-barbershop-2 -> slot 0"
+        }
+      ],
+      "income": 1,
+      "incident": "Food Critic Visit",
+      "incidentQueueSize": 2,
+      "coinsAfter": 3,
+      "reputationAfter": 4,
+      "score": 23,
+      "gridOccupied": 1
+    },
+    {
+      "turn": 2,
+      "actions": [
+        {
+          "type": "skip",
+          "detail": "No affordable actions"
+        }
+      ],
+      "income": 1,
+      "incident": "Power Outage",
+      "incidentQueueSize": 2,
+      "coinsAfter": 2,
+      "reputationAfter": 4,
+      "score": 22,
+      "gridOccupied": 1
+    },
+    {
+      "turn": 3,
+      "actions": [
+        {
+          "type": "skip",
+          "detail": "No affordable actions"
+        }
+      ],
+      "income": 1,
+      "incident": "Road Construction",
+      "incidentQueueSize": 2,
+      "coinsAfter": 2,
+      "reputationAfter": 4,
+      "score": 22,
+      "gridOccupied": 1
+    },
+    {
+      "turn": 4,
+      "actions": [
+        {
+          "type": "skip",
+          "detail": "No affordable actions"
+        }
+      ],
+      "income": 1,
+      "incident": "Viral Review",
+      "incidentQueueSize": 2,
+      "coinsAfter": 5,
+      "reputationAfter": 5,
+      "score": 30,
+      "gridOccupied": 1
+    },
+    {
+      "turn": 5,
+      "actions": [
+        {
+          "type": "buy-event",
+          "detail": "evt-block-party-26"
+        }
+      ],
+      "income": 1,
+      "incident": "Food Critic Visit",
+      "incidentQueueSize": 2,
+      "coinsAfter": 2,
+      "reputationAfter": 6,
+      "score": 32,
+      "gridOccupied": 1
+    },
+    {
+      "turn": 6,
+      "actions": [
+        {
+          "type": "skip",
+          "detail": "No affordable actions"
+        }
+      ],
+      "income": 1,
+      "incident": "Community Award",
+      "incidentQueueSize": 2,
+      "coinsAfter": 3,
+      "reputationAfter": 10,
+      "score": 53,
+      "gridOccupied": 1
+    },
+    {
+      "turn": 7,
+      "actions": [
+        {
+          "type": "buy-event",
+          "detail": "evt-charity-drive-29"
+        }
+      ],
+      "income": 1,
+      "incident": "Rainy Day",
+      "incidentQueueSize": 2,
+      "coinsAfter": 2,
+      "reputationAfter": 10,
+      "score": 52,
+      "gridOccupied": 1
+    },
+    {
+      "turn": 8,
+      "actions": [
+        {
+          "type": "skip",
+          "detail": "No affordable actions"
+        }
+      ],
+      "income": 1,
+      "incident": "Health Inspection",
+      "incidentQueueSize": 2,
+      "coinsAfter": 3,
+      "reputationAfter": 12,
+      "score": 63,
+      "gridOccupied": 1
+    },
+    {
+      "turn": 9,
+      "actions": [
+        {
+          "type": "buy-event",
+          "detail": "evt-wellness-fair-23"
+        }
+      ],
+      "income": 1,
+      "incident": "Noise Complaint",
+      "incidentQueueSize": 2,
+      "coinsAfter": 1,
+      "reputationAfter": 11,
+      "score": 56,
+      "gridOccupied": 1
+    },
+    {
+      "turn": 10,
+      "actions": [
+        {
+          "type": "skip",
+          "detail": "No affordable actions"
+        }
+      ],
+      "income": 1,
+      "incident": "Tax Audit",
+      "incidentQueueSize": 2,
+      "coinsAfter": 2,
+      "reputationAfter": 12,
+      "score": 62,
+      "gridOccupied": 1
+    },
+    {
+      "turn": 11,
+      "actions": [
+        {
+          "type": "skip",
+          "detail": "No affordable actions"
+        }
+      ],
+      "income": 1,
+      "incident": "Tax Audit",
+      "incidentQueueSize": 2,
+      "coinsAfter": 0,
+      "reputationAfter": 12,
+      "score": 60,
+      "gridOccupied": 1
+    },
+    {
+      "turn": 12,
+      "actions": [
+        {
+          "type": "skip",
+          "detail": "No affordable actions"
+        }
+      ],
+      "income": 1,
+      "incident": "Shoplifting Spree",
+      "incidentQueueSize": 2,
+      "coinsAfter": 1,
+      "reputationAfter": 12,
+      "score": 61,
+      "gridOccupied": 1
+    },
+    {
+      "turn": 13,
+      "actions": [
+        {
+          "type": "skip",
+          "detail": "No affordable actions"
+        }
+      ],
+      "income": 1,
+      "incident": "Pipe Burst",
+      "incidentQueueSize": 2,
+      "coinsAfter": 0,
+      "reputationAfter": 12,
+      "score": 60,
+      "gridOccupied": 1
+    },
+    {
+      "turn": 14,
+      "actions": [
+        {
+          "type": "skip",
+          "detail": "No affordable actions"
+        }
+      ],
+      "income": 1,
+      "incident": "Pipe Burst",
+      "incidentQueueSize": 2,
+      "coinsAfter": -1,
+      "reputationAfter": 12,
+      "score": 59,
+      "gridOccupied": 1
+    }
+  ]
+}

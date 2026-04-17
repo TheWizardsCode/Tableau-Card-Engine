@@ -160,6 +160,15 @@ function runSeed(seed: string, maxTurns: number, strategy: MonteCarloStrategy): 
       while (action.type !== 'end-turn' && state.gameResult === 'playing') {
         executeAction(state, action);
         executedAction = true;
+        // Record AI action in transcript (if recorder is present)
+        try {
+          // recordMainStreetEvent is imported lazily to avoid circular deps when not present
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { recordMainStreetEvent } = require('./MainStreetTranscript');
+          recordMainStreetEvent({ type: 'ai-action', turn: state.turn, strategy: aiPlayer.strategy.name, action });
+        } catch (_) {
+          // ignore if recorder not wired
+        }
         action = aiPlayer.chooseAction(state);
       }
     } else {

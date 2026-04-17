@@ -97,26 +97,28 @@ export class UndoRedoManager {
    * Undo the most recent command.
    * No-op if the undo stack is empty.
    */
-  undo(): void {
+  undo(): Command | undefined {
     const command = this.undoStack.pop();
     if (command === undefined) {
-      return;
+      return undefined;
     }
     command.undo();
     this.redoStack.push(command);
+    return command;
   }
 
   /**
    * Redo the most recently undone command.
    * No-op if the redo stack is empty.
    */
-  redo(): void {
+  redo(): Command | undefined {
     const command = this.redoStack.pop();
     if (command === undefined) {
-      return;
+      return undefined;
     }
     command.execute();
     this.undoStack.push(command);
+    return command;
   }
 
   /** Whether there are commands that can be undone. */

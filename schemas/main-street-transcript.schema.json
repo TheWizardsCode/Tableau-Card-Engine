@@ -16,10 +16,11 @@
         "oneOf": [
           {
             "type": "object",
-            "required": ["type", "turn"],
+            "required": ["type","turn","action"],
             "properties": {
-              "type": { "type": "string", "enum": ["action", "ai-action", "hint", "undo", "redo", "turn-end", "game-end","info"] },
+              "type": { "const": "action" },
               "turn": { "type": "number" },
+              "action": { "type": "object" },
               "timestamp": { "type": "string" }
             },
             "additionalProperties": true
@@ -31,7 +32,8 @@
               "type": { "const": "ai-action" },
               "turn": { "type": "number" },
               "strategy": { "type": "string" },
-              "action": { "type": "object" }
+              "action": { "type": "object" },
+              "timestamp": { "type": "string" }
             },
             "additionalProperties": true
           },
@@ -42,7 +44,30 @@
               "type": { "const": "hint" },
               "turn": { "type": "number" },
               "recommendedAction": { "type": "object" },
-              "rationale": { "type": "string" }
+              "rationale": { "type": "string" },
+              "timestamp": { "type": "string" }
+            },
+            "additionalProperties": true
+          },
+          {
+            "type": "object",
+            "required": ["type","turn"],
+            "properties": {
+              "type": { "const": "turn-end" },
+              "turn": { "type": "number" },
+              "timestamp": { "type": "string" }
+            },
+            "additionalProperties": true
+          },
+          {
+            "type": "object",
+            "required": ["type","turn","finalScore"],
+            "properties": {
+              "type": { "const": "game-end" },
+              "turn": { "type": "number" },
+              "finalScore": { "type": "number" },
+              "result": { "type": "object" },
+              "timestamp": { "type": "string" }
             },
             "additionalProperties": true
           },
@@ -52,7 +77,8 @@
             "properties": {
               "type": { "const": "undo" },
               "turn": { "type": "number" },
-              "reversedAction": { "type": "object" }
+              "reversedAction": { "type": "object" },
+              "timestamp": { "type": "string" }
             },
             "additionalProperties": true
           },
@@ -62,7 +88,19 @@
             "properties": {
               "type": { "const": "redo" },
               "turn": { "type": "number" },
-              "reappliedAction": { "type": "object" }
+              "reappliedAction": { "type": "object" },
+              "timestamp": { "type": "string" }
+            },
+            "additionalProperties": true
+          },
+          {
+            "type": "object",
+            "required": ["type","turn"],
+            "properties": {
+              "type": { "const": "info" },
+              "turn": { "type": "number" },
+              "message": { "type": "string" },
+              "timestamp": { "type": "string" }
             },
             "additionalProperties": true
           }

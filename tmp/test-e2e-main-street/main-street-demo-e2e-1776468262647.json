@@ -1,0 +1,113 @@
+{
+  "game": "main-street",
+  "version": "1.0.0",
+  "seed": "e2e-1776468262647",
+  "startedAt": "2026-04-17T23:24:23.943Z",
+  "endedAt": "2026-04-17T23:24:23.947Z",
+  "totalTurns": 6,
+  "result": "loss",
+  "endReason": "bankruptcy",
+  "finalScore": 39,
+  "turns": [
+    {
+      "turn": 1,
+      "actions": [
+        {
+          "type": "buy-business",
+          "detail": "biz-food-truck-1 -> slot 0"
+        },
+        {
+          "type": "buy-event",
+          "detail": "evt-grand-opening-19"
+        }
+      ],
+      "income": 0,
+      "incident": "Food Critic Visit",
+      "incidentQueueSize": 2,
+      "coinsAfter": 3,
+      "reputationAfter": 4,
+      "score": 23,
+      "gridOccupied": 1
+    },
+    {
+      "turn": 2,
+      "actions": [
+        {
+          "type": "skip",
+          "detail": "No affordable actions"
+        }
+      ],
+      "income": 0,
+      "incident": "Power Outage",
+      "incidentQueueSize": 2,
+      "coinsAfter": 1,
+      "reputationAfter": 4,
+      "score": 21,
+      "gridOccupied": 1
+    },
+    {
+      "turn": 3,
+      "actions": [
+        {
+          "type": "skip",
+          "detail": "No affordable actions"
+        }
+      ],
+      "income": 0,
+      "incident": "Viral Review",
+      "incidentQueueSize": 2,
+      "coinsAfter": 3,
+      "reputationAfter": 5,
+      "score": 28,
+      "gridOccupied": 1
+    },
+    {
+      "turn": 4,
+      "actions": [
+        {
+          "type": "buy-event",
+          "detail": "evt-wellness-fair-22"
+        }
+      ],
+      "income": 0,
+      "incident": "Pipe Burst",
+      "incidentQueueSize": 2,
+      "coinsAfter": 0,
+      "reputationAfter": 5,
+      "score": 25,
+      "gridOccupied": 1
+    },
+    {
+      "turn": 5,
+      "actions": [
+        {
+          "type": "skip",
+          "detail": "No affordable actions"
+        }
+      ],
+      "income": 0,
+      "incident": "Community Award",
+      "incidentQueueSize": 2,
+      "coinsAfter": 0,
+      "reputationAfter": 8,
+      "score": 40,
+      "gridOccupied": 1
+    },
+    {
+      "turn": 6,
+      "actions": [
+        {
+          "type": "skip",
+          "detail": "No affordable actions"
+        }
+      ],
+      "income": 0,
+      "incident": "Rainy Day",
+      "incidentQueueSize": 2,
+      "coinsAfter": -1,
+      "reputationAfter": 8,
+      "score": 39,
+      "gridOccupied": 1
+    }
+  ]
+}

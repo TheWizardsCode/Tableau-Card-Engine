@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "gameType": "main-street",
+  "startedAt": "2026-04-17T23:24:23.943Z",
+  "endedAt": "2026-04-17T23:24:23.947Z",
+  "initialState": {
+    "seed": "e2e-1776468262647"
+  },
+  "events": [
+    {
+      "type": "action",
+      "turn": 1,
+      "action": {
+        "type": "buy-business",
+        "detail": "biz-food-truck-1 -> slot 0"
+      }
+    },
+    {
+      "type": "action",
+      "turn": 1,
+      "action": {
+        "type": "buy-event",
+        "detail": "evt-grand-opening-19"
+      }
+    },
+    {
+      "type": "turn-end",
+      "turn": 1
+    },
+    {
+      "type": "action",
+      "turn": 2,
+      "action": {
+        "type": "skip",
+        "detail": "No affordable actions"
+      }
+    },
+    {
+      "type": "turn-end",
+      "turn": 2
+    },
+    {
+      "type": "action",
+      "turn": 3,
+      "action": {
+        "type": "skip",
+        "detail": "No affordable actions"
+      }
+    },
+    {
+      "type": "turn-end",
+      "turn": 3
+    },
+    {
+      "type": "action",
+      "turn": 4,
+      "action": {
+        "type": "buy-event",
+        "detail": "evt-wellness-fair-22"
+      }
+    },
+    {
+      "type": "turn-end",
+      "turn": 4
+    },
+    {
+      "type": "action",
+      "turn": 5,
+      "action": {
+        "type": "skip",
+        "detail": "No affordable actions"
+      }
+    },
+    {
+      "type": "turn-end",
+      "turn": 5
+    },
+    {
+      "type": "action",
+      "turn": 6,
+      "action": {
+        "type": "skip",
+        "detail": "No affordable actions"
+      }
+    },
+    {
+      "type": "turn-end",
+      "turn": 6
+    },
+    {
+      "type": "game-end",
+      "turn": 6,
+      "finalScore": 39,
+      "result": {
+        "outcome": "loss"
+      },
+      "endReason": "bankruptcy"
+    }
+  ],
+  "results": {
+    "finalScore": 39,
+    "result": "loss",
+    "endReason": "bankruptcy"
+  }
+}

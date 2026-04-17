@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "gameType": "main-street",
+  "startedAt": "2026-04-17T23:15:41.888Z",
+  "endedAt": "2026-04-17T23:15:41.890Z",
+  "initialState": {
+    "seed": "e2e-1776467740991"
+  },
+  "events": [
+    {
+      "type": "action",
+      "turn": 1,
+      "action": {
+        "type": "buy-business",
+        "detail": "biz-arcade-0 -> slot 0"
+      }
+    },
+    {
+      "type": "turn-end",
+      "turn": 1
+    },
+    {
+      "type": "action",
+      "turn": 2,
+      "action": {
+        "type": "skip",
+        "detail": "No affordable actions"
+      }
+    },
+    {
+      "type": "turn-end",
+      "turn": 2
+    },
+    {
+      "type": "action",
+      "turn": 3,
+      "action": {
+        "type": "skip",
+        "detail": "No affordable actions"
+      }
+    },
+    {
+      "type": "turn-end",
+      "turn": 3
+    },
+    {
+      "type": "action",
+      "turn": 4,
+      "action": {
+        "type": "skip",
+        "detail": "No affordable actions"
+      }
+    },
+    {
+      "type": "turn-end",
+      "turn": 4
+    },
+    {
+      "type": "game-end",
+      "turn": 4,
+      "finalScore": 1,
+      "result": {
+        "outcome": "loss"
+      },
+      "endReason": "reputation_collapse"
+    }
+  ],
+  "results": {
+    "finalScore": 1,
+    "result": "loss",
+    "endReason": "reputation_collapse"
+  }
+}
