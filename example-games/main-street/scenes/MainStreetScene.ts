@@ -83,24 +83,24 @@ const BOX_STROKE = 0x665544;
 const BOX_FILL = 0x2a1f14;
 const BOX_RADIUS = 6;
 
-// Base metrics - used by computeLayout for non-compact viewports
-const BASE_MARKET_CARD_W = 120;
-const BASE_MARKET_CARD_H = 64;
-const BASE_MARKET_ROW_GAP = 6;
-const BASE_MARKET_CARD_GAP = 10;
-const BASE_MARKET_LABEL_W = 70;
-const BASE_QUEUE_CARD_W = 100;
-const BASE_QUEUE_CARD_H = 52;
-const BASE_QUEUE_CARD_GAP = 8;
-const BASE_SLOT_W = 88;
-const BASE_SLOT_H = 86;
-const BASE_SLOT_GAP = 6;
+// Base metrics are tuned for 1280x720 and scaled at runtime for narrower/taller viewports.
+const BASE_HUD_Y = 50;
+const BASE_MARKET_CARD_W = 140;
+const BASE_MARKET_CARD_H = 80;
+const BASE_MARKET_ROW_GAP = 10;
+const BASE_MARKET_CARD_GAP = 12;
+const BASE_MARKET_LABEL_W = 90;
+const BASE_QUEUE_CARD_W = 132;
+const BASE_QUEUE_CARD_H = 64;
+const BASE_QUEUE_CARD_GAP = 10;
+const BASE_SLOT_W = 96;
+const BASE_SLOT_H = 100;
+const BASE_SLOT_GAP = 10;
 const STREET_COLS = 5;
 const STREET_ROWS = 2;
-const STREET_ROW_GAP = 8;
-const BASE_HAND_CARD_W = 130;
-const BASE_HAND_CARD_H = 72;
-const BASE_HUD_Y = 50;
+const STREET_ROW_GAP = 12;
+const BASE_HAND_CARD_W = 150;
+const BASE_HAND_CARD_H = 90;
 
 // Activity Log panel layout
 const LOG_TITLE_H = 22;
@@ -374,54 +374,48 @@ export class MainStreetScene extends CardGameScene {
   private computeLayout(): SceneLayout {
     const gameW = Math.max(720, Math.floor(this.scale.width || GAME_W));
     const gameH = Math.max(640, Math.floor(this.scale.height || GAME_H));
-    const compact = gameW < 900;
+    const compact = gameW < 1100;
 
-    const margin = compact ? 12 : 16;
+    const margin = compact ? 16 : 20;
+    const marketCardW = compact ? 126 : BASE_MARKET_CARD_W;
+    const marketCardH = compact ? 72 : BASE_MARKET_CARD_H;
+    const marketLabelW = compact ? 80 : BASE_MARKET_LABEL_W;
+    const marketRowGap = BASE_MARKET_ROW_GAP;
+    const marketRowH = marketCardH + 14;
+    const marketTop = 90;
 
-    // Market - smaller and higher
-    const marketCardW = compact ? 100 : 120;
-    const marketCardH = compact ? 56 : 64;
-    const marketLabelW = compact ? 60 : 70;
-    const marketRowGap = 6;
-    const marketRowH = marketCardH + 10;
-    const marketTop = 68;
+    const queueCardW = compact ? 116 : BASE_QUEUE_CARD_W;
+    const queueCardH = compact ? 58 : BASE_QUEUE_CARD_H;
+    const queueCardGap = compact ? 8 : BASE_QUEUE_CARD_GAP;
+    const queueTop = marketTop + (2 * marketRowH + marketRowGap + 20) + 12;
 
-    // Incident queue - to the right of the main area
-    const queueCardW = compact ? 90 : 100;
-    const queueCardH = compact ? 46 : 52;
-    const queueCardGap = compact ? 6 : 8;
-    const queueTop = marketTop;
-
-    // Street - moved up
-    const slotGap = compact ? 4 : 6;
-    const slotW = compact ? 72 : 88;
-    const slotH = compact ? 74 : 86;
-    const streetCols = STREET_COLS;
-    const streetTotalW = streetCols * slotW + (streetCols - 1) * slotGap;
+    const slotGap = compact ? 8 : BASE_SLOT_GAP;
+    const slotW = compact ? 88 : BASE_SLOT_W;
+    const slotH = compact ? 92 : BASE_SLOT_H;
+    const streetTotalW = STREET_COLS * slotW + (STREET_COLS - 1) * slotGap;
     const streetX = (gameW - streetTotalW) / 2;
-    const streetTop = queueTop + queueCardH + 10;
+    const streetTop = queueTop + queueCardH + 2;
 
-    // Hand at bottom
-    const handCardW = compact ? 110 : 130;
-    const handCardH = compact ? 60 : 72;
-    const handY = gameH - margin - handCardH;
-    const instructionY = handY - 18;
+    const handCardW = compact ? 132 : BASE_HAND_CARD_W;
+    const handCardH = compact ? 78 : BASE_HAND_CARD_H;
+    const handY = gameH - handCardH - 24;
+    const instructionY = handY - 22;
 
-    // Action buttons
-    const actionButtonH = compact ? 28 : 30;
-    const actionY = gameH - margin - actionButtonH;
+    const actionButtonH = compact ? 32 : 34;
+    const actionY = gameH - actionButtonH - 20;
 
-    // Challenge panel above hand
-    const challengeW = Math.min(520, gameW - handCardW - margin * 3 - 140);
-    const challengeX = handCardW + margin + 16;
-    const challengeY = handY - 10;
+    const challengeW = compact ? 500 : 560;
+    const challengeX = handCardW + margin + 24;
+    const challengeY = handY - 80; // position above hand
 
-    // Activity log on right
-    const logW = compact ? 280 : 340;
-    const logX = gameW - margin - logW;
-    const logY = marketTop;
-    const logH = Math.max(120, Math.min(180, challengeY - logY - 8));
-    const logVisible = !compact && gameW > 1000;
+    const logW = compact ? 360 : 430;
+    const logX = compact ? 540 : gameW - margin - logW;
+    const logY = compact ? queueTop : Math.max(queueTop, challengeY + 28);
+    const logH = Math.max(
+      compact ? 180 : 200,
+      Math.min(260, Math.floor(gameH - logY - 60))
+    );
+    const logVisible = compact || logY < gameH - 140;
 
     return {
       gameW,
@@ -446,7 +440,7 @@ export class MainStreetScene extends CardGameScene {
       streetX,
       streetRowGap: STREET_ROW_GAP,
       streetCols: STREET_COLS,
-      handY: handY,
+      handY: compact ? handY : handY + handCardH + 16,
       handCardW,
       handCardH,
       instructionY,
