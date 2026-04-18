@@ -61,6 +61,8 @@ test-results/
 ##################################
 # Runtime Data (transcripts, screenshots, etc.)
 ##################################
+# Temporary runtime artifacts used by tests and local runs - do not commit
+tmp/
 data/
 results/
 
