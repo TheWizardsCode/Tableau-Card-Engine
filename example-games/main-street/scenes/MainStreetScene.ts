@@ -91,7 +91,7 @@ const BASE_MARKET_ROW_GAP = 10;
 const BASE_MARKET_CARD_GAP = 12;
 const BASE_MARKET_LABEL_W = 90;
 const BASE_QUEUE_CARD_W = 132;
-const BASE_QUEUE_CARD_H = 64;
+const BASE_QUEUE_CARD_H = 72;
 const BASE_QUEUE_CARD_GAP = 10;
 const BASE_SLOT_W = 96;
 const BASE_SLOT_H = 100;
@@ -385,7 +385,7 @@ export class MainStreetScene extends CardGameScene {
     const marketTop = 90;
 
     const queueCardW = compact ? 116 : BASE_QUEUE_CARD_W;
-    const queueCardH = compact ? 58 : BASE_QUEUE_CARD_H;
+    const queueCardH = compact ? 64 : BASE_QUEUE_CARD_H;
     const queueCardGap = compact ? 8 : BASE_QUEUE_CARD_GAP;
     const queueTop = marketTop + (2 * marketRowH + marketRowGap + 20) + 12;
 
@@ -440,7 +440,7 @@ export class MainStreetScene extends CardGameScene {
       streetX,
       streetRowGap: STREET_ROW_GAP,
       streetCols: STREET_COLS,
-      handY: compact ? handY : handY + handCardH + 16,
+      handY: handY,
       handCardW,
       handCardH,
       instructionY,
