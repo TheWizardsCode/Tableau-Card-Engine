@@ -222,6 +222,23 @@ export class MainStreetScene extends CardGameScene {
     super({ key: 'MainStreetScene' });
   }
 
+  // Preload placeholder SVG used for visual scale testing in the market
+  preload(): void {
+    // Canonical card size (140x190) — loader will keep vector fidelity and
+    // we scale when rendering into market slots.
+    try {
+      this.load.svg('ms_placeholder_card', 'assets/games/main-street/svg/placeholder-card.svg', {
+        width: 140,
+        height: 190,
+      });
+    } catch (e) {
+      // If svg loader is unavailable in the current environment, ignore
+      // the error — tests can still validate the file on disk.
+      // eslint-disable-next-line no-console
+      console.debug('[MS] preload: svg load failed', e);
+    }
+  }
+
   // ── Create ──────────────────────────────────────────────
 
   create(): void {
@@ -834,8 +851,38 @@ export class MainStreetScene extends CardGameScene {
       const card = cards[i];
 
       if (card) {
-        const cardObj = this.drawMarketCard(cx, y, card, onClick);
-        this.marketContainer.add(cardObj);
+        // If a placeholder texture is available, render it in the first slot
+        // so developers can visually validate SVG scaling. Otherwise fall back
+        // to the normal drawMarketCard rendering.
+        if (i === 0 && this.textures && this.textures.exists && this.textures.exists('ms_placeholder_card')) {
+          const container = this.add.container(cx + MARKET_CARD_W / 2, y + MARKET_CARD_H / 2);
+          const img = this.add.image(0, 0, 'ms_placeholder_card')
+            .setDisplaySize(MARKET_CARD_W - 4, MARKET_CARD_H - 4);
+          container.add(img);
+
+          // Add a simple label so the card still shows its name/cost
+          const labelStr = cardLabel(card);
+          const nameText = this.add.text(0, -MARKET_CARD_H / 2 + 10, labelStr, {
+            fontSize: '12px', fontStyle: 'bold', color: '#ffffff', fontFamily: FONT_FAMILY,
+            wordWrap: { width: MARKET_CARD_W - 12 },
+            align: 'center',
+          }).setOrigin(0.5, 0);
+          container.add(nameText);
+
+          // Make it interactive like the regular card if applicable
+          const isIncidentEvent = card.family === 'event' && (card as EventCard).trigger === 'Incident';
+          if (this.uiPhase === 'market' && !isIncidentEvent) {
+            img.setInteractive({ useHandCursor: true });
+            img.on('pointerdown', () => onClick(card));
+            img.on('pointerover', () => container.setScale(1.03));
+            img.on('pointerout', () => container.setScale(1.0));
+          }
+
+          this.marketContainer.add(container);
+        } else {
+          const cardObj = this.drawMarketCard(cx, y, card, onClick);
+          this.marketContainer.add(cardObj);
+        }
       } else {
         // Empty slot
         const empty = this.add.rectangle(
