@@ -856,8 +856,14 @@ export class MainStreetScene extends CardGameScene {
         // to the normal drawMarketCard rendering.
         if (i === 0 && this.textures && this.textures.exists && this.textures.exists('ms_placeholder_card')) {
           const container = this.add.container(cx + MARKET_CARD_W / 2, y + MARKET_CARD_H / 2);
-          const img = this.add.image(0, 0, 'ms_placeholder_card')
-            .setDisplaySize(MARKET_CARD_W - 4, MARKET_CARD_H - 4);
+          const img = this.add.image(0, 0, 'ms_placeholder_card');
+          // Preserve source aspect ratio when fitting into the slot.
+          const SRC_W = 140;
+          const SRC_H = 190;
+          const fitW = MARKET_CARD_W - 4;
+          const fitH = MARKET_CARD_H - 4;
+          const scale = Math.min(fitW / SRC_W, fitH / SRC_H);
+          img.setDisplaySize(Math.round(SRC_W * scale), Math.round(SRC_H * scale));
           container.add(img);
 
           // Add a simple label so the card still shows its name/cost

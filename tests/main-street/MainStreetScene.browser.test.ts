@@ -75,4 +75,35 @@ describe('MainStreetScene browser tests', () => {
 
     expect(textEntries.some((entry) => entry.text === 'Turn 2')).toBe(true);
   });
+
+  it('loads placeholder texture and renders it without squashing', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown> & { marketContainer?: Phaser.GameObjects.Container };
+
+    // Texture should be loaded by preload
+    expect((scene.textures as Phaser.Textures.TextureManager).exists('ms_placeholder_card')).toBe(true);
+
+    // Look for image in marketContainer with that texture key
+    const market = scene.marketContainer as Phaser.GameObjects.Container;
+    const imgs = market.list.filter((obj) => obj instanceof Phaser.GameObjects.Container) as Phaser.GameObjects.Container[];
+    let found = false;
+    for (const c of imgs) {
+      const childImg = c.list.find((o) => (o as Phaser.GameObjects.Image).texture && (o as Phaser.GameObjects.Image).texture.key === 'ms_placeholder_card');
+      if (childImg) {
+        found = true;
+        const img = childImg as Phaser.GameObjects.Image;
+        // The image should preserve aspect ratio relative to canonical 140x190
+        const srcW = 140;
+        const srcH = 190;
+        const displayedW = img.displayWidth;
+        const displayedH = img.displayHeight;
+        const srcRatio = srcW / srcH;
+        const dispRatio = Math.round((displayedW / displayedH) * 1000) / 1000;
+        const expectedRatio = Math.round(srcRatio * 1000) / 1000;
+        expect(Math.abs(dispRatio - expectedRatio)).toBeLessThan(0.02);
+        break;
+      }
+    }
+    expect(found).toBe(true);
+  });
 });
