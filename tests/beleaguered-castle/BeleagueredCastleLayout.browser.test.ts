@@ -88,7 +88,7 @@ function getSceneInternals(scene: Phaser.Scene): {
   foundationDropZones: Phaser.GameObjects.Zone[];
   tableauDropZones: Phaser.GameObjects.Zone[];
 } {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   return scene as any;
 }
 

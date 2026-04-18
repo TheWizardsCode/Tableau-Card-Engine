@@ -13,7 +13,7 @@ function usage() {
 
 function parseArgs() {
   const args = process.argv.slice(2);
-  const out: any = { sizes: [] };
+  const out = { sizes: [] };
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === '--src') out.src = args[++i];
@@ -43,7 +43,7 @@ async function main() {
     const srcPath = path.join(svgDir, file);
     const base = file.replace(/\.svg$/, '');
     for (const size of opts.sizes) {
-      const [w, h] = size.split('x').map((s: string) => parseInt(s, 10));
+      const [w, h] = size.split('x').map((s) => parseInt(s, 10));
       const outPath = path.join(outDir, `${base}-${w}x${h}.png`);
       try {
         await sharp(srcPath)

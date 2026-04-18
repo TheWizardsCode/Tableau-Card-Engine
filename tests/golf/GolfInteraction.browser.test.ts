@@ -81,7 +81,7 @@ function getSceneInternals(scene: Phaser.Scene): {
   instructionText: Phaser.GameObjects.Text;
   turnText: Phaser.GameObjects.Text;
 } {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   return scene as any;
 }
 

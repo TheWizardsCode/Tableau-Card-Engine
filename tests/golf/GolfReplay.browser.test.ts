@@ -88,7 +88,7 @@ function getSceneInternals(scene: Phaser.Scene): {
   enableInteractiveMode: (options: { nextPlayer: number }) => void;
   showTakeoverOverlay: (options: { turnNumber: number; lastAction: string }) => void;
 } {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   return scene as any;
 }
 

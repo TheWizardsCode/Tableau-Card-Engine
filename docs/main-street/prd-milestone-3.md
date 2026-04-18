@@ -637,7 +637,7 @@ The following tasks represent a suggested implementation order. Each task should
 
 | Dependency | Work Item | Notes |
 |------------|-----------|-------|
-| M4 -- Visual Polish | CG-0MM4RF91E1LR5RSY | Will polish hint and undo/redo UI |
+| M4 -- Visual Polish | CG-0MM4RF91E1LR5RSY | Will polish hint and undo/redo UI. Acceptance: produce and commit the finalized Main Street menu thumbnail (public/assets/games/main-street/thumbnail.png) generated from replay screenshots; include the fixture transcript (tests/fixtures/transcripts/main-street/fixture-game.json) and a registered ReplayAdapter so thumbnails can be regenerated; update Game Selector to reference the thumbnail. |
 | M5 -- Tutorial, Onboarding | CG-0MM4RFN5N0KTUR66 | May use hints as part of tutorial flow |
 | M6 -- Engine Extraction | CG-0MM4RG1GM0SRVENC | May extract hint generation pattern as engine component |
 

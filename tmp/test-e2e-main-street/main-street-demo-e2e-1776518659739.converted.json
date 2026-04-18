@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "gameType": "main-street",
+  "startedAt": "2026-04-18T13:24:21.322Z",
+  "endedAt": "2026-04-18T13:24:21.328Z",
+  "initialState": {
+    "seed": "e2e-1776518659739"
+  },
+  "events": [
+    {
+      "type": "action",
+      "turn": 1,
+      "action": {
+        "type": "buy-business",
+        "detail": "biz-florist-1 -> slot 0"
+      }
+    },
+    {
+      "type": "action",
+      "turn": 1,
+      "action": {
+        "type": "buy-event",
+        "detail": "evt-festival-2"
+      }
+    },
+    {
+      "type": "turn-end",
+      "turn": 1
+    },
+    {
+      "type": "action",
+      "turn": 2,
+      "action": {
+        "type": "skip",
+        "detail": "No affordable actions"
+      }
+    },
+    {
+      "type": "turn-end",
+      "turn": 2
+    },
+    {
+      "type": "action",
+      "turn": 3,
+      "action": {
+        "type": "buy-event",
+        "detail": "evt-wellness-fair-21"
+      }
+    },
+    {
+      "type": "turn-end",
+      "turn": 3
+    },
+    {
+      "type": "game-end",
+      "turn": 3,
+      "finalScore": 12,
+      "result": {
+        "outcome": "loss"
+      },
+      "endReason": "bankruptcy"
+    }
+  ],
+  "results": {
+    "finalScore": 12,
+    "result": "loss",
+    "endReason": "bankruptcy"
+  }
+}

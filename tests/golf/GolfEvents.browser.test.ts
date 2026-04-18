@@ -69,7 +69,7 @@ function getSceneInternals(scene: Phaser.Scene): {
   discardSprite: Phaser.GameObjects.Image;
   gameEvents: GameEventEmitter;
 } {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   return scene as any;
 }
 
@@ -216,9 +216,9 @@ describe('GolfScene event integration', () => {
 
     // Force the game to end by setting phase and revealing all cards
     const gs = internals.session.gameState;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     (gs as any).phase = 'ended';
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const sceneAny = scene as any;
     // Reveal all cards so scoring works
     for (let p = 0; p < 2; p++) {

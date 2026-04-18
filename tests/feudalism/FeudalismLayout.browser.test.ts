@@ -89,7 +89,7 @@ function getSceneInternals(scene: Phaser.Scene): {
     actionButtonH: number;
   };
 } {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   return scene as any;
 }
 
@@ -107,7 +107,7 @@ function containerBounds(
   let maxX = -Infinity;
   let maxY = -Infinity;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   function processObject(obj: any, offsetX: number, offsetY: number): void {
     if (obj instanceof Phaser.GameObjects.Container) {
       for (const child of obj.list) {

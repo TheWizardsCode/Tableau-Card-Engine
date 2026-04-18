@@ -3,7 +3,7 @@ windows:
   - name: "TCE"
     cwd: "~/projects/Tableau-Card-Engine"
     panes:
-      - cmd: "opencode -c"
+      - cmd: "pi --continue"
       - cmd: "wl tui"
         split:
           dir: vertical

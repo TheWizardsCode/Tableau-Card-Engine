@@ -163,7 +163,7 @@ function runSeed(seed: string, maxTurns: number, strategy: MonteCarloStrategy): 
         // Record AI action in transcript (if recorder is present)
         try {
           // recordMainStreetEvent is imported lazily to avoid circular deps when not present
-          // eslint-disable-next-line @typescript-eslint/no-var-requires
+           
           const { recordMainStreetEvent } = require('./MainStreetTranscript');
           recordMainStreetEvent({ type: 'ai-action', turn: state.turn, strategy: aiPlayer.strategy.name, action });
         } catch (_) {

@@ -60,7 +60,7 @@ function waitFrames(n: number): Promise<void> {
  * Get scene private properties via type-safe cast.
  */
 function getSceneInternals(scene: Phaser.Scene) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   return scene as any;
 }
 

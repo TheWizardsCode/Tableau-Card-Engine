@@ -668,7 +668,7 @@ export class SushiGoScene extends CardGameScene {
           // If anything goes wrong, fall back to the simple label
           // computed from the group's cards to keep UI stable.
           // (This should not normally happen.)
-          // eslint-disable-next-line no-console
+           
           console.warn('Failed to compute breakdown for tableau labels', e);
           labelText = this.getTypeGroupLabel(type, cards);
         }
