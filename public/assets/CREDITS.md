@@ -2,6 +2,13 @@
 
 All assets in this directory are licensed for free commercial use.
 
+## Canonical card art (project standard)
+
+- Orientation: portrait
+- Canonical pixel size (source SVGs): 140 × 190 px
+
+Rendering guidance: The project's canonical card art is 140×190 (portrait). All runtime renderers should preserve aspect ratio (fit-inside) when deriving thumbnails for market slots, street slots, hand sprites, and UI components. See `docs/main-street/card-dimensions.md` for recommended mappings and Phaser examples.
+
 ## Playing Card Assets
 
 52 card face SVGs and 1 card back SVG sourced from:
