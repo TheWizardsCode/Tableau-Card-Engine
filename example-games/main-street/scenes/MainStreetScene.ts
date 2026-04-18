@@ -90,8 +90,9 @@ const BASE_MARKET_CARD_H = 80;
 const BASE_MARKET_ROW_GAP = 10;
 const BASE_MARKET_CARD_GAP = 12;
 const BASE_MARKET_LABEL_W = 90;
-const BASE_QUEUE_CARD_W = 132;
-const BASE_QUEUE_CARD_H = 64;
+// Incident queue uses same card size as market for consistency
+const BASE_QUEUE_CARD_W = BASE_MARKET_CARD_W;
+const BASE_QUEUE_CARD_H = BASE_MARKET_CARD_H;
 const BASE_QUEUE_CARD_GAP = 10;
 const BASE_SLOT_W = 96;
 const BASE_SLOT_H = 100;
@@ -146,6 +147,7 @@ interface SceneLayout {
   streetRowGap: number;
   streetCols: number;
   handY: number;
+  handX: number;
   handCardW: number;
   handCardH: number;
   instructionY: number;
@@ -384,9 +386,9 @@ export class MainStreetScene extends CardGameScene {
     const marketRowH = marketCardH + 14;
     const marketTop = 90;
 
-    const queueCardW = compact ? 116 : BASE_QUEUE_CARD_W;
-    const queueCardH = compact ? 58 : BASE_QUEUE_CARD_H;
-    const queueCardGap = compact ? 8 : BASE_QUEUE_CARD_GAP;
+    const queueCardW = compact ? 126 : BASE_QUEUE_CARD_W;
+    const queueCardH = compact ? 72 : BASE_QUEUE_CARD_H;
+    const queueCardGap = compact ? 10 : BASE_QUEUE_CARD_GAP;
     const queueTop = marketTop + (2 * marketRowH + marketRowGap + 20) + 12;
 
     const slotGap = compact ? 8 : BASE_SLOT_GAP;
@@ -394,23 +396,25 @@ export class MainStreetScene extends CardGameScene {
     const slotH = compact ? 92 : BASE_SLOT_H;
     const streetTotalW = STREET_COLS * slotW + (STREET_COLS - 1) * slotGap;
     const streetX = (gameW - streetTotalW) / 2;
-    const streetTop = queueTop + queueCardH + 2;
+    const streetTop = queueTop + queueCardH + 22;
 
     const handCardW = compact ? 132 : BASE_HAND_CARD_W;
     const handCardH = compact ? 78 : BASE_HAND_CARD_H;
-    const handY = gameH - handCardH - 24;
-    const instructionY = handY - 22;
+    const handY = gameH - margin - handCardH;
+    const handX = gameW - margin - handCardW / 2;
+    const instructionY = handY - 20;
 
     const actionButtonH = compact ? 32 : 34;
-    const actionY = gameH - actionButtonH - 20;
+    const actionY = gameH - 16 - actionButtonH;
 
-    const challengeW = compact ? 500 : 560;
-    const challengeX = handCardW + margin + 24;
-    const challengeY = handY - 80; // position above hand
+    // Challenge tracker: position between hand and action buttons
+    const challengeW = Math.min(560, gameW - handCardW - margin * 3);
+    const challengeX = gameW - margin - challengeW;
+    const challengeY = queueTop;
 
     const logW = compact ? 360 : 430;
     const logX = compact ? 540 : gameW - margin - logW;
-    const logY = compact ? queueTop : Math.max(queueTop, challengeY + 28);
+    const logY = marketTop;
     const logH = Math.max(
       compact ? 180 : 200,
       Math.min(260, Math.floor(gameH - logY - 60))
@@ -440,7 +444,8 @@ export class MainStreetScene extends CardGameScene {
       streetX,
       streetRowGap: STREET_ROW_GAP,
       streetCols: STREET_COLS,
-      handY: compact ? handY : handY + handCardH + 16,
+      handY: handY,
+      handX,
       handCardW,
       handCardH,
       instructionY,
@@ -1244,7 +1249,7 @@ export class MainStreetScene extends CardGameScene {
     this.handContainer.removeAll(true);
 
     const held = this.state.heldEvent;
-    const { handY, handCardW, handCardH } = this.layout;
+    const { handY, handX, handCardW, handCardH } = this.layout;
 
     // Section label
     const label = this.add.text(40, handY - 10, 'Your Hand', {
@@ -1253,7 +1258,7 @@ export class MainStreetScene extends CardGameScene {
     this.handContainer.add(label);
 
     if (held) {
-      const cardContainer = this.drawHeldEventCard(40, handY, held);
+      const cardContainer = this.drawHeldEventCard(handX, handY, held);
       this.handContainer.add(cardContainer);
     } else {
       // Empty hand slot
