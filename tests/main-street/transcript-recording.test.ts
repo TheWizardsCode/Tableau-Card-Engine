@@ -23,7 +23,9 @@ describe('Main Street transcript recording (action, undo, redo)', () => {
 
     const businessCards = state.market.business;
     expect(businessCards.length).toBeGreaterThan(0);
-    const cardId = businessCards[0].id;
+    // Pick an affordable business card for the test (avoid brittle cost assumptions)
+    const affordable = businessCards.find((b) => b.cost <= state.resourceBank.coins) ?? businessCards[0];
+    const cardId = affordable.id;
     const slot = emptySlots[0];
 
     // Attach a global recorder like the scene does
