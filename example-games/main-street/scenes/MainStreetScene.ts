@@ -83,25 +83,24 @@ const BOX_STROKE = 0x665544;
 const BOX_FILL = 0x2a1f14;
 const BOX_RADIUS = 6;
 
-// Base metrics are tuned for 1280x720 and scaled at runtime for narrower/taller viewports.
-const BASE_HUD_Y = 50;
-const BASE_MARKET_CARD_W = 140;
-const BASE_MARKET_CARD_H = 80;
-const BASE_MARKET_ROW_GAP = 10;
-const BASE_MARKET_CARD_GAP = 12;
-const BASE_MARKET_LABEL_W = 90;
-// Incident queue uses same card size as market for consistency
-const BASE_QUEUE_CARD_W = BASE_MARKET_CARD_W;
-const BASE_QUEUE_CARD_H = BASE_MARKET_CARD_H;
-const BASE_QUEUE_CARD_GAP = 10;
-const BASE_SLOT_W = 96;
-const BASE_SLOT_H = 100;
-const BASE_SLOT_GAP = 10;
+// Base metrics - used by computeLayout for non-compact viewports
+const BASE_MARKET_CARD_W = 120;
+const BASE_MARKET_CARD_H = 64;
+const BASE_MARKET_ROW_GAP = 6;
+const BASE_MARKET_CARD_GAP = 10;
+const BASE_MARKET_LABEL_W = 70;
+const BASE_QUEUE_CARD_W = 100;
+const BASE_QUEUE_CARD_H = 52;
+const BASE_QUEUE_CARD_GAP = 8;
+const BASE_SLOT_W = 88;
+const BASE_SLOT_H = 86;
+const BASE_SLOT_GAP = 6;
 const STREET_COLS = 5;
 const STREET_ROWS = 2;
-const STREET_ROW_GAP = 12;
-const BASE_HAND_CARD_W = 150;
-const BASE_HAND_CARD_H = 90;
+const STREET_ROW_GAP = 8;
+const BASE_HAND_CARD_W = 130;
+const BASE_HAND_CARD_H = 72;
+const BASE_HUD_Y = 50;
 
 // Activity Log panel layout
 const LOG_TITLE_H = 22;
