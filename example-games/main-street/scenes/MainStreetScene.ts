@@ -77,60 +77,32 @@ import { MainStreetTranscriptRecorder, setMainStreetRecorder, recordMainStreetEv
 const BG_COLOR = '#2a1f14';
 
 // ── Layout regions ──────────────────────────────────────────
-// Canvas is 1280 x 720.
-//
-// Top bar (y 0-40):  header (title + menu button)
-// HUD band (y 44-78):  Turn/phase, coins, reputation, score
-// Street (y 90-220):  10 grid slots, horizontally centered
-// Market (y 240-440): 2 rows (business, investments)
-// Incident queue (y 450-530): face-up upcoming incidents
-// Bottom bar (y 550-710): player hand (left), actions (right)
-
-const HUD_Y = 50;
-
-// Street grid
-const STREET_TOP = 100;
-const SLOT_W = 105;
-const SLOT_H = 110;
-const SLOT_GAP = 10;
-const STREET_TOTAL_W = GRID_SIZE * SLOT_W + (GRID_SIZE - 1) * SLOT_GAP;
-const STREET_X = (GAME_W - STREET_TOTAL_W) / 2;
-
-// Market
-const MARKET_TOP = 240;
-const MARKET_ROW_H = 90;
-const MARKET_ROW_GAP = 10;
-const MARKET_CARD_W = 140;
-const MARKET_CARD_H = 80;
-const MARKET_CARD_GAP = 12;
-const MARKET_LABEL_W = 90;
-
-// Incident queue (below market)
-const QUEUE_TOP = 455;
-const QUEUE_CARD_W = 140;
-const QUEUE_CARD_H = 70;
-const QUEUE_CARD_GAP = 12;
-const QUEUE_LABEL_W = MARKET_LABEL_W;
-
-// Player hand (bottom-left)
-const HAND_Y = 570;
-const HAND_CARD_W = 150;
-const HAND_CARD_H = 90;
-
-// Action area (right-aligned)
-const INSTRUCTION_Y = 580;
-const ACTION_Y = 640;
 
 // Section box styling
 const BOX_STROKE = 0x665544;
 const BOX_FILL = 0x2a1f14;
 const BOX_RADIUS = 6;
 
+// Base metrics are tuned for 1280x720 and scaled at runtime for narrower/taller viewports.
+const BASE_HUD_Y = 50;
+const BASE_MARKET_CARD_W = 140;
+const BASE_MARKET_CARD_H = 80;
+const BASE_MARKET_ROW_GAP = 10;
+const BASE_MARKET_CARD_GAP = 12;
+const BASE_MARKET_LABEL_W = 90;
+const BASE_QUEUE_CARD_W = 132;
+const BASE_QUEUE_CARD_H = 64;
+const BASE_QUEUE_CARD_GAP = 10;
+const BASE_SLOT_W = 96;
+const BASE_SLOT_H = 100;
+const BASE_SLOT_GAP = 10;
+const STREET_COLS = 5;
+const STREET_ROWS = 2;
+const STREET_ROW_GAP = 12;
+const BASE_HAND_CARD_W = 150;
+const BASE_HAND_CARD_H = 90;
+
 // Activity Log panel layout
-const LOG_X = 810;
-const LOG_Y = 240;
-const LOG_W = 440;
-const LOG_H = 290;
 const LOG_TITLE_H = 22;
 const LOG_PAD = 8;
 const LOG_FONT_SIZE = 13;
@@ -145,14 +117,51 @@ const LOG_COLORS: Record<string, string> = {
   'turn-header': '#ffdd44',
 };
 
-// Challenge Tracker panel layout (bottom section, between hand and actions)
-const CHALLENGE_X = 230;
-const CHALLENGE_Y = 550;
-const CHALLENGE_W = 560;
+// Challenge Tracker panel layout
 const CHALLENGE_LINE_H = 20;
 const CHALLENGE_PAD = 6;
 const CHALLENGE_TITLE_H = 20;
 
+interface SceneLayout {
+  gameW: number;
+  gameH: number;
+  hudY: number;
+  marketTop: number;
+  marketRowH: number;
+  marketRowGap: number;
+  marketCardW: number;
+  marketCardH: number;
+  marketCardGap: number;
+  marketLabelW: number;
+  queueTop: number;
+  queueCardW: number;
+  queueCardH: number;
+  queueCardGap: number;
+  queueLabelW: number;
+  streetTop: number;
+  slotW: number;
+  slotH: number;
+  slotGap: number;
+  streetX: number;
+  streetRowGap: number;
+  streetCols: number;
+  handY: number;
+  handCardW: number;
+  handCardH: number;
+  instructionY: number;
+  actionY: number;
+  actionButtonH: number;
+  actionButtonW: number;
+  hintButtonW: number;
+  smallButtonW: number;
+  challengeX: number;
+  challengeY: number;
+  challengeW: number;
+  logX: number;
+  logY: number;
+  logW: number;
+  logH: number;
+}
 // ── UI Phase (scene-level interaction state) ────────────────
 
 type UIPhase =
@@ -178,6 +187,9 @@ export class MainStreetScene extends CardGameScene {
 
   // Pending selection for placing a business
   private pendingBusinessCard: BusinessCard | null = null;
+
+  // Computed responsive layout metrics
+  private layout!: SceneLayout;
 
   // Display containers
   private hudContainer!: Phaser.GameObjects.Container;
@@ -285,9 +297,13 @@ export class MainStreetScene extends CardGameScene {
     }
 
     // UI scaffolding
+    this.layout = this.computeLayout();
     this.createHeader();
     this.createContainers();
     this.createInstructions();
+
+    this.scale.off(Phaser.Scale.Events.RESIZE, this.handleResize, this);
+    this.scale.on(Phaser.Scale.Events.RESIZE, this.handleResize, this);
 
     // Help panel
     const helpSections: HelpSection[] = [
@@ -355,6 +371,94 @@ export class MainStreetScene extends CardGameScene {
     createSceneTitle(this, 'Main Street');
   }
 
+  private computeLayout(): SceneLayout {
+    const gameW = Math.max(720, Math.floor(this.scale.width || GAME_W));
+    const gameH = Math.max(640, Math.floor(this.scale.height || GAME_H));
+    const compact = gameW < 1100;
+
+    const margin = compact ? 16 : 20;
+    const marketCardW = compact ? 126 : BASE_MARKET_CARD_W;
+    const marketCardH = compact ? 72 : BASE_MARKET_CARD_H;
+    const marketLabelW = compact ? 80 : BASE_MARKET_LABEL_W;
+    const marketRowGap = BASE_MARKET_ROW_GAP;
+    const marketRowH = marketCardH + 14;
+    const marketTop = 90;
+
+    const queueCardW = compact ? 116 : BASE_QUEUE_CARD_W;
+    const queueCardH = compact ? 58 : BASE_QUEUE_CARD_H;
+    const queueCardGap = compact ? 8 : BASE_QUEUE_CARD_GAP;
+    const queueTop = marketTop + (2 * marketRowH + marketRowGap + 20) + 12;
+
+    const slotGap = compact ? 8 : BASE_SLOT_GAP;
+    const slotW = compact ? 88 : BASE_SLOT_W;
+    const slotH = compact ? 92 : BASE_SLOT_H;
+    const streetTotalW = STREET_COLS * slotW + (STREET_COLS - 1) * slotGap;
+    const streetX = (gameW - streetTotalW) / 2;
+    const streetTop = queueTop + queueCardH + 22;
+
+    const handCardW = compact ? 132 : BASE_HAND_CARD_W;
+    const handCardH = compact ? 78 : BASE_HAND_CARD_H;
+    const handY = gameH - handCardH - 24;
+    const instructionY = handY - 22;
+
+    const actionButtonH = compact ? 32 : 34;
+    const actionY = gameH - actionButtonH - 20;
+
+    const challengeW = compact ? 500 : 560;
+    const challengeX = handCardW + margin + 24;
+    const challengeY = compact ? handY - 8 : handY + handCardH + 12;
+
+    const logW = compact ? 360 : 430;
+    const logX = compact ? 540 : gameW - margin - logW;
+    const logY = compact ? queueTop : Math.max(queueTop, challengeY + 28);
+    const logH = Math.max(
+      compact ? 180 : 200,
+      Math.min(260, Math.floor(gameH - logY - 60))
+    );
+    const logVisible = compact || logY < gameH - 140;
+
+    return {
+      gameW,
+      gameH,
+      hudY: BASE_HUD_Y,
+      marketTop,
+      marketRowH,
+      marketRowGap,
+      marketCardW,
+      marketCardH,
+      marketCardGap: BASE_MARKET_CARD_GAP,
+      marketLabelW,
+      queueTop,
+      queueCardW,
+      queueCardH,
+      queueCardGap,
+      queueLabelW: marketLabelW,
+      streetTop,
+      slotW,
+      slotH,
+      slotGap,
+      streetX,
+      streetRowGap: STREET_ROW_GAP,
+      streetCols: STREET_COLS,
+      handY: compact ? handY : handY + handCardH + 16,
+      handCardW,
+      handCardH,
+      instructionY,
+      actionY,
+      actionButtonH,
+      actionButtonW: compact ? 132 : 140,
+      hintButtonW: compact ? 98 : 104,
+      smallButtonW: compact ? 64 : 68,
+      challengeX,
+      challengeY,
+      challengeW,
+      logX: logVisible ? logX : -1000,
+      logY: logVisible ? logY : 0,
+      logW: logVisible ? logW : 0,
+      logH,
+    };
+  }
+
   private createContainers(): void {
     this.hudContainer = this.add.container(0, 0);
     this.streetContainer = this.add.container(0, 0);
@@ -364,26 +468,26 @@ export class MainStreetScene extends CardGameScene {
     this.actionContainer = this.add.container(0, 0);
 
     // Challenge Tracker panel
-    this.challengeContainer = this.add.container(CHALLENGE_X, CHALLENGE_Y);
+    this.challengeContainer = this.add.container(this.layout.challengeX, this.layout.challengeY);
 
     // Activity Log panel (persistent, not rebuilt each refresh)
-    this.logContainer = this.add.container(LOG_X, LOG_Y);
+    this.logContainer = this.add.container(this.layout.logX, this.layout.logY);
 
     // Panel background
     const bg = this.add.graphics();
     bg.fillStyle(0x1a1408, 0.85);
-    bg.fillRoundedRect(0, 0, LOG_W, LOG_H, 4);
+    bg.fillRoundedRect(0, 0, this.layout.logW, this.layout.logH, 4);
     bg.lineStyle(1, BOX_STROKE, 0.5);
-    bg.strokeRoundedRect(0, 0, LOG_W, LOG_H, 4);
+    bg.strokeRoundedRect(0, 0, this.layout.logW, this.layout.logH, 4);
     this.logContainer.add(bg);
 
     // Title bar
     const titleBg = this.add.graphics();
     titleBg.fillStyle(0x332816, 0.9);
-    titleBg.fillRoundedRect(0, 0, LOG_W, LOG_TITLE_H, { tl: 4, tr: 4, bl: 0, br: 0 });
+    titleBg.fillRoundedRect(0, 0, this.layout.logW, LOG_TITLE_H, { tl: 4, tr: 4, bl: 0, br: 0 });
     this.logContainer.add(titleBg);
 
-    const titleText = this.add.text(LOG_W / 2, LOG_TITLE_H / 2, 'Activity Log', {
+    const titleText = this.add.text(this.layout.logW / 2, LOG_TITLE_H / 2, 'Activity Log', {
       fontSize: '12px', fontStyle: 'bold', color: '#aa9977', fontFamily: FONT_FAMILY,
     }).setOrigin(0.5);
     this.logContainer.add(titleText);
@@ -406,12 +510,20 @@ export class MainStreetScene extends CardGameScene {
 
   private createInstructions(): void {
     this.instructionText = this.add
-      .text(GAME_W - 40, INSTRUCTION_Y, '', {
-        fontSize: '16px',
+      .text(this.layout.gameW - 24, this.layout.instructionY, '', {
+        fontSize: '14px',
         color: '#ccaa77',
         fontFamily: FONT_FAMILY,
       })
       .setOrigin(1, 0.5);
+  }
+
+  private handleResize(): void {
+    this.layout = this.computeLayout();
+    this.challengeContainer.setPosition(this.layout.challengeX, this.layout.challengeY);
+    this.logContainer.setPosition(this.layout.logX, this.layout.logY);
+    this.instructionText.setPosition(this.layout.gameW - 24, this.layout.instructionY);
+    this.refreshAll();
   }
 
   // ── Campaign / Meta-Progression ─────────────────────────
@@ -563,44 +675,45 @@ export class MainStreetScene extends CardGameScene {
 
     const score = computeScore(this.state);
     const { coins, reputation } = this.state.resourceBank;
+    const { gameW, hudY } = this.layout;
 
     // Background strip
-    const strip = this.add.rectangle(GAME_W / 2, HUD_Y, GAME_W - 40, 28, 0x1a1408, 0.6);
+    const strip = this.add.rectangle(gameW / 2, hudY, gameW - 40, 28, 0x1a1408, 0.6);
     strip.setStrokeStyle(1, BOX_STROKE, 0.5);
     this.hudContainer.add(strip);
 
     // Turn
-    const turnText = this.add.text(40, HUD_Y, `Turn ${this.state.turn}/${this.state.config.maxTurns}`, {
+    const turnText = this.add.text(40, hudY, `Turn ${this.state.turn}/${this.state.config.maxTurns}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#ffdd88', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0.5);
     this.hudContainer.add(turnText);
 
     // Phase
-    const phaseText = this.add.text(200, HUD_Y, `Phase: ${this.state.phase}`, {
+    const phaseText = this.add.text(200, hudY, `Phase: ${this.state.phase}`, {
       fontSize: '14px', color: '#aa9977', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0.5);
     this.hudContainer.add(phaseText);
 
     // Difficulty
-    const diffText = this.add.text(420, HUD_Y, `[${this.state.config.difficultyName}]`, {
+    const diffText = this.add.text(420, hudY, `[${this.state.config.difficultyName}]`, {
       fontSize: '13px', color: '#999977', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0.5);
     this.hudContainer.add(diffText);
 
     // Coins
-    const coinText = this.add.text(GAME_W / 2 - 100, HUD_Y, `Coins: ${coins}`, {
+    const coinText = this.add.text(gameW / 2 - 100, hudY, `Coins: ${coins}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#ffcc44', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0.5);
     this.hudContainer.add(coinText);
 
     // Reputation
-    const repText = this.add.text(GAME_W / 2 + 50, HUD_Y, `Rep: ${reputation}`, {
+    const repText = this.add.text(gameW / 2 + 50, hudY, `Rep: ${reputation}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#88bbff', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0.5);
     this.hudContainer.add(repText);
 
     // Score
-    const scoreText = this.add.text(GAME_W - 40, HUD_Y, `Score: ${score}`, {
+    const scoreText = this.add.text(gameW - 40, hudY, `Score: ${score}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#ff8844', fontFamily: FONT_FAMILY,
     }).setOrigin(1, 0.5);
     this.hudContainer.add(scoreText);
@@ -616,24 +729,25 @@ export class MainStreetScene extends CardGameScene {
 
     // Dynamic height based on number of challenges
     const panelH = CHALLENGE_TITLE_H + challenges.length * CHALLENGE_LINE_H + CHALLENGE_PAD * 2;
+    const challengeW = this.layout.challengeW;
 
     // Panel background
     const bg = this.add.graphics();
     bg.fillStyle(0x1a1408, 0.85);
-    bg.fillRoundedRect(0, 0, CHALLENGE_W, panelH, 4);
+    bg.fillRoundedRect(0, 0, challengeW, panelH, 4);
     bg.lineStyle(1, BOX_STROKE, 0.5);
-    bg.strokeRoundedRect(0, 0, CHALLENGE_W, panelH, 4);
+    bg.strokeRoundedRect(0, 0, challengeW, panelH, 4);
     this.challengeContainer.add(bg);
 
     // Title bar
     const titleBg = this.add.graphics();
     titleBg.fillStyle(0x332816, 0.9);
-    titleBg.fillRoundedRect(0, 0, CHALLENGE_W, CHALLENGE_TITLE_H, { tl: 4, tr: 4, bl: 0, br: 0 });
+    titleBg.fillRoundedRect(0, 0, challengeW, CHALLENGE_TITLE_H, { tl: 4, tr: 4, bl: 0, br: 0 });
     this.challengeContainer.add(titleBg);
 
     const completedCount = challenges.filter(ac => ac.completed).length;
     const titleText = this.add.text(
-      CHALLENGE_W / 2, CHALLENGE_TITLE_H / 2,
+      challengeW / 2, CHALLENGE_TITLE_H / 2,
       `Challenges (${completedCount}/${challenges.length})`,
       { fontSize: '11px', fontStyle: 'bold', color: '#aa9977', fontFamily: FONT_FAMILY },
     ).setOrigin(0.5);
@@ -668,13 +782,13 @@ export class MainStreetScene extends CardGameScene {
 
       // Description (right portion of the row)
       const descText = this.add.text(
-        CHALLENGE_W * 0.42, yOff,
+        challengeW * 0.42, yOff,
         ac.challenge.description,
         {
           fontSize: '10px',
           color: isComplete ? '#558855' : '#998877',
           fontFamily: FONT_FAMILY,
-          wordWrap: { width: CHALLENGE_W * 0.56 },
+          wordWrap: { width: challengeW * 0.56 },
         },
       ).setOrigin(0, 0);
       this.challengeContainer.add(descText);
@@ -688,15 +802,19 @@ export class MainStreetScene extends CardGameScene {
   private refreshStreetGrid(): void {
     this.streetContainer.removeAll(true);
 
+    const { gameW, streetTop, streetX, slotW, slotGap, slotH, streetCols, streetRowGap } = this.layout;
+
     // Section label
-    const label = this.add.text(GAME_W / 2, STREET_TOP - 16, 'Your Street', {
+    const label = this.add.text(gameW / 2, streetTop - 16, 'Your Street', {
       fontSize: '14px', fontStyle: 'bold', color: '#aa9966', fontFamily: FONT_FAMILY,
     }).setOrigin(0.5, 1);
     this.streetContainer.add(label);
 
     for (let i = 0; i < GRID_SIZE; i++) {
-      const x = STREET_X + i * (SLOT_W + SLOT_GAP);
-      const y = STREET_TOP;
+      const col = i % streetCols;
+      const row = Math.floor(i / streetCols);
+      const x = streetX + col * (slotW + slotGap);
+      const y = streetTop + row * (slotH + streetRowGap);
       const biz = this.state.streetGrid[i];
 
       if (biz) {
@@ -708,36 +826,37 @@ export class MainStreetScene extends CardGameScene {
   }
 
   private drawBusinessSlot(x: number, y: number, _index: number, biz: BusinessCard): void {
+    const { slotW, slotH } = this.layout;
     const primaryColor = synergyColor(biz.synergyTypes[0]);
     const isHinted = this.hintedSlotIndex === _index;
 
     // Card background
     const bg = this.add.rectangle(
-      x + SLOT_W / 2, y + SLOT_H / 2,
-      SLOT_W, SLOT_H, primaryColor, 0.7,
+      x + slotW / 2, y + slotH / 2,
+      slotW, slotH, primaryColor, 0.7,
     );
     // Highlight the slot if it is the hint target (e.g., upgrade target)
     bg.setStrokeStyle(isHinted ? 3 : 2, isHinted ? 0x44ffff : 0xffffff, isHinted ? 1.0 : 0.4);
     this.streetContainer.add(bg);
 
     // Name
-    const nameText = this.add.text(x + SLOT_W / 2, y + 12, biz.name, {
+    const nameText = this.add.text(x + slotW / 2, y + 12, biz.name, {
       fontSize: '12px', fontStyle: 'bold', color: '#ffffff', fontFamily: FONT_FAMILY,
-      wordWrap: { width: SLOT_W - 8 },
+      wordWrap: { width: slotW - 8 },
       align: 'center',
     }).setOrigin(0.5, 0);
     this.streetContainer.add(nameText);
 
     // Income
     const income = biz.baseIncome + biz.incomeBonus;
-    const incText = this.add.text(x + SLOT_W / 2, y + SLOT_H - 30, `+${income}/turn`, {
+    const incText = this.add.text(x + slotW / 2, y + slotH - 30, `+${income}/turn`, {
       fontSize: '13px', color: '#ffee88', fontFamily: FONT_FAMILY,
     }).setOrigin(0.5, 0);
     this.streetContainer.add(incText);
 
     // Level
     if (biz.level > 0) {
-      const lvlText = this.add.text(x + SLOT_W - 6, y + 4, `Lv${biz.level}`, {
+      const lvlText = this.add.text(x + slotW - 6, y + 4, `Lv${biz.level}`, {
         fontSize: '11px', color: '#ffdd44', fontFamily: FONT_FAMILY,
       }).setOrigin(1, 0);
       this.streetContainer.add(lvlText);
@@ -745,7 +864,7 @@ export class MainStreetScene extends CardGameScene {
 
     // Synergy label at bottom
     const synLabel = biz.synergyTypes.join('/');
-    const synText = this.add.text(x + SLOT_W / 2, y + SLOT_H - 12, synLabel, {
+    const synText = this.add.text(x + slotW / 2, y + slotH - 12, synLabel, {
       fontSize: '10px', color: '#dddddd', fontFamily: FONT_FAMILY,
     }).setOrigin(0.5, 1);
     this.streetContainer.add(synText);
@@ -758,6 +877,7 @@ export class MainStreetScene extends CardGameScene {
   }
 
   private drawEmptySlot(x: number, y: number, index: number): void {
+    const { slotW, slotH } = this.layout;
     const isSelectable = this.uiPhase === 'placing-business';
     const isHinted = this.hintedSlotIndex === index && !isSelectable;
     const fillAlpha = isSelectable ? 0.4 : isHinted ? 0.35 : 0.2;
@@ -765,14 +885,14 @@ export class MainStreetScene extends CardGameScene {
     const strokeWidth = (isSelectable || isHinted) ? 2 : 1;
 
     const bg = this.add.rectangle(
-      x + SLOT_W / 2, y + SLOT_H / 2,
-      SLOT_W, SLOT_H, 0x333322, fillAlpha,
+      x + slotW / 2, y + slotH / 2,
+      slotW, slotH, 0x333322, fillAlpha,
     );
     bg.setStrokeStyle(strokeWidth, strokeColor);
     this.streetContainer.add(bg);
 
     // Slot number
-    const idxText = this.add.text(x + SLOT_W / 2, y + SLOT_H / 2, `${index}`, {
+    const idxText = this.add.text(x + slotW / 2, y + slotH / 2, `${index}`, {
       fontSize: '18px', color: (isSelectable || isHinted) ? '#ffdd44' : '#666655',
       fontFamily: FONT_FAMILY,
     }).setOrigin(0.5);
@@ -792,23 +912,25 @@ export class MainStreetScene extends CardGameScene {
   private refreshMarket(): void {
     this.marketContainer.removeAll(true);
 
+    const { gameW, marketTop, marketRowH, marketRowGap } = this.layout;
+
     // Section background (2 rows: business + investments)
-    const totalH = 2 * MARKET_ROW_H + MARKET_ROW_GAP + 20;
+    const totalH = 2 * marketRowH + marketRowGap + 20;
     const bgBox = this.add.graphics();
     bgBox.fillStyle(BOX_FILL, 0.3);
-    bgBox.fillRoundedRect(20, MARKET_TOP - 10, GAME_W - 40, totalH, BOX_RADIUS);
+    bgBox.fillRoundedRect(20, marketTop - 10, gameW - 40, totalH, BOX_RADIUS);
     bgBox.lineStyle(1, BOX_STROKE, 0.4);
-    bgBox.strokeRoundedRect(20, MARKET_TOP - 10, GAME_W - 40, totalH, BOX_RADIUS);
+    bgBox.strokeRoundedRect(20, marketTop - 10, gameW - 40, totalH, BOX_RADIUS);
     this.marketContainer.add(bgBox);
 
-    const sectionLabel = this.add.text(GAME_W / 2, MARKET_TOP - 4, 'Market', {
+    const sectionLabel = this.add.text(gameW / 2, marketTop - 4, 'Market', {
       fontSize: '13px', fontStyle: 'bold', color: '#887766', fontFamily: FONT_FAMILY,
     }).setOrigin(0.5, 1);
     this.marketContainer.add(sectionLabel);
 
     // Business row
     this.drawMarketRow(
-      MARKET_TOP + 6,
+      marketTop + 6,
       'Business',
       this.state.market.business,
       MARKET_BUSINESS_SLOTS,
@@ -817,7 +939,7 @@ export class MainStreetScene extends CardGameScene {
 
     // Investments row (mixed upgrades + investment events)
     this.drawMarketRow(
-      MARKET_TOP + 6 + MARKET_ROW_H + MARKET_ROW_GAP,
+      marketTop + 6 + marketRowH + marketRowGap,
       'Investments',
       this.state.market.investments,
       MARKET_INVESTMENT_SLOTS,
@@ -838,16 +960,18 @@ export class MainStreetScene extends CardGameScene {
     maxSlots: number,
     onClick: (card: BusinessCard | EventCard | UpgradeCard) => void,
   ): void {
+    const { marketCardW, marketCardH, marketCardGap, marketLabelW } = this.layout;
+
     // Row label
-    const label = this.add.text(40, y + MARKET_CARD_H / 2, rowLabel, {
+    const label = this.add.text(40, y + marketCardH / 2, rowLabel, {
       fontSize: '14px', fontStyle: 'bold', color: '#aa9977', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0.5);
     this.marketContainer.add(label);
 
-    const startX = MARKET_LABEL_W + 50;
+    const startX = marketLabelW + 50;
 
     for (let i = 0; i < maxSlots; i++) {
-      const cx = startX + i * (MARKET_CARD_W + MARKET_CARD_GAP);
+      const cx = startX + i * (marketCardW + marketCardGap);
       const card = cards[i];
 
       if (card) {
@@ -855,22 +979,22 @@ export class MainStreetScene extends CardGameScene {
         // so developers can visually validate SVG scaling. Otherwise fall back
         // to the normal drawMarketCard rendering.
         if (i === 0 && this.textures && this.textures.exists && this.textures.exists('ms_placeholder_card')) {
-          const container = this.add.container(cx + MARKET_CARD_W / 2, y + MARKET_CARD_H / 2);
+          const container = this.add.container(cx + marketCardW / 2, y + marketCardH / 2);
           const img = this.add.image(0, 0, 'ms_placeholder_card');
           // Preserve source aspect ratio when fitting into the slot.
           const SRC_W = 140;
           const SRC_H = 190;
-          const fitW = MARKET_CARD_W - 4;
-          const fitH = MARKET_CARD_H - 4;
+          const fitW = marketCardW - 4;
+          const fitH = marketCardH - 4;
           const scale = Math.min(fitW / SRC_W, fitH / SRC_H);
           img.setDisplaySize(Math.round(SRC_W * scale), Math.round(SRC_H * scale));
           container.add(img);
 
           // Add a simple label so the card still shows its name/cost
           const labelStr = cardLabel(card);
-          const nameText = this.add.text(0, -MARKET_CARD_H / 2 + 10, labelStr, {
+          const nameText = this.add.text(0, -marketCardH / 2 + 10, labelStr, {
             fontSize: '12px', fontStyle: 'bold', color: '#ffffff', fontFamily: FONT_FAMILY,
-            wordWrap: { width: MARKET_CARD_W - 12 },
+            wordWrap: { width: marketCardW - 12 },
             align: 'center',
           }).setOrigin(0.5, 0);
           container.add(nameText);
@@ -892,8 +1016,8 @@ export class MainStreetScene extends CardGameScene {
       } else {
         // Empty slot
         const empty = this.add.rectangle(
-          cx + MARKET_CARD_W / 2, y + MARKET_CARD_H / 2,
-          MARKET_CARD_W, MARKET_CARD_H, 0x222211, 0.3,
+          cx + marketCardW / 2, y + marketCardH / 2,
+          marketCardW, marketCardH, 0x222211, 0.3,
         );
         empty.setStrokeStyle(1, 0x333322);
         this.marketContainer.add(empty);
@@ -901,10 +1025,10 @@ export class MainStreetScene extends CardGameScene {
     }
 
     // Deck count (right side)
-    const deckX = startX + maxSlots * (MARKET_CARD_W + MARKET_CARD_GAP) + 10;
+    const deckX = startX + maxSlots * (marketCardW + marketCardGap) + 10;
     if (rowLabel === 'Business') {
       const deckCount = this.state.decks.business.length;
-      const deckText = this.add.text(deckX, y + MARKET_CARD_H / 2, `Deck: ${deckCount}`, {
+      const deckText = this.add.text(deckX, y + marketCardH / 2, `Deck: ${deckCount}`, {
         fontSize: '12px', color: '#776655', fontFamily: FONT_FAMILY,
       }).setOrigin(0, 0.5);
       this.marketContainer.add(deckText);
@@ -913,7 +1037,7 @@ export class MainStreetScene extends CardGameScene {
       const upgCount = this.state.decks.upgrade.length;
       const evtCount = this.state.decks.event.length;
       const deckText = this.add.text(
-        deckX, y + MARKET_CARD_H / 2,
+        deckX, y + marketCardH / 2,
         `Upg: ${upgCount}  Evt: ${evtCount}`,
         { fontSize: '11px', color: '#776655', fontFamily: FONT_FAMILY },
       ).setOrigin(0, 0.5);
@@ -927,7 +1051,8 @@ export class MainStreetScene extends CardGameScene {
     card: BusinessCard | EventCard | UpgradeCard,
     onClick: (card: BusinessCard | EventCard | UpgradeCard) => void,
   ): Phaser.GameObjects.Container {
-    const container = this.add.container(x + MARKET_CARD_W / 2, y + MARKET_CARD_H / 2);
+    const { marketCardW, marketCardH } = this.layout;
+    const container = this.add.container(x + marketCardW / 2, y + marketCardH / 2);
 
     // Determine if this is a non-purchasable Incident event
     const isIncidentEvent = card.family === 'event' && (card as EventCard).trigger === 'Incident';
@@ -947,7 +1072,7 @@ export class MainStreetScene extends CardGameScene {
 
     // Background
     const fillAlpha = isIncidentEvent ? 0.5 : 0.7;
-    const bg = this.add.rectangle(0, 0, MARKET_CARD_W, MARKET_CARD_H, fillColor, fillAlpha);
+    const bg = this.add.rectangle(0, 0, marketCardW, marketCardH, fillColor, fillAlpha);
     // Hinted cards get a bright cyan border; incident events use their normal border
     const strokeColor = isHinted ? 0x44ffff : (isIncidentEvent ? 0x556688 : 0x888877);
     const strokeWidth = isHinted ? 3 : 1;
@@ -956,11 +1081,11 @@ export class MainStreetScene extends CardGameScene {
 
     // Card label (name + cost for business/upgrade)
     const labelStr = cardLabel(card);
-    const nameText = this.add.text(0, -MARKET_CARD_H / 2 + 10, labelStr, {
+    const nameText = this.add.text(0, -marketCardH / 2 + 10, labelStr, {
       fontSize: '12px', fontStyle: 'bold',
       color: isIncidentEvent ? '#8899bb' : '#ffffff',
       fontFamily: FONT_FAMILY,
-      wordWrap: { width: MARKET_CARD_W - 12 },
+      wordWrap: { width: marketCardW - 12 },
       align: 'center',
     }).setOrigin(0.5, 0);
     container.add(nameText);
@@ -970,7 +1095,7 @@ export class MainStreetScene extends CardGameScene {
       const evt = card as EventCard;
       const triggerColor = isIncidentEvent ? '#6688bb' : '#cc9944';
       const triggerLabel = this.add.text(
-        MARKET_CARD_W / 2 - 4, -MARKET_CARD_H / 2 + 4,
+        marketCardW / 2 - 4, -marketCardH / 2 + 4,
         evt.trigger,
         { fontSize: '9px', fontStyle: 'bold', color: triggerColor, fontFamily: FONT_FAMILY },
       ).setOrigin(1, 0);
@@ -993,10 +1118,10 @@ export class MainStreetScene extends CardGameScene {
       infoStr = `For: ${upg.targetBusiness}`;
     }
 
-    const infoText = this.add.text(0, MARKET_CARD_H / 2 - 18, infoStr, {
+    const infoText = this.add.text(0, marketCardH / 2 - 18, infoStr, {
       fontSize: '11px', color: isIncidentEvent ? '#7788aa' : '#ddddcc',
       fontFamily: FONT_FAMILY,
-      wordWrap: { width: MARKET_CARD_W - 12 },
+      wordWrap: { width: marketCardW - 12 },
       align: 'center',
     }).setOrigin(0.5, 1);
     container.add(infoText);
@@ -1027,37 +1152,39 @@ export class MainStreetScene extends CardGameScene {
     const queue = this.state.incidentQueue;
     const deckRemaining = this.state.decks.event.length;
 
+    const { queueLabelW, queueCardW, queueCardH, queueCardGap, queueTop } = this.layout;
+
     // Section background
-    const queueW = QUEUE_LABEL_W + INCIDENT_QUEUE_SIZE * (QUEUE_CARD_W + QUEUE_CARD_GAP) + 100;
-    const queueH = QUEUE_CARD_H + 24;
+    const queueW = queueLabelW + INCIDENT_QUEUE_SIZE * (queueCardW + queueCardGap) + 100;
+    const queueH = queueCardH + 24;
     const bgBox = this.add.graphics();
     bgBox.fillStyle(0x1a1830, 0.35);
-    bgBox.fillRoundedRect(20, QUEUE_TOP - 10, queueW, queueH, BOX_RADIUS);
+    bgBox.fillRoundedRect(20, queueTop - 10, queueW, queueH, BOX_RADIUS);
     bgBox.lineStyle(1, 0x445577, 0.5);
-    bgBox.strokeRoundedRect(20, QUEUE_TOP - 10, queueW, queueH, BOX_RADIUS);
+    bgBox.strokeRoundedRect(20, queueTop - 10, queueW, queueH, BOX_RADIUS);
     this.incidentQueueContainer.add(bgBox);
 
     // Section label
-    const label = this.add.text(40, QUEUE_TOP + QUEUE_CARD_H / 2 - 2, 'Upcoming\nIncidents', {
+    const label = this.add.text(40, queueTop + queueCardH / 2 - 2, 'Upcoming\nIncidents', {
       fontSize: '13px', fontStyle: 'bold', color: '#7788aa', fontFamily: FONT_FAMILY,
       align: 'center',
     }).setOrigin(0, 0.5);
     this.incidentQueueContainer.add(label);
 
-    const startX = QUEUE_LABEL_W + 50;
+    const startX = queueLabelW + 50;
 
     for (let i = 0; i < INCIDENT_QUEUE_SIZE; i++) {
-      const cx = startX + i * (QUEUE_CARD_W + QUEUE_CARD_GAP);
+      const cx = startX + i * (queueCardW + queueCardGap);
       const card = queue[i];
 
       if (card) {
-        const cardContainer = this.drawIncidentCard(cx, QUEUE_TOP, card);
+        const cardContainer = this.drawIncidentCard(cx, queueTop, card);
         this.incidentQueueContainer.add(cardContainer);
       } else {
         // Empty queue slot
         const empty = this.add.rectangle(
-          cx + QUEUE_CARD_W / 2, QUEUE_TOP + QUEUE_CARD_H / 2,
-          QUEUE_CARD_W, QUEUE_CARD_H, 0x111122, 0.3,
+          cx + queueCardW / 2, queueTop + queueCardH / 2,
+          queueCardW, queueCardH, 0x111122, 0.3,
         );
         empty.setStrokeStyle(1, 0x223344);
         this.incidentQueueContainer.add(empty);
@@ -1065,8 +1192,8 @@ export class MainStreetScene extends CardGameScene {
     }
 
     // Deck count
-    const deckX = startX + INCIDENT_QUEUE_SIZE * (QUEUE_CARD_W + QUEUE_CARD_GAP) + 10;
-    const deckText = this.add.text(deckX, QUEUE_TOP + QUEUE_CARD_H / 2, `Deck: ${deckRemaining}`, {
+    const deckX = startX + INCIDENT_QUEUE_SIZE * (queueCardW + queueCardGap) + 10;
+    const deckText = this.add.text(deckX, queueTop + queueCardH / 2, `Deck: ${deckRemaining}`, {
       fontSize: '11px', color: '#556677', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0.5);
     this.incidentQueueContainer.add(deckText);
@@ -1077,18 +1204,19 @@ export class MainStreetScene extends CardGameScene {
     y: number,
     card: EventCard,
   ): Phaser.GameObjects.Container {
-    const container = this.add.container(x + QUEUE_CARD_W / 2, y + QUEUE_CARD_H / 2);
+    const { queueCardW, queueCardH } = this.layout;
+    const container = this.add.container(x + queueCardW / 2, y + queueCardH / 2);
 
     // Indigo background (non-interactive)
-    const bg = this.add.rectangle(0, 0, QUEUE_CARD_W, QUEUE_CARD_H, 0x2B3A67, 0.5);
+    const bg = this.add.rectangle(0, 0, queueCardW, queueCardH, 0x2B3A67, 0.5);
     bg.setStrokeStyle(1, 0x556688);
     container.add(bg);
 
     // Card name
-    const nameText = this.add.text(0, -QUEUE_CARD_H / 2 + 8, cardLabel(card), {
+    const nameText = this.add.text(0, -queueCardH / 2 + 8, cardLabel(card), {
       fontSize: '11px', fontStyle: 'bold', color: '#8899bb',
       fontFamily: FONT_FAMILY,
-      wordWrap: { width: QUEUE_CARD_W - 12 },
+      wordWrap: { width: queueCardW - 12 },
       align: 'center',
     }).setOrigin(0.5, 0);
     container.add(nameText);
@@ -1099,10 +1227,10 @@ export class MainStreetScene extends CardGameScene {
     if (card.reputationDelta !== 0) parts.push(`${card.reputationDelta > 0 ? '+' : ''}${card.reputationDelta} rep`);
     const infoStr = parts.join(', ') || card.effect;
 
-    const infoText = this.add.text(0, QUEUE_CARD_H / 2 - 12, infoStr, {
+    const infoText = this.add.text(0, queueCardH / 2 - 12, infoStr, {
       fontSize: '10px', color: '#7788aa',
       fontFamily: FONT_FAMILY,
-      wordWrap: { width: QUEUE_CARD_W - 12 },
+      wordWrap: { width: queueCardW - 12 },
       align: 'center',
     }).setOrigin(0.5, 1);
     container.add(infoText);
@@ -1116,27 +1244,28 @@ export class MainStreetScene extends CardGameScene {
     this.handContainer.removeAll(true);
 
     const held = this.state.heldEvent;
+    const { handY, handCardW, handCardH } = this.layout;
 
     // Section label
-    const label = this.add.text(40, HAND_Y - 10, 'Your Hand', {
+    const label = this.add.text(40, handY - 10, 'Your Hand', {
       fontSize: '13px', fontStyle: 'bold', color: '#aa9944', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 1);
     this.handContainer.add(label);
 
     if (held) {
-      const cardContainer = this.drawHeldEventCard(40, HAND_Y, held);
+      const cardContainer = this.drawHeldEventCard(40, handY, held);
       this.handContainer.add(cardContainer);
     } else {
       // Empty hand slot
       const empty = this.add.rectangle(
-        40 + HAND_CARD_W / 2, HAND_Y + HAND_CARD_H / 2,
-        HAND_CARD_W, HAND_CARD_H, 0x222211, 0.2,
+        40 + handCardW / 2, handY + handCardH / 2,
+        handCardW, handCardH, 0x222211, 0.2,
       );
       empty.setStrokeStyle(1, 0x333322, 0.4);
       this.handContainer.add(empty);
 
       const emptyText = this.add.text(
-        40 + HAND_CARD_W / 2, HAND_Y + HAND_CARD_H / 2,
+        40 + handCardW / 2, handY + handCardH / 2,
         'No held event',
         { fontSize: '11px', color: '#555544', fontFamily: FONT_FAMILY },
       ).setOrigin(0.5);
@@ -1149,19 +1278,20 @@ export class MainStreetScene extends CardGameScene {
     y: number,
     card: EventCard,
   ): Phaser.GameObjects.Container {
-    const container = this.add.container(x + HAND_CARD_W / 2, y + HAND_CARD_H / 2);
+    const { handCardW, handCardH } = this.layout;
+    const container = this.add.container(x + handCardW / 2, y + handCardH / 2);
     const isHinted = this.hintedCardId !== null && card.id === this.hintedCardId;
 
     // Warm brown background (Investment)
-    const bg = this.add.rectangle(0, 0, HAND_CARD_W, HAND_CARD_H, 0x8B4513, 0.7);
+    const bg = this.add.rectangle(0, 0, handCardW, handCardH, 0x8B4513, 0.7);
     bg.setStrokeStyle(isHinted ? 3 : 2, isHinted ? 0x44ffff : 0xcc9944);
     container.add(bg);
 
     // Card name
-    const nameText = this.add.text(0, -HAND_CARD_H / 2 + 10, cardLabel(card), {
+    const nameText = this.add.text(0, -handCardH / 2 + 10, cardLabel(card), {
       fontSize: '12px', fontStyle: 'bold', color: '#ffffff',
       fontFamily: FONT_FAMILY,
-      wordWrap: { width: HAND_CARD_W - 12 },
+      wordWrap: { width: handCardW - 12 },
       align: 'center',
     }).setOrigin(0.5, 0);
     container.add(nameText);
@@ -1172,16 +1302,16 @@ export class MainStreetScene extends CardGameScene {
     if (card.reputationDelta !== 0) parts.push(`${card.reputationDelta > 0 ? '+' : ''}${card.reputationDelta} rep`);
     const infoStr = parts.join(', ') || card.effect;
 
-    const infoText = this.add.text(0, HAND_CARD_H / 2 - 14, infoStr, {
+    const infoText = this.add.text(0, handCardH / 2 - 14, infoStr, {
       fontSize: '11px', color: '#ddddcc',
       fontFamily: FONT_FAMILY,
-      wordWrap: { width: HAND_CARD_W - 12 },
+      wordWrap: { width: handCardW - 12 },
       align: 'center',
     }).setOrigin(0.5, 1);
     container.add(infoText);
 
     // "Click to play" hint
-    const hint = this.add.text(0, HAND_CARD_H / 2 - 2, 'Click to play', {
+    const hint = this.add.text(0, handCardH / 2 - 2, 'Click to play', {
       fontSize: '9px', fontStyle: 'italic', color: '#ccaa66',
       fontFamily: FONT_FAMILY,
     }).setOrigin(0.5, 1);
@@ -1231,8 +1361,8 @@ export class MainStreetScene extends CardGameScene {
     this.actionContainer.removeAll(true);
 
     if (this.uiPhase === 'market') {
-      const rightX = GAME_W - 40;
-      const by = ACTION_Y;
+      const rightX = this.layout.gameW - 24;
+      const by = this.layout.actionY;
 
       // Affordable summary
       const affordable = getAffordableBusinessCards(this.state);
@@ -1250,45 +1380,45 @@ export class MainStreetScene extends CardGameScene {
         ? `Can buy: ${summaryParts.join(', ')}`
         : 'No affordable cards';
 
-      const summary = this.add.text(rightX, by - 8, summaryStr, {
-        fontSize: '13px', color: '#887766', fontFamily: FONT_FAMILY,
+      const summary = this.add.text(rightX, by - 4, summaryStr, {
+        fontSize: '12px', color: '#887766', fontFamily: FONT_FAMILY,
       }).setOrigin(1, 1);
       this.actionContainer.add(summary);
 
       // End Turn button (right-aligned)
-      const btnW = 160;
-      const hintBtnW = 130;
-      const smallW = 80;
+      const btnW = this.layout.actionButtonW;
+      const hintBtnW = this.layout.hintButtonW;
+      const smallW = this.layout.smallButtonW;
 
-      const endBtn = this.createActionButton(rightX - btnW, by + 8, btnW, 'End Turn', () => {
+      const endBtn = this.createActionButton(rightX - btnW, by + 4, btnW, 'End Turn', () => {
         this.endTurn();
       });
       this.actionContainer.add(endBtn);
 
       // Hint button (to the left of End Turn)
-      const hintBtn = this.createHintButton(rightX - btnW - 12 - hintBtnW, by + 8, hintBtnW);
+      const hintBtn = this.createHintButton(rightX - btnW - 12 - hintBtnW, by + 4, hintBtnW);
       this.actionContainer.add(hintBtn);
 
       // Undo / Redo buttons (to the left of Hint)
       const undoBaseX = rightX - btnW - 12 - hintBtnW - 12 - smallW - 12 - smallW;
-      const undoBtn = this.createActionButton(undoBaseX, by + 8, smallW, 'Undo', () => this.performUndo());
+      const undoBtn = this.createActionButton(undoBaseX, by + 4, smallW, 'Undo', () => this.performUndo());
       this.actionContainer.add(undoBtn);
-      const redoBtn = this.createActionButton(undoBaseX + smallW + 12, by + 8, smallW, 'Redo', () => this.performRedo());
+      const redoBtn = this.createActionButton(undoBaseX + smallW + 12, by + 4, smallW, 'Redo', () => this.performRedo());
       this.actionContainer.add(redoBtn);
 
     } else if (this.uiPhase === 'placing-business') {
-      const rightX = GAME_W - 40;
-      const by = ACTION_Y;
+      const rightX = this.layout.gameW - 24;
+      const by = this.layout.actionY;
 
       const cardName = this.pendingBusinessCard?.name ?? '???';
-      const hint = this.add.text(rightX, by - 8, `Place "${cardName}" -- click an empty slot`, {
-        fontSize: '15px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY,
+      const hint = this.add.text(rightX, by - 4, `Place "${cardName}" -- click an empty slot`, {
+        fontSize: '14px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY,
       }).setOrigin(1, 1);
       this.actionContainer.add(hint);
 
       // Cancel button (right-aligned)
-      const btnW = 160;
-      const cancelBtn = this.createActionButton(rightX - btnW, by + 8, btnW, 'Cancel', () => {
+      const btnW = this.layout.actionButtonW;
+      const cancelBtn = this.createActionButton(rightX - btnW, by + 4, btnW, 'Cancel', () => {
         this.pendingBusinessCard = null;
         this.uiPhase = 'market';
         this.refreshAll();
@@ -1307,7 +1437,7 @@ export class MainStreetScene extends CardGameScene {
     text: string,
     callback: () => void,
   ): Phaser.GameObjects.Container {
-    const btnH = 40;
+    const btnH = this.layout.actionButtonH;
     const container = this.add.container(x + width / 2, y + btnH / 2);
 
     const bg = this.add.rectangle(0, 0, width, btnH, 0x554422, 0.8);
@@ -1315,7 +1445,7 @@ export class MainStreetScene extends CardGameScene {
     container.add(bg);
 
     const label = this.add.text(0, 0, text, {
-      fontSize: '16px', fontStyle: 'bold', color: '#ffcc88', fontFamily: FONT_FAMILY,
+      fontSize: '14px', fontStyle: 'bold', color: '#ffcc88', fontFamily: FONT_FAMILY,
     }).setOrigin(0.5);
     container.add(label);
 
@@ -1343,7 +1473,7 @@ export class MainStreetScene extends CardGameScene {
     y: number,
     width: number,
   ): Phaser.GameObjects.Container {
-    const btnH = 40;
+    const btnH = this.layout.actionButtonH;
     const isDisabled = this.hintUsedThisTurn;
 
     const container = this.add.container(x + width / 2, y + btnH / 2);
@@ -1357,7 +1487,7 @@ export class MainStreetScene extends CardGameScene {
     container.add(bg);
 
     const label = this.add.text(0, 0, isDisabled ? 'Hint ✓' : 'Hint', {
-      fontSize: '16px', fontStyle: 'bold', color: textColor, fontFamily: FONT_FAMILY,
+      fontSize: '14px', fontStyle: 'bold', color: textColor, fontFamily: FONT_FAMILY,
     }).setOrigin(0.5);
     container.add(label);
 
@@ -1584,8 +1714,8 @@ export class MainStreetScene extends CardGameScene {
     );
     this.overlayObjects.push(...overlay.objects);
 
-    const cx = GAME_W / 2;
-    const cy = GAME_H / 2;
+    const cx = this.layout.gameW / 2;
+    const cy = this.layout.gameH / 2;
     const top = cy - MODAL_H / 2;
 
     // Title
@@ -1681,7 +1811,7 @@ export class MainStreetScene extends CardGameScene {
     // Clear existing content
     this.logContentContainer.removeAll(true);
 
-    const contentW = LOG_W - LOG_PAD * 2;
+    const contentW = this.layout.logW - LOG_PAD * 2;
     let yOff = 0;
 
     for (const entry of entries) {
@@ -1692,7 +1822,7 @@ export class MainStreetScene extends CardGameScene {
         // Subtle background bar for turn headers
         const barBg = this.add.graphics();
         barBg.fillStyle(0x443311, 0.5);
-        barBg.fillRect(0, yOff, LOG_W, LOG_LINE_H);
+        barBg.fillRect(0, yOff, this.layout.logW, LOG_LINE_H);
         this.logContentContainer.add(barBg);
       }
 
@@ -1712,7 +1842,7 @@ export class MainStreetScene extends CardGameScene {
     this.logTotalContentH = yOff;
 
     // Visible area inside the panel (below title bar, above bottom edge)
-    const visibleH = LOG_H - LOG_TITLE_H - 4;
+    const visibleH = this.layout.logH - LOG_TITLE_H - 4;
     this.logMaxScroll = Math.max(0, this.logTotalContentH - visibleH);
 
     // Keep scroll position valid for the current content height.
@@ -1734,10 +1864,10 @@ export class MainStreetScene extends CardGameScene {
     this.logMaskGraphics.fillStyle(0xffffff);
     // Mask is in world coordinates
     this.logMaskGraphics.fillRect(
-      LOG_X,
-      LOG_Y + LOG_TITLE_H,
-      LOG_W,
-      LOG_H - LOG_TITLE_H - 2,
+      this.layout.logX,
+      this.layout.logY + LOG_TITLE_H,
+      this.layout.logW,
+      this.layout.logH - LOG_TITLE_H - 2,
     );
   }
 
@@ -1750,8 +1880,8 @@ export class MainStreetScene extends CardGameScene {
   ): void => {
     // Only scroll when pointer is inside the log panel bounds
     if (
-      pointer.x < LOG_X || pointer.x > LOG_X + LOG_W ||
-      pointer.y < LOG_Y || pointer.y > LOG_Y + LOG_H
+      pointer.x < this.layout.logX || pointer.x > this.layout.logX + this.layout.logW ||
+      pointer.y < this.layout.logY || pointer.y > this.layout.logY + this.layout.logH
     ) {
       return;
     }
@@ -1774,6 +1904,66 @@ export class MainStreetScene extends CardGameScene {
   private applyLogScroll(): void {
     this.logContentContainer.setY(LOG_TITLE_H + 2 - this.logScrollOffset);
     this.updateLogMask();
+  }
+
+  /** Test helper: returns current computed scene layout metrics. */
+  getLayoutMetricsForTest(): SceneLayout {
+    return { ...this.layout };
+  }
+
+  /** Test helper: returns rectangles for major play zones. */
+  getSectionRectsForTest(): {
+    market: { x: number; y: number; w: number; h: number };
+    queue: { x: number; y: number; w: number; h: number };
+    street: { x: number; y: number; w: number; h: number };
+    hand: { x: number; y: number; w: number; h: number };
+    action: { x: number; y: number; w: number; h: number };
+    instruction: { x: number; y: number; w: number; h: number };
+  } {
+    const l = this.layout;
+    const market = {
+      x: 20,
+      y: l.marketTop - 10,
+      w: l.gameW - 40,
+      h: 2 * l.marketRowH + l.marketRowGap + 20,
+    };
+    const queue = {
+      x: 20,
+      y: l.queueTop - 10,
+      w: l.queueLabelW + INCIDENT_QUEUE_SIZE * (l.queueCardW + l.queueCardGap) + 100,
+      h: l.queueCardH + 24,
+    };
+    const street = {
+      x: l.streetX,
+      y: l.streetTop,
+      w: l.streetCols * l.slotW + (l.streetCols - 1) * l.slotGap,
+      h: STREET_ROWS * l.slotH + (STREET_ROWS - 1) * l.streetRowGap,
+    };
+    const hand = {
+      x: 40,
+      y: l.handY,
+      w: l.handCardW,
+      h: l.handCardH,
+    };
+
+    const rightX = l.gameW - 24;
+    const actionRowY = l.actionY + 4;
+    const actionW = l.actionButtonW + 12 + l.hintButtonW + 12 + l.smallButtonW + 12 + l.smallButtonW;
+    const action = {
+      x: rightX - actionW,
+      y: actionRowY,
+      w: actionW,
+      h: l.actionButtonH,
+    };
+
+    const instruction = {
+      x: this.instructionText.x - this.instructionText.displayWidth,
+      y: this.instructionText.y - this.instructionText.displayHeight * 0.5,
+      w: this.instructionText.displayWidth,
+      h: this.instructionText.displayHeight,
+    };
+
+    return { market, queue, street, hand, action, instruction };
   }
 
   // ── Game Over Overlay ───────────────────────────────────
@@ -1821,10 +2011,10 @@ export class MainStreetScene extends CardGameScene {
     this.overlayObjects.push(...overlay.objects);
 
     // Vertical anchor: centre of the panel
-    const panelTop = GAME_H / 2 - panelH / 2;
+    const panelTop = this.layout.gameH / 2 - panelH / 2;
 
     // Title
-    const titleText = this.add.text(GAME_W / 2, panelTop + 30, title, {
+    const titleText = this.add.text(this.layout.gameW / 2, panelTop + 30, title, {
       fontSize: '36px', fontStyle: 'bold', color, fontFamily: FONT_FAMILY,
     }).setOrigin(0.5).setDepth(101);
     this.overlayObjects.push(titleText);
@@ -1832,7 +2022,7 @@ export class MainStreetScene extends CardGameScene {
     // End reason
     const reason = this.state.endReason ?? 'unknown';
     const reasonText = this.add.text(
-      GAME_W / 2, panelTop + 72,
+      this.layout.gameW / 2, panelTop + 72,
       reason.replace(/_/g, ' '),
       { fontSize: '18px', color: '#ccbbaa', fontFamily: FONT_FAMILY },
     ).setOrigin(0.5).setDepth(101);
@@ -1849,7 +2039,7 @@ export class MainStreetScene extends CardGameScene {
       `Final Score: ${result.finalScore}`,
     ];
     const breakdownY = panelTop + 110;
-    const breakdown = this.add.text(GAME_W / 2, breakdownY, lines.join('\n'), {
+    const breakdown = this.add.text(this.layout.gameW / 2, breakdownY, lines.join('\n'), {
       fontSize: '16px', color: '#ddccbb', fontFamily: FONT_FAMILY,
       align: 'center', lineSpacing: 6,
     }).setOrigin(0.5, 0).setDepth(101);
@@ -1859,7 +2049,7 @@ export class MainStreetScene extends CardGameScene {
     let cursorY = breakdownY + 100; // approximate height of score breakdown text
     if (challengeLineCount > 0) {
       const sectionTitle = this.add.text(
-        GAME_W / 2, cursorY,
+        this.layout.gameW / 2, cursorY,
         'Challenge Details:',
         { fontSize: '14px', fontStyle: 'bold', color: '#aa9977', fontFamily: FONT_FAMILY },
       ).setOrigin(0.5, 0).setDepth(101);
@@ -1871,7 +2061,7 @@ export class MainStreetScene extends CardGameScene {
         const icon = done ? '\u2713' : '\u2717'; // checkmark or cross
         const lineColor = done ? '#44ff44' : '#ff6666';
         const challengeLine = this.add.text(
-          GAME_W / 2, cursorY,
+          this.layout.gameW / 2, cursorY,
           `${icon}  ${ac.challenge.title}`,
           { fontSize: '13px', color: lineColor, fontFamily: FONT_FAMILY },
         ).setOrigin(0.5, 0).setDepth(101);
@@ -1884,7 +2074,7 @@ export class MainStreetScene extends CardGameScene {
     if (newlyUnlockedTiers.length > 0) {
       cursorY += 8;
       const unlockHeader = this.add.text(
-        GAME_W / 2, cursorY,
+        this.layout.gameW / 2, cursorY,
         'Tier Unlocked!',
         { fontSize: '14px', fontStyle: 'bold', color: '#44ff44', fontFamily: FONT_FAMILY },
       ).setOrigin(0.5, 0).setDepth(101);
@@ -1903,7 +2093,7 @@ export class MainStreetScene extends CardGameScene {
           ? '(via challenges)' : '(via reputation)';
 
         const tierLine = this.add.text(
-          GAME_W / 2, cursorY,
+          this.layout.gameW / 2, cursorY,
           `NEW: Tier ${def.order} - ${def.name} ${triggerLabel}`,
           { fontSize: '13px', color: '#88ff88', fontFamily: FONT_FAMILY },
         ).setOrigin(0.5, 0).setDepth(101);
@@ -1914,7 +2104,7 @@ export class MainStreetScene extends CardGameScene {
         for (const cardId of def.newCardIds) {
           const cardName = CARD_TEMPLATE_NAMES.get(cardId) ?? cardId;
           const cardLine = this.add.text(
-            GAME_W / 2, cursorY,
+            this.layout.gameW / 2, cursorY,
             `  + ${cardName}`,
             { fontSize: '12px', color: '#aaddaa', fontFamily: FONT_FAMILY },
           ).setOrigin(0.5, 0).setDepth(101);
@@ -1933,7 +2123,7 @@ export class MainStreetScene extends CardGameScene {
         ? `Current Tier: ${highest.order} / ${tierCount} - ${highest.name}`
         : 'Current Tier: --';
       const tierIndicator = this.add.text(
-        GAME_W / 2, cursorY, tierLabel,
+        this.layout.gameW / 2, cursorY, tierLabel,
         { fontSize: '14px', fontStyle: 'bold', color: '#ddbb88', fontFamily: FONT_FAMILY },
       ).setOrigin(0.5, 0).setDepth(101);
       this.overlayObjects.push(tierIndicator);
@@ -1947,7 +2137,7 @@ export class MainStreetScene extends CardGameScene {
         `High Score: ${this.campaign.highestScore}  |  Best Rep: ${this.campaign.persistentReputation}`,
       ];
       const statsText = this.add.text(
-        GAME_W / 2, cursorY, statsLines.join('\n'),
+        this.layout.gameW / 2, cursorY, statsLines.join('\n'),
         { fontSize: '13px', color: '#bbaa99', fontFamily: FONT_FAMILY, align: 'center', lineSpacing: 4 },
       ).setOrigin(0.5, 0).setDepth(101);
       this.overlayObjects.push(statsText);
@@ -1956,14 +2146,14 @@ export class MainStreetScene extends CardGameScene {
     // Difficulty selector
     const diffY = panelTop + panelH - 80;
     const diffLabel = this.add.text(
-      GAME_W / 2 - 80, diffY,
+      this.layout.gameW / 2 - 80, diffY,
       `Difficulty: ${this.selectedDifficulty}`,
       { fontSize: '14px', color: '#ccbbaa', fontFamily: FONT_FAMILY },
     ).setOrigin(0, 0.5).setDepth(101);
     this.overlayObjects.push(diffLabel);
 
     const cycleBtn = this.add.text(
-      GAME_W / 2 + 90, diffY,
+      this.layout.gameW / 2 + 90, diffY,
       '[ Change ]',
       { fontSize: '14px', color: '#ffdd88', fontFamily: FONT_FAMILY },
     ).setOrigin(0, 0.5).setDepth(101).setInteractive({ useHandCursor: true });
@@ -1977,7 +2167,7 @@ export class MainStreetScene extends CardGameScene {
     // Buttons (positioned relative to panel bottom)
     const btnY = panelTop + panelH - 40;
     const playAgainBtn = createOverlayButton(
-      this, GAME_W / 2 - 110, btnY,
+      this, this.layout.gameW / 2 - 110, btnY,
       '[ Play Again ]', 101,
     );
     playAgainBtn.on('pointerdown', () => {
@@ -1988,7 +2178,7 @@ export class MainStreetScene extends CardGameScene {
     this.overlayObjects.push(playAgainBtn);
 
     const menuBtn = createOverlayMenuButton(
-      this, GAME_W / 2 + 30, btnY, 101,
+      this, this.layout.gameW / 2 + 30, btnY, 101,
     );
     this.overlayObjects.push(menuBtn);
   }

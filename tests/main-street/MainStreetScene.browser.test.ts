@@ -4,7 +4,7 @@ import Phaser from 'phaser';
 import { waitForScene } from '../helpers/waitForScene';
 import { executeDayStart, processEndOfTurn } from '../../example-games/main-street/MainStreetEngine';
 
-async function bootGame(): Promise<Phaser.Game> {
+async function bootGame(options: { width?: number; height?: number } = {}): Promise<Phaser.Game> {
   let container = document.getElementById('game-container');
   if (container) container.remove();
 
@@ -13,7 +13,7 @@ async function bootGame(): Promise<Phaser.Game> {
   document.body.appendChild(container);
 
   const { createMainStreetGame } = await import('../../example-games/main-street/createMainStreetGame');
-  const game = createMainStreetGame();
+  const game = createMainStreetGame(options);
   await waitForScene(game, 'MainStreetScene');
   return game;
 }
@@ -24,6 +24,17 @@ function destroyGame(game: Phaser.Game | null): void {
   }
   const container = document.getElementById('game-container');
   if (container) container.remove();
+}
+
+function overlaps(a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }): boolean {
+  const aRight = a.x + a.w;
+  const aBottom = a.y + a.h;
+  const bRight = b.x + b.w;
+  const bBottom = b.y + b.h;
+
+  if (aRight <= b.x || bRight <= a.x) return false;
+  if (aBottom <= b.y || bBottom <= a.y) return false;
+  return true;
 }
 
 describe('MainStreetScene browser tests', () => {
@@ -74,6 +85,59 @@ describe('MainStreetScene browser tests', () => {
     const textEntries = logContentContainer.list.filter((obj) => obj instanceof Phaser.GameObjects.Text) as Phaser.GameObjects.Text[];
 
     expect(textEntries.some((entry) => entry.text === 'Turn 2')).toBe(true);
+  });
+
+  it('renders the street as a 2x5 grid', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & { streetContainer?: Phaser.GameObjects.Container };
+
+    const street = scene.streetContainer as Phaser.GameObjects.Container;
+    const slots = street.list.filter((obj) => obj instanceof Phaser.GameObjects.Rectangle) as Phaser.GameObjects.Rectangle[];
+
+    expect(slots.length).toBe(10);
+
+    const rows = new Map<number, number>();
+    for (const slot of slots) {
+      const y = Math.round(slot.y);
+      rows.set(y, (rows.get(y) ?? 0) + 1);
+    }
+
+    expect(rows.size).toBe(2);
+    for (const count of rows.values()) {
+      expect(count).toBe(5);
+    }
+  });
+
+  it('keeps major zones non-overlapping at desktop and narrow mobile dimensions', async () => {
+    const viewports = [
+      { width: 1280, height: 720 },
+      { width: 900, height: 1100 },
+    ];
+
+    for (const vp of viewports) {
+      game = await bootGame(vp);
+      const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & {
+        getSectionRectsForTest: () => {
+          market: { x: number; y: number; w: number; h: number };
+          queue: { x: number; y: number; w: number; h: number };
+          street: { x: number; y: number; w: number; h: number };
+          hand: { x: number; y: number; w: number; h: number };
+          action: { x: number; y: number; w: number; h: number };
+          instruction: { x: number; y: number; w: number; h: number };
+        };
+      };
+
+      const rects = scene.getSectionRectsForTest();
+
+      expect(overlaps(rects.market, rects.queue), `market/queue overlap at ${vp.width}x${vp.height}`).toBe(false);
+      expect(overlaps(rects.queue, rects.street), `queue/street overlap at ${vp.width}x${vp.height}`).toBe(false);
+      expect(overlaps(rects.street, rects.hand), `street/hand overlap at ${vp.width}x${vp.height}`).toBe(false);
+      expect(overlaps(rects.hand, rects.action), `hand/action overlap at ${vp.width}x${vp.height}`).toBe(false);
+      expect(overlaps(rects.action, rects.instruction), `action/instruction overlap at ${vp.width}x${vp.height}`).toBe(false);
+
+      destroyGame(game);
+      game = null;
+    }
   });
 
   it('loads placeholder texture and renders it without squashing', async () => {

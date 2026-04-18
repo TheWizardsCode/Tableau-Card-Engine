@@ -19,8 +19,8 @@ UI slot mappings (recommendations)
   - Rendering: scale canonical art to fit inside the slot width (max width = 140) while preserving aspect ratio. Center vertically; allow top/bottom letterbox space.
   - Phaser: add Image with displayWidth = slotWidth, set displayHeight = (displayWidth * canonicalH / canonicalW) and position centered in slot.
 
-- Street slot (10-slot grid): nominal slot size = 105 × 110 px (square).
-  - Rendering: fit-inside within 105×110, center in slot. Do NOT stretch; vertical/horizontal centering is acceptable. If a tighter crop is desired for visual density, consider providing a derived thumbnail (see "Derived thumbnails" below) and document exception.
+- Street slot (10-slot grid shown as 2 rows × 5 columns): nominal slot size = 96 × 100 px (desktop reference), scaled down on narrower viewports.
+  - Rendering: fit-inside within slot bounds, center in slot. Do NOT stretch; vertical/horizontal centering is acceptable. If a tighter crop is desired for visual density, consider providing a derived thumbnail (see "Derived thumbnails" below) and document exception.
 
 - Incident queue and Investment/held-event thumbnails: nominal sizes vary; recommended approach is to scale to fit inside the slot and use a fixed padding (2–6 px) so glyphs and text do not clip.
 
@@ -40,6 +40,11 @@ UI slot mappings (recommendations)
   - Street small thumbnail: fit to 105×110
   - UI small (compact hand): CARD_W × CARD_H (48×65 default runtime)
   - Selector thumbnail: 120×68 (scene screenshot)
+
+## Layout notes (Main Street)
+
+- Main Street presents the street as a responsive 2×5 grid to preserve readability and avoid overlap with market, incident queue, hand, action controls, and instruction text across desktop and narrow/tall viewports.
+- Bottom-right action controls are compact by design to preserve vertical space for the lower hand/challenge area.
 
 ## Migration notes
 
