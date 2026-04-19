@@ -413,12 +413,10 @@ export class MainStreetScene extends CardGameScene {
     const challengeY = queueTop;
 
     const logW = compact ? 360 : 430;
-    const logX = compact ? 540 : gameW - margin - logW;
-    const logY = marketTop;
-    const logH = Math.max(
-      compact ? 180 : 200,
-      Math.min(260, Math.floor(gameH - logY - 60))
-    );
+    const logX = gameW - margin - logW - 10; // left edge just left of right margin
+    const logY = marketTop - 10; // align top with market
+    // bottom aligns with market bottom border
+    const logH = Math.max(100, (queueTop + queueCardH + 10) - logY);
     const logVisible = compact || logY < gameH - 140;
 
     return {
@@ -811,7 +809,7 @@ export class MainStreetScene extends CardGameScene {
     const { gameW, streetTop, streetX, slotW, slotGap, slotH, streetCols, streetRowGap } = this.layout;
 
     // Section label
-    const label = this.add.text(gameW / 2, streetTop - 16, 'Your Street', {
+    const label = this.add.text(gameW / 2, streetTop - 16, '', {
       fontSize: '14px', fontStyle: 'bold', color: '#aa9966', fontFamily: FONT_FAMILY,
     }).setOrigin(0.5, 1);
     this.streetContainer.add(label);
@@ -1252,11 +1250,7 @@ export class MainStreetScene extends CardGameScene {
     const held = this.state.heldEvent;
     const { handY, handX, handCardW, handCardH } = this.layout;
 
-    // Section label
-    const label = this.add.text(40, handY - 10, 'Your Hand', {
-      fontSize: '13px', fontStyle: 'bold', color: '#aa9944', fontFamily: FONT_FAMILY,
-    }).setOrigin(0, 1);
-    this.handContainer.add(label);
+    // Your Hand label removed
 
     if (held) {
       const cardContainer = this.drawHeldEventCard(handX, handY, held);
