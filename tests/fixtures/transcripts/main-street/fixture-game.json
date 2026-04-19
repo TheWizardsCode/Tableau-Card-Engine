@@ -1,0 +1,33 @@
+{
+  "game": "main-street",
+  "version": "1.0.0",
+  "seed": "FixtureSeed123",
+  "startedAt": "2026-04-19T23:16:25.240Z",
+  "endedAt": "2026-04-19T23:16:25.242Z",
+  "totalTurns": 1,
+  "result": "loss",
+  "endReason": "bankruptcy",
+  "finalScore": 14,
+  "turns": [
+    {
+      "turn": 1,
+      "actions": [
+        {
+          "type": "buy-business",
+          "detail": "biz-laundromat-2 -> slot 0"
+        },
+        {
+          "type": "buy-event",
+          "detail": "evt-charity-drive-29"
+        }
+      ],
+      "income": 1,
+      "incident": "Pipe Burst",
+      "incidentQueueSize": 2,
+      "coinsAfter": -1,
+      "reputationAfter": 3,
+      "score": 14,
+      "gridOccupied": 1
+    }
+  ]
+}

@@ -31,6 +31,7 @@ import { LostCitiesReplayAdapter } from './LostCitiesReplayAdapter';
 import { TheMindReplayAdapter } from './TheMindReplayAdapter';
 import { SushiGoReplayAdapter } from './SushiGoReplayAdapter';
 import { FeudalismReplayAdapter } from './FeudalismReplayAdapter';
+import { MainStreetReplayAdapter } from './MainStreetReplayAdapter';
 import { GolfReplayAdapter } from './GolfReplayAdapter';
 import { adapterRegistry } from './AdapterRegistry';
 
@@ -48,6 +49,9 @@ adapterRegistry.register(new SushiGoReplayAdapter());
 
 // Feudalism has an explicit `gameType: 'feudalism'` field -- register before Golf
 adapterRegistry.register(new FeudalismReplayAdapter());
+
+// Main Street has an explicit `gameType: 'main-street'` field (adapter) -- register before Golf
+adapterRegistry.register(new MainStreetReplayAdapter());
 
 // Golf uses structural detection (no `gameType` field) -- register last
 adapterRegistry.register(new GolfReplayAdapter());
