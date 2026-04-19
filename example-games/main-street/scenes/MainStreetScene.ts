@@ -881,6 +881,7 @@ export class MainStreetScene extends CardGameScene {
   // ── Refresh display ─────────────────────────────────────
 
   private refreshAll(): void {
+    this.svgDom?.clear();
     this.refreshHud();
     this.refreshStreetGrid();
     this.refreshMarket();
@@ -1047,7 +1048,8 @@ export class MainStreetScene extends CardGameScene {
       const cy = y + slotH / 2;
       const templateId = this.templateIdFromCardId(biz.id);
       const svgText = this.cardSvgSources.get(templateId)!;
-      this.svgDom.createOrUpdate(templateId, svgText, cx, cy, renderW, renderH, () => {
+      const domKey = this.domKeyForCard('street', _index, biz.id);
+      this.svgDom.createOrUpdate(domKey, svgText, cx, cy, renderW, renderH, () => {
         // click maps to scene slot click
         this.onSlotClick(_index);
       }, 100);
@@ -1172,6 +1174,7 @@ export class MainStreetScene extends CardGameScene {
     this.drawMarketRow(
       marketTop + 6,
       'Business',
+      'business',
       this.state.market.business,
       MARKET_BUSINESS_SLOTS,
       (card) => this.onBusinessCardClick(card as BusinessCard),
@@ -1181,6 +1184,7 @@ export class MainStreetScene extends CardGameScene {
     this.drawMarketRow(
       marketTop + 6 + marketRowH + marketRowGap,
       'Investments',
+      'investments',
       this.state.market.investments,
       MARKET_INVESTMENT_SLOTS,
       (card) => {
@@ -1196,6 +1200,7 @@ export class MainStreetScene extends CardGameScene {
   private drawMarketRow(
     y: number,
     rowLabel: string,
+    rowKey: string,
     cards: readonly (BusinessCard | EventCard | UpgradeCard)[],
     maxSlots: number,
     onClick: (card: BusinessCard | EventCard | UpgradeCard) => void,
@@ -1215,7 +1220,7 @@ export class MainStreetScene extends CardGameScene {
       const card = cards[i];
 
       if (card) {
-        const cardObj = this.drawMarketCard(cx, y, card, onClick);
+        const cardObj = this.drawMarketCard(cx, y, card, onClick, rowKey, i);
         this.marketContainer.add(cardObj);
       } else {
         // Empty slot
@@ -1261,11 +1266,17 @@ export class MainStreetScene extends CardGameScene {
     return `ms_card_${base}`;
   }
 
+  private domKeyForCard(context: string, slot: number | string, cardId: string): string {
+    return `ms_dom_${context}_${slot}_${cardId}`;
+  }
+
   private drawMarketCard(
     x: number,
     y: number,
     card: BusinessCard | EventCard | UpgradeCard,
     onClick: (card: BusinessCard | EventCard | UpgradeCard) => void,
+    rowKey: string,
+    slotIndex: number,
   ): Phaser.GameObjects.Container {
     const { marketCardW, marketCardH } = this.layout;
     const container = this.add.container(Math.round(x + marketCardW / 2), Math.round(y + marketCardH / 2));
@@ -1291,7 +1302,8 @@ export class MainStreetScene extends CardGameScene {
       const cy = y + marketCardH / 2;
       const templateId = this.templateIdFromCardId(card.id);
       const svgText = this.cardSvgSources.get(templateId)!;
-      this.svgDom.createOrUpdate(templateId, svgText, cx, cy, renderW, renderH, () => onClick(card), 100);
+      const domKey = this.domKeyForCard(`market-${rowKey}`, slotIndex, card.id);
+      this.svgDom.createOrUpdate(domKey, svgText, cx, cy, renderW, renderH, () => onClick(card), 100);
     } else {
       this.requestCardTexture(card.id, renderW, renderH);
       // Determine card color
