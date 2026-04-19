@@ -413,10 +413,10 @@ export class MainStreetScene extends CardGameScene {
     // Challenge to the left of the log - expand to fill space
     const challengeW = Math.min(350, logX - handCardW - margin - 20);
     const challengeX = logX - challengeW - 10;
-    const challengeY = queueTop - 20;
+    const challengeY = queueTop; // align with incidents top
     const logY = marketTop - 10; // align top with market
     // bottom aligns with market bottom border
-    const logH = Math.max(100, (queueTop + queueCardH + 10) - logY);
+    const logH = Math.max(100, (queueTop + queueCardH + 20) - logY);
     const logVisible = compact || logY < gameH - 140;
 
     return {
@@ -1142,9 +1142,8 @@ export class MainStreetScene extends CardGameScene {
 
     const { queueLabelW, queueCardW, queueCardH, queueCardGap, queueTop } = this.layout;
 
-    // Section background
-    // Shrink width to just fit cards
-    const queueW = queueLabelW + INCIDENT_QUEUE_SIZE * (queueCardW + queueCardGap) + 10;
+    // Section background - width to just fit cards with small right margin
+    const queueW = queueLabelW + 50 + INCIDENT_QUEUE_SIZE * (queueCardW + queueCardGap) - queueCardGap + 20;
     const queueH = queueCardH + 24;
     const bgBox = this.add.graphics();
     bgBox.fillStyle(0x1a1830, 0.35);
