@@ -408,13 +408,12 @@ export class MainStreetScene extends CardGameScene {
     const actionY = gameH - 16 - actionButtonH;
 
     // Challenge tracker: position between hand and action buttons
-    const challengeW = Math.min(560, gameW - handCardW - margin * 3);
-    const challengeY = queueTop;
-
     const logW = compact ? 360 : 430;
     const logX = gameW - margin - logW - 10; // left edge just left of right margin
-    // Challenge to the left of the log
+    // Challenge to the left of the log - calculate width first
+    const challengeW = Math.min(280, logX - handCardW - margin - 20);
     const challengeX = logX - challengeW - 10;
+    const challengeY = queueTop;
     const logY = marketTop - 10; // align top with market
     // bottom aligns with market bottom border
     const logH = Math.max(100, (queueTop + queueCardH + 10) - logY);
@@ -682,28 +681,12 @@ export class MainStreetScene extends CardGameScene {
     const { coins, reputation } = this.state.resourceBank;
     const { gameW, hudY } = this.layout;
 
-    // Background strip - simplified, just for visual
-    const strip = this.add.rectangle(gameW / 2, hudY, gameW - 40, 28, 0x1a1408, 0.6);
+    // Background strip - 2/3 width, centered
+    const strip = this.add.rectangle(gameW / 2, hudY, gameW * 0.66, 28, 0x1a1408, 0.6);
     strip.setStrokeStyle(1, BOX_STROKE, 0.5);
     this.hudContainer.add(strip);
 
-    // Turn and Phase displayed at bottom
-    const margin = 20;
-    const bottomY = this.scale.height - margin;
-    
-    // Turn - centered at bottom
-    const turnText = this.add.text(this.scale.width / 2, bottomY, `Turn ${this.state.turn}/${this.state.config.maxTurns}`, {
-      fontSize: '16px', fontStyle: 'bold', color: '#ffdd88', fontFamily: FONT_FAMILY,
-    }).setOrigin(0.5, 1);
-    this.hudContainer.add(turnText);
-
-    // Phase - to the right of turn
-    const phaseText = this.add.text(this.scale.width / 2 + 100, bottomY, `Phase: ${this.state.phase}`, {
-      fontSize: '14px', color: '#aa9977', fontFamily: FONT_FAMILY,
-    }).setOrigin(0.5, 1);
-    this.hudContainer.add(phaseText);
-
-    // Coins
+    // Coins - centered in strip
     const coinText = this.add.text(gameW / 2 - 180, hudY, `Coins: ${coins}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#ffcc44', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0.5);
@@ -715,10 +698,10 @@ export class MainStreetScene extends CardGameScene {
     }).setOrigin(0, 0.5);
     this.hudContainer.add(repText);
 
-    // Score
-    const scoreText = this.add.text(gameW - 40, hudY, `Score: ${score}`, {
+    // Score - move left away from icons
+    const scoreText = this.add.text(220, hudY, `Score: ${score}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#ff8844', fontFamily: FONT_FAMILY,
-    }).setOrigin(1, 0.5);
+    }).setOrigin(0, 0.5);
     this.hudContainer.add(scoreText);
   }
 
@@ -965,8 +948,8 @@ export class MainStreetScene extends CardGameScene {
   ): void {
     const { marketCardW, marketCardH, marketCardGap, marketLabelW } = this.layout;
 
-    // Row label
-    const label = this.add.text(40, y + marketCardH / 2, rowLabel, {
+    // Row label - also use for positioning deck count
+    const label = this.add.text(40, y, rowLabel, {
       fontSize: '14px', fontStyle: 'bold', color: '#aa9977', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0.5);
     this.marketContainer.add(label);
@@ -1027,8 +1010,8 @@ export class MainStreetScene extends CardGameScene {
       }
     }
 
-    // Deck count - below the row label
-    const deckY = y + marketCardH + 15;
+    // Deck count - immediately below the label
+    const deckY = y + 16;
     if (rowLabel === 'Business') {
       const deckCount = this.state.decks.business.length;
       const deckText = this.add.text(40, deckY, `Deck: ${deckCount}`, {
@@ -1194,8 +1177,8 @@ export class MainStreetScene extends CardGameScene {
       }
     }
 
-    // Deck count - below the label
-    const deckText = this.add.text(40, queueTop + queueCardH + 12, `Deck: ${deckRemaining}`, {
+    // Deck count - immediately below the label
+    const deckText = this.add.text(40, queueTop + 32, `Deck: ${deckRemaining}`, {
       fontSize: '11px', color: '#556677', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0);
     this.incidentQueueContainer.add(deckText);
