@@ -409,11 +409,12 @@ export class MainStreetScene extends CardGameScene {
 
     // Challenge tracker: position between hand and action buttons
     const challengeW = Math.min(560, gameW - handCardW - margin * 3);
-    const challengeX = gameW - margin - challengeW;
     const challengeY = queueTop;
 
     const logW = compact ? 360 : 430;
     const logX = gameW - margin - logW - 10; // left edge just left of right margin
+    // Challenge to the left of the log
+    const challengeX = logX - challengeW - 10;
     const logY = marketTop - 10; // align top with market
     // bottom aligns with market bottom border
     const logH = Math.max(100, (queueTop + queueCardH + 10) - logY);
@@ -512,13 +513,14 @@ export class MainStreetScene extends CardGameScene {
   }
 
   private createInstructions(): void {
+    // Centered at bottom
     this.instructionText = this.add
-      .text(this.layout.gameW - 24, this.layout.instructionY, '', {
+      .text(this.layout.gameW / 2, this.layout.gameH - 20, '', {
         fontSize: '14px',
         color: '#ccaa77',
         fontFamily: FONT_FAMILY,
       })
-      .setOrigin(1, 0.5);
+      .setOrigin(0.5, 1);
   }
 
   private handleResize(): void {
@@ -680,32 +682,29 @@ export class MainStreetScene extends CardGameScene {
     const { coins, reputation } = this.state.resourceBank;
     const { gameW, hudY } = this.layout;
 
-    // Background strip
+    // Background strip - simplified, just for visual
     const strip = this.add.rectangle(gameW / 2, hudY, gameW - 40, 28, 0x1a1408, 0.6);
     strip.setStrokeStyle(1, BOX_STROKE, 0.5);
     this.hudContainer.add(strip);
 
-    // Turn - centered at bottom (in hudY position for now)
+    // Turn and Phase displayed at bottom
     const margin = 20;
-    const turnText = this.add.text(this.scale.width / 2, this.scale.height - margin, `Turn ${this.state.turn}/${this.state.config.maxTurns}`, {
+    const bottomY = this.scale.height - margin;
+    
+    // Turn - centered at bottom
+    const turnText = this.add.text(this.scale.width / 2, bottomY, `Turn ${this.state.turn}/${this.state.config.maxTurns}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#ffdd88', fontFamily: FONT_FAMILY,
-    }).setOrigin(0, 0.5);
+    }).setOrigin(0.5, 1);
     this.hudContainer.add(turnText);
 
-    // Phase
-    const phaseText = this.add.text(200, hudY, `Phase: ${this.state.phase}`, {
+    // Phase - to the right of turn
+    const phaseText = this.add.text(this.scale.width / 2 + 100, bottomY, `Phase: ${this.state.phase}`, {
       fontSize: '14px', color: '#aa9977', fontFamily: FONT_FAMILY,
-    }).setOrigin(0, 0.5);
+    }).setOrigin(0.5, 1);
     this.hudContainer.add(phaseText);
 
-    // Difficulty
-    const diffText = this.add.text(420, hudY, `[${this.state.config.difficultyName}]`, {
-      fontSize: '13px', color: '#999977', fontFamily: FONT_FAMILY,
-    }).setOrigin(0, 0.5);
-    this.hudContainer.add(diffText);
-
     // Coins
-    const coinText = this.add.text(gameW / 2 - 100, hudY, `Coins: ${coins}`, {
+    const coinText = this.add.text(gameW / 2 - 180, hudY, `Coins: ${coins}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#ffcc44', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0.5);
     this.hudContainer.add(coinText);
@@ -1028,23 +1027,23 @@ export class MainStreetScene extends CardGameScene {
       }
     }
 
-    // Deck count (right side)
-    const deckX = startX + maxSlots * (marketCardW + marketCardGap) + 10;
+    // Deck count - below the row label
+    const deckY = y + marketCardH + 15;
     if (rowLabel === 'Business') {
       const deckCount = this.state.decks.business.length;
-      const deckText = this.add.text(deckX, y + marketCardH / 2, `Deck: ${deckCount}`, {
+      const deckText = this.add.text(40, deckY, `Deck: ${deckCount}`, {
         fontSize: '12px', color: '#776655', fontFamily: FONT_FAMILY,
-      }).setOrigin(0, 0.5);
+      }).setOrigin(0, 0);
       this.marketContainer.add(deckText);
     } else {
-      // Investments row: show both upgrade and event deck counts
+      // Investments row: show both upgrade and event deck counts - below label
       const upgCount = this.state.decks.upgrade.length;
       const evtCount = this.state.decks.event.length;
       const deckText = this.add.text(
-        deckX, y + marketCardH / 2,
+        40, deckY,
         `Upg: ${upgCount}  Evt: ${evtCount}`,
         { fontSize: '11px', color: '#776655', fontFamily: FONT_FAMILY },
-      ).setOrigin(0, 0.5);
+      ).setOrigin(0, 0);
       this.marketContainer.add(deckText);
     }
   }
@@ -1195,11 +1194,10 @@ export class MainStreetScene extends CardGameScene {
       }
     }
 
-    // Deck count
-    const deckX = startX + INCIDENT_QUEUE_SIZE * (queueCardW + queueCardGap) + 10;
-    const deckText = this.add.text(deckX, queueTop + queueCardH / 2, `Deck: ${deckRemaining}`, {
+    // Deck count - below the label
+    const deckText = this.add.text(40, queueTop + queueCardH + 12, `Deck: ${deckRemaining}`, {
       fontSize: '11px', color: '#556677', fontFamily: FONT_FAMILY,
-    }).setOrigin(0, 0.5);
+    }).setOrigin(0, 0);
     this.incidentQueueContainer.add(deckText);
   }
 
