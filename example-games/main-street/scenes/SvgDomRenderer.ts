@@ -47,7 +47,11 @@ export class SvgDomRenderer {
 
     if (pointerCallback) {
       img.style.cursor = 'pointer';
+      // Support multiple input event types so clicks/taps/pointers are handled
       img.addEventListener('click', pointerCallback);
+      img.addEventListener('pointerdown', pointerCallback);
+      img.addEventListener('mousedown', pointerCallback);
+      img.addEventListener('touchstart', pointerCallback, { passive: true });
     }
 
     // Create Phaser DOMElement wrapping the img. Position uses game coordinates
