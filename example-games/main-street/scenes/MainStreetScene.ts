@@ -410,8 +410,8 @@ export class MainStreetScene extends CardGameScene {
     // Challenge tracker: position between hand and action buttons
     const logW = compact ? 360 : 430;
     const logX = gameW - margin - logW - 10; // left edge just left of right margin
-    // Challenge to the left of the log - calculate width first
-    const challengeW = Math.min(280, logX - handCardW - margin - 20);
+    // Challenge to the left of the log - expand to fill space
+    const challengeW = Math.min(320, logX - handCardW - margin - 20);
     const challengeX = logX - challengeW - 10;
     const challengeY = queueTop;
     const logY = marketTop - 10; // align top with market
@@ -687,19 +687,21 @@ export class MainStreetScene extends CardGameScene {
     this.hudContainer.add(strip);
 
     // Coins - centered in strip
-    const coinText = this.add.text(gameW / 2 - 180, hudY, `Coins: ${coins}`, {
+    const stripWidth = gameW * 0.66;
+    const stripLeft = (gameW - stripWidth) / 2;
+    const coinText = this.add.text(stripLeft + stripWidth * 0.25, hudY, `Coins: ${coins}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#ffcc44', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0.5);
     this.hudContainer.add(coinText);
 
-    // Reputation
-    const repText = this.add.text(gameW / 2 + 50, hudY, `Rep: ${reputation}`, {
+    // Reputation - centered in strip
+    const repText = this.add.text(stripLeft + stripWidth * 0.5, hudY, `Rep: ${reputation}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#88bbff', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0.5);
     this.hudContainer.add(repText);
 
-    // Score - move left away from icons
-    const scoreText = this.add.text(220, hudY, `Score: ${score}`, {
+    // Score - right side of strip
+    const scoreText = this.add.text(stripLeft + stripWidth * 0.85, hudY, `Score: ${score}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#ff8844', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0.5);
     this.hudContainer.add(scoreText);
@@ -1141,7 +1143,8 @@ export class MainStreetScene extends CardGameScene {
     const { queueLabelW, queueCardW, queueCardH, queueCardGap, queueTop } = this.layout;
 
     // Section background
-    const queueW = queueLabelW + INCIDENT_QUEUE_SIZE * (queueCardW + queueCardGap) + 100;
+    // Shrink width to just fit cards
+    const queueW = queueLabelW + INCIDENT_QUEUE_SIZE * (queueCardW + queueCardGap) + 10;
     const queueH = queueCardH + 24;
     const bgBox = this.add.graphics();
     bgBox.fillStyle(0x1a1830, 0.35);
@@ -1151,7 +1154,7 @@ export class MainStreetScene extends CardGameScene {
     this.incidentQueueContainer.add(bgBox);
 
     // Section label
-    const label = this.add.text(40, queueTop + queueCardH / 2 - 2, 'Upcoming\nIncidents', {
+    const label = this.add.text(40, queueTop + queueCardH / 2 - 2, 'Upcoming', {
       fontSize: '13px', fontStyle: 'bold', color: '#7788aa', fontFamily: FONT_FAMILY,
       align: 'center',
     }).setOrigin(0, 0.5);
