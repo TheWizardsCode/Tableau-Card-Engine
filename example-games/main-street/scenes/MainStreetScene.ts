@@ -687,10 +687,11 @@ export class MainStreetScene extends CardGameScene {
     strip.setStrokeStyle(1, BOX_STROKE, 0.5);
     this.hudContainer.add(strip);
 
-    // Turn
-    const turnText = this.add.text(40, hudY, `Turn ${this.state.turn}/${this.state.config.maxTurns}`, {
+    // Turn - centered at bottom
+    const margin = 20;
+    const turnText = this.add.text(gameW / 2, gameH - margin, `Turn ${this.state.turn}/${this.state.config.maxTurns}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#ffdd88', fontFamily: FONT_FAMILY,
-    }).setOrigin(0, 0.5);
+    }).setOrigin(0.5, 1);
     this.hudContainer.add(turnText);
 
     // Phase
@@ -712,13 +713,14 @@ export class MainStreetScene extends CardGameScene {
     this.hudContainer.add(coinText);
 
     // Reputation
-    const repText = this.add.text(gameW / 2 + 50, hudY, `Rep: ${reputation}`, {
+    // Rep and Score side by side
+    const repText = this.add.text(gameW / 2, hudY, `Reputation: ${reputation}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#88bbff', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0.5);
     this.hudContainer.add(repText);
 
-    // Score
-    const scoreText = this.add.text(gameW - 40, hudY, `Score: ${score}`, {
+    // Score - to the right of Reputation
+    const scoreText = this.add.text(gameW / 2 + 160, hudY, `Score: ${score}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#ff8844', fontFamily: FONT_FAMILY,
     }).setOrigin(1, 0.5);
     this.hudContainer.add(scoreText);
