@@ -3,7 +3,7 @@ import { join } from 'path';
 import { describe, it, expect } from 'vitest';
 
 describe('Main Street placeholder SVG', () => {
-  it('exists and has correct canonical dimensions (140x190)', () => {
+  it('exists and has correct canonical dimensions (140x80)', () => {
     const p = join('public', 'assets', 'games', 'main-street', 'svg', 'placeholder-card.svg');
     const src = readFileSync(p, 'utf8');
 
@@ -26,6 +26,6 @@ describe('Main Street placeholder SVG', () => {
     const w = Number(widthMatch![1]);
     const h = Number(heightMatch![1]);
     expect(w).toBe(140);
-    expect(h).toBe(190);
+    expect(h).toBe(80);
   });
 });

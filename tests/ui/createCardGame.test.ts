@@ -108,6 +108,7 @@ describe('createCardGame', () => {
       expect(config.scale).toEqual({
         mode: 1, // Phaser.Scale.FIT
         autoCenter: 2, // Phaser.Scale.CENTER_BOTH
+        autoRound: true,
       });
     });
 

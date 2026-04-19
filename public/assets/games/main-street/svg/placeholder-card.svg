@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="140" height="190" viewBox="0 0 140 190" role="img" aria-label="Placeholder card">
+<svg xmlns="http://www.w3.org/2000/svg" width="140" height="80" viewBox="0 0 140 80" role="img" aria-label="Placeholder card (market slot)">
   <defs>
     <linearGradient id="g" x1="0" x2="1">
       <stop offset="0" stop-color="#ffffff" stop-opacity="0.06" />
       <stop offset="1" stop-color="#ffffff" stop-opacity="0.02" />
     </linearGradient>
   </defs>
-  <rect x="0" y="0" width="140" height="190" rx="8" ry="8" fill="#f5efe6" stroke="#c8b79a" stroke-width="2" />
-  <rect x="6" y="6" width="128" height="178" rx="6" ry="6" fill="url(#g)" />
-  <g font-family="Arial, Helvetica, sans-serif" fill="#4a3524" font-size="18" font-weight="bold">
-    <text x="10" y="28">Main</text>
-    <text x="10" y="52">Street</text>
+  <rect x="0" y="0" width="140" height="80" rx="6" ry="6" fill="#f5efe6" stroke="#c8b79a" stroke-width="2" />
+  <rect x="4" y="4" width="132" height="72" rx="4" ry="4" fill="url(#g)" />
+  <g font-family="Arial, Helvetica, sans-serif" fill="#4a3524" font-size="14" font-weight="bold">
+    <text x="8" y="22">Main Street</text>
   </g>
-  <circle cx="110" cy="150" r="18" fill="#e0c7a0" stroke="#c8b79a" stroke-width="2" />
-  <text x="110" y="157" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#4a3524" text-anchor="middle">$5</text>
+  <!-- Price badge: bottom-right for market thumbnail -->
+  <circle cx="118" cy="56" r="12" fill="#e0c7a0" stroke="#c8b79a" stroke-width="2" />
+  <text x="118" y="60" font-family="Arial, Helvetica, sans-serif" font-size="10" fill="#4a3524" text-anchor="middle">$5</text>
 </svg>

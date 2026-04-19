@@ -21,7 +21,6 @@ import type { BusinessCard, EventCard, UpgradeCard } from '../MainStreetCards';
 import {
   GRID_SIZE,
   synergyColor,
-  cardLabel,
   CARD_TEMPLATE_NAMES,
   MARKET_BUSINESS_SLOTS,
   MARKET_INVESTMENT_SLOTS,
@@ -70,6 +69,8 @@ import {
 import { UndoRedoManager } from '../../../src/core-engine';
 import { BuyBusinessCommand, BuyUpgradeCommand, BuyEventCommand, PlayEventCommand } from '../MainStreetCommands';
 import { MainStreetTranscriptRecorder, setMainStreetRecorder, recordMainStreetEvent } from '../MainStreetTranscript';
+import { rasteriseSvgToTexture, makeTextureKey, markSceneValid } from './SvgTextureHelpers';
+import { SvgDomRenderer } from './SvgDomRenderer';
 
 // ── Constants ───────────────────────────────────────────────
 
@@ -94,14 +95,16 @@ const BASE_MARKET_LABEL_W = 90;
 const BASE_QUEUE_CARD_W = BASE_MARKET_CARD_W;
 const BASE_QUEUE_CARD_H = BASE_MARKET_CARD_H;
 const BASE_QUEUE_CARD_GAP = 10;
-const BASE_SLOT_W = 96;
-const BASE_SLOT_H = 100;
+// Make street slots match market placeholder size (market slots: 140x80)
+const BASE_SLOT_W = 140;
+const BASE_SLOT_H = 80;
 const BASE_SLOT_GAP = 10;
 const STREET_COLS = 5;
 const STREET_ROWS = 2;
 const STREET_ROW_GAP = 12;
-const BASE_HAND_CARD_W = 150;
-const BASE_HAND_CARD_H = 90;
+// Make hand slot match placeholder size as requested
+const BASE_HAND_CARD_W = 140;
+const BASE_HAND_CARD_H = 80;
 
 // Activity Log panel layout
 const LOG_TITLE_H = 22;
@@ -229,6 +232,10 @@ export class MainStreetScene extends CardGameScene {
   /** Grid slot index highlighted by the current hint (null = none). */
   private hintedSlotIndex: number | null = null;
 
+  // SVG debug overlay (opt-in via ?msSvgDebug=1)
+  private svgDebugEnabled = false;
+  private svgDebugText?: Phaser.GameObjects.Text;
+
   // Undo/Redo manager for market actions (per-scene)
   private undoManager!: UndoRedoManager;
 
@@ -236,18 +243,42 @@ export class MainStreetScene extends CardGameScene {
     super({ key: 'MainStreetScene' });
   }
 
+  /** Stores raw SVG text for each card template (fetched in preload, used for lazy rasterisation). */
+  private cardSvgSources: Map<string, string> = new Map();
+  /** Resolves when all SVG source fetches started in preload have settled. */
+  private cardSvgLoadPromise: Promise<void> = Promise.resolve();
+
+  // DOM-based SVG renderer (optional) - renders crisp SVGs using browser image rendering
+  private svgDom?: SvgDomRenderer;
+
   // Preload placeholder SVG used for visual scale testing in the market
   preload(): void {
-    // Canonical card size (140x190) — loader will keep vector fidelity and
-    // we scale when rendering into market slots.
+    // Canonical card size for Main Street market placeholder (140x80)
     try {
       this.load.svg('ms_placeholder_card', 'assets/games/main-street/svg/placeholder-card.svg', {
         width: 140,
-        height: 190,
+        height: 80,
       });
+
+      // Fetch all per-card SVG assets as text for dynamic rasterisation at display size.
+      // We do not pre-load them as textures - we lazily rasterise them at exact pixel
+      // dimensions needed for crisp rendering on the current screen/DPR.
+      const fetches: Promise<void>[] = [];
+      for (const templateId of CARD_TEMPLATE_NAMES.keys()) {
+        const path = `assets/games/main-street/svg/cards/${templateId}.svg`;
+        const p = fetch(path)
+          .then((resp) => (resp.ok ? resp.text() : null))
+          .then((text) => {
+            if (text) {
+              this.cardSvgSources.set(templateId, text);
+            }
+          })
+          .catch(() => { /* ignore fetch failures in test environments */ });
+        fetches.push(p);
+      }
+      this.cardSvgLoadPromise = Promise.all(fetches).then(() => {});
     } catch (e) {
       // If svg loader is unavailable in the current environment, ignore
-      // the error — tests can still validate the file on disk.
       // eslint-disable-next-line no-console
       console.debug('[MS] preload: svg load failed', e);
     }
@@ -300,9 +331,31 @@ export class MainStreetScene extends CardGameScene {
 
     // UI scaffolding
     this.layout = this.computeLayout();
+    this.svgDebugEnabled = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('msSvgDebug') === '1';
+    // Prewarm SVG textures once all SVG sources are loaded.
+    // Until then the scene uses fallback cards; then we refresh with SVG textures.
+    void this.cardSvgLoadPromise
+      .then(() => this.prewarmVisibleCardTextures())
+      .then(() => {
+        try {
+          if (this && this.hudContainer && (this as any).game?.renderer) {
+            this.refreshAll();
+          }
+        } catch {
+          // Ignore errors - scene may have been destroyed
+        }
+      });
     this.createHeader();
     this.createContainers();
     this.createInstructions();
+    this.initSvgDebugOverlay();
+
+    // DOM renderer for SVGs
+    try {
+      this.svgDom = new SvgDomRenderer(this);
+    } catch {
+      this.svgDom = undefined;
+    }
 
     this.scale.off(Phaser.Scale.Events.RESIZE, this.handleResize, this);
     this.scale.on(Phaser.Scale.Events.RESIZE, this.handleResize, this);
@@ -371,6 +424,113 @@ export class MainStreetScene extends CardGameScene {
   private createHeader(): void {
     createSceneMenuButton(this);
     createSceneTitle(this, 'Main Street');
+  }
+
+  /**
+   * Prewarms SVG textures for cards that will be visible on initial render.
+   * This rasterises them at the exact pixel sizes needed for the current layout,
+   * ensuring crisp rendering on HiDPI displays.
+   */
+  private async prewarmVisibleCardTextures(): Promise<void> {
+    // Mark scene as valid before starting rasterisation
+    markSceneValid(this);
+    
+    const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
+    const { slotW, slotH, marketCardW, marketCardH, queueCardW, queueCardH, handCardW, handCardH } = this.layout;
+    const renderSlotW = Math.max(1, Math.round(slotW - 4));
+    const renderSlotH = Math.max(1, Math.round(slotH - 4));
+    const renderMarketW = Math.max(1, Math.round(marketCardW - 4));
+    const renderMarketH = Math.max(1, Math.round(marketCardH - 4));
+    const renderQueueW = Math.max(1, Math.round(queueCardW - 4));
+    const renderQueueH = Math.max(1, Math.round(queueCardH - 4));
+    const renderHandW = Math.max(1, Math.round(handCardW - 4));
+    const renderHandH = Math.max(1, Math.round(handCardH - 4));
+
+    // Collect unique template IDs visible in market, queue, street, and hand
+    const visibleTemplates = new Set<string>();
+
+    // Market business cards
+    for (const card of this.state.market.business) {
+      if (card) visibleTemplates.add(this.templateIdFromCardId(card.id));
+    }
+    // Market investment cards (upgrades + events)
+    for (const card of this.state.market.investments) {
+      if (card) visibleTemplates.add(this.templateIdFromCardId(card.id));
+    }
+    // Incident queue
+    for (const card of this.state.incidentQueue) {
+      if (card) visibleTemplates.add(this.templateIdFromCardId(card.id));
+    }
+    // Street grid businesses
+    for (const biz of this.state.streetGrid) {
+      if (biz) visibleTemplates.add(this.templateIdFromCardId(biz.id));
+    }
+    // Held event card
+    if (this.state.heldEvent) {
+      visibleTemplates.add(this.templateIdFromCardId(this.state.heldEvent.id));
+    }
+
+    // Rasterise each visible template at the required sizes
+    const rasterizePromises: Promise<void>[] = [];
+
+    for (const templateId of visibleTemplates) {
+      const svgText = this.cardSvgSources.get(templateId);
+      if (!svgText) continue;
+
+      // Market size
+      const marketKey = makeTextureKey(templateId, renderMarketW, renderMarketH, dpr);
+      rasterizePromises.push(
+        rasteriseSvgToTexture(this, marketKey, svgText, renderMarketW, renderMarketH, dpr),
+      );
+
+      // Street slot size
+      const slotKey = makeTextureKey(templateId, renderSlotW, renderSlotH, dpr);
+      rasterizePromises.push(
+        rasteriseSvgToTexture(this, slotKey, svgText, renderSlotW, renderSlotH, dpr),
+      );
+
+      // Queue size
+      const queueKey = makeTextureKey(templateId, renderQueueW, renderQueueH, dpr);
+      rasterizePromises.push(
+        rasteriseSvgToTexture(this, queueKey, svgText, renderQueueW, renderQueueH, dpr),
+      );
+
+      // Hand size
+      const handKey = makeTextureKey(templateId, renderHandW, renderHandH, dpr);
+      rasterizePromises.push(
+        rasteriseSvgToTexture(this, handKey, svgText, renderHandW, renderHandH, dpr),
+      );
+    }
+
+    // Wait for all prewarming to complete
+    await Promise.all(rasterizePromises);
+  }
+
+  /** Extracts the base template ID from a card ID (strips copy suffixes like -0, -1). */
+  private templateIdFromCardId(cardId: string): string {
+    return cardId.replace(/-\d+$/, '');
+  }
+
+  /**
+   * Lazily request a card texture for the given render size.
+   * If generation succeeds, trigger a refresh so the SVG texture is used.
+   */
+  private requestCardTexture(cardId: string, renderW: number, renderH: number): void {
+    const templateId = this.templateIdFromCardId(cardId);
+    const svgText = this.cardSvgSources.get(templateId);
+    if (!svgText) return;
+
+    const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
+    const key = makeTextureKey(templateId, renderW, renderH, dpr);
+    if (this.textures.exists(key)) return;
+
+    void rasteriseSvgToTexture(this, key, svgText, renderW, renderH, dpr).then(() => {
+      try {
+        this.refreshAll();
+      } catch {
+        // scene may be shutting down
+      }
+    });
   }
 
   private computeLayout(): SceneLayout {
@@ -522,8 +682,55 @@ export class MainStreetScene extends CardGameScene {
       .setOrigin(0.5, 1);
   }
 
+  private initSvgDebugOverlay(): void {
+    if (!this.svgDebugEnabled) return;
+    this.svgDebugText = this.add.text(10, 42, '', {
+      fontSize: '12px',
+      color: '#9be0ff',
+      fontFamily: FONT_FAMILY,
+      backgroundColor: '#00000088',
+      padding: { x: 6, y: 4 },
+    }).setDepth(10_000).setScrollFactor(0);
+  }
+
+  private updateSvgDebugOverlay(): void {
+    if (!this.svgDebugEnabled || !this.svgDebugText) return;
+    const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
+    const keys = Object.keys((this.textures as unknown as { list?: Record<string, unknown> }).list ?? {});
+    const cardTextureKeys = keys.filter((k) => k.startsWith('ms_card_'));
+
+    let sampleLine = 'sample: none';
+    const containers = this.marketContainer?.list ?? [];
+    for (const obj of containers) {
+      const c = obj as Phaser.GameObjects.Container;
+      if (!c.list) continue;
+      for (const child of c.list) {
+        const img = child as Phaser.GameObjects.Image;
+        const key = img?.texture?.key;
+        if (key && key.startsWith('ms_card_')) {
+          const tex = this.textures.get(key);
+          const src = tex?.source?.[0] as { width?: number; height?: number } | undefined;
+          sampleLine = `sample: ${key} disp:${Math.round(img.displayWidth)}x${Math.round(img.displayHeight)} src:${src?.width ?? '?'}x${src?.height ?? '?'}`;
+          break;
+        }
+      }
+      if (sampleLine !== 'sample: none') break;
+    }
+
+    const canvasW = (this.game?.canvas?.width ?? 0);
+    const canvasH = (this.game?.canvas?.height ?? 0);
+    this.svgDebugText.setText([
+      '[SVG Debug]',
+      `dpr:${dpr} canvas:${canvasW}x${canvasH} scale:${Math.round(this.scale.width)}x${Math.round(this.scale.height)}`,
+      `svg sources:${this.cardSvgSources.size} generated textures:${cardTextureKeys.length}`,
+      sampleLine,
+    ]);
+  }
+
   private handleResize(): void {
     this.layout = this.computeLayout();
+    // Regenerate textures at new sizes on resize
+    this.prewarmVisibleCardTextures();
     this.challengeContainer.setPosition(this.layout.challengeX, this.layout.challengeY);
     this.logContainer.setPosition(this.layout.logX, this.layout.logY);
     this.instructionText.setPosition(this.layout.gameW - 24, this.layout.instructionY);
@@ -596,6 +803,18 @@ export class MainStreetScene extends CardGameScene {
     this.hintedSlotIndex = null;
 
     this.refreshAll();
+
+    // Prewarm currently-visible cards after market/queue are populated.
+    void this.cardSvgLoadPromise
+      .then(() => this.prewarmVisibleCardTextures())
+      .then(() => {
+        try {
+          this.refreshAll();
+        } catch {
+          // scene may be shutting down
+        }
+      });
+
     this.instructionText.setText(
       `Turn ${this.state.turn} / ${this.state.config.maxTurns} -- Buy cards from the market or End Turn`,
     );
@@ -670,6 +889,7 @@ export class MainStreetScene extends CardGameScene {
     this.refreshActionButtons();
     this.refreshChallengeTracker();
     this.refreshLog();
+    this.updateSvgDebugOverlay();
   }
 
   // ── HUD ─────────────────────────────────────────────────
@@ -815,53 +1035,85 @@ export class MainStreetScene extends CardGameScene {
 
   private drawBusinessSlot(x: number, y: number, _index: number, biz: BusinessCard): void {
     const { slotW, slotH } = this.layout;
-    const primaryColor = synergyColor(biz.synergyTypes[0]);
     const isHinted = this.hintedSlotIndex === _index;
 
-    // Card background
-    const bg = this.add.rectangle(
-      x + slotW / 2, y + slotH / 2,
-      slotW, slotH, primaryColor, 0.7,
-    );
-    // Highlight the slot if it is the hint target (e.g., upgrade target)
-    bg.setStrokeStyle(isHinted ? 3 : 2, isHinted ? 0x44ffff : 0xffffff, isHinted ? 1.0 : 0.4);
-    this.streetContainer.add(bg);
+    const renderW = Math.max(1, Math.round(slotW - 4));
+    const renderH = Math.max(1, Math.round(slotH - 4));
+    const tplKey = this.templateKeyForCard(biz.id, renderW, renderH);
+    const usedSvg = this.textures && (this.textures as Phaser.Textures.TextureManager).exists(tplKey);
+    if (usedSvg && this.svgDom) {
+      // Render via DOM SVG image for perfect crispness
+      const cx = x + slotW / 2;
+      const cy = y + slotH / 2;
+      const templateId = this.templateIdFromCardId(biz.id);
+      const svgText = this.cardSvgSources.get(templateId)!;
+      this.svgDom.createOrUpdate(templateId, svgText, cx, cy, renderW, renderH, () => {
+        // click maps to scene slot click
+        this.onSlotClick(_index);
+      }, 100);
+    } else if (usedSvg) {
+      const img = this.add.image(Math.round(x + slotW / 2), Math.round(y + slotH / 2), tplKey);
+      // Use the exact slot dimensions - texture is already rasterised at correct size
+      img.setDisplaySize(renderW, renderH);
+      this.streetContainer.add(img);
 
-    // Name
-    const nameText = this.add.text(x + slotW / 2, y + 12, biz.name, {
-      fontSize: '12px', fontStyle: 'bold', color: '#ffffff', fontFamily: FONT_FAMILY,
-      wordWrap: { width: slotW - 8 },
-      align: 'center',
-    }).setOrigin(0.5, 0);
-    this.streetContainer.add(nameText);
+      if (isHinted) {
+        const hintRect = this.add.rectangle(x + slotW / 2, y + slotH / 2, slotW, slotH);
+        hintRect.setStrokeStyle(3, 0x44ffff);
+        hintRect.setFillStyle(0x000000, 0);
+        this.streetContainer.add(hintRect);
+      }
+    } else {
+      this.requestCardTexture(biz.id, renderW, renderH);
+      const primaryColor = synergyColor(biz.synergyTypes[0]);
+      // Card background
+      const bg = this.add.rectangle(
+        x + slotW / 2, y + slotH / 2,
+        slotW, slotH, primaryColor, 0.7,
+      );
+      // Highlight the slot if it is the hint target (e.g., upgrade target)
+      bg.setStrokeStyle(isHinted ? 3 : 2, isHinted ? 0x44ffff : 0xffffff, isHinted ? 1.0 : 0.4);
+      this.streetContainer.add(bg);
 
-    // Income
-    const income = biz.baseIncome + biz.incomeBonus;
-    const incText = this.add.text(x + slotW / 2, y + slotH - 30, `+${income}/turn`, {
-      fontSize: '13px', color: '#ffee88', fontFamily: FONT_FAMILY,
-    }).setOrigin(0.5, 0);
-    this.streetContainer.add(incText);
+      // Name
+      const nameText = this.add.text(x + slotW / 2, y + 8, biz.name, {
+        fontSize: '12px', fontStyle: 'bold', color: '#ffffff', fontFamily: FONT_FAMILY,
+        wordWrap: { width: slotW - 8 },
+        align: 'center',
+      }).setOrigin(0.5, 0);
+      this.streetContainer.add(nameText);
 
-    // Level
-    if (biz.level > 0) {
-      const lvlText = this.add.text(x + slotW - 6, y + 4, `Lv${biz.level}`, {
-        fontSize: '11px', color: '#ffdd44', fontFamily: FONT_FAMILY,
-      }).setOrigin(1, 0);
-      this.streetContainer.add(lvlText);
+      // Income
+      const income = biz.baseIncome + biz.incomeBonus;
+      const incText = this.add.text(x + slotW / 2, y + slotH - 28, `+${income}/turn`, {
+        fontSize: '13px', color: '#ffee88', fontFamily: FONT_FAMILY,
+      }).setOrigin(0.5, 0);
+      this.streetContainer.add(incText);
     }
 
-    // Synergy label at bottom
-    const synLabel = biz.synergyTypes.join('/');
-    const synText = this.add.text(x + slotW / 2, y + slotH - 12, synLabel, {
-      fontSize: '10px', color: '#dddddd', fontFamily: FONT_FAMILY,
-    }).setOrigin(0.5, 1);
-    this.streetContainer.add(synText);
+    // Only draw fallback textual overlays when no SVG texture is available.
+    if (!usedSvg) {
+      // Level
+      if (biz.level > 0) {
+        const lvlText = this.add.text(x + slotW - 6, y + 4, `Lv${biz.level}`, {
+          fontSize: '11px', color: '#ffdd44', fontFamily: FONT_FAMILY,
+        }).setOrigin(1, 0);
+        this.streetContainer.add(lvlText);
+      }
 
-    // Slot index
-    const idxText = this.add.text(x + 4, y + 4, `${_index}`, {
-      fontSize: '10px', color: '#ffffff55', fontFamily: FONT_FAMILY,
-    });
-    this.streetContainer.add(idxText);
+      // Synergy label at bottom
+      const synLabel = biz.synergyTypes.join('/');
+      const synText = this.add.text(x + slotW / 2, y + slotH - 12, synLabel, {
+        fontSize: '10px', color: '#dddddd', fontFamily: FONT_FAMILY,
+      }).setOrigin(0.5, 1);
+      this.streetContainer.add(synText);
+
+      // Slot index
+      const idxText = this.add.text(x + 4, y + 4, `${_index}`, {
+        fontSize: '10px', color: '#ffffff55', fontFamily: FONT_FAMILY,
+      });
+      this.streetContainer.add(idxText);
+    }
   }
 
   private drawEmptySlot(x: number, y: number, index: number): void {
@@ -963,44 +1215,8 @@ export class MainStreetScene extends CardGameScene {
       const card = cards[i];
 
       if (card) {
-        // If a placeholder texture is available, render it in the first slot
-        // so developers can visually validate SVG scaling. Otherwise fall back
-        // to the normal drawMarketCard rendering.
-        if (i === 0 && this.textures && this.textures.exists && this.textures.exists('ms_placeholder_card')) {
-          const container = this.add.container(cx + marketCardW / 2, y + marketCardH / 2);
-          const img = this.add.image(0, 0, 'ms_placeholder_card');
-          // Preserve source aspect ratio when fitting into the slot.
-          const SRC_W = 140;
-          const SRC_H = 190;
-          const fitW = marketCardW - 4;
-          const fitH = marketCardH - 4;
-          const scale = Math.min(fitW / SRC_W, fitH / SRC_H);
-          img.setDisplaySize(Math.round(SRC_W * scale), Math.round(SRC_H * scale));
-          container.add(img);
-
-          // Add a simple label so the card still shows its name/cost
-          const labelStr = cardLabel(card);
-          const nameText = this.add.text(0, -marketCardH / 2 + 10, labelStr, {
-            fontSize: '12px', fontStyle: 'bold', color: '#ffffff', fontFamily: FONT_FAMILY,
-            wordWrap: { width: marketCardW - 12 },
-            align: 'center',
-          }).setOrigin(0.5, 0);
-          container.add(nameText);
-
-          // Make it interactive like the regular card if applicable
-          const isIncidentEvent = card.family === 'event' && (card as EventCard).trigger === 'Incident';
-          if (this.uiPhase === 'market' && !isIncidentEvent) {
-            img.setInteractive({ useHandCursor: true });
-            img.on('pointerdown', () => onClick(card));
-            img.on('pointerover', () => container.setScale(1.03));
-            img.on('pointerout', () => container.setScale(1.0));
-          }
-
-          this.marketContainer.add(container);
-        } else {
-          const cardObj = this.drawMarketCard(cx, y, card, onClick);
-          this.marketContainer.add(cardObj);
-        }
+        const cardObj = this.drawMarketCard(cx, y, card, onClick);
+        this.marketContainer.add(cardObj);
       } else {
         // Empty slot
         const empty = this.add.rectangle(
@@ -1033,6 +1249,18 @@ export class MainStreetScene extends CardGameScene {
     }
   }
 
+  private templateKeyForCard(cardId: string, width?: number, height?: number): string {
+    // strip copy suffixes like `-0`, `-1`, or serials appended by deck builders
+    const base = cardId.replace(/-\d+$/,'');
+    
+    // If dimensions provided, include them in the key for size-specific textures
+    if (width !== undefined && height !== undefined) {
+      const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
+      return makeTextureKey(base, width, height, dpr);
+    }
+    return `ms_card_${base}`;
+  }
+
   private drawMarketCard(
     x: number,
     y: number,
@@ -1040,7 +1268,7 @@ export class MainStreetScene extends CardGameScene {
     onClick: (card: BusinessCard | EventCard | UpgradeCard) => void,
   ): Phaser.GameObjects.Container {
     const { marketCardW, marketCardH } = this.layout;
-    const container = this.add.container(x + marketCardW / 2, y + marketCardH / 2);
+    const container = this.add.container(Math.round(x + marketCardW / 2), Math.round(y + marketCardH / 2));
 
     // Determine if this is a non-purchasable Incident event
     const isIncidentEvent = card.family === 'event' && (card as EventCard).trigger === 'Incident';
@@ -1048,85 +1276,65 @@ export class MainStreetScene extends CardGameScene {
     // Determine if this card is the hint recommendation
     const isHinted = this.hintedCardId !== null && card.id === this.hintedCardId;
 
-    // Determine card color
-    let fillColor = 0x333322;
-    if (card.family === 'business') {
-      fillColor = synergyColor((card as BusinessCard).synergyTypes[0]);
-    } else if (card.family === 'event') {
-      fillColor = isIncidentEvent ? 0x2B3A67 : 0x8B4513;  // Indigo for Incident, Brown for Investment
-    } else if (card.family === 'upgrade') {
-      fillColor = 0x6B4C9A;  // Purple for upgrades
+    // If we have a per-card SVG texture, render it as the card background
+    const renderW = Math.max(1, Math.round(marketCardW - 4));
+    const renderH = Math.max(1, Math.round(marketCardH - 4));
+    const tplKey = this.templateKeyForCard(card.id, renderW, renderH);
+    if (this.textures && (this.textures as Phaser.Textures.TextureManager).exists(tplKey) && this.svgDom === undefined) {
+      const img = this.add.image(0, 0, tplKey);
+      // Texture is already rasterised at correct size for this slot
+      img.setDisplaySize(renderW, renderH);
+      container.add(img);
+    } else if (this.svgDom && this.cardSvgSources.has(this.templateIdFromCardId(card.id))) {
+      // Render SVG via DOM element
+      const cx = x + marketCardW / 2;
+      const cy = y + marketCardH / 2;
+      const templateId = this.templateIdFromCardId(card.id);
+      const svgText = this.cardSvgSources.get(templateId)!;
+      this.svgDom.createOrUpdate(templateId, svgText, cx, cy, renderW, renderH, () => onClick(card), 100);
+    } else {
+      this.requestCardTexture(card.id, renderW, renderH);
+      // Determine card color
+      let fillColor = 0x333322;
+      if (card.family === 'business') {
+        fillColor = synergyColor((card as BusinessCard).synergyTypes[0]);
+      } else if (card.family === 'event') {
+        fillColor = isIncidentEvent ? 0x2B3A67 : 0x8B4513;  // Indigo for Incident, Brown for Investment
+      } else if (card.family === 'upgrade') {
+        fillColor = 0x6B4C9A;  // Purple for upgrades
+      }
+
+      // Background
+      const fillAlpha = isIncidentEvent ? 0.5 : 0.7;
+      const bg = this.add.rectangle(0, 0, marketCardW, marketCardH, fillColor, fillAlpha);
+      // Hinted cards get a bright cyan border; incident events use their normal border
+      const strokeColor = isHinted ? 0x44ffff : (isIncidentEvent ? 0x556688 : 0x888877);
+      const strokeWidth = isHinted ? 3 : 1;
+      bg.setStrokeStyle(strokeWidth, strokeColor);
+      container.add(bg);
+
+      // Interactivity (only during market phase, and not for Incident events)
+      if (this.uiPhase === 'market' && !isIncidentEvent) {
+        bg.setInteractive({ useHandCursor: true });
+        bg.on('pointerdown', () => onClick(card));
+        bg.on('pointerover', () => {
+          bg.setStrokeStyle(2, 0xffdd44);
+          container.setScale(1.05);
+        });
+        bg.on('pointerout', () => {
+          // Restore hint border if this card is hinted; otherwise use normal border
+          bg.setStrokeStyle(isHinted ? 3 : 1, isHinted ? 0x44ffff : 0x888877);
+          container.setScale(1.0);
+        });
+      }
     }
 
-    // Background
-    const fillAlpha = isIncidentEvent ? 0.5 : 0.7;
-    const bg = this.add.rectangle(0, 0, marketCardW, marketCardH, fillColor, fillAlpha);
-    // Hinted cards get a bright cyan border; incident events use their normal border
-    const strokeColor = isHinted ? 0x44ffff : (isIncidentEvent ? 0x556688 : 0x888877);
-    const strokeWidth = isHinted ? 3 : 1;
-    bg.setStrokeStyle(strokeWidth, strokeColor);
-    container.add(bg);
+    // Card label and additional info are rendered inside per-card SVGs; only
+    // add textual overlays when we do NOT have a per-card texture.
+    const usedSvg = this.textures && (this.textures as Phaser.Textures.TextureManager).exists(tplKey);
 
-    // Card label (name + cost for business/upgrade)
-    const labelStr = cardLabel(card);
-    const nameText = this.add.text(0, -marketCardH / 2 + 10, labelStr, {
-      fontSize: '12px', fontStyle: 'bold',
-      color: isIncidentEvent ? '#8899bb' : '#ffffff',
-      fontFamily: FONT_FAMILY,
-      wordWrap: { width: marketCardW - 12 },
-      align: 'center',
-    }).setOrigin(0.5, 0);
-    container.add(nameText);
-
-    // Trigger label for event cards (top-right corner)
-    if (card.family === 'event') {
-      const evt = card as EventCard;
-      const triggerColor = isIncidentEvent ? '#6688bb' : '#cc9944';
-      const triggerLabel = this.add.text(
-        marketCardW / 2 - 4, -marketCardH / 2 + 4,
-        evt.trigger,
-        { fontSize: '9px', fontStyle: 'bold', color: triggerColor, fontFamily: FONT_FAMILY },
-      ).setOrigin(1, 0);
-      container.add(triggerLabel);
-    }
-
-    // Additional info line
-    let infoStr = '';
-    if (card.family === 'business') {
-      const biz = card as BusinessCard;
-      infoStr = `+${biz.baseIncome}/turn  ${biz.synergyTypes.join('/')}`;
-    } else if (card.family === 'event') {
-      const evt = card as EventCard;
-      const parts: string[] = [];
-      if (evt.coinDelta !== 0) parts.push(`${evt.coinDelta > 0 ? '+' : ''}${evt.coinDelta} coins`);
-      if (evt.reputationDelta !== 0) parts.push(`${evt.reputationDelta > 0 ? '+' : ''}${evt.reputationDelta} rep`);
-      infoStr = parts.join(', ') || evt.effect;
-    } else if (card.family === 'upgrade') {
-      const upg = card as UpgradeCard;
-      infoStr = `For: ${upg.targetBusiness}`;
-    }
-
-    const infoText = this.add.text(0, marketCardH / 2 - 18, infoStr, {
-      fontSize: '11px', color: isIncidentEvent ? '#7788aa' : '#ddddcc',
-      fontFamily: FONT_FAMILY,
-      wordWrap: { width: marketCardW - 12 },
-      align: 'center',
-    }).setOrigin(0.5, 1);
-    container.add(infoText);
-
-    // Interactivity (only during market phase, and not for Incident events)
-    if (this.uiPhase === 'market' && !isIncidentEvent) {
-      bg.setInteractive({ useHandCursor: true });
-      bg.on('pointerdown', () => onClick(card));
-      bg.on('pointerover', () => {
-        bg.setStrokeStyle(2, 0xffdd44);
-        container.setScale(1.05);
-      });
-      bg.on('pointerout', () => {
-        // Restore hint border if this card is hinted; otherwise use normal border
-        bg.setStrokeStyle(isHinted ? 3 : 1, isHinted ? 0x44ffff : 0x888877);
-        container.setScale(1.0);
-      });
+    if (!usedSvg) {
+      // Intentionally no text overlays: card text is authored inside each SVG.
     }
 
     return container;
@@ -1192,35 +1400,24 @@ export class MainStreetScene extends CardGameScene {
     card: EventCard,
   ): Phaser.GameObjects.Container {
     const { queueCardW, queueCardH } = this.layout;
-    const container = this.add.container(x + queueCardW / 2, y + queueCardH / 2);
+    const container = this.add.container(Math.round(x + queueCardW / 2), Math.round(y + queueCardH / 2));
 
-    // Indigo background (non-interactive)
-    const bg = this.add.rectangle(0, 0, queueCardW, queueCardH, 0x2B3A67, 0.5);
-    bg.setStrokeStyle(1, 0x556688);
-    container.add(bg);
-
-    // Card name
-    const nameText = this.add.text(0, -queueCardH / 2 + 8, cardLabel(card), {
-      fontSize: '11px', fontStyle: 'bold', color: '#8899bb',
-      fontFamily: FONT_FAMILY,
-      wordWrap: { width: queueCardW - 12 },
-      align: 'center',
-    }).setOrigin(0.5, 0);
-    container.add(nameText);
-
-    // Effect summary
-    const parts: string[] = [];
-    if (card.coinDelta !== 0) parts.push(`${card.coinDelta > 0 ? '+' : ''}${card.coinDelta} coins`);
-    if (card.reputationDelta !== 0) parts.push(`${card.reputationDelta > 0 ? '+' : ''}${card.reputationDelta} rep`);
-    const infoStr = parts.join(', ') || card.effect;
-
-    const infoText = this.add.text(0, queueCardH / 2 - 12, infoStr, {
-      fontSize: '10px', color: '#7788aa',
-      fontFamily: FONT_FAMILY,
-      wordWrap: { width: queueCardW - 12 },
-      align: 'center',
-    }).setOrigin(0.5, 1);
-    container.add(infoText);
+    const renderW = Math.max(1, Math.round(queueCardW - 4));
+    const renderH = Math.max(1, Math.round(queueCardH - 4));
+    const tplKey = this.templateKeyForCard(card.id, renderW, renderH);
+    const usedSvg = this.textures && (this.textures as Phaser.Textures.TextureManager).exists(tplKey);
+    if (usedSvg) {
+      const img = this.add.image(0, 0, tplKey);
+      // Texture is already rasterised at correct size for this slot
+      img.setDisplaySize(renderW, renderH);
+      container.add(img);
+    } else {
+      this.requestCardTexture(card.id, renderW, renderH);
+      // Indigo fallback background (non-interactive); no text overlays.
+      const bg = this.add.rectangle(0, 0, queueCardW, queueCardH, 0x2B3A67, 0.5);
+      bg.setStrokeStyle(1, 0x556688);
+      container.add(bg);
+    }
 
     return container;
   }
@@ -1262,54 +1459,39 @@ export class MainStreetScene extends CardGameScene {
     card: EventCard,
   ): Phaser.GameObjects.Container {
     const { handCardW, handCardH } = this.layout;
-    const container = this.add.container(x + handCardW / 2, y + handCardH / 2);
+    const container = this.add.container(Math.round(x + handCardW / 2), Math.round(y + handCardH / 2));
     const isHinted = this.hintedCardId !== null && card.id === this.hintedCardId;
 
-    // Warm brown background (Investment)
-    const bg = this.add.rectangle(0, 0, handCardW, handCardH, 0x8B4513, 0.7);
-    bg.setStrokeStyle(isHinted ? 3 : 2, isHinted ? 0x44ffff : 0xcc9944);
-    container.add(bg);
-
-    // Card name
-    const nameText = this.add.text(0, -handCardH / 2 + 10, cardLabel(card), {
-      fontSize: '12px', fontStyle: 'bold', color: '#ffffff',
-      fontFamily: FONT_FAMILY,
-      wordWrap: { width: handCardW - 12 },
-      align: 'center',
-    }).setOrigin(0.5, 0);
-    container.add(nameText);
-
-    // Effect summary
-    const parts: string[] = [];
-    if (card.coinDelta !== 0) parts.push(`${card.coinDelta > 0 ? '+' : ''}${card.coinDelta} coins`);
-    if (card.reputationDelta !== 0) parts.push(`${card.reputationDelta > 0 ? '+' : ''}${card.reputationDelta} rep`);
-    const infoStr = parts.join(', ') || card.effect;
-
-    const infoText = this.add.text(0, handCardH / 2 - 14, infoStr, {
-      fontSize: '11px', color: '#ddddcc',
-      fontFamily: FONT_FAMILY,
-      wordWrap: { width: handCardW - 12 },
-      align: 'center',
-    }).setOrigin(0.5, 1);
-    container.add(infoText);
-
-    // "Click to play" hint
-    const hint = this.add.text(0, handCardH / 2 - 2, 'Click to play', {
-      fontSize: '9px', fontStyle: 'italic', color: '#ccaa66',
-      fontFamily: FONT_FAMILY,
-    }).setOrigin(0.5, 1);
-    container.add(hint);
+    const renderW = Math.max(1, Math.round(handCardW - 4));
+    const renderH = Math.max(1, Math.round(handCardH - 4));
+    const tplKey = this.templateKeyForCard(card.id, renderW, renderH);
+    let interactiveTarget: Phaser.GameObjects.GameObject | null = null;
+    if (this.textures && (this.textures as Phaser.Textures.TextureManager).exists(tplKey)) {
+      const img = this.add.image(0, 0, tplKey);
+      // Texture is already rasterised at correct size for this slot
+      img.setDisplaySize(renderW, renderH);
+      container.add(img);
+      interactiveTarget = img;
+    } else {
+      this.requestCardTexture(card.id, renderW, renderH);
+      // Warm brown fallback background (Investment); no text overlays.
+      const bg = this.add.rectangle(0, 0, handCardW, handCardH, 0x8B4513, 0.7);
+      bg.setStrokeStyle(isHinted ? 3 : 2, isHinted ? 0x44ffff : 0xcc9944);
+      container.add(bg);
+      interactiveTarget = bg;
+    }
 
     // Interactivity (only during market phase)
-    if (this.uiPhase === 'market') {
-      bg.setInteractive({ useHandCursor: true });
-      bg.on('pointerdown', () => this.onPlayHeldEvent());
-      bg.on('pointerover', () => {
-        bg.setStrokeStyle(3, 0xffdd44);
+    if (this.uiPhase === 'market' && interactiveTarget) {
+      interactiveTarget.setInteractive({ useHandCursor: true });
+      interactiveTarget.on('pointerdown', () => this.onPlayHeldEvent());
+      interactiveTarget.on('pointerover', () => {
+        // if target is a rectangle with setStrokeStyle, it will respond; otherwise just scale
+        try { (interactiveTarget as any).setStrokeStyle(3, 0xffdd44); } catch (_) {}
         container.setScale(1.05);
       });
-      bg.on('pointerout', () => {
-        bg.setStrokeStyle(isHinted ? 3 : 2, isHinted ? 0x44ffff : 0xcc9944);
+      interactiveTarget.on('pointerout', () => {
+        try { (interactiveTarget as any).setStrokeStyle(isHinted ? 3 : 2, isHinted ? 0x44ffff : 0xcc9944); } catch (_) {}
         container.setScale(1.0);
       });
     }

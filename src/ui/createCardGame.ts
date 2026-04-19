@@ -104,6 +104,8 @@ export function createCardGame(options: CardGameOptions): Phaser.Game {
     exposeOnWindow = false,
   } = options;
 
+  const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) ? window.devicePixelRatio : 1;
+
   const config: Phaser.Types.Core.GameConfig = {
     type: Phaser.AUTO,
     parent,
@@ -114,16 +116,26 @@ export function createCardGame(options: CardGameOptions): Phaser.Game {
     scale: {
       mode: Phaser.Scale.FIT,
       autoCenter: Phaser.Scale.CENTER_BOTH,
+      autoRound: true,
     },
     render: {
+      antialias: false,
+      antialiasGL: false,
       roundPixels: true,
       ...renderOverrides,
+    } as Phaser.Types.Core.RenderConfig & { resolution?: number },
+    // Enable Phaser DOM container so DOMElement/GameObjectFactory.dom() works
+    dom: {
+      createContainer: true,
     },
     audio: {
       disableWebAudio: false,
     },
     ...(callbacks ? { callbacks } : {}),
   };
+
+  // Phaser runtime supports render resolution although typings may not expose it everywhere.
+  ((config.render ?? {}) as { resolution?: number }).resolution = dpr;
 
   const game = new Phaser.Game(config);
 
