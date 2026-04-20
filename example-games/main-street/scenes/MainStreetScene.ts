@@ -14,7 +14,7 @@
  */
 
 import type { MainStreetState } from '../MainStreetState';
-import { setupMainStreetGame, addLog } from '../MainStreetState';
+import { setupMainStreetGame, addLog, deserializeMainStreetState } from '../MainStreetState';
 import type { DifficultyName } from '../MainStreetDifficulty';
 import { DIFFICULTY_NAMES } from '../MainStreetDifficulty';
 import type { BusinessCard, EventCard, UpgradeCard } from '../MainStreetCards';
@@ -2141,6 +2141,57 @@ export class MainStreetScene extends CardGameScene {
     };
 
     return { market, queue, street, hand, action, instruction };
+  }
+
+  // ── Replay: load board state ─────────────────────────────
+
+  /**
+   * Inject a board state snapshot for the replay tool.
+   *
+   * Called by the replay adapter via `page.evaluate()`.
+   * Updates internal scene state to reflect the given snapshot and emits
+   * `state-settled` so the replay tool can take a screenshot.
+   *
+   * Accepts either the engine's serialized state shape (MainStreetSerializedState)
+   * or a minimal snapshot containing a `seed` and optional `turn`.
+   */
+  public loadBoardState(state: any): void {
+    if (!this.replayMode) {
+      throw new Error('loadBoardState() is only available in replay mode (?mode=replay)');
+    }
+
+    try {
+      // If the payload looks like a full serialized state, use the deserializer
+      if (state && state.config && typeof state.turn === 'number') {
+        this.state = deserializeMainStreetState(state);
+      } else if (state && state.initialState) {
+        // Some transcripts embed initialState under a wrapper
+        this.state = deserializeMainStreetState(state.initialState as any);
+      } else if (state && state.seed) {
+        // Minimal snapshot: create a fresh game from the seed
+        this.state = setupMainStreetGame({ seed: state.seed, difficulty: this.selectedDifficulty });
+        if (typeof state.turn === 'number') {
+          this.state.turn = state.turn;
+        }
+      } else {
+        // Fallback: generate a default game
+        this.state = setupMainStreetGame({ difficulty: this.selectedDifficulty });
+      }
+    } catch (e) {
+      // On error, fall back to a default setup so replay can continue
+      console.error('[MS] loadBoardState deserialise failed:', e);
+      this.state = setupMainStreetGame({ difficulty: this.selectedDifficulty });
+    }
+
+    // Refresh visuals to reflect the injected state
+    this.refreshAll();
+
+    // If a stepIndex or turn was provided, use it; otherwise use current turn
+    const step = state && (state.stepIndex ?? state.turn ?? null);
+    const stepIdx = typeof step === 'number' ? step : this.state.turn;
+
+    // Signal board is visually stable
+    this.emitStateSettled(stepIdx, 'playing');
   }
 
   // ── Game Over Overlay ───────────────────────────────────

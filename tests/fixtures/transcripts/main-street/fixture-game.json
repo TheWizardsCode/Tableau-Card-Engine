@@ -1,32 +1,64 @@
 {
   "game": "main-street",
   "version": "1.0.0",
-  "seed": "FixtureSeed123",
-  "startedAt": "2026-04-19T23:16:25.240Z",
-  "endedAt": "2026-04-19T23:16:25.242Z",
-  "totalTurns": 1,
+  "seed": "ThumbnailSeed123",
+  "startedAt": "2026-04-20T00:44:29.295Z",
+  "endedAt": "2026-04-20T00:44:29.297Z",
+  "totalTurns": 3,
   "result": "loss",
   "endReason": "bankruptcy",
-  "finalScore": 14,
+  "finalScore": 24,
   "turns": [
     {
       "turn": 1,
       "actions": [
         {
           "type": "buy-business",
-          "detail": "biz-laundromat-2 -> slot 0"
+          "detail": "biz-food-truck-2 -> slot 0"
         },
         {
           "type": "buy-event",
-          "detail": "evt-charity-drive-29"
+          "detail": "evt-block-party-25"
         }
       ],
-      "income": 1,
-      "incident": "Pipe Burst",
+      "income": 0,
+      "incident": "Viral Review",
+      "incidentQueueSize": 2,
+      "coinsAfter": 2,
+      "reputationAfter": 4,
+      "score": 22,
+      "gridOccupied": 1
+    },
+    {
+      "turn": 2,
+      "actions": [
+        {
+          "type": "skip",
+          "detail": "No affordable actions"
+        }
+      ],
+      "income": 0,
+      "incident": "Health Inspection",
+      "incidentQueueSize": 2,
+      "coinsAfter": 2,
+      "reputationAfter": 5,
+      "score": 27,
+      "gridOccupied": 1
+    },
+    {
+      "turn": 3,
+      "actions": [
+        {
+          "type": "buy-event",
+          "detail": "evt-grand-opening-19"
+        }
+      ],
+      "income": 0,
+      "incident": "Rainy Day",
       "incidentQueueSize": 2,
       "coinsAfter": -1,
-      "reputationAfter": 3,
-      "score": 14,
+      "reputationAfter": 5,
+      "score": 24,
       "gridOccupied": 1
     }
   ]

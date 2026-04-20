@@ -110,10 +110,12 @@ export class MainStreetReplayAdapter implements ReplayAdapter {
 
   private async _tryLoadBoardState(page: Page, state: any, timeoutMs: number): Promise<void> {
     // If scene exposes loadBoardState(), call it and wait for state-settled event
-    const payload = JSON.stringify(state || {});
+    const payload = { state: state || {}, timeoutMs };
     try {
       await page.evaluate(
-        (p, t) => new Promise<void>((resolve, reject) => {
+        (payload: any) => new Promise<void>((resolve, reject) => {
+          const t = payload.timeoutMs;
+          const p = payload.state;
           const timeout = setTimeout(() => reject(new Error('Timed out waiting for state-settled')), t);
           const emitter = (window as any).__GAME_EVENTS__;
           try {
@@ -150,8 +152,7 @@ export class MainStreetReplayAdapter implements ReplayAdapter {
             resolve();
           }
         }),
-        state,
-        timeoutMs,
+        payload,
       );
     } catch {
       // swallow
