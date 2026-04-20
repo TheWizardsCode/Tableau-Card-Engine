@@ -241,6 +241,28 @@ export interface DealCardPayload {
   readonly totalCards: number;
 }
 
+/**
+ * Emitted when a card is dealt to a player's hand (deal animation complete).
+ */
+export interface CardDealtPayload {
+  /** Card ID (optional, for tracking). */
+  readonly cardId?: string;
+  /** Player index (optional, for multi-player). */
+  readonly playerIndex?: number;
+}
+
+/**
+ * Emitted when a card is placed on a grid/street (placement animation complete).
+ */
+export interface CardPlacedPayload {
+  /** Card ID (optional, for tracking). */
+  readonly cardId?: string;
+  /** Player index (optional, for multi-player). */
+  readonly playerIndex?: number;
+  /** Slot/target index (optional, for locating). */
+  readonly slotIndex?: number;
+}
+
 // ── Event Map ───────────────────────────────────────────────
 
 /**
@@ -259,6 +281,8 @@ export interface GameEventMap {
   'card-flipped': CardFlippedPayload;
   'card-swapped': CardSwappedPayload;
   'card-discarded': CardDiscardedPayload;
+  'card:dealt': CardDealtPayload;
+  'card:placed': CardPlacedPayload;
   'ui-interaction': UIInteractionPayload;
   // Solitaire events
   'card-to-foundation': CardToFoundationPayload;

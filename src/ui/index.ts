@@ -25,6 +25,18 @@ export type { ShakeIllegalMoveOptions } from './shakeIllegalMove';
 export { moveGameObject } from './moveGameObject';
 export type { MoveGameObjectOptions } from './moveGameObject';
 
+// Card deal animation
+export { dealCard, DEFAULT_DEAL_DURATION, DEFAULT_DEAL_ARC_HEIGHT } from './dealCard';
+export type { DealCardOptions, CardDealtPayload } from './dealCard';
+
+// Card place animation
+export { placeCard, DEFAULT_PLACE_DURATION } from './placeCard';
+export type { PlaceCardOptions, CardPlacedPayload } from './placeCard';
+
+// Card discard animation
+export { discardCard, DEFAULT_DISCARD_DURATION } from './discardCard';
+export type { DiscardCardOptions, CardDiscardedPayload } from './discardCard';
+
 // Card layout helpers
 export { layoutCardPositions } from './layoutCardPositions';
 export type {
