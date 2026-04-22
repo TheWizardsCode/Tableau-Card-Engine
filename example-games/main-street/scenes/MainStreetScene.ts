@@ -290,6 +290,31 @@ export class MainStreetScene extends CardGameScene {
   create(): void {
     this.cameras.main.setBackgroundColor(BG_COLOR);
 
+    // Ensure placeholder texture exists. Some test environments have trouble
+    // loading SVGs as images. Generate a simple placeholder texture at runtime
+    // if it's not already present in the Texture Manager.
+    try {
+      if (!this.textures.exists('ms_placeholder_card')) {
+        const g = this.add.graphics();
+        // Background
+        g.fillStyle(0xf5efe6, 1);
+        g.fillRoundedRect(0, 0, 140, 80, 6);
+        g.lineStyle(2, 0xc8b79a, 1);
+        g.strokeRoundedRect(0, 0, 140, 80, 6);
+        // Badge circle
+        g.fillStyle(0xe0c7a0, 1);
+        g.fillCircle(118, 56, 12);
+        // Render into texture
+        g.generateTexture('ms_placeholder_card', 140, 80);
+        g.destroy();
+      }
+    } catch (e) {
+      // Non-fatal: if texture generation fails let the scene continue
+      // and fall back to colored rectangles.
+      // eslint-disable-next-line no-console
+      console.debug('[MS] placeholder generation failed', e);
+    }
+
     // Reset
     this.uiPhase = 'idle';
     this.pendingBusinessCard = null;
