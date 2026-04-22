@@ -255,10 +255,11 @@ export class MainStreetScene extends CardGameScene {
   preload(): void {
     // Canonical card size for Main Street market placeholder (140x80)
     try {
-      this.load.svg('ms_placeholder_card', 'assets/games/main-street/svg/placeholder-card.svg', {
-        width: 140,
-        height: 80,
-      });
+      // Load placeholder as an image to avoid Phaser's SVGFile XML parsing in some environments.
+      // Phaser's svg loader parses and manipulates the SVG XML during onProcess which
+      // can cause DOMParser issues in headless/browser test harnesses. We therefore
+      // load the SVG via the image loader which treats it as an image resource.
+      this.load.image('ms_placeholder_card', 'assets/games/main-street/svg/placeholder-card.svg');
 
       // Fetch all per-card SVG assets as text for dynamic rasterisation at display size.
       // We do not pre-load them as textures - we lazily rasterise them at exact pixel
