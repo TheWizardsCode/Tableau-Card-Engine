@@ -255,10 +255,11 @@ export class MainStreetScene extends CardGameScene {
   preload(): void {
     // Canonical card size for Main Street market placeholder (140x80)
     try {
-      this.load.svg('ms_placeholder_card', 'assets/games/main-street/svg/placeholder-card.svg', {
-        width: 140,
-        height: 80,
-      });
+      // Load placeholder as an image to avoid Phaser's SVGFile XML parsing in some environments.
+      // Phaser's svg loader parses and manipulates the SVG XML during onProcess which
+      // can cause DOMParser issues in headless/browser test harnesses. We therefore
+      // load the SVG via the image loader which treats it as an image resource.
+      this.load.image('ms_placeholder_card', 'assets/games/main-street/svg/placeholder-card.svg');
 
       // Fetch all per-card SVG assets as text for dynamic rasterisation at display size.
       // We do not pre-load them as textures - we lazily rasterise them at exact pixel
@@ -288,6 +289,31 @@ export class MainStreetScene extends CardGameScene {
 
   create(): void {
     this.cameras.main.setBackgroundColor(BG_COLOR);
+
+    // Ensure placeholder texture exists. Some test environments have trouble
+    // loading SVGs as images. Generate a simple placeholder texture at runtime
+    // if it's not already present in the Texture Manager.
+    try {
+      if (!this.textures.exists('ms_placeholder_card')) {
+        const g = this.add.graphics();
+        // Background
+        g.fillStyle(0xf5efe6, 1);
+        g.fillRoundedRect(0, 0, 140, 80, 6);
+        g.lineStyle(2, 0xc8b79a, 1);
+        g.strokeRoundedRect(0, 0, 140, 80, 6);
+        // Badge circle
+        g.fillStyle(0xe0c7a0, 1);
+        g.fillCircle(118, 56, 12);
+        // Render into texture
+        g.generateTexture('ms_placeholder_card', 140, 80);
+        g.destroy();
+      }
+    } catch (e) {
+      // Non-fatal: if texture generation fails let the scene continue
+      // and fall back to colored rectangles.
+      // eslint-disable-next-line no-console
+      console.debug('[MS] placeholder generation failed', e);
+    }
 
     // Reset
     this.uiPhase = 'idle';
