@@ -40,12 +40,12 @@ function fillEllipse(
   height: number,
 ): void {
   const segments = 24;
-  const points: Phaser.Geom.Point[] = [];
+  const points: Phaser.Math.Vector2[] = [];
   const rx = width / 2;
   const ry = height / 2;
   for (let i = 0; i < segments; i++) {
     const angle = (i / segments) * Math.PI * 2;
-    points.push(new Phaser.Geom.Point(
+    points.push(new Phaser.Math.Vector2(
       cx + Math.cos(angle) * rx,
       cy + Math.sin(angle) * ry,
     ));

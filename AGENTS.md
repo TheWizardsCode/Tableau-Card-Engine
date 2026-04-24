@@ -82,7 +82,7 @@ Example games live in `example-games/<game-name>/` with their own `main.ts` entr
 
 ## Technology Stack
 
-- **Phaser 3.x** (currently 3.90.0): The current stable release of the Phaser HTML5 game framework. Provides a solid foundation for building 2D games, including card games, with WebGL/Canvas rendering, input handling, tweens, and scene management.
+- **Phaser 4 RC** (currently 4.0.0-rc.7): The current release-candidate line of the Phaser HTML5 game framework used by this repository. Provides a foundation for building 2D games, including card games, with WebGL/Canvas rendering, input handling, tweens, and scene management.
 - **TypeScript** (strict mode, ES2020 target): A statically typed superset of JavaScript that enhances code quality and maintainability, making it easier to manage complex codebases and catch errors early in the development process.
 - **Vite**: A fast build tool and dev server with native ESM support, hot module replacement (HMR), and optimized production builds. Replaces Webpack for faster development iteration.
 - **Vitest**: A Vite-native testing framework with a Jest-compatible API. Integrates seamlessly with the Vite build pipeline and avoids ESM/CJS compatibility issues.

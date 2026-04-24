@@ -45,7 +45,7 @@ export class HelloWorldScene extends Phaser.Scene {
       .text(
         this.scale.width / 2,
         70,
-        'Phaser 3.x + Vite + TypeScript',
+        'Phaser 4 RC + Vite + TypeScript',
         {
           fontSize: '14px',
           color: '#aaccaa',
