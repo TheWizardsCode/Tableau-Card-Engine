@@ -66,6 +66,15 @@ tmp/
 data/
 results/
 
+# Per-test visual regression / Playwright screenshot artifacts
+# These are generated during tests and should not be committed.
+tests/**/__screenshots__/
+
+# Local debug artifacts
+debug-page.png
+debug-playwright.cjs
+debug-playwright.js
+
 ##################################
 Worklog Specific Ignores
 ##################################
