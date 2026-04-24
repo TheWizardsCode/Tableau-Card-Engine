@@ -1,7 +1,7 @@
 /**
  * Hello World - Tableau Card Engine (TCE)
  *
- * A minimal Phaser 3.x game demonstrating the toolchain works:
+ * A minimal Phaser 4 RC game demonstrating the toolchain works:
  * Vite dev server, TypeScript compilation, Phaser initialization,
  * and asset loading from public/assets/.
  */
