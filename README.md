@@ -82,6 +82,18 @@ More games are planned: Coloretto.
 
 For detailed development guidance, see [`docs/DEVELOPER.md`](docs/DEVELOPER.md).
 
+## AI Assisted Development
+
+To use pi to assist with Phaser development, clone the Phaser repository into the parent directory and install it as a pi package. For example, from this repository root:
+
+```bash
+cd ..
+git clone git@github.com:phaserjs/phaser.git
+pi install ../phaser
+```
+
+After running these commands, pi will discover the Phaser package and any skills, prompts, or extensions it exposes. Use `/reload` or restart pi if needed.
+
 ## License
 
 MIT
