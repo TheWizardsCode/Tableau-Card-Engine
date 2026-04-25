@@ -1,7 +1,7 @@
 {
   "name": "tableau-card-engine",
   "version": "0.1.0",
-  "description": "Tableau Card Engine (TCE) -- a modular game engine for building single-player tableau card games using Phaser 3.x and TypeScript",
+  "description": "Tableau Card Engine (TCE) -- a modular game engine for building single-player tableau card games using Phaser 4 RC and TypeScript",
   "private": true,
   "type": "module",
   "scripts": {
@@ -16,7 +16,7 @@
     "save-load-smoke": "tsx scripts/save-load-smoke.ts"
   },
   "dependencies": {
-    "phaser": "^3.90.0"
+    "phaser": "4.0.0-rc.7"
   },
   "devDependencies": {
     "@types/node": "^25.3.0",

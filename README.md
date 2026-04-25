@@ -1,6 +1,6 @@
 # Tableau Card Engine (TCE)
 
-A modular, spike-driven game engine for building single-player tableau card games with **Phaser 3.x**, **TypeScript**, **Vite**, and **Vitest**.
+A modular, spike-driven game engine for building single-player tableau card games with **Phaser 4 RC**, **TypeScript**, **Vite**, and **Vitest**.
 
 **[Play Alpha Game Now](https://thewizardscode.github.io/Tableau-Card-Engine/)**
 
@@ -54,7 +54,7 @@ tableau-card-engine/
 
 | Tool | Purpose |
 |------|---------|
-| [Phaser 3.x](https://phaser.io/) (3.90.0) | HTML5 game framework -- rendering, input, tweens, scenes |
+| [Phaser 4 RC](https://phaser.io/) (4.0.0-rc.7) | HTML5 game framework -- rendering, input, tweens, scenes |
 | [TypeScript](https://www.typescriptlang.org/) (strict, ES2020) | Static typing and early error detection |
 | [Vite](https://vitejs.dev/) | Dev server with HMR and optimized production builds |
 | [Vitest](https://vitest.dev/) | Vite-native test runner with Jest-compatible API |

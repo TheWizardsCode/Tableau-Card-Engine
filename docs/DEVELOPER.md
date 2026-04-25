@@ -34,7 +34,7 @@ This document covers everything you need to develop, test, and build the Tableau
 npm install
 ```
 
-This installs Phaser 3.x as a runtime dependency and TypeScript, Vite, and Vitest as dev dependencies.
+This installs Phaser 4.0.0-rc.7 as a runtime dependency and TypeScript, Vite, and Vitest as dev dependencies.
 
 ## Running Locally
 
@@ -71,7 +71,7 @@ To preview the production build locally:
 npm run preview
 ```
 
-**Note:** The Phaser library produces a ~1.4 MB chunk. This is expected and can be addressed with code-splitting when needed.
+**Note:** The Phaser library produces a ~2.0 MB chunk with the current Phaser 4 RC bundle. This is expected and can be addressed with code-splitting when needed.
 
 ## Deployment / Release
 
