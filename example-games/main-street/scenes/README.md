@@ -18,7 +18,7 @@ const text = this.add.text(x, y, '+2', {
 void popTextOrIcon({
   scene: this,
   target: text,
-  duration: 840,
+  duration: 420,
   riseY: 22,
   scale: 1.2,
   reducedMotion: this.settingsPanel?.reducedMotion,
