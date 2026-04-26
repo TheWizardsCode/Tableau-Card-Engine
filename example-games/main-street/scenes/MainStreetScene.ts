@@ -997,7 +997,7 @@ export class MainStreetScene extends CardGameScene {
       void popTextOrIcon({
         scene: this,
         target: text,
-        duration: 420,
+        duration: 1500,
         riseY: 22,
         scale: 1.2,
         reducedMotion,
@@ -1015,7 +1015,7 @@ export class MainStreetScene extends CardGameScene {
       void popTextOrIcon({
         scene: this,
         target: text,
-        duration: 420,
+        duration: 1500,
         riseY: 22,
         scale: 1.2,
         reducedMotion,

@@ -10,7 +10,7 @@ This document captures the current implementation-level guidance for Main Street
 
 - Trigger: whenever HUD coin or reputation value changes.
 - Helper: `popTextOrIcon()` from `src/ui/popTextOrIcon.ts`.
-- Timing target: ~420ms.
+- Timing target: ~1500ms (~1.5 seconds).
 - Motion: upward rise + fade + scale pop.
 - Non-blocking: animation runs asynchronously and does not block game logic flow.
 
@@ -20,7 +20,7 @@ Example:
 void popTextOrIcon({
   scene: this,
   target: deltaText,
-  duration: 420,
+  duration: 1500,
   riseY: 22,
   scale: 1.2,
   reducedMotion: this.settingsPanel?.reducedMotion,
