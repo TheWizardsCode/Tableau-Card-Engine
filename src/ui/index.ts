@@ -37,6 +37,12 @@ export type { PlaceCardOptions, CardPlacedPayload } from './placeCard';
 export { discardCard, DEFAULT_DISCARD_DURATION } from './discardCard';
 export type { DiscardCardOptions, CardDiscardedPayload } from './discardCard';
 
+// Event / transition animation helpers
+export { popTextOrIcon } from './popTextOrIcon';
+export type { PopTextOrIconOptions } from './popTextOrIcon';
+export { runSceneTransition } from './sceneTransition';
+export type { SceneTransitionOptions, SceneTransitionMode, SceneTransitionType } from './sceneTransition';
+
 // Card layout helpers
 export { layoutCardPositions } from './layoutCardPositions';
 export type {

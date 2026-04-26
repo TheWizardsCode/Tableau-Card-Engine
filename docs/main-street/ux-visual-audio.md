@@ -1,35 +1,66 @@
-# Main Street: UX, Visual Design, and Audio Direction
+# Main Street: UX, Visual, Animation, and Audio Notes
 
-## Summary
+## Scope
 
-Write the UX and presentation section of The Build's Game Design Document covering the user interface layout, visual style, card art direction, animations, and audio/music direction.
+This document captures the current implementation-level guidance for Main Street UI feedback polish in Milestone 4.
 
-## User Story
+## Event Feedback Animations
 
-As a game designer, I want The Build's look, feel, and player interaction patterns documented so that implementation can deliver a cohesive, polished experience from the first milestone.
+### Resource pop feedback (coins / reputation)
 
-## Sections
+- Trigger: whenever HUD coin or reputation value changes.
+- Helper: `popTextOrIcon()` from `src/ui/popTextOrIcon.ts`.
+- Timing target: ~420ms (within the 300–600ms target range).
+- Motion: upward rise + fade + scale pop.
+- Non-blocking: animation runs asynchronously and does not block game logic flow.
 
-1. **Screen Layout and Zones** – Where are The Build's game zones positioned on screen? Wireframes or descriptions of the main game view, menus, and overlays.
-2. **Card Visual Design** – Card dimensions, layout of information on cards, visual hierarchy, face‑down appearance. Art style direction (pixel art, illustrated, minimalist, etc.).
-3. **Interaction Design** – How does the player interact? Click/tap to select, drag and drop, contextual menus? Interaction feedback (highlights, hover states, invalid move indicators).
-4. **Animation and Juice** – Key animations: card dealing, card movement, crafting/building effects, win/loss celebrations, score tallying. Timing and easing guidelines.
-5. **Visual Theme and Mood** – Colour palette direction, mood board concepts, atmosphere goals. How does the visual design reinforce The Build's buildy/crafty theme?
-6. **Audio Direction** – Sound effects needed (card sounds, crafting sounds, UI feedback, ambient). Music style and mood. Volume and mixing guidelines.
-7. **Accessibility** – Colour‑blind considerations, text sizing, input method alternatives, screen‑reader hints (where feasible).
-8. **Responsive/Resolution Considerations** – Target resolutions, scaling strategy, mobile vs desktop layout differences (if any).
+Example:
 
-## Expected Output
+```ts
+void popTextOrIcon({
+  scene: this,
+  target: deltaText,
+  duration: 420,
+  riseY: 22,
+  scale: 1.2,
+  reducedMotion: this.settingsPanel?.reducedMotion,
+});
+```
 
-A formal GDD section with wireframes (ASCII/text‑based is acceptable), style guidelines, and interaction specifications sufficient for a UI developer to implement The Build.
+## Scene Transitions
 
-## Acceptance Criteria
+### Enter / Exit transitions
 
-- Screen layout documented with zone positions and sizes.
-- Card visual design specified with dimensions and info layout.
-- All player interactions documented with feedback states.
-- Key animations listed with timing targets.
-- Visual theme direction established.
-- Audio needs inventoried.
-- Basic accessibility considerations documented.
-- Document reviewed and approved by the producer.
+- Helper: `runSceneTransition()` from `src/ui/sceneTransition.ts`.
+- Enter transition: fade-in on scene create.
+- Exit transition: fade-out on Play Again before scene restart.
+- Transitions are short and deterministic (default 220–300ms in Main Street).
+
+Example:
+
+```ts
+void runSceneTransition({
+  scene: this,
+  mode: 'enter',
+  type: 'fade',
+  duration: 280,
+  reducedMotion: this.settingsPanel?.reducedMotion,
+});
+```
+
+## Accessibility
+
+### Reduced motion
+
+A `Reduced Motion` toggle is available in the Settings panel.
+
+- Storage key: `tce-ui-reduced-motion`
+- Behavior:
+  - resource pop animations are skipped
+  - scene transitions are skipped
+- Helpers also respect OS `prefers-reduced-motion` when no explicit override is provided.
+
+## Asset pipeline notes
+
+- Current implementation uses existing SVG card placeholders.
+- Animation helpers are asset-agnostic and will accept final art replacements without API changes.

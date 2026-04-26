@@ -48,6 +48,8 @@ import {
   createOverlayBackground, createOverlayButton, createOverlayMenuButton,
   dismissOverlay,
   createSceneTitle, createSceneMenuButton,
+  popTextOrIcon,
+  runSceneTransition,
 } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
 import { SaveLoadStore } from '../../../src/core-engine';
@@ -224,6 +226,10 @@ export class MainStreetScene extends CardGameScene {
   // Overlay objects
   private overlayObjects: Phaser.GameObjects.GameObject[] = [];
 
+  // HUD animation state
+  private previousCoins: number | null = null;
+  private previousReputation: number | null = null;
+
   // Hint system
   /** True after the player has used their one hint for this turn. */
   private hintUsedThisTurn = false;
@@ -319,6 +325,8 @@ export class MainStreetScene extends CardGameScene {
     this.uiPhase = 'idle';
     this.pendingBusinessCard = null;
     this.overlayObjects = [];
+    this.previousCoins = null;
+    this.previousReputation = null;
 
     // Reset hint state
     this.hintUsedThisTurn = false;
@@ -440,6 +448,15 @@ export class MainStreetScene extends CardGameScene {
     ];
     this.initHelpPanel(helpSections);
     this.initSettingsPanel();
+
+    // Scene enter transition (fade by default, disabled when reduced motion is enabled).
+    void runSceneTransition({
+      scene: this,
+      mode: 'enter',
+      type: 'fade',
+      duration: 280,
+      reducedMotion: this.settingsPanel?.reducedMotion,
+    });
 
     // Start first turn
     this.startDayPhase();
@@ -952,6 +969,71 @@ export class MainStreetScene extends CardGameScene {
       fontSize: '16px', fontStyle: 'bold', color: '#ff8844', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0.5);
     this.hudContainer.add(scoreText);
+
+    this.animateHudValueChanges({
+      coins,
+      reputation,
+      coinX: stripLeft + stripWidth * 0.25 + 80,
+      repX: stripLeft + stripWidth * 0.5 + 65,
+      hudY,
+    });
+  }
+
+  private animateHudValueChanges(params: {
+    coins: number;
+    reputation: number;
+    coinX: number;
+    repX: number;
+    hudY: number;
+  }): void {
+    const { coins, reputation, coinX, repX, hudY } = params;
+
+    if (this.previousCoins === null || this.previousReputation === null) {
+      this.previousCoins = coins;
+      this.previousReputation = reputation;
+      return;
+    }
+
+    const reducedMotion = this.settingsPanel?.reducedMotion;
+
+    if (coins !== this.previousCoins) {
+      const delta = coins - this.previousCoins;
+      const text = this.add.text(coinX, hudY - 6, `${delta > 0 ? '+' : ''}${delta}`, {
+        fontSize: '16px',
+        fontStyle: 'bold',
+        color: delta >= 0 ? '#ffdd66' : '#ff7777',
+        fontFamily: FONT_FAMILY,
+      }).setOrigin(0.5).setDepth(500);
+      void popTextOrIcon({
+        scene: this,
+        target: text,
+        duration: 420,
+        riseY: 22,
+        scale: 1.2,
+        reducedMotion,
+      });
+    }
+
+    if (reputation !== this.previousReputation) {
+      const delta = reputation - this.previousReputation;
+      const text = this.add.text(repX, hudY - 6, `${delta > 0 ? '+' : ''}${delta}`, {
+        fontSize: '16px',
+        fontStyle: 'bold',
+        color: delta >= 0 ? '#99ccff' : '#ff8899',
+        fontFamily: FONT_FAMILY,
+      }).setOrigin(0.5).setDepth(500);
+      void popTextOrIcon({
+        scene: this,
+        target: text,
+        duration: 420,
+        riseY: 22,
+        scale: 1.2,
+        reducedMotion,
+      });
+    }
+
+    this.previousCoins = coins;
+    this.previousReputation = reputation;
   }
 
   // ── Challenge Tracker ───────────────────────────────────
@@ -2427,7 +2509,13 @@ export class MainStreetScene extends CardGameScene {
     playAgainBtn.on('pointerdown', () => {
       dismissOverlay(this.overlayObjects);
       this.overlayObjects = [];
-      this.scene.restart();
+      void runSceneTransition({
+        scene: this,
+        mode: 'exit',
+        type: 'fade',
+        duration: 220,
+        reducedMotion: this.settingsPanel?.reducedMotion,
+      }).finally(() => this.scene.restart());
     });
     this.overlayObjects.push(playAgainBtn);
 
