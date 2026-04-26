@@ -10,7 +10,7 @@ This document captures the current implementation-level guidance for Main Street
 
 - Trigger: whenever HUD coin or reputation value changes.
 - Helper: `popTextOrIcon()` from `src/ui/popTextOrIcon.ts`.
-- Timing target: ~420ms (within the 300–600ms target range).
+- Timing target: ~840ms (slowed to half speed based on latest playtest feedback).
 - Motion: upward rise + fade + scale pop.
 - Non-blocking: animation runs asynchronously and does not block game logic flow.
 
@@ -20,7 +20,7 @@ Example:
 void popTextOrIcon({
   scene: this,
   target: deltaText,
-  duration: 420,
+  duration: 840,
   riseY: 22,
   scale: 1.2,
   reducedMotion: this.settingsPanel?.reducedMotion,
@@ -29,24 +29,8 @@ void popTextOrIcon({
 
 ## Scene Transitions
 
-### Enter / Exit transitions
-
-- Helper: `runSceneTransition()` from `src/ui/sceneTransition.ts`.
-- Enter transition: fade-in on scene create.
-- Exit transition: fade-out on Play Again before scene restart.
-- Transitions are short and deterministic (default 220–300ms in Main Street).
-
-Example:
-
-```ts
-void runSceneTransition({
-  scene: this,
-  mode: 'enter',
-  type: 'fade',
-  duration: 280,
-  reducedMotion: this.settingsPanel?.reducedMotion,
-});
-```
+- Main Street scene-level fade transitions are currently disabled.
+- The reusable helper `runSceneTransition()` remains available in `src/ui/sceneTransition.ts` for future use once the fade issue is addressed.
 
 ## Accessibility
 

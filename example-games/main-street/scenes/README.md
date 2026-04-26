@@ -3,7 +3,7 @@
 This folder uses two reusable UI helpers from `src/ui`:
 
 - `popTextOrIcon` for short HUD/event feedback pops
-- `runSceneTransition` for simple enter/exit transitions
+- `runSceneTransition` helper exists in `src/ui`, but scene fades are currently disabled in Main Street
 
 ## Resource delta pop
 
@@ -18,21 +18,10 @@ const text = this.add.text(x, y, '+2', {
 void popTextOrIcon({
   scene: this,
   target: text,
-  duration: 420,
+  duration: 840,
   riseY: 22,
   scale: 1.2,
   reducedMotion: this.settingsPanel?.reducedMotion,
 });
 ```
 
-## Scene transition
-
-```ts
-void runSceneTransition({
-  scene: this,
-  mode: 'enter',
-  type: 'fade',
-  duration: 280,
-  reducedMotion: this.settingsPanel?.reducedMotion,
-});
-```

@@ -49,7 +49,6 @@ import {
   dismissOverlay,
   createSceneTitle, createSceneMenuButton,
   popTextOrIcon,
-  runSceneTransition,
 } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
 import { SaveLoadStore } from '../../../src/core-engine';
@@ -448,15 +447,6 @@ export class MainStreetScene extends CardGameScene {
     ];
     this.initHelpPanel(helpSections);
     this.initSettingsPanel();
-
-    // Scene enter transition (fade by default, disabled when reduced motion is enabled).
-    void runSceneTransition({
-      scene: this,
-      mode: 'enter',
-      type: 'fade',
-      duration: 280,
-      reducedMotion: this.settingsPanel?.reducedMotion,
-    });
 
     // Start first turn
     this.startDayPhase();
@@ -1007,7 +997,7 @@ export class MainStreetScene extends CardGameScene {
       void popTextOrIcon({
         scene: this,
         target: text,
-        duration: 420,
+        duration: 840,
         riseY: 22,
         scale: 1.2,
         reducedMotion,
@@ -1025,7 +1015,7 @@ export class MainStreetScene extends CardGameScene {
       void popTextOrIcon({
         scene: this,
         target: text,
-        duration: 420,
+        duration: 840,
         riseY: 22,
         scale: 1.2,
         reducedMotion,
@@ -2509,13 +2499,7 @@ export class MainStreetScene extends CardGameScene {
     playAgainBtn.on('pointerdown', () => {
       dismissOverlay(this.overlayObjects);
       this.overlayObjects = [];
-      void runSceneTransition({
-        scene: this,
-        mode: 'exit',
-        type: 'fade',
-        duration: 220,
-        reducedMotion: this.settingsPanel?.reducedMotion,
-      }).finally(() => this.scene.restart());
+      this.scene.restart();
     });
     this.overlayObjects.push(playAgainBtn);
 
