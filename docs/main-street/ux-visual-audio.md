@@ -6,6 +6,15 @@ This document captures the current implementation-level guidance for Main Street
 
 ## Event Feedback Animations
 
+### Card transfer feedback (market -> destination)
+
+- Trigger: when buying cards from the market.
+- Behavior:
+  - Businesses animate from the market row to the selected street slot.
+  - Investment events animate from the market row to the player hand.
+  - Upgrades animate from the market row to the upgraded street slot.
+- Accessibility: transfer animation is skipped when Reduced Motion is enabled.
+
 ### Resource pop feedback (coins / reputation)
 
 - Trigger: whenever HUD coin or reputation value changes.
