@@ -3,6 +3,7 @@ import Phaser from 'phaser';
 
 import { waitForScene } from '../helpers/waitForScene';
 import { executeDayStart, processEndOfTurn } from '../../example-games/main-street/MainStreetEngine';
+import { canPurchaseBusiness, canPurchaseEvent, getEmptySlots } from '../../example-games/main-street/MainStreetMarket';
 
 async function bootGame(options: { width?: number; height?: number } = {}): Promise<Phaser.Game> {
   let container = document.getElementById('game-container');
@@ -170,6 +171,56 @@ describe('MainStreetScene browser tests', () => {
         expect(Math.abs(dispRatio - srcRatio)).toBeLessThan(0.1);
         break;
       }
+    }
+  });
+
+  it('only materializes purchased cards at destination after transfer animation completes', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;
+    const state = scene.state;
+
+    const emptySlots = getEmptySlots(state);
+    expect(emptySlots.length).toBeGreaterThan(0);
+    const targetSlot = emptySlots[0];
+
+    const business = state.market.business.find((card: any) =>
+      card && canPurchaseBusiness(state, card.id, targetSlot).legal,
+    );
+    expect(business).toBeTruthy();
+
+    const beforeBusinessAnimCount = scene.getTransferAnimationCountForTest();
+    scene.onBusinessCardClick(business);
+    scene.onSlotClick(targetSlot);
+
+    // Business should not appear in street immediately while transfer is playing
+    expect(state.streetGrid[targetSlot]).toBeNull();
+    expect(scene.getHiddenTransferSourceCardCountForTest()).toBeGreaterThan(0);
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(scene.getTransferAnimationCountForTest()).toBeGreaterThan(beforeBusinessAnimCount);
+
+    await new Promise((resolve) => setTimeout(resolve, 1700));
+    expect(state.streetGrid[targetSlot]?.id).toBe(business.id);
+    expect(scene.getHiddenTransferSourceCardCountForTest()).toBe(0);
+
+    const eventCard = state.market.investments.find((card: any) =>
+      card && card.family === 'event' && canPurchaseEvent(state, card.id).legal,
+    );
+
+    if (eventCard) {
+      const beforeEventAnimCount = scene.getTransferAnimationCountForTest();
+      scene.onEventCardClick(eventCard);
+
+      // Event should not appear in hand immediately while transfer is playing
+      expect(state.heldEvent).toBeNull();
+      expect(scene.getHiddenTransferSourceCardCountForTest()).toBeGreaterThan(0);
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(scene.getTransferAnimationCountForTest()).toBeGreaterThan(beforeEventAnimCount);
+
+      await new Promise((resolve) => setTimeout(resolve, 1700));
+      expect(state.heldEvent?.id).toBe(eventCard.id);
+      expect(scene.getHiddenTransferSourceCardCountForTest()).toBe(0);
     }
   });
 });

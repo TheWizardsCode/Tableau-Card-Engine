@@ -59,7 +59,7 @@ When building a new example game, focus first on making it playable, reusing as 
 ```bash
 npm install          # Install dependencies
 npm run dev          # Start Vite dev server with hot-reload (port 3000)
-npm test             # Run Vitest test suite
+npm test             # Run Vitest test suite (non-destructive: does not modify tracked assets)
 npm run build        # TypeScript check + production build to dist/
 npm run preview      # Serve production build locally
 npm run monte-carlo  # Run Main Street Monte Carlo harness (JSON + CSV)

@@ -66,6 +66,8 @@ const SLIDER_FILL_COLOR = 0xf0c040;
 const SLIDER_HANDLE_RADIUS = 10;
 const SLIDER_HANDLE_COLOR = 0xffffff;
 
+const REDUCED_MOTION_STORAGE_KEY = 'tce-ui-reduced-motion';
+
 // Depth layers (high values so panel renders above game content)
 const DEPTH_INPUT_BLOCKER = 900;
 const DEPTH_PANEL_BG = 901;
@@ -114,10 +116,17 @@ export class SettingsPanel {
   private tooltipLabel: Phaser.GameObjects.Text;
   private tooltipStatusText: Phaser.GameObjects.Text;
 
+  // Reduced-motion toggle
+  private reducedMotionToggleBg: Phaser.GameObjects.Rectangle;
+  private reducedMotionToggleKnob: Phaser.GameObjects.Graphics;
+  private reducedMotionLabel: Phaser.GameObjects.Text;
+  private reducedMotionStatusText: Phaser.GameObjects.Text;
+
   // State
   private _isOpen = false;
   private _isAnimating = false;
   private _showTooltips = true;
+  private _reducedMotion = false;
   private currentTween: Phaser.Tweens.Tween | null = null;
   private destroyed = false;
 
@@ -136,6 +145,8 @@ export class SettingsPanel {
     this.canvasWidth = scene.scale.width;
     this.canvasHeight = scene.scale.height;
     this.panelWidth = Math.floor(this.canvasWidth * (this.config.widthPercent / 100));
+
+    this._reducedMotion = this.loadReducedMotionPreference();
 
     // Build the panel (hidden off-screen to the right)
     this.container = scene.add.container(this.canvasWidth, 0);
@@ -377,6 +388,52 @@ export class SettingsPanel {
     tooltipHitArea.on('pointerdown', () => this.handleTooltipToggle());
     this.container.add(tooltipHitArea);
 
+    // ── Reduced Motion toggle ──────────────────────────
+
+    const reducedMotionY = tooltipY + 46;
+    this.reducedMotionLabel = scene.add.text(PADDING, reducedMotionY, 'Reduced Motion', LABEL_STYLE);
+    this.reducedMotionLabel.setOrigin(0, 0.5);
+    this.reducedMotionLabel.setDepth(DEPTH_PANEL_CONTENT);
+    this.container.add(this.reducedMotionLabel);
+
+    const reducedMotionToggleX = this.panelWidth - PADDING - TOGGLE_SIZE * 1.8;
+    this.reducedMotionToggleBg = scene.add.rectangle(
+      reducedMotionToggleX,
+      reducedMotionY,
+      TOGGLE_SIZE * 1.8,
+      TOGGLE_SIZE,
+      this._reducedMotion ? TOGGLE_ON_COLOR : TOGGLE_OFF_COLOR,
+    );
+    this.reducedMotionToggleBg.setOrigin(0, 0.5);
+    this.reducedMotionToggleBg.setDepth(DEPTH_PANEL_CONTENT);
+    this.container.add(this.reducedMotionToggleBg);
+
+    this.reducedMotionToggleKnob = scene.add.graphics();
+    this.reducedMotionToggleKnob.setDepth(DEPTH_PANEL_CONTENT);
+    this.drawReducedMotionKnob(this._reducedMotion);
+    this.container.add(this.reducedMotionToggleKnob);
+
+    this.reducedMotionStatusText = scene.add.text(
+      reducedMotionToggleX + TOGGLE_SIZE * 1.8 + 8,
+      reducedMotionY,
+      this._reducedMotion ? 'ON' : 'OFF',
+      VALUE_STYLE,
+    );
+    this.reducedMotionStatusText.setOrigin(0, 0.5);
+    this.reducedMotionStatusText.setDepth(DEPTH_PANEL_CONTENT);
+    this.container.add(this.reducedMotionStatusText);
+
+    const reducedMotionHitArea = scene.add.zone(
+      reducedMotionToggleX + TOGGLE_SIZE * 0.9,
+      reducedMotionY,
+      TOGGLE_SIZE * 2.8,
+      TOGGLE_SIZE + 10,
+    );
+    reducedMotionHitArea.setDepth(DEPTH_PANEL_CONTENT);
+    reducedMotionHitArea.setInteractive({ useHandCursor: true });
+    reducedMotionHitArea.on('pointerdown', () => this.handleReducedMotionToggle());
+    this.container.add(reducedMotionHitArea);
+
     // Scene-level pointer events for slider dragging
     scene.input.on('pointermove', this.handlePointerMove, this);
     scene.input.on('pointerup', this.handlePointerUp, this);
@@ -401,6 +458,11 @@ export class SettingsPanel {
   /** Whether scoring-rule tooltips are enabled. Default: true. */
   get showTooltips(): boolean {
     return this._showTooltips;
+  }
+
+  /** Whether reduced motion is enabled. */
+  get reducedMotion(): boolean {
+    return this._reducedMotion;
   }
 
   /** Open the settings panel with slide-in animation from the right. */
@@ -553,6 +615,59 @@ export class SettingsPanel {
 
     this.tooltipToggleKnob.fillStyle(0xffffff, 1);
     this.tooltipToggleKnob.fillCircle(knobX, tooltipY, knobRadius);
+  }
+
+  // ── Private: Reduced motion toggle ─────────────────────
+
+  private handleReducedMotionToggle(): void {
+    if (this.destroyed) return;
+    this._reducedMotion = !this._reducedMotion;
+    this.updateReducedMotionVisuals(this._reducedMotion);
+    this.saveReducedMotionPreference(this._reducedMotion);
+  }
+
+  private updateReducedMotionVisuals(enabled: boolean): void {
+    this.reducedMotionToggleBg.setFillStyle(enabled ? TOGGLE_ON_COLOR : TOGGLE_OFF_COLOR);
+    this.drawReducedMotionKnob(enabled);
+    this.reducedMotionStatusText.setText(enabled ? 'ON' : 'OFF');
+  }
+
+  private drawReducedMotionKnob(enabled: boolean): void {
+    this.reducedMotionToggleKnob.clear();
+
+    const toggleX = this.panelWidth - PADDING - TOGGLE_SIZE * 1.8;
+    const knobRadius = TOGGLE_SIZE / 2 - 3;
+    const knobX = enabled
+      ? toggleX + TOGGLE_SIZE * 1.8 - knobRadius - 3
+      : toggleX + knobRadius + 3;
+    const reducedMotionY = this.reducedMotionLabel.y;
+
+    this.reducedMotionToggleKnob.fillStyle(0xffffff, 1);
+    this.reducedMotionToggleKnob.fillCircle(knobX, reducedMotionY, knobRadius);
+  }
+
+  private loadReducedMotionPreference(): boolean {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return false;
+    }
+
+    try {
+      return window.localStorage.getItem(REDUCED_MOTION_STORAGE_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  }
+
+  private saveReducedMotionPreference(enabled: boolean): void {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return;
+    }
+
+    try {
+      window.localStorage.setItem(REDUCED_MOTION_STORAGE_KEY, enabled ? 'true' : 'false');
+    } catch {
+      // ignore storage failures
+    }
   }
 
   // ── Private: Volume slider ───────────────────────────────

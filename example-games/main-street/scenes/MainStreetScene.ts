@@ -48,6 +48,8 @@ import {
   createOverlayBackground, createOverlayButton, createOverlayMenuButton,
   dismissOverlay,
   createSceneTitle, createSceneMenuButton,
+  popTextOrIcon,
+  moveGameObject,
 } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
 import { SaveLoadStore } from '../../../src/core-engine';
@@ -192,6 +194,7 @@ export class MainStreetScene extends CardGameScene {
 
   // Pending selection for placing a business
   private pendingBusinessCard: BusinessCard | null = null;
+  private pendingBusinessSourceIndex: number | null = null;
 
   // Computed responsive layout metrics
   private layout!: SceneLayout;
@@ -223,6 +226,14 @@ export class MainStreetScene extends CardGameScene {
 
   // Overlay objects
   private overlayObjects: Phaser.GameObjects.GameObject[] = [];
+
+  // HUD animation state
+  private previousCoins: number | null = null;
+  private previousReputation: number | null = null;
+  private transferAnimationCount = 0;
+  private activeTransferTweens = new Set<Phaser.Tweens.Tween>();
+  private activeTransferVisuals = new Set<Phaser.GameObjects.GameObject>();
+  private hiddenTransferSourceCardIds = new Set<string>();
 
   // Hint system
   /** True after the player has used their one hint for this turn. */
@@ -319,6 +330,12 @@ export class MainStreetScene extends CardGameScene {
     this.uiPhase = 'idle';
     this.pendingBusinessCard = null;
     this.overlayObjects = [];
+    this.previousCoins = null;
+    this.previousReputation = null;
+    this.pendingBusinessSourceIndex = null;
+    this.transferAnimationCount = 0;
+    this.cleanupTransferAnimations();
+    this.hiddenTransferSourceCardIds.clear();
 
     // Reset hint state
     this.hintUsedThisTurn = false;
@@ -440,6 +457,10 @@ export class MainStreetScene extends CardGameScene {
     ];
     this.initHelpPanel(helpSections);
     this.initSettingsPanel();
+
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.cleanupTransferAnimations();
+    });
 
     // Start first turn
     this.startDayPhase();
@@ -952,6 +973,203 @@ export class MainStreetScene extends CardGameScene {
       fontSize: '16px', fontStyle: 'bold', color: '#ff8844', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0.5);
     this.hudContainer.add(scoreText);
+
+    this.animateHudValueChanges({
+      coins,
+      reputation,
+      coinX: stripLeft + stripWidth * 0.25 + 80,
+      repX: stripLeft + stripWidth * 0.5 + 65,
+      hudY,
+    });
+  }
+
+  private animateHudValueChanges(params: {
+    coins: number;
+    reputation: number;
+    coinX: number;
+    repX: number;
+    hudY: number;
+  }): void {
+    const { coins, reputation, coinX, repX, hudY } = params;
+
+    if (this.previousCoins === null || this.previousReputation === null) {
+      this.previousCoins = coins;
+      this.previousReputation = reputation;
+      return;
+    }
+
+    const reducedMotion = this.settingsPanel?.reducedMotion;
+
+    if (coins !== this.previousCoins) {
+      const delta = coins - this.previousCoins;
+      const text = this.add.text(coinX, hudY - 6, `${delta > 0 ? '+' : ''}${delta}`, {
+        fontSize: '16px',
+        fontStyle: 'bold',
+        color: delta >= 0 ? '#ffdd66' : '#ff7777',
+        fontFamily: FONT_FAMILY,
+      }).setOrigin(0.5).setDepth(500);
+      void popTextOrIcon({
+        scene: this,
+        target: text,
+        duration: 1500,
+        riseY: 22,
+        scale: 1.2,
+        reducedMotion,
+      });
+    }
+
+    if (reputation !== this.previousReputation) {
+      const delta = reputation - this.previousReputation;
+      const text = this.add.text(repX, hudY - 6, `${delta > 0 ? '+' : ''}${delta}`, {
+        fontSize: '16px',
+        fontStyle: 'bold',
+        color: delta >= 0 ? '#99ccff' : '#ff8899',
+        fontFamily: FONT_FAMILY,
+      }).setOrigin(0.5).setDepth(500);
+      void popTextOrIcon({
+        scene: this,
+        target: text,
+        duration: 1500,
+        riseY: 22,
+        scale: 1.2,
+        reducedMotion,
+      });
+    }
+
+    this.previousCoins = coins;
+    this.previousReputation = reputation;
+  }
+
+  private getMarketCardCenter(row: 'business' | 'investments', slotIndex: number): { x: number; y: number } | null {
+    if (slotIndex < 0) return null;
+    const rowTop = row === 'business'
+      ? this.layout.marketTop + 6
+      : this.layout.marketTop + 6 + this.layout.marketRowH + this.layout.marketRowGap;
+    const cardX = this.layout.marketLabelW + 50 + slotIndex * (this.layout.marketCardW + this.layout.marketCardGap);
+    return {
+      x: cardX + this.layout.marketCardW / 2,
+      y: rowTop + this.layout.marketCardH / 2,
+    };
+  }
+
+  private getStreetSlotCenter(slotIndex: number): { x: number; y: number } {
+    const col = slotIndex % this.layout.streetCols;
+    const row = Math.floor(slotIndex / this.layout.streetCols);
+    const x = this.layout.streetX + col * (this.layout.slotW + this.layout.slotGap) + this.layout.slotW / 2;
+    const y = this.layout.streetTop + row * (this.layout.slotH + this.layout.streetRowGap) + this.layout.slotH / 2;
+    return { x, y };
+  }
+
+  private getHandCardCenter(): { x: number; y: number } {
+    return {
+      x: this.layout.handX + this.layout.handCardW / 2,
+      y: this.layout.handY + this.layout.handCardH / 2,
+    };
+  }
+
+  private createTransferCardVisual(
+    cardId: string,
+    family: 'business' | 'event' | 'upgrade',
+    atX: number,
+    atY: number,
+  ): Phaser.GameObjects.GameObject & Phaser.GameObjects.Components.Transform {
+    // If cards are currently rendered as DOM SVGs, render transfer visual as DOM too
+    // so it can layer above table cards consistently.
+    const templateId = this.templateIdFromCardId(cardId);
+    const svgText = this.cardSvgSources.get(templateId);
+    if (this.svgDom && svgText) {
+      const domId = `ms_dom_transfer_${cardId}_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+      return this.svgDom.createOrUpdate(
+        domId,
+        svgText,
+        atX,
+        atY,
+        this.layout.marketCardW,
+        this.layout.marketCardH,
+        undefined,
+        10000,
+      ) as Phaser.GameObjects.GameObject & Phaser.GameObjects.Components.Transform;
+    }
+
+    const bgColor = family === 'business' ? 0x5a7f36 : family === 'upgrade' ? 0x6B4C9A : 0x8B4513;
+    const w = this.layout.marketCardW;
+    const h = this.layout.marketCardH;
+    const container = this.add.container(atX, atY);
+
+    const cardBg = this.add.rectangle(0, 0, w, h, bgColor, 0.95);
+    cardBg.setStrokeStyle(2, 0xffdd88, 0.9);
+    container.add(cardBg);
+
+    const title = CARD_TEMPLATE_NAMES.get(templateId) ?? cardId;
+    const titleText = this.add.text(0, -h * 0.18, title, {
+      fontSize: '12px',
+      fontStyle: 'bold',
+      color: '#ffffff',
+      fontFamily: FONT_FAMILY,
+      align: 'center',
+      wordWrap: { width: w - 10 },
+    }).setOrigin(0.5, 0.5);
+    container.add(titleText);
+
+    const subtitle = this.add.text(0, h * 0.22, family.toUpperCase(), {
+      fontSize: '10px',
+      color: '#ffeecc',
+      fontFamily: FONT_FAMILY,
+      align: 'center',
+    }).setOrigin(0.5, 0.5);
+    container.add(subtitle);
+
+    container.setDepth(10000);
+    return container;
+  }
+
+  private cleanupTransferAnimations(): void {
+    for (const tween of this.activeTransferTweens) {
+      tween.stop();
+    }
+    this.activeTransferTweens.clear();
+
+    for (const visual of this.activeTransferVisuals) {
+      visual.destroy();
+    }
+    this.activeTransferVisuals.clear();
+    this.hiddenTransferSourceCardIds.clear();
+  }
+
+  private animateTransferFromMarket(options: {
+    cardId: string;
+    family: 'business' | 'event' | 'upgrade';
+    row: 'business' | 'investments';
+    slotIndex: number;
+    destination: { x: number; y: number };
+  }): Promise<void> {
+    if (this.settingsPanel?.reducedMotion) return Promise.resolve();
+
+    const source = this.getMarketCardCenter(options.row, options.slotIndex);
+    if (!source) return Promise.resolve();
+
+    const visual = this.createTransferCardVisual(options.cardId, options.family, source.x, source.y);
+    this.activeTransferVisuals.add(visual);
+    this.transferAnimationCount += 1;
+
+    return new Promise((resolve) => {
+      const tween = moveGameObject({
+        scene: this,
+        target: visual,
+        destX: options.destination.x,
+        destY: options.destination.y,
+        duration: 1500,
+        ease: 'Cubic.easeInOut',
+        onComplete: () => {
+          this.activeTransferTweens.delete(tween);
+          this.activeTransferVisuals.delete(visual);
+          visual.destroy();
+          resolve();
+        },
+      });
+
+      this.activeTransferTweens.add(tween);
+    });
   }
 
   // ── Challenge Tracker ───────────────────────────────────
@@ -1245,7 +1463,7 @@ export class MainStreetScene extends CardGameScene {
       const cx = startX + i * (marketCardW + marketCardGap);
       const card = cards[i];
 
-      if (card) {
+      if (card && !this.hiddenTransferSourceCardIds.has(card.id)) {
         const cardObj = this.drawMarketCard(cx, y, card, onClick, rowKey, i);
         this.marketContainer.add(cardObj);
       } else {
@@ -1623,6 +1841,7 @@ export class MainStreetScene extends CardGameScene {
       const btnW = this.layout.actionButtonW;
       const cancelBtn = this.createActionButton(rightX - btnW, by + 4, btnW, 'Cancel', () => {
         this.pendingBusinessCard = null;
+        this.pendingBusinessSourceIndex = null;
         this.uiPhase = 'market';
         this.refreshAll();
         this.instructionText.setText(
@@ -1804,6 +2023,7 @@ export class MainStreetScene extends CardGameScene {
 
     // Enter placement mode
     this.pendingBusinessCard = card;
+    this.pendingBusinessSourceIndex = this.state.market.business.findIndex((c) => c.id === card.id);
     this.uiPhase = 'placing-business';
     this.instructionText.setText(`Click an empty slot to place "${card.name}"`);
     this.refreshStreetGrid();
@@ -1813,24 +2033,46 @@ export class MainStreetScene extends CardGameScene {
   private onSlotClick(slotIndex: number): void {
     if (this.uiPhase !== 'placing-business' || !this.pendingBusinessCard) return;
 
-    console.debug('[MS] onSlotClick: attempting BuyBusiness', { cardId: this.pendingBusinessCard?.id, slotIndex, coinsBefore: this.state.resourceBank.coins, marketBefore: this.state.market.business.map(c=>c.id) });
-    try {
-      const cmd = new BuyBusinessCommand(this.state, this.pendingBusinessCard.id, slotIndex);
-      this.undoManager.execute(cmd);
-      // Record action event
-      try { recordMainStreetEvent({ type: 'action', turn: this.state.turn, action: { type: 'buy-business', cardId: this.pendingBusinessCard.id, slotIndex }, description: cmd.description }); } catch (_) {}
-      this.instructionText.setText(
-        `Placed "${this.pendingBusinessCard.name}" on slot ${slotIndex}`,
-      );
-      console.debug('[MS] BuyBusiness executed successfully', { coinsAfter: this.state.resourceBank.coins, marketAfter: this.state.market.business.map(c=>c.id), street: this.state.streetGrid.map(s=>s?.id ?? null) });
-    } catch (e) {
-      console.error('[MS] BuyBusiness failed', e);
-      this.instructionText.setText(`Error: ${(e as Error).message}`);
-    }
+    const sourceIndex = this.pendingBusinessSourceIndex;
+    const pendingCardId = this.pendingBusinessCard.id;
+    const pendingCardName = this.pendingBusinessCard.name;
 
     this.pendingBusinessCard = null;
-    this.uiPhase = 'market';
+    this.pendingBusinessSourceIndex = null;
+    this.uiPhase = 'animating';
+    this.instructionText.setText(`Placing "${pendingCardName}"...`);
+    this.hiddenTransferSourceCardIds.add(pendingCardId);
     this.refreshAll();
+
+    const afterTransfer = (): void => {
+      console.debug('[MS] onSlotClick: attempting BuyBusiness', { cardId: pendingCardId, slotIndex, coinsBefore: this.state.resourceBank.coins, marketBefore: this.state.market.business.map(c=>c.id) });
+      try {
+        const cmd = new BuyBusinessCommand(this.state, pendingCardId, slotIndex);
+        this.undoManager.execute(cmd);
+        // Record action event
+        try { recordMainStreetEvent({ type: 'action', turn: this.state.turn, action: { type: 'buy-business', cardId: pendingCardId, slotIndex }, description: cmd.description }); } catch (_) {}
+        this.instructionText.setText(`Placed "${pendingCardName}" on slot ${slotIndex}`);
+      } catch (e) {
+        console.error('[MS] BuyBusiness failed', e);
+        this.instructionText.setText(`Error: ${(e as Error).message}`);
+      }
+
+      this.hiddenTransferSourceCardIds.delete(pendingCardId);
+      this.uiPhase = 'market';
+      this.refreshAll();
+    };
+
+    if (typeof sourceIndex === 'number' && sourceIndex >= 0) {
+      void this.animateTransferFromMarket({
+        cardId: pendingCardId,
+        family: 'business',
+        row: 'business',
+        slotIndex: sourceIndex,
+        destination: this.getStreetSlotCenter(slotIndex),
+      }).then(afterTransfer);
+    } else {
+      afterTransfer();
+    }
   }
 
   private onEventCardClick(card: EventCard): void {
@@ -1842,19 +2084,41 @@ export class MainStreetScene extends CardGameScene {
       return;
     }
 
-    console.debug('[MS] onEventCardClick: attempting BuyEvent', { cardId: card.id, coinsBefore: this.state.resourceBank.coins, marketBefore: this.state.market.investments.map(c=>c.id) });
-    try {
-      const cmd = new BuyEventCommand(this.state, card.id);
-      this.undoManager.execute(cmd);
-      try { recordMainStreetEvent({ type: 'action', turn: this.state.turn, action: { type: 'buy-event', cardId: card.id }, description: cmd.description }); } catch (_) {}
-      this.instructionText.setText(`Bought event: "${card.name}"`);
-      console.debug('[MS] BuyEvent executed', { coinsAfter: this.state.resourceBank.coins, heldEvent: this.state.heldEvent?.id ?? null, marketAfter: this.state.market.investments.map(c=>c.id) });
-    } catch (e) {
-      console.error('[MS] BuyEvent failed', e);
-      this.instructionText.setText(`Error: ${(e as Error).message}`);
-    }
+    const sourceIndex = this.state.market.investments.findIndex((c) => c.id === card.id);
 
+    this.uiPhase = 'animating';
+    this.instructionText.setText(`Buying event "${card.name}"...`);
+    this.hiddenTransferSourceCardIds.add(card.id);
     this.refreshAll();
+
+    const afterTransfer = (): void => {
+      console.debug('[MS] onEventCardClick: attempting BuyEvent', { cardId: card.id, coinsBefore: this.state.resourceBank.coins, marketBefore: this.state.market.investments.map(c=>c.id) });
+      try {
+        const cmd = new BuyEventCommand(this.state, card.id);
+        this.undoManager.execute(cmd);
+        try { recordMainStreetEvent({ type: 'action', turn: this.state.turn, action: { type: 'buy-event', cardId: card.id }, description: cmd.description }); } catch (_) {}
+        this.instructionText.setText(`Bought event: "${card.name}"`);
+      } catch (e) {
+        console.error('[MS] BuyEvent failed', e);
+        this.instructionText.setText(`Error: ${(e as Error).message}`);
+      }
+
+      this.hiddenTransferSourceCardIds.delete(card.id);
+      this.uiPhase = 'market';
+      this.refreshAll();
+    };
+
+    if (sourceIndex >= 0) {
+      void this.animateTransferFromMarket({
+        cardId: card.id,
+        family: 'event',
+        row: 'investments',
+        slotIndex: sourceIndex,
+        destination: this.getHandCardCenter(),
+      }).then(afterTransfer);
+    } else {
+      afterTransfer();
+    }
   }
 
   private onUpgradeCardClick(card: UpgradeCard): void {
@@ -1866,30 +2130,52 @@ export class MainStreetScene extends CardGameScene {
       return;
     }
 
+    const sourceIndex = this.state.market.investments.findIndex((c) => c.id === card.id);
+
     // Determine which business slot this upgrade targets (first eligible match)
     const targetSlot = findTargetBusinessSlot(this.state, card);
 
     // If there are multiple upgrade branches for that business, show a choice modal
     const branches = getUpgradeBranchesForBusiness(this.state, targetSlot);
     if (branches.length > 1) {
-      this.showUpgradeChoiceModal(branches, targetSlot);
+      this.showUpgradeChoiceModal(branches, targetSlot, sourceIndex);
       return;
     }
 
-    // Single upgrade available — apply immediately with the resolved slot
-    console.debug('[MS] onUpgradeCardClick: attempting BuyUpgrade', { cardId: card.id, targetSlot, coinsBefore: this.state.resourceBank.coins, marketBefore: this.state.market.investments.map(c=>c.id), streetBefore: this.state.streetGrid.map(s=>s?.id ?? null) });
-    try {
-      const cmd = new BuyUpgradeCommand(this.state, card.id, targetSlot);
-      this.undoManager.execute(cmd);
-      try { recordMainStreetEvent({ type: 'action', turn: this.state.turn, action: { type: 'buy-upgrade', cardId: card.id, targetSlot }, description: cmd.description }); } catch (_) {}
-      this.instructionText.setText(`Applied upgrade: "${card.name}"`);
-      console.debug('[MS] BuyUpgrade executed', { coinsAfter: this.state.resourceBank.coins, marketAfter: this.state.market.investments.map(c=>c.id), streetAfter: this.state.streetGrid.map(s=>s?.id ?? null) });
-    } catch (e) {
-      console.error('[MS] BuyUpgrade failed', e);
-      this.instructionText.setText(`Error: ${(e as Error).message}`);
-    }
-
+    // Single upgrade available — apply after transfer animation
+    this.uiPhase = 'animating';
+    this.instructionText.setText(`Applying upgrade "${card.name}"...`);
+    this.hiddenTransferSourceCardIds.add(card.id);
     this.refreshAll();
+
+    const afterTransfer = (): void => {
+      console.debug('[MS] onUpgradeCardClick: attempting BuyUpgrade', { cardId: card.id, targetSlot, coinsBefore: this.state.resourceBank.coins, marketBefore: this.state.market.investments.map(c=>c.id), streetBefore: this.state.streetGrid.map(s=>s?.id ?? null) });
+      try {
+        const cmd = new BuyUpgradeCommand(this.state, card.id, targetSlot);
+        this.undoManager.execute(cmd);
+        try { recordMainStreetEvent({ type: 'action', turn: this.state.turn, action: { type: 'buy-upgrade', cardId: card.id, targetSlot }, description: cmd.description }); } catch (_) {}
+        this.instructionText.setText(`Applied upgrade: "${card.name}"`);
+      } catch (e) {
+        console.error('[MS] BuyUpgrade failed', e);
+        this.instructionText.setText(`Error: ${(e as Error).message}`);
+      }
+
+      this.hiddenTransferSourceCardIds.delete(card.id);
+      this.uiPhase = 'market';
+      this.refreshAll();
+    };
+
+    if (sourceIndex >= 0) {
+      void this.animateTransferFromMarket({
+        cardId: card.id,
+        family: 'upgrade',
+        row: 'investments',
+        slotIndex: sourceIndex,
+        destination: this.getStreetSlotCenter(targetSlot),
+      }).then(afterTransfer);
+    } else {
+      afterTransfer();
+    }
   }
 
   /**
@@ -1902,7 +2188,7 @@ export class MainStreetScene extends CardGameScene {
    * @param branches   Eligible UpgradeCards the player may choose from.
    * @param targetSlot Street grid slot of the business to be upgraded.
    */
-  private showUpgradeChoiceModal(branches: UpgradeCard[], targetSlot: number): void {
+  private showUpgradeChoiceModal(branches: UpgradeCard[], targetSlot: number, sourceIndex: number): void {
     const MODAL_DEPTH = 20;
     const MODAL_W = 500;
     const BTN_H = 60;
@@ -1965,13 +2251,35 @@ export class MainStreetScene extends CardGameScene {
         dismissOverlay(this.overlayObjects);
         this.overlayObjects = [];
 
-        try {
-          this.undoManager.execute(new BuyUpgradeCommand(this.state, branch.id, targetSlot));
-          this.instructionText.setText(`Applied upgrade: "${branch.name}"`);
-        } catch (e) {
-          this.instructionText.setText(`Error: ${(e as Error).message}`);
-        }
+        this.uiPhase = 'animating';
+        this.instructionText.setText(`Applying upgrade "${branch.name}"...`);
+        this.hiddenTransferSourceCardIds.add(branch.id);
         this.refreshAll();
+
+        const afterTransfer = (): void => {
+          try {
+            this.undoManager.execute(new BuyUpgradeCommand(this.state, branch.id, targetSlot));
+            this.instructionText.setText(`Applied upgrade: "${branch.name}"`);
+          } catch (e) {
+            this.instructionText.setText(`Error: ${(e as Error).message}`);
+          }
+
+          this.hiddenTransferSourceCardIds.delete(branch.id);
+          this.uiPhase = 'market';
+          this.refreshAll();
+        };
+
+        if (sourceIndex >= 0) {
+          void this.animateTransferFromMarket({
+            cardId: branch.id,
+            family: 'upgrade',
+            row: 'investments',
+            slotIndex: sourceIndex,
+            destination: this.getStreetSlotCenter(targetSlot),
+          }).then(afterTransfer);
+        } else {
+          afterTransfer();
+        }
       };
 
       btnBg.on('pointerdown', onChoose);
@@ -2107,6 +2415,16 @@ export class MainStreetScene extends CardGameScene {
   private applyLogScroll(): void {
     this.logContentContainer.setY(LOG_TITLE_H + 2 - this.logScrollOffset);
     this.updateLogMask();
+  }
+
+  /** Test helper: returns number of transfer animations triggered in this scene instance. */
+  getTransferAnimationCountForTest(): number {
+    return this.transferAnimationCount;
+  }
+
+  /** Test helper: returns count of hidden source cards while transfer animation is in progress. */
+  getHiddenTransferSourceCardCountForTest(): number {
+    return this.hiddenTransferSourceCardIds.size;
   }
 
   /** Test helper: returns current computed scene layout metrics. */

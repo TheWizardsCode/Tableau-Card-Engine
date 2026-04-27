@@ -81,9 +81,11 @@ Release and deployment instructions have moved to RELEASE.md at the repository r
 ## Testing
 
 ```bash
-npm test            # run all tests once (unit + browser)
+npm test            # run all tests once (unit + browser, no tracked-asset restore step)
 npm run monte-carlo # run Main Street Monte Carlo harness (JSON + CSV outputs)
 ```
+
+`npm test` is intentionally non-destructive and must not mutate tracked source assets such as `public/assets/games/main-street/svg/cards`. If asset regeneration is needed, run the dedicated generation scripts explicitly.
 
 ### Monte Carlo environment variables
 
