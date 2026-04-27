@@ -1072,7 +1072,25 @@ export class MainStreetScene extends CardGameScene {
     family: 'business' | 'event' | 'upgrade',
     atX: number,
     atY: number,
-  ): Phaser.GameObjects.Container {
+  ): Phaser.GameObjects.GameObject & Phaser.GameObjects.Components.Transform {
+    // If cards are currently rendered as DOM SVGs, render transfer visual as DOM too
+    // so it can layer above table cards consistently.
+    const templateId = this.templateIdFromCardId(cardId);
+    const svgText = this.cardSvgSources.get(templateId);
+    if (this.svgDom && svgText) {
+      const domId = `ms_dom_transfer_${cardId}_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+      return this.svgDom.createOrUpdate(
+        domId,
+        svgText,
+        atX,
+        atY,
+        this.layout.marketCardW,
+        this.layout.marketCardH,
+        undefined,
+        10000,
+      ) as Phaser.GameObjects.GameObject & Phaser.GameObjects.Components.Transform;
+    }
+
     const bgColor = family === 'business' ? 0x5a7f36 : family === 'upgrade' ? 0x6B4C9A : 0x8B4513;
     const w = this.layout.marketCardW;
     const h = this.layout.marketCardH;
@@ -1082,7 +1100,7 @@ export class MainStreetScene extends CardGameScene {
     cardBg.setStrokeStyle(2, 0xffdd88, 0.9);
     container.add(cardBg);
 
-    const title = CARD_TEMPLATE_NAMES.get(this.templateIdFromCardId(cardId)) ?? cardId;
+    const title = CARD_TEMPLATE_NAMES.get(templateId) ?? cardId;
     const titleText = this.add.text(0, -h * 0.18, title, {
       fontSize: '12px',
       fontStyle: 'bold',
@@ -1101,7 +1119,7 @@ export class MainStreetScene extends CardGameScene {
     }).setOrigin(0.5, 0.5);
     container.add(subtitle);
 
-    container.setDepth(3000);
+    container.setDepth(10000);
     return container;
   }
 
