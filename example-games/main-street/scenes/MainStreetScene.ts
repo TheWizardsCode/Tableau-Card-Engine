@@ -233,6 +233,7 @@ export class MainStreetScene extends CardGameScene {
   private transferAnimationCount = 0;
   private activeTransferTweens = new Set<Phaser.Tweens.Tween>();
   private activeTransferVisuals = new Set<Phaser.GameObjects.GameObject>();
+  private hiddenTransferSourceCardIds = new Set<string>();
 
   // Hint system
   /** True after the player has used their one hint for this turn. */
@@ -334,6 +335,7 @@ export class MainStreetScene extends CardGameScene {
     this.pendingBusinessSourceIndex = null;
     this.transferAnimationCount = 0;
     this.cleanupTransferAnimations();
+    this.hiddenTransferSourceCardIds.clear();
 
     // Reset hint state
     this.hintUsedThisTurn = false;
@@ -1113,6 +1115,7 @@ export class MainStreetScene extends CardGameScene {
       visual.destroy();
     }
     this.activeTransferVisuals.clear();
+    this.hiddenTransferSourceCardIds.clear();
   }
 
   private animateTransferFromMarket(options: {
@@ -1137,7 +1140,7 @@ export class MainStreetScene extends CardGameScene {
         target: visual,
         destX: options.destination.x,
         destY: options.destination.y,
-        duration: 420,
+        duration: 1500,
         ease: 'Cubic.easeInOut',
         onComplete: () => {
           this.activeTransferTweens.delete(tween);
@@ -1442,7 +1445,7 @@ export class MainStreetScene extends CardGameScene {
       const cx = startX + i * (marketCardW + marketCardGap);
       const card = cards[i];
 
-      if (card) {
+      if (card && !this.hiddenTransferSourceCardIds.has(card.id)) {
         const cardObj = this.drawMarketCard(cx, y, card, onClick, rowKey, i);
         this.marketContainer.add(cardObj);
       } else {
@@ -2020,8 +2023,8 @@ export class MainStreetScene extends CardGameScene {
     this.pendingBusinessSourceIndex = null;
     this.uiPhase = 'animating';
     this.instructionText.setText(`Placing "${pendingCardName}"...`);
-    this.refreshActionButtons();
-    this.refreshStreetGrid();
+    this.hiddenTransferSourceCardIds.add(pendingCardId);
+    this.refreshAll();
 
     const afterTransfer = (): void => {
       console.debug('[MS] onSlotClick: attempting BuyBusiness', { cardId: pendingCardId, slotIndex, coinsBefore: this.state.resourceBank.coins, marketBefore: this.state.market.business.map(c=>c.id) });
@@ -2036,6 +2039,7 @@ export class MainStreetScene extends CardGameScene {
         this.instructionText.setText(`Error: ${(e as Error).message}`);
       }
 
+      this.hiddenTransferSourceCardIds.delete(pendingCardId);
       this.uiPhase = 'market';
       this.refreshAll();
     };
@@ -2066,7 +2070,8 @@ export class MainStreetScene extends CardGameScene {
 
     this.uiPhase = 'animating';
     this.instructionText.setText(`Buying event "${card.name}"...`);
-    this.refreshActionButtons();
+    this.hiddenTransferSourceCardIds.add(card.id);
+    this.refreshAll();
 
     const afterTransfer = (): void => {
       console.debug('[MS] onEventCardClick: attempting BuyEvent', { cardId: card.id, coinsBefore: this.state.resourceBank.coins, marketBefore: this.state.market.investments.map(c=>c.id) });
@@ -2080,6 +2085,7 @@ export class MainStreetScene extends CardGameScene {
         this.instructionText.setText(`Error: ${(e as Error).message}`);
       }
 
+      this.hiddenTransferSourceCardIds.delete(card.id);
       this.uiPhase = 'market';
       this.refreshAll();
     };
@@ -2121,7 +2127,8 @@ export class MainStreetScene extends CardGameScene {
     // Single upgrade available — apply after transfer animation
     this.uiPhase = 'animating';
     this.instructionText.setText(`Applying upgrade "${card.name}"...`);
-    this.refreshActionButtons();
+    this.hiddenTransferSourceCardIds.add(card.id);
+    this.refreshAll();
 
     const afterTransfer = (): void => {
       console.debug('[MS] onUpgradeCardClick: attempting BuyUpgrade', { cardId: card.id, targetSlot, coinsBefore: this.state.resourceBank.coins, marketBefore: this.state.market.investments.map(c=>c.id), streetBefore: this.state.streetGrid.map(s=>s?.id ?? null) });
@@ -2135,6 +2142,7 @@ export class MainStreetScene extends CardGameScene {
         this.instructionText.setText(`Error: ${(e as Error).message}`);
       }
 
+      this.hiddenTransferSourceCardIds.delete(card.id);
       this.uiPhase = 'market';
       this.refreshAll();
     };
@@ -2227,7 +2235,8 @@ export class MainStreetScene extends CardGameScene {
 
         this.uiPhase = 'animating';
         this.instructionText.setText(`Applying upgrade "${branch.name}"...`);
-        this.refreshActionButtons();
+        this.hiddenTransferSourceCardIds.add(branch.id);
+        this.refreshAll();
 
         const afterTransfer = (): void => {
           try {
@@ -2237,6 +2246,7 @@ export class MainStreetScene extends CardGameScene {
             this.instructionText.setText(`Error: ${(e as Error).message}`);
           }
 
+          this.hiddenTransferSourceCardIds.delete(branch.id);
           this.uiPhase = 'market';
           this.refreshAll();
         };
@@ -2392,6 +2402,11 @@ export class MainStreetScene extends CardGameScene {
   /** Test helper: returns number of transfer animations triggered in this scene instance. */
   getTransferAnimationCountForTest(): number {
     return this.transferAnimationCount;
+  }
+
+  /** Test helper: returns count of hidden source cards while transfer animation is in progress. */
+  getHiddenTransferSourceCardCountForTest(): number {
+    return this.hiddenTransferSourceCardIds.size;
   }
 
   /** Test helper: returns current computed scene layout metrics. */

@@ -194,12 +194,14 @@ describe('MainStreetScene browser tests', () => {
 
     // Business should not appear in street immediately while transfer is playing
     expect(state.streetGrid[targetSlot]).toBeNull();
+    expect(scene.getHiddenTransferSourceCardCountForTest()).toBeGreaterThan(0);
 
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(scene.getTransferAnimationCountForTest()).toBeGreaterThan(beforeBusinessAnimCount);
 
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 1700));
     expect(state.streetGrid[targetSlot]?.id).toBe(business.id);
+    expect(scene.getHiddenTransferSourceCardCountForTest()).toBe(0);
 
     const eventCard = state.market.investments.find((card: any) =>
       card && card.family === 'event' && canPurchaseEvent(state, card.id).legal,
@@ -211,12 +213,14 @@ describe('MainStreetScene browser tests', () => {
 
       // Event should not appear in hand immediately while transfer is playing
       expect(state.heldEvent).toBeNull();
+      expect(scene.getHiddenTransferSourceCardCountForTest()).toBeGreaterThan(0);
 
       await new Promise((resolve) => setTimeout(resolve, 20));
       expect(scene.getTransferAnimationCountForTest()).toBeGreaterThan(beforeEventAnimCount);
 
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 1700));
       expect(state.heldEvent?.id).toBe(eventCard.id);
+      expect(scene.getHiddenTransferSourceCardCountForTest()).toBe(0);
     }
   });
 });
