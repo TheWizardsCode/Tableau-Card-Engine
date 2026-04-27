@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { mkdirSync, rmSync, existsSync } from 'fs';
+import { mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import sharp from 'sharp';
 import { execSync } from 'child_process';
@@ -8,13 +8,20 @@ const ROOT = join(__dirname, '..', '..');
 const SOURCE_DIR = join(ROOT, 'data', 'screenshots', 'main-street');
 const OUT_PATH = join(ROOT, 'public', 'assets', 'games', 'main-street', 'thumbnail.png');
 
+let originalThumbnail: Buffer | null = null;
+
 describe('generate-thumbnail script (main-street)', () => {
   beforeAll(async () => {
-    // Ensure a clean environment
+    if (existsSync(OUT_PATH)) {
+      originalThumbnail = readFileSync(OUT_PATH);
+    }
+
+    // Ensure a clean environment without touching tracked source assets.
     try { rmSync(SOURCE_DIR, { recursive: true, force: true }); } catch {}
-    try { rmSync(join(ROOT, 'public', 'assets', 'games', 'main-street'), { recursive: true, force: true }); } catch {}
+    try { rmSync(OUT_PATH, { force: true }); } catch {}
 
     mkdirSync(SOURCE_DIR, { recursive: true });
+    mkdirSync(join(ROOT, 'public', 'assets', 'games', 'main-street'), { recursive: true });
 
     // Create a dummy turn-000.png (larger than thumbnail size)
     const img = sharp({
@@ -30,7 +37,11 @@ describe('generate-thumbnail script (main-street)', () => {
 
   afterAll(() => {
     // cleanup generated files to avoid polluting repo working tree
-    try { rmSync(join(ROOT, 'public', 'assets', 'games', 'main-street'), { recursive: true, force: true }); } catch {}
+    if (originalThumbnail) {
+      writeFileSync(OUT_PATH, originalThumbnail);
+    } else {
+      try { rmSync(OUT_PATH, { force: true }); } catch {}
+    }
     try { rmSync(SOURCE_DIR, { recursive: true, force: true }); } catch {}
   });
 

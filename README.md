@@ -9,7 +9,7 @@ A modular, spike-driven game engine for building single-player tableau card game
 ```bash
 npm install          # install dependencies
 npm run dev          # start Vite dev server (http://localhost:3000)
-npm test             # run Vitest test suite
+npm test             # run Vitest test suite (non-destructive: does not modify tracked assets)
 npm run build        # TypeScript check + production build -> dist/
 npm run preview      # serve production build locally
 ```

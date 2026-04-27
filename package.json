@@ -8,7 +8,6 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "pretest": "git restore --source=HEAD --worktree public/assets/games/main-street/svg || true",
     "test": "vitest run --project unit && vitest run --project browser",
     "monte-carlo": "tsx scripts/monte-carlo.ts --seeds 200 --seed-prefix mc-balance --maxTurns 25 --strategy greedy --out results/main-street-monte-carlo.json --csv-out results/main-street-monte-carlo.csv",
     "replay": "tsx scripts/replay.ts",

@@ -7,6 +7,8 @@
 
 Rationale: 140×80 matches the Main Street market slot size and keeps runtime scaling simple for thumbnails and UI slots. SVG source art preserves vector fidelity and can be rasterised to derived thumbnails programmatically.
 
+Safety note: treat `public/assets/games/main-street/svg/cards` as source-controlled canonical art. Test workflows must not write to or restore this directory automatically.
+
 ## Rendering rules (aspect-preserving)
 
 All runtime rendering MUST preserve the canonical aspect ratio (landscape 140:80) unless an explicit designer decision is made and documented.
