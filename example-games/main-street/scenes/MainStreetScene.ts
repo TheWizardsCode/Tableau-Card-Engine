@@ -1066,23 +1066,41 @@ export class MainStreetScene extends CardGameScene {
   }
 
   private createTransferCardVisual(
-    _cardId: string,
+    cardId: string,
     family: 'business' | 'event' | 'upgrade',
     atX: number,
     atY: number,
-  ): Phaser.GameObjects.Rectangle {
-    const fallbackColor = family === 'business' ? 0x5a7f36 : family === 'upgrade' ? 0x6B4C9A : 0x8B4513;
-    const rect = this.add.rectangle(
-      atX,
-      atY,
-      this.layout.marketCardW,
-      this.layout.marketCardH,
-      fallbackColor,
-      0.9,
-    );
-    rect.setStrokeStyle(2, 0xffdd88, 0.8);
-    rect.setDepth(3000);
-    return rect;
+  ): Phaser.GameObjects.Container {
+    const bgColor = family === 'business' ? 0x5a7f36 : family === 'upgrade' ? 0x6B4C9A : 0x8B4513;
+    const w = this.layout.marketCardW;
+    const h = this.layout.marketCardH;
+    const container = this.add.container(atX, atY);
+
+    const cardBg = this.add.rectangle(0, 0, w, h, bgColor, 0.95);
+    cardBg.setStrokeStyle(2, 0xffdd88, 0.9);
+    container.add(cardBg);
+
+    const title = CARD_TEMPLATE_NAMES.get(this.templateIdFromCardId(cardId)) ?? cardId;
+    const titleText = this.add.text(0, -h * 0.18, title, {
+      fontSize: '12px',
+      fontStyle: 'bold',
+      color: '#ffffff',
+      fontFamily: FONT_FAMILY,
+      align: 'center',
+      wordWrap: { width: w - 10 },
+    }).setOrigin(0.5, 0.5);
+    container.add(titleText);
+
+    const subtitle = this.add.text(0, h * 0.22, family.toUpperCase(), {
+      fontSize: '10px',
+      color: '#ffeecc',
+      fontFamily: FONT_FAMILY,
+      align: 'center',
+    }).setOrigin(0.5, 0.5);
+    container.add(subtitle);
+
+    container.setDepth(3000);
+    return container;
   }
 
   private cleanupTransferAnimations(): void {
