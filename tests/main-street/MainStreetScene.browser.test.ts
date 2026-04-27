@@ -174,25 +174,32 @@ describe('MainStreetScene browser tests', () => {
     }
   });
 
-  it('triggers transfer animations when buying business to street and event to hand', async () => {
+  it('only materializes purchased cards at destination after transfer animation completes', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;
     const state = scene.state;
 
     const emptySlots = getEmptySlots(state);
     expect(emptySlots.length).toBeGreaterThan(0);
+    const targetSlot = emptySlots[0];
 
     const business = state.market.business.find((card: any) =>
-      card && canPurchaseBusiness(state, card.id, emptySlots[0]).legal,
+      card && canPurchaseBusiness(state, card.id, targetSlot).legal,
     );
     expect(business).toBeTruthy();
 
     const beforeBusinessAnimCount = scene.getTransferAnimationCountForTest();
     scene.onBusinessCardClick(business);
-    scene.onSlotClick(emptySlots[0]);
+    scene.onSlotClick(targetSlot);
 
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    // Business should not appear in street immediately while transfer is playing
+    expect(state.streetGrid[targetSlot]).toBeNull();
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
     expect(scene.getTransferAnimationCountForTest()).toBeGreaterThan(beforeBusinessAnimCount);
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    expect(state.streetGrid[targetSlot]?.id).toBe(business.id);
 
     const eventCard = state.market.investments.find((card: any) =>
       card && card.family === 'event' && canPurchaseEvent(state, card.id).legal,
@@ -201,8 +208,15 @@ describe('MainStreetScene browser tests', () => {
     if (eventCard) {
       const beforeEventAnimCount = scene.getTransferAnimationCountForTest();
       scene.onEventCardClick(eventCard);
-      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Event should not appear in hand immediately while transfer is playing
+      expect(state.heldEvent).toBeNull();
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
       expect(scene.getTransferAnimationCountForTest()).toBeGreaterThan(beforeEventAnimCount);
+
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      expect(state.heldEvent?.id).toBe(eventCard.id);
     }
   });
 });
