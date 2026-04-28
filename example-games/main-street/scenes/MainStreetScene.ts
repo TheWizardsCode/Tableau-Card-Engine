@@ -108,6 +108,16 @@ const STREET_ROW_GAP = 12;
 const BASE_HAND_CARD_W = 140;
 const BASE_HAND_CARD_H = 80;
 
+// ── Main Street SFX keys (logical keys used by SoundManager)
+const SFX_KEYS = {
+  DEAL: 'ms-deal',
+  PLACE: 'ms-place',
+  DISCARD: 'ms-discard',
+  COIN_POP: 'ms-coin-pop',
+  CLICK: 'ms-click',
+  BG_LOOP: 'ms-bg-loop',
+} as const;
+
 // Activity Log panel layout
 const LOG_TITLE_H = 22;
 const LOG_PAD = 8;
@@ -272,6 +282,19 @@ export class MainStreetScene extends CardGameScene {
       // load the SVG via the image loader which treats it as an image resource.
       this.load.image('ms_placeholder_card', 'assets/games/main-street/svg/placeholder-card.svg');
 
+      // Preload Main Street audio assets (small, CC0-generated SFX and a short loop)
+      try {
+        const audioDir = 'assets/games/main-street/audio';
+        this.load.audio(SFX_KEYS.DEAL, `${audioDir}/deal.wav`);
+        this.load.audio(SFX_KEYS.PLACE, `${audioDir}/place.wav`);
+        this.load.audio(SFX_KEYS.DISCARD, `${audioDir}/discard.wav`);
+        this.load.audio(SFX_KEYS.COIN_POP, `${audioDir}/coin-pop.wav`);
+        this.load.audio(SFX_KEYS.CLICK, `${audioDir}/click.wav`);
+        this.load.audio(SFX_KEYS.BG_LOOP, `${audioDir}/loop.wav`);
+      } catch (e) {
+        // Some test environments may lack an audio loader; ignore preload failures
+      }
+
       // Fetch all per-card SVG assets as text for dynamic rasterisation at display size.
       // We do not pre-load them as textures - we lazily rasterise them at exact pixel
       // dimensions needed for crisp rendering on the current screen/DPR.
@@ -353,7 +376,19 @@ export class MainStreetScene extends CardGameScene {
     this.initEventSystem();
 
     // Sound (re-use existing audio assets)
-    this.initSoundSystem([], {});
+    // Register Main Street SFX and map common events to logical sound keys.
+    // The mapping uses common engine events; scenes can emit these events
+    // via `this.gameEvents.emit(...)` to trigger audio feedback.
+    const mapping = {
+      'ui-interaction': SFX_KEYS.CLICK,
+      'card-drawn': SFX_KEYS.DEAL,
+      'card-placed': SFX_KEYS.PLACE,
+      'card-discarded': SFX_KEYS.DISCARD,
+      // income-gained is an example domain event emitted when coins are earned
+      'income-gained': SFX_KEYS.COIN_POP,
+    } as const;
+
+    this.initSoundSystem(Object.values(SFX_KEYS), mapping);
 
     // Game setup -- load campaign for tier-filtered deck building
     this.saveStore = new SaveLoadStore();

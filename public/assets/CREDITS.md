@@ -39,6 +39,23 @@ Files (in `audio/`):
 - `score-reveal.wav` — score display (sparkle arpeggio)
 - `ui-click.wav` — generic UI button click
 
+## Audio Sound Effects — Main Street
+
+Minimal set of SFX and a short background loop added for the Main Street game:
+
+- **Source**: Procedurally generated using `scripts/generate-sfx.mjs` and copied into the Main Street game audio folder
+- **License**: CC0 / Public Domain (procedural synthesis, no external samples used)
+- **Format**: 16-bit PCM WAV, 22050 Hz, mono
+- **Generator**: Run `node scripts/generate-sfx.mjs` to regenerate, then copy or symlink required files into `public/assets/games/main-street/audio/`
+
+Files (in `games/main-street/audio/`):
+- `deal.wav` — card deal / draw swoosh
+- `place.wav` — card placement snap
+- `discard.wav` — card discard thud
+- `coin-pop.wav` — coin / coin-pop reward sound
+- `click.wav` — generic UI click
+- `loop.wav` — short background loop (use sparingly; may be gated behind user interaction)
+
 ## Audio Sound Effects — Beleaguered Castle
 
 14 medieval/castle-themed WAV sound effects generated for the Beleaguered Castle solitaire game:
