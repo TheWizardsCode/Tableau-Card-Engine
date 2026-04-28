@@ -1196,6 +1196,17 @@ export class MainStreetScene extends CardGameScene {
     this.transferAnimationCount += 1;
 
     return new Promise((resolve) => {
+      // Choose SFX based on family/type of transfer
+      const sfxForFamily = (family: string) => {
+        if (family === 'event') {
+          return { start: SFX_KEYS.DEAL, move: SFX_KEYS.DEAL, end: SFX_KEYS.DEAL, moveIntervalMs: 100 };
+        }
+        // business and upgrade -> play deal during move, place on end
+        return { start: SFX_KEYS.DEAL, move: SFX_KEYS.DEAL, end: SFX_KEYS.PLACE, moveIntervalMs: 100 };
+      };
+
+      const sfx = sfxForFamily(options.family);
+
       const tween = moveGameObject({
         scene: this,
         target: visual,
@@ -1203,6 +1214,8 @@ export class MainStreetScene extends CardGameScene {
         destY: options.destination.y,
         duration: 1500,
         ease: 'Cubic.easeInOut',
+        soundManager: this.soundManager,
+        sfx,
         onComplete: () => {
           this.activeTransferTweens.delete(tween);
           this.activeTransferVisuals.delete(visual);
