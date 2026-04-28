@@ -83,6 +83,8 @@ export interface DiscardCardOptions {
     move?: string;
     end?: string;
     moveIntervalMs?: number;
+    /** If true, play the `move` SFX as a looping sound during discard. */
+    moveLoop?: boolean;
   };
 }
 
@@ -151,6 +153,7 @@ export function discardCard(opts: DiscardCardOptions): Phaser.Tweens.Tween {
 
   const moveInterval = sfx?.moveIntervalMs ?? 120;
   let lastMovePlay = 0;
+  let loopSound: Phaser.Sound.BaseSound | null = null;
 
   // Current position
   const startX = target.x;
@@ -168,17 +171,27 @@ export function discardCard(opts: DiscardCardOptions): Phaser.Tweens.Tween {
     duration: duration,
     ease: ease,
     onStart: () => {
-      if (soundManager && sfx?.start) soundManager.play(sfx.start);
-      if (soundManager && sfx?.move) {
-        soundManager.play(sfx.move);
-        lastMovePlay = Date.now();
+      if (sfx?.start) {
+        if (soundManager) soundManager.play(sfx.start);
+        else scene.sound?.play(sfx.start);
+      }
+      if (sfx?.move) {
+        if (sfx.moveLoop && scene.sound && typeof scene.sound.play === 'function') {
+          try { loopSound = scene.sound.play(sfx.move, { loop: true }) as Phaser.Sound.BaseSound; } catch { loopSound = null; }
+        } else {
+          if (soundManager) soundManager.play(sfx.move);
+          else scene.sound?.play(sfx.move);
+          lastMovePlay = Date.now();
+        }
       }
     },
     onUpdate: () => {
-      if (!soundManager || !sfx?.move) return;
+      if (!sfx?.move) return;
+      if (sfx.moveLoop) return;
       const now = Date.now();
       if (now - lastMovePlay >= moveInterval) {
-        soundManager.play(sfx.move);
+        if (soundManager) soundManager.play(sfx.move);
+        else scene.sound?.play(sfx.move);
         lastMovePlay = now;
       }
     },
@@ -186,7 +199,11 @@ export function discardCard(opts: DiscardCardOptions): Phaser.Tweens.Tween {
       if (gameEvents && cardId) {
         gameEvents.emit('card:discarded', { cardId, playerIndex });
       }
-      if (soundManager && sfx?.end) soundManager.play(sfx.end);
+      if (loopSound) { try { loopSound.stop(); } catch {} loopSound = null; }
+      if (sfx?.end) {
+        if (soundManager) soundManager.play(sfx.end);
+        else scene.sound?.play(sfx.end);
+      }
       if (destroyAfter) {
         target.destroy();
       }

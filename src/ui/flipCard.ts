@@ -74,6 +74,8 @@ export interface FlipCardOptions {
     move?: string;
     end?: string;
     moveIntervalMs?: number;
+    /** If true, play the `move` SFX as a looping sound during the flip. */
+    moveLoop?: boolean;
   };
 }
 
@@ -108,6 +110,7 @@ export function flipCard(opts: FlipCardOptions): Phaser.Tweens.Tween {
 
   const half = duration / 2;
   const moveInterval = sfx?.moveIntervalMs ?? 120;
+  let loopSound: Phaser.Sound.BaseSound | null = null;
 
   // Build the close-phase tween config
   const closeConfig: Phaser.Types.Tweens.TweenBuilderConfig = {
@@ -116,19 +119,29 @@ export function flipCard(opts: FlipCardOptions): Phaser.Tweens.Tween {
     duration: half,
     ease: easeClose,
     onStart: () => {
-      if (soundManager && sfx?.start) soundManager.play(sfx.start);
-      if (soundManager && sfx?.move) {
-        soundManager.play(sfx.move);
-        // We'll throttle subsequent move plays during onUpdate of the tween
-        (closeConfig as any).__lastMovePlay = Date.now();
+      if (sfx?.start) {
+        if (soundManager) soundManager.play(sfx.start);
+        else scene.sound?.play(sfx.start);
+      }
+
+      if (sfx?.move) {
+        if (sfx.moveLoop && scene.sound && typeof scene.sound.play === 'function') {
+          try { loopSound = scene.sound.play(sfx.move, { loop: true }) as Phaser.Sound.BaseSound; } catch { loopSound = null; }
+        } else {
+          if (soundManager) soundManager.play(sfx.move);
+          else scene.sound?.play(sfx.move);
+          (closeConfig as any).__lastMovePlay = Date.now();
+        }
       }
     },
     onUpdate: () => {
-      if (!soundManager || !sfx?.move) return;
+      if (!sfx?.move) return;
+      if (sfx.moveLoop) return;
       const last = (closeConfig as any).__lastMovePlay || 0;
       const now = Date.now();
       if (now - last >= moveInterval) {
-        soundManager.play(sfx.move);
+        if (soundManager) soundManager.play(sfx.move);
+        else scene.sound?.play(sfx.move);
         (closeConfig as any).__lastMovePlay = now;
       }
     },
@@ -143,19 +156,33 @@ export function flipCard(opts: FlipCardOptions): Phaser.Tweens.Tween {
         duration: half,
         ease: easeOpen,
         onStart: () => {
-          // Carry forward move SFX timing
-          if (soundManager && sfx?.move) {
+          if (sfx?.move && !sfx.moveLoop) {
             (openConfig as any).__lastMovePlay = (closeConfig as any).__lastMovePlay || 0;
           }
         },
         onUpdate: () => {
-          if (!soundManager || !sfx?.move) return;
+          if (!sfx?.move) return;
+          if (sfx.moveLoop) return;
           const last = (openConfig as any).__lastMovePlay || 0;
           const now = Date.now();
           if (now - last >= moveInterval) {
-            soundManager.play(sfx.move);
+            if (soundManager) soundManager.play(sfx.move);
+            else scene.sound?.play(sfx.move);
             (openConfig as any).__lastMovePlay = now;
           }
+        },
+        onComplete: () => {
+          if (loopSound) {
+            try { loopSound.stop(); } catch {}
+            loopSound = null;
+          }
+
+          if (sfx?.end) {
+            if (soundManager) soundManager.play(sfx.end);
+            else scene.sound?.play(sfx.end);
+          }
+
+          if (onComplete) onComplete();
         },
       } as Phaser.Types.Tweens.TweenBuilderConfig;
 
@@ -167,11 +194,9 @@ export function flipCard(opts: FlipCardOptions): Phaser.Tweens.Tween {
 
       // Only attach an onComplete wrapper if caller provided one. Tests rely on
       // the open-phase onComplete being undefined when not supplied.
-      if (onComplete) {
-        openConfig.onComplete = () => {
-          if (soundManager && sfx?.end) soundManager.play(sfx.end);
-          onComplete();
-        };
+      if (!onComplete) {
+        // remove onComplete if none provided - already handled above
+        delete openConfig.onComplete;
       }
 
       scene.tweens.add(openConfig);

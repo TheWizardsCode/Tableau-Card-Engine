@@ -59,6 +59,8 @@ export interface MoveGameObjectOptions {
     move?: string;
     end?: string;
     moveIntervalMs?: number;
+    /** If true, play the `move` SFX as a looping sound during the tween. */
+    moveLoop?: boolean;
   };
 }
 
@@ -86,6 +88,7 @@ export function moveGameObject(opts: MoveGameObjectOptions): Phaser.Tweens.Tween
 
   const moveInterval = sfx?.moveIntervalMs ?? 120;
   let lastMovePlay = 0;
+  let loopSound: Phaser.Sound.BaseSound | null = null;
 
   return scene.tweens.add({
     targets: target,
@@ -94,23 +97,53 @@ export function moveGameObject(opts: MoveGameObjectOptions): Phaser.Tweens.Tween
     duration,
     ease,
     onStart: () => {
-      if (soundManager && sfx?.start) soundManager.play(sfx.start);
-      if (soundManager && sfx?.move) {
-        // Play initial move sound immediately (also allowed to play on updates)
-        soundManager.play(sfx.move);
-        lastMovePlay = Date.now();
+      // Play start SFX (prefers SoundManager, fall back to scene.sound)
+      if (sfx?.start) {
+        if (soundManager) soundManager.play(sfx.start);
+        else scene.sound?.play(sfx.start);
+      }
+
+      if (sfx?.move) {
+        if (sfx.moveLoop && scene.sound && typeof scene.sound.play === 'function') {
+          // Start a looping sound via Phaser's sound system
+          try {
+            loopSound = scene.sound.play(sfx.move, { loop: true }) as Phaser.Sound.BaseSound;
+          } catch {
+            loopSound = null;
+          }
+        } else {
+          // Play initial move sound immediately and allow throttled repeats
+          if (soundManager) {
+            soundManager.play(sfx.move);
+          } else {
+            scene.sound?.play(sfx.move);
+          }
+          lastMovePlay = Date.now();
+        }
       }
     },
     onUpdate: () => {
-      if (!soundManager || !sfx?.move) return;
+      if (!sfx?.move) return;
+      if (sfx.moveLoop) return; // loop sound handles continuous playback
+
       const now = Date.now();
       if (now - lastMovePlay >= moveInterval) {
-        soundManager.play(sfx.move);
+        if (soundManager) soundManager.play(sfx.move);
+        else scene.sound?.play(sfx.move);
         lastMovePlay = now;
       }
     },
     onComplete: () => {
-      if (soundManager && sfx?.end) soundManager.play(sfx.end);
+      // Stop loop if playing
+      if (loopSound) {
+        try { loopSound.stop(); } catch {}
+        loopSound = null;
+      }
+
+      if (sfx?.end) {
+        if (soundManager) soundManager.play(sfx.end);
+        else scene.sound?.play(sfx.end);
+      }
       onComplete?.();
     },
   });
