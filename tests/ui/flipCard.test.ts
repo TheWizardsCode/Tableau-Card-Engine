@@ -177,6 +177,38 @@ describe('flipCard', () => {
     expect(tweenConfigs[1].onComplete).toBeUndefined();
   });
 
+  it('uses scene.sound.add for looping move SFX and stops it on completion', () => {
+    const stop = vi.fn();
+    const play = vi.fn();
+    const add = vi.fn(() => ({ play, stop }));
+
+    scene = {
+      tweens: {
+        add: vi.fn((config: Phaser.Types.Tweens.TweenBuilderConfig) => {
+          tweenConfigs.push(config);
+          return createMockTween();
+        }),
+      },
+      sound: { add },
+    } as unknown as Phaser.Scene;
+
+    flipCard({
+      scene,
+      target,
+      newTexture: 'card_face',
+      onComplete: vi.fn(),
+      sfx: { move: 'ms-move-loop', moveLoop: true },
+    });
+
+    (tweenConfigs[0].onStart as Function)();
+    expect(add).toHaveBeenCalledWith('ms-move-loop', { loop: true });
+    expect(play).toHaveBeenCalledOnce();
+
+    (tweenConfigs[0].onComplete as Function)();
+    (tweenConfigs[1].onComplete as Function)();
+    expect(stop).toHaveBeenCalledOnce();
+  });
+
   // ── Flip with translation ──────────────────────────────
 
   describe('with destination (flip + translate)', () => {

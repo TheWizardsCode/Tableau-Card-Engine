@@ -176,8 +176,12 @@ export function discardCard(opts: DiscardCardOptions): Phaser.Tweens.Tween {
         else scene.sound?.play(sfx.start);
       }
       if (sfx?.move) {
-        if (sfx.moveLoop && scene.sound && typeof scene.sound.play === 'function') {
-          try { loopSound = scene.sound.play(sfx.move, { loop: true }) as Phaser.Sound.BaseSound; } catch { loopSound = null; }
+        if (sfx.moveLoop && scene.sound && typeof scene.sound.add === 'function') {
+          try {
+            const created = scene.sound.add(sfx.move, { loop: true });
+            created.play();
+            loopSound = created;
+          } catch { loopSound = null; }
         } else {
           if (soundManager) soundManager.play(sfx.move);
           else scene.sound?.play(sfx.move);

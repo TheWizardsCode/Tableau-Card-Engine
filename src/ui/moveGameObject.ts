@@ -104,10 +104,12 @@ export function moveGameObject(opts: MoveGameObjectOptions): Phaser.Tweens.Tween
       }
 
       if (sfx?.move) {
-        if (sfx.moveLoop && scene.sound && typeof scene.sound.play === 'function') {
+        if (sfx.moveLoop && scene.sound && typeof scene.sound.add === 'function') {
           // Start a looping sound via Phaser's sound system
           try {
-            loopSound = scene.sound.play(sfx.move, { loop: true }) as Phaser.Sound.BaseSound;
+            const created = scene.sound.add(sfx.move, { loop: true });
+            created.play();
+            loopSound = created;
           } catch {
             loopSound = null;
           }
