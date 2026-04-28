@@ -7,6 +7,8 @@
  * @module ui/flipCard
  */
 
+import { SoundManager } from '../core-engine';
+
 /** Options for the {@link flipCard} animation. */
 export interface FlipCardOptions {
   /** The Phaser scene that owns the tween timeline. */
@@ -62,6 +64,17 @@ export interface FlipCardOptions {
    * Called after the full flip animation completes (end of the open phase).
    */
   onComplete?: () => void;
+
+  /** Optional SoundManager to play SFX during the flip. */
+  soundManager?: SoundManager | null;
+
+  /** Optional SFX keys for the flip animation. */
+  sfx?: {
+    start?: string;
+    move?: string;
+    end?: string;
+    moveIntervalMs?: number;
+  };
 }
 
 /**
@@ -89,9 +102,12 @@ export function flipCard(opts: FlipCardOptions): Phaser.Tweens.Tween {
     destY,
     onMidpoint,
     onComplete,
+    soundManager = null,
+    sfx,
   } = opts;
 
   const half = duration / 2;
+  const moveInterval = sfx?.moveIntervalMs ?? 120;
 
   // Build the close-phase tween config
   const closeConfig: Phaser.Types.Tweens.TweenBuilderConfig = {
@@ -99,6 +115,23 @@ export function flipCard(opts: FlipCardOptions): Phaser.Tweens.Tween {
     scaleX: 0,
     duration: half,
     ease: easeClose,
+    onStart: () => {
+      if (soundManager && sfx?.start) soundManager.play(sfx.start);
+      if (soundManager && sfx?.move) {
+        soundManager.play(sfx.move);
+        // We'll throttle subsequent move plays during onUpdate of the tween
+        (closeConfig as any).__lastMovePlay = Date.now();
+      }
+    },
+    onUpdate: () => {
+      if (!soundManager || !sfx?.move) return;
+      const last = (closeConfig as any).__lastMovePlay || 0;
+      const now = Date.now();
+      if (now - last >= moveInterval) {
+        soundManager.play(sfx.move);
+        (closeConfig as any).__lastMovePlay = now;
+      }
+    },
     onComplete: () => {
       target.setTexture(newTexture);
       onMidpoint?.();
@@ -109,13 +142,36 @@ export function flipCard(opts: FlipCardOptions): Phaser.Tweens.Tween {
         scaleX: 1,
         duration: half,
         ease: easeOpen,
-        onComplete: onComplete ? () => onComplete() : undefined,
-      };
+        onStart: () => {
+          // Carry forward move SFX timing
+          if (soundManager && sfx?.move) {
+            (openConfig as any).__lastMovePlay = (closeConfig as any).__lastMovePlay || 0;
+          }
+        },
+        onUpdate: () => {
+          if (!soundManager || !sfx?.move) return;
+          const last = (openConfig as any).__lastMovePlay || 0;
+          const now = Date.now();
+          if (now - last >= moveInterval) {
+            soundManager.play(sfx.move);
+            (openConfig as any).__lastMovePlay = now;
+          }
+        },
+      } as Phaser.Types.Tweens.TweenBuilderConfig;
 
       // Add translation for the second half if destination was provided
       if (destX !== undefined && destY !== undefined) {
         openConfig.x = destX;
         openConfig.y = destY;
+      }
+
+      // Only attach an onComplete wrapper if caller provided one. Tests rely on
+      // the open-phase onComplete being undefined when not supplied.
+      if (onComplete) {
+        openConfig.onComplete = () => {
+          if (soundManager && sfx?.end) soundManager.play(sfx.end);
+          onComplete();
+        };
       }
 
       scene.tweens.add(openConfig);

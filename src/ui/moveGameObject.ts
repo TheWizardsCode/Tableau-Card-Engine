@@ -8,6 +8,8 @@
  * @module ui/moveGameObject
  */
 
+import { SoundManager } from '../core-engine';
+
 /** Options for the {@link moveGameObject} animation. */
 export interface MoveGameObjectOptions {
   /** The Phaser scene that owns the tween. */
@@ -41,6 +43,23 @@ export interface MoveGameObjectOptions {
    * Called after the movement animation completes.
    */
   onComplete?: () => void;
+
+  /** Optional SoundManager to play SFX during the animation. */
+  soundManager?: SoundManager | null;
+
+  /**
+   * Optional SFX keys. Each key refers to a registered logical sound name.
+   * - start: played when the tween starts
+   * - move: played periodically during movement (throttled)
+   * - end: played when the tween completes
+   * - moveIntervalMs: throttle interval for move SFX in milliseconds (default 120)
+   */
+  sfx?: {
+    start?: string;
+    move?: string;
+    end?: string;
+    moveIntervalMs?: number;
+  };
 }
 
 /**
@@ -61,7 +80,12 @@ export function moveGameObject(opts: MoveGameObjectOptions): Phaser.Tweens.Tween
     duration = 700,
     ease = 'Quad.easeOut',
     onComplete,
+    soundManager = null,
+    sfx,
   } = opts;
+
+  const moveInterval = sfx?.moveIntervalMs ?? 120;
+  let lastMovePlay = 0;
 
   return scene.tweens.add({
     targets: target,
@@ -69,6 +93,25 @@ export function moveGameObject(opts: MoveGameObjectOptions): Phaser.Tweens.Tween
     y: destY,
     duration,
     ease,
-    onComplete: onComplete ? () => onComplete() : undefined,
+    onStart: () => {
+      if (soundManager && sfx?.start) soundManager.play(sfx.start);
+      if (soundManager && sfx?.move) {
+        // Play initial move sound immediately (also allowed to play on updates)
+        soundManager.play(sfx.move);
+        lastMovePlay = Date.now();
+      }
+    },
+    onUpdate: () => {
+      if (!soundManager || !sfx?.move) return;
+      const now = Date.now();
+      if (now - lastMovePlay >= moveInterval) {
+        soundManager.play(sfx.move);
+        lastMovePlay = now;
+      }
+    },
+    onComplete: () => {
+      if (soundManager && sfx?.end) soundManager.play(sfx.end);
+      onComplete?.();
+    },
   });
 }

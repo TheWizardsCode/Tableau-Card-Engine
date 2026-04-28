@@ -261,6 +261,20 @@ export interface CardPlacedPayload {
   readonly playerIndex?: number;
   /** Slot/target index (optional, for locating). */
   readonly slotIndex?: number;
+  /** Optional action string for contextual events (e.g., 'play-event'). */
+  readonly action?: string;
+  /** Optional target slot for upgrades, placements etc. */
+  readonly targetSlot?: number;
+  /** Optional held event id for play-event actions. */
+  readonly heldEventId?: string;
+}
+
+/**
+ * Emitted when the player gains coins/income.
+ */
+export interface IncomeGainedPayload {
+  /** Amount of coins gained (positive integer). */
+  readonly amount: number;
 }
 
 // ── Event Map ───────────────────────────────────────────────
@@ -284,6 +298,7 @@ export interface GameEventMap {
   'card:dealt': CardDealtPayload;
   'card:placed': CardPlacedPayload;
   'ui-interaction': UIInteractionPayload;
+  'income-gained': IncomeGainedPayload;
   // Solitaire events
   'card-to-foundation': CardToFoundationPayload;
   'card-to-tableau': CardToTableauPayload;

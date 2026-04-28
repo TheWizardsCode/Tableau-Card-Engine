@@ -1,13 +1,4 @@
-/**
- * dealCard -- reusable card dealing animation helper.
- *
- * Animates a card being dealt from a source position into a player's hand.
- * Uses "arc" motion: card starts at source, flies in an arc to destination,
- * optionally rotates during flight for a more natural dealing motion.
- * Fires 'card:dealt' event via GameEventEmitter on completion.
- *
- * @module ui/dealCard
- */
+import { SoundManager } from '../core-engine';
 
 /** Default deal animation duration in milliseconds. */
 export const DEFAULT_DEAL_DURATION = 400;
@@ -87,6 +78,17 @@ export interface DealCardOptions {
    * Optional player index to include in the event payload.
    */
   playerIndex?: number;
+
+  /** Optional SoundManager to play SFX during the deal. */
+  soundManager?: SoundManager | null;
+
+  /** Optional SFX keys for the deal: start/move/end. */
+  sfx?: {
+    start?: string;
+    move?: string;
+    end?: string;
+    moveIntervalMs?: number;
+  };
 }
 
 /** Payload for the 'card:dealt' event. */
@@ -133,6 +135,8 @@ export function dealCard(opts: DealCardOptions): Phaser.Tweens.Tween {
     gameEvents,
     cardId,
     playerIndex,
+    soundManager = null,
+    sfx,
   } = opts;
 
   // Determine source position
@@ -158,6 +162,9 @@ export function dealCard(opts: DealCardOptions): Phaser.Tweens.Tween {
     });
   }
 
+  const moveInterval = sfx?.moveIntervalMs ?? 120;
+  let lastMovePlay = 0;
+
   // Use an "arc" motion with two tweens chained together
   const midX = (startX + destX) / 2;
   const midY = (startY + destY) / 2 + arcHeight;
@@ -172,6 +179,21 @@ export function dealCard(opts: DealCardOptions): Phaser.Tweens.Tween {
     rotation: rotation,
     duration: phase1Duration,
     ease: ease,
+    onStart: () => {
+      if (soundManager && sfx?.start) soundManager.play(sfx.start);
+      if (soundManager && sfx?.move) {
+        soundManager.play(sfx.move);
+        lastMovePlay = Date.now();
+      }
+    },
+    onUpdate: () => {
+      if (!soundManager || !sfx?.move) return;
+      const now = Date.now();
+      if (now - lastMovePlay >= moveInterval) {
+        soundManager.play(sfx.move);
+        lastMovePlay = now;
+      }
+    },
     onComplete: () => {
       // Phase 2: Fall to destination
       scene.tweens.add({
@@ -181,7 +203,19 @@ export function dealCard(opts: DealCardOptions): Phaser.Tweens.Tween {
         rotation: 0,
         duration: phase2Duration,
         ease: 'Quad.easeIn',
+        onStart: () => {
+          // continue move SFX timing
+        },
+        onUpdate: () => {
+          if (!soundManager || !sfx?.move) return;
+          const now = Date.now();
+          if (now - lastMovePlay >= moveInterval) {
+            soundManager.play(sfx.move);
+            lastMovePlay = now;
+          }
+        },
         onComplete: () => {
+          if (soundManager && sfx?.end) soundManager.play(sfx.end);
           if (gameEvents && cardId) {
             gameEvents.emit('card:dealt', { cardId, playerIndex });
           }

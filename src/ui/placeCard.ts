@@ -1,3 +1,5 @@
+import { SoundManager } from '../core-engine';
+
 /**
  * placeCard -- reusable card placement/moving animation helper.
  *
@@ -76,6 +78,17 @@ export interface PlaceCardOptions {
    * Optional slot index to include in the event payload.
    */
   slotIndex?: number;
+
+  /** Optional SoundManager to play SFX during the placement. */
+  soundManager?: SoundManager | null;
+
+  /** Optional SFX keys for placement: start/move/end. */
+  sfx?: {
+    start?: string;
+    move?: string;
+    end?: string;
+    moveIntervalMs?: number;
+  };
 }
 
 /** Payload for the 'card:placed' event. */
@@ -120,6 +133,8 @@ export function placeCard(opts: PlaceCardOptions): Phaser.Tweens.Tween {
     cardId,
     playerIndex,
     slotIndex,
+    soundManager = null,
+    sfx,
   } = opts;
 
   // Check for reduced motion preference
@@ -137,6 +152,9 @@ export function placeCard(opts: PlaceCardOptions): Phaser.Tweens.Tween {
     });
   }
 
+  const moveInterval = sfx?.moveIntervalMs ?? 120;
+  let lastMovePlay = 0;
+
   // Determine scale values
   const startScaleX = target.scaleX;
   const startScaleY = target.scaleY;
@@ -151,6 +169,21 @@ export function placeCard(opts: PlaceCardOptions): Phaser.Tweens.Tween {
     scaleY: scale,
     duration: phase1Duration,
     ease: ease,
+    onStart: () => {
+      if (soundManager && sfx?.start) soundManager.play(sfx.start);
+      if (soundManager && sfx?.move) {
+        soundManager.play(sfx.move);
+        lastMovePlay = Date.now();
+      }
+    },
+    onUpdate: () => {
+      if (!soundManager || !sfx?.move) return;
+      const now = Date.now();
+      if (now - lastMovePlay >= moveInterval) {
+        soundManager.play(sfx.move);
+        lastMovePlay = now;
+      }
+    },
     onComplete: () => {
       // Phase 2: Scale back to normal
       scene.tweens.add({
@@ -160,6 +193,7 @@ export function placeCard(opts: PlaceCardOptions): Phaser.Tweens.Tween {
         duration: duration - phase1Duration,
         ease: 'Quad.easeOut',
         onComplete: () => {
+          if (soundManager && sfx?.end) soundManager.play(sfx.end);
           if (gameEvents && cardId) {
             gameEvents.emit('card:placed', { cardId, playerIndex, slotIndex });
           }

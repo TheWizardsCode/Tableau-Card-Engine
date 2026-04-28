@@ -1,16 +1,4 @@
-/**
- * discardCard -- reusable card discard animation helper.
- *
- * Animates a card being discarded from play:
- * - Fades out (alpha → 0)
- * - Shrinks (scale → 0)
- * - Moves slightly downward (gravity effect)
- * - Rotates slightly for natural discard feel
- *
- * Fires 'card:discarded' event via GameEventEmitter on completion.
- *
- * @module ui/discardCard
- */
+import { SoundManager } from '../core-engine';
 
 /** Default discard animation duration in milliseconds. */
 export const DEFAULT_DISCARD_DURATION = 400;
@@ -85,6 +73,17 @@ export interface DiscardCardOptions {
    * @default true
    */
   destroyAfter?: boolean;
+
+  /** Optional SoundManager to play SFX during discard. */
+  soundManager?: SoundManager | null;
+
+  /** Optional SFX keys for discard: start/move/end. */
+  sfx?: {
+    start?: string;
+    move?: string;
+    end?: string;
+    moveIntervalMs?: number;
+  };
 }
 
 /** Payload for the 'card:discarded' event. */
@@ -127,6 +126,8 @@ export function discardCard(opts: DiscardCardOptions): Phaser.Tweens.Tween {
     cardId,
     playerIndex,
     destroyAfter = true,
+    soundManager = null,
+    sfx,
   } = opts;
 
   // Check for reduced motion preference
@@ -148,6 +149,9 @@ export function discardCard(opts: DiscardCardOptions): Phaser.Tweens.Tween {
     });
   }
 
+  const moveInterval = sfx?.moveIntervalMs ?? 120;
+  let lastMovePlay = 0;
+
   // Current position
   const startX = target.x;
   const startY = target.y;
@@ -163,10 +167,26 @@ export function discardCard(opts: DiscardCardOptions): Phaser.Tweens.Tween {
     rotation: rotation,
     duration: duration,
     ease: ease,
+    onStart: () => {
+      if (soundManager && sfx?.start) soundManager.play(sfx.start);
+      if (soundManager && sfx?.move) {
+        soundManager.play(sfx.move);
+        lastMovePlay = Date.now();
+      }
+    },
+    onUpdate: () => {
+      if (!soundManager || !sfx?.move) return;
+      const now = Date.now();
+      if (now - lastMovePlay >= moveInterval) {
+        soundManager.play(sfx.move);
+        lastMovePlay = now;
+      }
+    },
     onComplete: () => {
       if (gameEvents && cardId) {
         gameEvents.emit('card:discarded', { cardId, playerIndex });
       }
+      if (soundManager && sfx?.end) soundManager.play(sfx.end);
       if (destroyAfter) {
         target.destroy();
       }
