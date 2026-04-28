@@ -120,6 +120,11 @@ const SFX_KEYS = {
   COIN_POP: 'ms-coin-pop',
   CLICK: 'ms-click',
   BG_LOOP: 'ms-bg-loop',
+  BUSINESS_START: 'ms-business-start',
+  BUSINESS_END: 'ms-business-end',
+  UPGRADE_START: 'ms-upgrade-start',
+  UPGRADE_END: 'ms-upgrade-end',
+  EVENT_CHEER: 'ms-event-cheer',
 } as const;
 
 // Activity Log panel layout
@@ -296,6 +301,11 @@ export class MainStreetScene extends CardGameScene {
         this.load.audio(SFX_KEYS.COIN_POP, `${audioDir}/coin-pop.wav`);
         this.load.audio(SFX_KEYS.CLICK, `${audioDir}/click.wav`);
         this.load.audio(SFX_KEYS.BG_LOOP, `${audioDir}/loop.wav`);
+        this.load.audio(SFX_KEYS.BUSINESS_START, `${audioDir}/deal.wav`);
+        this.load.audio(SFX_KEYS.BUSINESS_END, `${audioDir}/place.wav`);
+        this.load.audio(SFX_KEYS.UPGRADE_START, `${audioDir}/click.wav`);
+        this.load.audio(SFX_KEYS.UPGRADE_END, `${audioDir}/place.wav`);
+        this.load.audio(SFX_KEYS.EVENT_CHEER, `${audioDir}/coin-pop.wav`);
       } catch (e) {
         // Some test environments may lack an audio loader; ignore preload failures
       }
@@ -1222,10 +1232,12 @@ export class MainStreetScene extends CardGameScene {
       // Choose SFX based on family/type of transfer
       const sfxForFamily = (family: string) => {
         if (family === 'event') {
-          return { start: SFX_KEYS.DEAL, move: SFX_KEYS.MOVE_LOOP, end: SFX_KEYS.DEAL, moveIntervalMs: 1500 };
+          return { start: SFX_KEYS.EVENT_CHEER, move: SFX_KEYS.MOVE_LOOP, end: SFX_KEYS.EVENT_CHEER, moveIntervalMs: 1500 };
         }
-        // business and upgrade -> play deal during move, place on end
-        return { start: SFX_KEYS.DEAL, move: SFX_KEYS.MOVE_LOOP, end: SFX_KEYS.PLACE, moveIntervalMs: 1500 };
+        if (family === 'upgrade') {
+          return { start: SFX_KEYS.UPGRADE_START, move: SFX_KEYS.MOVE_LOOP, end: SFX_KEYS.UPGRADE_END, moveIntervalMs: 1500 };
+        }
+        return { start: SFX_KEYS.BUSINESS_START, move: SFX_KEYS.MOVE_LOOP, end: SFX_KEYS.BUSINESS_END, moveIntervalMs: 1500 };
       };
 
       const sfx = sfxForFamily(options.family);

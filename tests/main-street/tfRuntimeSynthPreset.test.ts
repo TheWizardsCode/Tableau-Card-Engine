@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 describe('tf runtime synth generation presets', () => {
-  it('uses a quieter, duller card-slide movement voice preset', () => {
+  it('uses tuned movement and transfer-family presets', () => {
     const scriptPath = resolve(process.cwd(), 'scripts/tf-generate-synths.sh');
     const script = readFileSync(scriptPath, 'utf8');
 
@@ -12,5 +12,11 @@ describe('tf runtime synth generation presets', () => {
     expect(script).toContain("noise: { type: 'brown' }");
     expect(script).toContain("new Tone.Filter(1100, 'lowpass')");
     expect(script).toContain('output.gain.value = clamp(v);');
+
+    expect(script).toContain("'construction-hammer': () => constructionHammerVoice()");
+    expect(script).toContain("'construction-saw': () => constructionSawVoice()");
+    expect(script).toContain("'construction-lite-hammer': () => constructionHammerVoice({ lite: true })");
+    expect(script).toContain("'construction-lite-saw': () => constructionSawVoice({ lite: true })");
+    expect(script).toContain("'crowd-cheer': () => crowdCheerVoice()");
   });
 });

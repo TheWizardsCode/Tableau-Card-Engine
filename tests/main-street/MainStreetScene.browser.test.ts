@@ -222,12 +222,13 @@ describe('MainStreetScene browser tests', () => {
   });
 
   it('routes mapped SFX keys to tf-backed adapter when tf module is provided', async () => {
-    const playSpy = vi.fn();
-    const stopSpy = vi.fn();
+    const placePlaySpy = vi.fn();
+    const cheerPlaySpy = vi.fn();
 
     (globalThis as unknown as Record<string, unknown>).__MAIN_STREET_TF_MODULE__ = {
       factories: {
-        'card-place': () => ({ play: playSpy, stop: stopSpy }),
+        'card-place': () => ({ play: placePlaySpy, stop: vi.fn() }),
+        'crowd-cheer': () => ({ play: cheerPlaySpy, stop: vi.fn() }),
       },
     };
 
@@ -235,7 +236,9 @@ describe('MainStreetScene browser tests', () => {
     const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;
 
     scene.soundManager.play('ms-place');
-    expect(playSpy).toHaveBeenCalled();
+    scene.soundManager.play('ms-event-cheer');
+    expect(placePlaySpy).toHaveBeenCalled();
+    expect(cheerPlaySpy).toHaveBeenCalled();
 
     delete (globalThis as unknown as Record<string, unknown>).__MAIN_STREET_TF_MODULE__;
   });
@@ -271,7 +274,7 @@ describe('MainStreetScene browser tests', () => {
       await new Promise((resolve) => setTimeout(resolve, 20));
       expect(scene.getTransferAnimationCountForTest()).toBeGreaterThan(beforeBusinessAnimCount);
 
-      await new Promise((resolve) => setTimeout(resolve, 1700));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
       expect(state.streetGrid[targetSlot]?.id).toBe(business.id);
       expect(scene.getHiddenTransferSourceCardCountForTest()).toBe(0);
 
@@ -290,7 +293,7 @@ describe('MainStreetScene browser tests', () => {
         await new Promise((resolve) => setTimeout(resolve, 20));
         expect(scene.getTransferAnimationCountForTest()).toBeGreaterThan(beforeEventAnimCount);
 
-        await new Promise((resolve) => setTimeout(resolve, 1700));
+        await new Promise((resolve) => setTimeout(resolve, 2000));
         expect(state.heldEvent?.id).toBe(eventCard.id);
         expect(scene.getHiddenTransferSourceCardCountForTest()).toBe(0);
 

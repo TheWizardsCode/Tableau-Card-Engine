@@ -12,4 +12,9 @@ export const MAIN_STREET_TF_SFX_MAPPING: Record<string, string> = {
   'ms-coin-pop': 'card-coin-collect',
   'ms-click': 'ui-notification-chime',
   'ms-bg-loop': 'card-table-ambience',
+  'ms-business-start': 'construction-hammer',
+  'ms-business-end': 'construction-saw',
+  'ms-upgrade-start': 'construction-lite-hammer',
+  'ms-upgrade-end': 'construction-lite-saw',
+  'ms-event-cheer': 'crowd-cheer',
 };

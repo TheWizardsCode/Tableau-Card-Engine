@@ -187,6 +187,43 @@ function movementVoice(durationMs = 1500) {
   };
 }
 
+function constructionHammerVoice({ lite = false } = {}) {
+  return oneShotVoice(
+    () => new Tone.MetalSynth({
+      frequency: lite ? 170 : 145,
+      envelope: { attack: 0.001, decay: lite ? 0.07 : 0.12, release: 0.02 },
+      harmonicity: lite ? 2.2 : 3.8,
+      modulationIndex: lite ? 8 : 16,
+      resonance: lite ? 800 : 1400,
+      octaves: lite ? 1.2 : 1.8,
+      volume: lite ? -12 : -8,
+    }),
+    (synth) => synth.triggerAttackRelease('32n'),
+  );
+}
+
+function constructionSawVoice({ lite = false } = {}) {
+  return oneShotVoice(
+    () => new Tone.NoiseSynth({
+      noise: { type: 'pink' },
+      envelope: { attack: 0.005, decay: lite ? 0.11 : 0.2, sustain: 0, release: 0.04 },
+      volume: lite ? -14 : -10,
+    }),
+    (synth) => synth.triggerAttackRelease(lite ? '16n' : '8n'),
+  );
+}
+
+function crowdCheerVoice() {
+  return oneShotVoice(
+    () => new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: 'triangle' },
+      envelope: { attack: 0.01, decay: 0.4, sustain: 0.05, release: 0.3 },
+      volume: -9,
+    }),
+    (synth) => synth.triggerAttackRelease(['C4', 'E4', 'G4', 'A4'], '4n'),
+  );
+}
+
 export const descriptors = {
   'card-draw': { runtime: 'Tone.FMSynth' },
   'card-slide': { runtime: 'Tone.NoiseSynth' },
@@ -195,6 +232,11 @@ export const descriptors = {
   'card-coin-collect': { runtime: 'Tone.Synth' },
   'ui-notification-chime': { runtime: 'Tone.PolySynth' },
   'card-table-ambience': { runtime: 'Tone.Noise' },
+  'construction-hammer': { runtime: 'Tone.MetalSynth' },
+  'construction-saw': { runtime: 'Tone.NoiseSynth' },
+  'construction-lite-hammer': { runtime: 'Tone.MetalSynth' },
+  'construction-lite-saw': { runtime: 'Tone.NoiseSynth' },
+  'crowd-cheer': { runtime: 'Tone.PolySynth' },
 };
 
 export const factories = {
@@ -220,6 +262,11 @@ export const factories = {
     (synth) => synth.triggerAttackRelease(['C5', 'E5', 'G5'], '8n'),
   ),
   'card-table-ambience': () => ambienceVoice(),
+  'construction-hammer': () => constructionHammerVoice(),
+  'construction-saw': () => constructionSawVoice(),
+  'construction-lite-hammer': () => constructionHammerVoice({ lite: true }),
+  'construction-lite-saw': () => constructionSawVoice({ lite: true }),
+  'crowd-cheer': () => crowdCheerVoice(),
 };
 
 export function getFactory(name) {
