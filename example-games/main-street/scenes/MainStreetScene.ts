@@ -1222,10 +1222,10 @@ export class MainStreetScene extends CardGameScene {
       // Choose SFX based on family/type of transfer
       const sfxForFamily = (family: string) => {
         if (family === 'event') {
-          return { start: SFX_KEYS.DEAL, move: SFX_KEYS.MOVE_LOOP, end: SFX_KEYS.DEAL, moveIntervalMs: 100 };
+          return { start: SFX_KEYS.DEAL, move: SFX_KEYS.MOVE_LOOP, end: SFX_KEYS.DEAL, moveIntervalMs: 1500 };
         }
         // business and upgrade -> play deal during move, place on end
-        return { start: SFX_KEYS.DEAL, move: SFX_KEYS.MOVE_LOOP, end: SFX_KEYS.PLACE, moveIntervalMs: 100 };
+        return { start: SFX_KEYS.DEAL, move: SFX_KEYS.MOVE_LOOP, end: SFX_KEYS.PLACE, moveIntervalMs: 1500 };
       };
 
       const sfx = sfxForFamily(options.family);

@@ -142,6 +142,50 @@ function ambienceVoice() {
   };
 }
 
+function movementVoice(durationMs = 1500) {
+  const output = gainNode(0.45);
+  const synth = new Tone.NoiseSynth({
+    noise: { type: 'white' },
+    envelope: { attack: 0.01, decay: durationMs / 1000, sustain: 0, release: 0.1 },
+  }).connect(output);
+
+  let muted = false;
+  let playing = false;
+  let releaseTimer = null;
+
+  return {
+    async play() {
+      await ensureStarted();
+      if (muted || playing) return;
+      synth.triggerAttackRelease(`${durationMs / 1000}`);
+      playing = true;
+      clearTimeout(releaseTimer);
+      releaseTimer = setTimeout(() => {
+        playing = false;
+      }, durationMs);
+    },
+    stop() {
+      try {
+        synth.triggerRelease?.();
+      } catch {
+        // noop
+      }
+      clearTimeout(releaseTimer);
+      playing = false;
+    },
+    setVolume(v) {
+      output.gain.value = clamp(v);
+    },
+    setMute(v) {
+      muted = Boolean(v);
+      if (muted) {
+        clearTimeout(releaseTimer);
+        playing = false;
+      }
+    },
+  };
+}
+
 export const descriptors = {
   'card-draw': { runtime: 'Tone.FMSynth' },
   'card-slide': { runtime: 'Tone.NoiseSynth' },
@@ -157,10 +201,7 @@ export const factories = {
     () => new Tone.FMSynth({ harmonicity: 2.5, modulationIndex: 4, envelope: { attack: 0.002, decay: 0.08, sustain: 0.1, release: 0.08 } }),
     (synth) => synth.triggerAttackRelease('G5', '32n'),
   ),
-  'card-slide': () => oneShotVoice(
-    () => new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.09, sustain: 0, release: 0.03 } }),
-    (synth) => synth.triggerAttackRelease('16n'),
-  ),
+  'card-slide': () => movementVoice(1500),
   'card-place': () => oneShotVoice(
     () => new Tone.MembraneSynth({ pitchDecay: 0.012, octaves: 2, envelope: { attack: 0.001, decay: 0.14, sustain: 0, release: 0.05 } }),
     (synth) => synth.triggerAttackRelease('C3', '16n'),
