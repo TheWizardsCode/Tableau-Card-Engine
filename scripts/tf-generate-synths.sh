@@ -143,11 +143,12 @@ function ambienceVoice() {
 }
 
 function movementVoice(durationMs = 1500) {
-  const output = gainNode(0.45);
+  const output = gainNode(0.28125);
+  const lowpass = new Tone.Filter(1100, 'lowpass').connect(output);
   const synth = new Tone.NoiseSynth({
-    noise: { type: 'white' },
-    envelope: { attack: 0.01, decay: durationMs / 1000, sustain: 0, release: 0.1 },
-  }).connect(output);
+    noise: { type: 'brown' },
+    envelope: { attack: 0.02, decay: durationMs / 1000, sustain: 0, release: 0.12 },
+  }).connect(lowpass);
 
   let muted = false;
   let playing = false;
