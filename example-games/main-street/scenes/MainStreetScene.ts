@@ -1724,12 +1724,33 @@ export class MainStreetScene extends CardGameScene {
     const renderH = Math.max(1, Math.round(handCardH - 4));
     const tplKey = this.templateKeyForCard(card.id, renderW, renderH);
     let interactiveTarget: Phaser.GameObjects.GameObject | null = null;
-    if (this.textures && (this.textures as Phaser.Textures.TextureManager).exists(tplKey)) {
+    let usedDomSvg = false;
+    if (this.textures
+      && (this.textures as Phaser.Textures.TextureManager).exists(tplKey)
+      && this.svgDom === undefined) {
       const img = this.add.image(0, 0, tplKey);
       // Texture is already rasterised at correct size for this slot
       img.setDisplaySize(renderW, renderH);
       container.add(img);
       interactiveTarget = img;
+    } else if (this.svgDom && this.cardSvgSources.has(this.templateIdFromCardId(card.id))) {
+      // Match market row rendering path for crisp SVG text in hand slot.
+      const cx = x + handCardW / 2;
+      const cy = y + handCardH / 2;
+      const templateId = this.templateIdFromCardId(card.id);
+      const svgText = this.cardSvgSources.get(templateId)!;
+      const domKey = this.domKeyForCard('hand', 0, card.id);
+      interactiveTarget = this.svgDom.createOrUpdate(
+        domKey,
+        svgText,
+        cx,
+        cy,
+        renderW,
+        renderH,
+        () => this.onPlayHeldEvent(),
+        100,
+      );
+      usedDomSvg = true;
     } else {
       this.requestCardTexture(card.id, renderW, renderH);
       // Warm brown fallback background (Investment); no text overlays.
@@ -1740,7 +1761,7 @@ export class MainStreetScene extends CardGameScene {
     }
 
     // Interactivity (only during market phase)
-    if (this.uiPhase === 'market' && interactiveTarget) {
+    if (this.uiPhase === 'market' && interactiveTarget && !usedDomSvg) {
       interactiveTarget.setInteractive({ useHandCursor: true });
       interactiveTarget.on('pointerdown', () => this.onPlayHeldEvent());
       interactiveTarget.on('pointerover', () => {

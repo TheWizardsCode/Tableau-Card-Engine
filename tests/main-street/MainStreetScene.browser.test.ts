@@ -151,10 +151,10 @@ describe('MainStreetScene browser tests', () => {
     // Look for card containers in marketContainer (cards are rendered via drawMarketCard)
     const market = scene.marketContainer as Phaser.GameObjects.Container;
     const containers = market.list.filter((obj) => obj instanceof Phaser.GameObjects.Container) as Phaser.GameObjects.Container[];
-    
+
     // Check that we have card containers rendered
     expect(containers.length).toBeGreaterThan(0);
-    
+
     // Check aspect ratio on any image that might be rendered (placeholder or card texture)
     for (const c of containers) {
       const childImg = c.list.find((o) => o instanceof Phaser.GameObjects.Image) as Phaser.GameObjects.Image | undefined;
@@ -164,7 +164,7 @@ describe('MainStreetScene browser tests', () => {
         // Key should be either placeholder or a size-specific card texture
         const isValidKey = key === 'ms_placeholder_card' || key.startsWith('ms_card_');
         expect(isValidKey).toBe(true);
-        
+
         // Check aspect ratio is roughly preserved (140x80 = 1.75)
         const srcRatio = 140 / 80; // 1.75
         const dispRatio = childImg.displayWidth / childImg.displayHeight;
@@ -172,6 +172,36 @@ describe('MainStreetScene browser tests', () => {
         break;
       }
     }
+  });
+
+  it('uses DOM SVG rendering for held-event hand slot when DOM renderer is available', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;
+    const state = scene.state;
+
+    const eventCard = state.market.investments.find((card: any) => card && card.family === 'event');
+    expect(eventCard).toBeTruthy();
+
+    // Ensure the held card has an SVG source available for DOM rendering.
+    const templateId = String(eventCard.id).replace(/-\d+$/, '');
+    scene.cardSvgSources.set(templateId, '<svg xmlns="http://www.w3.org/2000/svg" width="140" height="80" viewBox="0 0 140 80"><rect width="140" height="80" fill="#8B4513"/><text x="70" y="44" font-size="14" text-anchor="middle" fill="#fff">Held</text></svg>');
+
+    state.heldEvent = eventCard;
+
+    const domCalls: Array<{ id: string; width: number; height: number }> = [];
+    scene.svgDom = {
+      clear: () => {},
+      createOrUpdate: (id: string, _svg: string, _cx: number, _cy: number, width: number, height: number) => {
+        domCalls.push({ id, width, height });
+      },
+    };
+
+    scene.refreshAll();
+
+    const handCall = domCalls.find((call) => call.id.startsWith('ms_dom_hand_'));
+    expect(handCall).toBeTruthy();
+    expect(handCall!.width).toBeGreaterThan(0);
+    expect(handCall!.height).toBeGreaterThan(0);
   });
 
   it('only materializes purchased cards at destination after transfer animation completes (desktop + narrow viewports)', async () => {
