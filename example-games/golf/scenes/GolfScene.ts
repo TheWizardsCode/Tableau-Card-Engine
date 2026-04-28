@@ -1088,17 +1088,32 @@ export class GolfScene extends CardGameScene {
         easeClose: 'Power2',
         destX: discardPos.x,
         destY: discardPos.y,
+        soundManager: this.soundManager,
+        sfx: { start: SFX_KEYS.CARD_SWAP, move: SFX_KEYS.CARD_SWAP, end: SFX_KEYS.CARD_FLIP, moveIntervalMs: 100 },
         onComplete: checkDone,
       });
 
       // 2. Drawn card: translate from display position to vacated grid slot
       if (this.drawnCardSprite) {
+        // throttle move plays for this tween
+        let lastMove = 0;
         this.tweens.add({
           targets: this.drawnCardSprite,
           x: gridSlotPos.x,
           y: gridSlotPos.y,
           duration: SWAP_ANIM_DURATION,
           ease: 'Power2',
+          onStart: () => {
+            this.soundManager?.play(SFX_KEYS.CARD_SWAP);
+            lastMove = Date.now();
+          },
+          onUpdate: () => {
+            const now = Date.now();
+            if (now - lastMove >= 100) {
+              this.soundManager?.play(SFX_KEYS.CARD_SWAP);
+              lastMove = now;
+            }
+          },
           onComplete: checkDone,
         });
       } else {
@@ -1125,6 +1140,8 @@ export class GolfScene extends CardGameScene {
           newTexture: getCardTexture(grid[idx]),
           duration: SWAP_ANIM_DURATION / 2,
           easeClose: 'Power2',
+          soundManager: this.soundManager,
+          sfx: { start: SFX_KEYS.CARD_DISCARD, move: SFX_KEYS.CARD_DISCARD, end: SFX_KEYS.CARD_FLIP, moveIntervalMs: 100 },
           onComplete: onComplete, // Skip wrappedOnComplete; drawn card already hidden
         });
       };
@@ -1171,6 +1188,8 @@ export class GolfScene extends CardGameScene {
         easeClose: 'Power2',
         destX,
         destY,
+        soundManager: this.soundManager,
+        sfx: { start: SFX_KEYS.CARD_DRAW, move: SFX_KEYS.CARD_DRAW, end: SFX_KEYS.CARD_FLIP, moveIntervalMs: 100 },
         onComplete: () => {
           if (this.drawnCardSprite) this.drawnCardSprite.setDepth(0);
         },
@@ -1180,12 +1199,25 @@ export class GolfScene extends CardGameScene {
       this.drawnCardSprite = this.add.image(startX, startY, faceTexture);
       this.drawnCardSprite.setDepth(15);
 
+      // animate slide-in with SFX
+      let lastMove = 0;
       this.tweens.add({
         targets: this.drawnCardSprite,
         x: destX,
         y: destY,
         duration: ANIM_DURATION,
         ease: 'Power2',
+        onStart: () => {
+          this.soundManager?.play(SFX_KEYS.CARD_DRAW);
+          lastMove = Date.now();
+        },
+        onUpdate: () => {
+          const now = Date.now();
+          if (now - lastMove >= 100) {
+            this.soundManager?.play(SFX_KEYS.CARD_DRAW);
+            lastMove = now;
+          }
+        },
         onComplete: () => {
           if (this.drawnCardSprite) this.drawnCardSprite.setDepth(0);
         },
@@ -1232,12 +1264,24 @@ export class GolfScene extends CardGameScene {
     this.phaseManager.set('animating');
     this.drawnCardSprite.setDepth(15);
 
+    let lastMove = 0;
     this.tweens.add({
       targets: this.drawnCardSprite,
       x: PILE_X,
       y: DISCARD_Y,
       duration: SWAP_ANIM_DURATION / 2,
       ease: 'Power2',
+      onStart: () => {
+        this.soundManager?.play(SFX_KEYS.CARD_DISCARD);
+        lastMove = Date.now();
+      },
+      onUpdate: () => {
+        const now = Date.now();
+        if (now - lastMove >= 100) {
+          this.soundManager?.play(SFX_KEYS.CARD_DISCARD);
+          lastMove = now;
+        }
+      },
       onComplete: () => {
         this.hideDrawnCard();
         // Update the discard sprite to show the card that was just visually
@@ -1247,6 +1291,7 @@ export class GolfScene extends CardGameScene {
           this.discardSprite.setAlpha(1);
           this.discardSprite.setVisible(true);
         }
+        this.soundManager?.play(SFX_KEYS.CARD_DISCARD);
         onComplete();
       },
     });
