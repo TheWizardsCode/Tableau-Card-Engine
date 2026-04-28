@@ -202,6 +202,15 @@ describe('MainStreetScene browser tests', () => {
     expect(handCall).toBeTruthy();
     expect(handCall!.width).toBeGreaterThan(0);
     expect(handCall!.height).toBeGreaterThan(0);
+
+    // Hand slot should not fall back to Phaser image/rectangle rendering.
+    const handContainer = scene.handContainer as Phaser.GameObjects.Container;
+    const heldCardContainer = handContainer.list.find((obj) => obj instanceof Phaser.GameObjects.Container) as Phaser.GameObjects.Container | undefined;
+    expect(heldCardContainer).toBeTruthy();
+    const hasFallbackDisplayObject = heldCardContainer!.list.some((obj) =>
+      obj instanceof Phaser.GameObjects.Image || obj instanceof Phaser.GameObjects.Rectangle,
+    );
+    expect(hasFallbackDisplayObject).toBe(false);
   });
 
   it('only materializes purchased cards at destination after transfer animation completes (desktop + narrow viewports)', async () => {
