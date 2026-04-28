@@ -131,8 +131,8 @@ export interface SoundManagerOptions {
 export class SoundManager {
   private readonly player: SoundPlayer;
   private readonly storage: StorageLike | null;
-  private readonly synthPlayer: SoundPlayer | null;
-  private readonly synthKeyMap: Record<string, string>;
+  private synthPlayer: SoundPlayer | null;
+  private synthKeyMap: Record<string, string>;
   private readonly registry = new Map<string, string>();
   private readonly eventUnsubs: Array<() => void> = [];
 
@@ -257,6 +257,20 @@ export class SoundManager {
   toggleMute(): boolean {
     this.setMute(!this._muted);
     return this._muted;
+  }
+
+  /**
+   * Attach or replace synth integration at runtime.
+   * Useful when a tf module is loaded asynchronously after scene boot.
+   */
+  setSynthIntegration(
+    synthPlayer: SoundPlayer | null,
+    synthKeyMap: Record<string, string> = {},
+  ): void {
+    this.synthPlayer = synthPlayer;
+    this.synthKeyMap = synthKeyMap;
+    this.synthPlayer?.setMute(this._muted);
+    this.synthPlayer?.setVolume(this._volume);
   }
 
   // ── Event-to-sound mapping ──────────────────────────────

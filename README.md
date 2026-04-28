@@ -78,6 +78,8 @@ More games are planned: Coloretto.
 
 Main Street can optionally route mapped SFX keys through a ToneForge-backed module via `createTfPlayer`.
 
+`npm run tf:generate` now emits a runtime synth module at `build/tf-synths/main-street-runtime-synth.mjs` that provides on-the-fly Tone/WebAudio voices.
+
 Expected tf module exports consumed by the adapter:
 
 - `factories: Record<string, () => TfVoice>`

@@ -70,4 +70,21 @@ describe('SoundManager tf integration', () => {
     expect(wavPlayer.setMute).toHaveBeenCalledWith(true);
     expect(synthPlayer.setMute).toHaveBeenCalledWith(true);
   });
+
+  it('supports late synth attachment for async module loading', () => {
+    const wavPlayer = createMockPlayer();
+    const synthPlayer = createMockPlayer();
+
+    const manager = new SoundManager(wavPlayer, {
+      storage: null,
+    });
+
+    manager.register('ms-place', 'ms-place-wav');
+    manager.play('ms-place');
+    expect(wavPlayer.play).toHaveBeenCalledWith('ms-place-wav');
+
+    manager.setSynthIntegration(synthPlayer, { 'ms-place': 'card-place' });
+    manager.play('ms-place');
+    expect(synthPlayer.play).toHaveBeenCalledWith('card-place');
+  });
 });

@@ -53,7 +53,7 @@ import {
 } from '../../../src/ui';
 import { createTfPlayer } from '../../../src/core-engine';
 import { MAIN_STREET_TF_SFX_MAPPING } from '../sfx-tf-mapping';
-import { getMainStreetTfModule } from '../tf/mainStreetTfModule';
+import { getMainStreetTfModule, loadMainStreetTfModule } from '../tf/mainStreetTfModule';
 import type { HelpSection } from '../../../src/ui';
 import { SaveLoadStore } from '../../../src/core-engine';
 import type { MainStreetCampaignProgress } from '../MainStreetState';
@@ -401,6 +401,15 @@ export class MainStreetScene extends CardGameScene {
     this.initSoundSystem(Object.values(SFX_KEYS), mapping, {
       synthPlayer: tfPlayer,
       synthKeyMap: MAIN_STREET_TF_SFX_MAPPING,
+    });
+
+    // Late async tf module load (runtime-generated module path) without restart.
+    void loadMainStreetTfModule().then((loadedModule) => {
+      if (!loadedModule || !this.soundManager) return;
+      this.soundManager.setSynthIntegration(
+        createTfPlayer(loadedModule),
+        MAIN_STREET_TF_SFX_MAPPING,
+      );
     });
 
     // Game setup -- load campaign for tier-filtered deck building

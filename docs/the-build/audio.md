@@ -27,7 +27,8 @@ npm run tf:generate
 This command executes `scripts/tf-generate-synths.sh` and writes outputs to:
 
 - `build/tf-synths/wav/*.wav`
-- `build/tf-synths/main-street-tf-module.mjs`
+- `build/tf-synths/main-street-tf-module.mjs` (metadata)
+- `build/tf-synths/main-street-runtime-synth.mjs` (Tone/WebAudio runtime synth factories)
 - `build/tf-synths/*.json` metadata
 
 To use a custom output path:
@@ -56,7 +57,17 @@ Default source-controlled shim:
 
 The shim defaults to `null` so the game continues to use WAV fallback when tf artifacts are not present.
 
-For local experiments, provide a tf module by setting `globalThis.__MAIN_STREET_TF_MODULE__` (used by tests) or by adapting the shim in your local branch.
+At runtime, MainStreetScene also attempts asynchronous dynamic loading from:
+
+- `/build/tf-synths/main-street-runtime-synth.mjs`
+
+You can override this URL for development/tests via:
+
+- `globalThis.__MAIN_STREET_TF_MODULE_URL__`
+
+For direct injection (used by tests), set:
+
+- `globalThis.__MAIN_STREET_TF_MODULE__`
 
 ## CI guidance
 

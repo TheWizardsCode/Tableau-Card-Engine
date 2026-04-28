@@ -186,7 +186,7 @@ ToneForge-generated synth artifacts are integrated via a thin adapter and are **
 npm run tf:generate
 ```
 
-This runs `scripts/tf-generate-synths.sh` and writes generated outputs under `build/tf-synths/`.
+This runs `scripts/tf-generate-synths.sh` and writes generated outputs under `build/tf-synths/`, including a runtime synth module (`main-street-runtime-synth.mjs`) used for on-the-fly synthesis.
 
 See `docs/the-build/audio.md` for full details (module shape, mapping, runtime wiring, CI guidance).
 

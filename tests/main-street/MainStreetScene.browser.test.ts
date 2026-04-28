@@ -42,7 +42,14 @@ describe('MainStreetScene browser tests', () => {
   let game: Phaser.Game | null = null;
 
   afterEach(() => {
+    const moduleUrl = (globalThis as unknown as Record<string, unknown>).__MAIN_STREET_TF_MODULE_URL__;
+    if (typeof moduleUrl === 'string' && moduleUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(moduleUrl);
+    }
+
     delete (globalThis as unknown as Record<string, unknown>).__MAIN_STREET_TF_MODULE__;
+    delete (globalThis as unknown as Record<string, unknown>).__MAIN_STREET_TF_MODULE_URL__;
+    delete (globalThis as unknown as Record<string, unknown>).__TF_PLAY_COUNT__;
     destroyGame(game);
     game = null;
   });
