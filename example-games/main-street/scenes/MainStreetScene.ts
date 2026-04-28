@@ -1796,6 +1796,7 @@ export class MainStreetScene extends CardGameScene {
       this.undoManager.execute(cmd);
       // Record action event
       try { recordMainStreetEvent({ type: 'action', turn: this.state.turn, action: { type: 'play-event' }, description: cmd.description }); } catch (_) {}
+      try { this.gameEvents?.emit('card-placed', { action: 'play-event', heldEventId: this.state.heldEvent?.id ?? null }); } catch (_) {}
       this.instructionText.setText('Played held Investment event!');
       addLog(this.state, 'Played held event (via UI)', 'neutral');
       console.debug('[MS] PlayEvent executed', { coinsAfter: this.state.resourceBank.coins, heldEventAfter: this.state.heldEvent?.id ?? null });
@@ -2082,6 +2083,8 @@ export class MainStreetScene extends CardGameScene {
         this.undoManager.execute(cmd);
         // Record action event
         try { recordMainStreetEvent({ type: 'action', turn: this.state.turn, action: { type: 'buy-business', cardId: pendingCardId, slotIndex }, description: cmd.description }); } catch (_) {}
+        // Emit a game event for audio / integrations
+        try { this.gameEvents?.emit('card-placed', { cardId: pendingCardId, slotIndex }); } catch (_) {}
         this.instructionText.setText(`Placed "${pendingCardName}" on slot ${slotIndex}`);
       } catch (e) {
         console.error('[MS] BuyBusiness failed', e);
@@ -2128,6 +2131,7 @@ export class MainStreetScene extends CardGameScene {
         const cmd = new BuyEventCommand(this.state, card.id);
         this.undoManager.execute(cmd);
         try { recordMainStreetEvent({ type: 'action', turn: this.state.turn, action: { type: 'buy-event', cardId: card.id }, description: cmd.description }); } catch (_) {}
+        try { this.gameEvents?.emit('card-placed', { cardId: card.id }); } catch (_) {}
         this.instructionText.setText(`Bought event: "${card.name}"`);
       } catch (e) {
         console.error('[MS] BuyEvent failed', e);
@@ -2185,6 +2189,7 @@ export class MainStreetScene extends CardGameScene {
         const cmd = new BuyUpgradeCommand(this.state, card.id, targetSlot);
         this.undoManager.execute(cmd);
         try { recordMainStreetEvent({ type: 'action', turn: this.state.turn, action: { type: 'buy-upgrade', cardId: card.id, targetSlot }, description: cmd.description }); } catch (_) {}
+        try { this.gameEvents?.emit('card-placed', { cardId: card.id, targetSlot }); } catch (_) {}
         this.instructionText.setText(`Applied upgrade: "${card.name}"`);
       } catch (e) {
         console.error('[MS] BuyUpgrade failed', e);
