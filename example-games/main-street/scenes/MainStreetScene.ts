@@ -1053,6 +1053,12 @@ export class MainStreetScene extends CardGameScene {
         scale: 1.2,
         reducedMotion,
       });
+      // Emit income event for audio when coins increased
+      try {
+        if (delta > 0) {
+          try { this.gameEvents?.emit('income-gained', { amount: delta }); } catch (_) {}
+        }
+      } catch (_) {}
     }
 
     if (reputation !== this.previousReputation) {
