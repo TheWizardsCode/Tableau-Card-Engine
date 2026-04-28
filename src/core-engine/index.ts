@@ -94,6 +94,17 @@ export { PhaserEventBridge } from './PhaserEventBridge';
 export type { SoundPlayer, EventSoundMapping, StorageLike, SoundManagerOptions } from './SoundManager';
 export { SoundManager } from './SoundManager';
 
+// ToneForge runtime adapter
+export type {
+  TfVoice,
+  TfFactory,
+  TfGeneratedModule,
+  TfAdapterLogger,
+  CreateTfPlayerOptions,
+  TfPlayer,
+} from './tfAdapter';
+export { createTfPlayer } from './tfAdapter';
+
 // Seeded RNG factory
 export { createSeededRng } from './SeededRng';
 

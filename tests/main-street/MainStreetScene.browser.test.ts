@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import Phaser from 'phaser';
 
 import { waitForScene } from '../helpers/waitForScene';
@@ -42,6 +42,7 @@ describe('MainStreetScene browser tests', () => {
   let game: Phaser.Game | null = null;
 
   afterEach(() => {
+    delete (globalThis as unknown as Record<string, unknown>).__MAIN_STREET_TF_MODULE__;
     destroyGame(game);
     game = null;
   });
@@ -211,6 +212,25 @@ describe('MainStreetScene browser tests', () => {
       obj instanceof Phaser.GameObjects.Image || obj instanceof Phaser.GameObjects.Rectangle,
     );
     expect(hasFallbackDisplayObject).toBe(false);
+  });
+
+  it('routes mapped SFX keys to tf-backed adapter when tf module is provided', async () => {
+    const playSpy = vi.fn();
+    const stopSpy = vi.fn();
+
+    (globalThis as unknown as Record<string, unknown>).__MAIN_STREET_TF_MODULE__ = {
+      factories: {
+        'card-place': () => ({ play: playSpy, stop: stopSpy }),
+      },
+    };
+
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;
+
+    scene.soundManager.play('ms-place');
+    expect(playSpy).toHaveBeenCalled();
+
+    delete (globalThis as unknown as Record<string, unknown>).__MAIN_STREET_TF_MODULE__;
   });
 
   it('only materializes purchased cards at destination after transfer animation completes (desktop + narrow viewports)', async () => {

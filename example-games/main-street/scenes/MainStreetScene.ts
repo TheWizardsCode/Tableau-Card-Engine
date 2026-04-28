@@ -51,6 +51,9 @@ import {
   popTextOrIcon,
   moveGameObject,
 } from '../../../src/ui';
+import { createTfPlayer } from '../../../src/core-engine';
+import { MAIN_STREET_TF_SFX_MAPPING } from '../sfx-tf-mapping';
+import { getMainStreetTfModule } from '../tf/mainStreetTfModule';
 import type { HelpSection } from '../../../src/ui';
 import { SaveLoadStore } from '../../../src/core-engine';
 import type { MainStreetCampaignProgress } from '../MainStreetState';
@@ -71,7 +74,7 @@ import {
 import { UndoRedoManager } from '../../../src/core-engine';
 import { BuyBusinessCommand, BuyUpgradeCommand, BuyEventCommand, PlayEventCommand } from '../MainStreetCommands';
 import { MainStreetTranscriptRecorder, setMainStreetRecorder, recordMainStreetEvent } from '../MainStreetTranscript';
-import { rasteriseSvgToTexture, makeTextureKey, markSceneValid } from './SvgTextureHelpers';
+import { rasteriseSvgToTexture, makeTextureKey, markSceneValid, markSceneInvalid } from './SvgTextureHelpers';
 import { SvgDomRenderer } from './SvgDomRenderer';
 
 // ── Constants ───────────────────────────────────────────────
@@ -111,6 +114,7 @@ const BASE_HAND_CARD_H = 80;
 // ── Main Street SFX keys (logical keys used by SoundManager)
 const SFX_KEYS = {
   DEAL: 'ms-deal',
+  MOVE_LOOP: 'ms-move-loop',
   PLACE: 'ms-place',
   DISCARD: 'ms-discard',
   COIN_POP: 'ms-coin-pop',
@@ -286,6 +290,7 @@ export class MainStreetScene extends CardGameScene {
       try {
         const audioDir = 'assets/games/main-street/audio';
         this.load.audio(SFX_KEYS.DEAL, `${audioDir}/deal.wav`);
+        this.load.audio(SFX_KEYS.MOVE_LOOP, `${audioDir}/deal.wav`);
         this.load.audio(SFX_KEYS.PLACE, `${audioDir}/place.wav`);
         this.load.audio(SFX_KEYS.DISCARD, `${audioDir}/discard.wav`);
         this.load.audio(SFX_KEYS.COIN_POP, `${audioDir}/coin-pop.wav`);
@@ -388,7 +393,15 @@ export class MainStreetScene extends CardGameScene {
       'income-gained': SFX_KEYS.COIN_POP,
     } as const;
 
-    this.initSoundSystem(Object.values(SFX_KEYS), mapping);
+    const tfModule = getMainStreetTfModule();
+    const tfPlayer = tfModule
+      ? createTfPlayer(tfModule)
+      : null;
+
+    this.initSoundSystem(Object.values(SFX_KEYS), mapping, {
+      synthPlayer: tfPlayer,
+      synthKeyMap: MAIN_STREET_TF_SFX_MAPPING,
+    });
 
     // Game setup -- load campaign for tier-filtered deck building
     this.saveStore = new SaveLoadStore();
@@ -494,6 +507,7 @@ export class MainStreetScene extends CardGameScene {
     this.initSettingsPanel();
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      markSceneInvalid(this);
       this.cleanupTransferAnimations();
     });
 
@@ -1199,10 +1213,10 @@ export class MainStreetScene extends CardGameScene {
       // Choose SFX based on family/type of transfer
       const sfxForFamily = (family: string) => {
         if (family === 'event') {
-          return { start: SFX_KEYS.DEAL, move: SFX_KEYS.DEAL, end: SFX_KEYS.DEAL, moveIntervalMs: 100 };
+          return { start: SFX_KEYS.DEAL, move: SFX_KEYS.MOVE_LOOP, end: SFX_KEYS.DEAL, moveIntervalMs: 100 };
         }
         // business and upgrade -> play deal during move, place on end
-        return { start: SFX_KEYS.DEAL, move: SFX_KEYS.DEAL, end: SFX_KEYS.PLACE, moveIntervalMs: 100 };
+        return { start: SFX_KEYS.DEAL, move: SFX_KEYS.MOVE_LOOP, end: SFX_KEYS.PLACE, moveIntervalMs: 100 };
       };
 
       const sfx = sfxForFamily(options.family);

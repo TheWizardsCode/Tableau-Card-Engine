@@ -101,6 +101,19 @@ export interface SoundManagerOptions {
    * Pass `null` to disable persistence.
    */
   storage?: StorageLike | null;
+
+  /**
+   * Optional ToneForge-backed player used for synth-mapped keys.
+   * When present and a key appears in `synthKeyMap`, playback delegates
+   * to this player instead of WAV assets.
+   */
+  synthPlayer?: SoundPlayer | null;
+
+  /**
+   * Map logical sound keys to tf-generated key names/factory IDs.
+   * Example: `{ 'ms-place': 'card-place' }`.
+   */
+  synthKeyMap?: Record<string, string>;
 }
 
 /**
@@ -118,6 +131,8 @@ export interface SoundManagerOptions {
 export class SoundManager {
   private readonly player: SoundPlayer;
   private readonly storage: StorageLike | null;
+  private readonly synthPlayer: SoundPlayer | null;
+  private readonly synthKeyMap: Record<string, string>;
   private readonly registry = new Map<string, string>();
   private readonly eventUnsubs: Array<() => void> = [];
 
@@ -126,6 +141,9 @@ export class SoundManager {
 
   constructor(player: SoundPlayer, options?: SoundManagerOptions) {
     this.player = player;
+
+    this.synthPlayer = options?.synthPlayer ?? null;
+    this.synthKeyMap = options?.synthKeyMap ?? {};
 
     // Resolve storage backend
     if (options?.storage !== undefined) {
@@ -148,6 +166,8 @@ export class SoundManager {
     // Apply initial state to the player
     this.player.setMute(this._muted);
     this.player.setVolume(this._volume);
+    this.synthPlayer?.setMute(this._muted);
+    this.synthPlayer?.setVolume(this._volume);
   }
 
   // ── Registration ────────────────────────────────────────
@@ -171,6 +191,12 @@ export class SoundManager {
    */
   play(key: string): void {
     if (this._muted) return;
+    const synthMappedKey = this.synthKeyMap[key];
+    if (this.synthPlayer && synthMappedKey !== undefined) {
+      this.synthPlayer.play(synthMappedKey);
+      return;
+    }
+
     const assetKey = this.registry.get(key);
     if (assetKey === undefined) return;
     this.player.play(assetKey);
@@ -180,6 +206,12 @@ export class SoundManager {
    * Stop a registered sound by its logical key.
    */
   stop(key: string): void {
+    const synthMappedKey = this.synthKeyMap[key];
+    if (this.synthPlayer && synthMappedKey !== undefined) {
+      this.synthPlayer.stop(synthMappedKey);
+      return;
+    }
+
     const assetKey = this.registry.get(key);
     if (assetKey === undefined) return;
     this.player.stop(assetKey);
@@ -199,6 +231,7 @@ export class SoundManager {
   setVolume(volume: number): void {
     this._volume = Math.max(0, Math.min(1, volume));
     this.player.setVolume(this._volume);
+    this.synthPlayer?.setVolume(this._volume);
     this.persist(STORAGE_KEY_VOLUME, String(this._volume));
   }
 
@@ -216,6 +249,7 @@ export class SoundManager {
   setMute(muted: boolean): void {
     this._muted = muted;
     this.player.setMute(muted);
+    this.synthPlayer?.setMute(muted);
     this.persist(STORAGE_KEY_MUTE, String(muted));
   }
 

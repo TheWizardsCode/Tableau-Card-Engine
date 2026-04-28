@@ -164,8 +164,12 @@ class TestScene extends CardGameScene {
 
   public callDetectReplayMode() { this.detectReplayMode(); }
   public callInitEventSystem() { this.initEventSystem(); }
-  public callInitSoundSystem(sfxKeys: readonly string[], mapping: Record<string, string>) {
-    this.initSoundSystem(sfxKeys, mapping);
+  public callInitSoundSystem(
+    sfxKeys: readonly string[],
+    mapping: Record<string, string>,
+    options?: { synthPlayer?: unknown; synthKeyMap?: Record<string, string> },
+  ) {
+    this.initSoundSystem(sfxKeys, mapping, options as any);
   }
   public callInitHelpPanel(sections: Array<{ heading: string; body: string }>) {
     this.initHelpPanel(sections);
@@ -262,6 +266,20 @@ describe('CardGameScene', () => {
         scene._gameEvents,
         mapping,
       );
+    });
+
+    it('passes synth options to SoundManager', () => {
+      const synthPlayer = { play: vi.fn(), stop: vi.fn(), setVolume: vi.fn(), setMute: vi.fn() };
+      scene.callInitSoundSystem(
+        ['sfx-draw'],
+        { 'card-drawn': 'sfx-draw' },
+        { synthPlayer, synthKeyMap: { 'ms-place': 'card-place' } },
+      );
+
+      expect(MockSoundManager).toHaveBeenCalledWith(expect.anything(), {
+        synthPlayer,
+        synthKeyMap: { 'ms-place': 'card-place' },
+      });
     });
   });
 

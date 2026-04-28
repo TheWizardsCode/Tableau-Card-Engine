@@ -26,6 +26,7 @@ import type {
   SoundPlayer,
   EventSoundMapping,
   GamePhase,
+  SoundManagerOptions,
 } from '../core-engine';
 import { HelpPanel } from './HelpPanel';
 import { HelpButton } from './HelpButton';
@@ -141,6 +142,7 @@ export abstract class CardGameScene extends Phaser.Scene {
   protected initSoundSystem(
     sfxKeys: readonly string[],
     mapping: EventSoundMapping,
+    options?: Pick<SoundManagerOptions, 'synthPlayer' | 'synthKeyMap'>,
   ): void {
     const phaserSound = this.sound;
     const player: SoundPlayer = {
@@ -149,7 +151,10 @@ export abstract class CardGameScene extends Phaser.Scene {
       setVolume: (v: number) => { phaserSound.volume = v; },
       setMute: (m: boolean) => { phaserSound.mute = m; },
     };
-    this.soundManager = new SoundManager(player);
+    this.soundManager = new SoundManager(player, {
+      synthPlayer: options?.synthPlayer ?? null,
+      synthKeyMap: options?.synthKeyMap,
+    });
 
     for (const sfxKey of sfxKeys) {
       this.soundManager.register(sfxKey);

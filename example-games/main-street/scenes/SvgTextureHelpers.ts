@@ -91,7 +91,11 @@ export async function rasteriseSvgToTexture(
         try {
           // Best-effort generation: if scene is unavailable this will be caught
           // below and ignored safely.
-          
+          if (!validScenes.has(scene) || !(scene as any).sys || !(scene as any).sys.game) {
+            resolve();
+            return;
+          }
+
           const canvas = document.createElement('canvas');
           const targetW = Math.round(width * qualityScale);
           const targetH = Math.round(height * qualityScale);
@@ -112,6 +116,11 @@ export async function rasteriseSvgToTexture(
           
           // Add canvas as texture (removes old one if exists)
           try {
+            if (!validScenes.has(scene) || !(scene as any).sys || !(scene as any).sys.game) {
+              resolve();
+              return;
+            }
+
             if (scene.textures?.exists(key)) {
               scene.textures.remove(key);
             }
