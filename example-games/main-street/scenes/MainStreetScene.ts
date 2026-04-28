@@ -1718,41 +1718,29 @@ export class MainStreetScene extends CardGameScene {
   ): Phaser.GameObjects.Container {
     const { handCardW, handCardH } = this.layout;
     const container = this.add.container(Math.round(x + handCardW / 2), Math.round(y + handCardH / 2));
-    const isHinted = this.hintedCardId !== null && card.id === this.hintedCardId;
-
     const renderW = Math.max(1, Math.round(handCardW - 4));
     const renderH = Math.max(1, Math.round(handCardH - 4));
-    const tplKey = this.templateKeyForCard(card.id, renderW, renderH);
-    let interactiveTarget: Phaser.GameObjects.GameObject | null = null;
-    if (this.textures && (this.textures as Phaser.Textures.TextureManager).exists(tplKey)) {
-      const img = this.add.image(0, 0, tplKey);
-      // Texture is already rasterised at correct size for this slot
-      img.setDisplaySize(renderW, renderH);
-      container.add(img);
-      interactiveTarget = img;
-    } else {
-      this.requestCardTexture(card.id, renderW, renderH);
-      // Warm brown fallback background (Investment); no text overlays.
-      const bg = this.add.rectangle(0, 0, handCardW, handCardH, 0x8B4513, 0.7);
-      bg.setStrokeStyle(isHinted ? 3 : 2, isHinted ? 0x44ffff : 0xcc9944);
-      container.add(bg);
-      interactiveTarget = bg;
+
+    // DOM-only rendering path for held investment cards.
+    const templateId = this.templateIdFromCardId(card.id);
+    const svgText = this.cardSvgSources.get(templateId);
+    if (!this.svgDom || !svgText) {
+      return container;
     }
 
-    // Interactivity (only during market phase)
-    if (this.uiPhase === 'market' && interactiveTarget) {
-      interactiveTarget.setInteractive({ useHandCursor: true });
-      interactiveTarget.on('pointerdown', () => this.onPlayHeldEvent());
-      interactiveTarget.on('pointerover', () => {
-        // if target is a rectangle with setStrokeStyle, it will respond; otherwise just scale
-        try { (interactiveTarget as any).setStrokeStyle(3, 0xffdd44); } catch (_) {}
-        container.setScale(1.05);
-      });
-      interactiveTarget.on('pointerout', () => {
-        try { (interactiveTarget as any).setStrokeStyle(isHinted ? 3 : 2, isHinted ? 0x44ffff : 0xcc9944); } catch (_) {}
-        container.setScale(1.0);
-      });
-    }
+    const cx = x + handCardW / 2;
+    const cy = y + handCardH / 2;
+    const domKey = this.domKeyForCard('hand', 0, card.id);
+    this.svgDom.createOrUpdate(
+      domKey,
+      svgText,
+      cx,
+      cy,
+      renderW,
+      renderH,
+      this.uiPhase === 'market' ? () => this.onPlayHeldEvent() : undefined,
+      100,
+    );
 
     return container;
   }
