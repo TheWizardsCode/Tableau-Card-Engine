@@ -608,7 +608,9 @@ export class MainStreetScene extends CardGameScene {
     const handCardW = compact ? 132 : BASE_HAND_CARD_W;
     const handCardH = compact ? 78 : BASE_HAND_CARD_H;
     const handY = gameH - margin - handCardH;
-    const handX = gameW - margin - handCardW / 2;
+    // Hand slot is anchored to the left side of the UI (matches the "No held event" slot at x=40)
+    // Previously this was positioned on the right which caused purchased events to appear off-screen.
+    const handX = 40;
     const instructionY = handY - 20;
 
     const actionButtonH = compact ? 32 : 34;

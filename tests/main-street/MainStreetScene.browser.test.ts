@@ -174,53 +174,75 @@ describe('MainStreetScene browser tests', () => {
     }
   });
 
-  it('only materializes purchased cards at destination after transfer animation completes', async () => {
-    game = await bootGame();
-    const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;
-    const state = scene.state;
+  it('only materializes purchased cards at destination after transfer animation completes (desktop + narrow viewports)', async () => {
+    const viewports = [
+      { width: 1280, height: 720 },
+      { width: 900, height: 1100 },
+    ];
 
-    const emptySlots = getEmptySlots(state);
-    expect(emptySlots.length).toBeGreaterThan(0);
-    const targetSlot = emptySlots[0];
+    for (const vp of viewports) {
+      game = await bootGame(vp);
+      const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;
+      const state = scene.state;
 
-    const business = state.market.business.find((card: any) =>
-      card && canPurchaseBusiness(state, card.id, targetSlot).legal,
-    );
-    expect(business).toBeTruthy();
+      const emptySlots = getEmptySlots(state);
+      expect(emptySlots.length).toBeGreaterThan(0);
+      const targetSlot = emptySlots[0];
 
-    const beforeBusinessAnimCount = scene.getTransferAnimationCountForTest();
-    scene.onBusinessCardClick(business);
-    scene.onSlotClick(targetSlot);
+      const business = state.market.business.find((card: any) =>
+        card && canPurchaseBusiness(state, card.id, targetSlot).legal,
+      );
+      expect(business).toBeTruthy();
 
-    // Business should not appear in street immediately while transfer is playing
-    expect(state.streetGrid[targetSlot]).toBeNull();
-    expect(scene.getHiddenTransferSourceCardCountForTest()).toBeGreaterThan(0);
+      const beforeBusinessAnimCount = scene.getTransferAnimationCountForTest();
+      scene.onBusinessCardClick(business);
+      scene.onSlotClick(targetSlot);
 
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(scene.getTransferAnimationCountForTest()).toBeGreaterThan(beforeBusinessAnimCount);
-
-    await new Promise((resolve) => setTimeout(resolve, 1700));
-    expect(state.streetGrid[targetSlot]?.id).toBe(business.id);
-    expect(scene.getHiddenTransferSourceCardCountForTest()).toBe(0);
-
-    const eventCard = state.market.investments.find((card: any) =>
-      card && card.family === 'event' && canPurchaseEvent(state, card.id).legal,
-    );
-
-    if (eventCard) {
-      const beforeEventAnimCount = scene.getTransferAnimationCountForTest();
-      scene.onEventCardClick(eventCard);
-
-      // Event should not appear in hand immediately while transfer is playing
-      expect(state.heldEvent).toBeNull();
+      // Business should not appear in street immediately while transfer is playing
+      expect(state.streetGrid[targetSlot]).toBeNull();
       expect(scene.getHiddenTransferSourceCardCountForTest()).toBeGreaterThan(0);
 
       await new Promise((resolve) => setTimeout(resolve, 20));
-      expect(scene.getTransferAnimationCountForTest()).toBeGreaterThan(beforeEventAnimCount);
+      expect(scene.getTransferAnimationCountForTest()).toBeGreaterThan(beforeBusinessAnimCount);
 
       await new Promise((resolve) => setTimeout(resolve, 1700));
-      expect(state.heldEvent?.id).toBe(eventCard.id);
+      expect(state.streetGrid[targetSlot]?.id).toBe(business.id);
       expect(scene.getHiddenTransferSourceCardCountForTest()).toBe(0);
+
+      const eventCard = state.market.investments.find((card: any) =>
+        card && card.family === 'event' && canPurchaseEvent(state, card.id).legal,
+      );
+
+      if (eventCard) {
+        const beforeEventAnimCount = scene.getTransferAnimationCountForTest();
+        scene.onEventCardClick(eventCard);
+
+        // Event should not appear in hand immediately while transfer is playing
+        expect(state.heldEvent).toBeNull();
+        expect(scene.getHiddenTransferSourceCardCountForTest()).toBeGreaterThan(0);
+
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        expect(scene.getTransferAnimationCountForTest()).toBeGreaterThan(beforeEventAnimCount);
+
+        await new Promise((resolve) => setTimeout(resolve, 1700));
+        expect(state.heldEvent?.id).toBe(eventCard.id);
+        expect(scene.getHiddenTransferSourceCardCountForTest()).toBe(0);
+
+        // Verify held-event slot is on the left and fully within the viewport bounds
+        const rects = (scene as any).getSectionRectsForTest();
+        const layout = (scene as any).getLayoutMetricsForTest();
+        const hand = rects.hand;
+
+        expect(hand.x).toBeGreaterThanOrEqual(0);
+        expect(hand.x + hand.w).toBeLessThanOrEqual(layout.gameW);
+        expect(hand.y).toBeGreaterThanOrEqual(0);
+        expect(hand.y + hand.h).toBeLessThanOrEqual(layout.gameH);
+        // Ensure it is on the left half of the screen (not on the right)
+        expect(hand.x + hand.w / 2).toBeLessThan(layout.gameW / 2);
+      }
+
+      destroyGame(game);
+      game = null;
     }
   });
 });
