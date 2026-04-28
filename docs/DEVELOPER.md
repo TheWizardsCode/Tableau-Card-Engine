@@ -8,6 +8,7 @@ This document covers everything you need to develop, test, and build the Tableau
 - [Running Locally](#running-locally)
 - [Building for Production](#building-for-production)
 - [Testing](#testing)
+- [ToneForge Audio Generation](#toneforge-audio-generation)
 - [Project Structure](#project-structure)
 - [Path Aliases](#path-aliases)
 - [Adding an Example Game](#adding-an-example-game)
@@ -83,6 +84,7 @@ Release and deployment instructions have moved to RELEASE.md at the repository r
 ```bash
 npm test            # run all tests once (unit + browser, no tracked-asset restore step)
 npm run monte-carlo # run Main Street Monte Carlo harness (JSON + CSV outputs)
+npm run tf:generate # generate tf audio artifacts (out-of-repo build/tf-synths)
 ```
 
 `npm test` is intentionally non-destructive and must not mutate tracked source assets such as `public/assets/games/main-street/svg/cards`. If asset regeneration is needed, run the dedicated generation scripts explicitly.
@@ -175,6 +177,18 @@ describe('MyScene browser tests', () => {
 - `@vitest/browser` (matches vitest version)
 - `playwright` (provides Chromium browser)
 - Install Chromium: `npx playwright install chromium`
+
+## ToneForge Audio Generation
+
+ToneForge-generated synth artifacts are integrated via a thin adapter and are **not committed** to source control.
+
+```bash
+npm run tf:generate
+```
+
+This runs `scripts/tf-generate-synths.sh` and writes generated outputs under `build/tf-synths/`.
+
+See `docs/the-build/audio.md` for full details (module shape, mapping, runtime wiring, CI guidance).
 
 ## Project Structure
 

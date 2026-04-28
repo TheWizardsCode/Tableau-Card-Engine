@@ -12,7 +12,8 @@
     "monte-carlo": "tsx scripts/monte-carlo.ts --seeds 200 --seed-prefix mc-balance --maxTurns 25 --strategy greedy --out results/main-street-monte-carlo.json --csv-out results/main-street-monte-carlo.csv",
     "replay": "tsx scripts/replay.ts",
     "transcripts:export": "tsx scripts/export-transcripts.ts",
-    "save-load-smoke": "tsx scripts/save-load-smoke.ts"
+    "save-load-smoke": "tsx scripts/save-load-smoke.ts",
+    "tf:generate": "scripts/tf-generate-synths.sh"
   },
   "dependencies": {
     "phaser": "4.0.0-rc.7"

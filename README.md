@@ -12,6 +12,7 @@ npm run dev          # start Vite dev server (http://localhost:3000)
 npm test             # run Vitest test suite (non-destructive: does not modify tracked assets)
 npm run build        # TypeScript check + production build -> dist/
 npm run preview      # serve production build locally
+npm run tf:generate  # generate ToneForge artifacts to build/tf-synths/
 ```
 
 ## What Is This?
@@ -72,6 +73,25 @@ tableau-card-engine/
 | Main Street | `example-games/main-street/` | Single-player tableau builder. Buy businesses/upgrades/events, place businesses on a 10-slot street rendered as a responsive 2x5 grid, and optimize score over 20 turns |
 
 More games are planned: Coloretto.
+
+## ToneForge runtime adapter (Main Street)
+
+Main Street can optionally route mapped SFX keys through a ToneForge-backed module via `createTfPlayer`.
+
+Expected tf module exports consumed by the adapter:
+
+- `factories: Record<string, () => TfVoice>`
+- optional `getFactory(name)` helper
+- optional `descriptors` metadata map
+
+Where `TfVoice` supports any subset of:
+
+- `play()`
+- `stop()`
+- `setVolume(number)`
+- `setMute(boolean)`
+
+See `docs/the-build/audio.md` for generation workflow and wiring details.
 
 ## Contributing
 

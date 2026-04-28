@@ -63,6 +63,7 @@ npm test             # Run Vitest test suite (non-destructive: does not modify t
 npm run build        # TypeScript check + production build to dist/
 npm run preview      # Serve production build locally
 npm run monte-carlo  # Run Main Street Monte Carlo harness (JSON + CSV)
+npm run tf:generate  # Generate ToneForge audio artifacts into build/tf-synths/
 ```
 
 ### Quality Gates
