@@ -128,9 +128,7 @@ export class SettingsPanel {
   // Difficulty selector (optional; provided by scene via SettingsPanelConfig)
   private difficultyNames: readonly string[] | null = null;
   private difficultyLabel?: Phaser.GameObjects.Text;
-  private difficultyValueText?: Phaser.GameObjects.Text;
-  private difficultyPrevZone?: Phaser.GameObjects.Zone;
-  private difficultyNextZone?: Phaser.GameObjects.Zone;
+  private difficultyTextObjects: Phaser.GameObjects.Text[] = [];
   private _selectedDifficulty?: string;
 
   // State
@@ -363,41 +361,6 @@ export class SettingsPanel {
     this.tooltipLabel.setDepth(DEPTH_PANEL_CONTENT);
     this.container.add(this.tooltipLabel);
 
-    // If difficulty names were provided, render a compact selector below tooltips
-    if (this.difficultyNames) {
-      const difficultyY = tooltipY + 46;
-      this.difficultyLabel = scene.add.text(PADDING, difficultyY, 'Difficulty', LABEL_STYLE);
-      this.difficultyLabel.setOrigin(0, 0.5);
-      this.difficultyLabel.setDepth(DEPTH_PANEL_CONTENT);
-      this.container.add(this.difficultyLabel);
-
-      const valueX = this.panelWidth - PADDING - 60;
-      this.difficultyValueText = scene.add.text(valueX, difficultyY, String(this._selectedDifficulty), VALUE_STYLE);
-      this.difficultyValueText.setOrigin(1, 0.5);
-      this.difficultyValueText.setDepth(DEPTH_PANEL_CONTENT + 1);
-      this.container.add(this.difficultyValueText);
-
-      // Prev / Next hit zones (left/right of value text)
-      this.difficultyPrevZone = scene.add.zone(valueX - 80, difficultyY, 36, TOGGLE_SIZE + 8);
-      this.difficultyPrevZone.setInteractive({ useHandCursor: true });
-      this.difficultyPrevZone.on('pointerdown', () => this.cycleDifficulty(-1));
-      this.difficultyPrevZone.setDepth(DEPTH_PANEL_CONTENT);
-      this.container.add(this.difficultyPrevZone);
-
-      this.difficultyNextZone = scene.add.zone(valueX + 40, difficultyY, 36, TOGGLE_SIZE + 8);
-      this.difficultyNextZone.setInteractive({ useHandCursor: true });
-      this.difficultyNextZone.on('pointerdown', () => this.cycleDifficulty(1));
-      this.difficultyNextZone.setDepth(DEPTH_PANEL_CONTENT);
-      this.container.add(this.difficultyNextZone);
-
-      // Tooltip about application scope
-      const tip = scene.add.text(PADDING, difficultyY + 26, 'Difficulty applies to new games only', {
-        fontSize: '12px', color: '#aaaaaa', fontFamily: 'Arial, sans-serif',
-      });
-      tip.setDepth(DEPTH_PANEL_CONTENT);
-      this.container.add(tip);
-    }
-
     // Toggle background (same pill style as mute toggle)
     const tooltipToggleX = this.panelWidth - PADDING - TOGGLE_SIZE * 1.8;
 
@@ -486,6 +449,42 @@ export class SettingsPanel {
     reducedMotionHitArea.setInteractive({ useHandCursor: true });
     reducedMotionHitArea.on('pointerdown', () => this.handleReducedMotionToggle());
     this.container.add(reducedMotionHitArea);
+
+    // If difficulty names were provided, render a horizontal selectable list here
+    if (this.difficultyNames) {
+      const difficultyY = reducedMotionY + 46; // place below reduced-motion toggle to avoid overlap
+      this.difficultyLabel = scene.add.text(PADDING, difficultyY, 'Difficulty', LABEL_STYLE);
+      this.difficultyLabel.setOrigin(0, 0.5);
+      this.difficultyLabel.setDepth(DEPTH_PANEL_CONTENT);
+      this.container.add(this.difficultyLabel);
+
+      // layout names horizontally from left (after label) with spacing
+      const startX = PADDING + 120;
+      const gap = 8;
+      let x = startX;
+      this.difficultyTextObjects = [];
+      for (const name of this.difficultyNames) {
+        const isSelected = name === this._selectedDifficulty;
+        const style = isSelected ? { ...VALUE_STYLE, color: (HEADING_STYLE.color as string) ?? '#f0c040' } : VALUE_STYLE;
+        const txt = scene.add.text(x, difficultyY, name, style as Phaser.Types.GameObjects.Text.TextStyle);
+        txt.setOrigin(0, 0.5);
+        txt.setDepth(DEPTH_PANEL_CONTENT + 1);
+        txt.setInteractive({ useHandCursor: true });
+        // store name for later reference
+        (txt as any).tceName = name;
+        txt.on('pointerdown', () => this.setSelectedDifficulty(name));
+        this.container.add(txt);
+        this.difficultyTextObjects.push(txt);
+        x += txt.width + gap;
+      }
+
+      // Tooltip about application scope (apply immediately)
+      const tip = scene.add.text(PADDING, difficultyY + 26, 'Difficulty applies immediately', {
+        fontSize: '12px', color: '#aaaaaa', fontFamily: 'Arial, sans-serif',
+      });
+      tip.setDepth(DEPTH_PANEL_CONTENT);
+      this.container.add(tip);
+    }
 
     // Scene-level pointer events for slider dragging
     scene.input.on('pointermove', this.handlePointerMove, this);
@@ -691,9 +690,36 @@ export class SettingsPanel {
     if (!this.difficultyNames || this.destroyed) return;
     const idx = this.difficultyNames.indexOf(String(this._selectedDifficulty));
     const next = (idx + delta + this.difficultyNames.length) % this.difficultyNames.length;
-    this._selectedDifficulty = String(this.difficultyNames[next]);
-    this.difficultyValueText?.setText(this._selectedDifficulty);
-    this.saveSelectedDifficulty(this._selectedDifficulty);
+    this.setSelectedDifficulty(this.difficultyNames[next]);
+  }
+
+  /** Set the selected difficulty and update visuals. */
+  private setSelectedDifficulty(name: string): void {
+    if (!this.difficultyNames || this.destroyed) return;
+    if (!this.difficultyNames.includes(name)) return;
+    this._selectedDifficulty = name;
+    this.saveSelectedDifficulty(name);
+
+    // Update visual state of the name list
+    for (const txt of this.difficultyTextObjects) {
+      const txtName = (txt as any).tceName as string | undefined;
+      if (!txtName) continue;
+      if (txtName === name) {
+        txt.setColor((HEADING_STYLE.color as string) ?? '#f0c040');
+      } else {
+        txt.setColor(VALUE_STYLE.color as string);
+      }
+    }
+
+    // Emit a DOM event so scenes or other systems can react immediately if needed
+    try {
+      if (typeof window !== 'undefined' && (window as any).dispatchEvent) {
+        const ev = new CustomEvent('tce:difficulty-changed', { detail: { difficulty: name } });
+        (window as any).dispatchEvent(ev);
+      }
+    } catch {
+      // ignore
+    }
   }
 
   /** Load persisted selected difficulty from localStorage. */
