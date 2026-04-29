@@ -179,10 +179,11 @@ export abstract class CardGameScene extends Phaser.Scene {
    * Requires {@link initSoundSystem} to have been called first; does nothing
    * if `soundManager` is null.
    */
-  protected initSettingsPanel(): void {
+  protected initSettingsPanel(difficultyNames?: readonly string[]): void {
     if (!this.soundManager) return;
     this.settingsPanel = new SettingsPanel(this, {
       soundManager: this.soundManager,
+      difficultyNames,
     });
     this.settingsButton = new SettingsButton(this, this.settingsPanel);
   }

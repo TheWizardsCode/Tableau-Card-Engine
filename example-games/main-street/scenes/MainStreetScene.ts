@@ -523,7 +523,8 @@ export class MainStreetScene extends CardGameScene {
       },
     ];
     this.initHelpPanel(helpSections);
-    this.initSettingsPanel();
+    // Provide the ordered difficulty names so the Settings panel can render a selector
+    this.initSettingsPanel(DIFFICULTY_NAMES);
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       markSceneInvalid(this);
@@ -864,6 +865,16 @@ export class MainStreetScene extends CardGameScene {
   private loadCampaignAndSetup(): void {
     // Synchronously set up with defaults first (so UI can render immediately)
     this.campaign = createDefaultCampaignProgress();
+    // If a persisted difficulty exists in the SettingsPanel, prefer that for new games.
+    try {
+      const persisted = (this.settingsPanel?.selectedDifficulty) as unknown as string | undefined;
+      if (persisted && DIFFICULTY_NAMES.includes(persisted as any)) {
+        this.selectedDifficulty = persisted as any;
+      }
+    } catch {
+      // ignore
+    }
+
     this.state = setupMainStreetGame({
       difficulty: this.selectedDifficulty,
       unlockedCardIds: this.campaign.unlockedCardIds,

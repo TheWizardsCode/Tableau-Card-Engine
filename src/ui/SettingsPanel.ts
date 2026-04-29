@@ -16,6 +16,8 @@ import type { SoundManager } from '../core-engine/SoundManager';
 export interface SettingsPanelConfig {
   /** The SoundManager instance to control. */
   soundManager: SoundManager;
+  /** Optional ordered list of difficulty names to present in the panel (game-specific). */
+  difficultyNames?: readonly string[];
   /** Panel width as a percentage of canvas width (0-100). Default: 30. */
   widthPercent?: number;
   /** Slide animation duration in ms. Default: 300. */
@@ -67,6 +69,7 @@ const SLIDER_HANDLE_RADIUS = 10;
 const SLIDER_HANDLE_COLOR = 0xffffff;
 
 const REDUCED_MOTION_STORAGE_KEY = 'tce-ui-reduced-motion';
+const DIFFICULTY_STORAGE_KEY = 'tce-selected-difficulty';
 
 // Depth layers (high values so panel renders above game content)
 const DEPTH_INPUT_BLOCKER = 900;
@@ -122,6 +125,14 @@ export class SettingsPanel {
   private reducedMotionLabel: Phaser.GameObjects.Text;
   private reducedMotionStatusText: Phaser.GameObjects.Text;
 
+  // Difficulty selector (optional; provided by scene via SettingsPanelConfig)
+  private difficultyNames: readonly string[] | null = null;
+  private difficultyLabel?: Phaser.GameObjects.Text;
+  private difficultyValueText?: Phaser.GameObjects.Text;
+  private difficultyPrevZone?: Phaser.GameObjects.Zone;
+  private difficultyNextZone?: Phaser.GameObjects.Zone;
+  private _selectedDifficulty?: string;
+
   // State
   private _isOpen = false;
   private _isAnimating = false;
@@ -147,6 +158,13 @@ export class SettingsPanel {
     this.panelWidth = Math.floor(this.canvasWidth * (this.config.widthPercent / 100));
 
     this._reducedMotion = this.loadReducedMotionPreference();
+
+    // Pull optional difficulty names from config
+    if (config.difficultyNames && config.difficultyNames.length > 0) {
+      this.difficultyNames = config.difficultyNames;
+      // Load persisted selected difficulty (fall back to first provided name)
+      this._selectedDifficulty = this.loadSelectedDifficulty() ?? String(this.difficultyNames[0]);
+    }
 
     // Build the panel (hidden off-screen to the right)
     this.container = scene.add.container(this.canvasWidth, 0);
@@ -345,6 +363,41 @@ export class SettingsPanel {
     this.tooltipLabel.setDepth(DEPTH_PANEL_CONTENT);
     this.container.add(this.tooltipLabel);
 
+    // If difficulty names were provided, render a compact selector below tooltips
+    if (this.difficultyNames) {
+      const difficultyY = tooltipY + 46;
+      this.difficultyLabel = scene.add.text(PADDING, difficultyY, 'Difficulty', LABEL_STYLE);
+      this.difficultyLabel.setOrigin(0, 0.5);
+      this.difficultyLabel.setDepth(DEPTH_PANEL_CONTENT);
+      this.container.add(this.difficultyLabel);
+
+      const valueX = this.panelWidth - PADDING - 60;
+      this.difficultyValueText = scene.add.text(valueX, difficultyY, String(this._selectedDifficulty), VALUE_STYLE);
+      this.difficultyValueText.setOrigin(1, 0.5);
+      this.difficultyValueText.setDepth(DEPTH_PANEL_CONTENT + 1);
+      this.container.add(this.difficultyValueText);
+
+      // Prev / Next hit zones (left/right of value text)
+      this.difficultyPrevZone = scene.add.zone(valueX - 80, difficultyY, 36, TOGGLE_SIZE + 8);
+      this.difficultyPrevZone.setInteractive({ useHandCursor: true });
+      this.difficultyPrevZone.on('pointerdown', () => this.cycleDifficulty(-1));
+      this.difficultyPrevZone.setDepth(DEPTH_PANEL_CONTENT);
+      this.container.add(this.difficultyPrevZone);
+
+      this.difficultyNextZone = scene.add.zone(valueX + 40, difficultyY, 36, TOGGLE_SIZE + 8);
+      this.difficultyNextZone.setInteractive({ useHandCursor: true });
+      this.difficultyNextZone.on('pointerdown', () => this.cycleDifficulty(1));
+      this.difficultyNextZone.setDepth(DEPTH_PANEL_CONTENT);
+      this.container.add(this.difficultyNextZone);
+
+      // Tooltip about application scope
+      const tip = scene.add.text(PADDING, difficultyY + 26, 'Difficulty applies to new games only', {
+        fontSize: '12px', color: '#aaaaaa', fontFamily: 'Arial, sans-serif',
+      });
+      tip.setDepth(DEPTH_PANEL_CONTENT);
+      this.container.add(tip);
+    }
+
     // Toggle background (same pill style as mute toggle)
     const tooltipToggleX = this.panelWidth - PADDING - TOGGLE_SIZE * 1.8;
 
@@ -463,6 +516,11 @@ export class SettingsPanel {
   /** Whether reduced motion is enabled. */
   get reducedMotion(): boolean {
     return this._reducedMotion;
+  }
+
+  /** Currently selected difficulty (if the panel was configured with difficultyNames). */
+  get selectedDifficulty(): string | undefined {
+    return this._selectedDifficulty;
   }
 
   /** Open the settings panel with slide-in animation from the right. */
@@ -625,6 +683,42 @@ export class SettingsPanel {
     this.updateReducedMotionVisuals(this._reducedMotion);
     this.saveReducedMotionPreference(this._reducedMotion);
   }
+
+  // ── Difficulty selector helpers ─────────────────────────
+
+  /** Cycle the selected difficulty by the given delta (-1 or +1). */
+  private cycleDifficulty(delta: number): void {
+    if (!this.difficultyNames || this.destroyed) return;
+    const idx = this.difficultyNames.indexOf(String(this._selectedDifficulty));
+    const next = (idx + delta + this.difficultyNames.length) % this.difficultyNames.length;
+    this._selectedDifficulty = String(this.difficultyNames[next]);
+    this.difficultyValueText?.setText(this._selectedDifficulty);
+    this.saveSelectedDifficulty(this._selectedDifficulty);
+  }
+
+  /** Load persisted selected difficulty from localStorage. */
+  private loadSelectedDifficulty(): string | null {
+    if (typeof window === 'undefined' || !window.localStorage) return null;
+    try {
+      const v = window.localStorage.getItem(DIFFICULTY_STORAGE_KEY);
+      if (!v) return null;
+      if (this.difficultyNames && !this.difficultyNames.includes(v)) return null;
+      return v;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Save selected difficulty to localStorage. */
+  private saveSelectedDifficulty(name: string): void {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(DIFFICULTY_STORAGE_KEY, name);
+    } catch {
+      // ignore storage failures
+    }
+  }
+
 
   private updateReducedMotionVisuals(enabled: boolean): void {
     this.reducedMotionToggleBg.setFillStyle(enabled ? TOGGLE_ON_COLOR : TOGGLE_OFF_COLOR);
