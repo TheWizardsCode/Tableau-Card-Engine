@@ -1,14 +1,14 @@
 /**
  * Main Street: Adjacency & Income Calculation
  *
- * Implements the adjacency resolver for the 1x10 linear street grid
- * and income computation (base income + synergy bonuses). Upgrades
- * can extend synergy range beyond the default 1-slot adjacency.
+ * Implements the adjacency resolver for the 2x5 street grid
+ * (stored as a 10-slot row-major array) and income computation
+ * (base income + synergy bonuses). Upgrades can extend synergy
+ * range beyond the default 1-cell Manhattan adjacency.
  *
  * @module
  */
 
-import { Grid, neighbors as resolveNeighbors } from '@core-engine/SpatialRules';
 import type { BusinessCard, SynergyType } from './MainStreetCards';
 import { GRID_SIZE, SYNERGY_BONUS_PER_NEIGHBOR } from './MainStreetCards';
 import type { MainStreetState } from './MainStreetState';
@@ -19,25 +19,44 @@ import { applyReputationMultiplier } from './MainStreetDifficulty';
 
 /**
  * Returns the indices of neighboring slots within a given range
- * on the linear 1x10 street grid.
+ * on the Main Street 2x5 grid.
  *
- * Default range is 1 (immediate neighbors). Upgrades can extend this.
- * Clamps to valid grid boundaries [0, GRID_SIZE).
+ * Slot indices are row-major:
+ *   row 0: 0..4
+ *   row 1: 5..9
+ *
+ * Default range is 1 (orthogonal neighbors at Manhattan distance 1).
+ * Upgrades can extend this radius.
  *
  * @param index  The slot index to find neighbors for.
  * @param range  How far to look in each direction (default 1).
  * @returns Array of neighbor indices (excluding the slot itself).
  */
-const STREET_TOPOLOGY = new Grid<null>(GRID_SIZE, 1, null);
+const STREET_COLS = 5;
+
+function toGridPosition(index: number): { x: number; y: number } {
+  return {
+    x: index % STREET_COLS,
+    y: Math.floor(index / STREET_COLS),
+  };
+}
 
 export function neighbors(index: number, range: number = 1): number[] {
-  const positions = resolveNeighbors(STREET_TOPOLOGY, { x: index, y: 0 }, {
-    range,
-    metric: 'manhattan',
-    includeDiagonals: false,
-  });
+  if (index < 0 || index >= GRID_SIZE || range <= 0) return [];
 
-  return positions.map((position) => position.x);
+  const origin = toGridPosition(index);
+  const result: number[] = [];
+
+  for (let i = 0; i < GRID_SIZE; i++) {
+    if (i === index) continue;
+    const p = toGridPosition(i);
+    const distance = Math.abs(origin.x - p.x) + Math.abs(origin.y - p.y);
+    if (distance <= range) {
+      result.push(i);
+    }
+  }
+
+  return result.sort((a, b) => a - b);
 }
 
 /**

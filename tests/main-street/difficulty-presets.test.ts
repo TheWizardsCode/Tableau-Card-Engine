@@ -484,12 +484,12 @@ describe('Adjacency uses config.synergyBonusPerNeighbor', () => {
 
   it('should scale correctly with multiple neighbors', () => {
     const grid: (BusinessCard | null)[] = new Array(10).fill(null);
-    grid[3] = makeTestBusiness({ id: 'a', synergyTypes: ['Food'] });
-    grid[4] = makeTestBusiness({ id: 'b', synergyTypes: ['Food'] });
-    grid[5] = makeTestBusiness({ id: 'c', synergyTypes: ['Food'] });
-    // Middle business has 2 neighbors with matching synergy
-    expect(computeSynergyBonus(grid, 4, 1)).toBe(2); // 2 neighbors * 1
-    expect(computeSynergyBonus(grid, 4, 2)).toBe(4); // 2 neighbors * 2
+    grid[5] = makeTestBusiness({ id: 'a', synergyTypes: ['Food'] });
+    grid[6] = makeTestBusiness({ id: 'b', synergyTypes: ['Food'] });
+    grid[7] = makeTestBusiness({ id: 'c', synergyTypes: ['Food'] });
+    // Index 6 has two matching orthogonal neighbors (5 and 7)
+    expect(computeSynergyBonus(grid, 6, 1)).toBe(2); // 2 neighbors * 1
+    expect(computeSynergyBonus(grid, 6, 2)).toBe(4); // 2 neighbors * 2
   });
 });
 

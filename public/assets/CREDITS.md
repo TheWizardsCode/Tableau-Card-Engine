@@ -47,6 +47,7 @@ Minimal set of SFX and a short background loop added for the Main Street game:
 - **License**: CC0 / Public Domain (procedural synthesis, no external samples used)
 - **Format**: 16-bit PCM WAV, 22050 Hz, mono
 - **Generator**: Run `node scripts/generate-sfx.mjs` to regenerate, then copy or symlink required files into `public/assets/games/main-street/audio/`
+- **Replacement workflow**: See `docs/main-street/prd-milestone-4.md` for the placeholder-to-final audio replacement runbook and validation commands.
 
 Files (in `games/main-street/audio/`):
 - `deal.wav` — card deal / draw swoosh
