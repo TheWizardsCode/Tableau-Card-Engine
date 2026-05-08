@@ -146,6 +146,7 @@ export class SettingsPanel {
     this.scene = scene;
     this.config = {
       soundManager: config.soundManager,
+      difficultyNames: config.difficultyNames ?? [],
       widthPercent: config.widthPercent ?? 30,
       animationDuration: config.animationDuration ?? 300,
       toggleKey: config.toggleKey ?? 'Escape',
@@ -684,14 +685,6 @@ export class SettingsPanel {
   }
 
   // ── Difficulty selector helpers ─────────────────────────
-
-  /** Cycle the selected difficulty by the given delta (-1 or +1). */
-  private cycleDifficulty(delta: number): void {
-    if (!this.difficultyNames || this.destroyed) return;
-    const idx = this.difficultyNames.indexOf(String(this._selectedDifficulty));
-    const next = (idx + delta + this.difficultyNames.length) % this.difficultyNames.length;
-    this.setSelectedDifficulty(this.difficultyNames[next]);
-  }
 
   /** Set the selected difficulty and update visuals. */
   private setSelectedDifficulty(name: string): void {

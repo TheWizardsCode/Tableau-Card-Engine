@@ -41,7 +41,8 @@ tableau-card-engine/
 │   └── cards/             52 standard card SVGs + card back + game-specific cards (140x190px)
 ├── tests/                 Vitest test files
 ├── docs/                  Developer documentation
-│   └── DEVELOPER.md       Detailed developer guide
+│   ├── DEVELOPER.md       Detailed developer guide
+│   └── core-engine/       Engine API notes (including spatial rules)
 ├── dist/                  Production build output (gitignored)
 ├── AGENTS.md              Project guidance and Worklog rules
 ├── package.json
