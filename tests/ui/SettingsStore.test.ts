@@ -1,5 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
-import { getSelectedDifficulty, setSelectedDifficulty } from '../../src/ui/SettingsStore';
+import {
+  getReducedMotion,
+  getSelectedDifficulty,
+  setReducedMotion,
+  setSelectedDifficulty,
+} from '../../src/ui/SettingsStore';
 import type { StorageLike } from '../../src/core-engine/SoundManager';
 
 function createMockStorage(): StorageLike {
@@ -30,5 +35,20 @@ describe('SettingsStore persistence', () => {
     setSelectedDifficulty('Impossible', storage);
     const restored = getSelectedDifficulty(storage, ['Easy', 'Medium', 'Hard']);
     expect(restored).toBeNull();
+  });
+
+  it('returns false for reduced motion when storage is null', () => {
+    expect(getReducedMotion(null)).toBe(false);
+  });
+
+  it('persists and restores reduced motion preference', () => {
+    const storage = createMockStorage();
+    setReducedMotion(true, storage);
+    expect(storage.setItem).toHaveBeenCalledWith('tce-ui-reduced-motion', 'true');
+    expect(getReducedMotion(storage)).toBe(true);
+
+    setReducedMotion(false, storage);
+    expect(storage.setItem).toHaveBeenCalledWith('tce-ui-reduced-motion', 'false');
+    expect(getReducedMotion(storage)).toBe(false);
   });
 });

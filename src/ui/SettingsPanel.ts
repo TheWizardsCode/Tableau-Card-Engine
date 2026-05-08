@@ -9,6 +9,7 @@
  */
 import Phaser from 'phaser';
 import type { SoundManager } from '../core-engine/SoundManager';
+import { getReducedMotion, setReducedMotion } from './SettingsStore';
 
 // ── Public types ────────────────────────────────────────────
 
@@ -68,7 +69,6 @@ const SLIDER_FILL_COLOR = 0xf0c040;
 const SLIDER_HANDLE_RADIUS = 10;
 const SLIDER_HANDLE_COLOR = 0xffffff;
 
-const REDUCED_MOTION_STORAGE_KEY = 'tce-ui-reduced-motion';
 const DIFFICULTY_STORAGE_KEY = 'tce-selected-difficulty';
 
 // Depth layers (high values so panel renders above game content)
@@ -769,24 +769,14 @@ export class SettingsPanel {
     if (typeof window === 'undefined' || !window.localStorage) {
       return false;
     }
-
-    try {
-      return window.localStorage.getItem(REDUCED_MOTION_STORAGE_KEY) === 'true';
-    } catch {
-      return false;
-    }
+    return getReducedMotion(window.localStorage);
   }
 
   private saveReducedMotionPreference(enabled: boolean): void {
     if (typeof window === 'undefined' || !window.localStorage) {
       return;
     }
-
-    try {
-      window.localStorage.setItem(REDUCED_MOTION_STORAGE_KEY, enabled ? 'true' : 'false');
-    } catch {
-      // ignore storage failures
-    }
+    setReducedMotion(enabled, window.localStorage);
   }
 
   // ── Private: Volume slider ───────────────────────────────
