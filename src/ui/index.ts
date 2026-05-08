@@ -54,6 +54,15 @@ export type {
 export { createCardGame } from './createCardGame';
 export type { CardGameOptions } from './createCardGame';
 
+// Card selection helpers
+export { attachSelection, createSingleSelectionManager } from './selection';
+export type {
+  SelectionController,
+  SelectionState,
+  AttachSelectionOptions,
+  SingleSelectionManager,
+} from './selection';
+
 export { HelpPanel, DEPTH_HELP_BUTTON } from './HelpPanel';
 export type { HelpSection, HelpPanelConfig } from './HelpPanel';
 

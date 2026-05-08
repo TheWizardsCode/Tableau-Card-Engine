@@ -55,7 +55,10 @@ import {
   dismissOverlay,
   createSceneTitle, createSceneMenuButton,
   moveGameObject,
+  attachSelection,
+  createSingleSelectionManager,
 } from '../../../src/ui';
+import type { SelectionController, SingleSelectionManager } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
 import helpContent from '../help-content.json';
 
@@ -231,6 +234,12 @@ export class FeudalismScene extends CardGameScene {
   // Overlay cleanup
   private overlayObjects: Phaser.GameObjects.GameObject[] = [];
 
+  // Market-card selection UX
+  private marketSelectionManager!: SingleSelectionManager;
+  private marketSelectionByCardId = new Map<number, SelectionController>();
+  private marketCardContainerById = new Map<number, Phaser.GameObjects.Container>();
+  private selectedMarketCardId: number | null = null;
+
   constructor() {
     super({ key: 'FeudalismScene' });
   }
@@ -262,6 +271,12 @@ export class FeudalismScene extends CardGameScene {
     this.pendingPlayerIndex = -1;
     this.pendingAction = null;
     this.pendingResult = null;
+    this.marketSelectionByCardId.clear();
+    this.marketCardContainerById.clear();
+    this.selectedMarketCardId = null;
+
+    this.marketSelectionManager?.destroy();
+    this.marketSelectionManager = createSingleSelectionManager(this);
 
     // Check URL parameters
     this.detectReplayMode();
@@ -446,6 +461,11 @@ export class FeudalismScene extends CardGameScene {
 
   private refreshMarket(): void {
     this.marketContainer.removeAll(true);
+    this.marketSelectionManager.clear();
+    this.marketSelectionManager.clearTargets();
+    this.marketSelectionByCardId.clear();
+    this.marketCardContainerById.clear();
+    this.selectedMarketCardId = null;
 
     const tiers: Tier[] = [3, 2, 1]; // Top to bottom: T3, T2, T1
 
@@ -569,16 +589,43 @@ export class FeudalismScene extends CardGameScene {
 
     // Interactivity
     if (this.turnPhase === 'player-turn') {
+      const selection = attachSelection(container, {
+        onStateChange: ({ selected, hovered }) => {
+          if (selected) {
+            this.selectedMarketCardId = card.id;
+          } else if (this.selectedMarketCardId === card.id) {
+            this.selectedMarketCardId = null;
+          }
+
+          if (hovered) {
+            bg.setStrokeStyle(2, 0xffdd44);
+            container.setScale(1.05);
+            return;
+          }
+
+          if (selected) {
+            bg.setStrokeStyle(2, 0x44ff66);
+            container.setScale(1.04);
+            return;
+          }
+
+          bg.setStrokeStyle(1, 0x444444);
+          container.setScale(1.0);
+        },
+      });
+
+      this.marketSelectionByCardId.set(card.id, selection);
+      this.marketCardContainerById.set(card.id, container);
+
       bg.setInteractive({ useHandCursor: true });
-      bg.on('pointerdown', () => this.onMarketCardClick(card));
-      bg.on('pointerover', () => {
-        bg.setStrokeStyle(2, 0xffdd44);
-        container.setScale(1.05);
+      this.marketSelectionManager.registerTarget(bg);
+
+      bg.on('pointerdown', () => {
+        this.marketSelectionManager.select(selection);
+        this.onMarketCardClick(card);
       });
-      bg.on('pointerout', () => {
-        bg.setStrokeStyle(1, 0x444444);
-        container.setScale(1.0);
-      });
+      bg.on('pointerover', () => selection.setHovered(true));
+      bg.on('pointerout', () => selection.setHovered(false));
     }
 
     return container;
@@ -1330,6 +1377,10 @@ export class FeudalismScene extends CardGameScene {
   private setPhase(phase: TurnPhase): void {
     this.turnPhase = phase;
 
+    if (phase !== 'player-turn') {
+      this.clearMarketSelection();
+    }
+
     switch (phase) {
       case 'player-turn':
         this.instructionText.setText('Click a card to buy/reserve, or take tokens');
@@ -1398,6 +1449,11 @@ export class FeudalismScene extends CardGameScene {
 
   // ── Card click handlers ─────────────────────────────────
 
+  private clearMarketSelection(): void {
+    this.marketSelectionManager?.clear();
+    this.selectedMarketCardId = null;
+  }
+
   private onMarketCardClick(card: DevelopmentCard): void {
     if (this.turnPhase !== 'player-turn') return;
 
@@ -1459,6 +1515,7 @@ export class FeudalismScene extends CardGameScene {
     if (canBuy) {
       const buyBtn = createOverlayButton(this, bx, GAME_H / 2 + 40, '[ Buy ]');
       buyBtn.on('pointerdown', () => {
+        this.clearMarketSelection();
         dismissOverlay(this.overlayObjects);
         this.overlayObjects = [];
         this.executePurchase(card.id);
@@ -1471,6 +1528,7 @@ export class FeudalismScene extends CardGameScene {
     if (player.reservedCards.length < 3) {
       const resBtn = createOverlayButton(this, bx, GAME_H / 2 + 40, '[ Reserve ]');
       resBtn.on('pointerdown', () => {
+        this.clearMarketSelection();
         dismissOverlay(this.overlayObjects);
         this.overlayObjects = [];
         this.executeReserve(card.id);
@@ -1482,6 +1540,7 @@ export class FeudalismScene extends CardGameScene {
     const cancelBtn = createOverlayButton(this, bx, GAME_H / 2 + 40, '[ Cancel ]');
     cancelBtn.on('pointerdown', () => {
       this.soundManager?.play(SFX_KEYS.UI_CLICK);
+      this.clearMarketSelection();
       dismissOverlay(this.overlayObjects);
       this.overlayObjects = [];
       this.setPhase('player-turn');
@@ -2393,11 +2452,47 @@ export class FeudalismScene extends CardGameScene {
     };
   }
 
+  /** Test helper: returns currently selected market card id (or null). */
+  getSelectedMarketCardIdForTest(): number | null {
+    return this.selectedMarketCardId;
+  }
+
+  /** Test helper: returns current market card visual scale by id. */
+  getMarketCardScaleForTest(cardId: number): number | null {
+    const container = this.marketCardContainerById.get(cardId);
+    return container ? container.scaleX : null;
+  }
+
+  /** Test helper: selects a market card by id via the selection manager. */
+  selectMarketCardForTest(cardId: number): void {
+    const selection = this.marketSelectionByCardId.get(cardId);
+    if (!selection) return;
+    this.marketSelectionManager.select(selection);
+  }
+
+  /** Test helper: returns the first visible market card id, if any. */
+  getFirstVisibleMarketCardIdForTest(): number | null {
+    for (const tier of [3, 2, 1] as Tier[]) {
+      const card = this.session.market[tier].visible.find((entry) => entry != null);
+      if (card) return card.id;
+    }
+    return null;
+  }
+
+  /** Test helper: simulates a scene-level non-card pointerdown. */
+  emitNonCardPointerDownForTest(): void {
+    this.input.emit('pointerdown', this.input.activePointer, []);
+  }
+
   // ── Lifecycle cleanup ───────────────────────────────────
 
   shutdown(): void {
     dismissOverlay(this.overlayObjects);
     this.overlayObjects = [];
+    this.marketSelectionManager?.destroy();
+    this.marketSelectionByCardId.clear();
+    this.marketCardContainerById.clear();
+    this.selectedMarketCardId = null;
     this.discardContainer?.removeAll(true);
     this.shutdownBase();
   }

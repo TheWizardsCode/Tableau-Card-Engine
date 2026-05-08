@@ -84,7 +84,13 @@ export const DEPTH_SETTINGS_BUTTON = 904;
 
 export class SettingsPanel {
   private readonly scene: Phaser.Scene;
-  private readonly config: Required<SettingsPanelConfig>;
+  private readonly config: {
+    soundManager: SoundManager;
+    widthPercent: number;
+    animationDuration: number;
+    toggleKey: string;
+    difficultyNames?: readonly string[];
+  };
   private readonly panelWidth: number;
   private readonly canvasWidth: number;
   private readonly canvasHeight: number;

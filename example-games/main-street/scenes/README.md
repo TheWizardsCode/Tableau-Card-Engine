@@ -4,6 +4,7 @@ This folder uses reusable UI helpers from `src/ui`:
 
 - `popTextOrIcon` for short HUD/event feedback pops
 - `moveGameObject` for card transfer animations from market to street/hand
+- `attachSelection` + `createSingleSelectionManager` for persistent card selection highlights
 - `runSceneTransition` helper exists in `src/ui`, but scene fades are currently disabled in Main Street
 
 ## Resource delta pop

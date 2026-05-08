@@ -50,7 +50,10 @@ import {
   createSceneTitle, createSceneMenuButton,
   popTextOrIcon,
   moveGameObject,
+  attachSelection,
+  createSingleSelectionManager,
 } from '../../../src/ui';
+import type { SelectionController, SingleSelectionManager } from '../../../src/ui';
 import { createTfPlayer } from '../../../src/core-engine';
 import { MAIN_STREET_TF_SFX_MAPPING } from '../sfx-tf-mapping';
 import { getMainStreetTfModule, loadMainStreetTfModule } from '../tf/mainStreetTfModule';
@@ -262,6 +265,11 @@ export class MainStreetScene extends CardGameScene {
   /** Grid slot index highlighted by the current hint (null = none). */
   private hintedSlotIndex: number | null = null;
 
+  // Persistent market-card selection UX
+  private marketSelectionManager!: SingleSelectionManager;
+  private marketSelectionByCardId = new Map<string, SelectionController>();
+  private selectedMarketCardId: string | null = null;
+
   // SVG debug overlay (opt-in via ?msSvgDebug=1)
   private svgDebugEnabled = false;
   private svgDebugText?: Phaser.GameObjects.Text;
@@ -379,6 +387,11 @@ export class MainStreetScene extends CardGameScene {
     this.hintUsedThisTurn = false;
     this.hintedCardId = null;
     this.hintedSlotIndex = null;
+
+    this.marketSelectionByCardId.clear();
+    this.selectedMarketCardId = null;
+    this.marketSelectionManager?.destroy();
+    this.marketSelectionManager = createSingleSelectionManager(this);
 
     // Reset activity-log panel state in case this scene instance is restarted.
     this.logScrollOffset = 0;
@@ -1499,6 +1512,10 @@ export class MainStreetScene extends CardGameScene {
 
   private refreshMarket(): void {
     this.marketContainer.removeAll(true);
+    this.marketSelectionManager.clear();
+    this.marketSelectionManager.clearTargets();
+    this.marketSelectionByCardId.clear();
+    this.selectedMarketCardId = null;
 
     const { gameW, marketTop, marketRowH, marketRowGap } = this.layout;
 
@@ -1637,6 +1654,11 @@ export class MainStreetScene extends CardGameScene {
     const renderW = Math.max(1, Math.round(marketCardW - 4));
     const renderH = Math.max(1, Math.round(marketCardH - 4));
     const tplKey = this.templateKeyForCard(card.id, renderW, renderH);
+    const baseStrokeColor = isHinted ? 0x44ffff : (isIncidentEvent ? 0x556688 : 0x888877);
+    const baseStrokeWidth = isHinted ? 3 : 1;
+
+    let bg: Phaser.GameObjects.Rectangle | null = null;
+
     if (this.textures && (this.textures as Phaser.Textures.TextureManager).exists(tplKey) && this.svgDom === undefined) {
       const img = this.add.image(0, 0, tplKey);
       // Texture is already rasterised at correct size for this slot
@@ -1649,7 +1671,10 @@ export class MainStreetScene extends CardGameScene {
       const templateId = this.templateIdFromCardId(card.id);
       const svgText = this.cardSvgSources.get(templateId)!;
       const domKey = this.domKeyForCard(`market-${rowKey}`, slotIndex, card.id);
-      this.svgDom.createOrUpdate(domKey, svgText, cx, cy, renderW, renderH, () => onClick(card), 100);
+      this.svgDom.createOrUpdate(domKey, svgText, cx, cy, renderW, renderH, () => {
+        this.selectMarketCardById(card.id);
+        onClick(card);
+      }, 100);
     } else {
       this.requestCardTexture(card.id, renderW, renderH);
       // Determine card color
@@ -1664,27 +1689,67 @@ export class MainStreetScene extends CardGameScene {
 
       // Background
       const fillAlpha = isIncidentEvent ? 0.5 : 0.7;
-      const bg = this.add.rectangle(0, 0, marketCardW, marketCardH, fillColor, fillAlpha);
-      // Hinted cards get a bright cyan border; incident events use their normal border
-      const strokeColor = isHinted ? 0x44ffff : (isIncidentEvent ? 0x556688 : 0x888877);
-      const strokeWidth = isHinted ? 3 : 1;
-      bg.setStrokeStyle(strokeWidth, strokeColor);
+      bg = this.add.rectangle(0, 0, marketCardW, marketCardH, fillColor, fillAlpha);
+      bg.setStrokeStyle(baseStrokeWidth, baseStrokeColor);
       container.add(bg);
+    }
 
-      // Interactivity (only during market phase, and not for Incident events)
-      if (this.uiPhase === 'market' && !isIncidentEvent) {
-        bg.setInteractive({ useHandCursor: true });
-        bg.on('pointerdown', () => onClick(card));
-        bg.on('pointerover', () => {
-          bg.setStrokeStyle(2, 0xffdd44);
+    const selectionRing = this.add.rectangle(0, 0, marketCardW, marketCardH);
+    selectionRing.setFillStyle(0x000000, 0);
+    selectionRing.setStrokeStyle(2, 0x44ff66);
+    selectionRing.setVisible(false);
+    container.add(selectionRing);
+
+    const interactiveEnabled = this.uiPhase === 'market' && !isIncidentEvent;
+    const selection = attachSelection(container, {
+      onStateChange: ({ selected, hovered }) => {
+        if (selected) {
+          this.selectedMarketCardId = card.id;
+        } else if (this.selectedMarketCardId === card.id) {
+          this.selectedMarketCardId = null;
+        }
+
+        if (hovered && interactiveEnabled) {
+          if (bg) {
+            bg.setStrokeStyle(2, 0xffdd44);
+          }
+          selectionRing.setStrokeStyle(2, 0xffdd44);
+          selectionRing.setVisible(!bg);
           container.setScale(1.05);
-        });
-        bg.on('pointerout', () => {
-          // Restore hint border if this card is hinted; otherwise use normal border
-          bg.setStrokeStyle(isHinted ? 3 : 1, isHinted ? 0x44ffff : 0x888877);
-          container.setScale(1.0);
-        });
-      }
+          return;
+        }
+
+        if (selected) {
+          if (bg) {
+            bg.setStrokeStyle(2, 0x44ff66);
+          }
+          selectionRing.setStrokeStyle(2, 0x44ff66);
+          selectionRing.setVisible(true);
+          container.setScale(1.04);
+          return;
+        }
+
+        if (bg) {
+          bg.setStrokeStyle(baseStrokeWidth, baseStrokeColor);
+        }
+        selectionRing.setVisible(false);
+        container.setScale(1.0);
+      },
+    });
+
+    if (interactiveEnabled) {
+      this.marketSelectionByCardId.set(card.id, selection);
+
+      const hitArea = this.add.rectangle(0, 0, marketCardW, marketCardH, 0x000000, 0.001);
+      hitArea.setInteractive({ useHandCursor: true });
+      hitArea.on('pointerdown', () => {
+        this.marketSelectionManager.select(selection);
+        onClick(card);
+      });
+      hitArea.on('pointerover', () => selection.setHovered(true));
+      hitArea.on('pointerout', () => selection.setHovered(false));
+      this.marketSelectionManager.registerTarget(hitArea);
+      container.add(hitArea);
     }
 
     // Card label and additional info are rendered inside per-card SVGs; only
@@ -1933,6 +1998,7 @@ export class MainStreetScene extends CardGameScene {
       const cancelBtn = this.createActionButton(rightX - btnW, by + 4, btnW, 'Cancel', () => {
         this.pendingBusinessCard = null;
         this.pendingBusinessSourceIndex = null;
+        this.clearMarketSelection();
         this.uiPhase = 'market';
         this.refreshAll();
         this.instructionText.setText(
@@ -2095,8 +2161,21 @@ export class MainStreetScene extends CardGameScene {
   }
 
 
+  private clearMarketSelection(): void {
+    this.marketSelectionManager?.clear();
+    this.selectedMarketCardId = null;
+  }
+
+  private selectMarketCardById(cardId: string): void {
+    const selection = this.marketSelectionByCardId.get(cardId);
+    if (!selection) return;
+    this.marketSelectionManager.select(selection);
+  }
+
   private onBusinessCardClick(card: BusinessCard): void {
     if (this.uiPhase !== 'market') return;
+
+    this.selectMarketCardById(card.id);
 
     const emptySlots = getEmptySlots(this.state);
     if (emptySlots.length === 0) {
@@ -2130,6 +2209,7 @@ export class MainStreetScene extends CardGameScene {
 
     this.pendingBusinessCard = null;
     this.pendingBusinessSourceIndex = null;
+    this.clearMarketSelection();
     this.uiPhase = 'animating';
     this.instructionText.setText(`Placing "${pendingCardName}"...`);
     this.hiddenTransferSourceCardIds.add(pendingCardId);
@@ -2170,6 +2250,8 @@ export class MainStreetScene extends CardGameScene {
 
   private onEventCardClick(card: EventCard): void {
     if (this.uiPhase !== 'market') return;
+
+    this.selectMarketCardById(card.id);
 
     const legality = canPurchaseEvent(this.state, card.id);
     if (!legality.legal) {
@@ -2217,6 +2299,8 @@ export class MainStreetScene extends CardGameScene {
 
   private onUpgradeCardClick(card: UpgradeCard): void {
     if (this.uiPhase !== 'market') return;
+
+    this.selectMarketCardById(card.id);
 
     const legality = canPurchaseUpgrade(this.state, card.id);
     if (!legality.legal) {
