@@ -124,11 +124,15 @@ interface GameState {
 ```
 
 **Key components**
-- **Grid<T>** – generic NxM grid (used here as 1x10). Provides `place(card, index)`, `neighbors(index)` utilities.
-- **AdjacencyResolver** – computes synergy bonuses based on shared `synergyTypes` and proximity (default range 1, can be extended by upgrades).
+- **Grid<T>** – generic NxM grid (used here as 1x10), now using the reusable `@core-engine` `Grid` type.
+- **AdjacencyResolver** – computes synergy bonuses based on shared `synergyTypes` and proximity (default range 1, can be extended by upgrades) via `@core-engine/SpatialRules`.
 - **Market** – two rows: Business row (4 face‑up cards from the Business deck) and Investments row (2 Upgrades + 1 Investment event = 3 slots). Cards are replenished after purchase.
 - **Incident Queue** – visible FIFO queue of 2 Incident cards drawn from the event deck. The front card resolves each turn during IncidentPhase; a replacement is drawn from the deck afterward. If the deck runs out, the queue shrinks naturally.
 - **ResourceBank** – tracks `coins` (start 8) and `reputation` (start 3). Reputation is a multiplier applied at final score calculation (`finalScore = coins + reputation * 5 + challengeBonuses`).
+
+### Spatial API migration note
+
+Main Street keeps the same external behavior for linear adjacency (`neighbors(index, range = 1)`), but internally now adapts the street to a `10x1` `Grid` and calls `neighbors()` from `@core-engine/SpatialRules` with Manhattan distance and orthogonal-only traversal. This preserves all existing gameplay behavior and tests while enabling shared NxM spatial logic for future games.
 
 ---
 

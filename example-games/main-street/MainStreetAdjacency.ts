@@ -8,6 +8,7 @@
  * @module
  */
 
+import { Grid, neighbors as resolveNeighbors } from '@core-engine/SpatialRules';
 import type { BusinessCard, SynergyType } from './MainStreetCards';
 import { GRID_SIZE, SYNERGY_BONUS_PER_NEIGHBOR } from './MainStreetCards';
 import type { MainStreetState } from './MainStreetState';
@@ -27,14 +28,16 @@ import { applyReputationMultiplier } from './MainStreetDifficulty';
  * @param range  How far to look in each direction (default 1).
  * @returns Array of neighbor indices (excluding the slot itself).
  */
+const STREET_TOPOLOGY = new Grid<null>(GRID_SIZE, 1, null);
+
 export function neighbors(index: number, range: number = 1): number[] {
-  const result: number[] = [];
-  const lo = Math.max(0, index - range);
-  const hi = Math.min(GRID_SIZE - 1, index + range);
-  for (let i = lo; i <= hi; i++) {
-    if (i !== index) result.push(i);
-  }
-  return result;
+  const positions = resolveNeighbors(STREET_TOPOLOGY, { x: index, y: 0 }, {
+    range,
+    metric: 'manhattan',
+    includeDiagonals: false,
+  });
+
+  return positions.map((position) => position.x);
 }
 
 /**

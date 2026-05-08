@@ -20,6 +20,11 @@ import {
   evaluateChallenges,
   createPresetLookup,
   getPresetNames,
+  Grid,
+  neighbors,
+  shortestPath,
+  pathExists,
+  computeAdjacencyBonus,
 } from '../../src/core-engine/index';
 
 describe('core-engine barrel exports', () => {
@@ -69,6 +74,14 @@ describe('core-engine barrel exports', () => {
   it('should export difficulty presets functions', () => {
     expect(typeof createPresetLookup).toBe('function');
     expect(typeof getPresetNames).toBe('function');
+  });
+
+  it('should export spatial rules primitives', () => {
+    expect(typeof Grid).toBe('function');
+    expect(typeof neighbors).toBe('function');
+    expect(typeof shortestPath).toBe('function');
+    expect(typeof pathExists).toBe('function');
+    expect(typeof computeAdjacencyBonus).toBe('function');
   });
 
   it('should work end-to-end through barrel exports', () => {

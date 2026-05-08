@@ -131,3 +131,21 @@ export {
   createPresetLookup,
   getPresetNames,
 } from './DifficultyPresets';
+
+// Spatial rules API (CG-0MM5ZG7071KO7PVG)
+export type {
+  Position,
+  DistanceMetric,
+  NeighborOptions,
+  PathOptions,
+  PathExistsOptions,
+  AdjacencyBonusOptions,
+  AdjacencyPredicate,
+} from './SpatialRules';
+export {
+  Grid,
+  neighbors,
+  shortestPath,
+  pathExists,
+  computeAdjacencyBonus,
+} from './SpatialRules';
