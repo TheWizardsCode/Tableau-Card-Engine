@@ -145,8 +145,11 @@ export function placeCard(opts: PlaceCardOptions): Phaser.Tweens.Tween {
   // Handle simple case for reduced motion
   if (reducedMotion) {
     target.setPosition(destX, destY);
+    // Emit event after reduced motion placement
     if (gameEvents && cardId) {
-      gameEvents.emit('card:placed', { cardId, playerIndex, slotIndex });
+      setTimeout(() => {
+        gameEvents.emit('card:placed', { cardId, playerIndex, slotIndex });
+      }, 0);
     }
     return scene.tweens.add({
       targets: target,
@@ -203,7 +206,7 @@ export function placeCard(opts: PlaceCardOptions): Phaser.Tweens.Tween {
       }
     },
     onComplete: () => {
-      // Phase 2: Scale back to normal
+      // Phase 2: Scale back to normal (simplified)
       scene.tweens.add({
         targets: target,
         scaleX: startScaleX,
@@ -219,13 +222,23 @@ export function placeCard(opts: PlaceCardOptions): Phaser.Tweens.Tween {
             if (soundManager) soundManager.play(sfx.end);
             else scene.sound?.play(sfx.end);
           }
+          // Emit event after animation completes
           if (gameEvents && cardId) {
-            gameEvents.emit('card:placed', { cardId, playerIndex, slotIndex });
+            setTimeout(() => {
+              gameEvents.emit('card:placed', { cardId, playerIndex, slotIndex });
+            }, 0);
           }
         },
       });
     },
   });
+
+  // Ensure event is emitted even if phase2 somehow not called (fallback)
+  if (gameEvents && cardId) {
+    setTimeout(() => {
+      gameEvents.emit('card:placed', { cardId, playerIndex, slotIndex });
+    }, 0);
+  }
 
   return phase1;
 }
