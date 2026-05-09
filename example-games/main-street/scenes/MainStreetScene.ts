@@ -1479,6 +1479,7 @@ export class MainStreetScene extends CardGameScene {
         fontSize: '10px', color: '#ffffff55', fontFamily: FONT_FAMILY,
       });
       this.streetContainer.add(idxText);
+    }
 
     if (!this.replayMode) {
       // Tooltip hit area for this business slot
