@@ -52,6 +52,7 @@ import {
   moveGameObject,
   attachSelection,
   createSingleSelectionManager,
+  TooltipManager,
 } from '../../../src/ui';
 import type { SelectionController, SingleSelectionManager } from '../../../src/ui';
 import { createTfPlayer } from '../../../src/core-engine';
@@ -203,6 +204,7 @@ type UIPhase =
 // ── Scene ───────────────────────────────────────────────────
 
 export class MainStreetScene extends CardGameScene {
+  private tooltipManager?: TooltipManager;
   // Game state
   private state!: MainStreetState;
   private uiPhase: UIPhase = 'idle';
@@ -538,6 +540,9 @@ export class MainStreetScene extends CardGameScene {
     this.initHelpPanel(helpSections);
     // Provide the ordered difficulty names so the Settings panel can render a selector
     this.initSettingsPanel(DIFFICULTY_NAMES);
+    if (!this.replayMode) {
+      this.tooltipManager = new TooltipManager(this, this.settingsPanel);
+    }
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       markSceneInvalid(this);
@@ -1474,8 +1479,28 @@ export class MainStreetScene extends CardGameScene {
         fontSize: '10px', color: '#ffffff55', fontFamily: FONT_FAMILY,
       });
       this.streetContainer.add(idxText);
+
+    if (!this.replayMode) {
+      // Tooltip hit area for this business slot
+      const tooltipZone = this.add.zone(
+        x + slotW / 2,
+        y + slotH / 2,
+        slotW,
+        slotH,
+      );
+      tooltipZone.setOrigin(0.5);
+      tooltipZone.setInteractive({ useHandCursor: true });
+      tooltipZone.on('pointerover', () => {
+        const info = `Business: ${biz.name}\nIncome: +${biz.baseIncome + biz.incomeBonus}\nSynergy: ${biz.synergyTypes.join('/') }\nLevel: ${biz.level}`;
+        this.tooltipManager?.show(info, tooltipZone.x, tooltipZone.y);
+      });
+      tooltipZone.on('pointerout', () => {
+        this.tooltipManager?.hide();
+      });
+      this.streetContainer.add(tooltipZone);
     }
   }
+
 
   private drawEmptySlot(x: number, y: number, index: number): void {
     const { slotW, slotH } = this.layout;
@@ -1671,10 +1696,32 @@ export class MainStreetScene extends CardGameScene {
       const templateId = this.templateIdFromCardId(card.id);
       const svgText = this.cardSvgSources.get(templateId)!;
       const domKey = this.domKeyForCard(`market-${rowKey}`, slotIndex, card.id);
-      this.svgDom.createOrUpdate(domKey, svgText, cx, cy, renderW, renderH, () => {
+      const domEl = this.svgDom.createOrUpdate(domKey, svgText, cx, cy, renderW, renderH, () => {
         this.selectMarketCardById(card.id);
         onClick(card);
       }, 100);
+      if (domEl && !this.replayMode) {
+        try {
+          const node = (domEl as any).node as HTMLElement | null;
+          if (node) {
+            node.addEventListener('mouseenter', () => {
+              let info = '';
+              if (card.family === 'business') {
+                const b = card as any;
+                info = `Business: ${b.name}\nCost: ${b.cost}\nIncome: +${b.baseIncome + (b.incomeBonus || 0)}/turn\nSynergy: ${(b.synergyTypes || []).join('/')}\n${b.description ?? ''}`;
+              } else if (card.family === 'event') {
+                const e = card as any;
+                info = `Event: ${e.name}\nCost: ${e.cost}\nEffect: ${e.effect}`;
+              } else if (card.family === 'upgrade') {
+                const u = card as any;
+                info = `Upgrade: ${u.name}\nCost: ${u.cost}\nIncome Bonus: +${u.incomeBonus}\nRequires: Lv${u.requiredLevel ?? 0}`;
+              }
+              this.tooltipManager?.show(info, container.x, container.y);
+            });
+            node.addEventListener('mouseleave', () => this.tooltipManager?.hide());
+          }
+        } catch (e) { /* ignore DOM attach errors */ }
+      }
     } else {
       this.requestCardTexture(card.id, renderW, renderH);
       // Determine card color
@@ -1746,8 +1793,27 @@ export class MainStreetScene extends CardGameScene {
         this.marketSelectionManager.select(selection);
         onClick(card);
       });
-      hitArea.on('pointerover', () => selection.setHovered(true));
-      hitArea.on('pointerout', () => selection.setHovered(false));
+      hitArea.on('pointerover', () => {
+        selection.setHovered(true);
+        if (!this.replayMode) {
+          let info = '';
+          if (card.family === 'business') {
+            const b = card as any;
+            info = `Business: ${b.name}\nCost: ${b.cost}\nIncome: +${b.baseIncome + (b.incomeBonus || 0)}/turn\nSynergy: ${(b.synergyTypes || []).join('/')}\n${b.description ?? ''}`;
+          } else if (card.family === 'event') {
+            const e = card as any;
+            info = `Event: ${e.name}\nCost: ${e.cost}\nEffect: ${e.effect}\nCoins: ${e.coinDelta >= 0 ? '+' : ''}${e.coinDelta}, Rep: ${e.reputationDelta >= 0 ? '+' : ''}${e.reputationDelta}`;
+          } else if (card.family === 'upgrade') {
+            const u = card as any;
+            info = `Upgrade: ${u.name}\nCost: ${u.cost}\nIncome Bonus: +${u.incomeBonus}\nRequires: Lv${u.requiredLevel ?? 0}\n${u.description ?? ''}`;
+          }
+          this.tooltipManager?.show(info, container.x, container.y);
+        }
+      });
+      hitArea.on('pointerout', () => {
+        selection.setHovered(false);
+        if (!this.replayMode) this.tooltipManager?.hide();
+      });
       this.marketSelectionManager.registerTarget(hitArea);
       container.add(hitArea);
     }
@@ -1842,6 +1908,17 @@ export class MainStreetScene extends CardGameScene {
       container.add(bg);
     }
 
+    if (!this.replayMode) {
+      const hover = this.add.rectangle(0, 0, queueCardW, queueCardH, 0x000000, 0.001);
+      hover.setInteractive({ useHandCursor: true });
+      hover.on('pointerover', () => {
+        const info = `Event: ${card.name}\nEffect: ${card.effect}\nCoins: ${card.coinDelta >= 0 ? '+' : ''}${card.coinDelta}, Rep: ${card.reputationDelta >= 0 ? '+' : ''}${card.reputationDelta}`;
+        this.tooltipManager?.show(info, container.x, container.y);
+      });
+      hover.on('pointerout', () => this.tooltipManager?.hide());
+      container.add(hover);
+    }
+
     return container;
   }
 
@@ -1896,7 +1973,7 @@ export class MainStreetScene extends CardGameScene {
     const cx = x + handCardW / 2;
     const cy = y + handCardH / 2;
     const domKey = this.domKeyForCard('hand', 0, card.id);
-    this.svgDom.createOrUpdate(
+    const domEl = this.svgDom.createOrUpdate(
       domKey,
       svgText,
       cx,
@@ -1906,6 +1983,28 @@ export class MainStreetScene extends CardGameScene {
       this.uiPhase === 'market' ? () => this.onPlayHeldEvent() : undefined,
       100,
     );
+
+    if (!this.replayMode) {
+      try {
+        const node = (domEl as any)?.node as HTMLElement | null;
+        if (node) {
+          node.addEventListener('mouseenter', () => {
+            const info = `Event: ${card.name}\nCost: ${card.cost}\nEffect: ${card.effect}`;
+            this.tooltipManager?.show(info, container.x, container.y);
+          });
+          node.addEventListener('mouseleave', () => this.tooltipManager?.hide());
+        }
+      } catch (e) { /* ignore */ }
+
+      const hover = this.add.rectangle(0, 0, handCardW, handCardH, 0x000000, 0.001);
+      hover.setInteractive({ useHandCursor: true });
+      hover.on('pointerover', () => {
+        const info = `Event: ${card.name}\nCost: ${card.cost}\nEffect: ${card.effect}`;
+        this.tooltipManager?.show(info, container.x, container.y);
+      });
+      hover.on('pointerout', () => this.tooltipManager?.hide());
+      container.add(hover);
+    }
 
     return container;
   }
