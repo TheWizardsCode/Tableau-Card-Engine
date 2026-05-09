@@ -74,6 +74,7 @@ tests/**/__screenshots__/
 debug-page.png
 debug-playwright.cjs
 debug-playwright.js
+tui-debug.log
 
 ##################################
 Worklog Specific Ignores
