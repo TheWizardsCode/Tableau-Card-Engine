@@ -70,6 +70,7 @@ export { HelpButton } from './HelpButton';
 export type { HelpButtonConfig } from './HelpButton';
 
 export { SettingsPanel, DEPTH_SETTINGS_BUTTON } from './SettingsPanel';
+export { TooltipManager } from './Tooltip';
 export type { SettingsPanelConfig } from './SettingsPanel';
 
 export { SettingsButton } from './SettingsButton';
