@@ -126,5 +126,5 @@ describe('SushiGoScene SVG icon rendering', () => {
     }
 
     expect(foundVariation).toBe(true);
-  }, 20000);
+  }, 10000);
 });
