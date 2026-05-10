@@ -36,13 +36,26 @@ Naming and variants
   - `icon-tempura.svg`, `icon-sashimi.svg`, `icon-dumpling.svg`
 
 CI / Regeneration notes
-- We recommend a small Node script to rasterize SVG -> PNG using `sharp`.
-- Suggested script path: `tools/export-sushi-icons.js` (not yet implemented).
-- Example command to produce fallbacks:
+- Keep SVGs as the source of truth. Runtime textures are rasterised in-scene using shared helpers in `src/core-engine/SvgHelpers.ts`.
+- If you add a new icon, ensure the corresponding scene preloads SVG text (`this.load.text`) and rasterises via `rasteriseSvgToTexture` or `getOrCreateTexture`.
+- Optional PNG fallbacks can still be generated for manual verification if needed.
 
-  npx tsx tools/export-sushi-icons.js --src public/assets/sushi-go --out public/assets/sushi-go/png --sizes 128x128,110x145,72x48
+Migration notes (shared core SVG helpers)
+- Do not add new `this.load.svg(...)` usage for Sushi Go icons.
+- Preferred flow:
+  1. `this.load.text('svg:<icon-key>', 'assets/sushi-go/<file>.svg')`
+  2. Scene `create()` calls `markSceneValid(this)` and registers shutdown/destroy invalidation.
+  3. Scene rasterises icon textures through shared helpers before first render.
+- Keep icon keys stable (`icon-...`) so tests and card mapping remain deterministic.
 
-- Keep SVGs as the source of truth. If you edit an SVG, re-run the raster export to refresh PNG fallbacks.
+Asset authoring checklist
+- Include `xmlns="http://www.w3.org/2000/svg"` on root `<svg>`.
+- Use explicit fills/strokes; avoid relying on inherited defaults.
+- Avoid SVG filters/masks that fail in canvas `drawImage` pipelines.
+- Prefer simple flat shapes and strong contrast for small-card readability.
+- After editing icons, run browser smoke tests:
+
+  npx vitest run --project browser tests/sushi-go/SushiGoIcons.browser.test.ts
 
 Accessibility
 - Ensure icon color contrast is sufficient when used over card backgrounds. Prefer a subtle outline (`#2E3B2E`) to maintain separation on light/dark backgrounds.
