@@ -14,7 +14,7 @@
  */
 
 import type { MainStreetState } from '../MainStreetState';
-import { setupMainStreetGame, addLog, deserializeMainStreetState } from '../MainStreetState';
+import { setupMainStreetGame, deserializeMainStreetState } from '../MainStreetState';
 import type { DifficultyName } from '../MainStreetDifficulty';
 import { DIFFICULTY_NAMES } from '../MainStreetDifficulty';
 import type { BusinessCard } from '../MainStreetCards';
@@ -24,7 +24,6 @@ import {
 } from '../MainStreetCards';
 import {
   CardGameScene,
-  FONT_FAMILY,
   createSingleSelectionManager,
   TooltipManager,
 } from '../../../src/ui';
@@ -40,22 +39,17 @@ import {
   loadCampaignProgress,
   updateCampaignAfterRun,
 } from '../MainStreetSaveLoad';
-import {
-  generateHint,
-  type HintResult,
-} from '../MainStreetHint';
 import { UndoRedoManager } from '../../../src/core-engine';
-import { MainStreetTranscriptRecorder, setMainStreetRecorder, recordMainStreetEvent } from '../MainStreetTranscript';
+import { MainStreetTranscriptRecorder, setMainStreetRecorder } from '../MainStreetTranscript';
 import { rasteriseSvgToTexture, makeTextureKey, markSceneValid, markSceneInvalid } from '../../../src/core-engine';
 import { SvgDomRenderer } from './SvgDomRenderer';
 import { MainStreetRenderer } from './MainStreetRenderer';
 import { MainStreetAnimator } from './MainStreetAnimator';
 import { MainStreetTurnController } from './MainStreetTurnController';
 import { MainStreetOverlayManager } from './MainStreetOverlayManager';
+import { MainStreetInputManager } from './MainStreetInputManager';
 import {
   BG_COLOR,
-  LOG_SCROLL_SPEED,
-  LOG_TITLE_H,
   type SceneLayout,
   SFX_KEYS,
   STREET_ROWS,
@@ -78,6 +72,7 @@ export class MainStreetScene extends CardGameScene {
   public msAnimator!: MainStreetAnimator;
   public msTurnController!: MainStreetTurnController;
   public msOverlayManager!: MainStreetOverlayManager;
+  public msInputManager!: MainStreetInputManager;
   // Game state
   public state!: MainStreetState;
   public uiPhase: UIPhase = 'idle';
@@ -251,6 +246,7 @@ export class MainStreetScene extends CardGameScene {
     this.msAnimator = new MainStreetAnimator(this);
     this.msTurnController = new MainStreetTurnController(this);
     this.msOverlayManager = new MainStreetOverlayManager(this);
+    this.msInputManager = new MainStreetInputManager(this);
 
     // Reset
     this.uiPhase = 'idle';
@@ -337,6 +333,7 @@ export class MainStreetScene extends CardGameScene {
     this.msAnimator = new MainStreetAnimator(this);
     this.msTurnController = new MainStreetTurnController(this);
     this.msOverlayManager = new MainStreetOverlayManager(this);
+    this.msInputManager = new MainStreetInputManager(this);
     this.layout = this.computeLayout();
     this.svgDebugEnabled = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('msSvgDebug') === '1';
     // Prewarm SVG textures once all SVG sources are loaded.
@@ -555,50 +552,11 @@ export class MainStreetScene extends CardGameScene {
   public createInstructions(...args: any[]): any {
     return (this.msRenderer as any).createInstructions.apply(this.msRenderer, args);
   }
-
-  public initSvgDebugOverlay(): void {
-    if (!this.svgDebugEnabled) return;
-    this.svgDebugText = this.add.text(10, 42, '', {
-      fontSize: '12px',
-      color: '#9be0ff',
-      fontFamily: FONT_FAMILY,
-      backgroundColor: '#00000088',
-      padding: { x: 6, y: 4 },
-    }).setDepth(10_000).setScrollFactor(0);
+  public initSvgDebugOverlay(...args: any[]): any {
+    return (this.msInputManager as any).initSvgDebugOverlay.apply(this.msInputManager, args);
   }
-
-  public updateSvgDebugOverlay(): void {
-    if (!this.svgDebugEnabled || !this.svgDebugText) return;
-    const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
-    const keys = Object.keys((this.textures as unknown as { list?: Record<string, unknown> }).list ?? {});
-    const cardTextureKeys = keys.filter((k) => k.startsWith('ms_card_'));
-
-    let sampleLine = 'sample: none';
-    const containers = this.marketContainer?.list ?? [];
-    for (const obj of containers) {
-      const c = obj as Phaser.GameObjects.Container;
-      if (!c.list) continue;
-      for (const child of c.list) {
-        const img = child as Phaser.GameObjects.Image;
-        const key = img?.texture?.key;
-        if (key && key.startsWith('ms_card_')) {
-          const tex = this.textures.get(key);
-          const src = tex?.source?.[0] as { width?: number; height?: number } | undefined;
-          sampleLine = `sample: ${key} disp:${Math.round(img.displayWidth)}x${Math.round(img.displayHeight)} src:${src?.width ?? '?'}x${src?.height ?? '?'}`;
-          break;
-        }
-      }
-      if (sampleLine !== 'sample: none') break;
-    }
-
-    const canvasW = (this.game?.canvas?.width ?? 0);
-    const canvasH = (this.game?.canvas?.height ?? 0);
-    this.svgDebugText.setText([
-      '[SVG Debug]',
-      `dpr:${dpr} canvas:${canvasW}x${canvasH} scale:${Math.round(this.scale.width)}x${Math.round(this.scale.height)}`,
-      `svg sources:${this.cardSvgSources.size} generated textures:${cardTextureKeys.length}`,
-      sampleLine,
-    ]);
+  public updateSvgDebugOverlay(...args: any[]): any {
+    return (this.msInputManager as any).updateSvgDebugOverlay.apply(this.msInputManager, args);
   }
 
   public handleResize(): void {
@@ -800,49 +758,8 @@ export class MainStreetScene extends CardGameScene {
   }
 
   /** Handles the Hint button click: generates and displays the hint. */
-  public onHintClick(): void {
-    if (this.hintUsedThisTurn) return;
-    if (this.uiPhase !== 'market') return;
-
-    const hint: HintResult | null = generateHint(this.state);
-    if (!hint) {
-      this.instructionText.setText('Hint not available right now.');
-      return;
-    }
-
-    // Record usage and store highlight targets
-    this.hintUsedThisTurn = true;
-
-    // Determine which card and slot to highlight based on the action type
-    if (hint.action.type === 'buy-business') {
-      this.hintedCardId = hint.action.cardId;
-      this.hintedSlotIndex = hint.action.slotIndex;
-    } else if (hint.action.type === 'buy-upgrade') {
-      this.hintedCardId = hint.action.cardId;
-      this.hintedSlotIndex = hint.action.targetSlot ?? null;
-    } else if (hint.action.type === 'buy-event') {
-      this.hintedCardId = hint.action.cardId;
-      this.hintedSlotIndex = null;
-    } else if (hint.action.type === 'play-event') {
-      this.hintedCardId = this.state.heldEvent?.id ?? null;
-      this.hintedSlotIndex = null;
-    } else {
-      this.hintedCardId = null;
-      this.hintedSlotIndex = null;
-    }
-
-    // Show rationale in instruction text
-    this.instructionText.setText(`Hint: ${hint.rationale}`);
-
-    // Record the hint request in the activity log / transcript
-    addLog(this.state, `Hint: ${hint.rationale}`, 'neutral');
-    try { recordMainStreetEvent({ type: 'hint', turn: this.state.turn, recommendedAction: hint.action, rationale: hint.rationale }); } catch (_) {}
-
-    // Refresh buttons (to disable the hint button) and visual highlights
-    this.refreshActionButtons();
-    this.refreshStreetGrid();
-    this.refreshMarket();
-    this.refreshPlayerHand();
+  public onHintClick(...args: any[]): any {
+    return (this.msInputManager as any).onHintClick.apply(this.msInputManager, args);
   }
   public performUndo(...args: any[]): any {
     return (this.msTurnController as any).performUndo.apply(this.msTurnController, args);
@@ -850,17 +767,11 @@ export class MainStreetScene extends CardGameScene {
   public performRedo(...args: any[]): any {
     return (this.msTurnController as any).performRedo.apply(this.msTurnController, args);
   }
-
-
-  public clearMarketSelection(): void {
-    this.marketSelectionManager?.clear();
-    this.selectedMarketCardId = null;
+  public clearMarketSelection(...args: any[]): any {
+    return (this.msInputManager as any).clearMarketSelection.apply(this.msInputManager, args);
   }
-
-  public selectMarketCardById(cardId: string): void {
-    const selection = this.marketSelectionByCardId.get(cardId);
-    if (!selection) return;
-    this.marketSelectionManager.select(selection);
+  public selectMarketCardById(...args: any[]): any {
+    return (this.msInputManager as any).selectMarketCardById.apply(this.msInputManager, args);
   }
   public onBusinessCardClick(...args: any[]): any {
     return (this.msTurnController as any).onBusinessCardClick.apply(this.msTurnController, args);
@@ -900,52 +811,18 @@ export class MainStreetScene extends CardGameScene {
   }
 
   /** Updates the geometry mask rectangle to clip log content. */
-  public updateLogMask(): void {
-    if (!this.logMaskGraphics) return;
-    this.logMaskGraphics.clear();
-    this.logMaskGraphics.fillStyle(0xffffff);
-    // Mask is in world coordinates
-    this.logMaskGraphics.fillRect(
-      this.layout.logX,
-      this.layout.logY + LOG_TITLE_H,
-      this.layout.logW,
-      this.layout.logH - LOG_TITLE_H - 2,
-    );
+  public updateLogMask(...args: any[]): any {
+    return (this.msInputManager as any).updateLogMask.apply(this.msInputManager, args);
   }
 
   /** Handles mouse wheel events over the log panel area. */
-  public handleLogWheel = (
-    pointer: Phaser.Input.Pointer,
-    _gameObjects: Phaser.GameObjects.GameObject[],
-    _deltaX: number,
-    deltaY: number,
-  ): void => {
-    // Only scroll when pointer is inside the log panel bounds
-    if (
-      pointer.x < this.layout.logX || pointer.x > this.layout.logX + this.layout.logW ||
-      pointer.y < this.layout.logY || pointer.y > this.layout.logY + this.layout.logH
-    ) {
-      return;
-    }
-    if (this.logMaxScroll <= 0) return;
-
-    this.logScrollOffset = Phaser.Math.Clamp(
-      this.logScrollOffset + (deltaY > 0 ? LOG_SCROLL_SPEED : -LOG_SCROLL_SPEED),
-      0,
-      this.logMaxScroll,
-    );
-
-    // Update auto-scroll flag: re-enable if scrolled to bottom
-    const BOTTOM_THRESHOLD = 4;
-    this.logAutoScroll = this.logScrollOffset >= this.logMaxScroll - BOTTOM_THRESHOLD;
-
-    this.applyLogScroll();
+  public handleLogWheel = (...args: any[]): any => {
+    return (this.msInputManager as any).handleLogWheel.apply(this.msInputManager, args);
   };
 
   /** Applies the current scroll offset to the log content container. */
-  public applyLogScroll(): void {
-    this.logContentContainer.setY(LOG_TITLE_H + 2 - this.logScrollOffset);
-    this.updateLogMask();
+  public applyLogScroll(...args: any[]): any {
+    return (this.msInputManager as any).applyLogScroll.apply(this.msInputManager, args);
   }
 
   getStreetContainer(): Phaser.GameObjects.Container {
