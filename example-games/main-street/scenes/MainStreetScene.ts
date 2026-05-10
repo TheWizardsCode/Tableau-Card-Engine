@@ -80,118 +80,41 @@ import { BuyBusinessCommand, BuyUpgradeCommand, BuyEventCommand, PlayEventComman
 import { MainStreetTranscriptRecorder, setMainStreetRecorder, recordMainStreetEvent } from '../MainStreetTranscript';
 import { rasteriseSvgToTexture, makeTextureKey, markSceneValid, markSceneInvalid } from '../../../src/core-engine';
 import { SvgDomRenderer } from './SvgDomRenderer';
+import {
+  BASE_HAND_CARD_H,
+  BASE_HAND_CARD_W,
+  BASE_HUD_Y,
+  BASE_MARKET_CARD_GAP,
+  BASE_MARKET_CARD_H,
+  BASE_MARKET_CARD_W,
+  BASE_MARKET_LABEL_W,
+  BASE_MARKET_ROW_GAP,
+  BASE_QUEUE_CARD_GAP,
+  BASE_QUEUE_CARD_H,
+  BASE_QUEUE_CARD_W,
+  BASE_SLOT_GAP,
+  BASE_SLOT_H,
+  BASE_SLOT_W,
+  BG_COLOR,
+  BOX_FILL,
+  BOX_RADIUS,
+  BOX_STROKE,
+  CHALLENGE_LINE_H,
+  CHALLENGE_PAD,
+  CHALLENGE_TITLE_H,
+  LOG_COLORS,
+  LOG_FONT_SIZE,
+  LOG_LINE_H,
+  LOG_PAD,
+  LOG_SCROLL_SPEED,
+  LOG_TITLE_H,
+  type SceneLayout,
+  SFX_KEYS,
+  STREET_COLS,
+  STREET_ROW_GAP,
+  STREET_ROWS,
+} from './MainStreetConstants';
 
-// ── Constants ───────────────────────────────────────────────
-
-/** Background colour for Main Street (warm town feel). */
-const BG_COLOR = '#2a1f14';
-
-// ── Layout regions ──────────────────────────────────────────
-
-// Section box styling
-const BOX_STROKE = 0x665544;
-const BOX_FILL = 0x2a1f14;
-const BOX_RADIUS = 6;
-
-// Base metrics are tuned for 1280x720 and scaled at runtime for narrower/taller viewports.
-const BASE_HUD_Y = 50;
-const BASE_MARKET_CARD_W = 140;
-const BASE_MARKET_CARD_H = 80;
-const BASE_MARKET_ROW_GAP = 10;
-const BASE_MARKET_CARD_GAP = 12;
-const BASE_MARKET_LABEL_W = 90;
-// Incident queue uses same card size as market for consistency
-const BASE_QUEUE_CARD_W = BASE_MARKET_CARD_W;
-const BASE_QUEUE_CARD_H = BASE_MARKET_CARD_H;
-const BASE_QUEUE_CARD_GAP = 10;
-// Make street slots match market placeholder size (market slots: 140x80)
-const BASE_SLOT_W = 140;
-const BASE_SLOT_H = 80;
-const BASE_SLOT_GAP = 10;
-const STREET_COLS = 5;
-const STREET_ROWS = 2;
-const STREET_ROW_GAP = 12;
-// Make hand slot match placeholder size as requested
-const BASE_HAND_CARD_W = 140;
-const BASE_HAND_CARD_H = 80;
-
-// ── Main Street SFX keys (logical keys used by SoundManager)
-const SFX_KEYS = {
-  DEAL: 'ms-deal',
-  MOVE_LOOP: 'ms-move-loop',
-  PLACE: 'ms-place',
-  DISCARD: 'ms-discard',
-  COIN_POP: 'ms-coin-pop',
-  CLICK: 'ms-click',
-  BG_LOOP: 'ms-bg-loop',
-  BUSINESS_START: 'ms-business-start',
-  BUSINESS_END: 'ms-business-end',
-  UPGRADE_START: 'ms-upgrade-start',
-  UPGRADE_END: 'ms-upgrade-end',
-  EVENT_CHEER: 'ms-event-cheer',
-} as const;
-
-// Activity Log panel layout
-const LOG_TITLE_H = 22;
-const LOG_PAD = 8;
-const LOG_FONT_SIZE = 13;
-const LOG_LINE_H = 18;
-const LOG_SCROLL_SPEED = 24;
-
-// Log entry colors by type
-const LOG_COLORS: Record<string, string> = {
-  gain: '#44ff44',
-  loss: '#ff4444',
-  neutral: '#ccbbaa',
-  'turn-header': '#ffdd44',
-};
-
-// Challenge Tracker panel layout
-const CHALLENGE_LINE_H = 20;
-const CHALLENGE_PAD = 6;
-const CHALLENGE_TITLE_H = 20;
-
-interface SceneLayout {
-  gameW: number;
-  gameH: number;
-  hudY: number;
-  marketTop: number;
-  marketRowH: number;
-  marketRowGap: number;
-  marketCardW: number;
-  marketCardH: number;
-  marketCardGap: number;
-  marketLabelW: number;
-  queueTop: number;
-  queueCardW: number;
-  queueCardH: number;
-  queueCardGap: number;
-  queueLabelW: number;
-  streetTop: number;
-  slotW: number;
-  slotH: number;
-  slotGap: number;
-  streetX: number;
-  streetRowGap: number;
-  streetCols: number;
-  handY: number;
-  handX: number;
-  handCardW: number;
-  handCardH: number;
-  instructionY: number;
-  actionY: number;
-  actionButtonH: number;
-  actionButtonW: number;
-  hintButtonW: number;
-  smallButtonW: number;
-  challengeX: number;
-  challengeY: number;
-  challengeW: number;
-  logX: number;
-  logY: number;
-  logW: number;
-  logH: number;
-}
 // ── UI Phase (scene-level interaction state) ────────────────
 
 type UIPhase =
