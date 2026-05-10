@@ -71,6 +71,7 @@ results/
 tests/**/__screenshots__/
 
 # Local debug artifacts
+artifacts/
 debug-page.png
 debug-playwright.cjs
 debug-playwright.js
