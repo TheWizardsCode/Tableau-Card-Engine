@@ -78,7 +78,7 @@ import {
 import { UndoRedoManager } from '../../../src/core-engine';
 import { BuyBusinessCommand, BuyUpgradeCommand, BuyEventCommand, PlayEventCommand } from '../MainStreetCommands';
 import { MainStreetTranscriptRecorder, setMainStreetRecorder, recordMainStreetEvent } from '../MainStreetTranscript';
-import { rasteriseSvgToTexture, makeTextureKey, markSceneValid, markSceneInvalid } from './SvgTextureHelpers';
+import { rasteriseSvgToTexture, makeTextureKey, markSceneValid, markSceneInvalid } from '../../../src/core-engine';
 import { SvgDomRenderer } from './SvgDomRenderer';
 
 // ── Constants ───────────────────────────────────────────────
