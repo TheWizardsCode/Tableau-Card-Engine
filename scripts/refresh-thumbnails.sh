@@ -26,7 +26,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # All known games (hello-world excluded -- it has no gameplay)
-ALL_GAMES=(golf beleaguered-castle lost-cities sushi-go feudalism the-mind)
+ALL_GAMES=(golf beleaguered-castle lost-cities sushi-go feudalism the-mind main-street)
 
 # If arguments are provided, use those as the game list; otherwise process all
 if [[ $# -gt 0 ]]; then
