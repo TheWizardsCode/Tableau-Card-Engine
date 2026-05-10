@@ -14,7 +14,6 @@
 
 import Phaser from 'phaser';
 import './hiDpiText'; // side-effect: crisp text on HiDPI displays
-import './patchTexturerImage'; // side-effect: defensive patch for intermittent null frame.source errors
 
 // ── Default values ────────────────────────────────────────
 

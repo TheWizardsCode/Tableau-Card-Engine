@@ -98,16 +98,17 @@ export async function rasteriseSvgToTexture(
               return;
             }
 
-            if (scene.textures?.exists(key)) {
-              scene.textures.remove(key);
-            }
+            // Never remove and re-add an existing texture key here.
+            // Removing a texture that is still referenced by active frames can
+            // transiently leave frame.source null in Phaser's WebGL path.
+            if (!scene.textures?.exists(key)) {
+              scene.textures.addCanvas(key, canvas);
 
-            scene.textures.addCanvas(key, canvas);
-
-            const texture = scene.textures.get(key) as { setFilter?: (mode: number) => void } | undefined;
-            if (texture?.setFilter) {
-              // Phaser uses 1 for linear filtering; avoid runtime Phaser import in core helpers.
-              texture.setFilter(1);
+              const texture = scene.textures.get(key) as { setFilter?: (mode: number) => void } | undefined;
+              if (texture?.setFilter) {
+                // Phaser uses 1 for linear filtering; avoid runtime Phaser import in core helpers.
+                texture.setFilter(1);
+              }
             }
           } catch {
             // Best effort texture registration.
