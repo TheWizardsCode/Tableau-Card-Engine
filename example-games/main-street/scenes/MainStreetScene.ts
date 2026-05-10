@@ -22,12 +22,9 @@ import {
   CARD_TEMPLATE_NAMES,
   INCIDENT_QUEUE_SIZE,
 } from '../MainStreetCards';
-import { type TurnResult } from '../MainStreetEngine';
 import {
   CardGameScene,
   FONT_FAMILY,
-  createOverlayBackground, createOverlayButton, createOverlayMenuButton,
-  dismissOverlay,
   createSingleSelectionManager,
   TooltipManager,
 } from '../../../src/ui';
@@ -44,11 +41,6 @@ import {
   updateCampaignAfterRun,
 } from '../MainStreetSaveLoad';
 import {
-  TIER_DEFINITIONS,
-  ORDERED_TIER_DEFINITIONS,
-  highestUnlockedTier,
-} from '../MainStreetTiers';
-import {
   generateHint,
   type HintResult,
 } from '../MainStreetHint';
@@ -59,6 +51,7 @@ import { SvgDomRenderer } from './SvgDomRenderer';
 import { MainStreetRenderer } from './MainStreetRenderer';
 import { MainStreetAnimator } from './MainStreetAnimator';
 import { MainStreetTurnController } from './MainStreetTurnController';
+import { MainStreetOverlayManager } from './MainStreetOverlayManager';
 import {
   BG_COLOR,
   LOG_SCROLL_SPEED,
@@ -84,6 +77,7 @@ export class MainStreetScene extends CardGameScene {
   public msRenderer!: MainStreetRenderer;
   public msAnimator!: MainStreetAnimator;
   public msTurnController!: MainStreetTurnController;
+  public msOverlayManager!: MainStreetOverlayManager;
   // Game state
   public state!: MainStreetState;
   public uiPhase: UIPhase = 'idle';
@@ -256,6 +250,7 @@ export class MainStreetScene extends CardGameScene {
     // Initialize helpers needed during reset and early lifecycle callbacks
     this.msAnimator = new MainStreetAnimator(this);
     this.msTurnController = new MainStreetTurnController(this);
+    this.msOverlayManager = new MainStreetOverlayManager(this);
 
     // Reset
     this.uiPhase = 'idle';
@@ -341,6 +336,7 @@ export class MainStreetScene extends CardGameScene {
     this.msRenderer = new MainStreetRenderer(this);
     this.msAnimator = new MainStreetAnimator(this);
     this.msTurnController = new MainStreetTurnController(this);
+    this.msOverlayManager = new MainStreetOverlayManager(this);
     this.layout = this.computeLayout();
     this.svgDebugEnabled = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('msSvgDebug') === '1';
     // Prewarm SVG textures once all SVG sources are loaded.
@@ -1094,219 +1090,7 @@ export class MainStreetScene extends CardGameScene {
   }
 
   // ── Game Over Overlay ───────────────────────────────────
-
-  public showGameOverOverlay(
-    result: TurnResult,
-    newlyUnlockedTiers: string[] = [],
-  ): void {
-    this.uiPhase = 'game-over';
-    this.refreshAll();
-
-    const isWin = result.gameResult === 'win';
-    const title = isWin ? 'You Win!' : 'Game Over';
-    const color = isWin ? '#44ff44' : '#ff4444';
-
-    // Per-challenge breakdown lines (rendered below score breakdown)
-    const activeChallenges = this.state.activeChallenges;
-    const challengeLineCount = activeChallenges.length;
-    // Extra height: section header + one line per challenge
-    const challengeExtraH = challengeLineCount > 0 ? 24 + challengeLineCount * 20 : 0;
-
-    // ── Meta-progression section heights ──
-    // Tier unlock notifications (conditional)
-    let tierUnlockH = 0;
-    if (newlyUnlockedTiers.length > 0) {
-      tierUnlockH += 26; // section header
-      for (const tierId of newlyUnlockedTiers) {
-        tierUnlockH += 20; // tier name line
-        const def = TIER_DEFINITIONS[tierId];
-        if (def) tierUnlockH += def.newCardIds.length * 16; // card list
-      }
-      tierUnlockH += 8; // bottom padding
-    }
-    // Current tier + campaign stats (always shown when campaign exists)
-    const campaignH = this.campaign ? 80 : 0; // tier indicator + 3 stat lines + spacing
-
-    const panelH = 360 + challengeExtraH + tierUnlockH + campaignH;
-
-    // Overlay background
-    const overlay = createOverlayBackground(
-      this,
-      { depth: 100, alpha: 0.75 },
-      { width: 500, height: panelH, alpha: 0.95 },
-    );
-    this.overlayObjects.push(...overlay.objects);
-
-    // Vertical anchor: centre of the panel
-    const panelTop = this.layout.gameH / 2 - panelH / 2;
-
-    // Title
-    const titleText = this.add.text(this.layout.gameW / 2, panelTop + 30, title, {
-      fontSize: '36px', fontStyle: 'bold', color, fontFamily: FONT_FAMILY,
-    }).setOrigin(0.5).setDepth(101);
-    this.overlayObjects.push(titleText);
-
-    // End reason
-    const reason = this.state.endReason ?? 'unknown';
-    const reasonText = this.add.text(
-      this.layout.gameW / 2, panelTop + 72,
-      reason.replace(/_/g, ' '),
-      { fontSize: '18px', color: '#ccbbaa', fontFamily: FONT_FAMILY },
-    ).setOrigin(0.5).setDepth(101);
-    this.overlayObjects.push(reasonText);
-
-    // Score breakdown
-    const { coins, reputation } = this.state.resourceBank;
-    const challenges = this.state.challengesCompleted.length;
-    const cfg = this.state.config;
-    const lines = [
-      `Coins: ${coins}`,
-      `Reputation: ${reputation} (x${cfg.reputationScoreMultiplier} = ${reputation * cfg.reputationScoreMultiplier})`,
-      `Challenges: ${challenges} (x${cfg.challengeBonusPoints} = ${challenges * cfg.challengeBonusPoints})`,
-      `Final Score: ${result.finalScore}`,
-    ];
-    const breakdownY = panelTop + 110;
-    const breakdown = this.add.text(this.layout.gameW / 2, breakdownY, lines.join('\n'), {
-      fontSize: '16px', color: '#ddccbb', fontFamily: FONT_FAMILY,
-      align: 'center', lineSpacing: 6,
-    }).setOrigin(0.5, 0).setDepth(101);
-    this.overlayObjects.push(breakdown);
-
-    // Per-challenge breakdown (below score breakdown)
-    let cursorY = breakdownY + 100; // approximate height of score breakdown text
-    if (challengeLineCount > 0) {
-      const sectionTitle = this.add.text(
-        this.layout.gameW / 2, cursorY,
-        'Challenge Details:',
-        { fontSize: '14px', fontStyle: 'bold', color: '#aa9977', fontFamily: FONT_FAMILY },
-      ).setOrigin(0.5, 0).setDepth(101);
-      this.overlayObjects.push(sectionTitle);
-      cursorY += 22;
-
-      for (const ac of activeChallenges) {
-        const done = ac.completed;
-        const icon = done ? '\u2713' : '\u2717'; // checkmark or cross
-        const lineColor = done ? '#44ff44' : '#ff6666';
-        const challengeLine = this.add.text(
-          this.layout.gameW / 2, cursorY,
-          `${icon}  ${ac.challenge.title}`,
-          { fontSize: '13px', color: lineColor, fontFamily: FONT_FAMILY },
-        ).setOrigin(0.5, 0).setDepth(101);
-        this.overlayObjects.push(challengeLine);
-        cursorY += 20;
-      }
-    }
-
-    // ── Meta-progression: Tier Unlock Notifications ──
-    if (newlyUnlockedTiers.length > 0) {
-      cursorY += 8;
-      const unlockHeader = this.add.text(
-        this.layout.gameW / 2, cursorY,
-        'Tier Unlocked!',
-        { fontSize: '14px', fontStyle: 'bold', color: '#44ff44', fontFamily: FONT_FAMILY },
-      ).setOrigin(0.5, 0).setDepth(101);
-      this.overlayObjects.push(unlockHeader);
-      cursorY += 22;
-
-      for (const tierId of newlyUnlockedTiers) {
-        const def = TIER_DEFINITIONS[tierId];
-        if (!def) continue;
-
-        // Find the milestone record to determine the trigger type
-        const milestone = this.campaign?.milestoneHistory.find(
-          (m) => m.tierId === tierId,
-        );
-        const triggerLabel = milestone?.triggerType === 'challenge'
-          ? '(via challenges)' : '(via reputation)';
-
-        const tierLine = this.add.text(
-          this.layout.gameW / 2, cursorY,
-          `NEW: Tier ${def.order} - ${def.name} ${triggerLabel}`,
-          { fontSize: '13px', color: '#88ff88', fontFamily: FONT_FAMILY },
-        ).setOrigin(0.5, 0).setDepth(101);
-        this.overlayObjects.push(tierLine);
-        cursorY += 20;
-
-        // List the new cards added by this tier
-        for (const cardId of def.newCardIds) {
-          const cardName = CARD_TEMPLATE_NAMES.get(cardId) ?? cardId;
-          const cardLine = this.add.text(
-            this.layout.gameW / 2, cursorY,
-            `  + ${cardName}`,
-            { fontSize: '12px', color: '#aaddaa', fontFamily: FONT_FAMILY },
-          ).setOrigin(0.5, 0).setDepth(101);
-          this.overlayObjects.push(cardLine);
-          cursorY += 16;
-        }
-      }
-    }
-
-    // ── Meta-progression: Current Tier + Campaign Stats ──
-    if (this.campaign) {
-      cursorY += 8;
-      const highest = highestUnlockedTier(this.campaign.unlockedTiers);
-      const tierCount = ORDERED_TIER_DEFINITIONS.length;
-      const tierLabel = highest
-        ? `Current Tier: ${highest.order} / ${tierCount} - ${highest.name}`
-        : 'Current Tier: --';
-      const tierIndicator = this.add.text(
-        this.layout.gameW / 2, cursorY, tierLabel,
-        { fontSize: '14px', fontStyle: 'bold', color: '#ddbb88', fontFamily: FONT_FAMILY },
-      ).setOrigin(0.5, 0).setDepth(101);
-      this.overlayObjects.push(tierIndicator);
-      cursorY += 22;
-
-      const winRate = this.campaign.totalRuns > 0
-        ? Math.round((this.campaign.totalWins / this.campaign.totalRuns) * 100)
-        : 0;
-      const statsLines = [
-        `Runs: ${this.campaign.totalRuns}  |  Wins: ${this.campaign.totalWins}  (${winRate}%)`,
-        `High Score: ${this.campaign.highestScore}  |  Best Rep: ${this.campaign.persistentReputation}`,
-      ];
-      const statsText = this.add.text(
-        this.layout.gameW / 2, cursorY, statsLines.join('\n'),
-        { fontSize: '13px', color: '#bbaa99', fontFamily: FONT_FAMILY, align: 'center', lineSpacing: 4 },
-      ).setOrigin(0.5, 0).setDepth(101);
-      this.overlayObjects.push(statsText);
-    }
-
-    // Difficulty selector
-    const diffY = panelTop + panelH - 80;
-    const diffLabel = this.add.text(
-      this.layout.gameW / 2 - 80, diffY,
-      `Difficulty: ${this.selectedDifficulty}`,
-      { fontSize: '14px', color: '#ccbbaa', fontFamily: FONT_FAMILY },
-    ).setOrigin(0, 0.5).setDepth(101);
-    this.overlayObjects.push(diffLabel);
-
-    const cycleBtn = this.add.text(
-      this.layout.gameW / 2 + 90, diffY,
-      '[ Change ]',
-      { fontSize: '14px', color: '#ffdd88', fontFamily: FONT_FAMILY },
-    ).setOrigin(0, 0.5).setDepth(101).setInteractive({ useHandCursor: true });
-    cycleBtn.on('pointerdown', () => {
-      const idx = DIFFICULTY_NAMES.indexOf(this.selectedDifficulty);
-      this.selectedDifficulty = DIFFICULTY_NAMES[(idx + 1) % DIFFICULTY_NAMES.length];
-      diffLabel.setText(`Difficulty: ${this.selectedDifficulty}`);
-    });
-    this.overlayObjects.push(cycleBtn);
-
-    // Buttons (positioned relative to panel bottom)
-    const btnY = panelTop + panelH - 40;
-    const playAgainBtn = createOverlayButton(
-      this, this.layout.gameW / 2 - 110, btnY,
-      '[ Play Again ]', 101,
-    );
-    playAgainBtn.on('pointerdown', () => {
-      dismissOverlay(this.overlayObjects);
-      this.overlayObjects = [];
-      this.scene.restart();
-    });
-    this.overlayObjects.push(playAgainBtn);
-
-    const menuBtn = createOverlayMenuButton(
-      this, this.layout.gameW / 2 + 30, btnY, 101,
-    );
-    this.overlayObjects.push(menuBtn);
+  public showGameOverOverlay(...args: any[]): any {
+    return (this.msOverlayManager as any).showGameOverOverlay.apply(this.msOverlayManager, args);
   }
 }
