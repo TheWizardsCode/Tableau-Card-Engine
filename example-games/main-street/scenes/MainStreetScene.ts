@@ -19,7 +19,6 @@ import type { DifficultyName } from '../MainStreetDifficulty';
 import { DIFFICULTY_NAMES } from '../MainStreetDifficulty';
 import type { BusinessCard } from '../MainStreetCards';
 import {
-  CARD_TEMPLATE_NAMES,
   INCIDENT_QUEUE_SIZE,
 } from '../MainStreetCards';
 import {
@@ -41,13 +40,14 @@ import {
 } from '../MainStreetSaveLoad';
 import { UndoRedoManager } from '../../../src/core-engine';
 import { MainStreetTranscriptRecorder, setMainStreetRecorder } from '../MainStreetTranscript';
-import { rasteriseSvgToTexture, makeTextureKey, markSceneValid, markSceneInvalid } from '../../../src/core-engine';
+import { markSceneValid, markSceneInvalid } from '../../../src/core-engine';
 import { SvgDomRenderer } from './SvgDomRenderer';
 import { MainStreetRenderer } from './MainStreetRenderer';
 import { MainStreetAnimator } from './MainStreetAnimator';
 import { MainStreetTurnController } from './MainStreetTurnController';
 import { MainStreetOverlayManager } from './MainStreetOverlayManager';
 import { MainStreetInputManager } from './MainStreetInputManager';
+import { MainStreetSvgTextureManager } from './MainStreetSvgTextureManager';
 import {
   BG_COLOR,
   type SceneLayout,
@@ -73,6 +73,7 @@ export class MainStreetScene extends CardGameScene {
   public msTurnController!: MainStreetTurnController;
   public msOverlayManager!: MainStreetOverlayManager;
   public msInputManager!: MainStreetInputManager;
+  public msSvgTextureManager!: MainStreetSvgTextureManager;
   // Game state
   public state!: MainStreetState;
   public uiPhase: UIPhase = 'idle';
@@ -191,20 +192,8 @@ export class MainStreetScene extends CardGameScene {
       // Fetch all per-card SVG assets as text for dynamic rasterisation at display size.
       // We do not pre-load them as textures - we lazily rasterise them at exact pixel
       // dimensions needed for crisp rendering on the current screen/DPR.
-      const fetches: Promise<void>[] = [];
-      for (const templateId of CARD_TEMPLATE_NAMES.keys()) {
-        const path = `assets/games/main-street/svg/cards/${templateId}.svg`;
-        const p = fetch(path)
-          .then((resp) => (resp.ok ? resp.text() : null))
-          .then((text) => {
-            if (text) {
-              this.cardSvgSources.set(templateId, text);
-            }
-          })
-          .catch(() => { /* ignore fetch failures in test environments */ });
-        fetches.push(p);
-      }
-      this.cardSvgLoadPromise = Promise.all(fetches).then(() => {});
+      this.msSvgTextureManager = this.msSvgTextureManager ?? new MainStreetSvgTextureManager(this);
+      this.msSvgTextureManager.loadCardSvgSources();
     } catch (e) {
       // If svg loader is unavailable in the current environment, ignore
       // eslint-disable-next-line no-console
@@ -215,6 +204,7 @@ export class MainStreetScene extends CardGameScene {
   // ── Create ──────────────────────────────────────────────
 
   create(): void {
+    markSceneValid(this);
     this.cameras.main.setBackgroundColor(BG_COLOR);
 
     // Ensure placeholder texture exists. Some test environments have trouble
@@ -247,6 +237,7 @@ export class MainStreetScene extends CardGameScene {
     this.msTurnController = new MainStreetTurnController(this);
     this.msOverlayManager = new MainStreetOverlayManager(this);
     this.msInputManager = new MainStreetInputManager(this);
+    this.msSvgTextureManager = new MainStreetSvgTextureManager(this);
 
     // Reset
     this.uiPhase = 'idle';
@@ -334,6 +325,7 @@ export class MainStreetScene extends CardGameScene {
     this.msTurnController = new MainStreetTurnController(this);
     this.msOverlayManager = new MainStreetOverlayManager(this);
     this.msInputManager = new MainStreetInputManager(this);
+    this.msSvgTextureManager = new MainStreetSvgTextureManager(this);
     this.layout = this.computeLayout();
     this.svgDebugEnabled = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('msSvgDebug') === '1';
     // Prewarm SVG textures once all SVG sources are loaded.
@@ -442,106 +434,21 @@ export class MainStreetScene extends CardGameScene {
    * This rasterises them at the exact pixel sizes needed for the current layout,
    * ensuring crisp rendering on HiDPI displays.
    */
-  public async prewarmVisibleCardTextures(): Promise<void> {
-    // Mark scene as valid before starting rasterisation
-    markSceneValid(this);
-    
-    const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
-    const { slotW, slotH, marketCardW, marketCardH, queueCardW, queueCardH, handCardW, handCardH } = this.layout;
-    const renderSlotW = Math.max(1, Math.round(slotW - 4));
-    const renderSlotH = Math.max(1, Math.round(slotH - 4));
-    const renderMarketW = Math.max(1, Math.round(marketCardW - 4));
-    const renderMarketH = Math.max(1, Math.round(marketCardH - 4));
-    const renderQueueW = Math.max(1, Math.round(queueCardW - 4));
-    const renderQueueH = Math.max(1, Math.round(queueCardH - 4));
-    const renderHandW = Math.max(1, Math.round(handCardW - 4));
-    const renderHandH = Math.max(1, Math.round(handCardH - 4));
-
-    // Collect unique template IDs visible in market, queue, street, and hand
-    const visibleTemplates = new Set<string>();
-
-    // Market business cards
-    for (const card of this.state.market.business) {
-      if (card) visibleTemplates.add(this.templateIdFromCardId(card.id));
-    }
-    // Market investment cards (upgrades + events)
-    for (const card of this.state.market.investments) {
-      if (card) visibleTemplates.add(this.templateIdFromCardId(card.id));
-    }
-    // Incident queue
-    for (const card of this.state.incidentQueue) {
-      if (card) visibleTemplates.add(this.templateIdFromCardId(card.id));
-    }
-    // Street grid businesses
-    for (const biz of this.state.streetGrid) {
-      if (biz) visibleTemplates.add(this.templateIdFromCardId(biz.id));
-    }
-    // Held event card
-    if (this.state.heldEvent) {
-      visibleTemplates.add(this.templateIdFromCardId(this.state.heldEvent.id));
-    }
-
-    // Rasterise each visible template at the required sizes
-    const rasterizePromises: Promise<void>[] = [];
-
-    for (const templateId of visibleTemplates) {
-      const svgText = this.cardSvgSources.get(templateId);
-      if (!svgText) continue;
-
-      // Market size
-      const marketKey = makeTextureKey(templateId, renderMarketW, renderMarketH, dpr);
-      rasterizePromises.push(
-        rasteriseSvgToTexture(this, marketKey, svgText, renderMarketW, renderMarketH, dpr),
-      );
-
-      // Street slot size
-      const slotKey = makeTextureKey(templateId, renderSlotW, renderSlotH, dpr);
-      rasterizePromises.push(
-        rasteriseSvgToTexture(this, slotKey, svgText, renderSlotW, renderSlotH, dpr),
-      );
-
-      // Queue size
-      const queueKey = makeTextureKey(templateId, renderQueueW, renderQueueH, dpr);
-      rasterizePromises.push(
-        rasteriseSvgToTexture(this, queueKey, svgText, renderQueueW, renderQueueH, dpr),
-      );
-
-      // Hand size
-      const handKey = makeTextureKey(templateId, renderHandW, renderHandH, dpr);
-      rasterizePromises.push(
-        rasteriseSvgToTexture(this, handKey, svgText, renderHandW, renderHandH, dpr),
-      );
-    }
-
-    // Wait for all prewarming to complete
-    await Promise.all(rasterizePromises);
+  public prewarmVisibleCardTextures(...args: any[]): any {
+    return (this.msSvgTextureManager as any).prewarmVisibleCardTextures.apply(this.msSvgTextureManager, args);
   }
 
   /** Extracts the base template ID from a card ID (strips copy suffixes like -0, -1). */
-  public templateIdFromCardId(cardId: string): string {
-    return cardId.replace(/-\d+$/, '');
+  public templateIdFromCardId(...args: any[]): any {
+    return (this.msSvgTextureManager as any).templateIdFromCardId.apply(this.msSvgTextureManager, args);
   }
 
   /**
    * Lazily request a card texture for the given render size.
    * If generation succeeds, trigger a refresh so the SVG texture is used.
    */
-  public requestCardTexture(cardId: string, renderW: number, renderH: number): void {
-    const templateId = this.templateIdFromCardId(cardId);
-    const svgText = this.cardSvgSources.get(templateId);
-    if (!svgText) return;
-
-    const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
-    const key = makeTextureKey(templateId, renderW, renderH, dpr);
-    if (this.textures.exists(key)) return;
-
-    void rasteriseSvgToTexture(this, key, svgText, renderW, renderH, dpr).then(() => {
-      try {
-        this.refreshAll();
-      } catch {
-        // scene may be shutting down
-      }
-    });
+  public requestCardTexture(...args: any[]): any {
+    return (this.msSvgTextureManager as any).requestCardTexture.apply(this.msSvgTextureManager, args);
   }
   public computeLayout(...args: any[]): any {
     return (this.msRenderer as any).computeLayout.apply(this.msRenderer, args);
@@ -701,21 +608,11 @@ export class MainStreetScene extends CardGameScene {
   public drawMarketRow(...args: any[]): any {
     return (this.msRenderer as any).drawMarketRow.apply(this.msRenderer, args);
   }
-
-  public templateKeyForCard(cardId: string, width?: number, height?: number): string {
-    // strip copy suffixes like `-0`, `-1`, or serials appended by deck builders
-    const base = cardId.replace(/-\d+$/,'');
-    
-    // If dimensions provided, include them in the key for size-specific textures
-    if (width !== undefined && height !== undefined) {
-      const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
-      return makeTextureKey(base, width, height, dpr);
-    }
-    return `ms_card_${base}`;
+  public templateKeyForCard(...args: any[]): any {
+    return (this.msSvgTextureManager as any).templateKeyForCard.apply(this.msSvgTextureManager, args);
   }
-
-  public domKeyForCard(context: string, slot: number | string, cardId: string): string {
-    return `ms_dom_${context}_${slot}_${cardId}`;
+  public domKeyForCard(...args: any[]): any {
+    return (this.msSvgTextureManager as any).domKeyForCard.apply(this.msSvgTextureManager, args);
   }
   public drawMarketCard(...args: any[]): any {
     return (this.msRenderer as any).drawMarketCard.apply(this.msRenderer, args);
