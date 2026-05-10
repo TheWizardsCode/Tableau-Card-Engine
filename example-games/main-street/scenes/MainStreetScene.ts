@@ -40,8 +40,6 @@ import {
   FONT_FAMILY,
   createOverlayBackground, createOverlayButton, createOverlayMenuButton,
   dismissOverlay,
-  popTextOrIcon,
-  moveGameObject,
   createSingleSelectionManager,
   TooltipManager,
 } from '../../../src/ui';
@@ -72,6 +70,7 @@ import { MainStreetTranscriptRecorder, setMainStreetRecorder, recordMainStreetEv
 import { rasteriseSvgToTexture, makeTextureKey, markSceneValid, markSceneInvalid } from '../../../src/core-engine';
 import { SvgDomRenderer } from './SvgDomRenderer';
 import { MainStreetRenderer } from './MainStreetRenderer';
+import { MainStreetAnimator } from './MainStreetAnimator';
 import {
   BG_COLOR,
   LOG_SCROLL_SPEED,
@@ -95,6 +94,7 @@ type UIPhase =
 export class MainStreetScene extends CardGameScene {
   public tooltipManager?: TooltipManager;
   public msRenderer!: MainStreetRenderer;
+  public msAnimator!: MainStreetAnimator;
   // Game state
   public state!: MainStreetState;
   public uiPhase: UIPhase = 'idle';
@@ -264,6 +264,9 @@ export class MainStreetScene extends CardGameScene {
       console.debug('[MS] placeholder generation failed', e);
     }
 
+    // Initialize helpers needed during reset and early lifecycle callbacks
+    this.msAnimator = new MainStreetAnimator(this);
+
     // Reset
     this.uiPhase = 'idle';
     this.pendingBusinessCard = null;
@@ -346,6 +349,7 @@ export class MainStreetScene extends CardGameScene {
 
     // UI scaffolding
     this.msRenderer = new MainStreetRenderer(this);
+    this.msAnimator = new MainStreetAnimator(this);
     this.layout = this.computeLayout();
     this.svgDebugEnabled = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('msSvgDebug') === '1';
     // Prewarm SVG textures once all SVG sources are loaded.
@@ -781,214 +785,32 @@ export class MainStreetScene extends CardGameScene {
     return (this.msRenderer as any).refreshHud.apply(this.msRenderer, args);
   }
 
-  public animateHudValueChanges(params: {
-    coins: number;
-    reputation: number;
-    coinX: number;
-    repX: number;
-    hudY: number;
-  }): void {
-    const { coins, reputation, coinX, repX, hudY } = params;
-
-    if (this.previousCoins === null || this.previousReputation === null) {
-      this.previousCoins = coins;
-      this.previousReputation = reputation;
-      return;
-    }
-
-    const reducedMotion = this.settingsPanel?.reducedMotion;
-
-    if (coins !== this.previousCoins) {
-      const delta = coins - this.previousCoins;
-      const text = this.add.text(coinX, hudY - 6, `${delta > 0 ? '+' : ''}${delta}`, {
-        fontSize: '16px',
-        fontStyle: 'bold',
-        color: delta >= 0 ? '#ffdd66' : '#ff7777',
-        fontFamily: FONT_FAMILY,
-      }).setOrigin(0.5).setDepth(500);
-      void popTextOrIcon({
-        scene: this,
-        target: text,
-        duration: 1500,
-        riseY: 22,
-        scale: 1.2,
-        reducedMotion,
-      });
-      // Emit income event for audio when coins increased
-      try {
-        if (delta > 0) {
-          try { this.gameEvents?.emit('income-gained', { amount: delta }); } catch (_) {}
-        }
-      } catch (_) {}
-    }
-
-    if (reputation !== this.previousReputation) {
-      const delta = reputation - this.previousReputation;
-      const text = this.add.text(repX, hudY - 6, `${delta > 0 ? '+' : ''}${delta}`, {
-        fontSize: '16px',
-        fontStyle: 'bold',
-        color: delta >= 0 ? '#99ccff' : '#ff8899',
-        fontFamily: FONT_FAMILY,
-      }).setOrigin(0.5).setDepth(500);
-      void popTextOrIcon({
-        scene: this,
-        target: text,
-        duration: 1500,
-        riseY: 22,
-        scale: 1.2,
-        reducedMotion,
-      });
-    }
-
-    this.previousCoins = coins;
-    this.previousReputation = reputation;
+  public animateHudValueChanges(...args: any[]): any {
+    return (this.msAnimator as any).animateHudValueChanges.apply(this.msAnimator, args);
   }
 
-  public getMarketCardCenter(row: 'business' | 'investments', slotIndex: number): { x: number; y: number } | null {
-    if (slotIndex < 0) return null;
-    const rowTop = row === 'business'
-      ? this.layout.marketTop + 6
-      : this.layout.marketTop + 6 + this.layout.marketRowH + this.layout.marketRowGap;
-    const cardX = this.layout.marketLabelW + 50 + slotIndex * (this.layout.marketCardW + this.layout.marketCardGap);
-    return {
-      x: cardX + this.layout.marketCardW / 2,
-      y: rowTop + this.layout.marketCardH / 2,
-    };
+  public getMarketCardCenter(...args: any[]): any {
+    return (this.msAnimator as any).getMarketCardCenter.apply(this.msAnimator, args);
   }
 
-  public getStreetSlotCenter(slotIndex: number): { x: number; y: number } {
-    const col = slotIndex % this.layout.streetCols;
-    const row = Math.floor(slotIndex / this.layout.streetCols);
-    const x = this.layout.streetX + col * (this.layout.slotW + this.layout.slotGap) + this.layout.slotW / 2;
-    const y = this.layout.streetTop + row * (this.layout.slotH + this.layout.streetRowGap) + this.layout.slotH / 2;
-    return { x, y };
+  public getStreetSlotCenter(...args: any[]): any {
+    return (this.msAnimator as any).getStreetSlotCenter.apply(this.msAnimator, args);
   }
 
-  public getHandCardCenter(): { x: number; y: number } {
-    return {
-      x: this.layout.handX + this.layout.handCardW / 2,
-      y: this.layout.handY + this.layout.handCardH / 2,
-    };
+  public getHandCardCenter(...args: any[]): any {
+    return (this.msAnimator as any).getHandCardCenter.apply(this.msAnimator, args);
   }
 
-  public createTransferCardVisual(
-    cardId: string,
-    family: 'business' | 'event' | 'upgrade',
-    atX: number,
-    atY: number,
-  ): Phaser.GameObjects.GameObject & Phaser.GameObjects.Components.Transform {
-    // If cards are currently rendered as DOM SVGs, render transfer visual as DOM too
-    // so it can layer above table cards consistently.
-    const templateId = this.templateIdFromCardId(cardId);
-    const svgText = this.cardSvgSources.get(templateId);
-    if (this.svgDom && svgText) {
-      const domId = `ms_dom_transfer_${cardId}_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
-      return this.svgDom.createOrUpdate(
-        domId,
-        svgText,
-        atX,
-        atY,
-        this.layout.marketCardW,
-        this.layout.marketCardH,
-        undefined,
-        10000,
-      ) as Phaser.GameObjects.GameObject & Phaser.GameObjects.Components.Transform;
-    }
-
-    const bgColor = family === 'business' ? 0x5a7f36 : family === 'upgrade' ? 0x6B4C9A : 0x8B4513;
-    const w = this.layout.marketCardW;
-    const h = this.layout.marketCardH;
-    const container = this.add.container(atX, atY);
-
-    const cardBg = this.add.rectangle(0, 0, w, h, bgColor, 0.95);
-    cardBg.setStrokeStyle(2, 0xffdd88, 0.9);
-    container.add(cardBg);
-
-    const title = CARD_TEMPLATE_NAMES.get(templateId) ?? cardId;
-    const titleText = this.add.text(0, -h * 0.18, title, {
-      fontSize: '12px',
-      fontStyle: 'bold',
-      color: '#ffffff',
-      fontFamily: FONT_FAMILY,
-      align: 'center',
-      wordWrap: { width: w - 10 },
-    }).setOrigin(0.5, 0.5);
-    container.add(titleText);
-
-    const subtitle = this.add.text(0, h * 0.22, family.toUpperCase(), {
-      fontSize: '10px',
-      color: '#ffeecc',
-      fontFamily: FONT_FAMILY,
-      align: 'center',
-    }).setOrigin(0.5, 0.5);
-    container.add(subtitle);
-
-    container.setDepth(10000);
-    return container;
+  public createTransferCardVisual(...args: any[]): any {
+    return (this.msAnimator as any).createTransferCardVisual.apply(this.msAnimator, args);
   }
 
-  public cleanupTransferAnimations(): void {
-    for (const tween of this.activeTransferTweens) {
-      tween.stop();
-    }
-    this.activeTransferTweens.clear();
-
-    for (const visual of this.activeTransferVisuals) {
-      visual.destroy();
-    }
-    this.activeTransferVisuals.clear();
-    this.hiddenTransferSourceCardIds.clear();
+  public cleanupTransferAnimations(...args: any[]): any {
+    return (this.msAnimator as any).cleanupTransferAnimations.apply(this.msAnimator, args);
   }
 
-  public animateTransferFromMarket(options: {
-    cardId: string;
-    family: 'business' | 'event' | 'upgrade';
-    row: 'business' | 'investments';
-    slotIndex: number;
-    destination: { x: number; y: number };
-  }): Promise<void> {
-    if (this.settingsPanel?.reducedMotion) return Promise.resolve();
-
-    const source = this.getMarketCardCenter(options.row, options.slotIndex);
-    if (!source) return Promise.resolve();
-
-    const visual = this.createTransferCardVisual(options.cardId, options.family, source.x, source.y);
-    this.activeTransferVisuals.add(visual);
-    this.transferAnimationCount += 1;
-
-    return new Promise((resolve) => {
-      // Choose SFX based on family/type of transfer
-      const sfxForFamily = (family: string) => {
-        if (family === 'event') {
-          return { start: SFX_KEYS.EVENT_CHEER, move: SFX_KEYS.MOVE_LOOP, end: SFX_KEYS.EVENT_CHEER, moveIntervalMs: 1500 };
-        }
-        if (family === 'upgrade') {
-          return { start: SFX_KEYS.UPGRADE_START, move: SFX_KEYS.MOVE_LOOP, end: SFX_KEYS.UPGRADE_END, moveIntervalMs: 1500 };
-        }
-        return { start: SFX_KEYS.BUSINESS_START, move: SFX_KEYS.MOVE_LOOP, end: SFX_KEYS.BUSINESS_END, moveIntervalMs: 1500 };
-      };
-
-      const sfx = sfxForFamily(options.family);
-
-      const tween = moveGameObject({
-        scene: this,
-        target: visual,
-        destX: options.destination.x,
-        destY: options.destination.y,
-        duration: 1500,
-        ease: 'Cubic.easeInOut',
-        soundManager: this.soundManager,
-        sfx,
-        onComplete: () => {
-          this.activeTransferTweens.delete(tween);
-          this.activeTransferVisuals.delete(visual);
-          visual.destroy();
-          resolve();
-        },
-      });
-
-      this.activeTransferTweens.add(tween);
-    });
+  public animateTransferFromMarket(...args: any[]): any {
+    return (this.msAnimator as any).animateTransferFromMarket.apply(this.msAnimator, args);
   }
 
   // ── Challenge Tracker ───────────────────────────────────
