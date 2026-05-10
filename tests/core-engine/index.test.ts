@@ -25,6 +25,9 @@ import {
   shortestPath,
   pathExists,
   computeAdjacencyBonus,
+  makeTextureKey,
+  rasteriseSvgToTexture,
+  getOrCreateTexture,
 } from '../../src/core-engine/index';
 
 describe('core-engine barrel exports', () => {
@@ -82,6 +85,12 @@ describe('core-engine barrel exports', () => {
     expect(typeof shortestPath).toBe('function');
     expect(typeof pathExists).toBe('function');
     expect(typeof computeAdjacencyBonus).toBe('function');
+  });
+
+  it('should export SVG helper functions', () => {
+    expect(typeof makeTextureKey).toBe('function');
+    expect(typeof rasteriseSvgToTexture).toBe('function');
+    expect(typeof getOrCreateTexture).toBe('function');
   });
 
   it('should work end-to-end through barrel exports', () => {

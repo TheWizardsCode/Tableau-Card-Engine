@@ -31,6 +31,11 @@ import { TranscriptStore } from '../../../src/core-engine/TranscriptStore';
 import { autoSaveTranscript } from '../../../src/core-engine/autoSaveTranscript';
 import type { EventSoundMapping } from '../../../src/core-engine/SoundManager';
 import {
+  markSceneValid,
+  markSceneInvalid,
+  rasteriseSvgToTexture,
+} from '../../../src/core-engine';
+import {
   CardGameScene,
   GAME_W, GAME_H, FONT_FAMILY,
   createOverlayBackground, createOverlayButton, createOverlayMenuButton,
@@ -45,6 +50,13 @@ import helpContent from '../help-content.json';
 // ── Constants ───────────────────────────────────────────────
 
 const ANIM_DURATION = 300;      // ms for card pick animation
+
+const SUSHI_ICON_FILES = [
+  'icon-nigiri-salmon.svg', 'icon-nigiri-egg.svg', 'icon-nigiri-squid.svg',
+  'icon-maki-1.svg', 'icon-maki-2.svg', 'icon-maki-3.svg',
+  'icon-tempura.svg', 'icon-sashimi.svg', 'icon-dumpling.svg',
+  'icon-wasabi.svg', 'icon-pudding.svg', 'icon-chopsticks.svg',
+] as const;
 
 // Layout regions
 const HAND_Y = 600;             // center Y for hand cards
@@ -177,17 +189,10 @@ export class SushiGoScene extends CardGameScene {
     this.load.audio(SFX_KEYS.SCORE_REVEAL, 'assets/audio/score-reveal.wav');
     this.load.audio(SFX_KEYS.UI_CLICK, 'assets/audio/ui-click.wav');
 
-    // Sushi Go icon assets: preload all icon files present in public/assets/sushi-go
-    // We list the known filenames here to avoid dynamic FS lookups at runtime.
-    const icons = [
-      'icon-nigiri-salmon.svg', 'icon-nigiri-egg.svg', 'icon-nigiri-squid.svg',
-      'icon-maki-1.svg', 'icon-maki-2.svg', 'icon-maki-3.svg',
-      'icon-tempura.svg', 'icon-sashimi.svg', 'icon-dumpling.svg',
-      'icon-wasabi.svg', 'icon-pudding.svg', 'icon-chopsticks.svg',
-    ];
-    for (const fn of icons) {
-      const key = fn.replace(/\.svg$/, '');
-      this.load.svg(key, `assets/sushi-go/${fn}`);
+    // Preload raw SVG text and rasterise with shared core helpers in create().
+    for (const filename of SUSHI_ICON_FILES) {
+      const key = filename.replace(/\.svg$/, '');
+      this.load.text(`svg:${key}`, `assets/sushi-go/${filename}`);
     }
   }
 
@@ -195,6 +200,14 @@ export class SushiGoScene extends CardGameScene {
 
   create(): void {
     this.cameras.main.setBackgroundColor('#1a2a3a');
+    markSceneValid(this);
+
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      markSceneInvalid(this);
+    });
+    this.events.once(Phaser.Scenes.Events.DESTROY, () => {
+      markSceneInvalid(this);
+    });
 
     // Reset state
     this.phaseManager = new PhaseManager<TurnPhase>({
@@ -281,10 +294,14 @@ export class SushiGoScene extends CardGameScene {
     this.initHelpPanel(helpContent as HelpSection[]);
     this.initSettingsPanel();
 
-    // Initial render
-    this.refreshAll();
-    this.phaseManager.setTextObject(this.instructionText);
-    this.phaseManager.set('picking');
+    // Initial render after SVG icon rasterisation is complete.
+    // This keeps texture existence deterministic for browser tests and avoids
+    // transient text-only cards on first frame.
+    void this.ensureIconTextures().finally(() => {
+      this.refreshAll();
+      this.phaseManager.setTextObject(this.instructionText);
+      this.phaseManager.set('picking');
+    });
 
     // Keyboard: Escape cancels chopsticks mode
     this.input.keyboard?.on('keydown-ESC', () => {
@@ -373,6 +390,28 @@ export class SushiGoScene extends CardGameScene {
     this.handContainer = this.add.container(0, 0);
     this.playerTableauContainer = this.add.container(0, 0);
     this.aiTableauContainer = this.add.container(0, 0);
+  }
+
+  private async ensureIconTextures(): Promise<void> {
+    const rasterJobs: Promise<void>[] = [];
+
+    for (const filename of SUSHI_ICON_FILES) {
+      const iconKey = filename.replace(/\.svg$/, '');
+      if (this.textures.exists(iconKey)) {
+        continue;
+      }
+
+      const svgText = this.cache.text.get(`svg:${iconKey}`) as string | undefined;
+      if (!svgText) {
+        continue;
+      }
+
+      rasterJobs.push(rasteriseSvgToTexture(this, iconKey, svgText, 128, 128));
+    }
+
+    if (rasterJobs.length > 0) {
+      await Promise.all(rasterJobs);
+    }
   }
 
   // ── Card rendering helpers ──────────────────────────────

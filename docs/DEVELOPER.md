@@ -15,6 +15,7 @@ This document covers everything you need to develop, test, and build the Tableau
 - [Transcript Persistence](#transcript-persistence)
 - [Replay Tool](#replay-tool)
 - [Managing Assets](#managing-assets)
+- [SVG Rendering & Migration](#svg-rendering--migration)
 - [Keeping Docs Up to Date](#keeping-docs-up-to-date)
 - [Work-Item Tracking](#work-item-tracking)
 - [Troubleshooting](#troubleshooting)
@@ -843,6 +844,52 @@ npx vitest run --project unit tests/e2e/replay-main-street.e2e.test.ts tests/e2e
 **When to regenerate thumbnails:**
 
 Thumbnails are static assets. Regenerate them when a game's visual appearance changes significantly. Use `scripts/refresh-thumbnails.sh` to regenerate all thumbnails at once, or use the individual commands above for a single game.
+
+## SVG Rendering & Migration
+
+The engine now provides shared SVG raster helpers from `src/core-engine/SvgHelpers.ts` (exported via `src/core-engine/index.ts`).
+
+### Recommended scene pattern
+
+1. Preload SVG source text (not `this.load.svg`) so you can rasterise through shared helpers:
+
+```ts
+this.load.text('svg:icon-tempura', 'assets/sushi-go/icon-tempura.svg');
+```
+
+2. Mark scene validity during lifecycle:
+
+```ts
+import { markSceneValid, markSceneInvalid } from '@core-engine/index';
+
+markSceneValid(this);
+this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => markSceneInvalid(this));
+this.events.once(Phaser.Scenes.Events.DESTROY, () => markSceneInvalid(this));
+```
+
+3. Generate textures lazily or in a preload-to-render bridge:
+
+```ts
+import { makeTextureKey, getOrCreateTexture, rasteriseSvgToTexture } from '@core-engine/index';
+
+const svgText = this.cache.text.get('svg:icon-tempura') as string;
+const key = makeTextureKey('icon-tempura', 128, 128, window.devicePixelRatio || 1);
+
+// Option A: fully explicit
+await rasteriseSvgToTexture(this, key, svgText, 128, 128);
+
+// Option B: lazy helper
+const texture = getOrCreateTexture(this, 'icon-tempura', svgText, 128, 128);
+if (!texture.ready && texture.promise) await texture.promise;
+```
+
+### Migration checklist
+
+- Replace direct `this.load.svg(...)` calls in scenes with `this.load.text(...)` for SVG source text.
+- Import shared helpers from `src/core-engine` (`markSceneValid`, `markSceneInvalid`, `makeTextureKey`, `rasteriseSvgToTexture`, `getOrCreateTexture`).
+- Ensure scene lifecycle invalidates helper operations on shutdown/destroy.
+- Add or update browser smoke tests with pixel-sample assertions (non-solid texture checks).
+- Keep per-test runtime at or below 10 seconds for SVG smoke checks.
 
 ## Keeping Docs Up to Date
 

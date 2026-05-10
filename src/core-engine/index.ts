@@ -149,3 +149,13 @@ export {
   pathExists,
   computeAdjacencyBonus,
 } from './SpatialRules';
+
+// Shared SVG rasterisation helpers (CG-0MOZNXU4Y0043NR3)
+export {
+  markSceneValid,
+  markSceneInvalid,
+  fetchSvgText,
+  makeTextureKey,
+  rasteriseSvgToTexture,
+  getOrCreateTexture,
+} from './SvgHelpers';
