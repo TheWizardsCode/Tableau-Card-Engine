@@ -1,46 +1,16 @@
-/**
- * MainStreetScene -- the main Phaser scene for Main Street.
- *
- * Implements a minimal walking-skeleton UI:
- *   - 10-slot street grid (placeholder rectangles colored by synergy)
- *   - Market display (business, event, upgrade rows)
- *   - Resource bank HUD (coins, reputation, score)
- *   - Turn / phase indicator
- *   - Click-to-buy flow (select card -> select empty slot for businesses)
- *   - End Turn button to advance through remaining phases
- *   - Hint button (1 use per turn) that highlights the Greedy AI's recommended move
- *   - Game-over overlay with score and replay/menu buttons
- *   - Help panel and settings integration
- */
-
-import type { MainStreetState } from '../MainStreetState';
-import { setupMainStreetGame, deserializeMainStreetState } from '../MainStreetState';
+import type { MainStreetState, MainStreetCampaignProgress } from '../MainStreetState';
 import type { DifficultyName } from '../MainStreetDifficulty';
-import { DIFFICULTY_NAMES } from '../MainStreetDifficulty';
 import type { BusinessCard } from '../MainStreetCards';
 import {
   INCIDENT_QUEUE_SIZE,
 } from '../MainStreetCards';
 import {
   CardGameScene,
-  createSingleSelectionManager,
   TooltipManager,
 } from '../../../src/ui';
 import type { SelectionController, SingleSelectionManager } from '../../../src/ui';
-import { createTfPlayer } from '../../../src/core-engine';
-import { MAIN_STREET_TF_SFX_MAPPING } from '../sfx-tf-mapping';
-import { getMainStreetTfModule, loadMainStreetTfModule } from '../tf/mainStreetTfModule';
-import type { HelpSection } from '../../../src/ui';
 import { SaveLoadStore } from '../../../src/core-engine';
-import type { MainStreetCampaignProgress } from '../MainStreetState';
-import {
-  createDefaultCampaignProgress,
-  loadCampaignProgress,
-  updateCampaignAfterRun,
-} from '../MainStreetSaveLoad';
 import { UndoRedoManager } from '../../../src/core-engine';
-import { MainStreetTranscriptRecorder, setMainStreetRecorder } from '../MainStreetTranscript';
-import { markSceneValid, markSceneInvalid } from '../../../src/core-engine';
 import { SvgDomRenderer } from './SvgDomRenderer';
 import { MainStreetRenderer } from './MainStreetRenderer';
 import { MainStreetAnimator } from './MainStreetAnimator';
@@ -48,14 +18,11 @@ import { MainStreetTurnController } from './MainStreetTurnController';
 import { MainStreetOverlayManager } from './MainStreetOverlayManager';
 import { MainStreetInputManager } from './MainStreetInputManager';
 import { MainStreetSvgTextureManager } from './MainStreetSvgTextureManager';
+import { MainStreetLifecycleManager } from './MainStreetLifecycleManager';
 import {
-  BG_COLOR,
   type SceneLayout,
-  SFX_KEYS,
   STREET_ROWS,
 } from './MainStreetConstants';
-
-// ── UI Phase (scene-level interaction state) ────────────────
 
 type UIPhase =
   | 'idle'               // Waiting for DayStart
@@ -63,8 +30,6 @@ type UIPhase =
   | 'placing-business'   // Player selected a business card, picking a slot
   | 'animating'          // Brief pause for feedback
   | 'game-over';         // Final overlay
-
-// ── Scene ───────────────────────────────────────────────────
 
 export class MainStreetScene extends CardGameScene {
   public tooltipManager?: TooltipManager;
@@ -74,6 +39,7 @@ export class MainStreetScene extends CardGameScene {
   public msOverlayManager!: MainStreetOverlayManager;
   public msInputManager!: MainStreetInputManager;
   public msSvgTextureManager!: MainStreetSvgTextureManager;
+  public msLifecycleManager!: MainStreetLifecycleManager;
   // Game state
   public state!: MainStreetState;
   public uiPhase: UIPhase = 'idle';
@@ -150,6 +116,7 @@ export class MainStreetScene extends CardGameScene {
 
   constructor() {
     super({ key: 'MainStreetScene' });
+    this.msLifecycleManager = new MainStreetLifecycleManager(this);
   }
 
   /** Stores raw SVG text for each card template (fetched in preload, used for lazy rasterisation). */
@@ -161,267 +128,13 @@ export class MainStreetScene extends CardGameScene {
   public svgDom?: SvgDomRenderer;
 
   // Preload placeholder SVG used for visual scale testing in the market
-  preload(): void {
-    // Canonical card size for Main Street market placeholder (140x80)
-    try {
-      // Load placeholder as an image to avoid Phaser's SVGFile XML parsing in some environments.
-      // Phaser's svg loader parses and manipulates the SVG XML during onProcess which
-      // can cause DOMParser issues in headless/browser test harnesses. We therefore
-      // load the SVG via the image loader which treats it as an image resource.
-      this.load.image('ms_placeholder_card', 'assets/games/main-street/svg/placeholder-card.svg');
-
-      // Preload Main Street audio assets (small, CC0-generated SFX and a short loop)
-      try {
-        const audioDir = 'assets/games/main-street/audio';
-        this.load.audio(SFX_KEYS.DEAL, `${audioDir}/deal.wav`);
-        this.load.audio(SFX_KEYS.MOVE_LOOP, `${audioDir}/deal.wav`);
-        this.load.audio(SFX_KEYS.PLACE, `${audioDir}/place.wav`);
-        this.load.audio(SFX_KEYS.DISCARD, `${audioDir}/discard.wav`);
-        this.load.audio(SFX_KEYS.COIN_POP, `${audioDir}/coin-pop.wav`);
-        this.load.audio(SFX_KEYS.CLICK, `${audioDir}/click.wav`);
-        this.load.audio(SFX_KEYS.BG_LOOP, `${audioDir}/loop.wav`);
-        this.load.audio(SFX_KEYS.BUSINESS_START, `${audioDir}/deal.wav`);
-        this.load.audio(SFX_KEYS.BUSINESS_END, `${audioDir}/place.wav`);
-        this.load.audio(SFX_KEYS.UPGRADE_START, `${audioDir}/click.wav`);
-        this.load.audio(SFX_KEYS.UPGRADE_END, `${audioDir}/place.wav`);
-        this.load.audio(SFX_KEYS.EVENT_CHEER, `${audioDir}/coin-pop.wav`);
-      } catch (e) {
-        // Some test environments may lack an audio loader; ignore preload failures
-      }
-
-      // Fetch all per-card SVG assets as text for dynamic rasterisation at display size.
-      // We do not pre-load them as textures - we lazily rasterise them at exact pixel
-      // dimensions needed for crisp rendering on the current screen/DPR.
-      this.msSvgTextureManager = this.msSvgTextureManager ?? new MainStreetSvgTextureManager(this);
-      this.msSvgTextureManager.loadCardSvgSources();
-    } catch (e) {
-      // If svg loader is unavailable in the current environment, ignore
-      // eslint-disable-next-line no-console
-      console.debug('[MS] preload: svg load failed', e);
-    }
+  public preload(...args: any[]): any {
+    return (this.msLifecycleManager as any).preload.apply(this.msLifecycleManager, args);
   }
 
   // ── Create ──────────────────────────────────────────────
-
-  create(): void {
-    markSceneValid(this);
-    this.cameras.main.setBackgroundColor(BG_COLOR);
-
-    // Ensure placeholder texture exists. Some test environments have trouble
-    // loading SVGs as images. Generate a simple placeholder texture at runtime
-    // if it's not already present in the Texture Manager.
-    try {
-      if (!this.textures.exists('ms_placeholder_card')) {
-        const g = this.add.graphics();
-        // Background
-        g.fillStyle(0xf5efe6, 1);
-        g.fillRoundedRect(0, 0, 140, 80, 6);
-        g.lineStyle(2, 0xc8b79a, 1);
-        g.strokeRoundedRect(0, 0, 140, 80, 6);
-        // Badge circle
-        g.fillStyle(0xe0c7a0, 1);
-        g.fillCircle(118, 56, 12);
-        // Render into texture
-        g.generateTexture('ms_placeholder_card', 140, 80);
-        g.destroy();
-      }
-    } catch (e) {
-      // Non-fatal: if texture generation fails let the scene continue
-      // and fall back to colored rectangles.
-      // eslint-disable-next-line no-console
-      console.debug('[MS] placeholder generation failed', e);
-    }
-
-    // Initialize helpers needed during reset and early lifecycle callbacks
-    this.msAnimator = new MainStreetAnimator(this);
-    this.msTurnController = new MainStreetTurnController(this);
-    this.msOverlayManager = new MainStreetOverlayManager(this);
-    this.msInputManager = new MainStreetInputManager(this);
-    this.msSvgTextureManager = new MainStreetSvgTextureManager(this);
-
-    // Reset
-    this.uiPhase = 'idle';
-    this.pendingBusinessCard = null;
-    this.overlayObjects = [];
-    this.previousCoins = null;
-    this.previousReputation = null;
-    this.pendingBusinessSourceIndex = null;
-    this.transferAnimationCount = 0;
-    this.cleanupTransferAnimations();
-    this.hiddenTransferSourceCardIds.clear();
-
-    // Reset hint state
-    this.hintUsedThisTurn = false;
-    this.hintedCardId = null;
-    this.hintedSlotIndex = null;
-
-    this.marketSelectionByCardId.clear();
-    this.selectedMarketCardId = null;
-    this.marketSelectionManager?.destroy();
-    this.marketSelectionManager = createSingleSelectionManager(this);
-
-    // Reset activity-log panel state in case this scene instance is restarted.
-    this.logScrollOffset = 0;
-    this.logMaxScroll = 0;
-    this.logTotalContentH = 0;
-    this.logAutoScroll = true;
-    this.logPrevEntryCount = 0;
-
-    this.detectReplayMode();
-    this.initEventSystem();
-
-    // Sound (re-use existing audio assets)
-    // Register Main Street SFX and map common events to logical sound keys.
-    // The mapping uses common engine events; scenes can emit these events
-    // via `this.gameEvents.emit(...)` to trigger audio feedback.
-    const mapping = {
-      'ui-interaction': SFX_KEYS.CLICK,
-      'card-drawn': SFX_KEYS.DEAL,
-      'card:placed': SFX_KEYS.PLACE,
-      'card-discarded': SFX_KEYS.DISCARD,
-      // income-gained is an example domain event emitted when coins are earned
-      'income-gained': SFX_KEYS.COIN_POP,
-    } as const;
-
-    const tfModule = getMainStreetTfModule();
-    const tfPlayer = tfModule
-      ? createTfPlayer(tfModule)
-      : null;
-
-    this.initSoundSystem(Object.values(SFX_KEYS), mapping, {
-      synthPlayer: tfPlayer,
-      synthKeyMap: MAIN_STREET_TF_SFX_MAPPING,
-    });
-
-    // Late async tf module load (runtime-generated module path) without restart.
-    void loadMainStreetTfModule().then((loadedModule) => {
-      if (!loadedModule || !this.soundManager) return;
-      this.soundManager.setSynthIntegration(
-        createTfPlayer(loadedModule),
-        MAIN_STREET_TF_SFX_MAPPING,
-      );
-    });
-
-    // Game setup -- load campaign for tier-filtered deck building
-    this.saveStore = new SaveLoadStore();
-    this.loadCampaignAndSetup();
-
-    // Undo/Redo manager (per-scene)
-    this.undoManager = new UndoRedoManager();
-
-    // Transcript recorder (optional) — attach global recorder so other modules
-    // (AI, Monte Carlo runner) can emit events without direct wiring.
-    try {
-      const initialSnapshot = { seed: this.state.seed ?? null, snapshotAtTurn: this.state.turn };
-      const recorder = new MainStreetTranscriptRecorder(initialSnapshot);
-      setMainStreetRecorder(recorder);
-    } catch (_) {
-      // ignore if recorder cannot be created
-    }
-
-    // UI scaffolding
-    this.msRenderer = new MainStreetRenderer(this);
-    this.msAnimator = new MainStreetAnimator(this);
-    this.msTurnController = new MainStreetTurnController(this);
-    this.msOverlayManager = new MainStreetOverlayManager(this);
-    this.msInputManager = new MainStreetInputManager(this);
-    this.msSvgTextureManager = new MainStreetSvgTextureManager(this);
-    this.layout = this.computeLayout();
-    this.svgDebugEnabled = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('msSvgDebug') === '1';
-    // Prewarm SVG textures once all SVG sources are loaded.
-    // Until then the scene uses fallback cards; then we refresh with SVG textures.
-    void this.cardSvgLoadPromise
-      .then(() => this.prewarmVisibleCardTextures())
-      .then(() => {
-        try {
-          if (this && this.hudContainer && (this as any).game?.renderer) {
-            this.refreshAll();
-          }
-        } catch {
-          // Ignore errors - scene may have been destroyed
-        }
-      });
-    this.createHeader();
-    this.createContainers();
-    this.createInstructions();
-    this.initSvgDebugOverlay();
-
-    // DOM renderer for SVGs
-    try {
-      this.svgDom = new SvgDomRenderer(this);
-    } catch {
-      this.svgDom = undefined;
-    }
-
-    this.scale.off(Phaser.Scale.Events.RESIZE, this.handleResize, this);
-    this.scale.on(Phaser.Scale.Events.RESIZE, this.handleResize, this);
-
-    // Help panel
-    const helpSections: HelpSection[] = [
-      {
-        heading: 'How to Play',
-        body:
-          'Buy businesses from the market and place them on the street grid.\n' +
-          'Adjacent businesses with matching synergy types earn bonus income.\n' +
-          'Buy upgrades to improve existing businesses.\n' +
-          'Buy Investment events and play them for one-time effects.\n' +
-          'Complete challenges for bonus points.\n' +
-          'Earn coins and reputation each turn to reach the score threshold.',
-      },
-      {
-        heading: 'Challenges',
-        body:
-          `Each run selects ${this.state.config.challengesPerRun} random challenges for you to complete.\n` +
-          'Challenges have goals like earning coins, placing businesses,\n' +
-          'or building synergy combos. Progress is checked at the end of\n' +
-          'each turn -- once completed, a challenge stays completed.\n' +
-          `Each completed challenge adds ${this.state.config.challengeBonusPoints} bonus points to your score.\n` +
-          `Complete all ${this.state.config.challengesPerRun} challenges to win immediately!\n` +
-          'Track your progress in the challenge panel at the bottom.',
-      },
-      {
-        heading: 'Events',
-        body:
-          'Investment events (brown) can be purchased from the Investments row\n' +
-          'and held in your hand (max 1 at a time). Click the held card in\n' +
-          'your hand (bottom-left) to play it for a one-time effect.\n' +
-          'Held events persist across turns until you choose to play them.\n' +
-          'Incident events (blue) appear in the Upcoming Incidents queue and\n' +
-          'trigger automatically at the end of each turn -- plan around them!\n' +
-          'Check the Activity Log to see what events fired and their effects.',
-      },
-      {
-        heading: 'Synergy Types',
-        body:
-          'Food (orange) -- restaurants, cafes\n' +
-          'Culture (blue) -- galleries, theaters\n' +
-          'Commerce (green) -- shops, services\n' +
-          'Service (purple) -- salons, clinics\n' +
-          'Entertainment (red) -- cinemas, arcades',
-      },
-      {
-        heading: 'Win / Loss',
-        body:
-          `Reach ${this.state.config.winThreshold} points to win (coins + reputation*${this.state.config.reputationScoreMultiplier} + challenges*${this.state.config.challengeBonusPoints}).\n` +
-          `Complete all ${this.state.config.challengesPerRun} challenges for an instant win.\n` +
-          `Survive ${this.state.config.maxTurns} turns with positive reputation for a turn-limit victory.\n` +
-          'Bankruptcy (coins < 0) or reputation collapse (rep <= 0 after turn 1) loses.',
-      },
-    ];
-    this.initHelpPanel(helpSections);
-    // Provide the ordered difficulty names so the Settings panel can render a selector
-    this.initSettingsPanel(DIFFICULTY_NAMES);
-    if (!this.replayMode) {
-      this.tooltipManager = new TooltipManager(this, this.settingsPanel);
-    }
-
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      markSceneInvalid(this);
-      this.cleanupTransferAnimations();
-    });
-
-    // Start first turn
-    this.startDayPhase();
+  public create(...args: any[]): any {
+    return (this.msLifecycleManager as any).create.apply(this.msLifecycleManager, args);
   }
 
   // ── Header ──────────────────────────────────────────────
@@ -465,15 +178,8 @@ export class MainStreetScene extends CardGameScene {
   public updateSvgDebugOverlay(...args: any[]): any {
     return (this.msInputManager as any).updateSvgDebugOverlay.apply(this.msInputManager, args);
   }
-
-  public handleResize(): void {
-    this.layout = this.computeLayout();
-    // Regenerate textures at new sizes on resize
-    this.prewarmVisibleCardTextures();
-    this.challengeContainer.setPosition(this.layout.challengeX, this.layout.challengeY);
-    this.logContainer.setPosition(this.layout.logX, this.layout.logY);
-    this.instructionText.setPosition(this.layout.gameW - 24, this.layout.instructionY);
-    this.refreshAll();
+  public handleResize(...args: any[]): any {
+    return (this.msLifecycleManager as any).handleResize.apply(this.msLifecycleManager, args);
   }
 
   // ── Campaign / Meta-Progression ─────────────────────────
@@ -483,45 +189,8 @@ export class MainStreetScene extends CardGameScene {
    * with tier-filtered decks. Campaign loading is async but the scene
    * continues with default progress if the load is still pending.
    */
-  public loadCampaignAndSetup(): void {
-    // Synchronously set up with defaults first (so UI can render immediately)
-    this.campaign = createDefaultCampaignProgress();
-    // If a persisted difficulty exists in the SettingsPanel, prefer that for new games.
-    try {
-      const persisted = (this.settingsPanel?.selectedDifficulty) as unknown as string | undefined;
-      if (persisted && DIFFICULTY_NAMES.includes(persisted as any)) {
-        this.selectedDifficulty = persisted as any;
-      }
-    } catch {
-      // ignore
-    }
-
-    this.state = setupMainStreetGame({
-      difficulty: this.selectedDifficulty,
-      unlockedCardIds: this.campaign.unlockedCardIds,
-    });
-
-    // Async: attempt to load saved campaign and re-setup if found
-    if (this.saveStore) {
-      loadCampaignProgress(this.saveStore).then((saved) => {
-        if (saved) {
-          this.campaign = saved;
-          // Re-setup with the loaded campaign's unlocked cards
-          this.state = setupMainStreetGame({
-            difficulty: this.selectedDifficulty,
-            unlockedCardIds: this.campaign.unlockedCardIds,
-          });
-          // Must call startDayPhase() (not just refreshAll) so the new
-          // state transitions from DayStart -> MarketPhase and the UI
-          // phase is synchronised.  Without this, the engine stays in
-          // DayStart while the UI shows market controls, blocking all
-          // player actions and causing End Turn to hang.
-          this.startDayPhase();
-        }
-      }).catch(() => {
-        // If load fails, continue with defaults (already set up above)
-      });
-    }
+  public loadCampaignAndSetup(...args: any[]): any {
+    return (this.msLifecycleManager as any).loadCampaignAndSetup.apply(this.msLifecycleManager, args);
   }
 
   /**
@@ -530,13 +199,8 @@ export class MainStreetScene extends CardGameScene {
    * Returns a Promise that resolves when the update is done (or
    * immediately if no campaign / store is available).
    */
-  public updateCampaignProgress(): Promise<void> {
-    if (!this.campaign || !this.saveStore) return Promise.resolve();
-    return updateCampaignAfterRun(this.campaign, this.state, this.saveStore)
-      .then(() => {})  // discard the returned campaign (already mutated in place)
-      .catch(() => {
-        // Silently ignore save failures -- campaign will be retried next run
-      });
+  public updateCampaignProgress(...args: any[]): any {
+    return (this.msLifecycleManager as any).updateCampaignProgress.apply(this.msLifecycleManager, args);
   }
 
   // ── Day flow ────────────────────────────────────────────
@@ -824,43 +488,8 @@ export class MainStreetScene extends CardGameScene {
    * Accepts either the engine's serialized state shape (MainStreetSerializedState)
    * or a minimal snapshot containing a `seed` and optional `turn`.
    */
-  public loadBoardState(state: any): void {
-    if (!this.replayMode) {
-      throw new Error('loadBoardState() is only available in replay mode (?mode=replay)');
-    }
-
-    try {
-      // If the payload looks like a full serialized state, use the deserializer
-      if (state && state.config && typeof state.turn === 'number') {
-        this.state = deserializeMainStreetState(state);
-      } else if (state && state.initialState) {
-        // Some transcripts embed initialState under a wrapper
-        this.state = deserializeMainStreetState(state.initialState as any);
-      } else if (state && state.seed) {
-        // Minimal snapshot: create a fresh game from the seed
-        this.state = setupMainStreetGame({ seed: state.seed, difficulty: this.selectedDifficulty });
-        if (typeof state.turn === 'number') {
-          this.state.turn = state.turn;
-        }
-      } else {
-        // Fallback: generate a default game
-        this.state = setupMainStreetGame({ difficulty: this.selectedDifficulty });
-      }
-    } catch (e) {
-      // On error, fall back to a default setup so replay can continue
-      console.error('[MS] loadBoardState deserialise failed:', e);
-      this.state = setupMainStreetGame({ difficulty: this.selectedDifficulty });
-    }
-
-    // Refresh visuals to reflect the injected state
-    this.refreshAll();
-
-    // If a stepIndex or turn was provided, use it; otherwise use current turn
-    const step = state && (state.stepIndex ?? state.turn ?? null);
-    const stepIdx = typeof step === 'number' ? step : this.state.turn;
-
-    // Signal board is visually stable
-    this.emitStateSettled(stepIdx, 'playing');
+  public loadBoardState(...args: any[]): any {
+    return (this.msLifecycleManager as any).loadBoardState.apply(this.msLifecycleManager, args);
   }
 
   // ── Game Over Overlay ───────────────────────────────────
