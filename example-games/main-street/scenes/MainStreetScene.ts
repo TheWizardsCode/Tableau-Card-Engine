@@ -1987,6 +1987,11 @@ export class MainStreetScene extends CardGameScene {
 
     if (!this.replayMode) {
       try {
+        // If an SvgDomRenderer exists we intentionally avoid adding any
+        // Phaser fallback display objects for the held card. Tests may
+        // provide a mock `svgDom.createOrUpdate` which returns undefined
+        // but still counts as the DOM renderer being present. In that
+        // case we still should not add a Phaser fallback rectangle.
         const node = (domEl as any)?.node as HTMLElement | null;
         if (node) {
           node.addEventListener('mouseenter', () => {
@@ -1994,17 +1999,18 @@ export class MainStreetScene extends CardGameScene {
             this.tooltipManager?.show(info, container.x, container.y);
           });
           node.addEventListener('mouseleave', () => this.tooltipManager?.hide());
+
+          if (this.uiPhase === 'market') {
+            node.addEventListener('click', () => this.onPlayHeldEvent());
+          }
         }
       } catch (e) { /* ignore */ }
 
-      const hover = this.add.rectangle(0, 0, handCardW, handCardH, 0x000000, 0.001);
-      hover.setInteractive({ useHandCursor: true });
-      hover.on('pointerover', () => {
-        const info = `Event: ${card.name}\nCost: ${card.cost}\nEffect: ${card.effect}`;
-        this.tooltipManager?.show(info, container.x, container.y);
-      });
-      hover.on('pointerout', () => this.tooltipManager?.hide());
-      container.add(hover);
+      // Whether or not domEl.node was present, if svgDom is available we
+      // do not add Phaser fallback visuals for the held hand slot. The
+      // DOM renderer (or test-provided mock) is expected to handle
+      // interactivity. Return early to avoid creating a Rectangle/Image.
+      return container;
     }
 
     return container;
