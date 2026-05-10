@@ -19,22 +19,15 @@ import type { DifficultyName } from '../MainStreetDifficulty';
 import { DIFFICULTY_NAMES } from '../MainStreetDifficulty';
 import type { BusinessCard, EventCard, UpgradeCard } from '../MainStreetCards';
 import {
-  GRID_SIZE,
-  synergyColor,
   CARD_TEMPLATE_NAMES,
-  MARKET_BUSINESS_SLOTS,
-  MARKET_INVESTMENT_SLOTS,
   INCIDENT_QUEUE_SIZE,
 } from '../MainStreetCards';
 import {
   executeDayStart,
   processEndOfTurn,
-  computeScore,
   type TurnResult,
 } from '../MainStreetEngine';
 import {
-  getAffordableBusinessCards,
-  getAffordableUpgradeCards,
   getEmptySlots,
   getUpgradeBranchesForBusiness,
   findTargetBusinessSlot,
@@ -49,7 +42,6 @@ import {
   dismissOverlay,
   popTextOrIcon,
   moveGameObject,
-  attachSelection,
   createSingleSelectionManager,
   TooltipManager,
 } from '../../../src/ui';
@@ -82,16 +74,6 @@ import { SvgDomRenderer } from './SvgDomRenderer';
 import { MainStreetRenderer } from './MainStreetRenderer';
 import {
   BG_COLOR,
-  BOX_FILL,
-  BOX_RADIUS,
-  BOX_STROKE,
-  CHALLENGE_LINE_H,
-  CHALLENGE_PAD,
-  CHALLENGE_TITLE_H,
-  LOG_COLORS,
-  LOG_FONT_SIZE,
-  LOG_LINE_H,
-  LOG_PAD,
   LOG_SCROLL_SPEED,
   LOG_TITLE_H,
   type SceneLayout,
@@ -111,93 +93,93 @@ type UIPhase =
 // ── Scene ───────────────────────────────────────────────────
 
 export class MainStreetScene extends CardGameScene {
-  private tooltipManager?: TooltipManager;
-  private msRenderer!: MainStreetRenderer;
+  public tooltipManager?: TooltipManager;
+  public msRenderer!: MainStreetRenderer;
   // Game state
-  private state!: MainStreetState;
-  private uiPhase: UIPhase = 'idle';
+  public state!: MainStreetState;
+  public uiPhase: UIPhase = 'idle';
 
   // Campaign / meta-progression
-  private campaign: MainStreetCampaignProgress | null = null;
-  private saveStore: SaveLoadStore | null = null;
+  public campaign: MainStreetCampaignProgress | null = null;
+  public saveStore: SaveLoadStore | null = null;
 
   // Selected difficulty (persisted across replays)
-  private selectedDifficulty: DifficultyName = 'Medium';
+  public selectedDifficulty: DifficultyName = 'Medium';
 
   // Pending selection for placing a business
-  private pendingBusinessCard: BusinessCard | null = null;
-  private pendingBusinessSourceIndex: number | null = null;
+  public pendingBusinessCard: BusinessCard | null = null;
+  public pendingBusinessSourceIndex: number | null = null;
 
   // Computed responsive layout metrics
-  private layout!: SceneLayout;
+  public layout!: SceneLayout;
 
   // Display containers
-  private hudContainer!: Phaser.GameObjects.Container;
-  private streetContainer!: Phaser.GameObjects.Container;
-  private marketContainer!: Phaser.GameObjects.Container;
-  private incidentQueueContainer!: Phaser.GameObjects.Container;
-  private handContainer!: Phaser.GameObjects.Container;
-  private actionContainer!: Phaser.GameObjects.Container;
+  public hudContainer!: Phaser.GameObjects.Container;
+  public streetContainer!: Phaser.GameObjects.Container;
+  public marketContainer!: Phaser.GameObjects.Container;
+  public incidentQueueContainer!: Phaser.GameObjects.Container;
+  public handContainer!: Phaser.GameObjects.Container;
+  public actionContainer!: Phaser.GameObjects.Container;
 
   // Activity Log panel
-  private logContainer!: Phaser.GameObjects.Container;
-  private logContentContainer!: Phaser.GameObjects.Container;
-  private logMaskGraphics: Phaser.GameObjects.Graphics | null = null;
-  private logContentMask: Phaser.Display.Masks.GeometryMask | null = null;
-  private logScrollOffset = 0;
-  private logMaxScroll = 0;
-  private logTotalContentH = 0;
-  private logAutoScroll = true;
-  private logPrevEntryCount = 0;
+  public logContainer!: Phaser.GameObjects.Container;
+  public logContentContainer!: Phaser.GameObjects.Container;
+  public logMaskGraphics: Phaser.GameObjects.Graphics | null = null;
+  public logContentMask: Phaser.Display.Masks.GeometryMask | null = null;
+  public logScrollOffset = 0;
+  public logMaxScroll = 0;
+  public logTotalContentH = 0;
+  public logAutoScroll = true;
+  public logPrevEntryCount = 0;
 
   // Challenge Tracker panel
-  private challengeContainer!: Phaser.GameObjects.Container;
+  public challengeContainer!: Phaser.GameObjects.Container;
 
   // Instruction text
-  private instructionText!: Phaser.GameObjects.Text;
+  public instructionText!: Phaser.GameObjects.Text;
 
   // Overlay objects
-  private overlayObjects: Phaser.GameObjects.GameObject[] = [];
+  public overlayObjects: Phaser.GameObjects.GameObject[] = [];
 
   // HUD animation state
-  private previousCoins: number | null = null;
-  private previousReputation: number | null = null;
-  private transferAnimationCount = 0;
-  private activeTransferTweens = new Set<Phaser.Tweens.Tween>();
-  private activeTransferVisuals = new Set<Phaser.GameObjects.GameObject>();
-  private hiddenTransferSourceCardIds = new Set<string>();
+  public previousCoins: number | null = null;
+  public previousReputation: number | null = null;
+  public transferAnimationCount = 0;
+  public activeTransferTweens = new Set<Phaser.Tweens.Tween>();
+  public activeTransferVisuals = new Set<Phaser.GameObjects.GameObject>();
+  public hiddenTransferSourceCardIds = new Set<string>();
 
   // Hint system
   /** True after the player has used their one hint for this turn. */
-  private hintUsedThisTurn = false;
+  public hintUsedThisTurn = false;
   /** Card ID of the card highlighted by the current hint (null = none). */
-  private hintedCardId: string | null = null;
+  public hintedCardId: string | null = null;
   /** Grid slot index highlighted by the current hint (null = none). */
-  private hintedSlotIndex: number | null = null;
+  public hintedSlotIndex: number | null = null;
 
   // Persistent market-card selection UX
-  private marketSelectionManager!: SingleSelectionManager;
-  private marketSelectionByCardId = new Map<string, SelectionController>();
-  private selectedMarketCardId: string | null = null;
+  public marketSelectionManager!: SingleSelectionManager;
+  public marketSelectionByCardId = new Map<string, SelectionController>();
+  public selectedMarketCardId: string | null = null;
 
   // SVG debug overlay (opt-in via ?msSvgDebug=1)
-  private svgDebugEnabled = false;
-  private svgDebugText?: Phaser.GameObjects.Text;
+  public svgDebugEnabled = false;
+  public svgDebugText?: Phaser.GameObjects.Text;
 
   // Undo/Redo manager for market actions (per-scene)
-  private undoManager!: UndoRedoManager;
+  public undoManager!: UndoRedoManager;
 
   constructor() {
     super({ key: 'MainStreetScene' });
   }
 
   /** Stores raw SVG text for each card template (fetched in preload, used for lazy rasterisation). */
-  private cardSvgSources: Map<string, string> = new Map();
+  public cardSvgSources: Map<string, string> = new Map();
   /** Resolves when all SVG source fetches started in preload have settled. */
-  private cardSvgLoadPromise: Promise<void> = Promise.resolve();
+  public cardSvgLoadPromise: Promise<void> = Promise.resolve();
 
   // DOM-based SVG renderer (optional) - renders crisp SVGs using browser image rendering
-  private svgDom?: SvgDomRenderer;
+  public svgDom?: SvgDomRenderer;
 
   // Preload placeholder SVG used for visual scale testing in the market
   preload(): void {
@@ -463,9 +445,8 @@ export class MainStreetScene extends CardGameScene {
   }
 
   // ── Header ──────────────────────────────────────────────
-
-  private createHeader(): void {
-    return this.msRenderer.createHeader.apply(this.msRenderer, arguments as any);
+  public createHeader(...args: any[]): any {
+    return (this.msRenderer as any).createHeader.apply(this.msRenderer, args);
   }
 
   /**
@@ -473,7 +454,7 @@ export class MainStreetScene extends CardGameScene {
    * This rasterises them at the exact pixel sizes needed for the current layout,
    * ensuring crisp rendering on HiDPI displays.
    */
-  private async prewarmVisibleCardTextures(): Promise<void> {
+  public async prewarmVisibleCardTextures(): Promise<void> {
     // Mark scene as valid before starting rasterisation
     markSceneValid(this);
     
@@ -549,7 +530,7 @@ export class MainStreetScene extends CardGameScene {
   }
 
   /** Extracts the base template ID from a card ID (strips copy suffixes like -0, -1). */
-  private templateIdFromCardId(cardId: string): string {
+  public templateIdFromCardId(cardId: string): string {
     return cardId.replace(/-\d+$/, '');
   }
 
@@ -557,7 +538,7 @@ export class MainStreetScene extends CardGameScene {
    * Lazily request a card texture for the given render size.
    * If generation succeeds, trigger a refresh so the SVG texture is used.
    */
-  private requestCardTexture(cardId: string, renderW: number, renderH: number): void {
+  public requestCardTexture(cardId: string, renderW: number, renderH: number): void {
     const templateId = this.templateIdFromCardId(cardId);
     const svgText = this.cardSvgSources.get(templateId);
     if (!svgText) return;
@@ -574,65 +555,17 @@ export class MainStreetScene extends CardGameScene {
       }
     });
   }
-
-  private computeLayout(): SceneLayout {
-    return this.msRenderer.computeLayout.apply(this.msRenderer, arguments as any);
+  public computeLayout(...args: any[]): any {
+    return (this.msRenderer as any).computeLayout.apply(this.msRenderer, args);
+  }
+  public createContainers(...args: any[]): any {
+    return (this.msRenderer as any).createContainers.apply(this.msRenderer, args);
+  }
+  public createInstructions(...args: any[]): any {
+    return (this.msRenderer as any).createInstructions.apply(this.msRenderer, args);
   }
 
-  private createContainers(): void {
-    this.hudContainer = this.add.container(0, 0);
-    this.streetContainer = this.add.container(0, 0);
-    this.marketContainer = this.add.container(0, 0);
-    this.incidentQueueContainer = this.add.container(0, 0);
-    this.handContainer = this.add.container(0, 0);
-    this.actionContainer = this.add.container(0, 0);
-
-    // Challenge Tracker panel
-    this.challengeContainer = this.add.container(this.layout.challengeX, this.layout.challengeY);
-
-    // Activity Log panel (persistent, not rebuilt each refresh)
-    this.logContainer = this.add.container(this.layout.logX, this.layout.logY);
-
-    // Panel background
-    const bg = this.add.graphics();
-    bg.fillStyle(0x1a1408, 0.85);
-    bg.fillRoundedRect(0, 0, this.layout.logW, this.layout.logH, 4);
-    bg.lineStyle(1, BOX_STROKE, 0.5);
-    bg.strokeRoundedRect(0, 0, this.layout.logW, this.layout.logH, 4);
-    this.logContainer.add(bg);
-
-    // Title bar
-    const titleBg = this.add.graphics();
-    titleBg.fillStyle(0x332816, 0.9);
-    titleBg.fillRoundedRect(0, 0, this.layout.logW, LOG_TITLE_H, { tl: 4, tr: 4, bl: 0, br: 0 });
-    this.logContainer.add(titleBg);
-
-    const titleText = this.add.text(this.layout.logW / 2, LOG_TITLE_H / 2, 'Activity Log', {
-      fontSize: '12px', fontStyle: 'bold', color: '#aa9977', fontFamily: FONT_FAMILY,
-    }).setOrigin(0.5);
-    this.logContainer.add(titleText);
-
-    // Scrollable content container
-    this.logContentContainer = this.add.container(0, LOG_TITLE_H + 2);
-    this.logContainer.add(this.logContentContainer);
-
-    // Geometry mask for clipping scrollable content
-    this.logMaskGraphics = this.add.graphics();
-    this.logMaskGraphics.setVisible(false);
-    this.logContentMask = new Phaser.Display.Masks.GeometryMask(this, this.logMaskGraphics);
-    this.logContentContainer.setMask(this.logContentMask);
-    this.updateLogMask();
-
-    // Mouse-wheel scroll for the log panel
-    this.input.off('wheel', this.handleLogWheel, this);
-    this.input.on('wheel', this.handleLogWheel, this);
-  }
-
-  private createInstructions(): void {
-    return this.msRenderer.createInstructions.apply(this.msRenderer, arguments as any);
-  }
-
-  private initSvgDebugOverlay(): void {
+  public initSvgDebugOverlay(): void {
     if (!this.svgDebugEnabled) return;
     this.svgDebugText = this.add.text(10, 42, '', {
       fontSize: '12px',
@@ -643,7 +576,7 @@ export class MainStreetScene extends CardGameScene {
     }).setDepth(10_000).setScrollFactor(0);
   }
 
-  private updateSvgDebugOverlay(): void {
+  public updateSvgDebugOverlay(): void {
     if (!this.svgDebugEnabled || !this.svgDebugText) return;
     const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
     const keys = Object.keys((this.textures as unknown as { list?: Record<string, unknown> }).list ?? {});
@@ -677,7 +610,7 @@ export class MainStreetScene extends CardGameScene {
     ]);
   }
 
-  private handleResize(): void {
+  public handleResize(): void {
     this.layout = this.computeLayout();
     // Regenerate textures at new sizes on resize
     this.prewarmVisibleCardTextures();
@@ -694,7 +627,7 @@ export class MainStreetScene extends CardGameScene {
    * with tier-filtered decks. Campaign loading is async but the scene
    * continues with default progress if the load is still pending.
    */
-  private loadCampaignAndSetup(): void {
+  public loadCampaignAndSetup(): void {
     // Synchronously set up with defaults first (so UI can render immediately)
     this.campaign = createDefaultCampaignProgress();
     // If a persisted difficulty exists in the SettingsPanel, prefer that for new games.
@@ -741,7 +674,7 @@ export class MainStreetScene extends CardGameScene {
    * Returns a Promise that resolves when the update is done (or
    * immediately if no campaign / store is available).
    */
-  private updateCampaignProgress(): Promise<void> {
+  public updateCampaignProgress(): Promise<void> {
     if (!this.campaign || !this.saveStore) return Promise.resolve();
     return updateCampaignAfterRun(this.campaign, this.state, this.saveStore)
       .then(() => {})  // discard the returned campaign (already mutated in place)
@@ -752,7 +685,7 @@ export class MainStreetScene extends CardGameScene {
 
   // ── Day flow ────────────────────────────────────────────
 
-  private startDayPhase(): void {
+  public startDayPhase(): void {
     // Execute DayStart (refills market, transitions to MarketPhase)
     executeDayStart(this.state);
     this.uiPhase = 'market';
@@ -780,7 +713,7 @@ export class MainStreetScene extends CardGameScene {
     );
   }
 
-  private endTurn(): void {
+  public endTurn(): void {
     this.uiPhase = 'animating';
     this.instructionText.setText('Processing end of turn...');
     this.refreshActionButtons();
@@ -839,64 +772,16 @@ export class MainStreetScene extends CardGameScene {
   }
 
   // ── Refresh display ─────────────────────────────────────
-
-  private refreshAll(): void {
-    this.svgDom?.clear();
-    this.refreshHud();
-    this.refreshStreetGrid();
-    this.refreshMarket();
-    this.refreshIncidentQueue();
-    this.refreshPlayerHand();
-    this.refreshActionButtons();
-    this.refreshChallengeTracker();
-    this.refreshLog();
-    this.updateSvgDebugOverlay();
+  public refreshAll(...args: any[]): any {
+    return (this.msRenderer as any).refreshAll.apply(this.msRenderer, args);
   }
 
   // ── HUD ─────────────────────────────────────────────────
-
-  private refreshHud(): void {
-    this.hudContainer.removeAll(true);
-
-    const score = computeScore(this.state);
-    const { coins, reputation } = this.state.resourceBank;
-    const { gameW, hudY } = this.layout;
-
-    // Background strip - 2/3 width, centered
-    const strip = this.add.rectangle(gameW / 2, hudY, gameW * 0.66, 28, 0x1a1408, 0.6);
-    strip.setStrokeStyle(1, BOX_STROKE, 0.5);
-    this.hudContainer.add(strip);
-
-    // Coins - centered in strip
-    const stripWidth = gameW * 0.66;
-    const stripLeft = (gameW - stripWidth) / 2;
-    const coinText = this.add.text(stripLeft + stripWidth * 0.25, hudY, `Coins: ${coins}`, {
-      fontSize: '16px', fontStyle: 'bold', color: '#ffcc44', fontFamily: FONT_FAMILY,
-    }).setOrigin(0, 0.5);
-    this.hudContainer.add(coinText);
-
-    // Reputation - centered in strip
-    const repText = this.add.text(stripLeft + stripWidth * 0.5, hudY, `Rep: ${reputation}`, {
-      fontSize: '16px', fontStyle: 'bold', color: '#88bbff', fontFamily: FONT_FAMILY,
-    }).setOrigin(0, 0.5);
-    this.hudContainer.add(repText);
-
-    // Score - right side of strip
-    const scoreText = this.add.text(stripLeft + stripWidth * 0.85, hudY, `Score: ${score}`, {
-      fontSize: '16px', fontStyle: 'bold', color: '#ff8844', fontFamily: FONT_FAMILY,
-    }).setOrigin(0, 0.5);
-    this.hudContainer.add(scoreText);
-
-    this.animateHudValueChanges({
-      coins,
-      reputation,
-      coinX: stripLeft + stripWidth * 0.25 + 80,
-      repX: stripLeft + stripWidth * 0.5 + 65,
-      hudY,
-    });
+  public refreshHud(...args: any[]): any {
+    return (this.msRenderer as any).refreshHud.apply(this.msRenderer, args);
   }
 
-  private animateHudValueChanges(params: {
+  public animateHudValueChanges(params: {
     coins: number;
     reputation: number;
     coinX: number;
@@ -959,7 +844,7 @@ export class MainStreetScene extends CardGameScene {
     this.previousReputation = reputation;
   }
 
-  private getMarketCardCenter(row: 'business' | 'investments', slotIndex: number): { x: number; y: number } | null {
+  public getMarketCardCenter(row: 'business' | 'investments', slotIndex: number): { x: number; y: number } | null {
     if (slotIndex < 0) return null;
     const rowTop = row === 'business'
       ? this.layout.marketTop + 6
@@ -971,7 +856,7 @@ export class MainStreetScene extends CardGameScene {
     };
   }
 
-  private getStreetSlotCenter(slotIndex: number): { x: number; y: number } {
+  public getStreetSlotCenter(slotIndex: number): { x: number; y: number } {
     const col = slotIndex % this.layout.streetCols;
     const row = Math.floor(slotIndex / this.layout.streetCols);
     const x = this.layout.streetX + col * (this.layout.slotW + this.layout.slotGap) + this.layout.slotW / 2;
@@ -979,14 +864,14 @@ export class MainStreetScene extends CardGameScene {
     return { x, y };
   }
 
-  private getHandCardCenter(): { x: number; y: number } {
+  public getHandCardCenter(): { x: number; y: number } {
     return {
       x: this.layout.handX + this.layout.handCardW / 2,
       y: this.layout.handY + this.layout.handCardH / 2,
     };
   }
 
-  private createTransferCardVisual(
+  public createTransferCardVisual(
     cardId: string,
     family: 'business' | 'event' | 'upgrade',
     atX: number,
@@ -1042,7 +927,7 @@ export class MainStreetScene extends CardGameScene {
     return container;
   }
 
-  private cleanupTransferAnimations(): void {
+  public cleanupTransferAnimations(): void {
     for (const tween of this.activeTransferTweens) {
       tween.stop();
     }
@@ -1055,7 +940,7 @@ export class MainStreetScene extends CardGameScene {
     this.hiddenTransferSourceCardIds.clear();
   }
 
-  private animateTransferFromMarket(options: {
+  public animateTransferFromMarket(options: {
     cardId: string;
     family: 'business' | 'event' | 'upgrade';
     row: 'business' | 'investments';
@@ -1107,357 +992,30 @@ export class MainStreetScene extends CardGameScene {
   }
 
   // ── Challenge Tracker ───────────────────────────────────
-
-  private refreshChallengeTracker(): void {
-    this.challengeContainer.removeAll(true);
-
-    const challenges = this.state.activeChallenges;
-    if (challenges.length === 0) return;
-
-    // Dynamic height based on number of challenges
-    const panelH = CHALLENGE_TITLE_H + challenges.length * CHALLENGE_LINE_H + CHALLENGE_PAD * 2;
-    const challengeW = this.layout.challengeW;
-
-    // Panel background
-    const bg = this.add.graphics();
-    bg.fillStyle(0x1a1408, 0.85);
-    bg.fillRoundedRect(0, 0, challengeW, panelH, 4);
-    bg.lineStyle(1, BOX_STROKE, 0.5);
-    bg.strokeRoundedRect(0, 0, challengeW, panelH, 4);
-    this.challengeContainer.add(bg);
-
-    // Title bar
-    const titleBg = this.add.graphics();
-    titleBg.fillStyle(0x332816, 0.9);
-    titleBg.fillRoundedRect(0, 0, challengeW, CHALLENGE_TITLE_H, { tl: 4, tr: 4, bl: 0, br: 0 });
-    this.challengeContainer.add(titleBg);
-
-    const completedCount = challenges.filter(ac => ac.completed).length;
-    const titleText = this.add.text(
-      challengeW / 2, CHALLENGE_TITLE_H / 2,
-      `Challenges (${completedCount}/${challenges.length})`,
-      { fontSize: '11px', fontStyle: 'bold', color: '#aa9977', fontFamily: FONT_FAMILY },
-    ).setOrigin(0.5);
-    this.challengeContainer.add(titleText);
-
-    // Challenge list -- compact single-line rows: indicator + title + description
-    let yOff = CHALLENGE_TITLE_H + CHALLENGE_PAD;
-    for (const ac of challenges) {
-      const isComplete = ac.completed;
-      const indicator = isComplete ? '\u2713' : '\u2022';  // checkmark or bullet
-      const color = isComplete ? '#44ff44' : '#ccbbaa';
-      const nameColor = isComplete ? '#66aa66' : '#ddccbb';
-
-      // Indicator
-      const indicatorText = this.add.text(CHALLENGE_PAD, yOff, indicator, {
-        fontSize: '13px', fontStyle: 'bold', color, fontFamily: FONT_FAMILY,
-      }).setOrigin(0, 0);
-      this.challengeContainer.add(indicatorText);
-
-      // Challenge title
-      const challengeText = this.add.text(
-        CHALLENGE_PAD + 16, yOff,
-        ac.challenge.title,
-        {
-          fontSize: '11px',
-          fontStyle: isComplete ? 'italic' : 'normal',
-          color: nameColor,
-          fontFamily: FONT_FAMILY,
-        },
-      ).setOrigin(0, 0);
-      this.challengeContainer.add(challengeText);
-
-      // Description (right portion of the row)
-      const descText = this.add.text(
-        challengeW * 0.42, yOff,
-        ac.challenge.description,
-        {
-          fontSize: '10px',
-          color: isComplete ? '#558855' : '#998877',
-          fontFamily: FONT_FAMILY,
-          wordWrap: { width: challengeW * 0.56 },
-        },
-      ).setOrigin(0, 0);
-      this.challengeContainer.add(descText);
-
-      yOff += CHALLENGE_LINE_H;
-    }
+  public refreshChallengeTracker(...args: any[]): any {
+    return (this.msRenderer as any).refreshChallengeTracker.apply(this.msRenderer, args);
   }
 
   // ── Street Grid ─────────────────────────────────────────
-
-  private refreshStreetGrid(): void {
-    this.streetContainer.removeAll(true);
-
-    const { gameW, streetTop, streetX, slotW, slotGap, slotH, streetCols, streetRowGap } = this.layout;
-
-    // Section label
-    const label = this.add.text(gameW / 2, streetTop - 16, '', {
-      fontSize: '14px', fontStyle: 'bold', color: '#aa9966', fontFamily: FONT_FAMILY,
-    }).setOrigin(0.5, 1);
-    this.streetContainer.add(label);
-
-    for (let i = 0; i < GRID_SIZE; i++) {
-      const col = i % streetCols;
-      const row = Math.floor(i / streetCols);
-      const x = streetX + col * (slotW + slotGap);
-      const y = streetTop + row * (slotH + streetRowGap);
-      const biz = this.state.streetGrid[i];
-
-      if (biz) {
-        this.drawBusinessSlot(x, y, i, biz);
-      } else {
-        this.drawEmptySlot(x, y, i);
-      }
-    }
+  public refreshStreetGrid(...args: any[]): any {
+    return (this.msRenderer as any).refreshStreetGrid.apply(this.msRenderer, args);
   }
-
-  private drawBusinessSlot(x: number, y: number, _index: number, biz: BusinessCard): void {
-    const { slotW, slotH } = this.layout;
-    const isHinted = this.hintedSlotIndex === _index;
-
-    const renderW = Math.max(1, Math.round(slotW - 4));
-    const renderH = Math.max(1, Math.round(slotH - 4));
-    const tplKey = this.templateKeyForCard(biz.id, renderW, renderH);
-    const usedSvg = this.textures && (this.textures as Phaser.Textures.TextureManager).exists(tplKey);
-    if (usedSvg && this.svgDom) {
-      // Render via DOM SVG image for perfect crispness
-      const cx = x + slotW / 2;
-      const cy = y + slotH / 2;
-      const templateId = this.templateIdFromCardId(biz.id);
-      const svgText = this.cardSvgSources.get(templateId)!;
-      const domKey = this.domKeyForCard('street', _index, biz.id);
-      this.svgDom.createOrUpdate(domKey, svgText, cx, cy, renderW, renderH, () => {
-        // click maps to scene slot click
-        this.onSlotClick(_index);
-      }, 100);
-    } else if (usedSvg) {
-      const img = this.add.image(Math.round(x + slotW / 2), Math.round(y + slotH / 2), tplKey);
-      // Use the exact slot dimensions - texture is already rasterised at correct size
-      img.setDisplaySize(renderW, renderH);
-      this.streetContainer.add(img);
-
-      if (isHinted) {
-        const hintRect = this.add.rectangle(x + slotW / 2, y + slotH / 2, slotW, slotH);
-        hintRect.setStrokeStyle(3, 0x44ffff);
-        hintRect.setFillStyle(0x000000, 0);
-        this.streetContainer.add(hintRect);
-      }
-    } else {
-      this.requestCardTexture(biz.id, renderW, renderH);
-      const primaryColor = synergyColor(biz.synergyTypes[0]);
-      // Card background
-      const bg = this.add.rectangle(
-        x + slotW / 2, y + slotH / 2,
-        slotW, slotH, primaryColor, 0.7,
-      );
-      // Highlight the slot if it is the hint target (e.g., upgrade target)
-      bg.setStrokeStyle(isHinted ? 3 : 2, isHinted ? 0x44ffff : 0xffffff, isHinted ? 1.0 : 0.4);
-      this.streetContainer.add(bg);
-
-      // Name
-      const nameText = this.add.text(x + slotW / 2, y + 8, biz.name, {
-        fontSize: '12px', fontStyle: 'bold', color: '#ffffff', fontFamily: FONT_FAMILY,
-        wordWrap: { width: slotW - 8 },
-        align: 'center',
-      }).setOrigin(0.5, 0);
-      this.streetContainer.add(nameText);
-
-      // Income
-      const income = biz.baseIncome + biz.incomeBonus;
-      const incText = this.add.text(x + slotW / 2, y + slotH - 28, `+${income}/turn`, {
-        fontSize: '13px', color: '#ffee88', fontFamily: FONT_FAMILY,
-      }).setOrigin(0.5, 0);
-      this.streetContainer.add(incText);
-    }
-
-    // Only draw fallback textual overlays when no SVG texture is available.
-    if (!usedSvg) {
-      // Level
-      if (biz.level > 0) {
-        const lvlText = this.add.text(x + slotW - 6, y + 4, `Lv${biz.level}`, {
-          fontSize: '11px', color: '#ffdd44', fontFamily: FONT_FAMILY,
-        }).setOrigin(1, 0);
-        this.streetContainer.add(lvlText);
-      }
-
-      // Synergy label at bottom
-      const synLabel = biz.synergyTypes.join('/');
-      const synText = this.add.text(x + slotW / 2, y + slotH - 12, synLabel, {
-        fontSize: '10px', color: '#dddddd', fontFamily: FONT_FAMILY,
-      }).setOrigin(0.5, 1);
-      this.streetContainer.add(synText);
-
-      // Slot index
-      const idxText = this.add.text(x + 4, y + 4, `${_index}`, {
-        fontSize: '10px', color: '#ffffff55', fontFamily: FONT_FAMILY,
-      });
-      this.streetContainer.add(idxText);
-    }
-
-    if (!this.replayMode) {
-      // Tooltip hit area for this business slot
-      const tooltipZone = this.add.zone(
-        x + slotW / 2,
-        y + slotH / 2,
-        slotW,
-        slotH,
-      );
-      tooltipZone.setOrigin(0.5);
-      tooltipZone.setInteractive({ useHandCursor: true });
-      tooltipZone.on('pointerover', () => {
-        const info = `Business: ${biz.name}\nIncome: +${biz.baseIncome + biz.incomeBonus}\nSynergy: ${biz.synergyTypes.join('/') }\nLevel: ${biz.level}`;
-        this.tooltipManager?.show(info, tooltipZone.x, tooltipZone.y);
-      });
-      tooltipZone.on('pointerout', () => {
-        this.tooltipManager?.hide();
-      });
-      this.streetContainer.add(tooltipZone);
-    }
+  public drawBusinessSlot(...args: any[]): any {
+    return (this.msRenderer as any).drawBusinessSlot.apply(this.msRenderer, args);
   }
-
-
-  private drawEmptySlot(x: number, y: number, index: number): void {
-    const { slotW, slotH } = this.layout;
-    const isSelectable = this.uiPhase === 'placing-business';
-    const isHinted = this.hintedSlotIndex === index && !isSelectable;
-    const fillAlpha = isSelectable ? 0.4 : isHinted ? 0.35 : 0.2;
-    const strokeColor = isSelectable ? 0xffdd44 : isHinted ? 0x44ffff : 0x555544;
-    const strokeWidth = (isSelectable || isHinted) ? 2 : 1;
-
-    const bg = this.add.rectangle(
-      x + slotW / 2, y + slotH / 2,
-      slotW, slotH, 0x333322, fillAlpha,
-    );
-    bg.setStrokeStyle(strokeWidth, strokeColor);
-    this.streetContainer.add(bg);
-
-    // Slot number
-    const idxText = this.add.text(x + slotW / 2, y + slotH / 2, `${index}`, {
-      fontSize: '18px', color: (isSelectable || isHinted) ? '#ffdd44' : '#666655',
-      fontFamily: FONT_FAMILY,
-    }).setOrigin(0.5);
-    this.streetContainer.add(idxText);
-
-    // Click to place
-    if (isSelectable && this.pendingBusinessCard) {
-      bg.setInteractive({ useHandCursor: true });
-      bg.on('pointerdown', () => this.onSlotClick(index));
-      bg.on('pointerover', () => bg.setStrokeStyle(3, 0x44ff44));
-      bg.on('pointerout', () => bg.setStrokeStyle(2, 0xffdd44));
-    }
+  public drawEmptySlot(...args: any[]): any {
+    return (this.msRenderer as any).drawEmptySlot.apply(this.msRenderer, args);
   }
 
   // ── Market ──────────────────────────────────────────────
-
-  private refreshMarket(): void {
-    this.marketContainer.removeAll(true);
-    this.marketSelectionManager.clear();
-    this.marketSelectionManager.clearTargets();
-    this.marketSelectionByCardId.clear();
-    this.selectedMarketCardId = null;
-
-    const { gameW, marketTop, marketRowH, marketRowGap } = this.layout;
-
-    // Section background (2 rows: business + investments)
-    const totalH = 2 * marketRowH + marketRowGap + 20;
-    const bgBox = this.add.graphics();
-    bgBox.fillStyle(BOX_FILL, 0.3);
-    bgBox.fillRoundedRect(20, marketTop - 10, gameW - 40, totalH, BOX_RADIUS);
-    bgBox.lineStyle(1, BOX_STROKE, 0.4);
-    bgBox.strokeRoundedRect(20, marketTop - 10, gameW - 40, totalH, BOX_RADIUS);
-    this.marketContainer.add(bgBox);
-
-    const sectionLabel = this.add.text(gameW / 2, marketTop - 4, 'Market', {
-      fontSize: '13px', fontStyle: 'bold', color: '#887766', fontFamily: FONT_FAMILY,
-    }).setOrigin(0.5, 1);
-    this.marketContainer.add(sectionLabel);
-
-    // Business row
-    this.drawMarketRow(
-      marketTop + 6,
-      'Business',
-      'business',
-      this.state.market.business,
-      MARKET_BUSINESS_SLOTS,
-      (card) => this.onBusinessCardClick(card as BusinessCard),
-    );
-
-    // Investments row (mixed upgrades + investment events)
-    this.drawMarketRow(
-      marketTop + 6 + marketRowH + marketRowGap,
-      'Investments',
-      'investments',
-      this.state.market.investments,
-      MARKET_INVESTMENT_SLOTS,
-      (card) => {
-        if (card.family === 'upgrade') {
-          this.onUpgradeCardClick(card as UpgradeCard);
-        } else {
-          this.onEventCardClick(card as EventCard);
-        }
-      },
-    );
+  public refreshMarket(...args: any[]): any {
+    return (this.msRenderer as any).refreshMarket.apply(this.msRenderer, args);
+  }
+  public drawMarketRow(...args: any[]): any {
+    return (this.msRenderer as any).drawMarketRow.apply(this.msRenderer, args);
   }
 
-  private drawMarketRow(
-    y: number,
-    rowLabel: string,
-    rowKey: string,
-    cards: readonly (BusinessCard | EventCard | UpgradeCard)[],
-    maxSlots: number,
-    onClick: (card: BusinessCard | EventCard | UpgradeCard) => void,
-  ): void {
-    const { marketCardW, marketCardH, marketCardGap, marketLabelW } = this.layout;
-
-    // Row label - also use for positioning deck count
-    const label = this.add.text(40, y, rowLabel, {
-      fontSize: '14px', fontStyle: 'bold', color: '#aa9977', fontFamily: FONT_FAMILY,
-    }).setOrigin(0, 0.5);
-    this.marketContainer.add(label);
-
-    const startX = marketLabelW + 50;
-
-    for (let i = 0; i < maxSlots; i++) {
-      const cx = startX + i * (marketCardW + marketCardGap);
-      const card = cards[i];
-
-      if (card && !this.hiddenTransferSourceCardIds.has(card.id)) {
-        const cardObj = this.drawMarketCard(cx, y, card, onClick, rowKey, i);
-        this.marketContainer.add(cardObj);
-      } else {
-        // Empty slot
-        const empty = this.add.rectangle(
-          cx + marketCardW / 2, y + marketCardH / 2,
-          marketCardW, marketCardH, 0x222211, 0.3,
-        );
-        empty.setStrokeStyle(1, 0x333322);
-        this.marketContainer.add(empty);
-      }
-    }
-
-    // Deck count - immediately below the label
-    const deckY = y + 16;
-    if (rowLabel === 'Business') {
-      const deckCount = this.state.decks.business.length;
-      const deckText = this.add.text(40, deckY, `Deck: ${deckCount}`, {
-        fontSize: '12px', color: '#776655', fontFamily: FONT_FAMILY,
-      }).setOrigin(0, 0);
-      this.marketContainer.add(deckText);
-    } else {
-      // Investments row: show both upgrade and event deck counts - below label
-      const upgCount = this.state.decks.upgrade.length;
-      const evtCount = this.state.decks.event.length;
-      const deckText = this.add.text(
-        40, deckY,
-        `Upg: ${upgCount}  Evt: ${evtCount}`,
-        { fontSize: '11px', color: '#776655', fontFamily: FONT_FAMILY },
-      ).setOrigin(0, 0);
-      this.marketContainer.add(deckText);
-    }
-  }
-
-  private templateKeyForCard(cardId: string, width?: number, height?: number): string {
+  public templateKeyForCard(cardId: string, width?: number, height?: number): string {
     // strip copy suffixes like `-0`, `-1`, or serials appended by deck builders
     const base = cardId.replace(/-\d+$/,'');
     
@@ -1469,368 +1027,30 @@ export class MainStreetScene extends CardGameScene {
     return `ms_card_${base}`;
   }
 
-  private domKeyForCard(context: string, slot: number | string, cardId: string): string {
+  public domKeyForCard(context: string, slot: number | string, cardId: string): string {
     return `ms_dom_${context}_${slot}_${cardId}`;
   }
-
-  private drawMarketCard(
-    x: number,
-    y: number,
-    card: BusinessCard | EventCard | UpgradeCard,
-    onClick: (card: BusinessCard | EventCard | UpgradeCard) => void,
-    rowKey: string,
-    slotIndex: number,
-  ): Phaser.GameObjects.Container {
-    const { marketCardW, marketCardH } = this.layout;
-    const container = this.add.container(Math.round(x + marketCardW / 2), Math.round(y + marketCardH / 2));
-
-    // Determine if this is a non-purchasable Incident event
-    const isIncidentEvent = card.family === 'event' && (card as EventCard).trigger === 'Incident';
-
-    // Determine if this card is the hint recommendation
-    const isHinted = this.hintedCardId !== null && card.id === this.hintedCardId;
-
-    // If we have a per-card SVG texture, render it as the card background
-    const renderW = Math.max(1, Math.round(marketCardW - 4));
-    const renderH = Math.max(1, Math.round(marketCardH - 4));
-    const tplKey = this.templateKeyForCard(card.id, renderW, renderH);
-    const baseStrokeColor = isHinted ? 0x44ffff : (isIncidentEvent ? 0x556688 : 0x888877);
-    const baseStrokeWidth = isHinted ? 3 : 1;
-
-    let bg: Phaser.GameObjects.Rectangle | null = null;
-
-    if (this.textures && (this.textures as Phaser.Textures.TextureManager).exists(tplKey) && this.svgDom === undefined) {
-      const img = this.add.image(0, 0, tplKey);
-      // Texture is already rasterised at correct size for this slot
-      img.setDisplaySize(renderW, renderH);
-      container.add(img);
-    } else if (this.svgDom && this.cardSvgSources.has(this.templateIdFromCardId(card.id))) {
-      // Render SVG via DOM element
-      const cx = x + marketCardW / 2;
-      const cy = y + marketCardH / 2;
-      const templateId = this.templateIdFromCardId(card.id);
-      const svgText = this.cardSvgSources.get(templateId)!;
-      const domKey = this.domKeyForCard(`market-${rowKey}`, slotIndex, card.id);
-      const domEl = this.svgDom.createOrUpdate(domKey, svgText, cx, cy, renderW, renderH, () => {
-        this.selectMarketCardById(card.id);
-        onClick(card);
-      }, 100);
-      if (domEl && !this.replayMode) {
-        try {
-          const node = (domEl as any).node as HTMLElement | null;
-          if (node) {
-            node.addEventListener('mouseenter', () => {
-              let info = '';
-              if (card.family === 'business') {
-                const b = card as any;
-                info = `Business: ${b.name}\nCost: ${b.cost}\nIncome: +${b.baseIncome + (b.incomeBonus || 0)}/turn\nSynergy: ${(b.synergyTypes || []).join('/')}\n${b.description ?? ''}`;
-              } else if (card.family === 'event') {
-                const e = card as any;
-                info = `Event: ${e.name}\nCost: ${e.cost}\nEffect: ${e.effect}`;
-              } else if (card.family === 'upgrade') {
-                const u = card as any;
-                info = `Upgrade: ${u.name}\nCost: ${u.cost}\nIncome Bonus: +${u.incomeBonus}\nRequires: Lv${u.requiredLevel ?? 0}`;
-              }
-              this.tooltipManager?.show(info, container.x, container.y);
-            });
-            node.addEventListener('mouseleave', () => this.tooltipManager?.hide());
-          }
-        } catch (e) { /* ignore DOM attach errors */ }
-      }
-    } else {
-      this.requestCardTexture(card.id, renderW, renderH);
-      // Determine card color
-      let fillColor = 0x333322;
-      if (card.family === 'business') {
-        fillColor = synergyColor((card as BusinessCard).synergyTypes[0]);
-      } else if (card.family === 'event') {
-        fillColor = isIncidentEvent ? 0x2B3A67 : 0x8B4513;  // Indigo for Incident, Brown for Investment
-      } else if (card.family === 'upgrade') {
-        fillColor = 0x6B4C9A;  // Purple for upgrades
-      }
-
-      // Background
-      const fillAlpha = isIncidentEvent ? 0.5 : 0.7;
-      bg = this.add.rectangle(0, 0, marketCardW, marketCardH, fillColor, fillAlpha);
-      bg.setStrokeStyle(baseStrokeWidth, baseStrokeColor);
-      container.add(bg);
-    }
-
-    const selectionRing = this.add.rectangle(0, 0, marketCardW, marketCardH);
-    selectionRing.setFillStyle(0x000000, 0);
-    selectionRing.setStrokeStyle(2, 0x44ff66);
-    selectionRing.setVisible(false);
-    container.add(selectionRing);
-
-    const interactiveEnabled = this.uiPhase === 'market' && !isIncidentEvent;
-    const selection = attachSelection(container, {
-      onStateChange: ({ selected, hovered }) => {
-        if (selected) {
-          this.selectedMarketCardId = card.id;
-        } else if (this.selectedMarketCardId === card.id) {
-          this.selectedMarketCardId = null;
-        }
-
-        if (hovered && interactiveEnabled) {
-          if (bg) {
-            bg.setStrokeStyle(2, 0xffdd44);
-          }
-          selectionRing.setStrokeStyle(2, 0xffdd44);
-          selectionRing.setVisible(!bg);
-          container.setScale(1.05);
-          return;
-        }
-
-        if (selected) {
-          if (bg) {
-            bg.setStrokeStyle(2, 0x44ff66);
-          }
-          selectionRing.setStrokeStyle(2, 0x44ff66);
-          selectionRing.setVisible(true);
-          container.setScale(1.04);
-          return;
-        }
-
-        if (bg) {
-          bg.setStrokeStyle(baseStrokeWidth, baseStrokeColor);
-        }
-        selectionRing.setVisible(false);
-        container.setScale(1.0);
-      },
-    });
-
-    if (interactiveEnabled) {
-      this.marketSelectionByCardId.set(card.id, selection);
-
-      const hitArea = this.add.rectangle(0, 0, marketCardW, marketCardH, 0x000000, 0.001);
-      hitArea.setInteractive({ useHandCursor: true });
-      hitArea.on('pointerdown', () => {
-        this.marketSelectionManager.select(selection);
-        onClick(card);
-      });
-      hitArea.on('pointerover', () => {
-        selection.setHovered(true);
-        if (!this.replayMode) {
-          let info = '';
-          if (card.family === 'business') {
-            const b = card as any;
-            info = `Business: ${b.name}\nCost: ${b.cost}\nIncome: +${b.baseIncome + (b.incomeBonus || 0)}/turn\nSynergy: ${(b.synergyTypes || []).join('/')}\n${b.description ?? ''}`;
-          } else if (card.family === 'event') {
-            const e = card as any;
-            info = `Event: ${e.name}\nCost: ${e.cost}\nEffect: ${e.effect}\nCoins: ${e.coinDelta >= 0 ? '+' : ''}${e.coinDelta}, Rep: ${e.reputationDelta >= 0 ? '+' : ''}${e.reputationDelta}`;
-          } else if (card.family === 'upgrade') {
-            const u = card as any;
-            info = `Upgrade: ${u.name}\nCost: ${u.cost}\nIncome Bonus: +${u.incomeBonus}\nRequires: Lv${u.requiredLevel ?? 0}\n${u.description ?? ''}`;
-          }
-          this.tooltipManager?.show(info, container.x, container.y);
-        }
-      });
-      hitArea.on('pointerout', () => {
-        selection.setHovered(false);
-        if (!this.replayMode) this.tooltipManager?.hide();
-      });
-      this.marketSelectionManager.registerTarget(hitArea);
-      container.add(hitArea);
-    }
-
-    // Card label and additional info are rendered inside per-card SVGs; only
-    // add textual overlays when we do NOT have a per-card texture.
-    const usedSvg = this.textures && (this.textures as Phaser.Textures.TextureManager).exists(tplKey);
-
-    if (!usedSvg) {
-      // Intentionally no text overlays: card text is authored inside each SVG.
-    }
-
-    return container;
+  public drawMarketCard(...args: any[]): any {
+    return (this.msRenderer as any).drawMarketCard.apply(this.msRenderer, args);
   }
 
   // ── Incident Queue ───────────────────────────────────────
-
-  private refreshIncidentQueue(): void {
-    this.incidentQueueContainer.removeAll(true);
-
-    const queue = this.state.incidentQueue;
-    const deckRemaining = this.state.decks.event.length;
-
-    const { queueLabelW, queueCardW, queueCardH, queueCardGap, queueTop } = this.layout;
-
-    // Section background - width to just fit cards with small right margin
-    const queueW = queueLabelW + 50 + INCIDENT_QUEUE_SIZE * (queueCardW + queueCardGap) - queueCardGap + 20;
-    const queueH = queueCardH + 24;
-    const bgBox = this.add.graphics();
-    bgBox.fillStyle(0x1a1830, 0.35);
-    bgBox.fillRoundedRect(110, queueTop - 10, queueW, queueH, BOX_RADIUS);
-    bgBox.lineStyle(1, 0x445577, 0.5);
-    bgBox.strokeRoundedRect(110, queueTop - 10, queueW, queueH, BOX_RADIUS);
-    this.incidentQueueContainer.add(bgBox);
-
-    // Section label
-    const label = this.add.text(40, queueTop + queueCardH / 2 - 2, 'Upcoming', {
-      fontSize: '13px', fontStyle: 'bold', color: '#7788aa', fontFamily: FONT_FAMILY,
-      align: 'center',
-    }).setOrigin(0, 0.5);
-    this.incidentQueueContainer.add(label);
-
-    const startX = queueLabelW + 50;
-
-    for (let i = 0; i < INCIDENT_QUEUE_SIZE; i++) {
-      const cx = startX + i * (queueCardW + queueCardGap);
-      const card = queue[i];
-
-      if (card) {
-        const cardContainer = this.drawIncidentCard(cx, queueTop, card);
-        this.incidentQueueContainer.add(cardContainer);
-      } else {
-        // Empty queue slot
-        const empty = this.add.rectangle(
-          cx + queueCardW / 2, queueTop + queueCardH / 2,
-          queueCardW, queueCardH, 0x111122, 0.3,
-        );
-        empty.setStrokeStyle(1, 0x223344);
-        this.incidentQueueContainer.add(empty);
-      }
-    }
-
-    // Deck count - immediately below the label
-    const deckText = this.add.text(40, queueTop + 32, `Deck: ${deckRemaining}`, {
-      fontSize: '11px', color: '#556677', fontFamily: FONT_FAMILY,
-    }).setOrigin(0, 0);
-    this.incidentQueueContainer.add(deckText);
+  public refreshIncidentQueue(...args: any[]): any {
+    return (this.msRenderer as any).refreshIncidentQueue.apply(this.msRenderer, args);
   }
-
-  private drawIncidentCard(
-    x: number,
-    y: number,
-    card: EventCard,
-  ): Phaser.GameObjects.Container {
-    const { queueCardW, queueCardH } = this.layout;
-    const container = this.add.container(Math.round(x + queueCardW / 2), Math.round(y + queueCardH / 2));
-
-    const renderW = Math.max(1, Math.round(queueCardW - 4));
-    const renderH = Math.max(1, Math.round(queueCardH - 4));
-    const tplKey = this.templateKeyForCard(card.id, renderW, renderH);
-    const usedSvg = this.textures && (this.textures as Phaser.Textures.TextureManager).exists(tplKey);
-    if (usedSvg) {
-      const img = this.add.image(0, 0, tplKey);
-      // Texture is already rasterised at correct size for this slot
-      img.setDisplaySize(renderW, renderH);
-      container.add(img);
-    } else {
-      this.requestCardTexture(card.id, renderW, renderH);
-      // Indigo fallback background (non-interactive); no text overlays.
-      const bg = this.add.rectangle(0, 0, queueCardW, queueCardH, 0x2B3A67, 0.5);
-      bg.setStrokeStyle(1, 0x556688);
-      container.add(bg);
-    }
-
-    if (!this.replayMode) {
-      const hover = this.add.rectangle(0, 0, queueCardW, queueCardH, 0x000000, 0.001);
-      hover.setInteractive({ useHandCursor: true });
-      hover.on('pointerover', () => {
-        const info = `Event: ${card.name}\nEffect: ${card.effect}\nCoins: ${card.coinDelta >= 0 ? '+' : ''}${card.coinDelta}, Rep: ${card.reputationDelta >= 0 ? '+' : ''}${card.reputationDelta}`;
-        this.tooltipManager?.show(info, container.x, container.y);
-      });
-      hover.on('pointerout', () => this.tooltipManager?.hide());
-      container.add(hover);
-    }
-
-    return container;
+  public drawIncidentCard(...args: any[]): any {
+    return (this.msRenderer as any).drawIncidentCard.apply(this.msRenderer, args);
   }
 
   // ── Player Hand ────────────────────────────────────────────
-
-  private refreshPlayerHand(): void {
-    this.handContainer.removeAll(true);
-
-    const held = this.state.heldEvent;
-    const { handY, handX, handCardW, handCardH } = this.layout;
-
-    // Your Hand label removed
-
-    if (held) {
-      const cardContainer = this.drawHeldEventCard(handX, handY, held);
-      this.handContainer.add(cardContainer);
-    } else {
-      // Empty hand slot
-      const empty = this.add.rectangle(
-        40 + handCardW / 2, handY + handCardH / 2,
-        handCardW, handCardH, 0x222211, 0.2,
-      );
-      empty.setStrokeStyle(1, 0x333322, 0.4);
-      this.handContainer.add(empty);
-
-      const emptyText = this.add.text(
-        40 + handCardW / 2, handY + handCardH / 2,
-        'No held event',
-        { fontSize: '11px', color: '#555544', fontFamily: FONT_FAMILY },
-      ).setOrigin(0.5);
-      this.handContainer.add(emptyText);
-    }
+  public refreshPlayerHand(...args: any[]): any {
+    return (this.msRenderer as any).refreshPlayerHand.apply(this.msRenderer, args);
+  }
+  public drawHeldEventCard(...args: any[]): any {
+    return (this.msRenderer as any).drawHeldEventCard.apply(this.msRenderer, args);
   }
 
-  private drawHeldEventCard(
-    x: number,
-    y: number,
-    card: EventCard,
-  ): Phaser.GameObjects.Container {
-    const { handCardW, handCardH } = this.layout;
-    const container = this.add.container(Math.round(x + handCardW / 2), Math.round(y + handCardH / 2));
-    const renderW = Math.max(1, Math.round(handCardW - 4));
-    const renderH = Math.max(1, Math.round(handCardH - 4));
-
-    // DOM-only rendering path for held investment cards.
-    const templateId = this.templateIdFromCardId(card.id);
-    const svgText = this.cardSvgSources.get(templateId);
-    if (!this.svgDom || !svgText) {
-      return container;
-    }
-
-    const cx = x + handCardW / 2;
-    const cy = y + handCardH / 2;
-    const domKey = this.domKeyForCard('hand', 0, card.id);
-    const domEl = this.svgDom.createOrUpdate(
-      domKey,
-      svgText,
-      cx,
-      cy,
-      renderW,
-      renderH,
-      this.uiPhase === 'market' ? () => this.onPlayHeldEvent() : undefined,
-      100,
-    );
-
-    if (!this.replayMode) {
-      try {
-        // If an SvgDomRenderer exists we intentionally avoid adding any
-        // Phaser fallback display objects for the held card. Tests may
-        // provide a mock `svgDom.createOrUpdate` which returns undefined
-        // but still counts as the DOM renderer being present. In that
-        // case we still should not add a Phaser fallback rectangle.
-        const node = (domEl as any)?.node as HTMLElement | null;
-        if (node) {
-          node.addEventListener('mouseenter', () => {
-            const info = `Event: ${card.name}\nCost: ${card.cost}\nEffect: ${card.effect}`;
-            this.tooltipManager?.show(info, container.x, container.y);
-          });
-          node.addEventListener('mouseleave', () => this.tooltipManager?.hide());
-
-          if (this.uiPhase === 'market') {
-            node.addEventListener('click', () => this.onPlayHeldEvent());
-          }
-        }
-      } catch (e) { /* ignore */ }
-
-      // Whether or not domEl.node was present, if svgDom is available we
-      // do not add Phaser fallback visuals for the held hand slot. The
-      // DOM renderer (or test-provided mock) is expected to handle
-      // interactivity. Return early to avoid creating a Rectangle/Image.
-      return container;
-    }
-
-    return container;
-  }
-
-  private onPlayHeldEvent(): void {
+  public onPlayHeldEvent(): void {
     if (this.uiPhase !== 'market') return;
     if (!this.state.heldEvent) return;
 
@@ -1853,113 +1073,11 @@ export class MainStreetScene extends CardGameScene {
   }
 
   // ── Action buttons ──────────────────────────────────────
-
-  private refreshActionButtons(): void {
-    this.actionContainer.removeAll(true);
-
-    if (this.uiPhase === 'market') {
-      const rightX = this.layout.gameW - 24;
-      const by = this.layout.actionY;
-
-      // Affordable summary
-      const affordable = getAffordableBusinessCards(this.state);
-      const upgradeable = getAffordableUpgradeCards(this.state);
-      const emptySlots = getEmptySlots(this.state);
-
-      const summaryParts: string[] = [];
-      if (affordable.length > 0 && emptySlots.length > 0) {
-        summaryParts.push(`${affordable.length} businesses`);
-      }
-      if (upgradeable.length > 0) {
-        summaryParts.push(`${upgradeable.length} upgrades`);
-      }
-      const summaryStr = summaryParts.length > 0
-        ? `Can buy: ${summaryParts.join(', ')}`
-        : 'No affordable cards';
-
-      const summary = this.add.text(rightX, by - 4, summaryStr, {
-        fontSize: '12px', color: '#887766', fontFamily: FONT_FAMILY,
-      }).setOrigin(1, 1);
-      this.actionContainer.add(summary);
-
-      // End Turn button (right-aligned)
-      const btnW = this.layout.actionButtonW;
-      const hintBtnW = this.layout.hintButtonW;
-      const smallW = this.layout.smallButtonW;
-
-      const endBtn = this.createActionButton(rightX - btnW, by + 4, btnW, 'End Turn', () => {
-        this.endTurn();
-      });
-      this.actionContainer.add(endBtn);
-
-      // Hint button (to the left of End Turn)
-      const hintBtn = this.createHintButton(rightX - btnW - 12 - hintBtnW, by + 4, hintBtnW);
-      this.actionContainer.add(hintBtn);
-
-      // Undo / Redo buttons (to the left of Hint)
-      const undoBaseX = rightX - btnW - 12 - hintBtnW - 12 - smallW - 12 - smallW;
-      const undoBtn = this.createActionButton(undoBaseX, by + 4, smallW, 'Undo', () => this.performUndo());
-      this.actionContainer.add(undoBtn);
-      const redoBtn = this.createActionButton(undoBaseX + smallW + 12, by + 4, smallW, 'Redo', () => this.performRedo());
-      this.actionContainer.add(redoBtn);
-
-    } else if (this.uiPhase === 'placing-business') {
-      const rightX = this.layout.gameW - 24;
-      const by = this.layout.actionY;
-
-      const cardName = this.pendingBusinessCard?.name ?? '???';
-      const hint = this.add.text(rightX, by - 4, `Place "${cardName}" -- click an empty slot`, {
-        fontSize: '14px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY,
-      }).setOrigin(1, 1);
-      this.actionContainer.add(hint);
-
-      // Cancel button (right-aligned)
-      const btnW = this.layout.actionButtonW;
-      const cancelBtn = this.createActionButton(rightX - btnW, by + 4, btnW, 'Cancel', () => {
-        this.pendingBusinessCard = null;
-        this.pendingBusinessSourceIndex = null;
-        this.clearMarketSelection();
-        this.uiPhase = 'market';
-        this.refreshAll();
-        this.instructionText.setText(
-          `Turn ${this.state.turn} / ${this.state.config.maxTurns} -- Buy cards from the market or End Turn`,
-        );
-      });
-      this.actionContainer.add(cancelBtn);
-    }
+  public refreshActionButtons(...args: any[]): any {
+    return (this.msRenderer as any).refreshActionButtons.apply(this.msRenderer, args);
   }
-
-  private createActionButton(
-    x: number,
-    y: number,
-    width: number,
-    text: string,
-    callback: () => void,
-  ): Phaser.GameObjects.Container {
-    const btnH = this.layout.actionButtonH;
-    const container = this.add.container(x + width / 2, y + btnH / 2);
-
-    const bg = this.add.rectangle(0, 0, width, btnH, 0x554422, 0.8);
-    bg.setStrokeStyle(1, 0xaa8855);
-    container.add(bg);
-
-    const label = this.add.text(0, 0, text, {
-      fontSize: '14px', fontStyle: 'bold', color: '#ffcc88', fontFamily: FONT_FAMILY,
-    }).setOrigin(0.5);
-    container.add(label);
-
-    bg.setInteractive({ useHandCursor: true });
-    bg.on('pointerdown', callback);
-    bg.on('pointerover', () => {
-      bg.setStrokeStyle(2, 0xffdd44);
-      container.setScale(1.05);
-    });
-    bg.on('pointerout', () => {
-      bg.setStrokeStyle(1, 0xaa8855);
-      container.setScale(1.0);
-    });
-
-    return container;
+  public createActionButton(...args: any[]): any {
+    return (this.msRenderer as any).createActionButton.apply(this.msRenderer, args);
   }
 
   /**
@@ -1967,47 +1085,12 @@ export class MainStreetScene extends CardGameScene {
    * When clicked, queries the Greedy strategy and highlights the recommended
    * card/slot with a one-line rationale in the instruction text area.
    */
-  private createHintButton(
-    x: number,
-    y: number,
-    width: number,
-  ): Phaser.GameObjects.Container {
-    const btnH = this.layout.actionButtonH;
-    const isDisabled = this.hintUsedThisTurn;
-
-    const container = this.add.container(x + width / 2, y + btnH / 2);
-
-    const fillColor = isDisabled ? 0x2a2a2a : 0x224455;
-    const strokeColor = isDisabled ? 0x444444 : 0x4488aa;
-    const textColor = isDisabled ? '#666666' : '#88ccff';
-
-    const bg = this.add.rectangle(0, 0, width, btnH, fillColor, 0.8);
-    bg.setStrokeStyle(1, strokeColor);
-    container.add(bg);
-
-    const label = this.add.text(0, 0, isDisabled ? 'Hint ✓' : 'Hint', {
-      fontSize: '14px', fontStyle: 'bold', color: textColor, fontFamily: FONT_FAMILY,
-    }).setOrigin(0.5);
-    container.add(label);
-
-    if (!isDisabled) {
-      bg.setInteractive({ useHandCursor: true });
-      bg.on('pointerdown', () => this.onHintClick());
-      bg.on('pointerover', () => {
-        bg.setStrokeStyle(2, 0x88ddff);
-        container.setScale(1.05);
-      });
-      bg.on('pointerout', () => {
-        bg.setStrokeStyle(1, strokeColor);
-        container.setScale(1.0);
-      });
-    }
-
-    return container;
+  public createHintButton(...args: any[]): any {
+    return (this.msRenderer as any).createHintButton.apply(this.msRenderer, args);
   }
 
   /** Handles the Hint button click: generates and displays the hint. */
-  private onHintClick(): void {
+  public onHintClick(): void {
     if (this.hintUsedThisTurn) return;
     if (this.uiPhase !== 'market') return;
 
@@ -2052,7 +1135,7 @@ export class MainStreetScene extends CardGameScene {
     this.refreshPlayerHand();
   }
 
-  private performUndo(): void {
+  public performUndo(): void {
     if (this.uiPhase === 'animating' || this.uiPhase === 'game-over') return;
     if (!this.undoManager || !this.undoManager.canUndo()) return;
 
@@ -2066,7 +1149,7 @@ export class MainStreetScene extends CardGameScene {
     }
   }
 
-  private performRedo(): void {
+  public performRedo(): void {
     if (this.uiPhase === 'animating' || this.uiPhase === 'game-over') return;
     if (!this.undoManager || !this.undoManager.canRedo()) return;
 
@@ -2081,18 +1164,18 @@ export class MainStreetScene extends CardGameScene {
   }
 
 
-  private clearMarketSelection(): void {
+  public clearMarketSelection(): void {
     this.marketSelectionManager?.clear();
     this.selectedMarketCardId = null;
   }
 
-  private selectMarketCardById(cardId: string): void {
+  public selectMarketCardById(cardId: string): void {
     const selection = this.marketSelectionByCardId.get(cardId);
     if (!selection) return;
     this.marketSelectionManager.select(selection);
   }
 
-  private onBusinessCardClick(card: BusinessCard): void {
+  public onBusinessCardClick(card: BusinessCard): void {
     if (this.uiPhase !== 'market') return;
 
     this.selectMarketCardById(card.id);
@@ -2120,7 +1203,7 @@ export class MainStreetScene extends CardGameScene {
     this.refreshActionButtons();
   }
 
-  private onSlotClick(slotIndex: number): void {
+  public onSlotClick(slotIndex: number): void {
     if (this.uiPhase !== 'placing-business' || !this.pendingBusinessCard) return;
 
     const sourceIndex = this.pendingBusinessSourceIndex;
@@ -2168,7 +1251,7 @@ export class MainStreetScene extends CardGameScene {
     }
   }
 
-  private onEventCardClick(card: EventCard): void {
+  public onEventCardClick(card: EventCard): void {
     if (this.uiPhase !== 'market') return;
 
     this.selectMarketCardById(card.id);
@@ -2217,7 +1300,7 @@ export class MainStreetScene extends CardGameScene {
     }
   }
 
-  private onUpgradeCardClick(card: UpgradeCard): void {
+  public onUpgradeCardClick(card: UpgradeCard): void {
     if (this.uiPhase !== 'market') return;
 
     this.selectMarketCardById(card.id);
@@ -2287,7 +1370,7 @@ export class MainStreetScene extends CardGameScene {
    * @param branches   Eligible UpgradeCards the player may choose from.
    * @param targetSlot Street grid slot of the business to be upgraded.
    */
-  private showUpgradeChoiceModal(branches: UpgradeCard[], targetSlot: number, sourceIndex: number): void {
+  public showUpgradeChoiceModal(branches: UpgradeCard[], targetSlot: number, sourceIndex: number): void {
     const MODAL_DEPTH = 20;
     const MODAL_W = 500;
     const BTN_H = 60;
@@ -2408,67 +1491,12 @@ export class MainStreetScene extends CardGameScene {
    * Rebuilds the log panel content from state.activityLog.
    * Only re-renders when entries have been added since the last call.
    */
-  private refreshLog(): void {
-    const entries = this.state.activityLog;
-    const newCount = entries.length;
-
-    // Skip rebuild if nothing changed
-    if (newCount === this.logPrevEntryCount) return;
-
-    const hadAutoScroll = this.logAutoScroll;
-    this.logPrevEntryCount = newCount;
-
-    // Clear existing content
-    this.logContentContainer.removeAll(true);
-
-    const contentW = this.layout.logW - LOG_PAD * 2;
-    let yOff = 0;
-
-    for (const entry of entries) {
-      const color = LOG_COLORS[entry.type] ?? LOG_COLORS.neutral;
-      const isTurnHeader = entry.type === 'turn-header';
-
-      if (isTurnHeader) {
-        // Subtle background bar for turn headers
-        const barBg = this.add.graphics();
-        barBg.fillStyle(0x443311, 0.5);
-        barBg.fillRect(0, yOff, this.layout.logW, LOG_LINE_H);
-        this.logContentContainer.add(barBg);
-      }
-
-      const txt = this.add.text(LOG_PAD, yOff, entry.text, {
-        fontSize: `${LOG_FONT_SIZE}px`,
-        fontStyle: isTurnHeader ? 'bold' : 'normal',
-        color,
-        fontFamily: FONT_FAMILY,
-        wordWrap: { width: contentW },
-      });
-      this.logContentContainer.add(txt);
-
-      // Use actual rendered height to handle word-wrapped lines
-      yOff += Math.max(LOG_LINE_H, txt.height + 2);
-    }
-
-    this.logTotalContentH = yOff;
-
-    // Visible area inside the panel (below title bar, above bottom edge)
-    const visibleH = this.layout.logH - LOG_TITLE_H - 4;
-    this.logMaxScroll = Math.max(0, this.logTotalContentH - visibleH);
-
-    // Keep scroll position valid for the current content height.
-    // On scene restart we can transition from a long previous run to a short
-    // new log; without clamping, stale offsets can hide all entries.
-    if (hadAutoScroll) {
-      this.logScrollOffset = this.logMaxScroll;
-    } else {
-      this.logScrollOffset = Phaser.Math.Clamp(this.logScrollOffset, 0, this.logMaxScroll);
-    }
-
-    this.applyLogScroll();
+  public refreshLog(...args: any[]): any {
+    return (this.msRenderer as any).refreshLog.apply(this.msRenderer, args);
   }
 
   /** Updates the geometry mask rectangle to clip log content. */
-  private updateLogMask(): void {
+  public updateLogMask(): void {
     if (!this.logMaskGraphics) return;
     this.logMaskGraphics.clear();
     this.logMaskGraphics.fillStyle(0xffffff);
@@ -2482,7 +1510,7 @@ export class MainStreetScene extends CardGameScene {
   }
 
   /** Handles mouse wheel events over the log panel area. */
-  private handleLogWheel = (
+  public handleLogWheel = (
     pointer: Phaser.Input.Pointer,
     _gameObjects: Phaser.GameObjects.GameObject[],
     _deltaX: number,
@@ -2511,7 +1539,7 @@ export class MainStreetScene extends CardGameScene {
   };
 
   /** Applies the current scroll offset to the log content container. */
-  private applyLogScroll(): void {
+  public applyLogScroll(): void {
     this.logContentContainer.setY(LOG_TITLE_H + 2 - this.logScrollOffset);
     this.updateLogMask();
   }
@@ -2659,7 +1687,7 @@ export class MainStreetScene extends CardGameScene {
 
   // ── Game Over Overlay ───────────────────────────────────
 
-  private showGameOverOverlay(
+  public showGameOverOverlay(
     result: TurnResult,
     newlyUnlockedTiers: string[] = [],
   ): void {
