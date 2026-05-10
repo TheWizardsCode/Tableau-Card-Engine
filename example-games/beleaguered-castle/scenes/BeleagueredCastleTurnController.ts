@@ -3,7 +3,7 @@
  */
 import type { BeleagueredCastleState, BCMove } from '../BeleagueredCastleState';
 import {
-  applyMove, undoMove, findSafeAutoMoves, isWon, hasNoMoves, hasValuableMoves, isTriviallyWinnable, getAutoCompleteMoves,
+  applyMove, undoMove, findSafeAutoMoves, isWon, hasNoMoves, isTriviallyWinnable, getAutoCompleteMoves,
 } from '../BeleagueredCastleRules';
 import type { Command } from '../../../src/core-engine/UndoRedoManager';
 import { UndoRedoManager, CompoundCommand } from '../../../src/core-engine/UndoRedoManager';
@@ -156,7 +156,7 @@ export class BeleagueredCastleTurnController {
       this.callbacks.onCheckGameEnd();
     } else if (isTriviallyWinnable(this.state)) {
       this.startAutoComplete();
-    } else if (hasNoMoves(this.state) || !hasValuableMoves(this.state)) {
+    } else if (hasNoMoves(this.state)) {
       this.gameEnded = true;
       this.callbacks.onSoundEvent('game-ended', { result: 'loss' });
       this.callbacks.onCheckGameEnd();
