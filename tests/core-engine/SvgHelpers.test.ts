@@ -26,18 +26,23 @@ describe('SvgHelpers', () => {
   let addedCanvases: Array<{ key: string; canvas: MockCanvas }>;
   let createdCanvases: MockCanvas[];
 
-  function createMockScene() {
-    const existingKeys = new Set<string>();
+  function createMockScene(preExistingKeys: string[] = []) {
+    const existingKeys = new Set<string>(preExistingKeys);
     const textures = new Map<string, { setFilter: ReturnType<typeof vi.fn> }>();
+    for (const key of preExistingKeys) {
+      textures.set(key, { setFilter: vi.fn() });
+    }
+
+    const removeSpy = vi.fn((key: string) => {
+      existingKeys.delete(key);
+      textures.delete(key);
+    });
 
     const scene = {
       sys: { game: {} },
       textures: {
         exists: (key: string) => existingKeys.has(key),
-        remove: (key: string) => {
-          existingKeys.delete(key);
-          textures.delete(key);
-        },
+        remove: removeSpy,
         addCanvas: (key: string, canvas: MockCanvas) => {
           existingKeys.add(key);
           textures.set(key, { setFilter: vi.fn() });
@@ -45,6 +50,7 @@ describe('SvgHelpers', () => {
         },
         get: (key: string) => textures.get(key),
       },
+      __removeSpy: removeSpy,
     };
 
     return scene as any;
@@ -168,5 +174,23 @@ describe('SvgHelpers', () => {
     await Promise.all([first.promise, second.promise]);
 
     expect(addedCanvases).toHaveLength(1);
+  });
+
+  it('does not remove an existing texture key during rasterisation', async () => {
+    const scene = createMockScene(['existing-key']);
+    markSceneValid(scene);
+
+    await rasteriseSvgToTexture(
+      scene,
+      'existing-key',
+      '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>',
+      10,
+      10,
+      2,
+    );
+
+    expect(scene.__removeSpy).not.toHaveBeenCalled();
+    // Existing texture should be reused as-is.
+    expect(addedCanvases).toHaveLength(0);
   });
 });

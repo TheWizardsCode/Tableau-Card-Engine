@@ -121,16 +121,18 @@ export async function rasteriseSvgToTexture(
               return;
             }
 
-            if (scene.textures?.exists(key)) {
-              scene.textures.remove(key);
-            }
-            scene.textures.addCanvas(key, canvas);
-            
-            // Use LINEAR filter; textures are generated at exact display size,
-            // so this avoids harsh nearest-neighbor artifacts on text edges.
-            const texture = scene.textures.get(key);
-            if (texture) {
-              texture.setFilter(Phaser.Textures.FilterMode.LINEAR);
+            // Never remove and re-add an existing texture key here.
+            // Removing a texture while active GameObjects still reference its
+            // frame can transiently produce null frame.source during WebGL render.
+            if (!scene.textures?.exists(key)) {
+              scene.textures.addCanvas(key, canvas);
+              
+              // Use LINEAR filter; textures are generated at exact display size,
+              // so this avoids harsh nearest-neighbor artifacts on text edges.
+              const texture = scene.textures.get(key);
+              if (texture) {
+                texture.setFilter(Phaser.Textures.FilterMode.LINEAR);
+              }
             }
           } catch {
             // Silently ignore texture add failures
