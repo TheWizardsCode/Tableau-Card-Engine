@@ -3,6 +3,16 @@ import Phaser from 'phaser';
 import { SushiGoScene } from '../../example-games/sushi-go/scenes/SushiGoScene';
 import { waitForScene } from '../helpers/waitForScene';
 
+async function waitForCondition(check: () => boolean, timeoutMs = 3000): Promise<void> {
+  const start = performance.now();
+  while (!check()) {
+    if (performance.now() - start > timeoutMs) {
+      throw new Error(`Timed out after ${timeoutMs}ms waiting for condition.`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 16));
+  }
+}
+
 describe('SushiGoScene SVG icon rendering', () => {
   let game: Phaser.Game | null = null;
 
@@ -39,14 +49,10 @@ describe('SushiGoScene SVG icon rendering', () => {
       'icon-tempura', 'icon-sashimi', 'icon-dumpling',
       'icon-wasabi', 'icon-pudding', 'icon-chopsticks',
     ];
+    await waitForCondition(() => keys.every((k) => scene.textures.exists(k)), 3000);
+
     for (const k of keys) {
-      // textures.exists may throw if textures not ready; guard with try
-      try {
-        expect(scene.textures.exists(k)).toBe(true);
-      } catch (e) {
-        // If texture check throws, fail the test with helpful message
-        throw new Error(`Expected texture ${k} to exist: ${String(e)}`);
-      }
+      expect(scene.textures.exists(k)).toBe(true);
     }
 
     // Find the first hand card container and compute its bounds
