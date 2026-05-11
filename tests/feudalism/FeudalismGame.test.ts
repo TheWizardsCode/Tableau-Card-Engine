@@ -622,6 +622,41 @@ describe('FeudalismGame', () => {
       expect(session.phase).toBe('game-over');
     });
 
+    it('allows all other players one final turn after trigger and winner is highest influence', () => {
+      const session = createTestSession();
+      session.currentPlayerIndex = 1;
+
+      // Player 0 is currently ahead on influence.
+      for (let i = 0; i < 16; i++) {
+        session.players[0].purchasedCards.push(
+          { id: 800 + i, tier: 1, cost: {}, bonus: 'wheat', points: 1 },
+        );
+      }
+
+      // Player 1 will trigger the threshold on this turn.
+      for (let i = 0; i < 14; i++) {
+        session.players[1].purchasedCards.push(
+          { id: 900 + i, tier: 1, cost: {}, bonus: 'oats', points: 1 },
+        );
+      }
+      session.players[1].reservedCards.push(
+        { id: 5000, tier: 1, cost: {}, bonus: 'flax', points: 1 },
+      );
+
+      const triggerTurn = executeTurn(session, { type: 'purchase', cardId: 5000 });
+      expect(triggerTurn.gameOver).toBe(false);
+      expect(session.phase).toBe('final-round');
+      expect(session.currentPlayerIndex).toBe(0);
+
+      const finalTurn = executeTurn(session, {
+        type: 'take-different',
+        colors: ['wheat', 'oats', 'flax'],
+      });
+      expect(finalTurn.gameOver).toBe(true);
+      expect(session.phase).toBe('game-over');
+      expect(getWinnerIndex(session)).toBe(0);
+    });
+
     it('isGameOver returns true when game is over', () => {
       const session = createTestSession();
       session.phase = 'game-over';
