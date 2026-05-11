@@ -96,6 +96,23 @@ describe('MainStreetScene browser tests', () => {
     expect(textEntries.some((entry) => entry.text === 'Turn 2')).toBe(true);
   });
 
+  it('exposes major UI containers via scene accessors', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
+
+    expect(typeof scene.getStreetContainer).toBe('function');
+    expect(typeof scene.getMarketContainer).toBe('function');
+    expect(typeof scene.getIncidentQueueContainer).toBe('function');
+    expect(typeof scene.getHandContainer).toBe('function');
+    expect(typeof scene.getActionContainer).toBe('function');
+
+    expect((scene.getStreetContainer as () => Phaser.GameObjects.Container)()).toBeInstanceOf(Phaser.GameObjects.Container);
+    expect((scene.getMarketContainer as () => Phaser.GameObjects.Container)()).toBeInstanceOf(Phaser.GameObjects.Container);
+    expect((scene.getIncidentQueueContainer as () => Phaser.GameObjects.Container)()).toBeInstanceOf(Phaser.GameObjects.Container);
+    expect((scene.getHandContainer as () => Phaser.GameObjects.Container)()).toBeInstanceOf(Phaser.GameObjects.Container);
+    expect((scene.getActionContainer as () => Phaser.GameObjects.Container)()).toBeInstanceOf(Phaser.GameObjects.Container);
+  });
+
   it('renders the street as a 2x5 grid', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & { streetContainer?: Phaser.GameObjects.Container };
