@@ -38,6 +38,13 @@ import helpContent from '../help-content.json';
 
 import {
   SFX_KEYS,
+  CARD_W,
+  CARD_H,
+  DISCARD_CARD_W,
+  DISCARD_CARD_H,
+  laneX,
+  PLR_EXP_TOP,
+  DISCARD_Y,
   type SceneTurnPhase,
 } from './LostCitiesConstants';
 import { LostCitiesRenderer } from './LostCitiesRenderer';
@@ -68,7 +75,8 @@ export class LostCitiesScene extends CardGameScene {
 
   // ── Preload ─────────────────────────────────────────────
   preload(): void {
-    const { CARD_W, CARD_H, DISCARD_CARD_W, DISCARD_CARD_H } = require('./LostCitiesConstants');
+    // Card dimension constants imported from LostCitiesConstants
+    // (don't use `require` in browser bundles) 
 
     for (const color of EXPEDITION_COLORS) {
       for (let inv = 1; inv <= 3; inv++) {
@@ -182,7 +190,7 @@ export class LostCitiesScene extends CardGameScene {
         const color = this.tooltipManager.colorAtPointerX(pointer.x);
         if (!color) { this.tooltipManager.hideExpeditionTooltip(); return; }
         if (color === this.tooltipManager.currentTooltipColor) return;
-        const { laneX, PLR_EXP_TOP, CARD_H } = require('./LostCitiesConstants');
+        // laneX, PLR_EXP_TOP and CARD_H are imported from LostCitiesConstants
         this.tooltipManager.showExpeditionTooltip(color, {
           x: laneX(EXPEDITION_COLORS.indexOf(color)),
           y: PLR_EXP_TOP + CARD_H / 2,
@@ -197,7 +205,7 @@ export class LostCitiesScene extends CardGameScene {
         const color = this.tooltipManager.colorAtPointerX(pointer.x);
         if (!color) { this.tooltipManager.hideExpeditionTooltip(); return; }
         if (color === this.tooltipManager.currentTooltipColor) return;
-        const { laneX, DISCARD_Y, DISCARD_CARD_H } = require('./LostCitiesConstants');
+        // laneX, DISCARD_Y and DISCARD_CARD_H are imported from LostCitiesConstants
         this.tooltipManager.showExpeditionTooltip(color, {
           x: laneX(EXPEDITION_COLORS.indexOf(color)),
           y: DISCARD_Y + DISCARD_CARD_H / 2,

@@ -28,7 +28,7 @@ import {
   AI_ANIM_DURATION,
 } from './LostCitiesConstants';
 import { LostCitiesRenderer } from './LostCitiesRenderer';
-import { flipCard, moveGameObject, shakeIllegalMove } from '../../../src/ui';
+import { flipCard, moveGameObject, shakeIllegalMove, FONT_FAMILY } from '../../../src/ui';
 
 export class LostCitiesAnimator {
   private scene: Phaser.Scene;
@@ -234,7 +234,7 @@ export class LostCitiesAnimator {
     const targetX = AI_HAND_CENTER;
     const targetY = HAND_TOP + targetIdx * HAND_OVERLAP + HAND_CARD_H / 2;
 
-    const { FONT_FAMILY } = require('../../../src/ui');
+    // FONT_FAMILY imported from src/ui
     const annotation = this.scene.add.text(sourceX, sourceY - 40, annotationText, {
       fontFamily: FONT_FAMILY,
       fontSize: '16px',
