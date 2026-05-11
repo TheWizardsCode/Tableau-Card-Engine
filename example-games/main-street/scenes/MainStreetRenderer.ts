@@ -638,30 +638,21 @@ export class MainStreetRenderer {
         const labelText = `Discover (${REFRESH_INVESTMENTS_COST})`;
 
         const btn = this.createActionButton(btnX, btnY, btnW, labelText, canRefresh ? () => { s.onRefreshInvestmentsClick(); } : () => {});
-        // Disable interaction when not allowed
-        if (!canRefresh) {
-          try {
-            const bg = (btn.list && btn.list[0]) as Phaser.GameObjects.Rectangle | undefined;
-            if (bg && typeof bg.setInteractive === 'function') {
-              bg.disableInteractive?.();
-            }
-            // dim visual
-            if (bg && typeof bg.setFillStyle === 'function') {
+        // Dim visual when not allowed, but keep interactive so tooltip can show
+        try {
+          const bg = (btn.list && btn.list[0]) as Phaser.GameObjects.Rectangle | undefined;
+          if (bg) {
+            if (!canRefresh && typeof bg.setFillStyle === 'function') {
               bg.setFillStyle(0x333333, 0.6);
             }
-          } catch (_) { /* ignore */ }
-        }
 
-        // Tooltip for the Discover button
-        try {
-          const info = `Pay $${REFRESH_INVESTMENTS_COST} to redraw the investments row immediately. Removed cards go to their discard piles. Available only during Market phase.`;
-          // Create a transparent hover zone aligned with the button; it will be removed when marketContainer is cleared.
-          const hover = s.add.rectangle(btn.x, btn.y, btnW, s.layout.actionButtonH, 0x000000, 0);
-          hover.setOrigin(0.5);
-          hover.setInteractive({ useHandCursor: true });
-          hover.on('pointerover', () => s.tooltipManager?.show(info, hover.x, hover.y));
-          hover.on('pointerout', () => s.tooltipManager?.hide());
-          s.marketContainer.add(hover);
+            // Tooltip for the Discover button (attach to bg so it receives pointer events)
+            const info = `Pay $${REFRESH_INVESTMENTS_COST} to redraw the investments row immediately. Removed cards go to their discard piles. Available only during Market phase.`;
+            try {
+              bg.on('pointerover', (_pointer: any) => s.tooltipManager?.show(info, (_pointer && _pointer.worldX) || btn.x, (_pointer && _pointer.worldY) || btn.y));
+              bg.on('pointerout', () => s.tooltipManager?.hide());
+            } catch (_) { /* ignore */ }
+          }
         } catch (_) { /* ignore tooltip attach errors in tests */ }
 
         s.marketContainer.add(btn);
