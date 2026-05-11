@@ -1335,41 +1335,30 @@ describe('hasValuableMoves', () => {
     expect(hasValuableMoves(state)).toBe(true);
   });
 
-  it('should return false when only non-valuable tableau shuffles exist', () => {
-    // Two single-card columns with cards that can move between them
-    // but moving doesn't expose any new cards (both are single).
-    // Column 0: 5-clubs, Column 1: 6-diamonds -- 5 can go on 6
-    // After move: Column 0: empty, Column 1: 6-diamonds, 5-clubs
-    // New moves: 5-clubs can go to any empty column (0, 2-7) and also to
-    // columns with 6s. But the only cards involved are still 5-clubs and
-    // 6-diamonds -- no NEW cards are exposed.
-    //
-    // BUT we also need to prevent foundation moves from triggering true.
-    // Foundations have aces; next expected are 2s. 5-clubs and 6-diamonds
-    // are not 2s, so no foundation moves.
-    //
-    // Also need to ensure 6-diamonds can go on 5-clubs via empty col:
-    // Actually, moving 5 to col 1 (on 6) is legal. After move, 5 is on
-    // top of col 1. Legal moves: 5-clubs from col 1 to any of 6 empty
-    // cols. But involved cards are still just 5-clubs (from col 1).
-    // Since 5-clubs was already involved before, this is NOT valuable.
-    //
-    // The reverse: 6-diamonds can go to any empty column. After that move,
-    // col 1 is empty, col X has 6-diamonds. Legal moves: 5-clubs to col 1
-    // (empty) or to col X (on 6). Involved: 5-clubs and 6-diamonds -- same.
-    //
-    // Wait -- when we move 5 onto 6, the NEW moves include 6-diamonds
-    // being able to move to empty cols (but 6-diamonds is on the bottom
-    // not the top). Actually no: after moving 5-clubs onto 6-diamonds,
-    // the top of col 1 is 5-clubs. Only 5-clubs can move. So involved
-    // cards after: {5-clubs}. Before: {5-clubs, 6-diamonds}. This is a
-    // SUBSET, no NEW cards. Good.
-    //
-    // When 6-diamonds moves to an empty col: col 1 empty, col X has 6.
-    // Moves: 5 to col X (on 6), 5 to col 1 (empty), 6 to any empty col.
-    // Involved: {5-clubs, 6-diamonds}. Before: {5-clubs, 6-diamonds}. Same.
-    //
-    // So this should be false.
+  it('should treat illegal-parent to legal-parent moves as valuable', () => {
+    // 7h is on 9c (illegal parent), but can move to 8d (legal parent).
+    // Even if this does not open additional new-move branches, it should
+    // count as valuable according to productive-move policy.
+    const state = testState(
+      [[card('A', 'clubs')], [card('A', 'diamonds')], [card('A', 'hearts')], [card('A', 'spades')]],
+      [
+        [card('9', 'clubs'), card('7', 'hearts')],
+        [card('8', 'diamonds')],
+        [card('K', 'clubs')],
+        [card('K', 'diamonds')],
+        [card('K', 'hearts')],
+        [card('K', 'spades')],
+        [card('4', 'clubs')],
+        [card('4', 'diamonds')],
+      ],
+    );
+
+    expect(getLegalMoves(state)).toEqual([
+      { kind: 'tableau-to-tableau', fromCol: 0, toCol: 1 },
+    ]);
+    expect(hasValuableMoves(state)).toBe(true);
+  });
+  it('should return true when a tableau move creates a genuinely new non-reverse move', () => {
     const state = testState(
       [[card('A', 'clubs')], [card('A', 'diamonds')], [card('A', 'hearts')], [card('A', 'spades')]],
       [
@@ -1383,6 +1372,29 @@ describe('hasValuableMoves', () => {
         [],
       ],
     );
+    expect(hasValuableMoves(state)).toBe(true);
+  });
+
+  it('should treat immediate backtrack-only moves as non-valuable', () => {
+    // Repro from gameplay report: the only available action after moving
+    // 10 onto another Jack is moving the 10 straight back.
+    const state = testState(
+      [[card('A', 'clubs')], [card('A', 'diamonds')], [card('A', 'hearts')], [card('A', 'spades')]],
+      [
+        [card('J', 'clubs'), card('10', 'hearts')],
+        [card('J', 'diamonds')],
+        [card('4', 'clubs')],
+        [card('4', 'diamonds')],
+        [card('4', 'hearts')],
+        [card('4', 'spades')],
+        [card('7', 'clubs')],
+        [card('K', 'hearts')],
+      ],
+    );
+
+    expect(getLegalMoves(state)).toEqual([
+      { kind: 'tableau-to-tableau', fromCol: 0, toCol: 1 },
+    ]);
     expect(hasValuableMoves(state)).toBe(false);
   });
 

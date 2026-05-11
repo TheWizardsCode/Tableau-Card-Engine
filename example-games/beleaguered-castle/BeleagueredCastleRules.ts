@@ -392,31 +392,58 @@ export function hasNoMoves(state: BeleagueredCastleState): boolean {
 // ── Valuable-move detection ─────────────────────────────────
 
 /**
- * Return a unique string key for a card, suitable for Set membership.
+ * Stable key for a move, used to compare pre/post legal move sets.
  */
-function cardKey(rank: Rank, suit: Suit): string {
-  return `${rank}-${suit}`;
+function moveKey(move: BCMove): string {
+  if (move.kind === 'tableau-to-foundation') {
+    return `F:${move.fromCol}->${move.toFoundation}`;
+  }
+  return `T:${move.fromCol}->${move.toCol}`;
 }
 
 /**
- * Collect the set of card keys that are *involved* in a list of legal moves.
- *
- * "Involved" means the card is the top of the source column (`fromCol`)
- * for any move in the list.  These are the cards the player can currently
- * interact with.
+ * True when `candidate` is exactly the immediate undo of `applied`.
  */
-function involvedCardKeys(
+function isDirectReverseMove(applied: BCMove, candidate: BCMove): boolean {
+  return (
+    applied.kind === 'tableau-to-tableau' &&
+    candidate.kind === 'tableau-to-tableau' &&
+    applied.fromCol === candidate.toCol &&
+    applied.toCol === candidate.fromCol
+  );
+}
+
+function parentCard(state: BeleagueredCastleState, col: number): Card | undefined {
+  const cards = state.tableau[col].toArray();
+  return cards.length >= 2 ? cards[cards.length - 2] : undefined;
+}
+
+function isLegalParentRelation(child: Card, parent: Card): boolean {
+  return rankValue(child.rank) === rankValue(parent.rank) - 1;
+}
+
+/**
+ * A move is parent-improving when it moves a card that currently sits on an
+ * illegal parent onto a legal parent card.
+ */
+function isIllegalToLegalParentMove(
   state: BeleagueredCastleState,
-  moves: BCMove[],
-): Set<string> {
-  const keys = new Set<string>();
-  for (const move of moves) {
-    const card = state.tableau[move.fromCol].peek();
-    if (card) {
-      keys.add(cardKey(card.rank, card.suit));
-    }
-  }
-  return keys;
+  move: BCMove,
+): boolean {
+  if (move.kind !== 'tableau-to-tableau') return false;
+
+  const child = state.tableau[move.fromCol].peek();
+  if (!child) return false;
+
+  const sourceParent = parentCard(state, move.fromCol);
+  const destParent = state.tableau[move.toCol].peek();
+
+  if (!sourceParent || !destParent) return false;
+
+  const sourceLegal = isLegalParentRelation(child, sourceParent);
+  const destLegal = isLegalParentRelation(child, destParent);
+
+  return !sourceLegal && destLegal;
 }
 
 /**
@@ -451,26 +478,25 @@ export function hasValuableMoves(
     return true;
   }
 
-  // Only tableau-to-tableau moves remain.  Check each one via lookahead.
-  const currentKeys = involvedCardKeys(state, currentMoves);
+  // Only tableau-to-tableau moves remain.
+  // A move is valuable when either:
+  // 1) it moves a card from an illegal parent to a legal parent, OR
+  // 2) it enables at least one truly new move (excluding the direct reverse).
+  const currentMoveKeys = new Set(currentMoves.map(moveKey));
 
   for (const move of currentMoves) {
-    // Apply the move (mutates state, but we undo it afterwards)
+    if (isIllegalToLegalParentMove(state, move)) {
+      return true;
+    }
+
     applyMove(state, move);
 
     const newMoves = getLegalMoves(state);
-    const newKeys = involvedCardKeys(state, newMoves);
+    const valuable = newMoves.some((candidate) => {
+      if (isDirectReverseMove(move, candidate)) return false;
+      return !currentMoveKeys.has(moveKey(candidate));
+    });
 
-    // Check for any card newly involved that wasn't before
-    let valuable = false;
-    for (const key of newKeys) {
-      if (!currentKeys.has(key)) {
-        valuable = true;
-        break;
-      }
-    }
-
-    // Undo the move to restore original state
     undoMove(state, move);
 
     if (valuable) return true;

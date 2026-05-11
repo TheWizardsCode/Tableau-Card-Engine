@@ -76,7 +76,7 @@ export class BeleagueredCastleOverlayManager {
 
     const { objects: overlayObjects } = createOverlayBackground(this.scene, { depth: OVERLAY_DEPTH, alpha: 0.75 });
 
-    const title = this.scene.add.text(GAME_W / 2, GAME_H / 2 - 60, 'No Moves Available', {
+    const title = this.scene.add.text(GAME_W / 2, GAME_H / 2 - 60, 'No Productive Moves Available', {
       fontSize: '34px', color: '#ff8888', fontFamily: FONT_FAMILY, fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(BUTTON_DEPTH);
     overlayObjects.push(title);
