@@ -39,9 +39,7 @@ describe('refreshInvestments', () => {
     // Ensure we have enough coins
     s.resourceBank.coins = REFRESH_INVESTMENTS_COST + 5;
 
-    // Snapshot initial decks and discards
-    const upgDeckBefore = s.decks.upgrade.length;
-    const evtDeckBefore = s.decks.event.length;
+    // Snapshot initial discards
     expect(s.discards.upgrade).toHaveLength(0);
     expect(s.discards.event).toHaveLength(0);
 

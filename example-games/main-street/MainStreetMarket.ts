@@ -250,7 +250,12 @@ export function refreshInvestments(state: MainStreetState): RefreshResult {
   state.market.investments.length = 0;
   refillInvestmentsMarket(state);
 
-  addLog(state, `Refreshed investments (-$${REFRESH_INVESTMENTS_COST})`, 'loss');
+  // Build a detailed replacement summary for the activity log
+  const replacedStrings = removed.map(c => {
+    const name = (c as any).name ?? c.id;
+    return `${c.id}${name ? ` (${name})` : ''}`;
+  });
+  addLog(state, `Refreshed investments (-$${REFRESH_INVESTMENTS_COST}): replaced ${replacedStrings.join(', ')}`, 'loss');
 
   return { replaced: removed, cost: REFRESH_INVESTMENTS_COST };
 }
