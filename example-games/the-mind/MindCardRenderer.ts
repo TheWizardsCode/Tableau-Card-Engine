@@ -117,16 +117,16 @@ export function preloadMindCardAssets(
 
       // Mark the scene as valid for rasterisation helpers; callers should
       // hook lifecycle events to call `markSceneInvalid` on shutdown/destroy.
-      try {
-        // Import lazily to avoid circular deps at module-eval time.
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const { markSceneValid } = require('../../src/core-engine/SvgHelpers');
-        if (markSceneValid && typeof markSceneValid === 'function') {
-          markSceneValid(scene);
-        }
-      } catch {
-        // Ignore if SvgHelpers can't be resolved in this environment.
-      }
+      // Import lazily to avoid circular deps at module-eval time. Use a
+      // dynamic import so test environments (Vitest) resolve TypeScript
+      // modules correctly.
+      import('../../src/core-engine/SvgHelpers')
+        .then((m) => {
+          if (m && typeof m.markSceneValid === 'function') m.markSceneValid(scene);
+        })
+        .catch(() => {
+          /* ignore */
+        });
     }
   }
 }
@@ -172,22 +172,37 @@ export async function ensureMindCardTexture(
   if (!svgText) {
     // Use SvgHelpers.fetchSvgText to fetch remotely if available.
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { fetchSvgText, getOrCreateTexture } = require('../../src/core-engine/SvgHelpers');
+      const mod = await import('../../src/core-engine/SvgHelpers');
+      const { fetchSvgText, rasteriseSvgToTexture } = mod as any;
       const url = `/${ASSET_PATH}/${key}.svg`;
       svgText = await fetchSvgText(url);
-      const res = getOrCreateTexture(scene, key, svgText, width, height);
-      return res;
+
+      // If texture already exists, short-circuit.
+      if (scene.textures?.exists(key)) {
+        return { key, ready: true };
+      }
+
+      // Start rasterisation under the legacy texture key so existing scenes
+      // that reference 'mind-<n>' continue to work unchanged.
+      const promise = rasteriseSvgToTexture(scene, key, svgText, width, height);
+      return { key, ready: false, promise };
     } catch {
       // Best-effort: fallthrough to a non-rasterising result — return key only
       return { key, ready: false };
     }
   }
 
-  // svgText is available synchronously — delegate to getOrCreateTexture.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { getOrCreateTexture } = require('../../src/core-engine/SvgHelpers');
-  return getOrCreateTexture(scene, key, svgText, width, height);
+  // svgText is available synchronously — rasterise under the legacy
+  // texture key so callers that expect 'mind-<n>' continue to work.
+  const mod = await import('../../src/core-engine/SvgHelpers');
+  const { rasteriseSvgToTexture } = mod as any;
+
+  if (scene.textures?.exists(key)) {
+    return { key, ready: true };
+  }
+
+  const promise = rasteriseSvgToTexture(scene, key, svgText, width, height);
+  return { key, ready: false, promise };
 }
 
 // ── Validation ─────────────────────────────────────────────
