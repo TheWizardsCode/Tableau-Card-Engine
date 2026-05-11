@@ -9,6 +9,7 @@ export interface MonteCarloRunSummary {
   result: 'win' | 'loss';
   endReason: string;
   finalScore: number;
+  finalCoins: number;
   turns: number;
   turnWhenGridHalf: number | null;
   turnWhenGridFull: number | null;
@@ -22,6 +23,7 @@ export interface MonteCarloMetrics {
   winRate: number;
   medianScore: number;
   averageScore: number;
+  averageCoinsPerTurn: number;
   averageTurns: number;
   averageNoActionTurns: number;
   averageTurnWhenGridHalf: number | null;
@@ -209,6 +211,7 @@ function runSeed(seed: string, maxTurns: number, strategy: MonteCarloStrategy): 
     result,
     endReason,
     finalScore: state.finalScore,
+    finalCoins: state.resourceBank.coins,
     turns,
     turnWhenGridHalf,
     turnWhenGridFull,
@@ -242,6 +245,9 @@ export function runMonteCarlo(options: RunMonteCarloOptions): MonteCarloResult {
     winRate: runs.length > 0 ? wins / runs.length : 0,
     medianScore: median(runs.map(run => run.finalScore)),
     averageScore: average(runs.map(run => run.finalScore)),
+    averageCoinsPerTurn: average(
+      runs.map(run => (run.turns > 0 ? run.finalCoins / run.turns : 0)),
+    ),
     averageTurns: average(runs.map(run => run.turns)),
     averageNoActionTurns: average(runs.map(run => run.noActionTurns)),
     averageTurnWhenGridHalf: average(
@@ -274,6 +280,7 @@ export function toCsv(runs: readonly MonteCarloRunSummary[]): string {
     'result',
     'endReason',
     'finalScore',
+    'finalCoins',
     'turns',
     'turnWhenGridHalf',
     'turnWhenGridFull',
@@ -284,6 +291,7 @@ export function toCsv(runs: readonly MonteCarloRunSummary[]): string {
     run.result,
     run.endReason,
     String(run.finalScore),
+    String(run.finalCoins),
     String(run.turns),
     run.turnWhenGridHalf === null ? '' : String(run.turnWhenGridHalf),
     run.turnWhenGridFull === null ? '' : String(run.turnWhenGridFull),
