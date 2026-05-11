@@ -1,0 +1,11 @@
+{
+  "source": "Generated from MainStreetMonteCarlo.runMonteCarlo",
+  "generatedAt": "2026-05-11T23:58:08.168Z",
+  "seeds": 200,
+  "maxTurns": 25,
+  "strategy": "greedy",
+  "metrics": {
+    "winRate": 0.375,
+    "averageCoinsPerTurn": 1.3313735986450772
+  }
+}
