@@ -264,7 +264,7 @@ export class MainStreetLifecycleManager {
       },
       {
         heading: 'Synergy Types',
-        render: (scene, container, x, y, maxWidth) => {
+        render: (scene, container, x, y, _maxWidth) => {
           // Render only the icons (no text) in a horizontal row.
           const types = [
             { key: 'ms-icon-food' },
