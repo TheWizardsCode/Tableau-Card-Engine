@@ -5,9 +5,7 @@ import Phaser from 'phaser';
 import type { ResourceType, ResourceOrWild, DevelopmentCard, Tier } from '../FeudalismCards';
 import {
   RESOURCE_TYPES,
-  ALL_RESOURCE_TYPES,
   tokenCount,
-  totalTokens,
   resourceAbbrev,
   resourceDisplayName,
   formatCost,
@@ -31,6 +29,11 @@ import {
   ACTION_Y, INSTRUCTION_Y,
   RESOURCE_FILL, RESOURCE_TEXT_COLOR,
 } from './FeudalismConstants';
+import {
+  buildTokenEntries,
+  getBonusRenderOrder,
+  getTokenRenderOrder,
+} from './FeudalismRenderHelpers';
 
 export interface MarketCallbacks {
   onMarketCardClick: (card: DevelopmentCard) => void;
@@ -423,93 +426,185 @@ export class FeudalismRenderer {
   // ── Player area ─────────────────────────────────────────
   refreshPlayerArea(callbacks: ReservedCardCallbacks): void {
     this.playerContainer.removeAll(true);
+
     const player = this.session.players[0];
     const influence = getInfluence(player);
     const bonuses = getBonuses(player);
-
     const row0Y = PLAYER_AREA_Y;
-    const influenceBg = this.scene.add.rectangle(PLAYER_AREA_X + 44, row0Y + 10, 90, 24, 0x443300, 0.6);
-    influenceBg.setStrokeStyle(1, 0x887744);
-    this.playerContainer.add(influenceBg);
 
-    const influenceLabel = this.scene.add.text(PLAYER_AREA_X + 44, row0Y + 10, `★ ${influence} / 15`, {
-      fontSize: '16px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY,
-    }).setOrigin(0.5);
-    this.playerContainer.add(influenceLabel);
-
-    if (player.patrons.length > 0) {
-      const patronLabel = this.scene.add.text(PLAYER_AREA_X + 100, row0Y + 2, `Patrons: ${player.patrons.length}`, {
-        fontSize: '14px', color: '#aa88cc', fontFamily: FONT_FAMILY,
-      });
-      this.playerContainer.add(patronLabel);
-    }
-
-    const tokLabel = this.scene.add.text(PLAYER_AREA_X + 200, row0Y + 4, 'Tokens:', {
-      fontSize: '15px', color: '#aaaaaa', fontFamily: FONT_FAMILY,
+    this.renderInfluenceHeader(this.playerContainer, PLAYER_AREA_X + 44, row0Y, influence);
+    this.renderPatronCount(this.playerContainer, PLAYER_AREA_X + 100, row0Y + 2, player.patrons.length);
+    this.renderTokenRow(this.playerContainer, player.tokens, {
+      labelX: PLAYER_AREA_X + 200,
+      tokenStartX: PLAYER_AREA_X + 280,
+      y: row0Y + 14,
+      reverse: false,
+      emptyAlign: 'left',
     });
-    this.playerContainer.add(tokLabel);
-
-    let tx = PLAYER_AREA_X + 280;
-    const tokCenterY = row0Y + 14;
-    for (const c of ALL_RESOURCE_TYPES) {
-      const n = tokenCount(player.tokens, c);
-      if (n === 0) continue;
-      const circle = this.scene.add.circle(tx, tokCenterY, 14, RESOURCE_FILL[c]);
-      circle.setStrokeStyle(1, 0xffffff);
-      this.playerContainer.add(circle);
-      const pIcon = addCropIcon(this.scene as any, tx, tokCenterY, c, 14, cssColorToNumber(RESOURCE_TEXT_COLOR[c]));
-      this.playerContainer.add(pIcon);
-      const ct = this.scene.add.text(tx, tokCenterY, `${n}`, {
-        fontSize: '13px', fontStyle: 'bold', color: RESOURCE_TEXT_COLOR[c], fontFamily: FONT_FAMILY,
-      }).setOrigin(0.5);
-      this.playerContainer.add(ct);
-      tx += 34;
-    }
-
-    if (totalTokens(player.tokens) === 0) {
-      const noTok = this.scene.add.text(tx + 5, tokCenterY, '(none)', {
-        fontSize: '14px', color: '#666666', fontFamily: FONT_FAMILY,
-      }).setOrigin(0, 0.5);
-      this.playerContainer.add(noTok);
-    }
 
     const row1Y = row0Y + 32;
+    this.renderBonusSlots(this.playerContainer, bonuses, {
+      x: PLAYER_AREA_X,
+      y: row1Y,
+      reverse: false,
+    });
+
+    const row2Y = row1Y + 56;
+    this.renderReservedCards(callbacks, row2Y, player.reservedCards);
+  }
+
+  private renderInfluenceHeader(
+    container: Phaser.GameObjects.Container,
+    x: number,
+    rowY: number,
+    influence: number,
+  ): void {
+    const influenceBg = this.scene.add.rectangle(x, rowY + 10, 90, 24, 0x443300, 0.6);
+    influenceBg.setStrokeStyle(1, 0x887744);
+    container.add(influenceBg);
+
+    const influenceLabel = this.scene.add.text(x, rowY + 10, `★ ${influence} / 15`, {
+      fontSize: '16px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY,
+    }).setOrigin(0.5);
+    container.add(influenceLabel);
+  }
+
+  private renderPatronCount(
+    container: Phaser.GameObjects.Container,
+    x: number,
+    y: number,
+    patronCount: number,
+    rightAlign: boolean = false,
+  ): void {
+    if (patronCount <= 0) {
+      return;
+    }
+
+    const patronLabel = this.scene.add.text(x, y, `Patrons: ${patronCount}`, {
+      fontSize: '14px', color: '#aa88cc', fontFamily: FONT_FAMILY,
+    });
+
+    if (rightAlign) {
+      patronLabel.setOrigin(1, 0);
+    }
+
+    container.add(patronLabel);
+  }
+
+  private renderTokenRow(
+    container: Phaser.GameObjects.Container,
+    tokens: Partial<Record<ResourceOrWild, number>>,
+    options: {
+      labelX: number;
+      tokenStartX: number;
+      y: number;
+      reverse: boolean;
+      emptyAlign: 'left' | 'right';
+    },
+  ): void {
+    const label = this.scene.add.text(options.labelX, options.y - 10, 'Tokens:', {
+      fontSize: '15px', color: '#aaaaaa', fontFamily: FONT_FAMILY,
+    });
+    if (options.emptyAlign === 'right') {
+      label.setOrigin(1, 0);
+    }
+    container.add(label);
+
+    const tokenEntries = buildTokenEntries(tokens, getTokenRenderOrder(options.reverse));
+    let cursorX = options.tokenStartX;
+    const delta = options.reverse ? -34 : 34;
+
+    for (const entry of tokenEntries) {
+      this.renderTokenBubble(container, cursorX, options.y, entry.color, entry.count);
+      cursorX += delta;
+    }
+
+    if (tokenEntries.length === 0) {
+      const noTok = this.scene.add.text(options.tokenStartX, options.y, '(none)', {
+        fontSize: '14px', color: '#666666', fontFamily: FONT_FAMILY,
+      }).setOrigin(options.emptyAlign === 'right' ? 1 : 0, 0.5);
+      container.add(noTok);
+    }
+  }
+
+  private renderTokenBubble(
+    container: Phaser.GameObjects.Container,
+    x: number,
+    y: number,
+    color: ResourceOrWild,
+    count: number,
+  ): void {
+    const circle = this.scene.add.circle(x, y, 14, RESOURCE_FILL[color]);
+    circle.setStrokeStyle(1, 0xffffff);
+    container.add(circle);
+
+    const icon = addCropIcon(this.scene as any, x, y, color, 14, cssColorToNumber(RESOURCE_TEXT_COLOR[color]));
+    container.add(icon);
+
+    const countText = this.scene.add.text(x, y, `${count}`, {
+      fontSize: '13px', fontStyle: 'bold', color: RESOURCE_TEXT_COLOR[color], fontFamily: FONT_FAMILY,
+    }).setOrigin(0.5);
+    container.add(countText);
+  }
+
+  private renderBonusSlots(
+    container: Phaser.GameObjects.Container,
+    bonuses: Partial<Record<ResourceType, number>>,
+    options: {
+      x: number;
+      y: number;
+      reverse: boolean;
+    },
+  ): void {
     const SLOT_W = 38;
     const SLOT_H = 50;
     const SLOT_GAP = 8;
-    let sx = PLAYER_AREA_X;
-    for (const c of RESOURCE_TYPES) {
-      const count = bonuses[c];
+    const order = getBonusRenderOrder(options.reverse);
+    let slotX = options.reverse ? options.x - SLOT_W : options.x;
+
+    for (const color of order) {
+      const count = bonuses[color] ?? 0;
       const hasCards = count > 0;
       const alpha = hasCards ? 0.7 : 0.15;
-      const slot = this.scene.add.rectangle(sx + SLOT_W / 2, row1Y + SLOT_H / 2, SLOT_W, SLOT_H, RESOURCE_FILL[c], alpha);
+      const centerX = slotX + SLOT_W / 2;
+
+      const slot = this.scene.add.rectangle(centerX, options.y + SLOT_H / 2, SLOT_W, SLOT_H, RESOURCE_FILL[color], alpha);
       slot.setStrokeStyle(1, hasCards ? 0xaaaaaa : 0x555555, hasCards ? 0.8 : 0.3);
-      this.playerContainer.add(slot);
+      container.add(slot);
 
-      const abbr = this.scene.add.text(sx + SLOT_W / 2, row1Y + 10, resourceAbbrev(c), {
-        fontSize: '11px', fontStyle: 'bold', color: hasCards ? RESOURCE_TEXT_COLOR[c] : '#666666', fontFamily: FONT_FAMILY,
+      const abbr = this.scene.add.text(centerX, options.y + 10, resourceAbbrev(color), {
+        fontSize: '11px', fontStyle: 'bold', color: hasCards ? RESOURCE_TEXT_COLOR[color] : '#666666', fontFamily: FONT_FAMILY,
       }).setOrigin(0.5);
-      this.playerContainer.add(abbr);
+      container.add(abbr);
 
-      const countText = this.scene.add.text(sx + SLOT_W / 2, row1Y + SLOT_H / 2 + 6, `${count}`, {
+      const countText = this.scene.add.text(centerX, options.y + SLOT_H / 2 + 6, `${count}`, {
         fontSize: '18px', fontStyle: 'bold', color: hasCards ? '#ffffff' : '#444444', fontFamily: FONT_FAMILY,
       }).setOrigin(0.5);
-      this.playerContainer.add(countText);
-      sx += SLOT_W + SLOT_GAP;
+      container.add(countText);
+
+      slotX += options.reverse ? -(SLOT_W + SLOT_GAP) : (SLOT_W + SLOT_GAP);
+    }
+  }
+
+  private renderReservedCards(
+    callbacks: ReservedCardCallbacks,
+    rowY: number,
+    reservedCards: DevelopmentCard[],
+  ): void {
+    if (reservedCards.length === 0) {
+      return;
     }
 
-    const row2Y = row1Y + SLOT_H + 6;
-    if (player.reservedCards.length > 0) {
-      const resLabel = this.scene.add.text(PLAYER_AREA_X, row2Y + 4, `Reserved (${player.reservedCards.length}):`, {
-        fontSize: '15px', color: '#ccaa66', fontFamily: FONT_FAMILY,
-      });
-      this.playerContainer.add(resLabel);
-      let rx = PLAYER_AREA_X + 150;
-      for (const card of player.reservedCards) {
-        const cardContainer = this.createSmallCard(rx, row2Y - 2, card, true, callbacks);
-        this.playerContainer.add(cardContainer);
-        rx += 100;
-      }
+    const resLabel = this.scene.add.text(PLAYER_AREA_X, rowY + 4, `Reserved (${reservedCards.length}):`, {
+      fontSize: '15px', color: '#ccaa66', fontFamily: FONT_FAMILY,
+    });
+    this.playerContainer.add(resLabel);
+
+    let x = PLAYER_AREA_X + 150;
+    for (const card of reservedCards) {
+      const cardContainer = this.createSmallCard(x, rowY - 2, card, true, callbacks);
+      this.playerContainer.add(cardContainer);
+      x += 100;
     }
   }
 
@@ -554,94 +649,44 @@ export class FeudalismRenderer {
   // ── AI area ─────────────────────────────────────────────
   refreshAiArea(): void {
     this.aiContainer.removeAll(true);
+
     const ai = this.session.players[1];
     const bonuses = getBonuses(ai);
     const influence = getInfluence(ai);
-
     const row0Y = AI_AREA_Y;
-    const influenceBg = this.scene.add.rectangle(AI_AREA_X - 44, row0Y + 10, 90, 24, 0x443300, 0.6);
-    influenceBg.setStrokeStyle(1, 0x887744);
-    this.aiContainer.add(influenceBg);
 
-    const influenceLabel = this.scene.add.text(AI_AREA_X - 44, row0Y + 10, `★ ${influence} / 15`, {
-      fontSize: '16px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY,
-    }).setOrigin(0.5);
-    this.aiContainer.add(influenceLabel);
-
-    if (ai.patrons.length > 0) {
-      const patronLabel = this.scene.add.text(AI_AREA_X - 100, row0Y + 2, `Patrons: ${ai.patrons.length}`, {
-        fontSize: '14px', color: '#aa88cc', fontFamily: FONT_FAMILY,
-      }).setOrigin(1, 0);
-      this.aiContainer.add(patronLabel);
-    }
-
-    const tokLabel = this.scene.add.text(AI_AREA_X - 200, row0Y + 4, 'Tokens:', {
-      fontSize: '15px', color: '#aaaaaa', fontFamily: FONT_FAMILY,
-    }).setOrigin(1, 0);
-    this.aiContainer.add(tokLabel);
-
-    let tx = AI_AREA_X - 220;
-    const tokCenterY = row0Y + 14;
-    let hasTokens = false;
-    const tokenColors = [...ALL_RESOURCE_TYPES].reverse();
-    for (const c of tokenColors) {
-      const n = tokenCount(ai.tokens, c);
-      if (n === 0) continue;
-      hasTokens = true;
-      const circle = this.scene.add.circle(tx, tokCenterY, 14, RESOURCE_FILL[c]);
-      circle.setStrokeStyle(1, 0xffffff);
-      this.aiContainer.add(circle);
-      const aiIcon = addCropIcon(this.scene as any, tx, tokCenterY, c, 14, cssColorToNumber(RESOURCE_TEXT_COLOR[c]));
-      this.aiContainer.add(aiIcon);
-      const ct = this.scene.add.text(tx, tokCenterY, `${n}`, {
-        fontSize: '13px', fontStyle: 'bold', color: RESOURCE_TEXT_COLOR[c], fontFamily: FONT_FAMILY,
-      }).setOrigin(0.5);
-      this.aiContainer.add(ct);
-      tx -= 34;
-    }
-
-    if (!hasTokens) {
-      const noTok = this.scene.add.text(AI_AREA_X - 220, tokCenterY, '(none)', {
-        fontSize: '14px', color: '#666666', fontFamily: FONT_FAMILY,
-      }).setOrigin(1, 0.5);
-      this.aiContainer.add(noTok);
-    }
+    this.renderInfluenceHeader(this.aiContainer, AI_AREA_X - 44, row0Y, influence);
+    this.renderPatronCount(this.aiContainer, AI_AREA_X - 100, row0Y + 2, ai.patrons.length, true);
+    this.renderTokenRow(this.aiContainer, ai.tokens, {
+      labelX: AI_AREA_X - 200,
+      tokenStartX: AI_AREA_X - 220,
+      y: row0Y + 14,
+      reverse: true,
+      emptyAlign: 'right',
+    });
 
     const row1Y = row0Y + 32;
-    const SLOT_W = 38;
-    const SLOT_H = 50;
-    const SLOT_GAP = 8;
-    let sx = AI_AREA_X - SLOT_W;
-    const resourceTypesReversed = [...RESOURCE_TYPES].reverse();
-    for (const c of resourceTypesReversed) {
-      const count = bonuses[c];
-      const hasCards = count > 0;
-      const alpha = hasCards ? 0.7 : 0.15;
-      const slot = this.scene.add.rectangle(sx + SLOT_W / 2, row1Y + SLOT_H / 2, SLOT_W, SLOT_H, RESOURCE_FILL[c], alpha);
-      slot.setStrokeStyle(1, hasCards ? 0xaaaaaa : 0x555555, hasCards ? 0.8 : 0.3);
-      this.aiContainer.add(slot);
+    this.renderBonusSlots(this.aiContainer, bonuses, {
+      x: AI_AREA_X,
+      y: row1Y,
+      reverse: true,
+    });
 
-      const abbr = this.scene.add.text(sx + SLOT_W / 2, row1Y + 10, resourceAbbrev(c), {
-        fontSize: '11px', fontStyle: 'bold', color: hasCards ? RESOURCE_TEXT_COLOR[c] : '#666666', fontFamily: FONT_FAMILY,
-      }).setOrigin(0.5);
-      this.aiContainer.add(abbr);
+    this.renderAiSummary(ai.purchasedCards.length, ai.reservedCards.length, row1Y + 56);
+  }
 
-      const countText = this.scene.add.text(sx + SLOT_W / 2, row1Y + SLOT_H / 2 + 6, `${count}`, {
-        fontSize: '18px', fontStyle: 'bold', color: hasCards ? '#ffffff' : '#444444', fontFamily: FONT_FAMILY,
-      }).setOrigin(0.5);
-      this.aiContainer.add(countText);
-      sx -= (SLOT_W + SLOT_GAP);
-    }
-
-    const row2Y = row1Y + SLOT_H + 6;
-    const cardCount = ai.purchasedCards.length;
-    const cardText = this.scene.add.text(AI_AREA_X, row2Y + 4, `Cards: ${cardCount}`, {
+  private renderAiSummary(
+    purchasedCards: number,
+    reservedCards: number,
+    rowY: number,
+  ): void {
+    const cardText = this.scene.add.text(AI_AREA_X, rowY + 4, `Cards: ${purchasedCards}`, {
       fontSize: '15px', color: '#888888', fontFamily: FONT_FAMILY,
     }).setOrigin(1, 0);
     this.aiContainer.add(cardText);
 
-    if (ai.reservedCards.length > 0) {
-      const resText = this.scene.add.text(AI_AREA_X - 110, row2Y + 4, `Reserved: ${ai.reservedCards.length}`, {
+    if (reservedCards > 0) {
+      const resText = this.scene.add.text(AI_AREA_X - 110, rowY + 4, `Reserved: ${reservedCards}`, {
         fontSize: '15px', color: '#ccaa66', fontFamily: FONT_FAMILY,
       }).setOrigin(1, 0);
       this.aiContainer.add(resText);
