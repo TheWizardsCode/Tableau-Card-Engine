@@ -10,6 +10,7 @@ import {
   MARKET_BUSINESS_SLOTS,
   MARKET_INVESTMENT_SLOTS,
   INCIDENT_QUEUE_SIZE,
+  REFRESH_INVESTMENTS_COST,
 } from '../MainStreetCards';
 import { computeScore } from '../MainStreetEngine';
 import {
@@ -634,7 +635,7 @@ export class MainStreetRenderer {
         const btnX = Math.round(labelCenter - btnW / 2);
         const btnY = deckY + 22; // further below deck text to avoid overlap
 
-        const labelText = 'Discover (2)';
+        const labelText = `Discover (${REFRESH_INVESTMENTS_COST})`;
 
         const btn = this.createActionButton(btnX, btnY, btnW, labelText, canRefresh ? () => { s.onRefreshInvestmentsClick(); } : () => {});
         // Disable interaction when not allowed
