@@ -6,6 +6,26 @@ import { BeleagueredCastleTurnController } from '../../example-games/beleaguered
 import type { BCMove } from '../../example-games/beleaguered-castle/BeleagueredCastleState';
 
 describe('BeleagueredCastleTurnController', () => {
+  it('executePlayerMove does not emit game-end callback for non-terminal states', () => {
+    const state = deal(723);
+    const recorder = new BCTranscriptRecorder(723, state);
+    const openingMove: BCMove = { kind: 'tableau-to-tableau', fromCol: 3, toCol: 5 };
+
+    let gameEndSignals = 0;
+    const controller = new BeleagueredCastleTurnController(state, recorder, {
+      onRefresh: () => {},
+      onCheckGameEnd: () => { gameEndSignals++; },
+      onAutoCompleteVisual: () => {},
+      onAutoCompleteDone: () => {},
+      onSoundEvent: () => {},
+    });
+
+    controller.executePlayerMove(openingMove);
+
+    expect(controller.gameEnded).toBe(false);
+    expect(gameEndSignals).toBe(0);
+  });
+
   it('does not end the game while legal moves still exist', () => {
     const state = deal(723);
     const recorder = new BCTranscriptRecorder(723, state);

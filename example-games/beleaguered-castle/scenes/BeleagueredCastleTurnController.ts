@@ -117,7 +117,7 @@ export class BeleagueredCastleTurnController {
     }
 
     this.callbacks.onRefresh();
-    this.callbacks.onCheckGameEnd();
+    this.checkGameEnd();
   }
 
   performUndo(): void {
