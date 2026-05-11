@@ -652,6 +652,18 @@ export class MainStreetRenderer {
           } catch (_) { /* ignore */ }
         }
 
+        // Tooltip for the Discover button
+        try {
+          const info = `Pay $${REFRESH_INVESTMENTS_COST} to redraw the investments row immediately. Removed cards go to their discard piles. Available only during Market phase.`;
+          // Create a transparent hover zone aligned with the button; it will be removed when marketContainer is cleared.
+          const hover = s.add.rectangle(btn.x, btn.y, btnW, s.layout.actionButtonH, 0x000000, 0);
+          hover.setOrigin(0.5);
+          hover.setInteractive({ useHandCursor: true });
+          hover.on('pointerover', () => s.tooltipManager?.show(info, hover.x, hover.y));
+          hover.on('pointerout', () => s.tooltipManager?.hide());
+          s.marketContainer.add(hover);
+        } catch (_) { /* ignore tooltip attach errors in tests */ }
+
         s.marketContainer.add(btn);
       } catch (_) {
         // ignore UI errors in tests
