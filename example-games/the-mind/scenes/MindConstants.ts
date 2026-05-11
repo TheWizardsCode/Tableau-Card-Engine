@@ -32,16 +32,6 @@ export const DEPTH_UI = 5;
 export const DEPTH_OVERLAY = 2000;
 export const DEPTH_OVERLAY_CONTENT = DEPTH_OVERLAY + 1;
 
-// ── Audio asset keys ────────────────────────────────────────
-export const SFX_KEYS = {
-  CARD_PLAY: 'mind-sfx-card-play',
-  LIFE_LOST: 'mind-sfx-life-lost',
-  LEVEL_COMPLETE: 'mind-sfx-level-complete',
-  GAME_WIN: 'mind-sfx-game-win',
-  GAME_LOST: 'mind-sfx-game-lost',
-  UI_CLICK: 'mind-sfx-ui-click',
-} as const;
-
 // ── Phase state machine ─────────────────────────────────────
 export type GamePhase =
   | 'dealing'
