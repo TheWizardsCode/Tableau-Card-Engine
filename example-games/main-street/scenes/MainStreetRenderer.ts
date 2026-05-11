@@ -624,19 +624,32 @@ export class MainStreetRenderer {
       ).setOrigin(0, 0);
       s.marketContainer.add(deckText);
 
-      // Refresh Investments button (only in MarketPhase / when enabled)
+      // Refresh Investments button (centered under Investments label / deck count)
       try {
         const canRefresh = canRefreshInvestments(s.state).legal;
         const btnW = s.layout.smallButtonW;
-        const btnX = startX + maxSlots * (marketCardW + marketCardGap) + 12;
-        const btn = this.createActionButton(btnX, deckY - (marketCardH / 2), btnW, 'Refresh', () => {
-          s.onRefreshInvestmentsClick();
-        });
-        // Disable button when not allowed
+        // center under the label area: label left (40) + half label width
+        const labelCenter = 40 + s.layout.marketLabelW / 2;
+        const btnX = Math.round(labelCenter - btnW / 2);
+        const btnY = deckY + 6; // slightly below deck text
+
+        const labelText = 'Discord (2)';
+
+        const btn = this.createActionButton(btnX, btnY, btnW, labelText, canRefresh ? () => { s.onRefreshInvestmentsClick(); } : () => {});
+        // Disable interaction when not allowed
         if (!canRefresh) {
-          // visually indicate disabled
-          (btn.first as any)?.setFillStyle?.(0x333333, 0.6);
+          try {
+            const bg = (btn.list && btn.list[0]) as Phaser.GameObjects.Rectangle | undefined;
+            if (bg && typeof bg.setInteractive === 'function') {
+              bg.disableInteractive?.();
+            }
+            // dim visual
+            if (bg && typeof bg.setFillStyle === 'function') {
+              bg.setFillStyle(0x333333, 0.6);
+            }
+          } catch (_) { /* ignore */ }
         }
+
         s.marketContainer.add(btn);
       } catch (_) {
         // ignore UI errors in tests

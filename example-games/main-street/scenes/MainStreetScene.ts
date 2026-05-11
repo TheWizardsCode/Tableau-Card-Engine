@@ -309,6 +309,11 @@ export class MainStreetScene extends CardGameScene {
     return (this.msRenderer as any).createActionButton.apply(this.msRenderer, args);
   }
 
+  // Refresh investments proxy (forward to turn controller)
+  public onRefreshInvestmentsClick(...args: any[]): any {
+    return (this.msTurnController as any).onRefreshInvestmentsClick.apply(this.msTurnController, args);
+  }
+
   /**
    * Creates a "Hint" button that is disabled after first use per turn.
    * When clicked, queries the Greedy strategy and highlights the recommended
