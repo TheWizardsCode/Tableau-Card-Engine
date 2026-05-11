@@ -55,6 +55,12 @@ export class SushiGoOverlayManager {
     const humanMakiBonus = result.makiBonuses ? result.makiBonuses[0] : 0;
     const aiMakiBonus = result.makiBonuses ? result.makiBonuses[1] : 0;
 
+    const computeDisplayedTotal = (idx: number) => {
+      const roundsSum = this.session.players[idx].roundScores.reduce((a, b) => a + b, 0);
+      const pudding = result.puddingBonuses ? result.puddingBonuses[idx] : 0;
+      return roundsSum + pudding;
+    };
+
     const lines = [
       `Round ${roundNum} Complete!`,
       '',
@@ -65,7 +71,7 @@ export class SushiGoOverlayManager {
       `  (Tmp:${aiBreak.tempura} Ssh:${aiBreak.sashimi} Dmp:${aiBreak.dumpling} Nig:${aiBreak.nigiri})`,
       `  Maki: ${aiMakiCount} → ${aiMakiBonus >= 0 ? '+' : ''}${aiMakiBonus} pts`,
       '',
-      `Total -- You: ${human.totalScore}  AI: ${ai.totalScore}`,
+      `Total -- You: ${computeDisplayedTotal(0)}  AI: ${computeDisplayedTotal(1)}`,
     ];
 
     const { textY, buttonY } = this.resolveOverlayAnchors(overlay.box, {
@@ -132,6 +138,12 @@ export class SushiGoOverlayManager {
     const humanPuddingBonus = result.puddingBonuses ? result.puddingBonuses[0] : 0;
     const aiPuddingBonus = result.puddingBonuses ? result.puddingBonuses[1] : 0;
 
+    const computeDisplayedTotal = (idx: number) => {
+      const roundsSum = this.session.players[idx].roundScores.reduce((a, b) => a + b, 0);
+      const pudding = result.puddingBonuses ? result.puddingBonuses[idx] : 0;
+      return roundsSum + pudding;
+    };
+
     const lines = [
       winnerText,
       '',
@@ -154,7 +166,7 @@ export class SushiGoOverlayManager {
     for (let r = 0; r < human.roundScores.length; r++) {
       lines.push(`  R${r + 1}: You ${human.roundScores[r]} -- AI ${ai.roundScores[r]}`);
     }
-    lines.push('', `Final: You ${human.totalScore} -- AI ${ai.totalScore}`);
+    lines.push('', `Final: You ${computeDisplayedTotal(0)} -- AI ${computeDisplayedTotal(1)}`);
 
     const { textY, buttonY } = this.resolveOverlayAnchors(overlay.box, {
       fallbackTextY: GAME_H / 2 - 260 + 56,
