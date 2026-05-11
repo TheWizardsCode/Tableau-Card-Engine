@@ -17,7 +17,7 @@
   },
   {
     "heading": "Winning & Losing",
-    "body": "You win when all 52 cards are on the foundations (13 per suit).\n\nYou lose when no legal moves remain and the foundations are not complete.\n\nWhen the game detects the remaining cards can be trivially completed, it will auto-complete for you."
+    "body": "You win when all 52 cards are on the foundations (13 per suit).\n\nYou lose when no productive moves remain (no legal move can expose a new move) and the foundations are not complete.\n\nWhen the game detects the remaining cards can be trivially completed, it will auto-complete for you."
   },
   {
     "heading": "Controls",

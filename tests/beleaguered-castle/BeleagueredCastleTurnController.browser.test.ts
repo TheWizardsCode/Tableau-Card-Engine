@@ -6,10 +6,16 @@ import { BeleagueredCastleTurnController } from '../../example-games/beleaguered
 import type { BCMove } from '../../example-games/beleaguered-castle/BeleagueredCastleState';
 
 describe('BeleagueredCastleTurnController', () => {
-  it('executePlayerMove does not emit game-end callback for non-terminal states', () => {
-    const state = deal(723);
-    const recorder = new BCTranscriptRecorder(723, state);
-    const openingMove: BCMove = { kind: 'tableau-to-tableau', fromCol: 3, toCol: 5 };
+  it('executePlayerMove does not emit game-end callback for states with valuable moves', () => {
+    const openingMove: BCMove = { kind: 'tableau-to-tableau', fromCol: 0, toCol: 2 };
+
+    const precheckState = deal(1);
+    applyMove(precheckState, openingMove);
+    expect(hasNoMoves(precheckState)).toBe(false);
+    expect(hasValuableMoves(precheckState)).toBe(true);
+
+    const state = deal(1);
+    const recorder = new BCTranscriptRecorder(1, state);
 
     let gameEndSignals = 0;
     const controller = new BeleagueredCastleTurnController(state, recorder, {
@@ -26,31 +32,26 @@ describe('BeleagueredCastleTurnController', () => {
     expect(gameEndSignals).toBe(0);
   });
 
-  it('does not end the game while legal moves still exist', () => {
+  it('ends the game when no valuable moves remain (even if legal moves exist)', () => {
     const state = deal(723);
     const recorder = new BCTranscriptRecorder(723, state);
-
-    // Repro state found during debugging: after this move the current
-    // one-ply hasValuableMoves heuristic returns false, but legal moves remain.
     const openingMove: BCMove = { kind: 'tableau-to-tableau', fromCol: 3, toCol: 5 };
-    applyMove(state, openingMove);
 
-    expect(hasNoMoves(state)).toBe(false);
-    expect(getLegalMoves(state).length).toBeGreaterThan(0);
-    expect(hasValuableMoves(state)).toBe(false);
-
+    let gameEndSignals = 0;
     const controller = new BeleagueredCastleTurnController(state, recorder, {
       onRefresh: () => {},
-      onCheckGameEnd: () => {},
+      onCheckGameEnd: () => { gameEndSignals++; },
       onAutoCompleteVisual: () => {},
       onAutoCompleteDone: () => {},
       onSoundEvent: () => {},
     });
 
-    controller.checkGameEnd();
+    controller.executePlayerMove(openingMove);
 
-    // Even if heuristic says no valuable moves, a game with legal moves
-    // should not hard-end as loss.
-    expect(controller.gameEnded).toBe(false);
+    expect(getLegalMoves(state).length).toBeGreaterThan(0);
+    expect(hasNoMoves(state)).toBe(false);
+    expect(hasValuableMoves(state)).toBe(false);
+    expect(controller.gameEnded).toBe(true);
+    expect(gameEndSignals).toBe(1);
   });
 });
