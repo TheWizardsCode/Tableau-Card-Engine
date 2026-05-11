@@ -108,6 +108,7 @@ export type {
 } from './Overlay';
 
 export { createOverlayMenuButton } from './MenuButton';
+export { OverlayManager } from './OverlayManager';
 
 // Hi-DPI text rendering (side-effect import for patching)
 export { TEXT_DPR } from './hiDpiText';
