@@ -22,7 +22,7 @@ export const MAX_HAND_WIDTH = GAME_W - 80; // leave 40px margin each side
 export const LEVEL_COMPLETE_DELAY = 2000;
 export const PENALTY_REVEAL_DELAY = 1000;
 export const ANIM_DURATION = 250;
-export const PRE_PENALTY_PAUSE = 800;
+export const PRE_PENALTY_PAUSE = 120;
 
 // Depths
 export const DEPTH_CARDS = 1;

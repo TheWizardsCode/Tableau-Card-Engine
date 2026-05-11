@@ -14,6 +14,7 @@ import {
   ANIM_DURATION, PENALTY_REVEAL_DELAY,
   DEPTH_PLAYED_CARD, DEPTH_OVERLAY_CONTENT,
 } from './MindConstants';
+import { pickPenaltyStartPositions } from './penaltyAnimation';
 import type { MindRenderer } from './MindRenderer';
 import type { TheMindSession } from '../TheMindGameState';
 
@@ -132,11 +133,20 @@ export class MindAnimator {
   showPenaltyCards(result: PlayResult, onComplete: () => void): void {
     const penaltySprites: Phaser.GameObjects.Image[] = [];
 
-    for (const { playerId, card } of result.penaltyCards) {
+    const startPositions = pickPenaltyStartPositions(
+      result.penaltyCards,
+      this.renderer.humanCardSprites.map((s) => ({ x: s.x, y: s.y })),
+      this.renderer.aiCardSprites.map((s) => ({ x: s.x, y: s.y })),
+      {
+        0: { x: PILE_X, y: HUMAN_HAND_Y },
+        1: { x: PILE_X, y: AI_HAND_Y },
+      },
+    );
+
+    for (let i = 0; i < result.penaltyCards.length; i++) {
+      const { card } = result.penaltyCards[i];
       const displayCard = { ...card, faceUp: true };
-      const y = playerId === 0 ? HUMAN_HAND_Y : AI_HAND_Y;
-      const offsetX = penaltySprites.length * (CARD_W * 0.6);
-      const x = PILE_X - ((result.penaltyCards.length - 1) * CARD_W * 0.6) / 2 + offsetX;
+      const { x, y } = startPositions[i];
 
       const sprite = this.scene.add
         .image(x, y, getMindCardTexture(displayCard))
@@ -148,6 +158,7 @@ export class MindAnimator {
 
       this.scene.tweens.add({
         targets: sprite,
+        x: PILE_X,
         y: PILE_Y,
         alpha: 0.8,
         duration: ANIM_DURATION,
