@@ -166,6 +166,17 @@ export class SushiGoOverlayManager {
     for (let r = 0; r < human.roundScores.length; r++) {
       lines.push(`  R${r + 1}: You ${human.roundScores[r]} -- AI ${ai.roundScores[r]}`);
     }
+
+    // If pudding bonuses were computed at game end, surface them explicitly
+    // in the round-by-round section so the per-round lines remain pure round
+    // scores and the pudding adjustment is visible in context.
+    if (result.puddingBonuses) {
+      lines.push(
+        `  Pudding Bonus: You ${humanPuddingBonus >= 0 ? '+' : ''}${humanPuddingBonus} ` +
+          `-- AI ${aiPuddingBonus >= 0 ? '+' : ''}${aiPuddingBonus}`,
+      );
+    }
+
     lines.push('', `Final: You ${computeDisplayedTotal(0)} -- AI ${computeDisplayedTotal(1)}`);
 
     const { textY, buttonY } = this.resolveOverlayAnchors(overlay.box, {
