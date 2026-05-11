@@ -33,9 +33,9 @@ describe('BeleagueredCastleTurnController', () => {
   });
 
   it('ends the game when no valuable moves remain (even if legal moves exist)', () => {
-    const state = deal(4);
-    const recorder = new BCTranscriptRecorder(4, state);
-    const openingMove: BCMove = { kind: 'tableau-to-tableau', fromCol: 5, toCol: 4 };
+    const state = deal(11);
+    const recorder = new BCTranscriptRecorder(11, state);
+    const openingMove: BCMove = { kind: 'tableau-to-tableau', fromCol: 0, toCol: 3 };
 
     let gameEndSignals = 0;
     const controller = new BeleagueredCastleTurnController(state, recorder, {

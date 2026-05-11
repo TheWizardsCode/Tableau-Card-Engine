@@ -413,6 +413,39 @@ function isDirectReverseMove(applied: BCMove, candidate: BCMove): boolean {
   );
 }
 
+function parentCard(state: BeleagueredCastleState, col: number): Card | undefined {
+  const cards = state.tableau[col].toArray();
+  return cards.length >= 2 ? cards[cards.length - 2] : undefined;
+}
+
+function isLegalParentRelation(child: Card, parent: Card): boolean {
+  return rankValue(child.rank) === rankValue(parent.rank) - 1;
+}
+
+/**
+ * A move is parent-improving when it moves a card that currently sits on an
+ * illegal parent onto a legal parent card.
+ */
+function isIllegalToLegalParentMove(
+  state: BeleagueredCastleState,
+  move: BCMove,
+): boolean {
+  if (move.kind !== 'tableau-to-tableau') return false;
+
+  const child = state.tableau[move.fromCol].peek();
+  if (!child) return false;
+
+  const sourceParent = parentCard(state, move.fromCol);
+  const destParent = state.tableau[move.toCol].peek();
+
+  if (!sourceParent || !destParent) return false;
+
+  const sourceLegal = isLegalParentRelation(child, sourceParent);
+  const destLegal = isLegalParentRelation(child, destParent);
+
+  return !sourceLegal && destLegal;
+}
+
 /**
  * Check whether the current state has at least one **valuable** move.
  *
@@ -445,12 +478,17 @@ export function hasValuableMoves(
     return true;
   }
 
-  // Only tableau-to-tableau moves remain. Check each one via lookahead.
-  // A move is valuable only if it enables at least one truly new move,
-  // excluding the immediate reverse of the move itself.
+  // Only tableau-to-tableau moves remain.
+  // A move is valuable when either:
+  // 1) it moves a card from an illegal parent to a legal parent, OR
+  // 2) it enables at least one truly new move (excluding the direct reverse).
   const currentMoveKeys = new Set(currentMoves.map(moveKey));
 
   for (const move of currentMoves) {
+    if (isIllegalToLegalParentMove(state, move)) {
+      return true;
+    }
+
     applyMove(state, move);
 
     const newMoves = getLegalMoves(state);

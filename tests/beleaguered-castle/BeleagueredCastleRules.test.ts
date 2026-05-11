@@ -1335,6 +1335,29 @@ describe('hasValuableMoves', () => {
     expect(hasValuableMoves(state)).toBe(true);
   });
 
+  it('should treat illegal-parent to legal-parent moves as valuable', () => {
+    // 7h is on 9c (illegal parent), but can move to 8d (legal parent).
+    // Even if this does not open additional new-move branches, it should
+    // count as valuable according to productive-move policy.
+    const state = testState(
+      [[card('A', 'clubs')], [card('A', 'diamonds')], [card('A', 'hearts')], [card('A', 'spades')]],
+      [
+        [card('9', 'clubs'), card('7', 'hearts')],
+        [card('8', 'diamonds')],
+        [card('K', 'clubs')],
+        [card('K', 'diamonds')],
+        [card('K', 'hearts')],
+        [card('K', 'spades')],
+        [card('4', 'clubs')],
+        [card('4', 'diamonds')],
+      ],
+    );
+
+    expect(getLegalMoves(state)).toEqual([
+      { kind: 'tableau-to-tableau', fromCol: 0, toCol: 1 },
+    ]);
+    expect(hasValuableMoves(state)).toBe(true);
+  });
   it('should return true when a tableau move creates a genuinely new non-reverse move', () => {
     const state = testState(
       [[card('A', 'clubs')], [card('A', 'diamonds')], [card('A', 'hearts')], [card('A', 'spades')]],
