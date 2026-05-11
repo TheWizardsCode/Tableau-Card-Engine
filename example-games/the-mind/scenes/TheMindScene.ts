@@ -32,10 +32,10 @@ import type { HelpSection } from '../../../src/ui';
 import helpContent from '../help-content.json';
 
 import {
-  SFX_KEYS,
   PRE_PENALTY_PAUSE,
   type GamePhase,
 } from './MindConstants';
+import { SFX_KEYS } from './MindAudioKeys';
 import { MindRenderer } from './MindRenderer';
 import { MindAnimator } from './MindAnimator';
 import { MindAiScheduler } from './MindAiScheduler';
@@ -109,7 +109,23 @@ export class TheMindScene extends CardGameScene {
     this.cameras.main.setBackgroundColor('#1a1a2e');
     this.events.on('shutdown', this.shutdown, this);
 
-    // Reset state for scene restart
+    this.resetSceneState();
+    this.detectReplayMode();
+    this.initEventSystem();
+
+    if (this.replayMode) {
+      this.createReplayView();
+      return;
+    }
+
+    this.createSoundSystem();
+    this.initializeGameControllers();
+    this.createPrimaryView();
+    this.renderInitialState();
+    this.startLevel();
+  }
+
+  private resetSceneState(): void {
     this.phase = 'dealing';
     this.humanCardSprites = [];
     this.aiCardSprites = [];
@@ -120,49 +136,44 @@ export class TheMindScene extends CardGameScene {
 
     const urlParams = new URLSearchParams(window.location.search);
     this.autoPlayEnabled = urlParams.get('autoplay') === 'true';
-    this.detectReplayMode();
+  }
 
-    this.initEventSystem();
+  private createReplayView(): void {
+    this.createHeader();
+    this.createStatusDisplay();
+    this.createPile();
+    this.createInstruction();
+    this.instructionText.setText('');
+    this.levelText.setText('Level 1 / 8');
+    this.livesText.setText('Lives: \u2764\u2764');
+    this.emitStateSettled(0, 'playing');
+  }
 
-    if (this.replayMode) {
-      this.createHeader();
-      this.createStatusDisplay();
-      this.createPile();
-      this.createInstruction();
-      this.instructionText.setText('');
-      this.levelText.setText('Level 1 / 8');
-      this.livesText.setText('Lives: \u2764\u2764');
-      this.emitStateSettled(0, 'playing');
-      return;
-    }
-
-    this.createSoundSystem();
-
+  private initializeGameControllers(): void {
     this.session = setupTheMindGame();
     this.aiPlayer = new MindAiPlayer();
-
     this.recorder = this.createRecorder();
 
-    // Create helpers
     this.mindRenderer = new MindRenderer(this, this.session);
     this.mindAnimator = new MindAnimator(this, this.session, this.mindRenderer, this.soundManager);
     this.aiScheduler = new MindAiScheduler(this, this.session);
     this.overlayManager = new MindOverlayManager(this, this.session, this.gameEvents, this.soundManager);
     this.replayController = new MindReplayController(this, this.mindRenderer, { value: this.replayMode });
     this.turnController = new MindTurnController(this.session, this.recorder, this.gameEvents, this.soundManager);
-
-    // Sync auto-play state with scheduler
     this.aiScheduler.autoPlayEnabled = this.autoPlayEnabled;
+  }
 
-    // Create UI
+  private createPrimaryView(): void {
     this.mindRenderer.createHeader();
     this.mindRenderer.createStatusDisplay();
     this.mindRenderer.createPile();
     this.mindRenderer.createInstruction();
     this.createAutoPlayButton();
     this.initHelpPanel(helpContent as HelpSection[]);
+    this.bindRendererObjects();
+  }
 
-    // Expose renderer display objects on scene for test compatibility
+  private bindRendererObjects(): void {
     this.humanCardSprites = this.mindRenderer.humanCardSprites;
     this.aiCardSprites = this.mindRenderer.aiCardSprites;
     this.aiCountText = this.mindRenderer.aiCountText;
@@ -172,8 +183,9 @@ export class TheMindScene extends CardGameScene {
     this.levelText = this.mindRenderer.levelText;
     this.livesText = this.mindRenderer.livesText;
     this.instructionText = this.mindRenderer.instructionText;
+  }
 
-    // Initial render
+  private renderInitialState(): void {
     this.mindRenderer.renderHumanHand(
       (card) => this.onHumanCardClick(card),
       this.phase,
@@ -182,8 +194,6 @@ export class TheMindScene extends CardGameScene {
     this.mindRenderer.renderAiHand();
     this.mindRenderer.refreshStatus();
     this.mindRenderer.refreshPile();
-
-    this.startLevel();
   }
 
   // ── Header & Status ────────────────────────────────────

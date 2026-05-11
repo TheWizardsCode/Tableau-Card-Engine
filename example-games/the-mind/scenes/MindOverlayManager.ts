@@ -6,7 +6,8 @@ import { GAME_W, GAME_H, FONT_FAMILY, createOverlayBackground, createOverlayButt
 import { MAX_LEVEL } from '../TheMindGameState';
 import type { TheMindSession } from '../TheMindGameState';
 import type { SoundManager, GameEventEmitter } from '../../../src/core-engine';
-import { DEPTH_OVERLAY, DEPTH_OVERLAY_CONTENT, SFX_KEYS } from './MindConstants';
+import { DEPTH_OVERLAY, DEPTH_OVERLAY_CONTENT } from './MindConstants';
+import { SFX_KEYS } from './MindAudioKeys';
 
 export class MindOverlayManager {
   overlayObjects: Phaser.GameObjects.GameObject[] = [];

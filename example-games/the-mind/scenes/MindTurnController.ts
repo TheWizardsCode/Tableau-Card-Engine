@@ -6,7 +6,7 @@ import type { PlayResult, PlayerId, TheMindSession } from '../TheMindGameState';
 import { playCard, isGameOver, getPileTopValue } from '../TheMindGameState';
 import { MindTranscriptRecorder } from '../GameTranscript';
 import type { GameEventEmitter, SoundManager } from '../../../src/core-engine';
-import { SFX_KEYS } from './MindConstants';
+import { SFX_KEYS } from './MindAudioKeys';
 import type { MindAiScheduler } from './MindAiScheduler';
 
 export class MindTurnController {
