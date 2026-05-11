@@ -3,7 +3,7 @@
  */
 
 import { GAME_W, GAME_H, FONT_FAMILY, createSceneHeader, layoutCardPositions } from '../../../src/ui';
-import { getMindCardTexture } from '../MindCardRenderer';
+import { getMindCardTexture, ensureMindCardTexture } from '../MindCardRenderer';
 import { CARD_BACK_KEY } from '../MindCard';
 import type { MindCard } from '../MindCard';
 import type { TheMindSession } from '../TheMindGameState';
@@ -125,9 +125,18 @@ export class MindRenderer {
     const pileSize = this.session.pile.size();
 
     if (pileSize > 0 && topCard) {
-      this.pileSprite.setTexture(getMindCardTexture(topCard));
+      // Start with placeholder and update when texture is ready.
+      this.pileSprite.setTexture(CARD_BACK_KEY);
       this.pileSprite.setAlpha(1);
       this.pileValueText.setText(`${topCard.value}`);
+      (async () => {
+        try {
+          const res = await ensureMindCardTexture(this.scene, topCard.value, CARD_W, CARD_H);
+          if (res && res.key) this.pileSprite.setTexture(res.key);
+        } catch {
+          // noop
+        }
+      })();
     } else {
       this.pileSprite.setTexture(CARD_BACK_KEY);
       this.pileSprite.setAlpha(0.3);
@@ -162,11 +171,25 @@ export class MindRenderer {
       const card = hand[i];
       const displayCard = { ...card, faceUp: true };
       const x = positions[i];
+      // Create using placeholder key to avoid empty texture on creation.
       const sprite = this.scene.add
-        .image(x, HUMAN_HAND_Y, getMindCardTexture(displayCard))
+        .image(x, HUMAN_HAND_Y, CARD_BACK_KEY)
         .setDisplaySize(CARD_W, CARD_H)
         .setDepth(DEPTH_CARDS + i)
         .setInteractive({ useHandCursor: true });
+
+      // Kick off lazy rasterisation and update the sprite when ready.
+      (async () => {
+        try {
+          const res = await ensureMindCardTexture(this.scene, displayCard.value, CARD_W, CARD_H);
+          // If ready or later generated, set the texture key.
+          if (res && res.key && this.humanCardSprites.includes(sprite)) {
+            sprite.setTexture(res.key);
+          }
+        } catch {
+          // ignore rasterisation failures; keep placeholder
+        }
+      })();
 
       sprite.on('pointerdown', () => onCardClick(card));
       sprite.on('pointerover', () => {
@@ -203,7 +226,19 @@ export class MindRenderer {
 
     for (let i = 0; i < hand.length; i++) {
       const displayCard = { ...hand[i], faceUp: true };
-      this.humanCardSprites[i].setTexture(getMindCardTexture(displayCard));
+      const sprite = this.humanCardSprites[i];
+      // Start with placeholder and update when lazy texture ready.
+      sprite.setTexture(CARD_BACK_KEY);
+      (async () => {
+        try {
+          const res = await ensureMindCardTexture(this.scene, displayCard.value, CARD_W, CARD_H);
+          if (res && res.key && this.humanCardSprites[i] === sprite) {
+            sprite.setTexture(res.key);
+          }
+        } catch {
+          // noop
+        }
+      })();
     }
   }
 
@@ -313,11 +348,23 @@ export class MindRenderer {
     for (let i = 0; i < cardValues.length; i++) {
       const x = positions[i];
       const card: MindCard = { value: cardValues[i], faceUp };
-      const texture = faceUp ? getMindCardTexture(card) : CARD_BACK_KEY;
+      const texture = CARD_BACK_KEY;
       const sprite = this.scene.add
         .image(x, y, texture)
         .setDisplaySize(CARD_W, CARD_H)
         .setDepth(DEPTH_CARDS + i);
+
+      if (faceUp) {
+        (async () => {
+          try {
+            const res = await ensureMindCardTexture(this.scene, card.value, CARD_W, CARD_H);
+            if (res && res.key) sprite.setTexture(res.key);
+          } catch {
+            // noop
+          }
+        })();
+      }
+
       spriteArray.push(sprite);
     }
 
