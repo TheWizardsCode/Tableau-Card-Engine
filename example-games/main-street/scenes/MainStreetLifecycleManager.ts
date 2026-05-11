@@ -287,28 +287,21 @@ export class MainStreetLifecycleManager {
           let cy = y + para.height + 12; // gap after paragraph
 
           const types = [
-            { key: 'ms-icon-food', label: 'Food', desc: 'Restaurants and cafes — pairs well with Culture.' },
-            { key: 'ms-icon-culture', label: 'Culture', desc: 'Galleries and theaters — increases adjacent cultural value.' },
-            { key: 'ms-icon-commerce', label: 'Commerce', desc: 'Shops and boutiques — boosts neighborhood commerce.' },
-            { key: 'ms-icon-service', label: 'Service', desc: 'Salons and clinics — supports other businesses.' },
-            { key: 'ms-icon-entertainment', label: 'Entertainment', desc: 'Cinemas and arcades — draws crowd and foot traffic.' },
+            { key: 'ms-icon-food', label: 'Food' },
+            { key: 'ms-icon-culture', label: 'Culture' },
+            { key: 'ms-icon-commerce', label: 'Commerce' },
+            { key: 'ms-icon-service', label: 'Service' },
+            { key: 'ms-icon-entertainment', label: 'Entertainment' },
           ];
 
           const iconSize = 16;
           const gapY = 8;
           const labelXOffset = iconSize + 8;
 
-          // Text styles similar to HelpPanel BODY_STYLE
+          // Text style similar to HelpPanel BODY_STYLE
           const labelStyle: Phaser.Types.GameObjects.Text.TextStyle = {
             fontSize: '14px',
             color: '#dddddd',
-            fontFamily: 'Arial, sans-serif',
-            lineSpacing: 2,
-            wordWrap: { width: Math.max(40, (maxWidth || 120) - labelXOffset), useAdvancedWrap: true } as any,
-          };
-          const descStyle: Phaser.Types.GameObjects.Text.TextStyle = {
-            fontSize: '12px',
-            color: '#cccccc',
             fontFamily: 'Arial, sans-serif',
             lineSpacing: 2,
             wordWrap: { width: Math.max(40, (maxWidth || 120) - labelXOffset), useAdvancedWrap: true } as any,
@@ -323,12 +316,8 @@ export class MainStreetLifecycleManager {
             label.setOrigin(0, 0);
             container.add(label);
 
-            const desc = scene.add.text(x + labelXOffset, cy + label.height + 2, t.desc, descStyle);
-            desc.setOrigin(0, 0);
-            container.add(desc);
-
-            // Advance cy by the greater of iconSize and combined label+desc height plus gap
-            const rowH = Math.max(iconSize, label.height + 2 + desc.height);
+            // Advance cy by the greater of iconSize and label height plus gap
+            const rowH = Math.max(iconSize, label.height);
             cy += rowH + gapY;
           }
 
