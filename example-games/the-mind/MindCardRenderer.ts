@@ -23,6 +23,11 @@ export const MIND_CARD_H = 65;
 /** Base path to The Mind card SVG assets (relative to Vite public dir). */
 const ASSET_PATH = 'assets/cards/the-mind';
 
+// Module-level cache for SVG source text when running in Node (tests) or
+// when preload reads files. Keys are the texture keys (e.g. 'mind-42' or
+// 'mind-back').
+const svgTextCache = new Map<string, string>();
+
 // ── Texture key helpers ────────────────────────────────────
 
 /**
@@ -66,21 +71,123 @@ export function mindCardTextureKey(value: number): string {
  * @param height  Card sprite height in pixels (defaults to `MIND_CARD_H`).
  */
 export function preloadMindCardAssets(
-  scene: Phaser.Scene,
+  scene: Phaser.Scene | null,
   width: number = MIND_CARD_W,
   height: number = MIND_CARD_H,
 ): void {
-  // Card back
-  scene.load.svg(CARD_BACK_KEY, `${ASSET_PATH}/mind-back.svg`, {
-    width,
-    height,
-  });
+  // In browser environments, prefer loading SVG source text via the
+  // loader so the shared SvgHelpers can rasterise it on demand.
+  // In Node (tests) we synchronously read the files into svgTextCache so
+  // helper tests and headless runners can access the SVG content.
+  if (typeof window === 'undefined') {
+    // Node: synchronously read from the public assets directory.
+    try {
+      // Lazy import to avoid bundling `fs` in browser builds.
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const fs = require('fs');
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const path = require('path');
+      const base = path.join(process.cwd(), 'public', ASSET_PATH);
 
-  // All 100 numbered card faces
-  for (let value = MIN_VALUE; value <= MAX_VALUE; value++) {
-    const key = `mind-${value}`;
-    scene.load.svg(key, `${ASSET_PATH}/${key}.svg`, { width, height });
+      const backPath = path.join(base, 'mind-back.svg');
+      svgTextCache.set(CARD_BACK_KEY, fs.readFileSync(backPath, 'utf8'));
+
+      for (let v = MIN_VALUE; v <= MAX_VALUE; v++) {
+        const key = `mind-${v}`;
+        const filePath = path.join(base, `${key}.svg`);
+        svgTextCache.set(key, fs.readFileSync(filePath, 'utf8'));
+      }
+    } catch (err) {
+      // Best-effort: tests that need these assets should ensure they exist.
+    }
+  } else {
+    if (scene) {
+      // Register scene as valid for SvgHelpers and use text loader so the
+      // shared helpers can fetch from the cache when required.
+      // We avoid eager rasterisation here; textures are generated lazily
+      // on first use via SvgHelpers.getOrCreateTexture.
+      // Note: `this.load.text` stores content in the cache under the key
+      // provided (we prefix with `svg:` to avoid collisions).
+      scene.load.text('svg:mind-back', `${ASSET_PATH}/mind-back.svg`);
+
+      for (let value = MIN_VALUE; value <= MAX_VALUE; value++) {
+        const key = `mind-${value}`;
+        scene.load.text(`svg:${key}`, `${ASSET_PATH}/${key}.svg`);
+      }
+
+      // Mark the scene as valid for rasterisation helpers; callers should
+      // hook lifecycle events to call `markSceneInvalid` on shutdown/destroy.
+      try {
+        // Import lazily to avoid circular deps at module-eval time.
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { markSceneValid } = require('../../src/core-engine/SvgHelpers');
+        if (markSceneValid && typeof markSceneValid === 'function') {
+          markSceneValid(scene);
+        }
+      } catch {
+        // Ignore if SvgHelpers can't be resolved in this environment.
+      }
+    }
   }
+}
+
+/**
+ * Ensure a Mind card texture exists (or is scheduled) and return the
+ * texture key + readiness/promise info. This implements lazy rasterisation
+ * on first use via SvgHelpers.getOrCreateTexture.
+ */
+export async function ensureMindCardTexture(
+  scene: Phaser.Scene,
+  value: number,
+  width: number = MIND_CARD_W,
+  height: number = MIND_CARD_H,
+): Promise<{ key: string; ready: boolean; promise?: Promise<void> }> {
+  validateValue(value);
+  const key = mindCardTextureKey(value);
+
+  // If we already have the raw SVG text cached (Node/test preload) use it;
+  // otherwise attempt to read from the loader cache or fetch via SvgHelpers.
+  let svgText = svgTextCache.get(key);
+
+  if (!svgText) {
+    // Try to read from Phaser cache if available (browser runtime)
+    const cacheText = (scene as any).cache?.text?.get?.(`svg:${key}`) as string | undefined;
+    if (cacheText) {
+      svgText = cacheText;
+    } else if (typeof window === 'undefined') {
+      // Node fallback: try to read from disk synchronously
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const fs = require('fs');
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const path = require('path');
+        const filePath = path.join(process.cwd(), 'public', ASSET_PATH, `${key}.svg`);
+        svgText = fs.readFileSync(filePath, 'utf8');
+      } catch {
+        // leave svgText undefined and let fetchSvgText attempt network fetch
+      }
+    }
+  }
+
+  if (!svgText) {
+    // Use SvgHelpers.fetchSvgText to fetch remotely if available.
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { fetchSvgText, getOrCreateTexture } = require('../../src/core-engine/SvgHelpers');
+      const url = `/${ASSET_PATH}/${key}.svg`;
+      svgText = await fetchSvgText(url);
+      const res = getOrCreateTexture(scene, key, svgText, width, height);
+      return res;
+    } catch {
+      // Best-effort: fallthrough to a non-rasterising result — return key only
+      return { key, ready: false };
+    }
+  }
+
+  // svgText is available synchronously — delegate to getOrCreateTexture.
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { getOrCreateTexture } = require('../../src/core-engine/SvgHelpers');
+  return getOrCreateTexture(scene, key, svgText, width, height);
 }
 
 // ── Validation ─────────────────────────────────────────────

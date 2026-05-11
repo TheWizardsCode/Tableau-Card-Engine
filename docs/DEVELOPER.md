@@ -849,6 +849,8 @@ Thumbnails are static assets. Regenerate them when a game's visual appearance ch
 
 The engine now provides shared SVG raster helpers from `src/core-engine/SvgHelpers.ts` (exported via `src/core-engine/index.ts`).
 
+Rasterisation policy (project choice): lazy rasterisation on first use. In practice this means scenes should preload SVG *source text* (via `this.load.text`) and only rasterise to a texture when the texture is first required for rendering. This keeps preload fast and memory usage reasonable while ensuring visual fidelity when textures are needed.
+
 ### Recommended scene pattern
 
 1. Preload SVG source text (not `this.load.svg`) so you can rasterise through shared helpers:
@@ -878,7 +880,7 @@ const key = makeTextureKey('icon-tempura', 128, 128, window.devicePixelRatio || 
 // Option A: fully explicit
 await rasteriseSvgToTexture(this, key, svgText, 128, 128);
 
-// Option B: lazy helper
+// Option B: lazy helper (recommended)
 const texture = getOrCreateTexture(this, 'icon-tempura', svgText, 128, 128);
 if (!texture.ready && texture.promise) await texture.promise;
 ```
