@@ -647,10 +647,37 @@ export class MainStreetRenderer {
             }
 
             // Tooltip for the Discover button (attach to bg so it receives pointer events)
-            const info = `Pay $${REFRESH_INVESTMENTS_COST} to redraw the investments row immediately. Removed cards go to their discard piles. Available only during Market phase.`;
+            const info = `Pay $${REFRESH_INVESTMENTS_COST} to research new investment opportunities and replace the visible investments row. Removed cards go to their discard piles. Available only during Market phase.`;
             try {
-              bg.on('pointerover', (_pointer: any) => s.tooltipManager?.show(info, (_pointer && _pointer.worldX) || btn.x, (_pointer && _pointer.worldY) || btn.y));
-              bg.on('pointerout', () => s.tooltipManager?.hide());
+              bg.on('pointerover', (pointer: any) => {
+                if (s.tooltipManager) {
+                  s.tooltipManager.show(info, (pointer && pointer.worldX) || btn.x, (pointer && pointer.worldY) || btn.y);
+                  return;
+                }
+                // Fallback: create an in-canvas text tooltip if DOM tooltip manager isn't available
+                try {
+                  if ((s as any)._tempDiscoverTooltip) {
+                    (s as any)._tempDiscoverTooltip.destroy();
+                    (s as any)._tempDiscoverTooltip = null;
+                  }
+                  const tt = s.add.text(btn.x, btn.y - s.layout.actionButtonH / 2 - 6, info, {
+                    fontSize: '12px', color: '#ffffff', fontFamily: FONT_FAMILY, backgroundColor: 'rgba(0,0,0,0.85)', padding: { x: 6, y: 4 }, wordWrap: { width: 280 }, align: 'center'
+                  }).setOrigin(0.5, 1).setDepth(1000);
+                  (s as any)._tempDiscoverTooltip = tt;
+                } catch (e) { /* ignore fallback errors */ }
+              });
+              bg.on('pointerout', () => {
+                if (s.tooltipManager) {
+                  s.tooltipManager.hide();
+                  return;
+                }
+                try {
+                  if ((s as any)._tempDiscoverTooltip) {
+                    (s as any)._tempDiscoverTooltip.destroy();
+                    (s as any)._tempDiscoverTooltip = null;
+                  }
+                } catch (_) { /* ignore */ }
+              });
             } catch (_) { /* ignore */ }
           }
         } catch (_) { /* ignore tooltip attach errors in tests */ }
