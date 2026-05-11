@@ -176,10 +176,24 @@ export const DIFFICULTY_PRESETS: DifficultyPresetRegistry<GameConfig> = {
  * Returns the `GameConfig` for the given difficulty name.
  * Defaults to Medium if the name is not recognized.
  */
-export function getPreset(name: DifficultyName | undefined): Readonly<GameConfig> {
-  if (name && name in DIFFICULTY_PRESETS) {
-    return DIFFICULTY_PRESETS[name];
+export function getPreset(name: DifficultyName | string | undefined): Readonly<GameConfig> {
+  // Accept undefined -> default to Medium
+  if (!name) return MEDIUM_PRESET;
+
+  // If the provided name matches a preset key exactly, return it.
+  if (typeof name === 'string' && name in DIFFICULTY_PRESETS) {
+    // Type assertion: we've confirmed the key exists on the registry
+    return DIFFICULTY_PRESETS[name as DifficultyName];
   }
+
+  // Be tolerant of different casings (e.g. 'easy', 'EASY') by doing a
+  // case-insensitive lookup against the known difficulty names.
+  const lower = (name as string).toLowerCase();
+  for (const k of DIFFICULTY_NAMES) {
+    if (k.toLowerCase() === lower) return DIFFICULTY_PRESETS[k];
+  }
+
+  // Fallback to Medium for unknown values to preserve backward compatibility.
   return MEDIUM_PRESET;
 }
 
