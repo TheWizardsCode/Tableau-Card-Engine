@@ -2,7 +2,14 @@
  * SushiGoOverlayManager -- handles round score and game over overlays for Sushi Go!
  */
 
-import { GAME_W, GAME_H, FONT_FAMILY, createOverlayBackground, createOverlayButton, createOverlayMenuButton, dismissOverlay } from '../../../src/ui';
+import {
+  GAME_W,
+  GAME_H,
+  FONT_FAMILY,
+  createOverlayButton,
+  createOverlayMenuButton,
+  OverlayManager,
+} from '../../../src/ui';
 import { scoreTableauBreakdown } from '../SushiGoScoring';
 import type { SushiGoSession, RoundResult } from '../SushiGoGame';
 import { getWinnerIndex } from '../SushiGoGame';
@@ -15,24 +22,28 @@ import { SFX_KEYS } from './SushiGoConstants';
 const transcriptStore = new TranscriptStore();
 
 export class SushiGoOverlayManager {
-  overlayObjects: Phaser.GameObjects.GameObject[] = [];
+  private readonly overlayManager: OverlayManager;
+
+  get overlayObjects(): Phaser.GameObjects.GameObject[] {
+    return this.overlayManager.objects;
+  }
 
   constructor(
     private scene: Phaser.Scene,
     private session: SushiGoSession,
     private gameEvents: GameEventEmitter,
     private soundManager: SoundManager | null,
-  ) {}
+  ) {
+    this.overlayManager = new OverlayManager(scene);
+  }
 
   showRoundScoreOverlay(result: RoundResult, onNextRound: () => void): void {
     this.soundManager?.play(SFX_KEYS.SCORE_REVEAL);
 
-    const overlay = createOverlayBackground(
-      this.scene,
+    const overlay = this.overlayManager.create(
       { depth: 10, alpha: 0.01 },
       { width: 560, height: 460, alpha: 0.9 },
     );
-    this.overlayObjects.push(...overlay.objects);
 
     const roundNum = result.round + 1;
     const human = this.session.players[0];
@@ -57,19 +68,12 @@ export class SushiGoOverlayManager {
       `Total -- You: ${human.totalScore}  AI: ${ai.totalScore}`,
     ];
 
-    const box = overlay.box;
-    const padding = 24;
-    let textY: number;
-    let buttonY: number;
-    if (box) {
-      const boxTop = box.y - (box.height / 2);
-      const boxBottom = box.y + (box.height / 2);
-      textY = boxTop + padding;
-      buttonY = boxBottom - 40;
-    } else {
-      textY = GAME_H / 2 - 230 + 48;
-      buttonY = GAME_H / 2 + 230 - 40;
-    }
+    const { textY, buttonY } = this.resolveOverlayAnchors(overlay.box, {
+      fallbackTextY: GAME_H / 2 - 230 + 48,
+      fallbackButtonY: GAME_H / 2 + 230 - 40,
+      padding: 24,
+      buttonInset: 40,
+    });
 
     const text = this.scene.add
       .text(GAME_W / 2, textY, lines.join('\n'), {
@@ -81,19 +85,22 @@ export class SushiGoOverlayManager {
       })
       .setOrigin(0.5, 0)
       .setDepth(11);
-    this.overlayObjects.push(text);
+    this.overlayManager.add(text);
 
     const btn = createOverlayButton(this.scene, GAME_W / 2, buttonY, '[ Next Round ]');
     btn.on('pointerdown', () => {
       this.soundManager?.play(SFX_KEYS.UI_CLICK);
-      dismissOverlay(this.overlayObjects);
-      this.overlayObjects = [];
+      this.overlayManager.dismiss();
       onNextRound();
     });
-    this.overlayObjects.push(btn);
+    this.overlayManager.add(btn);
   }
 
-  showGameOverOverlay(result: RoundResult, recorder: SushiGoTranscriptRecorder | null, onRestart: () => void): void {
+  showGameOverOverlay(
+    result: RoundResult,
+    recorder: SushiGoTranscriptRecorder | null,
+    onRestart: () => void,
+  ): void {
     this.soundManager?.play(SFX_KEYS.SCORE_REVEAL);
 
     const winnerIdx = getWinnerIndex(this.session);
@@ -108,12 +115,10 @@ export class SushiGoOverlayManager {
       winnerIndex: winnerIdx,
     });
 
-    const overlay = createOverlayBackground(
-      this.scene,
+    const overlay = this.overlayManager.create(
       { depth: 10, alpha: 0.01 },
       { width: 560, height: 520, alpha: 0.9 },
     );
-    this.overlayObjects.push(...overlay.objects);
 
     const winnerText = winnerIdx === 0 ? 'You Win!' : 'AI Wins!';
     const human = this.session.players[0];
@@ -151,22 +156,15 @@ export class SushiGoOverlayManager {
     }
     lines.push('', `Final: You ${human.totalScore} -- AI ${ai.totalScore}`);
 
-    const box = overlay.box;
-    const padding = 24;
-    let gTextY: number;
-    let gButtonY: number;
-    if (box) {
-      const boxTop = box.y - (box.height / 2);
-      const boxBottom = box.y + (box.height / 2);
-      gTextY = boxTop + padding;
-      gButtonY = boxBottom - 48;
-    } else {
-      gTextY = GAME_H / 2 - 260 + 56;
-      gButtonY = GAME_H / 2 + 260 - 48;
-    }
+    const { textY, buttonY } = this.resolveOverlayAnchors(overlay.box, {
+      fallbackTextY: GAME_H / 2 - 260 + 56,
+      fallbackButtonY: GAME_H / 2 + 260 - 48,
+      padding: 24,
+      buttonInset: 48,
+    });
 
     const text = this.scene.add
-      .text(GAME_W / 2, gTextY, lines.join('\n'), {
+      .text(GAME_W / 2, textY, lines.join('\n'), {
         fontSize: '18px',
         color: '#ffffff',
         fontFamily: FONT_FAMILY,
@@ -175,21 +173,44 @@ export class SushiGoOverlayManager {
       })
       .setOrigin(0.5, 0)
       .setDepth(11);
-    this.overlayObjects.push(text);
+    this.overlayManager.add(text);
 
-    const playBtn = createOverlayButton(this.scene, GAME_W / 2 - 80, gButtonY, '[ Play Again ]');
+    const playBtn = createOverlayButton(this.scene, GAME_W / 2 - 80, buttonY, '[ Play Again ]');
     playBtn.on('pointerdown', () => {
       this.soundManager?.play(SFX_KEYS.UI_CLICK);
       onRestart();
     });
-    this.overlayObjects.push(playBtn);
+    this.overlayManager.add(playBtn);
 
-    const menuBtn = createOverlayMenuButton(this.scene, GAME_W / 2 + 80, gButtonY);
-    this.overlayObjects.push(menuBtn);
+    const menuBtn = createOverlayMenuButton(this.scene, GAME_W / 2 + 80, buttonY);
+    this.overlayManager.add(menuBtn);
+  }
+
+  private resolveOverlayAnchors(
+    box: Phaser.GameObjects.Rectangle | null,
+    options: {
+      fallbackTextY: number;
+      fallbackButtonY: number;
+      padding: number;
+      buttonInset: number;
+    },
+  ): { textY: number; buttonY: number } {
+    if (!box) {
+      return {
+        textY: options.fallbackTextY,
+        buttonY: options.fallbackButtonY,
+      };
+    }
+
+    const boxTop = box.y - (box.height / 2);
+    const boxBottom = box.y + (box.height / 2);
+    return {
+      textY: boxTop + options.padding,
+      buttonY: boxBottom - options.buttonInset,
+    };
   }
 
   dismiss(): void {
-    dismissOverlay(this.overlayObjects);
-    this.overlayObjects = [];
+    this.overlayManager.dismiss();
   }
 }
