@@ -651,6 +651,7 @@ export class MainStreetRenderer {
     const baseStrokeWidth = isHinted ? 3 : 1;
 
     let bg: Phaser.GameObjects.Rectangle | null = null;
+    let domElRef: any = null;
 
     if (s.textures && (s.textures as Phaser.Textures.TextureManager).exists(tplKey) && s.svgDom === undefined) {
       const img = s.add.image(0, 0, tplKey);
@@ -664,32 +665,11 @@ export class MainStreetRenderer {
       const templateId = s.templateIdFromCardId(card.id);
       const svgText = s.cardSvgSources.get(templateId)!;
       const domKey = s.domKeyForCard(`market-${rowKey}`, slotIndex, card.id);
-      const domEl = s.svgDom.createOrUpdate(domKey, svgText, cx, cy, renderW, renderH, () => {
+      domElRef = s.svgDom.createOrUpdate(domKey, svgText, cx, cy, renderW, renderH, () => {
         s.selectMarketCardById(card.id);
         onClick(card);
       }, 100);
-      if (domEl && !s.replayMode) {
-        try {
-          const node = (domEl as any).node as HTMLElement | null;
-          if (node) {
-            node.addEventListener('mouseenter', () => {
-              let info = '';
-              if (card.family === 'business') {
-                const b = card as any;
-                info = `Business: ${b.name}\nCost: ${b.cost}\nIncome: +${b.baseIncome + (b.incomeBonus || 0)}/turn\nSynergy: ${(b.synergyTypes || []).join('/')}\n${b.description ?? ''}`;
-              } else if (card.family === 'event') {
-                const e = card as any;
-                info = `Event: ${e.name}\nCost: ${e.cost}\nEffect: ${e.effect}`;
-              } else if (card.family === 'upgrade') {
-                const u = card as any;
-                info = `Upgrade: ${u.name}\nCost: ${u.cost}\nIncome Bonus: +${u.incomeBonus}\nRequires: Lv${u.requiredLevel ?? 0}`;
-              }
-              s.tooltipManager?.show(info, container.x, container.y);
-            });
-            node.addEventListener('mouseleave', () => s.tooltipManager?.hide());
-          }
-        } catch (e) { /* ignore DOM attach errors */ }
-      }
+
     } else {
       s.requestCardTexture(card.id, renderW, renderH);
       // Determine card color
@@ -784,6 +764,49 @@ export class MainStreetRenderer {
       });
       s.marketSelectionManager.registerTarget(hitArea);
       container.add(hitArea);
+    }
+
+    // If the DOM renderer produced an element, mirror Phaser hover/selection
+    // behaviour by wiring DOM events to the selection controller and
+    // selection manager so highlights work consistently when using SVG DOM
+    // rendering.
+    if (domElRef && !s.replayMode) {
+      try {
+        const node = (domElRef as any).node as HTMLElement | null;
+        if (node) {
+          try { s.marketSelectionManager.registerTarget(container); } catch (_) { /* ignore */ }
+
+          node.addEventListener('mouseenter', () => {
+            if (interactiveEnabled) selection.setHovered(true);
+            if (!s.replayMode) {
+              let info = '';
+              if (card.family === 'business') {
+                const b = card as any;
+                info = `Business: ${b.name}\nCost: ${b.cost}\nIncome: +${b.baseIncome + (b.incomeBonus || 0)}/turn\nSynergy: ${(b.synergyTypes || []).join('/') }\n${b.description ?? ''}`;
+              } else if (card.family === 'event') {
+                const e = card as any;
+                info = `Event: ${e.name}\nCost: ${e.cost}\nEffect: ${e.effect}\nCoins: ${e.coinDelta >= 0 ? '+' : ''}${e.coinDelta}, Rep: ${e.reputationDelta >= 0 ? '+' : ''}${e.reputationDelta}`;
+              } else if (card.family === 'upgrade') {
+                const u = card as any;
+                info = `Upgrade: ${u.name}\nCost: ${u.cost}\nIncome Bonus: +${u.incomeBonus}\nRequires: Lv${u.requiredLevel ?? 0}\n${u.description ?? ''}`;
+              }
+              s.tooltipManager?.show(info, container.x, container.y);
+            }
+          });
+
+          node.addEventListener('mouseleave', () => {
+            if (interactiveEnabled) selection.setHovered(false);
+            if (!s.replayMode) s.tooltipManager?.hide();
+          });
+
+          node.addEventListener('click', () => {
+            if (interactiveEnabled) {
+              s.marketSelectionManager.select(selection);
+              onClick(card);
+            }
+          });
+        }
+      } catch (e) { /* ignore DOM attach errors */ }
     }
 
     // Card label and additional info are rendered inside per-card SVGs; only
