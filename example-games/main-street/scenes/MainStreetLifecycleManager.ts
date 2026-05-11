@@ -267,21 +267,28 @@ export class MainStreetLifecycleManager {
         render: (scene, container, x, y, maxWidth) => {
           // Render icons with descriptive labels in a vertical list.
           const types = [
-            { key: 'ms-icon-food', label: 'Food' },
-            { key: 'ms-icon-culture', label: 'Culture' },
-            { key: 'ms-icon-commerce', label: 'Commerce' },
-            { key: 'ms-icon-service', label: 'Service' },
-            { key: 'ms-icon-entertainment', label: 'Entertainment' },
+            { key: 'ms-icon-food', label: 'Food', desc: 'Restaurants and cafes — pairs well with Culture.' },
+            { key: 'ms-icon-culture', label: 'Culture', desc: 'Galleries and theaters — increases adjacent cultural value.' },
+            { key: 'ms-icon-commerce', label: 'Commerce', desc: 'Shops and boutiques — boosts neighborhood commerce.' },
+            { key: 'ms-icon-service', label: 'Service', desc: 'Salons and clinics — supports other businesses.' },
+            { key: 'ms-icon-entertainment', label: 'Entertainment', desc: 'Cinemas and arcades — draws crowd and foot traffic.' },
           ];
           const iconSize = 16;
           const gapY = 8;
           const labelXOffset = iconSize + 8;
           let cy = y;
 
-          // Text style similar to HelpPanel BODY_STYLE
-          const textStyle: Phaser.Types.GameObjects.Text.TextStyle = {
+          // Text styles similar to HelpPanel BODY_STYLE
+          const labelStyle: Phaser.Types.GameObjects.Text.TextStyle = {
             fontSize: '14px',
             color: '#dddddd',
+            fontFamily: 'Arial, sans-serif',
+            lineSpacing: 2,
+            wordWrap: { width: Math.max(40, (maxWidth || 120) - labelXOffset), useAdvancedWrap: true } as any,
+          };
+          const descStyle: Phaser.Types.GameObjects.Text.TextStyle = {
+            fontSize: '12px',
+            color: '#cccccc',
             fontFamily: 'Arial, sans-serif',
             lineSpacing: 2,
             wordWrap: { width: Math.max(40, (maxWidth || 120) - labelXOffset), useAdvancedWrap: true } as any,
@@ -292,12 +299,16 @@ export class MainStreetLifecycleManager {
             img.setDisplaySize(iconSize, iconSize);
             container.add(img);
 
-            const label = scene.add.text(x + labelXOffset, cy, t.label, textStyle);
+            const label = scene.add.text(x + labelXOffset, cy, t.label, labelStyle);
             label.setOrigin(0, 0);
             container.add(label);
 
-            // Advance cy by the greater of iconSize and label height plus gap
-            const rowH = Math.max(iconSize, label.height);
+            const desc = scene.add.text(x + labelXOffset, cy + label.height + 2, t.desc, descStyle);
+            desc.setOrigin(0, 0);
+            container.add(desc);
+
+            // Advance cy by the greater of iconSize and combined label+desc height plus gap
+            const rowH = Math.max(iconSize, label.height + 2 + desc.height);
             cy += rowH + gapY;
           }
 
