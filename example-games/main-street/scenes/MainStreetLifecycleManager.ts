@@ -265,7 +265,27 @@ export class MainStreetLifecycleManager {
       {
         heading: 'Synergy Types',
         render: (scene, container, x, y, maxWidth) => {
-          // Render icons with descriptive labels in a vertical list.
+          // Render a short explanatory paragraph about the synergy mechanic, then
+          // render per-type icons with titles and a short description.
+          const paragraph =
+            'Synergies: when two adjacent businesses share a synergy type, they grant bonus income to each other. ' +
+            'Synergy checks are performed for neighboring slots (left/right) and stack additively: placing businesses that share types next to each other increases income. ' +
+            'Some cards bridge multiple synergy types and count for both. Plan placements to cluster synergies for higher returns.';
+
+          const paraStyle: Phaser.Types.GameObjects.Text.TextStyle = {
+            fontSize: '14px',
+            color: '#dddddd',
+            fontFamily: 'Arial, sans-serif',
+            lineSpacing: 2,
+            wordWrap: { width: Math.max(80, maxWidth || 260), useAdvancedWrap: true } as any,
+          };
+
+          const para = scene.add.text(x, y, paragraph, paraStyle);
+          para.setOrigin(0, 0);
+          container.add(para);
+
+          let cy = y + para.height + 12; // gap after paragraph
+
           const types = [
             { key: 'ms-icon-food', label: 'Food', desc: 'Restaurants and cafes — pairs well with Culture.' },
             { key: 'ms-icon-culture', label: 'Culture', desc: 'Galleries and theaters — increases adjacent cultural value.' },
@@ -273,10 +293,10 @@ export class MainStreetLifecycleManager {
             { key: 'ms-icon-service', label: 'Service', desc: 'Salons and clinics — supports other businesses.' },
             { key: 'ms-icon-entertainment', label: 'Entertainment', desc: 'Cinemas and arcades — draws crowd and foot traffic.' },
           ];
+
           const iconSize = 16;
           const gapY = 8;
           const labelXOffset = iconSize + 8;
-          let cy = y;
 
           // Text styles similar to HelpPanel BODY_STYLE
           const labelStyle: Phaser.Types.GameObjects.Text.TextStyle = {
