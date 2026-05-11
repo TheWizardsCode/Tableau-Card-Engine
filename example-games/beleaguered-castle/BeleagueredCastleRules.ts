@@ -392,31 +392,25 @@ export function hasNoMoves(state: BeleagueredCastleState): boolean {
 // ── Valuable-move detection ─────────────────────────────────
 
 /**
- * Return a unique string key for a card, suitable for Set membership.
+ * Stable key for a move, used to compare pre/post legal move sets.
  */
-function cardKey(rank: Rank, suit: Suit): string {
-  return `${rank}-${suit}`;
+function moveKey(move: BCMove): string {
+  if (move.kind === 'tableau-to-foundation') {
+    return `F:${move.fromCol}->${move.toFoundation}`;
+  }
+  return `T:${move.fromCol}->${move.toCol}`;
 }
 
 /**
- * Collect the set of card keys that are *involved* in a list of legal moves.
- *
- * "Involved" means the card is the top of the source column (`fromCol`)
- * for any move in the list.  These are the cards the player can currently
- * interact with.
+ * True when `candidate` is exactly the immediate undo of `applied`.
  */
-function involvedCardKeys(
-  state: BeleagueredCastleState,
-  moves: BCMove[],
-): Set<string> {
-  const keys = new Set<string>();
-  for (const move of moves) {
-    const card = state.tableau[move.fromCol].peek();
-    if (card) {
-      keys.add(cardKey(card.rank, card.suit));
-    }
-  }
-  return keys;
+function isDirectReverseMove(applied: BCMove, candidate: BCMove): boolean {
+  return (
+    applied.kind === 'tableau-to-tableau' &&
+    candidate.kind === 'tableau-to-tableau' &&
+    applied.fromCol === candidate.toCol &&
+    applied.toCol === candidate.fromCol
+  );
 }
 
 /**
@@ -451,26 +445,20 @@ export function hasValuableMoves(
     return true;
   }
 
-  // Only tableau-to-tableau moves remain.  Check each one via lookahead.
-  const currentKeys = involvedCardKeys(state, currentMoves);
+  // Only tableau-to-tableau moves remain. Check each one via lookahead.
+  // A move is valuable only if it enables at least one truly new move,
+  // excluding the immediate reverse of the move itself.
+  const currentMoveKeys = new Set(currentMoves.map(moveKey));
 
   for (const move of currentMoves) {
-    // Apply the move (mutates state, but we undo it afterwards)
     applyMove(state, move);
 
     const newMoves = getLegalMoves(state);
-    const newKeys = involvedCardKeys(state, newMoves);
+    const valuable = newMoves.some((candidate) => {
+      if (isDirectReverseMove(move, candidate)) return false;
+      return !currentMoveKeys.has(moveKey(candidate));
+    });
 
-    // Check for any card newly involved that wasn't before
-    let valuable = false;
-    for (const key of newKeys) {
-      if (!currentKeys.has(key)) {
-        valuable = true;
-        break;
-      }
-    }
-
-    // Undo the move to restore original state
     undoMove(state, move);
 
     if (valuable) return true;
