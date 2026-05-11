@@ -16,6 +16,7 @@ import type { LCTranscriptRecorder } from '../GameTranscript';
 import {
   AI_DELAY,
   SFX_KEYS,
+  laneX as laneXFn,
   type SceneTurnPhase,
 } from './LostCitiesConstants';
 import type { LostCitiesAnimator } from './LostCitiesAnimator';
@@ -164,8 +165,7 @@ export class LostCitiesTurnController {
   }
 
   private laneX(index: number): number {
-    const { CARD_W, TABLEAU_LEFT, LANE_STEP } = require('./LostCitiesConstants');
-    return TABLEAU_LEFT + index * LANE_STEP + CARD_W / 2;
+    return laneXFn(index);
   }
 
   onDrawPileClick(): void {
