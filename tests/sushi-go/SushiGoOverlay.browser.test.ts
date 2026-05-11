@@ -80,4 +80,42 @@ describe('Sushi Go game-over overlay', () => {
     expect(playAgainBtn!.input?.enabled).toBe(true);
     expect(menuBtn!.input?.enabled).toBe(true);
   });
+
+  it('displays correct final totals including pudding bonuses when provided', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('SushiGoScene') as any;
+
+    // Prepare session roundScores so computeDisplayedTotal can sum them
+    scene.session.players[0].roundScores = [9];
+    scene.session.players[1].roundScores = [8];
+
+    const fakeRoundResult = {
+      round: 2,
+      tableauScores: [9, 8],
+      tableauBreakdowns: [
+        { tempura: 0, sashimi: 0, dumpling: 0, nigiri: 0, chopsticks: 0, puddingCount: 1 },
+        { tempura: 0, sashimi: 0, dumpling: 0, nigiri: 0, chopsticks: 0, puddingCount: 0 },
+      ],
+      makiCounts: [0, 0],
+      makiBonuses: [0, 0],
+      roundScores: [9, 8],
+      puddingCounts: [1, 0],
+      puddingBonuses: [1, -1],
+    };
+
+    scene.overlayManager.showGameOverOverlay(fakeRoundResult, null, () => {
+      scene.scene.restart();
+    });
+
+    await waitFrames(3);
+
+    const texts = scene.children.list.filter(
+      (child: Phaser.GameObjects.GameObject) => child instanceof Phaser.GameObjects.Text,
+    ) as Phaser.GameObjects.Text[];
+
+    const finalTextObj = texts.find((t) => (t.text as string).includes('Final: You'));
+
+    expect(finalTextObj).toBeDefined();
+    expect(finalTextObj!.text).toContain(`Final: You ${9 + 1} -- AI ${8 - 1}`);
+  });
 });

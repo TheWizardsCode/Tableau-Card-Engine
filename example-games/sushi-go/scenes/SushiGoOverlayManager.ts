@@ -55,6 +55,12 @@ export class SushiGoOverlayManager {
     const humanMakiBonus = result.makiBonuses ? result.makiBonuses[0] : 0;
     const aiMakiBonus = result.makiBonuses ? result.makiBonuses[1] : 0;
 
+    const computeDisplayedTotal = (idx: number) => {
+      const roundsSum = this.session.players[idx].roundScores.reduce((a, b) => a + b, 0);
+      const pudding = result.puddingBonuses ? result.puddingBonuses[idx] : 0;
+      return roundsSum + pudding;
+    };
+
     const lines = [
       `Round ${roundNum} Complete!`,
       '',
@@ -65,7 +71,7 @@ export class SushiGoOverlayManager {
       `  (Tmp:${aiBreak.tempura} Ssh:${aiBreak.sashimi} Dmp:${aiBreak.dumpling} Nig:${aiBreak.nigiri})`,
       `  Maki: ${aiMakiCount} → ${aiMakiBonus >= 0 ? '+' : ''}${aiMakiBonus} pts`,
       '',
-      `Total -- You: ${human.totalScore}  AI: ${ai.totalScore}`,
+      `Total -- You: ${computeDisplayedTotal(0)}  AI: ${computeDisplayedTotal(1)}`,
     ];
 
     const { textY, buttonY } = this.resolveOverlayAnchors(overlay.box, {
@@ -132,6 +138,12 @@ export class SushiGoOverlayManager {
     const humanPuddingBonus = result.puddingBonuses ? result.puddingBonuses[0] : 0;
     const aiPuddingBonus = result.puddingBonuses ? result.puddingBonuses[1] : 0;
 
+    const computeDisplayedTotal = (idx: number) => {
+      const roundsSum = this.session.players[idx].roundScores.reduce((a, b) => a + b, 0);
+      const pudding = result.puddingBonuses ? result.puddingBonuses[idx] : 0;
+      return roundsSum + pudding;
+    };
+
     const lines = [
       winnerText,
       '',
@@ -141,12 +153,10 @@ export class SushiGoOverlayManager {
       `You:  Cards ${humanBreak.tempura + humanBreak.sashimi + humanBreak.dumpling + humanBreak.nigiri} ` +
         `(Tmp:${humanBreak.tempura} Ssh:${humanBreak.sashimi} Dmp:${humanBreak.dumpling} Nig:${humanBreak.nigiri})`,
       `      Maki: ${humanMakiCount} (bonus ${humanMakiBonus >= 0 ? '+' : ''}${humanMakiBonus})`,
-      `      Pudding: ${humanBreak.puddingCount} (bonus ${humanPuddingBonus >= 0 ? '+' : ''}${humanPuddingBonus})`,
       '',
       `AI:   Cards ${aiBreak.tempura + aiBreak.sashimi + aiBreak.dumpling + aiBreak.nigiri} ` +
         `(Tmp:${aiBreak.tempura} Ssh:${aiBreak.sashimi} Dmp:${aiBreak.dumpling} Nig:${aiBreak.nigiri})`,
       `      Maki: ${aiMakiCount} (bonus ${aiMakiBonus >= 0 ? '+' : ''}${aiMakiBonus})`,
-      `      Pudding: ${aiBreak.puddingCount} (bonus ${aiPuddingBonus >= 0 ? '+' : ''}${aiPuddingBonus})`,
       '',
       'Round-by-round:',
     ];
@@ -154,7 +164,18 @@ export class SushiGoOverlayManager {
     for (let r = 0; r < human.roundScores.length; r++) {
       lines.push(`  R${r + 1}: You ${human.roundScores[r]} -- AI ${ai.roundScores[r]}`);
     }
-    lines.push('', `Final: You ${human.totalScore} -- AI ${ai.totalScore}`);
+
+    // If pudding bonuses were computed at game end, surface them explicitly
+    // in the round-by-round section so the per-round lines remain pure round
+    // scores and the pudding adjustment is visible in context.
+    if (result.puddingBonuses) {
+      lines.push(
+        `  Pudding Bonus: You ${humanPuddingBonus >= 0 ? '+' : ''}${humanPuddingBonus} ` +
+          `-- AI ${aiPuddingBonus >= 0 ? '+' : ''}${aiPuddingBonus}`,
+      );
+    }
+
+    lines.push('', `Final: You ${computeDisplayedTotal(0)} -- AI ${computeDisplayedTotal(1)}`);
 
     const { textY, buttonY } = this.resolveOverlayAnchors(overlay.box, {
       fallbackTextY: GAME_H / 2 - 260 + 56,
