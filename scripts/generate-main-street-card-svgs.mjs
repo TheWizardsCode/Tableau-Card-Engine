@@ -55,6 +55,8 @@ function familyColor(family, trigger) {
 const outDir = path.resolve('public/assets/games/main-street/svg/cards');
 if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
 
+const iconsDir = path.resolve('public/assets/games/main-street/svg/icons');
+
 for (const t of templates) {
   const w = 140, h = 80;
   const bg = familyColor(t.family, t.trigger);
@@ -64,6 +66,26 @@ for (const t of templates) {
   const title = t.name.replace(/&/g, '&amp;');
   const syLabel = (t.synergies || []).join('/');
 
+  // Try to inline a matching icon for the first synergy type
+  let iconMarkup = '';
+  if (t.synergies && t.synergies.length > 0) {
+    const key = t.synergies[0];
+    const iconFile = `ms-icon-${String(key).toLowerCase()}.svg`;
+    const iconPath = path.join(iconsDir, iconFile);
+    if (fs.existsSync(iconPath)) {
+      let iconSvg = fs.readFileSync(iconPath, 'utf8');
+      // strip XML prolog
+      iconSvg = iconSvg.replace(/<\?xml[^>]*\?>\s*/i, '');
+      // strip outer <svg ...> and </svg>
+      iconSvg = iconSvg.replace(/^\s*<svg[^>]*>/i, '').replace(/<\/svg>\s*$/i, '');
+      // place icon at bottom-left (approx x=6, y=h-22) scaled to 16x16
+      iconMarkup = `  <g class="ms-synergy-icon" aria-hidden="false" transform="translate(6, ${h-22})">\n    <svg width="16" height="16" viewBox="0 0 16 16" role="img" aria-label="${key} icon">${iconSvg}\n    </svg>\n  </g>`;
+    } else {
+      // fallback dot: conservative placement
+      iconMarkup = `  <circle class="ms-synergy-fallback" cx="14" cy="${h-10}" r="6" fill="${accent}" aria-hidden="true" />`;
+    }
+  }
+
   const priceBadge = displayCost 
     ? `<circle cx="${w-16}" cy="56" r="12" fill="#e0c7a0" stroke="#c8b79a" stroke-width="1.5" />`
     : '';
@@ -71,23 +93,7 @@ for (const t of templates) {
     ? `<text x="${w-16}" y="60" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="11" fill="#3a2a14" text-anchor="middle" font-weight="500">${t.cost}</text>`
     : '';
 
-  const svg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${title}">
-  <defs>
-    <linearGradient id="g-${t.id}" x1="0" x2="1">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.06"/>
-      <stop offset="1" stop-color="#ffffff" stop-opacity="0.02"/>
-    </linearGradient>
-  </defs>
-  <rect x="0" y="0" width="${w}" height="${h}" rx="6" ry="6" fill="${bg}" />
-  <rect x="4" y="4" width="${w-8}" height="${h-8}" rx="4" ry="4" fill="url(#g-${t.id})" />
-  <rect x="4" y="4" width="${w-8}" height="20" rx="3" ry="3" fill="${accent}" opacity="0.18" />
-  <text x="${w/2}" y="19" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="11" fill="#ffffff" font-weight="400" text-anchor="middle">${title}</text>
-${priceBadge}
-${priceText}
-  <text x="8" y="${h-6}" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="9" fill="#ffffff" font-weight="400">${syLabel}</text>
-</svg>
-`;
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${title}">\n  <defs>\n    <linearGradient id="g-${t.id}" x1="0" x2="1">\n      <stop offset="0" stop-color="#ffffff" stop-opacity="0.06"/>\n      <stop offset="1" stop-color="#ffffff" stop-opacity="0.02"/>\n    </linearGradient>\n  </defs>\n  <rect x="0" y="0" width="${w}" height="${h}" rx="6" ry="6" fill="${bg}" />\n  <rect x="4" y="4" width="${w-8}" height="${h-8}" rx="4" ry="4" fill="url(#g-${t.id})" />\n  <rect x="4" y="4" width="${w-8}" height="20" rx="3" ry="3" fill="${accent}" opacity="0.18" />\n  <text x="${w/2}" y="19" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="11" fill="#ffffff" font-weight="400" text-anchor="middle">${title}</text>\n${priceBadge}\n${priceText}\n${iconMarkup}\n  <text x="8" y="${h-6}" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="9" fill="#ffffff" font-weight="400">${syLabel}</text>\n</svg>\n`;
 
   const outPath = path.join(outDir, `${t.id}.svg`);
   fs.writeFileSync(outPath, svg, 'utf8');

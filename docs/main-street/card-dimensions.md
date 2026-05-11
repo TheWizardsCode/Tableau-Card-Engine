@@ -67,3 +67,9 @@ img.setOrigin(0.5, 0.5);
 ```
 
 Keep this document in sync with `docs/main-street/prd-milestone-*` and `public/assets/CREDITS.md` when canonical dimensions change.
+
+## Synergy icons
+
+Main Street card art may include small SVG "synergy" icons embedded in the canonical SVGs. Icons are 16×16 visual targets and should be placed conservatively near the bottom-left of the card so they do not overlap important text or badges. Icons are embedded inline in `public/assets/games/main-street/svg/cards/*.svg` by the generator script (`scripts/generate-main-street-card-svgs.mjs`).
+
+If an icon cannot be inlined at generation time the renderer may draw a solid-colour fallback dot using the canonical synergy colour palette. Ensure any manual edits to card art preserve the icon region (approx x=6, y=h-22, size 16×16) to maintain consistency with automated generation.
