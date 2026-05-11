@@ -650,10 +650,10 @@ function finishTurn(
   // Advance to next player
   const nextPlayer = (session.currentPlayerIndex + 1) % session.players.length;
 
-  // Check if the round is complete (all players have had equal turns after trigger)
+  // Check if final round is complete (all other players had one final turn after trigger)
   if (
     session.phase === 'final-round' &&
-    nextPlayer === session.startingPlayerIndex
+    nextPlayer === session.triggerPlayerIndex
   ) {
     session.phase = 'game-over';
     return {
