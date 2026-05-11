@@ -264,26 +264,45 @@ export class MainStreetLifecycleManager {
       },
       {
         heading: 'Synergy Types',
-        render: (scene, container, x, y, _maxWidth) => {
-          // Render only the icons (no text) in a horizontal row.
+        render: (scene, container, x, y, maxWidth) => {
+          // Render icons with descriptive labels in a vertical list.
           const types = [
-            { key: 'ms-icon-food' },
-            { key: 'ms-icon-culture' },
-            { key: 'ms-icon-commerce' },
-            { key: 'ms-icon-service' },
-            { key: 'ms-icon-entertainment' },
+            { key: 'ms-icon-food', label: 'Food' },
+            { key: 'ms-icon-culture', label: 'Culture' },
+            { key: 'ms-icon-commerce', label: 'Commerce' },
+            { key: 'ms-icon-service', label: 'Service' },
+            { key: 'ms-icon-entertainment', label: 'Entertainment' },
           ];
           const iconSize = 16;
-          const gap = 10;
-          let cx = x;
+          const gapY = 8;
+          const labelXOffset = iconSize + 8;
+          let cy = y;
+
+          // Text style similar to HelpPanel BODY_STYLE
+          const textStyle: Phaser.Types.GameObjects.Text.TextStyle = {
+            fontSize: '14px',
+            color: '#dddddd',
+            fontFamily: 'Arial, sans-serif',
+            lineSpacing: 2,
+            wordWrap: { width: Math.max(40, (maxWidth || 120) - labelXOffset), useAdvancedWrap: true } as any,
+          };
+
           for (const t of types) {
-            const img = scene.add.image(cx, y, t.key).setOrigin(0, 0);
+            const img = scene.add.image(x, cy, t.key).setOrigin(0, 0);
             img.setDisplaySize(iconSize, iconSize);
             container.add(img);
-            cx += iconSize + gap;
+
+            const label = scene.add.text(x + labelXOffset, cy, t.label, textStyle);
+            label.setOrigin(0, 0);
+            container.add(label);
+
+            // Advance cy by the greater of iconSize and label height plus gap
+            const rowH = Math.max(iconSize, label.height);
+            cy += rowH + gapY;
           }
-          // Return rendered height
-          return iconSize;
+
+          // Return total height rendered
+          return cy - y;
         },
       },
       {
