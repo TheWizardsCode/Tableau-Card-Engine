@@ -627,13 +627,14 @@ export class MainStreetRenderer {
       // Refresh Investments button (centered under Investments label / deck count)
       try {
         const canRefresh = canRefreshInvestments(s.state).legal;
-        const btnW = s.layout.smallButtonW;
+        // Make button wider so label fits, and move it lower to avoid overlapping deck text
+        const btnW = Math.max(s.layout.smallButtonW, 96);
         // center under the label area: label left (40) + half label width
         const labelCenter = 40 + s.layout.marketLabelW / 2;
         const btnX = Math.round(labelCenter - btnW / 2);
-        const btnY = deckY + 6; // slightly below deck text
+        const btnY = deckY + 22; // further below deck text to avoid overlap
 
-        const labelText = 'Discord (2)';
+        const labelText = 'Discover (2)';
 
         const btn = this.createActionButton(btnX, btnY, btnW, labelText, canRefresh ? () => { s.onRefreshInvestmentsClick(); } : () => {});
         // Disable interaction when not allowed
