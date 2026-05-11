@@ -21,6 +21,7 @@ import {
   INCIDENT_QUEUE_SIZE,
   MARKET_INVESTMENT_UPGRADE_COUNT,
   MARKET_INVESTMENT_EVENT_COUNT,
+  REFRESH_INVESTMENTS_COST,
 } from './MainStreetCards';
 
 // ── Result Types ────────────────────────────────────────────
@@ -33,6 +34,12 @@ export interface PurchaseResult {
   cost: number;
   /** Whether the market slot was refilled from the deck. */
   refilled: boolean;
+}
+
+/** Result returned after refreshing the investments row. */
+export interface RefreshResult {
+  replaced: AnyCard[];
+  cost: number;
 }
 
 // ── Legality Checks ─────────────────────────────────────────
@@ -202,6 +209,50 @@ export function refillInvestmentsMarket(state: MainStreetState): void {
     market.investments.push(decks.event.splice(idx, 1)[0]);
     eventCount++;
   }
+}
+
+/**
+ * Checks whether the player can pay to refresh the investments row.
+ */
+export function canRefreshInvestments(state: MainStreetState): LegalityResult {
+  if (state.phase !== 'MarketPhase') {
+    return { legal: false, reason: 'Refresh investments is only allowed during MarketPhase.' };
+  }
+  if (state.resourceBank.coins < REFRESH_INVESTMENTS_COST) {
+    return { legal: false, reason: `Not enough coins. Need ${REFRESH_INVESTMENTS_COST}, have ${state.resourceBank.coins}.` };
+  }
+  return { legal: true };
+}
+
+/**
+ * Refreshes the investments row by charging the player, discarding the
+ * currently-visible investment cards to their respective discard piles,
+ * and drawing replacements using the same rules as refillInvestmentsMarket.
+ */
+export function refreshInvestments(state: MainStreetState): RefreshResult {
+  const legality = canRefreshInvestments(state);
+  if (!legality.legal) throw new Error(legality.reason);
+
+  // Deduct cost
+  state.resourceBank.coins -= REFRESH_INVESTMENTS_COST;
+
+  // Move visible investment cards to discard piles
+  const removed: AnyCard[] = state.market.investments.slice();
+  for (const c of removed) {
+    if (c.family === 'upgrade') {
+      state.discards.upgrade.push(c as any);
+    } else if (c.family === 'event') {
+      state.discards.event.push(c as any);
+    }
+  }
+
+  // Clear the visible investments row and draw replacements
+  state.market.investments.length = 0;
+  refillInvestmentsMarket(state);
+
+  addLog(state, `Refreshed investments (-$${REFRESH_INVESTMENTS_COST})`, 'loss');
+
+  return { replaced: removed, cost: REFRESH_INVESTMENTS_COST };
 }
 
 /**

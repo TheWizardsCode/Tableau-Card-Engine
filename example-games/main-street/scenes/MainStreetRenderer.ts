@@ -16,6 +16,7 @@ import {
   getAffordableBusinessCards,
   getAffordableUpgradeCards,
   getEmptySlots,
+  canRefreshInvestments,
 } from '../MainStreetMarket';
 import {
   GAME_W,
@@ -622,6 +623,24 @@ export class MainStreetRenderer {
         { fontSize: '11px', color: '#776655', fontFamily: FONT_FAMILY },
       ).setOrigin(0, 0);
       s.marketContainer.add(deckText);
+
+      // Refresh Investments button (only in MarketPhase / when enabled)
+      try {
+        const canRefresh = canRefreshInvestments(s.state).legal;
+        const btnW = s.layout.smallButtonW;
+        const btnX = startX + maxSlots * (marketCardW + marketCardGap) + 12;
+        const btn = this.createActionButton(btnX, deckY - (marketCardH / 2), btnW, 'Refresh', () => {
+          s.onRefreshInvestmentsClick();
+        });
+        // Disable button when not allowed
+        if (!canRefresh) {
+          // visually indicate disabled
+          (btn.first as any)?.setFillStyle?.(0x333333, 0.6);
+        }
+        s.marketContainer.add(btn);
+      } catch (_) {
+        // ignore UI errors in tests
+      }
     }
   }
 

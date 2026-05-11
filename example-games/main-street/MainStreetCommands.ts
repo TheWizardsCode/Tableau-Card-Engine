@@ -4,6 +4,7 @@ import {
   purchaseBusiness,
   purchaseUpgrade,
   purchaseEvent,
+  refreshInvestments,
 } from './MainStreetMarket';
 import { playHeldEvent } from './MainStreetEngine';
 
@@ -144,6 +145,26 @@ export class PlayEventCommand implements Command {
   execute(): void {
     if (this.pre === null) this.pre = captureSnapshot(this.state);
     playHeldEvent(this.state);
+  }
+
+  undo(): void {
+    if (this.pre === null) return;
+    restoreSnapshot(this.state, this.pre);
+  }
+}
+
+/** Command: Refresh Investments Row (buy new opportunities) */
+export class BuyRefreshInvestmentsCommand implements Command {
+  readonly description?: string;
+  private pre: MarketActionSnapshot | null = null;
+
+  constructor(private readonly state: MainStreetState) {
+    this.description = `RefreshInvestments`;
+  }
+
+  execute(): void {
+    if (this.pre === null) this.pre = captureSnapshot(this.state);
+    refreshInvestments(this.state);
   }
 
   undo(): void {

@@ -150,6 +150,9 @@ export const MARKET_UPGRADE_SLOTS = MARKET_INVESTMENT_UPGRADE_COUNT;
 /** Number of Incident cards visible in the incident queue at game start. */
 export const INCIDENT_QUEUE_SIZE = 2;
 
+/** Fixed coin cost to refresh the investments row (buy new opportunities). */
+export const REFRESH_INVESTMENTS_COST = 2;
+
 /** Coins earned per adjacent business sharing a synergy type. */
 export const SYNERGY_BONUS_PER_NEIGHBOR = 1;
 

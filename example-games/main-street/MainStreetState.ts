@@ -160,6 +160,12 @@ export interface MainStreetState {
     event: EventCard[];
     upgrade: UpgradeCard[];
   };
+  /** Discard piles for each deck (cards removed from markets are placed here). */
+  discards: {
+    business: BusinessCard[];
+    event: EventCard[];
+    upgrade: UpgradeCard[];
+  };
   /** IDs of completed challenges. */
   challengesCompleted: string[];
   /** Active challenges for this run (selected at setup, evaluated each EndCheck). */
@@ -194,6 +200,12 @@ export interface MainStreetSerializedState {
   market: MarketState;
   resourceBank: ResourceBank;
   decks: {
+    business: BusinessCard[];
+    event: EventCard[];
+    upgrade: UpgradeCard[];
+  };
+  /** Discard piles snapshot (for save/restore) */
+  discards: {
     business: BusinessCard[];
     event: EventCard[];
     upgrade: UpgradeCard[];
@@ -398,6 +410,12 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
       event: eventDeck,
       upgrade: upgradeDeck,
     },
+    // New discard piles for removed market cards
+    discards: {
+      business: [],
+      event: [],
+      upgrade: [],
+    },
     challengesCompleted: [],
     activeChallenges: [],
     heldEvent: null,
@@ -434,6 +452,7 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
     market: structuredClone(state.market),
     resourceBank: structuredClone(state.resourceBank),
     decks: structuredClone(state.decks),
+    discards: structuredClone(state.discards),
     challengesCompleted: [...state.challengesCompleted],
     activeChallenges: state.activeChallenges.map((ac) => ({
       challengeId: ac.challenge.id,
@@ -476,6 +495,7 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
     market: structuredClone(saved.market),
     resourceBank: structuredClone(saved.resourceBank),
     decks: structuredClone(saved.decks),
+    discards: structuredClone(saved.discards),
     challengesCompleted: [...saved.challengesCompleted],
     activeChallenges: saved.activeChallenges.map((ac) => {
       const challenge = CHALLENGE_TEMPLATES.find((tpl) => tpl.id === ac.challengeId);

@@ -7,9 +7,10 @@ import {
   canPurchaseBusiness,
   canPurchaseUpgrade,
   canPurchaseEvent,
+  canRefreshInvestments,
 } from '../MainStreetMarket';
 import type { BusinessCard, EventCard, UpgradeCard } from '../MainStreetCards';
-import { BuyBusinessCommand, BuyUpgradeCommand, BuyEventCommand, PlayEventCommand } from '../MainStreetCommands';
+import { BuyBusinessCommand, BuyUpgradeCommand, BuyEventCommand, PlayEventCommand, BuyRefreshInvestmentsCommand } from '../MainStreetCommands';
 import { recordMainStreetEvent } from '../MainStreetTranscript';
 import { FONT_FAMILY, createOverlayBackground, createOverlayButton, dismissOverlay } from '../../../src/ui';
 
@@ -283,6 +284,35 @@ export class MainStreetTurnController {
     } else {
       afterTransfer();
     }
+  }
+
+  public onRefreshInvestmentsClick(): void {
+    const s = this.scene;
+    if (s.uiPhase !== 'market') return;
+
+    const legality = canRefreshInvestments(s.state);
+    if (!legality.legal) {
+      s.instructionText.setText(`Cannot refresh: ${legality.reason ?? 'unknown'}`);
+      return;
+    }
+
+    s.uiPhase = 'animating';
+    s.instructionText.setText('Refreshing investments...');
+    s.refreshAll();
+
+    try {
+      const cmd = new BuyRefreshInvestmentsCommand(s.state);
+      s.undoManager.execute(cmd);
+      try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'refresh-investments' }, description: cmd.description }); } catch (_) {}
+      s.instructionText.setText('Refreshed investments');
+      addLog(s.state, 'Refreshed investments (via UI)', 'neutral');
+    } catch (e) {
+      console.error('[MS] RefreshInvestments failed', e);
+      s.instructionText.setText(`Error: ${(e as Error).message}`);
+    }
+
+    s.uiPhase = 'market';
+    s.refreshAll();
   }
 
   public onUpgradeCardClick(card: UpgradeCard): void {
