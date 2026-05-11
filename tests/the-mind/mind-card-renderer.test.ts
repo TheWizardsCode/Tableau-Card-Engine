@@ -198,3 +198,40 @@ describe('SVG content structure', () => {
     expect(svg).toContain('rx="10"');
   });
 });
+
+// ── Lazy rasterisation helpers ─────────────────────────────
+
+describe('lazy rasterisation helpers', () => {
+  it('ensureMindCardTexture returns a getOrCreateTexture-like result when preloaded in Node', async () => {
+    const { preloadMindCardAssets, ensureMindCardTexture } = await import('../../example-games/the-mind/MindCardRenderer');
+
+    // Minimal mock scene compatible with SvgHelpers expectations used in tests.
+    const existingKeys = new Set<string>();
+    const textures = new Map<string, { setFilter: () => void }>();
+
+    const scene = {
+      sys: { game: {} },
+      cache: { text: { get: (_: string) => undefined } },
+      textures: {
+        exists: (key: string) => existingKeys.has(key),
+        addCanvas: (_: string, __: any) => undefined,
+        get: (k: string) => textures.get(k),
+      },
+    } as any;
+
+    // Preload (Node path will read files into module cache if available).
+    preloadMindCardAssets(scene, 48, 65);
+
+    // Call ensureMindCardTexture for a known card value. We expect a result
+    // with a key matching the texture naming convention and an object that
+    // may include a promise for async rasterisation.
+    const res = await ensureMindCardTexture(scene, 42, 48, 65);
+
+    expect(res).toHaveProperty('key');
+    expect(res.key).toBe('mind-42');
+    // ready may be true/false depending on environment; promise is optional
+    if (res.promise) {
+      expect(typeof res.promise.then).toBe('function');
+    }
+  });
+});
