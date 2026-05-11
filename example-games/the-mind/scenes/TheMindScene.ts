@@ -33,6 +33,7 @@ import helpContent from '../help-content.json';
 
 import {
   SFX_KEYS,
+  PRE_PENALTY_PAUSE,
   type GamePhase,
 } from './MindConstants';
 import { MindRenderer } from './MindRenderer';
@@ -326,10 +327,12 @@ export class TheMindScene extends CardGameScene {
   }
 
   private handlePenalty(result: PlayResult): void {
-    this.mindRenderer.refreshAll();
+    this.setPhase('penalty');
+    this.mindRenderer.refreshPile();
+    this.mindRenderer.refreshStatus();
     this.mindRenderer.flashLives();
 
-    this.time.delayedCall(800, () => {
+    this.time.delayedCall(PRE_PENALTY_PAUSE, () => {
       this.mindAnimator.showPenaltyCards(result, () => {
         this.mindRenderer.refreshAll();
 

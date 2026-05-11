@@ -3,7 +3,7 @@
  */
 
 import { GAME_W, GAME_H, FONT_FAMILY, createSceneHeader, layoutCardPositions } from '../../../src/ui';
-import { getMindCardTexture, ensureMindCardTexture } from '../MindCardRenderer';
+import { ensureMindCardTexture } from '../MindCardRenderer';
 import { CARD_BACK_KEY } from '../MindCard';
 import type { MindCard } from '../MindCard';
 import type { TheMindSession } from '../TheMindGameState';
@@ -17,6 +17,13 @@ import {
 export class MindRenderer {
   // Display objects -- human hand
   humanCardSprites: Phaser.GameObjects.Image[] = [];
+  private lastHumanHandRenderArgs:
+    | {
+        onCardClick: (card: MindCard) => void;
+        phase: string;
+        autoPlayEnabled: boolean;
+      }
+    | null = null;
 
   // Display objects -- AI hand
   aiCardSprites: Phaser.GameObjects.Image[] = [];
@@ -151,6 +158,8 @@ export class MindRenderer {
   // ── Human hand rendering ───────────────────────────────
 
   renderHumanHand(onCardClick: (card: MindCard) => void, phase: string, autoPlayEnabled: boolean): void {
+    this.lastHumanHandRenderArgs = { onCardClick, phase, autoPlayEnabled };
+
     for (const sprite of this.humanCardSprites) {
       sprite.destroy();
     }
@@ -319,8 +328,27 @@ export class MindRenderer {
   // ── Refresh all ────────────────────────────────────────
 
   refreshAll(): void {
-    this.refreshHumanHand();
-    this.refreshAiHand();
+    const humanHand = this.session.players[0].hand;
+    if (
+      humanHand.length !== this.humanCardSprites.length &&
+      this.lastHumanHandRenderArgs
+    ) {
+      this.renderHumanHand(
+        this.lastHumanHandRenderArgs.onCardClick,
+        this.lastHumanHandRenderArgs.phase,
+        this.lastHumanHandRenderArgs.autoPlayEnabled,
+      );
+    } else {
+      this.refreshHumanHand();
+    }
+
+    const aiHand = this.session.players[1].hand;
+    if (aiHand.length !== this.aiCardSprites.length) {
+      this.renderAiHand();
+    } else {
+      this.refreshAiHand();
+    }
+
     this.refreshPile();
     this.refreshStatus();
   }
