@@ -2,7 +2,7 @@
  * SushiGoTableauRenderer -- renders the tableau display for Sushi Go!
  */
 
-import type { SushiGoCardType } from '../SushiGoCards';
+import type { SushiGoCard, SushiGoCardType } from '../SushiGoCards';
 import { scoreTableauBreakdown, countMakiIcons, scoreMaki } from '../SushiGoScoring';
 import type { SushiGoSession } from '../SushiGoGame';
 import {
@@ -12,6 +12,12 @@ import {
 import { GAME_W } from '../../../src/ui';
 import { SushiGoCardFactory } from './SushiGoCardFactory';
 import { SushiGoRenderer } from './SushiGoRenderer';
+import {
+  computeEncounterOrder,
+  computeTableauLayout,
+  pairWasabiNigiri,
+  type TableauLayoutItem,
+} from './SushiGoTableauHelpers';
 
 export class SushiGoTableauRenderer {
   constructor(
@@ -31,170 +37,218 @@ export class SushiGoTableauRenderer {
     const tableau = this.session.players[playerIdx].tableau;
     const baseY = who === 'player' ? PLAYER_TABLEAU_Y : AI_TABLEAU_Y;
 
-    if (tableau.length === 0) {
-      const empty = this.scene.add.text(GAME_W / 2, baseY, '(no cards yet)', {
-        fontSize: '15px',
-        color: '#666666',
-        fontFamily: 'sans-serif',
-      }).setOrigin(0.5);
-      container.add(empty);
+    if (this.renderEmptyTableauIfNeeded(container, tableau, baseY)) {
       return;
     }
 
-    const wasabiToNigiri = new Map<number, number>();
-    const nigiriToWasabi = new Map<number, number>();
-    const wasabiQueue: number[] = [];
-    for (const c of tableau) {
-      if (c.type === 'wasabi') {
-        wasabiQueue.push(c.id);
-      } else if (c.type === 'nigiri') {
-        if (wasabiQueue.length > 0) {
-          const wId = wasabiQueue.shift()!;
-          wasabiToNigiri.set(wId, c.id);
-          nigiriToWasabi.set(c.id, wId);
-        }
-      }
-    }
-
+    const pairings = pairWasabiNigiri(tableau);
     const groups = this.renderer.groupByType(tableau);
+    const visibleGroups = this.filterVisibleGroups(groups, pairings.wasabiToNigiri);
+    const order = computeEncounterOrder(tableau);
+    const layout = computeTableauLayout(
+      order,
+      visibleGroups,
+      GAME_W,
+      TABLEAU_CARD_W,
+      TABLEAU_CARD_GAP,
+      TABLEAU_GROUP_GAP,
+    );
 
-    const allMakiCounts = this.session.players.map((p) => countMakiIcons(p.tableau));
-    const allMakiBonuses = scoreMaki(allMakiCounts);
+    const makiBonuses = scoreMaki(
+      this.session.players.map((p) => countMakiIcons(p.tableau)),
+    );
 
-    const seenTypes = new Set<string>();
-    const typeOrder: string[] = [];
-    for (const c of tableau) {
-      if (!seenTypes.has(c.type)) {
-        seenTypes.add(c.type);
-        typeOrder.push(c.type);
-      }
+    this.renderGroups(who, container, tableau, baseY, layout, makiBonuses[playerIdx] ?? 0);
+    this.addWasabiOverlays(container, pairings.nigiriToWasabi);
+  }
+
+  private renderEmptyTableauIfNeeded(
+    container: Phaser.GameObjects.Container,
+    tableau: SushiGoCard[],
+    baseY: number,
+  ): boolean {
+    if (tableau.length > 0) {
+      return false;
     }
 
-    let totalWidth = 0;
-    const groupWidths: number[] = [];
-    for (const type of typeOrder) {
-      const cards = groups.get(type as SushiGoCardType);
-      if (!cards || cards.length === 0) continue;
-      const w = cards.length * (TABLEAU_CARD_W + TABLEAU_CARD_GAP) - TABLEAU_CARD_GAP;
-      groupWidths.push(w);
-      totalWidth += w;
+    const empty = this.scene.add.text(GAME_W / 2, baseY, '(no cards yet)', {
+      fontSize: '15px',
+      color: '#666666',
+      fontFamily: 'sans-serif',
+    }).setOrigin(0.5);
+    container.add(empty);
+    return true;
+  }
+
+  private filterVisibleGroups(
+    groups: Map<SushiGoCardType, SushiGoCard[]>,
+    wasabiToNigiri: Map<number, number>,
+  ): Map<SushiGoCardType, SushiGoCard[]> {
+    const visible = new Map(groups);
+    const wasabiCards = visible.get('wasabi') ?? [];
+    const unusedWasabi = wasabiCards.filter((card) => !wasabiToNigiri.has(card.id));
+    visible.set('wasabi', unusedWasabi);
+    return visible;
+  }
+
+  private renderGroups(
+    who: 'player' | 'ai',
+    container: Phaser.GameObjects.Container,
+    tableau: SushiGoCard[],
+    baseY: number,
+    layout: TableauLayoutItem[],
+    playerMakiBonus: number,
+  ): void {
+    const breakdown = scoreTableauBreakdown(tableau);
+
+    for (const group of layout) {
+      const labelText = this.buildTypeLabel(group.type, group.cards, breakdown, playerMakiBonus);
+      this.renderGroupLabel(who, container, group, baseY, labelText);
+      this.renderGroupCards(container, group, baseY);
     }
-    totalWidth += (groupWidths.length - 1) * TABLEAU_GROUP_GAP;
+  }
 
-    let curX = (GAME_W - totalWidth) / 2;
+  private buildTypeLabel(
+    type: SushiGoCardType,
+    cards: SushiGoCard[],
+    breakdown: ReturnType<typeof scoreTableauBreakdown>,
+    playerMakiBonus: number,
+  ): string {
+    const defaultLabel = this.renderer.getTypeGroupLabel(type, cards);
 
-    for (const type of typeOrder) {
-      let cards = groups.get(type as SushiGoCardType);
-      if (!cards || cards.length === 0) continue;
-
-      if (type === 'wasabi') {
-        cards = cards.filter((c) => !wasabiToNigiri.has(c.id));
-        if (cards.length === 0) continue;
+    if (type === 'maki') {
+      if (playerMakiBonus !== 0) {
+        return `Maki(${playerMakiBonus >= 0 ? '+' : ''}${playerMakiBonus})`;
       }
-
-      const groupW = cards.length * (TABLEAU_CARD_W + TABLEAU_CARD_GAP) - TABLEAU_CARD_GAP;
-      let labelText = this.renderer.getTypeGroupLabel(type as SushiGoCardType, cards);
-
-      if (type !== 'pudding') {
-        try {
-          const breakdown = scoreTableauBreakdown(tableau);
-          switch (type) {
-            case 'tempura':
-              labelText = `Tmp(${breakdown.tempura})`;
-              break;
-            case 'sashimi':
-              labelText = `Ssh(${breakdown.sashimi})`;
-              break;
-            case 'dumpling':
-              labelText = `Dmp(${breakdown.dumpling})`;
-              break;
-            case 'nigiri':
-              labelText = `Nig(${breakdown.nigiri})`;
-              break;
-            case 'wasabi':
-              labelText = `Wsb(${cards.length})`;
-              break;
-            case 'chopsticks':
-              labelText = `Chp(${breakdown.chopsticks})`;
-              break;
-          }
-        } catch (e) {
-          console.warn('Failed to compute breakdown for tableau labels', e);
-        }
-      }
-
-      if (type === 'maki') {
-        const totalIcons = cards.reduce((sum, c) => sum + (c.type === 'maki' ? c.icons : 0), 0);
-        const playerMakiBonus = allMakiBonuses[playerIdx] ?? 0;
-        if (playerMakiBonus !== 0) {
-          labelText = `Maki(${playerMakiBonus >= 0 ? '+' : ''}${playerMakiBonus})`;
-        } else {
-          labelText = `Maki(${totalIcons})`;
-        }
-      }
-
-      const typeLabel = this.scene.add.text(
-        curX + groupW / 2,
-        baseY - TABLEAU_CARD_H / 2 - 16,
-        labelText,
-        {
-          fontSize: '11px',
-          color: who === 'player' ? '#aaccaa' : '#99aabb',
-          fontFamily: 'sans-serif',
-        },
-      ).setOrigin(0.5);
-      container.add(typeLabel);
-
-      for (let i = 0; i < cards.length; i++) {
-        const x = curX + i * (TABLEAU_CARD_W + TABLEAU_CARD_GAP) + TABLEAU_CARD_W / 2;
-        const cardRect = this.cardFactory.createCardRect(
-          x, baseY, TABLEAU_CARD_W, TABLEAU_CARD_H, cards[i],
-        );
-        container.add(cardRect);
-      }
-
-      curX += groupW + TABLEAU_GROUP_GAP;
+      const totalIcons = cards.reduce((sum, card) => sum + (card.type === 'maki' ? card.icons : 0), 0);
+      return `Maki(${totalIcons})`;
     }
 
-    for (const [nigiriId] of nigiriToWasabi.entries()) {
-      const children = container.getAll();
-      let nigiriContainer: Phaser.GameObjects.Container | null = null;
-      for (const child of children) {
-        if (!(child instanceof Phaser.GameObjects.Container)) continue;
-        const possible = child.getData && child.getData('cardId') === nigiriId;
-        if (possible) {
-          nigiriContainer = child as Phaser.GameObjects.Container;
-          break;
-        }
-      }
+    if (type === 'pudding') {
+      return defaultLabel;
+    }
 
-      if (!nigiriContainer) continue;
-      if (nigiriContainer.getData('wasabiOverlay')) continue;
+    switch (type) {
+      case 'tempura':
+        return `Tmp(${breakdown.tempura})`;
+      case 'sashimi':
+        return `Ssh(${breakdown.sashimi})`;
+      case 'dumpling':
+        return `Dmp(${breakdown.dumpling})`;
+      case 'nigiri':
+        return `Nig(${breakdown.nigiri})`;
+      case 'wasabi':
+        return `Wsb(${cards.length})`;
+      case 'chopsticks':
+        return `Chp(${breakdown.chopsticks})`;
+      default:
+        return defaultLabel;
+    }
+  }
 
-      if (this.scene.textures.exists('icon-wasabi')) {
-        const iconSize = Math.round(TABLEAU_CARD_W * 0.36);
-        const wasabiY = TABLEAU_CARD_H / 2 - 26;
-        const wasabiImg = this.scene.add.image(0, wasabiY, 'icon-wasabi');
-        wasabiImg.setDisplaySize(iconSize, iconSize);
-        wasabiImg.setOrigin(0.5, 1);
-        nigiriContainer.addAt(wasabiImg, 1);
-      }
-
-      const badgeW = 32;
-      const badgeH = 18;
-      const badgeX = TABLEAU_CARD_W / 2 - badgeW / 2 - 6;
-      const badgeY = -TABLEAU_CARD_H / 2 + badgeH / 2 + 6;
-      const badgeBg = this.scene.add.rectangle(badgeX, badgeY, badgeW, badgeH, 0x90EE90, 1);
-      badgeBg.setStrokeStyle(1, 0x336633);
-      badgeBg.setOrigin(0.5);
-      const badgeText = this.scene.add.text(badgeX, badgeY, 'x3', {
-        fontSize: '12px',
-        color: '#1a3a1a',
+  private renderGroupLabel(
+    who: 'player' | 'ai',
+    container: Phaser.GameObjects.Container,
+    group: TableauLayoutItem,
+    baseY: number,
+    labelText: string,
+  ): void {
+    const typeLabel = this.scene.add.text(
+      group.startX + group.width / 2,
+      baseY - TABLEAU_CARD_H / 2 - 16,
+      labelText,
+      {
+        fontSize: '11px',
+        color: who === 'player' ? '#aaccaa' : '#99aabb',
         fontFamily: 'sans-serif',
-      }).setOrigin(0.5);
-      nigiriContainer.add(badgeBg);
-      nigiriContainer.add(badgeText);
+      },
+    ).setOrigin(0.5);
+    container.add(typeLabel);
+  }
+
+  private renderGroupCards(
+    container: Phaser.GameObjects.Container,
+    group: TableauLayoutItem,
+    baseY: number,
+  ): void {
+    for (let i = 0; i < group.cards.length; i++) {
+      const x = group.startX + i * (TABLEAU_CARD_W + TABLEAU_CARD_GAP) + TABLEAU_CARD_W / 2;
+      const cardRect = this.cardFactory.createCardRect(
+        x,
+        baseY,
+        TABLEAU_CARD_W,
+        TABLEAU_CARD_H,
+        group.cards[i],
+      );
+      container.add(cardRect);
+    }
+  }
+
+  private addWasabiOverlays(
+    container: Phaser.GameObjects.Container,
+    nigiriToWasabi: Map<number, number>,
+  ): void {
+    for (const nigiriId of nigiriToWasabi.keys()) {
+      const nigiriContainer = this.findCardContainer(container, nigiriId);
+      if (!nigiriContainer || nigiriContainer.getData('wasabiOverlay')) {
+        continue;
+      }
+
+      this.renderWasabiIcon(nigiriContainer);
+      this.renderMultiplierBadge(nigiriContainer);
       nigiriContainer.setData('wasabiOverlay', true);
     }
+  }
+
+  private findCardContainer(
+    container: Phaser.GameObjects.Container,
+    cardId: number,
+  ): Phaser.GameObjects.Container | null {
+    const children = container.getAll();
+
+    for (const child of children) {
+      if (!(child instanceof Phaser.GameObjects.Container)) {
+        continue;
+      }
+
+      if (child.getData && child.getData('cardId') === cardId) {
+        return child;
+      }
+    }
+
+    return null;
+  }
+
+  private renderWasabiIcon(target: Phaser.GameObjects.Container): void {
+    if (!this.scene.textures.exists('icon-wasabi')) {
+      return;
+    }
+
+    const iconSize = Math.round(TABLEAU_CARD_W * 0.36);
+    const wasabiY = TABLEAU_CARD_H / 2 - 26;
+    const wasabiImg = this.scene.add.image(0, wasabiY, 'icon-wasabi');
+    wasabiImg.setDisplaySize(iconSize, iconSize);
+    wasabiImg.setOrigin(0.5, 1);
+    target.addAt(wasabiImg, 1);
+  }
+
+  private renderMultiplierBadge(target: Phaser.GameObjects.Container): void {
+    const badgeW = 32;
+    const badgeH = 18;
+    const badgeX = TABLEAU_CARD_W / 2 - badgeW / 2 - 6;
+    const badgeY = -TABLEAU_CARD_H / 2 + badgeH / 2 + 6;
+
+    const badgeBg = this.scene.add.rectangle(badgeX, badgeY, badgeW, badgeH, 0x90EE90, 1);
+    badgeBg.setStrokeStyle(1, 0x336633);
+    badgeBg.setOrigin(0.5);
+
+    const badgeText = this.scene.add.text(badgeX, badgeY, 'x3', {
+      fontSize: '12px',
+      color: '#1a3a1a',
+      fontFamily: 'sans-serif',
+    }).setOrigin(0.5);
+
+    target.add(badgeBg);
+    target.add(badgeText);
   }
 }
