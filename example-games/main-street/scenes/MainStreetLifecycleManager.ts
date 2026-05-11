@@ -53,6 +53,19 @@ export class MainStreetLifecycleManager {
       // dimensions needed for crisp rendering on the current screen/DPR.
       s.msSvgTextureManager = s.msSvgTextureManager ?? new MainStreetSvgTextureManager(s);
       s.msSvgTextureManager.loadCardSvgSources();
+
+      // Preload small SVG icons used by the generator/help panel so the HelpPanel
+      // can display them in the sidebar. Use image loader to avoid DOM parsing
+      // differences in headless/test environments.
+      try {
+        const icons = ['food','culture','commerce','service','entertainment'];
+        const iconsDir = 'assets/games/main-street/svg/icons';
+        for (const k of icons) {
+          s.load.image(`ms-icon-${k}`, `${iconsDir}/ms-icon-${k}.svg`);
+        }
+      } catch (e) {
+        // ignore icon preload failures in constrained environments
+      }
     } catch (e) {
       // If svg loader is unavailable in the current environment, ignore
       // eslint-disable-next-line no-console
@@ -251,12 +264,66 @@ export class MainStreetLifecycleManager {
       },
       {
         heading: 'Synergy Types',
-        body:
-          'Food (orange) -- restaurants, cafes\n' +
-          'Culture (blue) -- galleries, theaters\n' +
-          'Commerce (green) -- shops, services\n' +
-          'Service (purple) -- salons, clinics\n' +
-          'Entertainment (red) -- cinemas, arcades',
+        render: (scene, container, x, y, maxWidth) => {
+          // Render a short explanatory paragraph about the synergy mechanic, then
+          // render per-type icons with titles and a short description.
+          const paragraph =
+            'Synergies: when two adjacent businesses share a synergy type, they grant bonus income to each other. ' +
+            'Synergy checks are performed for neighboring slots (left/right) and stack additively: placing businesses that share types next to each other increases income. ' +
+            'Some cards bridge multiple synergy types and count for both. Plan placements to cluster synergies for higher returns.';
+
+          const paraStyle: Phaser.Types.GameObjects.Text.TextStyle = {
+            fontSize: '14px',
+            color: '#dddddd',
+            fontFamily: 'Arial, sans-serif',
+            lineSpacing: 2,
+            wordWrap: { width: Math.max(80, maxWidth || 260), useAdvancedWrap: true } as any,
+          };
+
+          const para = scene.add.text(x, y, paragraph, paraStyle);
+          para.setOrigin(0, 0);
+          container.add(para);
+
+          let cy = y + para.height + 12; // gap after paragraph
+
+          const types = [
+            { key: 'ms-icon-food', label: 'Food' },
+            { key: 'ms-icon-culture', label: 'Culture' },
+            { key: 'ms-icon-commerce', label: 'Commerce' },
+            { key: 'ms-icon-service', label: 'Service' },
+            { key: 'ms-icon-entertainment', label: 'Entertainment' },
+          ];
+
+          const iconSize = 16;
+          const gapY = 8;
+          const labelXOffset = iconSize + 8;
+
+          // Text style similar to HelpPanel BODY_STYLE
+          const labelStyle: Phaser.Types.GameObjects.Text.TextStyle = {
+            fontSize: '14px',
+            color: '#dddddd',
+            fontFamily: 'Arial, sans-serif',
+            lineSpacing: 2,
+            wordWrap: { width: Math.max(40, (maxWidth || 120) - labelXOffset), useAdvancedWrap: true } as any,
+          };
+
+          for (const t of types) {
+            const img = scene.add.image(x, cy, t.key).setOrigin(0, 0);
+            img.setDisplaySize(iconSize, iconSize);
+            container.add(img);
+
+            const label = scene.add.text(x + labelXOffset, cy, t.label, labelStyle);
+            label.setOrigin(0, 0);
+            container.add(label);
+
+            // Advance cy by the greater of iconSize and label height plus gap
+            const rowH = Math.max(iconSize, label.height);
+            cy += rowH + gapY;
+          }
+
+          // Return total height rendered
+          return cy - y;
+        },
       },
       {
         heading: 'Win / Loss',

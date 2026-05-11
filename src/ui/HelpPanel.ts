@@ -13,7 +13,14 @@ import Phaser from 'phaser';
 /** A single content section displayed in the help panel. */
 export interface HelpSection {
   heading: string;
-  body: string;
+  body?: string;
+  /**
+   * Optional custom renderer for complex section content. The function is
+   * responsible for adding display objects to the provided container at the
+   * given x/y coordinates and must return the rendered height in pixels so
+   * the HelpPanel can compute spacing and scrolling.
+   */
+  render?: (scene: Phaser.Scene, container: Phaser.GameObjects.Container, x: number, y: number, maxWidth: number) => number;
 }
 
 /** Configuration for the HelpPanel constructor. */
@@ -293,13 +300,22 @@ export class HelpPanel {
       this.contentContainer.add(heading);
       yOffset += heading.height + HEADING_BODY_GAP;
 
-      // Body
-      const body = this.scene.add.text(PADDING, yOffset, section.body, {
-        ...BODY_STYLE,
-        wordWrap: { width: textWidth, useAdvancedWrap: true },
-      });
-      this.contentContainer.add(body);
-      yOffset += body.height + SECTION_GAP;
+      // Body: either plain text or a custom renderer
+      if (section.render) {
+        // Allow custom renderers to append GameObjects into our content container
+        const renderedH = section.render(this.scene, this.contentContainer, PADDING, yOffset, textWidth);
+        yOffset += (renderedH || 0) + SECTION_GAP;
+      } else if (section.body) {
+        const body = this.scene.add.text(PADDING, yOffset, section.body, {
+          ...BODY_STYLE,
+          wordWrap: { width: textWidth, useAdvancedWrap: true },
+        });
+        this.contentContainer.add(body);
+        yOffset += body.height + SECTION_GAP;
+      } else {
+        // Nothing to render for this section
+        yOffset += SECTION_GAP;
+      }
     }
 
     this.totalContentHeight = yOffset;
