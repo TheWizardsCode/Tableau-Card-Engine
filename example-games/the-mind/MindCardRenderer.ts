@@ -182,6 +182,14 @@ export async function ensureMindCardTexture(
         return { key, ready: true };
       }
 
+      // In non-browser (Node) test environments we cannot rasterise safely
+      // because `Image` / `document` are not available. Return a best-effort
+      // non-rasterising result so tests can continue without unhandled
+      // rejections. Browser runtimes will rasterise on demand.
+      if (typeof (globalThis as any).Image === 'undefined' || typeof (globalThis as any).document === 'undefined') {
+        return { key, ready: false };
+      }
+
       // Start rasterisation under the legacy texture key so existing scenes
       // that reference 'mind-<n>' continue to work unchanged.
       const promise = rasteriseSvgToTexture(scene, key, svgText, width, height);
@@ -199,6 +207,10 @@ export async function ensureMindCardTexture(
 
   if (scene.textures?.exists(key)) {
     return { key, ready: true };
+  }
+
+  if (typeof (globalThis as any).Image === 'undefined' || typeof (globalThis as any).document === 'undefined') {
+    return { key, ready: false };
   }
 
   const promise = rasteriseSvgToTexture(scene, key, svgText, width, height);
