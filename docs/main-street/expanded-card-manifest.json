@@ -1,0 +1,73 @@
+{
+  "source": "Generated from MainStreetCards.ts and Tier 1 IDs from MainStreetTiers.ts",
+  "generatedAt": "2026-05-11T23:51:22.930Z",
+  "baselineTier1CardIds": [
+    "biz-bakery",
+    "biz-bookshop",
+    "biz-diner",
+    "biz-hardware",
+    "biz-park",
+    "evt-award",
+    "evt-festival",
+    "evt-inspection",
+    "evt-rainy",
+    "evt-tax",
+    "upg-bistro",
+    "upg-library",
+    "upg-patisserie"
+  ],
+  "expandedCardIds": {
+    "business": [
+      "biz-arcade",
+      "biz-barbershop",
+      "biz-boutique",
+      "biz-cafe",
+      "biz-cinema",
+      "biz-clinic",
+      "biz-florist",
+      "biz-food-truck",
+      "biz-gallery",
+      "biz-laundromat",
+      "biz-pawnshop",
+      "biz-spa"
+    ],
+    "event": [
+      "evt-block-party",
+      "evt-charity-drive",
+      "evt-construction",
+      "evt-food-critic",
+      "evt-grand-opening",
+      "evt-noise-complaint",
+      "evt-pipe-burst",
+      "evt-power-outage",
+      "evt-shoplifting",
+      "evt-vandalism",
+      "evt-viral-review",
+      "evt-wellness-fair"
+    ],
+    "upgrade": [
+      "upg-bread-factory",
+      "upg-designer-store",
+      "upg-drive-in",
+      "upg-dry-cleaners",
+      "upg-fast-food",
+      "upg-gaming-lounge",
+      "upg-garden",
+      "upg-garden-center",
+      "upg-gourmet-truck",
+      "upg-grand-bakehouse",
+      "upg-home-improvement",
+      "upg-imax",
+      "upg-luxury-retreat",
+      "upg-medical-center",
+      "upg-multiplex",
+      "upg-museum",
+      "upg-resort-spa",
+      "upg-restaurant",
+      "upg-roastery",
+      "upg-salon",
+      "upg-vintage-shop",
+      "upg-wellness-center"
+    ]
+  }
+}
