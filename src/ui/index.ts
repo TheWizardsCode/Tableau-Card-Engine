@@ -109,6 +109,14 @@ export type {
 
 export { createOverlayMenuButton } from './MenuButton';
 export { OverlayManager } from './OverlayManager';
+export {
+  createParameterizedOverlay,
+  overlayCenterY,
+} from './ParameterizedOverlay';
+export type {
+  ParameterizedOverlayConfig,
+  ParameterizedOverlayButton,
+} from './ParameterizedOverlay';
 
 // Hi-DPI text rendering (side-effect import for patching)
 export { TEXT_DPR } from './hiDpiText';
