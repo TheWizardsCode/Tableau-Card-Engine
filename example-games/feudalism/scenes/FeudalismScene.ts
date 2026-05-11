@@ -149,7 +149,7 @@ export class FeudalismScene extends CardGameScene {
       onSupplyTokenClick: (color) => this.onSupplyTokenClick(color),
       onTakeTokens: () => this.onTakeTokens(),
       onTakeSame: (color) => this.turnController.executeTakeSame(color),
-      onConfirmDifferent: () => this.turnController.executeTakeDifferent(this.selectedTokens),
+      onConfirmDifferent: () => this.onConfirmDifferent(),
       onCancelSelection: () => this.onCancelSelection(),
       onReservedCardClick: (card) => this.onReservedCardClick(card),
     });
@@ -170,7 +170,7 @@ export class FeudalismScene extends CardGameScene {
         this.feudRenderer.refreshActionButtons({
           onTakeTokens: () => this.onTakeTokens(),
           onTakeSame: (color) => this.turnController.executeTakeSame(color),
-          onConfirmDifferent: () => this.turnController.executeTakeDifferent(this.selectedTokens),
+          onConfirmDifferent: () => this.onConfirmDifferent(),
           onCancelSelection: () => this.onCancelSelection(),
         });
         break;
@@ -221,9 +221,17 @@ export class FeudalismScene extends CardGameScene {
     this.feudRenderer.refreshActionButtons({
       onTakeTokens: () => this.onTakeTokens(),
       onTakeSame: (c) => this.turnController.executeTakeSame(c),
-      onConfirmDifferent: () => this.turnController.executeTakeDifferent(this.selectedTokens),
+      onConfirmDifferent: () => this.onConfirmDifferent(),
       onCancelSelection: () => this.onCancelSelection(),
     });
+  }
+
+  private onConfirmDifferent(): void {
+    // Execute the take-different action and immediately clear the UI selection
+    this.turnController.executeTakeDifferent(this.selectedTokens);
+    this.selectedTokens = [];
+    this.feudRenderer.selectedTokens = this.selectedTokens;
+    this.refreshAll();
   }
 
   // ── Card click handlers ─────────────────────────────────
