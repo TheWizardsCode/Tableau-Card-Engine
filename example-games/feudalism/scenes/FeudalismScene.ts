@@ -158,6 +158,10 @@ export class FeudalismScene extends CardGameScene {
   private setPhase(phase: TurnPhase): void {
     this.feudRenderer.turnPhase = phase;
     if (phase !== 'player-turn') this.feudRenderer.clearMarketSelection();
+    if (phase !== 'selecting-tokens' && this.selectedTokens.length > 0) {
+      this.selectedTokens = [];
+      this.feudRenderer.selectedTokens = this.selectedTokens;
+    }
 
     switch (phase) {
       case 'player-turn':
@@ -346,6 +350,26 @@ export class FeudalismScene extends CardGameScene {
   }
   emitNonCardPointerDownForTest(): void {
     this.input.emit('pointerdown', this.input.activePointer, []);
+  }
+
+  startTokenSelectionForTest(): void {
+    this.onTakeTokens();
+  }
+
+  toggleSupplyTokenForTest(color: ResourceType): void {
+    this.onSupplyTokenClick(color);
+  }
+
+  confirmTakeDifferentForTest(): void {
+    this.turnController.executeTakeDifferent(this.selectedTokens);
+  }
+
+  getSelectedTokensForTest(): ResourceType[] {
+    return [...this.selectedTokens];
+  }
+
+  getTurnPhaseForTest(): TurnPhase {
+    return this.turnController.phase;
   }
 
   // ── Cleanup ─────────────────────────────────────────────
