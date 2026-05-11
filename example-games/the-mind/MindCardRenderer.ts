@@ -75,6 +75,11 @@ export function preloadMindCardAssets(
   width: number = MIND_CARD_W,
   height: number = MIND_CARD_H,
 ): void {
+  // Keep width/height parameters for API compatibility — they are used
+  // by rasterisation code when textures are generated lazily. Silence
+  // the "declared but unused" TypeScript error in this preload path.
+  void width;
+  void height;
   // In browser environments, prefer loading SVG source text via the
   // loader so the shared SvgHelpers can rasterise it on demand.
   // In Node (tests) we synchronously read the files into svgTextCache so
@@ -102,24 +107,18 @@ export function preloadMindCardAssets(
     }
   } else {
     if (scene) {
-      // Register scene as valid for SvgHelpers and use text loader so the
-      // shared helpers can fetch from the cache when required.
-      // We avoid eager rasterisation here; textures are generated lazily
-      // on first use via SvgHelpers.getOrCreateTexture.
-      // Note: `this.load.text` stores content in the cache under the key
-      // provided (we prefix with `svg:` to avoid collisions).
-      scene.load.text('svg:mind-back', `${ASSET_PATH}/mind-back.svg`);
+      // Register scene as valid for SvgHelpers and ask the Phaser loader to
+      // create textures as before for compatibility. The loader's svg type
+      // produces textures synchronously for use in `create()`.
+      scene.load.svg(CARD_BACK_KEY, `${ASSET_PATH}/mind-back.svg`, { width, height });
 
       for (let value = MIN_VALUE; value <= MAX_VALUE; value++) {
         const key = `mind-${value}`;
-        scene.load.text(`svg:${key}`, `${ASSET_PATH}/${key}.svg`);
+        scene.load.svg(key, `${ASSET_PATH}/${key}.svg`, { width, height });
       }
 
-      // Mark the scene as valid for rasterisation helpers; callers should
-      // hook lifecycle events to call `markSceneInvalid` on shutdown/destroy.
-      // Import lazily to avoid circular deps at module-eval time. Use a
-      // dynamic import so test environments (Vitest) resolve TypeScript
-      // modules correctly.
+      // Mark the scene as valid for rasterisation helpers so later lazy
+      // rasterisation (if used) is safe.
       import('../../src/core-engine/SvgHelpers')
         .then((m) => {
           if (m && typeof m.markSceneValid === 'function') m.markSceneValid(scene);
