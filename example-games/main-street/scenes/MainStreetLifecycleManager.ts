@@ -53,6 +53,19 @@ export class MainStreetLifecycleManager {
       // dimensions needed for crisp rendering on the current screen/DPR.
       s.msSvgTextureManager = s.msSvgTextureManager ?? new MainStreetSvgTextureManager(s);
       s.msSvgTextureManager.loadCardSvgSources();
+
+      // Preload small SVG icons used by the generator/help panel so the HelpPanel
+      // can display them in the sidebar. Use image loader to avoid DOM parsing
+      // differences in headless/test environments.
+      try {
+        const icons = ['food','culture','commerce','service','entertainment'];
+        const iconsDir = 'assets/games/main-street/svg/icons';
+        for (const k of icons) {
+          s.load.image(`ms-icon-${k}`, `${iconsDir}/ms-icon-${k}.svg`);
+        }
+      } catch (e) {
+        // ignore icon preload failures in constrained environments
+      }
     } catch (e) {
       // If svg loader is unavailable in the current environment, ignore
       // eslint-disable-next-line no-console
@@ -251,12 +264,27 @@ export class MainStreetLifecycleManager {
       },
       {
         heading: 'Synergy Types',
-        body:
-          'Food (orange) -- restaurants, cafes\n' +
-          'Culture (blue) -- galleries, theaters\n' +
-          'Commerce (green) -- shops, services\n' +
-          'Service (purple) -- salons, clinics\n' +
-          'Entertainment (red) -- cinemas, arcades',
+        render: (scene, container, x, y, maxWidth) => {
+          // Render only the icons (no text) in a horizontal row.
+          const types = [
+            { key: 'ms-icon-food' },
+            { key: 'ms-icon-culture' },
+            { key: 'ms-icon-commerce' },
+            { key: 'ms-icon-service' },
+            { key: 'ms-icon-entertainment' },
+          ];
+          const iconSize = 16;
+          const gap = 10;
+          let cx = x;
+          for (const t of types) {
+            const img = scene.add.image(cx, y, t.key).setOrigin(0, 0);
+            img.setDisplaySize(iconSize, iconSize);
+            container.add(img);
+            cx += iconSize + gap;
+          }
+          // Return rendered height
+          return iconSize;
+        },
       },
       {
         heading: 'Win / Loss',

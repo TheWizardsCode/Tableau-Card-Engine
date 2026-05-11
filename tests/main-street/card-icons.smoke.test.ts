@@ -22,6 +22,9 @@ describe('Main Street card generator: synergy icons smoke', () => {
 
     expect(hasIconGroup || hasFallback).toBe(true);
 
+    // Ensure the textual synergy label is not present (we now show only the icon)
+    expect(content.includes('x="8"') && content.includes('font-size="9"')).toBe(false);
+
     // Also check that aria-label for the card title is present
     expect(content).toMatch(/aria-label=".+"/);
   });
