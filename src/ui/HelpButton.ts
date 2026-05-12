@@ -70,6 +70,15 @@ export class HelpButton {
     this.hitArea.setDepth(DEPTH_HELP_BUTTON);
     this.hitArea.setInteractive({ useHandCursor: true });
 
+    // If a HUD container exists, parent visual elements into it so button
+    // sits in the same top-layer group as overlays.
+    try {
+      const hud: any = (scene as any).hudContainer;
+      if (hud && typeof hud.add === 'function') {
+        try { hud.add(this.circle); hud.add(this.label); hud.add(this.hitArea); } catch (_) { /* ignore */ }
+      }
+    } catch (_) { /* ignore */ }
+
     this.hitArea.on('pointerdown', () => {
       if (!this.destroyed) {
         this.helpPanel.toggle();

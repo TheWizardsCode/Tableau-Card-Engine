@@ -124,6 +124,15 @@ export class HelpPanel {
     this.container = scene.add.container(-this.panelWidth, 0);
     this.container.setDepth(DEPTH_PANEL_BG);
 
+    // If scene exposes a top-level HUD container, parent the panel into it so
+    // the panel consistently renders above gameplay content.
+    try {
+      const hud: any = (scene as any).hudContainer;
+      if (hud && typeof hud.add === 'function') {
+        try { hud.add(this.container); } catch (_) { /* ignore */ }
+      }
+    } catch (_) { /* ignore */ }
+
     // Background
     this.background = scene.add.rectangle(
       this.panelWidth / 2,
@@ -337,6 +346,7 @@ export class HelpPanel {
     this.maskGraphics.fillRect(0, contentTopY, this.panelWidth, visibleHeight);
     this.maskGraphics.setVisible(false);
 
+
     this.contentMask = new Phaser.Display.Masks.GeometryMask(this.scene, this.maskGraphics);
     this.contentContainer.setMask(this.contentMask);
 
@@ -447,6 +457,15 @@ export class HelpPanel {
     this.inputBlocker.setDepth(DEPTH_INPUT_BLOCKER);
     this.inputBlocker.setInteractive();
     this.inputBlocker.on('pointerdown', () => this.close());
+
+    // Parent input blocker into HUD container if available (ensures it sits
+    // above gameplay objects and blocks input as intended).
+    try {
+      const hud: any = (this.scene as any).hudContainer;
+      if (hud && typeof hud.add === 'function') {
+        try { hud.add(this.inputBlocker); } catch (_) { /* ignore */ }
+      }
+    } catch (_) { /* ignore */ }
   }
 
   private removeInputBlocker(): void {
