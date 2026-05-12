@@ -182,7 +182,14 @@ export class SettingsPanel {
     try {
       const overlayRoot: any = (scene as any).hudOverlayContainer ?? (scene as any).hudContainer;
       if (overlayRoot && typeof overlayRoot.add === 'function') {
-        try { overlayRoot.add(this.container); } catch (_) { /* ignore */ }
+        try {
+          overlayRoot.add(this.container);
+          const base = Number(overlayRoot.depth ?? 1000);
+          try { this.inputBlocker && ((this.inputBlocker as any).setDepth(base)); } catch (_) {}
+          try { this.container.setDepth(base + 10); } catch (_) {}
+          try { this.background.setDepth(base + 11); } catch (_) {}
+          try { this.closeButton.setDepth(base + 12); } catch (_) {}
+        } catch (_) { /* ignore */ }
       }
     } catch (_) { /* ignore */ }
 

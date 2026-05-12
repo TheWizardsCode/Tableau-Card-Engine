@@ -128,11 +128,25 @@ export class HelpPanel {
     // If scene exposes a dedicated overlay container, parent the panel into
     // it so the panel consistently renders above gameplay content and is not
     // removed by HUD rebuilds. Fall back to hudContainer if overlay container
-    // is not present (compatibility).
+    // is not present (compatibility). When parenting, ensure the panel and
+    // its children use absolute depths above the overlay root so they render
+    // above any gameplay objects.
     try {
       const overlayRoot: any = (scene as any).hudOverlayContainer ?? (scene as any).hudContainer;
       if (overlayRoot && typeof overlayRoot.add === 'function') {
-        try { overlayRoot.add(this.container); } catch (_) { /* ignore */ }
+        try {
+          overlayRoot.add(this.container);
+          // Compute base depth relative to overlay root depth (fallback to 1000)
+          const base = Number(overlayRoot.depth ?? 1000);
+          // Put input blocker at base (covers gameplay)
+          // and panel container above it
+          try { this.inputBlocker && ((this.inputBlocker as any).setDepth(base)); } catch (_) {}
+          try { this.container.setDepth(base + 10); } catch (_) {}
+          try { this.background.setDepth(base + 11); } catch (_) {}
+          try { this.contentContainer.setDepth(base + 12); } catch (_) {}
+          try { this.closeButton.setDepth(base + 13); } catch (_) {}
+          try { if (this.trackBar) this.trackBar.setDepth(base + 12); } catch (_) {}
+        } catch (_) { /* ignore */ }
       }
     } catch (_) { /* ignore */ }
 
