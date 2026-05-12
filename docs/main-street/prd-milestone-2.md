@@ -170,13 +170,15 @@ Run N+1 starts with expanded card pool
 | 4 | District | >= 10 | Any 3 (incl. 1 cross-cutting/placement) | 1 (Arcade) | 1 (Block Party) | 1 (Bread Factory) | 22 |
 | 5 | Landmark | >= 12 | Diversified challenge | 1 (Day Spa) | 1 (Charity Drive) | 1 (Grand Bakehouse) | 25 |
 
-**Total new cards across Tiers 2-5: 12** (4 Business + 4 Event + 4 Upgrade)
+**Total new cards across Tiers 2-5: 41** (10 Business + 11 Event + 20 Upgrade)
 
-### 2.7 Remaining M2 Cards
+> Update note: tier distribution was expanded in follow-up work item CG-0MP1VO5FM008LB5Z so campaign progression now covers the full 59-template catalog, with a 5-card expanded sample available in Tier 1.
 
-The following M2 cards are **not tier-gated** and will be included in Tier 1 once the full M2 content milestone is complete. They are listed here for completeness and to clarify that tier-gating applies only to the 12 cards specified above.
+### 2.7 Historical note (superseded)
 
-These cards are part of the broader M2 content expansion (parent work item CG-0MM4REC2Z0GS2YKT) and will be added to Tier 1 as part of separate M2 content work items, not this meta-progression spec.
+This section originally tracked cards that were not tier-gated. It is now superseded by follow-up work item CG-0MP1VO5FM008LB5Z, which updated progression so the full expanded catalog is tier-gated and reachable through campaign unlocks.
+
+The list below is retained as historical context for prior milestone discussions.
 
 | Type | Remaining M2 Cards (added to Tier 1 pool) |
 |------|--------------------------------------------|
@@ -786,9 +788,9 @@ The following items are explicitly excluded from this spec:
 
 | Snapshot | Business | Event | Upgrade | Total templates |
 |---|---:|---:|---:|---:|
-| Tier 1 baseline | 5 | 5 | 3 | 13 |
+| Tier 1 baseline | 7 | 6 | 5 | 18 |
 | Current catalog | 17 | 17 | 25 | 59 |
-| Net increase | +12 | +12 | +22 | +46 |
+| Net increase | +10 | +11 | +20 | +41 |
 
 Verification artifacts:
 - `docs/main-street/card-catalog-baseline.json`

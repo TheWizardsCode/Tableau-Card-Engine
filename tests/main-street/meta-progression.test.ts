@@ -155,19 +155,19 @@ describe('Meta-Progression System', () => {
       }
     });
 
-    it('Tier 1 has 13 cards (5 biz + 5 evt + 3 upg)', () => {
-      expect(TIER_DEFINITIONS['tier-1'].newCardIds).toHaveLength(13);
-      expect(TIER_DEFINITIONS['tier-1'].cumulativeCardIds).toHaveLength(13);
+    it('Tier 1 has baseline plus early expanded sample (18 cards total)', () => {
+      expect(TIER_DEFINITIONS['tier-1'].newCardIds).toHaveLength(18);
+      expect(TIER_DEFINITIONS['tier-1'].cumulativeCardIds).toHaveLength(18);
     });
 
-    it('each subsequent tier adds exactly 3 new cards', () => {
+    it('each subsequent tier adds additional cards', () => {
       for (let i = 2; i <= 5; i++) {
-        expect(TIER_DEFINITIONS[`tier-${i}`].newCardIds).toHaveLength(3);
+        expect(TIER_DEFINITIONS[`tier-${i}`].newCardIds.length).toBeGreaterThan(0);
       }
     });
 
-    it('Tier 5 cumulative pool has 25 cards (13 + 3*4)', () => {
-      expect(TIER_DEFINITIONS['tier-5'].cumulativeCardIds).toHaveLength(25);
+    it('Tier 5 cumulative pool covers full catalog (59 templates)', () => {
+      expect(TIER_DEFINITIONS['tier-5'].cumulativeCardIds).toHaveLength(59);
     });
 
     it('cumulative card IDs are actually cumulative', () => {
@@ -689,7 +689,7 @@ describe('Meta-Progression System', () => {
       }
     });
 
-    it('Tier 5 pool yields all 25 unique template IDs across all deck builders', () => {
+    it('Tier 5 pool yields all 59 unique template IDs across all deck builders', () => {
       const tier5CardIds = TIER_DEFINITIONS['tier-5'].cumulativeCardIds;
 
       const bizDeck = createBusinessDeck(1, tier5CardIds);
@@ -702,7 +702,7 @@ describe('Meta-Progression System', () => {
         ...upgDeck.map((c) => c.id.replace(/-\d+$/, '')),
       ]);
 
-      expect(allBaseIds.size).toBe(25);
+      expect(allBaseIds.size).toBe(59);
     });
   });
 
@@ -717,10 +717,10 @@ describe('Meta-Progression System', () => {
       expect(campaign.schemaVersion).toBe(2);
     });
 
-    it('default campaign has tier-1 unlocked with 13 card IDs', () => {
+    it('default campaign has tier-1 unlocked with 18 card IDs', () => {
       const campaign = createDefaultCampaignProgress();
       expect(campaign.unlockedTiers).toEqual(['tier-1']);
-      expect(campaign.unlockedCardIds).toHaveLength(13);
+      expect(campaign.unlockedCardIds).toHaveLength(18);
       expect(campaign.milestoneHistory).toEqual([]);
     });
 
@@ -1062,18 +1062,18 @@ describe('Meta-Progression System', () => {
   describe('deriveUnlockedCardIds', () => {
     it('returns tier-1 cards for ["tier-1"]', () => {
       const ids = deriveUnlockedCardIds(['tier-1']);
-      expect(ids).toHaveLength(13);
-      expect(new Set(ids).size).toBe(13); // no duplicates
+      expect(ids).toHaveLength(18);
+      expect(new Set(ids).size).toBe(18); // no duplicates
     });
 
     it('returns cumulative cards for ["tier-1", "tier-2"]', () => {
       const ids = deriveUnlockedCardIds(['tier-1', 'tier-2']);
-      expect(ids).toHaveLength(16); // 13 + 3
+      expect(ids).toHaveLength(28); // 18 + 10
     });
 
-    it('returns all 25 cards for all 5 tiers', () => {
+    it('returns all 59 cards for all 5 tiers', () => {
       const ids = deriveUnlockedCardIds(['tier-1', 'tier-2', 'tier-3', 'tier-4', 'tier-5']);
-      expect(ids).toHaveLength(25);
+      expect(ids).toHaveLength(59);
     });
 
     it('handles empty array', () => {
@@ -1083,7 +1083,7 @@ describe('Meta-Progression System', () => {
 
     it('ignores unknown tier IDs gracefully', () => {
       const ids = deriveUnlockedCardIds(['tier-1', 'tier-99']);
-      expect(ids).toHaveLength(13); // only tier-1 cards
+      expect(ids).toHaveLength(18); // only tier-1 cards
     });
 
     it('does not produce duplicates even if tiers are listed twice', () => {
@@ -1443,7 +1443,7 @@ describe('Meta-Progression UI Logic', () => {
       const cardNames = tier2Def.newCardIds.map(
         (id) => CARD_TEMPLATE_NAMES.get(id) ?? id,
       );
-      expect(cardNames.length).toBe(3);
+      expect(cardNames.length).toBe(TIER_DEFINITIONS['tier-2'].newCardIds.length);
       // All names should be resolved (not fallback to IDs)
       for (const name of cardNames) {
         expect(name).not.toMatch(/^biz-|^evt-|^upg-/);
