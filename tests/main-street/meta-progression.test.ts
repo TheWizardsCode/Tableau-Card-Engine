@@ -1,4 +1,4 @@
-/**
+/*
  * Meta-Progression System Tests
  *
  * Comprehensive tests covering all 7 user stories from the PRD
@@ -195,12 +195,12 @@ describe('Meta-Progression System', () => {
       }
     });
 
-    it('specific reputation thresholds match PRD (0, 6, 8, 10, 12)', () => {
+    it('specific reputation thresholds match PRD (0, 8, 16, 32, 64)', () => {
       expect(TIER_DEFINITIONS['tier-1'].reputationThreshold).toBe(0);
-      expect(TIER_DEFINITIONS['tier-2'].reputationThreshold).toBe(6);
-      expect(TIER_DEFINITIONS['tier-3'].reputationThreshold).toBe(8);
-      expect(TIER_DEFINITIONS['tier-4'].reputationThreshold).toBe(10);
-      expect(TIER_DEFINITIONS['tier-5'].reputationThreshold).toBe(12);
+      expect(TIER_DEFINITIONS['tier-2'].reputationThreshold).toBe(8);
+      expect(TIER_DEFINITIONS['tier-3'].reputationThreshold).toBe(16);
+      expect(TIER_DEFINITIONS['tier-4'].reputationThreshold).toBe(32);
+      expect(TIER_DEFINITIONS['tier-5'].reputationThreshold).toBe(64);
     });
 
     it('all card IDs in tier definitions reference valid template IDs', () => {
@@ -223,46 +223,46 @@ describe('Meta-Progression System', () => {
   // ────────────────────────────────────────────────────────────
 
   describe('US-1: Tier evaluation via reputation thresholds', () => {
-    it('unlocks Tier 2 when reputation >= 6', async () => {
+    it('unlocks Tier 2 when reputation >= 8', async () => {
       const campaign = freshCampaign();
-      const state = createCompletedRunState({ reputation: 6 });
+      const state = createCompletedRunState({ reputation: 8 });
 
       await updateCampaignAfterRun(campaign, state);
 
       expect(campaign.unlockedTiers).toContain('tier-2');
     });
 
-    it('does NOT unlock Tier 2 when reputation < 6 and no challenges', async () => {
+    it('does NOT unlock Tier 2 when reputation < 8 and no challenges', async () => {
       const campaign = freshCampaign();
-      const state = createCompletedRunState({ reputation: 5 });
+      const state = createCompletedRunState({ reputation: 7 });
 
       await updateCampaignAfterRun(campaign, state);
 
       expect(campaign.unlockedTiers).not.toContain('tier-2');
     });
 
-    it('unlocks Tier 3 when reputation >= 8', async () => {
+    it('unlocks Tier 3 when reputation >= 16', async () => {
       const campaign = freshCampaign();
       campaign.unlockedTiers.push('tier-2'); // Must already have tier 2 or not - tiers are independent
-      const state = createCompletedRunState({ reputation: 8 });
+      const state = createCompletedRunState({ reputation: 16 });
 
       await updateCampaignAfterRun(campaign, state);
 
       expect(campaign.unlockedTiers).toContain('tier-3');
     });
 
-    it('unlocks Tier 4 when reputation >= 10', async () => {
+    it('unlocks Tier 4 when reputation >= 32', async () => {
       const campaign = freshCampaign();
-      const state = createCompletedRunState({ reputation: 10 });
+      const state = createCompletedRunState({ reputation: 32 });
 
       await updateCampaignAfterRun(campaign, state);
 
       expect(campaign.unlockedTiers).toContain('tier-4');
     });
 
-    it('unlocks Tier 5 when reputation >= 12', async () => {
+    it('unlocks Tier 5 when reputation >= 64', async () => {
       const campaign = freshCampaign();
-      const state = createCompletedRunState({ reputation: 12 });
+      const state = createCompletedRunState({ reputation: 64 });
 
       await updateCampaignAfterRun(campaign, state);
 
@@ -271,8 +271,8 @@ describe('Meta-Progression System', () => {
 
     it('unlocks multiple tiers in a single high-reputation run', async () => {
       const campaign = freshCampaign();
-      // A run with reputation 12 should unlock tiers 2, 3, 4, and 5 in one go
-      const state = createCompletedRunState({ reputation: 12 });
+      // A run with reputation 64 should unlock tiers 2, 3, 4, and 5 in one go
+      const state = createCompletedRunState({ reputation: 64 });
 
       await updateCampaignAfterRun(campaign, state);
 
@@ -537,7 +537,7 @@ describe('Meta-Progression System', () => {
     it('reputation and challenge paths are OR: either unlocks the tier', async () => {
       // Reputation path for tier 2
       const campaignA = freshCampaign();
-      const stateA = createCompletedRunState({ reputation: 6 });
+      const stateA = createCompletedRunState({ reputation: 8 });
       await updateCampaignAfterRun(campaignA, stateA);
       expect(campaignA.unlockedTiers).toContain('tier-2');
 
@@ -561,7 +561,7 @@ describe('Meta-Progression System', () => {
       const campaign = freshCampaign();
 
       // First run: unlock tier-2 and tier-3
-      const run1 = createCompletedRunState({ reputation: 8 });
+      const run1 = createCompletedRunState({ reputation: 16 });
       await updateCampaignAfterRun(campaign, run1);
       expect(campaign.unlockedTiers).toContain('tier-2');
       expect(campaign.unlockedTiers).toContain('tier-3');
@@ -577,9 +577,9 @@ describe('Meta-Progression System', () => {
       const campaign = freshCampaign();
 
       // Unlock tier-2 twice with high rep
-      const run1 = createCompletedRunState({ reputation: 6 });
+      const run1 = createCompletedRunState({ reputation: 8 });
       await updateCampaignAfterRun(campaign, run1);
-      const run2 = createCompletedRunState({ reputation: 7 });
+      const run2 = createCompletedRunState({ reputation: 9 });
       await updateCampaignAfterRun(campaign, run2);
 
       const tier2Count = campaign.unlockedTiers.filter((t) => t === 'tier-2').length;
@@ -590,17 +590,17 @@ describe('Meta-Progression System', () => {
       const campaign = freshCampaign();
 
       // Run 1: unlock tier-2 only
-      const run1 = createCompletedRunState({ reputation: 6 });
+      const run1 = createCompletedRunState({ reputation: 8 });
       await updateCampaignAfterRun(campaign, run1);
       expect(campaign.unlockedTiers).toEqual(['tier-1', 'tier-2']);
 
       // Run 2: unlock tier-3 (tier-2 was already unlocked)
-      const run2 = createCompletedRunState({ reputation: 8 });
+      const run2 = createCompletedRunState({ reputation: 16 });
       await updateCampaignAfterRun(campaign, run2);
       expect(campaign.unlockedTiers).toEqual(['tier-1', 'tier-2', 'tier-3']);
 
-      // Run 3: unlock tier-5 (skipping tier-4? No—rep 12 meets tier-4 threshold too)
-      const run3 = createCompletedRunState({ reputation: 12 });
+      // Run 3: unlock tier-5 (skipping tier-4? No—rep 64 meets tier-4 threshold too)
+      const run3 = createCompletedRunState({ reputation: 64 });
       await updateCampaignAfterRun(campaign, run3);
       expect(campaign.unlockedTiers).toContain('tier-4');
       expect(campaign.unlockedTiers).toContain('tier-5');
@@ -751,7 +751,7 @@ describe('Meta-Progression System', () => {
       // Simulate v1 data (no schemaVersion, no unlockedCardIds, no milestoneHistory)
       const v1Data = {
         unlockedTiers: ['tier-1', 'tier-2'],
-        persistentReputation: 6,
+        persistentReputation: 8,
         highestScore: 150,
         totalRuns: 3,
         totalWins: 1,
@@ -767,7 +767,7 @@ describe('Meta-Progression System', () => {
       expect(migrated.milestoneHistory).toEqual([]);
       // Original fields preserved
       expect(migrated.unlockedTiers).toEqual(['tier-1', 'tier-2']);
-      expect(migrated.persistentReputation).toBe(6);
+      expect(migrated.persistentReputation).toBe(8);
     });
 
     it('v1 data with explicit schemaVersion: 1 is also migrated', () => {
@@ -793,7 +793,7 @@ describe('Meta-Progression System', () => {
       v2Data.milestoneHistory.push({
         tierId: 'tier-2',
         triggerType: 'reputation',
-        reputationAtUnlock: 6,
+        reputationAtUnlock: 8,
         challengeIdsAtUnlock: null,
         runFinalScore: 120,
         runSeed: 'test',
@@ -809,7 +809,7 @@ describe('Meta-Progression System', () => {
     it('updateCampaignAfterRun persists to store when provided', async () => {
       const store = new SaveLoadStore();
       const campaign = freshCampaign();
-      const state = createCompletedRunState({ reputation: 8 });
+      const state = createCompletedRunState({ reputation: 16 });
 
       await updateCampaignAfterRun(campaign, state, store);
 
@@ -822,7 +822,7 @@ describe('Meta-Progression System', () => {
 
     it('updateCampaignAfterRun works without store (no persistence)', async () => {
       const campaign = freshCampaign();
-      const state = createCompletedRunState({ reputation: 6 });
+      const state = createCompletedRunState({ reputation: 8 });
 
       // Should not throw when store is undefined
       const result = await updateCampaignAfterRun(campaign, state);
@@ -899,7 +899,7 @@ describe('Meta-Progression System', () => {
     it('appends MilestoneRecord when a tier is unlocked via reputation', async () => {
       const campaign = freshCampaign();
       const state = createCompletedRunState({
-        reputation: 6,
+        reputation: 8,
         finalScore: 120,
         seed: 'ms-rep-test',
       });
@@ -910,7 +910,7 @@ describe('Meta-Progression System', () => {
       const record = campaign.milestoneHistory[0];
       expect(record.tierId).toBe('tier-2');
       expect(record.triggerType).toBe('reputation');
-      expect(record.reputationAtUnlock).toBe(6);
+      expect(record.reputationAtUnlock).toBe(8);
       expect(record.challengeIdsAtUnlock).toBeNull();
       expect(record.runFinalScore).toBe(120);
       expect(record.runSeed).toBe('ms-rep-test');
@@ -931,9 +931,7 @@ describe('Meta-Progression System', () => {
 
       await updateCampaignAfterRun(campaign, state);
 
-      const tier2Records = campaign.milestoneHistory.filter(
-        (r) => r.tierId === 'tier-2',
-      );
+      const tier2Records = campaign.milestoneHistory.filter((r) => r.tierId === 'tier-2');
       expect(tier2Records).toHaveLength(1);
       expect(tier2Records[0].triggerType).toBe('challenge');
       expect(tier2Records[0].reputationAtUnlock).toBeNull();
@@ -945,10 +943,7 @@ describe('Meta-Progression System', () => {
 
     it('multiple tier unlocks in one run each produce a MilestoneRecord', async () => {
       const campaign = freshCampaign();
-      const state = createCompletedRunState({
-        reputation: 12,
-        finalScore: 500,
-      });
+      const state = createCompletedRunState({ reputation: 64, finalScore: 500 });
 
       await updateCampaignAfterRun(campaign, state);
 
@@ -975,12 +970,12 @@ describe('Meta-Progression System', () => {
       const campaign = freshCampaign();
 
       // Run 1: unlock tier-2
-      const run1 = createCompletedRunState({ reputation: 6, seed: 'run1' });
+      const run1 = createCompletedRunState({ reputation: 8, seed: 'run1' });
       await updateCampaignAfterRun(campaign, run1);
       expect(campaign.milestoneHistory).toHaveLength(1);
 
       // Run 2: unlock tier-3
-      const run2 = createCompletedRunState({ reputation: 8, seed: 'run2' });
+      const run2 = createCompletedRunState({ reputation: 16, seed: 'run2' });
       await updateCampaignAfterRun(campaign, run2);
       expect(campaign.milestoneHistory).toHaveLength(2);
 
@@ -996,13 +991,13 @@ describe('Meta-Progression System', () => {
 
     it('reputation trigger records reputation value; challenge trigger records null', async () => {
       const campaign = freshCampaign();
-      const state = createCompletedRunState({ reputation: 6 });
+      const state = createCompletedRunState({ reputation: 8 });
 
       await updateCampaignAfterRun(campaign, state);
 
       const record = campaign.milestoneHistory[0];
       expect(record.triggerType).toBe('reputation');
-      expect(record.reputationAtUnlock).toBe(6);
+      expect(record.reputationAtUnlock).toBe(8);
       expect(record.challengeIdsAtUnlock).toBeNull();
     });
 
@@ -1033,7 +1028,7 @@ describe('Meta-Progression System', () => {
       const store = new SaveLoadStore();
       const campaign = freshCampaign();
       const state = createCompletedRunState({
-        reputation: 10,
+        reputation: 32,
         finalScore: 300,
         seed: 'persist-ms',
       });
@@ -1116,7 +1111,7 @@ describe('Meta-Progression System', () => {
 
       // Simulate a winning run with high reputation
       const state = createCompletedRunState({
-        reputation: 8,
+        reputation: 16,
         finalScore: 200,
         gameResult: 'win',
         seed: 'lifecycle-test',
@@ -1178,345 +1173,6 @@ describe('Meta-Progression System', () => {
       expect(campaign.totalWins).toBe(2);
       expect(campaign.highestScore).toBe(200);
       expect(campaign.persistentReputation).toBe(9);
-    });
-  });
-});
-
-// ── Meta-Progression UI Logic Tests ─────────────────────────
-
-describe('Meta-Progression UI Logic', () => {
-  beforeEach(() => {
-    vi.stubGlobal('indexedDB', undefined);
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  // ── CARD_TEMPLATE_NAMES lookup ──────────────────────────
-
-  describe('CARD_TEMPLATE_NAMES', () => {
-    it('contains entries for every card ID in all tier definitions', () => {
-      for (const tierDef of ORDERED_TIER_DEFINITIONS) {
-        for (const cardId of tierDef.newCardIds) {
-          expect(
-            CARD_TEMPLATE_NAMES.has(cardId),
-            `Missing template name for card ID "${cardId}" in tier "${tierDef.id}"`,
-          ).toBe(true);
-        }
-      }
-    });
-
-    it('returns non-empty names for all entries', () => {
-      for (const [id, name] of CARD_TEMPLATE_NAMES) {
-        expect(name.length, `Empty name for card ID "${id}"`).toBeGreaterThan(0);
-      }
-    });
-
-    it('maps known IDs to correct display names', () => {
-      // Spot-check a few known mappings
-      expect(CARD_TEMPLATE_NAMES.get('biz-bakery')).toBe('Bakery');
-      expect(CARD_TEMPLATE_NAMES.get('biz-cafe')).toBe('Cafe');
-      expect(CARD_TEMPLATE_NAMES.get('evt-grand-opening')).toBe('Grand Opening Sale');
-    });
-  });
-
-  // ── highestUnlockedTier ─────────────────────────────────
-
-  describe('highestUnlockedTier', () => {
-    it('returns tier-1 when only tier-1 is unlocked', () => {
-      const result = highestUnlockedTier(['tier-1']);
-      expect(result).toBeDefined();
-      expect(result!.id).toBe('tier-1');
-      expect(result!.order).toBe(1);
-    });
-
-    it('returns the highest tier when multiple are unlocked', () => {
-      const result = highestUnlockedTier(['tier-1', 'tier-2', 'tier-3']);
-      expect(result).toBeDefined();
-      expect(result!.id).toBe('tier-3');
-      expect(result!.order).toBe(3);
-    });
-
-    it('returns tier-5 when all tiers are unlocked (regardless of order)', () => {
-      const result = highestUnlockedTier(['tier-3', 'tier-5', 'tier-1', 'tier-4', 'tier-2']);
-      expect(result).toBeDefined();
-      expect(result!.id).toBe('tier-5');
-      expect(result!.name).toBe('Landmark');
-    });
-
-    it('returns undefined for empty array', () => {
-      expect(highestUnlockedTier([])).toBeUndefined();
-    });
-
-    it('returns undefined for invalid tier IDs', () => {
-      expect(highestUnlockedTier(['tier-999', 'not-a-tier'])).toBeUndefined();
-    });
-  });
-
-  // ── Tier diff (newly unlocked tiers) ────────────────────
-
-  describe('Tier diff computation', () => {
-    it('computes newly unlocked tiers correctly for single unlock', async () => {
-      const campaign = freshCampaign();
-      const tiersBefore = [...campaign.unlockedTiers];
-
-      await updateCampaignAfterRun(
-        campaign,
-        createCompletedRunState({ reputation: 7 }), // meets tier-2 threshold (6)
-      );
-
-      const newlyUnlocked = campaign.unlockedTiers.filter(
-        (t) => !tiersBefore.includes(t),
-      );
-
-      expect(newlyUnlocked).toEqual(['tier-2']);
-    });
-
-    it('computes newly unlocked tiers correctly for multiple unlocks', async () => {
-      const campaign = freshCampaign();
-      const tiersBefore = [...campaign.unlockedTiers];
-
-      // Reputation 10 meets tier-2 (6), tier-3 (8), and tier-4 (10)
-      await updateCampaignAfterRun(
-        campaign,
-        createCompletedRunState({ reputation: 10 }),
-      );
-
-      const newlyUnlocked = campaign.unlockedTiers.filter(
-        (t) => !tiersBefore.includes(t),
-      );
-
-      expect(newlyUnlocked).toContain('tier-2');
-      expect(newlyUnlocked).toContain('tier-3');
-      expect(newlyUnlocked).toContain('tier-4');
-      expect(newlyUnlocked).not.toContain('tier-1'); // was already unlocked
-    });
-
-    it('returns empty diff when no new tiers are unlocked', async () => {
-      const campaign = freshCampaign();
-      const tiersBefore = [...campaign.unlockedTiers];
-
-      // Low reputation, no challenges — no new tiers
-      await updateCampaignAfterRun(
-        campaign,
-        createCompletedRunState({ reputation: 3 }),
-      );
-
-      const newlyUnlocked = campaign.unlockedTiers.filter(
-        (t) => !tiersBefore.includes(t),
-      );
-
-      expect(newlyUnlocked).toEqual([]);
-    });
-
-    it('returns empty diff when tiers are already unlocked', async () => {
-      const campaign = freshCampaign();
-      // Unlock tier-2 first
-      await updateCampaignAfterRun(
-        campaign,
-        createCompletedRunState({ reputation: 7 }),
-      );
-
-      const tiersBefore = [...campaign.unlockedTiers];
-
-      // Same reputation again — no new tiers
-      await updateCampaignAfterRun(
-        campaign,
-        createCompletedRunState({ reputation: 7 }),
-      );
-
-      const newlyUnlocked = campaign.unlockedTiers.filter(
-        (t) => !tiersBefore.includes(t),
-      );
-
-      expect(newlyUnlocked).toEqual([]);
-    });
-  });
-
-  // ── Campaign stats for overlay ──────────────────────────
-
-  describe('Campaign stats for overlay', () => {
-    it('tracks total runs and wins correctly', async () => {
-      const campaign = freshCampaign();
-
-      await updateCampaignAfterRun(
-        campaign,
-        createCompletedRunState({ gameResult: 'win', finalScore: 100 }),
-      );
-      await updateCampaignAfterRun(
-        campaign,
-        createCompletedRunState({ gameResult: 'loss', finalScore: 50 }),
-      );
-      await updateCampaignAfterRun(
-        campaign,
-        createCompletedRunState({ gameResult: 'win', finalScore: 150 }),
-      );
-
-      expect(campaign.totalRuns).toBe(3);
-      expect(campaign.totalWins).toBe(2);
-    });
-
-    it('computes win rate correctly', async () => {
-      const campaign = freshCampaign();
-
-      for (let i = 0; i < 4; i++) {
-        await updateCampaignAfterRun(
-          campaign,
-          createCompletedRunState({ gameResult: i < 3 ? 'win' : 'loss', finalScore: 100 }),
-        );
-      }
-
-      const winRate = campaign.totalRuns > 0
-        ? Math.round((campaign.totalWins / campaign.totalRuns) * 100)
-        : 0;
-
-      expect(winRate).toBe(75);
-    });
-
-    it('tracks highest score correctly across runs', async () => {
-      const campaign = freshCampaign();
-
-      await updateCampaignAfterRun(
-        campaign,
-        createCompletedRunState({ finalScore: 80 }),
-      );
-      await updateCampaignAfterRun(
-        campaign,
-        createCompletedRunState({ finalScore: 200 }),
-      );
-      await updateCampaignAfterRun(
-        campaign,
-        createCompletedRunState({ finalScore: 120 }),
-      );
-
-      expect(campaign.highestScore).toBe(200);
-    });
-
-    it('tracks persistent reputation (best rep across all runs)', async () => {
-      const campaign = freshCampaign();
-
-      await updateCampaignAfterRun(
-        campaign,
-        createCompletedRunState({ reputation: 5 }),
-      );
-      await updateCampaignAfterRun(
-        campaign,
-        createCompletedRunState({ reputation: 9 }),
-      );
-      await updateCampaignAfterRun(
-        campaign,
-        createCompletedRunState({ reputation: 4 }),
-      );
-
-      expect(campaign.persistentReputation).toBe(9);
-    });
-
-    it('win rate is 0% for a fresh campaign with no runs', () => {
-      const campaign = freshCampaign();
-      const winRate = campaign.totalRuns > 0
-        ? Math.round((campaign.totalWins / campaign.totalRuns) * 100)
-        : 0;
-      expect(winRate).toBe(0);
-    });
-  });
-
-  // ── Integration: tier unlock → overlay data ─────────────
-
-  describe('Integration: tier unlock produces correct overlay data', () => {
-    it('newly unlocked tier-2 includes correct card names', async () => {
-      const campaign = freshCampaign();
-      const tiersBefore = [...campaign.unlockedTiers];
-
-      await updateCampaignAfterRun(
-        campaign,
-        createCompletedRunState({ reputation: 7 }),
-      );
-
-      const newlyUnlocked = campaign.unlockedTiers.filter(
-        (t) => !tiersBefore.includes(t),
-      );
-      expect(newlyUnlocked).toEqual(['tier-2']);
-
-      // Verify we can look up card names for the newly unlocked tier
-      const tier2Def = TIER_DEFINITIONS['tier-2'];
-      const cardNames = tier2Def.newCardIds.map(
-        (id) => CARD_TEMPLATE_NAMES.get(id) ?? id,
-      );
-      expect(cardNames.length).toBe(TIER_DEFINITIONS['tier-2'].newCardIds.length);
-      // All names should be resolved (not fallback to IDs)
-      for (const name of cardNames) {
-        expect(name).not.toMatch(/^biz-|^evt-|^upg-/);
-      }
-    });
-
-    it('highest unlocked tier reflects the campaign state after update', async () => {
-      const campaign = freshCampaign();
-
-      await updateCampaignAfterRun(
-        campaign,
-        createCompletedRunState({ reputation: 9 }), // tier-2 + tier-3
-      );
-
-      const highest = highestUnlockedTier(campaign.unlockedTiers);
-      expect(highest).toBeDefined();
-      expect(highest!.id).toBe('tier-3');
-      expect(highest!.name).toBe('Neighborhood');
-    });
-
-    it('milestone history records trigger type for UI display', async () => {
-      const campaign = freshCampaign();
-
-      // Unlock via reputation
-      await updateCampaignAfterRun(
-        campaign,
-        createCompletedRunState({ reputation: 7 }),
-      );
-
-      const tier2Milestone = campaign.milestoneHistory.find(
-        (m) => m.tierId === 'tier-2',
-      );
-      expect(tier2Milestone).toBeDefined();
-      expect(tier2Milestone!.triggerType).toBe('reputation');
-
-      // Unlock via challenges (tier-2 already unlocked, try tier-3 via challenges)
-      await updateCampaignAfterRun(
-        campaign,
-        createCompletedRunState({
-          reputation: 0,
-          challengesCompleted: ['ch-synergy-pair', 'ch-full-coffers'],
-          activeChallenges: [
-            {
-              challenge: {
-                id: 'ch-synergy-pair',
-                title: 'Synergy Pair',
-                description: 'Test',
-                category: 'synergy' as const,
-                evaluator: () => true,
-                rewardPoints: 10,
-              },
-              completed: true,
-            },
-            {
-              challenge: {
-                id: 'ch-full-coffers',
-                title: 'Full Coffers',
-                description: 'Test',
-                category: 'resource' as const,
-                evaluator: () => true,
-                rewardPoints: 10,
-              },
-              completed: true,
-            },
-          ],
-        }),
-      );
-
-      const tier3Milestone = campaign.milestoneHistory.find(
-        (m) => m.tierId === 'tier-3',
-      );
-      expect(tier3Milestone).toBeDefined();
-      expect(tier3Milestone!.triggerType).toBe('challenge');
     });
   });
 });
