@@ -1,7 +1,7 @@
 # Main Street: Card Catalog
 
 > **Source of truth:** `example-games/main-street/MainStreetCards.ts`
-> **Last updated:** M2 Expanded Card Pool (work item CG-0MMJ8S7LE0ZGBMEL)
+> **Last updated:** Expanded pool verification (work item CG-0MOKJPBOX006UQDO)
 
 This document lists every card template in the Main Street card pool, organised by family (Business, Event, Upgrade). Each entry includes all gameplay-relevant fields and a short design rationale.
 
@@ -14,6 +14,30 @@ This document lists every card template in the Main Street card pool, organised 
 | Upgrade  | 25        | 2           | 50          |
 
 **Synergy types:** Food, Culture, Commerce, Service (M2), Entertainment (M2)
+
+## Expansion summary (baseline vs current)
+
+| Snapshot | Business | Event | Upgrade | Total templates |
+|---|---:|---:|---:|---:|
+| Tier 1 baseline (`docs/main-street/card-catalog-baseline.json`) | 5 | 5 | 3 | 13 |
+| Current catalog (`MainStreetCards.ts`) | 17 | 17 | 25 | 59 |
+| Net increase | +12 | +12 | +22 | +46 |
+
+- 2x target from baseline: `>= 26` templates
+- Current total: `59` templates (`4.54x` baseline)
+- Non-baseline card IDs are tracked in `docs/main-street/expanded-card-manifest.json`
+
+### Guidance: adding more cards safely
+
+1. Add card templates in `example-games/main-street/MainStreetCards.ts`.
+2. Regenerate metadata artifacts:
+   - `npx tsx scripts/generate-main-street-catalog-baseline.ts`
+   - `npx tsx scripts/generate-main-street-expanded-card-manifest.ts`
+3. Regenerate placeholder art:
+   - `node scripts/generate-main-street-card-svgs.mjs`
+4. Run regression tests:
+   - `npx vitest run --project unit tests/main-street/expanded-card-pool.test.ts`
+   - `npx vitest run --project unit tests/main-street/card-manifest.test.ts tests/main-street/card-svg-coverage.test.ts`
 
 ---
 
