@@ -19,12 +19,12 @@ This document lists every card template in the Main Street card pool, organised 
 
 | Snapshot | Business | Event | Upgrade | Total templates |
 |---|---:|---:|---:|---:|
-| Tier 1 baseline (`docs/main-street/card-catalog-baseline.json`) | 5 | 5 | 3 | 13 |
+| Tier 1 baseline (`docs/main-street/card-catalog-baseline.json`) | 7 | 6 | 5 | 18 |
 | Current catalog (`MainStreetCards.ts`) | 17 | 17 | 25 | 59 |
-| Net increase | +12 | +12 | +22 | +46 |
+| Net increase | +10 | +11 | +20 | +41 |
 
-- 2x target from baseline: `>= 26` templates
-- Current total: `59` templates (`4.54x` baseline)
+- 2x target from baseline: `>= 36` templates
+- Current total: `59` templates (`3.28x` baseline)
 - Non-baseline card IDs are tracked in `docs/main-street/expanded-card-manifest.json`
 
 ### Guidance: adding more cards safely

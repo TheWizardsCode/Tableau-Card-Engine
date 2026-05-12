@@ -40,6 +40,7 @@ export interface TierDefinition {
 // ── Tier 1 Card IDs (M1 Baseline) ──────────────────────────
 
 const TIER_1_CARD_IDS: string[] = [
+  // M1 baseline (13)
   // Business (5)
   'biz-bakery',
   'biz-diner',
@@ -56,38 +57,74 @@ const TIER_1_CARD_IDS: string[] = [
   'upg-patisserie',
   'upg-bistro',
   'upg-library',
+
+  // Early expanded sample (~10% of expanded set => 5 cards)
+  'biz-pawnshop',
+  'biz-laundromat',
+  'evt-grand-opening',
+  'upg-garden',
+  'upg-vintage-shop',
 ];
 
 // ── Tier 2 Card IDs (Rising Street) ────────────────────────
 
 const TIER_2_NEW_CARD_IDS: string[] = [
-  'biz-pawnshop',
-  'biz-laundromat',
-  'evt-grand-opening',
+  'biz-boutique',
+  'biz-cafe',
+  'biz-arcade',
+  'evt-wellness-fair',
+  'evt-block-party',
+  'upg-bread-factory',
+  'upg-designer-store',
+  'upg-drive-in',
+  'upg-dry-cleaners',
+  'upg-fast-food',
 ];
 
 // ── Tier 3 Card IDs (Neighborhood) ─────────────────────────
 
 const TIER_3_NEW_CARD_IDS: string[] = [
-  'biz-cafe',
-  'evt-wellness-fair',
-  'upg-garden',
+  'biz-barbershop',
+  'biz-cinema',
+  'biz-food-truck',
+  'evt-charity-drive',
+  'evt-construction',
+  'evt-food-critic',
+  'upg-gaming-lounge',
+  'upg-imax',
+  'upg-garden-center',
+  'upg-gourmet-truck',
 ];
 
 // ── Tier 4 Card IDs (District) ─────────────────────────────
 
 const TIER_4_NEW_CARD_IDS: string[] = [
-  'biz-arcade',
-  'evt-block-party',
-  'upg-bread-factory',
+  'biz-gallery',
+  'biz-florist',
+  'biz-clinic',
+  'evt-noise-complaint',
+  'evt-pipe-burst',
+  'evt-power-outage',
+  'upg-grand-bakehouse',
+  'upg-home-improvement',
+  'upg-medical-center',
+  'upg-museum',
 ];
 
 // ── Tier 5 Card IDs (Landmark) ─────────────────────────────
 
 const TIER_5_NEW_CARD_IDS: string[] = [
   'biz-spa',
-  'evt-charity-drive',
-  'upg-grand-bakehouse',
+  'evt-shoplifting',
+  'evt-vandalism',
+  'evt-viral-review',
+  'upg-luxury-retreat',
+  'upg-multiplex',
+  'upg-resort-spa',
+  'upg-restaurant',
+  'upg-roastery',
+  'upg-salon',
+  'upg-wellness-center',
 ];
 
 // ── Challenge Condition Helpers ─────────────────────────────

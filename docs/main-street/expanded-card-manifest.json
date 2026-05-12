@@ -1,20 +1,25 @@
 {
   "source": "Generated from MainStreetCards.ts and Tier 1 IDs from MainStreetTiers.ts",
-  "generatedAt": "2026-05-11T23:51:22.930Z",
+  "generatedAt": "2026-05-12T00:15:46.868Z",
   "baselineTier1CardIds": [
     "biz-bakery",
     "biz-bookshop",
     "biz-diner",
     "biz-hardware",
+    "biz-laundromat",
     "biz-park",
+    "biz-pawnshop",
     "evt-award",
     "evt-festival",
+    "evt-grand-opening",
     "evt-inspection",
     "evt-rainy",
     "evt-tax",
     "upg-bistro",
+    "upg-garden",
     "upg-library",
-    "upg-patisserie"
+    "upg-patisserie",
+    "upg-vintage-shop"
   ],
   "expandedCardIds": {
     "business": [
@@ -27,8 +32,6 @@
       "biz-florist",
       "biz-food-truck",
       "biz-gallery",
-      "biz-laundromat",
-      "biz-pawnshop",
       "biz-spa"
     ],
     "event": [
@@ -36,7 +39,6 @@
       "evt-charity-drive",
       "evt-construction",
       "evt-food-critic",
-      "evt-grand-opening",
       "evt-noise-complaint",
       "evt-pipe-burst",
       "evt-power-outage",
@@ -52,7 +54,6 @@
       "upg-dry-cleaners",
       "upg-fast-food",
       "upg-gaming-lounge",
-      "upg-garden",
       "upg-garden-center",
       "upg-gourmet-truck",
       "upg-grand-bakehouse",
@@ -66,7 +67,6 @@
       "upg-restaurant",
       "upg-roastery",
       "upg-salon",
-      "upg-vintage-shop",
       "upg-wellness-center"
     ]
   }
