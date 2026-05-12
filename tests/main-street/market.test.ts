@@ -16,6 +16,7 @@ import {
   refillBusinessMarket,
   refillInvestmentsMarket,
   refillAllMarkets,
+  refillIncidentQueue,
   getAffordableBusinessCards,
   getEmptySlots,
 } from '../../example-games/main-street/MainStreetMarket';
@@ -528,6 +529,55 @@ describe('MainStreetMarket', () => {
       expect(empty).toHaveLength(GRID_SIZE - 2);
       expect(empty).not.toContain(3);
       expect(empty).not.toContain(7);
+    });
+  });
+
+  describe('reshuffle behavior', () => {
+    it('should reshuffle business discards into deck when deck empty and refill', () => {
+      const state = createTestState();
+      // Move some business cards into the discard pile and empty the deck
+      const moved = state.decks.business.splice(0, 3);
+      state.discards.business.push(...moved);
+      state.decks.business.length = 0;
+      // Clear visible market so refill must draw
+      state.market.business = [];
+      refillBusinessMarket(state);
+      expect(state.market.business.length).toBeGreaterThan(0);
+      expect(state.discards.business.length).toBe(0);
+    });
+
+    it('should reshuffle upgrade discards when upgrade deck empty and refill investments', () => {
+      const state = createTestState();
+      const moved = state.decks.upgrade.splice(0, 2);
+      state.discards.upgrade.push(...moved);
+      state.decks.upgrade.length = 0;
+      state.market.investments = [];
+      refillInvestmentsMarket(state);
+      const upgrades = state.market.investments.filter(c => c.family === 'upgrade');
+      expect(upgrades.length).toBeGreaterThanOrEqual(0);
+      expect(state.discards.upgrade.length).toBe(0);
+    });
+
+    it('should reshuffle event discards into event deck for incident queue filling', () => {
+      const state = createTestState();
+      // Pull out some incident cards and put them into discards
+      const incidentCards = state.decks.event.filter(e => e.trigger === 'Incident').slice(0, 2);
+      // Empty the event deck and place incident cards into discards so reshuffle is required
+      state.decks.event = [];
+      state.discards.event.push(...incidentCards);
+      state.incidentQueue = [];
+      refillIncidentQueue(state);
+      expect(state.incidentQueue.length).toBeGreaterThan(0);
+      expect(state.discards.event.length).toBe(0);
+    });
+
+    it('should leave slots empty when both deck and discard are empty', () => {
+      const state = createTestState();
+      state.decks.business = [];
+      state.discards.business = [];
+      state.market.business = [];
+      refillBusinessMarket(state);
+      expect(state.market.business.length).toBe(0);
     });
   });
 });

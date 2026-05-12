@@ -23,6 +23,23 @@ import {
   MARKET_INVESTMENT_EVENT_COUNT,
   REFRESH_INVESTMENTS_COST,
 } from './MainStreetCards';
+import { shuffleArray } from '../../src/card-system';
+
+// Shared reshuffle helper: when a draw/refill needs cards and the deck is
+// empty but the matching discard pile is non-empty, shuffle the discard
+// into the deck using the game's seeded RNG and continue.
+function reshuffleIfNeeded<T>(state: MainStreetState, deck: T[], discard: T[], name: string): void {
+  if (deck.length === 0 && discard.length > 0) {
+    // Shuffle the discard pile deterministically using the game's RNG
+    shuffleArray(discard, state.rng);
+    // Move all shuffled cards into the deck (draw from end = top)
+    while (discard.length > 0) {
+      deck.push(discard.pop()!);
+    }
+    // Log the reshuffle for visibility in tests and UI
+    addLog(state, `Reshuffled ${name} discard into deck`, 'neutral');
+  }
+}
 
 // ── Result Types ────────────────────────────────────────────
 
@@ -178,6 +195,10 @@ export function canPurchaseEvent(
  */
 export function refillBusinessMarket(state: MainStreetState): void {
   const { market, decks } = state;
+  // If the business deck is exhausted but there are discarded business cards,
+  // reshuffle them back into the deck immediately so refill can proceed.
+  reshuffleIfNeeded(state, decks.business, state.discards.business, 'business');
+
   while (market.business.length < 4 && decks.business.length > 0) {
     market.business.push(decks.business.pop()!);
   }
@@ -196,6 +217,10 @@ export function refillInvestmentsMarket(state: MainStreetState): void {
   let upgradeCount = market.investments.filter(c => c.family === 'upgrade').length;
   let eventCount = market.investments.filter(c => c.family === 'event').length;
 
+  // Ensure decks are replenished from their discards if empty
+  reshuffleIfNeeded(state, decks.upgrade, state.discards.upgrade, 'upgrade');
+  reshuffleIfNeeded(state, decks.event, state.discards.event, 'event');
+
   // Top up upgrades
   while (upgradeCount < MARKET_INVESTMENT_UPGRADE_COUNT && decks.upgrade.length > 0) {
     market.investments.push(decks.upgrade.pop()!);
@@ -204,8 +229,13 @@ export function refillInvestmentsMarket(state: MainStreetState): void {
 
   // Top up investment events (only Investment-trigger cards)
   while (eventCount < MARKET_INVESTMENT_EVENT_COUNT) {
-    const idx = decks.event.findIndex(e => e.trigger === 'Investment');
-    if (idx === -1) break;
+    let idx = decks.event.findIndex(e => e.trigger === 'Investment');
+    if (idx === -1) {
+      // Maybe the event deck was empty and discards can be reshuffled now
+      reshuffleIfNeeded(state, decks.event, state.discards.event, 'event');
+      idx = decks.event.findIndex(e => e.trigger === 'Investment');
+      if (idx === -1) break;
+    }
     market.investments.push(decks.event.splice(idx, 1)[0]);
     eventCount++;
   }
@@ -274,9 +304,17 @@ export function refillAllMarkets(state: MainStreetState): void {
  * remaining Incident cards, the queue stays at its current size.
  */
 export function refillIncidentQueue(state: MainStreetState): void {
+  // If the event deck is empty but incident discards exist, reshuffle them.
+  reshuffleIfNeeded(state, state.decks.event, state.discards.event, 'event');
+
   while (state.incidentQueue.length < INCIDENT_QUEUE_SIZE) {
-    const idx = state.decks.event.findIndex(e => e.trigger === 'Incident');
-    if (idx === -1) break;
+    let idx = state.decks.event.findIndex(e => e.trigger === 'Incident');
+    if (idx === -1) {
+      // Attempt a reshuffle in case the deck was empty earlier
+      reshuffleIfNeeded(state, state.decks.event, state.discards.event, 'event');
+      idx = state.decks.event.findIndex(e => e.trigger === 'Incident');
+      if (idx === -1) break;
+    }
     state.incidentQueue.push(state.decks.event.splice(idx, 1)[0]);
   }
 }
