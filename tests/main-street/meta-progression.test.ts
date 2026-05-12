@@ -24,7 +24,6 @@ import {
   TIER_DEFINITIONS,
   ORDERED_TIER_DEFINITIONS,
   deriveUnlockedCardIds,
-  highestUnlockedTier,
 } from '../../example-games/main-street/MainStreetTiers';
 import {
   createDefaultCampaignProgress,
@@ -38,7 +37,6 @@ import {
   createBusinessDeck,
   createEventDeck,
   createUpgradeDeck,
-  CARD_TEMPLATE_NAMES,
 } from '../../example-games/main-street/MainStreetCards';
 import { createSeededRng } from '../../src/core-engine';
 import { CHALLENGE_TEMPLATES } from '../../example-games/main-street/MainStreetChallenges';

@@ -13,6 +13,12 @@ npm test             # run Vitest test suite (non-destructive: does not modify t
 npm run build        # TypeScript check + production build -> dist/
 npm run preview      # serve production build locally
 npm run tf:generate  # generate ToneForge artifacts to build/tf-synths/
+
+# Smoke test: run deterministic Main Street demo (seed: smoke-1)
+npx tsx scripts/demo-main-street.ts --seed "smoke-1"
+
+# Headless smoke test (part of npm test):
+npx vitest run --project unit tests/main-street/smoke-scenario.test.ts
 ```
 
 ## What Is This?
@@ -72,6 +78,7 @@ tableau-card-engine/
 | Feudalism | `example-games/feudalism/` | Engine-building card game (human vs. AI). Collect gem tokens, purchase development cards for bonuses, attract nobles, and reach 15 prestige to win |
 | Lost Cities | `example-games/lost-cities/` | Two-player expedition card game (human vs. AI). Bet on up to 5 colored expeditions across a 3-round match with investment multipliers, ascending-play rules, and cumulative scoring |
 | Main Street | `example-games/main-street/` | Single-player tableau builder. Buy businesses/upgrades/events, place businesses on a 10-slot street rendered as a responsive 2x5 grid, and optimize score over 20 turns |
+| Scenario: Tutorial | `example-games/main-street/scenes/MainStreetTutorialScene.ts` | Guided introduction to Main Street. Non-interactive tutorial overlays walk through the market, street placement, synergies, events, and scoring. Easy difficulty, 25 turns. Accessible from the Game Selector. |
 
 More games are planned: Coloretto.
 

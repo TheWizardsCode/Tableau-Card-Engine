@@ -20,6 +20,7 @@ import { FeudalismScene } from './example-games/feudalism/scenes/FeudalismScene'
 import { LostCitiesScene } from './example-games/lost-cities/scenes/LostCitiesScene';
 import { TheMindScene } from './example-games/the-mind/scenes/TheMindScene';
 import { MainStreetScene } from './example-games/main-street/scenes/MainStreetScene';
+import { MainStreetTutorialScene } from './example-games/main-street/scenes/MainStreetTutorialScene';
 
 // ── Game catalogue ─────────────────────────────────────────
 
@@ -73,6 +74,13 @@ const GAMES: GameEntry[] = [
       'Single-player tableau builder. Purchase businesses, place them along a 10-slot street for synergy bonuses, manage coins and reputation, and build the highest-scoring Main Street in 20 turns.',
     thumbnail: 'games/main-street/thumbnail',
   },
+  {
+    sceneKey: 'MainStreetTutorialScene',
+    title: 'Scenario: Tutorial',
+    description:
+      'Guided introduction to Main Street (Easy, 25 turns). Non-interactive tutorial overlays walk you through the market, street placement, synergies, events, and scoring — perfect for new players.',
+    thumbnail: 'games/main-street/thumbnail',
+  },
 ];
 
 // ── Phaser boot ────────────────────────────────────────────
@@ -86,7 +94,7 @@ const isReplayMode = new URLSearchParams(window.location.search).get('mode') ===
 createCardGame({
   backgroundColor: '#1a2a1a',
   // Register all scenes; GameSelectorScene is first so it auto-starts.
-  scenes: [GameSelectorScene, GolfScene, BeleagueredCastleScene, SushiGoScene, FeudalismScene, LostCitiesScene, TheMindScene, MainStreetScene],
+  scenes: [GameSelectorScene, GolfScene, BeleagueredCastleScene, SushiGoScene, FeudalismScene, LostCitiesScene, TheMindScene, MainStreetScene, MainStreetTutorialScene],
   render: isReplayMode ? { preserveDrawingBuffer: true } : undefined,
   callbacks: {
     preBoot: (game: Phaser.Game) => {

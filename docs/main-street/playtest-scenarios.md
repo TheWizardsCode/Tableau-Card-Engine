@@ -1,7 +1,7 @@
 # Main Street: Playtest Scenarios
 
 > **Work item:** CG-0MMJCMVMQ1TGTM0R (Playtest Scenarios & Balance Tasks)
-> **Last updated:** M2 Expanded Card Pool
+> **Last updated:** M2 Expanded Card Pool + Tutorial Scenario (CG-0MM5ZGB8U02S0BFO)
 
 This document defines curated playtest scenarios for validating the M2 expanded card pool. Each scenario uses a deterministic seed so results are exactly reproducible. Designers can run these scenarios to verify balance expectations after any card or rule changes.
 
@@ -10,6 +10,9 @@ This document defines curated playtest scenarios for validating the M2 expanded 
 ```bash
 # Run a single scenario by seed
 npx tsx scripts/demo-main-street.ts --seed "sweep-63"
+
+# Run the canonical smoke-test scenario (seed: smoke-1)
+npx tsx scripts/demo-main-street.ts --seed "smoke-1"
 
 # Run all 5 curated scenarios and compare results
 npx tsx scripts/playtest-scenarios.ts
@@ -20,6 +23,48 @@ npx vitest run --project unit -t "Monte Carlo"
 # Run the dedicated Monte Carlo harness (JSON + CSV output)
 npm run monte-carlo
 ```
+
+---
+
+## Scenario 0: "Tutorial Smoke" (seed: `smoke-1`)  ← **CI Smoke Seed**
+
+**Category:** Loss -- Bankruptcy  
+**Expected outcome:** Loss on turn 4 (bankruptcy)  
+**Score:** 43 | **Turns:** 4  
+**Difficulty used in test:** Medium (greedy strategy baseline); Easy for Tutorial scenario UI
+
+### What happens
+
+The player purchases a Florist and a Block Party investment on turn 1, then faces a Tax Audit incident. The tight coin reserve leads to bankruptcy by turn 4.
+
+### Smoke test
+
+This seed is wired to `tests/main-street/smoke-scenario.test.ts` (included in `npm test`):
+
+```bash
+# Run smoke test directly
+npx vitest run --project unit tests/main-street/smoke-scenario.test.ts
+
+# Run via CLI demo (JSON output)
+npx tsx scripts/demo-main-street.ts --seed "smoke-1"
+```
+
+**Assertions made by the smoke test:**
+- Run completes without errors
+- All required summary fields present (`game`, `version`, `seed`, `totalTurns`, `result`, `endReason`, `finalScore`, `turns`)
+- Run is deterministic (two runs with the same seed produce identical output)
+- Each turn record has the expected fields
+
+**Tutorial scenario (Easy):** The same seed with Easy difficulty will produce a different outcome since Easy provides more starting coins and 25 turns. This is tested in the `smoke-scenario.test.ts` as the "Tutorial scenario baseline" suite.
+
+### Adding or updating tutorial text
+
+Tutorial steps are defined in `example-games/main-street/scenes/MainStreetTutorialOverlayManager.ts` in the `TUTORIAL_STEPS` array. Each step has:
+- `title` — short heading shown in bold
+- `body` — multi-line description text
+- `anchor` — function that returns the `{x, y, w, h}` bounding box to highlight, or `null` for centred
+
+To add a step, append a new `TutorialStep` object to `TUTORIAL_STEPS`. To change copy, edit the `title` and `body` strings. All strings are localizable by replacing the string literals with i18n key lookups when i18n support is added.
 
 ---
 

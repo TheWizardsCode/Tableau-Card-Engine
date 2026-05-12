@@ -114,8 +114,8 @@ export class MainStreetScene extends CardGameScene {
   // Undo/Redo manager for market actions (per-scene)
   public undoManager!: UndoRedoManager;
 
-  constructor() {
-    super({ key: 'MainStreetScene' });
+  constructor(config?: Partial<Phaser.Types.Scenes.SettingsConfig>) {
+    super({ key: 'MainStreetScene', ...(config ?? {}) });
     this.msLifecycleManager = new MainStreetLifecycleManager(this);
   }
 
