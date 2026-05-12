@@ -120,6 +120,17 @@ describe('createOverlayBackground', () => {
     expect(result.objects).toHaveLength(2);
   });
 
+  it('parents overlay objects into scene.hudContainer when present', () => {
+    // Provide a scene with a hudContainer that has an `add` spy
+    const hudScene: any = mockScene();
+    hudScene.hudContainer = { add: vi.fn() };
+
+    const res = createOverlayBackground(hudScene);
+
+    // hudContainer.add should have been called for the background (and box if present)
+    expect(hudScene.hudContainer.add).toHaveBeenCalledWith(res.background);
+  });
+
   it('box uses custom depth when specified', () => {
     const result = createOverlayBackground(
       scene,

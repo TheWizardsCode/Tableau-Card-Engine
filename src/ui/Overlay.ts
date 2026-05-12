@@ -107,6 +107,18 @@ export function createOverlayBackground(
     objects.push(overlayBox);
   }
 
+  // If the scene exposes a top-level HUD container, parent overlay objects
+  // into it so all overlays share a single, stable top-layer container.
+  // This keeps z-ordering consistent across Main Street overlays.
+  try {
+    const hudContainer: any = (scene as any).hudContainer;
+    if (hudContainer && typeof hudContainer.add === 'function') {
+      for (const obj of objects) {
+        try { hudContainer.add(obj); } catch (_) { /* ignore */ }
+      }
+    }
+  } catch (_) { /* ignore failures when inspecting scene */ }
+
   return { background, box: overlayBox, objects };
 }
 

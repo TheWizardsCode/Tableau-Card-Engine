@@ -162,6 +162,9 @@ export class MainStreetRenderer {
   public createContainers(): void {
     const s = this.scene;
     s.hudContainer = s.add.container(0, 0);
+    // Ensure HUD container renders above gameplay containers by default.
+    try { s.hudContainer.setDepth(1000); } catch (_) { /* ignore in tests */ }
+
     s.streetContainer = s.add.container(0, 0);
     s.marketContainer = s.add.container(0, 0);
     s.incidentQueueContainer = s.add.container(0, 0);
