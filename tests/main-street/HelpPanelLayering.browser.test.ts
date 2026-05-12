@@ -120,6 +120,13 @@ describe('MainStreet Help panel layering (visual)', () => {
 
     const afterOpenPixel = await readScenePixel(scene, canvas, samplePoint[0], samplePoint[1]);
 
+    // Debug: log panel state and pixel values to help triage flakiness
+    // (these logs appear in test output)
+    // eslint-disable-next-line no-console
+    console.log('DEBUG: panel.isOpen=', scene.helpPanel.isOpen, 'container.x=', panelContainer.x);
+    // eslint-disable-next-line no-console
+    console.log('DEBUG: beforePixel=', beforePixel, 'afterOpenPixel=', afterOpenPixel);
+
     // Help panel background is dark blue-ish: 0x1a1a2e => (26,26,46)
     const panelColor: [number, number, number, number] = [26, 26, 46, 255];
 
