@@ -280,6 +280,9 @@ describe('MainStreetScene browser tests', () => {
       );
       expect(business).toBeTruthy();
 
+      const hideSpy = vi.spyOn(scene.tooltipManager, 'hide');
+      scene.tooltipManager?.show('tmp tooltip', 100, 100);
+
       const beforeBusinessAnimCount = scene.getTransferAnimationCountForTest();
       scene.onBusinessCardClick(business);
       scene.onSlotClick(targetSlot);
@@ -294,6 +297,7 @@ describe('MainStreetScene browser tests', () => {
       await new Promise((resolve) => setTimeout(resolve, 2000));
       expect(state.streetGrid[targetSlot]?.id).toBe(business.id);
       expect(scene.getHiddenTransferSourceCardCountForTest()).toBe(0);
+      expect(hideSpy).toHaveBeenCalled();
 
       const eventCard = state.market.investments.find((card: any) =>
         card && card.family === 'event' && canPurchaseEvent(state, card.id).legal,
