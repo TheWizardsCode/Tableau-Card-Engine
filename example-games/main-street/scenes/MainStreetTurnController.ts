@@ -191,6 +191,9 @@ export class MainStreetTurnController {
     const s = this.scene;
     if (s.uiPhase !== 'placing-business' || !s.pendingBusinessCard) return;
 
+    // Ensure stale hover tooltip is cleared when a card is played.
+    s.tooltipManager?.hide();
+
     const sourceIndex = s.pendingBusinessSourceIndex;
     const pendingCardId = s.pendingBusinessCard.id;
     const pendingCardName = s.pendingBusinessCard.name;
@@ -239,6 +242,9 @@ export class MainStreetTurnController {
   public onEventCardClick(card: EventCard): void {
     const s = this.scene;
     if (s.uiPhase !== 'market') return;
+
+    // Ensure stale hover tooltip is cleared when a card is played.
+    s.tooltipManager?.hide();
 
     s.selectMarketCardById(card.id);
 
@@ -318,6 +324,9 @@ export class MainStreetTurnController {
   public onUpgradeCardClick(card: UpgradeCard): void {
     const s = this.scene;
     if (s.uiPhase !== 'market') return;
+
+    // Ensure stale hover tooltip is cleared when a card is played.
+    s.tooltipManager?.hide();
 
     s.selectMarketCardById(card.id);
 
