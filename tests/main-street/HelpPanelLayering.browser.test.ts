@@ -88,26 +88,25 @@ describe('MainStreet Help panel layering (visual)', () => {
     if (!canvas) throw new Error('Canvas not found');
 
     const l = scene.layout;
-    const panelW = Number((scene.helpPanel as any).panelWidth ?? Math.floor(l.gameW * 0.35));
 
-    // Inject a bright marker into gameplay layer under where the help panel opens.
-    // This gives a deterministic pixel target to verify panel-over-gameplay ordering.
-    const markerX = Math.max(20, Math.min(Math.floor(panelW - 24), 120));
-    const markerY = Math.max(80, Math.floor(l.marketTop + l.marketCardH * 0.5));
-    const marker = scene.add.rectangle(markerX, markerY, 18, 18, 0xff00ff, 1);
-    marker.setDepth(9999);
-    scene.marketContainer.add(marker);
-    try { (scene.marketContainer as Phaser.GameObjects.Container).bringToTop(marker); } catch (_) { /* ignore */ }
-    await waitFrames(6);
+    // Repro point requested by operator: first card in first market row.
+    const firstCardX = Math.floor((l.marketLabelW + 50) + l.marketCardW * 0.5);
+    const firstCardY = Math.floor((l.marketTop + 6) + l.marketCardH * 0.5);
+    const samplePoint: [number, number] = [
+      Math.max(2, Math.min(firstCardX, canvas.width - 3)),
+      Math.max(2, Math.min(firstCardY, canvas.height - 3)),
+    ];
 
-    const samplePoint: [number, number] = [Math.floor(markerX), Math.floor(markerY)];
     const beforePixel = await readScenePixel(scene, canvas, samplePoint[0], samplePoint[1]);
-    const markerColor: [number, number, number, number] = [255, 0, 255, 255];
-    expect(colorDistance(beforePixel, markerColor)).toBeLessThan(120);
     scene.helpPanel.open();
     await waitFrames(24);
 
     expect(scene.helpPanel.isOpen).toBe(true);
+    // DOM-rendered card images should be hidden while the panel is open.
+    const domImages = Array.from(document.querySelectorAll('#game-container img')) as HTMLImageElement[];
+    if (domImages.length > 0) {
+      expect(domImages[0].style.visibility).toBe('hidden');
+    }
     const panelContainer = (scene.helpPanel as any).container as Phaser.GameObjects.Container;
     expect(panelContainer.visible).toBe(true);
     expect(panelContainer.x).toBeGreaterThanOrEqual(-1);
@@ -121,11 +120,14 @@ describe('MainStreet Help panel layering (visual)', () => {
     expect(colorDistance(beforePixel, afterOpenPixel)).toBeGreaterThan(40);
     expect(colorDistance(afterOpenPixel, panelColor)).toBeLessThan(220);
 
-    // Closing should restore underlying gameplay marker color.
+    // Closing should restore underlying first-card pixel.
     scene.helpPanel.close();
     await waitFrames(24);
     const afterClosePixel = await readScenePixel(scene, canvas, samplePoint[0], samplePoint[1]);
 
+    if (domImages.length > 0) {
+      expect(domImages[0].style.visibility).toBe('visible');
+    }
     expect(colorDistance(afterOpenPixel, afterClosePixel)).toBeGreaterThan(40);
   });
 });

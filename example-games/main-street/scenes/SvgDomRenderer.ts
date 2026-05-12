@@ -75,6 +75,21 @@ export class SvgDomRenderer {
     this.map.delete(id);
   }
 
+  /** Toggle visibility for all DOM-rendered card elements. */
+  setVisible(visible: boolean) {
+    for (const dom of this.map.values()) {
+      try {
+        const node = (dom as any).node as HTMLElement | null;
+        if (node) {
+          node.style.visibility = visible ? 'visible' : 'hidden';
+          node.style.pointerEvents = visible ? 'auto' : 'none';
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+
   clear() {
     for (const [k, dom] of this.map.entries()) {
       try { dom.destroy(); } catch {};

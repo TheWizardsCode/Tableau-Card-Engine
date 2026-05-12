@@ -557,6 +557,11 @@ export class SettingsPanel {
     this.syncControlsToSoundManager();
     this.createInputBlocker();
 
+    // Main Street uses DOM-based SVG cards which otherwise render above
+    // canvas overlays. Hide them while sidebars are open so panel occludes
+    // card UI as expected.
+    try { (this.scene as any).svgDom?.setVisible(false); } catch (_) { /* ignore */ }
+
     // Ensure settings panel sits at top of overlay root ordering when opened.
     try {
       const overlayRoot: any = (this.scene as any).hudOverlayContainer ?? (this.scene as any).hudContainer;
@@ -609,6 +614,13 @@ export class SettingsPanel {
         this.currentTween = null;
         this.container.setVisible(false);
         this.removeInputBlocker();
+        // Restore DOM-rendered cards only if help panel is not open.
+        try {
+          const helpOpen = !!(this.scene as any).helpPanel?.isOpen;
+          if (!helpOpen) {
+            try { (this.scene as any).svgDom?.setVisible(true); } catch (_) { /* ignore */ }
+          }
+        } catch (_) { /* ignore */ }
       },
     });
   }
