@@ -782,6 +782,18 @@ The following items are explicitly excluded from this spec:
 
 ## Appendix A: Card Catalog by Tier
 
+### Appendix A.0: Catalog growth summary
+
+| Snapshot | Business | Event | Upgrade | Total templates |
+|---|---:|---:|---:|---:|
+| Tier 1 baseline | 5 | 5 | 3 | 13 |
+| Current catalog | 17 | 17 | 25 | 59 |
+| Net increase | +12 | +12 | +22 | +46 |
+
+Verification artifacts:
+- `docs/main-street/card-catalog-baseline.json`
+- `docs/main-street/expanded-card-manifest.json`
+
 ### Tier 1 -- Foundation (13 templates)
 
 | ID | Name | Family | Synergy | Cost |
