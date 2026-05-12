@@ -165,6 +165,14 @@ export class MainStreetRenderer {
     // Ensure HUD container renders above gameplay containers by default.
     try { s.hudContainer.setDepth(1000); } catch (_) { /* ignore in tests */ }
 
+    // Persistent overlay container that is not rebuilt each refresh. This
+    // should hold help/settings buttons and panel input blockers so they
+    // are not removed by hudContainer.removeAll(true).
+    try {
+      (s as any).hudOverlayContainer = s.add.container(0, 0);
+      try { (s as any).hudOverlayContainer.setDepth(1100); } catch (_) { /* ignore */ }
+    } catch (_) { /* ignore */ }
+
     s.streetContainer = s.add.container(0, 0);
     s.marketContainer = s.add.container(0, 0);
     s.incidentQueueContainer = s.add.container(0, 0);

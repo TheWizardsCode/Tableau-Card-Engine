@@ -111,10 +111,13 @@ export function createOverlayBackground(
   // into it so all overlays share a single, stable top-layer container.
   // This keeps z-ordering consistent across Main Street overlays.
   try {
-    const hudContainer: any = (scene as any).hudContainer;
-    if (hudContainer && typeof hudContainer.add === 'function') {
+    // Prefer a dedicated overlay container if present (so overlays are not
+    // removed by HUD rebuilds). Fall back to hudContainer for backward
+    // compatibility.
+    const overlayContainer: any = (scene as any).hudOverlayContainer ?? (scene as any).hudContainer;
+    if (overlayContainer && typeof overlayContainer.add === 'function') {
       for (const obj of objects) {
-        try { hudContainer.add(obj); } catch (_) { /* ignore */ }
+        try { overlayContainer.add(obj); } catch (_) { /* ignore */ }
       }
     }
   } catch (_) { /* ignore failures when inspecting scene */ }

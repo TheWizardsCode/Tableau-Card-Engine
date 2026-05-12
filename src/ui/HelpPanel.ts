@@ -73,7 +73,8 @@ const DEPTH_INPUT_BLOCKER = 900;
 const DEPTH_PANEL_BG = 901;
 const DEPTH_PANEL_CONTENT = 902;
 const DEPTH_CLOSE_BUTTON = 903;
-const DEPTH_HELP_BUTTON = 904;
+// Help button should render above HUD overlays; choose depth higher than HUD (1000)
+const DEPTH_HELP_BUTTON = 1101;
 
 export { DEPTH_HELP_BUTTON };
 
@@ -124,12 +125,14 @@ export class HelpPanel {
     this.container = scene.add.container(-this.panelWidth, 0);
     this.container.setDepth(DEPTH_PANEL_BG);
 
-    // If scene exposes a top-level HUD container, parent the panel into it so
-    // the panel consistently renders above gameplay content.
+    // If scene exposes a dedicated overlay container, parent the panel into
+    // it so the panel consistently renders above gameplay content and is not
+    // removed by HUD rebuilds. Fall back to hudContainer if overlay container
+    // is not present (compatibility).
     try {
-      const hud: any = (scene as any).hudContainer;
-      if (hud && typeof hud.add === 'function') {
-        try { hud.add(this.container); } catch (_) { /* ignore */ }
+      const overlayRoot: any = (scene as any).hudOverlayContainer ?? (scene as any).hudContainer;
+      if (overlayRoot && typeof overlayRoot.add === 'function') {
+        try { overlayRoot.add(this.container); } catch (_) { /* ignore */ }
       }
     } catch (_) { /* ignore */ }
 
@@ -458,12 +461,12 @@ export class HelpPanel {
     this.inputBlocker.setInteractive();
     this.inputBlocker.on('pointerdown', () => this.close());
 
-    // Parent input blocker into HUD container if available (ensures it sits
-    // above gameplay objects and blocks input as intended).
+    // Parent input blocker into overlay root if available so it is not
+    // removed during HUD rebuilds.
     try {
-      const hud: any = (this.scene as any).hudContainer;
-      if (hud && typeof hud.add === 'function') {
-        try { hud.add(this.inputBlocker); } catch (_) { /* ignore */ }
+      const overlayRoot: any = (this.scene as any).hudOverlayContainer ?? (this.scene as any).hudContainer;
+      if (overlayRoot && typeof overlayRoot.add === 'function') {
+        try { overlayRoot.add(this.inputBlocker); } catch (_) { /* ignore */ }
       }
     } catch (_) { /* ignore */ }
   }

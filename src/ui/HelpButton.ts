@@ -70,12 +70,15 @@ export class HelpButton {
     this.hitArea.setDepth(DEPTH_HELP_BUTTON);
     this.hitArea.setInteractive({ useHandCursor: true });
 
-    // If a HUD container exists, parent visual elements into it so button
-    // sits in the same top-layer group as overlays.
+    // Do NOT parent the button visuals into hudContainer directly — hudContainer
+    // is rebuilt every refresh in some scenes which would remove persistent
+    // button visuals. Prefer hudOverlayContainer when available; otherwise
+    // leave as top-level children and rely on high depth to keep them above
+    // gameplay elements.
     try {
-      const hud: any = (scene as any).hudContainer;
-      if (hud && typeof hud.add === 'function') {
-        try { hud.add(this.circle); hud.add(this.label); hud.add(this.hitArea); } catch (_) { /* ignore */ }
+      const overlayRoot: any = (scene as any).hudOverlayContainer ?? null;
+      if (overlayRoot && typeof overlayRoot.add === 'function') {
+        try { overlayRoot.add(this.circle); overlayRoot.add(this.label); overlayRoot.add(this.hitArea); } catch (_) { /* ignore */ }
       }
     } catch (_) { /* ignore */ }
 
