@@ -55,6 +55,7 @@ export class BeleagueredCastleTurnController {
   gameEnded = false;
   autoCompleting = false;
   private autoCompleteTimers: Phaser.Time.TimerEvent[] = [];
+  private pendingAutoCompleteCmds: Command[] | null = null;
   private timerStarted = false;
 
   constructor(state: BeleagueredCastleState, recorder: BCTranscriptRecorder, callbacks: TurnControllerCallbacks) {
@@ -75,9 +76,17 @@ export class BeleagueredCastleTurnController {
 
     applyMove(this.state, move);
     const autoMoves: BCMove[] = [];
+    const moveCardsCaptured: Array<{ suit: string; rank: string; foundationIndex: number }> = [];
     let safe = findSafeAutoMoves(this.state);
     while (safe.length > 0) {
       for (const am of safe) {
+        // Capture the top card that will be moved for visuals BEFORE changing state
+        if (am.kind === 'tableau-to-foundation') {
+          const topCard = this.state.tableau[am.fromCol].peek();
+          moveCardsCaptured.push({ suit: topCard?.suit ?? '', rank: topCard?.rank ?? '', foundationIndex: am.toFoundation });
+        } else {
+          moveCardsCaptured.push({ suit: '', rank: '', foundationIndex: -1 });
+        }
         applyMove(this.state, am);
         autoMoves.push(am);
       }
@@ -88,10 +97,13 @@ export class BeleagueredCastleTurnController {
     }
     undoMove(this.state, move);
 
+    const allCmds: Command[] = [playerCmd];
+    for (const am of autoMoves) allCmds.push(new AutoMoveCommand(this.state, am));
+
     if (autoMoves.length > 0) {
-      const allCmds: Command[] = [playerCmd];
-      for (const am of autoMoves) allCmds.push(new AutoMoveCommand(this.state, am));
-      this.undoManager.execute(new CompoundCommand(allCmds, playerCmd.description));
+      // Defer execution of the compound command until visuals complete so we can animate auto-promotes
+      this.autoCompleting = true;
+      this.pendingAutoCompleteCmds = allCmds;
     } else {
       this.undoManager.execute(playerCmd);
     }
@@ -99,6 +111,12 @@ export class BeleagueredCastleTurnController {
     this.recorder.recordMove(move, this.state.moveCount);
     for (const am of autoMoves) this.recorder.recordAutoMove(am);
 
+    // Use the captured card infos (in the same order as autoMoves) for visuals
+    const moveCardsForVisuals = moveCardsCaptured;
+
+
+
+    // Play sound for the player's explicit move immediately
     if (move.kind === 'tableau-to-foundation') {
       const topCard = this.state.foundations[move.toFoundation].peek();
       if (topCard) {
@@ -114,6 +132,13 @@ export class BeleagueredCastleTurnController {
     if (!this.timerStarted) {
       this.timerStarted = true;
       this.callbacks.onSoundEvent('timer-started');
+    }
+
+    // If we deferred commands (autoMoves present), trigger visuals and return; finalizeAutoComplete will execute commands when visuals complete
+    if (this.pendingAutoCompleteCmds) {
+      this.callbacks.onAutoCompleteVisual(autoMoves, moveCardsForVisuals);
+      // Do not call onRefresh or checkGameEnd here; finalizeAutoComplete will call onRefresh after applying commands
+      return;
     }
 
     this.callbacks.onRefresh();
@@ -185,8 +210,8 @@ export class BeleagueredCastleTurnController {
     this.callbacks.onSoundEvent('auto-complete-start', { cardCount: moves.length });
 
     const cmds: Command[] = moves.map((m) => new AutoMoveCommand(this.state, m));
-    this.undoManager.execute(new CompoundCommand(cmds, 'Auto-complete'));
-    this.callbacks.onRefresh();
+    // Defer execution of the auto-complete commands until visuals have run.
+    this.pendingAutoCompleteCmds = cmds;
     this.callbacks.onAutoCompleteVisual(moves, moveCards);
   }
 
@@ -214,9 +239,31 @@ export class BeleagueredCastleTurnController {
   cancelAutoComplete(): void {
     if (!this.autoCompleting) return;
     this.autoCompleting = false;
+    this.pendingAutoCompleteCmds = null;
     for (const timer of this.autoCompleteTimers) {
       timer.destroy();
     }
     this.autoCompleteTimers = [];
   }
+
+  /**
+   * Finalize a previously-started auto-complete after visuals have run.
+   * Executes the pending auto-complete commands and refreshes the UI.
+   */
+  finalizeAutoComplete(): void {
+    if (!this.autoCompleting && (!this.pendingAutoCompleteCmds || this.pendingAutoCompleteCmds.length === 0)) return;
+    if (!this.pendingAutoCompleteCmds || this.pendingAutoCompleteCmds.length === 0) {
+      this.autoCompleting = false;
+      this.callbacks.onAutoCompleteDone();
+      return;
+    }
+
+    const cmds = this.pendingAutoCompleteCmds;
+    this.pendingAutoCompleteCmds = null;
+    this.undoManager.execute(new CompoundCommand(cmds, 'Auto-complete'));
+    this.callbacks.onRefresh();
+    this.autoCompleting = false;
+    this.callbacks.onAutoCompleteDone();
+  }
 }
+

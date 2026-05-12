@@ -23,10 +23,11 @@ import type { EventSoundMapping } from '../../../src/core-engine/SoundManager';
 import type { HelpSection } from '../../../src/ui';
 import helpContent from '../help-content.json';
 
-import { SFX_KEYS } from './BeleagueredCastleConstants';
+import { SFX_KEYS, ANIM_DURATION } from './BeleagueredCastleConstants';
 import { BeleagueredCastleRenderer } from './BeleagueredCastleRenderer';
 import { BeleagueredCastleOverlayManager } from './BeleagueredCastleOverlayManager';
 import { BeleagueredCastleTurnController } from './BeleagueredCastleTurnController';
+import { moveGameObject, cardTextureKey } from '../../../src/ui';
 
 export class BeleagueredCastleScene extends CardGameScene {
   private gameState!: BeleagueredCastleState;
@@ -316,10 +317,85 @@ export class BeleagueredCastleScene extends CardGameScene {
     }
   }
 
-  private runAutoCompleteVisuals(moves: BCMove[], _moveCards: Array<{ suit: string; rank: string; foundationIndex: number }>): void {
-    this.turnController.scheduleAutoCompleteTimers(moves, this, (_move, _cardInfo) => {
-      this.bcRenderer.refreshFoundations();
-    }, () => this.handleAutoCompleteDone());
+  private runAutoCompleteVisuals(moves: BCMove[], moveCards: Array<{ suit: string; rank: string; foundationIndex: number }>): void {
+    const STAGGER_MS = 100;
+
+
+    const animIndices: number[] = [];
+    for (let i = 0; i < moves.length; i++) if (moves[i].kind === 'tableau-to-foundation') animIndices.push(i);
+    const animCount = animIndices.length;
+    let completed = 0;
+
+    if (animCount === 0) {
+      this.turnController.finalizeAutoComplete();
+      return;
+    }
+
+    for (let j = 0; j < animIndices.length; j++) {
+      const i = animIndices[j];
+      const move = moves[i];
+      const cardInfo = moveCards[i];
+
+      if (move.kind !== 'tableau-to-foundation') {
+        completed++;
+        if (completed >= animCount) this.turnController.finalizeAutoComplete();
+        continue;
+      }
+
+      const fromCol = move.fromCol;
+      const colSprites = this.bcRenderer.tableauSprs[fromCol];
+      if (!colSprites || colSprites.length === 0) {
+        completed++;
+        if (completed >= animCount) this.turnController.finalizeAutoComplete();
+        continue;
+      }
+
+      const expectedKey = cardTextureKey(cardInfo.rank as any, cardInfo.suit as any);
+
+
+      let sourceSprite: Phaser.GameObjects.Image | undefined;
+      for (const s of colSprites) {
+        if (s.texture && s.texture.key === expectedKey) { sourceSprite = s; break; }
+      }
+      if (!sourceSprite) sourceSprite = colSprites[colSprites.length - 1];
+
+      const startX = sourceSprite.x;
+      const startY = sourceSprite.y;
+
+      try { sourceSprite.setVisible(false); } catch {}
+
+      const destIndex = move.toFoundation;
+      const destSprite = this.bcRenderer.foundationSprites[destIndex];
+      const destX = destSprite.x;
+      const destY = destSprite.y;
+
+      const moving = this.add.image(startX, startY, expectedKey).setDepth(5000).setAlpha(1);
+
+
+      this.time.delayedCall(j * STAGGER_MS, () => {
+        moveGameObject({
+          scene: this,
+          target: moving,
+          destX,
+          destY,
+          duration: Math.max(50, ANIM_DURATION),
+          soundManager: this.soundManager ?? null,
+          sfx: { start: SFX_KEYS.CARD_PICKUP, end: SFX_KEYS.AUTO_COMPLETE_CARD },
+          onComplete: () => {
+            try { moving.destroy(); } catch {}
+            this.gameEvents.emit('auto-complete-card', { suit: cardInfo.suit, rank: cardInfo.rank, foundationIndex: destIndex });
+
+            // restore visibility; final refresh after command execution will re-render settled board
+            try { sourceSprite.setVisible(true); } catch {}
+
+            completed++;
+            if (completed >= animCount) {
+              this.turnController.finalizeAutoComplete();
+            }
+          },
+        });
+      });
+    }
   }
 
   private handleSoundEvent(event: string, _data?: any): void {
