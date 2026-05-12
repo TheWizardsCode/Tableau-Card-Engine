@@ -62,14 +62,22 @@ describe('MainStreet help/settings buttons (regression)', () => {
     expect(helpLabel).toBeDefined();
     expect(settingsLabel).toBeDefined();
 
+    // Narrow types for TypeScript and guard at runtime
+    if (!helpLabel || !settingsLabel) {
+      throw new Error('Help/Settings labels not found');
+    }
+
+    const hl = helpLabel as Phaser.GameObjects.Text;
+    const sl = settingsLabel as Phaser.GameObjects.Text;
+
     // Basic visibility checks
-    expect(helpLabel.visible).toBeTruthy();
-    expect(settingsLabel.visible).toBeTruthy();
+    expect(hl.visible).toBeTruthy();
+    expect(sl.visible).toBeTruthy();
 
     // Check expected characters
-    expect(helpLabel.text).toBe('?');
+    expect(hl.text).toBe('?');
     // settings label may be gear unicode; accept a couple variants
-    expect(['\u2699', '⚙', '\u2699']).toContain(settingsLabel.text);
+    expect(['\u2699', '⚙', '\u2699']).toContain(sl.text);
 
     // If hudContainer exists, ensure the button visuals were parented into it (regression guard)
     if (scene.hudContainer) {

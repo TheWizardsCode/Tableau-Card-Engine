@@ -175,23 +175,6 @@ export class SettingsPanel {
     this.container = scene.add.container(this.canvasWidth, 0);
     this.container.setDepth(DEPTH_PANEL_BG);
 
-    // If scene exposes a dedicated overlay container, parent the panel into
-    // it so it consistently renders above gameplay content and is not removed
-    // by HUD rebuilds. Fall back to hudContainer if overlay container is
-    // unavailable.
-    try {
-      const overlayRoot: any = (scene as any).hudOverlayContainer ?? (scene as any).hudContainer;
-      if (overlayRoot && typeof overlayRoot.add === 'function') {
-        try {
-          overlayRoot.add(this.container);
-          const base = Number(overlayRoot.depth ?? 1000);
-          try { this.inputBlocker && ((this.inputBlocker as any).setDepth(base)); } catch (_) {}
-          try { this.container.setDepth(base + 10); } catch (_) {}
-          try { this.background.setDepth(base + 11); } catch (_) {}
-          try { this.closeButton.setDepth(base + 12); } catch (_) {}
-        } catch (_) { /* ignore */ }
-      }
-    } catch (_) { /* ignore */ }
 
     // Background
     this.background = scene.add.rectangle(
@@ -515,6 +498,23 @@ export class SettingsPanel {
     scene.input.on('pointermove', this.handlePointerMove, this);
     scene.input.on('pointerup', this.handlePointerUp, this);
 
+    // After constructing child objects, parent into overlay root and apply
+    // absolute depths so the settings panel renders above gameplay content.
+    try {
+      const overlayRoot: any = (scene as any).hudOverlayContainer ?? (scene as any).hudContainer;
+      if (overlayRoot && typeof overlayRoot.add === 'function') {
+        try {
+          overlayRoot.add(this.container);
+          const base = Number(overlayRoot.depth ?? 1000);
+          try { this.inputBlocker && ((this.inputBlocker as any).setDepth(base)); } catch (_) {}
+          try { this.container.setDepth(base + 10); } catch (_) {}
+          try { this.background.setDepth(base + 11); } catch (_) {}
+          try { this.closeButton.setDepth(base + 12); } catch (_) {}
+          try { this.scene.children?.depthSort?.(); } catch (_) {}
+        } catch (_) { /* ignore */ }
+      }
+    } catch (_) { /* ignore */ }
+
     // Setup keyboard shortcut
     this.setupKeyboardShortcut();
 
@@ -556,6 +556,15 @@ export class SettingsPanel {
     this.container.setVisible(true);
     this.syncControlsToSoundManager();
     this.createInputBlocker();
+
+    // Ensure settings panel sits at top of overlay root ordering when opened.
+    try {
+      const overlayRoot: any = (this.scene as any).hudOverlayContainer ?? (this.scene as any).hudContainer;
+      if (overlayRoot && typeof overlayRoot.bringToTop === 'function') {
+        try { overlayRoot.bringToTop(this.container); } catch (_) { /* ignore */ }
+      }
+      try { this.scene.children?.depthSort?.(); } catch (_) { /* ignore */ }
+    } catch (_) { /* ignore */ }
 
     // Stop any existing tween
     if (this.currentTween) {

@@ -179,6 +179,9 @@ export class MainStreetRenderer {
     s.handContainer = s.add.container(0, 0);
     s.actionContainer = s.add.container(0, 0);
 
+    // Ensure depth ordering is applied after container creation.
+    try { s.children?.depthSort?.(); } catch (_) { /* ignore */ }
+
     // Challenge Tracker panel
     s.challengeContainer = s.add.container(s.layout.challengeX, s.layout.challengeY);
 
