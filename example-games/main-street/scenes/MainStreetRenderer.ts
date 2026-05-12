@@ -58,6 +58,12 @@ import {
   STREET_ROW_GAP,
 } from './MainStreetConstants';
 
+/** Tag a Phaser game object as transient so `refreshHud()` knows to destroy it on the next refresh. */
+function markHudTransient<T extends Phaser.GameObjects.GameObject>(obj: T): T & { _hudTransient: true } {
+  (obj as any)._hudTransient = true;
+  return obj as T & { _hudTransient: true };
+}
+
 export class MainStreetRenderer {
   constructor(private readonly scene: any) {}
 
@@ -254,35 +260,46 @@ export class MainStreetRenderer {
 
   public refreshHud(): void {
     const s = this.scene;
-    s.hudContainer.removeAll(true);
+
+    // Remove only elements tagged as transient HUD items so that persistent overlay
+    // objects (helpPanel, settingsPanel, buttons) that also reside in hudContainer are
+    // not destroyed on each refresh.  Using removeAll(true) would destroy those persistent
+    // children, breaking their parentContainer reference and causing the SidebarOverlay test
+    // (and the live game) to lose the panels after the first refresh.
+    const hudList = [...s.hudContainer.list] as Array<Phaser.GameObjects.GameObject & { _hudTransient?: boolean }>;
+    for (const child of hudList) {
+      if (child._hudTransient) {
+        s.hudContainer.remove(child, true);
+      }
+    }
 
     const score = computeScore(s.state);
     const { coins, reputation } = s.state.resourceBank;
     const { gameW, hudY } = s.layout;
 
     // Background strip - 2/3 width, centered
-    const strip = s.add.rectangle(gameW / 2, hudY, gameW * 0.66, 28, 0x1a1408, 0.6);
+    const strip = markHudTransient(s.add.rectangle(gameW / 2, hudY, gameW * 0.66, 28, 0x1a1408, 0.6));
     strip.setStrokeStyle(1, BOX_STROKE, 0.5);
     s.hudContainer.add(strip);
 
     // Coins - centered in strip
     const stripWidth = gameW * 0.66;
     const stripLeft = (gameW - stripWidth) / 2;
-    const coinText = s.add.text(stripLeft + stripWidth * 0.25, hudY, `Coins: ${coins}`, {
+    const coinText = markHudTransient(s.add.text(stripLeft + stripWidth * 0.25, hudY, `Coins: ${coins}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#ffcc44', fontFamily: FONT_FAMILY,
-    }).setOrigin(0, 0.5);
+    }).setOrigin(0, 0.5));
     s.hudContainer.add(coinText);
 
     // Reputation - centered in strip
-    const repText = s.add.text(stripLeft + stripWidth * 0.5, hudY, `Rep: ${reputation}`, {
+    const repText = markHudTransient(s.add.text(stripLeft + stripWidth * 0.5, hudY, `Rep: ${reputation}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#88bbff', fontFamily: FONT_FAMILY,
-    }).setOrigin(0, 0.5);
+    }).setOrigin(0, 0.5));
     s.hudContainer.add(repText);
 
     // Score - right side of strip
-    const scoreText = s.add.text(stripLeft + stripWidth * 0.85, hudY, `Score: ${score}`, {
+    const scoreText = markHudTransient(s.add.text(stripLeft + stripWidth * 0.85, hudY, `Score: ${score}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#ff8844', fontFamily: FONT_FAMILY,
-    }).setOrigin(0, 0.5);
+    }).setOrigin(0, 0.5));
     s.hudContainer.add(scoreText);
 
     s.animateHudValueChanges({
