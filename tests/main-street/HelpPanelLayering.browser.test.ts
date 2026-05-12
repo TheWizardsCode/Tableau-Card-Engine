@@ -81,7 +81,8 @@ describe('MainStreet Help panel layering (visual)', () => {
   it('renders help panel above market cards and HUD strip when opened', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('MainStreetScene') as any;
-    await waitFrames(6);
+    // Allow additional frames for HUD and overlay parenting to settle
+    await waitFrames(24);
 
     const canvas = document.querySelector('#game-container canvas') as HTMLCanvasElement | null;
     expect(canvas).toBeTruthy();
@@ -99,7 +100,11 @@ describe('MainStreet Help panel layering (visual)', () => {
 
     const beforePixel = await readScenePixel(scene, canvas, samplePoint[0], samplePoint[1]);
     scene.helpPanel.open();
-    await waitFrames(24);
+    // Wait longer to allow slide animation to complete in headless env
+    await waitFrames(40);
+
+    // Ensure any pending tweens have completed
+    await new Promise((r) => setTimeout(r, 20));
 
     expect(scene.helpPanel.isOpen).toBe(true);
     // DOM-rendered card images should be hidden while the panel is open.

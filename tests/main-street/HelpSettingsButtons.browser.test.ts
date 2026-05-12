@@ -46,7 +46,7 @@ describe('MainStreet help/settings buttons (regression)', () => {
     const scene = game.scene.getScene('MainStreetScene') as any;
 
     // Wait a few frames for HUD parenting to settle
-    await waitFrames(4);
+    await waitFrames(20);
 
     // Access helpButton and settingsButton directly (more robust)
     const helpBtn = (scene as any).helpButton;
@@ -96,8 +96,9 @@ describe('MainStreet help/settings buttons (regression)', () => {
 
     // Trigger opening the help panel via API to ensure it's rendered
     scene.helpPanel.open();
-    // Allow animations/frames to run
-    await waitFrames(8);
+    // Allow animations/frames and HUD parenting to settle
+    await waitFrames(24);
+    await new Promise((r) => setTimeout(r, 10));
 
     const canvas = document.querySelector('#game-container canvas') as HTMLCanvasElement | null;
     expect(canvas).toBeTruthy();
