@@ -95,6 +95,10 @@ export class MainStreetTutorialScene extends MainStreetScene {
       if (this.hudContainer) {
         this.hudContainer.add(btn);
       }
-    } catch (_) { /* ignore */ }
+    } catch (e) {
+      // Non-fatal: hudContainer.add may fail in headless test environments.
+      // eslint-disable-next-line no-console
+      console.debug('[Tutorial] _addTutorialButton: hudContainer.add failed', e);
+    }
   }
 }

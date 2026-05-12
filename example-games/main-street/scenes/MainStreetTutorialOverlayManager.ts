@@ -323,7 +323,11 @@ export class MainStreetTutorialOverlayManager {
 
   private clearObjects(): void {
     for (const obj of this.objects) {
-      try { obj.destroy(); } catch (_) { /* ignore */ }
+      try { obj.destroy(); } catch (e) {
+        // Non-fatal: Phaser may throw when destroying already-destroyed objects in tests.
+        // eslint-disable-next-line no-console
+        console.debug('[Tutorial] clearObjects: destroy failed', e);
+      }
     }
     this.objects = [];
   }
