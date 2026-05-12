@@ -183,7 +183,7 @@ export const TIER_DEFINITIONS: Record<string, TierDefinition> = {
     id: 'tier-2',
     name: 'Rising Street',
     order: 2,
-    reputationThreshold: 6,
+    reputationThreshold: 8,
     // Challenge path: Complete any 2 challenges in a single run
     challengeCondition: (state) => completedChallengeCount(state) >= 2,
     newCardIds: TIER_2_NEW_CARD_IDS,
@@ -194,7 +194,7 @@ export const TIER_DEFINITIONS: Record<string, TierDefinition> = {
     id: 'tier-3',
     name: 'Neighborhood',
     order: 3,
-    reputationThreshold: 8,
+    reputationThreshold: 16,
     // Challenge path: Complete 1 synergy challenge AND 1 resource challenge
     challengeCondition: (state) =>
       hasCompletedChallengeInCategory(state, 'synergy') &&
@@ -207,7 +207,7 @@ export const TIER_DEFINITIONS: Record<string, TierDefinition> = {
     id: 'tier-4',
     name: 'District',
     order: 4,
-    reputationThreshold: 10,
+    reputationThreshold: 32,
     // Challenge path: Complete any 3 challenges (at least 1 must be cross-cutting or placement)
     challengeCondition: (state) =>
       completedChallengeCount(state) >= 3 &&
@@ -225,7 +225,7 @@ export const TIER_DEFINITIONS: Record<string, TierDefinition> = {
     id: 'tier-5',
     name: 'Landmark',
     order: 5,
-    reputationThreshold: 12,
+    reputationThreshold: 64,
     // Challenge path: Complete the "Diversified" challenge
     challengeCondition: (state) => state.challengesCompleted.includes('ch-diversified'),
     newCardIds: TIER_5_NEW_CARD_IDS,

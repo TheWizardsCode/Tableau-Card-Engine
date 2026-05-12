@@ -98,7 +98,7 @@ Run N+1 starts with expanded card pool
 
 ### 2.2 Tier 2 -- Rising Street
 
-**Reputation Threshold:** >= 6 reputation at end-of-run
+**Reputation Threshold:** >= 8 reputation at end-of-run
 
 **Challenge Milestone:** Complete any 2 challenges in a single run
 
@@ -114,7 +114,7 @@ Run N+1 starts with expanded card pool
 
 ### 2.3 Tier 3 -- Neighborhood
 
-**Reputation Threshold:** >= 8 reputation at end-of-run
+**Reputation Threshold:** >= 16 reputation at end-of-run
 
 **Challenge Milestone:** Complete 1 synergy challenge AND 1 resource challenge in a single run
 
@@ -130,7 +130,7 @@ Run N+1 starts with expanded card pool
 
 ### 2.4 Tier 4 -- District
 
-**Reputation Threshold:** >= 10 reputation at end-of-run
+**Reputation Threshold:** >= 32 reputation at end-of-run
 
 **Challenge Milestone:** Complete any 3 challenges in a single run (at least 1 must be cross-cutting or placement)
 
@@ -146,7 +146,7 @@ Run N+1 starts with expanded card pool
 
 ### 2.5 Tier 5 -- Landmark
 
-**Reputation Threshold:** >= 12 reputation at end-of-run
+**Reputation Threshold:** >= 64 reputation at end-of-run
 
 **Challenge Milestone:** Complete the "Diversified" challenge (`ch-diversified`: all 5 synergy types present) in a single run
 
@@ -165,10 +165,10 @@ Run N+1 starts with expanded card pool
 | Tier | Name | Rep Threshold | Challenge Path | New Business | New Event | New Upgrade | Cumulative Templates |
 |------|------|--------------|----------------|-------------|-----------|------------|---------------------|
 | 1 | Foundation | -- | -- | 5 | 5 | 3 | 13 |
-| 2 | Rising Street | >= 6 | Any 2 challenges | 1 (Pawn Shop) | 1 (Grand Opening) | 0 | 16 |
-| 3 | Neighborhood | >= 8 | 1 synergy + 1 resource | 1 (Cafe) | 1 (Wellness Fair) | 1 (Garden) | 19 |
-| 4 | District | >= 10 | Any 3 (incl. 1 cross-cutting/placement) | 1 (Arcade) | 1 (Block Party) | 1 (Bread Factory) | 22 |
-| 5 | Landmark | >= 12 | Diversified challenge | 1 (Day Spa) | 1 (Charity Drive) | 1 (Grand Bakehouse) | 25 |
+| 2 | Rising Street | >= 8 | Any 2 challenges | 1 (Pawn Shop) | 1 (Grand Opening) | 0 | 16 |
+| 3 | Neighborhood | >= 16 | 1 synergy + 1 resource | 1 (Cafe) | 1 (Wellness Fair) | 1 (Garden) | 19 |
+| 4 | District | >= 32 | Any 3 (incl. 1 cross-cutting/placement) | 1 (Arcade) | 1 (Block Party) | 1 (Bread Factory) | 22 |
+| 5 | Landmark | >= 64 | Diversified challenge | 1 (Day Spa) | 1 (Charity Drive) | 1 (Grand Bakehouse) | 25 |
 
 **Total new cards across Tiers 2-5: 41** (10 Business + 11 Event + 20 Upgrade)
 
@@ -652,7 +652,7 @@ Next run starts with updated campaign
 **Testable Conditions:**
 - Given a completed run with `reputation = 7` and only `tier-1` unlocked, then `tier-2` is added to `unlockedTiers`.
 - Given a completed run with `reputation = 5` and only `tier-1` unlocked, then `unlockedTiers` remains `['tier-1']`.
-- Given a completed run with `reputation = 12` and only `tier-1` unlocked, then `unlockedTiers` becomes `['tier-1', 'tier-2', 'tier-3', 'tier-4', 'tier-5']`.
+- Given a completed run with `reputation = 64` and only `tier-1` unlocked, then `unlockedTiers` becomes `['tier-1', 'tier-2', 'tier-3', 'tier-4', 'tier-5']`.
 
 ### US-2: Challenge-Based Tier Unlock
 
