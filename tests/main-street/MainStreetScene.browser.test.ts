@@ -335,4 +335,44 @@ describe('MainStreetScene browser tests', () => {
       game = null;
     }
   });
+
+  it('allows pressing Enter to end the turn when legal', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;
+
+    // Ensure we are in market phase
+    expect(scene.uiPhase).toBe('market');
+    const beforeTurn = scene.state.turn;
+
+    // Dispatch Enter
+    const ev = new KeyboardEvent('keydown', { key: 'Enter' });
+    if (typeof window !== 'undefined') window.dispatchEvent(ev);
+
+    // Allow engine to process
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(scene.state.turn).toBeGreaterThan(beforeTurn);
+
+    destroyGame(game);
+    game = null;
+  });
+
+  it('does not end the turn when overlays are open and Enter is pressed', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;
+
+    // Open settings panel (overlay)
+    try { scene.settingsPanel.open(); } catch (_) {}
+
+    const beforeTurn = scene.state.turn;
+    const ev = new KeyboardEvent('keydown', { key: 'Enter' });
+    if (typeof window !== 'undefined') window.dispatchEvent(ev);
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(scene.state.turn).toBe(beforeTurn);
+
+    destroyGame(game);
+    game = null;
+  });
 });

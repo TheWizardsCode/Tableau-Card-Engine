@@ -9,7 +9,7 @@
  */
 import Phaser from 'phaser';
 import type { SoundManager } from '../core-engine/SoundManager';
-import { getReducedMotion, setReducedMotion } from './SettingsStore';
+import { getReducedMotion, setReducedMotion, getEndTurnKeybind, setEndTurnKeybind } from './SettingsStore';
 
 // ── Public types ────────────────────────────────────────────
 
@@ -147,6 +147,14 @@ export class SettingsPanel {
 
   // Keyboard
   private keyboardListener: ((event: KeyboardEvent) => void) | null = null;
+
+  // End Turn keybind UI
+  private _endTurnKeyText: Phaser.GameObjects.Text | null = null;
+  private _endTurnHitArea: Phaser.GameObjects.Zone | null = null;
+  private _endTurnInstruction: Phaser.GameObjects.Text | null = null;
+  private _awaitingEndTurnKey = false;
+  private _endTurnCaptureListener: ((event: KeyboardEvent) => void) | null = null;
+
 
   constructor(scene: Phaser.Scene, config: SettingsPanelConfig) {
     this.scene = scene;
@@ -458,9 +466,44 @@ export class SettingsPanel {
     reducedMotionHitArea.on('pointerdown', () => this.handleReducedMotionToggle());
     this.container.add(reducedMotionHitArea);
 
+    // ── End Turn keybind control ──────────────────────────
+    const endTurnY = reducedMotionY + 46;
+    const endTurnLabel = scene.add.text(PADDING, endTurnY, 'End Turn Key', LABEL_STYLE);
+    endTurnLabel.setOrigin(0, 0.5);
+    endTurnLabel.setDepth(DEPTH_PANEL_CONTENT);
+    this.container.add(endTurnLabel);
+
+    // Current key label
+    const currentKey = getEndTurnKeybind();
+    this._endTurnKeyText = scene.add.text(this.panelWidth - PADDING, endTurnY, currentKey, VALUE_STYLE);
+    this._endTurnKeyText.setOrigin(1, 0.5);
+    this._endTurnKeyText.setDepth(DEPTH_PANEL_CONTENT);
+    this.container.add(this._endTurnKeyText);
+
+    // Hit area to change binding
+    this._endTurnHitArea = scene.add.zone(
+      this.panelWidth - PADDING - 120,
+      endTurnY,
+      120,
+      28,
+    );
+    this._endTurnHitArea.setOrigin(1, 0.5);
+    this._endTurnHitArea.setDepth(DEPTH_PANEL_CONTENT);
+    this._endTurnHitArea.setInteractive({ useHandCursor: true });
+    this._endTurnHitArea.on('pointerdown', () => this.beginEndTurnKeyCapture());
+    this.container.add(this._endTurnHitArea as any);
+
+    // Instruction when waiting for key
+    this._endTurnInstruction = scene.add.text(this.panelWidth - PADDING - 130, endTurnY + 28, '', {
+      fontSize: '12px', color: '#aaaaaa', fontFamily: 'Arial, sans-serif',
+    });
+    this._endTurnInstruction.setOrigin(1, 0.5);
+    this._endTurnInstruction.setDepth(DEPTH_PANEL_CONTENT);
+    this.container.add(this._endTurnInstruction);
+
     // If difficulty names were provided, render a horizontal selectable list here
     if (this.difficultyNames) {
-      const difficultyY = reducedMotionY + 46; // place below reduced-motion toggle to avoid overlap
+      const difficultyY = endTurnY + 46; // place below end-turn control to avoid overlap
       this.difficultyLabel = scene.add.text(PADDING, difficultyY, 'Difficulty', LABEL_STYLE);
       this.difficultyLabel.setOrigin(0, 0.5);
       this.difficultyLabel.setDepth(DEPTH_PANEL_CONTENT);
@@ -521,6 +564,43 @@ export class SettingsPanel {
     // Set entire container invisible initially
     this.container.setVisible(false);
   }
+
+  // ── End Turn keybind capture ─────────────────────────
+
+  private beginEndTurnKeyCapture(): void {
+    if (this.destroyed || this._awaitingEndTurnKey) return;
+    this._awaitingEndTurnKey = true;
+    if (this._endTurnInstruction) this._endTurnInstruction.setText('Press a key...');
+
+    this._endTurnCaptureListener = (ev: KeyboardEvent) => this.captureEndTurnKey(ev);
+    if (this.scene.input && this.scene.input.keyboard && this._endTurnCaptureListener) {
+      this.scene.input.keyboard.on('keydown', this._endTurnCaptureListener);
+    } else if (typeof window !== 'undefined') {
+      // Fallback for environments without Phaser keyboard wrapper
+      window.addEventListener('keydown', this._endTurnCaptureListener as EventListener);
+    }
+  }
+
+  private captureEndTurnKey(ev: KeyboardEvent): void {
+    if (!this._awaitingEndTurnKey) return;
+    const keyName = ev.key || 'Enter';
+    // Persist
+    try { setEndTurnKeybind(keyName, (window as any).localStorage); } catch (_) { setEndTurnKeybind(keyName); }
+    if (this._endTurnKeyText) this._endTurnKeyText.setText(keyName);
+    if (this._endTurnInstruction) this._endTurnInstruction.setText('');
+    this._awaitingEndTurnKey = false;
+
+    // Remove listener
+    if (this._endTurnCaptureListener) {
+      if (this.scene.input && this.scene.input.keyboard) {
+        this.scene.input.keyboard.off('keydown', this._endTurnCaptureListener);
+      } else if (typeof window !== 'undefined') {
+        window.removeEventListener('keydown', this._endTurnCaptureListener as EventListener);
+      }
+      this._endTurnCaptureListener = null;
+    }
+  }
+
 
   /** Whether the panel is currently open. */
   get isOpen(): boolean {
@@ -644,6 +724,17 @@ export class SettingsPanel {
     if (this.keyboardListener) {
       this.scene.input.keyboard?.off('keydown', this.keyboardListener);
       this.keyboardListener = null;
+    }
+
+    // Remove any pending end-turn capture listener
+    if (this._endTurnCaptureListener) {
+      if (this.scene.input && this.scene.input.keyboard) {
+        this.scene.input.keyboard.off('keydown', this._endTurnCaptureListener);
+      } else if (typeof window !== 'undefined') {
+        window.removeEventListener('keydown', this._endTurnCaptureListener as EventListener);
+      }
+      this._endTurnCaptureListener = null;
+      this._awaitingEndTurnKey = false;
     }
 
     // Remove scene-level pointer listeners

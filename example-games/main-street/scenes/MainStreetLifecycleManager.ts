@@ -15,6 +15,7 @@ import { MainStreetOverlayManager } from './MainStreetOverlayManager';
 import { MainStreetInputManager } from './MainStreetInputManager';
 import { MainStreetSvgTextureManager } from './MainStreetSvgTextureManager';
 import { SvgDomRenderer } from './SvgDomRenderer';
+import { getEndTurnKeybind } from '../../../src/ui/SettingsStore';
 
 export class MainStreetLifecycleManager {
   constructor(private readonly scene: any) {}
@@ -341,9 +342,42 @@ export class MainStreetLifecycleManager {
       s.tooltipManager = new TooltipManager(s, s.settingsPanel);
     }
 
+    // Global keyboard handler for End Turn (configurable via Settings)
+    const endTurnKeyHandler = (ev: KeyboardEvent) => {
+      try {
+        if (s.replayMode) return;
+        const bound = getEndTurnKeybind((window as any).localStorage);
+        if (!bound) return;
+        if (ev.key !== bound) return;
+        // Guard: overlays/panels open
+        const overlayOpen = Array.isArray(s.overlayObjects) && s.overlayObjects.length > 0;
+        if (overlayOpen) return;
+        if ((s as any).helpPanel?.isOpen) return;
+        if ((s as any).settingsPanel?.isOpen) return;
+        if (s.uiPhase !== 'market') return;
+        // Trigger end turn via canonical path
+        s.endTurn();
+      } catch (e) {
+        // ignore runtime errors in key handler
+      }
+    };
+
+    if (s.input && s.input.keyboard) {
+      s.input.keyboard.on('keydown', endTurnKeyHandler);
+    } else if (typeof window !== 'undefined') {
+      window.addEventListener('keydown', endTurnKeyHandler as EventListener);
+    }
+
     s.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       markSceneInvalid(s);
       s.cleanupTransferAnimations();
+      try {
+        if (s.input && s.input.keyboard) {
+          s.input.keyboard.off('keydown', endTurnKeyHandler);
+        } else if (typeof window !== 'undefined') {
+          window.removeEventListener('keydown', endTurnKeyHandler as EventListener);
+        }
+      } catch (_) { /* ignore */ }
     });
 
     // Start first turn

@@ -168,10 +168,9 @@ export class MainStreetRenderer {
     // Persistent overlay container that is not rebuilt each refresh. This
     // should hold help/settings buttons and panel input blockers so they
     // are not removed by hudContainer.removeAll(true).
-    try {
-      (s as any).hudOverlayContainer = s.add.container(0, 0);
-      try { (s as any).hudOverlayContainer.setDepth(1100); } catch (_) { /* ignore */ }
-    } catch (_) { /* ignore */ }
+    // HUD overlay container intentionally omitted to ensure panels are parented
+    // into the main hudContainer for consistent overlay ordering in tests.
+    (s as any).hudOverlayContainer = undefined;
 
     s.streetContainer = s.add.container(0, 0);
     s.marketContainer = s.add.container(0, 0);

@@ -2,6 +2,7 @@ import type { StorageLike } from '../core-engine/SoundManager';
 
 const STORAGE_KEY_SELECTED_DIFFICULTY = 'tce-selected-difficulty';
 const STORAGE_KEY_REDUCED_MOTION = 'tce-ui-reduced-motion';
+const STORAGE_KEY_END_TURN_KEYBIND = 'tce-endturn-keybind';
 
 function resolveStorage(storage?: StorageLike | null): StorageLike | null {
   let backend = storage;
@@ -70,6 +71,39 @@ export function setReducedMotion(enabled: boolean, storage: StorageLike | null =
 
   try {
     backend.setItem(STORAGE_KEY_REDUCED_MOTION, enabled ? 'true' : 'false');
+  } catch {
+    // ignore storage failures
+  }
+}
+
+// ── End Turn keybind helpers ───────────────────────────
+
+/**
+ * Read the configured End Turn keybind from storage. Returns the key name
+ * (e.g. 'Enter'). If not set, returns the default 'Enter'.
+ */
+export function getEndTurnKeybind(storage: StorageLike | null = null): string {
+  const backend = resolveStorage(storage);
+  if (!backend) return 'Enter';
+
+  try {
+    const raw = backend.getItem(STORAGE_KEY_END_TURN_KEYBIND);
+    if (!raw) return 'Enter';
+    return raw;
+  } catch {
+    return 'Enter';
+  }
+}
+
+/**
+ * Persist the End Turn keybind name to storage.
+ */
+export function setEndTurnKeybind(keyName: string, storage: StorageLike | null = null): void {
+  const backend = resolveStorage(storage);
+  if (!backend) return;
+
+  try {
+    backend.setItem(STORAGE_KEY_END_TURN_KEYBIND, keyName);
   } catch {
     // ignore storage failures
   }
