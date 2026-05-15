@@ -146,8 +146,6 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
 
 const TOOLTIP_W = 360;
 const TOOLTIP_H_BASE = 170;
-const TOOLTIP_BG_COLOR = 0x1a2a1a;
-const TOOLTIP_BORDER_COLOR = 0x44aa44;
 const TOOLTIP_DEPTH = 200;
 const HIGHLIGHT_COLOR = 0x44ff44;
 const HIGHLIGHT_ALPHA = 0.18;
