@@ -166,6 +166,9 @@ export class MainStreetTutorialOverlayManager {
   public start(): void {
     this.currentStep = 0;
     this.visible = true;
+    // Hide DOM-rendered SVG cards while tutorial overlays are visible so
+    // the canvas-based tooltip is not occluded by DOM elements.
+    try { this.scene.svgDom?.setVisible(false); } catch { /* ignore */ }
     this.showStep(this.currentStep);
   }
 
@@ -182,6 +185,8 @@ export class MainStreetTutorialOverlayManager {
   public dismiss(): void {
     this.clearObjects();
     this.visible = false;
+    // Restore DOM-rendered SVG cards visibility when tutorial is dismissed.
+    try { this.scene.svgDom?.setVisible(true); } catch { /* ignore */ }
   }
 
   /** Advance to the next tutorial step (or dismiss if at end). */
@@ -215,6 +220,10 @@ export class MainStreetTutorialOverlayManager {
     const gameW: number = layout.gameW ?? 1280;
     const gameH: number = layout.gameH ?? 720;
 
+    // Ensure DOM-rendered SVG cards are hidden while overlay is visible so
+    // canvas-based overlays are visually on top.
+    try { s.svgDom?.setVisible(false); } catch { /* ignore */ }
+
     // ── Optional highlight rectangle ──────────────────────
     const anchor = step.anchor(s);
     if (anchor) {
@@ -229,67 +238,79 @@ export class MainStreetTutorialOverlayManager {
       this.objects.push(highlight);
     }
 
-    // ── Tooltip box ───────────────────────────────────────
-    // Position tooltip below the anchor (or centred if no anchor)
+    // Precompute layout for tooltip contents (title + body + buttons)
     const tooltipX = gameW / 2 - TOOLTIP_W / 2;
-    let tooltipY: number;
-    if (anchor) {
-      // Try to place below the highlight; clamp to viewport
-      const belowY = anchor.y + anchor.h + 12;
-      const aboveY = anchor.y - TOOLTIP_H_BASE - 12;
-      tooltipY = belowY + TOOLTIP_H_BASE < gameH ? belowY : aboveY;
-    } else {
-      tooltipY = gameH / 2 - TOOLTIP_H_BASE / 2;
+
+    // Create title and body first to measure heights, but keep them off-screen
+    const titleText = s.add.text(0, 0, step.title, {
+      fontSize: '15px', fontStyle: 'bold', color: '#aaffaa', fontFamily: FONT_FAMILY,
+      wordWrap: { width: TOOLTIP_W - 32 },
+    }).setOrigin(0, 0).setDepth(TOOLTIP_DEPTH + 1);
+
+    const bodyText = s.add.text(0, 0, step.body, {
+      fontSize: '13px', color: '#ddccbb', fontFamily: FONT_FAMILY, wordWrap: { width: TOOLTIP_W - 32 }, lineSpacing: 3,
+    }).setOrigin(0, 0).setDepth(TOOLTIP_DEPTH + 1);
+
+    // Step label height (small)
+    const stepLabelHeight = 18;
+
+    // Buttons area height
+    const btnAreaH = 36; // comfortable area for dismiss/prev/next
+
+    // Padding and spacing
+    const padTop = 12;
+    const padSides = 16;
+    const padBetweenTitleAndBody = 8;
+    const padBottom = 12;
+
+    // Compute desired tooltip height
+    let contentH = padTop + titleText.height + padBetweenTitleAndBody + bodyText.height + btnAreaH + padBottom;
+    const maxH = gameH - 40; // leave safety margin
+    let tooltipH = Math.min(Math.max(contentH, 80), maxH);
+
+    // If content would overflow, clamp body and recompute heights
+    if (contentH > tooltipH) {
+      const availableForBody = tooltipH - (padTop + titleText.height + padBetweenTitleAndBody + btnAreaH + padBottom);
+      if (availableForBody > 20) {
+        bodyText.setCrop(0, 0, bodyText.width, availableForBody);
+      }
     }
 
+    // Decide vertical position relative to anchor
+    let tooltipY: number;
+    if (anchor) {
+      const belowY = anchor.y + anchor.h + 12;
+      const aboveY = anchor.y - tooltipH - 12;
+      tooltipY = belowY + tooltipH < gameH ? belowY : Math.max(12, aboveY);
+    } else {
+      tooltipY = Math.max(12, Math.floor(gameH / 2 - tooltipH / 2));
+    }
+
+    // Draw background using computed height
     const bg = s.add.graphics();
     bg.setDepth(TOOLTIP_DEPTH);
     bg.fillStyle(TOOLTIP_BG_COLOR, 0.95);
-    bg.fillRoundedRect(tooltipX, tooltipY, TOOLTIP_W, TOOLTIP_H_BASE, 8);
+    bg.fillRoundedRect(tooltipX, tooltipY, TOOLTIP_W, tooltipH, 8);
     bg.lineStyle(2, TOOLTIP_BORDER_COLOR, 0.9);
-    bg.strokeRoundedRect(tooltipX, tooltipY, TOOLTIP_W, TOOLTIP_H_BASE, 8);
+    bg.strokeRoundedRect(tooltipX, tooltipY, TOOLTIP_W, tooltipH, 8);
     this.objects.push(bg);
 
     // Step counter badge (e.g. "1 / 7")
-    const stepLabel = s.add.text(
-      tooltipX + TOOLTIP_W - 12,
-      tooltipY + 10,
-      `${index + 1} / ${TUTORIAL_STEPS.length}`,
-      { fontSize: '11px', color: '#669966', fontFamily: FONT_FAMILY },
-    ).setOrigin(1, 0).setDepth(TOOLTIP_DEPTH + 1);
+    const stepLabel = s.add.text(tooltipX + TOOLTIP_W - 12, tooltipY + 10, `${index + 1} / ${TUTORIAL_STEPS.length}`, { fontSize: '11px', color: '#669966', fontFamily: FONT_FAMILY }).setOrigin(1, 0).setDepth(TOOLTIP_DEPTH + 1);
     this.objects.push(stepLabel);
 
-    // Title
-    const titleText = s.add.text(
-      tooltipX + 16,
-      tooltipY + 12,
-      step.title,
-      { fontSize: '15px', fontStyle: 'bold', color: '#aaffaa', fontFamily: FONT_FAMILY },
-    ).setOrigin(0, 0).setDepth(TOOLTIP_DEPTH + 1);
+    // Position title and body inside box
+    titleText.setPosition(tooltipX + padSides, tooltipY + padTop);
     this.objects.push(titleText);
 
-    // Body
-    const bodyText = s.add.text(
-      tooltipX + 16,
-      tooltipY + 36,
-      step.body,
-      {
-        fontSize: '13px',
-        color: '#ddccbb',
-        fontFamily: FONT_FAMILY,
-        wordWrap: { width: TOOLTIP_W - 32 },
-        lineSpacing: 3,
-      },
-    ).setOrigin(0, 0).setDepth(TOOLTIP_DEPTH + 1);
+    bodyText.setPosition(tooltipX + padSides, tooltipY + padTop + titleText.height + padBetweenTitleAndBody);
     this.objects.push(bodyText);
 
-    // ── Navigation buttons ────────────────────────────────
-    const btnY = tooltipY + TOOLTIP_H_BASE - 24;
+    // Navigation buttons positioned at bottom area
+    const btnY = tooltipY + tooltipH - padBottom - btnAreaH / 2;
 
     // Dismiss button (always shown on the left)
-    const dismissBtn = s.add.text(tooltipX + 12, btnY, '[ Dismiss ]', {
-      fontSize: '12px', color: '#aa8866', fontFamily: FONT_FAMILY,
-    }).setOrigin(0, 0.5).setDepth(TOOLTIP_DEPTH + 1).setInteractive({ useHandCursor: true });
+    const dismissBtn = s.add.text(tooltipX + 12, btnY, '[ Dismiss ]', { fontSize: '12px', color: '#aa8866', fontFamily: FONT_FAMILY }).setOrigin(0, 0.5).setDepth(TOOLTIP_DEPTH + 1).setInteractive({ useHandCursor: true });
     dismissBtn.on('pointerdown', () => this.dismiss());
     dismissBtn.on('pointerover', () => dismissBtn.setColor('#ddaa88'));
     dismissBtn.on('pointerout', () => dismissBtn.setColor('#aa8866'));
@@ -297,9 +318,7 @@ export class MainStreetTutorialOverlayManager {
 
     // Prev button (disabled on step 0)
     if (index > 0) {
-      const prevBtn = s.add.text(tooltipX + TOOLTIP_W / 2 - 50, btnY, '[ < Prev ]', {
-        fontSize: '12px', color: '#88bbff', fontFamily: FONT_FAMILY,
-      }).setOrigin(0.5, 0.5).setDepth(TOOLTIP_DEPTH + 1).setInteractive({ useHandCursor: true });
+      const prevBtn = s.add.text(tooltipX + TOOLTIP_W / 2 - 50, btnY, '[ < Prev ]', { fontSize: '12px', color: '#88bbff', fontFamily: FONT_FAMILY }).setOrigin(0.5, 0.5).setDepth(TOOLTIP_DEPTH + 1).setInteractive({ useHandCursor: true });
       prevBtn.on('pointerdown', () => this.prevStep());
       prevBtn.on('pointerover', () => prevBtn.setColor('#aaddff'));
       prevBtn.on('pointerout', () => prevBtn.setColor('#88bbff'));
@@ -310,9 +329,7 @@ export class MainStreetTutorialOverlayManager {
     const isLast = index === TUTORIAL_STEPS.length - 1;
     const nextLabel = isLast ? '[ Finish ]' : '[ Next > ]';
     const nextColor = isLast ? '#44ff44' : '#88ff88';
-    const nextBtn = s.add.text(tooltipX + TOOLTIP_W - 12, btnY, nextLabel, {
-      fontSize: '12px', color: nextColor, fontFamily: FONT_FAMILY,
-    }).setOrigin(1, 0.5).setDepth(TOOLTIP_DEPTH + 1).setInteractive({ useHandCursor: true });
+    const nextBtn = s.add.text(tooltipX + TOOLTIP_W - 12, btnY, nextLabel, { fontSize: '12px', color: nextColor, fontFamily: FONT_FAMILY }).setOrigin(1, 0.5).setDepth(TOOLTIP_DEPTH + 1).setInteractive({ useHandCursor: true });
     nextBtn.on('pointerdown', () => this.nextStep());
     nextBtn.on('pointerover', () => nextBtn.setColor('#ffffff'));
     nextBtn.on('pointerout', () => nextBtn.setColor(nextColor));
