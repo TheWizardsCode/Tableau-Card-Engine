@@ -18,6 +18,7 @@
  */
 
 import { FONT_FAMILY } from '../../../src/ui';
+import { MARKET_BUSINESS_SLOTS } from '../MainStreetCards';
 
 // ── Tutorial step definitions ────────────────────────────────
 
@@ -58,9 +59,17 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     anchor: (scene: any) => {
       const l = scene.layout;
       if (!l) return null;
-      // Market visual area uses a left padding of 20 and width of gameW - 40
-      const x = 20;
-      const w = Math.max(100, l.gameW - 40);
+      // Market visual area: compute card row start and width so the highlight
+      // matches the visible card columns and doesn't extend into the log sidebar.
+      const startX = l.marketLabelW + 50;
+      const slots = MARKET_BUSINESS_SLOTS;
+      const totalCardsW = slots * l.marketCardW + (slots - 1) * l.marketCardGap;
+      const padding = 8; // small padding around the highlight
+      const x = Math.max(20, startX - padding);
+      // Prevent highlight from extending into the right-hand log/challenge area
+      const rightLimit = (typeof l.logX === 'number' && l.logX > 0) ? l.logX - 20 : Math.max(20, l.gameW - 40);
+      const desiredW = Math.max(80, totalCardsW + padding * 2);
+      const w = Math.max(80, Math.min(desiredW, Math.max(80, rightLimit - x)));
       const y = l.marketTop - 6;
       const h = l.marketRowH * 2 + l.marketRowGap + 16;
       return { x, y, w, h };
@@ -78,7 +87,14 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     anchor: (scene: any) => {
       const l = scene.layout;
       if (!l) return null;
-      return { x: 0, y: l.queueTop - 6, w: l.gameW, h: l.queueCardH + 16 };
+      // Compute queue area width using label width + card widths for the visible queue
+      const x = 20;
+      const desiredW = Math.max(80, l.queueLabelW + INCIDENT_QUEUE_SIZE * (l.queueCardW + l.queueCardGap) + 32);
+      const rightLimitQ = (typeof l.logX === 'number' && l.logX > 0) ? l.logX - 20 : Math.max(20, l.gameW - 40);
+      const w = Math.max(80, Math.min(desiredW, Math.max(80, rightLimitQ - x)));
+      const y = l.queueTop - 6;
+      const h = l.queueCardH + 16;
+      return { x, y, w, h };
     },
   },
   {
