@@ -58,8 +58,14 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     anchor: (scene: any) => {
       const l = scene.layout;
       if (!l) return null;
-      return { x: 0, y: l.marketTop - 6, w: l.gameW, h: l.marketRowH * 2 + l.marketRowGap + 16 };
+      // Market visual area uses a left padding of 20 and width of gameW - 40
+      const x = 20;
+      const w = Math.max(100, l.gameW - 40);
+      const y = l.marketTop - 6;
+      const h = l.marketRowH * 2 + l.marketRowGap + 16;
+      return { x, y, w, h };
     },
+
   },
   {
     title: 'Upcoming Incidents',
