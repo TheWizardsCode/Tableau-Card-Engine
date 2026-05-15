@@ -18,7 +18,7 @@
  */
 
 import { FONT_FAMILY } from '../../../src/ui';
-import { MARKET_BUSINESS_SLOTS } from '../MainStreetCards';
+import { MARKET_BUSINESS_SLOTS, INCIDENT_QUEUE_SIZE } from '../MainStreetCards';
 
 // ── Tutorial step definitions ────────────────────────────────
 
@@ -65,10 +65,12 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
       const slots = MARKET_BUSINESS_SLOTS;
       const totalCardsW = slots * l.marketCardW + (slots - 1) * l.marketCardGap;
       const padding = 8; // small padding around the highlight
-      const x = Math.max(20, startX - padding);
+      const leftLabelX = 40; // title/label X used in renderer
+      const x = Math.max(20, leftLabelX);
       // Prevent highlight from extending into the right-hand log/challenge area
       const rightLimit = (typeof l.logX === 'number' && l.logX > 0) ? l.logX - 20 : Math.max(20, l.gameW - 40);
-      const desiredW = Math.max(80, totalCardsW + padding * 2);
+      // Desired width includes the space from label left to card area plus cards
+      const desiredW = Math.max(80, (startX - leftLabelX) + totalCardsW + padding * 2);
       const w = Math.max(80, Math.min(desiredW, Math.max(80, rightLimit - x)));
       const y = l.marketTop - 6;
       const h = l.marketRowH * 2 + l.marketRowGap + 16;
@@ -88,7 +90,8 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
       const l = scene.layout;
       if (!l) return null;
       // Compute queue area width using label width + card widths for the visible queue
-      const x = 20;
+      const leftLabelX = 40;
+      const x = Math.max(20, leftLabelX);
       const desiredW = Math.max(80, l.queueLabelW + INCIDENT_QUEUE_SIZE * (l.queueCardW + l.queueCardGap) + 32);
       const rightLimitQ = (typeof l.logX === 'number' && l.logX > 0) ? l.logX - 20 : Math.max(20, l.gameW - 40);
       const w = Math.max(80, Math.min(desiredW, Math.max(80, rightLimitQ - x)));
