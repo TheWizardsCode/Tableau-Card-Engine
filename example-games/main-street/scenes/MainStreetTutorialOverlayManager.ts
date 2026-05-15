@@ -315,14 +315,48 @@ export class MainStreetTutorialOverlayManager {
 
     container.appendChild(btnRow);
 
-    // Add as a Phaser DOMElement positioned at top-left
-    const dom = s.add.dom(tooltipX, Math.max(12, Math.floor(gameH / 2 - TOOLTIP_H_BASE / 2)), container) as Phaser.GameObjects.DOMElement;
+    // Measure tooltip height by temporarily attaching to the document so we can
+    // position it accurately relative to the anchor. Clamp to viewport height.
+    document.body.appendChild(container);
+    const measuredH = Math.min(container.offsetHeight || TOOLTIP_H_BASE, Math.max(80, gameH - 40));
+    document.body.removeChild(container);
+
+    const tooltipH = measuredH;
+
+    // Decide tooltip position relative to anchor. Prefer placing to the right
+    // of the anchor to avoid obscuring the highlighted region (useful for
+    // the Challenges panel which sits near the left of the sidebar).
+    let tooltipY: number;
+    let domX = tooltipX;
+    if (anchor) {
+      const rightX = anchor.x + anchor.w + 12;
+      const leftX = anchor.x - TOOLTIP_W - 12;
+      const centerYBased = anchor.y + Math.floor((anchor.h - tooltipH) / 2);
+
+      if (rightX + TOOLTIP_W < gameW - 12) {
+        domX = Math.max(12, rightX);
+        tooltipY = Math.max(12, Math.min(centerYBased, gameH - tooltipH - 12));
+      } else if (leftX > 12) {
+        domX = Math.max(12, leftX);
+        tooltipY = Math.max(12, Math.min(centerYBased, gameH - tooltipH - 12));
+      } else {
+        const belowY = anchor.y + anchor.h + 12;
+        const aboveY = anchor.y - tooltipH - 12;
+        tooltipY = belowY + tooltipH < gameH ? belowY : Math.max(12, aboveY);
+      }
+    } else {
+      domX = Math.max(12, Math.floor(gameW / 2 - TOOLTIP_W / 2));
+      tooltipY = Math.max(12, Math.floor(gameH / 2 - tooltipH / 2));
+    }
+
+    // Add as a Phaser DOMElement at computed position (top-left)
+    const dom = s.add.dom(domX, tooltipY, container) as Phaser.GameObjects.DOMElement;
     dom.setOrigin(0, 0);
     try { dom.setDepth(TOOLTIP_DEPTH + 1000); } catch { /* ignore */ }
     this.objects.push(dom);
 
-    // Step counter badge as a small canvas text on top-left of tooltip
-    const stepLabel = s.add.text(tooltipX + TOOLTIP_W - 12, (dom as any).y + 10, `${index + 1} / ${TUTORIAL_STEPS.length}`, { fontSize: '11px', color: '#669966', fontFamily: FONT_FAMILY }).setOrigin(1, 0).setDepth(TOOLTIP_DEPTH + 1);
+    // Step counter badge as a small canvas text anchored to the tooltip
+    const stepLabel = s.add.text(domX + TOOLTIP_W - 12, tooltipY + 10, `${index + 1} / ${TUTORIAL_STEPS.length}`, { fontSize: '11px', color: '#669966', fontFamily: FONT_FAMILY }).setOrigin(1, 0).setDepth(TOOLTIP_DEPTH + 1);
     this.objects.push(stepLabel);
   }
 
