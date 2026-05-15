@@ -65,8 +65,9 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
       const slots = MARKET_BUSINESS_SLOTS;
       const totalCardsW = slots * l.marketCardW + (slots - 1) * l.marketCardGap;
       const padding = 8; // small padding around the highlight
-      const leftLabelX = 40; // title/label X used in renderer
-      const x = Math.max(20, leftLabelX);
+      // Use a small left padding so highlight hugs the market box closely
+      const leftLabelX = 20; // match renderer background left padding
+      const x = Math.max(12, leftLabelX);
       // Prevent highlight from extending into the right-hand log/challenge area
       const rightLimit = (typeof l.logX === 'number' && l.logX > 0) ? l.logX - 20 : Math.max(20, l.gameW - 40);
       // Desired width includes the space from label left to card area plus cards
@@ -90,8 +91,9 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
       const l = scene.layout;
       if (!l) return null;
       // Compute queue area width using label width + card widths for the visible queue
-      const leftLabelX = 40;
-      const x = Math.max(20, leftLabelX);
+      // Align queue highlight with left content padding
+      const leftLabelX = 20;
+      const x = Math.max(12, leftLabelX);
       const desiredW = Math.max(80, l.queueLabelW + INCIDENT_QUEUE_SIZE * (l.queueCardW + l.queueCardGap) + 32);
       const rightLimitQ = (typeof l.logX === 'number' && l.logX > 0) ? l.logX - 20 : Math.max(20, l.gameW - 40);
       const w = Math.max(80, Math.min(desiredW, Math.max(80, rightLimitQ - x)));
@@ -156,7 +158,21 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
       const l = scene.layout;
       if (!l) return null;
       if (!l.challengeX || l.challengeX < 0) return null;
-      return { x: l.challengeX - 8, y: l.challengeY - 8, w: l.challengeW + 16, h: 140 };
+      // Compute challenge panel height from constants and current active challenges if available
+      try {
+        const activeCount = (scene.state && Array.isArray(scene.state.activeChallenges)) ? scene.state.activeChallenges.length : 0;
+        const CH = (require('../MainStreetConstants') as any).CHALLENGE_TITLE_H || 20;
+        const CL = (require('../MainStreetConstants') as any).CHALLENGE_LINE_H || 20;
+        const CP = (require('../MainStreetConstants') as any).CHALLENGE_PAD || 6;
+        const contentH = CH + Math.max(0, activeCount) * CL + CP * 2;
+        const h = Math.max(80, Math.min(contentH, 240));
+        const x = Math.max(12, l.challengeX - 8);
+        const y = Math.max(12, l.challengeY - 8);
+        const w = Math.max(120, l.challengeW + 16);
+        return { x, y, w, h };
+      } catch {
+        return { x: l.challengeX - 8, y: l.challengeY - 8, w: l.challengeW + 16, h: 140 };
+      }
     },
   },
 ];
