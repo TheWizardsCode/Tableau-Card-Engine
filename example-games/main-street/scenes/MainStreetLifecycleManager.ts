@@ -1,5 +1,5 @@
 import { setupMainStreetGame, deserializeMainStreetState } from '../MainStreetState';
-import { createDefaultCampaignProgress, loadCampaignProgress, updateCampaignAfterRun } from '../MainStreetSaveLoad';
+import { createDefaultCampaignProgress, loadCampaignProgress, updateCampaignAfterRun, saveCampaignProgress } from '../MainStreetSaveLoad';
 import { DIFFICULTY_NAMES } from '../MainStreetDifficulty';
 import { SaveLoadStore, markSceneValid, markSceneInvalid, createTfPlayer, UndoRedoManager } from '../../../src/core-engine';
 import { createSingleSelectionManager, TooltipManager } from '../../../src/ui';
@@ -342,6 +342,34 @@ export class MainStreetLifecycleManager {
       s.tooltipManager = new TooltipManager(s, s.settingsPanel);
     }
 
+    // Create tutorial overlay manager (attached to main scene) so the tutorial
+    // can be shown from Settings or automatically on first run. The onComplete
+    // callback marks the campaign as having seen the tutorial and persists it.
+    try {
+      (s as any).tutorialOverlay = new (require('./MainStreetTutorialOverlayManager').MainStreetTutorialOverlayManager)(s, () => {
+        try {
+          if (s.campaign) {
+            s.campaign.tutorialSeen = true;
+            if (s.saveStore) {
+              // Persist the updated campaign progress asynchronously
+              void saveCampaignProgress(s.saveStore, s.campaign).catch(() => {});
+            }
+          }
+        } catch (_) { /* ignore */ }
+      });
+    } catch (_) {
+      // Ignore if DOM environment is unavailable (tests)
+    }
+
+    // Listen for Settings 'Play Tutorial' request
+    try {
+      if (typeof window !== 'undefined' && (window as any).addEventListener) {
+        (window as any).addEventListener('tce:play-tutorial', () => {
+          try { (s as any).tutorialOverlay?.start(); } catch (_) { /* ignore */ }
+        });
+      }
+    } catch (_) { /* ignore */ }
+
     // Global keyboard handler for End Turn (configurable via Settings)
     const endTurnKeyHandler = (ev: KeyboardEvent) => {
       try {
@@ -416,7 +444,8 @@ export class MainStreetLifecycleManager {
 
     // Async: attempt to load saved campaign and re-setup if found
     if (s.saveStore) {
-      loadCampaignProgress(s.saveStore).then((saved: any) => {
+      // Store the load promise on the scene so other code can wait if needed
+      (s as any)._campaignLoadPromise = loadCampaignProgress(s.saveStore).then((saved: any) => {
         if (saved) {
           s.campaign = saved;
           // Re-setup with the loaded campaign's unlocked cards
@@ -429,11 +458,31 @@ export class MainStreetLifecycleManager {
           // phase is synchronised.  Without this, the engine stays in
           // DayStart while the UI shows market controls, blocking all
           // player actions and causing End Turn to hang.
-          s.startDayPhase();
+          try { s.startDayPhase(); } catch (_) { /* ignore */ }
         }
+        // After attempting to load (saved or not) auto-show tutorial if not seen
+        try {
+          if (s.campaign && !(s.campaign as any).tutorialSeen && (s as any).tutorialOverlay) {
+            try { (s as any).tutorialOverlay.start(); } catch (_) { /* ignore */ }
+          }
+        } catch (_) { /* ignore */ }
+        return saved;
       }).catch(() => {
         // If load fails, continue with defaults (already set up above)
+        try {
+          if (s.campaign && !(s.campaign as any).tutorialSeen && (s as any).tutorialOverlay) {
+            try { (s as any).tutorialOverlay.start(); } catch (_) { /* ignore */ }
+          }
+        } catch (_) { /* ignore */ }
+        return null;
       });
+    } else {
+      // No saveStore: if tutorial hasn't been seen, show it now (best-effort)
+      try {
+        if (s.campaign && !(s.campaign as any).tutorialSeen && (s as any).tutorialOverlay) {
+          try { (s as any).tutorialOverlay.start(); } catch (_) { /* ignore */ }
+        }
+      } catch (_) { /* ignore */ }
     }
   }
 

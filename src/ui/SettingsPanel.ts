@@ -535,6 +535,23 @@ export class SettingsPanel {
       });
       tip.setDepth(DEPTH_PANEL_CONTENT);
       this.container.add(tip);
+
+      // Play Tutorial button (dispatches a DOM event consumed by scenes)
+      const playTutorialY = difficultyY + 56;
+      const playTutorial = scene.add.text(PADDING, playTutorialY, 'Play Tutorial', {
+        fontSize: '14px', color: (HEADING_STYLE.color as string) ?? '#f0c040', fontFamily: 'Arial, sans-serif',
+      });
+      playTutorial.setDepth(DEPTH_PANEL_CONTENT + 1);
+      playTutorial.setInteractive({ useHandCursor: true });
+      playTutorial.on('pointerdown', () => {
+        try {
+          if (typeof window !== 'undefined' && (window as any).dispatchEvent) {
+            const ev = new CustomEvent('tce:play-tutorial');
+            (window as any).dispatchEvent(ev);
+          }
+        } catch { /* ignore */ }
+      });
+      this.container.add(playTutorial);
     }
 
     // Scene-level pointer events for slider dragging

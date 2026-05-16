@@ -232,8 +232,11 @@ export class MainStreetTutorialOverlayManager {
   private objects: Phaser.GameObjects.GameObject[] = [];
   private currentStep = 0;
   private visible = false;
+  private readonly onComplete: (() => void) | null;
 
-  constructor(private readonly scene: any) {}
+  constructor(private readonly scene: any, onComplete?: () => void) {
+    this.onComplete = onComplete ?? null;
+  }
 
   /** True if the tutorial overlay is currently visible. */
   get isVisible(): boolean {
@@ -258,8 +261,12 @@ export class MainStreetTutorialOverlayManager {
 
   /** Dismiss (hide) all tutorial objects. */
   public dismiss(): void {
+    const wasVisible = this.visible;
     this.clearObjects();
     this.visible = false;
+    if (wasVisible && this.onComplete) {
+      try { this.onComplete(); } catch (_) { /* ignore errors in callback */ }
+    }
   }
 
   /** Advance to the next tutorial step (or dismiss if at end). */

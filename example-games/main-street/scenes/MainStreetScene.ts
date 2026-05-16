@@ -19,6 +19,7 @@ import { MainStreetOverlayManager } from './MainStreetOverlayManager';
 import { MainStreetInputManager } from './MainStreetInputManager';
 import { MainStreetSvgTextureManager } from './MainStreetSvgTextureManager';
 import { MainStreetLifecycleManager } from './MainStreetLifecycleManager';
+import { MainStreetTutorialOverlayManager } from './MainStreetTutorialOverlayManager';
 import {
   type SceneLayout,
   STREET_ROWS,
@@ -40,6 +41,7 @@ export class MainStreetScene extends CardGameScene {
   public msInputManager!: MainStreetInputManager;
   public msSvgTextureManager!: MainStreetSvgTextureManager;
   public msLifecycleManager!: MainStreetLifecycleManager;
+  public tutorialOverlay?: MainStreetTutorialOverlayManager;
   // Game state
   public state!: MainStreetState;
   public uiPhase: UIPhase = 'idle';
