@@ -66,12 +66,13 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
       const totalCardsW = slots * l.marketCardW + (slots - 1) * l.marketCardGap;
       const padding = 8; // small padding around the highlight
       // Use a small left padding so highlight hugs the market box closely
-      const leftLabelX = 20; // match renderer background left padding
-      const x = Math.max(12, leftLabelX);
+      // Start at the text label X (40) so the highlight includes the title.
+      const labelX = 40;
+      const x = Math.max(12, labelX - 8); // small left padding to avoid tight edge
       // Prevent highlight from extending into the right-hand log/challenge area
       const rightLimit = (typeof l.logX === 'number' && l.logX > 0) ? l.logX - 20 : Math.max(20, l.gameW - 40);
-      // Desired width includes the space from label left to card area plus cards
-      const desiredW = Math.max(80, (startX - leftLabelX) + totalCardsW + padding * 2);
+      // Desired width: distance from label to card start + total cards width + padding
+      const desiredW = Math.max(80, (startX - labelX) + totalCardsW + padding * 2);
       const w = Math.max(80, Math.min(desiredW, Math.max(80, rightLimit - x)));
       const y = l.marketTop - 6;
       const h = l.marketRowH * 2 + l.marketRowGap + 16;
@@ -92,8 +93,8 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
       if (!l) return null;
       // Compute queue area width using label width + card widths for the visible queue
       // Align queue highlight with left content padding
-      const leftLabelX = 20;
-      const x = Math.max(12, leftLabelX);
+      const labelX = 40;
+      const x = Math.max(12, labelX - 8);
       const desiredW = Math.max(80, l.queueLabelW + INCIDENT_QUEUE_SIZE * (l.queueCardW + l.queueCardGap) + 32);
       const rightLimitQ = (typeof l.logX === 'number' && l.logX > 0) ? l.logX - 20 : Math.max(20, l.gameW - 40);
       const w = Math.max(80, Math.min(desiredW, Math.max(80, rightLimitQ - x)));
@@ -160,6 +161,17 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
       if (!l.challengeX || l.challengeX < 0) return null;
       // Compute challenge panel height from constants and current active challenges if available
       try {
+        // Prefer using the rendered challenge container bounds if available
+        if (scene.challengeContainer && typeof (scene.challengeContainer as any).getBounds === 'function') {
+          const b = (scene.challengeContainer as any).getBounds();
+          const pad = 8;
+          const x = Math.max(12, b.x - pad);
+          const y = Math.max(12, b.y - pad);
+          const w = Math.max(120, b.width + pad * 2);
+          const h = Math.max(80, Math.min(b.height + pad * 2, 240));
+          return { x, y, w, h };
+        }
+
         const activeCount = (scene.state && Array.isArray(scene.state.activeChallenges)) ? scene.state.activeChallenges.length : 0;
         const CH = (require('../MainStreetConstants') as any).CHALLENGE_TITLE_H || 20;
         const CL = (require('../MainStreetConstants') as any).CHALLENGE_LINE_H || 20;
