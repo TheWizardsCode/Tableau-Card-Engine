@@ -129,6 +129,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
       const h = l.queueCardH + 16;
       return { x, y, w, h };
     },
+  },
   {
     title: 'Your Street',
     body:
