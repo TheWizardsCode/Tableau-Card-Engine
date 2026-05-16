@@ -199,8 +199,12 @@ export class MainStreetLifecycleManager {
           }
         } catch (_) { /* ignore */ }
       });
-    } catch (_) {
+      // eslint-disable-next-line no-console
+      console.info('[MainStreet] tutorialOverlay created');
+    } catch (e) {
       // Ignore if DOM environment is unavailable (tests)
+      // eslint-disable-next-line no-console
+      console.warn('[MainStreet] tutorialOverlay creation failed', e);
     }
 
     // Game setup -- load campaign for tier-filtered deck building
@@ -492,18 +496,32 @@ export class MainStreetLifecycleManager {
         }
         // After attempting to load (saved or not) auto-show tutorial if not seen
         try {
-          if (s.campaign && !(s.campaign as any).tutorialSeen && (s as any).tutorialOverlay) {
-            try { (s as any).tutorialOverlay.start(); } catch (_) { /* ignore */ }
+          if (s.campaign && !(s.campaign as any).tutorialSeen) {
+            if ((s as any).tutorialOverlay) {
+              // eslint-disable-next-line no-console
+              console.info('[MainStreet] auto-showing tutorial (first run)');
+              try { (s as any).tutorialOverlay.start(); } catch (e) { console.error('[MainStreet] tutorial start failed', e); }
+            } else {
+              // eslint-disable-next-line no-console
+              console.warn('[MainStreet] tutorialOverlay not available to auto-show');
+            }
           }
-        } catch (_) { /* ignore */ }
+        } catch (e) { /* eslint-disable-next-line no-console */ console.error('[MainStreet] auto-show tutorial check failed', e); }
         return saved;
-      }).catch(() => {
+      }).catch((err) => {
         // If load fails, continue with defaults (already set up above)
         try {
-          if (s.campaign && !(s.campaign as any).tutorialSeen && (s as any).tutorialOverlay) {
-            try { (s as any).tutorialOverlay.start(); } catch (_) { /* ignore */ }
+          if (s.campaign && !(s.campaign as any).tutorialSeen) {
+            if ((s as any).tutorialOverlay) {
+              // eslint-disable-next-line no-console
+              console.info('[MainStreet] auto-showing tutorial (no saved campaign)');
+              try { (s as any).tutorialOverlay.start(); } catch (e) { console.error('[MainStreet] tutorial start failed', e); }
+            } else {
+              // eslint-disable-next-line no-console
+              console.warn('[MainStreet] tutorialOverlay not available to auto-show');
+            }
           }
-        } catch (_) { /* ignore */ }
+        } catch (e) { /* eslint-disable-next-line no-console */ console.error('[MainStreet] auto-show tutorial fallback failed', e); }
         return null;
       });
     } else {
