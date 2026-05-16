@@ -323,126 +323,157 @@ export class MainStreetTutorialOverlayManager {
     const padBetweenTitleAndBody = 8;
     const padBottom = 12;
 
-    const container = document.createElement('div');
-    container.className = 'ms-tutorial-tooltip';
-    container.style.width = TOOLTIP_W + 'px';
-    container.style.boxSizing = 'border-box';
-    container.style.padding = `${padTop}px ${padSides}px ${padBottom}px ${padSides}px`;
-    container.style.background = '#1a2a1a';
-    container.style.border = '2px solid #44aa44';
-    container.style.borderRadius = '8px';
-    container.style.color = '#ddccbb';
-    container.style.fontFamily = FONT_FAMILY;
-    container.style.fontSize = '13px';
-    container.style.lineHeight = '1.25';
-    container.style.overflow = 'auto';
-    container.style.pointerEvents = 'auto';
+    try {
+      const container = document.createElement('div');
+      container.className = 'ms-tutorial-tooltip';
+      container.style.width = TOOLTIP_W + 'px';
+      container.style.boxSizing = 'border-box';
+      container.style.padding = `${padTop}px ${padSides}px ${padBottom}px ${padSides}px`;
+      container.style.background = '#1a2a1a';
+      container.style.border = '2px solid #44aa44';
+      container.style.borderRadius = '8px';
+      container.style.color = '#ddccbb';
+      container.style.fontFamily = FONT_FAMILY;
+      container.style.fontSize = '13px';
+      container.style.lineHeight = '1.25';
+      container.style.overflow = 'auto';
+      container.style.pointerEvents = 'auto';
 
-    const titleEl = document.createElement('div');
-    titleEl.style.fontWeight = '700';
-    titleEl.style.color = '#aaffaa';
-    titleEl.style.marginBottom = `${padBetweenTitleAndBody}px`;
-    titleEl.textContent = step.title;
-    container.appendChild(titleEl);
+      const titleEl = document.createElement('div');
+      titleEl.style.fontWeight = '700';
+      titleEl.style.color = '#aaffaa';
+      titleEl.style.marginBottom = `${padBetweenTitleAndBody}px`;
+      titleEl.textContent = step.title;
+      container.appendChild(titleEl);
 
-    const bodyEl = document.createElement('div');
-    bodyEl.style.whiteSpace = 'pre-wrap';
-    bodyEl.style.color = '#ddccbb';
-    bodyEl.textContent = step.body;
-    container.appendChild(bodyEl);
+      const bodyEl = document.createElement('div');
+      bodyEl.style.whiteSpace = 'pre-wrap';
+      bodyEl.style.color = '#ddccbb';
+      bodyEl.textContent = step.body;
+      container.appendChild(bodyEl);
 
-    const btnRow = document.createElement('div');
-    btnRow.style.display = 'flex';
-    btnRow.style.justifyContent = 'space-between';
-    btnRow.style.alignItems = 'center';
-    btnRow.style.marginTop = '12px';
+      const btnRow = document.createElement('div');
+      btnRow.style.display = 'flex';
+      btnRow.style.justifyContent = 'space-between';
+      btnRow.style.alignItems = 'center';
+      btnRow.style.marginTop = '12px';
 
-    const leftGroup = document.createElement('div');
-    const dismissBtn = document.createElement('button');
-    dismissBtn.textContent = 'Dismiss';
-    dismissBtn.style.background = '#2a2a1a';
-    dismissBtn.style.color = '#aa8866';
-    dismissBtn.style.border = 'none';
-    dismissBtn.style.padding = '6px 8px';
-    dismissBtn.style.borderRadius = '6px';
-    dismissBtn.style.cursor = 'pointer';
-    dismissBtn.onclick = () => this.dismiss();
-    leftGroup.appendChild(dismissBtn);
-    btnRow.appendChild(leftGroup);
+      const leftGroup = document.createElement('div');
+      const dismissBtn = document.createElement('button');
+      dismissBtn.textContent = 'Dismiss';
+      dismissBtn.style.background = '#2a2a1a';
+      dismissBtn.style.color = '#aa8866';
+      dismissBtn.style.border = 'none';
+      dismissBtn.style.padding = '6px 8px';
+      dismissBtn.style.borderRadius = '6px';
+      dismissBtn.style.cursor = 'pointer';
+      dismissBtn.onclick = () => this.dismiss();
+      leftGroup.appendChild(dismissBtn);
+      btnRow.appendChild(leftGroup);
 
-    const middleGroup = document.createElement('div');
-    if (index > 0) {
-      const prevBtn = document.createElement('button');
-      prevBtn.textContent = '< Prev';
-      prevBtn.style.background = 'transparent';
-      prevBtn.style.color = '#88bbff';
-      prevBtn.style.border = 'none';
-      prevBtn.style.padding = '6px 8px';
-      prevBtn.style.cursor = 'pointer';
-      prevBtn.onclick = () => this.prevStep();
-      middleGroup.appendChild(prevBtn);
-    }
-    btnRow.appendChild(middleGroup);
-
-    const rightGroup = document.createElement('div');
-    const nextBtn = document.createElement('button');
-    const isLast = index === TUTORIAL_STEPS.length - 1;
-    nextBtn.textContent = isLast ? 'Finish' : 'Next >';
-    nextBtn.style.background = isLast ? '#44ff44' : '#88ff88';
-    nextBtn.style.color = '#002200';
-    nextBtn.style.border = 'none';
-    nextBtn.style.padding = '6px 8px';
-    nextBtn.style.borderRadius = '6px';
-    nextBtn.style.cursor = 'pointer';
-    nextBtn.onclick = () => this.nextStep();
-    rightGroup.appendChild(nextBtn);
-    btnRow.appendChild(rightGroup);
-
-    container.appendChild(btnRow);
-
-    // Measure tooltip height by temporarily attaching to the document so we can
-    // position it accurately relative to the anchor. Clamp to viewport height.
-    document.body.appendChild(container);
-    const measuredH = Math.min(container.offsetHeight || TOOLTIP_H_BASE, Math.max(80, gameH - 40));
-    document.body.removeChild(container);
-
-    const tooltipH = measuredH;
-
-    // Decide tooltip position relative to anchor. Prefer placing to the right
-    // of the anchor to avoid obscuring the highlighted region (useful for
-    // the Challenges panel which sits near the left of the sidebar).
-    let tooltipY: number;
-    let domX = tooltipX;
-    if (anchor) {
-      const rightX = anchor.x + anchor.w + 12;
-      const leftX = anchor.x - TOOLTIP_W - 12;
-      const centerYBased = anchor.y + Math.floor((anchor.h - tooltipH) / 2);
-
-      if (rightX + TOOLTIP_W < gameW - 12) {
-        domX = Math.max(12, rightX);
-        tooltipY = Math.max(12, Math.min(centerYBased, gameH - tooltipH - 12));
-      } else if (leftX > 12) {
-        domX = Math.max(12, leftX);
-        tooltipY = Math.max(12, Math.min(centerYBased, gameH - tooltipH - 12));
-      } else {
-        const belowY = anchor.y + anchor.h + 12;
-        const aboveY = anchor.y - tooltipH - 12;
-        tooltipY = belowY + tooltipH < gameH ? belowY : Math.max(12, aboveY);
+      const middleGroup = document.createElement('div');
+      if (index > 0) {
+        const prevBtn = document.createElement('button');
+        prevBtn.textContent = '< Prev';
+        prevBtn.style.background = 'transparent';
+        prevBtn.style.color = '#88bbff';
+        prevBtn.style.border = 'none';
+        prevBtn.style.padding = '6px 8px';
+        prevBtn.style.cursor = 'pointer';
+        prevBtn.onclick = () => this.prevStep();
+        middleGroup.appendChild(prevBtn);
       }
-    } else {
-      domX = Math.max(12, Math.floor(gameW / 2 - TOOLTIP_W / 2));
-      tooltipY = Math.max(12, Math.floor(gameH / 2 - tooltipH / 2));
+      btnRow.appendChild(middleGroup);
+
+      const rightGroup = document.createElement('div');
+      const nextBtn = document.createElement('button');
+      const isLast = index === TUTORIAL_STEPS.length - 1;
+      nextBtn.textContent = isLast ? 'Finish' : 'Next >';
+      nextBtn.style.background = isLast ? '#44ff44' : '#88ff88';
+      nextBtn.style.color = '#002200';
+      nextBtn.style.border = 'none';
+      nextBtn.style.padding = '6px 8px';
+      nextBtn.style.borderRadius = '6px';
+      nextBtn.style.cursor = 'pointer';
+      nextBtn.onclick = () => this.nextStep();
+      rightGroup.appendChild(nextBtn);
+      btnRow.appendChild(rightGroup);
+
+      container.appendChild(btnRow);
+
+      // Measure tooltip height by temporarily attaching to the document so we can
+      // position it accurately relative to the anchor. Clamp to viewport height.
+      document.body.appendChild(container);
+      const measuredH = Math.min(container.offsetHeight || TOOLTIP_H_BASE, Math.max(80, gameH - 40));
+      document.body.removeChild(container);
+
+      const tooltipH = measuredH;
+
+      // Decide tooltip position relative to anchor. Prefer placing to the right
+      // of the anchor to avoid obscuring the highlighted region (useful for
+      // the Challenges panel which sits near the left of the sidebar).
+      let tooltipY: number;
+      let domX = tooltipX;
+      if (anchor) {
+        const rightX = anchor.x + anchor.w + 12;
+        const leftX = anchor.x - TOOLTIP_W - 12;
+        const centerYBased = anchor.y + Math.floor((anchor.h - tooltipH) / 2);
+
+        if (rightX + TOOLTIP_W < gameW - 12) {
+          domX = Math.max(12, rightX);
+          tooltipY = Math.max(12, Math.min(centerYBased, gameH - tooltipH - 12));
+        } else if (leftX > 12) {
+          domX = Math.max(12, leftX);
+          tooltipY = Math.max(12, Math.min(centerYBased, gameH - tooltipH - 12));
+        } else {
+          const belowY = anchor.y + anchor.h + 12;
+          const aboveY = anchor.y - tooltipH - 12;
+          tooltipY = belowY + tooltipH < gameH ? belowY : Math.max(12, aboveY);
+        }
+      } else {
+        domX = Math.max(12, Math.floor(gameW / 2 - TOOLTIP_W / 2));
+        tooltipY = Math.max(12, Math.floor(gameH / 2 - tooltipH / 2));
+      }
+
+      // Add as a Phaser DOMElement at computed position (top-left)
+      const dom = s.add.dom(domX, tooltipY, container) as Phaser.GameObjects.DOMElement;
+      dom.setOrigin(0, 0);
+      try { dom.setDepth(TOOLTIP_DEPTH + 1000); } catch { /* ignore */ }
+      this.objects.push(dom);
+
+      // Step counter badge as a small canvas text anchored to the tooltip
+      const stepLabel = s.add.text(domX + TOOLTIP_W - 12, tooltipY + 10, `${index + 1} / ${TUTORIAL_STEPS.length}`, { fontSize: '11px', color: '#669966', fontFamily: FONT_FAMILY }).setOrigin(1, 0).setDepth(TOOLTIP_DEPTH + 1);
+      this.objects.push(stepLabel);
+    } catch (e) {
+      // Fallback to in-canvas tooltip if DOM is not available or fails
+      // eslint-disable-next-line no-console
+      console.warn('[Tutorial] DOM tooltip creation failed, falling back to canvas tooltip', e);
+
+      const tooltipH = TOOLTIP_H_BASE;
+      const domX = Math.max(12, Math.floor(gameW / 2 - TOOLTIP_W / 2));
+      const tooltipY = Math.max(12, Math.floor(gameH / 2 - tooltipH / 2));
+
+      const bg = s.add.rectangle(domX + TOOLTIP_W / 2, tooltipY + tooltipH / 2, TOOLTIP_W, tooltipH, 0x1a2a1a).setDepth(TOOLTIP_DEPTH + 1000);
+      const border = s.add.rectangle(domX + TOOLTIP_W / 2, tooltipY + tooltipH / 2, TOOLTIP_W, tooltipH).setStrokeStyle(2, 0x44aa44).setDepth(TOOLTIP_DEPTH + 1001);
+      const titleTxt = s.add.text(domX + 12, tooltipY + 12, step.title, { fontSize: '16px', color: '#aaffaa', fontFamily: FONT_FAMILY }).setDepth(TOOLTIP_DEPTH + 1002).setOrigin(0, 0);
+      const bodyTxt = s.add.text(domX + 12, tooltipY + 40, step.body, { fontSize: '13px', color: '#ddccbb', fontFamily: FONT_FAMILY, wordWrap: { width: TOOLTIP_W - 24 } as any }).setDepth(TOOLTIP_DEPTH + 1002).setOrigin(0, 0);
+
+      const dismissBtn = s.add.text(domX + 12, tooltipY + tooltipH - 30, 'Dismiss', { fontSize: '13px', color: '#aa8866', fontFamily: FONT_FAMILY }).setInteractive({ useHandCursor: true }).setDepth(TOOLTIP_DEPTH + 1003);
+      dismissBtn.on('pointerdown', () => this.dismiss());
+
+      const isLast = index === TUTORIAL_STEPS.length - 1;
+      const nextLabel = isLast ? 'Finish' : 'Next >';
+      const nextBtn = s.add.text(domX + TOOLTIP_W - 12, tooltipY + tooltipH - 30, nextLabel, { fontSize: '13px', color: '#002200', backgroundColor: isLast ? '#44ff44' : '#88ff88', padding: { left: 6, right: 6 } as any, fontFamily: FONT_FAMILY }).setInteractive({ useHandCursor: true }).setOrigin(1, 0).setDepth(TOOLTIP_DEPTH + 1003);
+      nextBtn.on('pointerdown', () => this.nextStep());
+
+      if (index > 0) {
+        const prevBtn = s.add.text(domX + TOOLTIP_W / 2, tooltipY + tooltipH - 30, '< Prev', { fontSize: '13px', color: '#88bbff', fontFamily: FONT_FAMILY }).setInteractive({ useHandCursor: true }).setDepth(TOOLTIP_DEPTH + 1003).setOrigin(0.5, 0);
+        prevBtn.on('pointerdown', () => this.prevStep());
+        this.objects.push(prevBtn);
+      }
+
+      this.objects.push(bg, border, titleTxt, bodyTxt, dismissBtn, nextBtn);
     }
-
-    // Add as a Phaser DOMElement at computed position (top-left)
-    const dom = s.add.dom(domX, tooltipY, container) as Phaser.GameObjects.DOMElement;
-    dom.setOrigin(0, 0);
-    try { dom.setDepth(TOOLTIP_DEPTH + 1000); } catch { /* ignore */ }
-    this.objects.push(dom);
-
-    // Step counter badge as a small canvas text anchored to the tooltip
-    const stepLabel = s.add.text(domX + TOOLTIP_W - 12, tooltipY + 10, `${index + 1} / ${TUTORIAL_STEPS.length}`, { fontSize: '11px', color: '#669966', fontFamily: FONT_FAMILY }).setOrigin(1, 0).setDepth(TOOLTIP_DEPTH + 1);
-    this.objects.push(stepLabel);
   }
 
   // ── Private helpers ───────────────────────────────────────
