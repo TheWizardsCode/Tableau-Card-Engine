@@ -393,6 +393,20 @@ export class MainStreetLifecycleManager {
             console.error('[MainStreet] play-tutorial handler failed', e);
           }
         });
+        (window as any).addEventListener('tce:reset-tutorial', () => {
+          try {
+            if (s.campaign) {
+              s.campaign.tutorialSeen = false;
+              if (s.saveStore) {
+                // Persist change but do not block
+                void saveCampaignProgress(s.saveStore, s.campaign).catch(() => {});
+              }
+            }
+          } catch (e) {
+            // eslint-disable-next-line no-console
+            console.error('[MainStreet] reset-tutorial handler failed', e);
+          }
+        });
       }
     } catch (_e) {
       // ignore

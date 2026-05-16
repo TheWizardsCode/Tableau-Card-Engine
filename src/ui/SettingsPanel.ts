@@ -536,22 +536,22 @@ export class SettingsPanel {
       tip.setDepth(DEPTH_PANEL_CONTENT);
       this.container.add(tip);
 
-      // Play Tutorial button (dispatches a DOM event consumed by scenes)
-      const playTutorialY = difficultyY + 56;
-      const playTutorial = scene.add.text(PADDING, playTutorialY, 'Play Tutorial', {
+      // Reset Tutorial button (dispatches a DOM event consumed by scenes)
+      const resetTutorialY = difficultyY + 56;
+      const resetTutorial = scene.add.text(PADDING, resetTutorialY, 'Reset Tutorial', {
         fontSize: '14px', color: (HEADING_STYLE.color as string) ?? '#f0c040', fontFamily: 'Arial, sans-serif',
       });
-      playTutorial.setDepth(DEPTH_PANEL_CONTENT + 1);
-      playTutorial.setInteractive({ useHandCursor: true });
-      playTutorial.on('pointerdown', () => {
+      resetTutorial.setDepth(DEPTH_PANEL_CONTENT + 1);
+      resetTutorial.setInteractive({ useHandCursor: true });
+      resetTutorial.on('pointerdown', () => {
         try {
           if (typeof window !== 'undefined' && (window as any).dispatchEvent) {
-            const ev = new CustomEvent('tce:play-tutorial');
+            const ev = new CustomEvent('tce:reset-tutorial');
             (window as any).dispatchEvent(ev);
           }
-        } catch (e) { /* eslint-disable-next-line no-console */ console.error('[SettingsPanel] failed to dispatch tce:play-tutorial', e); }
+        } catch (e) { /* eslint-disable-next-line no-console */ console.error('[SettingsPanel] failed to dispatch tce:reset-tutorial', e); }
       });
-      this.container.add(playTutorial);
+      this.container.add(resetTutorial);
     }
 
     // Scene-level pointer events for slider dragging
