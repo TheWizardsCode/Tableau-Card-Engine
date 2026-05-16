@@ -296,6 +296,15 @@ export class MainStreetTutorialOverlayManager {
 
     const step = TUTORIAL_STEPS[index];
     const s = this.scene;
+    // If the scene is not fully ready (no add/sys), retry shortly.
+    if (!s || !s.add) {
+      // eslint-disable-next-line no-console
+      console.debug('[Tutorial] scene not ready for overlays, retrying shortly');
+      setTimeout(() => {
+        try { this.showStep(index); } catch (_) { /* ignore */ }
+      }, 60);
+      return;
+    }
     const layout = s.layout ?? {};
     const gameW: number = layout.gameW ?? 1280;
     const gameH: number = layout.gameH ?? 720;
