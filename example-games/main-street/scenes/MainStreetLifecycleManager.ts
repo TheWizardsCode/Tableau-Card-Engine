@@ -492,7 +492,7 @@ export class MainStreetLifecycleManager {
         try {
           if (s.campaign && !(s.campaign as any).tutorialSeen) {
             if ((s as any).tutorialOverlay) {
-              try { (s as any).tutorialOverlay.start(); } catch (e) { console.error('[MainStreet] tutorial start failed', e); }
+              try { (s as any).tutorialOverlay.start(); } catch (_e) { /* ignore */ }
             }
           }
         } catch (e) { /* eslint-disable-next-line no-console */ console.error('[MainStreet] auto-show tutorial check failed', e); }
@@ -502,7 +502,7 @@ export class MainStreetLifecycleManager {
         try {
           if (s.campaign && !(s.campaign as any).tutorialSeen) {
             if ((s as any).tutorialOverlay) {
-              try { (s as any).tutorialOverlay.start(); } catch (e) { console.error('[MainStreet] tutorial start failed', e); }
+              try { (s as any).tutorialOverlay.start(); } catch (_e) { /* ignore */ }
             }
           }
         } catch (e) { /* eslint-disable-next-line no-console */ console.error('[MainStreet] auto-show tutorial fallback failed', e); }
