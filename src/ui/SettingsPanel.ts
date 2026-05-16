@@ -584,23 +584,38 @@ export class SettingsPanel {
     if (this._modalOpen) return;
     this._modalOpen = true;
 
-    const w = Math.min(320, this.panelWidth - 40);
-    const h = 140;
-    const x = 20; // relative inside panel
-    const y = 120;
+    // Modal dimensions
+    const w = Math.min(480, Math.max(320, Math.floor(this.canvasWidth * 0.5)));
+    const h = 160;
 
-    const bg = this.scene.add.rectangle(x + w/2, y + h/2, w + 24, h + 24, 0x000000, 0.8).setDepth(DEPTH_PANEL_CONTENT + 50);
-    const box = this.scene.add.rectangle(x + w/2, y + h/2, w, h, 0x1a2a1a, 1).setDepth(DEPTH_PANEL_CONTENT + 51);
-    const title = this.scene.add.text(x + 12, y + 12, 'Replay Tutorial?', { fontSize: '16px', color: '#f0c040', fontFamily: 'Arial, sans-serif' }).setDepth(DEPTH_PANEL_CONTENT + 52).setOrigin(0,0);
-    const body = this.scene.add.text(x + 12, y + 36, 'Replaying the tutorial will end the current game and restart a tutorial run. Continue?', { fontSize: '13px', color: '#dddddd', fontFamily: 'Arial, sans-serif', wordWrap: { width: w - 24 } as any }).setDepth(DEPTH_PANEL_CONTENT + 52).setOrigin(0,0);
+    // Create a centered modal container (global canvas coordinates)
+    const container = this.scene.add.container(this.canvasWidth / 2, this.canvasHeight / 2);
+    container.setDepth(DEPTH_PANEL_CONTENT + 100);
 
-    const cancel = this.scene.add.text(x + 12, y + h - 28, 'Cancel', { fontSize: '13px', color: '#aa8866', fontFamily: 'Arial, sans-serif' }).setInteractive({ useHandCursor: true }).setDepth(DEPTH_PANEL_CONTENT + 53).setOrigin(0,0);
-    const confirm = this.scene.add.text(x + w - 12, y + h - 28, 'Continue', { fontSize: '13px', color: '#002200', backgroundColor: '#88ff88', padding: { left: 6, right: 6 } as any, fontFamily: 'Arial, sans-serif' }).setInteractive({ useHandCursor: true }).setDepth(DEPTH_PANEL_CONTENT + 53).setOrigin(1,0);
+    // Full-screen dark overlay (blocks input and visually centers modal)
+    const bg = this.scene.add.rectangle(0, 0, this.canvasWidth, this.canvasHeight, 0x000000, 0.6);
+    bg.setOrigin(0.5, 0.5);
+    bg.setInteractive();
+    // Clicking the background should close the modal (like Cancel)
+    bg.on('pointerdown', () => this._closeReplayTutorialModal());
 
-    const container = this.scene.add.container(this.panelWidth - this.canvasWidth + this.container.x, 0);
-    // The container is positioned relative to the parent; we'll add children at panel-local coords
+    // Modal box
+    const box = this.scene.add.rectangle(0, 0, w, h, 0x1a2a1a, 1);
+    box.setOrigin(0.5, 0.5);
+
+    const title = this.scene.add.text(-w / 2 + 12, -h / 2 + 12, 'Replay Tutorial?', { fontSize: '16px', color: '#f0c040', fontFamily: 'Arial, sans-serif' });
+    title.setOrigin(0, 0);
+
+    const body = this.scene.add.text(-w / 2 + 12, -h / 2 + 36, 'Replaying the tutorial will end the current game and restart a tutorial run. Continue?', { fontSize: '13px', color: '#dddddd', fontFamily: 'Arial, sans-serif', wordWrap: { width: w - 24 } as any });
+    body.setOrigin(0, 0);
+
+    const cancel = this.scene.add.text(-w / 2 + 12, h / 2 - 36, 'Cancel', { fontSize: '13px', color: '#aa8866', fontFamily: 'Arial, sans-serif' }).setInteractive({ useHandCursor: true });
+    cancel.setOrigin(0, 0);
+
+    const confirm = this.scene.add.text(w / 2 - 12, h / 2 - 36, 'Continue', { fontSize: '13px', color: '#002200', backgroundColor: '#88ff88', padding: { left: 6, right: 6 } as any, fontFamily: 'Arial, sans-serif' }).setInteractive({ useHandCursor: true });
+    confirm.setOrigin(1, 0);
+
     container.add([bg, box, title, body, cancel, confirm]);
-    container.setDepth(DEPTH_PANEL_CONTENT + 50);
 
     cancel.on('pointerdown', () => this._closeReplayTutorialModal());
     confirm.on('pointerdown', () => {
@@ -610,8 +625,9 @@ export class SettingsPanel {
           (window as any).dispatchEvent(ev);
         }
       } catch (e) { /* eslint-disable-next-line no-console */ console.error('[SettingsPanel] failed to dispatch tce:replay-tutorial', e); }
+
+      // Close modal first then the settings panel
       this._closeReplayTutorialModal();
-      // Close settings panel after confirmation
       try { this.close(); } catch (_) { /* ignore */ }
     });
 
