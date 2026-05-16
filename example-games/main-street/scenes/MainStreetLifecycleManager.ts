@@ -393,7 +393,8 @@ export class MainStreetLifecycleManager {
             console.error('[MainStreet] play-tutorial handler failed', e);
           }
         });
-        (window as any).addEventListener('tce:reset-tutorial', () => {
+        // Replay tutorial: warn in settings, then dispatch this event to restart current run into tutorial mode
+        (window as any).addEventListener('tce:replay-tutorial', () => {
           try {
             if (s.campaign) {
               s.campaign.tutorialSeen = false;
@@ -402,9 +403,21 @@ export class MainStreetLifecycleManager {
                 void saveCampaignProgress(s.saveStore, s.campaign).catch(() => {});
               }
             }
+
+            // Restart the current run as a tutorial run (force Easy difficulty)
+            try {
+              s.selectedDifficulty = 'Easy';
+              s.state = setupMainStreetGame({ difficulty: 'Easy', unlockedCardIds: s.campaign?.unlockedCardIds });
+              s.startDayPhase();
+              // show tutorial overlay if available
+              try { (s as any).tutorialOverlay?.start(); } catch (_) { /* ignore */ }
+            } catch (e) {
+              // eslint-disable-next-line no-console
+              console.error('[MainStreet] failed to restart into tutorial', e);
+            }
           } catch (e) {
             // eslint-disable-next-line no-console
-            console.error('[MainStreet] reset-tutorial handler failed', e);
+            console.error('[MainStreet] replay-tutorial handler failed', e);
           }
         });
       }
