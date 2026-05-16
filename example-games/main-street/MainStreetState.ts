@@ -269,6 +269,8 @@ export interface MainStreetCampaignProgress {
   totalWins: number;
   /** ISO 8601 timestamp of the last update to this campaign data. */
   lastUpdatedAt: string;
+  /** Whether the introductory tutorial has been completed by the player. */
+  tutorialSeen?: boolean;
 }
 
 // ── Setup Options ───────────────────────────────────────────

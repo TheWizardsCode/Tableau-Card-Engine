@@ -1,5 +1,5 @@
 import { setupMainStreetGame, deserializeMainStreetState } from '../MainStreetState';
-import { createDefaultCampaignProgress, loadCampaignProgress, updateCampaignAfterRun } from '../MainStreetSaveLoad';
+import { createDefaultCampaignProgress, loadCampaignProgress, updateCampaignAfterRun, saveCampaignProgress } from '../MainStreetSaveLoad';
 import { DIFFICULTY_NAMES } from '../MainStreetDifficulty';
 import { SaveLoadStore, markSceneValid, markSceneInvalid, createTfPlayer, UndoRedoManager } from '../../../src/core-engine';
 import { createSingleSelectionManager, TooltipManager } from '../../../src/ui';
@@ -15,6 +15,7 @@ import { MainStreetOverlayManager } from './MainStreetOverlayManager';
 import { MainStreetInputManager } from './MainStreetInputManager';
 import { MainStreetSvgTextureManager } from './MainStreetSvgTextureManager';
 import { SvgDomRenderer } from './SvgDomRenderer';
+import { MainStreetTutorialOverlayManager } from './MainStreetTutorialOverlayManager';
 import { getEndTurnKeybind } from '../../../src/ui/SettingsStore';
 
 export class MainStreetLifecycleManager {
@@ -175,6 +176,35 @@ export class MainStreetLifecycleManager {
       );
     });
 
+    // UI scaffolding
+    s.msRenderer = new MainStreetRenderer(s);
+    s.msAnimator = new MainStreetAnimator(s);
+    s.msTurnController = new MainStreetTurnController(s);
+    s.msOverlayManager = new MainStreetOverlayManager(s);
+    s.msInputManager = new MainStreetInputManager(s);
+    s.msSvgTextureManager = new MainStreetSvgTextureManager(s);
+    s.layout = s.computeLayout();
+    s.svgDebugEnabled = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('msSvgDebug') === '1';
+
+    // Create tutorial overlay manager early so it's available to any async
+    // callbacks (campaign load) that may want to auto-show the tutorial.
+    try {
+      (s as any).tutorialOverlay = new MainStreetTutorialOverlayManager(s, () => {
+        try {
+          if (s.campaign) {
+            s.campaign.tutorialSeen = true;
+            if (s.saveStore) {
+              // Persist the updated campaign progress asynchronously
+              void saveCampaignProgress(s.saveStore, s.campaign).catch(() => {});
+            }
+          }
+        } catch (_) { /* ignore */ }
+      });
+    } catch (e) {
+      // Ignore if DOM environment is unavailable (tests)
+      /* keep silent on creation failure */
+    }
+
     // Game setup -- load campaign for tier-filtered deck building
     s.saveStore = new SaveLoadStore();
     this.loadCampaignAndSetup();
@@ -192,15 +222,6 @@ export class MainStreetLifecycleManager {
       // ignore if recorder cannot be created
     }
 
-    // UI scaffolding
-    s.msRenderer = new MainStreetRenderer(s);
-    s.msAnimator = new MainStreetAnimator(s);
-    s.msTurnController = new MainStreetTurnController(s);
-    s.msOverlayManager = new MainStreetOverlayManager(s);
-    s.msInputManager = new MainStreetInputManager(s);
-    s.msSvgTextureManager = new MainStreetSvgTextureManager(s);
-    s.layout = s.computeLayout();
-    s.svgDebugEnabled = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('msSvgDebug') === '1';
     // Prewarm SVG textures once all SVG sources are loaded.
     // Until then the scene uses fallback cards; then we refresh with SVG textures.
     void s.cardSvgLoadPromise
@@ -342,6 +363,68 @@ export class MainStreetLifecycleManager {
       s.tooltipManager = new TooltipManager(s, s.settingsPanel);
     }
 
+    // Create tutorial overlay manager (attached to main scene) so the tutorial
+    // can be shown from Settings or automatically on first run. The onComplete
+    // callback marks the campaign as having seen the tutorial and persists it.
+    try {
+      (s as any).tutorialOverlay = new (require('./MainStreetTutorialOverlayManager').MainStreetTutorialOverlayManager)(s, () => {
+        try {
+          if (s.campaign) {
+            s.campaign.tutorialSeen = true;
+            if (s.saveStore) {
+              // Persist the updated campaign progress asynchronously
+              void saveCampaignProgress(s.saveStore, s.campaign).catch(() => {});
+            }
+          }
+        } catch (_) { /* ignore */ }
+      });
+    } catch (_) {
+      // Ignore if DOM environment is unavailable (tests)
+    }
+
+    // Listen for Settings 'Play Tutorial' request and log for debugging
+    try {
+      if (typeof window !== 'undefined' && (window as any).addEventListener) {
+        (window as any).addEventListener('tce:play-tutorial', () => {
+          try {
+            (s as any).tutorialOverlay?.start();
+          } catch (e) {
+            // eslint-disable-next-line no-console
+            console.error('[MainStreet] play-tutorial handler failed', e);
+          }
+        });
+        // Replay tutorial: warn in settings, then dispatch this event to restart current run into tutorial mode
+        (window as any).addEventListener('tce:replay-tutorial', () => {
+          try {
+            if (s.campaign) {
+              s.campaign.tutorialSeen = false;
+              if (s.saveStore) {
+                // Persist change but do not block
+                void saveCampaignProgress(s.saveStore, s.campaign).catch(() => {});
+              }
+            }
+
+            // Restart the current run as a tutorial run (force Easy difficulty)
+            try {
+              s.selectedDifficulty = 'Easy';
+              s.state = setupMainStreetGame({ difficulty: 'Easy', unlockedCardIds: s.campaign?.unlockedCardIds });
+              s.startDayPhase();
+              // show tutorial overlay if available
+              try { (s as any).tutorialOverlay?.start(); } catch (_) { /* ignore */ }
+            } catch (e) {
+              // eslint-disable-next-line no-console
+              console.error('[MainStreet] failed to restart into tutorial', e);
+            }
+          } catch (e) {
+            // eslint-disable-next-line no-console
+            console.error('[MainStreet] replay-tutorial handler failed', e);
+          }
+        });
+      }
+    } catch (_e) {
+      // ignore
+    }
+
     // Global keyboard handler for End Turn (configurable via Settings)
     const endTurnKeyHandler = (ev: KeyboardEvent) => {
       try {
@@ -416,7 +499,8 @@ export class MainStreetLifecycleManager {
 
     // Async: attempt to load saved campaign and re-setup if found
     if (s.saveStore) {
-      loadCampaignProgress(s.saveStore).then((saved: any) => {
+      // Store the load promise on the scene so other code can wait if needed
+      (s as any)._campaignLoadPromise = loadCampaignProgress(s.saveStore).then((saved: any) => {
         if (saved) {
           s.campaign = saved;
           // Re-setup with the loaded campaign's unlocked cards
@@ -429,11 +513,35 @@ export class MainStreetLifecycleManager {
           // phase is synchronised.  Without this, the engine stays in
           // DayStart while the UI shows market controls, blocking all
           // player actions and causing End Turn to hang.
-          s.startDayPhase();
+          try { s.startDayPhase(); } catch (_) { /* ignore */ }
         }
+        // After attempting to load (saved or not) auto-show tutorial if not seen
+        try {
+          if (s.campaign && !(s.campaign as any).tutorialSeen) {
+            if ((s as any).tutorialOverlay) {
+              try { (s as any).tutorialOverlay.start(); } catch (_e) { /* ignore */ }
+            }
+          }
+        } catch (e) { /* eslint-disable-next-line no-console */ console.error('[MainStreet] auto-show tutorial check failed', e); }
+        return saved;
       }).catch(() => {
         // If load fails, continue with defaults (already set up above)
+        try {
+          if (s.campaign && !(s.campaign as any).tutorialSeen) {
+            if ((s as any).tutorialOverlay) {
+              try { (s as any).tutorialOverlay.start(); } catch (_e) { /* ignore */ }
+            }
+          }
+        } catch (e) { /* eslint-disable-next-line no-console */ console.error('[MainStreet] auto-show tutorial fallback failed', e); }
+        return null;
       });
+    } else {
+      // No saveStore: if tutorial hasn't been seen, show it now (best-effort)
+      try {
+        if (s.campaign && !(s.campaign as any).tutorialSeen && (s as any).tutorialOverlay) {
+          try { (s as any).tutorialOverlay.start(); } catch (_) { /* ignore */ }
+        }
+      } catch (_) { /* ignore */ }
     }
   }
 

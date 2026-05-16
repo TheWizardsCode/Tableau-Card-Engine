@@ -46,7 +46,13 @@ export const mainStreetCampaignSerializer: SaveSerializer<
         milestoneHistory: [],
       };
     }
-    return structuredClone(data);
+
+    // Ensure tutorialSeen flag exists on returned object for runtime code.
+    const cloned = structuredClone(data) as any;
+    if (typeof cloned.tutorialSeen === 'undefined') {
+      cloned.tutorialSeen = false;
+    }
+    return cloned as MainStreetCampaignProgress;
   },
 };
 
@@ -61,6 +67,7 @@ export function createDefaultCampaignProgress(): MainStreetCampaignProgress {
     totalRuns: 0,
     totalWins: 0,
     lastUpdatedAt: new Date().toISOString(),
+    tutorialSeen: false,
   };
 }
 

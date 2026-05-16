@@ -18,6 +18,39 @@
   </head>
   <body>
     <div id="game-container"></div>
+
+    <!--
+      Client-side 404 redirect guard
+      If the page is loaded from a nested file path (for example
+      `/example-games/hello-world/index.html`) the dev server's SPA
+      fallback returns index.html which can hide the fact the requested
+      file doesn't exist. Redirect such requests to a dedicated
+      /404.html page so users see a proper Not Found message instead of
+      the app silently booting from the wrong base path.
+    -->
+    <script type="module">
+      // Module-mode guard: we can safely read import.meta.env here.
+      (function () {
+        try {
+          const path = window.location.pathname || '/';
+          // Detect deep-linked example game file paths or other nested index.html
+          if (/\/example-games\//.test(path) && !/^\/(|index\.html)$/.test(path)) {
+            const base = (import.meta && import.meta.env && import.meta.env.BASE_URL) ? import.meta.env.BASE_URL : '/';
+            const target = base + '404.html';
+            // Avoid redirect loop if already at 404
+            if (path !== new URL(target, window.location.origin).pathname) {
+              window.location.replace(target);
+              return;
+            }
+          }
+        } catch (e) {
+          // Fail closed: if the guard errors, continue booting the app.
+          // eslint-disable-next-line no-console
+          console.debug('[404-guard] check failed', e);
+        }
+      })();
+    </script>
+
     <script type="module" src="/main.ts"></script>
   </body>
 </html>
