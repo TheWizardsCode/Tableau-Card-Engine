@@ -15,6 +15,7 @@ import { MainStreetOverlayManager } from './MainStreetOverlayManager';
 import { MainStreetInputManager } from './MainStreetInputManager';
 import { MainStreetSvgTextureManager } from './MainStreetSvgTextureManager';
 import { SvgDomRenderer } from './SvgDomRenderer';
+import { MainStreetTutorialOverlayManager } from './MainStreetTutorialOverlayManager';
 import { getEndTurnKeybind } from '../../../src/ui/SettingsStore';
 
 export class MainStreetLifecycleManager {
@@ -188,7 +189,7 @@ export class MainStreetLifecycleManager {
     // Create tutorial overlay manager early so it's available to any async
     // callbacks (campaign load) that may want to auto-show the tutorial.
     try {
-      (s as any).tutorialOverlay = new (require('./MainStreetTutorialOverlayManager').MainStreetTutorialOverlayManager)(s, () => {
+      (s as any).tutorialOverlay = new MainStreetTutorialOverlayManager(s, () => {
         try {
           if (s.campaign) {
             s.campaign.tutorialSeen = true;
