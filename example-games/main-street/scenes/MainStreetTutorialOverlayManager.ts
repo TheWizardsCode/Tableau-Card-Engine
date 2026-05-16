@@ -59,19 +59,33 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     anchor: (scene: any) => {
       const l = scene.layout;
       if (!l) return null;
-      // Market visual area: compute card row start and width so the highlight
-      // matches the visible card columns and doesn't extend into the log sidebar.
+      // Prefer using the rendered marketContainer bounds when available so
+      // the highlight precisely matches the visible market region including
+      // the left-side title. Fallback to layout-derived bounds otherwise.
+      try {
+        const mc = (scene as any).marketContainer;
+        if (mc && typeof mc.getBounds === 'function') {
+          const b = mc.getBounds();
+          const pad = 8;
+          const x = Math.max(12, b.x - pad);
+          const y = Math.max(12, b.y - pad);
+          const rightLimit = (typeof l.logX === 'number' && l.logX > 0) ? l.logX - 20 : l.gameW - 40;
+          const w = Math.max(80, Math.min(b.width + pad * 2, Math.max(80, rightLimit - x)));
+          const h = Math.max(40, Math.min(b.height + pad * 2, l.gameH - 40));
+          return { x, y, w, h };
+        }
+      } catch (_e) {
+        // ignore and fallback
+      }
+
       const startX = l.marketLabelW + 50;
       const slots = MARKET_BUSINESS_SLOTS;
       const totalCardsW = slots * l.marketCardW + (slots - 1) * l.marketCardGap;
       const padding = 8; // small padding around the highlight
-      // Use a small left padding so highlight hugs the market box closely
-      // Start at the text label X (40) so the highlight includes the title.
+      // Start at the content label X so the highlight includes the title area
       const labelX = 40;
-      const x = Math.max(12, labelX - 8); // small left padding to avoid tight edge
-      // Prevent highlight from extending into the right-hand log/challenge area
+      const x = Math.max(12, labelX - 8);
       const rightLimit = (typeof l.logX === 'number' && l.logX > 0) ? l.logX - 20 : Math.max(20, l.gameW - 40);
-      // Desired width: distance from label to card start + total cards width + padding
       const desiredW = Math.max(80, (startX - labelX) + totalCardsW + padding * 2);
       const w = Math.max(80, Math.min(desiredW, Math.max(80, rightLimit - x)));
       const y = l.marketTop - 6;
@@ -91,8 +105,21 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     anchor: (scene: any) => {
       const l = scene.layout;
       if (!l) return null;
-      // Compute queue area width using label width + card widths for the visible queue
-      // Align queue highlight with left content padding
+      // Prefer using rendered incident queue container bounds when available
+      try {
+        const qc = (scene as any).incidentQueueContainer;
+        if (qc && typeof qc.getBounds === 'function') {
+          const bq = qc.getBounds();
+          const padq = 8;
+          const x = Math.max(12, bq.x - padq);
+          const y = Math.max(12, bq.y - padq);
+          const rightLimitQ = (typeof l.logX === 'number' && l.logX > 0) ? l.logX - 20 : l.gameW - 40;
+          const w = Math.max(80, Math.min(bq.width + padq * 2, Math.max(80, rightLimitQ - x)));
+          const h = Math.max(40, Math.min(bq.height + padq * 2, l.gameH - 40));
+          return { x, y, w, h };
+        }
+      } catch (_e) { /* ignore */ }
+
       const labelX = 40;
       const x = Math.max(12, labelX - 8);
       const desiredW = Math.max(80, l.queueLabelW + INCIDENT_QUEUE_SIZE * (l.queueCardW + l.queueCardGap) + 32);
@@ -102,7 +129,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
       const h = l.queueCardH + 16;
       return { x, y, w, h };
     },
-  },
+  }
   {
     title: 'Your Street',
     body:
