@@ -548,9 +548,6 @@ export class SettingsPanel {
           if (typeof window !== 'undefined' && (window as any).dispatchEvent) {
             const ev = new CustomEvent('tce:play-tutorial');
             (window as any).dispatchEvent(ev);
-            // Log to help trace event firing (use info so it's visible by default)
-            // eslint-disable-next-line no-console
-            console.info('[SettingsPanel] dispatched tce:play-tutorial');
           }
         } catch (e) { /* eslint-disable-next-line no-console */ console.error('[SettingsPanel] failed to dispatch tce:play-tutorial', e); }
       });

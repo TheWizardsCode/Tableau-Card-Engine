@@ -298,8 +298,6 @@ export class MainStreetTutorialOverlayManager {
     const s = this.scene;
     // If the scene is not fully ready (no add/sys), retry shortly.
     if (!s || !s.add) {
-      // eslint-disable-next-line no-console
-      console.debug('[Tutorial] scene not ready for overlays, retrying shortly');
       setTimeout(() => {
         try { this.showStep(index); } catch (_) { /* ignore */ }
       }, 60);
@@ -456,7 +454,7 @@ export class MainStreetTutorialOverlayManager {
     } catch (e) {
       // Fallback to in-canvas tooltip if DOM is not available or fails
       // eslint-disable-next-line no-console
-      console.warn('[Tutorial] DOM tooltip creation failed, falling back to canvas tooltip', e);
+      // DOM tooltip creation failed; fall back to in-canvas rendering
 
       const tooltipH = TOOLTIP_H_BASE;
       const domX = Math.max(12, Math.floor(gameW / 2 - TOOLTIP_W / 2));

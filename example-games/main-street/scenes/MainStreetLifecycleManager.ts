@@ -200,12 +200,9 @@ export class MainStreetLifecycleManager {
           }
         } catch (_) { /* ignore */ }
       });
-      // eslint-disable-next-line no-console
-      console.info('[MainStreet] tutorialOverlay created');
     } catch (e) {
       // Ignore if DOM environment is unavailable (tests)
-      // eslint-disable-next-line no-console
-      console.warn('[MainStreet] tutorialOverlay creation failed', e);
+      /* keep silent on creation failure */
     }
 
     // Game setup -- load campaign for tier-filtered deck building
@@ -388,11 +385,8 @@ export class MainStreetLifecycleManager {
     // Listen for Settings 'Play Tutorial' request and log for debugging
     try {
       if (typeof window !== 'undefined' && (window as any).addEventListener) {
-        (window as any).addEventListener('tce:play-tutorial', (ev: any) => {
+        (window as any).addEventListener('tce:play-tutorial', () => {
           try {
-            // Debug log to help trace events from Settings
-            // eslint-disable-next-line no-console
-            console.debug('[MainStreet] Received tce:play-tutorial event', ev);
             (s as any).tutorialOverlay?.start();
           } catch (e) {
             // eslint-disable-next-line no-console
@@ -400,9 +394,8 @@ export class MainStreetLifecycleManager {
           }
         });
       }
-    } catch (e) {
-      // eslint-disable-next-line no-console
-      console.debug('[MainStreet] failed to register play-tutorial listener', e);
+    } catch (_e) {
+      // ignore
     }
 
     // Global keyboard handler for End Turn (configurable via Settings)
@@ -499,27 +492,17 @@ export class MainStreetLifecycleManager {
         try {
           if (s.campaign && !(s.campaign as any).tutorialSeen) {
             if ((s as any).tutorialOverlay) {
-              // eslint-disable-next-line no-console
-              console.info('[MainStreet] auto-showing tutorial (first run)');
               try { (s as any).tutorialOverlay.start(); } catch (e) { console.error('[MainStreet] tutorial start failed', e); }
-            } else {
-              // eslint-disable-next-line no-console
-              console.warn('[MainStreet] tutorialOverlay not available to auto-show');
             }
           }
         } catch (e) { /* eslint-disable-next-line no-console */ console.error('[MainStreet] auto-show tutorial check failed', e); }
         return saved;
-      }).catch((err) => {
+      }).catch(() => {
         // If load fails, continue with defaults (already set up above)
         try {
           if (s.campaign && !(s.campaign as any).tutorialSeen) {
             if ((s as any).tutorialOverlay) {
-              // eslint-disable-next-line no-console
-              console.info('[MainStreet] auto-showing tutorial (no saved campaign)');
               try { (s as any).tutorialOverlay.start(); } catch (e) { console.error('[MainStreet] tutorial start failed', e); }
-            } else {
-              // eslint-disable-next-line no-console
-              console.warn('[MainStreet] tutorialOverlay not available to auto-show');
             }
           }
         } catch (e) { /* eslint-disable-next-line no-console */ console.error('[MainStreet] auto-show tutorial fallback failed', e); }
