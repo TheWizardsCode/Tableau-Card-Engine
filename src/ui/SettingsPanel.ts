@@ -548,8 +548,11 @@ export class SettingsPanel {
           if (typeof window !== 'undefined' && (window as any).dispatchEvent) {
             const ev = new CustomEvent('tce:play-tutorial');
             (window as any).dispatchEvent(ev);
+            // Debug log to help trace event firing
+            // eslint-disable-next-line no-console
+            console.debug('[SettingsPanel] dispatched tce:play-tutorial');
           }
-        } catch { /* ignore */ }
+        } catch (e) { /* eslint-disable-next-line no-console */ console.error('[SettingsPanel] failed to dispatch tce:play-tutorial', e); }
       });
       this.container.add(playTutorial);
     }

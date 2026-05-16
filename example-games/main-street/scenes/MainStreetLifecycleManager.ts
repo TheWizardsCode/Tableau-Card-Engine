@@ -175,6 +175,34 @@ export class MainStreetLifecycleManager {
       );
     });
 
+    // UI scaffolding
+    s.msRenderer = new MainStreetRenderer(s);
+    s.msAnimator = new MainStreetAnimator(s);
+    s.msTurnController = new MainStreetTurnController(s);
+    s.msOverlayManager = new MainStreetOverlayManager(s);
+    s.msInputManager = new MainStreetInputManager(s);
+    s.msSvgTextureManager = new MainStreetSvgTextureManager(s);
+    s.layout = s.computeLayout();
+    s.svgDebugEnabled = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('msSvgDebug') === '1';
+
+    // Create tutorial overlay manager early so it's available to any async
+    // callbacks (campaign load) that may want to auto-show the tutorial.
+    try {
+      (s as any).tutorialOverlay = new (require('./MainStreetTutorialOverlayManager').MainStreetTutorialOverlayManager)(s, () => {
+        try {
+          if (s.campaign) {
+            s.campaign.tutorialSeen = true;
+            if (s.saveStore) {
+              // Persist the updated campaign progress asynchronously
+              void saveCampaignProgress(s.saveStore, s.campaign).catch(() => {});
+            }
+          }
+        } catch (_) { /* ignore */ }
+      });
+    } catch (_) {
+      // Ignore if DOM environment is unavailable (tests)
+    }
+
     // Game setup -- load campaign for tier-filtered deck building
     s.saveStore = new SaveLoadStore();
     this.loadCampaignAndSetup();
@@ -192,15 +220,6 @@ export class MainStreetLifecycleManager {
       // ignore if recorder cannot be created
     }
 
-    // UI scaffolding
-    s.msRenderer = new MainStreetRenderer(s);
-    s.msAnimator = new MainStreetAnimator(s);
-    s.msTurnController = new MainStreetTurnController(s);
-    s.msOverlayManager = new MainStreetOverlayManager(s);
-    s.msInputManager = new MainStreetInputManager(s);
-    s.msSvgTextureManager = new MainStreetSvgTextureManager(s);
-    s.layout = s.computeLayout();
-    s.svgDebugEnabled = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('msSvgDebug') === '1';
     // Prewarm SVG textures once all SVG sources are loaded.
     // Until then the scene uses fallback cards; then we refresh with SVG textures.
     void s.cardSvgLoadPromise
@@ -361,14 +380,25 @@ export class MainStreetLifecycleManager {
       // Ignore if DOM environment is unavailable (tests)
     }
 
-    // Listen for Settings 'Play Tutorial' request
+    // Listen for Settings 'Play Tutorial' request and log for debugging
     try {
       if (typeof window !== 'undefined' && (window as any).addEventListener) {
-        (window as any).addEventListener('tce:play-tutorial', () => {
-          try { (s as any).tutorialOverlay?.start(); } catch (_) { /* ignore */ }
+        (window as any).addEventListener('tce:play-tutorial', (ev: any) => {
+          try {
+            // Debug log to help trace events from Settings
+            // eslint-disable-next-line no-console
+            console.debug('[MainStreet] Received tce:play-tutorial event', ev);
+            (s as any).tutorialOverlay?.start();
+          } catch (e) {
+            // eslint-disable-next-line no-console
+            console.error('[MainStreet] play-tutorial handler failed', e);
+          }
         });
       }
-    } catch (_) { /* ignore */ }
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.debug('[MainStreet] failed to register play-tutorial listener', e);
+    }
 
     // Global keyboard handler for End Turn (configurable via Settings)
     const endTurnKeyHandler = (ev: KeyboardEvent) => {
