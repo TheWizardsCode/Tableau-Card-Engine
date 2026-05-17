@@ -39,6 +39,7 @@ function runReplay(
       cwd: PROJECT_ROOT,
       encoding: 'utf-8',
       timeout: timeoutMs,
+      killSignal: 'SIGKILL',
       env: { ...process.env },
     },
   );

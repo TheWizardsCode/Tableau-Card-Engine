@@ -16,7 +16,6 @@
 
 import { describe, it, expect, afterEach } from 'vitest';
 import Phaser from 'phaser';
-import { waitForScene } from '../helpers/waitForScene';
 
 // ── Helpers ─────────────────────────────────────────────────
 
@@ -31,7 +30,10 @@ async function bootGame(): Promise<Phaser.Game> {
     '../../example-games/golf/createGolfGame'
   );
   const game = createGolfGame();
-  await waitForScene(game, 'GolfScene');
+  await waitForCondition(() => {
+    const scene = game.scene.getScene('GolfScene');
+    return Boolean(scene && getSceneInternals(scene).phaseManager);
+  }, 20_000);
   return game;
 }
 
@@ -41,19 +43,45 @@ function destroyGame(game: Phaser.Game | null): void {
   if (container) container.remove();
 }
 
-function waitFrames(n: number): Promise<void> {
+function waitFrames(n: number, fallbackMs = 2000): Promise<void> {
   return new Promise((resolve) => {
-    let count = 0;
+    let settled = false;
+    let left = n;
+
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+
+    const fallback = setTimeout(finish, fallbackMs);
+
     const step = () => {
-      count++;
-      if (count >= n) {
-        resolve();
+      if (settled) return;
+      left -= 1;
+      if (left <= 0) {
+        clearTimeout(fallback);
+        finish();
       } else {
         requestAnimationFrame(step);
       }
     };
+
     requestAnimationFrame(step);
   });
+}
+
+async function waitForCondition(
+  predicate: () => boolean,
+  timeoutMs = 10_000,
+  pollMs = 25,
+): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (predicate()) return;
+    await new Promise((resolve) => setTimeout(resolve, pollMs));
+  }
+  throw new Error(`Timed out waiting for condition after ${timeoutMs}ms`);
 }
 
 /**
@@ -186,11 +214,13 @@ describe('Golf overlay button tests', () => {
     // Click at the button's game-world position through the DOM
     clickAtGameCoords(game, playAgainBtn!.x, playAgainBtn!.y);
 
-    // Wait for restart: Phaser queues scene restart for next frame
-    await waitFrames(3);
-    // scene.restart() destroys and recreates; wait for re-activation
-    await waitForScene(game, 'GolfScene');
-    await waitFrames(3);
+    // Wait for restart: Phaser queues scene.restart() to the next tick.
+    await waitForCondition(() => {
+      const activeScene = game!.scene.getScene('GolfScene');
+      const maybeSession = getSceneInternals(activeScene).session;
+      return maybeSession && maybeSession !== originalSession;
+    }, 15_000);
+    await waitFrames(2);
 
     // Verify: new session was created (different object reference)
     const newScene = game.scene.getScene('GolfScene')!;
