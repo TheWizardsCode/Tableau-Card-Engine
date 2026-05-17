@@ -14,7 +14,6 @@ import { MainStreetTurnController } from './MainStreetTurnController';
 import { MainStreetOverlayManager } from './MainStreetOverlayManager';
 import { MainStreetInputManager } from './MainStreetInputManager';
 import { MainStreetSvgTextureManager } from './MainStreetSvgTextureManager';
-import { SvgDomRenderer } from './SvgDomRenderer';
 import { MainStreetTutorialOverlayManager } from './MainStreetTutorialOverlayManager';
 import { getEndTurnKeybind } from '../../../src/ui/SettingsStore';
 
@@ -240,13 +239,6 @@ export class MainStreetLifecycleManager {
     s.createInstructions();
     s.initSvgDebugOverlay();
 
-    // DOM renderer for SVGs
-    try {
-      s.svgDom = new SvgDomRenderer(s);
-    } catch {
-      s.svgDom = undefined;
-    }
-
     s.scale.off(Phaser.Scale.Events.RESIZE, s.handleResize, s);
     s.scale.on(Phaser.Scale.Events.RESIZE, s.handleResize, s);
 
@@ -470,7 +462,15 @@ export class MainStreetLifecycleManager {
   public handleResize(): void {
     const s = this.scene;
     s.layout = s.computeLayout();
-    // Regenerate textures at new sizes on resize
+
+    // Keep SVG texture cache aligned with display metrics (DPR/viewport).
+    try {
+      s.msSvgTextureManager?.syncDisplayMetrics?.();
+    } catch {
+      // ignore in constrained test environments
+    }
+
+    // Regenerate textures at new sizes on resize.
     s.prewarmVisibleCardTextures();
     s.challengeContainer.setPosition(s.layout.challengeX, s.layout.challengeY);
     s.logContainer.setPosition(s.layout.logX, s.layout.logY);

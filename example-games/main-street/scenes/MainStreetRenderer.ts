@@ -246,7 +246,6 @@ export class MainStreetRenderer {
 
   public refreshAll(): void {
     const s = this.scene;
-    s.svgDom?.clear();
     this.refreshHud();
     this.refreshStreetGrid();
     this.refreshMarket();
@@ -424,18 +423,7 @@ export class MainStreetRenderer {
     const renderH = Math.max(1, Math.round(slotH - 4));
     const tplKey = s.templateKeyForCard(biz.id, renderW, renderH);
     const usedSvg = s.textures && (s.textures as Phaser.Textures.TextureManager).exists(tplKey);
-    if (usedSvg && s.svgDom) {
-      // Render via DOM SVG image for perfect crispness
-      const cx = x + slotW / 2;
-      const cy = y + slotH / 2;
-      const templateId = s.templateIdFromCardId(biz.id);
-      const svgText = s.cardSvgSources.get(templateId)!;
-      const domKey = s.domKeyForCard('street', _index, biz.id);
-      s.svgDom.createOrUpdate(domKey, svgText, cx, cy, renderW, renderH, () => {
-        // click maps to scene slot click
-        s.onSlotClick(_index);
-      }, 100);
-    } else if (usedSvg) {
+    if (usedSvg) {
       const img = s.add.image(Math.round(x + slotW / 2), Math.round(y + slotH / 2), tplKey);
       // Use the exact slot dimensions - texture is already rasterised at correct size
       img.setDisplaySize(renderW, renderH);
@@ -728,8 +716,8 @@ export class MainStreetRenderer {
     y: number,
     card: BusinessCard | EventCard | UpgradeCard,
     onClick: (card: BusinessCard | EventCard | UpgradeCard) => void,
-    rowKey: string,
-    slotIndex: number,
+    _rowKey: string,
+    _slotIndex: number,
   ): Phaser.GameObjects.Container {
     const s = this.scene;
     const { marketCardW, marketCardH } = s.layout;
@@ -749,25 +737,12 @@ export class MainStreetRenderer {
     const baseStrokeWidth = isHinted ? 3 : 1;
 
     let bg: Phaser.GameObjects.Rectangle | null = null;
-    let domElRef: any = null;
 
-    if (s.textures && (s.textures as Phaser.Textures.TextureManager).exists(tplKey) && s.svgDom === undefined) {
+    if (s.textures && (s.textures as Phaser.Textures.TextureManager).exists(tplKey)) {
       const img = s.add.image(0, 0, tplKey);
       // Texture is already rasterised at correct size for this slot
       img.setDisplaySize(renderW, renderH);
       container.add(img);
-    } else if (s.svgDom && s.cardSvgSources.has(s.templateIdFromCardId(card.id))) {
-      // Render SVG via DOM element
-      const cx = x + marketCardW / 2;
-      const cy = y + marketCardH / 2;
-      const templateId = s.templateIdFromCardId(card.id);
-      const svgText = s.cardSvgSources.get(templateId)!;
-      const domKey = s.domKeyForCard(`market-${rowKey}`, slotIndex, card.id);
-      domElRef = s.svgDom.createOrUpdate(domKey, svgText, cx, cy, renderW, renderH, () => {
-        s.selectMarketCardById(card.id);
-        onClick(card);
-      }, 100);
-
     } else {
       s.requestCardTexture(card.id, renderW, renderH);
       // Determine card color
@@ -862,49 +837,6 @@ export class MainStreetRenderer {
       });
       s.marketSelectionManager.registerTarget(hitArea);
       container.add(hitArea);
-    }
-
-    // If the DOM renderer produced an element, mirror Phaser hover/selection
-    // behaviour by wiring DOM events to the selection controller and
-    // selection manager so highlights work consistently when using SVG DOM
-    // rendering.
-    if (domElRef && !s.replayMode) {
-      try {
-        const node = (domElRef as any).node as HTMLElement | null;
-        if (node) {
-          try { s.marketSelectionManager.registerTarget(container); } catch (_) { /* ignore */ }
-
-          node.addEventListener('mouseenter', () => {
-            if (interactiveEnabled) selection.setHovered(true);
-            if (!s.replayMode) {
-              let info = '';
-              if (card.family === 'business') {
-                const b = card as any;
-                info = `Business: ${b.name}\nCost: ${b.cost}\nIncome: +${b.baseIncome + (b.incomeBonus || 0)}/turn\nSynergy: ${(b.synergyTypes || []).join('/') }\n${b.description ?? ''}`;
-              } else if (card.family === 'event') {
-                const e = card as any;
-                info = `Event: ${e.name}\nCost: ${e.cost}\nEffect: ${e.effect}\nCoins: ${e.coinDelta >= 0 ? '+' : ''}${e.coinDelta}, Rep: ${e.reputationDelta >= 0 ? '+' : ''}${e.reputationDelta}`;
-              } else if (card.family === 'upgrade') {
-                const u = card as any;
-                info = `Upgrade: ${u.name}\nCost: ${u.cost}\nIncome Bonus: +${u.incomeBonus}\nRequires: Lv${u.requiredLevel ?? 0}\n${u.description ?? ''}`;
-              }
-              s.tooltipManager?.show(info, container.x, container.y);
-            }
-          });
-
-          node.addEventListener('mouseleave', () => {
-            if (interactiveEnabled) selection.setHovered(false);
-            if (!s.replayMode) s.tooltipManager?.hide();
-          });
-
-          node.addEventListener('click', () => {
-            if (interactiveEnabled) {
-              s.marketSelectionManager.select(selection);
-              onClick(card);
-            }
-          });
-        }
-      } catch (e) { /* ignore DOM attach errors */ }
     }
 
     // Card label and additional info are rendered inside per-card SVGs; only
@@ -1041,6 +973,10 @@ export class MainStreetRenderer {
     }
   }
 
+  /**
+   * Render held-event cards via the same Phaser texture pipeline used by
+   * market/street/incident cards (no DOM-only branch).
+   */
   public drawHeldEventCard(
     x: number,
     y: number,
@@ -1051,54 +987,32 @@ export class MainStreetRenderer {
     const container = s.add.container(Math.round(x + handCardW / 2), Math.round(y + handCardH / 2));
     const renderW = Math.max(1, Math.round(handCardW - 4));
     const renderH = Math.max(1, Math.round(handCardH - 4));
+    const tplKey = s.templateKeyForCard(card.id, renderW, renderH);
+    const usedSvg = s.textures && (s.textures as Phaser.Textures.TextureManager).exists(tplKey);
 
-    // DOM-only rendering path for held investment cards.
-    const templateId = s.templateIdFromCardId(card.id);
-    const svgText = s.cardSvgSources.get(templateId);
-    if (!s.svgDom || !svgText) {
-      return container;
+    if (usedSvg) {
+      const img = s.add.image(0, 0, tplKey);
+      img.setDisplaySize(renderW, renderH);
+      container.add(img);
+    } else {
+      s.requestCardTexture(card.id, renderW, renderH);
+      const bg = s.add.rectangle(0, 0, handCardW, handCardH, 0x8B4513, 0.7);
+      bg.setStrokeStyle(1, 0x776655);
+      container.add(bg);
     }
 
-    const cx = x + handCardW / 2;
-    const cy = y + handCardH / 2;
-    const domKey = s.domKeyForCard('hand', 0, card.id);
-    const domEl = s.svgDom.createOrUpdate(
-      domKey,
-      svgText,
-      cx,
-      cy,
-      renderW,
-      renderH,
-      s.uiPhase === 'market' ? () => s.onPlayHeldEvent() : undefined,
-      100,
-    );
-
     if (!s.replayMode) {
-      try {
-        // If an SvgDomRenderer exists we intentionally avoid adding any
-        // Phaser fallback display objects for the held card. Tests may
-        // provide a mock `svgDom.createOrUpdate` which returns undefined
-        // but still counts as the DOM renderer being present. In that
-        // case we still should not add a Phaser fallback rectangle.
-        const node = (domEl as any)?.node as HTMLElement | null;
-        if (node) {
-          node.addEventListener('mouseenter', () => {
-            const info = `Event: ${card.name}\nCost: ${card.cost}\nEffect: ${card.effect}`;
-            s.tooltipManager?.show(info, container.x, container.y);
-          });
-          node.addEventListener('mouseleave', () => s.tooltipManager?.hide());
-
-          if (s.uiPhase === 'market') {
-            node.addEventListener('click', () => s.onPlayHeldEvent());
-          }
-        }
-      } catch (e) { /* ignore */ }
-
-      // Whether or not domEl.node was present, if svgDom is available we
-      // do not add Phaser fallback visuals for the held hand slot. The
-      // DOM renderer (or test-provided mock) is expected to handle
-      // interactivity. Return early to avoid creating a Rectangle/Image.
-      return container;
+      const hover = s.add.rectangle(0, 0, handCardW, handCardH, 0x000000, 0.001);
+      hover.setInteractive({ useHandCursor: s.uiPhase === 'market' });
+      hover.on('pointerover', () => {
+        const info = `Event: ${card.name}\nCost: ${card.cost}\nEffect: ${card.effect}`;
+        s.tooltipManager?.show(info, container.x, container.y);
+      });
+      hover.on('pointerout', () => s.tooltipManager?.hide());
+      if (s.uiPhase === 'market') {
+        hover.on('pointerdown', () => s.onPlayHeldEvent());
+      }
+      container.add(hover);
     }
 
     return container;

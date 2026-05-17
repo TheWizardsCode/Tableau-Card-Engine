@@ -18,6 +18,16 @@ Milestone 4 delivers presentation polish for Main Street: reproducible thumbnail
   - final assets may be delivered as PNG/WebP/atlas without changing scene/game logic
   - texture key conventions should remain stable so game code does not change
 
+### Texture cache key/invalidation policy
+
+- Card textures use deterministic keys: `ms_card_<template>_<width>x<height>@<dpr>`.
+- Regeneration triggers:
+  - viewport resize (`handleResize`) prewarms visible card sizes for the new layout
+  - device pixel ratio (DPR) change clears `ms_card_*` textures, then prewarms at the new DPR
+- Steady state behavior:
+  - if a texture key already exists, no rerasterization is performed
+  - lazy request paths (`requestCardTexture`) only generate missing keys, then refresh scene render
+
 ### Thumbnail pipeline
 
 Canonical fixture transcript:
@@ -139,6 +149,31 @@ Relevant smoke coverage includes:
 - `tests/e2e/replay-main-street.e2e.test.ts`
 - `tests/e2e/generate-thumbnail.main-street.test.ts`
 - `tests/main-street/MainStreetScene.browser.test.ts`
+
+## Main Street card rendering architecture (current)
+
+- Runtime card display is Phaser-native only (GameObjects/textures). The legacy DOM renderer path has been removed from production flow.
+- Overlay occlusion behavior (Help/Settings) is validated via canvas pixel assertions, not DOM visibility toggles.
+- Texture cache invalidation policy:
+  - `ms_card_*` textures are keyed by template + size + DPR
+  - resize triggers prewarm for visible card sizes
+  - DPR change clears existing `ms_card_*` textures before regeneration
+
+## Rollback guidance
+
+If a rendering migration regression is detected, roll back by reverting the dedicated feature commits on the rendering branch rather than reintroducing partial DOM behavior.
+
+Suggested rollback flow:
+
+```bash
+git checkout <feature-branch>
+git log --oneline -- example-games/main-street/scenes src/ui tests/main-street
+# Revert the specific rendering migration commit(s)
+git revert <commit-hash>
+# Re-run quality gates
+npm test
+npm run build
+```
 
 ### Regenerate Main Street thumbnail from fixture
 

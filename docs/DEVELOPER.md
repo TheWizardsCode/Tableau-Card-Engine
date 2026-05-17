@@ -830,6 +830,8 @@ The script processes all supported games (`golf`, `beleaguered-castle`, `lost-ci
 
 ### Main Street visual smoke runbook
 
+Main Street rendering policy is Phaser-native only for runtime card visuals. Do not add new `svgDom` visibility toggles for overlays; validate layering through canvas-native assertions.
+
 Use these commands when validating Main Street visual polish changes:
 
 ```bash
@@ -841,6 +843,18 @@ npx tsx scripts/generate-thumbnail.ts main-street
 
 # Execute dedicated visual/replay smoke checks
 npx vitest run --project unit tests/e2e/replay-main-street.e2e.test.ts tests/e2e/generate-thumbnail.main-street.test.ts
+```
+
+#### Rendering rollback (Main Street)
+
+Use commit-level reverts on the feature branch if a rendering regression is discovered:
+
+```bash
+git checkout <feature-branch>
+git log --oneline -- example-games/main-street/scenes src/ui tests/main-street
+git revert <commit-hash>
+npm test
+npm run build
 ```
 
 **When to regenerate thumbnails:**
