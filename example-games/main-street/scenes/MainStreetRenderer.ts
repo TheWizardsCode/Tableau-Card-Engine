@@ -14,6 +14,12 @@ import {
 } from '../MainStreetCards';
 import { computeScore } from '../MainStreetEngine';
 import {
+  buildCoinsTooltip,
+  buildReputationTooltip,
+  buildScoreTooltip,
+  HUD_ARIA_LABELS,
+} from './MainStreetHudTooltips';
+import {
   getAffordableBusinessCards,
   getAffordableUpgradeCards,
   getEmptySlots,
@@ -301,12 +307,81 @@ export class MainStreetRenderer {
     }).setOrigin(0, 0.5));
     s.hudContainer.add(scoreText);
 
+    // HUD tooltip zones (desktop: pointer hover, mobile: tap toggle)
+    if (!s.replayMode) {
+      this.attachHudTooltipZone(coinText, HUD_ARIA_LABELS.coins, () => buildCoinsTooltip(s.state));
+      this.attachHudTooltipZone(repText, HUD_ARIA_LABELS.rep, () => buildReputationTooltip(s.state));
+      this.attachHudTooltipZone(scoreText, HUD_ARIA_LABELS.score, () => buildScoreTooltip(s.state, s.campaign));
+    }
+
     s.animateHudValueChanges({
       coins,
       reputation,
       coinX: stripLeft + stripWidth * 0.25 + 80,
       repX: stripLeft + stripWidth * 0.5 + 65,
       hudY,
+    });
+  }
+
+  /**
+   * Attaches an interactive tooltip zone to a HUD text element.
+   *
+   * On desktop (pointer), shows the tooltip on hover and hides on leave.
+   * On mobile (touch), the first tap shows the tooltip and a second
+   * tap (or tap elsewhere) dismisses it.
+   *
+   * ARIA labels are set on the underlying text object for screen-readers.
+   */
+  private attachHudTooltipZone(
+    textObj: Phaser.GameObjects.Text,
+    ariaLabel: string,
+    contentBuilder: () => string,
+  ): void {
+    const s = this.scene;
+
+    // Set ARIA label for screen-reader accessibility
+    try {
+      const node = (textObj as any).node;
+      if (node && typeof node.setAttribute === 'function') {
+        node.setAttribute('aria-label', ariaLabel);
+        node.setAttribute('role', 'button');
+        node.setAttribute('tabindex', '0');
+      }
+    } catch (_) { /* ignore in non-DOM environments */ }
+
+    // Compute hit area size from text metrics
+    const w = Math.max(textObj.width, 60);
+    const h = Math.max(textObj.height, 20);
+
+    textObj.setInteractive(
+      new Phaser.Geom.Rectangle(0, 0, w / textObj.scaleX, h / textObj.scaleY),
+      Phaser.Geom.Rectangle.Contains,
+    );
+
+    // Mobile tap-toggle state (per element)
+    let tooltipVisible = false;
+
+    textObj.on('pointerover', () => {
+      tooltipVisible = true;
+      const content = contentBuilder();
+      s.tooltipManager?.show(content, textObj.x, textObj.y - 10);
+    });
+
+    textObj.on('pointerout', () => {
+      tooltipVisible = false;
+      s.tooltipManager?.hide();
+    });
+
+    // Mobile / tap: toggle on pointerdown
+    textObj.on('pointerdown', () => {
+      if (tooltipVisible) {
+        tooltipVisible = false;
+        s.tooltipManager?.hide();
+      } else {
+        tooltipVisible = true;
+        const content = contentBuilder();
+        s.tooltipManager?.show(content, textObj.x, textObj.y - 10);
+      }
     });
   }
 

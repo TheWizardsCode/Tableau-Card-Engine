@@ -408,4 +408,62 @@ describe('MainStreetScene browser tests', () => {
     destroyGame(game);
     game = null;
   });
+
+  it('attaches interactive tooltip zones to HUD Coins, Reputation, and Score text elements', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;
+
+    // The HUD should have been refreshed with tooltip zones on the text elements.
+    // We verify that hovering over the coin/rep/score text triggers tooltipManager.show.
+    const tooltipShowSpy = vi.spyOn(scene.tooltipManager, 'show');
+    const tooltipHideSpy = vi.spyOn(scene.tooltipManager, 'hide');
+
+    // Find transient text objects in hudContainer
+    const hudList = scene.hudContainer.list as Phaser.GameObjects.GameObject[];
+    const textObjects = hudList.filter(
+      (obj) => obj instanceof Phaser.GameObjects.Text && (obj as any)._hudTransient,
+    ) as Phaser.GameObjects.Text[];
+
+    // Should have at least coin, rep, score, and strip texts
+    expect(textObjects.length).toBeGreaterThanOrEqual(3);
+
+    // Find specific text objects by content
+    const coinText = textObjects.find((t) => t.text.startsWith('Coins:'));
+    const repText = textObjects.find((t) => t.text.startsWith('Rep:'));
+    const scoreText = textObjects.find((t) => t.text.startsWith('Score:'));
+
+    expect(coinText).toBeTruthy();
+    expect(repText).toBeTruthy();
+    expect(scoreText).toBeTruthy();
+
+    // Emit pointerover on coin text
+    coinText!.emit('pointerover');
+    expect(tooltipShowSpy).toHaveBeenCalled();
+    const coinCallArgs = tooltipShowSpy.mock.calls[0];
+    // The tooltip content should mention income
+    expect(coinCallArgs[0]).toContain('Income');
+    tooltipShowSpy.mockClear();
+
+    // Emit pointerout
+    coinText!.emit('pointerout');
+    expect(tooltipHideSpy).toHaveBeenCalled();
+    tooltipHideSpy.mockClear();
+
+    // Emit pointerover on rep text
+    repText!.emit('pointerover');
+    expect(tooltipShowSpy).toHaveBeenCalled();
+    const repCallArgs = tooltipShowSpy.mock.calls[0];
+    expect(repCallArgs[0]).toContain('Reputation');
+    tooltipShowSpy.mockClear();
+
+    // Emit pointerover on score text
+    scoreText!.emit('pointerover');
+    expect(tooltipShowSpy).toHaveBeenCalled();
+    const scoreCallArgs = tooltipShowSpy.mock.calls[0];
+    expect(scoreCallArgs[0]).toContain('Score');
+    tooltipShowSpy.mockClear();
+
+    destroyGame(game);
+    game = null;
+  });
 });
