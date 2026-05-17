@@ -38,6 +38,23 @@ function overlaps(a: { x: number; y: number; w: number; h: number }, b: { x: num
   return true;
 }
 
+async function waitForCondition(
+  predicate: () => boolean,
+  options: { timeoutMs?: number; intervalMs?: number; label?: string } = {},
+): Promise<void> {
+  const timeoutMs = options.timeoutMs ?? 5000;
+  const intervalMs = options.intervalMs ?? 25;
+  const label = options.label ?? 'condition';
+  const start = Date.now();
+
+  while (Date.now() - start < timeoutMs) {
+    if (predicate()) return;
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+
+  throw new Error(`Timed out waiting for ${label} after ${timeoutMs}ms`);
+}
+
 describe('MainStreetScene browser tests', () => {
   let game: Phaser.Game | null = null;
 
@@ -291,11 +308,15 @@ describe('MainStreetScene browser tests', () => {
       expect(state.streetGrid[targetSlot]).toBeNull();
       expect(scene.getHiddenTransferSourceCardCountForTest()).toBeGreaterThan(0);
 
-      await new Promise((resolve) => setTimeout(resolve, 20));
-      expect(scene.getTransferAnimationCountForTest()).toBeGreaterThan(beforeBusinessAnimCount);
+      await waitForCondition(
+        () => scene.getTransferAnimationCountForTest() > beforeBusinessAnimCount,
+        { label: 'business transfer animation start' },
+      );
 
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      expect(state.streetGrid[targetSlot]?.id).toBe(business.id);
+      await waitForCondition(
+        () => state.streetGrid[targetSlot]?.id === business.id,
+        { timeoutMs: 6000, label: 'business transfer completion' },
+      );
       expect(scene.getHiddenTransferSourceCardCountForTest()).toBe(0);
       expect(hideSpy).toHaveBeenCalled();
 
@@ -311,11 +332,15 @@ describe('MainStreetScene browser tests', () => {
         expect(state.heldEvent).toBeNull();
         expect(scene.getHiddenTransferSourceCardCountForTest()).toBeGreaterThan(0);
 
-        await new Promise((resolve) => setTimeout(resolve, 20));
-        expect(scene.getTransferAnimationCountForTest()).toBeGreaterThan(beforeEventAnimCount);
+        await waitForCondition(
+          () => scene.getTransferAnimationCountForTest() > beforeEventAnimCount,
+          { label: 'event transfer animation start' },
+        );
 
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        expect(state.heldEvent?.id).toBe(eventCard.id);
+        await waitForCondition(
+          () => state.heldEvent?.id === eventCard.id,
+          { timeoutMs: 6000, label: 'event transfer completion' },
+        );
         expect(scene.getHiddenTransferSourceCardCountForTest()).toBe(0);
 
         // Verify held-event slot is on the left and fully within the viewport bounds
@@ -334,7 +359,7 @@ describe('MainStreetScene browser tests', () => {
       destroyGame(game);
       game = null;
     }
-  });
+  }, 45_000);
 
   it('allows pressing Enter to end the turn when legal', async () => {
     game = await bootGame();

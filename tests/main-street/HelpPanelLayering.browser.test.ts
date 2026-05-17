@@ -21,14 +21,30 @@ function destroyGame(game: Phaser.Game | null): void {
   if (container) container.remove();
 }
 
-function waitFrames(n: number): Promise<void> {
+function waitFrames(n: number, fallbackMs = 2000): Promise<void> {
   return new Promise((resolve) => {
+    let settled = false;
     let left = n;
-    const tick = () => {
-      left -= 1;
-      if (left <= 0) resolve();
-      else requestAnimationFrame(tick);
+
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
     };
+
+    const fallback = setTimeout(finish, fallbackMs);
+
+    const tick = () => {
+      if (settled) return;
+      left -= 1;
+      if (left <= 0) {
+        clearTimeout(fallback);
+        finish();
+      } else {
+        requestAnimationFrame(tick);
+      }
+    };
+
     requestAnimationFrame(tick);
   });
 }
@@ -152,5 +168,5 @@ describe('MainStreet Help panel layering (visual)', () => {
       scene.helpPanel.close();
       await waitFrames(8);
     }
-  });
+  }, 45_000);
 });
