@@ -130,6 +130,8 @@ Tests use [Vitest](https://vitest.dev/) configured inline in `vite.config.ts` wi
 
 Both projects run together via `npm test`. The browser project runs in headless Chromium using `@vitest/browser` with the Playwright provider.
 
+During Vitest runs, the dev-only transcript persistence middleware (`POST /api/transcripts`) is intentionally disabled even though Vitest browser mode uses an internal Vite server. This prevents file-system side effects and reduces harness noise/flakiness during test execution.
+
 ### Writing unit tests
 
 - Place test files in `tests/` following the `*.test.ts` pattern

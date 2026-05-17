@@ -21,6 +21,8 @@ npx tsx scripts/demo-main-street.ts --seed "smoke-1"
 npx vitest run --project unit tests/main-street/smoke-scenario.test.ts
 ```
 
+Note: Vitest browser runs use an internal Vite server, but the dev-only transcript persistence middleware is disabled in test mode to avoid file-system side effects and reduce harness flakiness.
+
 ## What Is This?
 
 The Tableau Card Engine (TCE) builds increasingly complex card games as "spikes" to validate gameplay mechanics and engine APIs. Reusable components are extracted from each spike into shared engine modules. The end goal is a fully modular engine that others can use to build their own tableau card games.
