@@ -462,7 +462,15 @@ export class MainStreetLifecycleManager {
   public handleResize(): void {
     const s = this.scene;
     s.layout = s.computeLayout();
-    // Regenerate textures at new sizes on resize
+
+    // Keep SVG texture cache aligned with display metrics (DPR/viewport).
+    try {
+      s.msSvgTextureManager?.syncDisplayMetrics?.();
+    } catch {
+      // ignore in constrained test environments
+    }
+
+    // Regenerate textures at new sizes on resize.
     s.prewarmVisibleCardTextures();
     s.challengeContainer.setPosition(s.layout.challengeX, s.layout.challengeY);
     s.logContainer.setPosition(s.layout.logX, s.layout.logY);

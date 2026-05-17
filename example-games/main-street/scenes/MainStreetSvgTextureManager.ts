@@ -2,7 +2,40 @@ import { CARD_TEMPLATE_NAMES } from '../MainStreetCards';
 import { rasteriseSvgToTexture, makeTextureKey } from '../../../src/core-engine';
 
 export class MainStreetSvgTextureManager {
-  constructor(private readonly scene: any) {}
+  private lastDevicePixelRatio: number;
+
+  constructor(private readonly scene: any) {
+    this.lastDevicePixelRatio = this.getCurrentDevicePixelRatio();
+  }
+
+  private getCurrentDevicePixelRatio(): number {
+    return (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
+  }
+
+  /**
+   * Keeps texture cache aligned with display metrics. If DPR changed, clear
+   * cached card textures so next prewarm/request regenerates at the new DPR.
+   */
+  public syncDisplayMetrics(): { dprChanged: boolean; removedTextureCount: number } {
+    const currentDpr = this.getCurrentDevicePixelRatio();
+    if (currentDpr === this.lastDevicePixelRatio) {
+      return { dprChanged: false, removedTextureCount: 0 };
+    }
+
+    this.lastDevicePixelRatio = currentDpr;
+
+    const textureKeys: string[] = this.scene.textures?.getTextureKeys?.() ?? [];
+    const cardKeys = textureKeys.filter((key) => key.startsWith('ms_card_'));
+    for (const key of cardKeys) {
+      try {
+        this.scene.textures?.remove?.(key);
+      } catch {
+        // ignore cache cleanup failures in constrained test environments
+      }
+    }
+
+    return { dprChanged: true, removedTextureCount: cardKeys.length };
+  }
 
   public loadCardSvgSources(): void {
     const s = this.scene;
@@ -46,7 +79,7 @@ export class MainStreetSvgTextureManager {
       visibleTemplates.add(this.templateIdFromCardId(s.state.heldEvent.id));
     }
 
-    const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
+    const dpr = this.getCurrentDevicePixelRatio();
     const rasterizePromises: Promise<void>[] = [];
 
     for (const templateId of visibleTemplates) {
@@ -82,7 +115,7 @@ export class MainStreetSvgTextureManager {
     const svgText = s.cardSvgSources.get(templateId);
     if (!svgText) return;
 
-    const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
+    const dpr = this.getCurrentDevicePixelRatio();
     const key = makeTextureKey(templateId, renderW, renderH, dpr);
     if (s.textures.exists(key)) return;
 
@@ -98,7 +131,7 @@ export class MainStreetSvgTextureManager {
   public templateKeyForCard(cardId: string, width?: number, height?: number): string {
     const base = cardId.replace(/-\d+$/, '');
     if (width !== undefined && height !== undefined) {
-      const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
+      const dpr = this.getCurrentDevicePixelRatio();
       return makeTextureKey(base, width, height, dpr);
     }
     return `ms_card_${base}`;

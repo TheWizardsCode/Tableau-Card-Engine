@@ -18,6 +18,16 @@ Milestone 4 delivers presentation polish for Main Street: reproducible thumbnail
   - final assets may be delivered as PNG/WebP/atlas without changing scene/game logic
   - texture key conventions should remain stable so game code does not change
 
+### Texture cache key/invalidation policy
+
+- Card textures use deterministic keys: `ms_card_<template>_<width>x<height>@<dpr>`.
+- Regeneration triggers:
+  - viewport resize (`handleResize`) prewarms visible card sizes for the new layout
+  - device pixel ratio (DPR) change clears `ms_card_*` textures, then prewarms at the new DPR
+- Steady state behavior:
+  - if a texture key already exists, no rerasterization is performed
+  - lazy request paths (`requestCardTexture`) only generate missing keys, then refresh scene render
+
 ### Thumbnail pipeline
 
 Canonical fixture transcript:
