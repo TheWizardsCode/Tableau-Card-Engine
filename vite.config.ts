@@ -8,8 +8,10 @@ export default defineConfig(({ mode, command }) => ({
   // keep '/' for local development so localhost:3000 works as expected.
   base: mode === 'production' ? '/Tableau-Card-Engine/' : '/',
   plugins: [
-    // Only register the transcript persistence plugin during dev server
-    ...(command === 'serve' ? [transcriptPersistPlugin()] : []),
+    // Only register the transcript persistence plugin during normal dev-server runs.
+    // Vitest browser uses an internal Vite server; avoid plugin middleware there to
+    // prevent file-system side effects and extra request handling during tests.
+    ...(command === 'serve' && !process.env.VITEST ? [transcriptPersistPlugin()] : []),
   ],
   resolve: {
     alias: {
