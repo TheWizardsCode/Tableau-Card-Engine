@@ -973,6 +973,10 @@ export class MainStreetRenderer {
     }
   }
 
+  /**
+   * Render held-event cards via the same Phaser texture pipeline used by
+   * market/street/incident cards (no DOM-only branch).
+   */
   public drawHeldEventCard(
     x: number,
     y: number,

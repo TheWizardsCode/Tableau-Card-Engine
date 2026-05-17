@@ -253,6 +253,37 @@ describe('MainStreetScene browser tests', () => {
     expect(hasPhaserCardVisual).toBe(true);
   });
 
+  it('renders market and street cards through Phaser objects without DOM renderer calls', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;
+
+    const domCalls: Array<{ id: string }> = [];
+    scene.svgDom = {
+      clear: () => {},
+      createOrUpdate: (id: string) => {
+        domCalls.push({ id });
+      },
+    };
+
+    scene.refreshAll();
+
+    expect(domCalls.length).toBe(0);
+
+    const marketHasRenderableCard = (scene.marketContainer as Phaser.GameObjects.Container).list.some((obj) =>
+      obj instanceof Phaser.GameObjects.Container
+      && (obj as Phaser.GameObjects.Container).list.some((child) =>
+        child instanceof Phaser.GameObjects.Image || child instanceof Phaser.GameObjects.Rectangle,
+      ),
+    );
+
+    const streetHasRenderableCard = (scene.streetContainer as Phaser.GameObjects.Container).list.some((obj) =>
+      obj instanceof Phaser.GameObjects.Image || obj instanceof Phaser.GameObjects.Rectangle,
+    );
+
+    expect(marketHasRenderableCard).toBe(true);
+    expect(streetHasRenderableCard).toBe(true);
+  });
+
   it('routes mapped SFX keys to tf-backed adapter when tf module is provided', async () => {
     const placePlaySpy = vi.fn();
     const cheerPlaySpy = vi.fn();
