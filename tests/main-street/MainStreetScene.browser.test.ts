@@ -230,19 +230,8 @@ describe('MainStreetScene browser tests', () => {
 
     state.heldEvent = eventCard;
 
-    const domCalls: Array<{ id: string; width: number; height: number }> = [];
-    scene.svgDom = {
-      clear: () => {},
-      createOrUpdate: (id: string, _svg: string, _cx: number, _cy: number, width: number, height: number) => {
-        domCalls.push({ id, width, height });
-      },
-    };
-
     scene.refreshAll();
     await new Promise((resolve) => setTimeout(resolve, 30));
-
-    const handCall = domCalls.find((call) => call.id.startsWith('ms_dom_hand_'));
-    expect(handCall).toBeUndefined();
 
     const handContainer = scene.handContainer as Phaser.GameObjects.Container;
     const heldCardContainer = handContainer.list.find((obj) => obj instanceof Phaser.GameObjects.Container) as Phaser.GameObjects.Container | undefined;
@@ -257,17 +246,7 @@ describe('MainStreetScene browser tests', () => {
     game = await bootGame();
     const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;
 
-    const domCalls: Array<{ id: string }> = [];
-    scene.svgDom = {
-      clear: () => {},
-      createOrUpdate: (id: string) => {
-        domCalls.push({ id });
-      },
-    };
-
     scene.refreshAll();
-
-    expect(domCalls.length).toBe(0);
 
     const marketHasRenderableCard = (scene.marketContainer as Phaser.GameObjects.Container).list.some((obj) =>
       obj instanceof Phaser.GameObjects.Container

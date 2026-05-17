@@ -137,7 +137,4 @@ export class MainStreetSvgTextureManager {
     return `ms_card_${base}`;
   }
 
-  public domKeyForCard(context: string, slot: number | string, cardId: string): string {
-    return `ms_dom_${context}_${slot}_${cardId}`;
-  }
 }

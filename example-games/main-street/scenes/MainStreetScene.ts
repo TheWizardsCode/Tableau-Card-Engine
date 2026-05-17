@@ -273,9 +273,6 @@ export class MainStreetScene extends CardGameScene {
   public templateKeyForCard(...args: any[]): any {
     return (this.msSvgTextureManager as any).templateKeyForCard.apply(this.msSvgTextureManager, args);
   }
-  public domKeyForCard(...args: any[]): any {
-    return (this.msSvgTextureManager as any).domKeyForCard.apply(this.msSvgTextureManager, args);
-  }
   public drawMarketCard(...args: any[]): any {
     return (this.msRenderer as any).drawMarketCard.apply(this.msRenderer, args);
   }
