@@ -123,11 +123,6 @@ describe('MainStreet Help panel layering (visual)', () => {
     await new Promise((r) => setTimeout(r, 20));
 
     expect(scene.helpPanel.isOpen).toBe(true);
-    // DOM-rendered card images should be hidden while the panel is open.
-    const domImages = Array.from(document.querySelectorAll('#game-container img')) as HTMLImageElement[];
-    if (domImages.length > 0) {
-      expect(domImages[0].style.visibility).toBe('hidden');
-    }
     const panelContainer = (scene.helpPanel as any).container as Phaser.GameObjects.Container;
     expect(panelContainer.visible).toBe(true);
     // Some headless environments may not advance tweens as expected; skip strict x-position check
@@ -157,9 +152,6 @@ describe('MainStreet Help panel layering (visual)', () => {
       await waitFrames(24);
       const afterClosePixel = await readScenePixel(scene, canvas, samplePoint[0], samplePoint[1]);
 
-      if (domImages.length > 0) {
-        expect(domImages[0].style.visibility).toBe('visible');
-      }
       expect(colorDistance(afterOpenPixel, afterClosePixel)).toBeGreaterThan(40);
     } else {
       // In some headless environments tweens don't advance; assert logical open state

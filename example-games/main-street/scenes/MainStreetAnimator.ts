@@ -108,21 +108,6 @@ export class MainStreetAnimator {
   ): Phaser.GameObjects.GameObject & Phaser.GameObjects.Components.Transform {
     const s = this.scene;
     const templateId = s.templateIdFromCardId(cardId);
-    const svgText = s.cardSvgSources.get(templateId);
-    if (s.svgDom && svgText) {
-      const domId = `ms_dom_transfer_${cardId}_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
-      return s.svgDom.createOrUpdate(
-        domId,
-        svgText,
-        atX,
-        atY,
-        s.layout.marketCardW,
-        s.layout.marketCardH,
-        undefined,
-        10000,
-      ) as Phaser.GameObjects.GameObject & Phaser.GameObjects.Components.Transform;
-    }
-
     const bgColor = family === 'business' ? 0x5a7f36 : family === 'upgrade' ? 0x6B4C9A : 0x8B4513;
     const w = s.layout.marketCardW;
     const h = s.layout.marketCardH;

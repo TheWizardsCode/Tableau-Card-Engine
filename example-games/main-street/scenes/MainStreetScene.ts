@@ -11,7 +11,6 @@ import {
 import type { SelectionController, SingleSelectionManager } from '../../../src/ui';
 import { SaveLoadStore } from '../../../src/core-engine';
 import { UndoRedoManager } from '../../../src/core-engine';
-import { SvgDomRenderer } from './SvgDomRenderer';
 import { MainStreetRenderer } from './MainStreetRenderer';
 import { MainStreetAnimator } from './MainStreetAnimator';
 import { MainStreetTurnController } from './MainStreetTurnController';
@@ -125,9 +124,6 @@ export class MainStreetScene extends CardGameScene {
   public cardSvgSources: Map<string, string> = new Map();
   /** Resolves when all SVG source fetches started in preload have settled. */
   public cardSvgLoadPromise: Promise<void> = Promise.resolve();
-
-  // DOM-based SVG renderer (optional) - renders crisp SVGs using browser image rendering
-  public svgDom?: SvgDomRenderer;
 
   // Preload placeholder SVG used for visual scale testing in the market
   public preload(...args: any[]): any {

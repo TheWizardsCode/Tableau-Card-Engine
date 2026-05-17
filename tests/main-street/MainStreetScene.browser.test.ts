@@ -216,7 +216,7 @@ describe('MainStreetScene browser tests', () => {
     }
   });
 
-  it('uses DOM SVG rendering for held-event hand slot when DOM renderer is available', async () => {
+  it('renders held-event hand slot using Phaser objects without DOM svg renderer calls', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;
     const state = scene.state;
@@ -224,7 +224,7 @@ describe('MainStreetScene browser tests', () => {
     const eventCard = state.market.investments.find((card: any) => card && card.family === 'event');
     expect(eventCard).toBeTruthy();
 
-    // Ensure the held card has an SVG source available for DOM rendering.
+    // Ensure the held card has an SVG source available so rasterized textures can be generated.
     const templateId = String(eventCard.id).replace(/-\d+$/, '');
     scene.cardSvgSources.set(templateId, '<svg xmlns="http://www.w3.org/2000/svg" width="140" height="80" viewBox="0 0 140 80"><rect width="140" height="80" fill="#8B4513"/><text x="70" y="44" font-size="14" text-anchor="middle" fill="#fff">Held</text></svg>');
 
@@ -239,20 +239,18 @@ describe('MainStreetScene browser tests', () => {
     };
 
     scene.refreshAll();
+    await new Promise((resolve) => setTimeout(resolve, 30));
 
     const handCall = domCalls.find((call) => call.id.startsWith('ms_dom_hand_'));
-    expect(handCall).toBeTruthy();
-    expect(handCall!.width).toBeGreaterThan(0);
-    expect(handCall!.height).toBeGreaterThan(0);
+    expect(handCall).toBeUndefined();
 
-    // Hand slot should not fall back to Phaser image/rectangle rendering.
     const handContainer = scene.handContainer as Phaser.GameObjects.Container;
     const heldCardContainer = handContainer.list.find((obj) => obj instanceof Phaser.GameObjects.Container) as Phaser.GameObjects.Container | undefined;
     expect(heldCardContainer).toBeTruthy();
-    const hasFallbackDisplayObject = heldCardContainer!.list.some((obj) =>
+    const hasPhaserCardVisual = heldCardContainer!.list.some((obj) =>
       obj instanceof Phaser.GameObjects.Image || obj instanceof Phaser.GameObjects.Rectangle,
     );
-    expect(hasFallbackDisplayObject).toBe(false);
+    expect(hasPhaserCardVisual).toBe(true);
   });
 
   it('routes mapped SFX keys to tf-backed adapter when tf module is provided', async () => {

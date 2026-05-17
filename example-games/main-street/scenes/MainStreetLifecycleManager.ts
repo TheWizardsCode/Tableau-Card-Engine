@@ -14,7 +14,6 @@ import { MainStreetTurnController } from './MainStreetTurnController';
 import { MainStreetOverlayManager } from './MainStreetOverlayManager';
 import { MainStreetInputManager } from './MainStreetInputManager';
 import { MainStreetSvgTextureManager } from './MainStreetSvgTextureManager';
-import { SvgDomRenderer } from './SvgDomRenderer';
 import { MainStreetTutorialOverlayManager } from './MainStreetTutorialOverlayManager';
 import { getEndTurnKeybind } from '../../../src/ui/SettingsStore';
 
@@ -239,13 +238,6 @@ export class MainStreetLifecycleManager {
     s.createContainers();
     s.createInstructions();
     s.initSvgDebugOverlay();
-
-    // DOM renderer for SVGs
-    try {
-      s.svgDom = new SvgDomRenderer(s);
-    } catch {
-      s.svgDom = undefined;
-    }
 
     s.scale.off(Phaser.Scale.Events.RESIZE, s.handleResize, s);
     s.scale.on(Phaser.Scale.Events.RESIZE, s.handleResize, s);
