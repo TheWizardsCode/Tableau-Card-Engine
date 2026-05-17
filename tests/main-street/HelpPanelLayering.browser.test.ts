@@ -161,4 +161,49 @@ describe('MainStreet Help panel layering (visual)', () => {
       await waitFrames(8);
     }
   }, 45_000);
+
+  it('renders settings panel above market cards when opened', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene') as any;
+    await waitFrames(24);
+
+    const canvas = document.querySelector('#game-container canvas') as HTMLCanvasElement | null;
+    expect(canvas).toBeTruthy();
+    if (!canvas) throw new Error('Canvas not found');
+
+    const panelWidth = (scene.settingsPanel as any).panelWidth ?? Math.round(canvas.width * 0.35);
+    // Sample where the settings panel body will occupy after opening.
+    const samplePoint: [number, number] = [
+      Math.max(2, Math.min(Math.floor(canvas.width - panelWidth * 0.5), canvas.width - 3)),
+      Math.max(2, Math.min(Math.floor(canvas.height * 0.35), canvas.height - 3)),
+    ];
+
+    const beforePixel = await readScenePixel(scene, canvas, samplePoint[0], samplePoint[1]);
+    scene.settingsPanel.open();
+    await waitFrames(40);
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(scene.settingsPanel.isOpen).toBe(true);
+    const panelContainer = (scene.settingsPanel as any).container as Phaser.GameObjects.Container;
+    expect(panelContainer.visible).toBe(true);
+
+    const afterOpenPixel = await readScenePixel(scene, canvas, samplePoint[0], samplePoint[1]);
+
+    // Settings panel background is dark navy-ish: 0x101020 => (16,16,32)
+    const panelColor: [number, number, number, number] = [16, 16, 32, 255];
+
+    if (panelContainer.x <= canvas.width) {
+      expect(colorDistance(beforePixel, afterOpenPixel)).toBeGreaterThan(30);
+      expect(colorDistance(afterOpenPixel, panelColor)).toBeLessThan(240);
+
+      scene.settingsPanel.close();
+      await waitFrames(24);
+      const afterClosePixel = await readScenePixel(scene, canvas, samplePoint[0], samplePoint[1]);
+      expect(colorDistance(afterOpenPixel, afterClosePixel)).toBeGreaterThan(30);
+    } else {
+      expect(scene.settingsPanel.isOpen).toBe(true);
+      scene.settingsPanel.close();
+      await waitFrames(8);
+    }
+  }, 45_000);
 });
