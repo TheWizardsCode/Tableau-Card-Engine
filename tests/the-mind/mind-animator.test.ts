@@ -86,6 +86,36 @@ describe('MindAnimator', () => {
     expect(humanSprite.setDisplaySize).toHaveBeenCalledWith(120, 164);
   });
 
+  it('uses flip completion callback (not delayedCall) to finish AI card animation', async () => {
+    const scene = createScene() as any;
+    const renderer = {
+      aiCardSprites: [createSprite('canonical-mind-back')],
+      humanCardSprites: [],
+    } as any;
+    const session = {
+      players: [
+        { hand: [] },
+        { hand: [] },
+      ],
+    } as any;
+
+    const animator = new MindAnimator(scene, session, renderer, null);
+    const onComplete = vi.fn();
+
+    animator.animateCardTowardsPile(1, 42, onComplete);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(flipCardMock).toHaveBeenCalled();
+    const flipArgs = flipCardMock.mock.calls[0][0] as { onComplete?: () => void };
+    expect(typeof flipArgs.onComplete).toBe('function');
+
+    // Complete animation via flip callback and ensure delayedCall is not used.
+    flipArgs.onComplete?.();
+    expect(onComplete).toHaveBeenCalled();
+    expect(scene.time.delayedCall).not.toHaveBeenCalled();
+  });
+
   it('uses ensured textures for AI play animation instead of unresolved canonical keys', async () => {
     const scene = createScene();
     const renderer = {

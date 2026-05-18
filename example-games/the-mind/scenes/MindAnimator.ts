@@ -153,11 +153,13 @@ export class MindAnimator {
         onMidpoint: () => {
           tempSprite.setDisplaySize(CARD_W, CARD_H);
         },
-      });
-
-      this.scene.time.delayedCall(ANIM_DURATION, () => {
-        tempSprite.destroy();
-        onComplete();
+        onComplete: () => {
+          // Ensure final frame remains normalized before cleanup.
+          tempSprite.setScale(1);
+          tempSprite.setDisplaySize(CARD_W, CARD_H);
+          tempSprite.destroy();
+          onComplete();
+        },
       });
     })();
   }
