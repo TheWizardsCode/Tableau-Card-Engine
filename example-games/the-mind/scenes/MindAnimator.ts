@@ -69,6 +69,10 @@ export class MindAnimator {
 
     this.renderer.humanCardSprites.splice(spriteIdx, 1);
     sprite.disableInteractive();
+    // Reset hover scaling before animation so played cards do not
+    // momentarily appear wider than intended during travel to pile.
+    sprite.setScale(1);
+    sprite.setDisplaySize(CARD_W, CARD_H);
     sprite.setDepth(DEPTH_PLAYED_CARD);
 
     this.scene.tweens.add({

@@ -30,6 +30,8 @@ function createSprite(key: string) {
     texture: { key },
     setDisplaySize: vi.fn().mockReturnThis(),
     setDepth: vi.fn().mockReturnThis(),
+    setScale: vi.fn().mockReturnThis(),
+    disableInteractive: vi.fn().mockReturnThis(),
     destroy: vi.fn(),
     setTexture: vi.fn().mockReturnThis(),
   };
@@ -57,6 +59,31 @@ describe('MindAnimator', () => {
     ensureTextureMock.mockClear();
     ensureBackTextureMock.mockClear();
     flipCardMock.mockClear();
+  });
+
+  it('normalizes human card sprite scale before animating to pile', () => {
+    const scene = createScene();
+    const humanSprite = createSprite('canonical-mind-42') as any;
+    humanSprite.__mindCardValue = 42;
+
+    const renderer = {
+      aiCardSprites: [],
+      humanCardSprites: [humanSprite],
+    } as any;
+    const session = {
+      players: [
+        { hand: [] },
+        { hand: [] },
+      ],
+    } as any;
+
+    const animator = new MindAnimator(scene, session, renderer, null);
+
+    animator.animateCardTowardsPile(0, 42, vi.fn());
+
+    expect(humanSprite.disableInteractive).toHaveBeenCalled();
+    expect(humanSprite.setScale).toHaveBeenCalledWith(1);
+    expect(humanSprite.setDisplaySize).toHaveBeenCalledWith(120, 164);
   });
 
   it('uses ensured textures for AI play animation instead of unresolved canonical keys', async () => {
