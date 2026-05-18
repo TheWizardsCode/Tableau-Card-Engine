@@ -361,6 +361,8 @@ import { ENGINE_VERSION } from '@core-engine/index';
 
 ## Adding an Example Game
 
+> **Note:** For engine feature demonstrations (not full games), add a demo scene to the **Gym** instead of creating a new example game. See [Gym documentation](../example-games/gym/README.md) and [Gym scene index](gym/GYM_INDEX.md).
+
 1. Create a directory: `example-games/<game-name>/`
 2. Add a standalone entry point: `example-games/<game-name>/main.ts`
 3. Add a factory function: `example-games/<game-name>/createXxxGame.ts` (for browser tests)
