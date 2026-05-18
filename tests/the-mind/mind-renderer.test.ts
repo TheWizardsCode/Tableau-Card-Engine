@@ -1,9 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('../../example-games/the-mind/MindCardTextureAdapter', () => ({
-  ensureTexture: vi.fn(async (_scene: unknown, value: number) => ({
+const { ensureTextureMock, ensureBackTextureMock } = vi.hoisted(() => ({
+  ensureTextureMock: vi.fn(async (_scene: unknown, value: number) => ({
     key: `ms_card_mind-${value}_120x164@1`,
+    ready: true,
   })),
+  ensureBackTextureMock: vi.fn(async () => ({
+    key: 'ms_card_mind-back_120x164@1',
+    ready: true,
+  })),
+}));
+
+vi.mock('../../example-games/the-mind/MindCardTextureAdapter', () => ({
+  ensureTexture: ensureTextureMock,
+  ensureBackTexture: ensureBackTextureMock,
   resolveTemplateId: vi.fn((value: number) => `mind-${value}`),
   resolveBackTemplateId: vi.fn(() => 'mind-back'),
   getCanonicalTextureKey: vi.fn((templateId: string, _w?: number, _h?: number, _dpr?: number) => `ms_card_${templateId}_120x164@1`),
@@ -24,6 +34,14 @@ vi.mock('../../src/ui', () => ({
 
 import { MindRenderer } from '../../example-games/the-mind/scenes/MindRenderer';
 import type { TheMindSession } from '../../example-games/the-mind/TheMindGameState';
+
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
+}
 
 function createMockSprite() {
   const sprite = {
@@ -102,6 +120,18 @@ describe('MindRenderer', () => {
   let renderer: MindRenderer;
 
   beforeEach(() => {
+    ensureTextureMock.mockReset();
+    ensureBackTextureMock.mockReset();
+
+    ensureTextureMock.mockImplementation(async (_scene: unknown, value: number) => ({
+      key: `ms_card_mind-${value}_120x164@1`,
+      ready: true,
+    }));
+    ensureBackTextureMock.mockImplementation(async () => ({
+      key: 'ms_card_mind-back_120x164@1',
+      ready: true,
+    }));
+
     scene = createMockScene();
     session = createSession();
     renderer = new MindRenderer(scene, session);
@@ -116,7 +146,6 @@ describe('MindRenderer', () => {
     expect(renderer.humanCardSprites).toHaveLength(2);
     expect(renderer.aiCardSprites).toHaveLength(2);
 
-    // Simulate out-of-order penalty removing lower cards from both players.
     session.players[0].hand = [{ value: 20, faceUp: false }];
     session.players[1].hand = [{ value: 30, faceUp: false }];
 
@@ -124,5 +153,52 @@ describe('MindRenderer', () => {
 
     expect(renderer.humanCardSprites).toHaveLength(1);
     expect(renderer.aiCardSprites).toHaveLength(1);
+  });
+
+  it('waits for face texture promise before applying card texture', async () => {
+    const deferred = createDeferred<void>();
+    ensureTextureMock.mockImplementation(async (_scene: unknown, value: number) => ({
+      key: `ms_card_mind-${value}_120x164@1`,
+      ready: false,
+      promise: deferred.promise,
+    }));
+
+    const firstSprite = renderer.humanCardSprites[0] as unknown as { texture: { key: string }; setTexture: ReturnType<typeof vi.fn> };
+    (firstSprite.setTexture as unknown as { mockClear: () => void }).mockClear();
+
+    renderer.refreshHumanHand();
+    const callsBeforeResolve = (firstSprite.setTexture as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    expect(callsBeforeResolve.some((c) => c[0] === 'ms_card_mind-5_120x164@1')).toBe(false);
+
+    deferred.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const callsAfterResolve = (firstSprite.setTexture as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    expect(callsAfterResolve.some((c) => c[0] === 'ms_card_mind-5_120x164@1')).toBe(true);
+  });
+
+  it('re-applies display size after setting ensured texture', async () => {
+    renderer.refreshHumanHand();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const firstSprite = renderer.humanCardSprites[0] as unknown as { setDisplaySize: ReturnType<typeof vi.fn> };
+    const displayCalls = (firstSprite.setDisplaySize as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+
+    // One call is from sprite creation; at least one additional call should happen
+    // after texture swap to avoid unintended size reset.
+    expect(displayCalls.length).toBeGreaterThan(1);
+    expect(displayCalls[displayCalls.length - 1]).toEqual([120, 164]);
+  });
+
+  it('ensures real card-back texture for AI hand', async () => {
+    expect(ensureBackTextureMock).toHaveBeenCalled();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    for (const sprite of renderer.aiCardSprites as unknown as Array<{ texture: { key: string } }>) {
+      expect(sprite.texture.key).toBe('ms_card_mind-back_120x164@1');
+    }
   });
 });

@@ -195,38 +195,21 @@ export function preloadMindCardAssets(
       // Best-effort: tests that need these assets should ensure they exist.
     }
   } else {
-    // Browser: registration-only — mark scene as valid for lazy rasterisation.
-    // No eager SVG loading via scene.load.svg.
+    // Browser: registration-only for lazy rasterisation plus a static
+    // card-back fallback image (Main Street pattern) so first paint never
+    // shows missing-texture placeholders.
     if (scene) {
       markSceneValid(scene);
 
-      // Create a lightweight synchronous placeholder texture for the
-      // card-back so that sprites created immediately in create() have
-      // a visible texture. The real, high-quality DPR-aware texture will
-      // be generated lazily by SvgHelpers.getOrCreateTexture when needed.
       try {
-        const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
-        const backKey = makeMindCardTextureKey(CARD_BACK_KEY, width, height, dpr);
-        if (!scene.textures?.exists(backKey)) {
-          const canvas = document.createElement('canvas');
-          canvas.width = Math.round(width * dpr);
-          canvas.height = Math.round(height * dpr);
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            // Simple placeholder: dark background with light label to indicate card-back
-            ctx.fillStyle = '#222';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = '#eee';
-            ctx.font = `${Math.round(14 * dpr)}px sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('Mind', canvas.width / 2, canvas.height / 2);
-          }
-          // Register placeholder canvas under the DPR-aware back key.
-          scene.textures.addCanvas(backKey, canvas);
+        // Use Phaser image loader (not load.svg) to provide a reliable
+        // immediate fallback texture key while DPR-aware textures are
+        // generated lazily by SvgHelpers.
+        if (!scene.textures?.exists(CARD_BACK_KEY)) {
+          (scene.load as any)?.image?.(CARD_BACK_KEY, `${ASSET_PATH}/mind-back.svg`);
         }
       } catch {
-        // Best-effort: do not let placeholder creation block preload.
+        // Best-effort: keep preload resilient in constrained environments.
       }
     }
   }
@@ -304,6 +287,10 @@ export async function ensureMindCardBackTexture(
   const svgText = await resolveSvgText(scene, templateId);
 
   if (!svgText) {
+    // Fall back to preloaded static image key when available.
+    if (scene.textures?.exists(CARD_BACK_KEY)) {
+      return { key: CARD_BACK_KEY, ready: true };
+    }
     return { key: templateId, ready: false };
   }
 

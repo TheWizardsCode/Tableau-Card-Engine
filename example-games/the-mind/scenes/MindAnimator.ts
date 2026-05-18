@@ -4,7 +4,13 @@
 
 import type { MindCard } from '../MindCard';
 import type { PlayResult, PlayerId } from '../TheMindGameState';
-import { resolveTemplateId, resolveBackTemplateId, getCanonicalTextureKey } from '../MindCardTextureAdapter';
+import {
+  resolveTemplateId,
+  resolveBackTemplateId,
+  getCanonicalTextureKey,
+  ensureTexture,
+  ensureBackTexture,
+} from '../MindCardTextureAdapter';
 import { flipCard, shakeIllegalMove } from '../../../src/ui';
 import type { SoundManager } from '../../../src/core-engine';
 import {
@@ -48,8 +54,9 @@ export class MindAnimator {
     let spriteIdx = -1;
 
     for (let i = 0; i < this.renderer.humanCardSprites.length; i++) {
-      if (this.renderer.humanCardSprites[i].texture.key === targetTex) {
-        sprite = this.renderer.humanCardSprites[i];
+      const candidate = this.renderer.humanCardSprites[i] as Phaser.GameObjects.Image & { __mindCardValue?: number };
+      if (candidate.__mindCardValue === cardValue || candidate.texture.key === targetTex) {
+        sprite = candidate;
         spriteIdx = i;
         break;
       }
@@ -93,38 +100,62 @@ export class MindAnimator {
       srcSprite.destroy();
     }
 
-    const backKey = getCanonicalTextureKey(resolveBackTemplateId(), CARD_W, CARD_H);
-    const tempSprite = this.scene.add
-      .image(sourceX, sourceY, backKey)
-      .setDisplaySize(CARD_W, CARD_H)
-      .setDepth(DEPTH_PLAYED_CARD);
+    void (async () => {
+      let backKey = getCanonicalTextureKey(resolveBackTemplateId(), CARD_W, CARD_H);
+      let faceUpTex = getCanonicalTextureKey(resolveTemplateId(cardValue), CARD_W, CARD_H);
 
-    const faceUpTex = getCanonicalTextureKey(resolveTemplateId(cardValue), CARD_W, CARD_H);
+      try {
+        const backRes = await ensureBackTexture(this.scene, CARD_W, CARD_H);
+        if (!backRes.ready && backRes.promise) {
+          await backRes.promise;
+        }
+        backKey = backRes.key;
+      } catch {
+        if (this.scene.textures?.exists(resolveBackTemplateId())) {
+          backKey = resolveBackTemplateId();
+        }
+      }
 
-    this.scene.tweens.add({
-      targets: tempSprite,
-      x: PILE_X,
-      y: PILE_Y,
-      duration: ANIM_DURATION,
-      ease: 'Cubic.easeOut',
-    });
+      try {
+        const faceRes = await ensureTexture(this.scene, cardValue, CARD_W, CARD_H);
+        if (!faceRes.ready && faceRes.promise) {
+          await faceRes.promise;
+        }
+        faceUpTex = faceRes.key;
+      } catch {
+        // keep canonical fallback key
+      }
 
-    flipCard({
-      scene: this.scene,
-      target: tempSprite,
-      newTexture: faceUpTex,
-      duration: ANIM_DURATION,
-      easeClose: 'Cubic.easeIn',
-      easeOpen: 'Cubic.easeOut',
-      onMidpoint: () => {
-        tempSprite.setDisplaySize(CARD_W, CARD_H);
-      },
-    });
+      const tempSprite = this.scene.add
+        .image(sourceX, sourceY, backKey)
+        .setDisplaySize(CARD_W, CARD_H)
+        .setDepth(DEPTH_PLAYED_CARD);
 
-    this.scene.time.delayedCall(ANIM_DURATION, () => {
-      tempSprite.destroy();
-      onComplete();
-    });
+      this.scene.tweens.add({
+        targets: tempSprite,
+        x: PILE_X,
+        y: PILE_Y,
+        duration: ANIM_DURATION,
+        ease: 'Cubic.easeOut',
+      });
+
+      flipCard({
+        scene: this.scene,
+        target: tempSprite,
+        newTexture: faceUpTex,
+        duration: ANIM_DURATION,
+        easeClose: 'Cubic.easeIn',
+        easeOpen: 'Cubic.easeOut',
+        onMidpoint: () => {
+          tempSprite.setDisplaySize(CARD_W, CARD_H);
+        },
+      });
+
+      this.scene.time.delayedCall(ANIM_DURATION, () => {
+        tempSprite.destroy();
+        onComplete();
+      });
+    })();
   }
 
   // ── Penalty display ────────────────────────────────────
