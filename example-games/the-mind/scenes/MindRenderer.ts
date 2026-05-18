@@ -3,7 +3,13 @@
  */
 
 import { GAME_W, GAME_H, FONT_FAMILY, createSceneHeader, layoutCardPositions } from '../../../src/ui';
-import { ensureTexture, ensureBackTexture, resolveBackTemplateId, getCanonicalTextureKey } from '../MindCardTextureAdapter';
+import {
+  ensureTexture,
+  ensureBackTexture,
+  resolveBackTemplateId,
+  resolveTemplateId,
+  getCanonicalTextureKey,
+} from '../MindCardTextureAdapter';
 import type { MindCard } from '../MindCard';
 import type { TheMindSession } from '../TheMindGameState';
 import { MAX_LEVEL } from '../TheMindGameState';
@@ -174,9 +180,13 @@ export class MindRenderer {
     const pileSize = this.session.pile.size();
 
     if (pileSize > 0 && topCard) {
-      // Use a fallback back texture while the face texture is being ensured.
       const backKey = this.getBackTextureFallbackKey();
-      this.pileSprite.setTexture(backKey);
+      const faceKey = getCanonicalTextureKey(resolveTemplateId(topCard.value), CARD_W, CARD_H);
+      const hasFaceTexture = !!this.scene.textures?.exists?.(faceKey);
+
+      // Avoid flicker: if face texture is already available, use it immediately
+      // instead of flashing back texture first.
+      this.pileSprite.setTexture(hasFaceTexture ? faceKey : backKey);
       this.pileSprite.setDisplaySize(CARD_W, CARD_H);
       this.pileSprite.setAlpha(1);
       this.pileValueText.setText(`${topCard.value}`);

@@ -201,4 +201,22 @@ describe('MindRenderer', () => {
       expect(sprite.texture.key).toBe('ms_card_mind-back_120x164@1');
     }
   });
+
+  it('does not flash pile back texture when face texture already exists', () => {
+    session.pile.peek = () => ({ value: 42, faceUp: true }) as any;
+    session.pile.size = () => 1;
+
+    (scene as any).textures = {
+      exists: (key: string) => key === 'ms_card_mind-42_120x164@1' || key === 'ms_card_mind-back_120x164@1',
+    };
+
+    const pileSprite = renderer.pileSprite as unknown as { setTexture: ReturnType<typeof vi.fn> };
+    (pileSprite.setTexture as unknown as { mockClear: () => void }).mockClear();
+
+    renderer.refreshPile();
+
+    const calls = (pileSprite.setTexture as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls[0][0]).toBe('ms_card_mind-42_120x164@1');
+  });
 });
