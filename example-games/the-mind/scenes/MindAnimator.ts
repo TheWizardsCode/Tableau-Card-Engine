@@ -4,8 +4,13 @@
 
 import type { MindCard } from '../MindCard';
 import type { PlayResult, PlayerId } from '../TheMindGameState';
-import { getMindCardTexture } from '../MindCardRenderer';
-import { CARD_BACK_KEY } from '../MindCard';
+import {
+  resolveTemplateId,
+  resolveBackTemplateId,
+  getCanonicalTextureKey,
+  ensureTexture,
+  ensureBackTexture,
+} from '../MindCardTextureAdapter';
 import { flipCard, shakeIllegalMove } from '../../../src/ui';
 import type { SoundManager } from '../../../src/core-engine';
 import {
@@ -44,14 +49,14 @@ export class MindAnimator {
     cardValue: number,
     onComplete: () => void,
   ): void {
-    const displayCard: MindCard = { value: cardValue, faceUp: true };
-    const targetTex = getMindCardTexture(displayCard);
+    const targetTex = getCanonicalTextureKey(resolveTemplateId(cardValue), CARD_W, CARD_H);
     let sprite: Phaser.GameObjects.Image | undefined;
     let spriteIdx = -1;
 
     for (let i = 0; i < this.renderer.humanCardSprites.length; i++) {
-      if (this.renderer.humanCardSprites[i].texture.key === targetTex) {
-        sprite = this.renderer.humanCardSprites[i];
+      const candidate = this.renderer.humanCardSprites[i] as Phaser.GameObjects.Image & { __mindCardValue?: number };
+      if (candidate.__mindCardValue === cardValue || candidate.texture.key === targetTex) {
+        sprite = candidate;
         spriteIdx = i;
         break;
       }
@@ -64,6 +69,10 @@ export class MindAnimator {
 
     this.renderer.humanCardSprites.splice(spriteIdx, 1);
     sprite.disableInteractive();
+    // Reset hover scaling before animation so played cards do not
+    // momentarily appear wider than intended during travel to pile.
+    sprite.setScale(1);
+    sprite.setDisplaySize(CARD_W, CARD_H);
     sprite.setDepth(DEPTH_PLAYED_CARD);
 
     this.scene.tweens.add({
@@ -95,37 +104,64 @@ export class MindAnimator {
       srcSprite.destroy();
     }
 
-    const tempSprite = this.scene.add
-      .image(sourceX, sourceY, CARD_BACK_KEY)
-      .setDisplaySize(CARD_W, CARD_H)
-      .setDepth(DEPTH_PLAYED_CARD);
+    void (async () => {
+      let backKey = getCanonicalTextureKey(resolveBackTemplateId(), CARD_W, CARD_H);
+      let faceUpTex = getCanonicalTextureKey(resolveTemplateId(cardValue), CARD_W, CARD_H);
 
-    const faceUpTex = getMindCardTexture({ value: cardValue, faceUp: true });
+      try {
+        const backRes = await ensureBackTexture(this.scene, CARD_W, CARD_H);
+        if (!backRes.ready && backRes.promise) {
+          await backRes.promise;
+        }
+        backKey = backRes.key;
+      } catch {
+        if (this.scene.textures?.exists(resolveBackTemplateId())) {
+          backKey = resolveBackTemplateId();
+        }
+      }
 
-    this.scene.tweens.add({
-      targets: tempSprite,
-      x: PILE_X,
-      y: PILE_Y,
-      duration: ANIM_DURATION,
-      ease: 'Cubic.easeOut',
-    });
+      try {
+        const faceRes = await ensureTexture(this.scene, cardValue, CARD_W, CARD_H);
+        if (!faceRes.ready && faceRes.promise) {
+          await faceRes.promise;
+        }
+        faceUpTex = faceRes.key;
+      } catch {
+        // keep canonical fallback key
+      }
 
-    flipCard({
-      scene: this.scene,
-      target: tempSprite,
-      newTexture: faceUpTex,
-      duration: ANIM_DURATION,
-      easeClose: 'Cubic.easeIn',
-      easeOpen: 'Cubic.easeOut',
-      onMidpoint: () => {
-        tempSprite.setDisplaySize(CARD_W, CARD_H);
-      },
-    });
+      const tempSprite = this.scene.add
+        .image(sourceX, sourceY, backKey)
+        .setDisplaySize(CARD_W, CARD_H)
+        .setDepth(DEPTH_PLAYED_CARD);
 
-    this.scene.time.delayedCall(ANIM_DURATION, () => {
-      tempSprite.destroy();
-      onComplete();
-    });
+      this.scene.tweens.add({
+        targets: tempSprite,
+        x: PILE_X,
+        y: PILE_Y,
+        duration: ANIM_DURATION,
+        ease: 'Cubic.easeOut',
+      });
+
+      flipCard({
+        scene: this.scene,
+        target: tempSprite,
+        newTexture: faceUpTex,
+        duration: ANIM_DURATION,
+        easeClose: 'Cubic.easeIn',
+        easeOpen: 'Cubic.easeOut',
+        onMidpoint: () => {
+          tempSprite.setDisplaySize(CARD_W, CARD_H);
+        },
+        onComplete: () => {
+          // Ensure final frame remains normalized before cleanup.
+          tempSprite.setScale(1);
+          tempSprite.setDisplaySize(CARD_W, CARD_H);
+          tempSprite.destroy();
+          onComplete();
+        },
+      });
+    })();
   }
 
   // ── Penalty display ────────────────────────────────────
@@ -149,7 +185,7 @@ export class MindAnimator {
       const { x, y } = startPositions[i];
 
       const sprite = this.scene.add
-        .image(x, y, getMindCardTexture(displayCard))
+        .image(x, y, getCanonicalTextureKey(resolveTemplateId(displayCard.value), CARD_W, CARD_H))
         .setDisplaySize(CARD_W, CARD_H)
         .setDepth(DEPTH_PLAYED_CARD + 1)
         .setTint(0xff4444);

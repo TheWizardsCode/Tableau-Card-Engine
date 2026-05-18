@@ -909,6 +909,24 @@ if (!texture.ready && texture.promise) await texture.promise;
 - Add or update browser smoke tests with pixel-sample assertions (non-solid texture checks).
 - Keep per-test runtime at or below 10 seconds for SVG smoke checks.
 
+### The Mind migration (CG-0MP12H40Q003Y7OU)
+
+The Mind was the first example game migrated from `scene.load.svg` to SvgHelpers lazy rasterisation. Key changes:
+
+- **MindCardRenderer.ts**: `preloadMindCardAssets` is now registration-only in browser runtimes (calls `markSceneValid(scene)`); it does NOT eagerly rasterise SVGs. The Node/test preload path still populates the `svgTextCache` for headless access.
+- **MindCardTextureAdapter.ts**: New module providing a stable, DPR-aware API for callers. Use `resolveTemplateId()`, `getCanonicalTextureKey()`, and `ensureTexture()` instead of legacy template IDs when setting sprite textures.
+- **Scene callers**: `MindRenderer`, `MindAnimator`, and `MindReplayController` now import from `MindCardTextureAdapter` instead of using `CARD_BACK_KEY` or `getMindCardTexture` directly.
+- **Texture keys**: Lazy rasterisation via `SvgHelpers.getOrCreateTexture` produces DPR-aware keys (e.g. `ms_card_mind-42_48x65@2`). The legacy template IDs (`mind-42`, `mind-back`) are still returned by `getMindCardTexture()` and `mindCardTextureKey()` but should not be used for sprite texture lookups.
+- **Tests**: Unit and integration tests updated to assert DPR-aware key format. A headless integration smoke test (`tests/the-mind/headless.test.ts`) verifies the full preload → ensure → key resolution pipeline.
+
+**Pattern for migrating other games:**
+1. Create a texture adapter module with `resolveTemplateId()`, `getCanonicalTextureKey()`, and `ensureTexture()` wrappers.
+2. Replace `this.load.svg(...)` with `markSceneValid(this)` in preload; populate SVG text cache via `this.load.text(...)` or module-level cache for Node.
+3. Replace direct texture key strings with adapter calls in scene code.
+4. Update tests to assert DPR-aware key format and add headless integration checks.
+
+Games still using `scene.load.svg` (as of this migration): hello-world, lost-cities.
+
 ## Keeping Docs Up to Date
 
 **Policy:** Any change that alters developer workflows must include a documentation update. Specifically:

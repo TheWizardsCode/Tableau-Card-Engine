@@ -2,12 +2,10 @@
  * MindReplayController -- handles replay mode state injection for The Mind.
  */
 
-import type { MindCard } from '../MindCard';
-import { getMindCardTexture } from '../MindCardRenderer';
-import { CARD_BACK_KEY } from '../MindCard';
+import { resolveTemplateId, resolveBackTemplateId, getCanonicalTextureKey } from '../MindCardTextureAdapter';
 import { MAX_LEVEL } from '../TheMindGameState';
 import type { MindRenderer } from './MindRenderer';
-import { HUMAN_HAND_Y, AI_HAND_Y, DEPTH_UI } from './MindConstants';
+import { HUMAN_HAND_Y, AI_HAND_Y, DEPTH_UI, CARD_W, CARD_H } from './MindConstants';
 
 export class MindReplayController {
   replayStepIndex = 0;
@@ -56,7 +54,7 @@ export class MindReplayController {
     if (this.renderer.aiCountText) this.renderer.aiCountText.destroy();
     if (state.aiHand.length > 0) {
       this.renderer.aiCountText = this.scene.add
-        .text(this.scene.scale.width / 2, AI_HAND_Y + 164 / 2 + 14, '', {
+        .text(this.scene.scale.width / 2, AI_HAND_Y + CARD_H / 2 + 14, '', {
           fontSize: '12px',
           color: '#aaaaaa',
           fontFamily: 'sans-serif',
@@ -71,12 +69,15 @@ export class MindReplayController {
     }
 
     if (state.pileTop > 0) {
-      const faceUpCard: MindCard = { value: state.pileTop, faceUp: true };
-      this.renderer.pileSprite.setTexture(getMindCardTexture(faceUpCard));
+      const faceUpKey = getCanonicalTextureKey(resolveTemplateId(state.pileTop), CARD_W, CARD_H);
+      this.renderer.pileSprite.setTexture(faceUpKey);
+      this.renderer.pileSprite.setDisplaySize(CARD_W, CARD_H);
       this.renderer.pileSprite.setAlpha(1);
       this.renderer.pileValueText.setText(`${state.pileTop}`);
     } else {
-      this.renderer.pileSprite.setTexture(CARD_BACK_KEY);
+      const backKey = getCanonicalTextureKey(resolveBackTemplateId(), CARD_W, CARD_H);
+      this.renderer.pileSprite.setTexture(backKey);
+      this.renderer.pileSprite.setDisplaySize(CARD_W, CARD_H);
       this.renderer.pileSprite.setAlpha(0.3);
       this.renderer.pileValueText.setText('Empty');
     }
