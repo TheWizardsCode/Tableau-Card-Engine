@@ -4,8 +4,7 @@
 
 import type { MindCard } from '../MindCard';
 import type { PlayResult, PlayerId } from '../TheMindGameState';
-import { getMindCardTexture } from '../MindCardRenderer';
-import { CARD_BACK_KEY } from '../MindCard';
+import { resolveTemplateId, resolveBackTemplateId, getCanonicalTextureKey } from '../MindCardTextureAdapter';
 import { flipCard, shakeIllegalMove } from '../../../src/ui';
 import type { SoundManager } from '../../../src/core-engine';
 import {
@@ -44,8 +43,7 @@ export class MindAnimator {
     cardValue: number,
     onComplete: () => void,
   ): void {
-    const displayCard: MindCard = { value: cardValue, faceUp: true };
-    const targetTex = getMindCardTexture(displayCard);
+    const targetTex = getCanonicalTextureKey(resolveTemplateId(cardValue), CARD_W, CARD_H);
     let sprite: Phaser.GameObjects.Image | undefined;
     let spriteIdx = -1;
 
@@ -95,12 +93,13 @@ export class MindAnimator {
       srcSprite.destroy();
     }
 
+    const backKey = getCanonicalTextureKey(resolveBackTemplateId(), CARD_W, CARD_H);
     const tempSprite = this.scene.add
-      .image(sourceX, sourceY, CARD_BACK_KEY)
+      .image(sourceX, sourceY, backKey)
       .setDisplaySize(CARD_W, CARD_H)
       .setDepth(DEPTH_PLAYED_CARD);
 
-    const faceUpTex = getMindCardTexture({ value: cardValue, faceUp: true });
+    const faceUpTex = getCanonicalTextureKey(resolveTemplateId(cardValue), CARD_W, CARD_H);
 
     this.scene.tweens.add({
       targets: tempSprite,
@@ -149,7 +148,7 @@ export class MindAnimator {
       const { x, y } = startPositions[i];
 
       const sprite = this.scene.add
-        .image(x, y, getMindCardTexture(displayCard))
+        .image(x, y, getCanonicalTextureKey(resolveTemplateId(displayCard.value), CARD_W, CARD_H))
         .setDisplaySize(CARD_W, CARD_H)
         .setDepth(DEPTH_PLAYED_CARD + 1)
         .setTint(0xff4444);

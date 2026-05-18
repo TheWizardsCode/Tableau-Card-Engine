@@ -1,10 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('../../example-games/the-mind/MindCardRenderer', () => ({
-  ensureMindCardTexture: vi.fn(async (_scene: unknown, value: number) => ({
-    key: `card-${value}`,
+vi.mock('../../example-games/the-mind/MindCardTextureAdapter', () => ({
+  ensureTexture: vi.fn(async (_scene: unknown, value: number) => ({
+    key: `ms_card_mind-${value}_120x164@1`,
   })),
-  getMindCardTexture: vi.fn((card: { value: number }) => `card-${card.value}`),
+  resolveTemplateId: vi.fn((value: number) => `mind-${value}`),
+  resolveBackTemplateId: vi.fn(() => 'mind-back'),
+  getCanonicalTextureKey: vi.fn((templateId: string, _w?: number, _h?: number, _dpr?: number) => `ms_card_${templateId}_120x164@1`),
+  getTextureKey: vi.fn((card: { value: number; faceUp: boolean }) =>
+    card.faceUp ? `ms_card_mind-${card.value}_120x164@1` : 'ms_card_mind-back_120x164@1',
+  ),
 }));
 
 vi.mock('../../src/ui', () => ({
@@ -22,7 +27,7 @@ import type { TheMindSession } from '../../example-games/the-mind/TheMindGameSta
 
 function createMockSprite() {
   const sprite = {
-    texture: { key: 'card-back' },
+    texture: { key: 'ms_card_mind-back_120x164@1' },
     x: 0,
     y: 0,
     setDisplaySize: vi.fn().mockReturnThis(),

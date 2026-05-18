@@ -2,9 +2,7 @@
  * MindReplayController -- handles replay mode state injection for The Mind.
  */
 
-import type { MindCard } from '../MindCard';
-import { getMindCardTexture } from '../MindCardRenderer';
-import { CARD_BACK_KEY } from '../MindCard';
+import { resolveTemplateId, resolveBackTemplateId, getCanonicalTextureKey } from '../MindCardTextureAdapter';
 import { MAX_LEVEL } from '../TheMindGameState';
 import type { MindRenderer } from './MindRenderer';
 import { HUMAN_HAND_Y, AI_HAND_Y, DEPTH_UI } from './MindConstants';
@@ -71,12 +69,13 @@ export class MindReplayController {
     }
 
     if (state.pileTop > 0) {
-      const faceUpCard: MindCard = { value: state.pileTop, faceUp: true };
-      this.renderer.pileSprite.setTexture(getMindCardTexture(faceUpCard));
+      const faceUpKey = getCanonicalTextureKey(resolveTemplateId(state.pileTop), 120, 164);
+      this.renderer.pileSprite.setTexture(faceUpKey);
       this.renderer.pileSprite.setAlpha(1);
       this.renderer.pileValueText.setText(`${state.pileTop}`);
     } else {
-      this.renderer.pileSprite.setTexture(CARD_BACK_KEY);
+      const backKey = getCanonicalTextureKey(resolveBackTemplateId(), 120, 164);
+      this.renderer.pileSprite.setTexture(backKey);
       this.renderer.pileSprite.setAlpha(0.3);
       this.renderer.pileValueText.setText('Empty');
     }

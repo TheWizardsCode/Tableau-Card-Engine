@@ -12,7 +12,13 @@ import {
   mindCardTextureKey,
   MIND_CARD_W,
   MIND_CARD_H,
+  makeMindCardTextureKey,
 } from '../../example-games/the-mind/MindCardRenderer';
+import {
+  resolveTemplateId,
+  resolveBackTemplateId,
+  getCanonicalTextureKey,
+} from '../../example-games/the-mind/MindCardTextureAdapter';
 
 // ── Constants ────────────────────────────────────────────────
 
@@ -32,7 +38,7 @@ describe('getMindCardTexture', () => {
     expect(getMindCardTexture(card)).toBe(CARD_BACK_KEY);
   });
 
-  it('should return the correct texture key for a face-up card', () => {
+  it('should return the correct template ID for a face-up card', () => {
     const card = makeMindCard(42, true);
     expect(getMindCardTexture(card)).toBe('mind-42');
   });
@@ -109,6 +115,84 @@ describe('mindCardTextureKey', () => {
 
   it('should throw for Infinity', () => {
     expect(() => mindCardTextureKey(Infinity)).toThrow('Invalid Mind card value');
+  });
+});
+
+// ── DPR-aware texture keys ────────────────────────────────────
+
+describe('makeMindCardTextureKey', () => {
+  it('should produce a DPR-aware key using SvgHelpers.makeTextureKey', () => {
+    const key = makeMindCardTextureKey('mind-42', 48, 65, 2);
+    expect(key).toBe('ms_card_mind-42_48x65@2');
+  });
+
+  it('should default DPR to 1 when not provided and no window', () => {
+    const key = makeMindCardTextureKey('mind-42', 48, 65);
+    // In Node test environment, window is undefined, so DPR defaults to 1
+    expect(key).toBe('ms_card_mind-42_48x65@1');
+  });
+
+  it('should produce a key for the card back', () => {
+    const key = makeMindCardTextureKey('mind-back', 48, 65, 2);
+    expect(key).toBe('ms_card_mind-back_48x65@2');
+  });
+
+  it('should round non-integer dimensions', () => {
+    const key = makeMindCardTextureKey('mind-1', 47.7, 64.3, 1);
+    expect(key).toBe('ms_card_mind-1_48x64@1');
+  });
+});
+
+// ── MindCardTextureAdapter ────────────────────────────────────
+
+describe('MindCardTextureAdapter', () => {
+  describe('resolveTemplateId', () => {
+    it('should return mind-1 for value 1', () => {
+      expect(resolveTemplateId(1)).toBe('mind-1');
+    });
+
+    it('should return mind-50 for value 50', () => {
+      expect(resolveTemplateId(50)).toBe('mind-50');
+    });
+
+    it('should return mind-100 for value 100', () => {
+      expect(resolveTemplateId(100)).toBe('mind-100');
+    });
+
+    it('should throw for value 0', () => {
+      expect(() => resolveTemplateId(0)).toThrow('Invalid Mind card value');
+    });
+
+    it('should throw for value 101', () => {
+      expect(() => resolveTemplateId(101)).toThrow('Invalid Mind card value');
+    });
+
+    it('should throw for non-integer values', () => {
+      expect(() => resolveTemplateId(3.5)).toThrow('Invalid Mind card value');
+    });
+  });
+
+  describe('resolveBackTemplateId', () => {
+    it('should return mind-back', () => {
+      expect(resolveBackTemplateId()).toBe('mind-back');
+    });
+  });
+
+  describe('getCanonicalTextureKey', () => {
+    it('should produce a DPR-aware key for a template ID', () => {
+      const key = getCanonicalTextureKey('mind-42', 48, 65, 2);
+      expect(key).toBe('ms_card_mind-42_48x65@2');
+    });
+
+    it('should default width and height to MIND_CARD_W and MIND_CARD_H', () => {
+      const key = getCanonicalTextureKey('mind-42', undefined, undefined, 1);
+      expect(key).toBe(`ms_card_mind-42_${MIND_CARD_W}x${MIND_CARD_H}@1`);
+    });
+
+    it('should default DPR to 1 in Node environment', () => {
+      const key = getCanonicalTextureKey('mind-back');
+      expect(key).toBe(`ms_card_mind-back_${MIND_CARD_W}x${MIND_CARD_H}@1`);
+    });
   });
 });
 
@@ -204,6 +288,7 @@ describe('SVG content structure', () => {
 describe('lazy rasterisation helpers', () => {
   it('ensureMindCardTexture returns a getOrCreateTexture-like result when preloaded in Node', async () => {
     const { preloadMindCardAssets, ensureMindCardTexture } = await import('../../example-games/the-mind/MindCardRenderer');
+    const { makeTextureKey } = await import('../../src/core-engine/SvgHelpers');
 
     // Minimal mock scene compatible with SvgHelpers expectations used in tests.
     const existingKeys = new Set<string>();
@@ -223,15 +308,26 @@ describe('lazy rasterisation helpers', () => {
     preloadMindCardAssets(scene, 48, 65);
 
     // Call ensureMindCardTexture for a known card value. We expect a result
-    // with a key matching the texture naming convention and an object that
-    // may include a promise for async rasterisation.
+    // with a DPR-aware texture key and an object that may include a promise
+    // for async rasterisation.
     const res = await ensureMindCardTexture(scene, 42, 48, 65);
 
     expect(res).toHaveProperty('key');
-    expect(res.key).toBe('mind-42');
-    // ready may be true/false depending on environment; promise is optional
-    if (res.promise) {
-      expect(typeof res.promise.then).toBe('function');
-    }
+    // Key should follow the DPR-aware format from SvgHelpers.makeTextureKey
+    expect(res.key).toBe(makeTextureKey('mind-42', 48, 65, 1));
+    // In Node environment, ready should be false (no rasterisation possible)
+    expect(res.ready).toBe(false);
+  });
+
+  it('ensureMindCardTexture throws for invalid card values', async () => {
+    const { ensureMindCardTexture } = await import('../../example-games/the-mind/MindCardRenderer');
+
+    const scene = {
+      sys: { game: {} },
+      textures: { exists: () => false, addCanvas: () => undefined, get: () => undefined },
+    } as any;
+
+    await expect(ensureMindCardTexture(scene, 0, 48, 65)).rejects.toThrow('Invalid Mind card value');
+    await expect(ensureMindCardTexture(scene, 101, 48, 65)).rejects.toThrow('Invalid Mind card value');
   });
 });
