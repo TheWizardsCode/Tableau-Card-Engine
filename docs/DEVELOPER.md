@@ -838,7 +838,7 @@ Use the `scripts/refresh-thumbnails.sh` script to replay fixture transcripts and
 bash scripts/refresh-thumbnails.sh
 ```
 
-The script processes all supported games (`golf`, `beleaguered-castle`, `lost-cities`, `sushi-go`, `feudalism`, `the-mind`, `main-street`). For each game it runs the replay tool to capture screenshots, then invokes the thumbnail generator. Games that lack a fixture transcript or replay adapter are skipped with a warning (not a failure). `hello-world` is excluded — it has no gameplay and no fixture transcript. A summary table is printed at the end showing which games were refreshed and which were skipped. The script exits non-zero if any supported game fails during replay or thumbnail generation.
+The script processes all supported games (`golf`, `beleaguered-castle`, `lost-cities`, `sushi-go`, `feudalism`, `the-mind`, `main-street`). For each game it runs the replay tool to capture screenshots, then invokes the thumbnail generator. Games that lack a fixture transcript or replay adapter are skipped with a warning (not a failure). The `gym` is excluded -- it has no replay transcript. A summary table is printed at the end showing which games were refreshed and which were skipped. The script exits non-zero if any supported game fails during replay or thumbnail generation.
 
 ### Main Street visual smoke runbook
 
@@ -937,7 +937,7 @@ The Mind was the first example game migrated from `scene.load.svg` to SvgHelpers
 3. Replace direct texture key strings with adapter calls in scene code.
 4. Update tests to assert DPR-aware key format and add headless integration checks.
 
-Games still using `scene.load.svg` (as of this migration): hello-world, lost-cities.
+Games still using `scene.load.svg` (as of this migration): lost-cities.
 
 ## Keeping Docs Up to Date
 
