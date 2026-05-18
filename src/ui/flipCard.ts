@@ -111,6 +111,7 @@ export function flipCard(opts: FlipCardOptions): Phaser.Tweens.Tween {
   const half = duration / 2;
   const moveInterval = sfx?.moveIntervalMs ?? 120;
   let loopSound: Phaser.Sound.BaseSound | null = null;
+  const initialScaleX = (target as any).scaleX ?? 1;
 
   // Build the close-phase tween config
   const closeConfig: Phaser.Types.Tweens.TweenBuilderConfig = {
@@ -153,10 +154,18 @@ export function flipCard(opts: FlipCardOptions): Phaser.Tweens.Tween {
       target.setTexture(newTexture);
       onMidpoint?.();
 
-      // Build the open-phase tween config
+      // Build the open-phase tween config.
+      // Preserve the intended visible width after midpoint work
+      // (e.g. setDisplaySize), instead of always forcing scaleX=1.
+      const postMidScaleX = (target as any).scaleX;
+      const reopenScaleX =
+        typeof postMidScaleX === 'number' && Math.abs(postMidScaleX) > 0.0001
+          ? postMidScaleX
+          : initialScaleX;
+
       const openConfig: Phaser.Types.Tweens.TweenBuilderConfig = {
         targets: target,
-        scaleX: 1,
+        scaleX: reopenScaleX,
         duration: half,
         ease: easeOpen,
         onStart: () => {
