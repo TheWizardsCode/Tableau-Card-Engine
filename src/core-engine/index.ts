@@ -132,6 +132,16 @@ export {
   getPresetNames,
 } from './DifficultyPresets';
 
+// i18n / localisation helpers
+export {
+  t,
+  registerLocale,
+  setLocale,
+  getLocale,
+  resetI18n,
+} from './I18n';
+export type { I18nBundle } from './I18n';
+
 // Spatial rules API (CG-0MM5ZG7071KO7PVG)
 export type {
   Position,

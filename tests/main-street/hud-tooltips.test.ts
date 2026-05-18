@@ -17,7 +17,10 @@ import {
   HUD_TOOLTIP_I18N_KEYS,
   HUD_ARIA_I18N_KEYS,
   HUD_TOOLTIP_STRINGS,
+  HUD_ARIA_STRINGS,
+  HUD_ARIA_LABELS,
 } from '../../example-games/main-street/scenes/MainStreetHudTooltips';
+import { t, setLocale, registerLocale, resetI18n } from '../../src/core-engine/I18n';
 
 import {
   setupMainStreetGame,
@@ -49,6 +52,54 @@ describe('HUD tooltip i18n keys', () => {
     expect(ariaKeys).toContain('coins');
     expect(ariaKeys).toContain('rep');
     expect(ariaKeys).toContain('score');
+  });
+
+  it('t() resolves every tooltip i18n key to its English default', () => {
+    for (const [key, i18nKey] of Object.entries(HUD_TOOLTIP_I18N_KEYS)) {
+      const expected = HUD_TOOLTIP_STRINGS[key as keyof typeof HUD_TOOLTIP_STRINGS];
+      expect(t(i18nKey as string)).toBe(expected);
+    }
+  });
+
+  it('t() resolves every ARIA i18n key to its English default', () => {
+    for (const [key, i18nKey] of Object.entries(HUD_ARIA_I18N_KEYS)) {
+      const expected = HUD_ARIA_STRINGS[key as keyof typeof HUD_ARIA_STRINGS];
+      expect(t(i18nKey as string)).toBe(expected);
+    }
+  });
+
+  it('HUD_ARIA_LABELS resolves through i18n', () => {
+    expect(HUD_ARIA_LABELS.coins).toBe(HUD_ARIA_STRINGS.coins);
+    expect(HUD_ARIA_LABELS.rep).toBe(HUD_ARIA_STRINGS.rep);
+    expect(HUD_ARIA_LABELS.score).toBe(HUD_ARIA_STRINGS.score);
+  });
+
+  it('tooltip builders use i18n — overriding locale changes content', () => {
+    const state = setupMainStreetGame({ seed: 'test-i18n-override' });
+
+    // Register a German locale that overrides a few keys
+    registerLocale('de', {
+      [HUD_TOOLTIP_I18N_KEYS.coinsTitle]: 'Einkommen Diese Runde',
+    });
+    setLocale('de');
+
+    const tooltip = buildCoinsTooltip(state);
+    expect(tooltip).toContain('Einkommen Diese Runde');
+    // Non-overridden keys should fall back to English
+    expect(tooltip).toContain('Before reputation');
+
+    // Reset to English for other tests
+    resetI18n();
+    // Re-register en bundle since resetI18n cleared everything
+    const enBundle: Record<string, string> = {};
+    for (const [k, v] of Object.entries(HUD_TOOLTIP_STRINGS)) {
+      enBundle[HUD_TOOLTIP_I18N_KEYS[k as keyof typeof HUD_TOOLTIP_I18N_KEYS]] = v;
+    }
+    for (const [k, v] of Object.entries(HUD_ARIA_STRINGS)) {
+      enBundle[HUD_ARIA_I18N_KEYS[k as keyof typeof HUD_ARIA_I18N_KEYS]] = v;
+    }
+    registerLocale('en', enBundle);
+    setLocale('en');
   });
 });
 

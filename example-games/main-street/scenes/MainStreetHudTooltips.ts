@@ -1,17 +1,18 @@
 /**
  * MainStreetHudTooltips -- Tooltip content builders for the HUD status bar.
  *
- * Provides localizable string keys and builder functions for the Coins,
+ * Provides localisable string keys and builder functions for the Coins,
  * Reputation, and Score tooltips shown when hovering/tapping HUD values.
  *
- * ## i18n key convention
- * Each tooltip string is keyed under `hud.tooltip.<field>` so that a future
- * i18n system can swap implementations. For now the strings are built with
- * template functions that embed computed numeric values.
+ * ## i18n integration
+ * Every user-facing string is looked up via the core-engine `t()` function
+ * which resolves the active locale bundle and falls back to English defaults.
+ * The English defaults are registered at module load time so they are always
+ * available, even without an explicit locale setup.
  *
  * ## ARIA labels
  * Each interactive zone carries a static `aria-label` for screen readers.
- * These are also localizable via the same key convention.
+ * These are also localisable through the same i18n system.
  *
  * @module
  */
@@ -21,6 +22,7 @@ import { reputationCoinMultiplier, applyReputationMultiplier } from '../MainStre
 import { ORDERED_TIER_DEFINITIONS } from '../MainStreetTiers';
 import { computeScore } from '../MainStreetEngine';
 import type { MainStreetState, MainStreetCampaignProgress } from '../MainStreetState';
+import { t, registerLocale } from '../../../src/core-engine/I18n';
 
 // ── i18n Keys ───────────────────────────────────────────────
 
@@ -49,18 +51,18 @@ export const HUD_ARIA_I18N_KEYS = {
   score: 'hud.aria.score',
 } as const;
 
-// ── ARIA label defaults (localize here) ─────────────────────
+// ── ARIA label lookup via i18n ──────────────────────────────
 
-/** Default ARIA labels for each HUD interactive zone. */
+/** ARIA labels for HUD interactive zones — resolved through the i18n system. */
 export const HUD_ARIA_LABELS = {
-  coins: 'Coins status — hover for	expected income breakdown',
-  rep: 'Reputation status — hover for multiplier details',
-  score: 'Score status — hover for next tier threshold',
-} as const;
+  get coins() { return t(HUD_ARIA_I18N_KEYS.coins); },
+  get rep() { return t(HUD_ARIA_I18N_KEYS.rep); },
+  get score() { return t(HUD_ARIA_I18N_KEYS.score); },
+};
 
-// ── Default string templates (localize here) ──────────────────
+// ── Default English strings (registered as the 'en' locale bundle) ────
 
-/** Default English string templates. Swappable via i18n key map. */
+/** Default English string templates. Registered as the `en` locale bundle. */
 export const HUD_TOOLTIP_STRINGS = {
   coinsTitle: 'Income This Turn',
   coinsIncomeLabel: 'Base income',
@@ -76,6 +78,27 @@ export const HUD_TOOLTIP_STRINGS = {
   scoreNextTierLabel: 'Next tier',
   scoreAllTiersUnlocked: 'All tiers unlocked',
 } as const;
+
+/** ARIA label default English strings. Registered as the `en` locale bundle. */
+export const HUD_ARIA_STRINGS = {
+  coins: 'Coins status — hover for expected income breakdown',
+  rep: 'Reputation status — hover for multiplier details',
+  score: 'Score status — hover for next tier threshold',
+} as const;
+
+// ── Register the English locale bundle ────────────────────────────────
+// This is done at module-load time so the default strings are always available.
+// The i18n keys (HUD_TOOLTIP_I18N_KEYS / HUD_ARIA_I18N_KEYS) are used as the
+// lookup keys; HUD_TOOLTIP_STRINGS and HUD_ARIA_STRINGS supply the values.
+
+const enBundle: Record<string, string> = {};
+for (const [k, v] of Object.entries(HUD_TOOLTIP_STRINGS)) {
+  enBundle[HUD_TOOLTIP_I18N_KEYS[k as keyof typeof HUD_TOOLTIP_STRINGS]] = v;
+}
+for (const [k, v] of Object.entries(HUD_ARIA_STRINGS)) {
+  enBundle[HUD_ARIA_I18N_KEYS[k as keyof typeof HUD_ARIA_STRINGS]] = v;
+}
+registerLocale('en', enBundle);
 
 // ── Tooltip Content Builders ─────────────────────────────────
 
@@ -99,10 +122,10 @@ export function buildCoinsTooltip(state: MainStreetState): string {
   const multiplierStr = Number.isFinite(multiplier) ? multiplier.toFixed(1) : '1.0';
 
   const lines = [
-    HUD_TOOLTIP_STRINGS.coinsTitle,
-    `${HUD_TOOLTIP_STRINGS.coinsPreMultiplierLabel}: ${baseIncome}`,
-    `${HUD_TOOLTIP_STRINGS.coinsPostMultiplierLabel}: ${multipliedIncome} (×${multiplierStr})`,
-    HUD_TOOLTIP_STRINGS.coinsCalcNote,
+    t(HUD_TOOLTIP_I18N_KEYS.coinsTitle),
+    `${t(HUD_TOOLTIP_I18N_KEYS.coinsPreMultiplierLabel)}: ${baseIncome}`,
+    `${t(HUD_TOOLTIP_I18N_KEYS.coinsPostMultiplierLabel)}: ${multipliedIncome} (×${multiplierStr})`,
+    t(HUD_TOOLTIP_I18N_KEYS.coinsCalcNote),
   ];
 
   return lines.join('\n');
@@ -129,10 +152,10 @@ export function buildReputationTooltip(state: MainStreetState): string {
   const multiplierStr = Number.isFinite(multiplier) ? multiplier.toFixed(1) : '1.0';
 
   const lines = [
-    HUD_TOOLTIP_STRINGS.repTitle,
-    `${HUD_TOOLTIP_STRINGS.repValueLabel}: ${rep}`,
-    `${HUD_TOOLTIP_STRINGS.repMultiplierLabel}: ×${multiplierStr}`,
-    HUD_TOOLTIP_STRINGS.repEffectLabel,
+    t(HUD_TOOLTIP_I18N_KEYS.repTitle),
+    `${t(HUD_TOOLTIP_I18N_KEYS.repValueLabel)}: ${rep}`,
+    `${t(HUD_TOOLTIP_I18N_KEYS.repMultiplierLabel)}: ×${multiplierStr}`,
+    t(HUD_TOOLTIP_I18N_KEYS.repEffectLabel),
   ];
 
   return lines.join('\n');
@@ -156,16 +179,16 @@ export function buildScoreTooltip(
   const nextTier = findNextLockedTier(unlockedTiers);
 
   const lines = [
-    HUD_TOOLTIP_STRINGS.scoreTitle,
-    `${HUD_TOOLTIP_STRINGS.scoreEstimateLabel}: ${score}`,
+    t(HUD_TOOLTIP_I18N_KEYS.scoreTitle),
+    `${t(HUD_TOOLTIP_I18N_KEYS.scoreEstimateLabel)}: ${score}`,
   ];
 
   if (nextTier) {
     lines.push(
-      `${HUD_TOOLTIP_STRINGS.scoreNextTierLabel}: ${nextTier.name} (requires Rep ≥ ${nextTier.reputationThreshold})`,
+      `${t(HUD_TOOLTIP_I18N_KEYS.scoreNextTierLabel)}: ${nextTier.name} (requires Rep ≥ ${nextTier.reputationThreshold})`,
     );
   } else {
-    lines.push(HUD_TOOLTIP_STRINGS.scoreAllTiersUnlocked);
+    lines.push(t(HUD_TOOLTIP_I18N_KEYS.scoreAllTiersUnlocked));
   }
 
   return lines.join('\n');
