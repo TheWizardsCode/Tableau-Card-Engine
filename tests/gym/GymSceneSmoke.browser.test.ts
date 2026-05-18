@@ -11,6 +11,7 @@ import { GymHandPileScene } from '../../example-games/gym/scenes/GymHandPileScen
 import { GymOverlayUiScene } from '../../example-games/gym/scenes/GymOverlayUiScene';
 import { GymUndoRedoScene } from '../../example-games/gym/scenes/GymUndoRedoScene';
 import { GymTranscriptScene } from '../../example-games/gym/scenes/GymTranscriptScene';
+import { GymSaveLoadScene } from '../../example-games/gym/scenes/GymSaveLoadScene';
 import { GymAudioFeedbackScene } from '../../example-games/gym/scenes/GymAudioFeedbackScene';
 import { waitForScene } from '../helpers/waitForScene';
 import {
@@ -19,6 +20,7 @@ import {
   GYM_OVERLAY_UI_KEY,
   GYM_UNDO_REDO_KEY,
   GYM_TRANSCRIPT_KEY,
+  GYM_SAVE_LOAD_KEY,
   GYM_AUDIO_FEEDBACK_KEY,
 } from '../../example-games/gym/GymRegistry';
 
@@ -28,6 +30,7 @@ const SCENES = [
   { key: GYM_OVERLAY_UI_KEY, Scene: GymOverlayUiScene },
   { key: GYM_UNDO_REDO_KEY, Scene: GymUndoRedoScene },
   { key: GYM_TRANSCRIPT_KEY, Scene: GymTranscriptScene },
+  { key: GYM_SAVE_LOAD_KEY, Scene: GymSaveLoadScene },
   { key: GYM_AUDIO_FEEDBACK_KEY, Scene: GymAudioFeedbackScene },
 ];
 
