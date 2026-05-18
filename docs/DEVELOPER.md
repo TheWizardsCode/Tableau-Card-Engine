@@ -221,10 +221,20 @@ src/
     └── index.ts             Barrel file / public API
 
 example-games/
-├── hello-world/
-│   ├── main.ts                 Game entry point (Phaser.Game config)
+├── gym/
+│   ├── README.md               Gym documentation and quick-start instructions
+│   ├── GymRegistry.ts           Scene key constants and catalogue
+│   ├── index.ts                 Barrel file / public API
 │   └── scenes/
-│       └── HelloWorldScene.ts  Phaser.Scene subclass
+│       ├── GymRouterScene.ts    Landing page with navigation cards
+│       ├── GymSceneBase.ts      Shared base class for all Gym scenes
+│       ├── GymDeckRngScene.ts   Deck lifecycle & seeded RNG demo
+│       ├── GymHandPileScene.ts  Hand/pile interaction demo
+│       ├── GymOverlayUiScene.ts Overlay & UI configuration demo
+│       ├── GymUndoRedoScene.ts  Undo/redo workflow demo
+│       ├── GymTranscriptScene.ts Transcript recording demo
+│       ├── GymSaveLoadScene.ts  Save/load state demo
+│       └── GymAudioFeedbackScene.ts Audio & feedback configuration demo
 ├── golf/
 │   ├── main.ts                 Game entry point (Phaser.Game config)
 │   ├── createGolfGame.ts       Factory function (used by main.ts and tests)
