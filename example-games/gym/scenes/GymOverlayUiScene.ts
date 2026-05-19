@@ -22,6 +22,7 @@ export class GymOverlayUiScene extends GymSceneBase {
   private intensityText!: Phaser.GameObjects.Text;
   private logTexts: Phaser.GameObjects.Text[] = [];
   private eventLog: string[] = [];
+  private overlayIntensityText: Phaser.GameObjects.Text | null = null;
 
   // Overlay appearance tuning
   private readonly OVERLAY_BASE_COLOR = 0x0a1a0a;
@@ -95,6 +96,22 @@ export class GymOverlayUiScene extends GymSceneBase {
     dismiss.setDepth(11);
     this.overlayObjects.push(dismiss);
 
+    // Add overlay-local intensity controls so users can tune brightness while overlay is shown
+    const minus = this.add.text(GAME_W / 2 - 80, 420, '[-]', { fontSize: '14px', color: '#ff8877', fontFamily: 'monospace' }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    minus.on('pointerdown', () => this.adjustIntensity(-0.2));
+    minus.setDepth(11);
+    this.overlayObjects.push(minus);
+
+    const intensityLabel = this.add.text(GAME_W / 2, 420, `Intensity: ${this.feedbackIntensity}`, { fontSize: '14px', color: '#ffffff', fontFamily: 'monospace' }).setOrigin(0.5);
+    intensityLabel.setDepth(11);
+    this.overlayObjects.push(intensityLabel);
+    this.overlayIntensityText = intensityLabel;
+
+    const plus = this.add.text(GAME_W / 2 + 80, 420, '[+]', { fontSize: '14px', color: '#77ff88', fontFamily: 'monospace' }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    plus.on('pointerdown', () => this.adjustIntensity(0.2));
+    plus.setDepth(11);
+    this.overlayObjects.push(plus);
+
     this.logEvent('Overlay opened');
   }
 
@@ -105,6 +122,7 @@ export class GymOverlayUiScene extends GymSceneBase {
     }
     dismissOverlay(this.overlayObjects);
     this.overlayObjects = null;
+    this.overlayIntensityText = null;
     this.overlayOpen = false;
     this.logEvent('Overlay dismissed');
   }
@@ -114,6 +132,10 @@ export class GymOverlayUiScene extends GymSceneBase {
     this.feedbackIntensity = Math.max(0, Math.min(1, this.feedbackIntensity));
     this.intensityText.setText(`Feedback Intensity: ${this.feedbackIntensity}`);
     this.logEvent(`Intensity set to ${this.feedbackIntensity}`);
+
+    if (this.overlayIntensityText) {
+      try { this.overlayIntensityText.setText(`Intensity: ${this.feedbackIntensity}`); } catch (_) {}
+    }
 
     // If overlay is open, update its appearance immediately
     if (this.overlayOpen) this.updateOverlayAppearance();
