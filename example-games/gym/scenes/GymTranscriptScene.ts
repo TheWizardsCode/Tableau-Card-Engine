@@ -84,8 +84,9 @@ export class GymTranscriptScene extends GymSceneBase {
     this.addButton(cx - 400, y, '[ New Session ]', () => this.newSession());
     this.addButton(cx - 240, y, '[ Record Event ]', () => this.recordEvent());
     this.addButton(cx - 70, y, '[ Finalize ]', () => this.finalizeSession());
-    this.addButton(cx + 80, y, '[ Show Transcript ]', () => this.showTranscript());
-    this.addButton(cx + 280, y, '[ Verify Seed ]', () => this.verifySeed());
+    this.addButton(cx + 80, y, '[ Playback ]', () => this.playTranscript());
+    this.addButton(cx + 200, y, '[ Show Transcript ]', () => this.showTranscript());
+    this.addButton(cx + 320, y, '[ Verify Seed ]', () => this.verifySeed());
 
     y += 40;
     this.addLabel(cx, y, '── Event Log ──', { fontSize: '12px', color: '#669966' }).setOrigin(0.5);
@@ -119,8 +120,8 @@ export class GymTranscriptScene extends GymSceneBase {
     if (!this.recorder) { this.logEvent('No session'); return; }
     const t = this.recorder.getTranscript();
     this.logEvent(`Transcript: v${t.version}, type=${t.gameType}, events=${t.events.length}`);
-    // Show a few events
-    for (const evt of t.events.slice(-3)) {
+    // Show all recorded events (in order)
+    for (const evt of t.events) {
       this.logEvent(`  -> ${evt.type} (turn ${evt.turn}): ${evt.detail}`);
     }
   }
@@ -133,6 +134,30 @@ export class GymTranscriptScene extends GymSceneBase {
     const vals2 = Array.from({ length: 5 }, () => rng2());
     const match = vals1.every((v, i) => Math.abs(v - vals2[i]) < 1e-10);
     this.logEvent(`Seed ${this.seed} determinism: ${match ? 'PASS' : 'FAIL'}`);
+  }
+
+  private playTranscript(): void {
+    if (!this.recorder) { this.logEvent('No session'); return; }
+    const t = this.recorder.getTranscript();
+    if (!t.events || t.events.length === 0) {
+      this.logEvent('No events to play');
+      return;
+    }
+    this.logEvent(`Playing ${t.events.length} events...`);
+    // Play events sequentially with a small delay
+    const intervalMs = 600;
+    for (let i = 0; i < t.events.length; i++) {
+      const evt = t.events[i];
+      // Use Phaser timer so playback is tied to scene lifecycle
+      try {
+        this.time.delayedCall(i * intervalMs, () => {
+          this.logEvent(`[PLAY] ${evt.type} (turn ${evt.turn}): ${evt.detail}`);
+        });
+      } catch (_e) {
+        // Fallback if time.delayedCall is unavailable
+        setTimeout(() => this.logEvent(`[PLAY] ${evt.type} (turn ${evt.turn}): ${evt.detail}`), i * intervalMs);
+      }
+    }
   }
 
   private logEvent(msg: string): void {
