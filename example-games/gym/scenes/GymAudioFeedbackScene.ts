@@ -43,6 +43,7 @@ const DEMO_EVENT_MAPPING: EventSoundMapping = {
   'game-ended': 'sfx-test-ding',
 };
 
+
 export class GymAudioFeedbackScene extends GymSceneBase {
   private gameEvents = new GameEventEmitter();
   private stubPlayer = new StubSoundPlayer();
@@ -57,13 +58,33 @@ export class GymAudioFeedbackScene extends GymSceneBase {
     super({ key: GYM_AUDIO_FEEDBACK_KEY });
   }
 
+  preload(): void {
+    // Load demo audio assets so the Phaser sound system can play them
+    this.load.audio('sfx-test-ding', 'assets/audio/card-draw.wav');
+    this.load.audio('sfx-test-buzz', 'assets/audio/card-discard.wav');
+  }
+
   create(): void {
     this.cameras.main.setBackgroundColor('#1a2a1a');
     this.initHeader('Audio & Feedback Config');
     this.addDivider();
 
-    // Initialize sound manager with stub player
-    this.soundManager = new SoundManager(this.stubPlayer, { storage: null });
+    // Initialize sound manager using Phaser's sound system when available.
+    // Fall back to a stub player in environments without audio support.
+    let player: SoundPlayer;
+    if (this.sound && typeof this.sound.play === 'function') {
+      const phaserSound = this.sound;
+      player = {
+        play: (key: string) => { try { phaserSound.play(key); } catch (_) { /* ignore play errors */ } },
+        stop: (key: string) => { try { (phaserSound as any).stopByKey?.(key); } catch (_) { /* ignore */ } },
+        setVolume: (v: number) => { try { phaserSound.volume = v; } catch (_) { /* ignore */ } },
+        setMute: (m: boolean) => { try { phaserSound.mute = m; } catch (_) { /* ignore */ } },
+      };
+    } else {
+      player = this.stubPlayer;
+    }
+
+    this.soundManager = new SoundManager(player, { storage: null });
     for (const key of DEMO_SFX_KEYS) {
       this.soundManager.register(key);
     }
