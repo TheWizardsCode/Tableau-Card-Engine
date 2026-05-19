@@ -116,8 +116,8 @@ export class GymAudioFeedbackScene extends GymSceneBase {
     this.addButton(cx - 400, y, '[ Toggle Mute ]', () => this.toggleMute());
     this.addButton(cx - 230, y, '[ Volume - ]', () => this.adjustVolume(-0.1));
     this.addButton(cx - 90, y, '[ Volume + ]', () => this.adjustVolume(0.1));
-    this.addButton(cx + 50, y, '[ Emit Ding ]', () => this.emitEvent('card-drawn'));
-    this.addButton(cx + 210, y, '[ Emit Buzz ]', () => this.emitEvent('card-discarded'));
+    this.addButton(cx + 50, y, '[ Draw Card ]', () => this.emitEvent('card-drawn'));
+    this.addButton(cx + 210, y, '[ Discard Card ]', () => this.emitEvent('card-discarded'));
     this.addButton(cx + 380, y, '[ Invalid Key ]', () => this.playInvalid());
 
     y += 50;
