@@ -54,6 +54,7 @@ export class GymUndoRedoScene extends GymSceneBase {
     this.cameras.main.setBackgroundColor('#1a2a1a');
     this.initHeader('Undo / Redo');
     this.addDivider();
+    this.initReducedMotion();
 
     this.initHelp([
       { heading: 'Overview', body: 'Demonstrates reversible actions and stack semantics using the UndoRedoManager. Useful to verify undo/redo boundaries and compound commands.' },

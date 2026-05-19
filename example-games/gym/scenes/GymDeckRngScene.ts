@@ -41,6 +41,7 @@ export class GymDeckRngScene extends GymSceneBase {
     this.cameras.main.setBackgroundColor('#1a2a1a');
     this.initHeader('Deck & Seeded RNG');
     this.addDivider();
+    this.initReducedMotion();
 
     this.initHelp([
       {

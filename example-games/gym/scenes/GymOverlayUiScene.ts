@@ -42,6 +42,7 @@ export class GymOverlayUiScene extends GymSceneBase {
     this.cameras.main.setBackgroundColor('#1a2a1a');
     this.initHeader('Overlay & UI Config');
     this.addDivider();
+    this.initReducedMotion();
 
     this.initHelp([
       { heading: 'Overview', body: 'Explores overlay lifecycle and live UI configuration. Verify overlays open/close cleanly and that settings are applied in real-time.' },

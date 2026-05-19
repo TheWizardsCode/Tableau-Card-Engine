@@ -68,6 +68,7 @@ export class GymAudioFeedbackScene extends GymSceneBase {
     this.cameras.main.setBackgroundColor('#1a2a1a');
     this.initHeader('Audio & Feedback Config');
     this.addDivider();
+    this.initReducedMotion();
 
     this.initHelp([
       { heading: 'Overview', body: 'Demonstrates audio mapping, mute toggling, and feedback configuration via SoundManager. Uses a stub player when audio is unavailable.' },

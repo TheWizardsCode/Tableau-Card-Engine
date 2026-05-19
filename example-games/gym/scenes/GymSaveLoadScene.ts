@@ -59,6 +59,7 @@ export class GymSaveLoadScene extends GymSceneBase {
     this.cameras.main.setBackgroundColor('#1a2a1a');
     this.initHeader('Save / Load State');
     this.addDivider();
+    this.initReducedMotion();
 
     this.initHelp([
       { heading: 'Overview', body: 'Demonstrates saving and loading scene state via the SaveLoadStore API. Includes handling malformed payloads and verifying invariants after restore.' },

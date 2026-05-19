@@ -77,6 +77,7 @@ export class GymTranscriptScene extends GymSceneBase {
     this.cameras.main.setBackgroundColor('#1a2a1a');
     this.initHeader('Transcript Recording');
     this.addDivider();
+    this.initReducedMotion();
 
     this.initHelp([
       { heading: 'Overview', body: 'Shows transcript recording and deterministic event ordering. Use a fixed seed to produce stable transcripts for testing and debugging.' },

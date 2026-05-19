@@ -36,6 +36,7 @@ export class GymHandPileScene extends GymSceneBase {
     this.cameras.main.setBackgroundColor('#1a2a1a');
     this.initHeader('Hand & Pile Interactions');
     this.addDivider();
+    this.initReducedMotion();
 
     this.initHelp([
       { heading: 'Overview', body: 'Demonstrates hand, discard, and pile movement flows. Experiment with drawing, discarding, and recalling to see state changes and legal/illegal move handling.' },
