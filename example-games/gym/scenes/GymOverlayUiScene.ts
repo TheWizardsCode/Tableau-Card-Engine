@@ -43,6 +43,11 @@ export class GymOverlayUiScene extends GymSceneBase {
     this.initHeader('Overlay & UI Config');
     this.addDivider();
 
+    this.initHelp([
+      { heading: 'Overview', body: 'Explores overlay lifecycle and live UI configuration. Verify overlays open/close cleanly and that settings are applied in real-time.' },
+      { heading: 'Controls', body: '[ Show Overlay ]: Open a dismissible overlay.\n[ Dismiss Overlay ]: Close the overlay if open.\n[ Intensity - ] / [ Intensity + ]: Adjust feedback intensity which influences overlay appearance.\n\nOverlay tip: Overlay clicks may be ignored briefly after interacting with overlay-local controls to avoid accidental dismissal.' }
+    ]);
+
     const cx = GAME_W / 2;
     let y = 60;
 

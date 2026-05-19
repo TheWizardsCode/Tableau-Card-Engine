@@ -16,6 +16,8 @@ import { GAME_W } from '../../../src/ui/constants';
 import { createSceneHeader } from '../../../src/ui/SceneHeader';
 import type { SceneHeaderResult } from '../../../src/ui/SceneHeader';
 import { GYM_ROUTER_KEY } from '../GymRegistry';
+import { HelpPanel, type HelpSection } from '../../../src/ui/HelpPanel';
+import { HelpButton } from '../../../src/ui/HelpButton';
 
 /**
  * Abstract base class for Gym demo scenes.
@@ -104,5 +106,54 @@ export abstract class GymSceneBase extends Phaser.Scene {
     g.moveTo(20, yOffset);
     g.lineTo(GAME_W - 20, yOffset);
     g.strokePath();
+  }
+
+  // ── Help slide-out integration ─────────────────────────
+
+  /** Optional HelpPanel instance for the scene. */
+  protected helpPanel?: HelpPanel;
+  /** Optional HelpButton instance to toggle the help panel. */
+  protected helpButton?: HelpButton;
+
+  /**
+   * Initialize the standard Gym help slide-out for this scene.
+   *
+   * Call this from your scene's create() after initHeader()/addDivider().
+   *
+   * @param sections  Array of HelpPanel sections describing the scene.
+   * @param widthPercent Optional panel width percent (defaults to 35).
+   */
+  protected initHelp(sections: HelpSection[], widthPercent: number = 35): void {
+    // Tear down any existing help UI first
+    if (this.helpPanel) {
+      try { this.helpPanel.destroy(); } catch (_) { /* ignore */ }
+      this.helpPanel = undefined;
+    }
+    if (this.helpButton) {
+      try { this.helpButton.destroy(); } catch (_) { /* ignore */ }
+      this.helpButton = undefined;
+    }
+
+    // Create new help panel + help button
+    this.helpPanel = new HelpPanel(this, { sections, widthPercent });
+    this.helpButton = new HelpButton(this, this.helpPanel);
+
+    // Ensure help resources are cleaned up when the scene shuts down/destroys
+    const cleanup = () => {
+      if (this.helpPanel) { try { this.helpPanel.destroy(); } catch (_) { /* ignore */ } this.helpPanel = undefined; }
+      if (this.helpButton) { try { this.helpButton.destroy(); } catch (_) { /* ignore */ } this.helpButton = undefined; }
+    };
+
+    // Remove any previous listener stored on the instance, then register
+    try {
+      const key = '__helpCleanupListener';
+      const prev = (this as any)[key] as (() => void) | undefined;
+      if (prev) { this.events.off('shutdown', prev); this.events.off('destroy', prev); }
+      (this as any)[key] = cleanup;
+      this.events.on('shutdown', cleanup);
+      this.events.on('destroy', cleanup);
+    } catch (_) {
+      // If event wiring fails for any reason, we still have the cleanup closure
+    }
   }
 }

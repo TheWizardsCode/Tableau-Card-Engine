@@ -42,6 +42,17 @@ export class GymDeckRngScene extends GymSceneBase {
     this.initHeader('Deck & Seeded RNG');
     this.addDivider();
 
+    this.initHelp([
+      {
+        heading: 'Overview',
+        body: 'Demonstrates deck lifecycle and deterministic seeded randomness. Use the seed controls to reproduce shuffle/draw sequences.'
+      },
+      {
+        heading: 'Controls',
+        body: '[ -1 ] / [ +1 ]: Adjust seed.\n[ Reset Seed ]: Restore default seed.\n[ Shuffle ]: Shuffle the deck with the current seed.\n[ Draw ]: Draw the top card.\n[ Reset ]: Reset deck to unshuffled state.\n\nTip: Press "?" (or click the ? button) to toggle this help.'
+      }
+    ]);
+
     // ── Controls ─────────────────────────────────────────
     const cx = GAME_W / 2;
     let y = 60;

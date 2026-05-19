@@ -37,6 +37,11 @@ export class GymHandPileScene extends GymSceneBase {
     this.initHeader('Hand & Pile Interactions');
     this.addDivider();
 
+    this.initHelp([
+      { heading: 'Overview', body: 'Demonstrates hand, discard, and pile movement flows. Experiment with drawing, discarding, and recalling to see state changes and legal/illegal move handling.' },
+      { heading: 'Controls', body: '[ Draw to Hand ]: Deal a card into your hand.\n[ Discard Selected ]: Move the selected hand card to the discard pile.\n[ Recall from Discard ]: Move top of discard back to hand.\n[ Reset ]: Shuffle a new deck and deal starting hand.\n[ Select Next ]: Cycle selection in your hand.\n\nTip: Use "?" or the ? button to toggle this help.' }
+    ]);
+
     const cx = GAME_W / 2;
     let y = 60;
 
