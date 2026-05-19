@@ -86,7 +86,6 @@ export class GymTranscriptScene extends GymSceneBase {
     this.addButton(cx - 70, y, '[ Finalize ]', () => this.finalizeSession());
     this.addButton(cx + 80, y, '[ Playback ]', () => this.playTranscript());
     this.addButton(cx + 200, y, '[ Show Transcript ]', () => this.showTranscript());
-    this.addButton(cx + 320, y, '[ Verify Seed ]', () => this.verifySeed());
 
     y += 40;
     this.addLabel(cx, y, '── Event Log ──', { fontSize: '12px', color: '#669966' }).setOrigin(0.5);
@@ -126,15 +125,7 @@ export class GymTranscriptScene extends GymSceneBase {
     }
   }
 
-  private verifySeed(): void {
-    // Verify deterministic: two sessions with same seed produce same RNG sequence
-    const rng1 = createSeededRng(this.seed);
-    const rng2 = createSeededRng(this.seed);
-    const vals1 = Array.from({ length: 5 }, () => rng1());
-    const vals2 = Array.from({ length: 5 }, () => rng2());
-    const match = vals1.every((v, i) => Math.abs(v - vals2[i]) < 1e-10);
-    this.logEvent(`Seed ${this.seed} determinism: ${match ? 'PASS' : 'FAIL'}`);
-  }
+
 
   private playTranscript(): void {
     if (!this.recorder) { this.logEvent('No session'); return; }
