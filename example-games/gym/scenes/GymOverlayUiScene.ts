@@ -23,6 +23,12 @@ export class GymOverlayUiScene extends GymSceneBase {
   private logTexts: Phaser.GameObjects.Text[] = [];
   private eventLog: string[] = [];
 
+  // Overlay appearance tuning
+  private readonly OVERLAY_BASE_COLOR = 0x0a1a0a;
+  private readonly OVERLAY_MIN_BRIGHTNESS = 0.4; // how dark at intensity=0
+  private readonly OVERLAY_ALPHA_MIN = 0.3; // alpha at intensity=0
+  private readonly OVERLAY_ALPHA_MAX = 0.7; // alpha at intensity=1
+
   constructor() {
     super({ key: GYM_OVERLAY_UI_KEY });
   }
@@ -53,7 +59,8 @@ export class GymOverlayUiScene extends GymSceneBase {
       this.logEvent('Overlay already open; ignoring');
       return;
     }
-    const result = createOverlayBackground(this, { color: 0x0a1a0a, alpha: 0.7 });
+    // Create overlay with base color and seeded alpha
+    const result = createOverlayBackground(this, { color: this.OVERLAY_BASE_COLOR, alpha: this.OVERLAY_ALPHA_MAX });
     this.overlayObjects = result.objects;
     this.overlayOpen = true;
 
@@ -63,6 +70,9 @@ export class GymOverlayUiScene extends GymSceneBase {
     } catch (e) {
       // ignore - defensive in case background isn't interactive in some envs
     }
+
+    // Apply current intensity to the overlay appearance
+    this.updateOverlayAppearance();
 
     // Add central content text (ensure it's above the background)
     const info = this.add.text(
@@ -104,6 +114,36 @@ export class GymOverlayUiScene extends GymSceneBase {
     this.feedbackIntensity = Math.max(0, Math.min(1, this.feedbackIntensity));
     this.intensityText.setText(`Feedback Intensity: ${this.feedbackIntensity}`);
     this.logEvent(`Intensity set to ${this.feedbackIntensity}`);
+
+    // If overlay is open, update its appearance immediately
+    if (this.overlayOpen) this.updateOverlayAppearance();
+  }
+
+  private updateOverlayAppearance(): void {
+    if (!this.overlayObjects || this.overlayObjects.length === 0) return;
+
+    const brightness = this.OVERLAY_MIN_BRIGHTNESS + (1 - this.OVERLAY_MIN_BRIGHTNESS) * this.feedbackIntensity;
+    const alpha = this.OVERLAY_ALPHA_MIN + (this.OVERLAY_ALPHA_MAX - this.OVERLAY_ALPHA_MIN) * this.feedbackIntensity;
+    const color = this.applyBrightnessToColor(this.OVERLAY_BASE_COLOR, brightness);
+
+    for (const obj of this.overlayObjects) {
+      try {
+        if (typeof (obj as any).setFillStyle === 'function') {
+          (obj as any).setFillStyle(color, alpha);
+        } else if (typeof (obj as any).setAlpha === 'function') {
+          (obj as any).setAlpha(alpha);
+        }
+      } catch (_e) {
+        // ignore
+      }
+    }
+  }
+
+  private applyBrightnessToColor(color: number, factor: number): number {
+    const r = Math.min(255, Math.max(0, Math.round(((color >> 16) & 0xff) * factor)));
+    const g = Math.min(255, Math.max(0, Math.round(((color >> 8) & 0xff) * factor)));
+    const b = Math.min(255, Math.max(0, Math.round((color & 0xff) * factor)));
+    return (r << 16) | (g << 8) | b;
   }
 
   private logEvent(msg: string): void {
