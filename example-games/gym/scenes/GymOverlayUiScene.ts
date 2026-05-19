@@ -57,14 +57,33 @@ export class GymOverlayUiScene extends GymSceneBase {
     this.overlayObjects = result.objects;
     this.overlayOpen = true;
 
-    // Add central content text
+    // Make overlay background dismissible by clicking it directly
+    try {
+      result.background.on('pointerdown', () => this.closeOverlay());
+    } catch (e) {
+      // ignore - defensive in case background isn't interactive in some envs
+    }
+
+    // Add central content text (ensure it's above the background)
     const info = this.add.text(
       GAME_W / 2,
       300,
       'Overlay Active\nClick "Dismiss Overlay" to close.',
       { fontSize: '18px', color: '#ffffff', fontFamily: 'monospace', align: 'center' },
     ).setOrigin(0.5);
+    info.setDepth(11);
     this.overlayObjects.push(info);
+
+    // Add an explicit in-overlay dismiss link so overlay users can close it
+    const dismiss = this.add.text(GAME_W / 2, 360, '[ Dismiss Overlay ]', {
+      fontSize: '14px',
+      color: '#88ff88',
+      fontFamily: 'monospace',
+      fontStyle: 'bold',
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    dismiss.on('pointerdown', () => this.closeOverlay());
+    dismiss.setDepth(11);
+    this.overlayObjects.push(dismiss);
 
     this.logEvent('Overlay opened');
   }
