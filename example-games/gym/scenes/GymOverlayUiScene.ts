@@ -72,7 +72,7 @@ export class GymOverlayUiScene extends GymSceneBase {
     // Make overlay background dismissible by clicking it directly, but guard against
     // immediate propagation when clicking overlay-local controls (small targets).
     try {
-      result.background.on('pointerdown', (pointer?: any) => {
+      result.background.on('pointerdown', () => {
         if (this.overlayInteractionGuard) {
           // recent overlay-local interaction; ignore this background click
           return;
