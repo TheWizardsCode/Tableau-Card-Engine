@@ -75,10 +75,29 @@ export class GymAudioFeedbackScene extends GymSceneBase {
     if (this.sound && typeof this.sound.play === 'function') {
       const phaserSound = this.sound;
       player = {
-        play: (key: string) => { try { phaserSound.play(key); } catch (_) { /* ignore play errors */ } },
-        stop: (key: string) => { try { (phaserSound as any).stopByKey?.(key); } catch (_) { /* ignore */ } },
-        setVolume: (v: number) => { try { phaserSound.volume = v; } catch (_) { /* ignore */ } },
-        setMute: (m: boolean) => { try { phaserSound.mute = m; } catch (_) { /* ignore */ } },
+        play: (key: string) => {
+          try {
+            phaserSound.play(key);
+          } catch (_err) {
+            // ignore play errors (browser autoplay policies, etc.)
+          }
+          try {
+            // Record the play in the stub so UI/logging can reflect it
+            this.stubPlayer.play(key);
+          } catch (_e) { /* ignore */ }
+        },
+        stop: (key: string) => {
+          try { (phaserSound as any).stopByKey?.(key); } catch (_) { /* ignore */ }
+          try { this.stubPlayer.stop(key); } catch (_) { /* ignore */ }
+        },
+        setVolume: (v: number) => {
+          try { phaserSound.volume = v; } catch (_) { /* ignore */ }
+          try { this.stubPlayer.setVolume(v); } catch (_) { /* ignore */ }
+        },
+        setMute: (m: boolean) => {
+          try { phaserSound.mute = m; } catch (_) { /* ignore */ }
+          try { this.stubPlayer.setMute(m); } catch (_) { /* ignore */ }
+        },
       };
     } else {
       player = this.stubPlayer;
