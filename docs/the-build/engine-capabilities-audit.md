@@ -163,11 +163,11 @@
 
 ## 2. Existing Example Games
 
-### Hello World (`example-games/hello-world/`)
-A minimal toolchain-proof scene that creates a standard 52-card deck, shuffles it with a seeded RNG, and displays a subset of cards as sprites on screen. Validates that Phaser, Vite, and the card-system module are wired together correctly.
+### Gym (`example-games/gym/`)
+A curated suite of interactive demo scenes, each demonstrating a specific core-engine feature. Replaces the original minimal Hello World scene with comprehensive, testable demos.
 
-- **Engine APIs used:** `createStandardDeck`, `shuffleArray`, `createSeededRng`, `preloadCardAssets`, `getCardTexture`, `CARD_W`, `CARD_H`, `GAME_W`, `GAME_H`
-- **Notable patterns:** No game logic; purely a rendering sanity check.
+- **Engine APIs used:** `createStandardDeck`, `shuffleArray`, `createSeededRng`, `Pile`, `UndoRedoManager`, `CompoundCommand`, `TranscriptRecorderBase`, `SaveLoadStore`, `SoundManager`, `GameEventEmitter`, `createOverlayBackground`, `dismissOverlay`, `createSceneHeader`
+- **Notable patterns:** Each scene is self-contained; deterministic headless smoke tests for every demonstrated API; event-driven UI with live state display.
 
 ### Golf (`example-games/golf/`)
 A 2-player card game where each player has a 5x4 grid of mostly face-down cards. Players take turns swapping grid cards with drawn cards or discarding, aiming for the lowest total. Features a column-clearing bonus, stock/discard draw mechanic, and a full AI opponent with Random and Greedy strategies.

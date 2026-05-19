@@ -221,10 +221,20 @@ src/
     └── index.ts             Barrel file / public API
 
 example-games/
-├── hello-world/
-│   ├── main.ts                 Game entry point (Phaser.Game config)
+├── gym/
+│   ├── README.md               Gym documentation and quick-start instructions
+│   ├── GymRegistry.ts           Scene key constants and catalogue
+│   ├── index.ts                 Barrel file / public API
 │   └── scenes/
-│       └── HelloWorldScene.ts  Phaser.Scene subclass
+│       ├── GymRouterScene.ts    Landing page with navigation cards
+│       ├── GymSceneBase.ts      Shared base class for all Gym scenes
+│       ├── GymDeckRngScene.ts   Deck lifecycle & seeded RNG demo
+│       ├── GymHandPileScene.ts  Hand/pile interaction demo
+│       ├── GymOverlayUiScene.ts Overlay & UI configuration demo
+│       ├── GymUndoRedoScene.ts  Undo/redo workflow demo
+│       ├── GymTranscriptScene.ts Transcript recording demo
+│       ├── GymSaveLoadScene.ts  Save/load state demo
+│       └── GymAudioFeedbackScene.ts Audio & feedback configuration demo
 ├── golf/
 │   ├── main.ts                 Game entry point (Phaser.Game config)
 │   ├── createGolfGame.ts       Factory function (used by main.ts and tests)
@@ -350,6 +360,8 @@ import { ENGINE_VERSION } from '@core-engine/index';
 ```
 
 ## Adding an Example Game
+
+> **Note:** For engine feature demonstrations (not full games), add a demo scene to the **Gym** instead of creating a new example game. See [Gym documentation](../example-games/gym/README.md) and [Gym scene index](gym/GYM_INDEX.md).
 
 1. Create a directory: `example-games/<game-name>/`
 2. Add a standalone entry point: `example-games/<game-name>/main.ts`
@@ -826,7 +838,7 @@ Use the `scripts/refresh-thumbnails.sh` script to replay fixture transcripts and
 bash scripts/refresh-thumbnails.sh
 ```
 
-The script processes all supported games (`golf`, `beleaguered-castle`, `lost-cities`, `sushi-go`, `feudalism`, `the-mind`, `main-street`). For each game it runs the replay tool to capture screenshots, then invokes the thumbnail generator. Games that lack a fixture transcript or replay adapter are skipped with a warning (not a failure). `hello-world` is excluded — it has no gameplay and no fixture transcript. A summary table is printed at the end showing which games were refreshed and which were skipped. The script exits non-zero if any supported game fails during replay or thumbnail generation.
+The script processes all supported games (`golf`, `beleaguered-castle`, `lost-cities`, `sushi-go`, `feudalism`, `the-mind`, `main-street`). For each game it runs the replay tool to capture screenshots, then invokes the thumbnail generator. Games that lack a fixture transcript or replay adapter are skipped with a warning (not a failure). The `gym` is excluded -- it has no replay transcript. A summary table is printed at the end showing which games were refreshed and which were skipped. The script exits non-zero if any supported game fails during replay or thumbnail generation.
 
 ### Main Street visual smoke runbook
 
@@ -925,7 +937,7 @@ The Mind was the first example game migrated from `scene.load.svg` to SvgHelpers
 3. Replace direct texture key strings with adapter calls in scene code.
 4. Update tests to assert DPR-aware key format and add headless integration checks.
 
-Games still using `scene.load.svg` (as of this migration): hello-world, lost-cities.
+Games still using `scene.load.svg` (as of this migration): lost-cities.
 
 ## Keeping Docs Up to Date
 
