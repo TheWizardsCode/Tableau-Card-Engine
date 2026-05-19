@@ -11,6 +11,7 @@
 
 import Phaser from 'phaser';
 import { GAME_W, GAME_H } from '../../../src/ui/constants';
+import { createSceneMenuButton } from '../../../src/ui/SceneHeader';
 import { GYM_ROUTER_KEY, GYM_SCENE_CATALOGUE } from '../GymRegistry';
 import type { GymSceneEntry } from '../GymRegistry';
 
@@ -39,6 +40,9 @@ export class GymRouterScene extends Phaser.Scene {
 
   create(): void {
     this.cameras.main.setBackgroundColor('#1a2a1a');
+
+    // Menu button (returns to Game Selector)
+    createSceneMenuButton(this);
 
     // Title
     this.add
