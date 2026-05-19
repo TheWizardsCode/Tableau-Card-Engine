@@ -24,6 +24,10 @@ export class GymOverlayUiScene extends GymSceneBase {
   private eventLog: string[] = [];
   private overlayIntensityText: Phaser.GameObjects.Text | null = null;
 
+  // Guard to prevent background clicks from immediately closing the overlay
+  private overlayInteractionGuard = false;
+  private readonly OVERLAY_INTERACTION_GUARD_MS = 220;
+
   // Overlay appearance tuning
   private readonly OVERLAY_BASE_COLOR = 0x0a1a0a;
   private readonly OVERLAY_MIN_BRIGHTNESS = 0.4; // how dark at intensity=0
@@ -65,9 +69,16 @@ export class GymOverlayUiScene extends GymSceneBase {
     this.overlayObjects = result.objects;
     this.overlayOpen = true;
 
-    // Make overlay background dismissible by clicking it directly
+    // Make overlay background dismissible by clicking it directly, but guard against
+    // immediate propagation when clicking overlay-local controls (small targets).
     try {
-      result.background.on('pointerdown', () => this.closeOverlay());
+      result.background.on('pointerdown', (pointer?: any) => {
+        if (this.overlayInteractionGuard) {
+          // recent overlay-local interaction; ignore this background click
+          return;
+        }
+        this.closeOverlay();
+      });
     } catch (e) {
       // ignore - defensive in case background isn't interactive in some envs
     }
@@ -79,7 +90,7 @@ export class GymOverlayUiScene extends GymSceneBase {
     const info = this.add.text(
       GAME_W / 2,
       300,
-      'Overlay Active\nClick "Dismiss Overlay" to close.',
+      'Overlay Active\nClick anywhere to dismiss.',
       { fontSize: '18px', color: '#ffffff', fontFamily: 'monospace', align: 'center' },
     ).setOrigin(0.5);
     info.setDepth(11);
@@ -92,13 +103,16 @@ export class GymOverlayUiScene extends GymSceneBase {
       fontFamily: 'monospace',
       fontStyle: 'bold',
     }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-    dismiss.on('pointerdown', () => this.closeOverlay());
+    dismiss.on('pointerdown', () => {
+      this.markOverlayInteraction();
+      this.closeOverlay();
+    });
     dismiss.setDepth(11);
     this.overlayObjects.push(dismiss);
 
     // Add overlay-local intensity controls so users can tune brightness while overlay is shown
     const minus = this.add.text(GAME_W / 2 - 80, 420, '[-]', { fontSize: '14px', color: '#ff8877', fontFamily: 'monospace' }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-    minus.on('pointerdown', () => this.adjustIntensity(-0.2));
+    minus.on('pointerdown', () => { this.markOverlayInteraction(); this.adjustIntensity(-0.2); });
     minus.setDepth(11);
     this.overlayObjects.push(minus);
 
@@ -108,9 +122,24 @@ export class GymOverlayUiScene extends GymSceneBase {
     this.overlayIntensityText = intensityLabel;
 
     const plus = this.add.text(GAME_W / 2 + 80, 420, '[+]', { fontSize: '14px', color: '#77ff88', fontFamily: 'monospace' }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-    plus.on('pointerdown', () => this.adjustIntensity(0.2));
+    plus.on('pointerdown', () => { this.markOverlayInteraction(); this.adjustIntensity(0.2); });
     plus.setDepth(11);
     this.overlayObjects.push(plus);
+
+    // Also add slightly larger invisible hit zones for the +/- controls to make tapping easier
+    try {
+      const minusZone = this.add.zone(GAME_W / 2 - 80, 420, 80, 42).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      minusZone.on('pointerdown', () => { this.markOverlayInteraction(); this.adjustIntensity(-0.2); });
+      minusZone.setDepth(11);
+      this.overlayObjects.push(minusZone);
+
+      const plusZone = this.add.zone(GAME_W / 2 + 80, 420, 80, 42).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      plusZone.on('pointerdown', () => { this.markOverlayInteraction(); this.adjustIntensity(0.2); });
+      plusZone.setDepth(11);
+      this.overlayObjects.push(plusZone);
+    } catch (_e) {
+      // ignore if zones cannot be created in some environments
+    }
 
     this.logEvent('Overlay opened');
   }
@@ -166,6 +195,24 @@ export class GymOverlayUiScene extends GymSceneBase {
     const g = Math.min(255, Math.max(0, Math.round(((color >> 8) & 0xff) * factor)));
     const b = Math.min(255, Math.max(0, Math.round((color & 0xff) * factor)));
     return (r << 16) | (g << 8) | b;
+  }
+
+  /** Mark a recent overlay-local interaction to avoid accidental background dismissals. */
+  private markOverlayInteraction(): void {
+    this.overlayInteractionGuard = true;
+    try {
+      // Use Phaser's time system if available so the delayed clear is tied to the scene
+      if (this.time && typeof this.time.delayedCall === 'function') {
+        this.time.delayedCall(this.OVERLAY_INTERACTION_GUARD_MS, () => {
+          this.overlayInteractionGuard = false;
+        });
+      } else {
+        setTimeout(() => { this.overlayInteractionGuard = false; }, this.OVERLAY_INTERACTION_GUARD_MS);
+      }
+    } catch (_e) {
+      // fallback
+      setTimeout(() => { this.overlayInteractionGuard = false; }, this.OVERLAY_INTERACTION_GUARD_MS);
+    }
   }
 
   private logEvent(msg: string): void {
