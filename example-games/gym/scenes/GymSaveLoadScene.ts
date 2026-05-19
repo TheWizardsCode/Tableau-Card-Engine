@@ -60,6 +60,11 @@ export class GymSaveLoadScene extends GymSceneBase {
     this.initHeader('Save / Load State');
     this.addDivider();
 
+    this.initHelp([
+      { heading: 'Overview', body: 'Demonstrates saving and loading scene state via the SaveLoadStore API. Includes handling malformed payloads and verifying invariants after restore.' },
+      { heading: 'Controls', body: '[ Increment ]: Mutate demo state.\n[ Set Label ]: Update label to reflect counter.\n[ Save State ]: Persist current state.\n[ Load State ]: Restore last saved state.\n[ Load Malformed ]: Simulate a bad payload to verify error handling.\n[ Clear Save ]: Remove persisted save data.' }
+    ]);
+
     this.store = new SaveLoadStore({ dbName: 'gym-save-load', localStoragePrefix: 'gym-sl' });
 
     const cx = GAME_W / 2;

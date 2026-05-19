@@ -64,6 +64,18 @@ export class GymRouterScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.layoutSceneCards();
+
+    // Help for the router
+    try {
+      // Lazy-init help panel so the router doesn't crash headless tests
+      (this as any).initHelp?.([{
+        heading: 'Overview',
+        body: 'The Gym is a collection of demo scenes that showcase core-engine features. Click any card to open that demo scene.'
+      }, {
+        heading: 'Navigation',
+        body: 'Click a scene card to open it. Use the [ Menu ] button to return to the main Game Selector.'
+      }]);
+    } catch (_) { /* ignore in environments without help UI */ }
   }
 
   // ── Adaptive grid layout ────────────────────────────────

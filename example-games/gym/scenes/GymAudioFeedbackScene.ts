@@ -69,6 +69,11 @@ export class GymAudioFeedbackScene extends GymSceneBase {
     this.initHeader('Audio & Feedback Config');
     this.addDivider();
 
+    this.initHelp([
+      { heading: 'Overview', body: 'Demonstrates audio mapping, mute toggling, and feedback configuration via SoundManager. Uses a stub player when audio is unavailable.' },
+      { heading: 'Controls', body: '[ Toggle Mute ]: Mute/unmute audio.\n[ Volume - ] / [ Volume + ]: Adjust global volume.\n[ Draw Card ] / [ Discard Card ]: Emit events mapped to sounds.\n[ Invalid Key ]: Attempt to play an unregistered key (safely ignored).' }
+    ]);
+
     // Initialize sound manager using Phaser's sound system when available.
     // Fall back to a stub player in environments without audio support.
     let player: SoundPlayer;

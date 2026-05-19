@@ -78,6 +78,11 @@ export class GymTranscriptScene extends GymSceneBase {
     this.initHeader('Transcript Recording');
     this.addDivider();
 
+    this.initHelp([
+      { heading: 'Overview', body: 'Shows transcript recording and deterministic event ordering. Use a fixed seed to produce stable transcripts for testing and debugging.' },
+      { heading: 'Controls', body: '[ New Session ]: Start a fresh transcript session.\n[ Record Event ]: Append a new event to the transcript.\n[ Finalize ]: Mark the transcript finished.\n[ Playback ]: Sequentially replay recorded events.\n[ Show Transcript ]: Log transcript metadata and events.' }
+    ]);
+
     const cx = GAME_W / 2;
     let y = 60;
 

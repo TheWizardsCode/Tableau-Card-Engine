@@ -55,6 +55,11 @@ export class GymUndoRedoScene extends GymSceneBase {
     this.initHeader('Undo / Redo');
     this.addDivider();
 
+    this.initHelp([
+      { heading: 'Overview', body: 'Demonstrates reversible actions and stack semantics using the UndoRedoManager. Useful to verify undo/redo boundaries and compound commands.' },
+      { heading: 'Controls', body: '[ +1 ], [ +5 ], [ -3 ]: Execute simple increment/decrement actions.\n[ Compound (+2,+3) ]: Execute a grouped command.\n[ Undo ] / [ Redo ]: Step backward/forward through action history.\n[ Clear History ]: Reset undo/redo stacks.' }
+    ]);
+
     const cx = GAME_W / 2;
     let y = 60;
 
