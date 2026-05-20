@@ -58,6 +58,13 @@ export interface HandViewOptions {
    * @default false
    */
   reducedMotion?: boolean;
+
+  /**
+   * Maximum per-card rotation (degrees). Positive values tilt cards up to
+   * `maxRotationDegrees` based on their horizontal offset from the hand
+   * centre. Default: 0 (no tilt).
+   */
+  maxRotationDegrees?: number;
 }
 
 /** Options for the {@link HandView.addCard} method. */
@@ -131,6 +138,9 @@ export class HandView {
   private clickEnabled: boolean;
   private _reducedMotion: boolean;
 
+  /** Maximum rotation (degrees) applied proportionally based on card offset from centre. */
+  private maxRotationDegrees: number = 0;
+
   // State
   private cards: Card[] = [];
   private selectedIndex: number | null = null;
@@ -156,6 +166,7 @@ export class HandView {
     this.selectionEnabled = opts.selectionEnabled ?? true;
     this.clickEnabled = opts.clickEnabled ?? true;
     this._reducedMotion = opts.reducedMotion ?? false;
+    this.maxRotationDegrees = opts.maxRotationDegrees ?? 0;
   }
 
   // ── Public API ──────────────────────────────────────────
@@ -275,6 +286,22 @@ export class HandView {
   }
 
   /**
+   * Set the maximum rotation in degrees applied to cards based on their
+   * horizontal offset from the hand centre. A value of 0 disables tilt.
+   */
+  setMaxRotationDegrees(maxDegrees: number): void {
+    const next = Number.isFinite(maxDegrees) ? Math.max(0, maxDegrees) : 0;
+    if (next === this.maxRotationDegrees) return;
+    this.maxRotationDegrees = next;
+    this.applyLayout();
+  }
+
+  /** Current maximum rotation (degrees). */
+  getMaxRotationDegrees(): number {
+    return this.maxRotationDegrees;
+  }
+
+  /**
    * Register an event callback.
    *
    * Supported events:
@@ -363,10 +390,24 @@ export class HandView {
 
     const positions = this.computeCardPositions();
 
+    // Precompute rotation helpers (centre and half-span) so rotation is
+    // proportional to horizontal offset from the hand centre.
+    const firstX = positions[0].x;
+    const lastX = positions[positions.length - 1].x;
+    const arcCenterX = (firstX + lastX) / 2;
+    const halfSpan = Math.max((lastX - firstX) / 2, 1);
+
     for (let i = 0; i < this.cards.length; i++) {
       const card = this.cards[i];
       const textureKey = getCardTexture(card);
       const sprite = this.scene.add.image(positions[i].x, positions[i].y, textureKey);
+
+      // Apply initial per-card rotation based on horizontal offset
+      if (this.maxRotationDegrees !== 0) {
+        const normalized = (positions[i].x - arcCenterX) / halfSpan;
+        const rotDeg = this.maxRotationDegrees * normalized;
+        sprite.rotation = (rotDeg * Math.PI) / 180;
+      }
 
       if (this.clickEnabled || this.selectionEnabled) {
         sprite.setInteractive({ useHandCursor: true });
@@ -453,11 +494,25 @@ export class HandView {
 
     const positions = this.computeCardPositions();
 
+    // Precompute rotation helpers (centre and half-span) so rotation is
+    // proportional to horizontal offset from the hand centre.
+    const firstX = positions[0].x;
+    const lastX = positions[positions.length - 1].x;
+    const arcCenterX = (firstX + lastX) / 2;
+    const halfSpan = Math.max((lastX - firstX) / 2, 1);
+
     for (let i = 0; i < this.sprites.length && i < positions.length; i++) {
       const sprite = this.sprites[i];
       const pos = positions[i];
       (sprite as any).x = pos.x;
       (sprite as any).y = pos.y;
+
+      // Apply per-card rotation (radians) proportional to horizontal offset
+      if (this.maxRotationDegrees !== 0) {
+        const normalized = (pos.x - arcCenterX) / halfSpan;
+        const rotDeg = this.maxRotationDegrees * normalized;
+        (sprite as any).rotation = (rotDeg * Math.PI) / 180;
+      }
 
       if (i < this.labels.length) {
         const label = this.labels[i];
