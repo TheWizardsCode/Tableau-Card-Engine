@@ -249,6 +249,32 @@ export class HandView {
   }
 
   /**
+   * Set the horizontal centre-to-centre spacing (in pixels) used when
+   * laying out cards. Accepts integer or floating values; values below
+   * a sensible minimum are clamped to avoid degenerate layouts. When
+   * updated the visible sprite positions are updated via applyLayout().
+   *
+   * Note: spacing is the centre-to-centre distance — when spacing <
+   * cardWidth the computed `gap = spacing - cardWidth` will be
+   * negative, allowing card overlap.
+   */
+  setSpacing(spacing: number): void {
+    const next = Number.isFinite(spacing) ? spacing : this.spacing;
+    // Protect against absurdly small values; 25% of cardWidth is a
+    // reasonable lower bound and complements the Gym slider bounds.
+    const min = Math.max(1, Math.round(this.cardWidth * 0.25));
+    const clamped = Math.max(min, next);
+    if (clamped === this.spacing) return;
+    this.spacing = clamped;
+    this.applyLayout();
+  }
+
+  /** Current spacing (px) used between card centres. */
+  getSpacing(): number {
+    return this.spacing;
+  }
+
+  /**
    * Register an event callback.
    *
    * Supported events:
@@ -394,7 +420,7 @@ export class HandView {
     const { positions } = layoutCardPositions({
       count: this.cards.length,
       cardWidth: this.cardWidth,
-      gap: Math.max(0, gap),
+      gap,
       centerX,
       maxWidth: this.maxWidth,
     });
