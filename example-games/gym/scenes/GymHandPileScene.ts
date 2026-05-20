@@ -23,13 +23,10 @@ import { discardCard } from '../../../src/ui/discardCard';
 import { moveGameObject } from '../../../src/ui/moveGameObject';
 import { shakeIllegalMove } from '../../../src/ui/shakeIllegalMove';
 import { GAME_W } from '../../../src/ui/constants';
+import { preloadCardAssets, getCardTexture, ensureCardTextureFallbacks } from '../../../src/ui/CardTextureHelpers';
 
 const HAND_SIZE = 5;
 const DEFAULT_SEED = 42;
-
-/** Texture keys for card representations. */
-const CARD_BACK_KEY = 'hp-card-back';
-const CARD_FRONT_KEY = 'hp-card-front';
 
 /** Colors for highlight zones. */
 const HIGHLIGHT_COLOR = 0x44ff44;
@@ -58,21 +55,8 @@ export class GymHandPileScene extends GymSceneBase {
   }
 
   preload(): void {
-    const graphics = this.add.graphics();
-    // Card back
-    graphics.fillStyle(0x2244aa, 1);
-    graphics.fillRoundedRect(0, 0, 50, 70, 5);
-    graphics.lineStyle(1, 0x3366cc, 1);
-    graphics.strokeRoundedRect(2, 2, 46, 66, 4);
-    graphics.generateTexture(CARD_BACK_KEY, 50, 70);
-    // Card front
-    graphics.clear();
-    graphics.fillStyle(0xfafafa, 1);
-    graphics.fillRoundedRect(0, 0, 50, 70, 5);
-    graphics.lineStyle(1, 0x333333, 1);
-    graphics.strokeRoundedRect(1, 1, 48, 68, 4);
-    graphics.generateTexture(CARD_FRONT_KEY, 50, 70);
-    graphics.destroy();
+    // Preload standard SVG card assets (faces + back).
+    preloadCardAssets(this);
   }
 
   create(): void {
@@ -80,6 +64,9 @@ export class GymHandPileScene extends GymSceneBase {
     this.initHeader('Hand & Pile Interactions');
     this.addDivider();
     this.initReducedMotion();
+
+    // Ensure runtime fallbacks exist in headless/test environments
+    ensureCardTextureFallbacks(this);
 
     this.initHelp([
       { heading: 'Overview', body: 'Demonstrates hand/pile card movement with animations: deal, place, discard, move, flip, shake (illegal), and drop-zone highlights.' },
@@ -192,8 +179,11 @@ export class GymHandPileScene extends GymSceneBase {
       return;
     }
 
-    const currentTexture = sprite.texture.key;
-    const newTexture = currentTexture === CARD_BACK_KEY ? CARD_FRONT_KEY : CARD_BACK_KEY;
+    const card = this.hand[this.selectedIdx];
+
+    // Toggle face state on the model and compute texture accordingly
+    card.faceUp = !card.faceUp;
+    const newTexture = getCardTexture(card);
 
     if (this.reducedMotion) {
       sprite.setTexture(newTexture);
@@ -371,7 +361,7 @@ export class GymHandPileScene extends GymSceneBase {
 
     for (let i = 0; i < this.hand.length; i++) {
       const card = this.hand[i];
-      const textureKey = card.faceUp ? CARD_FRONT_KEY : CARD_BACK_KEY;
+      const textureKey = getCardTexture(card);
       const sprite = this.add.image(baseX + i * spacing, baseY, textureKey);
       sprite.setTint(i === this.selectedIdx ? 0x88ff88 : 0xffffff);
 

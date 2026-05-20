@@ -20,14 +20,10 @@ import { flipCard } from '../../../src/ui/flipCard';
 import { dealCard } from '../../../src/ui/dealCard';
 import { GameEventEmitter } from '../../../src/core-engine';
 import { GAME_W } from '../../../src/ui/constants';
+import { preloadCardAssets, getCardTexture, ensureCardTextureFallbacks } from '../../../src/ui/CardTextureHelpers';
 
 /** Default seed for deterministic demonstrations. */
 const DEFAULT_SEED = 42;
-
-/** Texture key for card back. */
-const CARD_BACK_TEXTURE = 'card-back-gym';
-/** Texture key for card front placeholder. */
-const CARD_FRONT_TEXTURE = 'card-front-gym';
 
 export class GymDeckRngScene extends GymSceneBase {
   private deck: ReturnType<typeof createStandardDeck> = [];
@@ -42,6 +38,7 @@ export class GymDeckRngScene extends GymSceneBase {
   private logTexts: Phaser.GameObjects.Text[] = [];
   private eventLog: string[] = [];
   private lastDrawnSprite: Phaser.GameObjects.Image | null = null;
+  private lastDrawnCard: ReturnType<typeof createStandardDeck>[0] | null = null;
   private flipAnimActive: boolean = false;
 
   constructor() {
@@ -49,22 +46,8 @@ export class GymDeckRngScene extends GymSceneBase {
   }
 
   preload(): void {
-    // Generate simple procedural card textures for flip demo
-    const graphics = this.add.graphics();
-    // Card back - blue with pattern
-    graphics.fillStyle(0x2244aa, 1);
-    graphics.fillRoundedRect(0, 0, 60, 84, 6);
-    graphics.lineStyle(1, 0x3366cc, 1);
-    graphics.strokeRoundedRect(2, 2, 56, 80, 4);
-    graphics.generateTexture(CARD_BACK_TEXTURE, 60, 84);
-    // Card front - light with border
-    graphics.clear();
-    graphics.fillStyle(0xfafafa, 1);
-    graphics.fillRoundedRect(0, 0, 60, 84, 6);
-    graphics.lineStyle(1, 0x333333, 1);
-    graphics.strokeRoundedRect(1, 1, 58, 82, 5);
-    graphics.generateTexture(CARD_FRONT_TEXTURE, 60, 84);
-    graphics.destroy();
+    // Preload standard SVG card assets (faces + back).
+    preloadCardAssets(this);
   }
 
   create(): void {
@@ -72,6 +55,9 @@ export class GymDeckRngScene extends GymSceneBase {
     this.initHeader('Deck & Seeded RNG');
     this.addDivider();
     this.initReducedMotion();
+
+    // Ensure runtime fallbacks exist in headless/test environments
+    ensureCardTextureFallbacks(this);
 
     this.initHelp([
       {
@@ -157,7 +143,8 @@ export class GymDeckRngScene extends GymSceneBase {
     const card = this.deck.pop()!;
     this.drawn.push(card);
     this.clearLastDrawnSprite();
-    this.showCardSprite(card, CARD_BACK_TEXTURE);
+    // Show the back (card.faceUp is false by default)
+    this.showCardSprite(card);
     this.updateStatus();
     this.logEvent(`Drew ${card.rank} of ${card.suit} (${this.deck.length} remaining)`);
   }
@@ -171,16 +158,17 @@ export class GymDeckRngScene extends GymSceneBase {
       this.logEvent('Flip animation already active');
       return;
     }
-    if (!this.lastDrawnSprite) {
+    if (!this.lastDrawnSprite || !this.lastDrawnCard) {
       this.logEvent('No visible card sprite to flip');
       return;
     }
 
     const sprite = this.lastDrawnSprite;
-    const currentTexture = sprite.texture.key;
+    const card = this.lastDrawnCard;
 
-    // Toggle between front and back texture
-    const newTexture = currentTexture === CARD_BACK_TEXTURE ? CARD_FRONT_TEXTURE : CARD_BACK_TEXTURE;
+    // Toggle face state
+    card.faceUp = !card.faceUp;
+    const newTexture = getCardTexture(card);
 
     if (this.reducedMotion) {
       // Instant texture swap for reduced motion
@@ -216,8 +204,9 @@ export class GymDeckRngScene extends GymSceneBase {
     const destX = cx + 80;
     const destY = 180;
 
-    const sprite = this.add.image(cx - 200, 100, CARD_BACK_TEXTURE);
+    const sprite = this.add.image(cx - 200, 100, getCardTexture(card));
     this.lastDrawnSprite = sprite;
+    this.lastDrawnCard = card;
 
     if (this.reducedMotion) {
       // Instant placement for reduced motion
@@ -258,8 +247,9 @@ export class GymDeckRngScene extends GymSceneBase {
 
   // ── Card sprite helpers ──────────────────────────────────
 
-  private showCardSprite(card: ReturnType<typeof createStandardDeck>[0], texture: string): void {
+  private showCardSprite(card: ReturnType<typeof createStandardDeck>[0]): void {
     const cx = GAME_W / 2;
+    const texture = getCardTexture(card);
     const sprite = this.add.image(cx + 80, 180, texture);
     // Label below
     const label = this.add.text(cx + 80, 230, `${card.rank}${card.suit}`, {
@@ -268,11 +258,12 @@ export class GymDeckRngScene extends GymSceneBase {
       fontFamily: 'monospace',
     }).setOrigin(0.5);
 
-    // Store reference; we clean up old sprites when drawing new ones
+    // Store references; we clean up old sprites when drawing new ones
     if (this.lastDrawnSprite) {
       this.lastDrawnSprite.destroy();
     }
     this.lastDrawnSprite = sprite;
+    this.lastDrawnCard = card;
 
     // Clean up label on scene shutdown
     this.events.once('shutdown', () => {
@@ -286,6 +277,7 @@ export class GymDeckRngScene extends GymSceneBase {
       try { this.lastDrawnSprite.destroy(); } catch (_) { /* ignore */ }
       this.lastDrawnSprite = null;
     }
+    this.lastDrawnCard = null;
   }
 
   // ── UI helpers ───────────────────────────────────────────
