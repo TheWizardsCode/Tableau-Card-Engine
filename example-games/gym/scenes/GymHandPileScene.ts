@@ -72,7 +72,7 @@ export class GymHandPileScene extends GymSceneBase {
   // Arc slider constants/state
   private readonly ARC_RADIUS_MIN = 0;
   private readonly ARC_RADIUS_MAX = 200;
-  private readonly ARC_RADIUS_DEFAULT = 60;
+  private readonly ARC_RADIUS_DEFAULT = 150;
   private readonly ARC_SLIDER_WIDTH = 150;
   private readonly ARC_SLIDER_HEIGHT = 6;
   private arcRadius = this.ARC_RADIUS_DEFAULT;
