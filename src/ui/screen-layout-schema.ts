@@ -50,6 +50,18 @@ export interface ScreenLayoutValidationResult {
   errors: ScreenLayoutValidationError[];
 }
 
+export type ScreenLayoutParseResult =
+  | {
+      valid: true;
+      errors: [];
+      layout: ScreenLayoutDocument;
+    }
+  | {
+      valid: false;
+      errors: ScreenLayoutValidationError[];
+      layout: null;
+    };
+
 export const SCREEN_LAYOUT_SCHEMA = {
   $id: 'https://tableau-card-engine.dev/schema/screen-layout.json',
   type: 'object',
@@ -189,5 +201,25 @@ export function validateScreenLayoutDocument(
   return {
     valid: errors.length === 0,
     errors,
+  };
+}
+
+export function parseScreenLayoutDocument(
+  document: unknown,
+): ScreenLayoutParseResult {
+  const validation = validateScreenLayoutDocument(document);
+
+  if (!validation.valid) {
+    return {
+      valid: false,
+      errors: validation.errors,
+      layout: null,
+    };
+  }
+
+  return {
+    valid: true,
+    errors: [],
+    layout: document as ScreenLayoutDocument,
   };
 }

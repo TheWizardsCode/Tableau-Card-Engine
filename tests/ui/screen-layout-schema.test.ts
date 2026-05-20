@@ -6,6 +6,7 @@ import invalidMissingZone from '../fixtures/layouts/main-street.invalid-missing-
 import invalidOverflow from '../fixtures/layouts/main-street.invalid-overflow.layout.json';
 import validMainStreetLayout from '../fixtures/layouts/main-street.valid.layout.json';
 import {
+  parseScreenLayoutDocument,
   validateScreenLayoutDocument,
   type ScreenLayoutDocument,
 } from '../../src/ui/screen-layout-schema';
@@ -53,5 +54,26 @@ describe('screen layout schema contract', () => {
 
     expect(result.valid).toBe(false);
     expect(errorContainsPath(result, '/zones/market/rect')).toBe(true);
+  });
+
+  it('parses valid layouts into typed documents', () => {
+    const result = parseScreenLayoutDocument(validMainStreetLayout);
+
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      expect(result.layout.id).toBe('main-street-default');
+    }
+  });
+
+  it('returns structured errors for invalid parse attempts', () => {
+    const result = parseScreenLayoutDocument(invalidAnchor);
+
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.layout).toBeNull();
+      expect(result.errors.length).toBeGreaterThan(0);
+      expect(result.errors[0]).toHaveProperty('path');
+      expect(result.errors[0]).toHaveProperty('message');
+    }
   });
 });

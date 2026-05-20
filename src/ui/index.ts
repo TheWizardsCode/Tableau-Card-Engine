@@ -51,7 +51,11 @@ export type {
 } from './layoutCardPositions';
 
 // Screen layout language (SLL)
-export { SCREEN_LAYOUT_SCHEMA, validateScreenLayoutDocument } from './screen-layout-schema';
+export {
+  SCREEN_LAYOUT_SCHEMA,
+  validateScreenLayoutDocument,
+  parseScreenLayoutDocument,
+} from './screen-layout-schema';
 export type {
   PixelPoint,
   PixelRect,
@@ -61,6 +65,7 @@ export type {
   ScreenLayoutDocument,
   ScreenLayoutValidationError,
   ScreenLayoutValidationResult,
+  ScreenLayoutParseResult,
 } from './screen-layout-schema';
 export {
   normalizedToPixels,
