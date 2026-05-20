@@ -5,6 +5,7 @@ import invalidCoordinate from '../fixtures/layouts/main-street.invalid-coordinat
 import invalidMissingZone from '../fixtures/layouts/main-street.invalid-missing-zone.layout.json';
 import invalidOverflow from '../fixtures/layouts/main-street.invalid-overflow.layout.json';
 import validMainStreetLayout from '../fixtures/layouts/main-street.valid.layout.json';
+import canonicalMainStreetLayout from '../../example-games/main-street/layouts/main-street.layout.json';
 import {
   parseScreenLayoutDocument,
   validateScreenLayoutDocument,
@@ -62,6 +63,15 @@ describe('screen layout schema contract', () => {
     expect(result.valid).toBe(true);
     if (result.valid) {
       expect(result.layout.id).toBe('main-street-default');
+    }
+  });
+
+  it('validates the canonical Main Street layout document', () => {
+    const result = parseScreenLayoutDocument(canonicalMainStreetLayout);
+
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      expect(result.layout.id).toBe('main-street-canonical');
     }
   });
 

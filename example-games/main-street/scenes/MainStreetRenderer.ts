@@ -57,6 +57,7 @@ import {
   STREET_COLS,
   STREET_ROW_GAP,
 } from './MainStreetConstants';
+import { computeMainStreetLayoutWithSll } from './MainStreetLayoutAdapter';
 
 /** Tag a Phaser game object as transient so `refreshHud()` knows to destroy it on the next refresh. */
 function markHudTransient<T extends Phaser.GameObjects.GameObject>(obj: T): T & { _hudTransient: true } {
@@ -122,7 +123,7 @@ export class MainStreetRenderer {
     const logH = Math.max(100, (queueTop + queueCardH + 20) - logY);
     const logVisible = compact || logY < gameH - 140;
 
-    return {
+    const legacyLayout: SceneLayout = {
       gameW,
       gameH,
       hudY: BASE_HUD_Y,
@@ -163,6 +164,8 @@ export class MainStreetRenderer {
       logW: logVisible ? logW : 0,
       logH,
     };
+
+    return computeMainStreetLayoutWithSll(legacyLayout);
   }
 
   public createContainers(): void {
