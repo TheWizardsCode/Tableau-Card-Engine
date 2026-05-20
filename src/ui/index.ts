@@ -72,11 +72,17 @@ export {
   pixelToNormalized,
   getZoneRect,
   anchorPoint,
+  adaptLayoutWithFallback,
+  ScreenLayoutMappingError,
 } from './screen-layout';
 export type {
   LayoutViewport,
   ResolvedZone,
   ResolvedScreenLayout,
+  ScreenLayoutIssueCode,
+  ScreenLayoutIssue,
+  ScreenLayoutIssueReporter,
+  LegacyLayoutAdapterOptions,
 } from './screen-layout';
 
 // Card game factory helper

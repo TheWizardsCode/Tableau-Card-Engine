@@ -27,12 +27,54 @@ export interface ResolvedScreenLayout {
   zones: Record<string, ResolvedZone>;
 }
 
-function toPixels(
-  value: number,
-  viewportAxis: number,
-  dpr: number,
-): number {
+export type ScreenLayoutIssueCode =
+  | 'UNKNOWN_ZONE'
+  | 'UNKNOWN_ANCHOR'
+  | 'LAYOUT_MISSING'
+  | 'LAYOUT_ADAPTER_FALLBACK';
+
+export interface ScreenLayoutIssue {
+  code: ScreenLayoutIssueCode;
+  message: string;
+  zoneName?: string;
+  anchorName?: string;
+  cause?: unknown;
+}
+
+export type ScreenLayoutIssueReporter = (issue: ScreenLayoutIssue) => void;
+
+export class ScreenLayoutMappingError extends Error {
+  constructor(
+    readonly code: ScreenLayoutIssueCode,
+    message: string,
+    readonly zoneName?: string,
+    readonly anchorName?: string,
+  ) {
+    super(message);
+    this.name = 'ScreenLayoutMappingError';
+  }
+}
+
+export interface LegacyLayoutAdapterOptions<TLegacyLayout> {
+  layoutDocument: ScreenLayoutDocument | null | undefined;
+  viewport: LayoutViewport;
+  dpr?: number;
+  mapResolvedLayout: (resolved: ResolvedScreenLayout) => TLegacyLayout;
+  fallback: () => TLegacyLayout;
+  reportIssue?: ScreenLayoutIssueReporter;
+}
+
+function toPixels(value: number, viewportAxis: number, dpr: number): number {
   return value * viewportAxis * dpr;
+}
+
+function reportIssue(
+  reportIssueHook: ScreenLayoutIssueReporter | undefined,
+  issue: ScreenLayoutIssue,
+): void {
+  if (reportIssueHook) {
+    reportIssueHook(issue);
+  }
 }
 
 function resolveRect(
@@ -141,12 +183,24 @@ export function getZoneRect(
   zoneName: string,
   viewport: LayoutViewport,
   dpr = 1,
+  reportIssueHook?: ScreenLayoutIssueReporter,
 ): PixelRect {
   const resolved = normalizedToPixels(layout, viewport, dpr);
   const zone = resolved.zones[zoneName];
 
   if (!zone) {
-    throw new Error(`Unknown zone: ${zoneName}`);
+    const error = new ScreenLayoutMappingError(
+      'UNKNOWN_ZONE',
+      `Unknown zone: ${zoneName}`,
+      zoneName,
+    );
+    reportIssue(reportIssueHook, {
+      code: 'UNKNOWN_ZONE',
+      message: error.message,
+      zoneName,
+      cause: error,
+    });
+    throw error;
   }
 
   return zone.rect;
@@ -158,18 +212,84 @@ export function anchorPoint(
   anchorName: string,
   viewport: LayoutViewport,
   dpr = 1,
+  reportIssueHook?: ScreenLayoutIssueReporter,
 ): PixelPoint {
   const resolved = normalizedToPixels(layout, viewport, dpr);
   const zone = resolved.zones[zoneName];
 
   if (!zone) {
-    throw new Error(`Unknown zone: ${zoneName}`);
+    const error = new ScreenLayoutMappingError(
+      'UNKNOWN_ZONE',
+      `Unknown zone: ${zoneName}`,
+      zoneName,
+    );
+    reportIssue(reportIssueHook, {
+      code: 'UNKNOWN_ZONE',
+      message: error.message,
+      zoneName,
+      cause: error,
+    });
+    throw error;
   }
 
   const anchor = zone.anchors[anchorName];
   if (!anchor) {
-    throw new Error(`Unknown anchor "${anchorName}" in zone "${zoneName}"`);
+    const error = new ScreenLayoutMappingError(
+      'UNKNOWN_ANCHOR',
+      `Unknown anchor "${anchorName}" in zone "${zoneName}"`,
+      zoneName,
+      anchorName,
+    );
+    reportIssue(reportIssueHook, {
+      code: 'UNKNOWN_ANCHOR',
+      message: error.message,
+      zoneName,
+      anchorName,
+      cause: error,
+    });
+    throw error;
   }
 
   return anchor;
+}
+
+/**
+ * Adapter helper for incremental migration from legacy computeLayout-based scenes.
+ *
+ * - If layoutDocument is present and mapping succeeds, the mapped SLL result is returned.
+ * - If layoutDocument is missing or mapping fails, it reports a structured issue and
+ *   returns the legacy fallback result.
+ */
+export function adaptLayoutWithFallback<TLegacyLayout>(
+  options: LegacyLayoutAdapterOptions<TLegacyLayout>,
+): TLegacyLayout {
+  const {
+    layoutDocument,
+    viewport,
+    dpr = 1,
+    mapResolvedLayout,
+    fallback,
+    reportIssue: reportIssueHook,
+  } = options;
+
+  if (!layoutDocument) {
+    reportIssue(reportIssueHook, {
+      code: 'LAYOUT_MISSING',
+      message: 'No SLL layout document available; using legacy fallback layout.',
+    });
+    return fallback();
+  }
+
+  try {
+    const resolved = normalizedToPixels(layoutDocument, viewport, dpr);
+    return mapResolvedLayout(resolved);
+  } catch (error) {
+    reportIssue(reportIssueHook, {
+      code: 'LAYOUT_ADAPTER_FALLBACK',
+      message:
+        'Failed to adapt SLL layout to legacy shape; using legacy fallback layout.',
+      cause: error,
+    });
+    return fallback();
+  }
 }

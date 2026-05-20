@@ -6,10 +6,12 @@ import type {
   ScreenLayoutDocument,
 } from '../../src/ui/screen-layout-schema';
 import {
+  adaptLayoutWithFallback,
   anchorPoint,
   getZoneRect,
   normalizedToPixels,
   pixelToNormalized,
+  type ScreenLayoutIssue,
 } from '../../src/ui/screen-layout';
 
 const layout = validMainStreetLayout as ScreenLayoutDocument;
@@ -75,6 +77,42 @@ describe('screen layout mapping utilities', () => {
     expect(center.x).toBeLessThanOrEqual(zoneRect.x + zoneRect.width);
     expect(center.y).toBeGreaterThanOrEqual(zoneRect.y);
     expect(center.y).toBeLessThanOrEqual(zoneRect.y + zoneRect.height);
+  });
+
+  it('emits structured issues for unknown zone lookups', () => {
+    const issues: ScreenLayoutIssue[] = [];
+
+    expect(() =>
+      getZoneRect(
+        layout,
+        'unknown-zone',
+        { width: 1280, height: 720 },
+        1,
+        issue => issues.push(issue),
+      ),
+    ).toThrow('Unknown zone: unknown-zone');
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].code).toBe('UNKNOWN_ZONE');
+    expect(issues[0].zoneName).toBe('unknown-zone');
+  });
+
+  it('uses legacy fallback adapter path when SLL mapping fails', () => {
+    const issues: ScreenLayoutIssue[] = [];
+
+    const resolved = adaptLayoutWithFallback({
+      layoutDocument: layout,
+      viewport: { width: 1280, height: 720 },
+      dpr: 1,
+      mapResolvedLayout: _resolved => {
+        throw new Error('simulated mapping failure');
+      },
+      fallback: () => ({ source: 'legacy' as const }),
+      reportIssue: issue => issues.push(issue),
+    });
+
+    expect(resolved.source).toBe('legacy');
+    expect(issues.some(issue => issue.code === 'LAYOUT_ADAPTER_FALLBACK')).toBe(true);
   });
 
   it('maps a frame-sized batch within a small budget', () => {
