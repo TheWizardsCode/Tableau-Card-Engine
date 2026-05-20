@@ -65,7 +65,7 @@ export class GymHandPileScene extends GymSceneBase {
   private readonly PILE_Y = 150;
 
   // Hand layout constants
-  private readonly HAND_SPACING = 56;
+  private readonly HAND_SPACING = 20;
   private readonly HAND_BASE_X = GAME_W / 2 - ((HAND_SIZE - 1) * this.HAND_SPACING) / 2;
   private readonly HAND_BASE_Y = GAME_H - CARD_H / 2 - 10;
 
@@ -93,8 +93,8 @@ export class GymHandPileScene extends GymSceneBase {
 
   // Rotation slider constants/state
   private readonly ROTATION_DEGREES_MIN = 0;
-  private readonly ROTATION_DEGREES_MAX = 30;
-  private readonly ROTATION_DEGREES_DEFAULT = 0;
+  private readonly ROTATION_DEGREES_MAX = 45;
+  private readonly ROTATION_DEGREES_DEFAULT = 25;
   private rotationSliderTrack?: Phaser.GameObjects.Rectangle;
   private rotationSliderFill?: Phaser.GameObjects.Rectangle;
   private rotationSliderHandle?: Phaser.GameObjects.Graphics;
@@ -125,6 +125,7 @@ export class GymHandPileScene extends GymSceneBase {
       spacing: this.HAND_SPACING,
       arcRadius: this.arcRadius,
       showLabels: false,
+      maxRotationDegrees: this.ROTATION_DEGREES_DEFAULT,
       reducedMotion: this.reducedMotion,
     });
 

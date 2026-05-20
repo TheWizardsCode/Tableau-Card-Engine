@@ -79,7 +79,7 @@ import { HandView } from '@ui/HandView';
 const handView = new HandView(scene, {
   baseX: 60,
   baseY: 130,
-  spacing: 56,
+  spacing: 20,
   arcRadius: 60,
   showLabels: false,
 });

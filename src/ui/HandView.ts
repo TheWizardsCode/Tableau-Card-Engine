@@ -25,7 +25,7 @@ export interface HandViewOptions {
   /** Y coordinate for all cards in the hand. */
   baseY: number;
 
-  /** Horizontal spacing (px) between card centres. @default 56 */
+  /** Horizontal spacing (px) between card centres. @default 20 */
   spacing?: number;
 
   /** Card width used for layout calculations. @default CARD_W (48) */
@@ -62,7 +62,7 @@ export interface HandViewOptions {
   /**
    * Maximum per-card rotation (degrees). Positive values tilt cards up to
    * `maxRotationDegrees` based on their horizontal offset from the hand
-   * centre. Default: 0 (no tilt).
+   * centre. Default: 25 (tilt).
    */
   maxRotationDegrees?: number;
 }
@@ -115,7 +115,7 @@ type EventCallback = (...args: any[]) => void;
  *
  * ### Example
  * ```ts
- * const handView = new HandView(scene, { baseX: 60, baseY: 130, spacing: 56 });
+ * const handView = new HandView(scene, { baseX: 60, baseY: 130, spacing: 20 });
  * handView.setCards(myHand);
  * handView.on('cardclick', (idx) => handView.setSelected(idx));
  * // Later:
@@ -158,7 +158,7 @@ export class HandView {
     this.scene = scene;
     this.baseX = opts.baseX;
     this.baseY = opts.baseY;
-    this.spacing = opts.spacing ?? 56;
+    this.spacing = opts.spacing ?? 20;
     this.cardWidth = opts.cardWidth ?? CARD_W;
     this.maxWidth = opts.maxWidth;
     this.arcRadius = Math.max(0, opts.arcRadius ?? 0);
@@ -166,7 +166,7 @@ export class HandView {
     this.selectionEnabled = opts.selectionEnabled ?? true;
     this.clickEnabled = opts.clickEnabled ?? true;
     this._reducedMotion = opts.reducedMotion ?? false;
-    this.maxRotationDegrees = opts.maxRotationDegrees ?? 0;
+    this.maxRotationDegrees = opts.maxRotationDegrees ?? 25;
   }
 
   // ── Public API ──────────────────────────────────────────
