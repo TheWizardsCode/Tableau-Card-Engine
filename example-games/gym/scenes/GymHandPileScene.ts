@@ -30,7 +30,7 @@ import { discardCard } from '../../../src/ui/discardCard';
 import { dealCard } from '../../../src/ui/dealCard';
 import { moveGameObject } from '../../../src/ui/moveGameObject';
 import { shakeIllegalMove } from '../../../src/ui/shakeIllegalMove';
-import { GAME_W } from '../../../src/ui/constants';
+import { CARD_H, CARD_W, GAME_H, GAME_W } from '../../../src/ui/constants';
 import { getCardTexture, ensureCardTextureFallbacks, preloadCardAssets } from '../../../src/ui/CardTextureHelpers';
 import type { Card } from '../../../src/card-system/Card';
 
@@ -65,9 +65,23 @@ export class GymHandPileScene extends GymSceneBase {
   private readonly PILE_Y = 150;
 
   // Hand layout constants
-  private readonly HAND_BASE_X = 60;
-  private readonly HAND_BASE_Y = 130;
   private readonly HAND_SPACING = 56;
+  private readonly HAND_BASE_X = GAME_W / 2 - ((HAND_SIZE - 1) * this.HAND_SPACING) / 2;
+  private readonly HAND_BASE_Y = GAME_H - CARD_H / 2 - 10;
+
+  // Arc slider constants/state
+  private readonly ARC_RADIUS_MIN = 0;
+  private readonly ARC_RADIUS_MAX = 200;
+  private readonly ARC_RADIUS_DEFAULT = 60;
+  private readonly ARC_SLIDER_WIDTH = 150;
+  private readonly ARC_SLIDER_HEIGHT = 6;
+  private arcRadius = this.ARC_RADIUS_DEFAULT;
+  private arcSliderTrack?: Phaser.GameObjects.Rectangle;
+  private arcSliderFill?: Phaser.GameObjects.Rectangle;
+  private arcSliderHandle?: Phaser.GameObjects.Graphics;
+  private arcSliderHitArea?: Phaser.GameObjects.Zone;
+  private arcSliderValueText?: Phaser.GameObjects.Text;
+  private isArcSliderDragging = false;
 
   constructor() {
     super({ key: GYM_HAND_PILE_KEY });
@@ -90,6 +104,8 @@ export class GymHandPileScene extends GymSceneBase {
       baseX: this.HAND_BASE_X,
       baseY: this.HAND_BASE_Y,
       spacing: this.HAND_SPACING,
+      arcRadius: this.arcRadius,
+      showLabels: false,
       reducedMotion: this.reducedMotion,
     });
 
@@ -118,7 +134,7 @@ export class GymHandPileScene extends GymSceneBase {
 
     this.initHelp([
       { heading: 'Overview', body: 'Demonstrates hand/pile card movement with animations: deal, place, discard, move, flip, shake (illegal), and drop-zone highlights. Uses HandView and PileView components.' },
-      { heading: 'Controls', body: '[ Draw to Hand ]: Deal a card (with arc animation).\n[ Discard Selected ]: Discard the selected card (with fade animation).\n[ Recall from Discard ]: Move top of discard back to hand.\n[ Flip Selected ]: Flip the selected card (two-phase animation).\n[ Move Selected ]: Tween selected card to display area (move demo).\n[ Cancel Move ]: Cancel an active move animation.\n[ Show Valid Moves ]: Highlight valid drop zones.\n[ Show Illegal ]: Trigger an illegal-move shake demo.\n[ Reset ]: Shuffle a new deck and deal starting hand.\n[ Select Next ]: Cycle selection in your hand.' }
+      { heading: 'Controls', body: '[ Draw to Hand ]: Deal a card (with arc animation).\n[ Discard Selected ]: Discard the selected card (with fade animation).\n[ Recall from Discard ]: Move top of discard back to hand.\n[ Flip Selected ]: Flip the selected card (two-phase animation).\n[ Move Selected ]: Tween selected card to display area (move demo).\n[ Cancel Move ]: Cancel an active move animation.\n[ Show Valid Moves ]: Highlight valid drop zones.\n[ Show Illegal ]: Trigger an illegal-move shake demo.\n[ Reset ]: Shuffle a new deck and deal starting hand.\n[ Select Next ]: Cycle selection in your hand.\nArc slider (right of hand): Adjust hand curvature live (0 = straight).' }
     ]);
 
     const cx = GAME_W / 2;
@@ -142,8 +158,134 @@ export class GymHandPileScene extends GymSceneBase {
     y += 35;
     this.addLabel(cx, y, '── Event Log ──', { fontSize: '12px', color: '#669966' }).setOrigin(0.5);
 
+    this.createArcRadiusSlider();
+
     // Initialize
     this.reset();
+  }
+
+  private createArcRadiusSlider(): void {
+    const sliderY = this.HAND_BASE_Y;
+
+    this.arcSliderTrack = this.add.rectangle(0, sliderY, this.ARC_SLIDER_WIDTH, this.ARC_SLIDER_HEIGHT, 0x334433, 1)
+      .setOrigin(0, 0.5);
+
+    this.arcSliderFill = this.add.rectangle(0, sliderY, 1, this.ARC_SLIDER_HEIGHT, 0x88ff88, 1)
+      .setOrigin(0, 0.5);
+
+    this.arcSliderHandle = this.add.graphics();
+
+    this.arcSliderValueText = this.add.text(0, sliderY - 20, '', {
+      fontSize: '11px',
+      color: '#88ff88',
+      fontFamily: 'monospace',
+    }).setOrigin(0.5);
+
+    this.arcSliderHitArea = this.add.zone(0, sliderY, this.ARC_SLIDER_WIDTH + 24, 28)
+      .setInteractive({ useHandCursor: true });
+
+    this.arcSliderHitArea.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      this.isArcSliderDragging = true;
+      this.setArcRadiusFromPointer(pointer.x);
+    });
+
+    this.input.on('pointermove', this.handleArcSliderPointerMove, this);
+    this.input.on('pointerup', this.handleArcSliderPointerUp, this);
+
+    this.events.once('shutdown', () => {
+      this.input.off('pointermove', this.handleArcSliderPointerMove, this);
+      this.input.off('pointerup', this.handleArcSliderPointerUp, this);
+    });
+
+    this.updateArcSliderPosition();
+    this.updateArcSliderVisuals();
+  }
+
+  private handleArcSliderPointerMove(pointer: Phaser.Input.Pointer): void {
+    if (!this.isArcSliderDragging) return;
+    this.setArcRadiusFromPointer(pointer.x);
+  }
+
+  private handleArcSliderPointerUp(): void {
+    this.isArcSliderDragging = false;
+  }
+
+  private setArcRadiusFromPointer(pointerX: number): void {
+    if (!this.arcSliderTrack) return;
+
+    const minX = this.arcSliderTrack.x;
+    const maxX = minX + this.ARC_SLIDER_WIDTH;
+    const clampedX = Math.max(minX, Math.min(maxX, pointerX));
+    const ratio = (clampedX - minX) / this.ARC_SLIDER_WIDTH;
+    const nextRadius = this.ARC_RADIUS_MIN + ratio * (this.ARC_RADIUS_MAX - this.ARC_RADIUS_MIN);
+
+    this.arcRadius = nextRadius;
+    this.handView.setArcRadius(this.arcRadius);
+    this.updateArcSliderVisuals();
+  }
+
+  private updateArcSliderPosition(): void {
+    if (!this.arcSliderTrack || !this.arcSliderFill || !this.arcSliderHitArea || !this.arcSliderValueText) {
+      return;
+    }
+
+    const centers = this.handView.getCardCenters();
+    const rightmostCenterX = centers.length > 0
+      ? Math.max(...centers.map((c) => c.x))
+      : this.HAND_BASE_X + (Math.max(this.hand.length, 1) - 1) * this.HAND_SPACING;
+
+    const rightEdge = rightmostCenterX + CARD_W / 2;
+    const maxTrackX = GAME_W - this.ARC_SLIDER_WIDTH - 16;
+    const trackX = Math.min(maxTrackX, rightEdge + 12);
+
+    this.arcSliderTrack.setPosition(trackX, this.HAND_BASE_Y);
+    this.arcSliderFill.setPosition(trackX, this.HAND_BASE_Y);
+    this.arcSliderHitArea.setPosition(trackX + this.ARC_SLIDER_WIDTH / 2, this.HAND_BASE_Y);
+    this.arcSliderValueText.setPosition(trackX + this.ARC_SLIDER_WIDTH / 2, this.HAND_BASE_Y - 20);
+
+    this.updateArcSliderVisuals();
+  }
+
+  private updateArcSliderVisuals(): void {
+    if (!this.arcSliderTrack || !this.arcSliderFill || !this.arcSliderHandle || !this.arcSliderValueText) {
+      return;
+    }
+
+    const ratio = (this.arcRadius - this.ARC_RADIUS_MIN) / (this.ARC_RADIUS_MAX - this.ARC_RADIUS_MIN);
+    const clampedRatio = Math.max(0, Math.min(1, ratio));
+    const fillWidth = Math.max(1, this.ARC_SLIDER_WIDTH * clampedRatio);
+    const handleX = this.arcSliderTrack.x + fillWidth;
+    const handleY = this.arcSliderTrack.y;
+
+    this.arcSliderFill.setSize(fillWidth, this.ARC_SLIDER_HEIGHT);
+    this.arcSliderFill.setPosition(this.arcSliderTrack.x, handleY);
+
+    this.arcSliderHandle.clear();
+    this.arcSliderHandle.fillStyle(0xffffff, 1);
+    this.arcSliderHandle.fillCircle(handleX, handleY, 8);
+    this.arcSliderHandle.lineStyle(2, 0x88ff88, 1);
+    this.arcSliderHandle.strokeCircle(handleX, handleY, 8);
+
+    this.arcSliderValueText.setText(`Arc: ${Math.round(this.arcRadius)}`);
+  }
+
+  private getHandPositionForIndex(index: number, handCount: number): { x: number; y: number } {
+    const x = this.HAND_BASE_X + index * this.HAND_SPACING;
+
+    if (this.arcRadius <= 0 || handCount < 3) {
+      return { x, y: this.HAND_BASE_Y };
+    }
+
+    const firstX = this.HAND_BASE_X;
+    const lastX = this.HAND_BASE_X + (handCount - 1) * this.HAND_SPACING;
+    const arcCenterX = (firstX + lastX) / 2;
+    const halfSpan = Math.max((lastX - firstX) / 2, 1);
+    const normalized = (x - arcCenterX) / halfSpan;
+    // Inverted arc: central card should be at the highest point while edges remain at baseY.
+    // Use a parabolic profile that peaks at normalized=0 and falls to zero at normalized=±1.
+    const offsetY = ((1 - normalized * normalized) * halfSpan * halfSpan) / (2 * this.arcRadius);
+
+    return { x, y: this.HAND_BASE_Y - offsetY };
   }
 
   private drawToHand(): void {
@@ -156,8 +298,7 @@ export class GymHandPileScene extends GymSceneBase {
     card.faceUp = true;
     this.hand.push(card);
 
-    const destX = this.HAND_BASE_X + (this.hand.length - 1) * this.HAND_SPACING;
-    const destY = this.HAND_BASE_Y;
+    const destination = this.getHandPositionForIndex(this.hand.length - 1, this.hand.length);
     const deckX = this.DECK_X;
     const deckY = this.PILE_Y;
 
@@ -165,6 +306,7 @@ export class GymHandPileScene extends GymSceneBase {
       // Instant placement for reduced motion
       this.handView.setCards(this.hand);
       this.handView.setSelected(this.selectedIdx >= 0 ? this.selectedIdx : null);
+      this.updateArcSliderPosition();
       this.deckView.update();
       this.logEvent(`Drew ${card.rank}${card.suit} to hand (instant, reduced-motion)`);
       return;
@@ -178,6 +320,7 @@ export class GymHandPileScene extends GymSceneBase {
       try { animSprite.destroy(); } catch (_) { /* ignore */ }
       this.handView.setCards(this.hand);
       this.handView.setSelected(this.selectedIdx >= 0 ? this.selectedIdx : null);
+      this.updateArcSliderPosition();
       this.deckView.update();
       gameEvents.removeAllListeners();
       this.logEvent(`Drew ${card.rank}${card.suit} to hand (animated)`);
@@ -186,8 +329,8 @@ export class GymHandPileScene extends GymSceneBase {
     dealCard({
       scene: this,
       target: animSprite,
-      destX,
-      destY,
+      destX: destination.x,
+      destY: destination.y,
       sourceX: deckX,
       sourceY: deckY,
       duration: 400,
@@ -221,6 +364,7 @@ export class GymHandPileScene extends GymSceneBase {
         this.clearHighlights();
         this.handView.setCards(this.hand);
         this.handView.setSelected(null);
+        this.updateArcSliderPosition();
         this.discardView.update();
         (gameEvents as any).removeAllListeners();
         this.logEvent(`Discarded ${card.rank}${card.suit} (animated)`);
@@ -246,6 +390,7 @@ export class GymHandPileScene extends GymSceneBase {
       this.clearHighlights();
       this.handView.setCards(this.hand);
       this.handView.setSelected(null);
+      this.updateArcSliderPosition();
       this.discardView.update();
       this.logEvent(`Discarded ${card.rank}${card.suit} (instant)`);
     }
@@ -261,14 +406,14 @@ export class GymHandPileScene extends GymSceneBase {
     card.faceUp = true;
     this.hand.push(card);
 
-    const destX = this.HAND_BASE_X + (this.hand.length - 1) * this.HAND_SPACING;
-    const destY = this.HAND_BASE_Y;
+    const destination = this.getHandPositionForIndex(this.hand.length - 1, this.hand.length);
     const sourceX = this.DISCARD_X;
     const sourceY = this.PILE_Y;
 
     if (this.reducedMotion) {
       this.handView.setCards(this.hand);
       this.handView.setSelected(this.selectedIdx >= 0 ? this.selectedIdx : null);
+      this.updateArcSliderPosition();
       this.discardView.update();
       this.logEvent(`Recalled ${card.rank}${card.suit} from discard (instant)`);
       return;
@@ -281,6 +426,7 @@ export class GymHandPileScene extends GymSceneBase {
       try { animSprite.destroy(); } catch (_) {}
       this.handView.setCards(this.hand);
       this.handView.setSelected(this.selectedIdx >= 0 ? this.selectedIdx : null);
+      this.updateArcSliderPosition();
       this.discardView.update();
       gameEvents.removeAllListeners();
       this.logEvent(`Recalled ${card.rank}${card.suit} from discard (animated)`);
@@ -289,8 +435,8 @@ export class GymHandPileScene extends GymSceneBase {
     dealCard({
       scene: this,
       target: animSprite,
-      destX,
-      destY,
+      destX: destination.x,
+      destY: destination.y,
       sourceX,
       sourceY,
       duration: 350,
@@ -471,9 +617,15 @@ export class GymHandPileScene extends GymSceneBase {
     this.clearHighlights();
     this.cancelMove();
 
+    // Reset arc slider to default on scene reset (no persistence).
+    this.arcRadius = this.ARC_RADIUS_DEFAULT;
+    this.handView.setArcRadius(this.arcRadius);
+    this.updateArcSliderVisuals();
+
     // Sync UI components
     this.handView.setCards(this.hand);
     this.handView.setSelected(null);
+    this.updateArcSliderPosition();
     this.deckView.setPile(this.drawPile);
     this.discardView.setPile(this.discardPile);
 

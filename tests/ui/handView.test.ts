@@ -131,6 +131,21 @@ describe('HandView', () => {
     hv.destroy();
   });
 
+  it('showLabels=false suppresses card labels', () => {
+    const hv = new HandView(scene, {
+      baseX: 60,
+      baseY: 130,
+      spacing: 56,
+      showLabels: false,
+    });
+
+    hv.setCards([card('A', 'spades'), card('2', 'hearts')]);
+
+    expect(scene.add.image).toHaveBeenCalledTimes(2);
+    expect(scene.add.text).not.toHaveBeenCalled();
+    hv.destroy();
+  });
+
   it('setCards with empty array clears the hand', () => {
     const hv = new HandView(scene, {
       baseX: 60,
@@ -157,6 +172,75 @@ describe('HandView', () => {
     hv.setCards(cards);
 
     expect(hv.getCards()).toEqual(cards);
+    hv.destroy();
+  });
+
+  it('arcRadius=0 keeps all cards on the baseY line', () => {
+    const hv = new HandView(scene, {
+      baseX: 60,
+      baseY: 300,
+      spacing: 56,
+      arcRadius: 0,
+    });
+
+    hv.setCards([card('A', 'spades'), card('2', 'hearts'), card('3', 'clubs')]);
+
+    expect(scene._images).toHaveLength(3);
+    for (const img of scene._images) {
+      expect(img.y).toBe(300);
+    }
+    hv.destroy();
+  });
+
+  it('arcRadius>0 positions cards on an arc (center card above edges)', () => {
+    const hv = new HandView(scene, {
+      baseX: 60,
+      baseY: 300,
+      spacing: 56,
+      arcRadius: 60,
+    });
+
+    hv.setCards([
+      card('A', 'spades'),
+      card('2', 'hearts'),
+      card('3', 'clubs'),
+      card('4', 'diamonds'),
+      card('5', 'spades'),
+    ]);
+
+    const ys = scene._images.map((img: any) => img.y);
+    // Center should be above (smaller y) than the edges
+    expect(ys[2]).toBeLessThan(300);
+    expect(ys[0]).toBeGreaterThan(ys[2]);
+    expect(ys[4]).toBeGreaterThan(ys[2]);
+    hv.destroy();
+  });
+
+  it('setArcRadius updates card Y offsets live', () => {
+    const hv = new HandView(scene, {
+      baseX: 60,
+      baseY: 300,
+      spacing: 56,
+      arcRadius: 0,
+    });
+
+    hv.setCards([
+      card('A', 'spades'),
+      card('2', 'hearts'),
+      card('3', 'clubs'),
+      card('4', 'diamonds'),
+      card('5', 'spades'),
+    ]);
+
+    const before = scene._images.map((img: any) => img.y);
+    hv.setArcRadius(120);
+    const after = scene._images.map((img: any) => img.y);
+
+    expect(hv.getArcRadius()).toBe(120);
+    // Edges should remain at or near the baseY while the center moves up
+    expect(after[0]).toBeCloseTo(before[0], 6);
+    expect(after[4]).toBeCloseTo(before[4], 6);
+    expect(after[2]).toBeLessThan(before[2]);
     hv.destroy();
   });
 

@@ -34,6 +34,17 @@ export interface HandViewOptions {
   /** Maximum row width (px). Cards compress if they exceed this. */
   maxWidth?: number;
 
+  /**
+   * Arc radius used for curved layout.
+   * - `0` renders a straight horizontal line at `baseY`.
+   * - `>0` lifts edge cards along a smooth arc.
+   * @default 0
+   */
+  arcRadius?: number;
+
+  /** Whether per-card rank/suit labels are shown. @default true */
+  showLabels?: boolean;
+
   /** Whether selection clicks are enabled. @default true */
   selectionEnabled?: boolean;
 
@@ -114,6 +125,8 @@ export class HandView {
   private spacing: number;
   private cardWidth: number;
   private maxWidth: number | undefined;
+  private arcRadius: number;
+  private showLabels: boolean;
   private selectionEnabled: boolean;
   private clickEnabled: boolean;
   private _reducedMotion: boolean;
@@ -138,6 +151,8 @@ export class HandView {
     this.spacing = opts.spacing ?? 56;
     this.cardWidth = opts.cardWidth ?? CARD_W;
     this.maxWidth = opts.maxWidth;
+    this.arcRadius = Math.max(0, opts.arcRadius ?? 0);
+    this.showLabels = opts.showLabels ?? true;
     this.selectionEnabled = opts.selectionEnabled ?? true;
     this.clickEnabled = opts.clickEnabled ?? true;
     this._reducedMotion = opts.reducedMotion ?? false;
@@ -218,6 +233,22 @@ export class HandView {
   }
 
   /**
+   * Set arc radius for hand layout.
+   * `0` means straight horizontal layout at `baseY`.
+   */
+  setArcRadius(radius: number): void {
+    const next = Number.isFinite(radius) ? Math.max(0, radius) : 0;
+    if (next === this.arcRadius) return;
+    this.arcRadius = next;
+    this.applyLayout();
+  }
+
+  /** Current arc radius used for layout. */
+  getArcRadius(): number {
+    return this.arcRadius;
+  }
+
+  /**
    * Register an event callback.
    *
    * Supported events:
@@ -270,6 +301,13 @@ export class HandView {
   }
 
   /**
+   * Return current sprite centers in display order.
+   */
+  getCardCenters(): Array<{ x: number; y: number }> {
+    return this.sprites.map((sprite) => ({ x: sprite.x, y: sprite.y }));
+  }
+
+  /**
    * Destroy all sprites, labels, and event listeners.
    */
   destroy(): void {
@@ -297,27 +335,12 @@ export class HandView {
 
     if (this.cards.length === 0) return;
 
-    // Compute layout positions using shared layout helper
-    const gap = this.spacing - this.cardWidth;
-    const centerX = this.baseX + (this.cards.length - 1) * this.spacing / 2;
-
-    const { positions } = layoutCardPositions({
-      count: this.cards.length,
-      cardWidth: this.cardWidth,
-      gap: Math.max(0, gap),
-      centerX,
-      maxWidth: this.maxWidth,
-    });
-
-    // If layoutCardPositions returned empty, fall back to simple linear layout
-    const xs = positions.length > 0
-      ? positions
-      : this.cards.map((_, i) => this.baseX + i * this.spacing);
+    const positions = this.computeCardPositions();
 
     for (let i = 0; i < this.cards.length; i++) {
       const card = this.cards[i];
       const textureKey = getCardTexture(card);
-      const sprite = this.scene.add.image(xs[i], this.baseY, textureKey);
+      const sprite = this.scene.add.image(positions[i].x, positions[i].y, textureKey);
 
       if (this.clickEnabled || this.selectionEnabled) {
         sprite.setInteractive({ useHandCursor: true });
@@ -348,15 +371,73 @@ export class HandView {
       // Selection tint
       sprite.setTint(i === this.selectedIndex ? 0x88ff88 : 0xffffff);
 
-      // Card label
-      const label = this.scene.add.text(xs[i], this.baseY + 42, `${card.rank}${card.suit}`, {
-        fontSize: '9px',
-        color: i === this.selectedIndex ? '#88ff88' : '#aaaaaa',
-        fontFamily: 'monospace',
-      }).setOrigin(0.5);
-
       this.sprites.push(sprite);
-      this.labels.push(label);
+
+      if (this.showLabels) {
+        const label = this.scene.add.text(positions[i].x, positions[i].y + 42, `${card.rank}${card.suit}`, {
+          fontSize: '9px',
+          color: i === this.selectedIndex ? '#88ff88' : '#aaaaaa',
+          fontFamily: 'monospace',
+        }).setOrigin(0.5);
+        this.labels.push(label);
+      }
+    }
+  }
+
+  /** Compute current hand card center positions (x/y). */
+  private computeCardPositions(): Array<{ x: number; y: number }> {
+    if (this.cards.length === 0) return [];
+
+    const gap = this.spacing - this.cardWidth;
+    const centerX = this.baseX + (this.cards.length - 1) * this.spacing / 2;
+
+    const { positions } = layoutCardPositions({
+      count: this.cards.length,
+      cardWidth: this.cardWidth,
+      gap: Math.max(0, gap),
+      centerX,
+      maxWidth: this.maxWidth,
+    });
+
+    const xs = positions.length > 0
+      ? positions
+      : this.cards.map((_, i) => this.baseX + i * this.spacing);
+
+    if (this.arcRadius <= 0 || xs.length < 3) {
+      return xs.map((x) => ({ x, y: this.baseY }));
+    }
+
+    const first = xs[0];
+    const last = xs[xs.length - 1];
+    const arcCenterX = (first + last) / 2;
+    const halfSpan = Math.max((last - first) / 2, 1);
+
+    return xs.map((x) => {
+      const normalized = (x - arcCenterX) / halfSpan;
+      // Inverted arc: central card should be at the highest point while edges remain at baseY.
+      // Use a parabolic profile that peaks at normalized=0 and falls to zero at normalized=±1.
+      const offsetY = ((1 - normalized * normalized) * halfSpan * halfSpan) / (2 * this.arcRadius);
+      return { x, y: this.baseY - offsetY };
+    });
+  }
+
+  /** Apply current layout to existing display objects. */
+  private applyLayout(): void {
+    if (this.sprites.length === 0 || this.cards.length === 0) return;
+
+    const positions = this.computeCardPositions();
+
+    for (let i = 0; i < this.sprites.length && i < positions.length; i++) {
+      const sprite = this.sprites[i];
+      const pos = positions[i];
+      (sprite as any).x = pos.x;
+      (sprite as any).y = pos.y;
+
+      if (i < this.labels.length) {
+        const label = this.labels[i];
+        (label as any).x = pos.x;
+        (label as any).y = pos.y + 42;
+      }
     }
   }
 
