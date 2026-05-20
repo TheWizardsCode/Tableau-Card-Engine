@@ -96,6 +96,8 @@ describe('Gym reduced-motion: GymSceneBase property API', () => {
       'GymTranscriptScene.ts',
       'GymSaveLoadScene.ts',
       'GymAudioFeedbackScene.ts',
+      'GymGraphicsShaderSpikeScene.ts',
+      'GymGraphicsLightingSpikeScene.ts',
     ];
 
     for (const file of sceneFiles) {

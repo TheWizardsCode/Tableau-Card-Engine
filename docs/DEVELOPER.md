@@ -234,7 +234,9 @@ example-games/
 │       ├── GymUndoRedoScene.ts  Undo/redo workflow demo
 │       ├── GymTranscriptScene.ts Transcript recording demo
 │       ├── GymSaveLoadScene.ts  Save/load state demo
-│       └── GymAudioFeedbackScene.ts Audio & feedback configuration demo
+│       ├── GymAudioFeedbackScene.ts Audio & feedback configuration demo
+│       ├── GymGraphicsShaderSpikeScene.ts Shader & blend mode spike
+│       └── GymGraphicsLightingSpikeScene.ts Lighting spike
 ├── golf/
 │   ├── main.ts                 Game entry point (Phaser.Game config)
 │   ├── createGolfGame.ts       Factory function (used by main.ts and tests)
