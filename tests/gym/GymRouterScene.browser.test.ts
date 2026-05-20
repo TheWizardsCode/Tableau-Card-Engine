@@ -17,6 +17,8 @@ import {
   GymTranscriptScene,
   GymSaveLoadScene,
   GymAudioFeedbackScene,
+  GymGraphicsShaderSpikeScene,
+  GymGraphicsLightingSpikeScene,
 } from '../../example-games/gym';
 import { waitForScene } from '../helpers/waitForScene';
 import {
@@ -28,6 +30,8 @@ import {
   GYM_TRANSCRIPT_KEY,
   GYM_SAVE_LOAD_KEY,
   GYM_AUDIO_FEEDBACK_KEY,
+  GYM_GRAPHICS_SHADER_SPIKE_KEY,
+  GYM_GRAPHICS_LIGHTING_SPIKE_KEY,
   GYM_SCENE_CATALOGUE,
 } from '../../example-games/gym/GymRegistry';
 
@@ -61,6 +65,8 @@ describe('GymRouterScene browser smoke', () => {
         GymTranscriptScene,
         GymSaveLoadScene,
         GymAudioFeedbackScene,
+        GymGraphicsShaderSpikeScene,
+        GymGraphicsLightingSpikeScene,
       ],
     });
 
@@ -111,6 +117,8 @@ describe('GymRouterScene browser smoke', () => {
       GYM_TRANSCRIPT_KEY,
       GYM_SAVE_LOAD_KEY,
       GYM_AUDIO_FEEDBACK_KEY,
+      GYM_GRAPHICS_SHADER_SPIKE_KEY,
+      GYM_GRAPHICS_LIGHTING_SPIKE_KEY,
     ];
 
     game = new Phaser.Game({
@@ -128,6 +136,8 @@ describe('GymRouterScene browser smoke', () => {
         GymTranscriptScene,
         GymSaveLoadScene,
         GymAudioFeedbackScene,
+        GymGraphicsShaderSpikeScene,
+        GymGraphicsLightingSpikeScene,
       ],
     });
 

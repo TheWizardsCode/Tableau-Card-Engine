@@ -35,6 +35,8 @@ npx vitest run --project browser tests/gym/*.browser.test.ts
 | Transcript Recording | `GymTranscriptScene` | `TranscriptRecorderBase`, `createSeededRng` | [`scenes/GymTranscriptScene.ts`](../../example-games/gym/scenes/GymTranscriptScene.ts) | [`GymTranscript.test.ts`](../../tests/gym/GymTranscript.test.ts) |
 | Save / Load State | `GymSaveLoadScene` | `SaveLoadStore`, `serializeWithVersion`, `deserializeWithVersion` | [`scenes/GymSaveLoadScene.ts`](../../example-games/gym/scenes/GymSaveLoadScene.ts) | [`GymSaveLoad.test.ts`](../../tests/gym/GymSaveLoad.test.ts) |
 | Audio & Feedback Config | `GymAudioFeedbackScene` | `SoundManager`, `GameEventEmitter`, `EventSoundMapping` | [`scenes/GymAudioFeedbackScene.ts`](../../example-games/gym/scenes/GymAudioFeedbackScene.ts) | [`GymAudioFeedback.test.ts`](../../tests/gym/GymAudioFeedback.test.ts) |
+| Shader & Blend Spike | `GymGraphicsShaderSpikeScene` | Sprite tinting, blend modes, shader feasibility | [`scenes/GymGraphicsShaderSpikeScene.ts`](../../example-games/gym/scenes/GymGraphicsShaderSpikeScene.ts) | [`GymSceneSmoke.browser.test.ts`](../../tests/gym/GymSceneSmoke.browser.test.ts) |
+| Lighting Spike | `GymGraphicsLightingSpikeScene` | Point light, shadow evaluation, WebGL fallback | [`scenes/GymGraphicsLightingSpikeScene.ts`](../../example-games/gym/scenes/GymGraphicsLightingSpikeScene.ts) | [`GymSceneSmoke.browser.test.ts`](../../tests/gym/GymSceneSmoke.browser.test.ts) |
 
 ## Deterministic Headless Tests
 

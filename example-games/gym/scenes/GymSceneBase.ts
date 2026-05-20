@@ -18,6 +18,8 @@ import type { SceneHeaderResult } from '../../../src/ui/SceneHeader';
 import { GYM_ROUTER_KEY } from '../GymRegistry';
 import { HelpPanel, type HelpSection } from '../../../src/ui/HelpPanel';
 import { HelpButton } from '../../../src/ui/HelpButton';
+import { getReducedMotion, setReducedMotion } from '../../../src/ui/SettingsStore';
+import { runSceneTransition } from '../../../src/ui/sceneTransition';
 
 /**
  * Abstract base class for Gym demo scenes.
@@ -29,8 +31,37 @@ export abstract class GymSceneBase extends Phaser.Scene {
   /** Scene header elements (title + menu button). */
   protected header!: SceneHeaderResult;
 
+  /** Whether reduced motion is currently enabled. Scenes and helpers
+   *  should consult this property to skip or shorten animations when true. */
+  private _reducedMotion: boolean = false;
+
   constructor(config: Phaser.Types.Scenes.SettingsConfig) {
     super(config);
+  }
+
+  /**
+   * Whether reduced motion is enabled.
+   *
+   * When true, scenes should skip tween animations and apply instant state
+   * changes instead. Helpers like flipCard, dealCard, etc. that accept a
+   * `reducedMotion` override should be passed this value.
+   *
+   * The value is initialised from the SettingsStore and the browser
+   * prefers-reduced-motion media query on each scene create(). It can also
+   * be toggled programmatically via `setReducedMotionProperty()`.
+   */
+  get reducedMotion(): boolean {
+    return this._reducedMotion;
+  }
+
+  /**
+   * Programmatically override the reduced-motion flag for this scene.
+   *
+   * Primarily useful in headless tests to force reduced-motion mode
+   * without requiring a DOM or SettingsStore backend.
+   */
+  setReducedMotionProperty(value: boolean): void {
+    this._reducedMotion = value;
   }
 
   /**
@@ -51,6 +82,62 @@ export abstract class GymSceneBase extends Phaser.Scene {
       this.scene.start(GYM_ROUTER_KEY);
     });
     return this.header;
+  }
+
+  // ── Reduced-motion helper ─────────────────────────────────
+
+  /**
+   * Read the current reduced-motion preference from the SettingsStore
+   * (and the DOM media query as a fallback) and cache it in
+   * `this.reducedMotion`.
+   *
+   * Call this early in your scene's `create()` method (after
+   * `initHeader()`).
+   */
+  protected initReducedMotion(): void {
+    // Check SettingsStore first, then DOM media query
+    const storedPreference = getReducedMotion();
+    const domPreference = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      : false;
+    this._reducedMotion = storedPreference || domPreference;
+  }
+
+  /**
+   * Toggle the reduced-motion setting and persist it to SettingsStore.
+   *
+   * This also updates `this.reducedMotion` so any subsequent animation
+   * checks use the new value.
+   */
+  protected toggleReducedMotion(): void {
+    this._reducedMotion = !this._reducedMotion;
+    setReducedMotion(this._reducedMotion);
+  }
+
+  // ── Scene transition hook ─────────────────────────────────
+
+  /**
+   * Run an animated enter transition when the scene starts.
+   *
+   * Call this from your scene's create() to fade or slide in.
+   * When reduced-motion is enabled, the transition is skipped
+   * (returns a resolved Promise immediately).
+   *
+   * @param type  Transition type: 'fade' or 'slide'
+   * @param duration  Duration in ms (default 300)
+   * @returns Promise that resolves when the transition completes
+   */
+  protected runEnterTransition(
+    type: 'fade' | 'slide' = 'fade',
+    duration: number = 300,
+  ): Promise<void> {
+    return runSceneTransition({
+      scene: this,
+      mode: 'enter',
+      type,
+      duration,
+      reducedMotion: this.reducedMotion,
+    });
   }
 
   /**

@@ -18,13 +18,15 @@ Open `http://localhost:3000` and select **Gym** from the game selector. From the
 
 | Scene | Key | What it Demonstrates |
 |---|---|---|
-| Deck & Seeded RNG | `GymDeckRngScene` | Create/shuffle/draw with deterministic seeded randomness |
-| Hand & Pile Interactions | `GymHandPileScene` | Move cards between hand and piles; legal/illegal action feedback |
-| Overlay & UI Config | `GymOverlayUiScene` | Open/close overlays; toggle feedback intensity |
-| Undo / Redo | `GymUndoRedoScene` | Execute, undo, and redo actions; history stack and boundary conditions |
-| Transcript Recording | `GymTranscriptScene` | Record game events, inspect transcripts, verify deterministic ordering |
-| Save / Load State | `GymSaveLoadScene` | Save and restore state; handle malformed payloads safely |
-| Audio & Feedback Config | `GymAudioFeedbackScene` | Toggle mute, adjust volume, map events to sounds, handle invalid keys |
+| Deck & Seeded RNG | `GymDeckRngScene` | Create/shuffle/draw with deterministic seeded randomness; flip and deal animations |
+| Hand & Pile Interactions | `GymHandPileScene` | Move cards with deal/place/discard/move/shake animations; drop-zone highlights; flip support |
+| Overlay & UI Config | `GymOverlayUiScene` | Open/close overlays; toggle feedback intensity; GeometryMask scrollable content |
+| Undo / Redo | `GymUndoRedoScene` | Execute, undo, and redo actions; pop text feedback on undo/redo |
+| Transcript Recording | `GymTranscriptScene` | Record game events, inspect transcripts; pop text feedback |
+| Save / Load State | `GymSaveLoadScene` | Save and restore state; RenderTexture snapshot; handle malformed payloads |
+| Audio & Feedback Config | `GymAudioFeedbackScene` | Toggle mute, adjust volume, map events to sounds; pop text; particle celebration |
+| Shader & Blend Spike | `GymGraphicsShaderSpikeScene` | Sprite tinting, blend modes, shader feasibility evaluation |
+| Lighting Spike | `GymGraphicsLightingSpikeScene` | Point light, shadow evaluation, WebGL fallback behavior |
 
 ## Running Tests
 
@@ -35,6 +37,16 @@ npm test
 # Run only Gym-related tests
 npx vitest run tests/gym/
 ```
+
+## Reduced Motion
+
+All Gym scenes support reduced-motion mode. When enabled (via browser preferences or SettingsStore), animations are shortened or replaced with instant state changes, and particle effects are suppressed. This is controlled by the `reducedMotion` property on `GymSceneBase`, which reads from both the SettingsStore and the browser's `prefers-reduced-motion` media query.
+
+Headless tests can force reduced-motion by calling `scene.setReducedMotionProperty(true)`.
+
+## Scene Transitions
+
+The Gym Router supports optional animated scene transitions (fade) when navigating to a demo scene. Toggle transitions on/off via the "Transitions" button in the top-right corner of the router. Transitions are skipped when reduced-motion is enabled.
 
 ## Adding a New Scene
 
@@ -52,3 +64,45 @@ npx vitest run tests/gym/
 - **GymRegistry**: Central catalogue of scene keys, titles, and descriptions.
 
 Each demo scene uses core-engine APIs directly (SeededRng, UndoRedoManager, TranscriptRecorderBase, SaveLoadStore, SoundManager, etc.) without duplicating engine code.
+
+## Reusable UI Components
+
+The Gym scenes use and demonstrate several reusable UI components from `src/ui/` that can be used in any card game:
+
+### HandView (`src/ui/HandView.ts`)
+
+Displays a player's hand of cards as a horizontal row of interactive sprites with selection highlighting and event emission.
+
+```ts
+import { HandView } from '@ui/HandView';
+
+const handView = new HandView(scene, { baseX: 60, baseY: 130, spacing: 56 });
+handView.setCards(myHand);
+handView.on('cardclick', (idx) => handView.setSelected(idx));
+
+// After mutating your hand array:
+handView.setCards(myHand);
+handView.setSelected(null);
+
+// Cleanup
+handView.destroy();
+```
+
+**API**: `setCards(cards)`, `getCards()`, `addCard(card, opts?)`, `removeCard(index, opts?)`, `setSelected(index|null)`, `getSelected()`, `on(event, cb)`, `off(event, cb)`, `getSpriteAt(index)`, `getSprites()`, `setReducedMotion(bool)`, `destroy()`.
+
+### PileView (`src/ui/PileView.ts`)
+
+Displays a card pile (deck, discard, etc.) as a single sprite showing the top card, with a count label below and click events.
+
+```ts
+import { PileView } from '@ui/PileView';
+
+const deckView = new PileView(scene, { x: 500, y: 150, label: 'Deck' });
+deckView.setPile(myDrawPile);
+deckView.onClick(() => { /* draw logic */ deckView.update(); });
+
+// Cleanup
+deckView.destroy();
+```
+
+**API**: `setPile(pile)`, `peek()`, `update()`, `onClick(cb)`, `getCountText()`, `getSprite()`, `getPile()`, `destroy()`.

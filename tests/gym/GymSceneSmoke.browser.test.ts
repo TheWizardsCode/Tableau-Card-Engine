@@ -13,6 +13,8 @@ import { GymUndoRedoScene } from '../../example-games/gym/scenes/GymUndoRedoScen
 import { GymTranscriptScene } from '../../example-games/gym/scenes/GymTranscriptScene';
 import { GymSaveLoadScene } from '../../example-games/gym/scenes/GymSaveLoadScene';
 import { GymAudioFeedbackScene } from '../../example-games/gym/scenes/GymAudioFeedbackScene';
+import { GymGraphicsShaderSpikeScene } from '../../example-games/gym/scenes/GymGraphicsShaderSpikeScene';
+import { GymGraphicsLightingSpikeScene } from '../../example-games/gym/scenes/GymGraphicsLightingSpikeScene';
 import { waitForScene } from '../helpers/waitForScene';
 import {
   GYM_DECK_RNG_KEY,
@@ -22,6 +24,8 @@ import {
   GYM_TRANSCRIPT_KEY,
   GYM_SAVE_LOAD_KEY,
   GYM_AUDIO_FEEDBACK_KEY,
+  GYM_GRAPHICS_SHADER_SPIKE_KEY,
+  GYM_GRAPHICS_LIGHTING_SPIKE_KEY,
 } from '../../example-games/gym/GymRegistry';
 
 const SCENES = [
@@ -32,6 +36,8 @@ const SCENES = [
   { key: GYM_TRANSCRIPT_KEY, Scene: GymTranscriptScene },
   { key: GYM_SAVE_LOAD_KEY, Scene: GymSaveLoadScene },
   { key: GYM_AUDIO_FEEDBACK_KEY, Scene: GymAudioFeedbackScene },
+  { key: GYM_GRAPHICS_SHADER_SPIKE_KEY, Scene: GymGraphicsShaderSpikeScene },
+  { key: GYM_GRAPHICS_LIGHTING_SPIKE_KEY, Scene: GymGraphicsLightingSpikeScene },
 ];
 
 describe('Gym individual scene smoke', () => {

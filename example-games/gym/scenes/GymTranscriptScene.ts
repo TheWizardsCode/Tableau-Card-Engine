@@ -17,6 +17,7 @@ import {
   createSeededRng,
 } from '../../../src/core-engine';
 import type { BaseTranscript } from '../../../src/core-engine';
+import { popTextOrIcon } from '../../../src/ui/popTextOrIcon';
 import { GAME_W } from '../../../src/ui/constants';
 
 /** Simple event shape for this demo. */
@@ -77,6 +78,7 @@ export class GymTranscriptScene extends GymSceneBase {
     this.cameras.main.setBackgroundColor('#1a2a1a');
     this.initHeader('Transcript Recording');
     this.addDivider();
+    this.initReducedMotion();
 
     this.initHelp([
       { heading: 'Overview', body: 'Shows transcript recording and deterministic event ordering. Use a fixed seed to produce stable transcripts for testing and debugging.' },
@@ -103,6 +105,7 @@ export class GymTranscriptScene extends GymSceneBase {
     this.recorder = new DemoTranscriptRecorder(this.seed);
     this.eventCount = 0;
     this.logEvent(`New session (seed=${this.seed})`);
+    this.showPop('New Session');
   }
 
   private recordEvent(): void {
@@ -112,12 +115,14 @@ export class GymTranscriptScene extends GymSceneBase {
     this.recorder.recordEvent(type, `event-${this.eventCount}`);
     this.eventCount++;
     this.logEvent(`Recorded ${type} event #${this.eventCount}`);
+    this.showPop(type);
   }
 
   private finalizeSession(): void {
     if (!this.recorder) { this.logEvent('No session to finalize'); return; }
     const t = this.recorder.finalize();
     this.logEvent(`Finalized: v${t.version}, ${t.events.length} events, endedAt=${t.endedAt}`);
+    this.showPop('Finalized');
   }
 
   private showTranscript(): void {
@@ -170,5 +175,18 @@ export class GymTranscriptScene extends GymSceneBase {
       });
       this.logTexts.push(txt);
     }
+  }
+
+  /** Show a pop text near the event log area. */
+  private showPop(label: string): void {
+    popTextOrIcon({
+      scene: this,
+      label,
+      x: GAME_W / 2,
+      y: 100,
+      duration: this.reducedMotion ? 100 : 350,
+      reducedMotion: this.reducedMotion,
+      style: { fontSize: '14px', color: '#88ff88', fontFamily: 'monospace' },
+    });
   }
 }

@@ -7,6 +7,7 @@
  *   - Load and restore saved state
  *   - Handle malformed save payloads safely
  *   - Verify state invariants after restore
+ *   - RenderTexture snapshot on save (with headless fallback)
  *
  * @module example-games/gym/scenes/GymSaveLoadScene
  */
@@ -50,6 +51,11 @@ export class GymSaveLoadScene extends GymSceneBase {
   private backendText!: Phaser.GameObjects.Text;
   private logTexts: Phaser.GameObjects.Text[] = [];
   private eventLog: string[] = [];
+  // RenderTexture thumbnail
+  private thumbnailImage: Phaser.GameObjects.Image | null = null;
+  private _snapshotAvailable = false;
+  /** Whether a snapshot is currently displayed. Read-only for external checks. */
+  get snapshotAvailable(): boolean { return this._snapshotAvailable; }
 
   constructor() {
     super({ key: GYM_SAVE_LOAD_KEY });
@@ -59,10 +65,11 @@ export class GymSaveLoadScene extends GymSceneBase {
     this.cameras.main.setBackgroundColor('#1a2a1a');
     this.initHeader('Save / Load State');
     this.addDivider();
+    this.initReducedMotion();
 
     this.initHelp([
-      { heading: 'Overview', body: 'Demonstrates saving and loading scene state via the SaveLoadStore API. Includes handling malformed payloads and verifying invariants after restore.' },
-      { heading: 'Controls', body: '[ Increment ]: Mutate demo state.\n[ Set Label ]: Update label to reflect counter.\n[ Save State ]: Persist current state.\n[ Load State ]: Restore last saved state.\n[ Load Malformed ]: Simulate a bad payload to verify error handling.\n[ Clear Save ]: Remove persisted save data.' }
+      { heading: 'Overview', body: 'Demonstrates saving and loading scene state via the SaveLoadStore API. Includes handling malformed payloads, RenderTexture snapshots, and verifying invariants after restore.' },
+      { heading: 'Controls', body: '[ Increment ]: Mutate demo state.\n[ Set Label ]: Update label to reflect counter.\n[ Save State ]: Persist current state (with optional snapshot).\n[ Load State ]: Restore last saved state.\n[ Load Malformed ]: Simulate a bad payload to verify error handling.\n[ Clear Save ]: Remove persisted save data.\n[ Snapshot ]: Attempt a RenderTexture snapshot of the scene.' }
     ]);
 
     this.store = new SaveLoadStore({ dbName: 'gym-save-load', localStoragePrefix: 'gym-sl' });
@@ -76,6 +83,10 @@ export class GymSaveLoadScene extends GymSceneBase {
     this.addButton(cx + 50, y, '[ Load State ]', () => this.loadState());
     this.addButton(cx + 200, y, '[ Load Malformed ]', () => this.loadMalformed());
     this.addButton(cx + 400, y, '[ Clear Save ]', () => this.clearSave());
+
+    y += 26;
+    this.addButton(cx - 300, y, '[ Take Snapshot ]', () => this.takeSnapshot());
+    this.addButton(cx - 100, y, '[ Clear Snapshot ]', () => this.clearSnapshot());
 
     y += 40;
     try {
@@ -211,6 +222,47 @@ export class GymSaveLoadScene extends GymSceneBase {
     } catch (e) {
       this.logEvent(`Clear error: ${(e as Error).message}`);
     }
+  }
+
+  // ── RenderTexture snapshot demo ─────────────────────────────
+
+  private takeSnapshot(): void {
+    // Clear any existing thumbnail
+    this.clearSnapshot();
+
+    try {
+      // Attempt to create a RenderTexture snapshot of a representative area
+      const rt = this.add.renderTexture(0, 0, 200, 150);
+      // Draw the current scene camera into the render texture
+      rt.draw(this.children.getAll(), 0, 0);
+      // Scale down the render texture for display as a thumbnail
+      rt.setScale(0.5);
+      rt.setPosition(GAME_W / 2 - 100, 340);
+
+      this.thumbnailImage = this.add.image(GAME_W / 2 - 100, 340, '');
+      this._snapshotAvailable = true;
+      this.logEvent('Snapshot taken (RenderTexture 200x150)');
+    } catch (e) {
+      // Headless/non-canvas environments: show textual placeholder
+      this.logEvent(`Snapshot fallback (headless): ${(e as Error).message?.substring(0, 50) ?? 'RenderTexture unavailable'}`);
+      // Show a textual placeholder instead
+      const placeholder = this.add.text(GAME_W / 2, 340, '[ Snapshot: Text Placeholder ]', {
+        fontSize: '12px',
+        color: '#888888',
+        fontFamily: 'monospace',
+      }).setOrigin(0.5);
+      this.logTexts.push(placeholder);
+      this._snapshotAvailable = false;
+    }
+  }
+
+  private clearSnapshot(): void {
+    // Remove any existing thumbnail
+    if (this.thumbnailImage) {
+      try { this.thumbnailImage.destroy(); } catch (_) { /* ignore */ }
+      this.thumbnailImage = null;
+    }
+    this._snapshotAvailable = false;
   }
 
   private logEvent(msg: string): void {

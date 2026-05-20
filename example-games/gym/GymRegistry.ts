@@ -43,6 +43,12 @@ export const GYM_SAVE_LOAD_KEY = 'GymSaveLoadScene';
 /** Audio & Feedback Configuration demo scene key. */
 export const GYM_AUDIO_FEEDBACK_KEY = 'GymAudioFeedbackScene';
 
+/** Graphics Shader Spike scene key. */
+export const GYM_GRAPHICS_SHADER_SPIKE_KEY = 'GymGraphicsShaderSpikeScene';
+
+/** Graphics Lighting Spike scene key. */
+export const GYM_GRAPHICS_LIGHTING_SPIKE_KEY = 'GymGraphicsLightingSpikeScene';
+
 // ── Registry ──────────────────────────────────────────────
 
 /**
@@ -93,5 +99,17 @@ export const GYM_SCENE_CATALOGUE: GymSceneEntry[] = [
     title: 'Audio & Feedback Config',
     description:
       'Toggle mute, switch sound mappings at runtime, and adjust feedback intensity. Validate event-to-sound resolution.',
+  },
+  {
+    sceneKey: GYM_GRAPHICS_SHADER_SPIKE_KEY,
+    title: 'Shader & Blend Spike',
+    description:
+      'Experimental: demonstrates sprite tinting, blend modes, and shader feasibility evaluation. Separate spike scene.',
+  },
+  {
+    sceneKey: GYM_GRAPHICS_LIGHTING_SPIKE_KEY,
+    title: 'Lighting Spike',
+    description:
+      'Experimental: evaluates Phaser lighting pipeline for card-glow and shadow effects. Feasibility spike with fallback.',
   },
 ];
