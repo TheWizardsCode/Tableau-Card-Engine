@@ -29,7 +29,7 @@ npx vitest run --project browser tests/gym/*.browser.test.ts
 | Scene | Key | Core APIs | Source | Tests |
 |---|---|---|---|---|
 | Deck & Seeded RNG | `GymDeckRngScene` | `createStandardDeck`, `shuffleArray`, `createSeededRng` | [`scenes/GymDeckRngScene.ts`](../../example-games/gym/scenes/GymDeckRngScene.ts) | [`GymDeckRng.test.ts`](../../tests/gym/GymDeckRng.test.ts) |
-| Hand & Pile Interactions | `GymHandPileScene` | `Pile`, `createStandardDeck`, `createSeededRng` | [`scenes/GymHandPileScene.ts`](../../example-games/gym/scenes/GymHandPileScene.ts) | [`GymRegistry.test.ts`](../../tests/gym/GymRegistry.test.ts) |
+| Hand & Pile Interactions | `GymHandPileScene` | `Pile`, `createStandardDeck`, `createSeededRng`, `HandView.setMaxRotationDegrees` | [`scenes/GymHandPileScene.ts`](../../example-games/gym/scenes/GymHandPileScene.ts) | [`GymRegistry.test.ts`](../../tests/gym/GymRegistry.test.ts), [`GymHandPileRotation.test.ts`](../../tests/gym/GymHandPileRotation.test.ts) |
 | Overlay & UI Config | `GymOverlayUiScene` | `createOverlayBackground`, `dismissOverlay` | [`scenes/GymOverlayUiScene.ts`](../../example-games/gym/scenes/GymOverlayUiScene.ts) | [`GymSceneSmoke.browser.test.ts`](../../tests/gym/GymSceneSmoke.browser.test.ts) |
 | Undo / Redo | `GymUndoRedoScene` | `UndoRedoManager`, `CompoundCommand` | [`scenes/GymUndoRedoScene.ts`](../../example-games/gym/scenes/GymUndoRedoScene.ts) | [`GymUndoRedo.test.ts`](../../tests/gym/GymUndoRedo.test.ts) |
 | Transcript Recording | `GymTranscriptScene` | `TranscriptRecorderBase`, `createSeededRng` | [`scenes/GymTranscriptScene.ts`](../../example-games/gym/scenes/GymTranscriptScene.ts) | [`GymTranscript.test.ts`](../../tests/gym/GymTranscript.test.ts) |

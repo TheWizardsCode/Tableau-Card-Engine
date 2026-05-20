@@ -19,7 +19,7 @@ Open `http://localhost:3000` and select **Gym** from the game selector. From the
 | Scene | Key | What it Demonstrates |
 |---|---|---|
 | Deck & Seeded RNG | `GymDeckRngScene` | Create/shuffle/draw with deterministic seeded randomness; flip and deal animations |
-| Hand & Pile Interactions | `GymHandPileScene` | Move cards with deal/place/discard/move/shake animations; bottom-anchored arc hand layout with live radius slider; drop-zone highlights; flip support |
+| Hand & Pile Interactions | `GymHandPileScene` | Move cards with deal/place/discard/move/shake animations; bottom-anchored arc hand layout with live radius and per-card rotation sliders; drop-zone highlights; flip support |
 | Overlay & UI Config | `GymOverlayUiScene` | Open/close overlays; toggle feedback intensity; GeometryMask scrollable content |
 | Undo / Redo | `GymUndoRedoScene` | Execute, undo, and redo actions; pop text feedback on undo/redo |
 | Transcript Recording | `GymTranscriptScene` | Record game events, inspect transcripts; pop text feedback |
@@ -79,7 +79,7 @@ import { HandView } from '@ui/HandView';
 const handView = new HandView(scene, {
   baseX: 60,
   baseY: 130,
-  spacing: 56,
+  spacing: 20,
   arcRadius: 60,
   showLabels: false,
 });
@@ -97,7 +97,7 @@ handView.setSelected(null);
 handView.destroy();
 ```
 
-**API**: `setCards(cards)`, `getCards()`, `addCard(card, opts?)`, `removeCard(index, opts?)`, `setSelected(index|null)`, `getSelected()`, `setArcRadius(radius)`, `getArcRadius()`, `on(event, cb)`, `off(event, cb)`, `getSpriteAt(index)`, `getSprites()`, `getCardCenters()`, `setReducedMotion(bool)`, `destroy()`.
+**API**: `setCards(cards)`, `getCards()`, `addCard(card, opts?)`, `removeCard(index, opts?)`, `setSelected(index|null)`, `getSelected()`, `setArcRadius(radius)`, `getArcRadius()`, `setMaxRotationDegrees(degrees)`, `getMaxRotationDegrees()`, `on(event, cb)`, `off(event, cb)`, `getSpriteAt(index)`, `getSprites()`, `getCardCenters()`, `setReducedMotion(bool)`, `destroy()`.
 
 ### PileView (`src/ui/PileView.ts`)
 
