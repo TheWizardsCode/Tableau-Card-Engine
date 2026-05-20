@@ -72,7 +72,7 @@ export class GymHandPileScene extends GymSceneBase {
   // Arc slider constants/state
   private readonly ARC_RADIUS_MIN = 0;
   private readonly ARC_RADIUS_MAX = 200;
-  private readonly ARC_RADIUS_DEFAULT = 60;
+  private readonly ARC_RADIUS_DEFAULT = 150;
   private readonly ARC_SLIDER_WIDTH = 150;
   private readonly ARC_SLIDER_HEIGHT = 6;
   private arcRadius = this.ARC_RADIUS_DEFAULT;
@@ -82,6 +82,14 @@ export class GymHandPileScene extends GymSceneBase {
   private arcSliderHitArea?: Phaser.GameObjects.Zone;
   private arcSliderValueText?: Phaser.GameObjects.Text;
   private isArcSliderDragging = false;
+
+  // Spacing slider state
+  private spacingSliderTrack?: Phaser.GameObjects.Rectangle;
+  private spacingSliderFill?: Phaser.GameObjects.Rectangle;
+  private spacingSliderHandle?: Phaser.GameObjects.Graphics;
+  private spacingSliderHitArea?: Phaser.GameObjects.Zone;
+  private spacingSliderValueText?: Phaser.GameObjects.Text;
+  private isSpacingSliderDragging = false;
 
   constructor() {
     super({ key: GYM_HAND_PILE_KEY });
@@ -159,6 +167,7 @@ export class GymHandPileScene extends GymSceneBase {
     this.addLabel(cx, y, '── Event Log ──', { fontSize: '12px', color: '#669966' }).setOrigin(0.5);
 
     this.createArcRadiusSlider();
+    this.createSpacingSlider();
 
     // Initialize
     this.reset();
@@ -244,6 +253,8 @@ export class GymHandPileScene extends GymSceneBase {
     this.arcSliderValueText.setPosition(trackX + this.ARC_SLIDER_WIDTH / 2, this.HAND_BASE_Y - 20);
 
     this.updateArcSliderVisuals();
+    // Also update spacing slider position so both sliders track the hand
+    try { this.updateSpacingSliderPosition(); } catch (_) { /* spacing slider may not be initialised */ }
   }
 
   private updateArcSliderVisuals(): void {
@@ -267,6 +278,119 @@ export class GymHandPileScene extends GymSceneBase {
     this.arcSliderHandle.strokeCircle(handleX, handleY, 8);
 
     this.arcSliderValueText.setText(`Arc: ${Math.round(this.arcRadius)}`);
+  }
+
+  // ── Spacing slider ──────────────────────────────────────
+
+  private createSpacingSlider(): void {
+    const sliderY = this.HAND_BASE_Y;
+
+    this.spacingSliderTrack = this.add.rectangle(0, sliderY, this.ARC_SLIDER_WIDTH, this.ARC_SLIDER_HEIGHT, 0x333344, 1)
+      .setOrigin(0, 0.5);
+
+    this.spacingSliderFill = this.add.rectangle(0, sliderY, 1, this.ARC_SLIDER_HEIGHT, 0x88ff88, 1)
+      .setOrigin(0, 0.5);
+
+    this.spacingSliderHandle = this.add.graphics();
+
+    this.spacingSliderValueText = this.add.text(0, sliderY - 20, '', {
+      fontSize: '11px',
+      color: '#88ff88',
+      fontFamily: 'monospace',
+    }).setOrigin(0.5);
+
+    this.spacingSliderHitArea = this.add.zone(0, sliderY, this.ARC_SLIDER_WIDTH + 24, 28)
+      .setInteractive({ useHandCursor: true });
+
+    this.spacingSliderHitArea.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      this.isSpacingSliderDragging = true;
+      this.setSpacingFromPointer(pointer.x);
+    });
+
+    this.input.on('pointermove', this.handleSpacingSliderPointerMove, this);
+    this.input.on('pointerup', this.handleSpacingSliderPointerUp, this);
+
+    this.events.once('shutdown', () => {
+      this.input.off('pointermove', this.handleSpacingSliderPointerMove, this);
+      this.input.off('pointerup', this.handleSpacingSliderPointerUp, this);
+    });
+
+    this.updateSpacingSliderPosition();
+    this.updateSpacingSliderVisuals();
+  }
+
+  private handleSpacingSliderPointerMove(pointer: Phaser.Input.Pointer): void {
+    if (!this.isSpacingSliderDragging) return;
+    this.setSpacingFromPointer(pointer.x);
+  }
+
+  private handleSpacingSliderPointerUp(): void {
+    this.isSpacingSliderDragging = false;
+  }
+
+  private setSpacingFromPointer(pointerX: number): void {
+    if (!this.spacingSliderTrack || !this.spacingSliderValueText) return;
+
+    const minSpacing = Math.round(CARD_W * (1 - 0.75));
+    const maxSpacing = Math.round(CARD_W * (1 + 0.75));
+
+    const minX = this.spacingSliderTrack.x;
+    const maxX = minX + this.ARC_SLIDER_WIDTH;
+    const clampedX = Math.max(minX, Math.min(maxX, pointerX));
+    const ratio = (clampedX - minX) / this.ARC_SLIDER_WIDTH;
+    const nextSpacing = Math.round(minSpacing + ratio * (maxSpacing - minSpacing));
+
+    this.handView.setSpacing(nextSpacing);
+    this.updateSpacingSliderVisuals();
+  }
+
+  private updateSpacingSliderPosition(): void {
+    if (!this.spacingSliderTrack || !this.spacingSliderFill || !this.spacingSliderHitArea || !this.spacingSliderValueText) {
+      return;
+    }
+
+    const centers = this.handView.getCardCenters();
+    const rightmostCenterX = centers.length > 0
+      ? Math.max(...centers.map((c) => c.x))
+      : this.HAND_BASE_X + (Math.max(this.hand.length, 1) - 1) * this.HAND_SPACING;
+
+    const rightEdge = rightmostCenterX + CARD_W / 2;
+    const arcAnchor = this.arcSliderTrack ? this.arcSliderTrack.x : 0;
+    const trackX = Math.min(GAME_W - this.ARC_SLIDER_WIDTH - 16, arcAnchor + this.ARC_SLIDER_WIDTH + 12);
+
+    this.spacingSliderTrack.setPosition(trackX, this.HAND_BASE_Y);
+    this.spacingSliderFill.setPosition(trackX, this.HAND_BASE_Y);
+    this.spacingSliderHitArea.setPosition(trackX + this.ARC_SLIDER_WIDTH / 2, this.HAND_BASE_Y);
+    this.spacingSliderValueText.setPosition(trackX + this.ARC_SLIDER_WIDTH / 2, this.HAND_BASE_Y - 20);
+
+    this.updateSpacingSliderVisuals();
+  }
+
+  private updateSpacingSliderVisuals(): void {
+    if (!this.spacingSliderTrack || !this.spacingSliderFill || !this.spacingSliderHandle || !this.spacingSliderValueText) {
+      return;
+    }
+
+    const minSpacing = Math.round(CARD_W * (1 - 0.75));
+    const maxSpacing = Math.round(CARD_W * (1 + 0.75));
+    const cur = this.handView.getSpacing ? this.handView.getSpacing() : this.HAND_SPACING;
+
+    const ratio = (cur - minSpacing) / (maxSpacing - minSpacing);
+    const clampedRatio = Math.max(0, Math.min(1, ratio));
+    const fillWidth = Math.max(1, this.ARC_SLIDER_WIDTH * clampedRatio);
+    const handleX = this.spacingSliderTrack.x + fillWidth;
+    const handleY = this.spacingSliderTrack.y;
+
+    this.spacingSliderFill.setSize(fillWidth, this.ARC_SLIDER_HEIGHT);
+    this.spacingSliderFill.setPosition(this.spacingSliderTrack.x, handleY);
+
+    this.spacingSliderHandle.clear();
+    this.spacingSliderHandle.fillStyle(0xffffff, 1);
+    this.spacingSliderHandle.fillCircle(handleX, handleY, 8);
+    this.spacingSliderHandle.lineStyle(2, 0x88ff88, 1);
+    this.spacingSliderHandle.strokeCircle(handleX, handleY, 8);
+
+    this.spacingSliderValueText.setText(`Spacing: ${Math.round(cur)}`);
   }
 
   private getHandPositionForIndex(index: number, handCount: number): { x: number; y: number } {
