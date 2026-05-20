@@ -414,7 +414,9 @@ export class HandView {
 
     return xs.map((x) => {
       const normalized = (x - arcCenterX) / halfSpan;
-      const offsetY = (normalized * normalized * halfSpan * halfSpan) / (2 * this.arcRadius);
+      // Inverted arc: central card should be at the highest point while edges remain at baseY.
+      // Use a parabolic profile that peaks at normalized=0 and falls to zero at normalized=±1.
+      const offsetY = ((1 - normalized * normalized) * halfSpan * halfSpan) / (2 * this.arcRadius);
       return { x, y: this.baseY - offsetY };
     });
   }

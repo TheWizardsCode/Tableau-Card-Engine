@@ -192,7 +192,7 @@ describe('HandView', () => {
     hv.destroy();
   });
 
-  it('arcRadius>0 positions cards on an arc (edge cards above center)', () => {
+  it('arcRadius>0 positions cards on an arc (center card above edges)', () => {
     const hv = new HandView(scene, {
       baseX: 60,
       baseY: 300,
@@ -209,9 +209,10 @@ describe('HandView', () => {
     ]);
 
     const ys = scene._images.map((img: any) => img.y);
-    expect(ys[2]).toBeCloseTo(300, 6);
-    expect(ys[0]).toBeLessThan(ys[2]);
-    expect(ys[4]).toBeLessThan(ys[2]);
+    // Center should be above (smaller y) than the edges
+    expect(ys[2]).toBeLessThan(300);
+    expect(ys[0]).toBeGreaterThan(ys[2]);
+    expect(ys[4]).toBeGreaterThan(ys[2]);
     hv.destroy();
   });
 
@@ -236,9 +237,10 @@ describe('HandView', () => {
     const after = scene._images.map((img: any) => img.y);
 
     expect(hv.getArcRadius()).toBe(120);
-    expect(after[0]).toBeLessThan(before[0]);
-    expect(after[4]).toBeLessThan(before[4]);
-    expect(after[2]).toBeCloseTo(300, 6);
+    // Edges should remain at or near the baseY while the center moves up
+    expect(after[0]).toBeCloseTo(before[0], 6);
+    expect(after[4]).toBeCloseTo(before[4], 6);
+    expect(after[2]).toBeLessThan(before[2]);
     hv.destroy();
   });
 
