@@ -18,13 +18,15 @@ Open `http://localhost:3000` and select **Gym** from the game selector. From the
 
 | Scene | Key | What it Demonstrates |
 |---|---|---|
-| Deck & Seeded RNG | `GymDeckRngScene` | Create/shuffle/draw with deterministic seeded randomness |
-| Hand & Pile Interactions | `GymHandPileScene` | Move cards between hand and piles; legal/illegal action feedback |
-| Overlay & UI Config | `GymOverlayUiScene` | Open/close overlays; toggle feedback intensity |
-| Undo / Redo | `GymUndoRedoScene` | Execute, undo, and redo actions; history stack and boundary conditions |
-| Transcript Recording | `GymTranscriptScene` | Record game events, inspect transcripts, verify deterministic ordering |
-| Save / Load State | `GymSaveLoadScene` | Save and restore state; handle malformed payloads safely |
-| Audio & Feedback Config | `GymAudioFeedbackScene` | Toggle mute, adjust volume, map events to sounds, handle invalid keys |
+| Deck & Seeded RNG | `GymDeckRngScene` | Create/shuffle/draw with deterministic seeded randomness; flip and deal animations |
+| Hand & Pile Interactions | `GymHandPileScene` | Move cards with deal/place/discard/move/shake animations; drop-zone highlights; flip support |
+| Overlay & UI Config | `GymOverlayUiScene` | Open/close overlays; toggle feedback intensity; GeometryMask scrollable content |
+| Undo / Redo | `GymUndoRedoScene` | Execute, undo, and redo actions; pop text feedback on undo/redo |
+| Transcript Recording | `GymTranscriptScene` | Record game events, inspect transcripts; pop text feedback |
+| Save / Load State | `GymSaveLoadScene` | Save and restore state; RenderTexture snapshot; handle malformed payloads |
+| Audio & Feedback Config | `GymAudioFeedbackScene` | Toggle mute, adjust volume, map events to sounds; pop text; particle celebration |
+| Shader & Blend Spike | `GymGraphicsShaderSpikeScene` | Sprite tinting, blend modes, shader feasibility evaluation |
+| Lighting Spike | `GymGraphicsLightingSpikeScene` | Point light, shadow evaluation, WebGL fallback behavior |
 
 ## Running Tests
 
@@ -35,6 +37,16 @@ npm test
 # Run only Gym-related tests
 npx vitest run tests/gym/
 ```
+
+## Reduced Motion
+
+All Gym scenes support reduced-motion mode. When enabled (via browser preferences or SettingsStore), animations are shortened or replaced with instant state changes, and particle effects are suppressed. This is controlled by the `reducedMotion` property on `GymSceneBase`, which reads from both the SettingsStore and the browser's `prefers-reduced-motion` media query.
+
+Headless tests can force reduced-motion by calling `scene.setReducedMotionProperty(true)`.
+
+## Scene Transitions
+
+The Gym Router supports optional animated scene transitions (fade) when navigating to a demo scene. Toggle transitions on/off via the "Transitions" button in the top-right corner of the router. Transitions are skipped when reduced-motion is enabled.
 
 ## Adding a New Scene
 

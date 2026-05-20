@@ -6,12 +6,16 @@
  * entry point. When the user selects "Gym" from the game catalogue,
  * they arrive here and can choose which engine feature to explore.
  *
+ * Scene transitions can optionally use animated transitions (fade/slide)
+ * via runSceneTransition, respected by the reduced-motion setting.
+ *
  * @module example-games/gym/scenes/GymRouterScene
  */
 
 import Phaser from 'phaser';
 import { GAME_W, GAME_H } from '../../../src/ui/constants';
 import { createSceneMenuButton } from '../../../src/ui/SceneHeader';
+import { runSceneTransition } from '../../../src/ui/sceneTransition';
 import { GYM_ROUTER_KEY, GYM_SCENE_CATALOGUE } from '../GymRegistry';
 import type { GymSceneEntry } from '../GymRegistry';
 
@@ -28,6 +32,10 @@ const CARD_BORDER = 0x3a7a3a;
 const CARD_BORDER_HOVER = 0x88ff88;
 const HEADER_H = 70;
 const GRID_MARGIN = 20;
+
+/** Enable animated transitions when navigating to demo scenes.
+ *  Can be toggled at runtime via the "Animate Transitions" button. */
+let animateTransitions = false;
 
 // ── Scene ───────────────────────────────────────────────────
 
@@ -62,6 +70,23 @@ export class GymRouterScene extends Phaser.Scene {
         fontFamily: FONT_FAMILY,
       })
       .setOrigin(0.5);
+
+    // Transition toggle button
+    const toggleBtn = this.add
+      .text(GAME_W - 20, 10, `Transitions: ${animateTransitions ? 'ON' : 'OFF'}`, {
+        fontSize: '10px',
+        color: animateTransitions ? '#88ff88' : '#666666',
+        fontFamily: FONT_FAMILY,
+      })
+      .setOrigin(1, 0)
+      .setInteractive({ useHandCursor: true });
+    toggleBtn.on('pointerdown', () => {
+      animateTransitions = !animateTransitions;
+      toggleBtn.setText(`Transitions: ${animateTransitions ? 'ON' : 'OFF'}`);
+      toggleBtn.setColor(animateTransitions ? '#88ff88' : '#666666');
+    });
+    toggleBtn.on('pointerover', () => toggleBtn.setColor('#bbffbb'));
+    toggleBtn.on('pointerout', () => toggleBtn.setColor(animateTransitions ? '#88ff88' : '#666666'));
 
     this.layoutSceneCards();
 
@@ -179,7 +204,19 @@ export class GymRouterScene extends Phaser.Scene {
     });
 
     hitZone.on('pointerdown', () => {
-      this.scene.start(entry.sceneKey);
+      if (animateTransitions) {
+        // Use animated scene transition before navigating
+        runSceneTransition({
+          scene: this,
+          mode: 'exit',
+          type: 'fade',
+          duration: 200,
+        }).then(() => {
+          this.scene.start(entry.sceneKey);
+        });
+      } else {
+        this.scene.start(entry.sceneKey);
+      }
     });
   }
 

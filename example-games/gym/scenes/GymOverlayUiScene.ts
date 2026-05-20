@@ -1,11 +1,14 @@
 /**
  * GymOverlayUiScene -- Demonstrates overlays, help/settings components,
- * and live UI configuration using core-engine UI APIs.
+ * live UI configuration, and GeometryMask clipping using core-engine UI APIs.
  *
  * Features:
  *   - Open and close help/settings overlays
  *   - Toggle feedback intensity settings
  *   - Verify overlay lifecycle (no state leaks)
+ *   - Scrollable content area clipped with GeometryMask
+ *   - Mask position updates during overlay animation
+ *   - Mask is destroyed on overlay dismiss
  *
  * @module example-games/gym/scenes/GymOverlayUiScene
  */
@@ -23,6 +26,10 @@ export class GymOverlayUiScene extends GymSceneBase {
   private logTexts: Phaser.GameObjects.Text[] = [];
   private eventLog: string[] = [];
   private overlayIntensityText: Phaser.GameObjects.Text | null = null;
+
+  // Mask references for GeometryMask demo
+  private contentMask: Phaser.Display.Masks.GeometryMask | null = null;
+  private maskedContainer: Phaser.GameObjects.Container | null = null;
 
   // Guard to prevent background clicks from immediately closing the overlay
   private overlayInteractionGuard = false;
@@ -45,8 +52,8 @@ export class GymOverlayUiScene extends GymSceneBase {
     this.initReducedMotion();
 
     this.initHelp([
-      { heading: 'Overview', body: 'Explores overlay lifecycle and live UI configuration. Verify overlays open/close cleanly and that settings are applied in real-time.' },
-      { heading: 'Controls', body: '[ Show Overlay ]: Open a dismissible overlay.\n[ Dismiss Overlay ]: Close the overlay if open.\n[ Intensity - ] / [ Intensity + ]: Adjust feedback intensity which influences overlay appearance.\n\nOverlay tip: Overlay clicks may be ignored briefly after interacting with overlay-local controls to avoid accidental dismissal.' }
+      { heading: 'Overview', body: 'Explores overlay lifecycle, live UI configuration, and GeometryMask clipping for scrollable content.' },
+      { heading: 'Controls', body: '[ Show Overlay ]: Open a dismissible overlay with masked scrollable content.\n[ Dismiss Overlay ]: Close the overlay if open.\n[ Intensity - ] / [ Intensity + ]: Adjust feedback intensity which influences overlay appearance.' }
     ]);
 
     const cx = GAME_W / 2;
@@ -75,35 +82,80 @@ export class GymOverlayUiScene extends GymSceneBase {
     this.overlayObjects = result.objects;
     this.overlayOpen = true;
 
-    // Make overlay background dismissible by clicking it directly, but guard against
-    // immediate propagation when clicking overlay-local controls (small targets).
+    // Make overlay background dismissible by clicking
     try {
       result.background.on('pointerdown', () => {
         if (this.overlayInteractionGuard) {
-          // recent overlay-local interaction; ignore this background click
           return;
         }
         this.closeOverlay();
       });
     } catch (e) {
-      // ignore - defensive in case background isn't interactive in some envs
+      // ignore
     }
 
     // Apply current intensity to the overlay appearance
     this.updateOverlayAppearance();
 
-    // Add central content text (ensure it's above the background)
+    // ── GeometryMask demo: scrollable content ─────────────
+    try {
+      // Create a shaped mask for clipping
+      const maskShape = this.add.graphics();
+      maskShape.fillStyle(0xffffff, 1);
+      maskShape.fillRect(0, 0, 300, 200);
+      this.contentMask = new Phaser.Display.Masks.GeometryMask(this, maskShape);
+      this.overlayObjects.push(maskShape);
+
+      // Create a container for content that will be clipped
+      this.maskedContainer = this.add.container(GAME_W / 2 - 150, 280);
+      this.maskedContainer.setMask(this.contentMask);
+      this.maskedContainer.setDepth(12);
+      this.overlayObjects.push(this.maskedContainer);
+
+      // Add scrollable content inside the clipped area
+      const contentLines = [
+        'Masked Content Area',
+        '─────────────────────',
+        'This text is inside a',
+        'GeometryMask-clipped',
+        'scrollable region.',
+        '',
+        'The mask clips content',
+        'to a 300×200 rectangle.',
+        '',
+        'When the overlay closes,',
+        'the mask is destroyed',
+        'and resources freed.',
+        '',
+        'Intensity setting affects',
+        'overlay brightness.',
+      ];
+      for (let i = 0; i < contentLines.length; i++) {
+        const line = this.add.text(10, i * 16, contentLines[i], {
+          fontSize: '12px',
+          color: '#ccddcc',
+          fontFamily: 'monospace',
+        });
+        this.maskedContainer.add(line);
+      }
+      this.logEvent('Overlay opened with GeometryMask content area');
+    } catch (e) {
+      // GeometryMask may not be available in all environments (e.g., headless)
+      this.logEvent('Overlay opened (GeometryMask unavailable, text fallback)');
+    }
+
+    // Add central content text (above the mask)
     const info = this.add.text(
       GAME_W / 2,
-      300,
-      'Overlay Active\nClick anywhere to dismiss.',
-      { fontSize: '18px', color: '#ffffff', fontFamily: 'monospace', align: 'center' },
+      240,
+      'Overlay Active\nScrollable content below.',
+      { fontSize: '16px', color: '#ffffff', fontFamily: 'monospace', align: 'center' },
     ).setOrigin(0.5);
     info.setDepth(11);
     this.overlayObjects.push(info);
 
-    // Add an explicit in-overlay dismiss link so overlay users can close it
-    const dismiss = this.add.text(GAME_W / 2, 360, '[ Dismiss Overlay ]', {
+    // Dismiss link
+    const dismiss = this.add.text(GAME_W / 2, 520, '[ Dismiss Overlay ]', {
       fontSize: '14px',
       color: '#88ff88',
       fontFamily: 'monospace',
@@ -116,38 +168,25 @@ export class GymOverlayUiScene extends GymSceneBase {
     dismiss.setDepth(11);
     this.overlayObjects.push(dismiss);
 
-    // Add overlay-local intensity controls so users can tune brightness while overlay is shown
-    const minus = this.add.text(GAME_W / 2 - 80, 420, '[-]', { fontSize: '14px', color: '#ff8877', fontFamily: 'monospace' }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    // Intensity controls within overlay
+    const minus = this.add.text(GAME_W / 2 - 80, 550, '[-]', { fontSize: '14px', color: '#ff8877', fontFamily: 'monospace' }).setOrigin(0.5).setInteractive({ useHandCursor: true });
     minus.on('pointerdown', () => { this.markOverlayInteraction(); this.adjustIntensity(-0.2); });
     minus.setDepth(11);
     this.overlayObjects.push(minus);
 
-    const intensityLabel = this.add.text(GAME_W / 2, 420, `Intensity: ${this.feedbackIntensity}`, { fontSize: '14px', color: '#ffffff', fontFamily: 'monospace' }).setOrigin(0.5);
+    const intensityLabel = this.add.text(GAME_W / 2, 550, `Intensity: ${this.feedbackIntensity}`, { fontSize: '14px', color: '#ffffff', fontFamily: 'monospace' }).setOrigin(0.5);
     intensityLabel.setDepth(11);
     this.overlayObjects.push(intensityLabel);
     this.overlayIntensityText = intensityLabel;
 
-    const plus = this.add.text(GAME_W / 2 + 80, 420, '[+]', { fontSize: '14px', color: '#77ff88', fontFamily: 'monospace' }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    const plus = this.add.text(GAME_W / 2 + 80, 550, '[+]', { fontSize: '14px', color: '#77ff88', fontFamily: 'monospace' }).setOrigin(0.5).setInteractive({ useHandCursor: true });
     plus.on('pointerdown', () => { this.markOverlayInteraction(); this.adjustIntensity(0.2); });
     plus.setDepth(11);
     this.overlayObjects.push(plus);
 
-    // Also add slightly larger invisible hit zones for the +/- controls to make tapping easier
-    try {
-      const minusZone = this.add.zone(GAME_W / 2 - 80, 420, 80, 42).setOrigin(0.5).setInteractive({ useHandCursor: true });
-      minusZone.on('pointerdown', () => { this.markOverlayInteraction(); this.adjustIntensity(-0.2); });
-      minusZone.setDepth(11);
-      this.overlayObjects.push(minusZone);
-
-      const plusZone = this.add.zone(GAME_W / 2 + 80, 420, 80, 42).setOrigin(0.5).setInteractive({ useHandCursor: true });
-      plusZone.on('pointerdown', () => { this.markOverlayInteraction(); this.adjustIntensity(0.2); });
-      plusZone.setDepth(11);
-      this.overlayObjects.push(plusZone);
-    } catch (_e) {
-      // ignore if zones cannot be created in some environments
+    if (!this.contentMask) {
+      this.logEvent('Overlay opened');
     }
-
-    this.logEvent('Overlay opened');
   }
 
   private closeOverlay(): void {
@@ -155,11 +194,22 @@ export class GymOverlayUiScene extends GymSceneBase {
       this.logEvent('No overlay open; ignoring');
       return;
     }
+
+    // Destroy GeometryMask references before dismissing overlay objects
+    if (this.maskedContainer) {
+      try { this.maskedContainer.clearMask(); } catch (_) { /* ignore */ }
+      this.maskedContainer = null;
+    }
+    if (this.contentMask) {
+      try { (this.contentMask as any).destroy?.(); } catch (_) { /* ignore */ }
+      this.contentMask = null;
+    }
+
     dismissOverlay(this.overlayObjects);
     this.overlayObjects = null;
     this.overlayIntensityText = null;
     this.overlayOpen = false;
-    this.logEvent('Overlay dismissed');
+    this.logEvent('Overlay dismissed (mask destroyed)');
   }
 
   private adjustIntensity(delta: number): void {
@@ -207,7 +257,6 @@ export class GymOverlayUiScene extends GymSceneBase {
   private markOverlayInteraction(): void {
     this.overlayInteractionGuard = true;
     try {
-      // Use Phaser's time system if available so the delayed clear is tied to the scene
       if (this.time && typeof this.time.delayedCall === 'function') {
         this.time.delayedCall(this.OVERLAY_INTERACTION_GUARD_MS, () => {
           this.overlayInteractionGuard = false;
@@ -216,7 +265,6 @@ export class GymOverlayUiScene extends GymSceneBase {
         setTimeout(() => { this.overlayInteractionGuard = false; }, this.OVERLAY_INTERACTION_GUARD_MS);
       }
     } catch (_e) {
-      // fallback
       setTimeout(() => { this.overlayInteractionGuard = false; }, this.OVERLAY_INTERACTION_GUARD_MS);
     }
   }

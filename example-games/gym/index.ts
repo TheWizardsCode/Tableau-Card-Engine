@@ -18,6 +18,8 @@ export { GymUndoRedoScene } from './scenes/GymUndoRedoScene';
 export { GymTranscriptScene } from './scenes/GymTranscriptScene';
 export { GymSaveLoadScene } from './scenes/GymSaveLoadScene';
 export { GymAudioFeedbackScene } from './scenes/GymAudioFeedbackScene';
+export { GymGraphicsShaderSpikeScene } from './scenes/GymGraphicsShaderSpikeScene';
+export { GymGraphicsLightingSpikeScene } from './scenes/GymGraphicsLightingSpikeScene';
 
 export {
   GYM_ROUTER_KEY,
@@ -28,6 +30,8 @@ export {
   GYM_TRANSCRIPT_KEY,
   GYM_SAVE_LOAD_KEY,
   GYM_AUDIO_FEEDBACK_KEY,
+  GYM_GRAPHICS_SHADER_SPIKE_KEY,
+  GYM_GRAPHICS_LIGHTING_SPIKE_KEY,
   GYM_SCENE_CATALOGUE,
 } from './GymRegistry';
 export type { GymSceneEntry } from './GymRegistry';

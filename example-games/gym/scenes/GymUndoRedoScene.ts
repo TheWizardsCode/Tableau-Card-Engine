@@ -15,6 +15,7 @@ import { GymSceneBase } from './GymSceneBase';
 import { GYM_UNDO_REDO_KEY } from '../GymRegistry';
 import { UndoRedoManager, CompoundCommand } from '../../../src/core-engine/UndoRedoManager';
 import type { Command } from '../../../src/core-engine/UndoRedoManager';
+import { popTextOrIcon } from '../../../src/ui/popTextOrIcon';
 import { GAME_W } from '../../../src/ui/constants';
 
 /** A simple command that increments/decrements a counter. */
@@ -100,6 +101,7 @@ export class GymUndoRedoScene extends GymSceneBase {
     const cmd = new IncrementCommand(this.state, delta);
     this.undoRedo.execute(cmd);
     this.logEvent(`Executed ${delta >= 0 ? '+' : ''}${delta} (counter=${this.state.value})`);
+    this.showPop(`+${delta}`, this.counterText.x, this.counterText.y - 20);
     this.updateDisplay();
   }
 
@@ -120,6 +122,7 @@ export class GymUndoRedoScene extends GymSceneBase {
     }
     const cmd = this.undoRedo.undo()!;
     this.logEvent(`Undid "${cmd.description}" (counter=${this.state.value})`);
+    this.showPop('Undo', GAME_W / 2, 140);
     this.updateDisplay();
   }
 
@@ -130,6 +133,7 @@ export class GymUndoRedoScene extends GymSceneBase {
     }
     const cmd = this.undoRedo.redo()!;
     this.logEvent(`Redid "${cmd.description}" (counter=${this.state.value})`);
+    this.showPop('Redo', GAME_W / 2, 140);
     this.updateDisplay();
   }
 
@@ -166,5 +170,18 @@ export class GymUndoRedoScene extends GymSceneBase {
       });
       this.logTexts.push(txt);
     }
+  }
+
+  /** Show a pop text/icon near the specified coordinates. */
+  private showPop(label: string, x: number, y: number): void {
+    popTextOrIcon({
+      scene: this,
+      label,
+      x,
+      y,
+      duration: this.reducedMotion ? 100 : 400,
+      reducedMotion: this.reducedMotion,
+      style: { fontSize: '14px', color: '#88ff88', fontFamily: 'monospace' },
+    });
   }
 }

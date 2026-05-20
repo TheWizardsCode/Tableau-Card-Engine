@@ -19,6 +19,7 @@ import { GYM_ROUTER_KEY } from '../GymRegistry';
 import { HelpPanel, type HelpSection } from '../../../src/ui/HelpPanel';
 import { HelpButton } from '../../../src/ui/HelpButton';
 import { getReducedMotion, setReducedMotion } from '../../../src/ui/SettingsStore';
+import { runSceneTransition } from '../../../src/ui/sceneTransition';
 
 /**
  * Abstract base class for Gym demo scenes.
@@ -111,6 +112,32 @@ export abstract class GymSceneBase extends Phaser.Scene {
   protected toggleReducedMotion(): void {
     this._reducedMotion = !this._reducedMotion;
     setReducedMotion(this._reducedMotion);
+  }
+
+  // ── Scene transition hook ─────────────────────────────────
+
+  /**
+   * Run an animated enter transition when the scene starts.
+   *
+   * Call this from your scene's create() to fade or slide in.
+   * When reduced-motion is enabled, the transition is skipped
+   * (returns a resolved Promise immediately).
+   *
+   * @param type  Transition type: 'fade' or 'slide'
+   * @param duration  Duration in ms (default 300)
+   * @returns Promise that resolves when the transition completes
+   */
+  protected runEnterTransition(
+    type: 'fade' | 'slide' = 'fade',
+    duration: number = 300,
+  ): Promise<void> {
+    return runSceneTransition({
+      scene: this,
+      mode: 'enter',
+      type,
+      duration,
+      reducedMotion: this.reducedMotion,
+    });
   }
 
   /**
