@@ -168,6 +168,17 @@ export class GymHandPileScene extends GymSceneBase {
     this.updateHandDisplay();
   }
 
+  /**
+   * Handle pointer clicks on hand sprites to select a card.
+   */
+  private onHandSpriteClick(index: number): void {
+    if (index < 0 || index >= this.hand.length) return;
+    this.selectedIdx = index;
+    const card = this.hand[index];
+    this.logEvent(`Selected card ${index}: ${card.rank}${card.suit}`);
+    this.updateHandDisplay();
+  }
+
   private flipSelected(): void {
     if (this.selectedIdx < 0 || this.selectedIdx >= this.hand.length) {
       this.logEvent('No card selected to flip');
@@ -363,6 +374,20 @@ export class GymHandPileScene extends GymSceneBase {
       const card = this.hand[i];
       const textureKey = getCardTexture(card);
       const sprite = this.add.image(baseX + i * spacing, baseY, textureKey);
+
+      // Make sprite interactive so users can click to select
+      sprite.setInteractive({ useHandCursor: true });
+      sprite.on('pointerdown', () => {
+        this.onHandSpriteClick(i);
+      });
+      sprite.on('pointerover', () => {
+        sprite.setTint(0x66ff66);
+      });
+      sprite.on('pointerout', () => {
+        sprite.setTint(i === this.selectedIdx ? 0x88ff88 : 0xffffff);
+      });
+
+      // Selection tint
       sprite.setTint(i === this.selectedIdx ? 0x88ff88 : 0xffffff);
 
       // Card label
