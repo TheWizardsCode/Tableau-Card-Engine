@@ -64,3 +64,45 @@ The Gym Router supports optional animated scene transitions (fade) when navigati
 - **GymRegistry**: Central catalogue of scene keys, titles, and descriptions.
 
 Each demo scene uses core-engine APIs directly (SeededRng, UndoRedoManager, TranscriptRecorderBase, SaveLoadStore, SoundManager, etc.) without duplicating engine code.
+
+## Reusable UI Components
+
+The Gym scenes use and demonstrate several reusable UI components from `src/ui/` that can be used in any card game:
+
+### HandView (`src/ui/HandView.ts`)
+
+Displays a player's hand of cards as a horizontal row of interactive sprites with selection highlighting and event emission.
+
+```ts
+import { HandView } from '@ui/HandView';
+
+const handView = new HandView(scene, { baseX: 60, baseY: 130, spacing: 56 });
+handView.setCards(myHand);
+handView.on('cardclick', (idx) => handView.setSelected(idx));
+
+// After mutating your hand array:
+handView.setCards(myHand);
+handView.setSelected(null);
+
+// Cleanup
+handView.destroy();
+```
+
+**API**: `setCards(cards)`, `getCards()`, `addCard(card, opts?)`, `removeCard(index, opts?)`, `setSelected(index|null)`, `getSelected()`, `on(event, cb)`, `off(event, cb)`, `getSpriteAt(index)`, `getSprites()`, `setReducedMotion(bool)`, `destroy()`.
+
+### PileView (`src/ui/PileView.ts`)
+
+Displays a card pile (deck, discard, etc.) as a single sprite showing the top card, with a count label below and click events.
+
+```ts
+import { PileView } from '@ui/PileView';
+
+const deckView = new PileView(scene, { x: 500, y: 150, label: 'Deck' });
+deckView.setPile(myDrawPile);
+deckView.onClick(() => { /* draw logic */ deckView.update(); });
+
+// Cleanup
+deckView.destroy();
+```
+
+**API**: `setPile(pile)`, `peek()`, `update()`, `onClick(cb)`, `getCountText()`, `getSprite()`, `getPile()`, `destroy()`.

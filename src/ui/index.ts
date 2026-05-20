@@ -118,6 +118,19 @@ export type {
   ParameterizedOverlayButton,
 } from './ParameterizedOverlay';
 
+// HandView – reusable hand-of-cards display component
+export { HandView } from './HandView';
+export type {
+  HandViewOptions,
+  AddCardOptions,
+  RemoveCardOptions,
+  HandViewEvents,
+} from './HandView';
+
+// PileView – reusable card-pile display component
+export { PileView } from './PileView';
+export type { PileViewOptions, PileViewEvents } from './PileView';
+
 // Hi-DPI text rendering (side-effect import for patching)
 export { TEXT_DPR } from './hiDpiText';
 

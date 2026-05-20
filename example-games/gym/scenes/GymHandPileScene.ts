@@ -2,6 +2,10 @@
  * GymHandPileScene -- Demonstrates hand, discard, and pile movement
  * flows using core-engine card-system APIs with animation helpers.
  *
+ * This scene uses the reusable {@link HandView} and {@link PileView}
+ * components for card display and interaction, separating rendering
+ * from game logic.
+ *
  * Features:
  *   - Move cards between hand and piles with deal/place/discard animations
  *   - Legal/illegal action feedback with shake animation
@@ -18,12 +22,17 @@ import { GYM_HAND_PILE_KEY } from '../GymRegistry';
 import { createStandardDeck, shuffleArray } from '../../../src/card-system/Deck';
 import { Pile } from '../../../src/card-system/Pile';
 import { createSeededRng } from '../../../src/core-engine/SeededRng';
+import { GameEventEmitter } from '../../../src/core-engine';
+import { HandView } from '../../../src/ui/HandView';
+import { PileView } from '../../../src/ui/PileView';
 import { flipCard } from '../../../src/ui/flipCard';
 import { discardCard } from '../../../src/ui/discardCard';
+import { dealCard } from '../../../src/ui/dealCard';
 import { moveGameObject } from '../../../src/ui/moveGameObject';
 import { shakeIllegalMove } from '../../../src/ui/shakeIllegalMove';
 import { GAME_W } from '../../../src/ui/constants';
-import { preloadCardAssets, getCardTexture, ensureCardTextureFallbacks } from '../../../src/ui/CardTextureHelpers';
+import { getCardTexture, ensureCardTextureFallbacks, preloadCardAssets } from '../../../src/ui/CardTextureHelpers';
+import type { Card } from '../../../src/card-system/Card';
 
 const HAND_SIZE = 5;
 const DEFAULT_SEED = 42;
@@ -33,29 +42,38 @@ const HIGHLIGHT_COLOR = 0x44ff44;
 const HIGHLIGHT_ALPHA = 0.35;
 
 export class GymHandPileScene extends GymSceneBase {
-  private hand: ReturnType<typeof createStandardDeck> = [];
-  private discardPile!: Pile;
-  private drawPile!: Pile;
+  private hand: Card[] = [];
+  private discardPile!: Pile<Card>;
+  private drawPile!: Pile<Card>;
   private selectedIdx: number = -1;
   private logTexts: Phaser.GameObjects.Text[] = [];
   private eventLog: string[] = [];
 
-  // Card sprites for hand cards
-  private handSprites: Phaser.GameObjects.Image[] = [];
+  // Reusable UI components
+  private handView!: HandView;
+  private deckView!: PileView;
+  private discardView!: PileView;
+
   // Highlight graphics
   private highlightGraphics: Phaser.GameObjects.Graphics | null = null;
   // Active move tween reference (for cancellation)
   private activeMoveTween: Phaser.Tweens.Tween | null = null;
-  // Card display area sprite
-  private displayCard: Phaser.GameObjects.Image | null = null;
-  private displayLabel: Phaser.GameObjects.Text | null = null;
+
+  // Pile position constants
+  private readonly DECK_X = GAME_W / 2 - 250;
+  private readonly DISCARD_X = GAME_W / 2 + 100;
+  private readonly PILE_Y = 150;
+
+  // Hand layout constants
+  private readonly HAND_BASE_X = 60;
+  private readonly HAND_BASE_Y = 130;
+  private readonly HAND_SPACING = 56;
 
   constructor() {
     super({ key: GYM_HAND_PILE_KEY });
   }
 
   preload(): void {
-    // Preload standard SVG card assets (faces + back).
     preloadCardAssets(this);
   }
 
@@ -65,11 +83,41 @@ export class GymHandPileScene extends GymSceneBase {
     this.addDivider();
     this.initReducedMotion();
 
-    // Ensure runtime fallbacks exist in headless/test environments
     ensureCardTextureFallbacks(this);
 
+    // Create HandView for the player's hand
+    this.handView = new HandView(this, {
+      baseX: this.HAND_BASE_X,
+      baseY: this.HAND_BASE_Y,
+      spacing: this.HAND_SPACING,
+      reducedMotion: this.reducedMotion,
+    });
+
+    // Wire selection click handler
+    this.handView.on('cardclick', (idx: number) => {
+      if (idx >= 0 && idx < this.hand.length) {
+        this.selectedIdx = idx;
+        this.logEvent(`Selected card ${idx}: ${this.hand[idx].rank}${this.hand[idx].suit}`);
+      }
+    });
+
+    // Create PileViews for deck and discard
+    this.deckView = new PileView(this, {
+      x: this.DECK_X,
+      y: this.PILE_Y,
+      label: 'Deck',
+    });
+    this.deckView.onClick(() => this.drawToHand());
+
+    this.discardView = new PileView(this, {
+      x: this.DISCARD_X,
+      y: this.PILE_Y,
+      label: 'Discard',
+    });
+    this.discardView.onClick(() => this.recallFromDiscard());
+
     this.initHelp([
-      { heading: 'Overview', body: 'Demonstrates hand/pile card movement with animations: deal, place, discard, move, flip, shake (illegal), and drop-zone highlights.' },
+      { heading: 'Overview', body: 'Demonstrates hand/pile card movement with animations: deal, place, discard, move, flip, shake (illegal), and drop-zone highlights. Uses HandView and PileView components.' },
       { heading: 'Controls', body: '[ Draw to Hand ]: Deal a card (with arc animation).\n[ Discard Selected ]: Discard the selected card (with fade animation).\n[ Recall from Discard ]: Move top of discard back to hand.\n[ Flip Selected ]: Flip the selected card (two-phase animation).\n[ Move Selected ]: Tween selected card to display area (move demo).\n[ Cancel Move ]: Cancel an active move animation.\n[ Show Valid Moves ]: Highlight valid drop zones.\n[ Show Illegal ]: Trigger an illegal-move shake demo.\n[ Reset ]: Shuffle a new deck and deal starting hand.\n[ Select Next ]: Cycle selection in your hand.' }
     ]);
 
@@ -107,8 +155,48 @@ export class GymHandPileScene extends GymSceneBase {
     const card = this.drawPile.pop()!;
     card.faceUp = true;
     this.hand.push(card);
-    this.updateHandDisplay();
-    this.logEvent(`Drew ${card.rank}${card.suit} to hand (${this.hand.length} in hand, ${this.drawPile.size()} in deck)`);
+
+    const destX = this.HAND_BASE_X + (this.hand.length - 1) * this.HAND_SPACING;
+    const destY = this.HAND_BASE_Y;
+    const deckX = this.DECK_X;
+    const deckY = this.PILE_Y;
+
+    if (this.reducedMotion) {
+      // Instant placement for reduced motion
+      this.handView.setCards(this.hand);
+      this.handView.setSelected(this.selectedIdx >= 0 ? this.selectedIdx : null);
+      this.deckView.update();
+      this.logEvent(`Drew ${card.rank}${card.suit} to hand (instant, reduced-motion)`);
+      return;
+    }
+
+    // Create a temporary sprite at the deck position to animate
+    const animSprite = this.add.image(deckX, deckY, getCardTexture(card));
+
+    const gameEvents = new GameEventEmitter();
+    gameEvents.on('card:dealt', () => {
+      try { animSprite.destroy(); } catch (_) { /* ignore */ }
+      this.handView.setCards(this.hand);
+      this.handView.setSelected(this.selectedIdx >= 0 ? this.selectedIdx : null);
+      this.deckView.update();
+      gameEvents.removeAllListeners();
+      this.logEvent(`Drew ${card.rank}${card.suit} to hand (animated)`);
+    });
+
+    dealCard({
+      scene: this,
+      target: animSprite,
+      destX,
+      destY,
+      sourceX: deckX,
+      sourceY: deckY,
+      duration: 400,
+      gameEvents,
+      cardId: `${card.rank}${card.suit}`,
+    });
+
+    // Update pile visuals immediately
+    this.deckView.update();
   }
 
   private discardSelected(): void {
@@ -117,31 +205,50 @@ export class GymHandPileScene extends GymSceneBase {
       this.showIllegalShake();
       return;
     }
+    // Remove the card from hand model
     const card = this.hand.splice(this.selectedIdx, 1)[0];
 
-    // Use discardCard animation on the sprite if not reduced motion
     const spriteIdx = this.selectedIdx;
-    const sprite = this.handSprites[spriteIdx];
+    const sprite = this.handView.getSpriteAt(spriteIdx);
+
+    // We'll push to discardPile when the animation completes.
     if (sprite && !this.reducedMotion) {
-      // discardCard destroys the sprite by default; just play animation
+      const gameEvents = new GameEventEmitter();
+      (gameEvents as any).on('card:discarded', () => {
+        card.faceUp = false;
+        this.discardPile.push(card);
+        this.selectedIdx = -1;
+        this.clearHighlights();
+        this.handView.setCards(this.hand);
+        this.handView.setSelected(null);
+        this.discardView.update();
+        (gameEvents as any).removeAllListeners();
+        this.logEvent(`Discarded ${card.rank}${card.suit} (animated)`);
+      });
+
       discardCard({
         scene: this,
         target: sprite as any,
         offsetY: 30,
         duration: 350,
         destroyAfter: true,
+        gameEvents: gameEvents as any,
+        cardId: `${card.rank}${card.suit}`,
       });
-      this.logEvent(`Discarded ${card.rank}${card.suit} (animated)`);
     } else {
-      if (sprite) sprite.destroy();
+      if (sprite) {
+        // For reduced-motion, immediately clean up the sprite
+        try { sprite.destroy(); } catch (_) { /* ignore */ }
+      }
+      card.faceUp = false;
+      this.discardPile.push(card);
+      this.selectedIdx = -1;
+      this.clearHighlights();
+      this.handView.setCards(this.hand);
+      this.handView.setSelected(null);
+      this.discardView.update();
       this.logEvent(`Discarded ${card.rank}${card.suit} (instant)`);
     }
-
-    card.faceUp = false;
-    this.discardPile.push(card);
-    this.selectedIdx = -1;
-    this.clearHighlights();
-    this.updateHandDisplay();
   }
 
   private recallFromDiscard(): void {
@@ -153,8 +260,45 @@ export class GymHandPileScene extends GymSceneBase {
     const card = this.discardPile.pop()!;
     card.faceUp = true;
     this.hand.push(card);
-    this.updateHandDisplay();
-    this.logEvent(`Recalled ${card.rank}${card.suit} from discard (${this.hand.length} in hand)`);
+
+    const destX = this.HAND_BASE_X + (this.hand.length - 1) * this.HAND_SPACING;
+    const destY = this.HAND_BASE_Y;
+    const sourceX = this.DISCARD_X;
+    const sourceY = this.PILE_Y;
+
+    if (this.reducedMotion) {
+      this.handView.setCards(this.hand);
+      this.handView.setSelected(this.selectedIdx >= 0 ? this.selectedIdx : null);
+      this.discardView.update();
+      this.logEvent(`Recalled ${card.rank}${card.suit} from discard (instant)`);
+      return;
+    }
+
+    const animSprite = this.add.image(sourceX, sourceY, getCardTexture(card));
+
+    const gameEvents = new GameEventEmitter();
+    gameEvents.on('card:dealt', () => {
+      try { animSprite.destroy(); } catch (_) {}
+      this.handView.setCards(this.hand);
+      this.handView.setSelected(this.selectedIdx >= 0 ? this.selectedIdx : null);
+      this.discardView.update();
+      gameEvents.removeAllListeners();
+      this.logEvent(`Recalled ${card.rank}${card.suit} from discard (animated)`);
+    });
+
+    dealCard({
+      scene: this,
+      target: animSprite,
+      destX,
+      destY,
+      sourceX,
+      sourceY,
+      duration: 350,
+      gameEvents,
+      cardId: `${card.rank}${card.suit}`,
+    });
+
+    this.discardView.update();
   }
 
   private selectNext(): void {
@@ -165,18 +309,7 @@ export class GymHandPileScene extends GymSceneBase {
     this.selectedIdx = (this.selectedIdx + 1) % this.hand.length;
     const card = this.hand[this.selectedIdx];
     this.logEvent(`Selected card ${this.selectedIdx}: ${card.rank}${card.suit}`);
-    this.updateHandDisplay();
-  }
-
-  /**
-   * Handle pointer clicks on hand sprites to select a card.
-   */
-  private onHandSpriteClick(index: number): void {
-    if (index < 0 || index >= this.hand.length) return;
-    this.selectedIdx = index;
-    const card = this.hand[index];
-    this.logEvent(`Selected card ${index}: ${card.rank}${card.suit}`);
-    this.updateHandDisplay();
+    this.handView.setSelected(this.selectedIdx);
   }
 
   private flipSelected(): void {
@@ -184,15 +317,13 @@ export class GymHandPileScene extends GymSceneBase {
       this.logEvent('No card selected to flip');
       return;
     }
-    const sprite = this.handSprites[this.selectedIdx];
+    const sprite = this.handView.getSpriteAt(this.selectedIdx);
     if (!sprite) {
       this.logEvent('No sprite for selected card');
       return;
     }
 
     const card = this.hand[this.selectedIdx];
-
-    // Toggle face state on the model and compute texture accordingly
     card.faceUp = !card.faceUp;
     const newTexture = getCardTexture(card);
 
@@ -223,7 +354,7 @@ export class GymHandPileScene extends GymSceneBase {
       return;
     }
 
-    const sprite = this.handSprites[this.selectedIdx];
+    const sprite = this.handView.getSpriteAt(this.selectedIdx);
     if (!sprite) {
       this.logEvent('No sprite for selected card');
       return;
@@ -267,7 +398,6 @@ export class GymHandPileScene extends GymSceneBase {
     }
     const g = this.highlightGraphics;
 
-    // Draw valid zones as green rounded rects
     const zones = [
       { x: GAME_W / 2 - 250, y: 150, label: 'Discard Pile' },
       { x: GAME_W / 2 + 100, y: 150, label: 'Display Area' },
@@ -286,8 +416,6 @@ export class GymHandPileScene extends GymSceneBase {
     }
 
     this.logEvent('Showing valid drop zones (green highlights)');
-
-    // Auto-clear after 3 seconds
     this.time?.delayedCall(3000, () => this.clearHighlights());
   }
 
@@ -296,14 +424,12 @@ export class GymHandPileScene extends GymSceneBase {
   }
 
   private showIllegalShake(): void {
-    // Shake demo on a label or on the selected card sprite
-    const target = this.selectedIdx >= 0 && this.selectedIdx < this.handSprites.length
-      ? this.handSprites[this.selectedIdx]
+    const target = this.selectedIdx >= 0
+      ? this.handView.getSpriteAt(this.selectedIdx)
       : null;
 
     if (target) {
       if (this.reducedMotion) {
-        // Brief tint flash for reduced-motion
         target.setTint(0xff4444);
         this.time?.delayedCall(200, () => {
           try { target.clearTint(); } catch (_) { /* ignore */ }
@@ -324,7 +450,6 @@ export class GymHandPileScene extends GymSceneBase {
         this.logEvent('Illegal move shake triggered');
       }
     } else {
-      // No sprite to shake, just log
       this.logEvent('Illegal action (no visual target)');
     }
   }
@@ -333,8 +458,8 @@ export class GymHandPileScene extends GymSceneBase {
     const rng = createSeededRng(DEFAULT_SEED);
     const deck = createStandardDeck();
     shuffleArray(deck, rng);
-    this.drawPile = new Pile(deck);
-    this.discardPile = new Pile();
+    this.drawPile = new Pile<Card>(deck);
+    this.discardPile = new Pile<Card>();
     // Draw initial hand
     this.hand = [];
     for (let i = 0; i < HAND_SIZE && !this.drawPile.isEmpty(); i++) {
@@ -345,77 +470,14 @@ export class GymHandPileScene extends GymSceneBase {
     this.selectedIdx = -1;
     this.clearHighlights();
     this.cancelMove();
-    this.updateHandDisplay();
+
+    // Sync UI components
+    this.handView.setCards(this.hand);
+    this.handView.setSelected(null);
+    this.deckView.setPile(this.drawPile);
+    this.discardView.setPile(this.discardPile);
+
     this.logEvent('Reset: new deck shuffled, hand dealt');
-  }
-
-  private updateHandDisplay(): void {
-    // Clear old sprites
-    for (const s of this.handSprites) {
-      try { s.destroy(); } catch (_) { /* ignore */ }
-    }
-    this.handSprites = [];
-
-    // Clean up display card
-    if (this.displayCard) {
-      try { this.displayCard.destroy(); } catch (_) { /* ignore */ }
-      this.displayCard = null;
-    }
-    if (this.displayLabel) {
-      try { this.displayLabel.destroy(); } catch (_) { /* ignore */ }
-      this.displayLabel = null;
-    }
-
-    const baseX = 60;
-    const baseY = 130;
-    const spacing = 56;
-
-    for (let i = 0; i < this.hand.length; i++) {
-      const card = this.hand[i];
-      const textureKey = getCardTexture(card);
-      const sprite = this.add.image(baseX + i * spacing, baseY, textureKey);
-
-      // Make sprite interactive so users can click to select
-      sprite.setInteractive({ useHandCursor: true });
-      sprite.on('pointerdown', () => {
-        this.onHandSpriteClick(i);
-      });
-      sprite.on('pointerover', () => {
-        sprite.setTint(0x66ff66);
-      });
-      sprite.on('pointerout', () => {
-        sprite.setTint(i === this.selectedIdx ? 0x88ff88 : 0xffffff);
-      });
-
-      // Selection tint
-      sprite.setTint(i === this.selectedIdx ? 0x88ff88 : 0xffffff);
-
-      // Card label
-      const label = this.add.text(baseX + i * spacing, baseY + 42, `${card.rank}${card.suit}`, {
-        fontSize: '9px',
-        color: i === this.selectedIdx ? '#88ff88' : '#aaaaaa',
-        fontFamily: 'monospace',
-      }).setOrigin(0.5);
-
-      this.handSprites.push(sprite);
-
-      // Clean label on scene shutdown
-      this.events.once('shutdown', () => {
-        try { label.destroy(); } catch (_) { /* ignore */ }
-      });
-    }
-
-    // Show pile sizes
-    this.add.text(baseX, baseY + 65, `Deck: ${this.drawPile.size()}`, {
-      fontSize: '11px',
-      color: '#888888',
-      fontFamily: 'monospace',
-    });
-    this.add.text(baseX + 100, baseY + 65, `Discard: ${this.discardPile.size()}`, {
-      fontSize: '11px',
-      color: '#888888',
-      fontFamily: 'monospace',
-    });
   }
 
   private clearHighlights(): void {
