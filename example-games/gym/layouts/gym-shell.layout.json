@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "id": "gym-shell-layout",
+  "baseViewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "requiredZones": [
+    "shell",
+    "shared",
+    "banner"
+  ],
+  "zones": {
+    "shell": {
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 0.125
+      },
+      "anchors": {
+        "title": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "help": {
+          "x": 0.92,
+          "y": 0.5
+        }
+      }
+    },
+    "shared": {
+      "rect": {
+        "x": 0.1,
+        "y": 0.1,
+        "width": 0.25,
+        "height": 0.2
+      },
+      "anchors": {
+        "left": {
+          "x": 0.1,
+          "y": 0.5
+        },
+        "action": {
+          "x": 0.9,
+          "y": 0.5
+        }
+      }
+    },
+    "banner": {
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 0.05,
+        "height": 0.05,
+        "pixelOverride": {
+          "x": 16,
+          "y": 9,
+          "width": 64,
+          "height": 36
+        }
+      },
+      "anchors": {
+        "center": {
+          "x": 0.5,
+          "y": 0.5
+        }
+      }
+    }
+  }
+}

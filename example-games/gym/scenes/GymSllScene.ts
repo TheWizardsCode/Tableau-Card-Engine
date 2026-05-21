@@ -5,8 +5,7 @@
  * legacy fallback adapter:
  *   - validateScreenLayoutDocument / parseScreenLayoutDocument
  *   - normalizedToPixels
- *   - getZoneRect
- *   - anchorPoint
+ *   - composeResolvedLayouts
  *
  * It renders SLL zones and anchors as an optional debug overlay, and uses
  * anchor-derived positions for title/header text, a help button, an action
@@ -20,17 +19,16 @@ import { GymSceneBase } from './GymSceneBase';
 import { GYM_SLL_KEY } from '../GymRegistry';
 import defaultLayoutJson from '../layouts/gym-sll-default.layout.json';
 import pixelOverrideLayoutJson from '../layouts/gym-sll-pixel-override.layout.json';
+import gymSceneLayoutJson from '../layouts/gym-scene.layout.json';
+import gymShellLayoutJson from '../layouts/gym-shell.layout.json';
 import type {
   PixelPoint,
   PixelRect,
   ScreenLayoutDocument,
   ScreenLayoutParseResult,
 } from '../../../src/ui/screen-layout-schema';
-import {
-  anchorPoint,
-  getZoneRect,
-  normalizedToPixels,
-} from '../../../src/ui/screen-layout';
+import { composeResolvedLayouts } from '../../../src/ui/screen-layout-compose';
+import { normalizedToPixels } from '../../../src/ui/screen-layout';
 import {
   parseScreenLayoutDocument,
   validateScreenLayoutDocument,
@@ -43,10 +41,36 @@ interface LayoutProfile {
   dpr: number;
 }
 
-interface LayoutOption {
-  name: string;
-  layout: ScreenLayoutDocument;
+interface PlacementMapping {
+  title: { zone: string; anchor: string };
+  help: { zone: string; anchor: string };
+  action: { zone: string; anchor: string };
+  content: { zone: string; anchor: string };
 }
+
+interface DirectLayoutOption {
+  kind: 'direct';
+  name: string;
+  layoutId: string;
+  layout: ScreenLayoutDocument;
+  placement: PlacementMapping;
+}
+
+interface ComposedLayoutOption {
+  kind: 'composed';
+  name: string;
+  layoutId: string;
+  baseLayout: ScreenLayoutDocument;
+  sceneLayout: ScreenLayoutDocument;
+  composition: {
+    baseLayoutId: string;
+    sceneLayoutId: string;
+    policy: 'sceneWins';
+  };
+  placement: PlacementMapping;
+}
+
+type LayoutOption = DirectLayoutOption | ComposedLayoutOption;
 
 interface ReadyMarker {
   ready: boolean;
@@ -61,6 +85,11 @@ interface ReadyMarker {
     title: PixelPoint;
     help: PixelPoint;
     action: PixelPoint;
+  };
+  composition?: {
+    baseLayoutId: string;
+    sceneLayoutId: string;
+    policy: 'sceneWins';
   };
 }
 
@@ -86,6 +115,20 @@ const LAYOUT_PROFILES: LayoutProfile[] = [
 ];
 
 const OVERLAY_COLORS = [0x66ddff, 0x66ff99, 0xffcc66, 0xff8899, 0xd9a5ff, 0x99ffdd];
+
+const DIRECT_PLACEMENT: PlacementMapping = {
+  title: { zone: 'header', anchor: 'title' },
+  help: { zone: 'menu', anchor: 'help' },
+  action: { zone: 'controls', anchor: 'action' },
+  content: { zone: 'content', anchor: 'center' },
+};
+
+const COMPOSED_PLACEMENT: PlacementMapping = {
+  title: { zone: 'shell', anchor: 'title' },
+  help: { zone: 'shell', anchor: 'help' },
+  action: { zone: 'shared', anchor: 'action' },
+  content: { zone: 'sceneOnly', anchor: 'center' },
+};
 
 export class GymSllScene extends GymSceneBase {
   private layouts: LayoutOption[] = [];
@@ -122,17 +165,17 @@ export class GymSllScene extends GymSceneBase {
       {
         heading: 'Overview',
         body:
-          'This scene demonstrates SLL directly. It validates and parses layout JSON, maps zones/anchors to pixels, and positions UI using anchorPoint/getZoneRect.',
+          'This scene demonstrates SLL directly and in composed form. It validates and parses layout JSON, maps zones/anchors to pixels, and positions UI using composeResolvedLayouts + normalizedToPixels.',
       },
       {
         heading: 'Controls',
         body:
-          '[ Layout ] cycles between sample SLL documents. [ Profile ] simulates viewport + DPR combinations. [ Overlay ] toggles zone and anchor debug visualization.',
+          '[ Layout ] cycles between the composed shell + scene example and the direct SLL sample layouts. [ Profile ] simulates viewport + DPR combinations. [ Overlay ] toggles zone and anchor debug visualization.',
       },
       {
         heading: 'Notes',
         body:
-          'No legacy fallback adapter is used in this scene. All positioning comes from parseScreenLayoutDocument + normalizedToPixels + getZoneRect + anchorPoint.',
+          'The composed sample uses a shared shell layout plus a scene layout. The overlay shows merged zones and anchors so collision handling and namespacing are easy to inspect.',
       },
     ]);
 
@@ -150,6 +193,38 @@ export class GymSllScene extends GymSceneBase {
   }
 
   private bootstrapLayouts(): void {
+    const composedBaseValidation = validateScreenLayoutDocument(gymShellLayoutJson);
+    if (!composedBaseValidation.valid) {
+      const firstError = composedBaseValidation.errors[0];
+      throw new Error(
+        `Invalid composed base layout: ${firstError?.path ?? '/'} ${firstError?.message ?? 'unknown validation error'}`,
+      );
+    }
+
+    const composedSceneValidation = validateScreenLayoutDocument(gymSceneLayoutJson);
+    if (!composedSceneValidation.valid) {
+      const firstError = composedSceneValidation.errors[0];
+      throw new Error(
+        `Invalid composed scene layout: ${firstError?.path ?? '/'} ${firstError?.message ?? 'unknown validation error'}`,
+      );
+    }
+
+    const composedBaseParsed = parseScreenLayoutDocument(gymShellLayoutJson);
+    const composedSceneParsed = parseScreenLayoutDocument(gymSceneLayoutJson);
+    this.layouts.push({
+      kind: 'composed',
+      name: 'Composed Shell + Scene',
+      layoutId: `${this.requireValidParsedLayout('Composed Base', composedBaseParsed).id}+${this.requireValidParsedLayout('Composed Scene', composedSceneParsed).id}`,
+      baseLayout: this.requireValidParsedLayout('Composed Base', composedBaseParsed),
+      sceneLayout: this.requireValidParsedLayout('Composed Scene', composedSceneParsed),
+      composition: {
+        baseLayoutId: this.requireValidParsedLayout('Composed Base', composedBaseParsed).id,
+        sceneLayoutId: this.requireValidParsedLayout('Composed Scene', composedSceneParsed).id,
+        policy: 'sceneWins',
+      },
+      placement: COMPOSED_PLACEMENT,
+    });
+
     const candidates: Array<{ name: string; source: unknown }> = [
       { name: 'Default', source: defaultLayoutJson },
       { name: 'Pixel Override', source: pixelOverrideLayoutJson },
@@ -165,9 +240,13 @@ export class GymSllScene extends GymSceneBase {
       }
 
       const parsed = parseScreenLayoutDocument(candidate.source);
+      const layout = this.requireValidParsedLayout(candidate.name, parsed);
       this.layouts.push({
+        kind: 'direct',
         name: candidate.name,
-        layout: this.requireValidParsedLayout(candidate.name, parsed),
+        layoutId: layout.id,
+        layout,
+        placement: DIRECT_PLACEMENT,
       });
     }
   }
@@ -288,11 +367,51 @@ export class GymSllScene extends GymSceneBase {
     );
   }
 
+  private getAnchorPoint(
+    resolved: ReturnType<typeof normalizedToPixels>,
+    placement: PlacementMapping[keyof PlacementMapping],
+  ): PixelPoint {
+    const zone = resolved.zones[placement.zone];
+    if (!zone) {
+      throw new Error(`Unknown resolved zone "${placement.zone}" in the current layout.`);
+    }
+
+    const anchor = zone.anchors[placement.anchor];
+    if (!anchor) {
+      throw new Error(`Unknown resolved anchor "${placement.anchor}" in zone "${placement.zone}".`);
+    }
+
+    return anchor;
+  }
+
+  private getZoneRect(
+    resolved: ReturnType<typeof normalizedToPixels>,
+    zoneName: string,
+  ): PixelRect {
+    const zone = resolved.zones[zoneName];
+    if (!zone) {
+      throw new Error(`Unknown resolved zone "${zoneName}" in the current layout.`);
+    }
+
+    return zone.rect;
+  }
+
   private applyLayout(): void {
-    const currentLayout = this.layouts[this.layoutIndex].layout;
+    const currentLayout = this.layouts[this.layoutIndex];
     const currentProfile = LAYOUT_PROFILES[this.profileIndex];
 
-    const resolved = normalizedToPixels(currentLayout, currentProfile.viewport, currentProfile.dpr);
+    const resolved =
+      currentLayout.kind === 'direct'
+        ? normalizedToPixels(currentLayout.layout, currentProfile.viewport, currentProfile.dpr)
+        : composeResolvedLayouts(
+            currentLayout.baseLayout,
+            currentLayout.sceneLayout,
+            currentProfile.viewport,
+            currentProfile.dpr,
+            {
+              policy: currentLayout.composition.policy,
+            },
+          );
 
     const previewScaleX = this.scale.width / resolved.viewport.pixelWidth;
     const previewScaleY = this.scale.height / resolved.viewport.pixelHeight;
@@ -309,42 +428,12 @@ export class GymSllScene extends GymSceneBase {
       height: rect.height * previewScaleY,
     });
 
-    // Anchor-driven placements for the acceptance criteria demo targets.
-    const titleAnchorPx = anchorPoint(
-      currentLayout,
-      'header',
-      'title',
-      currentProfile.viewport,
-      currentProfile.dpr,
-    );
-    const helpAnchorPx = anchorPoint(
-      currentLayout,
-      'menu',
-      'help',
-      currentProfile.viewport,
-      currentProfile.dpr,
-    );
-    const actionAnchorPx = anchorPoint(
-      currentLayout,
-      'controls',
-      'action',
-      currentProfile.viewport,
-      currentProfile.dpr,
-    );
+    const titleAnchorPx = this.getAnchorPoint(resolved, currentLayout.placement.title);
+    const helpAnchorPx = this.getAnchorPoint(resolved, currentLayout.placement.help);
+    const actionAnchorPx = this.getAnchorPoint(resolved, currentLayout.placement.action);
 
-    const contentRectPx = getZoneRect(
-      currentLayout,
-      'content',
-      currentProfile.viewport,
-      currentProfile.dpr,
-    );
-    const contentCenterPx = anchorPoint(
-      currentLayout,
-      'content',
-      'center',
-      currentProfile.viewport,
-      currentProfile.dpr,
-    );
+    const contentRectPx = this.getZoneRect(resolved, currentLayout.placement.content.zone);
+    const contentCenterPx = this.getAnchorPoint(resolved, currentLayout.placement.content);
 
     const titleAnchorDisplay = toDisplayPoint(titleAnchorPx);
     const helpAnchorDisplay = toDisplayPoint(helpAnchorPx);
@@ -356,26 +445,27 @@ export class GymSllScene extends GymSceneBase {
     this.layoutHelpButton.setPosition(helpAnchorDisplay.x, helpAnchorDisplay.y);
     this.actionButton.setPosition(actionAnchorDisplay.x, actionAnchorDisplay.y);
 
+    const panelWidth = Math.min(420, contentRectDisplay.width * 0.85);
+    const panelHeight = Math.min(220, contentRectDisplay.height * 0.85);
     this.contentPanel
-      .setPosition(
-        contentRectDisplay.x + contentRectDisplay.width / 2,
-        contentRectDisplay.y + contentRectDisplay.height / 2,
-      )
-      .setSize(contentRectDisplay.width, contentRectDisplay.height);
+      .setPosition(contentCenterDisplay.x, contentCenterDisplay.y)
+      .setSize(panelWidth, panelHeight);
     this.contentLabel.setPosition(contentCenterDisplay.x, contentCenterDisplay.y);
 
-    this.redrawOverlay(currentLayout, resolved, toDisplayRect, toDisplayPoint);
+    this.redrawOverlay(resolved, toDisplayRect, toDisplayPoint);
 
-    this.layoutButton.setText(`[ Layout: ${this.layouts[this.layoutIndex].name} ]`);
+    this.layoutButton.setText(`[ Layout: ${currentLayout.name} ]`);
     this.profileButton.setText(`[ Profile: ${currentProfile.id} ]`);
     this.statusLine.setText(
-      `Layout ${currentLayout.id} | ${currentProfile.label} | previewScale x${previewScaleX.toFixed(3)} y${previewScaleY.toFixed(3)}`,
+      currentLayout.kind === 'composed'
+        ? `Layout ${currentLayout.layoutId} | composed ${currentLayout.composition.baseLayoutId} + ${currentLayout.composition.sceneLayoutId} | ${currentProfile.label} | previewScale x${previewScaleX.toFixed(3)} y${previewScaleY.toFixed(3)}`
+        : `Layout ${currentLayout.layoutId} | ${currentProfile.label} | previewScale x${previewScaleX.toFixed(3)} y${previewScaleY.toFixed(3)}`,
     );
 
     this.publishReadyMarker({
       ready: true,
       sceneKey: GYM_SLL_KEY,
-      layoutId: currentLayout.id,
+      layoutId: currentLayout.layoutId,
       profile: {
         id: currentProfile.id,
         viewport: { ...currentProfile.viewport },
@@ -386,11 +476,11 @@ export class GymSllScene extends GymSceneBase {
         help: helpAnchorDisplay,
         action: actionAnchorDisplay,
       },
+      ...(currentLayout.kind === 'composed' ? { composition: currentLayout.composition } : {}),
     });
   }
 
   private redrawOverlay(
-    layout: ScreenLayoutDocument,
     resolved: ReturnType<typeof normalizedToPixels>,
     toDisplayRect: (rect: PixelRect) => PixelRect,
     toDisplayPoint: (point: PixelPoint) => PixelPoint,
@@ -405,12 +495,11 @@ export class GymSllScene extends GymSceneBase {
 
     let colorIndex = 0;
 
-    for (const [zoneName, zone] of Object.entries(layout.zones)) {
+    for (const [zoneName, zone] of Object.entries(resolved.zones)) {
       const color = OVERLAY_COLORS[colorIndex % OVERLAY_COLORS.length];
       colorIndex += 1;
 
-      const normalizedRect = zone.rect;
-      const pixelRect = resolved.zones[zoneName].rect;
+      const pixelRect = zone.rect;
       const displayRect = toDisplayRect(pixelRect);
 
       this.overlayGraphics.lineStyle(2, color, 0.95);
@@ -425,7 +514,7 @@ export class GymSllScene extends GymSceneBase {
         .text(
           displayRect.x + 4,
           displayRect.y + 4,
-          `${zoneName}\nn:[${normalizedRect.x.toFixed(3)},${normalizedRect.y.toFixed(3)},${normalizedRect.width.toFixed(3)},${normalizedRect.height.toFixed(3)}]\np:[${pixelRect.x.toFixed(1)},${pixelRect.y.toFixed(1)},${pixelRect.width.toFixed(1)},${pixelRect.height.toFixed(1)}]`,
+          `${zoneName}\np:[${pixelRect.x.toFixed(1)},${pixelRect.y.toFixed(1)},${pixelRect.width.toFixed(1)},${pixelRect.height.toFixed(1)}]`,
           {
             fontFamily: 'monospace',
             fontSize: '10px',
@@ -436,9 +525,7 @@ export class GymSllScene extends GymSceneBase {
         .setDepth(75);
       this.overlayLabels.push(infoLabel);
 
-      const anchors = zone.anchors ?? {};
-      for (const [anchorName, _anchor] of Object.entries(anchors)) {
-        const anchorPixel = resolved.zones[zoneName].anchors[anchorName];
+      for (const [anchorName, anchorPixel] of Object.entries(zone.anchors)) {
         const anchorDisplay = toDisplayPoint(anchorPixel);
 
         this.overlayGraphics.fillStyle(color, 0.95);

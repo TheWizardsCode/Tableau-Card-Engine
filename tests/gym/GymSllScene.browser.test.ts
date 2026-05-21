@@ -18,6 +18,11 @@ interface GymSllReadyMarker {
     help: { x: number; y: number };
     action: { x: number; y: number };
   };
+  composition?: {
+    baseLayoutId: string;
+    sceneLayoutId: string;
+    policy: 'sceneWins' | 'baseWins' | 'namespace';
+  };
 }
 
 function waitForSllReadyMarker(timeoutMs = 10_000): Promise<GymSllReadyMarker> {
@@ -72,8 +77,13 @@ describe('GymSllScene browser integration', () => {
     const marker = await waitForSllReadyMarker();
 
     expect(marker.ready).toBe(true);
-    expect(marker.layoutId).toBe('gym-sll-default');
+    expect(marker.layoutId).toBe('gym-shell-layout+gym-scene-layout');
     expect(marker.profile.id).toBe('desktop-1x');
+    expect(marker.composition).toEqual({
+      baseLayoutId: 'gym-shell-layout',
+      sceneLayoutId: 'gym-scene-layout',
+      policy: 'sceneWins',
+    });
   });
 
   it('positions anchor-derived elements in expected pixel ranges', async () => {
@@ -93,19 +103,22 @@ describe('GymSllScene browser integration', () => {
     await waitForScene(game, GYM_SLL_KEY);
     const marker = await waitForSllReadyMarker();
 
-    expect(marker.anchorsDisplay.title.x).toBeGreaterThan(500);
-    expect(marker.anchorsDisplay.title.x).toBeLessThan(524);
-    expect(marker.anchorsDisplay.title.y).toBeGreaterThan(60);
-    expect(marker.anchorsDisplay.title.y).toBeLessThan(84);
+    // Range-based assertions keep the browser spec stable across headless
+    // Chromium runs while still proving the merged shell + scene anchors land
+    // in the expected regions.
+    expect(marker.anchorsDisplay.title.x).toBeGreaterThan(620);
+    expect(marker.anchorsDisplay.title.x).toBeLessThan(660);
+    expect(marker.anchorsDisplay.title.y).toBeGreaterThan(36);
+    expect(marker.anchorsDisplay.title.y).toBeLessThan(54);
 
-    expect(marker.anchorsDisplay.help.x).toBeGreaterThan(1070);
-    expect(marker.anchorsDisplay.help.x).toBeLessThan(1106);
-    expect(marker.anchorsDisplay.help.y).toBeGreaterThan(54);
-    expect(marker.anchorsDisplay.help.y).toBeLessThan(76);
+    expect(marker.anchorsDisplay.help.x).toBeGreaterThan(1160);
+    expect(marker.anchorsDisplay.help.x).toBeLessThan(1195);
+    expect(marker.anchorsDisplay.help.y).toBeGreaterThan(36);
+    expect(marker.anchorsDisplay.help.y).toBeLessThan(54);
 
-    expect(marker.anchorsDisplay.action.x).toBeGreaterThan(370);
-    expect(marker.anchorsDisplay.action.x).toBeLessThan(398);
-    expect(marker.anchorsDisplay.action.y).toBeGreaterThan(154);
-    expect(marker.anchorsDisplay.action.y).toBeLessThan(178);
+    expect(marker.anchorsDisplay.action.x).toBeGreaterThan(325);
+    expect(marker.anchorsDisplay.action.x).toBeLessThan(340);
+    expect(marker.anchorsDisplay.action.y).toBeGreaterThan(150);
+    expect(marker.anchorsDisplay.action.y).toBeLessThan(166);
   });
 });

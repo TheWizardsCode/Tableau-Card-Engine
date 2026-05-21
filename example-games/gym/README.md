@@ -27,16 +27,35 @@ Open `http://localhost:3000` and select **Gym** from the game selector. From the
 | Audio & Feedback Config | `GymAudioFeedbackScene` | Toggle mute, adjust volume, map events to sounds; pop text; particle celebration |
 | Shader & Blend Spike | `GymGraphicsShaderSpikeScene` | Sprite tinting, blend modes, shader feasibility evaluation |
 | Lighting Spike | `GymGraphicsLightingSpikeScene` | Point light, shadow evaluation, WebGL fallback behavior |
-| Screen Layout Language (SLL) | `GymSllScene` | Parses/validates SLL JSON, maps zones+anchors across viewport/DPR profiles, and visualizes layout overlays |
+| Screen Layout Language (SLL) | `GymSllScene` | Demonstrates both direct SLL layouts and composed shell+scene layouts, maps zones+anchors across viewport/DPR profiles, and visualizes merged overlays |
 
 ## SLL Demo
 
-Open **Screen Layout Language (SLL)** from the Gym Router to explore direct SLL usage (without fallback adapters):
+Open **Screen Layout Language (SLL)** from the Gym Router to explore direct SLL usage and composed shell + scene layouts:
 
-- Cycles between two layout JSON documents in `example-games/gym/layouts/`
-- Uses `parseScreenLayoutDocument`, `validateScreenLayoutDocument`, `getZoneRect`, `anchorPoint`, and `normalizedToPixels`
-- Toggles an overlay that shows zone bounds, anchor points, normalized coordinates, and mapped pixel coordinates
+- Cycles between the composed shell + scene example and the direct layout JSON documents in `example-games/gym/layouts/`
+- Uses `composeResolvedLayouts`, `parseScreenLayoutDocument`, `validateScreenLayoutDocument`, and `normalizedToPixels`
+- Toggles an overlay that shows merged zone bounds and anchor points for the active layout
 - Simulates multiple viewport/DPR profiles (desktop and portrait) to inspect mapping behavior
+
+### Composed shell + scene usage
+
+The composed demo uses a shared shell layout and a scene layout at runtime:
+
+```ts
+const resolved = composeResolvedLayouts(shellLayout, sceneLayout, viewport, dpr, {
+  policy: 'sceneWins',
+});
+
+const title = resolved.zones.shell.anchors.title;
+const help = resolved.zones.shell.anchors.help;
+const action = resolved.zones.shared.anchors.action;
+```
+
+Recommended local files:
+
+- `example-games/gym/layouts/gym-shell.layout.json`
+- `example-games/gym/layouts/gym-scene.layout.json`
 
 ## Running Tests
 

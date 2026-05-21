@@ -952,6 +952,7 @@ The project now includes a reusable **Screen Layout Language** for viewport-awar
 
 - Schema + types: `src/ui/screen-layout-schema.ts`
 - Runtime mapping: `src/ui/screen-layout.ts`
+- Composition helper: `src/ui/screen-layout-compose.ts`
 - Public exports: `src/ui/index.ts`
 
 ### Main Street canonical example
@@ -960,12 +961,25 @@ The project now includes a reusable **Screen Layout Language** for viewport-awar
 - Adapter: `example-games/main-street/scenes/MainStreetLayoutAdapter.ts`
 - Renderer integration: `example-games/main-street/scenes/MainStreetRenderer.ts` (`computeLayout()` applies SLL first, then falls back)
 
-### Gym direct SLL demo example
+### Gym SLL demo example
 
 - Scene: `example-games/gym/scenes/GymSllScene.ts`
-- Layout documents: `example-games/gym/layouts/gym-sll-default.layout.json`, `example-games/gym/layouts/gym-sll-pixel-override.layout.json`
+- Layout documents: `example-games/gym/layouts/gym-shell.layout.json`, `example-games/gym/layouts/gym-scene.layout.json`, `example-games/gym/layouts/gym-sll-default.layout.json`, `example-games/gym/layouts/gym-sll-pixel-override.layout.json`
 - Browser verification: `tests/gym/GymSllScene.browser.test.ts`
-- Unit verification: `tests/gym/GymSllLayout.test.ts`
+- Unit verification: `tests/ui/screen-layout-compose.test.ts`, `tests/gym/GymSllLayout.test.ts`
+
+### Composing shell + scene layouts
+
+Use `composeResolvedLayouts(baseLayout, sceneLayout, viewport, dpr, { policy: 'sceneWins' })` when a scene wants a shared shell (header/menu/toolbar/help) and a scene-specific layout without duplicating placement math.
+
+Typical use cases:
+
+- Shared app chrome that stays stable across multiple scenes
+- A scene-specific layout that overrides only the zones it owns
+- Browser tests that assert merged anchor positions across DPR/viewports
+- Debug overlays that need both the source layout ids and the merged resolved pixels
+
+Collision handling follows the project default: scene wins, and the helper reports a warning when a zone name collides so local dev/test runs surface the merge choice.
 
 ### Authoring and validation workflow
 
@@ -978,7 +992,12 @@ The project now includes a reusable **Screen Layout Language** for viewport-awar
    ```bash
    npx vitest run tests/ui/screen-layout-mapping.test.ts --project unit
    ```
-4. Validate Main Street layout integration via:
+4. Validate SLL composition and Gym integration via:
+   ```bash
+   npx vitest run tests/ui/screen-layout-compose.test.ts --project unit
+   npx vitest run tests/gym/GymSllScene.browser.test.ts --project browser
+   ```
+5. Validate Main Street layout integration via:
    ```bash
    npx vitest run tests/main-street/MainStreetLayoutAnchors.browser.test.ts --project browser
    npx vitest run tests/main-street/MainStreetScene.browser.test.ts --project browser
