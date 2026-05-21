@@ -134,7 +134,7 @@ export class GymSllScene extends GymSceneBase {
   private layouts: LayoutOption[] = [];
   private layoutIndex = 0;
   private profileIndex = 0;
-  private overlayVisible = true;
+  private overlayVisible = false;
 
   private layoutButton!: Phaser.GameObjects.Text;
   private profileButton!: Phaser.GameObjects.Text;
@@ -273,7 +273,7 @@ export class GymSllScene extends GymSceneBase {
       color: '#88ddff',
     });
 
-    this.overlayButton = this.addButton(490, y, '[ Overlay: ON ]', () => this.toggleOverlay(), {
+    this.overlayButton = this.addButton(490, y, '[ Overlay: OFF ]', () => this.toggleOverlay(), {
       fontSize: '13px',
       color: '#ffee99',
     });
@@ -458,7 +458,7 @@ export class GymSllScene extends GymSceneBase {
     this.profileButton.setText(`[ Profile: ${currentProfile.id} ]`);
     this.statusLine.setText(
       currentLayout.kind === 'composed'
-        ? `Layout ${currentLayout.layoutId} | composed ${currentLayout.composition.baseLayoutId} + ${currentLayout.composition.sceneLayoutId} | ${currentProfile.label} | previewScale x${previewScaleX.toFixed(3)} y${previewScaleY.toFixed(3)}`
+        ? `Composed shell + scene | ${currentProfile.label} | previewScale x${previewScaleX.toFixed(3)} y${previewScaleY.toFixed(3)}`
         : `Layout ${currentLayout.layoutId} | ${currentProfile.label} | previewScale x${previewScaleX.toFixed(3)} y${previewScaleY.toFixed(3)}`,
     );
 
