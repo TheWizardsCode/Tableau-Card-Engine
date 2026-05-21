@@ -96,13 +96,9 @@ describe('GymSllScene browser integration', () => {
     const marker = await waitForSllReadyMarker();
 
     expect(marker.ready).toBe(true);
-    expect(marker.layoutId).toBe('gym-shell-layout+gym-scene-layout');
+    expect(marker.layoutId).toBe('gym-shell-layout');
     expect(marker.profile.id).toBe('desktop-1x');
-    expect(marker.composition).toEqual({
-      baseLayoutId: 'gym-shell-layout',
-      sceneLayoutId: 'gym-scene-layout',
-      policy: 'sceneWins',
-    });
+    expect(marker.composition).toBeUndefined();
   });
 
   it('cycles to the scene-only layout example', async () => {
@@ -122,7 +118,7 @@ describe('GymSllScene browser integration', () => {
     await waitForScene(game, GYM_SLL_KEY);
     const scene = game.scene.getScene(GYM_SLL_KEY) as Phaser.Scene;
 
-    const layoutButton = findTextObject(scene, text => text === '[ Layout: Shell+Scene ]');
+    const layoutButton = findTextObject(scene, text => text === '[ Layout: Shell-only ]');
     expect(layoutButton).toBeTruthy();
 
     layoutButton?.emit('pointerdown');
@@ -169,10 +165,10 @@ describe('GymSllScene browser integration', () => {
     expect(marker.anchorsDisplay.help.y).toBeGreaterThan(36);
     expect(marker.anchorsDisplay.help.y).toBeLessThan(54);
 
-    expect(marker.anchorsDisplay.action.x).toBeGreaterThan(575);
-    expect(marker.anchorsDisplay.action.x).toBeLessThan(590);
-    expect(marker.anchorsDisplay.action.y).toBeGreaterThan(120);
-    expect(marker.anchorsDisplay.action.y).toBeLessThan(132);
+    expect(marker.anchorsDisplay.action.x).toBeGreaterThan(405);
+    expect(marker.anchorsDisplay.action.x).toBeLessThan(425);
+    expect(marker.anchorsDisplay.action.y).toBeGreaterThan(138);
+    expect(marker.anchorsDisplay.action.y).toBeLessThan(150);
   });
 
   it('renders a readable overlay legend when toggled on', async () => {
@@ -204,6 +200,6 @@ describe('GymSllScene browser integration', () => {
     expect(overlayLegend?.x).toBeGreaterThanOrEqual(20);
     expect(overlayLegend?.y).toBeGreaterThanOrEqual(120);
     expect(overlayLegend?.text).toContain('shell');
-    expect(overlayLegend?.text).toContain('sceneOnly');
+    expect(overlayLegend?.text).toContain('banner');
   });
 });

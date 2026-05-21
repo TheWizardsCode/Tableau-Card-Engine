@@ -964,7 +964,7 @@ The project now includes a reusable **Screen Layout Language** for viewport-awar
 ### Gym SLL demo example
 
 - Scene: `example-games/gym/scenes/GymSllScene.ts`
-- Layout documents: `example-games/gym/layouts/gym-shell.layout.json`, `example-games/gym/layouts/gym-scene.layout.json`, `example-games/gym/layouts/gym-sll-pixel-override.layout.json`
+- Layout documents: `example-games/gym/layouts/gym-shell.layout.json` (shell-only and composed shell source), `example-games/gym/layouts/gym-scene.layout.json` (scene-only source), `example-games/gym/layouts/gym-sll-pixel-override.layout.json`
 - Browser verification: `tests/gym/GymSllScene.browser.test.ts`
 - Unit verification: `tests/ui/screen-layout-compose.test.ts`, `tests/gym/GymSllLayout.test.ts`
 

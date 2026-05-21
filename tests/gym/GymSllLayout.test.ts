@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import shellLayoutJson from '../../example-games/gym/layouts/gym-shell.layout.json';
 import sceneOnlyLayoutJson from '../../example-games/gym/layouts/gym-scene.layout.json';
 import pixelOverrideLayoutJson from '../../example-games/gym/layouts/gym-sll-pixel-override.layout.json';
 import type { ScreenLayoutDocument } from '../../src/ui/screen-layout-schema';
@@ -8,6 +9,7 @@ import {
 } from '../../src/ui/screen-layout-schema';
 import { anchorPoint, getZoneRect } from '../../src/ui/screen-layout';
 
+const shellLayout = shellLayoutJson as ScreenLayoutDocument;
 const sceneOnlyLayout = sceneOnlyLayoutJson as ScreenLayoutDocument;
 const pixelOverrideLayout = pixelOverrideLayoutJson as ScreenLayoutDocument;
 
@@ -22,6 +24,25 @@ describe('Gym SLL layout fixtures', () => {
       const parsed = parseScreenLayoutDocument(layout);
       expect(parsed.valid).toBe(true);
     }
+  });
+
+  it('maps the shell-only layout at 1280x720 @ DPR 1', () => {
+    const shellRect = getZoneRect(shellLayout, 'shell', { width: 1280, height: 720 }, 1);
+    const titleAnchor = anchorPoint(shellLayout, 'shell', 'title', { width: 1280, height: 720 }, 1);
+    const helpAnchor = anchorPoint(shellLayout, 'shell', 'help', { width: 1280, height: 720 }, 1);
+    const actionAnchor = anchorPoint(shellLayout, 'shared', 'action', { width: 1280, height: 720 }, 1);
+
+    expect(shellRect.x).toBeCloseTo(0, 6);
+    expect(shellRect.y).toBeCloseTo(0, 6);
+    expect(shellRect.width).toBeCloseTo(1280, 6);
+    expect(shellRect.height).toBeCloseTo(90, 6);
+
+    expect(titleAnchor.x).toBeCloseTo(640, 6);
+    expect(titleAnchor.y).toBeCloseTo(45, 6);
+    expect(helpAnchor.x).toBeCloseTo(1177.6, 6);
+    expect(helpAnchor.y).toBeCloseTo(45, 6);
+    expect(actionAnchor.x).toBeCloseTo(416, 6);
+    expect(actionAnchor.y).toBeCloseTo(144, 6);
   });
 
   it('maps the scene-only layout at 1280x720 @ DPR 1', () => {

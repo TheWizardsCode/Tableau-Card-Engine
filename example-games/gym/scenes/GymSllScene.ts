@@ -44,7 +44,7 @@ interface PlacementMapping {
   title: { zone: string; anchor: string };
   help: { zone: string; anchor: string };
   action: { zone: string; anchor: string };
-  content: { zone: string; anchor: string };
+  content?: { zone: string; anchor: string };
 }
 
 interface DirectLayoutOption {
@@ -53,6 +53,7 @@ interface DirectLayoutOption {
   layoutId: string;
   layout: ScreenLayoutDocument;
   placement: PlacementMapping;
+  showContent: boolean;
 }
 
 interface ComposedLayoutOption {
@@ -67,9 +68,12 @@ interface ComposedLayoutOption {
     policy: 'sceneWins';
   };
   placement: PlacementMapping;
+  showContent: boolean;
 }
 
 type LayoutOption = DirectLayoutOption | ComposedLayoutOption;
+
+type PlacementTarget = NonNullable<PlacementMapping[keyof PlacementMapping]>;
 
 interface ReadyMarker {
   ready: boolean;
@@ -114,6 +118,12 @@ const LAYOUT_PROFILES: LayoutProfile[] = [
 ];
 
 const OVERLAY_COLORS = [0x66ddff, 0x66ff99, 0xffcc66, 0xff8899, 0xd9a5ff, 0x99ffdd];
+
+const SHELL_ONLY_PLACEMENT: PlacementMapping = {
+  title: { zone: 'shell', anchor: 'title' },
+  help: { zone: 'shell', anchor: 'help' },
+  action: { zone: 'shared', anchor: 'action' },
+};
 
 const SCENE_ONLY_PLACEMENT: PlacementMapping = {
   title: { zone: 'shared', anchor: 'title' },
@@ -176,12 +186,12 @@ export class GymSllScene extends GymSceneBase {
       {
         heading: 'Controls',
         body:
-          '[ Layout ] cycles between the composed shell + scene example, the scene-only layout, and the pixel override layout. [ Profile ] simulates viewport + DPR combinations. [ Overlay ] toggles zone and anchor debug visualization.',
+          '[ Layout ] cycles between the shell-only example, the scene-only layout, the pixel override layout, and the composed shell + scene example. [ Profile ] simulates viewport + DPR combinations. [ Overlay ] toggles zone and anchor debug visualization.',
       },
       {
         heading: 'Notes',
         body:
-          'The composed sample uses a shared shell layout plus a scene layout. The overlay shows merged zones and anchors so collision handling and namespacing are easy to inspect.',
+          'The shell-only example uses the shared shell layout by itself. The composed sample uses a shared shell layout plus a scene layout. The overlay shows merged zones and anchors so collision handling and namespacing are easy to inspect.',
       },
     ]);
 
@@ -217,23 +227,24 @@ export class GymSllScene extends GymSceneBase {
 
     const composedBaseParsed = parseScreenLayoutDocument(gymShellLayoutJson);
     const composedSceneParsed = parseScreenLayoutDocument(sceneOnlyLayoutJson);
+    const shellOnlyLayout = this.requireValidParsedLayout('Shell-only', composedBaseParsed);
     this.layouts.push({
-      kind: 'composed',
-      name: 'Composed Shell + Scene',
-      layoutId: `${this.requireValidParsedLayout('Composed Base', composedBaseParsed).id}+${this.requireValidParsedLayout('Composed Scene', composedSceneParsed).id}`,
-      baseLayout: this.requireValidParsedLayout('Composed Base', composedBaseParsed),
-      sceneLayout: this.requireValidParsedLayout('Composed Scene', composedSceneParsed),
-      composition: {
-        baseLayoutId: this.requireValidParsedLayout('Composed Base', composedBaseParsed).id,
-        sceneLayoutId: this.requireValidParsedLayout('Composed Scene', composedSceneParsed).id,
-        policy: 'sceneWins',
-      },
-      placement: COMPOSED_PLACEMENT,
+      kind: 'direct',
+      name: 'Shell-only',
+      layoutId: shellOnlyLayout.id,
+      layout: shellOnlyLayout,
+      placement: SHELL_ONLY_PLACEMENT,
+      showContent: false,
     });
 
-    const candidates: Array<{ name: string; source: unknown; placement: PlacementMapping }> = [
-      { name: 'Scene-only', source: sceneOnlyLayoutJson, placement: SCENE_ONLY_PLACEMENT },
-      { name: 'Pixel Override', source: pixelOverrideLayoutJson, placement: PIXEL_OVERRIDE_PLACEMENT },
+    const candidates: Array<{
+      name: string;
+      source: unknown;
+      placement: PlacementMapping;
+      showContent: boolean;
+    }> = [
+      { name: 'Scene-only', source: sceneOnlyLayoutJson, placement: SCENE_ONLY_PLACEMENT, showContent: true },
+      { name: 'Pixel Override', source: pixelOverrideLayoutJson, placement: PIXEL_OVERRIDE_PLACEMENT, showContent: true },
     ];
 
     for (const candidate of candidates) {
@@ -253,8 +264,24 @@ export class GymSllScene extends GymSceneBase {
         layoutId: layout.id,
         layout,
         placement: candidate.placement,
+        showContent: candidate.showContent,
       });
     }
+
+    this.layouts.push({
+      kind: 'composed',
+      name: 'Composed Shell + Scene',
+      layoutId: `${this.requireValidParsedLayout('Composed Base', composedBaseParsed).id}+${this.requireValidParsedLayout('Composed Scene', composedSceneParsed).id}`,
+      baseLayout: this.requireValidParsedLayout('Composed Base', composedBaseParsed),
+      sceneLayout: this.requireValidParsedLayout('Composed Scene', composedSceneParsed),
+      composition: {
+        baseLayoutId: this.requireValidParsedLayout('Composed Base', composedBaseParsed).id,
+        sceneLayoutId: this.requireValidParsedLayout('Composed Scene', composedSceneParsed).id,
+        policy: 'sceneWins',
+      },
+      placement: COMPOSED_PLACEMENT,
+      showContent: true,
+    });
   }
 
   private requireValidParsedLayout(name: string, parsed: ScreenLayoutParseResult): ScreenLayoutDocument {
@@ -375,7 +402,7 @@ export class GymSllScene extends GymSceneBase {
 
   private getAnchorPoint(
     resolved: ReturnType<typeof normalizedToPixels>,
-    placement: PlacementMapping[keyof PlacementMapping],
+    placement: PlacementTarget,
   ): PixelPoint {
     const zone = resolved.zones[placement.zone];
     if (!zone) {
@@ -403,8 +430,8 @@ export class GymSllScene extends GymSceneBase {
   }
 
   private applyLayout(): void {
-    const currentLayout = this.layouts[this.layoutIndex];
-    const currentProfile = LAYOUT_PROFILES[this.profileIndex];
+    const currentLayout = this.layouts[this.layoutIndex]!;
+    const currentProfile = LAYOUT_PROFILES[this.profileIndex]!;
 
     const resolved =
       currentLayout.kind === 'direct'
@@ -438,25 +465,33 @@ export class GymSllScene extends GymSceneBase {
     const helpAnchorPx = this.getAnchorPoint(resolved, currentLayout.placement.help);
     const actionAnchorPx = this.getAnchorPoint(resolved, currentLayout.placement.action);
 
-    const contentRectPx = this.getZoneRect(resolved, currentLayout.placement.content.zone);
-    const contentCenterPx = this.getAnchorPoint(resolved, currentLayout.placement.content);
+    const contentPlacement = currentLayout.placement.content;
 
     const titleAnchorDisplay = toDisplayPoint(titleAnchorPx);
     const helpAnchorDisplay = toDisplayPoint(helpAnchorPx);
     const actionAnchorDisplay = toDisplayPoint(actionAnchorPx);
-    const contentRectDisplay = toDisplayRect(contentRectPx);
-    const contentCenterDisplay = toDisplayPoint(contentCenterPx);
 
     this.layoutTitle.setPosition(titleAnchorDisplay.x, titleAnchorDisplay.y);
     this.layoutHelpButton.setPosition(helpAnchorDisplay.x, helpAnchorDisplay.y);
     this.actionButton.setPosition(actionAnchorDisplay.x, actionAnchorDisplay.y);
 
-    const panelWidth = Math.min(420, contentRectDisplay.width * 0.85);
-    const panelHeight = Math.min(220, contentRectDisplay.height * 0.85);
-    this.contentPanel
-      .setPosition(contentCenterDisplay.x, contentCenterDisplay.y)
-      .setSize(panelWidth, panelHeight);
-    this.contentLabel.setPosition(contentCenterDisplay.x, contentCenterDisplay.y);
+    if (currentLayout.showContent && contentPlacement) {
+      const contentRectPx = this.getZoneRect(resolved, contentPlacement.zone);
+      const contentCenterPx = this.getAnchorPoint(resolved, contentPlacement);
+      const contentRectDisplay = toDisplayRect(contentRectPx);
+      const contentCenterDisplay = toDisplayPoint(contentCenterPx);
+      const panelWidth = Math.min(420, contentRectDisplay.width * 0.85);
+      const panelHeight = Math.min(220, contentRectDisplay.height * 0.85);
+      this.contentPanel.setVisible(true);
+      this.contentLabel.setVisible(true);
+      this.contentPanel
+        .setPosition(contentCenterDisplay.x, contentCenterDisplay.y)
+        .setSize(panelWidth, panelHeight);
+      this.contentLabel.setPosition(contentCenterDisplay.x, contentCenterDisplay.y);
+    } else {
+      this.contentPanel.setVisible(false);
+      this.contentLabel.setVisible(false);
+    }
 
     this.redrawOverlay(resolved, toDisplayRect, toDisplayPoint);
 
@@ -467,7 +502,7 @@ export class GymSllScene extends GymSceneBase {
     this.statusLine.setText(
       currentLayout.kind === 'composed'
         ? `Composed shell + scene | ${currentProfile.label} | previewScale x${previewScaleX.toFixed(3)} y${previewScaleY.toFixed(3)}`
-        : `Layout ${currentLayout.layoutId} | ${currentProfile.label} | previewScale x${previewScaleX.toFixed(3)} y${previewScaleY.toFixed(3)}`,
+        : `${currentLayout.name} | ${currentProfile.label} | previewScale x${previewScaleX.toFixed(3)} y${previewScaleY.toFixed(3)}`,
     );
 
     this.publishReadyMarker({
