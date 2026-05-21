@@ -16,6 +16,7 @@ This document covers everything you need to develop, test, and build the Tableau
 - [Replay Tool](#replay-tool)
 - [Managing Assets](#managing-assets)
 - [SVG Rendering & Migration](#svg-rendering--migration)
+- [Screen Layout Language (SLL)](#screen-layout-language-sll)
 - [Keeping Docs Up to Date](#keeping-docs-up-to-date)
 - [Work-Item Tracking](#work-item-tracking)
 - [Troubleshooting](#troubleshooting)
@@ -940,6 +941,55 @@ The Mind was the first example game migrated from `scene.load.svg` to SvgHelpers
 4. Update tests to assert DPR-aware key format and add headless integration checks.
 
 Games still using `scene.load.svg` (as of this migration): lost-cities.
+
+## Screen Layout Language (SLL)
+
+The project now includes a reusable **Screen Layout Language** for viewport-aware scene layout.
+
+### Core files
+
+- Schema + types: `src/ui/screen-layout-schema.ts`
+- Runtime mapping: `src/ui/screen-layout.ts`
+- Public exports: `src/ui/index.ts`
+
+### Main Street canonical example
+
+- Layout file: `example-games/main-street/layouts/main-street.layout.json`
+- Adapter: `example-games/main-street/scenes/MainStreetLayoutAdapter.ts`
+- Renderer integration: `example-games/main-street/scenes/MainStreetRenderer.ts` (`computeLayout()` applies SLL first, then falls back)
+
+### Authoring and validation workflow
+
+1. Author/update a `*.layout.json` file with normalized zone rectangles and anchors.
+2. Validate schema + parse behavior via:
+   ```bash
+   npx vitest run tests/ui/screen-layout-schema.test.ts --project unit
+   ```
+3. Validate mapping behavior via:
+   ```bash
+   npx vitest run tests/ui/screen-layout-mapping.test.ts --project unit
+   ```
+4. Validate Main Street layout integration via:
+   ```bash
+   npx vitest run tests/main-street/MainStreetLayoutAnchors.browser.test.ts --project browser
+   npx vitest run tests/main-street/MainStreetScene.browser.test.ts --project browser
+   ```
+
+### Migration and fallback behavior
+
+- Use `adaptLayoutWithFallback(...)` for incremental scene migration.
+- If a layout document is missing or mapping fails, fallback layout code remains active.
+- Runtime issue hooks (`ScreenLayoutIssue`) can be wired to telemetry/logging without changing scene logic.
+
+### Troubleshooting SLL issues
+
+- If schema validation fails, inspect `path` and `message` in validation errors from `validateScreenLayoutDocument`.
+- If zones/anchors are missing at runtime, look for `UNKNOWN_ZONE` / `UNKNOWN_ANCHOR` issues.
+- If scene behavior unexpectedly matches legacy coordinates, verify that the adapter sees a valid layout document and that the relevant zone names exist.
+
+### Related follow-up scope
+
+- Tutorial-specific layout migration remains tracked separately in work item **Adapt tutorial system to use layout description (CG-0MP7IZ4RK008065O)**.
 
 ## Keeping Docs Up to Date
 

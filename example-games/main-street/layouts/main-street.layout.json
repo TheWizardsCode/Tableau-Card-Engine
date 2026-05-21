@@ -1,0 +1,108 @@
+{
+  "version": 1,
+  "id": "main-street-canonical",
+  "baseViewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "requiredZones": [
+    "market",
+    "activityLog",
+    "street",
+    "endTurnButton"
+  ],
+  "zones": {
+    "market": {
+      "rect": {
+        "x": 0.015625,
+        "y": 0.125,
+        "width": 0.96875,
+        "height": 0.302778
+      },
+      "anchors": {
+        "topCenter": { "x": 0.5, "y": 0 },
+        "bottomCenter": { "x": 0.5, "y": 1 }
+      }
+    },
+    "incidentQueue": {
+      "rect": {
+        "x": 0.085938,
+        "y": 0.444444,
+        "width": 0.522656,
+        "height": 0.152778
+      },
+      "anchors": {
+        "topLeft": { "x": 0, "y": 0 },
+        "bottomLeft": { "x": 0, "y": 1 }
+      }
+    },
+    "street": {
+      "rect": {
+        "x": 0.265625,
+        "y": 0.586111,
+        "width": 0.46875,
+        "height": 0.272222
+      },
+      "anchors": {
+        "topCenter": { "x": 0.5, "y": 0 },
+        "bottomCenter": { "x": 0.5, "y": 1 }
+      }
+    },
+    "hand": {
+      "rect": {
+        "x": 0.03125,
+        "y": 0.861111,
+        "width": 0.109375,
+        "height": 0.111111
+      },
+      "anchors": {
+        "topLeft": { "x": 0, "y": 0 }
+      }
+    },
+    "actions": {
+      "rect": {
+        "x": 0.6875,
+        "y": 0.930556,
+        "width": 0.292188,
+        "height": 0.047222
+      },
+      "anchors": {
+        "rightCenter": { "x": 1, "y": 0.5 }
+      }
+    },
+    "activityLog": {
+      "rect": {
+        "x": 0.640625,
+        "y": 0.111111,
+        "width": 0.335938,
+        "height": 0.472222
+      },
+      "anchors": {
+        "topLeft": { "x": 0, "y": 0 },
+        "bottomRight": { "x": 1, "y": 1 }
+      }
+    },
+    "challengePanel": {
+      "rect": {
+        "x": 0.359375,
+        "y": 0.444444,
+        "width": 0.273438,
+        "height": 0.152778
+      },
+      "anchors": {
+        "topLeft": { "x": 0, "y": 0 }
+      }
+    },
+    "endTurnButton": {
+      "rect": {
+        "x": 0.871875,
+        "y": 0.936111,
+        "width": 0.109375,
+        "height": 0.047222
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.5 }
+      }
+    }
+  }
+}

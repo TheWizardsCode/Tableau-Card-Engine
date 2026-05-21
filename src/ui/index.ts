@@ -50,6 +50,41 @@ export type {
   LayoutCardPositionsResult,
 } from './layoutCardPositions';
 
+// Screen layout language (SLL)
+export {
+  SCREEN_LAYOUT_SCHEMA,
+  validateScreenLayoutDocument,
+  parseScreenLayoutDocument,
+} from './screen-layout-schema';
+export type {
+  PixelPoint,
+  PixelRect,
+  NormalizedPoint,
+  NormalizedRect,
+  ScreenLayoutZone,
+  ScreenLayoutDocument,
+  ScreenLayoutValidationError,
+  ScreenLayoutValidationResult,
+  ScreenLayoutParseResult,
+} from './screen-layout-schema';
+export {
+  normalizedToPixels,
+  pixelToNormalized,
+  getZoneRect,
+  anchorPoint,
+  adaptLayoutWithFallback,
+  ScreenLayoutMappingError,
+} from './screen-layout';
+export type {
+  LayoutViewport,
+  ResolvedZone,
+  ResolvedScreenLayout,
+  ScreenLayoutIssueCode,
+  ScreenLayoutIssue,
+  ScreenLayoutIssueReporter,
+  LegacyLayoutAdapterOptions,
+} from './screen-layout';
+
 // Card game factory helper
 export { createCardGame } from './createCardGame';
 export type { CardGameOptions } from './createCardGame';
