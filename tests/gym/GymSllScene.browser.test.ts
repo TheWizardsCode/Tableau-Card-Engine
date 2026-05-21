@@ -93,12 +93,21 @@ describe('GymSllScene browser integration', () => {
     });
 
     await waitForScene(game, GYM_SLL_KEY);
+    const scene = game.scene.getScene(GYM_SLL_KEY) as Phaser.Scene;
     const marker = await waitForSllReadyMarker();
 
     expect(marker.ready).toBe(true);
     expect(marker.layoutId).toBe('gym-shell-layout');
     expect(marker.profile.id).toBe('desktop-1x');
     expect(marker.composition).toBeUndefined();
+
+    expect(findTextObject(scene, text => text === '[ Help ]')).toBeNull();
+    const helpIcon = findTextObject(scene, text => text === '?');
+    expect(helpIcon).toBeTruthy();
+    expect(helpIcon?.x).toBeGreaterThan(1160);
+    expect(helpIcon?.x).toBeLessThan(1195);
+    expect(helpIcon?.y).toBeGreaterThan(36);
+    expect(helpIcon?.y).toBeLessThan(54);
   });
 
   it('cycles to the scene-only layout example', async () => {

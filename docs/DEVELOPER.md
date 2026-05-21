@@ -970,7 +970,7 @@ The project now includes a reusable **Screen Layout Language** for viewport-awar
 
 ### Composing shell + scene layouts
 
-Use `composeResolvedLayouts(baseLayout, sceneLayout, viewport, dpr, { policy: 'sceneWins' })` when a scene wants a shared shell (header/menu/toolbar/help) and a scene-specific layout without duplicating placement math.
+Use `composeResolvedLayouts(baseLayout, sceneLayout, viewport, dpr, { policy: 'sceneWins' })` when a scene wants a shared shell (header/menu/toolbar/help) and a scene-specific layout without duplicating placement math. In the Gym SLL demo, the base help icon is positioned from the shell layout so the shell-only view shows a single help affordance.
 
 Typical use cases:
 

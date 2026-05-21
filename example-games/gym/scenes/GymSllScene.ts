@@ -158,7 +158,6 @@ export class GymSllScene extends GymSceneBase {
   private statusLine!: Phaser.GameObjects.Text;
 
   private layoutTitle!: Phaser.GameObjects.Text;
-  private layoutHelpButton!: Phaser.GameObjects.Text;
   private actionButton!: Phaser.GameObjects.Text;
   private contentPanel!: Phaser.GameObjects.Rectangle;
   private contentLabel!: Phaser.GameObjects.Text;
@@ -325,23 +324,6 @@ export class GymSllScene extends GymSceneBase {
       .setOrigin(0.5)
       .setDepth(40);
 
-    this.layoutHelpButton = this.add
-      .text(0, 0, '[ Help ]', {
-        fontSize: '16px',
-        color: '#ffee88',
-        fontFamily: 'monospace',
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5)
-      .setDepth(40)
-      .setInteractive({ useHandCursor: true });
-
-    this.layoutHelpButton.on('pointerdown', () => {
-      this.helpPanel?.toggle();
-    });
-    this.layoutHelpButton.on('pointerover', () => this.layoutHelpButton.setColor('#fff7b0'));
-    this.layoutHelpButton.on('pointerout', () => this.layoutHelpButton.setColor('#ffee88'));
-
     this.actionButton = this.add
       .text(0, 0, '[ Toggle Pulse ]', {
         fontSize: '15px',
@@ -472,7 +454,7 @@ export class GymSllScene extends GymSceneBase {
     const actionAnchorDisplay = toDisplayPoint(actionAnchorPx);
 
     this.layoutTitle.setPosition(titleAnchorDisplay.x, titleAnchorDisplay.y);
-    this.layoutHelpButton.setPosition(helpAnchorDisplay.x, helpAnchorDisplay.y);
+    this.helpButton?.setPosition(helpAnchorDisplay.x, helpAnchorDisplay.y);
     this.actionButton.setPosition(actionAnchorDisplay.x, actionAnchorDisplay.y);
 
     if (currentLayout.showContent && contentPlacement) {

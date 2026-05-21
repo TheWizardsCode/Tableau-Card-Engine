@@ -35,6 +35,7 @@ Open **Screen Layout Language (SLL)** from the Gym Router to explore direct SLL 
 
 - Cycles between the shell-only example, the scene-only example, the pixel override example, and the composed shell + scene example in `example-games/gym/layouts/`
 - Uses `composeResolvedLayouts`, `parseScreenLayoutDocument`, `validateScreenLayoutDocument`, and `normalizedToPixels`
+- Anchors the base help icon from the shell layout and uses the shell/scene anchors to position the visible UI
 - Toggles an overlay that shows merged zone bounds and anchor points for the active layout
 - Simulates multiple viewport/DPR profiles (desktop and portrait) to inspect mapping behavior
 
