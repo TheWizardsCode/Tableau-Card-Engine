@@ -17,9 +17,8 @@
 import Phaser from 'phaser';
 import { GymSceneBase } from './GymSceneBase';
 import { GYM_SLL_KEY } from '../GymRegistry';
-import defaultLayoutJson from '../layouts/gym-sll-default.layout.json';
+import sceneOnlyLayoutJson from '../layouts/gym-scene.layout.json';
 import pixelOverrideLayoutJson from '../layouts/gym-sll-pixel-override.layout.json';
-import gymSceneLayoutJson from '../layouts/gym-scene.layout.json';
 import gymShellLayoutJson from '../layouts/gym-shell.layout.json';
 import type {
   PixelPoint,
@@ -116,7 +115,14 @@ const LAYOUT_PROFILES: LayoutProfile[] = [
 
 const OVERLAY_COLORS = [0x66ddff, 0x66ff99, 0xffcc66, 0xff8899, 0xd9a5ff, 0x99ffdd];
 
-const DIRECT_PLACEMENT: PlacementMapping = {
+const SCENE_ONLY_PLACEMENT: PlacementMapping = {
+  title: { zone: 'shared', anchor: 'title' },
+  help: { zone: 'shared', anchor: 'help' },
+  action: { zone: 'shared', anchor: 'action' },
+  content: { zone: 'sceneOnly', anchor: 'center' },
+};
+
+const PIXEL_OVERRIDE_PLACEMENT: PlacementMapping = {
   title: { zone: 'header', anchor: 'title' },
   help: { zone: 'menu', anchor: 'help' },
   action: { zone: 'controls', anchor: 'action' },
@@ -170,7 +176,7 @@ export class GymSllScene extends GymSceneBase {
       {
         heading: 'Controls',
         body:
-          '[ Layout ] cycles between the composed shell + scene example and the direct SLL sample layouts. [ Profile ] simulates viewport + DPR combinations. [ Overlay ] toggles zone and anchor debug visualization.',
+          '[ Layout ] cycles between the composed shell + scene example, the scene-only layout, and the pixel override layout. [ Profile ] simulates viewport + DPR combinations. [ Overlay ] toggles zone and anchor debug visualization.',
       },
       {
         heading: 'Notes',
@@ -201,7 +207,7 @@ export class GymSllScene extends GymSceneBase {
       );
     }
 
-    const composedSceneValidation = validateScreenLayoutDocument(gymSceneLayoutJson);
+    const composedSceneValidation = validateScreenLayoutDocument(sceneOnlyLayoutJson);
     if (!composedSceneValidation.valid) {
       const firstError = composedSceneValidation.errors[0];
       throw new Error(
@@ -210,7 +216,7 @@ export class GymSllScene extends GymSceneBase {
     }
 
     const composedBaseParsed = parseScreenLayoutDocument(gymShellLayoutJson);
-    const composedSceneParsed = parseScreenLayoutDocument(gymSceneLayoutJson);
+    const composedSceneParsed = parseScreenLayoutDocument(sceneOnlyLayoutJson);
     this.layouts.push({
       kind: 'composed',
       name: 'Composed Shell + Scene',
@@ -225,9 +231,9 @@ export class GymSllScene extends GymSceneBase {
       placement: COMPOSED_PLACEMENT,
     });
 
-    const candidates: Array<{ name: string; source: unknown }> = [
-      { name: 'Default', source: defaultLayoutJson },
-      { name: 'Pixel Override', source: pixelOverrideLayoutJson },
+    const candidates: Array<{ name: string; source: unknown; placement: PlacementMapping }> = [
+      { name: 'Scene-only', source: sceneOnlyLayoutJson, placement: SCENE_ONLY_PLACEMENT },
+      { name: 'Pixel Override', source: pixelOverrideLayoutJson, placement: PIXEL_OVERRIDE_PLACEMENT },
     ];
 
     for (const candidate of candidates) {
@@ -246,7 +252,7 @@ export class GymSllScene extends GymSceneBase {
         name: candidate.name,
         layoutId: layout.id,
         layout,
-        placement: DIRECT_PLACEMENT,
+        placement: candidate.placement,
       });
     }
   }

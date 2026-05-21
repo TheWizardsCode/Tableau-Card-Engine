@@ -25,18 +25,28 @@ interface GymSllReadyMarker {
   };
 }
 
-function waitForSllReadyMarker(timeoutMs = 10_000): Promise<GymSllReadyMarker> {
+function waitForSllReadyMarker(
+  expectedLayoutId?: string,
+  timeoutMs = 10_000,
+): Promise<GymSllReadyMarker> {
   return new Promise((resolve, reject) => {
     const started = Date.now();
 
     const check = () => {
       const marker = (window as Window & { __gymSllSceneReady?: GymSllReadyMarker }).__gymSllSceneReady;
-      if (marker?.ready && marker.sceneKey === GYM_SLL_KEY) {
+      const layoutMatches = expectedLayoutId ? marker?.layoutId === expectedLayoutId : true;
+      if (marker?.ready && marker.sceneKey === GYM_SLL_KEY && layoutMatches) {
         resolve(marker);
         return;
       }
       if (Date.now() - started > timeoutMs) {
-        reject(new Error(`Timed out waiting for window.__gymSllSceneReady after ${timeoutMs}ms`));
+        reject(
+          new Error(
+            `Timed out waiting for window.__gymSllSceneReady${
+              expectedLayoutId ? ` to reach layout ${expectedLayoutId}` : ''
+            } after ${timeoutMs}ms`,
+          ),
+        );
         return;
       }
       requestAnimationFrame(check);
@@ -95,6 +105,40 @@ describe('GymSllScene browser integration', () => {
     });
   });
 
+  it('cycles to the scene-only layout example', async () => {
+    const container = document.createElement('div');
+    container.id = 'game-container';
+    document.body.appendChild(container);
+
+    game = new Phaser.Game({
+      type: Phaser.AUTO,
+      width: 1280,
+      height: 720,
+      parent: 'game-container',
+      backgroundColor: '#1a2a1a',
+      scene: [GymSllScene],
+    });
+
+    await waitForScene(game, GYM_SLL_KEY);
+    const scene = game.scene.getScene(GYM_SLL_KEY) as Phaser.Scene;
+
+    const layoutButton = findTextObject(scene, text => text === '[ Layout: Shell+Scene ]');
+    expect(layoutButton).toBeTruthy();
+
+    layoutButton?.emit('pointerdown');
+
+    const marker = await waitForSllReadyMarker('gym-scene-layout');
+
+    expect(marker.layoutId).toBe('gym-scene-layout');
+    expect(findTextObject(scene, text => text === '[ Layout: Scene-only ]')).toBeTruthy();
+    expect(marker.anchorsDisplay.title.x).toBeGreaterThan(300);
+    expect(marker.anchorsDisplay.title.x).toBeLessThan(330);
+    expect(marker.anchorsDisplay.help.x).toBeGreaterThan(430);
+    expect(marker.anchorsDisplay.help.x).toBeLessThan(470);
+    expect(marker.anchorsDisplay.action.x).toBeGreaterThan(560);
+    expect(marker.anchorsDisplay.action.x).toBeLessThan(600);
+  });
+
   it('positions anchor-derived elements in expected pixel ranges', async () => {
     const container = document.createElement('div');
     container.id = 'game-container';
@@ -125,10 +169,10 @@ describe('GymSllScene browser integration', () => {
     expect(marker.anchorsDisplay.help.y).toBeGreaterThan(36);
     expect(marker.anchorsDisplay.help.y).toBeLessThan(54);
 
-    expect(marker.anchorsDisplay.action.x).toBeGreaterThan(325);
-    expect(marker.anchorsDisplay.action.x).toBeLessThan(340);
-    expect(marker.anchorsDisplay.action.y).toBeGreaterThan(150);
-    expect(marker.anchorsDisplay.action.y).toBeLessThan(166);
+    expect(marker.anchorsDisplay.action.x).toBeGreaterThan(575);
+    expect(marker.anchorsDisplay.action.x).toBeLessThan(590);
+    expect(marker.anchorsDisplay.action.y).toBeGreaterThan(120);
+    expect(marker.anchorsDisplay.action.y).toBeLessThan(132);
   });
 
   it('renders a readable overlay legend when toggled on', async () => {

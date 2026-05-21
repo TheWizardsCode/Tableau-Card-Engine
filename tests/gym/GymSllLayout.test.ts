@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import defaultLayoutJson from '../../example-games/gym/layouts/gym-sll-default.layout.json';
+import sceneOnlyLayoutJson from '../../example-games/gym/layouts/gym-scene.layout.json';
 import pixelOverrideLayoutJson from '../../example-games/gym/layouts/gym-sll-pixel-override.layout.json';
 import type { ScreenLayoutDocument } from '../../src/ui/screen-layout-schema';
 import {
@@ -8,12 +8,12 @@ import {
 } from '../../src/ui/screen-layout-schema';
 import { anchorPoint, getZoneRect } from '../../src/ui/screen-layout';
 
-const defaultLayout = defaultLayoutJson as ScreenLayoutDocument;
+const sceneOnlyLayout = sceneOnlyLayoutJson as ScreenLayoutDocument;
 const pixelOverrideLayout = pixelOverrideLayoutJson as ScreenLayoutDocument;
 
 describe('Gym SLL layout fixtures', () => {
   it('validates bundled gym SLL documents against schema', () => {
-    const docs = [defaultLayout, pixelOverrideLayout];
+    const docs = [sceneOnlyLayout, pixelOverrideLayout];
 
     for (const layout of docs) {
       const validation = validateScreenLayoutDocument(layout);
@@ -24,30 +24,33 @@ describe('Gym SLL layout fixtures', () => {
     }
   });
 
-  it('maps the default layout at 1280x720 @ DPR 1', () => {
-    const headerRect = getZoneRect(defaultLayout, 'header', { width: 1280, height: 720 }, 1);
-    const titleAnchor = anchorPoint(defaultLayout, 'header', 'title', { width: 1280, height: 720 }, 1);
+  it('maps the scene-only layout at 1280x720 @ DPR 1', () => {
+    const sceneOnlyRect = getZoneRect(sceneOnlyLayout, 'sceneOnly', { width: 1280, height: 720 }, 1);
+    const helpAnchor = anchorPoint(sceneOnlyLayout, 'shared', 'help', { width: 1280, height: 720 }, 1);
+    const sceneCenter = anchorPoint(sceneOnlyLayout, 'sceneOnly', 'center', { width: 1280, height: 720 }, 1);
 
-    expect(headerRect.x).toBeCloseTo(153.6, 6);
-    expect(headerRect.y).toBeCloseTo(36, 6);
-    expect(headerRect.width).toBeCloseTo(716.8, 6);
-    expect(headerRect.height).toBeCloseTo(72, 6);
+    expect(sceneOnlyRect.x).toBeCloseTo(294.4, 6);
+    expect(sceneOnlyRect.y).toBeCloseTo(201.6, 6);
+    expect(sceneOnlyRect.width).toBeCloseTo(691.2, 6);
+    expect(sceneOnlyRect.height).toBeCloseTo(302.4, 6);
 
-    expect(titleAnchor.x).toBeCloseTo(512, 6);
-    expect(titleAnchor.y).toBeCloseTo(72, 6);
+    expect(helpAnchor.x).toBeCloseTo(448, 6);
+    expect(helpAnchor.y).toBeCloseTo(126, 6);
+    expect(sceneCenter.x).toBeCloseTo(640, 6);
+    expect(sceneCenter.y).toBeCloseTo(352.8, 6);
   });
 
-  it('maps the default layout at 720x1280 @ DPR 2', () => {
-    const contentRect = getZoneRect(defaultLayout, 'content', { width: 720, height: 1280 }, 2);
-    const menuAnchor = anchorPoint(defaultLayout, 'menu', 'help', { width: 720, height: 1280 }, 2);
+  it('maps the scene-only layout at 720x1280 @ DPR 2', () => {
+    const sharedRect = getZoneRect(sceneOnlyLayout, 'shared', { width: 720, height: 1280 }, 2);
+    const actionAnchor = anchorPoint(sceneOnlyLayout, 'shared', 'action', { width: 720, height: 1280 }, 2);
 
-    expect(contentRect.x).toBeCloseTo(172.8, 6);
-    expect(contentRect.y).toBeCloseTo(819.2, 6);
-    expect(contentRect.width).toBeCloseTo(1094.4, 6);
-    expect(contentRect.height).toBeCloseTo(1228.8, 6);
+    expect(sharedRect.x).toBeCloseTo(288, 6);
+    expect(sharedRect.y).toBeCloseTo(256, 6);
+    expect(sharedRect.width).toBeCloseTo(432, 6);
+    expect(sharedRect.height).toBeCloseTo(384, 6);
 
-    expect(menuAnchor.x).toBeCloseTo(1224, 6);
-    expect(menuAnchor.y).toBeCloseTo(230.4, 6);
+    expect(actionAnchor.x).toBeCloseTo(655.2, 6);
+    expect(actionAnchor.y).toBeCloseTo(448, 6);
   });
 
   it('applies pixelOverride fields in the alternate layout and scales by viewport + DPR', () => {
