@@ -243,4 +243,12 @@ export abstract class GymSceneBase extends Phaser.Scene {
       // If event wiring fails for any reason, we still have the cleanup closure
     }
   }
+
+  /**
+   * Show or hide the shared help chrome for scenes that reuse HelpPanel/HelpButton.
+   */
+  protected setHelpChromeVisible(visible: boolean): void {
+    this.helpPanel?.setVisible(visible);
+    this.helpButton?.setVisible(visible);
+  }
 }

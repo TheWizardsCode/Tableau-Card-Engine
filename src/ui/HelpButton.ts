@@ -41,6 +41,7 @@ export class HelpButton {
   private label: Phaser.GameObjects.Text;
   private hitArea: Phaser.GameObjects.Zone;
   private destroyed = false;
+  private enabled = true;
   private posX: number;
   private posY: number;
 
@@ -84,20 +85,20 @@ export class HelpButton {
     } catch (_) { /* ignore */ }
 
     this.hitArea.on('pointerdown', () => {
-      if (!this.destroyed) {
+      if (!this.destroyed && this.enabled) {
         this.helpPanel.toggle();
       }
     });
 
     this.hitArea.on('pointerover', () => {
-      if (!this.destroyed) {
+      if (!this.destroyed && this.enabled) {
         this.drawCircle(BUTTON_HOVER_BG_COLOR, 1);
         this.label.setColor(BUTTON_HOVER_TEXT_COLOR);
       }
     });
 
     this.hitArea.on('pointerout', () => {
-      if (!this.destroyed) {
+      if (!this.destroyed && this.enabled) {
         this.drawCircle(BUTTON_BG_COLOR, BUTTON_BG_ALPHA);
         this.label.setColor(BUTTON_TEXT_COLOR);
       }
@@ -111,6 +112,22 @@ export class HelpButton {
     this.label.setPosition(x, y);
     this.hitArea.setPosition(x, y);
     this.drawCircle(BUTTON_BG_COLOR, BUTTON_BG_ALPHA);
+  }
+
+  /** Show or hide the help button and its hit target. */
+  setVisible(visible: boolean): void {
+    this.enabled = visible;
+    this.circle.setVisible(visible);
+    this.label.setVisible(visible);
+    this.hitArea.setVisible(visible);
+
+    if (visible) {
+      this.hitArea.setInteractive({ useHandCursor: true });
+      this.drawCircle(BUTTON_BG_COLOR, BUTTON_BG_ALPHA);
+      return;
+    }
+
+    this.hitArea.disableInteractive();
   }
 
   /** Clean up all game objects. */

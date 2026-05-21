@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import shellLayoutJson from '../../example-games/gym/layouts/gym-shell.layout.json';
 import sceneOnlyLayoutJson from '../../example-games/gym/layouts/gym-scene.layout.json';
 import pixelOverrideLayoutJson from '../../example-games/gym/layouts/gym-sll-pixel-override.layout.json';
+import { shouldShowSharedHelpChrome } from '../../example-games/gym/scenes/GymSllVisibility';
 import type { ScreenLayoutDocument } from '../../src/ui/screen-layout-schema';
 import {
   parseScreenLayoutDocument,
@@ -97,5 +98,20 @@ describe('Gym SLL layout fixtures', () => {
     expect(menuPortraitDpr2.height).toBeCloseTo(199.111111, 5);
     expect(actionPortraitDpr2.x).toBeCloseTo(438.75, 6);
     expect(actionPortraitDpr2.y).toBeCloseTo(604.444444, 5);
+  });
+
+  it('suppresses shared help chrome in the pure scene-only layout', () => {
+    expect(
+      shouldShowSharedHelpChrome({ kind: 'direct', name: 'Shell-only' }),
+    ).toBe(true);
+    expect(
+      shouldShowSharedHelpChrome({ kind: 'direct', name: 'Pixel Override' }),
+    ).toBe(true);
+    expect(
+      shouldShowSharedHelpChrome({ kind: 'composed', name: 'Composed Shell + Scene' }),
+    ).toBe(true);
+    expect(
+      shouldShowSharedHelpChrome({ kind: 'direct', name: 'Scene-only' }),
+    ).toBe(false);
   });
 });

@@ -101,9 +101,9 @@ describe('GymSllScene browser integration', () => {
     expect(marker.profile.id).toBe('desktop-1x');
     expect(marker.composition).toBeUndefined();
 
-    expect(findTextObject(scene, text => text === '[ Help ]')).toBeNull();
     const helpIcon = findTextObject(scene, text => text === '?');
     expect(helpIcon).toBeTruthy();
+    expect(helpIcon?.visible).toBe(true);
     expect(helpIcon?.x).toBeGreaterThan(1160);
     expect(helpIcon?.x).toBeLessThan(1195);
     expect(helpIcon?.y).toBeGreaterThan(36);
@@ -136,6 +136,9 @@ describe('GymSllScene browser integration', () => {
 
     expect(marker.layoutId).toBe('gym-scene-layout');
     expect(findTextObject(scene, text => text === '[ Layout: Scene-only ]')).toBeTruthy();
+    const helpIcon = findTextObject(scene, text => text === '?');
+    expect(helpIcon).toBeTruthy();
+    expect(helpIcon?.visible).toBe(false);
     expect(marker.anchorsDisplay.title.x).toBeGreaterThan(300);
     expect(marker.anchorsDisplay.title.x).toBeLessThan(330);
     expect(marker.anchorsDisplay.help.x).toBeGreaterThan(430);
