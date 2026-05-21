@@ -46,6 +46,15 @@ function waitForSllReadyMarker(timeoutMs = 10_000): Promise<GymSllReadyMarker> {
   });
 }
 
+function findTextObject(scene: Phaser.Scene, textMatch: (text: string) => boolean): Phaser.GameObjects.Text | null {
+  return (
+    scene.children.list.find(
+      (child): child is Phaser.GameObjects.Text =>
+        child instanceof Phaser.GameObjects.Text && textMatch(child.text),
+    ) ?? null
+  );
+}
+
 describe('GymSllScene browser integration', () => {
   let game: Phaser.Game | null = null;
 
@@ -120,5 +129,37 @@ describe('GymSllScene browser integration', () => {
     expect(marker.anchorsDisplay.action.x).toBeLessThan(340);
     expect(marker.anchorsDisplay.action.y).toBeGreaterThan(150);
     expect(marker.anchorsDisplay.action.y).toBeLessThan(166);
+  });
+
+  it('renders a readable overlay legend when toggled on', async () => {
+    const container = document.createElement('div');
+    container.id = 'game-container';
+    document.body.appendChild(container);
+
+    game = new Phaser.Game({
+      type: Phaser.AUTO,
+      width: 1280,
+      height: 720,
+      parent: 'game-container',
+      backgroundColor: '#1a2a1a',
+      scene: [GymSllScene],
+    });
+
+    await waitForScene(game, GYM_SLL_KEY);
+    const scene = game.scene.getScene(GYM_SLL_KEY) as Phaser.Scene;
+
+    const overlayButton = findTextObject(scene, text => text.includes('[ Overlay: OFF ]'));
+    expect(overlayButton).toBeTruthy();
+
+    overlayButton?.emit('pointerdown');
+
+    await waitForSllReadyMarker();
+
+    const overlayLegend = findTextObject(scene, text => text.startsWith('Overlay legend'));
+    expect(overlayLegend).toBeTruthy();
+    expect(overlayLegend?.x).toBeGreaterThanOrEqual(20);
+    expect(overlayLegend?.y).toBeGreaterThanOrEqual(120);
+    expect(overlayLegend?.text).toContain('shell');
+    expect(overlayLegend?.text).toContain('sceneOnly');
   });
 });

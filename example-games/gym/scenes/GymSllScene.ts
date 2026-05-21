@@ -268,12 +268,12 @@ export class GymSllScene extends GymSceneBase {
       color: '#88ffcc',
     });
 
-    this.profileButton = this.addButton(235, y, '[ Profile ]', () => this.cycleProfile(), {
+    this.profileButton = this.addButton(320, y, '[ Profile ]', () => this.cycleProfile(), {
       fontSize: '13px',
       color: '#88ddff',
     });
 
-    this.overlayButton = this.addButton(490, y, '[ Overlay: OFF ]', () => this.toggleOverlay(), {
+    this.overlayButton = this.addButton(560, y, '[ Overlay: OFF ]', () => this.toggleOverlay(), {
       fontSize: '13px',
       color: '#ffee99',
     });
@@ -454,7 +454,9 @@ export class GymSllScene extends GymSceneBase {
 
     this.redrawOverlay(resolved, toDisplayRect, toDisplayPoint);
 
-    this.layoutButton.setText(`[ Layout: ${currentLayout.name} ]`);
+    this.layoutButton.setText(
+      `[ Layout: ${currentLayout.kind === 'composed' ? 'Shell+Scene' : currentLayout.name} ]`,
+    );
     this.profileButton.setText(`[ Profile: ${currentProfile.id} ]`);
     this.statusLine.setText(
       currentLayout.kind === 'composed'
@@ -494,6 +496,7 @@ export class GymSllScene extends GymSceneBase {
     }
 
     let colorIndex = 0;
+    const legendLines: string[] = ['Overlay legend'];
 
     for (const [zoneName, zone] of Object.entries(resolved.zones)) {
       const color = OVERLAY_COLORS[colorIndex % OVERLAY_COLORS.length];
@@ -510,20 +513,9 @@ export class GymSllScene extends GymSceneBase {
         displayRect.height,
       );
 
-      const infoLabel = this.add
-        .text(
-          displayRect.x + 4,
-          displayRect.y + 4,
-          `${zoneName}\np:[${pixelRect.x.toFixed(1)},${pixelRect.y.toFixed(1)},${pixelRect.width.toFixed(1)},${pixelRect.height.toFixed(1)}]`,
-          {
-            fontFamily: 'monospace',
-            fontSize: '10px',
-            color: '#dff6ff',
-            backgroundColor: '#00000080',
-          },
-        )
-        .setDepth(75);
-      this.overlayLabels.push(infoLabel);
+      legendLines.push(
+        `${zoneName}: [${pixelRect.x.toFixed(0)}, ${pixelRect.y.toFixed(0)}, ${pixelRect.width.toFixed(0)}, ${pixelRect.height.toFixed(0)}]`,
+      );
 
       for (const [anchorName, anchorPixel] of Object.entries(zone.anchors)) {
         const anchorDisplay = toDisplayPoint(anchorPixel);
@@ -531,22 +523,41 @@ export class GymSllScene extends GymSceneBase {
         this.overlayGraphics.fillStyle(color, 0.95);
         this.overlayGraphics.fillCircle(anchorDisplay.x, anchorDisplay.y, 4);
 
-        const anchorLabel = this.add
-          .text(
-            anchorDisplay.x + 6,
-            anchorDisplay.y - 6,
-            `${zoneName}.${anchorName} (${anchorPixel.x.toFixed(1)},${anchorPixel.y.toFixed(1)})`,
-            {
-              fontFamily: 'monospace',
-              fontSize: '10px',
-              color: '#ffffff',
-              backgroundColor: '#00000090',
-            },
-          )
-          .setDepth(75);
-        this.overlayLabels.push(anchorLabel);
+        legendLines.push(
+          `  ${anchorName}: (${anchorPixel.x.toFixed(0)}, ${anchorPixel.y.toFixed(0)})`,
+        );
       }
     }
+
+    const legendPanelX = 864;
+    const legendPanelY = 122;
+    const legendPanelWidth = 392;
+    const legendPanelHeight = Math.min(520, 18 + legendLines.length * 12);
+
+    this.overlayGraphics.fillStyle(0x09151b, 0.82);
+    this.overlayGraphics.fillRect(
+      legendPanelX,
+      legendPanelY,
+      legendPanelWidth,
+      legendPanelHeight,
+    );
+    this.overlayGraphics.lineStyle(1, 0x66ddff, 0.9);
+    this.overlayGraphics.strokeRect(
+      legendPanelX,
+      legendPanelY,
+      legendPanelWidth,
+      legendPanelHeight,
+    );
+
+    const legendLabel = this.add
+      .text(legendPanelX + 10, legendPanelY + 8, legendLines.join('\n'), {
+        fontFamily: 'monospace',
+        fontSize: '10px',
+        color: '#dff6ff',
+        lineSpacing: 2,
+      })
+      .setDepth(75);
+    this.overlayLabels.push(legendLabel);
   }
 
   private publishReadyMarker(marker: ReadyMarker): void {
