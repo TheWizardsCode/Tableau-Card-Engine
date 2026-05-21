@@ -1,0 +1,478 @@
+/**
+ * GymSllScene -- Demonstrates the Screen Layout Language (SLL) directly.
+ *
+ * This scene intentionally uses the SLL helpers end-to-end without any
+ * legacy fallback adapter:
+ *   - validateScreenLayoutDocument / parseScreenLayoutDocument
+ *   - normalizedToPixels
+ *   - getZoneRect
+ *   - anchorPoint
+ *
+ * It renders SLL zones and anchors as an optional debug overlay, and uses
+ * anchor-derived positions for title/header text, a help button, an action
+ * control, and a content area.
+ *
+ * @module example-games/gym/scenes/GymSllScene
+ */
+
+import Phaser from 'phaser';
+import { GymSceneBase } from './GymSceneBase';
+import { GYM_SLL_KEY } from '../GymRegistry';
+import defaultLayoutJson from '../layouts/gym-sll-default.layout.json';
+import pixelOverrideLayoutJson from '../layouts/gym-sll-pixel-override.layout.json';
+import type {
+  PixelPoint,
+  PixelRect,
+  ScreenLayoutDocument,
+  ScreenLayoutParseResult,
+} from '../../../src/ui/screen-layout-schema';
+import {
+  anchorPoint,
+  getZoneRect,
+  normalizedToPixels,
+} from '../../../src/ui/screen-layout';
+import {
+  parseScreenLayoutDocument,
+  validateScreenLayoutDocument,
+} from '../../../src/ui/screen-layout-schema';
+
+interface LayoutProfile {
+  id: string;
+  label: string;
+  viewport: { width: number; height: number };
+  dpr: number;
+}
+
+interface LayoutOption {
+  name: string;
+  layout: ScreenLayoutDocument;
+}
+
+interface ReadyMarker {
+  ready: boolean;
+  sceneKey: string;
+  layoutId: string;
+  profile: {
+    id: string;
+    viewport: { width: number; height: number };
+    dpr: number;
+  };
+  anchorsDisplay: {
+    title: PixelPoint;
+    help: PixelPoint;
+    action: PixelPoint;
+  };
+}
+
+const LAYOUT_PROFILES: LayoutProfile[] = [
+  {
+    id: 'desktop-1x',
+    label: 'Desktop 1280x720 @1x',
+    viewport: { width: 1280, height: 720 },
+    dpr: 1,
+  },
+  {
+    id: 'portrait-2x',
+    label: 'Portrait 720x1280 @2x',
+    viewport: { width: 720, height: 1280 },
+    dpr: 2,
+  },
+  {
+    id: 'desktop-2x',
+    label: 'Desktop 1280x720 @2x',
+    viewport: { width: 1280, height: 720 },
+    dpr: 2,
+  },
+];
+
+const OVERLAY_COLORS = [0x66ddff, 0x66ff99, 0xffcc66, 0xff8899, 0xd9a5ff, 0x99ffdd];
+
+export class GymSllScene extends GymSceneBase {
+  private layouts: LayoutOption[] = [];
+  private layoutIndex = 0;
+  private profileIndex = 0;
+  private overlayVisible = true;
+
+  private layoutButton!: Phaser.GameObjects.Text;
+  private profileButton!: Phaser.GameObjects.Text;
+  private overlayButton!: Phaser.GameObjects.Text;
+  private statusLine!: Phaser.GameObjects.Text;
+
+  private layoutTitle!: Phaser.GameObjects.Text;
+  private layoutHelpButton!: Phaser.GameObjects.Text;
+  private actionButton!: Phaser.GameObjects.Text;
+  private contentPanel!: Phaser.GameObjects.Rectangle;
+  private contentLabel!: Phaser.GameObjects.Text;
+
+  private overlayGraphics!: Phaser.GameObjects.Graphics;
+  private overlayLabels: Phaser.GameObjects.Text[] = [];
+  private pulseOn = false;
+
+  constructor() {
+    super({ key: GYM_SLL_KEY });
+  }
+
+  create(): void {
+    this.cameras.main.setBackgroundColor('#14252d');
+    this.initHeader('Screen Layout Language (SLL)');
+    this.addDivider();
+    this.initReducedMotion();
+
+    this.initHelp([
+      {
+        heading: 'Overview',
+        body:
+          'This scene demonstrates SLL directly. It validates and parses layout JSON, maps zones/anchors to pixels, and positions UI using anchorPoint/getZoneRect.',
+      },
+      {
+        heading: 'Controls',
+        body:
+          '[ Layout ] cycles between sample SLL documents. [ Profile ] simulates viewport + DPR combinations. [ Overlay ] toggles zone and anchor debug visualization.',
+      },
+      {
+        heading: 'Notes',
+        body:
+          'No legacy fallback adapter is used in this scene. All positioning comes from parseScreenLayoutDocument + normalizedToPixels + getZoneRect + anchorPoint.',
+      },
+    ]);
+
+    this.bootstrapLayouts();
+    this.createControlRow();
+    this.createDemoObjects();
+
+    this.overlayGraphics = this.add.graphics();
+    this.overlayGraphics.setDepth(70);
+
+    this.applyLayout();
+
+    this.events.once('shutdown', () => this.clearReadyMarker());
+    this.events.once('destroy', () => this.clearReadyMarker());
+  }
+
+  private bootstrapLayouts(): void {
+    const candidates: Array<{ name: string; source: unknown }> = [
+      { name: 'Default', source: defaultLayoutJson },
+      { name: 'Pixel Override', source: pixelOverrideLayoutJson },
+    ];
+
+    for (const candidate of candidates) {
+      const validation = validateScreenLayoutDocument(candidate.source);
+      if (!validation.valid) {
+        const firstError = validation.errors[0];
+        throw new Error(
+          `Invalid SLL layout "${candidate.name}": ${firstError?.path ?? '/'} ${firstError?.message ?? 'unknown validation error'}`,
+        );
+      }
+
+      const parsed = parseScreenLayoutDocument(candidate.source);
+      this.layouts.push({
+        name: candidate.name,
+        layout: this.requireValidParsedLayout(candidate.name, parsed),
+      });
+    }
+  }
+
+  private requireValidParsedLayout(name: string, parsed: ScreenLayoutParseResult): ScreenLayoutDocument {
+    if (!parsed.valid) {
+      const firstError = parsed.errors[0];
+      throw new Error(
+        `Unable to parse SLL layout "${name}": ${firstError?.path ?? '/'} ${firstError?.message ?? 'unknown parse error'}`,
+      );
+    }
+    return parsed.layout;
+  }
+
+  private createControlRow(): void {
+    const y = 58;
+    this.layoutButton = this.addButton(28, y, '[ Layout ]', () => this.cycleLayout(), {
+      fontSize: '13px',
+      color: '#88ffcc',
+    });
+
+    this.profileButton = this.addButton(235, y, '[ Profile ]', () => this.cycleProfile(), {
+      fontSize: '13px',
+      color: '#88ddff',
+    });
+
+    this.overlayButton = this.addButton(490, y, '[ Overlay: ON ]', () => this.toggleOverlay(), {
+      fontSize: '13px',
+      color: '#ffee99',
+    });
+
+    this.statusLine = this.addLabel(28, 84, '', { fontSize: '12px', color: '#b7d9e3' });
+  }
+
+  private createDemoObjects(): void {
+    this.layoutTitle = this.add
+      .text(0, 0, 'SLL Title Anchor', {
+        fontSize: '24px',
+        color: '#ffffff',
+        fontFamily: 'monospace',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5)
+      .setDepth(40);
+
+    this.layoutHelpButton = this.add
+      .text(0, 0, '[ Help ]', {
+        fontSize: '16px',
+        color: '#ffee88',
+        fontFamily: 'monospace',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5)
+      .setDepth(40)
+      .setInteractive({ useHandCursor: true });
+
+    this.layoutHelpButton.on('pointerdown', () => {
+      this.helpPanel?.toggle();
+    });
+    this.layoutHelpButton.on('pointerover', () => this.layoutHelpButton.setColor('#fff7b0'));
+    this.layoutHelpButton.on('pointerout', () => this.layoutHelpButton.setColor('#ffee88'));
+
+    this.actionButton = this.add
+      .text(0, 0, '[ Toggle Pulse ]', {
+        fontSize: '15px',
+        color: '#88ff88',
+        fontFamily: 'monospace',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5)
+      .setDepth(40)
+      .setInteractive({ useHandCursor: true });
+
+    this.actionButton.on('pointerdown', () => this.togglePulse());
+    this.actionButton.on('pointerover', () => this.actionButton.setColor('#bbffbb'));
+    this.actionButton.on('pointerout', () => this.actionButton.setColor('#88ff88'));
+
+    this.contentPanel = this.add
+      .rectangle(0, 0, 420, 220, 0x133848, 0.78)
+      .setStrokeStyle(2, 0x66ddff, 0.95)
+      .setOrigin(0.5)
+      .setDepth(25);
+
+    this.contentLabel = this.add
+      .text(0, 0, 'SLL content area\n(anchor + zone driven)', {
+        fontSize: '16px',
+        color: '#ffffff',
+        fontFamily: 'monospace',
+        align: 'center',
+      })
+      .setOrigin(0.5)
+      .setDepth(35);
+  }
+
+  private cycleLayout(): void {
+    this.layoutIndex = (this.layoutIndex + 1) % this.layouts.length;
+    this.applyLayout();
+  }
+
+  private cycleProfile(): void {
+    this.profileIndex = (this.profileIndex + 1) % LAYOUT_PROFILES.length;
+    this.applyLayout();
+  }
+
+  private toggleOverlay(): void {
+    this.overlayVisible = !this.overlayVisible;
+    this.overlayButton.setText(`[ Overlay: ${this.overlayVisible ? 'ON' : 'OFF'} ]`);
+    this.applyLayout();
+  }
+
+  private togglePulse(): void {
+    this.pulseOn = !this.pulseOn;
+    this.contentPanel.setFillStyle(this.pulseOn ? 0x2a5f33 : 0x133848, 0.82);
+    this.contentLabel.setText(
+      this.pulseOn
+        ? 'SLL content area\nstate: PULSE ON'
+        : 'SLL content area\nstate: PULSE OFF',
+    );
+  }
+
+  private applyLayout(): void {
+    const currentLayout = this.layouts[this.layoutIndex].layout;
+    const currentProfile = LAYOUT_PROFILES[this.profileIndex];
+
+    const resolved = normalizedToPixels(currentLayout, currentProfile.viewport, currentProfile.dpr);
+
+    const previewScaleX = this.scale.width / resolved.viewport.pixelWidth;
+    const previewScaleY = this.scale.height / resolved.viewport.pixelHeight;
+
+    const toDisplayPoint = (point: PixelPoint): PixelPoint => ({
+      x: point.x * previewScaleX,
+      y: point.y * previewScaleY,
+    });
+
+    const toDisplayRect = (rect: PixelRect): PixelRect => ({
+      x: rect.x * previewScaleX,
+      y: rect.y * previewScaleY,
+      width: rect.width * previewScaleX,
+      height: rect.height * previewScaleY,
+    });
+
+    // Anchor-driven placements for the acceptance criteria demo targets.
+    const titleAnchorPx = anchorPoint(
+      currentLayout,
+      'header',
+      'title',
+      currentProfile.viewport,
+      currentProfile.dpr,
+    );
+    const helpAnchorPx = anchorPoint(
+      currentLayout,
+      'menu',
+      'help',
+      currentProfile.viewport,
+      currentProfile.dpr,
+    );
+    const actionAnchorPx = anchorPoint(
+      currentLayout,
+      'controls',
+      'action',
+      currentProfile.viewport,
+      currentProfile.dpr,
+    );
+
+    const contentRectPx = getZoneRect(
+      currentLayout,
+      'content',
+      currentProfile.viewport,
+      currentProfile.dpr,
+    );
+    const contentCenterPx = anchorPoint(
+      currentLayout,
+      'content',
+      'center',
+      currentProfile.viewport,
+      currentProfile.dpr,
+    );
+
+    const titleAnchorDisplay = toDisplayPoint(titleAnchorPx);
+    const helpAnchorDisplay = toDisplayPoint(helpAnchorPx);
+    const actionAnchorDisplay = toDisplayPoint(actionAnchorPx);
+    const contentRectDisplay = toDisplayRect(contentRectPx);
+    const contentCenterDisplay = toDisplayPoint(contentCenterPx);
+
+    this.layoutTitle.setPosition(titleAnchorDisplay.x, titleAnchorDisplay.y);
+    this.layoutHelpButton.setPosition(helpAnchorDisplay.x, helpAnchorDisplay.y);
+    this.actionButton.setPosition(actionAnchorDisplay.x, actionAnchorDisplay.y);
+
+    this.contentPanel
+      .setPosition(
+        contentRectDisplay.x + contentRectDisplay.width / 2,
+        contentRectDisplay.y + contentRectDisplay.height / 2,
+      )
+      .setSize(contentRectDisplay.width, contentRectDisplay.height);
+    this.contentLabel.setPosition(contentCenterDisplay.x, contentCenterDisplay.y);
+
+    this.redrawOverlay(currentLayout, resolved, toDisplayRect, toDisplayPoint);
+
+    this.layoutButton.setText(`[ Layout: ${this.layouts[this.layoutIndex].name} ]`);
+    this.profileButton.setText(`[ Profile: ${currentProfile.id} ]`);
+    this.statusLine.setText(
+      `Layout ${currentLayout.id} | ${currentProfile.label} | previewScale x${previewScaleX.toFixed(3)} y${previewScaleY.toFixed(3)}`,
+    );
+
+    this.publishReadyMarker({
+      ready: true,
+      sceneKey: GYM_SLL_KEY,
+      layoutId: currentLayout.id,
+      profile: {
+        id: currentProfile.id,
+        viewport: { ...currentProfile.viewport },
+        dpr: currentProfile.dpr,
+      },
+      anchorsDisplay: {
+        title: titleAnchorDisplay,
+        help: helpAnchorDisplay,
+        action: actionAnchorDisplay,
+      },
+    });
+  }
+
+  private redrawOverlay(
+    layout: ScreenLayoutDocument,
+    resolved: ReturnType<typeof normalizedToPixels>,
+    toDisplayRect: (rect: PixelRect) => PixelRect,
+    toDisplayPoint: (point: PixelPoint) => PixelPoint,
+  ): void {
+    this.overlayGraphics.clear();
+    for (const label of this.overlayLabels) label.destroy();
+    this.overlayLabels = [];
+
+    if (!this.overlayVisible) {
+      return;
+    }
+
+    let colorIndex = 0;
+
+    for (const [zoneName, zone] of Object.entries(layout.zones)) {
+      const color = OVERLAY_COLORS[colorIndex % OVERLAY_COLORS.length];
+      colorIndex += 1;
+
+      const normalizedRect = zone.rect;
+      const pixelRect = resolved.zones[zoneName].rect;
+      const displayRect = toDisplayRect(pixelRect);
+
+      this.overlayGraphics.lineStyle(2, color, 0.95);
+      this.overlayGraphics.strokeRect(
+        displayRect.x,
+        displayRect.y,
+        displayRect.width,
+        displayRect.height,
+      );
+
+      const infoLabel = this.add
+        .text(
+          displayRect.x + 4,
+          displayRect.y + 4,
+          `${zoneName}\nn:[${normalizedRect.x.toFixed(3)},${normalizedRect.y.toFixed(3)},${normalizedRect.width.toFixed(3)},${normalizedRect.height.toFixed(3)}]\np:[${pixelRect.x.toFixed(1)},${pixelRect.y.toFixed(1)},${pixelRect.width.toFixed(1)},${pixelRect.height.toFixed(1)}]`,
+          {
+            fontFamily: 'monospace',
+            fontSize: '10px',
+            color: '#dff6ff',
+            backgroundColor: '#00000080',
+          },
+        )
+        .setDepth(75);
+      this.overlayLabels.push(infoLabel);
+
+      const anchors = zone.anchors ?? {};
+      for (const [anchorName, _anchor] of Object.entries(anchors)) {
+        const anchorPixel = resolved.zones[zoneName].anchors[anchorName];
+        const anchorDisplay = toDisplayPoint(anchorPixel);
+
+        this.overlayGraphics.fillStyle(color, 0.95);
+        this.overlayGraphics.fillCircle(anchorDisplay.x, anchorDisplay.y, 4);
+
+        const anchorLabel = this.add
+          .text(
+            anchorDisplay.x + 6,
+            anchorDisplay.y - 6,
+            `${zoneName}.${anchorName} (${anchorPixel.x.toFixed(1)},${anchorPixel.y.toFixed(1)})`,
+            {
+              fontFamily: 'monospace',
+              fontSize: '10px',
+              color: '#ffffff',
+              backgroundColor: '#00000090',
+            },
+          )
+          .setDepth(75);
+        this.overlayLabels.push(anchorLabel);
+      }
+    }
+  }
+
+  private publishReadyMarker(marker: ReadyMarker): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    (window as Window & { __gymSllSceneReady?: ReadyMarker }).__gymSllSceneReady = marker;
+  }
+
+  private clearReadyMarker(): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    delete (window as Window & { __gymSllSceneReady?: ReadyMarker }).__gymSllSceneReady;
+  }
+}

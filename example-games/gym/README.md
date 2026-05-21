@@ -27,6 +27,16 @@ Open `http://localhost:3000` and select **Gym** from the game selector. From the
 | Audio & Feedback Config | `GymAudioFeedbackScene` | Toggle mute, adjust volume, map events to sounds; pop text; particle celebration |
 | Shader & Blend Spike | `GymGraphicsShaderSpikeScene` | Sprite tinting, blend modes, shader feasibility evaluation |
 | Lighting Spike | `GymGraphicsLightingSpikeScene` | Point light, shadow evaluation, WebGL fallback behavior |
+| Screen Layout Language (SLL) | `GymSllScene` | Parses/validates SLL JSON, maps zones+anchors across viewport/DPR profiles, and visualizes layout overlays |
+
+## SLL Demo
+
+Open **Screen Layout Language (SLL)** from the Gym Router to explore direct SLL usage (without fallback adapters):
+
+- Cycles between two layout JSON documents in `example-games/gym/layouts/`
+- Uses `parseScreenLayoutDocument`, `validateScreenLayoutDocument`, `getZoneRect`, `anchorPoint`, and `normalizedToPixels`
+- Toggles an overlay that shows zone bounds, anchor points, normalized coordinates, and mapped pixel coordinates
+- Simulates multiple viewport/DPR profiles (desktop and portrait) to inspect mapping behavior
 
 ## Running Tests
 

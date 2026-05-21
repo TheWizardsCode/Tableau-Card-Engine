@@ -226,6 +226,7 @@ example-games/
 │   ├── README.md               Gym documentation and quick-start instructions
 │   ├── GymRegistry.ts           Scene key constants and catalogue
 │   ├── index.ts                 Barrel file / public API
+│   ├── layouts/                 SLL sample layout JSON documents for GymSllScene
 │   └── scenes/
 │       ├── GymRouterScene.ts    Landing page with navigation cards
 │       ├── GymSceneBase.ts      Shared base class for all Gym scenes
@@ -237,7 +238,8 @@ example-games/
 │       ├── GymSaveLoadScene.ts  Save/load state demo
 │       ├── GymAudioFeedbackScene.ts Audio & feedback configuration demo
 │       ├── GymGraphicsShaderSpikeScene.ts Shader & blend mode spike
-│       └── GymGraphicsLightingSpikeScene.ts Lighting spike
+│       ├── GymGraphicsLightingSpikeScene.ts Lighting spike
+│       └── GymSllScene.ts       Screen Layout Language demo (schema+mapping+overlay)
 ├── golf/
 │   ├── main.ts                 Game entry point (Phaser.Game config)
 │   ├── createGolfGame.ts       Factory function (used by main.ts and tests)
@@ -957,6 +959,13 @@ The project now includes a reusable **Screen Layout Language** for viewport-awar
 - Layout file: `example-games/main-street/layouts/main-street.layout.json`
 - Adapter: `example-games/main-street/scenes/MainStreetLayoutAdapter.ts`
 - Renderer integration: `example-games/main-street/scenes/MainStreetRenderer.ts` (`computeLayout()` applies SLL first, then falls back)
+
+### Gym direct SLL demo example
+
+- Scene: `example-games/gym/scenes/GymSllScene.ts`
+- Layout documents: `example-games/gym/layouts/gym-sll-default.layout.json`, `example-games/gym/layouts/gym-sll-pixel-override.layout.json`
+- Browser verification: `tests/gym/GymSllScene.browser.test.ts`
+- Unit verification: `tests/gym/GymSllLayout.test.ts`
 
 ### Authoring and validation workflow
 
