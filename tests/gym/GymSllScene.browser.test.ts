@@ -108,6 +108,10 @@ describe('GymSllScene browser integration', () => {
     expect(helpIcon?.x).toBeLessThan(1195);
     expect(helpIcon?.y).toBeGreaterThan(36);
     expect(helpIcon?.y).toBeLessThan(54);
+
+    const actionButton = findTextObject(scene, text => text === '[ Toggle Pulse ]');
+    expect(actionButton).toBeTruthy();
+    expect(actionButton?.visible).toBe(false);
   });
 
   it('cycles to the scene-only layout example', async () => {

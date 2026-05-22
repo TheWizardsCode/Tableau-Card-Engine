@@ -12,3 +12,13 @@ export function shouldShowSharedHelpChrome(
 ): boolean {
   return !(layout.kind === 'direct' && layout.name === 'Scene-only');
 }
+
+/**
+ * The central demo action control is scene-owned, so shell-only mode hides it
+ * to keep the shell demo focused on shared shell chrome.
+ */
+export function shouldShowDemoActionControl(
+  layout: GymSllLayoutDescriptor,
+): boolean {
+  return !(layout.kind === 'direct' && layout.name === 'Shell-only');
+}

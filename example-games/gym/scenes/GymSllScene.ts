@@ -16,7 +16,10 @@
 
 import Phaser from 'phaser';
 import { GymSceneBase } from './GymSceneBase';
-import { shouldShowSharedHelpChrome } from './GymSllVisibility';
+import {
+  shouldShowDemoActionControl,
+  shouldShowSharedHelpChrome,
+} from './GymSllVisibility';
 import { GYM_SLL_KEY } from '../GymRegistry';
 import sceneOnlyLayoutJson from '../layouts/gym-scene.layout.json';
 import pixelOverrideLayoutJson from '../layouts/gym-sll-pixel-override.layout.json';
@@ -458,6 +461,7 @@ export class GymSllScene extends GymSceneBase {
     this.helpButton?.setPosition(helpAnchorDisplay.x, helpAnchorDisplay.y);
     this.actionButton.setPosition(actionAnchorDisplay.x, actionAnchorDisplay.y);
     this.setHelpChromeVisible(shouldShowSharedHelpChrome(currentLayout));
+    this.actionButton.setVisible(shouldShowDemoActionControl(currentLayout));
 
     if (currentLayout.showContent && contentPlacement) {
       const contentRectPx = this.getZoneRect(resolved, contentPlacement.zone);
