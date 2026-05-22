@@ -172,8 +172,10 @@ describe('GymSllScene browser integration', () => {
     const actionButton = findTextObject(scene, text => text === '[ Toggle Pulse ]');
     expect(actionButton).toBeTruthy();
     expect(actionButton?.visible).toBe(true);
-    expect(marker.anchorsDisplay.title.x).toBeGreaterThan(300);
-    expect(marker.anchorsDisplay.title.x).toBeLessThan(330);
+    expect(marker.anchorsDisplay.title.x).toBeGreaterThan(620);
+    expect(marker.anchorsDisplay.title.x).toBeLessThan(660);
+    expect(marker.anchorsDisplay.title.y).toBeGreaterThan(36);
+    expect(marker.anchorsDisplay.title.y).toBeLessThan(54);
     expect(marker.anchorsDisplay.help.x).toBeGreaterThan(430);
     expect(marker.anchorsDisplay.help.x).toBeLessThan(470);
     expect(marker.anchorsDisplay.action.x).toBeGreaterThan(560);

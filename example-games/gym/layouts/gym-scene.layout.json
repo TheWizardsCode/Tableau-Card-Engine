@@ -20,7 +20,11 @@
       "anchors": {
         "title": {
           "x": 0.15,
-          "y": 0.5
+          "y": 0.5,
+          "pixelOverride": {
+            "x": 640,
+            "y": 45
+          }
         },
         "help": {
           "x": 0.5,

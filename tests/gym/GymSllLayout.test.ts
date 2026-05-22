@@ -47,6 +47,7 @@ describe('Gym SLL layout fixtures', () => {
 
   it('maps the scene-only layout at 1280x720 @ DPR 1', () => {
     const sceneOnlyRect = getZoneRect(sceneOnlyLayout, 'sceneOnly', { width: 1280, height: 720 }, 1);
+    const titleAnchor = anchorPoint(sceneOnlyLayout, 'shared', 'title', { width: 1280, height: 720 }, 1);
     const helpAnchor = anchorPoint(sceneOnlyLayout, 'shared', 'help', { width: 1280, height: 720 }, 1);
     const sceneCenter = anchorPoint(sceneOnlyLayout, 'sceneOnly', 'center', { width: 1280, height: 720 }, 1);
 
@@ -55,6 +56,8 @@ describe('Gym SLL layout fixtures', () => {
     expect(sceneOnlyRect.width).toBeCloseTo(691.2, 6);
     expect(sceneOnlyRect.height).toBeCloseTo(302.4, 6);
 
+    expect(titleAnchor.x).toBeCloseTo(640, 6);
+    expect(titleAnchor.y).toBeCloseTo(45, 6);
     expect(helpAnchor.x).toBeCloseTo(448, 6);
     expect(helpAnchor.y).toBeCloseTo(126, 6);
     expect(sceneCenter.x).toBeCloseTo(640, 6);
