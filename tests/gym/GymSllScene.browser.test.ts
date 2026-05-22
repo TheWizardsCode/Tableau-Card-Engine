@@ -123,6 +123,27 @@ describe('GymSllScene browser integration', () => {
     expect(actionButton).toBeTruthy();
     expect(actionButton?.visible).toBe(true);
 
+    const shellToggleButton = findTextObject(scene, text => text.startsWith('[ Toggle Shell: ON ]'));
+    expect(shellToggleButton).toBeTruthy();
+    expect(shellToggleButton?.visible).toBe(true);
+
+    shellToggleButton?.emit('pointerdown');
+    expect(shellToggleButton?.text).toContain('OFF');
+    expect(findTextObject(scene, text => text === 'Screen Layout Language (SLL)')?.visible).toBe(false);
+    expect(findTextObject(scene, text => text === '[ Menu ]')?.visible).toBe(false);
+    expect(findTextObject(scene, text => text === '[ Layout: Shell+Scene ]')?.visible).toBe(false);
+    expect(findTextObject(scene, text => text === '[ Profile: desktop-1x ]')?.visible).toBe(false);
+    expect(findTextObject(scene, text => text === '[ Overlay: OFF ]')?.visible).toBe(false);
+    expect(findTextObject(scene, text => text === 'SLL Title Anchor')?.visible).toBe(true);
+    expect(findTextObject(scene, text => text === 'SLL Title Anchor')?.y).toBeGreaterThan(120);
+    expect(findTextObject(scene, text => text === 'SLL Title Anchor')?.y).toBeLessThan(132);
+
+    shellToggleButton?.emit('pointerdown');
+    expect(shellToggleButton?.text).toContain('ON');
+    expect(findTextObject(scene, text => text === 'Screen Layout Language (SLL)')?.visible).toBe(true);
+    expect(findTextObject(scene, text => text === '[ Menu ]')?.visible).toBe(true);
+    expect(findTextObject(scene, text => text === '[ Layout: Shell+Scene ]')?.visible).toBe(true);
+
     const layoutButton = findTextObject(scene, text => text === '[ Layout: Shell+Scene ]');
     expect(layoutButton).toBeTruthy();
 
@@ -169,13 +190,14 @@ describe('GymSllScene browser integration', () => {
     const helpIcon = findTextObject(scene, text => text === '?');
     expect(helpIcon).toBeTruthy();
     expect(helpIcon?.visible).toBe(false);
+    expect(findTextObject(scene, text => text.startsWith('[ Toggle Shell: '))?.visible).toBe(true);
     const actionButton = findTextObject(scene, text => text === '[ Toggle Pulse ]');
     expect(actionButton).toBeTruthy();
     expect(actionButton?.visible).toBe(true);
     expect(marker.anchorsDisplay.title.x).toBeGreaterThan(620);
     expect(marker.anchorsDisplay.title.x).toBeLessThan(660);
-    expect(marker.anchorsDisplay.title.y).toBeGreaterThan(36);
-    expect(marker.anchorsDisplay.title.y).toBeLessThan(54);
+    expect(marker.anchorsDisplay.title.y).toBeGreaterThan(120);
+    expect(marker.anchorsDisplay.title.y).toBeLessThan(132);
     expect(marker.anchorsDisplay.help.x).toBeGreaterThan(430);
     expect(marker.anchorsDisplay.help.x).toBeLessThan(470);
     expect(marker.anchorsDisplay.action.x).toBeGreaterThan(560);
@@ -204,8 +226,8 @@ describe('GymSllScene browser integration', () => {
     // in the expected regions.
     expect(marker.anchorsDisplay.title.x).toBeGreaterThan(620);
     expect(marker.anchorsDisplay.title.x).toBeLessThan(660);
-    expect(marker.anchorsDisplay.title.y).toBeGreaterThan(36);
-    expect(marker.anchorsDisplay.title.y).toBeLessThan(54);
+    expect(marker.anchorsDisplay.title.y).toBeGreaterThan(120);
+    expect(marker.anchorsDisplay.title.y).toBeLessThan(132);
 
     expect(marker.anchorsDisplay.help.x).toBeGreaterThan(1160);
     expect(marker.anchorsDisplay.help.x).toBeLessThan(1195);

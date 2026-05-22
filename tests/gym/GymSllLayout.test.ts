@@ -57,7 +57,7 @@ describe('Gym SLL layout fixtures', () => {
     expect(sceneOnlyRect.height).toBeCloseTo(302.4, 6);
 
     expect(titleAnchor.x).toBeCloseTo(640, 6);
-    expect(titleAnchor.y).toBeCloseTo(45, 6);
+    expect(titleAnchor.y).toBeCloseTo(126, 6);
     expect(helpAnchor.x).toBeCloseTo(448, 6);
     expect(helpAnchor.y).toBeCloseTo(126, 6);
     expect(sceneCenter.x).toBeCloseTo(640, 6);

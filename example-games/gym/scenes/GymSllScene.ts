@@ -148,7 +148,7 @@ const PIXEL_OVERRIDE_PLACEMENT: PlacementMapping = {
 };
 
 const COMPOSED_PLACEMENT: PlacementMapping = {
-  title: { zone: 'shell', anchor: 'title' },
+  title: { zone: 'shared', anchor: 'title' },
   help: { zone: 'shell', anchor: 'help' },
   action: { zone: 'shared', anchor: 'action' },
   content: { zone: 'sceneOnly', anchor: 'center' },
@@ -159,10 +159,12 @@ export class GymSllScene extends GymSceneBase {
   private layoutIndex = 0;
   private profileIndex = 0;
   private overlayVisible = false;
+  private shellVisible = true;
 
   private layoutButton!: Phaser.GameObjects.Text;
   private profileButton!: Phaser.GameObjects.Text;
   private overlayButton!: Phaser.GameObjects.Text;
+  private shellToggleButton!: Phaser.GameObjects.Text;
   private statusLine!: Phaser.GameObjects.Text;
 
   private layoutTitle!: Phaser.GameObjects.Text;
@@ -194,7 +196,7 @@ export class GymSllScene extends GymSceneBase {
       {
         heading: 'Controls',
         body:
-          '[ Layout ] starts on the composed shell + scene example, then cycles through the shell-only example, the scene-only layout, and the pixel override layout. [ Profile ] simulates viewport + DPR combinations. [ Overlay ] toggles zone and anchor debug visualization.',
+          '[ Layout ] starts on the composed shell + scene example, then cycles through the shell-only example, the scene-only layout, and the pixel override layout. [ Toggle Shell ] hides or restores the shared shell chrome without changing the selected layout. [ Profile ] simulates viewport + DPR combinations. [ Overlay ] toggles zone and anchor debug visualization.',
       },
       {
         heading: 'Notes',
@@ -339,6 +341,11 @@ export class GymSllScene extends GymSceneBase {
       color: '#ffee99',
     });
 
+    this.shellToggleButton = this.addButton(760, y, '[ Toggle Shell: ON ]', () => this.toggleShell(), {
+      fontSize: '13px',
+      color: '#ffcc88',
+    });
+
     this.statusLine = this.addLabel(28, 84, '', { fontSize: '12px', color: '#b7d9e3' });
   }
 
@@ -401,6 +408,12 @@ export class GymSllScene extends GymSceneBase {
     this.applyLayout();
   }
 
+  private toggleShell(): void {
+    this.shellVisible = !this.shellVisible;
+    this.shellToggleButton.setText(`[ Toggle Shell: ${this.shellVisible ? 'ON' : 'OFF'} ]`);
+    this.applyLayout();
+  }
+
   private togglePulse(): void {
     this.pulseOn = !this.pulseOn;
     this.contentPanel.setFillStyle(this.pulseOn ? 0x2a5f33 : 0x133848, 0.82);
@@ -409,6 +422,15 @@ export class GymSllScene extends GymSceneBase {
         ? 'SLL content area\nstate: PULSE ON'
         : 'SLL content area\nstate: PULSE OFF',
     );
+  }
+
+  private setShellChromeVisible(visible: boolean): void {
+    this.setHeaderChromeVisible(visible);
+    this.setHelpChromeVisible(visible);
+    this.layoutButton.setVisible(visible);
+    this.profileButton.setVisible(visible);
+    this.overlayButton.setVisible(visible);
+    this.statusLine.setVisible(visible);
   }
 
   private configureVisibility(): void {
@@ -529,6 +551,7 @@ export class GymSllScene extends GymSceneBase {
     this.helpButton?.setPosition(helpAnchorDisplay.x, helpAnchorDisplay.y);
     this.actionButton.setPosition(actionAnchorDisplay.x, actionAnchorDisplay.y);
     this.visibilityController.setMode(currentLayout.visibilityMode);
+    this.setShellChromeVisible(this.shellVisible && currentLayout.visibilityMode !== 'scene-only');
 
     if (currentLayout.showContent && contentPlacement) {
       const contentRectPx = this.getZoneRect(resolved, contentPlacement.zone);
