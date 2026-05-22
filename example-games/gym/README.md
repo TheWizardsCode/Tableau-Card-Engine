@@ -35,6 +35,7 @@ Open **Screen Layout Language (SLL)** from the Gym Router to explore direct SLL 
 
 - Cycles between the shell-only example, the scene-only example, the pixel override example, and the composed shell + scene example in `example-games/gym/layouts/`
 - Uses `composeResolvedLayouts`, `parseScreenLayoutDocument`, `validateScreenLayoutDocument`, and `normalizedToPixels`
+- Uses the shared core-engine `VisibilityOwnershipController` to toggle shell, shared, and scene UI groups instead of hard-coding layout-name checks in the scene
 - Anchors the base help icon from the shell layout for shell-only and composed views, while the pure scene-only view hides the shared shell chrome so the scene-owned layout stays uncluttered
 - Keeps the demo action control hidden in shell-only mode so the shell example focuses on shell-owned chrome
 - Toggles an overlay that shows merged zone bounds and anchor points for the active layout

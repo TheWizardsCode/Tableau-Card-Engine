@@ -953,7 +953,8 @@ The project now includes a reusable **Screen Layout Language** for viewport-awar
 - Schema + types: `src/ui/screen-layout-schema.ts`
 - Runtime mapping: `src/ui/screen-layout.ts`
 - Composition helper: `src/ui/screen-layout-compose.ts`
-- Public exports: `src/ui/index.ts`
+- Visibility / ownership helper: `src/core-engine/VisibilityOwnership.ts`
+- Public exports: `src/ui/index.ts`, `src/core-engine/index.ts`
 
 ### Main Street canonical example
 
@@ -966,11 +967,12 @@ The project now includes a reusable **Screen Layout Language** for viewport-awar
 - Scene: `example-games/gym/scenes/GymSllScene.ts`
 - Layout documents: `example-games/gym/layouts/gym-shell.layout.json` (shell-only and composed shell source), `example-games/gym/layouts/gym-scene.layout.json` (scene-only source), `example-games/gym/layouts/gym-sll-pixel-override.layout.json`
 - Browser verification: `tests/gym/GymSllScene.browser.test.ts`
-- Unit verification: `tests/ui/screen-layout-compose.test.ts`, `tests/gym/GymSllLayout.test.ts`
+- Unit verification: `tests/core-engine/VisibilityOwnership.test.ts`, `tests/ui/screen-layout-compose.test.ts`, `tests/gym/GymSllLayout.test.ts`
+- Shared ownership helper: `src/core-engine/VisibilityOwnership.ts`
 
 ### Composing shell + scene layouts
 
-Use `composeResolvedLayouts(baseLayout, sceneLayout, viewport, dpr, { policy: 'sceneWins' })` when a scene wants a shared shell (header/menu/toolbar/help) and a scene-specific layout without duplicating placement math. In the Gym SLL demo, the base help icon is positioned from the shell layout so shell-only and composed views show the shared help affordance, while the pure scene-only view hides the shared shell chrome. The shell-only example also hides the central demo action control so the shell view stays focused on shell-owned chrome.
+Use `composeResolvedLayouts(baseLayout, sceneLayout, viewport, dpr, { policy: 'sceneWins' })` when a scene wants a shared shell (header/menu/toolbar/help) and a scene-specific layout without duplicating placement math. In the Gym SLL demo, the base help icon is positioned from the shell layout so shell-only and composed views show the shared help affordance, while the pure scene-only view hides the shared shell chrome. The shell-only example also hides the central demo action control so the shell view stays focused on shell-owned chrome. The scene now uses the reusable `VisibilityOwnershipController` from `src/core-engine/` to toggle shell, shared, and scene UI groups by layout mode.
 
 Typical use cases:
 

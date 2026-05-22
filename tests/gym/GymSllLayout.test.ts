@@ -2,11 +2,6 @@ import { describe, expect, it } from 'vitest';
 import shellLayoutJson from '../../example-games/gym/layouts/gym-shell.layout.json';
 import sceneOnlyLayoutJson from '../../example-games/gym/layouts/gym-scene.layout.json';
 import pixelOverrideLayoutJson from '../../example-games/gym/layouts/gym-sll-pixel-override.layout.json';
-import {
-  shouldShowDemoActionControl,
-  shouldShowSharedHelpChrome,
-  shouldShowShellChrome,
-} from '../../example-games/gym/scenes/GymSllVisibility';
 import type { ScreenLayoutDocument } from '../../src/ui/screen-layout-schema';
 import {
   parseScreenLayoutDocument,
@@ -104,42 +99,4 @@ describe('Gym SLL layout fixtures', () => {
     expect(actionPortraitDpr2.y).toBeCloseTo(604.444444, 5);
   });
 
-  it('suppresses shared shell chrome in the pure scene-only layout', () => {
-    expect(
-      shouldShowShellChrome({ kind: 'direct', name: 'Shell-only' }),
-    ).toBe(true);
-    expect(
-      shouldShowShellChrome({ kind: 'direct', name: 'Pixel Override' }),
-    ).toBe(true);
-    expect(
-      shouldShowShellChrome({ kind: 'composed', name: 'Composed Shell + Scene' }),
-    ).toBe(true);
-    expect(
-      shouldShowShellChrome({ kind: 'direct', name: 'Scene-only' }),
-    ).toBe(false);
-  });
-
-  it('keeps shared help chrome aligned with shell chrome visibility', () => {
-    expect(
-      shouldShowSharedHelpChrome({ kind: 'direct', name: 'Shell-only' }),
-    ).toBe(true);
-    expect(
-      shouldShowSharedHelpChrome({ kind: 'direct', name: 'Scene-only' }),
-    ).toBe(false);
-  });
-
-  it('hides the demo action control in shell-only mode', () => {
-    expect(
-      shouldShowDemoActionControl({ kind: 'direct', name: 'Shell-only' }),
-    ).toBe(false);
-    expect(
-      shouldShowDemoActionControl({ kind: 'direct', name: 'Scene-only' }),
-    ).toBe(true);
-    expect(
-      shouldShowDemoActionControl({ kind: 'composed', name: 'Composed Shell + Scene' }),
-    ).toBe(true);
-    expect(
-      shouldShowDemoActionControl({ kind: 'direct', name: 'Pixel Override' }),
-    ).toBe(true);
-  });
 });

@@ -28,6 +28,7 @@ import {
   makeTextureKey,
   rasteriseSvgToTexture,
   getOrCreateTexture,
+  VisibilityOwnershipController,
 } from '../../src/core-engine/index';
 
 describe('core-engine barrel exports', () => {
@@ -91,6 +92,10 @@ describe('core-engine barrel exports', () => {
     expect(typeof makeTextureKey).toBe('function');
     expect(typeof rasteriseSvgToTexture).toBe('function');
     expect(typeof getOrCreateTexture).toBe('function');
+  });
+
+  it('should export visibility ownership controller', () => {
+    expect(typeof VisibilityOwnershipController).toBe('function');
   });
 
   it('should work end-to-end through barrel exports', () => {

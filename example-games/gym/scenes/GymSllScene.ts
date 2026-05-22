@@ -6,6 +6,7 @@
  *   - validateScreenLayoutDocument / parseScreenLayoutDocument
  *   - normalizedToPixels
  *   - composeResolvedLayouts
+ *   - VisibilityOwnershipController for shell/shared/scene chrome
  *
  * It renders SLL zones and anchors as an optional debug overlay, and uses
  * anchor-derived positions for title/header text, a help button, an action
@@ -16,12 +17,12 @@
 
 import Phaser from 'phaser';
 import { GymSceneBase } from './GymSceneBase';
-import {
-  shouldShowDemoActionControl,
-  shouldShowSharedHelpChrome,
-  shouldShowShellChrome,
-} from './GymSllVisibility';
 import { GYM_SLL_KEY } from '../GymRegistry';
+import {
+  VisibilityOwnershipController,
+  type VisibilityMode,
+  type VisibilityTarget,
+} from '../../../src/core-engine/VisibilityOwnership';
 import sceneOnlyLayoutJson from '../layouts/gym-scene.layout.json';
 import pixelOverrideLayoutJson from '../layouts/gym-sll-pixel-override.layout.json';
 import gymShellLayoutJson from '../layouts/gym-shell.layout.json';
@@ -58,6 +59,7 @@ interface DirectLayoutOption {
   layoutId: string;
   layout: ScreenLayoutDocument;
   placement: PlacementMapping;
+  visibilityMode: VisibilityMode;
   showContent: boolean;
 }
 
@@ -73,6 +75,7 @@ interface ComposedLayoutOption {
     policy: 'sceneWins';
   };
   placement: PlacementMapping;
+  visibilityMode: VisibilityMode;
   showContent: boolean;
 }
 
@@ -170,6 +173,7 @@ export class GymSllScene extends GymSceneBase {
   private overlayGraphics!: Phaser.GameObjects.Graphics;
   private overlayLabels: Phaser.GameObjects.Text[] = [];
   private pulseOn = false;
+  private visibilityController!: VisibilityOwnershipController<VisibilityTarget>;
 
   constructor() {
     super({ key: GYM_SLL_KEY });
@@ -202,6 +206,7 @@ export class GymSllScene extends GymSceneBase {
     this.bootstrapLayouts();
     this.createControlRow();
     this.createDemoObjects();
+    this.configureVisibility();
 
     this.overlayGraphics = this.add.graphics();
     this.overlayGraphics.setDepth(70);
@@ -238,6 +243,7 @@ export class GymSllScene extends GymSceneBase {
       layoutId: shellOnlyLayout.id,
       layout: shellOnlyLayout,
       placement: SHELL_ONLY_PLACEMENT,
+      visibilityMode: 'shell-only',
       showContent: false,
     });
 
@@ -245,10 +251,23 @@ export class GymSllScene extends GymSceneBase {
       name: string;
       source: unknown;
       placement: PlacementMapping;
+      visibilityMode: VisibilityMode;
       showContent: boolean;
     }> = [
-      { name: 'Scene-only', source: sceneOnlyLayoutJson, placement: SCENE_ONLY_PLACEMENT, showContent: true },
-      { name: 'Pixel Override', source: pixelOverrideLayoutJson, placement: PIXEL_OVERRIDE_PLACEMENT, showContent: true },
+      {
+        name: 'Scene-only',
+        source: sceneOnlyLayoutJson,
+        placement: SCENE_ONLY_PLACEMENT,
+        visibilityMode: 'scene-only',
+        showContent: true,
+      },
+      {
+        name: 'Pixel Override',
+        source: pixelOverrideLayoutJson,
+        placement: PIXEL_OVERRIDE_PLACEMENT,
+        visibilityMode: 'composed',
+        showContent: true,
+      },
     ];
 
     for (const candidate of candidates) {
@@ -268,6 +287,7 @@ export class GymSllScene extends GymSceneBase {
         layoutId: layout.id,
         layout,
         placement: candidate.placement,
+        visibilityMode: candidate.visibilityMode,
         showContent: candidate.showContent,
       });
     }
@@ -284,6 +304,7 @@ export class GymSllScene extends GymSceneBase {
         policy: 'sceneWins',
       },
       placement: COMPOSED_PLACEMENT,
+      visibilityMode: 'composed',
       showContent: true,
     });
   }
@@ -387,6 +408,49 @@ export class GymSllScene extends GymSceneBase {
     );
   }
 
+  private configureVisibility(): void {
+    this.visibilityController = new VisibilityOwnershipController<VisibilityTarget>({
+      groupRules: {
+        shell: {
+          'shell-only': true,
+          composed: true,
+        },
+        scene: {
+          'scene-only': true,
+          composed: true,
+        },
+        shared: {
+          'shell-only': true,
+          'scene-only': true,
+          composed: true,
+        },
+      },
+    });
+
+    this.visibilityController.register(this.header.title, 'shell');
+    this.visibilityController.register(this.header.menuButton, 'shell');
+    if (this.headerDivider) {
+      this.visibilityController.register(this.headerDivider, 'shell');
+    }
+
+    if (this.helpPanel) {
+      this.visibilityController.register(this.helpPanel, 'shell');
+    }
+    if (this.helpButton) {
+      this.visibilityController.register(this.helpButton, 'shell');
+    }
+
+    this.visibilityController.register(this.layoutButton, 'shell');
+    this.visibilityController.register(this.profileButton, 'shell');
+    this.visibilityController.register(this.overlayButton, 'shell');
+    this.visibilityController.register(this.statusLine, 'shell');
+
+    this.visibilityController.register(this.layoutTitle, 'shared');
+    this.visibilityController.register(this.actionButton, 'scene');
+    this.visibilityController.register(this.contentPanel, 'scene');
+    this.visibilityController.register(this.contentLabel, 'scene');
+  }
+
   private getAnchorPoint(
     resolved: ReturnType<typeof normalizedToPixels>,
     placement: PlacementTarget,
@@ -458,18 +522,10 @@ export class GymSllScene extends GymSceneBase {
     const helpAnchorDisplay = toDisplayPoint(helpAnchorPx);
     const actionAnchorDisplay = toDisplayPoint(actionAnchorPx);
 
-    const showShellChrome = shouldShowShellChrome(currentLayout);
-
     this.layoutTitle.setPosition(titleAnchorDisplay.x, titleAnchorDisplay.y);
     this.helpButton?.setPosition(helpAnchorDisplay.x, helpAnchorDisplay.y);
     this.actionButton.setPosition(actionAnchorDisplay.x, actionAnchorDisplay.y);
-    this.setHeaderChromeVisible(showShellChrome);
-    this.setHelpChromeVisible(shouldShowSharedHelpChrome(currentLayout));
-    this.layoutButton.setVisible(showShellChrome);
-    this.profileButton.setVisible(showShellChrome);
-    this.overlayButton.setVisible(showShellChrome);
-    this.statusLine.setVisible(showShellChrome);
-    this.actionButton.setVisible(shouldShowDemoActionControl(currentLayout));
+    this.visibilityController.setMode(currentLayout.visibilityMode);
 
     if (currentLayout.showContent && contentPlacement) {
       const contentRectPx = this.getZoneRect(resolved, contentPlacement.zone);
