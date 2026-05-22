@@ -972,7 +972,7 @@ The project now includes a reusable **Screen Layout Language** for viewport-awar
 
 ### Composing shell + scene layouts
 
-Use `composeResolvedLayouts(baseLayout, sceneLayout, viewport, dpr, { policy: 'sceneWins' })` when a scene wants a shared shell (header/menu/toolbar/help) and a scene-specific layout without duplicating placement math. In the Gym SLL demo, the base help icon is positioned from the shell layout so shell-only and composed views show the shared help affordance, while the pure scene-only view hides the shared shell chrome. The shell-only example also hides the central demo action control so the shell view stays focused on shell-owned chrome. The scene now uses the reusable `VisibilityOwnershipController` from `src/core-engine/` to toggle shell, shared, and scene UI groups by layout mode.
+Use `composeResolvedLayouts(baseLayout, sceneLayout, viewport, dpr, { policy: 'sceneWins' })` when a scene wants a shared shell (header/menu/toolbar/help) and a scene-specific layout without duplicating placement math. In the Gym SLL demo, the base help icon is positioned from the shell layout so shell-only and composed views show the shared help affordance, while the pure scene-only view hides the shared shell chrome. The shell-only example also hides the central demo action control and the `SLL Title Anchor` demo label so the shell view stays focused on shell-owned chrome. The scene now uses the reusable `VisibilityOwnershipController` from `src/core-engine/` to toggle shell, shared, and scene UI groups by layout mode.
 
 Typical use cases:
 

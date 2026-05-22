@@ -448,7 +448,7 @@ export class GymSllScene extends GymSceneBase {
     this.visibilityController.register(this.overlayButton, 'shell');
     this.visibilityController.register(this.statusLine, 'shell');
 
-    this.visibilityController.register(this.layoutTitle, 'shared');
+    this.visibilityController.register(this.layoutTitle, 'scene');
     this.visibilityController.register(this.actionButton, 'scene');
     this.visibilityController.register(this.contentPanel, 'scene');
     this.visibilityController.register(this.contentLabel, 'scene');

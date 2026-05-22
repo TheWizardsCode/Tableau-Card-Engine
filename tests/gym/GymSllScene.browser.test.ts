@@ -122,6 +122,14 @@ describe('GymSllScene browser integration', () => {
     const actionButton = findTextObject(scene, text => text === '[ Toggle Pulse ]');
     expect(actionButton).toBeTruthy();
     expect(actionButton?.visible).toBe(true);
+
+    const layoutButton = findTextObject(scene, text => text === '[ Layout: Shell+Scene ]');
+    expect(layoutButton).toBeTruthy();
+
+    layoutButton?.emit('pointerdown');
+    const shellOnlyMarker = await waitForSllReadyMarker('gym-shell-layout');
+    expect(shellOnlyMarker.layoutId).toBe('gym-shell-layout');
+    expect(findTextObject(scene, text => text === 'SLL Title Anchor')?.visible).toBe(false);
   });
 
   it('cycles to the scene-only layout example', async () => {
