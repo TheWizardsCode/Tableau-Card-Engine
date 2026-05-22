@@ -27,13 +27,13 @@ Open `http://localhost:3000` and select **Gym** from the game selector. From the
 | Audio & Feedback Config | `GymAudioFeedbackScene` | Toggle mute, adjust volume, map events to sounds; pop text; particle celebration |
 | Shader & Blend Spike | `GymGraphicsShaderSpikeScene` | Sprite tinting, blend modes, shader feasibility evaluation |
 | Lighting Spike | `GymGraphicsLightingSpikeScene` | Point light, shadow evaluation, WebGL fallback behavior |
-| Screen Layout Language (SLL) | `GymSllScene` | Demonstrates shell-only, scene-only, pixel override, and composed shell+scene layouts, maps zones+anchors across viewport/DPR profiles, and visualizes merged overlays |
+| Screen Layout Language (SLL) | `GymSllScene` | Starts on the composed shell+scene layout, then cycles through shell-only, scene-only, and pixel override examples while mapping zones+anchors across viewport/DPR profiles and visualizing merged overlays |
 
 ## SLL Demo
 
 Open **Screen Layout Language (SLL)** from the Gym Router to explore direct SLL usage and composed shell + scene layouts:
 
-- Cycles between the shell-only example, the scene-only example, the pixel override example, and the composed shell + scene example in `example-games/gym/layouts/`
+- Starts with the composed shell + scene example, then cycles through the shell-only example, the scene-only example, and the pixel override example in `example-games/gym/layouts/`
 - Uses `composeResolvedLayouts`, `parseScreenLayoutDocument`, `validateScreenLayoutDocument`, and `normalizedToPixels`
 - Uses the shared core-engine `VisibilityOwnershipController` to toggle shell, shared, and scene UI groups instead of hard-coding layout-name checks in the scene
 - Anchors the base help icon from the shell layout for shell-only and composed views, while the pure scene-only view hides the shared shell chrome so the scene-owned layout stays uncluttered

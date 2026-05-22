@@ -78,7 +78,7 @@ describe('GymSllScene browser integration', () => {
     delete (window as Window & { __gymSllSceneReady?: GymSllReadyMarker }).__gymSllSceneReady;
   });
 
-  it('boots and emits a scene-ready marker', async () => {
+  it('boots on the composed shell + scene layout and emits a scene-ready marker', async () => {
     const container = document.createElement('div');
     container.id = 'game-container';
     document.body.appendChild(container);
@@ -97,13 +97,17 @@ describe('GymSllScene browser integration', () => {
     const marker = await waitForSllReadyMarker();
 
     expect(marker.ready).toBe(true);
-    expect(marker.layoutId).toBe('gym-shell-layout');
+    expect(marker.layoutId).toBe('gym-shell-layout+gym-scene-layout');
     expect(marker.profile.id).toBe('desktop-1x');
-    expect(marker.composition).toBeUndefined();
+    expect(marker.composition).toEqual({
+      baseLayoutId: 'gym-shell-layout',
+      sceneLayoutId: 'gym-scene-layout',
+      policy: 'sceneWins',
+    });
 
     expect(findTextObject(scene, text => text === 'Screen Layout Language (SLL)')?.visible).toBe(true);
     expect(findTextObject(scene, text => text === '[ Menu ]')?.visible).toBe(true);
-    expect(findTextObject(scene, text => text === '[ Layout: Shell-only ]')?.visible).toBe(true);
+    expect(findTextObject(scene, text => text === '[ Layout: Shell+Scene ]')?.visible).toBe(true);
     expect(findTextObject(scene, text => text === '[ Profile: desktop-1x ]')?.visible).toBe(true);
     expect(findTextObject(scene, text => text === '[ Overlay: OFF ]')?.visible).toBe(true);
 
@@ -117,7 +121,7 @@ describe('GymSllScene browser integration', () => {
 
     const actionButton = findTextObject(scene, text => text === '[ Toggle Pulse ]');
     expect(actionButton).toBeTruthy();
-    expect(actionButton?.visible).toBe(false);
+    expect(actionButton?.visible).toBe(true);
   });
 
   it('cycles to the scene-only layout example', async () => {
@@ -137,8 +141,11 @@ describe('GymSllScene browser integration', () => {
     await waitForScene(game, GYM_SLL_KEY);
     const scene = game.scene.getScene(GYM_SLL_KEY) as Phaser.Scene;
 
-    const layoutButton = findTextObject(scene, text => text === '[ Layout: Shell-only ]');
+    const layoutButton = findTextObject(scene, text => text === '[ Layout: Shell+Scene ]');
     expect(layoutButton).toBeTruthy();
+
+    layoutButton?.emit('pointerdown');
+    await waitForSllReadyMarker('gym-shell-layout');
 
     layoutButton?.emit('pointerdown');
 
@@ -195,10 +202,10 @@ describe('GymSllScene browser integration', () => {
     expect(marker.anchorsDisplay.help.y).toBeGreaterThan(36);
     expect(marker.anchorsDisplay.help.y).toBeLessThan(54);
 
-    expect(marker.anchorsDisplay.action.x).toBeGreaterThan(405);
-    expect(marker.anchorsDisplay.action.x).toBeLessThan(425);
-    expect(marker.anchorsDisplay.action.y).toBeGreaterThan(138);
-    expect(marker.anchorsDisplay.action.y).toBeLessThan(150);
+    expect(marker.anchorsDisplay.action.x).toBeGreaterThan(560);
+    expect(marker.anchorsDisplay.action.x).toBeLessThan(600);
+    expect(marker.anchorsDisplay.action.y).toBeGreaterThan(120);
+    expect(marker.anchorsDisplay.action.y).toBeLessThan(132);
   });
 
   it('renders a readable overlay legend when toggled on', async () => {

@@ -194,7 +194,7 @@ export class GymSllScene extends GymSceneBase {
       {
         heading: 'Controls',
         body:
-          '[ Layout ] cycles between the shell-only example, the scene-only layout, the pixel override layout, and the composed shell + scene example. [ Profile ] simulates viewport + DPR combinations. [ Overlay ] toggles zone and anchor debug visualization.',
+          '[ Layout ] starts on the composed shell + scene example, then cycles through the shell-only example, the scene-only layout, and the pixel override layout. [ Profile ] simulates viewport + DPR combinations. [ Overlay ] toggles zone and anchor debug visualization.',
       },
       {
         heading: 'Notes',
@@ -236,6 +236,25 @@ export class GymSllScene extends GymSceneBase {
 
     const composedBaseParsed = parseScreenLayoutDocument(gymShellLayoutJson);
     const composedSceneParsed = parseScreenLayoutDocument(sceneOnlyLayoutJson);
+    const composedBaseLayout = this.requireValidParsedLayout('Composed Base', composedBaseParsed);
+    const composedSceneLayout = this.requireValidParsedLayout('Composed Scene', composedSceneParsed);
+
+    this.layouts.push({
+      kind: 'composed',
+      name: 'Composed Shell + Scene',
+      layoutId: `${composedBaseLayout.id}+${composedSceneLayout.id}`,
+      baseLayout: composedBaseLayout,
+      sceneLayout: composedSceneLayout,
+      composition: {
+        baseLayoutId: composedBaseLayout.id,
+        sceneLayoutId: composedSceneLayout.id,
+        policy: 'sceneWins',
+      },
+      placement: COMPOSED_PLACEMENT,
+      visibilityMode: 'composed',
+      showContent: true,
+    });
+
     const shellOnlyLayout = this.requireValidParsedLayout('Shell-only', composedBaseParsed);
     this.layouts.push({
       kind: 'direct',
@@ -291,22 +310,6 @@ export class GymSllScene extends GymSceneBase {
         showContent: candidate.showContent,
       });
     }
-
-    this.layouts.push({
-      kind: 'composed',
-      name: 'Composed Shell + Scene',
-      layoutId: `${this.requireValidParsedLayout('Composed Base', composedBaseParsed).id}+${this.requireValidParsedLayout('Composed Scene', composedSceneParsed).id}`,
-      baseLayout: this.requireValidParsedLayout('Composed Base', composedBaseParsed),
-      sceneLayout: this.requireValidParsedLayout('Composed Scene', composedSceneParsed),
-      composition: {
-        baseLayoutId: this.requireValidParsedLayout('Composed Base', composedBaseParsed).id,
-        sceneLayoutId: this.requireValidParsedLayout('Composed Scene', composedSceneParsed).id,
-        policy: 'sceneWins',
-      },
-      placement: COMPOSED_PLACEMENT,
-      visibilityMode: 'composed',
-      showContent: true,
-    });
   }
 
   private requireValidParsedLayout(name: string, parsed: ScreenLayoutParseResult): ScreenLayoutDocument {
