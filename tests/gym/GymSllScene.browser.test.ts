@@ -101,6 +101,12 @@ describe('GymSllScene browser integration', () => {
     expect(marker.profile.id).toBe('desktop-1x');
     expect(marker.composition).toBeUndefined();
 
+    expect(findTextObject(scene, text => text === 'Screen Layout Language (SLL)')?.visible).toBe(true);
+    expect(findTextObject(scene, text => text === '[ Menu ]')?.visible).toBe(true);
+    expect(findTextObject(scene, text => text === '[ Layout: Shell-only ]')?.visible).toBe(true);
+    expect(findTextObject(scene, text => text === '[ Profile: desktop-1x ]')?.visible).toBe(true);
+    expect(findTextObject(scene, text => text === '[ Overlay: OFF ]')?.visible).toBe(true);
+
     const helpIcon = findTextObject(scene, text => text === '?');
     expect(helpIcon).toBeTruthy();
     expect(helpIcon?.visible).toBe(true);
@@ -139,10 +145,18 @@ describe('GymSllScene browser integration', () => {
     const marker = await waitForSllReadyMarker('gym-scene-layout');
 
     expect(marker.layoutId).toBe('gym-scene-layout');
-    expect(findTextObject(scene, text => text === '[ Layout: Scene-only ]')).toBeTruthy();
+    expect(findTextObject(scene, text => text === '[ Layout: Scene-only ]')?.visible).toBe(false);
+    expect(findTextObject(scene, text => text === 'Screen Layout Language (SLL)')?.visible).toBe(false);
+    expect(findTextObject(scene, text => text === '[ Menu ]')?.visible).toBe(false);
+    expect(findTextObject(scene, text => text === '[ Profile: desktop-1x ]')?.visible).toBe(false);
+    expect(findTextObject(scene, text => text === '[ Overlay: OFF ]')?.visible).toBe(false);
+
     const helpIcon = findTextObject(scene, text => text === '?');
     expect(helpIcon).toBeTruthy();
     expect(helpIcon?.visible).toBe(false);
+    const actionButton = findTextObject(scene, text => text === '[ Toggle Pulse ]');
+    expect(actionButton).toBeTruthy();
+    expect(actionButton?.visible).toBe(true);
     expect(marker.anchorsDisplay.title.x).toBeGreaterThan(300);
     expect(marker.anchorsDisplay.title.x).toBeLessThan(330);
     expect(marker.anchorsDisplay.help.x).toBeGreaterThan(430);

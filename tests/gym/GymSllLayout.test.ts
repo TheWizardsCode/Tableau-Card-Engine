@@ -5,6 +5,7 @@ import pixelOverrideLayoutJson from '../../example-games/gym/layouts/gym-sll-pix
 import {
   shouldShowDemoActionControl,
   shouldShowSharedHelpChrome,
+  shouldShowShellChrome,
 } from '../../example-games/gym/scenes/GymSllVisibility';
 import type { ScreenLayoutDocument } from '../../src/ui/screen-layout-schema';
 import {
@@ -103,15 +104,24 @@ describe('Gym SLL layout fixtures', () => {
     expect(actionPortraitDpr2.y).toBeCloseTo(604.444444, 5);
   });
 
-  it('suppresses shared help chrome in the pure scene-only layout', () => {
+  it('suppresses shared shell chrome in the pure scene-only layout', () => {
+    expect(
+      shouldShowShellChrome({ kind: 'direct', name: 'Shell-only' }),
+    ).toBe(true);
+    expect(
+      shouldShowShellChrome({ kind: 'direct', name: 'Pixel Override' }),
+    ).toBe(true);
+    expect(
+      shouldShowShellChrome({ kind: 'composed', name: 'Composed Shell + Scene' }),
+    ).toBe(true);
+    expect(
+      shouldShowShellChrome({ kind: 'direct', name: 'Scene-only' }),
+    ).toBe(false);
+  });
+
+  it('keeps shared help chrome aligned with shell chrome visibility', () => {
     expect(
       shouldShowSharedHelpChrome({ kind: 'direct', name: 'Shell-only' }),
-    ).toBe(true);
-    expect(
-      shouldShowSharedHelpChrome({ kind: 'direct', name: 'Pixel Override' }),
-    ).toBe(true);
-    expect(
-      shouldShowSharedHelpChrome({ kind: 'composed', name: 'Composed Shell + Scene' }),
     ).toBe(true);
     expect(
       shouldShowSharedHelpChrome({ kind: 'direct', name: 'Scene-only' }),

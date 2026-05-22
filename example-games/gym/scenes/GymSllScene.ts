@@ -19,6 +19,7 @@ import { GymSceneBase } from './GymSceneBase';
 import {
   shouldShowDemoActionControl,
   shouldShowSharedHelpChrome,
+  shouldShowShellChrome,
 } from './GymSllVisibility';
 import { GYM_SLL_KEY } from '../GymRegistry';
 import sceneOnlyLayoutJson from '../layouts/gym-scene.layout.json';
@@ -457,10 +458,17 @@ export class GymSllScene extends GymSceneBase {
     const helpAnchorDisplay = toDisplayPoint(helpAnchorPx);
     const actionAnchorDisplay = toDisplayPoint(actionAnchorPx);
 
+    const showShellChrome = shouldShowShellChrome(currentLayout);
+
     this.layoutTitle.setPosition(titleAnchorDisplay.x, titleAnchorDisplay.y);
     this.helpButton?.setPosition(helpAnchorDisplay.x, helpAnchorDisplay.y);
     this.actionButton.setPosition(actionAnchorDisplay.x, actionAnchorDisplay.y);
+    this.setHeaderChromeVisible(showShellChrome);
     this.setHelpChromeVisible(shouldShowSharedHelpChrome(currentLayout));
+    this.layoutButton.setVisible(showShellChrome);
+    this.profileButton.setVisible(showShellChrome);
+    this.overlayButton.setVisible(showShellChrome);
+    this.statusLine.setVisible(showShellChrome);
     this.actionButton.setVisible(shouldShowDemoActionControl(currentLayout));
 
     if (currentLayout.showContent && contentPlacement) {
