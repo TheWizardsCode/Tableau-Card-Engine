@@ -226,6 +226,7 @@ example-games/
 │   ├── README.md               Gym documentation and quick-start instructions
 │   ├── GymRegistry.ts           Scene key constants and catalogue
 │   ├── index.ts                 Barrel file / public API
+│   ├── layouts/                 SLL sample layout JSON documents for GymSllScene
 │   └── scenes/
 │       ├── GymRouterScene.ts    Landing page with navigation cards
 │       ├── GymSceneBase.ts      Shared base class for all Gym scenes
@@ -237,7 +238,8 @@ example-games/
 │       ├── GymSaveLoadScene.ts  Save/load state demo
 │       ├── GymAudioFeedbackScene.ts Audio & feedback configuration demo
 │       ├── GymGraphicsShaderSpikeScene.ts Shader & blend mode spike
-│       └── GymGraphicsLightingSpikeScene.ts Lighting spike
+│       ├── GymGraphicsLightingSpikeScene.ts Lighting spike
+│       └── GymSllScene.ts       Screen Layout Language demo (schema+mapping+overlay)
 ├── golf/
 │   ├── main.ts                 Game entry point (Phaser.Game config)
 │   ├── createGolfGame.ts       Factory function (used by main.ts and tests)
@@ -950,13 +952,54 @@ The project now includes a reusable **Screen Layout Language** for viewport-awar
 
 - Schema + types: `src/ui/screen-layout-schema.ts`
 - Runtime mapping: `src/ui/screen-layout.ts`
-- Public exports: `src/ui/index.ts`
+- Composition helper: `src/ui/screen-layout-compose.ts`
+- Visibility / ownership helper: `src/core-engine/VisibilityOwnership.ts`
+- Public exports: `src/ui/index.ts`, `src/core-engine/index.ts`
 
 ### Main Street canonical example
 
 - Layout file: `example-games/main-street/layouts/main-street.layout.json`
 - Adapter: `example-games/main-street/scenes/MainStreetLayoutAdapter.ts`
 - Renderer integration: `example-games/main-street/scenes/MainStreetRenderer.ts` (`computeLayout()` applies SLL first, then falls back)
+
+### Gym SLL demo example
+
+- Scene: `example-games/gym/scenes/GymSllScene.ts`
+- Layout documents: `example-games/gym/layouts/gym-shell.layout.json` (shell-only and composed shell source), `example-games/gym/layouts/gym-scene.layout.json` (scene-only source), `example-games/gym/layouts/gym-sll-pixel-override.layout.json`
+- Browser verification: `tests/gym/GymSllScene.browser.test.ts`
+- Unit verification: `tests/core-engine/VisibilityOwnership.test.ts`, `tests/ui/screen-layout-compose.test.ts`, `tests/gym/GymSllLayout.test.ts`
+- Shared ownership helper: `src/core-engine/VisibilityOwnership.ts`
+
+### Composing shell + scene layouts
+
+Use `composeResolvedLayouts(baseLayout, sceneLayout, viewport, dpr, { policy: 'sceneWins' })` when a scene wants a shared shell (header/menu/toolbar/help) and a scene-specific layout without duplicating placement math. In the Gym SLL demo, the base help icon is positioned from the shell layout so shell-only and composed views show the shared help affordance, while the pure scene-only view hides the shared shell chrome. The shell-only example also hides the central demo action control and the `SLL Title Anchor` demo label so the shell view stays focused on shell-owned chrome, while the scene-only and composed views keep that title label lower so it does not collide with the shell contents. The demo also includes a `Toggle Shell` control that hides or restores shared shell chrome without changing the selected layout. The scene now uses the reusable `VisibilityOwnershipController` from `src/core-engine/` to toggle shell, shared, and scene UI groups by layout mode.
+
+Register scene objects into ownership groups so visibility is managed automatically:
+
+```ts
+import { VisibilityOwnershipController } from '@core-engine/VisibilityOwnership';
+
+const controller = new VisibilityOwnershipController({
+  groupRules: {
+    shell: { 'shell-only': true, composed: true },
+    scene: { 'scene-only': true, composed: true },
+    shared: { 'shell-only': true, 'scene-only': true, composed: true },
+  },
+});
+controller.register(headerText, 'shell');
+controller.register(sceneContent, 'scene');
+controller.register(sharedOverlay, 'shared');
+controller.setMode('scene-only'); // hides shell, shows scene+shared
+```
+
+Typical use cases:
+
+- Shared app chrome that stays stable across multiple scenes
+- A scene-specific layout that overrides only the zones it owns
+- Browser tests that assert merged anchor positions across DPR/viewports
+- Debug overlays that need both the source layout ids and the merged resolved pixels
+
+Collision handling follows the project default: scene wins, and the helper reports a warning when a zone name collides so local dev/test runs surface the merge choice.
 
 ### Authoring and validation workflow
 
@@ -969,7 +1012,12 @@ The project now includes a reusable **Screen Layout Language** for viewport-awar
    ```bash
    npx vitest run tests/ui/screen-layout-mapping.test.ts --project unit
    ```
-4. Validate Main Street layout integration via:
+4. Validate SLL composition and Gym integration via:
+   ```bash
+   npx vitest run tests/ui/screen-layout-compose.test.ts --project unit
+   npx vitest run tests/gym/GymSllScene.browser.test.ts --project browser
+   ```
+5. Validate Main Street layout integration via:
    ```bash
    npx vitest run tests/main-street/MainStreetLayoutAnchors.browser.test.ts --project browser
    npx vitest run tests/main-street/MainStreetScene.browser.test.ts --project browser

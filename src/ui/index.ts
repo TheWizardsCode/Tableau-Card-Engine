@@ -84,6 +84,16 @@ export type {
   ScreenLayoutIssueReporter,
   LegacyLayoutAdapterOptions,
 } from './screen-layout';
+export {
+  composeResolvedLayouts,
+} from './screen-layout-compose';
+export type {
+  ComposeResolvedLayoutsPolicy,
+  ComposeResolvedLayoutsIssueCode,
+  ComposeResolvedLayoutsIssue,
+  ComposeResolvedLayoutsIssueReporter,
+  ComposeResolvedLayoutsOptions,
+} from './screen-layout-compose';
 
 // Card game factory helper
 export { createCardGame } from './createCardGame';

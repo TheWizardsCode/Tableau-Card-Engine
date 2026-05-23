@@ -27,6 +27,40 @@ Open `http://localhost:3000` and select **Gym** from the game selector. From the
 | Audio & Feedback Config | `GymAudioFeedbackScene` | Toggle mute, adjust volume, map events to sounds; pop text; particle celebration |
 | Shader & Blend Spike | `GymGraphicsShaderSpikeScene` | Sprite tinting, blend modes, shader feasibility evaluation |
 | Lighting Spike | `GymGraphicsLightingSpikeScene` | Point light, shadow evaluation, WebGL fallback behavior |
+| Screen Layout Language (SLL) | `GymSllScene` | Starts on the composed shell+scene layout, then cycles through shell-only, scene-only, and pixel override examples while mapping zones+anchors across viewport/DPR profiles and visualizing merged overlays |
+
+## SLL Demo
+
+Open **Screen Layout Language (SLL)** from the Gym Router to explore direct SLL usage and composed shell + scene layouts:
+
+- Starts with the composed shell + scene example, then cycles through the shell-only example, the scene-only example, and the pixel override example in `example-games/gym/layouts/`
+- Uses `composeResolvedLayouts`, `parseScreenLayoutDocument`, `validateScreenLayoutDocument`, and `normalizedToPixels`
+- Uses the shared core-engine `VisibilityOwnershipController` to toggle shell, shared, and scene UI groups instead of hard-coding layout-name checks in the scene
+- Anchors the base help icon from the shell layout for shell-only and composed views, while the pure scene-only view hides the shared shell chrome so the scene-owned layout stays uncluttered
+- Keeps the demo action control hidden in shell-only mode so the shell example focuses on shell-owned chrome
+- Hides the `SLL Title Anchor` demo label in shell-only mode so the shell example remains focused on shared shell chrome, while the scene-only and composed views keep that title label lower so it does not collide with the shell contents
+- Adds a `Toggle Shell` control that hides/restores shared shell chrome without changing the selected layout
+- Toggles an overlay that shows merged zone bounds and anchor points for the active layout
+- Simulates multiple viewport/DPR profiles (desktop and portrait) to inspect mapping behavior
+
+### Composed shell + scene usage
+
+The composed demo uses a shared shell layout and a scene layout at runtime:
+
+```ts
+const resolved = composeResolvedLayouts(shellLayout, sceneLayout, viewport, dpr, {
+  policy: 'sceneWins',
+});
+
+const title = resolved.zones.shell.anchors.title;
+const help = resolved.zones.shell.anchors.help;
+const action = resolved.zones.shared.anchors.action;
+```
+
+Recommended local files:
+
+- `example-games/gym/layouts/gym-shell.layout.json` (shell-only and composed shell source)
+- `example-games/gym/layouts/gym-scene.layout.json` (scene-only source)
 
 ## Running Tests
 

@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "id": "gym-scene-layout",
+  "baseViewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "requiredZones": [
+    "shared",
+    "sceneOnly"
+  ],
+  "zones": {
+    "shared": {
+      "rect": {
+        "x": 0.2,
+        "y": 0.1,
+        "width": 0.3,
+        "height": 0.15
+      },
+      "anchors": {
+        "title": {
+          "x": 0.15,
+          "y": 0.5,
+          "pixelOverride": {
+            "x": 640,
+            "y": 126
+          }
+        },
+        "help": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "action": {
+          "x": 0.85,
+          "y": 0.5,
+          "pixelOverride": {
+            "x": 640,
+            "y": 170
+          }
+        }
+      }
+    },
+    "sceneOnly": {
+      "rect": {
+        "x": 0.23,
+        "y": 0.28,
+        "width": 0.54,
+        "height": 0.42
+      },
+      "anchors": {
+        "center": {
+          "x": 0.5,
+          "y": 0.5
+        }
+      }
+    }
+  }
+}

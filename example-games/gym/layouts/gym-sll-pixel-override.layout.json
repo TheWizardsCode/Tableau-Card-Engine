@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "id": "gym-sll-pixel-override",
+  "baseViewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "requiredZones": [
+    "header",
+    "menu",
+    "controls",
+    "content"
+  ],
+  "zones": {
+    "header": {
+      "rect": {
+        "x": 0.08,
+        "y": 0.04,
+        "width": 0.62,
+        "height": 0.11
+      },
+      "anchors": {
+        "title": { "x": 0.5, "y": 0.5 }
+      }
+    },
+    "menu": {
+      "rect": {
+        "x": 0.7,
+        "y": 0.04,
+        "width": 0.24,
+        "height": 0.11,
+        "pixelOverride": {
+          "x": 1000,
+          "y": 28,
+          "width": 230,
+          "height": 56
+        }
+      },
+      "anchors": {
+        "help": { "x": 0.5, "y": 0.5 }
+      }
+    },
+    "controls": {
+      "rect": {
+        "x": 0.08,
+        "y": 0.18,
+        "width": 0.44,
+        "height": 0.12
+      },
+      "anchors": {
+        "action": {
+          "x": 0.5,
+          "y": 0.5,
+          "pixelOverride": {
+            "x": 390,
+            "y": 170
+          }
+        },
+        "center": { "x": 0.5, "y": 0.5 }
+      }
+    },
+    "content": {
+      "rect": {
+        "x": 0.08,
+        "y": 0.34,
+        "width": 0.84,
+        "height": 0.56,
+        "pixelOverride": {
+          "x": 120,
+          "y": 250,
+          "width": 1040,
+          "height": 400
+        }
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.5 },
+        "topLeft": { "x": 0, "y": 0 },
+        "bottomRight": { "x": 1, "y": 1 }
+      }
+    }
+  }
+}

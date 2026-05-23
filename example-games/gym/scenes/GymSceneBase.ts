@@ -30,6 +30,8 @@ import { runSceneTransition } from '../../../src/ui/sceneTransition';
 export abstract class GymSceneBase extends Phaser.Scene {
   /** Scene header elements (title + menu button). */
   protected header!: SceneHeaderResult;
+  /** Divider line drawn below the header. */
+  protected headerDivider?: Phaser.GameObjects.Graphics;
 
   /** Whether reduced motion is currently enabled. Scenes and helpers
    *  should consult this property to skip or shorten animations when true. */
@@ -187,12 +189,12 @@ export abstract class GymSceneBase extends Phaser.Scene {
    * Utility: add a horizontal divider line below the header.
    */
   protected addDivider(yOffset: number = 36): void {
-    const g = this.add.graphics();
-    g.lineStyle(1, 0x336633, 0.6);
-    g.beginPath();
-    g.moveTo(20, yOffset);
-    g.lineTo(GAME_W - 20, yOffset);
-    g.strokePath();
+    this.headerDivider = this.add.graphics();
+    this.headerDivider.lineStyle(1, 0x336633, 0.6);
+    this.headerDivider.beginPath();
+    this.headerDivider.moveTo(20, yOffset);
+    this.headerDivider.lineTo(GAME_W - 20, yOffset);
+    this.headerDivider.strokePath();
   }
 
   // ── Help slide-out integration ─────────────────────────
@@ -242,5 +244,22 @@ export abstract class GymSceneBase extends Phaser.Scene {
     } catch (_) {
       // If event wiring fails for any reason, we still have the cleanup closure
     }
+  }
+
+  /**
+   * Show or hide the shared help chrome for scenes that reuse HelpPanel/HelpButton.
+   */
+  protected setHelpChromeVisible(visible: boolean): void {
+    this.helpPanel?.setVisible(visible);
+    this.helpButton?.setVisible(visible);
+  }
+
+  /**
+   * Show or hide the standard Gym header chrome (title, menu button, divider).
+   */
+  protected setHeaderChromeVisible(visible: boolean): void {
+    this.header.title.setVisible(visible);
+    this.header.menuButton.setVisible(visible);
+    this.headerDivider?.setVisible(visible);
   }
 }

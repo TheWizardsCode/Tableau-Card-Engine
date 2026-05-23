@@ -49,6 +49,9 @@ export const GYM_GRAPHICS_SHADER_SPIKE_KEY = 'GymGraphicsShaderSpikeScene';
 /** Graphics Lighting Spike scene key. */
 export const GYM_GRAPHICS_LIGHTING_SPIKE_KEY = 'GymGraphicsLightingSpikeScene';
 
+/** Screen Layout Language (SLL) demo scene key. */
+export const GYM_SLL_KEY = 'GymSllScene';
+
 // ── Registry ──────────────────────────────────────────────
 
 /**
@@ -111,5 +114,11 @@ export const GYM_SCENE_CATALOGUE: GymSceneEntry[] = [
     title: 'Lighting Spike',
     description:
       'Experimental: evaluates Phaser lighting pipeline for card-glow and shadow effects. Feasibility spike with fallback.',
+  },
+  {
+    sceneKey: GYM_SLL_KEY,
+    title: 'Screen Layout Language (SLL)',
+    description:
+      'Parses and validates SLL JSON, maps zones/anchors to pixels across viewport+DPR profiles, and visualizes layout overlays interactively.',
   },
 ];

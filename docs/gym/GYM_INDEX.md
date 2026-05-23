@@ -37,6 +37,7 @@ npx vitest run --project browser tests/gym/*.browser.test.ts
 | Audio & Feedback Config | `GymAudioFeedbackScene` | `SoundManager`, `GameEventEmitter`, `EventSoundMapping` | [`scenes/GymAudioFeedbackScene.ts`](../../example-games/gym/scenes/GymAudioFeedbackScene.ts) | [`GymAudioFeedback.test.ts`](../../tests/gym/GymAudioFeedback.test.ts) |
 | Shader & Blend Spike | `GymGraphicsShaderSpikeScene` | Sprite tinting, blend modes, shader feasibility | [`scenes/GymGraphicsShaderSpikeScene.ts`](../../example-games/gym/scenes/GymGraphicsShaderSpikeScene.ts) | [`GymSceneSmoke.browser.test.ts`](../../tests/gym/GymSceneSmoke.browser.test.ts) |
 | Lighting Spike | `GymGraphicsLightingSpikeScene` | Point light, shadow evaluation, WebGL fallback | [`scenes/GymGraphicsLightingSpikeScene.ts`](../../example-games/gym/scenes/GymGraphicsLightingSpikeScene.ts) | [`GymSceneSmoke.browser.test.ts`](../../tests/gym/GymSceneSmoke.browser.test.ts) |
+| Screen Layout Language (SLL) | `GymSllScene` | `validateScreenLayoutDocument`, `parseScreenLayoutDocument`, `normalizedToPixels`, `getZoneRect`, `anchorPoint` | [`scenes/GymSllScene.ts`](../../example-games/gym/scenes/GymSllScene.ts) | [`GymSllLayout.test.ts`](../../tests/gym/GymSllLayout.test.ts), [`GymSllScene.browser.test.ts`](../../tests/gym/GymSllScene.browser.test.ts) |
 
 ## Deterministic Headless Tests
 
@@ -55,6 +56,8 @@ All Gym scenes are validated by deterministic headless smoke tests in [`GymHeadl
 [`GymSceneSmoke.browser.test.ts`](../../tests/gym/GymSceneSmoke.browser.test.ts) verifies that every Gym scene boots without errors in a headless Chromium environment and renders an active canvas.
 
 [`GymRouterScene.browser.test.ts`](../../tests/gym/GymRouterScene.browser.test.ts) verifies the router scene renders navigation cards and that all scene keys resolve to registered Phaser scenes.
+
+[`GymSllScene.browser.test.ts`](../../tests/gym/GymSllScene.browser.test.ts) verifies the SLL scene publishes a deterministic scene-ready marker and that anchor-derived UI elements land within expected pixel ranges.
 
 ## Adding a New Scene
 

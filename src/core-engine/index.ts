@@ -159,3 +159,15 @@ export {
   rasteriseSvgToTexture,
   getOrCreateTexture,
 } from './SvgHelpers';
+
+// Visibility / ownership controller for shell-scene UI groups
+export type {
+  VisibilityMode,
+  VisibilityModeRuleSet,
+  VisibilityTarget,
+  VisibilityOwnershipIssue,
+  VisibilityOwnershipIssueCode,
+  VisibilityOwnershipIssueReporter,
+  VisibilityOwnershipControllerOptions,
+} from './VisibilityOwnership';
+export { VisibilityOwnershipController } from './VisibilityOwnership';
