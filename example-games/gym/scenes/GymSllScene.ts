@@ -325,28 +325,29 @@ export class GymSllScene extends GymSceneBase {
   }
 
   private createControlRow(): void {
-    const y = 58;
-    this.layoutButton = this.addButton(28, y, '[ Layout ]', () => this.cycleLayout(), {
+    const y1 = 58;
+    const y2 = 82;
+    this.layoutButton = this.addButton(28, y1, '[ Layout ]', () => this.cycleLayout(), {
       fontSize: '13px',
       color: '#88ffcc',
     });
 
-    this.profileButton = this.addButton(320, y, '[ Profile ]', () => this.cycleProfile(), {
+    this.profileButton = this.addButton(320, y1, '[ Profile ]', () => this.cycleProfile(), {
       fontSize: '13px',
       color: '#88ddff',
     });
 
-    this.overlayButton = this.addButton(560, y, '[ Overlay: OFF ]', () => this.toggleOverlay(), {
+    this.overlayButton = this.addButton(28, y2, '[ Overlay: OFF ]', () => this.toggleOverlay(), {
       fontSize: '13px',
       color: '#ffee99',
     });
 
-    this.shellToggleButton = this.addButton(760, y, '[ Toggle Shell: ON ]', () => this.toggleShell(), {
+    this.shellToggleButton = this.addButton(320, y2, `[ Toggle Shell: ${this.shellVisible ? 'ON' : 'OFF'} ]`, () => this.toggleShell(), {
       fontSize: '13px',
       color: '#ffcc88',
     });
 
-    this.statusLine = this.addLabel(28, 84, '', { fontSize: '12px', color: '#b7d9e3' });
+    this.statusLine = this.addLabel(28, 106, '', { fontSize: '12px', color: '#b7d9e3' });
   }
 
   private createDemoObjects(): void {
@@ -361,7 +362,7 @@ export class GymSllScene extends GymSceneBase {
       .setDepth(40);
 
     this.actionButton = this.add
-      .text(0, 0, '[ Toggle Pulse ]', {
+      .text(0, 0, '[ Toggle Fill ]', {
         fontSize: '15px',
         color: '#88ff88',
         fontFamily: 'monospace',
@@ -411,7 +412,9 @@ export class GymSllScene extends GymSceneBase {
   private toggleShell(): void {
     this.shellVisible = !this.shellVisible;
     this.shellToggleButton.setText(`[ Toggle Shell: ${this.shellVisible ? 'ON' : 'OFF'} ]`);
-    this.applyLayout();
+    this.visibilityController.setGroupRules('shell', this.shellVisible
+      ? { 'shell-only': true, 'composed': true }
+      : {});
   }
 
   private togglePulse(): void {
@@ -419,18 +422,9 @@ export class GymSllScene extends GymSceneBase {
     this.contentPanel.setFillStyle(this.pulseOn ? 0x2a5f33 : 0x133848, 0.82);
     this.contentLabel.setText(
       this.pulseOn
-        ? 'SLL content area\nstate: PULSE ON'
-        : 'SLL content area\nstate: PULSE OFF',
+        ? 'SLL content area\nstate: FILL ON'
+        : 'SLL content area\nstate: FILL OFF',
     );
-  }
-
-  private setShellChromeVisible(visible: boolean): void {
-    this.setHeaderChromeVisible(visible);
-    this.setHelpChromeVisible(visible);
-    this.layoutButton.setVisible(visible);
-    this.profileButton.setVisible(visible);
-    this.overlayButton.setVisible(visible);
-    this.statusLine.setVisible(visible);
   }
 
   private configureVisibility(): void {
@@ -551,7 +545,6 @@ export class GymSllScene extends GymSceneBase {
     this.helpButton?.setPosition(helpAnchorDisplay.x, helpAnchorDisplay.y);
     this.actionButton.setPosition(actionAnchorDisplay.x, actionAnchorDisplay.y);
     this.visibilityController.setMode(currentLayout.visibilityMode);
-    this.setShellChromeVisible(this.shellVisible && currentLayout.visibilityMode !== 'scene-only');
 
     if (currentLayout.showContent && contentPlacement) {
       const contentRectPx = this.getZoneRect(resolved, contentPlacement.zone);
