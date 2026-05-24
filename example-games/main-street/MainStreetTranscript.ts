@@ -1,4 +1,4 @@
-import { TranscriptRecorderBase } from '../../src/core-engine/TranscriptRecorder';
+import { TranscriptRecorderBase } from '../../src/core-engine/transcript';
 
 // Minimal transcript event types for Main Street
 export type PlayerActionDescriptor = { type: string; [k: string]: any };

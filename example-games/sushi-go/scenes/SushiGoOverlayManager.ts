@@ -15,8 +15,7 @@ import type { SushiGoSession, RoundResult } from '../SushiGoGame';
 import { getWinnerIndex } from '../SushiGoGame';
 import type { SoundManager, GameEventEmitter } from '../../../src/core-engine';
 import { SushiGoTranscriptRecorder } from '../GameTranscript';
-import { TranscriptStore } from '../../../src/core-engine/TranscriptStore';
-import { autoSaveTranscript } from '../../../src/core-engine/autoSaveTranscript';
+import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
 import { SFX_KEYS } from './SushiGoConstants';
 
 const transcriptStore = new TranscriptStore();

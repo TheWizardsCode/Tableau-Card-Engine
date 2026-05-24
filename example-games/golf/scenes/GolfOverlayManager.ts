@@ -4,8 +4,7 @@
 
 
 import type { TranscriptRecorder } from '../GameTranscript';
-import { TranscriptStore } from '../../../src/core-engine/TranscriptStore';
-import { autoSaveTranscript } from '../../../src/core-engine/autoSaveTranscript';
+import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
 import type { SoundManager, GameEventEmitter } from '../../../src/core-engine';
 import {
   GAME_W, GAME_H, FONT_FAMILY,

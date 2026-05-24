@@ -29,7 +29,7 @@ import type {
 import type {
   LostCitiesAction,
 } from './LostCitiesRules';
-import { TranscriptRecorderBase } from '../../src/core-engine/TranscriptRecorder';
+import { TranscriptRecorderBase } from '../../src/core-engine/transcript';
 
 // ── Card snapshot ──────────────────────────────────────────
 

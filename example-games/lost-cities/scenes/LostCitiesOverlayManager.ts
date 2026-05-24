@@ -5,8 +5,7 @@ import Phaser from 'phaser';
 import { EXPEDITION_COLORS } from '../LostCitiesCards';
 import type { LostCitiesSession, RoundScoreResult } from '../LostCitiesGame';
 import { getMatchWinner } from '../LostCitiesGame';
-import { autoSaveTranscript } from '../../../src/core-engine/autoSaveTranscript';
-import { TranscriptStore } from '../../../src/core-engine/TranscriptStore';
+import { autoSaveTranscript, TranscriptStore } from '../../../src/core-engine/transcript';
 import {
   GAME_W,
   GAME_H,
