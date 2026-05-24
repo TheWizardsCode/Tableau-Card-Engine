@@ -110,6 +110,12 @@ describe('SvgHelpers', () => {
     expect(makeTextureKey('tempura', 120.2, 80.7, 2)).toBe('ms_card_tempura_120x81@2');
   });
 
+  it('supports custom prefix for game-agnostic texture keys', () => {
+    expect(makeTextureKey('sashimi', 64, 64, 1, 'sg_')).toBe('sg_sashimi_64x64@1');
+    expect(makeTextureKey('expedition', 48, 65, 2, 'lc_')).toBe('lc_expedition_48x65@2');
+    expect(makeTextureKey('mind', 48, 65, 2)).toBe('ms_card_mind_48x65@2');
+  });
+
   it('rasterises SVG and scales canvas using quality scale (>= 4x)', async () => {
     const scene = createMockScene();
     markSceneValid(scene);
