@@ -13,9 +13,11 @@ import type { GolfGrid } from './GolfGrid';
 import type { DrawSource, GolfMove } from './GolfRules';
 import type { GolfSession, TurnResult } from './GolfGame';
 import { scoreGrid, scoreVisibleCards } from './GolfScoring';
-import { snapshotCard } from '../../src/core-engine/TranscriptTypes';
-import type { CardSnapshot } from '../../src/core-engine/TranscriptTypes';
-import { TranscriptRecorderBase } from '../../src/core-engine/TranscriptRecorder';
+import {
+  snapshotCard,
+  TranscriptRecorderBase,
+  type CardSnapshot,
+} from '../../src/core-engine/transcript';
 
 // Re-export so existing consumers that import from this module still work.
 export { snapshotCard };

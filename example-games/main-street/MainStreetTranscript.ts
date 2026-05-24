@@ -1,4 +1,4 @@
-import { TranscriptRecorderBase } from '../../src/core-engine/TranscriptRecorder';
+import { TranscriptRecorderBase } from '../../src/core-engine/transcript';
 
 // Minimal transcript event types for Main Street
 export type PlayerActionDescriptor = { type: string; [k: string]: any };
@@ -63,4 +63,29 @@ export function recordMainStreetEvent(e: MainStreetTranscriptEvent): void {
   } catch (_) {
     // defensive: do not throw from recorder in non-critical paths
   }
+}
+
+/**
+ * Finalize the global transcript and return it.
+ *
+ * Returns null if no recorder has been set (e.g. in headless tests).
+ * The `result` parameter should be the game-end result object containing
+ * at least `gameResult` and `finalScore`.
+ */
+export function finalizeMainStreetTranscript(result: {
+  gameResult: string;
+  finalScore: number;
+  [k: string]: unknown;
+}): MainStreetTranscript | null {
+  if (!globalRecorder) return null;
+  return globalRecorder.finalize(result);
+}
+
+/**
+ * Get the current (possibly un-finalized) transcript from the global recorder.
+ *
+ * Returns null if no recorder has been set.
+ */
+export function getMainStreetTranscript(): MainStreetTranscript | null {
+  return globalRecorder?.getTranscript() ?? null;
 }
