@@ -11,7 +11,8 @@ import {
 } from '../MainStreetMarket';
 import type { BusinessCard, EventCard, UpgradeCard } from '../MainStreetCards';
 import { BuyBusinessCommand, BuyUpgradeCommand, BuyEventCommand, PlayEventCommand, BuyRefreshInvestmentsCommand } from '../MainStreetCommands';
-import { recordMainStreetEvent } from '../MainStreetTranscript';
+import { recordMainStreetEvent, finalizeMainStreetTranscript } from '../MainStreetTranscript';
+import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
 import { FONT_FAMILY, createOverlayBackground, createOverlayButton, dismissOverlay } from '../../../src/ui';
 
 export class MainStreetTurnController {
@@ -80,6 +81,16 @@ export class MainStreetTurnController {
 
         // Update campaign progress (tier evaluation + persistence),
         // then compute newly unlocked tiers and show the overlay.
+        // Auto-save transcript to browser storage (fire-and-forget)
+        const transcript = finalizeMainStreetTranscript({
+          gameResult: result.gameResult,
+          finalScore: result.finalScore,
+        });
+        if (transcript) {
+          const transcriptStore = new TranscriptStore();
+          autoSaveTranscript(transcriptStore, 'main-street', transcript, '[MainStreet]');
+        }
+
         s.updateCampaignProgress().then(() => {
           const tiersAfter = s.campaign
             ? s.campaign.unlockedTiers
