@@ -956,6 +956,25 @@ The project now includes a reusable **Screen Layout Language** for viewport-awar
 - Visibility / ownership helper: `src/core-engine/VisibilityOwnership.ts`
 - Public exports: `src/ui/index.ts`, `src/core-engine/index.ts`
 
+### Migrated games
+
+The following games have been migrated to use SLL layout helpers:
+
+| Game | Layout file | Adapter |
+|------|------------|---------|
+| Golf | `example-games/golf/layouts/golf.layout.json` | `example-games/golf/scenes/GolfLayoutAdapter.ts` |
+| The Mind | `example-games/the-mind/layouts/the-mind.layout.json` | `example-games/the-mind/scenes/MindLayoutAdapter.ts` |
+| Beleaguered Castle | `example-games/beleaguered-castle/layouts/beleaguered-castle.layout.json` | `example-games/beleaguered-castle/scenes/BeleagueredCastleLayoutAdapter.ts` |
+| Main Street | `example-games/main-street/layouts/main-street.layout.json` | `example-games/main-street/scenes/MainStreetLayoutAdapter.ts` |
+
+Games with layout files and adapters ready for renderer integration:
+
+| Game | Layout file | Adapter |
+|------|------------|---------|
+| Feudalism | `example-games/feudalism/layouts/feudalism.layout.json` | `example-games/feudalism/scenes/FeudalismLayoutAdapter.ts` |
+| Sushi Go | `example-games/sushi-go/layouts/sushi-go.layout.json` | `example-games/sushi-go/scenes/SushiGoLayoutAdapter.ts` |
+| Lost Cities | `example-games/lost-cities/layouts/lost-cities.layout.json` | `example-games/lost-cities/scenes/LostCitiesLayoutAdapter.ts` |
+
 ### Main Street canonical example
 
 - Layout file: `example-games/main-street/layouts/main-street.layout.json`
@@ -1000,6 +1019,29 @@ Typical use cases:
 - Debug overlays that need both the source layout ids and the merged resolved pixels
 
 Collision handling follows the project default: scene wins, and the helper reports a warning when a zone name collides so local dev/test runs surface the merge choice.
+
+### Standard SLL migration pattern for new games
+
+When adding a new example game, follow this pattern:
+
+1. **Create a layout JSON file** in `example-games/<game>/layouts/<game>.layout.json` with normalized zone rectangles and anchors. Use `baseViewport` of 1280x720 (matching the shared `GAME_W`/`GAME_H` constants).
+
+2. **Create a layout adapter** in `example-games/<game>/scenes/<Game>LayoutAdapter.ts` that:
+   - Parses the layout JSON using `parseScreenLayoutDocument`
+   - Defines a typed `GameLayout` interface with the positions your renderer needs
+   - Exports a `compute<Game>Layout()` function that maps SLL zones to the game-specific shape, falling back to legacy values if the SLL document is unavailable
+
+3. **Update the renderer** to:
+   - Import `compute<Game>Layout()` and call it in the constructor
+   - Replace hardcoded position constants with `this.layout.<property>` references
+   - Keep card dimensions and game-logic constants in the Constants file; remove layout position constants
+
+4. **Update the Constants file** to:
+   - Remove layout position constants (e.g. `PILE_X`, `HAND_Y`)
+   - Keep card dimensions, timing constants, audio keys, and game-logic constants
+   - Add a comment noting that layout positions are now defined via SLL
+
+5. **Update tests** that mock renderers to include a `layout` property matching the `GameLayout` interface.
 
 ### Authoring and validation workflow
 
