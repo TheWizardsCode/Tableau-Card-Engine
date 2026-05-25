@@ -44,7 +44,9 @@ tableau-card-engine/
 │   ├── beleaguered-castle/ Beleaguered Castle (open solitaire)
 │   ├── sushi-go/          Sushi Go! (card drafting, human vs. AI)
 │   ├── feudalism/          Feudalism (engine-building, human vs. AI)
-│   └── lost-cities/       Lost Cities (2-player expedition lanes, human vs. AI)
+│   ├── lost-cities/       Lost Cities (2-player expedition lanes, human vs. AI)
+│   ├── the-mind/          The Mind (cooperative real-time, human vs. AI)
+│   └── main-street/       Main Street (single-player tableau builder)
 ├── public/assets/         Static assets (cards, fonts, images)
 │   └── cards/             52 standard card SVGs + card back + game-specific cards (140x190px)
 ├── tests/                 Vitest test files
@@ -73,7 +75,7 @@ tableau-card-engine/
 
 | Game | Location | Description |
 |------|----------|-------------|
-| Hello World \(replaced\) | `example-games/gym/` | Interactive demo scenes for every core-engine feature, including bottom-anchored curved hand layout controls in the Hand & Pile gym -- replaces the original minimal Hello World scene |
+| Gym (demo suite) | `example-games/gym/` | Interactive demo scenes for every core-engine feature: deck lifecycle, hand/pile interactions, undo/redo, overlays, SLL composition, audio feedback, transcript recording, save/load |
 | 9-Card Golf | `example-games/golf/` | Single-round 9-Card Golf (human vs. AI) with card flip animations, greedy/random AI strategies, and JSON game transcripts |
 | Beleaguered Castle | `example-games/beleaguered-castle/` | Open solitaire with drag-and-drop, click-to-move, undo/redo, auto-move to foundations, auto-complete, win/loss detection, help panel, and JSON game transcripts |
 | Sushi Go! | `example-games/sushi-go/` | Card drafting game (human vs. AI). Pick and pass hands over 3 rounds, collect sets of sushi dishes, and score the most points |
@@ -86,24 +88,7 @@ More games are planned: Coloretto.
 
 ## ToneForge runtime adapter (Main Street)
 
-Main Street can optionally route mapped SFX keys through a ToneForge-backed module via `createTfPlayer`.
-
-`npm run tf:generate` now emits a runtime synth module at `build/tf-synths/main-street-runtime-synth.mjs` that provides on-the-fly Tone/WebAudio voices.
-
-Expected tf module exports consumed by the adapter:
-
-- `factories: Record<string, () => TfVoice>`
-- optional `getFactory(name)` helper
-- optional `descriptors` metadata map
-
-Where `TfVoice` supports any subset of:
-
-- `play()`
-- `stop()`
-- `setVolume(number)`
-- `setMute(boolean)`
-
-See `docs/the-build/audio.md` for generation workflow and wiring details.
+Main Street can optionally route mapped SFX keys through a ToneForge-backed module via `createTfPlayer`. Run `npm run tf:generate` to emit a runtime synth module at `build/tf-synths/main-street-runtime-synth.mjs` providing on-the-fly Tone/WebAudio voices. The adapter expects module exports `factories: Record<string, () => TfVoice>` and optional `getFactory()` / `descriptors` helpers. See `docs/the-build/audio.md` for generation workflow and wiring details.
 
 ## Contributing
 

@@ -12,6 +12,7 @@ This document covers everything you need to develop, test, and build the Tableau
 - [Project Structure](#project-structure)
 - [Path Aliases](#path-aliases)
 - [Adding an Example Game](#adding-an-example-game)
+- [Example Games](#example-games)
 - [Transcript Persistence](#transcript-persistence)
 - [Replay Tool](#replay-tool)
 - [Managing Assets](#managing-assets)
@@ -78,8 +79,7 @@ npm run preview
 
 ## Deployment / Release
 
-Release and deployment instructions have moved to RELEASE.md at the repository root. See RELEASE.md for the full release workflow, checklist, and verification steps. The CI workflow that performs releases is .github/workflows/deploy.yml.
-
+See [RELEASE.md](../RELEASE.md) for the full release workflow, checklist, and verification steps. The CI workflow is `.github/workflows/deploy.yml`.
 
 ## Testing
 
@@ -398,215 +398,27 @@ import { ENGINE_VERSION } from '@core-engine/index';
 
 Follow the Golf (original reference) and Sushi Go (most recent) examples as reference implementations.
 
-## 9-Card Golf
+## Example Games
 
-The Golf game is the first full spike built on the engine. It demonstrates:
-
-- **Card system**: Card, Deck, and Pile abstractions from `src/card-system/`
-- **Core engine**: GameState and TurnSequencer from `src/core-engine/`
-- **Game rules**: Golf-specific scoring (A=1, 2=-2, 3-10=face, J/Q=10, K=0, column-of-three=0), turn legality, and round-end detection
-- **AI strategies**: RandomStrategy (uniform random legal moves) and GreedyStrategy (minimizes total score)
-- **Transcript recording**: JSON game transcripts capturing all turns, board states, and results
-- **Phaser UI**: Full visual interface with 3x3 grids, draw/discard piles, card flip animations, score display, and end-of-round screen
-
-### Running the Golf game
+All example games are playable via the Game Selector after running:
 
 ```bash
 npm run dev
 ```
 
-Open `http://localhost:3000` and click the **9-Card Golf** card on the game selector page. Click the stock or discard pile to draw, click a grid card to swap, or click the discard pile after drawing to discard and flip a face-down card. Use the `[ Menu ]` button in the top-left to return to the game selector.
+Open `http://localhost:3000` and click the desired game card. Each game also has a standalone entry point (`main.ts`) and factory function (`create<Game>Game.ts`) for independent testing.
 
-### Golf game files
+### Game reference
 
-| File | Purpose |
-|------|---------|
-| `example-games/golf/main.ts` | Phaser game config entry point |
-| `example-games/golf/createGolfGame.ts` | Factory function to create a Golf game instance |
-| `example-games/golf/GolfGrid.ts` | 3x3 grid type and utilities |
-| `example-games/golf/GolfRules.ts` | Turn legality, move application, round-end detection |
-| `example-games/golf/GolfScoring.ts` | Scoring rules (card values, column matching) |
-| `example-games/golf/GolfGame.ts` | Game orchestration (setup, turn execution, move enumeration) |
-| `example-games/golf/AiStrategy.ts` | AI strategies and AiPlayer wrapper |
-| `example-games/golf/GameTranscript.ts` | Transcript types and TranscriptRecorder |
-| `example-games/golf/scenes/GolfScene.ts` | Phaser scene (visual interface) |
-
-### Golf game tests
-
-Tests are in `tests/golf/`:
-
-| File | Tests |
-|------|-------|
-| `GolfGrid.test.ts` | Grid creation, indexing, face-up counting |
-| `GolfRules.test.ts` | Turn legality, move application, round-end detection |
-| `GolfScoring.test.ts` | Card values, grid scoring, column matching |
-| `GolfGame.test.ts` | Game setup, legal move enumeration, turn execution |
-| `AiStrategy.test.ts` | RandomStrategy, GreedyStrategy, AiPlayer |
-| `GameTranscript.test.ts` | Transcript recording, snapshots, finalization |
-| `Integration.test.ts` | Full AI-vs-AI games, transcript validation, game invariants |
-| `GolfScene.browser.test.ts` | Phaser UI rendering, canvas, game objects, interactions (browser) |
-
-## Beleaguered Castle
-
-Beleaguered Castle is the second full spike. It is a single-player open solitaire game demonstrating:
-
-- **Single-player support**: Core engine's `createGameState()` accepts 1 player (deprecated for setup — use `resolveSetupOptions()` or `resolveBaseSetupOptions()` from `SetupOptions.ts` instead)
-- **Undo/Redo**: Reusable `UndoRedoManager` in `src/core-engine/` with Command pattern and compound commands
-- **Drag-and-drop**: Phaser drag events with drop zone highlighting and snap-back animation
-- **Click-to-move**: Select a card then click a destination; co-exists with drag-and-drop
-- **Auto-move to foundations**: Safe-move heuristic automatically plays cards to foundations when no tableau column needs them
-- **Auto-complete**: Detects trivially winnable states and plays all remaining moves to completion
-- **Win/loss detection**: Recognises when all 52 cards are on foundations (win) or no legal moves remain (loss)
-- **Game transcript**: JSON transcript recording compatible with the Visual Replay Dev Tool
-- **Help panel**: In-game rules and keyboard shortcut reference using the reusable HelpPanel/HelpButton components
-
-### Running Beleaguered Castle
-
-```bash
-npm run dev
-```
-
-Open `http://localhost:3000` and click the **Beleaguered Castle** card on the game selector page. Use the `[ Menu ]` button in the top-left to return to the game selector.
-
-### Beleaguered Castle game files
-
-| File | Purpose |
-|------|---------|
-| `example-games/beleaguered-castle/main.ts` | Phaser game config entry point |
-| `example-games/beleaguered-castle/createBeleagueredCastleGame.ts` | Factory function to create a BC game instance |
-| `example-games/beleaguered-castle/BeleagueredCastleState.ts` | State types, move types, constants (FOUNDATION_COUNT, TABLEAU_COUNT, etc.) |
-| `example-games/beleaguered-castle/BeleagueredCastleRules.ts` | Pure game logic: deal, applyMove, undoMove, getLegalMoves, isWon, hasNoMoves, findSafeAutoMoves, isTriviallyWinnable, getAutoCompleteMoves |
-| `example-games/beleaguered-castle/GameTranscript.ts` | Transcript types and BCTranscriptRecorder |
-| `example-games/beleaguered-castle/help-content.json` | Help panel content (8 sections: overview, setup, foundations, tableau, winning/losing, controls, keyboard shortcuts, tips) |
-| `example-games/beleaguered-castle/scenes/BeleagueredCastleScene.ts` | Phaser scene with drag-and-drop, click-to-move, undo/redo, auto-move, auto-complete, win/loss overlays, help panel, and transcript recording |
-
-### Beleaguered Castle tests
-
-Tests are in `tests/beleaguered-castle/`:
-
-| File | Tests |
-|------|-------|
-| `BeleagueredCastleRules.test.ts` | Deal correctness, move legality, foundation builds, win/loss detection, undo, auto-move heuristics, auto-complete (70 tests) |
-| `Integration.test.ts` | Full greedy game play across seeds, game invariants, undo/redo across moves, transcript recording and validation, auto-complete verification, snapshot utilities (30 tests) |
-
-## Sushi Go!
-
-Sushi Go! is a card drafting game demonstrating:
-
-- **Card drafting**: Pick one card from a hand, pass the rest, repeat until hands are exhausted
-- **Custom card types**: Non-standard cards representing sushi dishes (Tempura, Sashimi, Maki Rolls, Nigiri, Wasabi, Dumplings, Pudding, Chopsticks)
-- **Multi-round match**: 3-round game with inter-round scoring and Pudding scored only at game end
-- **Set-collection scoring**: Different scoring functions per card type
-- **AI strategies**: Random (valid picks) and Greedy (highest-value pick)
-
-### Running Sushi Go!
-
-```bash
-npm run dev
-```
-
-Open `http://localhost:3000` and click the **Sushi Go!** card on the game selector page.
-
-### Sushi Go! game files
-
-| File | Purpose |
-|------|---------|
-| `example-games/sushi-go/main.ts` | Phaser game config entry point |
-| `example-games/sushi-go/createSushiGoGame.ts` | Factory function for tests |
-| `example-games/sushi-go/SushiGoCards.ts` | Card types, deck creation, procedural card-back textures |
-| `example-games/sushi-go/SushiGoGame.ts` | Game orchestration (drafting rounds, hand passing, scoring) |
-| `example-games/sushi-go/SushiGoScoring.ts` | Set-collection scoring rules per card type |
-| `example-games/sushi-go/AiStrategy.ts` | AI strategies (RandomStrategy, GreedyStrategy) |
-| `example-games/sushi-go/GameTranscript.ts` | Transcript types and SushiGoTranscriptRecorder |
-| `example-games/sushi-go/help-content.json` | Help panel content |
-| `example-games/sushi-go/scenes/SushiGoScene.ts` | Phaser scene (drafting interface) |
-
-### Sushi Go! tests
-
-Tests are in `tests/sushi-go/`:
-
-| File | Tests |
-|------|-------|
-| `SushiGoCards.test.ts` | Card types, deck creation, card counts (19 tests) |
-| `SushiGoScoring.test.ts` | All card type scoring rules (56 tests) |
-| `SushiGoGame.test.ts` | Game setup, drafting, round progression (21 tests) |
-| `AiStrategy.test.ts` | Random and Greedy strategy validation (15 tests) |
-
-## Feudalism
-
-Feudalism is an engine-building card game demonstrating:
-
-- **Resource management**: Collect gem tokens to purchase development cards
-- **Custom card types**: Development cards with costs, gem bonuses, and prestige points across 3 tiers
-- **Noble attraction**: Automatically attract noble tiles when development card bonuses meet thresholds
-- **Multi-action turns**: Take gems, reserve cards, or purchase developments
-- **AI strategies**: Random (valid actions) and Greedy (prioritizes purchases and high-value cards)
-
-### Running Feudalism
-
-```bash
-npm run dev
-```
-
-Open `http://localhost:3000` and click the **Feudalism** card on the game selector page.
-
-### Feudalism game files
-
-| File | Purpose |
-|------|---------|
-| `example-games/feudalism/main.ts` | Phaser game config entry point |
-| `example-games/feudalism/createFeudalismGame.ts` | Factory function for tests |
-| `example-games/feudalism/FeudalismCards.ts` | Development cards, nobles, gem types, tier data |
-| `example-games/feudalism/FeudalismGame.ts` | Game orchestration (token collection, purchases, nobles, win detection) |
-| `example-games/feudalism/AiStrategy.ts` | AI strategies (RandomStrategy, GreedyStrategy) |
-| `example-games/feudalism/GameTranscript.ts` | Transcript types and FeudalismTranscriptRecorder |
-| `example-games/feudalism/help-content.json` | Help panel content |
-| `example-games/feudalism/scenes/FeudalismScene.ts` | Phaser scene (gem market, card tiers, token UI) |
-
-### Feudalism tests
-
-Tests are in `tests/feudalism/`:
-
-| File | Tests |
-|------|-------|
-| `FeudalismCards.test.ts` | Card data, noble data, gem types (50 tests) |
-| `FeudalismGame.test.ts` | Game setup, turn execution, win detection, noble attraction (55 tests) |
-| `AiStrategy.test.ts` | Random and Greedy strategy validation (14 tests) |
-
-## Lost Cities
-
-Lost Cities is a two-player expedition card game demonstrating:
-
-- **Custom card types**: 60 cards across 5 expedition colors (yellow, blue, white, green, red) with investment cards and ranks 2-10
-- **Custom SVG assets**: 61 procedurally generated SVG card images (60 cards + card back) at 140x190px
-- **Two-phase turn model**: Each turn consists of a play/discard phase followed by a draw phase
-- **Ascending-play rules**: Cards must be played in ascending order on expedition lanes; investment cards must be played before any numbered cards
-- **Multi-round match**: 3-round match with cumulative scoring across rounds
-- **Investment multipliers**: 1/2/3 investment cards multiply expedition score by x2/x3/x4
-- **AI strategies**: Random (valid moves) and Greedy (discard-aware, avoids giving opponent useful cards)
-- **Transcript recording**: Multi-round JSON transcripts capturing all actions and board states
-
-### Running Lost Cities
-
-```bash
-npm run dev
-```
-
-Open `http://localhost:3000` and click the **Lost Cities** card on the game selector page. Select a card from your hand, then click an expedition lane to play or a discard pile to discard. Draw from the draw pile or a discard pile to complete your turn. The AI opponent plays automatically between your turns.
-
-### Lost Cities game files
-
-| File | Purpose |
-|------|---------|
-| `example-games/lost-cities/LostCitiesCards.ts` | Card types, deck factory, expedition colors, card helpers |
-| `example-games/lost-cities/LostCitiesRules.ts` | Two-phase turn model, ascending-play validation, legality checks |
-| `example-games/lost-cities/LostCitiesScoring.ts` | Expedition scoring (-20 base, card values, investment multiplier, 8-card bonus) |
-| `example-games/lost-cities/LostCitiesGame.ts` | Match manager (3-round session, executeAction, visible state, match lifecycle) |
-| `example-games/lost-cities/AiStrategy.ts` | AI strategies (RandomStrategy, GreedyStrategy, LostCitiesAiPlayer wrapper) |
-| `example-games/lost-cities/GameTranscript.ts` | Transcript recording (LCTranscriptRecorder, multi-round structure) |
-| `example-games/lost-cities/help-content.json` | Help panel content (8 sections: overview, scoring, controls, strategy tips) |
-| `example-games/lost-cities/scenes/LostCitiesScene.ts` | Phaser scene (interactive play with two-phase turns, animations, overlays) |
-| `example-games/lost-cities/scenes/LostCitiesMockScene.ts` | Static layout mockup (development aid) |
+| Game | Location | Key engine features demonstrated | Tests |
+|------|----------|--------------------------------|-------|
+| 9-Card Golf | `example-games/golf/` | Card/Deck/Pile abstractions, GameState/TurnSequencer, scoring rules (A=1, 2=-2, K=0, column-of-three=0), Random/Greedy AI strategies, transcript recording, Phaser UI with 3x3 grid | `tests/golf/` (8 files) |
+| Beleaguered Castle | `example-games/beleaguered-castle/` | Single-player solitaire, UndoRedoManager (Command pattern), drag-and-drop + click-to-move, auto-move heuristics, auto-complete, win/loss detection, HelpPanel component | `tests/beleaguered-castle/` (2 files) |
+| Sushi Go! | `example-games/sushi-go/` | Card drafting (pick-and-pass hands), custom card types with set-collection scoring, multi-round match, procedural card-back textures | `tests/sushi-go/` (4 files) |
+| Feudalism | `example-games/feudalism/` | Resource management (gem tokens), tiered development cards with costs/bonuses, noble attraction, multi-action turns (take/reserve/purchase) | `tests/feudalism/` (3 files) |
+| Lost Cities | `example-games/lost-cities/` | Two-player expeditions, two-phase turn model (play/discard then draw), ascending-play rules, investment multipliers (x2/x3/x4), multi-round match scoring, procedurally generated SVG card assets | `tests/lost-cities/` (6 files) |
+| The Mind | `example-games/the-mind/` | Cooperative real-time game, event-based transcript, timing-based AI, level progression (1-100 cards, 8 levels), headless AI-vs-AI runner for fixture generation | `tests/the-mind/` (7 files) |
+| Main Street | `example-games/main-street/` | Single-player tableau builder, responsive 2x5 grid layout, SLL integration, ToneForge audio adapter, Monte Carlo balance testing, tutorial scene | `tests/main-street/` |
 
 ### Lost Cities card assets
 
@@ -617,65 +429,6 @@ npx tsx scripts/generate-lost-cities-cards.ts
 ```
 
 Assets are output to `public/assets/cards/lost-cities/` and documented in `public/assets/CREDITS.md`.
-
-### Lost Cities tests
-
-Tests are in `tests/lost-cities/`:
-
-| File | Tests |
-|------|-------|
-| `lost-cities-cards.test.ts` | Card types, deck factory, helpers, uniqueness (44 tests) |
-| `lost-cities-scoring.test.ts` | Expedition scoring, round scoring, match scoring (26 tests) |
-| `lost-cities-rules.test.ts` | Turn phases, legality checks, legal action enumeration (32 tests) |
-| `lost-cities-game.test.ts` | Session setup, executeAction, round/match lifecycle (40 tests) |
-| `lost-cities-ai.test.ts` | Random and Greedy strategies, AI player wrapper (22 tests) |
-| `lost-cities-transcript.test.ts` | Transcript recording, full AI-vs-AI match validation (21 tests) |
-
-## The Mind
-
-The Mind is a cooperative real-time card game demonstrating:
-
-- **Real-time gameplay**: Players play numbered cards (1-100) onto a shared ascending pile without communicating
-- **Event-based transcript**: Unlike turn-based games, The Mind records real-time events (card plays, penalties, level completions) rather than discrete turns
-- **Cooperative AI**: AI players use timing-based strategies to decide when to play cards
-- **Level progression**: Survive 8 levels with increasing card counts per player
-- **Headless runner**: `headlessGame.ts` enables AI-vs-AI games without Phaser for fixture generation
-
-### Running The Mind
-
-```bash
-npm run dev
-```
-
-Open `http://localhost:3000` and click the **The Mind** card on the game selector page. Click your cards to play them onto the shared pile. The AI partner plays automatically based on timing. Survive all 8 levels to win.
-
-### The Mind game files
-
-| File | Purpose |
-|------|---------|
-| `example-games/the-mind/main.ts` | Phaser game config entry point |
-| `example-games/the-mind/createTheMindGame.ts` | Factory function for tests |
-| `example-games/the-mind/MindCards.ts` | Card types and deck creation |
-| `example-games/the-mind/MindGame.ts` | Game orchestration (levels, lives, card play, penalties) |
-| `example-games/the-mind/AiStrategy.ts` | AI strategies (timing-based play decisions) |
-| `example-games/the-mind/GameTranscript.ts` | Transcript types and MindTranscriptRecorder (event-based) |
-| `example-games/the-mind/headlessGame.ts` | Headless AI-vs-AI runner for fixture generation |
-| `example-games/the-mind/help-content.json` | Help panel content |
-| `example-games/the-mind/scenes/TheMindScene.ts` | Phaser scene (real-time card play interface) |
-
-### The Mind tests
-
-Tests are in `tests/the-mind/`:
-
-| File | Tests |
-|------|-------|
-| `mind-card.test.ts` | Card types and deck creation (27 tests) |
-| `mind-card-renderer.test.ts` | Card rendering utilities (37 tests) |
-| `game-state.test.ts` | Game state, level progression, lives (72 tests) |
-| `ai-strategy.test.ts` | AI timing strategies (56 tests) |
-| `transcript.test.ts` | Event-based transcript recording (32 tests) |
-| `auto-play.test.ts` | Headless auto-play across seeds (33 tests) |
-| `integration.test.ts` | Full game invariants across seeds (33 tests) |
 
 ## Transcript Persistence
 
@@ -719,7 +472,7 @@ Each game has a fixture transcript used by replay tests and thumbnail generation
 tests/fixtures/transcripts/<game-name>/fixture-game.json
 ```
 
-All six games have fixture transcripts checked into version control:
+All example games have fixture transcripts checked into version control:
 
 | Game | Fixture Path |
 |------|-------------|
@@ -991,9 +744,9 @@ Games with layout files and adapters ready for renderer integration:
 
 ### Composing shell + scene layouts
 
-Use `composeResolvedLayouts(baseLayout, sceneLayout, viewport, dpr, { policy: 'sceneWins' })` when a scene wants a shared shell (header/menu/toolbar/help) and a scene-specific layout without duplicating placement math. In the Gym SLL demo, the base help icon is positioned from the shell layout so shell-only and composed views show the shared help affordance, while the pure scene-only view hides the shared shell chrome. The shell-only example also hides the central demo action control and the `SLL Title Anchor` demo label so the shell view stays focused on shell-owned chrome, while the scene-only and composed views keep that title label lower so it does not collide with the shell contents. The demo also includes a `Toggle Shell` control that hides or restores shared shell chrome without changing the selected layout. The scene now uses the reusable `VisibilityOwnershipController` from `src/core-engine/` to toggle shell, shared, and scene UI groups by layout mode.
+Use `composeResolvedLayouts(baseLayout, sceneLayout, viewport, dpr, { policy: 'sceneWins' })` to combine a shared shell layout (header/menu/toolbar/help) with a scene-specific layout without duplicating placement math. Collision handling follows the project default: scene wins, with a warning reported on collision for local dev visibility.
 
-Register scene objects into ownership groups so visibility is managed automatically:
+Register scene objects into ownership groups so visibility is managed automatically per layout mode:
 
 ```ts
 import { VisibilityOwnershipController } from '@core-engine/VisibilityOwnership';
@@ -1007,18 +760,12 @@ const controller = new VisibilityOwnershipController({
 });
 controller.register(headerText, 'shell');
 controller.register(sceneContent, 'scene');
-controller.register(sharedOverlay, 'shared');
 controller.setMode('scene-only'); // hides shell, shows scene+shared
 ```
 
-Typical use cases:
+Typical use cases: shared app chrome across scenes, scene-specific overrides, browser tests asserting merged anchor positions across DPR/viewports, and debug overlays needing both source layout IDs and resolved pixels.
 
-- Shared app chrome that stays stable across multiple scenes
-- A scene-specific layout that overrides only the zones it owns
-- Browser tests that assert merged anchor positions across DPR/viewports
-- Debug overlays that need both the source layout ids and the merged resolved pixels
-
-Collision handling follows the project default: scene wins, and the helper reports a warning when a zone name collides so local dev/test runs surface the merge choice.
+See the Gym SLL demo (`example-games/gym/scenes/GymSllScene.ts`) for a working example with shell toggling.
 
 ### Standard SLL migration pattern for new games
 
@@ -1085,35 +832,20 @@ When adding a new example game, follow this pattern:
 
 ## Keeping Docs Up to Date
 
-**Policy:** Any change that alters developer workflows must include a documentation update. Specifically:
-
-- Changes to npm scripts, dependencies, or `package.json` structure
-- Changes to `tsconfig.json`, `vite.config.ts`, or build configuration
-- Changes to directory structure or path aliases
-- New tooling, CI/CD, or developer-facing infrastructure
-
-**How to comply:**
-
-1. Update this file (`docs/DEVELOPER.md`) and the relevant section of `AGENTS.md` in the same commit or PR
-2. If the doc update cannot be done in the same commit, create a child work item in Worklog:
-   ```bash
-   wl create --title "Update docs for <change>" --parent <parent-id> --priority medium --issue-type task --json
-   ```
-3. The parent work item cannot be closed until the doc-update child is also closed
+See the **Doc-Update Policy** in `AGENTS.md` for the canonical policy. In summary: any change that alters developer workflows must include a corresponding documentation update in both `docs/DEVELOPER.md` and `AGENTS.md`, or a child work item tracking the doc update must be created.
 
 ## Work-Item Tracking
 
-This project uses **Worklog (wl)** for all task tracking. Key commands:
+This project uses **Worklog (wl)** for all task tracking. See the Worklog section in `AGENTS.md` for full documentation on creating, updating, closing, and querying work items.
+
+Quick reference:
 
 ```bash
-wl next --json                    # what should I work on?
-wl create --title "..." --json    # create a work item
+wl next --json              # what should I work on?
+wl create --title "..." --json  # create a work item
 wl update <id> --status in_progress --json  # claim a task
-wl close <id> --reason "..." --json         # close when done
-wl sync                           # sync with remote
+wl close <id> --reason "..." --json  # close when done
 ```
-
-See the Worklog section in `AGENTS.md` for full documentation.
 
 ## Troubleshooting
 
