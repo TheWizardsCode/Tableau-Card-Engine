@@ -68,7 +68,7 @@ export const GYM_SCENE_CATALOGUE: GymSceneEntry[] = [
     sceneKey: GYM_DECK_RNG_KEY,
     title: 'Deck & Seeded RNG',
     description:
-      'Create, shuffle, and draw from decks using deterministic seeded randomness. Verify reproducible sequences across runs.',
+      'Displays all 52 cards face-up in a compact grid. Shuffle with a deterministic seed to see reproducible card arrangements.',
   },
   {
     sceneKey: GYM_HAND_PILE_KEY,

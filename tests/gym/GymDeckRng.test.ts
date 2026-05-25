@@ -3,8 +3,8 @@
  *
  * Validates that:
  *  - createSeededRng with same seed produces identical sequences
- *  - Deck and Pile operations work correctly
- *  - Seed input and adjustment is handled correctly
+ *  - Deck shuffle operations work correctly with seeded RNG
+ *  - Full-deck display and shuffle visual behavior (scene-level tests)
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -13,9 +13,7 @@ import {
 import {
   createStandardDeck,
   shuffleArray,
-  drawOrThrow,
 } from '../../src/card-system/Deck';
-import { Pile } from '../../src/card-system/Pile';
 
 describe('Gym Deck & RNG deterministic scenarios', () => {
   it('same seed produces identical shuffle sequences', () => {
@@ -54,35 +52,21 @@ describe('Gym Deck & RNG deterministic scenarios', () => {
     expect(same).toBeLessThan(deck1.length);
   });
 
-  it('draw cards from deck and verify state', () => {
+  it('shuffled deck contains all 52 cards', () => {
+    const rng = createSeededRng(42);
     const deck = createStandardDeck();
-    const drawn: ReturnType<typeof createStandardDeck> = [];
-    for (let i = 0; i < 5; i++) {
-      const card = drawOrThrow(deck);
-      drawn.push(card);
+    shuffleArray(deck, rng);
+
+    expect(deck.length).toBe(52);
+
+    // Verify all ranks and suits are present exactly once
+    const seen = new Set<string>();
+    for (const card of deck) {
+      const key = `${card.rank}${card.suit}`;
+      expect(seen.has(key)).toBe(false);
+      seen.add(key);
     }
-
-    expect(drawn.length).toBe(5);
-    expect(deck.length).toBe(47);
-  });
-
-  it('Pile push/pop operations', () => {
-    const deck = createStandardDeck();
-    const pile = new Pile(deck);
-
-    expect(pile.size()).toBe(52);
-    expect(pile.isEmpty()).toBe(false);
-
-    const topCard = pile.pop()!;
-    expect(topCard).toBeDefined();
-    expect(pile.size()).toBe(51);
-
-    pile.push(topCard);
-    expect(pile.size()).toBe(52);
-
-    pile.clear();
-    expect(pile.isEmpty()).toBe(true);
-    expect(pile.size()).toBe(0);
+    expect(seen.size).toBe(52);
   });
 
   it('seeds of 0 and 1 produce different sequences', () => {
@@ -91,5 +75,39 @@ describe('Gym Deck & RNG deterministic scenarios', () => {
     const vals0 = Array.from({ length: 10 }, () => rng0());
     const vals1 = Array.from({ length: 10 }, () => rng1());
     expect(vals0).not.toEqual(vals1);
+  });
+
+  it('shuffling produces a different order from an unshuffled deck', () => {
+    const unshuffled = createStandardDeck();
+    const shuffled = createStandardDeck();
+    const rng = createSeededRng(99);
+    shuffleArray(shuffled, rng);
+
+    // At least some cards should be in different positions
+    let different = 0;
+    for (let i = 0; i < unshuffled.length; i++) {
+      if (unshuffled[i].rank !== shuffled[i].rank || unshuffled[i].suit !== shuffled[i].suit) {
+        different++;
+      }
+    }
+    expect(different).toBeGreaterThan(0);
+  });
+
+  it('multiple shuffles with the same seed produce the same result', () => {
+    const deck1 = createStandardDeck();
+    shuffleArray(deck1, createSeededRng(7));
+
+    const deck2 = createStandardDeck();
+    shuffleArray(deck2, createSeededRng(7));
+
+    const deck3 = createStandardDeck();
+    shuffleArray(deck3, createSeededRng(7));
+
+    for (let i = 0; i < 52; i++) {
+      expect(deck1[i].rank).toBe(deck2[i].rank);
+      expect(deck1[i].suit).toBe(deck2[i].suit);
+      expect(deck2[i].rank).toBe(deck3[i].rank);
+      expect(deck2[i].suit).toBe(deck3[i].suit);
+    }
   });
 });
