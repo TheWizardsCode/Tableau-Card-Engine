@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "id": "main-street-canonical",
+  "baseViewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "requiredZones": [
+    "market",
+    "activityLog",
+    "street",
+    "endTurnButton"
+  ],
+  "zones": {
+    "market": {
+      "rect": {
+        "x": 0.015625,
+        "y": 0.125
+      },
+      "anchors": {
+        "topCenter": { "x": 0.5, "y": 0.125 },
+        "topLeft": { "x": 0.015625, "y": 0.125 }
+      }
+    },
+    "incidentQueue": {
+      "rect": {
+        "x": 0.085938,
+        "y": 0.444444
+      },
+      "anchors": {
+        "topLeft": { "x": 0.085938, "y": 0.444444 },
+        "bottomLeft": { "x": 0.085938, "y": 0.597222 }
+      }
+    },
+    "street": {
+      "rect": {
+        "x": 0.265625,
+        "y": 0.586111
+      },
+      "anchors": {
+        "topCenter": { "x": 0.5, "y": 0.586111 },
+        "bottomCenter": { "x": 0.5, "y": 0.858333 }
+      }
+    },
+    "hand": {
+      "rect": {
+        "x": 0.03125,
+        "y": 0.861111
+      },
+      "anchors": {
+        "topLeft": { "x": 0.03125, "y": 0.861111 }
+      }
+    },
+    "actions": {
+      "rect": {
+        "x": 0.6875,
+        "y": 0.930556
+      },
+      "anchors": {
+        "rightCenter": { "x": 0.979688, "y": 0.954167 }
+      }
+    },
+    "activityLog": {
+      "rect": {
+        "x": 0.640625,
+        "y": 0.111111
+      },
+      "anchors": {
+        "topLeft": { "x": 0.640625, "y": 0.111111 },
+        "bottomRight": { "x": 0.976563, "y": 0.583333 }
+      }
+    },
+    "challengePanel": {
+      "rect": {
+        "x": 0.359375,
+        "y": 0.444444
+      },
+      "anchors": {
+        "topLeft": { "x": 0.359375, "y": 0.444444 },
+        "bottomRight": { "x": 0.632813, "y": 0.597222 }
+      }
+    },
+    "endTurnButton": {
+      "rect": {
+        "x": 0.871875,
+        "y": 0.936111
+      },
+      "anchors": {
+        "center": { "x": 0.926563, "y": 0.959722 }
+      }
+    }
+  }
+}

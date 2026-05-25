@@ -10,11 +10,14 @@ import {
   createSceneTitle, createSceneMenuButton,
 } from '../../../src/ui';
 import {
-  GOLF_CARD_W, GOLF_CARD_H, CARD_GAP,
-  GRID_COLS, GRID_ROWS,
-  GRID_CENTER_Y, HUMAN_GRID_X, AI_GRID_X,
-  PILE_X, STOCK_Y, DISCARD_Y,
+  GOLF_CARD_H, CARD_GAP,
+  GRID_ROWS,
 } from './GolfConstants';
+import {
+  computeGolfLayout,
+  gridCellPosition,
+  type GolfLayout,
+} from './GolfLayoutAdapter';
 
 export class GolfRenderer {
   // Display objects -- grids
@@ -34,11 +37,16 @@ export class GolfRenderer {
   humanLabel!: Phaser.GameObjects.Text;
   aiLabel!: Phaser.GameObjects.Text;
 
+  /** SLL-derived layout resolved once at construction. */
+  private layout: GolfLayout;
+
   constructor(
     private scene: Phaser.Scene,
     private session: GolfSession,
     private replayMode: boolean,
-  ) {}
+  ) {
+    this.layout = computeGolfLayout();
+  }
 
   // ── UI creation ─────────────────────────────────────────
 
@@ -54,7 +62,7 @@ export class GolfRenderer {
     const gridH = GRID_ROWS * GOLF_CARD_H + (GRID_ROWS - 1) * CARD_GAP;
 
     this.humanLabel = this.scene.add
-      .text(HUMAN_GRID_X, GRID_CENTER_Y - gridH / 2 - 24, 'You', {
+      .text(this.layout.humanGridCenterX, this.layout.humanGridCenterY - gridH / 2 - 24, 'You', {
         fontSize: '24px',
         color: '#ffffff',
         fontFamily: FONT_FAMILY,
@@ -62,7 +70,7 @@ export class GolfRenderer {
       .setOrigin(0.5);
 
     this.aiLabel = this.scene.add
-      .text(AI_GRID_X, GRID_CENTER_Y - gridH / 2 - 24, 'AI', {
+      .text(this.layout.aiGridCenterX, this.layout.aiGridCenterY - gridH / 2 - 24, 'AI', {
         fontSize: '24px',
         color: '#cccccc',
         fontFamily: FONT_FAMILY,
@@ -75,14 +83,14 @@ export class GolfRenderer {
     onDiscardClick: () => void,
   ): void {
     // Stock pile (upper center)
-    this.stockSprite = this.scene.add.image(PILE_X, STOCK_Y, 'card_back');
+    this.stockSprite = this.scene.add.image(this.layout.stockPileCenterX, this.layout.stockPileCenterY, 'card_back');
     if (!this.replayMode) {
       this.stockSprite.setInteractive({ useHandCursor: true });
       this.stockSprite.on('pointerdown', onStockClick);
     }
 
     this.scene.add
-      .text(PILE_X, STOCK_Y + GOLF_CARD_H / 2 + 16, 'Stock', {
+      .text(this.layout.stockPileCenterX, this.layout.stockPileCenterY + GOLF_CARD_H / 2 + 16, 'Stock', {
         fontSize: '16px',
         color: '#aaccaa',
         fontFamily: FONT_FAMILY,
@@ -90,14 +98,14 @@ export class GolfRenderer {
       .setOrigin(0.5);
 
     // Discard pile (lower center)
-    this.discardSprite = this.scene.add.image(PILE_X, DISCARD_Y, 'card_back');
+    this.discardSprite = this.scene.add.image(this.layout.discardPileCenterX, this.layout.discardPileCenterY, 'card_back');
     if (!this.replayMode) {
       this.discardSprite.setInteractive({ useHandCursor: true });
       this.discardSprite.on('pointerdown', onDiscardClick);
     }
 
     this.scene.add
-      .text(PILE_X, DISCARD_Y + GOLF_CARD_H / 2 + 16, 'Discard', {
+      .text(this.layout.discardPileCenterX, this.layout.discardPileCenterY + GOLF_CARD_H / 2 + 16, 'Discard', {
         fontSize: '16px',
         color: '#aaccaa',
         fontFamily: FONT_FAMILY,
@@ -130,7 +138,7 @@ export class GolfRenderer {
     const gridH = GRID_ROWS * GOLF_CARD_H + (GRID_ROWS - 1) * CARD_GAP;
 
     this.humanScoreText = this.scene.add
-      .text(HUMAN_GRID_X, GRID_CENTER_Y + gridH / 2 + 24, 'Score: 0', {
+      .text(this.layout.humanGridCenterX, this.layout.humanGridCenterY + gridH / 2 + 24, 'Score: 0', {
         fontSize: '22px',
         color: '#ffffff',
         fontFamily: FONT_FAMILY,
@@ -138,7 +146,7 @@ export class GolfRenderer {
       .setOrigin(0.5);
 
     this.aiScoreText = this.scene.add
-      .text(AI_GRID_X, GRID_CENTER_Y + gridH / 2 + 24, 'Score: 0', {
+      .text(this.layout.aiGridCenterX, this.layout.aiGridCenterY + gridH / 2 + 24, 'Score: 0', {
         fontSize: '22px',
         color: '#cccccc',
         fontFamily: FONT_FAMILY,
@@ -147,7 +155,7 @@ export class GolfRenderer {
 
     // Turn indicator above the stock pile in center
     this.turnText = this.scene.add
-      .text(PILE_X, STOCK_Y - GOLF_CARD_H / 2 - 24, '', {
+      .text(this.layout.stockPileCenterX, this.layout.stockPileCenterY - GOLF_CARD_H / 2 - 24, '', {
         fontSize: '20px',
         color: '#ffdd44',
         fontFamily: FONT_FAMILY,
@@ -171,20 +179,7 @@ export class GolfRenderer {
     index: number,
     player: 'human' | 'ai',
   ): { x: number; y: number } {
-    const row = Math.floor(index / GRID_COLS);
-    const col = index % GRID_COLS;
-
-    const gridW = GRID_COLS * GOLF_CARD_W + (GRID_COLS - 1) * CARD_GAP;
-    const gridH = GRID_ROWS * GOLF_CARD_H + (GRID_ROWS - 1) * CARD_GAP;
-
-    const centerX = player === 'human' ? HUMAN_GRID_X : AI_GRID_X;
-    const startX = centerX - gridW / 2 + GOLF_CARD_W / 2;
-    const startY = GRID_CENTER_Y - gridH / 2 + GOLF_CARD_H / 2;
-
-    return {
-      x: startX + col * (GOLF_CARD_W + CARD_GAP),
-      y: startY + row * (GOLF_CARD_H + CARD_GAP),
-    };
+    return gridCellPosition(this.layout, index, player);
   }
 
   // ── Refresh display ─────────────────────────────────────

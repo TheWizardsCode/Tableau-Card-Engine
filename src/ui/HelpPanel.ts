@@ -104,6 +104,7 @@ export class HelpPanel {
   private scrollOffset = 0;
   private maxScroll = 0;
   private destroyed = false;
+  private enabled = true;
 
   // Keyboard
   private keyboardListener: ((event: KeyboardEvent) => void) | null = null;
@@ -201,7 +202,7 @@ export class HelpPanel {
 
   /** Open the help panel with slide-in animation. */
   open(): void {
-    if (this.destroyed) return;
+    if (this.destroyed || !this.enabled) return;
     if (this._isOpen && !this._isAnimating) return;
 
     this._isOpen = true;
@@ -241,7 +242,7 @@ export class HelpPanel {
 
   /** Close the help panel with slide-out animation. */
   close(): void {
-    if (this.destroyed) return;
+    if (this.destroyed || !this.enabled) return;
     if (!this._isOpen && !this._isAnimating) return;
 
     this._isOpen = false;
@@ -270,12 +271,40 @@ export class HelpPanel {
 
   /** Toggle the panel open/closed. */
   toggle(): void {
-    if (this._isAnimating) return;
+    if (this._isAnimating || !this.enabled) return;
     if (this._isOpen) {
       this.close();
     } else {
       this.open();
     }
+  }
+
+  /** Show or hide the help panel chrome. */
+  setVisible(visible: boolean): void {
+    this.enabled = visible;
+
+    if (this.currentTween) {
+      this.currentTween.stop();
+      this.currentTween = null;
+    }
+
+    this.removeInputBlocker();
+    this._isAnimating = false;
+    this._isOpen = false;
+
+    const contentTopY = (this as unknown as Record<string, number>)._contentTopY ?? PADDING + 10;
+    this.scrollOffset = 0;
+    this.contentContainer.setY(contentTopY);
+    if (this.trackBar) {
+      this.trackBar.setY(contentTopY);
+    }
+
+    this.container.setVisible(visible);
+    if (!visible) {
+      this.container.setX(-this.panelWidth);
+    }
+
+    this.updateMask();
   }
 
   /** Clean up all game objects. */
@@ -401,7 +430,7 @@ export class HelpPanel {
     _deltaX: number,
     deltaY: number,
   ): void => {
-    if (!this._isOpen || this._isAnimating || this.destroyed) return;
+    if (!this.enabled || !this._isOpen || this._isAnimating || this.destroyed) return;
     if (this.maxScroll <= 0) return;
 
     this.scrollOffset = Phaser.Math.Clamp(
@@ -502,7 +531,7 @@ export class HelpPanel {
     if (!this.scene.input.keyboard) return;
 
     this.keyboardListener = (event: KeyboardEvent) => {
-      if (this.destroyed) return;
+      if (this.destroyed || !this.enabled) return;
 
       // Check for '?' key (Shift + /)
       if (this.config.toggleKey === 'FORWARD_SLASH') {

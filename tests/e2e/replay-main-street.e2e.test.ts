@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import sharp from 'sharp';
 
 const PROJECT_ROOT = path.resolve(__dirname, '../..');
 const FIXTURE_TRANSCRIPT = path.join(
@@ -74,4 +75,21 @@ describe('Main Street replay e2e', () => {
       expect(fs.existsSync(screenshotPath)).toBe(true);
     }
   }, 90_000);
+
+  it('captures canonical-resolution screenshots for layout assertions', async () => {
+    const summaryPath = path.join(OUT_DIR, 'replay-summary.json');
+    expect(fs.existsSync(summaryPath)).toBe(true);
+
+    const summary = JSON.parse(fs.readFileSync(summaryPath, 'utf-8')) as {
+      screenshots: Array<{ screenshotPath: string }>;
+    };
+
+    expect(summary.screenshots.length).toBeGreaterThan(0);
+    const firstScreenshot = summary.screenshots[0]?.screenshotPath;
+    expect(firstScreenshot).toBeTruthy();
+
+    const metadata = await sharp(firstScreenshot).metadata();
+    expect(metadata.width).toBe(1280);
+    expect(metadata.height).toBe(720);
+  });
 });

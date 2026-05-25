@@ -39,7 +39,7 @@ tableau-card-engine/
 │   ├── rule-engine/       Rule definitions, validation, turn logic
 │   └── ui/                Reusable UI components
 ├── example-games/         Standalone example games
-│   ├── hello-world/       Minimal Phaser scene (toolchain proof)
+│   ├── gym/               Interactive demo scene suite for core-engine features
 │   ├── golf/              9-Card Golf (human vs. AI)
 │   ├── beleaguered-castle/ Beleaguered Castle (open solitaire)
 │   ├── sushi-go/          Sushi Go! (card drafting, human vs. AI)
@@ -73,7 +73,7 @@ tableau-card-engine/
 
 | Game | Location | Description |
 |------|----------|-------------|
-| Hello World | `example-games/hello-world/` | Minimal Phaser scene with card sprites -- proves the toolchain works |
+| Hello World \(replaced\) | `example-games/gym/` | Interactive demo scenes for every core-engine feature, including bottom-anchored curved hand layout controls in the Hand & Pile gym -- replaces the original minimal Hello World scene |
 | 9-Card Golf | `example-games/golf/` | Single-round 9-Card Golf (human vs. AI) with card flip animations, greedy/random AI strategies, and JSON game transcripts |
 | Beleaguered Castle | `example-games/beleaguered-castle/` | Open solitaire with drag-and-drop, click-to-move, undo/redo, auto-move to foundations, auto-complete, win/loss detection, help panel, and JSON game transcripts |
 | Sushi Go! | `example-games/sushi-go/` | Card drafting game (human vs. AI). Pick and pass hands over 3 rounds, collect sets of sushi dishes, and score the most points |

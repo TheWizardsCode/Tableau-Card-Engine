@@ -1,19 +1,15 @@
 /**
- * MindConstants -- shared layout, timing, and audio constants for The Mind.
+ * MindConstants -- shared timing, rendering, and game-logic constants for The Mind.
+ *
+ * Layout positions are now defined via SLL in `../layouts/the-mind.layout.json`
+ * and resolved through `MindLayoutAdapter.ts`.
  */
 
-import { GAME_W, GAME_H } from '../../../src/ui';
+import { GAME_W } from '../../../src/ui';
 
 // Card display dimensions (~50% larger than default for readability)
 export const CARD_W = 120;
 export const CARD_H = 164;
-
-// Layout
-export const PILE_X = GAME_W / 2;
-export const PILE_Y = GAME_H / 2 - 10;
-
-export const HUMAN_HAND_Y = GAME_H - 110;
-export const AI_HAND_Y = 150;
 
 export const CARD_GAP = 8;
 export const MAX_HAND_WIDTH = GAME_W - 80; // leave 40px margin each side

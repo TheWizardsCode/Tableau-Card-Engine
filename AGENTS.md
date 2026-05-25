@@ -13,7 +13,7 @@ This project follows a **spike-driven development** approach: example games are 
 - **Rule Engine** (`src/rule-engine/`): A component that allows for the creation and enforcement of game rules, enabling complex gameplay mechanics, turn logic, and validation.
 - **AI** (`src/ai/`): Shared AI strategy abstractions and utility functions. Provides `AiStrategyBase` (base interface), `AiPlayer<TStrategy>` (generic player wrapper that binds a strategy to an RNG), `pickRandom<T>()` (uniform random selection), and `pickBest<T>()` (scored selection with random tie-breaking). Game-specific strategies extend the base types.
 - **User Interface** (`src/ui/`): A modular UI system with reusable components (buttons, menus, overlays) that can be customized and extended to fit different card game themes and styles.
-- **Example Games** (`example-games/`): A collection of sample card games built using the engine, demonstrating its capabilities and serving as templates for future game development. Each example game has its own entry point, scenes, and tests.
+- **Example Games** (`example-games/`): A collection of sample card games built using the engine, demonstrating its capabilities and serving as templates for future game development. Each example game has its own entry point, scenes, and tests. The **Gym** (`example-games/gym/`) is a curated set of demo scenes that comprehensively showcase core-engine features, including direct and composed Screen Layout Language (SLL) examples.
 
 ## Directory Structure
 
@@ -31,10 +31,20 @@ tableau-card-engine/
 │   └── ui/                # Reusable UI components
 │       └── index.ts
 ├── example-games/
-│   └── hello-world/       # Minimal Phaser scene (toolchain proof)
-│       ├── scenes/
-│       │   └── HelloWorldScene.ts
-│       └── main.ts
+│   └── gym/               Gym demo scenes for core-engine features
+│       ├── README.md
+│       ├── GymRegistry.ts
+│       ├── index.ts
+│       └── scenes/
+│           ├── GymRouterScene.ts
+│           ├── GymSceneBase.ts
+│           ├── GymDeckRngScene.ts
+│           ├── GymHandPileScene.ts
+│           ├── GymOverlayUiScene.ts
+│           ├── GymUndoRedoScene.ts
+│           ├── GymTranscriptScene.ts
+│           ├── GymSaveLoadScene.ts
+│           └── GymAudioFeedbackScene.ts
 ├── public/                # Static assets (images, fonts, etc.)
 │   └── assets/
 │       ├── cards/         # Card sprite assets (CC0/permissive)

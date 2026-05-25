@@ -2,17 +2,25 @@
  * MindRenderer -- creates and refreshes all visual game objects for The Mind.
  */
 
-import { GAME_W, GAME_H, FONT_FAMILY, createSceneHeader, layoutCardPositions } from '../../../src/ui';
-import { ensureMindCardTexture } from '../MindCardRenderer';
-import { CARD_BACK_KEY } from '../MindCard';
+import { FONT_FAMILY, createSceneHeader, layoutCardPositions } from '../../../src/ui';
+import {
+  ensureTexture,
+  ensureBackTexture,
+  resolveBackTemplateId,
+  resolveTemplateId,
+  getCanonicalTextureKey,
+} from '../MindCardTextureAdapter';
 import type { MindCard } from '../MindCard';
 import type { TheMindSession } from '../TheMindGameState';
 import { MAX_LEVEL } from '../TheMindGameState';
 import {
   CARD_W, CARD_H, CARD_GAP, MAX_HAND_WIDTH,
-  PILE_X, PILE_Y, HUMAN_HAND_Y, AI_HAND_Y,
   DEPTH_CARDS, DEPTH_PILE, DEPTH_UI,
 } from './MindConstants';
+import {
+  computeMindLayout,
+  type MindLayout,
+} from './MindLayoutAdapter';
 
 export class MindRenderer {
   // Display objects -- human hand
@@ -39,10 +47,63 @@ export class MindRenderer {
   livesText!: Phaser.GameObjects.Text;
   instructionText!: Phaser.GameObjects.Text;
 
+  /** SLL-derived layout resolved once at construction. */
+  private layout: MindLayout;
+
+  private get sceneW(): number { return (this.scene.game.config.width as number) ?? 1280; }
+  private get sceneH(): number { return (this.scene.game.config.height as number) ?? 720; }
+
   constructor(
     private scene: Phaser.Scene,
     private session: TheMindSession,
-  ) {}
+  ) {
+    this.layout = computeMindLayout({
+      width: (this.scene.game.config.width as number) ?? 1280,
+      height: (this.scene.game.config.height as number) ?? 720,
+    });
+  }
+
+  private getBackTextureFallbackKey(): string {
+    const canonical = getCanonicalTextureKey(resolveBackTemplateId(), CARD_W, CARD_H);
+    if (this.scene.textures?.exists(canonical)) return canonical;
+    if (this.scene.textures?.exists(resolveBackTemplateId())) return resolveBackTemplateId();
+    return canonical;
+  }
+
+  private async applyEnsuredTexture(
+    sprite: Phaser.GameObjects.Image,
+    ensureOp: Promise<{ key: string; ready: boolean; promise?: Promise<void> }>,
+    stillMounted: () => boolean,
+  ): Promise<void> {
+    try {
+      const result = await ensureOp;
+      if (!result.ready && result.promise) {
+        await result.promise;
+      }
+      if (!stillMounted()) return;
+      sprite.setTexture(result.key);
+      sprite.setDisplaySize(CARD_W, CARD_H);
+    } catch {
+      // keep existing texture fallback on error
+    }
+  }
+
+  private ensureAiBackTextures(): void {
+    void (async () => {
+      try {
+        const result = await ensureBackTexture(this.scene, CARD_W, CARD_H);
+        if (!result.ready && result.promise) {
+          await result.promise;
+        }
+        for (const sprite of this.aiCardSprites) {
+          sprite.setTexture(result.key);
+          sprite.setDisplaySize(CARD_W, CARD_H);
+        }
+      } catch {
+        // keep fallback back texture
+      }
+    })();
+  }
 
   // ── UI creation ─────────────────────────────────────────
 
@@ -52,7 +113,7 @@ export class MindRenderer {
 
   createStatusDisplay(): void {
     this.levelText = this.scene.add
-      .text(GAME_W - 100, 55, '', {
+      .text(this.sceneW - 100, 55, '', {
         fontSize: '16px',
         color: '#aaccff',
         fontFamily: FONT_FAMILY,
@@ -61,7 +122,7 @@ export class MindRenderer {
       .setDepth(DEPTH_UI);
 
     this.livesText = this.scene.add
-      .text(GAME_W - 100, 79, '', {
+      .text(this.sceneW - 100, 79, '', {
         fontSize: '16px',
         color: '#ff6666',
         fontFamily: FONT_FAMILY,
@@ -71,14 +132,15 @@ export class MindRenderer {
   }
 
   createPile(): void {
+    const backKey = this.getBackTextureFallbackKey();
     this.pileSprite = this.scene.add
-      .image(PILE_X, PILE_Y, CARD_BACK_KEY)
+      .image(this.layout.playPileCenterX, this.layout.playPileCenterY, backKey)
       .setDisplaySize(CARD_W, CARD_H)
       .setDepth(DEPTH_PILE)
       .setAlpha(0.3);
 
     this.scene.add
-      .text(PILE_X, PILE_Y - CARD_H / 2 - 18, 'PILE', {
+      .text(this.layout.playPileCenterX, this.layout.playPileCenterY - CARD_H / 2 - 18, 'PILE', {
         fontSize: '12px',
         color: '#888888',
         fontFamily: FONT_FAMILY,
@@ -87,7 +149,7 @@ export class MindRenderer {
       .setDepth(DEPTH_UI);
 
     this.pileValueText = this.scene.add
-      .text(PILE_X, PILE_Y + CARD_H / 2 + 14, '', {
+      .text(this.layout.playPileCenterX, this.layout.playPileCenterY + CARD_H / 2 + 14, '', {
         fontSize: '14px',
         color: '#ffffff',
         fontFamily: FONT_FAMILY,
@@ -96,7 +158,7 @@ export class MindRenderer {
       .setDepth(DEPTH_UI);
 
     this.pileCountText = this.scene.add
-      .text(PILE_X, PILE_Y + CARD_H / 2 + 32, '', {
+      .text(this.layout.playPileCenterX, this.layout.playPileCenterY + CARD_H / 2 + 32, '', {
         fontSize: '11px',
         color: '#888888',
         fontFamily: FONT_FAMILY,
@@ -107,7 +169,7 @@ export class MindRenderer {
 
   createInstruction(): void {
     this.instructionText = this.scene.add
-      .text(GAME_W / 2, GAME_H - 20, '', {
+      .text(this.sceneW / 2, this.sceneH - 20, '', {
         fontSize: '12px',
         color: '#aaaaaa',
         fontFamily: FONT_FAMILY,
@@ -132,20 +194,26 @@ export class MindRenderer {
     const pileSize = this.session.pile.size();
 
     if (pileSize > 0 && topCard) {
-      // Start with placeholder and update when texture is ready.
-      this.pileSprite.setTexture(CARD_BACK_KEY);
+      const backKey = this.getBackTextureFallbackKey();
+      const faceKey = getCanonicalTextureKey(resolveTemplateId(topCard.value), CARD_W, CARD_H);
+      const hasFaceTexture = !!this.scene.textures?.exists?.(faceKey);
+
+      // Avoid flicker: if face texture is already available, use it immediately
+      // instead of flashing back texture first.
+      this.pileSprite.setTexture(hasFaceTexture ? faceKey : backKey);
+      this.pileSprite.setDisplaySize(CARD_W, CARD_H);
       this.pileSprite.setAlpha(1);
       this.pileValueText.setText(`${topCard.value}`);
-      (async () => {
-        try {
-          const res = await ensureMindCardTexture(this.scene, topCard.value, CARD_W, CARD_H);
-          if (res && res.key) this.pileSprite.setTexture(res.key);
-        } catch {
-          // noop
-        }
-      })();
+
+      void this.applyEnsuredTexture(
+        this.pileSprite,
+        ensureTexture(this.scene, topCard.value, CARD_W, CARD_H),
+        () => !!this.pileSprite,
+      );
     } else {
-      this.pileSprite.setTexture(CARD_BACK_KEY);
+      const backKey = this.getBackTextureFallbackKey();
+      this.pileSprite.setTexture(backKey);
+      this.pileSprite.setDisplaySize(CARD_W, CARD_H);
       this.pileSprite.setAlpha(0.3);
       this.pileValueText.setText('Empty');
     }
@@ -168,11 +236,13 @@ export class MindRenderer {
     const hand = this.session.players[0].hand;
     if (hand.length === 0) return;
 
+    const backKey = this.getBackTextureFallbackKey();
+
     const { positions } = layoutCardPositions({
       count: hand.length,
       cardWidth: CARD_W,
       gap: CARD_GAP,
-      centerX: GAME_W / 2,
+      centerX: this.sceneW / 2,
       maxWidth: MAX_HAND_WIDTH,
     });
 
@@ -180,43 +250,39 @@ export class MindRenderer {
       const card = hand[i];
       const displayCard = { ...card, faceUp: true };
       const x = positions[i];
-      // Create using placeholder key to avoid empty texture on creation.
+      // Create using fallback back texture as placeholder to avoid empty texture.
       const sprite = this.scene.add
-        .image(x, HUMAN_HAND_Y, CARD_BACK_KEY)
+        .image(x, this.layout.humanHandCenterY, backKey)
         .setDisplaySize(CARD_W, CARD_H)
         .setDepth(DEPTH_CARDS + i)
         .setInteractive({ useHandCursor: true });
 
+      (sprite as any).__mindCardValue = card.value;
+
       // Kick off lazy rasterisation and update the sprite when ready.
-      (async () => {
-        try {
-          const res = await ensureMindCardTexture(this.scene, displayCard.value, CARD_W, CARD_H);
-          // If ready or later generated, set the texture key.
-          if (res && res.key && this.humanCardSprites.includes(sprite)) {
-            sprite.setTexture(res.key);
-          }
-        } catch {
-          // ignore rasterisation failures; keep placeholder
-        }
-      })();
+      void this.applyEnsuredTexture(
+        sprite,
+        ensureTexture(this.scene, displayCard.value, CARD_W, CARD_H),
+        () => this.humanCardSprites.includes(sprite),
+      );
 
       sprite.on('pointerdown', () => onCardClick(card));
       sprite.on('pointerover', () => {
         if (phase === 'playing' && !autoPlayEnabled) {
-          sprite.setScale(1.08);
-          sprite.setY(HUMAN_HAND_Y - 6);
+          sprite.setDisplaySize(CARD_W * 1.03, CARD_H * 1.03);
+          sprite.setY(this.layout.humanHandCenterY - 4);
         }
       });
       sprite.on('pointerout', () => {
-        sprite.setScale(1);
-        sprite.setY(HUMAN_HAND_Y);
+        sprite.setDisplaySize(CARD_W, CARD_H);
+        sprite.setY(this.layout.humanHandCenterY);
       });
 
       this.humanCardSprites.push(sprite);
     }
 
     this.scene.add
-      .text(GAME_W / 2, HUMAN_HAND_Y - CARD_H / 2 - 14, 'Your Hand', {
+      .text(this.sceneW / 2, this.layout.humanHandCenterY - CARD_H / 2 - 14, 'Your Hand', {
         fontSize: '12px',
         color: '#88ff88',
         fontFamily: FONT_FAMILY,
@@ -233,21 +299,20 @@ export class MindRenderer {
       return;
     }
 
+    const backKey = this.getBackTextureFallbackKey();
     for (let i = 0; i < hand.length; i++) {
       const displayCard = { ...hand[i], faceUp: true };
       const sprite = this.humanCardSprites[i];
-      // Start with placeholder and update when lazy texture ready.
-      sprite.setTexture(CARD_BACK_KEY);
-      (async () => {
-        try {
-          const res = await ensureMindCardTexture(this.scene, displayCard.value, CARD_W, CARD_H);
-          if (res && res.key && this.humanCardSprites[i] === sprite) {
-            sprite.setTexture(res.key);
-          }
-        } catch {
-          // noop
-        }
-      })();
+      (sprite as any).__mindCardValue = hand[i].value;
+
+      // Start with card-back placeholder and update when lazy texture is ready.
+      sprite.setTexture(backKey);
+      sprite.setDisplaySize(CARD_W, CARD_H);
+      void this.applyEnsuredTexture(
+        sprite,
+        ensureTexture(this.scene, displayCard.value, CARD_W, CARD_H),
+        () => this.humanCardSprites[i] === sprite,
+      );
     }
   }
 
@@ -265,18 +330,20 @@ export class MindRenderer {
       return;
     }
 
+    const backKey = this.getBackTextureFallbackKey();
+
     const { positions } = layoutCardPositions({
       count: hand.length,
       cardWidth: CARD_W,
       gap: CARD_GAP,
-      centerX: GAME_W / 2,
+      centerX: this.sceneW / 2,
       maxWidth: MAX_HAND_WIDTH,
     });
 
     for (let i = 0; i < hand.length; i++) {
       const x = positions[i];
       const sprite = this.scene.add
-        .image(x, AI_HAND_Y, CARD_BACK_KEY)
+        .image(x, this.layout.aiHandCenterY, backKey)
         .setDisplaySize(CARD_W, CARD_H)
         .setDepth(DEPTH_CARDS + i);
 
@@ -287,7 +354,7 @@ export class MindRenderer {
       this.aiCountText.destroy();
     }
     this.aiCountText = this.scene.add
-      .text(GAME_W / 2, AI_HAND_Y + CARD_H / 2 + 14, '', {
+      .text(this.sceneW / 2, this.layout.aiHandCenterY + CARD_H / 2 + 14, '', {
         fontSize: '12px',
         color: '#aaaaaa',
         fontFamily: FONT_FAMILY,
@@ -300,13 +367,15 @@ export class MindRenderer {
     );
 
     this.scene.add
-      .text(GAME_W / 2, AI_HAND_Y - CARD_H / 2 - 14, 'AI Hand', {
+      .text(this.sceneW / 2, this.layout.aiHandCenterY - CARD_H / 2 - 14, 'AI Hand', {
         fontSize: '12px',
         color: '#ffaa44',
         fontFamily: FONT_FAMILY,
       })
       .setOrigin(0.5)
       .setDepth(DEPTH_UI);
+
+    this.ensureAiBackTextures();
   }
 
   refreshAiHand(): void {
@@ -369,35 +438,32 @@ export class MindRenderer {
       count: cardValues.length,
       cardWidth: CARD_W,
       gap: CARD_GAP,
-      centerX: GAME_W / 2,
+      centerX: this.sceneW / 2,
       maxWidth: MAX_HAND_WIDTH,
     });
 
     for (let i = 0; i < cardValues.length; i++) {
       const x = positions[i];
       const card: MindCard = { value: cardValues[i], faceUp };
-      const texture = CARD_BACK_KEY;
+      const backKey = this.getBackTextureFallbackKey();
       const sprite = this.scene.add
-        .image(x, y, texture)
+        .image(x, y, backKey)
         .setDisplaySize(CARD_W, CARD_H)
         .setDepth(DEPTH_CARDS + i);
 
       if (faceUp) {
-        (async () => {
-          try {
-            const res = await ensureMindCardTexture(this.scene, card.value, CARD_W, CARD_H);
-            if (res && res.key) sprite.setTexture(res.key);
-          } catch {
-            // noop
-          }
-        })();
+        void this.applyEnsuredTexture(
+          sprite,
+          ensureTexture(this.scene, card.value, CARD_W, CARD_H),
+          () => (sprite as any).active !== false,
+        );
       }
 
       spriteArray.push(sprite);
     }
 
     this.scene.add
-      .text(GAME_W / 2, y - CARD_H / 2 - 14, label, {
+      .text(this.sceneW / 2, y - CARD_H / 2 - 14, label, {
         fontSize: '12px',
         color: labelColor,
         fontFamily: FONT_FAMILY,

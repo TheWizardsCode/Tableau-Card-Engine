@@ -7,8 +7,7 @@ import { tierDisplayName, resourceDisplayName, formatCost } from '../FeudalismCa
 import type { FeudalismSession } from '../FeudalismGame';
 import { getInfluence, getWinnerIndex } from '../FeudalismGame';
 import { FeudalismTranscriptRecorder } from '../GameTranscript';
-import { autoSaveTranscript } from '../../../src/core-engine/autoSaveTranscript';
-import { TranscriptStore } from '../../../src/core-engine/TranscriptStore';
+import { autoSaveTranscript, TranscriptStore } from '../../../src/core-engine/transcript';
 import {
   GAME_W, GAME_H, FONT_FAMILY,
   createOverlayBackground, createOverlayButton, createOverlayMenuButton,

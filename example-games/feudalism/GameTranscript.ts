@@ -19,7 +19,7 @@
  * @module
  */
 
-import { TranscriptRecorderBase } from '../../src/core-engine/TranscriptRecorder';
+import { TranscriptRecorderBase } from '../../src/core-engine/transcript';
 import type { DevelopmentCard, PatronTile, ResourceTokens, Tier } from './FeudalismCards';
 import type {
   FeudalismSession,

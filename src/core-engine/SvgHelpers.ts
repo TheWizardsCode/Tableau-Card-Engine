@@ -29,9 +29,21 @@ export async function fetchSvgText(url: string): Promise<string> {
 /**
  * Generates a deterministic texture key for a template + dimensions + DPR.
  * Width/height are rounded to avoid key fragmentation from sub-pixel values.
+ *
+ * @param templateId - Logical identifier for the texture template (e.g. "tempura", "business-1")
+ * @param width - Target display width in pixels
+ * @param height - Target display height in pixels
+ * @param dpr - Device pixel ratio
+ * @param prefix - Optional namespace prefix for the key (default: "ms_card_")
  */
-export function makeTextureKey(templateId: string, width: number, height: number, dpr: number): string {
-  return `ms_card_${templateId}_${Math.round(width)}x${Math.round(height)}@${dpr}`;
+export function makeTextureKey(
+  templateId: string,
+  width: number,
+  height: number,
+  dpr: number,
+  prefix: string = 'ms_card_',
+): string {
+  return `${prefix}${templateId}_${Math.round(width)}x${Math.round(height)}@${dpr}`;
 }
 
 function svgToDataUri(svgText: string): string {

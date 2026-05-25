@@ -16,6 +16,7 @@ This document covers everything you need to develop, test, and build the Tableau
 - [Replay Tool](#replay-tool)
 - [Managing Assets](#managing-assets)
 - [SVG Rendering & Migration](#svg-rendering--migration)
+- [Screen Layout Language (SLL)](#screen-layout-language-sll)
 - [Keeping Docs Up to Date](#keeping-docs-up-to-date)
 - [Work-Item Tracking](#work-item-tracking)
 - [Troubleshooting](#troubleshooting)
@@ -221,10 +222,24 @@ src/
     └── index.ts             Barrel file / public API
 
 example-games/
-├── hello-world/
-│   ├── main.ts                 Game entry point (Phaser.Game config)
+├── gym/
+│   ├── README.md               Gym documentation and quick-start instructions
+│   ├── GymRegistry.ts           Scene key constants and catalogue
+│   ├── index.ts                 Barrel file / public API
+│   ├── layouts/                 SLL sample layout JSON documents for GymSllScene
 │   └── scenes/
-│       └── HelloWorldScene.ts  Phaser.Scene subclass
+│       ├── GymRouterScene.ts    Landing page with navigation cards
+│       ├── GymSceneBase.ts      Shared base class for all Gym scenes
+│       ├── GymDeckRngScene.ts   Deck lifecycle & seeded RNG demo
+│       ├── GymHandPileScene.ts  Hand/pile interaction demo (bottom-anchored hand arc + live radius slider)
+│       ├── GymOverlayUiScene.ts Overlay & UI configuration demo
+│       ├── GymUndoRedoScene.ts  Undo/redo workflow demo
+│       ├── GymTranscriptScene.ts Transcript recording demo
+│       ├── GymSaveLoadScene.ts  Save/load state demo
+│       ├── GymAudioFeedbackScene.ts Audio & feedback configuration demo
+│       ├── GymGraphicsShaderSpikeScene.ts Shader & blend mode spike
+│       ├── GymGraphicsLightingSpikeScene.ts Lighting spike
+│       └── GymSllScene.ts       Screen Layout Language demo (schema+mapping+overlay)
 ├── golf/
 │   ├── main.ts                 Game entry point (Phaser.Game config)
 │   ├── createGolfGame.ts       Factory function (used by main.ts and tests)
@@ -350,6 +365,8 @@ import { ENGINE_VERSION } from '@core-engine/index';
 ```
 
 ## Adding an Example Game
+
+> **Note:** For engine feature demonstrations (not full games), add a demo scene to the **Gym** instead of creating a new example game. See [Gym documentation](../example-games/gym/README.md) and [Gym scene index](gym/GYM_INDEX.md).
 
 1. Create a directory: `example-games/<game-name>/`
 2. Add a standalone entry point: `example-games/<game-name>/main.ts`
@@ -826,7 +843,7 @@ Use the `scripts/refresh-thumbnails.sh` script to replay fixture transcripts and
 bash scripts/refresh-thumbnails.sh
 ```
 
-The script processes all supported games (`golf`, `beleaguered-castle`, `lost-cities`, `sushi-go`, `feudalism`, `the-mind`, `main-street`). For each game it runs the replay tool to capture screenshots, then invokes the thumbnail generator. Games that lack a fixture transcript or replay adapter are skipped with a warning (not a failure). `hello-world` is excluded — it has no gameplay and no fixture transcript. A summary table is printed at the end showing which games were refreshed and which were skipped. The script exits non-zero if any supported game fails during replay or thumbnail generation.
+The script processes all supported games (`golf`, `beleaguered-castle`, `lost-cities`, `sushi-go`, `feudalism`, `the-mind`, `main-street`). For each game it runs the replay tool to capture screenshots, then invokes the thumbnail generator. Games that lack a fixture transcript or replay adapter are skipped with a warning (not a failure). The `gym` is excluded -- it has no replay transcript. A summary table is printed at the end showing which games were refreshed and which were skipped. The script exits non-zero if any supported game fails during replay or thumbnail generation.
 
 ### Main Street visual smoke runbook
 
@@ -908,6 +925,163 @@ if (!texture.ready && texture.promise) await texture.promise;
 - Ensure scene lifecycle invalidates helper operations on shutdown/destroy.
 - Add or update browser smoke tests with pixel-sample assertions (non-solid texture checks).
 - Keep per-test runtime at or below 10 seconds for SVG smoke checks.
+
+### The Mind migration (CG-0MP12H40Q003Y7OU)
+
+The Mind was the first example game migrated from `scene.load.svg` to SvgHelpers lazy rasterisation. Key changes:
+
+- **MindCardRenderer.ts**: `preloadMindCardAssets` is now registration-only in browser runtimes (calls `markSceneValid(scene)`); it does NOT eagerly rasterise SVGs. The Node/test preload path still populates the `svgTextCache` for headless access.
+- **MindCardTextureAdapter.ts**: New module providing a stable, DPR-aware API for callers. Use `resolveTemplateId()`, `getCanonicalTextureKey()`, and `ensureTexture()` instead of legacy template IDs when setting sprite textures.
+- **Scene callers**: `MindRenderer`, `MindAnimator`, and `MindReplayController` now import from `MindCardTextureAdapter` instead of using `CARD_BACK_KEY` or `getMindCardTexture` directly.
+- **Texture keys**: Lazy rasterisation via `SvgHelpers.getOrCreateTexture` produces DPR-aware keys (e.g. `ms_card_mind-42_48x65@2`). The legacy template IDs (`mind-42`, `mind-back`) are still returned by `getMindCardTexture()` and `mindCardTextureKey()` but should not be used for sprite texture lookups.
+- **Tests**: Unit and integration tests updated to assert DPR-aware key format. A headless integration smoke test (`tests/the-mind/headless.test.ts`) verifies the full preload → ensure → key resolution pipeline.
+
+**Pattern for migrating other games:**
+1. Create a texture adapter module with `resolveTemplateId()`, `getCanonicalTextureKey()`, and `ensureTexture()` wrappers.
+2. Replace `this.load.svg(...)` with `markSceneValid(this)` in preload; populate SVG text cache via `this.load.text(...)` or module-level cache for Node.
+3. Replace direct texture key strings with adapter calls in scene code.
+4. Update tests to assert DPR-aware key format and add headless integration checks.
+
+Games still using `scene.load.svg` (as of this migration): lost-cities.
+
+## Screen Layout Language (SLL)
+
+The project now includes a reusable **Screen Layout Language** for viewport-aware scene layout.
+
+### Core files
+
+- Schema + types: `src/ui/screen-layout-schema.ts`
+- Runtime mapping: `src/ui/screen-layout.ts`
+- Composition helper: `src/ui/screen-layout-compose.ts`
+- Visibility / ownership helper: `src/core-engine/VisibilityOwnership.ts`
+- Public exports: `src/ui/index.ts`, `src/core-engine/index.ts`
+
+### Migrated games
+
+The following games have been migrated to use SLL layout helpers:
+
+| Game | Layout file | Adapter |
+|------|------------|---------|
+| Golf | `example-games/golf/layouts/golf.layout.json` | `example-games/golf/scenes/GolfLayoutAdapter.ts` |
+| The Mind | `example-games/the-mind/layouts/the-mind.layout.json` | `example-games/the-mind/scenes/MindLayoutAdapter.ts` |
+| Beleaguered Castle | `example-games/beleaguered-castle/layouts/beleaguered-castle.layout.json` | `example-games/beleaguered-castle/scenes/BeleagueredCastleLayoutAdapter.ts` |
+| Main Street | `example-games/main-street/layouts/main-street.layout.json` | `example-games/main-street/scenes/MainStreetLayoutAdapter.ts` |
+
+Games with layout files and adapters ready for renderer integration:
+
+| Game | Layout file | Adapter |
+|------|------------|---------|
+| Feudalism | `example-games/feudalism/layouts/feudalism.layout.json` | `example-games/feudalism/scenes/FeudalismLayoutAdapter.ts` |
+| Sushi Go | `example-games/sushi-go/layouts/sushi-go.layout.json` | `example-games/sushi-go/scenes/SushiGoLayoutAdapter.ts` |
+| Lost Cities | `example-games/lost-cities/layouts/lost-cities.layout.json` | `example-games/lost-cities/scenes/LostCitiesLayoutAdapter.ts` |
+
+### Main Street canonical example
+
+- Layout file: `example-games/main-street/layouts/main-street.layout.json`
+- Adapter: `example-games/main-street/scenes/MainStreetLayoutAdapter.ts`
+- Renderer integration: `example-games/main-street/scenes/MainStreetRenderer.ts` (`computeLayout()` applies SLL first, then falls back)
+
+### Gym SLL demo example
+
+- Scene: `example-games/gym/scenes/GymSllScene.ts`
+- Layout documents: `example-games/gym/layouts/gym-shell.layout.json` (shell-only and composed shell source), `example-games/gym/layouts/gym-scene.layout.json` (scene-only source), `example-games/gym/layouts/gym-sll-pixel-override.layout.json`
+- Browser verification: `tests/gym/GymSllScene.browser.test.ts`
+- Unit verification: `tests/core-engine/VisibilityOwnership.test.ts`, `tests/ui/screen-layout-compose.test.ts`, `tests/gym/GymSllLayout.test.ts`
+- Shared ownership helper: `src/core-engine/VisibilityOwnership.ts`
+
+### Composing shell + scene layouts
+
+Use `composeResolvedLayouts(baseLayout, sceneLayout, viewport, dpr, { policy: 'sceneWins' })` when a scene wants a shared shell (header/menu/toolbar/help) and a scene-specific layout without duplicating placement math. In the Gym SLL demo, the base help icon is positioned from the shell layout so shell-only and composed views show the shared help affordance, while the pure scene-only view hides the shared shell chrome. The shell-only example also hides the central demo action control and the `SLL Title Anchor` demo label so the shell view stays focused on shell-owned chrome, while the scene-only and composed views keep that title label lower so it does not collide with the shell contents. The demo also includes a `Toggle Shell` control that hides or restores shared shell chrome without changing the selected layout. The scene now uses the reusable `VisibilityOwnershipController` from `src/core-engine/` to toggle shell, shared, and scene UI groups by layout mode.
+
+Register scene objects into ownership groups so visibility is managed automatically:
+
+```ts
+import { VisibilityOwnershipController } from '@core-engine/VisibilityOwnership';
+
+const controller = new VisibilityOwnershipController({
+  groupRules: {
+    shell: { 'shell-only': true, composed: true },
+    scene: { 'scene-only': true, composed: true },
+    shared: { 'shell-only': true, 'scene-only': true, composed: true },
+  },
+});
+controller.register(headerText, 'shell');
+controller.register(sceneContent, 'scene');
+controller.register(sharedOverlay, 'shared');
+controller.setMode('scene-only'); // hides shell, shows scene+shared
+```
+
+Typical use cases:
+
+- Shared app chrome that stays stable across multiple scenes
+- A scene-specific layout that overrides only the zones it owns
+- Browser tests that assert merged anchor positions across DPR/viewports
+- Debug overlays that need both the source layout ids and the merged resolved pixels
+
+Collision handling follows the project default: scene wins, and the helper reports a warning when a zone name collides so local dev/test runs surface the merge choice.
+
+### Standard SLL migration pattern for new games
+
+When adding a new example game, follow this pattern:
+
+1. **Create a layout JSON file** in `example-games/<game>/layouts/<game>.layout.json` with **position-only** normalized zone rectangles (`x`, `y`) and anchors. Use `baseViewport` of 1280x720 (matching the shared `GAME_W`/`GAME_H` constants).
+
+   **Important**: Layout zones define **positioning only** (`x`, `y`). Card dimensions come entirely from per-game constants (e.g., `CARD_W`, `CARD_H`), not from layout zones. The `pixelOverride` field supports exact pixel-position overrides for `x` and `y` only — no dimensions.
+
+2. **Create a layout adapter** in `example-games/<game>/scenes/<Game>LayoutAdapter.ts` that:
+   - Parses the layout JSON using `parseScreenLayoutDocument`
+   - Defines a typed `GameLayout` interface with the positions your renderer needs
+   - Exports a `compute<Game>Layout()` function that maps SLL zones to the game-specific shape, falling back to legacy values if the SLL document is unavailable
+
+3. **Update the renderer** to:
+   - Import `compute<Game>Layout()` and call it in the constructor
+   - Replace hardcoded position constants with `this.layout.<property>` references
+   - Card dimensions always come from per-game constants (e.g., `CARD_W`, `CARD_H`); never derive card sizes from layout zones
+
+4. **Update the Constants file** to:
+   - Remove layout position constants (e.g. `PILE_X`, `HAND_Y`)
+   - Keep card dimensions, timing constants, audio keys, and game-logic constants
+   - Add a comment noting that layout positions are now defined via SLL
+
+5. **Update tests** that mock renderers to include a `layout` property matching the `GameLayout` interface.
+
+### Authoring and validation workflow
+
+1. Author/update a `*.layout.json` file with **position-only** normalized zone rectangles (`x`, `y` — no `width`/`height`) and anchors.
+2. Validate schema + parse behavior via:
+   ```bash
+   npx vitest run tests/ui/screen-layout-schema.test.ts --project unit
+   ```
+3. Validate mapping behavior via:
+   ```bash
+   npx vitest run tests/ui/screen-layout-mapping.test.ts --project unit
+   ```
+4. Validate SLL composition and Gym integration via:
+   ```bash
+   npx vitest run tests/ui/screen-layout-compose.test.ts --project unit
+   npx vitest run tests/gym/GymSllScene.browser.test.ts --project browser
+   ```
+5. Validate Main Street layout integration via:
+   ```bash
+   npx vitest run tests/main-street/MainStreetLayoutAnchors.browser.test.ts --project browser
+   npx vitest run tests/main-street/MainStreetScene.browser.test.ts --project browser
+   ```
+
+### Migration and fallback behavior
+
+- Use `adaptLayoutWithFallback(...)` for incremental scene migration.
+- If a layout document is missing or mapping fails, fallback layout code remains active.
+- Runtime issue hooks (`ScreenLayoutIssue`) can be wired to telemetry/logging without changing scene logic.
+
+### Troubleshooting SLL issues
+
+- If schema validation fails, inspect `path` and `message` in validation errors from `validateScreenLayoutDocument`.
+- If zones/anchors are missing at runtime, look for `UNKNOWN_ZONE` / `UNKNOWN_ANCHOR` issues.
+- If scene behavior unexpectedly matches legacy coordinates, verify that the adapter sees a valid layout document and that the relevant zone names exist.
+
+### Related follow-up scope
+
+- Tutorial-specific layout migration remains tracked separately in work item **Adapt tutorial system to use layout description (CG-0MP7IZ4RK008065O)**.
 
 ## Keeping Docs Up to Date
 

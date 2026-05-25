@@ -20,10 +20,29 @@ import { FeudalismScene } from './example-games/feudalism/scenes/FeudalismScene'
 import { LostCitiesScene } from './example-games/lost-cities/scenes/LostCitiesScene';
 import { TheMindScene } from './example-games/the-mind/scenes/TheMindScene';
 import { MainStreetScene } from './example-games/main-street/scenes/MainStreetScene';
+import {
+  GymRouterScene,
+  GymDeckRngScene,
+  GymHandPileScene,
+  GymOverlayUiScene,
+  GymUndoRedoScene,
+  GymTranscriptScene,
+  GymSaveLoadScene,
+  GymAudioFeedbackScene,
+  GymGraphicsShaderSpikeScene,
+  GymGraphicsLightingSpikeScene,
+  GymSllScene,
+} from './example-games/gym';
 
 // ── Game catalogue ─────────────────────────────────────────
 
 const GAMES: GameEntry[] = [
+  {
+    sceneKey: 'GymRouterScene',
+    title: 'Gym',
+    description:
+      'Interactive demo scenes for every core-engine feature. Explore deck management, seeded RNG, undo/redo, overlays, transcript recording, save/load, and audio/feedback configuration.',
+  },
   {
     sceneKey: 'GolfScene',
     title: '9-Card Golf',
@@ -86,7 +105,28 @@ const isReplayMode = new URLSearchParams(window.location.search).get('mode') ===
 createCardGame({
   backgroundColor: '#1a2a1a',
   // Register all scenes; GameSelectorScene is first so it auto-starts.
-  scenes: [GameSelectorScene, GolfScene, BeleagueredCastleScene, SushiGoScene, FeudalismScene, LostCitiesScene, TheMindScene, MainStreetScene],
+  scenes: [
+    GameSelectorScene,
+    GolfScene,
+    BeleagueredCastleScene,
+    SushiGoScene,
+    FeudalismScene,
+    LostCitiesScene,
+    TheMindScene,
+    MainStreetScene,
+    // Gym demo scenes
+    GymRouterScene,
+    GymDeckRngScene,
+    GymHandPileScene,
+    GymOverlayUiScene,
+    GymUndoRedoScene,
+    GymTranscriptScene,
+    GymSaveLoadScene,
+    GymAudioFeedbackScene,
+    GymGraphicsShaderSpikeScene,
+    GymGraphicsLightingSpikeScene,
+    GymSllScene,
+  ],
   render: isReplayMode ? { preserveDrawingBuffer: true } : undefined,
   callbacks: {
     preBoot: (game: Phaser.Game) => {

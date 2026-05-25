@@ -20,17 +20,23 @@ describe('TheMind browser smoke', () => {
     game = createTheMindGame({ parent: 'game-container', width: 900, height: 700 });
 
     // Wait for the Phaser texture manager to contain at least one Mind card
-    // texture (e.g. 'mind-1'). The loader's svg registered textures should
-    // be available before `create()` finishes; wait up to 10s.
+    // texture using DPR-aware keys (e.g. 'ms_card_mind-42_120x164@...').
+    // Under the new lazy rasterisation model, textures are created on demand
+    // via ensureMindCardTexture. The game scene's create() method triggers
+    // lazy rasterisation for visible cards, so we wait for at least one
+    // ms_card_mind-* texture to appear in the texture manager.
     const textures = () => game?.scene.getScene('TheMindScene')?.textures as Phaser.Textures.TextureManager | undefined;
 
     await new Promise<void>((resolve, reject) => {
       const start = Date.now();
       const check = () => {
         const t = textures();
-        if (t && (t.exists('mind-1') || t.exists('mind-42') || t.exists('mind-100'))) {
-          resolve();
-          return;
+        if (t) {
+          const keys = t.getTextureKeys().filter((k: string) => k.startsWith('ms_card_mind-'));
+          if (keys.length > 0) {
+            resolve();
+            return;
+          }
         }
         if (Date.now() - start > 10_000) {
           reject(new Error('Mind textures were not available in time'));
@@ -45,7 +51,7 @@ describe('TheMind browser smoke', () => {
     // single-colour placeholder. This avoids depending on the game's canvas
     // rendering context type (WebGL vs 2D).
     const s = game!.scene.getScene('TheMindScene') as any as Phaser.Scene;
-    const keys = (s.textures.getTextureKeys?.() ?? []).filter((k: string) => k.startsWith('mind-'));
+    const keys = (s.textures.getTextureKeys?.() ?? []).filter((k: string) => k.startsWith('ms_card_mind-'));
     expect(keys.length).toBeGreaterThan(0);
 
     function isTextureNonSolid(scene: Phaser.Scene, key: string): boolean {

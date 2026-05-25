@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "id": "main-street-default",
+  "baseViewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "requiredZones": [
+    "market",
+    "activityLog",
+    "street",
+    "endTurnButton"
+  ],
+  "zones": {
+    "market": {
+      "rect": {
+        "x": 0.02,
+        "y": 0.12
+      },
+      "anchors": {
+        "topLeft": { "x": 0.02, "y": 0.12 },
+        "center": { "x": 0.41, "y": 0.23 }
+      }
+    },
+    "activityLog": {
+      "rect": {
+        "x": 0.81,
+        "y": 0.12,
+        "pixelOverride": {
+          "x": 1036,
+          "y": 86
+        }
+      },
+      "anchors": {
+        "topLeft": { "x": 0.81, "y": 0.12 },
+        "bottomRight": { "x": 0.98, "y": 0.5 }
+      }
+    },
+    "street": {
+      "rect": {
+        "x": 0.12,
+        "y": 0.53
+      },
+      "anchors": {
+        "row1Center": { "x": 0.47, "y": 0.6472 },
+        "row2Center": { "x": 0.47, "y": 0.7076 }
+      }
+    },
+    "endTurnButton": {
+      "rect": {
+        "x": 0.87,
+        "y": 0.9,
+        "pixelOverride": {
+          "x": 1110,
+          "y": 648
+        }
+      },
+      "anchors": {
+        "center": { "x": 0.92, "y": 0.93 }
+      }
+    }
+  }
+}

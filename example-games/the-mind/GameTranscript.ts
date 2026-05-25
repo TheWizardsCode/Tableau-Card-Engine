@@ -16,7 +16,7 @@
  * @module
  */
 
-import { TranscriptRecorderBase } from '../../src/core-engine/TranscriptRecorder';
+import { TranscriptRecorderBase } from '../../src/core-engine/transcript';
 import type { PlayerId } from './TheMindGameState';
 
 // ---------------------------------------------------------------------------

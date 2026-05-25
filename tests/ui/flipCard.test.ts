@@ -288,9 +288,13 @@ describe('flipCard', () => {
   // ── Equivalence with TheMind's AI flip pattern ─────────
 
   it('reproduces TheMind AI flip: asymmetric easing, 250ms, flip-only (translation separate)', () => {
-    const sprite = createMockTarget(400, 100);
-    const setDisplaySize = vi.fn();
-    (sprite as any).setDisplaySize = setDisplaySize;
+    const sprite = createMockTarget(400, 100) as any;
+    sprite.scaleX = 1;
+    const setDisplaySize = vi.fn(() => {
+      // Simulate Phaser setDisplaySize changing effective scaleX.
+      sprite.scaleX = 0.25;
+    });
+    sprite.setDisplaySize = setDisplaySize;
 
     flipCard({
       scene,
@@ -300,7 +304,7 @@ describe('flipCard', () => {
       easeClose: 'Cubic.easeIn',
       easeOpen: 'Cubic.easeOut',
       onMidpoint: () => {
-        (sprite as any).setDisplaySize(120, 168);
+        sprite.setDisplaySize(120, 168);
       },
     });
 
@@ -316,8 +320,8 @@ describe('flipCard', () => {
     expect(sprite.setTexture).toHaveBeenCalledWith('mind_card_42');
     expect(setDisplaySize).toHaveBeenCalledWith(120, 168);
 
-    // Open phase
-    expect(tweenConfigs[1].scaleX).toBe(1);
+    // Open phase should preserve midpoint scale target (no width pop).
+    expect(tweenConfigs[1].scaleX).toBe(0.25);
     expect(tweenConfigs[1].duration).toBe(125);
     expect(tweenConfigs[1].ease).toBe('Cubic.easeOut');
   });

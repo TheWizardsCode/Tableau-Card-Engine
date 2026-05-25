@@ -1,8 +1,11 @@
 /**
- * GolfConstants -- shared layout, timing, and audio constants for 9-Card Golf.
+ * GolfConstants -- shared timing, audio, and game-logic constants for 9-Card Golf.
+ *
+ * Layout positions are now defined via SLL in `../layouts/golf.layout.json`
+ * and resolved through `GolfLayoutAdapter.ts`. Only card dimensions and
+ * grid geometry remain here because they affect gameplay rendering logic
+ * (e.g. grid cell computation) rather than placement.
  */
-
-import { GAME_W } from '../../../src/ui';
 
 // Card dimensions -- sized to fill the 1280x720 canvas in the horizontal
 // layout.  Standard playing-card aspect ratio (5:7), roughly 2.5× the
@@ -18,14 +21,6 @@ export const AI_DELAY = 600; // ms before AI chooses
 export const AI_SHOW_DRAW_DELAY = 1000; // ms to show drawn card before moving
 export const ANIM_DURATION = 300; // ms for animations
 export const SWAP_ANIM_DURATION = ANIM_DURATION * 1.5; // ms for swap/discard-and-flip
-
-// Layout positions (horizontal: human grid left, piles center, AI grid right)
-export const GRID_CENTER_Y = 385;
-export const HUMAN_GRID_X = 230;
-export const AI_GRID_X = 1050;
-export const PILE_X = GAME_W / 2; // 640
-export const STOCK_Y = 295;       // center Y of stock pile
-export const DISCARD_Y = 490;     // center Y of discard pile
 
 // ── Turn state machine ──────────────────────────────────────
 

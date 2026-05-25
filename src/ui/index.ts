@@ -50,6 +50,51 @@ export type {
   LayoutCardPositionsResult,
 } from './layoutCardPositions';
 
+// Screen layout language (SLL)
+export {
+  SCREEN_LAYOUT_SCHEMA,
+  validateScreenLayoutDocument,
+  parseScreenLayoutDocument,
+} from './screen-layout-schema';
+export type {
+  PixelPoint,
+  PixelRect,
+  NormalizedPoint,
+  NormalizedRect,
+  ScreenLayoutZone,
+  ScreenLayoutDocument,
+  ScreenLayoutValidationError,
+  ScreenLayoutValidationResult,
+  ScreenLayoutParseResult,
+} from './screen-layout-schema';
+export {
+  normalizedToPixels,
+  pixelToNormalized,
+  getZoneRect,
+  anchorPoint,
+  adaptLayoutWithFallback,
+  ScreenLayoutMappingError,
+} from './screen-layout';
+export type {
+  LayoutViewport,
+  ResolvedZone,
+  ResolvedScreenLayout,
+  ScreenLayoutIssueCode,
+  ScreenLayoutIssue,
+  ScreenLayoutIssueReporter,
+  LegacyLayoutAdapterOptions,
+} from './screen-layout';
+export {
+  composeResolvedLayouts,
+} from './screen-layout-compose';
+export type {
+  ComposeResolvedLayoutsPolicy,
+  ComposeResolvedLayoutsIssueCode,
+  ComposeResolvedLayoutsIssue,
+  ComposeResolvedLayoutsIssueReporter,
+  ComposeResolvedLayoutsOptions,
+} from './screen-layout-compose';
+
 // Card game factory helper
 export { createCardGame } from './createCardGame';
 export type { CardGameOptions } from './createCardGame';
@@ -117,6 +162,19 @@ export type {
   ParameterizedOverlayConfig,
   ParameterizedOverlayButton,
 } from './ParameterizedOverlay';
+
+// HandView – reusable hand-of-cards display component
+export { HandView } from './HandView';
+export type {
+  HandViewOptions,
+  AddCardOptions,
+  RemoveCardOptions,
+  HandViewEvents,
+} from './HandView';
+
+// PileView – reusable card-pile display component
+export { PileView } from './PileView';
+export type { PileViewOptions, PileViewEvents } from './PileView';
 
 // Hi-DPI text rendering (side-effect import for patching)
 export { TEXT_DPR } from './hiDpiText';

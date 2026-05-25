@@ -31,9 +31,17 @@ export {
 export type { Command } from './UndoRedoManager';
 export { CompoundCommand, UndoRedoManager } from './UndoRedoManager';
 
-// Transcript persistence
+// Transcript persistence (consolidated module — CG-0MP12WI75001L9P4)
 export type { StoredTranscript, TranscriptStoreOptions } from './TranscriptStore';
 export { TranscriptStore } from './TranscriptStore';
+
+// Consolidated transcript sub-module barrel (canonical location)
+export {
+  TranscriptRecorderBase,
+  autoSaveTranscript,
+  snapshotCard,
+} from './transcript';
+export type { BaseTranscript, CardSnapshot } from './transcript';
 
 // Save/load persistence
 export type {
@@ -78,14 +86,6 @@ export type {
 } from './GameEventEmitter';
 export { GameEventEmitter } from './GameEventEmitter';
 
-// Shared transcript snapshot types
-export type { CardSnapshot } from './TranscriptTypes';
-export { snapshotCard } from './TranscriptTypes';
-
-// Shared transcript recorder base
-export type { BaseTranscript } from './TranscriptRecorder';
-export { TranscriptRecorderBase } from './TranscriptRecorder';
-
 // Phaser event bridge
 export type { PhaserLikeEventEmitter } from './PhaserEventBridge';
 export { PhaserEventBridge } from './PhaserEventBridge';
@@ -108,8 +108,7 @@ export { createTfPlayer } from './tfAdapter';
 // Seeded RNG factory
 export { createSeededRng } from './SeededRng';
 
-// Transcript auto-save helper
-export { autoSaveTranscript } from './autoSaveTranscript';
+// Transcript auto-save helper — re-exported from consolidated transcript module
 
 // Challenge system generic API (CG-0MMJ8S9850MV4L0A)
 export type {
@@ -169,3 +168,15 @@ export {
   rasteriseSvgToTexture,
   getOrCreateTexture,
 } from './SvgHelpers';
+
+// Visibility / ownership controller for shell-scene UI groups
+export type {
+  VisibilityMode,
+  VisibilityModeRuleSet,
+  VisibilityTarget,
+  VisibilityOwnershipIssue,
+  VisibilityOwnershipIssueCode,
+  VisibilityOwnershipIssueReporter,
+  VisibilityOwnershipControllerOptions,
+} from './VisibilityOwnership';
+export { VisibilityOwnershipController } from './VisibilityOwnership';
