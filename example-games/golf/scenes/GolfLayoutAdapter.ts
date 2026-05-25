@@ -8,9 +8,8 @@
  * @module example-games/golf/scenes/GolfLayoutAdapter
  */
 
-import { getZoneRect, type ScreenLayoutIssue } from '../../../src/ui/screen-layout';
+import { getZoneRect } from '../../../src/ui/screen-layout';
 import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
-import type { ScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
 import golfLayoutJson from '../layouts/golf.layout.json';
 import {
   GOLF_CARD_W, GOLF_CARD_H, CARD_GAP,
@@ -19,8 +18,13 @@ import {
 
 const parsedLayout = parseScreenLayoutDocument(golfLayoutJson);
 
-const GOLF_SLL_LAYOUT: ScreenLayoutDocument | null =
-  parsedLayout.valid ? parsedLayout.layout : null;
+if (!parsedLayout.valid) {
+  throw new Error(
+    `Invalid Golf SLL layout: ${parsedLayout.errors[0]?.message ?? 'unknown parse error'}`,
+  );
+}
+
+const GOLF_SLL_LAYOUT = parsedLayout.layout;
 
 export interface GolfLayout {
   gameW: number;
@@ -35,12 +39,13 @@ export interface GolfLayout {
   discardPileCenterY: number;
 }
 
-function applySllLayout(legacyLayout: GolfLayout): GolfLayout {
-  if (!GOLF_SLL_LAYOUT) {
-    return legacyLayout;
-  }
-
-  const viewport = { width: legacyLayout.gameW, height: legacyLayout.gameH };
+/**
+ * Compute the Golf layout using SLL zones as the single source of truth.
+ */
+export function computeGolfLayout(): GolfLayout {
+  const gameW = 1280;
+  const gameH = 720;
+  const viewport = { width: gameW, height: gameH };
 
   const humanGrid = getZoneRect(GOLF_SLL_LAYOUT, 'humanGrid', viewport, 1);
   const aiGrid = getZoneRect(GOLF_SLL_LAYOUT, 'aiGrid', viewport, 1);
@@ -48,7 +53,8 @@ function applySllLayout(legacyLayout: GolfLayout): GolfLayout {
   const discardPile = getZoneRect(GOLF_SLL_LAYOUT, 'discardPile', viewport, 1);
 
   return {
-    ...legacyLayout,
+    gameW,
+    gameH,
     humanGridCenterX: Math.round(humanGrid.x + humanGrid.width / 2),
     humanGridCenterY: Math.round(humanGrid.y + humanGrid.height / 2),
     aiGridCenterX: Math.round(aiGrid.x + aiGrid.width / 2),
@@ -58,54 +64,6 @@ function applySllLayout(legacyLayout: GolfLayout): GolfLayout {
     discardPileCenterX: Math.round(discardPile.x + discardPile.width / 2),
     discardPileCenterY: Math.round(discardPile.y + discardPile.height / 2),
   };
-}
-
-function reportGolfLayoutIssue(_issue: ScreenLayoutIssue): void {
-  // Intentionally lightweight; future telemetry wiring can be added here.
-}
-
-/**
- * Legacy layout shape used by the Golf renderer.
- */
-function buildLegacyGolfLayout(): GolfLayout {
-  return {
-    gameW: 1280,
-    gameH: 720,
-    humanGridCenterX: 230,
-    humanGridCenterY: 385,
-    aiGridCenterX: 1050,
-    aiGridCenterY: 385,
-    stockPileCenterX: 640,
-    stockPileCenterY: 295,
-    discardPileCenterX: 640,
-    discardPileCenterY: 490,
-  };
-}
-
-/**
- * Compute the Golf layout using SLL zones, falling back to hardcoded
- * legacy values if the SLL document is unavailable or fails to resolve.
- */
-export function computeGolfLayout(): GolfLayout {
-  const legacy = buildLegacyGolfLayout();
-
-  if (!GOLF_SLL_LAYOUT) {
-    reportGolfLayoutIssue({
-      code: 'LAYOUT_MISSING',
-      message: 'No SLL layout document available for Golf; using legacy fallback layout.',
-    });
-    return legacy;
-  }
-
-  try {
-    return applySllLayout(legacy);
-  } catch (_error) {
-    reportGolfLayoutIssue({
-      code: 'LAYOUT_ADAPTER_FALLBACK',
-      message: 'Failed to adapt SLL layout to Golf shape; using legacy fallback layout.',
-    });
-    return legacy;
-  }
 }
 
 /**

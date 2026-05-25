@@ -120,7 +120,7 @@ describe('GymSllScene browser integration', () => {
     expect(actionButton).toBeTruthy();
     expect(actionButton?.visible).toBe(true);
 
-    const shellToggleButton = findTextObject(scene, text => text.startsWith('[ Toggle Shell: ON ]'));
+    const shellToggleButton = findTextObject(scene, text => text.startsWith('[ Toggle Shell: OFF ]'));
     expect(shellToggleButton).toBeTruthy();
     expect(shellToggleButton?.visible).toBe(true);
 

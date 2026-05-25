@@ -1,18 +1,24 @@
 /**
  * SushiGoLayoutAdapter -- maps SLL layout zones to Sushi Go-specific layout shape.
  *
+ * Uses the SLL layout JSON as the single source of truth for zone positioning.
+ *
  * @module example-games/sushi-go/scenes/SushiGoLayoutAdapter
  */
 
 import { getZoneRect } from '../../../src/ui/screen-layout';
 import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
-import type { ScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
 import sushiLayoutJson from '../layouts/sushi-go.layout.json';
 
 const parsedLayout = parseScreenLayoutDocument(sushiLayoutJson);
 
-const SUSHI_SLL_LAYOUT: ScreenLayoutDocument | null =
-  parsedLayout.valid ? parsedLayout.layout : null;
+if (!parsedLayout.valid) {
+  throw new Error(
+    `Invalid Sushi Go SLL layout: ${parsedLayout.errors[0]?.message ?? 'unknown parse error'}`,
+  );
+}
+
+const SUSHI_SLL_LAYOUT = parsedLayout.layout;
 
 export interface SushiGoLayout {
   gameW: number;
@@ -25,25 +31,13 @@ export interface SushiGoLayout {
   aiScoreY: number;
 }
 
-function buildLegacyLayout(): SushiGoLayout {
-  return {
-    gameW: 1280,
-    gameH: 720,
-    aiTableauCenterY: 200,
-    playerTableauCenterY: 395,
-    playerHandCenterY: 600,
-    scoreAreaCenterX: 1265,
-    playerScoreY: 485,
-    aiScoreY: 100,
-  };
-}
-
-function applySllLayout(legacyLayout: SushiGoLayout): SushiGoLayout {
-  if (!SUSHI_SLL_LAYOUT) {
-    return legacyLayout;
-  }
-
-  const viewport = { width: legacyLayout.gameW, height: legacyLayout.gameH };
+/**
+ * Compute Sushi Go layout using SLL zones as the single source of truth.
+ */
+export function computeSushiGoLayout(): SushiGoLayout {
+  const gameW = 1280;
+  const gameH = 720;
+  const viewport = { width: gameW, height: gameH };
 
   const aiTableau = getZoneRect(SUSHI_SLL_LAYOUT, 'aiTableau', viewport, 1);
   const playerTableau = getZoneRect(SUSHI_SLL_LAYOUT, 'playerTableau', viewport, 1);
@@ -51,7 +45,8 @@ function applySllLayout(legacyLayout: SushiGoLayout): SushiGoLayout {
   const scoreArea = getZoneRect(SUSHI_SLL_LAYOUT, 'scoreArea', viewport, 1);
 
   return {
-    ...legacyLayout,
+    gameW,
+    gameH,
     aiTableauCenterY: Math.round(aiTableau.y + aiTableau.height / 2),
     playerTableauCenterY: Math.round(playerTableau.y + playerTableau.height / 2),
     playerHandCenterY: Math.round(playerHand.y + playerHand.height * 0.25),
@@ -59,23 +54,4 @@ function applySllLayout(legacyLayout: SushiGoLayout): SushiGoLayout {
     playerScoreY: Math.round(playerTableau.y + playerTableau.height + 30),
     aiScoreY: Math.round(aiTableau.y - 20),
   };
-}
-
-/**
- * Compute Sushi Go layout using SLL zones, falling back to legacy values.
- */
-export function computeSushiGoLayout(): SushiGoLayout {
-  const legacy = buildLegacyLayout();
-
-  if (!SUSHI_SLL_LAYOUT) {
-    console.warn('No SLL layout document for Sushi Go; using legacy fallback.');
-    return legacy;
-  }
-
-  try {
-    return applySllLayout(legacy);
-  } catch {
-    console.warn('Failed to adapt SLL layout for Sushi Go; using legacy fallback.');
-    return legacy;
-  }
 }

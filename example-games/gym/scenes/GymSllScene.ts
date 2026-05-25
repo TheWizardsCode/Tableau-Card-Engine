@@ -159,7 +159,7 @@ export class GymSllScene extends GymSceneBase {
   private layoutIndex = 0;
   private profileIndex = 0;
   private overlayVisible = false;
-  private shellVisible = true;
+  private shellVisible = false;
 
   private layoutButton!: Phaser.GameObjects.Text;
   private profileButton!: Phaser.GameObjects.Text;
@@ -430,10 +430,9 @@ export class GymSllScene extends GymSceneBase {
   private configureVisibility(): void {
     this.visibilityController = new VisibilityOwnershipController<VisibilityTarget>({
       groupRules: {
-        shell: {
-          'shell-only': true,
-          composed: true,
-        },
+        shell: this.shellVisible
+          ? { 'shell-only': true, composed: true }
+          : {},
         scene: {
           'scene-only': true,
           composed: true,

@@ -64,9 +64,9 @@ describe('Gym SLL layout fixtures', () => {
     expect(sceneCenter.y).toBeCloseTo(352.8, 6);
 
     const actionAnchor = anchorPoint(sceneOnlyLayout, 'shared', 'action', { width: 1280, height: 720 }, 1);
-    // pixelOverride (640, 170) at 1280x720 @ DPR 1: scaleX=1, scaleY=1
-    expect(actionAnchor.x).toBeCloseTo(640, 6);
-    expect(actionAnchor.y).toBeCloseTo(170, 6);
+    // pixelOverride (580, 126) at 1280x720 @ DPR 1: scaleX=1, scaleY=1
+    expect(actionAnchor.x).toBeCloseTo(580, 6);
+    expect(actionAnchor.y).toBeCloseTo(126, 6);
   });
 
   it('maps the scene-only layout at 720x1280 @ DPR 2', () => {
@@ -78,10 +78,10 @@ describe('Gym SLL layout fixtures', () => {
     expect(sharedRect.width).toBeCloseTo(432, 6);
     expect(sharedRect.height).toBeCloseTo(384, 6);
 
-    // pixelOverride (640, 170) scaled by viewport 720x1280 @ DPR 2
+    // pixelOverride (580, 126) scaled by viewport 720x1280 @ DPR 2
     // scaleX = (720*2)/1280 = 1.125, scaleY = (1280*2)/720 ≈ 3.555556
-    expect(actionAnchor.x).toBeCloseTo(720, 6);
-    expect(actionAnchor.y).toBeCloseTo(604.444444, 5);
+    expect(actionAnchor.x).toBeCloseTo(652.5, 6);
+    expect(actionAnchor.y).toBeCloseTo(448, 5);
   });
 
   it('applies pixelOverride fields in the alternate layout and scales by viewport + DPR', () => {

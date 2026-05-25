@@ -1,27 +1,55 @@
+/**
+ * MainStreetLayoutAdapter -- maps SLL layout zones to Main Street-specific layout shape.
+ *
+ * Uses the SLL layout JSON as the single source of truth for zone positioning.
+ * Card dimensions, gaps, and other non-positioning values come from shared constants.
+ *
+ * @module example-games/main-street/scenes/MainStreetLayoutAdapter
+ */
+
 import {
-  adaptLayoutWithFallback,
   getZoneRect,
-  type ScreenLayoutIssue,
 } from '../../../src/ui/screen-layout';
 import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
-import type { ScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
 import type { SceneLayout } from './MainStreetConstants';
+import {
+  BASE_HUD_Y,
+  BASE_MARKET_CARD_W,
+  BASE_MARKET_CARD_H,
+  BASE_MARKET_ROW_GAP,
+  BASE_MARKET_CARD_GAP,
+  BASE_MARKET_LABEL_W,
+  BASE_QUEUE_CARD_W,
+  BASE_QUEUE_CARD_H,
+  BASE_QUEUE_CARD_GAP,
+  BASE_SLOT_W,
+  BASE_SLOT_H,
+  BASE_SLOT_GAP,
+  BASE_HAND_CARD_W,
+  BASE_HAND_CARD_H,
+  STREET_COLS,
+  STREET_ROW_GAP,
+} from './MainStreetConstants';
 import mainStreetLayoutJson from '../layouts/main-street.layout.json';
 
 const parsedLayout = parseScreenLayoutDocument(mainStreetLayoutJson);
 
-const MAIN_STREET_SLL_LAYOUT: ScreenLayoutDocument | null =
-  parsedLayout.valid ? parsedLayout.layout : null;
+if (!parsedLayout.valid) {
+  throw new Error(
+    `Invalid Main Street SLL layout: ${parsedLayout.errors[0]?.message ?? 'unknown parse error'}`,
+  );
+}
 
-function applySllLayout(legacyLayout: SceneLayout): SceneLayout {
-  if (!MAIN_STREET_SLL_LAYOUT) {
-    return legacyLayout;
-  }
+const MAIN_STREET_SLL_LAYOUT = parsedLayout.layout;
 
-  const viewport = {
-    width: legacyLayout.gameW,
-    height: legacyLayout.gameH,
-  };
+/**
+ * Compute Main Street layout using SLL zones as the single source of truth for positioning.
+ * Card dimensions, gaps, and other non-positioning values come from shared constants.
+ */
+export function computeMainStreetLayoutWithSll(): SceneLayout {
+  const gameW = 1280;
+  const gameH = 720;
+  const viewport = { width: gameW, height: gameH };
 
   const market = getZoneRect(MAIN_STREET_SLL_LAYOUT, 'market', viewport, 1);
   const incidentQueue = getZoneRect(MAIN_STREET_SLL_LAYOUT, 'incidentQueue', viewport, 1);
@@ -32,40 +60,53 @@ function applySllLayout(legacyLayout: SceneLayout): SceneLayout {
   const activityLog = getZoneRect(MAIN_STREET_SLL_LAYOUT, 'activityLog', viewport, 1);
   const challengePanel = getZoneRect(MAIN_STREET_SLL_LAYOUT, 'challengePanel', viewport, 1);
 
+  const marketRowH = BASE_MARKET_CARD_H + 14;
+
+  const actionButtonH = 34;
+  const hintButtonW = 104;
+  const smallButtonW = 68;
+
+  const logVisible = true;
+
   return {
-    ...legacyLayout,
+    gameW,
+    gameH,
+    hudY: BASE_HUD_Y,
     marketTop: Math.round(market.y),
+    marketRowH,
+    marketRowGap: BASE_MARKET_ROW_GAP,
+    marketCardW: BASE_MARKET_CARD_W,
+    marketCardH: BASE_MARKET_CARD_H,
+    marketCardGap: BASE_MARKET_CARD_GAP,
+    marketLabelW: BASE_MARKET_LABEL_W,
     queueTop: Math.round(incidentQueue.y),
+    queueCardW: BASE_QUEUE_CARD_W,
+    queueCardH: BASE_QUEUE_CARD_H,
+    queueCardGap: BASE_QUEUE_CARD_GAP,
+    queueLabelW: BASE_MARKET_LABEL_W,
     streetTop: Math.round(street.y),
+    slotW: BASE_SLOT_W,
+    slotH: BASE_SLOT_H,
+    slotGap: BASE_SLOT_GAP,
     streetX: Math.round(street.x),
-    handX: Math.round(hand.x),
+    streetRowGap: STREET_ROW_GAP,
+    streetCols: STREET_COLS,
     handY: Math.round(hand.y),
+    handX: Math.round(hand.x),
+    handCardW: BASE_HAND_CARD_W,
+    handCardH: BASE_HAND_CARD_H,
     instructionY: Math.round(hand.y - 20),
     actionY: Math.round(actions.y),
+    actionButtonH,
     actionButtonW: Math.round(endTurnButton.width),
-    actionButtonH: Math.round(endTurnButton.height),
-    logX: Math.round(activityLog.x),
-    logY: Math.round(activityLog.y),
-    logW: Math.round(activityLog.width),
-    logH: Math.round(activityLog.height),
+    hintButtonW,
+    smallButtonW,
     challengeX: Math.round(challengePanel.x),
     challengeY: Math.round(challengePanel.y),
     challengeW: Math.round(challengePanel.width),
+    logX: logVisible ? Math.round(activityLog.x) : -1000,
+    logY: logVisible ? Math.round(activityLog.y) : 0,
+    logW: logVisible ? Math.round(activityLog.width) : 0,
+    logH: Math.round(activityLog.height),
   };
-}
-
-function reportMainStreetLayoutIssue(_issue: ScreenLayoutIssue): void {
-  // Hook intentionally kept lightweight. In tests we rely on deterministic output,
-  // so this remains a no-op unless future telemetry wiring is required.
-}
-
-export function computeMainStreetLayoutWithSll(legacyLayout: SceneLayout): SceneLayout {
-  return adaptLayoutWithFallback({
-    layoutDocument: MAIN_STREET_SLL_LAYOUT,
-    viewport: { width: legacyLayout.gameW, height: legacyLayout.gameH },
-    dpr: 1,
-    mapResolvedLayout: () => applySllLayout(legacyLayout),
-    fallback: () => legacyLayout,
-    reportIssue: reportMainStreetLayoutIssue,
-  });
 }

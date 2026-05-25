@@ -1,18 +1,24 @@
 /**
  * LostCitiesLayoutAdapter -- maps SLL layout zones to Lost Cities-specific layout shape.
  *
+ * Uses the SLL layout JSON as the single source of truth for zone positioning.
+ *
  * @module example-games/lost-cities/scenes/LostCitiesLayoutAdapter
  */
 
 import { getZoneRect } from '../../../src/ui/screen-layout';
 import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
-import type { ScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
 import lcLayoutJson from '../layouts/lost-cities.layout.json';
 
 const parsedLayout = parseScreenLayoutDocument(lcLayoutJson);
 
-const LC_SLL_LAYOUT: ScreenLayoutDocument | null =
-  parsedLayout.valid ? parsedLayout.layout : null;
+if (!parsedLayout.valid) {
+  throw new Error(
+    `Invalid Lost Cities SLL layout: ${parsedLayout.errors[0]?.message ?? 'unknown parse error'}`,
+  );
+}
+
+const LC_SLL_LAYOUT = parsedLayout.layout;
 
 export interface LostCitiesLayout {
   gameW: number;
@@ -28,28 +34,13 @@ export interface LostCitiesLayout {
   handBottom: number;
 }
 
-function buildLegacyLayout(): LostCitiesLayout {
-  return {
-    gameW: 1280,
-    gameH: 720,
-    expeditionsCenterY: 360,
-    opponentExpTop: 64,
-    playerExpBottom: 704,
-    discardAreaCenterY: 360,
-    midColumnCenterX: 1173,
-    playerHandCenterX: 802,
-    aiHandCenterX: 1014,
-    handTop: 64,
-    handBottom: 690,
-  };
-}
-
-function applySllLayout(legacyLayout: LostCitiesLayout): LostCitiesLayout {
-  if (!LC_SLL_LAYOUT) {
-    return legacyLayout;
-  }
-
-  const viewport = { width: legacyLayout.gameW, height: legacyLayout.gameH };
+/**
+ * Compute Lost Cities layout using SLL zones as the single source of truth.
+ */
+export function computeLostCitiesLayout(): LostCitiesLayout {
+  const gameW = 1280;
+  const gameH = 720;
+  const viewport = { width: gameW, height: gameH };
 
   const oppExp = getZoneRect(LC_SLL_LAYOUT, 'opponentExpeditions', viewport, 1);
   const plrExp = getZoneRect(LC_SLL_LAYOUT, 'playerExpeditions', viewport, 1);
@@ -59,7 +50,8 @@ function applySllLayout(legacyLayout: LostCitiesLayout): LostCitiesLayout {
   const aiHand = getZoneRect(LC_SLL_LAYOUT, 'aiHand', viewport, 1);
 
   return {
-    ...legacyLayout,
+    gameW,
+    gameH,
     expeditionsCenterY: Math.round((oppExp.y + oppExp.height + plrExp.y) / 2),
     opponentExpTop: Math.round(oppExp.y),
     playerExpBottom: Math.round(plrExp.y + plrExp.height),
@@ -70,23 +62,4 @@ function applySllLayout(legacyLayout: LostCitiesLayout): LostCitiesLayout {
     handTop: Math.round(playerHand.y),
     handBottom: Math.round(playerHand.y + playerHand.height),
   };
-}
-
-/**
- * Compute Lost Cities layout using SLL zones, falling back to legacy values.
- */
-export function computeLostCitiesLayout(): LostCitiesLayout {
-  const legacy = buildLegacyLayout();
-
-  if (!LC_SLL_LAYOUT) {
-    console.warn('No SLL layout document for Lost Cities; using legacy fallback.');
-    return legacy;
-  }
-
-  try {
-    return applySllLayout(legacy);
-  } catch {
-    console.warn('Failed to adapt SLL layout for Lost Cities; using legacy fallback.');
-    return legacy;
-  }
 }
