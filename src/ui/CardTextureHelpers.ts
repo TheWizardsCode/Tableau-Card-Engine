@@ -71,6 +71,19 @@ export function preloadCardAssets(
   width: number = CARD_W,
   height: number = CARD_H,
 ): void {
+  const tex = scene.textures;
+
+  // Remove existing card textures so each scene can load at its own size.
+  // Textures are global to the Phaser Game, so without this a scene that
+  // loads after another would reuse the previous scene's dimensions.
+  if (tex.exists('card_back')) tex.remove('card_back');
+  for (const suit of SUITS) {
+    for (const rank of RANKS) {
+      const key = cardTextureKey(rank, suit);
+      if (tex.exists(key)) tex.remove(key);
+    }
+  }
+
   // Card back
   scene.load.svg('card_back', 'assets/cards/card_back.svg', {
     width,

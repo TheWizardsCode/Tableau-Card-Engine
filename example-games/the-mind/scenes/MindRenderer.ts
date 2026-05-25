@@ -2,7 +2,7 @@
  * MindRenderer -- creates and refreshes all visual game objects for The Mind.
  */
 
-import { GAME_W, GAME_H, FONT_FAMILY, createSceneHeader, layoutCardPositions } from '../../../src/ui';
+import { FONT_FAMILY, createSceneHeader, layoutCardPositions } from '../../../src/ui';
 import {
   ensureTexture,
   ensureBackTexture,
@@ -50,11 +50,17 @@ export class MindRenderer {
   /** SLL-derived layout resolved once at construction. */
   private layout: MindLayout;
 
+  private get sceneW(): number { return (this.scene.game.config.width as number) ?? 1280; }
+  private get sceneH(): number { return (this.scene.game.config.height as number) ?? 720; }
+
   constructor(
     private scene: Phaser.Scene,
     private session: TheMindSession,
   ) {
-    this.layout = computeMindLayout();
+    this.layout = computeMindLayout({
+      width: (this.scene.game.config.width as number) ?? 1280,
+      height: (this.scene.game.config.height as number) ?? 720,
+    });
   }
 
   private getBackTextureFallbackKey(): string {
@@ -107,7 +113,7 @@ export class MindRenderer {
 
   createStatusDisplay(): void {
     this.levelText = this.scene.add
-      .text(GAME_W - 100, 55, '', {
+      .text(this.sceneW - 100, 55, '', {
         fontSize: '16px',
         color: '#aaccff',
         fontFamily: FONT_FAMILY,
@@ -116,7 +122,7 @@ export class MindRenderer {
       .setDepth(DEPTH_UI);
 
     this.livesText = this.scene.add
-      .text(GAME_W - 100, 79, '', {
+      .text(this.sceneW - 100, 79, '', {
         fontSize: '16px',
         color: '#ff6666',
         fontFamily: FONT_FAMILY,
@@ -163,7 +169,7 @@ export class MindRenderer {
 
   createInstruction(): void {
     this.instructionText = this.scene.add
-      .text(GAME_W / 2, GAME_H - 20, '', {
+      .text(this.sceneW / 2, this.sceneH - 20, '', {
         fontSize: '12px',
         color: '#aaaaaa',
         fontFamily: FONT_FAMILY,
@@ -236,7 +242,7 @@ export class MindRenderer {
       count: hand.length,
       cardWidth: CARD_W,
       gap: CARD_GAP,
-      centerX: GAME_W / 2,
+      centerX: this.sceneW / 2,
       maxWidth: MAX_HAND_WIDTH,
     });
 
@@ -276,7 +282,7 @@ export class MindRenderer {
     }
 
     this.scene.add
-      .text(GAME_W / 2, this.layout.humanHandCenterY - CARD_H / 2 - 14, 'Your Hand', {
+      .text(this.sceneW / 2, this.layout.humanHandCenterY - CARD_H / 2 - 14, 'Your Hand', {
         fontSize: '12px',
         color: '#88ff88',
         fontFamily: FONT_FAMILY,
@@ -330,7 +336,7 @@ export class MindRenderer {
       count: hand.length,
       cardWidth: CARD_W,
       gap: CARD_GAP,
-      centerX: GAME_W / 2,
+      centerX: this.sceneW / 2,
       maxWidth: MAX_HAND_WIDTH,
     });
 
@@ -348,7 +354,7 @@ export class MindRenderer {
       this.aiCountText.destroy();
     }
     this.aiCountText = this.scene.add
-      .text(GAME_W / 2, this.layout.aiHandCenterY + CARD_H / 2 + 14, '', {
+      .text(this.sceneW / 2, this.layout.aiHandCenterY + CARD_H / 2 + 14, '', {
         fontSize: '12px',
         color: '#aaaaaa',
         fontFamily: FONT_FAMILY,
@@ -361,7 +367,7 @@ export class MindRenderer {
     );
 
     this.scene.add
-      .text(GAME_W / 2, this.layout.aiHandCenterY - CARD_H / 2 - 14, 'AI Hand', {
+      .text(this.sceneW / 2, this.layout.aiHandCenterY - CARD_H / 2 - 14, 'AI Hand', {
         fontSize: '12px',
         color: '#ffaa44',
         fontFamily: FONT_FAMILY,
@@ -432,7 +438,7 @@ export class MindRenderer {
       count: cardValues.length,
       cardWidth: CARD_W,
       gap: CARD_GAP,
-      centerX: GAME_W / 2,
+      centerX: this.sceneW / 2,
       maxWidth: MAX_HAND_WIDTH,
     });
 
@@ -457,7 +463,7 @@ export class MindRenderer {
     }
 
     this.scene.add
-      .text(GAME_W / 2, y - CARD_H / 2 - 14, label, {
+      .text(this.sceneW / 2, y - CARD_H / 2 - 14, label, {
         fontSize: '12px',
         color: labelColor,
         fontFamily: FONT_FAMILY,

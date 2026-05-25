@@ -28,7 +28,7 @@ export const BC_CARD_W = 90;
 export const BC_CARD_H = 126;
 
 // ── Layout geometry (positions now driven by SLL) ─────────
-export const CARD_GAP = 18;
+export const CARD_GAP = 30;
 export const CASCADE_OFFSET_Y = 42;
 export const DRAG_DEPTH = 1000;
 

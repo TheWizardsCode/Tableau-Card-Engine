@@ -17,9 +17,9 @@
         "y": 0.75
       },
       "anchors": {
-        "center": { "x": 0.5, "y": 0.863889 },
+        "center": { "x": 0.5, "y": 0.85 },
         "topCenter": { "x": 0.5, "y": 0.75 },
-        "handCenterY": { "x": 0.5, "y": 0.920833 }
+        "handCenterY": { "x": 0.5, "y": 0.82 }
       }
     },
     "aiHand": {
@@ -28,9 +28,9 @@
         "y": 0.069444
       },
       "anchors": {
-        "center": { "x": 0.5, "y": 0.183333 },
-        "bottomCenter": { "x": 0.5, "y": 0.297222 },
-        "handCenterY": { "x": 0.5, "y": 0.126388 }
+        "center": { "x": 0.5, "y": 0.18 },
+        "bottomCenter": { "x": 0.5, "y": 0.25 },
+        "handCenterY": { "x": 0.5, "y": 0.15 }
       }
     },
     "playPile": {

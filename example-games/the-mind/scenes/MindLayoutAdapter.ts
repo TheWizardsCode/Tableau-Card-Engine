@@ -32,14 +32,14 @@ export interface MindLayout {
 /**
  * Compute The Mind layout using SLL zones as the single source of truth.
  */
-export function computeMindLayout(): MindLayout {
-  const gameW = 1280;
-  const gameH = 720;
-  const viewport = { width: gameW, height: gameH };
+export function computeMindLayout(viewport?: { width: number; height: number }): MindLayout {
+  const gameW = viewport?.width ?? 1280;
+  const gameH = viewport?.height ?? 720;
+  const vp = { width: gameW, height: gameH };
 
-  const playPileCenter = anchorPoint(MIND_SLL_LAYOUT, 'playPile', 'center', viewport, 1);
-  const humanHandCenterY = anchorPoint(MIND_SLL_LAYOUT, 'humanHand', 'handCenterY', viewport, 1);
-  const aiHandCenterY = anchorPoint(MIND_SLL_LAYOUT, 'aiHand', 'handCenterY', viewport, 1);
+  const playPileCenter = anchorPoint(MIND_SLL_LAYOUT, 'playPile', 'center', vp, 1);
+  const humanHandCenterY = anchorPoint(MIND_SLL_LAYOUT, 'humanHand', 'handCenterY', vp, 1);
+  const aiHandCenterY = anchorPoint(MIND_SLL_LAYOUT, 'aiHand', 'handCenterY', vp, 1);
 
   return {
     gameW,

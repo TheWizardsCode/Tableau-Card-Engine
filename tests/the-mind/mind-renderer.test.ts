@@ -92,6 +92,12 @@ function createMockScene() {
       addEvent: vi.fn(() => ({ destroy: vi.fn() })),
       delayedCall: vi.fn(),
     },
+    game: {
+      config: {
+        width: 1000,
+        height: 700,
+      },
+    },
   } as unknown as Phaser.Scene;
 }
 
