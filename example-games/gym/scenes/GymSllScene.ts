@@ -28,7 +28,6 @@ import pixelOverrideLayoutJson from '../layouts/gym-sll-pixel-override.layout.js
 import gymShellLayoutJson from '../layouts/gym-shell.layout.json';
 import type {
   PixelPoint,
-  PixelRect,
   ScreenLayoutDocument,
   ScreenLayoutParseResult,
 } from '../../../src/ui/screen-layout-schema';
@@ -486,18 +485,6 @@ export class GymSllScene extends GymSceneBase {
     return anchor;
   }
 
-  private getZoneRect(
-    resolved: ReturnType<typeof normalizedToPixels>,
-    zoneName: string,
-  ): PixelRect {
-    const zone = resolved.zones[zoneName];
-    if (!zone) {
-      throw new Error(`Unknown resolved zone "${zoneName}" in the current layout.`);
-    }
-
-    return zone.rect;
-  }
-
   private applyLayout(): void {
     const currentLayout = this.layouts[this.layoutIndex]!;
     const currentProfile = LAYOUT_PROFILES[this.profileIndex]!;
@@ -523,11 +510,10 @@ export class GymSllScene extends GymSceneBase {
       y: point.y * previewScaleY,
     });
 
-    const toDisplayRect = (rect: PixelRect): PixelRect => ({
+    // Zones are position-only; overlay shows anchors, not zone rectangles.
+    const _toDisplayRect = (rect: PixelPoint): PixelPoint => ({
       x: rect.x * previewScaleX,
       y: rect.y * previewScaleY,
-      width: rect.width * previewScaleX,
-      height: rect.height * previewScaleY,
     });
 
     const titleAnchorPx = this.getAnchorPoint(resolved, currentLayout.placement.title);
@@ -546,12 +532,11 @@ export class GymSllScene extends GymSceneBase {
     this.visibilityController.setMode(currentLayout.visibilityMode);
 
     if (currentLayout.showContent && contentPlacement) {
-      const contentRectPx = this.getZoneRect(resolved, contentPlacement.zone);
+      // Zones are position-only; panel dimensions use fixed defaults.
       const contentCenterPx = this.getAnchorPoint(resolved, contentPlacement);
-      const contentRectDisplay = toDisplayRect(contentRectPx);
       const contentCenterDisplay = toDisplayPoint(contentCenterPx);
-      const panelWidth = Math.min(420, contentRectDisplay.width * 0.85);
-      const panelHeight = Math.min(220, contentRectDisplay.height * 0.85);
+      const panelWidth = 420;
+      const panelHeight = 220;
       this.contentPanel.setVisible(true);
       this.contentLabel.setVisible(true);
       this.contentPanel
@@ -563,7 +548,7 @@ export class GymSllScene extends GymSceneBase {
       this.contentLabel.setVisible(false);
     }
 
-    this.redrawOverlay(resolved, toDisplayRect, toDisplayPoint);
+    this.redrawOverlay(resolved, _toDisplayRect, toDisplayPoint);
 
     this.layoutButton.setText(
       `[ Layout: ${currentLayout.kind === 'composed' ? 'Shell+Scene' : currentLayout.name} ]`,
@@ -595,7 +580,7 @@ export class GymSllScene extends GymSceneBase {
 
   private redrawOverlay(
     resolved: ReturnType<typeof normalizedToPixels>,
-    toDisplayRect: (rect: PixelRect) => PixelRect,
+    toDisplayPointFn: (point: PixelPoint) => PixelPoint,
     toDisplayPoint: (point: PixelPoint) => PixelPoint,
   ): void {
     this.overlayGraphics.clear();
@@ -613,19 +598,15 @@ export class GymSllScene extends GymSceneBase {
       const color = OVERLAY_COLORS[colorIndex % OVERLAY_COLORS.length];
       colorIndex += 1;
 
-      const pixelRect = zone.rect;
-      const displayRect = toDisplayRect(pixelRect);
+      const pixelPos = zone.rect;
+      const displayPos = toDisplayPointFn(pixelPos);
 
+      // Zones are position-only; show anchor points but not zone rectangles
       this.overlayGraphics.lineStyle(2, color, 0.95);
-      this.overlayGraphics.strokeRect(
-        displayRect.x,
-        displayRect.y,
-        displayRect.width,
-        displayRect.height,
-      );
+      this.overlayGraphics.strokeCircle(displayPos.x, displayPos.y, 6);
 
       legendLines.push(
-        `${zoneName}: [${pixelRect.x.toFixed(0)}, ${pixelRect.y.toFixed(0)}, ${pixelRect.width.toFixed(0)}, ${pixelRect.height.toFixed(0)}]`,
+        `${zoneName}: [${pixelPos.x.toFixed(0)}, ${pixelPos.y.toFixed(0)}]`,
       );
 
       for (const [anchorName, anchorPixel] of Object.entries(zone.anchors)) {

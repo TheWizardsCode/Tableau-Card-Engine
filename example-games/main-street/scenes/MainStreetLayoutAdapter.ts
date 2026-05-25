@@ -8,7 +8,7 @@
  */
 
 import {
-  getZoneRect,
+  anchorPoint,
 } from '../../../src/ui/screen-layout';
 import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
 import type { SceneLayout } from './MainStreetConstants';
@@ -51,62 +51,66 @@ export function computeMainStreetLayoutWithSll(): SceneLayout {
   const gameH = 720;
   const viewport = { width: gameW, height: gameH };
 
-  const market = getZoneRect(MAIN_STREET_SLL_LAYOUT, 'market', viewport, 1);
-  const incidentQueue = getZoneRect(MAIN_STREET_SLL_LAYOUT, 'incidentQueue', viewport, 1);
-  const street = getZoneRect(MAIN_STREET_SLL_LAYOUT, 'street', viewport, 1);
-  const hand = getZoneRect(MAIN_STREET_SLL_LAYOUT, 'hand', viewport, 1);
-  const actions = getZoneRect(MAIN_STREET_SLL_LAYOUT, 'actions', viewport, 1);
-  const endTurnButton = getZoneRect(MAIN_STREET_SLL_LAYOUT, 'endTurnButton', viewport, 1);
-  const activityLog = getZoneRect(MAIN_STREET_SLL_LAYOUT, 'activityLog', viewport, 1);
-  const challengePanel = getZoneRect(MAIN_STREET_SLL_LAYOUT, 'challengePanel', viewport, 1);
+  const marketTopLeft = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'market', 'topLeft', viewport, 1);
+  const queueTopLeft = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'incidentQueue', 'topLeft', viewport, 1);
+  const streetTopCenter = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'street', 'topCenter', viewport, 1);
+  const handTopLeft = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'hand', 'topLeft', viewport, 1);
+  const challengeTopLeft = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'challengePanel', 'topLeft', viewport, 1);
+  const challengeBottomRight = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'challengePanel', 'bottomRight', viewport, 1);
+  const logTopLeft = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'activityLog', 'topLeft', viewport, 1);
+  const logBottomRight = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'activityLog', 'bottomRight', viewport, 1);
 
   const marketRowH = BASE_MARKET_CARD_H + 14;
 
   const actionButtonH = 34;
   const hintButtonW = 104;
   const smallButtonW = 68;
+  const actionButtonW = 140; // from per-game constants (matches legacy endTurnButton.width)
 
   const logVisible = true;
+  const logW = Math.round(logBottomRight.x - logTopLeft.x);
+  const logH = Math.round(logBottomRight.y - logTopLeft.y);
+  const challengeW = Math.round(challengeBottomRight.x - challengeTopLeft.x);
 
   return {
     gameW,
     gameH,
     hudY: BASE_HUD_Y,
-    marketTop: Math.round(market.y),
+    marketTop: Math.round(marketTopLeft.y),
     marketRowH,
     marketRowGap: BASE_MARKET_ROW_GAP,
     marketCardW: BASE_MARKET_CARD_W,
     marketCardH: BASE_MARKET_CARD_H,
     marketCardGap: BASE_MARKET_CARD_GAP,
     marketLabelW: BASE_MARKET_LABEL_W,
-    queueTop: Math.round(incidentQueue.y),
+    queueTop: Math.round(queueTopLeft.y),
     queueCardW: BASE_QUEUE_CARD_W,
     queueCardH: BASE_QUEUE_CARD_H,
     queueCardGap: BASE_QUEUE_CARD_GAP,
     queueLabelW: BASE_MARKET_LABEL_W,
-    streetTop: Math.round(street.y),
+    streetTop: Math.round(streetTopCenter.y),
     slotW: BASE_SLOT_W,
     slotH: BASE_SLOT_H,
     slotGap: BASE_SLOT_GAP,
-    streetX: Math.round(street.x),
+    streetX: Math.round(streetTopCenter.x),
     streetRowGap: STREET_ROW_GAP,
     streetCols: STREET_COLS,
-    handY: Math.round(hand.y),
-    handX: Math.round(hand.x),
+    handY: Math.round(handTopLeft.y),
+    handX: Math.round(handTopLeft.x),
     handCardW: BASE_HAND_CARD_W,
     handCardH: BASE_HAND_CARD_H,
-    instructionY: Math.round(hand.y - 20),
-    actionY: Math.round(actions.y),
+    instructionY: Math.round(handTopLeft.y - 20),
+    actionY: Math.round(handTopLeft.y + 28),
     actionButtonH,
-    actionButtonW: Math.round(endTurnButton.width),
+    actionButtonW,
     hintButtonW,
     smallButtonW,
-    challengeX: Math.round(challengePanel.x),
-    challengeY: Math.round(challengePanel.y),
-    challengeW: Math.round(challengePanel.width),
-    logX: logVisible ? Math.round(activityLog.x) : -1000,
-    logY: logVisible ? Math.round(activityLog.y) : 0,
-    logW: logVisible ? Math.round(activityLog.width) : 0,
-    logH: Math.round(activityLog.height),
+    challengeX: Math.round(challengeTopLeft.x),
+    challengeY: Math.round(challengeTopLeft.y),
+    challengeW,
+    logX: logVisible ? Math.round(logTopLeft.x) : -1000,
+    logY: logVisible ? Math.round(logTopLeft.y) : 0,
+    logW: logVisible ? logW : 0,
+    logH,
   };
 }

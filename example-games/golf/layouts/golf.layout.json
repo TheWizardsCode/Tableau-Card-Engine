@@ -15,51 +15,43 @@
     "humanGrid": {
       "rect": {
         "x": 0.027344,
-        "y": 0.204167,
-        "width": 0.304688,
-        "height": 0.661111
+        "y": 0.204167
       },
       "anchors": {
-        "center": { "x": 0.5, "y": 0.5 },
-        "topCenter": { "x": 0.5, "y": 0 },
-        "bottomCenter": { "x": 0.5, "y": 1 }
+        "center": { "x": 0.179688, "y": 0.534722 },
+        "topCenter": { "x": 0.179688, "y": 0.204167 },
+        "bottomCenter": { "x": 0.179688, "y": 0.865278 }
       }
     },
     "aiGrid": {
       "rect": {
         "x": 0.667969,
-        "y": 0.204167,
-        "width": 0.304688,
-        "height": 0.661111
+        "y": 0.204167
       },
       "anchors": {
-        "center": { "x": 0.5, "y": 0.5 },
-        "topCenter": { "x": 0.5, "y": 0 },
-        "bottomCenter": { "x": 0.5, "y": 1 }
+        "center": { "x": 0.820313, "y": 0.534722 },
+        "topCenter": { "x": 0.820313, "y": 0.204167 },
+        "bottomCenter": { "x": 0.820313, "y": 0.865278 }
       }
     },
     "stockPile": {
       "rect": {
         "x": 0.453125,
-        "y": 0.218056,
-        "width": 0.09375,
-        "height": 0.322222
+        "y": 0.218056
       },
       "anchors": {
-        "center": { "x": 0.5, "y": 0.5 },
-        "bottomCenter": { "x": 0.5, "y": 1 }
+        "center": { "x": 0.5, "y": 0.379167 },
+        "bottomCenter": { "x": 0.5, "y": 0.540278 }
       }
     },
     "discardPile": {
       "rect": {
         "x": 0.453125,
-        "y": 0.544444,
-        "width": 0.09375,
-        "height": 0.322222
+        "y": 0.544444
       },
       "anchors": {
-        "center": { "x": 0.5, "y": 0.5 },
-        "topCenter": { "x": 0.5, "y": 0 }
+        "center": { "x": 0.5, "y": 0.705556 },
+        "topCenter": { "x": 0.5, "y": 0.544444 }
       }
     }
   }

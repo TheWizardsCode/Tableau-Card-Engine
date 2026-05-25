@@ -21,7 +21,7 @@ import { HelpButton } from '../../../src/ui/HelpButton';
 import { getReducedMotion, setReducedMotion } from '../../../src/ui/SettingsStore';
 import { runSceneTransition } from '../../../src/ui/sceneTransition';
 import { getZoneRect, anchorPoint } from '../../../src/ui/screen-layout';
-import { parseScreenLayoutDocument, type ScreenLayoutDocument, type PixelPoint, type PixelRect } from '../../../src/ui/screen-layout-schema';
+import { parseScreenLayoutDocument, type ScreenLayoutDocument, type PixelPoint } from '../../../src/ui/screen-layout-schema';
 import gymScenesLayoutJson from '../layouts/gym-scenes.layout.json';
 
 // Parse the shared Gym scenes layout once at module load.
@@ -286,16 +286,18 @@ export abstract class GymSceneBase extends Phaser.Scene {
   }
 
   /**
-   * Get a zone rectangle from the shared Gym scenes layout.
+   * Get a zone position from the shared Gym scenes layout.
+   *
+   * Zones are position-only — card dimensions come from per-game constants.
    *
    * Falls back to the default viewport (1280x720) if no custom viewport is provided.
    * Returns `undefined` if the SLL layout is unavailable.
    *
    * @param zoneName  Name of the zone (e.g. 'content', 'controls', 'cardDisplay')
    * @param viewport  Optional custom viewport dimensions
-   * @returns PixelRect for the zone, or undefined
+   * @returns PixelPoint for the zone position, or undefined
    */
-  protected getGymZoneRect(zoneName: string, viewport = DEFAULT_VIEWPORT): PixelRect | undefined {
+  protected getGymZoneRect(zoneName: string, viewport = DEFAULT_VIEWPORT): PixelPoint | undefined {
     if (!GYM_SCENES_LAYOUT) return undefined;
     return getZoneRect(GYM_SCENES_LAYOUT, zoneName, viewport, 1);
   }

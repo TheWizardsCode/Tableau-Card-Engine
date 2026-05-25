@@ -6,8 +6,8 @@ export interface PixelPoint {
 }
 
 export interface PixelRect extends PixelPoint {
-  width: number;
-  height: number;
+  width?: number;
+  height?: number;
 }
 
 export interface NormalizedPoint {
@@ -16,12 +16,18 @@ export interface NormalizedPoint {
   pixelOverride?: PixelPoint;
 }
 
+/**
+ * Position-only zone rectangle in normalized (0-1) coordinates.
+ *
+ * Layout zones define **positioning only** (x, y). Card dimensions come
+ * entirely from per-game constants, not from layout zones. The optional
+ * `pixelOverride` provides exact pixel-position overrides for the anchor
+ * point (x, y only — no dimensions).
+ */
 export interface NormalizedRect {
   x: number;
   y: number;
-  width: number;
-  height: number;
-  pixelOverride?: PixelRect;
+  pixelOverride?: PixelPoint;
 }
 
 export interface ScreenLayoutZone {
@@ -96,21 +102,17 @@ export const SCREEN_LAYOUT_SCHEMA = {
           rect: {
             type: 'object',
             additionalProperties: false,
-            required: ['x', 'y', 'width', 'height'],
+            required: ['x', 'y'],
             properties: {
               x: { type: 'number', minimum: 0, maximum: 1 },
               y: { type: 'number', minimum: 0, maximum: 1 },
-              width: { type: 'number', minimum: 0, maximum: 1 },
-              height: { type: 'number', minimum: 0, maximum: 1 },
               pixelOverride: {
                 type: 'object',
                 additionalProperties: false,
-                required: ['x', 'y', 'width', 'height'],
+                required: ['x', 'y'],
                 properties: {
                   x: { type: 'number', minimum: 0 },
                   y: { type: 'number', minimum: 0 },
-                  width: { type: 'number', minimum: 1 },
-                  height: { type: 'number', minimum: 1 },
                 },
               },
             },
@@ -185,18 +187,8 @@ export function validateScreenLayoutDocument(
     }
   }
 
-  for (const [zoneName, zone] of Object.entries(typedDocument.zones)) {
-    const maxX = zone.rect.x + zone.rect.width;
-    const maxY = zone.rect.y + zone.rect.height;
-
-    if (maxX > 1 || maxY > 1) {
-      errors.push({
-        path: `/zones/${zoneName}/rect`,
-        message:
-          'Zone rectangle must fit within normalized viewport bounds (x + width <= 1 and y + height <= 1)',
-      });
-    }
-  }
+  // Position-only zones have no width/height to validate for overflow.
+  // Normalized x and y are already constrained to [0, 1] by the schema.
 
   return {
     valid: errors.length === 0,

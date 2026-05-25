@@ -2,7 +2,6 @@ import type {
   NormalizedPoint,
   NormalizedRect,
   PixelPoint,
-  PixelRect,
   ScreenLayoutDocument,
 } from './screen-layout-schema';
 
@@ -12,7 +11,7 @@ export interface LayoutViewport {
 }
 
 export interface ResolvedZone {
-  rect: PixelRect;
+  rect: PixelPoint;
   anchors: Record<string, PixelPoint>;
 }
 
@@ -77,34 +76,42 @@ function reportIssue(
   }
 }
 
+/**
+ * Resolve a position-only NormalizedRect to pixel coordinates.
+ *
+ * Zones define positioning only (x, y) — card dimensions come from
+ * per-game constants, not from layout zones.
+ */
 function resolveRect(
   rect: NormalizedRect,
   viewport: LayoutViewport,
   baseViewport: ScreenLayoutDocument['baseViewport'],
   dpr: number,
-): PixelRect {
+): PixelPoint {
   if (rect.pixelOverride) {
     const scaleX = (viewport.width * dpr) / baseViewport.width;
     const scaleY = (viewport.height * dpr) / baseViewport.height;
     return {
       x: rect.pixelOverride.x * scaleX,
       y: rect.pixelOverride.y * scaleY,
-      width: rect.pixelOverride.width * scaleX,
-      height: rect.pixelOverride.height * scaleY,
     };
   }
 
   return {
     x: toPixels(rect.x, viewport.width, dpr),
     y: toPixels(rect.y, viewport.height, dpr),
-    width: toPixels(rect.width, viewport.width, dpr),
-    height: toPixels(rect.height, viewport.height, dpr),
   };
 }
 
+/**
+ * Resolve an anchor point to pixel coordinates.
+ *
+ * Since zones are position-only, anchors are always resolved in absolute
+ * viewport coordinates (not relative to a zone rectangle).
+ */
 function resolveAnchor(
   anchor: NormalizedPoint,
-  zoneRect: PixelRect,
+  _zoneRect: PixelPoint,
   viewport: LayoutViewport,
   baseViewport: ScreenLayoutDocument['baseViewport'],
   dpr: number,
@@ -119,8 +126,8 @@ function resolveAnchor(
   }
 
   return {
-    x: zoneRect.x + zoneRect.width * anchor.x,
-    y: zoneRect.y + zoneRect.height * anchor.y,
+    x: toPixels(anchor.x, viewport.width, dpr),
+    y: toPixels(anchor.y, viewport.height, dpr),
   };
 }
 
@@ -165,26 +172,36 @@ export function normalizedToPixels(
   };
 }
 
+/**
+ * Convert a pixel point back to normalized (0-1) coordinates.
+ *
+ * Note: this is a position-only conversion. Layout zones do not carry
+ * dimensions — card sizes come from per-game constants.
+ */
 export function pixelToNormalized(
-  rect: PixelRect,
+  point: PixelPoint,
   viewport: LayoutViewport,
   dpr = 1,
 ): NormalizedRect {
   return {
-    x: rect.x / (viewport.width * dpr),
-    y: rect.y / (viewport.height * dpr),
-    width: rect.width / (viewport.width * dpr),
-    height: rect.height / (viewport.height * dpr),
+    x: point.x / (viewport.width * dpr),
+    y: point.y / (viewport.height * dpr),
   };
 }
 
+/**
+ * Get the resolved pixel position for a layout zone.
+ *
+ * Returns a PixelPoint (x, y) — zones are position-only. Card dimensions
+ * should come from per-game constants, not from layout zones.
+ */
 export function getZoneRect(
   layout: ScreenLayoutDocument,
   zoneName: string,
   viewport: LayoutViewport,
   dpr = 1,
   reportIssueHook?: ScreenLayoutIssueReporter,
-): PixelRect {
+): PixelPoint {
   const resolved = normalizedToPixels(layout, viewport, dpr);
   const zone = resolved.zones[zoneName];
 

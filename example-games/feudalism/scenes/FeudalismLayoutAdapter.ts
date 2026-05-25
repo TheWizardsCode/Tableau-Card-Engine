@@ -6,7 +6,7 @@
  * @module example-games/feudalism/scenes/FeudalismLayoutAdapter
  */
 
-import { getZoneRect } from '../../../src/ui/screen-layout';
+import { anchorPoint } from '../../../src/ui/screen-layout';
 import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
 import feudLayoutJson from '../layouts/feudalism.layout.json';
 
@@ -46,27 +46,29 @@ export function computeFeudalismLayout(): FeudalismLayout {
   const gameH = 720;
   const viewport = { width: gameW, height: gameH };
 
-  const patron = getZoneRect(FEUD_SLL_LAYOUT, 'patronArea', viewport, 1);
-  const supply = getZoneRect(FEUD_SLL_LAYOUT, 'supplyArea', viewport, 1);
-  const market = getZoneRect(FEUD_SLL_LAYOUT, 'marketArea', viewport, 1);
-  const player = getZoneRect(FEUD_SLL_LAYOUT, 'playerArea', viewport, 1);
-  const ai = getZoneRect(FEUD_SLL_LAYOUT, 'aiArea', viewport, 1);
+  const patronCenter = anchorPoint(FEUD_SLL_LAYOUT, 'patronArea', 'center', viewport, 1);
+  const patronTop = anchorPoint(FEUD_SLL_LAYOUT, 'patronArea', 'topCenter', viewport, 1);
+  const patronBottom = anchorPoint(FEUD_SLL_LAYOUT, 'patronArea', 'bottom', viewport, 1);
+  const supplyCenter = anchorPoint(FEUD_SLL_LAYOUT, 'supplyArea', 'center', viewport, 1);
+  const marketCenter = anchorPoint(FEUD_SLL_LAYOUT, 'marketArea', 'center', viewport, 1);
+  const playerCenter = anchorPoint(FEUD_SLL_LAYOUT, 'playerArea', 'center', viewport, 1);
+  const aiCenter = anchorPoint(FEUD_SLL_LAYOUT, 'aiArea', 'center', viewport, 1);
 
   return {
     gameW,
     gameH,
-    patronAreaCenterX: Math.round(patron.x + patron.width / 2),
-    patronAreaCenterY: Math.round(patron.y + patron.height / 2),
-    supplyAreaCenterX: Math.round(supply.x + supply.width / 2),
-    supplyAreaCenterY: Math.round(supply.y + supply.height / 2),
-    marketAreaCenterX: Math.round(market.x + market.width / 2),
-    marketAreaCenterY: Math.round(market.y + market.height / 2),
-    playerAreaCenterX: Math.round(player.x + player.width / 2),
-    playerAreaCenterY: Math.round(player.y + player.height / 2),
-    aiAreaCenterX: Math.round(ai.x + ai.width / 2),
-    aiAreaCenterY: Math.round(ai.y + ai.height / 2),
-    upperBandTop: Math.round(patron.y),
-    upperBandBottom: Math.round(patron.y + patron.height),
-    lowerBandTop: Math.round(player.y),
+    patronAreaCenterX: Math.round(patronCenter.x),
+    patronAreaCenterY: Math.round(patronCenter.y),
+    supplyAreaCenterX: Math.round(supplyCenter.x),
+    supplyAreaCenterY: Math.round(supplyCenter.y),
+    marketAreaCenterX: Math.round(marketCenter.x),
+    marketAreaCenterY: Math.round(marketCenter.y),
+    playerAreaCenterX: Math.round(playerCenter.x),
+    playerAreaCenterY: Math.round(playerCenter.y),
+    aiAreaCenterX: Math.round(aiCenter.x),
+    aiAreaCenterY: Math.round(aiCenter.y),
+    upperBandTop: Math.round(patronTop.y),
+    upperBandBottom: Math.round(patronBottom.y),
+    lowerBandTop: Math.round(playerCenter.y),
   };
 }

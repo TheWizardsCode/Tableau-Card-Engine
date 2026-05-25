@@ -9,14 +9,12 @@ import {
 const desktopViewport = { width: 1280, height: 720 };
 const portraitViewport = { width: 720, height: 1280 };
 
-function expectRectCloseTo(
-  actual: { x: number; y: number; width: number; height: number },
-  expected: { x: number; y: number; width: number; height: number },
+function expectPointCloseTo(
+  actual: { x: number; y: number },
+  expected: { x: number; y: number },
 ): void {
   expect(actual.x).toBeCloseTo(expected.x, 6);
   expect(actual.y).toBeCloseTo(expected.y, 6);
-  expect(actual.width).toBeCloseTo(expected.width, 6);
-  expect(actual.height).toBeCloseTo(expected.height, 6);
 }
 
 const baseLayout = {
@@ -26,14 +24,14 @@ const baseLayout = {
   requiredZones: ['shell', 'shared', 'banner'],
   zones: {
     shell: {
-      rect: { x: 0, y: 0, width: 1, height: 0.125 },
+      rect: { x: 0, y: 0 },
       anchors: {
         title: { x: 0.5, y: 0.5 },
         help: { x: 0.92, y: 0.5 },
       },
     },
     shared: {
-      rect: { x: 0.1, y: 0.1, width: 0.25, height: 0.2 },
+      rect: { x: 0.1, y: 0.1 },
       anchors: {
         left: { x: 0.1, y: 0.5 },
         action: { x: 0.9, y: 0.5 },
@@ -43,9 +41,7 @@ const baseLayout = {
       rect: {
         x: 0,
         y: 0,
-        width: 0.05,
-        height: 0.05,
-        pixelOverride: { x: 16, y: 9, width: 64, height: 36 },
+        pixelOverride: { x: 16, y: 9 },
       },
       anchors: {
         center: { x: 0.5, y: 0.5 },
@@ -61,14 +57,14 @@ const sceneLayout = {
   requiredZones: ['shared', 'sceneOnly'],
   zones: {
     shared: {
-      rect: { x: 0.2, y: 0.1, width: 0.3, height: 0.15 },
+      rect: { x: 0.2, y: 0.1 },
       anchors: {
         help: { x: 0.82, y: 0.5 },
         action: { x: 0.2, y: 0.8 },
       },
     },
     sceneOnly: {
-      rect: { x: 0.55, y: 0.45, width: 0.2, height: 0.2 },
+      rect: { x: 0.55, y: 0.45 },
       anchors: {
         center: { x: 0.5, y: 0.5 },
       },
@@ -99,14 +95,13 @@ describe('composeResolvedLayouts', () => {
       'shell',
     ]);
 
-    expectRectCloseTo(resolved.zones.shared.rect, {
+    expectPointCloseTo(resolved.zones.shared.rect, {
       x: 256,
       y: 72,
-      width: 384,
-      height: 108,
     });
-    expect(resolved.zones.shared.anchors.help).toEqual({ x: 570.88, y: 126 });
-    expect(resolved.zones.shared.anchors.action).toEqual({ x: 332.8, y: 158.4 });
+    // Anchors are resolved in absolute viewport coordinates (not zone-relative)
+    expect(resolved.zones.shared.anchors.help).toEqual({ x: 1049.6, y: 360 });
+    expect(resolved.zones.shared.anchors.action).toEqual({ x: 256, y: 576 });
 
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({
@@ -125,19 +120,15 @@ describe('composeResolvedLayouts', () => {
       policy: 'baseWins',
     });
 
-    expectRectCloseTo(resolved.zones.shared.rect, {
+    expectPointCloseTo(resolved.zones.shared.rect, {
       x: 128,
       y: 72,
-      width: 320,
-      height: 144,
     });
-    expect(resolved.zones.shared.anchors.left).toEqual({ x: 160, y: 144 });
-    expect(resolved.zones.shared.anchors.action).toEqual({ x: 416, y: 144 });
+    expect(resolved.zones.shared.anchors.left).toEqual({ x: 128, y: 360 });
+    expect(resolved.zones.shared.anchors.action).toEqual({ x: 1152, y: 360 });
     expect(resolved.zones.sceneOnly.rect).toEqual({
       x: 704,
       y: 324,
-      width: 256,
-      height: 144,
     });
   });
 
@@ -155,13 +146,11 @@ describe('composeResolvedLayouts', () => {
       'shell',
     ]);
 
-    expect(resolved.zones['scene:shared'].anchors.help).toEqual({ x: 570.88, y: 126 });
-    expect(resolved.zones['scene:sceneOnly'].anchors.center).toEqual({ x: 832, y: 396 });
-    expect(resolved.zones.shared.rect).toEqual({
+    expect(resolved.zones['scene:shared'].anchors.help).toEqual({ x: 1049.6, y: 360 });
+    expect(resolved.zones['scene:sceneOnly'].anchors.center).toEqual({ x: 640, y: 360 });
+    expectPointCloseTo(resolved.zones.shared.rect, {
       x: 128,
       y: 72,
-      width: 320,
-      height: 144,
     });
   });
 
@@ -169,26 +158,20 @@ describe('composeResolvedLayouts', () => {
     const desktopResolved = composeResolvedLayouts(baseLayout, sceneLayout, desktopViewport, 1);
     const portraitResolved = composeResolvedLayouts(baseLayout, sceneLayout, portraitViewport, 2);
 
-    expectRectCloseTo(desktopResolved.zones.banner.rect, {
+    expectPointCloseTo(desktopResolved.zones.banner.rect, {
       x: 16,
       y: 9,
-      width: 64,
-      height: 36,
     });
 
-    expectRectCloseTo(portraitResolved.zones.banner.rect, {
+    expectPointCloseTo(portraitResolved.zones.banner.rect, {
       x: 18,
       y: 32,
-      width: 72,
-      height: 128,
     });
     expect(portraitResolved.viewport.pixelWidth).toBe(1440);
     expect(portraitResolved.viewport.pixelHeight).toBe(2560);
-    expectRectCloseTo(portraitResolved.zones.sceneOnly.rect, {
+    expectPointCloseTo(portraitResolved.zones.sceneOnly.rect, {
       x: 792,
       y: 1152,
-      width: 288,
-      height: 512,
     });
   });
 

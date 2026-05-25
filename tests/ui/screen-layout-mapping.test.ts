@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import validMainStreetLayout from '../fixtures/layouts/main-street.valid.layout.json';
 import type {
-  NormalizedRect,
   ScreenLayoutDocument,
+  PixelPoint,
 } from '../../src/ui/screen-layout-schema';
 import {
   adaptLayoutWithFallback,
@@ -16,40 +16,34 @@ import {
 
 const layout = validMainStreetLayout as ScreenLayoutDocument;
 
-function expectRectCloseTo(actual: NormalizedRect, expected: NormalizedRect): void {
+function expectPointCloseTo(actual: PixelPoint, expected: PixelPoint): void {
   expect(actual.x).toBeCloseTo(expected.x, 6);
   expect(actual.y).toBeCloseTo(expected.y, 6);
-  expect(actual.width).toBeCloseTo(expected.width, 6);
-  expect(actual.height).toBeCloseTo(expected.height, 6);
 }
 
 describe('screen layout mapping utilities', () => {
-  it('maps normalized zones to pixels at 1280x720 @ DPR 1', () => {
-    const marketRect = getZoneRect(layout, 'market', { width: 1280, height: 720 }, 1);
+  it('maps position-only zones to pixels at 1280x720 @ DPR 1', () => {
+    const marketPos = getZoneRect(layout, 'market', { width: 1280, height: 720 }, 1);
 
-    expect(marketRect.x).toBeCloseTo(25.6, 6);
-    expect(marketRect.y).toBeCloseTo(86.4, 6);
-    expect(marketRect.width).toBeCloseTo(998.4, 6);
-    expect(marketRect.height).toBeCloseTo(158.4, 6);
+    expect(marketPos.x).toBeCloseTo(25.6, 6);
+    expect(marketPos.y).toBeCloseTo(86.4, 6);
   });
 
-  it('maps normalized zones to pixels at 720x1280 @ DPR 2', () => {
-    const marketRect = getZoneRect(layout, 'market', { width: 720, height: 1280 }, 2);
+  it('maps position-only zones at different viewport and DPR', () => {
+    const marketPos = getZoneRect(layout, 'market', { width: 720, height: 1280 }, 2);
 
-    expect(marketRect.x).toBeCloseTo(28.8, 6);
-    expect(marketRect.y).toBeCloseTo(307.2, 6);
-    expect(marketRect.width).toBeCloseTo(1123.2, 6);
-    expect(marketRect.height).toBeCloseTo(563.2, 6);
+    expect(marketPos.x).toBeCloseTo(28.8, 6);
+    expect(marketPos.y).toBeCloseTo(307.2, 6);
   });
 
-  it('round-trips zone rects with bounded precision loss', () => {
+  it('round-trips position-only zone positions', () => {
     const viewport = { width: 1280, height: 720 };
     const dpr = 1;
-    const marketRect = getZoneRect(layout, 'market', viewport, dpr);
+    const marketPos = getZoneRect(layout, 'market', viewport, dpr);
 
-    const normalized = pixelToNormalized(marketRect, viewport, dpr);
+    const normalized = pixelToNormalized(marketPos, viewport, dpr);
 
-    expectRectCloseTo(normalized, layout.zones.market.rect);
+    expectPointCloseTo(normalized, layout.zones.market.rect);
   });
 
   it('throws explicit errors for unknown zones and unknown anchors', () => {
@@ -69,14 +63,13 @@ describe('screen layout mapping utilities', () => {
     expect(second).toEqual(first);
   });
 
-  it('returns anchor points inside the owning zone bounds', () => {
-    const zoneRect = getZoneRect(layout, 'market', { width: 1280, height: 720 }, 1);
+  it('resolves anchors using absolute coordinates for position-only zones', () => {
     const center = anchorPoint(layout, 'market', 'center', { width: 1280, height: 720 }, 1);
 
-    expect(center.x).toBeGreaterThanOrEqual(zoneRect.x);
-    expect(center.x).toBeLessThanOrEqual(zoneRect.x + zoneRect.width);
-    expect(center.y).toBeGreaterThanOrEqual(zoneRect.y);
-    expect(center.y).toBeLessThanOrEqual(zoneRect.y + zoneRect.height);
+    // For position-only zones, anchors are in absolute viewport coordinates
+    // center anchor is at x=0.41, y=0.23 in the fixture
+    expect(center.x).toBeCloseTo(524.8, 6); // 0.41 * 1280
+    expect(center.y).toBeCloseTo(165.6, 6); // 0.23 * 720
   });
 
   it('emits structured issues for unknown zone lookups', () => {
@@ -125,5 +118,13 @@ describe('screen layout mapping utilities', () => {
 
     const elapsedMs = Date.now() - started;
     expect(elapsedMs).toBeLessThan(50);
+  });
+
+  it('handles zones with pixelOverride for position-only override', () => {
+    // The activityLog zone has a pixelOverride for precise positioning
+    const activityLogPos = getZoneRect(layout, 'activityLog', { width: 1280, height: 720 }, 1);
+
+    expect(activityLogPos.x).toBeCloseTo(1036, 6);
+    expect(activityLogPos.y).toBeCloseTo(86, 6);
   });
 });

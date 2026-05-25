@@ -6,7 +6,7 @@
  * @module example-games/lost-cities/scenes/LostCitiesLayoutAdapter
  */
 
-import { getZoneRect } from '../../../src/ui/screen-layout';
+import { anchorPoint } from '../../../src/ui/screen-layout';
 import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
 import lcLayoutJson from '../layouts/lost-cities.layout.json';
 
@@ -42,24 +42,28 @@ export function computeLostCitiesLayout(): LostCitiesLayout {
   const gameH = 720;
   const viewport = { width: gameW, height: gameH };
 
-  const oppExp = getZoneRect(LC_SLL_LAYOUT, 'opponentExpeditions', viewport, 1);
-  const plrExp = getZoneRect(LC_SLL_LAYOUT, 'playerExpeditions', viewport, 1);
-  const discard = getZoneRect(LC_SLL_LAYOUT, 'discardArea', viewport, 1);
-  const midCol = getZoneRect(LC_SLL_LAYOUT, 'midColumn', viewport, 1);
-  const playerHand = getZoneRect(LC_SLL_LAYOUT, 'playerHand', viewport, 1);
-  const aiHand = getZoneRect(LC_SLL_LAYOUT, 'aiHand', viewport, 1);
+  const oppExpTop = anchorPoint(LC_SLL_LAYOUT, 'opponentExpeditions', 'top', viewport, 1);
+  const oppExpCenter = anchorPoint(LC_SLL_LAYOUT, 'opponentExpeditions', 'center', viewport, 1);
+  const plrExpCenter = anchorPoint(LC_SLL_LAYOUT, 'playerExpeditions', 'center', viewport, 1);
+  const plrExpBottom = anchorPoint(LC_SLL_LAYOUT, 'playerExpeditions', 'bottom', viewport, 1);
+  const discardCenter = anchorPoint(LC_SLL_LAYOUT, 'discardArea', 'center', viewport, 1);
+  const midColCenter = anchorPoint(LC_SLL_LAYOUT, 'midColumn', 'center', viewport, 1);
+  const playerHandCenter = anchorPoint(LC_SLL_LAYOUT, 'playerHand', 'center', viewport, 1);
+  const playerHandTop = anchorPoint(LC_SLL_LAYOUT, 'playerHand', 'top', viewport, 1);
+  const playerHandBottom = anchorPoint(LC_SLL_LAYOUT, 'playerHand', 'bottom', viewport, 1);
+  const aiHandCenter = anchorPoint(LC_SLL_LAYOUT, 'aiHand', 'center', viewport, 1);
 
   return {
     gameW,
     gameH,
-    expeditionsCenterY: Math.round((oppExp.y + oppExp.height + plrExp.y) / 2),
-    opponentExpTop: Math.round(oppExp.y),
-    playerExpBottom: Math.round(plrExp.y + plrExp.height),
-    discardAreaCenterY: Math.round(discard.y + discard.height / 2),
-    midColumnCenterX: Math.round(midCol.x + midCol.width / 2),
-    playerHandCenterX: Math.round(playerHand.x + playerHand.width / 2),
-    aiHandCenterX: Math.round(aiHand.x + aiHand.width / 2),
-    handTop: Math.round(playerHand.y),
-    handBottom: Math.round(playerHand.y + playerHand.height),
+    expeditionsCenterY: Math.round((oppExpCenter.y + plrExpCenter.y) / 2),
+    opponentExpTop: Math.round(oppExpTop.y),
+    playerExpBottom: Math.round(plrExpBottom.y),
+    discardAreaCenterY: Math.round(discardCenter.y),
+    midColumnCenterX: Math.round(midColCenter.x),
+    playerHandCenterX: Math.round(playerHandCenter.x),
+    aiHandCenterX: Math.round(aiHandCenter.x),
+    handTop: Math.round(playerHandTop.y),
+    handBottom: Math.round(playerHandBottom.y),
   };
 }

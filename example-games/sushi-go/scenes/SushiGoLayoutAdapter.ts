@@ -6,7 +6,7 @@
  * @module example-games/sushi-go/scenes/SushiGoLayoutAdapter
  */
 
-import { getZoneRect } from '../../../src/ui/screen-layout';
+import { anchorPoint } from '../../../src/ui/screen-layout';
 import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
 import sushiLayoutJson from '../layouts/sushi-go.layout.json';
 
@@ -39,19 +39,21 @@ export function computeSushiGoLayout(): SushiGoLayout {
   const gameH = 720;
   const viewport = { width: gameW, height: gameH };
 
-  const aiTableau = getZoneRect(SUSHI_SLL_LAYOUT, 'aiTableau', viewport, 1);
-  const playerTableau = getZoneRect(SUSHI_SLL_LAYOUT, 'playerTableau', viewport, 1);
-  const playerHand = getZoneRect(SUSHI_SLL_LAYOUT, 'playerHand', viewport, 1);
-  const scoreArea = getZoneRect(SUSHI_SLL_LAYOUT, 'scoreArea', viewport, 1);
+  const aiTableauCenter = anchorPoint(SUSHI_SLL_LAYOUT, 'aiTableau', 'center', viewport, 1);
+  const aiTableauBottom = anchorPoint(SUSHI_SLL_LAYOUT, 'aiTableau', 'bottomCenter', viewport, 1);
+  const playerTableauCenter = anchorPoint(SUSHI_SLL_LAYOUT, 'playerTableau', 'center', viewport, 1);
+  const playerTableauBottom = anchorPoint(SUSHI_SLL_LAYOUT, 'playerTableau', 'bottomCenter', viewport, 1);
+  const playerHandCenterYAnchor = anchorPoint(SUSHI_SLL_LAYOUT, 'playerHand', 'handCenterY', viewport, 1);
+  const scoreAreaCenter = anchorPoint(SUSHI_SLL_LAYOUT, 'scoreArea', 'center', viewport, 1);
 
   return {
     gameW,
     gameH,
-    aiTableauCenterY: Math.round(aiTableau.y + aiTableau.height / 2),
-    playerTableauCenterY: Math.round(playerTableau.y + playerTableau.height / 2),
-    playerHandCenterY: Math.round(playerHand.y + playerHand.height * 0.25),
-    scoreAreaCenterX: Math.round(scoreArea.x + scoreArea.width / 2),
-    playerScoreY: Math.round(playerTableau.y + playerTableau.height + 30),
-    aiScoreY: Math.round(aiTableau.y - 20),
+    aiTableauCenterY: Math.round(aiTableauCenter.y),
+    playerTableauCenterY: Math.round(playerTableauCenter.y),
+    playerHandCenterY: Math.round(playerHandCenterYAnchor.y),
+    scoreAreaCenterX: Math.round(scoreAreaCenter.x),
+    playerScoreY: Math.round(playerTableauBottom.y + 30),
+    aiScoreY: Math.round(aiTableauBottom.y - 20),
   };
 }

@@ -8,7 +8,7 @@
  * @module example-games/golf/scenes/GolfLayoutAdapter
  */
 
-import { getZoneRect } from '../../../src/ui/screen-layout';
+import { anchorPoint } from '../../../src/ui/screen-layout';
 import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
 import golfLayoutJson from '../layouts/golf.layout.json';
 import {
@@ -47,22 +47,22 @@ export function computeGolfLayout(): GolfLayout {
   const gameH = 720;
   const viewport = { width: gameW, height: gameH };
 
-  const humanGrid = getZoneRect(GOLF_SLL_LAYOUT, 'humanGrid', viewport, 1);
-  const aiGrid = getZoneRect(GOLF_SLL_LAYOUT, 'aiGrid', viewport, 1);
-  const stockPile = getZoneRect(GOLF_SLL_LAYOUT, 'stockPile', viewport, 1);
-  const discardPile = getZoneRect(GOLF_SLL_LAYOUT, 'discardPile', viewport, 1);
+  const humanGridCenter = anchorPoint(GOLF_SLL_LAYOUT, 'humanGrid', 'center', viewport, 1);
+  const aiGridCenter = anchorPoint(GOLF_SLL_LAYOUT, 'aiGrid', 'center', viewport, 1);
+  const stockPileCenter = anchorPoint(GOLF_SLL_LAYOUT, 'stockPile', 'center', viewport, 1);
+  const discardPileCenter = anchorPoint(GOLF_SLL_LAYOUT, 'discardPile', 'center', viewport, 1);
 
   return {
     gameW,
     gameH,
-    humanGridCenterX: Math.round(humanGrid.x + humanGrid.width / 2),
-    humanGridCenterY: Math.round(humanGrid.y + humanGrid.height / 2),
-    aiGridCenterX: Math.round(aiGrid.x + aiGrid.width / 2),
-    aiGridCenterY: Math.round(aiGrid.y + aiGrid.height / 2),
-    stockPileCenterX: Math.round(stockPile.x + stockPile.width / 2),
-    stockPileCenterY: Math.round(stockPile.y + stockPile.height / 2),
-    discardPileCenterX: Math.round(discardPile.x + discardPile.width / 2),
-    discardPileCenterY: Math.round(discardPile.y + discardPile.height / 2),
+    humanGridCenterX: Math.round(humanGridCenter.x),
+    humanGridCenterY: Math.round(humanGridCenter.y),
+    aiGridCenterX: Math.round(aiGridCenter.x),
+    aiGridCenterY: Math.round(aiGridCenter.y),
+    stockPileCenterX: Math.round(stockPileCenter.x),
+    stockPileCenterY: Math.round(stockPileCenter.y),
+    discardPileCenterX: Math.round(discardPileCenter.x),
+    discardPileCenterY: Math.round(discardPileCenter.y),
   };
 }
 

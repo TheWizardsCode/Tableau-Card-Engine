@@ -6,7 +6,7 @@
  * @module example-games/the-mind/scenes/MindLayoutAdapter
  */
 
-import { getZoneRect } from '../../../src/ui/screen-layout';
+import { anchorPoint } from '../../../src/ui/screen-layout';
 import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
 import mindLayoutJson from '../layouts/the-mind.layout.json';
 
@@ -37,16 +37,16 @@ export function computeMindLayout(): MindLayout {
   const gameH = 720;
   const viewport = { width: gameW, height: gameH };
 
-  const playPile = getZoneRect(MIND_SLL_LAYOUT, 'playPile', viewport, 1);
-  const humanHand = getZoneRect(MIND_SLL_LAYOUT, 'humanHand', viewport, 1);
-  const aiHand = getZoneRect(MIND_SLL_LAYOUT, 'aiHand', viewport, 1);
+  const playPileCenter = anchorPoint(MIND_SLL_LAYOUT, 'playPile', 'center', viewport, 1);
+  const humanHandCenterY = anchorPoint(MIND_SLL_LAYOUT, 'humanHand', 'handCenterY', viewport, 1);
+  const aiHandCenterY = anchorPoint(MIND_SLL_LAYOUT, 'aiHand', 'handCenterY', viewport, 1);
 
   return {
     gameW,
     gameH,
-    playPileCenterX: Math.round(playPile.x + playPile.width / 2),
-    playPileCenterY: Math.round(playPile.y + playPile.height / 2),
-    humanHandCenterY: Math.round(humanHand.y + humanHand.height * 0.75),
-    aiHandCenterY: Math.round(aiHand.y + aiHand.height * 0.25),
+    playPileCenterX: Math.round(playPileCenter.x),
+    playPileCenterY: Math.round(playPileCenter.y),
+    humanHandCenterY: Math.round(humanHandCenterY.y),
+    aiHandCenterY: Math.round(aiHandCenterY.y),
   };
 }

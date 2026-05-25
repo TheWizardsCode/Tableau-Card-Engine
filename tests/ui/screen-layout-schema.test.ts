@@ -50,11 +50,13 @@ describe('screen layout schema contract', () => {
     expect(errorContainsPath(result, '/zones/market/rect/x')).toBe(true);
   });
 
-  it('rejects a zone rectangle that overflows normalized bounds', () => {
+  it('accepts position-only zones at any valid normalized coordinate', () => {
+    // Position-only zones (x, y only) cannot overflow since x and y are
+    // already constrained to [0, 1] by the schema.
     const result = validateScreenLayoutDocument(invalidOverflow as ScreenLayoutDocument);
 
-    expect(result.valid).toBe(false);
-    expect(errorContainsPath(result, '/zones/market/rect')).toBe(true);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
   });
 
   it('parses valid layouts into typed documents', () => {

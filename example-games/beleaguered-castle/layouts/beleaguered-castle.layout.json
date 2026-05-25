@@ -14,37 +14,33 @@
     "header": {
       "rect": {
         "x": 0,
-        "y": 0,
-        "width": 1,
-        "height": 0.083333
+        "y": 0
       },
       "anchors": {
-        "center": { "x": 0.5, "y": 0.5 },
-        "menuLeft": { "x": 0.05, "y": 0.5 }
+        "center": { "x": 0.5, "y": 0.041667 },
+        "menuLeft": { "x": 0.05, "y": 0.041667 },
+        "headerY": { "x": 0.5, "y": 0.020833 }
       }
     },
     "foundation": {
       "rect": {
         "x": 0.0625,
-        "y": 0.0625,
-        "width": 0.875,
-        "height": 0.138889
+        "y": 0.0625
       },
       "anchors": {
-        "center": { "x": 0.5, "y": 0.5 },
-        "topCenter": { "x": 0.5, "y": 0 }
+        "center": { "x": 0.5, "y": 0.131945 },
+        "topCenter": { "x": 0.5, "y": 0.0625 }
       }
     },
     "tableau": {
       "rect": {
         "x": 0.0625,
-        "y": 0.370833,
-        "width": 0.875,
-        "height": 0.486111
+        "y": 0.370833
       },
       "anchors": {
-        "center": { "x": 0.5, "y": 0.5 },
-        "topCenter": { "x": 0.5, "y": 0 }
+        "center": { "x": 0.5, "y": 0.613889 },
+        "topCenter": { "x": 0.5, "y": 0.370833 },
+        "bottomCenter": { "x": 0.5, "y": 0.856944 }
       }
     }
   }

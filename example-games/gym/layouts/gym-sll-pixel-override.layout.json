@@ -15,67 +15,55 @@
     "header": {
       "rect": {
         "x": 0.08,
-        "y": 0.04,
-        "width": 0.62,
-        "height": 0.11
+        "y": 0.04
       },
       "anchors": {
-        "title": { "x": 0.5, "y": 0.5 }
+        "title": { "x": 0.39, "y": 0.095 }
       }
     },
     "menu": {
       "rect": {
         "x": 0.7,
         "y": 0.04,
-        "width": 0.24,
-        "height": 0.11,
         "pixelOverride": {
           "x": 1000,
-          "y": 28,
-          "width": 230,
-          "height": 56
+          "y": 28
         }
       },
       "anchors": {
-        "help": { "x": 0.5, "y": 0.5 }
+        "help": { "x": 0.82, "y": 0.095 }
       }
     },
     "controls": {
       "rect": {
         "x": 0.08,
-        "y": 0.18,
-        "width": 0.44,
-        "height": 0.12
+        "y": 0.18
       },
       "anchors": {
         "action": {
-          "x": 0.5,
-          "y": 0.5,
+          "x": 0.3,
+          "y": 0.24,
           "pixelOverride": {
             "x": 390,
             "y": 170
           }
         },
-        "center": { "x": 0.5, "y": 0.5 }
+        "center": { "x": 0.3, "y": 0.24 }
       }
     },
     "content": {
       "rect": {
         "x": 0.08,
         "y": 0.34,
-        "width": 0.84,
-        "height": 0.56,
         "pixelOverride": {
           "x": 120,
-          "y": 250,
-          "width": 1040,
-          "height": 400
+          "y": 250
         }
       },
       "anchors": {
-        "center": { "x": 0.5, "y": 0.5 },
-        "topLeft": { "x": 0, "y": 0 },
-        "bottomRight": { "x": 1, "y": 1 }
+        "center": { "x": 0.5, "y": 0.62 },
+        "topLeft": { "x": 0.08, "y": 0.34 },
+        "bottomRight": { "x": 0.92, "y": 0.9 }
       }
     }
   }

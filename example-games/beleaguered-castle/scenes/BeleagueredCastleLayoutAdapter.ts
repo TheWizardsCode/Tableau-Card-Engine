@@ -6,7 +6,7 @@
  * @module example-games/beleaguered-castle/scenes/BeleagueredCastleLayoutAdapter
  */
 
-import { getZoneRect } from '../../../src/ui/screen-layout';
+import { anchorPoint } from '../../../src/ui/screen-layout';
 import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
 import bcLayoutJson from '../layouts/beleaguered-castle.layout.json';
 
@@ -37,16 +37,17 @@ export function computeBeleagueredCastleLayout(): BeleagueredCastleLayout {
   const gameH = 720;
   const viewport = { width: gameW, height: gameH };
 
-  const header = getZoneRect(BC_SLL_LAYOUT, 'header', viewport, 1);
-  const foundation = getZoneRect(BC_SLL_LAYOUT, 'foundation', viewport, 1);
-  const tableau = getZoneRect(BC_SLL_LAYOUT, 'tableau', viewport, 1);
+  const headerYAnchor = anchorPoint(BC_SLL_LAYOUT, 'header', 'headerY', viewport, 1);
+  const foundationCenter = anchorPoint(BC_SLL_LAYOUT, 'foundation', 'center', viewport, 1);
+  const tableauTop = anchorPoint(BC_SLL_LAYOUT, 'tableau', 'topCenter', viewport, 1);
+  const tableauBottom = anchorPoint(BC_SLL_LAYOUT, 'tableau', 'bottomCenter', viewport, 1);
 
   return {
     gameW,
     gameH,
-    headerY: Math.round(header.y + header.height * 0.25),
-    foundationCenterY: Math.round(foundation.y + foundation.height / 2),
-    tableauTopY: Math.round(tableau.y),
-    tableauBottomY: Math.round(tableau.y + tableau.height),
+    headerY: Math.round(headerYAnchor.y),
+    foundationCenterY: Math.round(foundationCenter.y),
+    tableauTopY: Math.round(tableauTop.y),
+    tableauBottomY: Math.round(tableauBottom.y),
   };
 }

@@ -17,69 +17,59 @@
     "opponentExpeditions": {
       "rect": {
         "x": 0.03125,
-        "y": 0.1,
-        "width": 0.546875,
-        "height": 0.375
+        "y": 0.1
       },
       "anchors": {
-        "center": { "x": 0.5, "y": 0.5 },
-        "topCenter": { "x": 0.5, "y": 0 }
+        "center": { "x": 0.304688, "y": 0.2875 },
+        "top": { "x": 0.304688, "y": 0.1 }
       }
     },
     "playerExpeditions": {
       "rect": {
         "x": 0.03125,
-        "y": 0.525,
-        "width": 0.546875,
-        "height": 0.375
+        "y": 0.525
       },
       "anchors": {
-        "center": { "x": 0.5, "y": 0.5 },
-        "bottomCenter": { "x": 0.5, "y": 1 }
+        "center": { "x": 0.304688, "y": 0.7125 },
+        "bottom": { "x": 0.304688, "y": 0.9 }
       }
     },
     "discardArea": {
       "rect": {
         "x": 0.03125,
-        "y": 0.475,
-        "width": 0.546875,
-        "height": 0.05
+        "y": 0.475
       },
       "anchors": {
-        "center": { "x": 0.5, "y": 0.5 }
+        "center": { "x": 0.304688, "y": 0.5 }
       }
     },
     "midColumn": {
       "rect": {
         "x": 0.625,
-        "y": 0.066667,
-        "width": 0.148438,
-        "height": 0.866667
+        "y": 0.066667
       },
       "anchors": {
-        "center": { "x": 0.5, "y": 0.5 }
+        "center": { "x": 0.699219, "y": 0.5 }
       }
     },
     "playerHand": {
       "rect": {
         "x": 0.625,
-        "y": 0.4,
-        "width": 0.171875,
-        "height": 0.533333
+        "y": 0.4
       },
       "anchors": {
-        "center": { "x": 0.5, "y": 0.5 }
+        "center": { "x": 0.710938, "y": 0.666667 },
+        "top": { "x": 0.710938, "y": 0.4 },
+        "bottom": { "x": 0.710938, "y": 0.933333 }
       }
     },
     "aiHand": {
       "rect": {
         "x": 0.804688,
-        "y": 0.4,
-        "width": 0.171875,
-        "height": 0.533333
+        "y": 0.4
       },
       "anchors": {
-        "center": { "x": 0.5, "y": 0.5 }
+        "center": { "x": 0.890625, "y": 0.666667 }
       }
     }
   }

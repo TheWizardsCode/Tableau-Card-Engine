@@ -1024,7 +1024,9 @@ Collision handling follows the project default: scene wins, and the helper repor
 
 When adding a new example game, follow this pattern:
 
-1. **Create a layout JSON file** in `example-games/<game>/layouts/<game>.layout.json` with normalized zone rectangles and anchors. Use `baseViewport` of 1280x720 (matching the shared `GAME_W`/`GAME_H` constants).
+1. **Create a layout JSON file** in `example-games/<game>/layouts/<game>.layout.json` with **position-only** normalized zone rectangles (`x`, `y`) and anchors. Use `baseViewport` of 1280x720 (matching the shared `GAME_W`/`GAME_H` constants).
+
+   **Important**: Layout zones define **positioning only** (`x`, `y`). Card dimensions come entirely from per-game constants (e.g., `CARD_W`, `CARD_H`), not from layout zones. The `pixelOverride` field supports exact pixel-position overrides for `x` and `y` only — no dimensions.
 
 2. **Create a layout adapter** in `example-games/<game>/scenes/<Game>LayoutAdapter.ts` that:
    - Parses the layout JSON using `parseScreenLayoutDocument`
@@ -1034,7 +1036,7 @@ When adding a new example game, follow this pattern:
 3. **Update the renderer** to:
    - Import `compute<Game>Layout()` and call it in the constructor
    - Replace hardcoded position constants with `this.layout.<property>` references
-   - Keep card dimensions and game-logic constants in the Constants file; remove layout position constants
+   - Card dimensions always come from per-game constants (e.g., `CARD_W`, `CARD_H`); never derive card sizes from layout zones
 
 4. **Update the Constants file** to:
    - Remove layout position constants (e.g. `PILE_X`, `HAND_Y`)
@@ -1045,7 +1047,7 @@ When adding a new example game, follow this pattern:
 
 ### Authoring and validation workflow
 
-1. Author/update a `*.layout.json` file with normalized zone rectangles and anchors.
+1. Author/update a `*.layout.json` file with **position-only** normalized zone rectangles (`x`, `y` — no `width`/`height`) and anchors.
 2. Validate schema + parse behavior via:
    ```bash
    npx vitest run tests/ui/screen-layout-schema.test.ts --project unit

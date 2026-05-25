@@ -15,93 +15,78 @@
     "market": {
       "rect": {
         "x": 0.015625,
-        "y": 0.125,
-        "width": 0.96875,
-        "height": 0.302778
+        "y": 0.125
       },
       "anchors": {
-        "topCenter": { "x": 0.5, "y": 0 },
-        "bottomCenter": { "x": 0.5, "y": 1 }
+        "topCenter": { "x": 0.5, "y": 0.125 },
+        "topLeft": { "x": 0.015625, "y": 0.125 }
       }
     },
     "incidentQueue": {
       "rect": {
         "x": 0.085938,
-        "y": 0.444444,
-        "width": 0.522656,
-        "height": 0.152778
+        "y": 0.444444
       },
       "anchors": {
-        "topLeft": { "x": 0, "y": 0 },
-        "bottomLeft": { "x": 0, "y": 1 }
+        "topLeft": { "x": 0.085938, "y": 0.444444 },
+        "bottomLeft": { "x": 0.085938, "y": 0.597222 }
       }
     },
     "street": {
       "rect": {
         "x": 0.265625,
-        "y": 0.586111,
-        "width": 0.46875,
-        "height": 0.272222
+        "y": 0.586111
       },
       "anchors": {
-        "topCenter": { "x": 0.5, "y": 0 },
-        "bottomCenter": { "x": 0.5, "y": 1 }
+        "topCenter": { "x": 0.5, "y": 0.586111 },
+        "bottomCenter": { "x": 0.5, "y": 0.858333 }
       }
     },
     "hand": {
       "rect": {
         "x": 0.03125,
-        "y": 0.861111,
-        "width": 0.109375,
-        "height": 0.111111
+        "y": 0.861111
       },
       "anchors": {
-        "topLeft": { "x": 0, "y": 0 }
+        "topLeft": { "x": 0.03125, "y": 0.861111 }
       }
     },
     "actions": {
       "rect": {
         "x": 0.6875,
-        "y": 0.930556,
-        "width": 0.292188,
-        "height": 0.047222
+        "y": 0.930556
       },
       "anchors": {
-        "rightCenter": { "x": 1, "y": 0.5 }
+        "rightCenter": { "x": 0.979688, "y": 0.954167 }
       }
     },
     "activityLog": {
       "rect": {
         "x": 0.640625,
-        "y": 0.111111,
-        "width": 0.335938,
-        "height": 0.472222
+        "y": 0.111111
       },
       "anchors": {
-        "topLeft": { "x": 0, "y": 0 },
-        "bottomRight": { "x": 1, "y": 1 }
+        "topLeft": { "x": 0.640625, "y": 0.111111 },
+        "bottomRight": { "x": 0.976563, "y": 0.583333 }
       }
     },
     "challengePanel": {
       "rect": {
         "x": 0.359375,
-        "y": 0.444444,
-        "width": 0.273438,
-        "height": 0.152778
+        "y": 0.444444
       },
       "anchors": {
-        "topLeft": { "x": 0, "y": 0 }
+        "topLeft": { "x": 0.359375, "y": 0.444444 },
+        "bottomRight": { "x": 0.632813, "y": 0.597222 }
       }
     },
     "endTurnButton": {
       "rect": {
         "x": 0.871875,
-        "y": 0.936111,
-        "width": 0.109375,
-        "height": 0.047222
+        "y": 0.936111
       },
       "anchors": {
-        "center": { "x": 0.5, "y": 0.5 }
+        "center": { "x": 0.926563, "y": 0.959722 }
       }
     }
   }
