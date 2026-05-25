@@ -20,6 +20,17 @@ import { HelpPanel, type HelpSection } from '../../../src/ui/HelpPanel';
 import { HelpButton } from '../../../src/ui/HelpButton';
 import { getReducedMotion, setReducedMotion } from '../../../src/ui/SettingsStore';
 import { runSceneTransition } from '../../../src/ui/sceneTransition';
+import { getZoneRect, anchorPoint } from '../../../src/ui/screen-layout';
+import { parseScreenLayoutDocument, type ScreenLayoutDocument, type PixelPoint, type PixelRect } from '../../../src/ui/screen-layout-schema';
+import gymScenesLayoutJson from '../layouts/gym-scenes.layout.json';
+
+// Parse the shared Gym scenes layout once at module load.
+const GYM_SCENES_LAYOUT: ScreenLayoutDocument | null = (() => {
+  const parsed = parseScreenLayoutDocument(gymScenesLayoutJson);
+  return parsed.valid ? parsed.layout : null;
+})();
+
+const DEFAULT_VIEWPORT = { width: 1280, height: 720 };
 
 /**
  * Abstract base class for Gym demo scenes.
@@ -261,5 +272,101 @@ export abstract class GymSceneBase extends Phaser.Scene {
     this.header.title.setVisible(visible);
     this.header.menuButton.setVisible(visible);
     this.headerDivider?.setVisible(visible);
+  }
+
+  // ── SLL layout helpers ────────────────────────────────────
+
+  /**
+   * Get the shared Gym scenes SLL layout document, or `null` if unavailable.
+   *
+   * Scenes can use this to access zone/anchor positions for SLL-driven layout.
+   */
+  protected getGymScenesLayout(): ScreenLayoutDocument | null {
+    return GYM_SCENES_LAYOUT;
+  }
+
+  /**
+   * Get a zone rectangle from the shared Gym scenes layout.
+   *
+   * Falls back to the default viewport (1280x720) if no custom viewport is provided.
+   * Returns `undefined` if the SLL layout is unavailable.
+   *
+   * @param zoneName  Name of the zone (e.g. 'content', 'controls', 'cardDisplay')
+   * @param viewport  Optional custom viewport dimensions
+   * @returns PixelRect for the zone, or undefined
+   */
+  protected getGymZoneRect(zoneName: string, viewport = DEFAULT_VIEWPORT): PixelRect | undefined {
+    if (!GYM_SCENES_LAYOUT) return undefined;
+    return getZoneRect(GYM_SCENES_LAYOUT, zoneName, viewport, 1);
+  }
+
+  /**
+   * Get an anchor point from a zone in the shared Gym scenes layout.
+   *
+   * Falls back to the default viewport (1280x720) if no custom viewport is provided.
+   * Returns `undefined` if the SLL layout is unavailable.
+   *
+   * @param zoneName   Name of the zone
+   * @param anchorName Name of the anchor within the zone
+   * @param viewport   Optional custom viewport dimensions
+   * @returns PixelPoint for the anchor, or undefined
+   */
+  protected getGymAnchor(zoneName: string, anchorName: string, viewport = DEFAULT_VIEWPORT): PixelPoint | undefined {
+    if (!GYM_SCENES_LAYOUT) return undefined;
+    return anchorPoint(GYM_SCENES_LAYOUT, zoneName, anchorName, viewport, 1);
+  }
+
+  /**
+   * Create a label positioned at an SLL anchor point.
+   *
+   * If the SLL layout is unavailable, falls back to the provided fallback coordinates.
+   *
+   * @param zoneName   Zone to position within
+   * @param anchorName Anchor within the zone
+   * @param fallbackX  Fallback X if SLL is unavailable
+   * @param fallbackY  Fallback Y if SLL is unavailable
+   * @param text       Label text
+   * @param opts       Optional text styling
+   */
+  protected addLabelAtAnchor(
+    zoneName: string,
+    anchorName: string,
+    fallbackX: number,
+    fallbackY: number,
+    text: string,
+    opts?: Partial<{ fontSize: string; color: string }>,
+  ): Phaser.GameObjects.Text {
+    const anchor = this.getGymAnchor(zoneName, anchorName);
+    const x = anchor?.x ?? fallbackX;
+    const y = anchor?.y ?? fallbackY;
+    return this.addLabel(x, y, text, opts);
+  }
+
+  /**
+   * Create a button positioned at an SLL anchor point.
+   *
+   * If the SLL layout is unavailable, falls back to the provided fallback coordinates.
+   *
+   * @param zoneName   Zone to position within
+   * @param anchorName Anchor within the zone
+   * @param fallbackX  Fallback X if SLL is unavailable
+   * @param fallbackY  Fallback Y if SLL is unavailable
+   * @param label      Button label
+   * @param callback   Button click handler
+   * @param opts       Optional button styling
+   */
+  protected addButtonAtAnchor(
+    zoneName: string,
+    anchorName: string,
+    fallbackX: number,
+    fallbackY: number,
+    label: string,
+    callback: () => void,
+    opts?: Partial<{ fontSize: string; color: string; hoverColor: string }>,
+  ): Phaser.GameObjects.Text {
+    const anchor = this.getGymAnchor(zoneName, anchorName);
+    const x = anchor?.x ?? fallbackX;
+    const y = anchor?.y ?? fallbackY;
+    return this.addButton(x, y, label, callback, opts);
   }
 }

@@ -70,42 +70,40 @@ export class GymDeckRngScene extends GymSceneBase {
       }
     ]);
 
-    // ── Controls ─────────────────────────────────────────
-    const cx = GAME_W / 2;
-    let y = 60;
+    // ── Controls (positioned via SLL controls zone) ────────────
+    const controlsAnchor = this.getGymAnchor('controls', 'left');
+    const cx = controlsAnchor?.x ?? GAME_W / 2;
+    let y = controlsAnchor?.y ?? 60;
 
-    this.addLabel(cx - 300, y, 'Seed:');
-    this.seedText = this.add.text(cx - 250, y, String(this.seed), {
+    this.addLabel(cx, y, 'Seed:');
+    this.seedText = this.add.text(cx + 50, y, String(this.seed), {
       fontSize: '16px',
       color: '#ffffff',
       fontFamily: 'monospace',
     });
 
-    this.addButton(cx - 120, y, '[ -1 ]', () => this.adjustSeed(-1));
-    this.addButton(cx - 60, y, '[ +1 ]', () => this.adjustSeed(1));
-    this.addButton(cx + 10, y, '[ Reset Seed ]', () => this.resetSeed());
-    this.addButton(cx + 150, y, '[ Shuffle ]', () => this.shuffleDeck());
-    this.addButton(cx + 260, y, '[ Draw ]', () => this.drawCard());
+    this.addButton(cx + 180, y, '[ -1 ]', () => this.adjustSeed(-1));
+    this.addButton(cx + 240, y, '[ +1 ]', () => this.adjustSeed(1));
+    this.addButton(cx + 310, y, '[ Reset Seed ]', () => this.resetSeed());
+    this.addButton(cx + 450, y, '[ Shuffle ]', () => this.shuffleDeck());
+    this.addButton(cx + 560, y, '[ Draw ]', () => this.drawCard());
 
     y += 28;
-    this.addButton(cx - 250, y, '[ Flip Last ]', () => this.flipLastDrawn());
-    this.addButton(cx - 90, y, '[ Deal ]', () => this.dealCardAction());
-    this.addButton(cx + 50, y, '[ Reset ]', () => this.resetDeck());
-
-    y += 32;
+    this.addButton(cx + 50, y, '[ Flip Last ]', () => this.flipLastDrawn());
+    this.addButton(cx + 210, y, '[ Deal ]', () => this.dealCardAction());
+    this.addButton(cx + 350, y, '[ Reset ]', () => this.resetDeck());
 
     // ── Status ───────────────────────────────────────────
-    this.deckCountText = this.addLabel(cx - 200, y, 'Deck: 0 cards', { fontSize: '16px', color: '#88ff88' });
-    this.drawnCountText = this.addLabel(cx + 100, y, 'Drawn: 0 cards', { fontSize: '16px', color: '#88ff88' });
+    this.deckCountText = this.addLabel(cx + 100, y, 'Deck: 0 cards', { fontSize: '16px', color: '#88ff88' });
+    this.drawnCountText = this.addLabel(cx + 400, y, 'Drawn: 0 cards', { fontSize: '16px', color: '#88ff88' });
 
-    y += 30;
+    // ── Card display area (positioned via SLL cardDisplay zone) ──
+    const cardDisplay = this.getGymAnchor('cardDisplay', 'center');
+    const cardDisplayY = cardDisplay?.y ?? 280;
+    this.addLabel(cardDisplay?.x ?? cx, cardDisplayY - 40, '── Last Drawn Card ──', { fontSize: '12px', color: '#669966' }).setOrigin(0.5);
 
-    // ── Card display area ────────────────────────────────
-    this.addLabel(cx, y + 10, '── Last Drawn Card ──', { fontSize: '12px', color: '#669966' }).setOrigin(0.5);
-
-    y += 40;
-    // ── Event log area ───────────────────────────────────
-    this.addLabel(cx, y + 50, '── Event Log ──', { fontSize: '12px', color: '#669966' }).setOrigin(0.5);
+    // ── Event log area (positioned below card display) ──────
+    this.addLabel(cardDisplay?.x ?? cx, cardDisplayY + 140, '── Event Log ──', { fontSize: '12px', color: '#669966' }).setOrigin(0.5);
 
     // Initialize deck
     this.resetDeck();
@@ -200,11 +198,11 @@ export class GymDeckRngScene extends GymSceneBase {
     this.clearLastDrawnSprite();
 
     // Create a sprite at the deck position and deal it to the drawn area
-    const cx = GAME_W / 2;
-    const destX = cx + 80;
-    const destY = 180;
+    const cardDisplay = this.getGymAnchor('cardDisplay', 'center');
+    const destX = cardDisplay?.x ?? (GAME_W / 2 + 80);
+    const destY = cardDisplay?.y ?? 180;
 
-    const sprite = this.add.image(cx - 200, 100, getCardTexture(card));
+    const sprite = this.add.image(destX - 280, destY - 80, getCardTexture(card));
     this.lastDrawnSprite = sprite;
     this.lastDrawnCard = card;
 
@@ -225,8 +223,8 @@ export class GymDeckRngScene extends GymSceneBase {
         target: sprite,
         destX,
         destY,
-        sourceX: cx - 200,
-        sourceY: 100,
+        sourceX: destX - 280,
+        sourceY: destY - 80,
         duration: 400,
         gameEvents,
         cardId: `${card.rank}${card.suit}`,
@@ -248,11 +246,13 @@ export class GymDeckRngScene extends GymSceneBase {
   // ── Card sprite helpers ──────────────────────────────────
 
   private showCardSprite(card: ReturnType<typeof createStandardDeck>[0]): void {
-    const cx = GAME_W / 2;
+    const cardDisplay = this.getGymAnchor('cardDisplay', 'center');
+    const spriteX = cardDisplay?.x ?? (GAME_W / 2 + 80);
+    const spriteY = cardDisplay?.y ?? 180;
     const texture = getCardTexture(card);
-    const sprite = this.add.image(cx + 80, 180, texture);
+    const sprite = this.add.image(spriteX, spriteY, texture);
     // Label below
-    const label = this.add.text(cx + 80, 230, `${card.rank}${card.suit}`, {
+    const label = this.add.text(spriteX, spriteY + 50, `${card.rank}${card.suit}`, {
       fontSize: '14px',
       color: '#ffffff',
       fontFamily: 'monospace',
@@ -295,7 +295,8 @@ export class GymDeckRngScene extends GymSceneBase {
     for (const t of this.logTexts) t.destroy();
     this.logTexts = [];
 
-    const baseY = 280;
+    const cardDisplay = this.getGymAnchor('cardDisplay', 'center');
+    const baseY = cardDisplay?.y ? cardDisplay.y + 100 : 280;
     for (let i = 0; i < this.eventLog.length; i++) {
       const txt = this.add.text(40, baseY + i * 18, this.eventLog[i], {
         fontSize: '12px',

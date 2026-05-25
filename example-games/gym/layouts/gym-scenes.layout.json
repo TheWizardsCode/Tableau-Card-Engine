@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "id": "gym-scenes-layout",
+  "baseViewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "requiredZones": [
+    "header",
+    "content",
+    "controls",
+    "cardDisplay"
+  ],
+  "zones": {
+    "header": {
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 0.125
+      },
+      "anchors": {
+        "title": { "x": 0.5, "y": 0.5 },
+        "left": { "x": 0.05, "y": 0.5 }
+      }
+    },
+    "content": {
+      "rect": {
+        "x": 0.05,
+        "y": 0.15,
+        "width": 0.9,
+        "height": 0.75
+      },
+      "anchors": {
+        "topCenter": { "x": 0.5, "y": 0 },
+        "center": { "x": 0.5, "y": 0.5 },
+        "bottomCenter": { "x": 0.5, "y": 1 }
+      }
+    },
+    "controls": {
+      "rect": {
+        "x": 0.05,
+        "y": 0.08,
+        "width": 0.9,
+        "height": 0.07
+      },
+      "anchors": {
+        "left": { "x": 0, "y": 0.5 },
+        "right": { "x": 1, "y": 0.5 },
+        "center": { "x": 0.5, "y": 0.5 }
+      }
+    },
+    "cardDisplay": {
+      "rect": {
+        "x": 0.25,
+        "y": 0.2,
+        "width": 0.5,
+        "height": 0.35
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.5 },
+        "deckPosition": { "x": 0.15, "y": 0.5 },
+        "drawnPosition": { "x": 0.85, "y": 0.5 }
+      }
+    }
+  }
+}
