@@ -60,9 +60,9 @@ describe('TheMind layout regression', () => {
     expect(pileSprite!.x).toBeGreaterThan(600);
     expect(pileSprite!.x).toBeLessThan(680);
 
-    // AI Hand label should be near the top but on-screen
-    expect(aiHandLabel!.y).toBeGreaterThan(10);
-    expect(aiHandLabel!.y).toBeLessThan(40);
+    // AI Hand label should be below the title (title is at y≈14) but on-screen
+    expect(aiHandLabel!.y).toBeGreaterThan(30);
+    expect(aiHandLabel!.y).toBeLessThan(60);
 
     // Your Hand label should be well above the bottom
     expect(yourHandLabel!.y).toBeGreaterThan(480);
