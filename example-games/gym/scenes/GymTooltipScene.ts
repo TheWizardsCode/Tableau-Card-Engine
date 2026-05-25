@@ -86,7 +86,7 @@ export class GymTooltipScene extends GymSceneBase {
           wordWrap: { width: 200 },
         }).setOrigin(0, 0);
 
-        const bg = scene.add.rectangle(0, 0, text.width + 16, text.height + 16, 0x000000, 0.9);
+        const bg = scene.add.rectangle(0, 0, text.width + 16, text.height + 16, 0x000000, 0.9).setOrigin(0, 0);
         bg.setStrokeStyle(1, (ctx.borderColor as number) ?? 0x888888);
 
         text.setPosition(8, 8);
