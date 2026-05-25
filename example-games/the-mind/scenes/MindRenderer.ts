@@ -269,8 +269,8 @@ export class MindRenderer {
       sprite.on('pointerdown', () => onCardClick(card));
       sprite.on('pointerover', () => {
         if (phase === 'playing' && !autoPlayEnabled) {
-          sprite.setScale(1.08);
-          sprite.setY(this.layout.humanHandCenterY - 6);
+          sprite.setScale(1.03);
+          sprite.setY(this.layout.humanHandCenterY - 4);
         }
       });
       sprite.on('pointerout', () => {
