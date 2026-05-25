@@ -21,6 +21,7 @@ export { GymAudioFeedbackScene } from './scenes/GymAudioFeedbackScene';
 export { GymGraphicsShaderSpikeScene } from './scenes/GymGraphicsShaderSpikeScene';
 export { GymGraphicsLightingSpikeScene } from './scenes/GymGraphicsLightingSpikeScene';
 export { GymSllScene } from './scenes/GymSllScene';
+export { GymTooltipScene } from './scenes/GymTooltipScene';
 
 export {
   GYM_ROUTER_KEY,
@@ -34,6 +35,7 @@ export {
   GYM_GRAPHICS_SHADER_SPIKE_KEY,
   GYM_GRAPHICS_LIGHTING_SPIKE_KEY,
   GYM_SLL_KEY,
+  GYM_TOOLTIP_KEY,
   GYM_SCENE_CATALOGUE,
 } from './GymRegistry';
 export type { GymSceneEntry } from './GymRegistry';

@@ -21,7 +21,7 @@
  *   Phase 2 — click draw pile or discard pile to draw
  *   AI plays automatically with configurable delay
  */
-import { EXPEDITION_COLORS, CARD_BACK_KEY } from '../LostCitiesCards';
+import { EXPEDITION_COLORS, CARD_BACK_KEY, type ExpeditionColor } from '../LostCitiesCards';
 import { setupLostCitiesGame } from '../LostCitiesGame';
 import {
   LostCitiesAiPlayer,
@@ -32,8 +32,11 @@ import type { EventSoundMapping } from '../../../src/core-engine/SoundManager';
 import {
   CardGameScene,
   createSceneHeader,
+  TooltipManager,
+  FONT_FAMILY,
+  GAME_W, GAME_H,
 } from '../../../src/ui';
-import type { HelpSection } from '../../../src/ui';
+import type { HelpSection, TooltipRenderContext } from '../../../src/ui';
 import helpContent from '../help-content.json';
 
 import {
@@ -50,9 +53,11 @@ import {
 import { LostCitiesRenderer } from './LostCitiesRenderer';
 import { LostCitiesAnimator } from './LostCitiesAnimator';
 import { LostCitiesOverlayManager } from './LostCitiesOverlayManager';
-import { LostCitiesTooltipManager } from './LostCitiesTooltipManager';
+import { TOOLTIP_BG_COLOR, TOOLTIP_BG_ALPHA, TOOLTIP_PAD, TOOLTIP_DEPTH, TOOLTIP_MAX_W } from './LostCitiesConstants';
+// TooltipManager imported from shared src/ui (LostCitiesTooltipManager migrated)
 import { LostCitiesReplayController } from './LostCitiesReplayController';
 import { LostCitiesTurnController } from './LostCitiesTurnController';
+import { scoreExpeditionDetailed } from '../LostCitiesScoring';
 
 // ═══════════════════════════════════════════════════════════
 export class LostCitiesScene extends CardGameScene {
@@ -65,7 +70,8 @@ export class LostCitiesScene extends CardGameScene {
   private lcRenderer!: LostCitiesRenderer;
   private animator!: LostCitiesAnimator;
   private overlayManager!: LostCitiesOverlayManager;
-  private tooltipManager!: LostCitiesTooltipManager;
+  private tooltipManager!: TooltipManager;
+  private currentTooltipColor: ExpeditionColor | null = null;
   private replayController!: LostCitiesReplayController;
   private turnController!: LostCitiesTurnController;
 
@@ -150,7 +156,7 @@ export class LostCitiesScene extends CardGameScene {
     this.lcRenderer = new LostCitiesRenderer(this, this.session);
     this.animator = new LostCitiesAnimator(this, this.session, this.lcRenderer);
     this.overlayManager = new LostCitiesOverlayManager(this, this.session, this.recorder);
-    this.tooltipManager = new LostCitiesTooltipManager(this, this.session);
+    this.tooltipManager = this.createTooltipManager();
     this.replayController = new LostCitiesReplayController(this.session);
 
     this.turnController = new LostCitiesTurnController(
@@ -181,38 +187,38 @@ export class LostCitiesScene extends CardGameScene {
     createSceneHeader(this, 'Lost Cities');
     this.lcRenderer.createGraphics();
     this.lcRenderer.createSectionBoxes(
-      (color, anchor, position) => this.tooltipManager.showExpeditionTooltip(color, anchor, position),
-      () => this.tooltipManager.hideExpeditionTooltip(),
+      (color, anchor, position) => this.showExpeditionTooltip(color, anchor, position),
+      () => this.tooltipManager.hide(),
     );
     this.lcRenderer.createExpeditionZones({
       onExpeditionClick: () => this.turnController.onExpeditionClick(),
       onExpeditionPointerMove: (pointer) => {
-        const color = this.tooltipManager.colorAtPointerX(pointer.x);
-        if (!color) { this.tooltipManager.hideExpeditionTooltip(); return; }
-        if (color === this.tooltipManager.currentTooltipColor) return;
+        const color = this.colorAtPointerX(pointer.x);
+        if (!color) { this.tooltipManager.hide(); return; }
+        if (color === this.currentTooltipColor) return;
         // laneX, PLR_EXP_TOP and CARD_H are imported from LostCitiesConstants
-        this.tooltipManager.showExpeditionTooltip(color, {
+        this.showExpeditionTooltip(color, {
           x: laneX(EXPEDITION_COLORS.indexOf(color)),
           y: PLR_EXP_TOP + CARD_H / 2,
           height: CARD_H,
         } as any, 'above');
       },
-      onExpeditionPointerOut: () => this.tooltipManager.hideExpeditionTooltip(),
+      onExpeditionPointerOut: () => this.tooltipManager.hide(),
     });
     this.lcRenderer.createDiscardZones({
       onDiscardRowClick: (pointer) => this.turnController.onDiscardRowClick(pointer.x),
       onDiscardPointerMove: (pointer) => {
-        const color = this.tooltipManager.colorAtPointerX(pointer.x);
-        if (!color) { this.tooltipManager.hideExpeditionTooltip(); return; }
-        if (color === this.tooltipManager.currentTooltipColor) return;
+        const color = this.colorAtPointerX(pointer.x);
+        if (!color) { this.tooltipManager.hide(); return; }
+        if (color === this.currentTooltipColor) return;
         // laneX, DISCARD_Y and DISCARD_CARD_H are imported from LostCitiesConstants
-        this.tooltipManager.showExpeditionTooltip(color, {
+        this.showExpeditionTooltip(color, {
           x: laneX(EXPEDITION_COLORS.indexOf(color)),
           y: DISCARD_Y + DISCARD_CARD_H / 2,
           height: DISCARD_CARD_H,
         } as any, 'below');
       },
-      onDiscardPointerOut: () => this.tooltipManager.hideExpeditionTooltip(),
+      onDiscardPointerOut: () => this.tooltipManager.hide(),
     });
     this.lcRenderer.createRightColumn({
       onDrawPileClick: () => this.turnController.onDrawPileClick(),
@@ -275,6 +281,108 @@ export class LostCitiesScene extends CardGameScene {
         instruction.setText('');
         break;
     }
+  }
+
+  // ── Tooltip helpers (migrated from LostCitiesTooltipManager) ──────
+
+  /** Create the shared TooltipManager with a Phaser render callback
+   *  for in-canvas expedition-scoring tooltips. */
+  private createTooltipManager(): TooltipManager {
+    return new TooltipManager(this, this.settingsPanel, {
+      phaserRender: (container, scene, _hideTooltip, ctx) => {
+        const color = ctx.color as ExpeditionColor | undefined;
+        if (!color) return container;
+
+        const plrCards = this.session.players[0].expeditions.get(color) ?? [];
+        const oppCards = this.session.players[1].expeditions.get(color) ?? [];
+        const plr = scoreExpeditionDetailed(color, plrCards);
+        const opp = scoreExpeditionDetailed(color, oppCards);
+
+        const detailLines = [
+          this.formatExpBreakdown('You', plr),
+          this.formatExpBreakdown('Opp', opp),
+        ];
+
+        const text = scene.add.text(0, 0, detailLines.join('\n'), {
+          fontSize: '12px',
+          color: '#dddddd',
+          fontFamily: FONT_FAMILY,
+          lineSpacing: 4,
+          wordWrap: { width: TOOLTIP_MAX_W - TOOLTIP_PAD * 2 },
+        }).setOrigin(0, 0);
+
+        const title = scene.add.text(TOOLTIP_PAD, TOOLTIP_PAD, `${color.toUpperCase()} Expedition`, {
+          fontSize: '13px',
+          color: '#f0c040',
+          fontFamily: FONT_FAMILY,
+          fontStyle: 'bold',
+        }).setOrigin(0, 0);
+
+        text.setPosition(TOOLTIP_PAD, TOOLTIP_PAD + title.height + 6);
+
+        const boxW = Math.max(text.width, title.width) + TOOLTIP_PAD * 2;
+        const boxH = TOOLTIP_PAD + title.height + 6 + text.height + TOOLTIP_PAD;
+
+        let tooltipX = (ctx.x ?? 0) - boxW / 2;
+        let tooltipY: number;
+        if (ctx.position === 'below') {
+          tooltipY = (ctx.y ?? 0) + ((ctx.height as number | undefined) ?? 0) / 2 + 6;
+        } else {
+          tooltipY = (ctx.y ?? 0) - ((ctx.height as number | undefined) ?? 0) / 2 - boxH - 6;
+        }
+
+        tooltipX = Phaser.Math.Clamp(tooltipX, 4, GAME_W - boxW - 4);
+        tooltipY = Phaser.Math.Clamp(tooltipY, 4, GAME_H - boxH - 4);
+
+        const bg = scene.add.rectangle(
+          boxW / 2, boxH / 2,
+          boxW, boxH,
+          TOOLTIP_BG_COLOR, TOOLTIP_BG_ALPHA,
+        );
+        bg.setStrokeStyle(1, 0x888888);
+
+        container.add([bg, title, text]);
+        container.setPosition(tooltipX, tooltipY);
+        container.setDepth(TOOLTIP_DEPTH);
+        return container;
+      },
+    });
+  }
+
+  /** Show an expedition-scoring tooltip via the shared TooltipManager. */
+  private showExpeditionTooltip(
+    color: ExpeditionColor,
+    anchor: Phaser.GameObjects.Components.Transform & { width?: number; height?: number },
+    position: 'above' | 'below' = 'above',
+  ): void {
+    this.currentTooltipColor = color;
+    this.tooltipManager.show('', anchor.x, anchor.y, {
+      color,
+      x: anchor.x,
+      y: anchor.y,
+      height: anchor.height ?? 0,
+      position,
+    } as TooltipRenderContext);
+  }
+
+  /** Determine which expedition color lane the pointer X falls on. */
+  private colorAtPointerX(px: number): ExpeditionColor | null {
+    const half = CARD_W / 2 + 4;
+    for (let i = 0; i < 5; i++) {
+      const cx = laneX(i);
+      if (px >= cx - half && px <= cx + half) return EXPEDITION_COLORS[i];
+    }
+    return null;
+  }
+
+  private formatExpBreakdown(
+    label: string,
+    b: ReturnType<typeof scoreExpeditionDetailed>,
+  ): string {
+    if (b.cardCount === 0) return `${label}: no cards`;
+    const inv = b.investmentCount > 0 ? `, ${b.investmentCount} inv (x${b.multiplier})` : '';
+    const bonus = b.bonusEarned ? ', +20 bonus' : '';
+    return `${label}: ${b.cardCount} cards${inv}${bonus} = ${b.score}`;
   }
 
   // ── Replay API ──────────────────────────────────────────

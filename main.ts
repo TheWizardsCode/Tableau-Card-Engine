@@ -32,6 +32,7 @@ import {
   GymGraphicsShaderSpikeScene,
   GymGraphicsLightingSpikeScene,
   GymSllScene,
+  GymTooltipScene,
 } from './example-games/gym';
 
 // ── Game catalogue ─────────────────────────────────────────
@@ -126,6 +127,7 @@ createCardGame({
     GymGraphicsShaderSpikeScene,
     GymGraphicsLightingSpikeScene,
     GymSllScene,
+    GymTooltipScene,
   ],
   render: isReplayMode ? { preserveDrawingBuffer: true } : undefined,
   callbacks: {

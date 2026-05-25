@@ -52,6 +52,9 @@ export const GYM_GRAPHICS_LIGHTING_SPIKE_KEY = 'GymGraphicsLightingSpikeScene';
 /** Screen Layout Language (SLL) demo scene key. */
 export const GYM_SLL_KEY = 'GymSllScene';
 
+/** Tooltip demo scene key. */
+export const GYM_TOOLTIP_KEY = 'GymTooltipScene';
+
 // ── Registry ──────────────────────────────────────────────
 
 /**
@@ -120,5 +123,11 @@ export const GYM_SCENE_CATALOGUE: GymSceneEntry[] = [
     title: 'Screen Layout Language (SLL)',
     description:
       'Parses and validates SLL JSON, maps zones/anchors to pixels across viewport+DPR profiles, and visualizes layout overlays interactively.',
+  },
+  {
+    sceneKey: GYM_TOOLTIP_KEY,
+    title: 'Tooltip Manager',
+    description:
+      'Demonstrate the shared TooltipManager in both DOM-overlay and Phaser GameObject modes. Toggle tooltips via the Settings panel.',
   },
 ];

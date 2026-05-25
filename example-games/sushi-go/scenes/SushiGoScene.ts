@@ -5,7 +5,7 @@
  * composable helper classes:
  *   - SushiGoRenderer: board layout and UI creation
  *   - SushiGoOverlayManager: round score and game over overlays
- *   - SushiGoTooltipManager: card tooltip display
+ *   - TooltipManager (shared src/ui): card tooltip display
  *   - SushiGoReplayController: replay mode state injection
  */
 
@@ -33,8 +33,9 @@ import {
   PhaseManager,
   layoutCardPositions,
   createSceneTitle, createSceneMenuButton,
+  TooltipManager,
 } from '../../../src/ui';
-import type { HelpSection } from '../../../src/ui';
+import type { HelpSection, TooltipRenderContext } from '../../../src/ui';
 import helpContent from '../help-content.json';
 
 import {
@@ -45,9 +46,10 @@ import {
   SFX_KEYS,
   type TurnPhase,
 } from './SushiGoConstants';
+import { SCORING_TOOLTIPS, TOOLTIP_BG_COLOR, TOOLTIP_BG_ALPHA, TOOLTIP_PADDING, TOOLTIP_FONT_SIZE, TOOLTIP_MAX_WIDTH, TOOLTIP_DEPTH } from './SushiGoConstants';
 import { SushiGoRenderer } from './SushiGoRenderer';
 import { SushiGoOverlayManager } from './SushiGoOverlayManager';
-import { SushiGoTooltipManager } from './SushiGoTooltipManager';
+// TooltipManager imported from shared src/ui (SushiGoTooltipManager migrated)
 import { SushiGoReplayController } from './SushiGoReplayController';
 import { SushiGoCardFactory } from './SushiGoCardFactory';
 import { SushiGoTableauRenderer } from './SushiGoTableauRenderer';
@@ -93,7 +95,7 @@ export class SushiGoScene extends CardGameScene {
   // Helpers
   private goRenderer!: SushiGoRenderer;
   private overlayManager!: SushiGoOverlayManager;
-  private tooltipManager!: SushiGoTooltipManager;
+  private tooltipManager!: TooltipManager;
   private replayController!: SushiGoReplayController;
   private cardFactory!: SushiGoCardFactory;
   private tableauRenderer!: SushiGoTableauRenderer;
@@ -195,7 +197,7 @@ export class SushiGoScene extends CardGameScene {
 
     this.goRenderer = new SushiGoRenderer(this, this.session);
     this.overlayManager = new SushiGoOverlayManager(this, this.session, this.gameEvents, this.soundManager);
-    this.tooltipManager = new SushiGoTooltipManager(this, () => this.settingsPanel?.showTooltips ?? false);
+    this.tooltipManager = this.createTooltipManager();
     this.replayController = new SushiGoReplayController(this, { value: this.replayMode });
     this.cardFactory = new SushiGoCardFactory(this);
     this.tableauRenderer = new SushiGoTableauRenderer(this, this.session, this.cardFactory, this.goRenderer);
@@ -336,15 +338,72 @@ export class SushiGoScene extends CardGameScene {
     return this.cardFactory.createCardRect(
       x, y, w, h, card, interactive, handIndex,
       (idx) => this.onHandCardClick(idx),
-      (c, container) => this.tooltipManager.showCardTooltip(c, container),
-      () => this.tooltipManager.hideCardTooltip(),
+      (c, container) => this.showCardTooltip(c, container),
+      () => this.tooltipManager.hide(),
     );
+  }
+
+  // ── Tooltip ─────────────────────────────────────────────
+
+  /** Create the shared TooltipManager with a Phaser render callback
+   *  for in-canvas card-scoring tooltips. */
+  private createTooltipManager(): TooltipManager {
+    return new TooltipManager(this, this.settingsPanel, {
+      phaserRender: (container, scene, _hideTooltip, ctx) => {
+        const card = ctx.card as SushiGoCard | undefined;
+        if (!card) return container;
+
+        const tooltipText = SCORING_TOOLTIPS[card.type];
+
+        const text = scene.add.text(0, 0, tooltipText, {
+          fontSize: TOOLTIP_FONT_SIZE,
+          color: '#ffffff',
+          fontFamily: FONT_FAMILY,
+          wordWrap: { width: TOOLTIP_MAX_WIDTH - TOOLTIP_PADDING * 2 },
+        }).setOrigin(0, 0);
+
+        const textW = text.width;
+        const textH = text.height;
+        const boxW = textW + TOOLTIP_PADDING * 2;
+        const boxH = textH + TOOLTIP_PADDING * 2;
+
+        let tooltipX = (ctx.x ?? 0) - boxW / 2;
+        let tooltipY = (ctx.y ?? 0) + 40;
+
+        tooltipX = Phaser.Math.Clamp(tooltipX, 4, GAME_W - boxW - 4);
+        tooltipY = Phaser.Math.Clamp(tooltipY, 4, GAME_H - boxH - 4);
+
+        if (tooltipY < (ctx.y ?? 0) + 30 && tooltipY + boxH > (ctx.y ?? 0) - 30) {
+          tooltipY = (ctx.y ?? 0) - 40 - boxH;
+          tooltipY = Phaser.Math.Clamp(tooltipY, 4, GAME_H - boxH - 4);
+        }
+
+        const bg = scene.add.rectangle(
+          boxW / 2, boxH / 2,
+          boxW, boxH,
+          TOOLTIP_BG_COLOR, TOOLTIP_BG_ALPHA,
+        );
+        bg.setStrokeStyle(1, 0x888888);
+
+        text.setPosition(TOOLTIP_PADDING, TOOLTIP_PADDING);
+
+        container.add([bg, text]);
+        container.setPosition(tooltipX, tooltipY);
+        container.setDepth(TOOLTIP_DEPTH);
+        return container;
+      },
+    });
+  }
+
+  /** Show a card-scoring tooltip via the shared TooltipManager. */
+  private showCardTooltip(card: SushiGoCard, cardContainer: Phaser.GameObjects.Container): void {
+    this.tooltipManager.show('', cardContainer.x, cardContainer.y, { card } as TooltipRenderContext);
   }
 
   // ── Refresh display ─────────────────────────────────────
 
   private refreshAll(): void {
-    this.tooltipManager.hideCardTooltip();
+    this.tooltipManager.hide();
     this.refreshHand();
     this.refreshTableau('player');
     this.refreshTableau('ai');

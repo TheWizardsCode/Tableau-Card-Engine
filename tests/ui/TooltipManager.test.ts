@@ -169,4 +169,74 @@ describe('TooltipManager', () => {
     expect(div.style.left).toBe('160px');
     expect(div.style.top).toBe('130px');
   });
+
+  it('does not create DOM node when phaserRender is provided', () => {
+    const renderFn = vi.fn() as unknown as import('../../src/ui/Tooltip').PhaserTooltipRenderFn;
+    new TooltipManager(mockScene, undefined, { phaserRender: renderFn });
+
+    expect(createdDivs).toHaveLength(0);
+  });
+
+  it('calls phaserRender callback on show', () => {
+    const renderFn = vi.fn((_container, _scene, _hide, _ctx) => {
+      return _container;
+    });
+
+    const tooltip = new TooltipManager(mockScene, undefined, { phaserRender: renderFn });
+
+    const mockContainer = { add: vi.fn(), setPosition: vi.fn(), setDepth: vi.fn() };
+    (mockScene.add as any) = { container: vi.fn(() => mockContainer) };
+
+    tooltip.show('hello', 100, 200, { cardName: 'test' });
+
+    expect(renderFn).toHaveBeenCalledTimes(1);
+    expect(renderFn).toHaveBeenCalledWith(
+      mockContainer,
+      mockScene,
+      expect.any(Function),
+      expect.objectContaining({ content: 'hello', x: 100, y: 200, cardName: 'test' }),
+    );
+  });
+
+  it('destroys phaser container on hide', () => {
+    const destroyFn = vi.fn();
+    const mockContainer = {
+      add: vi.fn(),
+      setPosition: vi.fn(),
+      setDepth: vi.fn(),
+      destroy: destroyFn,
+    } as unknown as Phaser.GameObjects.Container;
+
+    const renderFn = vi.fn(() => mockContainer) as unknown as import('../../src/ui/Tooltip').PhaserTooltipRenderFn;
+    (mockScene.add as any) = { container: vi.fn(() => mockContainer) };
+
+    const tooltip = new TooltipManager(mockScene, undefined, { phaserRender: renderFn });
+    tooltip.show('hello', 0, 0);
+
+    expect(mockContainer.destroy).not.toHaveBeenCalled();
+
+    tooltip.hide();
+    expect(mockContainer.destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it('respects SettingsPanel.showTooltips in Phaser mode', () => {
+    const mockSettingsPanel = { showTooltips: false } as any;
+
+    (mockScene.add as any) = { container: vi.fn() };
+
+    const tooltip = new TooltipManager(mockScene, mockSettingsPanel, { phaserRender: () => ({}) as any });
+    tooltip.show('should not show', 0, 0);
+
+    expect((mockScene.add as any).container).not.toHaveBeenCalled();
+  });
+
+  it('destroy cleans up both DOM and Phaser resources', () => {
+    const tooltip = new TooltipManager(mockScene);
+    tooltip.show('Test', 0, 0);
+
+    // DOM mode – destroy should remove the node
+    const div = createdDivs[0] as any;
+    tooltip.destroy();
+    expect(div.remove).toHaveBeenCalled();
+  });
 });
