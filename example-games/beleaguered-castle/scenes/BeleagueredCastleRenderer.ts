@@ -8,10 +8,13 @@ import { cardTextureKey } from '../../../src/ui';
 import { GAME_W, GAME_H, FONT_FAMILY, createSceneTitle, createSceneMenuButton } from '../../../src/ui';
 import {
   BC_CARD_W, BC_CARD_H, CARD_GAP, CASCADE_OFFSET_Y,
-  TABLEAU_MAX_Y, TITLE_Y, FOUNDATION_Y, TABLEAU_TOP_Y,
   DRAG_DEPTH, DEAL_STAGGER, ANIM_DURATION, SNAP_BACK_DURATION,
   HIGHLIGHT_VALID, HIGHLIGHT_ALPHA, SELECTION_TINT,
 } from './BeleagueredCastleConstants';
+import {
+  computeBeleagueredCastleLayout,
+  type BeleagueredCastleLayout,
+} from './BeleagueredCastleLayoutAdapter';
 
 export interface CardSpriteData {
   colIndex: number;
@@ -24,6 +27,9 @@ export interface CardSpriteData {
 export class BeleagueredCastleRenderer {
   private scene: Phaser.Scene;
   private state: BeleagueredCastleState;
+
+  /** SLL-derived layout resolved once at construction. */
+  private layout: BeleagueredCastleLayout;
 
   // Display objects
   private _foundationSprites: Phaser.GameObjects.Image[] = [];
@@ -49,6 +55,7 @@ export class BeleagueredCastleRenderer {
   constructor(scene: Phaser.Scene, state: BeleagueredCastleState) {
     this.scene = scene;
     this.state = state;
+    this.layout = computeBeleagueredCastleLayout();
   }
 
   // ── Getters ─────────────────────────────────────────────
@@ -64,8 +71,8 @@ export class BeleagueredCastleRenderer {
 
   // ── UI creation ─────────────────────────────────────────
   createTitle(): void {
-    createSceneMenuButton(this.scene, { y: TITLE_Y });
-    createSceneTitle(this.scene, 'Beleaguered Castle', { y: TITLE_Y });
+    createSceneMenuButton(this.scene, { y: this.layout.headerY });
+    createSceneTitle(this.scene, 'Beleaguered Castle', { y: this.layout.headerY });
   }
 
   createFoundationSlots(): void {
@@ -77,12 +84,12 @@ export class BeleagueredCastleRenderer {
       const x = startX + i * (BC_CARD_W + FOUNDATION_GAP);
       const slotGraphics = this.scene.add.graphics();
       slotGraphics.lineStyle(2, 0x448844, 0.6);
-      slotGraphics.strokeRoundedRect(x - BC_CARD_W / 2, FOUNDATION_Y - BC_CARD_H / 2, BC_CARD_W, BC_CARD_H, 6);
+      slotGraphics.strokeRoundedRect(x - BC_CARD_W / 2, this.layout.foundationCenterY - BC_CARD_H / 2, BC_CARD_W, BC_CARD_H, 6);
 
-      const sprite = this.scene.add.image(x, FOUNDATION_Y, 'card_back').setVisible(false);
+      const sprite = this.scene.add.image(x, this.layout.foundationCenterY, 'card_back').setVisible(false);
       this._foundationSprites.push(sprite);
 
-      const zone = this.scene.add.zone(x, FOUNDATION_Y, BC_CARD_W, BC_CARD_H)
+      const zone = this.scene.add.zone(x, this.layout.foundationCenterY, BC_CARD_W, BC_CARD_H)
         .setRectangleDropZone(BC_CARD_W, BC_CARD_H)
         .setData('type', 'foundation')
         .setData('index', i);
@@ -91,8 +98,8 @@ export class BeleagueredCastleRenderer {
   }
 
   createTableauDropZones(): void {
-    const zoneTop = TABLEAU_TOP_Y - BC_CARD_H / 2;
-    const zoneBottom = TABLEAU_MAX_Y + BC_CARD_H / 2;
+    const zoneTop = this.layout.tableauTopY - BC_CARD_H / 2;
+    const zoneBottom = this.layout.tableauBottomY + BC_CARD_H / 2;
     const maxColHeight = zoneBottom - zoneTop;
     const zoneCenterY = (zoneTop + zoneBottom) / 2;
 
@@ -119,7 +126,7 @@ export class BeleagueredCastleRenderer {
       fontSize: '18px', color: '#668866', fontFamily: FONT_FAMILY,
     }).setOrigin(1, 0.5);
 
-    this.undoButton = this.scene.add.text(GAME_W - 220, TITLE_Y, '[ Undo ]', {
+    this.undoButton = this.scene.add.text(GAME_W - 220, this.layout.headerY, '[ Undo ]', {
       fontSize: '18px', color: '#557755', fontFamily: FONT_FAMILY,
     }).setOrigin(0.5).setInteractive({ useHandCursor: true });
     this.undoButton.on('pointerdown', () => this.onUndoClick?.());
@@ -128,7 +135,7 @@ export class BeleagueredCastleRenderer {
     });
     this.undoButton.on('pointerout', () => this.refreshUndoRedoButtons(false, false));
 
-    this.redoButton = this.scene.add.text(GAME_W - 140, TITLE_Y, '[ Redo ]', {
+    this.redoButton = this.scene.add.text(GAME_W - 140, this.layout.headerY, '[ Redo ]', {
       fontSize: '18px', color: '#557755', fontFamily: FONT_FAMILY,
     }).setOrigin(0.5).setInteractive({ useHandCursor: true });
     this.redoButton.on('pointerdown', () => this.onRedoClick?.());
@@ -167,13 +174,13 @@ export class BeleagueredCastleRenderer {
     const maxOffsets = columnSize - 1;
     let offset = CASCADE_OFFSET_Y;
     if (maxOffsets > 0) {
-      const maxTotalHeight = TABLEAU_MAX_Y - TABLEAU_TOP_Y;
+      const maxTotalHeight = this.layout.tableauBottomY - this.layout.tableauTopY;
       const idealHeight = maxOffsets * CASCADE_OFFSET_Y;
       if (idealHeight > maxTotalHeight) {
         offset = maxTotalHeight / maxOffsets;
       }
     }
-    return TABLEAU_TOP_Y + rowIndex * offset;
+    return this.layout.tableauTopY + rowIndex * offset;
   }
 
   // ── Deal animation ──────────────────────────────────────

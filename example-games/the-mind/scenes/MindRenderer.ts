@@ -15,9 +15,12 @@ import type { TheMindSession } from '../TheMindGameState';
 import { MAX_LEVEL } from '../TheMindGameState';
 import {
   CARD_W, CARD_H, CARD_GAP, MAX_HAND_WIDTH,
-  PILE_X, PILE_Y, HUMAN_HAND_Y, AI_HAND_Y,
   DEPTH_CARDS, DEPTH_PILE, DEPTH_UI,
 } from './MindConstants';
+import {
+  computeMindLayout,
+  type MindLayout,
+} from './MindLayoutAdapter';
 
 export class MindRenderer {
   // Display objects -- human hand
@@ -44,10 +47,15 @@ export class MindRenderer {
   livesText!: Phaser.GameObjects.Text;
   instructionText!: Phaser.GameObjects.Text;
 
+  /** SLL-derived layout resolved once at construction. */
+  private layout: MindLayout;
+
   constructor(
     private scene: Phaser.Scene,
     private session: TheMindSession,
-  ) {}
+  ) {
+    this.layout = computeMindLayout();
+  }
 
   private getBackTextureFallbackKey(): string {
     const canonical = getCanonicalTextureKey(resolveBackTemplateId(), CARD_W, CARD_H);
@@ -120,13 +128,13 @@ export class MindRenderer {
   createPile(): void {
     const backKey = this.getBackTextureFallbackKey();
     this.pileSprite = this.scene.add
-      .image(PILE_X, PILE_Y, backKey)
+      .image(this.layout.playPileCenterX, this.layout.playPileCenterY, backKey)
       .setDisplaySize(CARD_W, CARD_H)
       .setDepth(DEPTH_PILE)
       .setAlpha(0.3);
 
     this.scene.add
-      .text(PILE_X, PILE_Y - CARD_H / 2 - 18, 'PILE', {
+      .text(this.layout.playPileCenterX, this.layout.playPileCenterY - CARD_H / 2 - 18, 'PILE', {
         fontSize: '12px',
         color: '#888888',
         fontFamily: FONT_FAMILY,
@@ -135,7 +143,7 @@ export class MindRenderer {
       .setDepth(DEPTH_UI);
 
     this.pileValueText = this.scene.add
-      .text(PILE_X, PILE_Y + CARD_H / 2 + 14, '', {
+      .text(this.layout.playPileCenterX, this.layout.playPileCenterY + CARD_H / 2 + 14, '', {
         fontSize: '14px',
         color: '#ffffff',
         fontFamily: FONT_FAMILY,
@@ -144,7 +152,7 @@ export class MindRenderer {
       .setDepth(DEPTH_UI);
 
     this.pileCountText = this.scene.add
-      .text(PILE_X, PILE_Y + CARD_H / 2 + 32, '', {
+      .text(this.layout.playPileCenterX, this.layout.playPileCenterY + CARD_H / 2 + 32, '', {
         fontSize: '11px',
         color: '#888888',
         fontFamily: FONT_FAMILY,
@@ -238,7 +246,7 @@ export class MindRenderer {
       const x = positions[i];
       // Create using fallback back texture as placeholder to avoid empty texture.
       const sprite = this.scene.add
-        .image(x, HUMAN_HAND_Y, backKey)
+        .image(x, this.layout.humanHandCenterY, backKey)
         .setDisplaySize(CARD_W, CARD_H)
         .setDepth(DEPTH_CARDS + i)
         .setInteractive({ useHandCursor: true });
@@ -256,19 +264,19 @@ export class MindRenderer {
       sprite.on('pointerover', () => {
         if (phase === 'playing' && !autoPlayEnabled) {
           sprite.setScale(1.08);
-          sprite.setY(HUMAN_HAND_Y - 6);
+          sprite.setY(this.layout.humanHandCenterY - 6);
         }
       });
       sprite.on('pointerout', () => {
         sprite.setScale(1);
-        sprite.setY(HUMAN_HAND_Y);
+        sprite.setY(this.layout.humanHandCenterY);
       });
 
       this.humanCardSprites.push(sprite);
     }
 
     this.scene.add
-      .text(GAME_W / 2, HUMAN_HAND_Y - CARD_H / 2 - 14, 'Your Hand', {
+      .text(GAME_W / 2, this.layout.humanHandCenterY - CARD_H / 2 - 14, 'Your Hand', {
         fontSize: '12px',
         color: '#88ff88',
         fontFamily: FONT_FAMILY,
@@ -329,7 +337,7 @@ export class MindRenderer {
     for (let i = 0; i < hand.length; i++) {
       const x = positions[i];
       const sprite = this.scene.add
-        .image(x, AI_HAND_Y, backKey)
+        .image(x, this.layout.aiHandCenterY, backKey)
         .setDisplaySize(CARD_W, CARD_H)
         .setDepth(DEPTH_CARDS + i);
 
@@ -340,7 +348,7 @@ export class MindRenderer {
       this.aiCountText.destroy();
     }
     this.aiCountText = this.scene.add
-      .text(GAME_W / 2, AI_HAND_Y + CARD_H / 2 + 14, '', {
+      .text(GAME_W / 2, this.layout.aiHandCenterY + CARD_H / 2 + 14, '', {
         fontSize: '12px',
         color: '#aaaaaa',
         fontFamily: FONT_FAMILY,
@@ -353,7 +361,7 @@ export class MindRenderer {
     );
 
     this.scene.add
-      .text(GAME_W / 2, AI_HAND_Y - CARD_H / 2 - 14, 'AI Hand', {
+      .text(GAME_W / 2, this.layout.aiHandCenterY - CARD_H / 2 - 14, 'AI Hand', {
         fontSize: '12px',
         color: '#ffaa44',
         fontFamily: FONT_FAMILY,

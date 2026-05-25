@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "id": "feudalism-canonical",
+  "baseViewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "requiredZones": [
+    "patronArea",
+    "supplyArea",
+    "marketArea",
+    "playerArea",
+    "aiArea"
+  ],
+  "zones": {
+    "patronArea": {
+      "rect": {
+        "x": 0.007813,
+        "y": 0.072222,
+        "width": 0.164063,
+        "height": 0.538889
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.5 },
+        "topCenter": { "x": 0.5, "y": 0 }
+      }
+    },
+    "supplyArea": {
+      "rect": {
+        "x": 0.859375,
+        "y": 0.1625,
+        "width": 0.117188,
+        "height": 0.375
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.5 }
+      }
+    },
+    "marketArea": {
+      "rect": {
+        "x": 0.195313,
+        "y": 0.094444,
+        "width": 0.53125,
+        "height": 0.444444
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.5 },
+        "topCenter": { "x": 0.5, "y": 0 }
+      }
+    },
+    "playerArea": {
+      "rect": {
+        "x": 0.015625,
+        "y": 0.627778,
+        "width": 0.46875,
+        "height": 0.258333
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.5 }
+      }
+    },
+    "aiArea": {
+      "rect": {
+        "x": 0.984375,
+        "y": 0.627778,
+        "width": 0.46875,
+        "height": 0.258333
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.5 }
+      }
+    }
+  }
+}

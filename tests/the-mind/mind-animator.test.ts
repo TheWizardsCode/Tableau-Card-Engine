@@ -69,6 +69,7 @@ describe('MindAnimator', () => {
     const renderer = {
       aiCardSprites: [],
       humanCardSprites: [humanSprite],
+      layout: { playPileCenterX: 640, playPileCenterY: 350, humanHandCenterY: 610, aiHandCenterY: 150 },
     } as any;
     const session = {
       players: [
@@ -91,6 +92,7 @@ describe('MindAnimator', () => {
     const renderer = {
       aiCardSprites: [createSprite('canonical-mind-back')],
       humanCardSprites: [],
+      layout: { playPileCenterX: 640, playPileCenterY: 350, humanHandCenterY: 610, aiHandCenterY: 150 },
     } as any;
     const session = {
       players: [
@@ -121,6 +123,7 @@ describe('MindAnimator', () => {
     const renderer = {
       aiCardSprites: [createSprite('canonical-mind-back')],
       humanCardSprites: [],
+      layout: { playPileCenterX: 640, playPileCenterY: 350, humanHandCenterY: 610, aiHandCenterY: 150 },
     } as any;
     const session = {
       players: [

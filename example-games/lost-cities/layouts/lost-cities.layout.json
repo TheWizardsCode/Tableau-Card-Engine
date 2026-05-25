@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "id": "lost-cities-canonical",
+  "baseViewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "requiredZones": [
+    "opponentExpeditions",
+    "playerExpeditions",
+    "discardArea",
+    "midColumn",
+    "playerHand",
+    "aiHand"
+  ],
+  "zones": {
+    "opponentExpeditions": {
+      "rect": {
+        "x": 0.03125,
+        "y": 0.1,
+        "width": 0.546875,
+        "height": 0.375
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.5 },
+        "topCenter": { "x": 0.5, "y": 0 }
+      }
+    },
+    "playerExpeditions": {
+      "rect": {
+        "x": 0.03125,
+        "y": 0.525,
+        "width": 0.546875,
+        "height": 0.375
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.5 },
+        "bottomCenter": { "x": 0.5, "y": 1 }
+      }
+    },
+    "discardArea": {
+      "rect": {
+        "x": 0.03125,
+        "y": 0.475,
+        "width": 0.546875,
+        "height": 0.05
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.5 }
+      }
+    },
+    "midColumn": {
+      "rect": {
+        "x": 0.625,
+        "y": 0.066667,
+        "width": 0.148438,
+        "height": 0.866667
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.5 }
+      }
+    },
+    "playerHand": {
+      "rect": {
+        "x": 0.625,
+        "y": 0.4,
+        "width": 0.171875,
+        "height": 0.533333
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.5 }
+      }
+    },
+    "aiHand": {
+      "rect": {
+        "x": 0.804688,
+        "y": 0.4,
+        "width": 0.171875,
+        "height": 0.533333
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.5 }
+      }
+    }
+  }
+}

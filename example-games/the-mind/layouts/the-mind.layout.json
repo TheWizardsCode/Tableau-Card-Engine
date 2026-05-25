@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "id": "the-mind-canonical",
+  "baseViewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "requiredZones": [
+    "humanHand",
+    "aiHand",
+    "playPile"
+  ],
+  "zones": {
+    "humanHand": {
+      "rect": {
+        "x": 0.0625,
+        "y": 0.75,
+        "width": 0.875,
+        "height": 0.227778
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.5 },
+        "topCenter": { "x": 0.5, "y": 0 }
+      }
+    },
+    "aiHand": {
+      "rect": {
+        "x": 0.0625,
+        "y": 0.069444,
+        "width": 0.875,
+        "height": 0.227778
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.5 },
+        "bottomCenter": { "x": 0.5, "y": 1 }
+      }
+    },
+    "playPile": {
+      "rect": {
+        "x": 0.40625,
+        "y": 0.333333,
+        "width": 0.1875,
+        "height": 0.333333
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.5 },
+        "topCenter": { "x": 0.5, "y": 0 },
+        "bottomCenter": { "x": 0.5, "y": 1 }
+      }
+    }
+  }
+}

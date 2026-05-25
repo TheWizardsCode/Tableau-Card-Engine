@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "id": "sushi-go-canonical",
+  "baseViewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "requiredZones": [
+    "playerHand",
+    "playerTableau",
+    "aiTableau",
+    "scoreArea"
+  ],
+  "zones": {
+    "aiTableau": {
+      "rect": {
+        "x": 0.0625,
+        "y": 0.083333,
+        "width": 0.875,
+        "height": 0.222222
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.5 },
+        "bottomCenter": { "x": 0.5, "y": 1 }
+      }
+    },
+    "playerTableau": {
+      "rect": {
+        "x": 0.0625,
+        "y": 0.422222,
+        "width": 0.875,
+        "height": 0.222222
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.5 },
+        "topCenter": { "x": 0.5, "y": 0 }
+      }
+    },
+    "playerHand": {
+      "rect": {
+        "x": 0.0625,
+        "y": 0.708333,
+        "width": 0.875,
+        "height": 0.208333
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.5 },
+        "topCenter": { "x": 0.5, "y": 0 }
+      }
+    },
+    "scoreArea": {
+      "rect": {
+        "x": 0.875,
+        "y": 0.069444,
+        "width": 0.109375,
+        "height": 0.625
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.5 }
+      }
+    }
+  }
+}

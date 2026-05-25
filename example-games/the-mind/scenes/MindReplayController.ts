@@ -5,7 +5,7 @@
 import { resolveTemplateId, resolveBackTemplateId, getCanonicalTextureKey } from '../MindCardTextureAdapter';
 import { MAX_LEVEL } from '../TheMindGameState';
 import type { MindRenderer } from './MindRenderer';
-import { HUMAN_HAND_Y, AI_HAND_Y, DEPTH_UI, CARD_W, CARD_H } from './MindConstants';
+import { DEPTH_UI, CARD_W, CARD_H } from './MindConstants';
 
 export class MindReplayController {
   replayStepIndex = 0;
@@ -33,9 +33,10 @@ export class MindReplayController {
 
     this.renderer.clearSprites();
 
+    const layout = (this.renderer as any).layout;
     this.renderer.renderReplayHand(
       state.humanHand,
-      HUMAN_HAND_Y,
+      layout.humanHandCenterY,
       true,
       this.renderer.humanCardSprites,
       'Your Hand',
@@ -44,7 +45,7 @@ export class MindReplayController {
 
     this.renderer.renderReplayHand(
       state.aiHand,
-      AI_HAND_Y,
+      layout.aiHandCenterY,
       false,
       this.renderer.aiCardSprites,
       'AI Hand',
@@ -54,7 +55,7 @@ export class MindReplayController {
     if (this.renderer.aiCountText) this.renderer.aiCountText.destroy();
     if (state.aiHand.length > 0) {
       this.renderer.aiCountText = this.scene.add
-        .text(this.scene.scale.width / 2, AI_HAND_Y + CARD_H / 2 + 14, '', {
+        .text(this.scene.scale.width / 2, layout.aiHandCenterY + CARD_H / 2 + 14, '', {
           fontSize: '12px',
           color: '#aaaaaa',
           fontFamily: 'sans-serif',

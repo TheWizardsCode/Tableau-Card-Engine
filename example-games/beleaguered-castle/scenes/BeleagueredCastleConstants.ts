@@ -1,7 +1,9 @@
 /**
- * BeleagueredCastleConstants — shared layout, styling, timing, and audio constants.
+ * BeleagueredCastleConstants — shared styling, timing, and audio constants.
+ *
+ * Layout positions are now defined via SLL in `../layouts/beleaguered-castle.layout.json`
+ * and resolved through `BeleagueredCastleLayoutAdapter.ts`.
  */
-import { GAME_H } from '../../../src/ui';
 
 // ── Audio asset keys ──────────────────────────────────────
 export const SFX_KEYS = {
@@ -25,18 +27,16 @@ export const SFX_KEYS = {
 export const BC_CARD_W = 90;
 export const BC_CARD_H = 126;
 
-// ── Layout ────────────────────────────────────────────────
+// ── Layout geometry (positions now driven by SLL) ─────────
 export const CARD_GAP = 18;
+export const CASCADE_OFFSET_Y = 42;
+export const DRAG_DEPTH = 1000;
+
+// ── Animation timing ──────────────────────────────────────
 export const ANIM_DURATION = 300;
 export const DEAL_STAGGER = 40;
 export const SNAP_BACK_DURATION = 200;
 export const AUTO_COMPLETE_DELAY = 100;
-export const CASCADE_OFFSET_Y = 42;
-export const TABLEAU_MAX_Y = GAME_H - 40 - BC_CARD_H / 2;
-export const TITLE_Y = 20;
-export const FOUNDATION_Y = 95;
-export const TABLEAU_TOP_Y = 267;
-export const DRAG_DEPTH = 1000;
 
 // ── Highlight colours ─────────────────────────────────────
 export const HIGHLIGHT_VALID = 0x44ff44;

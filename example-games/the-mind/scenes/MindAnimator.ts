@@ -15,7 +15,6 @@ import { flipCard, shakeIllegalMove } from '../../../src/ui';
 import type { SoundManager } from '../../../src/core-engine';
 import {
   CARD_W, CARD_H,
-  PILE_X, PILE_Y, HUMAN_HAND_Y, AI_HAND_Y,
   ANIM_DURATION, PENALTY_REVEAL_DELAY,
   DEPTH_PLAYED_CARD, DEPTH_OVERLAY_CONTENT,
 } from './MindConstants';
@@ -30,6 +29,8 @@ export class MindAnimator {
     private renderer: MindRenderer,
     _soundManager: SoundManager | null,
   ) {}
+
+  private get layout() { return this.renderer['layout']; }
 
   // ── Card play animation ────────────────────────────────
 
@@ -77,8 +78,8 @@ export class MindAnimator {
 
     this.scene.tweens.add({
       targets: sprite,
-      x: PILE_X,
-      y: PILE_Y,
+      x: this.layout.playPileCenterX,
+      y: this.layout.playPileCenterY,
       duration: ANIM_DURATION,
       ease: 'Cubic.easeOut',
       onComplete: () => {
@@ -92,8 +93,8 @@ export class MindAnimator {
     cardValue: number,
     onComplete: () => void,
   ): void {
-    let sourceX = PILE_X;
-    let sourceY = AI_HAND_Y;
+    let sourceX = this.layout.playPileCenterX;
+    let sourceY = this.layout.aiHandCenterY;
 
     if (this.renderer.aiCardSprites.length > 0) {
       const lastIdx = this.renderer.aiCardSprites.length - 1;
@@ -137,8 +138,8 @@ export class MindAnimator {
 
       this.scene.tweens.add({
         targets: tempSprite,
-        x: PILE_X,
-        y: PILE_Y,
+        x: this.layout.playPileCenterX,
+        y: this.layout.playPileCenterY,
         duration: ANIM_DURATION,
         ease: 'Cubic.easeOut',
       });
@@ -174,8 +175,8 @@ export class MindAnimator {
       this.renderer.humanCardSprites.map((s) => ({ x: s.x, y: s.y })),
       this.renderer.aiCardSprites.map((s) => ({ x: s.x, y: s.y })),
       {
-        0: { x: PILE_X, y: HUMAN_HAND_Y },
-        1: { x: PILE_X, y: AI_HAND_Y },
+        0: { x: this.layout.playPileCenterX, y: this.layout.humanHandCenterY },
+        1: { x: this.layout.playPileCenterX, y: this.layout.aiHandCenterY },
       },
     );
 
@@ -194,8 +195,8 @@ export class MindAnimator {
 
       this.scene.tweens.add({
         targets: sprite,
-        x: PILE_X,
-        y: PILE_Y,
+        x: this.layout.playPileCenterX,
+        y: this.layout.playPileCenterY,
         alpha: 0.8,
         duration: ANIM_DURATION,
       });
@@ -241,8 +242,8 @@ export class MindAnimator {
 
     const levelText = this.scene.add
       .text(
-        PILE_X,
-        PILE_Y + 40,
+        this.layout.playPileCenterX,
+        this.layout.playPileCenterY + 40,
         `Level ${completedLevel} Complete!${bonusText}`,
         {
           fontSize: '28px',

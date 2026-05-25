@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "id": "beleaguered-castle-canonical",
+  "baseViewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "requiredZones": [
+    "foundation",
+    "tableau",
+    "header"
+  ],
+  "zones": {
+    "header": {
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 0.083333
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.5 },
+        "menuLeft": { "x": 0.05, "y": 0.5 }
+      }
+    },
+    "foundation": {
+      "rect": {
+        "x": 0.0625,
+        "y": 0.055556,
+        "width": 0.875,
+        "height": 0.138889
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.5 },
+        "topCenter": { "x": 0.5, "y": 0 }
+      }
+    },
+    "tableau": {
+      "rect": {
+        "x": 0.0625,
+        "y": 0.370833,
+        "width": 0.875,
+        "height": 0.556944
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.5 },
+        "topCenter": { "x": 0.5, "y": 0 }
+      }
+    }
+  }
+}

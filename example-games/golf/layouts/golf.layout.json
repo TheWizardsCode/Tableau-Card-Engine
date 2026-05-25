@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "id": "golf-canonical",
+  "baseViewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "requiredZones": [
+    "humanGrid",
+    "aiGrid",
+    "stockPile",
+    "discardPile"
+  ],
+  "zones": {
+    "humanGrid": {
+      "rect": {
+        "x": 0.027344,
+        "y": 0.286111,
+        "width": 0.304688,
+        "height": 0.661111
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.5 },
+        "topCenter": { "x": 0.5, "y": 0 },
+        "bottomCenter": { "x": 0.5, "y": 1 }
+      }
+    },
+    "aiGrid": {
+      "rect": {
+        "x": 0.667969,
+        "y": 0.286111,
+        "width": 0.304688,
+        "height": 0.661111
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.5 },
+        "topCenter": { "x": 0.5, "y": 0 },
+        "bottomCenter": { "x": 0.5, "y": 1 }
+      }
+    },
+    "stockPile": {
+      "rect": {
+        "x": 0.453125,
+        "y": 0.218056,
+        "width": 0.09375,
+        "height": 0.322222
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.5 },
+        "bottomCenter": { "x": 0.5, "y": 1 }
+      }
+    },
+    "discardPile": {
+      "rect": {
+        "x": 0.453125,
+        "y": 0.544444,
+        "width": 0.09375,
+        "height": 0.322222
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.5 },
+        "topCenter": { "x": 0.5, "y": 0 }
+      }
+    }
+  }
+}

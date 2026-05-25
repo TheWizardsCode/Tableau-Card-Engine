@@ -8,7 +8,6 @@ import { cardTextureKey, flipCard } from '../../../src/ui';
 import type { SoundManager } from '../../../src/core-engine';
 import {
   GOLF_CARD_W,
-  PILE_X, STOCK_Y, DISCARD_Y,
   ANIM_DURATION, SWAP_ANIM_DURATION,
   SFX_KEYS,
 } from './GolfConstants';
@@ -22,6 +21,8 @@ export class GolfAnimator {
     private renderer: GolfRenderer,
     private soundManager: SoundManager | null,
   ) {}
+
+  private get layout() { return this.renderer['layout']; }
 
   // ── Turn animation ──────────────────────────────────────
 
@@ -60,7 +61,7 @@ export class GolfAnimator {
 
     // Compute destination positions
     const gridSlotPos = this.renderer.gridCellPosition(idx, result.playerIndex === 0 ? 'human' : 'ai');
-    const discardPos = { x: PILE_X, y: DISCARD_Y };
+    const discardPos = { x: this.layout.discardPileCenterX, y: this.layout.discardPileCenterY };
 
     // Track completion of both parallel tweens
     let completed = 0;
@@ -127,7 +128,7 @@ export class GolfAnimator {
     const idx = result.move.row * 3 + result.move.col;
     const sprite = sprites[idx];
     const grid = this.session.gameState.playerStates[result.playerIndex].grid;
-    const discardPos = { x: PILE_X, y: DISCARD_Y };
+    const discardPos = { x: this.layout.discardPileCenterX, y: this.layout.discardPileCenterY };
 
     const phase2 = () => {
       this.renderer.hideDrawnCard();
@@ -163,13 +164,13 @@ export class GolfAnimator {
 
   showDrawnCard(card: Card, source: 'stock' | 'discard' = 'stock'): void {
     // Destination: to the right of the discard pile, between piles and AI grid
-    const destX = PILE_X + GOLF_CARD_W + 24;
-    const destY = DISCARD_Y;
+    const destX = this.layout.discardPileCenterX + GOLF_CARD_W + 24;
+    const destY = this.layout.discardPileCenterY;
     const faceTexture = cardTextureKey(card.rank, card.suit);
 
     // Start at the source pile position
-    const startX = PILE_X;
-    const startY = source === 'stock' ? STOCK_Y : DISCARD_Y;
+    const startX = this.layout.stockPileCenterX;
+    const startY = source === 'stock' ? this.layout.stockPileCenterY : this.layout.discardPileCenterY;
 
     if (source === 'stock') {
       // Stock draw: start face-down, flip to reveal during transit
@@ -260,8 +261,8 @@ export class GolfAnimator {
     let lastMove = 0;
     this.scene.tweens.add({
       targets: drawnCardSprite,
-      x: PILE_X,
-      y: DISCARD_Y,
+      x: this.layout.discardPileCenterX,
+      y: this.layout.discardPileCenterY,
       duration: SWAP_ANIM_DURATION / 2,
       ease: 'Power2',
       onStart: () => {
