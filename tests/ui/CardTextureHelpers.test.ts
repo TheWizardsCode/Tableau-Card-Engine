@@ -106,12 +106,12 @@ describe('getCardTexture', () => {
 // ── Shared constants ─────────────────────────────────────────
 
 describe('shared UI constants', () => {
-  it('should export CARD_W as 48', () => {
-    expect(CARD_W).toBe(48);
+  it('should export CARD_W as 96', () => {
+    expect(CARD_W).toBe(96);
   });
 
-  it('should export CARD_H as 65', () => {
-    expect(CARD_H).toBe(65);
+  it('should export CARD_H as 130', () => {
+    expect(CARD_H).toBe(130);
   });
 
   it('should export GAME_W as 1280', () => {

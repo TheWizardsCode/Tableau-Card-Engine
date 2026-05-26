@@ -67,7 +67,12 @@ export class GymHandPileScene extends GymSceneBase {
   // Hand layout constants
   private readonly HAND_SPACING = 20;
   private readonly HAND_BASE_X = GAME_W / 2 - ((HAND_SIZE - 1) * this.HAND_SPACING) / 2;
-  private readonly HAND_BASE_Y = GAME_H - CARD_H / 2 - 10;
+  private readonly HAND_BASE_Y = GAME_H - CARD_H - 80;
+
+  // Slider layout constants
+  private readonly SLIDER_Y = GAME_H - 40;
+  private readonly SLIDER_HORIZ_GAP = 40;
+  private readonly SLIDER_START_X = 375;
 
   // Arc slider constants/state
   private readonly ARC_RADIUS_MIN = 0;
@@ -75,6 +80,9 @@ export class GymHandPileScene extends GymSceneBase {
   private readonly ARC_RADIUS_DEFAULT = 150;
   private readonly ARC_SLIDER_WIDTH = 150;
   private readonly ARC_SLIDER_HEIGHT = 6;
+  private readonly ARC_SLIDER_X = this.SLIDER_START_X;
+  private readonly SPACING_SLIDER_X = this.SLIDER_START_X + this.ARC_SLIDER_WIDTH + this.SLIDER_HORIZ_GAP;
+  private readonly ROTATION_SLIDER_X = this.SLIDER_START_X + 2 * (this.ARC_SLIDER_WIDTH + this.SLIDER_HORIZ_GAP);
   private arcRadius = this.ARC_RADIUS_DEFAULT;
   private arcSliderTrack?: Phaser.GameObjects.Rectangle;
   private arcSliderFill?: Phaser.GameObjects.Rectangle;
@@ -187,7 +195,7 @@ export class GymHandPileScene extends GymSceneBase {
   }
 
   private createArcRadiusSlider(): void {
-    const sliderY = this.HAND_BASE_Y;
+    const sliderY = this.SLIDER_Y;
 
     this.arcSliderTrack = this.add.rectangle(0, sliderY, this.ARC_SLIDER_WIDTH, this.ARC_SLIDER_HEIGHT, 0x334433, 1)
       .setOrigin(0, 0.5);
@@ -251,19 +259,12 @@ export class GymHandPileScene extends GymSceneBase {
       return;
     }
 
-    const centers = this.handView.getCardCenters();
-    const rightmostCenterX = centers.length > 0
-      ? Math.max(...centers.map((c) => c.x))
-      : this.HAND_BASE_X + (Math.max(this.hand.length, 1) - 1) * this.HAND_SPACING;
+    const trackX = this.ARC_SLIDER_X;
 
-    const rightEdge = rightmostCenterX + CARD_W / 2;
-    const maxTrackX = GAME_W - this.ARC_SLIDER_WIDTH - 16;
-    const trackX = Math.min(maxTrackX, rightEdge + 12);
-
-    this.arcSliderTrack.setPosition(trackX, this.HAND_BASE_Y);
-    this.arcSliderFill.setPosition(trackX, this.HAND_BASE_Y);
-    this.arcSliderHitArea.setPosition(trackX + this.ARC_SLIDER_WIDTH / 2, this.HAND_BASE_Y);
-    this.arcSliderValueText.setPosition(trackX + this.ARC_SLIDER_WIDTH / 2, this.HAND_BASE_Y - 20);
+    this.arcSliderTrack.setPosition(trackX, this.SLIDER_Y);
+    this.arcSliderFill.setPosition(trackX, this.SLIDER_Y);
+    this.arcSliderHitArea.setPosition(trackX + this.ARC_SLIDER_WIDTH / 2, this.SLIDER_Y);
+    this.arcSliderValueText.setPosition(trackX + this.ARC_SLIDER_WIDTH / 2, this.SLIDER_Y - 20);
 
     this.updateArcSliderVisuals();
     // Also update spacing slider position so both sliders track the hand
@@ -296,7 +297,7 @@ export class GymHandPileScene extends GymSceneBase {
   // ── Spacing slider ──────────────────────────────────────
 
   private createSpacingSlider(): void {
-    const sliderY = this.HAND_BASE_Y;
+    const sliderY = this.SLIDER_Y;
 
     this.spacingSliderTrack = this.add.rectangle(0, sliderY, this.ARC_SLIDER_WIDTH, this.ARC_SLIDER_HEIGHT, 0x333344, 1)
       .setOrigin(0, 0.5);
@@ -362,13 +363,12 @@ export class GymHandPileScene extends GymSceneBase {
       return;
     }
 
-    const arcAnchor = this.arcSliderTrack ? this.arcSliderTrack.x : 0;
-    const trackX = Math.min(GAME_W - this.ARC_SLIDER_WIDTH - 16, arcAnchor + this.ARC_SLIDER_WIDTH + 12);
+    const trackX = this.SPACING_SLIDER_X;
 
-    this.spacingSliderTrack.setPosition(trackX, this.HAND_BASE_Y);
-    this.spacingSliderFill.setPosition(trackX, this.HAND_BASE_Y);
-    this.spacingSliderHitArea.setPosition(trackX + this.ARC_SLIDER_WIDTH / 2, this.HAND_BASE_Y);
-    this.spacingSliderValueText.setPosition(trackX + this.ARC_SLIDER_WIDTH / 2, this.HAND_BASE_Y - 20);
+    this.spacingSliderTrack.setPosition(trackX, this.SLIDER_Y);
+    this.spacingSliderFill.setPosition(trackX, this.SLIDER_Y);
+    this.spacingSliderHitArea.setPosition(trackX + this.ARC_SLIDER_WIDTH / 2, this.SLIDER_Y);
+    this.spacingSliderValueText.setPosition(trackX + this.ARC_SLIDER_WIDTH / 2, this.SLIDER_Y - 20);
 
     this.updateSpacingSliderVisuals();
     // Also update rotation slider position so all sliders track the hand
@@ -405,7 +405,7 @@ export class GymHandPileScene extends GymSceneBase {
   // ── Rotation slider ───────────────────────────────────
 
   private createRotationSlider(): void {
-    const sliderY = this.HAND_BASE_Y;
+    const sliderY = this.SLIDER_Y;
 
     this.rotationSliderTrack = this.add.rectangle(0, sliderY, this.ARC_SLIDER_WIDTH, this.ARC_SLIDER_HEIGHT, 0x333344, 1)
       .setOrigin(0, 0.5);
@@ -468,15 +468,12 @@ export class GymHandPileScene extends GymSceneBase {
       return;
     }
 
-    const arcAnchor = this.arcSliderTrack ? this.arcSliderTrack.x : 0;
-    const baseTrackX = Math.min(GAME_W - this.ARC_SLIDER_WIDTH - 16, arcAnchor + this.ARC_SLIDER_WIDTH + 12);
-    // Place rotation track after the spacing track
-    const trackX = Math.min(GAME_W - this.ARC_SLIDER_WIDTH - 16, baseTrackX + this.ARC_SLIDER_WIDTH + 12);
+    const trackX = this.ROTATION_SLIDER_X;
 
-    this.rotationSliderTrack.setPosition(trackX, this.HAND_BASE_Y);
-    this.rotationSliderFill.setPosition(trackX, this.HAND_BASE_Y);
-    this.rotationSliderHitArea.setPosition(trackX + this.ARC_SLIDER_WIDTH / 2, this.HAND_BASE_Y);
-    this.rotationSliderValueText.setPosition(trackX + this.ARC_SLIDER_WIDTH / 2, this.HAND_BASE_Y - 20);
+    this.rotationSliderTrack.setPosition(trackX, this.SLIDER_Y);
+    this.rotationSliderFill.setPosition(trackX, this.SLIDER_Y);
+    this.rotationSliderHitArea.setPosition(trackX + this.ARC_SLIDER_WIDTH / 2, this.SLIDER_Y);
+    this.rotationSliderValueText.setPosition(trackX + this.ARC_SLIDER_WIDTH / 2, this.SLIDER_Y - 20);
 
     this.updateRotationSliderVisuals();
   }

@@ -7,10 +7,10 @@
  */
 
 /** Default card sprite width (pixels). */
-export const CARD_W = 48;
+export const CARD_W = 96;
 
 /** Default card sprite height (pixels). */
-export const CARD_H = 65;
+export const CARD_H = 130;
 
 /** Default game viewport width (pixels). */
 export const GAME_W = 1280;
