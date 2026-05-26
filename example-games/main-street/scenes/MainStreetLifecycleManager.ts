@@ -15,6 +15,14 @@ import { MainStreetOverlayManager } from './MainStreetOverlayManager';
 import { MainStreetInputManager } from './MainStreetInputManager';
 import { MainStreetSvgTextureManager } from './MainStreetSvgTextureManager';
 import { MainStreetTutorialOverlayManager } from './MainStreetTutorialOverlayManager';
+import { TutorialOfferModal } from './TutorialOfferModal';
+import {
+  BrowserLocalStorageAdapter,
+  loadTutorialState,
+  saveTutorialState,
+  updateTutorialStatus,
+  type TutorialVisibilityOptions,
+} from '../TutorialState';
 import { getEndTurnKeybind } from '../../../src/ui/SettingsStore';
 
 export class MainStreetLifecycleManager {
@@ -190,10 +198,13 @@ export class MainStreetLifecycleManager {
     try {
       (s as any).tutorialOverlay = new MainStreetTutorialOverlayManager(s, () => {
         try {
+          // On tutorial overlay completion, persist tutorial completion state
+          const tutorialState = loadTutorialState(new BrowserLocalStorageAdapter());
+          const updated = updateTutorialStatus(tutorialState, 'completed');
+          void saveTutorialState(new BrowserLocalStorageAdapter(), updated);
           if (s.campaign) {
             s.campaign.tutorialSeen = true;
             if (s.saveStore) {
-              // Persist the updated campaign progress asynchronously
               void saveCampaignProgress(s.saveStore, s.campaign).catch(() => {});
             }
           }
@@ -355,21 +366,23 @@ export class MainStreetLifecycleManager {
       s.tooltipManager = new TooltipManager(s, s.settingsPanel);
     }
 
-    // Create tutorial overlay manager (attached to main scene) so the tutorial
-    // can be shown from Settings or automatically on first run. The onComplete
-    // callback marks the campaign as having seen the tutorial and persists it.
+    // Create tutorial offer modal for first-launch onboarding (Milestone 5).
+    // The modal shows before free turn interactions begin and blocks input
+    // until the player starts or skips the tutorial.
     try {
-      (s as any).tutorialOverlay = new (require('./MainStreetTutorialOverlayManager').MainStreetTutorialOverlayManager)(s, () => {
-        try {
-          if (s.campaign) {
-            s.campaign.tutorialSeen = true;
-            if (s.saveStore) {
-              // Persist the updated campaign progress asynchronously
-              void saveCampaignProgress(s.saveStore, s.campaign).catch(() => {});
-            }
-          }
-        } catch (_) { /* ignore */ }
-      });
+      (s as any).tutorialOfferModal = new TutorialOfferModal(
+        s,
+        new BrowserLocalStorageAdapter(),
+        {
+          onStartTutorial: () => {
+            try { (s as any).tutorialOverlay?.start(); } catch (_) { /* ignore */ }
+          },
+          onSkip: () => {
+            // Normal gameplay begins; the DayStart -> MarketPhase flow
+            // is already in motion from startDayPhase() called below.
+          },
+        },
+      );
     } catch (_) {
       // Ignore if DOM environment is unavailable (tests)
     }
@@ -385,13 +398,18 @@ export class MainStreetLifecycleManager {
             console.error('[MainStreet] play-tutorial handler failed', e);
           }
         });
-        // Replay tutorial: warn in settings, then dispatch this event to restart current run into tutorial mode
+        // Replay tutorial: reset tutorial state and restart current run into tutorial mode
         (window as any).addEventListener('tce:replay-tutorial', () => {
           try {
+            // Reset tutorial state so the offer modal would show again
+            const storage = new BrowserLocalStorageAdapter();
+            const tutorialState = loadTutorialState(storage);
+            const reset = updateTutorialStatus(tutorialState, 'not_seen');
+            void saveTutorialState(storage, reset);
+
             if (s.campaign) {
               s.campaign.tutorialSeen = false;
               if (s.saveStore) {
-                // Persist change but do not block
                 void saveCampaignProgress(s.saveStore, s.campaign).catch(() => {});
               }
             }
@@ -401,7 +419,7 @@ export class MainStreetLifecycleManager {
               s.selectedDifficulty = 'Easy';
               s.state = setupMainStreetGame({ difficulty: 'Easy', unlockedCardIds: s.campaign?.unlockedCardIds });
               s.startDayPhase();
-              // show tutorial overlay if available
+              // Immediately show the tutorial overlay for replay (bypass the offer modal)
               try { (s as any).tutorialOverlay?.start(); } catch (_) { /* ignore */ }
             } catch (e) {
               // eslint-disable-next-line no-console
@@ -497,6 +515,11 @@ export class MainStreetLifecycleManager {
       unlockedCardIds: s.campaign.unlockedCardIds,
     });
 
+    // Determine tutorial visibility options from scene state
+    const tutorialOpts: TutorialVisibilityOptions = {
+      replayMode: s.replayMode === true,
+    };
+
     // Async: attempt to load saved campaign and re-setup if found
     if (s.saveStore) {
       // Store the load promise on the scene so other code can wait if needed
@@ -515,32 +538,26 @@ export class MainStreetLifecycleManager {
           // player actions and causing End Turn to hang.
           try { s.startDayPhase(); } catch (_) { /* ignore */ }
         }
-        // After attempting to load (saved or not) auto-show tutorial if not seen
+        // After attempting to load (saved or not), show the tutorial offer modal
+        // if eligibility checks pass (Milestone 5 onboarding flow).
         try {
-          if (s.campaign && !(s.campaign as any).tutorialSeen) {
-            if ((s as any).tutorialOverlay) {
-              try { (s as any).tutorialOverlay.start(); } catch (_e) { /* ignore */ }
-            }
-          }
-        } catch (e) { /* eslint-disable-next-line no-console */ console.error('[MainStreet] auto-show tutorial check failed', e); }
+          const legacySeen = s.campaign ? (s.campaign as any).tutorialSeen : undefined;
+          (s as any).tutorialOfferModal?.showIfEligible(tutorialOpts, legacySeen);
+        } catch (e) { /* eslint-disable-next-line no-console */ console.error('[MainStreet] tutorial offer check failed', e); }
         return saved;
       }).catch(() => {
-        // If load fails, continue with defaults (already set up above)
+        // If load fails, continue with defaults and show offer modal
         try {
-          if (s.campaign && !(s.campaign as any).tutorialSeen) {
-            if ((s as any).tutorialOverlay) {
-              try { (s as any).tutorialOverlay.start(); } catch (_e) { /* ignore */ }
-            }
-          }
-        } catch (e) { /* eslint-disable-next-line no-console */ console.error('[MainStreet] auto-show tutorial fallback failed', e); }
+          const legacySeen = s.campaign ? (s.campaign as any).tutorialSeen : undefined;
+          (s as any).tutorialOfferModal?.showIfEligible(tutorialOpts, legacySeen);
+        } catch (e) { /* eslint-disable-next-line no-console */ console.error('[MainStreet] tutorial offer fallback failed', e); }
         return null;
       });
     } else {
-      // No saveStore: if tutorial hasn't been seen, show it now (best-effort)
+      // No saveStore: show tutorial offer modal if eligible (best-effort)
       try {
-        if (s.campaign && !(s.campaign as any).tutorialSeen && (s as any).tutorialOverlay) {
-          try { (s as any).tutorialOverlay.start(); } catch (_) { /* ignore */ }
-        }
+        const legacySeen = s.campaign ? (s.campaign as any).tutorialSeen : undefined;
+        (s as any).tutorialOfferModal?.showIfEligible(tutorialOpts, legacySeen);
       } catch (_) { /* ignore */ }
     }
   }
