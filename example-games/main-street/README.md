@@ -38,3 +38,40 @@ npx vitest run tests/e2e/replay-main-street.e2e.test.ts --project unit
 Tutorial-specific layout migration is tracked separately in:
 
 - **Adapt tutorial system to use layout description (CG-0MP7IZ4RK008065O)**
+
+## Milestone 5: Tutorial, Onboarding, and Game Selector Integration
+
+Main Street Milestone 5 (CG-0MOY5TOJK008JFJM) adds a first-time player onboarding experience:
+
+### Tutorial State and Persistence
+
+- **Module:** `TutorialState.ts` — typed schema (`MainStreetTutorialStateV1`), localStorage persistence, eligibility logic.
+- **Storage key:** `tce-main-street-tutorial-state`
+- **Statuses:** `not_seen`, `skipped`, `completed`
+- **Legacy bridge:** compatible with existing `campaign.tutorialSeen` flag.
+
+### Tutorial Offer Modal
+
+- **Module:** `scenes/TutorialOfferModal.ts` — first-launch modal with Start/Skip options.
+- Blocks gameplay until player chooses Start or Skip.
+- Replay mode and test harnesses can suppress via `disableTutorial` or `replayMode` flags.
+
+### Action-Gated Tutorial Flow
+
+- **Module:** `TutorialFlow.ts` — T1-T10 step definitions with pure progression controller.
+- Each step gates on a specific player action (confirm, select-business, place-business, end-turn, etc.)
+- Invalid actions show: "Complete the highlighted step first."
+
+### Help/Rules Panel
+
+- Updated to 6 PRD-required sections: How to Play, Card Types, Synergy and Placement, Turn Flow, Win/Loss Conditions, Tools.
+- Each section has <= 8 lines of concise English-only copy.
+
+### Game Selector Integration
+
+- Main Street registered with PRD-specified metadata in `main.ts` GAMES array.
+- Tested via `tests/main-street/game-selector-integration.test.ts`.
+
+### Deferred
+
+- Optional statistics tracking deferred to future milestone (CG-0MPLR9E10003L6K6).

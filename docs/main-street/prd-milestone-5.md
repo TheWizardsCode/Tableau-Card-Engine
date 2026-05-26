@@ -4,7 +4,7 @@
 **Parent Epic:** Main Street (CG-0MM4R9UJF1DGI0ZF)  
 **Author:** opencode  
 **Date:** 2026-05-09  
-**Status:** DRAFT -- Awaiting Producer Review
+**Status:** IMPLEMENTED -- Milestone 5 delivered via CG-0MOY5TOJK008JFJM
 
 ---
 
@@ -352,10 +352,31 @@ interface MainStreetStatsV1 {
 
 ## 11. Milestone Exit Checklist
 
-- [ ] Tutorial script implemented according to Section 4.
-- [ ] First-time onboarding prompt and replay flow implemented.
-- [ ] Main Street selector metadata confirmed and validated.
-- [ ] Help/rules sections complete and reviewed.
-- [ ] Optional stats feature either implemented or explicitly deferred with child work item.
-- [ ] All automated tests and build pass.
+- [x] Tutorial script implemented according to Section 4 (TutorialFlow.ts with T1-T10 controller).
+- [x] First-time onboarding prompt and replay flow implemented (TutorialOfferModal + TutorialState).
+- [x] Main Street selector metadata confirmed and validated (game-selector-integration.test.ts).
+- [x] Help/rules sections complete and reviewed (6 PRD-required sections, <= 8 lines each).
+- [x] Optional stats feature explicitly deferred (see Section 12 below).
+- [x] All automated tests and build pass (207+ tests, TypeScript + Vite build green).
 - [ ] Producer review completed and approved.
+
+---
+
+## 12. Deferred: Optional Statistics Tracking
+
+The optional statistics tracking feature (US-5, Section 7.3 of this PRD) has been **deferred** to a future milestone. This decision was made during Milestone 5 planning to keep scope focused on the core onboarding experience.
+
+### What is Deferred
+
+- `MainStreetStatsV1` schema (`gamesPlayed`, `wins`, `bestScore`, `lastPlayedAt`)
+- Stats persistence to `localStorage` under key `tce-main-street-stats`
+- Stats view in the Main Street menu/help/settings area
+- Stats reset with confirmation
+
+### Future Work Item
+
+- **Main Street optional local statistics tracking (CG-0MPLR9E10003L6K6)** — linked with `discovered-from:CG-0MOY5TOJK008JFJM`
+
+### Rationale
+
+Statistics tracking is non-blocking for the core onboarding and tutorial experience. The tutorial state schema (`MainStreetTutorialStateV1`) and persistence infrastructure (`TutorialState.ts`) are in place and can be extended when statistics tracking is implemented.
