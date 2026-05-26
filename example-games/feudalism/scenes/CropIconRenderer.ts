@@ -13,7 +13,7 @@
  *   - Turnip: round root with leaf sprout
  *   - Mead:   honeycomb hexagon cluster
  *
- * Icons are drawn in the token's text colour (from RESOURCE_TEXT_COLOR)
+ * Icons are drawn in the icon colour (from RESOURCE_ICON_COLOR)
  * at reduced opacity so the count numeral remains readable on top.
  *
  * Related work item: CG-0MM5KDA9E0QG6OKY

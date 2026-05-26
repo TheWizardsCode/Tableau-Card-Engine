@@ -20,7 +20,28 @@ export const RESOURCE_FILL: Record<ResourceOrWild, number> = {
   mead:     0xCC79A7,
 };
 
+// Token count text colour (white for readability on coloured tokens)
 export const RESOURCE_TEXT_COLOR: Record<ResourceOrWild, string> = {
+  oats:     '#ffffff',
+  flax:     '#ffffff',
+  wheat:    '#ffffff',
+  barley:   '#ffffff',
+  turnip:   '#ffffff',
+  mead:     '#ffffff',
+};
+
+// Crop icon overlay colour (drawn at reduced opacity on token circles)
+export const RESOURCE_ICON_COLOR: Record<ResourceOrWild, string> = {
+  oats:     '#000000',
+  flax:     '#000000',
+  wheat:    '#000000',
+  barley:   '#000000',
+  turnip:   '#000000',
+  mead:     '#000000',
+};
+
+// Resource label/abbreviation text colour (bonus abbrevs, cost chips, patron chips, etc.)
+export const RESOURCE_LABEL_COLOR: Record<ResourceOrWild, string> = {
   oats:     '#000000',
   flax:     '#000000',
   wheat:    '#000000',
