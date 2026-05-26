@@ -133,8 +133,8 @@ export class GymDeckRngScene extends GymSceneBase {
     // Shift the grid down within the cardDisplay zone to clear the header/controls
     const centerY = (cardDisplay?.y ?? 270) + 100;
 
-    // Scale of 0.85 gives ~41px wide × ~55px tall cards, 8 columns = ~354px wide
-    const cardScale = 0.85;
+    // Full-scale cards (48×65px), 8 columns = ~412px wide
+    const cardScale = 1.0;
     const scaledCardW = CARD_W * cardScale;
     const scaledCardH = CARD_H * cardScale;
     const stepX = scaledCardW + GRID_GAP_X;
