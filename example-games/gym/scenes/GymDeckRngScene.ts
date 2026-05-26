@@ -42,7 +42,6 @@ export class GymDeckRngScene extends GymSceneBase {
 
   // Grid card sprites — tracked so they can be destroyed on shuffle
   private cardSprites: Phaser.GameObjects.Image[] = [];
-  private cardLabels: Phaser.GameObjects.Text[] = [];
 
   constructor() {
     super({ key: GYM_DECK_RNG_KEY });
@@ -167,13 +166,6 @@ export class GymDeckRngScene extends GymSceneBase {
       sprite.setScale(cardScale);
       this.cardSprites.push(sprite);
 
-      // Small label below each card for easy identification
-      const label = this.add.text(x, y + scaledCardH / 2 + 10, `${card.rank}${card.suit[0]}`, {
-        fontSize: '8px',
-        color: '#88aacc',
-        fontFamily: 'monospace',
-      }).setOrigin(0.5, 0);
-      this.cardLabels.push(label);
     }
 
     this.statusText.setText(`${this.deck.length} cards displayed · seed=${this.seed}`);
@@ -188,9 +180,5 @@ export class GymDeckRngScene extends GymSceneBase {
     }
     this.cardSprites = [];
 
-    for (const label of this.cardLabels) {
-      try { label.destroy(); } catch (_) { /* ignore */ }
-    }
-    this.cardLabels = [];
   }
 }
