@@ -27,7 +27,7 @@ import {
   LOWER_TOP, LOWER_BOX_H, PLAYER_AREA_X, PLAYER_AREA_Y,
   AI_AREA_X, AI_AREA_Y, DIVIDER_X,
   ACTION_Y, INSTRUCTION_Y,
-  RESOURCE_FILL, RESOURCE_TEXT_COLOR,
+  RESOURCE_FILL, RESOURCE_TEXT_COLOR, RESOURCE_ICON_COLOR, RESOURCE_LABEL_COLOR,
 } from './FeudalismConstants';
 import {
   buildTokenEntries,
@@ -273,7 +273,7 @@ export class FeudalismRenderer {
     }
 
     const bonusLetter = this.scene.add.text(MARKET_CARD_W / 2 - 10, -MARKET_CARD_H / 2 + 26, resourceAbbrev(card.bonus), {
-      fontSize: '16px', fontStyle: 'bold', color: RESOURCE_TEXT_COLOR[card.bonus], fontFamily: FONT_FAMILY,
+      fontSize: '16px', fontStyle: 'bold', color: RESOURCE_LABEL_COLOR[card.bonus], fontFamily: FONT_FAMILY,
     }).setOrigin(1, 0);
     container.add(bonusLetter);
 
@@ -291,7 +291,7 @@ export class FeudalismRenderer {
       container.add(chip);
       const ct = this.scene.add.text(cx, cy, `${costEntries[i].count}`, {
         fontSize: '14px', fontStyle: 'bold',
-        color: RESOURCE_TEXT_COLOR[costEntries[i].color], fontFamily: FONT_FAMILY,
+        color: RESOURCE_LABEL_COLOR[costEntries[i].color], fontFamily: FONT_FAMILY,
       }).setOrigin(0.5);
       container.add(ct);
     }
@@ -366,7 +366,7 @@ export class FeudalismRenderer {
         this.patronContainer.add(chip);
         const ct = this.scene.add.text(rx, ry, `${reqs[j].count}`, {
           fontSize: '15px', fontStyle: 'bold',
-          color: RESOURCE_TEXT_COLOR[reqs[j].color], fontFamily: FONT_FAMILY,
+          color: RESOURCE_LABEL_COLOR[reqs[j].color], fontFamily: FONT_FAMILY,
         }).setOrigin(0.5);
         this.patronContainer.add(ct);
       }
@@ -393,7 +393,7 @@ export class FeudalismRenderer {
       if (count === 0) circle.setAlpha(0.3);
       this.supplyContainer.add(circle);
 
-      const supplyIcon = addCropIcon(this.scene as any, SUPPLY_X, y, color, SUPPLY_TOKEN_R, cssColorToNumber(RESOURCE_TEXT_COLOR[color]));
+      const supplyIcon = addCropIcon(this.scene as any, SUPPLY_X, y, color, SUPPLY_TOKEN_R, cssColorToNumber(RESOURCE_ICON_COLOR[color]));
       if (count === 0) supplyIcon.setAlpha(0.3);
       this.supplyContainer.add(supplyIcon);
 
@@ -538,7 +538,7 @@ export class FeudalismRenderer {
     circle.setStrokeStyle(1, 0xffffff);
     container.add(circle);
 
-    const icon = addCropIcon(this.scene as any, x, y, color, 14, cssColorToNumber(RESOURCE_TEXT_COLOR[color]));
+    const icon = addCropIcon(this.scene as any, x, y, color, 14, cssColorToNumber(RESOURCE_ICON_COLOR[color]));
     container.add(icon);
 
     const countText = this.scene.add.text(x, y, `${count}`, {
@@ -573,7 +573,7 @@ export class FeudalismRenderer {
       container.add(slot);
 
       const abbr = this.scene.add.text(centerX, options.y + 10, resourceAbbrev(color), {
-        fontSize: '11px', fontStyle: 'bold', color: hasCards ? RESOURCE_TEXT_COLOR[color] : '#666666', fontFamily: FONT_FAMILY,
+        fontSize: '11px', fontStyle: 'bold', color: hasCards ? RESOURCE_LABEL_COLOR[color] : '#666666', fontFamily: FONT_FAMILY,
       }).setOrigin(0.5);
       container.add(abbr);
 
@@ -734,11 +734,11 @@ export class FeudalismRenderer {
           circle.on('pointerout', () => circle.setStrokeStyle(1, 0xffffff));
           this.actionContainer.add(circle);
 
-          const actIcon = addCropIcon(this.scene as any, bx, by, c, 22, cssColorToNumber(RESOURCE_TEXT_COLOR[c]));
+          const actIcon = addCropIcon(this.scene as any, bx, by, c, 22, cssColorToNumber(RESOURCE_ICON_COLOR[c]));
           this.actionContainer.add(actIcon);
 
           const abbr = this.scene.add.text(bx, by, resourceAbbrev(c), {
-            fontSize: '15px', fontStyle: 'bold', color: RESOURCE_TEXT_COLOR[c], fontFamily: FONT_FAMILY,
+            fontSize: '15px', fontStyle: 'bold', color: RESOURCE_LABEL_COLOR[c], fontFamily: FONT_FAMILY,
           }).setOrigin(0.5);
           this.actionContainer.add(abbr);
           bx += 54;
@@ -844,7 +844,7 @@ export class FeudalismRenderer {
       this.discardContainer.add(slot);
 
       const abbr = this.scene.add.text(dsx + DSLOT_W / 2, dsY + 8, resourceAbbrev(c), {
-        fontSize: '10px', fontStyle: 'bold', color: hasCards ? RESOURCE_TEXT_COLOR[c] : '#666666', fontFamily: FONT_FAMILY,
+        fontSize: '10px', fontStyle: 'bold', color: hasCards ? RESOURCE_LABEL_COLOR[c] : '#666666', fontFamily: FONT_FAMILY,
       }).setOrigin(0.5).setDepth(11);
       this.discardContainer.add(abbr);
 
@@ -872,7 +872,7 @@ export class FeudalismRenderer {
       circle.setDepth(11);
       this.discardContainer.add(circle);
 
-      const discIcon = addCropIcon(this.scene as any, tx, ty, c, 28, cssColorToNumber(RESOURCE_TEXT_COLOR[c]));
+      const discIcon = addCropIcon(this.scene as any, tx, ty, c, 28, cssColorToNumber(RESOURCE_ICON_COLOR[c]));
       discIcon.setDepth(11);
       this.discardContainer.add(discIcon);
 

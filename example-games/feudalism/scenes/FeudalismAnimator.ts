@@ -11,7 +11,7 @@ import {
   MARKET_Y, DECK_X, MARKET_X,
   PLAYER_AREA_X, PLAYER_AREA_Y,
   AI_AREA_X, AI_AREA_Y,
-  RESOURCE_FILL, RESOURCE_TEXT_COLOR,
+  RESOURCE_FILL, RESOURCE_LABEL_COLOR,
   MOVE_DURATION,
 } from './FeudalismConstants';
 import { moveGameObject } from '../../../src/ui';
@@ -191,7 +191,7 @@ export class FeudalismAnimator {
     }
 
     const bonusLetter = this.scene.add.text(MARKET_CARD_W / 2 - 10, -MARKET_CARD_H / 2 + 26, resourceAbbrev(card.bonus), {
-      fontSize: '16px', fontStyle: 'bold', color: RESOURCE_TEXT_COLOR[card.bonus], fontFamily: 'Arial',
+      fontSize: '16px', fontStyle: 'bold', color: RESOURCE_LABEL_COLOR[card.bonus], fontFamily: 'Arial',
     }).setOrigin(1, 0);
     container.add(bonusLetter);
 
