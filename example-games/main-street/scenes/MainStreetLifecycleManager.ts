@@ -253,49 +253,37 @@ export class MainStreetLifecycleManager {
     s.scale.off(Phaser.Scale.Events.RESIZE, s.handleResize, s);
     s.scale.on(Phaser.Scale.Events.RESIZE, s.handleResize, s);
 
-    // Help panel
+    // Help panel (Milestone 5: PRD-required sections)
+    const cfg = s.state.config;
     const helpSections: HelpSection[] = [
       {
         heading: 'How to Play',
         body:
-          'Buy businesses from the market and place them on the street grid.\n' +
-          'Adjacent businesses with matching synergy types earn bonus income.\n' +
+          'Buy businesses from the market and place them on the 2x5 street.\n' +
+          'Earn income and score through card value + synergy + reputation.\n' +
           'Buy upgrades to improve existing businesses.\n' +
-          'Buy Investment events and play them for one-time effects.\n' +
-          'Complete challenges for bonus points.\n' +
-          'Earn coins and reputation each turn to reach the score threshold.',
+          'Hold one event card and play it when timing is best.\n' +
+          'Complete challenges for bonus points and instant-win conditions.\n' +
+          'Manage coins and reputation across 20 turns to build the best street.',
       },
       {
-        heading: 'Challenges',
+        heading: 'Card Types',
         body:
-          `Each run selects ${s.state.config.challengesPerRun} random challenges for you to complete.\n` +
-          'Challenges have goals like earning coins, placing businesses,\n' +
-          'or building synergy combos. Progress is checked at the end of\n' +
-          'each turn -- once completed, a challenge stays completed.\n' +
-          `Each completed challenge adds ${s.state.config.challengeBonusPoints} bonus points to your score.\n` +
-          `Complete all ${s.state.config.challengesPerRun} challenges to win immediately!\n` +
-          'Track your progress in the challenge panel at the bottom.',
+          'Business (green): persistent board value, placed on your street.\n' +
+          'Upgrade (orange): enhances an existing business on the street.\n' +
+          'Event / Investment (brown): one-time effects, held in your hand.\n' +
+          'Incident (blue): automatic pressure events at end of each turn.\n' +
+          'Each card has a cost, value, and one or more synergy types.',
       },
       {
-        heading: 'Events',
-        body:
-          'Investment events (brown) can be purchased from the Investments row\n' +
-          'and held in your hand (max 1 at a time). Click the held card in\n' +
-          'your hand (bottom-left) to play it for a one-time effect.\n' +
-          'Held events persist across turns until you choose to play them.\n' +
-          'Incident events (blue) appear in the Upcoming Incidents queue and\n' +
-          'trigger automatically at the end of each turn -- plan around them!\n' +
-          'Check the Activity Log to see what events fired and their effects.',
-      },
-      {
-        heading: 'Synergy Types',
+        heading: 'Synergy and Placement',
         render: (scene, container, x, y, maxWidth) => {
-          // Render a short explanatory paragraph about the synergy mechanic, then
-          // render per-type icons with titles and a short description.
           const paragraph =
-            'Synergies: when two adjacent businesses share a synergy type, they grant bonus income to each other. ' +
-            'Synergy checks are performed for neighboring slots (left/right) and stack additively: placing businesses that share types next to each other increases income. ' +
-            'Some cards bridge multiple synergy types and count for both. Plan placements to cluster synergies for higher returns.';
+            'Adjacent matching synergy types yield bonus income. ' +
+            'Synergy checks are performed for left/right neighbors and stack additively. ' +
+            'Some cards bridge multiple synergy types and count for both. ' +
+            'Upgrades can increase range and value. ' +
+            'Plan placements to cluster synergies for higher returns.';
 
           const paraStyle: Phaser.Types.GameObjects.Text.TextStyle = {
             fontSize: '14px',
@@ -309,7 +297,7 @@ export class MainStreetLifecycleManager {
           para.setOrigin(0, 0);
           container.add(para);
 
-          let cy = y + para.height + 12; // gap after paragraph
+          let cy = y + para.height + 12;
 
           const types = [
             { key: 'ms-icon-food', label: 'Food' },
@@ -322,8 +310,6 @@ export class MainStreetLifecycleManager {
           const iconSize = 16;
           const gapY = 8;
           const labelXOffset = iconSize + 8;
-
-          // Text style similar to HelpPanel BODY_STYLE
           const labelStyle: Phaser.Types.GameObjects.Text.TextStyle = {
             fontSize: '14px',
             color: '#dddddd',
@@ -336,27 +322,41 @@ export class MainStreetLifecycleManager {
             const img = scene.add.image(x, cy, t.key).setOrigin(0, 0);
             img.setDisplaySize(iconSize, iconSize);
             container.add(img);
-
             const label = scene.add.text(x + labelXOffset, cy, t.label, labelStyle);
             label.setOrigin(0, 0);
             container.add(label);
-
-            // Advance cy by the greater of iconSize and label height plus gap
             const rowH = Math.max(iconSize, label.height);
             cy += rowH + gapY;
           }
 
-          // Return total height rendered
           return cy - y;
         },
       },
       {
-        heading: 'Win / Loss',
+        heading: 'Turn Flow',
         body:
-          `Reach ${s.state.config.winThreshold} points to win (coins + reputation*${s.state.config.reputationScoreMultiplier} + challenges*${s.state.config.challengeBonusPoints}).\n` +
-          `Complete all ${s.state.config.challengesPerRun} challenges for an instant win.\n` +
-          `Survive ${s.state.config.maxTurns} turns with positive reputation for a turn-limit victory.\n` +
-          'Bankruptcy (coins < 0) or reputation collapse (rep <= 0 after turn 1) loses.',
+          'Day Start: market refreshes and income is calculated.\n' +
+          'Market Actions: buy businesses, upgrades, or events from the market.\n' +
+          'Place businesses on the street grid to earn future income.\n' +
+          'End Turn: resolves income, incidents, and advances to the next day.\n' +
+          'Repeat for 20 turns or until you win or go bankrupt.',
+      },
+      {
+        heading: 'Win / Loss Conditions',
+        body:
+          `Reach ${cfg.winThreshold} points to win (coins + reputation multiplier + challenges).\n` +
+          `Complete all ${cfg.challengesPerRun} challenges for an instant win.\n` +
+          `Survive ${cfg.maxTurns} turns with positive reputation for a turn-limit victory.\n` +
+          'Bankruptcy (coins < 0) or reputation collapse (rep <= 0) loses the game.',
+      },
+      {
+        heading: 'Tools',
+        body:
+          'Hint: get a suggested move (once per turn).\n' +
+          'Undo / Redo: step back or forward through market actions.\n' +
+          'Refresh Investments: swap the investment row (costs coins).\n' +
+          'Tutorial Replay: restart the guided tutorial from Settings.\n' +
+          'Keyboard shortcuts: End Turn key configurable in Settings.',
       },
     ];
     s.initHelpPanel(helpSections);
