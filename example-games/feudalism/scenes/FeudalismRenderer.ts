@@ -291,7 +291,7 @@ export class FeudalismRenderer {
       container.add(chip);
       const ct = this.scene.add.text(cx, cy, `${costEntries[i].count}`, {
         fontSize: '14px', fontStyle: 'bold',
-        color: RESOURCE_LABEL_COLOR[costEntries[i].color], fontFamily: FONT_FAMILY,
+        color: RESOURCE_TEXT_COLOR[costEntries[i].color], fontFamily: FONT_FAMILY,
       }).setOrigin(0.5);
       container.add(ct);
     }
@@ -366,7 +366,7 @@ export class FeudalismRenderer {
         this.patronContainer.add(chip);
         const ct = this.scene.add.text(rx, ry, `${reqs[j].count}`, {
           fontSize: '15px', fontStyle: 'bold',
-          color: RESOURCE_LABEL_COLOR[reqs[j].color], fontFamily: FONT_FAMILY,
+          color: RESOURCE_TEXT_COLOR[reqs[j].color], fontFamily: FONT_FAMILY,
         }).setOrigin(0.5);
         this.patronContainer.add(ct);
       }
