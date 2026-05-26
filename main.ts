@@ -37,7 +37,7 @@ import {
 
 // ── Game catalogue ─────────────────────────────────────────
 
-const GAMES: GameEntry[] = [
+export const GAMES: GameEntry[] = [
   {
     sceneKey: 'GymRouterScene',
     title: 'Gym',
