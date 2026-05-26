@@ -23,6 +23,17 @@ import {
   updateTutorialStatus,
   type TutorialVisibilityOptions,
 } from '../TutorialState';
+import {
+  createTutorialControllerState,
+  startTutorial,
+  exitTutorial,
+  completeCurrentStep,
+  getCurrentStep,
+  isRequiredAction,
+  INVALID_ACTION_MESSAGE,
+  type TutorialControllerState,
+  type TutorialActionType,
+} from '../TutorialFlow';
 import { getEndTurnKeybind } from '../../../src/ui/SettingsStore';
 
 export class MainStreetLifecycleManager {
@@ -360,6 +371,26 @@ export class MainStreetLifecycleManager {
       },
     ];
     s.initHelpPanel(helpSections);
+    // Patch help button to support tutorial gating (T9: open-help)
+    // The HelpButton's hitArea pointerdown handler directly calls helpPanel.toggle(),
+    // so we intercept by wrapping the panel's toggle method.
+    const originalHelpToggle = (s as any).helpPanel?.toggle?.bind((s as any).helpPanel);
+    if (originalHelpToggle && (s as any).helpPanel) {
+      (s as any).helpPanel.toggle = () => {
+        const wasOpen = (s as any).helpPanel.isOpen;
+        // Tutorial gating: only allow open-help if it's the required action or tutorial is inactive
+        const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('open-help' as TutorialActionType);
+        if (check && !check.allowed) {
+          s.instructionText.setText(check.reason ?? 'Complete the highlighted step first.');
+          return;
+        }
+        originalHelpToggle();
+        // If we just opened help (was closed, now open), mark tutorial step complete
+        if ((s as any).helpPanel.isOpen && !wasOpen) {
+          (s.msLifecycleManager as any).onTutorialActionComplete?.('open-help' as TutorialActionType);
+        }
+      };
+    }
     // Provide the ordered difficulty names so the Settings panel can render a selector
     s.initSettingsPanel(DIFFICULTY_NAMES);
     if (!s.replayMode) {
@@ -375,7 +406,15 @@ export class MainStreetLifecycleManager {
         new BrowserLocalStorageAdapter(),
         {
           onStartTutorial: () => {
-            try { (s as any).tutorialOverlay?.start(); } catch (_) { /* ignore */ }
+            try {
+              // Start the action-gated tutorial flow (T1-T10)
+              const controller = (s as any).tutorialController as TutorialControllerState | undefined;
+              if (controller) {
+                Object.assign(s, { tutorialController: startTutorial(controller) });
+                // Show the first tutorial step overlay
+                (s as any).showTutorialStepOverlay?.();
+              }
+            } catch (_) { /* ignore */ }
           },
           onSkip: () => {
             // Normal gameplay begins; the DayStart -> MarketPhase flow
@@ -386,6 +425,9 @@ export class MainStreetLifecycleManager {
     } catch (_) {
       // Ignore if DOM environment is unavailable (tests)
     }
+
+    // Initialize the action-gated tutorial controller state
+    (s as any).tutorialController = createTutorialControllerState();
 
     // Listen for Settings 'Play Tutorial' request and log for debugging
     try {
@@ -494,6 +536,117 @@ export class MainStreetLifecycleManager {
     s.logContainer.setPosition(s.layout.logX, s.layout.logY);
     s.instructionText.setPosition(s.layout.gameW - 24, s.layout.instructionY);
     s.refreshAll();
+  }
+
+  // ── Tutorial Flow Handlers (Milestone 5 action-gated) ───
+
+  /**
+   * Called by the tutorial overlay to confirm the current step.
+   * For steps with action type 'confirm' or 'confirm-complete', this
+   * advances to the next step. For other steps, this does nothing
+   * (the step is completed by the actual game action).
+   */
+  public confirmTutorialStep(): void {
+    const s = this.scene;
+    const controller = (s as any).tutorialController as TutorialControllerState | undefined;
+    if (!controller || !controller.isActive) return;
+
+    const step = getCurrentStep(controller);
+    if (!step) return;
+
+    if (step.requiredAction === 'confirm' || step.requiredAction === 'confirm-complete') {
+      const { newState, completedStepId } = completeCurrentStep(controller);
+      Object.assign(s, { tutorialController: newState });
+
+      if (completedStepId === 'T10') {
+        this.persistTutorialCompletion();
+        (s as any).tutorialOverlay?.dismiss();
+        return;
+      }
+
+      (s as any).showTutorialStepOverlay?.();
+    } else if (step.requiredAction === 'acknowledge' || step.requiredAction === 'acknowledge-queue') {
+      const { newState } = completeCurrentStep(controller);
+      Object.assign(s, { tutorialController: newState });
+      (s as any).showTutorialStepOverlay?.();
+    }
+  }
+
+  /**
+   * Exits the tutorial early without marking it as completed.
+   */
+  public exitTutorialFlow(): void {
+    const s = this.scene;
+    const controller = (s as any).tutorialController as TutorialControllerState | undefined;
+    if (!controller) return;
+    Object.assign(s, { tutorialController: exitTutorial(controller) });
+    (s as any).tutorialOverlay?.dismiss();
+  }
+
+  /**
+   * Shows the overlay for the current tutorial step.
+   */
+  public showTutorialStepOverlay(): void {
+    const s = this.scene;
+    const controller = (s as any).tutorialController as TutorialControllerState | undefined;
+    if (!controller || !controller.isActive) return;
+    try {
+      (s as any).tutorialOverlay?.showActionGatedStep(controller);
+    } catch (_) { /* ignore */ }
+  }
+
+  /**
+   * Checks whether a given game action should be allowed during tutorial.
+   * Returns { allowed: boolean, reason?: string }.
+   */
+  public isTutorialActionAllowed(actionType: TutorialActionType): { allowed: boolean; reason?: string } {
+    const s = this.scene;
+    const controller = (s as any).tutorialController as TutorialControllerState | undefined;
+    if (!controller || !controller.isActive) return { allowed: true };
+
+    if (isRequiredAction(controller, actionType)) return { allowed: true };
+    return { allowed: false, reason: INVALID_ACTION_MESSAGE };
+  }
+
+  /**
+   * Called when a tutorial action-gated game action succeeds.
+   * Advances the tutorial to the next step and shows the next overlay.
+   */
+  public onTutorialActionComplete(actionType: TutorialActionType): void {
+    const s = this.scene;
+    const controller = (s as any).tutorialController as TutorialControllerState | undefined;
+    if (!controller || !controller.isActive) return;
+    if (!isRequiredAction(controller, actionType)) return;
+
+    const { newState, completedStepId } = completeCurrentStep(controller);
+    Object.assign(s, { tutorialController: newState });
+
+    if (completedStepId === 'T10') {
+      this.persistTutorialCompletion();
+      (s as any).tutorialOverlay?.dismiss();
+      return;
+    }
+
+    s.time.delayedCall(600, () => {
+      (s as any).showTutorialStepOverlay?.();
+    });
+  }
+
+  /** Persists tutorial completion to localStorage and campaign. */
+  private persistTutorialCompletion(): void {
+    const s = this.scene;
+    try {
+      const storage = new BrowserLocalStorageAdapter();
+      const tutorialState = loadTutorialState(storage);
+      const updated = updateTutorialStatus(tutorialState, 'completed');
+      void saveTutorialState(storage, updated);
+      if (s.campaign) {
+        s.campaign.tutorialSeen = true;
+        if (s.saveStore) {
+          void saveCampaignProgress(s.saveStore, s.campaign).catch(() => {});
+        }
+      }
+    } catch (_) { /* ignore */ }
   }
 
   public loadCampaignAndSetup(): void {

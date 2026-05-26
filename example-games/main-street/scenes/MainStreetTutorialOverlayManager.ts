@@ -19,6 +19,12 @@
 
 import { FONT_FAMILY } from '../../../src/ui';
 import { MARKET_BUSINESS_SLOTS, INCIDENT_QUEUE_SIZE } from '../MainStreetCards';
+import {
+  TUTORIAL_STEP_DEFS,
+  getCurrentStep,
+  type TutorialControllerState,
+  type TutorialHighlightZone,
+} from '../TutorialFlow';
 
 // ── Tutorial step definitions ────────────────────────────────
 
@@ -480,6 +486,203 @@ export class MainStreetTutorialOverlayManager {
       }
 
       this.objects.push(bg, border, titleTxt, bodyTxt, dismissBtn, nextBtn);
+    }
+  }
+
+  // ── Action-gated tutorial step overlay (Milestone 5) ─────
+
+  /**
+   * Shows an overlay for the current action-gated tutorial step from TutorialFlow.
+   * This uses the T1-T10 step definitions and highlights the appropriate UI zone.
+   *
+   * Called by the scene after the tutorial controller advances to a new step.
+   */
+  public showActionGatedStep(controller: TutorialControllerState): void {
+    this.clearObjects();
+    const step = getCurrentStep(controller);
+    if (!step) return;
+
+    this.visible = true;
+    const s = this.scene;
+    if (!s || !s.add) return;
+
+    const layout = s.layout ?? {};
+    const gameW: number = layout.gameW ?? 1280;
+    const gameH: number = layout.gameH ?? 720;
+
+    // Compute highlight zone bounds
+    const anchor = this.zoneToAnchor(step.highlightZone, s);
+    if (anchor) {
+      const highlight = s.add.graphics();
+      highlight.setDepth(TOOLTIP_DEPTH - 1);
+      highlight.fillStyle(HIGHLIGHT_COLOR, HIGHLIGHT_ALPHA);
+      highlight.fillRect(anchor.x, anchor.y, anchor.w, anchor.h);
+      highlight.lineStyle(2, HIGHLIGHT_COLOR, HIGHLIGHT_BORDER_ALPHA);
+      highlight.strokeRect(anchor.x, anchor.y, anchor.w, anchor.h);
+      this.objects.push(highlight);
+    }
+
+    const tooltipW = 340;
+    const tooltipX = Math.max(12, Math.floor(gameW / 2 - tooltipW / 2));
+
+    const isLast = step.id === 'T10';
+    const isExitable = !isLast;
+
+    try {
+      const container = document.createElement('div');
+      container.style.width = tooltipW + 'px';
+      container.style.boxSizing = 'border-box';
+      container.style.padding = '16px';
+      container.style.background = '#1a2a1a';
+      container.style.border = '2px solid #44aa44';
+      container.style.borderRadius = '8px';
+      container.style.color = '#ddccbb';
+      container.style.fontFamily = FONT_FAMILY;
+      container.style.fontSize = '14px';
+      container.style.lineHeight = '1.3';
+      container.style.pointerEvents = 'auto';
+
+      const titleEl = document.createElement('div');
+      titleEl.style.fontWeight = '700';
+      titleEl.style.color = '#aaffaa';
+      titleEl.style.marginBottom = '8px';
+      titleEl.style.fontSize = '16px';
+      titleEl.textContent = step.title;
+      container.appendChild(titleEl);
+
+      const bodyEl = document.createElement('div');
+      bodyEl.style.whiteSpace = 'pre-wrap';
+      bodyEl.style.color = '#ddccbb';
+      bodyEl.textContent = step.body;
+      container.appendChild(bodyEl);
+
+      const btnRow = document.createElement('div');
+      btnRow.style.display = 'flex';
+      btnRow.style.justifyContent = 'space-between';
+      btnRow.style.alignItems = 'center';
+      btnRow.style.marginTop = '14px';
+
+      const leftGroup = document.createElement('div');
+      if (isExitable) {
+        const exitBtn = document.createElement('button');
+        exitBtn.textContent = 'Exit Tutorial';
+        exitBtn.style.background = '#2a1a1a';
+        exitBtn.style.color = '#cc6666';
+        exitBtn.style.border = 'none';
+        exitBtn.style.padding = '6px 10px';
+        exitBtn.style.borderRadius = '6px';
+        exitBtn.style.cursor = 'pointer';
+        exitBtn.onclick = () => {
+          this.clearObjects();
+          this.visible = false;
+          try { (s as any).exitTutorialFlow?.(); } catch (_) { /* ignore */ }
+        };
+        leftGroup.appendChild(exitBtn);
+      }
+      btnRow.appendChild(leftGroup);
+
+      const rightGroup = document.createElement('div');
+      const confirmBtn = document.createElement('button');
+      if (isLast) {
+        confirmBtn.textContent = 'Start Full Game';
+        confirmBtn.style.background = '#44ff44';
+        confirmBtn.style.color = '#002200';
+      } else {
+        confirmBtn.textContent = 'Continue';
+        confirmBtn.style.background = '#88ff88';
+        confirmBtn.style.color = '#002200';
+      }
+      confirmBtn.style.border = 'none';
+      confirmBtn.style.padding = '8px 16px';
+      confirmBtn.style.borderRadius = '6px';
+      confirmBtn.style.cursor = 'pointer';
+      confirmBtn.style.fontWeight = '700';
+      confirmBtn.onclick = () => {
+        try { (s as any).confirmTutorialStep?.(); } catch (_) { /* ignore */ }
+      };
+      rightGroup.appendChild(confirmBtn);
+      btnRow.appendChild(rightGroup);
+
+      container.appendChild(btnRow);
+
+      // Measure height
+      document.body.appendChild(container);
+      const measuredH = Math.min(container.offsetHeight || 160, Math.max(80, gameH - 40));
+      document.body.removeChild(container);
+
+      const finalY = Math.max(12, Math.floor(gameH / 2 - measuredH / 2));
+
+      const dom = s.add.dom(tooltipX, finalY, container) as Phaser.GameObjects.DOMElement;
+      dom.setOrigin(0, 0);
+      try { dom.setDepth(TOOLTIP_DEPTH + 1000); } catch { /* ignore */ }
+      this.objects.push(dom);
+
+      // Step badge
+      const stepNum = TUTORIAL_STEP_DEFS.findIndex((d) => d.id === step.id) + 1;
+      const stepLabel = s.add.text(
+        tooltipX + tooltipW - 12, finalY + 10,
+        `${stepNum} / ${TUTORIAL_STEP_DEFS.length}`,
+        { fontSize: '11px', color: '#669966', fontFamily: FONT_FAMILY }
+      ).setOrigin(1, 0).setDepth(TOOLTIP_DEPTH + 1);
+      this.objects.push(stepLabel);
+    } catch (e) {
+      // Canvas fallback
+      const tooltipH = 160;
+      const finalY = Math.max(12, Math.floor(gameH / 2 - tooltipH / 2));
+      const bg = s.add.rectangle(tooltipX + tooltipW / 2, finalY + tooltipH / 2, tooltipW, tooltipH, 0x1a2a1a).setDepth(TOOLTIP_DEPTH + 1000);
+      const border = s.add.rectangle(tooltipX + tooltipW / 2, finalY + tooltipH / 2, tooltipW, tooltipH).setStrokeStyle(2, 0x44aa44).setDepth(TOOLTIP_DEPTH + 1001);
+      const titleTxt = s.add.text(tooltipX + 12, finalY + 12, step.title, { fontSize: '16px', color: '#aaffaa', fontFamily: FONT_FAMILY }).setDepth(TOOLTIP_DEPTH + 1002);
+      const bodyTxt = s.add.text(tooltipX + 12, finalY + 40, step.body, { fontSize: '13px', color: '#ddccbb', fontFamily: FONT_FAMILY, wordWrap: { width: tooltipW - 24 } as any }).setDepth(TOOLTIP_DEPTH + 1002);
+      this.objects.push(bg, border, titleTxt, bodyTxt);
+    }
+  }
+
+  /**
+   * Maps a TutorialHighlightZone to screen-space coordinates.
+   * Returns null if the zone cannot be resolved.
+   */
+  private zoneToAnchor(
+    zone: TutorialHighlightZone,
+    scene: any,
+  ): { x: number; y: number; w: number; h: number } | null {
+    const l = scene.layout;
+    if (!l) return null;
+
+    switch (zone) {
+      case 'center-modal':
+        return null; // overlay is already centred
+      case 'hud':
+        return { x: 0, y: 0, w: l.gameW, h: l.hudH ?? 40 };
+      case 'market-business-row': {
+        const slots = MARKET_BUSINESS_SLOTS;
+        const totalW = slots * l.marketCardW + (slots - 1) * l.marketCardGap;
+        return { x: 40, y: l.marketTop - 6, w: Math.max(200, totalW + 80), h: l.marketRowH + 16 };
+      }
+      case 'street-grid':
+        return {
+          x: l.streetX,
+          y: l.streetTop,
+          w: l.streetCols * l.slotW + (l.streetCols - 1) * l.slotGap,
+          h: 2 * l.slotH + l.streetRowGap,
+        };
+      case 'end-turn-button': {
+        const rightX = l.gameW - 24;
+        return { x: rightX - l.actionButtonW - 20, y: l.actionY - 4, w: l.actionButtonW + 20, h: l.actionButtonH + 8 };
+      }
+      case 'incident-queue': {
+        const totalW = l.queueLabelW + INCIDENT_QUEUE_SIZE * (l.queueCardW + l.queueCardGap) + 32;
+        return { x: 20, y: l.queueTop - 6, w: totalW, h: l.queueCardH + 16 };
+      }
+      case 'investments-row': {
+        return { x: 40, y: l.marketTop + l.marketRowH + l.marketRowGap - 6, w: l.gameW - 80, h: l.marketRowH + 16 };
+      }
+      case 'help-button': {
+        return { x: l.gameW - 120, y: l.actionY - 4, w: 100, h: l.actionButtonH + 8 };
+      }
+      case 'completion-modal':
+        return null;
+      default:
+        return null;
     }
   }
 

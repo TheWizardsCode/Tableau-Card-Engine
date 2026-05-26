@@ -496,4 +496,15 @@ export class MainStreetScene extends CardGameScene {
   public showGameOverOverlay(...args: any[]): any {
     return (this.msOverlayManager as any).showGameOverOverlay.apply(this.msOverlayManager, args);
   }
+
+  // ── Tutorial Flow (Milestone 5 action-gated) ────────────
+  public confirmTutorialStep(...args: any[]): any {
+    return (this.msLifecycleManager as any).confirmTutorialStep.apply(this.msLifecycleManager, args);
+  }
+  public exitTutorialFlow(...args: any[]): any {
+    return (this.msLifecycleManager as any).exitTutorialFlow.apply(this.msLifecycleManager, args);
+  }
+  public showTutorialStepOverlay(...args: any[]): any {
+    return (this.msLifecycleManager as any).showTutorialStepOverlay.apply(this.msLifecycleManager, args);
+  }
 }

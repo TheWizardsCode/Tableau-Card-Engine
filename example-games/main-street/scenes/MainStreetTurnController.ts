@@ -14,6 +14,7 @@ import { BuyBusinessCommand, BuyUpgradeCommand, BuyEventCommand, PlayEventComman
 import { recordMainStreetEvent, finalizeMainStreetTranscript } from '../MainStreetTranscript';
 import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
 import { FONT_FAMILY, createOverlayBackground, createOverlayButton, dismissOverlay } from '../../../src/ui';
+import type { TutorialActionType } from '../TutorialFlow';
 
 export class MainStreetTurnController {
   constructor(private readonly scene: any) {}
@@ -49,6 +50,13 @@ export class MainStreetTurnController {
 
   public endTurn(): void {
     const s = this.scene;
+    // Tutorial gating: only allow end-turn if it's the required action or tutorial is inactive
+    const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('end-turn' as TutorialActionType);
+    if (check && !check.allowed) {
+      s.instructionText.setText(check.reason ?? 'Complete the highlighted step first.');
+      return;
+    }
+
     s.uiPhase = 'animating';
     s.instructionText.setText('Processing end of turn...');
     s.refreshActionButtons();
@@ -111,6 +119,8 @@ export class MainStreetTurnController {
           s.instructionText.setText(`Incident: ${result.incident.name}`);
         }
         s.refreshAll();
+        // Tutorial: mark end-turn step complete if active
+        (s.msLifecycleManager as any).onTutorialActionComplete?.('end-turn' as TutorialActionType);
         s.time.delayedCall(800, () => this.startDayPhase());
       }
     });
@@ -172,6 +182,12 @@ export class MainStreetTurnController {
   public onBusinessCardClick(card: BusinessCard): void {
     const s = this.scene;
     if (s.uiPhase !== 'market') return;
+    // Tutorial gating: only allow select-business if it's the required action or tutorial is inactive
+    const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('select-business' as TutorialActionType);
+    if (check && !check.allowed) {
+      s.instructionText.setText(check.reason ?? 'Complete the highlighted step first.');
+      return;
+    }
 
     s.selectMarketCardById(card.id);
 
@@ -201,6 +217,12 @@ export class MainStreetTurnController {
   public onSlotClick(slotIndex: number): void {
     const s = this.scene;
     if (s.uiPhase !== 'placing-business' || !s.pendingBusinessCard) return;
+    // Tutorial gating: only allow place-business if it's the required action or tutorial is inactive
+    const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('place-business' as TutorialActionType);
+    if (check && !check.allowed) {
+      s.instructionText.setText(check.reason ?? 'Complete the highlighted step first.');
+      return;
+    }
 
     // Ensure stale hover tooltip is cleared when a card is played.
     s.tooltipManager?.hide();
@@ -235,6 +257,8 @@ export class MainStreetTurnController {
       s.hiddenTransferSourceCardIds.delete(pendingCardId);
       s.uiPhase = 'market';
       s.refreshAll();
+      // Tutorial: mark place-business step complete if active
+      (s.msLifecycleManager as any).onTutorialActionComplete?.('place-business' as TutorialActionType);
     };
 
     if (typeof sourceIndex === 'number' && sourceIndex >= 0) {
@@ -253,6 +277,12 @@ export class MainStreetTurnController {
   public onEventCardClick(card: EventCard): void {
     const s = this.scene;
     if (s.uiPhase !== 'market') return;
+    // Tutorial gating: only allow buy-event if it's the required action or tutorial is inactive
+    const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('buy-event' as TutorialActionType);
+    if (check && !check.allowed) {
+      s.instructionText.setText(check.reason ?? 'Complete the highlighted step first.');
+      return;
+    }
 
     // Ensure stale hover tooltip is cleared when a card is played.
     s.tooltipManager?.hide();
@@ -335,6 +365,12 @@ export class MainStreetTurnController {
   public onUpgradeCardClick(card: UpgradeCard): void {
     const s = this.scene;
     if (s.uiPhase !== 'market') return;
+    // Tutorial gating: only allow apply-upgrade if it's the required action or tutorial is inactive
+    const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('apply-upgrade' as TutorialActionType);
+    if (check && !check.allowed) {
+      s.instructionText.setText(check.reason ?? 'Complete the highlighted step first.');
+      return;
+    }
 
     // Ensure stale hover tooltip is cleared when a card is played.
     s.tooltipManager?.hide();
@@ -381,6 +417,8 @@ export class MainStreetTurnController {
       s.hiddenTransferSourceCardIds.delete(card.id);
       s.uiPhase = 'market';
       s.refreshAll();
+      // Tutorial: mark apply-upgrade step complete if active
+      (s.msLifecycleManager as any).onTutorialActionComplete?.('apply-upgrade' as TutorialActionType);
     };
 
     if (sourceIndex >= 0) {
