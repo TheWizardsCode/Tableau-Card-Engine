@@ -93,7 +93,8 @@ export class GymDeckRngScene extends GymSceneBase {
     // ── Status ───────────────────────────────────────────
     this.statusText = this.addLabel(cx + 600, y, '52 cards displayed', { fontSize: '16px', color: '#88ff88' });
 
-    // ── Card display area: render full deck in a grid ─────
+    // ── Initialize deck and render full deck in a grid ─────
+    this.deck = createStandardDeck();
     this.renderFullDeckGrid();
   }
 
