@@ -65,11 +65,11 @@ export class GymDeckRngScene extends GymSceneBase {
     this.initHelp([
       {
         heading: 'Overview',
-        body: 'Displays all 52 cards face-up in a compact grid. Shuffle the deck using a deterministic seed to see how card order changes.'
+        body: 'Displays all 52 cards face-up in a compact grid, shuffled with the default seed (42) on load.'
       },
       {
         heading: 'Controls',
-        body: '[ -1 ] / [ +1 ]: Adjust seed.\n[ Reset Seed ]: Restore default seed.\n[ Shuffle ]: Shuffle and re-display all 52 cards using the current seed.\n\nTip: Using the same seed always produces the same shuffle order.'
+        body: '[ -1 ] / [ +1 ]: Adjust seed and re-shuffle the deck.\n[ Reset Seed ]: Restore default seed (42) and re-shuffle.\n[ Shuffle ]: Re-shuffle using a random seed.\n\nTip: Using the same seed always produces the same card order.'
       }
     ]);
 
@@ -88,14 +88,18 @@ export class GymDeckRngScene extends GymSceneBase {
     this.addButton(cx + 180, y, '[ -1 ]', () => this.adjustSeed(-1));
     this.addButton(cx + 240, y, '[ +1 ]', () => this.adjustSeed(1));
     this.addButton(cx + 310, y, '[ Reset Seed ]', () => this.resetSeed());
-    this.addButton(cx + 450, y, '[ Shuffle ]', () => this.shuffleAndRedraw());
+    this.addButton(cx + 450, y, '[ Shuffle ]', () => {
+      this.seed = Math.floor(Math.random() * 100000);
+      this.seedText.setText(String(this.seed));
+      this.shuffleAndRedraw();
+    });
 
     // ── Status ───────────────────────────────────────────
     this.statusText = this.addLabel(cx + 600, y, '52 cards displayed', { fontSize: '16px', color: '#88ff88' });
 
-    // ── Initialize deck and render full deck in a grid ─────
-    this.deck = createStandardDeck();
-    this.renderFullDeckGrid();
+    // ── Initialize deck, shuffle with default seed, and render ──
+    this.seed = DEFAULT_SEED;
+    this.shuffleAndRedraw();
   }
 
   // ── Actions ──────────────────────────────────────────────
@@ -103,11 +107,13 @@ export class GymDeckRngScene extends GymSceneBase {
   private adjustSeed(delta: number): void {
     this.seed = Math.max(0, this.seed + delta);
     this.seedText.setText(String(this.seed));
+    this.shuffleAndRedraw();
   }
 
   private resetSeed(): void {
     this.seed = DEFAULT_SEED;
     this.seedText.setText(String(this.seed));
+    this.shuffleAndRedraw();
   }
 
   /**

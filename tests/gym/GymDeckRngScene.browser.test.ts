@@ -215,24 +215,18 @@ describe('GymDeckRngScene browser integration', () => {
     expect(findText(scene, '42')).toBeTruthy();
   });
 
-  // ── AC 3: Shuffle button actually uses the current seed ────
+  // ── AC 3 & 4: Seed changes auto-shuffle deterministically ──
 
-  it('shuffling with same seed reproduces identical arrangement (determinism)', async () => {
+  it('same seed produces identical arrangement; different seed different (+/- auto-shuffle)', async () => {
     const scene = await bootScene();
 
-    // Click Shuffle with seed 42
-    const shuffleBtn = findText(scene, '[ Shuffle ]');
-    expect(shuffleBtn).toBeTruthy();
-    shuffleBtn!.emit('pointerdown');
-    await new Promise((r) => requestAnimationFrame(r));
+    // Scene loads shuffled with seed 42 → capture arrangement
     const arrangements1 = getCardSnapshot(scene).map((s) => s.textureKey);
 
-    // Change seed and shuffle
+    // Click +1 → seed 43, auto-shuffles → different arrangement
     const plusBtn = findText(scene, '[ +1 ]');
+    expect(plusBtn).toBeTruthy();
     plusBtn!.emit('pointerdown');
-    await new Promise((r) => requestAnimationFrame(r));
-
-    shuffleBtn!.emit('pointerdown');
     await new Promise((r) => requestAnimationFrame(r));
     const arrangements2 = getCardSnapshot(scene).map((s) => s.textureKey);
 
@@ -243,12 +237,10 @@ describe('GymDeckRngScene browser integration', () => {
     }
     expect(sameCount).toBeLessThan(52);
 
-    // Reset seed and shuffle — should reproduce seed 42 arrangement exactly
+    // Reset Seed → seed 42, auto-shuffles → should reproduce seed 42 arrangement exactly
     const resetBtn = findText(scene, '[ Reset Seed ]');
+    expect(resetBtn).toBeTruthy();
     resetBtn!.emit('pointerdown');
-    await new Promise((r) => requestAnimationFrame(r));
-
-    shuffleBtn!.emit('pointerdown');
     await new Promise((r) => requestAnimationFrame(r));
     const arrangements3 = getCardSnapshot(scene).map((s) => s.textureKey);
 
