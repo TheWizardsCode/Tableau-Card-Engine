@@ -21,7 +21,7 @@
  *   Phase 2 — click draw pile or discard pile to draw
  *   AI plays automatically with configurable delay
  */
-import { EXPEDITION_COLORS, CARD_BACK_KEY, type ExpeditionColor } from '../LostCitiesCards';
+import { EXPEDITION_COLORS, type ExpeditionColor } from '../LostCitiesCards';
 import { setupLostCitiesGame } from '../LostCitiesGame';
 import {
   LostCitiesAiPlayer,
@@ -43,7 +43,6 @@ import {
   SFX_KEYS,
   CARD_W,
   CARD_H,
-  DISCARD_CARD_W,
   DISCARD_CARD_H,
   laneX,
   PLR_EXP_TOP,
@@ -58,6 +57,7 @@ import { TOOLTIP_BG_COLOR, TOOLTIP_BG_ALPHA, TOOLTIP_PAD, TOOLTIP_DEPTH, TOOLTIP
 import { LostCitiesReplayController } from './LostCitiesReplayController';
 import { LostCitiesTurnController } from './LostCitiesTurnController';
 import { scoreExpeditionDetailed } from '../LostCitiesScoring';
+import { preloadLostCitiesAssets, markSceneInvalid } from '../LostCitiesTextureHelpers';
 
 // ═══════════════════════════════════════════════════════════
 export class LostCitiesScene extends CardGameScene {
@@ -81,47 +81,13 @@ export class LostCitiesScene extends CardGameScene {
 
   // ── Preload ─────────────────────────────────────────────
   preload(): void {
-    // Card dimension constants imported from LostCitiesConstants
-    // (don't use `require` in browser bundles) 
-
-    for (const color of EXPEDITION_COLORS) {
-      for (let inv = 1; inv <= 3; inv++) {
-        const key = `lc-${color}-inv${inv}`;
-        this.load.svg(key, `assets/cards/lost-cities/${key}.svg`, {
-          width: CARD_W,
-          height: CARD_H,
-        });
-      }
-      for (let rank = 2; rank <= 10; rank++) {
-        const key = `lc-${color}-${rank}`;
-        this.load.svg(key, `assets/cards/lost-cities/${key}.svg`, {
-          width: CARD_W,
-          height: CARD_H,
-        });
-      }
-    }
-    this.load.svg(CARD_BACK_KEY, `assets/cards/lost-cities/${CARD_BACK_KEY}.svg`, {
-      width: CARD_W,
-      height: CARD_H,
-    });
-
-    // Compact card variants for discard piles
-    for (const color of EXPEDITION_COLORS) {
-      for (let inv = 1; inv <= 3; inv++) {
-        const key = `lc-${color}-inv${inv}-sm`;
-        this.load.svg(key, `assets/cards/lost-cities/${key}.svg`, {
-          width: DISCARD_CARD_W,
-          height: DISCARD_CARD_H,
-        });
-      }
-      for (let rank = 2; rank <= 10; rank++) {
-        const key = `lc-${color}-${rank}-sm`;
-        this.load.svg(key, `assets/cards/lost-cities/${key}.svg`, {
-          width: DISCARD_CARD_W,
-          height: DISCARD_CARD_H,
-        });
-      }
-    }
+    // SVG assets: migrated to lazy rasterisation via SvgHelpers
+    // (CG-0MOZN33JW004XILY). preloadLostCitiesAssets marks the scene
+    // as valid for SvgHelpers and preloads the card back as a static
+    // fallback image. Card face textures are generated lazily on first
+    // use via getOrCreateTexture.
+    preloadLostCitiesAssets(this);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => markSceneInvalid(this));
 
     // Audio
     this.load.audio(SFX_KEYS.CARD_SELECT, 'assets/audio/lost-cities/card-select.wav');
@@ -404,6 +370,7 @@ export class LostCitiesScene extends CardGameScene {
 
   // ── Cleanup ─────────────────────────────────────────────
   shutdown(): void {
+    markSceneInvalid(this);
     this.overlayManager.dismiss();
     this.shutdownBase();
   }

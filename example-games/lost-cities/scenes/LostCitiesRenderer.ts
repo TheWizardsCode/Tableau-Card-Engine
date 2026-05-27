@@ -8,10 +8,16 @@ import {
   EXPEDITION_HEX,
   cardAssetKey,
   compactAssetKey,
-  CARD_BACK_KEY,
 } from '../LostCitiesCards';
 import type { LostCitiesSession } from '../LostCitiesGame';
 import { scoreRoundDetailed } from '../LostCitiesScoring';
+import {
+  getLcBackFallbackKey,
+  ensureLcCardTexture,
+  ensureLcCompactTexture,
+  ensureLcBackTexture,
+  applyEnsuredTexture,
+} from '../LostCitiesTextureHelpers';
 import {
   TABLEAU_LEFT,
   laneX,
@@ -99,6 +105,9 @@ export class LostCitiesRenderer {
   private instructionText!: Phaser.GameObjects.Text;
   private drawPileSprite!: Phaser.GameObjects.Image;
   private drawPileCountText!: Phaser.GameObjects.Text;
+
+  /** Cache the refresh generation for stillMounted checks in async texture updates. */
+  private refreshGen = 0;
 
   constructor(scene: Phaser.Scene, session: LostCitiesSession) {
     this.scene = scene;
@@ -317,11 +326,23 @@ export class LostCitiesRenderer {
       })
       .setOrigin(0.5, 0);
 
+    // Draw pile uses card back as fallback; lazy rasterisation will update
+    // the texture when the DPR-aware texture is ready.
+    const backKey = getLcBackFallbackKey(this.scene);
     this.drawPileSprite = this.scene.add.image(
-      MID_COL_CENTER, DRAW_PILE_Y + CARD_H / 2, CARD_BACK_KEY,
+      MID_COL_CENTER, DRAW_PILE_Y + CARD_H / 2, backKey,
     );
     this.drawPileSprite.setInteractive({ useHandCursor: true });
     this.drawPileSprite.on('pointerdown', () => callbacks.onDrawPileClick());
+
+    // Kick off lazy rasterisation for the card back.
+    void applyEnsuredTexture(
+      this.drawPileSprite,
+      ensureLcBackTexture(this.scene, CARD_W, CARD_H),
+      () => !!this.drawPileSprite,
+      CARD_W,
+      CARD_H,
+    );
 
     this.drawPileCountText = this.scene.add
       .text(MID_COL_CENTER, DRAW_PILE_Y + CARD_H + 4, '44 remaining', SMALL_LABEL)
@@ -347,6 +368,7 @@ export class LostCitiesRenderer {
 
   // ── Refresh display ─────────────────────────────────────
   refreshAll(onHandClick?: (index: number) => void): void {
+    this.refreshGen++;
     this.refreshExpeditions();
     this.refreshDiscardPiles();
     if (onHandClick) this.refreshHand(onHandClick);
@@ -357,6 +379,9 @@ export class LostCitiesRenderer {
   }
 
   refreshExpeditions(): void {
+    const gen = this.refreshGen;
+    const backKey = getLcBackFallbackKey(this.scene);
+
     for (const sprites of this.oppExpSprites.values()) {
       sprites.forEach(s => s.destroy());
     }
@@ -372,10 +397,21 @@ export class LostCitiesRenderer {
       for (let c = 0; c < oppCards.length; c++) {
         const x = laneX(i);
         const y = OPP_EXP_TOP + c * EXP_OVERLAP + CARD_H / 2;
-        const sprite = this.scene.add.image(x, y, cardAssetKey(oppCards[c]));
+        const templateId = cardAssetKey(oppCards[c]);
+        const sprite = this.scene.add.image(x, y, backKey);
         sprite.setDisplaySize(CARD_W, CARD_H);
         sprite.setDepth(c);
         oppSprites.push(sprite);
+
+        // Lazy rasterisation: ensure texture exists and update sprite when ready.
+        const colorSprites = this.oppExpSprites.get(color);
+        void applyEnsuredTexture(
+          sprite,
+          ensureLcCardTexture(this.scene, templateId, CARD_W, CARD_H),
+          () => gen === this.refreshGen && !!colorSprites && colorSprites.includes(sprite),
+          CARD_W,
+          CARD_H,
+        );
       }
       this.oppExpSprites.set(color, oppSprites);
 
@@ -384,16 +420,29 @@ export class LostCitiesRenderer {
       for (let c = 0; c < plrCards.length; c++) {
         const x = laneX(i);
         const y = PLR_EXP_TOP + c * EXP_OVERLAP + CARD_H / 2;
-        const sprite = this.scene.add.image(x, y, cardAssetKey(plrCards[c]));
+        const templateId = cardAssetKey(plrCards[c]);
+        const sprite = this.scene.add.image(x, y, backKey);
         sprite.setDisplaySize(CARD_W, CARD_H);
         sprite.setDepth(c);
         plrSprites.push(sprite);
+
+        const colorSprites = this.playerExpSprites.get(color);
+        void applyEnsuredTexture(
+          sprite,
+          ensureLcCardTexture(this.scene, templateId, CARD_W, CARD_H),
+          () => gen === this.refreshGen && !!colorSprites && colorSprites.includes(sprite),
+          CARD_W,
+          CARD_H,
+        );
       }
       this.playerExpSprites.set(color, plrSprites);
     }
   }
 
   refreshDiscardPiles(): void {
+    const gen = this.refreshGen;
+    const backKey = getLcBackFallbackKey(this.scene);
+
     for (const sprite of this.discardSprites.values()) {
       sprite.destroy();
     }
@@ -405,17 +454,29 @@ export class LostCitiesRenderer {
 
       if (pile.length > 0) {
         const topCard = pile[pile.length - 1];
+        const templateId = compactAssetKey(topCard);
         const sprite = this.scene.add.image(
           laneX(i), DISCARD_Y + DISCARD_CARD_H / 2,
-          compactAssetKey(topCard),
+          backKey,
         );
         sprite.setDisplaySize(DISCARD_CARD_W, DISCARD_CARD_H);
         this.discardSprites.set(color, sprite);
+
+        void applyEnsuredTexture(
+          sprite,
+          ensureLcCompactTexture(this.scene, templateId),
+          () => gen === this.refreshGen && this.discardSprites.get(color) === sprite,
+          DISCARD_CARD_W,
+          DISCARD_CARD_H,
+        );
       }
     }
   }
 
   refreshHand(onClick: (index: number) => void): void {
+    const gen = this.refreshGen;
+    const backKey = getLcBackFallbackKey(this.scene);
+
     this.handSprites.forEach(s => s.destroy());
     this.handSprites = [];
     if (this.selectionHighlight) {
@@ -428,16 +489,28 @@ export class LostCitiesRenderer {
     for (let c = 0; c < hand.length; c++) {
       const x = PLAYER_HAND_CENTER;
       const y = HAND_TOP + c * HAND_OVERLAP + HAND_CARD_H / 2;
-      const sprite = this.scene.add.image(x, y, cardAssetKey(hand[c]));
+      const templateId = cardAssetKey(hand[c]);
+      const sprite = this.scene.add.image(x, y, backKey);
       sprite.setDisplaySize(HAND_CARD_W, HAND_CARD_H);
       sprite.setDepth(c + 1);
       sprite.setInteractive({ useHandCursor: true });
       sprite.on('pointerdown', () => onClick(c));
       this.handSprites.push(sprite);
+
+      void applyEnsuredTexture(
+        sprite,
+        ensureLcCardTexture(this.scene, templateId, CARD_W, CARD_H),
+        () => gen === this.refreshGen && this.handSprites.includes(sprite),
+        CARD_W,
+        CARD_H,
+      );
     }
   }
 
   refreshAiHand(): void {
+    const gen = this.refreshGen;
+    const backKey = getLcBackFallbackKey(this.scene);
+
     for (const sprite of this.aiHandSprites) {
       sprite.destroy();
     }
@@ -447,17 +520,44 @@ export class LostCitiesRenderer {
     for (let c = 0; c < aiHand.length; c++) {
       const x = AI_HAND_CENTER;
       const y = HAND_TOP + c * HAND_OVERLAP + HAND_CARD_H / 2;
-      const sprite = this.scene.add.image(x, y, CARD_BACK_KEY);
+      const sprite = this.scene.add.image(x, y, backKey);
       sprite.setDisplaySize(HAND_CARD_W, HAND_CARD_H);
       sprite.setDepth(c + 1);
       this.aiHandSprites.push(sprite);
     }
+
+    // Kick off lazy rasterisation for card back and update all AI hand sprites.
+    void (async () => {
+      try {
+        const result = await ensureLcBackTexture(this.scene, CARD_W, CARD_H);
+        if (!result.ready && result.promise) {
+          await result.promise;
+        }
+        if (gen !== this.refreshGen) return;
+        for (const sprite of this.aiHandSprites) {
+          sprite.setTexture(result.key);
+          sprite.setDisplaySize(HAND_CARD_W, HAND_CARD_H);
+        }
+      } catch {
+        // keep fallback back texture
+      }
+    })();
   }
 
   refreshDrawPile(): void {
+    const gen = this.refreshGen;
     const remaining = this.session.round.drawPile.length;
     this.drawPileCountText.setText(`${remaining} remaining`);
     this.drawPileSprite.setVisible(remaining > 0);
+
+    // Ensure card back texture is available for draw pile.
+    void applyEnsuredTexture(
+      this.drawPileSprite,
+      ensureLcBackTexture(this.scene, CARD_W, CARD_H),
+      () => gen === this.refreshGen && !!this.drawPileSprite,
+      CARD_W,
+      CARD_H,
+    );
   }
 
   refreshScores(): void {

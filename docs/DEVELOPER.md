@@ -695,7 +695,23 @@ The Mind was the first example game migrated from `scene.load.svg` to SvgHelpers
 3. Replace direct texture key strings with adapter calls in scene code.
 4. Update tests to assert DPR-aware key format and add headless integration checks.
 
-Games still using `scene.load.svg` (as of this migration): lost-cities.
+### Lost Cities migration (CG-0MOZN33JW004XILY)
+
+Lost Cities was the third example game migrated from `scene.load.svg` to SvgHelpers lazy rasterisation, following the pattern established by The Mind. Key changes:
+
+- **LostCitiesTextureHelpers.ts**: New co-located helper module providing `preloadLostCitiesAssets()`, `getLcTextureKey()`, `ensureLcCardTexture()`, `ensureLcCompactTexture()`, and `ensureLcBackTexture()`. The preload function is registration-only in browser runtimes (marks scene valid via `markSceneValid`); the Node/test path reads all 121 SVGs into a module-level cache.
+- **LostCitiesScene.ts**: Removed 5 `this.load.svg()` blocks (121 SVG files) from `preload()`. Replaced with `preloadLostCitiesAssets(this)` and added `markSceneInvalid(this)` on shutdown.
+- **LostCitiesRenderer.ts**: All sprite creation now starts with a card-back fallback texture and uses `applyEnsuredTexture` to lazily update to the DPR-aware texture when rasterisation completes. Expedition cards, discard pile cards, hand cards, and the draw pile all use the same lazy pattern.
+- **Texture keys**: Lazy rasterisation via `SvgHelpers.getOrCreateTexture` produces DPR-aware keys (e.g. `ms_card_lc-blue-2_95x130@2`). Legacy template IDs (`lc-blue-2`, `lc-back`) are still returned by `cardAssetKey()`/`compactAssetKey()` but should not be used for sprite texture lookups.
+- **Tests**: Focused unit tests added at `tests/lost-cities/texture-helpers.test.ts` covering key generation, SVG text caching, and texture retrieval for representative card samples.
+
+**Pattern for migrating other games:**
+1. Create a co-located helper module with `preload*Assets()`, `ensure*Texture()`, `get*TextureKey()`, and `svgTextCache`.
+2. Replace `this.load.svg(...)` with `markSceneValid(this)` in preload; populate SVG text cache in Node.
+3. Replace direct texture key strings with helper calls in scene/renderer code.
+4. Update tests to assert DPR-aware key format and add focused unit tests.
+
+No remaining games use `scene.load.svg`.
 
 ## Screen Layout Language (SLL)
 
