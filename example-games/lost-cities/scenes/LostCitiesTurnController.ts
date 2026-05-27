@@ -239,7 +239,10 @@ export class LostCitiesTurnController {
       const phase1Result = executeAction(this.session, phase1Action);
       this.recorder.recordAction(this.session, phase1Result, phase1Action, phase1Phase);
 
-      this.renderer.refreshExpeditions();
+      // Don't refresh expeditions before animation — that would create a
+      // destination sprite with card back before the animated card arrives.
+      // Instead, the card hand sprite is animated to the destination via
+      // flipCard, then refreshAll after phase 2 creates the correct state.
       this.renderer.refreshDiscardPiles();
       this.renderer.refreshScores();
       this.renderer.refreshDrawPile();

@@ -3,9 +3,10 @@
  */
 import Phaser from 'phaser';
 import type { Phase1Action, Phase2Action } from '../LostCitiesRules';
-import { cardAssetKey, CARD_BACK_KEY } from '../LostCitiesCards';
+import { cardAssetKey } from '../LostCitiesCards';
 import type { LostCitiesSession } from '../LostCitiesGame';
 import { EXPEDITION_COLORS } from '../LostCitiesCards';
+import { getLcTextureKey, getLcBackFallbackKey } from '../LostCitiesTextureHelpers';
 import {
   laneX,
   PLR_EXP_TOP,
@@ -52,10 +53,14 @@ export class LostCitiesAnimator {
       return;
     }
 
-    const targetKey = cardAssetKey(action.card);
+    // Use DPR-aware key for sprite lookup (hand sprites use CARD_W x CARD_H).
+    const targetTemplateId = cardAssetKey(action.card);
+    const targetKey = getLcTextureKey(targetTemplateId, CARD_W, CARD_H);
     let spriteIdx = -1;
     for (let i = 0; i < handSprites.length; i++) {
-      if (handSprites[i].texture.key === targetKey) {
+      const spriteKey = handSprites[i].texture.key;
+      // Match DPR-aware keys; fall back to template ID for legacy compatibility.
+      if (spriteKey === targetKey || spriteKey === targetTemplateId) {
         spriteIdx = i;
         break;
       }
@@ -110,12 +115,15 @@ export class LostCitiesAnimator {
     if (action.kind === 'draw-from-pile') {
       sourceX = MID_COL_CENTER;
       sourceY = DRAW_PILE_Y + CARD_H / 2;
-      textureKey = CARD_BACK_KEY;
+      // Use card back fallback for draw pile (correct — cards are face-down).
+      textureKey = getLcBackFallbackKey(this.scene);
     } else {
       const colorIdx = EXPEDITION_COLORS.indexOf(action.color);
       sourceX = laneX(colorIdx);
       sourceY = DISCARD_Y + DISCARD_CARD_H / 2;
-      textureKey = cardAssetKey(drawnCard);
+      // Use DPR-aware key for the drawn card texture.
+      const templateId = cardAssetKey(drawnCard);
+      textureKey = getLcTextureKey(templateId, DISCARD_CARD_W, DISCARD_CARD_H);
     }
 
     const tempSprite = this.scene.add.image(sourceX, sourceY, textureKey);
@@ -174,10 +182,15 @@ export class LostCitiesAnimator {
     const finalW = isDiscard ? DISCARD_CARD_W : CARD_W;
     const finalH = isDiscard ? DISCARD_CARD_H : CARD_H;
 
+    // Use DPR-aware texture key for the face texture that flipCard applies
+    // at the midpoint of the animation.
+    const templateId = cardAssetKey(action.card);
+    const flipTextureKey = getLcTextureKey(templateId, finalW, finalH);
+
     flipCard({
       scene: this.scene,
       target: sprite,
-      newTexture: cardAssetKey(action.card),
+      newTexture: flipTextureKey,
       duration: AI_ANIM_DURATION,
       destX: targetX,
       destY: targetY,
@@ -187,6 +200,7 @@ export class LostCitiesAnimator {
       onComplete: () => {
         sprite.destroy();
 
+        // Reposition remaining AI hand sprites.
         for (let i = 0; i < sprites.length; i++) {
           const newY = HAND_TOP + i * HAND_OVERLAP + HAND_CARD_H / 2;
           if (sprites[i].y !== newY) {
@@ -222,7 +236,7 @@ export class LostCitiesAnimator {
       annotationText = `Drew ${action.color.charAt(0).toUpperCase() + action.color.slice(1)}`;
     }
 
-    const tempSprite = this.scene.add.image(sourceX, sourceY, CARD_BACK_KEY);
+    const tempSprite = this.scene.add.image(sourceX, sourceY, getLcBackFallbackKey(this.scene));
     tempSprite.setDisplaySize(
       action.kind === 'draw-from-pile' ? CARD_W : DISCARD_CARD_W,
       action.kind === 'draw-from-pile' ? CARD_H : DISCARD_CARD_H,
