@@ -250,6 +250,11 @@ export class LostCitiesTurnController {
       this.animator.animateAiPhase1(phase1Action, () => {
         if (this.session.matchPhase !== 'playing') return;
 
+        // After the card has animated from hand to expedition, refresh the
+        // expedition display so the card is visible (with correct texture if
+        // available, or card-back fallback if async generation hasn't finished).
+        this.renderer.refreshExpeditions();
+
         const state2 = getVisibleState(this.session, aiId);
         const phase2Action = this.aiPlayer.choosePhase2(state2);
 

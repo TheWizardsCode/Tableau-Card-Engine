@@ -6,7 +6,7 @@ import type { Phase1Action, Phase2Action } from '../LostCitiesRules';
 import { cardAssetKey } from '../LostCitiesCards';
 import type { LostCitiesSession } from '../LostCitiesGame';
 import { EXPEDITION_COLORS } from '../LostCitiesCards';
-import { getLcTextureKey, getLcBackFallbackKey } from '../LostCitiesTextureHelpers';
+import { getLcTextureKey, getLcBackFallbackKey, getLcFaceKey } from '../LostCitiesTextureHelpers';
 import {
   laneX,
   PLR_EXP_TOP,
@@ -89,12 +89,17 @@ export class LostCitiesAnimator {
       targetY = DISCARD_Y + DISCARD_CARD_H / 2;
     }
 
+    const targetW = action.kind === 'discard' ? DISCARD_CARD_W : CARD_W;
+    const targetH = action.kind === 'discard' ? DISCARD_CARD_H : CARD_H;
+    // Use displayWidth/displayHeight instead of scaleX/scaleY so the
+    // tween works correctly with high-DPI textures (whose intrinsic size
+    // differs from the original 95x130 load.svg textures).
     this.scene.tweens.add({
       targets: sprite,
       x: targetX,
       y: targetY,
-      scaleX: action.kind === 'discard' ? DISCARD_CARD_W / HAND_CARD_W : CARD_W / HAND_CARD_W,
-      scaleY: action.kind === 'discard' ? DISCARD_CARD_H / HAND_CARD_H : CARD_H / HAND_CARD_H,
+      displayWidth: targetW,
+      displayHeight: targetH,
       duration: ANIM_DURATION,
       ease: 'Power2',
       onComplete: () => {
@@ -142,8 +147,8 @@ export class LostCitiesAnimator {
       targets: tempSprite,
       x: targetX,
       y: targetY,
-      scaleX: HAND_CARD_W / (action.kind === 'draw-from-pile' ? CARD_W : DISCARD_CARD_W),
-      scaleY: HAND_CARD_H / (action.kind === 'draw-from-pile' ? CARD_H : DISCARD_CARD_H),
+      displayWidth: HAND_CARD_W,
+      displayHeight: HAND_CARD_H,
       duration: ANIM_DURATION,
       ease: 'Power2',
       onComplete: () => {
@@ -182,42 +187,69 @@ export class LostCitiesAnimator {
     const finalW = isDiscard ? DISCARD_CARD_W : CARD_W;
     const finalH = isDiscard ? DISCARD_CARD_H : CARD_H;
 
-    // Use DPR-aware texture key for the face texture that flipCard applies
-    // at the midpoint of the animation.
+    // Pre-ensure the face texture via synchronous rasterisation if possible.
     const templateId = cardAssetKey(action.card);
-    const flipTextureKey = getLcTextureKey(templateId, finalW, finalH);
+    const faceKey = getLcTextureKey(templateId, finalW, finalH);
+    // getLcFaceKey will attempt synchronous rasterisation if the texture
+    // doesn't exist yet and SVG text is available in cache.
+    void getLcFaceKey(this.scene, templateId, finalW, finalH);
 
-    flipCard({
-      scene: this.scene,
-      target: sprite,
-      newTexture: flipTextureKey,
+    // Phase 1: move the AI card (showing back) from hand to destination.
+    // Phase 2 (at destination): flip to face.
+    this.scene.tweens.add({
+      targets: sprite,
+      x: targetX,
+      y: targetY,
+      displayWidth: finalW,
+      displayHeight: finalH,
       duration: AI_ANIM_DURATION,
-      destX: targetX,
-      destY: targetY,
-      onMidpoint: () => {
-        sprite.setDisplaySize(finalW, finalH);
-      },
+      ease: 'Power2',
       onComplete: () => {
-        sprite.destroy();
+        const hasFaceTexture = this.scene.textures?.exists(faceKey) ?? false;
 
-        // Reposition remaining AI hand sprites.
-        for (let i = 0; i < sprites.length; i++) {
-          const newY = HAND_TOP + i * HAND_OVERLAP + HAND_CARD_H / 2;
-          if (sprites[i].y !== newY) {
-            moveGameObject({
-              scene: this.scene,
-              target: sprites[i],
-              destX: AI_HAND_CENTER,
-              destY: newY,
-              duration: 200,
-            });
-          }
-          sprites[i].setDepth(i + 1);
+        if (hasFaceTexture) {
+          // Flip at destination to reveal the face.
+          flipCard({
+            scene: this.scene,
+            target: sprite,
+            newTexture: faceKey,
+            duration: 300,
+            onMidpoint: () => {
+              sprite.setDisplaySize(finalW, finalH);
+            },
+            onComplete: () => {
+              sprite.destroy();
+              this.repositionAiHand(sprites);
+              onComplete();
+            },
+          });
+        } else {
+          // Face texture not ready yet — destroy the temp sprite.
+          // refreshExpeditions() called after this will create the correct
+          // sprite with a fallback if texture still not ready.
+          sprite.destroy();
+          this.repositionAiHand(sprites);
+          onComplete();
         }
-
-        onComplete();
       },
     });
+  }
+
+  /** Reposition remaining AI hand sprites after removing one. */
+  private repositionAiHand(sprites: Phaser.GameObjects.Image[]): void {
+    for (let i = 0; i < sprites.length; i++) {
+      const newY = HAND_TOP + i * HAND_OVERLAP + HAND_CARD_H / 2;
+      if (sprites[i].y !== newY) {
+        moveGameObject({
+          scene: this.scene,
+          target: sprites[i],
+          destX: AI_HAND_CENTER,
+          destY: newY,
+          duration: 200,
+        });
+      }
+      sprites[i].setDepth(i + 1);
+    }
   }
 
   animateAiPhase2(action: Phase2Action, onComplete: () => void): void {
@@ -237,6 +269,10 @@ export class LostCitiesAnimator {
     }
 
     const tempSprite = this.scene.add.image(sourceX, sourceY, getLcBackFallbackKey(this.scene));
+    tempSprite.setDisplaySize(
+      action.kind === 'draw-from-pile' ? CARD_W : DISCARD_CARD_W,
+      action.kind === 'draw-from-pile' ? CARD_H : DISCARD_CARD_H,
+    );
     tempSprite.setDisplaySize(
       action.kind === 'draw-from-pile' ? CARD_W : DISCARD_CARD_W,
       action.kind === 'draw-from-pile' ? CARD_H : DISCARD_CARD_H,
