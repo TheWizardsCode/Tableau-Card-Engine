@@ -56,13 +56,14 @@ export class GymHandPileScene extends GymSceneBase {
 
   // Highlight graphics
   private highlightGraphics: Phaser.GameObjects.Graphics | null = null;
+  private highlightLabels: Phaser.GameObjects.Text[] = [];
   // Active move tween reference (for cancellation)
   private activeMoveTween: Phaser.Tweens.Tween | null = null;
 
   // Pile position constants
   private readonly DECK_X = GAME_W / 2 - 250;
   private readonly DISCARD_X = GAME_W / 2 + 100;
-  private readonly PILE_Y = 150;
+  private readonly PILE_Y = 250;
 
   // Hand layout constants
   private readonly HAND_SPACING = 20;
@@ -778,22 +779,23 @@ export class GymHandPileScene extends GymSceneBase {
     }
     const g = this.highlightGraphics;
 
-    const zones = [
-      { x: GAME_W / 2 - 250, y: 150, label: 'Discard Pile' },
-      { x: GAME_W / 2 + 100, y: 150, label: 'Display Area' },
-    ];
+    const highlightW = 160;
+    const highlightH = 100;
+
+    // Deck zone: centred on the deck pile sprite
+    const deckZoneX = this.DECK_X - highlightW / 2;
+    const deckZoneY = this.PILE_Y - highlightH / 2;
+
+    // Discard zone: centred on the discard pile sprite
+    const discardZoneX = this.DISCARD_X - highlightW / 2;
+    const discardZoneY = this.PILE_Y - highlightH / 2;
 
     g.fillStyle(HIGHLIGHT_COLOR, HIGHLIGHT_ALPHA);
     g.lineStyle(2, HIGHLIGHT_COLOR, 0.8);
-    for (const zone of zones) {
-      g.fillRoundedRect(zone.x, zone.y, 140, 80, 8);
-      g.strokeRoundedRect(zone.x, zone.y, 140, 80, 8);
-      this.add.text(zone.x + 70, zone.y + 40, zone.label, {
-        fontSize: '10px',
-        color: '#44ff44',
-        fontFamily: 'monospace',
-      }).setOrigin(0.5);
-    }
+    g.fillRoundedRect(deckZoneX, deckZoneY, highlightW, highlightH, 8);
+    g.strokeRoundedRect(deckZoneX, deckZoneY, highlightW, highlightH, 8);
+    g.fillRoundedRect(discardZoneX, discardZoneY, highlightW, highlightH, 8);
+    g.strokeRoundedRect(discardZoneX, discardZoneY, highlightW, highlightH, 8);
 
     this.logEvent('Showing valid drop zones (green highlights)');
     this.time?.delayedCall(3000, () => this.clearHighlights());
@@ -874,6 +876,11 @@ export class GymHandPileScene extends GymSceneBase {
     if (this.highlightGraphics) {
       this.highlightGraphics.clear();
     }
+    // Remove any highlight labels
+    for (const label of this.highlightLabels) {
+      try { label.destroy(); } catch (_) { /* ignore */ }
+    }
+    this.highlightLabels = [];
   }
 
   private logEvent(msg: string): void {

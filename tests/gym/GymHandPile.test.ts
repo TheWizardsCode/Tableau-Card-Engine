@@ -231,7 +231,7 @@ describe('Gym Hand & Pile integration with HandView/PileView', () => {
       'utf-8',
     );
 
-    expect(source).toContain('HAND_BASE_Y = GAME_H - CARD_H / 2 - 10');
+    expect(source).toContain('HAND_BASE_Y = GAME_H - CARD_H - 80');
     expect(source).toContain('showLabels: false');
     expect(source).toContain('arcRadius: this.arcRadius');
     expect(source).toContain('ARC_RADIUS_MIN = 0');
