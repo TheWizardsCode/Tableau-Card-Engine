@@ -57,6 +57,9 @@ function numberedTemplateId(color: string, rank: number): string {
 /** Base path to Lost Cities card SVG assets. */
 const ASSET_PATH = 'assets/cards/lost-cities';
 
+/** Quality scale factor for rasterisation (matches SvgHelpers default). */
+const QUALITY_SCALE = 4;
+
 // ── SVG text cache ─────────────────────────────────────────
 
 /**
@@ -113,9 +116,115 @@ export function getLcBackFallbackKey(scene: Phaser.Scene): string {
  * @returns           Either the DPR-aware texture key (if it exists) or
  *                    the card back fallback key.
  */
+/**
+ * Synchronous SVG rasterisation helper.
+ *
+ * For data-URI sources, modern browsers make the image data available
+ * synchronously — `img.complete` is true immediately after setting `src`.
+ * This function uses that fact to rasterise an SVG to a Phaser canvas
+ * texture without waiting for the async `onload` event.
+ *
+ * If successful, the texture is registered and `true` is returned.
+ * If the image is not immediately available (edge case), returns `false`
+ * and the caller should fall back to async rasterisation.
+ */
+function trySyncRasterise(
+  scene: Phaser.Scene,
+  templateId: string,
+  svgText: string,
+  width: number,
+  height: number,
+): boolean {
+  const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
+  const key = makeTextureKey(templateId, width, height, dpr);
+
+  if (scene.textures?.exists(key)) return true;
+
+  try {
+    const dataUri = svgToDataUri(svgText);
+    const qualityScale = Math.max(QUALITY_SCALE, dpr);
+    const targetW = Math.round(width * qualityScale);
+    const targetH = Math.round(height * qualityScale);
+
+    const img = new Image();
+    img.src = dataUri;
+
+    // For data URIs, img.complete should be true synchronously.
+    if (img.complete && img.naturalWidth > 0 && img.naturalHeight > 0) {
+      const canvas = document.createElement('canvas');
+      canvas.width = targetW;
+      canvas.height = targetH;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return false;
+
+      ctx.clearRect(0, 0, targetW, targetH);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, targetW, targetH);
+
+      if (!scene.textures?.exists(key)) {
+        scene.textures.addCanvas(key, canvas);
+        const texture = scene.textures.get(key) as { setFilter?: (mode: number) => void } | undefined;
+        if (texture?.setFilter) {
+          texture.setFilter(1); // Linear filtering
+        }
+      }
+      return true;
+    }
+  } catch {
+    // Best-effort; caller falls back to async path.
+  }
+  return false;
+}
+
+/**
+ * Convert SVG text to a data URI (same implementation as SvgHelpers).
+ */
+function svgToDataUri(svgText: string): string {
+  return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgText)));
+}
+
+/**
+ * Resolve SVG text from caches synchronously.
+ *
+ * Checks the module-level svgTextCache first, then the Phaser text cache.
+ * Returns undefined if SVG text is not available synchronously.
+ */
+function getSvgTextSync(scene: Phaser.Scene, templateId: string): string | undefined {
+  const cached = svgTextCache.get(templateId);
+  if (cached) return cached;
+  const cacheText = (scene as any).cache?.text?.get?.(`svg:${templateId}`) as string | undefined;
+  if (cacheText) return cacheText;
+  return undefined;
+}
+
+/**
+ * Resolve the best available texture key for a card face.
+ *
+ * Tries in order:
+ * 1. If the DPR-aware texture already exists in the scene's texture manager, use it.
+ * 2. If SVG text is available synchronously (from cache), rasterise synchronously and use the key.
+ * 3. Otherwise, fall back to the card back (async generation will update the sprite when ready).
+ *
+ * @param scene       The Phaser scene.
+ * @param templateId  Template ID (e.g. 'lc-blue-2' or 'lc-blue-2-sm').
+ * @param width       Logical pixel width of the texture.
+ * @param height      Logical pixel height of the texture.
+ * @returns           Texture key to use for sprite creation.
+ */
 export function getLcFaceKey(scene: Phaser.Scene, templateId: string, width: number, height: number): string {
   const dprKey = getLcTextureKey(templateId, width, height);
+
+  // 1. Texture already exists — use it directly.
   if (scene.textures?.exists(dprKey)) return dprKey;
+
+  // 2. Try synchronous rasterisation if SVG text is cached.
+  const svgText = getSvgTextSync(scene, templateId);
+  if (svgText && trySyncRasterise(scene, templateId, svgText, width, height)) {
+    return dprKey;
+  }
+
+  // 3. Fall back to card back (async generation scheduled separately).
   return getLcBackFallbackKey(scene);
 }
 
@@ -212,9 +321,9 @@ export function preloadLostCitiesAssets(scene: Phaser.Scene | null): void {
       // Best-effort: tests that need these assets should ensure they exist.
     }
   } else {
-    // Browser: registration-only for lazy rasterisation plus a static
-    // card-back fallback image so first paint never shows missing-texture
-    // placeholders.
+    // Browser: registration-only for lazy rasterisation, plus SVG source text
+    // preload for synchronous rasterisation, plus a static card-back fallback
+    // image so first paint never shows missing-texture placeholders.
     if (scene) {
       markSceneValid(scene);
 
@@ -224,6 +333,24 @@ export function preloadLostCitiesAssets(scene: Phaser.Scene | null): void {
         // generated lazily by SvgHelpers.
         if (!scene.textures?.exists(CARD_BACK_KEY)) {
           (scene.load as any)?.image?.(CARD_BACK_KEY, `${ASSET_PATH}/${CARD_BACK_KEY}.svg`);
+        }
+
+        // Preload all SVG source texts into Phaser's text cache so that
+        // synchronous rasterisation (via trySyncRasterise) can work in
+        // create() without async network fetches. These are lightweight
+        // text loads (not rasterisation).
+        (scene.load as any)?.text?.(`svg:${CARD_BACK_KEY}`, `${ASSET_PATH}/${CARD_BACK_KEY}.svg`);
+        for (const color of EXPEDITION_COLORS) {
+          for (let inv = 1; inv <= 3; inv++) {
+            const tid = investmentTemplateId(color, inv);
+            (scene.load as any)?.text?.(`svg:${tid}`, `${ASSET_PATH}/${tid}.svg`);
+            (scene.load as any)?.text?.(`svg:${tid}-sm`, `${ASSET_PATH}/${tid}-sm.svg`);
+          }
+          for (let rank = 2; rank <= 10; rank++) {
+            const tid = numberedTemplateId(color, rank);
+            (scene.load as any)?.text?.(`svg:${tid}`, `${ASSET_PATH}/${tid}.svg`);
+            (scene.load as any)?.text?.(`svg:${tid}-sm`, `${ASSET_PATH}/${tid}-sm.svg`);
+          }
         }
       } catch {
         // Best-effort: keep preload resilient in constrained environments.
