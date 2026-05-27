@@ -6,7 +6,6 @@ import Phaser from 'phaser';
 import type { BusinessCard, EventCard, UpgradeCard } from '../MainStreetCards';
 import {
   GRID_SIZE,
-  synergyColor,
   MARKET_BUSINESS_SLOTS,
   MARKET_INVESTMENT_SLOTS,
   INCIDENT_QUEUE_SIZE,
@@ -31,6 +30,12 @@ import {
   createSceneMenuButton,
   attachSelection,
 } from '../../../src/ui';
+import {
+  createActionButton,
+  attachHudTooltipZone,
+  mainStreetRenderCardSvg,
+  createMainStreetHintButton,
+} from '../../../src/ui/Renderer/adapters/MainStreetAdapter';
 import {
   BOX_FILL,
   BOX_RADIUS,
@@ -204,9 +209,9 @@ export class MainStreetRenderer {
 
     // HUD tooltip zones (desktop: pointer hover, mobile: tap toggle)
     if (!s.replayMode) {
-      this.attachHudTooltipZone(coinText, HUD_ARIA_LABELS.coins, () => buildCoinsTooltip(s.state));
-      this.attachHudTooltipZone(repText, HUD_ARIA_LABELS.rep, () => buildReputationTooltip(s.state));
-      this.attachHudTooltipZone(scoreText, HUD_ARIA_LABELS.score, () => buildScoreTooltip(s.state, s.campaign));
+      attachHudTooltipZone(s, coinText, HUD_ARIA_LABELS.coins, () => buildCoinsTooltip(s.state));
+      attachHudTooltipZone(s, repText, HUD_ARIA_LABELS.rep, () => buildReputationTooltip(s.state));
+      attachHudTooltipZone(s, scoreText, HUD_ARIA_LABELS.score, () => buildScoreTooltip(s.state, s.campaign));
     }
 
     s.animateHudValueChanges({
@@ -218,67 +223,7 @@ export class MainStreetRenderer {
     });
   }
 
-  /**
-   * Attaches an interactive tooltip zone to a HUD text element.
-   *
-   * On desktop (pointer), shows the tooltip on hover and hides on leave.
-   * On mobile (touch), the first tap shows the tooltip and a second
-   * tap (or tap elsewhere) dismisses it.
-   *
-   * ARIA labels are set on the underlying text object for screen-readers.
-   */
-  private attachHudTooltipZone(
-    textObj: Phaser.GameObjects.Text,
-    ariaLabel: string,
-    contentBuilder: () => string,
-  ): void {
-    const s = this.scene;
 
-    // Set ARIA label for screen-reader accessibility
-    try {
-      const node = (textObj as any).node;
-      if (node && typeof node.setAttribute === 'function') {
-        node.setAttribute('aria-label', ariaLabel);
-        node.setAttribute('role', 'button');
-        node.setAttribute('tabindex', '0');
-      }
-    } catch (_) { /* ignore in non-DOM environments */ }
-
-    // Compute hit area size from text metrics
-    const w = Math.max(textObj.width, 60);
-    const h = Math.max(textObj.height, 20);
-
-    textObj.setInteractive(
-      new Phaser.Geom.Rectangle(0, 0, w / textObj.scaleX, h / textObj.scaleY),
-      Phaser.Geom.Rectangle.Contains,
-    );
-
-    // Mobile tap-toggle state (per element)
-    let tooltipVisible = false;
-
-    textObj.on('pointerover', () => {
-      tooltipVisible = true;
-      const content = contentBuilder();
-      s.tooltipManager?.show(content, textObj.x, textObj.y - 10);
-    });
-
-    textObj.on('pointerout', () => {
-      tooltipVisible = false;
-      s.tooltipManager?.hide();
-    });
-
-    // Mobile / tap: toggle on pointerdown
-    textObj.on('pointerdown', () => {
-      if (tooltipVisible) {
-        tooltipVisible = false;
-        s.tooltipManager?.hide();
-      } else {
-        tooltipVisible = true;
-        const content = contentBuilder();
-        s.tooltipManager?.show(content, textObj.x, textObj.y - 10);
-      }
-    });
-  }
 
   public refreshChallengeTracker(): void {
     const s = this.scene;
@@ -391,70 +336,17 @@ export class MainStreetRenderer {
 
     const renderW = Math.max(1, Math.round(slotW - 4));
     const renderH = Math.max(1, Math.round(slotH - 4));
-    const tplKey = s.templateKeyForCard(biz.id, renderW, renderH);
-    const usedSvg = s.textures && (s.textures as Phaser.Textures.TextureManager).exists(tplKey);
-    if (usedSvg) {
-      const img = s.add.image(Math.round(x + slotW / 2), Math.round(y + slotH / 2), tplKey);
-      // Use the exact slot dimensions - texture is already rasterised at correct size
-      img.setDisplaySize(renderW, renderH);
-      s.streetContainer.add(img);
 
-      if (isHinted) {
-        const hintRect = s.add.rectangle(x + slotW / 2, y + slotH / 2, slotW, slotH);
-        hintRect.setStrokeStyle(3, 0x44ffff);
-        hintRect.setFillStyle(0x000000, 0);
-        s.streetContainer.add(hintRect);
-      }
-    } else {
-      s.requestCardTexture(biz.id, renderW, renderH);
-      const primaryColor = synergyColor(biz.synergyTypes[0]);
-      // Card background
-      const bg = s.add.rectangle(
-        x + slotW / 2, y + slotH / 2,
-        slotW, slotH, primaryColor, 0.7,
-      );
-      // Highlight the slot if it is the hint target (e.g., upgrade target)
-      bg.setStrokeStyle(isHinted ? 3 : 2, isHinted ? 0x44ffff : 0xffffff, isHinted ? 1.0 : 0.4);
-      s.streetContainer.add(bg);
+    // Render card via shared adapter
+    const cardContainer = s.add.container(Math.round(x + slotW / 2), Math.round(y + slotH / 2));
+    mainStreetRenderCardSvg(s, cardContainer, biz.id, renderW, renderH);
+    s.streetContainer.add(cardContainer);
 
-      // Name
-      const nameText = s.add.text(x + slotW / 2, y + 8, biz.name, {
-        fontSize: '12px', fontStyle: 'bold', color: '#ffffff', fontFamily: FONT_FAMILY,
-        wordWrap: { width: slotW - 8 },
-        align: 'center',
-      }).setOrigin(0.5, 0);
-      s.streetContainer.add(nameText);
-
-      // Income
-      const income = biz.baseIncome + biz.incomeBonus;
-      const incText = s.add.text(x + slotW / 2, y + slotH - 28, `+${income}/turn`, {
-        fontSize: '13px', color: '#ffee88', fontFamily: FONT_FAMILY,
-      }).setOrigin(0.5, 0);
-      s.streetContainer.add(incText);
-    }
-
-    // Only draw fallback textual overlays when no SVG texture is available.
-    if (!usedSvg) {
-      // Level
-      if (biz.level > 0) {
-        const lvlText = s.add.text(x + slotW - 6, y + 4, `Lv${biz.level}`, {
-          fontSize: '11px', color: '#ffdd44', fontFamily: FONT_FAMILY,
-        }).setOrigin(1, 0);
-        s.streetContainer.add(lvlText);
-      }
-
-      // Synergy label at bottom
-      const synLabel = biz.synergyTypes.join('/');
-      const synText = s.add.text(x + slotW / 2, y + slotH - 12, synLabel, {
-        fontSize: '10px', color: '#dddddd', fontFamily: FONT_FAMILY,
-      }).setOrigin(0.5, 1);
-      s.streetContainer.add(synText);
-
-      // Slot index
-      const idxText = s.add.text(x + 4, y + 4, `${_index}`, {
-        fontSize: '10px', color: '#ffffff55', fontFamily: FONT_FAMILY,
-      });
-      s.streetContainer.add(idxText);
+    if (isHinted) {
+      const hintRect = s.add.rectangle(x + slotW / 2, y + slotH / 2, slotW, slotH);
+      hintRect.setStrokeStyle(3, 0x44ffff);
+      hintRect.setFillStyle(0x000000, 0);
+      s.streetContainer.add(hintRect);
     }
 
     if (!s.replayMode) {
@@ -629,7 +521,10 @@ export class MainStreetRenderer {
 
         const labelText = `Discover (${REFRESH_INVESTMENTS_COST})`;
 
-        const btn = this.createActionButton(btnX, btnY, btnW, labelText, canRefresh ? () => { s.onRefreshInvestmentsClick(); } : () => {});
+        const btn = createActionButton(s, btnX, btnY, btnW, labelText, canRefresh ? () => { s.onRefreshInvestmentsClick(); } : () => {}, {
+          disabled: !canRefresh,
+          ...(canRefresh ? {} : { fillColor: 0x333333, fillAlpha: 0.6 }),
+        });
         // Dim visual when not allowed, but keep interactive so tooltip can show
         try {
           const bg = (btn.list && btn.list[0]) as Phaser.GameObjects.Rectangle | undefined;
@@ -699,38 +594,12 @@ export class MainStreetRenderer {
     // Determine if this card is the hint recommendation
     const isHinted = s.hintedCardId !== null && card.id === s.hintedCardId;
 
-    // If we have a per-card SVG texture, render it as the card background
     const renderW = Math.max(1, Math.round(marketCardW - 4));
     const renderH = Math.max(1, Math.round(marketCardH - 4));
-    const tplKey = s.templateKeyForCard(card.id, renderW, renderH);
     const baseStrokeColor = isHinted ? 0x44ffff : (isIncidentEvent ? 0x556688 : 0x888877);
-    const baseStrokeWidth = isHinted ? 3 : 1;
 
-    let bg: Phaser.GameObjects.Rectangle | null = null;
-
-    if (s.textures && (s.textures as Phaser.Textures.TextureManager).exists(tplKey)) {
-      const img = s.add.image(0, 0, tplKey);
-      // Texture is already rasterised at correct size for this slot
-      img.setDisplaySize(renderW, renderH);
-      container.add(img);
-    } else {
-      s.requestCardTexture(card.id, renderW, renderH);
-      // Determine card color
-      let fillColor = 0x333322;
-      if (card.family === 'business') {
-        fillColor = synergyColor((card as BusinessCard).synergyTypes[0]);
-      } else if (card.family === 'event') {
-        fillColor = isIncidentEvent ? 0x2B3A67 : 0x8B4513;  // Indigo for Incident, Brown for Investment
-      } else if (card.family === 'upgrade') {
-        fillColor = 0x6B4C9A;  // Purple for upgrades
-      }
-
-      // Background
-      const fillAlpha = isIncidentEvent ? 0.5 : 0.7;
-      bg = s.add.rectangle(0, 0, marketCardW, marketCardH, fillColor, fillAlpha);
-      bg!.setStrokeStyle(baseStrokeWidth, baseStrokeColor);
-      container.add(bg!);
-    }
+    // Render card via shared adapter
+    mainStreetRenderCardSvg(s, container, card.id, renderW, renderH);
 
     const selectionRing = s.add.rectangle(0, 0, marketCardW, marketCardH);
     selectionRing.setFillStyle(0x000000, 0);
@@ -748,28 +617,20 @@ export class MainStreetRenderer {
         }
 
         if (hovered && interactiveEnabled) {
-          if (bg) {
-            bg.setStrokeStyle(2, 0xffdd44);
-          }
           selectionRing.setStrokeStyle(2, 0xffdd44);
-          selectionRing.setVisible(!bg);
+          selectionRing.setVisible(true);
           container.setScale(1.05);
           return;
         }
 
         if (selected) {
-          if (bg) {
-            bg.setStrokeStyle(2, 0x44ff66);
-          }
           selectionRing.setStrokeStyle(2, 0x44ff66);
           selectionRing.setVisible(true);
           container.setScale(1.04);
           return;
         }
 
-        if (bg) {
-          bg.setStrokeStyle(baseStrokeWidth, baseStrokeColor);
-        }
+        selectionRing.setStrokeStyle(2, baseStrokeColor);
         selectionRing.setVisible(false);
         container.setScale(1.0);
       },
@@ -807,14 +668,6 @@ export class MainStreetRenderer {
       });
       s.marketSelectionManager.registerTarget(hitArea);
       container.add(hitArea);
-    }
-
-    // Card label and additional info are rendered inside per-card SVGs; only
-    // add textual overlays when we do NOT have a per-card texture.
-    const usedSvg = s.textures && (s.textures as Phaser.Textures.TextureManager).exists(tplKey);
-
-    if (!usedSvg) {
-      // Intentionally no text overlays: card text is authored inside each SVG.
     }
 
     return container;
@@ -884,20 +737,9 @@ export class MainStreetRenderer {
 
     const renderW = Math.max(1, Math.round(queueCardW - 4));
     const renderH = Math.max(1, Math.round(queueCardH - 4));
-    const tplKey = s.templateKeyForCard(card.id, renderW, renderH);
-    const usedSvg = s.textures && (s.textures as Phaser.Textures.TextureManager).exists(tplKey);
-    if (usedSvg) {
-      const img = s.add.image(0, 0, tplKey);
-      // Texture is already rasterised at correct size for this slot
-      img.setDisplaySize(renderW, renderH);
-      container.add(img);
-    } else {
-      s.requestCardTexture(card.id, renderW, renderH);
-      // Indigo fallback background (non-interactive); no text overlays.
-      const bg = s.add.rectangle(0, 0, queueCardW, queueCardH, 0x2B3A67, 0.5);
-      bg.setStrokeStyle(1, 0x556688);
-      container.add(bg);
-    }
+
+    // Render card via shared adapter
+    mainStreetRenderCardSvg(s, container, card.id, renderW, renderH);
 
     if (!s.replayMode) {
       const hover = s.add.rectangle(0, 0, queueCardW, queueCardH, 0x000000, 0.001);
@@ -944,8 +786,8 @@ export class MainStreetRenderer {
   }
 
   /**
-   * Render held-event cards via the same Phaser texture pipeline used by
-   * market/street/incident cards (no DOM-only branch).
+   * Render held-event cards via the shared adapter using the same Phaser
+   * texture pipeline used by market/street/incident cards.
    */
   public drawHeldEventCard(
     x: number,
@@ -957,19 +799,9 @@ export class MainStreetRenderer {
     const container = s.add.container(Math.round(x + handCardW / 2), Math.round(y + handCardH / 2));
     const renderW = Math.max(1, Math.round(handCardW - 4));
     const renderH = Math.max(1, Math.round(handCardH - 4));
-    const tplKey = s.templateKeyForCard(card.id, renderW, renderH);
-    const usedSvg = s.textures && (s.textures as Phaser.Textures.TextureManager).exists(tplKey);
 
-    if (usedSvg) {
-      const img = s.add.image(0, 0, tplKey);
-      img.setDisplaySize(renderW, renderH);
-      container.add(img);
-    } else {
-      s.requestCardTexture(card.id, renderW, renderH);
-      const bg = s.add.rectangle(0, 0, handCardW, handCardH, 0x8B4513, 0.7);
-      bg.setStrokeStyle(1, 0x776655);
-      container.add(bg);
-    }
+    // Render card via shared adapter
+    mainStreetRenderCardSvg(s, container, card.id, renderW, renderH);
 
     if (!s.replayMode) {
       const hover = s.add.rectangle(0, 0, handCardW, handCardH, 0x000000, 0.001);
@@ -1022,20 +854,23 @@ export class MainStreetRenderer {
       const hintBtnW = s.layout.hintButtonW;
       const smallW = s.layout.smallButtonW;
 
-      const endBtn = this.createActionButton(rightX - btnW, by + 4, btnW, 'End Turn', () => {
+      const endBtn = createActionButton(s, rightX - btnW, by + 4, btnW, 'End Turn', () => {
         s.endTurn();
       });
       s.actionContainer.add(endBtn);
 
       // Hint button (to the left of End Turn)
-      const hintBtn = this.createHintButton(rightX - btnW - 12 - hintBtnW, by + 4, hintBtnW);
+      const hintBtn = createMainStreetHintButton(
+        s, rightX - btnW - 12 - hintBtnW, by + 4, hintBtnW, s.layout.actionButtonH,
+        s.hintUsedThisTurn, () => s.onHintClick(),
+      );
       s.actionContainer.add(hintBtn);
 
       // Undo / Redo buttons (to the left of Hint)
       const undoBaseX = rightX - btnW - 12 - hintBtnW - 12 - smallW - 12 - smallW;
-      const undoBtn = this.createActionButton(undoBaseX, by + 4, smallW, 'Undo', () => s.performUndo());
+      const undoBtn = createActionButton(s, undoBaseX, by + 4, smallW, 'Undo', () => s.performUndo());
       s.actionContainer.add(undoBtn);
-      const redoBtn = this.createActionButton(undoBaseX + smallW + 12, by + 4, smallW, 'Redo', () => s.performRedo());
+      const redoBtn = createActionButton(s, undoBaseX + smallW + 12, by + 4, smallW, 'Redo', () => s.performRedo());
       s.actionContainer.add(redoBtn);
 
     } else if (s.uiPhase === 'placing-business') {
@@ -1050,7 +885,7 @@ export class MainStreetRenderer {
 
       // Cancel button (right-aligned)
       const btnW = s.layout.actionButtonW;
-      const cancelBtn = this.createActionButton(rightX - btnW, by + 4, btnW, 'Cancel', () => {
+      const cancelBtn = createActionButton(s, rightX - btnW, by + 4, btnW, 'Cancel', () => {
         s.pendingBusinessCard = null;
         s.pendingBusinessSourceIndex = null;
         s.clearMarketSelection();
@@ -1064,79 +899,6 @@ export class MainStreetRenderer {
     }
   }
 
-  public createActionButton(
-    x: number,
-    y: number,
-    width: number,
-    text: string,
-    callback: () => void,
-  ): Phaser.GameObjects.Container {
-    const s = this.scene;
-    const btnH = s.layout.actionButtonH;
-    const container = s.add.container(x + width / 2, y + btnH / 2);
-
-    const bg = s.add.rectangle(0, 0, width, btnH, 0x554422, 0.8);
-    bg.setStrokeStyle(1, 0xaa8855);
-    container.add(bg);
-
-    const label = s.add.text(0, 0, text, {
-      fontSize: '14px', fontStyle: 'bold', color: '#ffcc88', fontFamily: FONT_FAMILY,
-    }).setOrigin(0.5);
-    container.add(label);
-
-    bg.setInteractive({ useHandCursor: true });
-    bg.on('pointerdown', callback);
-    bg.on('pointerover', () => {
-      bg.setStrokeStyle(2, 0xffdd44);
-      container.setScale(1.05);
-    });
-    bg.on('pointerout', () => {
-      bg.setStrokeStyle(1, 0xaa8855);
-      container.setScale(1.0);
-    });
-
-    return container;
-  }
-
-  public createHintButton(
-    x: number,
-    y: number,
-    width: number,
-  ): Phaser.GameObjects.Container {
-    const s = this.scene;
-    const btnH = s.layout.actionButtonH;
-    const isDisabled = s.hintUsedThisTurn;
-
-    const container = s.add.container(x + width / 2, y + btnH / 2);
-
-    const fillColor = isDisabled ? 0x2a2a2a : 0x224455;
-    const strokeColor = isDisabled ? 0x444444 : 0x4488aa;
-    const textColor = isDisabled ? '#666666' : '#88ccff';
-
-    const bg = s.add.rectangle(0, 0, width, btnH, fillColor, 0.8);
-    bg.setStrokeStyle(1, strokeColor);
-    container.add(bg);
-
-    const label = s.add.text(0, 0, isDisabled ? 'Hint ✓' : 'Hint', {
-      fontSize: '14px', fontStyle: 'bold', color: textColor, fontFamily: FONT_FAMILY,
-    }).setOrigin(0.5);
-    container.add(label);
-
-    if (!isDisabled) {
-      bg.setInteractive({ useHandCursor: true });
-      bg.on('pointerdown', () => s.onHintClick());
-      bg.on('pointerover', () => {
-        bg.setStrokeStyle(2, 0x88ddff);
-        container.setScale(1.05);
-      });
-      bg.on('pointerout', () => {
-        bg.setStrokeStyle(1, strokeColor);
-        container.setScale(1.0);
-      });
-    }
-
-    return container;
-  }
 
   public refreshLog(): void {
     const s = this.scene;
