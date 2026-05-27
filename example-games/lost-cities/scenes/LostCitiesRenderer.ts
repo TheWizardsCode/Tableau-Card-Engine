@@ -13,6 +13,7 @@ import type { LostCitiesSession } from '../LostCitiesGame';
 import { scoreRoundDetailed } from '../LostCitiesScoring';
 import {
   getLcBackFallbackKey,
+  getLcFaceKey,
   ensureLcCardTexture,
   ensureLcCompactTexture,
   ensureLcBackTexture,
@@ -367,8 +368,51 @@ export class LostCitiesRenderer {
   }
 
   // ── Refresh display ─────────────────────────────────────
+
+  /**
+   * Pre-warm texture generation for all cards currently visible in the game
+   * state. Called at the start of refreshAll so textures are being generated
+   * (or are already cached) before sprites are created.
+   */
+  private prewarmTextures(): void {
+    // Kick off generation for all expedition cards (both players)
+    for (const color of EXPEDITION_COLORS) {
+      for (const cards of [
+        this.session.players[0].expeditions.get(color) ?? [],
+        this.session.players[1].expeditions.get(color) ?? [],
+      ]) {
+        for (const card of cards) {
+          const templateId = cardAssetKey(card);
+          void ensureLcCardTexture(this.scene, templateId, CARD_W, CARD_H);
+        }
+      }
+
+      // Discard piles
+      const pile = this.session.round.discardPiles.get(color) ?? [];
+      if (pile.length > 0) {
+        const topCard = pile[pile.length - 1];
+        const templateId = compactAssetKey(topCard);
+        void ensureLcCompactTexture(this.scene, templateId);
+      }
+    }
+
+    // Player hand
+    for (const card of this.session.players[0].hand) {
+      const templateId = cardAssetKey(card);
+      void ensureLcCardTexture(this.scene, templateId, CARD_W, CARD_H);
+    }
+
+    // Card back (for AI hand and draw pile)
+    void ensureLcBackTexture(this.scene, CARD_W, CARD_H);
+  }
+
   refreshAll(onHandClick?: (index: number) => void): void {
     this.refreshGen++;
+    // Start generating textures for all currently-visible cards BEFORE
+    // destroying and recreating sprites. On the first render this means
+    // textures will start generation early; on subsequent renders they
+    // will already be cached and used directly via getLcFaceKey.
+    this.prewarmTextures();
     this.refreshExpeditions();
     this.refreshDiscardPiles();
     if (onHandClick) this.refreshHand(onHandClick);
@@ -380,7 +424,6 @@ export class LostCitiesRenderer {
 
   refreshExpeditions(): void {
     const gen = this.refreshGen;
-    const backKey = getLcBackFallbackKey(this.scene);
 
     for (const sprites of this.oppExpSprites.values()) {
       sprites.forEach(s => s.destroy());
@@ -398,7 +441,9 @@ export class LostCitiesRenderer {
         const x = laneX(i);
         const y = OPP_EXP_TOP + c * EXP_OVERLAP + CARD_H / 2;
         const templateId = cardAssetKey(oppCards[c]);
-        const sprite = this.scene.add.image(x, y, backKey);
+        // Use face texture if available; fall back to card back on first render.
+        const textureKey = getLcFaceKey(this.scene, templateId, CARD_W, CARD_H);
+        const sprite = this.scene.add.image(x, y, textureKey);
         sprite.setDisplaySize(CARD_W, CARD_H);
         sprite.setDepth(c);
         oppSprites.push(sprite);
@@ -421,7 +466,8 @@ export class LostCitiesRenderer {
         const x = laneX(i);
         const y = PLR_EXP_TOP + c * EXP_OVERLAP + CARD_H / 2;
         const templateId = cardAssetKey(plrCards[c]);
-        const sprite = this.scene.add.image(x, y, backKey);
+        const textureKey = getLcFaceKey(this.scene, templateId, CARD_W, CARD_H);
+        const sprite = this.scene.add.image(x, y, textureKey);
         sprite.setDisplaySize(CARD_W, CARD_H);
         sprite.setDepth(c);
         plrSprites.push(sprite);
@@ -441,7 +487,6 @@ export class LostCitiesRenderer {
 
   refreshDiscardPiles(): void {
     const gen = this.refreshGen;
-    const backKey = getLcBackFallbackKey(this.scene);
 
     for (const sprite of this.discardSprites.values()) {
       sprite.destroy();
@@ -455,9 +500,11 @@ export class LostCitiesRenderer {
       if (pile.length > 0) {
         const topCard = pile[pile.length - 1];
         const templateId = compactAssetKey(topCard);
+        // Use face texture if available; fall back to card back on first render.
+        const textureKey = getLcFaceKey(this.scene, templateId, DISCARD_CARD_W, DISCARD_CARD_H);
         const sprite = this.scene.add.image(
           laneX(i), DISCARD_Y + DISCARD_CARD_H / 2,
-          backKey,
+          textureKey,
         );
         sprite.setDisplaySize(DISCARD_CARD_W, DISCARD_CARD_H);
         this.discardSprites.set(color, sprite);
@@ -475,7 +522,6 @@ export class LostCitiesRenderer {
 
   refreshHand(onClick: (index: number) => void): void {
     const gen = this.refreshGen;
-    const backKey = getLcBackFallbackKey(this.scene);
 
     this.handSprites.forEach(s => s.destroy());
     this.handSprites = [];
@@ -490,7 +536,9 @@ export class LostCitiesRenderer {
       const x = PLAYER_HAND_CENTER;
       const y = HAND_TOP + c * HAND_OVERLAP + HAND_CARD_H / 2;
       const templateId = cardAssetKey(hand[c]);
-      const sprite = this.scene.add.image(x, y, backKey);
+      // Use face texture if available; fall back to card back on first render.
+      const textureKey = getLcFaceKey(this.scene, templateId, CARD_W, CARD_H);
+      const sprite = this.scene.add.image(x, y, textureKey);
       sprite.setDisplaySize(HAND_CARD_W, HAND_CARD_H);
       sprite.setDepth(c + 1);
       sprite.setInteractive({ useHandCursor: true });

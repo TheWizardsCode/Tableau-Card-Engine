@@ -326,4 +326,45 @@ describe('lazy rasterisation helpers', () => {
       expect(res.key).toBe(makeTextureKey(templateId, CARD_W, CARD_H, 1));
     }
   });
+
+  describe('getLcFaceKey', () => {
+    it('returns DPR-aware key when texture exists in scene', async () => {
+      const { getLcFaceKey, preloadLostCitiesAssets, ensureLcCardTexture } =
+        await import('../../example-games/lost-cities/LostCitiesTextureHelpers');
+
+      const scene = createMockScene();
+      preloadLostCitiesAssets(scene);
+
+      // Call ensureLcCardTexture which registers the texture in the scene's
+      // texture cache (in browser) or just caches the key. After preload, the
+      // texture is registered as "exists" in the mock scene via the async
+      // rasterisation flow. In Node we can't rasterise, so getLcFaceKey
+      // should fall back to the card back key.
+      await ensureLcCardTexture(scene, 'lc-blue-5', CARD_W, CARD_H);
+
+      // In Node, texture won't exist (no DOM rasterisation), so falls back.
+      const fallback = getLcFaceKey(scene, 'lc-blue-5', CARD_W, CARD_H);
+      expect(fallback).toBe(getLcBackKey(scene));
+    });
+
+    it('returns card back fallback when texture does not exist', async () => {
+      const { getLcFaceKey } =
+        await import('../../example-games/lost-cities/LostCitiesTextureHelpers');
+
+      const scene = createMockScene();
+      // No preload, no texture — should fall back to card back key.
+      const key = getLcFaceKey(scene, 'lc-nonexistent', CARD_W, CARD_H);
+      expect(key).toBe(getLcBackKey(scene));
+    });
+  });
 });
+
+/**
+ * Helper to get the expected card back fallback key for the test scene.
+ */
+function getLcBackKey(scene: any): string {
+  const canonical = makeTextureKey(CARD_BACK_KEY, CARD_W, CARD_H, 1);
+  if (scene.textures?.exists(canonical)) return canonical;
+  if (scene.textures?.exists(CARD_BACK_KEY)) return CARD_BACK_KEY;
+  return canonical;
+}

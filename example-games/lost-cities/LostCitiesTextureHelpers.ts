@@ -98,6 +98,27 @@ export function getLcBackFallbackKey(scene: Phaser.Scene): string {
   return canonical;
 }
 
+/**
+ * Resolve the best available texture key for a card face.
+ *
+ * If the DPR-aware face texture already exists in the scene's texture
+ * manager, returns it directly (avoiding card-back flicker on re-render).
+ * Otherwise falls back to getLcBackFallbackKey so the sprite is always
+ * created with a valid texture.
+ *
+ * @param scene       The Phaser scene.
+ * @param templateId  Template ID (e.g. 'lc-blue-2' or 'lc-blue-2-sm').
+ * @param width       Logical pixel width of the texture.
+ * @param height      Logical pixel height of the texture.
+ * @returns           Either the DPR-aware texture key (if it exists) or
+ *                    the card back fallback key.
+ */
+export function getLcFaceKey(scene: Phaser.Scene, templateId: string, width: number, height: number): string {
+  const dprKey = getLcTextureKey(templateId, width, height);
+  if (scene.textures?.exists(dprKey)) return dprKey;
+  return getLcBackFallbackKey(scene);
+}
+
 // ── SVG text resolution ────────────────────────────────────
 
 /**
