@@ -350,9 +350,11 @@ export class SushiGoScene extends CardGameScene {
   private createTooltipManager(): TooltipManager {
     return new TooltipManager(this, this.settingsPanel, {
       phaserRender: (container, scene, _hideTooltip, ctx) => {
-        // Use ctx.content if provided (tableau tooltips), otherwise fall back to
-        // SCORING_TOOLTIPS for the card type (hand card tooltips).
-        const tooltipText = (ctx.content as string | undefined) ?? (() => {
+        // Use ctx.content when non-empty (tableau tooltips), otherwise fall back
+        // to SCORING_TOOLTIPS[card.type] for hand card tooltips.
+        const tooltipText = (() => {
+          const provided = ctx.content as string | undefined;
+          if (provided && provided.length > 0) return provided;
           const card = ctx.card as SushiGoCard | undefined;
           return card ? SCORING_TOOLTIPS[card.type] : '';
         })();
