@@ -200,7 +200,7 @@ export class SushiGoScene extends CardGameScene {
     this.tooltipManager = this.createTooltipManager();
     this.replayController = new SushiGoReplayController(this, { value: this.replayMode });
     this.cardFactory = new SushiGoCardFactory(this);
-    this.tableauRenderer = new SushiGoTableauRenderer(this, this.session, this.cardFactory, this.goRenderer);
+    this.tableauRenderer = new SushiGoTableauRenderer(this, this.session, this.cardFactory, this.goRenderer, this.tooltipManager);
 
     this.createHeader();
     this.createLabels();
@@ -350,10 +350,13 @@ export class SushiGoScene extends CardGameScene {
   private createTooltipManager(): TooltipManager {
     return new TooltipManager(this, this.settingsPanel, {
       phaserRender: (container, scene, _hideTooltip, ctx) => {
-        const card = ctx.card as SushiGoCard | undefined;
-        if (!card) return container;
-
-        const tooltipText = SCORING_TOOLTIPS[card.type];
+        // Use ctx.content if provided (tableau tooltips), otherwise fall back to
+        // SCORING_TOOLTIPS for the card type (hand card tooltips).
+        const tooltipText = (ctx.content as string | undefined) ?? (() => {
+          const card = ctx.card as SushiGoCard | undefined;
+          return card ? SCORING_TOOLTIPS[card.type] : '';
+        })();
+        if (!tooltipText) return container;
 
         const text = scene.add.text(0, 0, tooltipText, {
           fontSize: TOOLTIP_FONT_SIZE,
