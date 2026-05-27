@@ -211,5 +211,7 @@ export {
 export type {
   ActionButtonOptions,
   HudTextOptions,
-  RenderCardSvgResult,
+  RenderCardSvgOptions,
+  MakeTextureKeyFn,
+  RequestTextureFn,
 } from './Renderer';

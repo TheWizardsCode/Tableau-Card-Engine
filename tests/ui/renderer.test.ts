@@ -22,14 +22,23 @@ vi.mock('phaser', () => {
 // ── SvgHelpers mock ─────────────────────────────────────────────────────────
 
 const getOrCreateTextureMock = vi.hoisted(() => vi.fn(
-  (_scene: unknown, templateId: string, _svgText: string, w: number, h: number) => ({
-    key: `svg_${templateId}_${w}x${h}`,
+  (_scene: unknown, _templateId: string, _svgText: string, _w: number, _h: number) => ({
+    key: 'mock_key',
     ready: true,
   }),
 ));
 
-vi.mock('../../core-engine/SvgHelpers', () => ({
+const makeTextureKeyMock = vi.hoisted(() => vi.fn(
+  (templateId: string, w: number, h: number, _dpr: number) =>
+    `svg_${templateId}_${w}x${h}`,
+));
+
+// Mock must match the path used by the module under test (renderCardSvg.ts),
+// which imports via '../../core-engine/SvgHelpers'. Vitest resolves from the
+// test file's directory, so we need the path from tests/ui/ to src/core-engine/.
+vi.mock('../../src/core-engine/SvgHelpers', () => ({
   getOrCreateTexture: getOrCreateTextureMock,
+  makeTextureKey: makeTextureKeyMock,
 }));
 
 // ── Imports (after mocks) ───────────────────────────────────────────────────
@@ -271,30 +280,142 @@ describe('createActionButton', () => {
 });
 
 
+// ── Extended mock scene with texture exists support ─────────────────────────
+
+function createMockSceneWithTextures(textureExists = true): Phaser.Scene {
+  const children: any[] = [];
+  const container: any = {
+    list: children,
+    _children: children,
+    _depth: 0,
+    setDepth: vi.fn(function (this: any, d: number) { this._depth = d; return container; }),
+    setScale: vi.fn().mockReturnThis(),
+    add: vi.fn(function (this: any, obj: any) { children.push(obj); return container; }),
+    remove: vi.fn(),
+  };
+
+  return {
+    add: {
+      container: vi.fn(() => container),
+      text: vi.fn(() => {
+        const t: any = {
+          width: 80,
+          height: 20,
+          x: 0,
+          y: 0,
+          _originX: 0,
+          _originY: 0,
+          _text: '',
+          setText: vi.fn(function (this: any, v: string) { this._text = v; return this; }),
+          setOrigin: vi.fn(function (this: any, ox: number, oy: number) { this._originX = ox; this._originY = oy; return this; }),
+          setInteractive: vi.fn().mockReturnThis(),
+          on: vi.fn().mockReturnThis(),
+        };
+        return t;
+      }),
+      rectangle: vi.fn(() => {
+        const r: any = {
+          _strokeWidth: 1,
+          _strokeColor: 0xffffff,
+          setStrokeStyle: vi.fn(function (this: any, w: number, c: number) { this._strokeWidth = w; this._strokeColor = c; return this; }),
+          setFillStyle: vi.fn().mockReturnThis(),
+          setInteractive: vi.fn().mockReturnThis(),
+          on: vi.fn().mockReturnThis(),
+        };
+        return r;
+      }),
+      image: vi.fn(() => ({
+        setDisplaySize: vi.fn().mockReturnThis(),
+        setTexture: vi.fn().mockReturnThis(),
+      })),
+    },
+    textures: {
+      exists: vi.fn(() => textureExists),
+    } as unknown as Phaser.Textures.TextureManager,
+  } as unknown as Phaser.Scene;
+}
+
+// ── Tests ───────────────────────────────────────────────────────────────────
+
 describe('renderCardSvg', () => {
-  it('returns an object with key, ready, and optional promise', () => {
-    const scene = createMockScene();
-    const result = renderCardSvg(scene, 'business-card-1', '<svg>...</svg>', 96, 130);
-    expect(result).toHaveProperty('key');
-    expect(typeof result.key).toBe('string');
-    expect(result).toHaveProperty('ready');
-    expect(typeof result.ready).toBe('boolean');
+  it('creates an Image when texture exists and adds to container', () => {
+    const scene = createMockSceneWithTextures(true);
+    const container = scene.add.container();
+    const result = renderCardSvg(scene, container, 'business-card-1', 96, 130);
+    expect(scene.add.image).toHaveBeenCalledWith(0, 0, expect.stringContaining('business-card-1'));
+    const img = (scene.add.image as ReturnType<typeof vi.fn>).mock.results[0].value;
+    expect(img.setDisplaySize).toHaveBeenCalledWith(96, 130);
+    expect(container.add).toHaveBeenCalledWith(img);
+    expect(result).toBe(img);
   });
 
-  it('delegates to getOrCreateTexture with correct scene', () => {
-    const scene = createMockScene();
-    const result = renderCardSvg(scene, 'test-card', '<svg/>', 100, 100);
-    // The key should contain the templateId we passed
-    expect(result.key).toContain('test-card');
+  it('creates a fallback Rectangle when texture does not exist', () => {
+    const scene = createMockSceneWithTextures(false);
+    const container = scene.add.container();
+    const result = renderCardSvg(scene, container, 'missing-card', 96, 130);
+    expect(scene.add.rectangle).toHaveBeenCalledWith(0, 0, 96, 130, 0x333333);
+    const rect = (scene.add.rectangle as ReturnType<typeof vi.fn>).mock.results[0].value;
+    expect(rect.setStrokeStyle).toHaveBeenCalledWith(1, 0x666666);
+    expect(container.add).toHaveBeenCalledWith(rect);
+    expect(result).toBe(rect);
+  });
+
+  it('calls requestTexture when texture is missing', () => {
+    const scene = createMockSceneWithTextures(false);
+    const container = scene.add.container();
+    renderCardSvg(scene, container, 'gen-card', 96, 130);
+    expect(getOrCreateTextureMock).toHaveBeenCalled();
+  });
+
+  it('uses custom makeKey callback', () => {
+    const scene = createMockSceneWithTextures(true);
+    const container = scene.add.container();
+    const customKey = 'custom_key_123';
+    renderCardSvg(scene, container, 'any-id', 96, 130, {
+      makeKey: () => customKey,
+    });
+    expect(scene.add.image).toHaveBeenCalledWith(0, 0, customKey);
+  });
+
+  it('uses custom requestTexture callback', () => {
+    const scene = createMockSceneWithTextures(false);
+    const container = scene.add.container();
+    const customRequest = vi.fn();
+    renderCardSvg(scene, container, 'any-id', 96, 130, {
+      requestTexture: customRequest,
+    });
+    expect(customRequest).toHaveBeenCalledWith(scene, 'any-id', 96, 130);
+  });
+
+  it('uses custom fallback colours', () => {
+    const scene = createMockSceneWithTextures(false);
+    const container = scene.add.container();
+    renderCardSvg(scene, container, 'any-id', 96, 130, {
+      fallbackFill: 0xff0000,
+      fallbackStroke: 0x00ff00,
+    });
+    expect(scene.add.rectangle).toHaveBeenCalledWith(0, 0, 96, 130, 0xff0000);
+    const rect = (scene.add.rectangle as ReturnType<typeof vi.fn>).mock.results[0].value;
+    expect(rect.setStrokeStyle).toHaveBeenCalledWith(1, 0x00ff00);
   });
 
   it('handles empty template id without throwing', () => {
-    const scene = createMockScene();
-    expect(() => renderCardSvg(scene, '', '<svg/>', 96, 130)).not.toThrow();
+    const scene = createMockSceneWithTextures(true);
+    const container = scene.add.container();
+    expect(() => renderCardSvg(scene, container, '', 96, 130)).not.toThrow();
   });
 
   it('handles zero dimensions without throwing', () => {
+    const scene = createMockSceneWithTextures(true);
+    const container = scene.add.container();
+    expect(() => renderCardSvg(scene, container, 'card', 0, 0)).not.toThrow();
+  });
+
+  it('works with missing texture manager gracefully', () => {
     const scene = createMockScene();
-    expect(() => renderCardSvg(scene, 'card', '<svg/>', 0, 0)).not.toThrow();
+    (scene as any).textures = null;
+    const container = scene.add.container();
+    // When textures is null, exists() throws/returns falsy, so fallback path is taken
+    expect(() => renderCardSvg(scene, container, 'card', 96, 130)).not.toThrow();
   });
 });

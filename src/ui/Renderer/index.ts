@@ -11,7 +11,14 @@
 
 import Phaser from 'phaser';
 import { FONT_FAMILY } from '../constants';
-import { getOrCreateTexture } from '../../core-engine/SvgHelpers';
+export {
+  renderCardSvg,
+} from './renderCardSvg';
+export type {
+  RenderCardSvgOptions,
+  MakeTextureKeyFn,
+  RequestTextureFn,
+} from './renderCardSvg';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -274,40 +281,4 @@ export function createActionButton(
 
   return container;
 }
-// ---------------------------------------------------------------------------
-// SVG card rendering helper
-// ---------------------------------------------------------------------------
 
-/**
- * Result of a {@link renderCardSvg} call.
- */
-export interface RenderCardSvgResult {
-  /** The texture key to use with `scene.add.image(key)`. */
-  key: string;
-  /** Whether the texture was already available synchronously. */
-  ready: boolean;
-  /** A promise that resolves when the texture is ready (only present when `ready` is false). */
-  promise?: Promise<void>;
-}
-
-/**
- * Rasterise an SVG card template into a Phaser texture. Wraps the core
- * engine's {@linkcode getOrCreateTexture} so that game scenes don't need
- * to import core-engine directly.
- *
- * @param scene - The Phaser scene.
- * @param templateId - A unique identifier for the card template.
- * @param svgText - The raw SVG text to rasterise.
- * @param width - Target raster width in pixels.
- * @param height - Target raster height in pixels.
- * @returns An object with `key`, `ready`, and optionally `promise`.
- */
-export function renderCardSvg(
-  scene: Phaser.Scene,
-  templateId: string,
-  svgText: string,
-  width: number,
-  height: number,
-): RenderCardSvgResult {
-  return getOrCreateTexture(scene, templateId, svgText, width, height);
-}
