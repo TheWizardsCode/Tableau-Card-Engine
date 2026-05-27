@@ -779,8 +779,8 @@ export class GymHandPileScene extends GymSceneBase {
     }
     const g = this.highlightGraphics;
 
-    const highlightW = 160;
-    const highlightH = 100;
+    const highlightW = CARD_W + 16;
+    const highlightH = CARD_H + 16;
 
     // Deck zone: centred on the deck pile sprite
     const deckZoneX = this.DECK_X - highlightW / 2;
