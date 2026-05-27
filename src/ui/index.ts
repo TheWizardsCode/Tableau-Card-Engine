@@ -198,3 +198,18 @@ export type {
   SceneMenuButtonConfig,
   SceneHeaderResult,
 } from './SceneHeader';
+
+// Shared Renderer API – container, HUD, tooltip, and button helpers
+export {
+  createHudContainer,
+  createGameZone,
+  createHudText,
+  attachHudTooltipZone,
+  createActionButton,
+  renderCardSvg,
+} from './Renderer';
+export type {
+  ActionButtonOptions,
+  HudTextOptions,
+  RenderCardSvgResult,
+} from './Renderer';
