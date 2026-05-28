@@ -108,6 +108,59 @@ export function createGameZone(
 }
 
 // ---------------------------------------------------------------------------
+// Texture application helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Result shape returned by an async texture-ensure operation.
+ */
+export interface EnsureTextureResult {
+  /** The texture key that will be (or is) available. */
+  key: string;
+  /** True if the texture is already registered and ready to use. */
+  ready: boolean;
+  /** Optional promise that resolves when async generation completes. */
+  promise?: Promise<void>;
+}
+
+/**
+ * Apply an ensured texture to a sprite, awaiting async generation if needed.
+ *
+ * This helper encapsulates the common pattern used across card games:
+ * await the texture ensure operation, check that the sprite is still mounted,
+ * then swap the texture and re-apply display size (since Phaser may reset
+ * dimensions on texture change).
+ *
+ * @param sprite       - The image sprite to update.
+ * @param ensureOp     - A promise that resolves to an {@link EnsureTextureResult}.
+ * @param stillMounted - Guard function that returns false if the sprite has been
+ *                       destroyed or removed since the operation started.
+ * @param displayWidth  - Optional display width to re-apply after texture swap.
+ * @param displayHeight - Optional display height to re-apply after texture swap.
+ */
+export async function applyEnsuredTexture(
+  sprite: Phaser.GameObjects.Image,
+  ensureOp: Promise<EnsureTextureResult>,
+  stillMounted: () => boolean,
+  displayWidth?: number,
+  displayHeight?: number,
+): Promise<void> {
+  try {
+    const result = await ensureOp;
+    if (!result.ready && result.promise) {
+      await result.promise;
+    }
+    if (!stillMounted()) return;
+    sprite.setTexture(result.key);
+    if (displayWidth !== undefined && displayHeight !== undefined) {
+      sprite.setDisplaySize(displayWidth, displayHeight);
+    }
+  } catch {
+    // keep existing texture fallback on error
+  }
+}
+
+// ---------------------------------------------------------------------------
 // HUD text helper
 // ---------------------------------------------------------------------------
 

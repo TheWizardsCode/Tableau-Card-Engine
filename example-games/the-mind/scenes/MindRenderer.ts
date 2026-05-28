@@ -3,6 +3,7 @@
  */
 
 import { FONT_FAMILY, createSceneHeader, layoutCardPositions } from '../../../src/ui';
+import { createMindHudText } from '../../../src/ui/Renderer/adapters/MindAdapter';
 import {
   ensureTexture,
   ensureBackTexture,
@@ -112,23 +113,17 @@ export class MindRenderer {
   }
 
   createStatusDisplay(): void {
-    this.levelText = this.scene.add
-      .text(this.sceneW - 100, 55, '', {
-        fontSize: '16px',
-        color: '#aaccff',
-        fontFamily: FONT_FAMILY,
-      })
-      .setOrigin(0.5, 0)
-      .setDepth(DEPTH_UI);
+    this.levelText = createMindHudText(
+      this.scene,
+      this.sceneW - 100, 55, '',
+      '#aaccff',
+    );
 
-    this.livesText = this.scene.add
-      .text(this.sceneW - 100, 79, '', {
-        fontSize: '16px',
-        color: '#ff6666',
-        fontFamily: FONT_FAMILY,
-      })
-      .setOrigin(0.5, 0)
-      .setDepth(DEPTH_UI);
+    this.livesText = createMindHudText(
+      this.scene,
+      this.sceneW - 100, 79, '',
+      '#ff6666',
+    );
   }
 
   createPile(): void {

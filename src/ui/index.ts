@@ -207,6 +207,7 @@ export {
   attachHudTooltipZone,
   createActionButton,
   renderCardSvg,
+  applyEnsuredTexture,
 } from './Renderer';
 export type {
   ActionButtonOptions,
@@ -214,4 +215,5 @@ export type {
   RenderCardSvgOptions,
   MakeTextureKeyFn,
   RequestTextureFn,
+  EnsureTextureResult,
 } from './Renderer';

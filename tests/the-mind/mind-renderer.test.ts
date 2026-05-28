@@ -11,6 +11,16 @@ const { ensureTextureMock, ensureBackTextureMock } = vi.hoisted(() => ({
   })),
 }));
 
+const { createMindHudTextMock } = vi.hoisted(() => ({
+  createMindHudTextMock: vi.fn((_scene: unknown, _x: number, _y: number, _text: string, _color: string) => ({
+    setOrigin: vi.fn().mockReturnThis(),
+    setDepth: vi.fn().mockReturnThis(),
+    setText: vi.fn().mockReturnThis(),
+    setColor: vi.fn().mockReturnThis(),
+    destroy: vi.fn(),
+  })),
+}));
+
 vi.mock('../../example-games/the-mind/MindCardTextureAdapter', () => ({
   ensureTexture: ensureTextureMock,
   ensureBackTexture: ensureBackTextureMock,
@@ -20,6 +30,10 @@ vi.mock('../../example-games/the-mind/MindCardTextureAdapter', () => ({
   getTextureKey: vi.fn((card: { value: number; faceUp: boolean }) =>
     card.faceUp ? `ms_card_mind-${card.value}_120x164@1` : 'ms_card_mind-back_120x164@1',
   ),
+}));
+
+vi.mock('/home/rgardler/projects/Tableau-Card-Engine/src/ui/Renderer/adapters/MindAdapter', () => ({
+  createMindHudText: createMindHudTextMock,
 }));
 
 vi.mock('../../src/ui', () => ({
