@@ -5,7 +5,8 @@ import Phaser from 'phaser';
 import type { BeleagueredCastleState } from '../BeleagueredCastleState';
 import { FOUNDATION_COUNT, TABLEAU_COUNT } from '../BeleagueredCastleState';
 import { cardTextureKey } from '../../../src/ui';
-import { GAME_W, GAME_H, FONT_FAMILY, createSceneTitle, createSceneMenuButton } from '../../../src/ui';
+import { GAME_W, GAME_H, createSceneTitle, createSceneMenuButton } from '../../../src/ui';
+import { createBcHudText, createActionButton } from '../../../src/ui/Renderer/adapters/BeleagueredCastleAdapter';
 import {
   BC_CARD_W, BC_CARD_H, CARD_GAP, CASCADE_OFFSET_Y,
   DRAG_DEPTH, DEAL_STAGGER, ANIM_DURATION, SNAP_BACK_DURATION,
@@ -42,8 +43,8 @@ export class BeleagueredCastleRenderer {
   private moveCountText!: Phaser.GameObjects.Text;
   private timerText!: Phaser.GameObjects.Text;
   private seedText!: Phaser.GameObjects.Text;
-  private undoButton!: Phaser.GameObjects.Text;
-  private redoButton!: Phaser.GameObjects.Text;
+  private undoButton!: Phaser.GameObjects.Container;
+  private redoButton!: Phaser.GameObjects.Container;
 
   // Callbacks
   onUndoClick?: () => void;
@@ -66,8 +67,8 @@ export class BeleagueredCastleRenderer {
   get moveText(): Phaser.GameObjects.Text { return this.moveCountText; }
   get timer(): Phaser.GameObjects.Text { return this.timerText; }
   get seedDisplay(): Phaser.GameObjects.Text { return this.seedText; }
-  get undoBtn(): Phaser.GameObjects.Text { return this.undoButton; }
-  get redoBtn(): Phaser.GameObjects.Text { return this.redoButton; }
+  get undoBtn(): Phaser.GameObjects.Container { return this.undoButton; }
+  get redoBtn(): Phaser.GameObjects.Container { return this.redoButton; }
 
   // ── UI creation ─────────────────────────────────────────
   createTitle(): void {
@@ -114,40 +115,22 @@ export class BeleagueredCastleRenderer {
   }
 
   createHUD(seed: number): void {
-    this.moveCountText = this.scene.add.text(20, GAME_H - 28, 'Moves: 0', {
-      fontSize: '20px', color: '#aaccaa', fontFamily: FONT_FAMILY,
-    }).setOrigin(0, 0.5);
+    this.moveCountText = createBcHudText(this.scene, 20, GAME_H - 28, 'Moves: 0', '#aaccaa', { fontSize: '20px' });
 
-    this.timerText = this.scene.add.text(GAME_W / 2, GAME_H - 28, '00:00', {
-      fontSize: '20px', color: '#aaccaa', fontFamily: FONT_FAMILY,
-    }).setOrigin(0.5, 0.5);
+    this.timerText = createBcHudText(this.scene, GAME_W / 2, GAME_H - 28, '00:00', '#aaccaa', { fontSize: '20px' });
 
-    this.seedText = this.scene.add.text(GAME_W - 20, GAME_H - 28, `Seed: ${seed}`, {
-      fontSize: '18px', color: '#668866', fontFamily: FONT_FAMILY,
-    }).setOrigin(1, 0.5);
-
-    this.undoButton = this.scene.add.text(GAME_W - 220, this.layout.headerY, '[ Undo ]', {
-      fontSize: '18px', color: '#557755', fontFamily: FONT_FAMILY,
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-    this.undoButton.on('pointerdown', () => this.onUndoClick?.());
-    this.undoButton.on('pointerover', () => {
-      if (this.onUndoClick) this.undoButton.setColor('#88ff88');
+    this.seedText = createBcHudText(this.scene, GAME_W - 20, GAME_H - 28, `Seed: ${seed}`, '#668866', {
+      fontSize: '18px',
+      originX: 1,
     });
-    this.undoButton.on('pointerout', () => this.refreshUndoRedoButtons(false, false));
 
-    this.redoButton = this.scene.add.text(GAME_W - 140, this.layout.headerY, '[ Redo ]', {
-      fontSize: '18px', color: '#557755', fontFamily: FONT_FAMILY,
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-    this.redoButton.on('pointerdown', () => this.onRedoClick?.());
-    this.redoButton.on('pointerover', () => {
-      if (this.onRedoClick) this.redoButton.setColor('#88ff88');
-    });
-    this.redoButton.on('pointerout', () => this.refreshUndoRedoButtons(false, false));
+    this.undoButton = createActionButton(this.scene, GAME_W - 220, this.layout.headerY, 60, 'Undo', () => this.onUndoClick?.());
+    this.redoButton = createActionButton(this.scene, GAME_W - 140, this.layout.headerY, 60, 'Redo', () => this.onRedoClick?.());
   }
 
   refreshUndoRedoButtons(canUndo: boolean, canRedo: boolean): void {
-    this.undoButton.setColor(canUndo ? '#aaccaa' : '#557755');
-    this.redoButton.setColor(canRedo ? '#aaccaa' : '#557755');
+    this.undoButton.setAlpha(canUndo ? 1 : 0.5);
+    this.redoButton.setAlpha(canRedo ? 1 : 0.5);
   }
 
   // ── Foundation rendering ────────────────────────────────
