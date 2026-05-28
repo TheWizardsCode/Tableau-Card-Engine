@@ -28,6 +28,8 @@ export type {
 export interface ActionButtonOptions {
   /** Height of the button in pixels. Defaults to the scene's layout value or 32. */
   height?: number;
+  /** Display depth. Defaults to the Container's default (0). */
+  depth?: number;
   /** Background fill colour. Defaults to 0x554422. */
   fillColor?: number;
   /** Background fill alpha. Defaults to 0.8. */
@@ -298,6 +300,7 @@ export function createActionButton(
   options?: ActionButtonOptions,
 ): Phaser.GameObjects.Container {
   const height = options?.height ?? 32;
+  const depth: number | undefined = options?.depth;
   const fillColor: number = options?.fillColor ?? 0x554422;
   const fillAlpha: number = options?.fillAlpha ?? 0.8;
   const strokeColor: number = options?.strokeColor ?? 0xaa8855;
@@ -306,6 +309,9 @@ export function createActionButton(
   const disabled: boolean = options?.disabled ?? false;
 
   const container = scene.add.container(x + width / 2, y + height / 2);
+  if (depth !== undefined) {
+    container.setDepth(depth);
+  }
 
   const bg = scene.add.rectangle(0, 0, width, height, fillColor, fillAlpha);
   bg.setStrokeStyle(1, strokeColor);

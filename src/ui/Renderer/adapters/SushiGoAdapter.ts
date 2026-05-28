@@ -40,6 +40,7 @@ export type { ActionButtonOptions };
  * @param x - X position (left edge of the button).
  * @param y - Y position (top edge of the button).
  * @param width - Button width in pixels.
+ * @param options - Optional styling overrides forwarded to `createActionButton`.
  * @returns A Phaser.Container containing the menu button.
  */
 export function createSushiGoMenuButton(
@@ -47,8 +48,9 @@ export function createSushiGoMenuButton(
   x: number,
   y: number,
   width: number,
+  options?: ActionButtonOptions,
 ): Phaser.GameObjects.Container {
   return sharedCreateActionButton(scene, x, y, width, 'Menu', () => {
     scene.scene.start('GameSelectorScene');
-  });
+  }, options);
 }

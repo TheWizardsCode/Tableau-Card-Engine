@@ -105,6 +105,7 @@ export class SushiGoOverlayManager {
         this.overlayManager.dismiss();
         onNextRound();
       },
+      { depth: 11 },
     );
     this.overlayManager.add(btn);
   }
@@ -213,10 +214,11 @@ export class SushiGoOverlayManager {
         this.soundManager?.play(SFX_KEYS.UI_CLICK);
         onRestart();
       },
+      { depth: 11 },
     );
     this.overlayManager.add(playBtn);
 
-    const menuBtn = createSushiGoMenuButton(this.scene, GAME_W / 2 + 20, buttonY - 16, 120);
+    const menuBtn = createSushiGoMenuButton(this.scene, GAME_W / 2 + 20, buttonY - 16, 120, { depth: 11 });
     this.overlayManager.add(menuBtn);
   }
 
