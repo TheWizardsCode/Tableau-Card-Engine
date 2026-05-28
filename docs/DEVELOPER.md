@@ -1009,6 +1009,8 @@ createActionButton(this, x, y, 120, 'Buy', () => buyCard());
 
 ### Changelog
 
+> **PR**: Merged as part of [Shared Renderer epic (GitHub #568)](https://github.com/TheWizardsCode/Tableau-Card-Engine/issues/568)
+
 | Commit | Work Item | Description |
 |---|---|---|
 | `42a3916` | CG-0MPOLH2U9001P7BC | Shared Renderer API scaffold and core helpers |
@@ -1016,6 +1018,7 @@ createActionButton(this, x, y, 120, 'Buy', () => buyCard());
 | `9f1272f` | CG-0MPOLHCAN0037UUS | Main Street adapter and migration |
 | `14fa97f` | CG-0MPOLHCB400363VZ | The Mind adapter and migration |
 | `7192f1f` | CG-0MPOLHCB400363VZ | Migrate MindRenderer to use shared `applyEnsuredTexture` |
+| `f173bfd` | CG-0MPOLHCBV005SD2L | Migration documentation in DEVELOPER.md |
 
 ### Related work items
 
