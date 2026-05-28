@@ -903,6 +903,69 @@ renderCardSvg(this, cardContainer, 'card-42', 95, 130, {
 });
 ```
 
+### Type interfaces
+
+The Renderer module exports several TypeScript interfaces used by the public API functions.
+
+#### ActionButtonOptions
+
+Passed to `createActionButton` to customise button appearance and behaviour.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `height` | `number` | `32` | Button height in pixels. |
+| `fillColor` | `number` | `0x554422` | Background fill colour. |
+| `fillAlpha` | `number` | `0.8` | Background fill alpha. |
+| `strokeColor` | `number` | `0xaa8855` | Stroke colour. |
+| `textColor` | `string` | `'#ffcc88'` | Label text colour. |
+| `fontSize` | `string` | `'14px'` | Label font size. |
+| `disabled` | `boolean` | `false` | When `true`, the button is visually dimmed and non-interactive. |
+
+#### HudTextOptions
+
+Passed to `createHudText` (merged with an inline `fontSize` option) to customise text styling.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `fontFamily` | `string` | `FONT_FAMILY` | Override the default font family. |
+| `originX` | `number` | `0` | Horizontal origin (default `0`). |
+| `originY` | `number` | `0.5` | Vertical origin (default `0.5`). |
+
+The `createHudText` options parameter accepts `{ fontSize?: string } & HudTextOptions`, so you can pass `fontSize` alongside the fields above.
+
+#### EnsureTextureResult
+
+Returned by async texture-ensure operations; consumed by `applyEnsuredTexture`.
+
+| Field | Type | Description |
+|---|---|---|
+| `key` | `string` | The texture key that will be (or is) available. |
+| `ready` | `boolean` | `true` if the texture is already registered and ready to use. |
+| `promise` | `Promise<void>` (optional) | Resolves when async generation completes. |
+
+#### RenderCardSvgOptions
+
+Passed to `renderCardSvg` to customise card rendering behaviour.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `makeKey` | `MakeTextureKeyFn` | `makeTextureKey` from SvgHelpers | Derives a texture cache key from template ID and dimensions. |
+| `requestTexture` | `RequestTextureFn` | wrapper around `getOrCreateTexture` | Initiates async texture generation when the texture is missing. |
+| `fallbackFill` | `number` | `0x333333` | Fill colour for the fallback rectangle. |
+| `fallbackStroke` | `number` | `0x666666` | Stroke colour for the fallback rectangle. |
+
+#### MakeTextureKeyFn
+
+Type alias: `(templateId: string, width: number, height: number) => string`
+
+Derives a texture cache key. Games with custom texture pipelines provide their own implementation via `RenderCardSvgOptions.makeKey`.
+
+#### RequestTextureFn
+
+Type alias: `(scene: Phaser.Scene, templateId: string, width: number, height: number) => void`
+
+Initiates asynchronous texture generation. Games with custom texture pipelines provide their own implementation via `RenderCardSvgOptions.requestTexture`.
+
 ### Adapter pattern
 
 Each game provides a thin adapter module under `src/ui/Renderer/adapters/` that re-exports shared helpers and wires game-specific texture pipelines. This keeps scene code importing from a single adapter while the shared API remains stable.
