@@ -17,6 +17,7 @@ This document covers everything you need to develop, test, and build the Tableau
 - [Replay Tool](#replay-tool)
 - [Managing Assets](#managing-assets)
 - [SVG Rendering & Migration](#svg-rendering--migration)
+- [Shared Renderer](#shared-renderer)
 - [Screen Layout Language (SLL)](#screen-layout-language-sll)
 - [Keeping Docs Up to Date](#keeping-docs-up-to-date)
 - [Work-Item Tracking](#work-item-tracking)
@@ -780,6 +781,251 @@ controller.setMode('scene-only'); // hides shell, shows scene+shared
 ```
 
 Typical use cases: shared app chrome across scenes, scene-specific overrides, browser tests asserting merged anchor positions across DPR/viewports, and debug overlays needing both source layout IDs and resolved pixels.
+
+## Shared Renderer
+
+The engine provides a shared rendering API under `src/ui/Renderer/` that supplies common rendering helpers so game scenes stay small and focused without duplicating boilerplate patterns. The module exports container creation, HUD text, tooltip zones, action buttons, and an SVG card rendering wrapper — all designed to work with a standard Phaser Scene.
+
+### Public API
+
+All exports are available via `@ui/Renderer` (which resolves to `src/ui/Renderer/index.ts`).
+
+#### Container helpers
+
+```typescript
+import {
+  createHudContainer,
+  createGameZone,
+} from '@ui/Renderer';
+```
+
+**`createHudContainer(scene: Phaser.Scene): Phaser.GameObjects.Container`**
+
+Creates a HUD container with depth 1000, intended for transient overlay elements that are rebuilt each HUD refresh cycle. Children should be tagged with `_hudTransient: true` so they can be selectively destroyed on the next refresh.
+
+```typescript
+const hud = createHudContainer(this);
+const scoreText = createHudText(this, 10, 10, 'Score: 0', '#ffcc44');
+(scoreText as any)._hudTransient = true;
+hud.add(scoreText);
+```
+
+**`createGameZone(scene: Phaser.Scene, x: number, y: number, w: number, h: number, name?: string): Phaser.GameObjects.Container`**
+
+Creates a named zone container for grouping related game objects. Stores logical width/height as `__zoneWidth` and `__zoneHeight` custom properties.
+
+```typescript
+const streetZone = createGameZone(this, 100, 200, 600, 300, 'street');
+```
+
+#### HUD text helper
+
+```typescript
+import { createHudText, attachHudTooltipZone } from '@ui/Renderer';
+```
+
+**`createHudText(scene: Phaser.Scene, x: number, y: number, text: string, color: string, options?: { fontSize?: string; fontFamily?: string; originX?: number; originY?: number }): Phaser.GameObjects.Text`**
+
+Creates a styled text object using `FONT_FAMILY` by default, bold style, and origin (0, 0.5).
+
+```typescript
+const label = createHudText(this, 200, 50, 'Turn 1', '#ffffff', { fontSize: '18px' });
+```
+
+#### Tooltip zone helper
+
+**`attachHudTooltipZone(scene: Phaser.Scene, textObj: Phaser.GameObjects.Text, ariaLabel: string, contentBuilder: () => string): void`**
+
+Attaches an interactive tooltip zone to a HUD text element. On desktop, tooltip shows on hover; on mobile, toggles on tap. Sets ARIA labels for accessibility.
+
+```typescript
+attachHudTooltipZone(
+  this,
+  scoreText,
+  'Current score',
+  () => `Your score is ${gameState.score}`,
+);
+```
+
+#### Action button helper
+
+```typescript
+import { createActionButton, type ActionButtonOptions } from '@ui/Renderer';
+```
+
+**`createActionButton(scene: Phaser.Scene, x: number, y: number, width: number, text: string, callback: () => void, options?: ActionButtonOptions): Phaser.GameObjects.Container`**
+
+Creates a styled button with background, label, hover/click effects, and optional disabled state.
+
+```typescript
+createActionButton(
+  this,
+  100, 500, 120, 'Buy',
+  () => buyCard(),
+  { fillColor: 0x224455, textColor: '#88ccff' },
+);
+```
+
+#### Texture application helper
+
+```typescript
+import { applyEnsuredTexture, type EnsureTextureResult } from '@ui/Renderer';
+```
+
+**`applyEnsuredTexture(sprite: Phaser.GameObjects.Image, ensureOp: Promise<EnsureTextureResult>, stillMounted: () => boolean, displayWidth?: number, displayHeight?: number): Promise<void>`**
+
+Applies an ensured texture to a sprite, awaiting async generation if needed. Encapsulates the pattern: await the texture operation, check sprite is still mounted, swap texture, and re-apply display size.
+
+```typescript
+await applyEnsuredTexture(
+  cardImage,
+  ensureCardTexture(this, cardId, width, height),
+  () => cardImage.active,
+  width,
+  height,
+);
+```
+
+#### Card rendering SVG wrapper
+
+```typescript
+import { renderCardSvg, type RenderCardSvgOptions } from '@ui/Renderer';
+```
+
+**`renderCardSvg(scene: Phaser.Scene, parentContainer: Phaser.GameObjects.Container, templateId: string, width: number, height: number, options?: RenderCardSvgOptions): Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle`**
+
+Renders an SVG card into a parent container. Checks for an existing texture; if found creates an `Image`, otherwise starts async generation and draws a fallback `Rectangle`.
+
+```typescript
+renderCardSvg(this, cardContainer, 'card-42', 95, 130, {
+  fallbackFill: 0x333333,
+  fallbackStroke: 0x666666,
+});
+```
+
+### Adapter pattern
+
+Each game provides a thin adapter module under `src/ui/Renderer/adapters/` that re-exports shared helpers and wires game-specific texture pipelines. This keeps scene code importing from a single adapter while the shared API remains stable.
+
+#### Main Street adapter (`src/ui/Renderer/adapters/MainStreetAdapter.ts`)
+
+Re-exports `createActionButton` and `attachHudTooltipZone` unchanged. Provides `mainStreetRenderCardSvg` that wires the scene's `templateKeyForCard` and `requestCardTexture` methods:
+
+```typescript
+import {
+  createActionButton,
+  attachHudTooltipZone,
+  mainStreetRenderCardSvg,
+  createMainStreetHintButton,
+} from '@ui/Renderer/adapters/MainStreetAdapter';
+
+// Button and tooltips use the shared helpers directly
+const buyBtn = createActionButton(this, x, y, 120, 'Buy', () => buy());
+attachHudTooltipZone(this, costText, 'Card cost', () => `Cost: ${card.cost}`);
+
+// Card rendering uses the Main Street–specific wrapper
+mainStreetRenderCardSvg(this, slotContainer, card.id, CARD_W, CARD_H);
+
+// Hint button with game-specific styling
+createMainStreetHintButton(this, x, y, 80, 32, hintUsed, () => showHint());
+```
+
+#### The Mind adapter (`src/ui/Renderer/adapters/MindAdapter.ts`)
+
+Re-exports `createHudContainer` and `renderCardSvg`. Provides `createMindHudText` (centred origin, game depth) and `mindRenderCardSvg` (pre-configured with The Mind's card dimensions):
+
+```typescript
+import {
+  createMindHudText,
+  mindRenderCardSvg,
+  createHudContainer,
+} from '@ui/Renderer/adapters/MindAdapter';
+
+const hud = createHudContainer(this);
+const levelText = createMindHudText(this, 640, 20, 'Level 3', '#ffcc44', { fontSize: '20px' });
+hud.add(levelText);
+
+mindRenderCardSvg(this, cardContainer, 'mind-42');
+```
+
+### Migration reference: helpers moved from game scenes
+
+The following table lists helpers that were extracted from individual game scenes into the shared Renderer module.
+
+| Old location (scene) | Old name | New location | New name |
+|---|---|---|---|
+| `example-games/main-street/scenes/MainStreetScene.ts` | Inline HUD container creation | `@ui/Renderer` | `createHudContainer` |
+| `example-games/main-street/scenes/MainStreetScene.ts` | Inline HUD text styling | `@ui/Renderer` | `createHudText` |
+| `example-games/main-street/scenes/MainStreetScene.ts` | Inline tooltip zone setup | `@ui/Renderer` | `attachHudTooltipZone` |
+| `example-games/main-street/scenes/MainStreetScene.ts` | Inline action button creation | `@ui/Renderer` | `createActionButton` |
+| `example-games/main-street/scenes/MainStreetRenderer.ts` | `renderCardSvg` (local) | `@ui/Renderer` | `renderCardSvg` |
+| `example-games/the-mind/scenes/TheMindScene.ts` | Inline HUD container creation | `@ui/Renderer` | `createHudContainer` |
+| `example-games/the-mind/scenes/TheMindScene.ts` | Inline HUD text styling | `@ui/Renderer` | `createHudText` |
+| `example-games/the-mind/scenes/MindRenderer.ts` | `createMindHudText` (local) | `@ui/Renderer/adapters/MindAdapter` | `createMindHudText` |
+
+### Before and after migration examples
+
+**Before (Main Street — inline in scene):**
+
+```typescript
+// Old pattern: duplicated in every scene
+const hudContainer = this.add.container(0, 0);
+hudContainer.setDepth(1000);
+
+const scoreText = this.add.text(10, 10, 'Score: 0', {
+  fontSize: '16px',
+  fontStyle: 'bold',
+  color: '#ffcc44',
+  fontFamily: 'system-ui, sans-serif',
+}).setOrigin(0, 0.5);
+
+const buyBtn = this.add.container(x + 60, y + 16);
+const bg = this.add.rectangle(0, 0, 120, 32, 0x554422, 0.8);
+bg.setStrokeStyle(1, 0xaa8855);
+buyBtn.add(bg);
+const label = this.add.text(0, 0, 'Buy', {
+  fontSize: '14px', fontStyle: 'bold', color: '#ffcc88',
+}).setOrigin(0.5);
+buyBtn.add(label);
+bg.setInteractive({ useHandCursor: true });
+bg.on('pointerdown', () => buyCard());
+```
+
+**After (using shared Renderer via adapter):**
+
+```typescript
+import {
+  createHudContainer,
+  createHudText,
+  createActionButton,
+} from '@ui/Renderer/adapters/MainStreetAdapter';
+
+const hud = createHudContainer(this);
+const scoreText = createHudText(this, 10, 10, 'Score: 0', '#ffcc44');
+hud.add(scoreText);
+
+createActionButton(this, x, y, 120, 'Buy', () => buyCard());
+```
+
+### Changelog
+
+| Commit | Work Item | Description |
+|---|---|---|
+| `42a3916` | CG-0MPOLH2U9001P7BC | Shared Renderer API scaffold and core helpers |
+| `7d80ec1` | CG-0MPOLHCAN004D753 | Card rendering SVG wrapper helper (`renderCardSvg`) |
+| `9f1272f` | CG-0MPOLHCAN0037UUS | Main Street adapter and migration |
+| `14fa97f` | CG-0MPOLHCB400363VZ | The Mind adapter and migration |
+| `7192f1f` | CG-0MPOLHCB400363VZ | Migrate MindRenderer to use shared `applyEnsuredTexture` |
+
+### Related work items
+
+- **Shared Renderer** (CG-0MP12VWO1003YL55) — parent epic
+- **Shared Renderer API scaffold and core helpers** (CG-0MPOLH2U9001P7BC)
+- **Card rendering SVG wrapper helper** (CG-0MPOLHCAN004D753)
+- **Main Street adapter and migration** (CG-0MPOLHCAN0037UUS)
+- **The Mind adapter and migration** (CG-0MPOLHCB400363VZ)
+- **Unit test specification for shared Renderer helpers** (CG-0MPOLGVTH009NSTM)
+- **Browser integration smoke tests for Main Street and The Mind** (CG-0MPOLGZ70000Q9J1)
 
 See the Gym SLL demo (`example-games/gym/scenes/GymSllScene.ts`) for a working example with shell toggling.
 
