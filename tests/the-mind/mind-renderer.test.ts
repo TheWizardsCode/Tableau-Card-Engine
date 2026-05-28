@@ -36,6 +36,26 @@ vi.mock('/home/rgardler/projects/Tableau-Card-Engine/src/ui/Renderer/adapters/Mi
   createMindHudText: createMindHudTextMock,
 }));
 
+vi.mock('../../src/ui/Renderer', () => ({
+  applyEnsuredTexture: vi.fn(async (
+    sprite: { setTexture: (key: string) => unknown; setDisplaySize: (w: number, h: number) => unknown },
+    ensureOp: Promise<{ key: string; ready: boolean; promise?: Promise<void> }>,
+    stillMounted: () => boolean,
+    displayWidth?: number,
+    displayHeight?: number,
+  ) => {
+    const result = await ensureOp;
+    if (!result.ready && result.promise) {
+      await result.promise;
+    }
+    if (!stillMounted()) return;
+    sprite.setTexture(result.key);
+    if (displayWidth !== undefined && displayHeight !== undefined) {
+      sprite.setDisplaySize(displayWidth, displayHeight);
+    }
+  }),
+}));
+
 vi.mock('../../src/ui', () => ({
   GAME_W: 1000,
   GAME_H: 700,

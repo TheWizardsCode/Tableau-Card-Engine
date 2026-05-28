@@ -4,6 +4,7 @@
 
 import { FONT_FAMILY, createSceneHeader, layoutCardPositions } from '../../../src/ui';
 import { createMindHudText } from '../../../src/ui/Renderer/adapters/MindAdapter';
+import { applyEnsuredTexture } from '../../../src/ui/Renderer';
 import {
   ensureTexture,
   ensureBackTexture,
@@ -69,24 +70,6 @@ export class MindRenderer {
     if (this.scene.textures?.exists(canonical)) return canonical;
     if (this.scene.textures?.exists(resolveBackTemplateId())) return resolveBackTemplateId();
     return canonical;
-  }
-
-  private async applyEnsuredTexture(
-    sprite: Phaser.GameObjects.Image,
-    ensureOp: Promise<{ key: string; ready: boolean; promise?: Promise<void> }>,
-    stillMounted: () => boolean,
-  ): Promise<void> {
-    try {
-      const result = await ensureOp;
-      if (!result.ready && result.promise) {
-        await result.promise;
-      }
-      if (!stillMounted()) return;
-      sprite.setTexture(result.key);
-      sprite.setDisplaySize(CARD_W, CARD_H);
-    } catch {
-      // keep existing texture fallback on error
-    }
   }
 
   private ensureAiBackTextures(): void {
@@ -200,10 +183,12 @@ export class MindRenderer {
       this.pileSprite.setAlpha(1);
       this.pileValueText.setText(`${topCard.value}`);
 
-      void this.applyEnsuredTexture(
+      void applyEnsuredTexture(
         this.pileSprite,
         ensureTexture(this.scene, topCard.value, CARD_W, CARD_H),
         () => !!this.pileSprite,
+        CARD_W,
+        CARD_H,
       );
     } else {
       const backKey = this.getBackTextureFallbackKey();
@@ -255,10 +240,12 @@ export class MindRenderer {
       (sprite as any).__mindCardValue = card.value;
 
       // Kick off lazy rasterisation and update the sprite when ready.
-      void this.applyEnsuredTexture(
+      void applyEnsuredTexture(
         sprite,
         ensureTexture(this.scene, displayCard.value, CARD_W, CARD_H),
         () => this.humanCardSprites.includes(sprite),
+        CARD_W,
+        CARD_H,
       );
 
       sprite.on('pointerdown', () => onCardClick(card));
@@ -303,10 +290,12 @@ export class MindRenderer {
       // Start with card-back placeholder and update when lazy texture is ready.
       sprite.setTexture(backKey);
       sprite.setDisplaySize(CARD_W, CARD_H);
-      void this.applyEnsuredTexture(
+      void applyEnsuredTexture(
         sprite,
         ensureTexture(this.scene, displayCard.value, CARD_W, CARD_H),
         () => this.humanCardSprites[i] === sprite,
+        CARD_W,
+        CARD_H,
       );
     }
   }
@@ -447,10 +436,12 @@ export class MindRenderer {
         .setDepth(DEPTH_CARDS + i);
 
       if (faceUp) {
-        void this.applyEnsuredTexture(
+        void applyEnsuredTexture(
           sprite,
           ensureTexture(this.scene, card.value, CARD_W, CARD_H),
           () => (sprite as any).active !== false,
+          CARD_W,
+          CARD_H,
         );
       }
 
