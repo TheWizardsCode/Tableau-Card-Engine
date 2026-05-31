@@ -181,14 +181,9 @@ export abstract class GymSceneBase extends Phaser.Scene {
   ): Phaser.GameObjects.Text {
     const color = opts?.color ?? '#88ff88';
     const hoverColor = opts?.hoverColor ?? '#bbffbb';
-    const btn = this.add
-      .text(x, y, label, {
-        fontSize: opts?.fontSize ?? '14px',
-        color,
-        fontFamily: 'monospace',
-        fontStyle: 'bold',
-      })
-      .setInteractive({ useHandCursor: true });
+    const btn = createHudText(this, x, y, label, color, {
+      fontSize: opts?.fontSize ?? '14px',
+    }).setInteractive({ useHandCursor: true });
 
     btn.on('pointerdown', callback);
     btn.on('pointerover', () => btn.setColor(hoverColor));

@@ -18,10 +18,10 @@ import { createSceneMenuButton } from '../../../src/ui/SceneHeader';
 import { runSceneTransition } from '../../../src/ui/sceneTransition';
 import { GYM_ROUTER_KEY, GYM_SCENE_CATALOGUE } from '../GymRegistry';
 import type { GymSceneEntry } from '../GymRegistry';
+import { createHudText } from '../../../src/ui/Renderer';
 
 // ── Layout constants ───────────────────────────────────────
 
-const FONT_FAMILY = 'monospace';
 const CARD_W = 320;
 const CARD_H = 120;
 const CARD_GAP = 16;
@@ -53,32 +53,13 @@ export class GymRouterScene extends Phaser.Scene {
     createSceneMenuButton(this);
 
     // Title
-    this.add
-      .text(GAME_W / 2, 24, 'TCE Gym', {
-        fontSize: '28px',
-        color: '#88ff88',
-        fontFamily: FONT_FAMILY,
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5);
+    createHudText(this, GAME_W / 2, 24, 'TCE Gym', '#88ff88', { fontSize: '28px' }).setOrigin(0.5);
 
     // Subtitle
-    this.add
-      .text(GAME_W / 2, 52, 'Select a scene to explore core-engine features', {
-        fontSize: '13px',
-        color: '#669966',
-        fontFamily: FONT_FAMILY,
-      })
-      .setOrigin(0.5);
+    createHudText(this, GAME_W / 2, 52, 'Select a scene to explore core-engine features', '#669966', { fontSize: '13px' }).setOrigin(0.5);
 
     // Transition toggle button
-    const toggleBtn = this.add
-      .text(GAME_W - 20, 10, `Transitions: ${animateTransitions ? 'ON' : 'OFF'}`, {
-        fontSize: '10px',
-        color: animateTransitions ? '#88ff88' : '#666666',
-        fontFamily: FONT_FAMILY,
-      })
-      .setOrigin(1, 0)
+    const toggleBtn = createHudText(this, GAME_W - 20, 10, `Transitions: ${animateTransitions ? 'ON' : 'OFF'}`, animateTransitions ? '#88ff88' : '#666666', { fontSize: '10px', originX: 1, originY: 0 })
       .setInteractive({ useHandCursor: true });
     toggleBtn.on('pointerdown', () => {
       animateTransitions = !animateTransitions;
@@ -147,26 +128,11 @@ export class GymRouterScene extends Phaser.Scene {
     this.drawCard(bg, x, y, cardW, cardH, CARD_BG, CARD_BORDER);
 
     // Title
-    const title = this.add
-      .text(x, y - cardH / 2 + 18, entry.title, {
-        fontSize: '15px',
-        color: '#ffffff',
-        fontFamily: FONT_FAMILY,
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5);
+    const title = createHudText(this, x, y - cardH / 2 + 18, entry.title, '#ffffff', { fontSize: '15px' }).setOrigin(0.5);
 
     // Description
-    const desc = this.add
-      .text(x, y + 6, entry.description, {
-        fontSize: '10px',
-        color: '#aaddaa',
-        fontFamily: FONT_FAMILY,
-        align: 'center',
-        wordWrap: { width: cardW - 24 },
-        lineSpacing: 2,
-      })
-      .setOrigin(0.5);
+    const desc = createHudText(this, x, y + 6, entry.description, '#aaddaa', { fontSize: '10px', align: 'center', lineSpacing: 2 }).setOrigin(0.5);
+    desc.setWordWrapWidth(cardW - 24);
 
     // Crop description overflow
     const maxDescH = cardH - 60;
@@ -175,14 +141,7 @@ export class GymRouterScene extends Phaser.Scene {
     }
 
     // "[ Open ]" button label
-    const openLabel = this.add
-      .text(x, y + cardH / 2 - 16, '[ Open ]', {
-        fontSize: '13px',
-        color: '#88ff88',
-        fontFamily: FONT_FAMILY,
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5);
+    const openLabel = createHudText(this, x, y + cardH / 2 - 16, '[ Open ]', '#88ff88', { fontSize: '13px' }).setOrigin(0.5);
 
     // Interactive hit area
     const hitZone = this.add
