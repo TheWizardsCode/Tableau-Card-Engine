@@ -4,11 +4,13 @@
 
 import { scoreVisibleCards, scoreGrid } from '../GolfScoring';
 import type { GolfSession } from '../GolfGame';
+import { GAME_W, GAME_H } from '../../../src/ui';
 import {
-  GAME_W, GAME_H, FONT_FAMILY,
+  createGolfHudText,
   getCardTexture,
-  createSceneTitle, createSceneMenuButton,
-} from '../../../src/ui';
+  createSceneTitle,
+  createSceneMenuButton,
+} from '../../../src/ui/Renderer/adapters/GolfAdapter';
 import {
   GOLF_CARD_H, CARD_GAP,
   GRID_ROWS,
@@ -61,21 +63,23 @@ export class GolfRenderer {
     // Player labels above each grid
     const gridH = GRID_ROWS * GOLF_CARD_H + (GRID_ROWS - 1) * CARD_GAP;
 
-    this.humanLabel = this.scene.add
-      .text(this.layout.humanGridCenterX, this.layout.humanGridCenterY - gridH / 2 - 24, 'You', {
-        fontSize: '24px',
-        color: '#ffffff',
-        fontFamily: FONT_FAMILY,
-      })
-      .setOrigin(0.5);
+    this.humanLabel = createGolfHudText(
+      this.scene,
+      this.layout.humanGridCenterX,
+      this.layout.humanGridCenterY - gridH / 2 - 24,
+      'You',
+      '#ffffff',
+      { fontSize: '24px', originX: 0.5 },
+    );
 
-    this.aiLabel = this.scene.add
-      .text(this.layout.aiGridCenterX, this.layout.aiGridCenterY - gridH / 2 - 24, 'AI', {
-        fontSize: '24px',
-        color: '#cccccc',
-        fontFamily: FONT_FAMILY,
-      })
-      .setOrigin(0.5);
+    this.aiLabel = createGolfHudText(
+      this.scene,
+      this.layout.aiGridCenterX,
+      this.layout.aiGridCenterY - gridH / 2 - 24,
+      'AI',
+      '#cccccc',
+      { fontSize: '24px', originX: 0.5 },
+    );
   }
 
   createPiles(
@@ -89,13 +93,14 @@ export class GolfRenderer {
       this.stockSprite.on('pointerdown', onStockClick);
     }
 
-    this.scene.add
-      .text(this.layout.stockPileCenterX, this.layout.stockPileCenterY + GOLF_CARD_H / 2 + 16, 'Stock', {
-        fontSize: '16px',
-        color: '#aaccaa',
-        fontFamily: FONT_FAMILY,
-      })
-      .setOrigin(0.5);
+    createGolfHudText(
+      this.scene,
+      this.layout.stockPileCenterX,
+      this.layout.stockPileCenterY + GOLF_CARD_H / 2 + 16,
+      'Stock',
+      '#aaccaa',
+      { fontSize: '16px', originX: 0.5 },
+    );
 
     // Discard pile (lower center)
     this.discardSprite = this.scene.add.image(this.layout.discardPileCenterX, this.layout.discardPileCenterY, 'card_back');
@@ -104,13 +109,14 @@ export class GolfRenderer {
       this.discardSprite.on('pointerdown', onDiscardClick);
     }
 
-    this.scene.add
-      .text(this.layout.discardPileCenterX, this.layout.discardPileCenterY + GOLF_CARD_H / 2 + 16, 'Discard', {
-        fontSize: '16px',
-        color: '#aaccaa',
-        fontFamily: FONT_FAMILY,
-      })
-      .setOrigin(0.5);
+    createGolfHudText(
+      this.scene,
+      this.layout.discardPileCenterX,
+      this.layout.discardPileCenterY + GOLF_CARD_H / 2 + 16,
+      'Discard',
+      '#aaccaa',
+      { fontSize: '16px', originX: 0.5 },
+    );
   }
 
   createGrids(onHumanCardClick: (index: number) => void): void {
@@ -137,40 +143,44 @@ export class GolfRenderer {
     // Scores below each grid
     const gridH = GRID_ROWS * GOLF_CARD_H + (GRID_ROWS - 1) * CARD_GAP;
 
-    this.humanScoreText = this.scene.add
-      .text(this.layout.humanGridCenterX, this.layout.humanGridCenterY + gridH / 2 + 24, 'Score: 0', {
-        fontSize: '22px',
-        color: '#ffffff',
-        fontFamily: FONT_FAMILY,
-      })
-      .setOrigin(0.5);
+    this.humanScoreText = createGolfHudText(
+      this.scene,
+      this.layout.humanGridCenterX,
+      this.layout.humanGridCenterY + gridH / 2 + 24,
+      'Score: 0',
+      '#ffffff',
+      { fontSize: '22px', originX: 0.5 },
+    );
 
-    this.aiScoreText = this.scene.add
-      .text(this.layout.aiGridCenterX, this.layout.aiGridCenterY + gridH / 2 + 24, 'Score: 0', {
-        fontSize: '22px',
-        color: '#cccccc',
-        fontFamily: FONT_FAMILY,
-      })
-      .setOrigin(0.5);
+    this.aiScoreText = createGolfHudText(
+      this.scene,
+      this.layout.aiGridCenterX,
+      this.layout.aiGridCenterY + gridH / 2 + 24,
+      'Score: 0',
+      '#cccccc',
+      { fontSize: '22px', originX: 0.5 },
+    );
 
     // Turn indicator above the stock pile in center
-    this.turnText = this.scene.add
-      .text(this.layout.stockPileCenterX, this.layout.stockPileCenterY - GOLF_CARD_H / 2 - 24, '', {
-        fontSize: '20px',
-        color: '#ffdd44',
-        fontFamily: FONT_FAMILY,
-      })
-      .setOrigin(0.5);
+    this.turnText = createGolfHudText(
+      this.scene,
+      this.layout.stockPileCenterX,
+      this.layout.stockPileCenterY - GOLF_CARD_H / 2 - 24,
+      '',
+      '#ffdd44',
+      { fontSize: '20px', originX: 0.5 },
+    );
   }
 
   createInstructions(): void {
-    this.instructionText = this.scene.add
-      .text(GAME_W / 2, GAME_H - 18, '', {
-        fontSize: '18px',
-        color: '#88aa88',
-        fontFamily: FONT_FAMILY,
-      })
-      .setOrigin(0.5);
+    this.instructionText = createGolfHudText(
+      this.scene,
+      GAME_W / 2,
+      GAME_H - 18,
+      '',
+      '#88aa88',
+      { fontSize: '18px', originX: 0.5 },
+    );
   }
 
   // ── Grid layout helpers ─────────────────────────────────

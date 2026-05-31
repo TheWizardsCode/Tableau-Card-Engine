@@ -36,6 +36,60 @@ function waitFrames(n: number): Promise<void> {
   });
 }
 
+describe('Sushi Go round-score overlay', () => {
+  let game: Phaser.Game | null = null;
+
+  afterEach(() => {
+    destroyGame(game);
+    game = null;
+  });
+
+  it('renders Next Round button above overlay background depth', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('SushiGoScene') as any;
+
+    const fakeRoundResult = {
+      round: 1,
+      tableauScores: [9, 8],
+      tableauBreakdowns: [
+        { tempura: 0, sashimi: 0, dumpling: 0, nigiri: 0, chopsticks: 0, puddingCount: 0 },
+        { tempura: 0, sashimi: 0, dumpling: 0, nigiri: 0, chopsticks: 0, puddingCount: 0 },
+      ],
+      makiCounts: [0, 0],
+      makiBonuses: [0, 0],
+      roundScores: [9, 8],
+      puddingCounts: [0, 0],
+      puddingBonuses: [0, 0],
+    };
+
+    scene.overlayManager.showRoundScoreOverlay(fakeRoundResult, () => {});
+    await waitFrames(3);
+
+    // Find the "Next Round" button container
+    const containers = scene.children.list.filter(
+      (child: Phaser.GameObjects.GameObject) => child instanceof Phaser.GameObjects.Container,
+    ) as Phaser.GameObjects.Container[];
+
+    const findButtonLabel = (container: Phaser.GameObjects.Container, label: string): boolean => {
+      return (container as any).list?.some(
+        (child: any) => child instanceof Phaser.GameObjects.Text && child.text === label,
+      );
+    };
+
+    const nextRoundBtn = containers.find((c) => findButtonLabel(c, 'Next Round'));
+    expect(nextRoundBtn).toBeDefined();
+
+    // The button must be above the overlay background depth (10)
+    expect(nextRoundBtn!.depth).toBeGreaterThanOrEqual(11);
+
+    // Verify the background rectangle is interactive
+    const bg = (nextRoundBtn as any).list?.find(
+      (child: any) => child instanceof Phaser.GameObjects.Rectangle,
+    );
+    expect(bg?.input?.enabled).toBe(true);
+  });
+});
+
 describe('Sushi Go game-over overlay', () => {
   let game: Phaser.Game | null = null;
 
@@ -68,17 +122,31 @@ describe('Sushi Go game-over overlay', () => {
 
     await waitFrames(3);
 
-    const texts = scene.children.list.filter(
-      (child: Phaser.GameObjects.GameObject) => child instanceof Phaser.GameObjects.Text,
-    ) as Phaser.GameObjects.Text[];
+    // Action buttons are Containers with Text children (migrated to shared Renderer API).
+    const containers = scene.children.list.filter(
+      (child: Phaser.GameObjects.GameObject) => child instanceof Phaser.GameObjects.Container,
+    ) as Phaser.GameObjects.Container[];
 
-    const playAgainBtn = texts.find((t) => t.text === '[ Play Again ]');
-    const menuBtn = texts.find((t) => t.text === '[ Menu ]');
+    const findButtonLabel = (container: Phaser.GameObjects.Container, label: string): boolean => {
+      return (container as any).list?.some(
+        (child: any) => child instanceof Phaser.GameObjects.Text && child.text === label,
+      );
+    };
+
+    const playAgainBtn = containers.find((c) => findButtonLabel(c, 'Play Again'));
+    const menuBtn = containers.find((c) => findButtonLabel(c, 'Menu'));
 
     expect(playAgainBtn).toBeDefined();
     expect(menuBtn).toBeDefined();
-    expect(playAgainBtn!.input?.enabled).toBe(true);
-    expect(menuBtn!.input?.enabled).toBe(true);
+    // Verify the background rectangle is interactive
+    const playBg = (playAgainBtn as any).list?.find(
+      (child: any) => child instanceof Phaser.GameObjects.Rectangle,
+    );
+    const menuBg = (menuBtn as any).list?.find(
+      (child: any) => child instanceof Phaser.GameObjects.Rectangle,
+    );
+    expect(playBg?.input?.enabled).toBe(true);
+    expect(menuBg?.input?.enabled).toBe(true);
   });
 
   it('displays correct final totals including pudding bonuses when provided', async () => {

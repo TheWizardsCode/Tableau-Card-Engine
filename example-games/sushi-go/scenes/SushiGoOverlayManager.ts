@@ -6,10 +6,12 @@ import {
   GAME_W,
   GAME_H,
   FONT_FAMILY,
-  createOverlayButton,
-  createOverlayMenuButton,
   OverlayManager,
 } from '../../../src/ui';
+import {
+  createActionButton,
+  createSushiGoMenuButton,
+} from '../../../src/ui/Renderer/adapters/SushiGoAdapter';
 import { scoreTableauBreakdown } from '../SushiGoScoring';
 import type { SushiGoSession, RoundResult } from '../SushiGoGame';
 import { getWinnerIndex } from '../SushiGoGame';
@@ -92,12 +94,19 @@ export class SushiGoOverlayManager {
       .setDepth(11);
     this.overlayManager.add(text);
 
-    const btn = createOverlayButton(this.scene, GAME_W / 2, buttonY, '[ Next Round ]');
-    btn.on('pointerdown', () => {
-      this.soundManager?.play(SFX_KEYS.UI_CLICK);
-      this.overlayManager.dismiss();
-      onNextRound();
-    });
+    const btn = createActionButton(
+      this.scene,
+      GAME_W / 2 - 100,
+      buttonY - 16,
+      200,
+      'Next Round',
+      () => {
+        this.soundManager?.play(SFX_KEYS.UI_CLICK);
+        this.overlayManager.dismiss();
+        onNextRound();
+      },
+      { depth: 11 },
+    );
     this.overlayManager.add(btn);
   }
 
@@ -195,14 +204,21 @@ export class SushiGoOverlayManager {
       .setDepth(11);
     this.overlayManager.add(text);
 
-    const playBtn = createOverlayButton(this.scene, GAME_W / 2 - 80, buttonY, '[ Play Again ]');
-    playBtn.on('pointerdown', () => {
-      this.soundManager?.play(SFX_KEYS.UI_CLICK);
-      onRestart();
-    });
+    const playBtn = createActionButton(
+      this.scene,
+      GAME_W / 2 - 140,
+      buttonY - 16,
+      120,
+      'Play Again',
+      () => {
+        this.soundManager?.play(SFX_KEYS.UI_CLICK);
+        onRestart();
+      },
+      { depth: 11 },
+    );
     this.overlayManager.add(playBtn);
 
-    const menuBtn = createOverlayMenuButton(this.scene, GAME_W / 2 + 80, buttonY);
+    const menuBtn = createSushiGoMenuButton(this.scene, GAME_W / 2 + 20, buttonY - 16, 120, { depth: 11 });
     this.overlayManager.add(menuBtn);
   }
 

@@ -5,10 +5,13 @@
 import type { Card, Rank, Suit } from '../../../src/card-system/Card';
 import { scoreVisibleCards } from '../GolfScoring';
 import type { BoardSnapshot, CardSnapshot } from '../GameTranscript';
+import { GAME_W, GAME_H } from '../../../src/ui';
 import {
-  GAME_W, GAME_H, FONT_FAMILY,
-  createOverlayBackground, createOverlayButton, dismissOverlay,
-} from '../../../src/ui';
+  createActionButton,
+  createGolfHudText,
+  createOverlayBackground,
+  dismissOverlay,
+} from '../../../src/ui/Renderer/adapters/GolfAdapter';
 import type { GolfSession } from '../GolfGame';
 import type { GolfRenderer } from './GolfRenderer';
 
@@ -177,15 +180,15 @@ export class GolfReplayController {
     const boxTop = GAME_H / 2 - 210;
 
     // Title
-    const title = this.scene.add
-      .text(centerX, boxTop + 30, 'Interactive Takeover', {
-        fontSize: '26px',
-        color: '#ffdd44',
-        fontFamily: FONT_FAMILY,
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5)
-      .setDepth(21);
+    const title = createGolfHudText(
+      this.scene,
+      centerX,
+      boxTop + 30,
+      'Interactive Takeover',
+      '#ffdd44',
+      { fontSize: '26px', originX: 0.5 },
+    );
+    title.setDepth(21);
     this.takeoverOverlayObjects.push(title);
 
     // Gather debug info
@@ -207,16 +210,15 @@ export class GolfReplayController {
       `Last action: ${options.lastAction}`,
     ];
 
-    const info = this.scene.add
-      .text(centerX, boxTop + 90, infoLines.join('\n'), {
-        fontSize: '16px',
-        color: '#cccccc',
-        fontFamily: FONT_FAMILY,
-        align: 'center',
-        lineSpacing: 6,
-      })
-      .setOrigin(0.5, 0)
-      .setDepth(21);
+    const info = createGolfHudText(
+      this.scene,
+      centerX,
+      boxTop + 90,
+      infoLines.join('\n'),
+      '#cccccc',
+      { fontSize: '16px', originX: 0.5, originY: 0, align: 'center', lineSpacing: 6 },
+    );
+    info.setDepth(21);
     this.takeoverOverlayObjects.push(info);
 
     // Helper to destroy overlay and mark interactive mode
@@ -233,50 +235,50 @@ export class GolfReplayController {
     const buttonSpacing = 170;
 
     // "Human plays next" button
-    const humanBtn = createOverlayButton(
+    const humanBtn = createActionButton(
       this.scene,
       centerX - buttonSpacing,
       buttonY,
+      200,
       '[ Human plays next ]',
-      21,
-      { fontSize: '16px' },
+      () => {
+        dismissAndAct(() => this.enableInteractiveMode({ nextPlayer: 0 }));
+      },
+      { fontSize: '16px', depth: 21 },
     );
-    humanBtn.on('pointerdown', () => {
-      dismissAndAct(() => this.enableInteractiveMode({ nextPlayer: 0 }));
-    });
     this.takeoverOverlayObjects.push(humanBtn);
 
     // "AI plays next" button
-    const aiBtn = createOverlayButton(
+    const aiBtn = createActionButton(
       this.scene,
       centerX,
       buttonY,
+      200,
       '[ AI plays next ]',
-      21,
-      { fontSize: '16px' },
+      () => {
+        dismissAndAct(() => this.enableInteractiveMode({ nextPlayer: 1 }));
+      },
+      { fontSize: '16px', depth: 21 },
     );
-    aiBtn.on('pointerdown', () => {
-      dismissAndAct(() => this.enableInteractiveMode({ nextPlayer: 1 }));
-    });
     this.takeoverOverlayObjects.push(aiBtn);
 
     // "Resume replay" button
-    const resumeBtn = createOverlayButton(
+    const resumeBtn = createActionButton(
       this.scene,
       centerX + buttonSpacing,
       buttonY,
+      200,
       '[ Resume replay ]',
-      21,
-      { fontSize: '16px' },
+      () => {
+        dismissAndAct(() => {
+          gameEvents.emit(
+            'resume-replay' as Parameters<typeof gameEvents.emit>[0],
+            {} as never,
+          );
+        });
+      },
+      { fontSize: '16px', depth: 21 },
     );
-    resumeBtn.on('pointerdown', () => {
-      dismissAndAct(() => {
-        gameEvents.emit(
-          'resume-replay' as Parameters<typeof gameEvents.emit>[0],
-          {} as never,
-        );
-      });
-    });
     this.takeoverOverlayObjects.push(resumeBtn);
   }
 }

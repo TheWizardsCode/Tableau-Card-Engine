@@ -8,6 +8,7 @@ import {
   createOverlayBackground, createOverlayButton, createOverlayMenuButton,
   dismissOverlay as sharedDismissOverlay,
 } from '../../../src/ui';
+import { createHudText } from '../../../src/ui/Renderer/adapters/BeleagueredCastleAdapter';
 
 
 export class BeleagueredCastleOverlayManager {
@@ -50,10 +51,13 @@ export class BeleagueredCastleOverlayManager {
     }).setOrigin(0.5).setDepth(BUTTON_DEPTH);
     overlayObjects.push(title);
 
-    const stats = this.scene.add.text(GAME_W / 2, GAME_H / 2 - 20,
-      `Moves: ${this.state.moveCount}    Time: ${mm}:${ss}`, {
-        fontSize: '22px', color: '#aaccaa', fontFamily: FONT_FAMILY, align: 'center',
-      }).setOrigin(0.5).setDepth(BUTTON_DEPTH);
+    const stats = createHudText(this.scene, GAME_W / 2, GAME_H / 2 - 20,
+      `Moves: ${this.state.moveCount}    Time: ${mm}:${ss}`, '#aaccaa', {
+        fontSize: '22px',
+        originX: 0.5,
+        originY: 0.5,
+      });
+    stats.setDepth(BUTTON_DEPTH);
     overlayObjects.push(stats);
 
     const newGameBtn = createOverlayButton(this.scene, GAME_W / 2 - 150, GAME_H / 2 + 50, '[ New Game ]', BUTTON_DEPTH);
@@ -76,9 +80,13 @@ export class BeleagueredCastleOverlayManager {
 
     const { objects: overlayObjects } = createOverlayBackground(this.scene, { depth: OVERLAY_DEPTH, alpha: 0.75 });
 
-    const title = this.scene.add.text(GAME_W / 2, GAME_H / 2 - 60, 'No Productive Moves Available', {
-      fontSize: '34px', color: '#ff8888', fontFamily: FONT_FAMILY, fontStyle: 'bold',
-    }).setOrigin(0.5).setDepth(BUTTON_DEPTH);
+    const title = createHudText(this.scene, GAME_W / 2, GAME_H / 2 - 60,
+      'No Productive Moves Available', '#ff8888', {
+        fontSize: '34px',
+        originX: 0.5,
+        originY: 0.5,
+      });
+    title.setDepth(BUTTON_DEPTH);
     overlayObjects.push(title);
 
     const undoBtn = createOverlayButton(this.scene, GAME_W / 2 - 180, GAME_H / 2 + 30, '[ Undo Last ]', BUTTON_DEPTH);

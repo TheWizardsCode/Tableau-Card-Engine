@@ -117,37 +117,38 @@ function clickAtGameCoords(
   // Ensure ScaleManager bounds are up to date before computing coords
   scale.refresh();
 
-  // Convert game coords to page coords (inverse of ScaleManager.transformX/Y)
-  // transformX(pageX) = (pageX - canvasBounds.left) * displayScale.x
-  // => pageX = gameX / displayScale.x + canvasBounds.left
+  // Convert game-world coords to page/screen coords using Phaser's scale
+  // transform methods which handle all DPR and viewport scaling.
+  // transformX/Y converts page coords to game coords, so we need the
+  // inverse. For a scale that maps page→game via:
+  //   gameX = (pageX - canvasBounds.left) * displayScale.x
+  // The inverse is:
+  //   pageX = gameX / displayScale.x + canvasBounds.left
   const pageX =
     gameX / scale.displayScale.x + scale.canvasBounds.left;
   const pageY =
     gameY / scale.displayScale.y + scale.canvasBounds.top;
 
-  const eventInit: MouseEventInit = {
-    clientX: pageX,
-    clientY: pageY,
-    screenX: pageX,
-    screenY: pageY,
-    bubbles: true,
-    cancelable: true,
-    button: 0,
-    buttons: 1,
+  // Phaser 4 RC7's MouseManager natively listens for native DOM `mousedown`
+  // and `mouseup` events (not `pointerdown`/`pointerup`). Synthetic
+  // PointerEvents dispatched via dispatchEvent do NOT auto-generate the
+  // corresponding MouseEvent, so we must dispatch MouseEvent directly.
+  const dispatch = (type: string, buttons: number) => {
+    const e = new MouseEvent(type, {
+      clientX: Math.round(pageX),
+      clientY: Math.round(pageY),
+      screenX: Math.round(pageX),
+      screenY: Math.round(pageY),
+      button: 0,
+      buttons,
+      bubbles: true,
+      cancelable: true,
+    });
+    canvas.dispatchEvent(e);
   };
 
-  // Dispatch mousedown, then patch pageX/pageY (not in MouseEventInit typedef
-  // but Phaser reads event.pageX; browsers auto-compute it from clientX but
-  // we set it explicitly for robustness in synthetic events).
-  const down = new MouseEvent('mousedown', eventInit);
-  Object.defineProperty(down, 'pageX', { value: pageX });
-  Object.defineProperty(down, 'pageY', { value: pageY });
-  canvas.dispatchEvent(down);
-
-  const up = new MouseEvent('mouseup', { ...eventInit, buttons: 0 });
-  Object.defineProperty(up, 'pageX', { value: pageX });
-  Object.defineProperty(up, 'pageY', { value: pageY });
-  canvas.dispatchEvent(up);
+  dispatch('mousedown', 1);
+  dispatch('mouseup', 0);
 }
 
 /**
@@ -177,19 +178,36 @@ describe('Golf overlay button tests', () => {
     forceEndScreen(scene);
     await waitFrames(3);
 
-    // Find text objects with overlay button labels
-    const texts = scene.children.list.filter(
-      (child: Phaser.GameObjects.GameObject) =>
-        child instanceof Phaser.GameObjects.Text,
-    ) as Phaser.GameObjects.Text[];
+    // Helper: find a container that contains a Text child with the given label.
+    const findContainerByText = (
+      label: string,
+    ): Phaser.GameObjects.Container | undefined => {
+      return scene.children.list.find(
+        (child: Phaser.GameObjects.GameObject) =>
+          child instanceof Phaser.GameObjects.Container &&
+          (child as Phaser.GameObjects.Container).list.some(
+            (c: Phaser.GameObjects.GameObject) =>
+              c instanceof Phaser.GameObjects.Text && c.text === label,
+          ),
+      ) as Phaser.GameObjects.Container | undefined;
+    };
 
-    const playAgainBtn = texts.find((t) => t.text === '[ Play Again ]');
-    const menuBtn = texts.find((t) => t.text === '[ Menu ]');
+    const playAgainBtn = findContainerByText('[ Play Again ]');
+    const menuBtn = findContainerByText('Menu');
 
     expect(playAgainBtn).toBeDefined();
     expect(menuBtn).toBeDefined();
-    expect(playAgainBtn!.input?.enabled).toBe(true);
-    expect(menuBtn!.input?.enabled).toBe(true);
+    // Buttons are interactive containers (the container itself is the hit target)
+    const playBg = (playAgainBtn!.list as Phaser.GameObjects.GameObject[]).find(
+      (c) => c instanceof Phaser.GameObjects.Rectangle,
+    );
+    const menuBg = (menuBtn!.list as Phaser.GameObjects.GameObject[]).find(
+      (c) => c instanceof Phaser.GameObjects.Rectangle,
+    );
+    expect(playBg).toBeDefined();
+    expect(menuBg).toBeDefined();
+    expect((playBg as Phaser.GameObjects.Rectangle).input?.enabled).toBe(true);
+    expect((menuBg as Phaser.GameObjects.Rectangle).input?.enabled).toBe(true);
   });
 
   it('should restart the scene when "Play Again" is clicked via DOM pointer event', async () => {
@@ -203,31 +221,44 @@ describe('Golf overlay button tests', () => {
     // Wait for the end screen to render and Phaser to process the frame
     await waitFrames(5);
 
-    // Find the "Play Again" button to get its coordinates
-    const texts = scene.children.list.filter(
-      (child: Phaser.GameObjects.GameObject) =>
-        child instanceof Phaser.GameObjects.Text,
-    ) as Phaser.GameObjects.Text[];
-    const playAgainBtn = texts.find((t) => t.text === '[ Play Again ]');
+    // Helper: find a container that contains a Text child with the given label
+    // and return the interactive Rectangle (background) inside it.
+    const findButtonContainer = (
+      label: string,
+    ): Phaser.GameObjects.Container | undefined => {
+      return scene.children.list.find(
+        (child: Phaser.GameObjects.GameObject) =>
+          child instanceof Phaser.GameObjects.Container &&
+          (child as Phaser.GameObjects.Container).list.some(
+            (c: Phaser.GameObjects.GameObject) =>
+              c instanceof Phaser.GameObjects.Text && c.text === label,
+          ),
+      ) as Phaser.GameObjects.Container | undefined;
+    };
+
+    // Find the "Play Again" button container.
+    // createActionButton places the container at (x + width/2, y + height/2)
+    // with the Rectangle at local (0, 0) — world pos = container pos.
+    const playAgainBtn = findButtonContainer('[ Play Again ]');
     expect(playAgainBtn).toBeDefined();
 
-    // Click at the button's game-world position through the DOM
+    // Click at the button's world position through the DOM.
+    // This routes through Phaser's full input pipeline (hit-testing, depth
+    // sorting, topOnly filtering) so the full system is exercised.
     clickAtGameCoords(game, playAgainBtn!.x, playAgainBtn!.y);
 
-    // Wait for restart: Phaser queues scene.restart() to the next tick.
+    // Wait for restart: scene.restart() destroys the old scene and creates
+    // a new one. We wait for the session object to change as proof that
+    // a fresh scene was created.
     await waitForCondition(() => {
       const activeScene = game!.scene.getScene('GolfScene');
       const maybeSession = getSceneInternals(activeScene).session;
-      return maybeSession && maybeSession !== originalSession;
+      return Boolean(maybeSession && maybeSession !== originalSession);
     }, 15_000);
     await waitFrames(2);
 
-    // Verify: new session was created (different object reference)
-    const newScene = game.scene.getScene('GolfScene')!;
-    const newSession = getSceneInternals(newScene).session;
-    expect(newSession).not.toBe(originalSession);
-
     // Verify: the scene is in initial state, not in round-ended
+    const newScene = game.scene.getScene('GolfScene')!;
     expect(getSceneInternals(newScene).phaseManager.current).toBe('waiting-for-draw');
 
     // Verify: overlay buttons no longer exist
