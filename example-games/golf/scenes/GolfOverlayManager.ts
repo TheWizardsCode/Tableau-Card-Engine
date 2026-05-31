@@ -6,10 +6,13 @@
 import type { TranscriptRecorder } from '../GameTranscript';
 import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
 import type { SoundManager, GameEventEmitter } from '../../../src/core-engine';
+import { GAME_W, GAME_H } from '../../../src/ui';
 import {
-  GAME_W, GAME_H, FONT_FAMILY,
-  createOverlayBackground, createOverlayButton, createOverlayMenuButton,
-} from '../../../src/ui';
+  createActionButton,
+  createGolfHudText,
+  createGolfMenuButton,
+  createOverlayBackground,
+} from '../../../src/ui/Renderer/adapters/GolfAdapter';
 import { SFX_KEYS } from './GolfConstants';
 import type { GolfSession } from '../GolfGame';
 
@@ -64,35 +67,36 @@ export class GolfOverlayManager {
     );
 
     const winnerText = results.winnerIndex === 0 ? 'You Win!' : 'AI Wins!';
-    this.scene.add
-      .text(
-        GAME_W / 2,
-        GAME_H / 2 - 50,
-        `${winnerText}\n\nYou: ${results.scores[0]} pts\nAI: ${results.scores[1]} pts`,
-        {
-          fontSize: '28px',
-          color: '#ffffff',
-          fontFamily: FONT_FAMILY,
-          align: 'center',
-        },
-      )
-      .setOrigin(0.5)
-      .setDepth(11);
+    createGolfHudText(
+      this.scene,
+      GAME_W / 2,
+      GAME_H / 2 - 50,
+      `${winnerText}\n\nYou: ${results.scores[0]} pts\nAI: ${results.scores[1]} pts`,
+      '#ffffff',
+      { fontSize: '28px', originX: 0.5, align: 'center' },
+    );
 
     // Play again button
-    const btn = createOverlayButton(
-      this.scene, GAME_W / 2 - 85, GAME_H / 2 + 85, '[ Play Again ]',
+    createActionButton(
+      this.scene,
+      GAME_W / 2 - 85,
+      GAME_H / 2 + 85,
+      170,
+      '[ Play Again ]',
+      () => {
+        this.soundManager?.play(SFX_KEYS.UI_CLICK);
+        this.gameEvents.emit('ui-interaction', {
+          elementId: 'play-again',
+          action: 'click',
+        });
+        this.scene.scene.restart();
+      },
+      { depth: 11 },
     );
-    btn.on('pointerdown', () => {
-      this.soundManager?.play(SFX_KEYS.UI_CLICK);
-      this.gameEvents.emit('ui-interaction', {
-        elementId: 'play-again',
-        action: 'click',
-      });
-      this.scene.scene.restart();
-    });
 
     // Menu button
-    createOverlayMenuButton(this.scene, GAME_W / 2 + 85, GAME_H / 2 + 85);
+    createGolfMenuButton(this.scene, GAME_W / 2 + 85, GAME_H / 2 + 85, 80, {
+      depth: 11,
+    });
   }
 }

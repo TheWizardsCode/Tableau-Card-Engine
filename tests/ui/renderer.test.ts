@@ -66,6 +66,8 @@ function createMockScene(): Phaser.Scene {
           _depth: 0,
           setDepth: vi.fn(function (this: any, d: number) { this._depth = d; return c; }),
           setScale: vi.fn().mockReturnThis(),
+          setInteractive: vi.fn().mockReturnThis(),
+          on: vi.fn().mockReturnThis(),
           add: vi.fn(function (this: any, obj: any) { children.push(obj); return c; }),
           remove: vi.fn(),
         };
@@ -290,6 +292,8 @@ function createMockSceneWithTextures(textureExists = true): Phaser.Scene {
     _depth: 0,
     setDepth: vi.fn(function (this: any, d: number) { this._depth = d; return container; }),
     setScale: vi.fn().mockReturnThis(),
+    setInteractive: vi.fn().mockReturnThis(),
+    on: vi.fn().mockReturnThis(),
     add: vi.fn(function (this: any, obj: any) { children.push(obj); return container; }),
     remove: vi.fn(),
   };

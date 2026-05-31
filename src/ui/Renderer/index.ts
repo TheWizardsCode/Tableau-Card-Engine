@@ -51,6 +51,10 @@ export interface HudTextOptions {
   /** Override the default origin (default is (0, 0.5)). */
   originX?: number;
   originY?: number;
+  /** Text alignment ('left', 'center', 'right'). */
+  align?: Phaser.Types.GameObjects.Text.TextStyle['align'];
+  /** Extra line spacing in pixels. */
+  lineSpacing?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -192,13 +196,21 @@ export function createHudText(
   const fontSize = options?.fontSize ?? '16px';
   const originX = options?.originX ?? 0;
   const originY = options?.originY ?? 0.5;
-
-  return scene.add.text(x, y, text, {
+  const baseStyle: Phaser.Types.GameObjects.Text.TextStyle = {
     fontSize,
     fontStyle: 'bold',
     color,
     fontFamily,
-  }).setOrigin(originX, originY);
+  };
+  if (options?.align !== undefined) {
+    (baseStyle as Phaser.Types.GameObjects.Text.TextStyle).align = options.align;
+  }
+  if (options?.lineSpacing !== undefined) {
+    (baseStyle as Phaser.Types.GameObjects.Text.TextStyle).lineSpacing =
+      options.lineSpacing;
+  }
+
+  return scene.add.text(x, y, text, baseStyle).setOrigin(originX, originY);
 }
 
 // ---------------------------------------------------------------------------
