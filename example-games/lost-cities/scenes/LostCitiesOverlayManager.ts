@@ -6,15 +6,14 @@ import { EXPEDITION_COLORS } from '../LostCitiesCards';
 import type { LostCitiesSession, RoundScoreResult } from '../LostCitiesGame';
 import { getMatchWinner } from '../LostCitiesGame';
 import { autoSaveTranscript, TranscriptStore } from '../../../src/core-engine/transcript';
+import { GAME_W, GAME_H } from '../../../src/ui';
 import {
-  GAME_W,
-  GAME_H,
-  FONT_FAMILY,
+  createLcHudText,
   createOverlayBackground,
   createOverlayButton,
-  createOverlayMenuButton,
+  createLcMenuButton,
   dismissOverlay,
-} from '../../../src/ui';
+} from '../../../src/ui/Renderer/adapters/LostCitiesAdapter';
 import { SFX_KEYS } from './LostCitiesConstants';
 import type { LCTranscriptRecorder } from '../GameTranscript';
 
@@ -64,15 +63,11 @@ export class LostCitiesOverlayManager {
     const cx = GAME_W / 2;
     const topY = GAME_H / 2 - 200;
 
-    const title = this.scene.add
-      .text(cx, topY, `Round ${this.session.roundNumber - 1} Complete`, {
-        fontSize: '28px',
-        color: '#f0c040',
-        fontFamily: FONT_FAMILY,
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5, 0)
-      .setDepth(11);
+    const title = createLcHudText(this.scene, cx, topY, `Round ${this.session.roundNumber - 1} Complete`, '#f0c040', {
+      fontSize: '28px',
+      originX: 0.5,
+      originY: 0,
+    });
     this.overlayObjects.push(title);
 
     const [p0Details, p1Details] = roundScore.details;
@@ -80,14 +75,11 @@ export class LostCitiesOverlayManager {
 
     let y = topY + 50;
 
-    const header = this.scene.add
-      .text(cx, y, 'Color             You     AI', {
-        fontSize: '14px',
-        color: '#aaaaaa',
-        fontFamily: FONT_FAMILY,
-      })
-      .setOrigin(0.5, 0)
-      .setDepth(11);
+    const header = createLcHudText(this.scene, cx, y, 'Color             You     AI', '#aaaaaa', {
+      fontSize: '14px',
+      originX: 0.5,
+      originY: 0,
+    });
     this.overlayObjects.push(header);
     y += 26;
 
@@ -104,44 +96,39 @@ export class LostCitiesOverlayManager {
       const p0Str = p0Cards > 0 ? `${p0Score}` : '-';
       const p1Str = p1Cards > 0 ? `${p1Score}` : '-';
 
-      const row = this.scene.add
-        .text(cx, y, `${colorName.padEnd(14)}${p0Str.padStart(8)}${p1Str.padStart(8)}`, {
-          fontSize: '14px',
-          color: '#dddddd',
-          fontFamily: FONT_FAMILY,
-        })
-        .setOrigin(0.5, 0)
-        .setDepth(11);
+      const row = createLcHudText(this.scene, cx, y, `${colorName.padEnd(14)}${p0Str.padStart(8)}${p1Str.padStart(8)}`, '#dddddd', {
+        fontSize: '14px',
+        originX: 0.5,
+        originY: 0,
+      });
       this.overlayObjects.push(row);
       y += 22;
     }
 
     y += 8;
-    const totalRow = this.scene.add
-      .text(cx, y, `Round Total${String(p0Total).padStart(11)}${String(p1Total).padStart(8)}`, {
-        fontSize: '16px',
-        color: '#ffffff',
-        fontFamily: FONT_FAMILY,
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5, 0)
-      .setDepth(11);
+    const totalRow = createLcHudText(this.scene, cx, y, `Round Total${String(p0Total).padStart(11)}${String(p1Total).padStart(8)}`, '#ffffff', {
+      fontSize: '16px',
+      originX: 0.5,
+      originY: 0,
+    });
     this.overlayObjects.push(totalRow);
 
     y += 30;
     const [cum0, cum1] = this.session.cumulativeScores;
-    const cumRow = this.scene.add
-      .text(cx, y, `Cumulative${String(cum0).padStart(12)}${String(cum1).padStart(8)}`, {
-        fontSize: '16px',
-        color: '#f0c040',
-        fontFamily: FONT_FAMILY,
-      })
-      .setOrigin(0.5, 0)
-      .setDepth(11);
+    const cumRow = createLcHudText(this.scene, cx, y, `Cumulative${String(cum0).padStart(12)}${String(cum1).padStart(8)}`, '#f0c040', {
+      fontSize: '16px',
+      originX: 0.5,
+      originY: 0,
+    });
     this.overlayObjects.push(cumRow);
 
     y += 50;
     const btn = createOverlayButton(this.scene, cx, y, '[ Next Round ]');
+    try {
+      btn.setDepth(11);
+    } catch {
+      // Depth may not be available in headless / test environments.
+    }
     btn.on('pointerdown', () => {
       this.scene.sound.play?.(SFX_KEYS.UI_CLICK);
       this.dismiss();
@@ -176,70 +163,49 @@ export class LostCitiesOverlayManager {
       this.scene.sound.play?.(SFX_KEYS.SCORE_REVEAL);
     });
 
-    const title = this.scene.add
-      .text(cx, topY, winnerText, {
-        fontSize: '32px',
-        color: '#f0c040',
-        fontFamily: FONT_FAMILY,
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5, 0)
-      .setDepth(11);
+    const title = createLcHudText(this.scene, cx, topY, winnerText, '#f0c040', {
+      fontSize: '32px',
+      originX: 0.5,
+      originY: 0,
+    });
     this.overlayObjects.push(title);
 
     let y = topY + 55;
 
-    const header = this.scene.add
-      .text(cx, y, 'Round             You     AI', {
-        fontSize: '14px',
-        color: '#aaaaaa',
-        fontFamily: FONT_FAMILY,
-      })
-      .setOrigin(0.5, 0)
-      .setDepth(11);
+    const header = createLcHudText(this.scene, cx, y, 'Round             You     AI', '#aaaaaa', {
+      fontSize: '14px',
+      originX: 0.5,
+      originY: 0,
+    });
     this.overlayObjects.push(header);
     y += 26;
 
     for (let r = 0; r < this.session.roundScores.length; r++) {
       const rs = this.session.roundScores[r];
-      const row = this.scene.add
-        .text(
-          cx, y,
-          `Round ${r + 1}${String(rs.totals[0]).padStart(14)}${String(rs.totals[1]).padStart(8)}`,
-          {
-            fontSize: '14px',
-            color: '#dddddd',
-            fontFamily: FONT_FAMILY,
-          },
-        )
-        .setOrigin(0.5, 0)
-        .setDepth(11);
+      const row = createLcHudText(this.scene, cx, y, `Round ${r + 1}${String(rs.totals[0]).padStart(14)}${String(rs.totals[1]).padStart(8)}`, '#dddddd', {
+        fontSize: '14px',
+        originX: 0.5,
+        originY: 0,
+      });
       this.overlayObjects.push(row);
       y += 22;
     }
 
     y += 10;
     const [cum0, cum1] = this.session.cumulativeScores;
-    const totalRow = this.scene.add
-      .text(cx, y, `Final Total${String(cum0).padStart(11)}${String(cum1).padStart(8)}`, {
-        fontSize: '18px',
-        color: '#ffffff',
-        fontFamily: FONT_FAMILY,
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5, 0)
-      .setDepth(11);
+    const totalRow = createLcHudText(this.scene, cx, y, `Final Total${String(cum0).padStart(11)}${String(cum1).padStart(8)}`, '#ffffff', {
+      fontSize: '18px',
+      originX: 0.5,
+      originY: 0,
+    });
     this.overlayObjects.push(totalRow);
 
     y += 40;
-    const detailsTitle = this.scene.add
-      .text(cx, y, `Round ${this.session.roundNumber} Breakdown`, {
-        fontSize: '14px',
-        color: '#aaccaa',
-        fontFamily: FONT_FAMILY,
-      })
-      .setOrigin(0.5, 0)
-      .setDepth(11);
+    const detailsTitle = createLcHudText(this.scene, cx, y, `Round ${this.session.roundNumber} Breakdown`, '#aaccaa', {
+      fontSize: '14px',
+      originX: 0.5,
+      originY: 0,
+    });
     this.overlayObjects.push(detailsTitle);
     y += 22;
 
@@ -251,14 +217,11 @@ export class LostCitiesOverlayManager {
       const p1Score = p1Bd && p1Bd.cardCount > 0 ? `${p1Bd.score}` : '-';
       const colorName = color.charAt(0).toUpperCase() + color.slice(1);
 
-      const row = this.scene.add
-        .text(cx, y, `${colorName.padEnd(14)}${p0Score.padStart(8)}${p1Score.padStart(8)}`, {
-          fontSize: '12px',
-          color: '#bbbbbb',
-          fontFamily: FONT_FAMILY,
-        })
-        .setOrigin(0.5, 0)
-        .setDepth(11);
+      const row = createLcHudText(this.scene, cx, y, `${colorName.padEnd(14)}${p0Score.padStart(8)}${p1Score.padStart(8)}`, '#bbbbbb', {
+        fontSize: '12px',
+        originX: 0.5,
+        originY: 0,
+      });
       this.overlayObjects.push(row);
       y += 18;
     }
@@ -272,7 +235,9 @@ export class LostCitiesOverlayManager {
     });
     this.overlayObjects.push(newMatchBtn);
 
-    const menuBtn = createOverlayMenuButton(this.scene, cx + 85, y);
+    const menuBtn = createLcMenuButton(this.scene, cx + 85, y, 60, {
+      depth: 11,
+    });
     this.overlayObjects.push(menuBtn);
   }
 }
