@@ -19,6 +19,7 @@ import {
 } from '../../../src/core-engine';
 import type { SaveSerializer } from '../../../src/core-engine';
 import { GAME_W } from '../../../src/ui/constants';
+import { createHudText } from '../../../src/ui/Renderer';
 
 /** Simple state for this demo. */
 interface DemoState {
@@ -90,18 +91,14 @@ export class GymSaveLoadScene extends GymSceneBase {
 
     y += 40;
     try {
-      this.stateText = this.add.text(cx, y, this.stateString(), {
-        fontSize: '18px',
-        color: '#ffffff',
-        fontFamily: 'monospace',
-      }).setOrigin(0.5);
+      this.stateText = createHudText(this, cx, y, this.stateString(), '#ffffff', { fontSize: '18px' }).setOrigin(0.5);
     } catch (e) {
       // Fallback to label if text texture creation fails in some headless environments
       this.stateText = this.addLabel(cx, y, this.stateString(), { fontSize: '18px', color: '#ffffff' }).setOrigin(0.5);
     }
 
     y += 30;
-    this.backendText = this.addLabel(cx, y, 'Storage: checking...', { fontSize: '12px', color: '#888888' });
+    this.backendText = createHudText(this, cx, y, 'Storage: checking...', '#888888', { fontSize: '12px' });
     this.backendText.setOrigin(0.5);
 
     // Check backend
@@ -114,7 +111,7 @@ export class GymSaveLoadScene extends GymSceneBase {
 
     y += 20;
     if (this.sys && this.sys.isActive && this.sys.isActive()) {
-      this.addLabel(cx, y, '── Event Log ──', { fontSize: '12px', color: '#669966' }).setOrigin(0.5);
+      createHudText(this, cx, y, '── Event Log ──', '#669966', { fontSize: '12px' }).setOrigin(0.5);
     }
   }
 
@@ -246,11 +243,7 @@ export class GymSaveLoadScene extends GymSceneBase {
       // Headless/non-canvas environments: show textual placeholder
       this.logEvent(`Snapshot fallback (headless): ${(e as Error).message?.substring(0, 50) ?? 'RenderTexture unavailable'}`);
       // Show a textual placeholder instead
-      const placeholder = this.add.text(GAME_W / 2, 340, '[ Snapshot: Text Placeholder ]', {
-        fontSize: '12px',
-        color: '#888888',
-        fontFamily: 'monospace',
-      }).setOrigin(0.5);
+      const placeholder = createHudText(this, GAME_W / 2, 340, '[ Snapshot: Text Placeholder ]', '#888888', { fontSize: '12px' }).setOrigin(0.5);
       this.logTexts.push(placeholder);
       this._snapshotAvailable = false;
     }
@@ -272,18 +265,14 @@ export class GymSaveLoadScene extends GymSceneBase {
     this.logTexts = [];
     const baseY = 170;
     for (let i = 0; i < this.eventLog.length; i++) {
-      let txt: Phaser.GameObjects.Text;
       try {
-        txt = this.add.text(40, baseY + i * 17, this.eventLog[i], {
-          fontSize: '11px',
-          color: '#aaddaa',
-          fontFamily: 'monospace',
-        });
+        const txt = createHudText(this, 40, baseY + i * 17, this.eventLog[i], '#aaddaa', { fontSize: '11px' });
+        this.logTexts.push(txt);
       } catch (e) {
         // Fallback to label if text texture creation fails
-        txt = this.addLabel(40, baseY + i * 17, this.eventLog[i], { fontSize: '11px', color: '#aaddaa' });
+        const txt = this.addLabel(40, baseY + i * 17, this.eventLog[i], { fontSize: '11px', color: '#aaddaa' });
+        this.logTexts.push(txt);
       }
-      this.logTexts.push(txt);
     }
   }
 }
