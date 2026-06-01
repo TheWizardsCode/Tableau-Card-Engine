@@ -135,12 +135,22 @@ export class GymDeckRngScene extends GymSceneBase {
     // Shift the grid down within the cardDisplay zone to clear the header/controls
     const centerY = (cardDisplay?.y ?? 270) + 100;
 
-    // Full-scale cards (48×65px), 8 columns = ~412px wide
-    const cardScale = 1.0;
+    // Target the legacy on-screen appearance (48×65px). If the global
+    // CARD_W/CARD_H have been increased (e.g. high‑DPI assets at 96×130),
+    // scale the grid down so the gym scene preserves its compact layout.
+    const LEGACY_CARD_W = 48;
+    // Increase the computed legacy scale by 15% to restore a slightly larger
+    // on-screen appearance requested by design (makes the compact grid
+    // a bit more readable without affecting other scenes).
+    const SCALE_UP = 1.15;
+    const cardScale = Math.min(1, (LEGACY_CARD_W / CARD_W) * SCALE_UP);
     const scaledCardW = CARD_W * cardScale;
     const scaledCardH = CARD_H * cardScale;
-    const stepX = scaledCardW + GRID_GAP_X;
-    const stepY = scaledCardH + GRID_GAP_Y;
+    // Scale grid gaps proportionally so spacing remains visually consistent
+    const gapX = GRID_GAP_X * cardScale;
+    const gapY = GRID_GAP_Y * cardScale;
+    const stepX = scaledCardW + gapX;
+    const stepY = scaledCardH + gapY;
 
     // Calculate the top-left origin of the grid so it's centered
     const totalWidth = GRID_COLUMNS * stepX - GRID_GAP_X;
