@@ -32,7 +32,7 @@ vi.mock('../../example-games/the-mind/MindCardTextureAdapter', () => ({
   ),
 }));
 
-vi.mock('/home/rgardler/projects/Tableau-Card-Engine/src/ui/Renderer/adapters/MindAdapter', () => ({
+vi.mock('../../src/ui/Renderer/adapters/MindAdapter', () => ({
   createMindHudText: createMindHudTextMock,
 }));
 
