@@ -77,6 +77,45 @@ export async function rasteriseSvgToTexture(
   const promise = (async () => {
     const dataUri = svgToDataUri(svgText);
 
+    // Pre-create a placeholder canvas and register it immediately when the
+    // scene is known to be valid. This ensures a DPR-aware texture key exists
+    // in scene.textures synchronously so sprites created immediately after
+    // requesting a texture will not see Phaser's "missing texture" placeholder
+    // due to a later addCanvas call.
+    let placeholderCanvas: HTMLCanvasElement | null = null;
+    try {
+      // Only add a placeholder when the scene is currently valid for texture ops.
+      if (validScenes.has(scene) && !scene.textures?.exists(key)) {
+        const targetW = Math.round(width * qualityScale);
+        const targetH = Math.round(height * qualityScale);
+        const pc = document.createElement('canvas');
+        pc.width = targetW;
+        pc.height = targetH;
+        const pctx = pc.getContext('2d');
+        if (pctx) {
+          // Draw a very small single-colour placeholder so the texture has a
+          // valid backing immediately. Keep it visually neutral.
+          pctx.clearRect(0, 0, targetW, targetH);
+          pctx.fillStyle = '#dddddd';
+          pctx.fillRect(0, 0, targetW, targetH);
+        }
+
+        try {
+          scene.textures.addCanvas(key, pc);
+          const texture = scene.textures.get(key) as { setFilter?: (mode: number) => void } | undefined;
+          if (texture?.setFilter) {
+            texture.setFilter(1);
+          }
+          placeholderCanvas = pc;
+        } catch {
+          // Best-effort placeholder registration; fall back to later addCanvas.
+          placeholderCanvas = null;
+        }
+      }
+    } catch {
+      placeholderCanvas = null;
+    }
+
     await new Promise<void>((resolve) => {
       const img = new Image();
 
@@ -87,9 +126,12 @@ export async function rasteriseSvgToTexture(
             return;
           }
 
-          const canvas = document.createElement('canvas');
           const targetW = Math.round(width * qualityScale);
           const targetH = Math.round(height * qualityScale);
+
+          // Reuse the placeholder canvas if it was registered, otherwise create
+          // a fresh canvas and add it to the texture manager.
+          const canvas = placeholderCanvas ?? document.createElement('canvas');
           canvas.width = targetW;
           canvas.height = targetH;
 
@@ -113,12 +155,22 @@ export async function rasteriseSvgToTexture(
             // Never remove and re-add an existing texture key here.
             // Removing a texture that is still referenced by active frames can
             // transiently leave frame.source null in Phaser's WebGL path.
-            if (!scene.textures?.exists(key)) {
-              scene.textures.addCanvas(key, canvas);
+            if (!placeholderCanvas) {
+              if (!scene.textures?.exists(key)) {
+                scene.textures.addCanvas(key, canvas);
 
+                const texture = scene.textures.get(key) as { setFilter?: (mode: number) => void } | undefined;
+                if (texture?.setFilter) {
+                  // Phaser uses 1 for linear filtering; avoid runtime Phaser import in core helpers.
+                  texture.setFilter(1);
+                }
+              }
+            } else {
+              // If we reused the placeholder canvas, the texture is already
+              // backed by the same canvas reference. Update any texture state
+              // (filter) if available.
               const texture = scene.textures.get(key) as { setFilter?: (mode: number) => void } | undefined;
               if (texture?.setFilter) {
-                // Phaser uses 1 for linear filtering; avoid runtime Phaser import in core helpers.
                 texture.setFilter(1);
               }
             }

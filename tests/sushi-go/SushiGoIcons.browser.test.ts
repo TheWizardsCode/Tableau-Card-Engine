@@ -56,6 +56,7 @@ describe('SushiGoScene SVG icon rendering', () => {
     }
 
     // Find the first hand card container and compute its bounds
+    await waitForCondition(() => !!scene.handContainer && scene.handContainer.list && scene.handContainer.list.length > 0, 3000);
     const handContainer = scene.handContainer as Phaser.GameObjects.Container;
     expect(handContainer).toBeTruthy();
     const firstChild = handContainer.list[0] as Phaser.GameObjects.Container;
@@ -71,8 +72,59 @@ describe('SushiGoScene SVG icon rendering', () => {
       'icon-wasabi', 'icon-pudding', 'icon-chopsticks',
     ];
 
-    let foundVariation = false;
+    // Wait for any one of the icon textures to become non-solid. This
+    // accounts for the placeholder-first texture registration where a
+    // texture key may exist but its rasterisation is still in-flight.
+    await waitForCondition(() => {
+      for (const key of keysToTry) {
+        try {
+          if (!scene.textures.exists(key)) continue;
+          const tex = scene.textures.get(key) as any;
+          const src = tex?.source?.[0];
+          if (!src) continue;
+          const imgEl = src.image as HTMLImageElement | HTMLCanvasElement | undefined;
+          if (!imgEl) continue;
 
+          const off = document.createElement('canvas');
+          const sw = (imgEl as any).width || 1;
+          const sh = (imgEl as any).height || 1;
+          off.width = sw;
+          off.height = sh;
+          const ctx = off.getContext('2d');
+          if (!ctx) continue;
+          ctx.drawImage(imgEl as any, 0, 0, sw, sh);
+
+          const sampleW = Math.max(1, Math.floor(sw * 0.5));
+          const sampleH = Math.max(1, Math.floor(sh * 0.5));
+          const sampleX = Math.floor((sw - sampleW) / 2);
+          const sampleY = Math.floor((sh - sampleH) / 2);
+
+          const imgData = ctx.getImageData(sampleX, sampleY, sampleW, sampleH).data;
+          if (imgData.length < 4) continue;
+
+          const r0 = imgData[0];
+          const g0 = imgData[1];
+          const b0 = imgData[2];
+          const a0 = imgData[3];
+          for (let i = 4; i < imgData.length; i += 4) {
+            if (
+              imgData[i] !== r0 ||
+              imgData[i + 1] !== g0 ||
+              imgData[i + 2] !== b0 ||
+              imgData[i + 3] !== a0
+            ) {
+              return true;
+            }
+          }
+        } catch (e) {
+          // ignore and try next texture
+        }
+      }
+      return false;
+    }, 5000);
+
+    // Final assertion for clarity: at least one texture should have variation
+    let foundVariation = false;
     for (const key of keysToTry) {
       try {
         if (!scene.textures.exists(key)) continue;
