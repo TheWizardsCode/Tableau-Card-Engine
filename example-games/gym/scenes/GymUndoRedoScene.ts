@@ -18,6 +18,8 @@ import type { Command } from '../../../src/core-engine/UndoRedoManager';
 import { popTextOrIcon } from '../../../src/ui/popTextOrIcon';
 import { GAME_W } from '../../../src/ui/constants';
 import { createHudText } from '../../../src/ui/Renderer';
+import { createEventLog } from '../../../src/ui/GymSceneUtils';
+import type { EventLogResult } from '../../../src/ui/GymSceneUtils';
 
 /** A simple command that increments/decrements a counter. */
 class IncrementCommand implements Command {
@@ -45,8 +47,8 @@ export class GymUndoRedoScene extends GymSceneBase {
   private undoAvailText!: Phaser.GameObjects.Text;
   private redoAvailText!: Phaser.GameObjects.Text;
   private historyText!: Phaser.GameObjects.Text;
-  private logTexts: Phaser.GameObjects.Text[] = [];
   private eventLog: string[] = [];
+  private eventLogResult!: EventLogResult;
 
   constructor() {
     super({ key: GYM_UNDO_REDO_KEY });
@@ -90,7 +92,16 @@ export class GymUndoRedoScene extends GymSceneBase {
     this.historyText.setOrigin(0.5);
 
     y += 20;
-    createHudText(this, cx, y, '── Event Log ──', '#669966', { fontSize: '12px' }).setOrigin(0.5);
+    this.eventLogResult = createEventLog(this, y + 20, {
+      headerText: '── Event Log ──',
+      maxLines: 12,
+      lineHeight: 17,
+      textColor: '#aaddaa',
+      fontSize: '11px',
+      headerFontSize: '12px',
+      headerColor: '#669966',
+      lineX: 40,
+    });
   }
 
   private executeAction(delta: number): void {
@@ -155,13 +166,7 @@ export class GymUndoRedoScene extends GymSceneBase {
   private logEvent(msg: string): void {
     this.eventLog.push(msg);
     if (this.eventLog.length > 12) this.eventLog.shift();
-    for (const t of this.logTexts) t.destroy();
-    this.logTexts = [];
-    const baseY = 250;
-    for (let i = 0; i < this.eventLog.length; i++) {
-      const txt = createHudText(this, 40, baseY + i * 17, this.eventLog[i], '#aaddaa', { fontSize: '11px' });
-      this.logTexts.push(txt);
-    }
+    this.eventLogResult.render(this.eventLog);
   }
 
   /** Show a pop text/icon near the specified coordinates. */

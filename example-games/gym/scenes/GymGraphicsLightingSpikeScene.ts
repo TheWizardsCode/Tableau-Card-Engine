@@ -17,12 +17,14 @@
 import { GymSceneBase } from './GymSceneBase';
 import { GAME_W } from '../../../src/ui/constants';
 import { createHudText } from '../../../src/ui/Renderer';
+import { createEventLog } from '../../../src/ui/GymSceneUtils';
+import type { EventLogResult } from '../../../src/ui/GymSceneUtils';
 
 export const GYM_GRAPHICS_LIGHTING_SPIKE_KEY = 'GymGraphicsLightingSpikeScene';
 
 export class GymGraphicsLightingSpikeScene extends GymSceneBase {
-  private logTexts: Phaser.GameObjects.Text[] = [];
   private eventLog: string[] = [];
+  private eventLogResult!: EventLogResult;
   private lightingAvailable = false;
   private lightActive = true;
 
@@ -109,7 +111,16 @@ export class GymGraphicsLightingSpikeScene extends GymSceneBase {
     }
 
     y += 260;
-    createHudText(this, cx, y, '── Findings & Event Log ──', '#669966', { fontSize: '12px' }).setOrigin(0.5);
+    this.eventLogResult = createEventLog(this, y + 20, {
+      headerText: '── Findings & Event Log ──',
+      maxLines: 14,
+      lineHeight: 16,
+      textColor: '#aaddaa',
+      fontSize: '10px',
+      headerFontSize: '12px',
+      headerColor: '#669966',
+      lineX: 20,
+    });
 
     // Record findings
     this.logEvent('--- Lighting Spike Findings ---');
@@ -165,12 +176,6 @@ export class GymGraphicsLightingSpikeScene extends GymSceneBase {
   private logEvent(msg: string): void {
     this.eventLog.push(msg);
     if (this.eventLog.length > 14) this.eventLog.shift();
-    for (const t of this.logTexts) t.destroy();
-    this.logTexts = [];
-    const baseY = 370;
-    for (let i = 0; i < this.eventLog.length; i++) {
-      const txt = createHudText(this, 20, baseY + i * 16, this.eventLog[i], '#aaddaa', { fontSize: '10px' });
-      this.logTexts.push(txt);
-    }
+    this.eventLogResult.render(this.eventLog);
   }
 }
