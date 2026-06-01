@@ -16,6 +16,7 @@
 
 import { GymSceneBase } from './GymSceneBase';
 import { GAME_W } from '../../../src/ui/constants';
+import { createHudText } from '../../../src/ui/Renderer';
 
 export const GYM_GRAPHICS_LIGHTING_SPIKE_KEY = 'GymGraphicsLightingSpikeScene';
 
@@ -101,16 +102,14 @@ export class GymGraphicsLightingSpikeScene extends GymSceneBase {
       // Show fallback sprites without lighting
       this.add.image(cx - 150, y + 120, 'lighting-sprite-a');
       this.add.image(cx + 150, y + 120, 'lighting-sprite-b');
-      this.add.text(cx, y + 120, 'Lighting unavailable\n(showing fallback sprites)', {
+      createHudText(this, cx, y + 120, 'Lighting unavailable\n(showing fallback sprites)', '#ff8844', {
         fontSize: '12px',
-        color: '#ff8844',
-        fontFamily: 'monospace',
         align: 'center',
       }).setOrigin(0.5);
     }
 
     y += 260;
-    this.addLabel(cx, y, '── Findings & Event Log ──', { fontSize: '12px', color: '#669966' }).setOrigin(0.5);
+    createHudText(this, cx, y, '── Findings & Event Log ──', '#669966', { fontSize: '12px' }).setOrigin(0.5);
 
     // Record findings
     this.logEvent('--- Lighting Spike Findings ---');
@@ -170,11 +169,7 @@ export class GymGraphicsLightingSpikeScene extends GymSceneBase {
     this.logTexts = [];
     const baseY = 370;
     for (let i = 0; i < this.eventLog.length; i++) {
-      const txt = this.add.text(20, baseY + i * 16, this.eventLog[i], {
-        fontSize: '10px',
-        color: '#aaddaa',
-        fontFamily: 'monospace',
-      });
+      const txt = createHudText(this, 20, baseY + i * 16, this.eventLog[i], '#aaddaa', { fontSize: '10px' });
       this.logTexts.push(txt);
     }
   }

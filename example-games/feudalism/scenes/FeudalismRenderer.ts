@@ -34,6 +34,7 @@ import {
   getBonusRenderOrder,
   getTokenRenderOrder,
 } from './FeudalismRenderHelpers';
+import { createFeudalismActionButton } from '../../../src/ui/Renderer/adapters/FeudalismAdapter';
 
 export interface MarketCallbacks {
   onMarketCardClick: (card: DevelopmentCard) => void;
@@ -714,7 +715,7 @@ export class FeudalismRenderer {
       if (availSame.length > 0) totalW += 30 + 80 + availSame.length * 54;
       let bx = centerX - totalW / 2;
 
-      const takeBtn = this.createActionButton(bx, by, 'Take Tokens', () => callbacks.onTakeTokens());
+      const takeBtn = createFeudalismActionButton(this.scene, bx, by, 'Take Tokens', () => callbacks.onTakeTokens());
       this.actionContainer.add(takeBtn);
       bx += 185;
 
@@ -756,35 +757,14 @@ export class FeudalismRenderer {
       bx += 290;
 
       if (canConfirm) {
-        const confirmBtn = this.createActionButton(bx, by, 'Confirm', () => callbacks.onConfirmDifferent());
+        const confirmBtn = createFeudalismActionButton(this.scene, bx, by, 'Confirm', () => callbacks.onConfirmDifferent());
         this.actionContainer.add(confirmBtn);
         bx += 155;
       }
 
-      const cancelBtn = this.createActionButton(bx, by, 'Cancel', () => callbacks.onCancelSelection());
+      const cancelBtn = createFeudalismActionButton(this.scene, bx, by, 'Cancel', () => callbacks.onCancelSelection());
       this.actionContainer.add(cancelBtn);
     }
-  }
-
-  private createActionButton(x: number, y: number, text: string, callback: () => void): Phaser.GameObjects.Container {
-    const btnW = 155;
-    const btnH = 42;
-    const container = this.scene.add.container(x + btnW / 2, y);
-    const bg = this.scene.add.rectangle(0, 0, btnW, btnH, 0x335533, 0.8);
-    bg.setStrokeStyle(1, 0x55aa55);
-    container.add(bg);
-
-    const label = this.scene.add.text(0, 0, text, {
-      fontSize: '17px', fontStyle: 'bold', color: '#88ff88', fontFamily: FONT_FAMILY,
-    }).setOrigin(0.5);
-    container.add(label);
-
-    bg.setInteractive({ useHandCursor: true });
-    bg.on('pointerdown', callback);
-    bg.on('pointerover', () => bg.setStrokeStyle(2, 0xffdd44));
-    bg.on('pointerout', () => bg.setStrokeStyle(1, 0x55aa55));
-
-    return container;
   }
 
   private isValidTokenSelection(): boolean {

@@ -23,6 +23,7 @@ import {
 import type { SoundPlayer, EventSoundMapping } from '../../../src/core-engine';
 import { popTextOrIcon } from '../../../src/ui/popTextOrIcon';
 import { GAME_W } from '../../../src/ui/constants';
+import { createHudText } from '../../../src/ui/Renderer';
 
 /** A stub SoundPlayer that records play calls instead of producing audio. */
 class StubSoundPlayer implements SoundPlayer {
@@ -132,14 +133,10 @@ export class GymAudioFeedbackScene extends GymSceneBase {
     this.addButton(cx + 220, y, '[ Celebrate ]', () => this.triggerCelebration());
 
     y += 50;
-    this.statusText = this.add.text(cx, y, this.statusString(), {
-      fontSize: '16px',
-      color: '#ffffff',
-      fontFamily: 'monospace',
-    }).setOrigin(0.5);
+    this.statusText = createHudText(this, cx, y, this.statusString(), '#ffffff', { fontSize: '16px' }).setOrigin(0.5);
 
     y += 30;
-    this.addLabel(cx, y, '── Sound Call Log ──', { fontSize: '12px', color: '#669966' }).setOrigin(0.5);
+    createHudText(this, cx, y, '── Sound Call Log ──', '#669966', { fontSize: '12px' }).setOrigin(0.5);
   }
 
   private statusString(): string {
@@ -296,11 +293,7 @@ export class GymAudioFeedbackScene extends GymSceneBase {
     this.callLogTexts = [];
     const baseY = 250;
     for (let i = 0; i < this.callLog.length; i++) {
-      const txt = this.add.text(40, baseY + i * 17, this.callLog[i], {
-        fontSize: '11px',
-        color: '#aaddaa',
-        fontFamily: 'monospace',
-      });
+      const txt = createHudText(this, 40, baseY + i * 17, this.callLog[i], '#aaddaa', { fontSize: '11px' });
       this.callLogTexts.push(txt);
     }
   }

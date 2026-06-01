@@ -17,6 +17,7 @@ import { GymSceneBase } from './GymSceneBase';
 import { GYM_OVERLAY_UI_KEY } from '../GymRegistry';
 import { GAME_W } from '../../../src/ui/constants';
 import { createOverlayBackground, dismissOverlay } from '../../../src/ui/Overlay';
+import { createHudText } from '../../../src/ui/Renderer';
 
 export class GymOverlayUiScene extends GymSceneBase {
   private overlayObjects: Phaser.GameObjects.GameObject[] | null = null;
@@ -65,11 +66,11 @@ export class GymOverlayUiScene extends GymSceneBase {
     this.addButton(cx + 260, y, '[ Intensity + ]', () => this.adjustIntensity(0.2));
 
     y += 40;
-    this.intensityText = this.addLabel(cx, y, 'Feedback Intensity: 1.0', { fontSize: '16px', color: '#88ff88' });
+    this.intensityText = createHudText(this, cx, y, 'Feedback Intensity: 1.0', '#88ff88', { fontSize: '16px' });
     this.intensityText.setOrigin(0.5);
 
     y += 30;
-    this.addLabel(cx, y, '── Event Log ──', { fontSize: '12px', color: '#669966' }).setOrigin(0.5);
+    createHudText(this, cx, y, '── Event Log ──', '#669966', { fontSize: '12px' }).setOrigin(0.5);
   }
 
   private openOverlay(): void {
@@ -131,11 +132,7 @@ export class GymOverlayUiScene extends GymSceneBase {
         'overlay brightness.',
       ];
       for (let i = 0; i < contentLines.length; i++) {
-        const line = this.add.text(10, i * 16, contentLines[i], {
-          fontSize: '12px',
-          color: '#ccddcc',
-          fontFamily: 'monospace',
-        });
+        const line = createHudText(this, 10, i * 16, contentLines[i], '#ccddcc', { fontSize: '12px' });
         this.maskedContainer.add(line);
       }
       this.logEvent('Overlay opened with GeometryMask content area');
@@ -145,21 +142,20 @@ export class GymOverlayUiScene extends GymSceneBase {
     }
 
     // Add central content text (above the mask)
-    const info = this.add.text(
+    const info = createHudText(
+      this,
       GAME_W / 2,
       240,
       'Overlay Active\nScrollable content below.',
-      { fontSize: '16px', color: '#ffffff', fontFamily: 'monospace', align: 'center' },
+      '#ffffff',
+      { fontSize: '16px', align: 'center' },
     ).setOrigin(0.5);
     info.setDepth(11);
     this.overlayObjects.push(info);
 
     // Dismiss link
-    const dismiss = this.add.text(GAME_W / 2, 520, '[ Dismiss Overlay ]', {
+    const dismiss = createHudText(this, GAME_W / 2, 520, '[ Dismiss Overlay ]', '#88ff88', {
       fontSize: '14px',
-      color: '#88ff88',
-      fontFamily: 'monospace',
-      fontStyle: 'bold',
     }).setOrigin(0.5).setInteractive({ useHandCursor: true });
     dismiss.on('pointerdown', () => {
       this.markOverlayInteraction();
@@ -169,17 +165,17 @@ export class GymOverlayUiScene extends GymSceneBase {
     this.overlayObjects.push(dismiss);
 
     // Intensity controls within overlay
-    const minus = this.add.text(GAME_W / 2 - 80, 550, '[-]', { fontSize: '14px', color: '#ff8877', fontFamily: 'monospace' }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    const minus = createHudText(this, GAME_W / 2 - 80, 550, '[-]', '#ff8877', { fontSize: '14px' }).setOrigin(0.5).setInteractive({ useHandCursor: true });
     minus.on('pointerdown', () => { this.markOverlayInteraction(); this.adjustIntensity(-0.2); });
     minus.setDepth(11);
     this.overlayObjects.push(minus);
 
-    const intensityLabel = this.add.text(GAME_W / 2, 550, `Intensity: ${this.feedbackIntensity}`, { fontSize: '14px', color: '#ffffff', fontFamily: 'monospace' }).setOrigin(0.5);
+    const intensityLabel = createHudText(this, GAME_W / 2, 550, `Intensity: ${this.feedbackIntensity}`, '#ffffff', { fontSize: '14px' }).setOrigin(0.5);
     intensityLabel.setDepth(11);
     this.overlayObjects.push(intensityLabel);
     this.overlayIntensityText = intensityLabel;
 
-    const plus = this.add.text(GAME_W / 2 + 80, 550, '[+]', { fontSize: '14px', color: '#77ff88', fontFamily: 'monospace' }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    const plus = createHudText(this, GAME_W / 2 + 80, 550, '[+]', '#77ff88', { fontSize: '14px' }).setOrigin(0.5).setInteractive({ useHandCursor: true });
     plus.on('pointerdown', () => { this.markOverlayInteraction(); this.adjustIntensity(0.2); });
     plus.setDepth(11);
     this.overlayObjects.push(plus);
@@ -276,11 +272,7 @@ export class GymOverlayUiScene extends GymSceneBase {
     this.logTexts = [];
     const baseY = 150;
     for (let i = 0; i < this.eventLog.length; i++) {
-      const txt = this.add.text(40, baseY + i * 17, this.eventLog[i], {
-        fontSize: '11px',
-        color: '#aaddaa',
-        fontFamily: 'monospace',
-      });
+      const txt = createHudText(this, 40, baseY + i * 17, this.eventLog[i], '#aaddaa', { fontSize: '11px' });
       this.logTexts.push(txt);
     }
   }

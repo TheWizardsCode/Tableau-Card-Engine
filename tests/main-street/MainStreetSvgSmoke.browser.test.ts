@@ -89,9 +89,15 @@ describe('MainStreetScene SVG smoke', () => {
       return keys.length > 0;
     }, 3000);
 
+    await waitForCondition(() => {
+      const keys = (scene.textures.getTextureKeys?.() ?? []).filter((k) => k.startsWith('ms_card_'));
+      if (keys.length === 0) return false;
+      return keys.some((key) => isTextureNonSolid(scene, key));
+    }, 5000);
+
+    // Re-check and assert for clarity
     const cardKeys = (scene.textures.getTextureKeys?.() ?? []).filter((k) => k.startsWith('ms_card_')).sort();
     expect(cardKeys.length).toBeGreaterThan(0);
-
     const hasVariation = cardKeys.some((key) => isTextureNonSolid(scene, key));
     expect(hasVariation).toBe(true);
   }, 10000);
