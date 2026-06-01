@@ -23,6 +23,7 @@ import { runSceneTransition } from '../../../src/ui/sceneTransition';
 import { getZoneRect, anchorPoint } from '../../../src/ui/screen-layout';
 import { parseScreenLayoutDocument, type ScreenLayoutDocument, type PixelPoint } from '../../../src/ui/screen-layout-schema';
 import gymScenesLayoutJson from '../layouts/gym-scenes.layout.json';
+import { createHudText } from '../../../src/ui/Renderer';
 
 // Parse the shared Gym scenes layout once at module load.
 const GYM_SCENES_LAYOUT: ScreenLayoutDocument | null = (() => {
@@ -155,6 +156,7 @@ export abstract class GymSceneBase extends Phaser.Scene {
 
   /**
    * Utility: create a label text at (x, y) with standard Gym styling.
+   * Uses the shared Renderer helper for consistent text rendering.
    */
   protected addLabel(
     x: number,
@@ -162,10 +164,8 @@ export abstract class GymSceneBase extends Phaser.Scene {
     text: string,
     opts?: Partial<{ fontSize: string; color: string }>,
   ): Phaser.GameObjects.Text {
-    return this.add.text(x, y, text, {
+    return createHudText(this, x, y, text, opts?.color ?? '#aaccaa', {
       fontSize: opts?.fontSize ?? '14px',
-      color: opts?.color ?? '#aaccaa',
-      fontFamily: 'monospace',
     });
   }
 
@@ -181,14 +181,9 @@ export abstract class GymSceneBase extends Phaser.Scene {
   ): Phaser.GameObjects.Text {
     const color = opts?.color ?? '#88ff88';
     const hoverColor = opts?.hoverColor ?? '#bbffbb';
-    const btn = this.add
-      .text(x, y, label, {
-        fontSize: opts?.fontSize ?? '14px',
-        color,
-        fontFamily: 'monospace',
-        fontStyle: 'bold',
-      })
-      .setInteractive({ useHandCursor: true });
+    const btn = createHudText(this, x, y, label, color, {
+      fontSize: opts?.fontSize ?? '14px',
+    }).setInteractive({ useHandCursor: true });
 
     btn.on('pointerdown', callback);
     btn.on('pointerover', () => btn.setColor(hoverColor));

@@ -19,6 +19,7 @@ import {
 import type { BaseTranscript } from '../../../src/core-engine';
 import { popTextOrIcon } from '../../../src/ui/popTextOrIcon';
 import { GAME_W } from '../../../src/ui/constants';
+import { createHudText } from '../../../src/ui/Renderer';
 
 /** Simple event shape for this demo. */
 interface DemoTranscriptEvent {
@@ -95,7 +96,7 @@ export class GymTranscriptScene extends GymSceneBase {
     this.addButton(cx + 200, y, '[ Show Transcript ]', () => this.showTranscript());
 
     y += 40;
-    this.addLabel(cx, y, '── Event Log ──', { fontSize: '12px', color: '#669966' }).setOrigin(0.5);
+    createHudText(this, cx, y, '── Event Log ──', '#669966', { fontSize: '12px' }).setOrigin(0.5);
 
     this.newSession();
   }
@@ -168,11 +169,7 @@ export class GymTranscriptScene extends GymSceneBase {
     this.logTexts = [];
     const baseY = 140;
     for (let i = 0; i < this.eventLog.length; i++) {
-      const txt = this.add.text(40, baseY + i * 16, this.eventLog[i], {
-        fontSize: '11px',
-        color: '#aaddaa',
-        fontFamily: 'monospace',
-      });
+      const txt = createHudText(this, 40, baseY + i * 16, this.eventLog[i], '#aaddaa', { fontSize: '11px' });
       this.logTexts.push(txt);
     }
   }

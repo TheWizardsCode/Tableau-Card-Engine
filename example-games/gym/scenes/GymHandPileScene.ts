@@ -32,6 +32,7 @@ import { moveGameObject } from '../../../src/ui/moveGameObject';
 import { shakeIllegalMove } from '../../../src/ui/shakeIllegalMove';
 import { CARD_H, CARD_W, GAME_H, GAME_W } from '../../../src/ui/constants';
 import { getCardTexture, ensureCardTextureFallbacks, preloadCardAssets } from '../../../src/ui/CardTextureHelpers';
+import { createHudText } from '../../../src/ui/Renderer';
 import type { Card } from '../../../src/card-system/Card';
 
 const HAND_SIZE = 5;
@@ -185,7 +186,7 @@ export class GymHandPileScene extends GymSceneBase {
     this.addButton(cx + 180, y, '[ Reset ]', () => this.reset());
 
     y += 35;
-    this.addLabel(cx, y, '── Event Log ──', { fontSize: '12px', color: '#669966' }).setOrigin(0.5);
+    createHudText(this, cx, y, '── Event Log ──', '#669966', { fontSize: '12px' }).setOrigin(0.5);
 
     this.createArcRadiusSlider();
     this.createSpacingSlider();
@@ -206,11 +207,7 @@ export class GymHandPileScene extends GymSceneBase {
 
     this.arcSliderHandle = this.add.graphics();
 
-    this.arcSliderValueText = this.add.text(0, sliderY - 20, '', {
-      fontSize: '11px',
-      color: '#88ff88',
-      fontFamily: 'monospace',
-    }).setOrigin(0.5);
+    this.arcSliderValueText = createHudText(this, 0, sliderY - 20, '', '#88ff88', { fontSize: '11px' }).setOrigin(0.5);
 
     this.arcSliderHitArea = this.add.zone(0, sliderY, this.ARC_SLIDER_WIDTH + 24, 28)
       .setInteractive({ useHandCursor: true });
@@ -308,11 +305,7 @@ export class GymHandPileScene extends GymSceneBase {
 
     this.spacingSliderHandle = this.add.graphics();
 
-    this.spacingSliderValueText = this.add.text(0, sliderY - 20, '', {
-      fontSize: '11px',
-      color: '#88ff88',
-      fontFamily: 'monospace',
-    }).setOrigin(0.5);
+    this.spacingSliderValueText = createHudText(this, 0, sliderY - 20, '', '#88ff88', { fontSize: '11px' }).setOrigin(0.5);
 
     this.spacingSliderHitArea = this.add.zone(0, sliderY, this.ARC_SLIDER_WIDTH + 24, 28)
       .setInteractive({ useHandCursor: true });
@@ -416,11 +409,7 @@ export class GymHandPileScene extends GymSceneBase {
 
     this.rotationSliderHandle = this.add.graphics();
 
-    this.rotationSliderValueText = this.add.text(0, sliderY - 20, '', {
-      fontSize: '11px',
-      color: '#88ff88',
-      fontFamily: 'monospace',
-    }).setOrigin(0.5);
+    this.rotationSliderValueText = createHudText(this, 0, sliderY - 20, '', '#88ff88', { fontSize: '11px' }).setOrigin(0.5);
 
     this.rotationSliderHitArea = this.add.zone(0, sliderY, this.ARC_SLIDER_WIDTH + 24, 28)
       .setInteractive({ useHandCursor: true });
@@ -890,11 +879,7 @@ export class GymHandPileScene extends GymSceneBase {
     this.logTexts = [];
     const baseY = 230;
     for (let i = 0; i < this.eventLog.length; i++) {
-      const txt = this.add.text(40, baseY + i * 17, this.eventLog[i], {
-        fontSize: '11px',
-        color: '#aaddaa',
-        fontFamily: 'monospace',
-      });
+      const txt = createHudText(this, 40, baseY + i * 17, this.eventLog[i], '#aaddaa', { fontSize: '11px' });
       this.logTexts.push(txt);
     }
   }

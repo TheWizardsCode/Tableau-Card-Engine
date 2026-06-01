@@ -18,6 +18,7 @@ import type { Card } from '../../../src/card-system/Card';
 import { createSeededRng } from '../../../src/core-engine/SeededRng';
 import { GAME_W, CARD_W, CARD_H } from '../../../src/ui/constants';
 import { preloadCardAssets, getCardTexture, ensureCardTextureFallbacks } from '../../../src/ui/CardTextureHelpers';
+import { createHudText } from '../../../src/ui/Renderer';
 
 /** Default seed for deterministic demonstrations. */
 const DEFAULT_SEED = 42;
@@ -78,11 +79,7 @@ export class GymDeckRngScene extends GymSceneBase {
     let y = controlsAnchor?.y ?? 60;
 
     this.addLabel(cx, y, 'Seed:');
-    this.seedText = this.add.text(cx + 50, y, String(this.seed), {
-      fontSize: '16px',
-      color: '#ffffff',
-      fontFamily: 'monospace',
-    });
+    this.seedText = createHudText(this, cx + 50, y, String(this.seed), '#ffffff', { fontSize: '16px' });
 
     this.addButton(cx + 180, y, '[ -1 ]', () => this.adjustSeed(-1));
     this.addButton(cx + 240, y, '[ +1 ]', () => this.adjustSeed(1));
@@ -94,7 +91,7 @@ export class GymDeckRngScene extends GymSceneBase {
     });
 
     // ── Status ───────────────────────────────────────────
-    this.statusText = this.addLabel(cx + 600, y, '52 cards displayed', { fontSize: '16px', color: '#88ff88' });
+    this.statusText = createHudText(this, cx + 600, y, '52 cards displayed', '#88ff88', { fontSize: '16px' });
 
     // ── Initialize deck, shuffle with default seed, and render ──
     this.seed = DEFAULT_SEED;

@@ -17,6 +17,7 @@ import { UndoRedoManager, CompoundCommand } from '../../../src/core-engine/UndoR
 import type { Command } from '../../../src/core-engine/UndoRedoManager';
 import { popTextOrIcon } from '../../../src/ui/popTextOrIcon';
 import { GAME_W } from '../../../src/ui/constants';
+import { createHudText } from '../../../src/ui/Renderer';
 
 /** A simple command that increments/decrements a counter. */
 class IncrementCommand implements Command {
@@ -77,24 +78,19 @@ export class GymUndoRedoScene extends GymSceneBase {
     y += 50;
 
     // State display
-    this.counterText = this.add.text(cx, y, 'Counter: 0', {
-      fontSize: '28px',
-      color: '#ffffff',
-      fontFamily: 'monospace',
-      fontStyle: 'bold',
-    }).setOrigin(0.5);
+    this.counterText = createHudText(this, cx, y, 'Counter: 0', '#ffffff', { fontSize: '28px' }).setOrigin(0.5);
 
     y += 40;
 
-    this.undoAvailText = this.addLabel(cx - 120, y, 'Can Undo: no', { fontSize: '14px', color: '#888888' });
-    this.redoAvailText = this.addLabel(cx + 80, y, 'Can Redo: no', { fontSize: '14px', color: '#888888' });
+    this.undoAvailText = createHudText(this, cx - 120, y, 'Can Undo: no', '#888888', { fontSize: '14px' });
+    this.redoAvailText = createHudText(this, cx + 80, y, 'Can Redo: no', '#888888', { fontSize: '14px' });
 
     y += 30;
-    this.historyText = this.addLabel(cx, y, 'History: (empty)', { fontSize: '12px', color: '#669966' });
+    this.historyText = createHudText(this, cx, y, 'History: (empty)', '#669966', { fontSize: '12px' });
     this.historyText.setOrigin(0.5);
 
     y += 20;
-    this.addLabel(cx, y, '── Event Log ──', { fontSize: '12px', color: '#669966' }).setOrigin(0.5);
+    createHudText(this, cx, y, '── Event Log ──', '#669966', { fontSize: '12px' }).setOrigin(0.5);
   }
 
   private executeAction(delta: number): void {
@@ -163,11 +159,7 @@ export class GymUndoRedoScene extends GymSceneBase {
     this.logTexts = [];
     const baseY = 250;
     for (let i = 0; i < this.eventLog.length; i++) {
-      const txt = this.add.text(40, baseY + i * 17, this.eventLog[i], {
-        fontSize: '11px',
-        color: '#aaddaa',
-        fontFamily: 'monospace',
-      });
+      const txt = createHudText(this, 40, baseY + i * 17, this.eventLog[i], '#aaddaa', { fontSize: '11px' });
       this.logTexts.push(txt);
     }
   }

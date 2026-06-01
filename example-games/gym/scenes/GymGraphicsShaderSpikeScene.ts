@@ -15,6 +15,7 @@
 
 import { GymSceneBase } from './GymSceneBase';
 import { GAME_W } from '../../../src/ui/constants';
+import { createHudText } from '../../../src/ui/Renderer';
 
 /** The scene key must match the registration in GymRegistry. */
 export const GYM_GRAPHICS_SHADER_SPIKE_KEY = 'GymGraphicsShaderSpikeScene';
@@ -113,7 +114,7 @@ export class GymGraphicsShaderSpikeScene extends GymSceneBase {
     this.addButton(cx + 120, y, '[ Attempt Shader ]', () => this.attemptShader());
 
     y += 30;
-    this.addLabel(cx, y, 'Blend: NORMAL | Tint: None', { fontSize: '12px', color: '#88ff88' }).setOrigin(0.5);
+    createHudText(this, cx, y, 'Blend: NORMAL | Tint: None', '#88ff88', { fontSize: '12px' }).setOrigin(0.5);
 
     y += 30;
     // Create sample sprites
@@ -125,7 +126,7 @@ export class GymGraphicsShaderSpikeScene extends GymSceneBase {
     }
 
     y += 200;
-    this.addLabel(cx, y, '── Event Log ──', { fontSize: '12px', color: '#669966' }).setOrigin(0.5);
+    createHudText(this, cx, y, '── Event Log ──', '#669966', { fontSize: '12px' }).setOrigin(0.5);
   }
 
   private cycleTint(): void {
@@ -198,11 +199,7 @@ export class GymGraphicsShaderSpikeScene extends GymSceneBase {
     this.logTexts = [];
     const baseY = 280;
     for (let i = 0; i < this.eventLog.length; i++) {
-      const txt = this.add.text(40, baseY + i * 17, this.eventLog[i], {
-        fontSize: '11px',
-        color: '#aaddaa',
-        fontFamily: 'monospace',
-      });
+      const txt = createHudText(this, 40, baseY + i * 17, this.eventLog[i], '#aaddaa', { fontSize: '11px' });
       this.logTexts.push(txt);
     }
   }

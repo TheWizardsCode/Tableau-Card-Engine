@@ -13,6 +13,7 @@
 import { GymSceneBase } from './GymSceneBase';
 import { GYM_TOOLTIP_KEY } from '../GymRegistry';
 import { GAME_W, GAME_H, FONT_FAMILY, TooltipManager } from '../../../src/ui';
+import { createHudText } from '../../../src/ui/Renderer';
 
 export class GymTooltipScene extends GymSceneBase {
   private domTooltipManager!: TooltipManager;
@@ -57,19 +58,19 @@ export class GymTooltipScene extends GymSceneBase {
     this.addButton(cx + 380, y, '[ Hide ]', () => this.hideTooltip());
 
     y += 40;
-    const modeLabel = this.addLabel(cx, y, 'Mode: DOM overlay', { fontSize: '16px', color: '#88ccff' });
+    const modeLabel = createHudText(this, cx, y, 'Mode: DOM overlay', '#88ccff', { fontSize: '16px' });
     modeLabel.setOrigin(0.5);
     modeLabel.setName('modeLabel');
 
     y += 50;
-    this.addLabel(cx, y, '── Hover over the cards below ──', { fontSize: '14px', color: '#6699aa' }).setOrigin(0.5);
+    createHudText(this, cx, y, '── Hover over the cards below ──', '#6699aa', { fontSize: '14px' }).setOrigin(0.5);
 
     // Create interactive demo cards
     y += 50;
     this.createDemoCards(y);
 
     y += 180;
-    this.addLabel(cx, y, '── Event Log ──', { fontSize: '12px', color: '#6699aa' }).setOrigin(0.5);
+    createHudText(this, cx, y, '── Event Log ──', '#6699aa', { fontSize: '12px' }).setOrigin(0.5);
 
     // Create tooltip managers
     this.domTooltipManager = new TooltipManager(this);
@@ -109,11 +110,7 @@ export class GymTooltipScene extends GymSceneBase {
       const card = this.add.container(data.x, startY);
       const bg = this.add.rectangle(0, 0, 150, 80, data.color, 0.8);
       bg.setStrokeStyle(2, 0xffffff);
-      const label = this.add.text(0, 0, data.name.split(' — ')[0], {
-        fontSize: '14px',
-        color: '#ffffff',
-        fontFamily: FONT_FAMILY,
-      }).setOrigin(0.5);
+      const label = createHudText(this, 0, 0, data.name.split(' — ')[0], '#ffffff', { fontSize: '14px' }).setOrigin(0.5);
 
       card.add([bg, label]);
       // Set hit area on the background rectangle for interactivity
@@ -189,11 +186,7 @@ export class GymTooltipScene extends GymSceneBase {
     this.logTexts = [];
     const baseY = 450;
     for (let i = 0; i < this.eventLog.length; i++) {
-      const txt = this.add.text(GAME_W / 2, baseY + i * 17, this.eventLog[i], {
-        fontSize: '11px',
-        color: '#aabbcc',
-        fontFamily: 'monospace',
-      }).setOrigin(0.5);
+      const txt = createHudText(this, GAME_W / 2, baseY + i * 17, this.eventLog[i], '#aabbcc', { fontSize: '11px' }).setOrigin(0.5);
       this.logTexts.push(txt);
     }
   }
