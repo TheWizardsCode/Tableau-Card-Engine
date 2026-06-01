@@ -176,6 +176,13 @@ export class GymGraphicsLightingSpikeScene extends GymSceneBase {
   private logEvent(msg: string): void {
     this.eventLog.push(msg);
     if (this.eventLog.length > 14) this.eventLog.shift();
-    this.eventLogResult.render(this.eventLog);
+    // Guard against rendering before the eventLogResult has been created.
+    if (this.eventLogResult && typeof this.eventLogResult.render === 'function') {
+      try {
+        this.eventLogResult.render(this.eventLog);
+      } catch (_) {
+        // Ignore render errors in headless/test environments.
+      }
+    }
   }
 }
