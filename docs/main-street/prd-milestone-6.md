@@ -257,6 +257,7 @@ Approach:
   - `tests/main-street/**`
   - `tests/e2e/replay-main-street.e2e.test.ts`
   - `tests/main-street/monte-carlo-balance.test.ts`
+  - `tests/main-street/market-extraction-parity.test.ts` — extraction parity oracle for MarketOfferEngine (40 tests, CG-0MPWZ5R1M001MZ3B)
 
 ### Manual checks
 
@@ -297,6 +298,15 @@ Suggested implementation sequence:
 | Over-extraction of game-specific logic | Medium | Keep content/challenge/card definitions in game folder |
 
 ---
+
+## 9.1 Implementation progress
+
+| Component | Status | Work Item | Notes |
+|---|---|---|---|
+| MarketOfferEngine — extraction parity tests | ✅ Done | CG-0MPWZ5R1M001MZ3B | 40 tests in `tests/main-street/market-extraction-parity.test.ts` |
+| MarketOfferEngine — shared module extraction | ⏳ Pending | — | Awaiting follow-up implementation work |
+| Economy Ledger | ⏳ Pending | — | — |
+| Action Commands | ⏳ Pending | — | — |
 
 ## 10. Open questions
 
