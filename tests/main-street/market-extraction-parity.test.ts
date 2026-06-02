@@ -343,6 +343,68 @@ describe('MarketOfferEngine — negative-path buy eligibility', () => {
       expect(result.legal).toBe(true);
     });
   });
+
+  describe('canPurchaseBusiness — card not found', () => {
+    it('should reject when the card ID does not exist in the business market', () => {
+      const state = createTestState();
+      const result = canPurchaseBusiness(state, 'nonexistent-card-id', 0);
+      expect(result.legal).toBe(false);
+      if (!result.legal) {
+        expect(result.reason).toContain('not found');
+      }
+    });
+  });
+
+  describe('canPurchaseUpgrade — card not found', () => {
+    it('should reject when the card ID does not exist in the investments row', () => {
+      const state = createTestState();
+      state.resourceBank.coins = 100;
+      const result = canPurchaseUpgrade(state, 'nonexistent-upgrade-id');
+      expect(result.legal).toBe(false);
+      if (!result.legal) {
+        expect(result.reason).toContain('not found');
+      }
+    });
+  });
+
+  describe('canPurchaseEvent — card not found and already holding', () => {
+    it('should reject when the card ID does not exist in the investments row', () => {
+      const state = createTestState();
+      const result = canPurchaseEvent(state, 'nonexistent-event-id');
+      expect(result.legal).toBe(false);
+      if (!result.legal) {
+        expect(result.reason).toContain('not found');
+      }
+    });
+
+    it('should reject when the player is already holding an Investment event', () => {
+      const state = createTestState();
+      // Set a held event
+      state.heldEvent = {
+        family: 'event',
+        id: 'evt-held-parity',
+        name: 'Held Event',
+        trigger: 'Investment',
+        effect: 'test',
+        target: 'All',
+        coinDelta: 0,
+        reputationDelta: 0,
+        cost: 0,
+      };
+      // Find an Investment event in investments row
+      const investmentEvent = state.market.investments.find(
+        c => c.family === 'event' && (c as EventCard).trigger === 'Investment',
+      ) as EventCard | undefined;
+      if (!investmentEvent) return;
+
+      state.resourceBank.coins = 100;
+      const result = canPurchaseEvent(state, investmentEvent.id);
+      expect(result.legal).toBe(false);
+      if (!result.legal) {
+        expect(result.reason).toContain('Already holding');
+      }
+    });
+  });
 });
 
 // ── Positive-Path: Buy Eligibility ──────────────────────────
@@ -708,6 +770,83 @@ describe('MarketOfferEngine — refill policy: exhaustion edge cases', () => {
 
       expect(state.market.business.map(c => c.id)).toEqual(bizBefore);
       expect(state.market.investments.map(c => c.id)).toEqual(invBefore);
+    });
+  });
+});
+
+// ── Refill Policy — Reshuffle from Discard ─────────────────
+
+describe('MarketOfferEngine — refill policy: reshuffle from discard', () => {
+  describe('reshuffleIfNeeded — business deck', () => {
+    it('should reshuffle business discards into deck when deck is empty and refill draws cards', () => {
+      const state = createTestState();
+      // Move some business cards into the discard pile and empty the deck
+      const moved = state.decks.business.splice(0, 3);
+      state.discards.business.push(...moved);
+      state.decks.business.length = 0;
+      // Clear visible market so refill must draw from reshuffled deck
+      state.market.business = [];
+      refillBusinessMarket(state);
+      expect(state.market.business.length).toBeGreaterThan(0);
+      expect(state.discards.business.length).toBe(0);
+    });
+
+    it('should leave market empty when both business deck and discard are empty', () => {
+      const state = createTestState();
+      state.decks.business = [];
+      state.discards.business = [];
+      state.market.business = [];
+      refillBusinessMarket(state);
+      expect(state.market.business).toHaveLength(0);
+    });
+  });
+
+  describe('reshuffleIfNeeded — upgrade deck', () => {
+    it('should reshuffle upgrade discards into deck when upgrade deck is empty', () => {
+      const state = createTestState();
+      const moved = state.decks.upgrade.splice(0, 2);
+      state.discards.upgrade.push(...moved);
+      state.decks.upgrade.length = 0;
+      state.market.investments = [];
+      refillInvestmentsMarket(state);
+      // Upgrades should have been drawn from the reshuffled discard
+      expect(state.discards.upgrade.length).toBe(0);
+      expect(state.market.investments.filter(c => c.family === 'upgrade').length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('reshuffleIfNeeded — event deck for incident queue', () => {
+    it('should reshuffle event discards into deck when filling incident queue', () => {
+      const state = createTestState();
+      // Pull out some incident cards and put them into discards
+      const incidentCards = state.decks.event.filter(e => e.trigger === 'Incident').slice(0, 2);
+      // Empty the event deck and place incident cards into discards
+      state.decks.event = [];
+      state.discards.event.push(...incidentCards);
+      state.incidentQueue = [];
+      refillIncidentQueue(state);
+      expect(state.incidentQueue.length).toBeGreaterThan(0);
+      expect(state.discards.event.length).toBe(0);
+    });
+  });
+
+  describe('reshuffleNeeded — event deck for investments market', () => {
+    it('should reshuffle event discards to find Investment events for the market row', () => {
+      const state = createTestState();
+      // Move ALL event cards (including Investment events) from deck to discard
+      const allEvents = state.decks.event.slice();
+      state.decks.event = [];
+      state.discards.event.push(...allEvents);
+      // Ensure we have Investment events in discards
+      const investInDiscard = state.discards.event.filter(e => e.trigger === 'Investment').length;
+      if (investInDiscard === 0) return; // Skip if no Investment events available
+      state.market.investments = [];
+      // Ensure upgrade deck has cards so we can test event reshuffle
+      expect(state.decks.upgrade.length).toBeGreaterThanOrEqual(MARKET_INVESTMENT_UPGRADE_COUNT);
+      refillInvestmentsMarket(state);
+      // Events should have been drawn from reshuffled discards
+      const events = state.market.investments.filter(c => c.family === 'event');
+      expect(events.length).toBeGreaterThan(0);
     });
   });
 });
