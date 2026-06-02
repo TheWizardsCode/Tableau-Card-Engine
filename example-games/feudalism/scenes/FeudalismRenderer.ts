@@ -29,6 +29,7 @@ import {
   ACTION_Y, INSTRUCTION_Y,
   RESOURCE_FILL, RESOURCE_TEXT_COLOR, RESOURCE_ICON_COLOR, RESOURCE_LABEL_COLOR,
 } from './FeudalismConstants';
+import { createFeudalismActionButton } from '../../../src/ui/Renderer/adapters/FeudalismAdapter';
 import {
   buildTokenEntries,
   getBonusRenderOrder,
