@@ -305,7 +305,8 @@ Suggested implementation sequence:
 |---|---|---|---|
 | MarketOfferEngine — extraction parity tests | ✅ Done | CG-0MPWZ5R1M001MZ3B | 57 tests in `tests/main-street/market-extraction-parity.test.ts` (positive + negative paths, reshuffle behavior, integration, refill) |
 | MarketOfferEngine — shared module extraction | ⏳ Pending | — | Awaiting follow-up implementation work |
-| Economy Ledger | ⏳ Pending | — | — |
+| Economy Ledger — extraction parity tests | ✅ Done | CG-0MPWZ5RFI001DJUA | 47 unit + integration tests in `tests/rule-engine/EconomyLedger.test.ts`; shared module at `src/rule-engine/EconomyLedger.ts` |
+| Economy Ledger — shared module extraction | ⏳ Pending | — | EconomyLedger interface and `createEconomyLedger` factory implemented with full test coverage; Main Street migration to consume it is pending |
 | Action Commands | ⏳ Pending | — | — |
 
 ## 10. Open questions
