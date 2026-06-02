@@ -154,9 +154,11 @@ multiplier formula.
 
 ## Tests
 
-47 unit and integration tests are available in
+51 unit and integration tests are available in
 `tests/rule-engine/EconomyLedger.test.ts`, covering:
 
 - `get` / `snapshot` / `canApply` / `apply` / `setScore` semantics
 - Invariant checks (no underflow guards, deterministic ordering, additive behavior)
 - Integration parity with Main Street economy outcomes
+- Negative economy scenarios (coins and reputation driven negative via events)
+- Score computation parity using the full `computeScore` formula (including challenges bonus)

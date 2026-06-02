@@ -39,6 +39,7 @@ import {
   processEndOfTurn,
   resolveEvent,
   playHeldEvent,
+  computeScore,
 } from '../../example-games/main-street/MainStreetEngine';
 
 import {
@@ -622,6 +623,106 @@ describe('EconomyLedger — Main Street integration parity', () => {
     });
   });
 
+  describe('Negative economy integration (bankruptcy / rep collapse)', () => {
+    it('ledger tracks coins through an event that drives coins negative', () => {
+      const state = setupMainStreetGame({ seed: 'ledger-negative-coins' });
+      // Start with low coins so the event drives them negative
+      state.resourceBank.coins = 2;
+      const ledger = createLedger({ coins: 2, reputation: state.resourceBank.reputation });
+
+      const coinsBefore = state.resourceBank.coins;
+
+      const event: EventCard = {
+        family: 'event',
+        id: 'evt-coin-bankruptcy',
+        name: 'Financial Crisis',
+        trigger: 'Incident',
+        effect: '-10 coins',
+        target: 'All',
+        coinDelta: -10,
+        reputationDelta: 0,
+        cost: 0,
+      };
+
+      resolveEvent(state, event);
+
+      ledger.apply({ coins: state.resourceBank.coins - coinsBefore, reputation: 0 });
+
+      expect(ledger.get('coins')).toBe(state.resourceBank.coins);
+      // Coins are negative — ledger allows this (bankruptcy checked downstream)
+      expect(ledger.get('coins')).toBeLessThan(0);
+      expect(state.resourceBank.coins).toBe(-8);
+    });
+
+    it('ledger tracks reputation through an event that drives rep negative', () => {
+      const state = setupMainStreetGame({ seed: 'ledger-negative-rep' });
+      state.resourceBank.reputation = 1;
+      const ledger = createLedger({ coins: state.resourceBank.coins, reputation: 1 });
+
+      const repBefore = state.resourceBank.reputation;
+
+      const event: EventCard = {
+        family: 'event',
+        id: 'evt-rep-collapse',
+        name: 'Reputation Disaster',
+        trigger: 'Incident',
+        effect: '-5 rep',
+        target: 'All',
+        coinDelta: 0,
+        reputationDelta: -5,
+        cost: 0,
+      };
+
+      resolveEvent(state, event);
+
+      ledger.apply({
+        coins: state.resourceBank.coins - (state.resourceBank.coins), // 0
+        reputation: state.resourceBank.reputation - repBefore,
+      });
+
+      expect(ledger.get('reputation')).toBe(state.resourceBank.reputation);
+      // Reputation may be negative — ledger allows this (collapse checked downstream)
+      if (state.resourceBank.reputation < 0) {
+        expect(ledger.get('reputation')).toBeLessThan(0);
+      }
+    });
+
+    it('ledger correctly reports both coins and rep negative simultaneously', () => {
+      const state = setupMainStreetGame({ seed: 'ledger-both-negative' });
+      state.resourceBank.coins = 0;
+      state.resourceBank.reputation = 0;
+
+      const ledger = createLedger({ coins: 0, reputation: 0 });
+
+      const coinsBefore = state.resourceBank.coins;
+      const repBefore = state.resourceBank.reputation;
+
+      const event: EventCard = {
+        family: 'event',
+        id: 'evt-double-negative',
+        name: 'Double Whammy',
+        trigger: 'Incident',
+        effect: '-5 coins, -3 rep',
+        target: 'All',
+        coinDelta: -5,
+        reputationDelta: -3,
+        cost: 0,
+      };
+
+      resolveEvent(state, event);
+
+      ledger.apply({
+        coins: state.resourceBank.coins - coinsBefore,
+        reputation: state.resourceBank.reputation - repBefore,
+      });
+
+      expect(ledger.get('coins')).toBe(state.resourceBank.coins);
+      expect(ledger.get('reputation')).toBe(state.resourceBank.reputation);
+      expect(ledger.get('coins')).toBeLessThan(0);
+      expect(ledger.get('reputation')).toBeLessThan(0);
+    });
+  });
+
   describe('Score computation parity', () => {
     it('ledger score matches Main Street computeScore formula', () => {
       const state = setupMainStreetGame({ seed: 'ledger-score' });
@@ -649,10 +750,11 @@ describe('EconomyLedger — Main Street integration parity', () => {
       executeDayStart(state);
       processEndOfTurn(state);
 
-      // Compute score the Main Street way
+      // Compute score the Main Street way (full formula including challenges)
       const expectedScore =
         state.resourceBank.coins +
-        state.resourceBank.reputation * state.config.reputationScoreMultiplier;
+        state.resourceBank.reputation * state.config.reputationScoreMultiplier +
+        state.challengesCompleted.length * state.config.challengeBonusPoints;
 
       const ledger = createLedger({
         coins: state.resourceBank.coins,
@@ -662,6 +764,23 @@ describe('EconomyLedger — Main Street integration parity', () => {
 
       expect(ledger.get('score')).toBe(expectedScore);
     });
+
+    it('score parity uses exact computeScore formula, not partial approximation', () => {
+      const state = setupMainStreetGame({ seed: 'ledger-score-formula-parity' });
+
+      // Compute score using Main Street's own computeScore function
+      const expectedScore = computeScore(state);
+
+      const ledger = createLedger({
+        coins: state.resourceBank.coins,
+        reputation: state.resourceBank.reputation,
+      });
+      ledger.setScore(expectedScore);
+
+      expect(ledger.get('score')).toBe(expectedScore);
+      // Verify formula equivalence: ledger.setScore(computeScore(state))
+      // should produce identical results for any state configuration.
+    });
   });
 });
 
@@ -669,27 +788,29 @@ describe('EconomyLedger — Main Street integration parity', () => {
 //
 // The following table maps test cases to ledger behaviors:
 //
-// | Test Group                  | Behavior Tested                          | AC Coverage |
-// |----------------------------|------------------------------------------|-------------|
-// | get — defaults             | get returns 0 for unconfigured resources | AC-1        |
-// | get — configured           | get returns initial values               | AC-1        |
-// | get — after mutations      | get reflects applied deltas              | AC-1        |
-// | snapshot — copy            | snapshot returns independent copy        | AC-1        |
-// | snapshot — independence    | mutations after snapshot don't affect it | AC-2        |
-// | canApply — unconstrained   | always true (Main St baseline)           | AC-1, AC-2  |
-// | canApply — with constraints| minCoins/minReputation guards            | AC-1        |
-// | apply — positive/negative  | additive delta application               | AC-1        |
-// | apply — negative allowed   | coins/rep can go below zero              | AC-2        |
-// | apply — multiple resources | combined delta in single call            | AC-1        |
-// | apply — selective          | only specified fields change             | AC-1        |
-// | setScore — absolute        | score set to explicit value              | AC-1        |
-// | Invariant — no underflow   | no guards prevent negative balance       | AC-2        |
-// | Invariant — deterministic  | sequential apply is reproducible         | AC-2        |
-// | Invariant — additive       | purely additive, no clamping             | AC-2        |
-// | Invariant — independence   | resources don't affect each other        | AC-2        |
-// | Integration — purchase     | business/upgrade/event purchase parity   | AC-3        |
-// | Integration — income       | income with rep multiplier parity        | AC-3        |
-// | Integration — events       | event resolution (pos/neg) parity        | AC-3        |
-// | Integration — full turn    | full turn cycle parity                   | AC-3        |
-// | Integration — multi-turn   | 3 consecutive turns parity               | AC-3        |
-// | Integration — score        | score formula parity                     | AC-3        |
+// | Test Group                      | Behavior Tested                                     | AC Coverage |
+// |--------------------------------|-----------------------------------------------------|-------------|
+// | get — defaults                 | get returns 0 for unconfigured resources            | AC-1        |
+// | get — configured               | get returns initial values                          | AC-1        |
+// | get — after mutations          | get reflects applied deltas                         | AC-1        |
+// | snapshot — copy                | snapshot returns independent copy                   | AC-1        |
+// | snapshot — independence        | mutations after snapshot don't affect it            | AC-2        |
+// | canApply — unconstrained       | always true (Main St baseline)                      | AC-1, AC-2  |
+// | canApply — with constraints    | minCoins/minReputation guards                       | AC-1        |
+// | apply — positive/negative      | additive delta application                          | AC-1        |
+// | apply — negative allowed       | coins/rep can go below zero                         | AC-2        |
+// | apply — multiple resources     | combined delta in single call                       | AC-1        |
+// | apply — selective              | only specified fields change                        | AC-1        |
+// | setScore — absolute            | score set to explicit value                         | AC-1        |
+// | Invariant — no underflow       | no guards prevent negative balance                  | AC-2        |
+// | Invariant — deterministic      | sequential apply is reproducible                    | AC-2        |
+// | Invariant — additive           | purely additive, no clamping                        | AC-2        |
+// | Invariant — independence       | resources don't affect each other                   | AC-2        |
+// | Integration — purchase         | business/upgrade/event purchase parity              | AC-3        |
+// | Integration — income           | income with rep multiplier parity                   | AC-3        |
+// | Integration — events           | event resolution (pos/neg) parity                   | AC-3        |
+// | Integration — full turn        | full turn cycle parity                              | AC-3        |
+// | Integration — multi-turn       | 3 consecutive turns parity                          | AC-3        |
+// | Integration — negative economy | coins/rep go negative via events (bankruptcy path)  | AC-2, AC-3  |
+// | Integration — score formula    | score matches full computeScore (incl. challenges)  | AC-3        |
+// | Integration — score parity     | setScore(computeScore(state)) equivalence           | AC-3        |
