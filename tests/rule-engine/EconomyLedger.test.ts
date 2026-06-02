@@ -39,6 +39,7 @@ import {
   processEndOfTurn,
   resolveEvent,
   playHeldEvent,
+  computeScore,
 } from '../../example-games/main-street/MainStreetEngine';
 
 import {
@@ -662,6 +663,149 @@ describe('EconomyLedger — Main Street integration parity', () => {
 
       expect(ledger.get('score')).toBe(expectedScore);
     });
+
+    it('ledger.setScore matches actual computeScore() function output', () => {
+      const state = setupMainStreetGame({ seed: 'ledger-computeScore-direct' });
+
+      // Place businesses and run a few turns to get interesting state
+      state.streetGrid.fill(null);
+      state.streetGrid[0] = { ...state.decks.business[0] };
+      state.streetGrid[1] = { ...state.decks.business[1] };
+      executeDayStart(state);
+      processEndOfTurn(state);
+      executeDayStart(state);
+      processEndOfTurn(state);
+
+      // Call the actual computeScore function
+      const actualScore = computeScore(state);
+
+      // Set ledger score to the same value and verify
+      const ledger = createLedger({
+        coins: state.resourceBank.coins,
+        reputation: state.resourceBank.reputation,
+        score: 0,
+      });
+      ledger.setScore(actualScore);
+
+      expect(ledger.get('score')).toBe(actualScore);
+      expect(ledger.get('score')).toBe(state.resourceBank.coins + state.resourceBank.reputation * state.config.reputationScoreMultiplier + state.challengesCompleted.length * state.config.challengeBonusPoints);
+    });
+  });
+
+  describe('Negative economy integration (bankruptcy / reputation collapse scenarios)', () => {
+    it('coins driven negative via event resolution — ledger tracks bankruptcy state', () => {
+      const state = setupMainStreetGame({ seed: 'ledger-bankruptcy' });
+      state.resourceBank.coins = 2; // low coins so a big penalty drives them negative
+      state.resourceBank.reputation = 5;
+
+      const ledger = createLedger({
+        coins: state.resourceBank.coins,
+        reputation: state.resourceBank.reputation,
+      });
+      const coinsBefore = state.resourceBank.coins;
+
+      // Resolve a large negative event
+      const event: EventCard = {
+        family: 'event',
+        id: 'evt-bankruptcy',
+        name: 'Market Crash',
+        trigger: 'Incident',
+        effect: '-20 coins',
+        target: 'All',
+        coinDelta: -20,
+        reputationDelta: 0,
+        cost: 0,
+      };
+
+      resolveEvent(state, event);
+
+      const coinsDelta = state.resourceBank.coins - coinsBefore;
+      ledger.apply({ coins: coinsDelta, reputation: 0 });
+
+      // Verify ledger matches state (coins now negative)
+      expect(ledger.get('coins')).toBe(state.resourceBank.coins);
+      expect(ledger.get('coins')).toBeLessThan(0);
+      // Ledger allows negative (bankruptcy is engine-level check)
+      expect(ledger.canApply({ coins: -1 })).toBe(true);
+    });
+
+    it('reputation driven negative via event resolution — ledger tracks collapse state', () => {
+      const state = setupMainStreetGame({ seed: 'ledger-rep-collapse' });
+      state.resourceBank.coins = 10;
+      state.resourceBank.reputation = 2; // low reputation
+      state.turn = 3; // past turn 1 so collapse would trigger
+
+      const ledger = createLedger({
+        coins: state.resourceBank.coins,
+        reputation: state.resourceBank.reputation,
+      });
+      const repBefore = state.resourceBank.reputation;
+
+      // Resolve a large negative reputation event
+      const event: EventCard = {
+        family: 'event',
+        id: 'evt-rep-collapse',
+        name: 'Public Scandal',
+        trigger: 'Incident',
+        effect: '-10 reputation',
+        target: 'All',
+        coinDelta: 0,
+        reputationDelta: -10,
+        cost: 0,
+      };
+
+      resolveEvent(state, event);
+
+      const repDelta = state.resourceBank.reputation - repBefore;
+      ledger.apply({ coins: 0, reputation: repDelta });
+
+      // Verify ledger matches state (reputation now negative)
+      expect(ledger.get('reputation')).toBe(state.resourceBank.reputation);
+      expect(ledger.get('reputation')).toBeLessThan(0);
+      // Ledger allows negative (collapse is engine-level check)
+      expect(ledger.canApply({ reputation: -1 })).toBe(true);
+    });
+
+    it('both coins and reputation negative simultaneously via event resolution', () => {
+      const state = setupMainStreetGame({ seed: 'ledger-double-negative' });
+      state.resourceBank.coins = 3;
+      state.resourceBank.reputation = 2;
+      state.turn = 3;
+
+      const ledger = createLedger({
+        coins: state.resourceBank.coins,
+        reputation: state.resourceBank.reputation,
+      });
+      const coinsBefore = state.resourceBank.coins;
+      const repBefore = state.resourceBank.reputation;
+
+      // Resolve an event that hits both resources hard
+      const event: EventCard = {
+        family: 'event',
+        id: 'evt-double-hit',
+        name: 'Catastrophic Failure',
+        trigger: 'Incident',
+        effect: '-15 coins, -8 reputation',
+        target: 'All',
+        coinDelta: -15,
+        reputationDelta: -8,
+        cost: 0,
+      };
+
+      resolveEvent(state, event);
+
+      const coinsDelta = state.resourceBank.coins - coinsBefore;
+      const repDelta = state.resourceBank.reputation - repBefore;
+      ledger.apply({ coins: coinsDelta, reputation: repDelta });
+
+      // Verify both resources are negative and match state
+      expect(ledger.get('coins')).toBe(state.resourceBank.coins);
+      expect(ledger.get('reputation')).toBe(state.resourceBank.reputation);
+      expect(ledger.get('coins')).toBeLessThan(0);
+      expect(ledger.get('reputation')).toBeLessThan(0);
+      // Ledger permits both negative simultaneously
+      expect(ledger.canApply({ coins: -1, reputation: -1 })).toBe(true);
+    });
   });
 });
 
@@ -693,3 +837,7 @@ describe('EconomyLedger — Main Street integration parity', () => {
 // | Integration — full turn    | full turn cycle parity                   | AC-3        |
 // | Integration — multi-turn   | 3 consecutive turns parity               | AC-3        |
 // | Integration — score        | score formula parity                     | AC-3        |
+// | Integration — computeScore | direct computeScore() equivalence        | AC-3        |
+// | Integration — bankruptcy   | coins driven negative via events         | AC-2, AC-3  |
+// | Integration — rep collapse | reputation driven negative via events    | AC-2, AC-3  |
+// | Integration — double neg   | coins + rep negative simultaneously      | AC-2, AC-3  |
