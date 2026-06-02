@@ -34,3 +34,14 @@ export const RULE_ENGINE_VERSION = '0.1.0';
 export type LegalityResult =
   | { legal: true }
   | { legal: false; reason: string };
+
+// ── Economy Ledger ──────────────────────────────────────────
+
+export {
+  createEconomyLedger,
+  type EconomyLedger,
+  type EconomyLedgerConfig,
+  type EconomyConstraints,
+  type ResourceDelta,
+  type ResourceSnapshot,
+} from './EconomyLedger';
