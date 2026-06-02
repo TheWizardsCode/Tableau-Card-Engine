@@ -11,11 +11,15 @@ These tests serve as the regression oracle during migration.
 | Category | Functions under test | Count |
 |---|---|---|
 | Market row retrieval | `findTargetBusinessSlot`, `getAffordableUpgradeCards` | 10 |
+| Positive-path buy eligibility | `canPurchaseBusiness`, `canPurchaseUpgrade`, `canPurchaseEvent` | 3 |
 | Negative-path buy eligibility | `canPurchaseBusiness`, `canPurchaseUpgrade`, `canPurchaseEvent`, `canRefreshInvestments` | 8 |
+| Positive-path purchase results | `purchaseBusiness`, `purchaseUpgrade`, `purchaseEvent`, `refreshInvestments` | 5 |
 | Invalid row/slot selection | `purchaseBusiness`, `purchaseUpgrade`, `purchaseEvent`, `refreshInvestments` | 7 |
 | Refill policy — incident queue | `refillIncidentQueue` | 5 |
 | Refill policy — exhaustion | `refillInvestmentsMarket`, `refillBusinessMarket`, `refillAllMarkets` | 3 |
 | Multi-turn integration | `executeDayStart`, `processEndOfTurn`, `executeAction` | 7 |
+
+**Total: 48 tests**
 
 ### Known gaps
 

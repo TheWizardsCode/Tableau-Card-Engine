@@ -35,7 +35,6 @@ import {
   getBonusRenderOrder,
   getTokenRenderOrder,
 } from './FeudalismRenderHelpers';
-import { createFeudalismActionButton } from '../../../src/ui/Renderer/adapters/FeudalismAdapter';
 
 export interface MarketCallbacks {
   onMarketCardClick: (card: DevelopmentCard) => void;

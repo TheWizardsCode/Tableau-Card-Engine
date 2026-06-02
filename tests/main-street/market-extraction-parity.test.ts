@@ -31,6 +31,7 @@ import {
   getAffordableUpgradeCards,
   getEmptySlots,
   getAffordableBusinessCards,
+  type RefreshResult,
 } from '../../example-games/main-street/MainStreetMarket';
 import { executeDayStart, processEndOfTurn, executeAction } from '../../example-games/main-street/MainStreetEngine';
 import {
@@ -340,6 +341,165 @@ describe('MarketOfferEngine — negative-path buy eligibility', () => {
 
       const result = canRefreshInvestments(state);
       expect(result.legal).toBe(true);
+    });
+  });
+});
+
+// ── Positive-Path: Buy Eligibility ──────────────────────────
+
+describe('MarketOfferEngine — positive-path buy eligibility', () => {
+  describe('canPurchaseBusiness — success', () => {
+    it('should allow purchase when player has enough coins and slot is empty', () => {
+      const state = createTestState();
+      const card = state.market.business[0];
+      state.resourceBank.coins = card.cost;
+      const result = canPurchaseBusiness(state, card.id, 0);
+      expect(result.legal).toBe(true);
+    });
+  });
+
+  describe('canPurchaseUpgrade — success', () => {
+    it('should allow upgrade purchase when player can afford and target exists', () => {
+      const state = createTestState();
+      const upgrade = state.market.investments.find(
+        c => c.family === 'upgrade',
+      ) as UpgradeCard | undefined;
+      if (!upgrade) return;
+
+      const biz = state.decks.business.find(b => b.name === upgrade.targetBusiness);
+      if (!biz) return;
+      state.streetGrid[0] = { ...biz, level: upgrade.requiredLevel ?? 0 };
+      state.resourceBank.coins = upgrade.cost;
+
+      const result = canPurchaseUpgrade(state, upgrade.id);
+      expect(result.legal).toBe(true);
+    });
+  });
+
+  describe('canPurchaseEvent — success', () => {
+    it('should allow purchase of an Investment-trigger event when player can afford', () => {
+      const state = createTestState();
+      const investmentEvent = state.market.investments.find(
+        c => c.family === 'event' && (c as EventCard).trigger === 'Investment',
+      ) as EventCard | undefined;
+      if (!investmentEvent) return;
+
+      state.resourceBank.coins = investmentEvent.cost;
+      const result = canPurchaseEvent(state, investmentEvent.id);
+      expect(result.legal).toBe(true);
+    });
+  });
+});
+
+// ── Positive-Path: Purchase Results ─────────────────────────
+
+describe('MarketOfferEngine — positive-path purchase results', () => {
+  describe('purchaseBusiness — success', () => {
+    it('should deduct coins, place card in slot, and remove from market', () => {
+      const state = createTestState();
+      const card = state.market.business[0];
+      state.resourceBank.coins = 100;
+      const coinsBefore = state.resourceBank.coins;
+
+      const result = purchaseBusiness(state, card.id, 0);
+
+      expect(result.card.id).toBe(card.id);
+      expect(result.cost).toBe(card.cost);
+      expect(state.resourceBank.coins).toBe(coinsBefore - card.cost);
+      expect(state.streetGrid[0]).not.toBeNull();
+      expect(state.streetGrid[0]!.id).toBe(card.id);
+      expect(state.market.business.map(c => c.id)).not.toContain(card.id);
+    });
+
+    it('should not refill the market immediately after purchase', () => {
+      const state = createTestState();
+      const card = state.market.business[0];
+      state.resourceBank.coins = 100;
+      purchaseBusiness(state, card.id, 0);
+      expect(state.market.business).toHaveLength(MARKET_BUSINESS_SLOTS - 1);
+    });
+  });
+
+  describe('purchaseUpgrade — success', () => {
+    it('should deduct coins and level up the target business', () => {
+      const state = createTestState();
+      const upgrade = state.market.investments.find(
+        c => c.family === 'upgrade',
+      ) as UpgradeCard | undefined;
+      if (!upgrade) return;
+
+      const biz = state.decks.business.find(b => b.name === upgrade.targetBusiness);
+      if (!biz) return;
+      state.streetGrid[0] = { ...biz, level: upgrade.requiredLevel ?? 0 };
+      state.resourceBank.coins = 100;
+      const coinsBefore = state.resourceBank.coins;
+      const levelBefore = state.streetGrid[0]!.level;
+      const incomeBefore = state.streetGrid[0]!.incomeBonus;
+      const rangeBefore = state.streetGrid[0]!.synergyRangeBonus;
+
+      purchaseUpgrade(state, upgrade.id);
+
+      expect(state.resourceBank.coins).toBe(coinsBefore - upgrade.cost);
+      expect(state.streetGrid[0]!.level).toBe(levelBefore + 1);
+      expect(state.streetGrid[0]!.incomeBonus).toBe(incomeBefore + upgrade.incomeBonus);
+      expect(state.streetGrid[0]!.synergyRangeBonus).toBe(rangeBefore + upgrade.synergyRangeBonus);
+    });
+  });
+
+  describe('purchaseEvent — success', () => {
+    it('should set heldEvent and remove event from investments row', () => {
+      const state = createTestState();
+      const investmentEvt: EventCard = {
+        family: 'event',
+        id: 'evt-parity-test',
+        name: 'Parity Test Festival',
+        trigger: 'Investment',
+        effect: '+1 coin test',
+        target: 'All',
+        coinDelta: 1,
+        reputationDelta: 0,
+        cost: 3,
+      };
+      state.market.investments = [investmentEvt];
+      state.resourceBank.coins = investmentEvt.cost;
+      const coinsBefore = state.resourceBank.coins;
+
+      purchaseEvent(state, investmentEvt.id);
+
+      expect(state.heldEvent).not.toBeNull();
+      expect(state.heldEvent!.id).toBe(investmentEvt.id);
+      expect(state.resourceBank.coins).toBe(coinsBefore - investmentEvt.cost);
+      expect(state.market.investments).toHaveLength(0);
+    });
+  });
+
+  describe('refreshInvestments — success', () => {
+    it('should deduct cost, discard current investments, and refill the row', () => {
+      const state = createTestState();
+      state.phase = 'MarketPhase';
+      state.resourceBank.coins = REFRESH_INVESTMENTS_COST + 10;
+
+      const invBefore = state.market.investments.map(c => c.id).slice();
+      expect(invBefore.length).toBeGreaterThan(0);
+      const coinsBefore = state.resourceBank.coins;
+
+      const result: RefreshResult = refreshInvestments(state);
+
+      expect(result.cost).toBe(REFRESH_INVESTMENTS_COST);
+      expect(state.resourceBank.coins).toBe(coinsBefore - REFRESH_INVESTMENTS_COST);
+      // All previously visible cards should be discarded
+      const discardedIds = [
+        ...state.discards.upgrade.map(c => c.id),
+        ...state.discards.event.map(c => c.id),
+      ];
+      for (const id of result.replaced.map(c => c.id)) {
+        expect(discardedIds).toContain(id);
+      }
+      // Investments row refilled within slot limits
+      expect(state.market.investments.length).toBeLessThanOrEqual(MARKET_INVESTMENT_SLOTS);
+      // No duplicate IDs in the refreshed row
+      const refreshedIds = state.market.investments.map(c => c.id);
+      expect(new Set(refreshedIds).size).toBe(refreshedIds.length);
     });
   });
 });

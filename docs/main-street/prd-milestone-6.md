@@ -257,7 +257,7 @@ Approach:
   - `tests/main-street/**`
   - `tests/e2e/replay-main-street.e2e.test.ts`
   - `tests/main-street/monte-carlo-balance.test.ts`
-  - `tests/main-street/market-extraction-parity.test.ts` — extraction parity oracle for MarketOfferEngine (40 tests, CG-0MPWZ5R1M001MZ3B)
+  - `tests/main-street/market-extraction-parity.test.ts` — extraction parity oracle for MarketOfferEngine (48 tests, CG-0MPWZ5R1M001MZ3B)
 
 ### Manual checks
 
@@ -303,7 +303,7 @@ Suggested implementation sequence:
 
 | Component | Status | Work Item | Notes |
 |---|---|---|---|
-| MarketOfferEngine — extraction parity tests | ✅ Done | CG-0MPWZ5R1M001MZ3B | 40 tests in `tests/main-street/market-extraction-parity.test.ts` |
+| MarketOfferEngine — extraction parity tests | ✅ Done | CG-0MPWZ5R1M001MZ3B | 48 tests in `tests/main-street/market-extraction-parity.test.ts` (positive + negative paths, integration, refill) |
 | MarketOfferEngine — shared module extraction | ⏳ Pending | — | Awaiting follow-up implementation work |
 | Economy Ledger | ⏳ Pending | — | — |
 | Action Commands | ⏳ Pending | — | — |
