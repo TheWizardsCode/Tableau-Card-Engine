@@ -58,7 +58,9 @@ export class GymSaveLoadScene extends GymSceneBase {
   private eventLog: string[] = [];
   private eventLogResult!: EventLogResult;
   private snapshotPlaceholder: Phaser.GameObjects.Text | null = null;
-  // RenderTexture thumbnail
+  /** The RenderTexture used as the current snapshot display (if any). */
+  private snapshotDisplay: Phaser.GameObjects.RenderTexture | null = null;
+  /** A flat Image created from a loaded snapshot data URL (used during load restore). */
   private thumbnailImage: Phaser.GameObjects.Image | null = null;
   private _snapshotAvailable = false;
   /** Pending snapshot callback data URL (set async by snapshot()); null if none. */
@@ -251,21 +253,33 @@ export class GymSaveLoadScene extends GymSceneBase {
   // ── RenderTexture snapshot demo ─────────────────────────────
 
   private takeSnapshot(): void {
-    // Clear any existing thumbnail
+    // Clear any existing thumbnail and orphaned display objects
     this.clearSnapshot();
 
     try {
-      // Attempt to create a RenderTexture snapshot of a representative area
+      // Create a RenderTexture to capture the scene into a 200x150 thumbnail
       const rt = this.add.renderTexture(0, 0, 200, 150);
-      // Draw the current scene children into the render texture
-      rt.draw(this.children.getAll(), 0, 0);
-      // Save the RenderTexture to the Texture Manager so it can be used as a named texture
-      rt.saveTexture('snapshot-thumb');
-      // Position the RenderTexture (it will render itself each frame)
-      rt.setPosition(GAME_W / 2 - 100, 340);
 
-      // Display the saved texture as a thumbnail image
-      this.thumbnailImage = this.add.image(GAME_W / 2 - 100, 340, 'snapshot-thumb');
+      // Draw scene children into the RenderTexture, excluding rt itself
+      // to avoid recursion / self-referencing.
+      const drawables = this.children.getAll().filter((child) => child !== rt);
+      rt.draw(drawables, 0, 0);
+
+      // Phaser 4 uses a command-buffer; render() commits the queued draw commands.
+      // Without this call the texture may appear blank.
+      rt.render();
+
+      // Save to the Texture Manager so the RenderTexture content is available for
+      // persistence extraction via snapshot().
+      rt.saveTexture('snapshot-thumb');
+
+      // Present the RenderTexture itself as the thumbnail display.
+      // RenderTexture extends Image and renders its captured texture each frame.
+      rt.setPosition(GAME_W / 2 - 100, 340);
+      rt.setScale(0.5);
+
+      // Store the reference so we can destroy it later.
+      this.snapshotDisplay = rt;
       this._snapshotAvailable = true;
 
       // Extract a base64 data URL from the RenderTexture for persistence.
@@ -299,6 +313,10 @@ export class GymSaveLoadScene extends GymSceneBase {
 
   /** Remove the thumbnail display objects without touching state data. */
   private removeThumbnailDisplay(): void {
+    if (this.snapshotDisplay) {
+      try { this.snapshotDisplay.destroy(); } catch (_) { /* ignore */ }
+      this.snapshotDisplay = null;
+    }
     if (this.thumbnailImage) {
       try { this.thumbnailImage.destroy(); } catch (_) { /* ignore */ }
       this.thumbnailImage = null;
@@ -317,8 +335,9 @@ export class GymSaveLoadScene extends GymSceneBase {
   }
 
   /**
-   * Recreate a thumbnail image from a persisted base64 data URL.
+   * Recreate a thumbnail from a persisted base64 data URL.
    * Called when loading a saved state that includes snapshot data.
+   * Creates a canvas texture from the decoded data and displays it as an Image.
    */
   private recreateSnapshot(dataUrl: string): void {
     this.removeThumbnailDisplay();
@@ -332,8 +351,10 @@ export class GymSaveLoadScene extends GymSceneBase {
           const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.drawImage(img, 0, 0);
+            // Register the canvas as a texture so we can use it with Image
             this.textures.addCanvas('snapshot-loaded', canvas);
             this.thumbnailImage = this.add.image(GAME_W / 2 - 100, 340, 'snapshot-loaded');
+            this.thumbnailImage.setScale(0.5);
             this._snapshotAvailable = true;
           }
         } catch (e) {
