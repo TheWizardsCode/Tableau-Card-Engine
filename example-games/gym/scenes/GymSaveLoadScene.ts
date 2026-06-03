@@ -3,11 +3,12 @@
  * the core-engine SaveLoadStore API.
  *
  * Features:
- *   - Save current scene state (hand of cards + snapshot) to persistent storage
+ *   - Save current scene state (hand of cards + screenshot) to persistent storage
  *   - Load and restore saved state
  *   - Handle malformed save payloads safely
- *   - RenderTexture screenshot on save (with headless fallback)
- *   - Hand display with card sprites for visual snapshot interest
+ *   - RenderTexture screenshot with camera-scroll for proper hand capture
+ *   - Hand display via reusable HandView component (arc layout, lower centre)
+ *   - Add Card button deals a random card; score totals card values
  *
  * @module example-games/gym/scenes/GymSaveLoadScene
  */
@@ -18,13 +19,14 @@ import {
   SaveLoadStore,
 } from '../../../src/core-engine';
 import type { SaveSerializer } from '../../../src/core-engine';
-import { GAME_W } from '../../../src/ui/constants';
+import { GAME_W, GAME_H, CARD_W } from '../../../src/ui/constants';
 import { createHudText } from '../../../src/ui/Renderer';
 import { createEventLog } from '../../../src/ui/GymSceneUtils';
 import type { EventLogResult } from '../../../src/ui/GymSceneUtils';
 import { createCard, shuffleArray, createStandardDeck, rankValue } from '../../../src/card-system';
 import type { Card, Rank, Suit } from '../../../src/card-system';
-import { getCardTexture, ensureCardTextureFallbacks } from '../../../src/ui/CardTextureHelpers';
+import { ensureCardTextureFallbacks } from '../../../src/ui/CardTextureHelpers';
+import { HandView } from '../../../src/ui/HandView';
 
 // ── Card score: A=1, 2=2, ..., J=11, Q=12, K=13 ────────────
 function cardScore(rank: Rank): number {
@@ -66,14 +68,15 @@ const SLOT_ID = 'demo-slot';
 /** Number of cards dealt to the starting hand. */
 const STARTING_HAND_SIZE = 5;
 
-/** Card display dimensions within the 200×150 screenshot capture area. */
-const CARD_DISPLAY_W = 36;
-const CARD_DISPLAY_H = 50;
-const CARD_GAP = 4;
-const CARDS_PER_ROW = 5;
-/** Top-left origin for the hand display (inside the capture area). */
-const HAND_X0 = 6;
-const HAND_Y0 = 40;
+/** HandView position: lower centre of the screen. */
+const HAND_BASE_X = GAME_W / 2;
+const HAND_BASE_Y = GAME_H * 0.65;
+const HAND_SPACING = 74;
+const HAND_ARC_RADIUS = 350;
+
+/** Screenshot capture area – centred over the hand. */
+const SCREENSHOT_W = 240;
+const SCREENSHOT_H = 180;
 
 export class GymSaveLoadScene extends GymSceneBase {
   private state: DemoState = { hand: [], screenshotDataUrl: null };
@@ -82,8 +85,8 @@ export class GymSaveLoadScene extends GymSceneBase {
   private backendText!: Phaser.GameObjects.Text;
   private eventLog: string[] = [];
   private eventLogResult!: EventLogResult;
-  /** Phaser Image sprites for each card in the hand. */
-  private cardSprites: Phaser.GameObjects.Image[] = [];
+  /** Reusable HandView component for the hand display. */
+  private handView!: HandView;
   /** Source deck used for dealing random cards. */
   private deck: Card[] = [];
   private screenshotPlaceholder: Phaser.GameObjects.Text | null = null;
@@ -109,8 +112,8 @@ export class GymSaveLoadScene extends GymSceneBase {
     this.initReducedMotion();
 
     this.initHelp([
-      { heading: 'Overview', body: 'Demonstrates saving and loading scene state via the SaveLoadStore API. Includes handling malformed payloads, RenderTexture screenshots, hand-of-cards display, and verifying invariants after restore.' },
-      { heading: 'Controls', body: '[ Add Card ]: Deal a random card to the hand.\n[ Save State ]: Persist current hand + screenshot.\n[ Load State ]: Restore last saved hand + screenshot.\n[ Load Malformed ]: Simulate a bad payload to verify error handling.\n[ Clear Save ]: Remove persisted save data.\n[ Take Screenshot ]: Capture a RenderTexture screenshot including the hand.\n[ Clear Screenshot ]: Remove the screenshot thumbnail.' },
+      { heading: 'Overview', body: 'Demonstrates saving and loading scene state via the SaveLoadStore API. Includes handling malformed payloads, RenderTexture screenshots, a hand of cards displayed via HandView, and verifying invariants after restore.' },
+      { heading: 'Controls', body: '[ Add Card ]: Deal a random card to the hand.\n[ Save State ]: Persist current hand + screenshot.\n[ Load State ]: Restore last saved hand + screenshot.\n[ Load Malformed ]: Simulate a bad payload to verify error handling.\n[ Clear Save ]: Remove persisted save data.\n[ Take Screenshot ]: Capture a RenderTexture screenshot of the hand area.\n[ Clear Screenshot ]: Remove the screenshot thumbnail.' },
     ]);
 
     // Ensure card placeholder textures exist (for headless / test envs)
@@ -118,13 +121,30 @@ export class GymSaveLoadScene extends GymSceneBase {
 
     // Initialise the source deck and deal the starting hand
     this.deck = shuffleArray(createStandardDeck());
-    this.state.hand = [];
+    const initialHand: Card[] = [];
     for (let i = 0; i < STARTING_HAND_SIZE; i++) {
-      this.state.hand.push(this.deck.pop()!);
+      const card = this.deck.pop()!;
+      card.faceUp = true;
+      initialHand.push(card);
     }
+    this.state = { hand: initialHand, screenshotDataUrl: null };
 
     this.store = new SaveLoadStore({ dbName: 'gym-save-load', localStoragePrefix: 'gym-sl' });
 
+    // ── HandView (lower centre, arc) ──────────────────────────
+    this.handView = new HandView(this, {
+      baseX: HAND_BASE_X,
+      baseY: HAND_BASE_Y,
+      spacing: HAND_SPACING,
+      cardWidth: CARD_W,
+      arcRadius: HAND_ARC_RADIUS,
+      showLabels: false,
+      selectionEnabled: false,
+      clickEnabled: false,
+    });
+    this.handView.setCards(this.state.hand);
+
+    // ── Buttons ───────────────────────────────────────────────
     const cx = GAME_W / 2;
     let y = 60;
 
@@ -138,6 +158,7 @@ export class GymSaveLoadScene extends GymSceneBase {
     this.addButton(cx - 300, y, '[ Take Screenshot ]', () => this.takeScreenshot());
     this.addButton(cx - 100, y, '[ Clear Screenshot ]', () => this.clearScreenshot());
 
+    // ── State text ────────────────────────────────────────────
     y += 40;
     try {
       this.stateText = createHudText(this, cx, y, this.stateString(), '#ffffff', { fontSize: '18px' }).setOrigin(0.5);
@@ -156,9 +177,7 @@ export class GymSaveLoadScene extends GymSceneBase {
       // Ignore text set errors in headless environments
     }
 
-    // Render the initial hand of cards
-    this.renderHand();
-
+    // ── Event log ─────────────────────────────────────────────
     y += 20;
     if (this.sys && this.sys.isActive && this.sys.isActive()) {
       this.eventLogResult = createEventLog(this, y + 20, {
@@ -196,27 +215,6 @@ export class GymSaveLoadScene extends GymSceneBase {
     }
   }
 
-  // ── Card rendering (within the 200×150 screenshot capture area) ─
-
-  private renderHand(): void {
-    // Destroy old sprites
-    for (const s of this.cardSprites) {
-      try { s.destroy(); } catch (_) { /* ignore */ }
-    }
-    this.cardSprites = [];
-
-    // Create sprites for each card, positioned in the capture area
-    this.state.hand.forEach((card, i) => {
-      const row = Math.floor(i / CARDS_PER_ROW);
-      const col = i % CARDS_PER_ROW;
-      const x = HAND_X0 + col * (CARD_DISPLAY_W + CARD_GAP) + CARD_DISPLAY_W / 2;
-      const y = HAND_Y0 + row * (CARD_DISPLAY_H + CARD_GAP) + CARD_DISPLAY_H / 2;
-      const sprite = this.add.image(x, y, getCardTexture(card));
-      sprite.setDisplaySize(CARD_DISPLAY_W, CARD_DISPLAY_H);
-      this.cardSprites.push(sprite);
-    });
-  }
-
   // ── Card actions ─────────────────────────────────────────────
 
   private addCard(): void {
@@ -226,7 +224,7 @@ export class GymSaveLoadScene extends GymSceneBase {
     const card = this.deck.pop()!;
     card.faceUp = true;
     this.state.hand.push(card);
-    this.renderHand();
+    this.handView.addCard(card);
     this.updateStateDisplay();
     this.logEvent(`Added ${card.rank} of ${card.suit} (score +${cardScore(card.rank)})`);
   }
@@ -268,7 +266,7 @@ export class GymSaveLoadScene extends GymSceneBase {
         this.state = loaded;
         // Ensure all loaded cards are face-up
         for (const c of this.state.hand) c.faceUp = true;
-        this.renderHand();
+        this.handView.setCards(this.state.hand);
         this.updateStateDisplay();
         // Recreate screenshot thumbnail from persisted data
         if (this.state.screenshotDataUrl) {
@@ -301,7 +299,7 @@ export class GymSaveLoadScene extends GymSceneBase {
       if (loaded) {
         this.state = loaded;
         for (const c of this.state.hand) c.faceUp = true;
-        this.renderHand();
+        this.handView.setCards(this.state.hand);
         this.updateStateDisplay();
       }
     } catch (e) {
@@ -319,29 +317,29 @@ export class GymSaveLoadScene extends GymSceneBase {
     }
   }
 
-  // ── RenderTexture screenshot demo ────────────────────────────
+  // ── RenderTexture screenshot ─────────────────────────────────
 
   private takeScreenshot(): void {
-    // Clear any existing screenshot display objects
     this.clearScreenshot();
 
     try {
-      // Create a RenderTexture to capture a 200×150 thumbnail of the hand area
-      const rt = this.add.renderTexture(0, 0, 200, 150);
+      const rt = this.add.renderTexture(0, 0, SCREENSHOT_W, SCREENSHOT_H);
 
-      // Draw scene children into the RenderTexture, excluding rt itself
+      // Scroll the RT's camera to centre on the hand area so the draw
+      // captures the card sprites regardless of their world position.
+      rt.camera.scrollX = HAND_BASE_X - SCREENSHOT_W / 2;
+      rt.camera.scrollY = HAND_BASE_Y - SCREENSHOT_H / 2;
+
+      // Draw scene children into the RT, excluding rt itself
       const drawables = this.children.getAll().filter((child) => child !== rt);
       rt.draw(drawables, 0, 0);
-
-      // Commit the queued draw commands
       rt.render();
 
-      // Save to the Texture Manager so content is available for persistence
       rt.saveTexture('screenshot-thumb');
 
-      // Present the RenderTexture itself as the thumbnail display
-      rt.setPosition(GAME_W / 2 - 100, 340);
-      rt.setScale(0.5);
+      // Display the RT as a thumbnail below the controls
+      rt.setPosition(GAME_W / 2, 370);
+      rt.setScale(0.6);
 
       this.screenshotDisplay = rt;
       this._screenshotAvailable = true;
@@ -351,8 +349,8 @@ export class GymSaveLoadScene extends GymSceneBase {
         if (!(snapshot instanceof HTMLImageElement)) return;
         try {
           const canvas = document.createElement('canvas');
-          canvas.width = snapshot.naturalWidth || 200;
-          canvas.height = snapshot.naturalHeight || 150;
+          canvas.width = snapshot.naturalWidth || SCREENSHOT_W;
+          canvas.height = snapshot.naturalHeight || SCREENSHOT_H;
           const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.drawImage(snapshot, 0, 0);
@@ -363,10 +361,10 @@ export class GymSaveLoadScene extends GymSceneBase {
         }
       }, 'image/png');
 
-      this.logEvent('Screenshot taken (RenderTexture 200x150)');
+      this.logEvent('Screenshot taken');
     } catch (e) {
       this.logEvent(`Screenshot fallback (headless): ${(e as Error).message?.substring(0, 50) ?? 'RenderTexture unavailable'}`);
-      this.screenshotPlaceholder = createHudText(this, GAME_W / 2, 340, '[ Screenshot: Text Placeholder ]', '#888888', { fontSize: '12px' }).setOrigin(0.5);
+      this.screenshotPlaceholder = createHudText(this, GAME_W / 2, 370, '[ Screenshot: Text Placeholder ]', '#888888', { fontSize: '12px' }).setOrigin(0.5);
       this._screenshotAvailable = false;
     }
   }
@@ -405,14 +403,14 @@ export class GymSaveLoadScene extends GymSceneBase {
       img.onload = () => {
         try {
           const canvas = document.createElement('canvas');
-          canvas.width = img.naturalWidth || 200;
-          canvas.height = img.naturalHeight || 150;
+          canvas.width = img.naturalWidth || SCREENSHOT_W;
+          canvas.height = img.naturalHeight || SCREENSHOT_H;
           const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.drawImage(img, 0, 0);
             this.textures.addCanvas('screenshot-loaded', canvas);
-            this.screenshotImage = this.add.image(GAME_W / 2 - 100, 340, 'screenshot-loaded');
-            this.screenshotImage.setScale(0.5);
+            this.screenshotImage = this.add.image(GAME_W / 2, 370, 'screenshot-loaded');
+            this.screenshotImage.setScale(0.6);
             this._screenshotAvailable = true;
           }
         } catch (e) {
