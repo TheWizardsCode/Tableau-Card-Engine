@@ -31,6 +31,13 @@ export {
 export type { Command } from './UndoRedoManager';
 export { CompoundCommand, UndoRedoManager } from './UndoRedoManager';
 
+// Action Commands adapter
+export {
+  toCommand,
+  createSnapshotAction,
+  type ReversibleAction,
+} from './ActionCommands';
+
 // Transcript persistence (consolidated module — CG-0MP12WI75001L9P4)
 export type { StoredTranscript, TranscriptStoreOptions } from './TranscriptStore';
 export { TranscriptStore } from './TranscriptStore';
