@@ -3,11 +3,11 @@
  * the core-engine SaveLoadStore API.
  *
  * Features:
- *   - Save current scene state to persistent storage
+ *   - Save current scene state (hand of cards + snapshot) to persistent storage
  *   - Load and restore saved state
  *   - Handle malformed save payloads safely
- *   - Verify state invariants after restore
- *   - RenderTexture snapshot on save (with headless fallback)
+ *   - RenderTexture screenshot on save (with headless fallback)
+ *   - Hand display with card sprites for visual snapshot interest
  *
  * @module example-games/gym/scenes/GymSaveLoadScene
  */
@@ -22,51 +22,81 @@ import { GAME_W } from '../../../src/ui/constants';
 import { createHudText } from '../../../src/ui/Renderer';
 import { createEventLog } from '../../../src/ui/GymSceneUtils';
 import type { EventLogResult } from '../../../src/ui/GymSceneUtils';
+import { createCard, shuffleArray, createStandardDeck, rankValue } from '../../../src/card-system';
+import type { Card, Rank, Suit } from '../../../src/card-system';
+import { getCardTexture, ensureCardTextureFallbacks } from '../../../src/ui/CardTextureHelpers';
 
-/** Simple state for this demo. */
-interface DemoState {
-  counter: number;
-  label: string;
-  /** Base64 data URL of the snapshot thumbnail, or null if no snapshot taken. */
-  snapshotDataUrl: string | null;
+// ── Card score: A=1, 2=2, ..., J=11, Q=12, K=13 ────────────
+function cardScore(rank: Rank): number {
+  return rankValue(rank) + 1;
 }
 
+// ── State & serialisation types ────────────────────────────
+
+/** State tracked by this demo scene. */
+interface DemoState {
+  hand: Card[];
+  /** Base64 data URL of the screenshot thumbnail, or null. */
+  screenshotDataUrl: string | null;
+}
+
+/** Wire format for save/load persistence. */
 interface DemoSerialized {
-  c: number;
-  l: string;
-  s: string | null;
+  h: Array<{ r: string; s: string }>;
+  sd: string | null;
 }
 
 const DEMO_SERIALIZER: SaveSerializer<DemoState, DemoSerialized> = {
   schemaVersion: 1,
   serialize(state: DemoState): DemoSerialized {
-    return { c: state.counter, l: state.label, s: state.snapshotDataUrl };
+    return {
+      h: state.hand.map((c) => ({ r: c.rank, s: c.suit })),
+      sd: state.screenshotDataUrl,
+    };
   },
   deserialize(data: DemoSerialized): DemoState {
-    return { counter: data.c, label: data.l, snapshotDataUrl: data.s ?? null };
+    const hand = data.h.map((c) => createCard(c.r as Rank, c.s as Suit, true));
+    return { hand, screenshotDataUrl: data.sd ?? null };
   },
 };
 
 const GAME_TYPE = 'gym-save-load';
 const SLOT_ID = 'demo-slot';
 
+/** Number of cards dealt to the starting hand. */
+const STARTING_HAND_SIZE = 5;
+
+/** Card display dimensions within the 200×150 screenshot capture area. */
+const CARD_DISPLAY_W = 36;
+const CARD_DISPLAY_H = 50;
+const CARD_GAP = 4;
+const CARDS_PER_ROW = 5;
+/** Top-left origin for the hand display (inside the capture area). */
+const HAND_X0 = 6;
+const HAND_Y0 = 40;
+
 export class GymSaveLoadScene extends GymSceneBase {
-  private state: DemoState = { counter: 0, label: 'initial', snapshotDataUrl: null };
+  private state: DemoState = { hand: [], screenshotDataUrl: null };
   private store!: SaveLoadStore;
   private stateText!: Phaser.GameObjects.Text;
   private backendText!: Phaser.GameObjects.Text;
   private eventLog: string[] = [];
   private eventLogResult!: EventLogResult;
-  private snapshotPlaceholder: Phaser.GameObjects.Text | null = null;
-  /** The RenderTexture used as the current snapshot display (if any). */
-  private snapshotDisplay: Phaser.GameObjects.RenderTexture | null = null;
-  /** A flat Image created from a loaded snapshot data URL (used during load restore). */
-  private thumbnailImage: Phaser.GameObjects.Image | null = null;
-  private _snapshotAvailable = false;
-  /** Pending snapshot callback data URL (set async by snapshot()); null if none. */
-  private _pendingSnapshotDataUrl: string | null = null;
-  /** Whether a snapshot is currently displayed. Read-only for external checks. */
-  get snapshotAvailable(): boolean { return this._snapshotAvailable; }
+  /** Phaser Image sprites for each card in the hand. */
+  private cardSprites: Phaser.GameObjects.Image[] = [];
+  /** Source deck used for dealing random cards. */
+  private deck: Card[] = [];
+  private screenshotPlaceholder: Phaser.GameObjects.Text | null = null;
+  /** The RenderTexture used as the current screenshot display (if any). */
+  private screenshotDisplay: Phaser.GameObjects.RenderTexture | null = null;
+  /** An Image created from a loaded screenshot data URL (used during load restore). */
+  private screenshotImage: Phaser.GameObjects.Image | null = null;
+  private _screenshotAvailable = false;
+  /** Pending screenshot callback data URL (set async by snapshot()); null if none. */
+  private _pendingScreenshotDataUrl: string | null = null;
+
+  /** Whether a screenshot is currently displayed. Read-only for external checks. */
+  get screenshotAvailable(): boolean { return this._screenshotAvailable; }
 
   constructor() {
     super({ key: GYM_SAVE_LOAD_KEY });
@@ -79,31 +109,39 @@ export class GymSaveLoadScene extends GymSceneBase {
     this.initReducedMotion();
 
     this.initHelp([
-      { heading: 'Overview', body: 'Demonstrates saving and loading scene state via the SaveLoadStore API. Includes handling malformed payloads, RenderTexture snapshots, and verifying invariants after restore.' },
-      { heading: 'Controls', body: '[ Increment ]: Mutate demo state.\n[ Set Label ]: Update label to reflect counter.\n[ Save State ]: Persist current state (with optional snapshot).\n[ Load State ]: Restore last saved state.\n[ Load Malformed ]: Simulate a bad payload to verify error handling.\n[ Clear Save ]: Remove persisted save data.\n[ Snapshot ]: Attempt a RenderTexture snapshot of the scene.' }
+      { heading: 'Overview', body: 'Demonstrates saving and loading scene state via the SaveLoadStore API. Includes handling malformed payloads, RenderTexture screenshots, hand-of-cards display, and verifying invariants after restore.' },
+      { heading: 'Controls', body: '[ Add Card ]: Deal a random card to the hand.\n[ Save State ]: Persist current hand + screenshot.\n[ Load State ]: Restore last saved hand + screenshot.\n[ Load Malformed ]: Simulate a bad payload to verify error handling.\n[ Clear Save ]: Remove persisted save data.\n[ Take Screenshot ]: Capture a RenderTexture screenshot including the hand.\n[ Clear Screenshot ]: Remove the screenshot thumbnail.' },
     ]);
+
+    // Ensure card placeholder textures exist (for headless / test envs)
+    ensureCardTextureFallbacks(this);
+
+    // Initialise the source deck and deal the starting hand
+    this.deck = shuffleArray(createStandardDeck());
+    this.state.hand = [];
+    for (let i = 0; i < STARTING_HAND_SIZE; i++) {
+      this.state.hand.push(this.deck.pop()!);
+    }
 
     this.store = new SaveLoadStore({ dbName: 'gym-save-load', localStoragePrefix: 'gym-sl' });
 
     const cx = GAME_W / 2;
     let y = 60;
 
-    this.addButton(cx - 400, y, '[ Increment ]', () => this.increment());
-    this.addButton(cx - 260, y, '[ Set Label ]', () => this.setLabel());
-    this.addButton(cx - 110, y, '[ Save State ]', () => this.saveState());
-    this.addButton(cx + 50, y, '[ Load State ]', () => this.loadState());
-    this.addButton(cx + 200, y, '[ Load Malformed ]', () => this.loadMalformed());
-    this.addButton(cx + 400, y, '[ Clear Save ]', () => this.clearSave());
+    this.addButton(cx - 400, y, '[ Add Card ]', () => this.addCard());
+    this.addButton(cx - 240, y, '[ Save State ]', () => this.saveState());
+    this.addButton(cx - 80, y, '[ Load State ]', () => this.loadState());
+    this.addButton(cx + 80, y, '[ Load Malformed ]', () => this.loadMalformed());
+    this.addButton(cx + 240, y, '[ Clear Save ]', () => this.clearSave());
 
     y += 26;
-    this.addButton(cx - 300, y, '[ Take Snapshot ]', () => this.takeSnapshot());
-    this.addButton(cx - 100, y, '[ Clear Snapshot ]', () => this.clearSnapshot());
+    this.addButton(cx - 300, y, '[ Take Screenshot ]', () => this.takeScreenshot());
+    this.addButton(cx - 100, y, '[ Clear Screenshot ]', () => this.clearScreenshot());
 
     y += 40;
     try {
       this.stateText = createHudText(this, cx, y, this.stateString(), '#ffffff', { fontSize: '18px' }).setOrigin(0.5);
     } catch (e) {
-      // Fallback to label if text texture creation fails in some headless environments
       this.stateText = this.addLabel(cx, y, this.stateString(), { fontSize: '18px', color: '#ffffff' }).setOrigin(0.5);
     }
 
@@ -111,13 +149,15 @@ export class GymSaveLoadScene extends GymSceneBase {
     this.backendText = createHudText(this, cx, y, 'Storage: checking...', '#888888', { fontSize: '12px' });
     this.backendText.setOrigin(0.5);
 
-    // Check backend
     const backendName = await this.store.getBackendName();
     try {
       this.backendText.setText(`Storage backend: ${backendName ?? 'none'}`);
     } catch (e) {
       // Ignore text set errors in headless environments
     }
+
+    // Render the initial hand of cards
+    this.renderHand();
 
     y += 20;
     if (this.sys && this.sys.isActive && this.sys.isActive()) {
@@ -134,35 +174,70 @@ export class GymSaveLoadScene extends GymSceneBase {
     }
   }
 
+  // ── State helpers ───────────────────────────────────────────
+
+  private handSize(): number {
+    return this.state.hand.length;
+  }
+
+  private score(): number {
+    return this.state.hand.reduce((sum, c) => sum + cardScore(c.rank), 0);
+  }
+
   private stateString(): string {
-    return `Counter: ${this.state.counter} | Label: "${this.state.label}"`;
+    return `Hand size: ${this.handSize()} | Score: ${this.score()}`;
   }
 
-  private increment(): void {
-    this.state.counter++;
+  private updateStateDisplay(): void {
     try {
       this.stateText.setText(this.stateString());
     } catch (e) {
       // Ignore text update errors during headless tests
     }
-    this.logEvent(`Counter incremented to ${this.state.counter}`);
   }
 
-  private setLabel(): void {
-    this.state.label = `label-${this.state.counter}`;
-    try {
-      this.stateText.setText(this.stateString());
-    } catch (e) {
-      // Ignore text update errors during headless tests
+  // ── Card rendering (within the 200×150 screenshot capture area) ─
+
+  private renderHand(): void {
+    // Destroy old sprites
+    for (const s of this.cardSprites) {
+      try { s.destroy(); } catch (_) { /* ignore */ }
     }
-    this.logEvent(`Label set to "${this.state.label}"`);
+    this.cardSprites = [];
+
+    // Create sprites for each card, positioned in the capture area
+    this.state.hand.forEach((card, i) => {
+      const row = Math.floor(i / CARDS_PER_ROW);
+      const col = i % CARDS_PER_ROW;
+      const x = HAND_X0 + col * (CARD_DISPLAY_W + CARD_GAP) + CARD_DISPLAY_W / 2;
+      const y = HAND_Y0 + row * (CARD_DISPLAY_H + CARD_GAP) + CARD_DISPLAY_H / 2;
+      const sprite = this.add.image(x, y, getCardTexture(card));
+      sprite.setDisplaySize(CARD_DISPLAY_W, CARD_DISPLAY_H);
+      this.cardSprites.push(sprite);
+    });
   }
+
+  // ── Card actions ─────────────────────────────────────────────
+
+  private addCard(): void {
+    if (this.deck.length === 0) {
+      this.deck = shuffleArray(createStandardDeck());
+    }
+    const card = this.deck.pop()!;
+    card.faceUp = true;
+    this.state.hand.push(card);
+    this.renderHand();
+    this.updateStateDisplay();
+    this.logEvent(`Added ${card.rank} of ${card.suit} (score +${cardScore(card.rank)})`);
+  }
+
+  // ── Save / Load ──────────────────────────────────────────────
 
   private async saveState(): Promise<void> {
     try {
-      // Adopt any pending snapshot data from the async snapshot callback
-      if (this._pendingSnapshotDataUrl) {
-        this.state.snapshotDataUrl = this._pendingSnapshotDataUrl;
+      // Adopt any pending screenshot data from the async snapshot callback
+      if (this._pendingScreenshotDataUrl) {
+        this.state.screenshotDataUrl = this._pendingScreenshotDataUrl;
       }
       const result = await this.store.saveSerialized(
         'run-checkpoint',
@@ -191,18 +266,17 @@ export class GymSaveLoadScene extends GymSceneBase {
       );
       if (loaded) {
         this.state = loaded;
-        try {
-          this.stateText.setText(this.stateString());
-        } catch (e) {
-          // Ignore text update errors during headless tests
-        }
-        // Recreate snapshot thumbnail from persisted data
-        if (this.state.snapshotDataUrl) {
-          this.recreateSnapshot(this.state.snapshotDataUrl);
+        // Ensure all loaded cards are face-up
+        for (const c of this.state.hand) c.faceUp = true;
+        this.renderHand();
+        this.updateStateDisplay();
+        // Recreate screenshot thumbnail from persisted data
+        if (this.state.screenshotDataUrl) {
+          this.recreateScreenshot(this.state.screenshotDataUrl);
         } else {
-          this.clearSnapshot();
+          this.clearScreenshot();
         }
-        this.logEvent(`Loaded: counter=${this.state.counter}, label="${this.state.label}"`);
+        this.logEvent(`Loaded: hand size=${this.handSize()}, score=${this.score()}`);
       } else {
         this.logEvent('No save data found');
       }
@@ -212,7 +286,6 @@ export class GymSaveLoadScene extends GymSceneBase {
   }
 
   private async loadMalformed(): Promise<void> {
-    // Simulate a malformed payload by writing incompatible version then loading
     try {
       await this.store.save('run-checkpoint', GAME_TYPE, SLOT_ID, 99, {
         schemaVersion: 99,
@@ -224,19 +297,15 @@ export class GymSaveLoadScene extends GymSceneBase {
         SLOT_ID,
         DEMO_SERIALIZER,
       );
-      // Should have thrown
       this.logEvent('Unexpected: malformed load succeeded without error');
       if (loaded) {
         this.state = loaded;
-        try {
-          this.stateText.setText(this.stateString());
-        } catch (e) {
-          // Ignore text update errors during headless tests
-        }
+        for (const c of this.state.hand) c.faceUp = true;
+        this.renderHand();
+        this.updateStateDisplay();
       }
     } catch (e) {
       this.logEvent(`Malformed payload caught: ${(e as Error).message}`);
-      // Clean up the bad save
       await this.store.remove('run-checkpoint', GAME_TYPE, SLOT_ID);
     }
   }
@@ -250,42 +319,35 @@ export class GymSaveLoadScene extends GymSceneBase {
     }
   }
 
-  // ── RenderTexture snapshot demo ─────────────────────────────
+  // ── RenderTexture screenshot demo ────────────────────────────
 
-  private takeSnapshot(): void {
-    // Clear any existing thumbnail and orphaned display objects
-    this.clearSnapshot();
+  private takeScreenshot(): void {
+    // Clear any existing screenshot display objects
+    this.clearScreenshot();
 
     try {
-      // Create a RenderTexture to capture the scene into a 200x150 thumbnail
+      // Create a RenderTexture to capture a 200×150 thumbnail of the hand area
       const rt = this.add.renderTexture(0, 0, 200, 150);
 
       // Draw scene children into the RenderTexture, excluding rt itself
-      // to avoid recursion / self-referencing.
       const drawables = this.children.getAll().filter((child) => child !== rt);
       rt.draw(drawables, 0, 0);
 
-      // Phaser 4 uses a command-buffer; render() commits the queued draw commands.
-      // Without this call the texture may appear blank.
+      // Commit the queued draw commands
       rt.render();
 
-      // Save to the Texture Manager so the RenderTexture content is available for
-      // persistence extraction via snapshot().
-      rt.saveTexture('snapshot-thumb');
+      // Save to the Texture Manager so content is available for persistence
+      rt.saveTexture('screenshot-thumb');
 
-      // Present the RenderTexture itself as the thumbnail display.
-      // RenderTexture extends Image and renders its captured texture each frame.
+      // Present the RenderTexture itself as the thumbnail display
       rt.setPosition(GAME_W / 2 - 100, 340);
       rt.setScale(0.5);
 
-      // Store the reference so we can destroy it later.
-      this.snapshotDisplay = rt;
-      this._snapshotAvailable = true;
+      this.screenshotDisplay = rt;
+      this._screenshotAvailable = true;
 
-      // Extract a base64 data URL from the RenderTexture for persistence.
-      // The snapshot() callback fires asynchronously when the renderer is ready.
+      // Extract a base64 data URL for persistence.
       rt.snapshot((snapshot: Phaser.Display.Color | HTMLImageElement) => {
-        // Narrow to HTMLImageElement (full snapshot, not a pixel color query)
         if (!(snapshot instanceof HTMLImageElement)) return;
         try {
           const canvas = document.createElement('canvas');
@@ -294,53 +356,50 @@ export class GymSaveLoadScene extends GymSceneBase {
           const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.drawImage(snapshot, 0, 0);
-            this._pendingSnapshotDataUrl = canvas.toDataURL('image/png');
+            this._pendingScreenshotDataUrl = canvas.toDataURL('image/png');
           }
         } catch (_) {
-          console.warn('[GymSaveLoadScene] Failed to extract snapshot data URL');
+          console.warn('[GymSaveLoadScene] Failed to extract screenshot data URL');
         }
       }, 'image/png');
 
-      this.logEvent('Snapshot taken (RenderTexture 200x150)');
+      this.logEvent('Screenshot taken (RenderTexture 200x150)');
     } catch (e) {
-      // Headless/non-canvas environments: show textual placeholder
-      this.logEvent(`Snapshot fallback (headless): ${(e as Error).message?.substring(0, 50) ?? 'RenderTexture unavailable'}`);
-      // Show a textual placeholder instead
-      this.snapshotPlaceholder = createHudText(this, GAME_W / 2, 340, '[ Snapshot: Text Placeholder ]', '#888888', { fontSize: '12px' }).setOrigin(0.5);
-      this._snapshotAvailable = false;
+      this.logEvent(`Screenshot fallback (headless): ${(e as Error).message?.substring(0, 50) ?? 'RenderTexture unavailable'}`);
+      this.screenshotPlaceholder = createHudText(this, GAME_W / 2, 340, '[ Screenshot: Text Placeholder ]', '#888888', { fontSize: '12px' }).setOrigin(0.5);
+      this._screenshotAvailable = false;
     }
   }
 
-  /** Remove the thumbnail display objects without touching state data. */
-  private removeThumbnailDisplay(): void {
-    if (this.snapshotDisplay) {
-      try { this.snapshotDisplay.destroy(); } catch (_) { /* ignore */ }
-      this.snapshotDisplay = null;
+  /** Remove the screenshot display objects without touching state data. */
+  private removeScreenshotDisplay(): void {
+    if (this.screenshotDisplay) {
+      try { this.screenshotDisplay.destroy(); } catch (_) { /* ignore */ }
+      this.screenshotDisplay = null;
     }
-    if (this.thumbnailImage) {
-      try { this.thumbnailImage.destroy(); } catch (_) { /* ignore */ }
-      this.thumbnailImage = null;
+    if (this.screenshotImage) {
+      try { this.screenshotImage.destroy(); } catch (_) { /* ignore */ }
+      this.screenshotImage = null;
     }
-    if (this.snapshotPlaceholder) {
-      try { this.snapshotPlaceholder.destroy(); } catch (_) { /* ignore */ }
-      this.snapshotPlaceholder = null;
+    if (this.screenshotPlaceholder) {
+      try { this.screenshotPlaceholder.destroy(); } catch (_) { /* ignore */ }
+      this.screenshotPlaceholder = null;
     }
   }
 
-  private clearSnapshot(): void {
-    this.removeThumbnailDisplay();
-    this.state.snapshotDataUrl = null;
-    this._pendingSnapshotDataUrl = null;
-    this._snapshotAvailable = false;
+  private clearScreenshot(): void {
+    this.removeScreenshotDisplay();
+    this.state.screenshotDataUrl = null;
+    this._pendingScreenshotDataUrl = null;
+    this._screenshotAvailable = false;
   }
 
   /**
-   * Recreate a thumbnail from a persisted base64 data URL.
-   * Called when loading a saved state that includes snapshot data.
-   * Creates a canvas texture from the decoded data and displays it as an Image.
+   * Recreate a screenshot thumbnail from a persisted base64 data URL.
+   * Called when loading a saved state that includes screenshot data.
    */
-  private recreateSnapshot(dataUrl: string): void {
-    this.removeThumbnailDisplay();
+  private recreateScreenshot(dataUrl: string): void {
+    this.removeScreenshotDisplay();
     try {
       const img = new Image();
       img.onload = () => {
@@ -351,22 +410,21 @@ export class GymSaveLoadScene extends GymSceneBase {
           const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.drawImage(img, 0, 0);
-            // Register the canvas as a texture so we can use it with Image
-            this.textures.addCanvas('snapshot-loaded', canvas);
-            this.thumbnailImage = this.add.image(GAME_W / 2 - 100, 340, 'snapshot-loaded');
-            this.thumbnailImage.setScale(0.5);
-            this._snapshotAvailable = true;
+            this.textures.addCanvas('screenshot-loaded', canvas);
+            this.screenshotImage = this.add.image(GAME_W / 2 - 100, 340, 'screenshot-loaded');
+            this.screenshotImage.setScale(0.5);
+            this._screenshotAvailable = true;
           }
         } catch (e) {
-          console.warn('[GymSaveLoadScene] Failed to draw loaded snapshot onto canvas');
+          console.warn('[GymSaveLoadScene] Failed to draw loaded screenshot onto canvas');
         }
       };
       img.onerror = () => {
-        console.warn('[GymSaveLoadScene] Failed to decode snapshot image data');
+        console.warn('[GymSaveLoadScene] Failed to decode screenshot image data');
       };
       img.src = dataUrl;
     } catch (e) {
-      console.warn('[GymSaveLoadScene] Failed to recreate snapshot from loaded data');
+      console.warn('[GymSaveLoadScene] Failed to recreate screenshot from loaded data');
     }
   }
 
