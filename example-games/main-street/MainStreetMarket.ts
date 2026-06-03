@@ -19,11 +19,17 @@ import type { BusinessCard, UpgradeCard, EventCard, AnyCard } from './MainStreet
 import {
   GRID_SIZE,
   INCIDENT_QUEUE_SIZE,
+  MARKET_BUSINESS_SLOTS,
+  MARKET_INVESTMENT_SLOTS,
   MARKET_INVESTMENT_UPGRADE_COUNT,
   MARKET_INVESTMENT_EVENT_COUNT,
   REFRESH_INVESTMENTS_COST,
 } from './MainStreetCards';
 import { shuffleArray } from '../../src/card-system';
+import {
+  createMarketOfferEngine,
+  type MarketOfferEngine,
+} from '../../src/card-system/MarketOfferEngine';
 
 // Shared reshuffle helper: when a draw/refill needs cards and the deck is
 // empty but the matching discard pile is non-empty, shuffle the discard
@@ -38,6 +44,45 @@ function reshuffleIfNeeded<T>(state: MainStreetState, deck: T[], discard: T[], n
     }
     // Log the reshuffle for visibility in tests and UI
     addLog(state, `Reshuffled ${name} discard into deck`, 'neutral');
+  }
+}
+
+// ── Shared Market Engine Integration ──────────────────────
+
+/**
+ * Builds a MarketOfferEngine snapshot from the current Main Street state.
+ * The engine provides row-based access to business and investments markets.
+ */
+function buildMarketEngine(state: MainStreetState): MarketOfferEngine<AnyCard> {
+  return createMarketOfferEngine<AnyCard>([
+    {
+      id: 'business',
+      slots: MARKET_BUSINESS_SLOTS,
+      cards: state.market.business,
+    },
+    {
+      id: 'investments',
+      slots: MARKET_INVESTMENT_SLOTS,
+      cards: state.market.investments,
+    },
+  ]);
+}
+
+/**
+ * Syncs only the business row from the engine back to state.market.business.
+ */
+function syncBusinessFromEngine(
+  state: MainStreetState,
+  engine: MarketOfferEngine<AnyCard>,
+): void {
+  const bizRow = engine.getRow('business');
+  if (bizRow) {
+    state.market.business = [];
+    for (const slot of bizRow.slots) {
+      if (slot.card !== null) {
+        state.market.business.push(slot.card as BusinessCard);
+      }
+    }
   }
 }
 
@@ -194,14 +239,14 @@ export function canPurchaseEvent(
  * Called after initial setup or if the market is partially empty.
  */
 export function refillBusinessMarket(state: MainStreetState): void {
-  const { market, decks } = state;
+  const { decks } = state;
   // If the business deck is exhausted but there are discarded business cards,
   // reshuffle them back into the deck immediately so refill can proceed.
   reshuffleIfNeeded(state, decks.business, state.discards.business, 'business');
 
-  while (market.business.length < 4 && decks.business.length > 0) {
-    market.business.push(decks.business.pop()!);
-  }
+  const engine = buildMarketEngine(state);
+  engine.refillRow('business', decks.business);
+  syncBusinessFromEngine(state, engine);
 }
 
 /**
