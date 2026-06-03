@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
 import { executeDayStart } from '../../example-games/main-street/MainStreetEngine';
 import { UndoRedoManager } from '../../src/core-engine/UndoRedoManager';
-import { BuyBusinessCommand } from '../../example-games/main-street/MainStreetCommands';
+import { buyBusinessCommand } from '../../example-games/main-street/MainStreetCommands';
 import {
   MainStreetTranscriptRecorder,
   setMainStreetRecorder,
@@ -34,7 +34,7 @@ describe('Main Street transcript recording (action, undo, redo)', () => {
     setMainStreetRecorder(recorder);
 
     const mgr = new UndoRedoManager();
-    const cmd = new BuyBusinessCommand(state, cardId, slot);
+    const cmd = buyBusinessCommand(state, cardId, slot);
 
     // Execute command via manager (like scene would)
     mgr.execute(cmd);

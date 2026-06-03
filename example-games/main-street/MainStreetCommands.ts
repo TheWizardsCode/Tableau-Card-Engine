@@ -1,4 +1,15 @@
-import type { Command } from '../../src/core-engine/UndoRedoManager';
+/**
+ * Main Street: Action Commands
+ *
+ * Reversible command wrappers for market actions, built using the shared
+ * ActionCommands adapter (`toCommand` / `ReversibleAction`) from the
+ * core engine. Each command captures a pre-snapshot on first execute
+ * and restores it on undo.
+ *
+ * @module
+ */
+
+import { toCommand, type ReversibleAction } from '../../src/core-engine/ActionCommands';
 import type { MainStreetState } from './MainStreetState';
 import {
   purchaseBusiness,
@@ -29,7 +40,7 @@ function safeClone<T>(obj: T): T {
   } catch (_) {
     // fall back
   }
-  // JSON fallback (sufficient for our snapshotuses: arrays/objects of primitives)
+  // JSON fallback (sufficient for our snapshot uses: arrays/objects of primitives)
   return JSON.parse(JSON.stringify(obj));
 }
 
@@ -60,115 +71,104 @@ function restoreSnapshot(state: MainStreetState, snap: MarketActionSnapshot): vo
   state.activityLog = snap.activityLog as any;
 }
 
+/**
+ * Creates a snapshot-capturing action from a do function.
+ * Captures the snapshot on the first execute and restores it on undo.
+ */
+function snapshotAction(
+  doFn: (state: MainStreetState) => void,
+  description: string,
+): ReversibleAction<MainStreetState> {
+  let pre: MarketActionSnapshot | null = null;
+  return {
+    description,
+    do(state: MainStreetState): void {
+      if (pre === null) pre = captureSnapshot(state);
+      doFn(state);
+    },
+    undo(state: MainStreetState): void {
+      if (pre === null) return;
+      restoreSnapshot(state, pre);
+    },
+  };
+}
+
+// ── Commands ────────────────────────────────────────────────
+
 /** Command: Buy Business */
-export class BuyBusinessCommand implements Command {
-  readonly description?: string;
-  private pre: MarketActionSnapshot | null = null;
-
-  constructor(
-    private readonly state: MainStreetState,
-    private readonly cardId: string,
-    private readonly slotIndex: number,
-  ) {
-    this.description = `BuyBusiness ${cardId} -> slot ${slotIndex}`;
-  }
-
-  execute(): void {
-    if (this.pre === null) {
-      this.pre = captureSnapshot(this.state);
-    }
-    purchaseBusiness(this.state, this.cardId, this.slotIndex);
-  }
-
-  undo(): void {
-    if (this.pre === null) return;
-    restoreSnapshot(this.state, this.pre);
-  }
+export function buyBusinessCommand(
+  state: MainStreetState,
+  cardId: string,
+  slotIndex: number,
+) {
+  return toCommand(
+    state,
+    snapshotAction(
+      (s) => purchaseBusiness(s, cardId, slotIndex),
+      `BuyBusiness ${cardId} -> slot ${slotIndex}`,
+    ),
+  );
 }
 
 /** Command: Buy Upgrade */
-export class BuyUpgradeCommand implements Command {
-  readonly description?: string;
-  private pre: MarketActionSnapshot | null = null;
-
-  constructor(
-    private readonly state: MainStreetState,
-    private readonly cardId: string,
-    private readonly targetSlot?: number,
-  ) {
-    this.description = `BuyUpgrade ${cardId} -> slot ${targetSlot ?? 'auto'}`;
-  }
-
-  execute(): void {
-    if (this.pre === null) this.pre = captureSnapshot(this.state);
-    purchaseUpgrade(this.state, this.cardId, this.targetSlot);
-  }
-
-  undo(): void {
-    if (this.pre === null) return;
-    restoreSnapshot(this.state, this.pre);
-  }
+export function buyUpgradeCommand(
+  state: MainStreetState,
+  cardId: string,
+  targetSlot?: number,
+) {
+  return toCommand(
+    state,
+    snapshotAction(
+      (s) => purchaseUpgrade(s, cardId, targetSlot),
+      `BuyUpgrade ${cardId} -> slot ${targetSlot ?? 'auto'}`,
+    ),
+  );
 }
 
 /** Command: Buy Event (Investment) */
-export class BuyEventCommand implements Command {
-  readonly description?: string;
-  private pre: MarketActionSnapshot | null = null;
-
-  constructor(
-    private readonly state: MainStreetState,
-    private readonly cardId: string,
-  ) {
-    this.description = `BuyEvent ${cardId}`;
-  }
-
-  execute(): void {
-    if (this.pre === null) this.pre = captureSnapshot(this.state);
-    purchaseEvent(this.state, this.cardId);
-  }
-
-  undo(): void {
-    if (this.pre === null) return;
-    restoreSnapshot(this.state, this.pre);
-  }
+export function buyEventCommand(
+  state: MainStreetState,
+  cardId: string,
+) {
+  return toCommand(
+    state,
+    snapshotAction(
+      (s) => purchaseEvent(s, cardId),
+      `BuyEvent ${cardId}`,
+    ),
+  );
 }
 
 /** Command: Play Held Investment Event */
-export class PlayEventCommand implements Command {
-  readonly description?: string;
-  private pre: MarketActionSnapshot | null = null;
-
-  constructor(private readonly state: MainStreetState) {
-    this.description = `PlayHeldEvent`;
-  }
-
-  execute(): void {
-    if (this.pre === null) this.pre = captureSnapshot(this.state);
-    playHeldEvent(this.state);
-  }
-
-  undo(): void {
-    if (this.pre === null) return;
-    restoreSnapshot(this.state, this.pre);
-  }
+export function playEventCommand(state: MainStreetState) {
+  return toCommand(
+    state,
+    snapshotAction(
+      (s) => playHeldEvent(s),
+      'PlayHeldEvent',
+    ),
+  );
 }
 
-/** Command: Refresh Investments Row (buy new opportunities) */
-export class BuyRefreshInvestmentsCommand implements Command {
-  readonly description?: string;
-  private pre: MarketActionSnapshot | null = null;
-
-  constructor(private readonly state: MainStreetState) {
-    this.description = `RefreshInvestments`;
-  }
-
-  execute(): void {
-    if (this.pre === null) this.pre = captureSnapshot(this.state);
-    refreshInvestments(this.state);
-  }
-
-  undo(): void {
-    if (this.pre === null) return;
-    restoreSnapshot(this.state, this.pre);
-  }
+/** Command: Refresh Investments Row */
+export function refreshInvestmentsCommand(state: MainStreetState) {
+  return toCommand(
+    state,
+    snapshotAction(
+      (s) => refreshInvestments(s),
+      'RefreshInvestments',
+    ),
+  );
 }
+
+// Re-export renamed symbols for backward compatibility
+/** @deprecated Use buyBusinessCommand() instead. */
+export const BuyBusinessCommand = buyBusinessCommand;
+/** @deprecated Use buyUpgradeCommand() instead. */
+export const BuyUpgradeCommand = buyUpgradeCommand;
+/** @deprecated Use buyEventCommand() instead. */
+export const BuyEventCommand = buyEventCommand;
+/** @deprecated Use playEventCommand() instead. */
+export const PlayEventCommand = playEventCommand;
+/** @deprecated Use refreshInvestmentsCommand() instead. */
+export const BuyRefreshInvestmentsCommand = refreshInvestmentsCommand;
