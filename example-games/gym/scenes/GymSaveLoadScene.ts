@@ -27,20 +27,23 @@ import type { EventLogResult } from '../../../src/ui/GymSceneUtils';
 interface DemoState {
   counter: number;
   label: string;
+  /** Base64 data URL of the snapshot thumbnail, or null if no snapshot taken. */
+  snapshotDataUrl: string | null;
 }
 
 interface DemoSerialized {
   c: number;
   l: string;
+  s: string | null;
 }
 
 const DEMO_SERIALIZER: SaveSerializer<DemoState, DemoSerialized> = {
   schemaVersion: 1,
   serialize(state: DemoState): DemoSerialized {
-    return { c: state.counter, l: state.label };
+    return { c: state.counter, l: state.label, s: state.snapshotDataUrl };
   },
   deserialize(data: DemoSerialized): DemoState {
-    return { counter: data.c, label: data.l };
+    return { counter: data.c, label: data.l, snapshotDataUrl: data.s ?? null };
   },
 };
 
@@ -48,7 +51,7 @@ const GAME_TYPE = 'gym-save-load';
 const SLOT_ID = 'demo-slot';
 
 export class GymSaveLoadScene extends GymSceneBase {
-  private state: DemoState = { counter: 0, label: 'initial' };
+  private state: DemoState = { counter: 0, label: 'initial', snapshotDataUrl: null };
   private store!: SaveLoadStore;
   private stateText!: Phaser.GameObjects.Text;
   private backendText!: Phaser.GameObjects.Text;
@@ -58,6 +61,8 @@ export class GymSaveLoadScene extends GymSceneBase {
   // RenderTexture thumbnail
   private thumbnailImage: Phaser.GameObjects.Image | null = null;
   private _snapshotAvailable = false;
+  /** Pending snapshot callback data URL (set async by snapshot()); null if none. */
+  private _pendingSnapshotDataUrl: string | null = null;
   /** Whether a snapshot is currently displayed. Read-only for external checks. */
   get snapshotAvailable(): boolean { return this._snapshotAvailable; }
 
@@ -153,6 +158,10 @@ export class GymSaveLoadScene extends GymSceneBase {
 
   private async saveState(): Promise<void> {
     try {
+      // Adopt any pending snapshot data from the async snapshot callback
+      if (this._pendingSnapshotDataUrl) {
+        this.state.snapshotDataUrl = this._pendingSnapshotDataUrl;
+      }
       const result = await this.store.saveSerialized(
         'run-checkpoint',
         GAME_TYPE,
@@ -184,6 +193,12 @@ export class GymSaveLoadScene extends GymSceneBase {
           this.stateText.setText(this.stateString());
         } catch (e) {
           // Ignore text update errors during headless tests
+        }
+        // Recreate snapshot thumbnail from persisted data
+        if (this.state.snapshotDataUrl) {
+          this.recreateSnapshot(this.state.snapshotDataUrl);
+        } else {
+          this.clearSnapshot();
         }
         this.logEvent(`Loaded: counter=${this.state.counter}, label="${this.state.label}"`);
       } else {
@@ -242,14 +257,36 @@ export class GymSaveLoadScene extends GymSceneBase {
     try {
       // Attempt to create a RenderTexture snapshot of a representative area
       const rt = this.add.renderTexture(0, 0, 200, 150);
-      // Draw the current scene camera into the render texture
+      // Draw the current scene children into the render texture
       rt.draw(this.children.getAll(), 0, 0);
-      // Scale down the render texture for display as a thumbnail
-      rt.setScale(0.5);
+      // Save the RenderTexture to the Texture Manager so it can be used as a named texture
+      rt.saveTexture('snapshot-thumb');
+      // Position the RenderTexture (it will render itself each frame)
       rt.setPosition(GAME_W / 2 - 100, 340);
 
-      this.thumbnailImage = this.add.image(GAME_W / 2 - 100, 340, '');
+      // Display the saved texture as a thumbnail image
+      this.thumbnailImage = this.add.image(GAME_W / 2 - 100, 340, 'snapshot-thumb');
       this._snapshotAvailable = true;
+
+      // Extract a base64 data URL from the RenderTexture for persistence.
+      // The snapshot() callback fires asynchronously when the renderer is ready.
+      rt.snapshot((snapshot: Phaser.Display.Color | HTMLImageElement) => {
+        // Narrow to HTMLImageElement (full snapshot, not a pixel color query)
+        if (!(snapshot instanceof HTMLImageElement)) return;
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = snapshot.naturalWidth || 200;
+          canvas.height = snapshot.naturalHeight || 150;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(snapshot, 0, 0);
+            this._pendingSnapshotDataUrl = canvas.toDataURL('image/png');
+          }
+        } catch (_) {
+          console.warn('[GymSaveLoadScene] Failed to extract snapshot data URL');
+        }
+      }, 'image/png');
+
       this.logEvent('Snapshot taken (RenderTexture 200x150)');
     } catch (e) {
       // Headless/non-canvas environments: show textual placeholder
@@ -260,18 +297,56 @@ export class GymSaveLoadScene extends GymSceneBase {
     }
   }
 
-  private clearSnapshot(): void {
-    // Remove any existing thumbnail
+  /** Remove the thumbnail display objects without touching state data. */
+  private removeThumbnailDisplay(): void {
     if (this.thumbnailImage) {
       try { this.thumbnailImage.destroy(); } catch (_) { /* ignore */ }
       this.thumbnailImage = null;
     }
-    // Remove placeholder text if present
     if (this.snapshotPlaceholder) {
       try { this.snapshotPlaceholder.destroy(); } catch (_) { /* ignore */ }
       this.snapshotPlaceholder = null;
     }
+  }
+
+  private clearSnapshot(): void {
+    this.removeThumbnailDisplay();
+    this.state.snapshotDataUrl = null;
+    this._pendingSnapshotDataUrl = null;
     this._snapshotAvailable = false;
+  }
+
+  /**
+   * Recreate a thumbnail image from a persisted base64 data URL.
+   * Called when loading a saved state that includes snapshot data.
+   */
+  private recreateSnapshot(dataUrl: string): void {
+    this.removeThumbnailDisplay();
+    try {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth || 200;
+          canvas.height = img.naturalHeight || 150;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0);
+            this.textures.addCanvas('snapshot-loaded', canvas);
+            this.thumbnailImage = this.add.image(GAME_W / 2 - 100, 340, 'snapshot-loaded');
+            this._snapshotAvailable = true;
+          }
+        } catch (e) {
+          console.warn('[GymSaveLoadScene] Failed to draw loaded snapshot onto canvas');
+        }
+      };
+      img.onerror = () => {
+        console.warn('[GymSaveLoadScene] Failed to decode snapshot image data');
+      };
+      img.src = dataUrl;
+    } catch (e) {
+      console.warn('[GymSaveLoadScene] Failed to recreate snapshot from loaded data');
+    }
   }
 
   private logEvent(msg: string): void {
