@@ -18,14 +18,16 @@ import { GYM_OVERLAY_UI_KEY } from '../GymRegistry';
 import { GAME_W } from '../../../src/ui/constants';
 import { createOverlayBackground, dismissOverlay } from '../../../src/ui/Overlay';
 import { createHudText } from '../../../src/ui/Renderer';
+import { createEventLog } from '../../../src/ui/GymSceneUtils';
+import type { EventLogResult } from '../../../src/ui/GymSceneUtils';
 
 export class GymOverlayUiScene extends GymSceneBase {
   private overlayObjects: Phaser.GameObjects.GameObject[] | null = null;
   private overlayOpen = false;
   private feedbackIntensity = 1.0;
   private intensityText!: Phaser.GameObjects.Text;
-  private logTexts: Phaser.GameObjects.Text[] = [];
   private eventLog: string[] = [];
+  private eventLogResult!: EventLogResult;
   private overlayIntensityText: Phaser.GameObjects.Text | null = null;
 
   // Mask references for GeometryMask demo
@@ -70,7 +72,16 @@ export class GymOverlayUiScene extends GymSceneBase {
     this.intensityText.setOrigin(0.5);
 
     y += 30;
-    createHudText(this, cx, y, '── Event Log ──', '#669966', { fontSize: '12px' }).setOrigin(0.5);
+    this.eventLogResult = createEventLog(this, y + 20, {
+      headerText: '── Event Log ──',
+      maxLines: 14,
+      lineHeight: 17,
+      textColor: '#aaddaa',
+      fontSize: '11px',
+      headerFontSize: '12px',
+      headerColor: '#669966',
+      lineX: 40,
+    });
   }
 
   private openOverlay(): void {
@@ -268,12 +279,6 @@ export class GymOverlayUiScene extends GymSceneBase {
   private logEvent(msg: string): void {
     this.eventLog.push(msg);
     if (this.eventLog.length > 14) this.eventLog.shift();
-    for (const t of this.logTexts) t.destroy();
-    this.logTexts = [];
-    const baseY = 150;
-    for (let i = 0; i < this.eventLog.length; i++) {
-      const txt = createHudText(this, 40, baseY + i * 17, this.eventLog[i], '#aaddaa', { fontSize: '11px' });
-      this.logTexts.push(txt);
-    }
+    this.eventLogResult.render(this.eventLog);
   }
 }

@@ -95,8 +95,8 @@ export const AI_AREA_Y = LOWER_TOP;
 export const DIVIDER_X = 640;
 
 // Action buttons
-export const ACTION_Y = 660;
-export const INSTRUCTION_Y = 696;
+export const ACTION_Y = 652;
+export const INSTRUCTION_Y = 708;
 
 // ── Audio asset keys ──────────────────────────────────────
 export const SFX_KEYS = {

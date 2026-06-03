@@ -19,7 +19,8 @@ import {
 import type { BaseTranscript } from '../../../src/core-engine';
 import { popTextOrIcon } from '../../../src/ui/popTextOrIcon';
 import { GAME_W } from '../../../src/ui/constants';
-import { createHudText } from '../../../src/ui/Renderer';
+import { createEventLog } from '../../../src/ui/GymSceneUtils';
+import type { EventLogResult } from '../../../src/ui/GymSceneUtils';
 
 /** Simple event shape for this demo. */
 interface DemoTranscriptEvent {
@@ -68,8 +69,8 @@ export class GymTranscriptScene extends GymSceneBase {
   private rng: (() => number) | null = null;
   private seed = 42;
   private eventCount = 0;
-  private logTexts: Phaser.GameObjects.Text[] = [];
   private eventLog: string[] = [];
+  private eventLogResult!: EventLogResult;
 
   constructor() {
     super({ key: GYM_TRANSCRIPT_KEY });
@@ -96,7 +97,16 @@ export class GymTranscriptScene extends GymSceneBase {
     this.addButton(cx + 200, y, '[ Show Transcript ]', () => this.showTranscript());
 
     y += 40;
-    createHudText(this, cx, y, '── Event Log ──', '#669966', { fontSize: '12px' }).setOrigin(0.5);
+    this.eventLogResult = createEventLog(this, y + 20, {
+      headerText: '── Event Log ──',
+      maxLines: 16,
+      lineHeight: 16,
+      textColor: '#aaddaa',
+      fontSize: '11px',
+      headerFontSize: '12px',
+      headerColor: '#669966',
+      lineX: 40,
+    });
 
     this.newSession();
   }
@@ -165,13 +175,7 @@ export class GymTranscriptScene extends GymSceneBase {
   private logEvent(msg: string): void {
     this.eventLog.push(msg);
     if (this.eventLog.length > 16) this.eventLog.shift();
-    for (const t of this.logTexts) t.destroy();
-    this.logTexts = [];
-    const baseY = 140;
-    for (let i = 0; i < this.eventLog.length; i++) {
-      const txt = createHudText(this, 40, baseY + i * 16, this.eventLog[i], '#aaddaa', { fontSize: '11px' });
-      this.logTexts.push(txt);
-    }
+    this.eventLogResult.render(this.eventLog);
   }
 
   /** Show a pop text near the event log area. */

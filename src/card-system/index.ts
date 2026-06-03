@@ -27,3 +27,13 @@ export { rankValue } from './rankValue';
 
 // Pile abstraction
 export { Pile } from './Pile';
+
+// Market Offer Engine
+export {
+  createMarketOfferEngine,
+  type MarketOfferEngine,
+  type MarketRow,
+  type MarketSlot,
+  type MarketRowConfig,
+  type PurchaseResult,
+} from './MarketOfferEngine';

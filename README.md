@@ -52,7 +52,8 @@ tableau-card-engine/
 ├── tests/                 Vitest test files
 ├── docs/                  Developer documentation
 │   ├── DEVELOPER.md       Detailed developer guide
-│   └── core-engine/       Engine API notes (including spatial rules)
+│   ├── core-engine/       Engine API notes (including spatial rules)
+│   └── rule-engine/       Rule engine API docs (including economy ledger)
 ├── dist/                  Production build output (gitignored)
 ├── AGENTS.md              Project guidance and Worklog rules
 ├── package.json

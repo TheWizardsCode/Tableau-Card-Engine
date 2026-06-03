@@ -149,3 +149,105 @@ deckView.destroy();
 ```
 
 **API**: `setPile(pile)`, `peek()`, `update()`, `onClick(cb)`, `getCountText()`, `getSprite()`, `getPile()`, `destroy()`.
+
+## Shared Gym Utilities
+
+The Gym provides shared utility functions (in [`src/ui/GymSceneUtils.ts`](../../src/ui/GymSceneUtils.ts)) that extract common rendering patterns from demo scenes. These are used internally by Gym scenes but can also be imported directly for custom scenes or testing.
+
+### `createEventLog(scene, baseY, options?)`
+
+Renders a centered header and scrollable log line area. Used by 7 Gym scenes to display event logs.
+
+```ts
+import { createEventLog } from '@ui/GymSceneUtils';
+
+const eventLog = createEventLog(scene, 200, {
+  headerText: '── Event Log ──',  // default
+  maxLines: 14,                    // default
+  lineHeight: 17,                  // default
+  textColor: '#aaddaa',           // default
+  fontSize: '11px',               // default
+  lineX: 40,                       // default
+});
+
+// Later, update the display:
+eventLog.render(myLogLines);
+
+// Cleanup:
+eventLog.destroy();
+```
+
+**Options**: `headerText`, `lineHeight`, `textColor`, `maxLines`, `fontSize`, `headerX`, `lineX`, `headerFontSize`, `headerColor`.
+
+**Returns**: `{ header, lines, baseY, render(lines), destroy() }`.
+
+### `createDeckGrid(scene, deck, options?)`
+
+Renders a deck of cards as a compact face-up grid. Used by GymDeckRngScene.
+
+```ts
+import { createDeckGrid } from '@ui/GymSceneUtils';
+
+const grid = createDeckGrid(scene, myDeck, {
+  cols: 8,       // default
+  gapX: 4,       // default
+  gapY: 4,       // default
+  centerX: 640,  // default: GAME_W / 2
+  centerY: 370,  // default gym position
+});
+
+// Replace with a new shuffled deck:
+grid.destroy();
+const newGrid = createDeckGrid(scene, shuffledDeck);
+```
+
+**Options**: `gapX`, `gapY`, `cols`, `centerX`, `centerY`, `cardScale`.
+
+**Returns**: `{ sprites[], destroy() }`.
+
+### `createSlider(scene, x, y, options?)`
+
+Creates a horizontal slider with track, fill bar, handle, and value text. Encapsulates drag logic. Used by GymHandPileScene's three live-control sliders.
+
+```ts
+import { createSlider } from '@ui/GymSceneUtils';
+
+const slider = createSlider(scene, 100, 680, {
+  initialValue: 0.5,
+  minValue: 0,
+  maxValue: 1,
+  label: 'Volume',
+  width: 150,
+  textColor: '#88ff88',
+});
+
+// Wire value changes:
+slider.onValueChange = (value) => {
+  console.log('Slider value:', value);
+};
+
+// Wire scene input to slider drag:
+scene.input.on('pointermove', (pointer) => {
+  slider.handlePointerMove(pointer.x);
+});
+scene.input.on('pointerup', () => {
+  slider.handlePointerUp();
+});
+
+// Programmatic set (does not fire onValueChange):
+slider.setValue(0.75);
+```
+
+**Options**: `initialValue`, `minValue`, `maxValue`, `label`, `width`, `trackHeight`, `trackColor`, `fillColor`, `handleColor`, `fontSize`, `textColor`.
+
+**Returns**: `{ value, track, fill, handle, valueText, hitArea, onValueChange, setValue(v), destroy(), handlePointerMove(px), handlePointerUp() }`.
+
+### Migration Notes
+
+The following Gym scenes were migrated to use these shared utilities:
+
+- **Event log** (`createEventLog`): GymAudioFeedbackScene, GymGraphicsLightingSpikeScene, GymGraphicsShaderSpikeScene, GymOverlayUiScene, GymSaveLoadScene, GymTranscriptScene, GymUndoRedoScene
+- **Deck grid** (`createDeckGrid`): GymDeckRngScene
+- **Slider** (`createSlider`): GymHandPileScene (3 sliders: arc, spacing, rotation)
+
+Each migration preserved the original visual parameters (header text, colors, line spacing, slider ranges) via options, so player-facing behavior is unchanged.

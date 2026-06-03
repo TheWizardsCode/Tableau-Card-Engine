@@ -8,6 +8,9 @@
  * Feudalism's original private method used the button's vertical centre as
  * the `y` coordinate, while the shared helper uses the top edge.
  *
+ * Additionally re-exports the shared `createActionButton` so other code can
+ * use the unwrapped helper when the Feudalism-specific styling is not desired.
+ *
  * @module FeudalismAdapter
  */
 
@@ -17,8 +20,12 @@ import {
   ActionButtonOptions,
 } from '../index';
 
+// Re-export the shared helper for callers that prefer it.
+export { sharedCreateActionButton as createActionButton };
+export type { ActionButtonOptions };
+
 // ---------------------------------------------------------------------------
-// Action button
+// Feudalism-specific action button
 // ---------------------------------------------------------------------------
 
 /**
@@ -37,6 +44,7 @@ import {
  * @param y       - Y position (vertical centre of the button).
  * @param text    - Label text.
  * @param callback - Click handler.
+ * @param options - Optional styling overrides.
  * @returns A Phaser.Container containing the button.
  */
 export function createFeudalismActionButton(
@@ -45,6 +53,7 @@ export function createFeudalismActionButton(
   y: number,
   text: string,
   callback: () => void,
+  options?: ActionButtonOptions,
 ): Phaser.GameObjects.Container {
   const btnW = 155;
   const btnH = 42;
@@ -55,5 +64,6 @@ export function createFeudalismActionButton(
     strokeColor: 0x55aa55,
     textColor: '#88ff88',
     fontSize: '17px',
+    ...options,
   } as ActionButtonOptions);
 }
