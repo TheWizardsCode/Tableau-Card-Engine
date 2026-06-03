@@ -6,7 +6,7 @@
  *   - Save current scene state (hand of cards + screenshot) to persistent storage
  *   - Load and restore saved state
  *   - Handle malformed save payloads safely
- *   - RenderTexture screenshot with camera-scroll for proper hand capture
+ *   - Full-screen RenderTexture screenshot captured and displayed as thumbnail
  *   - Hand display via reusable HandView component (arc layout, lower centre)
  *   - Add Card button deals a random card; score totals card values
  *
@@ -19,13 +19,13 @@ import {
   SaveLoadStore,
 } from '../../../src/core-engine';
 import type { SaveSerializer } from '../../../src/core-engine';
-import { GAME_W, GAME_H, CARD_W } from '../../../src/ui/constants';
+import { GAME_W, GAME_H, CARD_W, CARD_H } from '../../../src/ui/constants';
 import { createHudText } from '../../../src/ui/Renderer';
 import { createEventLog } from '../../../src/ui/GymSceneUtils';
 import type { EventLogResult } from '../../../src/ui/GymSceneUtils';
 import { createCard, shuffleArray, createStandardDeck, rankValue } from '../../../src/card-system';
 import type { Card, Rank, Suit } from '../../../src/card-system';
-import { ensureCardTextureFallbacks } from '../../../src/ui/CardTextureHelpers';
+import { ensureCardTextureFallbacks, preloadCardAssets } from '../../../src/ui/CardTextureHelpers';
 import { HandView } from '../../../src/ui/HandView';
 
 // ── Card score: A=1, 2=2, ..., J=11, Q=12, K=13 ────────────
@@ -68,15 +68,19 @@ const SLOT_ID = 'demo-slot';
 /** Number of cards dealt to the starting hand. */
 const STARTING_HAND_SIZE = 5;
 
-/** HandView position: lower centre of the screen. */
-const HAND_BASE_X = GAME_W / 2;
-const HAND_BASE_Y = GAME_H * 0.65;
+/** Card spacing & arc for HandView (lower centre of screen). */
 const HAND_SPACING = 74;
 const HAND_ARC_RADIUS = 350;
 
-/** Screenshot capture area – centred over the hand. */
-const SCREENSHOT_W = 240;
-const SCREENSHOT_H = 180;
+/*
+ * HandView baseX is computed at runtime so the full hand is centred.
+ * baseY is the Y centre of the first card; we place it a card-height
+ * below the previous position.
+ */
+const HAND_BASE_Y = GAME_H * 0.65 + CARD_H; // ~598
+
+/** Full-screen RenderTexture for the screenshot, displayed at this scale. */
+const SCREENSHOT_THUMB_SCALE = 0.25;
 
 export class GymSaveLoadScene extends GymSceneBase {
   private state: DemoState = { hand: [], screenshotDataUrl: null };
@@ -105,6 +109,14 @@ export class GymSaveLoadScene extends GymSceneBase {
     super({ key: GYM_SAVE_LOAD_KEY });
   }
 
+  /**
+   * Preload the real card SVG assets from the shared card sprite set.
+   * Falls back to placeholders if the SVGs are unavailable.
+   */
+  preload(): void {
+    preloadCardAssets(this, CARD_W, CARD_H);
+  }
+
   async create(): Promise<void> {
     this.cameras.main.setBackgroundColor('#1a2a1a');
     this.initHeader('Save / Load State');
@@ -112,14 +124,14 @@ export class GymSaveLoadScene extends GymSceneBase {
     this.initReducedMotion();
 
     this.initHelp([
-      { heading: 'Overview', body: 'Demonstrates saving and loading scene state via the SaveLoadStore API. Includes handling malformed payloads, RenderTexture screenshots, a hand of cards displayed via HandView, and verifying invariants after restore.' },
-      { heading: 'Controls', body: '[ Add Card ]: Deal a random card to the hand.\n[ Save State ]: Persist current hand + screenshot.\n[ Load State ]: Restore last saved hand + screenshot.\n[ Load Malformed ]: Simulate a bad payload to verify error handling.\n[ Clear Save ]: Remove persisted save data.\n[ Take Screenshot ]: Capture a RenderTexture screenshot of the hand area.\n[ Clear Screenshot ]: Remove the screenshot thumbnail.' },
+      { heading: 'Overview', body: 'Demonstrates saving and loading scene state via the SaveLoadStore API. Includes handling malformed payloads, full-screen RenderTexture screenshots, a hand of cards displayed via HandView, and verifying invariants after restore.' },
+      { heading: 'Controls', body: '[ Add Card ]: Deal a random card to the hand.\n[ Save State ]: Persist current hand + screenshot.\n[ Load State ]: Restore last saved hand + screenshot.\n[ Load Malformed ]: Simulate a bad payload to verify error handling.\n[ Clear Save ]: Remove persisted save data.\n[ Take Screenshot ]: Capture a full-screen RenderTexture screenshot.\n[ Clear Screenshot ]: Remove the screenshot thumbnail.' },
     ]);
 
-    // Ensure card placeholder textures exist (for headless / test envs)
+    // Generate fallback card textures if the real SVGs did not load
     ensureCardTextureFallbacks(this);
 
-    // Initialise the source deck and deal the starting hand
+    // Initialise the source deck and deal the starting hand, centred
     this.deck = shuffleArray(createStandardDeck());
     const initialHand: Card[] = [];
     for (let i = 0; i < STARTING_HAND_SIZE; i++) {
@@ -131,9 +143,12 @@ export class GymSaveLoadScene extends GymSceneBase {
 
     this.store = new SaveLoadStore({ dbName: 'gym-save-load', localStoragePrefix: 'gym-sl' });
 
-    // ── HandView (lower centre, arc) ──────────────────────────
+    // ── HandView (lower centre, arc, full-size cards) ─────────
+    const handWidth = (STARTING_HAND_SIZE - 1) * HAND_SPACING;
+    const handBaseX = GAME_W / 2 - handWidth / 2;
+
     this.handView = new HandView(this, {
-      baseX: HAND_BASE_X,
+      baseX: handBaseX,
       baseY: HAND_BASE_Y,
       spacing: HAND_SPACING,
       cardWidth: CARD_W,
@@ -177,12 +192,12 @@ export class GymSaveLoadScene extends GymSceneBase {
       // Ignore text set errors in headless environments
     }
 
-    // ── Event log ─────────────────────────────────────────────
+    // ── Event log (reduced lines to leave room for screenshot) ─
     y += 20;
     if (this.sys && this.sys.isActive && this.sys.isActive()) {
       this.eventLogResult = createEventLog(this, y + 20, {
         headerText: '── Event Log ──',
-        maxLines: 14,
+        maxLines: 8,
         lineHeight: 17,
         textColor: '#aaddaa',
         fontSize: '11px',
@@ -317,29 +332,28 @@ export class GymSaveLoadScene extends GymSceneBase {
     }
   }
 
-  // ── RenderTexture screenshot ─────────────────────────────────
+  // ── RenderTexture screenshot (full-screen) ───────────────────
 
   private takeScreenshot(): void {
     this.clearScreenshot();
 
     try {
-      const rt = this.add.renderTexture(0, 0, SCREENSHOT_W, SCREENSHOT_H);
+      // Capture the entire game canvas into a full-size RenderTexture.
+      // By leaving the RT camera at default scroll (0,0) and making the
+      // RT the same size as the game, all scene children are captured at
+      // their world positions through the main scene camera.
+      const rt = this.add.renderTexture(0, 0, GAME_W, GAME_H);
 
-      // Scroll the RT's camera to centre on the hand area so the draw
-      // captures the card sprites regardless of their world position.
-      rt.camera.scrollX = HAND_BASE_X - SCREENSHOT_W / 2;
-      rt.camera.scrollY = HAND_BASE_Y - SCREENSHOT_H / 2;
-
-      // Draw scene children into the RT, excluding rt itself
+      // Exclude rt itself from the draw
       const drawables = this.children.getAll().filter((child) => child !== rt);
       rt.draw(drawables, 0, 0);
       rt.render();
 
       rt.saveTexture('screenshot-thumb');
 
-      // Display the RT as a thumbnail below the controls
-      rt.setPosition(GAME_W / 2, 370);
-      rt.setScale(0.6);
+      // Display as a thumbnail centred below the controls
+      rt.setPosition(GAME_W / 2, 360);
+      rt.setScale(SCREENSHOT_THUMB_SCALE);
 
       this.screenshotDisplay = rt;
       this._screenshotAvailable = true;
@@ -349,8 +363,8 @@ export class GymSaveLoadScene extends GymSceneBase {
         if (!(snapshot instanceof HTMLImageElement)) return;
         try {
           const canvas = document.createElement('canvas');
-          canvas.width = snapshot.naturalWidth || SCREENSHOT_W;
-          canvas.height = snapshot.naturalHeight || SCREENSHOT_H;
+          canvas.width = snapshot.naturalWidth || GAME_W;
+          canvas.height = snapshot.naturalHeight || GAME_H;
           const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.drawImage(snapshot, 0, 0);
@@ -361,10 +375,10 @@ export class GymSaveLoadScene extends GymSceneBase {
         }
       }, 'image/png');
 
-      this.logEvent('Screenshot taken');
+      this.logEvent('Screenshot taken (full-screen)');
     } catch (e) {
       this.logEvent(`Screenshot fallback (headless): ${(e as Error).message?.substring(0, 50) ?? 'RenderTexture unavailable'}`);
-      this.screenshotPlaceholder = createHudText(this, GAME_W / 2, 370, '[ Screenshot: Text Placeholder ]', '#888888', { fontSize: '12px' }).setOrigin(0.5);
+      this.screenshotPlaceholder = createHudText(this, GAME_W / 2, 360, '[ Screenshot: Text Placeholder ]', '#888888', { fontSize: '12px' }).setOrigin(0.5);
       this._screenshotAvailable = false;
     }
   }
@@ -403,14 +417,14 @@ export class GymSaveLoadScene extends GymSceneBase {
       img.onload = () => {
         try {
           const canvas = document.createElement('canvas');
-          canvas.width = img.naturalWidth || SCREENSHOT_W;
-          canvas.height = img.naturalHeight || SCREENSHOT_H;
+          canvas.width = img.naturalWidth || GAME_W;
+          canvas.height = img.naturalHeight || GAME_H;
           const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.drawImage(img, 0, 0);
             this.textures.addCanvas('screenshot-loaded', canvas);
-            this.screenshotImage = this.add.image(GAME_W / 2, 370, 'screenshot-loaded');
-            this.screenshotImage.setScale(0.6);
+            this.screenshotImage = this.add.image(GAME_W / 2, 360, 'screenshot-loaded');
+            this.screenshotImage.setScale(SCREENSHOT_THUMB_SCALE);
             this._screenshotAvailable = true;
           }
         } catch (e) {
@@ -428,7 +442,7 @@ export class GymSaveLoadScene extends GymSceneBase {
 
   private logEvent(msg: string): void {
     this.eventLog.push(msg);
-    if (this.eventLog.length > 14) this.eventLog.shift();
+    if (this.eventLog.length > 8) this.eventLog.shift();
     this.eventLogResult.render(this.eventLog);
   }
 }
