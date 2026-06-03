@@ -16,7 +16,7 @@
  */
 
 import type { MainStreetState, DayPhase } from './MainStreetState';
-import { PHASE_ORDER, addLog } from './MainStreetState';
+import { PHASE_ORDER, addLog, syncResourceBankToLedger } from './MainStreetState';
 import type { EventCard, SynergyType } from './MainStreetCards';
 import { applyIncome, type IncomeResult } from './MainStreetAdjacency';
 import {
@@ -94,9 +94,13 @@ export interface TurnResult {
  * Formula: coins + (reputation * reputationScoreMultiplier) + (challengesCompleted * challengeBonusPoints)
  */
 export function computeScore(state: MainStreetState): number {
+  // Sync the ledger from resourceBank before reading, to ensure it reflects
+  // any direct resourceBank mutations made by tests or external code.
+  syncResourceBankToLedger(state);
+  // Use shared EconomyLedger for resource values
   return (
-    state.resourceBank.coins +
-    state.resourceBank.reputation * state.config.reputationScoreMultiplier +
+    state.ledger.get('coins') +
+    state.ledger.get('reputation') * state.config.reputationScoreMultiplier +
     state.challengesCompleted.length * state.config.challengeBonusPoints
   );
 }
@@ -243,6 +247,9 @@ export function resolveEvent(state: MainStreetState, event: EventCard): void {
       break;
     }
   }
+
+  // Sync shared EconomyLedger after resourceBank mutations
+  syncResourceBankToLedger(state);
 }
 
 /**

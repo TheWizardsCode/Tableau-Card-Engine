@@ -10,6 +10,7 @@
 
 import { shuffleArray } from '../../src/card-system';
 import { createSeededRng } from '../../src/core-engine';
+import { createEconomyLedger, type EconomyLedger } from '../../src/rule-engine/EconomyLedger';
 import {
   type BusinessCard,
   type EventCard,
@@ -66,6 +67,20 @@ export function addLog(
   type: LogEntryType,
 ): void {
   state.activityLog.push({ turn: state.turn, text, type });
+}
+
+/**
+ * Syncs the shared EconomyLedger from resourceBank values.
+ * Called after direct resourceBank mutations to keep the ledger consistent.
+ */
+export function syncResourceBankToLedger(state: MainStreetState): void {
+  const coins = state.resourceBank.coins;
+  const rep = state.resourceBank.reputation;
+  const coinDelta = coins - state.ledger.get('coins');
+  const repDelta = rep - state.ledger.get('reputation');
+  if (coinDelta !== 0 || repDelta !== 0) {
+    state.ledger.apply({ coins: coinDelta, reputation: repDelta }, 'sync-from-resourceBank');
+  }
 }
 
 // ── Phase Types ─────────────────────────────────────────────
@@ -154,6 +169,8 @@ export interface MainStreetState {
   market: MarketState;
   /** Player resources. */
   resourceBank: ResourceBank;
+  /** Shared EconomyLedger for resource mutation (synced with resourceBank). */
+  ledger: EconomyLedger;
   /** Remaining cards in each deck (draw from end = top). */
   decks: {
     business: BusinessCard[];
@@ -397,6 +414,8 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
   }
 
   // Build initial state -- use config values instead of hard-coded constants
+  const initCoins = config.startingCoins;
+  const initRep = config.startingReputation;
   state = {
     config,
     turn: 1,
@@ -404,9 +423,14 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     streetGrid: new Array<BusinessCard | null>(GRID_SIZE).fill(null),
     market,
     resourceBank: {
-      coins: config.startingCoins,
-      reputation: config.startingReputation,
+      coins: initCoins,
+      reputation: initRep,
     },
+    ledger: createEconomyLedger({
+      coins: initCoins,
+      reputation: initRep,
+      score: 0,
+    }),
     decks: {
       business: businessDeck,
       event: eventDeck,
@@ -496,6 +520,11 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
     streetGrid: structuredClone(saved.streetGrid),
     market: structuredClone(saved.market),
     resourceBank: structuredClone(saved.resourceBank),
+    ledger: createEconomyLedger({
+      coins: saved.resourceBank.coins,
+      reputation: saved.resourceBank.reputation,
+      score: saved.finalScore,
+    }),
     decks: structuredClone(saved.decks),
     discards: structuredClone(saved.discards),
     challengesCompleted: [...saved.challengesCompleted],

@@ -12,7 +12,7 @@
 import type { BusinessCard, SynergyType } from './MainStreetCards';
 import { GRID_SIZE, SYNERGY_BONUS_PER_NEIGHBOR } from './MainStreetCards';
 import type { MainStreetState } from './MainStreetState';
-import { addLog } from './MainStreetState';
+import { addLog, syncResourceBankToLedger } from './MainStreetState';
 import { applyReputationMultiplier } from './MainStreetDifficulty';
 
 // ── Adjacency Resolver ──────────────────────────────────────
@@ -180,6 +180,7 @@ export function applyIncome(state: MainStreetState): IncomeResult {
     state.config,
   );
   state.resourceBank.coins += multiplied;
+  syncResourceBankToLedger(state);
   if (multiplied > 0) {
     addLog(state, `Income: +${multiplied} coins`, 'gain');
   } else {

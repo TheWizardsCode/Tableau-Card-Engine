@@ -10,7 +10,7 @@ import {
   canRefreshInvestments,
 } from '../MainStreetMarket';
 import type { BusinessCard, EventCard, UpgradeCard } from '../MainStreetCards';
-import { BuyBusinessCommand, BuyUpgradeCommand, BuyEventCommand, PlayEventCommand, BuyRefreshInvestmentsCommand } from '../MainStreetCommands';
+import { buyBusinessCommand, buyUpgradeCommand, buyEventCommand, playEventCommand, refreshInvestmentsCommand } from '../MainStreetCommands';
 import { recordMainStreetEvent, finalizeMainStreetTranscript } from '../MainStreetTranscript';
 import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
 import { FONT_FAMILY, createOverlayBackground, createOverlayButton, dismissOverlay } from '../../../src/ui';
@@ -133,7 +133,7 @@ export class MainStreetTurnController {
 
     console.debug('[MS] onPlayHeldEvent: attempting PlayEvent', { heldEventId: s.state.heldEvent?.id, coinsBefore: s.state.resourceBank.coins });
     try {
-      const cmd = new PlayEventCommand(s.state);
+      const cmd = playEventCommand(s.state);
       s.undoManager.execute(cmd);
       // Record action event
       try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'play-event' }, description: cmd.description }); } catch (_) {}
@@ -242,7 +242,7 @@ export class MainStreetTurnController {
     const afterTransfer = (): void => {
       console.debug('[MS] onSlotClick: attempting BuyBusiness', { cardId: pendingCardId, slotIndex, coinsBefore: s.state.resourceBank.coins, marketBefore: s.state.market.business.map((c: any)=>c.id) });
       try {
-        const cmd = new BuyBusinessCommand(s.state, pendingCardId, slotIndex);
+        const cmd = buyBusinessCommand(s.state, pendingCardId, slotIndex);
         s.undoManager.execute(cmd);
         // Record action event
         try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'buy-business', cardId: pendingCardId, slotIndex }, description: cmd.description }); } catch (_) {}
@@ -305,7 +305,7 @@ export class MainStreetTurnController {
     const afterTransfer = (): void => {
       console.debug('[MS] onEventCardClick: attempting BuyEvent', { cardId: card.id, coinsBefore: s.state.resourceBank.coins, marketBefore: s.state.market.investments.map((c: any)=>c.id) });
       try {
-        const cmd = new BuyEventCommand(s.state, card.id);
+        const cmd = buyEventCommand(s.state, card.id);
         s.undoManager.execute(cmd);
         try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'buy-event', cardId: card.id }, description: cmd.description }); } catch (_) {}
         try { s.gameEvents?.emit('card:placed', { cardId: card.id }); } catch (_) {}
@@ -348,7 +348,7 @@ export class MainStreetTurnController {
     s.refreshAll();
 
     try {
-      const cmd = new BuyRefreshInvestmentsCommand(s.state);
+      const cmd = refreshInvestmentsCommand(s.state);
       s.undoManager.execute(cmd);
       try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'refresh-investments' }, description: cmd.description }); } catch (_) {}
       s.instructionText.setText('Refreshed investments');
@@ -404,7 +404,7 @@ export class MainStreetTurnController {
     const afterTransfer = (): void => {
       console.debug('[MS] onUpgradeCardClick: attempting BuyUpgrade', { cardId: card.id, targetSlot, coinsBefore: s.state.resourceBank.coins, marketBefore: s.state.market.investments.map((c: any)=>c.id), streetBefore: s.state.streetGrid.map((slot: any)=>slot?.id ?? null) });
       try {
-        const cmd = new BuyUpgradeCommand(s.state, card.id, targetSlot);
+        const cmd = buyUpgradeCommand(s.state, card.id, targetSlot);
         s.undoManager.execute(cmd);
         try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'buy-upgrade', cardId: card.id, targetSlot }, description: cmd.description }); } catch (_) {}
         try { s.gameEvents?.emit('card:placed', { cardId: card.id, targetSlot }); } catch (_) {}
@@ -505,7 +505,7 @@ export class MainStreetTurnController {
 
         const afterTransfer = (): void => {
           try {
-            s.undoManager.execute(new BuyUpgradeCommand(s.state, branch.id, targetSlot));
+            s.undoManager.execute(buyUpgradeCommand(s.state, branch.id, targetSlot));
             s.instructionText.setText(`Applied upgrade: "${branch.name}"`);
           } catch (e) {
             s.instructionText.setText(`Error: ${(e as Error).message}`);

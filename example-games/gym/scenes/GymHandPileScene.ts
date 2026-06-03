@@ -33,6 +33,8 @@ import { shakeIllegalMove } from '../../../src/ui/shakeIllegalMove';
 import { CARD_H, CARD_W, GAME_H, GAME_W } from '../../../src/ui/constants';
 import { getCardTexture, ensureCardTextureFallbacks, preloadCardAssets } from '../../../src/ui/CardTextureHelpers';
 import { createHudText } from '../../../src/ui/Renderer';
+import { createSlider } from '../../../src/ui/GymSceneUtils';
+import type { SliderResult } from '../../../src/ui/GymSceneUtils';
 import type { Card } from '../../../src/card-system/Card';
 
 const HAND_SIZE = 5;
@@ -75,42 +77,13 @@ export class GymHandPileScene extends GymSceneBase {
   private readonly SLIDER_Y = GAME_H - 40;
   private readonly SLIDER_HORIZ_GAP = 40;
   private readonly SLIDER_START_X = 375;
-
-  // Arc slider constants/state
-  private readonly ARC_RADIUS_MIN = 0;
-  private readonly ARC_RADIUS_MAX = 200;
-  private readonly ARC_RADIUS_DEFAULT = 150;
   private readonly ARC_SLIDER_WIDTH = 150;
-  private readonly ARC_SLIDER_HEIGHT = 6;
-  private readonly ARC_SLIDER_X = this.SLIDER_START_X;
-  private readonly SPACING_SLIDER_X = this.SLIDER_START_X + this.ARC_SLIDER_WIDTH + this.SLIDER_HORIZ_GAP;
-  private readonly ROTATION_SLIDER_X = this.SLIDER_START_X + 2 * (this.ARC_SLIDER_WIDTH + this.SLIDER_HORIZ_GAP);
-  private arcRadius = this.ARC_RADIUS_DEFAULT;
-  private arcSliderTrack?: Phaser.GameObjects.Rectangle;
-  private arcSliderFill?: Phaser.GameObjects.Rectangle;
-  private arcSliderHandle?: Phaser.GameObjects.Graphics;
-  private arcSliderHitArea?: Phaser.GameObjects.Zone;
-  private arcSliderValueText?: Phaser.GameObjects.Text;
-  private isArcSliderDragging = false;
-
-  // Spacing slider state
-  private spacingSliderTrack?: Phaser.GameObjects.Rectangle;
-  private spacingSliderFill?: Phaser.GameObjects.Rectangle;
-  private spacingSliderHandle?: Phaser.GameObjects.Graphics;
-  private spacingSliderHitArea?: Phaser.GameObjects.Zone;
-  private spacingSliderValueText?: Phaser.GameObjects.Text;
-  private isSpacingSliderDragging = false;
-
-  // Rotation slider constants/state
-  private readonly ROTATION_DEGREES_MIN = 0;
-  private readonly ROTATION_DEGREES_MAX = 45;
+  private readonly ARC_RADIUS_DEFAULT = 150;
   private readonly ROTATION_DEGREES_DEFAULT = 25;
-  private rotationSliderTrack?: Phaser.GameObjects.Rectangle;
-  private rotationSliderFill?: Phaser.GameObjects.Rectangle;
-  private rotationSliderHandle?: Phaser.GameObjects.Graphics;
-  private rotationSliderHitArea?: Phaser.GameObjects.Zone;
-  private rotationSliderValueText?: Phaser.GameObjects.Text;
-  private isRotationSliderDragging = false;
+  private arcRadius = this.ARC_RADIUS_DEFAULT;
+  private arcSlider!: SliderResult;
+  private spacingSlider!: SliderResult;
+  private rotationSlider!: SliderResult;
 
   constructor() {
     super({ key: GYM_HAND_PILE_KEY });
@@ -188,309 +161,74 @@ export class GymHandPileScene extends GymSceneBase {
     y += 35;
     createHudText(this, cx, y, '── Event Log ──', '#669966', { fontSize: '12px' }).setOrigin(0.5);
 
-    this.createArcRadiusSlider();
-    this.createSpacingSlider();
-    this.createRotationSlider();
+    // Create sliders using the shared utility
+    const sliderY = this.SLIDER_Y;
+    const sliderWidth = this.ARC_SLIDER_WIDTH;
+    const sliderHorizGap = this.SLIDER_HORIZ_GAP;
+    const startX = this.SLIDER_START_X;
+
+    const arcSliderX = startX;
+    const spacingSliderX = startX + sliderWidth + sliderHorizGap;
+    const rotationSliderX = startX + 2 * (sliderWidth + sliderHorizGap);
+
+    this.arcSlider = createSlider(this, arcSliderX, sliderY, {
+      initialValue: this.ARC_RADIUS_DEFAULT,
+      minValue: 0,
+      maxValue: 200,
+      label: 'Arc',
+      width: sliderWidth,
+      textColor: '#88ff88',
+    });
+    this.arcSlider.onValueChange = (value: number) => {
+      this.arcRadius = value;
+      this.handView.setArcRadius(value);
+    };
+
+    const minSpacing = Math.round(CARD_W * (1 - 0.75));
+    const maxSpacing = Math.round(CARD_W * (1 + 0.75));
+    this.spacingSlider = createSlider(this, spacingSliderX, sliderY, {
+      initialValue: this.HAND_SPACING,
+      minValue: minSpacing,
+      maxValue: maxSpacing,
+      label: 'Spacing',
+      width: sliderWidth,
+      textColor: '#88ff88',
+    });
+    this.spacingSlider.onValueChange = (value: number) => {
+      this.handView.setSpacing(Math.round(value));
+    };
+
+    this.rotationSlider = createSlider(this, rotationSliderX, sliderY, {
+      initialValue: this.ROTATION_DEGREES_DEFAULT,
+      minValue: 0,
+      maxValue: 45,
+      label: 'Rotation',
+      width: sliderWidth,
+      textColor: '#88ff88',
+    });
+    this.rotationSlider.onValueChange = (value: number) => {
+      this.handView.setMaxRotationDegrees(value);
+    };
+
+    // Wire global input events to forward drag events to all sliders
+    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      this.arcSlider.handlePointerMove(pointer.x);
+      this.spacingSlider.handlePointerMove(pointer.x);
+      this.rotationSlider.handlePointerMove(pointer.x);
+    });
+    this.input.on('pointerup', () => {
+      this.arcSlider.handlePointerUp();
+      this.spacingSlider.handlePointerUp();
+      this.rotationSlider.handlePointerUp();
+    });
+
+    this.events.once('shutdown', () => {
+      this.input.off('pointermove');
+      this.input.off('pointerup');
+    });
 
     // Initialize
     this.reset();
-  }
-
-  private createArcRadiusSlider(): void {
-    const sliderY = this.SLIDER_Y;
-
-    this.arcSliderTrack = this.add.rectangle(0, sliderY, this.ARC_SLIDER_WIDTH, this.ARC_SLIDER_HEIGHT, 0x334433, 1)
-      .setOrigin(0, 0.5);
-
-    this.arcSliderFill = this.add.rectangle(0, sliderY, 1, this.ARC_SLIDER_HEIGHT, 0x88ff88, 1)
-      .setOrigin(0, 0.5);
-
-    this.arcSliderHandle = this.add.graphics();
-
-    this.arcSliderValueText = createHudText(this, 0, sliderY - 20, '', '#88ff88', { fontSize: '11px' }).setOrigin(0.5);
-
-    this.arcSliderHitArea = this.add.zone(0, sliderY, this.ARC_SLIDER_WIDTH + 24, 28)
-      .setInteractive({ useHandCursor: true });
-
-    this.arcSliderHitArea.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      this.isArcSliderDragging = true;
-      this.setArcRadiusFromPointer(pointer.x);
-    });
-
-    this.input.on('pointermove', this.handleArcSliderPointerMove, this);
-    this.input.on('pointerup', this.handleArcSliderPointerUp, this);
-
-    this.events.once('shutdown', () => {
-      this.input.off('pointermove', this.handleArcSliderPointerMove, this);
-      this.input.off('pointerup', this.handleArcSliderPointerUp, this);
-    });
-
-    this.updateArcSliderPosition();
-    this.updateArcSliderVisuals();
-  }
-
-  private handleArcSliderPointerMove(pointer: Phaser.Input.Pointer): void {
-    if (!this.isArcSliderDragging) return;
-    this.setArcRadiusFromPointer(pointer.x);
-  }
-
-  private handleArcSliderPointerUp(): void {
-    this.isArcSliderDragging = false;
-  }
-
-  private setArcRadiusFromPointer(pointerX: number): void {
-    if (!this.arcSliderTrack) return;
-
-    const minX = this.arcSliderTrack.x;
-    const maxX = minX + this.ARC_SLIDER_WIDTH;
-    const clampedX = Math.max(minX, Math.min(maxX, pointerX));
-    const ratio = (clampedX - minX) / this.ARC_SLIDER_WIDTH;
-    const nextRadius = this.ARC_RADIUS_MIN + ratio * (this.ARC_RADIUS_MAX - this.ARC_RADIUS_MIN);
-
-    this.arcRadius = nextRadius;
-    this.handView.setArcRadius(this.arcRadius);
-    this.updateArcSliderVisuals();
-  }
-
-  private updateArcSliderPosition(): void {
-    if (!this.arcSliderTrack || !this.arcSliderFill || !this.arcSliderHitArea || !this.arcSliderValueText) {
-      return;
-    }
-
-    const trackX = this.ARC_SLIDER_X;
-
-    this.arcSliderTrack.setPosition(trackX, this.SLIDER_Y);
-    this.arcSliderFill.setPosition(trackX, this.SLIDER_Y);
-    this.arcSliderHitArea.setPosition(trackX + this.ARC_SLIDER_WIDTH / 2, this.SLIDER_Y);
-    this.arcSliderValueText.setPosition(trackX + this.ARC_SLIDER_WIDTH / 2, this.SLIDER_Y - 20);
-
-    this.updateArcSliderVisuals();
-    // Also update spacing slider position so both sliders track the hand
-    try { this.updateSpacingSliderPosition(); } catch (_) { /* spacing slider may not be initialised */ }
-  }
-
-  private updateArcSliderVisuals(): void {
-    if (!this.arcSliderTrack || !this.arcSliderFill || !this.arcSliderHandle || !this.arcSliderValueText) {
-      return;
-    }
-
-    const ratio = (this.arcRadius - this.ARC_RADIUS_MIN) / (this.ARC_RADIUS_MAX - this.ARC_RADIUS_MIN);
-    const clampedRatio = Math.max(0, Math.min(1, ratio));
-    const fillWidth = Math.max(1, this.ARC_SLIDER_WIDTH * clampedRatio);
-    const handleX = this.arcSliderTrack.x + fillWidth;
-    const handleY = this.arcSliderTrack.y;
-
-    this.arcSliderFill.setSize(fillWidth, this.ARC_SLIDER_HEIGHT);
-    this.arcSliderFill.setPosition(this.arcSliderTrack.x, handleY);
-
-    this.arcSliderHandle.clear();
-    this.arcSliderHandle.fillStyle(0xffffff, 1);
-    this.arcSliderHandle.fillCircle(handleX, handleY, 8);
-    this.arcSliderHandle.lineStyle(2, 0x88ff88, 1);
-    this.arcSliderHandle.strokeCircle(handleX, handleY, 8);
-
-    this.arcSliderValueText.setText(`Arc: ${Math.round(this.arcRadius)}`);
-  }
-
-  // ── Spacing slider ──────────────────────────────────────
-
-  private createSpacingSlider(): void {
-    const sliderY = this.SLIDER_Y;
-
-    this.spacingSliderTrack = this.add.rectangle(0, sliderY, this.ARC_SLIDER_WIDTH, this.ARC_SLIDER_HEIGHT, 0x333344, 1)
-      .setOrigin(0, 0.5);
-
-    this.spacingSliderFill = this.add.rectangle(0, sliderY, 1, this.ARC_SLIDER_HEIGHT, 0x88ff88, 1)
-      .setOrigin(0, 0.5);
-
-    this.spacingSliderHandle = this.add.graphics();
-
-    this.spacingSliderValueText = createHudText(this, 0, sliderY - 20, '', '#88ff88', { fontSize: '11px' }).setOrigin(0.5);
-
-    this.spacingSliderHitArea = this.add.zone(0, sliderY, this.ARC_SLIDER_WIDTH + 24, 28)
-      .setInteractive({ useHandCursor: true });
-
-    this.spacingSliderHitArea.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      this.isSpacingSliderDragging = true;
-      this.setSpacingFromPointer(pointer.x);
-    });
-
-    this.input.on('pointermove', this.handleSpacingSliderPointerMove, this);
-    this.input.on('pointerup', this.handleSpacingSliderPointerUp, this);
-
-    this.events.once('shutdown', () => {
-      this.input.off('pointermove', this.handleSpacingSliderPointerMove, this);
-      this.input.off('pointerup', this.handleSpacingSliderPointerUp, this);
-    });
-
-    this.updateSpacingSliderPosition();
-    this.updateSpacingSliderVisuals();
-  }
-
-  private handleSpacingSliderPointerMove(pointer: Phaser.Input.Pointer): void {
-    if (!this.isSpacingSliderDragging) return;
-    this.setSpacingFromPointer(pointer.x);
-  }
-
-  private handleSpacingSliderPointerUp(): void {
-    this.isSpacingSliderDragging = false;
-  }
-
-  private setSpacingFromPointer(pointerX: number): void {
-    if (!this.spacingSliderTrack || !this.spacingSliderValueText) return;
-
-    const minSpacing = Math.round(CARD_W * (1 - 0.75));
-    const maxSpacing = Math.round(CARD_W * (1 + 0.75));
-
-    const minX = this.spacingSliderTrack.x;
-    const maxX = minX + this.ARC_SLIDER_WIDTH;
-    const clampedX = Math.max(minX, Math.min(maxX, pointerX));
-    const ratio = (clampedX - minX) / this.ARC_SLIDER_WIDTH;
-    const nextSpacing = Math.round(minSpacing + ratio * (maxSpacing - minSpacing));
-
-    this.handView.setSpacing(nextSpacing);
-    this.updateSpacingSliderVisuals();
-  }
-
-  private updateSpacingSliderPosition(): void {
-    if (!this.spacingSliderTrack || !this.spacingSliderFill || !this.spacingSliderHitArea || !this.spacingSliderValueText) {
-      return;
-    }
-
-    const trackX = this.SPACING_SLIDER_X;
-
-    this.spacingSliderTrack.setPosition(trackX, this.SLIDER_Y);
-    this.spacingSliderFill.setPosition(trackX, this.SLIDER_Y);
-    this.spacingSliderHitArea.setPosition(trackX + this.ARC_SLIDER_WIDTH / 2, this.SLIDER_Y);
-    this.spacingSliderValueText.setPosition(trackX + this.ARC_SLIDER_WIDTH / 2, this.SLIDER_Y - 20);
-
-    this.updateSpacingSliderVisuals();
-    // Also update rotation slider position so all sliders track the hand
-    try { this.updateRotationSliderPosition(); } catch (_) { /* rotation slider may not be initialised */ }
-  }
-
-  private updateSpacingSliderVisuals(): void {
-    if (!this.spacingSliderTrack || !this.spacingSliderFill || !this.spacingSliderHandle || !this.spacingSliderValueText) {
-      return;
-    }
-
-    const minSpacing = Math.round(CARD_W * (1 - 0.75));
-    const maxSpacing = Math.round(CARD_W * (1 + 0.75));
-    const cur = this.handView.getSpacing ? this.handView.getSpacing() : this.HAND_SPACING;
-
-    const ratio = (cur - minSpacing) / (maxSpacing - minSpacing);
-    const clampedRatio = Math.max(0, Math.min(1, ratio));
-    const fillWidth = Math.max(1, this.ARC_SLIDER_WIDTH * clampedRatio);
-    const handleX = this.spacingSliderTrack.x + fillWidth;
-    const handleY = this.spacingSliderTrack.y;
-
-    this.spacingSliderFill.setSize(fillWidth, this.ARC_SLIDER_HEIGHT);
-    this.spacingSliderFill.setPosition(this.spacingSliderTrack.x, handleY);
-
-    this.spacingSliderHandle.clear();
-    this.spacingSliderHandle.fillStyle(0xffffff, 1);
-    this.spacingSliderHandle.fillCircle(handleX, handleY, 8);
-    this.spacingSliderHandle.lineStyle(2, 0x88ff88, 1);
-    this.spacingSliderHandle.strokeCircle(handleX, handleY, 8);
-
-    this.spacingSliderValueText.setText(`Spacing: ${Math.round(cur)}`);
-  }
-
-  // ── Rotation slider ───────────────────────────────────
-
-  private createRotationSlider(): void {
-    const sliderY = this.SLIDER_Y;
-
-    this.rotationSliderTrack = this.add.rectangle(0, sliderY, this.ARC_SLIDER_WIDTH, this.ARC_SLIDER_HEIGHT, 0x333344, 1)
-      .setOrigin(0, 0.5);
-
-    this.rotationSliderFill = this.add.rectangle(0, sliderY, 1, this.ARC_SLIDER_HEIGHT, 0x88ff88, 1)
-      .setOrigin(0, 0.5);
-
-    this.rotationSliderHandle = this.add.graphics();
-
-    this.rotationSliderValueText = createHudText(this, 0, sliderY - 20, '', '#88ff88', { fontSize: '11px' }).setOrigin(0.5);
-
-    this.rotationSliderHitArea = this.add.zone(0, sliderY, this.ARC_SLIDER_WIDTH + 24, 28)
-      .setInteractive({ useHandCursor: true });
-
-    this.rotationSliderHitArea.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      this.isRotationSliderDragging = true;
-      this.setRotationFromPointer(pointer.x);
-    });
-
-    this.input.on('pointermove', this.handleRotationSliderPointerMove, this);
-    this.input.on('pointerup', this.handleRotationSliderPointerUp, this);
-
-    this.events.once('shutdown', () => {
-      this.input.off('pointermove', this.handleRotationSliderPointerMove, this);
-      this.input.off('pointerup', this.handleRotationSliderPointerUp, this);
-    });
-
-    this.updateRotationSliderPosition();
-    this.updateRotationSliderVisuals();
-  }
-
-  private handleRotationSliderPointerMove(pointer: Phaser.Input.Pointer): void {
-    if (!this.isRotationSliderDragging) return;
-    this.setRotationFromPointer(pointer.x);
-  }
-
-  private handleRotationSliderPointerUp(): void {
-    this.isRotationSliderDragging = false;
-  }
-
-  private setRotationFromPointer(pointerX: number): void {
-    if (!this.rotationSliderTrack || !this.rotationSliderValueText) return;
-
-    const minX = this.rotationSliderTrack.x;
-    const maxX = minX + this.ARC_SLIDER_WIDTH;
-    const clampedX = Math.max(minX, Math.min(maxX, pointerX));
-    const ratio = (clampedX - minX) / this.ARC_SLIDER_WIDTH;
-    const nextRotation = this.ROTATION_DEGREES_MIN + ratio * (this.ROTATION_DEGREES_MAX - this.ROTATION_DEGREES_MIN);
-
-    this.handView.setMaxRotationDegrees(nextRotation);
-    this.updateRotationSliderVisuals();
-  }
-
-  private updateRotationSliderPosition(): void {
-    if (!this.rotationSliderTrack || !this.rotationSliderFill || !this.rotationSliderHitArea || !this.rotationSliderValueText) {
-      return;
-    }
-
-    const trackX = this.ROTATION_SLIDER_X;
-
-    this.rotationSliderTrack.setPosition(trackX, this.SLIDER_Y);
-    this.rotationSliderFill.setPosition(trackX, this.SLIDER_Y);
-    this.rotationSliderHitArea.setPosition(trackX + this.ARC_SLIDER_WIDTH / 2, this.SLIDER_Y);
-    this.rotationSliderValueText.setPosition(trackX + this.ARC_SLIDER_WIDTH / 2, this.SLIDER_Y - 20);
-
-    this.updateRotationSliderVisuals();
-  }
-
-  private updateRotationSliderVisuals(): void {
-    if (!this.rotationSliderTrack || !this.rotationSliderFill || !this.rotationSliderHandle || !this.rotationSliderValueText) {
-      return;
-    }
-
-    const cur = this.handView.getMaxRotationDegrees ? this.handView.getMaxRotationDegrees() : this.ROTATION_DEGREES_DEFAULT;
-
-    const ratio = cur / this.ROTATION_DEGREES_MAX;
-    const clampedRatio = Math.max(0, Math.min(1, ratio));
-    const fillWidth = Math.max(1, this.ARC_SLIDER_WIDTH * clampedRatio);
-    const handleX = this.rotationSliderTrack.x + fillWidth;
-    const handleY = this.rotationSliderTrack.y;
-
-    this.rotationSliderFill.setSize(fillWidth, this.ARC_SLIDER_HEIGHT);
-    this.rotationSliderFill.setPosition(this.rotationSliderTrack.x, handleY);
-
-    this.rotationSliderHandle.clear();
-    this.rotationSliderHandle.fillStyle(0xffffff, 1);
-    this.rotationSliderHandle.fillCircle(handleX, handleY, 8);
-    this.rotationSliderHandle.lineStyle(2, 0x88ff88, 1);
-    this.rotationSliderHandle.strokeCircle(handleX, handleY, 8);
-
-    this.rotationSliderValueText.setText(`Rotation: ${Math.round(cur)}°`);
   }
 
   private getHandPositionForIndex(index: number, handCount: number): { x: number; y: number } {
@@ -530,7 +268,6 @@ export class GymHandPileScene extends GymSceneBase {
       // Instant placement for reduced motion
       this.handView.setCards(this.hand);
       this.handView.setSelected(this.selectedIdx >= 0 ? this.selectedIdx : null);
-      this.updateArcSliderPosition();
       this.deckView.update();
       this.logEvent(`Drew ${card.rank}${card.suit} to hand (instant, reduced-motion)`);
       return;
@@ -544,7 +281,6 @@ export class GymHandPileScene extends GymSceneBase {
       try { animSprite.destroy(); } catch (_) { /* ignore */ }
       this.handView.setCards(this.hand);
       this.handView.setSelected(this.selectedIdx >= 0 ? this.selectedIdx : null);
-      this.updateArcSliderPosition();
       this.deckView.update();
       gameEvents.removeAllListeners();
       this.logEvent(`Drew ${card.rank}${card.suit} to hand (animated)`);
@@ -588,7 +324,6 @@ export class GymHandPileScene extends GymSceneBase {
         this.clearHighlights();
         this.handView.setCards(this.hand);
         this.handView.setSelected(null);
-        this.updateArcSliderPosition();
         this.discardView.update();
         (gameEvents as any).removeAllListeners();
         this.logEvent(`Discarded ${card.rank}${card.suit} (animated)`);
@@ -614,7 +349,6 @@ export class GymHandPileScene extends GymSceneBase {
       this.clearHighlights();
       this.handView.setCards(this.hand);
       this.handView.setSelected(null);
-      this.updateArcSliderPosition();
       this.discardView.update();
       this.logEvent(`Discarded ${card.rank}${card.suit} (instant)`);
     }
@@ -637,7 +371,6 @@ export class GymHandPileScene extends GymSceneBase {
     if (this.reducedMotion) {
       this.handView.setCards(this.hand);
       this.handView.setSelected(this.selectedIdx >= 0 ? this.selectedIdx : null);
-      this.updateArcSliderPosition();
       this.discardView.update();
       this.logEvent(`Recalled ${card.rank}${card.suit} from discard (instant)`);
       return;
@@ -650,7 +383,6 @@ export class GymHandPileScene extends GymSceneBase {
       try { animSprite.destroy(); } catch (_) {}
       this.handView.setCards(this.hand);
       this.handView.setSelected(this.selectedIdx >= 0 ? this.selectedIdx : null);
-      this.updateArcSliderPosition();
       this.discardView.update();
       gameEvents.removeAllListeners();
       this.logEvent(`Recalled ${card.rank}${card.suit} from discard (animated)`);
@@ -842,19 +574,18 @@ export class GymHandPileScene extends GymSceneBase {
     this.clearHighlights();
     this.cancelMove();
 
-    // Reset arc slider to default on scene reset (no persistence).
+    // Reset sliders to defaults
     this.arcRadius = this.ARC_RADIUS_DEFAULT;
+    this.arcSlider.setValue(this.ARC_RADIUS_DEFAULT);
     this.handView.setArcRadius(this.arcRadius);
-    this.updateArcSliderVisuals();
 
-    // Reset rotation slider to default (backwards-compatible: 0 = no tilt)
+    // Reset rotation slider to default
+    this.rotationSlider.setValue(this.ROTATION_DEGREES_DEFAULT);
     this.handView.setMaxRotationDegrees(this.ROTATION_DEGREES_DEFAULT);
-    try { this.updateRotationSliderVisuals(); } catch (_) { /* ignore */ }
 
     // Sync UI components
     this.handView.setCards(this.hand);
     this.handView.setSelected(null);
-    this.updateArcSliderPosition();
     this.deckView.setPile(this.drawPile);
     this.discardView.setPile(this.discardPile);
 

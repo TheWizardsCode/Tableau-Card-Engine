@@ -24,6 +24,8 @@ import type { SoundPlayer, EventSoundMapping } from '../../../src/core-engine';
 import { popTextOrIcon } from '../../../src/ui/popTextOrIcon';
 import { GAME_W } from '../../../src/ui/constants';
 import { createHudText } from '../../../src/ui/Renderer';
+import { createEventLog } from '../../../src/ui/GymSceneUtils';
+import type { EventLogResult } from '../../../src/ui/GymSceneUtils';
 
 /** A stub SoundPlayer that records play calls instead of producing audio. */
 class StubSoundPlayer implements SoundPlayer {
@@ -57,8 +59,8 @@ export class GymAudioFeedbackScene extends GymSceneBase {
   private muted = false;
   private volume = 0.5;
   private statusText!: Phaser.GameObjects.Text;
-  private callLogTexts: Phaser.GameObjects.Text[] = [];
   private callLog: string[] = [];
+  private eventLogResult!: EventLogResult;
   // Track pop text targets for cleanup
   private popTargets: Phaser.GameObjects.Text[] = [];
 
@@ -136,7 +138,16 @@ export class GymAudioFeedbackScene extends GymSceneBase {
     this.statusText = createHudText(this, cx, y, this.statusString(), '#ffffff', { fontSize: '16px' }).setOrigin(0.5);
 
     y += 30;
-    createHudText(this, cx, y, '── Sound Call Log ──', '#669966', { fontSize: '12px' }).setOrigin(0.5);
+    this.eventLogResult = createEventLog(this, y + 40, {
+      headerText: '── Sound Call Log ──',
+      maxLines: 14,
+      lineHeight: 17,
+      textColor: '#aaddaa',
+      fontSize: '11px',
+      headerFontSize: '12px',
+      headerColor: '#669966',
+      lineX: 40,
+    });
   }
 
   private statusString(): string {
@@ -289,13 +300,7 @@ export class GymAudioFeedbackScene extends GymSceneBase {
   private logCall(msg: string): void {
     this.callLog.push(msg);
     if (this.callLog.length > 14) this.callLog.shift();
-    for (const t of this.callLogTexts) t.destroy();
-    this.callLogTexts = [];
-    const baseY = 250;
-    for (let i = 0; i < this.callLog.length; i++) {
-      const txt = createHudText(this, 40, baseY + i * 17, this.callLog[i], '#aaddaa', { fontSize: '11px' });
-      this.callLogTexts.push(txt);
-    }
+    this.eventLogResult.render(this.callLog);
   }
 
   protected cleanup(): void {

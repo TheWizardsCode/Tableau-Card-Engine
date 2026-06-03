@@ -1,0 +1,23 @@
+{
+  "model_source": "remote",
+  "model": {
+    "remote": {
+      "intake": "opencode/claude-opus-4.7",
+      "planning": "opencode/gpt-5.5",
+      "implementation": "opencode-go/qwen3.6-plus",
+      "audit": "opencode-go/glm-5.1"
+    },
+    "local": {
+      "intake": "qwen3",
+      "planning": "qwen3",
+      "implementation": "qwen3",
+      "audit": "qwen3"
+    }
+  },
+  "timeout": {
+    "pi_stream": {
+      "remote": 900,
+      "local": 60
+    }
+  }
+}

@@ -3,9 +3,9 @@ import fs from 'fs';
 import path from 'path';
 
 describe('GymHandPileScene rotation slider presence', () => {
-  it('scene source contains createRotationSlider and setMaxRotationDegrees usage', () => {
+  it('scene source contains rotationSlider and setMaxRotationDegrees usage', () => {
     const source = fs.readFileSync(path.resolve(__dirname, '../../example-games/gym/scenes/GymHandPileScene.ts'), 'utf-8');
-    expect(source).toContain('createRotationSlider');
+    expect(source).toContain('rotationSlider');
     expect(source).toContain('setMaxRotationDegrees(');
   });
 
