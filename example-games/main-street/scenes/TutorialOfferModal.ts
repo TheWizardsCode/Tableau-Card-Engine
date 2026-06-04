@@ -37,7 +37,10 @@ export interface TutorialOfferCallbacks {
 
 const MODAL_WIDTH = 420;
 const MODAL_HEIGHT = 260;
-const MODAL_DEPTH = 200;
+// Depth must exceed the Main Street hudContainer depth (1000) so that
+// overlay text/buttons render above the container that hosts the
+// overlay background & box (created by createOverlayBackground).
+const MODAL_DEPTH = 1001;
 const MODAL_BOX_COLOR = 0x16213e;
 const TITLE_COLOR = '#aaffaa';
 const BODY_COLOR = '#ddccbb';
@@ -121,6 +124,13 @@ export class TutorialOfferModal {
     const panelTop = gameH / 2 - MODAL_HEIGHT / 2;
     const centerX = gameW / 2;
 
+    // ── Content depth: above the container (depth 1000)   ─
+    // The overlay background and box are parented into the
+    // hudContainer (depth 1000).  All interactive content
+    // (text, buttons) must sit at a higher depth so Phaser
+    // renders them after the container and its children.
+    const CONTENT_DEPTH = MODAL_DEPTH + 2; // 1003
+
     // ── Title ────────────────────────────────────────────
     const title = s.add.text(
       centerX,
@@ -134,7 +144,7 @@ export class TutorialOfferModal {
       },
     )
       .setOrigin(0.5)
-      .setDepth(MODAL_DEPTH + 2);
+      .setDepth(CONTENT_DEPTH);
     this.overlayObjects.push(title);
 
     // ── Body text ────────────────────────────────────────
@@ -153,12 +163,15 @@ export class TutorialOfferModal {
       },
     )
       .setOrigin(0.5, 0)
-      .setDepth(MODAL_DEPTH + 2);
+      .setDepth(CONTENT_DEPTH);
     this.overlayObjects.push(body);
 
     // ── Buttons ──────────────────────────────────────────
     const buttonY = panelTop + MODAL_HEIGHT - 48;
-    const buttonGap = 40;
+    // Two buttons centered within the modal panel. A 240px gap between
+    // button centres keeps them well inside the 420px panel width with
+    // comfortable padding on the outer edges.
+    const buttonGap = 240;
     const startX = centerX - buttonGap / 2;
     const endX = centerX + buttonGap / 2;
 
@@ -168,7 +181,7 @@ export class TutorialOfferModal {
       startX,
       buttonY,
       '[ Start Tutorial ]',
-      MODAL_DEPTH + 2,
+      CONTENT_DEPTH,
       { fontSize: '15px', color: '#88ff88', hoverColor: '#aaffaa' },
     );
     startBtn.on('pointerdown', () => {
@@ -184,7 +197,7 @@ export class TutorialOfferModal {
       endX,
       buttonY,
       '[ Skip for Now ]',
-      MODAL_DEPTH + 2,
+      CONTENT_DEPTH,
       { fontSize: '15px', color: SKIP_COLOR, hoverColor: SKIP_HOVER_COLOR },
     );
     skipBtn.on('pointerdown', () => {
