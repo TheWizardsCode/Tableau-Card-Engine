@@ -12,8 +12,9 @@
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import Phaser from 'phaser';
-import { waitForScene } from '../../helpers/waitForScene';
+import { waitForScene } from '../helpers/waitForScene';
 import { page } from '@vitest/browser/context';
+import { MARKET_BUSINESS_SLOTS } from '../../example-games/main-street/MainStreetCards';
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -26,7 +27,7 @@ async function bootGame(): Promise<{
   document.body.appendChild(container);
 
   const { createMainStreetGame } = await import(
-    '../../../example-games/main-street/createMainStreetGame'
+    '../../example-games/main-street/createMainStreetGame'
   );
   const game = createMainStreetGame({ parent: 'game-container', width: 1280, height: 720 });
   await waitForScene(game, 'MainStreetScene');
@@ -209,6 +210,9 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
       marketTop: number;
       marketRowH: number;
       marketRowGap: number;
+      marketLabelW: number;
+      marketCardW: number;
+      marketCardGap: number;
       gameW: number;
     } | undefined;
     expect(layout).toBeTruthy();
@@ -216,10 +220,13 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
     const marketTop = layout!.marketTop;
     const totalH = 2 * layout!.marketRowH + layout!.marketRowGap + 20;
 
+    // Calculate correct market width from card layout
+    const marketStartX = layout!.marketLabelW + 50;
+    const marketRight = marketStartX + (MARKET_BUSINESS_SLOTS - 1) * (layout!.marketCardW + layout!.marketCardGap) + layout!.marketCardW + 20;
     const expectedRef = {
       x: 20,
       y: marketTop - 10,
-      w: layout!.gameW - 40,
+      w: marketRight - 20,
       h: totalH,
     };
 
@@ -352,14 +359,20 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
       marketTop: number;
       marketRowH: number;
       marketRowGap: number;
+      marketLabelW: number;
+      marketCardW: number;
+      marketCardGap: number;
       gameW: number;
     } | undefined;
     expect(layout).toBeTruthy();
 
+    // Calculate correct investments row width (same as business row)
+    const invMarketStartX = layout!.marketLabelW + 50;
+    const invMarketRight = invMarketStartX + (MARKET_BUSINESS_SLOTS - 1) * (layout!.marketCardW + layout!.marketCardGap) + layout!.marketCardW + 20;
     const expectedRef = {
-      x: 40,
+      x: 20,
       y: layout!.marketTop + layout!.marketRowH + layout!.marketRowGap,
-      w: layout!.gameW - 80,
+      w: invMarketRight - 20,
       h: layout!.marketRowH,
     };
 

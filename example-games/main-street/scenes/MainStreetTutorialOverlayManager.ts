@@ -658,12 +658,14 @@ export class MainStreetTutorialOverlayManager {
       }
       case 'market-business-row': {
         // Market has TWO rows: business (top) + investments (bottom).
-        // The renderer draws the section background as:
-        //   fillRoundedRect(20, marketTop - 10, gameW - 40, 2 * marketRowH + marketRowGap + 20)
+        // The renderer draws the section background aligned to the business row cards
+        // with +20px right padding.
+        const marketStartX = l.marketLabelW + 50;
+        const marketRight = marketStartX + (MARKET_BUSINESS_SLOTS - 1) * (l.marketCardW + l.marketCardGap) + l.marketCardW + 20;
         return {
           x: 20,
           y: l.marketTop - 10,
-          w: l.gameW - 40,
+          w: marketRight - 20,
           h: 2 * l.marketRowH + l.marketRowGap + 20,
         };
       }
@@ -682,11 +684,13 @@ export class MainStreetTutorialOverlayManager {
       }
       case 'investments-row': {
         // Investments row is the second (bottom) market row.
-        // It starts at marketTop + marketRowH + marketRowGap and has height marketRowH.
+        // Uses same left alignment and right padding as business row.
+        const marketStartX = l.marketLabelW + 50;
+        const marketRight = marketStartX + (MARKET_BUSINESS_SLOTS - 1) * (l.marketCardW + l.marketCardGap) + l.marketCardW + 20;
         return {
-          x: 40,
+          x: 20,
           y: l.marketTop + l.marketRowH + l.marketRowGap,
-          w: l.gameW - 80,
+          w: marketRight - 20,
           h: l.marketRowH,
         };
       }

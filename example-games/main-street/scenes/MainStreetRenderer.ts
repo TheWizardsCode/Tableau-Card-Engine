@@ -410,15 +410,18 @@ export class MainStreetRenderer {
     s.marketSelectionByCardId.clear();
     s.selectedMarketCardId = null;
 
-    const { gameW, marketTop, marketRowH, marketRowGap } = s.layout;
+    const { gameW, marketTop, marketRowH, marketRowGap, marketCardW, marketCardGap, marketLabelW } = s.layout;
 
     // Section background (2 rows: business + investments)
+    // Calculate actual right edge from the widest row (business: 4 slots)
+    const marketStartX = marketLabelW + 50;
+    const marketRight = marketStartX + (MARKET_BUSINESS_SLOTS - 1) * (marketCardW + marketCardGap) + marketCardW + 20;
     const totalH = 2 * marketRowH + marketRowGap + 20;
     const bgBox = s.add.graphics();
     bgBox.fillStyle(BOX_FILL, 0.3);
-    bgBox.fillRoundedRect(20, marketTop - 10, gameW - 40, totalH, BOX_RADIUS);
+    bgBox.fillRoundedRect(20, marketTop - 10, marketRight - 20, totalH, BOX_RADIUS);
     bgBox.lineStyle(1, BOX_STROKE, 0.4);
-    bgBox.strokeRoundedRect(20, marketTop - 10, gameW - 40, totalH, BOX_RADIUS);
+    bgBox.strokeRoundedRect(20, marketTop - 10, marketRight - 20, totalH, BOX_RADIUS);
     s.marketContainer.add(bgBox);
 
     const sectionLabel = s.add.text(gameW / 2, marketTop - 4, 'Market', {
