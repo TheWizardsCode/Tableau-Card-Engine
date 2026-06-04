@@ -163,8 +163,10 @@ export class GolfAnimator {
   // ── Drawn card display ──────────────────────────────────
 
   showDrawnCard(card: Card, source: 'stock' | 'discard' = 'stock'): void {
-    // Destination: to the right of the discard pile, between piles and AI grid
-    const destX = this.layout.discardPileCenterX + GOLF_CARD_W + 24;
+    // Destination: to the right of the discard pile, between piles and AI grid.
+    // Position at midpoint between the deck right edge and the original position,
+    // moving it left by half the distance from the right edge of the deck.
+    const destX = this.layout.discardPileCenterX + GOLF_CARD_W * 3 / 4 + 12;
     const destY = this.layout.discardPileCenterY;
     const faceTexture = cardTextureKey(card.rank, card.suit);
 
