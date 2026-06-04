@@ -652,24 +652,26 @@ export class MainStreetTutorialOverlayManager {
       case 'center-modal':
         return null; // overlay is already centred
       case 'hud': {
-        // HUD strip is 28px tall, positioned at hudY. Use 34px to add
-        // a few pixels of padding above/below the strip.
-        return { x: 0, y: l.hudY - 3, w: l.gameW, h: 34 };
+        // HUD strip is a Phaser rectangle centered at hudY with height 28.
+        // The strip's top edge is at hudY - 14.
+        return { x: 0, y: l.hudY - 14, w: l.gameW, h: 28 };
       }
       case 'market-business-row': {
-        const slots = MARKET_BUSINESS_SLOTS;
-        const totalW = slots * l.marketCardW + (slots - 1) * l.marketCardGap;
         // Market has TWO rows: business (top) + investments (bottom).
-        // The renderer draws the section background as: fillRoundedRect(20, marketTop - 10, gameW - 40, 2 * marketRowH + marketRowGap + 20)
-        return { x: 40, y: l.marketTop - 10, w: Math.max(200, totalW + 80), h: 2 * l.marketRowH + l.marketRowGap + 20 };
-      }
-      case 'street-grid':
+        // The renderer draws the section background as:
+        //   fillRoundedRect(20, marketTop - 10, gameW - 40, 2 * marketRowH + marketRowGap + 20)
         return {
-          x: l.streetX,
-          y: l.streetTop,
-          w: l.streetCols * l.slotW + (l.streetCols - 1) * l.slotGap,
-          h: 2 * l.slotH + l.streetRowGap,
+          x: 20,
+          y: l.marketTop - 10,
+          w: l.gameW - 40,
+          h: 2 * l.marketRowH + l.marketRowGap + 20,
         };
+      }
+      case 'street-grid': {
+        // Street grid spans the full width of the screen, two rows of slots.
+        const streetH = 2 * l.slotH + l.streetRowGap + 12;
+        return { x: 0, y: l.streetTop - 6, w: l.gameW, h: streetH };
+      }
       case 'end-turn-button': {
         const rightX = l.gameW - 24;
         return { x: rightX - l.actionButtonW - 20, y: l.actionY - 4, w: l.actionButtonW + 20, h: l.actionButtonH + 8 };
@@ -679,7 +681,14 @@ export class MainStreetTutorialOverlayManager {
         return { x: 20, y: l.queueTop - 6, w: totalW, h: l.queueCardH + 16 };
       }
       case 'investments-row': {
-        return { x: 40, y: l.marketTop + l.marketRowH + l.marketRowGap - 6, w: l.gameW - 80, h: l.marketRowH + 16 };
+        // Investments row is the second (bottom) market row.
+        // It starts at marketTop + marketRowH + marketRowGap and has height marketRowH.
+        return {
+          x: 40,
+          y: l.marketTop + l.marketRowH + l.marketRowGap,
+          w: l.gameW - 80,
+          h: l.marketRowH,
+        };
       }
       case 'help-button': {
         return { x: l.gameW - 120, y: l.actionY - 4, w: 100, h: l.actionButtonH + 8 };

@@ -142,9 +142,9 @@ describe('TutorialOverlayManager highlight zones', () => {
     expect(bounds).toBeTruthy();
 
     const hudY = layout!.hudY;
-    // The highlight should start at approximately hudY (within ~6px for padding)
-    expect(bounds!.y).toBeLessThanOrEqual(hudY + 6);
-    expect(bounds!.y).toBeGreaterThanOrEqual(hudY - 10);
+    // The highlight should start at hudY - 14 (top of the 28px HUD strip)
+    expect(bounds!.y).toBeLessThanOrEqual(hudY + 2);
+    expect(bounds!.y).toBeGreaterThanOrEqual(hudY - 16);
 
     // Width should cover most of the screen
     expect(bounds!.w).toBeGreaterThan(layout!.gameW * 0.6);
@@ -274,8 +274,8 @@ describe('TutorialOverlayManager highlight zones', () => {
     expect(bounds).toBeTruthy();
 
     // The investments row is the second (bottom) market row
-    // Source code positions it at: marketTop + marketRowH + marketRowGap - 6
-    const expectedTopY = layout!.marketTop + layout!.marketRowH + layout!.marketRowGap - 6;
+    // Source code positions it at: marketTop + marketRowH + marketRowGap
+    const expectedTopY = layout!.marketTop + layout!.marketRowH + layout!.marketRowGap;
     expect(bounds!.y).toBeLessThanOrEqual(expectedTopY + 4); // small tolerance for rendering
     expect(bounds!.y).toBeGreaterThanOrEqual(layout!.marketTop - 10);
   });
