@@ -651,12 +651,17 @@ export class MainStreetTutorialOverlayManager {
     switch (zone) {
       case 'center-modal':
         return null; // overlay is already centred
-      case 'hud':
-        return { x: 0, y: 0, w: l.gameW, h: l.hudH ?? 40 };
+      case 'hud': {
+        // HUD strip is 28px tall, positioned at hudY. Use 34px to add
+        // a few pixels of padding above/below the strip.
+        return { x: 0, y: l.hudY - 3, w: l.gameW, h: 34 };
+      }
       case 'market-business-row': {
         const slots = MARKET_BUSINESS_SLOTS;
         const totalW = slots * l.marketCardW + (slots - 1) * l.marketCardGap;
-        return { x: 40, y: l.marketTop - 6, w: Math.max(200, totalW + 80), h: l.marketRowH + 16 };
+        // Market has TWO rows: business (top) + investments (bottom).
+        // The renderer draws the section background as: fillRoundedRect(20, marketTop - 10, gameW - 40, 2 * marketRowH + marketRowGap + 20)
+        return { x: 40, y: l.marketTop - 10, w: Math.max(200, totalW + 80), h: 2 * l.marketRowH + l.marketRowGap + 20 };
       }
       case 'street-grid':
         return {
