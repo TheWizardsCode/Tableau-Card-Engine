@@ -164,9 +164,10 @@ export class GolfAnimator {
 
   showDrawnCard(card: Card, source: 'stock' | 'discard' = 'stock'): void {
     // Destination: to the right of the discard pile, between piles and AI grid.
-    // Position at midpoint between the deck right edge and the original position,
-    // moving it left by half the distance from the right edge of the deck.
-    const destX = this.layout.discardPileCenterX + GOLF_CARD_W * 3 / 4 + 12;
+    // Original position (discardPileCenterX + GOLF_CARD_W + 24) was too far right.
+    // Moved left by half the distance from the deck right edge, but that was too far.
+    // Compromise: move right by half of that adjustment.
+    const destX = this.layout.discardPileCenterX + GOLF_CARD_W * 3 / 4 + 33;
     const destY = this.layout.discardPileCenterY;
     const faceTexture = cardTextureKey(card.rank, card.suit);
 
