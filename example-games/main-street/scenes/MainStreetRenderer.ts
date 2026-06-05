@@ -386,8 +386,8 @@ export class MainStreetRenderer {
     bg.setStrokeStyle(strokeWidth, strokeColor);
     s.streetContainer.add(bg);
 
-    // Slot number
-    const idxText = s.add.text(x + slotW / 2, y + slotH / 2, `${index}`, {
+    // Slot number (1-indexed for readability: 1-10)
+    const idxText = s.add.text(x + slotW / 2, y + slotH / 2, `${index + 1}`, {
       fontSize: '18px', color: (isSelectable || isHinted) ? '#ffdd44' : '#666655',
       fontFamily: FONT_FAMILY,
     }).setOrigin(0.5);

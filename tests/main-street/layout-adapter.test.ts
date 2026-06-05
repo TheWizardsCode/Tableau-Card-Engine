@@ -10,8 +10,10 @@ describe('MainStreetLayoutAdapter', () => {
     expect(layout.marketTop).toBe(90);
     // incidentQueue zone: y = 0.444444 * 720 ≈ 320
     expect(layout.queueTop).toBe(320);
-    // street zone: y = 0.586111 * 720 ≈ 422
-    expect(layout.streetTop).toBe(422);
+    // street zone: y = 0.586111 * 720 ≈ 422, shifted down by 17px for vertical spacing
+    expect(layout.streetTop).toBe(439);
+    // streetX is centered: (1280 - (5*140 + 4*10)) / 2 = (1280 - 740) / 2 = 270
+    expect(layout.streetX).toBe(270);
     // hand zone: x = 0.03125 * 1280 = 40
     expect(layout.handX).toBe(40);
     // activityLog zone: x = 0.640625 * 1280 = 820
