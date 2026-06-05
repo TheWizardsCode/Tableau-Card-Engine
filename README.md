@@ -37,7 +37,7 @@ tableau-card-engine/
 │   ├── core-engine/       Game loop, state management, turn sequencing
 │   ├── card-system/       Card, Deck, Pile abstractions
 │   ├── rule-engine/       Rule definitions, validation, turn logic
-│   └── ui/                Reusable UI components
+│   └── ui/                Reusable UI components (HelpPanel, SettingsPanel, Overlay, buttons, HUD utilities)
 ├── example-games/         Standalone example games
 │   ├── gym/               Interactive demo scene suite for core-engine features
 │   ├── golf/              9-Card Golf (human vs. AI)
