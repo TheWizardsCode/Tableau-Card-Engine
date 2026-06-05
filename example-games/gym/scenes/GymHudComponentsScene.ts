@@ -202,11 +202,7 @@ export class GymHudComponentsScene extends GymSceneBase {
     this.settingsPanel = new SettingsPanel(this, {
       soundManager: this.mockSound as any,
     });
-    this.settingsButton = new SettingsButton(
-      this,
-      this.settingsPanel,
-      { x: GAME_W - 34, y: 38 },
-    );
+    this.settingsButton = new SettingsButton(this, this.settingsPanel);
 
     // Cleanup on scene shutdown
     this.events.on('shutdown', () => this.cleanupComponents());
