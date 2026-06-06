@@ -26,12 +26,11 @@ import {
 } from '../MainStreetMarket';
 import {
   FONT_FAMILY,
-  createSceneTitle,
-  createSceneMenuButton,
   attachSelection,
   markHudTransient,
   clearTransientHud,
 } from '../../../src/ui';
+import { createSceneTitle, createSceneMenuButton } from '@ui/Renderer';
 import {
   createActionButton,
   attachHudTooltipZone,

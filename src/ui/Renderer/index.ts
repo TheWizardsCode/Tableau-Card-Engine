@@ -11,6 +11,25 @@
 
 import Phaser from 'phaser';
 import { FONT_FAMILY } from '../constants';
+
+// Re-export scene header helpers so games can import everything from @ui/Renderer
+export {
+  createSceneTitle,
+  createSceneMenuButton,
+  createSceneHeader,
+  SCENE_HEADER_Y,
+  SCENE_MENU_BUTTON_X,
+  SCENE_TITLE_FONT_SIZE,
+  SCENE_TITLE_COLOR,
+  SCENE_MENU_BUTTON_FONT_SIZE,
+  SCENE_MENU_BUTTON_COLOR,
+  SCENE_MENU_BUTTON_HOVER_COLOR,
+} from '../SceneHeader';
+export type {
+  SceneTitleConfig,
+  SceneMenuButtonConfig,
+  SceneHeaderResult,
+} from '../SceneHeader';
 export {
   renderCardSvg,
 } from './renderCardSvg';

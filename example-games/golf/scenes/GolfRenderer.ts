@@ -5,11 +5,10 @@
 import { scoreVisibleCards, scoreGrid } from '../GolfScoring';
 import type { GolfSession } from '../GolfGame';
 import { GAME_W, GAME_H } from '../../../src/ui';
+import { createSceneTitle, createSceneMenuButton } from '@ui/Renderer';
 import {
   createGolfHudText,
   getCardTexture,
-  createSceneTitle,
-  createSceneMenuButton,
 } from '../../../src/ui/Renderer/adapters/GolfAdapter';
 import {
   GOLF_CARD_H, CARD_GAP,
