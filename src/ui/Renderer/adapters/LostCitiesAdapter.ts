@@ -2,8 +2,8 @@
  * Lost Cities Adapter – bridges Lost Cities scene rendering to the shared
  * Renderer API.
  *
- * Re-exports shared helpers (`createHudText`, `createActionButton`,
- * `createOverlayBackground`, `dismissOverlay`) and provides Lost Cities–specific
+ * Re-exports shared helpers (`createHudText`, `createOverlayBackground`,
+ * `dismissOverlay`, `createOverlayButton`) and provides Lost Cities–specific
  * defaults for HUD text so that `LostCitiesRenderer`, `LostCitiesOverlayManager`,
  * and related modules can use engine-standard patterns without duplicating
  * styling logic.
@@ -27,7 +27,6 @@ import { FONT_FAMILY } from '../../../ui/constants';
 
 // Re-export shared helpers so callers can import from a single adapter module.
 export { sharedCreateHudText as createHudText };
-export { sharedCreateActionButton as createActionButton };
 export { sharedCreateOverlayBackground as createOverlayBackground };
 export { sharedCreateOverlayButton as createOverlayButton };
 export { sharedDismissOverlay as dismissOverlay };

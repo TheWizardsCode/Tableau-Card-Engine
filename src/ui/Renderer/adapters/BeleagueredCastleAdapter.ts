@@ -2,10 +2,10 @@
  * Beleaguered Castle Adapter – bridges Beleaguered Castle scene rendering
  * to the shared Renderer API.
  *
- * Re-exports shared helpers (`createHudText`, `createActionButton`) and
- * provides Beleaguered Castle–specific defaults for HUD text so that
- * `BeleagueredCastleRenderer` and `BeleagueredCastleOverlayManager` can
- * use engine-standard patterns without duplicating styling logic.
+ * Re-exports shared helper (`createHudText`) and provides Beleaguered
+ * Castle–specific defaults for HUD text so that `BeleagueredCastleRenderer`
+ * and `BeleagueredCastleOverlayManager` can use engine-standard patterns
+ * without duplicating styling logic.
  *
  * @module BeleagueredCastleAdapter
  */
@@ -13,7 +13,6 @@
 import Phaser from 'phaser';
 import {
   createHudText as sharedCreateHudText,
-  createActionButton as sharedCreateActionButton,
   HudTextOptions,
   ActionButtonOptions,
 } from '../index';
@@ -21,7 +20,6 @@ import { FONT_FAMILY } from '../../../ui/constants';
 
 // Re-export shared helpers so callers can import from a single adapter module.
 export { sharedCreateHudText as createHudText };
-export { sharedCreateActionButton as createActionButton };
 export type { HudTextOptions, ActionButtonOptions };
 
 /** Default depth for HUD UI elements in Beleaguered Castle. */

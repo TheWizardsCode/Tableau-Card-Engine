@@ -8,8 +8,8 @@ import {
   FONT_FAMILY,
   OverlayManager,
 } from '../../../src/ui';
+import { createActionButton } from '@ui/Renderer';
 import {
-  createActionButton,
   createSushiGoMenuButton,
 } from '../../../src/ui/Renderer/adapters/SushiGoAdapter';
 import { scoreTableauBreakdown } from '../SushiGoScoring';

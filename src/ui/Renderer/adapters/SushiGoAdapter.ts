@@ -2,9 +2,8 @@
  * Sushi Go Adapter – bridges Sushi Go overlay rendering to the shared
  * Renderer API.
  *
- * Re-exports shared helpers (`createActionButton`) so that
- * SushiGoOverlayManager can use engine-standard patterns for overlay
- * buttons without duplicating styling logic.
+ * Provides Sushi Go–specific overlay button helpers that build on the
+ * shared renderer patterns.
  *
  * @module SushiGoAdapter
  */
@@ -19,12 +18,6 @@ import {
 // Re-exports
 // ---------------------------------------------------------------------------
 
-/**
- * Create an action button using the shared renderer helper.
- *
- * @see sharedCreateActionButton
- */
-export { sharedCreateActionButton as createActionButton };
 export type { ActionButtonOptions };
 
 // ---------------------------------------------------------------------------

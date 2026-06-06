@@ -8,9 +8,6 @@
  * Feudalism's original private method used the button's vertical centre as
  * the `y` coordinate, while the shared helper uses the top edge.
  *
- * Additionally re-exports the shared `createActionButton` so other code can
- * use the unwrapped helper when the Feudalism-specific styling is not desired.
- *
  * @module FeudalismAdapter
  */
 
@@ -20,8 +17,6 @@ import {
   ActionButtonOptions,
 } from '../index';
 
-// Re-export the shared helper for callers that prefer it.
-export { sharedCreateActionButton as createActionButton };
 export type { ActionButtonOptions };
 
 // ---------------------------------------------------------------------------

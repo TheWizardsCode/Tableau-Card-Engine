@@ -31,8 +31,8 @@ import {
   clearTransientHud,
 } from '../../../src/ui';
 import { createSceneTitle, createSceneMenuButton } from '@ui/Renderer';
+import { createActionButton } from '@ui/Renderer';
 import {
-  createActionButton,
   attachHudTooltipZone,
   mainStreetRenderCardSvg,
   createMainStreetHintButton,

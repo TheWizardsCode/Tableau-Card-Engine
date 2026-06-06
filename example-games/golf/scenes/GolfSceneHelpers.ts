@@ -6,8 +6,8 @@ import type { TranscriptRecorder } from '../GameTranscript';
 import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
 import type { SoundManager, GameEventEmitter } from '../../../src/core-engine';
 import { GAME_W, GAME_H, OverlayManager } from '../../../src/ui';
+import { createActionButton } from '@ui/Renderer';
 import {
-  createActionButton,
   createGolfHudText,
   createGolfMenuButton,
 } from '../../../src/ui/Renderer/adapters/GolfAdapter';
