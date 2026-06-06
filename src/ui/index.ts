@@ -154,7 +154,7 @@ export type {
 } from './Overlay';
 
 export { createOverlayMenuButton } from './MenuButton';
-export { OverlayManager } from './OverlayManager';
+export { OverlayManager, type OverlayConfig, type OverlayType } from './OverlayManager';
 export {
   createParameterizedOverlay,
   overlayCenterY,

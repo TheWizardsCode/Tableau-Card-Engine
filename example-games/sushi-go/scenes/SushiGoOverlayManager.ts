@@ -41,10 +41,11 @@ export class SushiGoOverlayManager {
   showRoundScoreOverlay(result: RoundResult, onNextRound: () => void): void {
     this.soundManager?.play(SFX_KEYS.SCORE_REVEAL);
 
-    const overlay = this.overlayManager.create(
-      { depth: 10, alpha: 0.01 },
-      { width: 560, height: 460, alpha: 0.9 },
-    );
+    const overlay = this.overlayManager.showOverlay({
+      type: 'custom',
+      backgroundOptions: { depth: 10, alpha: 0.01 },
+      box: { width: 560, height: 460, alpha: 0.9 },
+    });
 
     const roundNum = result.round + 1;
     const human = this.session.players[0];
@@ -129,10 +130,11 @@ export class SushiGoOverlayManager {
       winnerIndex: winnerIdx,
     });
 
-    const overlay = this.overlayManager.create(
-      { depth: 10, alpha: 0.01 },
-      { width: 560, height: 520, alpha: 0.9 },
-    );
+    const overlay = this.overlayManager.showOverlay({
+      type: 'custom',
+      backgroundOptions: { depth: 10, alpha: 0.01 },
+      box: { width: 560, height: 520, alpha: 0.9 },
+    });
 
     const winnerText = winnerIdx === 0 ? 'You Win!' : 'AI Wins!';
     const human = this.session.players[0];

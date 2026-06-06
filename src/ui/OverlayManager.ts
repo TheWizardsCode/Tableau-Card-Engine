@@ -1,5 +1,7 @@
 /**
  * OverlayManager -- small helper to manage modal overlay object lifecycles.
+ * Provides a generic, reusable way to show and dismiss overlays with proper
+ * depth handling for different overlay types.
  */
 
 import {
@@ -10,6 +12,19 @@ import {
   type OverlayResult,
 } from './Overlay';
 
+/** Overlay type determines default depth and behavior. */
+export type OverlayType = 'game-over' | 'win/loss' | 'round-end' | 'custom';
+
+/** Configuration for showing an overlay. */
+export interface OverlayConfig {
+  /** Type of overlay (affects default depth). */
+  type: OverlayType;
+  /** Background options (depth will be overridden by type unless custom). */
+  backgroundOptions?: OverlayBackgroundOptions;
+  /** Box options for visible overlay content. */
+  box?: OverlayBoxOptions;
+}
+
 export class OverlayManager {
   private _objects: Phaser.GameObjects.GameObject[] = [];
 
@@ -19,12 +34,27 @@ export class OverlayManager {
     return this._objects;
   }
 
-  create(
-    options?: OverlayBackgroundOptions,
-    box?: OverlayBoxOptions,
-  ): OverlayResult {
-    this.dismiss();
-    const overlay = createOverlayBackground(this.scene, options, box);
+  /**
+   * Show an overlay with the given configuration.
+   * 
+   * @param config - Overlay configuration including type and options
+   * @returns The created overlay result
+   */
+  showOverlay(config: OverlayConfig): OverlayResult {
+    this.dismiss(); // Clear any existing overlay
+    
+    // Determine depth based on overlay type
+    const depth = config.type === 'custom' 
+      ? config.backgroundOptions?.depth ?? 10 
+      : 2000; // Game state overlays use depth 2000
+    
+    // Prepare background options with correct depth
+    const backgroundOptions: OverlayBackgroundOptions = {
+      ...config.backgroundOptions,
+      depth,
+    };
+    
+    const overlay = createOverlayBackground(this.scene, backgroundOptions, config.box);
     this._objects.push(...overlay.objects);
     return overlay;
   }
