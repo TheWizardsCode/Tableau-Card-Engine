@@ -23,7 +23,7 @@ import {
 import {
   createSceneTitle as sharedCreateSceneTitle,
   createSceneMenuButton as sharedCreateSceneMenuButton,
-} from '../../SceneHeader';
+} from '../index';
 import {
   createOverlayBackground as sharedCreateOverlayBackground,
   dismissOverlay as sharedDismissOverlay,

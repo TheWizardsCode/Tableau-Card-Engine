@@ -2,7 +2,8 @@
  * MindRenderer -- creates and refreshes all visual game objects for The Mind.
  */
 
-import { FONT_FAMILY, createSceneHeader, layoutCardPositions } from '../../../src/ui';
+import { FONT_FAMILY, layoutCardPositions } from '../../../src/ui';
+import { createSceneHeader } from '@ui/Renderer';
 import { createMindHudText } from '../../../src/ui/Renderer/adapters/MindAdapter';
 import { applyEnsuredTexture } from '../../../src/ui/Renderer';
 import {

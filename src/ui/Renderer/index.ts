@@ -11,6 +11,30 @@
 
 import Phaser from 'phaser';
 import { FONT_FAMILY } from '../constants';
+
+// ---------------------------------------------------------------------------
+// Scene header scaffolding – re-exported for convenience via the shared
+// Renderer API so that game renderers can import everything from a single
+// module (`@ui/Renderer`) rather than mixing `src/ui` with relative paths.
+// ---------------------------------------------------------------------------
+export {
+  createSceneTitle,
+  createSceneMenuButton,
+  createSceneHeader,
+  SCENE_HEADER_Y,
+  SCENE_MENU_BUTTON_X,
+  SCENE_TITLE_FONT_SIZE,
+  SCENE_TITLE_COLOR,
+  SCENE_MENU_BUTTON_FONT_SIZE,
+  SCENE_MENU_BUTTON_COLOR,
+  SCENE_MENU_BUTTON_HOVER_COLOR,
+} from '../SceneHeader';
+export type {
+  SceneTitleConfig,
+  SceneMenuButtonConfig,
+  SceneHeaderResult,
+} from '../SceneHeader';
+
 export {
   renderCardSvg,
 } from './renderCardSvg';

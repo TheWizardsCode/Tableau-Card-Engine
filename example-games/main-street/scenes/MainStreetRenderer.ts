@@ -26,15 +26,17 @@ import {
 } from '../MainStreetMarket';
 import {
   FONT_FAMILY,
-  createSceneTitle,
-  createSceneMenuButton,
   attachSelection,
   markHudTransient,
   clearTransientHud,
 } from '../../../src/ui';
 import {
+  createSceneTitle,
+  createSceneMenuButton,
   createActionButton,
   attachHudTooltipZone,
+} from '@ui/Renderer';
+import {
   mainStreetRenderCardSvg,
   createMainStreetHintButton,
 } from '../../../src/ui/Renderer/adapters/MainStreetAdapter';
