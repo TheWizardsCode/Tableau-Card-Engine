@@ -554,10 +554,10 @@ export class SettingsPanel {
     scene.input.on('pointermove', this.handlePointerMove, this);
     scene.input.on('pointerup', this.handlePointerUp, this);
 
-    // After constructing child objects, parent into overlay root and apply
+    // After constructing child objects, parent into HUD container and apply
     // absolute depths so the settings panel renders above gameplay content.
     try {
-      const overlayRoot: any = (scene as any).hudOverlayContainer ?? (scene as any).hudContainer;
+      const overlayRoot: any = (scene as any).hudContainer;
       if (overlayRoot && typeof overlayRoot.add === 'function') {
         try {
           overlayRoot.add(this.container);
@@ -717,7 +717,7 @@ export class SettingsPanel {
 
     // Ensure settings panel sits at top of overlay root ordering when opened.
     try {
-      const overlayRoot: any = (this.scene as any).hudOverlayContainer ?? (this.scene as any).hudContainer;
+      const overlayRoot: any = (this.scene as any).hudContainer;
       if (overlayRoot && typeof overlayRoot.bringToTop === 'function') {
         try { overlayRoot.bringToTop(this.container); } catch (_) { /* ignore */ }
       }
@@ -1051,10 +1051,10 @@ export class SettingsPanel {
     this.inputBlocker.setInteractive();
     this.inputBlocker.on('pointerdown', () => this.close());
 
-    // Parent input blocker into overlay root if available so it is not
-    // removed during HUD rebuilds.
+    // Parent input blocker into HUD container if available so it is not
+    // removed during scene rebuilds.
     try {
-      const overlayRoot: any = (this.scene as any).hudOverlayContainer ?? (this.scene as any).hudContainer;
+      const overlayRoot: any = (this.scene as any).hudContainer;
       if (overlayRoot && typeof overlayRoot.add === 'function') {
         try { overlayRoot.add(this.inputBlocker); } catch (_) { /* ignore */ }
       }

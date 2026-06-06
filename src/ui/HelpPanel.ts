@@ -164,10 +164,10 @@ export class HelpPanel {
     // Setup scrolling mask and track bar
     this.setupScrollMask(contentTopY);
 
-    // After constructing child objects, parent into overlay root (if present)
+    // After constructing child objects, parent into HUD container (if present)
     // and apply absolute depths so the panel renders above gameplay.
     try {
-      const overlayRoot: any = (scene as any).hudOverlayContainer ?? (scene as any).hudContainer;
+      const overlayRoot: any = (scene as any).hudContainer;
       if (overlayRoot && typeof overlayRoot.add === 'function') {
         try {
           overlayRoot.add(this.container);
@@ -212,7 +212,7 @@ export class HelpPanel {
 
     // Ensure panel sits at top of overlay root ordering when opened.
     try {
-      const overlayRoot: any = (this.scene as any).hudOverlayContainer ?? (this.scene as any).hudContainer;
+      const overlayRoot: any = (this.scene as any).hudContainer;
       if (overlayRoot && typeof overlayRoot.bringToTop === 'function') {
         try { overlayRoot.bringToTop(this.container); } catch (_) { /* ignore */ }
       }
@@ -508,10 +508,10 @@ export class HelpPanel {
     this.inputBlocker.setInteractive();
     this.inputBlocker.on('pointerdown', () => this.close());
 
-    // Parent input blocker into overlay root if available so it is not
-    // removed during HUD rebuilds.
+    // Parent input blocker into HUD container if available so it is not
+    // removed during scene rebuilds.
     try {
-      const overlayRoot: any = (this.scene as any).hudOverlayContainer ?? (this.scene as any).hudContainer;
+      const overlayRoot: any = (this.scene as any).hudContainer;
       if (overlayRoot && typeof overlayRoot.add === 'function') {
         try { overlayRoot.add(this.inputBlocker); } catch (_) { /* ignore */ }
       }
