@@ -87,6 +87,29 @@ tableau-card-engine/
 
 More games are planned: Coloretto.
 
+## Main Street Card Upgrade Visualization
+
+Main Street uses a **code-based overlay rendering pipeline** to display upgrade state on Business cards without requiring separate SVG assets for each level variant.
+
+### How it works
+
+When a Business card is upgraded (level > 0), the renderer applies visual overlays on top of the base SVG card texture:
+
+| Overlay | Position | Description |
+|---------|----------|-------------|
+| **Level badge** | Top-right | Gold bold text showing "Lvl N" (e.g., "Lvl 2") |
+| **Income display** | Bottom-center | Green bold text showing combined income (baseIncome + incomeBonus), e.g., "+8" |
+| **Name overlay** | Top-center | White bold text with dark semi-transparent background showing the upgraded card name (e.g., "Library" instead of "Bookshop") |
+| **Upgrade border** | Card perimeter | 3px golden stroke (`#ffaa22`) for visual distinction from base cards |
+
+### Architecture
+
+- **`UpgradeOverlaySpec.ts`** – Pure data module (no Phaser dependencies) that defines overlay specifications (`OverlayTextSpec`, `OverlayBorderSpec`, `UpgradeOverlaySpec`) and provides `buildUpgradeOverlaySpec(biz, width, height)` to generate overlay specs from a `BusinessCard`'s current state.
+- **`MainStreetRenderer.applyUpgradeOverlays()`** – Reads the overlay spec and creates Phaser text/graphics objects as children of the card's container.
+- **Texture caching** – Base card SVGs are rasterized once and cached. Overlays are drawn on top at render time, avoiding expensive re-rasterization for every card state variant.
+
+This approach was chosen for **performance** (no per-level SVG regeneration), **texture caching simplicity** (one texture per base card), and **backward compatibility** (non-upgraded cards render identically to before).
+
 ## ToneForge runtime adapter (Main Street)
 
 Main Street can optionally route mapped SFX keys through a ToneForge-backed module via `createTfPlayer`. Run `npm run tf:generate` to emit a runtime synth module at `build/tf-synths/main-street-runtime-synth.mjs` providing on-the-fly Tone/WebAudio voices. The adapter expects module exports `factories: Record<string, () => TfVoice>` and optional `getFactory()` / `descriptors` helpers. See `docs/the-build/audio.md` for generation workflow and wiring details.

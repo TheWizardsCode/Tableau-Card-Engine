@@ -2,8 +2,25 @@
  * Upgrade Overlay Spec – describes what visual overlays to render on top of
  * a BusinessCard when it has been upgraded (level > 0).
  *
- * This is a pure data module with no Phaser/runtime dependencies so it can
- * be unit-tested in a Node environment.
+ * This is a **pure data module** with no Phaser/runtime dependencies so it can
+ * be unit-tested in a Node environment. It defines the contract between game
+ * state (BusinessCard) and the rendering layer (MainStreetRenderer).
+ *
+ * ## How it fits into the rendering pipeline
+ *
+ * 1. `MainStreetRenderer.drawBusinessSlot()` renders the base SVG card texture
+ *    via `mainStreetRenderCardSvg()`.
+ * 2. It then calls `applyUpgradeOverlays()`, which invokes
+ *    `buildUpgradeOverlaySpec()` to get overlay specifications.
+ * 3. The renderer creates Phaser Text/Graphics objects from the spec and adds
+ *    them as children of the card's container.
+ *
+ * ## Extending
+ *
+ * To add a new overlay element:
+ * 1. Add a field to `UpgradeOverlaySpec` and compute it in `buildUpgradeOverlaySpec()`.
+ * 2. Handle the new field in `MainStreetRenderer.applyUpgradeOverlays()`.
+ * 3. Add unit tests for the spec builder (no Phaser needed).
  *
  * @module UpgradeOverlaySpec
  */
@@ -51,8 +68,9 @@ export interface UpgradeOverlaySpec {
  * upgrade state. Returns specs for level badge, income display, name overlay,
  * and border styling.
  *
- * Base cards (level 0) get only the income text. Upgraded cards get all
- * overlays for visual distinction.
+ * Base cards (level === 0) get `null` for all overlay fields — the renderer
+ * skips overlay creation entirely. Upgraded cards (level > 0) get all four
+ * overlays populated for visual distinction.
  *
  * @param biz - The BusinessCard to generate overlays for.
  * @param width - Card display width in pixels.
