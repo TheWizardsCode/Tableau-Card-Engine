@@ -70,24 +70,30 @@ const {
   }));
 
   const mockHelpPanelDestroy = vi.fn();
-  const MockHelpPanel = vi.fn().mockImplementation(() => ({
-    destroy: mockHelpPanelDestroy,
-  }));
-
   const mockHelpButtonDestroy = vi.fn();
   const MockHelpButton = vi.fn().mockImplementation(() => ({
     destroy: mockHelpButtonDestroy,
   }));
+  const MockHelpPanel = vi.fn().mockImplementation((_scene: unknown, _config: { sections?: unknown }) => {
+    const btn = new MockHelpButton(scene, null as any, undefined);
+    return {
+      destroy: mockHelpPanelDestroy,
+      helpButton: btn,
+    };
+  });
 
   const mockSettingsPanelDestroy = vi.fn();
-  const MockSettingsPanel = vi.fn().mockImplementation(() => ({
-    destroy: mockSettingsPanelDestroy,
-  }));
-
   const mockSettingsButtonDestroy = vi.fn();
   const MockSettingsButton = vi.fn().mockImplementation(() => ({
     destroy: mockSettingsButtonDestroy,
   }));
+  const MockSettingsPanel = vi.fn().mockImplementation((_scene: unknown) => {
+    const btn = new MockSettingsButton(scene, null as any, undefined);
+    return {
+      destroy: mockSettingsPanelDestroy,
+      settingsButton: btn,
+    };
+  });
 
   return {
     mockEmit,
@@ -228,25 +234,28 @@ describe('CardGameScene', () => {
   });
 
   describe('initHelpPanel() after initHUDContainer()', () => {
-    it('creates HelpPanel and HelpButton', () => {
+    it('creates HelpPanel with integrated button', () => {
       scene.callInitHUDContainer();
       const sections = [{ heading: 'Rules', body: 'Play cards.' }];
       scene.callInitHelpPanel(sections);
       expect(MockHelpPanel).toHaveBeenCalledOnce();
       expect(scene._helpPanel).toBeDefined();
+      // Button is created inside the panel (showButton:true by default)
+      expect(scene._helpPanel.helpButton).toBeDefined();
       expect(MockHelpButton).toHaveBeenCalledOnce();
-      expect(MockHelpButton).toHaveBeenCalledWith(scene, scene._helpPanel);
     });
   });
 
   describe('initSettingsPanel() after initHUDContainer()', () => {
-    it('creates SettingsPanel and SettingsButton when soundManager is available', () => {
+    it('creates SettingsPanel with integrated button when soundManager is available', () => {
       scene.callInitHUDContainer();
       scene.callInitEventSystem();
       scene.callInitSoundSystem(['sfx-test'], {});
       scene.callInitSettingsPanel();
       expect(MockSettingsPanel).toHaveBeenCalledOnce();
       expect(scene._settingsPanel).toBeDefined();
+      // Button is created inside the panel (showButton:true by default)
+      expect(scene._settingsPanel.settingsButton).toBeDefined();
       expect(MockSettingsButton).toHaveBeenCalledOnce();
     });
   });
@@ -345,11 +354,11 @@ describe('CardGameScene', () => {
       expect(scene._helpPanel).toBeDefined();
     });
 
-    it('creates HelpButton linked to the panel', () => {
+    it('exposes the integrated help button via panel.helpButton', () => {
       const sections = [{ heading: 'Rules', body: 'Play cards.' }];
       scene.callInitHelpPanel(sections);
       expect(MockHelpButton).toHaveBeenCalledOnce();
-      expect(MockHelpButton).toHaveBeenCalledWith(scene, scene._helpPanel);
+      expect(scene._helpPanel.helpButton).toBeDefined();
     });
   });
 
@@ -367,12 +376,12 @@ describe('CardGameScene', () => {
       expect(scene._settingsPanel).toBeDefined();
     });
 
-    it('creates SettingsButton linked to the panel', () => {
+    it('exposes the integrated settings button via panel.settingsButton', () => {
       scene.callInitEventSystem();
       scene.callInitSoundSystem(['sfx-test'], {});
       scene.callInitSettingsPanel();
       expect(MockSettingsButton).toHaveBeenCalledOnce();
-      expect(MockSettingsButton).toHaveBeenCalledWith(scene, scene._settingsPanel);
+      expect(scene._settingsPanel.settingsButton).toBeDefined();
     });
   });
 
@@ -397,12 +406,14 @@ describe('CardGameScene', () => {
 
       scene.callShutdownBase();
 
+      // Panels destroy themselves (including their integrated buttons)
       expect(mockHudContainerDestroy).toHaveBeenCalledOnce();
       expect(mockSmDestroy).toHaveBeenCalledOnce();
       expect(scene._soundManager).toBeNull();
       expect(mockBridgeDestroy).toHaveBeenCalledOnce();
       expect(mockRemoveAllListeners).toHaveBeenCalledOnce();
       expect(mockHelpPanelDestroy).toHaveBeenCalledOnce();
+      // HelpButton is destroyed inside HelpPanel.destroy(), so both are called
       expect(mockHelpButtonDestroy).toHaveBeenCalledOnce();
       expect(mockSettingsPanelDestroy).toHaveBeenCalledOnce();
       expect(mockSettingsButtonDestroy).toHaveBeenCalledOnce();

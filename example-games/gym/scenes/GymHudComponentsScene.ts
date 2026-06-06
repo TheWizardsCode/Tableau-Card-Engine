@@ -16,7 +16,6 @@ import { GYM_HUD_COMPONENTS_KEY } from '../GymRegistry';
 import { GAME_W } from '../../../src/ui/constants';
 import { HelpPanel } from '../../../src/ui/HelpPanel';
 import type { HelpSection } from '../../../src/ui/HelpPanel';
-import { HelpButton } from '../../../src/ui/HelpButton';
 import { SettingsPanel } from '../../../src/ui/SettingsPanel';
 import { SettingsButton } from '../../../src/ui/SettingsButton';
 import { createHudText } from '../../../src/ui/Renderer';
@@ -190,19 +189,19 @@ export class GymHudComponentsScene extends GymSceneBase {
   }
 
   /**
-   * Create the shared HUD components: HelpPanel, HelpButton,
-   * SettingsPanel, and SettingsButton.
+   * Create the shared HUD components: HelpPanel and SettingsPanel.
+   * Buttons are created automatically via showButton:true (default).
    */
   private initComponents(): void {
-    // HelpPanel + HelpButton (using inherited fields from GymSceneBase)
+    // HelpPanel (integrated button created automatically)
     this.helpPanel = new HelpPanel(this, { sections: HELP_SECTIONS });
-    this.helpButton = new HelpButton(this, this.helpPanel);
+    this.helpButton = this.helpPanel.helpButton!;
 
-    // SettingsPanel + SettingsButton (with mock SoundManager)
+    // SettingsPanel (integrated button created automatically)
     this.settingsPanel = new SettingsPanel(this, {
       soundManager: this.mockSound as any,
     });
-    this.settingsButton = new SettingsButton(this, this.settingsPanel);
+    this.settingsButton = this.settingsPanel.settingsButton!;
 
     // Cleanup on scene shutdown
     this.events.on('shutdown', () => this.cleanupComponents());

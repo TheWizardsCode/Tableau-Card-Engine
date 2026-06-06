@@ -184,18 +184,24 @@ export abstract class CardGameScene extends Phaser.Scene {
   /**
    * Create the help panel and its toggle button.
    *
+   * The button is created automatically (showButton:true by default).
+   *
    * @param sections  Help content sections (typically loaded from a JSON file).
    */
   protected initHelpPanel(sections: HelpSection[]): void {
     this.helpPanel = new HelpPanel(this, { sections });
-    this.helpButton = new HelpButton(this, this.helpPanel);
+    this.helpButton = this.helpPanel.helpButton!;
   }
 
   /**
    * Create the settings panel (volume / mute controls) and its toggle button.
    *
+   * The button is created automatically (showButton:true by default).
+   *
    * Requires {@link initSoundSystem} to have been called first; does nothing
    * if `soundManager` is null.
+   *
+   * @param difficultyNames  Optional ordered list of difficulty names.
    */
   protected initSettingsPanel(difficultyNames?: readonly string[]): void {
     if (!this.soundManager) return;
@@ -203,7 +209,7 @@ export abstract class CardGameScene extends Phaser.Scene {
       soundManager: this.soundManager,
       difficultyNames,
     });
-    this.settingsButton = new SettingsButton(this, this.settingsPanel);
+    this.settingsButton = this.settingsPanel.settingsButton!;
   }
 
   // ── Event helpers ────────────────────────────────────────

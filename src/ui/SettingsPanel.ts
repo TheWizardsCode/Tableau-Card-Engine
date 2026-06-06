@@ -9,9 +9,18 @@
  */
 import Phaser from 'phaser';
 import type { SoundManager } from '../core-engine/SoundManager';
+import { SettingsButton } from './SettingsButton';
 import { getReducedMotion, setReducedMotion, getEndTurnKeybind, setEndTurnKeybind } from './SettingsStore';
 
 // ── Public types ────────────────────────────────────────────
+
+/** Optional position override for the integrated settings button. */
+export interface SettingsButtonPosition {
+  /** X position. Defaults to left of help button. */
+  x?: number;
+  /** Y position. Defaults to top of screen. */
+  y?: number;
+}
 
 /** Configuration for the SettingsPanel constructor. */
 export interface SettingsPanelConfig {
@@ -25,6 +34,17 @@ export interface SettingsPanelConfig {
   animationDuration?: number;
   /** Keyboard shortcut key to toggle the panel. Default: 'Escape'. */
   toggleKey?: string;
+  /**
+   * When true (the default), automatically create a SettingsButton that
+   * toggles this panel. Set to false to manage the button yourself.
+   */
+  showButton?: boolean;
+  /**
+   * Optional position override for the integrated settings button. When
+   * provided, the button is placed at these coordinates instead of
+   * the default position (left of the help button).
+   */
+  buttonPosition?: SettingsButtonPosition;
 }
 
 // ── Style constants ─────────────────────────────────────────
@@ -90,6 +110,8 @@ export class SettingsPanel {
     animationDuration: number;
     toggleKey: string;
     difficultyNames?: readonly string[];
+    showButton: boolean;
+    buttonPosition: SettingsPanelConfig['buttonPosition'];
   };
   private readonly panelWidth: number;
   private readonly canvasWidth: number;
@@ -147,6 +169,14 @@ export class SettingsPanel {
 
   // Keyboard
   private keyboardListener: ((event: KeyboardEvent) => void) | null = null;
+  private _settingsButton: SettingsButton | null = null;
+
+  /**
+   * The integrated settings button, or `null` when `showButton` is false.
+   */
+  get settingsButton(): SettingsButton | null {
+    return this._settingsButton;
+  }
 
   // End Turn keybind UI
   private _endTurnKeyText: Phaser.GameObjects.Text | null = null;
@@ -161,12 +191,15 @@ export class SettingsPanel {
 
   constructor(scene: Phaser.Scene, config: SettingsPanelConfig) {
     this.scene = scene;
+    const showButton = config.showButton ?? true;
     this.config = {
       soundManager: config.soundManager,
       difficultyNames: config.difficultyNames ?? [],
       widthPercent: config.widthPercent ?? 30,
       animationDuration: config.animationDuration ?? 300,
       toggleKey: config.toggleKey ?? 'Escape',
+      showButton,
+      buttonPosition: config.buttonPosition,
     };
 
     this.canvasWidth = scene.scale.width;
@@ -574,6 +607,14 @@ export class SettingsPanel {
     // Setup keyboard shortcut
     this.setupKeyboardShortcut();
 
+    // Create integrated button when showButton is true
+    if (showButton) {
+      this._settingsButton = new SettingsButton(scene, this, {
+        x: config.buttonPosition?.x,
+        y: config.buttonPosition?.y,
+      });
+    }
+
     // Set entire container invisible initially
     this.container.setVisible(false);
   }
@@ -815,6 +856,12 @@ export class SettingsPanel {
 
     // Remove input blocker
     this.removeInputBlocker();
+
+    // Destroy the integrated button
+    if (this._settingsButton) {
+      this._settingsButton.destroy();
+      this._settingsButton = null;
+    }
 
     // Destroy the main container (destroys all children)
     this.container.destroy();

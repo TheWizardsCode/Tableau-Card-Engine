@@ -121,7 +121,7 @@ export type {
 } from './selection';
 
 export { HelpPanel, DEPTH_HELP_BUTTON } from './HelpPanel';
-export type { HelpSection, HelpPanelConfig } from './HelpPanel';
+export type { HelpSection, HelpPanelConfig, HelpButtonPosition } from './HelpPanel';
 
 export { HelpButton } from './HelpButton';
 export type { HelpButtonConfig } from './HelpButton';
@@ -129,7 +129,7 @@ export type { HelpButtonConfig } from './HelpButton';
 export { SettingsPanel, DEPTH_SETTINGS_BUTTON } from './SettingsPanel';
 export { TooltipManager } from './Tooltip';
 export type { TooltipRenderContext, PhaserTooltipRenderFn, TooltipManagerConfig } from './Tooltip';
-export type { SettingsPanelConfig } from './SettingsPanel';
+export type { SettingsPanelConfig, SettingsButtonPosition } from './SettingsPanel';
 
 export { SettingsButton } from './SettingsButton';
 export type { SettingsButtonConfig } from './SettingsButton';
