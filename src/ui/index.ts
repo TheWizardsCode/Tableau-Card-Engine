@@ -2,7 +2,19 @@
  * UI Module
  *
  * Provides reusable UI components such as buttons, menus,
- * and overlays that can be customized for different tableau card game themes.
+ * overlays, and the shared HUD layer that can be customized
+ * for different tableau card game themes.
+ *
+ * ## HUD Layer
+ *
+ * - `initHUDContainer()` on `CardGameScene` creates a shared container
+ *   at depth 1000 for help/settings panels and buttons.
+ * - `OverlayManager` provides lifecycle management for game-state
+ *   overlays (win, loss, game-over, round-end) at depth 2000.
+ * - `createOverlayBackground()` and `createParameterizedOverlay()`
+ *   provide reusable overlay UI primitives.
+ *
+ * See docs/HUD-LAYER-MIGRATION.md for migration guide.
  */
 export const UI_VERSION = '0.1.0';
 

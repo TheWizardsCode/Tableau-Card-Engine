@@ -17,6 +17,7 @@ This document covers everything you need to develop, test, and build the Tableau
 - [Replay Tool](#replay-tool)
 - [Managing Assets](#managing-assets)
 - [SVG Rendering & Migration](#svg-rendering--migration)
+- [HUD Layer](#hud-layer)
 - [Shared Renderer](#shared-renderer)
 - [Screen Layout Language (SLL)](#screen-layout-language-sll)
 - [Keeping Docs Up to Date](#keeping-docs-up-to-date)
@@ -713,6 +714,34 @@ Lost Cities was the third example game migrated from `scene.load.svg` to SvgHelp
 4. Update tests to assert DPR-aware key format and add focused unit tests.
 
 No remaining games use `scene.load.svg`.
+
+## HUD Layer
+
+The project provides a shared HUD (Heads-Up Display) layer abstraction
+that ensures help/settings panels, buttons, and game-state overlays
+render consistently above gameplay content across all example games.
+
+### Components
+
+1.  **`CardGameScene.initHUDContainer()`** — Creates a shared container
+    (`this.hudContainer`) at depth `1000`. Call this early in `create()`
+    before `initHelpPanel()` and `initSettingsPanel()`.
+
+2.  **`OverlayManager`** (`src/ui/OverlayManager.ts`) — A reusable class
+    that manages game-state overlay lifecycle. Supports types:
+    `'game-over'`, `'win/loss'`, `'round-end'`, `'custom'`.
+
+### Depth Convention
+
+| Layer                | Depth  | Purpose                                    |
+|----------------------|--------|--------------------------------------------|
+| HUD container        | 1000   | Help/settings panels, buttons              |
+| Game-state overlays  | 2000   | Win, loss, game-over, round-end overlays   |
+
+### Migration Guide
+
+For detailed migration steps, see
+[docs/HUD-LAYER-MIGRATION.md](HUD-LAYER-MIGRATION.md).
 
 ## Screen Layout Language (SLL)
 
