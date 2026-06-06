@@ -220,6 +220,8 @@ export {
   createActionButton,
   renderCardSvg,
   applyEnsuredTexture,
+  markHudTransient,
+  clearTransientHud,
 } from './Renderer';
 export type {
   ActionButtonOptions,

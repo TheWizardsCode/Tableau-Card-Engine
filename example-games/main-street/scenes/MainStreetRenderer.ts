@@ -29,6 +29,8 @@ import {
   createSceneTitle,
   createSceneMenuButton,
   attachSelection,
+  markHudTransient,
+  clearTransientHud,
 } from '../../../src/ui';
 import {
   createActionButton,
@@ -61,11 +63,7 @@ export { buildUpgradeOverlaySpec, type UpgradeOverlaySpec };
 
 import { computeMainStreetLayoutWithSll } from './MainStreetLayoutAdapter';
 
-/** Tag a Phaser game object as transient so `refreshHud()` knows to destroy it on the next refresh. */
-function markHudTransient<T extends Phaser.GameObjects.GameObject>(obj: T): T & { _hudTransient: true } {
-  (obj as any)._hudTransient = true;
-  return obj as T & { _hudTransient: true };
-}
+// markHudTransient and clearTransientHud are now imported from src/ui/Renderer
 
 export class MainStreetRenderer {
   constructor(private readonly scene: any) {}
@@ -180,12 +178,7 @@ export class MainStreetRenderer {
     // not destroyed on each refresh.  Using removeAll(true) would destroy those persistent
     // children, breaking their parentContainer reference and causing the SidebarOverlay test
     // (and the live game) to lose the panels after the first refresh.
-    const hudList = [...s.hudContainer.list] as Array<Phaser.GameObjects.GameObject & { _hudTransient?: boolean }>;
-    for (const child of hudList) {
-      if (child._hudTransient) {
-        s.hudContainer.remove(child, true);
-      }
-    }
+    clearTransientHud(s.hudContainer);
 
     const score = computeScore(s.state);
     const { coins, reputation } = s.state.resourceBank;

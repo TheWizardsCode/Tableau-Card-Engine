@@ -286,6 +286,59 @@ export function attachHudTooltipZone(
 }
 
 // ---------------------------------------------------------------------------
+// Transient HUD helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Tag a Phaser game object as transient so that selective HUD cleanup knows
+ * to destroy it on the next refresh cycle.
+ *
+ * Transient HUD elements (coins text, score text, background strips, etc.)
+ * are rebuilt each time the HUD is refreshed.  Persistent elements (help
+ * panels, settings buttons, overlay panels) should **not** be tagged so
+ * they survive HUD refreshes.
+ *
+ * @example
+ * ```ts
+ * const coinText = markHudTransient(scene.add.text(x, y, `Coins: ${coins}`, style));
+ * hudContainer.add(coinText);
+ * ```
+ *
+ * @param obj - Any Phaser game object to tag.
+ * @returns The same object, narrowed to the `_hudTransient` branded type.
+ */
+export function markHudTransient<T extends Phaser.GameObjects.GameObject>(obj: T): T & { _hudTransient: true } {
+  (obj as any)._hudTransient = true;
+  return obj as T & { _hudTransient: true };
+}
+
+/**
+ * Selectively remove and destroy only the transient children of a HUD
+ * container, leaving persistent overlay elements intact.
+ *
+ * This is the preferred alternative to `container.removeAll(true)` when
+ * the container also holds persistent children (e.g. help panels, settings
+ * buttons) that must not be destroyed on every HUD refresh.
+ *
+ * @example
+ * ```ts
+ * // In refreshHud():
+ * clearTransientHud(hudContainer);
+ * // ...rebuild transient HUD elements...
+ * ```
+ *
+ * @param container - The Phaser container whose transient children should be removed.
+ */
+export function clearTransientHud(container: Phaser.GameObjects.Container): void {
+  const list = [...container.list] as Array<Phaser.GameObjects.GameObject & { _hudTransient?: boolean }>;
+  for (const child of list) {
+    if (child._hudTransient) {
+      container.remove(child, true);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Action button helper
 // ---------------------------------------------------------------------------
 

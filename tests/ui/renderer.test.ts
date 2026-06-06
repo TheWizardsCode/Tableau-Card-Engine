@@ -51,6 +51,8 @@ import {
   attachHudTooltipZone,
   createActionButton,
   renderCardSvg,
+  markHudTransient,
+  clearTransientHud,
 } from '../../src/ui/Renderer';
 
 // ── Test helpers ────────────────────────────────────────────────────────────
@@ -165,6 +167,86 @@ describe('createGameZone', () => {
     const zone = createGameZone(scene, 0, 0, -10, -5);
     expect((zone as any).__zoneWidth).toBe(-10);
     expect((zone as any).__zoneHeight).toBe(-5);
+  });
+});
+
+describe('markHudTransient', () => {
+  it('tags a game object with _hudTransient: true', () => {
+    const scene = createMockScene();
+    const textObj = scene.add.text(0, 0, 'test', {}) as any;
+    const tagged = markHudTransient(textObj);
+    expect(tagged._hudTransient).toBe(true);
+  });
+
+  it('returns the same object reference', () => {
+    const scene = createMockScene();
+    const rect = scene.add.rectangle() as any;
+    const tagged = markHudTransient(rect);
+    expect(tagged).toBe(rect);
+  });
+
+  it('works with any game object type', () => {
+    const scene = createMockScene();
+    const container = scene.add.container() as any;
+    const tagged = markHudTransient(container);
+    expect(tagged._hudTransient).toBe(true);
+  });
+});
+
+describe('clearTransientHud', () => {
+  it('removes only children tagged with _hudTransient', () => {
+    const scene = createMockScene();
+    const container = scene.add.container() as any;
+
+    const transientText = scene.add.text(0, 0, 'transient', {}) as any;
+    markHudTransient(transientText);
+    container.add(transientText);
+
+    const persistentRect = scene.add.rectangle() as any;
+    // NOT tagged
+    container.add(persistentRect);
+
+    clearTransientHud(container);
+
+    expect(container.remove).toHaveBeenCalledWith(transientText, true);
+    expect(container.remove).not.toHaveBeenCalledWith(persistentRect, true);
+  });
+
+  it('removes all transient children when multiple exist', () => {
+    const scene = createMockScene();
+    const container = scene.add.container() as any;
+
+    const t1 = markHudTransient(scene.add.text(0, 0, 'a', {}) as any);
+    const t2 = markHudTransient(scene.add.text(0, 20, 'b', {}) as any);
+    const t3 = markHudTransient(scene.add.rectangle() as any);
+    container.add(t1);
+    container.add(t2);
+    container.add(t3);
+
+    clearTransientHud(container);
+
+    expect(container.remove).toHaveBeenCalledTimes(3);
+  });
+
+  it('does nothing when no transient children exist', () => {
+    const scene = createMockScene();
+    const container = scene.add.container() as any;
+
+    const persistent = scene.add.rectangle() as any;
+    container.add(persistent);
+
+    clearTransientHud(container);
+
+    expect(container.remove).not.toHaveBeenCalled();
+  });
+
+  it('does nothing on an empty container', () => {
+    const scene = createMockScene();
+    const container = scene.add.container() as any;
+
+    clearTransientHud(container);
+
+    expect(container.remove).not.toHaveBeenCalled();
   });
 });
 
