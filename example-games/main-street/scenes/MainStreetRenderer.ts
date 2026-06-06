@@ -50,6 +50,15 @@ import {
   LOG_TITLE_H,
   type SceneLayout,
 } from './MainStreetConstants';
+
+import {
+  buildUpgradeOverlaySpec,
+  type UpgradeOverlaySpec,
+} from './UpgradeOverlaySpec';
+
+// Re-export for test imports
+export { buildUpgradeOverlaySpec, type UpgradeOverlaySpec };
+
 import { computeMainStreetLayoutWithSll } from './MainStreetLayoutAdapter';
 
 /** Tag a Phaser game object as transient so `refreshHud()` knows to destroy it on the next refresh. */
@@ -340,6 +349,10 @@ export class MainStreetRenderer {
     // Render card via shared adapter
     const cardContainer = s.add.container(Math.round(x + slotW / 2), Math.round(y + slotH / 2));
     mainStreetRenderCardSvg(s, cardContainer, biz.id, renderW, renderH);
+
+    // Apply upgrade overlays (level badge, income, name, border)
+    this.applyUpgradeOverlays(cardContainer, biz, renderW, renderH);
+
     s.streetContainer.add(cardContainer);
 
     if (isHinted) {
@@ -367,6 +380,98 @@ export class MainStreetRenderer {
         s.tooltipManager?.hide();
       });
       s.streetContainer.add(tooltipZone);
+    }
+  }
+
+  /**
+   * Apply upgrade overlay visuals to a business card container.
+   *
+   * Renders level badge, income text, name overlay, and upgrade border
+   * based on the card's current upgrade state (level > 0).
+   *
+   * @param container - The Phaser container holding the card image.
+   * @param biz - The BusinessCard with upgrade state.
+   * @param width - Card display width.
+   * @param height - Card display height.
+   */
+  private applyUpgradeOverlays(
+    container: Phaser.GameObjects.Container,
+    biz: BusinessCard,
+    width: number,
+    height: number,
+  ): void {
+    const spec = buildUpgradeOverlaySpec(biz, width, height);
+
+    // Upgrade border (drawn behind text overlays but on top of card image)
+    if (spec.upgradeBorder) {
+      const border = this.scene.add.rectangle(0, 0, width, height);
+      border.setStrokeStyle(spec.upgradeBorder.strokeWidth, spec.upgradeBorder.color);
+      border.setFillStyle(0x000000, 0);
+      container.add(border);
+    }
+
+    // Level badge (top-right)
+    if (spec.levelBadge) {
+      const lvlText = this.scene.add.text(
+        spec.levelBadge.x,
+        spec.levelBadge.y,
+        spec.levelBadge.text,
+        {
+          fontSize: spec.levelBadge.fontSize ?? '10px',
+          fontStyle: spec.levelBadge.fontStyle,
+          color: spec.levelBadge.color,
+          fontFamily: FONT_FAMILY,
+        },
+      );
+      lvlText.setOrigin(1, 0);
+      container.add(lvlText);
+    }
+
+    // Name overlay (top center) for upgraded cards
+    if (spec.nameText) {
+      const nameText = this.scene.add.text(
+        spec.nameText.x,
+        spec.nameText.y,
+        spec.nameText.text,
+        {
+          fontSize: spec.nameText.fontSize ?? '10px',
+          fontStyle: spec.nameText.fontStyle,
+          color: spec.nameText.color,
+          fontFamily: FONT_FAMILY,
+        },
+      );
+      nameText.setOrigin(0.5, 0);
+      // Add a subtle dark background for readability
+      const bg = this.scene.add.graphics();
+      const textWidth = nameText.width + 8;
+      const textHeight = nameText.height + 2;
+      bg.fillStyle(0x000000, 0.6);
+      bg.fillRoundedRect(
+        spec.nameText.x - textWidth / 2,
+        spec.nameText.y - 1,
+        textWidth,
+        textHeight,
+        2,
+      );
+      container.add(bg);
+      container.add(nameText);
+    }
+
+    // Income text (bottom center)
+    if (spec.incomeText) {
+      const incomeText = this.scene.add.text(
+        spec.incomeText.x,
+        spec.incomeText.y,
+        spec.incomeText.text,
+        {
+          fontSize: spec.incomeText.fontSize ?? '12px',
+          fontStyle: spec.incomeText.fontStyle,
+          color: spec.incomeText.color,
+          fontFamily: FONT_FAMILY,
+        },
+      );
+      incomeText.setOrigin(0.5, 1);
+      container.add(incomeText);
     }
   }
 
