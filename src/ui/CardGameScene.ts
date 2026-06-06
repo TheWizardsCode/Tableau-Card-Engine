@@ -86,6 +86,12 @@ export abstract class CardGameScene extends Phaser.Scene {
   /** Sound manager instance (null when in replay mode or before init). */
   protected soundManager: SoundManager | null = null;
 
+  // ── HUD container ─────────────────────────────────────────
+
+  /** Shared HUD container for overlay/sidebar UI (depth 1000).
+   *  Created by calling {@link initHUDContainer} early in `create()`. */
+  public hudContainer!: Phaser.GameObjects.Container;
+
   // ── UI panels ────────────────────────────────────────────
 
   /** Help panel overlay. */
@@ -164,6 +170,18 @@ export abstract class CardGameScene extends Phaser.Scene {
   }
 
   /**
+   * Create the shared HUD container at depth 1000.
+   *
+   * Call this before {@link initHelpPanel} and {@link initSettingsPanel}
+   * so that help/settings panels are parented into the HUD container
+   * for correct z-ordering above gameplay content.
+   */
+  protected initHUDContainer(): void {
+    this.hudContainer = this.add.container(0, 0);
+    this.hudContainer.setDepth(1000);
+  }
+
+  /**
    * Create the help panel and its toggle button.
    *
    * @param sections  Help content sections (typically loaded from a JSON file).
@@ -221,5 +239,6 @@ export abstract class CardGameScene extends Phaser.Scene {
     this.helpButton?.destroy();
     this.settingsPanel?.destroy();
     this.settingsButton?.destroy();
+    this.hudContainer?.destroy();
   }
 }
