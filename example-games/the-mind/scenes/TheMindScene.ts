@@ -16,6 +16,7 @@ import type { PlayResult, TheMindSession } from '../TheMindGameState';
 import {
   setupTheMindGame,
   isGameOver,
+  MAX_LEVEL,
 } from '../TheMindGameState';
 import { MindAiPlayer } from '../AiStrategy';
 import {
@@ -25,23 +26,29 @@ import { MindTranscriptRecorder } from '../GameTranscript';
 import type { EventSoundMapping } from '../../../src/core-engine/SoundManager';
 import {
   CardGameScene,
+  OverlayManager,
   createSceneHeader,
-  dismissOverlay,
+  createParameterizedOverlay,
+  overlayCenterY,
 } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
 import helpContent from '../help-content.json';
 
 import {
   PRE_PENALTY_PAUSE,
+  DEPTH_OVERLAY,
+  DEPTH_OVERLAY_CONTENT,
   type GamePhase,
 } from './MindConstants';
 import { SFX_KEYS } from './MindAudioKeys';
 import { MindRenderer } from './MindRenderer';
 import { MindAnimator } from './MindAnimator';
 import { MindAiScheduler } from './MindAiScheduler';
-import { MindOverlayManager } from './MindOverlayManager';
+
 import { MindReplayController } from './MindReplayController';
 import { MindTurnController } from './MindTurnController';
+
+import { GAME_W, GAME_H } from '../../../src/ui';
 
 export class TheMindScene extends CardGameScene {
   // Game state (accessed by tests)
@@ -78,11 +85,12 @@ export class TheMindScene extends CardGameScene {
   // Overlay tracking
   overlayObjects: Phaser.GameObjects.GameObject[] = [];
 
+  private overlayManager!: OverlayManager;
+
   // Helpers
   private mindRenderer!: MindRenderer;
   private mindAnimator!: MindAnimator;
   private aiScheduler!: MindAiScheduler;
-  private overlayManager!: MindOverlayManager;
   private replayController!: MindReplayController;
   private turnController!: MindTurnController;
 
@@ -119,6 +127,7 @@ export class TheMindScene extends CardGameScene {
     }
 
     this.createSoundSystem();
+    this.initHUDContainer();
     this.initializeGameControllers();
     this.createPrimaryView();
     this.renderInitialState();
@@ -130,6 +139,7 @@ export class TheMindScene extends CardGameScene {
     this.humanCardSprites = [];
     this.aiCardSprites = [];
     this.overlayObjects = [];
+    this.overlayManager = new OverlayManager(this);
     this.turnCounter = 0;
     this.replayStepIndex = 0;
     this.aiCountText = null;
@@ -157,7 +167,7 @@ export class TheMindScene extends CardGameScene {
     this.mindRenderer = new MindRenderer(this, this.session);
     this.mindAnimator = new MindAnimator(this, this.session, this.mindRenderer, this.soundManager);
     this.aiScheduler = new MindAiScheduler(this, this.session);
-    this.overlayManager = new MindOverlayManager(this, this.session, this.gameEvents, this.soundManager);
+
     this.replayController = new MindReplayController(this, this.mindRenderer, { value: this.replayMode });
     this.turnController = new MindTurnController(this.session, this.recorder, this.gameEvents, this.soundManager);
     this.aiScheduler.autoPlayEnabled = this.autoPlayEnabled;
@@ -414,20 +424,97 @@ export class TheMindScene extends CardGameScene {
     this.aiScheduler.cancelAllTimers();
     this.mindRenderer.disableGameInteraction(this.autoPlayButton);
 
-    this.overlayObjects = this.overlayManager.overlayObjects;
-
     this.turnController.handleGameOver(
       () => {
         this.setPhase('game-won');
-        this.overlayManager.showWinOverlay();
-        this.overlayObjects = this.overlayManager.overlayObjects;
+        this.showWinOverlay();
       },
       () => {
         this.setPhase('game-lost');
-        this.overlayManager.showLossOverlay();
-        this.overlayObjects = this.overlayManager.overlayObjects;
+        this.showLossOverlay();
       },
     );
+  }
+
+  // ── Overlay helpers ────────────────────────────────────
+
+  private showWinOverlay(): void {
+    this.soundManager?.play(SFX_KEYS.GAME_WIN);
+    this.showOutcomeOverlay({
+      title: 'You Win!',
+      titleColor: '#88ff88',
+      detailText: `Completed all ${MAX_LEVEL} levels!\nLives remaining: ${'❤'.repeat(this.session.lives)}`,
+      primaryButtonLabel: '[ Play Again ]',
+      primaryButtonEvent: 'play-again',
+    });
+  }
+
+  private showLossOverlay(): void {
+    this.soundManager?.play(SFX_KEYS.GAME_LOST);
+    this.showOutcomeOverlay({
+      title: 'Game Over',
+      titleColor: '#ff6666',
+      detailText: `Reached Level ${this.session.currentLevel} of ${MAX_LEVEL}\nRan out of lives!`,
+      primaryButtonLabel: '[ Try Again ]',
+      primaryButtonEvent: 'try-again',
+    });
+  }
+
+  private showOutcomeOverlay(config: {
+    title: string;
+    titleColor: string;
+    detailText: string;
+    primaryButtonLabel: string;
+    primaryButtonEvent: string;
+  }): void {
+    this.overlayManager.dismiss();
+
+    const result = createParameterizedOverlay(this, {
+      title: config.title,
+      titleColor: config.titleColor,
+      detailText: config.detailText,
+      titleY: overlayCenterY(-60),
+      detailY: overlayCenterY(-15),
+      titleDepth: DEPTH_OVERLAY_CONTENT,
+      detailDepth: DEPTH_OVERLAY_CONTENT,
+      background: { depth: DEPTH_OVERLAY, alpha: 0.75 },
+      box: { width: 460, height: 280, alpha: 0.9 },
+      buttons: [
+        {
+          label: config.primaryButtonLabel,
+          x: GAME_W / 2 - 90,
+          y: GAME_H / 2 + 60,
+          config: { fontSize: '18px' },
+          onClick: () => {
+            this.soundManager?.play(SFX_KEYS.UI_CLICK);
+            this.gameEvents.emit('ui-interaction', {
+              elementId: config.primaryButtonEvent,
+              action: 'click',
+            });
+            this.time.delayedCall(0, () => this.scene.restart());
+          },
+        },
+        {
+          label: '[ Menu ]',
+          x: GAME_W / 2 + 90,
+          y: GAME_H / 2 + 60,
+          config: { fontSize: '18px' },
+          onClick: () => {
+            this.soundManager?.play(SFX_KEYS.UI_CLICK);
+            this.gameEvents.emit('ui-interaction', {
+              elementId: 'menu',
+              action: 'click',
+            });
+            this.time.delayedCall(0, () =>
+              this.scene.start('GameSelectorScene'),
+            );
+          },
+        },
+      ],
+    });
+
+    this.overlayManager.add(...result);
+    this.overlayObjects = this.overlayManager.objects;
   }
 
   // ── Refresh all ────────────────────────────────────────
@@ -474,7 +561,6 @@ export class TheMindScene extends CardGameScene {
     this.events.off('shutdown', this.shutdown, this);
     this.aiScheduler.destroy();
     this.overlayManager.dismiss();
-    dismissOverlay(this.overlayObjects);
     this.overlayObjects = [];
     this.shutdownBase();
   }

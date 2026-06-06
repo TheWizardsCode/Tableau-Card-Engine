@@ -1,5 +1,5 @@
 /**
- * MainStreetTutorialOverlayManager -- Non-interactive tutorial overlays for Main Street.
+ * MainStreetTutorialHints -- Non-interactive tutorial overlays for Main Street.
  *
  * Displays a sequence of contextual tooltip hints that highlight key UI
  * regions (market, street slots, hand, action controls, scoring).
@@ -8,7 +8,7 @@
  * The player can dismiss individual hints or toggle the whole tutorial off.
  *
  * Usage:
- *   const mgr = new MainStreetTutorialOverlayManager(scene);
+ *   const mgr = new MainStreetTutorialHints(scene);
  *   mgr.showStep(0);        // show first hint
  *   mgr.nextStep();         // advance to next hint
  *   mgr.dismiss();          // hide all hints
@@ -234,7 +234,7 @@ const HIGHLIGHT_BORDER_ALPHA = 0.8;
 // ── Manager ──────────────────────────────────────────────────
 
 /** Manages the lifecycle of all tutorial overlay objects. */
-export class MainStreetTutorialOverlayManager {
+export class MainStreetTutorialHints {
   private objects: Phaser.GameObjects.GameObject[] = [];
   private currentStep = 0;
   private visible = false;

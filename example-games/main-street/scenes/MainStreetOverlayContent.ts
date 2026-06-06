@@ -4,7 +4,7 @@ import type { TurnResult } from '../MainStreetEngine';
 import { FONT_FAMILY, createOverlayBackground, createOverlayButton, createOverlayMenuButton, dismissOverlay } from '../../../src/ui';
 import { TIER_DEFINITIONS, ORDERED_TIER_DEFINITIONS, highestUnlockedTier } from '../MainStreetTiers';
 
-export class MainStreetOverlayManager {
+export class MainStreetOverlayContent {
   constructor(private readonly scene: any) {}
 
   public showGameOverOverlay(

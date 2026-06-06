@@ -1,5 +1,5 @@
 /**
- * SushiGoOverlayManager -- handles round score and game over overlays for Sushi Go!
+ * SushiGoOverlayContent -- handles round score and game over overlays for Sushi Go!
  */
 
 import {
@@ -22,7 +22,7 @@ import { SFX_KEYS } from './SushiGoConstants';
 
 const transcriptStore = new TranscriptStore();
 
-export class SushiGoOverlayManager {
+export class SushiGoOverlayContent {
   private readonly overlayManager: OverlayManager;
 
   get overlayObjects(): Phaser.GameObjects.GameObject[] {

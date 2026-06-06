@@ -1,24 +1,23 @@
 /**
- * GolfOverlayManager -- handles end-of-game overlay and related UI for 9-Card Golf.
+ * GolfSceneHelpers -- overlay helpers for 9-Card Golf, using the generic OverlayManager.
  */
-
 
 import type { TranscriptRecorder } from '../GameTranscript';
 import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
 import type { SoundManager, GameEventEmitter } from '../../../src/core-engine';
-import { GAME_W, GAME_H } from '../../../src/ui';
+import { GAME_W, GAME_H, OverlayManager } from '../../../src/ui';
 import {
   createActionButton,
   createGolfHudText,
   createGolfMenuButton,
-  createOverlayBackground,
 } from '../../../src/ui/Renderer/adapters/GolfAdapter';
 import { SFX_KEYS } from './GolfConstants';
 import type { GolfSession } from '../GolfGame';
 
-export class GolfOverlayManager {
+export class GolfOverlayHelper {
   constructor(
     private scene: Phaser.Scene,
+    private overlayManager: OverlayManager,
     private session: GolfSession,
     private recorder: TranscriptRecorder,
     private gameEvents: GameEventEmitter,
@@ -60,14 +59,14 @@ export class GolfOverlayManager {
     });
 
     // Overlay -- near-invisible blocker + visible box
-    createOverlayBackground(
-      this.scene,
-      { depth: 10, alpha: 0.01 },
-      { width: 520, height: 300, alpha: 0.85 },
-    );
+    this.overlayManager.showOverlay({
+      type: 'custom',
+      backgroundOptions: { depth: 10, alpha: 0.01 },
+      box: { width: 520, height: 300, alpha: 0.85 },
+    });
 
     const winnerText = results.winnerIndex === 0 ? 'You Win!' : 'AI Wins!';
-    createGolfHudText(
+    const text = createGolfHudText(
       this.scene,
       GAME_W / 2,
       GAME_H / 2 - 50,
@@ -75,9 +74,10 @@ export class GolfOverlayManager {
       '#ffffff',
       { fontSize: '28px', originX: 0.5, align: 'center' },
     );
+    this.overlayManager.add(text);
 
     // Play again button
-    createActionButton(
+    const playBtn = createActionButton(
       this.scene,
       GAME_W / 2 - 85,
       GAME_H / 2 + 85,
@@ -93,10 +93,12 @@ export class GolfOverlayManager {
       },
       { depth: 11 },
     );
+    this.overlayManager.add(playBtn);
 
     // Menu button
-    createGolfMenuButton(this.scene, GAME_W / 2 + 85, GAME_H / 2 + 85, 80, {
+    const menuBtn = createGolfMenuButton(this.scene, GAME_W / 2 + 85, GAME_H / 2 + 85, 80, {
       depth: 11,
     });
+    this.overlayManager.add(menuBtn);
   }
 }

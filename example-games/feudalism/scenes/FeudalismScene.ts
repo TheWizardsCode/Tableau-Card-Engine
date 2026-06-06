@@ -11,6 +11,7 @@ import type { EventSoundMapping } from '../../../src/core-engine/SoundManager';
 import {
   CardGameScene,
   GAME_W, GAME_H,
+  OverlayManager,
   createSceneTitle, createSceneMenuButton,
 } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
@@ -22,7 +23,7 @@ import {
 } from './FeudalismConstants';
 import { FeudalismRenderer } from './FeudalismRenderer';
 import { FeudalismAnimator } from './FeudalismAnimator';
-import { FeudalismOverlayManager } from './FeudalismOverlayManager';
+import { FeudalismOverlayHelper } from './FeudalismOverlays';
 import { FeudalismTurnController } from './FeudalismTurnController';
 import { FeudalismReplayController } from './FeudalismReplayController';
 import {
@@ -40,7 +41,8 @@ export class FeudalismScene extends CardGameScene {
 
   private feudRenderer!: FeudalismRenderer;
   private animator!: FeudalismAnimator;
-  private overlayManager!: FeudalismOverlayManager;
+  private overlayManager!: OverlayManager;
+  private overlayHelper!: FeudalismOverlayHelper;
   private turnController!: FeudalismTurnController;
   private replayController!: FeudalismReplayController;
 
@@ -65,6 +67,7 @@ export class FeudalismScene extends CardGameScene {
 
     this.detectReplayMode();
     this.initEventSystem();
+    this.initHUDContainer();
 
     if (this.replayMode) {
       this.createHeader();
@@ -93,13 +96,14 @@ export class FeudalismScene extends CardGameScene {
 
     this.feudRenderer = new FeudalismRenderer(this, this.session);
     this.animator = new FeudalismAnimator(this, this.session);
-    this.overlayManager = new FeudalismOverlayManager(this, this.session);
+    this.overlayManager = new OverlayManager(this);
+    this.overlayHelper = new FeudalismOverlayHelper(this, this.overlayManager, this.session);
     this.turnController = new FeudalismTurnController(this.session, this.aiPlayer, this.animator, {
       onPhaseChange: (phase) => this.setPhase(phase),
       onRefreshAll: () => this.refreshAll(),
       onShowToast: (msg) => this.feudRenderer.showToast(msg),
       onShowDiscardDialog: (excess) => this.showDiscardDialog(excess),
-      onShowGameOver: () => this.overlayManager.showGameOverOverlay(),
+      onShowGameOver: () => this.overlayHelper.showGameOverOverlay(this.recorder, () => this.scene.restart()),
       onPlaySound: (key) => this.soundManager?.play(key),
       onEmitTurnStarted: () => {
         this.gameEvents.emit('turn-started', {
@@ -118,8 +122,6 @@ export class FeudalismScene extends CardGameScene {
     });
 
     this.turnController.setRecorder(this.recorder);
-    this.overlayManager.setRecorder(this.recorder);
-    this.overlayManager.setOnRestart(() => this.scene.restart());
     this.replayController = new FeudalismReplayController();
 
     this.createHeader();
@@ -270,7 +272,7 @@ export class FeudalismScene extends CardGameScene {
     const player = this.session.players[0];
     const canReserve = player.reservedCards.length < 3;
 
-    this.overlayManager.showCardActionMenu(
+    this.overlayHelper.showCardActionMenu(
       card, canBuy, canReserve,
       () => {
         this.feudRenderer.clearMarketSelection();
@@ -383,6 +385,7 @@ export class FeudalismScene extends CardGameScene {
   // ── Cleanup ─────────────────────────────────────────────
   shutdown(): void {
     this.overlayManager.dismiss();
+    this.overlayHelper.dismiss();
     this.feudRenderer.destroy();
     this.shutdownBase();
   }

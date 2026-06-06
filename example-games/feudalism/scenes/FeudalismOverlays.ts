@@ -1,5 +1,5 @@
 /**
- * FeudalismOverlayManager — game over overlay and card action menu.
+ * FeudalismOverlays -- game over overlay and card action menu helpers, using generic OverlayManager.
  */
 import Phaser from 'phaser';
 import type { DevelopmentCard } from '../FeudalismCards';
@@ -10,53 +10,38 @@ import { FeudalismTranscriptRecorder } from '../GameTranscript';
 import { autoSaveTranscript, TranscriptStore } from '../../../src/core-engine/transcript';
 import {
   GAME_W, GAME_H, FONT_FAMILY,
-  createOverlayBackground, createOverlayButton, createOverlayMenuButton,
-  dismissOverlay,
+  createOverlayButton, createOverlayMenuButton,
+  OverlayManager,
 } from '../../../src/ui';
 import { SFX_KEYS } from './FeudalismConstants';
 
 const transcriptStore = new TranscriptStore();
 
-export class FeudalismOverlayManager {
-  private scene: Phaser.Scene;
-  private session: FeudalismSession;
-  private recorder: FeudalismTranscriptRecorder | null = null;
-  private overlayObjects: Phaser.GameObjects.GameObject[] = [];
-  private onRestart?: () => void;
-
-  constructor(scene: Phaser.Scene, session: FeudalismSession) {
-    this.scene = scene;
-    this.session = session;
-  }
-
-  setRecorder(recorder: FeudalismTranscriptRecorder | null): void {
-    this.recorder = recorder;
-  }
-
-  setOnRestart(callback: () => void): void {
-    this.onRestart = callback;
-  }
+export class FeudalismOverlayHelper {
+  constructor(
+    private scene: Phaser.Scene,
+    private overlayManager: OverlayManager,
+    private session: FeudalismSession,
+  ) {}
 
   dismiss(): void {
-    dismissOverlay(this.overlayObjects);
-    this.overlayObjects = [];
+    this.overlayManager.dismiss();
   }
 
-  showGameOverOverlay(): void {
+  showGameOverOverlay(recorder: FeudalismTranscriptRecorder | null, onRestart: () => void): void {
     this.scene.sound.play?.(SFX_KEYS.GAME_END);
     const winnerIdx = getWinnerIndex(this.session);
 
-    if (this.recorder && !this.recorder.isSealed()) {
-      const transcript = this.recorder.finalize(winnerIdx);
+    if (recorder && !recorder.isSealed()) {
+      const transcript = recorder.finalize(winnerIdx);
       autoSaveTranscript(transcriptStore, 'feudalism', transcript, '[FeudalismScene]');
     }
 
-    const overlay = createOverlayBackground(
-      this.scene,
-      { depth: 10, alpha: 0.01 },
-      { width: 520, height: 340, alpha: 0.9 },
-    );
-    this.overlayObjects.push(...overlay.objects);
+    this.overlayManager.showOverlay({
+      type: 'custom',
+      backgroundOptions: { depth: 10, alpha: 0.01 },
+      box: { width: 520, height: 340, alpha: 0.9 },
+    });
 
     const winnerText = winnerIdx === 0 ? 'You Win!' : 'AI Wins!';
     const human = this.session.players[0];
@@ -80,18 +65,18 @@ export class FeudalismOverlayManager {
       })
       .setOrigin(0.5)
       .setDepth(11);
-    this.overlayObjects.push(text);
+    this.overlayManager.add(text);
 
     const playBtn = createOverlayButton(this.scene, GAME_W / 2 - 80, GAME_H / 2 + 110, '[ Play Again ]');
     playBtn.on('pointerdown', () => {
       this.scene.sound.play?.(SFX_KEYS.UI_CLICK);
       this.dismiss();
-      this.onRestart?.();
+      onRestart();
     });
-    this.overlayObjects.push(playBtn);
+    this.overlayManager.add(playBtn);
 
     const menuBtn = createOverlayMenuButton(this.scene, GAME_W / 2 + 80, GAME_H / 2 + 110);
-    this.overlayObjects.push(menuBtn);
+    this.overlayManager.add(menuBtn);
   }
 
   showCardActionMenu(
@@ -102,19 +87,18 @@ export class FeudalismOverlayManager {
     onReserve: () => void,
     onCancel: () => void,
   ): void {
-    const overlay = createOverlayBackground(
-      this.scene,
-      { depth: 10, alpha: 0.5 },
-      { width: 420, height: 230, alpha: 0.9 },
-    );
-    this.overlayObjects.push(...overlay.objects);
+    this.overlayManager.showOverlay({
+      type: 'custom',
+      backgroundOptions: { depth: 10, alpha: 0.5 },
+      box: { width: 420, height: 230, alpha: 0.9 },
+    });
 
     const pts = card.points > 0 ? `${card.points} pt, ` : '';
     const info = `${tierDisplayName(card.tier)} ${resourceDisplayName(card.bonus)} bonus\n${pts}Cost: ${formatCost(card.cost)}`;
     const infoText = this.scene.add.text(GAME_W / 2, GAME_H / 2 - 55, info, {
       fontSize: '18px', color: '#ffffff', fontFamily: FONT_FAMILY, align: 'center',
     }).setOrigin(0.5).setDepth(11);
-    this.overlayObjects.push(infoText);
+    this.overlayManager.add(infoText);
 
     let bx = GAME_W / 2 - 105;
 
@@ -124,7 +108,7 @@ export class FeudalismOverlayManager {
         this.dismiss();
         onBuy();
       });
-      this.overlayObjects.push(buyBtn);
+      this.overlayManager.add(buyBtn);
       bx += 105;
     }
 
@@ -134,7 +118,7 @@ export class FeudalismOverlayManager {
         this.dismiss();
         onReserve();
       });
-      this.overlayObjects.push(resBtn);
+      this.overlayManager.add(resBtn);
       bx += 105;
     }
 
@@ -144,6 +128,6 @@ export class FeudalismOverlayManager {
       this.dismiss();
       onCancel();
     });
-    this.overlayObjects.push(cancelBtn);
+    this.overlayManager.add(cancelBtn);
   }
 }

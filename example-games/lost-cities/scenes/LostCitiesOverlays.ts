@@ -1,50 +1,34 @@
 /**
- * LostCitiesOverlayManager — round and match summary overlays.
+ * LostCitiesOverlays -- round and match summary overlay helpers, using generic OverlayManager.
  */
 import Phaser from 'phaser';
 import { EXPEDITION_COLORS } from '../LostCitiesCards';
 import type { LostCitiesSession, RoundScoreResult } from '../LostCitiesGame';
 import { getMatchWinner } from '../LostCitiesGame';
 import { autoSaveTranscript, TranscriptStore } from '../../../src/core-engine/transcript';
-import { GAME_W, GAME_H } from '../../../src/ui';
+import { GAME_W, GAME_H, OverlayManager } from '../../../src/ui';
 import {
   createLcHudText,
-  createOverlayBackground,
   createOverlayButton,
   createLcMenuButton,
-  dismissOverlay,
 } from '../../../src/ui/Renderer/adapters/LostCitiesAdapter';
 import { SFX_KEYS } from './LostCitiesConstants';
 import type { LCTranscriptRecorder } from '../GameTranscript';
 
 const transcriptStore = new TranscriptStore();
 
-export class LostCitiesOverlayManager {
-  private scene: Phaser.Scene;
-  private session: LostCitiesSession;
-  private recorder: LCTranscriptRecorder;
-  private overlayObjects: Phaser.GameObjects.GameObject[] = [];
-  private onNextRound?: () => void;
-  private onRestart?: () => void;
-
+export class LostCitiesOverlayHelper {
   constructor(
-    scene: Phaser.Scene,
-    session: LostCitiesSession,
-    recorder: LCTranscriptRecorder,
-  ) {
-    this.scene = scene;
-    this.session = session;
-    this.recorder = recorder;
-  }
-
-  setCallbacks(onNextRound?: () => void, onRestart?: () => void): void {
-    this.onNextRound = onNextRound;
-    this.onRestart = onRestart;
-  }
+    private scene: Phaser.Scene,
+    private overlayManager: OverlayManager,
+    private session: LostCitiesSession,
+    private recorder: LCTranscriptRecorder,
+    private onNextRound?: () => void,
+    private onRestart?: () => void,
+  ) {}
 
   dismiss(): void {
-    dismissOverlay(this.overlayObjects);
-    this.overlayObjects = [];
+    this.overlayManager.dismiss();
   }
 
   showRoundSummary(roundScore: RoundScoreResult): void {
@@ -53,12 +37,11 @@ export class LostCitiesOverlayManager {
       this.scene.sound.play?.(SFX_KEYS.SCORE_REVEAL);
     });
 
-    const overlay = createOverlayBackground(
-      this.scene,
-      { depth: 10, alpha: 0.8 },
-      { width: 600, height: 450, alpha: 0.92 },
-    );
-    this.overlayObjects.push(...overlay.objects);
+    this.overlayManager.showOverlay({
+      type: 'custom',
+      backgroundOptions: { depth: 10, alpha: 0.8 },
+      box: { width: 600, height: 450, alpha: 0.92 },
+    });
 
     const cx = GAME_W / 2;
     const topY = GAME_H / 2 - 200;
@@ -68,7 +51,7 @@ export class LostCitiesOverlayManager {
       originX: 0.5,
       originY: 0,
     });
-    this.overlayObjects.push(title);
+    this.overlayManager.add(title);
 
     const [p0Details, p1Details] = roundScore.details;
     const [p0Total, p1Total] = roundScore.totals;
@@ -80,7 +63,7 @@ export class LostCitiesOverlayManager {
       originX: 0.5,
       originY: 0,
     });
-    this.overlayObjects.push(header);
+    this.overlayManager.add(header);
     y += 26;
 
     for (let i = 0; i < EXPEDITION_COLORS.length; i++) {
@@ -101,7 +84,7 @@ export class LostCitiesOverlayManager {
         originX: 0.5,
         originY: 0,
       });
-      this.overlayObjects.push(row);
+      this.overlayManager.add(row);
       y += 22;
     }
 
@@ -111,7 +94,7 @@ export class LostCitiesOverlayManager {
       originX: 0.5,
       originY: 0,
     });
-    this.overlayObjects.push(totalRow);
+    this.overlayManager.add(totalRow);
 
     y += 30;
     const [cum0, cum1] = this.session.cumulativeScores;
@@ -120,33 +103,28 @@ export class LostCitiesOverlayManager {
       originX: 0.5,
       originY: 0,
     });
-    this.overlayObjects.push(cumRow);
+    this.overlayManager.add(cumRow);
 
     y += 50;
     const btn = createOverlayButton(this.scene, cx, y, '[ Next Round ]');
-    try {
-      btn.setDepth(11);
-    } catch {
-      // Depth may not be available in headless / test environments.
-    }
+    try { btn.setDepth(11); } catch { /* ignore */ }
     btn.on('pointerdown', () => {
       this.scene.sound.play?.(SFX_KEYS.UI_CLICK);
       this.dismiss();
       this.onNextRound?.();
     });
-    this.overlayObjects.push(btn);
+    this.overlayManager.add(btn);
   }
 
   showMatchSummary(lastRoundScore: RoundScoreResult): void {
     const transcript = this.recorder.finalize(this.session);
     autoSaveTranscript(transcriptStore, 'lost-cities', transcript, '[LostCitiesScene]');
 
-    const overlay = createOverlayBackground(
-      this.scene,
-      { depth: 10, alpha: 0.85 },
-      { width: 600, height: 480, alpha: 0.92 },
-    );
-    this.overlayObjects.push(...overlay.objects);
+    this.overlayManager.showOverlay({
+      type: 'custom',
+      backgroundOptions: { depth: 10, alpha: 0.85 },
+      box: { width: 600, height: 480, alpha: 0.92 },
+    });
 
     const cx = GAME_W / 2;
     const topY = GAME_H / 2 - 215;
@@ -168,7 +146,7 @@ export class LostCitiesOverlayManager {
       originX: 0.5,
       originY: 0,
     });
-    this.overlayObjects.push(title);
+    this.overlayManager.add(title);
 
     let y = topY + 55;
 
@@ -177,7 +155,7 @@ export class LostCitiesOverlayManager {
       originX: 0.5,
       originY: 0,
     });
-    this.overlayObjects.push(header);
+    this.overlayManager.add(header);
     y += 26;
 
     for (let r = 0; r < this.session.roundScores.length; r++) {
@@ -187,7 +165,7 @@ export class LostCitiesOverlayManager {
         originX: 0.5,
         originY: 0,
       });
-      this.overlayObjects.push(row);
+      this.overlayManager.add(row);
       y += 22;
     }
 
@@ -198,7 +176,7 @@ export class LostCitiesOverlayManager {
       originX: 0.5,
       originY: 0,
     });
-    this.overlayObjects.push(totalRow);
+    this.overlayManager.add(totalRow);
 
     y += 40;
     const detailsTitle = createLcHudText(this.scene, cx, y, `Round ${this.session.roundNumber} Breakdown`, '#aaccaa', {
@@ -206,7 +184,7 @@ export class LostCitiesOverlayManager {
       originX: 0.5,
       originY: 0,
     });
-    this.overlayObjects.push(detailsTitle);
+    this.overlayManager.add(detailsTitle);
     y += 22;
 
     const [p0Details, p1Details] = lastRoundScore.details;
@@ -222,7 +200,7 @@ export class LostCitiesOverlayManager {
         originX: 0.5,
         originY: 0,
       });
-      this.overlayObjects.push(row);
+      this.overlayManager.add(row);
       y += 18;
     }
 
@@ -233,11 +211,9 @@ export class LostCitiesOverlayManager {
       this.dismiss();
       this.onRestart?.();
     });
-    this.overlayObjects.push(newMatchBtn);
+    this.overlayManager.add(newMatchBtn);
 
-    const menuBtn = createLcMenuButton(this.scene, cx + 85, y, 60, {
-      depth: 11,
-    });
-    this.overlayObjects.push(menuBtn);
+    const menuBtn = createLcMenuButton(this.scene, cx + 85, y, 60, { depth: 11 });
+    this.overlayManager.add(menuBtn);
   }
 }

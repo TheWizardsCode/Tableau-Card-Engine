@@ -14,11 +14,11 @@ import { UndoRedoManager } from '../../../src/core-engine';
 import { MainStreetRenderer } from './MainStreetRenderer';
 import { MainStreetAnimator } from './MainStreetAnimator';
 import { MainStreetTurnController } from './MainStreetTurnController';
-import { MainStreetOverlayManager } from './MainStreetOverlayManager';
+import { MainStreetOverlayContent } from './MainStreetOverlayContent';
 import { MainStreetInputManager } from './MainStreetInputManager';
 import { MainStreetSvgTextureManager } from './MainStreetSvgTextureManager';
 import { MainStreetLifecycleManager } from './MainStreetLifecycleManager';
-import { MainStreetTutorialOverlayManager } from './MainStreetTutorialOverlayManager';
+import { MainStreetTutorialHints } from './MainStreetTutorialHints';
 import {
   type SceneLayout,
   STREET_ROWS,
@@ -36,11 +36,11 @@ export class MainStreetScene extends CardGameScene {
   public msRenderer!: MainStreetRenderer;
   public msAnimator!: MainStreetAnimator;
   public msTurnController!: MainStreetTurnController;
-  public msOverlayManager!: MainStreetOverlayManager;
+  public msOverlayManager!: MainStreetOverlayContent;
   public msInputManager!: MainStreetInputManager;
   public msSvgTextureManager!: MainStreetSvgTextureManager;
   public msLifecycleManager!: MainStreetLifecycleManager;
-  public tutorialOverlay?: MainStreetTutorialOverlayManager;
+  public tutorialOverlay?: MainStreetTutorialHints;
   // Game state
   public state!: MainStreetState;
   public uiPhase: UIPhase = 'idle';
