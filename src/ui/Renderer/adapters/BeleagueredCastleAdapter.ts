@@ -14,13 +14,12 @@ import Phaser from 'phaser';
 import {
   createHudText as sharedCreateHudText,
   HudTextOptions,
-  ActionButtonOptions,
 } from '../index';
 import { FONT_FAMILY } from '../../../ui/constants';
 
 // Re-export shared helpers so callers can import from a single adapter module.
 export { sharedCreateHudText as createHudText };
-export type { HudTextOptions, ActionButtonOptions };
+export type { HudTextOptions };
 
 /** Default depth for HUD UI elements in Beleaguered Castle. */
 const BC_DEPTH_HUD = 1000;

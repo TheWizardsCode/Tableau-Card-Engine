@@ -111,8 +111,6 @@ export function createOverlayBackground(
   // into it so all overlays share a single, stable top-layer container.
   // This keeps z-ordering consistent across Main Street overlays.
   try {
-    // Parent overlay objects into the shared HUD container for consistent
-    // top-layer rendering above gameplay content.
     const overlayContainer: any = (scene as any).hudContainer;
     if (overlayContainer && typeof overlayContainer.add === 'function') {
       for (const obj of objects) {

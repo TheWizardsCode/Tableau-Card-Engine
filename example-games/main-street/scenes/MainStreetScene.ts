@@ -300,9 +300,6 @@ export class MainStreetScene extends CardGameScene {
   public refreshActionButtons(...args: any[]): any {
     return (this.msRenderer as any).refreshActionButtons.apply(this.msRenderer, args);
   }
-  public createActionButton(...args: any[]): any {
-    return (this.msRenderer as any).createActionButton.apply(this.msRenderer, args);
-  }
 
   // Refresh investments proxy (forward to turn controller)
   public onRefreshInvestmentsClick(...args: any[]): any {
