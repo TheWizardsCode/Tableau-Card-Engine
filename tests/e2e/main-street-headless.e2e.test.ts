@@ -3,7 +3,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { validateTranscriptFile } from '../../scripts/validate-transcript';
 import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
-import type { MainStreetState } from '../../example-games/main-street/MainStreetState';
 import {
   executeDayStart,
   executeAction,
