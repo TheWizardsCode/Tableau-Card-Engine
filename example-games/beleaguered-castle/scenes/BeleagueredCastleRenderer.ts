@@ -5,8 +5,10 @@ import Phaser from 'phaser';
 import type { BeleagueredCastleState } from '../BeleagueredCastleState';
 import { FOUNDATION_COUNT, TABLEAU_COUNT } from '../BeleagueredCastleState';
 import { cardTextureKey } from '../../../src/ui';
-import { GAME_W, GAME_H, createSceneTitle, createSceneMenuButton } from '../../../src/ui';
-import { createBcHudText, createActionButton } from '../../../src/ui/Renderer/adapters/BeleagueredCastleAdapter';
+import { GAME_W, GAME_H } from '../../../src/ui';
+import { createSceneTitle, createSceneMenuButton } from '@ui/Renderer';
+import { createActionButton } from '@ui/Renderer';
+import { createBcHudText } from '../../../src/ui/Renderer/adapters/BeleagueredCastleAdapter';
 import {
   BC_CARD_W, BC_CARD_H, CARD_GAP, CASCADE_OFFSET_Y,
   DRAG_DEPTH, DEAL_STAGGER, ANIM_DURATION, SNAP_BACK_DURATION,

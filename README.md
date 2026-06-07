@@ -14,10 +14,7 @@ npm run build        # TypeScript check + production build -> dist/
 npm run preview      # serve production build locally
 npm run tf:generate  # generate ToneForge artifacts to build/tf-synths/
 
-# Smoke test: run deterministic Main Street demo (seed: smoke-1)
-npx tsx scripts/demo-main-street.ts --seed "smoke-1"
-
-# Headless smoke test (part of npm test):
+# Smoke test (headless, part of npm test):
 npx vitest run --project unit tests/main-street/smoke-scenario.test.ts
 ```
 
@@ -37,7 +34,7 @@ tableau-card-engine/
 │   ├── core-engine/       Game loop, state management, turn sequencing
 │   ├── card-system/       Card, Deck, Pile abstractions
 │   ├── rule-engine/       Rule definitions, validation, turn logic
-│   └── ui/                Reusable UI components
+│   └── ui/                Reusable UI components (HelpPanel, SettingsPanel, Overlay, buttons, HUD utilities)
 ├── example-games/         Standalone example games
 │   ├── gym/               Interactive demo scene suite for core-engine features
 │   ├── golf/              9-Card Golf (human vs. AI)
@@ -86,6 +83,29 @@ tableau-card-engine/
 | Scenario: Tutorial | `example-games/main-street/scenes/MainStreetTutorialScene.ts` | Guided introduction to Main Street. Non-interactive tutorial overlays walk through the market, street placement, synergies, events, and scoring. Easy difficulty, 25 turns. Accessible from the Game Selector. |
 
 More games are planned: Coloretto.
+
+## Main Street Card Upgrade Visualization
+
+Main Street uses a **code-based overlay rendering pipeline** to display upgrade state on Business cards without requiring separate SVG assets for each level variant.
+
+### How it works
+
+When a Business card is upgraded (level > 0), the renderer applies visual overlays on top of the base SVG card texture:
+
+| Overlay | Position | Description |
+|---------|----------|-------------|
+| **Level badge** | Top-right | Gold bold text showing "Lvl N" (e.g., "Lvl 2") |
+| **Income display** | Bottom-center | Green bold text showing combined income (baseIncome + incomeBonus), e.g., "+8" |
+| **Name overlay** | Top-center | White bold text with dark semi-transparent background showing the upgraded card name (e.g., "Library" instead of "Bookshop") |
+| **Upgrade border** | Card perimeter | 3px golden stroke (`#ffaa22`) for visual distinction from base cards |
+
+### Architecture
+
+- **`UpgradeOverlaySpec.ts`** – Pure data module (no Phaser dependencies) that defines overlay specifications (`OverlayTextSpec`, `OverlayBorderSpec`, `UpgradeOverlaySpec`) and provides `buildUpgradeOverlaySpec(biz, width, height)` to generate overlay specs from a `BusinessCard`'s current state.
+- **`MainStreetRenderer.applyUpgradeOverlays()`** – Reads the overlay spec and creates Phaser text/graphics objects as children of the card's container.
+- **Texture caching** – Base card SVGs are rasterized once and cached. Overlays are drawn on top at render time, avoiding expensive re-rasterization for every card state variant.
+
+This approach was chosen for **performance** (no per-level SVG regeneration), **texture caching simplicity** (one texture per base card), and **backward compatibility** (non-upgraded cards render identically to before).
 
 ## ToneForge runtime adapter (Main Street)
 

@@ -86,6 +86,12 @@ export abstract class CardGameScene extends Phaser.Scene {
   /** Sound manager instance (null when in replay mode or before init). */
   protected soundManager: SoundManager | null = null;
 
+  // ── HUD container ─────────────────────────────────────────
+
+  /** Shared HUD container for overlay/sidebar UI (depth 1000).
+   *  Created by calling {@link initHUDContainer} early in `create()`. */
+  public hudContainer!: Phaser.GameObjects.Container;
+
   // ── UI panels ────────────────────────────────────────────
 
   /** Help panel overlay. */
@@ -164,20 +170,38 @@ export abstract class CardGameScene extends Phaser.Scene {
   }
 
   /**
+   * Create the shared HUD container at depth 1000.
+   *
+   * Call this before {@link initHelpPanel} and {@link initSettingsPanel}
+   * so that help/settings panels are parented into the HUD container
+   * for correct z-ordering above gameplay content.
+   */
+  protected initHUDContainer(): void {
+    this.hudContainer = this.add.container(0, 0);
+    this.hudContainer.setDepth(1000);
+  }
+
+  /**
    * Create the help panel and its toggle button.
+   *
+   * The button is created automatically (showButton:true by default).
    *
    * @param sections  Help content sections (typically loaded from a JSON file).
    */
   protected initHelpPanel(sections: HelpSection[]): void {
     this.helpPanel = new HelpPanel(this, { sections });
-    this.helpButton = new HelpButton(this, this.helpPanel);
+    this.helpButton = this.helpPanel.helpButton!;
   }
 
   /**
    * Create the settings panel (volume / mute controls) and its toggle button.
    *
+   * The button is created automatically (showButton:true by default).
+   *
    * Requires {@link initSoundSystem} to have been called first; does nothing
    * if `soundManager` is null.
+   *
+   * @param difficultyNames  Optional ordered list of difficulty names.
    */
   protected initSettingsPanel(difficultyNames?: readonly string[]): void {
     if (!this.soundManager) return;
@@ -185,7 +209,7 @@ export abstract class CardGameScene extends Phaser.Scene {
       soundManager: this.soundManager,
       difficultyNames,
     });
-    this.settingsButton = new SettingsButton(this, this.settingsPanel);
+    this.settingsButton = this.settingsPanel.settingsButton!;
   }
 
   // ── Event helpers ────────────────────────────────────────
@@ -221,5 +245,6 @@ export abstract class CardGameScene extends Phaser.Scene {
     this.helpButton?.destroy();
     this.settingsPanel?.destroy();
     this.settingsButton?.destroy();
+    this.hudContainer?.destroy();
   }
 }

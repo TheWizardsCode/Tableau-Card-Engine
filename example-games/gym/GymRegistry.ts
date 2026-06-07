@@ -55,6 +55,9 @@ export const GYM_SLL_KEY = 'GymSllScene';
 /** Tooltip demo scene key. */
 export const GYM_TOOLTIP_KEY = 'GymTooltipScene';
 
+/** HUD Components demo scene key. */
+export const GYM_HUD_COMPONENTS_KEY = 'GymHudComponentsScene';
+
 // ── Registry ──────────────────────────────────────────────
 
 /**
@@ -129,5 +132,11 @@ export const GYM_SCENE_CATALOGUE: GymSceneEntry[] = [
     title: 'Tooltip Manager',
     description:
       'Demonstrate the shared TooltipManager in both DOM-overlay and Phaser GameObject modes. Toggle tooltips via the Settings panel.',
+  },
+  {
+    sceneKey: GYM_HUD_COMPONENTS_KEY,
+    title: 'HUD Components',
+    description:
+      'Interact with the shared HUD component library: open/close HelpPanel, SettingsPanel, and observe depth layering and toggle controls.',
   },
 ];

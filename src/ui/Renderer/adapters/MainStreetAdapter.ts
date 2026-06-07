@@ -2,9 +2,9 @@
  * Main Street Adapter – bridges Main Street scene rendering to the shared
  * Renderer API.
  *
- * Re-exports shared helpers (`createActionButton`, `attachHudTooltipZone`)
- * and provides a Main Street–specific card rendering wrapper that uses the
- * scene's `templateKeyForCard` and `requestCardTexture` methods.
+ * Re-exports shared helpers (`attachHudTooltipZone`) and provides a Main
+ * Street–specific card rendering wrapper that uses the scene's
+ * `templateKeyForCard` and `requestCardTexture` methods.
  *
  * @module MainStreetAdapter
  */
@@ -22,20 +22,13 @@ import { renderCardSvg } from '../renderCardSvg';
 // ---------------------------------------------------------------------------
 
 /**
- * Create an action button using the shared renderer helper.
- *
- * @see sharedCreateActionButton
- */
-export { sharedCreateActionButton as createActionButton };
-export type { ActionButtonOptions };
-
-/**
  * Attach an interactive tooltip zone to a HUD text element using the shared
  * renderer helper.
  *
  * @see sharedAttachHudTooltipZone
  */
 export { sharedAttachHudTooltipZone as attachHudTooltipZone };
+export type { ActionButtonOptions };
 
 // ---------------------------------------------------------------------------
 // Card rendering adapter

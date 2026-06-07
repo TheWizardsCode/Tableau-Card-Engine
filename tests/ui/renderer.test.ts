@@ -51,6 +51,8 @@ import {
   attachHudTooltipZone,
   createActionButton,
   renderCardSvg,
+  markHudTransient,
+  clearTransientHud,
 } from '../../src/ui/Renderer';
 
 // ── Test helpers ────────────────────────────────────────────────────────────
@@ -73,12 +75,12 @@ function createMockScene(): Phaser.Scene {
         };
         return c;
       }),
-      text: vi.fn(() => {
+      text: vi.fn((x: number, y: number) => {
         const t: any = {
           width: 80,
           height: 20,
-          x: 0,
-          y: 0,
+          x: x ?? 0,
+          y: y ?? 0,
           _originX: 0,
           _originY: 0,
           _text: '',
@@ -168,6 +170,86 @@ describe('createGameZone', () => {
   });
 });
 
+describe('markHudTransient', () => {
+  it('tags a game object with _hudTransient: true', () => {
+    const scene = createMockScene();
+    const textObj = scene.add.text(0, 0, 'test', {}) as any;
+    const tagged = markHudTransient(textObj);
+    expect(tagged._hudTransient).toBe(true);
+  });
+
+  it('returns the same object reference', () => {
+    const scene = createMockScene();
+    const rect = scene.add.rectangle() as any;
+    const tagged = markHudTransient(rect);
+    expect(tagged).toBe(rect);
+  });
+
+  it('works with any game object type', () => {
+    const scene = createMockScene();
+    const container = scene.add.container() as any;
+    const tagged = markHudTransient(container);
+    expect(tagged._hudTransient).toBe(true);
+  });
+});
+
+describe('clearTransientHud', () => {
+  it('removes only children tagged with _hudTransient', () => {
+    const scene = createMockScene();
+    const container = scene.add.container() as any;
+
+    const transientText = scene.add.text(0, 0, 'transient', {}) as any;
+    markHudTransient(transientText);
+    container.add(transientText);
+
+    const persistentRect = scene.add.rectangle() as any;
+    // NOT tagged
+    container.add(persistentRect);
+
+    clearTransientHud(container);
+
+    expect(container.remove).toHaveBeenCalledWith(transientText, true);
+    expect(container.remove).not.toHaveBeenCalledWith(persistentRect, true);
+  });
+
+  it('removes all transient children when multiple exist', () => {
+    const scene = createMockScene();
+    const container = scene.add.container() as any;
+
+    const t1 = markHudTransient(scene.add.text(0, 0, 'a', {}) as any);
+    const t2 = markHudTransient(scene.add.text(0, 20, 'b', {}) as any);
+    const t3 = markHudTransient(scene.add.rectangle() as any);
+    container.add(t1);
+    container.add(t2);
+    container.add(t3);
+
+    clearTransientHud(container);
+
+    expect(container.remove).toHaveBeenCalledTimes(3);
+  });
+
+  it('does nothing when no transient children exist', () => {
+    const scene = createMockScene();
+    const container = scene.add.container() as any;
+
+    const persistent = scene.add.rectangle() as any;
+    container.add(persistent);
+
+    clearTransientHud(container);
+
+    expect(container.remove).not.toHaveBeenCalled();
+  });
+
+  it('does nothing on an empty container', () => {
+    const scene = createMockScene();
+    const container = scene.add.container() as any;
+
+    clearTransientHud(container);
+
+    expect(container.remove).not.toHaveBeenCalled();
+  });
+});
+
 describe('createHudText', () => {
   it('creates text with default options', () => {
     const scene = createMockScene();
@@ -202,6 +284,30 @@ describe('createHudText', () => {
     expect((text as any)._originX).toBe(0.5);
     expect((text as any)._originY).toBe(0);
   });
+
+  it('respects align option', () => {
+    const scene = createMockScene();
+    createHudText(scene, 0, 0, 'Aligned', '#fff', { align: 'center' });
+    expect(scene.add.text).toHaveBeenCalledWith(0, 0, 'Aligned', expect.objectContaining({
+      align: 'center',
+    }));
+  });
+
+  it('respects lineSpacing option', () => {
+    const scene = createMockScene();
+    createHudText(scene, 0, 0, 'Spaced', '#fff', { lineSpacing: 4 });
+    expect(scene.add.text).toHaveBeenCalledWith(0, 0, 'Spaced', expect.objectContaining({
+      lineSpacing: 4,
+    }));
+  });
+
+  it('respects custom fontFamily override', () => {
+    const scene = createMockScene();
+    createHudText(scene, 0, 0, 'Custom', '#fff', { fontFamily: 'Courier, monospace' });
+    expect(scene.add.text).toHaveBeenCalledWith(0, 0, 'Custom', expect.objectContaining({
+      fontFamily: 'Courier, monospace',
+    }));
+  });
 });
 
 describe('attachHudTooltipZone', () => {
@@ -226,6 +332,46 @@ describe('attachHudTooltipZone', () => {
     const textObj = scene.add.text(0, 0, 'test', {}) as any;
     attachHudTooltipZone(scene, textObj, 'label', () => '');
     expect(textObj.on).toHaveBeenCalledWith('pointerover', expect.any(Function));
+  });
+
+  it('shows tooltip on pointerover', () => {
+    const tooltipManager = { show: vi.fn(), hide: vi.fn() };
+    const scene = { ...createMockScene(), tooltipManager } as unknown as Phaser.Scene;
+    const textObj = scene.add.text(50, 100, 'test', {}) as any;
+    attachHudTooltipZone(scene, textObj, 'label', () => 'hovered!');
+    const pointeroverHandler = (textObj.on as ReturnType<typeof vi.fn>).mock.calls
+      .find((call: any[]) => call[0] === 'pointerover');
+    expect(pointeroverHandler).toBeDefined();
+    pointeroverHandler![1]();
+    expect(tooltipManager.show).toHaveBeenCalledWith('hovered!', textObj.x, textObj.y - 10);
+  });
+
+  it('hides tooltip on pointerout', () => {
+    const tooltipManager = { show: vi.fn(), hide: vi.fn() };
+    const scene = { ...createMockScene(), tooltipManager } as unknown as Phaser.Scene;
+    const textObj = scene.add.text(50, 100, 'test', {}) as any;
+    attachHudTooltipZone(scene, textObj, 'label', () => 'content');
+    const pointeroutHandler = (textObj.on as ReturnType<typeof vi.fn>).mock.calls
+      .find((call: any[]) => call[0] === 'pointerout');
+    expect(pointeroutHandler).toBeDefined();
+    pointeroutHandler![1]();
+    expect(tooltipManager.hide).toHaveBeenCalledTimes(1);
+  });
+
+  it('toggles tooltip on pointerdown', () => {
+    const tooltipManager = { show: vi.fn(), hide: vi.fn() };
+    const scene = { ...createMockScene(), tooltipManager } as unknown as Phaser.Scene;
+    const textObj = scene.add.text(50, 100, 'test', {}) as any;
+    attachHudTooltipZone(scene, textObj, 'label', () => 'tapped!');
+    const pointerdownHandler = (textObj.on as ReturnType<typeof vi.fn>).mock.calls
+      .find((call: any[]) => call[0] === 'pointerdown');
+    expect(pointerdownHandler).toBeDefined();
+    // First tap: show
+    pointerdownHandler![1]();
+    expect(tooltipManager.show).toHaveBeenCalledWith('tapped!', textObj.x, textObj.y - 10);
+    // Second tap: hide
+    pointerdownHandler![1]();
+    expect(tooltipManager.hide).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -279,6 +425,90 @@ describe('createActionButton', () => {
     createActionButton(scene, 0, 0, 100, '', () => {});
     expect(scene.add.text).toHaveBeenCalledWith(0, 0, '', expect.any(Object));
   });
+
+  it('applies custom depth to the container', () => {
+    const scene = createMockScene();
+    const btn = createActionButton(scene, 0, 0, 100, 'Deep', () => {}, { depth: 500 });
+    expect((btn as any)._depth).toBe(500);
+  });
+
+  it('does not set depth when depth option is omitted', () => {
+    const scene = createMockScene();
+    const btn = createActionButton(scene, 0, 0, 100, 'NoDepth', () => {});
+    expect((btn as any)._depth).toBe(0);
+  });
+
+  it('fires callback when pointerdown is triggered on an enabled button', () => {
+    const scene = createMockScene();
+    const callback = vi.fn();
+    createActionButton(scene, 0, 0, 100, 'Click', callback);
+    const rect = (scene.add.rectangle as ReturnType<typeof vi.fn>).mock.results[0].value;
+    const pointerdownHandler = (rect.on as ReturnType<typeof vi.fn>).mock.calls
+      .find((call: any[]) => call[0] === 'pointerdown');
+    expect(pointerdownHandler).toBeDefined();
+    pointerdownHandler![1]();
+    expect(callback).toHaveBeenCalledTimes(1);
+  });
+
+  it('applies hover effect: scale increase and yellow stroke on pointerover', () => {
+    const scene = createMockScene();
+    const btn = createActionButton(scene, 0, 0, 100, 'Hover', () => {});
+    const rect = (scene.add.rectangle as ReturnType<typeof vi.fn>).mock.results[0].value;
+    const pointeroverHandler = (rect.on as ReturnType<typeof vi.fn>).mock.calls
+      .find((call: any[]) => call[0] === 'pointerover');
+    expect(pointeroverHandler).toBeDefined();
+    pointeroverHandler![1]();
+    expect(btn.setScale).toHaveBeenCalledWith(1.05);
+    expect(rect.setStrokeStyle).toHaveBeenCalledWith(2, 0xffdd44);
+  });
+
+  it('restores default scale and stroke on pointerout', () => {
+    const scene = createMockScene();
+    const btn = createActionButton(scene, 0, 0, 100, 'Out', () => {});
+    const rect = (scene.add.rectangle as ReturnType<typeof vi.fn>).mock.results[0].value;
+    const pointeroutHandler = (rect.on as ReturnType<typeof vi.fn>).mock.calls
+      .find((call: any[]) => call[0] === 'pointerout');
+    expect(pointeroutHandler).toBeDefined();
+    pointeroutHandler![1]();
+    expect(btn.setScale).toHaveBeenCalledWith(1.0);
+    expect(rect.setStrokeStyle).toHaveBeenCalledWith(1, 0xaa8855);
+  });
+
+  it('disabled button does not fire callback even if pointerdown is triggered', () => {
+    const scene = createMockScene();
+    const callback = vi.fn();
+    createActionButton(scene, 0, 0, 100, 'Disabled', callback, { disabled: true });
+    const rect = (scene.add.rectangle as ReturnType<typeof vi.fn>).mock.results[0].value;
+    const pointerdownCalls = (rect.on as ReturnType<typeof vi.fn>).mock.calls
+      .filter((call: any[]) => call[0] === 'pointerdown');
+    expect(pointerdownCalls).toHaveLength(0);
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  it('disabled button uses grey text color', () => {
+    const scene = createMockScene();
+    createActionButton(scene, 0, 0, 100, 'Disabled', () => {}, { disabled: true });
+    const textCall = (scene.add.text as ReturnType<typeof vi.fn>).mock.calls
+      .find((call: any[]) => call[2] === 'Disabled');
+    expect(textCall).toBeDefined();
+    expect(textCall![3].color).toBe('#666666');
+  });
+
+  it('enabled button uses configured text color', () => {
+    const scene = createMockScene();
+    createActionButton(scene, 0, 0, 100, 'Enabled', () => {}, { textColor: '#aabbcc' });
+    const textCall = (scene.add.text as ReturnType<typeof vi.fn>).mock.calls
+      .find((call: any[]) => call[2] === 'Enabled');
+    expect(textCall).toBeDefined();
+    expect(textCall![3].color).toBe('#aabbcc');
+  });
+
+  it('applies custom fill alpha', () => {
+    const scene = createMockScene();
+    createActionButton(scene, 0, 0, 100, 'Alpha', () => {}, { fillAlpha: 0.5 });
+    const rectCall = (scene.add.rectangle as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(rectCall[5]).toBe(0.5);
+  });
 });
 
 
@@ -301,12 +531,12 @@ function createMockSceneWithTextures(textureExists = true): Phaser.Scene {
   return {
     add: {
       container: vi.fn(() => container),
-      text: vi.fn(() => {
+      text: vi.fn((x: number, y: number) => {
         const t: any = {
           width: 80,
           height: 20,
-          x: 0,
-          y: 0,
+          x: x ?? 0,
+          y: y ?? 0,
           _originX: 0,
           _originY: 0,
           _text: '',

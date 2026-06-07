@@ -1,5 +1,5 @@
 /**
- * SushiGoOverlayManager -- handles round score and game over overlays for Sushi Go!
+ * SushiGoOverlayContent -- handles round score and game over overlays for Sushi Go!
  */
 
 import {
@@ -8,8 +8,8 @@ import {
   FONT_FAMILY,
   OverlayManager,
 } from '../../../src/ui';
+import { createActionButton } from '@ui/Renderer';
 import {
-  createActionButton,
   createSushiGoMenuButton,
 } from '../../../src/ui/Renderer/adapters/SushiGoAdapter';
 import { scoreTableauBreakdown } from '../SushiGoScoring';
@@ -22,7 +22,7 @@ import { SFX_KEYS } from './SushiGoConstants';
 
 const transcriptStore = new TranscriptStore();
 
-export class SushiGoOverlayManager {
+export class SushiGoOverlayContent {
   private readonly overlayManager: OverlayManager;
 
   get overlayObjects(): Phaser.GameObjects.GameObject[] {
@@ -41,10 +41,11 @@ export class SushiGoOverlayManager {
   showRoundScoreOverlay(result: RoundResult, onNextRound: () => void): void {
     this.soundManager?.play(SFX_KEYS.SCORE_REVEAL);
 
-    const overlay = this.overlayManager.create(
-      { depth: 10, alpha: 0.01 },
-      { width: 560, height: 460, alpha: 0.9 },
-    );
+    const overlay = this.overlayManager.showOverlay({
+      type: 'custom',
+      backgroundOptions: { depth: 10, alpha: 0.01 },
+      box: { width: 560, height: 460, alpha: 0.9 },
+    });
 
     const roundNum = result.round + 1;
     const human = this.session.players[0];
@@ -129,10 +130,11 @@ export class SushiGoOverlayManager {
       winnerIndex: winnerIdx,
     });
 
-    const overlay = this.overlayManager.create(
-      { depth: 10, alpha: 0.01 },
-      { width: 560, height: 520, alpha: 0.9 },
-    );
+    const overlay = this.overlayManager.showOverlay({
+      type: 'custom',
+      backgroundOptions: { depth: 10, alpha: 0.01 },
+      box: { width: 560, height: 520, alpha: 0.9 },
+    });
 
     const winnerText = winnerIdx === 0 ? 'You Win!' : 'AI Wins!';
     const human = this.session.players[0];

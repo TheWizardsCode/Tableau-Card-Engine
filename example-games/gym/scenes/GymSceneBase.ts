@@ -229,9 +229,9 @@ export abstract class GymSceneBase extends Phaser.Scene {
       this.helpButton = undefined;
     }
 
-    // Create new help panel + help button
+    // Create new help panel (integrated button created automatically)
     this.helpPanel = new HelpPanel(this, { sections, widthPercent });
-    this.helpButton = new HelpButton(this, this.helpPanel);
+    this.helpButton = this.helpPanel.helpButton!;
 
     // Ensure help resources are cleaned up when the scene shuts down/destroys
     const cleanup = () => {

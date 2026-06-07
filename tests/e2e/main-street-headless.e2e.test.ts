@@ -1,34 +1,160 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { validateTranscriptFile } from '../../scripts/validate-transcript';
+import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
+import {
+  executeDayStart,
+  executeAction,
+  processEndOfTurn,
+  computeScore,
+  type PlayerAction,
+  type TurnResult,
+} from '../../example-games/main-street/MainStreetEngine';
+import {
+  getAffordableBusinessCards,
+  getAffordableUpgradeCards,
+  getEmptySlots,
+  canPurchaseEvent,
+} from '../../example-games/main-street/MainStreetMarket';
 
 const OUT_DIR = path.join('tmp', 'test-e2e-main-street');
 fs.mkdirSync(OUT_DIR, { recursive: true });
 
-function runDemo(seed: string): any {
-  // Use tsx to execute the TypeScript demo script. Captures stdout JSON.
-  const res = spawnSync('npx', ['tsx', 'scripts/demo-main-street.ts', '--seed', seed], {
-    encoding: 'utf8',
-    maxBuffer: 10 * 1024 * 1024,
-  });
-
-  if (res.error) throw res.error;
-  if (res.status !== 0) {
-    throw new Error(`demo-main-street failed: ${res.stderr || res.stdout}`);
-  }
-  // demo script prints JSON to stdout
-  const stdout = res.stdout as string;
-  try {
-    return JSON.parse(stdout);
-  } catch (err) {
-    throw new Error(`Failed to parse demo output as JSON: ${(err as Error).message}\nOutput:\n${stdout}`);
-  }
+interface TurnRecord {
+  turn: number;
+  actions: { type: string; detail: string }[];
+  income: number | null;
+  incident: string | null;
+  coinsAfter: number;
+  reputationAfter: number;
+  score: number;
+  gridOccupied: number;
 }
 
-function convertDemoToSchema(demo: any): any {
-  // Convert the demo transcript shape to the schema-like shape used by the validator
+/**
+ * Runs a full greedy headless game (mirrors tests/main-street/smoke-scenario.test.ts).
+ */
+function runGreedyGame(seed: string, maxTurns = 30): {
+  game: 'main-street';
+  version: '1.0.0';
+  seed: string;
+  startedAt: string;
+  endedAt: string;
+  totalTurns: number;
+  result: 'win' | 'loss';
+  endReason: string | null;
+  finalScore: number;
+  turns: TurnRecord[];
+} {
+  const startedAt = new Date().toISOString();
+  const state = setupMainStreetGame({ seed });
+  const turns: TurnRecord[] = [];
+
+  while (state.gameResult === 'playing' && state.turn <= maxTurns) {
+    executeDayStart(state);
+
+    const actions: PlayerAction[] = [];
+    const executed: { type: string; detail: string }[] = [];
+
+    const emptySlots = getEmptySlots(state);
+    const affordable = getAffordableBusinessCards(state);
+    affordable.sort((a, b) => a.cost - b.cost);
+    if (affordable.length > 0 && emptySlots.length > 0) {
+      const card = affordable[0];
+      const slot = emptySlots[0];
+      actions.push({ type: 'buy-business', cardId: card.id, slotIndex: slot });
+    }
+
+    if (state.heldEvent !== null) {
+      actions.push({ type: 'play-event' });
+    }
+
+    for (const card of state.market.investments) {
+      if (card.family !== 'event') continue;
+      const result = canPurchaseEvent(state, card.id);
+      if (result.legal) {
+        actions.push({ type: 'buy-event', cardId: card.id });
+        break;
+      }
+    }
+
+    const upgrades = getAffordableUpgradeCards(state);
+    if (upgrades.length > 0) {
+      const upg = upgrades[0];
+      const matchSlot = state.streetGrid.findIndex(
+        b => b !== null && b.upgradePath === upg.targetBusiness && b.level < b.maxLevel,
+      );
+      if (matchSlot >= 0) {
+        actions.push({ type: 'buy-upgrade', cardId: upg.id, targetSlot: matchSlot });
+      }
+    }
+
+    actions.push({ type: 'end-turn' });
+
+    for (const action of actions) {
+      if (action.type === 'end-turn') break;
+      try {
+        executeAction(state, action);
+        switch (action.type) {
+          case 'buy-business': {
+            const a = action as { type: string; cardId: string; slotIndex: number };
+            executed.push({ type: 'buy-business', detail: `${a.cardId} -> slot ${a.slotIndex}` });
+            break;
+          }
+          case 'buy-upgrade': {
+            const a = action as { type: string; cardId: string; targetSlot?: number };
+            executed.push({ type: 'buy-upgrade', detail: `${a.cardId} -> slot ${a.targetSlot}` });
+            break;
+          }
+          case 'buy-event': {
+            const a = action as { type: string; cardId: string };
+            executed.push({ type: 'buy-event', detail: a.cardId });
+            break;
+          }
+        }
+      } catch {
+        // Illegal action — skip
+      }
+    }
+
+    if (executed.length === 0) {
+      executed.push({ type: 'skip', detail: 'No affordable actions' });
+    }
+
+    const turnResult: TurnResult = processEndOfTurn(state);
+
+    turns.push({
+      turn: turns.length + 1,
+      actions: executed,
+      income: turnResult.income ? turnResult.income.total : null,
+      incident: turnResult.incident ? turnResult.incident.name : null,
+      coinsAfter: state.resourceBank.coins,
+      reputationAfter: state.resourceBank.reputation,
+      score: computeScore(state),
+      gridOccupied: state.streetGrid.filter(s => s !== null).length,
+    });
+
+    if (state.gameResult !== 'playing') break;
+  }
+
+  const endedAt = new Date().toISOString();
+
+  return {
+    game: 'main-street',
+    version: '1.0.0',
+    seed,
+    startedAt,
+    endedAt,
+    totalTurns: turns.length,
+    result: state.gameResult === 'win' ? 'win' : 'loss',
+    endReason: state.endReason,
+    finalScore: state.finalScore,
+    turns,
+  };
+}
+
+function convertDemoToSchema(demo: ReturnType<typeof runGreedyGame>): any {
   const events: any[] = [];
   for (const t of demo.turns) {
     const turn = t.turn;
@@ -54,7 +180,7 @@ function convertDemoToSchema(demo: any): any {
 describe('Main Street headless demo e2e', () => {
   it('runs a short headless Main Street session and validates output', () => {
     const seed = `e2e-${Date.now()}`;
-    const demo = runDemo(seed);
+    const demo = runGreedyGame(seed);
 
     // Basic smoke assertions on demo output
     expect(demo).toBeDefined();

@@ -4,7 +4,7 @@ import type { TurnResult } from '../MainStreetEngine';
 import { FONT_FAMILY, createOverlayBackground, createOverlayButton, createOverlayMenuButton, dismissOverlay } from '../../../src/ui';
 import { TIER_DEFINITIONS, ORDERED_TIER_DEFINITIONS, highestUnlockedTier } from '../MainStreetTiers';
 
-export class MainStreetOverlayManager {
+export class MainStreetOverlayContent {
   constructor(private readonly scene: any) {}
 
   public showGameOverOverlay(
@@ -42,12 +42,24 @@ export class MainStreetOverlayManager {
 
     const panelH = 360 + challengeExtraH + tierUnlockH + campaignH;
 
-    // Overlay background
+    // Overlay background & box (created by createOverlayBackground).
+    const boxConfig = {
+      width: 500,
+      height: panelH,
+      color: 0x000000,
+      alpha: 1.0,
+      depth: 100,
+    };
     const overlay = createOverlayBackground(
       s,
       { depth: 100, alpha: 0.75 },
-      { width: 500, height: panelH, alpha: 0.95 },
+      boxConfig,
     );
+    if (overlay.box) {
+      const panelTop = s.layout.gameH / 2 - panelH / 2;
+      // Position box center at panel top + panel height / 2
+      overlay.box.y = panelTop + panelH / 2;
+    }
     s.overlayObjects.push(...overlay.objects);
 
     // Vertical anchor: centre of the panel
@@ -57,6 +69,7 @@ export class MainStreetOverlayManager {
     const titleText = s.add.text(s.layout.gameW / 2, panelTop + 30, title, {
       fontSize: '36px', fontStyle: 'bold', color, fontFamily: FONT_FAMILY,
     }).setOrigin(0.5).setDepth(101);
+    if (s.hudContainer) s.hudContainer.add(titleText);
     s.overlayObjects.push(titleText);
 
     // End reason
@@ -66,6 +79,7 @@ export class MainStreetOverlayManager {
       reason.replace(/_/g, ' '),
       { fontSize: '18px', color: '#ccbbaa', fontFamily: FONT_FAMILY },
     ).setOrigin(0.5).setDepth(101);
+    if (s.hudContainer) s.hudContainer.add(reasonText);
     s.overlayObjects.push(reasonText);
 
     // Score breakdown
@@ -83,6 +97,7 @@ export class MainStreetOverlayManager {
       fontSize: '16px', color: '#ddccbb', fontFamily: FONT_FAMILY,
       align: 'center', lineSpacing: 6,
     }).setOrigin(0.5, 0).setDepth(101);
+    if (s.hudContainer) s.hudContainer.add(breakdown);
     s.overlayObjects.push(breakdown);
 
     // Per-challenge breakdown (below score breakdown)
@@ -105,6 +120,7 @@ export class MainStreetOverlayManager {
           `${icon}  ${ac.challenge.title}`,
           { fontSize: '13px', color: lineColor, fontFamily: FONT_FAMILY },
         ).setOrigin(0.5, 0).setDepth(101);
+        if (s.hudContainer) s.hudContainer.add(challengeLine);
         s.overlayObjects.push(challengeLine);
         cursorY += 20;
       }
@@ -118,6 +134,7 @@ export class MainStreetOverlayManager {
         'Tier Unlocked!',
         { fontSize: '14px', fontStyle: 'bold', color: '#44ff44', fontFamily: FONT_FAMILY },
       ).setOrigin(0.5, 0).setDepth(101);
+      if (s.hudContainer) s.hudContainer.add(unlockHeader);
       s.overlayObjects.push(unlockHeader);
       cursorY += 22;
 
@@ -137,6 +154,7 @@ export class MainStreetOverlayManager {
           `NEW: Tier ${def.order} - ${def.name} ${triggerLabel}`,
           { fontSize: '13px', color: '#88ff88', fontFamily: FONT_FAMILY },
         ).setOrigin(0.5, 0).setDepth(101);
+        if (s.hudContainer) s.hudContainer.add(tierLine);
         s.overlayObjects.push(tierLine);
         cursorY += 20;
 
@@ -148,6 +166,7 @@ export class MainStreetOverlayManager {
             `  + ${cardName}`,
             { fontSize: '12px', color: '#aaddaa', fontFamily: FONT_FAMILY },
           ).setOrigin(0.5, 0).setDepth(101);
+          if (s.hudContainer) s.hudContainer.add(cardLine);
           s.overlayObjects.push(cardLine);
           cursorY += 16;
         }

@@ -5,8 +5,7 @@
  * ("smoke-1") and validates that the run completes without error and that
  * the final transcript contains all expected summary fields.
  *
- * This mirrors the CLI demo script (scripts/demo-main-street.ts) but runs
- * inside Vitest so it is part of the standard `npm test` quality gate.
+ * Runs inside Vitest so it is part of the standard `npm test` quality gate.
  *
  * Usage:
  *   npx vitest run --project unit tests/main-street/smoke-scenario.test.ts
@@ -38,7 +37,6 @@ const SMOKE_SEED = 'smoke-1';
 
 /**
  * Additional seeds exercised as regression targets.
- * These are the same seeds used in demo-main-street.ts and playtest-scenarios.ts.
  */
 const REGRESSION_SEEDS = ['DemoSeed42', 'sweep-63', 'sweep-14', 'Bridge-Master-7'];
 

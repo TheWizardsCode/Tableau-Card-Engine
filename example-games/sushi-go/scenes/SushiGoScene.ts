@@ -48,7 +48,7 @@ import {
 } from './SushiGoConstants';
 import { SCORING_TOOLTIPS, TOOLTIP_BG_COLOR, TOOLTIP_BG_ALPHA, TOOLTIP_PADDING, TOOLTIP_FONT_SIZE, TOOLTIP_MAX_WIDTH, TOOLTIP_DEPTH } from './SushiGoConstants';
 import { SushiGoRenderer } from './SushiGoRenderer';
-import { SushiGoOverlayManager } from './SushiGoOverlayManager';
+import { SushiGoOverlayContent } from './SushiGoOverlayContent';
 // TooltipManager imported from shared src/ui (SushiGoTooltipManager migrated)
 import { SushiGoReplayController } from './SushiGoReplayController';
 import { SushiGoCardFactory } from './SushiGoCardFactory';
@@ -94,7 +94,7 @@ export class SushiGoScene extends CardGameScene {
 
   // Helpers
   private goRenderer!: SushiGoRenderer;
-  private overlayManager!: SushiGoOverlayManager;
+  private overlayManager!: SushiGoOverlayContent;
   private tooltipManager!: TooltipManager;
   private replayController!: SushiGoReplayController;
   private cardFactory!: SushiGoCardFactory;
@@ -165,6 +165,7 @@ export class SushiGoScene extends CardGameScene {
 
     this.detectReplayMode();
     this.initEventSystem();
+    this.initHUDContainer();
 
     if (this.replayMode) {
       this.createHeader();
@@ -196,7 +197,7 @@ export class SushiGoScene extends CardGameScene {
     this.recorder = new SushiGoTranscriptRecorder(this.session);
 
     this.goRenderer = new SushiGoRenderer(this, this.session);
-    this.overlayManager = new SushiGoOverlayManager(this, this.session, this.gameEvents, this.soundManager);
+    this.overlayManager = new SushiGoOverlayContent(this, this.session, this.gameEvents, this.soundManager);
     this.tooltipManager = this.createTooltipManager();
     this.replayController = new SushiGoReplayController(this, { value: this.replayMode });
     this.cardFactory = new SushiGoCardFactory(this);

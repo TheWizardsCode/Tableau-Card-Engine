@@ -18,6 +18,7 @@ import type { BCGameTranscript, BoardSnapshot } from '../GameTranscript';
 import {
   CardGameScene,
   preloadCardAssets,
+  OverlayManager,
 } from '../../../src/ui';
 import type { EventSoundMapping } from '../../../src/core-engine/SoundManager';
 import type { HelpSection } from '../../../src/ui';
@@ -25,9 +26,13 @@ import helpContent from '../help-content.json';
 
 import { SFX_KEYS, ANIM_DURATION } from './BeleagueredCastleConstants';
 import { BeleagueredCastleRenderer } from './BeleagueredCastleRenderer';
-import { BeleagueredCastleOverlayManager } from './BeleagueredCastleOverlayManager';
 import { BeleagueredCastleTurnController } from './BeleagueredCastleTurnController';
 import { moveGameObject, cardTextureKey } from '../../../src/ui';
+import {
+  GAME_W, GAME_H, FONT_FAMILY,
+  createOverlayButton, createOverlayMenuButton,
+} from '../../../src/ui';
+import { createHudText } from '../../../src/ui/Renderer/adapters/BeleagueredCastleAdapter';
 
 export class BeleagueredCastleScene extends CardGameScene {
   private gameState!: BeleagueredCastleState;
@@ -40,8 +45,12 @@ export class BeleagueredCastleScene extends CardGameScene {
   private transcript: BCGameTranscript | null = null;
 
   private bcRenderer!: BeleagueredCastleRenderer;
-  private overlayManager!: BeleagueredCastleOverlayManager;
+  private overlayManager!: OverlayManager;
   private turnController!: BeleagueredCastleTurnController;
+
+  private onNewGame?: () => void;
+  private onRestart?: () => void;
+  private onUndoLast?: () => void;
 
   constructor() {
     super({ key: 'BeleagueredCastleScene' });
@@ -88,7 +97,7 @@ export class BeleagueredCastleScene extends CardGameScene {
     const recorder = new BCTranscriptRecorder(this.seed, this.gameState);
 
     this.bcRenderer = new BeleagueredCastleRenderer(this, this.gameState);
-    this.overlayManager = new BeleagueredCastleOverlayManager(this, this.gameState);
+    this.overlayManager = new OverlayManager(this);
     this.turnController = new BeleagueredCastleTurnController(this.gameState, recorder, {
       onRefresh: () => this.refreshAll(),
       onCheckGameEnd: () => this.handleGameEnd(),
@@ -97,11 +106,9 @@ export class BeleagueredCastleScene extends CardGameScene {
       onSoundEvent: (event, data) => this.handleSoundEvent(event, data),
     });
 
-    this.overlayManager.setCallbacks(
-      () => { this.seed = Date.now(); this.scene.restart(); },
-      () => this.scene.restart(),
-      () => { this.overlayManager.dismiss(); this.gameEnded = false; this.resumeTimer(); this.turnController.performUndo(); },
-    );
+    this.onNewGame = () => { this.seed = Date.now(); this.scene.restart(); };
+    this.onRestart = () => this.scene.restart();
+    this.onUndoLast = () => { this.overlayManager.dismiss(); this.gameEnded = false; this.resumeTimer(); this.turnController.performUndo(); };
 
     this.bcRenderer.createTitle();
     this.bcRenderer.createFoundationSlots();
@@ -114,6 +121,7 @@ export class BeleagueredCastleScene extends CardGameScene {
     this.bcRenderer.onCardClick = (col) => this.handleCardClick(col);
 
     this.initEventSystem();
+    this.initHUDContainer();
 
     if (!this.replayMode) {
       this.initHelpPanel(helpContent as HelpSection[]);
@@ -298,13 +306,13 @@ export class BeleagueredCastleScene extends CardGameScene {
       this.stopTimer();
       this.transcript = this.turnController['recorder'].finalize('win', this.gameState.moveCount, this.elapsedSeconds);
       this.soundManager?.play(SFX_KEYS.WIN_FANFARE);
-      this.overlayManager.showWinOverlay(this.elapsedSeconds);
+      this.showWinOverlay(this.elapsedSeconds);
     } else {
       this.gameEnded = true;
       this.stopTimer();
       this.transcript = this.turnController['recorder'].finalize('loss', this.gameState.moveCount, this.elapsedSeconds);
       this.gameEvents.emit('game-ended', { finalTurnNumber: this.gameState.moveCount, winnerIndex: -1, reason: 'no-moves' });
-      this.overlayManager.showNoMovesOverlay();
+      this.showNoMovesOverlay();
     }
   }
 
@@ -313,7 +321,7 @@ export class BeleagueredCastleScene extends CardGameScene {
       this.gameEnded = true;
       this.stopTimer();
       this.transcript = this.turnController['recorder'].finalize('win', this.gameState.moveCount, this.elapsedSeconds);
-      this.overlayManager.showWinOverlay(this.elapsedSeconds, this.soundManager);
+      this.showWinOverlay(this.elapsedSeconds, this.soundManager);
     }
   }
 
@@ -481,5 +489,81 @@ export class BeleagueredCastleScene extends CardGameScene {
     this.bcRenderer.clearDropHighlights();
     this.overlayManager.dismiss();
     this.shutdownBase();
+  }
+
+  // ── Overlay helpers ────────────────────────────────────
+
+  private showWinOverlay(elapsedSeconds: number, _soundManager?: { play: (key: string) => void } | null): void {
+    const OVERLAY_DEPTH = 2000;
+    const BUTTON_DEPTH = OVERLAY_DEPTH + 1;
+
+    this.overlayManager.showOverlay({
+      type: 'game-over',
+      backgroundOptions: { depth: OVERLAY_DEPTH, alpha: 0.75 },
+    });
+
+    const minutes = Math.floor(elapsedSeconds / 60);
+    const seconds = elapsedSeconds % 60;
+    const mm = String(minutes).padStart(2, '0');
+    const ss = String(seconds).padStart(2, '0');
+
+    const title = this.add.text(GAME_W / 2, GAME_H / 2 - 80, 'You Win!', {
+      fontSize: '42px', color: '#88ff88', fontFamily: FONT_FAMILY, fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(BUTTON_DEPTH);
+    this.overlayManager.add(title);
+
+    const stats = createHudText(this, GAME_W / 2, GAME_H / 2 - 20,
+      `Moves: ${this.gameState.moveCount}    Time: ${mm}:${ss}`, '#aaccaa', {
+        fontSize: '22px',
+        originX: 0.5,
+        originY: 0.5,
+      });
+    stats.setDepth(BUTTON_DEPTH);
+    this.overlayManager.add(stats);
+
+    const newGameBtn = createOverlayButton(this, GAME_W / 2 - 150, GAME_H / 2 + 50, '[ New Game ]', BUTTON_DEPTH);
+    newGameBtn.on('pointerdown', () => this.onNewGame?.());
+    this.overlayManager.add(newGameBtn);
+
+    const restartBtn = createOverlayButton(this, GAME_W / 2, GAME_H / 2 + 50, '[ Restart ]', BUTTON_DEPTH);
+    restartBtn.on('pointerdown', () => this.onRestart?.());
+    this.overlayManager.add(restartBtn);
+
+    const menuBtn = createOverlayMenuButton(this, GAME_W / 2 + 150, GAME_H / 2 + 50, BUTTON_DEPTH);
+    this.overlayManager.add(menuBtn);
+  }
+
+  private showNoMovesOverlay(): void {
+    const OVERLAY_DEPTH = 2000;
+    const BUTTON_DEPTH = OVERLAY_DEPTH + 1;
+
+    this.overlayManager.showOverlay({
+      type: 'game-over',
+      backgroundOptions: { depth: OVERLAY_DEPTH, alpha: 0.75 },
+    });
+
+    const title = createHudText(this, GAME_W / 2, GAME_H / 2 - 60,
+      'No Productive Moves Available', '#ff8888', {
+        fontSize: '34px',
+        originX: 0.5,
+        originY: 0.5,
+      });
+    title.setDepth(BUTTON_DEPTH);
+    this.overlayManager.add(title);
+
+    const undoBtn = createOverlayButton(this, GAME_W / 2 - 180, GAME_H / 2 + 30, '[ Undo Last ]', BUTTON_DEPTH);
+    undoBtn.on('pointerdown', () => this.onUndoLast?.());
+    this.overlayManager.add(undoBtn);
+
+    const newGameBtn = createOverlayButton(this, GAME_W / 2 - 30, GAME_H / 2 + 30, '[ New Game ]', BUTTON_DEPTH);
+    newGameBtn.on('pointerdown', () => this.onNewGame?.());
+    this.overlayManager.add(newGameBtn);
+
+    const restartBtn = createOverlayButton(this, GAME_W / 2 + 110, GAME_H / 2 + 30, '[ Restart ]', BUTTON_DEPTH);
+    restartBtn.on('pointerdown', () => this.onRestart?.());
+    this.overlayManager.add(restartBtn);
+
+    const menuBtn = createOverlayMenuButton(this, GAME_W / 2 + 230, GAME_H / 2 + 30, BUTTON_DEPTH);
+    this.overlayManager.add(menuBtn);
   }
 }

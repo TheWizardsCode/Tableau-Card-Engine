@@ -2,7 +2,19 @@
  * UI Module
  *
  * Provides reusable UI components such as buttons, menus,
- * and overlays that can be customized for different tableau card game themes.
+ * overlays, and the shared HUD layer that can be customized
+ * for different tableau card game themes.
+ *
+ * ## HUD Layer
+ *
+ * - `initHUDContainer()` on `CardGameScene` creates a shared container
+ *   at depth 1000 for help/settings panels and buttons.
+ * - `OverlayManager` provides lifecycle management for game-state
+ *   overlays (win, loss, game-over, round-end) at depth 2000.
+ * - `createOverlayBackground()` and `createParameterizedOverlay()`
+ *   provide reusable overlay UI primitives.
+ *
+ * See docs/HUD-LAYER-MIGRATION.md for migration guide.
  */
 export const UI_VERSION = '0.1.0';
 
@@ -109,7 +121,7 @@ export type {
 } from './selection';
 
 export { HelpPanel, DEPTH_HELP_BUTTON } from './HelpPanel';
-export type { HelpSection, HelpPanelConfig } from './HelpPanel';
+export type { HelpSection, HelpPanelConfig, HelpButtonPosition } from './HelpPanel';
 
 export { HelpButton } from './HelpButton';
 export type { HelpButtonConfig } from './HelpButton';
@@ -117,7 +129,7 @@ export type { HelpButtonConfig } from './HelpButton';
 export { SettingsPanel, DEPTH_SETTINGS_BUTTON } from './SettingsPanel';
 export { TooltipManager } from './Tooltip';
 export type { TooltipRenderContext, PhaserTooltipRenderFn, TooltipManagerConfig } from './Tooltip';
-export type { SettingsPanelConfig } from './SettingsPanel';
+export type { SettingsPanelConfig, SettingsButtonPosition } from './SettingsPanel';
 
 export { SettingsButton } from './SettingsButton';
 export type { SettingsButtonConfig } from './SettingsButton';
@@ -154,7 +166,7 @@ export type {
 } from './Overlay';
 
 export { createOverlayMenuButton } from './MenuButton';
-export { OverlayManager } from './OverlayManager';
+export { OverlayManager, type OverlayConfig, type OverlayType } from './OverlayManager';
 export {
   createParameterizedOverlay,
   overlayCenterY,
@@ -208,6 +220,8 @@ export {
   createActionButton,
   renderCardSvg,
   applyEnsuredTexture,
+  markHudTransient,
+  clearTransientHud,
 } from './Renderer';
 export type {
   ActionButtonOptions,

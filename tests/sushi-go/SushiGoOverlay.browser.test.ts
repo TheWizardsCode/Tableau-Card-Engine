@@ -87,6 +87,14 @@ describe('Sushi Go round-score overlay', () => {
       (child: any) => child instanceof Phaser.GameObjects.Rectangle,
     );
     expect(bg?.input?.enabled).toBe(true);
+
+    // Verify the full-screen input blocker exists and is interactive
+    const rects = scene.children.list.filter(
+      (child: any) => child instanceof Phaser.GameObjects.Rectangle && child.depth === 10,
+    ) as Phaser.GameObjects.Rectangle[];
+    expect(rects.length).toBeGreaterThanOrEqual(2); // blocker + visible box
+    const blocker = rects.find((r: any) => r.width === 1280 && r.height === 720 && r.input?.enabled);
+    expect(blocker).toBeDefined();
   });
 });
 
@@ -147,6 +155,23 @@ describe('Sushi Go game-over overlay', () => {
     );
     expect(playBg?.input?.enabled).toBe(true);
     expect(menuBg?.input?.enabled).toBe(true);
+
+    // Verify the full-screen input blocker exists and is interactive
+    const rects = scene.children.list.filter(
+      (child: any) => child instanceof Phaser.GameObjects.Rectangle && child.depth === 10,
+    ) as Phaser.GameObjects.Rectangle[];
+    expect(rects.length).toBeGreaterThanOrEqual(2); // blocker + visible box
+    const blocker = rects.find((r: any) => r.width === 1280 && r.height === 720 && r.input?.enabled);
+    expect(blocker).toBeDefined();
+
+    // Verify dismissal cleans up overlay
+    scene.overlayManager.dismiss();
+    await waitFrames(2);
+    const textsAfterDismiss = scene.children.list.filter(
+      (child: any) => child instanceof Phaser.GameObjects.Text && 
+        (child as Phaser.GameObjects.Text).text.includes('You Win!'),
+    );
+    expect(textsAfterDismiss.length).toBe(0);
   });
 
   it('displays correct final totals including pudding bonuses when provided', async () => {

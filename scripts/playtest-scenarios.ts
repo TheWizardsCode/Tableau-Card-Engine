@@ -86,7 +86,7 @@ const SCENARIOS: ScenarioExpectation[] = [
   },
 ];
 
-// ── Greedy Strategy (same as demo-main-street.ts) ───────────
+// ── Greedy Strategy (same as tests/main-street/smoke-scenario.test.ts) ──
 
 function chooseActions(state: MainStreetState): PlayerAction[] {
   const actions: PlayerAction[] = [];

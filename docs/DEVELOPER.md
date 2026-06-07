@@ -17,6 +17,8 @@ This document covers everything you need to develop, test, and build the Tableau
 - [Replay Tool](#replay-tool)
 - [Managing Assets](#managing-assets)
 - [SVG Rendering & Migration](#svg-rendering--migration)
+- [HUD Layer](#hud-layer)
+- [Card Upgrade Rendering Pipeline](#card-upgrade-rendering-pipeline)
 - [Shared Renderer](#shared-renderer)
 - [Screen Layout Language (SLL)](#screen-layout-language-sll)
 - [Keeping Docs Up to Date](#keeping-docs-up-to-date)
@@ -714,6 +716,34 @@ Lost Cities was the third example game migrated from `scene.load.svg` to SvgHelp
 
 No remaining games use `scene.load.svg`.
 
+## HUD Layer
+
+The project provides a shared HUD (Heads-Up Display) layer abstraction
+that ensures help/settings panels, buttons, and game-state overlays
+render consistently above gameplay content across all example games.
+
+### Components
+
+1.  **`CardGameScene.initHUDContainer()`** — Creates a shared container
+    (`this.hudContainer`) at depth `1000`. Call this early in `create()`
+    before `initHelpPanel()` and `initSettingsPanel()`.
+
+2.  **`OverlayManager`** (`src/ui/OverlayManager.ts`) — A reusable class
+    that manages game-state overlay lifecycle. Supports types:
+    `'game-over'`, `'win/loss'`, `'round-end'`, `'custom'`.
+
+### Depth Convention
+
+| Layer                | Depth  | Purpose                                    |
+|----------------------|--------|--------------------------------------------|
+| HUD container        | 1000   | Help/settings panels, buttons              |
+| Game-state overlays  | 2000   | Win, loss, game-over, round-end overlays   |
+
+### Migration Guide
+
+For detailed migration steps, see
+[docs/HUD-LAYER-MIGRATION.md](HUD-LAYER-MIGRATION.md).
+
 ## Screen Layout Language (SLL)
 
 The project now includes a reusable **Screen Layout Language** for viewport-aware scene layout.
@@ -781,6 +811,167 @@ controller.setMode('scene-only'); // hides shell, shows scene+shared
 ```
 
 Typical use cases: shared app chrome across scenes, scene-specific overrides, browser tests asserting merged anchor positions across DPR/viewports, and debug overlays needing both source layout IDs and resolved pixels.
+
+## Card Upgrade Rendering Pipeline
+
+Main Street uses a **code-based overlay rendering pipeline** to display upgrade state on Business cards. This section documents how the pipeline works, why it was designed this way, and how to extend it.
+
+### Problem
+
+When a player upgrades a Business card in Main Street, the game state updates correctly (level increases, income bonus applies, card name changes) but the visual display must reflect these changes. Creating separate SVG assets for every level variant of every card would cause asset explosion and make maintenance difficult.
+
+### Solution: Code-Based Overlays
+
+Instead of generating separate SVG templates for each card level, the system renders the base SVG card once (cached texture) and draws Phaser text/graphics objects on top as overlays. This approach provides:
+
+- **Performance**: No per-level SVG re-rasterization. Base textures are cached and reused.
+- **Texture caching simplicity**: One texture key per base card, regardless of upgrade state.
+- **Backward compatibility**: Non-upgraded cards (level 0) render identically to before; no visual changes to existing rendering paths.
+- **Testability**: The overlay spec builder is a pure function with no Phaser dependencies.
+
+### Architecture
+
+The pipeline has two layers:
+
+#### Layer 1: Overlay Specification (`UpgradeOverlaySpec.ts`)
+
+Location: `example-games/main-street/scenes/UpgradeOverlaySpec.ts`
+
+This is a **pure data module** with no Phaser or runtime dependencies. It defines three interfaces:
+
+- **`OverlayTextSpec`** – Describes a text overlay with `text`, `x`, `y`, `fontSize`, `color`, and `fontStyle` properties.
+- **`OverlayBorderSpec`** – Describes a border/glow overlay with `color` (hex number) and `strokeWidth` (pixels).
+- **`UpgradeOverlaySpec`** – Combines all overlay elements: `levelBadge`, `incomeText`, `nameText`, and `upgradeBorder`.
+
+The key function is `buildUpgradeOverlaySpec(biz: BusinessCard, width: number, height: number): UpgradeOverlaySpec`:
+
+```
+BusinessCard state ──► buildUpgradeOverlaySpec() ──► UpgradeOverlaySpec
+  (level, name,          (pure function,              (positioned text
+   baseIncome,            no Phaser deps)               specs + border
+   incomeBonus)                                        spec)
+```
+
+**Logic:**
+- Base cards (`level === 0`): All overlay fields are `null` — nothing extra is rendered.
+- Upgraded cards (`level > 0`): All four overlay specs are populated:
+  - **Level badge** — `"Lvl N"` in gold (`#ffdd44`), top-right corner, 10px bold.
+  - **Income text** — `"+N"` (combined `baseIncome + incomeBonus`) in green (`#44ff44`), bottom-center, 12px bold.
+  - **Name overlay** — Upgraded card name in white (`#ffffff`), top-center, 10px bold, with a dark semi-transparent background rectangle for readability.
+  - **Upgrade border** — Golden stroke (`0xffaa22`), 3px width, around the card perimeter.
+
+#### Layer 2: Overlay Rendering (`MainStreetRenderer.applyUpgradeOverlays()`)
+
+Location: `example-games/main-street/scenes/MainStreetRenderer.ts` — `applyUpgradeOverlays()` method.
+
+This method reads the `UpgradeOverlaySpec` and creates Phaser game objects as children of the card's container:
+
+```
+UpgradeOverlaySpec ──► applyUpgradeOverlays() ──► Phaser text/graphics objects
+  (from Layer 1)        (reads spec, creates         (added to card container)
+                         Phaser objects)
+```
+
+**Rendering order (back to front within the container):**
+1. Upgrade border (transparent fill, golden stroke) — drawn behind text but on top of card image.
+2. Name overlay background (dark semi-transparent rectangle) — for readability.
+3. Name text (white bold).
+4. Level badge text (gold, top-right).
+5. Income text (green, bottom-center).
+
+**Call site:** `drawBusinessSlot()` in `MainStreetRenderer.ts`:
+
+```typescript
+// Render base card SVG
+mainStreetRenderCardSvg(s, cardContainer, biz.id, renderW, renderH);
+
+// Apply upgrade overlays on top
+this.applyUpgradeOverlays(cardContainer, biz, renderW, renderH);
+```
+
+### Data Flow Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     Game State Update                           │
+│  Player upgrades Bookshop → Library (level 1→2, income +3→+8)  │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                  refreshStreetGrid()                             │
+│  Iterates over street grid, calls drawBusinessSlot() per card   │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                  drawBusinessSlot()                              │
+│  1. mainStreetRenderCardSvg() → base SVG texture (cached)       │
+│  2. applyUpgradeOverlays() → Phaser overlays on top             │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │
+              ┌────────────┴────────────┐
+              ▼                         ▼
+┌─────────────────────┐     ┌─────────────────────────────┐
+│  Base SVG texture   │     │  buildUpgradeOverlaySpec()  │
+│  (cached, reused)   │     │  → levelBadge: "Lvl 2"      │
+│                     │     │  → incomeText: "+8"          │
+│                     │     │  → nameText: "Library"       │
+│                     │     │  → upgradeBorder: gold 3px   │
+└─────────────────────┘     └──────────────┬──────────────┘
+                                           │
+                                           ▼
+                              ┌─────────────────────────────┐
+                              │  applyUpgradeOverlays()     │
+                              │  Creates Phaser objects:    │
+                              │  - Rectangle (golden border)│
+                              │  - Graphics (name bg)       │
+                              │  - Text (name, level, income)│
+                              └─────────────────────────────┘
+```
+
+### Extending Upgrade Visualizations
+
+To add or modify upgrade overlays:
+
+1. **Modify `buildUpgradeOverlaySpec()`** in `UpgradeOverlaySpec.ts` to compute new overlay specs. Keep it pure — no Phaser imports.
+2. **Modify `applyUpgradeOverlays()`** in `MainStreetRenderer.ts` to create the corresponding Phaser objects.
+3. **Add unit tests** for `buildUpgradeOverlaySpec()` in `tests/main-street/UpgradeOverlaySpec.test.ts` (this file tests the pure spec builder, not Phaser rendering).
+
+**Example: Adding a star icon for level 3+ cards:**
+
+```typescript
+// In UpgradeOverlaySpec.ts — add to the spec interface:
+export interface UpgradeOverlaySpec {
+  // ... existing fields ...
+  /** Star icon overlay for level 3+ cards, null otherwise. */
+  starIcon: OverlayTextSpec | null;
+}
+
+// In buildUpgradeOverlaySpec():
+const starIcon: OverlayTextSpec | null = biz.level >= 3
+  ? { text: '\u2605', x: 4, y: Math.round(height / 2), fontSize: '16px', color: '#ffdd44' }
+  : null;
+
+// In applyUpgradeOverlays() in MainStreetRenderer.ts:
+if (spec.starIcon) {
+  const star = this.scene.add.text(spec.starIcon.x, spec.starIcon.y, spec.starIcon.text, {
+    fontSize: spec.starIcon.fontSize, color: spec.starIcon.color,
+  });
+  container.add(star);
+}
+```
+
+### Why Not SVG-Based Overlays?
+
+An alternative approach would be to generate composite SVGs with embedded level/income text and re-rasterize them per card state. This was considered but rejected because:
+
+- **Asset duplication**: Each card would need SVG variants for each level (Bookshop L1, L2, L3, etc.), multiplying asset count.
+- **Cache complexity**: Texture cache keys would need to encode card state, increasing cache miss rates.
+- **SVG text rendering**: SVG text positioning and font rendering can be inconsistent across browsers, making precise overlay placement harder.
+- **Performance**: Re-rasterizing SVGs on every state change is more expensive than drawing Phaser text objects on top of a cached texture.
+
+The code-based overlay approach keeps the texture cache simple (one key per base card) and leverages Phaser's reliable text rendering.
 
 ## Shared Renderer
 
@@ -1157,6 +1348,218 @@ When adding a new example game, follow this pattern:
 ### Related follow-up scope
 
 - Tutorial-specific layout migration remains tracked separately in work item **Adapt tutorial system to use layout description (CG-0MP7IZ4RK008065O)**.
+
+## Shared HUD Components
+
+The engine provides a collection of reusable HUD (heads-up display) components under `src/ui/` that standardise overlay, sidebar, and button UI across all example games. These components are exported via the core-engine public API (`src/ui/index.ts`) and are consumed through adapter modules in each game.
+
+### Help Panel
+
+The `HelpPanel` class provides a slide-in left sidebar that displays game rules, controls, and tips. It accepts an array of `HelpSection` objects, each with a `heading` and either `body` (plain text) or `render` (custom Phaser renderer) for rich content.
+
+```typescript
+import { HelpPanel, type HelpSection } from '@ui';
+
+const helpPanel = new HelpPanel(this, {
+  sections: [
+    { heading: 'How to Play', body: 'Select cards and build sets...' },
+    { heading: 'Scoring', body: 'Each card contributes...' },
+  ],
+});
+helpPanel.open();   // Slide in from the left
+helpPanel.close();  // Slide out
+helpPanel.toggle(); // Toggle open/closed
+```
+
+**Depth conventions:**
+- Input blocker: 900
+- Panel background: 901
+- Panel content: 902
+- Close button: 903
+- Help button: 1101
+
+**Input blocking:** When open, the panel creates a full-screen transparent interactive rectangle that captures pointer events. Closing the panel removes this blocker.
+
+### Help Button
+
+The `HelpButton` class renders a circular "?" toggle button that opens/closes the associated `HelpPanel`. It renders at depth 1101 (above all gameplay and HUD content).
+
+```typescript
+import { HelpButton } from '@ui';
+
+const helpButton = new HelpButton(this, helpPanel);
+```
+
+### Settings Panel
+
+The `SettingsPanel` class provides a slide-in right sidebar with controls for:
+- Sound mute toggle
+- Volume slider
+- Tooltip visibility toggle
+- Reduced motion toggle
+- Configurable End Turn keybind
+- Difficulty selector (when `difficultyNames` provided)
+
+```typescript
+import { SettingsPanel } from '@ui';
+
+const settingsPanel = new SettingsPanel(this, {
+  soundManager: this.soundManager,
+  difficultyNames: ['Easy', 'Medium', 'Hard'],
+});
+settingsPanel.open();   // Slide in from the right
+settingsPanel.close();  // Slide out
+settingsPanel.toggle(); // Toggle open/closed
+```
+
+**Depth conventions:** Same as HelpPanel (blocker 900, background 901, etc.). Settings button at depth 1102.
+
+### Settings Button
+
+The `SettingsButton` class renders a circular gear icon (\u2699) toggle button that opens/closes the associated `SettingsPanel`. It renders at depth 1102.
+
+```typescript
+import { SettingsButton } from '@ui';
+
+const settingsButton = new SettingsButton(this, settingsPanel);
+```
+
+### Overlay Background System
+
+The shared overlay system provides full-screen modal overlays with input-blocking backgrounds.
+
+```typescript
+import { createOverlayBackground, dismissOverlay } from '@ui';
+
+// Create an overlay with a dark background and a visible centered box
+const { background, box, objects } = createOverlayBackground(
+  scene,
+  { depth: 10, alpha: 0.75 },       // full-screen dark overlay
+  { width: 500, height: 300, alpha: 0.95 }, // centered content box
+);
+
+// Later, dismiss the overlay
+dismissOverlay(objects);
+```
+
+### Overlay Manager
+
+The `OverlayManager` class provides a lifecycle wrapper around the overlay background system.
+
+```typescript
+import { OverlayManager } from '@ui';
+
+const overlayManager = new OverlayManager(scene);
+const overlay = overlayManager.create({ depth: 10 }, { width: 500, height: 300 });
+overlayManager.dismiss(); // Cleans up all managed objects
+```
+
+### Overlay Button
+
+The `createOverlayButton` factory creates interactive text buttons with hover effects, suitable for use in modal overlays (win screens, pause menus, etc.).
+
+```typescript
+import { createOverlayButton } from '@ui';
+
+const playAgainBtn = createOverlayButton(
+  scene,
+  GAME_W / 2, GAME_H / 2 + 50,
+  '[ Play Again ]',
+  11, // depth
+);
+playAgainBtn.on('pointerdown', () => scene.scene.restart());
+```
+
+### Menu Button
+
+The `createOverlayMenuButton` factory creates a "[ Menu ]" button that navigates to the GameSelectorScene when clicked.
+
+```typescript
+import { createOverlayMenuButton } from '@ui';
+
+const menuBtn = createOverlayMenuButton(scene, GAME_W / 2, GAME_H / 2 + 50, 11);
+```
+
+### Parameterized Overlay
+
+The `createParameterizedOverlay` factory combines overlay background, title text, detail text, and action buttons into a single convenient call.
+
+```typescript
+import { createParameterizedOverlay, overlayCenterY } from '@ui';
+
+const objects = createParameterizedOverlay(scene, {
+  title: 'You Win!',
+  titleColor: '#88ff88',
+  detailText: 'Score: 100',
+  titleY: overlayCenterY(-60),
+  detailY: overlayCenterY(-15),
+  titleDepth: 11,
+  detailDepth: 11,
+  background: { depth: 10, alpha: 0.75 },
+  box: { width: 460, height: 280, alpha: 0.9 },
+  buttons: [
+    { label: '[ Play Again ]', x: GAME_W / 2 - 90, y: GAME_H / 2 + 60, onClick: () => scene.scene.restart() },
+  ],
+});
+```
+
+### CardGameScene Base Class
+
+The `CardGameScene` abstract class (at `src/ui/CardGameScene.ts`) provides shared boilerplate for all card game scenes:
+- Event system setup (`GameEventEmitter` + `PhaserEventBridge`)
+- Sound system setup (`SoundManager` + SFX registration)
+- Help and Settings panel initialization via `initHelpPanel()` and `initSettingsPanel()`
+- Replay mode detection
+- Standard shutdown/cleanup via `shutdownBase()`
+
+```typescript
+import { CardGameScene, type HelpSection } from '@ui';
+
+export class MyGameScene extends CardGameScene {
+  constructor() { super({ key: 'MyGameScene' }); }
+
+  create(): void {
+    this.detectReplayMode();
+    this.initEventSystem();
+
+    if (!this.replayMode) {
+      this.initHelpPanel(helpContent as HelpSection[]);
+      this.initSettingsPanel();
+    }
+    // ... game-specific setup ...
+  }
+
+  shutdown(): void {
+    this.shutdownBase();
+  }
+}
+```
+
+The `initHelpPanel()` method creates both `HelpPanel` and `HelpButton`. The `initSettingsPanel()` method creates both `SettingsPanel` and `SettingsButton`. These are accessed via `this.helpPanel`, `this.helpButton`, `this.settingsPanel`, and `this.settingsButton` respectively.
+
+### HUD Container Pattern
+
+Games that need to separate persistent overlay elements (help/settings buttons, panel input blockers) from transient HUD elements (score text, status bars) should use a two-container pattern:
+
+1. **`hudOverlayContainer`** – Persistent container for help/settings buttons and panel input blockers. Not rebuilt during HUD refresh cycles.
+2. **`hudContainer`** – Transient container for HUD text and elements that need to be rebuilt each refresh. Children should be tagged with `_hudTransient: true`.
+
+If no `hudOverlayContainer` exists on the scene, the HelpPanel and SettingsPanel will fall back to `hudContainer`, and if neither exists, they use standard depth layering.
+
+### Depth Convention Summary
+
+| Component | Depth |
+|-----------|-------|
+| Gameplay containers | 0–999 |
+| HUD container (transient) | 1000 |
+| Help panel button | 1101 |
+| Settings panel button | 1102 |
+| Panel input blocker | 900 |
+| Panel background | 901 |
+| Panel content | 902 |
+| Panel close button | 903 |
+| Overlay background | 10–2000 (game-specific) |
+| Overlay buttons | overlay depth + 1 |
 
 ## Keeping Docs Up to Date
 

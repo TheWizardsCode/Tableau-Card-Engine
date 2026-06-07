@@ -1,10 +1,12 @@
 /**
  * Golf Adapter – bridges Golf scene rendering to the shared Renderer API.
  *
- * Re-exports shared helpers (`createHudText`, `createActionButton`,
- * `createHudContainer`) and provides Golf-specific defaults for HUD text
- * so that `GolfRenderer`, `GolfOverlayManager`, and `GolfReplayController`
- * can use engine-standard patterns without duplicating styling logic.
+ * Re-exports shared helpers (`createHudText`, `createHudContainer`,
+ * `createSceneTitle`, `createSceneMenuButton`, `createOverlayBackground`,
+ * `dismissOverlay`, `getCardTexture`) and provides Golf-specific defaults
+ * for HUD text so that `GolfRenderer`, `GolfOverlayManager`, and
+ * `GolfReplayController` can use engine-standard patterns without
+ * duplicating styling logic.
  *
  * @module GolfAdapter
  */
@@ -12,8 +14,8 @@
 import Phaser from 'phaser';
 import {
   createHudText as sharedCreateHudText,
-  createActionButton as sharedCreateActionButton,
   createHudContainer as sharedCreateHudContainer,
+  createActionButton as sharedCreateActionButton,
   HudTextOptions,
   ActionButtonOptions,
 } from '../index';
@@ -23,7 +25,7 @@ import {
 import {
   createSceneTitle as sharedCreateSceneTitle,
   createSceneMenuButton as sharedCreateSceneMenuButton,
-} from '../../SceneHeader';
+} from '../index';
 import {
   createOverlayBackground as sharedCreateOverlayBackground,
   dismissOverlay as sharedDismissOverlay,
@@ -32,7 +34,6 @@ import { FONT_FAMILY } from '../../../ui/constants';
 
 // Re-export shared helpers so callers can import from a single adapter module.
 export { sharedCreateHudText as createHudText };
-export { sharedCreateActionButton as createActionButton };
 export { sharedCreateHudContainer as createHudContainer };
 export { sharedGetCardTexture as getCardTexture };
 export { sharedCreateSceneTitle as createSceneTitle };

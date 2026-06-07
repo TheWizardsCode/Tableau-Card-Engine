@@ -31,6 +31,7 @@ import { LCTranscriptRecorder } from '../GameTranscript';
 import type { EventSoundMapping } from '../../../src/core-engine/SoundManager';
 import {
   CardGameScene,
+  OverlayManager,
   createSceneHeader,
   TooltipManager,
   FONT_FAMILY,
@@ -51,7 +52,7 @@ import {
 } from './LostCitiesConstants';
 import { LostCitiesRenderer } from './LostCitiesRenderer';
 import { LostCitiesAnimator } from './LostCitiesAnimator';
-import { LostCitiesOverlayManager } from './LostCitiesOverlayManager';
+import { LostCitiesOverlayHelper } from './LostCitiesOverlays';
 import { TOOLTIP_BG_COLOR, TOOLTIP_BG_ALPHA, TOOLTIP_PAD, TOOLTIP_DEPTH, TOOLTIP_MAX_W } from './LostCitiesConstants';
 // TooltipManager imported from shared src/ui (LostCitiesTooltipManager migrated)
 import { LostCitiesReplayController } from './LostCitiesReplayController';
@@ -69,7 +70,8 @@ export class LostCitiesScene extends CardGameScene {
   // Helpers
   private lcRenderer!: LostCitiesRenderer;
   private animator!: LostCitiesAnimator;
-  private overlayManager!: LostCitiesOverlayManager;
+  private overlayManager!: OverlayManager;
+  private overlayHelper!: LostCitiesOverlayHelper;
   private tooltipManager!: TooltipManager;
   private currentTooltipColor: ExpeditionColor | null = null;
   private replayController!: LostCitiesReplayController;
@@ -110,6 +112,7 @@ export class LostCitiesScene extends CardGameScene {
 
     this.detectReplayMode();
     this.initEventSystem();
+    this.initHUDContainer();
 
     this.session = setupLostCitiesGame({
       playerNames: ['You', 'AI'],
@@ -121,7 +124,7 @@ export class LostCitiesScene extends CardGameScene {
     // Create helpers
     this.lcRenderer = new LostCitiesRenderer(this, this.session);
     this.animator = new LostCitiesAnimator(this, this.session, this.lcRenderer);
-    this.overlayManager = new LostCitiesOverlayManager(this, this.session, this.recorder);
+    this.overlayManager = new OverlayManager(this);
     this.tooltipManager = this.createTooltipManager();
     this.replayController = new LostCitiesReplayController(this.session);
 
@@ -134,21 +137,19 @@ export class LostCitiesScene extends CardGameScene {
       {
         onPhaseChange: (phase) => this.setPhase(phase),
         onRefreshAll: () => this.lcRenderer.refreshAll((idx) => this.turnController.onHandCardClick(idx)),
-        onShowRoundSummary: (score) => this.overlayManager.showRoundSummary(score),
-        onShowMatchSummary: (score) => this.overlayManager.showMatchSummary(score),
+        onShowRoundSummary: (score) => this.overlayHelper.showRoundSummary(score),
+        onShowMatchSummary: (score) => this.overlayHelper.showMatchSummary(score),
         onRunAiTurn: () => this.turnController.runAiTurn(),
         onIllegalMove: (sprite) => this.animator.showIllegalMoveFlash(sprite, this.soundManager),
         onPlaySound: (key) => this.soundManager?.play(key),
       },
     );
 
-    this.overlayManager.setCallbacks(
-      () => {
-        this.lcRenderer.refreshAll((idx) => this.turnController.onHandCardClick(idx));
-        this.turnController.checkNextTurn();
-      },
-      () => this.scene.restart(),
-    );
+    const onNextRound = () => {
+      this.lcRenderer.refreshAll((idx) => this.turnController.onHandCardClick(idx));
+      this.turnController.checkNextTurn();
+    };
+    this.overlayHelper = new LostCitiesOverlayHelper(this, this.overlayManager, this.session, this.recorder, onNextRound, () => this.scene.restart());
 
     createSceneHeader(this, 'Lost Cities');
     this.lcRenderer.createGraphics();
@@ -372,6 +373,7 @@ export class LostCitiesScene extends CardGameScene {
   shutdown(): void {
     markSceneInvalid(this);
     this.overlayManager.dismiss();
+    this.overlayHelper.dismiss();
     this.shutdownBase();
   }
 }

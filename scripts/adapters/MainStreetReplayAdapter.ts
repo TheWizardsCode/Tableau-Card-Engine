@@ -4,9 +4,9 @@ import type { ReplayAdapter, ValidationResult, TakeoverOptions } from './ReplayA
 /**
  * Minimal ReplayAdapter for Main Street.
  *
- * This adapter accepts transcripts produced by scripts/demo-main-street.ts
- * (legacy shape with `game: 'main-street'`) as well as the engine's
- * serialized checkpoint shape (gameType: 'main-street' with initialState).
+ * This adapter accepts Main Street transcripts (legacy shape with
+ * `game: 'main-street'`) as well as the engine's serialized checkpoint
+ * shape (gameType: 'main-street' with initialState).
  *
  * For thumbnail generation we do a lightweight injection: if the scene
  * exposes `loadBoardState()` we call it with either `initialState` (when

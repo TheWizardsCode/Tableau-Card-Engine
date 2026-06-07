@@ -26,12 +26,13 @@ import {
 } from '../MainStreetMarket';
 import {
   FONT_FAMILY,
-  createSceneTitle,
-  createSceneMenuButton,
   attachSelection,
+  markHudTransient,
+  clearTransientHud,
 } from '../../../src/ui';
+import { createSceneTitle, createSceneMenuButton } from '@ui/Renderer';
+import { createActionButton } from '@ui/Renderer';
 import {
-  createActionButton,
   attachHudTooltipZone,
   mainStreetRenderCardSvg,
   createMainStreetHintButton,
@@ -50,13 +51,18 @@ import {
   LOG_TITLE_H,
   type SceneLayout,
 } from './MainStreetConstants';
+
+import {
+  buildUpgradeOverlaySpec,
+  type UpgradeOverlaySpec,
+} from './UpgradeOverlaySpec';
+
+// Re-export for test imports
+export { buildUpgradeOverlaySpec, type UpgradeOverlaySpec };
+
 import { computeMainStreetLayoutWithSll } from './MainStreetLayoutAdapter';
 
-/** Tag a Phaser game object as transient so `refreshHud()` knows to destroy it on the next refresh. */
-function markHudTransient<T extends Phaser.GameObjects.GameObject>(obj: T): T & { _hudTransient: true } {
-  (obj as any)._hudTransient = true;
-  return obj as T & { _hudTransient: true };
-}
+// markHudTransient and clearTransientHud are now imported from src/ui/Renderer
 
 export class MainStreetRenderer {
   constructor(private readonly scene: any) {}
@@ -171,12 +177,7 @@ export class MainStreetRenderer {
     // not destroyed on each refresh.  Using removeAll(true) would destroy those persistent
     // children, breaking their parentContainer reference and causing the SidebarOverlay test
     // (and the live game) to lose the panels after the first refresh.
-    const hudList = [...s.hudContainer.list] as Array<Phaser.GameObjects.GameObject & { _hudTransient?: boolean }>;
-    for (const child of hudList) {
-      if (child._hudTransient) {
-        s.hudContainer.remove(child, true);
-      }
-    }
+    clearTransientHud(s.hudContainer);
 
     const score = computeScore(s.state);
     const { coins, reputation } = s.state.resourceBank;
@@ -340,6 +341,10 @@ export class MainStreetRenderer {
     // Render card via shared adapter
     const cardContainer = s.add.container(Math.round(x + slotW / 2), Math.round(y + slotH / 2));
     mainStreetRenderCardSvg(s, cardContainer, biz.id, renderW, renderH);
+
+    // Apply upgrade overlays (level badge, income, name, border)
+    this.applyUpgradeOverlays(cardContainer, biz, renderW, renderH);
+
     s.streetContainer.add(cardContainer);
 
     if (isHinted) {
@@ -370,6 +375,98 @@ export class MainStreetRenderer {
     }
   }
 
+  /**
+   * Apply upgrade overlay visuals to a business card container.
+   *
+   * Renders level badge, income text, name overlay, and upgrade border
+   * based on the card's current upgrade state (level > 0).
+   *
+   * @param container - The Phaser container holding the card image.
+   * @param biz - The BusinessCard with upgrade state.
+   * @param width - Card display width.
+   * @param height - Card display height.
+   */
+  private applyUpgradeOverlays(
+    container: Phaser.GameObjects.Container,
+    biz: BusinessCard,
+    width: number,
+    height: number,
+  ): void {
+    const spec = buildUpgradeOverlaySpec(biz, width, height);
+
+    // Upgrade border (drawn behind text overlays but on top of card image)
+    if (spec.upgradeBorder) {
+      const border = this.scene.add.rectangle(0, 0, width, height);
+      border.setStrokeStyle(spec.upgradeBorder.strokeWidth, spec.upgradeBorder.color);
+      border.setFillStyle(0x000000, 0);
+      container.add(border);
+    }
+
+    // Level badge (top-right)
+    if (spec.levelBadge) {
+      const lvlText = this.scene.add.text(
+        spec.levelBadge.x,
+        spec.levelBadge.y,
+        spec.levelBadge.text,
+        {
+          fontSize: spec.levelBadge.fontSize ?? '10px',
+          fontStyle: spec.levelBadge.fontStyle,
+          color: spec.levelBadge.color,
+          fontFamily: FONT_FAMILY,
+        },
+      );
+      lvlText.setOrigin(1, 0);
+      container.add(lvlText);
+    }
+
+    // Name overlay (top center) for upgraded cards
+    if (spec.nameText) {
+      const nameText = this.scene.add.text(
+        spec.nameText.x,
+        spec.nameText.y,
+        spec.nameText.text,
+        {
+          fontSize: spec.nameText.fontSize ?? '10px',
+          fontStyle: spec.nameText.fontStyle,
+          color: spec.nameText.color,
+          fontFamily: FONT_FAMILY,
+        },
+      );
+      nameText.setOrigin(0.5, 0);
+      // Add a subtle dark background for readability
+      const bg = this.scene.add.graphics();
+      const textWidth = nameText.width + 8;
+      const textHeight = nameText.height + 2;
+      bg.fillStyle(0x000000, 0.6);
+      bg.fillRoundedRect(
+        spec.nameText.x - textWidth / 2,
+        spec.nameText.y - 1,
+        textWidth,
+        textHeight,
+        2,
+      );
+      container.add(bg);
+      container.add(nameText);
+    }
+
+    // Income text (bottom center)
+    if (spec.incomeText) {
+      const incomeText = this.scene.add.text(
+        spec.incomeText.x,
+        spec.incomeText.y,
+        spec.incomeText.text,
+        {
+          fontSize: spec.incomeText.fontSize ?? '12px',
+          fontStyle: spec.incomeText.fontStyle,
+          color: spec.incomeText.color,
+          fontFamily: FONT_FAMILY,
+        },
+      );
+      incomeText.setOrigin(0.5, 1);
+      container.add(incomeText);
+    }
+  }
+
   public drawEmptySlot(x: number, y: number, index: number): void {
     const s = this.scene;
     const { slotW, slotH } = s.layout;
@@ -386,8 +483,8 @@ export class MainStreetRenderer {
     bg.setStrokeStyle(strokeWidth, strokeColor);
     s.streetContainer.add(bg);
 
-    // Slot number
-    const idxText = s.add.text(x + slotW / 2, y + slotH / 2, `${index}`, {
+    // Slot number (1-indexed for readability: 1-10)
+    const idxText = s.add.text(x + slotW / 2, y + slotH / 2, `${index + 1}`, {
       fontSize: '18px', color: (isSelectable || isHinted) ? '#ffdd44' : '#666655',
       fontFamily: FONT_FAMILY,
     }).setOrigin(0.5);
@@ -410,15 +507,18 @@ export class MainStreetRenderer {
     s.marketSelectionByCardId.clear();
     s.selectedMarketCardId = null;
 
-    const { gameW, marketTop, marketRowH, marketRowGap } = s.layout;
+    const { gameW, marketTop, marketRowH, marketRowGap, marketCardW, marketCardGap, marketLabelW } = s.layout;
 
     // Section background (2 rows: business + investments)
+    // Calculate actual right edge from the widest row (business: 4 slots)
+    const marketStartX = marketLabelW + 50;
+    const marketRight = marketStartX + (MARKET_BUSINESS_SLOTS - 1) * (marketCardW + marketCardGap) + marketCardW + 20;
     const totalH = 2 * marketRowH + marketRowGap + 20;
     const bgBox = s.add.graphics();
     bgBox.fillStyle(BOX_FILL, 0.3);
-    bgBox.fillRoundedRect(20, marketTop - 10, gameW - 40, totalH, BOX_RADIUS);
+    bgBox.fillRoundedRect(20, marketTop - 10, marketRight - 20, totalH, BOX_RADIUS);
     bgBox.lineStyle(1, BOX_STROKE, 0.4);
-    bgBox.strokeRoundedRect(20, marketTop - 10, gameW - 40, totalH, BOX_RADIUS);
+    bgBox.strokeRoundedRect(20, marketTop - 10, marketRight - 20, totalH, BOX_RADIUS);
     s.marketContainer.add(bgBox);
 
     const sectionLabel = s.add.text(gameW / 2, marketTop - 4, 'Market', {

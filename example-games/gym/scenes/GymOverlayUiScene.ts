@@ -116,6 +116,10 @@ export class GymOverlayUiScene extends GymSceneBase {
       maskShape.fillStyle(0xffffff, 1);
       maskShape.fillRect(0, 0, 300, 200);
       this.contentMask = new Phaser.Display.Masks.GeometryMask(this, maskShape);
+      // Hide the mask shape — it provides geometry data for the mask but
+      // should not be rendered as a visible white rectangle at (0,0) behind
+      // the semi-transparent overlay background.
+      maskShape.setVisible(false);
       this.overlayObjects.push(maskShape);
 
       // Create a container for content that will be clipped

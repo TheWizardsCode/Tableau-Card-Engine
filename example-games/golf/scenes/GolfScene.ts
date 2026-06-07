@@ -25,6 +25,7 @@ import {
   CardGameScene,
   preloadCardAssets,
   PhaseManager,
+  OverlayManager,
 } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
 import helpContent from '../help-content.json';
@@ -37,8 +38,9 @@ import { GolfRenderer } from './GolfRenderer';
 import { GolfAnimator } from './GolfAnimator';
 import { GolfTurnController } from './GolfTurnController';
 import { GolfAiController } from './GolfAiController';
-import { GolfOverlayManager } from './GolfOverlayManager';
+
 import { GolfReplayController } from './GolfReplayController';
+import { GolfOverlayHelper } from './GolfSceneHelpers';
 
 export class GolfScene extends CardGameScene {
   // Game state
@@ -78,7 +80,8 @@ export class GolfScene extends CardGameScene {
   private animator!: GolfAnimator;
   private turnController!: GolfTurnController;
   private aiController!: GolfAiController;
-  private overlayManager!: GolfOverlayManager;
+  private overlayManager!: OverlayManager;
+  private overlayHelper!: GolfOverlayHelper;
   private replayController!: GolfReplayController;
 
   constructor() {
@@ -138,6 +141,7 @@ export class GolfScene extends CardGameScene {
 
     // Event system: create emitter and bridge to Phaser scene events
     this.initEventSystem();
+    this.initHUDContainer();
 
     // Sound system: wrap Phaser's sound manager as a SoundPlayer
     if (!this.replayMode) {
@@ -180,8 +184,10 @@ export class GolfScene extends CardGameScene {
       this.phaseManager,
       this.gameEvents,
     );
-    this.overlayManager = new GolfOverlayManager(
+    this.overlayManager = new OverlayManager(this);
+    this.overlayHelper = new GolfOverlayHelper(
       this,
+      this.overlayManager,
       this.session,
       this.recorder,
       this.gameEvents,
@@ -432,13 +438,14 @@ export class GolfScene extends CardGameScene {
 
   /** Clean up resources when the scene shuts down. */
   shutdown(): void {
+    this.overlayManager?.dismiss();
     this.shutdownBase();
   }
 
   // ── End screen ──────────────────────────────────────────
 
   private showEndScreen(): void {
-    this.overlayManager.showEndScreen(
+    this.overlayHelper.showEndScreen(
       (player) => this.golfRenderer.refreshGrid(player),
       () => this.golfRenderer.refreshScores(),
     );

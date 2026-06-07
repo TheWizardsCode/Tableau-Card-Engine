@@ -3,6 +3,7 @@
  */
 
 import { GAME_W, GAME_H, FONT_FAMILY } from '../../../src/ui';
+import { createSceneTitle, createSceneMenuButton } from '@ui/Renderer';
 import type { SushiGoCard, SushiGoCardType } from '../SushiGoCards';
 import { cardLabel } from '../SushiGoCards';
 import type { SushiGoSession } from '../SushiGoGame';
@@ -30,9 +31,8 @@ export class SushiGoRenderer {
   ) {}
 
   createHeader(): void {
-    const ui = require('../../../src/ui');
-    ui.createSceneMenuButton(this.scene);
-    ui.createSceneTitle(this.scene, 'Sushi Go!');
+    createSceneMenuButton(this.scene);
+    createSceneTitle(this.scene, 'Sushi Go!');
   }
 
   createLabels(): void {

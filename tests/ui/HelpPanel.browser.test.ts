@@ -110,4 +110,102 @@ describe('HelpPanel browser tests', () => {
       console.error = originalError;
     }
   });
+
+  it('should export HelpButtonPosition and SettingsButtonPosition types', async () => {
+    const ui = await import('../../src/ui/index');
+    // Type-only exports cannot be checked at runtime, but we can verify
+    // that the module imports without errors and the types are available
+    expect(ui.HelpPanel).toBeDefined();
+    expect(ui.SettingsPanel).toBeDefined();
+  });
+
+  it('should allow showButton:false to suppress button creation', async () => {
+    // Create a minimal game just to test HelpPanel with showButton:false
+    let container = document.getElementById('game-container');
+    if (container) container.remove();
+    container = document.createElement('div');
+    container.id = 'game-container';
+    document.body.appendChild(container);
+
+    const { createGolfGame } = await import(
+      '../../example-games/golf/createGolfGame'
+    );
+    game = createGolfGame();
+    await waitForScene(game, 'GolfScene');
+    const scene = game.scene.getScene('GolfScene') as Phaser.Scene;
+
+    // Create a HelpPanel with showButton: false
+    const { HelpPanel } = await import('../../src/ui/HelpPanel');
+    const panel = new HelpPanel(scene, {
+      sections: [{ heading: 'Test', body: 'Test body' }],
+      showButton: false,
+    });
+
+    expect(panel.helpButton).toBeNull();
+
+    // Cleanup
+    panel.destroy();
+  });
+
+  it('should allow showButton:true (default) to create a button', async () => {
+    // Create a minimal game just to test HelpPanel with showButton:true
+    let container = document.getElementById('game-container');
+    if (container) container.remove();
+    container = document.createElement('div');
+    container.id = 'game-container';
+    document.body.appendChild(container);
+
+    const { createGolfGame } = await import(
+      '../../example-games/golf/createGolfGame'
+    );
+    game = createGolfGame();
+    await waitForScene(game, 'GolfScene');
+    const scene = game.scene.getScene('GolfScene') as Phaser.Scene;
+
+    const { HelpPanel } = await import('../../src/ui/HelpPanel');
+    const panel = new HelpPanel(scene, {
+      sections: [{ heading: 'Test', body: 'Test body' }],
+    });
+
+    // Default: showButton is true, so helpButton should exist
+    expect(panel.helpButton).not.toBeNull();
+    expect(panel.helpButton).toBeDefined();
+
+    // Cleanup
+    panel.destroy();
+  });
+
+  it('should destroy the integrated button when panel is destroyed', async () => {
+    let container = document.getElementById('game-container');
+    if (container) container.remove();
+    container = document.createElement('div');
+    container.id = 'game-container';
+    document.body.appendChild(container);
+
+    const { createGolfGame } = await import(
+      '../../example-games/golf/createGolfGame'
+    );
+    game = createGolfGame();
+    await waitForScene(game, 'GolfScene');
+    const scene = game.scene.getScene('GolfScene') as Phaser.Scene;
+
+    const { HelpPanel } = await import('../../src/ui/HelpPanel');
+    const panel = new HelpPanel(scene, {
+      sections: [{ heading: 'Test', body: 'Test body' }],
+    });
+
+    // Button exists
+    expect(panel.helpButton).not.toBeNull();
+    const btn = panel.helpButton!;
+
+    // Destroy panel
+    panel.destroy();
+
+    // Button should be destroyed (destroyed flag set, objects cleaned up)
+    // HelpButton.destroy() is idempotent, so calling it again is safe
+    btn.destroy();
+
+    // Panel's helpButton should be null after destroy
+    expect(panel.helpButton).toBeNull();
+  });
 });

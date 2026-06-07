@@ -431,9 +431,9 @@ The layout stacks vertically: Market on top (business row + investments row), in
 | `full-turn.test.ts` | Simulate one complete turn (buy, place, income, night event, end check) and verify state transitions |
 | `full-game.test.ts` | Run a scripted 20-turn game to victory/loss and verify transcript correctness |
 
-### 7.3 Demo Script
+### 7.3 Smoke Test
 
-`scripts/demo-main-street.ts` -- Runs a headless deterministic game with a fixed seed, executing a pre-scripted action sequence, and emits a JSON transcript to stdout. Can be run with `npx tsx scripts/demo-main-street.ts`.
+`tests/main-street/smoke-scenario.test.ts` -- Runs a headless deterministic game with a fixed seed (e.g. `smoke-1`), executes a greedy strategy, and validates the transcript output. Included in `npm test`.
 
 ### 7.4 Playtest Checklist
 
@@ -509,11 +509,11 @@ npm run dev
 # Open browser to http://localhost:3000
 # Click "Main Street" in the Game Selector
 
-# Run tests
+# Run tests (includes smoke test)
 npm test
 
-# Run headless demo with fixed seed
-npx tsx scripts/demo-main-street.ts
+# Run smoke test directly
+npx vitest run --project unit tests/main-street/smoke-scenario.test.ts
 
 # Production build
 npm run build

@@ -72,13 +72,11 @@ export class HelpButton {
 
     this.setPosition(this.posX, this.posY);
 
-    // Do NOT parent the button visuals into hudContainer directly — hudContainer
-    // is rebuilt every refresh in some scenes which would remove persistent
-    // button visuals. Prefer hudOverlayContainer when available; otherwise
-    // leave as top-level children and rely on high depth to keep them above
-    // gameplay elements.
+    // Parent button visuals into the shared HUD container for consistent
+    // top-layer rendering. The HUD container is stable and not rebuilt
+    // per refresh (unlike per-game scene containers).
     try {
-      const overlayRoot: any = (scene as any).hudOverlayContainer ?? null;
+      const overlayRoot: any = (scene as any).hudContainer ?? null;
       if (overlayRoot && typeof overlayRoot.add === 'function') {
         try { overlayRoot.add(this.circle); overlayRoot.add(this.label); overlayRoot.add(this.hitArea); } catch (_) { /* ignore */ }
       }

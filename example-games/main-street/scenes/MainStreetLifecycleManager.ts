@@ -11,10 +11,10 @@ import { BG_COLOR, SFX_KEYS } from './MainStreetConstants';
 import { MainStreetRenderer } from './MainStreetRenderer';
 import { MainStreetAnimator } from './MainStreetAnimator';
 import { MainStreetTurnController } from './MainStreetTurnController';
-import { MainStreetOverlayManager } from './MainStreetOverlayManager';
+import { MainStreetOverlayContent } from './MainStreetOverlayContent';
 import { MainStreetInputManager } from './MainStreetInputManager';
 import { MainStreetSvgTextureManager } from './MainStreetSvgTextureManager';
-import { MainStreetTutorialOverlayManager } from './MainStreetTutorialOverlayManager';
+import { MainStreetTutorialHints } from './MainStreetTutorialHints';
 import { TutorialOfferModal } from './TutorialOfferModal';
 import {
   BrowserLocalStorageAdapter,
@@ -127,7 +127,7 @@ export class MainStreetLifecycleManager {
     // Initialize helpers needed during reset and early lifecycle callbacks
     s.msAnimator = new MainStreetAnimator(s);
     s.msTurnController = new MainStreetTurnController(s);
-    s.msOverlayManager = new MainStreetOverlayManager(s);
+    s.msOverlayManager = new MainStreetOverlayContent(s);
     s.msInputManager = new MainStreetInputManager(s);
     s.msSvgTextureManager = new MainStreetSvgTextureManager(s);
 
@@ -161,6 +161,7 @@ export class MainStreetLifecycleManager {
 
     s.detectReplayMode();
     s.initEventSystem();
+    s.initHUDContainer();
 
     // Sound (re-use existing audio assets)
     // Register Main Street SFX and map common events to logical sound keys.
@@ -198,7 +199,7 @@ export class MainStreetLifecycleManager {
     s.msRenderer = new MainStreetRenderer(s);
     s.msAnimator = new MainStreetAnimator(s);
     s.msTurnController = new MainStreetTurnController(s);
-    s.msOverlayManager = new MainStreetOverlayManager(s);
+    s.msOverlayManager = new MainStreetOverlayContent(s);
     s.msInputManager = new MainStreetInputManager(s);
     s.msSvgTextureManager = new MainStreetSvgTextureManager(s);
     s.layout = s.computeLayout();
@@ -207,7 +208,7 @@ export class MainStreetLifecycleManager {
     // Create tutorial overlay manager early so it's available to any async
     // callbacks (campaign load) that may want to auto-show the tutorial.
     try {
-      (s as any).tutorialOverlay = new MainStreetTutorialOverlayManager(s, () => {
+      (s as any).tutorialOverlay = new MainStreetTutorialHints(s, () => {
         try {
           // On tutorial overlay completion, persist tutorial completion state
           const tutorialState = loadTutorialState(new BrowserLocalStorageAdapter());

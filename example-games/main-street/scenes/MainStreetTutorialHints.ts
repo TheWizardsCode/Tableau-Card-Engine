@@ -1,5 +1,5 @@
 /**
- * MainStreetTutorialOverlayManager -- Non-interactive tutorial overlays for Main Street.
+ * MainStreetTutorialHints -- Non-interactive tutorial overlays for Main Street.
  *
  * Displays a sequence of contextual tooltip hints that highlight key UI
  * regions (market, street slots, hand, action controls, scoring).
@@ -8,7 +8,7 @@
  * The player can dismiss individual hints or toggle the whole tutorial off.
  *
  * Usage:
- *   const mgr = new MainStreetTutorialOverlayManager(scene);
+ *   const mgr = new MainStreetTutorialHints(scene);
  *   mgr.showStep(0);        // show first hint
  *   mgr.nextStep();         // advance to next hint
  *   mgr.dismiss();          // hide all hints
@@ -234,7 +234,7 @@ const HIGHLIGHT_BORDER_ALPHA = 0.8;
 // ── Manager ──────────────────────────────────────────────────
 
 /** Manages the lifecycle of all tutorial overlay objects. */
-export class MainStreetTutorialOverlayManager {
+export class MainStreetTutorialHints {
   private objects: Phaser.GameObjects.GameObject[] = [];
   private currentStep = 0;
   private visible = false;
@@ -651,20 +651,29 @@ export class MainStreetTutorialOverlayManager {
     switch (zone) {
       case 'center-modal':
         return null; // overlay is already centred
-      case 'hud':
-        return { x: 0, y: 0, w: l.gameW, h: l.hudH ?? 40 };
-      case 'market-business-row': {
-        const slots = MARKET_BUSINESS_SLOTS;
-        const totalW = slots * l.marketCardW + (slots - 1) * l.marketCardGap;
-        return { x: 40, y: l.marketTop - 6, w: Math.max(200, totalW + 80), h: l.marketRowH + 16 };
+      case 'hud': {
+        // HUD strip is a Phaser rectangle centered at hudY with height 28.
+        // The strip's top edge is at hudY - 14.
+        return { x: 0, y: l.hudY - 14, w: l.gameW, h: 28 };
       }
-      case 'street-grid':
+      case 'market-business-row': {
+        // Market has TWO rows: business (top) + investments (bottom).
+        // The renderer draws the section background aligned to the business row cards
+        // with +20px right padding.
+        const marketStartX = l.marketLabelW + 50;
+        const marketRight = marketStartX + (MARKET_BUSINESS_SLOTS - 1) * (l.marketCardW + l.marketCardGap) + l.marketCardW + 20;
         return {
-          x: l.streetX,
-          y: l.streetTop,
-          w: l.streetCols * l.slotW + (l.streetCols - 1) * l.slotGap,
-          h: 2 * l.slotH + l.streetRowGap,
+          x: 20,
+          y: l.marketTop - 10,
+          w: marketRight - 20,
+          h: 2 * l.marketRowH + l.marketRowGap + 20,
         };
+      }
+      case 'street-grid': {
+        // Street grid spans the full width of the screen, two rows of slots.
+        const streetH = 2 * l.slotH + l.streetRowGap + 12;
+        return { x: 0, y: l.streetTop - 6, w: l.gameW, h: streetH };
+      }
       case 'end-turn-button': {
         const rightX = l.gameW - 24;
         return { x: rightX - l.actionButtonW - 20, y: l.actionY - 4, w: l.actionButtonW + 20, h: l.actionButtonH + 8 };
@@ -674,7 +683,16 @@ export class MainStreetTutorialOverlayManager {
         return { x: 20, y: l.queueTop - 6, w: totalW, h: l.queueCardH + 16 };
       }
       case 'investments-row': {
-        return { x: 40, y: l.marketTop + l.marketRowH + l.marketRowGap - 6, w: l.gameW - 80, h: l.marketRowH + 16 };
+        // Investments row is the second (bottom) market row.
+        // Uses same left alignment and right padding as business row.
+        const marketStartX = l.marketLabelW + 50;
+        const marketRight = marketStartX + (MARKET_BUSINESS_SLOTS - 1) * (l.marketCardW + l.marketCardGap) + l.marketCardW + 20;
+        return {
+          x: 20,
+          y: l.marketTop + l.marketRowH + l.marketRowGap,
+          w: marketRight - 20,
+          h: l.marketRowH,
+        };
       }
       case 'help-button': {
         return { x: l.gameW - 120, y: l.actionY - 4, w: 100, h: l.actionButtonH + 8 };

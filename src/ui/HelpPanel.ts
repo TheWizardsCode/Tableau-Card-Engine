@@ -7,8 +7,17 @@
  * @module @ui/HelpPanel
  */
 import Phaser from 'phaser';
+import { HelpButton } from './HelpButton';
 
 // ── Public types ────────────────────────────────────────────
+
+/** Optional position override for the integrated help button. */
+export interface HelpButtonPosition {
+  /** X position. Defaults to top-right corner. */
+  x?: number;
+  /** Y position. Defaults to top-right corner. */
+  y?: number;
+}
 
 /** A single content section displayed in the help panel. */
 export interface HelpSection {
@@ -33,6 +42,17 @@ export interface HelpPanelConfig {
   animationDuration?: number;
   /** Keyboard shortcut key code to toggle the panel. Default: 'FORWARD_SLASH' (with shift = '?'). */
   toggleKey?: string;
+  /**
+   * When true (the default), automatically create a HelpButton that
+   * toggles this panel. Set to false to manage the button yourself.
+   */
+  showButton?: boolean;
+  /**
+   * Optional position override for the integrated help button. When
+   * provided, the button is placed at these coordinates instead of
+   * the default top-right position.
+   */
+  buttonPosition?: HelpButtonPosition;
 }
 
 // ── Style constants ─────────────────────────────────────────
@@ -82,7 +102,14 @@ export { DEPTH_HELP_BUTTON };
 
 export class HelpPanel {
   private readonly scene: Phaser.Scene;
-  private readonly config: Required<HelpPanelConfig>;
+  private readonly config: {
+    sections: HelpPanelConfig['sections'];
+    widthPercent: number;
+    animationDuration: number;
+    toggleKey: string;
+    showButton: boolean;
+    buttonPosition: HelpPanelConfig['buttonPosition'];
+  };
   private readonly panelWidth: number;
   private readonly canvasHeight: number;
 
@@ -108,15 +135,34 @@ export class HelpPanel {
 
   // Keyboard
   private keyboardListener: ((event: KeyboardEvent) => void) | null = null;
+  private _helpButton: HelpButton | null = null;
+
+  /**
+   * The integrated help button, or `null` when `showButton` is false.
+   */
+  get helpButton(): HelpButton | null {
+    return this._helpButton;
+  }
 
   constructor(scene: Phaser.Scene, config: HelpPanelConfig) {
     this.scene = scene;
+    const showButton = config.showButton ?? true;
     this.config = {
       sections: config.sections,
       widthPercent: config.widthPercent ?? 35,
       animationDuration: config.animationDuration ?? 300,
       toggleKey: config.toggleKey ?? 'FORWARD_SLASH',
+      showButton,
+      buttonPosition: config.buttonPosition,
     };
+
+    // Create integrated button when showButton is true
+    if (showButton) {
+      this._helpButton = new HelpButton(scene, this, {
+        x: config.buttonPosition?.x,
+        y: config.buttonPosition?.y,
+      });
+    }
 
     const canvasWidth = scene.scale.width;
     this.canvasHeight = scene.scale.height;
@@ -164,10 +210,10 @@ export class HelpPanel {
     // Setup scrolling mask and track bar
     this.setupScrollMask(contentTopY);
 
-    // After constructing child objects, parent into overlay root (if present)
+    // After constructing child objects, parent into HUD container (if present)
     // and apply absolute depths so the panel renders above gameplay.
     try {
-      const overlayRoot: any = (scene as any).hudOverlayContainer ?? (scene as any).hudContainer;
+      const overlayRoot: any = (scene as any).hudContainer;
       if (overlayRoot && typeof overlayRoot.add === 'function') {
         try {
           overlayRoot.add(this.container);
@@ -212,7 +258,7 @@ export class HelpPanel {
 
     // Ensure panel sits at top of overlay root ordering when opened.
     try {
-      const overlayRoot: any = (this.scene as any).hudOverlayContainer ?? (this.scene as any).hudContainer;
+      const overlayRoot: any = (this.scene as any).hudContainer;
       if (overlayRoot && typeof overlayRoot.bringToTop === 'function') {
         try { overlayRoot.bringToTop(this.container); } catch (_) { /* ignore */ }
       }
@@ -338,6 +384,12 @@ export class HelpPanel {
     if (this.maskGraphics) {
       this.maskGraphics.destroy();
       this.maskGraphics = null;
+    }
+
+    // Destroy the integrated button
+    if (this._helpButton) {
+      this._helpButton.destroy();
+      this._helpButton = null;
     }
 
     // Destroy the main container (destroys all children)
@@ -508,10 +560,10 @@ export class HelpPanel {
     this.inputBlocker.setInteractive();
     this.inputBlocker.on('pointerdown', () => this.close());
 
-    // Parent input blocker into overlay root if available so it is not
-    // removed during HUD rebuilds.
+    // Parent input blocker into HUD container if available so it is not
+    // removed during scene rebuilds.
     try {
-      const overlayRoot: any = (this.scene as any).hudOverlayContainer ?? (this.scene as any).hudContainer;
+      const overlayRoot: any = (this.scene as any).hudContainer;
       if (overlayRoot && typeof overlayRoot.add === 'function') {
         try { overlayRoot.add(this.inputBlocker); } catch (_) { /* ignore */ }
       }

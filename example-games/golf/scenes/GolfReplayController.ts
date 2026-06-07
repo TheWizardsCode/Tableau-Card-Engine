@@ -6,8 +6,8 @@ import type { Card, Rank, Suit } from '../../../src/card-system/Card';
 import { scoreVisibleCards } from '../GolfScoring';
 import type { BoardSnapshot, CardSnapshot } from '../GameTranscript';
 import { GAME_W, GAME_H } from '../../../src/ui';
+import { createActionButton } from '@ui/Renderer';
 import {
-  createActionButton,
   createGolfHudText,
   createOverlayBackground,
   dismissOverlay,
