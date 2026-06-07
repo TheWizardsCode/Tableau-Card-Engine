@@ -8,11 +8,8 @@ This document defines curated playtest scenarios for validating the M2 expanded 
 ## Running Scenarios
 
 ```bash
-# Run a single scenario by seed
-npx tsx scripts/demo-main-street.ts --seed "sweep-63"
-
 # Run the canonical smoke-test scenario (seed: smoke-1)
-npx tsx scripts/demo-main-street.ts --seed "smoke-1"
+npx vitest run --project unit tests/main-street/smoke-scenario.test.ts
 
 # Run all 5 curated scenarios and compare results
 npx tsx scripts/playtest-scenarios.ts
@@ -44,9 +41,6 @@ This seed is wired to `tests/main-street/smoke-scenario.test.ts` (included in `n
 ```bash
 # Run smoke test directly
 npx vitest run --project unit tests/main-street/smoke-scenario.test.ts
-
-# Run via CLI demo (JSON output)
-npx tsx scripts/demo-main-street.ts --seed "smoke-1"
 ```
 
 **Assertions made by the smoke test:**
@@ -238,12 +232,10 @@ Latest baseline interpretation is tracked in `docs/main-street/monte-carlo-sampl
 
 For custom sweep sizes, modify the `SEED_COUNT` constant in `tests/main-street/market.integration.test.ts`.
 
-To run a batch of seeds with full transcripts:
+To run a batch of seeds with full transcripts, use the Monte Carlo harness:
 
 ```bash
-for i in $(seq 0 49); do
-  npx tsx scripts/demo-main-street.ts --seed "batch-$i" > "transcripts/batch-$i.json" 2>/dev/null
-done
+npm run monte-carlo -- --seeds 50 --seed-prefix batch --maxTurns 25 --strategy greedy
 ```
 
 Then analyse transcripts with standard JSON tools (`jq`, Python, etc.) to extract aggregate statistics.

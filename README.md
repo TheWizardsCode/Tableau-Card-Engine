@@ -14,10 +14,7 @@ npm run build        # TypeScript check + production build -> dist/
 npm run preview      # serve production build locally
 npm run tf:generate  # generate ToneForge artifacts to build/tf-synths/
 
-# Smoke test: run deterministic Main Street demo (seed: smoke-1)
-npx tsx scripts/demo-main-street.ts --seed "smoke-1"
-
-# Headless smoke test (part of npm test):
+# Smoke test (headless, part of npm test):
 npx vitest run --project unit tests/main-street/smoke-scenario.test.ts
 ```
 
