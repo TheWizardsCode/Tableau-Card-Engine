@@ -93,9 +93,6 @@ export class SushiGoOverlayContent {
       })
       .setOrigin(0.5, 0)
       .setDepth(11);
-    if ((this.scene as any).hudContainer) {
-      (this.scene as any).hudContainer.add(text);
-    }
     this.overlayManager.add(text);
 
     const btn = createActionButton(
@@ -111,9 +108,6 @@ export class SushiGoOverlayContent {
       },
       { depth: 11 },
     );
-    if ((this.scene as any).hudContainer) {
-      (this.scene as any).hudContainer.add(btn);
-    }
     this.overlayManager.add(btn);
   }
 
@@ -210,9 +204,6 @@ export class SushiGoOverlayContent {
       })
       .setOrigin(0.5, 0)
       .setDepth(11);
-    if ((this.scene as any).hudContainer) {
-      (this.scene as any).hudContainer.add(text);
-    }
     this.overlayManager.add(text);
 
     const playBtn = createActionButton(
@@ -227,15 +218,9 @@ export class SushiGoOverlayContent {
       },
       { depth: 11 },
     );
-    if ((this.scene as any).hudContainer) {
-      (this.scene as any).hudContainer.add(playBtn);
-    }
     this.overlayManager.add(playBtn);
 
     const menuBtn = createSushiGoMenuButton(this.scene, GAME_W / 2 + 20, buttonY - 16, 120, { depth: 11 });
-    if ((this.scene as any).hudContainer) {
-      (this.scene as any).hudContainer.add(menuBtn);
-    }
     this.overlayManager.add(menuBtn);
   }
 

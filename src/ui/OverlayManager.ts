@@ -60,6 +60,15 @@ export class OverlayManager {
   }
 
   add(...objects: Phaser.GameObjects.GameObject[]): void {
+    // Auto-parent all overlay content objects to hudContainer so they render
+    // above the overlay background box. This centralises z-ordering for all
+    // overlay content across every game that uses OverlayManager.
+    // createOverlayBackground() already parents the box/background itself;
+    // this handles all application-level content (text, buttons, etc.).
+    const hud = (this.scene as any).hudContainer as { add: (obj: Phaser.GameObjects.GameObject) => void } | undefined;
+    for (const obj of objects) {
+      hud?.add(obj);
+    }
     this._objects.push(...objects);
   }
 

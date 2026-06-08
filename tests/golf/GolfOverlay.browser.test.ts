@@ -254,17 +254,26 @@ describe('Golf overlay button tests', () => {
 
     // Helper: find a container that contains a Text child with the given label
     // and return the interactive Rectangle (background) inside it.
+    // Search both scene children and HUD container (OverlayManager.add now
+    // parents content to hudContainer for correct z-ordering).
     const findButtonContainer = (
       label: string,
     ): Phaser.GameObjects.Container | undefined => {
-      return scene.children.list.find(
-        (child: Phaser.GameObjects.GameObject) =>
-          child instanceof Phaser.GameObjects.Container &&
-          (child as Phaser.GameObjects.Container).list.some(
-            (c: Phaser.GameObjects.GameObject) =>
-              c instanceof Phaser.GameObjects.Text && c.text === label,
-          ),
-      ) as Phaser.GameObjects.Container | undefined;
+      const findIn = (items: Phaser.GameObjects.GameObject[]) => {
+        return items.find(
+          (child: Phaser.GameObjects.GameObject) =>
+            child instanceof Phaser.GameObjects.Container &&
+            (child as Phaser.GameObjects.Container).list.some(
+              (c: Phaser.GameObjects.GameObject) =>
+                c instanceof Phaser.GameObjects.Text && c.text === label,
+            ),
+        ) as Phaser.GameObjects.Container | undefined;
+      };
+      let result = findIn(scene.children.list);
+      if (result) return result;
+      const hud = (scene as any).hudContainer as { list: Phaser.GameObjects.GameObject[] } | undefined;
+      if (hud && hud.list) result = findIn(hud.list);
+      return result;
     };
 
     // Find the "Play Again" button container.
