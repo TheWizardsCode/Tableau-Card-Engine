@@ -346,11 +346,21 @@ describe('GolfScene interaction tests', () => {
     const scene = game.scene.getScene('GolfScene')!;
     const internals = getSceneInternals(scene);
 
-    // Verify initial score format
-    const texts = scene.children.list.filter(
+    // Verify initial score format (HUD text is parented into hudContainer)
+    const sceneTexts = scene.children.list.filter(
       (child) => child instanceof Phaser.GameObjects.Text,
     ) as Phaser.GameObjects.Text[];
-    const scoreTexts = texts.filter((t) => t.text.startsWith('Score:'));
+    const hudContainer = (scene as any).hudContainer as {
+      getAll?: () => Phaser.GameObjects.GameObject[];
+      list?: Phaser.GameObjects.GameObject[];
+    };
+    // Phaser 4 Container exposes children via .getAll() or .list (not .children.list)
+    const hudAllObjects = hudContainer?.getAll?.() ?? hudContainer?.list ?? [];
+    const hudTexts = hudAllObjects.filter(
+      (child) => child instanceof Phaser.GameObjects.Text,
+    ) as Phaser.GameObjects.Text[];
+    const allTexts = [...sceneTexts, ...(hudTexts as Phaser.GameObjects.Text[])];
+    const scoreTexts = allTexts.filter((t) => t.text.startsWith('Score:'));
     expect(scoreTexts.length).toBe(2);
     for (const st of scoreTexts) {
       expect(st.text).toMatch(/^Score: -?\d+$/);

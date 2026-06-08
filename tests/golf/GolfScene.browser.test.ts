@@ -91,10 +91,23 @@ describe('GolfScene browser tests', () => {
 
     const scene = game.scene.getScene('GolfScene') as Phaser.Scene;
 
-    // Collect all text game objects
-    const texts = scene.children.list.filter(
+    // Collect all text game objects from scene children and hudContainer
+    // (HUD text is now parented into hudContainer after the container-refactoring)
+    const sceneTexts = scene.children.list.filter(
       (child) => child instanceof Phaser.GameObjects.Text,
     ) as Phaser.GameObjects.Text[];
+
+    const hudContainer = (scene as any).hudContainer as {
+      getAll?: () => Phaser.GameObjects.GameObject[];
+      list?: Phaser.GameObjects.GameObject[];
+    };
+    // Phaser 4 Container exposes children via .getAll() or .list (not .children.list)
+    const hudAllObjects = hudContainer?.getAll?.() ?? hudContainer?.list ?? [];
+    const hudTexts = hudAllObjects.filter(
+      (child) => child instanceof Phaser.GameObjects.Text,
+    ) as Phaser.GameObjects.Text[];
+
+    const texts = [...sceneTexts, ...(hudTexts as Phaser.GameObjects.Text[])];
 
     // Extract text content
     const textContents = texts.map((t) => t.text);
