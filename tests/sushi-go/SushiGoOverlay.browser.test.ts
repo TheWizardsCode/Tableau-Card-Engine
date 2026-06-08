@@ -233,6 +233,44 @@ describe('Sushi Go game-over overlay', () => {
     expect(roundScoreText).toBeDefined();
   });
 
+  it('renders Next Round button inside hudContainer for correct z-ordering', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('SushiGoScene') as any;
+
+    const fakeRoundResult = {
+      round: 1,
+      tableauScores: [9, 8],
+      tableauBreakdowns: [
+        { tempura: 0, sashimi: 0, dumpling: 0, nigiri: 0, chopsticks: 0, puddingCount: 0 },
+        { tempura: 0, sashimi: 0, dumpling: 0, nigiri: 0, chopsticks: 0, puddingCount: 0 },
+      ],
+      makiCounts: [0, 0],
+      makiBonuses: [0, 0],
+      roundScores: [9, 8],
+      puddingCounts: [0, 0],
+      puddingBonuses: [0, 0],
+    };
+
+    scene.overlayManager.showRoundScoreOverlay(fakeRoundResult, () => {});
+    await waitFrames(3);
+
+    // Collect containers from hudContainer
+    const hud = scene.hudContainer as { list: Phaser.GameObjects.GameObject[] };
+    const hudContainers = hud.list?.filter(
+      (child) => child instanceof Phaser.GameObjects.Container,
+    ) as Phaser.GameObjects.Container[];
+
+    const findButtonLabel = (container: Phaser.GameObjects.Container, label: string): boolean => {
+      return (container as any).list?.some(
+        (child: any) => child instanceof Phaser.GameObjects.Text && child.text === label,
+      );
+    };
+
+    // The Next Round button container should be in hudContainer so it renders above the overlay box
+    const nextRoundBtn = hudContainers.find((c) => findButtonLabel(c, 'Next Round'));
+    expect(nextRoundBtn).toBeDefined();
+  });
+
   it('renders game-over text inside hudContainer for correct z-ordering', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('SushiGoScene') as any;
@@ -276,6 +314,53 @@ describe('Sushi Go game-over overlay', () => {
     const finalText = hudTexts.find((t) => (t.text as string).includes('Final:'));
     expect(winnerText).toBeDefined();
     expect(finalText).toBeDefined();
+  });
+
+  it('renders game-over buttons inside hudContainer for correct z-ordering', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('SushiGoScene') as any;
+
+    // Prepare session roundScores so computeDisplayedTotal can sum them
+    scene.session.players[0].roundScores = [9];
+    scene.session.players[1].roundScores = [8];
+
+    const fakeRoundResult = {
+      round: 2,
+      tableauScores: [9, 8],
+      tableauBreakdowns: [
+        { tempura: 0, sashimi: 0, dumpling: 0, nigiri: 0, chopsticks: 0, puddingCount: 0 },
+        { tempura: 0, sashimi: 0, dumpling: 0, nigiri: 0, chopsticks: 0, puddingCount: 0 },
+      ],
+      makiCounts: [0, 0],
+      makiBonuses: [0, 0],
+      roundScores: [9, 8],
+      puddingCounts: [0, 0],
+      puddingBonuses: [0, 0],
+    };
+
+    scene.overlayManager.showGameOverOverlay(fakeRoundResult, null, () => {
+      scene.scene.restart();
+    });
+
+    await waitFrames(3);
+
+    // Collect containers from hudContainer
+    const hud = scene.hudContainer as { list: Phaser.GameObjects.GameObject[] };
+    const hudContainers = hud.list?.filter(
+      (child) => child instanceof Phaser.GameObjects.Container,
+    ) as Phaser.GameObjects.Container[];
+
+    const findButtonLabel = (container: Phaser.GameObjects.Container, label: string): boolean => {
+      return (container as any).list?.some(
+        (child: any) => child instanceof Phaser.GameObjects.Text && child.text === label,
+      );
+    };
+
+    // Both game-over buttons should be in hudContainer so they render above the overlay box
+    const playAgainBtn = hudContainers.find((c) => findButtonLabel(c, 'Play Again'));
+    const menuBtn = hudContainers.find((c) => findButtonLabel(c, 'Menu'));
+    expect(playAgainBtn).toBeDefined();
+    expect(menuBtn).toBeDefined();
   });
 
   it('displays correct final totals including pudding bonuses when provided', async () => {
