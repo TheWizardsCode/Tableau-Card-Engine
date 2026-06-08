@@ -197,6 +197,87 @@ describe('Sushi Go game-over overlay', () => {
     expect(textsAfterDismiss.length).toBe(0);
   });
 
+  it('renders round-score text inside hudContainer for correct z-ordering', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('SushiGoScene') as any;
+
+    const fakeRoundResult = {
+      round: 1,
+      tableauScores: [9, 8],
+      tableauBreakdowns: [
+        { tempura: 0, sashimi: 0, dumpling: 0, nigiri: 0, chopsticks: 0, puddingCount: 0 },
+        { tempura: 0, sashimi: 0, dumpling: 0, nigiri: 0, chopsticks: 0, puddingCount: 0 },
+      ],
+      makiCounts: [0, 0],
+      makiBonuses: [0, 0],
+      roundScores: [9, 8],
+      puddingCounts: [0, 0],
+      puddingBonuses: [0, 0],
+    };
+
+    scene.overlayManager.showRoundScoreOverlay(fakeRoundResult, () => {});
+    await waitFrames(3);
+
+    // Verify hudContainer exists
+    expect(scene.hudContainer).toBeDefined();
+    expect(scene.hudContainer).toBeInstanceOf(Phaser.GameObjects.Container);
+
+    // Collect text from hudContainer specifically
+    const hud = scene.hudContainer as { list: Phaser.GameObjects.GameObject[] };
+    const hudTexts = hud.list?.filter(
+      (child) => child instanceof Phaser.GameObjects.Text,
+    ) as Phaser.GameObjects.Text[];
+
+    // The round-score overlay text should be in hudContainer so it renders above the overlay box
+    const roundScoreText = hudTexts.find((t) => (t.text as string).includes('Round') && (t.text as string).includes('Complete'));
+    expect(roundScoreText).toBeDefined();
+  });
+
+  it('renders game-over text inside hudContainer for correct z-ordering', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('SushiGoScene') as any;
+
+    // Prepare session roundScores so computeDisplayedTotal can sum them
+    scene.session.players[0].roundScores = [9];
+    scene.session.players[1].roundScores = [8];
+
+    const fakeRoundResult = {
+      round: 2,
+      tableauScores: [9, 8],
+      tableauBreakdowns: [
+        { tempura: 0, sashimi: 0, dumpling: 0, nigiri: 0, chopsticks: 0, puddingCount: 0 },
+        { tempura: 0, sashimi: 0, dumpling: 0, nigiri: 0, chopsticks: 0, puddingCount: 0 },
+      ],
+      makiCounts: [0, 0],
+      makiBonuses: [0, 0],
+      roundScores: [9, 8],
+      puddingCounts: [0, 0],
+      puddingBonuses: [0, 0],
+    };
+
+    scene.overlayManager.showGameOverOverlay(fakeRoundResult, null, () => {
+      scene.scene.restart();
+    });
+
+    await waitFrames(3);
+
+    // Verify hudContainer exists
+    expect(scene.hudContainer).toBeDefined();
+    expect(scene.hudContainer).toBeInstanceOf(Phaser.GameObjects.Container);
+
+    // Collect text from hudContainer specifically
+    const hud = scene.hudContainer as { list: Phaser.GameObjects.GameObject[] };
+    const hudTexts = hud.list?.filter(
+      (child) => child instanceof Phaser.GameObjects.Text,
+    ) as Phaser.GameObjects.Text[];
+
+    // The game-over text should be in hudContainer so it renders above the overlay box
+    const winnerText = hudTexts.find((t) => (t.text as string).includes('You Win!') || (t.text as string).includes('AI Wins!'));
+    const finalText = hudTexts.find((t) => (t.text as string).includes('Final:'));
+    expect(winnerText).toBeDefined();
+    expect(finalText).toBeDefined();
+  });
+
   it('displays correct final totals including pudding bonuses when provided', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('SushiGoScene') as any;

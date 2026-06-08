@@ -93,6 +93,9 @@ export class SushiGoOverlayContent {
       })
       .setOrigin(0.5, 0)
       .setDepth(11);
+    if ((this.scene as any).hudContainer) {
+      (this.scene as any).hudContainer.add(text);
+    }
     this.overlayManager.add(text);
 
     const btn = createActionButton(
@@ -204,6 +207,9 @@ export class SushiGoOverlayContent {
       })
       .setOrigin(0.5, 0)
       .setDepth(11);
+    if ((this.scene as any).hudContainer) {
+      (this.scene as any).hudContainer.add(text);
+    }
     this.overlayManager.add(text);
 
     const playBtn = createActionButton(
