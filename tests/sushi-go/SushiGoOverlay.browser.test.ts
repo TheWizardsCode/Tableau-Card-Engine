@@ -36,6 +36,29 @@ function waitFrames(n: number): Promise<void> {
   });
 }
 
+/**
+ * Collect display objects from scene children and the HUD container.
+ * Phaser 4 containers store children in .list (not .children).
+ */
+function collectFromSceneAndHud<T extends Phaser.GameObjects.GameObject>(
+  scene: Phaser.Scene,
+  predicate: (obj: Phaser.GameObjects.GameObject) => obj is T,
+): T[] {
+  const result: T[] = [];
+  const walk = (parent: Phaser.GameObjects.GameObject[]) => {
+    for (const child of parent) {
+      if (predicate(child)) result.push(child);
+      if (child instanceof Phaser.GameObjects.Container && (child as any).list) {
+        walk((child as any).list);
+      }
+    }
+  };
+  walk(scene.children.list);
+  const hud = (scene as any).hudContainer as { list: Phaser.GameObjects.GameObject[] } | undefined;
+  if (hud && hud.list) walk(hud.list);
+  return result;
+}
+
 describe('Sushi Go round-score overlay', () => {
   let game: Phaser.Game | null = null;
 
@@ -66,9 +89,9 @@ describe('Sushi Go round-score overlay', () => {
     await waitFrames(3);
 
     // Find the "Next Round" button container
-    const containers = scene.children.list.filter(
-      (child: Phaser.GameObjects.GameObject) => child instanceof Phaser.GameObjects.Container,
-    ) as Phaser.GameObjects.Container[];
+    const containers = collectFromSceneAndHud(scene, (child): child is Phaser.GameObjects.Container =>
+      child instanceof Phaser.GameObjects.Container,
+    );
 
     const findButtonLabel = (container: Phaser.GameObjects.Container, label: string): boolean => {
       return (container as any).list?.some(
@@ -89,9 +112,9 @@ describe('Sushi Go round-score overlay', () => {
     expect(bg?.input?.enabled).toBe(true);
 
     // Verify the full-screen input blocker exists and is interactive
-    const rects = scene.children.list.filter(
-      (child: any) => child instanceof Phaser.GameObjects.Rectangle && child.depth === 10,
-    ) as Phaser.GameObjects.Rectangle[];
+    const rects = collectFromSceneAndHud(scene, (child): child is Phaser.GameObjects.Rectangle =>
+      child instanceof Phaser.GameObjects.Rectangle && child.depth === 10,
+    );
     expect(rects.length).toBeGreaterThanOrEqual(2); // blocker + visible box
     const blocker = rects.find((r: any) => r.width === 1280 && r.height === 720 && r.input?.enabled);
     expect(blocker).toBeDefined();
@@ -131,9 +154,9 @@ describe('Sushi Go game-over overlay', () => {
     await waitFrames(3);
 
     // Action buttons are Containers with Text children (migrated to shared Renderer API).
-    const containers = scene.children.list.filter(
-      (child: Phaser.GameObjects.GameObject) => child instanceof Phaser.GameObjects.Container,
-    ) as Phaser.GameObjects.Container[];
+    const containers = collectFromSceneAndHud(scene, (child): child is Phaser.GameObjects.Container =>
+      child instanceof Phaser.GameObjects.Container,
+    );
 
     const findButtonLabel = (container: Phaser.GameObjects.Container, label: string): boolean => {
       return (container as any).list?.some(
@@ -157,9 +180,9 @@ describe('Sushi Go game-over overlay', () => {
     expect(menuBg?.input?.enabled).toBe(true);
 
     // Verify the full-screen input blocker exists and is interactive
-    const rects = scene.children.list.filter(
-      (child: any) => child instanceof Phaser.GameObjects.Rectangle && child.depth === 10,
-    ) as Phaser.GameObjects.Rectangle[];
+    const rects = collectFromSceneAndHud(scene, (child): child is Phaser.GameObjects.Rectangle =>
+      child instanceof Phaser.GameObjects.Rectangle && child.depth === 10,
+    );
     expect(rects.length).toBeGreaterThanOrEqual(2); // blocker + visible box
     const blocker = rects.find((r: any) => r.width === 1280 && r.height === 720 && r.input?.enabled);
     expect(blocker).toBeDefined();
@@ -167,8 +190,8 @@ describe('Sushi Go game-over overlay', () => {
     // Verify dismissal cleans up overlay
     scene.overlayManager.dismiss();
     await waitFrames(2);
-    const textsAfterDismiss = scene.children.list.filter(
-      (child: any) => child instanceof Phaser.GameObjects.Text && 
+    const textsAfterDismiss = collectFromSceneAndHud(scene, (child): child is Phaser.GameObjects.Text =>
+      child instanceof Phaser.GameObjects.Text && 
         (child as Phaser.GameObjects.Text).text.includes('You Win!'),
     );
     expect(textsAfterDismiss.length).toBe(0);
@@ -202,9 +225,9 @@ describe('Sushi Go game-over overlay', () => {
 
     await waitFrames(3);
 
-    const texts = scene.children.list.filter(
-      (child: Phaser.GameObjects.GameObject) => child instanceof Phaser.GameObjects.Text,
-    ) as Phaser.GameObjects.Text[];
+    const texts = collectFromSceneAndHud(scene, (child): child is Phaser.GameObjects.Text =>
+      child instanceof Phaser.GameObjects.Text,
+    );
 
     const finalTextObj = texts.find((t) => (t.text as string).includes('Final: You'));
 

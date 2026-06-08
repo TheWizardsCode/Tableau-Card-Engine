@@ -88,8 +88,30 @@ async function waitForCondition(
  * Get scene private properties via type-safe cast.
  */
 function getSceneInternals(scene: Phaser.Scene) {
-   
   return scene as any;
+}
+
+/**
+ * Collect display objects from scene children and the HUD container.
+ * Phaser 4 containers store children in .list.
+ */
+function collectFromSceneAndHud<T extends Phaser.GameObjects.GameObject>(
+  scene: Phaser.Scene,
+  predicate: (obj: Phaser.GameObjects.GameObject) => obj is T,
+): T[] {
+  const result: T[] = [];
+  const walk = (parent: Phaser.GameObjects.GameObject[]) => {
+    for (const child of parent) {
+      if (predicate(child)) result.push(child);
+      if (child instanceof Phaser.GameObjects.Container && (child as any).list) {
+        walk((child as any).list);
+      }
+    }
+  };
+  walk(scene.children.list);
+  const hud = (scene as any).hudContainer as { list: Phaser.GameObjects.GameObject[] } | undefined;
+  if (hud && hud.list) walk(hud.list);
+  return result;
 }
 
 /**
@@ -179,17 +201,26 @@ describe('Golf overlay button tests', () => {
     await waitFrames(3);
 
     // Helper: find a container that contains a Text child with the given label.
+    // Search both scene children and HUD container (Phaser 4 uses .list)
     const findContainerByText = (
       label: string,
     ): Phaser.GameObjects.Container | undefined => {
-      return scene.children.list.find(
-        (child: Phaser.GameObjects.GameObject) =>
-          child instanceof Phaser.GameObjects.Container &&
-          (child as Phaser.GameObjects.Container).list.some(
-            (c: Phaser.GameObjects.GameObject) =>
-              c instanceof Phaser.GameObjects.Text && c.text === label,
-          ),
-      ) as Phaser.GameObjects.Container | undefined;
+      const findInList = (items: Phaser.GameObjects.GameObject[]) => {
+        const found = items.find(
+          (child: Phaser.GameObjects.GameObject) =>
+            child instanceof Phaser.GameObjects.Container &&
+            (child as any).list.some(
+              (c: Phaser.GameObjects.GameObject) =>
+                c instanceof Phaser.GameObjects.Text && c.text === label,
+            ),
+        );
+        return found as Phaser.GameObjects.Container | undefined;
+      };
+      const found = findInList(scene.children.list);
+      if (found) return found;
+      const hud = (scene as any).hudContainer as { list: Phaser.GameObjects.GameObject[] } | undefined;
+      if (hud && hud.list) return findInList(hud.list);
+      return undefined;
     };
 
     const playAgainBtn = findContainerByText('[ Play Again ]');
@@ -280,11 +311,11 @@ describe('Golf overlay button tests', () => {
     await waitFrames(3);
 
     // Find interactive rectangles at depth 10 (the input blocker)
-    const rects = scene.children.list.filter(
-      (child: Phaser.GameObjects.GameObject) =>
-        child instanceof Phaser.GameObjects.Rectangle &&
-        (child as Phaser.GameObjects.Rectangle).depth === 10,
-    ) as Phaser.GameObjects.Rectangle[];
+    // The overlay system parents objects into the HUD container in Phaser 4
+    const allRects = collectFromSceneAndHud(scene, (child): child is Phaser.GameObjects.Rectangle =>
+      child instanceof Phaser.GameObjects.Rectangle,
+    );
+    const rects = allRects.filter((r) => r.depth === 10);
 
     // Should have at least 2 rectangles at depth 10: the full-screen blocker and the visible overlay
     expect(rects.length).toBeGreaterThanOrEqual(2);

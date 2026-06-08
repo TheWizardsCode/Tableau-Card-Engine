@@ -40,6 +40,29 @@ function getOverlayManager(scene: Phaser.Scene): any {
   return (scene as any).overlayManager;
 }
 
+/**
+ * Collect display objects from scene children and the HUD container.
+ * Phaser 4 containers store children in .list (not .children).
+ */
+function collectFromSceneAndHud<T extends Phaser.GameObjects.GameObject>(
+  scene: Phaser.Scene,
+  predicate: (obj: Phaser.GameObjects.GameObject) => obj is T,
+): T[] {
+  const result: T[] = [];
+  const walk = (parent: Phaser.GameObjects.GameObject[]) => {
+    for (const child of parent) {
+      if (predicate(child)) result.push(child);
+      if (child instanceof Phaser.GameObjects.Container && (child as any).list) {
+        walk((child as any).list);
+      }
+    }
+  };
+  walk(scene.children.list);
+  const hud = (scene as any).hudContainer as { list: Phaser.GameObjects.GameObject[] } | undefined;
+  if (hud && hud.list) walk(hud.list);
+  return result;
+}
+
 describe('Beleaguered Castle help panel', () => {
   let game: Phaser.Game | null = null;
 
@@ -122,29 +145,31 @@ describe('Beleaguered Castle overlays', () => {
     const scene = game.scene.getScene('BeleagueredCastleScene') as any;
     await waitFrames(8);
 
-    getOverlayManager(scene).showWinOverlay(0);
+    (scene as any).showWinOverlay(0);
     await waitFrames(5);
 
-    // Check blocker
-    const rects = scene.children.list.filter(
-      (child: any) => child instanceof Phaser.GameObjects.Rectangle && child.depth === 2000,
-    ) as Phaser.GameObjects.Rectangle[];
-    expect(rects.length).toBeGreaterThanOrEqual(1);
-    const blocker = rects.find((r: any) => r.width === 1280 && r.height === 720 && r.input?.enabled);
+    // Check blocker - objects are in HUD container
+    const allRects = collectFromSceneAndHud(scene, (child): child is Phaser.GameObjects.Rectangle =>
+      child instanceof Phaser.GameObjects.Rectangle && child.depth === 2000,
+    );
+    expect(allRects.length).toBeGreaterThanOrEqual(1);
+    const blocker = allRects.find((r) => r.width === 1280 && r.height === 720 && r.input?.enabled);
     expect(blocker).toBeDefined();
 
     // Check buttons at depth 2001
     const labels = ['[ New Game ]', '[ Restart ]', '[ Menu ]'];
-    const btns = scene.children.list.filter(
-      (child: any) => child instanceof Phaser.GameObjects.Text && labels.includes(child.text) && child.depth === 2001,
-    ) as Phaser.GameObjects.Text[];
+    const btns = collectFromSceneAndHud(scene, (child): child is Phaser.GameObjects.Text =>
+      child instanceof Phaser.GameObjects.Text && labels.includes(child.text) && child.depth === 2001,
+    );
     expect(btns.length).toBeGreaterThanOrEqual(2);
     for (const btn of btns) expect(btn.input?.enabled).toBe(true);
 
     // Dismiss
     getOverlayManager(scene).dismiss();
     await waitFrames(3);
-    const winText = scene.children.list.filter((child: any) => child instanceof Phaser.GameObjects.Text && child.text === 'You Win!');
+    const winText = collectFromSceneAndHud(scene, (child): child is Phaser.GameObjects.Text =>
+      child instanceof Phaser.GameObjects.Text && child.text === 'You Win!',
+    );
     expect(winText.length).toBe(0);
   });
 
@@ -153,30 +178,30 @@ describe('Beleaguered Castle overlays', () => {
     const scene = game.scene.getScene('BeleagueredCastleScene') as any;
     await waitFrames(8);
 
-    getOverlayManager(scene).showNoMovesOverlay();
+    (scene as any).showNoMovesOverlay();
     await waitFrames(5);
 
-    // Check blocker
-    const rects = scene.children.list.filter(
-      (child: any) => child instanceof Phaser.GameObjects.Rectangle && child.depth === 2000,
-    ) as Phaser.GameObjects.Rectangle[];
-    expect(rects.length).toBeGreaterThanOrEqual(1);
-    const blocker = rects.find((r: any) => r.width === 1280 && r.height === 720 && r.input?.enabled);
+    // Check blocker - objects are in HUD container
+    const allRects = collectFromSceneAndHud(scene, (child): child is Phaser.GameObjects.Rectangle =>
+      child instanceof Phaser.GameObjects.Rectangle && child.depth === 2000,
+    );
+    expect(allRects.length).toBeGreaterThanOrEqual(1);
+    const blocker = allRects.find((r) => r.width === 1280 && r.height === 720 && r.input?.enabled);
     expect(blocker).toBeDefined();
 
     // Check buttons
     const labels = ['[ Undo Last ]', '[ New Game ]', '[ Restart ]', '[ Menu ]'];
-    const btns = scene.children.list.filter(
-      (child: any) => child instanceof Phaser.GameObjects.Text && labels.includes(child.text) && child.depth === 2001,
-    ) as Phaser.GameObjects.Text[];
+    const btns = collectFromSceneAndHud(scene, (child): child is Phaser.GameObjects.Text =>
+      child instanceof Phaser.GameObjects.Text && labels.includes(child.text) && child.depth === 2001,
+    );
     expect(btns.length).toBeGreaterThanOrEqual(3);
     for (const btn of btns) expect(btn.input?.enabled).toBe(true);
 
     // Dismiss
     getOverlayManager(scene).dismiss();
     await waitFrames(3);
-    const noMoveText = scene.children.list.filter(
-      (child: any) => child instanceof Phaser.GameObjects.Text && child.text === 'No Productive Moves Available',
+    const noMoveText = collectFromSceneAndHud(scene, (child): child is Phaser.GameObjects.Text =>
+      child instanceof Phaser.GameObjects.Text && child.text === 'No Productive Moves Available',
     );
     expect(noMoveText.length).toBe(0);
   });

@@ -46,6 +46,38 @@ function waitFrames(n: number): Promise<void> {
   });
 }
 
+/**
+ * Collect display objects from scene children and the HUD container.
+ * In Phaser 4, containers store children in .list (not .children).
+ */
+function collectFromSceneAndHud<T extends Phaser.GameObjects.GameObject>(
+  scene: Phaser.Scene,
+  predicate: (obj: Phaser.GameObjects.GameObject) => obj is T,
+): T[] {
+  const result: T[] = [];
+
+  // Walk scene children recursively
+  const walk = (parent: Phaser.GameObjects.GameObject[]) => {
+    for (const child of parent) {
+      if (predicate(child)) {
+        result.push(child);
+      }
+      if (child instanceof Phaser.GameObjects.Container && (child as any).list) {
+        walk((child as any).list);
+      }
+    }
+  };
+  walk(scene.children.list);
+
+  // Also walk the HUD container
+  const hud = (scene as any).hudContainer as { list: Phaser.GameObjects.GameObject[] } | undefined;
+  if (hud && hud.list) {
+    walk(hud.list);
+  }
+
+  return result;
+}
+
 // ── Tests ───────────────────────────────────────────────────
 
 describe('UI module exports (browser)', () => {
@@ -69,11 +101,12 @@ describe('HelpPanel browser tests', () => {
     game = await bootGame();
     const scene = game.scene.getScene('GolfScene') as Phaser.Scene;
 
-    const texts = scene.children.list.filter(
-      (child) => child instanceof Phaser.GameObjects.Text,
-    ) as Phaser.GameObjects.Text[];
+    // Collect Text objects from scene and HUD container (Phaser 4 uses .list)
+    const allTexts = collectFromSceneAndHud(scene, (child): child is Phaser.GameObjects.Text =>
+      child instanceof Phaser.GameObjects.Text
+    );
 
-    const helpButtonText = texts.find((t) => t.text === '?');
+    const helpButtonText = allTexts.find((t) => t.text === '?');
     expect(helpButtonText).toBeDefined();
   });
 
@@ -81,16 +114,17 @@ describe('HelpPanel browser tests', () => {
     game = await bootGame();
     const scene = game.scene.getScene('GolfScene') as Phaser.Scene;
 
-    // The HelpPanel container should exist but not be visible
-    const containers = scene.children.list.filter(
-      (child) => child instanceof Phaser.GameObjects.Container,
-    ) as Phaser.GameObjects.Container[];
+    // Collect Containers from scene and HUD container
+    const allContainers = collectFromSceneAndHud(scene, (child): child is Phaser.GameObjects.Container =>
+      child instanceof Phaser.GameObjects.Container
+    );
 
     // At least one container should exist (the help panel)
-    expect(containers.length).toBeGreaterThanOrEqual(1);
+    expect(allContainers.length).toBeGreaterThanOrEqual(1);
 
     // The help panel container should be hidden (not visible or off-screen)
-    const panelContainer = containers.find((c) => c.x < 0 || !c.visible);
+    // HelpPanel creates its container at x = -panelWidth
+    const panelContainer = allContainers.find((c) => c.x < 0 || !c.visible);
     expect(panelContainer).toBeDefined();
   });
 
