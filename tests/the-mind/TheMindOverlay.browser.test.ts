@@ -60,8 +60,30 @@ function waitFrames(n: number): Promise<void> {
  * Get scene private properties via type-safe cast.
  */
 function getSceneInternals(scene: Phaser.Scene) {
-   
   return scene as any;
+}
+
+/**
+ * Collect display objects from scene children and the HUD container.
+ * Phaser 4 containers store children in .list (not .children).
+ */
+function collectFromSceneAndHud<T extends Phaser.GameObjects.GameObject>(
+  scene: Phaser.Scene,
+  predicate: (obj: Phaser.GameObjects.GameObject) => obj is T,
+): T[] {
+  const result: T[] = [];
+  const walk = (parent: Phaser.GameObjects.GameObject[]) => {
+    for (const child of parent) {
+      if (predicate(child)) result.push(child);
+      if (child instanceof Phaser.GameObjects.Container && (child as any).list) {
+        walk((child as any).list);
+      }
+    }
+  };
+  walk(scene.children.list);
+  const hud = (scene as any).hudContainer as { list: Phaser.GameObjects.GameObject[] } | undefined;
+  if (hud && hud.list) walk(hud.list);
+  return result;
 }
 
 /**
@@ -157,10 +179,9 @@ describe('The Mind overlay button tests', () => {
     await waitFrames(3);
 
     // Find text objects with overlay button labels
-    const texts = scene.children.list.filter(
-      (child: Phaser.GameObjects.GameObject) =>
+    const texts = collectFromSceneAndHud(scene, (child): child is Phaser.GameObjects.Text =>
         child instanceof Phaser.GameObjects.Text,
-    ) as Phaser.GameObjects.Text[];
+      );
 
     const tryAgainBtn = texts.find((t) => t.text === '[ Try Again ]');
     const menuBtn = texts.find((t) => t.text === '[ Menu ]');
@@ -183,10 +204,9 @@ describe('The Mind overlay button tests', () => {
     await waitFrames(5);
 
     // Find the "Try Again" button to get its coordinates
-    const texts = scene.children.list.filter(
-      (child: Phaser.GameObjects.GameObject) =>
+    const texts = collectFromSceneAndHud(scene, (child): child is Phaser.GameObjects.Text =>
         child instanceof Phaser.GameObjects.Text,
-    ) as Phaser.GameObjects.Text[];
+      );
     const tryAgainBtn = texts.find((t) => t.text === '[ Try Again ]');
     expect(tryAgainBtn).toBeDefined();
 
@@ -210,10 +230,9 @@ describe('The Mind overlay button tests', () => {
     expect(newPhase).not.toBe('game-won');
 
     // Verify: overlay buttons no longer exist
-    const newTexts = newScene.children.list.filter(
-      (child: Phaser.GameObjects.GameObject) =>
-        child instanceof Phaser.GameObjects.Text,
-    ) as Phaser.GameObjects.Text[];
+    const newTexts = collectFromSceneAndHud(newScene, (child): child is Phaser.GameObjects.Text =>
+      child instanceof Phaser.GameObjects.Text,
+    );
     const tryAgainAfterRestart = newTexts.find(
       (t) => t.text === '[ Try Again ]',
     );
@@ -230,10 +249,9 @@ describe('The Mind overlay button tests', () => {
     await waitFrames(5);
 
     // Find the "Play Again" button
-    const texts = scene.children.list.filter(
-      (child: Phaser.GameObjects.GameObject) =>
+    const texts = collectFromSceneAndHud(scene, (child): child is Phaser.GameObjects.Text =>
         child instanceof Phaser.GameObjects.Text,
-    ) as Phaser.GameObjects.Text[];
+      );
     const playAgainBtn = texts.find((t) => t.text === '[ Play Again ]');
     expect(playAgainBtn).toBeDefined();
     expect(playAgainBtn!.input?.enabled).toBe(true);
@@ -260,11 +278,10 @@ describe('The Mind overlay button tests', () => {
     await waitFrames(3);
 
     // Find interactive rectangles at depth 2000 (the overlay background)
-    const rects = scene.children.list.filter(
-      (child: Phaser.GameObjects.GameObject) =>
+    const rects = collectFromSceneAndHud(scene, (child): child is Phaser.GameObjects.Rectangle =>
         child instanceof Phaser.GameObjects.Rectangle &&
         (child as Phaser.GameObjects.Rectangle).depth === 2000,
-    ) as Phaser.GameObjects.Rectangle[];
+      );
 
     // Should have at least 2 rectangles: the full-screen blocker and the visible overlay box
     expect(rects.length).toBeGreaterThanOrEqual(2);

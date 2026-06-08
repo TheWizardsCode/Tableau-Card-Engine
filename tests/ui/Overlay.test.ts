@@ -121,13 +121,17 @@ describe('createOverlayBackground', () => {
   });
 
   it('parents overlay objects into scene.hudContainer when present', () => {
-    // Provide a scene with a hudContainer that has an `add` spy
+    // Provide a scene with a hudContainer that has an `add` spy.
+    // Overlay box/background are parented into hudContainer so all overlay
+    // content (box + text + buttons) shares the same depth-sort space.  HUD-
+    // level game elements (e.g. "Stock" label) must also be parented into
+    // hudContainer so overlays can correctly cover them.
     const hudScene: any = mockScene();
     hudScene.hudContainer = { add: vi.fn() };
 
     const res = createOverlayBackground(hudScene);
 
-    // hudContainer.add should have been called for the background (and box if present)
+    // hudContainer.add should have been called for the background
     expect(hudScene.hudContainer.add).toHaveBeenCalledWith(res.background);
   });
 
