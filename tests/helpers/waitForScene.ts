@@ -22,7 +22,18 @@ export function waitForScene(
         scene &&
         (scene as Phaser.Scene & { sys: Phaser.Scenes.Systems }).sys.isActive()
       ) {
-        resolve();
+        // The scene is active, but create() may still be executing.
+        // Wait for the next animation frame to ensure create() has completed
+        // (Phaser marks a scene as active during the create() phase).
+        requestAnimationFrame(() => {
+          // Also wait a couple more frames for deferred initializations
+          // (e.g., initHUDContainer, renderer setup)
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              resolve();
+            });
+          });
+        });
         return;
       }
       if (Date.now() - start > timeoutMs) {
