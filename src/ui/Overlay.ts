@@ -107,17 +107,12 @@ export function createOverlayBackground(
     objects.push(overlayBox);
   }
 
-  // If the scene exposes a top-level HUD container, parent overlay objects
-  // into it so all overlays share a single, stable top-layer container.
-  // This keeps z-ordering consistent across Main Street overlays.
-  try {
-    const overlayContainer: any = (scene as any).hudContainer;
-    if (overlayContainer && typeof overlayContainer.add === 'function') {
-      for (const obj of objects) {
-        try { overlayContainer.add(obj); } catch (_) { /* ignore */ }
-      }
-    }
-  } catch (_) { /* ignore failures when inspecting scene */ }
+  // Do NOT parent overlay box/background to hudContainer.
+  // The box/background should stay in the normal scene hierarchy at their
+  // specified depths so they can block input to game elements beneath them
+  // without visually overlapping HUD-level content (e.g. "Stock" label at
+  // depth 1000). Overlay content (text, buttons) is parented to hudContainer
+  // by OverlayManager.add() so they render above the box.
 
   return { background, box: overlayBox, objects };
 }
