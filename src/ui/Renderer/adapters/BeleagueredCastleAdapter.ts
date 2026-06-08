@@ -51,7 +51,15 @@ export function createBcHudText(
     fontFamily: FONT_FAMILY,
     ...options,
   });
+  // Parent into hudContainer so it shares the same depth-sort space as
+  // overlay content (game-over text, buttons, overlay box).  This ensures
+  // HUD labels are correctly covered by overlays that use
+  // createOverlayBackground + OverlayManager.add().
   try {
+    const hud = (scene as any).hudContainer;
+    if (hud && typeof hud.add === 'function') {
+      hud.add(textObj);
+    }
     textObj.setDepth(BC_DEPTH_HUD);
   } catch {
     // Depth may not be available in headless / test environments.
