@@ -120,21 +120,19 @@ describe('createOverlayBackground', () => {
     expect(result.objects).toHaveLength(2);
   });
 
-  it('does NOT parent overlay box/background to hudContainer', () => {
+  it('parents overlay objects into scene.hudContainer when present', () => {
     // Provide a scene with a hudContainer that has an `add` spy.
-    // Overlay box/background must stay in the normal scene hierarchy so
-    // custom overlays at depth 10 don't visually overlap HUD content at
-    // depth 1000. Content (text, buttons) is parented by OverlayManager.add().
+    // Overlay box/background are parented into hudContainer so all overlay
+    // content (box + text + buttons) shares the same depth-sort space.  HUD-
+    // level game elements (e.g. "Stock" label) must also be parented into
+    // hudContainer so overlays can correctly cover them.
     const hudScene: any = mockScene();
     hudScene.hudContainer = { add: vi.fn() };
 
     const res = createOverlayBackground(hudScene);
 
-    // hudContainer.add should NOT be called for the box/background
-    expect(hudScene.hudContainer.add).not.toHaveBeenCalled();
-    // Objects should still be returned for cleanup
-    expect(res.objects).toHaveLength(1);
-    expect(res.background).toBeDefined();
+    // hudContainer.add should have been called for the background
+    expect(hudScene.hudContainer.add).toHaveBeenCalledWith(res.background);
   });
 
   it('box uses custom depth when specified', () => {
