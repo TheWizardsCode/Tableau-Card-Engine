@@ -143,37 +143,37 @@ describe('Main Street container z-order', () => {
     expect(actionIdx).toBeGreaterThan(marketIdx);
   });
 
-  it('zone metadata is not set on Main Street containers (they use raw containers)', async () => {
+  it('zone containers have metadata from createGameZone', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('MainStreetScene') as any;
 
-    const containers = [
-      'hudContainer',
-      'streetContainer',
-      'marketContainer',
-      'handContainer',
-      'actionContainer',
+    const containers: { name: string; expectedW?: number; expectedH?: number; expectedName?: string }[] = [
+      { name: 'hudContainer', expectedW: undefined, expectedH: undefined, expectedName: 'hudContainer' },
+      { name: 'streetContainer', expectedW: undefined, expectedH: undefined, expectedName: 'streetContainer' },
+      { name: 'marketContainer', expectedW: undefined, expectedH: undefined, expectedName: 'marketContainer' },
+      { name: 'handContainer', expectedW: undefined, expectedH: undefined, expectedName: 'handContainer' },
+      { name: 'actionContainer', expectedW: undefined, expectedH: undefined, expectedName: 'actionContainer' },
     ];
 
-    for (const name of containers) {
+    for (const { name, expectedName } of containers) {
       if (scene[name]) {
-        expect((scene[name] as any).__zoneWidth, `${name} should not have __zoneWidth`).toBeUndefined();
-        expect((scene[name] as any).__zoneHeight, `${name} should not have __zoneHeight`).toBeUndefined();
-        expect((scene[name] as any).__zoneName, `${name} should not have __zoneName`).toBeUndefined();
+        const zone = scene[name] as any;
+        expect(zone.__zoneName, `${name} should have __zoneName`).toBe(expectedName);
+        expect(zone.__zoneWidth, `${name} should have __zoneWidth`).toBeDefined();
+        expect(zone.__zoneHeight, `${name} should have __zoneHeight`).toBeDefined();
       }
     }
   });
 
-  it('hudContainer stores no zone metadata but has correct depth', async () => {
+  it('hudContainer has zone metadata and correct depth', async () => {
     game = await bootGame();
     await waitFrames(3);
     const scene = game.scene.getScene('MainStreetScene') as any;
 
-    // hudContainer is created via scene.add.container, not createGameZone,
-    // so it should not have zone metadata
-    expect((scene.hudContainer as any).__zoneWidth).toBeUndefined();
-    expect((scene.hudContainer as any).__zoneHeight).toBeUndefined();
-    expect((scene.hudContainer as any).__zoneName).toBeUndefined();
+    // hudContainer is created via createGameZone, so it should have zone metadata
+    expect((scene.hudContainer as any).__zoneName).toBe('hudContainer');
+    expect((scene.hudContainer as any).__zoneWidth).toBeDefined();
+    expect((scene.hudContainer as any).__zoneHeight).toBeDefined();
 
     // But it should have the correct depth
     expect(scene.hudContainer.depth).toBeGreaterThanOrEqual(1000);
