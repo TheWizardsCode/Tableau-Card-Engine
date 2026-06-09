@@ -148,6 +148,27 @@ function resolveAnchor(
   };
 }
 
+/**
+ * Resolve a full SLL layout document into pixel-space coordinates.
+ *
+ * Converts all zone rectangles and anchor points from normalized (0-1)
+ * coordinates to absolute pixel values based on the provided viewport
+ * and device pixel ratio.
+ *
+ * ### Dimension support
+ *
+ * Zone rectangles may include optional `w` (width) and `h` (height)
+ * fields. When present, the resulting {@link ResolvedZone.rect} will
+ * contain corresponding `width` and `height` values in pixels. When
+ * absent, `width` and `height` are `undefined`, preserving the
+ * traditional position-only zone behaviour for backward-compatible
+ * consumers.
+ *
+ * @param layout - The validated SLL layout document to resolve.
+ * @param viewport - The current viewport dimensions (logical pixels).
+ * @param dpr - Device pixel ratio, defaults to `1`.
+ * @returns A fully resolved layout with pixel-space zones and anchors.
+ */
 export function normalizedToPixels(
   layout: ScreenLayoutDocument,
   viewport: LayoutViewport,
@@ -176,10 +197,6 @@ export function normalizedToPixels(
       anchors,
     };
   }
-
-  // Dimensioned zones (w/h present) carry pixel-level dimensions that
-  // downstream consumers may use for sizing overlays, highlight boxes,
-  // or other bounding-box operations.
 
   return {
     viewport: {
