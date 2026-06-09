@@ -37,15 +37,15 @@
  * | `completion-modal` | _(null — no highlight)_ |
  */
 export type TutorialHighlightZone =
-  | 'center-modal'
+  | 'centerModal'
   | 'hud'
-  | 'market-business-row'
-  | 'street-grid'
-  | 'end-turn-button'
-  | 'incident-queue'
-  | 'investments-row'
-  | 'help-button'
-  | 'completion-modal';
+  | 'marketBusinessRow'
+  | 'streetGrid'
+  | 'endTurnButton'
+  | 'incidentQueue'
+  | 'investmentsRow'
+  | 'helpButton'
+  | 'completionModal';
 
 /**
  * The type of player action expected to complete a step.
@@ -87,7 +87,7 @@ export const TUTORIAL_STEP_DEFS: readonly TutorialStepDef[] = [
     title: 'Welcome to Main Street',
     body:
       'Build the best Main Street in 20 turns. I\'ll guide your first few actions.',
-    highlightZone: 'center-modal',
+    highlightZone: 'centerModal',
     requiredAction: 'confirm',
   },
   {
@@ -103,7 +103,7 @@ export const TUTORIAL_STEP_DEFS: readonly TutorialStepDef[] = [
     title: 'Market Rows',
     body:
       'Businesses go on your street. Investments are upgrades and events that shape your strategy.',
-    highlightZone: 'market-business-row',
+    highlightZone: 'marketBusinessRow',
     requiredAction: 'select-business',
   },
   {
@@ -111,7 +111,7 @@ export const TUTORIAL_STEP_DEFS: readonly TutorialStepDef[] = [
     title: 'Place a Business',
     body:
       'Place this business in a highlighted slot. Adjacent matching types create synergy bonuses.',
-    highlightZone: 'street-grid',
+    highlightZone: 'streetGrid',
     requiredAction: 'place-business',
   },
   {
@@ -119,7 +119,7 @@ export const TUTORIAL_STEP_DEFS: readonly TutorialStepDef[] = [
     title: 'End Turn',
     body:
       'End Turn resolves income and incidents, then starts a new market day.',
-    highlightZone: 'end-turn-button',
+    highlightZone: 'endTurnButton',
     requiredAction: 'end-turn',
   },
   {
@@ -127,7 +127,7 @@ export const TUTORIAL_STEP_DEFS: readonly TutorialStepDef[] = [
     title: 'Incident Queue',
     body:
       'Incidents are upcoming events. Watch this queue to plan ahead.',
-    highlightZone: 'incident-queue',
+    highlightZone: 'incidentQueue',
     requiredAction: 'acknowledge-queue',
   },
   {
@@ -135,7 +135,7 @@ export const TUTORIAL_STEP_DEFS: readonly TutorialStepDef[] = [
     title: 'Held Event Card',
     body:
       'You can hold one event card and play it when timing is best.',
-    highlightZone: 'investments-row',
+    highlightZone: 'investmentsRow',
     requiredAction: 'buy-event',
   },
   {
@@ -143,7 +143,7 @@ export const TUTORIAL_STEP_DEFS: readonly TutorialStepDef[] = [
     title: 'Upgrade Concept',
     body:
       'Upgrades improve an existing business. Strong upgrades compound over remaining turns.',
-    highlightZone: 'investments-row',
+    highlightZone: 'investmentsRow',
     requiredAction: 'apply-upgrade',
   },
   {
@@ -151,7 +151,7 @@ export const TUTORIAL_STEP_DEFS: readonly TutorialStepDef[] = [
     title: 'Help + Hint Tools',
     body:
       'Need a refresher? Open Help anytime. Hint suggests one strong move per turn.',
-    highlightZone: 'help-button',
+    highlightZone: 'helpButton',
     requiredAction: 'open-help',
   },
   {
@@ -159,7 +159,7 @@ export const TUTORIAL_STEP_DEFS: readonly TutorialStepDef[] = [
     title: 'Tutorial Complete',
     body:
       'Great job! You\'re ready for a full run. Tutorial can be replayed from menu/settings.',
-    highlightZone: 'completion-modal',
+    highlightZone: 'completionModal',
     requiredAction: 'confirm-complete',
   },
 ] as const;
