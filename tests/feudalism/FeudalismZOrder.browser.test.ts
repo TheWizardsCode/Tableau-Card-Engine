@@ -176,17 +176,17 @@ describe('Feudalism container z-order', () => {
     scene.overlayManager?.dismiss?.();
   });
 
-  it('zone metadata is not set on Feudalism containers (they use raw containers)', async () => {
+  it('zone metadata is set on Feudalism containers (created via createGameZone)', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('FeudalismScene')!;
     const containers = getRendererContainers(scene);
 
-    // Feudalism containers are raw Phaser containers, not created via createGameZone,
-    // so they should not have zone metadata properties.
+    // Feudalism containers are created via createGameZone, so they should have
+    // zone metadata properties (__zoneWidth, __zoneHeight, __zoneName).
     for (const [name, container] of Object.entries(containers)) {
-      expect((container as any).__zoneWidth, `${name} should not have __zoneWidth`).toBeUndefined();
-      expect((container as any).__zoneHeight, `${name} should not have __zoneHeight`).toBeUndefined();
-      expect((container as any).__zoneName, `${name} should not have __zoneName`).toBeUndefined();
+      expect((container as any).__zoneWidth, `${name} should have __zoneWidth`).toBeDefined();
+      expect((container as any).__zoneHeight, `${name} should have __zoneHeight`).toBeDefined();
+      expect((container as any).__zoneName, `${name} should have __zoneName`).toBe(name);
     }
   });
 });
