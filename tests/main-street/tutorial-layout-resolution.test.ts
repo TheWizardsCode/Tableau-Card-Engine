@@ -313,13 +313,13 @@ describe('Tutorial layout resolution', () => {
   });
 
   describe('missing zones return null', () => {
-    it('center-modal returns null as expected', () => {
-      const result = computeExpectedZoneBounds('center-modal');
+    it('centerModal returns null as expected', () => {
+      const result = computeExpectedZoneBounds('centerModal');
       expect(result).toBeNull();
     });
 
-    it('completion-modal returns null as expected', () => {
-      const result = computeExpectedZoneBounds('completion-modal');
+    it('completionModal returns null as expected', () => {
+      const result = computeExpectedZoneBounds('completionModal');
       expect(result).toBeNull();
     });
   });
