@@ -17,16 +17,21 @@ export interface NormalizedPoint {
 }
 
 /**
- * Position-only zone rectangle in normalized (0-1) coordinates.
+ * Zone rectangle in normalized (0-1) coordinates.
  *
- * Layout zones define **positioning only** (x, y). Card dimensions come
- * entirely from per-game constants, not from layout zones. The optional
- * `pixelOverride` provides exact pixel-position overrides for the anchor
- * point (x, y only — no dimensions).
+ * Supports both **position-only** zones (x, y only) for traditional
+ * SLL consumers and **dimensioned** zones (x, y, w, h) for bounding-box
+ * use cases such as tutorial highlight areas. Card dimensions from
+ * per-game constants remain fully supported.
+ *
+ * The optional `pixelOverride` provides an exact pixel-position override
+ * for the top-left corner (x, y only — no dimensions).
  */
 export interface NormalizedRect {
   x: number;
   y: number;
+  w?: number;
+  h?: number;
   pixelOverride?: PixelPoint;
 }
 
@@ -106,6 +111,8 @@ export const SCREEN_LAYOUT_SCHEMA = {
             properties: {
               x: { type: 'number', minimum: 0, maximum: 1 },
               y: { type: 'number', minimum: 0, maximum: 1 },
+              w: { type: 'number', minimum: 0 },
+              h: { type: 'number', minimum: 0 },
               pixelOverride: {
                 type: 'object',
                 additionalProperties: false,
@@ -187,7 +194,7 @@ export function validateScreenLayoutDocument(
     }
   }
 
-  // Position-only zones have no width/height to validate for overflow.
+  // Dimensioned zones: w and h are validated by the schema (minimum: 0).
   // Normalized x and y are already constrained to [0, 1] by the schema.
 
   return {
