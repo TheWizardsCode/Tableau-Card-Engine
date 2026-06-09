@@ -111,8 +111,8 @@ export const SCREEN_LAYOUT_SCHEMA = {
             properties: {
               x: { type: 'number', minimum: 0, maximum: 1 },
               y: { type: 'number', minimum: 0, maximum: 1 },
-              w: { type: 'number', minimum: 0 },
-              h: { type: 'number', minimum: 0 },
+              w: { type: 'number', minimum: 0, maximum: 1 },
+              h: { type: 'number', minimum: 0, maximum: 1 },
               pixelOverride: {
                 type: 'object',
                 additionalProperties: false,

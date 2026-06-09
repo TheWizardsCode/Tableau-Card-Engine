@@ -86,6 +86,52 @@ describe('NormalizedRect dimension support (w/h)', () => {
     expect(result.errors.length).toBeGreaterThan(0);
   });
 
+  it('rejects zones with w or h greater than 1 (out-of-range)', () => {
+    const layout: ScreenLayoutDocument = {
+      version: 1,
+      id: 'oor-dim-test',
+      baseViewport: { width: 1280, height: 720 },
+      requiredZones: ['boxed'],
+      zones: {
+        boxed: {
+          rect: {
+            x: 0.1,
+            y: 0.2,
+            w: 999,
+            h: 0.4,
+          },
+        },
+      },
+    };
+
+    const result = validateScreenLayoutDocument(layout);
+    expect(result.valid).toBe(false);
+    expect(result.errors.length).toBeGreaterThan(0);
+  });
+
+  it('rejects zones with both w and h out-of-range', () => {
+    const layout: ScreenLayoutDocument = {
+      version: 1,
+      id: 'oor-both-dim-test',
+      baseViewport: { width: 1280, height: 720 },
+      requiredZones: ['boxed'],
+      zones: {
+        boxed: {
+          rect: {
+            x: 0.1,
+            y: 0.2,
+            w: 2,
+            h: 5,
+          },
+        },
+      },
+    };
+
+    const result = validateScreenLayoutDocument(layout);
+    expect(result.valid).toBe(false);
+    expect(result.errors.length).toBeGreaterThan(0);
+  });
+
   it('accepts zones without w/h (backward-compatible)', () => {
     const layout: ScreenLayoutDocument = {
       version: 1,
