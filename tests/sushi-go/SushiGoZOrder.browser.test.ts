@@ -99,15 +99,15 @@ describe('Sushi Go container z-order', () => {
     expect(playerTableauIdx).not.toBe(aiTableauIdx);
   });
 
-  it('no explicit depth is set on gameplay containers (rely on creation order)', async () => {
+  it('depth is 0 on all gameplay containers (creation-order sorting)', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('SushiGoScene') as any;
 
-    // Sushi Go containers use default depth (0); verify none have been
-    // assigned a custom depth value that would override creation order.
-    expect((scene.handContainer as any).depth ?? 0).toBe(0);
-    expect((scene.playerTableauContainer as any).depth ?? 0).toBe(0);
-    expect((scene.aiTableauContainer as any).depth ?? 0).toBe(0);
+    // All gameplay containers use depth 0 (set by createGameZone which does
+    // not assign a depth), so render order is determined by creation order.
+    expect(scene.handContainer.depth).toBe(0);
+    expect(scene.playerTableauContainer.depth).toBe(0);
+    expect(scene.aiTableauContainer.depth).toBe(0);
   });
 
   it('hudContainer depth (1000) is above all gameplay containers', async () => {
@@ -126,14 +126,17 @@ describe('Sushi Go container z-order', () => {
     }
   });
 
-  it('zone metadata is not set on Sushi Go containers (they use raw containers)', async () => {
+  it('zone metadata is set on containers created via createGameZone', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('SushiGoScene') as any;
 
-    // Sushi Go containers are raw Phaser containers, not created via createGameZone,
-    // so they should not have zone metadata properties.
-    expect((scene.handContainer as any).__zoneWidth).toBeUndefined();
-    expect((scene.handContainer as any).__zoneHeight).toBeUndefined();
-    expect((scene.handContainer as any).__zoneName).toBeUndefined();
+    // After migration, Sushi Go containers are created via createGameZone,
+    // so they should carry zone metadata properties matching GAME_W x GAME_H.
+    expect((scene.handContainer as any).__zoneWidth).toBe(1280);
+    expect((scene.handContainer as any).__zoneHeight).toBe(720);
+    expect((scene.handContainer as any).__zoneName).toBe('handContainer');
+
+    expect((scene.playerTableauContainer as any).__zoneName).toBe('playerTableauContainer');
+    expect((scene.aiTableauContainer as any).__zoneName).toBe('aiTableauContainer');
   });
 });
