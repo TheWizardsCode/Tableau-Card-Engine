@@ -5,6 +5,10 @@ Main Street now uses the shared **Screen Layout Language (SLL)** as its canonica
 ## Layout files and adapter
 
 - Canonical layout JSON: `example-games/main-street/layouts/main-street.layout.json`
+- Tutorial layout JSON: `example-games/main-street/layouts/main-street-tutorial.layout.json`
+  - Defines 7 bounding-box zones for tutorial highlight areas (HUD, market, street, etc.)
+  - Uses optional `w`/`h` dimensions on `NormalizedRect` for zone extents
+  - Composed with the base layout via `composeResolvedLayouts()` in the tutorial system
 - Scene adapter: `example-games/main-street/scenes/MainStreetLayoutAdapter.ts`
 - Renderer entrypoint: `example-games/main-street/scenes/MainStreetRenderer.ts`
 
@@ -35,9 +39,14 @@ npx vitest run tests/e2e/replay-main-street.e2e.test.ts --project unit
 
 ## Follow-up work
 
-Tutorial-specific layout migration is tracked separately in:
+The tutorial overlay system (`MainStreetTutorialHints.ts`) currently uses `zoneToAnchor()` with
+per-zone pixel-math to compute highlight bounding boxes. A follow-up work item tracks migrating
+this to resolve zones directly through the composed SLL layout:
 
 - **Adapt tutorial system to use layout description (CG-0MP7IZ4RK008065O)**
+  - Will refactor `zoneToAnchor()` to use `composeResolvedLayouts(baseLayout, tutorialLayout)`
+  - Replaces hardcoded pixel-math with SLL-resolved bounding boxes
+  - Zone names align with those in `main-street-tutorial.layout.json`
 
 ## Milestone 5: Tutorial, Onboarding, and Game Selector Integration
 

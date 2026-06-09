@@ -639,7 +639,31 @@ export class MainStreetTutorialHints {
 
   /**
    * Maps a TutorialHighlightZone to screen-space coordinates.
-   * Returns null if the zone cannot be resolved.
+   *
+   * This method computes bounding-box coordinates for tutorial highlight overlays
+   * using hardcoded pixel-math derived from `scene.layout` properties. It is the
+   * current implementation and will be replaced by SLL-based resolution in the
+   * tutorial layout migration (CG-0MP7IZ4RK008065O), where zone bounding boxes
+   * will be resolved directly from `main-street-tutorial.layout.json` via
+   * `composeResolvedLayouts()`.
+   *
+   * ### Zone mapping
+   *
+   * | Zone | Pixel computation |
+   * |------|-------------------|
+   * | `hud` | `{ x: 0, y: hudY - 14, w: gameW, h: 28 }` |
+   * | `market-business-row` | Computed from market layout constants |
+   * | `street-grid` | `{ x: 0, y: streetTop - 6, w: gameW, h: streetGridH }` |
+   * | `end-turn-button` | Computed from action button layout |
+   * | `incident-queue` | Computed from queue layout constants |
+   * | `investments-row` | Computed from market row layout |
+   * | `help-button` | `{ x: gameW - 120, y: actionY - 4, w: 100, h: actionButtonH + 8 }` |
+   * | `center-modal` | `null` (centered overlay, no highlight) |
+   * | `completion-modal` | `null` (centered overlay, no highlight) |
+   *
+   * @param zone - The tutorial highlight zone identifier.
+   * @param scene - The Phaser scene with layout properties.
+   * @returns Pixel-space bounding box `{ x, y, w, h }`, or `null` for centered overlays.
    */
   private zoneToAnchor(
     zone: TutorialHighlightZone,

@@ -14,6 +14,27 @@
 
 /**
  * The zone of the screen that should be highlighted for a given step.
+ *
+ * These zone names are used by `MainStreetTutorialHints.zoneToAnchor()` to compute
+ * bounding-box coordinates for tutorial highlight overlays. When the tutorial system
+ * is migrated to SLL-based resolution (CG-0MP7IZ4RK008065O), these names will align
+ * with zone IDs in `main-street-tutorial.layout.json`:
+ *
+ * | TutorialHighlightZone | SLL tutorial zone ID |
+ * |----------------------|---------------------|
+ * | `hud` | `hud` |
+ * | `market-business-row` | `marketBusinessRow` |
+ * | `street-grid` | `streetGrid` |
+ * | `end-turn-button` | `endTurnButton` |
+ * | `incident-queue` | `incidentQueue` |
+ * | `investments-row` | `investmentsRow` |
+ * | `help-button` | `helpButton` |
+ * | `center-modal` | _(null — no highlight)_ |
+ * | `completion-modal` | _(null — no highlight)_ |
+ *
+ * The SLL tutorial layout uses camelCase zone IDs, while TutorialHighlightZone uses
+ * kebab-case for readability in step definitions. The mapping is handled in the
+ * `zoneToAnchor()` method and will be replaced by direct SLL lookups after migration.
  */
 export type TutorialHighlightZone =
   | 'center-modal'
