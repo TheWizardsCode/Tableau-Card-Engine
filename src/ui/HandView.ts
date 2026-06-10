@@ -17,6 +17,18 @@ import { CARD_W } from './constants';
 
 // ── Types ────────────────────────────────────────────────────
 
+/**
+ * Custom card texture resolver for non-standard card models.
+ *
+ * Used by {@link HandView} when the card type does not have `rank`/`suit`
+ * properties (e.g. The Mind's `MindCard` with a numeric `value`).
+ *
+ * @param card  - The card object to resolve a texture for.
+ * @param index - The card's index in the hand (useful for back-face cards).
+ * @returns The texture key to use for the card sprite.
+ */
+export type CardTextureResolver<T = Card> = (card: T, index: number) => string;
+
 /** Options for creating a {@link HandView}. */
 export interface HandViewOptions {
   /** X coordinate for the leftmost (or centre) card position. */
@@ -65,6 +77,14 @@ export interface HandViewOptions {
    * centre. Default: 25 (tilt).
    */
   maxRotationDegrees?: number;
+
+  /**
+   * Custom texture resolver for non-standard card models (e.g. MindCard
+   * with numeric `value` instead of `rank`/`suit`). When provided,
+   * this function is called instead of `getCardTexture()` to determine
+   * the texture key for each card.
+   */
+  cardTextureFn?: CardTextureResolver;
 }
 
 /** Options for the {@link HandView.addCard} method. */
@@ -144,10 +164,13 @@ export class HandView {
   // State
   private cards: Card[] = [];
   private selectedIndex: number | null = null;
+  private _cardType: 'standard' | 'custom' = 'standard';
 
   // Display objects
   private sprites: Phaser.GameObjects.Image[] = [];
   private labels: Phaser.GameObjects.Text[] = [];
+  /** Custom texture function (used for non-standard card models like MindCard). */
+  private _customTextureFn: CardTextureResolver | undefined;
 
   // Events — lightweight listener map
   private listeners: Map<keyof HandViewEvents, Set<EventCallback>> = new Map();
@@ -167,6 +190,8 @@ export class HandView {
     this.clickEnabled = opts.clickEnabled ?? true;
     this._reducedMotion = opts.reducedMotion ?? false;
     this.maxRotationDegrees = opts.maxRotationDegrees ?? 25;
+    this._customTextureFn = opts.cardTextureFn;
+    this._cardType = opts.cardTextureFn ? 'custom' : 'standard';
   }
 
   // ── Public API ──────────────────────────────────────────
@@ -175,7 +200,12 @@ export class HandView {
    * Replace all cards in the hand, rebuilding sprites from scratch.
    * Clears existing selection.
    */
-  setCards(cards: Card[]): void {
+  setCards(cards: Card[], _opts?: { cardTextureFn?: CardTextureResolver<Card> }): void {
+    if (_opts?.cardTextureFn) {
+      this._customTextureFn = _opts.cardTextureFn;
+      this._cardType = 'custom';
+    }
+    this.cards = [...cards];
     this.cards = [...cards];
     this.selectedIndex = null;
     this.rebuildDisplay();
@@ -186,6 +216,15 @@ export class HandView {
    */
   getCards(): Card[] {
     return [...this.cards];
+  }
+
+  /**
+   * Update the custom texture resolver at runtime (e.g. when switching
+   * from standard cards to MindCard rendering mid-game).
+   */
+  setCardTextureFn(fn: CardTextureResolver<Card>): void {
+    this._customTextureFn = fn;
+    this._cardType = 'custom';
   }
 
   /**
@@ -399,7 +438,9 @@ export class HandView {
 
     for (let i = 0; i < this.cards.length; i++) {
       const card = this.cards[i];
-      const textureKey = getCardTexture(card);
+      const textureKey = this._cardType === 'custom' && this._customTextureFn
+        ? this._customTextureFn(card, i)
+        : getCardTexture(card);
       const sprite = this.scene.add.image(positions[i].x, positions[i].y, textureKey);
 
       // Apply initial per-card rotation based on horizontal offset
