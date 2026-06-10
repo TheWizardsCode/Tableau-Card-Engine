@@ -151,6 +151,7 @@ export class TheMindScene extends CardGameScene {
   private createReplayView(): void {
     this.createHeader();
     this.createStatusDisplay();
+    // In replay mode, the replay controller handles rendering; skip shared view init.
     this.createPile();
     this.createInstruction();
     this.instructionText.setText('');
@@ -176,6 +177,7 @@ export class TheMindScene extends CardGameScene {
   private createPrimaryView(): void {
     this.mindRenderer.createHeader();
     this.mindRenderer.createStatusDisplay();
+    this.mindRenderer.createHands();
     this.mindRenderer.createPile();
     this.mindRenderer.createInstruction();
     this.createAutoPlayButton();

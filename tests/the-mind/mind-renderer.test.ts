@@ -56,15 +56,69 @@ vi.mock('../../src/ui/Renderer', () => ({
   }),
 }));
 
-vi.mock('../../src/ui', () => ({
-  GAME_W: 1000,
-  GAME_H: 700,
-  FONT_FAMILY: 'sans-serif',
-  createSceneHeader: vi.fn(),
-  layoutCardPositions: vi.fn(({ count }: { count: number }) => ({
-    positions: Array.from({ length: count }, (_, i) => 100 + i * 40),
-  })),
-}));
+vi.mock('../../src/ui', () => {
+  // Shared sprite pool for HandView
+  const spritePool: Array<{ texture: { key: string } }> = [];
+
+  function makeMockSprite(): any {
+    const sprite = {
+      texture: { key: 'ms_card_mind-back_120x164@1' },
+      setDisplaySize: vi.fn().mockReturnThis(),
+      setDepth: vi.fn().mockReturnThis(),
+      setInteractive: vi.fn().mockReturnThis(),
+      setY: vi.fn(),
+      on: vi.fn().mockReturnThis(),
+      destroy: vi.fn(),
+      setTexture: vi.fn(),
+    };
+    return sprite;
+  }
+
+  return {
+    GAME_W: 1000,
+    GAME_H: 700,
+    FONT_FAMILY: 'sans-serif',
+    createSceneHeader: vi.fn(),
+    layoutCardPositions: vi.fn(({ count }: { count: number }) => ({
+      positions: Array.from({ length: count }, (_, i) => 100 + i * 40),
+    })),
+    HandView: vi.fn().mockImplementation(() => {
+      spritePool.length = 0;
+      return {
+        setCards: vi.fn((cards: any[]) => {
+          spritePool.length = 0;
+          if (cards) {
+            for (let i = 0; i < cards.length; i++) {
+              spritePool.push(makeMockSprite());
+            }
+          }
+        }),
+        on: vi.fn(),
+        getSprites: vi.fn(() => spritePool),
+        destroy: vi.fn(),
+      };
+    }),
+    PileView: vi.fn().mockImplementation(() => {
+      const pileSprite = {
+        texture: { key: 'ms_card_mind-back_120x164@1' },
+        setAlpha: vi.fn(),
+        setTexture: vi.fn(),
+        setDisplaySize: vi.fn(),
+        setDepth: vi.fn(),
+      };
+      const countText = { setText: vi.fn() };
+      return {
+        setPile: vi.fn(),
+        onClick: vi.fn(),
+        update: vi.fn(),
+        getSprite: vi.fn(() => pileSprite),
+        getCountText: vi.fn(() => countText),
+        destroy: vi.fn(),
+      };
+    }),
+    CardTextureResolver: undefined,
+  };
+});
 
 import { MindRenderer } from '../../example-games/the-mind/scenes/MindRenderer';
 import type { TheMindSession } from '../../example-games/the-mind/TheMindGameState';
@@ -176,6 +230,7 @@ describe('MindRenderer', () => {
     session = createSession();
     renderer = new MindRenderer(scene, session);
     renderer.createStatusDisplay();
+    renderer.createHands();
     renderer.createPile();
     renderer.createInstruction();
     renderer.renderHumanHand(() => undefined, 'playing', false);

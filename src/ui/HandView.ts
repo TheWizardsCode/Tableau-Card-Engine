@@ -23,11 +23,14 @@ import { CARD_W } from './constants';
  * Used by {@link HandView} when the card type does not have `rank`/`suit`
  * properties (e.g. The Mind's `MindCard` with a numeric `value`).
  *
+ * The `card` parameter is typed as `any` to allow resolvers for arbitrary
+ * card-like types (MindCard, etc.) without requiring casts at the call site.
+ *
  * @param card  - The card object to resolve a texture for.
  * @param index - The card's index in the hand (useful for back-face cards).
  * @returns The texture key to use for the card sprite.
  */
-export type CardTextureResolver<T = Card> = (card: T, index: number) => string;
+export type CardTextureResolver = (card: any, index: number) => string;
 
 /** Options for creating a {@link HandView}. */
 export interface HandViewOptions {
@@ -200,7 +203,7 @@ export class HandView {
    * Replace all cards in the hand, rebuilding sprites from scratch.
    * Clears existing selection.
    */
-  setCards(cards: Card[], _opts?: { cardTextureFn?: CardTextureResolver<Card> }): void {
+  setCards(cards: Card[], _opts?: { cardTextureFn?: CardTextureResolver }): void {
     if (_opts?.cardTextureFn) {
       this._customTextureFn = _opts.cardTextureFn;
       this._cardType = 'custom';
@@ -222,7 +225,7 @@ export class HandView {
    * Update the custom texture resolver at runtime (e.g. when switching
    * from standard cards to MindCard rendering mid-game).
    */
-  setCardTextureFn(fn: CardTextureResolver<Card>): void {
+  setCardTextureFn(fn: CardTextureResolver): void {
     this._customTextureFn = fn;
     this._cardType = 'custom';
   }
