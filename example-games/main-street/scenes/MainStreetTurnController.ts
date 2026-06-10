@@ -212,6 +212,11 @@ export class MainStreetTurnController {
     s.instructionText.setText(`Click an empty slot to place "${card.name}"`);
     s.refreshStreetGrid();
     s.refreshActionButtons();
+
+    // Tutorial: mark select-business step complete if active
+    try {
+      (s.msLifecycleManager as any).onTutorialActionComplete?.('select-business' as TutorialActionType);
+    } catch (_) { /* ignore */ }
   }
 
   public onSlotClick(slotIndex: number): void {
