@@ -632,7 +632,12 @@ export class MainStreetTutorialHints {
     // Button row at bottom of tooltip
     const btnY = finalY + tooltipH - 32;
 
-    // Exit Tutorial button (left side)
+    // Determine if this step can be advanced via Continue button.
+    // Steps with requiredAction 'confirm' or 'acknowledge' can be advanced;
+    // steps requiring actual game actions (select-business, etc.) cannot.
+    const canConfirmViaButton = step.requiredAction === 'confirm' || step.requiredAction === 'acknowledge';
+
+    // Exit Tutorial button (left side) - shown for all steps except the last
     if (isExitable) {
       const exitBtn = s.add.text(tooltipX + 16, btnY, 'Exit Tutorial', {
         fontSize: '13px',
@@ -652,23 +657,26 @@ export class MainStreetTutorialHints {
     }
 
     // Continue / Start Full Game button (right side)
-    const confirmLabel = isLast ? 'Start Full Game' : 'Continue';
-    const confirmColor = isLast ? '#002200' : '#002200';
-    const confirmBg = isLast ? '#44ff44' : '#88ff88';
-    const confirmBtn = s.add.text(tooltipX + tooltipW - 16, btnY, confirmLabel, {
-      fontSize: '13px',
-      color: confirmColor,
-      fontFamily: FONT_FAMILY,
-      fontStyle: 'bold',
-      padding: { left: 12, right: 12, top: 6, bottom: 6 },
-      backgroundColor: confirmBg,
-    }).setDepth(TOOLTIP_DEPTH + 1003).setOrigin(1, 0).setInteractive({ useHandCursor: true });
-    confirmBtn.on('pointerdown', () => {
-      try { (s as any).confirmTutorialStep?.(); } catch (_) { /* ignore */ }
-    });
-    confirmBtn.on('pointerover', () => confirmBtn.setAlpha(0.8));
-    confirmBtn.on('pointerout', () => confirmBtn.setAlpha(1));
-    this.objects.push(confirmBtn);
+    // Only show for steps that can be advanced via button click
+    if (canConfirmViaButton || isLast) {
+      const confirmLabel = isLast ? 'Start Full Game' : 'Continue';
+      const confirmColor = '#002200';
+      const confirmBg = isLast ? '#44ff44' : '#88ff88';
+      const confirmBtn = s.add.text(tooltipX + tooltipW - 16, btnY, confirmLabel, {
+        fontSize: '13px',
+        color: confirmColor,
+        fontFamily: FONT_FAMILY,
+        fontStyle: 'bold',
+        padding: { left: 12, right: 12, top: 6, bottom: 6 },
+        backgroundColor: confirmBg,
+      }).setDepth(TOOLTIP_DEPTH + 1003).setOrigin(1, 0).setInteractive({ useHandCursor: true });
+      confirmBtn.on('pointerdown', () => {
+        try { (s as any).confirmTutorialStep?.(); } catch (_) { /* ignore */ }
+      });
+      confirmBtn.on('pointerover', () => confirmBtn.setAlpha(0.8));
+      confirmBtn.on('pointerout', () => confirmBtn.setAlpha(1));
+      this.objects.push(confirmBtn);
+    }
 
     // Step badge
     const stepNum = TUTORIAL_STEP_DEFS.findIndex((d) => d.id === step.id) + 1;
