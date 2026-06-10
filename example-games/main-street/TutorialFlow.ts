@@ -118,19 +118,19 @@ export const TUTORIAL_STEP_DEFS: readonly TutorialStepDef[] = [
   },
   {
     id: 'T5',
+    title: 'Incident Queue',
+    body:
+      'Incidents are upcoming events that hit at the end of each turn.\nWatch this queue to plan ahead.',
+    highlightZone: 'incidentQueue',
+    requiredAction: 'acknowledge-queue',
+  },
+  {
+    id: 'T6',
     title: 'End Turn',
     body:
       'End Turn resolves income and incidents, then starts a new market day.',
     highlightZone: 'endTurnButton',
     requiredAction: 'end-turn',
-  },
-  {
-    id: 'T6',
-    title: 'Incident Queue',
-    body:
-      'Incidents are upcoming events. Watch this queue to plan ahead.',
-    highlightZone: 'incidentQueue',
-    requiredAction: 'acknowledge-queue',
   },
   {
     id: 'T7',

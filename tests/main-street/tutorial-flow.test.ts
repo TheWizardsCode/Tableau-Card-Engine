@@ -71,11 +71,18 @@ describe('TUTORIAL_STEP_DEFS', () => {
     expect(t4.highlightZone).toBe('streetGrid');
   });
 
-  it('T5 has end-turn action and endTurnButton highlight', () => {
+  it('T5 has acknowledge-queue action and incidentQueue highlight', () => {
     const t5 = TUTORIAL_STEP_DEFS[4];
     expect(t5.id).toBe('T5');
-    expect(t5.requiredAction).toBe('end-turn');
-    expect(t5.highlightZone).toBe('endTurnButton');
+    expect(t5.requiredAction).toBe('acknowledge-queue');
+    expect(t5.highlightZone).toBe('incidentQueue');
+  });
+
+  it('T6 has end-turn action and endTurnButton highlight', () => {
+    const t6 = TUTORIAL_STEP_DEFS[5];
+    expect(t6.id).toBe('T6');
+    expect(t6.requiredAction).toBe('end-turn');
+    expect(t6.highlightZone).toBe('endTurnButton');
   });
 
   it('T9 has open-help action and helpButton highlight', () => {
@@ -332,9 +339,18 @@ describe('shouldAllowAction', () => {
     expect(shouldAllowAction(state, 'place-business')).toBe(true);
   });
 
-  it('allows end-turn on T5', () => {
+  it('allows acknowledge-queue on T5', () => {
     let state = startTutorial(createTutorialControllerState());
     for (let i = 0; i < 4; i++) {
+      state = advanceTutorialStep(state);
+    }
+    expect(shouldAllowAction(state, 'acknowledge-queue')).toBe(true);
+    expect(shouldAllowAction(state, 'end-turn')).toBe(false);
+  });
+
+  it('allows end-turn on T6', () => {
+    let state = startTutorial(createTutorialControllerState());
+    for (let i = 0; i < 5; i++) {
       state = advanceTutorialStep(state);
     }
     expect(shouldAllowAction(state, 'end-turn')).toBe(true);

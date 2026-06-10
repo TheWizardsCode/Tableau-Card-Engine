@@ -222,7 +222,7 @@ describe('TutorialOverlayManager highlight zones', () => {
     } | undefined;
     expect(layout).toBeTruthy();
 
-    const highlight = showStepAndGetHighlight(4); // T5 = end-turn-button
+    const highlight = showStepAndGetHighlight(5); // T6 = end-turn-button
     expect(highlight).toBeTruthy();
 
     const bounds = getHighlightBounds(highlight!);
@@ -242,7 +242,7 @@ describe('TutorialOverlayManager highlight zones', () => {
     } | undefined;
     expect(layout).toBeTruthy();
 
-    const highlight = showStepAndGetHighlight(5); // T6 = incident-queue
+    const highlight = showStepAndGetHighlight(4); // T5 = incident-queue
     expect(highlight).toBeTruthy();
 
     const bounds = getHighlightBounds(highlight!);
