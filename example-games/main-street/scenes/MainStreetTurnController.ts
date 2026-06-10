@@ -323,6 +323,10 @@ export class MainStreetTurnController {
       s.hiddenTransferSourceCardIds.delete(card.id);
       s.uiPhase = 'market';
       s.refreshAll();
+      // Tutorial: mark buy-event step complete if active
+      try {
+        (s.msLifecycleManager as any).onTutorialActionComplete?.('buy-event' as TutorialActionType);
+      } catch (_) { /* ignore */ }
     };
 
     if (sourceIndex >= 0) {

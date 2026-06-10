@@ -136,6 +136,7 @@ export const TUTORIAL_STEP_DEFS: readonly TutorialStepDef[] = [
     id: 'T7',
     title: 'Held Event Card',
     body:
+      'Buy the "Grand Opening Sale" event card from the investments row.\n' +
       'You can hold one event card and play it when timing is best.',
     highlightZone: 'investmentsRow',
     requiredAction: 'buy-event',
