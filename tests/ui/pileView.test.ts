@@ -20,6 +20,7 @@ function createMockScene(): any {
       clearTint: vi.fn().mockReturnThis(),
       setAlpha: vi.fn().mockReturnThis(),
       setTexture: vi.fn().mockImplementation((tex: string) => { img.texture.key = tex; }),
+      setVisible: vi.fn().mockReturnThis(),
       on: vi.fn().mockReturnThis(),
       off: vi.fn().mockReturnThis(),
       destroy: vi.fn(),

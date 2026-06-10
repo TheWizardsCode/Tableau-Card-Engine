@@ -26,12 +26,14 @@ import {
   type GolfLayout,
 } from './GolfLayoutAdapter';
 
+import type { CardPile } from '../../../src/ui/PileView';
+
 /**
  * Lightweight adapter that wraps a plain Card[] with the PileView CardPile
  * interface (`size()`, `isEmpty()`, `peek()`). Golf's stock pile is a plain
  * array, not a Pile<T>, so this adapter enables PileView to render it.
  */
-class ArrayPileAdapter {
+class ArrayPileAdapter implements CardPile<Card> {
   constructor(private cards: Card[]) {}
   size(): number { return this.cards.length; }
   isEmpty(): boolean { return this.cards.length === 0; }
@@ -116,7 +118,7 @@ export class GolfRenderer {
     onStockClick: () => void,
     onDiscardClick: () => void,
     stockPile: Card[],
-    discardPile: { size: () => number; peek: () => { rank: string; suit: string } | undefined; isEmpty: () => boolean },
+    discardPile: CardPile<Card>,
   ): void {
     const ghostAlpha = this.replayMode ? 0.3 : 0.8;
 
@@ -136,10 +138,14 @@ export class GolfRenderer {
     this.stockPileView.setPile(new ArrayPileAdapter(stockPile));
     if (!this.replayMode) {
       this.stockPileView.onClick(onStockClick);
+    } else {
+      this.stockPileView.setInteractive(false);
     }
     this.stockSprite = this.stockPileView.getSprite();
 
     // Discard pile (lower center) -- rendered via shared PileView
+    // The discard pile already implements the CardPile interface so we pass
+    // it directly rather than wrapping it in ArrayPileAdapter.
     this.discardPileView = new PileView(this.scene, {
       x: this.layout.discardPileCenterX,
       y: this.layout.discardPileCenterY,
@@ -151,9 +157,11 @@ export class GolfRenderer {
       countFontSize: '16px',
       countColor: '#aaccaa',
     });
-    this.discardPileView.setPile(new ArrayPileAdapter(discardPile as any));
+    this.discardPileView.setPile(discardPile);
     if (!this.replayMode) {
       this.discardPileView.onClick(onDiscardClick);
+    } else {
+      this.discardPileView.setInteractive(false);
     }
     this.discardSprite = this.discardPileView.getSprite();
   }

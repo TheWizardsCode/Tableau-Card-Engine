@@ -163,10 +163,12 @@ export class PileView {
     if (this.pile.isEmpty()) {
       this.sprite.setTexture(this.emptyTexture);
       this.sprite.setAlpha(this.emptyAlpha);
+      this.sprite.setVisible(false);
     } else {
       const top = this.pile.peek()!;
       this.sprite.setTexture(getCardTexture(top));
       this.sprite.setAlpha(this.fullAlpha);
+      this.sprite.setVisible(true);
     }
 
     this.countText.setText(`${this.labelPrefix}${this.pile.size()}`);
@@ -178,6 +180,18 @@ export class PileView {
    */
   onClick(cb: () => void): void {
     this.clickCallbacks.push(cb);
+  }
+
+  /**
+   * Enable or disable pointer interaction on the pile sprite.
+   * Useful for disabling interaction in replay mode.
+   */
+  setInteractive(flag: boolean): void {
+    if (flag) {
+      this.sprite.setInteractive({ useHandCursor: true });
+    } else {
+      this.sprite.disableInteractive();
+    }
   }
 
   /**
