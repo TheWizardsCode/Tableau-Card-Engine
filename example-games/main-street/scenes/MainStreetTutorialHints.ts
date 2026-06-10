@@ -633,9 +633,9 @@ export class MainStreetTutorialHints {
     const btnY = finalY + tooltipH - 32;
 
     // Determine if this step can be advanced via Continue button.
-    // Steps with requiredAction 'confirm' or 'acknowledge' can be advanced;
+    // Steps with requiredAction 'confirm', 'acknowledge', or 'acknowledge-queue' can be advanced;
     // steps requiring actual game actions (select-business, etc.) cannot.
-    const canConfirmViaButton = step.requiredAction === 'confirm' || step.requiredAction === 'acknowledge';
+    const canConfirmViaButton = step.requiredAction === 'confirm' || step.requiredAction === 'acknowledge' || step.requiredAction === 'acknowledge-queue';
 
     // Exit Tutorial button (left side) - shown for all steps except the last
     if (isExitable) {
