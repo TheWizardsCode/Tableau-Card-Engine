@@ -13,7 +13,17 @@ import type { Card } from '../card-system/Card';
 import { Pile } from '../card-system/Pile';
 import { getCardTexture } from './CardTextureHelpers';
 
-// ── Types ────────────────────────────────────────────────────
+// ── Types ───────────────────────────────────────────────────
+
+/** Minimal interface for a card pile model. PileView works with any
+ *  object that provides `size()`, `isEmpty()`, and `peek()` methods.
+ *  This enables usage with `Pile<Card>` from card-system as well as
+ *  plain arrays or wrapper objects (e.g. Golf's `Card[]` stock pile). */
+export interface CardPile<T = Card> {
+  size(): number;
+  isEmpty(): boolean;
+  peek(): T | undefined;
+}
 
 /** Options for creating a {@link PileView}. */
 export interface PileViewOptions {
@@ -81,8 +91,8 @@ export class PileView {
   private countOffsetY: number;
   private labelPrefix: string;
 
-  // Pile model
-  private pile: Pile<Card> | null = null;
+  // Pile model (accepts both Pile<Card> and generic CardPile objects)
+  private pile: CardPile<Card> | null = null;
 
   // Display objects
   private sprite: Phaser.GameObjects.Image;
@@ -125,8 +135,8 @@ export class PileView {
    * Set (or replace) the pile model. Call {@link update} to
    * refresh the visual state after mutating the pile.
    */
-  setPile(pile: Pile<Card>): void {
-    this.pile = pile;
+  setPile<T = Card>(pile: CardPile<T>): void {
+    this.pile = pile as unknown as Pile<Card>;
     this.update();
   }
 
@@ -188,8 +198,8 @@ export class PileView {
   /**
    * Get the current pile model, or null if not set.
    */
-  getPile(): Pile<Card> | null {
-    return this.pile;
+  getPile(): CardPile<Card> | null {
+    return this.pile as unknown as CardPile<Card>;
   }
 
   /**

@@ -187,7 +187,7 @@ export type {
 
 // PileView – reusable card-pile display component
 export { PileView } from './PileView';
-export type { PileViewOptions, PileViewEvents } from './PileView';
+export type { PileViewOptions, PileViewEvents, CardPile } from './PileView';
 
 // Hi-DPI text rendering (side-effect import for patching)
 export { TEXT_DPR } from './hiDpiText';

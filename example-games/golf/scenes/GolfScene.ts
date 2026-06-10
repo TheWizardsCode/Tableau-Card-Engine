@@ -206,6 +206,8 @@ export class GolfScene extends CardGameScene {
     this.golfRenderer.createPiles(
       () => this.onStockClick(),
       () => this.onDiscardClick(),
+      this.session.shared.stockPile,
+      this.session.shared.discardPile,
     );
     this.golfRenderer.createGrids((i) => this.onHumanCardClick(i));
     this.golfRenderer.createScoreDisplay();
@@ -439,6 +441,7 @@ export class GolfScene extends CardGameScene {
   /** Clean up resources when the scene shuts down. */
   shutdown(): void {
     this.overlayManager?.dismiss();
+    this.golfRenderer.destroy();
     this.shutdownBase();
   }
 
