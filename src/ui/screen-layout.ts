@@ -2,6 +2,7 @@ import type {
   NormalizedPoint,
   NormalizedRect,
   PixelPoint,
+  PixelRect,
   ScreenLayoutDocument,
 } from './screen-layout-schema';
 
@@ -11,7 +12,7 @@ export interface LayoutViewport {
 }
 
 export interface ResolvedZone {
-  rect: PixelPoint;
+  rect: PixelRect;
   anchors: Record<string, PixelPoint>;
 }
 
@@ -77,30 +78,46 @@ function reportIssue(
 }
 
 /**
- * Resolve a position-only NormalizedRect to pixel coordinates.
+ * Resolve a NormalizedRect to pixel coordinates.
  *
- * Zones define positioning only (x, y) — card dimensions come from
- * per-game constants, not from layout zones.
+ * If `w` and `h` are present on the normalized rect, the result includes
+ * corresponding `width` and `height` pixel values. If absent, `width` and
+ * `height` are `undefined`, matching the traditional position-only zone
+ * behaviour.
  */
 function resolveRect(
   rect: NormalizedRect,
   viewport: LayoutViewport,
   baseViewport: ScreenLayoutDocument['baseViewport'],
   dpr: number,
-): PixelPoint {
+): PixelRect {
   if (rect.pixelOverride) {
     const scaleX = (viewport.width * dpr) / baseViewport.width;
     const scaleY = (viewport.height * dpr) / baseViewport.height;
-    return {
+    const result: PixelRect = {
       x: rect.pixelOverride.x * scaleX,
       y: rect.pixelOverride.y * scaleY,
     };
+    if (rect.w !== undefined) {
+      result.width = toPixels(rect.w, viewport.width, dpr);
+    }
+    if (rect.h !== undefined) {
+      result.height = toPixels(rect.h, viewport.height, dpr);
+    }
+    return result;
   }
 
-  return {
+  const result: PixelRect = {
     x: toPixels(rect.x, viewport.width, dpr),
     y: toPixels(rect.y, viewport.height, dpr),
   };
+  if (rect.w !== undefined) {
+    result.width = toPixels(rect.w, viewport.width, dpr);
+  }
+  if (rect.h !== undefined) {
+    result.height = toPixels(rect.h, viewport.height, dpr);
+  }
+  return result;
 }
 
 /**
@@ -131,6 +148,27 @@ function resolveAnchor(
   };
 }
 
+/**
+ * Resolve a full SLL layout document into pixel-space coordinates.
+ *
+ * Converts all zone rectangles and anchor points from normalized (0-1)
+ * coordinates to absolute pixel values based on the provided viewport
+ * and device pixel ratio.
+ *
+ * ### Dimension support
+ *
+ * Zone rectangles may include optional `w` (width) and `h` (height)
+ * fields. When present, the resulting {@link ResolvedZone.rect} will
+ * contain corresponding `width` and `height` values in pixels. When
+ * absent, `width` and `height` are `undefined`, preserving the
+ * traditional position-only zone behaviour for backward-compatible
+ * consumers.
+ *
+ * @param layout - The validated SLL layout document to resolve.
+ * @param viewport - The current viewport dimensions (logical pixels).
+ * @param dpr - Device pixel ratio, defaults to `1`.
+ * @returns A fully resolved layout with pixel-space zones and anchors.
+ */
 export function normalizedToPixels(
   layout: ScreenLayoutDocument,
   viewport: LayoutViewport,
@@ -175,8 +213,9 @@ export function normalizedToPixels(
 /**
  * Convert a pixel point back to normalized (0-1) coordinates.
  *
- * Note: this is a position-only conversion. Layout zones do not carry
- * dimensions — card sizes come from per-game constants.
+ * Returns a position-only NormalizedRect. Layout zones may carry
+ * optional dimensions (w, h), but this function focuses on position
+ * conversion only.
  */
 export function pixelToNormalized(
   point: PixelPoint,
@@ -190,10 +229,12 @@ export function pixelToNormalized(
 }
 
 /**
- * Get the resolved pixel position for a layout zone.
+ * Get the resolved pixel rectangle for a layout zone.
  *
- * Returns a PixelPoint (x, y) — zones are position-only. Card dimensions
- * should come from per-game constants, not from layout zones.
+ * Returns a PixelRect with `x`/`y` always set. `width`/`height` are set
+ * when the zone defines `w`/`h` (optional dimension support); otherwise
+ * they are `undefined`, matching the traditional position-only zone
+ * behaviour.
  */
 export function getZoneRect(
   layout: ScreenLayoutDocument,
@@ -201,7 +242,7 @@ export function getZoneRect(
   viewport: LayoutViewport,
   dpr = 1,
   reportIssueHook?: ScreenLayoutIssueReporter,
-): PixelPoint {
+): PixelRect {
   const resolved = normalizedToPixels(layout, viewport, dpr);
   const zone = resolved.zones[zoneName];
 

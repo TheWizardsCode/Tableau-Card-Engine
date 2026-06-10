@@ -18,6 +18,9 @@
  */
 
 import { FONT_FAMILY } from '../../../src/ui';
+import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
+import { composeResolvedLayouts } from '../../../src/ui/screen-layout-compose';
+import { type LayoutViewport } from '../../../src/ui/screen-layout';
 import { MARKET_BUSINESS_SLOTS, INCIDENT_QUEUE_SIZE } from '../MainStreetCards';
 import {
   TUTORIAL_STEP_DEFS,
@@ -25,6 +28,74 @@ import {
   type TutorialControllerState,
   type TutorialHighlightZone,
 } from '../TutorialFlow';
+import baseLayout from '../layouts/main-street.layout.json';
+import tutorialLayout from '../layouts/main-street-tutorial.layout.json';
+
+// ── Pre-parse layouts at module load ──────────────────────────
+
+const baseParsed = parseScreenLayoutDocument(baseLayout);
+if (!baseParsed.valid) {
+  throw new Error(
+    `Base layout is invalid: ${baseParsed.errors.map((e) => `${e.path}: ${e.message}`).join('; ')}`,
+  );
+}
+
+const tutorialParsed = parseScreenLayoutDocument(tutorialLayout);
+if (!tutorialParsed.valid) {
+  throw new Error(
+    `Tutorial layout is invalid: ${tutorialLayout ? tutorialLayout.id : '(unknown)'}: ${tutorialParsed.errors.map((e) => `${e.path}: ${e.message}`).join('; ')}`,
+  );
+}
+
+const BASE_LAYOUT = baseParsed.layout;
+const TUTORIAL_LAYOUT = tutorialParsed.layout;
+
+/** Null-zone values that do not need a highlight bounding box. */
+const NULL_ZONES: ReadonlySet<TutorialHighlightZone> = new Set([
+  'centerModal',
+  'completionModal',
+]);
+
+/**
+ * Resolve a tutorial highlight zone to pixel-space coordinates using SLL.
+ *
+ * Composes the base Main Street layout with the tutorial-specific layout
+ * (using `sceneWins` policy so tutorial zones override base zones where names
+ * collide), then looks up the requested zone in the composed result.
+ *
+ * Returns `{ x, y, w, h }` for known zones, or `null` for centered overlays
+ * (centerModal, completionModal) and unrecognized zones.
+ */
+function resolveZoneToAnchor(
+  zone: TutorialHighlightZone,
+  viewport: LayoutViewport,
+  dpr = 1,
+): { x: number; y: number; w: number; h: number } | null {
+  if (NULL_ZONES.has(zone)) {
+    return null;
+  }
+
+  const composed = composeResolvedLayouts(
+    BASE_LAYOUT,
+    TUTORIAL_LAYOUT,
+    viewport,
+    dpr,
+    { policy: 'sceneWins' },
+  );
+
+  const resolvedZone = composed.zones[zone];
+  if (!resolvedZone) {
+    return null;
+  }
+
+  const rect = resolvedZone.rect;
+  return {
+    x: Math.round(rect.x),
+    y: Math.round(rect.y),
+    w: Math.round(rect.width ?? 0),
+    h: Math.round(rect.height ?? 0),
+  };
+}
 
 // ── Tutorial step definitions ────────────────────────────────
 
@@ -639,69 +710,24 @@ export class MainStreetTutorialHints {
 
   /**
    * Maps a TutorialHighlightZone to screen-space coordinates.
-   * Returns null if the zone cannot be resolved.
+   *
+   * Resolves the highlight zone's bounding box from the composed SLL layout
+   * (base + tutorial layout merged via `composeResolvedLayouts`), replacing the
+   * previous hardcoded pixel-math.
+   *
+   * @param zone - The tutorial highlight zone identifier (camelCase SLL zone IDs).
+   * @param scene - The Phaser scene with layout properties.
+   * @returns Pixel-space bounding box `{ x, y, w, h }`, or `null` for centered
+   *   overlays (centerModal, completionModal) and unrecognized zones.
    */
   private zoneToAnchor(
     zone: TutorialHighlightZone,
     scene: any,
   ): { x: number; y: number; w: number; h: number } | null {
-    const l = scene.layout;
-    if (!l) return null;
-
-    switch (zone) {
-      case 'center-modal':
-        return null; // overlay is already centred
-      case 'hud': {
-        // HUD strip is a Phaser rectangle centered at hudY with height 28.
-        // The strip's top edge is at hudY - 14.
-        return { x: 0, y: l.hudY - 14, w: l.gameW, h: 28 };
-      }
-      case 'market-business-row': {
-        // Market has TWO rows: business (top) + investments (bottom).
-        // The renderer draws the section background aligned to the business row cards
-        // with +20px right padding.
-        const marketStartX = l.marketLabelW + 50;
-        const marketRight = marketStartX + (MARKET_BUSINESS_SLOTS - 1) * (l.marketCardW + l.marketCardGap) + l.marketCardW + 20;
-        return {
-          x: 20,
-          y: l.marketTop - 10,
-          w: marketRight - 20,
-          h: 2 * l.marketRowH + l.marketRowGap + 20,
-        };
-      }
-      case 'street-grid': {
-        // Street grid spans the full width of the screen, two rows of slots.
-        const streetH = 2 * l.slotH + l.streetRowGap + 12;
-        return { x: 0, y: l.streetTop - 6, w: l.gameW, h: streetH };
-      }
-      case 'end-turn-button': {
-        const rightX = l.gameW - 24;
-        return { x: rightX - l.actionButtonW - 20, y: l.actionY - 4, w: l.actionButtonW + 20, h: l.actionButtonH + 8 };
-      }
-      case 'incident-queue': {
-        const totalW = l.queueLabelW + INCIDENT_QUEUE_SIZE * (l.queueCardW + l.queueCardGap) + 32;
-        return { x: 20, y: l.queueTop - 6, w: totalW, h: l.queueCardH + 16 };
-      }
-      case 'investments-row': {
-        // Investments row is the second (bottom) market row.
-        // Uses same left alignment and right padding as business row.
-        const marketStartX = l.marketLabelW + 50;
-        const marketRight = marketStartX + (MARKET_BUSINESS_SLOTS - 1) * (l.marketCardW + l.marketCardGap) + l.marketCardW + 20;
-        return {
-          x: 20,
-          y: l.marketTop + l.marketRowH + l.marketRowGap,
-          w: marketRight - 20,
-          h: l.marketRowH,
-        };
-      }
-      case 'help-button': {
-        return { x: l.gameW - 120, y: l.actionY - 4, w: 100, h: l.actionButtonH + 8 };
-      }
-      case 'completion-modal':
-        return null;
-      default:
-        return null;
-    }
+    const layout = scene.layout ?? {};
+    const gameW: number = layout.gameW ?? 1280;
+    const gameH: number = layout.gameH ?? 720;
+    return resolveZoneToAnchor(zone, { width: gameW, height: gameH }, 1);
   }
 
   // ── Private helpers ───────────────────────────────────────

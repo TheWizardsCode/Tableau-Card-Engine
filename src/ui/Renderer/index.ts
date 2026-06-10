@@ -425,3 +425,180 @@ export function createActionButton(
   return container;
 }
 
+// ---------------------------------------------------------------------------
+// Zone & Container Best Practices
+// ---------------------------------------------------------------------------
+//
+// This section documents when and how to use createGameZone vs
+// scene.add.container(), zone dimension guidelines, z-order conventions,
+// and container naming patterns. The patterns below are established by the
+// Main Street, Sushi Go, and Feudalism migrations.
+//
+//
+// 1. When to use createGameZone
+// -----------------------------
+// Use createGameZone for every layout-area / zone container that organises
+// a distinct region of the game screen:
+//
+//   • Street / board area      • Market / shop area
+//   • Hand area                • Action button area
+//   • Player tableau           • AI opponent tableau
+//   • Discard / supply area    • Incident queue / log
+//   • Patron / special zones   • HUD container (with setDepth(1000))
+//
+// These zone containers give every area of the screen a named, metadata-rich
+// container (carrying __zoneWidth, __zoneHeight, and optional __zoneName)
+// which makes debugging, testing, and selective refreshing straightforward.
+//
+// ✅ Correct – zone container:
+//
+//   const streetZone = createGameZone(scene, 0, 0, layout.gameW, layout.gameH, 'streetContainer');
+//
+// ❌ Avoid – raw scene.add.container for zone containers:
+//
+//   const streetZone = scene.add.container(0, 0);  // No zone metadata
+//
+//
+// 2. When to keep scene.add.container()
+// --------------------------------------
+// Per-card containers — individual wrappers that position a single card
+// within a zone — MUST remain as raw scene.add.container() calls. These
+// are transient, positioned by game logic, and do not benefit from zone
+// metadata.
+//
+// ✅ Correct – per-card container:
+//
+//   const cardContainer = scene.add.container(cardX, cardY);
+//   cardContainer.add(cardSprite);
+//   marketZone.add(cardContainer);
+//
+// ✅ Correct – per-card container in MainStreetRenderer:
+//
+//   const cardContainer = s.add.container(
+//     Math.round(x + slotW / 2),
+//     Math.round(y + slotH / 2),
+//   );
+//
+// Per-card containers appear in drawBusinessSlot, drawMarketCard,
+// drawIncidentCard, drawHeldEventCard (Main Street), drawMarketCard
+// (Feudalism), and similar per-card methods.
+//
+//
+// 3. Zone dimension best practices
+// --------------------------------
+// Zone width and height should reflect the logical bounds of the area
+// the container covers. This helps with hit-testing, debugging overlays,
+// and future layout tools.
+//
+//   a) Full-screen zone
+//      Use GAME_W / GAME_H constants or layout dimensions:
+//
+//      const marketZone = createGameZone(scene, 0, 0, GAME_W, GAME_H, 'marketContainer');
+//
+//   b) Layout-derived zone
+//      Compute from a layout object:
+//
+//      const challengeZone = createGameZone(
+//        scene,
+//        layout.challengeX,
+//        layout.challengeY,
+//        layout.challengeW,
+//        0,
+//        'challengeContainer',
+//      );
+//
+//   c) Negative / zero dimensions
+//      createGameZone accepts zero or negative dimensions without error;
+//      they are stored as-is on the container. If you have a zone that
+//      will be sized later, pass 0 for width/height.
+//
+//
+// 4. Z-order conventions
+// ----------------------
+// Depth ordering should follow a consistent scheme across games:
+//
+//   Depth     Layer                Examples
+//   ─────     ─────                ───────────────────────
+//   1000+     HUD / overlay        hudContainer, persistent overlays
+//   500+      Tooltips / popups    tooltipManager panels
+//   0         Gameplay containers  street, market, hand, tableau, action
+//   < 0       Background / boards  section boxes, grid lines
+//
+//   • HUD containers: call setDepth(1000) after creation:
+//
+//       const hud = createGameZone(scene, 0, 0, w, h, 'hudContainer');
+//       hud.setDepth(1000);
+//
+//   • Action buttons should be added to gameplay containers (depth 0)
+//     unless they need to float above other content (use a dedicated
+//     container with a higher depth).
+//
+//   • After creating all zone containers, call depthSort() on the
+//     scene's children list to ensure Phaser applies depth ordering:
+//
+//       try { scene.children?.depthSort?.(); } catch { /* ignore in tests */ }
+//
+//   • If a game needs additional layers (e.g., a floating action panel
+//     above gameplay but below HUD), assign a depth between 1 and 999.
+//
+//   • Test assertions for z-order live in the per-game ZOrder browser
+//     test files (tests/main-street/MainStreetZOrder.browser.test.ts,
+//     tests/sushi-go/SushiGoZOrder.browser.test.ts,
+//     tests/feudalism/FeudalismZOrder.browser.test.ts).
+//
+//
+// 5. Container naming conventions
+// -------------------------------
+// Zone names follow lowercase camelCase and should describe the zone's
+// purpose, suffixed with "Container":
+//
+//   Name                      Game
+//   ──────                    ────────────────
+//   hudContainer              Main Street
+//   streetContainer           Main Street
+//   marketContainer           Main Street, Feudalism
+//   incidentQueueContainer    Main Street
+//   handContainer             Main Street, Sushi Go
+//   actionContainer           Main Street, Feudalism
+//   challengeContainer        Main Street
+//   logContainer              Main Street
+//   sectionBoxContainer       Feudalism
+//   patronContainer           Feudalism
+//   supplyContainer           Feudalism
+//   playerContainer           Feudalism
+//   aiContainer               Feudalism
+//   discardContainer          Feudalism
+//   playerTableauContainer    Sushi Go
+//   aiTableauContainer        Sushi Go
+//
+//
+// 6. Transient vs persistent children
+// ------------------------------------
+// Use markHudTransient() to tag HUD elements that are rebuilt every
+// refresh cycle (score text, coin counts, background strips). Use
+// clearTransientHud() to remove only those tagged children while
+// leaving persistent elements (help panels, settings buttons) intact.
+//
+// See the markHudTransient / clearTransientHud JSDoc above for details
+// and examples.
+//
+//
+// 7. Summary checklist
+// --------------------
+// When adding a new container to a game scene:
+//
+//   [ ] Is this a layout zone (street, market, hand, action area, etc.)?
+//       → Use createGameZone with a descriptive name.
+//
+//   [ ] Is this a per-card wrapper for a single card within a zone?
+//       → Use scene.add.container(x, y) — no zone metadata needed.
+//
+//   [ ] Does this zone need to appear above / below other zones?
+//       → Set depth explicitly. HUD goes at 1000, gameplay at 0.
+//
+//   [ ] Are the zone dimensions derived from layout constants or scene size?
+//       → Pass actual width/height; avoid 0 unless the zone is sized later.
+//
+//   [ ] Does the container hold ephemeral content rebuilt each frame/turn?
+//       → Tag children with markHudTransient() and use clearTransientHud().
+
