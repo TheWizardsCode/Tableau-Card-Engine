@@ -102,7 +102,9 @@ export const TUTORIAL_STEP_DEFS: readonly TutorialStepDef[] = [
     id: 'T3',
     title: 'Market Rows',
     body:
-      'Businesses go on your street. Investments are upgrades and events that shape your strategy.',
+      'Click a business card (top row) to buy it.\n' +
+      'Businesses go on your street to earn income.\n' +
+      'Investments (bottom row) give one-time effects.',
     highlightZone: 'marketBusinessRow',
     requiredAction: 'select-business',
   },
