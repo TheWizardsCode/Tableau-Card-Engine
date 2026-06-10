@@ -30,7 +30,11 @@ import {
   markHudTransient,
   clearTransientHud,
 } from '../../../src/ui';
-import { createSceneTitle, createSceneMenuButton } from '@ui/Renderer';
+import {
+  createSceneTitle,
+  createSceneMenuButton,
+  createGameZone,
+} from '@ui/Renderer';
 import { createActionButton } from '@ui/Renderer';
 import {
   attachHudTooltipZone,
@@ -79,7 +83,7 @@ export class MainStreetRenderer {
 
   public createContainers(): void {
     const s = this.scene;
-    s.hudContainer = s.add.container(0, 0);
+    s.hudContainer = createGameZone(s, 0, 0, s.layout.gameW, s.layout.gameH, 'hudContainer');
     // Ensure HUD container renders above gameplay containers by default.
     try { s.hudContainer.setDepth(1000); } catch (_) { /* ignore in tests */ }
 
@@ -94,20 +98,34 @@ export class MainStreetRenderer {
       (s as any).hudOverlayContainer = s.hudContainer;
     } catch (_) { (s as any).hudOverlayContainer = undefined; }
 
-    s.streetContainer = s.add.container(0, 0);
-    s.marketContainer = s.add.container(0, 0);
-    s.incidentQueueContainer = s.add.container(0, 0);
-    s.handContainer = s.add.container(0, 0);
-    s.actionContainer = s.add.container(0, 0);
+    s.streetContainer = createGameZone(s, 0, 0, s.layout.gameW, s.layout.gameH, 'streetContainer');
+    s.marketContainer = createGameZone(s, 0, 0, s.layout.gameW, s.layout.gameH, 'marketContainer');
+    s.incidentQueueContainer = createGameZone(s, 0, 0, s.layout.gameW, s.layout.gameH, 'incidentQueueContainer');
+    s.handContainer = createGameZone(s, 0, 0, s.layout.gameW, s.layout.gameH, 'handContainer');
+    s.actionContainer = createGameZone(s, 0, 0, s.layout.gameW, s.layout.gameH, 'actionContainer');
 
     // Ensure depth ordering is applied after container creation.
     try { s.children?.depthSort?.(); } catch (_) { /* ignore */ }
 
     // Challenge Tracker panel
-    s.challengeContainer = s.add.container(s.layout.challengeX, s.layout.challengeY);
+    s.challengeContainer = createGameZone(
+      s,
+      s.layout.challengeX,
+      s.layout.challengeY,
+      s.layout.challengeW,
+      0,
+      'challengeContainer',
+    );
 
     // Activity Log panel (persistent, not rebuilt each refresh)
-    s.logContainer = s.add.container(s.layout.logX, s.layout.logY);
+    s.logContainer = createGameZone(
+      s,
+      s.layout.logX,
+      s.layout.logY,
+      s.layout.logW,
+      s.layout.logH,
+      'logContainer',
+    );
 
     // Panel background
     const bg = s.add.graphics();

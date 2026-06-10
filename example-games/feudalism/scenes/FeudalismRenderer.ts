@@ -14,9 +14,10 @@ import {
 import type { FeudalismSession } from '../FeudalismGame';
 import { getInfluence, getBonuses } from '../FeudalismGame';
 import { addCropIcon, cssColorToNumber } from './CropIconRenderer';
-import { FONT_FAMILY, GAME_W, createOverlayBackground } from '../../../src/ui';
+import { FONT_FAMILY, GAME_W, GAME_H, createOverlayBackground } from '../../../src/ui';
 import type { SingleSelectionManager, SelectionController } from '../../../src/ui';
 import { attachSelection, createSingleSelectionManager } from '../../../src/ui';
+import { createGameZone } from '../../../src/ui/Renderer';
 import {
   PATRON_W, PATRON_H, PATRON_X,
   SUPPLY_TOKEN_R, SUPPLY_GAP, SUPPLY_TOTAL_H, SUPPLY_X, SUPPLY_Y,
@@ -101,14 +102,14 @@ export class FeudalismRenderer {
 
   // ── Init ────────────────────────────────────────────────
   createContainers(): void {
-    this.sectionBoxContainer = this.scene.add.container(0, 0);
-    this.marketContainer = this.scene.add.container(0, 0);
-    this.patronContainer = this.scene.add.container(0, 0);
-    this.supplyContainer = this.scene.add.container(0, 0);
-    this.playerContainer = this.scene.add.container(0, 0);
-    this.aiContainer = this.scene.add.container(0, 0);
-    this.actionContainer = this.scene.add.container(0, 0);
-    this.discardContainer = this.scene.add.container(0, 0);
+    this.sectionBoxContainer = createGameZone(this.scene, 0, 0, GAME_W, GAME_H, 'sectionBoxContainer');
+    this.marketContainer = createGameZone(this.scene, 0, 0, GAME_W, GAME_H, 'marketContainer');
+    this.patronContainer = createGameZone(this.scene, 0, 0, GAME_W, GAME_H, 'patronContainer');
+    this.supplyContainer = createGameZone(this.scene, 0, 0, GAME_W, GAME_H, 'supplyContainer');
+    this.playerContainer = createGameZone(this.scene, 0, 0, GAME_W, GAME_H, 'playerContainer');
+    this.aiContainer = createGameZone(this.scene, 0, 0, GAME_W, GAME_H, 'aiContainer');
+    this.actionContainer = createGameZone(this.scene, 0, 0, GAME_W, GAME_H, 'actionContainer');
+    this.discardContainer = createGameZone(this.scene, 0, 0, GAME_W, GAME_H, 'discardContainer');
     this.marketSelectionManager = createSingleSelectionManager(this.scene);
   }
 

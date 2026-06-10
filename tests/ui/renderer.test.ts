@@ -162,6 +162,38 @@ describe('createGameZone', () => {
     expect((zone as any).__zoneName).toBeUndefined();
   });
 
+  it('does not set __zoneName when name is explicitly undefined', () => {
+    const scene = createMockScene();
+    const zone = createGameZone(scene, 50, 75, 200, 150, undefined);
+    expect((zone as any).__zoneWidth).toBe(200);
+    expect((zone as any).__zoneHeight).toBe(150);
+    expect((zone as any).__zoneName).toBeUndefined();
+  });
+
+  it('treats empty string name as no-name (falsy)', () => {
+    const scene = createMockScene();
+    const zone = createGameZone(scene, 0, 0, 100, 100, '');
+    // Empty string is falsy, so __zoneName is not set
+    expect((zone as any).__zoneName).toBeUndefined();
+  });
+
+  it('returns a container with expected interface methods', () => {
+    const scene = createMockScene();
+    const zone = createGameZone(scene, 0, 0, 100, 100, 'testZone');
+    expect(typeof (zone as any).setDepth).toBe('function');
+    expect(typeof (zone as any).add).toBe('function');
+    expect(typeof (zone as any).remove).toBe('function');
+    expect(Array.isArray((zone as any).list)).toBe(true);
+  });
+
+  it('supports typical zone label conventions (hudContainer, streetContainer)', () => {
+    const scene = createMockScene();
+    const hudZone = createGameZone(scene, 0, 0, 1280, 720, 'hudContainer');
+    const streetZone = createGameZone(scene, 0, 200, 1280, 400, 'streetContainer');
+    expect((hudZone as any).__zoneName).toBe('hudContainer');
+    expect((streetZone as any).__zoneName).toBe('streetContainer');
+  });
+
   it('stores negative dimensions as provided', () => {
     const scene = createMockScene();
     const zone = createGameZone(scene, 0, 0, -10, -5);

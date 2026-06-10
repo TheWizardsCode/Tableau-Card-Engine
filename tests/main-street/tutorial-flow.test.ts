@@ -37,9 +37,9 @@ describe('TUTORIAL_STEP_DEFS', () => {
 
   it('each step has a valid highlightZone', () => {
     const validZones = [
-      'center-modal', 'hud', 'market-business-row', 'street-grid',
-      'end-turn-button', 'incident-queue', 'investments-row',
-      'help-button', 'completion-modal',
+      'centerModal', 'hud', 'marketBusinessRow', 'streetGrid',
+      'endTurnButton', 'incidentQueue', 'investmentsRow',
+      'helpButton', 'completionModal',
     ];
     for (const step of TUTORIAL_STEP_DEFS) {
       expect(validZones).toContain(step.highlightZone);
@@ -57,39 +57,39 @@ describe('TUTORIAL_STEP_DEFS', () => {
     }
   });
 
-  it('T1 has confirm action and center-modal highlight', () => {
+  it('T1 has confirm action and centerModal highlight', () => {
     const t1 = TUTORIAL_STEP_DEFS[0];
     expect(t1.id).toBe('T1');
     expect(t1.requiredAction).toBe('confirm');
-    expect(t1.highlightZone).toBe('center-modal');
+    expect(t1.highlightZone).toBe('centerModal');
   });
 
-  it('T4 has place-business action and street-grid highlight', () => {
+  it('T4 has place-business action and streetGrid highlight', () => {
     const t4 = TUTORIAL_STEP_DEFS[3];
     expect(t4.id).toBe('T4');
     expect(t4.requiredAction).toBe('place-business');
-    expect(t4.highlightZone).toBe('street-grid');
+    expect(t4.highlightZone).toBe('streetGrid');
   });
 
-  it('T5 has end-turn action and end-turn-button highlight', () => {
+  it('T5 has end-turn action and endTurnButton highlight', () => {
     const t5 = TUTORIAL_STEP_DEFS[4];
     expect(t5.id).toBe('T5');
     expect(t5.requiredAction).toBe('end-turn');
-    expect(t5.highlightZone).toBe('end-turn-button');
+    expect(t5.highlightZone).toBe('endTurnButton');
   });
 
-  it('T9 has open-help action and help-button highlight', () => {
+  it('T9 has open-help action and helpButton highlight', () => {
     const t9 = TUTORIAL_STEP_DEFS[8];
     expect(t9.id).toBe('T9');
     expect(t9.requiredAction).toBe('open-help');
-    expect(t9.highlightZone).toBe('help-button');
+    expect(t9.highlightZone).toBe('helpButton');
   });
 
   it('T10 has confirm-complete action', () => {
     const t10 = TUTORIAL_STEP_DEFS[9];
     expect(t10.id).toBe('T10');
     expect(t10.requiredAction).toBe('confirm-complete');
-    expect(t10.highlightZone).toBe('completion-modal');
+    expect(t10.highlightZone).toBe('completionModal');
   });
 });
 

@@ -1345,6 +1345,105 @@ When adding a new example game, follow this pattern:
 - If zones/anchors are missing at runtime, look for `UNKNOWN_ZONE` / `UNKNOWN_ANCHOR` issues.
 - If scene behavior unexpectedly matches legacy coordinates, verify that the adapter sees a valid layout document and that the relevant zone names exist.
 
+### Tutorial layout composition pattern
+
+Main Street uses a **tutorial-specific layout file** that complements the base layout with
+bounding-box zones for tutorial highlight areas. This pattern allows the tutorial to define
+zones that don't exist in the base scene layout (HUD strip, help button, investments row) while
+reusing base layout zones through composition.
+
+#### File layout
+
+| File | Purpose |
+|------|--------|
+| `example-games/main-street/layouts/main-street.layout.json` | Canonical base layout (8 zones, position-only) |
+| `example-games/main-street/layouts/main-street-tutorial.layout.json` | Tutorial-specific layout (7 zones, position + dimensions) |
+| `example-games/main-street/scenes/MainStreetTutorialHints.ts` | Tutorial overlay manager |
+| `example-games/main-street/TutorialFlow.ts` | T1-T10 step definitions with `TutorialHighlightZone` type |
+
+#### How composition works
+
+The tutorial layout is composed with the base layout using `composeResolvedLayouts()`:
+
+```typescript
+import { composeResolvedLayouts } from '@ui';
+import type { ScreenLayoutDocument } from '@ui';
+
+// Load both layout documents
+const baseDoc = parseScreenLayoutDocument(baseLayoutJson) as ScreenLayoutDocument;
+const tutorialDoc = parseScreenLayoutDocument(tutorialLayoutJson) as ScreenLayoutDocument;
+
+// Compose with sceneWins policy (tutorial zones override base zones on collision)
+const resolved = composeResolvedLayouts(
+  baseDoc,
+  tutorialDoc,
+  { width: 1280, height: 720 },  // viewport
+  1,                              // DPR
+  { policy: 'sceneWins' },
+);
+
+// Access tutorial-specific zones
+const hudRect = resolved.zones.hud.rect;      // { x, y, width, height }
+const streetRect = resolved.zones.streetGrid.rect;
+
+// Access base zones alongside tutorial zones
+const marketRect = resolved.zones.market.rect;  // still available from base
+```
+
+#### Tutorial zone names
+
+The tutorial layout defines these zones (all use normalized coordinates with optional `w`/`h` dimensions):
+
+| Zone ID | Description | Uses dimensions |
+|---------|-------------|-----------------|
+| `hud` | HUD strip (top bar with coins, reputation, score) | Yes (full-width bounding box) |
+| `marketBusinessRow` | Business card row in the market area | Yes |
+| `streetGrid` | The 2×5 street grid for placing businesses | Yes (full-width) |
+| `endTurnButton` | End Turn action button area | Yes |
+| `incidentQueue` | Scrollable incident cards queue | Yes |
+| `investmentsRow` | Investment/upgrade card row | Yes |
+| `helpButton` | Help/settings button area | Yes |
+
+Zones that return `null` for highlighting (no bounding box needed):
+- `center-modal` — centered overlay
+- `completion-modal` — centered completion dialog
+
+#### Schema extension for dimensions
+
+The `NormalizedRect` type and JSON Schema were extended with optional `w` (width) and `h` (height)
+fields. These are **fully backward-compatible** — existing position-only zones continue to work
+without modification. When `w` and `h` are present, `getZoneRect()` returns a `PixelRect` with
+`width` and `height` set.
+
+```typescript
+// Position-only (existing pattern)
+interface PositionOnlyRect {
+  x: number;  // 0-1 normalized
+  y: number;  // 0-1 normalized
+}
+
+// Dimensioned (new pattern for bounding boxes)
+interface DimensionedRect {
+  x: number;
+  y: number;
+  w?: number;  // optional width (0-1 normalized)
+  h?: number;  // optional height (0-1 normalized)
+}
+```
+
+#### Authoring a tutorial layout
+
+When creating a new tutorial layout file:
+
+1. **Copy the base layout** structure (`version`, `id`, `baseViewport`, `requiredZones`)
+2. **Define only the zones needed** for tutorial highlights (you don't need all base zones)
+3. **Include `w` and `h`** for all zones that need bounding-box dimensions
+4. **Use normalized coordinates** (0-1) — resolution is handled at runtime by `normalizedToPixels()`
+5. **Add anchors** for each zone (used for tooltip positioning relative to the zone)
+6. **Validate** with `validateScreenLayoutDocument()` and `composeResolvedLayouts()` before committing
+
+See `example-games/main-street/layouts/main-street-tutorial.layout.json` for a complete example.
+
 ### Related follow-up scope
 
 - Tutorial-specific layout migration remains tracked separately in work item **Adapt tutorial system to use layout description (CG-0MP7IZ4RK008065O)**.
