@@ -625,9 +625,9 @@ export class MainStreetLifecycleManager {
       return;
     }
 
-    s.time.delayedCall(600, () => {
-      (s as any).showTutorialStepOverlay?.();
-    });
+    // Show next step immediately (for action steps) or after brief delay
+    // For select-business -> place-business transition, show immediately
+    (s as any).showTutorialStepOverlay?.();
   }
 
   /** Persists tutorial completion to localStorage and campaign. */
