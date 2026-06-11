@@ -23,8 +23,9 @@ import { composeResolvedLayouts } from '../../../src/ui/screen-layout-compose';
 import { type LayoutViewport } from '../../../src/ui/screen-layout';
 import { MARKET_BUSINESS_SLOTS, INCIDENT_QUEUE_SIZE } from '../MainStreetCards';
 import {
-  TUTORIAL_STEP_DEFS,
   getCurrentStep,
+  UNIFIED_TUTORIAL_STEP_COUNT,
+  UNIFIED_TUTORIAL_STEPS,
   type TutorialControllerState,
   type TutorialHighlightZone,
 } from '../TutorialFlow';
@@ -596,7 +597,7 @@ export class MainStreetTutorialHints {
     const tooltipW = 340;
     const tooltipX = Math.max(12, Math.floor(gameW / 2 - tooltipW / 2));
 
-    const isLast = step.id === 'T10';
+    const isLast = step.id === 'T13';
     const isExitable = !isLast;
 
     // Use Phaser canvas-based tooltip with interactive Text buttons.
@@ -678,11 +679,11 @@ export class MainStreetTutorialHints {
       this.objects.push(confirmBtn);
     }
 
-    // Step badge
-    const stepNum = TUTORIAL_STEP_DEFS.findIndex((d) => d.id === step.id) + 1;
+    // Step badge — use unified step count for the 13-step system
+    const stepNum = UNIFIED_TUTORIAL_STEPS.findIndex((d) => d.id === step.id) + 1;
     const stepLabel = s.add.text(
       tooltipX + tooltipW - 12, finalY + 10,
-      `${stepNum} / ${TUTORIAL_STEP_DEFS.length}`,
+      `${stepNum} / ${UNIFIED_TUTORIAL_STEP_COUNT}`,
       { fontSize: '11px', color: '#669966', fontFamily: FONT_FAMILY }
     ).setOrigin(1, 0).setDepth(TOOLTIP_DEPTH + 1002);
     this.objects.push(stepLabel);

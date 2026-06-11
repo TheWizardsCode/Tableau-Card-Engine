@@ -2,11 +2,23 @@
  * Browser tests for MainStreetTutorialOverlayManager highlight zones.
  *
  * Validates that the highlight rectangles drawn by showActionGatedStep
- * cover the correct UI areas for each TutorialHighlightZone.
+ * cover the correct UI areas for each TutorialHighlightZone in the
+ * unified T1–T13 tutorial system.
+ *
+ * Unified step mapping:
+ *   0=T1 centerModal(confirm) 1=T2 hud(confirm) 2=T3 marketBusinessRow(action)
+ *   3=T4 streetGrid(action) 4=T5 incidentQueue(confirm) 5=T6 endTurnButton(action)
+ *   6=T7 investmentsRow(action) 7=T8 investmentsRow(action) 8=T9 centerModal(confirm)
+ *   9=T10 helpButton(action) 10=T11 endTurnButton(confirm) 11=T12 investmentsRow(confirm)
+ *   12=T13 completionModal(confirm)
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import Phaser from 'phaser';
 import { waitForScene } from '../helpers/waitForScene';
+import {
+  UNIFIED_TUTORIAL_STEPS,
+  type TutorialHighlightZone,
+} from '../../example-games/main-street/TutorialFlow';
 
 /**
  * Bootstrap a Main Street game and return the scene.
@@ -69,9 +81,19 @@ describe('TutorialOverlayManager highlight zones', () => {
   });
 
   /**
-   * Helper: show an action-gated step and return the highlight graphics.
+   * Resolve a step ID to its index in UNIFIED_TUTORIAL_STEPS.
    */
-  function showStepAndGetHighlight(stepIndex: number): Phaser.GameObjects.Graphics | null {
+  function stepIdToIndex(stepId: string): number {
+    const idx = UNIFIED_TUTORIAL_STEPS.findIndex((s) => s.id === stepId);
+    expect(idx >= 0, `Step ${stepId} not found in unified steps`).toBe(true);
+    return idx;
+  }
+
+  /**
+   * Show an action-gated step (by step ID) and return the highlight graphics,
+   * or null if this step has a null highlight zone.
+   */
+  function showStepAndGetHighlight(stepId: string): Phaser.GameObjects.Graphics | null {
     const mgr = scene.tutorialOverlay as { showActionGatedStep?: (controller: unknown) => void; dismiss?: () => void };
     if (!mgr || typeof mgr.showActionGatedStep !== 'function') {
       return null;
@@ -85,7 +107,7 @@ describe('TutorialOverlayManager highlight zones', () => {
     // Create a minimal controller state
     const controller = {
       isActive: true,
-      currentStepIndex: stepIndex,
+      currentStepIndex: stepIdToIndex(stepId),
       lastCompletedStepId: null,
       exited: false,
     };
@@ -130,12 +152,12 @@ describe('TutorialOverlayManager highlight zones', () => {
 
   // ── AC 1: HUD highlight ────────────────────────────────────
 
-  it('HUD highlight starts at hudY and covers the HUD strip', async () => {
+  it('HUD highlight (T2) starts at hudY and covers the HUD strip', async () => {
     const layout = scene.layout as { hudY: number; gameW: number } | undefined;
     expect(layout).toBeTruthy();
     expect(layout!.hudY).toBeGreaterThan(0);
 
-    const highlight = showStepAndGetHighlight(1); // T2 = HUD
+    const highlight = showStepAndGetHighlight('T2'); // T2 = confirm, hud zone
     expect(highlight).toBeTruthy();
 
     const bounds = getHighlightBounds(highlight!);
@@ -157,7 +179,7 @@ describe('TutorialOverlayManager highlight zones', () => {
 
   // ── AC 2: Market rows highlight ─────────────────────────────
 
-  it('Market rows highlight covers BOTH business and investments rows', async () => {
+  it('Market rows highlight (T3) covers BOTH business and investments rows', async () => {
     const layout = scene.layout as {
       marketTop: number;
       marketRowH: number;
@@ -165,7 +187,7 @@ describe('TutorialOverlayManager highlight zones', () => {
     } | undefined;
     expect(layout).toBeTruthy();
 
-    const highlight = showStepAndGetHighlight(2); // T3 = market-business-row
+    const highlight = showStepAndGetHighlight('T3'); // T3 = action, marketBusinessRow zone
     expect(highlight).toBeTruthy();
 
     const bounds = getHighlightBounds(highlight!);
@@ -184,7 +206,7 @@ describe('TutorialOverlayManager highlight zones', () => {
 
   // ── AC 3: Street grid highlight ─────────────────────────────
 
-  it('Street grid highlight covers the 2x5 grid area', async () => {
+  it('Street grid highlight (T4) covers the 2x5 grid area', async () => {
     const layout = scene.layout as {
       streetTop: number;
       streetX: number;
@@ -196,7 +218,7 @@ describe('TutorialOverlayManager highlight zones', () => {
     } | undefined;
     expect(layout).toBeTruthy();
 
-    const highlight = showStepAndGetHighlight(3); // T4 = street-grid
+    const highlight = showStepAndGetHighlight('T4'); // T4 = action, streetGrid zone
     expect(highlight).toBeTruthy();
 
     const bounds = getHighlightBounds(highlight!);
@@ -213,7 +235,7 @@ describe('TutorialOverlayManager highlight zones', () => {
 
   // ── AC 4: End turn button highlight ─────────────────────────
 
-  it('End turn button highlight covers the action button area', async () => {
+  it('End turn button highlight (T6) covers the action button area', async () => {
     const layout = scene.layout as {
       actionY: number;
       actionButtonH: number;
@@ -222,7 +244,7 @@ describe('TutorialOverlayManager highlight zones', () => {
     } | undefined;
     expect(layout).toBeTruthy();
 
-    const highlight = showStepAndGetHighlight(5); // T6 = end-turn-button
+    const highlight = showStepAndGetHighlight('T6'); // T6 = action, endTurnButton zone
     expect(highlight).toBeTruthy();
 
     const bounds = getHighlightBounds(highlight!);
@@ -235,14 +257,14 @@ describe('TutorialOverlayManager highlight zones', () => {
 
   // ── AC 5: Incident queue highlight ──────────────────────────
 
-  it('Incident queue highlight covers the queue area', async () => {
+  it('Incident queue highlight (T5) covers the queue area', async () => {
     const layout = scene.layout as {
       queueTop: number;
       queueCardH: number;
     } | undefined;
     expect(layout).toBeTruthy();
 
-    const highlight = showStepAndGetHighlight(4); // T5 = incident-queue
+    const highlight = showStepAndGetHighlight('T5'); // T5 = confirm, incidentQueue zone
     expect(highlight).toBeTruthy();
 
     const bounds = getHighlightBounds(highlight!);
@@ -256,9 +278,9 @@ describe('TutorialOverlayManager highlight zones', () => {
     expect(bounds!.h).toBeGreaterThanOrEqual(layout!.queueCardH - 5);
   });
 
-  // ── AC 6: Investments row highlight ─────────────────────────
+  // ── AC 6: Investments row highlight (T7/T8/T12) ─────────────
 
-  it('Investments row highlight covers the bottom market row', async () => {
+  it('Investments row highlight (T7) covers the bottom market row', async () => {
     const layout = scene.layout as {
       marketTop: number;
       marketRowH: number;
@@ -267,7 +289,7 @@ describe('TutorialOverlayManager highlight zones', () => {
     } | undefined;
     expect(layout).toBeTruthy();
 
-    const highlight = showStepAndGetHighlight(6); // T7 = investments-row
+    const highlight = showStepAndGetHighlight('T7'); // T7 = action, investmentsRow zone
     expect(highlight).toBeTruthy();
 
     const bounds = getHighlightBounds(highlight!);
@@ -282,7 +304,7 @@ describe('TutorialOverlayManager highlight zones', () => {
 
   // ── AC 7: Help button highlight ─────────────────────────────
 
-  it('Help button highlight covers the help button area', async () => {
+  it('Help button highlight (T10) covers the help button area', async () => {
     const layout = scene.layout as {
       actionY: number;
       actionButtonH: number;
@@ -290,7 +312,7 @@ describe('TutorialOverlayManager highlight zones', () => {
     } | undefined;
     expect(layout).toBeTruthy();
 
-    const highlight = showStepAndGetHighlight(8); // T9 = help-button
+    const highlight = showStepAndGetHighlight('T10'); // T10 = action, helpButton zone
     expect(highlight).toBeTruthy();
 
     const bounds = getHighlightBounds(highlight!);
@@ -300,9 +322,9 @@ describe('TutorialOverlayManager highlight zones', () => {
     expect(bounds!.y).toBeGreaterThanOrEqual(layout!.actionY - 10);
   });
 
-  // ── AC 8: center-modal zone (null anchor, no highlight) ─────
+  // ── AC 9: centerModal zone (null anchor, no highlight) ──────
 
-  it('center-modal zone returns null anchor (no highlight graphics drawn)', async () => {
+  it('centerModal zone (T1) returns null anchor (no highlight graphics drawn)', async () => {
     const mgr = scene.tutorialOverlay as { showActionGatedStep?: (controller: unknown) => void; dismiss?: () => void };
 
     if (mgr && typeof mgr.showActionGatedStep === 'function') {
@@ -312,15 +334,151 @@ describe('TutorialOverlayManager highlight zones', () => {
 
       const controller = {
         isActive: true,
-        currentStepIndex: 0,
+        currentStepIndex: stepIdToIndex('T1'),
         lastCompletedStepId: null,
         exited: false,
       };
       mgr.showActionGatedStep(controller);
 
-      // center-modal should not draw any highlight graphics at depth 199
+      // centerModal should not draw any highlight graphics at depth 199
       const highlights = findHighlightGraphics(scene);
       expect(highlights.length).toBe(0);
     }
   });
+
+  // ── AC 10: centerModal zone for T9 (non-gated, confirm) ─────
+
+  it('centerModal zone (T9) returns null anchor (no highlight graphics drawn)', async () => {
+    const mgr = scene.tutorialOverlay as { showActionGatedStep?: (controller: unknown) => void; dismiss?: () => void };
+
+    if (mgr && typeof mgr.showActionGatedStep === 'function') {
+      if (typeof mgr.dismiss === 'function') {
+        mgr.dismiss();
+      }
+
+      const controller = {
+        isActive: true,
+        currentStepIndex: stepIdToIndex('T9'),
+        lastCompletedStepId: null,
+        exited: false,
+      };
+      mgr.showActionGatedStep(controller);
+
+      // centerModal should not draw any highlight graphics at depth 199
+      const highlights = findHighlightGraphics(scene);
+      expect(highlights.length).toBe(0);
+    }
+  });
+
+  // ── AC 11: completionModal zone (null anchor, no highlight) ──
+
+  it('completionModal zone (T13) returns null anchor (no highlight graphics drawn)', async () => {
+    const mgr = scene.tutorialOverlay as { showActionGatedStep?: (controller: unknown) => void; dismiss?: () => void };
+
+    if (mgr && typeof mgr.showActionGatedStep === 'function') {
+      if (typeof mgr.dismiss === 'function') {
+        mgr.dismiss();
+      }
+
+      const controller = {
+        isActive: true,
+        currentStepIndex: stepIdToIndex('T13'),
+        lastCompletedStepId: null,
+        exited: false,
+      };
+      mgr.showActionGatedStep(controller);
+
+      // completionModal should not draw any highlight graphics at depth 199
+      const highlights = findHighlightGraphics(scene);
+      expect(highlights.length).toBe(0);
+    }
+  });
+
+  // ── AC 12: T8 investments row highlight (action-gated upgrade) ──
+
+  it('investmentsRow highlight (T8) covers the investments row for upgrade action', async () => {
+    const layout = scene.layout as {
+      marketTop: number;
+      marketRowH: number;
+      marketRowGap: number;
+      gameW: number;
+    } | undefined;
+    expect(layout).toBeTruthy();
+
+    const highlight = showStepAndGetHighlight('T8'); // T8 = action, investmentsRow zone
+    expect(highlight).toBeTruthy();
+
+    const bounds = getHighlightBounds(highlight!);
+    expect(bounds).toBeTruthy();
+
+    // The investments row is the second (bottom) market row
+    const expectedTopY = layout!.marketTop + layout!.marketRowH + layout!.marketRowGap;
+    expect(bounds!.y).toBeLessThanOrEqual(expectedTopY + 4);
+    expect(bounds!.y).toBeGreaterThanOrEqual(layout!.marketTop - 10);
+  });
+
+  // ── AC 13: T11 endTurnButton highlight (confirm, action controls) ──
+
+  it('endTurnButton highlight (T11) covers the action button area for action controls', async () => {
+    const layout = scene.layout as {
+      actionY: number;
+      actionButtonH: number;
+      actionButtonW: number;
+      gameW: number;
+    } | undefined;
+    expect(layout).toBeTruthy();
+
+    const highlight = showStepAndGetHighlight('T11'); // T11 = confirm, endTurnButton zone
+    expect(highlight).toBeTruthy();
+
+    const bounds = getHighlightBounds(highlight!);
+    expect(bounds).toBeTruthy();
+
+    // Should be in the bottom-right area
+    expect(bounds!.y).toBeGreaterThanOrEqual(layout!.actionY - 10);
+    expect(bounds!.h).toBeGreaterThan(layout!.actionButtonH - 10);
+  });
+
+  // ── AC 14: T12 investments row highlight (confirm, challenges) ──
+
+  it('investmentsRow highlight (T12) covers the investments row for challenges info', async () => {
+    const layout = scene.layout as {
+      marketTop: number;
+      marketRowH: number;
+      marketRowGap: number;
+      gameW: number;
+    } | undefined;
+    expect(layout).toBeTruthy();
+
+    const highlight = showStepAndGetHighlight('T12'); // T12 = confirm, investmentsRow zone
+    expect(highlight).toBeTruthy();
+
+    const bounds = getHighlightBounds(highlight!);
+    expect(bounds).toBeTruthy();
+
+    // The investments row is the second (bottom) market row
+    const expectedTopY = layout!.marketTop + layout!.marketRowH + layout!.marketRowGap;
+    expect(bounds!.y).toBeLessThanOrEqual(expectedTopY + 4);
+    expect(bounds!.y).toBeGreaterThanOrEqual(layout!.marketTop - 10);
+  });
+
+  // ── Coverage: all 13 unified steps have valid highlight zones ─
+
+  it.each(UNIFIED_TUTORIAL_STEPS.map((s) => [s.id, s.highlightZone]))(
+    'step %s has valid highlightZone: %s',
+    (_stepId, zone) => {
+      const validZones: TutorialHighlightZone[] = [
+        'centerModal',
+        'hud',
+        'marketBusinessRow',
+        'streetGrid',
+        'endTurnButton',
+        'incidentQueue',
+        'investmentsRow',
+        'helpButton',
+        'completionModal',
+      ];
+      expect(validZones).toContain(zone);
+    },
+  );
 });
