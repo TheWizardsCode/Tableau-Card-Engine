@@ -518,14 +518,20 @@ export class MainStreetLifecycleManager {
       return;
     }
 
-    // For action steps, check if the action already completed.
-    // If step still exists but we're not on the step that was showing,
-    // the action completed and we should advance to next step.
+    // For action steps, the Continue button should only work if the action
+    // has been completed. The predicate determines this. Since we want to
+    // allow continuing even if overlay is stale (action happened elsewhere),
+    // we check the predicate result here.
     if (step.gate === 'action') {
-      // Action already completed - advance and show next step (overlay may be stale)
-      const { newState } = completeCurrentStep(controller);
-      Object.assign(s, { tutorialController: newState });
-      (s as any).showTutorialStepOverlay?.();
+      const overlay = (s as any).tutorialOverlay as { getActionCompletePredicate?: () => (() => boolean) | null } | undefined;
+      const predicate = overlay?.getActionCompletePredicate?.();
+      // If predicate returns true, action completed - advance the tutorial
+      if (predicate && predicate()) {
+        const { newState } = completeCurrentStep(controller);
+        Object.assign(s, { tutorialController: newState });
+        (s as any).showTutorialStepOverlay?.();
+      }
+      // If predicate returns false, action not done - do nothing (button ignored)
       return;
     }
 

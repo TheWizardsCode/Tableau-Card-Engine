@@ -184,6 +184,15 @@ export class MainStreetTutorialHints {
   }
 
   /**
+   * Get the current action-complete predicate.
+   *
+   * Used by confirmTutorialStep to check if action completed since overlay was shown.
+   */
+  public getActionCompletePredicate(): (() => boolean) | null {
+    return this._actionCompletePredicate;
+  }
+
+  /**
    * Show a specific tutorial step by index.
    *
    * This is the unified rendering method that handles both confirm-style and
