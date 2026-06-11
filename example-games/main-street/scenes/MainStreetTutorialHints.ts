@@ -303,11 +303,11 @@ export class MainStreetTutorialHints {
         continueBtn.style.border = 'none';
         continueBtn.style.padding = '6px 8px';
         continueBtn.style.borderRadius = '6px';
-        continueBtn.style.cursor = actionComplete && !actionComplete() ? 'not-allowed' : 'pointer';
-        continueBtn.style.opacity = actionComplete && !actionComplete() ? '0.5' : '1';
-        continueBtn.disabled = actionComplete !== null && !actionComplete();
+        // Re-evaluate predicate on click (in case action completed while overlay was showing)
         continueBtn.onclick = () => {
-          if (!continueBtn.disabled) {
+          const ac = actionComplete;
+          // If no predicate or predicate returns true, action is complete
+          if (!ac || ac()) {
             (s as any).confirmTutorialStep?.();
           }
         };
@@ -430,10 +430,7 @@ export class MainStreetTutorialHints {
         const continueColor = isLast ? '#002200' : '#002200';
         const continueBg = isLast ? '#44ff44' : '#88ff88';
         const continueBtn = s.add.text(domX + TOOLTIP_W - 16, tooltipY + tooltipH - 30, continueLabel, { fontSize: '13px', color: continueColor, fontFamily: FONT_FAMILY, fontStyle: 'bold', padding: { left: 12, right: 12, top: 6, bottom: 6 } as any, backgroundColor: continueBg }).setInteractive({ useHandCursor: true }).setOrigin(1, 0).setDepth(TOOLTIP_DEPTH + 1003);
-        const isComplete = actionComplete ? actionComplete() : true;
-        if (!isComplete) {
-          continueBtn.setAlpha(0.5);
-        }
+        // Re-evaluate predicate on click (in case action completed while overlay was showing)
         continueBtn.on('pointerdown', () => {
           const ac = actionComplete;
           if (!ac || ac()) {
