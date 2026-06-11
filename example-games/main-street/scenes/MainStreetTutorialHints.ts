@@ -1,13 +1,15 @@
 /**
- * MainStreetTutorialHints -- Non-interactive tutorial overlays for Main Street.
+ * MainStreetTutorialHints -- Unified tutorial overlay system for Main Street.
  *
- * Displays a sequence of contextual tooltip hints that highlight key UI
- * regions (market, street slots, hand, action controls, scoring).
+ * Displays contextual tooltip hints that highlight key UI regions (market,
+ * street slots, hand, action controls, scoring). Supports two modes:
  *
- * Overlays are purely informational: they do not block gameplay interaction.
- * The player can dismiss individual hints or toggle the whole tutorial off.
+ * - **Confirm mode**: purely informational; the player clicks "Next" to advance.
+ * - **Action-gated mode**: the player must perform an in-game action to advance.
  *
- * Usage:
+ * The same `showStep()` method handles both modes via the `gate` field on
+ * each step definition. Usage:
+ *
  *   const mgr = new MainStreetTutorialHints(scene);
  *   mgr.showStep(0);        // show first hint
  *   mgr.nextStep();         // advance to next hint

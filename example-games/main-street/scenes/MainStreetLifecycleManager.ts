@@ -407,7 +407,7 @@ export class MainStreetLifecycleManager {
         {
           onStartTutorial: () => {
             try {
-              // Start the action-gated tutorial flow (T1-T10)
+              // Start the action-gated tutorial flow (T1-T13)
               const controller = (s as any).tutorialController as TutorialControllerState | undefined;
               if (controller) {
                 Object.assign(s, { tutorialController: startTutorial(controller) });
