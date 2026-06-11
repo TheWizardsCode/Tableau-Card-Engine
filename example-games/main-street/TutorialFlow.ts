@@ -86,12 +86,6 @@ export interface UnifiedTutorialStepDef {
   requiredAction?: TutorialActionType;
 }
 
-/**
- * Legacy alias for backward compatibility.
- * @deprecated Use `UnifiedTutorialStepDef` instead.
- */
-export type TutorialStepDef = UnifiedTutorialStepDef;
-
 // ── Unified Tutorial Script (T1-T13) ────────────────────────
 
 /**
@@ -236,20 +230,6 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
 
 /** Total number of unified tutorial steps. */
 export const UNIFIED_TUTORIAL_STEP_COUNT = UNIFIED_TUTORIAL_STEPS.length; // 13
-
-/**
- * Legacy step definitions (first 10 steps from the unified set) for backward
- * compatibility with existing code that references `TUTORIAL_STEP_DEFS`.
- * @deprecated Use `UNIFIED_TUTORIAL_STEPS` instead.
- */
-export const TUTORIAL_STEP_DEFS: readonly TutorialStepDef[] =
-  UNIFIED_TUTORIAL_STEPS.slice(0, 10) as readonly TutorialStepDef[];
-
-/**
- * Legacy step count (10) for backward compatibility.
- * @deprecated Use `UNIFIED_TUTORIAL_STEP_COUNT` (13) instead.
- */
-export const TUTORIAL_STEP_COUNT = TUTORIAL_STEP_DEFS.length; // 10
 
 export const INVALID_ACTION_MESSAGE = 'Complete the highlighted step first.';
 

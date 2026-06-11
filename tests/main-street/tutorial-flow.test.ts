@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   UNIFIED_TUTORIAL_STEPS, UNIFIED_TUTORIAL_STEP_COUNT,
-  TUTORIAL_STEP_DEFS, TUTORIAL_STEP_COUNT, INVALID_ACTION_MESSAGE,
+  INVALID_ACTION_MESSAGE,
   createTutorialControllerState, advanceTutorialStep, startTutorial,
   exitTutorial, completeCurrentStep, isOnStep, getCurrentStep,
   isRequiredAction, shouldAllowAction,
@@ -30,23 +30,6 @@ describe('UNIFIED_TUTORIAL_STEPS', () => {
   it('T8 is action gate with apply-upgrade requiredAction', () => { const t=findStep('T8'); expect(t.gate).toBe('action'); expect(t.requiredAction).toBe('apply-upgrade'); expect(t.highlightZone).toBe('investmentsRow'); });
   it('T10 is action gate with open-help requiredAction', () => { const t=findStep('T10'); expect(t.gate).toBe('action'); expect(t.requiredAction).toBe('open-help'); expect(t.highlightZone).toBe('helpButton'); });
   it('T13 is confirm gate with completionModal highlight', () => { expect(findStep('T13').gate).toBe('confirm'); expect(findStep('T13').highlightZone).toBe('completionModal'); });
-});
-
-describe('TUTORIAL_STEP_DEFS (legacy)', () => {
-  it('defines exactly 10 steps', () => { expect(TUTORIAL_STEP_DEFS.length).toBe(10); expect(TUTORIAL_STEP_COUNT).toBe(10); });
-  it('is a subset of the unified steps', () => { expect(TUTORIAL_STEP_DEFS.map(s=>s.id)).toEqual(['T1','T2','T3','T4','T5','T6','T7','T8','T9','T10']); });
-  it('each step has non-empty title and body', () => { for(const step of TUTORIAL_STEP_DEFS){ expect(step.title.length).toBeGreaterThan(0); expect(step.body.length).toBeGreaterThan(0); } });
-  it('action-gated legacy steps have requiredAction', () => { for(const step of TUTORIAL_STEP_DEFS) if(step.gate==='action') expect(step.requiredAction).toBeDefined(); });
-  it('T1 (index 0) is confirm gate', () => { expect(TUTORIAL_STEP_DEFS[0].gate).toBe('confirm'); });
-  it('T2 (index 1) is confirm gate', () => { expect(TUTORIAL_STEP_DEFS[1].gate).toBe('confirm'); });
-  it('T3 (index 2) is action gate with select-business', () => { expect(TUTORIAL_STEP_DEFS[2].requiredAction).toBe('select-business'); });
-  it('T4 (index 3) is action gate with place-business', () => { expect(TUTORIAL_STEP_DEFS[3].requiredAction).toBe('place-business'); });
-  it('T5 (index 4) is confirm gate', () => { expect(TUTORIAL_STEP_DEFS[4].gate).toBe('confirm'); });
-  it('T6 (index 5) is action gate with end-turn', () => { expect(TUTORIAL_STEP_DEFS[5].requiredAction).toBe('end-turn'); });
-  it('T7 (index 6) is action gate with buy-event', () => { expect(TUTORIAL_STEP_DEFS[6].requiredAction).toBe('buy-event'); });
-  it('T8 (index 7) is action gate with apply-upgrade', () => { expect(TUTORIAL_STEP_DEFS[7].requiredAction).toBe('apply-upgrade'); });
-  it('T9 (index 8) is confirm gate', () => { expect(TUTORIAL_STEP_DEFS[8].gate).toBe('confirm'); });
-  it('T10 (index 9) is action gate with open-help', () => { expect(TUTORIAL_STEP_DEFS[9].requiredAction).toBe('open-help'); });
 });
 
 describe('INVALID_ACTION_MESSAGE', () => {

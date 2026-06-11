@@ -21,7 +21,7 @@ import { FONT_FAMILY } from '../../../src/ui';
 import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
 import { composeResolvedLayouts } from '../../../src/ui/screen-layout-compose';
 import { type LayoutViewport } from '../../../src/ui/screen-layout';
-import { MARKET_BUSINESS_SLOTS, INCIDENT_QUEUE_SIZE } from '../MainStreetCards';
+
 import {
   getCurrentStep,
   UNIFIED_TUTORIAL_STEP_COUNT,
@@ -98,202 +98,6 @@ export function resolveZoneToAnchor(
   };
 }
 
-// ── Tutorial step definitions ────────────────────────────────
-
-/**
- * A single tutorial step: a title, body text, and an anchor function that
- * returns the screen-space rectangle (x, y, w, h) to highlight.
- *
- * If `anchor` returns null the tooltip is shown centred on screen.
- */
-export interface TutorialStep {
-  title: string;
-  body: string;
-  /** Returns {x, y, w, h} bounding box to highlight, or null for centred. */
-  anchor: (scene: any) => { x: number; y: number; w: number; h: number } | null;
-}
-
-/** The ordered set of tutorial hints shown to new players. */
-export const TUTORIAL_STEPS: TutorialStep[] = [
-  {
-    title: 'Welcome to Main Street!',
-    body:
-      'Build the most profitable street in town!\n' +
-      'Buy businesses, place them on your street, earn\n' +
-      'coins & reputation, and reach the score target.\n\n' +
-      'This is "Scenario: Tutorial" — Easy difficulty,\n' +
-      '25 turns, and a lower score target.\n\n' +
-      'Tap [Next] to learn the controls.',
-    anchor: () => null,
-  },
-  {
-    title: 'The Market',
-    body:
-      'The top section shows cards for sale.\n' +
-      'Business cards (top row) go on your street.\n' +
-      'Investment/Upgrade cards (bottom row) give\n' +
-      'one-time effects or improve existing businesses.\n\n' +
-      'Click a card to select it, then choose a street slot.',
-    anchor: (scene: any) => {
-      const l = scene.layout;
-      if (!l) return null;
-      // Prefer using the rendered marketContainer bounds when available so
-      // the highlight precisely matches the visible market region including
-      // the left-side title. Fallback to layout-derived bounds otherwise.
-      try {
-        const mc = (scene as any).marketContainer;
-        if (mc && typeof mc.getBounds === 'function') {
-          const b = mc.getBounds();
-          const pad = 8;
-          const x = Math.max(12, b.x - pad);
-          const y = Math.max(12, b.y - pad);
-          const rightLimit = (typeof l.logX === 'number' && l.logX > 0) ? l.logX - 20 : l.gameW - 40;
-          const w = Math.max(80, Math.min(b.width + pad * 2, Math.max(80, rightLimit - x)));
-          const h = Math.max(40, Math.min(b.height + pad * 2, l.gameH - 40));
-          return { x, y, w, h };
-        }
-      } catch (_e) {
-        // ignore and fallback
-      }
-
-      const startX = l.marketLabelW + 50;
-      const slots = MARKET_BUSINESS_SLOTS;
-      const totalCardsW = slots * l.marketCardW + (slots - 1) * l.marketCardGap;
-      const padding = 8; // small padding around the highlight
-      // Start at the content label X so the highlight includes the title area
-      const labelX = 40;
-      const x = Math.max(12, labelX - 8);
-      const rightLimit = (typeof l.logX === 'number' && l.logX > 0) ? l.logX - 20 : Math.max(20, l.gameW - 40);
-      const desiredW = Math.max(80, (startX - labelX) + totalCardsW + padding * 2);
-      const w = Math.max(80, Math.min(desiredW, Math.max(80, rightLimit - x)));
-      const y = l.marketTop - 6;
-      const h = l.marketRowH * 2 + l.marketRowGap + 16;
-      return { x, y, w, h };
-    },
-
-  },
-  {
-    title: 'Upcoming Incidents',
-    body:
-      'Blue cards show incidents that will hit at the\n' +
-      'end of each turn — plan around them!\n' +
-      'Negative incidents (Tax Audit, Vandalism) cost\n' +
-      'coins or reputation.  Positive ones help you.\n\n' +
-      'Queue scrolls left: the leftmost card fires next.',
-    anchor: (scene: any) => {
-      const l = scene.layout;
-      if (!l) return null;
-      // Prefer using rendered incident queue container bounds when available
-      try {
-        const qc = (scene as any).incidentQueueContainer;
-        if (qc && typeof qc.getBounds === 'function') {
-          const bq = qc.getBounds();
-          const padq = 8;
-          const x = Math.max(12, bq.x - padq);
-          const y = Math.max(12, bq.y - padq);
-          const rightLimitQ = (typeof l.logX === 'number' && l.logX > 0) ? l.logX - 20 : l.gameW - 40;
-          const w = Math.max(80, Math.min(bq.width + padq * 2, Math.max(80, rightLimitQ - x)));
-          const h = Math.max(40, Math.min(bq.height + padq * 2, l.gameH - 40));
-          return { x, y, w, h };
-        }
-      } catch (_e) { /* ignore */ }
-
-      const labelX = 40;
-      const x = Math.max(12, labelX - 8);
-      const desiredW = Math.max(80, l.queueLabelW + INCIDENT_QUEUE_SIZE * (l.queueCardW + l.queueCardGap) + 32);
-      const rightLimitQ = (typeof l.logX === 'number' && l.logX > 0) ? l.logX - 20 : Math.max(20, l.gameW - 40);
-      const w = Math.max(80, Math.min(desiredW, Math.max(80, rightLimitQ - x)));
-      const y = l.queueTop - 6;
-      const h = l.queueCardH + 16;
-      return { x, y, w, h };
-    },
-  },
-  {
-    title: 'Your Street',
-    body:
-      'The 2×5 grid is your street.\n' +
-      'Place businesses here to earn income each turn.\n' +
-      'Adjacent businesses that share a synergy type\n' +
-      '(Food, Culture, Commerce, Service, Entertainment)\n' +
-      'earn bonus income — cluster them for big returns!',
-    anchor: (scene: any) => {
-      const l = scene.layout;
-      if (!l) return null;
-      const streetH = 2 * l.slotH + l.streetRowGap + 12;
-      return { x: 0, y: l.streetTop - 6, w: l.gameW, h: streetH };
-    },
-  },
-  {
-    title: 'Your Hand',
-    body:
-      'You can hold one Investment event at a time.\n' +
-      'When you buy an event it appears here.\n' +
-      'Click the card in your hand to play it\n' +
-      'for its one-time effect.',
-    anchor: (scene: any) => {
-      const l = scene.layout;
-      if (!l) return null;
-      return { x: l.handX - 16, y: l.handY - 8, w: l.handCardW + 32, h: l.handCardH + 16 };
-    },
-  },
-  {
-    title: 'Action Controls',
-    body:
-      'Use the buttons along the bottom to:\n' +
-      '• End Turn — collect income and advance the day\n' +
-      '• Undo / Redo — step back a market action\n' +
-      '• Hint — get a suggested move\n' +
-      '• Refresh — swap the investment row (costs coins)\n\n' +
-      'You can also press the keyboard shortcut for\n' +
-      'End Turn (configurable in Settings ⚙).',
-    anchor: (scene: any) => {
-      const l = scene.layout;
-      if (!l) return null;
-      return { x: 0, y: l.actionY - 8, w: l.gameW, h: l.actionButtonH + 20 };
-    },
-  },
-  {
-    title: 'Challenges & Scoring',
-    body:
-      'Each run gives you challenges to complete for\n' +
-      'bonus points (visible in the Challenge Tracker).\n\n' +
-      'Final Score = Coins + Reputation × multiplier\n' +
-      '            + Challenges × bonus\n\n' +
-      'Reach the target score to win — good luck!',
-    anchor: (scene: any) => {
-      const l = scene.layout;
-      if (!l) return null;
-      if (!l.challengeX || l.challengeX < 0) return null;
-      // Compute challenge panel height from constants and current active challenges if available
-      try {
-        // Prefer using the rendered challenge container bounds if available
-        if (scene.challengeContainer && typeof (scene.challengeContainer as any).getBounds === 'function') {
-          const b = (scene.challengeContainer as any).getBounds();
-          const pad = 8;
-          const x = Math.max(12, b.x - pad);
-          const y = Math.max(12, b.y - pad);
-          const w = Math.max(120, b.width + pad * 2);
-          const h = Math.max(80, Math.min(b.height + pad * 2, 240));
-          return { x, y, w, h };
-        }
-
-        const activeCount = (scene.state && Array.isArray(scene.state.activeChallenges)) ? scene.state.activeChallenges.length : 0;
-        const CH = (require('../MainStreetConstants') as any).CHALLENGE_TITLE_H || 20;
-        const CL = (require('../MainStreetConstants') as any).CHALLENGE_LINE_H || 20;
-        const CP = (require('../MainStreetConstants') as any).CHALLENGE_PAD || 6;
-        const contentH = CH + Math.max(0, activeCount) * CL + CP * 2;
-        const h = Math.max(80, Math.min(contentH, 240));
-        const x = Math.max(12, l.challengeX - 8);
-        const y = Math.max(12, l.challengeY - 8);
-        const w = Math.max(120, l.challengeW + 16);
-        return { x, y, w, h };
-      } catch {
-        return { x: l.challengeX - 8, y: l.challengeY - 8, w: l.challengeW + 16, h: 140 };
-      }
-    },
-  },
-];
-
 // ── Visual constants ─────────────────────────────────────────
 
 const TOOLTIP_W = 360;
@@ -350,7 +154,7 @@ export class MainStreetTutorialHints {
   /** Advance to the next tutorial step (or dismiss if at end). */
   public nextStep(): void {
     this.currentStep++;
-    if (this.currentStep >= TUTORIAL_STEPS.length) {
+    if (this.currentStep >= UNIFIED_TUTORIAL_STEP_COUNT) {
       this.dismiss();
     } else {
       this.showStep(this.currentStep);
@@ -367,12 +171,12 @@ export class MainStreetTutorialHints {
 
   /** Show a specific tutorial step by index. */
   public showStep(index: number): void {
-    if (index < 0 || index >= TUTORIAL_STEPS.length) return;
+    if (index < 0 || index >= UNIFIED_TUTORIAL_STEP_COUNT) return;
     this.clearObjects();
     this.currentStep = index;
     this.visible = true;
 
-    const step = TUTORIAL_STEPS[index];
+    const step = UNIFIED_TUTORIAL_STEPS[index];
     const s = this.scene;
     // If the scene is not fully ready (no add/sys), retry shortly.
     if (!s || !s.add) {
@@ -386,7 +190,7 @@ export class MainStreetTutorialHints {
     const gameH: number = layout.gameH ?? 720;
 
     // ── Optional highlight rectangle (canvas) ──────────────
-    const anchor = step.anchor(s);
+    const anchor = this.zoneToAnchor(step.highlightZone, s);
     if (anchor) {
       const highlight = s.add.graphics();
       highlight.setDepth(TOOLTIP_DEPTH - 1);
@@ -472,7 +276,7 @@ export class MainStreetTutorialHints {
 
       const rightGroup = document.createElement('div');
       const nextBtn = document.createElement('button');
-      const isLast = index === TUTORIAL_STEPS.length - 1;
+      const isLast = index === UNIFIED_TUTORIAL_STEP_COUNT - 1;
       nextBtn.textContent = isLast ? 'Finish' : 'Next >';
       nextBtn.style.background = isLast ? '#44ff44' : '#88ff88';
       nextBtn.style.color = '#002200';
@@ -527,7 +331,7 @@ export class MainStreetTutorialHints {
       this.objects.push(dom);
 
       // Step counter badge as a small canvas text anchored to the tooltip
-      const stepLabel = s.add.text(domX + TOOLTIP_W - 12, tooltipY + 10, `${index + 1} / ${TUTORIAL_STEPS.length}`, { fontSize: '11px', color: '#669966', fontFamily: FONT_FAMILY }).setOrigin(1, 0).setDepth(TOOLTIP_DEPTH + 1);
+      const stepLabel = s.add.text(domX + TOOLTIP_W - 12, tooltipY + 10, `${index + 1} / ${UNIFIED_TUTORIAL_STEP_COUNT}`, { fontSize: '11px', color: '#669966', fontFamily: FONT_FAMILY }).setOrigin(1, 0).setDepth(TOOLTIP_DEPTH + 1);
       this.objects.push(stepLabel);
     } catch (e) {
       // Fallback to in-canvas tooltip if DOM is not available or fails
@@ -546,7 +350,7 @@ export class MainStreetTutorialHints {
       const dismissBtn = s.add.text(domX + 12, tooltipY + tooltipH - 30, 'Dismiss', { fontSize: '13px', color: '#aa8866', fontFamily: FONT_FAMILY }).setInteractive({ useHandCursor: true }).setDepth(TOOLTIP_DEPTH + 1003);
       dismissBtn.on('pointerdown', () => this.dismiss());
 
-      const isLast = index === TUTORIAL_STEPS.length - 1;
+      const isLast = index === UNIFIED_TUTORIAL_STEP_COUNT - 1;
       const nextLabel = isLast ? 'Finish' : 'Next >';
       const nextBtn = s.add.text(domX + TOOLTIP_W - 12, tooltipY + tooltipH - 30, nextLabel, { fontSize: '13px', color: '#002200', backgroundColor: isLast ? '#44ff44' : '#88ff88', padding: { left: 6, right: 6 } as any, fontFamily: FONT_FAMILY }).setInteractive({ useHandCursor: true }).setOrigin(1, 0).setDepth(TOOLTIP_DEPTH + 1003);
       nextBtn.on('pointerdown', () => this.nextStep());
