@@ -656,6 +656,7 @@ export class MainStreetLifecycleManager {
     // Determine tutorial visibility options from scene state
     const tutorialOpts: TutorialVisibilityOptions = {
       replayMode: s.replayMode === true,
+      forceShowOffer: typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tutorial') === '1',
     };
 
     // Async: attempt to load saved campaign and re-setup if found
