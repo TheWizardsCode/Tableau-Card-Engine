@@ -564,13 +564,13 @@ export class MainStreetLifecycleManager {
         const overlay = (s as any).tutorialOverlay as { setActionCompletePredicate: (p: () => boolean) => void } | undefined;
         if (overlay && typeof overlay.setActionCompletePredicate === 'function') {
           overlay.setActionCompletePredicate(() => {
-            const current = getCurrentStep(controller);
-            if (!current || current.id !== step.id) return false;
-            // Step is still active but not yet completed — check if the
-            // required action has been recorded as completed.
-            // We use a conservative check: if the player is still on this
-            // step, the action is NOT yet complete (it will be marked
-            // complete by onTutorialActionComplete which advances the step).
+            // Read the CURRENT controller state from the scene (not captured closure)
+            const currentController = (s as any).tutorialController as TutorialControllerState | undefined;
+            if (!currentController) return true;
+            const currentStep = getCurrentStep(currentController);
+            // If we've moved past this step, the action is complete
+            if (!currentStep || currentStep.id !== step.id) return true;
+            // Step is still active but not yet completed
             return false;
           });
         }
