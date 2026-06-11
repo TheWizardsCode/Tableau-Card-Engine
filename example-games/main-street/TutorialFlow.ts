@@ -120,11 +120,11 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
   },
   {
     id: 'T3',
-    title: 'Market Rows',
+    title: 'Market Business Row',
     body:
       'Click a business card (top row) to buy it.\n' +
-      'Businesses go on your street to earn income.\n' +
-      'Investments (bottom row) give one-time effects.',
+      'Businesses go on your street to earn income.\n\n' +
+      'The bottom row shows Investment cards with one-time effects.',
     highlightZone: 'marketBusinessRow',
     gate: 'action',
     requiredAction: 'select-business',
