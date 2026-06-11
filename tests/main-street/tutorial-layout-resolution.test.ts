@@ -67,7 +67,7 @@ function computeExpectedZoneBounds(
         x: 20,
         y: 90 - 10,
         w: marketRight - 20,
-        h: 2 * marketRowH + BASE_MARKET_ROW_GAP + 20,
+        h: marketRowH + 10,
       };
     }
     case 'streetGrid': {
