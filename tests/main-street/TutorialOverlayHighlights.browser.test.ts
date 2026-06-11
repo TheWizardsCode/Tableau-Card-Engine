@@ -1,7 +1,7 @@
 /**
  * Tutorial overlay highlight alignment visual regression test.
  *
- * Boots the Main Street game, triggers each action-gated tutorial step,
+ * Boots the Main Street game, triggers each tutorial step,
  * and captures a screenshot that shows:
  *   - The green highlight rectangle (depth 199) as drawn by the overlay
  *   - A red reference rectangle drawn by this test showing where the
@@ -93,12 +93,12 @@ function triggerStepAndGetHighlight(
   stepIndex: number,
 ): Promise<Phaser.GameObjects.Graphics | null> {
   const mgr = scene.tutorialOverlay as {
-    showActionGatedStep?: (controller: unknown) => void;
+    showStep?: (index: number) => void;
     dismiss?: () => void;
     objects?: Phaser.GameObjects.GameObject[];
   };
 
-  if (!mgr || typeof mgr.showActionGatedStep !== 'function') {
+  if (!mgr || typeof mgr.showStep !== 'function') {
     return Promise.resolve(null);
   }
 
@@ -110,15 +110,11 @@ function triggerStepAndGetHighlight(
   // Wait a frame for cleanup
   return new Promise<Phaser.GameObjects.Graphics | null>((resolve) => {
     setTimeout(() => {
-      // Create a minimal controller state
-      const controller = {
-        isActive: true,
-        currentStepIndex: stepIndex,
-        lastCompletedStepId: null,
-        exited: false,
-      };
-
-      (mgr as { showActionGatedStep: (c: unknown) => void }).showActionGatedStep(controller);
+      if (typeof mgr.showStep !== 'function') {
+        resolve(null);
+        return;
+      }
+      mgr.showStep(stepIndex);
 
       // Wait one frame for the highlight to be drawn
       requestAnimationFrame(() => {
@@ -482,24 +478,17 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
     await new Promise((r) => setTimeout(r, 200));
 
     const mgr = scene.tutorialOverlay as {
-      showActionGatedStep?: (controller: unknown) => void;
+      showStep?: (index: number) => void;
       dismiss?: () => void;
     };
 
-    if (mgr && typeof mgr.showActionGatedStep === 'function') {
+    if (mgr && typeof mgr.showStep === 'function') {
       if (typeof mgr.dismiss === 'function') {
         mgr.dismiss();
       }
 
       // T13 is index 12 in the unified steps (confirm gate, completionModal zone)
-      const controller = {
-        isActive: true,
-        currentStepIndex: 12,
-        lastCompletedStepId: null,
-        exited: false,
-      };
-
-      (mgr as { showActionGatedStep: (c: unknown) => void }).showActionGatedStep(controller);
+      mgr.showStep(12);
 
       // Wait a frame for rendering
       await new Promise((r) => setTimeout(r, 50));

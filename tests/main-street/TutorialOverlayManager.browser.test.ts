@@ -1,7 +1,7 @@
 /**
  * Browser tests for MainStreetTutorialOverlayManager highlight zones.
  *
- * Validates that the highlight rectangles drawn by showActionGatedStep
+ * Validates that the highlight rectangles drawn by showStep
  * cover the correct UI areas for each TutorialHighlightZone in the
  * unified T1–T13 tutorial system.
  *
@@ -90,12 +90,12 @@ describe('TutorialOverlayManager highlight zones', () => {
   }
 
   /**
-   * Show an action-gated step (by step ID) and return the highlight graphics,
+   * Show a tutorial step (by step ID) and return the highlight graphics,
    * or null if this step has a null highlight zone.
    */
   function showStepAndGetHighlight(stepId: string): Phaser.GameObjects.Graphics | null {
-    const mgr = scene.tutorialOverlay as { showActionGatedStep?: (controller: unknown) => void; dismiss?: () => void };
-    if (!mgr || typeof mgr.showActionGatedStep !== 'function') {
+    const mgr = scene.tutorialOverlay as { showStep?: (index: number) => void; dismiss?: () => void };
+    if (!mgr || typeof mgr.showStep !== 'function') {
       return null;
     }
 
@@ -104,15 +104,8 @@ describe('TutorialOverlayManager highlight zones', () => {
       mgr.dismiss();
     }
 
-    // Create a minimal controller state
-    const controller = {
-      isActive: true,
-      currentStepIndex: stepIdToIndex(stepId),
-      lastCompletedStepId: null,
-      exited: false,
-    };
-
-    mgr.showActionGatedStep(controller);
+    const stepIndex = stepIdToIndex(stepId);
+    mgr.showStep(stepIndex);
 
     // Find highlight graphics at depth 199
     const highlights = findHighlightGraphics(scene);
@@ -325,20 +318,14 @@ describe('TutorialOverlayManager highlight zones', () => {
   // ── AC 9: centerModal zone (null anchor, no highlight) ──────
 
   it('centerModal zone (T1) returns null anchor (no highlight graphics drawn)', async () => {
-    const mgr = scene.tutorialOverlay as { showActionGatedStep?: (controller: unknown) => void; dismiss?: () => void };
+    const mgr = scene.tutorialOverlay as { showStep?: (index: number) => void; dismiss?: () => void };
 
-    if (mgr && typeof mgr.showActionGatedStep === 'function') {
+    if (mgr && typeof mgr.showStep === 'function') {
       if (typeof mgr.dismiss === 'function') {
         mgr.dismiss();
       }
 
-      const controller = {
-        isActive: true,
-        currentStepIndex: stepIdToIndex('T1'),
-        lastCompletedStepId: null,
-        exited: false,
-      };
-      mgr.showActionGatedStep(controller);
+      mgr.showStep(stepIdToIndex('T1'));
 
       // centerModal should not draw any highlight graphics at depth 199
       const highlights = findHighlightGraphics(scene);
@@ -349,20 +336,14 @@ describe('TutorialOverlayManager highlight zones', () => {
   // ── AC 10: centerModal zone for T9 (non-gated, confirm) ─────
 
   it('centerModal zone (T9) returns null anchor (no highlight graphics drawn)', async () => {
-    const mgr = scene.tutorialOverlay as { showActionGatedStep?: (controller: unknown) => void; dismiss?: () => void };
+    const mgr = scene.tutorialOverlay as { showStep?: (index: number) => void; dismiss?: () => void };
 
-    if (mgr && typeof mgr.showActionGatedStep === 'function') {
+    if (mgr && typeof mgr.showStep === 'function') {
       if (typeof mgr.dismiss === 'function') {
         mgr.dismiss();
       }
 
-      const controller = {
-        isActive: true,
-        currentStepIndex: stepIdToIndex('T9'),
-        lastCompletedStepId: null,
-        exited: false,
-      };
-      mgr.showActionGatedStep(controller);
+      mgr.showStep(stepIdToIndex('T9'));
 
       // centerModal should not draw any highlight graphics at depth 199
       const highlights = findHighlightGraphics(scene);
@@ -373,20 +354,14 @@ describe('TutorialOverlayManager highlight zones', () => {
   // ── AC 11: completionModal zone (null anchor, no highlight) ──
 
   it('completionModal zone (T13) returns null anchor (no highlight graphics drawn)', async () => {
-    const mgr = scene.tutorialOverlay as { showActionGatedStep?: (controller: unknown) => void; dismiss?: () => void };
+    const mgr = scene.tutorialOverlay as { showStep?: (index: number) => void; dismiss?: () => void };
 
-    if (mgr && typeof mgr.showActionGatedStep === 'function') {
+    if (mgr && typeof mgr.showStep === 'function') {
       if (typeof mgr.dismiss === 'function') {
         mgr.dismiss();
       }
 
-      const controller = {
-        isActive: true,
-        currentStepIndex: stepIdToIndex('T13'),
-        lastCompletedStepId: null,
-        exited: false,
-      };
-      mgr.showActionGatedStep(controller);
+      mgr.showStep(stepIdToIndex('T13'));
 
       // completionModal should not draw any highlight graphics at depth 199
       const highlights = findHighlightGraphics(scene);

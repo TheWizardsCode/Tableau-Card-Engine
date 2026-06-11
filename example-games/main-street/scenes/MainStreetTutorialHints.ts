@@ -23,10 +23,8 @@ import { composeResolvedLayouts } from '../../../src/ui/screen-layout-compose';
 import { type LayoutViewport } from '../../../src/ui/screen-layout';
 
 import {
-  getCurrentStep,
   UNIFIED_TUTORIAL_STEP_COUNT,
   UNIFIED_TUTORIAL_STEPS,
-  type TutorialControllerState,
   type TutorialHighlightZone,
 } from '../TutorialFlow';
 import baseLayout from '../layouts/main-street.layout.json';
@@ -115,6 +113,7 @@ export class MainStreetTutorialHints {
   private currentStep = 0;
   private visible = false;
   private readonly onComplete: (() => void) | null;
+  private _actionCompletePredicate: (() => boolean) | null = null;
 
   constructor(private readonly scene: any, onComplete?: () => void) {
     this.onComplete = onComplete ?? null;
@@ -169,7 +168,32 @@ export class MainStreetTutorialHints {
     }
   }
 
-  /** Show a specific tutorial step by index. */
+  /**
+   * Set an action-complete predicate used by the Continue button in action-gated steps.
+   *
+   * Call this method before `showStep` for action-gated steps so the Continue button
+   * is disabled until the required in-game action completes.
+   *
+   * @param predicate - Returns `true` when the required action for the current
+   *   tutorial step has been completed.
+   */
+  public setActionCompletePredicate(predicate: () => boolean): void {
+    this._actionCompletePredicate = predicate;
+  }
+
+  /**
+   * Show a specific tutorial step by index.
+   *
+   * This is the unified rendering method that handles both confirm-style and
+   * action-gated tutorial steps.
+   *
+   * For **confirm** steps the button row shows: Dismiss | Prev | Next/Finish
+   * For **action** steps the button row shows: Exit Tutorial | Continue
+   *   (Continue is disabled until the action-complete predicate reports true).
+   *   The final step shows "Start Full Game" instead of Exit Tutorial.
+   *
+   * @param index - Zero-based index into `UNIFIED_TUTORIAL_STEPS`.
+   */
   public showStep(index: number): void {
     if (index < 0 || index >= UNIFIED_TUTORIAL_STEP_COUNT) return;
     this.clearObjects();
@@ -185,6 +209,7 @@ export class MainStreetTutorialHints {
       }, 60);
       return;
     }
+    const actionComplete = this._actionCompletePredicate;
     const layout = s.layout ?? {};
     const gameW: number = layout.gameW ?? 1280;
     const gameH: number = layout.gameH ?? 720;
@@ -247,46 +272,87 @@ export class MainStreetTutorialHints {
       btnRow.style.alignItems = 'center';
       btnRow.style.marginTop = '12px';
 
-      const leftGroup = document.createElement('div');
-      const dismissBtn = document.createElement('button');
-      dismissBtn.textContent = 'Dismiss';
-      dismissBtn.style.background = '#2a2a1a';
-      dismissBtn.style.color = '#aa8866';
-      dismissBtn.style.border = 'none';
-      dismissBtn.style.padding = '6px 8px';
-      dismissBtn.style.borderRadius = '6px';
-      dismissBtn.style.cursor = 'pointer';
-      dismissBtn.onclick = () => this.dismiss();
-      leftGroup.appendChild(dismissBtn);
-      btnRow.appendChild(leftGroup);
-
-      const middleGroup = document.createElement('div');
-      if (index > 0) {
-        const prevBtn = document.createElement('button');
-        prevBtn.textContent = '< Prev';
-        prevBtn.style.background = 'transparent';
-        prevBtn.style.color = '#88bbff';
-        prevBtn.style.border = 'none';
-        prevBtn.style.padding = '6px 8px';
-        prevBtn.style.cursor = 'pointer';
-        prevBtn.onclick = () => this.prevStep();
-        middleGroup.appendChild(prevBtn);
-      }
-      btnRow.appendChild(middleGroup);
-
-      const rightGroup = document.createElement('div');
-      const nextBtn = document.createElement('button');
       const isLast = index === UNIFIED_TUTORIAL_STEP_COUNT - 1;
-      nextBtn.textContent = isLast ? 'Finish' : 'Next >';
-      nextBtn.style.background = isLast ? '#44ff44' : '#88ff88';
-      nextBtn.style.color = '#002200';
-      nextBtn.style.border = 'none';
-      nextBtn.style.padding = '6px 8px';
-      nextBtn.style.borderRadius = '6px';
-      nextBtn.style.cursor = 'pointer';
-      nextBtn.onclick = () => this.nextStep();
-      rightGroup.appendChild(nextBtn);
-      btnRow.appendChild(rightGroup);
+      const isActionStep = step.gate === 'action';
+
+      if (isActionStep) {
+        // ── Action-gated row: Exit Tutorial | Continue ─────────
+        const leftGroup = document.createElement('div');
+        if (!isLast) {
+          const exitBtn = document.createElement('button');
+          exitBtn.textContent = 'Exit Tutorial';
+          exitBtn.style.background = '#2a1a1a';
+          exitBtn.style.color = '#cc6666';
+          exitBtn.style.border = 'none';
+          exitBtn.style.padding = '6px 8px';
+          exitBtn.style.borderRadius = '6px';
+          exitBtn.style.cursor = 'pointer';
+          exitBtn.onclick = () => this.dismiss();
+          leftGroup.appendChild(exitBtn);
+        }
+        btnRow.appendChild(leftGroup);
+
+        const rightGroup = document.createElement('div');
+        const continueLabel = isLast ? 'Start Full Game' : 'Continue';
+        const continueBtn = document.createElement('button');
+        continueBtn.textContent = continueLabel;
+        continueBtn.style.background = '#88ff88';
+        continueBtn.style.color = '#002200';
+        continueBtn.style.border = 'none';
+        continueBtn.style.padding = '6px 8px';
+        continueBtn.style.borderRadius = '6px';
+        continueBtn.style.cursor = actionComplete && !actionComplete() ? 'not-allowed' : 'pointer';
+        continueBtn.style.opacity = actionComplete && !actionComplete() ? '0.5' : '1';
+        continueBtn.disabled = actionComplete !== null && !actionComplete();
+        continueBtn.onclick = () => {
+          if (!continueBtn.disabled) {
+            (s as any).confirmTutorialStep?.();
+          }
+        };
+        rightGroup.appendChild(continueBtn);
+        btnRow.appendChild(rightGroup);
+      } else {
+        // ── Confirm row: Dismiss | Prev + Next/Finish ─────────
+        const leftGroup = document.createElement('div');
+        const dismissBtn = document.createElement('button');
+        dismissBtn.textContent = 'Dismiss';
+        dismissBtn.style.background = '#2a2a1a';
+        dismissBtn.style.color = '#aa8866';
+        dismissBtn.style.border = 'none';
+        dismissBtn.style.padding = '6px 8px';
+        dismissBtn.style.borderRadius = '6px';
+        dismissBtn.style.cursor = 'pointer';
+        dismissBtn.onclick = () => this.dismiss();
+        leftGroup.appendChild(dismissBtn);
+        btnRow.appendChild(leftGroup);
+
+        const middleGroup = document.createElement('div');
+        if (index > 0) {
+          const prevBtn = document.createElement('button');
+          prevBtn.textContent = '< Prev';
+          prevBtn.style.background = 'transparent';
+          prevBtn.style.color = '#88bbff';
+          prevBtn.style.border = 'none';
+          prevBtn.style.padding = '6px 8px';
+          prevBtn.style.cursor = 'pointer';
+          prevBtn.onclick = () => this.prevStep();
+          middleGroup.appendChild(prevBtn);
+        }
+        btnRow.appendChild(middleGroup);
+
+        const rightGroup = document.createElement('div');
+        const nextBtn = document.createElement('button');
+        nextBtn.textContent = isLast ? 'Start Full Game' : 'Next >';
+        nextBtn.style.background = isLast ? '#44ff44' : '#88ff88';
+        nextBtn.style.color = '#002200';
+        nextBtn.style.border = 'none';
+        nextBtn.style.padding = '6px 8px';
+        nextBtn.style.borderRadius = '6px';
+        nextBtn.style.cursor = 'pointer';
+        nextBtn.onclick = () => this.nextStep();
+        rightGroup.appendChild(nextBtn);
+        btnRow.appendChild(rightGroup);
+      }
 
       container.appendChild(btnRow);
 
@@ -347,150 +413,50 @@ export class MainStreetTutorialHints {
       const titleTxt = s.add.text(domX + 12, tooltipY + 12, step.title, { fontSize: '16px', color: '#aaffaa', fontFamily: FONT_FAMILY }).setDepth(TOOLTIP_DEPTH + 1002).setOrigin(0, 0);
       const bodyTxt = s.add.text(domX + 12, tooltipY + 40, step.body, { fontSize: '13px', color: '#ddccbb', fontFamily: FONT_FAMILY, wordWrap: { width: TOOLTIP_W - 24 } as any }).setDepth(TOOLTIP_DEPTH + 1002).setOrigin(0, 0);
 
-      const dismissBtn = s.add.text(domX + 12, tooltipY + tooltipH - 30, 'Dismiss', { fontSize: '13px', color: '#aa8866', fontFamily: FONT_FAMILY }).setInteractive({ useHandCursor: true }).setDepth(TOOLTIP_DEPTH + 1003);
-      dismissBtn.on('pointerdown', () => this.dismiss());
-
       const isLast = index === UNIFIED_TUTORIAL_STEP_COUNT - 1;
-      const nextLabel = isLast ? 'Finish' : 'Next >';
-      const nextBtn = s.add.text(domX + TOOLTIP_W - 12, tooltipY + tooltipH - 30, nextLabel, { fontSize: '13px', color: '#002200', backgroundColor: isLast ? '#44ff44' : '#88ff88', padding: { left: 6, right: 6 } as any, fontFamily: FONT_FAMILY }).setInteractive({ useHandCursor: true }).setOrigin(1, 0).setDepth(TOOLTIP_DEPTH + 1003);
-      nextBtn.on('pointerdown', () => this.nextStep());
+      const isActionStep = step.gate === 'action';
 
-      if (index > 0) {
-        const prevBtn = s.add.text(domX + TOOLTIP_W / 2, tooltipY + tooltipH - 30, '< Prev', { fontSize: '13px', color: '#88bbff', fontFamily: FONT_FAMILY }).setInteractive({ useHandCursor: true }).setDepth(TOOLTIP_DEPTH + 1003).setOrigin(0.5, 0);
-        prevBtn.on('pointerdown', () => this.prevStep());
-        this.objects.push(prevBtn);
+      if (isActionStep) {
+        // ── Action-gated canvas row: Exit Tutorial | Continue ─
+        if (!isLast) {
+          const exitBtn = s.add.text(domX + 16, tooltipY + tooltipH - 30, 'Exit Tutorial', { fontSize: '13px', color: '#cc6666', fontFamily: FONT_FAMILY, padding: { left: 8, right: 8, top: 4, bottom: 4 } as any, backgroundColor: '#2a1a1a' }).setInteractive({ useHandCursor: true }).setDepth(TOOLTIP_DEPTH + 1003);
+          exitBtn.on('pointerdown', () => this.dismiss());
+          this.objects.push(exitBtn);
+        }
+
+        const continueLabel = isLast ? 'Start Full Game' : 'Continue';
+        const continueColor = isLast ? '#002200' : '#002200';
+        const continueBg = isLast ? '#44ff44' : '#88ff88';
+        const continueBtn = s.add.text(domX + TOOLTIP_W - 16, tooltipY + tooltipH - 30, continueLabel, { fontSize: '13px', color: continueColor, fontFamily: FONT_FAMILY, fontStyle: 'bold', padding: { left: 12, right: 12, top: 6, bottom: 6 } as any, backgroundColor: continueBg }).setInteractive({ useHandCursor: true }).setOrigin(1, 0).setDepth(TOOLTIP_DEPTH + 1003);
+        const isComplete = actionComplete ? actionComplete() : true;
+        if (!isComplete) {
+          continueBtn.setAlpha(0.5);
+        }
+        continueBtn.on('pointerdown', () => {
+          const ac = actionComplete;
+          if (!ac || ac()) {
+            (s as any).confirmTutorialStep?.();
+          }
+        });
+        this.objects.push(bg, border, titleTxt, bodyTxt, continueBtn);
+      } else {
+        // ── Confirm canvas row: Dismiss | Prev + Next/Finish ─
+        const dismissBtn = s.add.text(domX + 12, tooltipY + tooltipH - 30, 'Dismiss', { fontSize: '13px', color: '#aa8866', fontFamily: FONT_FAMILY }).setInteractive({ useHandCursor: true }).setDepth(TOOLTIP_DEPTH + 1003);
+        dismissBtn.on('pointerdown', () => this.dismiss());
+
+        const nextLabel = isLast ? 'Start Full Game' : 'Next >';
+        const nextBtn = s.add.text(domX + TOOLTIP_W - 12, tooltipY + tooltipH - 30, nextLabel, { fontSize: '13px', color: '#002200', backgroundColor: isLast ? '#44ff44' : '#88ff88', padding: { left: 6, right: 6 } as any, fontFamily: FONT_FAMILY }).setInteractive({ useHandCursor: true }).setOrigin(1, 0).setDepth(TOOLTIP_DEPTH + 1003);
+        nextBtn.on('pointerdown', () => this.nextStep());
+
+        if (index > 0) {
+          const prevBtn = s.add.text(domX + TOOLTIP_W / 2, tooltipY + tooltipH - 30, '< Prev', { fontSize: '13px', color: '#88bbff', fontFamily: FONT_FAMILY }).setInteractive({ useHandCursor: true }).setDepth(TOOLTIP_DEPTH + 1003).setOrigin(0.5, 0);
+          prevBtn.on('pointerdown', () => this.prevStep());
+          this.objects.push(prevBtn);
+        }
+
+        this.objects.push(bg, border, titleTxt, bodyTxt, dismissBtn, nextBtn);
       }
-
-      this.objects.push(bg, border, titleTxt, bodyTxt, dismissBtn, nextBtn);
     }
-  }
-
-  // ── Action-gated tutorial step overlay (Milestone 5) ─────
-
-  /**
-   * Shows an overlay for the current action-gated tutorial step from TutorialFlow.
-   * This uses the T1-T10 step definitions and highlights the appropriate UI zone.
-   *
-   * Called by the scene after the tutorial controller advances to a new step.
-   */
-  public showActionGatedStep(controller: TutorialControllerState): void {
-    this.clearObjects();
-    const step = getCurrentStep(controller);
-    if (!step) return;
-
-    this.visible = true;
-    const s = this.scene;
-    if (!s || !s.add) return;
-
-    const layout = s.layout ?? {};
-    const gameW: number = layout.gameW ?? 1280;
-    const gameH: number = layout.gameH ?? 720;
-
-    // Compute highlight zone bounds
-    const anchor = this.zoneToAnchor(step.highlightZone, s);
-    if (anchor) {
-      const highlight = s.add.graphics();
-      highlight.setDepth(TOOLTIP_DEPTH - 1);
-      highlight.fillStyle(HIGHLIGHT_COLOR, HIGHLIGHT_ALPHA);
-      highlight.fillRect(anchor.x, anchor.y, anchor.w, anchor.h);
-      highlight.lineStyle(2, HIGHLIGHT_COLOR, HIGHLIGHT_BORDER_ALPHA);
-      highlight.strokeRect(anchor.x, anchor.y, anchor.w, anchor.h);
-      this.objects.push(highlight);
-    }
-
-    const tooltipW = 340;
-    const tooltipX = Math.max(12, Math.floor(gameW / 2 - tooltipW / 2));
-
-    const isLast = step.id === 'T13';
-    const isExitable = !isLast;
-
-    // Use Phaser canvas-based tooltip with interactive Text buttons.
-    // This avoids the DOM detach/reattach cycle that causes onclick handlers
-    // to be lost in Phaser 4 RC's DOM element handling.
-    const tooltipH = 160;
-    const finalY = Math.max(12, Math.floor(gameH / 2 - tooltipH / 2));
-
-    // Background and border
-    const bg = s.add.rectangle(tooltipX + tooltipW / 2, finalY + tooltipH / 2, tooltipW, tooltipH, 0x1a2a1a).setDepth(TOOLTIP_DEPTH + 1000);
-    const border = s.add.rectangle(tooltipX + tooltipW / 2, finalY + tooltipH / 2, tooltipW, tooltipH).setStrokeStyle(2, 0x44aa44).setDepth(TOOLTIP_DEPTH + 1001);
-    this.objects.push(bg, border);
-
-    // Title
-    const titleTxt = s.add.text(tooltipX + 16, finalY + 12, step.title, {
-      fontSize: '16px',
-      color: '#aaffaa',
-      fontFamily: FONT_FAMILY,
-      fontStyle: 'bold',
-    }).setDepth(TOOLTIP_DEPTH + 1002).setOrigin(0, 0);
-    this.objects.push(titleTxt);
-
-    // Body text
-    const bodyTxt = s.add.text(tooltipX + 16, finalY + 40, step.body, {
-      fontSize: '13px',
-      color: '#ddccbb',
-      fontFamily: FONT_FAMILY,
-      wordWrap: { width: tooltipW - 32 },
-      lineSpacing: 4,
-    }).setDepth(TOOLTIP_DEPTH + 1002).setOrigin(0, 0);
-    this.objects.push(bodyTxt);
-
-    // Button row at bottom of tooltip
-    const btnY = finalY + tooltipH - 32;
-
-    // Determine if this step can be advanced via Continue button.
-    // Steps with requiredAction 'confirm', 'acknowledge', or 'acknowledge-queue' can be advanced;
-    // steps requiring actual game actions (select-business, etc.) cannot.
-    const canConfirmViaButton = step.requiredAction === 'confirm' || step.requiredAction === 'acknowledge' || step.requiredAction === 'acknowledge-queue';
-
-    // Exit Tutorial button (left side) - shown for all steps except the last
-    if (isExitable) {
-      const exitBtn = s.add.text(tooltipX + 16, btnY, 'Exit Tutorial', {
-        fontSize: '13px',
-        color: '#cc6666',
-        fontFamily: FONT_FAMILY,
-        padding: { left: 8, right: 8, top: 4, bottom: 4 },
-        backgroundColor: '#2a1a1a',
-      }).setDepth(TOOLTIP_DEPTH + 1003).setInteractive({ useHandCursor: true });
-      exitBtn.on('pointerdown', () => {
-        this.clearObjects();
-        this.visible = false;
-        try { (s as any).exitTutorialFlow?.(); } catch (_) { /* ignore */ }
-      });
-      exitBtn.on('pointerover', () => exitBtn.setColor('#ff8888'));
-      exitBtn.on('pointerout', () => exitBtn.setColor('#cc6666'));
-      this.objects.push(exitBtn);
-    }
-
-    // Continue / Start Full Game button (right side)
-    // Only show for steps that can be advanced via button click
-    if (canConfirmViaButton || isLast) {
-      const confirmLabel = isLast ? 'Start Full Game' : 'Continue';
-      const confirmColor = '#002200';
-      const confirmBg = isLast ? '#44ff44' : '#88ff88';
-      const confirmBtn = s.add.text(tooltipX + tooltipW - 16, btnY, confirmLabel, {
-        fontSize: '13px',
-        color: confirmColor,
-        fontFamily: FONT_FAMILY,
-        fontStyle: 'bold',
-        padding: { left: 12, right: 12, top: 6, bottom: 6 },
-        backgroundColor: confirmBg,
-      }).setDepth(TOOLTIP_DEPTH + 1003).setOrigin(1, 0).setInteractive({ useHandCursor: true });
-      confirmBtn.on('pointerdown', () => {
-        try { (s as any).confirmTutorialStep?.(); } catch (_) { /* ignore */ }
-      });
-      confirmBtn.on('pointerover', () => confirmBtn.setAlpha(0.8));
-      confirmBtn.on('pointerout', () => confirmBtn.setAlpha(1));
-      this.objects.push(confirmBtn);
-    }
-
-    // Step badge — use unified step count for the 13-step system
-    const stepNum = UNIFIED_TUTORIAL_STEPS.findIndex((d) => d.id === step.id) + 1;
-    const stepLabel = s.add.text(
-      tooltipX + tooltipW - 12, finalY + 10,
-      `${stepNum} / ${UNIFIED_TUTORIAL_STEP_COUNT}`,
-      { fontSize: '11px', color: '#669966', fontFamily: FONT_FAMILY }
-    ).setOrigin(1, 0).setDepth(TOOLTIP_DEPTH + 1002);
-    this.objects.push(stepLabel);
   }
 
   /**

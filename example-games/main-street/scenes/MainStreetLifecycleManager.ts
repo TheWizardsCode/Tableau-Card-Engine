@@ -586,13 +586,38 @@ export class MainStreetLifecycleManager {
 
   /**
    * Shows the overlay for the current tutorial step.
+   *
+   * Uses the unified showStep() method from MainStreetTutorialHints with a
+   * gate-aware Continue button: for action-gated steps the Continue button
+   * stays disabled until the required in-game action is completed.
    */
   public showTutorialStepOverlay(): void {
     const s = this.scene;
     const controller = (s as any).tutorialController as TutorialControllerState | undefined;
     if (!controller || !controller.isActive) return;
     try {
-      (s as any).tutorialOverlay?.showActionGatedStep(controller);
+      const step = getCurrentStep(controller);
+      if (!step) return;
+
+      // For action-gated steps, set an action-complete predicate so
+      // the Continue button is disabled until the required action succeeds.
+      if (step.gate === 'action') {
+        const overlay = (s as any).tutorialOverlay as { setActionCompletePredicate: (p: () => boolean) => void } | undefined;
+        if (overlay && typeof overlay.setActionCompletePredicate === 'function') {
+          overlay.setActionCompletePredicate(() => {
+            const current = getCurrentStep(controller);
+            if (!current || current.id !== step.id) return false;
+            // Step is still active but not yet completed — check if the
+            // required action has been recorded as completed.
+            // We use a conservative check: if the player is still on this
+            // step, the action is NOT yet complete (it will be marked
+            // complete by onTutorialActionComplete which advances the step).
+            return false;
+          });
+        }
+      }
+
+      (s as any).tutorialOverlay?.showStep(controller.currentStepIndex);
     } catch (_) { /* ignore */ }
   }
 
