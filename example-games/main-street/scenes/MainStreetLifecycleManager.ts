@@ -367,7 +367,6 @@ export class MainStreetLifecycleManager {
           'Hint: get a suggested move (once per turn).\n' +
           'Undo / Redo: step back or forward through market actions.\n' +
           'Refresh Investments: swap the investment row (costs coins).\n' +
-          'Tutorial Replay: restart the guided tutorial from Settings.\n' +
           'Keyboard shortcuts: End Turn key configurable in Settings.',
       },
     ];
@@ -430,53 +429,13 @@ export class MainStreetLifecycleManager {
     // Initialize the action-gated tutorial controller state
     (s as any).tutorialController = createTutorialControllerState();
 
-    // Listen for Settings 'Play Tutorial' request and log for debugging
-    try {
-      if (typeof window !== 'undefined' && (window as any).addEventListener) {
-        (window as any).addEventListener('tce:play-tutorial', () => {
-          try {
-            (s as any).tutorialOverlay?.start();
-          } catch (e) {
-            // eslint-disable-next-line no-console
-            console.error('[MainStreet] play-tutorial handler failed', e);
-          }
-        });
-        // Replay tutorial: reset tutorial state and restart current run into tutorial mode
-        (window as any).addEventListener('tce:replay-tutorial', () => {
-          try {
-            // Reset tutorial state so the offer modal would show again
-            const storage = new BrowserLocalStorageAdapter();
-            const tutorialState = loadTutorialState(storage);
-            const reset = updateTutorialStatus(tutorialState, 'not_seen');
-            void saveTutorialState(storage, reset);
+    // Note: tce:play-tutorial and tce:replay-tutorial event listeners have been
+    // removed. The unified tutorial system uses the TutorialOfferModal (guided
+    // mode for first-time players) and the reference-mode replay button in
+    // Settings has been removed. Tutorial completion persists via the
+    // tutorial overlay's onComplete callback and the LifecycleManager's
+    // persistTutorialCompletion() method.
 
-            if (s.campaign) {
-              s.campaign.tutorialSeen = false;
-              if (s.saveStore) {
-                void saveCampaignProgress(s.saveStore, s.campaign).catch(() => {});
-              }
-            }
-
-            // Restart the current run as a tutorial run (force Easy difficulty)
-            try {
-              s.selectedDifficulty = 'Easy';
-              s.state = setupMainStreetGame({ difficulty: 'Easy', unlockedCardIds: s.campaign?.unlockedCardIds });
-              s.startDayPhase();
-              // Immediately show the tutorial overlay for replay (bypass the offer modal)
-              try { (s as any).tutorialOverlay?.start(); } catch (_) { /* ignore */ }
-            } catch (e) {
-              // eslint-disable-next-line no-console
-              console.error('[MainStreet] failed to restart into tutorial', e);
-            }
-          } catch (e) {
-            // eslint-disable-next-line no-console
-            console.error('[MainStreet] replay-tutorial handler failed', e);
-          }
-        });
-      }
-    } catch (_e) {
-      // ignore
-    }
 
     // Global keyboard handler for End Turn (configurable via Settings)
     const endTurnKeyHandler = (ev: KeyboardEvent) => {
