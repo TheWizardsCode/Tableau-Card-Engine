@@ -512,7 +512,20 @@ export class MainStreetLifecycleManager {
     if (!controller || !controller.isActive) return;
 
     const step = getCurrentStep(controller);
-    if (!step) return;
+    if (!step) {
+      // No current step means tutorial completed - dismiss overlay
+      (s as any).tutorialOverlay?.dismiss();
+      return;
+    }
+
+    // For action steps, check if the action already completed.
+    // If step still exists but we're not on the step that was showing,
+    // the action completed and we should show the next step.
+    if (step.gate === 'action') {
+      // Action already completed - show the next step (overlay may be stale)
+      (s as any).showTutorialStepOverlay?.();
+      return;
+    }
 
     if (step.requiredAction === 'confirm' || step.requiredAction === 'confirm-complete') {
       const { newState, completedStepId } = completeCurrentStep(controller);
