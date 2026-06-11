@@ -67,7 +67,7 @@ const NULL_ZONES: ReadonlySet<TutorialHighlightZone> = new Set([
  * Returns `{ x, y, w, h }` for known zones, or `null` for centered overlays
  * (centerModal, completionModal) and unrecognized zones.
  */
-function resolveZoneToAnchor(
+export function resolveZoneToAnchor(
   zone: TutorialHighlightZone,
   viewport: LayoutViewport,
   dpr = 1,
