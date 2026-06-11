@@ -520,9 +520,11 @@ export class MainStreetLifecycleManager {
 
     // For action steps, check if the action already completed.
     // If step still exists but we're not on the step that was showing,
-    // the action completed and we should show the next step.
+    // the action completed and we should advance to next step.
     if (step.gate === 'action') {
-      // Action already completed - show the next step (overlay may be stale)
+      // Action already completed - advance and show next step (overlay may be stale)
+      const { newState } = completeCurrentStep(controller);
+      Object.assign(s, { tutorialController: newState });
       (s as any).showTutorialStepOverlay?.();
       return;
     }
