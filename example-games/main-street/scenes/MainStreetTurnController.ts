@@ -14,7 +14,7 @@ import { buyBusinessCommand, buyUpgradeCommand, buyEventCommand, playEventComman
 import { recordMainStreetEvent, finalizeMainStreetTranscript } from '../MainStreetTranscript';
 import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
 import { FONT_FAMILY, createOverlayBackground, createOverlayButton, dismissOverlay } from '../../../src/ui';
-import type { TutorialActionType } from '../TutorialFlow';
+import { getCurrentStep, type TutorialActionType } from '../TutorialFlow';
 
 export class MainStreetTurnController {
   constructor(private readonly scene: any) {}
@@ -182,11 +182,31 @@ export class MainStreetTurnController {
   public onBusinessCardClick(card: BusinessCard): void {
     const s = this.scene;
     if (s.uiPhase !== 'market') return;
+
     // Tutorial gating: only allow select-business if it's the required action or tutorial is inactive
     const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('select-business' as TutorialActionType);
     if (check && !check.allowed) {
       s.instructionText.setText(check.reason ?? 'Complete the highlighted step first.');
       return;
+    }
+
+    // Tutorial: enforce specific card purchase if requiredCardId is set on the current step
+    const controller = (s as any).tutorialController as any;
+    if (controller?.isActive) {
+      const step = controller.currentStepIndex >= 0
+        ? getCurrentStep(controller)
+        : null;
+      if (step?.requiredCardId && card.id !== step.requiredCardId) {
+        // Find the card name from the market for the error message
+        const requiredCard = s.state.market.business.find(
+          (c: any) => c.id === step.requiredCardId
+        );
+        const requiredName = requiredCard?.name ?? 'the specified card';
+        s.instructionText.setText(
+          `This is not the card you should buy right now. Please buy ${requiredName} first.`
+        );
+        return;
+      }
     }
 
     s.selectMarketCardById(card.id);
@@ -221,7 +241,20 @@ export class MainStreetTurnController {
 
   public onSlotClick(slotIndex: number): void {
     const s = this.scene;
-    if (s.uiPhase !== 'placing-business' || !s.pendingBusinessCard) return;
+    if (s.uiPhase !== 'placing-business') return;
+
+    // Tutorial: if no card is pending (because it was rejected by requiredCardId check),
+    // show a helpful message directing the player to buy a business card first
+    if (!s.pendingBusinessCard) {
+      const controller = (s as any).tutorialController as any;
+      if (controller?.isActive) {
+        s.instructionText.setText(
+          'You must first buy a business card. Click on a business card in the market.'
+        );
+      }
+      return;
+    }
+
     // Tutorial gating: only allow place-business if it's the required action or tutorial is inactive
     const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('place-business' as TutorialActionType);
     if (check && !check.allowed) {
