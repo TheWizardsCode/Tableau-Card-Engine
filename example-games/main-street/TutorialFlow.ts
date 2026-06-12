@@ -13,6 +13,38 @@
  * A pure controller manages tutorial progression. This module has NO Phaser
  * dependency so it can be unit tested in Node.
  *
+ * ## Coin Budget Analysis (Tutorial seed, Easy difficulty)
+ *
+ * With the fixed tutorial seed and Easy difficulty (12 coins, 5 reputation):
+ *
+ * - Market business cards: Cinema ($10), **Laundromat ($6)**, Hardware Store ($10), Clinic ($10)
+ * - Investments: Upgrade to Garden ($3), Upgrade to Bistro ($4), Grand Opening Sale ($2)
+ * - Incidents in queue: varies by RNG, but per-turn income from the placed business
+ *   ensures sufficient coins remain throughout the 13-step flow.
+ *
+ * ### Budget Walkthrough
+ *
+ * | Step | Action                     | Coins In | Coins Out | Balance |
+ * |------|----------------------------|----------|-----------|---------|
+ * | T1   | Start (Easy)               | 12       | 0         | 12      |
+ * | T2   | Confirm (no cost)          | 0        | 0         | 12      |
+ * | T3   | Buy Laundromat ($6)        | 0        | 6         | 6       |
+ * | T4   | Place business (free)      | 0        | 0         | 6       |
+ * | T5   | Confirm (no cost)          | 0        | 0         | 6       |
+ * | T6   | End Turn + income (~1 coin)| 1        | 0         | 7       |
+ * | T7   | Buy Grand Opening Sale ($2)| 0        | 2         | 5       |
+ * | T8   | Confirm (no cost)          | 0        | 0         | 5       |
+ * | T9   | Confirm (no cost)          | 0        | 0         | 5       |
+ * | T10  | End Turn (no cost, income) | ~1       | 0         | ~6      |
+ * | T11  | Confirm (no cost)          | 0        | 0         | ~6      |
+ * | T12  | Confirm (no cost)          | 0        | 0         | ~6      |
+ * | T13  | Confirm (no cost)          | 0        | 0         | ~6      |
+ *
+ * **Conclusion:** Even with worst-case incidents, the budget is sufficient
+ * for all tutorial actions. The cheapest viable business card (Laundromat,
+ * $6) leaves enough coins for the Grand Opening Sale ($2) after one turn's
+ * income.
+ *
  * @module
  */
 
@@ -84,6 +116,13 @@ export interface UnifiedTutorialStepDef {
    * Only present when `gate === 'action'`.
    */
   requiredAction?: TutorialActionType;
+  /**
+   * If set, only this specific card ID can be used to complete the step.
+   * Used for tutorial steps that require buying a specific card (e.g., T3, T7).
+   * When set, the player must click/purchase exactly this card to advance;
+   * clicking any other card shows an error message.
+   */
+  requiredCardId?: string;
 }
 
 // ── Unified Tutorial Script (T1-T13) ────────────────────────
@@ -124,10 +163,14 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     body:
       'Click a business card (top row) to buy it.\n' +
       'Businesses go on your street to earn income.\n\n' +
+      'Buy the **Laundromat** card (cost $6) — it is the cheapest card and will earn you income each turn.\n\n' +
       'The bottom row shows Investment cards with one-time effects.',
     highlightZone: 'marketBusinessRow',
     gate: 'action',
     requiredAction: 'select-business',
+    // With the fixed tutorial seed 'tutorial-seed', the Laundromat (biz-laundromat-0) is
+    // always at market index 1 and costs $6 (most affordable, leaves 6 coins for later steps).
+    requiredCardId: 'biz-laundromat-0',
   },
   {
     id: 'T4',
@@ -161,11 +204,14 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     id: 'T7',
     title: 'Held Event Card',
     body:
-      'Buy the "Grand Opening Sale" event card from the investments row.\n' +
+      'Buy the **Grand Opening Sale** event card from the investments row.\n' +
       'You can hold one event card and play it when timing is best.',
     highlightZone: 'investmentsRow',
     gate: 'action',
     requiredAction: 'buy-event',
+    // With the fixed tutorial seed 'tutorial-seed', Grand Opening Sale (evt-grand-opening-15)
+    // is always at investments index 2 and costs $2 (affordable after T3+T6 income).
+    requiredCardId: 'evt-grand-opening-15',
   },
   {
     id: 'T8',

@@ -14,8 +14,9 @@ describe('UNIFIED_TUTORIAL_STEPS', () => {
   it('each step has non-empty title and body', () => { for(const step of UNIFIED_TUTORIAL_STEPS){ expect(step.title.length).toBeGreaterThan(0); expect(step.body.length).toBeGreaterThan(0); } });
   it('each step has valid highlightZone', () => { for(const step of UNIFIED_TUTORIAL_STEPS) expect(['centerModal','hud','marketBusinessRow','streetGrid','endTurnButton','incidentQueue','investmentsRow','helpButton','completionModal']).toContain(step.highlightZone); });
   it('each step has gate confirm or action', () => { for(const step of UNIFIED_TUTORIAL_STEPS) expect(['confirm','action']).toContain(step.gate); });
-  it('has correct distribution: 7 confirm + 6 action', () => { expect(UNIFIED_TUTORIAL_STEPS.filter(s=>s.gate==='confirm').length).toBe(7); expect(UNIFIED_TUTORIAL_STEPS.filter(s=>s.gate==='action').length).toBe(6); });
+  it('has correct distribution: 8 confirm + 5 action', () => { expect(UNIFIED_TUTORIAL_STEPS.filter(s=>s.gate==='confirm').length).toBe(8); expect(UNIFIED_TUTORIAL_STEPS.filter(s=>s.gate==='action').length).toBe(5); });
   it('confirm steps do not have requiredAction', () => { for(const step of UNIFIED_TUTORIAL_STEPS) if(step.gate==='confirm') expect(step.requiredAction).toBeUndefined(); });
+  it('confirm steps do not have requiredCardId', () => { for(const step of UNIFIED_TUTORIAL_STEPS) if(step.gate==='confirm') expect(step.requiredCardId).toBeUndefined(); });
   it('action steps have requiredAction', () => { for(const step of UNIFIED_TUTORIAL_STEPS) if(step.gate==='action') expect(step.requiredAction).toBeDefined(); });
   it('T1 is confirm gate with centerModal highlight', () => { expect(findStep('T1').gate).toBe('confirm'); expect(findStep('T1').highlightZone).toBe('centerModal'); });
   it('T2 is confirm gate with hud highlight', () => { expect(findStep('T2').gate).toBe('confirm'); expect(findStep('T2').highlightZone).toBe('hud'); });
@@ -23,12 +24,12 @@ describe('UNIFIED_TUTORIAL_STEPS', () => {
   it('T9 is confirm gate with centerModal highlight', () => { expect(findStep('T9').gate).toBe('confirm'); expect(findStep('T9').highlightZone).toBe('centerModal'); });
   it('T11 is confirm gate with endTurnButton highlight', () => { expect(findStep('T11').gate).toBe('confirm'); expect(findStep('T11').highlightZone).toBe('endTurnButton'); });
   it('T12 is confirm gate with investmentsRow highlight', () => { expect(findStep('T12').gate).toBe('confirm'); expect(findStep('T12').highlightZone).toBe('investmentsRow'); });
-  it('T3 is action gate with select-business requiredAction', () => { const t=findStep('T3'); expect(t.gate).toBe('action'); expect(t.requiredAction).toBe('select-business'); expect(t.highlightZone).toBe('marketBusinessRow'); });
-  it('T4 is action gate with place-business requiredAction', () => { const t=findStep('T4'); expect(t.gate).toBe('action'); expect(t.requiredAction).toBe('place-business'); expect(t.highlightZone).toBe('streetGrid'); });
-  it('T6 is action gate with end-turn requiredAction', () => { const t=findStep('T6'); expect(t.gate).toBe('action'); expect(t.requiredAction).toBe('end-turn'); expect(t.highlightZone).toBe('endTurnButton'); });
-  it('T7 is action gate with buy-event requiredAction', () => { const t=findStep('T7'); expect(t.gate).toBe('action'); expect(t.requiredAction).toBe('buy-event'); expect(t.highlightZone).toBe('investmentsRow'); });
-  it('T8 is action gate with apply-upgrade requiredAction', () => { const t=findStep('T8'); expect(t.gate).toBe('action'); expect(t.requiredAction).toBe('apply-upgrade'); expect(t.highlightZone).toBe('investmentsRow'); });
-  it('T10 is action gate with open-help requiredAction', () => { const t=findStep('T10'); expect(t.gate).toBe('action'); expect(t.requiredAction).toBe('open-help'); expect(t.highlightZone).toBe('helpButton'); });
+  it('T3 is action gate with select-business requiredAction and requiredCardId', () => { const t=findStep('T3'); expect(t.gate).toBe('action'); expect(t.requiredAction).toBe('select-business'); expect(t.requiredCardId).toBe('biz-laundromat-0'); expect(t.highlightZone).toBe('marketBusinessRow'); });
+  it('T4 is action gate with place-business requiredAction and no requiredCardId', () => { const t=findStep('T4'); expect(t.gate).toBe('action'); expect(t.requiredAction).toBe('place-business'); expect(t.requiredCardId).toBeUndefined(); expect(t.highlightZone).toBe('streetGrid'); });
+  it('T6 is action gate with end-turn requiredAction and no requiredCardId', () => { const t=findStep('T6'); expect(t.gate).toBe('action'); expect(t.requiredAction).toBe('end-turn'); expect(t.requiredCardId).toBeUndefined(); expect(t.highlightZone).toBe('endTurnButton'); });
+  it('T7 is action gate with buy-event requiredAction and requiredCardId', () => { const t=findStep('T7'); expect(t.gate).toBe('action'); expect(t.requiredAction).toBe('buy-event'); expect(t.requiredCardId).toBe('evt-grand-opening-15'); expect(t.highlightZone).toBe('investmentsRow'); });
+  it('T8 is confirm gate (upgrade concept reference, not action-gated)', () => { const t=findStep('T8'); expect(t.gate).toBe('confirm'); expect(t.requiredAction).toBeUndefined(); expect(t.highlightZone).toBe('investmentsRow'); });
+  it('T10 is action gate with open-help requiredAction and no requiredCardId', () => { const t=findStep('T10'); expect(t.gate).toBe('action'); expect(t.requiredAction).toBe('open-help'); expect(t.requiredCardId).toBeUndefined(); expect(t.highlightZone).toBe('helpButton'); });
   it('T13 is confirm gate with completionModal highlight', () => { expect(findStep('T13').gate).toBe('confirm'); expect(findStep('T13').highlightZone).toBe('completionModal'); });
 });
 
