@@ -202,9 +202,14 @@ export class MainStreetTurnController {
           (c: any) => c.id === step.requiredCardId
         );
         const requiredName = requiredCard?.name ?? 'the specified card';
-        s.instructionText.setText(
-          `This is not the card you should buy right now. Please buy ${requiredName} first.`
-        );
+        const msg = `This is not the card you should buy right now. Please buy ${requiredName} first.`;
+        s.instructionText.setText(msg);
+        // Clear the error message after 2 seconds so the overlay remains visible
+        s.time.delayedCall(2000, () => {
+          if (s.instructionText?.text === msg) {
+            s.instructionText.setText('Complete the highlighted step.');
+          }
+        });
         return;
       }
     }
@@ -248,9 +253,14 @@ export class MainStreetTurnController {
     if (!s.pendingBusinessCard) {
       const controller = (s as any).tutorialController as any;
       if (controller?.isActive) {
-        s.instructionText.setText(
-          'You must first buy a business card. Click on a business card in the market.'
-        );
+        const msg = 'You must first buy a business card. Click on a business card in the market.';
+        s.instructionText.setText(msg);
+        // Clear the error message after 2 seconds
+        s.time.delayedCall(2000, () => {
+          if (s.instructionText?.text === msg) {
+            s.instructionText.setText('Complete the highlighted step.');
+          }
+        });
       }
       return;
     }
@@ -320,6 +330,29 @@ export class MainStreetTurnController {
     if (check && !check.allowed) {
       s.instructionText.setText(check.reason ?? 'Complete the highlighted step first.');
       return;
+    }
+
+    // Tutorial: enforce specific event card purchase if requiredCardId is set
+    const evtController = (s as any).tutorialController as any;
+    if (evtController?.isActive) {
+      const step = evtController.currentStepIndex >= 0
+        ? getCurrentStep(evtController)
+        : null;
+      if (step?.requiredCardId && card.id !== step.requiredCardId) {
+        const requiredCard = s.state.market.investments.find(
+          (c: any) => c.id === step.requiredCardId
+        );
+        const requiredName = requiredCard?.name ?? 'the specified event card';
+        const msg = `This is not the card you should buy right now. Please buy ${requiredName} first.`;
+        s.instructionText.setText(msg);
+        // Clear the error message after 2 seconds
+        s.time.delayedCall(2000, () => {
+          if (s.instructionText?.text === msg) {
+            s.instructionText.setText('Complete the highlighted step.');
+          }
+        });
+        return;
+      }
     }
 
     // Ensure stale hover tooltip is cleared when a card is played.
