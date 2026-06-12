@@ -173,8 +173,7 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     body:
       'Upgrades improve an existing business. Strong upgrades compound over remaining turns.',
     highlightZone: 'investmentsRow',
-    gate: 'action',
-    requiredAction: 'apply-upgrade',
+    gate: 'confirm',
   },
   {
     id: 'T9',

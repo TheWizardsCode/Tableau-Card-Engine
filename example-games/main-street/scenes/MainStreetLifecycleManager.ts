@@ -21,6 +21,7 @@ import {
   loadTutorialState,
   saveTutorialState,
   updateTutorialStatus,
+  TUTORIAL_SEED,
   type TutorialVisibilityOptions,
 } from '../TutorialState';
 import {
@@ -407,6 +408,27 @@ export class MainStreetLifecycleManager {
         {
           onStartTutorial: () => {
             try {
+              // ── Deterministic Tutorial Setup ─────────────────
+              // When the tutorial starts, force Easy difficulty and use a
+              // fixed seed so the same cards appear in the same order.
+              // This ensures the player has enough coins for all actions
+              // (12 starting coins, 5 starting reputation) and that the
+              // required cards are always available.
+              s.selectedDifficulty = 'Easy';
+              s.state = setupMainStreetGame({
+                difficulty: 'Easy',
+                seed: TUTORIAL_SEED,
+                unlockedCardIds: s.campaign?.unlockedCardIds,
+              });
+              // Re-initialize the transcript recorder with the new seed
+              try {
+                const { MainStreetTranscriptRecorder, setMainStreetRecorder } = require('../MainStreetTranscript');
+                const initialSnapshot = { seed: s.state.seed, snapshotAtTurn: s.state.turn };
+                const recorder = new MainStreetTranscriptRecorder(initialSnapshot);
+                setMainStreetRecorder(recorder);
+              } catch (_) { /* ignore */ }
+              // Start the day phase so the market populates
+              s.startDayPhase();
               // Start the action-gated tutorial flow (T1-T13)
               const controller = (s as any).tutorialController as TutorialControllerState | undefined;
               if (controller) {
@@ -579,24 +601,7 @@ export class MainStreetLifecycleManager {
       const step = getCurrentStep(controller);
       if (!step) return;
 
-      // For action-gated steps, set an action-complete predicate so
-      // the Continue button is disabled until the required action succeeds.
-      if (step.gate === 'action') {
-        const overlay = (s as any).tutorialOverlay as { setActionCompletePredicate: (p: () => boolean) => void } | undefined;
-        if (overlay && typeof overlay.setActionCompletePredicate === 'function') {
-          overlay.setActionCompletePredicate(() => {
-            // Read the CURRENT controller state from the scene (not captured closure)
-            const currentController = (s as any).tutorialController as TutorialControllerState | undefined;
-            if (!currentController) return true;
-            const currentStep = getCurrentStep(currentController);
-            // If we've moved past this step, the action is complete
-            if (!currentStep || currentStep.id !== step.id) return true;
-            // Step is still active but not yet completed
-            return false;
-          });
-        }
-      }
-
+      // Show the next overlay step
       (s as any).tutorialOverlay?.showStep(controller.currentStepIndex);
     } catch (_) { /* ignore */ }
   }
@@ -696,6 +701,12 @@ export class MainStreetLifecycleManager {
           // phase is synchronised.  Without this, the engine stays in
           // DayStart while the UI shows market controls, blocking all
           // player actions and causing End Turn to hang.
+          try { s.startDayPhase(); } catch (_) { /* ignore */ }
+        } else {
+          // Even with no saved campaign, startDayPhase() must be called so
+          // the game transitions from DayStart -> MarketPhase and the market
+          // is populated. Without this the tutorial offer modal shows but
+          // the market is empty, making interactive tutorial steps impossible.
           try { s.startDayPhase(); } catch (_) { /* ignore */ }
         }
         // After attempting to load (saved or not), show the tutorial offer modal

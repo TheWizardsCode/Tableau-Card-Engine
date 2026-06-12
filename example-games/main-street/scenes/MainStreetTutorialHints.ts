@@ -27,6 +27,8 @@ import { type LayoutViewport } from '../../../src/ui/screen-layout';
 import {
   UNIFIED_TUTORIAL_STEP_COUNT,
   UNIFIED_TUTORIAL_STEPS,
+  advanceTutorialStep,
+  type TutorialControllerState,
   type TutorialHighlightZone,
 } from '../TutorialFlow';
 import baseLayout from '../layouts/main-street.layout.json';
@@ -115,7 +117,6 @@ export class MainStreetTutorialHints {
   private currentStep = 0;
   private visible = false;
   private readonly onComplete: (() => void) | null;
-  private _actionCompletePredicate: (() => boolean) | null = null;
 
   constructor(private readonly scene: any, onComplete?: () => void) {
     this.onComplete = onComplete ?? null;
@@ -158,38 +159,15 @@ export class MainStreetTutorialHints {
     if (this.currentStep >= UNIFIED_TUTORIAL_STEP_COUNT) {
       this.dismiss();
     } else {
+      // Also advance the scene's tutorial controller so the step index
+      // stays in sync with the overlay's currentStep.
+      const s = this.scene;
+      const controller = (s as any)?.tutorialController as TutorialControllerState | undefined;
+      if (controller && controller.isActive) {
+        Object.assign(s, { tutorialController: advanceTutorialStep(controller) });
+      }
       this.showStep(this.currentStep);
     }
-  }
-
-  /** Go back to the previous step. */
-  public prevStep(): void {
-    if (this.currentStep > 0) {
-      this.currentStep--;
-      this.showStep(this.currentStep);
-    }
-  }
-
-  /**
-   * Set an action-complete predicate used by the Continue button in action-gated steps.
-   *
-   * Call this method before `showStep` for action-gated steps so the Continue button
-   * is disabled until the required in-game action completes.
-   *
-   * @param predicate - Returns `true` when the required action for the current
-   *   tutorial step has been completed.
-   */
-  public setActionCompletePredicate(predicate: () => boolean): void {
-    this._actionCompletePredicate = predicate;
-  }
-
-  /**
-   * Get the current action-complete predicate.
-   *
-   * Used by confirmTutorialStep to check if action completed since overlay was shown.
-   */
-  public getActionCompletePredicate(): (() => boolean) | null {
-    return this._actionCompletePredicate;
   }
 
   /**
@@ -198,8 +176,8 @@ export class MainStreetTutorialHints {
    * This is the unified rendering method that handles both confirm-style and
    * action-gated tutorial steps.
    *
-   * For **confirm** steps the button row shows: Dismiss | Prev | Next/Finish
-   * For **action** steps the button row shows: Exit Tutorial | Continue
+   * For **confirm** steps the button row shows: Dismiss | Next/Finish
+   * For **action** steps the button row shows: Exit Tutorial (no Continue button; auto-advance on action)
    *   (Continue is disabled until the action-complete predicate reports true).
    *   The final step shows "Start Full Game" instead of Exit Tutorial.
    *
@@ -220,7 +198,6 @@ export class MainStreetTutorialHints {
       }, 60);
       return;
     }
-    const actionComplete = this._actionCompletePredicate;
     const layout = s.layout ?? {};
     const gameW: number = layout.gameW ?? 1280;
     const gameH: number = layout.gameH ?? 720;
@@ -287,7 +264,9 @@ export class MainStreetTutorialHints {
       const isActionStep = step.gate === 'action';
 
       if (isActionStep) {
-        // ── Action-gated row: Exit Tutorial | Continue ─────────
+        // ── Action-gated row: Exit Tutorial (left) ────────────
+        // No Continue button: the player performs the in-game action and
+        // the tutorial auto-advances via onTutorialActionComplete.
         const leftGroup = document.createElement('div');
         if (!isLast) {
           const exitBtn = document.createElement('button');
@@ -300,30 +279,31 @@ export class MainStreetTutorialHints {
           exitBtn.style.cursor = 'pointer';
           exitBtn.onclick = () => this.dismiss();
           leftGroup.appendChild(exitBtn);
+        } else {
+          // Last step: "Start Full Game" replaces "Exit Tutorial"
+          const startBtn = document.createElement('button');
+          startBtn.textContent = 'Start Full Game';
+          startBtn.style.background = '#44ff44';
+          startBtn.style.color = '#002200';
+          startBtn.style.border = 'none';
+          startBtn.style.padding = '6px 8px';
+          startBtn.style.borderRadius = '6px';
+          startBtn.style.cursor = 'pointer';
+          startBtn.onclick = () => (s as any).confirmTutorialStep?.();
+          leftGroup.appendChild(startBtn);
         }
+        leftGroup.style.display = 'flex';
+        leftGroup.style.gap = '8px';
         btnRow.appendChild(leftGroup);
 
-        const rightGroup = document.createElement('div');
-        const continueLabel = isLast ? 'Start Full Game' : 'Continue';
-        const continueBtn = document.createElement('button');
-        continueBtn.textContent = continueLabel;
-        continueBtn.style.background = '#88ff88';
-        continueBtn.style.color = '#002200';
-        continueBtn.style.border = 'none';
-        continueBtn.style.padding = '6px 8px';
-        continueBtn.style.borderRadius = '6px';
-        // Re-evaluate predicate on click (in case action completed while overlay was showing)
-        continueBtn.onclick = () => {
-          const ac = actionComplete;
-          // If no predicate or predicate returns true, action is complete
-          if (!ac || ac()) {
-            (s as any).confirmTutorialStep?.();
-          }
-        };
-        rightGroup.appendChild(continueBtn);
-        btnRow.appendChild(rightGroup);
+        // Spacer to push left button to the left side
+        const spacer = document.createElement('div');
+        spacer.style.flex = '1';
+        btnRow.appendChild(spacer);
       } else {
-        // ── Confirm row: Dismiss | Prev + Next/Finish ─────────
+        // ── Confirm row: Dismiss | Next/Finish ────────────────
+        // No Prev button: action-gated steps cannot be retried if
+        // the player navigates backward (e.g. market cards are consumed).
         const leftGroup = document.createElement('div');
         const dismissBtn = document.createElement('button');
         dismissBtn.textContent = 'Dismiss';
@@ -336,20 +316,6 @@ export class MainStreetTutorialHints {
         dismissBtn.onclick = () => this.dismiss();
         leftGroup.appendChild(dismissBtn);
         btnRow.appendChild(leftGroup);
-
-        const middleGroup = document.createElement('div');
-        if (index > 0) {
-          const prevBtn = document.createElement('button');
-          prevBtn.textContent = '< Prev';
-          prevBtn.style.background = 'transparent';
-          prevBtn.style.color = '#88bbff';
-          prevBtn.style.border = 'none';
-          prevBtn.style.padding = '6px 8px';
-          prevBtn.style.cursor = 'pointer';
-          prevBtn.onclick = () => this.prevStep();
-          middleGroup.appendChild(prevBtn);
-        }
-        btnRow.appendChild(middleGroup);
 
         const rightGroup = document.createElement('div');
         const nextBtn = document.createElement('button');
@@ -428,39 +394,30 @@ export class MainStreetTutorialHints {
       const isActionStep = step.gate === 'action';
 
       if (isActionStep) {
-        // ── Action-gated canvas row: Exit Tutorial | Continue ─
+        // ── Action-gated canvas row: Exit Tutorial (left only) ─
+        // No Continue button: the player performs the in-game action and
+        // the tutorial auto-advances via onTutorialActionComplete.
         if (!isLast) {
           const exitBtn = s.add.text(domX + 16, tooltipY + tooltipH - 30, 'Exit Tutorial', { fontSize: '13px', color: '#cc6666', fontFamily: FONT_FAMILY, padding: { left: 8, right: 8, top: 4, bottom: 4 } as any, backgroundColor: '#2a1a1a' }).setInteractive({ useHandCursor: true }).setDepth(TOOLTIP_DEPTH + 1003);
           exitBtn.on('pointerdown', () => this.dismiss());
           this.objects.push(exitBtn);
+        } else {
+          // Last step: "Start Full Game" replaces "Exit Tutorial"
+          const startBtn = s.add.text(domX + 16, tooltipY + tooltipH - 30, 'Start Full Game', { fontSize: '13px', color: '#002200', fontFamily: FONT_FAMILY, fontStyle: 'bold', padding: { left: 12, right: 12, top: 6, bottom: 6 } as any, backgroundColor: '#44ff44' }).setInteractive({ useHandCursor: true }).setDepth(TOOLTIP_DEPTH + 1003);
+          startBtn.on('pointerdown', () => (s as any).confirmTutorialStep?.());
+          this.objects.push(startBtn);
         }
-
-        const continueLabel = isLast ? 'Start Full Game' : 'Continue';
-        const continueColor = isLast ? '#002200' : '#002200';
-        const continueBg = isLast ? '#44ff44' : '#88ff88';
-        const continueBtn = s.add.text(domX + TOOLTIP_W - 16, tooltipY + tooltipH - 30, continueLabel, { fontSize: '13px', color: continueColor, fontFamily: FONT_FAMILY, fontStyle: 'bold', padding: { left: 12, right: 12, top: 6, bottom: 6 } as any, backgroundColor: continueBg }).setInteractive({ useHandCursor: true }).setOrigin(1, 0).setDepth(TOOLTIP_DEPTH + 1003);
-        // Re-evaluate predicate on click (in case action completed while overlay was showing)
-        continueBtn.on('pointerdown', () => {
-          const ac = actionComplete;
-          if (!ac || ac()) {
-            (s as any).confirmTutorialStep?.();
-          }
-        });
-        this.objects.push(bg, border, titleTxt, bodyTxt, continueBtn);
+        this.objects.push(bg, border, titleTxt, bodyTxt);
       } else {
-        // ── Confirm canvas row: Dismiss | Prev + Next/Finish ─
+        // ── Confirm canvas row: Dismiss | Next/Finish ────────
+        // No Prev button: action-gated steps cannot be retried if
+        // the player navigates backward (e.g. market cards are consumed).
         const dismissBtn = s.add.text(domX + 12, tooltipY + tooltipH - 30, 'Dismiss', { fontSize: '13px', color: '#aa8866', fontFamily: FONT_FAMILY }).setInteractive({ useHandCursor: true }).setDepth(TOOLTIP_DEPTH + 1003);
         dismissBtn.on('pointerdown', () => this.dismiss());
 
         const nextLabel = isLast ? 'Start Full Game' : 'Next >';
         const nextBtn = s.add.text(domX + TOOLTIP_W - 12, tooltipY + tooltipH - 30, nextLabel, { fontSize: '13px', color: '#002200', backgroundColor: isLast ? '#44ff44' : '#88ff88', padding: { left: 6, right: 6 } as any, fontFamily: FONT_FAMILY }).setInteractive({ useHandCursor: true }).setOrigin(1, 0).setDepth(TOOLTIP_DEPTH + 1003);
         nextBtn.on('pointerdown', () => this.nextStep());
-
-        if (index > 0) {
-          const prevBtn = s.add.text(domX + TOOLTIP_W / 2, tooltipY + tooltipH - 30, '< Prev', { fontSize: '13px', color: '#88bbff', fontFamily: FONT_FAMILY }).setInteractive({ useHandCursor: true }).setDepth(TOOLTIP_DEPTH + 1003).setOrigin(0.5, 0);
-          prevBtn.on('pointerdown', () => this.prevStep());
-          this.objects.push(prevBtn);
-        }
 
         this.objects.push(bg, border, titleTxt, bodyTxt, dismissBtn, nextBtn);
       }
