@@ -241,16 +241,9 @@ async function clickHelp(scene: Phaser.Scene): Promise<void> {
   if (typeof s.onOpenHelp === 'function') {
     try { s.onOpenHelp(); } catch (_) { /* ignore */ }
   }
+  // Belt-and-suspenders: advance from T10 (step 9) if onTutorialActionComplete
+  // didn't trigger (Phaser 4 event system quirk).
   maybeAdvanceTutorial(scene, 9); // T10 (step 9)
-  if (s.tutorialController?.currentStepIndex === 10) {
-    try {
-      const overlay = s.tutorialOverlay as { showStep?: (idx: number) => void } | undefined;
-      if (overlay?.showStep) {
-        overlay.showStep(10);
-      }
-    } catch (_) { /* ignore */ }
-    await new Promise((r) => setTimeout(r, 1000));
-  }
   await new Promise((r) => setTimeout(r, 200));
 }
 

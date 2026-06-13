@@ -463,7 +463,8 @@ export class MainStreetLifecycleManager {
     // mode for first-time players) and the reference-mode replay button in
     // Settings has been removed. Tutorial completion persists via the
     // tutorial overlay's onComplete callback and the LifecycleManager's
-    // persistTutorialCompletion() method.
+    // the tutorial overlay's onComplete callback, which persists
+    // completion only after all 13 steps are finished.
 
 
     // Global keyboard handler for End Turn (configurable via Settings)
@@ -565,14 +566,8 @@ export class MainStreetLifecycleManager {
     }
 
     if (step.requiredAction === 'confirm' || step.requiredAction === 'confirm-complete') {
-      const { newState, completedStepId } = completeCurrentStep(controller);
+      const { newState } = completeCurrentStep(controller);
       Object.assign(s, { tutorialController: newState });
-
-      if (completedStepId === 'T10') {
-        this.persistTutorialCompletion();
-        (s as any).tutorialOverlay?.dismiss();
-        return;
-      }
 
       (s as any).showTutorialStepOverlay?.();
     } else if (step.requiredAction === 'acknowledge' || step.requiredAction === 'acknowledge-queue') {
@@ -636,36 +631,15 @@ export class MainStreetLifecycleManager {
     if (!controller || !controller.isActive) return;
     if (!isRequiredAction(controller, actionType)) return;
 
-    const { newState, completedStepId } = completeCurrentStep(controller);
+    const { newState } = completeCurrentStep(controller);
     Object.assign(s, { tutorialController: newState });
-
-    if (completedStepId === 'T10') {
-      this.persistTutorialCompletion();
-      (s as any).tutorialOverlay?.dismiss();
-      return;
-    }
 
     // Show next step immediately (for action steps) or after brief delay
     // For select-business -> place-business transition, show immediately
     (s as any).showTutorialStepOverlay?.();
   }
 
-  /** Persists tutorial completion to localStorage and campaign. */
-  private persistTutorialCompletion(): void {
-    const s = this.scene;
-    try {
-      const storage = new BrowserLocalStorageAdapter();
-      const tutorialState = loadTutorialState(storage);
-      const updated = updateTutorialStatus(tutorialState, 'completed');
-      void saveTutorialState(storage, updated);
-      if (s.campaign) {
-        s.campaign.tutorialSeen = true;
-        if (s.saveStore) {
-          void saveCampaignProgress(s.saveStore, s.campaign).catch(() => {});
-        }
-      }
-    } catch (_) { /* ignore */ }
-  }
+
 
   public loadCampaignAndSetup(): void {
     const s = this.scene;

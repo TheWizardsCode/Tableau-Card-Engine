@@ -143,12 +143,29 @@ export class MainStreetTutorialHints {
     }
   }
 
-  /** Dismiss (hide) all tutorial objects. */
+  /**
+   * Dismiss (hide) all tutorial objects without marking as completed.
+   *
+   * This is used for early exits ("Exit Tutorial" button). It clears the
+   * overlay but does NOT call the onComplete callback, so the tutorial
+   * state is not persisted as 'completed'.
+   */
   public dismiss(): void {
-    const wasVisible = this.visible;
     this.clearObjects();
     this.visible = false;
-    if (wasVisible && this.onComplete) {
+  }
+
+  /**
+   * Complete the tutorial: dismiss the overlay and call onComplete
+   * to persist tutorial completion state.
+   *
+   * This is only called when the player reaches the final step (T13)
+   * and clicks "Start Full Game", or when nextStep() reaches the end.
+   */
+  public completeDismiss(): void {
+    this.clearObjects();
+    this.visible = false;
+    if (this.onComplete) {
       try { this.onComplete(); } catch (_) { /* ignore errors in callback */ }
     }
   }
@@ -157,7 +174,7 @@ export class MainStreetTutorialHints {
   public nextStep(): void {
     this.currentStep++;
     if (this.currentStep >= UNIFIED_TUTORIAL_STEP_COUNT) {
-      this.dismiss();
+      this.completeDismiss();
     } else {
       // Also advance the scene's tutorial controller so the step index
       // stays in sync with the overlay's currentStep.
@@ -277,7 +294,11 @@ export class MainStreetTutorialHints {
           exitBtn.style.padding = '6px 8px';
           exitBtn.style.borderRadius = '6px';
           exitBtn.style.cursor = 'pointer';
-          exitBtn.onclick = () => this.dismiss();
+          exitBtn.onclick = () => {
+            // Call the lifecycle manager's exit method so the tutorial
+            // controller is also updated (not just the overlay).
+            try { (this.scene as any).exitTutorialFlow?.(); } catch (_) { /* ignore */ }
+          };
           leftGroup.appendChild(exitBtn);
         } else {
           // Last step: "Start Full Game" replaces "Exit Tutorial"
@@ -313,7 +334,9 @@ export class MainStreetTutorialHints {
         dismissBtn.style.padding = '6px 8px';
         dismissBtn.style.borderRadius = '6px';
         dismissBtn.style.cursor = 'pointer';
-        dismissBtn.onclick = () => this.dismiss();
+        dismissBtn.onclick = () => {
+          try { (this.scene as any).exitTutorialFlow?.(); } catch (_) { /* ignore */ }
+        };
         leftGroup.appendChild(dismissBtn);
         btnRow.appendChild(leftGroup);
 
@@ -399,7 +422,9 @@ export class MainStreetTutorialHints {
         // the tutorial auto-advances via onTutorialActionComplete.
         if (!isLast) {
           const exitBtn = s.add.text(domX + 16, tooltipY + tooltipH - 30, 'Exit Tutorial', { fontSize: '13px', color: '#cc6666', fontFamily: FONT_FAMILY, padding: { left: 8, right: 8, top: 4, bottom: 4 } as any, backgroundColor: '#2a1a1a' }).setInteractive({ useHandCursor: true }).setDepth(TOOLTIP_DEPTH + 1003);
-          exitBtn.on('pointerdown', () => this.dismiss());
+          exitBtn.on('pointerdown', () => {
+            try { (this.scene as any).exitTutorialFlow?.(); } catch (_) { /* ignore */ }
+          });
           this.objects.push(exitBtn);
         } else {
           // Last step: "Start Full Game" replaces "Exit Tutorial"
@@ -413,7 +438,9 @@ export class MainStreetTutorialHints {
         // No Prev button: action-gated steps cannot be retried if
         // the player navigates backward (e.g. market cards are consumed).
         const dismissBtn = s.add.text(domX + 12, tooltipY + tooltipH - 30, 'Dismiss', { fontSize: '13px', color: '#aa8866', fontFamily: FONT_FAMILY }).setInteractive({ useHandCursor: true }).setDepth(TOOLTIP_DEPTH + 1003);
-        dismissBtn.on('pointerdown', () => this.dismiss());
+        dismissBtn.on('pointerdown', () => {
+          try { (this.scene as any).exitTutorialFlow?.(); } catch (_) { /* ignore */ }
+        });
 
         const nextLabel = isLast ? 'Start Full Game' : 'Next >';
         const nextBtn = s.add.text(domX + TOOLTIP_W - 12, tooltipY + tooltipH - 30, nextLabel, { fontSize: '13px', color: '#002200', backgroundColor: isLast ? '#44ff44' : '#88ff88', padding: { left: 6, right: 6 } as any, fontFamily: FONT_FAMILY }).setInteractive({ useHandCursor: true }).setOrigin(1, 0).setDepth(TOOLTIP_DEPTH + 1003);
