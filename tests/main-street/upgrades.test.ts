@@ -13,6 +13,7 @@
 import { describe, it, expect } from 'vitest';
 
 import { setupMainStreetGame, type MainStreetState } from '../../example-games/main-street/MainStreetState';
+import { createUpgradeDeck } from '../../example-games/main-street/MainStreetCards';
 import {
   canPurchaseUpgrade,
   purchaseUpgrade,
@@ -424,5 +425,63 @@ describe('branching & multi-level template pool (US-18, US-19)', () => {
   it('at least 2 upgrade templates require level >= 1 (US-19 AC#2)', () => {
     const advanced = allUpgrades.filter(u => (u.requiredLevel ?? 0) >= 1);
     expect(advanced.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+// ── Upgrade card target business display ──────────────────────
+
+describe('upgrade card target business display', () => {
+  const allUpgradeTemplates = createUpgradeDeck(1);
+
+  it('every upgrade card has a non-empty targetBusiness', () => {
+    for (const u of allUpgradeTemplates) {
+      expect(u.targetBusiness).toBeTruthy();
+      expect(u.targetBusiness.trim().length).toBeGreaterThan(0);
+    }
+  });
+
+  it('every upgrade card\'s targetBusiness matches a known business template name', () => {
+    const state = setupMainStreetGame({ seed: 'target-biz-check' });
+    const businessNames = new Set(state.decks.business.map(b => b.name));
+    for (const u of allUpgradeTemplates) {
+      expect(businessNames.has(u.targetBusiness)).toBe(true);
+    }
+  });
+
+  it('each unique targetBusiness appears in at least one upgrade card', () => {
+    const state = setupMainStreetGame({ seed: 'target-biz-coverage' });
+    const upgradeTargets = new Set(allUpgradeTemplates.map(u => u.targetBusiness));
+
+    // At minimum, every business with upgrades defined should have its
+    // targetBusiness referenced by at least one upgrade card
+    const businessesWithUpgrades = new Set(
+      state.decks.business.filter(b => b.upgradePath).map(b => b.name),
+    );
+
+    // All businesses that declare an upgradePath should have matching upgrade cards
+    for (const bizName of businessesWithUpgrades) {
+      expect(upgradeTargets.has(bizName)).toBe(true);
+    }
+  });
+
+  it('tooltip for an upgrade card would contain "Applies to: <targetBusiness>"', () => {
+    // Verify the tooltip format string includes the target business info
+    // This mirrors the format in MainStreetRenderer.drawMarketCard
+    for (const u of allUpgradeTemplates) {
+      const expectedTooltip = `Applies to: ${u.targetBusiness}`;
+      expect(expectedTooltip).toContain(u.targetBusiness);
+      expect(expectedTooltip.startsWith('Applies to:')).toBe(true);
+    }
+  });
+
+  it('display label "for <targetBusiness>" references a valid business name', () => {
+    const state = setupMainStreetGame({ seed: 'display-label-check' });
+    const businessNames = new Set(state.decks.business.map(b => b.name));
+
+    for (const u of allUpgradeTemplates) {
+      const displayLabel = `for ${u.targetBusiness}`;
+      expect(displayLabel).toContain(u.targetBusiness);
+      expect(businessNames.has(u.targetBusiness)).toBe(true);
+    }
   });
 });

@@ -719,6 +719,22 @@ export class MainStreetRenderer {
     // Render card via shared adapter
     mainStreetRenderCardSvg(s, container, card.id, renderW, renderH);
 
+    // For upgrade cards, add a dynamic text overlay showing the target business
+    if (card.family === 'upgrade') {
+      const u = card as UpgradeCard;
+      const targetLabel = `for ${u.targetBusiness}`;
+      const targetText = s.add.text(0, Math.round(-renderH / 2 + 24), targetLabel, {
+        fontSize: '9px',
+        color: '#ddbb88',
+        fontFamily: FONT_FAMILY,
+        fontStyle: 'bold',
+        align: 'center',
+      });
+      targetText.setOrigin(0.5, 0);
+      targetText.setName('upgradeTargetLabel');
+      container.add(targetText);
+    }
+
     const selectionRing = s.add.rectangle(0, 0, marketCardW, marketCardH);
     selectionRing.setFillStyle(0x000000, 0);
     selectionRing.setStrokeStyle(2, 0x44ff66);
@@ -775,7 +791,7 @@ export class MainStreetRenderer {
             info = `Event: ${e.name}\nCost: ${e.cost}\nEffect: ${e.effect}\nCoins: ${e.coinDelta >= 0 ? '+' : ''}${e.coinDelta}, Rep: ${e.reputationDelta >= 0 ? '+' : ''}${e.reputationDelta}`;
           } else if (card.family === 'upgrade') {
             const u = card as any;
-            info = `Upgrade: ${u.name}\nCost: ${u.cost}\nIncome Bonus: +${u.incomeBonus}\nRequires: Lv${u.requiredLevel ?? 0}\n${u.description ?? ''}`;
+            info = `Upgrade: ${u.name}\nCost: ${u.cost}\nApplies to: ${u.targetBusiness}\nIncome Bonus: +${u.incomeBonus}\nRequires: Lv${u.requiredLevel ?? 0}\n${u.description ?? ''}`;
           }
           s.tooltipManager?.show(info, container.x, container.y);
         }
