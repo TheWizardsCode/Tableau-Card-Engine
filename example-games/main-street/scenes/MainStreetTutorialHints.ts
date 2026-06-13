@@ -174,6 +174,14 @@ export class MainStreetTutorialHints {
   public nextStep(): void {
     this.currentStep++;
     if (this.currentStep >= UNIFIED_TUTORIAL_STEP_COUNT) {
+      // Deactivate the tutorial controller so game actions are no longer blocked.
+      // Without this, isTutorialActionAllowed would keep returning "Complete the
+      // highlighted step first." for all game actions.
+      const s = this.scene;
+      const controller = (s as any)?.tutorialController as TutorialControllerState | undefined;
+      if (controller) {
+        Object.assign(s, { tutorialController: { ...controller, isActive: false } });
+      }
       this.completeDismiss();
     } else {
       // Also advance the scene's tutorial controller so the step index
