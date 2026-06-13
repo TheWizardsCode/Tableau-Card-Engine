@@ -389,4 +389,276 @@ describe('HandView', () => {
     expect(hv.getCards()).toHaveLength(0);
     expect(hv.getSelected()).toBeNull();
   });
+
+  // ── Vertical / Cascade Layout ─────────────────────────────
+
+  describe('vertical layout mode', () => {
+    it('layoutDirection defaults to horizontal when not set', () => {
+      const hv = new HandView(scene, { baseX: 60, baseY: 130, spacing: 56 });
+      expect((hv as any).layoutDirection).toBe('horizontal');
+      hv.destroy();
+    });
+
+    it('renders cards stacked vertically from top to bottom', () => {
+      const hv = new HandView(scene, {
+        baseX: 200,
+        baseY: 100,
+        spacing: 50,
+        layoutDirection: 'vertical',
+      });
+
+      hv.setCards([
+        card('A', 'spades'),
+        card('2', 'hearts'),
+        card('3', 'clubs'),
+      ]);
+
+      expect(scene._images).toHaveLength(3);
+      // All cards should have same X
+      expect(scene._images[0].x).toBe(200);
+      expect(scene._images[1].x).toBe(200);
+      expect(scene._images[2].x).toBe(200);
+
+      // Y should increase by spacing each card
+      expect(scene._images[0].y).toBe(100); // baseY = top card
+      expect(scene._images[1].y).toBe(150); // baseY + 1*spacing
+      expect(scene._images[2].y).toBe(200); // baseY + 2*spacing
+
+      hv.destroy();
+    });
+
+    it('spacing smaller than card height produces overlapping cards', () => {
+      const hv = new HandView(scene, {
+        baseX: 200,
+        baseY: 100,
+        spacing: 42,  // Card height is 130 (from CARD_H), so spacing < card height = overlap
+        layoutDirection: 'vertical',
+      });
+
+      hv.setCards([
+        card('A', 'spades'),
+        card('2', 'hearts'),
+        card('3', 'clubs'),
+        card('4', 'diamonds'),
+      ]);
+
+      // All cards share same X
+      expect(scene._images[0].x).toBe(200);
+      expect(scene._images[1].x).toBe(200);
+
+      // Y positions cascade by spacing amount
+      expect(scene._images[0].y).toBe(100);
+      expect(scene._images[1].y).toBe(142);
+      expect(scene._images[2].y).toBe(184);
+      expect(scene._images[3].y).toBe(226);
+
+      // Since spacing (42) < typical card height (130), cards overlap vertically
+      expect(scene._images[1].y - scene._images[0].y).toBeLessThan(130);
+
+      hv.destroy();
+    });
+
+    it('cascade selection tints all cards from top to clicked index', () => {
+      const hv = new HandView(scene, {
+        baseX: 200,
+        baseY: 100,
+        spacing: 50,
+        layoutDirection: 'vertical',
+        selectionEnabled: true,
+      });
+
+      hv.setCards([
+        card('A', 'spades'),
+        card('2', 'hearts'),
+        card('3', 'clubs'),
+        card('4', 'diamonds'),
+      ]);
+
+      // Initially no selection — all sprites should have white tint
+      for (const img of scene._images) {
+        expect(img.setTint).toHaveBeenCalledWith(0xffffff);
+      }
+
+      // Simulate cascade selection: setSelected(2) should select [0, 1, 2]
+      hv.setSelected(2);
+
+      // Cards at indices 0, 1, 2 should have selection tint
+      expect(hv.getSelected()).toBe(2);
+
+      hv.destroy();
+    });
+
+    it('getCascadeRange returns [0..index] when selected in vertical mode', () => {
+      const hv = new HandView(scene, {
+        baseX: 200,
+        baseY: 100,
+        spacing: 50,
+        layoutDirection: 'vertical',
+      });
+
+      hv.setCards([
+        card('A', 'spades'),
+        card('2', 'hearts'),
+        card('3', 'clubs'),
+      ]);
+
+      expect(hv.getCascadeRange()).toBeNull();
+
+      hv.setSelected(2);
+      expect(hv.getCascadeRange()).toEqual({ from: 0, to: 2 });
+
+      hv.setSelected(0);
+      expect(hv.getCascadeRange()).toEqual({ from: 0, to: 0 });
+
+      hv.setSelected(null);
+      expect(hv.getCascadeRange()).toBeNull();
+
+      hv.destroy();
+    });
+
+    it('getCascadeRange returns single index range in horizontal mode', () => {
+      const hv = new HandView(scene, {
+        baseX: 60,
+        baseY: 130,
+        spacing: 56,
+      });
+
+      hv.setCards([card('A', 'spades'), card('2', 'hearts'), card('3', 'clubs')]);
+
+      expect(hv.getCascadeRange()).toBeNull();
+
+      hv.setSelected(1);
+      expect(hv.getCascadeRange()).toEqual({ from: 1, to: 1 });
+
+      hv.destroy();
+    });
+
+    it('selection change fires selectionchange event with selected index', () => {
+      const hv = new HandView(scene, {
+        baseX: 200,
+        baseY: 100,
+        spacing: 50,
+        layoutDirection: 'vertical',
+      });
+
+      hv.setCards([
+        card('A', 'spades'),
+        card('2', 'hearts'),
+        card('3', 'clubs'),
+      ]);
+
+      const changeHandler = vi.fn();
+      hv.on('selectionchange', changeHandler);
+
+      hv.setSelected(1);
+      expect(changeHandler).toHaveBeenCalledWith(1);
+
+      hv.setSelected(null);
+      expect(changeHandler).toHaveBeenCalledWith(null);
+
+      hv.destroy();
+    });
+
+    it('vertical layout with showLabels=false suppresses labels', () => {
+      const hv = new HandView(scene, {
+        baseX: 200,
+        baseY: 100,
+        spacing: 50,
+        layoutDirection: 'vertical',
+        showLabels: false,
+      });
+
+      hv.setCards([card('A', 'spades'), card('2', 'hearts')]);
+
+      expect(scene.add.image).toHaveBeenCalledTimes(2);
+      expect(scene.add.text).not.toHaveBeenCalled();
+      hv.destroy();
+    });
+
+    it('labels are positioned to the right in vertical mode', () => {
+      const hv = new HandView(scene, {
+        baseX: 200,
+        baseY: 100,
+        spacing: 50,
+        layoutDirection: 'vertical',
+        cardWidth: 96,
+      });
+
+      hv.setCards([card('A', 'spades'), card('2', 'hearts')]);
+
+      expect(scene._texts).toHaveLength(2);
+      // Label X should be to the right of card center
+      // baseX + cardWidth/2 + 8 = 200 + 48 + 8 = 256
+      expect(scene._texts[0].x).toBe(256);
+      expect(scene._texts[0].y).toBe(100); // Same Y as card
+
+      expect(scene._texts[1].x).toBe(256);
+      expect(scene._texts[1].y).toBe(150); // baseY + spacing
+
+      hv.destroy();
+    });
+
+    it('click on a card in vertical mode sets cascade selection', () => {
+      const hv = new HandView(scene, {
+        baseX: 200,
+        baseY: 100,
+        spacing: 50,
+        layoutDirection: 'vertical',
+        selectionEnabled: true,
+        clickEnabled: true,
+      });
+
+      hv.setCards([
+        card('A', 'spades'),
+        card('2', 'hearts'),
+        card('3', 'clubs'),
+      ]);
+
+      // Simulate a click on the third card (index 2)
+      const thirdImage = scene._images[2];
+      const onCalls = thirdImage.on.mock.calls;
+      const pointerdownCall = onCalls.find((c: any[]) => c[0] === 'pointerdown');
+      expect(pointerdownCall).toBeDefined();
+      pointerdownCall[1](); // invoke click handler
+
+      expect(hv.getSelected()).toBe(2);
+      expect(hv.getCascadeRange()).toEqual({ from: 0, to: 2 });
+
+      hv.destroy();
+    });
+
+    it('can represent Beleaguered Castle cascade column layout', () => {
+      // Simulate Beleaguered Castle column layout parameters
+      // BC_CARD_W = 90, CASCADE_OFFSET_Y = 42
+      const columnX = 200;
+      const columnTopY = 200;
+      const cascadeOffsetY = 42;
+
+      const hv = new HandView(scene, {
+        baseX: columnX,
+        baseY: columnTopY,
+        spacing: cascadeOffsetY,
+        cardWidth: 90,
+        layoutDirection: 'vertical',
+      });
+
+      // A Beleaguered Castle tableau column can have up to ~19 cards
+      const cards = Array.from({ length: 5 }, (_, i) =>
+        card(String(i + 1), 'spades'),
+      );
+      hv.setCards(cards);
+
+      // Verify all cards share the same column X
+      for (const img of scene._images) {
+        expect(img.x).toBe(columnX);
+      }
+
+      // Verify Y positions match cascade formula
+      for (let i = 0; i < cards.length; i++) {
+        expect(scene._images[i].y).toBe(columnTopY + i * cascadeOffsetY);
+      }
+
+      hv.destroy();
+    });
+  });
 });

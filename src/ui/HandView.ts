@@ -82,6 +82,14 @@ export interface HandViewOptions {
   maxRotationDegrees?: number;
 
   /**
+   * Layout direction for the hand.
+   * - `'horizontal'`: cards laid out in a row (left to right).
+   * - `'vertical'`: cards stacked vertically (top to bottom cascade).
+   * @default 'horizontal'
+   */
+  layoutDirection?: 'horizontal' | 'vertical';
+
+  /**
    * Custom texture resolver for non-standard card models (e.g. MindCard
    * with numeric `value` instead of `rank`/`suit`). When provided,
    * this function is called instead of `getCardTexture()` to determine
@@ -130,13 +138,13 @@ type EventCallback = (...args: any[]) => void;
 /**
  * Reusable hand-of-cards display component.
  *
- * Manages a row of card sprites laid out horizontally, with optional
- * selection highlighting and click events. The component does not
- * own the Card data — callers mutate their own array and call
- * {@link setCards} or {@link addCard}/{@link removeCard} to sync
- * the visual state.
+ * Manages a row of card sprites laid out horizontally (default) or in a
+ * vertical cascade, with optional selection highlighting and click events.
+ * The component does not own the Card data — callers mutate their own
+ * array and call {@link setCards} or {@link addCard}/{@link removeCard}
+ * to sync the visual state.
  *
- * ### Example
+ * ### Horizontal example (default)
  * ```ts
  * const handView = new HandView(scene, { baseX: 60, baseY: 130, spacing: 20 });
  * handView.setCards(myHand);
@@ -144,6 +152,19 @@ type EventCallback = (...args: any[]) => void;
  * // Later:
  * handView.addCard(drawnCard, { animate: true, sourceX: 500, sourceY: 150 });
  * handView.destroy();
+ * ```
+ *
+ * ### Vertical (cascade) example
+ * ```ts
+ * const cascade = new HandView(scene, {
+ *   baseX: 200,
+ *   baseY: 100,
+ *   spacing: 42,
+ *   layoutDirection: 'vertical',
+ * });
+ * cascade.setCards(tableauCards);
+ * cascade.on('cardclick', (idx) => cascade.setSelected(idx)); // selects cards [0..idx]
+ * cascade.getCascadeRange(); // { from: 0, to: idx }
  * ```
  */
 export class HandView {
@@ -163,6 +184,9 @@ export class HandView {
 
   /** Maximum rotation (degrees) applied proportionally based on card offset from centre. */
   private maxRotationDegrees: number = 0;
+
+  /** Layout direction for the hand — horizontal row or vertical cascade. */
+  private layoutDirection: 'horizontal' | 'vertical';
 
   // State
   private cards: Card[] = [];
@@ -193,6 +217,7 @@ export class HandView {
     this.clickEnabled = opts.clickEnabled ?? true;
     this._reducedMotion = opts.reducedMotion ?? false;
     this.maxRotationDegrees = opts.maxRotationDegrees ?? 25;
+    this.layoutDirection = opts.layoutDirection ?? 'horizontal';
     this._customTextureFn = opts.cardTextureFn;
     this._cardType = opts.cardTextureFn ? 'custom' : 'standard';
   }
@@ -280,9 +305,27 @@ export class HandView {
 
   /**
    * Return the currently selected card index, or null if none.
+   *
+   * In vertical (cascade) mode, this returns the bottom-most card index
+   * of the selection range (cards [0..index] are selected).
    */
   getSelected(): number | null {
     return this.selectedIndex;
+  }
+
+  /**
+   * Return the cascade selection range, or null if nothing is selected.
+   *
+   * In vertical mode, clicking card at index `i` selects cards `[0..i]`.
+   * Returns `{ from: 0, to: selectedIndex }` or `null` when no selection.
+   * In horizontal mode, `{ from: selectedIndex, to: selectedIndex }` or `null`.
+   */
+  getCascadeRange(): { from: number; to: number } | null {
+    if (this.selectedIndex === null) return null;
+    if (this.layoutDirection === 'vertical') {
+      return { from: 0, to: this.selectedIndex };
+    }
+    return { from: this.selectedIndex, to: this.selectedIndex };
   }
 
   /**
@@ -432,8 +475,8 @@ export class HandView {
 
     const positions = this.computeCardPositions();
 
-    // Precompute rotation helpers (centre and half-span) so rotation is
-    // proportional to horizontal offset from the hand centre.
+    // Precompute rotation helpers for horizontal mode (centre and half-span)
+    // so rotation is proportional to horizontal offset from the hand centre.
     const firstX = positions[0].x;
     const lastX = positions[positions.length - 1].x;
     const arcCenterX = (firstX + lastX) / 2;
@@ -446,8 +489,8 @@ export class HandView {
         : getCardTexture(card);
       const sprite = this.scene.add.image(positions[i].x, positions[i].y, textureKey);
 
-      // Apply initial per-card rotation based on horizontal offset
-      if (this.maxRotationDegrees !== 0) {
+      // Apply initial per-card rotation based on horizontal offset (horizontal mode only)
+      if (this.layoutDirection === 'horizontal' && this.maxRotationDegrees !== 0) {
         const normalized = (positions[i].x - arcCenterX) / halfSpan;
         const rotDeg = this.maxRotationDegrees * normalized;
         sprite.rotation = (rotDeg * Math.PI) / 180;
@@ -476,18 +519,31 @@ export class HandView {
         sprite.setTint(0x66ff66);
       });
       sprite.on('pointerout', () => {
-        sprite.setTint(idx === this.selectedIndex ? 0x88ff88 : 0xffffff);
+        const isSelected = this.layoutDirection === 'vertical' && this.selectedIndex !== null
+          ? idx <= this.selectedIndex
+          : idx === this.selectedIndex;
+        sprite.setTint(isSelected ? 0x88ff88 : 0xffffff);
       });
 
       // Selection tint
-      sprite.setTint(i === this.selectedIndex ? 0x88ff88 : 0xffffff);
+      const initiallySelected = this.layoutDirection === 'vertical' && this.selectedIndex !== null
+        ? i <= this.selectedIndex
+        : i === this.selectedIndex;
+      sprite.setTint(initiallySelected ? 0x88ff88 : 0xffffff);
 
       this.sprites.push(sprite);
 
       if (this.showLabels) {
-        const label = this.scene.add.text(positions[i].x, positions[i].y + 42, `${card.rank}${card.suit}`, {
+        // In vertical mode, position label to the right of the card to avoid overlap
+        const labelX = this.layoutDirection === 'vertical'
+          ? positions[i].x + this.cardWidth / 2 + 8
+          : positions[i].x;
+        const labelY = this.layoutDirection === 'vertical'
+          ? positions[i].y
+          : positions[i].y + 42;
+        const label = this.scene.add.text(labelX, labelY, `${card.rank}${card.suit}`, {
           fontSize: '9px',
-          color: i === this.selectedIndex ? '#88ff88' : '#aaaaaa',
+          color: initiallySelected ? '#88ff88' : '#aaaaaa',
           fontFamily: 'monospace',
         }).setOrigin(0.5);
         this.labels.push(label);
@@ -499,6 +555,15 @@ export class HandView {
   private computeCardPositions(): Array<{ x: number; y: number }> {
     if (this.cards.length === 0) return [];
 
+    // ── Vertical (cascade) layout ──
+    if (this.layoutDirection === 'vertical') {
+      return this.cards.map((_, i) => ({
+        x: this.baseX,
+        y: this.baseY + i * this.spacing,
+      }));
+    }
+
+    // ── Horizontal layout (unchanged) ──
     const gap = this.spacing - this.cardWidth;
     const centerX = this.baseX + (this.cards.length - 1) * this.spacing / 2;
 
@@ -538,8 +603,7 @@ export class HandView {
 
     const positions = this.computeCardPositions();
 
-    // Precompute rotation helpers (centre and half-span) so rotation is
-    // proportional to horizontal offset from the hand centre.
+    // Precompute rotation helpers for horizontal mode
     const firstX = positions[0].x;
     const lastX = positions[positions.length - 1].x;
     const arcCenterX = (firstX + lastX) / 2;
@@ -551,17 +615,25 @@ export class HandView {
       (sprite as any).x = pos.x;
       (sprite as any).y = pos.y;
 
-      // Apply per-card rotation (radians) proportional to horizontal offset
-      if (this.maxRotationDegrees !== 0) {
+      // Apply per-card rotation (horizontal mode only)
+      if (this.layoutDirection === 'horizontal' && this.maxRotationDegrees !== 0) {
         const normalized = (pos.x - arcCenterX) / halfSpan;
         const rotDeg = this.maxRotationDegrees * normalized;
         (sprite as any).rotation = (rotDeg * Math.PI) / 180;
+      } else if (this.layoutDirection === 'vertical') {
+        (sprite as any).rotation = 0;
       }
 
       if (i < this.labels.length) {
         const label = this.labels[i];
-        (label as any).x = pos.x;
-        (label as any).y = pos.y + 42;
+        // In vertical mode, position label to the right of the card
+        if (this.layoutDirection === 'vertical') {
+          (label as any).x = pos.x + this.cardWidth / 2 + 8;
+          (label as any).y = pos.y;
+        } else {
+          (label as any).x = pos.x;
+          (label as any).y = pos.y + 42;
+        }
       }
     }
   }
@@ -580,10 +652,14 @@ export class HandView {
 
   /** Update visual selection tint on all sprites. */
   private updateSelectionTints(): void {
+    const isVertical = this.layoutDirection === 'vertical';
     for (let i = 0; i < this.sprites.length; i++) {
       const sprite = this.sprites[i];
       if (!sprite || !sprite.active) continue;
-      const isSelected = i === this.selectedIndex;
+      // In vertical (cascade) mode, selecting index i selects the range [0..i]
+      const isSelected = isVertical && this.selectedIndex !== null
+        ? i <= this.selectedIndex
+        : i === this.selectedIndex;
       sprite.setTint(isSelected ? 0x88ff88 : 0xffffff);
 
       // Update label colour

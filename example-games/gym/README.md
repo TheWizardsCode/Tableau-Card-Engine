@@ -105,8 +105,9 @@ The Gym scenes use and demonstrate several reusable UI components from `src/ui/`
 
 ### HandView (`src/ui/HandView.ts`)
 
-Displays a player's hand of cards as a horizontal row of interactive sprites with selection highlighting and event emission.
+Displays a player's hand of cards as a horizontal row (default) or vertical cascade of interactive sprites with selection highlighting and event emission.
 
+**Horizontal layout (default):**
 ```ts
 import { HandView } from '@ui/HandView';
 
@@ -131,7 +132,28 @@ handView.setSelected(null);
 handView.destroy();
 ```
 
-**API**: `setCards(cards)`, `getCards()`, `addCard(card, opts?)`, `removeCard(index, opts?)`, `setSelected(index|null)`, `getSelected()`, `setArcRadius(radius)`, `getArcRadius()`, `setMaxRotationDegrees(degrees)`, `getMaxRotationDegrees()`, `on(event, cb)`, `off(event, cb)`, `getSpriteAt(index)`, `getSprites()`, `getCardCenters()`, `setReducedMotion(bool)`, `destroy()`.
+**Vertical cascade layout:**
+```ts
+const cascade = new HandView(scene, {
+  baseX: 200,
+  baseY: 100,       // Y position of the top card
+  spacing: 42,       // vertical centre-to-centre distance (negative overlap)
+  layoutDirection: 'vertical',
+});
+cascade.setCards(tableauCards);
+cascade.on('cardclick', (idx) => cascade.setSelected(idx)); // selects cards [0..idx]
+cascade.getCascadeRange(); // { from: 0, to: idx }
+```
+
+**API**: `setCards(cards)`, `getCards()`, `addCard(card, opts?)`, `removeCard(index, opts?)`, `setSelected(index|null)`, `getSelected()`, `getCascadeRange()`, `setArcRadius(radius)`, `getArcRadius()`, `setMaxRotationDegrees(degrees)`, `getMaxRotationDegrees()`, `on(event, cb)`, `off(event, cb)`, `getSpriteAt(index)`, `getSprites()`, `getCardCenters()`, `setReducedMotion(bool)`, `destroy()`.
+
+**New in vertical cascade mode:**
+- `layoutDirection: 'vertical'` — renders cards stacked vertically from top to bottom.
+- `baseY` positions the top card; `spacing` becomes vertical centre-to-centre distance.
+- Selecting index `i` selects cards `[0..i]` (the clicked card and all cards above it).
+- `getCascadeRange()` returns `{ from: 0, to: index }` when a selection is active.
+- `arcRadius`, `maxWidth`, and `maxRotationDegrees` are ignored in vertical mode.
+- Labels are positioned to the right of each card to avoid overlap with stacked cards.
 
 ### PileView (`src/ui/PileView.ts`)
 
