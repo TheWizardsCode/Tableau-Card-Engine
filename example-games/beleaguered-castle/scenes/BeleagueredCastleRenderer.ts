@@ -4,7 +4,7 @@
 import Phaser from 'phaser';
 import type { BeleagueredCastleState } from '../BeleagueredCastleState';
 import { FOUNDATION_COUNT, TABLEAU_COUNT } from '../BeleagueredCastleState';
-import { cardTextureKey } from '../../../src/ui';
+import { cardTextureKey, PileView } from '../../../src/ui';
 import { GAME_W, GAME_H } from '../../../src/ui';
 import { createSceneTitle, createSceneMenuButton } from '@ui/Renderer';
 import { createActionButton } from '@ui/Renderer';
@@ -35,7 +35,8 @@ export class BeleagueredCastleRenderer {
   private layout: BeleagueredCastleLayout;
 
   // Display objects
-  private _foundationSprites: Phaser.GameObjects.Image[] = [];
+  /** Shared PileView components for foundation piles (Phase 2 migration: CG-0MPDWKITM006Y08I). */
+  private foundationPileViews: PileView[] = [];
   private foundationDropZones: Phaser.GameObjects.Zone[] = [];
   private tableauSprites: Phaser.GameObjects.Image[][] = [];
   private tableauDropZones: Phaser.GameObjects.Zone[] = [];
@@ -62,7 +63,7 @@ export class BeleagueredCastleRenderer {
   }
 
   // ── Getters ─────────────────────────────────────────────
-  get foundationSprites(): Phaser.GameObjects.Image[] { return this._foundationSprites; }
+  get foundationSprites(): Phaser.GameObjects.Image[] { return this.foundationPileViews.map((pv) => pv.getSprite()); }
   get foundationDZs(): Phaser.GameObjects.Zone[] { return this.foundationDropZones; }
   get tableauDZs(): Phaser.GameObjects.Zone[] { return this.tableauDropZones; }
   get tableauSprs(): Phaser.GameObjects.Image[][] { return this.tableauSprites; }
@@ -89,8 +90,19 @@ export class BeleagueredCastleRenderer {
       slotGraphics.lineStyle(2, 0x448844, 0.6);
       slotGraphics.strokeRoundedRect(x - BC_CARD_W / 2, this.layout.foundationCenterY - BC_CARD_H / 2, BC_CARD_W, BC_CARD_H, 6);
 
-      const sprite = this.scene.add.image(x, this.layout.foundationCenterY, 'card_back').setVisible(false);
-      this._foundationSprites.push(sprite);
+      // Foundation pile rendered via shared PileView
+      const pileView = new PileView(this.scene, {
+        x,
+        y: this.layout.foundationCenterY,
+        emptyTexture: 'card_back',
+        emptyAlpha: 0,
+        fullAlpha: 1,
+        countOffsetY: BC_CARD_H / 2 + 16,
+        countFontSize: '12px',
+        countColor: '#aaccaa',
+      });
+      pileView.setPile(this.state.foundations[i]);
+      this.foundationPileViews.push(pileView);
 
       const zone = this.scene.add.zone(x, this.layout.foundationCenterY, BC_CARD_W, BC_CARD_H)
         .setRectangleDropZone(BC_CARD_W, BC_CARD_H)
@@ -138,13 +150,8 @@ export class BeleagueredCastleRenderer {
   // ── Foundation rendering ────────────────────────────────
   refreshFoundations(): void {
     for (let i = 0; i < FOUNDATION_COUNT; i++) {
-      const foundation = this.state.foundations[i];
-      const topCard = foundation.peek();
-      if (topCard) {
-        this._foundationSprites[i].setTexture(cardTextureKey(topCard.rank, topCard.suit)).setVisible(true);
-      } else {
-        this._foundationSprites[i].setVisible(false);
-      }
+      const pv = this.foundationPileViews[i];
+      if (pv) pv.update();
     }
   }
 
@@ -265,7 +272,8 @@ export class BeleagueredCastleRenderer {
 
     for (const move of relevantMoves) {
       if (move.kind === 'tableau-to-foundation' && move.toFoundation !== undefined) {
-        const fSprite = this._foundationSprites[move.toFoundation];
+        const fSprite = this.foundationPileViews[move.toFoundation]?.getSprite();
+        if (!fSprite || !fSprite.active) continue;
         const rect = this.scene.add.rectangle(fSprite.x, fSprite.y, BC_CARD_W + 4, BC_CARD_H + 4, HIGHLIGHT_VALID, HIGHLIGHT_ALPHA)
           .setDepth(DRAG_DEPTH - 1);
         this.highlightRects.push(rect);
