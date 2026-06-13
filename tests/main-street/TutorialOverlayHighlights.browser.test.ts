@@ -10,8 +10,8 @@
  * Unified step mapping for screenshot tests:
  *   T2 (hud, index 1)  T3 (marketBusinessRow, index 2)
  *   T4 (streetGrid, index 3)  T5 (incidentQueue, index 4)
- *   T6 (endTurnButton, index 5)  T12 (investmentsRow, index 11)
- *   T10 (helpButton, index 9)  T13 (completionModal, index 12)
+ *   T6 (endTurnButton, index 5)  T11 (investmentsRow, index 10)
+ *   T12 (completionModal, index 11)
  *
  * This allows visual verification that the highlights are correctly
  * aligned with their target UI elements.
@@ -397,42 +397,11 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
     }
   }, 30_000);
 
-  it('screenshot: Help button highlight (step T10)', async () => {
-    ({ game, scene } = await bootGame());
-    await new Promise((r) => setTimeout(r, 200));
 
-    const layout = scene.layout as {
-      actionY: number;
-      actionButtonH: number;
-      gameW: number;
-    } | undefined;
-    expect(layout).toBeTruthy();
 
-    const expectedRef = {
-      x: layout!.gameW - 120,
-      y: layout!.actionY - 4,
-      w: 100,
-      h: layout!.actionButtonH + 8,
-    };
+  // ── Additional unified step screenshots (T11, T12) ──────────
 
-    const highlight = await captureStepScreenshot(9, 'help-button-highlight', expectedRef);
-
-    const cmdBuf = (highlight as any)?.commandBuffer as unknown[];
-    if (cmdBuf && Array.isArray(cmdBuf)) {
-      for (let i = 0; i < cmdBuf.length - 4; i++) {
-        if (cmdBuf[i] === 3) {
-          console.log(
-            `[screenshot:help-button-highlight] actual={x:${cmdBuf[i+1]},y:${cmdBuf[i+2]},w:${cmdBuf[i+3]},h:${cmdBuf[i+4]}} ref={x:${expectedRef.x},y:${expectedRef.y},w:${expectedRef.w},h:${expectedRef.h}}`,
-          );
-          break;
-        }
-      }
-    }
-  }, 30_000);
-
-  // ── Additional unified step screenshots (T12, T13) ──────────
-
-  it('screenshot: Investments row highlight (step T12)', async () => {
+  it('screenshot: Investments row highlight (step T11)', async () => {
     ({ game, scene } = await bootGame());
     await new Promise((r) => setTimeout(r, 200));
 
@@ -457,15 +426,15 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
       h: layout!.marketRowH,
     };
 
-    // T12 is index 11 in the unified steps (confirm gate, investmentsRow zone)
-    const highlight = await captureStepScreenshot(11, 'investments-highlight-t12', expectedRef);
+    // T11 is index 10 in the unified steps (confirm gate, investmentsRow zone)
+    const highlight = await captureStepScreenshot(10, 'investments-highlight-t11', expectedRef);
 
     const cmdBuf = (highlight as any)?.commandBuffer as unknown[];
     if (cmdBuf && Array.isArray(cmdBuf)) {
       for (let i = 0; i < cmdBuf.length - 4; i++) {
         if (cmdBuf[i] === 3) {
           console.log(
-            `[screenshot:investments-highlight-t12] actual={x:${cmdBuf[i+1]},y:${cmdBuf[i+2]},w:${cmdBuf[i+3]},h:${cmdBuf[i+4]}} ref={x:${expectedRef.x},y:${expectedRef.y},w:${expectedRef.w},h:${expectedRef.h}}`,
+            `[screenshot:investments-highlight-t11] actual={x:${cmdBuf[i+1]},y:${cmdBuf[i+2]},w:${cmdBuf[i+3]},h:${cmdBuf[i+4]}} ref={x:${expectedRef.x},y:${expectedRef.y},w:${expectedRef.w},h:${expectedRef.h}}`,
           );
           break;
         }
@@ -473,7 +442,7 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
     }
   }, 30_000);
 
-  it('screenshot: Completion modal (step T13) draws no highlight', async () => {
+  it('screenshot: Completion modal (step T12) draws no highlight', async () => {
     ({ game, scene } = await bootGame());
     await new Promise((r) => setTimeout(r, 200));
 
@@ -487,8 +456,8 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
         mgr.dismiss();
       }
 
-      // T13 is index 12 in the unified steps (confirm gate, completionModal zone)
-      mgr.showStep(12);
+      // T12 is index 11 in the unified steps (confirm gate, completionModal zone)
+      mgr.showStep(11);
 
       // Wait a frame for rendering
       await new Promise((r) => setTimeout(r, 50));

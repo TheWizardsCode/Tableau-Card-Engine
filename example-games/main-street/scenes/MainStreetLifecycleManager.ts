@@ -372,26 +372,9 @@ export class MainStreetLifecycleManager {
       },
     ];
     s.initHelpPanel(helpSections);
-    // Patch help button to support tutorial gating (T9: open-help)
-    // The HelpButton's hitArea pointerdown handler directly calls helpPanel.toggle(),
-    // so we intercept by wrapping the panel's toggle method.
-    const originalHelpToggle = (s as any).helpPanel?.toggle?.bind((s as any).helpPanel);
-    if (originalHelpToggle && (s as any).helpPanel) {
-      (s as any).helpPanel.toggle = () => {
-        const wasOpen = (s as any).helpPanel.isOpen;
-        // Tutorial gating: only allow open-help if it's the required action or tutorial is inactive
-        const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('open-help' as TutorialActionType);
-        if (check && !check.allowed) {
-          s.instructionText.setText(check.reason ?? 'Complete the highlighted step first.');
-          return;
-        }
-        originalHelpToggle();
-        // If we just opened help (was closed, now open), mark tutorial step complete
-        if ((s as any).helpPanel.isOpen && !wasOpen) {
-          (s.msLifecycleManager as any).onTutorialActionComplete?.('open-help' as TutorialActionType);
-        }
-      };
-    }
+    // Note: The help button gating for the removed "Help + Hint Tools" step (old T10)
+    // has been removed. The tutorial no longer has an open-help action step.
+    // The HelpPanel toggle no longer needs tutorial intercept.
     // Provide the ordered difficulty names so the Settings panel can render a selector
     s.initSettingsPanel(DIFFICULTY_NAMES);
     if (!s.replayMode) {
@@ -436,7 +419,7 @@ export class MainStreetLifecycleManager {
               } catch (_) { /* ignore */ }
               // Start the day phase so the market populates
               s.startDayPhase();
-              // Start the action-gated tutorial flow (T1-T13)
+              // Start the action-gated tutorial flow (T1-T12)
               const controller = (s as any).tutorialController as TutorialControllerState | undefined;
               if (controller) {
                 Object.assign(s, { tutorialController: startTutorial(controller) });

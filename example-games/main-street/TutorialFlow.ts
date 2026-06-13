@@ -1,8 +1,8 @@
 /**
  * Main Street: Unified Tutorial Flow (Milestone 5+)
  *
- * Defines the unified T1-T13 tutorial steps that merge the original
- * 8 reference steps and 10 guided (action-gated) steps into a single
+ * Defines the unified T1-T12 tutorial steps that merge the original
+ * 8 reference steps and 9 guided (action-gated) steps into a single
  * coherent tutorial system. Each step has a gate type:
  *
  * - **confirm**: The player clicks "Next"/"Continue" to advance (no gameplay
@@ -20,7 +20,7 @@
  * - Market business cards: Cinema ($10), **Laundromat ($6)**, Hardware Store ($10), Clinic ($10)
  * - Investments: Upgrade to Garden ($3), Upgrade to Bistro ($4), Grand Opening Sale ($2)
  * - Incidents in queue: varies by RNG, but per-turn income from the placed business
- *   ensures sufficient coins remain throughout the 13-step flow.
+ *   ensures sufficient coins remain throughout the 12-step flow.
  *
  * ### Budget Walkthrough
  *
@@ -35,10 +35,9 @@
  * | T7   | Buy Grand Opening Sale ($2)| 0        | 2         | 5       |
  * | T8   | Confirm (no cost)          | 0        | 0         | 5       |
  * | T9   | Confirm (no cost)          | 0        | 0         | 5       |
- * | T10  | End Turn (no cost, income) | ~1       | 0         | ~6      |
+ * | T10  | Confirm (no cost)          | 0        | 0         | ~6      |
  * | T11  | Confirm (no cost)          | 0        | 0         | ~6      |
  * | T12  | Confirm (no cost)          | 0        | 0         | ~6      |
- * | T13  | Confirm (no cost)          | 0        | 0         | ~6      |
  *
  * **Conclusion:** Even with worst-case incidents, the budget is sufficient
  * for all tutorial actions. The cheapest viable business card (Laundromat,
@@ -80,7 +79,7 @@ export type TutorialActionType =
   | 'acknowledge-queue'  // Click incident queue
   | 'buy-event'          // Buy an event card from investments row
   | 'apply-upgrade'      // Buy/apply an upgrade
-  | 'open-help'          // Open the help panel
+  // 'open-help' has been removed (T10 "Help + Hint Tools" step was cut)
   | 'confirm-complete';  // Click "Start Full Game" on completion modal
 
 /**
@@ -101,7 +100,7 @@ export type TutorialGateType = 'confirm' | 'action';
  * specifies the in-game action the player must perform.
  */
 export interface UnifiedTutorialStepDef {
-  /** Step identifier (T1, T2, ..., T13). */
+  /** Step identifier (T1, T2, ..., T12). */
   id: string;
   /** Short title shown in the overlay. */
   title: string;
@@ -125,19 +124,20 @@ export interface UnifiedTutorialStepDef {
   requiredCardId?: string;
 }
 
-// ── Unified Tutorial Script (T1-T13) ────────────────────────
+// ── Unified Tutorial Script (T1-T12) ────────────────────────
 
 /**
- * The unified set of 13 tutorial steps, in sequential order.
+ * The unified set of 12 tutorial steps, in sequential order.
  *
  * Merged from:
- * - 10 guided (action-gated) steps T1-T10 from the original TutorialFlow
+ * - 9 guided (action-gated) steps T1-T9 from the original TutorialFlow
  * - 8 reference steps from the original MainStreetTutorialHints
  *
  * Overlapping content was deduplicated while preserving all unique information.
- * New steps (9, 11, 12) come from the reference system to fill gaps.
+ * New steps (9, 11, 12 from original 13-step set) come from the reference
+ * system to fill gaps.
  *
- * Gate type distribution: 7 confirm + 6 action.
+ * Gate type distribution: 8 confirm + 4 action.
  */
 export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
   {
@@ -231,17 +231,9 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     highlightZone: 'centerModal',
     gate: 'confirm',
   },
+
   {
     id: 'T10',
-    title: 'Help + Hint Tools',
-    body:
-      'Need a refresher? Open Help anytime. Hint suggests one strong move per turn.',
-    highlightZone: 'helpButton',
-    gate: 'action',
-    requiredAction: 'open-help',
-  },
-  {
-    id: 'T11',
     title: 'Action Controls',
     body:
       'Use the buttons along the bottom to:\n' +
@@ -254,7 +246,7 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     gate: 'confirm',
   },
   {
-    id: 'T12',
+    id: 'T11',
     title: 'Challenges & Scoring',
     body:
       'Each run gives you challenges to complete for bonus points (visible in the Challenge Tracker).\n\n' +
@@ -264,7 +256,7 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     gate: 'confirm',
   },
   {
-    id: 'T13',
+    id: 'T12',
     title: 'Tutorial Complete',
     body:
       'Great job! You\'re ready for a full run. Tutorial can be replayed from menu/settings.',
@@ -274,7 +266,7 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
 ] as const;
 
 /** Total number of unified tutorial steps. */
-export const UNIFIED_TUTORIAL_STEP_COUNT = UNIFIED_TUTORIAL_STEPS.length; // 13
+export const UNIFIED_TUTORIAL_STEP_COUNT = UNIFIED_TUTORIAL_STEPS.length; // 12
 
 export const INVALID_ACTION_MESSAGE = 'Complete the highlighted step first.';
 
