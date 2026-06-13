@@ -65,9 +65,9 @@ export class GymHandPileScene extends GymSceneBase {
   // Active move tween reference (for cancellation)
   private activeMoveTween: Phaser.Tweens.Tween | null = null;
 
-  // Pile position constants
-  private readonly DECK_X = GAME_W / 2 - 250;
-  private readonly DISCARD_X = GAME_W / 2 + 100;
+  // Pile position constants — deck and discard on the right side
+  private readonly DECK_X = GAME_W - 300;
+  private readonly DISCARD_X = GAME_W - 160;
   private readonly PILE_Y = 250;
 
   // Hand layout constants
@@ -167,11 +167,6 @@ export class GymHandPileScene extends GymSceneBase {
     this.addButton(cx + 10, y, '[ Select Next ]', () => this.selectNext());
     this.addButton(cx + 180, y, '[ Reset ]', () => this.reset());
 
-    y += 26;
-    // Controls row 3 — layout toggle
-    this.addButton(cx - 180, y, '[ Toggle Layout ]', () => this.toggleLayoutDirection());
-    this.layoutLabel = createHudText(this, cx + 30, y, 'Layout: horizontal', '#88ff88', { fontSize: '12px' });
-
     y += 35;
     createHudText(this, cx, y, '── Event Log ──', '#669966', { fontSize: '12px' }).setOrigin(0.5);
 
@@ -224,6 +219,10 @@ export class GymHandPileScene extends GymSceneBase {
       this.handView.setMaxRotationDegrees(value);
     };
 
+    // Toggle button and layout label — placed alongside the sliders
+    this.addButton(startX + 3 * (sliderWidth + sliderHorizGap) + 20, sliderY - 4, '[ Toggle Layout ]', () => this.toggleLayoutDirection());
+    this.layoutLabel = createHudText(this, startX + 3 * (sliderWidth + sliderHorizGap) + 175, sliderY, 'Layout: horizontal', '#88ff88', { fontSize: '12px' });
+
     // Wire global input events to forward drag events to all sliders
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
       this.arcSlider.handlePointerMove(pointer.x);
@@ -272,6 +271,21 @@ export class GymHandPileScene extends GymSceneBase {
   }
 
   /**
+   * Show or hide a slider's visual components and disable its input zone.
+   */
+  private setSliderVisible(slider: SliderResult, visible: boolean): void {
+    slider.track.setVisible(visible);
+    slider.fill.setVisible(visible);
+    slider.handle.setVisible(visible);
+    slider.valueText.setVisible(visible);
+    slider.hitArea.setVisible(visible);
+    // Disable the input zone so it doesn't swallow pointer events
+    if (slider.hitArea.input) {
+      (slider.hitArea.input as any).enabled = visible;
+    }
+  }
+
+  /**
    * Toggle between horizontal and vertical (cascade) layout.
    * Adjusts HandView position, spacing, and slider availability accordingly.
    */
@@ -286,11 +300,12 @@ export class GymHandPileScene extends GymSceneBase {
       this.handView.setLayoutDirection('vertical');
       this.handView.setSelected(null);
 
-      // Disable arc and rotation sliders (ignored in vertical mode)
-      this.arcSlider.setValue(0);
-      this.arcSlider.onValueChange?.(0);
-      this.rotationSlider.setValue(0);
-      this.rotationSlider.onValueChange?.(0);
+      // Sync the spacing slider to match cascade spacing
+      this.spacingSlider.setValue(this.CASCADE_SPACING);
+
+      // Hide arc and rotation sliders (ignored in vertical mode)
+      this.setSliderVisible(this.arcSlider, false);
+      this.setSliderVisible(this.rotationSlider, false);
 
       this.layoutLabel.setText('Layout: vertical cascade');
       this.logEvent('Switched to vertical cascade layout — cards stack top-to-bottom');
@@ -302,12 +317,17 @@ export class GymHandPileScene extends GymSceneBase {
       this.handView.setLayoutDirection('horizontal');
       this.handView.setSelected(null);
 
-      // Restore arc and rotation sliders to defaults
+      // Restore arc, rotation, and spacing sliders to defaults
       this.arcRadius = this.ARC_RADIUS_DEFAULT;
       this.arcSlider.setValue(this.ARC_RADIUS_DEFAULT);
       this.arcSlider.onValueChange?.(this.ARC_RADIUS_DEFAULT);
       this.rotationSlider.setValue(this.ROTATION_DEGREES_DEFAULT);
       this.rotationSlider.onValueChange?.(this.ROTATION_DEGREES_DEFAULT);
+      this.spacingSlider.setValue(this.HAND_SPACING);
+
+      // Show arc and rotation sliders again
+      this.setSliderVisible(this.arcSlider, true);
+      this.setSliderVisible(this.rotationSlider, true);
 
       this.layoutLabel.setText('Layout: horizontal');
       this.logEvent('Switched to horizontal layout — cards spread in a row');
@@ -645,6 +665,8 @@ export class GymHandPileScene extends GymSceneBase {
       this.handView.setBaseY(this.HAND_BASE_Y);
       this.handView.setSpacing(this.HAND_SPACING);
       this.handView.setLayoutDirection('horizontal');
+      this.setSliderVisible(this.arcSlider, true);
+      this.setSliderVisible(this.rotationSlider, true);
       this.layoutLabel.setText('Layout: horizontal');
     }
 
