@@ -445,9 +445,9 @@ describe('Main Street Tutorial E2E', () => {
     await saveScreenshot('t8-t9');
   }, 30_000);
 
-  // ── T10-T12: Remaining confirm steps ────────────────
+  // ── T10-T13: Remaining confirm steps ────────────────
 
-  it('T10-T12: Confirm steps advance to tutorial completion', async () => {
+  it('T10-T13: Challenges, Scoring, and Completion steps advance', async () => {
     await clickOverlayButtonByText('Next >'); await clickOverlayButtonByText('Next >'); // T1,T2
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
     clickRequiredBusinessCard(scene); // T3
@@ -465,16 +465,20 @@ describe('Main Street Tutorial E2E', () => {
     expect(getStepIndex(scene)).toBe(8); // T9
     await clickOverlayButtonByText('Next >'); // T9 -> T10
     expect(getStepIndex(scene)).toBe(9); // T10
-    await clickOverlayButtonByText('Next >'); // T10 -> T11
+    await clickOverlayButtonByText('Next >'); // T10 -> T11 (Challenges - challengePanel)
     expect(getStepIndex(scene)).toBe(10); // T11
     await saveScreenshot('t10-t11');
 
-    await clickOverlayButtonByText('Next >');
+    await clickOverlayButtonByText('Next >'); // T11 -> T12 (Scoring - hud)
     expect(getStepIndex(scene)).toBe(11); // T12
     await saveScreenshot('t11-t12');
 
+    await clickOverlayButtonByText('Next >'); // T12 -> T13 (Tutorial Complete)
+    expect(getStepIndex(scene)).toBe(12); // T13
+    await saveScreenshot('t12-t13');
+
     await clickOverlayButtonByText('Start Full Game');
-    // After T12, tutorial should be complete (overlay dismissed)
+    // After T13, tutorial should be complete (overlay dismissed)
     await new Promise((r) => setTimeout(r, 500));
     const finalOverlay = getOverlay();
     expect(finalOverlay).toBeFalsy();

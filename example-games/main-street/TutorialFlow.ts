@@ -1,7 +1,7 @@
 /**
  * Main Street: Unified Tutorial Flow (Milestone 5+)
  *
- * Defines the unified T1-T12 tutorial steps that merge the original
+ * Defines the unified T1-T13 tutorial steps that merge the original
  * 8 reference steps and 9 guided (action-gated) steps into a single
  * coherent tutorial system. Each step has a gate type:
  *
@@ -20,7 +20,7 @@
  * - Market business cards: Cinema ($10), **Laundromat ($6)**, Hardware Store ($10), Clinic ($10)
  * - Investments: Upgrade to Garden ($3), Upgrade to Bistro ($4), Grand Opening Sale ($2)
  * - Incidents in queue: varies by RNG, but per-turn income from the placed business
- *   ensures sufficient coins remain throughout the 12-step flow.
+ *   ensures sufficient coins remain throughout the 13-step flow.
  *
  * ### Budget Walkthrough
  *
@@ -38,6 +38,7 @@
  * | T10  | Confirm (no cost)          | 0        | 0         | ~6      |
  * | T11  | Confirm (no cost)          | 0        | 0         | ~6      |
  * | T12  | Confirm (no cost)          | 0        | 0         | ~6      |
+ * | T13  | Confirm (no cost)          | 0        | 0         | ~6      |
  *
  * **Conclusion:** Even with worst-case incidents, the budget is sufficient
  * for all tutorial actions. The cheapest viable business card (Laundromat,
@@ -64,6 +65,7 @@ export type TutorialHighlightZone =
   | 'endTurnButton'
   | 'incidentQueue'
   | 'investmentsRow'
+  | 'challengePanel'
   | 'helpButton'
   | 'completionModal';
 
@@ -100,7 +102,7 @@ export type TutorialGateType = 'confirm' | 'action';
  * specifies the in-game action the player must perform.
  */
 export interface UnifiedTutorialStepDef {
-  /** Step identifier (T1, T2, ..., T12). */
+  /** Step identifier (T1, T2, ..., T13). */
   id: string;
   /** Short title shown in the overlay. */
   title: string;
@@ -124,20 +126,20 @@ export interface UnifiedTutorialStepDef {
   requiredCardId?: string;
 }
 
-// ── Unified Tutorial Script (T1-T12) ────────────────────────
+// ── Unified Tutorial Script (T1-T13) ────────────────────────
 
 /**
- * The unified set of 12 tutorial steps, in sequential order.
+ * The unified set of 13 tutorial steps, in sequential order.
  *
  * Merged from:
  * - 9 guided (action-gated) steps T1-T9 from the original TutorialFlow
  * - 8 reference steps from the original MainStreetTutorialHints
  *
  * Overlapping content was deduplicated while preserving all unique information.
- * New steps (9, 11, 12 from original 13-step set) come from the reference
- * system to fill gaps.
+ * New steps (from the original 13-step set and split Challenges/Scoring)
+ * come from the reference system to fill gaps.
  *
- * Gate type distribution: 8 confirm + 4 action.
+ * Gate type distribution: 9 confirm + 4 action.
  */
 export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
   {
@@ -247,16 +249,27 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
   },
   {
     id: 'T11',
-    title: 'Challenges & Scoring',
+    title: 'Challenges',
     body:
       'Each run gives you challenges to complete for bonus points (visible in the Challenge Tracker).\n\n' +
-      'Final Score = Coins + Reputation × multiplier + Challenges × bonus\n\n' +
-      'Reach the target score to win — good luck!',
-    highlightZone: 'investmentsRow',
+      'Completing challenges unlocks new cards for future games —' +
+      ' the more challenges you complete across runs, the more businesses,' +
+      ' upgrades, and events you will have access to!',
+    highlightZone: 'challengePanel',
     gate: 'confirm',
   },
   {
     id: 'T12',
+    title: 'Scoring',
+    body:
+      'Your score is shown at the top of the screen.\n\n' +
+      'Final Score = Coins + Reputation × multiplier + Challenges × bonus\n\n' +
+      'Reach the target score within the turn limit to win the game — good luck!',
+    highlightZone: 'hud',
+    gate: 'confirm',
+  },
+  {
+    id: 'T13',
     title: 'Tutorial Complete',
     body:
       'Great job! You\'re ready for a full run. Tutorial can be replayed from menu/settings.',
@@ -266,7 +279,7 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
 ] as const;
 
 /** Total number of unified tutorial steps. */
-export const UNIFIED_TUTORIAL_STEP_COUNT = UNIFIED_TUTORIAL_STEPS.length; // 12
+export const UNIFIED_TUTORIAL_STEP_COUNT = UNIFIED_TUTORIAL_STEPS.length; // 13
 
 export const INVALID_ACTION_MESSAGE = 'Complete the highlighted step first.';
 

@@ -10,8 +10,8 @@
  * Unified step mapping for screenshot tests:
  *   T2 (hud, index 1)  T3 (marketBusinessRow, index 2)
  *   T4 (streetGrid, index 3)  T5 (incidentQueue, index 4)
- *   T6 (endTurnButton, index 5)  T11 (investmentsRow, index 10)
- *   T12 (completionModal, index 11)
+ *   T6 (endTurnButton, index 5)  T11 (challengePanel, index 10)
+ *   T12 (hud, index 11)  T13 (completionModal, index 12)
  *
  * This allows visual verification that the highlights are correctly
  * aligned with their target UI elements.
@@ -399,42 +399,22 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
 
 
 
-  // ── Additional unified step screenshots (T11, T12) ──────────
+  // ── Additional unified step screenshots (T11, T12, T13) ─────
 
-  it('screenshot: Investments row highlight (step T11)', async () => {
+  it('screenshot: Challenge panel highlight (step T11)', async () => {
     ({ game, scene } = await bootGame());
     await new Promise((r) => setTimeout(r, 200));
 
-    const layout = scene.layout as {
-      marketTop: number;
-      marketRowH: number;
-      marketRowGap: number;
-      marketLabelW: number;
-      marketCardW: number;
-      marketCardGap: number;
-      gameW: number;
-    } | undefined;
-    expect(layout).toBeTruthy();
-
-    // Calculate correct investments row width (same as business row)
-    const invMarketStartX = layout!.marketLabelW + 50;
-    const invMarketRight = invMarketStartX + (MARKET_BUSINESS_SLOTS - 1) * (layout!.marketCardW + layout!.marketCardGap) + layout!.marketCardW + 20;
-    const expectedRef = {
-      x: 20,
-      y: layout!.marketTop + layout!.marketRowH + layout!.marketRowGap,
-      w: invMarketRight - 20,
-      h: layout!.marketRowH,
-    };
-
-    // T11 is index 10 in the unified steps (confirm gate, investmentsRow zone)
-    const highlight = await captureStepScreenshot(10, 'investments-highlight-t11', expectedRef);
+    // T11 is index 10 in the unified steps (confirm gate, challengePanel zone)
+    // The challengePanel zone is defined in the SLL layout.
+    const highlight = await captureStepScreenshot(10, 'challenge-panel-highlight-t11');
 
     const cmdBuf = (highlight as any)?.commandBuffer as unknown[];
     if (cmdBuf && Array.isArray(cmdBuf)) {
       for (let i = 0; i < cmdBuf.length - 4; i++) {
         if (cmdBuf[i] === 3) {
           console.log(
-            `[screenshot:investments-highlight-t11] actual={x:${cmdBuf[i+1]},y:${cmdBuf[i+2]},w:${cmdBuf[i+3]},h:${cmdBuf[i+4]}} ref={x:${expectedRef.x},y:${expectedRef.y},w:${expectedRef.w},h:${expectedRef.h}}`,
+            `[screenshot:challenge-panel-highlight-t11] actual={x:${cmdBuf[i+1]},y:${cmdBuf[i+2]},w:${cmdBuf[i+3]},h:${cmdBuf[i+4]}}`,
           );
           break;
         }
@@ -442,7 +422,7 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
     }
   }, 30_000);
 
-  it('screenshot: Completion modal (step T12) draws no highlight', async () => {
+  it('screenshot: Completion modal (step T13) draws no highlight', async () => {
     ({ game, scene } = await bootGame());
     await new Promise((r) => setTimeout(r, 200));
 
@@ -456,8 +436,8 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
         mgr.dismiss();
       }
 
-      // T12 is index 11 in the unified steps (confirm gate, completionModal zone)
-      mgr.showStep(11);
+      // T13 is index 12 in the unified steps (confirm gate, completionModal zone)
+      mgr.showStep(12);
 
       // Wait a frame for rendering
       await new Promise((r) => setTimeout(r, 50));
@@ -487,6 +467,7 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
         'endTurnButton',
         'incidentQueue',
         'investmentsRow',
+        'challengePanel',
         'helpButton',
         'completionModal',
       ];
