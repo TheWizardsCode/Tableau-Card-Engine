@@ -13,6 +13,8 @@
  *   - Positional movement tween demo with cancel support
  *   - Valid-drop highlights using Phaser Graphics primitives
  *   - Reduced-motion fallbacks for all animations
+ *   - Toggle between horizontal row and vertical cascade layout
+ *     to demonstrate the extended HandView layoutDirection option
  *
  * @module example-games/gym/scenes/GymHandPileScene
  */
@@ -80,6 +82,13 @@ export class GymHandPileScene extends GymSceneBase {
   private readonly ARC_SLIDER_WIDTH = 150;
   private readonly ARC_RADIUS_DEFAULT = 150;
   private readonly ROTATION_DEGREES_DEFAULT = 25;
+  // Cascade / vertical layout state
+  private readonly CASCADE_SPACING = 42;
+  private readonly CASCADE_X = 120;
+  private readonly CASCADE_TOP_Y = 220;
+  private isVerticalLayout = false;
+  private layoutLabel!: Phaser.GameObjects.Text;
+
   private arcRadius = this.ARC_RADIUS_DEFAULT;
   private arcSlider!: SliderResult;
   private spacingSlider!: SliderResult;
@@ -158,6 +167,11 @@ export class GymHandPileScene extends GymSceneBase {
     this.addButton(cx + 10, y, '[ Select Next ]', () => this.selectNext());
     this.addButton(cx + 180, y, '[ Reset ]', () => this.reset());
 
+    y += 26;
+    // Controls row 3 — layout toggle
+    this.addButton(cx - 180, y, '[ Toggle Layout ]', () => this.toggleLayoutDirection());
+    this.layoutLabel = createHudText(this, cx + 30, y, 'Layout: horizontal', '#88ff88', { fontSize: '12px' });
+
     y += 35;
     createHudText(this, cx, y, '── Event Log ──', '#669966', { fontSize: '12px' }).setOrigin(0.5);
 
@@ -232,6 +246,13 @@ export class GymHandPileScene extends GymSceneBase {
   }
 
   private getHandPositionForIndex(index: number, handCount: number): { x: number; y: number } {
+    if (this.isVerticalLayout) {
+      return {
+        x: this.CASCADE_X,
+        y: this.CASCADE_TOP_Y + index * this.CASCADE_SPACING,
+      };
+    }
+
     const x = this.HAND_BASE_X + index * this.HAND_SPACING;
 
     if (this.arcRadius <= 0 || handCount < 3) {
@@ -248,6 +269,49 @@ export class GymHandPileScene extends GymSceneBase {
     const offsetY = ((1 - normalized * normalized) * halfSpan * halfSpan) / (2 * this.arcRadius);
 
     return { x, y: this.HAND_BASE_Y - offsetY };
+  }
+
+  /**
+   * Toggle between horizontal and vertical (cascade) layout.
+   * Adjusts HandView position, spacing, and slider availability accordingly.
+   */
+  private toggleLayoutDirection(): void {
+    this.isVerticalLayout = !this.isVerticalLayout;
+
+    if (this.isVerticalLayout) {
+      // Switch to vertical cascade layout
+      this.handView.setBaseX(this.CASCADE_X);
+      this.handView.setBaseY(this.CASCADE_TOP_Y);
+      this.handView.setSpacing(this.CASCADE_SPACING);
+      this.handView.setLayoutDirection('vertical');
+      this.handView.setSelected(null);
+
+      // Disable arc and rotation sliders (ignored in vertical mode)
+      this.arcSlider.setValue(0);
+      this.arcSlider.onValueChange?.(0);
+      this.rotationSlider.setValue(0);
+      this.rotationSlider.onValueChange?.(0);
+
+      this.layoutLabel.setText('Layout: vertical cascade');
+      this.logEvent('Switched to vertical cascade layout — cards stack top-to-bottom');
+    } else {
+      // Restore horizontal layout
+      this.handView.setBaseX(this.HAND_BASE_X);
+      this.handView.setBaseY(this.HAND_BASE_Y);
+      this.handView.setSpacing(this.HAND_SPACING);
+      this.handView.setLayoutDirection('horizontal');
+      this.handView.setSelected(null);
+
+      // Restore arc and rotation sliders to defaults
+      this.arcRadius = this.ARC_RADIUS_DEFAULT;
+      this.arcSlider.setValue(this.ARC_RADIUS_DEFAULT);
+      this.arcSlider.onValueChange?.(this.ARC_RADIUS_DEFAULT);
+      this.rotationSlider.setValue(this.ROTATION_DEGREES_DEFAULT);
+      this.rotationSlider.onValueChange?.(this.ROTATION_DEGREES_DEFAULT);
+
+      this.layoutLabel.setText('Layout: horizontal');
+      this.logEvent('Switched to horizontal layout — cards spread in a row');
+    }
   }
 
   private drawToHand(): void {
@@ -573,6 +637,16 @@ export class GymHandPileScene extends GymSceneBase {
     this.selectedIdx = -1;
     this.clearHighlights();
     this.cancelMove();
+
+    // Reset to horizontal layout if in vertical mode
+    if (this.isVerticalLayout) {
+      this.isVerticalLayout = false;
+      this.handView.setBaseX(this.HAND_BASE_X);
+      this.handView.setBaseY(this.HAND_BASE_Y);
+      this.handView.setSpacing(this.HAND_SPACING);
+      this.handView.setLayoutDirection('horizontal');
+      this.layoutLabel.setText('Layout: horizontal');
+    }
 
     // Reset sliders to defaults
     this.arcRadius = this.ARC_RADIUS_DEFAULT;

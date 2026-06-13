@@ -345,6 +345,43 @@ export class HandView {
   }
 
   /**
+   * Set the layout direction at runtime.
+   *
+   * When switching between horizontal and vertical mode, the display is
+   * rebuilt immediately. Existing selection is preserved (but reinterpreted
+   * for cascade selection when switching to vertical).
+   */
+  setLayoutDirection(direction: 'horizontal' | 'vertical'): void {
+    if (direction === this.layoutDirection) return;
+    this.layoutDirection = direction;
+    this.rebuildDisplay();
+  }
+
+  /** Current layout direction. */
+  getLayoutDirection(): 'horizontal' | 'vertical' {
+    return this.layoutDirection;
+  }
+
+  /**
+   * Update the base X position used for card layout.
+   * Does not trigger a full rebuild — calls applyLayout to reposition sprites.
+   */
+  setBaseX(x: number): void {
+    this.baseX = x;
+    this.applyLayout();
+  }
+
+  /**
+   * Update the base Y position used for card layout.
+   * In horizontal mode this is the row's Y; in vertical mode this is the top card's Y.
+   * Does not trigger a full rebuild — calls applyLayout to reposition sprites.
+   */
+  setBaseY(y: number): void {
+    this.baseY = y;
+    this.applyLayout();
+  }
+
+  /**
    * Set the horizontal centre-to-centre spacing (in pixels) used when
    * laying out cards. Accepts integer or floating values; values below
    * a sensible minimum are clamped to avoid degenerate layouts. When
