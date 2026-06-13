@@ -112,6 +112,7 @@ export class BeleagueredCastleScene extends CardGameScene {
 
     this.bcRenderer.createTitle();
     this.bcRenderer.createFoundationSlots();
+    this.bcRenderer.initTableauHandViews();
     this.bcRenderer.createTableauDropZones();
     this.bcRenderer.createHUD(this.seed);
     this.bcRenderer.onUndoClick = () => this.turnController.performUndo();
@@ -479,7 +480,7 @@ export class BeleagueredCastleScene extends CardGameScene {
   getTranscript(): BCGameTranscript | null { return this.transcript; }
   getRecorder(): BCTranscriptRecorder { return this.turnController['recorder']; }
   get tableauSprites(): Phaser.GameObjects.Image[][] { return this.bcRenderer.tableauSprs; }
-  get foundationSprites(): Phaser.GameObjects.Image[] { return (this.bcRenderer as any).foundationSprites; }
+  get foundationSprites(): Phaser.GameObjects.Image[] { return this.bcRenderer.foundationSprites; }
   get foundationDropZones(): Phaser.GameObjects.Zone[] { return this.bcRenderer.foundationDZs; }
 
   // ── Cleanup ─────────────────────────────────────────────
