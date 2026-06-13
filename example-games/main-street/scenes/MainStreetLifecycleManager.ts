@@ -414,11 +414,18 @@ export class MainStreetLifecycleManager {
               // This ensures the player has enough coins for all actions
               // (12 starting coins, 5 starting reputation) and that the
               // required cards are always available.
+              //
+              // NOTE: We intentionally do NOT filter by campaign-unlocked
+              // card IDs here. The tutorial must use the FULL card pool so
+              // that the fixed seed 'tutorial-seed' produces a deterministic
+              // market every time regardless of the player's campaign
+              // progress. Filtering by unlockedCardIds would change the deck
+              // composition and therefore the market lineup, breaking the
+              // hardcoded requiredCardId references in the tutorial steps.
               s.selectedDifficulty = 'Easy';
               s.state = setupMainStreetGame({
                 difficulty: 'Easy',
                 seed: TUTORIAL_SEED,
-                unlockedCardIds: s.campaign?.unlockedCardIds,
               });
               // Re-initialize the transcript recorder with the new seed
               try {
