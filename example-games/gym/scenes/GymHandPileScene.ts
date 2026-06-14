@@ -135,8 +135,8 @@ export class GymHandPileScene extends GymSceneBase {
     });
 
     // Wire drag-and-drop event handlers
-    this.handView.on('dragstart', (sourceRange: { from: number; to: number }) => {
-      this.logEvent(`Drag started: cards [${sourceRange.from}..${sourceRange.to}]`);
+    this.handView.on('dragstart', (_sourceRange: { from: number; to: number }) => {
+      this.logEvent('Drag started');
       this.clearHighlights();
       this.highlightDropZones();
     });
@@ -153,7 +153,12 @@ export class GymHandPileScene extends GymSceneBase {
       if (payload.accepted && payload.targetPileIndex !== null) {
         this.acceptDragDrop(payload);
       } else {
-        this.logEvent('Drop rejected — snap-back');
+        this.logEvent(`Drop rejected (target=${payload.targetPileIndex}, accepted=${payload.accepted})`);
+        // Rebuild hand so the card sprite is back in its original place
+        this.time.delayedCall(200, () => {
+          this.handView.setCards(this.hand);
+          this.handView.setSelected(this.selectedIdx >= 0 ? this.selectedIdx : null);
+        });
       }
     });
 
@@ -743,10 +748,8 @@ export class GymHandPileScene extends GymSceneBase {
       this.dragButton.setText('[ Disable Drag ]');
       this.dragLabel.setText('Drag: ON  (drag card to deck or discard pile)');
       this.dragLabel.setColor('#88ff88');
-      // Register validator: drop is accepted only when pointer is over a pile zone
-      this.handView.setDragValidator((_sourceRange, targetPileIndex) => {
-        return targetPileIndex !== null;
-      });
+      // Validator always returns true — the scene decides what to do in dragend
+      this.handView.setDragValidator(() => true);
       this.logEvent('Drag mode ON — cards are draggable to deck/discard zones');
     } else {
       this.dragButton.setText('[ Enable Drag ]');
@@ -762,25 +765,24 @@ export class GymHandPileScene extends GymSceneBase {
   /**
    * Hit-test pointer position against deck and discard pile zones.
    * Returns the target pile index (0=deck, 1=discard) or null if not over any pile.
+   *
+   * Zones are generous (2x card width + gap) to make dropping on piles forgiving.
    */
   private hitTestDropZones(pointerX: number, pointerY: number): number | null {
-    const halfW = CARD_W / 2 + 30;
-    const halfH = CARD_H / 2 + 30;
+    const halfW = CARD_W + 40;  // ~136px half-width for generous grab zone
+    const halfH = CARD_H / 2 + 60; // ~125px vertical tolerance
 
-    // Deck zone
-    if (
-      Math.abs(pointerX - this.DECK_X) < halfW &&
-      Math.abs(pointerY - this.PILE_Y) < halfH
-    ) {
-      return 0; // deck
+    // Only consider zones when pointer is roughly at pile Y
+    if (Math.abs(pointerY - this.PILE_Y) >= halfH) return null;
+
+    // Deck zone — generous left pile zone
+    if (Math.abs(pointerX - this.DECK_X) < halfW) {
+      return 0;
     }
 
-    // Discard zone
-    if (
-      Math.abs(pointerX - this.DISCARD_X) < halfW &&
-      Math.abs(pointerY - this.PILE_Y) < halfH
-    ) {
-      return 1; // discard
+    // Discard zone — generous right pile zone
+    if (Math.abs(pointerX - this.DISCARD_X) < halfW) {
+      return 1;
     }
 
     return null;
