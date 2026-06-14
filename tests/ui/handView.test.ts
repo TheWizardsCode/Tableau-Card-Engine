@@ -18,6 +18,7 @@ function createMockScene(): any {
       x,
       y,
       texture: { key: texture },
+      active: true,
       setInteractive: vi.fn().mockReturnThis(),
       setTint: vi.fn().mockReturnThis(),
       clearTint: vi.fn().mockReturnThis(),
@@ -52,6 +53,8 @@ function createMockScene(): any {
     return txt;
   };
 
+  const inputHandlers: Record<string, any[]> = {};
+
   return {
     add: {
       image: vi.fn().mockImplementation(mockImage),
@@ -75,6 +78,13 @@ function createMockScene(): any {
         return { stop: vi.fn() };
       }),
     },
+    input: {
+      on: vi.fn((event: string, handler: any) => {
+        if (!inputHandlers[event]) inputHandlers[event] = [];
+        inputHandlers[event].push(handler);
+      }),
+      off: vi.fn(),
+    },
     events: {
       once: vi.fn(),
       on: vi.fn(),
@@ -83,6 +93,7 @@ function createMockScene(): any {
     time: {
       delayedCall: vi.fn(),
     },
+    _inputHandlers: inputHandlers,
     _tweens: tweens,
     _images: images,
     _texts: texts,
@@ -657,6 +668,700 @@ describe('HandView', () => {
       for (let i = 0; i < cards.length; i++) {
         expect(scene._images[i].y).toBe(columnTopY + i * cascadeOffsetY);
       }
+
+      hv.destroy();
+    });
+  });
+
+  // ── Drag-and-drop ─────────────────────────────────────────
+
+  describe('drag-and-drop', () => {
+    /** Helper: simulate a pointerdown on a card sprite and retrieve the scene input handlers. */
+    function triggerPointerDown(
+      scene: any,
+      _hv: HandView,
+      spriteIndex: number,
+      pointerX: number,
+      pointerY: number,
+    ): void {
+      const sprite = scene._images[spriteIndex];
+      expect(sprite).toBeDefined();
+      const onCalls = sprite.on.mock.calls;
+      const pointerdownCall = onCalls.find((c: any[]) => c[0] === 'pointerdown');
+      expect(pointerdownCall).toBeDefined();
+      pointerdownCall[1]({ x: pointerX, y: pointerY });
+    }
+
+    /** Retrieve a scene input handler by event name. */
+    function getInputHandler(scene: any, event: string): any {
+      const handlers = scene._inputHandlers[event];
+      expect(handlers).toBeDefined();
+      return handlers[handlers.length - 1];
+    }
+
+    // ── Drag enable / disable ────────────────────────────────
+
+    it('setDragEnabled/getDragEnabled toggle drag state', () => {
+      const hv = new HandView(scene, { baseX: 60, baseY: 130, spacing: 56 });
+      expect(hv.getDragEnabled()).toBe(false);
+
+      hv.setDragEnabled(true);
+      expect(hv.getDragEnabled()).toBe(true);
+
+      hv.setDragEnabled(false);
+      expect(hv.getDragEnabled()).toBe(false);
+
+      hv.destroy();
+    });
+
+    it('does not register scene input handlers when drag is disabled', () => {
+      const hv = new HandView(scene, {
+        baseX: 60,
+        baseY: 130,
+        spacing: 56,
+      });
+
+      hv.setCards([card('A', 'spades'), card('2', 'hearts')]);
+
+      // Click without drag enabled
+      triggerPointerDown(scene, hv, 0, 100, 100);
+
+      // No scene input handlers should have been registered
+      expect(scene.input.on).not.toHaveBeenCalled();
+
+      hv.destroy();
+    });
+
+    it('registers scene input handlers on pointerdown when drag is enabled', () => {
+      const hv = new HandView(scene, {
+        baseX: 60,
+        baseY: 130,
+        spacing: 56,
+      });
+      hv.setDragEnabled(true);
+      hv.setCards([card('A', 'spades'), card('2', 'hearts')]);
+
+      triggerPointerDown(scene, hv, 0, 100, 100);
+
+      expect(scene.input.on).toHaveBeenCalledWith('pointermove', expect.any(Function));
+      expect(scene.input.on).toHaveBeenCalledWith('pointerup', expect.any(Function));
+
+      hv.destroy();
+    });
+
+    // ── Drag validator ───────────────────────────────────────
+
+    it('setDragValidator stores the validator callback', () => {
+      const hv = new HandView(scene, { baseX: 60, baseY: 130, spacing: 56 });
+      const validator = vi.fn(() => true);
+
+      hv.setDragValidator(validator);
+      // Cannot directly inspect private field, but we'll verify it's called in drag tests
+
+      hv.setDragValidator(null);
+      hv.destroy();
+    });
+
+    it('calls validator on drag end with source range and target pile index', () => {
+      const hv = new HandView(scene, {
+        baseX: 60,
+        baseY: 130,
+        spacing: 56,
+      });
+      const validator = vi.fn(() => true);
+
+      hv.setDragEnabled(true);
+      hv.setDragValidator(validator);
+      hv.setCards([card('A', 'spades'), card('2', 'hearts'), card('3', 'clubs')]);
+
+      // Click card at index 1
+      triggerPointerDown(scene, hv, 1, 100, 100);
+
+      // Exceed drag threshold with pointermove
+      const pointerMoveHandler = getInputHandler(scene, 'pointermove');
+      pointerMoveHandler({ x: 110, y: 120 }); // distance ~14px > 5px threshold
+
+      // Set target pile index
+      hv.setDragTargetPileIndex(2);
+
+      // End drag
+      const pointerUpHandler = getInputHandler(scene, 'pointerup');
+      pointerUpHandler();
+
+      expect(validator).toHaveBeenCalledWith({ from: 1, to: 1 }, 2);
+
+      hv.destroy();
+    });
+
+    it('calls validator returns false triggers snap-back (no accepted)', () => {
+      const hv = new HandView(scene, {
+        baseX: 60,
+        baseY: 130,
+        spacing: 56,
+      });
+      const validator = vi.fn(() => false);
+
+      hv.setDragEnabled(true);
+      hv.setDragValidator(validator);
+      hv.setCards([card('A', 'spades'), card('2', 'hearts'), card('3', 'clubs')]);
+
+      // Click card at index 1
+      triggerPointerDown(scene, hv, 1, 100, 100);
+
+      // Exceed drag threshold
+      const pointerMoveHandler = getInputHandler(scene, 'pointermove');
+      pointerMoveHandler({ x: 110, y: 120 });
+
+      hv.setDragTargetPileIndex(0);
+
+      // End drag
+      const pointerUpHandler = getInputHandler(scene, 'pointerup');
+      pointerUpHandler();
+
+      // Validator was called, returned false, so snap-back occurred
+      expect(validator).toHaveBeenCalledWith({ from: 1, to: 1 }, 0);
+
+      hv.destroy();
+    });
+
+    // ── Drag threshold ───────────────────────────────────────
+
+    it('does not start drag when pointer movement is below threshold', () => {
+      const hv = new HandView(scene, {
+        baseX: 60,
+        baseY: 130,
+        spacing: 56,
+      });
+
+      hv.setDragEnabled(true);
+      hv.setCards([card('A', 'spades')]);
+
+      // Store initial sprite position
+      const sprite = scene._images[0];
+      const initialX = sprite.x;
+      const initialY = sprite.y;
+
+      triggerPointerDown(scene, hv, 0, 100, 100);
+
+      const pointerMoveHandler = getInputHandler(scene, 'pointermove');
+      // Move only 3px (below 5px threshold)
+      pointerMoveHandler({ x: 103, y: 100 });
+
+      // Sprite should not have moved
+      expect(sprite.x).toBe(initialX);
+      expect(sprite.y).toBe(initialY);
+
+      hv.destroy();
+    });
+
+    it('starts drag when pointer movement exceeds threshold', () => {
+      const hv = new HandView(scene, {
+        baseX: 60,
+        baseY: 130,
+        spacing: 56,
+      });
+
+      hv.setDragEnabled(true);
+      hv.setCards([card('A', 'spades')]);
+
+      const sprite = scene._images[0];
+      const initialX = sprite.x;
+      const initialY = sprite.y;
+
+      triggerPointerDown(scene, hv, 0, 100, 100);
+
+      const pointerMoveHandler = getInputHandler(scene, 'pointermove');
+      // Move 10px (exceeds 5px threshold)
+      pointerMoveHandler({ x: 110, y: 110 });
+
+      // Sprite should have moved (original + delta + lift offset)
+      // originalPos.y + lift(-8) + dy(10) = initialY + 2
+      expect(sprite.x).toBe(initialX + 10);
+      expect(sprite.y).toBe(initialY + 2); // initialY + (-8 lift) + 10 dy
+
+      hv.destroy();
+    });
+
+    // ── Horizontal single-card drag ──────────────────────────
+
+    it('horizontal mode: source range is single card {i, i}', () => {
+      const hv = new HandView(scene, {
+        baseX: 60,
+        baseY: 130,
+        spacing: 56,
+      });
+      const dragstartHandler = vi.fn();
+
+      hv.setDragEnabled(true);
+      hv.setCards([card('A', 'spades'), card('2', 'hearts'), card('3', 'clubs')]);
+      hv.on('dragstart', dragstartHandler);
+
+      triggerPointerDown(scene, hv, 1, 100, 100);
+
+      const pointerMoveHandler = getInputHandler(scene, 'pointermove');
+      pointerMoveHandler({ x: 110, y: 120 });
+
+      expect(dragstartHandler).toHaveBeenCalledWith({ from: 1, to: 1 });
+
+      hv.destroy();
+    });
+
+    it('horizontal mode: single card moves with pointer delta', () => {
+      const hv = new HandView(scene, {
+        baseX: 60,
+        baseY: 130,
+        spacing: 56,
+      });
+
+      hv.setDragEnabled(true);
+      hv.setCards([card('A', 'spades'), card('2', 'hearts'), card('3', 'clubs')]);
+
+      const sprite1 = scene._images[1];
+      const sprite0 = scene._images[0];
+      const sprite2 = scene._images[2];
+      const startX1 = sprite1.x;
+      const startY1 = sprite1.y;
+      const startX0 = sprite0.x;
+      const startX2 = sprite2.x;
+
+      triggerPointerDown(scene, hv, 1, 100, 100);
+
+      const pointerMoveHandler = getInputHandler(scene, 'pointermove');
+      pointerMoveHandler({ x: 130, y: 150 });
+
+      // Dragged card (index 1) should move
+      expect(sprite1.x).toBe(startX1 + 30);
+      expect(sprite1.y).toBe(startY1 + 42); // lift(-8) + dy(50)
+
+      // Other cards should NOT move
+      expect(sprite0.x).toBe(startX0);
+      expect(sprite2.x).toBe(startX2);
+
+      hv.destroy();
+    });
+
+    // ── Vertical cascade multi-card drag ─────────────────────
+
+    it('vertical mode: source range is {0, i} (cascade selection)', () => {
+      const hv = new HandView(scene, {
+        baseX: 200,
+        baseY: 100,
+        spacing: 50,
+        layoutDirection: 'vertical',
+      });
+      const dragstartHandler = vi.fn();
+
+      hv.setDragEnabled(true);
+      hv.setCards([
+        card('A', 'spades'),
+        card('2', 'hearts'),
+        card('3', 'clubs'),
+        card('4', 'diamonds'),
+      ]);
+      hv.on('dragstart', dragstartHandler);
+
+      // Click card at index 2 (should select range [0..2])
+      triggerPointerDown(scene, hv, 2, 100, 100);
+
+      const pointerMoveHandler = getInputHandler(scene, 'pointermove');
+      pointerMoveHandler({ x: 110, y: 120 });
+
+      expect(dragstartHandler).toHaveBeenCalledWith({ from: 0, to: 2 });
+
+      hv.destroy();
+    });
+
+    it('vertical mode: all cards in cascade range move together', () => {
+      const hv = new HandView(scene, {
+        baseX: 200,
+        baseY: 100,
+        spacing: 50,
+        layoutDirection: 'vertical',
+      });
+
+      hv.setDragEnabled(true);
+      hv.setCards([
+        card('A', 'spades'),
+        card('2', 'hearts'),
+        card('3', 'clubs'),
+        card('4', 'diamonds'),
+      ]);
+
+      const posBefore = scene._images.map((img: any) => ({ x: img.x, y: img.y }));
+
+      // Click card at index 2 — selects [0..2]
+      triggerPointerDown(scene, hv, 2, 100, 100);
+
+      const pointerMoveHandler = getInputHandler(scene, 'pointermove');
+      pointerMoveHandler({ x: 120, y: 130 });
+
+      // Cards 0, 1, 2 should move
+      const dx = 20;
+      const dy = 30; // delta from (100,100) to (120,130)
+
+      for (let i = 0; i <= 2; i++) {
+        expect(scene._images[i].x).toBe(posBefore[i].x + dx);
+        expect(scene._images[i].y).toBe(posBefore[i].y + dy + (-8)); // lift applied
+      }
+
+      // Card 3 (index 3, not selected) should NOT move
+      expect(scene._images[3].x).toBe(posBefore[3].x);
+      expect(scene._images[3].y).toBe(posBefore[3].y);
+
+      hv.destroy();
+    });
+
+    // ── Drag events ──────────────────────────────────────────
+
+    it('emits dragstart, dragmove, dragend events in order', () => {
+      const hv = new HandView(scene, {
+        baseX: 60,
+        baseY: 130,
+        spacing: 56,
+      });
+      const events: string[] = [];
+
+      hv.setDragEnabled(true);
+      hv.setCards([card('A', 'spades')]);
+
+      hv.on('dragstart', () => events.push('dragstart'));
+      hv.on('dragmove', () => events.push('dragmove'));
+      hv.on('dragend', () => events.push('dragend'));
+
+      triggerPointerDown(scene, hv, 0, 100, 100);
+
+      const pointerMoveHandler = getInputHandler(scene, 'pointermove');
+      pointerMoveHandler({ x: 110, y: 120 });
+
+      const pointerUpHandler = getInputHandler(scene, 'pointerup');
+      pointerUpHandler();
+
+      expect(events).toEqual(['dragstart', 'dragmove', 'dragend']);
+
+      hv.destroy();
+    });
+
+    it('dragstart event receives source range', () => {
+      const hv = new HandView(scene, {
+        baseX: 60,
+        baseY: 130,
+        spacing: 56,
+      });
+      const dragstartHandler = vi.fn();
+
+      hv.setDragEnabled(true);
+      hv.setCards([card('A', 'spades'), card('2', 'hearts')]);
+      hv.on('dragstart', dragstartHandler);
+
+      triggerPointerDown(scene, hv, 0, 100, 100);
+
+      const pointerMoveHandler = getInputHandler(scene, 'pointermove');
+      pointerMoveHandler({ x: 110, y: 120 });
+
+      expect(dragstartHandler).toHaveBeenCalledWith({ from: 0, to: 0 });
+
+      hv.destroy();
+    });
+
+    it('dragmove event receives source range and pointer coordinates', () => {
+      const hv = new HandView(scene, {
+        baseX: 60,
+        baseY: 130,
+        spacing: 56,
+      });
+      const dragmoveHandler = vi.fn();
+
+      hv.setDragEnabled(true);
+      hv.setCards([card('A', 'spades')]);
+      hv.on('dragmove', dragmoveHandler);
+
+      triggerPointerDown(scene, hv, 0, 100, 100);
+
+      const pointerMoveHandler = getInputHandler(scene, 'pointermove');
+      pointerMoveHandler({ x: 150, y: 200 });
+
+      expect(dragmoveHandler).toHaveBeenCalledWith({
+        sourceRange: { from: 0, to: 0 },
+        x: 150,
+        y: 200,
+      });
+
+      hv.destroy();
+    });
+
+    it('dragend event receives source range, target pile index, and accepted flag', () => {
+      const hv = new HandView(scene, {
+        baseX: 60,
+        baseY: 130,
+        spacing: 56,
+      });
+      const dragendHandler = vi.fn();
+
+      hv.setDragEnabled(true);
+      hv.setDragValidator((_src, _target) => true);
+      hv.setCards([card('A', 'spades')]);
+      hv.on('dragend', dragendHandler);
+
+      triggerPointerDown(scene, hv, 0, 100, 100);
+
+      const pointerMoveHandler = getInputHandler(scene, 'pointermove');
+      pointerMoveHandler({ x: 110, y: 120 });
+
+      hv.setDragTargetPileIndex(3);
+
+      const pointerUpHandler = getInputHandler(scene, 'pointerup');
+      pointerUpHandler();
+
+      expect(dragendHandler).toHaveBeenCalledWith({
+        sourceRange: { from: 0, to: 0 },
+        targetPileIndex: 3,
+        accepted: true,
+      });
+
+      hv.destroy();
+    });
+
+    it('dragend with rejected validator sends accepted: false', () => {
+      const hv = new HandView(scene, {
+        baseX: 60,
+        baseY: 130,
+        spacing: 56,
+      });
+      const dragendHandler = vi.fn();
+
+      hv.setDragEnabled(true);
+      hv.setDragValidator((_src, _target) => false);
+      hv.setCards([card('A', 'spades')]);
+      hv.on('dragend', dragendHandler);
+
+      triggerPointerDown(scene, hv, 0, 100, 100);
+
+      const pointerMoveHandler = getInputHandler(scene, 'pointermove');
+      pointerMoveHandler({ x: 110, y: 120 });
+
+      hv.setDragTargetPileIndex(1);
+
+      const pointerUpHandler = getInputHandler(scene, 'pointerup');
+      pointerUpHandler();
+
+      expect(dragendHandler).toHaveBeenCalledWith({
+        sourceRange: { from: 0, to: 0 },
+        targetPileIndex: 1,
+        accepted: false,
+      });
+
+      hv.destroy();
+    });
+
+    // ── Visual feedback ──────────────────────────────────────
+
+    it('applies lift to selected cards in vertical mode and dims unselected cards above drag handle', () => {
+      const hv = new HandView(scene, {
+        baseX: 200,
+        baseY: 100,
+        spacing: 50,
+        layoutDirection: 'vertical',
+      });
+
+      hv.setDragEnabled(true);
+      hv.setCards([
+        card('A', 'spades'),
+        card('2', 'hearts'),
+        card('3', 'clubs'),
+        card('4', 'diamonds'),
+      ]);
+
+      const posBefore = scene._images.map((img: any) => ({ x: img.x, y: img.y }));
+
+      // Click card at index 2 — selects [0..2]
+      triggerPointerDown(scene, hv, 2, 100, 100);
+
+      const pointerMoveHandler = getInputHandler(scene, 'pointermove');
+      pointerMoveHandler({ x: 110, y: 120 });
+
+      // Selected cards (0, 1, 2) should have lift offset applied
+      // posBeforeY + lift(-8) + dy(20)
+      for (let i = 0; i <= 2; i++) {
+        expect(scene._images[i].y).toBe(posBefore[i].y + 12); // -8 lift + 20 dy
+      }
+
+      // Unselected card (3) below the selection should NOT have moved
+      expect(scene._images[3].x).toBe(posBefore[3].x);
+      expect(scene._images[3].y).toBe(posBefore[3].y);
+
+      hv.destroy();
+    });
+
+    it('restores selection tints on drag end', () => {
+      const hv = new HandView(scene, {
+        baseX: 60,
+        baseY: 130,
+        spacing: 56,
+      });
+
+      hv.setDragEnabled(true);
+      hv.setCards([card('A', 'spades'), card('2', 'hearts')]);
+
+      // Select card 0 via click
+      triggerPointerDown(scene, hv, 0, 100, 100);
+      expect(hv.getSelected()).toBe(0);
+
+      const pointerMoveHandler = getInputHandler(scene, 'pointermove');
+      pointerMoveHandler({ x: 110, y: 120 });
+
+      const pointerUpHandler = getInputHandler(scene, 'pointerup');
+      pointerUpHandler();
+
+      // After snap-back, selection should be restored:
+      // Selected card (0) should have selection tint, unselected (1) should be white
+      const spriteSelected = scene._images[0];
+      const spriteUnselected = scene._images[1];
+      const lastSelectedCall = spriteSelected.setTint.mock.calls.slice(-1)[0];
+      const lastUnselectedCall = spriteUnselected.setTint.mock.calls.slice(-1)[0];
+      expect(lastSelectedCall).toEqual([0x88ff88]);
+      expect(lastUnselectedCall).toEqual([0xffffff]);
+
+      hv.destroy();
+    });
+
+
+
+    // ── Reduced-motion ───────────────────────────────────────
+
+    it('reduced-motion: snap-back is instant (no tween)', () => {
+      const hv = new HandView(scene, {
+        baseX: 60,
+        baseY: 130,
+        spacing: 56,
+        reducedMotion: true,
+      });
+
+      hv.setDragEnabled(true);
+      hv.setCards([card('A', 'spades')]);
+
+      const sprite = scene._images[0];
+      const startX = sprite.x;
+      const startY = sprite.y;
+
+      triggerPointerDown(scene, hv, 0, 100, 100);
+
+      const pointerMoveHandler = getInputHandler(scene, 'pointermove');
+      pointerMoveHandler({ x: 130, y: 150 });
+
+      // Sprite moved
+      expect(sprite.x).not.toBe(startX);
+
+      const tweenCountBefore = scene._tweens.length;
+
+      const pointerUpHandler = getInputHandler(scene, 'pointerup');
+      pointerUpHandler();
+
+      // No new tweens should have been added
+      expect(scene._tweens.length).toBe(tweenCountBefore);
+
+      // Sprite should have snapped back to original position
+      expect(sprite.x).toBe(startX);
+      expect(sprite.y).toBe(startY);
+
+      hv.destroy();
+    });
+
+    it('reduced-motion: drag acceptance removes lift offset instantly', () => {
+      const hv = new HandView(scene, {
+        baseX: 60,
+        baseY: 130,
+        spacing: 56,
+        reducedMotion: true,
+      });
+
+      hv.setDragEnabled(true);
+      hv.setDragValidator((_src, _target) => true);
+      hv.setCards([card('A', 'spades')]);
+
+      const sprite = scene._images[0];
+      const startY = sprite.y;
+
+      triggerPointerDown(scene, hv, 0, 100, 100);
+
+      const pointerMoveHandler = getInputHandler(scene, 'pointermove');
+      pointerMoveHandler({ x: 110, y: 120 });
+
+      hv.setDragTargetPileIndex(0);
+
+      const tweenCountBefore = scene._tweens.length;
+
+      const pointerUpHandler = getInputHandler(scene, 'pointerup');
+      pointerUpHandler();
+
+      // No new tweens
+      expect(scene._tweens.length).toBe(tweenCountBefore);
+
+      // Lift offset should be removed
+      // original Y + dy = startY + 20 (lift removed, dy = 120-100 = 20)
+      expect(sprite.y).toBe(startY + 20);
+
+      hv.destroy();
+    });
+
+    // ── Backward compatibility ───────────────────────────────
+
+    it('existing behavior is unchanged when drag is not enabled', () => {
+      const hv = new HandView(scene, {
+        baseX: 60,
+        baseY: 130,
+        spacing: 56,
+      });
+
+      hv.setCards([card('A', 'spades'), card('2', 'hearts')]);
+
+      // Click should work normally
+      triggerPointerDown(scene, hv, 0, 100, 100);
+      expect(hv.getSelected()).toBe(0);
+
+      // No scene input handlers registered
+      expect(scene.input.on).not.toHaveBeenCalled();
+
+      hv.destroy();
+    });
+
+    it('existing horizontal mode continues to work when drag is enabled but not active', () => {
+      const hv = new HandView(scene, {
+        baseX: 60,
+        baseY: 130,
+        spacing: 56,
+      });
+
+      hv.setDragEnabled(true);
+      hv.setCards([card('A', 'spades')]);
+
+      // Simple click (no pointermove) — selection still works
+      triggerPointerDown(scene, hv, 0, 100, 100);
+      expect(hv.getSelected()).toBe(0);
+
+      hv.destroy();
+    });
+
+    it('existing vertical mode cascade selection still works with drag enabled', () => {
+      const hv = new HandView(scene, {
+        baseX: 200,
+        baseY: 100,
+        spacing: 50,
+        layoutDirection: 'vertical',
+      });
+
+      hv.setDragEnabled(true);
+      hv.setCards([
+        card('A', 'spades'),
+        card('2', 'hearts'),
+        card('3', 'clubs'),
+      ]);
+
+      // Click card at index 2
+      triggerPointerDown(scene, hv, 2, 100, 100);
+
+      // Selection should include cascade range
+      expect(hv.getSelected()).toBe(2);
+      expect(hv.getCascadeRange()).toEqual({ from: 0, to: 2 });
 
       hv.destroy();
     });

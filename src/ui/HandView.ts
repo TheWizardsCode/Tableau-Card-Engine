@@ -122,6 +122,26 @@ export interface RemoveCardOptions {
   duration?: number;
 }
 
+/** Source range for a drag operation (inclusive card indices). */
+export interface DragSourceRange {
+  from: number;
+  to: number;
+}
+
+/** Payload for the {@link HandViewEvents.dragmove} event. */
+export interface DragMovePayload {
+  sourceRange: DragSourceRange;
+  x: number;
+  y: number;
+}
+
+/** Payload for the {@link HandViewEvents.dragend} event. */
+export interface DragEndPayload {
+  sourceRange: DragSourceRange;
+  targetPileIndex: number | null;
+  accepted: boolean;
+}
+
 /** Event map for {@link HandView}. */
 export interface HandViewEvents {
   /** Fired when a card sprite is clicked. Payload: card index. */
@@ -129,6 +149,15 @@ export interface HandViewEvents {
 
   /** Fired when the selection changes. Payload: new selected index or null. */
   selectionchange: number | null;
+
+  /** Fired when a drag operation starts. Payload: source range (selected card indices). */
+  dragstart: DragSourceRange;
+
+  /** Fired during drag movement. Payload: source range and pointer coordinates. */
+  dragmove: DragMovePayload;
+
+  /** Fired when a drag ends. Payload: source range, target pile index (or null), and whether it was accepted. */
+  dragend: DragEndPayload;
 }
 
 // ── Implementation ───────────────────────────────────────────
@@ -198,6 +227,19 @@ export class HandView {
   private labels: Phaser.GameObjects.Text[] = [];
   /** Custom texture function (used for non-standard card models like MindCard). */
   private _customTextureFn: CardTextureResolver | undefined;
+
+  // Drag-and-drop state
+  private _dragEnabled: boolean = false;
+  private _dragValidator: ((sourceRange: DragSourceRange, targetPileIndex: number) => boolean) | null = null;
+  private _dragSourceRange: DragSourceRange | null = null;
+  private _dragStartX: number = 0;
+  private _dragStartY: number = 0;
+  private _isDragging: boolean = false;
+  private _originalPositions: { x: number; y: number }[] = [];
+  private _currentTargetPileIndex: number | null = null;
+  private _dragLiftOffset: number = -8;
+  private _dimTint: number = 0x888888;
+  private static readonly DRAG_THRESHOLD: number = 5;
 
   // Events — lightweight listener map
   private listeners: Map<keyof HandViewEvents, Set<EventCallback>> = new Map();
@@ -326,6 +368,48 @@ export class HandView {
       return { from: 0, to: this.selectedIndex };
     }
     return { from: this.selectedIndex, to: this.selectedIndex };
+  }
+
+  // ── Drag-and-drop API ──────────────────────────────────
+
+  /**
+   * Enable or disable drag-and-drop on this HandView.
+   * When disabled, pointer events behave as before (click-to-select only).
+   */
+  setDragEnabled(enabled: boolean): void {
+    this._dragEnabled = enabled;
+  }
+
+  /**
+   * Whether drag-and-drop is currently enabled.
+   */
+  getDragEnabled(): boolean {
+    return this._dragEnabled;
+  }
+
+  /**
+   * Register a validator callback for drag operations.
+   *
+   * The validator is called on drag end with the source range and target pile index.
+   * Return `true` to accept the drop, `false` to reject (triggers snap-back).
+   *
+   * Pass `null` to clear the validator.
+   */
+  setDragValidator(
+    validator: ((sourceRange: DragSourceRange, targetPileIndex: number) => boolean) | null,
+  ): void {
+    this._dragValidator = validator;
+  }
+
+  /**
+   * Set the current target pile index for an in-progress drag.
+   *
+   * Renderers should call this during dragmove processing, after hit-testing
+   * the pointer position against their pile zones. This value is passed to
+   * the validator and emitted in the dragend event.
+   */
+  setDragTargetPileIndex(index: number | null): void {
+    this._currentTargetPileIndex = index;
   }
 
   /**
@@ -540,14 +624,31 @@ export class HandView {
       // Capture index for closures
       const idx = i;
 
-      // Click handler
+      // Click handler (also initiates drag when enabled)
       if (this.clickEnabled) {
-        sprite.on('pointerdown', () => {
+        sprite.on('pointerdown', (pointer: any) => {
           if (this.selectionEnabled) {
             this.selectedIndex = idx;
             this.updateSelectionTints();
           }
           this.emit('cardclick', idx);
+
+          // Drag initiation — record state but don't start dragging yet
+          if (this._dragEnabled) {
+            this._cleanupDrag();
+            this._dragSourceRange = this._computeDragRange(idx);
+            this._dragStartX = pointer.x;
+            this._dragStartY = pointer.y;
+            this._isDragging = false;
+            this._originalPositions = [];
+
+            // Register scene-level handlers for pointer movement tracking
+            const sceneInput = (this.scene as any).input;
+            if (sceneInput && typeof sceneInput.on === 'function') {
+              sceneInput.on('pointermove', this._boundPointerMove);
+              sceneInput.on('pointerup', this._boundPointerUp);
+            }
+          }
         });
       }
 
@@ -708,4 +809,206 @@ export class HandView {
       }
     }
   }
+
+  // ── Drag helpers ─────────────────────────────────────────
+
+  /** Clean up any in-progress drag state. */
+  private _cleanupDrag(): void {
+    const sceneInput = (this.scene as any).input;
+    if (sceneInput && typeof sceneInput.off === 'function') {
+      sceneInput.off('pointermove', this._boundPointerMove);
+      sceneInput.off('pointerup', this._boundPointerUp);
+    }
+    // If we were mid-drag, restore positions
+    if (this._isDragging && this._dragSourceRange && this._originalPositions.length > 0) {
+      this._animateSnapBack();
+    }
+    this._dragSourceRange = null;
+    this._isDragging = false;
+    this._currentTargetPileIndex = null;
+    this._originalPositions = [];
+  }
+
+  /** Compute the drag source range for a clicked card index. */
+  private _computeDragRange(index: number): DragSourceRange {
+    if (this.layoutDirection === 'vertical') {
+      return { from: 0, to: index };
+    }
+    return { from: index, to: index };
+  }
+
+  /** Store current sprite positions before drag visuals are applied. */
+  private _storeOriginalPositions(): void {
+    this._originalPositions = [];
+    if (!this._dragSourceRange) return;
+    for (let i = this._dragSourceRange.from; i <= this._dragSourceRange.to; i++) {
+      const sprite = this.sprites[i];
+      if (sprite) {
+        this._originalPositions.push({ x: sprite.x, y: sprite.y });
+      }
+    }
+  }
+
+  /** Apply visual lift + dim effects when a drag starts. */
+  private _applyDragVisuals(): void {
+    if (!this._dragSourceRange) return;
+    const { from, to } = this._dragSourceRange;
+
+    // Lift selected cards (Y offset)
+    for (let i = from; i <= to; i++) {
+      const sprite = this.sprites[i];
+      if (sprite && sprite.active) {
+        sprite.y += this._dragLiftOffset;
+      }
+    }
+
+    // Dim unselected cards above drag handle (only meaningful in vertical mode)
+    if (this.layoutDirection === 'vertical') {
+      for (let i = 0; i < from; i++) {
+        const sprite = this.sprites[i];
+        if (sprite && sprite.active) {
+          sprite.setTint(this._dimTint);
+        }
+      }
+    }
+  }
+
+  /** Reset visual lift + dim and restore selection tints. */
+  private _resetDragVisuals(): void {
+    this.updateSelectionTints();
+  }
+
+  /** Move dragged sprites relative to pointer delta from drag start. */
+  private _moveDragSprites(pointerX: number, pointerY: number): void {
+    if (!this._dragSourceRange || this._originalPositions.length === 0) return;
+    const { from, to } = this._dragSourceRange;
+
+    const dx = pointerX - this._dragStartX;
+    const dy = pointerY - this._dragStartY;
+
+    for (let i = 0; i <= to - from; i++) {
+      const spriteIdx = from + i;
+      const sprite = this.sprites[spriteIdx];
+      if (sprite && sprite.active && this._originalPositions[i]) {
+        sprite.x = this._originalPositions[i].x + dx;
+        sprite.y = this._originalPositions[i].y + this._dragLiftOffset + dy;
+      }
+    }
+  }
+
+  /** Animate dragged cards back to original positions (snap-back on rejection). */
+  private _animateSnapBack(): void {
+    if (!this._dragSourceRange || this._originalPositions.length === 0) return;
+    const { from, to } = this._dragSourceRange;
+
+    for (let i = 0; i <= to - from; i++) {
+      const spriteIdx = from + i;
+      const sprite = this.sprites[spriteIdx];
+      if (sprite && sprite.active && this._originalPositions[i]) {
+        const targetX = this._originalPositions[i].x;
+        const targetY = this._originalPositions[i].y;
+
+        if (this._reducedMotion) {
+          sprite.x = targetX;
+          sprite.y = targetY;
+        } else {
+          this.scene.tweens.add({
+            targets: sprite as any,
+            x: targetX,
+            y: targetY,
+            duration: 200,
+            ease: 'Power2',
+          });
+        }
+      }
+    }
+  }
+
+  /** Remove lift offset on drag acceptance. */
+  private _animateDragAccept(): void {
+    if (!this._dragSourceRange || this._originalPositions.length === 0) return;
+    const { from, to } = this._dragSourceRange;
+
+    for (let i = 0; i <= to - from; i++) {
+      const spriteIdx = from + i;
+      const sprite = this.sprites[spriteIdx];
+      if (sprite && sprite.active && this._originalPositions[i]) {
+        const targetY = sprite.y - this._dragLiftOffset;
+
+        if (this._reducedMotion) {
+          sprite.y = targetY;
+        } else {
+          this.scene.tweens.add({
+            targets: sprite as any,
+            y: targetY,
+            duration: 150,
+            ease: 'Power2',
+          });
+        }
+      }
+    }
+  }
+
+  /** Scene-level pointermove handler (arrow = bound to instance). */
+  private _boundPointerMove = (pointer: any): void => {
+    if (!this._dragEnabled || !this._dragSourceRange) return;
+
+    const dx = pointer.x - this._dragStartX;
+    const dy = pointer.y - this._dragStartY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (!this._isDragging) {
+      if (dist < HandView.DRAG_THRESHOLD) return;
+      // Threshold exceeded — start drag
+      this._isDragging = true;
+      this._storeOriginalPositions();
+      this._applyDragVisuals();
+      this.emit('dragstart', this._dragSourceRange);
+    }
+
+    this._moveDragSprites(pointer.x, pointer.y);
+    this.emit('dragmove', {
+      sourceRange: this._dragSourceRange,
+      x: pointer.x,
+      y: pointer.y,
+    });
+  };
+
+  /** Scene-level pointerup handler (arrow = bound to instance). */
+  private _boundPointerUp = (): void => {
+    // Unregister scene handlers
+    const sceneInput = (this.scene as any).input;
+    if (sceneInput && typeof sceneInput.off === 'function') {
+      sceneInput.off('pointermove', this._boundPointerMove);
+      sceneInput.off('pointerup', this._boundPointerUp);
+    }
+
+    if (this._isDragging && this._dragSourceRange) {
+      const targetPileIndex = this._currentTargetPileIndex;
+      let accepted = false;
+
+      if (targetPileIndex !== null && this._dragValidator) {
+        accepted = this._dragValidator(this._dragSourceRange, targetPileIndex);
+      }
+
+      if (accepted) {
+        this._animateDragAccept();
+      } else {
+        this._animateSnapBack();
+      }
+
+      this.emit('dragend', {
+        sourceRange: this._dragSourceRange,
+        targetPileIndex,
+        accepted,
+      });
+
+      this._resetDragVisuals();
+    }
+
+    this._dragSourceRange = null;
+    this._isDragging = false;
+    this._currentTargetPileIndex = null;
+    this._originalPositions = [];
+  };
 }
