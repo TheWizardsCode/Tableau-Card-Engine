@@ -221,4 +221,138 @@ describe('PileView', () => {
     expect(sprite).toBeDefined();
     pv.destroy();
   });
+
+  describe('cardTextureFn (custom texture resolver)', () => {
+    it('uses cardTextureFn to resolve the texture for the top card', () => {
+      const pv = new PileView(scene, {
+        x: 500,
+        y: 150,
+        label: 'Deck',
+        cardTextureFn: (card: unknown) => {
+          const c = card as { type?: string; color?: string };
+          return `custom-${c.type ?? 'unknown'}-${c.color ?? 'default'}`;
+        },
+      });
+
+      // Use a plain object pile (not Card) to test non-standard cards
+      const customPile = {
+        size: () => 1,
+        isEmpty: () => false,
+        peek: () => ({ type: 'expedition', color: 'red' }),
+      };
+      pv.setPile(customPile);
+
+      const sprite = scene._images[0];
+      expect(sprite.setTexture).toHaveBeenCalledWith('custom-expedition-red');
+      pv.destroy();
+    });
+
+    it('falls back to getCardTexture when cardTextureFn is not provided', () => {
+      const pv = new PileView(scene, {
+        x: 500,
+        y: 150,
+        label: 'Deck',
+      });
+
+      const pile = new Pile<Card>();
+      pile.push(makeCard('A', 'spades'));
+      pv.setPile(pile);
+      pv.update();
+
+      const sprite = scene._images[0];
+      expect(sprite.setTexture).toHaveBeenCalled();
+      // Texture should NOT be 'custom-...', confirming fallback behaviour
+      const callArg = (sprite.setTexture as any).mock.calls[0][0];
+      expect(callArg).not.toMatch(/^custom-/);
+      pv.destroy();
+    });
+
+    it('cardTextureFn is called on each update', () => {
+      const resolver = vi.fn().mockReturnValue('my-custom-texture');
+      const pv = new PileView(scene, {
+        x: 500,
+        y: 150,
+        label: 'Deck',
+        cardTextureFn: resolver,
+      });
+
+      const customPile = {
+        size: () => 1,
+        isEmpty: () => false,
+        peek: () => ({ type: 'token' }),
+      };
+      pv.setPile(customPile);
+
+      // First call from setPile
+      expect(resolver).toHaveBeenCalledTimes(1);
+
+      // Update again
+      pv.update();
+      expect(resolver).toHaveBeenCalledTimes(2);
+
+      // Pass a different card
+      (customPile.peek as any) = () => ({ type: 'crop' });
+      pv.update();
+      expect(resolver).toHaveBeenCalledTimes(3);
+
+      pv.destroy();
+    });
+
+    it('cardTextureFn is not called when pile is empty', () => {
+      const resolver = vi.fn().mockReturnValue('should-not-be-called');
+      const pv = new PileView(scene, {
+        x: 500,
+        y: 150,
+        label: 'Deck',
+        cardTextureFn: resolver,
+      });
+
+      const emptyPile = {
+        size: () => 0,
+        isEmpty: () => true,
+        peek: () => undefined,
+      };
+      pv.setPile(emptyPile);
+
+      expect(resolver).not.toHaveBeenCalled();
+      pv.destroy();
+    });
+
+    it('cardTextureFn is not called when pile is not set', () => {
+      const resolver = vi.fn().mockReturnValue('should-not-be-called');
+      const pv = new PileView(scene, {
+        x: 500,
+        y: 150,
+        label: 'Deck',
+        cardTextureFn: resolver,
+      });
+
+      // Don't call setPile - just call update
+      pv.update();
+
+      expect(resolver).not.toHaveBeenCalled();
+      pv.destroy();
+    });
+
+    it('cardTextureFn set at construction is used during update', () => {
+      const pv = new PileView(scene, {
+        x: 500,
+        y: 150,
+        label: 'Deck',
+        cardTextureFn: () => 'constructor-resolve',
+      });
+
+      const customPile = {
+        size: () => 1,
+        isEmpty: () => false,
+        peek: () => ({ type: 'token' }),
+      };
+      pv.setPile(customPile);
+
+      const sprite = scene._images[0];
+      expect(sprite.setTexture).toHaveBeenCalledWith('constructor-resolve');
+
+      pv.destroy();
+    });
+  });
 });

@@ -195,6 +195,14 @@ export type {
   CardTextureResolver as PileViewCardTextureResolver,
 } from './PileView';
 
+// TokenPileView – reusable token-pile display for non-standard card models
+export { TokenPileView, createSimpleTokenRenderer, createCardBackTokenRenderer } from './TokenPileView';
+export type {
+  TokenPileViewOptions,
+  TokenPileViewEvents,
+  TokenRenderer,
+} from './TokenPileView';
+
 // Hi-DPI text rendering (side-effect import for patching)
 export { TEXT_DPR } from './hiDpiText';
 
