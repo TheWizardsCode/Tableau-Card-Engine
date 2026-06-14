@@ -51,9 +51,9 @@ function createMockScene(): any {
     return g;
   };
 
-  const mockCircle = (x: number, y: number, r: number, fill?: any, stroke?: any) => {
+  const mockCircle = (_x: number, _y: number, _r: number, _fill?: any, _stroke?: any) => {
     const circ: any = {
-      x, y, radius: r,
+      x: _x, y: _y, radius: _r,
       setStrokeStyle: vi.fn().mockReturnThis(),
       setInteractive: vi.fn().mockReturnThis(),
       destroy: vi.fn().mockImplementation(() => { destroyed.push(circ); }),
