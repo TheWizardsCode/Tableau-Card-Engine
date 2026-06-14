@@ -2,9 +2,11 @@
  * LostCitiesRenderer — UI creation and refresh logic for Lost Cities.
  *
  * This renderer uses the shared HandView and PileView components for
- * player hand, AI hand, draw pile, and discard pile rendering.
- * Expedition piles use bespoke sprite arrays because they require
- * multi-card vertical stacking with per-lane overlap.
+ * player hand, AI hand, draw pile, discard pile, and expedition pile
+ * rendering. Expedition piles use a PileView for the top card plus a
+ * lightweight cascade array for preceding cards in each lane.
+ *
+ * Phase 3 migration: CG-0MQBOKB540040Q60, CG-0MQ6IEM9F001JTQD
  *
  * @module example-games/lost-cities/scenes/LostCitiesRenderer
  */
@@ -28,7 +30,7 @@ import {
   applyEnsuredTexture,
 } from '../LostCitiesTextureHelpers';
 import { HandView } from '../../../src/ui/HandView';
-import { PileView } from '../../../src/ui/PileView';
+import { PileView, type CardPile } from '../../../src/ui/PileView';
 import {
   TABLEAU_LEFT,
   laneX,
@@ -205,6 +207,20 @@ class DiscardPileAdapter {
   }
 }
 
+/**
+ * Lightweight adapter that wraps a plain LostCitiesCard[] with the PileView
+ * CardPile interface (`size()`, `isEmpty()`, `peek()`). Used for expedition
+ * piles which are stored as plain arrays in the session model.
+ *
+ * Follows the same pattern as Golf's ArrayPileAdapter (CG-0MQ6IEM920091HF6).
+ */
+class LcArrayPileAdapter implements CardPile<LostCitiesCard> {
+  constructor(private cards: LostCitiesCard[]) {}
+  size(): number { return this.cards.length; }
+  isEmpty(): boolean { return this.cards.length === 0; }
+  peek(): LostCitiesCard | undefined { return this.cards.length > 0 ? this.cards[this.cards.length - 1] : undefined; }
+}
+
 // ── Renderer class ──────────────────────────────────────────
 
 export class LostCitiesRenderer {
@@ -214,9 +230,12 @@ export class LostCitiesRenderer {
   // Graphics layer
   private gfx!: Phaser.GameObjects.Graphics;
 
-  // Sprite collections (for expedition lanes only — hands/piles use HandView/PileView)
-  private playerExpSprites: Map<ExpeditionColor, Phaser.GameObjects.Image[]> = new Map();
-  private oppExpSprites: Map<ExpeditionColor, Phaser.GameObjects.Image[]> = new Map();
+  // PileView instances for expedition lanes' top card + cascade sprites for preceding cards.
+  // Phase 3 migration: CG-0MQBOKB540040Q60, CG-0MQ6IEM9F001JTQD
+  private playerExpPileViews: Map<ExpeditionColor, PileView> = new Map();
+  private oppExpPileViews: Map<ExpeditionColor, PileView> = new Map();
+  private playerExpCascade: Map<ExpeditionColor, Phaser.GameObjects.Image[]> = new Map();
+  private oppExpCascade: Map<ExpeditionColor, Phaser.GameObjects.Image[]> = new Map();
   private selectionHighlight: Phaser.GameObjects.Rectangle | null = null;
 
   // UI text
@@ -413,8 +432,41 @@ export class LostCitiesRenderer {
   createExpeditionZones(callbacks: ExpeditionZoneCallbacks): void {
     for (let i = 0; i < 5; i++) {
       const color = EXPEDITION_COLORS[i];
-      this.oppExpSprites.set(color, []);
-      this.playerExpSprites.set(color, []);
+      const laneCenterX = laneX(i);
+
+      // Initialize PileView instances for opponent (even if 0 cards — handles empty state)
+      if (!this.oppExpPileViews.has(color)) {
+        const pv = new PileView(this.scene, {
+          x: laneCenterX,
+          y: OPP_EXP_TOP + CARD_H / 2,
+          emptyTexture: getLcBackFallbackKey(this.scene),
+          emptyAlpha: 0.3,
+          fullAlpha: 1,
+          countOffsetY: EXP_OVERLAP + 8,
+          countFontSize: '11px',
+          countColor: '#667766',
+        });
+        pv.setInteractive(false); // no individual click — use expedition hit zone
+        this.oppExpPileViews.set(color, pv);
+      }
+      this.oppExpCascade.set(color, []);
+
+      // Initialize PileView instances for player
+      if (!this.playerExpPileViews.has(color)) {
+        const pv = new PileView(this.scene, {
+          x: laneCenterX,
+          y: PLR_EXP_TOP + CARD_H / 2,
+          emptyTexture: getLcBackFallbackKey(this.scene),
+          emptyAlpha: 0.3,
+          fullAlpha: 1,
+          countOffsetY: EXP_OVERLAP + 8,
+          countFontSize: '11px',
+          countColor: '#667766',
+        });
+        pv.setInteractive(false);
+        this.playerExpPileViews.set(color, pv);
+      }
+      this.playerExpCascade.set(color, []);
     }
 
     const areaLeft = laneX(0) - CARD_W / 2 - 2;
@@ -587,63 +639,117 @@ export class LostCitiesRenderer {
   refreshExpeditions(): void {
     const gen = this.refreshGen;
 
-    for (const sprites of this.oppExpSprites.values()) {
+    // Destroy old cascade sprites (PileView instances are kept and updated)
+    for (const sprites of this.oppExpCascade.values()) {
       sprites.forEach(s => s.destroy());
     }
-    for (const sprites of this.playerExpSprites.values()) {
+    for (const sprites of this.playerExpCascade.values()) {
       sprites.forEach(s => s.destroy());
     }
+
+    // ── Helpers for a single expedition lane ─────────────
+    const buildCascade = (
+      cards: LostCitiesCard[],
+      baseTop: number,
+      laneXpos: number,
+      cascadeMap: Map<ExpeditionColor, Phaser.GameObjects.Image[]>,
+      color: ExpeditionColor,
+    ): Phaser.GameObjects.Image[] => {
+      // All cards except the last (top)
+      const cascadeCards = cards.slice(0, -1);
+      const sprites: Phaser.GameObjects.Image[] = [];
+      for (let c = 0; c < cascadeCards.length; c++) {
+        const y = baseTop + c * EXP_OVERLAP + CARD_H / 2;
+        const templateId = cardAssetKey(cascadeCards[c]);
+        const textureKey = getLcFaceKey(this.scene, templateId, CARD_W, CARD_H);
+        const sprite = this.scene.add.image(laneXpos, y, textureKey);
+        sprite.setDisplaySize(CARD_W, CARD_H);
+        sprite.setDepth(c);
+        sprites.push(sprite);
+
+        // Lazy async texture update for generation that hasn't completed yet
+        const cascadeSprites = cascadeMap.get(color);
+        void applyEnsuredTexture(
+          sprite,
+          ensureLcCardTexture(this.scene, templateId, CARD_W, CARD_H),
+          () => gen === this.refreshGen && !!cascadeSprites && cascadeSprites.includes(sprite),
+          CARD_W,
+          CARD_H,
+        );
+      }
+      return sprites;
+    };
+
+    const updatePileView = (
+      pv: PileView,
+      cards: LostCitiesCard[],
+      laneXpos: number,
+      baseTop: number,
+    ): void => {
+      // Wire the pile model via adapter for future unified texture resolution.
+      // Manual setTexture is used currently (The Mind pattern); the adapter
+      // enables a later migration to PileView.update() with cardTextureFn.
+      pv.setPile(new LcArrayPileAdapter(cards));
+
+      if (cards.length === 0) {
+        // Empty state: show ghosted card_back at base-top position
+        pv.getSprite().setPosition(laneXpos, baseTop + CARD_H / 2);
+        pv.getSprite().setTexture(getLcBackFallbackKey(this.scene));
+        pv.getSprite().setAlpha(0.3);
+        pv.getSprite().setVisible(true);
+        pv.getSprite().setDisplaySize(CARD_W, CARD_H);
+        pv.getCountText().setPosition(laneXpos, baseTop + CARD_H / 2 + EXP_OVERLAP + 8);
+        pv.getCountText().setText('0');
+        return;
+      }
+
+      // Top card position (topmost in the cascade)
+      const topY = baseTop + (cards.length - 1) * EXP_OVERLAP + CARD_H / 2;
+      const topCard = cards[cards.length - 1];
+      const templateId = cardAssetKey(topCard);
+      const faceKey = getLcFaceKey(this.scene, templateId, CARD_W, CARD_H);
+
+      // Position sprite at top card location
+      pv.getSprite().setPosition(laneXpos, topY);
+      pv.getSprite().setTexture(faceKey);
+      pv.getSprite().setAlpha(1);
+      pv.getSprite().setVisible(true);
+      pv.getSprite().setDisplaySize(CARD_W, CARD_H);
+      pv.getSprite().setDepth(cards.length - 1);
+
+      // Count label below the cascade
+      pv.getCountText().setPosition(laneXpos, topY + EXP_OVERLAP + 8);
+      pv.getCountText().setText(`${cards.length}`);
+
+      // Lazy async texture update for top card
+      void applyEnsuredTexture(
+        pv.getSprite(),
+        ensureLcCardTexture(this.scene, templateId, CARD_W, CARD_H),
+        () => gen === this.refreshGen && pv.getSprite().active,
+        CARD_W,
+        CARD_H,
+      );
+    };
 
     for (let i = 0; i < 5; i++) {
       const color = EXPEDITION_COLORS[i];
+      const laneCenterX = laneX(i);
 
+      // Opponent expedition
       const oppCards = this.session.players[1].expeditions.get(color) ?? [];
-      const oppSprites: Phaser.GameObjects.Image[] = [];
-      for (let c = 0; c < oppCards.length; c++) {
-        const x = laneX(i);
-        const y = OPP_EXP_TOP + c * EXP_OVERLAP + CARD_H / 2;
-        const templateId = cardAssetKey(oppCards[c]);
-        // Use face texture if available; fall back to card back on first render.
-        const textureKey = getLcFaceKey(this.scene, templateId, CARD_W, CARD_H);
-        const sprite = this.scene.add.image(x, y, textureKey);
-        sprite.setDisplaySize(CARD_W, CARD_H);
-        sprite.setDepth(c);
-        oppSprites.push(sprite);
+      const oppPv = this.oppExpPileViews.get(color)!;
+      this.oppExpCascade.set(color, buildCascade(
+        oppCards, OPP_EXP_TOP, laneCenterX, this.oppExpCascade, color,
+      ));
+      updatePileView(oppPv, oppCards, laneCenterX, OPP_EXP_TOP);
 
-        // Lazy rasterisation: ensure texture exists and update sprite when ready.
-        const colorSprites = this.oppExpSprites.get(color);
-        void applyEnsuredTexture(
-          sprite,
-          ensureLcCardTexture(this.scene, templateId, CARD_W, CARD_H),
-          () => gen === this.refreshGen && !!colorSprites && colorSprites.includes(sprite),
-          CARD_W,
-          CARD_H,
-        );
-      }
-      this.oppExpSprites.set(color, oppSprites);
-
+      // Player expedition
       const plrCards = this.session.players[0].expeditions.get(color) ?? [];
-      const plrSprites: Phaser.GameObjects.Image[] = [];
-      for (let c = 0; c < plrCards.length; c++) {
-        const x = laneX(i);
-        const y = PLR_EXP_TOP + c * EXP_OVERLAP + CARD_H / 2;
-        const templateId = cardAssetKey(plrCards[c]);
-        const textureKey = getLcFaceKey(this.scene, templateId, CARD_W, CARD_H);
-        const sprite = this.scene.add.image(x, y, textureKey);
-        sprite.setDisplaySize(CARD_W, CARD_H);
-        sprite.setDepth(c);
-        plrSprites.push(sprite);
-
-        const colorSprites = this.playerExpSprites.get(color);
-        void applyEnsuredTexture(
-          sprite,
-          ensureLcCardTexture(this.scene, templateId, CARD_W, CARD_H),
-          () => gen === this.refreshGen && !!colorSprites && colorSprites.includes(sprite),
-          CARD_W,
-          CARD_H,
-        );
-      }
-      this.playerExpSprites.set(color, plrSprites);
+      const plrPv = this.playerExpPileViews.get(color)!;
+      this.playerExpCascade.set(color, buildCascade(
+        plrCards, PLR_EXP_TOP, laneCenterX, this.playerExpCascade, color,
+      ));
+      updatePileView(plrPv, plrCards, laneCenterX, PLR_EXP_TOP);
     }
   }
 
@@ -807,5 +913,28 @@ export class LostCitiesRenderer {
       return a.rank - b.rank;
     }
     return 0;
+  }
+
+  // ── Cleanup ─────────────────────────────────────────────
+
+  /** Destroy all PileView instances and cascade sprite collections. */
+  destroy(): void {
+    for (const pv of this.playerExpPileViews.values()) {
+      pv.destroy();
+    }
+    this.playerExpPileViews.clear();
+    for (const pv of this.oppExpPileViews.values()) {
+      pv.destroy();
+    }
+    this.oppExpPileViews.clear();
+
+    for (const sprites of this.playerExpCascade.values()) {
+      sprites.forEach(s => s.destroy());
+    }
+    this.playerExpCascade.clear();
+    for (const sprites of this.oppExpCascade.values()) {
+      sprites.forEach(s => s.destroy());
+    }
+    this.oppExpCascade.clear();
   }
 }
