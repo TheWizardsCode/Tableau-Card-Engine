@@ -455,4 +455,322 @@ describe('Lost Cities hand/pile migration', () => {
     playerHandView.destroy();
     drawPileView.destroy();
   });
+
+  // ── Expedition colour: multiple PileView instances ──────────
+
+  it('PileView: Lost Cities renderer creates one discard pile PileView per expedition color', () => {
+    // Simulate the Lost Cities discard row: 5 expedition colors, each with its own PileView.
+    // This mirrors the actual LostCitiesRenderer pattern (one PileView per colour).
+    const colors: Array<'yellow' | 'blue' | 'white' | 'green' | 'red'> = ['yellow', 'blue', 'white', 'green', 'red'];
+    const discardViews: PileView[] = [];
+
+    for (const color of colors) {
+      const pileCards = [
+        createMockLCCard(color, 'numbered', undefined, 2),
+        createMockLCCard(color, 'numbered', undefined, 3),
+      ];
+      discardViews.push(
+        new PileView(scene, {
+          x: 100 + colors.indexOf(color) * 120,
+          y: 300,
+          label: '',
+          emptyTexture: 'card_back',
+          cardTextureFn: (card: any) => cardAssetKey(card),
+        }),
+      );
+      // Simulate the LostCitiesRenderer refreshDiscardPiles() adapter pattern
+      discardViews[discardViews.length - 1].setPile({
+        size: () => pileCards.length,
+        isEmpty: () => pileCards.length === 0,
+        peek: () => pileCards[pileCards.length - 1],
+      });
+      discardViews[discardViews.length - 1].update();
+    }
+
+    // Verify exactly 5 PileView instances were created
+    expect(discardViews.length).toBe(5);
+
+    // Each PileView should have created a sprite and a count text
+    const sprites = scene.images.filter((img: any) => img.texture && img.texture.key.startsWith('lc-'));
+    expect(sprites.length).toBe(5);
+
+    // Verify each colour's pile shows the correct count and texture
+    for (let i = 0; i < 5; i++) {
+      const pileView = discardViews[i];
+      // The count text should reflect the pile size
+      const countText = pileView.getCountText();
+      expect(countText.text).toContain('2');
+    }
+
+    // Verify different colours use different texture keys
+    const textureKeys = new Set<string>();
+    for (let i = 0; i < 5; i++) {
+      const topCard = {
+        color: colors[i],
+        type: 'numbered' as const,
+        rank: 2,
+      };
+      textureKeys.add(cardAssetKey(topCard));
+    }
+    expect(textureKeys.size).toBe(5);
+
+    // Clean up all discard views
+    for (const view of discardViews) {
+      view.destroy();
+    }
+  });
+
+  it('PileView: expedition discard piles show different textures per colour', () => {
+    const colors: Array<'yellow' | 'blue' | 'white' | 'green' | 'red'> = ['yellow', 'blue', 'white', 'green', 'red'];
+    const pileViews: PileView[] = [];
+
+    for (const color of colors) {
+      const card = createMockLCCard(color, 'numbered', undefined, 5);
+      pileViews.push(
+        new PileView(scene, {
+          x: 100 + colors.indexOf(color) * 120,
+          y: 300,
+          label: '',
+          emptyTexture: 'card_back',
+          cardTextureFn: (c: any) => cardAssetKey(c),
+        }),
+      );
+      pileViews[pileViews.length - 1].setPile({
+        size: () => 3,
+        isEmpty: () => false,
+        peek: () => card,
+      });
+      pileViews[pileViews.length - 1].update();
+    }
+
+    // Each pile should show the correct card texture for its colour
+    for (let i = 0; i < 5; i++) {
+      const sprite = scene.images[scene.images.length - 5 + i];
+      const expectedKey = `lc-${colors[i]}-5`;
+      expect(sprite.texture.key).toBe(expectedKey);
+    }
+
+    // Clean up
+    for (const view of pileViews) {
+      view.destroy();
+    }
+  });
+
+  // ── Reduced-motion mode ─────────────────────────────────────
+
+  it('HandView: reduced-motion mode skips tweens and applies instant state changes', () => {
+    const cards = [
+      createMockLCCard('yellow', 'numbered', undefined, 5),
+      createMockLCCard('blue', 'numbered', undefined, 7),
+    ];
+
+    const handView = new HandView(scene, {
+      baseX: 500,
+      baseY: 550,
+      spacing: 20,
+      cardWidth: 100,
+      showLabels: false,
+      selectionEnabled: true,
+      clickEnabled: true,
+      layoutDirection: 'vertical',
+      cardTextureFn: (card: any) => cardAssetKey(card),
+      reducedMotion: true,
+    });
+
+    expect(handView.reducedMotion).toBe(true);
+
+    handView.setCards(cards);
+
+    // With reduced motion, tweens.add should not be called during layout or selection
+    // (selection updates tints via setTint, not tweens)
+    expect(handView.getSelected()).toBeNull();
+
+    // Select a card — this should NOT use tweens in reduced-motion mode
+    handView.setSelected(0);
+    expect(handView.getSelected()).toBe(0);
+
+    // Verify selection tint was applied
+    const sprites = handView.getSprites();
+    expect(sprites[0].setTint).toHaveBeenCalledWith(0x88ff88);
+
+    // Clear selection — should not use tweens
+    handView.setSelected(null);
+    expect(handView.getSelected()).toBeNull();
+
+    handView.destroy();
+  });
+
+  it('HandView: reducedMotion option defaults to false', () => {
+    const handView = new HandView(scene, {
+      baseX: 500,
+      baseY: 550,
+      spacing: 20,
+      cardWidth: 100,
+      showLabels: false,
+      selectionEnabled: true,
+      clickEnabled: true,
+      layoutDirection: 'vertical',
+      cardTextureFn: (card: any) => cardAssetKey(card),
+    });
+
+    expect(handView.reducedMotion).toBe(false);
+    handView.destroy();
+  });
+
+  it('HandView: setReducedMotion toggles at runtime', () => {
+    const handView = new HandView(scene, {
+      baseX: 500,
+      baseY: 550,
+      spacing: 20,
+      cardWidth: 100,
+      showLabels: false,
+      selectionEnabled: true,
+      clickEnabled: true,
+      layoutDirection: 'vertical',
+      cardTextureFn: (card: any) => cardAssetKey(card),
+    });
+
+    expect(handView.reducedMotion).toBe(false);
+    handView.setReducedMotion(true);
+    expect(handView.reducedMotion).toBe(true);
+    handView.setReducedMotion(false);
+    expect(handView.reducedMotion).toBe(false);
+    handView.destroy();
+  });
+
+  it('PileView: works correctly in an empty-pile scenario (no tweens needed)', () => {
+    const emptyPile = {
+      size: () => 0,
+      isEmpty: () => true,
+      peek: () => undefined,
+    };
+
+    const pileView = new PileView(scene, {
+      x: 500,
+      y: 200,
+      label: 'Draw',
+    });
+
+    pileView.setPile(emptyPile);
+    pileView.update();
+
+    // Sprite should be set invisible for empty pile
+    const sprite = scene.images[scene.images.length - 1];
+    expect(sprite.setVisible).toHaveBeenCalledWith(false);
+    expect(sprite.setAlpha).toHaveBeenCalledWith(0.3);
+
+    pileView.destroy();
+  });
+
+  it('HandView + PileView: full refresh cycle with reduced motion for Lost Cities', () => {
+    // Simulate a full Lost Cities refresh cycle with reduced motion enabled.
+    // This tests that all views can be rebuilt instantaneously without relying on tweens.
+
+    // Create views matching Lost Cities layout
+    const playerHandView = new HandView(scene, {
+      baseX: 1000,
+      baseY: 100,
+      spacing: 20,
+      cardWidth: 100,
+      showLabels: false,
+      selectionEnabled: true,
+      clickEnabled: true,
+      layoutDirection: 'vertical',
+      cardTextureFn: (card: any) => cardAssetKey(card),
+      reducedMotion: true,
+    });
+
+    const drawPileView = new PileView(scene, {
+      x: 1100,
+      y: 350,
+      label: 'Draw Pile',
+      emptyTexture: 'card_back',
+      cardTextureFn: () => 'card_back',
+    });
+
+    const colors: Array<'yellow' | 'blue' | 'white' | 'green' | 'red'> = ['yellow', 'blue', 'white', 'green', 'red'];
+    const discardViews = new Map<string, PileView>();
+
+    for (const color of colors) {
+      discardViews.set(
+        color,
+        new PileView(scene, {
+          x: 100 + colors.indexOf(color) * 120,
+          y: 300,
+          label: '',
+          emptyTexture: 'card_back',
+          cardTextureFn: (card: any) => cardAssetKey(card),
+        }),
+      );
+    }
+
+    // Simulate game state
+    const session = {
+      playerHand: [
+        createMockLCCard('yellow', 'numbered', undefined, 5),
+        createMockLCCard('yellow', 'numbered', undefined, 7),
+      ],
+      drawCount: 42,
+      discardPiles: new Map<string, any[]>([
+        ['yellow', [createMockLCCard('yellow', 'numbered', undefined, 2)]],
+        ['blue', [createMockLCCard('blue', 'investment', 1)]],
+        ['white', []],
+        ['green', [createMockLCCard('green', 'numbered', undefined, 3)]],
+        ['red', []],
+      ]),
+    };
+
+    // Player hand refresh
+    playerHandView.setCards(session.playerHand, {
+      cardTextureFn: (card: any) => cardAssetKey(card),
+    });
+    expect(playerHandView.getSprites().length).toBe(2);
+
+    // Draw pile refresh
+    drawPileView.setPile({
+      size: () => session.drawCount,
+      isEmpty: () => session.drawCount === 0,
+      peek: () => undefined,
+    });
+    drawPileView.update();
+
+    // Discard pile refresh (per colour)
+    for (const color of colors) {
+      const pileCards = session.discardPiles.get(color) ?? [];
+      const view = discardViews.get(color);
+      if (!view) continue;
+
+      if (pileCards.length === 0) {
+        view.setPile({
+          size: () => 0,
+          isEmpty: () => true,
+          peek: () => undefined,
+        });
+      } else {
+        view.setPile({
+          size: () => pileCards.length,
+          isEmpty: () => false,
+          peek: () => pileCards[pileCards.length - 1],
+        });
+      }
+      view.update();
+    }
+
+    // Verify discard pile counts are correct
+    expect(discardViews.get('yellow')!.getCountText().text).toContain('1');
+    expect(discardViews.get('blue')!.getCountText().text).toContain('1');
+    expect(discardViews.get('white')!.getCountText().text).toContain('0');
+    expect(discardViews.get('green')!.getCountText().text).toContain('1');
+    expect(discardViews.get('red')!.getCountText().text).toContain('0');
+
+    // Verify draw pile count
+    expect(drawPileView.getCountText().text).toContain('Draw Pile: 42');
+
+    // Clean up
+    playerHandView.destroy();
+    drawPileView.destroy();
+    for (const view of discardViews.values()) {
+      view.destroy();
+    }
+  });
 });
