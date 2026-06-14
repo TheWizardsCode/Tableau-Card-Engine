@@ -202,7 +202,7 @@ export class GymHandPileScene extends GymSceneBase {
 
     y += 26;
     // Controls row 3 — Drag-and-drop demo
-    this.addButton(cx - 280, y, '[ Enable Drag ]', () => this.toggleDrag());
+    this.dragButton = this.addButton(cx - 280, y, '[ Enable Drag ]', () => this.toggleDrag());
     this.dragLabel = createHudText(this, cx - 120, y, 'Drag: off  (click card, then drag to a pile)', '#777777', { fontSize: '11px' }).setOrigin(0, 0.5);
 
     y += 35;
