@@ -61,7 +61,7 @@ function createMockScene(): any {
     return txt;
   });
 
-  const createRectangle = vi.fn((x: number, y: number, w: number, h: number, color: number, alpha: number) => {
+  const createRectangle = vi.fn((x: number, y: number, w: number, h: number, _color: number, _alpha: number) => {
     const rect = {
       x,
       y,
@@ -250,7 +250,7 @@ describe('Lost Cities hand/pile migration', () => {
     expect(firstSprite.on).toHaveBeenCalled();
 
     // Verify the first call to 'on' is with 'pointerdown'
-    const onCalls = firstSprite.on.mock.calls;
+    const onCalls = (firstSprite.on as any).mock.calls;
     expect(onCalls.length).toBeGreaterThan(0);
     expect(onCalls[0][0]).toBe('pointerdown');
   });
