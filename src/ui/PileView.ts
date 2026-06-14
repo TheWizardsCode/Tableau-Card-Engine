@@ -15,6 +15,19 @@ import { getCardTexture } from './CardTextureHelpers';
 
 // ── Types ───────────────────────────────────────────────────
 
+/**
+ * Custom card texture resolver for non-standard card models.
+ *
+ * Used by {@link PileView} when the card type does not have `rank`/`suit`
+ * properties (e.g. Lost Cities cards with expedition color and type).
+ *
+ * @param card  - The card object to resolve a texture for.
+ * @returns The texture key to use for the card sprite.
+ */
+export type CardTextureResolver = (card: unknown) => string;
+
+// ── Types ───────────────────────────────────────────────────
+
 /** Minimal interface for a card pile model. PileView works with any
  *  object that provides `size()`, `isEmpty()`, and `peek()` methods.
  *  This enables usage with `Pile<Card>` from card-system as well as
@@ -53,6 +66,14 @@ export interface PileViewOptions {
 
   /** Y offset of the count label below the pile sprite. @default 60 */
   countOffsetY?: number;
+
+  /**
+   * Custom texture resolver for non-standard card models (e.g. Lost Cities
+   * cards with expedition color and type instead of rank/suit). When
+   * provided, this function is called instead of `getCardTexture()` to
+   * determine the texture key for the top card of the pile.
+   */
+  cardTextureFn?: CardTextureResolver;
 }
 
 /** Event map for {@link PileView}. */
@@ -90,6 +111,7 @@ export class PileView {
   private fullAlpha: number;
   private countOffsetY: number;
   private labelPrefix: string;
+  private cardTextureFn: CardTextureResolver | undefined;
 
   // Pile model (accepts both Pile<Card> and generic CardPile objects)
   private pile: CardPile<Card> | null = null;
@@ -111,6 +133,7 @@ export class PileView {
     this.fullAlpha = opts.fullAlpha ?? 1;
     this.countOffsetY = opts.countOffsetY ?? 60;
     this.labelPrefix = opts.label ? `${opts.label}: ` : '';
+    this.cardTextureFn = opts.cardTextureFn;
 
     // Create sprite (starts as empty/back)
     this.sprite = scene.add.image(this._x, this._y, this.emptyTexture)
@@ -166,7 +189,10 @@ export class PileView {
       this.sprite.setVisible(false);
     } else {
       const top = this.pile.peek()!;
-      this.sprite.setTexture(getCardTexture(top));
+      const textureKey = this.cardTextureFn
+        ? this.cardTextureFn(top)
+        : getCardTexture(top as Card);
+      this.sprite.setTexture(textureKey);
       this.sprite.setAlpha(this.fullAlpha);
       this.sprite.setVisible(true);
     }

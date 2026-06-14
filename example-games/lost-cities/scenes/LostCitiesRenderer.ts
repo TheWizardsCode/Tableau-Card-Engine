@@ -1,6 +1,14 @@
 /**
  * LostCitiesRenderer — UI creation and refresh logic for Lost Cities.
+ *
+ * This renderer uses the shared HandView and PileView components for
+ * player hand, AI hand, draw pile, and discard pile rendering.
+ * Expedition piles use bespoke sprite arrays because they require
+ * multi-card vertical stacking with per-lane overlap.
+ *
+ * @module example-games/lost-cities/scenes/LostCitiesRenderer
  */
+import type { Card } from '../../../src/card-system/Card';
 import Phaser from 'phaser';
 import type { ExpeditionColor, LostCitiesCard } from '../LostCitiesCards';
 import {
@@ -19,6 +27,8 @@ import {
   ensureLcBackTexture,
   applyEnsuredTexture,
 } from '../LostCitiesTextureHelpers';
+import { HandView } from '../../../src/ui/HandView';
+import { PileView } from '../../../src/ui/PileView';
 import {
   TABLEAU_LEFT,
   laneX,
@@ -83,6 +93,120 @@ export interface HandCallbacks {
   onHandCardClick: (index: number) => void;
 }
 
+// ── Card texture resolvers for Lost Cities cards ────────────
+
+/**
+ * Resolve texture key for a Lost Cities card.
+ * Uses `getLcFaceKey` for lazy texture cache with fallback.
+ */
+function lcCardTextureFn(
+  scene: Phaser.Scene,
+  cardW: number,
+  cardH: number,
+): (card: unknown, _index: number) => string {
+  return (card: unknown, _index: number): string => {
+    const lcCard = card as LostCitiesCard;
+    const templateId = cardAssetKey(lcCard);
+    return getLcFaceKey(scene, templateId, cardW, cardH);
+  };
+}
+
+/**
+ * Resolve texture key for discard pile top cards (compact size).
+ */
+function lcCompactTextureFn(
+  scene: Phaser.Scene,
+): (card: unknown) => string {
+  return (card: unknown): string => {
+    const lcCard = card as LostCitiesCard;
+    const templateId = compactAssetKey(lcCard);
+    return getLcFaceKey(scene, templateId, DISCARD_CARD_W, DISCARD_CARD_H);
+  };
+}
+
+/**
+ * Resolve texture key for draw pile (card back).
+ */
+function lcDrawPileTextureFn(scene: Phaser.Scene): () => string {
+  return (): string => getLcBackFallbackKey(scene);
+}
+
+// ── Draw pile PileView with card-back texture ───────────────
+
+/**
+ * A PileView that uses the card back texture and supports
+ * lazy card-back texture updates for Lost Cities.
+ */
+class DrawPileView extends PileView {
+  private scene: Phaser.Scene;
+  private cardW: number;
+  private cardH: number;
+  private refreshGen = 0;
+
+  constructor(
+    scene: Phaser.Scene,
+    opts: { x: number; y: number; cardW: number; cardH: number },
+  ) {
+    super(scene, {
+      x: opts.x,
+      y: opts.y,
+      label: 'Draw Pile',
+      emptyTexture: 'card_back',
+      cardTextureFn: lcDrawPileTextureFn(scene),
+    });
+    this.scene = scene;
+    this.cardW = opts.cardW;
+    this.cardH = opts.cardH;
+    // Size the sprite to match the expected card dimensions
+    this.getSprite().setDisplaySize(opts.cardW, opts.cardH);
+  }
+
+  /**
+   * Override update to also handle lazy card-back texture resolution.
+   */
+  override update(): void {
+    super.update();
+    // Also apply lazy texture if needed (for async card back generation)
+    const gen = this.refreshGen;
+    void applyEnsuredTexture(
+      this.getSprite(),
+      ensureLcBackTexture(this.scene, this.cardW, this.cardH),
+      () => gen === this.refreshGen && this.getSprite().active,
+      this.cardW,
+      this.cardH,
+    );
+    this.refreshGen++;
+  }
+}
+
+// ── Discard pile wrapper ────────────────────────────────────
+
+/**
+ * Simple adapter that wraps a single-card discard pile array
+ * to satisfy the PileView CardPile interface.
+ */
+class DiscardPileAdapter {
+  private cards: LostCitiesCard[];
+
+  constructor(cards: LostCitiesCard[]) {
+    this.cards = cards;
+  }
+
+  size(): number {
+    return this.cards.length;
+  }
+
+  isEmpty(): boolean {
+    return this.cards.length === 0;
+  }
+
+  peek(): LostCitiesCard | undefined {
+    return this.cards.length > 0 ? this.cards[this.cards.length - 1] : undefined;
+  }
+}
+
+// ── Renderer class ──────────────────────────────────────────
+
 export class LostCitiesRenderer {
   private scene: Phaser.Scene;
   private session: LostCitiesSession;
@@ -90,12 +214,9 @@ export class LostCitiesRenderer {
   // Graphics layer
   private gfx!: Phaser.GameObjects.Graphics;
 
-  // Sprite collections
+  // Sprite collections (for expedition lanes only — hands/piles use HandView/PileView)
   private playerExpSprites: Map<ExpeditionColor, Phaser.GameObjects.Image[]> = new Map();
   private oppExpSprites: Map<ExpeditionColor, Phaser.GameObjects.Image[]> = new Map();
-  private discardSprites: Map<ExpeditionColor, Phaser.GameObjects.Image> = new Map();
-  private handSprites: Phaser.GameObjects.Image[] = [];
-  private aiHandSprites: Phaser.GameObjects.Image[] = [];
   private selectionHighlight: Phaser.GameObjects.Rectangle | null = null;
 
   // UI text
@@ -104,8 +225,14 @@ export class LostCitiesRenderer {
   private roundText!: Phaser.GameObjects.Text;
   private turnIndicatorText!: Phaser.GameObjects.Text;
   private instructionText!: Phaser.GameObjects.Text;
-  private drawPileSprite!: Phaser.GameObjects.Image;
-  private drawPileCountText!: Phaser.GameObjects.Text;
+
+  // Reusable UI components
+  private handView!: HandView;
+  private drawPileView!: DrawPileView;
+  private discardViews: Map<ExpeditionColor, PileView> = new Map();
+
+  // AI hand sprites (kept separate from HandView — always face-down)
+  private aiHandSprites: Phaser.GameObjects.Image[] = [];
 
   /** Cache the refresh generation for stillMounted checks in async texture updates. */
   private refreshGen = 0;
@@ -118,9 +245,22 @@ export class LostCitiesRenderer {
   // ── Getters for external access ─────────────────────────
   getScene(): Phaser.Scene { return this.scene; }
   get gfxObject(): Phaser.GameObjects.Graphics { return this.gfx; }
-  get handSpriteList(): Phaser.GameObjects.Image[] { return this.handSprites; }
-  get aiHandSpriteList(): Phaser.GameObjects.Image[] { return this.aiHandSprites; }
-  get drawPile(): Phaser.GameObjects.Image { return this.drawPileSprite; }
+
+  /** Return the player hand sprite at the given index (for illegal move feedback). */
+  get handSpriteList(): Phaser.GameObjects.Image[] {
+    return this.handView.getSprites();
+  }
+
+  /** Return the AI hand sprite list (for AI animation). */
+  get aiHandSpriteList(): Phaser.GameObjects.Image[] {
+    return this.aiHandSprites;
+  }
+
+  /** Return the draw pile sprite (for animation). */
+  get drawPile(): Phaser.GameObjects.Image {
+    return this.drawPileView.getSprite();
+  }
+
   get instruction(): Phaser.GameObjects.Text { return this.instructionText; }
   get turnIndicator(): Phaser.GameObjects.Text { return this.turnIndicatorText; }
   get playerScore(): Phaser.GameObjects.Text { return this.plrScoreText; }
@@ -327,27 +467,49 @@ export class LostCitiesRenderer {
       })
       .setOrigin(0.5, 0);
 
-    // Draw pile uses card back as fallback; lazy rasterisation will update
-    // the texture when the DPR-aware texture is ready.
-    const backKey = getLcBackFallbackKey(this.scene);
-    this.drawPileSprite = this.scene.add.image(
-      MID_COL_CENTER, DRAW_PILE_Y + CARD_H / 2, backKey,
-    );
-    this.drawPileSprite.setInteractive({ useHandCursor: true });
-    this.drawPileSprite.on('pointerdown', () => callbacks.onDrawPileClick());
+    // ── Draw Pile: use PileView ─────────────────────────────
+    this.drawPileView = new DrawPileView(this.scene, {
+      x: MID_COL_CENTER,
+      y: DRAW_PILE_Y + CARD_H / 2,
+      cardW: CARD_W,
+      cardH: CARD_H,
+    });
+    this.drawPileView.setInteractive(false); // we handle clicks via callback
+    this.drawPileView.onClick(() => callbacks.onDrawPileClick());
 
-    // Kick off lazy rasterisation for the card back.
-    void applyEnsuredTexture(
-      this.drawPileSprite,
-      ensureLcBackTexture(this.scene, CARD_W, CARD_H),
-      () => !!this.drawPileSprite,
-      CARD_W,
-      CARD_H,
-    );
+    // ── Player Hand: use HandView ───────────────────────────
+    this.handView = new HandView(this.scene, {
+      baseX: PLAYER_HAND_CENTER,
+      baseY: HAND_TOP,
+      spacing: 20, // overlapping cards — HandView handles layout
+      cardWidth: HAND_CARD_W,
+      showLabels: false,
+      selectionEnabled: true,
+      clickEnabled: true,
+      layoutDirection: 'vertical',
+      cardTextureFn: lcCardTextureFn(this.scene, CARD_W, CARD_H),
+    });
 
-    this.drawPileCountText = this.scene.add
-      .text(MID_COL_CENTER, DRAW_PILE_Y + CARD_H + 4, '44 remaining', SMALL_LABEL)
-      .setOrigin(0.5, 0);
+    // ── AI Hand: use HandView (face-down cards) ─────────────
+    // Note: AI hand uses the same HandView infrastructure but with
+    // a texture resolver that always returns the card back key.
+    // We store AI hand cards separately and rebuild when needed.
+
+    // ── Discard Piles: use PileView per color ───────────────
+    for (const color of EXPEDITION_COLORS) {
+      this.discardViews.set(
+        color,
+        new PileView(this.scene, {
+          x: laneX(EXPEDITION_COLORS.indexOf(color)),
+          y: DISCARD_Y + DISCARD_CARD_H / 2,
+          label: '',
+          emptyTexture: getLcBackFallbackKey(this.scene),
+          emptyAlpha: 0.3,
+          fullAlpha: 1,
+          cardTextureFn: lcCompactTextureFn(this.scene),
+        }),
+      );
+    }
 
     this.scene.add
       .text(MID_COL_CENTER, PLR_SCORE_Y + 6, 'You', LABEL_STYLE)
@@ -486,85 +648,65 @@ export class LostCitiesRenderer {
   }
 
   refreshDiscardPiles(): void {
-    const gen = this.refreshGen;
-
-    for (const sprite of this.discardSprites.values()) {
-      sprite.destroy();
-    }
-    this.discardSprites.clear();
-
     for (let i = 0; i < 5; i++) {
       const color = EXPEDITION_COLORS[i];
       const pile = this.session.round.discardPiles.get(color) ?? [];
 
-      if (pile.length > 0) {
-        const topCard = pile[pile.length - 1];
-        const templateId = compactAssetKey(topCard);
-        // Use face texture if available; fall back to card back on first render.
-        const textureKey = getLcFaceKey(this.scene, templateId, DISCARD_CARD_W, DISCARD_CARD_H);
-        const sprite = this.scene.add.image(
-          laneX(i), DISCARD_Y + DISCARD_CARD_H / 2,
-          textureKey,
-        );
-        sprite.setDisplaySize(DISCARD_CARD_W, DISCARD_CARD_H);
-        this.discardSprites.set(color, sprite);
+      const discardView = this.discardViews.get(color);
+      if (!discardView) continue;
 
-        void applyEnsuredTexture(
-          sprite,
-          ensureLcCompactTexture(this.scene, templateId),
-          () => gen === this.refreshGen && this.discardSprites.get(color) === sprite,
-          DISCARD_CARD_W,
-          DISCARD_CARD_H,
-        );
+      if (pile.length === 0) {
+        discardView.setPile(new DiscardPileAdapter([]));
+        discardView.update();
+        continue;
       }
+
+      // Update the adapter with the current pile data
+      const adapter = new DiscardPileAdapter([...pile]);
+      discardView.setPile(adapter);
+      discardView.update();
+
+      // Also ensure compact texture is available
+      const topCard = pile[pile.length - 1];
+      const templateId = compactAssetKey(topCard);
+      void ensureLcCompactTexture(this.scene, templateId);
     }
   }
 
   refreshHand(onClick: (index: number) => void): void {
-    const gen = this.refreshGen;
+    // Use HandView for the player hand.
+    // HandView manages its own sprites via setCards(), selection, and events.
 
-    this.handSprites.forEach(s => s.destroy());
-    this.handSprites = [];
-    if (this.selectionHighlight) {
-      this.selectionHighlight.destroy();
-      this.selectionHighlight = null;
-    }
-
+    // Get current hand (already sorted by the turn controller via handSortCompare)
     const hand = this.session.players[0].hand;
-    hand.sort(LostCitiesRenderer.handSortCompare);
-    for (let c = 0; c < hand.length; c++) {
-      const x = PLAYER_HAND_CENTER;
-      const y = HAND_TOP + c * HAND_OVERLAP + HAND_CARD_H / 2;
-      const templateId = cardAssetKey(hand[c]);
-      // Use face texture if available; fall back to card back on first render.
-      const textureKey = getLcFaceKey(this.scene, templateId, CARD_W, CARD_H);
-      const sprite = this.scene.add.image(x, y, textureKey);
-      sprite.setDisplaySize(HAND_CARD_W, HAND_CARD_H);
-      sprite.setDepth(c + 1);
-      sprite.setInteractive({ useHandCursor: true });
-      sprite.on('pointerdown', () => onClick(c));
-      this.handSprites.push(sprite);
 
-      void applyEnsuredTexture(
-        sprite,
-        ensureLcCardTexture(this.scene, templateId, CARD_W, CARD_H),
-        () => gen === this.refreshGen && this.handSprites.includes(sprite),
-        CARD_W,
-        CARD_H,
-      );
-    }
+    // Update HandView with current cards.
+    // HandView.setCards expects Card[], but LostCitiesCard doesn't implement
+    // Card (no rank/suit). We cast to `any[]` since HandView only uses the
+    // card objects as opaque handles passed to the custom texture resolver.
+    this.handView.setCards(hand as unknown as Card[], { cardTextureFn: lcCardTextureFn(this.scene, CARD_W, CARD_H) });
+
+    // Wire click handler — HandView emits cardclick events
+    this.handView.on('cardclick', (index: number) => {
+      onClick(index);
+    });
   }
 
   refreshAiHand(): void {
-    const gen = this.refreshGen;
-    const backKey = getLcBackFallbackKey(this.scene);
+    const currentGen = this.refreshGen;
 
+    // Clean up old AI hand sprites
     for (const sprite of this.aiHandSprites) {
       sprite.destroy();
     }
     this.aiHandSprites = [];
 
     const aiHand = this.session.players[1].hand;
+    const backKey = getLcBackFallbackKey(this.scene);
+
+    // Create face-down card sprites for the AI hand.
+    // These use the card back texture and are managed separately
+    // from the player hand (which uses HandView).
     for (let c = 0; c < aiHand.length; c++) {
       const x = AI_HAND_CENTER;
       const y = HAND_TOP + c * HAND_OVERLAP + HAND_CARD_H / 2;
@@ -581,7 +723,7 @@ export class LostCitiesRenderer {
         if (!result.ready && result.promise) {
           await result.promise;
         }
-        if (gen !== this.refreshGen) return;
+        if (currentGen !== this.refreshGen) return;
         for (const sprite of this.aiHandSprites) {
           sprite.setTexture(result.key);
           sprite.setDisplaySize(HAND_CARD_W, HAND_CARD_H);
@@ -593,19 +735,17 @@ export class LostCitiesRenderer {
   }
 
   refreshDrawPile(): void {
-    const gen = this.refreshGen;
     const remaining = this.session.round.drawPile.length;
-    this.drawPileCountText.setText(`${remaining} remaining`);
-    this.drawPileSprite.setVisible(remaining > 0);
 
-    // Ensure card back texture is available for draw pile.
-    void applyEnsuredTexture(
-      this.drawPileSprite,
-      ensureLcBackTexture(this.scene, CARD_W, CARD_H),
-      () => gen === this.refreshGen && !!this.drawPileSprite,
-      CARD_W,
-      CARD_H,
-    );
+    // Update PileView
+    this.drawPileView.setPile({
+      size: () => remaining,
+      isEmpty: () => remaining === 0,
+      peek: () => (remaining > 0 ? undefined : undefined),
+    });
+    this.drawPileView.update();
+
+    // The DrawPileView handles card back texture updates internally.
   }
 
   refreshScores(): void {
@@ -635,7 +775,7 @@ export class LostCitiesRenderer {
   // ── Selection highlight ─────────────────────────────────
   showSelectionHighlight(handIndex: number): void {
     this.clearSelectionHighlight();
-    const sprite = this.handSprites[handIndex];
+    const sprite = this.handView.getSpriteAt(handIndex);
     if (!sprite) return;
 
     this.selectionHighlight = this.scene.add.rectangle(
