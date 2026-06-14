@@ -179,7 +179,7 @@ export class GymHandPileScene extends GymSceneBase {
 
     this.initHelp([
       { heading: 'Overview', body: 'Demonstrates hand/pile card movement with animations: deal, place, discard, move, flip, shake (illegal), and drop-zone highlights. Uses HandView and PileView components.' },
-      { heading: 'Controls', body: '[ Draw to Hand ]: Deal a card (with arc animation).\n[ Discard Selected ]: Discard the selected card (with fade animation).\n[ Recall from Discard ]: Move top of discard back to hand.\n[ Flip Selected ]: Flip the selected card (two-phase animation).\n[ Move Selected ]: Tween selected card to display area (move demo).\n[ Cancel Move ]: Cancel an active move animation.\n[ Show Valid Moves ]: Highlight valid drop zones.\n[ Show Illegal ]: Trigger an illegal-move shake demo.\n[ Reset ]: Shuffle a new deck and deal starting hand.\n[ Select Next ]: Cycle selection in your hand.\n[ Enable Drag ]: Turn on drag-and-drop. Drag a card from your hand to the deck or discard pile zones.\n[ Disable Drag ]: Turn off drag-and-drop restoring normal click-to-select behavior.\nArc slider (right of hand): Adjust hand curvature live (0 = straight).' }
+      { heading: 'Controls', body: '[ Draw to Hand ]: Deal a card (with arc animation).\n[ Discard Selected ]: Discard the selected card (with fade animation).\n[ Recall from Discard ]: Move top of discard back to hand.\n[ Flip Selected ]: Flip the selected card (two-phase animation).\n[ Move Selected ]: Tween selected card to display area (move demo).\n[ Cancel Move ]: Cancel an active move animation.\n[ Show Valid Moves ]: Highlight valid drop zones.\n[ Show Illegal ]: Trigger an illegal-move shake demo.\n[ Reset ]: Shuffle a new deck and deal starting hand.\n[ Select Next ]: Cycle selection in your hand.\n[ Enable Drag ]: Turn on drag-and-drop. Drag a card from your hand to the discard pile.\n[ Disable Drag ]: Turn off drag-and-drop restoring normal click-to-select behavior.\nArc slider (right of hand): Adjust hand curvature live (0 = straight).' }
     ]);
 
     const cx = GAME_W / 2;
@@ -203,7 +203,7 @@ export class GymHandPileScene extends GymSceneBase {
     y += 26;
     // Controls row 3 — Drag-and-drop demo
     this.dragButton = this.addButton(cx - 280, y, '[ Enable Drag ]', () => this.toggleDrag());
-    this.dragLabel = createHudText(this, cx - 120, y, 'Drag: off  (click card, then drag to a pile)', '#777777', { fontSize: '11px' }).setOrigin(0, 0.5);
+    this.dragLabel = createHudText(this, cx - 120, y, 'Drag: off  (click card, then drag to discard)', '#777777', { fontSize: '11px' }).setOrigin(0, 0.5);
 
     y += 35;
     createHudText(this, cx, y, '── Event Log ──', '#669966', { fontSize: '12px' }).setOrigin(0.5);
@@ -746,14 +746,14 @@ export class GymHandPileScene extends GymSceneBase {
 
     if (this.dragEnabled) {
       this.dragButton.setText('[ Disable Drag ]');
-      this.dragLabel.setText('Drag: ON  (drag card to deck or discard pile)');
+      this.dragLabel.setText('Drag: ON  (drag card to the discard pile)');
       this.dragLabel.setColor('#88ff88');
       // Validator always returns true — the scene decides what to do in dragend
       this.handView.setDragValidator(() => true);
-      this.logEvent('Drag mode ON — cards are draggable to deck/discard zones');
+      this.logEvent('Drag mode ON — cards are draggable to the discard pile');
     } else {
       this.dragButton.setText('[ Enable Drag ]');
-      this.dragLabel.setText('Drag: off  (click card, then drag to a pile)');
+      this.dragLabel.setText('Drag: off  (click card, then drag to discard)');
       this.dragLabel.setColor('#777777');
       this.handView.setDragValidator(null);
       this.handView.setSelected(null);
@@ -763,32 +763,26 @@ export class GymHandPileScene extends GymSceneBase {
   }
 
   /**
-   * Hit-test pointer position against deck and discard pile zones.
-   * Returns the target pile index (0=deck, 1=discard) or null if not over any pile.
-   *
-   * Zones are generous (2x card width + gap) to make dropping on piles forgiving.
+   * Hit-test pointer position against the discard pile zone.
+   * Returns target pile index (1, discard) or null if not over the discard pile.
+   * The deck is intentionally excluded as a drop target.
    */
   private hitTestDropZones(pointerX: number, pointerY: number): number | null {
     const halfW = CARD_W + 40;  // ~136px half-width for generous grab zone
     const halfH = CARD_H / 2 + 60; // ~125px vertical tolerance
 
-    // Only consider zones when pointer is roughly at pile Y
-    if (Math.abs(pointerY - this.PILE_Y) >= halfH) return null;
-
-    // Deck zone — generous left pile zone
-    if (Math.abs(pointerX - this.DECK_X) < halfW) {
-      return 0;
-    }
-
-    // Discard zone — generous right pile zone
-    if (Math.abs(pointerX - this.DISCARD_X) < halfW) {
-      return 1;
+    // Only check discard pile zone
+    if (
+      Math.abs(pointerX - this.DISCARD_X) < halfW &&
+      Math.abs(pointerY - this.PILE_Y) < halfH
+    ) {
+      return 1; // discard
     }
 
     return null;
   }
 
-  /** Draw green highlights on deck and discard drop zones. */
+  /** Draw a green highlight on the discard drop zone. */
   private highlightDropZones(): void {
     if (!this.highlightGraphics) {
       this.highlightGraphics = this.add.graphics();
@@ -797,18 +791,11 @@ export class GymHandPileScene extends GymSceneBase {
     const highlightW = CARD_W + 16;
     const highlightH = CARD_H + 16;
 
-    // Deck zone
-    const deckX = this.DECK_X - highlightW / 2;
-    const deckY = this.PILE_Y - highlightH / 2;
-
-    // Discard zone
     const discardX = this.DISCARD_X - highlightW / 2;
     const discardY = this.PILE_Y - highlightH / 2;
 
     g.fillStyle(0x44ff44, 0.35);
     g.lineStyle(2, 0x44ff44, 0.8);
-    g.fillRoundedRect(deckX, deckY, highlightW, highlightH, 8);
-    g.strokeRoundedRect(deckX, deckY, highlightW, highlightH, 8);
     g.fillRoundedRect(discardX, discardY, highlightW, highlightH, 8);
     g.strokeRoundedRect(discardX, discardY, highlightW, highlightH, 8);
   }
@@ -829,27 +816,20 @@ export class GymHandPileScene extends GymSceneBase {
     }
 
     const card = this.hand[cardIdx];
-    const targetName = payload.targetPileIndex === 1 ? 'discard' : 'deck';
 
     // Wait a brief frame for the acceptance animation to start, then update
     this.time.delayedCall(50, () => {
-      // Move card from hand to target pile
+      // Move card from hand to discard pile
       this.hand.splice(cardIdx, 1);
-
-      if (payload.targetPileIndex === 1) {
-        card.faceUp = false;
-        this.discardPile.push(card);
-      } else {
-        card.faceUp = false;
-        this.drawPile.push(card);
-      }
+      card.faceUp = false;
+      this.discardPile.push(card);
 
       this.selectedIdx = -1;
       this.handView.setCards(this.hand);
       this.handView.setSelected(null);
       this.deckView.update();
       this.discardView.update();
-      this.logEvent(`Drop accepted: ${card.rank}${card.suit} moved to ${targetName}`);
+      this.logEvent(`Drop accepted: ${card.rank}${card.suit} moved to discard`);
     });
   }
 
