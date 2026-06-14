@@ -743,11 +743,16 @@ export class GymHandPileScene extends GymSceneBase {
       this.dragButton.setText('[ Disable Drag ]');
       this.dragLabel.setText('Drag: ON  (drag card to deck or discard pile)');
       this.dragLabel.setColor('#88ff88');
+      // Register validator: drop is accepted only when pointer is over a pile zone
+      this.handView.setDragValidator((_sourceRange, targetPileIndex) => {
+        return targetPileIndex !== null;
+      });
       this.logEvent('Drag mode ON — cards are draggable to deck/discard zones');
     } else {
       this.dragButton.setText('[ Enable Drag ]');
       this.dragLabel.setText('Drag: off  (click card, then drag to a pile)');
       this.dragLabel.setColor('#777777');
+      this.handView.setDragValidator(null);
       this.handView.setSelected(null);
       this.clearHighlights();
       this.logEvent('Drag mode OFF — restored click-to-select behavior');
