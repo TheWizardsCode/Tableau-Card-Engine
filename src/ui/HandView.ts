@@ -363,6 +363,9 @@ export class HandView {
   private clickEnabled: boolean;
   private _reducedMotion: boolean;
 
+  /** Whether this HandView instance has been destroyed. */
+  public destroyed: boolean = false;
+
   /** Maximum rotation (degrees) applied proportionally based on card offset from centre. */
   private maxRotationDegrees: number = 0;
 
@@ -908,6 +911,7 @@ export class HandView {
    * Destroy all sprites, labels, and event listeners.
    */
   destroy(): void {
+    this.destroyed = true;
     this.clearDisplay();
     this.cards = [];
     this.selectedIndex = null;

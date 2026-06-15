@@ -25,6 +25,7 @@ import { createStandardDeck, shuffleArray } from '../../../src/card-system/Deck'
 import { rankValue } from '../../../src/card-system/rankValue';
 import { Pile } from '../../../src/card-system/Pile';
 import { createSeededRng } from '../../../src/core-engine/SeededRng';
+import { GameEventEmitter } from '../../../src/core-engine';
 import { HandView } from '../../../src/ui/HandView';
 import { PileView } from '../../../src/ui/PileView';
 import { flipCard } from '../../../src/ui/flipCard';

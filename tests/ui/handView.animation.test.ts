@@ -15,7 +15,6 @@ import { HandView } from '../../src/ui/HandView';
 import type { Card } from '../../src/card-system/Card';
 import { createCard } from '../../src/card-system/Card';
 import { layoutCardPositions } from '../../src/ui/layoutCardPositions';
-import { CARD_W } from '../../src/ui/constants';
 
 // ── Minimal Phaser mock (extended from handView.test.ts) ────
 // HandView uses scene.add.image(), scene.add.text(), scene.tweens, tweens.add
@@ -542,8 +541,6 @@ describe('HandView animateAddCard', () => {
 
       // Card should be in hand immediately
       expect(hv.getCards()).toHaveLength(1);
-
-      const initialTweenCount = scene._tweens.length;
 
       // Add another card
       await expect(

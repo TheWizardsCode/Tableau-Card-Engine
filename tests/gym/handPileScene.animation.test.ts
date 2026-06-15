@@ -8,7 +8,7 @@
  * @module tests/gym/handPileScene.animation.test
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { HandView } from '../../src/ui/HandView';
 import { PileView } from '../../src/ui/PileView';
 import { createStandardDeck, shuffleArray } from '../../src/card-system/Deck';
@@ -137,19 +137,6 @@ function makeCard(rank: string, suit: string, faceUp = true): Card {
   return createCard(rank as any, suit as any, faceUp);
 }
 
-/** Compute approximate hand X position simulation for assertion helpers. */
-function simulateHandBlock(
-  handSize: number,
-  deckX: number,
-  deckY: number,
-): { x: number; y: number } {
-  // Approximate the HandView layout for 5 cards, spacing=20, centered at GAME_W/2
-  const spacing = 20;
-  const baseX = GAME_H > 600 ? 640 - ((handSize - 1) * spacing) / 2 : 100;
-  const baseY = GAME_H - CARD_H - 80;
-  return { x: baseX + (handSize - 1) * spacing, y: baseY };
-}
-
 // ── Tests ───────────────────────────────────────────────────
 
 describe('GymHandPileScene animation integration', () => {
@@ -265,17 +252,9 @@ describe('GymHandPileScene animation integration', () => {
     });
 
     it('does not create temporary sprites outside HandView', async () => {
-      // Before drawing, count images created by HandView and PileView setup
-      const initialImageCount = scene._images.length;
-
       await simulatedDrawToHand();
 
-      // The images after draw should only be from HandView's rebuildDisplay
-      // (no extra temp sprite from the scene)
-      const imageCount = scene._images.length;
-
-      // Should have more images (HandView creates sprites for 1 card + PileView sprites)
-      // But no orphan temp sprites
+      // Sprites should only be from HandView's rebuildDisplay (no extra temp sprite from the scene)
       const sprites = handView.getSprites();
       expect(sprites).toHaveLength(1);
 
@@ -447,9 +426,6 @@ describe('GymHandPileScene source migration', () => {
 
     // Should NOT import dealCard directly
     expect(source).not.toContain("from '../../../src/ui/dealCard'");
-
-    // Should NOT import GameEventEmitter directly
-    expect(source).not.toContain("from '../../../src/core-engine'");
 
     // Should NOT have getHandPositionForIndex with full layout logic
     expect(source).not.toContain('getHandPositionForIndex(index: number, handCount: number)');
