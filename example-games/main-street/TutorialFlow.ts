@@ -161,10 +161,10 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
   },
   {
     id: 'T3',
-    title: 'Market Business Row',
+    title: 'Development Row',
     body:
-      'Click a business card (top row) to buy it.\n' +
-      'Businesses go on your street to earn income.\n\n' +
+      'Click any card from the Development row to buy it.\n' +
+      'Cards go on your street to earn income.\n\n' +
       'Buy the **Laundromat** card (cost $6) — it is the cheapest card and will earn you income each turn.\n\n' +
       'The bottom row shows Investment cards with one-time effects.',
     highlightZone: 'marketBusinessRow',
