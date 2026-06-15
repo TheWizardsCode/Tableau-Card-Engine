@@ -166,3 +166,17 @@ export async function loadBCSnapshot(
     bcStateSerializer,
   );
 }
+
+/**
+ * Delete the saved checkpoint so the next boot starts a fresh game.
+ * Safe to call even if no checkpoint exists.
+ *
+ * @param store   Initialized `SaveLoadStore` instance.
+ * @param slotId  Optional slot identifier (defaults to `BC_RUN_SLOT`).
+ */
+export async function clearBCSnapshot(
+  store: SaveLoadStore,
+  slotId: string = BC_RUN_SLOT,
+): Promise<void> {
+  await store.remove('run-checkpoint', BC_GAME_TYPE, slotId);
+}

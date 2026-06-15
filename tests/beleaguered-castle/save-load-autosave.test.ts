@@ -19,6 +19,7 @@ import {
   bcStateSerializer,
   saveBCSnapshot,
   loadBCSnapshot,
+  clearBCSnapshot,
   BC_GAME_TYPE,
 } from '../../example-games/beleaguered-castle/BeleagueredCastleSaveLoad';
 import type { BeleagueredCastleState, BCMove } from '../../example-games/beleaguered-castle/BeleagueredCastleState';
@@ -409,23 +410,24 @@ describe('Beleaguered Castle save/load integration (CG-0MPK8XS5A00345OT)', () =>
     expect(savedTranscripts.length).toBeGreaterThan(0);
   });
 
-  it('resume: clearing checkpoint by saving fresh state then loading returns fresh state', async () => {
+  it('resume: clearing checkpoint with clearBCSnapshot removes it', async () => {
     const SEED = 7777;
     const store = new SaveLoadStore();
 
-    // Save initial checkpoint
+    // Save checkpoint
     const state1 = deal(SEED);
     tryFindAndApplyMove(state1);
     await saveBCSnapshot(store, state1);
 
-    // "Clear" by saving a fresh deal state
-    const freshState = deal(Date.now());
-    await saveBCSnapshot(store, freshState);
-
-    // Load should return the fresh state (overwritten), not state1
-    const loaded = await loadBCSnapshot(store);
+    // Verify checkpoint exists
+    let loaded = await loadBCSnapshot(store);
     expect(loaded).not.toBeNull();
-    // The fresh state has moveCount=0 (just dealt)
-    expect(loaded!.moveCount).toBe(0);
+
+    // Clear it
+    await clearBCSnapshot(store);
+
+    // Verify it's gone
+    loaded = await loadBCSnapshot(store);
+    expect(loaded).toBeNull();
   });
 });
