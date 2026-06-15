@@ -212,8 +212,8 @@ describe('Lost Cities hand/pile migration', () => {
     // Verify the sprites have the correct textures
     const sprites = handView.getSprites();
     expect(sprites.length).toBe(cards.length);
-    expect(sprites[0].texture.key).toBe('lc-yellow-5');
-    expect(sprites[2].texture.key).toBe('lc-blue-inv1');
+    expect((sprites[0] as any).texture.key).toBe('lc-yellow-5');
+    expect((sprites[2] as any).texture.key).toBe('lc-blue-inv1');
   });
 
   it('HandView: emits cardclick events', () => {
@@ -287,7 +287,7 @@ describe('Lost Cities hand/pile migration', () => {
     const sprites = handView.getSprites();
     expect(sprites.length).toBe(3);
     for (const sprite of sprites) {
-      expect(sprite.setTint).toHaveBeenCalled();
+      expect((sprite as any).setTint).toHaveBeenCalled();
     }
 
     // Clear selection
@@ -591,7 +591,7 @@ describe('Lost Cities hand/pile migration', () => {
 
     // Verify selection tint was applied
     const sprites = handView.getSprites();
-    expect(sprites[0].setTint).toHaveBeenCalledWith(0x88ff88);
+    expect((sprites[0] as any).setTint).toHaveBeenCalledWith(0x88ff88);
 
     // Clear selection — should not use tweens
     handView.setSelected(null);

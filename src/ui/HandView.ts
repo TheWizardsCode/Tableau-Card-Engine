@@ -32,6 +32,52 @@ import { CARD_W } from './constants';
  */
 export type CardTextureResolver = (card: any, index: number) => string;
 
+/**
+ * Custom card renderer for non-standard card visuals.
+ *
+ * Used by {@link HandView} when a game needs to render cards using custom
+ * Phaser display objects (e.g. {@link Phaser.GameObjects.Container}s with
+ * colored rectangles, icons, and text labels) instead of the default
+ * Image-sprite model.
+ *
+ * When provided, HandView calls this callback for each card instead of
+ * creating a default `Phaser.GameObjects.Image` sprite. The returned
+ * object is managed by HandView for layout, selection tint, and (when
+ * no `customHoverFn`/`customClickFn` are provided) default hover and
+ * click event handling.
+ *
+ * **Interaction handling** — If the caller handles hover/click/selection
+ * inside the renderer, pass matching callbacks via
+ * {@link HandViewOptions.customHoverFn} and
+ * {@link HandViewOptions.customClickFn} to ensure HandView's built-in
+ * event emission and selection tint are applied correctly.
+ *
+ * ### Example (Sushi Go-style colored rect + icon + label)
+ * ```ts
+ * const handView = new HandView(scene, {
+ *   baseX: 60, baseY: 130, spacing: 20,
+ *   renderCard: (card, index) => {
+ *     const container = scene.add.container(0, 0);
+ *     const rect = scene.add.rectangle(0, 0, 48, 65, 0xff8888);
+ *     rect.setStrokeStyle(2, 0x333333);
+ *     container.add(rect);
+ *     container.setData('cardId', card.id);
+ *     return container;
+ *   },
+ * });
+ * ```
+ *
+ * @param card       - The card object to render.
+ * @param index      - The card's index in the hand.
+ * @param isSelected - Whether this card is currently selected.
+ * @returns A Phaser display object (Image, Container, etc.) representing the card.
+ */
+export type RenderCardFn = (
+  card: any,
+  index: number,
+  isSelected: boolean,
+) => Phaser.GameObjects.GameObject;
+
 /** Options for creating a {@link HandView}. */
 export interface HandViewOptions {
   /** X coordinate for the leftmost (or centre) card position. */
@@ -96,6 +142,44 @@ export interface HandViewOptions {
    * the texture key for each card.
    */
   cardTextureFn?: CardTextureResolver;
+
+  /**
+   * Custom card renderer for non-standard card visuals.
+   *
+   * When provided, this function is called for each card instead of
+   * creating a default `Phaser.GameObjects.Image` sprite. The returned
+   * display object is managed by HandView for layout and selection.
+   *
+   * HandView applies a selection tint to the returned object and emits
+   * `cardclick` events. If the caller handles hover effects inside the
+   * renderer, pass a {@link customHoverFn} to apply selection tint and
+   * emit events on hover as well.
+   */
+  renderCard?: RenderCardFn;
+
+  /**
+   * Custom hover callback for when the card object (rendered by
+   * {@link renderCard}) is hovered. When provided, HandView will call
+   * this function instead of applying its default `setTint(0x66ff66)`
+   * hover effect.
+   *
+   * This allows custom renderers that manage their own hover visuals
+   * (e.g. stroke color changes, scale tweens) to still benefit from
+   * HandView's event emission.
+   */
+  customHoverFn?: (cardObject: Phaser.GameObjects.GameObject) => void;
+
+  /**
+   * Custom click callback for when the card object (rendered by
+   * {@link renderCard}) is clicked. When provided, HandView will call
+   * this function instead of its default click handling (selection +
+   * event emission). The callback receives the card index.
+   *
+   * This allows custom renderers that manage their own click behaviour
+   * (e.g. opening a tooltip, triggering a chopsticks pick) to still
+   * benefit from HandView's layout and selection management.
+   */
+  customClickFn?: (cardIndex: number) => void;
 }
 
 /** Options for the {@link HandView.addCard} method. */
@@ -195,6 +279,27 @@ type EventCallback = (...args: any[]) => void;
  * cascade.on('cardclick', (idx) => cascade.setSelected(idx)); // selects cards [0..idx]
  * cascade.getCascadeRange(); // { from: 0, to: idx }
  * ```
+ *
+ * ### Custom card rendering example (Sushi Go style)
+ * ```ts
+ * const handView = new HandView(scene, {
+ *   baseX: 60, baseY: 130, spacing: 20,
+ *   renderCard: (card, index, isSelected) => {
+ *     const container = scene.add.container(0, 0);
+ *     const rect = scene.add.rectangle(0, 0, 48, 65, 0xff8888);
+ *     rect.setStrokeStyle(2, 0x333333);
+ *     rect.setInteractive({ useHandCursor: true });
+ *     container.add(rect);
+ *     container.setData('cardId', card.id);
+ *     // Custom hover/selection handled via customHoverFn below
+ *     return container;
+ *   },
+ *   customHoverFn: (cardObj) => {
+ *     // Apply selection tint to the custom card
+ *     cardObj.setTint(0x66ff66);
+ *   },
+ * });
+ * ```
  */
 export class HandView {
   private scene: Phaser.Scene;
@@ -223,10 +328,16 @@ export class HandView {
   private _cardType: 'standard' | 'custom' = 'standard';
 
   // Display objects
-  private sprites: Phaser.GameObjects.Image[] = [];
+  private sprites: Phaser.GameObjects.GameObject[] = [];
   private labels: Phaser.GameObjects.Text[] = [];
   /** Custom texture function (used for non-standard card models like MindCard). */
   private _customTextureFn: CardTextureResolver | undefined;
+  /** Custom card renderer (used for non-standard card visuals). */
+  private _renderCardFn: RenderCardFn | undefined;
+  /** Custom hover callback for custom-rendered cards. */
+  private _customHoverFn: ((cardObject: Phaser.GameObjects.GameObject) => void) | undefined;
+  /** Custom click callback for custom-rendered cards. */
+  private _customClickFn: ((cardIndex: number) => void) | undefined;
 
   // Drag-and-drop state
   private _dragEnabled: boolean = false;
@@ -262,6 +373,14 @@ export class HandView {
     this.layoutDirection = opts.layoutDirection ?? 'horizontal';
     this._customTextureFn = opts.cardTextureFn;
     this._cardType = opts.cardTextureFn ? 'custom' : 'standard';
+    this._renderCardFn = opts.renderCard;
+    this._customHoverFn = opts.customHoverFn;
+    this._customClickFn = opts.customClickFn;
+    // If renderCard is provided, also set cardType to 'custom'
+    // so that the existing texture resolution path is bypassed.
+    if (opts.renderCard) {
+      this._cardType = 'custom';
+    }
   }
 
   // ── Public API ──────────────────────────────────────────
@@ -295,6 +414,26 @@ export class HandView {
   setCardTextureFn(fn: CardTextureResolver): void {
     this._customTextureFn = fn;
     this._cardType = 'custom';
+  }
+
+  /**
+   * Set a custom card renderer at runtime.
+   *
+   * When provided, HandView calls this function for each card instead of
+   * creating a default Image sprite. Call {@link rebuildDisplay} after
+   * setting this to apply the new renderer to the current hand.
+   */
+  setRenderCard(fn: RenderCardFn): void {
+    this._renderCardFn = fn;
+    this._cardType = 'custom';
+  }
+
+  /**
+   * Clear the custom card renderer, reverting to default Image sprite creation.
+   */
+  clearRenderCard(): void {
+    this._renderCardFn = undefined;
+    this._cardType = this._customTextureFn ? 'custom' : 'standard';
   }
 
   /**
@@ -546,16 +685,31 @@ export class HandView {
   }
 
   /**
-   * Return the sprite for a card at the given index, or undefined.
+   * Return the display object for a card at the given index, or undefined.
+   *
+   * When using the default sprite creation path, the returned object is
+   * a `Phaser.GameObjects.Image`. When a custom {@link renderCard}
+   * callback is used, the returned object is whatever the callback
+   * returned (e.g. a {@link Phaser.GameObjects.Container}).
+   *
+   * @param index - The card index.
+   * @returns The card's display object, or `undefined` if out of bounds.
    */
-  getSpriteAt(index: number): Phaser.GameObjects.Image | undefined {
+  getSpriteAt(index: number): Phaser.GameObjects.GameObject | undefined {
     return this.sprites[index];
   }
 
   /**
-   * Return all card sprites.
+   * Return all card display objects.
+   *
+   * When using the default sprite creation path, the returned objects are
+   * `Phaser.GameObjects.Image` instances. When a custom {@link renderCard}
+   * callback is used, the returned objects are whatever the callback
+   * returned (e.g. {@link Phaser.GameObjects.Container}s).
+   *
+   * @returns A shallow copy of all card display objects.
    */
-  getSprites(): Phaser.GameObjects.Image[] {
+  getSprites(): Phaser.GameObjects.GameObject[] {
     return [...this.sprites];
   }
 
@@ -563,7 +717,7 @@ export class HandView {
    * Return current sprite centers in display order.
    */
   getCardCenters(): Array<{ x: number; y: number }> {
-    return this.sprites.map((sprite) => ({ x: sprite.x, y: sprite.y }));
+    return this.sprites.map((sprite) => ({ x: (sprite as any).x, y: (sprite as any).y }));
   }
 
   /**
@@ -605,88 +759,166 @@ export class HandView {
 
     for (let i = 0; i < this.cards.length; i++) {
       const card = this.cards[i];
-      const textureKey = this._cardType === 'custom' && this._customTextureFn
-        ? this._customTextureFn(card, i)
-        : getCardTexture(card);
-      const sprite = this.scene.add.image(positions[i].x, positions[i].y, textureKey);
-
-      // Apply initial per-card rotation based on horizontal offset (horizontal mode only)
-      if (this.layoutDirection === 'horizontal' && this.maxRotationDegrees !== 0) {
-        const normalized = (positions[i].x - arcCenterX) / halfSpan;
-        const rotDeg = this.maxRotationDegrees * normalized;
-        sprite.rotation = (rotDeg * Math.PI) / 180;
-      }
-
-      if (this.clickEnabled || this.selectionEnabled) {
-        sprite.setInteractive({ useHandCursor: true });
-      }
-
-      // Capture index for closures
-      const idx = i;
-
-      // Click handler (also initiates drag when enabled)
-      if (this.clickEnabled) {
-        sprite.on('pointerdown', (pointer: any) => {
-          if (this.selectionEnabled) {
-            this.selectedIndex = idx;
-            this.updateSelectionTints();
-          }
-          this.emit('cardclick', idx);
-
-          // Drag initiation — record state but don't start dragging yet
-          if (this._dragEnabled) {
-            this._cleanupDrag();
-            this._dragSourceRange = this._computeDragRange(idx);
-            this._dragStartX = pointer.x;
-            this._dragStartY = pointer.y;
-            this._isDragging = false;
-            this._originalPositions = [];
-
-            // Register scene-level handlers for pointer movement tracking
-            const sceneInput = (this.scene as any).input;
-            if (sceneInput && typeof sceneInput.on === 'function') {
-              sceneInput.on('pointermove', this._boundPointerMove);
-              sceneInput.on('pointerup', this._boundPointerUp);
-            }
-          }
-        });
-      }
-
-      // Hover visual feedback
-      sprite.on('pointerover', () => {
-        sprite.setTint(0x66ff66);
-      });
-      sprite.on('pointerout', () => {
-        const isSelected = this.layoutDirection === 'vertical' && this.selectedIndex !== null
-          ? idx <= this.selectedIndex
-          : idx === this.selectedIndex;
-        sprite.setTint(isSelected ? 0x88ff88 : 0xffffff);
-      });
-
-      // Selection tint
-      const initiallySelected = this.layoutDirection === 'vertical' && this.selectedIndex !== null
-        ? i <= this.selectedIndex
-        : i === this.selectedIndex;
-      sprite.setTint(initiallySelected ? 0x88ff88 : 0xffffff);
-
+      const sprite = this.createCardSprite(card, i, positions[i], arcCenterX, halfSpan);
       this.sprites.push(sprite);
 
-      if (this.showLabels) {
-        // In vertical mode, position label to the right of the card to avoid overlap
-        const labelX = this.layoutDirection === 'vertical'
-          ? positions[i].x + this.cardWidth / 2 + 8
-          : positions[i].x;
-        const labelY = this.layoutDirection === 'vertical'
-          ? positions[i].y
-          : positions[i].y + 42;
-        const label = this.scene.add.text(labelX, labelY, `${card.rank}${card.suit}`, {
-          fontSize: '9px',
-          color: initiallySelected ? '#88ff88' : '#aaaaaa',
-          fontFamily: 'monospace',
-        }).setOrigin(0.5);
-        this.labels.push(label);
+      if (!this._renderCardFn) {
+        // Default Image sprite path — attach hover and click handlers
+        this.attachDefaultInteractionHandlers(sprite as unknown as Phaser.GameObjects.Image, i);
+      } else {
+        // Custom render path — attach optional custom hover/click handlers
+        if (this._customHoverFn) {
+          (sprite as any).on('pointerover', () => {
+            this._customHoverFn!(sprite);
+          });
+          (sprite as any).on('pointerout', () => {
+            this.updateSelectionTints();
+          });
+        }
+        if (this._customClickFn) {
+          (sprite as any).on('pointerdown', () => {
+            this._customClickFn!(i);
+          });
+        }
+      }
+
+      if (this.showLabels && !this._renderCardFn) {
+        this.addCardLabel(card, i, positions[i], sprite);
       }
     }
+  }
+
+  /**
+   * Create a card display object for the given card at the given position.
+   *
+   * Uses the custom {@link renderCard} callback if provided, otherwise
+   * creates a default Image sprite from the card's texture key.
+   */
+  private createCardSprite(
+    card: Card,
+    index: number,
+    pos: { x: number; y: number },
+    arcCenterX: number,
+    halfSpan: number,
+  ): Phaser.GameObjects.GameObject {
+    if (this._renderCardFn) {
+      // Custom rendering path — caller provides the full card object
+      const isSelected = this.layoutDirection === 'vertical' && this.selectedIndex !== null
+        ? index <= this.selectedIndex
+        : index === this.selectedIndex;
+      const cardObj = this._renderCardFn(card, index, isSelected);
+      // Position the returned object at the computed layout position
+      (cardObj as any).x = pos.x;
+      (cardObj as any).y = pos.y;
+      return cardObj;
+    }
+
+    // Default Image sprite creation path
+    const textureKey = this._cardType === 'custom' && this._customTextureFn
+      ? this._customTextureFn(card, index)
+      : getCardTexture(card);
+    const sprite = this.scene.add.image(pos.x, pos.y, textureKey);
+
+    // Apply initial per-card rotation based on horizontal offset (horizontal mode only)
+    if (this.layoutDirection === 'horizontal' && this.maxRotationDegrees !== 0) {
+      const normalized = (pos.x - arcCenterX) / halfSpan;
+      const rotDeg = this.maxRotationDegrees * normalized;
+      (sprite as any).rotation = (rotDeg * Math.PI) / 180;
+    }
+
+    if (this.clickEnabled || this.selectionEnabled) {
+      sprite.setInteractive({ useHandCursor: true });
+    }
+
+    return sprite;
+  }
+
+  /**
+   * Attach default hover and click handlers to a default Image sprite.
+   *
+   * These handlers apply selection tint, hover tint, and emit events
+   * that downstream code (e.g. game logic, drag-and-drop) can respond to.
+   */
+  private attachDefaultInteractionHandlers(
+    sprite: Phaser.GameObjects.Image,
+    index: number,
+  ): void {
+    if (this.clickEnabled || this.selectionEnabled) {
+      sprite.setInteractive({ useHandCursor: true });
+    }
+
+    // Capture index for closures
+    const idx = index;
+
+    // Click handler (also initiates drag when enabled)
+    if (this.clickEnabled) {
+      sprite.on('pointerdown', (pointer: any) => {
+        if (this.selectionEnabled) {
+          this.selectedIndex = idx;
+          this.updateSelectionTints();
+        }
+        this.emit('cardclick', idx);
+
+        // Drag initiation — record state but don't start dragging yet
+        if (this._dragEnabled) {
+          this._cleanupDrag();
+          this._dragSourceRange = this._computeDragRange(idx);
+          this._dragStartX = pointer.x;
+          this._dragStartY = pointer.y;
+          this._isDragging = false;
+          this._originalPositions = [];
+
+          // Register scene-level handlers for pointer movement tracking
+          const sceneInput = (this.scene as any).input;
+          if (sceneInput && typeof sceneInput.on === 'function') {
+            sceneInput.on('pointermove', this._boundPointerMove);
+            sceneInput.on('pointerup', this._boundPointerUp);
+          }
+        }
+      });
+    }
+
+    // Hover visual feedback
+    sprite.on('pointerover', () => {
+      sprite.setTint(0x66ff66);
+    });
+    sprite.on('pointerout', () => {
+      const isSelected = this.layoutDirection === 'vertical' && this.selectedIndex !== null
+        ? idx <= this.selectedIndex
+        : idx === this.selectedIndex;
+      sprite.setTint(isSelected ? 0x88ff88 : 0xffffff);
+    });
+  }
+
+  /**
+   * Add a rank/suit label for a card sprite.
+   */
+  private addCardLabel(
+    card: Card,
+    index: number,
+    pos: { x: number; y: number },
+    sprite: Phaser.GameObjects.GameObject,
+  ): void {
+    const isSelected = this.layoutDirection === 'vertical' && this.selectedIndex !== null
+      ? index <= this.selectedIndex
+      : index === this.selectedIndex;
+
+    // In vertical mode, position label to the right of the card to avoid overlap
+    const labelX = this.layoutDirection === 'vertical'
+      ? pos.x + this.cardWidth / 2 + 8
+      : pos.x;
+    const labelY = this.layoutDirection === 'vertical'
+      ? pos.y
+      : pos.y + 42;
+    const label = this.scene.add.text(labelX, labelY, `${card.rank}${card.suit}`, {
+      fontSize: '9px',
+      color: isSelected ? '#88ff88' : '#aaaaaa',
+      fontFamily: 'monospace',
+    }).setOrigin(0.5);
+    this.labels.push(label);
+
+    // Apply selection tint (default Image sprite path only)
+    (sprite as any).setTint(isSelected ? 0x88ff88 : 0xffffff);
   }
 
   /** Compute current hand card center positions (x/y). */
@@ -790,6 +1022,8 @@ export class HandView {
 
   /** Update visual selection tint on all sprites. */
   private updateSelectionTints(): void {
+    // Custom-rendered cards manage their own selection visuals
+    if (this._renderCardFn) return;
     const isVertical = this.layoutDirection === 'vertical';
     for (let i = 0; i < this.sprites.length; i++) {
       const sprite = this.sprites[i];
@@ -798,7 +1032,7 @@ export class HandView {
       const isSelected = isVertical && this.selectedIndex !== null
         ? i <= this.selectedIndex
         : i === this.selectedIndex;
-      sprite.setTint(isSelected ? 0x88ff88 : 0xffffff);
+      (sprite as any).setTint(isSelected ? 0x88ff88 : 0xffffff);
 
       // Update label colour
       if (i < this.labels.length) {
@@ -844,7 +1078,7 @@ export class HandView {
     for (let i = this._dragSourceRange.from; i <= this._dragSourceRange.to; i++) {
       const sprite = this.sprites[i];
       if (sprite) {
-        this._originalPositions.push({ x: sprite.x, y: sprite.y });
+        this._originalPositions.push({ x: (sprite as any).x, y: (sprite as any).y });
       }
     }
   }
@@ -858,7 +1092,7 @@ export class HandView {
     for (let i = from; i <= to; i++) {
       const sprite = this.sprites[i];
       if (sprite && sprite.active) {
-        sprite.y += this._dragLiftOffset;
+        (sprite as any).y += this._dragLiftOffset;
       }
     }
 
@@ -867,7 +1101,7 @@ export class HandView {
       for (let i = 0; i < from; i++) {
         const sprite = this.sprites[i];
         if (sprite && sprite.active) {
-          sprite.setTint(this._dimTint);
+          (sprite as any).setTint(this._dimTint);
         }
       }
     }
@@ -890,8 +1124,8 @@ export class HandView {
       const spriteIdx = from + i;
       const sprite = this.sprites[spriteIdx];
       if (sprite && sprite.active && this._originalPositions[i]) {
-        sprite.x = this._originalPositions[i].x + dx;
-        sprite.y = this._originalPositions[i].y + this._dragLiftOffset + dy;
+        (sprite as any).x = this._originalPositions[i].x + dx;
+        (sprite as any).y = this._originalPositions[i].y + this._dragLiftOffset + dy;
       }
     }
   }
@@ -909,8 +1143,8 @@ export class HandView {
         const targetY = this._originalPositions[i].y;
 
         if (this._reducedMotion) {
-          sprite.x = targetX;
-          sprite.y = targetY;
+          (sprite as any).x = targetX;
+          (sprite as any).y = targetY;
         } else {
           this.scene.tweens.add({
             targets: sprite as any,
@@ -933,10 +1167,10 @@ export class HandView {
       const spriteIdx = from + i;
       const sprite = this.sprites[spriteIdx];
       if (sprite && sprite.active && this._originalPositions[i]) {
-        const targetY = sprite.y - this._dragLiftOffset;
+        const targetY = (sprite as any).y - this._dragLiftOffset;
 
         if (this._reducedMotion) {
-          sprite.y = targetY;
+          (sprite as any).y = targetY;
         } else {
           this.scene.tweens.add({
             targets: sprite as any,

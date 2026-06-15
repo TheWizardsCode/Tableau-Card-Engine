@@ -72,7 +72,7 @@ export class BeleagueredCastleRenderer {
   get foundationDZs(): Phaser.GameObjects.Zone[] { return this.foundationDropZones; }
   get tableauDZs(): Phaser.GameObjects.Zone[] { return this.tableauDropZones; }
   /** Each tableau column's sprites, derived from HandView components. */
-  get tableauSprs(): Phaser.GameObjects.Image[][] { return this.tableauHandViews.map((hv) => hv.getSprites()); }
+  get tableauSprs(): Phaser.GameObjects.Image[][] { return this.tableauHandViews.map((hv) => hv.getSprites() as Phaser.GameObjects.Image[]); }
   get moveText(): Phaser.GameObjects.Text { return this.moveCountText; }
   get timer(): Phaser.GameObjects.Text { return this.timerText; }
   get seedDisplay(): Phaser.GameObjects.Text { return this.seedText; }
@@ -264,7 +264,7 @@ export class BeleagueredCastleRenderer {
       if (!hv) continue;
       const sprites = hv.getSprites();
       for (const sprite of sprites) {
-        sprite.setPosition(centerX, centerY).setAlpha(0).setDepth(dealIndex);
+        (sprite as Phaser.GameObjects.Image).setPosition(centerX, centerY).setAlpha(0).setDepth(dealIndex);
         dealIndex++;
       }
     }
@@ -296,7 +296,7 @@ export class BeleagueredCastleRenderer {
             this.onDealCard?.({ cardIndex: currentDealIndex, totalCards });
           },
           onComplete: () => {
-            sprite.setDepth(row);
+            (sprite as Phaser.GameObjects.Image).setDepth(row);
             completedCount++;
             if (completedCount >= totalCards) {
               this.onDealComplete?.();
@@ -333,12 +333,13 @@ export class BeleagueredCastleRenderer {
       topSprite.setInteractive({ useHandCursor: true, draggable: !interactionBlocked });
       topSprite.on('pointerdown', () => this.onCardClick?.(col));
 
+      const imgSprite = topSprite as Phaser.GameObjects.Image;
       const cardData: CardSpriteData = {
         colIndex: col,
         rowIndex,
-        originX: topSprite.x,
-        originY: topSprite.y,
-        originDepth: topSprite.depth,
+        originX: imgSprite.x,
+        originY: imgSprite.y,
+        originDepth: imgSprite.depth,
       };
       topSprite.setData('cardData', cardData);
     }
@@ -384,7 +385,7 @@ export class BeleagueredCastleRenderer {
     if (!hv) return;
     const sprites = hv.getSprites();
     if (sprites.length > 0) {
-      sprites[sprites.length - 1].setTint(SELECTION_TINT);
+      (sprites[sprites.length - 1] as any).setTint(SELECTION_TINT);
     }
   }
 
@@ -393,7 +394,7 @@ export class BeleagueredCastleRenderer {
     if (!hv) return;
     const sprites = hv.getSprites();
     if (sprites.length > 0) {
-      sprites[sprites.length - 1].clearTint();
+      (sprites[sprites.length - 1] as any).clearTint();
     }
   }
 

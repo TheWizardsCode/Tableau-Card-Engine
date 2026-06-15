@@ -551,13 +551,14 @@ export class GymHandPileScene extends GymSceneBase {
     card.faceUp = !card.faceUp;
     const newTexture = getCardTexture(card);
 
+    const imgSprite = sprite as Phaser.GameObjects.Image;
     if (this.reducedMotion) {
-      sprite.setTexture(newTexture);
+      imgSprite.setTexture(newTexture);
       this.logEvent(`Flipped card (instant, reduced-motion) -> ${newTexture}`);
     } else {
       flipCard({
         scene: this,
-        target: sprite,
+        target: imgSprite,
         newTexture,
         duration: 300,
         onComplete: () => {
@@ -588,12 +589,12 @@ export class GymHandPileScene extends GymSceneBase {
     const destY = 200;
 
     if (this.reducedMotion) {
-      sprite.setPosition(destX, destY);
+      (sprite as any).setPosition(destX, destY);
       this.logEvent(`Moved card (instant, reduced-motion)`);
     } else {
       this.activeMoveTween = moveGameObject({
         scene: this,
-        target: sprite,
+        target: sprite as unknown as Phaser.GameObjects.Components.Transform & Phaser.GameObjects.GameObject,
         destX,
         destY,
         duration: 500,
@@ -655,15 +656,15 @@ export class GymHandPileScene extends GymSceneBase {
 
     if (target) {
       if (this.reducedMotion) {
-        target.setTint(0xff4444);
+        (target as any).setTint(0xff4444);
         this.time?.delayedCall(200, () => {
-          try { target.clearTint(); } catch (_) { /* ignore */ }
+          try { (target as any).clearTint(); } catch (_) { /* ignore */ }
         });
         this.logEvent('Illegal move (brief tint, reduced-motion)');
       } else {
         shakeIllegalMove({
           scene: this,
-          target,
+          target: target as unknown as Phaser.GameObjects.Image,
           tint: 0xff4444,
           shakeDistance: 6,
           duration: 50,

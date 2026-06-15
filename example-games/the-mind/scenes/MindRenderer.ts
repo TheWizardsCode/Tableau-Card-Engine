@@ -277,7 +277,7 @@ export class MindRenderer {
     });
 
     // Update sprite display size and store card value for lazy texture loading.
-    const sprites = this.humanHandView.getSprites();
+    const sprites = this.humanHandView.getSprites() as Phaser.GameObjects.Image[];
     this.humanCardSprites = sprites;
 
     for (let i = 0; i < sprites.length; i++) {
@@ -363,7 +363,7 @@ export class MindRenderer {
 
     // Use HandView for layout; AI cards are always face-down.
     this.aiHandView.setCards(hand as any, { cardTextureFn: () => backKey });
-    const sprites = this.aiHandView.getSprites();
+    const sprites = this.aiHandView.getSprites() as Phaser.GameObjects.Image[];
     this.aiCardSprites = sprites;
 
     // Apply Mind-specific properties to sprites.

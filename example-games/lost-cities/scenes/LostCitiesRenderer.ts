@@ -267,7 +267,7 @@ export class LostCitiesRenderer {
 
   /** Return the player hand sprite at the given index (for illegal move feedback). */
   get handSpriteList(): Phaser.GameObjects.Image[] {
-    return this.handView.getSprites();
+    return this.handView.getSprites() as Phaser.GameObjects.Image[];
   }
 
   /** Return the AI hand sprite list (for AI animation). */
@@ -883,9 +883,10 @@ export class LostCitiesRenderer {
     this.clearSelectionHighlight();
     const sprite = this.handView.getSpriteAt(handIndex);
     if (!sprite) return;
+    const imgSprite = sprite as Phaser.GameObjects.Image;
 
     this.selectionHighlight = this.scene.add.rectangle(
-      sprite.x, sprite.y,
+      imgSprite.x, imgSprite.y,
       HAND_CARD_W + 6, HAND_CARD_H + 6,
       0xffdd44, 0,
     );

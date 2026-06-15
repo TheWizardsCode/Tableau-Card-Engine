@@ -184,6 +184,7 @@ export type {
   RemoveCardOptions,
   HandViewEvents,
   CardTextureResolver,
+  RenderCardFn,
 } from './HandView';
 
 // PileView – reusable card-pile display component
