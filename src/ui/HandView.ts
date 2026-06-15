@@ -14,6 +14,8 @@ import type { Card } from '../card-system/Card';
 import { getCardTexture } from './CardTextureHelpers';
 import { layoutCardPositions } from './layoutCardPositions';
 import { CARD_W } from './constants';
+import { dealCard } from './dealCard';
+import { GameEventEmitter } from '../core-engine';
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -195,6 +197,51 @@ export interface AddCardOptions {
 
   /** Duration in ms for deal animation. Only used when animate=true. */
   duration?: number;
+}
+
+/**
+ * Animation options for {@link HandView.animateAddCard}.
+ *
+ * These options define the entry animation for a card being dealt into the hand.
+ */
+export interface AnimateAddCardOptions {
+  /** Source X coordinate (where the card is coming from). */
+  sourceX: number;
+
+  /** Source Y coordinate (where the card is coming from). */
+  sourceY: number;
+
+  /** Duration in ms for the deal animation. @default 400 */
+  duration?: number;
+
+  /**
+   * Arc height for the dealing motion (negative = upward arc).
+   * Set to 0 for straight-line movement.
+   * @default -50
+   */
+  arcHeight?: number;
+
+  /** Easing function for the movement. @default 'Quad.easeOut' */
+  ease?: string;
+
+  /**
+   * Optional rotation to apply during the deal (in radians).
+   * Set to a small value (e.g., 0.1) for a slight spin effect.
+   * @default 0.05
+   */
+  rotation?: number;
+
+  /**
+   * Optional SFX configuration for the deal animation.
+   * Keys: start, move, end — audio keys to play at each phase.
+   */
+  sfx?: {
+    start?: string;
+    move?: string;
+    end?: string;
+    moveIntervalMs?: number;
+    moveLoop?: boolean;
+  };
 }
 
 /** Options for the {@link HandView.removeCard} method. */
@@ -447,6 +494,112 @@ export class HandView {
     this.cards.push(card);
     this.rebuildDisplay();
     this.emit('selectionchange', this.selectedIndex);
+  }
+
+  /**
+   * Animate a card entering the hand with a dealing animation, then
+   * integrate it into the hand model and display on completion.
+   *
+   * The destination is computed using HandView's own layout algorithm
+   * (same as {@link computeCardPositions}) so the animation exactly
+   * matches where the card will appear. This avoids the mismatch that
+   * occurs when callers duplicate layout math externally.
+   *
+   * In reduced-motion mode, the card is placed instantly (no animation)
+   * and the returned Promise resolves synchronously.
+   *
+   * @param card   - The card to add.
+   * @param options - Animation options including source position and timing.
+   * @returns A Promise that resolves when the animation completes and the
+   *          card is fully integrated into the hand model and display.
+   */
+  async animateAddCard(card: Card, options: AnimateAddCardOptions): Promise<void> {
+    const nextIndex = this.cards.length;
+    const newCount = nextIndex + 1;
+
+    // ── Compute destination (same layout logic as computeCardPositions) ──
+    let destX: number;
+    let destY: number;
+
+    if (this.layoutDirection === 'vertical') {
+      destX = this.baseX;
+      destY = this.baseY + nextIndex * this.spacing;
+    } else {
+      const gap = this.spacing - this.cardWidth;
+      const centerX = this.baseX + (newCount - 1) * this.spacing / 2;
+
+      const { positions } = layoutCardPositions({
+        count: newCount,
+        cardWidth: this.cardWidth,
+        gap,
+        centerX,
+        maxWidth: this.maxWidth,
+      });
+
+      destX = positions[nextIndex];
+
+      if (this.arcRadius <= 0 || newCount < 3) {
+        destY = this.baseY;
+      } else {
+        const first = positions[0];
+        const last = positions[positions.length - 1];
+        const arcCenterX = (first + last) / 2;
+        const halfSpan = Math.max((last - first) / 2, 1);
+        const normalized = (destX - arcCenterX) / halfSpan;
+        const offsetY = ((1 - normalized * normalized) * halfSpan * halfSpan) / (2 * this.arcRadius);
+        destY = this.baseY - offsetY;
+      }
+    }
+
+    // ── Reduced motion: instant placement ──
+    if (this._reducedMotion) {
+      this.cards.push(card);
+      this.rebuildDisplay();
+      this.emit('selectionchange', this.selectedIndex);
+      return;
+    }
+
+    // ── Animated path ──
+    return new Promise<void>((resolve) => {
+      const animSprite = this.scene.add.image(
+        options.sourceX,
+        options.sourceY,
+        getCardTexture(card),
+      );
+
+      // Create a game event emitter to listen for deal completion
+      const gameEvents = new GameEventEmitter();
+      gameEvents.once('card:dealt', () => {
+        try {
+          animSprite.destroy();
+        } catch {
+          // Ignore destroy errors if sprite already cleaned up
+        }
+        this.cards.push(card);
+        this.rebuildDisplay();
+        this.emit('selectionchange', this.selectedIndex);
+        resolve();
+      });
+
+      // Use a unique card identifier for the deal event.
+      // Card.id may not exist on Card data models, so we generate a fallback.
+      const cardId = (card as any).id || `${(card as any).rank || '?'}${(card as any).suit || ''}_${Date.now()}`;
+
+      dealCard({
+        scene: this.scene,
+        target: animSprite,
+        destX,
+        destY,
+        sourceX: options.sourceX,
+        sourceY: options.sourceY,
+        duration: options.duration,
+        arcHeight: options.arcHeight,
+        ease: options.ease,
+        rotation: options.rotation,
+        gameEvents,
+        cardId,
+      });
+    });
   }
 
   /**

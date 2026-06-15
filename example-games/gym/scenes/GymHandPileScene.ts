@@ -25,12 +25,10 @@ import { createStandardDeck, shuffleArray } from '../../../src/card-system/Deck'
 import { rankValue } from '../../../src/card-system/rankValue';
 import { Pile } from '../../../src/card-system/Pile';
 import { createSeededRng } from '../../../src/core-engine/SeededRng';
-import { GameEventEmitter } from '../../../src/core-engine';
 import { HandView } from '../../../src/ui/HandView';
 import { PileView } from '../../../src/ui/PileView';
 import { flipCard } from '../../../src/ui/flipCard';
 import { discardCard } from '../../../src/ui/discardCard';
-import { dealCard } from '../../../src/ui/dealCard';
 import { moveGameObject } from '../../../src/ui/moveGameObject';
 import { shakeIllegalMove } from '../../../src/ui/shakeIllegalMove';
 import { CARD_H, CARD_W, GAME_H, GAME_W } from '../../../src/ui/constants';
@@ -285,31 +283,7 @@ export class GymHandPileScene extends GymSceneBase {
     this.reset();
   }
 
-  private getHandPositionForIndex(index: number, handCount: number): { x: number; y: number } {
-    if (this.isVerticalLayout) {
-      return {
-        x: this.CASCADE_X,
-        y: this.CASCADE_TOP_Y + index * this.CASCADE_SPACING,
-      };
-    }
 
-    const x = this.HAND_BASE_X + index * this.HAND_SPACING;
-
-    if (this.arcRadius <= 0 || handCount < 3) {
-      return { x, y: this.HAND_BASE_Y };
-    }
-
-    const firstX = this.HAND_BASE_X;
-    const lastX = this.HAND_BASE_X + (handCount - 1) * this.HAND_SPACING;
-    const arcCenterX = (firstX + lastX) / 2;
-    const halfSpan = Math.max((lastX - firstX) / 2, 1);
-    const normalized = (x - arcCenterX) / halfSpan;
-    // Inverted arc: central card should be at the highest point while edges remain at baseY.
-    // Use a parabolic profile that peaks at normalized=0 and falls to zero at normalized=±1.
-    const offsetY = ((1 - normalized * normalized) * halfSpan * halfSpan) / (2 * this.arcRadius);
-
-    return { x, y: this.HAND_BASE_Y - offsetY };
-  }
 
   /**
    * Show or hide a slider's visual components and disable its input zone.
@@ -375,7 +349,7 @@ export class GymHandPileScene extends GymSceneBase {
     }
   }
 
-  private drawToHand(): void {
+  private async drawToHand(): Promise<void> {
     if (this.drawPile.isEmpty()) {
       this.logEvent('Cannot draw: draw pile is empty');
       this.showIllegalShake();
@@ -383,48 +357,24 @@ export class GymHandPileScene extends GymSceneBase {
     }
     const card = this.drawPile.pop()!;
     card.faceUp = true;
-    this.hand.push(card);
 
-    const destination = this.getHandPositionForIndex(this.hand.length - 1, this.hand.length);
-    const deckX = this.DECK_X;
-    const deckY = this.PILE_Y;
+    // Delegate animation and card integration to HandView
+    await this.handView.animateAddCard(card, {
+      sourceX: this.DECK_X,
+      sourceY: this.PILE_Y,
+      duration: 400,
+    });
+
+    // Sync the scene's hand model after HandView has integrated the card
+    this.hand.push(card);
+    this.handView.setSelected(this.selectedIdx >= 0 ? this.selectedIdx : null);
+    this.deckView.update();
 
     if (this.reducedMotion) {
-      // Instant placement for reduced motion
-      this.handView.setCards(this.hand);
-      this.handView.setSelected(this.selectedIdx >= 0 ? this.selectedIdx : null);
-      this.deckView.update();
       this.logEvent(`Drew ${card.rank}${card.suit} to hand (instant, reduced-motion)`);
-      return;
-    }
-
-    // Create a temporary sprite at the deck position to animate
-    const animSprite = this.add.image(deckX, deckY, getCardTexture(card));
-
-    const gameEvents = new GameEventEmitter();
-    gameEvents.on('card:dealt', () => {
-      try { animSprite.destroy(); } catch (_) { /* ignore */ }
-      this.handView.setCards(this.hand);
-      this.handView.setSelected(this.selectedIdx >= 0 ? this.selectedIdx : null);
-      this.deckView.update();
-      gameEvents.removeAllListeners();
+    } else {
       this.logEvent(`Drew ${card.rank}${card.suit} to hand (animated)`);
-    });
-
-    dealCard({
-      scene: this,
-      target: animSprite,
-      destX: destination.x,
-      destY: destination.y,
-      sourceX: deckX,
-      sourceY: deckY,
-      duration: 400,
-      gameEvents,
-      cardId: `${card.rank}${card.suit}`,
-    });
-
-    // Update pile visuals immediately
-    this.deckView.update();
+    }
   }
 
   private discardSelected(): void {
@@ -479,7 +429,7 @@ export class GymHandPileScene extends GymSceneBase {
     }
   }
 
-  private recallFromDiscard(): void {
+  private async recallFromDiscard(): Promise<void> {
     if (this.discardPile.isEmpty()) {
       this.logEvent('Cannot recall: discard pile is empty');
       this.showIllegalShake();
@@ -487,45 +437,24 @@ export class GymHandPileScene extends GymSceneBase {
     }
     const card = this.discardPile.pop()!;
     card.faceUp = true;
-    this.hand.push(card);
 
-    const destination = this.getHandPositionForIndex(this.hand.length - 1, this.hand.length);
-    const sourceX = this.DISCARD_X;
-    const sourceY = this.PILE_Y;
+    // Delegate animation and card integration to HandView
+    await this.handView.animateAddCard(card, {
+      sourceX: this.DISCARD_X,
+      sourceY: this.PILE_Y,
+      duration: 350,
+    });
+
+    // Sync the scene's hand model after HandView has integrated the card
+    this.hand.push(card);
+    this.handView.setSelected(this.selectedIdx >= 0 ? this.selectedIdx : null);
+    this.discardView.update();
 
     if (this.reducedMotion) {
-      this.handView.setCards(this.hand);
-      this.handView.setSelected(this.selectedIdx >= 0 ? this.selectedIdx : null);
-      this.discardView.update();
-      this.logEvent(`Recalled ${card.rank}${card.suit} from discard (instant)`);
-      return;
-    }
-
-    const animSprite = this.add.image(sourceX, sourceY, getCardTexture(card));
-
-    const gameEvents = new GameEventEmitter();
-    gameEvents.on('card:dealt', () => {
-      try { animSprite.destroy(); } catch (_) {}
-      this.handView.setCards(this.hand);
-      this.handView.setSelected(this.selectedIdx >= 0 ? this.selectedIdx : null);
-      this.discardView.update();
-      gameEvents.removeAllListeners();
+      this.logEvent(`Recalled ${card.rank}${card.suit} from discard (instant, reduced-motion)`);
+    } else {
       this.logEvent(`Recalled ${card.rank}${card.suit} from discard (animated)`);
-    });
-
-    dealCard({
-      scene: this,
-      target: animSprite,
-      destX: destination.x,
-      destY: destination.y,
-      sourceX,
-      sourceY,
-      duration: 350,
-      gameEvents,
-      cardId: `${card.rank}${card.suit}`,
-    });
-
-    this.discardView.update();
+    }
   }
 
   private selectNext(): void {

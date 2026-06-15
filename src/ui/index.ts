@@ -181,6 +181,7 @@ export { HandView } from './HandView';
 export type {
   HandViewOptions,
   AddCardOptions,
+  AnimateAddCardOptions,
   RemoveCardOptions,
   HandViewEvents,
   CardTextureResolver,

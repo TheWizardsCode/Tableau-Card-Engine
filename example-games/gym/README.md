@@ -145,7 +145,25 @@ cascade.on('cardclick', (idx) => cascade.setSelected(idx)); // selects cards [0.
 cascade.getCascadeRange(); // { from: 0, to: idx }
 ```
 
-**API**: `setCards(cards)`, `getCards()`, `addCard(card, opts?)`, `removeCard(index, opts?)`, `setSelected(index|null)`, `getSelected()`, `getCascadeRange()`, `setArcRadius(radius)`, `getArcRadius()`, `setMaxRotationDegrees(degrees)`, `getMaxRotationDegrees()`, `on(event, cb)`, `off(event, cb)`, `getSpriteAt(index)`, `getSprites()`, `getCardCenters()`, `setReducedMotion(bool)`, `destroy()`.
+**Animated insertion**: `animateAddCard(card, options)` adds a card to the hand with a dealing animation, computing the destination using HandView's own layout algorithm so the animation lands exactly where the card will appear. This is the preferred way to draw cards into a hand — it avoids destination-coordinate mismatches by centralising the layout math.
+
+```ts
+// Draw a card from the deck position with a 400ms animation
+await handView.animateAddCard(drawnCard, {
+  sourceX: deckX,     // where the animation starts
+  sourceY: deckY,
+  duration: 400,       // optional, default 400ms
+});
+
+// Reduced-motion is handled automatically — no tween is created
+handView.setReducedMotion(true);
+await handView.animateAddCard(drawnCard, { sourceX: deckX, sourceY: deckY });
+// Card is placed instantly, Promise resolves immediately
+```
+
+When using `animateAddCard`, the caller should also update its own model array (e.g., `this.hand.push(card)`) after the Promise resolves, and update any pile views that may have changed.
+
+**API**: `setCards(cards)`, `getCards()`, `addCard(card, opts?)`, `animateAddCard(card, animOpts)`, `removeCard(index, opts?)`, `setSelected(index|null)`, `getSelected()`, `getCascadeRange()`, `setArcRadius(radius)`, `getArcRadius()`, `setMaxRotationDegrees(degrees)`, `getMaxRotationDegrees()`, `on(event, cb)`, `off(event, cb)`, `getSpriteAt(index)`, `getSprites()`, `getCardCenters()`, `setReducedMotion(bool)`, `destroy()`.
 
 **New in vertical cascade mode:**
 - `layoutDirection: 'vertical'` — renders cards stacked vertically from top to bottom.
