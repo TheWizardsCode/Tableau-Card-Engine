@@ -147,15 +147,15 @@ function maybeAdvanceTutorial(scene: Phaser.Scene, expectedBefore: number): void
 function clickRequiredBusinessCard(scene: Phaser.Scene): void {
   const s = scene as any;
   const controller = s.tutorialController;
-  const marketCards = s.state?.market?.business;
-  if (!marketCards || marketCards.length === 0) return;
+  const devCards = s.state?.market?.development;
+  if (!devCards || devCards.length === 0) return;
 
   // Find the card matching requiredCardId from the current step
-  let cardToClick = marketCards[0]; // fallback
+  let cardToClick = devCards[0]; // fallback
   if (controller?.isActive) {
     const step = getCurrentStep(controller);
     if (step?.requiredCardId) {
-      const found = marketCards.find((c: any) => c.id === step.requiredCardId);
+      const found = devCards.find((c: any) => c.id === step.requiredCardId);
       if (found) {
         cardToClick = found;
       }
@@ -203,20 +203,20 @@ function clickStreetSlot(scene: Phaser.Scene, slotIdx: number): void {
   if (s.pendingBusinessCard === null) {
     // No card selected yet — try to find the required card
     const controller = s.tutorialController;
-    const marketCards = s.state?.market?.business;
-    if (marketCards && controller?.isActive) {
+    const devCards = s.state?.market?.development;
+    if (devCards && controller?.isActive) {
       const step = getCurrentStep(controller);
       if (step?.requiredCardId) {
-        const found = marketCards.find((c: any) => c.id === step.requiredCardId);
+        const found = devCards.find((c: any) => c.id === step.requiredCardId);
         if (found) {
           s.pendingBusinessCard = found;
         }
       }
-      if (!s.pendingBusinessCard && marketCards[0]) {
-        s.pendingBusinessCard = marketCards[0];
+      if (!s.pendingBusinessCard && devCards[0]) {
+        s.pendingBusinessCard = devCards[0];
       }
-    } else if (marketCards && marketCards[0]) {
-      s.pendingBusinessCard = marketCards[0];
+    } else if (devCards && devCards[0]) {
+      s.pendingBusinessCard = devCards[0];
     }
   }
   if (s.uiPhase !== 'market') { s.uiPhase = 'market'; }
@@ -261,20 +261,21 @@ describe('Main Street Tutorial E2E', () => {
     expect(getStepIndex(scene)).toBe(0); // T1
 
     const s = scene as any;
-    const businessCards = s.state?.market?.business;
-    expect(businessCards).toBeTruthy();
-    expect(businessCards.length).toBe(4);
+    const devCards = s.state?.market?.development;
+    expect(devCards).toBeTruthy();
+    expect(devCards.length).toBe(4);
 
     // With tutorial seed 'tutorial-seed' and Easy difficulty, the
-    // first business card in the market is always Cinema (index 0).
-    expect(businessCards[0].id).toBe('biz-cinema-1');
-    expect(businessCards[0].name).toBe('Cinema');
-    expect(businessCards[0].cost).toBe(10);
+    // first development card in the market is always Cinema (index 0).
+    expect(devCards[0].id).toBe('biz-cinema-1');
+    expect(devCards[0].name).toBe('Cinema');
+    expect(devCards[0].cost).toBe(10);
 
-    // The second card is always Laundromat (index 1)
-    expect(businessCards[1].id).toBe('biz-laundromat-0');
-    expect(businessCards[1].name).toBe('Laundromat');
-    expect(businessCards[1].cost).toBe(6);
+    // The second card is always Barbershop (index 1) — deck now includes
+    // community space cards in the development row, shifting the order.
+    expect(devCards[1].id).toBe('biz-barbershop-0');
+    expect(devCards[1].name).toBe('Barbershop');
+    expect(devCards[1].cost).toBe(6);
 
     // The investments row always has Grand Opening Sale
     const investments = s.state?.market?.investments;
