@@ -168,6 +168,12 @@ class DrawPileView extends PileView {
    */
   override update(): void {
     super.update();
+    // After super.update() sets the texture via setTexture(), Phaser resets
+    // the sprite's display size to the texture frame's natural size. Since SVG
+    // textures are rasterised at quality scale (4x), we must re-apply the
+    // intended display size immediately — otherwise the sprite appears at 4x.
+    this.getSprite().setDisplaySize(this.cardW, this.cardH);
+
     // Also apply lazy texture if needed (for async card back generation)
     const gen = this.refreshGen;
     void applyEnsuredTexture(
@@ -255,6 +261,9 @@ export class LostCitiesRenderer {
 
   /** Cache the refresh generation for stillMounted checks in async texture updates. */
   private refreshGen = 0;
+
+  /** Stored reference to the hand click handler so we can remove it before re-adding. */
+  private boundHandClick: ((index: number) => void) | null = null;
 
   constructor(scene: Phaser.Scene, session: LostCitiesSession) {
     this.scene = scene;
@@ -526,20 +535,19 @@ export class LostCitiesRenderer {
       cardW: CARD_W,
       cardH: CARD_H,
     });
-    this.drawPileView.setInteractive(false); // we handle clicks via callback
     this.drawPileView.onClick(() => callbacks.onDrawPileClick());
 
     // ── Player Hand: use HandView ───────────────────────────
     this.handView = new HandView(this.scene, {
       baseX: PLAYER_HAND_CENTER,
-      baseY: HAND_TOP,
-      spacing: 20, // overlapping cards — HandView handles layout
+      baseY: HAND_TOP + HAND_CARD_H / 2,
+      spacing: HAND_OVERLAP,
       cardWidth: HAND_CARD_W,
       showLabels: false,
-      selectionEnabled: true,
+      selectionEnabled: false, // Lost Cities manages its own selection via showSelectionHighlight
       clickEnabled: true,
       layoutDirection: 'vertical',
-      cardTextureFn: lcCardTextureFn(this.scene, CARD_W, CARD_H),
+      cardTextureFn: lcCardTextureFn(this.scene, HAND_CARD_W, HAND_CARD_H),
     });
 
     // ── AI Hand: use HandView (face-down cards) ─────────────
@@ -549,18 +557,19 @@ export class LostCitiesRenderer {
 
     // ── Discard Piles: use PileView per color ───────────────
     for (const color of EXPEDITION_COLORS) {
-      this.discardViews.set(
-        color,
-        new PileView(this.scene, {
-          x: laneX(EXPEDITION_COLORS.indexOf(color)),
-          y: DISCARD_Y + DISCARD_CARD_H / 2,
-          label: '',
-          emptyTexture: getLcBackFallbackKey(this.scene),
-          emptyAlpha: 0.3,
-          fullAlpha: 1,
-          cardTextureFn: lcCompactTextureFn(this.scene),
-        }),
-      );
+      const dv = new PileView(this.scene, {
+        x: laneX(EXPEDITION_COLORS.indexOf(color)),
+        y: DISCARD_Y + DISCARD_CARD_H / 2,
+        label: '',
+        emptyTexture: getLcBackFallbackKey(this.scene),
+        emptyAlpha: 0.3,
+        fullAlpha: 1,
+        cardTextureFn: lcCompactTextureFn(this.scene),
+      });
+      // Disable interactivity — the discard hit area created in
+      // createDiscardZones handles all discard clicks.
+      dv.setInteractive(false);
+      this.discardViews.set(color, dv);
     }
 
     this.scene.add
@@ -754,6 +763,7 @@ export class LostCitiesRenderer {
   }
 
   refreshDiscardPiles(): void {
+    const gen = this.refreshGen;
     for (let i = 0; i < 5; i++) {
       const color = EXPEDITION_COLORS[i];
       const pile = this.session.round.discardPiles.get(color) ?? [];
@@ -772,10 +782,25 @@ export class LostCitiesRenderer {
       discardView.setPile(adapter);
       discardView.update();
 
+      // Set the correct display size on the discard pile sprite.
+      // SVG textures are rasterised at quality scale (4x), so without
+      // setDisplaySize the sprite appears at the full canvas pixel size.
+      discardView.getSprite().setDisplaySize(DISCARD_CARD_W, DISCARD_CARD_H);
+
       // Also ensure compact texture is available
       const topCard = pile[pile.length - 1];
       const templateId = compactAssetKey(topCard);
       void ensureLcCompactTexture(this.scene, templateId);
+
+      // Apply lazy texture update so the discard card shows face-up
+      // when the compact SVG texture finishes rasterising.
+      void applyEnsuredTexture(
+        discardView.getSprite(),
+        ensureLcCompactTexture(this.scene, templateId),
+        () => gen === this.refreshGen && discardView.getSprite().active,
+        DISCARD_CARD_W,
+        DISCARD_CARD_H,
+      );
     }
   }
 
@@ -783,19 +808,49 @@ export class LostCitiesRenderer {
     // Use HandView for the player hand.
     // HandView manages its own sprites via setCards(), selection, and events.
 
-    // Get current hand (already sorted by the turn controller via handSortCompare)
+    // Get current hand and sort it by color then value (ascending)
     const hand = this.session.players[0].hand;
+    hand.sort(LostCitiesRenderer.handSortCompare);
+    const currentGen = this.refreshGen;
 
     // Update HandView with current cards.
     // HandView.setCards expects Card[], but LostCitiesCard doesn't implement
     // Card (no rank/suit). We cast to `any[]` since HandView only uses the
     // card objects as opaque handles passed to the custom texture resolver.
-    this.handView.setCards(hand as unknown as Card[], { cardTextureFn: lcCardTextureFn(this.scene, CARD_W, CARD_H) });
+    this.handView.setCards(hand as unknown as Card[], { cardTextureFn: lcCardTextureFn(this.scene, HAND_CARD_W, HAND_CARD_H) });
 
-    // Wire click handler — HandView emits cardclick events
-    this.handView.on('cardclick', (index: number) => {
-      onClick(index);
-    });
+    // Wire click handler — HandView emits cardclick events.
+    // Must remove the old listener first to prevent accumulation across turns.
+    if (this.boundHandClick) {
+      this.handView.off('cardclick', this.boundHandClick);
+    }
+    this.boundHandClick = (index: number) => onClick(index);
+    this.handView.on('cardclick', this.boundHandClick);
+
+    // Set the correct display size on all hand sprites.
+    // SVG textures are rasterised at quality scale (4x), so without
+    // setDisplaySize sprites appear at the full canvas pixel size.
+    const sprites = this.handView.getSprites() as Phaser.GameObjects.Image[];
+    for (let i = 0; i < sprites.length; i++) {
+      const sprite = sprites[i];
+      sprite.setDisplaySize(HAND_CARD_W, HAND_CARD_H);
+      sprite.setDepth(i + 1);
+
+      // Kick off lazy rasterisation for each hand card so the face texture
+      // replaces the card-back fallback. The cardTextureFn above may return
+      // the card-back key for any card whose face texture isn't ready yet.
+      const card = hand[i];
+      if (card) {
+        const templateId = cardAssetKey(card);
+        void applyEnsuredTexture(
+          sprite,
+          ensureLcCardTexture(this.scene, templateId, HAND_CARD_W, HAND_CARD_H),
+          () => currentGen === this.refreshGen && sprites.includes(sprite),
+          HAND_CARD_W,
+          HAND_CARD_H,
+        );
+      }
+    }
   }
 
   refreshAiHand(): void {

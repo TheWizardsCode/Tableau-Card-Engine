@@ -22,6 +22,7 @@
 import { GymSceneBase } from './GymSceneBase';
 import { GYM_HAND_PILE_KEY } from '../GymRegistry';
 import { createStandardDeck, shuffleArray } from '../../../src/card-system/Deck';
+import { rankValue } from '../../../src/card-system/rankValue';
 import { Pile } from '../../../src/card-system/Pile';
 import { createSeededRng } from '../../../src/core-engine/SeededRng';
 import { GameEventEmitter } from '../../../src/core-engine';
@@ -195,10 +196,12 @@ export class GymHandPileScene extends GymSceneBase {
 
     y += 26;
     // Controls row 2
-    this.addButton(cx - 350, y, '[ Show Valid ]', () => this.showValidMoves());
-    this.addButton(cx - 180, y, '[ Show Illegal ]', () => this.showIllegalMove());
-    this.addButton(cx + 10, y, '[ Select Next ]', () => this.selectNext());
-    this.addButton(cx + 180, y, '[ Reset ]', () => this.reset());
+    this.addButton(cx - 380, y, '[ Show Valid ]', () => this.showValidMoves());
+    this.addButton(cx - 210, y, '[ Show Illegal ]', () => this.showIllegalMove());
+    this.addButton(cx - 40, y, '[ Select Next ]', () => this.selectNext());
+    this.addButton(cx + 100, y, '[ Sort Hand ]', () => this.sortHand());
+    this.addButton(cx + 230, y, '[ Shuffle Hand ]', () => this.shuffleHand());
+    this.addButton(cx + 340, y, '[ Reset ]', () => this.reset());
 
     y += 26;
     // Controls row 3 — Drag-and-drop demo
@@ -566,6 +569,34 @@ export class GymHandPileScene extends GymSceneBase {
         },
       });
     }
+  }
+
+  private sortHand(): void {
+    if (this.hand.length === 0) {
+      this.logEvent('No cards to sort');
+      return;
+    }
+    // Sort by suit then rank (ascending)
+    this.hand.sort((a, b) => {
+      if (a.suit !== b.suit) return a.suit.localeCompare(b.suit);
+      return rankValue(a.rank) - rankValue(b.rank);
+    });
+    this.selectedIdx = -1;
+    this.handView.setCards(this.hand);
+    this.handView.setSelected(null);
+    this.logEvent('Hand sorted by suit then rank');
+  }
+
+  private shuffleHand(): void {
+    if (this.hand.length === 0) {
+      this.logEvent('No cards to shuffle');
+      return;
+    }
+    shuffleArray(this.hand);
+    this.selectedIdx = -1;
+    this.handView.setCards(this.hand);
+    this.handView.setSelected(null);
+    this.logEvent('Hand shuffled');
   }
 
   private moveSelectedCard(): void {

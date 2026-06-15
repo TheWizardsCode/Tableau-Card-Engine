@@ -474,6 +474,37 @@ export class HandView {
   }
 
   /**
+   * Sort the hand cards in-place using the provided comparison function,
+   * then rebuild the display to reflect the new order.
+   *
+   * Clears the current selection.
+   *
+   * @param compareFn - A comparison function following the same contract as
+   *                    `Array.prototype.sort`. Receives two Card objects and
+   *                    returns a negative number if `a` should come before `b`,
+   *                    a positive number if `a` should come after `b`, or 0 if
+   *                    they are considered equal.
+   *
+   * @example
+   * ```ts
+   * // Sort by rank ascending
+   * handView.sortCards((a, b) => a.rank - b.rank);
+   *
+   * // Sort by suit then rank
+   * handView.sortCards((a, b) => {
+   *   if (a.suit !== b.suit) return a.suit.localeCompare(b.suit);
+   *   return a.rank - b.rank;
+   * });
+   * ```
+   */
+  sortCards(compareFn: (a: Card, b: Card) => number): void {
+    this.cards.sort(compareFn);
+    this.selectedIndex = null;
+    this.rebuildDisplay();
+    this.emit('selectionchange', this.selectedIndex);
+  }
+
+  /**
    * Set the selected card index.
    *
    * Pass `null` to clear selection. Visual tints update immediately.
