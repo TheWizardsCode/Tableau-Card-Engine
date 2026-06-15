@@ -33,6 +33,9 @@ import {
   createOverlayButton, createOverlayMenuButton,
 } from '../../../src/ui';
 import { createHudText } from '../../../src/ui/Renderer/adapters/BeleagueredCastleAdapter';
+import { SaveLoadStore } from '../../../src/core-engine';
+import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
+import { saveBCSnapshot } from '../BeleagueredCastleSaveLoad';
 
 export class BeleagueredCastleScene extends CardGameScene {
   private gameState!: BeleagueredCastleState;
@@ -43,6 +46,9 @@ export class BeleagueredCastleScene extends CardGameScene {
   private timerEvent: Phaser.Time.TimerEvent | null = null;
   private gameEnded: boolean = false;
   private transcript: BCGameTranscript | null = null;
+
+  private saveLoadStore!: SaveLoadStore;
+  private transcriptStore!: TranscriptStore;
 
   private bcRenderer!: BeleagueredCastleRenderer;
   private overlayManager!: OverlayManager;
@@ -96,6 +102,9 @@ export class BeleagueredCastleScene extends CardGameScene {
 
     const recorder = new BCTranscriptRecorder(this.seed, this.gameState);
 
+    this.saveLoadStore = new SaveLoadStore();
+    this.transcriptStore = new TranscriptStore();
+
     this.bcRenderer = new BeleagueredCastleRenderer(this, this.gameState);
     this.overlayManager = new OverlayManager(this);
     this.turnController = new BeleagueredCastleTurnController(this.gameState, recorder, {
@@ -104,6 +113,7 @@ export class BeleagueredCastleScene extends CardGameScene {
       onAutoCompleteVisual: (moves, moveCards) => this.runAutoCompleteVisuals(moves, moveCards),
       onAutoCompleteDone: () => this.handleAutoCompleteDone(),
       onSoundEvent: (event, data) => this.handleSoundEvent(event, data),
+      onSaveCheckpoint: () => this.saveCheckpoint(),
     });
 
     this.onNewGame = () => { this.seed = Date.now(); this.scene.restart(); };
@@ -118,7 +128,12 @@ export class BeleagueredCastleScene extends CardGameScene {
     this.bcRenderer.onUndoClick = () => this.turnController.performUndo();
     this.bcRenderer.onRedoClick = () => this.turnController.performRedo();
     this.bcRenderer.onDealCard = (info) => this.gameEvents.emit('deal-card', info);
-    this.bcRenderer.onDealComplete = () => { this.dealComplete = true; this.bcRenderer.makeDraggable(this.interactionBlocked); this.bcRenderer.refreshUndoRedoButtons(this.turnController.canUndo, this.turnController.canRedo); };
+    this.bcRenderer.onDealComplete = () => {
+      this.dealComplete = true;
+      this.bcRenderer.makeDraggable(this.interactionBlocked);
+      this.bcRenderer.refreshUndoRedoButtons(this.turnController.canUndo, this.turnController.canRedo);
+      this.saveCheckpoint();
+    };
     this.bcRenderer.onCardClick = (col) => this.handleCardClick(col);
 
     this.initEventSystem();
@@ -307,12 +322,14 @@ export class BeleagueredCastleScene extends CardGameScene {
       this.stopTimer();
       this.transcript = this.turnController['recorder'].finalize('win', this.gameState.moveCount, this.elapsedSeconds);
       this.soundManager?.play(SFX_KEYS.WIN_FANFARE);
+      this.autoSaveTranscript();
       this.showWinOverlay(this.elapsedSeconds);
     } else {
       this.gameEnded = true;
       this.stopTimer();
       this.transcript = this.turnController['recorder'].finalize('loss', this.gameState.moveCount, this.elapsedSeconds);
       this.gameEvents.emit('game-ended', { finalTurnNumber: this.gameState.moveCount, winnerIndex: -1, reason: 'no-moves' });
+      this.autoSaveTranscript();
       this.showNoMovesOverlay();
     }
   }
@@ -322,6 +339,7 @@ export class BeleagueredCastleScene extends CardGameScene {
       this.gameEnded = true;
       this.stopTimer();
       this.transcript = this.turnController['recorder'].finalize('win', this.gameState.moveCount, this.elapsedSeconds);
+      this.autoSaveTranscript();
       this.showWinOverlay(this.elapsedSeconds, this.soundManager);
     }
   }
@@ -433,6 +451,26 @@ export class BeleagueredCastleScene extends CardGameScene {
 
   private resumeTimer(): void {
     if (this.timerEvent) this.timerEvent.paused = false;
+  }
+
+  // ── Save/Load ───────────────────────────────────────────
+  /**
+   * Save a game-state checkpoint after deal or each player move.
+   * Fire-and-forget (not awaited) to avoid blocking the input handler.
+   */
+  private saveCheckpoint(): void {
+    saveBCSnapshot(this.saveLoadStore, this.gameState).catch((err) =>
+      console.warn('[BeleagueredCastle] Failed to save checkpoint:', err),
+    );
+  }
+
+  /**
+   * Auto-save the finalized transcript to browser storage.
+   * Fire-and-forget (not awaited). Skips if no transcript has been finalized.
+   */
+  private autoSaveTranscript(): void {
+    if (!this.transcript) return;
+    autoSaveTranscript(this.transcriptStore, 'beleaguered-castle', this.transcript, '[BeleagueredCastle]');
   }
 
   // ── Refresh ─────────────────────────────────────────────

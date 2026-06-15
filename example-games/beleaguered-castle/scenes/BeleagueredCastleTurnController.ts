@@ -44,6 +44,8 @@ export interface TurnControllerCallbacks {
   onAutoCompleteVisual: (moves: BCMove[], moveCards: Array<{ suit: string; rank: string; foundationIndex: number }>) => void;
   onAutoCompleteDone: () => void;
   onSoundEvent: (event: string, data?: any) => void;
+  /** Called after each player-initiated move (including auto-moves that follow). */
+  onSaveCheckpoint?: () => void;
 }
 
 export class BeleagueredCastleTurnController {
@@ -142,6 +144,7 @@ export class BeleagueredCastleTurnController {
     }
 
     this.callbacks.onRefresh();
+    this.callbacks.onSaveCheckpoint?.();
     this.checkGameEnd();
   }
 
@@ -262,6 +265,7 @@ export class BeleagueredCastleTurnController {
     this.pendingAutoCompleteCmds = null;
     this.undoManager.execute(new CompoundCommand(cmds, 'Auto-complete'));
     this.callbacks.onRefresh();
+    this.callbacks.onSaveCheckpoint?.();
     this.autoCompleting = false;
     this.callbacks.onAutoCompleteDone();
   }
