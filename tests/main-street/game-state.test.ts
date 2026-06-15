@@ -20,6 +20,7 @@ import {
   MARKET_INVESTMENT_SLOTS,
   INCIDENT_QUEUE_SIZE,
   createBusinessDeck,
+  createCommunitySpaceDeck,
   createEventDeck,
   createUpgradeDeck,
 } from '../../example-games/main-street/MainStreetCards';
@@ -27,13 +28,14 @@ import { createSeededRng } from '../../src/core-engine';
 
 import { DEFAULT_CHALLENGES_PER_RUN } from '../../example-games/main-street/MainStreetChallenges';
 
-// ── Template Counts (M1 + M2) ──────────────────────────────
-// Business: 5 (M1) + 12 (M2) = 17 templates
-// Event:    5 (M1) + 12 (M2) = 17 templates
-// Upgrade:  3 (M1) + 14 (M2) + 4 branching + 4 level-2 = 25 templates
-const BUSINESS_TEMPLATE_COUNT = 17;
+// ── Template Counts (M1 + M2 + Community Spaces) ───────────
+// Business:  5 (M1) + 12 (M2) - 1 (Park moved to community-space) = 16 templates
+// Event:     5 (M1) + 12 (M2) = 17 templates
+// Upgrade:   3 (M1) + 14 (M2) + 4 branching + 4 level-2 + 1 (Community Hub) = 26 templates
+// Community: 2 (Park, Library) = 2 templates
+const BUSINESS_TEMPLATE_COUNT = 16;
 const EVENT_TEMPLATE_COUNT = 17;
-const UPGRADE_TEMPLATE_COUNT = 25;
+const UPGRADE_TEMPLATE_COUNT = 26;
 const DEFAULT_BUSINESS_COPIES = 3;
 const DEFAULT_EVENT_COPIES = 3;
 const DEFAULT_UPGRADE_COPIES = 2;
@@ -375,12 +377,13 @@ describe('MainStreetState', () => {
       }
     });
 
-    it('should have upgrade cards that reference valid business names', () => {
+    it('should have upgrade cards that reference valid business or community space names', () => {
       const businesses = createBusinessDeck(1);
-      const businessNames = new Set(businesses.map(b => b.name));
+      const communitySpaces = createCommunitySpaceDeck(1);
+      const allNames = new Set([...businesses.map(b => b.name), ...communitySpaces.map(cs => cs.name)]);
       const upgrades = createUpgradeDeck(1);
       for (const upg of upgrades) {
-        expect(businessNames.has(upg.targetBusiness)).toBe(true);
+        expect(allNames.has(upg.targetBusiness), `${upg.id} targets "${upg.targetBusiness}" which is not a known card name`).toBe(true);
       }
     });
   });

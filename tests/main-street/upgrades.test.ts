@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest';
 
 import { setupMainStreetGame, type MainStreetState } from '../../example-games/main-street/MainStreetState';
-import { createUpgradeDeck } from '../../example-games/main-street/MainStreetCards';
+import { createUpgradeDeck, createCommunitySpaceDeck } from '../../example-games/main-street/MainStreetCards';
 import {
   canPurchaseUpgrade,
   purchaseUpgrade,
@@ -440,11 +440,13 @@ describe('upgrade card target business display', () => {
     }
   });
 
-  it('every upgrade card\'s targetBusiness matches a known business template name', () => {
+  it('every upgrade card\'s targetBusiness matches a known business or community space name', () => {
     const state = setupMainStreetGame({ seed: 'target-biz-check' });
     const businessNames = new Set(state.decks.business.map(b => b.name));
+    const communitySpaceNames = new Set(createCommunitySpaceDeck(1).map(cs => cs.name));
+    const allNames = new Set([...businessNames, ...communitySpaceNames]);
     for (const u of allUpgradeTemplates) {
-      expect(businessNames.has(u.targetBusiness)).toBe(true);
+      expect(allNames.has(u.targetBusiness), `${u.id} targets "${u.targetBusiness}" which is not a known card name`).toBe(true);
     }
   });
 
@@ -474,14 +476,16 @@ describe('upgrade card target business display', () => {
     }
   });
 
-  it('display label "for <targetBusiness>" references a valid business name', () => {
+  it('display label "for <targetBusiness>" references a valid business or community space name', () => {
     const state = setupMainStreetGame({ seed: 'display-label-check' });
     const businessNames = new Set(state.decks.business.map(b => b.name));
+    const communitySpaceNames = new Set(createCommunitySpaceDeck(1).map(cs => cs.name));
+    const allNames = new Set([...businessNames, ...communitySpaceNames]);
 
     for (const u of allUpgradeTemplates) {
       const displayLabel = `for ${u.targetBusiness}`;
       expect(displayLabel).toContain(u.targetBusiness);
-      expect(businessNames.has(u.targetBusiness)).toBe(true);
+      expect(allNames.has(u.targetBusiness), `${u.id} targets "${u.targetBusiness}" which is not a known card name`).toBe(true);
     }
   });
 });
