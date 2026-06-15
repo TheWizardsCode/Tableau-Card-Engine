@@ -35,7 +35,7 @@ import {
 import { createHudText } from '../../../src/ui/Renderer/adapters/BeleagueredCastleAdapter';
 import { SaveLoadStore } from '../../../src/core-engine';
 import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
-import { saveBCSnapshot } from '../BeleagueredCastleSaveLoad';
+import { saveBCSnapshot, loadBCSnapshot } from '../BeleagueredCastleSaveLoad';
 
 export class BeleagueredCastleScene extends CardGameScene {
   private gameState!: BeleagueredCastleState;
@@ -93,6 +93,8 @@ export class BeleagueredCastleScene extends CardGameScene {
     this.seed = seedParam ? parseInt(seedParam, 10) : Date.now();
 
     this.detectReplayMode();
+
+    // Create a placeholder game state; will be replaced if resuming from checkpoint
     this.gameState = deal(this.seed);
     this.dealComplete = false;
     this.selectedCol = null;
@@ -168,10 +170,8 @@ export class BeleagueredCastleScene extends CardGameScene {
       this.bcRenderer.refreshHUD();
       this.emitStateSettled(this.gameState.moveCount, this.gameEnded ? 'ended' : 'playing');
     } else {
-      this.bcRenderer.dealTableauAnimated();
-      this.setupDragAndDrop();
-      this.setupClickToMove();
-      this.setupKeyboard();
+      // Check for saved checkpoint before dealing a fresh game
+      this.checkForSavedGameAndStart();
     }
   }
 
@@ -451,6 +451,130 @@ export class BeleagueredCastleScene extends CardGameScene {
 
   private resumeTimer(): void {
     if (this.timerEvent) this.timerEvent.paused = false;
+  }
+
+  // ── Resume / Fresh start ────────────────────────────────
+  /**
+   * Check for a saved checkpoint and either offer to resume or start a fresh game.
+   * Called at the end of create() in non-replay mode.
+   */
+  private checkForSavedGameAndStart(): void {
+    loadBCSnapshot(this.saveLoadStore).then((savedState) => {
+      if (savedState) {
+        this.showResumeOverlay(savedState);
+      } else {
+        this.startFreshGame();
+      }
+    }).catch((err) => {
+      console.warn('[BeleagueredCastle] Error loading checkpoint:', err);
+      this.startFreshGame();
+    });
+  }
+
+  /**
+   * Show a "Resume Saved Game?" overlay with Resume and New Game options.
+   */
+  private showResumeOverlay(savedState: BeleagueredCastleState): void {
+    const OVERLAY_DEPTH = 2000;
+    const BUTTON_DEPTH = OVERLAY_DEPTH + 1;
+
+    this.overlayManager.showOverlay({
+      type: 'custom',
+      backgroundOptions: { depth: OVERLAY_DEPTH, alpha: 0.75 },
+    });
+
+    const title = this.add.text(GAME_W / 2, GAME_H / 2 - 60, 'Resume Saved Game?', {
+      fontSize: '36px',
+      color: '#ffcc00',
+      fontFamily: FONT_FAMILY,
+      fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(BUTTON_DEPTH);
+    this.overlayManager.add(title);
+
+    const infoText = this.add.text(GAME_W / 2, GAME_H / 2 - 15,
+      `A checkpoint was found from a previous game.\nResume where you left off or start fresh.`,
+      { fontSize: '18px', color: '#cccccc', fontFamily: FONT_FAMILY, align: 'center' },
+    ).setOrigin(0.5).setDepth(BUTTON_DEPTH);
+    this.overlayManager.add(infoText);
+
+    const resumeBtn = createOverlayButton(this, GAME_W / 2 - 110, GAME_H / 2 + 50, '[ Resume ]', BUTTON_DEPTH);
+    resumeBtn.on('pointerdown', () => {
+      this.overlayManager.dismiss();
+      this.restoreFromCheckpoint(savedState);
+    });
+    this.overlayManager.add(resumeBtn);
+
+    const newGameBtn = createOverlayButton(this, GAME_W / 2 + 110, GAME_H / 2 + 50, '[ New Game ]', BUTTON_DEPTH);
+    newGameBtn.on('pointerdown', () => {
+      this.overlayManager.dismiss();
+      this.clearCheckpointAndStartFresh();
+    });
+    this.overlayManager.add(newGameBtn);
+  }
+
+  /**
+   * Restore the game from a saved checkpoint.
+   * Replaces the current game state, skips deal animation, and wires up interactions.
+   */
+  private restoreFromCheckpoint(savedState: BeleagueredCastleState): void {
+    // Replace the placeholder game state with the saved checkpoint
+    this.gameState = savedState;
+    this.seed = savedState.seed;
+    this.dealComplete = true;
+
+    // Rebuild the turn controller with the restored state
+    const recorder = new BCTranscriptRecorder(this.seed, this.gameState);
+    this.turnController = new BeleagueredCastleTurnController(this.gameState, recorder, {
+      onRefresh: () => this.refreshAll(),
+      onCheckGameEnd: () => this.handleGameEnd(),
+      onAutoCompleteVisual: (moves, moveCards) => this.runAutoCompleteVisuals(moves, moveCards),
+      onAutoCompleteDone: () => this.handleAutoCompleteDone(),
+      onSoundEvent: (event, data) => this.handleSoundEvent(event, data),
+      onSaveCheckpoint: () => this.saveCheckpoint(),
+    });
+
+    // Reassign callbacks that reference the new turn controller
+    this.bcRenderer.onUndoClick = () => this.turnController.performUndo();
+    this.bcRenderer.onRedoClick = () => this.turnController.performRedo();
+    this.onNewGame = () => { this.seed = Date.now(); this.scene.restart(); };
+    this.onRestart = () => this.scene.restart();
+    this.onUndoLast = () => { this.overlayManager.dismiss(); this.gameEnded = false; this.resumeTimer(); this.turnController.performUndo(); };
+
+    // Refresh the renderer with the restored state
+    this.bcRenderer.refreshAll(true, false);
+    this.bcRenderer.refreshUndoRedoButtons(this.turnController.canUndo, this.turnController.canRedo);
+
+    // Wire up interactions (no deal animation since dealComplete is already true)
+    this.setupDragAndDrop();
+    this.setupClickToMove();
+    this.setupKeyboard();
+  }
+
+  /**
+   * Clear the saved checkpoint and start a fresh game.
+   * Used when the user clicks "New Game" on the resume overlay.
+   */
+  private clearCheckpointAndStartFresh(): void {
+    // Overwrite the checkpoint with a fresh deal state to effectively clear it
+    const freshState = deal(Date.now());
+    saveBCSnapshot(this.saveLoadStore, freshState).then(() => {
+      // Now restart the scene to get a clean fresh game
+      this.scene.restart();
+    }).catch((err) => {
+      console.warn('[BeleagueredCastle] Failed to clear checkpoint:', err);
+      this.scene.restart();
+    });
+  }
+
+  /**
+   * Start a fresh game (no saved checkpoint).
+   * Runs the deal animation and wires up interactions as normal.
+   */
+  private startFreshGame(): void {
+    this.bcRenderer.dealTableauAnimated();
+    this.setupDragAndDrop();
+    this.setupClickToMove();
+    this.setupKeyboard();
   }
 
   // ── Save/Load ───────────────────────────────────────────

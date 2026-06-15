@@ -327,4 +327,105 @@ describe('Beleaguered Castle save/load integration (CG-0MPK8XS5A00345OT)', () =>
     expect(rt.game).toBe('beleaguered-castle');
     expect(rt.result.outcome).toBe('win');
   });
+
+  // ── Resume overlay integration tests ────────────────────
+
+  it('resume: loadBCSnapshot returns null when no checkpoint saved', async () => {
+    const store = new SaveLoadStore();
+    const result = await loadBCSnapshot(store);
+    expect(result).toBeNull();
+  });
+
+  it('resume: checkpoint exists after save, can be loaded', async () => {
+    const SEED = 8888;
+    const store = new SaveLoadStore();
+    const state = deal(SEED);
+
+    // Apply a move to create non-trivial state
+    tryFindAndApplyMove(state);
+
+    await saveBCSnapshot(store, state);
+    const loaded = await loadBCSnapshot(store);
+    expect(loaded).not.toBeNull();
+    expect(loaded!.seed).toBe(SEED);
+    expect(loaded!.moveCount).toBe(state.moveCount);
+  });
+
+  it('resume: checkpoint persists across separate store instances', async () => {
+    const SEED = 4444;
+    const state = deal(SEED);
+    tryFindAndApplyMove(state);
+    const expectedMoveCount = state.moveCount;
+
+    // Save with one store instance
+    const store1 = new SaveLoadStore();
+    await saveBCSnapshot(store1, state);
+
+    // Load with a different store instance (same backend)
+    const store2 = new SaveLoadStore();
+    const loaded = await loadBCSnapshot(store2);
+    expect(loaded).not.toBeNull();
+    expect(loaded!.moveCount).toBe(expectedMoveCount);
+    expect(loaded!.seed).toBe(SEED);
+  });
+
+  it('resume: loading checkpoint does not affect autosave functionality', async () => {
+    const SEED = 6666;
+    const saveStore = new SaveLoadStore();
+    const transcriptStore = new TranscriptStore();
+
+    const state = deal(SEED);
+    const recorder = new BCTranscriptRecorder(SEED, state);
+
+    // Play some moves
+    tryFindAndApplyMove(state);
+
+    // Save checkpoint
+    await saveBCSnapshot(saveStore, state);
+
+    // Load checkpoint
+    const loaded = await loadBCSnapshot(saveStore);
+    expect(loaded).not.toBeNull();
+
+    // Continue playing from loaded state
+    tryFindAndApplyMove(loaded!);
+    recorder.recordMove(
+      { kind: 'tableau-to-foundation', fromCol: 0, toFoundation: 0 },
+      loaded!.moveCount,
+    );
+
+    // Finalize and auto-save transcript
+    const transcript = recorder.finalize('win', loaded!.moveCount, 60);
+    expect(transcript).not.toBeNull();
+    autoSaveTranscript(transcriptStore, 'beleaguered-castle', transcript!);
+
+    await vi.waitFor(() => {
+      expect(console.info).toHaveBeenCalledWith(
+        expect.stringContaining('Transcript saved'),
+      );
+    });
+
+    const savedTranscripts = await transcriptStore.list('beleaguered-castle');
+    expect(savedTranscripts.length).toBeGreaterThan(0);
+  });
+
+  it('resume: clearing checkpoint by saving fresh state then loading returns fresh state', async () => {
+    const SEED = 7777;
+    const store = new SaveLoadStore();
+
+    // Save initial checkpoint
+    const state1 = deal(SEED);
+    tryFindAndApplyMove(state1);
+    await saveBCSnapshot(store, state1);
+
+    // "Clear" by saving a fresh deal state
+    const freshState = deal(Date.now());
+    await saveBCSnapshot(store, freshState);
+
+    // Load should return the fresh state (overwritten), not state1
+    const loaded = await loadBCSnapshot(store);
+    expect(loaded).not.toBeNull();
+    // The fresh state has moveCount=0 (just dealt)
+    expect(loaded!.moveCount).toBe(0);
+  });
 });
