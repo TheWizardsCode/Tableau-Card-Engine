@@ -12,7 +12,7 @@
  * @module
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { UNIFIED_TUTORIAL_STEPS } from '../../example-games/main-street/TutorialFlow';
 
 describe('Tutorial text updates (AC1-3)', () => {

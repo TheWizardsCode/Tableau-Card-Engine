@@ -16,7 +16,6 @@
 
 import { describe, it, expect } from 'vitest';
 import { serializeMainStreetState, deserializeMainStreetState, setupMainStreetGame, type MainStreetState, type MainStreetSerializedState } from '../../example-games/main-street/MainStreetState';
-import { createBusinessDeck, createCommunitySpaceDeck, type BusinessCard, type CommunitySpaceCard } from '../../example-games/main-street/MainStreetCards';
 
 // ── Helpers ─────────────────────────────────────────────────
 
@@ -195,7 +194,9 @@ describe('New-format save deserialization (AC2)', () => {
     // Check if any Park card exists, it's community-space
     const gridParks = deserialized.streetGrid.filter(s => s && s.name === 'Park');
     for (const park of gridParks) {
-      expect(park.family).toBe('community-space');
+      if (park) {
+        expect(park.family).toBe('community-space');
+      }
     }
   });
 
