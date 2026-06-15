@@ -59,7 +59,7 @@ describe('Main Street save/load integration', () => {
     const state = setupMainStreetGame({ seed: 'save-load-turn-start' });
 
     executeDayStart(state);
-    const card = state.market.business[0];
+    const card = state.market.development[0];
     executeAction(state, { type: 'buy-business', cardId: card.id, slotIndex: 0 });
     processEndOfTurn(state);
 

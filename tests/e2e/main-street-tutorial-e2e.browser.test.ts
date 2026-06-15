@@ -331,7 +331,7 @@ describe('Main Street Tutorial E2E', () => {
     // Try to click the first business card (Cinema) instead of the
     // required Laundromat. This should show an error and NOT advance.
     const s = scene as any;
-    const wrongCard = s.state.market.business[0]; // Cinema
+    const wrongCard = s.state.market.development[0]; // Cinema
     expect(wrongCard.id).not.toBe('biz-laundromat-0');
 
     if (s.uiPhase !== 'market') { s.uiPhase = 'market'; }

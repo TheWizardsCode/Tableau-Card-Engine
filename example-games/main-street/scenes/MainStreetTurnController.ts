@@ -198,7 +198,7 @@ export class MainStreetTurnController {
         : null;
       if (step?.requiredCardId && card.id !== step.requiredCardId) {
         // Find the card name from the market for the error message
-        const requiredCard = s.state.market.business.find(
+        const requiredCard = s.state.market.development.find(
           (c: any) => c.id === step.requiredCardId
         );
         const requiredName = requiredCard?.name ?? 'the specified card';
@@ -232,7 +232,7 @@ export class MainStreetTurnController {
 
     // Enter placement mode
     s.pendingBusinessCard = card;
-    s.pendingBusinessSourceIndex = s.state.market.business.findIndex((c: any) => c.id === card.id);
+    s.pendingBusinessSourceIndex = s.state.market.development.findIndex((c: any) => c.id === card.id);
     s.uiPhase = 'placing-business';
     s.instructionText.setText(`Click an empty slot to place "${card.name}"`);
     s.refreshStreetGrid();
@@ -288,7 +288,7 @@ export class MainStreetTurnController {
     s.refreshAll();
 
     const afterTransfer = (): void => {
-      console.debug('[MS] onSlotClick: attempting BuyBusiness', { cardId: pendingCardId, slotIndex, coinsBefore: s.state.resourceBank.coins, marketBefore: s.state.market.business.map((c: any)=>c.id) });
+      console.debug('[MS] onSlotClick: attempting BuyBusiness', { cardId: pendingCardId, slotIndex, coinsBefore: s.state.resourceBank.coins, marketBefore: s.state.market.development.map((c: any)=>c.id) });
       try {
         const cmd = buyBusinessCommand(s.state, pendingCardId, slotIndex);
         s.undoManager.execute(cmd);
@@ -313,7 +313,7 @@ export class MainStreetTurnController {
       void s.animateTransferFromMarket({
         cardId: pendingCardId,
         family: 'business',
-        row: 'business',
+        row: 'development',
         slotIndex: sourceIndex,
         destination: s.getStreetSlotCenter(slotIndex),
       }).then(afterTransfer);

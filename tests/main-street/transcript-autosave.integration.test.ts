@@ -58,7 +58,7 @@ function playTurns(state: ReturnType<typeof setupMainStreetGame>, turns: number)
     if (state.gameResult !== 'playing') break;
     executeDayStart(state);
     // Try to buy first affordable business
-    const affordable = state.market.business.filter(
+    const affordable = state.market.development.filter(
       (c) => c.cost <= state.resourceBank.coins,
     );
     const emptyIdx = state.streetGrid.findIndex((b) => b === null);

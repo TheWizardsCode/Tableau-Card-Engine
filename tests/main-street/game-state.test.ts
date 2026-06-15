@@ -150,8 +150,8 @@ describe('MainStreetState', () => {
 
     it('should populate market with correct slot counts', () => {
       const state = createTestState();
-      expect(state.market.business.length).toBeLessThanOrEqual(MARKET_BUSINESS_SLOTS);
-      expect(state.market.business.length).toBeGreaterThan(0);
+      expect(state.market.development.length).toBeLessThanOrEqual(MARKET_BUSINESS_SLOTS);
+      expect(state.market.development.length).toBeGreaterThan(0);
       expect(state.market.investments.length).toBeLessThanOrEqual(MARKET_INVESTMENT_SLOTS);
       expect(state.market.investments.length).toBeGreaterThan(0);
     });
@@ -243,8 +243,8 @@ describe('MainStreetState', () => {
       expect(state1.seed).toBe(state2.seed);
 
       // Market should have same cards in same order
-      expect(state1.market.business.map(c => c.id)).toEqual(
-        state2.market.business.map(c => c.id),
+      expect(state1.market.development.map(c => c.id)).toEqual(
+        state2.market.development.map(c => c.id),
       );
       expect(state1.market.investments.map(c => c.id)).toEqual(
         state2.market.investments.map(c => c.id),
@@ -313,8 +313,8 @@ describe('MainStreetState', () => {
       for (const seed of seeds) {
         const s1 = createTestState(seed);
         const s2 = createTestState(seed);
-        expect(s1.market.business.map(c => c.id)).toEqual(
-          s2.market.business.map(c => c.id),
+        expect(s1.market.development.map(c => c.id)).toEqual(
+          s2.market.development.map(c => c.id),
         );
       }
     });
@@ -323,7 +323,7 @@ describe('MainStreetState', () => {
   describe('card integrity', () => {
     it('should have all market + deck cards equal total deck size (business)', () => {
       const state = createTestState();
-      const total = state.market.business.length + state.decks.business.length;
+      const total = state.market.development.length + state.decks.business.length;
       expect(total).toBe(BUSINESS_TEMPLATE_COUNT * DEFAULT_BUSINESS_COPIES);
     });
 
@@ -347,7 +347,7 @@ describe('MainStreetState', () => {
     it('should have all unique card IDs across market, decks, and queues', () => {
       const state = createTestState();
       const allIds = [
-        ...state.market.business.map(c => c.id),
+        ...state.market.development.map(c => c.id),
         ...state.market.investments.map(c => c.id),
         ...state.decks.business.map(c => c.id),
         ...state.decks.event.map(c => c.id),

@@ -587,12 +587,12 @@ export class MainStreetRenderer {
     }).setOrigin(0.5, 1);
     s.marketContainer.add(sectionLabel);
 
-    // Business row
+    // Development row (business + community space cards)
     this.drawMarketRow(
       marketTop + 6,
-      'Business',
-      'business',
-      s.state.market.business,
+      'Development',
+      'development',
+      s.state.market.development,
       MARKET_BUSINESS_SLOTS,
       (card) => s.onBusinessCardClick(card as BusinessCard),
     );

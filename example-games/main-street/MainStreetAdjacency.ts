@@ -9,7 +9,7 @@
  * @module
  */
 
-import type { BusinessCard, SynergyType } from './MainStreetCards';
+import type { BusinessCard, CommunitySpaceCard, SynergyType } from './MainStreetCards';
 import { GRID_SIZE, SYNERGY_BONUS_PER_NEIGHBOR } from './MainStreetCards';
 import type { MainStreetState } from './MainStreetState';
 import { addLog, syncResourceBankToLedger } from './MainStreetState';
@@ -72,7 +72,7 @@ export function neighbors(index: number, range: number = 1): number[] {
  * @returns The synergy bonus in coins.
  */
 export function computeSynergyBonus(
-  grid: (BusinessCard | null)[],
+  grid: (BusinessCard | CommunitySpaceCard | null)[],
   index: number,
   bonusPerNeighbor: number = SYNERGY_BONUS_PER_NEIGHBOR,
 ): number {
@@ -110,7 +110,7 @@ export function computeSynergyBonus(
  * @returns The total income in coins for this business.
  */
 export function computeBusinessIncome(
-  grid: (BusinessCard | null)[],
+  grid: (BusinessCard | CommunitySpaceCard | null)[],
   index: number,
   bonusPerNeighbor: number = SYNERGY_BONUS_PER_NEIGHBOR,
 ): number {
@@ -132,7 +132,7 @@ export function computeBusinessIncome(
  * @returns Object with `total` income and `breakdown` per slot.
  */
 export function computeIncome(
-  grid: (BusinessCard | null)[],
+  grid: (BusinessCard | CommunitySpaceCard | null)[],
   bonusPerNeighbor: number = SYNERGY_BONUS_PER_NEIGHBOR,
 ): IncomeResult {
   const breakdown: SlotIncome[] = [];

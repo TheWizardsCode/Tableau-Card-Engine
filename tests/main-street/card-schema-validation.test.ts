@@ -56,7 +56,7 @@ describe('Main Street card schema and registry validation', () => {
     const registered = new Set(CARD_TEMPLATE_NAMES.keys());
 
     const runtimeCardIds = [
-      ...state.market.business.map(card => card.id),
+      ...state.market.development.map(card => card.id),
       ...state.market.investments.map(card => card.id),
       ...state.incidentQueue.map(card => card.id),
       ...state.decks.business.map(card => card.id),

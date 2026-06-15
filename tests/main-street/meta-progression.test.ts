@@ -678,7 +678,7 @@ describe('Meta-Progression System', () => {
       const tier1BizIds = tier1CardIds.filter((id) => id.startsWith('biz-'));
 
       // All market business cards should also be from tier-1
-      for (const card of state.market.business) {
+      for (const card of state.market.development) {
         const baseId = card.id.replace(/-\d+$/, '');
         expect(tier1BizIds).toContain(baseId);
       }
@@ -1142,7 +1142,7 @@ describe('Meta-Progression System', () => {
         const baseId = card.id.replace(/-\d+$/, '');
         expect(allowedIds.has(baseId)).toBe(true);
       }
-      for (const card of nextRun.market.business) {
+      for (const card of nextRun.market.development) {
         const baseId = card.id.replace(/-\d+$/, '');
         expect(allowedIds.has(baseId)).toBe(true);
       }

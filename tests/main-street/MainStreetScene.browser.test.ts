@@ -302,7 +302,7 @@ describe('MainStreetScene browser tests', () => {
       expect(emptySlots.length).toBeGreaterThan(0);
       const targetSlot = emptySlots[0];
 
-      const business = state.market.business.find((card: any) =>
+      const business = state.market.development.find((card: any) =>
         card && canPurchaseBusiness(state, card.id, targetSlot).legal,
       );
       expect(business).toBeTruthy();
