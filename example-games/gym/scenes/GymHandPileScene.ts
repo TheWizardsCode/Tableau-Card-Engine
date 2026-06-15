@@ -350,6 +350,18 @@ export class GymHandPileScene extends GymSceneBase {
     }
   }
 
+  /** Find the sorted insertion index for a card (suit then rank). */
+  private findSortedIndex(card: Card): number {
+    for (let i = 0; i < this.hand.length; i++) {
+      const existing = this.hand[i];
+      const suitCmp = existing.suit.localeCompare(card.suit);
+      if (suitCmp > 0) return i;                 // existing suit after card suit → insert before
+      if (suitCmp < 0) continue;                  // existing suit before — keep looking
+      if (rankValue(existing.rank) > rankValue(card.rank)) return i; // same suit, higher rank → insert before
+    }
+    return this.hand.length; // append at end
+  }
+
   private async drawToHand(): Promise<void> {
     if (this.drawPile.isEmpty()) {
       this.logEvent('Cannot draw: draw pile is empty');
@@ -359,15 +371,19 @@ export class GymHandPileScene extends GymSceneBase {
     const card = this.drawPile.pop()!;
     card.faceUp = true;
 
+    // Determine insertion index to maintain sorted order
+    const insertIndex = this.findSortedIndex(card);
+
     // Delegate animation and card integration to HandView
     await this.handView.animateAddCard(card, {
       sourceX: this.DECK_X,
       sourceY: this.PILE_Y,
       duration: 400,
+      insertAtIndex: insertIndex,
     });
 
     // Sync the scene's hand model after HandView has integrated the card
-    this.hand.push(card);
+    this.hand.splice(insertIndex, 0, card);
     this.handView.setSelected(this.selectedIdx >= 0 ? this.selectedIdx : null);
     this.deckView.update();
 
@@ -439,15 +455,19 @@ export class GymHandPileScene extends GymSceneBase {
     const card = this.discardPile.pop()!;
     card.faceUp = true;
 
+    // Determine insertion index to maintain sorted order
+    const insertIndex = this.findSortedIndex(card);
+
     // Delegate animation and card integration to HandView
     await this.handView.animateAddCard(card, {
       sourceX: this.DISCARD_X,
       sourceY: this.PILE_Y,
       duration: 350,
+      insertAtIndex: insertIndex,
     });
 
     // Sync the scene's hand model after HandView has integrated the card
-    this.hand.push(card);
+    this.hand.splice(insertIndex, 0, card);
     this.handView.setSelected(this.selectedIdx >= 0 ? this.selectedIdx : null);
     this.discardView.update();
 

@@ -16,6 +16,7 @@ import { Pile } from '../../src/card-system/Pile';
 import { createCard } from '../../src/card-system/Card';
 import type { Card } from '../../src/card-system/Card';
 import { createSeededRng } from '../../src/core-engine/SeededRng';
+import { rankValue } from '../../src/card-system/rankValue';
 import { CARD_H, GAME_H } from '../../src/ui/constants';
 
 // ── Minimal Phaser mock ─────────────────────────────────────
@@ -149,20 +150,35 @@ describe('GymHandPileScene animation integration', () => {
   let discardPile: Pile<Card>;
   let animateAddCardSpy: any;
 
+  /** Find sorted insertion index matching the scene's sortHand logic. */
+  function findSortedIndex(card: Card): number {
+    for (let i = 0; i < hand.length; i++) {
+      const existing = hand[i];
+      const suitCmp = existing.suit.localeCompare(card.suit);
+      if (suitCmp > 0) return i;
+      if (suitCmp < 0) continue;
+      if (rankValue(existing.rank) > rankValue(card.rank)) return i;
+    }
+    return hand.length;
+  }
+
   /** Simulate the scene's drawToHand logic using HandView.animateAddCard. */
   async function simulatedDrawToHand(): Promise<void> {
     if (drawPile.isEmpty()) return;
     const card = drawPile.pop()!;
     card.faceUp = true;
 
+    const insertIndex = findSortedIndex(card);
+
     await handView.animateAddCard(card, {
       sourceX: 500, // Simulated DECK_X
       sourceY: 250, // Simulated PILE_Y
       duration: 400,
+      insertAtIndex: insertIndex,
     });
 
-    // Sync scene model
-    hand.push(card);
+    // Sync scene model at the same insertion index
+    hand.splice(insertIndex, 0, card);
     deckView.update();
   }
 
@@ -172,14 +188,17 @@ describe('GymHandPileScene animation integration', () => {
     const card = discardPile.pop()!;
     card.faceUp = true;
 
+    const insertIndex = findSortedIndex(card);
+
     await handView.animateAddCard(card, {
       sourceX: 640, // Simulated DISCARD_X
       sourceY: 250, // Simulated PILE_Y
       duration: 350,
+      insertAtIndex: insertIndex,
     });
 
-    // Sync scene model
-    hand.push(card);
+    // Sync scene model at the same insertion index
+    hand.splice(insertIndex, 0, card);
     discardView.update();
   }
 
@@ -241,6 +260,8 @@ describe('GymHandPileScene animation integration', () => {
       expect(callArgs[1].sourceX).toBe(500); // DECK_X
       expect(callArgs[1].sourceY).toBe(250); // PILE_Y
       expect(callArgs[1].duration).toBe(400);
+      // insertAtIndex should be provided (sorted insertion)
+      expect(callArgs[1].insertAtIndex).toBe(0); // Empty hand → insert at 0
     });
 
     it('adds card to hand model after animation', async () => {
@@ -309,6 +330,8 @@ describe('GymHandPileScene animation integration', () => {
       expect(callArgs[1].sourceX).toBe(640); // DISCARD_X
       expect(callArgs[1].sourceY).toBe(250); // PILE_Y
       expect(callArgs[1].duration).toBe(350);
+      // insertAtIndex should be provided (sorted insertion)
+      expect(callArgs[1].insertAtIndex).toBe(0); // Empty hand → insert at 0
     });
 
     it('does not create temporary sprites outside HandView', async () => {

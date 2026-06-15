@@ -242,6 +242,13 @@ export interface AnimateAddCardOptions {
     moveIntervalMs?: number;
     moveLoop?: boolean;
   };
+
+  /**
+   * Optional target index to insert the card at.
+   * When provided, destination is computed for this index
+   * and the card is inserted here. When omitted, appends.
+   */
+  insertAtIndex?: number;
 }
 
 /** Options for the {@link HandView.removeCard} method. */
@@ -517,8 +524,8 @@ export class HandView {
    *          card is fully integrated into the hand model and display.
    */
   async animateAddCard(card: Card, options: AnimateAddCardOptions): Promise<void> {
-    const nextIndex = this.cards.length;
-    const newCount = nextIndex + 1;
+    const insertIndex = options.insertAtIndex ?? this.cards.length;
+    const newCount = this.cards.length + 1;
 
     // ── Compute destination (same layout logic as computeCardPositions) ──
     let destX: number;
@@ -526,7 +533,7 @@ export class HandView {
 
     if (this.layoutDirection === 'vertical') {
       destX = this.baseX;
-      destY = this.baseY + nextIndex * this.spacing;
+      destY = this.baseY + insertIndex * this.spacing;
     } else {
       const gap = this.spacing - this.cardWidth;
       const centerX = this.baseX + (newCount - 1) * this.spacing / 2;
@@ -539,7 +546,7 @@ export class HandView {
         maxWidth: this.maxWidth,
       });
 
-      destX = positions[nextIndex];
+      destX = positions[insertIndex];
 
       if (this.arcRadius <= 0 || newCount < 3) {
         destY = this.baseY;
@@ -556,7 +563,7 @@ export class HandView {
 
     // ── Reduced motion: instant placement ──
     if (this._reducedMotion) {
-      this.cards.push(card);
+      this.cards.splice(insertIndex, 0, card);
       this.rebuildDisplay();
       this.emit('selectionchange', this.selectedIndex);
       return;
@@ -578,7 +585,7 @@ export class HandView {
         } catch {
           // Ignore destroy errors if sprite already cleaned up
         }
-        this.cards.push(card);
+        this.cards.splice(insertIndex, 0, card);
         this.rebuildDisplay();
         this.emit('selectionchange', this.selectedIndex);
         resolve();

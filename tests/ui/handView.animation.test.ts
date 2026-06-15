@@ -644,4 +644,107 @@ describe('HandView animateAddCard', () => {
       hvArc.destroy();
     });
   });
+
+  // ═══════════════════════════════════════════════════════════
+  // insertAtIndex behavior
+  // ═══════════════════════════════════════════════════════════
+
+  describe('insertAtIndex', () => {
+    beforeEach(() => {
+      hv = new HandView(scene, {
+        baseX,
+        baseY,
+        spacing: 56,
+        arcRadius: 0,
+        showLabels: false,
+      });
+    });
+
+    it('insertAtIndex=0 inserts at the beginning', async () => {
+      hv.setCards([card('2', 'hearts'), card('3', 'clubs'), card('4', 'diamonds')]);
+
+      await (hv as any).animateAddCard(card('A', 'spades'), {
+        sourceX: 100, sourceY: 200,
+        insertAtIndex: 0,
+      });
+
+      const cards = hv.getCards();
+      expect(cards).toHaveLength(4);
+      // 'A' should be at index 0
+      expect(cards[0].rank).toBe('A');
+      expect(cards[0].suit).toBe('spades');
+      expect(cards[1].rank).toBe('2');
+      expect(cards[2].rank).toBe('3');
+      expect(cards[3].rank).toBe('4');
+    });
+
+    it('insertAtIndex=middle inserts at correct position', async () => {
+      hv.setCards([card('2', 'hearts'), card('4', 'diamonds'), card('6', 'spades')]);
+
+      await (hv as any).animateAddCard(card('3', 'clubs'), {
+        sourceX: 100, sourceY: 200,
+        insertAtIndex: 1,
+      });
+
+      const cards = hv.getCards();
+      expect(cards).toHaveLength(4);
+      expect(cards[0].rank).toBe('2');
+      expect(cards[1].rank).toBe('3'); // inserted here
+      expect(cards[2].rank).toBe('4');
+      expect(cards[3].rank).toBe('6');
+    });
+
+    it('insertAtIndex=end appends (same as default)', async () => {
+      hv.setCards([card('2', 'hearts'), card('3', 'clubs')]);
+
+      await (hv as any).animateAddCard(card('4', 'diamonds'), {
+        sourceX: 100, sourceY: 200,
+        insertAtIndex: 2,
+      });
+
+      const cards = hv.getCards();
+      expect(cards).toHaveLength(3);
+      expect(cards[2].rank).toBe('4'); // appended at end
+    });
+
+    it('insertAtIndex destination matches final position', async () => {
+      hv.setCards([card('2', 'hearts'), card('4', 'diamonds')]);
+
+      await (hv as any).animateAddCard(card('3', 'clubs'), {
+        sourceX: 100, sourceY: 200,
+        insertAtIndex: 1,
+      });
+
+      const centers = hv.getCardCenters();
+      expect(centers).toHaveLength(3);
+
+      // Compute expected: gap = 56 - 48 = 8
+      // centerX = 300 + (3-1)*56/2 = 300 + 56 = 356
+      const gap = (hv as any).spacing - (hv as any).cardWidth;
+      const centerX = baseX + (3 - 1) * (hv as any).spacing / 2;
+      const { positions } = layoutCardPositions({
+        count: 3,
+        cardWidth: (hv as any).cardWidth,
+        gap,
+        centerX,
+      });
+
+      // Index 1 (middle) should be at positions[1]
+      expect(Math.abs(centers[1].x - positions[1])).toBeLessThanOrEqual(1);
+      expect(centers[1].y).toBe(baseY);
+    });
+
+    it('default behavior (no insertAtIndex) still appends', async () => {
+      hv.setCards([card('2', 'hearts'), card('3', 'clubs'), card('4', 'diamonds')]);
+
+      await (hv as any).animateAddCard(card('5', 'spades'), {
+        sourceX: 100, sourceY: 200,
+        // no insertAtIndex → should append
+      });
+
+      const cards = hv.getCards();
+      expect(cards).toHaveLength(4);
+      expect(cards[3].rank).toBe('5'); // appended at end
+    });
+  });
 });
