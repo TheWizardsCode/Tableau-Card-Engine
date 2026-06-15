@@ -14,6 +14,40 @@ type CardTextureResolver = (card: unknown) => string;
 
 A function that maps any card-like object to a texture key. When provided to HandView or PileView, it is called **instead of** `getCardTexture()` for every visible card.
 
+## RenderCard callback
+
+For games that need fully custom card visuals (colored rectangles + icons, SVG-rendered cards, tooltip overlays), HandView supports a `renderCard` callback:
+
+```ts
+type RenderCardFn = (
+  card: any,
+  index: number,
+  isSelected: boolean,
+) => Phaser.GameObjects.GameObject;
+```
+
+When provided, HandView calls this function for each card instead of creating a default Image sprite. The returned object is managed by HandView for layout and positioning. If the caller handles hover/click inside the renderer, an optional `customHoverFn` / `customClickFn` can be passed alongside `renderCard` so HandView can still coordinate event emission.
+
+### Example (Sushi Go)
+
+```ts
+const handView = new HandView(scene, {
+  baseX: GAME_W / 2,
+  baseY: HAND_Y,
+  spacing: HAND_GAP,
+  showLabels: false,
+  renderCard: (card, index) => {
+    return sushiGoCardFactory.createCardRect(
+      0, 0, HAND_CARD_W, HAND_CARD_H, card, true, index,
+    );
+  },
+});
+```
+
+### Selection handling
+
+Custom-rendered cards are responsible for their own selection/hover visuals. HandView skips default `setTint` selection feedback when `renderCard` is provided. Use `customHoverFn` to apply custom selection behaviour. See the Sushi Go and Main Street integration examples in `example-games/`.
+
 ### HandView
 
 ```ts
