@@ -170,10 +170,9 @@ export class BeleagueredCastleScene extends CardGameScene {
       this.bcRenderer.refreshHUD();
       this.emitStateSettled(this.gameState.moveCount, this.gameEnded ? 'ended' : 'playing');
     } else {
-      // Always start the deal animation immediately (synchronous — tests expect it).
-      // Then, on the next frame, check for a saved checkpoint; if one exists
-      // we show the resume overlay instead of the (already-in-progress) deal.
-      this.startFreshGame();
+      // First check for a saved checkpoint. If one exists, show the resume
+      // overlay — no deal animation runs until the user decides. If no
+      // checkpoint, start a fresh deal on the next frame.
       this.time.delayedCall(0, () => this.checkForSavedCheckpoint());
     }
   }
@@ -471,10 +470,17 @@ export class BeleagueredCastleScene extends CardGameScene {
   private checkForSavedCheckpoint(): void {
     loadBCSnapshot(this.saveLoadStore).then((savedState) => {
       if (savedState) {
+        // Checkpoint found — show the resume overlay. No deal animation
+        // will play until the user picks an option.
         this.showResumeOverlay(savedState);
+      } else {
+        // No checkpoint — start a fresh game with the deal animation.
+        this.startFreshGame();
       }
     }).catch((err) => {
       console.warn('[BeleagueredCastle] Error loading checkpoint:', err);
+      // On error, fall through to a fresh deal so the game is still playable.
+      this.startFreshGame();
     });
   }
 
