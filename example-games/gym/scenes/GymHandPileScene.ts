@@ -268,6 +268,9 @@ export class GymHandPileScene extends GymSceneBase {
     // No scene-level forwarding is needed — each slider handles its own
     // drag lifecycle internally.
 
+    // Register shutdown lifecycle handler for explicit cleanup
+    this.events.on('shutdown', this.shutdown, this);
+
     // Initialize
     this.reset();
   }
@@ -804,6 +807,72 @@ export class GymHandPileScene extends GymSceneBase {
       this.discardView.update();
       this.logEvent(`Drop accepted: ${card.rank}${card.suit} moved to discard`);
     });
+  }
+
+  /**
+   * Clean up all scene-created objects, tweens, and event listeners
+   * when the scene shuts down.
+   *
+   * Registered as a `shutdown` event listener in `create()` so it fires
+   * automatically when the Scene Manager stops this scene. This prevents
+   * memory leaks from stale references (highlightGraphics, sliders, etc.)
+   * and stops any active tweens before they can fire callbacks on a
+   * non-existent scene.
+   *
+   * The base class (`GymSceneBase`) also registers its own `shutdown`
+   * listener via initHelp() for helpPanel/helpButton cleanup — both run
+   * independently during shutdown.
+   */
+  private shutdown(): void {
+    // Stop any active move tween
+    if (this.activeMoveTween) {
+      this.activeMoveTween.stop();
+      this.activeMoveTween = null;
+    }
+
+    // Destroy highlight graphics if they were created
+    if (this.highlightGraphics) {
+      this.highlightGraphics.destroy();
+      this.highlightGraphics = null;
+    }
+
+    // Destroy all highlight label objects
+    for (const label of this.highlightLabels) {
+      try { label.destroy(); } catch (_) { /* ignore */ }
+    }
+    this.highlightLabels = [];
+
+    // Destroy sliders (each has a built-in destroy() that cleans up
+    // sub-objects — track, fill, handle, valueText, hitArea — and
+    // removes any self-registered pointermove/pointerup listeners)
+    try { this.arcSlider?.destroy(); } catch (_) { /* ignore */ }
+    try { this.spacingSlider?.destroy(); } catch (_) { /* ignore */ }
+    try { this.rotationSlider?.destroy(); } catch (_) { /* ignore */ }
+
+    // Destroy UI view components (HandView and PileView both have
+    // destroy() that cleans up sprites, labels, and event listeners)
+    try { this.handView?.destroy(); } catch (_) { /* ignore */ }
+    try { this.deckView?.destroy(); } catch (_) { /* ignore */ }
+    try { this.discardView?.destroy(); } catch (_) { /* ignore */ }
+
+    // Destroy layout and drag UI text labels
+    try { this.layoutLabel?.destroy(); } catch (_) { /* ignore */ }
+    try { this.dragLabel?.destroy(); } catch (_) { /* ignore */ }
+    try { this.dragButton?.destroy(); } catch (_) { /* ignore */ }
+
+    // Destroy all event log text objects
+    for (const t of this.logTexts) {
+      try { t.destroy(); } catch (_) { /* ignore */ }
+    }
+    this.logTexts = [];
+
+    // Clear internal state arrays
+    this.hand = [];
+    this.eventLog = [];
+
+    // Unregister this listener to avoid double-call if the scene
+    // is shut down again
+    this.events.off('shutdown', this.shutdown, this);
   }
 
   private logEvent(msg: string): void {
