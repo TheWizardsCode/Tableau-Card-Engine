@@ -182,6 +182,21 @@ export interface HandViewOptions {
    * benefit from HandView's layout and selection management.
    */
   customClickFn?: (cardIndex: number) => void;
+
+  /**
+   * Fixed horizontal centre for the hand layout.
+   *
+   * When set, {@link computeCardPositions} uses this value as the
+   * horizontal centre of the hand instead of deriving it from
+   * `baseX + (n-1)*spacing/2`. This keeps the hand anchored at a
+   * fixed screen position when spacing or hand-size changes.
+   *
+   * Has no effect in vertical (cascade) layout mode — the X position
+   * is always `baseX` in vertical mode.
+   *
+   * @default undefined (use baseX-derived centre)
+   */
+  centerX?: number;
 }
 
 /** Options for the {@link HandView.addCard} method. */
@@ -369,6 +384,7 @@ export class HandView {
   private selectionEnabled: boolean;
   private clickEnabled: boolean;
   private _reducedMotion: boolean;
+  private _centerX: number | undefined;
 
   /** Whether this HandView instance has been destroyed. */
   public destroyed: boolean = false;
@@ -428,6 +444,7 @@ export class HandView {
     this._reducedMotion = opts.reducedMotion ?? false;
     this.maxRotationDegrees = opts.maxRotationDegrees ?? 25;
     this.layoutDirection = opts.layoutDirection ?? 'horizontal';
+    this._centerX = opts.centerX;
     this._customTextureFn = opts.cardTextureFn;
     this._cardType = opts.cardTextureFn ? 'custom' : 'standard';
     this._renderCardFn = opts.renderCard;
@@ -536,7 +553,7 @@ export class HandView {
       destY = this.baseY + insertIndex * this.spacing;
     } else {
       const gap = this.spacing - this.cardWidth;
-      const centerX = this.baseX + (newCount - 1) * this.spacing / 2;
+      const centerX = this._centerX ?? (this.baseX + (newCount - 1) * this.spacing / 2);
 
       const { positions } = layoutCardPositions({
         count: newCount,
@@ -785,6 +802,23 @@ export class HandView {
    */
   setBaseX(x: number): void {
     this.baseX = x;
+    this.applyLayout();
+  }
+
+  /**
+   * Set the fixed horizontal centre for hand layout.
+   *
+   * When set, the hand is centred on this X coordinate regardless of
+   * spacing or hand-size changes. Pass `undefined` to restore the
+   * original baseX-derived centre calculation.
+   *
+   * Has no effect in vertical (cascade) mode — call {@link setBaseX}
+   * directly for vertical layout positioning.
+   *
+   * @param x - Fixed horizontal centre, or undefined to clear.
+   */
+  setCenterX(x: number | undefined): void {
+    this._centerX = x;
     this.applyLayout();
   }
 
@@ -1128,9 +1162,9 @@ export class HandView {
       }));
     }
 
-    // ── Horizontal layout (unchanged) ──
+    // ── Horizontal layout ──
     const gap = this.spacing - this.cardWidth;
-    const centerX = this.baseX + (this.cards.length - 1) * this.spacing / 2;
+    const centerX = this._centerX ?? (this.baseX + (this.cards.length - 1) * this.spacing / 2);
 
     const { positions } = layoutCardPositions({
       count: this.cards.length,

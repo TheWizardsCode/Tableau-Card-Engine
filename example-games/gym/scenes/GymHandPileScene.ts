@@ -35,8 +35,7 @@ import { shakeIllegalMove } from '../../../src/ui/shakeIllegalMove';
 import { CARD_H, CARD_W, GAME_H, GAME_W } from '../../../src/ui/constants';
 import { getCardTexture, ensureCardTextureFallbacks, preloadCardAssets } from '../../../src/ui/CardTextureHelpers';
 import { createHudText } from '../../../src/ui/Renderer';
-import { createSlider } from '../../../src/ui/GymSceneUtils';
-import type { SliderResult } from '../../../src/ui/GymSceneUtils';
+import { Slider } from '../../../src/ui/Slider';
 import { HighlightManager } from '../../../src/ui/HighlightManager';
 import type { Card } from '../../../src/card-system/Card';
 
@@ -70,7 +69,7 @@ export class GymHandPileScene extends GymSceneBase {
 
   // Hand layout constants
   private readonly HAND_SPACING = 20;
-  private readonly HAND_BASE_X = GAME_W / 2 - ((HAND_SIZE - 1) * this.HAND_SPACING) / 2;
+  private readonly HAND_CENTER_X = GAME_W / 2;
   private readonly HAND_BASE_Y = GAME_H - CARD_H - 80;
 
   // Slider layout constants
@@ -115,9 +114,10 @@ export class GymHandPileScene extends GymSceneBase {
 
     // Create HandView for the player's hand
     this.handView = new HandView(this, {
-      baseX: this.HAND_BASE_X,
+      baseX: this.HAND_CENTER_X,
       baseY: this.HAND_BASE_Y,
       spacing: this.HAND_SPACING,
+      centerX: this.HAND_CENTER_X,
       arcRadius: this.arcRadius,
       showLabels: false,
       maxRotationDegrees: this.ROTATION_DEGREES_DEFAULT,
@@ -319,7 +319,7 @@ export class GymHandPileScene extends GymSceneBase {
       this.logEvent('Switched to vertical cascade layout — cards stack top-to-bottom');
     } else {
       // Restore horizontal layout
-      this.handView.setBaseX(this.HAND_BASE_X);
+      this.handView.setCenterX(this.HAND_CENTER_X);
       this.handView.setBaseY(this.HAND_BASE_Y);
       this.handView.setSpacing(this.HAND_SPACING);
       this.handView.setLayoutDirection('horizontal');
@@ -675,7 +675,7 @@ export class GymHandPileScene extends GymSceneBase {
     // Reset to horizontal layout if in vertical mode
     if (this.isVerticalLayout) {
       this.isVerticalLayout = false;
-      this.handView.setBaseX(this.HAND_BASE_X);
+      this.handView.setCenterX(this.HAND_CENTER_X);
       this.handView.setBaseY(this.HAND_BASE_Y);
       this.handView.setSpacing(this.HAND_SPACING);
       this.handView.setLayoutDirection('horizontal');
