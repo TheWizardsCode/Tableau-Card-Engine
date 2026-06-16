@@ -403,15 +403,19 @@ export class GymHandPileScene extends GymSceneBase {
     // Remove the card from hand model
     const card = this.hand.splice(this.selectedIdx, 1)[0];
 
+    // Immediately update the data model before any animation starts.
+    // This ensures the card is always in discardPile (not orphaned)
+    // even if the animation completion event never fires.
+    card.faceUp = false;
+    this.discardPile.push(card);
+
     const spriteIdx = this.selectedIdx;
     const sprite = this.handView.getSpriteAt(spriteIdx);
 
-    // We'll push to discardPile when the animation completes.
     if (sprite && !this.reducedMotion) {
+      // Animated discard — data model already consistent, only UI cleanup needed
       const gameEvents = new GameEventEmitter();
       (gameEvents as any).on('card:discarded', () => {
-        card.faceUp = false;
-        this.discardPile.push(card);
         this.selectedIdx = -1;
         this.clearHighlights();
         this.handView.setCards(this.hand);
@@ -435,8 +439,7 @@ export class GymHandPileScene extends GymSceneBase {
         // For reduced-motion, immediately clean up the sprite
         try { sprite.destroy(); } catch (_) { /* ignore */ }
       }
-      card.faceUp = false;
-      this.discardPile.push(card);
+      // Data model already updated above — just UI cleanup
       this.selectedIdx = -1;
       this.clearHighlights();
       this.handView.setCards(this.hand);
