@@ -248,18 +248,19 @@ export type {
   EnsureTextureResult,
 } from './Renderer';
 
-// Shared Gym scene utilities – event log, deck grid, slider
+// Slider – reusable horizontal slider widget
+export { Slider } from './Slider';
+export type { SliderOptions } from './Slider';
+
+// Shared Gym scene utilities – event log, deck grid
 // These helpers extract common rendering patterns from Gym demo scenes.
 export {
   createEventLog,
   createDeckGrid,
-  createSlider,
 } from './GymSceneUtils';
 export type {
   EventLogOptions,
   EventLogResult,
   DeckGridOptions,
   DeckGridResult,
-  SliderOptions,
-  SliderResult,
 } from './GymSceneUtils';

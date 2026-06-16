@@ -35,8 +35,7 @@ import { shakeIllegalMove } from '../../../src/ui/shakeIllegalMove';
 import { CARD_H, CARD_W, GAME_H, GAME_W } from '../../../src/ui/constants';
 import { getCardTexture, ensureCardTextureFallbacks, preloadCardAssets } from '../../../src/ui/CardTextureHelpers';
 import { createHudText } from '../../../src/ui/Renderer';
-import { createSlider } from '../../../src/ui/GymSceneUtils';
-import type { SliderResult } from '../../../src/ui/GymSceneUtils';
+import { Slider } from '../../../src/ui/Slider';
 import type { Card } from '../../../src/card-system/Card';
 
 const HAND_SIZE = 5;
@@ -90,9 +89,9 @@ export class GymHandPileScene extends GymSceneBase {
   private layoutLabel!: Phaser.GameObjects.Text;
 
   private arcRadius = this.ARC_RADIUS_DEFAULT;
-  private arcSlider!: SliderResult;
-  private spacingSlider!: SliderResult;
-  private rotationSlider!: SliderResult;
+  private arcSlider!: Slider;
+  private spacingSlider!: Slider;
+  private rotationSlider!: Slider;
 
   // Drag-and-drop demo state
   private dragEnabled: boolean = false;
@@ -220,7 +219,7 @@ export class GymHandPileScene extends GymSceneBase {
     const spacingSliderX = startX + sliderWidth + sliderHorizGap;
     const rotationSliderX = startX + 2 * (sliderWidth + sliderHorizGap);
 
-    this.arcSlider = createSlider(this, arcSliderX, sliderY, {
+    this.arcSlider = new Slider(this, arcSliderX, sliderY, {
       initialValue: this.ARC_RADIUS_DEFAULT,
       minValue: 0,
       maxValue: 200,
@@ -235,7 +234,7 @@ export class GymHandPileScene extends GymSceneBase {
 
     const minSpacing = Math.round(CARD_W * (1 - 0.75));
     const maxSpacing = Math.round(CARD_W * (1 + 0.75));
-    this.spacingSlider = createSlider(this, spacingSliderX, sliderY, {
+    this.spacingSlider = new Slider(this, spacingSliderX, sliderY, {
       initialValue: this.HAND_SPACING,
       minValue: minSpacing,
       maxValue: maxSpacing,
@@ -247,7 +246,7 @@ export class GymHandPileScene extends GymSceneBase {
       this.handView.setSpacing(Math.round(value));
     };
 
-    this.rotationSlider = createSlider(this, rotationSliderX, sliderY, {
+    this.rotationSlider = new Slider(this, rotationSliderX, sliderY, {
       initialValue: this.ROTATION_DEGREES_DEFAULT,
       minValue: 0,
       maxValue: 45,
@@ -280,7 +279,7 @@ export class GymHandPileScene extends GymSceneBase {
   /**
    * Show or hide a slider's visual components and disable its input zone.
    */
-  private setSliderVisible(slider: SliderResult, visible: boolean): void {
+  private setSliderVisible(slider: Slider, visible: boolean): void {
     slider.track.setVisible(visible);
     slider.fill.setVisible(visible);
     slider.handle.setVisible(visible);
