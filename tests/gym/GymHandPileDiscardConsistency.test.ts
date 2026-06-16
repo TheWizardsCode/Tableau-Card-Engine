@@ -155,7 +155,7 @@ function simulateDiscardSelected(
   if (sprite && !reducedMotion) {
     const gameEvents = new GameEventEmitter();
 
-    (gameEvents as any).on('card:discarded', () => {
+    gameEvents.on('card:discarded', () => {
       // Data model is already consistent — only UI cleanup needed
       handView.setCards(hand);
       handView.setSelected(null);
@@ -168,7 +168,7 @@ function simulateDiscardSelected(
     // in discardPile before the animation starts, so it's not orphaned.
     if (!skipAnimationComplete) {
       // Simulate animation completion
-      (gameEvents as any).emit('card:discarded', {});
+      gameEvents.emit('card:discarded', {});
     }
   } else {
     if (sprite) {

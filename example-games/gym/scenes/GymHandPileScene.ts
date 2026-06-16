@@ -288,7 +288,7 @@ export class GymHandPileScene extends GymSceneBase {
     slider.hitArea.setVisible(visible);
     // Disable the input zone so it doesn't swallow pointer events
     if (slider.hitArea.input) {
-      (slider.hitArea.input as any).enabled = visible;
+      slider.hitArea.input.enabled = visible;
     }
   }
 
@@ -406,13 +406,13 @@ export class GymHandPileScene extends GymSceneBase {
     if (sprite && !this.reducedMotion) {
       // Animated discard — data model already consistent, only UI cleanup needed
       const gameEvents = new GameEventEmitter();
-      (gameEvents as any).on('card:discarded', () => {
+      gameEvents.on('card:discarded', () => {
         this.selectedIdx = -1;
         this.clearHighlights();
         this.handView.setCards(this.hand);
         this.handView.setSelected(null);
         this.discardView.update();
-        (gameEvents as any).removeAllListeners();
+        gameEvents.removeAllListeners();
         this.logEvent(`Discarded ${card.rank}${card.suit} (animated)`);
       });
 
@@ -422,7 +422,7 @@ export class GymHandPileScene extends GymSceneBase {
         offsetY: 30,
         duration: 350,
         destroyAfter: true,
-        gameEvents: gameEvents as any,
+        gameEvents,
         cardId: `${card.rank}${card.suit}`,
       });
     } else {
