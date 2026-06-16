@@ -264,3 +264,7 @@ export type {
   DeckGridOptions,
   DeckGridResult,
 } from './GymSceneUtils';
+
+// HighlightManager – reusable highlight zone manager
+export { HighlightManager } from './HighlightManager';
+export type { HighlightZoneConfig, HighlightStyle } from './HighlightManager';

@@ -35,15 +35,15 @@ import { shakeIllegalMove } from '../../../src/ui/shakeIllegalMove';
 import { CARD_H, CARD_W, GAME_H, GAME_W } from '../../../src/ui/constants';
 import { getCardTexture, ensureCardTextureFallbacks, preloadCardAssets } from '../../../src/ui/CardTextureHelpers';
 import { createHudText } from '../../../src/ui/Renderer';
-import { Slider } from '../../../src/ui/Slider';
+import { createSlider } from '../../../src/ui/GymSceneUtils';
+import type { SliderResult } from '../../../src/ui/GymSceneUtils';
+import { HighlightManager } from '../../../src/ui/HighlightManager';
 import type { Card } from '../../../src/card-system/Card';
 
 const HAND_SIZE = 5;
 const DEFAULT_SEED = 42;
 
-/** Colors for highlight zones. */
-const HIGHLIGHT_COLOR = 0x44ff44;
-const HIGHLIGHT_ALPHA = 0.35;
+
 
 export class GymHandPileScene extends GymSceneBase {
   private hand: Card[] = [];
@@ -58,9 +58,8 @@ export class GymHandPileScene extends GymSceneBase {
   private deckView!: PileView;
   private discardView!: PileView;
 
-  // Highlight graphics
-  private highlightGraphics: Phaser.GameObjects.Graphics | null = null;
-  private highlightLabels: Phaser.GameObjects.Text[] = [];
+  // Highlight manager
+  private highlightManager!: HighlightManager;
   // Active move tween reference (for cancellation)
   private activeMoveTween: Phaser.Tweens.Tween | null = null;
 
@@ -266,6 +265,9 @@ export class GymHandPileScene extends GymSceneBase {
     // registering only when actively dragged and unregistering on pointerup.
     // No scene-level forwarding is needed — each slider handles its own
     // drag lifecycle internally.
+
+    // Initialize highlight manager for drop-zone rendering
+    this.highlightManager = new HighlightManager(this);
 
     // Register shutdown lifecycle handler for explicit cleanup
     this.events.on('shutdown', this.shutdown, this);
@@ -592,10 +594,6 @@ export class GymHandPileScene extends GymSceneBase {
 
   private showValidMoves(): void {
     this.clearHighlights();
-    if (!this.highlightGraphics) {
-      this.highlightGraphics = this.add.graphics();
-    }
-    const g = this.highlightGraphics;
 
     const highlightW = CARD_W + 16;
     const highlightH = CARD_H + 16;
@@ -608,15 +606,18 @@ export class GymHandPileScene extends GymSceneBase {
     const discardZoneX = this.DISCARD_X - highlightW / 2;
     const discardZoneY = this.PILE_Y - highlightH / 2;
 
-    g.fillStyle(HIGHLIGHT_COLOR, HIGHLIGHT_ALPHA);
-    g.lineStyle(2, HIGHLIGHT_COLOR, 0.8);
-    g.fillRoundedRect(deckZoneX, deckZoneY, highlightW, highlightH, 8);
-    g.strokeRoundedRect(deckZoneX, deckZoneY, highlightW, highlightH, 8);
-    g.fillRoundedRect(discardZoneX, discardZoneY, highlightW, highlightH, 8);
-    g.strokeRoundedRect(discardZoneX, discardZoneY, highlightW, highlightH, 8);
+    this.highlightManager.addZone('deck-valid', {
+      x: deckZoneX, y: deckZoneY, w: highlightW, h: highlightH,
+      style: 'fill', color: 0x44ff44, alpha: 0.35,
+      lifetime: 3000,
+    });
+    this.highlightManager.addZone('discard-valid', {
+      x: discardZoneX, y: discardZoneY, w: highlightW, h: highlightH,
+      style: 'fill', color: 0x44ff44, alpha: 0.35,
+      lifetime: 3000,
+    });
 
     this.logEvent('Showing valid drop zones (green highlights)');
-    this.time?.delayedCall(3000, () => this.clearHighlights());
   }
 
   private showIllegalMove(): void {
@@ -702,14 +703,7 @@ export class GymHandPileScene extends GymSceneBase {
   }
 
   private clearHighlights(): void {
-    if (this.highlightGraphics) {
-      this.highlightGraphics.clear();
-    }
-    // Remove any highlight labels
-    for (const label of this.highlightLabels) {
-      try { label.destroy(); } catch (_) { /* ignore */ }
-    }
-    this.highlightLabels = [];
+    this.highlightManager.clearAll();
   }
 
   // ── Drag-and-drop demo helpers ──────────────────────────
@@ -759,20 +753,16 @@ export class GymHandPileScene extends GymSceneBase {
 
   /** Draw a green highlight on the discard drop zone. */
   private highlightDropZones(): void {
-    if (!this.highlightGraphics) {
-      this.highlightGraphics = this.add.graphics();
-    }
-    const g = this.highlightGraphics;
     const highlightW = CARD_W + 16;
     const highlightH = CARD_H + 16;
 
     const discardX = this.DISCARD_X - highlightW / 2;
     const discardY = this.PILE_Y - highlightH / 2;
 
-    g.fillStyle(0x44ff44, 0.35);
-    g.lineStyle(2, 0x44ff44, 0.8);
-    g.fillRoundedRect(discardX, discardY, highlightW, highlightH, 8);
-    g.strokeRoundedRect(discardX, discardY, highlightW, highlightH, 8);
+    this.highlightManager.addZone('discard-drop', {
+      x: discardX, y: discardY, w: highlightW, h: highlightH,
+      style: 'fill', color: 0x44ff44, alpha: 0.35,
+    });
   }
 
   /**
@@ -829,17 +819,8 @@ export class GymHandPileScene extends GymSceneBase {
       this.activeMoveTween = null;
     }
 
-    // Destroy highlight graphics if they were created
-    if (this.highlightGraphics) {
-      this.highlightGraphics.destroy();
-      this.highlightGraphics = null;
-    }
-
-    // Destroy all highlight label objects
-    for (const label of this.highlightLabels) {
-      try { label.destroy(); } catch (_) { /* ignore */ }
-    }
-    this.highlightLabels = [];
+    // Destroy highlight manager
+    try { this.highlightManager?.destroy(); } catch (_) { /* ignore */ }
 
     // Destroy sliders (each has a built-in destroy() that cleans up
     // sub-objects — track, fill, handle, valueText, hitArea — and

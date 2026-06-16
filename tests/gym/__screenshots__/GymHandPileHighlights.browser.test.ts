@@ -123,11 +123,12 @@ describe('GymHandPile highlight-zone regression', () => {
     expect(Math.abs(discardBounds.x + discardBounds.width / 2 - DISCARD_X)).toBeLessThan(tolerance);
     expect(Math.abs(discardBounds.y + discardBounds.height / 2 - PILE_Y)).toBeLessThan(tolerance);
 
-    // Verify highlight graphics exists and has drawing commands
-    const highlightGraphics = (scene as any).highlightGraphics as Phaser.GameObjects.Graphics;
-    expect(highlightGraphics).toBeDefined();
+    // Verify highlight manager exists and its graphics have drawing commands
+    const highlightManager = (scene as any).highlightManager as any;
+    expect(highlightManager).toBeDefined();
+    expect(highlightManager.graphics).toBeDefined();
 
-    const commandBuffer = (highlightGraphics as any).commandBuffer as unknown[];
+    const commandBuffer = (highlightManager.graphics as any).commandBuffer as unknown[];
     expect(Array.isArray(commandBuffer)).toBe(true);
     expect(commandBuffer.length).toBeGreaterThan(0);
 

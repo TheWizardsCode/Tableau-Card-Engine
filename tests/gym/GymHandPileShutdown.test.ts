@@ -41,17 +41,11 @@ describe('GymHandPileScene shutdown lifecycle', () => {
   });
 
   describe('cleanup of individual objects', () => {
-    it('destroys highlightGraphics if it exists', () => {
+    it('destroys highlightManager if it exists', () => {
       const src = loadSource();
-      // Must destroy or null highlightGraphics with a null/guard check
-      expect(src).toContain('highlightGraphics');
+      // Must destroy highlightManager with null/guard check
+      expect(src).toContain('highlightManager');
       expect(src).toContain('.destroy()');
-    });
-
-    it('cleans up highlightLabels', () => {
-      const src = loadSource();
-      // Must reference highlightLabels in the shutdown context
-      expect(src).toContain('highlightLabels');
     });
 
     it('stops activeMoveTween if active', () => {
