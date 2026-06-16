@@ -298,9 +298,13 @@ export interface SliderResult {
 /**
  * Create a horizontal slider with track, fill bar, handle, and value text.
  *
- * Drag logic uses pointer events: call {@link SliderResult.handlePointerMove}
- * from your scene's `pointermove` handler, and
- * {@link SliderResult.handlePointerUp} from `pointerup`.
+ * Each slider self-manages its own `pointermove` and `pointerup` listeners,
+ * registering them only while the slider is actively being dragged and
+ * unregistering them on `pointerup` or `destroy`. This means that when no
+ * slider is being dragged, zero active pointermove handlers are processing
+ * per-frame. The public {@link SliderResult.handlePointerMove} and
+ * {@link SliderResult.handlePointerUp} methods remain available for
+ * backward compatibility with any external callers.
  *
  * @param scene  The Phaser scene.
  * @param x      X position of the slider track (left edge).
@@ -332,6 +336,10 @@ export function createSlider(
   let isDragging = false;
   const _callbacks: { onChange: ((value: number) => void) | null } = { onChange: null };
 
+  // References to self-contained listener functions (for cleanup)
+  let _moveHandler: ((pointer: Phaser.Input.Pointer) => void) | null = null;
+  let _upHandler: (() => void) | null = null;
+
   // --- Create visual elements ---
 
   const track = scene.add.rectangle(x, y, width, trackHeight, trackColor, 1)
@@ -353,6 +361,11 @@ export function createSlider(
 
   hitArea.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
     isDragging = true;
+    // Register self-contained listeners — only active during drag
+    _moveHandler = (p: Phaser.Input.Pointer) => { handlePointerMove(p.x); };
+    _upHandler = () => { handlePointerUp(); };
+    scene.input.on('pointermove', _moveHandler);
+    scene.input.on('pointerup', _upHandler);
     setValueFromPointer(pointer.x);
   });
 
@@ -395,7 +408,7 @@ export function createSlider(
 
   updateVisuals();
 
-  // --- Input handler helpers for the scene ---
+  // --- Input handler helpers (backward compatible) ---
 
   function handlePointerMove(pointerX: number): void {
     if (!isDragging) return;
@@ -404,9 +417,27 @@ export function createSlider(
 
   function handlePointerUp(): void {
     isDragging = false;
+    // Unregister self-contained listeners
+    if (_moveHandler) {
+      scene.input.off('pointermove', _moveHandler);
+      _moveHandler = null;
+    }
+    if (_upHandler) {
+      scene.input.off('pointerup', _upHandler);
+      _upHandler = null;
+    }
   }
 
   const destroy = (): void => {
+    // Clean up any active self-contained listeners
+    if (_moveHandler) {
+      try { scene.input.off('pointermove', _moveHandler); } catch (_) { /* ignore */ }
+      _moveHandler = null;
+    }
+    if (_upHandler) {
+      try { scene.input.off('pointerup', _upHandler); } catch (_) { /* ignore */ }
+      _upHandler = null;
+    }
     try { track.destroy(); } catch (_) { /* ignore */ }
     try { fill.destroy(); } catch (_) { /* ignore */ }
     try { handle.destroy(); } catch (_) { /* ignore */ }

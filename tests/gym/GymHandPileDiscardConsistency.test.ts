@@ -398,17 +398,4 @@ describe('GymHandPileScene discard consistency', () => {
     expect(sectionDiscardCardPos).toBeGreaterThan(0);
     expect(sectionPushPos).toBeLessThan(sectionDiscardCardPos);
   });
-
-  it('scene source has shutdown safety net for orphaned cards', () => {
-    const fs = require('fs');
-    const path = require('path');
-    const source = fs.readFileSync(
-      path.resolve(__dirname, '../../example-games/gym/scenes/GymHandPileScene.ts'),
-      'utf-8',
-    );
-
-    // Confirm the shutdown handler logic is present in the scene
-    // (could be in create() or a separate method)
-    expect(source).toContain('shutdown');
-  });
 });

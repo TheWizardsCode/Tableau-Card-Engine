@@ -338,4 +338,175 @@ describe('createSlider', () => {
 
     expect(onChange).toHaveBeenCalled();
   });
+
+  // ── Self-contained listener tests ──────────────────────────
+
+  it('registers pointermove listener on pointerdown', () => {
+    const scene = createMockScene();
+    const result = createSlider(scene, 100, 200, {
+      initialValue: 0, minValue: 0, maxValue: 100, width: 200,
+    });
+
+    const inputOnMock = scene.input.on;
+    const inputOffMock = scene.input.off;
+    inputOnMock.mockClear();
+    inputOffMock.mockClear();
+
+    // Initially, no pointermove listener should be registered
+    expect(inputOnMock).not.toHaveBeenCalledWith('pointermove', expect.any(Function));
+    expect(inputOnMock).not.toHaveBeenCalledWith('pointerup', expect.any(Function));
+
+    // Simulate pointerdown on the hit area
+    const onMock = result.hitArea.on as unknown as ReturnType<typeof vi.fn>;
+    for (const call of onMock.mock.calls) {
+      if (call[0] === 'pointerdown') {
+        call[1]({ x: 150 });
+      }
+    }
+
+    // After pointerdown, scene.input.on should have registered pointermove and pointerup
+    expect(inputOnMock).toHaveBeenCalledWith('pointermove', expect.any(Function));
+    expect(inputOnMock).toHaveBeenCalledWith('pointerup', expect.any(Function));
+  });
+
+  it('unregisters listeners on pointerup', () => {
+    const scene = createMockScene();
+    const result = createSlider(scene, 100, 200, {
+      initialValue: 0, minValue: 0, maxValue: 100, width: 200,
+    });
+
+    const inputOnMock = scene.input.on;
+    const inputOffMock = scene.input.off;
+    inputOnMock.mockClear();
+    inputOffMock.mockClear();
+
+    // Trigger pointerdown
+    const onMock = result.hitArea.on as unknown as ReturnType<typeof vi.fn>;
+    for (const call of onMock.mock.calls) {
+      if (call[0] === 'pointerdown') {
+        call[1]({ x: 150 });
+      }
+    }
+
+    // Capture the registered handlers
+    const moveHandler = inputOnMock.mock.calls.find((c: any[]) => c[0] === 'pointermove')?.[1];
+    const upHandler = inputOnMock.mock.calls.find((c: any[]) => c[0] === 'pointerup')?.[1];
+    expect(moveHandler).toBeDefined();
+    expect(upHandler).toBeDefined();
+
+    // Simulate pointermove via the self-contained listener
+    moveHandler({ x: 200 });
+    const valueAfterMove = result.value;
+    expect(valueAfterMove).toBeGreaterThan(0);
+
+    // Simulate pointerup via the self-contained listener
+    upHandler();
+
+    // After pointerup, listeners should be unregistered
+    expect(inputOffMock).toHaveBeenCalledWith('pointermove', moveHandler);
+    expect(inputOffMock).toHaveBeenCalledWith('pointerup', upHandler);
+
+    // After pointerup, pointermove should not change value
+    const valueBeforeMove2 = result.value;
+    result.handlePointerMove(250);
+    expect(result.value).toBe(valueBeforeMove2);
+  });
+
+  it('handlePointerMove still updates value via external call during drag', () => {
+    const scene = createMockScene();
+    const result = createSlider(scene, 100, 200, {
+      initialValue: 0, minValue: 0, maxValue: 100, width: 200,
+    });
+
+    // Simulate pointerdown via hitArea
+    const onMock = result.hitArea.on as unknown as ReturnType<typeof vi.fn>;
+    for (const call of onMock.mock.calls) {
+      if (call[0] === 'pointerdown') {
+        call[1]({ x: 150 });
+      }
+    }
+
+    // External call to handlePointerMove should still work
+    result.handlePointerMove(200);
+    expect(result.value).toBeGreaterThan(0);
+
+    result.handlePointerUp();
+
+    // After pointer up, pointermove should not change value
+    const valueAfterUp = result.value;
+    result.handlePointerMove(250);
+    expect(result.value).toBe(valueAfterUp);
+  });
+
+  it('destroy cleans up active listeners', () => {
+    const scene = createMockScene();
+    const result = createSlider(scene, 100, 200, {
+      initialValue: 0, minValue: 0, maxValue: 100, width: 200,
+    });
+
+    const inputOnMock = scene.input.on;
+    const inputOffMock = scene.input.off;
+    inputOnMock.mockClear();
+    inputOffMock.mockClear();
+
+    // Trigger pointerdown
+    const onMock = result.hitArea.on as unknown as ReturnType<typeof vi.fn>;
+    for (const call of onMock.mock.calls) {
+      if (call[0] === 'pointerdown') {
+        call[1]({ x: 150 });
+      }
+    }
+
+    // Capture the registered handler
+    const moveHandler = inputOnMock.mock.calls.find((c: any[]) => c[0] === 'pointermove')?.[1];
+    expect(moveHandler).toBeDefined();
+
+    // Reset off mock to test destroy cleanup
+    inputOffMock.mockClear();
+
+    // Destroy the slider while dragging
+    result.destroy();
+
+    // Listeners should be cleaned up
+    expect(inputOffMock).toHaveBeenCalledWith('pointermove', moveHandler);
+  });
+
+  it('multiple sliders each self-manage their own listeners', () => {
+    const scene = createMockScene();
+
+    const slider1 = createSlider(scene, 100, 200, {
+      initialValue: 0, minValue: 0, maxValue: 100, width: 200,
+    });
+    const slider2 = createSlider(scene, 400, 200, {
+      initialValue: 0, minValue: 0, maxValue: 100, width: 200,
+    });
+
+    const inputOnMock = scene.input.on;
+    const inputOffMock = scene.input.off;
+    inputOnMock.mockClear();
+    inputOffMock.mockClear();
+
+    // Trigger pointerdown on slider1 only
+    const onMock1 = slider1.hitArea.on as unknown as ReturnType<typeof vi.fn>;
+    for (const call of onMock1.mock.calls) {
+      if (call[0] === 'pointerdown') {
+        call[1]({ x: 150 });
+      }
+    }
+
+    // Only one pointermove listener should be registered
+    const moveCalls = inputOnMock.mock.calls.filter((c: any[]) => c[0] === 'pointermove');
+    expect(moveCalls).toHaveLength(1);
+
+    // Simulate pointermove - only slider1 should update
+    const moveHandler = moveCalls[0][1];
+    moveHandler({ x: 200 });
+    expect(slider1.value).toBeGreaterThan(0);
+    expect(slider2.value).toBeCloseTo(0, 1);
+
+    // Simulate pointerup - listener should be cleaned up
+    const upHandler = inputOnMock.mock.calls.find((c: any[]) => c[0] === 'pointerup')?.[1];
+    upHandler();
+    expect(inputOffMock).toHaveBeenCalledWith('pointermove', moveHandler);
+  });
 });

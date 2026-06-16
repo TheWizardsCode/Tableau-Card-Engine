@@ -263,22 +263,10 @@ export class GymHandPileScene extends GymSceneBase {
     this.addButton(startX + 3 * (sliderWidth + sliderHorizGap) + 20, sliderY - 4, '[ Toggle Layout ]', () => this.toggleLayoutDirection());
     this.layoutLabel = createHudText(this, startX + 3 * (sliderWidth + sliderHorizGap) + 175, sliderY, 'Layout: horizontal', '#88ff88', { fontSize: '12px' });
 
-    // Wire global input events to forward drag events to all sliders
-    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
-      this.arcSlider.handlePointerMove(pointer.x);
-      this.spacingSlider.handlePointerMove(pointer.x);
-      this.rotationSlider.handlePointerMove(pointer.x);
-    });
-    this.input.on('pointerup', () => {
-      this.arcSlider.handlePointerUp();
-      this.spacingSlider.handlePointerUp();
-      this.rotationSlider.handlePointerUp();
-    });
-
-    this.events.once('shutdown', () => {
-      this.input.off('pointermove');
-      this.input.off('pointerup');
-    });
+    // Sliders self-manage their own pointermove/pointerup listeners,
+    // registering only when actively dragged and unregistering on pointerup.
+    // No scene-level forwarding is needed — each slider handles its own
+    // drag lifecycle internally.
 
     // Initialize
     this.reset();
