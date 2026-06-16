@@ -94,8 +94,17 @@ The Gym Router supports optional animated scene transitions (fade) when navigati
 ## Architecture
 
 - **GymRouterScene**: Landing page with navigation cards for all demo scenes.
-- **GymSceneBase**: Abstract base providing standard header, label, button, and divider helpers.
-- **GymRegistry**: Central catalogue of scene keys, titles, and descriptions.
+- **GymSceneBase**: Abstract base providing standard header (title, `[ Menu ]`, `[ < Prev ]`, `[ Next > ]` buttons), label, button, and divider helpers.
+- **GymRegistry**: Central catalogue of scene keys, titles, and descriptions, plus the `getAdjacentGymSceneKey` navigation helper.
+
+## Navigating Between Demo Scenes
+
+Each Gym demo scene includes **Prev** and **Next** navigation buttons in the header bar, positioned to the right of the `[ Menu ]` button. These cycle through the scene catalogue with wrap-around:
+
+- `[ < Prev ]` — jumps to the previous scene in the catalogue (wraps to the last scene when on the first).
+- `[ Next > ]` — jumps to the next scene in the catalogue (wraps to the first scene when on the last).
+
+The Gym Router landing page is unaffected since it does not extend `GymSceneBase`.
 
 Each demo scene uses core-engine APIs directly (SeededRng, UndoRedoManager, TranscriptRecorderBase, SaveLoadStore, SoundManager, etc.) without duplicating engine code.
 

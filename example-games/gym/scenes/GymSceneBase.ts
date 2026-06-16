@@ -12,10 +12,10 @@
  */
 
 import Phaser from 'phaser';
-import { GAME_W } from '../../../src/ui/constants';
-import { createSceneHeader } from '../../../src/ui/SceneHeader';
+import { GAME_W, FONT_FAMILY } from '../../../src/ui/constants';
+import { createSceneHeader, SCENE_HEADER_Y } from '../../../src/ui/SceneHeader';
 import type { SceneHeaderResult } from '../../../src/ui/SceneHeader';
-import { GYM_ROUTER_KEY } from '../GymRegistry';
+import { GYM_ROUTER_KEY, getAdjacentGymSceneKey } from '../GymRegistry';
 import { HelpPanel, type HelpSection } from '../../../src/ui/HelpPanel';
 import { HelpButton } from '../../../src/ui/HelpButton';
 import { getReducedMotion, setReducedMotion } from '../../../src/ui/SettingsStore';
@@ -42,6 +42,10 @@ const DEFAULT_VIEWPORT = { width: 1280, height: 720 };
 export abstract class GymSceneBase extends Phaser.Scene {
   /** Scene header elements (title + menu button). */
   protected header!: SceneHeaderResult;
+  /** Previous scene navigation button. */
+  protected prevButton!: Phaser.GameObjects.Text;
+  /** Next scene navigation button. */
+  protected nextButton!: Phaser.GameObjects.Text;
   /** Divider line drawn below the header. */
   protected headerDivider?: Phaser.GameObjects.Graphics;
 
@@ -95,6 +99,16 @@ export abstract class GymSceneBase extends Phaser.Scene {
     this.header.menuButton.on('pointerdown', () => {
       this.scene.start(GYM_ROUTER_KEY);
     });
+
+    // Add Previous and Next navigation buttons to the header bar.
+    // Positioned to the right of the [ Menu ] button on the same Y line.
+    this.prevButton = this.createNavButton(
+      120, SCENE_HEADER_Y, '[ < Prev ]', 'prev',
+    );
+    this.nextButton = this.createNavButton(
+      210, SCENE_HEADER_Y, '[ Next > ]', 'next',
+    );
+
     return this.header;
   }
 
@@ -126,6 +140,39 @@ export abstract class GymSceneBase extends Phaser.Scene {
   protected toggleReducedMotion(): void {
     this._reducedMotion = !this._reducedMotion;
     setReducedMotion(this._reducedMotion);
+  }
+
+  /**
+   * Create a navigation button matching the [ Menu ] button style.
+   *
+   * @param x         X position (origin 0.5).
+   * @param y         Y position.
+   * @param label     Button label text.
+   * @param direction 'prev' or 'next' for navigation.
+   * @returns The created Phaser text game object.
+   */
+  private createNavButton(
+    x: number,
+    y: number,
+    label: string,
+    direction: 'prev' | 'next',
+  ): Phaser.GameObjects.Text {
+    const btn = this.add
+      .text(x, y, label, {
+        fontSize: '12px',
+        color: '#aaccaa',
+        fontFamily: FONT_FAMILY,
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+
+    btn.on('pointerdown', () => {
+      this.scene.start(getAdjacentGymSceneKey(this.scene.key, direction));
+    });
+    btn.on('pointerover', () => btn.setColor('#88ff88'));
+    btn.on('pointerout', () => btn.setColor('#aaccaa'));
+
+    return btn;
   }
 
   // ── Scene transition hook ─────────────────────────────────
