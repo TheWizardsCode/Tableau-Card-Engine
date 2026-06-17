@@ -81,7 +81,7 @@ describe('MindTurnController.performPlay', () => {
     expect(onPenaltyComplete).not.toHaveBeenCalled();
     expect(onInvalidPlay).not.toHaveBeenCalled();
     expect(recorder.recordCardPlay).toHaveBeenCalledTimes(1);
-    expect(soundManager.play).toHaveBeenCalledWith('mind-sfx-card-play');
+    expect(soundManager.play).toHaveBeenCalledWith('sfx-card-play');
     expect(aiScheduler.removeCardFromAi).toHaveBeenCalledWith(10);
   });
 
@@ -116,7 +116,7 @@ describe('MindTurnController.performPlay', () => {
     expect(animateCard).toHaveBeenCalledTimes(1);
     expect(onPenaltyComplete).toHaveBeenCalledTimes(1);
     expect(onNormalComplete).not.toHaveBeenCalled();
-    expect(soundManager.play).toHaveBeenCalledWith('mind-sfx-life-lost');
+    expect(soundManager.play).toHaveBeenCalledWith('sfx-life-lost');
     expect(aiScheduler.cancelAllTimers).toHaveBeenCalledTimes(1);
     expect(aiScheduler.removePenaltyCards).toHaveBeenCalledTimes(1);
     expect(recorder.recordPenalty).toHaveBeenCalledTimes(1);

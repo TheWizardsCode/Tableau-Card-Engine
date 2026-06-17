@@ -19,7 +19,7 @@
 export const UI_VERSION = '0.1.0';
 
 // Card game scene base class
-export { CardGameScene } from './CardGameScene';
+export { CardGameScene, audioPathWithFallback } from './CardGameScene';
 
 // Phase state machine
 export { PhaseManager } from './PhaseManager';

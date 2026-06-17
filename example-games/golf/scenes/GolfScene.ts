@@ -26,6 +26,7 @@ import {
   preloadCardAssets,
   PhaseManager,
   OverlayManager,
+  audioPathWithFallback,
 } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
 import helpContent from '../help-content.json';
@@ -93,15 +94,17 @@ export class GolfScene extends CardGameScene {
   preload(): void {
     preloadCardAssets(this, GOLF_CARD_W, GOLF_CARD_H);
 
-    // Audio SFX assets
-    this.load.audio(SFX_KEYS.CARD_DRAW, 'assets/audio/card-draw.wav');
-    this.load.audio(SFX_KEYS.CARD_FLIP, 'assets/audio/card-flip.wav');
-    this.load.audio(SFX_KEYS.CARD_SWAP, 'assets/audio/card-swap.wav');
-    this.load.audio(SFX_KEYS.CARD_DISCARD, 'assets/audio/card-discard.wav');
-    this.load.audio(SFX_KEYS.TURN_CHANGE, 'assets/audio/turn-change.wav');
-    this.load.audio(SFX_KEYS.ROUND_END, 'assets/audio/round-end.wav');
-    this.load.audio(SFX_KEYS.SCORE_REVEAL, 'assets/audio/score-reveal.wav');
-    this.load.audio(SFX_KEYS.UI_CLICK, 'assets/audio/ui-click.wav');
+    // Audio SFX assets (namespace-scoped for collision protection)
+    const ns = 'golf';
+    const audioDir = 'golf';
+    this.load.audio(`${ns}:${SFX_KEYS.CARD_DRAW}`, audioPathWithFallback(audioDir, 'card-draw.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.CARD_FLIP}`, audioPathWithFallback(audioDir, 'card-flip.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.CARD_SWAP}`, audioPathWithFallback(audioDir, 'card-swap.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.CARD_DISCARD}`, audioPathWithFallback(audioDir, 'card-discard.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.TURN_CHANGE}`, audioPathWithFallback(audioDir, 'turn-change.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.ROUND_END}`, audioPathWithFallback(audioDir, 'round-end.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.SCORE_REVEAL}`, audioPathWithFallback(audioDir, 'score-reveal.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.UI_CLICK}`, audioPathWithFallback(audioDir, 'ui-click.wav'));
   }
 
   // ── Create ──────────────────────────────────────────────
@@ -153,7 +156,7 @@ export class GolfScene extends CardGameScene {
         'turn-started': SFX_KEYS.TURN_CHANGE,
         'game-ended': SFX_KEYS.ROUND_END,
       };
-      this.initSoundSystem(Object.values(SFX_KEYS), mapping);
+      this.initSoundSystem(Object.values(SFX_KEYS), mapping, { namespace: 'golf' });
     }
 
     // Setup game

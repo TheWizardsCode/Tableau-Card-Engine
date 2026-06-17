@@ -51,20 +51,22 @@ export class MainStreetLifecycleManager {
       s.load.image('ms_placeholder_card', 'assets/games/main-street/svg/placeholder-card.svg');
 
       // Preload Main Street audio assets (small, CC0-generated SFX and a short loop)
+      // Audio keys are namespace-scoped with 'main-street' for collision protection.
       try {
+        const ns = 'main-street';
         const audioDir = 'assets/games/main-street/audio';
-        s.load.audio(SFX_KEYS.DEAL, `${audioDir}/deal.wav`);
-        s.load.audio(SFX_KEYS.MOVE_LOOP, `${audioDir}/deal.wav`);
-        s.load.audio(SFX_KEYS.PLACE, `${audioDir}/place.wav`);
-        s.load.audio(SFX_KEYS.DISCARD, `${audioDir}/discard.wav`);
-        s.load.audio(SFX_KEYS.COIN_POP, `${audioDir}/coin-pop.wav`);
-        s.load.audio(SFX_KEYS.CLICK, `${audioDir}/click.wav`);
-        s.load.audio(SFX_KEYS.BG_LOOP, `${audioDir}/loop.wav`);
-        s.load.audio(SFX_KEYS.BUSINESS_START, `${audioDir}/deal.wav`);
-        s.load.audio(SFX_KEYS.BUSINESS_END, `${audioDir}/place.wav`);
-        s.load.audio(SFX_KEYS.UPGRADE_START, `${audioDir}/click.wav`);
-        s.load.audio(SFX_KEYS.UPGRADE_END, `${audioDir}/place.wav`);
-        s.load.audio(SFX_KEYS.EVENT_CHEER, `${audioDir}/coin-pop.wav`);
+        s.load.audio(`${ns}:${SFX_KEYS.DEAL}`, `${audioDir}/deal.wav`);
+        s.load.audio(`${ns}:${SFX_KEYS.MOVE_LOOP}`, `${audioDir}/deal.wav`);
+        s.load.audio(`${ns}:${SFX_KEYS.PLACE}`, `${audioDir}/place.wav`);
+        s.load.audio(`${ns}:${SFX_KEYS.DISCARD}`, `${audioDir}/discard.wav`);
+        s.load.audio(`${ns}:${SFX_KEYS.COIN_POP}`, `${audioDir}/coin-pop.wav`);
+        s.load.audio(`${ns}:${SFX_KEYS.CLICK}`, `${audioDir}/click.wav`);
+        s.load.audio(`${ns}:${SFX_KEYS.BG_LOOP}`, `${audioDir}/loop.wav`);
+        s.load.audio(`${ns}:${SFX_KEYS.BUSINESS_START}`, `${audioDir}/deal.wav`);
+        s.load.audio(`${ns}:${SFX_KEYS.BUSINESS_END}`, `${audioDir}/place.wav`);
+        s.load.audio(`${ns}:${SFX_KEYS.UPGRADE_START}`, `${audioDir}/click.wav`);
+        s.load.audio(`${ns}:${SFX_KEYS.UPGRADE_END}`, `${audioDir}/place.wav`);
+        s.load.audio(`${ns}:${SFX_KEYS.EVENT_CHEER}`, `${audioDir}/coin-pop.wav`);
       } catch (e) {
         // Some test environments may lack an audio loader; ignore preload failures
       }
@@ -185,6 +187,7 @@ export class MainStreetLifecycleManager {
     s.initSoundSystem(Object.values(SFX_KEYS), mapping, {
       synthPlayer: tfPlayer,
       synthKeyMap: MAIN_STREET_TF_SFX_MAPPING,
+      namespace: 'main-street',
     });
 
     // Late async tf module load (runtime-generated module path) without restart.

@@ -402,12 +402,12 @@ describe('CardGameScene', () => {
       scene.callInitSoundSystem(
         ['sfx-draw'],
         { 'card-drawn': 'sfx-draw' },
-        { synthPlayer, synthKeyMap: { 'ms-place': 'card-place' } },
+        { synthPlayer, synthKeyMap: { 'sfx-place': 'card-place' } },
       );
 
       expect(MockSoundManager).toHaveBeenCalledWith(expect.anything(), {
         synthPlayer,
-        synthKeyMap: { 'ms-place': 'card-place' },
+        synthKeyMap: { 'sfx-place': 'card-place' },
       });
     });
   });

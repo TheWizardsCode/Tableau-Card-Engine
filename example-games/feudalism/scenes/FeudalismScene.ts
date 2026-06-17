@@ -13,6 +13,7 @@ import {
   GAME_W, GAME_H,
   OverlayManager,
   createSceneTitle, createSceneMenuButton,
+  audioPathWithFallback,
 } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
 import helpContent from '../help-content.json';
@@ -53,12 +54,15 @@ export class FeudalismScene extends CardGameScene {
   }
 
   preload(): void {
-    this.load.audio(SFX_KEYS.TOKEN_TAKE, 'assets/audio/card-draw.wav');
-    this.load.audio(SFX_KEYS.CARD_PURCHASE, 'assets/audio/card-flip.wav');
-    this.load.audio(SFX_KEYS.PATRON_VISIT, 'assets/audio/score-reveal.wav');
-    this.load.audio(SFX_KEYS.TURN_CHANGE, 'assets/audio/turn-change.wav');
-    this.load.audio(SFX_KEYS.GAME_END, 'assets/audio/round-end.wav');
-    this.load.audio(SFX_KEYS.UI_CLICK, 'assets/audio/ui-click.wav');
+    // Audio SFX assets (namespace-scoped for collision protection)
+    const ns = 'feudalism';
+    const audioDir = 'feudalism';
+    this.load.audio(`${ns}:${SFX_KEYS.TOKEN_TAKE}`, audioPathWithFallback(audioDir, 'card-draw.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.CARD_PURCHASE}`, audioPathWithFallback(audioDir, 'card-flip.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.PATRON_VISIT}`, audioPathWithFallback(audioDir, 'score-reveal.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.TURN_CHANGE}`, audioPathWithFallback(audioDir, 'turn-change.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.GAME_END}`, audioPathWithFallback(audioDir, 'round-end.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.UI_CLICK}`, audioPathWithFallback(audioDir, 'ui-click.wav'));
   }
 
   create(): void {
@@ -84,7 +88,7 @@ export class FeudalismScene extends CardGameScene {
       'turn-started': SFX_KEYS.TURN_CHANGE,
       'game-ended': SFX_KEYS.GAME_END,
     };
-    this.initSoundSystem(Object.values(SFX_KEYS), mapping);
+    this.initSoundSystem(Object.values(SFX_KEYS), mapping, { namespace: 'feudalism' });
 
     this.session = setupFeudalismGame({
       playerCount: 2,

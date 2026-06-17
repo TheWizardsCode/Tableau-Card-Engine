@@ -6,21 +6,25 @@
  */
 
 // ── Audio asset keys ──────────────────────────────────────
+// All SFX keys use the standard `sfx-` prefix — no game-specific prefix.
+// See docs/SFX_CONVENTION.md for the naming convention.
+import { COMMON_SFX_KEYS } from '../../../src/core-engine/SoundManager';
+
 export const SFX_KEYS = {
-  CARD_PICKUP: 'bc-sfx-card-pickup',
-  CARD_TO_FOUNDATION: 'bc-sfx-card-to-foundation',
-  CARD_TO_TABLEAU: 'bc-sfx-card-to-tableau',
-  CARD_SNAP_BACK: 'bc-sfx-card-snap-back',
-  DEAL_CARD: 'bc-sfx-deal-card',
-  WIN_FANFARE: 'bc-sfx-win-fanfare',
-  LOSS_SOUND: 'bc-sfx-loss-sound',
-  AUTO_COMPLETE_START: 'bc-sfx-auto-complete-start',
-  AUTO_COMPLETE_CARD: 'bc-sfx-auto-complete-card',
-  UNDO: 'bc-sfx-undo',
-  REDO: 'bc-sfx-redo',
-  CARD_SELECT: 'bc-sfx-card-select',
-  CARD_DESELECT: 'bc-sfx-card-deselect',
-  UI_CLICK: 'bc-sfx-ui-click',
+  CARD_PICKUP: 'sfx-card-pickup',
+  CARD_TO_FOUNDATION: 'sfx-card-to-foundation',
+  CARD_TO_TABLEAU: 'sfx-card-to-tableau',
+  CARD_SNAP_BACK: 'sfx-card-snap-back',
+  DEAL_CARD: 'sfx-deal-card',
+  WIN_FANFARE: 'sfx-win-fanfare',
+  LOSS_SOUND: 'sfx-loss-sound',
+  AUTO_COMPLETE_START: 'sfx-auto-complete-start',
+  AUTO_COMPLETE_CARD: 'sfx-auto-complete-card',
+  UNDO: 'sfx-undo',
+  REDO: 'sfx-redo',
+  CARD_SELECT: 'sfx-card-select',
+  CARD_DESELECT: 'sfx-card-deselect',
+  UI_CLICK: COMMON_SFX_KEYS.UI_CLICK,
 } as const;
 
 // ── Card dimensions ───────────────────────────────────────

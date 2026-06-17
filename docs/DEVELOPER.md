@@ -197,6 +197,13 @@ This runs `scripts/tf-generate-synths.sh` and writes generated outputs under `bu
 
 See `docs/the-build/audio.md` for full details (module shape, mapping, runtime wiring, CI guidance).
 
+### SFX Key Naming Convention
+
+All sound effects use the `sfx-` prefix with no game identifier. Common cross-game
+keys are defined in `COMMON_SFX_KEYS` (exported from `src/core-engine/SoundManager.ts`).
+Audio assets are organized in `public/assets/audio/<game>/` with a fallback to
+`public/assets/audio/default/`. See `docs/SFX_CONVENTION.md` for the full convention.
+
 ## Project Structure
 
 ```

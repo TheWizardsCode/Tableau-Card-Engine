@@ -197,11 +197,11 @@ describe('flipCard', () => {
       target,
       newTexture: 'card_face',
       onComplete: vi.fn(),
-      sfx: { move: 'ms-move-loop', moveLoop: true },
+      sfx: { move: 'sfx-move-loop', moveLoop: true },
     });
 
     (tweenConfigs[0].onStart as Function)();
-    expect(add).toHaveBeenCalledWith('ms-move-loop', { loop: true });
+    expect(add).toHaveBeenCalledWith('sfx-move-loop', { loop: true });
     expect(play).toHaveBeenCalledOnce();
 
     (tweenConfigs[0].onComplete as Function)();

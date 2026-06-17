@@ -35,6 +35,34 @@ import { SettingsButton } from './SettingsButton';
 import type { HelpSection } from './HelpPanel';
 import { createStandardUndoRedoButtons } from './Renderer';
 
+// ── Audio path utility ───────────────────────────────────────
+
+/**
+ * Build an array of audio asset URLs with fallback to `assets/audio/default/`.
+ *
+ * Phaser's loader accepts an array of URLs for `this.load.audio()` and tries
+ * each in order until one succeeds. This enables the convention where each
+ * game stores its audio in `assets/audio/<gameDir>/` and shared/common sounds
+ * are placed in `assets/audio/default/`.
+ *
+ * @param gameDir  Subdirectory under `assets/audio/` for the current game.
+ * @param filename Audio filename (e.g. `'card-draw.wav'`).
+ * @returns Array of URLs: [game-specific, default]
+ *
+ * @example
+ * ```ts
+ * this.load.audio('sfx-card-draw', audioPathWithFallback('golf', 'card-draw.wav'));
+ * // Tries assets/audio/golf/card-draw.wav first,
+ * // then assets/audio/default/card-draw.wav
+ * ```
+ */
+export function audioPathWithFallback(gameDir: string, filename: string): string[] {
+  return [
+    `assets/audio/${gameDir}/${filename}`,
+    `assets/audio/default/${filename}`,
+  ];
+}
+
 /**
  * Abstract base class for card game scenes.
  *
@@ -156,7 +184,7 @@ export abstract class CardGameScene extends Phaser.Scene {
   protected initSoundSystem(
     sfxKeys: readonly string[],
     mapping: EventSoundMapping,
-    options?: Pick<SoundManagerOptions, 'synthPlayer' | 'synthKeyMap'>,
+    options?: Pick<SoundManagerOptions, 'synthPlayer' | 'synthKeyMap' | 'namespace'>,
   ): void {
     const phaserSound = this.sound;
     const player: SoundPlayer = {
@@ -168,6 +196,7 @@ export abstract class CardGameScene extends Phaser.Scene {
     this.soundManager = new SoundManager(player, {
       synthPlayer: options?.synthPlayer ?? null,
       synthKeyMap: options?.synthKeyMap,
+      namespace: options?.namespace,
     });
 
     for (const sfxKey of sfxKeys) {

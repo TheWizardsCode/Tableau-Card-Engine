@@ -279,8 +279,8 @@ describe('MainStreetScene browser tests', () => {
     game = await bootGame();
     const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;
 
-    scene.soundManager.play('ms-place');
-    scene.soundManager.play('ms-event-cheer');
+    scene.soundManager.play('sfx-place');
+    scene.soundManager.play('sfx-event-cheer');
     expect(placePlaySpy).toHaveBeenCalled();
     expect(cheerPlaySpy).toHaveBeenCalled();
 

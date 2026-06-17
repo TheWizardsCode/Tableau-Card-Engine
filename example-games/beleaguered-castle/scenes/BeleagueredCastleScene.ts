@@ -19,6 +19,7 @@ import {
   CardGameScene,
   preloadCardAssets,
   OverlayManager,
+  audioPathWithFallback,
 } from '../../../src/ui';
 import type { EventSoundMapping } from '../../../src/core-engine/SoundManager';
 import type { HelpSection } from '../../../src/ui';
@@ -68,21 +69,22 @@ export class BeleagueredCastleScene extends CardGameScene {
 
   preload(): void {
     preloadCardAssets(this, 90, 126);
-    const audioDir = 'assets/audio/beleaguered-castle';
-    this.load.audio(SFX_KEYS.CARD_PICKUP, `${audioDir}/card-pickup.wav`);
-    this.load.audio(SFX_KEYS.CARD_TO_FOUNDATION, `${audioDir}/card-to-foundation.wav`);
-    this.load.audio(SFX_KEYS.CARD_TO_TABLEAU, `${audioDir}/card-to-tableau.wav`);
-    this.load.audio(SFX_KEYS.CARD_SNAP_BACK, `${audioDir}/card-snap-back.wav`);
-    this.load.audio(SFX_KEYS.DEAL_CARD, `${audioDir}/deal-card.wav`);
-    this.load.audio(SFX_KEYS.WIN_FANFARE, `${audioDir}/win-fanfare.wav`);
-    this.load.audio(SFX_KEYS.LOSS_SOUND, `${audioDir}/loss-sound.wav`);
-    this.load.audio(SFX_KEYS.AUTO_COMPLETE_START, `${audioDir}/auto-complete-start.wav`);
-    this.load.audio(SFX_KEYS.AUTO_COMPLETE_CARD, `${audioDir}/auto-complete-card.wav`);
-    this.load.audio(SFX_KEYS.UNDO, `${audioDir}/undo.wav`);
-    this.load.audio(SFX_KEYS.REDO, `${audioDir}/redo.wav`);
-    this.load.audio(SFX_KEYS.CARD_SELECT, `${audioDir}/card-select.wav`);
-    this.load.audio(SFX_KEYS.CARD_DESELECT, `${audioDir}/card-deselect.wav`);
-    this.load.audio(SFX_KEYS.UI_CLICK, `${audioDir}/ui-click.wav`);
+    const ns = 'beleaguered-castle';
+    const audioDir = 'beleaguered-castle';
+    this.load.audio(`${ns}:${SFX_KEYS.CARD_PICKUP}`, audioPathWithFallback(audioDir, 'card-pickup.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.CARD_TO_FOUNDATION}`, audioPathWithFallback(audioDir, 'card-to-foundation.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.CARD_TO_TABLEAU}`, audioPathWithFallback(audioDir, 'card-to-tableau.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.CARD_SNAP_BACK}`, audioPathWithFallback(audioDir, 'card-snap-back.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.DEAL_CARD}`, audioPathWithFallback(audioDir, 'deal-card.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.WIN_FANFARE}`, audioPathWithFallback(audioDir, 'win-fanfare.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.LOSS_SOUND}`, audioPathWithFallback(audioDir, 'loss-sound.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.AUTO_COMPLETE_START}`, audioPathWithFallback(audioDir, 'auto-complete-start.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.AUTO_COMPLETE_CARD}`, audioPathWithFallback(audioDir, 'auto-complete-card.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.UNDO}`, audioPathWithFallback(audioDir, 'undo.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.REDO}`, audioPathWithFallback(audioDir, 'redo.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.CARD_SELECT}`, audioPathWithFallback(audioDir, 'card-select.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.CARD_DESELECT}`, audioPathWithFallback(audioDir, 'card-deselect.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.UI_CLICK}`, audioPathWithFallback(audioDir, 'ui-click.wav'));
   }
 
   create(): void {
@@ -156,7 +158,7 @@ export class BeleagueredCastleScene extends CardGameScene {
         'card-deselected': SFX_KEYS.CARD_DESELECT,
         'ui-interaction': SFX_KEYS.UI_CLICK,
       };
-      this.initSoundSystem(Object.values(SFX_KEYS), mapping);
+      this.initSoundSystem(Object.values(SFX_KEYS), mapping, { namespace: 'beleaguered-castle' });
       this.initSettingsPanel();
       this.initUndoRedoButtons(
         () => this.turnController.performUndo(),

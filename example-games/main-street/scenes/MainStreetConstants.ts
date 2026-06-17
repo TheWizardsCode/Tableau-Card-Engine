@@ -33,19 +33,23 @@ export const BASE_HAND_CARD_W = 140;
 export const BASE_HAND_CARD_H = 80;
 
 // ── Main Street SFX keys (logical keys used by SoundManager)
+// All SFX keys use the standard `sfx-` prefix — no game-specific prefix.
+// See docs/SFX_CONVENTION.md for the naming convention.
+import { COMMON_SFX_KEYS } from '../../../src/core-engine/SoundManager';
+
 export const SFX_KEYS = {
-  DEAL: 'ms-deal',
-  MOVE_LOOP: 'ms-move-loop',
-  PLACE: 'ms-place',
-  DISCARD: 'ms-discard',
-  COIN_POP: 'ms-coin-pop',
-  CLICK: 'ms-click',
-  BG_LOOP: 'ms-bg-loop',
-  BUSINESS_START: 'ms-business-start',
-  BUSINESS_END: 'ms-business-end',
-  UPGRADE_START: 'ms-upgrade-start',
-  UPGRADE_END: 'ms-upgrade-end',
-  EVENT_CHEER: 'ms-event-cheer',
+  DEAL: 'sfx-deal',
+  MOVE_LOOP: 'sfx-move-loop',
+  PLACE: 'sfx-place',
+  DISCARD: 'sfx-discard',
+  COIN_POP: 'sfx-coin-pop',
+  CLICK: COMMON_SFX_KEYS.UI_CLICK,
+  BG_LOOP: 'sfx-bg-loop',
+  BUSINESS_START: 'sfx-business-start',
+  BUSINESS_END: 'sfx-business-end',
+  UPGRADE_START: 'sfx-upgrade-start',
+  UPGRADE_END: 'sfx-upgrade-end',
+  EVENT_CHEER: 'sfx-event-cheer',
 } as const;
 
 // Activity Log panel layout

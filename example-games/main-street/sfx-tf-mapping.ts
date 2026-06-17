@@ -3,18 +3,20 @@
  *
  * These values are consumed by SoundManager + tfAdapter. Keep this list
  * in sync with keys used in MainStreetScene.
+ *
+ * All keys use the standard `sfx-` prefix per SFX_CONVENTION.md.
  */
 export const MAIN_STREET_TF_SFX_MAPPING: Record<string, string> = {
-  'ms-deal': 'card-draw',
-  'ms-move-loop': 'card-slide',
-  'ms-place': 'card-place',
-  'ms-discard': 'card-discard',
-  'ms-coin-pop': 'card-coin-collect',
-  'ms-click': 'ui-notification-chime',
-  'ms-bg-loop': 'card-table-ambience',
-  'ms-business-start': 'construction-hammer',
-  'ms-business-end': 'construction-saw',
-  'ms-upgrade-start': 'construction-lite-hammer',
-  'ms-upgrade-end': 'construction-lite-saw',
-  'ms-event-cheer': 'crowd-cheer',
+  'sfx-deal': 'card-draw',
+  'sfx-move-loop': 'card-slide',
+  'sfx-place': 'card-place',
+  'sfx-discard': 'card-discard',
+  'sfx-coin-pop': 'card-coin-collect',
+  'sfx-ui-click': 'ui-notification-chime',
+  'sfx-bg-loop': 'card-table-ambience',
+  'sfx-business-start': 'construction-hammer',
+  'sfx-business-end': 'construction-saw',
+  'sfx-upgrade-start': 'construction-lite-hammer',
+  'sfx-upgrade-end': 'construction-lite-saw',
+  'sfx-event-cheer': 'crowd-cheer',
 };

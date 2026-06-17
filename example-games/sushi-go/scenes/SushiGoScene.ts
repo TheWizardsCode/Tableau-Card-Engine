@@ -34,6 +34,7 @@ import {
   HandView,
   createSceneTitle, createSceneMenuButton,
   TooltipManager,
+  audioPathWithFallback,
 } from '../../../src/ui';
 import type { HelpSection, TooltipRenderContext } from '../../../src/ui';
 import helpContent from '../help-content.json';
@@ -113,12 +114,14 @@ export class SushiGoScene extends CardGameScene {
   // ── Preload ─────────────────────────────────────────────
 
   preload(): void {
-    this.load.audio(SFX_KEYS.CARD_PICK, 'assets/audio/card-draw.wav');
-    this.load.audio(SFX_KEYS.CARD_FLIP, 'assets/audio/card-flip.wav');
-    this.load.audio(SFX_KEYS.TURN_CHANGE, 'assets/audio/turn-change.wav');
-    this.load.audio(SFX_KEYS.ROUND_END, 'assets/audio/round-end.wav');
-    this.load.audio(SFX_KEYS.SCORE_REVEAL, 'assets/audio/score-reveal.wav');
-    this.load.audio(SFX_KEYS.UI_CLICK, 'assets/audio/ui-click.wav');
+    const ns = 'sushi-go';
+    const audioDir = 'sushi-go';
+    this.load.audio(`${ns}:${SFX_KEYS.CARD_PICK}`, audioPathWithFallback(audioDir, 'card-draw.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.CARD_FLIP}`, audioPathWithFallback(audioDir, 'card-flip.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.TURN_CHANGE}`, audioPathWithFallback(audioDir, 'turn-change.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.ROUND_END}`, audioPathWithFallback(audioDir, 'round-end.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.SCORE_REVEAL}`, audioPathWithFallback(audioDir, 'score-reveal.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.UI_CLICK}`, audioPathWithFallback(audioDir, 'ui-click.wav'));
 
     for (const filename of SUSHI_ICON_FILES) {
       const key = filename.replace(/\.svg$/, '');
@@ -192,7 +195,7 @@ export class SushiGoScene extends CardGameScene {
       'turn-started': SFX_KEYS.TURN_CHANGE,
       'game-ended': SFX_KEYS.ROUND_END,
     };
-    this.initSoundSystem(Object.values(SFX_KEYS), mapping);
+    this.initSoundSystem(Object.values(SFX_KEYS), mapping, { namespace: 'sushi-go' });
 
     this.session = setupSushiGoGame({
       playerCount: 2,
