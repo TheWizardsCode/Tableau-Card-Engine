@@ -60,7 +60,10 @@ describe('Beleaguered Castle HandView/PileView migration smoke test', () => {
     );
     game = createBeleagueredCastleGame();
     await waitForScene(game, 'BeleagueredCastleScene');
-  }, 120_000);
+    // Wait for the deal to complete so it's ready for all tests
+    const scene = game.scene.getScene('BeleagueredCastleScene') as any;
+    await waitForDeal(scene);
+  }, 180_000);
 
   afterAll(() => {
     if (game) {
