@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import Phaser from 'phaser';
 import { waitForScene } from '../helpers/waitForScene';
 
@@ -63,14 +63,20 @@ function collectFromSceneAndHud<T extends Phaser.GameObjects.GameObject>(
   return result;
 }
 
+let game: Phaser.Game | null = null;
+
+beforeAll(async () => {
+  game = await bootGame();
+}, 120_000);
+
+afterAll(() => {
+  destroyGame(game);
+  game = null;
+});
+
 describe('Beleaguered Castle help panel', () => {
-  let game: Phaser.Game | null = null;
-
-  afterEach(() => { destroyGame(game); game = null; });
-
   it('opens/closes, has correct depth, and input blocker', async () => {
-    game = await bootGame();
-    const scene = game.scene.getScene('BeleagueredCastleScene') as any;
+    const scene = game!.scene.getScene('BeleagueredCastleScene') as any;
     await waitFrames(8);
 
     expect(scene.helpPanel).toBeDefined();
@@ -100,13 +106,8 @@ describe('Beleaguered Castle help panel', () => {
 });
 
 describe('Beleaguered Castle settings panel', () => {
-  let game: Phaser.Game | null = null;
-
-  afterEach(() => { destroyGame(game); game = null; });
-
   it('opens/closes, has correct depth, and input blocker', async () => {
-    game = await bootGame();
-    const scene = game.scene.getScene('BeleagueredCastleScene') as any;
+    const scene = game!.scene.getScene('BeleagueredCastleScene') as any;
     await waitFrames(8);
 
     expect(scene.settingsPanel).toBeDefined();
@@ -136,13 +137,8 @@ describe('Beleaguered Castle settings panel', () => {
 });
 
 describe('Beleaguered Castle overlays', () => {
-  let game: Phaser.Game | null = null;
-
-  afterEach(() => { destroyGame(game); game = null; });
-
   it('win overlay has input blocker, buttons at correct depths, and dismissal', async () => {
-    game = await bootGame();
-    const scene = game.scene.getScene('BeleagueredCastleScene') as any;
+    const scene = game!.scene.getScene('BeleagueredCastleScene') as any;
     await waitFrames(8);
 
     (scene as any).showWinOverlay(0);
@@ -174,8 +170,7 @@ describe('Beleaguered Castle overlays', () => {
   });
 
   it('no-moves overlay has input blocker, buttons at correct depths, and dismissal', async () => {
-    game = await bootGame();
-    const scene = game.scene.getScene('BeleagueredCastleScene') as any;
+    const scene = game!.scene.getScene('BeleagueredCastleScene') as any;
     await waitFrames(8);
 
     (scene as any).showNoMovesOverlay();
@@ -208,8 +203,7 @@ describe('Beleaguered Castle overlays', () => {
 
   describe('Undo/Redo migration to shared mechanism', () => {
     it('uses initUndoRedoButtons from CardGameScene (no direct button creation in renderer)', async () => {
-      game = await bootGame();
-      const scene = game.scene.getScene('BeleagueredCastleScene') as any;
+        const scene = game!.scene.getScene('BeleagueredCastleScene') as any;
       await waitFrames(8);
 
       // Verify the shared mechanism's undo/redo buttons exist
@@ -227,8 +221,7 @@ describe('Beleaguered Castle overlays', () => {
     });
 
     it('undo/redo buttons do not overlap with settings button', async () => {
-      game = await bootGame();
-      const scene = game.scene.getScene('BeleagueredCastleScene') as any;
+        const scene = game!.scene.getScene('BeleagueredCastleScene') as any;
       await waitFrames(8);
 
       const undoBtn = (scene as any).undoButton as Phaser.GameObjects.Container | null;
@@ -248,8 +241,7 @@ describe('Beleaguered Castle overlays', () => {
     });
 
     it('undo/redo callbacks work (wired to turnController)', async () => {
-      game = await bootGame();
-      const scene = game.scene.getScene('BeleagueredCastleScene') as any;
+        const scene = game!.scene.getScene('BeleagueredCastleScene') as any;
       await waitFrames(8);
 
       // Access the undo/redo buttons' callback
@@ -267,8 +259,7 @@ describe('Beleaguered Castle overlays', () => {
     });
 
     it('keyboard shortcuts (Ctrl+Z, Ctrl+Y) remain functional', async () => {
-      game = await bootGame();
-      const scene = game.scene.getScene('BeleagueredCastleScene') as any;
+        const scene = game!.scene.getScene('BeleagueredCastleScene') as any;
       await waitFrames(8);
 
       // Simulate keyboard events by emitting on the scene's keyboard
