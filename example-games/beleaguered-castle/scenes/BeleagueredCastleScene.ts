@@ -127,13 +127,11 @@ export class BeleagueredCastleScene extends CardGameScene {
     this.bcRenderer.initTableauHandViews();
     this.bcRenderer.createTableauDropZones();
     this.bcRenderer.createHUD(this.seed);
-    this.bcRenderer.onUndoClick = () => this.turnController.performUndo();
-    this.bcRenderer.onRedoClick = () => this.turnController.performRedo();
     this.bcRenderer.onDealCard = (info) => this.gameEvents.emit('deal-card', info);
     this.bcRenderer.onDealComplete = () => {
       this.dealComplete = true;
       this.bcRenderer.makeDraggable(this.interactionBlocked);
-      this.bcRenderer.refreshUndoRedoButtons(this.turnController.canUndo, this.turnController.canRedo);
+      this.refreshUndoRedoButtons(this.turnController.canUndo, this.turnController.canRedo);
       this.saveCheckpoint();
     };
     this.bcRenderer.onCardClick = (col) => this.handleCardClick(col);
@@ -160,6 +158,10 @@ export class BeleagueredCastleScene extends CardGameScene {
       };
       this.initSoundSystem(Object.values(SFX_KEYS), mapping);
       this.initSettingsPanel();
+      this.initUndoRedoButtons(
+        () => this.turnController.performUndo(),
+        () => this.turnController.performRedo(),
+      );
     }
 
     this.bcRenderer.refreshFoundations();
@@ -566,15 +568,17 @@ export class BeleagueredCastleScene extends CardGameScene {
     });
 
     // Reassign callbacks that reference the new turn controller
-    this.bcRenderer.onUndoClick = () => this.turnController.performUndo();
-    this.bcRenderer.onRedoClick = () => this.turnController.performRedo();
+    this.initUndoRedoButtons(
+      () => this.turnController.performUndo(),
+      () => this.turnController.performRedo(),
+    );
     this.onNewGame = () => { this.seed = Date.now(); this.scene.restart(); };
     this.onRestart = () => this.scene.restart();
     this.onUndoLast = () => { this.overlayManager.dismiss(); this.gameEnded = false; this.resumeTimer(); this.turnController.performUndo(); };
 
     // Refresh the renderer with the restored state
     this.bcRenderer.refreshAll(true, false);
-    this.bcRenderer.refreshUndoRedoButtons(this.turnController.canUndo, this.turnController.canRedo);
+    this.refreshUndoRedoButtons(this.turnController.canUndo, this.turnController.canRedo);
 
     // Wire up interactions (no deal animation since dealComplete is already true)
     this.setupDragAndDrop();
@@ -629,7 +633,7 @@ export class BeleagueredCastleScene extends CardGameScene {
   // ── Refresh ─────────────────────────────────────────────
   private refreshAll(): void {
     this.bcRenderer.refreshAll(this.dealComplete, this.interactionBlocked);
-    this.bcRenderer.refreshUndoRedoButtons(this.turnController.canUndo, this.turnController.canRedo);
+    this.refreshUndoRedoButtons(this.turnController.canUndo, this.turnController.canRedo);
   }
 
   // ── Replay API ──────────────────────────────────────────

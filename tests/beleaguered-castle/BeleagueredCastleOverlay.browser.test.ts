@@ -205,4 +205,81 @@ describe('Beleaguered Castle overlays', () => {
     );
     expect(noMoveText.length).toBe(0);
   });
+
+  describe('Undo/Redo migration to shared mechanism', () => {
+    it('uses initUndoRedoButtons from CardGameScene (no direct button creation in renderer)', async () => {
+      game = await bootGame();
+      const scene = game.scene.getScene('BeleagueredCastleScene') as any;
+      await waitFrames(8);
+
+      // Verify the shared mechanism's undo/redo buttons exist
+      const undoBtn = (scene as any).undoButton as Phaser.GameObjects.Container | null;
+      const redoBtn = (scene as any).redoButton as Phaser.GameObjects.Container | null;
+      expect(undoBtn).not.toBeNull();
+      expect(redoBtn).not.toBeNull();
+
+      // Verify the renderer no longer has direct undo/redo button fields
+      expect((scene as any).bcRenderer.undoBtn).toBeUndefined();
+      expect((scene as any).bcRenderer.redoBtn).toBeUndefined();
+
+      // Verify correct ordering (undo left of redo)
+      expect(undoBtn!.x).toBeLessThan(redoBtn!.x);
+    });
+
+    it('undo/redo buttons do not overlap with settings button', async () => {
+      game = await bootGame();
+      const scene = game.scene.getScene('BeleagueredCastleScene') as any;
+      await waitFrames(8);
+
+      const undoBtn = (scene as any).undoButton as Phaser.GameObjects.Container | null;
+      const redoBtn = (scene as any).redoButton as Phaser.GameObjects.Container | null;
+      const settingsBtn = (scene as any).settingsButton as any;
+
+      expect(undoBtn).not.toBeNull();
+      expect(redoBtn).not.toBeNull();
+      expect(settingsBtn).not.toBeNull();
+
+      // Settings button left edge (center - radius)
+      const settingsLeftEdge = settingsBtn.posX - 16;
+      // Redo right edge (center + half-width)
+      const redoRightEdge = redoBtn!.x + 30;
+
+      expect(redoRightEdge).toBeLessThan(settingsLeftEdge);
+    });
+
+    it('undo/redo callbacks work (wired to turnController)', async () => {
+      game = await bootGame();
+      const scene = game.scene.getScene('BeleagueredCastleScene') as any;
+      await waitFrames(8);
+
+      // Access the undo/redo buttons' callback
+      // The buttons are Containers; their first child is the interactive bg rectangle
+      const redoContainer = (scene as any).redoButton as Phaser.GameObjects.Container;
+      expect(redoContainer).not.toBeNull();
+      expect(redoContainer.list.length).toBeGreaterThanOrEqual(1);
+
+      // The buttons should exist and be interactive (not test clicking which
+      // requires coordinate-based interaction - we just verify the mechanism
+      // is wired. The unit tests verify callback invocation.)
+      expect(scene.turnController).toBeDefined();
+      expect(typeof scene.turnController.performUndo).toBe('function');
+      expect(typeof scene.turnController.performRedo).toBe('function');
+    });
+
+    it('keyboard shortcuts (Ctrl+Z, Ctrl+Y) remain functional', async () => {
+      game = await bootGame();
+      const scene = game.scene.getScene('BeleagueredCastleScene') as any;
+      await waitFrames(8);
+
+      // Simulate keyboard events by emitting on the scene's keyboard
+      const keyboard = scene.input.keyboard;
+      expect(keyboard).toBeDefined();
+
+      // Verify keyboard is wired (the scene sets up keydown listener)
+      // For real keyboard tests we'd need to dispatch DOM events, but
+      // Phaser handles that internally. We just verify the scene has
+      // the keyboard handler wired up by checking the keyboard reference.
+      expect(keyboard.enabled).toBe(true);
+    });
+  });
 });

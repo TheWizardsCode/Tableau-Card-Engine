@@ -10,7 +10,6 @@ import { FOUNDATION_COUNT, TABLEAU_COUNT } from '../BeleagueredCastleState';
 import { HandView, PileView } from '../../../src/ui';
 import { GAME_W, GAME_H } from '../../../src/ui';
 import { createSceneTitle, createSceneMenuButton } from '@ui/Renderer';
-import { createActionButton } from '@ui/Renderer';
 import { createBcHudText } from '../../../src/ui/Renderer/adapters/BeleagueredCastleAdapter';
 import {
   BC_CARD_W, BC_CARD_H, CARD_GAP, CASCADE_OFFSET_Y,
@@ -51,12 +50,8 @@ export class BeleagueredCastleRenderer {
   private moveCountText!: Phaser.GameObjects.Text;
   private timerText!: Phaser.GameObjects.Text;
   private seedText!: Phaser.GameObjects.Text;
-  private undoButton!: Phaser.GameObjects.Container;
-  private redoButton!: Phaser.GameObjects.Container;
 
   // Callbacks
-  onUndoClick?: () => void;
-  onRedoClick?: () => void;
   onDealCard?: (info: { cardIndex: number; totalCards: number }) => void;
   onDealComplete?: () => void;
   onCardClick?: (colIndex: number) => void;
@@ -76,9 +71,6 @@ export class BeleagueredCastleRenderer {
   get moveText(): Phaser.GameObjects.Text { return this.moveCountText; }
   get timer(): Phaser.GameObjects.Text { return this.timerText; }
   get seedDisplay(): Phaser.GameObjects.Text { return this.seedText; }
-  get undoBtn(): Phaser.GameObjects.Container { return this.undoButton; }
-  get redoBtn(): Phaser.GameObjects.Container { return this.redoButton; }
-
   /**
    * Return the HandView for a given tableau column, or undefined.
    */
@@ -171,14 +163,6 @@ export class BeleagueredCastleRenderer {
       fontSize: '18px',
       originX: 1,
     });
-
-    this.undoButton = createActionButton(this.scene, GAME_W - 220, this.layout.headerY, 60, 'Undo', () => this.onUndoClick?.());
-    this.redoButton = createActionButton(this.scene, GAME_W - 140, this.layout.headerY, 60, 'Redo', () => this.onRedoClick?.());
-  }
-
-  refreshUndoRedoButtons(canUndo: boolean, canRedo: boolean): void {
-    this.undoButton.setAlpha(canUndo ? 1 : 0.5);
-    this.redoButton.setAlpha(canRedo ? 1 : 0.5);
   }
 
   // ── Foundation rendering ────────────────────────────────
