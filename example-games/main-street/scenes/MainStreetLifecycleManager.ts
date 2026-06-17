@@ -21,6 +21,7 @@ import {
   loadTutorialState,
   saveTutorialState,
   updateTutorialStatus,
+  TUTORIAL_SEED,
   type TutorialVisibilityOptions,
 } from '../TutorialState';
 import {
@@ -50,20 +51,22 @@ export class MainStreetLifecycleManager {
       s.load.image('ms_placeholder_card', 'assets/games/main-street/svg/placeholder-card.svg');
 
       // Preload Main Street audio assets (small, CC0-generated SFX and a short loop)
+      // Audio keys are namespace-scoped with 'main-street' for collision protection.
       try {
+        const ns = 'main-street';
         const audioDir = 'assets/games/main-street/audio';
-        s.load.audio(SFX_KEYS.DEAL, `${audioDir}/deal.wav`);
-        s.load.audio(SFX_KEYS.MOVE_LOOP, `${audioDir}/deal.wav`);
-        s.load.audio(SFX_KEYS.PLACE, `${audioDir}/place.wav`);
-        s.load.audio(SFX_KEYS.DISCARD, `${audioDir}/discard.wav`);
-        s.load.audio(SFX_KEYS.COIN_POP, `${audioDir}/coin-pop.wav`);
-        s.load.audio(SFX_KEYS.CLICK, `${audioDir}/click.wav`);
-        s.load.audio(SFX_KEYS.BG_LOOP, `${audioDir}/loop.wav`);
-        s.load.audio(SFX_KEYS.BUSINESS_START, `${audioDir}/deal.wav`);
-        s.load.audio(SFX_KEYS.BUSINESS_END, `${audioDir}/place.wav`);
-        s.load.audio(SFX_KEYS.UPGRADE_START, `${audioDir}/click.wav`);
-        s.load.audio(SFX_KEYS.UPGRADE_END, `${audioDir}/place.wav`);
-        s.load.audio(SFX_KEYS.EVENT_CHEER, `${audioDir}/coin-pop.wav`);
+        s.load.audio(`${ns}:${SFX_KEYS.DEAL}`, `${audioDir}/deal.wav`);
+        s.load.audio(`${ns}:${SFX_KEYS.MOVE_LOOP}`, `${audioDir}/deal.wav`);
+        s.load.audio(`${ns}:${SFX_KEYS.PLACE}`, `${audioDir}/place.wav`);
+        s.load.audio(`${ns}:${SFX_KEYS.DISCARD}`, `${audioDir}/discard.wav`);
+        s.load.audio(`${ns}:${SFX_KEYS.COIN_POP}`, `${audioDir}/coin-pop.wav`);
+        s.load.audio(`${ns}:${SFX_KEYS.CLICK}`, `${audioDir}/click.wav`);
+        s.load.audio(`${ns}:${SFX_KEYS.BG_LOOP}`, `${audioDir}/loop.wav`);
+        s.load.audio(`${ns}:${SFX_KEYS.BUSINESS_START}`, `${audioDir}/deal.wav`);
+        s.load.audio(`${ns}:${SFX_KEYS.BUSINESS_END}`, `${audioDir}/place.wav`);
+        s.load.audio(`${ns}:${SFX_KEYS.UPGRADE_START}`, `${audioDir}/click.wav`);
+        s.load.audio(`${ns}:${SFX_KEYS.UPGRADE_END}`, `${audioDir}/place.wav`);
+        s.load.audio(`${ns}:${SFX_KEYS.EVENT_CHEER}`, `${audioDir}/coin-pop.wav`);
       } catch (e) {
         // Some test environments may lack an audio loader; ignore preload failures
       }
@@ -184,6 +187,7 @@ export class MainStreetLifecycleManager {
     s.initSoundSystem(Object.values(SFX_KEYS), mapping, {
       synthPlayer: tfPlayer,
       synthKeyMap: MAIN_STREET_TF_SFX_MAPPING,
+      namespace: 'main-street',
     });
 
     // Late async tf module load (runtime-generated module path) without restart.
@@ -367,33 +371,19 @@ export class MainStreetLifecycleManager {
           'Hint: get a suggested move (once per turn).\n' +
           'Undo / Redo: step back or forward through market actions.\n' +
           'Refresh Investments: swap the investment row (costs coins).\n' +
-          'Tutorial Replay: restart the guided tutorial from Settings.\n' +
           'Keyboard shortcuts: End Turn key configurable in Settings.',
       },
     ];
     s.initHelpPanel(helpSections);
-    // Patch help button to support tutorial gating (T9: open-help)
-    // The HelpButton's hitArea pointerdown handler directly calls helpPanel.toggle(),
-    // so we intercept by wrapping the panel's toggle method.
-    const originalHelpToggle = (s as any).helpPanel?.toggle?.bind((s as any).helpPanel);
-    if (originalHelpToggle && (s as any).helpPanel) {
-      (s as any).helpPanel.toggle = () => {
-        const wasOpen = (s as any).helpPanel.isOpen;
-        // Tutorial gating: only allow open-help if it's the required action or tutorial is inactive
-        const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('open-help' as TutorialActionType);
-        if (check && !check.allowed) {
-          s.instructionText.setText(check.reason ?? 'Complete the highlighted step first.');
-          return;
-        }
-        originalHelpToggle();
-        // If we just opened help (was closed, now open), mark tutorial step complete
-        if ((s as any).helpPanel.isOpen && !wasOpen) {
-          (s.msLifecycleManager as any).onTutorialActionComplete?.('open-help' as TutorialActionType);
-        }
-      };
-    }
+    // Note: The help button gating for the removed "Help + Hint Tools" step (old T10)
+    // has been removed. The tutorial no longer has an open-help action step.
+    // The HelpPanel toggle no longer needs tutorial intercept.
     // Provide the ordered difficulty names so the Settings panel can render a selector
     s.initSettingsPanel(DIFFICULTY_NAMES);
+    s.initUndoRedoButtons(
+      () => s.performUndo(),
+      () => s.performRedo(),
+    );
     if (!s.replayMode) {
       s.tooltipManager = new TooltipManager(s, s.settingsPanel);
     }
@@ -408,7 +398,35 @@ export class MainStreetLifecycleManager {
         {
           onStartTutorial: () => {
             try {
-              // Start the action-gated tutorial flow (T1-T10)
+              // ── Deterministic Tutorial Setup ─────────────────
+              // When the tutorial starts, force Easy difficulty and use a
+              // fixed seed so the same cards appear in the same order.
+              // This ensures the player has enough coins for all actions
+              // (12 starting coins, 5 starting reputation) and that the
+              // required cards are always available.
+              //
+              // NOTE: We intentionally do NOT filter by campaign-unlocked
+              // card IDs here. The tutorial must use the FULL card pool so
+              // that the fixed seed 'tutorial-seed' produces a deterministic
+              // market every time regardless of the player's campaign
+              // progress. Filtering by unlockedCardIds would change the deck
+              // composition and therefore the market lineup, breaking the
+              // hardcoded requiredCardId references in the tutorial steps.
+              s.selectedDifficulty = 'Easy';
+              s.state = setupMainStreetGame({
+                difficulty: 'Easy',
+                seed: TUTORIAL_SEED,
+              });
+              // Re-initialize the transcript recorder with the new seed
+              try {
+                const { MainStreetTranscriptRecorder, setMainStreetRecorder } = require('../MainStreetTranscript');
+                const initialSnapshot = { seed: s.state.seed, snapshotAtTurn: s.state.turn };
+                const recorder = new MainStreetTranscriptRecorder(initialSnapshot);
+                setMainStreetRecorder(recorder);
+              } catch (_) { /* ignore */ }
+              // Start the day phase so the market populates
+              s.startDayPhase();
+              // Start the action-gated tutorial flow (T1-T12)
               const controller = (s as any).tutorialController as TutorialControllerState | undefined;
               if (controller) {
                 Object.assign(s, { tutorialController: startTutorial(controller) });
@@ -430,53 +448,14 @@ export class MainStreetLifecycleManager {
     // Initialize the action-gated tutorial controller state
     (s as any).tutorialController = createTutorialControllerState();
 
-    // Listen for Settings 'Play Tutorial' request and log for debugging
-    try {
-      if (typeof window !== 'undefined' && (window as any).addEventListener) {
-        (window as any).addEventListener('tce:play-tutorial', () => {
-          try {
-            (s as any).tutorialOverlay?.start();
-          } catch (e) {
-            // eslint-disable-next-line no-console
-            console.error('[MainStreet] play-tutorial handler failed', e);
-          }
-        });
-        // Replay tutorial: reset tutorial state and restart current run into tutorial mode
-        (window as any).addEventListener('tce:replay-tutorial', () => {
-          try {
-            // Reset tutorial state so the offer modal would show again
-            const storage = new BrowserLocalStorageAdapter();
-            const tutorialState = loadTutorialState(storage);
-            const reset = updateTutorialStatus(tutorialState, 'not_seen');
-            void saveTutorialState(storage, reset);
+    // Note: tce:play-tutorial and tce:replay-tutorial event listeners have been
+    // removed. The unified tutorial system uses the TutorialOfferModal (guided
+    // mode for first-time players) and the reference-mode replay button in
+    // Settings has been removed. Tutorial completion persists via the
+    // tutorial overlay's onComplete callback and the LifecycleManager's
+    // the tutorial overlay's onComplete callback, which persists
+    // completion only after all 13 steps are finished.
 
-            if (s.campaign) {
-              s.campaign.tutorialSeen = false;
-              if (s.saveStore) {
-                void saveCampaignProgress(s.saveStore, s.campaign).catch(() => {});
-              }
-            }
-
-            // Restart the current run as a tutorial run (force Easy difficulty)
-            try {
-              s.selectedDifficulty = 'Easy';
-              s.state = setupMainStreetGame({ difficulty: 'Easy', unlockedCardIds: s.campaign?.unlockedCardIds });
-              s.startDayPhase();
-              // Immediately show the tutorial overlay for replay (bypass the offer modal)
-              try { (s as any).tutorialOverlay?.start(); } catch (_) { /* ignore */ }
-            } catch (e) {
-              // eslint-disable-next-line no-console
-              console.error('[MainStreet] failed to restart into tutorial', e);
-            }
-          } catch (e) {
-            // eslint-disable-next-line no-console
-            console.error('[MainStreet] replay-tutorial handler failed', e);
-          }
-        });
-      }
-    } catch (_e) {
-      // ignore
-    }
 
     // Global keyboard handler for End Turn (configurable via Settings)
     const endTurnKeyHandler = (ev: KeyboardEvent) => {
@@ -553,17 +532,32 @@ export class MainStreetLifecycleManager {
     if (!controller || !controller.isActive) return;
 
     const step = getCurrentStep(controller);
-    if (!step) return;
+    if (!step) {
+      // No current step means tutorial completed - dismiss overlay
+      (s as any).tutorialOverlay?.dismiss();
+      return;
+    }
+
+    // For action steps, the Continue button should only work if the action
+    // has been completed. The predicate determines this. Since we want to
+    // allow continuing even if overlay is stale (action happened elsewhere),
+    // we check the predicate result here.
+    if (step.gate === 'action') {
+      const overlay = (s as any).tutorialOverlay as { getActionCompletePredicate?: () => (() => boolean) | null } | undefined;
+      const predicate = overlay?.getActionCompletePredicate?.();
+      // If predicate returns true, action completed - advance the tutorial
+      if (predicate && predicate()) {
+        const { newState } = completeCurrentStep(controller);
+        Object.assign(s, { tutorialController: newState });
+        (s as any).showTutorialStepOverlay?.();
+      }
+      // If predicate returns false, action not done - do nothing (button ignored)
+      return;
+    }
 
     if (step.requiredAction === 'confirm' || step.requiredAction === 'confirm-complete') {
-      const { newState, completedStepId } = completeCurrentStep(controller);
+      const { newState } = completeCurrentStep(controller);
       Object.assign(s, { tutorialController: newState });
-
-      if (completedStepId === 'T10') {
-        this.persistTutorialCompletion();
-        (s as any).tutorialOverlay?.dismiss();
-        return;
-      }
 
       (s as any).showTutorialStepOverlay?.();
     } else if (step.requiredAction === 'acknowledge' || step.requiredAction === 'acknowledge-queue') {
@@ -586,13 +580,21 @@ export class MainStreetLifecycleManager {
 
   /**
    * Shows the overlay for the current tutorial step.
+   *
+   * Uses the unified showStep() method from MainStreetTutorialHints with a
+   * gate-aware Continue button: for action-gated steps the Continue button
+   * stays disabled until the required in-game action is completed.
    */
   public showTutorialStepOverlay(): void {
     const s = this.scene;
     const controller = (s as any).tutorialController as TutorialControllerState | undefined;
     if (!controller || !controller.isActive) return;
     try {
-      (s as any).tutorialOverlay?.showActionGatedStep(controller);
+      const step = getCurrentStep(controller);
+      if (!step) return;
+
+      // Show the next overlay step
+      (s as any).tutorialOverlay?.showStep(controller.currentStepIndex);
     } catch (_) { /* ignore */ }
   }
 
@@ -619,36 +621,15 @@ export class MainStreetLifecycleManager {
     if (!controller || !controller.isActive) return;
     if (!isRequiredAction(controller, actionType)) return;
 
-    const { newState, completedStepId } = completeCurrentStep(controller);
+    const { newState } = completeCurrentStep(controller);
     Object.assign(s, { tutorialController: newState });
 
-    if (completedStepId === 'T10') {
-      this.persistTutorialCompletion();
-      (s as any).tutorialOverlay?.dismiss();
-      return;
-    }
-
-    s.time.delayedCall(600, () => {
-      (s as any).showTutorialStepOverlay?.();
-    });
+    // Show next step immediately (for action steps) or after brief delay
+    // For select-business -> place-business transition, show immediately
+    (s as any).showTutorialStepOverlay?.();
   }
 
-  /** Persists tutorial completion to localStorage and campaign. */
-  private persistTutorialCompletion(): void {
-    const s = this.scene;
-    try {
-      const storage = new BrowserLocalStorageAdapter();
-      const tutorialState = loadTutorialState(storage);
-      const updated = updateTutorialStatus(tutorialState, 'completed');
-      void saveTutorialState(storage, updated);
-      if (s.campaign) {
-        s.campaign.tutorialSeen = true;
-        if (s.saveStore) {
-          void saveCampaignProgress(s.saveStore, s.campaign).catch(() => {});
-        }
-      }
-    } catch (_) { /* ignore */ }
-  }
+
 
   public loadCampaignAndSetup(): void {
     const s = this.scene;
@@ -672,6 +653,7 @@ export class MainStreetLifecycleManager {
     // Determine tutorial visibility options from scene state
     const tutorialOpts: TutorialVisibilityOptions = {
       replayMode: s.replayMode === true,
+      forceShowOffer: typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tutorial') === '1',
     };
 
     // Async: attempt to load saved campaign and re-setup if found
@@ -690,6 +672,12 @@ export class MainStreetLifecycleManager {
           // phase is synchronised.  Without this, the engine stays in
           // DayStart while the UI shows market controls, blocking all
           // player actions and causing End Turn to hang.
+          try { s.startDayPhase(); } catch (_) { /* ignore */ }
+        } else {
+          // Even with no saved campaign, startDayPhase() must be called so
+          // the game transitions from DayStart -> MarketPhase and the market
+          // is populated. Without this the tutorial offer modal shows but
+          // the market is empty, making interactive tutorial steps impossible.
           try { s.startDayPhase(); } catch (_) { /* ignore */ }
         }
         // After attempting to load (saved or not), show the tutorial offer modal

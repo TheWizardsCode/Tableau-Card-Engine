@@ -10,6 +10,21 @@
  * @module
  */
 
+// ── Tutorial Constants ────────────────────────────────────────
+
+/**
+ * Fixed seed used when the tutorial is active.
+ *
+ * This seed ensures the tutorial always presents the same cards in the same
+ * order, making the tutorial fully deterministic and playable end-to-end
+ * without running out of money or encountering impossible actions.
+ *
+ * The seed is NOT persisted to any storage — it is purely for tutorial
+ * gameplay and is only used when the tutorial controller is active.
+ * Normal gameplay uses a random seed.
+ */
+export const TUTORIAL_SEED = 'tutorial-seed';
+
 // ── Tutorial State Schema ───────────────────────────────────
 
 export const TUTORIAL_STATE_SCHEMA_VERSION = 1;

@@ -70,10 +70,10 @@ export class MainStreetAnimator {
     s.previousReputation = reputation;
   }
 
-  public getMarketCardCenter(row: 'business' | 'investments', slotIndex: number): { x: number; y: number } | null {
+  public getMarketCardCenter(row: 'development' | 'investments', slotIndex: number): { x: number; y: number } | null {
     const s = this.scene;
     if (slotIndex < 0) return null;
-    const rowTop = row === 'business'
+    const rowTop = row === 'development'
       ? s.layout.marketTop + 6
       : s.layout.marketTop + 6 + s.layout.marketRowH + s.layout.marketRowGap;
     const cardX = s.layout.marketLabelW + 50 + slotIndex * (s.layout.marketCardW + s.layout.marketCardGap);
@@ -102,13 +102,13 @@ export class MainStreetAnimator {
 
   public createTransferCardVisual(
     cardId: string,
-    family: 'business' | 'event' | 'upgrade',
+    family: 'business' | 'community-space' | 'event' | 'upgrade',
     atX: number,
     atY: number,
   ): Phaser.GameObjects.GameObject & Phaser.GameObjects.Components.Transform {
     const s = this.scene;
     const templateId = s.templateIdFromCardId(cardId);
-    const bgColor = family === 'business' ? 0x5a7f36 : family === 'upgrade' ? 0x6B4C9A : 0x8B4513;
+    const bgColor = family === 'business' ? 0x5a7f36 : family === 'community-space' ? 0x2E86C1 : family === 'upgrade' ? 0x6B4C9A : 0x8B4513;
     const w = s.layout.marketCardW;
     const h = s.layout.marketCardH;
     const container = s.add.container(atX, atY);
@@ -156,8 +156,8 @@ export class MainStreetAnimator {
 
   public animateTransferFromMarket(options: {
     cardId: string;
-    family: 'business' | 'event' | 'upgrade';
-    row: 'business' | 'investments';
+    family: 'business' | 'community-space' | 'event' | 'upgrade';
+    row: 'development' | 'investments';
     slotIndex: number;
     destination: { x: number; y: number };
   }): Promise<void> {

@@ -153,7 +153,7 @@ describe('Activity Log', () => {
       executeDayStart(state);
 
       // Place a business from the market
-      const biz = state.market.business[0];
+      const biz = state.market.development[0];
       const cost = biz.cost;
       const name = biz.name;
       state.resourceBank.coins = 20; // ensure enough coins
@@ -483,7 +483,7 @@ describe('Activity Log', () => {
       executeDayStart(state);
 
       // Find an affordable business and place it
-      const biz = state.market.business[0];
+      const biz = state.market.development[0];
       state.resourceBank.coins = 50;
 
       purchaseBusiness(state, biz.id, 0);

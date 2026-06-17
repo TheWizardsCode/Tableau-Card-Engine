@@ -21,7 +21,7 @@ describe('Main Street transcript recording (action, undo, redo)', () => {
     const emptySlots = state.streetGrid.map((s, i) => (s === null ? i : -1)).filter(i => i >= 0);
     expect(emptySlots.length).toBeGreaterThan(0);
 
-    const businessCards = state.market.business;
+    const businessCards = state.market.development;
     expect(businessCards.length).toBeGreaterThan(0);
     // Pick an affordable business card for the test (avoid brittle cost assumptions)
     const affordable = businessCards.find((b) => b.cost <= state.resourceBank.coins) ?? businessCards[0];

@@ -83,7 +83,12 @@ export class MindAnimator {
       duration: ANIM_DURATION,
       ease: 'Cubic.easeOut',
       onComplete: () => {
-        sprite!.destroy();
+        // Keep the sprite visible at the pile position with face-up texture.
+        // The PileView's pileSprite handles the pile display separately,
+        // so we keep this sprite as a visual record of the last played card.
+        sprite!.setTexture(targetTex);
+        sprite!.setDisplaySize(CARD_W, CARD_H);
+        sprite!.setDepth(DEPTH_PLAYED_CARD);
         onComplete();
       },
     });
@@ -155,10 +160,13 @@ export class MindAnimator {
           tempSprite.setDisplaySize(CARD_W, CARD_H);
         },
         onComplete: () => {
-          // Ensure final frame remains normalized before cleanup.
+          // Keep the sprite visible at the pile position with face-up texture.
+          // The PileView's pileSprite handles the pile display separately,
+          // so we keep this sprite as a visual record of the last played card.
           tempSprite.setScale(1);
           tempSprite.setDisplaySize(CARD_W, CARD_H);
-          tempSprite.destroy();
+          tempSprite.setTexture(faceUpTex);
+          tempSprite.setDepth(DEPTH_PLAYED_CARD);
           onComplete();
         },
       });

@@ -233,10 +233,12 @@ describe('MainStreetScene browser tests', () => {
     scene.refreshAll();
     await new Promise((resolve) => setTimeout(resolve, 30));
 
-    const handContainer = scene.handContainer as Phaser.GameObjects.Container;
-    const heldCardContainer = handContainer.list.find((obj) => obj instanceof Phaser.GameObjects.Container) as Phaser.GameObjects.Container | undefined;
+    // HandView now manages hand card rendering
+    const handSprites = scene.msRenderer.handView.getSprites();
+    expect(handSprites.length).toBe(1);
+    const heldCardContainer = handSprites[0] as Phaser.GameObjects.Container;
     expect(heldCardContainer).toBeTruthy();
-    const hasPhaserCardVisual = heldCardContainer!.list.some((obj) =>
+    const hasPhaserCardVisual = heldCardContainer.list?.some((obj) =>
       obj instanceof Phaser.GameObjects.Image || obj instanceof Phaser.GameObjects.Rectangle,
     );
     expect(hasPhaserCardVisual).toBe(true);
@@ -277,8 +279,8 @@ describe('MainStreetScene browser tests', () => {
     game = await bootGame();
     const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;
 
-    scene.soundManager.play('ms-place');
-    scene.soundManager.play('ms-event-cheer');
+    scene.soundManager.play('sfx-place');
+    scene.soundManager.play('sfx-event-cheer');
     expect(placePlaySpy).toHaveBeenCalled();
     expect(cheerPlaySpy).toHaveBeenCalled();
 
@@ -300,7 +302,7 @@ describe('MainStreetScene browser tests', () => {
       expect(emptySlots.length).toBeGreaterThan(0);
       const targetSlot = emptySlots[0];
 
-      const business = state.market.business.find((card: any) =>
+      const business = state.market.development.find((card: any) =>
         card && canPurchaseBusiness(state, card.id, targetSlot).legal,
       );
       expect(business).toBeTruthy();

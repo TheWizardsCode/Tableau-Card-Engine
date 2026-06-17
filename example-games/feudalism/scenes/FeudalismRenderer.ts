@@ -597,6 +597,15 @@ export class FeudalismRenderer {
       return;
     }
 
+    // Sort reserved cards by bonus type (resource order), then tier, then points
+    reservedCards.sort((a, b) => {
+      const bonusA = RESOURCE_TYPES.indexOf(a.bonus);
+      const bonusB = RESOURCE_TYPES.indexOf(b.bonus);
+      if (bonusA !== bonusB) return bonusA - bonusB;
+      if (a.tier !== b.tier) return a.tier - b.tier;
+      return a.points - b.points;
+    });
+
     const resLabel = this.scene.add.text(PLAYER_AREA_X, rowY + 4, `Reserved (${reservedCards.length}):`, {
       fontSize: '15px', color: '#ccaa66', fontFamily: FONT_FAMILY,
     });

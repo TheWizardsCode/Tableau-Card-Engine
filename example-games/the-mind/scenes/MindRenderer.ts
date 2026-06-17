@@ -1,8 +1,14 @@
 /**
  * MindRenderer -- creates and refreshes all visual game objects for The Mind.
+ *
+ * Phase 1 migration (CG-0MQ6IEM920091HF6):
+ *   - Human hand now uses shared HandView component.
+ *   - AI hand now uses shared HandView component.
+ *   - Play pile now uses shared PileView component.
+ *   - Custom texture resolution via Mind-specific texture adapters.
  */
 
-import { FONT_FAMILY, layoutCardPositions } from '../../../src/ui';
+import { FONT_FAMILY, HandView, PileView, layoutCardPositions, type CardTextureResolver } from '../../../src/ui';
 import { createSceneHeader } from '@ui/Renderer';
 import { createMindHudText } from '../../../src/ui/Renderer/adapters/MindAdapter';
 import { applyEnsuredTexture } from '../../../src/ui/Renderer';
@@ -18,7 +24,7 @@ import type { TheMindSession } from '../TheMindGameState';
 import { MAX_LEVEL } from '../TheMindGameState';
 import {
   CARD_W, CARD_H, CARD_GAP, MAX_HAND_WIDTH,
-  DEPTH_CARDS, DEPTH_PILE, DEPTH_UI,
+  DEPTH_CARDS, DEPTH_UI,
 } from './MindConstants';
 import {
   computeMindLayout,
@@ -26,7 +32,18 @@ import {
 } from './MindLayoutAdapter';
 
 export class MindRenderer {
-  // Display objects -- human hand
+  // ── Shared view components (Phase 1 migration: CG-0MQ6IEM920091HF6) ──
+
+  /** HandView for the human player's hand. */
+  humanHandView!: HandView;
+
+  /** HandView for the AI player's hand (face-down). */
+  aiHandView!: HandView;
+
+  /** PileView for the play pile. */
+  pileView!: PileView;
+
+  // Legacy sprite refs (kept for backward compat with animator / tests)
   humanCardSprites: Phaser.GameObjects.Image[] = [];
   private lastHumanHandRenderArgs:
     | {
@@ -36,11 +53,11 @@ export class MindRenderer {
       }
     | null = null;
 
-  // Display objects -- AI hand
+  // Legacy AI hand sprite refs (kept for backward compat)
   aiCardSprites: Phaser.GameObjects.Image[] = [];
   aiCountText: Phaser.GameObjects.Text | null = null;
 
-  // Display objects -- pile
+  // Legacy pile sprite refs (kept for backward compat)
   pileSprite!: Phaser.GameObjects.Image;
   pileCountText!: Phaser.GameObjects.Text;
   pileValueText!: Phaser.GameObjects.Text;
@@ -112,34 +129,34 @@ export class MindRenderer {
 
   createPile(): void {
     const backKey = this.getBackTextureFallbackKey();
-    this.pileSprite = this.scene.add
-      .image(this.layout.playPileCenterX, this.layout.playPileCenterY, backKey)
-      .setDisplaySize(CARD_W, CARD_H)
-      .setDepth(DEPTH_PILE)
-      .setAlpha(0.3);
 
-    this.scene.add
-      .text(this.layout.playPileCenterX, this.layout.playPileCenterY - CARD_H / 2 - 18, 'PILE', {
-        fontSize: '12px',
-        color: '#888888',
-        fontFamily: FONT_FAMILY,
-      })
-      .setOrigin(0.5)
-      .setDepth(DEPTH_UI);
+    // ── Shared PileView for the play pile (Phase 1 migration) ──
+    this.pileView = new PileView(this.scene, {
+      x: this.layout.playPileCenterX,
+      y: this.layout.playPileCenterY,
+      emptyTexture: backKey,
+      emptyAlpha: 0.3,
+      fullAlpha: 1,
+      countOffsetY: CARD_H / 2 + 32,
+      countFontSize: '11px',
+      countColor: '#888888',
+      label: 'Pile',
+    });
 
+    // Wire the pile model to PileView.
+    // TheMindSession.pile is a Pile<MindCard> which satisfies CardPile.
+    this.pileView.setPile(this.session.pile as any);
+
+    // PileView handles the sprite and count label.
+    // The value text (e.g. "42") is a Mind-specific overlay.
+    this.pileSprite = this.pileView.getSprite();
+    this.pileCountText = this.pileView.getCountText();
+
+    // Value overlay (numeric value of the top card)
     this.pileValueText = this.scene.add
       .text(this.layout.playPileCenterX, this.layout.playPileCenterY + CARD_H / 2 + 14, '', {
         fontSize: '14px',
         color: '#ffffff',
-        fontFamily: FONT_FAMILY,
-      })
-      .setOrigin(0.5)
-      .setDepth(DEPTH_UI);
-
-    this.pileCountText = this.scene.add
-      .text(this.layout.playPileCenterX, this.layout.playPileCenterY + CARD_H / 2 + 32, '', {
-        fontSize: '11px',
-        color: '#888888',
         fontFamily: FONT_FAMILY,
       })
       .setOrigin(0.5)
@@ -204,52 +221,83 @@ export class MindRenderer {
     );
   }
 
-  // ── Human hand rendering ───────────────────────────────
+  /**
+   * Create HandView components for the human and AI hands.
+   * Call this once during scene creation, before rendering the initial state.
+   */
+  createHands(): void {
+    // Human hand HandView
+    this.humanHandView = new HandView(this.scene, {
+      baseX: this.sceneW / 2,
+      baseY: this.layout.humanHandCenterY,
+      spacing: CARD_GAP + CARD_W,
+      cardWidth: CARD_W,
+      maxWidth: MAX_HAND_WIDTH,
+      showLabels: false,
+      selectionEnabled: false,
+      clickEnabled: true,
+      arcRadius: 0,
+      maxRotationDegrees: 0,
+    });
+
+    // AI hand HandView (face-down cards)
+    this.aiHandView = new HandView(this.scene, {
+      baseX: this.sceneW / 2,
+      baseY: this.layout.aiHandCenterY,
+      spacing: CARD_GAP + CARD_W,
+      cardWidth: CARD_W,
+      maxWidth: MAX_HAND_WIDTH,
+      showLabels: false,
+      selectionEnabled: false,
+      clickEnabled: false,
+      arcRadius: 0,
+      maxRotationDegrees: 0,
+    });
+  }
+
+  // ── Human hand rendering (Phase 1: uses HandView) ──────
 
   renderHumanHand(onCardClick: (card: MindCard) => void, phase: string, autoPlayEnabled: boolean): void {
     this.lastHumanHandRenderArgs = { onCardClick, phase, autoPlayEnabled };
 
-    for (const sprite of this.humanCardSprites) {
-      sprite.destroy();
-    }
-    this.humanCardSprites = [];
-
     const hand = this.session.players[0].hand;
-    if (hand.length === 0) return;
 
-    const backKey = this.getBackTextureFallbackKey();
+    if (hand.length === 0) {
+      this.humanHandView.setCards([], { cardTextureFn: this._humanCardTextureFn });
+      return;
+    }
 
-    const { positions } = layoutCardPositions({
-      count: hand.length,
-      cardWidth: CARD_W,
-      gap: CARD_GAP,
-      centerX: this.sceneW / 2,
-      maxWidth: MAX_HAND_WIDTH,
+    // Use HandView for layout, selection, and click handling.
+    // Mind-specific: each card's texture is loaded lazily via applyEnsuredTexture.
+    this.humanHandView.setCards(hand as any, { cardTextureFn: this._humanCardTextureFn });
+    this.humanHandView.on('cardclick', (idx: number) => {
+      if (idx >= 0 && idx < hand.length) {
+        onCardClick(hand[idx]);
+      }
     });
 
-    for (let i = 0; i < hand.length; i++) {
+    // Update sprite display size and store card value for lazy texture loading.
+    const sprites = this.humanHandView.getSprites() as Phaser.GameObjects.Image[];
+    this.humanCardSprites = sprites;
+
+    for (let i = 0; i < sprites.length; i++) {
+      const sprite = sprites[i];
       const card = hand[i];
-      const displayCard = { ...card, faceUp: true };
-      const x = positions[i];
-      // Create using fallback back texture as placeholder to avoid empty texture.
-      const sprite = this.scene.add
-        .image(x, this.layout.humanHandCenterY, backKey)
-        .setDisplaySize(CARD_W, CARD_H)
-        .setDepth(DEPTH_CARDS + i)
-        .setInteractive({ useHandCursor: true });
-
       (sprite as any).__mindCardValue = card.value;
+      sprite.setDisplaySize(CARD_W, CARD_H);
+      sprite.setDepth(DEPTH_CARDS + i);
+      sprite.setInteractive({ useHandCursor: true });
 
-      // Kick off lazy rasterisation and update the sprite when ready.
+      // Kick off lazy rasterisation
       void applyEnsuredTexture(
         sprite,
-        ensureTexture(this.scene, displayCard.value, CARD_W, CARD_H),
+        ensureTexture(this.scene, card.value, CARD_W, CARD_H),
         () => this.humanCardSprites.includes(sprite),
         CARD_W,
         CARD_H,
       );
 
-      sprite.on('pointerdown', () => onCardClick(card));
+      // Hover feedback (only during playing phase, not auto-play)
       sprite.on('pointerover', () => {
         if (phase === 'playing' && !autoPlayEnabled) {
           sprite.setDisplaySize(CARD_W * 1.03, CARD_H * 1.03);
@@ -260,106 +308,72 @@ export class MindRenderer {
         sprite.setDisplaySize(CARD_W, CARD_H);
         sprite.setY(this.layout.humanHandCenterY);
       });
-
-      this.humanCardSprites.push(sprite);
     }
-
-    this.scene.add
-      .text(this.sceneW / 2, this.layout.humanHandCenterY - CARD_H / 2 - 14, 'Your Hand', {
-        fontSize: '12px',
-        color: '#88ff88',
-        fontFamily: FONT_FAMILY,
-      })
-      .setOrigin(0.5)
-      .setDepth(DEPTH_UI);
   }
+
+  /**
+   * Mind-specific texture resolver for the human hand.
+   * Returns the fallback back texture key (actual card textures loaded lazily).
+   */
+  private _humanCardTextureFn: CardTextureResolver = (
+    _card: MindCard,
+  ): string => {
+    // Return card-back as placeholder; lazy texture updates replace it.
+    return this.getBackTextureFallbackKey();
+  };
 
   refreshHumanHand(): void {
     const hand = this.session.players[0].hand;
+    const sprites = this.humanCardSprites;
 
-    if (hand.length !== this.humanCardSprites.length) {
+    if (hand.length !== sprites.length) {
       // Can't re-render here without callbacks; caller should use renderHumanHand
       return;
     }
 
-    const backKey = this.getBackTextureFallbackKey();
     for (let i = 0; i < hand.length; i++) {
-      const displayCard = { ...hand[i], faceUp: true };
-      const sprite = this.humanCardSprites[i];
-      (sprite as any).__mindCardValue = hand[i].value;
+      const card = hand[i];
+      const sprite = sprites[i];
+      (sprite as any).__mindCardValue = card.value;
 
-      // Start with card-back placeholder and update when lazy texture is ready.
-      sprite.setTexture(backKey);
+      // Update sprite with lazy texture loading.
       sprite.setDisplaySize(CARD_W, CARD_H);
       void applyEnsuredTexture(
         sprite,
-        ensureTexture(this.scene, displayCard.value, CARD_W, CARD_H),
-        () => this.humanCardSprites[i] === sprite,
+        ensureTexture(this.scene, card.value, CARD_W, CARD_H),
+        () => sprites[i] === sprite,
         CARD_W,
         CARD_H,
       );
     }
   }
 
-  // ── AI hand rendering ──────────────────────────────────
+  // ── AI hand rendering (Phase 1: uses HandView) ─────────
 
   renderAiHand(): void {
-    for (const sprite of this.aiCardSprites) {
-      sprite.destroy();
-    }
-    this.aiCardSprites = [];
-
     const hand = this.session.players[1].hand;
+    const backKey = this.getBackTextureFallbackKey();
+
     if (hand.length === 0) {
       if (this.aiCountText) this.aiCountText.setText('');
+      this.aiHandView.setCards([]);
+      this.aiCardSprites = [];
       return;
     }
 
-    const backKey = this.getBackTextureFallbackKey();
+    // Use HandView for layout; AI cards are always face-down.
+    this.aiHandView.setCards(hand as any, { cardTextureFn: () => backKey });
+    const sprites = this.aiHandView.getSprites() as Phaser.GameObjects.Image[];
+    this.aiCardSprites = sprites;
 
-    const { positions } = layoutCardPositions({
-      count: hand.length,
-      cardWidth: CARD_W,
-      gap: CARD_GAP,
-      centerX: this.sceneW / 2,
-      maxWidth: MAX_HAND_WIDTH,
-    });
-
-    for (let i = 0; i < hand.length; i++) {
-      const x = positions[i];
-      const sprite = this.scene.add
-        .image(x, this.layout.aiHandCenterY, backKey)
-        .setDisplaySize(CARD_W, CARD_H)
-        .setDepth(DEPTH_CARDS + i);
-
-      this.aiCardSprites.push(sprite);
+    // Apply Mind-specific properties to sprites.
+    for (let i = 0; i < sprites.length; i++) {
+      const sprite = sprites[i];
+      sprite.setDisplaySize(CARD_W, CARD_H);
+      sprite.setDepth(DEPTH_CARDS + i);
     }
 
-    if (this.aiCountText) {
-      this.aiCountText.destroy();
-    }
-    this.aiCountText = this.scene.add
-      .text(this.sceneW / 2, this.layout.aiHandCenterY + CARD_H / 2 + 14, '', {
-        fontSize: '12px',
-        color: '#aaaaaa',
-        fontFamily: FONT_FAMILY,
-      })
-      .setOrigin(0.5)
-      .setDepth(DEPTH_UI);
-
-    this.aiCountText.setText(
-      `AI: ${hand.length} card${hand.length !== 1 ? 's' : ''}`,
-    );
-
-    this.scene.add
-      .text(this.sceneW / 2, this.layout.aiHandCenterY - CARD_H / 2 - 14, 'AI Hand', {
-        fontSize: '12px',
-        color: '#ffaa44',
-        fontFamily: FONT_FAMILY,
-      })
-      .setOrigin(0.5)
-      .setDepth(DEPTH_UI);
-
+    // Ensure AI back textures are loaded.
     this.ensureAiBackTextures();
   }
 
@@ -383,8 +397,10 @@ export class MindRenderer {
 
   refreshAll(): void {
     const humanHand = this.session.players[0].hand;
+    const humanSprites = this.humanCardSprites;
+
     if (
-      humanHand.length !== this.humanCardSprites.length &&
+      humanHand.length !== humanSprites.length &&
       this.lastHumanHandRenderArgs
     ) {
       this.renderHumanHand(
@@ -464,6 +480,16 @@ export class MindRenderer {
     this.humanCardSprites = [];
     for (const sprite of this.aiCardSprites) sprite.destroy();
     this.aiCardSprites = [];
+  }
+
+  // ── Destroy (Phase 1 migration) ─────────────────────────
+
+  /** Clean up all display objects including shared view components. */
+  destroy(): void {
+    this.humanHandView.destroy();
+    this.aiHandView.destroy();
+    this.pileView.destroy();
+    this.clearSprites();
   }
 
   disableGameInteraction(autoPlayButton?: Phaser.GameObjects.Text): void {

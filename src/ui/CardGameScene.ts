@@ -33,6 +33,35 @@ import { HelpButton } from './HelpButton';
 import { SettingsPanel } from './SettingsPanel';
 import { SettingsButton } from './SettingsButton';
 import type { HelpSection } from './HelpPanel';
+import { createStandardUndoRedoButtons } from './Renderer';
+
+// ── Audio path utility ───────────────────────────────────────
+
+/**
+ * Build an array of audio asset URLs with fallback to `assets/audio/default/`.
+ *
+ * Phaser's loader accepts an array of URLs for `this.load.audio()` and tries
+ * each in order until one succeeds. This enables the convention where each
+ * game stores its audio in `assets/audio/<gameDir>/` and shared/common sounds
+ * are placed in `assets/audio/default/`.
+ *
+ * @param gameDir  Subdirectory under `assets/audio/` for the current game.
+ * @param filename Audio filename (e.g. `'card-draw.wav'`).
+ * @returns Array of URLs: [game-specific, default]
+ *
+ * @example
+ * ```ts
+ * this.load.audio('sfx-card-draw', audioPathWithFallback('golf', 'card-draw.wav'));
+ * // Tries assets/audio/golf/card-draw.wav first,
+ * // then assets/audio/default/card-draw.wav
+ * ```
+ */
+export function audioPathWithFallback(gameDir: string, filename: string): string[] {
+  return [
+    `assets/audio/${gameDir}/${filename}`,
+    `assets/audio/default/${filename}`,
+  ];
+}
 
 /**
  * Abstract base class for card game scenes.
@@ -103,6 +132,13 @@ export abstract class CardGameScene extends Phaser.Scene {
   /** Settings toggle button. */
   protected settingsButton!: SettingsButton;
 
+  // ── Undo/Redo buttons ─────────────────────────────────────
+
+  /** Undo button container (null before {@link initUndoRedoButtons}). */
+  protected undoButton: Phaser.GameObjects.Container | null = null;
+  /** Redo button container (null before {@link initUndoRedoButtons}). */
+  protected redoButton: Phaser.GameObjects.Container | null = null;
+
   // ── Replay mode ──────────────────────────────────────────
 
   /** When true, the scene suppresses input and AI turns for replay use. */
@@ -148,7 +184,7 @@ export abstract class CardGameScene extends Phaser.Scene {
   protected initSoundSystem(
     sfxKeys: readonly string[],
     mapping: EventSoundMapping,
-    options?: Pick<SoundManagerOptions, 'synthPlayer' | 'synthKeyMap'>,
+    options?: Pick<SoundManagerOptions, 'synthPlayer' | 'synthKeyMap' | 'namespace'>,
   ): void {
     const phaserSound = this.sound;
     const player: SoundPlayer = {
@@ -160,6 +196,7 @@ export abstract class CardGameScene extends Phaser.Scene {
     this.soundManager = new SoundManager(player, {
       synthPlayer: options?.synthPlayer ?? null,
       synthKeyMap: options?.synthKeyMap,
+      namespace: options?.namespace,
     });
 
     for (const sfxKey of sfxKeys) {
@@ -212,6 +249,50 @@ export abstract class CardGameScene extends Phaser.Scene {
     this.settingsButton = this.settingsPanel.settingsButton!;
   }
 
+  // ── Undo/Redo buttons ─────────────────────────────────────
+
+  /**
+   * Initialize standard undo/redo action buttons positioned to avoid overlap
+   * with the settings and help toggle buttons.
+   *
+   * The buttons are placed to the left of the settings button, with undo on the
+   * left and redo to its right. Positioning is resolution-independent — computed
+   * dynamically from the scene viewport using the same formula as the settings
+   * button's default position.
+   *
+   * This method is opt-in: only scenes that call it get undo/redo buttons.
+   * Safe to call only after {@link initHUDContainer}.
+   *
+   * @param onUndo - Callback invoked when the Undo button is clicked.
+   * @param onRedo - Callback invoked when the Redo button is clicked.
+   */
+  protected initUndoRedoButtons(onUndo: () => void, onRedo: () => void): void {
+    const { undoButton, redoButton } = createStandardUndoRedoButtons(
+      this, onUndo, onRedo,
+      { parent: this.hudContainer ?? undefined },
+    );
+    this.undoButton = undoButton;
+    this.redoButton = redoButton;
+  }
+
+  /**
+   * Update the enabled/disabled visual state of the undo/redo buttons.
+   *
+   * Sets button alpha to 1.0 when enabled, 0.5 when disabled.
+   * Safe to call before {@link initUndoRedoButtons} (does nothing).
+   *
+   * @param canUndo - Whether undo is currently available.
+   * @param canRedo - Whether redo is currently available.
+   */
+  protected refreshUndoRedoButtons(canUndo: boolean, canRedo: boolean): void {
+    if (this.undoButton) {
+      this.undoButton.setAlpha(canUndo ? 1 : 0.5);
+    }
+    if (this.redoButton) {
+      this.redoButton.setAlpha(canRedo ? 1 : 0.5);
+    }
+  }
+
   // ── Event helpers ────────────────────────────────────────
 
   /**
@@ -245,6 +326,10 @@ export abstract class CardGameScene extends Phaser.Scene {
     this.helpButton?.destroy();
     this.settingsPanel?.destroy();
     this.settingsButton?.destroy();
+    this.undoButton?.destroy();
+    this.undoButton = null;
+    this.redoButton?.destroy();
+    this.redoButton = null;
     this.hudContainer?.destroy();
   }
 }

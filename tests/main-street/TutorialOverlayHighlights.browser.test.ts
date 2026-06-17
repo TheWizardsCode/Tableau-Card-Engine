@@ -1,11 +1,17 @@
 /**
  * Tutorial overlay highlight alignment visual regression test.
  *
- * Boots the Main Street game, triggers each action-gated tutorial step,
+ * Boots the Main Street game, triggers each tutorial step,
  * and captures a screenshot that shows:
  *   - The green highlight rectangle (depth 199) as drawn by the overlay
  *   - A red reference rectangle drawn by this test showing where the
  *     actual UI element should be
+ *
+ * Unified step mapping for screenshot tests:
+ *   T2 (hud, index 1)  T3 (marketBusinessRow, index 2)
+ *   T4 (streetGrid, index 3)  T5 (incidentQueue, index 4)
+ *   T6 (endTurnButton, index 5)  T11 (challengePanel, index 10)
+ *   T12 (hud, index 11)  T13 (completionModal, index 12)
  *
  * This allows visual verification that the highlights are correctly
  * aligned with their target UI elements.
@@ -15,6 +21,10 @@ import Phaser from 'phaser';
 import { waitForScene } from '../helpers/waitForScene';
 import { page } from '@vitest/browser/context';
 import { MARKET_BUSINESS_SLOTS } from '../../example-games/main-street/MainStreetCards';
+import {
+  UNIFIED_TUTORIAL_STEPS,
+  type TutorialHighlightZone,
+} from '../../example-games/main-street/TutorialFlow';
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -83,12 +93,12 @@ function triggerStepAndGetHighlight(
   stepIndex: number,
 ): Promise<Phaser.GameObjects.Graphics | null> {
   const mgr = scene.tutorialOverlay as {
-    showActionGatedStep?: (controller: unknown) => void;
+    showStep?: (index: number) => void;
     dismiss?: () => void;
     objects?: Phaser.GameObjects.GameObject[];
   };
 
-  if (!mgr || typeof mgr.showActionGatedStep !== 'function') {
+  if (!mgr || typeof mgr.showStep !== 'function') {
     return Promise.resolve(null);
   }
 
@@ -100,15 +110,11 @@ function triggerStepAndGetHighlight(
   // Wait a frame for cleanup
   return new Promise<Phaser.GameObjects.Graphics | null>((resolve) => {
     setTimeout(() => {
-      // Create a minimal controller state
-      const controller = {
-        isActive: true,
-        currentStepIndex: stepIndex,
-        lastCompletedStepId: null,
-        exited: false,
-      };
-
-      (mgr as { showActionGatedStep: (c: unknown) => void }).showActionGatedStep(controller);
+      if (typeof mgr.showStep !== 'function') {
+        resolve(null);
+        return;
+      }
+      mgr.showStep(stepIndex);
 
       // Wait one frame for the highlight to be drawn
       requestAnimationFrame(() => {
@@ -279,7 +285,7 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
     }
   }, 30_000);
 
-  it('screenshot: End turn button highlight (step T5)', async () => {
+  it('screenshot: End turn button highlight (step T6)', async () => {
     ({ game, scene } = await bootGame());
     await new Promise((r) => setTimeout(r, 200));
 
@@ -299,7 +305,7 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
       h: layout!.actionButtonH + 8,
     };
 
-    const highlight = await captureStepScreenshot(4, 'end-turn-highlight', expectedRef);
+    const highlight = await captureStepScreenshot(5, 'end-turn-highlight', expectedRef);
 
     const cmdBuf = (highlight as any)?.commandBuffer as unknown[];
     if (cmdBuf && Array.isArray(cmdBuf)) {
@@ -314,7 +320,7 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
     }
   }, 30_000);
 
-  it('screenshot: Incident queue highlight (step T6)', async () => {
+  it('screenshot: Incident queue highlight (step T5)', async () => {
     ({ game, scene } = await bootGame());
     await new Promise((r) => setTimeout(r, 200));
 
@@ -336,7 +342,7 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
       h: layout!.queueCardH + 16,
     };
 
-    const highlight = await captureStepScreenshot(5, 'incident-queue-highlight', expectedRef);
+    const highlight = await captureStepScreenshot(4, 'incident-queue-highlight', expectedRef);
 
     const cmdBuf = (highlight as any)?.commandBuffer as unknown[];
     if (cmdBuf && Array.isArray(cmdBuf)) {
@@ -391,36 +397,81 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
     }
   }, 30_000);
 
-  it('screenshot: Help button highlight (step T9)', async () => {
+
+
+  // ── Additional unified step screenshots (T11, T12, T13) ─────
+
+  it('screenshot: Challenge panel highlight (step T11)', async () => {
     ({ game, scene } = await bootGame());
     await new Promise((r) => setTimeout(r, 200));
 
-    const layout = scene.layout as {
-      actionY: number;
-      actionButtonH: number;
-      gameW: number;
-    } | undefined;
-    expect(layout).toBeTruthy();
-
-    const expectedRef = {
-      x: layout!.gameW - 120,
-      y: layout!.actionY - 4,
-      w: 100,
-      h: layout!.actionButtonH + 8,
-    };
-
-    const highlight = await captureStepScreenshot(8, 'help-button-highlight', expectedRef);
+    // T11 is index 10 in the unified steps (confirm gate, challengePanel zone)
+    // The challengePanel zone is defined in the SLL layout.
+    const highlight = await captureStepScreenshot(10, 'challenge-panel-highlight-t11');
 
     const cmdBuf = (highlight as any)?.commandBuffer as unknown[];
     if (cmdBuf && Array.isArray(cmdBuf)) {
       for (let i = 0; i < cmdBuf.length - 4; i++) {
         if (cmdBuf[i] === 3) {
           console.log(
-            `[screenshot:help-button-highlight] actual={x:${cmdBuf[i+1]},y:${cmdBuf[i+2]},w:${cmdBuf[i+3]},h:${cmdBuf[i+4]}} ref={x:${expectedRef.x},y:${expectedRef.y},w:${expectedRef.w},h:${expectedRef.h}}`,
+            `[screenshot:challenge-panel-highlight-t11] actual={x:${cmdBuf[i+1]},y:${cmdBuf[i+2]},w:${cmdBuf[i+3]},h:${cmdBuf[i+4]}}`,
           );
           break;
         }
       }
     }
   }, 30_000);
+
+  it('screenshot: Completion modal (step T13) draws no highlight', async () => {
+    ({ game, scene } = await bootGame());
+    await new Promise((r) => setTimeout(r, 200));
+
+    const mgr = scene.tutorialOverlay as {
+      showStep?: (index: number) => void;
+      dismiss?: () => void;
+    };
+
+    if (mgr && typeof mgr.showStep === 'function') {
+      if (typeof mgr.dismiss === 'function') {
+        mgr.dismiss();
+      }
+
+      // T13 is index 12 in the unified steps (confirm gate, completionModal zone)
+      mgr.showStep(12);
+
+      // Wait a frame for rendering
+      await new Promise((r) => setTimeout(r, 50));
+
+      // completionModal should not draw any highlight graphics at depth 199
+      const highlights = scene.children.list.filter(
+        (obj): obj is Phaser.GameObjects.Graphics =>
+          obj instanceof Phaser.GameObjects.Graphics && (obj as any).depth === 199,
+      );
+      expect(highlights.length).toBe(0);
+    }
+
+    // Save screenshot showing no highlight (for visual regression)
+    await saveScreenshot('completion-modal-no-highlight');
+  }, 30_000);
+
+  // ── Coverage: all 13 unified steps have valid highlight zones ─
+
+  it.each(UNIFIED_TUTORIAL_STEPS.map((s) => [s.id, s.highlightZone]))(
+    'step %s has valid highlightZone: %s',
+    (_stepId, zone) => {
+      const validZones: TutorialHighlightZone[] = [
+        'centerModal',
+        'hud',
+        'marketBusinessRow',
+        'streetGrid',
+        'endTurnButton',
+        'incidentQueue',
+        'investmentsRow',
+        'challengePanel',
+        'helpButton',
+        'completionModal',
+      ];
+      expect(validZones).toContain(zone);
+    },
+  );
 });

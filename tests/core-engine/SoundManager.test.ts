@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   SoundManager,
+  COMMON_SFX_KEYS,
   type SoundPlayer,
   type StorageLike,
 } from '../../src/core-engine/SoundManager';
@@ -278,6 +279,134 @@ describe('SoundManager', () => {
         sm.destroy();
         sm.destroy();
       }).not.toThrow();
+    });
+  });
+
+  // ── Collision protection: namespace ────────────────────
+
+  describe('namespace collision protection', () => {
+    it('should prefix asset key with namespace when registering without explicit assetKey', () => {
+      const p = createMockPlayer();
+      const mgr = new SoundManager(p, { storage: null, namespace: 'golf' });
+      mgr.register('sfx-card-draw');
+      mgr.play('sfx-card-draw');
+      // Asset key stored in registry should be 'golf:sfx-card-draw'
+      expect(p.play).toHaveBeenCalledWith('golf:sfx-card-draw');
+    });
+
+    it('should NOT prefix an explicit assetKey when namespace is set', () => {
+      const p = createMockPlayer();
+      const mgr = new SoundManager(p, { storage: null, namespace: 'golf' });
+      mgr.register('sfx-card-draw', 'golf:sfx-card-draw');
+      mgr.play('sfx-card-draw');
+      expect(p.play).toHaveBeenCalledWith('golf:sfx-card-draw');
+    });
+
+    it('should work without namespace (default behavior)', () => {
+      const p = createMockPlayer();
+      const mgr = new SoundManager(p, { storage: null });
+      mgr.register('sfx-card-draw');
+      mgr.play('sfx-card-draw');
+      expect(p.play).toHaveBeenCalledWith('sfx-card-draw');
+    });
+
+    it('should allow different namespaces for different managers', () => {
+      const p1 = createMockPlayer();
+      const p2 = createMockPlayer();
+      const mgr1 = new SoundManager(p1, { storage: null, namespace: 'golf' });
+      const mgr2 = new SoundManager(p2, { storage: null, namespace: 'sushi' });
+
+      mgr1.register('sfx-card-draw');
+      mgr2.register('sfx-card-draw');
+
+      mgr1.play('sfx-card-draw');
+      mgr2.play('sfx-card-draw');
+
+      expect(p1.play).toHaveBeenCalledWith('golf:sfx-card-draw');
+      expect(p2.play).toHaveBeenCalledWith('sushi:sfx-card-draw');
+    });
+
+    it('should route synth-mapped keys correctly with namespace', () => {
+      const wav = createMockPlayer();
+      const synth = createMockPlayer();
+      const mgr = new SoundManager(wav, {
+        storage: null,
+        namespace: 'ms',
+        synthPlayer: synth,
+        synthKeyMap: { 'sfx-card-place': 'card-place' },
+      });
+      // Synth-mapped keys are NOT namespace-scoped — they use the logical key directly
+      mgr.register('sfx-card-place');
+      mgr.play('sfx-card-place');
+      expect(synth.play).toHaveBeenCalledWith('card-place');
+      expect(wav.play).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── COMMON_SFX_KEYS ────────────────────────────────────
+
+  describe('COMMON_SFX_KEYS', () => {
+    it('should define UI_CLICK', () => {
+      expect(COMMON_SFX_KEYS.UI_CLICK).toBe('sfx-ui-click');
+    });
+
+    it('should define TURN_CHANGE', () => {
+      expect(COMMON_SFX_KEYS.TURN_CHANGE).toBe('sfx-turn-change');
+    });
+
+    it('should define ROUND_END', () => {
+      expect(COMMON_SFX_KEYS.ROUND_END).toBe('sfx-round-end');
+    });
+
+    it('should define SCORE_REVEAL', () => {
+      expect(COMMON_SFX_KEYS.SCORE_REVEAL).toBe('sfx-score-reveal');
+    });
+
+    it('should be exported from core-engine barrel', async () => {
+      const mod = await import('../../src/core-engine/index');
+      expect(mod.COMMON_SFX_KEYS).toBeDefined();
+      expect(mod.COMMON_SFX_KEYS.UI_CLICK).toBe('sfx-ui-click');
+    });
+  });
+
+  // ── Inspection: has / keys ──────────────────────────────
+
+  describe('has / keys', () => {
+    it('should return true for registered keys', () => {
+      sm.register('sfx-test');
+      expect(sm.has('sfx-test')).toBe(true);
+    });
+
+    it('should return false for unregistered keys', () => {
+      expect(sm.has('nonexistent')).toBe(false);
+    });
+
+    it('should list all registered keys', () => {
+      sm.register('sfx-a');
+      sm.register('sfx-b');
+      const all = Array.from(sm.keys());
+      expect(all).toContain('sfx-a');
+      expect(all).toContain('sfx-b');
+    });
+  });
+
+  // ── clearRegistrations ─────────────────────────────────
+
+  describe('clearRegistrations', () => {
+    it('should remove all registrations', () => {
+      sm.register('sfx-card-draw');
+      sm.register('sfx-card-flip');
+      expect(Array.from(sm.keys()).length).toBe(2);
+
+      sm.clearRegistrations();
+      expect(Array.from(sm.keys()).length).toBe(0);
+    });
+
+    it('should prevent playback after clear', () => {
+      sm.register('sfx-test');
+      sm.clearRegistrations();
+      sm.play('sfx-test');
+      expect(player.play).not.toHaveBeenCalled();
     });
   });
 

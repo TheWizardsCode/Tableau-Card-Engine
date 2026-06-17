@@ -393,7 +393,7 @@ describe('EconomyLedger — Main Street integration parity', () => {
       const ledger = ledgerFromState(state);
 
       const coinsBefore = state.resourceBank.coins;
-      const businessCard = state.market.business[0];
+      const businessCard = state.market.development[0];
       purchaseBusiness(state, businessCard.id, 0);
 
       const expectedDelta = state.resourceBank.coins - coinsBefore;
