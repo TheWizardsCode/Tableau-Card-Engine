@@ -3,15 +3,16 @@
  * integration after the Phase 2 shared-component migration.
  *
  * These tests run inside a real Chromium browser via Vitest browser mode
- * and Playwright. They boot the Beleaguered Castle scene and verify that
- * tableau columns use HandView (vertical cascade) and foundation piles
+ * and Playwright. They boot the Beleaguered Castle scene once and verify
+ * that tableau columns use HandView (vertical cascade) and foundation piles
  * use PileView.
  *
- * NOTE: Each test boots a fresh Phaser game which creates a WebGL context.
- * We keep total boots per file <= 3 to avoid context exhaustion.
+ * NOTE: A single Phaser game instance is shared across all tests to avoid
+ * WebGL context exhaustion and the cumulative slowdown from destroying
+ * and recreating games in headless Chromium.
  */
 
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import Phaser from 'phaser';
 import { waitForScene } from '../helpers/waitForScene';
 
@@ -19,42 +20,20 @@ import { waitForScene } from '../helpers/waitForScene';
 const TABLEAU_COUNT = 8;
 const FOUNDATION_COUNT = 4;
 
-// ── Helpers ─────────────────────────────────────────────────
+// ── Shared game instance ────────────────────────────────────
+let game: Phaser.Game | null = null;
 
-async function bootGame(): Promise<Phaser.Game> {
-  let container = document.getElementById('game-container');
-  if (container) container.remove();
-  container = document.createElement('div');
-  container.id = 'game-container';
-  document.body.appendChild(container);
-
-  const { createBeleagueredCastleGame } = await import(
-    '../../example-games/beleaguered-castle/createBeleagueredCastleGame'
-  );
-  const game = createBeleagueredCastleGame();
-  await waitForScene(game, 'BeleagueredCastleScene');
-  return game;
-}
-
-function destroyGame(game: Phaser.Game | null): void {
-  if (game) {
-    game.destroy(true, false);
-  }
-  const container = document.getElementById('game-container');
-  if (container) container.remove();
-}
-
-/** Wait for a specific number of milliseconds. */
-function wait(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+/** Wait for N ms. */
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
- * Wait for the deal animation to finish.
+ * Wait for the deal animation to finish (up to 60s).
+ * Phaser browser tests in headless Chromium run the game loop at
+ * a reduced frame rate, which proportionally slows tween animations.
  */
 async function waitForDeal(
   scene: Phaser.Scene & { isDealComplete(): boolean },
-  timeoutMs: number = 10_000,
+  timeoutMs: number = 60_000,
 ): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
@@ -67,22 +46,39 @@ async function waitForDeal(
 // ── Tests ───────────────────────────────────────────────────
 
 describe('Beleaguered Castle HandView/PileView migration smoke test', () => {
-  let game: Phaser.Game | null = null;
 
-  afterEach(() => {
-    destroyGame(game);
-    game = null;
+  beforeAll(async () => {
+    // Create a fresh container and boot the game once
+    let container = document.getElementById('game-container');
+    if (container) container.remove();
+    container = document.createElement('div');
+    container.id = 'game-container';
+    document.body.appendChild(container);
+
+    const { createBeleagueredCastleGame } = await import(
+      '../../example-games/beleaguered-castle/createBeleagueredCastleGame'
+    );
+    game = createBeleagueredCastleGame();
+    await waitForScene(game, 'BeleagueredCastleScene');
+  }, 120_000);
+
+  afterAll(() => {
+    if (game) {
+      game.destroy(true, false);
+      game = null;
+    }
+    const container = document.getElementById('game-container');
+    if (container) container.remove();
   });
 
   // ── Test 1: Foundation piles use PileView ─────────────────
   it('foundation piles are rendered via PileView', async () => {
-    game = await bootGame();
-    const scene = game.scene.getScene('BeleagueredCastleScene') as any;
+    const scene = game!.scene.getScene('BeleagueredCastleScene') as any;
+    await waitForDeal(scene);
 
     const renderer = scene.bcRenderer as any;
     expect(renderer).toBeDefined();
 
-    // foundationPileViews should exist and contain PileView instances
     const foundationPileViews: any[] = renderer.foundationPileViews;
     expect(foundationPileViews).toBeDefined();
     expect(foundationPileViews).toHaveLength(FOUNDATION_COUNT);
@@ -90,30 +86,26 @@ describe('Beleaguered Castle HandView/PileView migration smoke test', () => {
     for (let i = 0; i < FOUNDATION_COUNT; i++) {
       const pv = foundationPileViews[i];
       expect(pv).toBeDefined();
-      // Check that it looks like a PileView (has pile-related methods)
       expect(typeof pv.getSprite).toBe('function');
       expect(typeof pv.update).toBe('function');
       expect(typeof pv.setPile).toBe('function');
     }
 
-    // Foundation sprites should be accessible and have correct positions
     const foundationSprites = renderer.foundationSprites;
     expect(foundationSprites).toHaveLength(FOUNDATION_COUNT);
     for (let i = 0; i < FOUNDATION_COUNT; i++) {
       expect(foundationSprites[i]).toBeInstanceOf(Phaser.GameObjects.Image);
     }
-  });
+  }, 120_000);
 
   // ── Test 2: Tableau columns use HandView (vertical cascade) ──
   it('tableau columns are rendered via HandView with vertical layout', async () => {
-    game = await bootGame();
-    const scene = game.scene.getScene('BeleagueredCastleScene') as any;
-    await waitForDeal(scene as any);
+    const scene = game!.scene.getScene('BeleagueredCastleScene') as any;
+    await waitForDeal(scene);
 
     const renderer = scene.bcRenderer as any;
     expect(renderer).toBeDefined();
 
-    // tableauHandViews should exist and contain HandView instances
     const tableauHandViews: any[] = renderer.tableauHandViews;
     expect(tableauHandViews).toBeDefined();
     expect(tableauHandViews).toHaveLength(TABLEAU_COUNT);
@@ -121,34 +113,27 @@ describe('Beleaguered Castle HandView/PileView migration smoke test', () => {
     for (let col = 0; col < TABLEAU_COUNT; col++) {
       const hv = tableauHandViews[col];
       expect(hv).toBeDefined();
-
-      // Check that it looks like a HandView
       expect(typeof hv.getLayoutDirection).toBe('function');
       expect(typeof hv.setCards).toBe('function');
       expect(typeof hv.getSpriteAt).toBe('function');
       expect(typeof hv.getSprites).toBe('function');
-
-      // Verify layout direction is vertical
       expect(hv.getLayoutDirection()).toBe('vertical');
 
-      // Each column should have sprites after deal
       const sprites = hv.getSprites();
       expect(sprites.length).toBeGreaterThan(0);
 
-      // Verify cards overlap vertically (Y positions should be increasing)
       if (sprites.length > 1) {
         for (let i = 1; i < sprites.length; i++) {
           expect(sprites[i].y).toBeGreaterThan(sprites[i - 1].y);
         }
       }
     }
-  });
+  }, 120_000);
 
   // ── Test 3: All tableau columns have correct number of cards after deal ──
   it('deals 6 cards to each tableau column', async () => {
-    game = await bootGame();
-    const scene = game.scene.getScene('BeleagueredCastleScene') as any;
-    await waitForDeal(scene as any);
+    const scene = game!.scene.getScene('BeleagueredCastleScene') as any;
+    await waitForDeal(scene);
 
     const renderer = scene.bcRenderer as any;
     const tableauHandViews: any[] = renderer.tableauHandViews;
@@ -158,5 +143,5 @@ describe('Beleaguered Castle HandView/PileView migration smoke test', () => {
       const sprites = hv.getSprites();
       expect(sprites).toHaveLength(6);
     }
-  });
+  }, 120_000);
 });

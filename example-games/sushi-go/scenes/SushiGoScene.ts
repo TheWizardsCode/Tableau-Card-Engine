@@ -125,7 +125,7 @@ export class SushiGoScene extends CardGameScene {
 
     for (const filename of SUSHI_ICON_FILES) {
       const key = filename.replace(/\.svg$/, '');
-      this.load.text(`svg:${key}`, `assets/sushi-go/${filename}`);
+      this.load.text(`svg:${key}`, `/assets/sushi-go/${filename}`);
     }
   }
 

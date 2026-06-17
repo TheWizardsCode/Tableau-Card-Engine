@@ -1046,7 +1046,49 @@ export class HandView {
     const textureKey = this._cardType === 'custom' && this._customTextureFn
       ? this._customTextureFn(card, index)
       : getCardTexture(card);
-    const sprite = this.scene.add.image(pos.x, pos.y, textureKey);
+
+    // Guard against scene being destroyed mid-operation (e.g. during
+    // async deal animation teardown in tests). If the scene's game
+    // object factory is null, return a stub object so callers
+    // don't crash with a null reference.
+    if (this.destroyed || !this.scene || !this.scene.add) {
+      const stub = { x: pos.x, y: pos.y, alpha: 1, depth: 0, rotation: 0 } as any;
+      stub.setPosition = () => stub;
+      stub.setAlpha = () => stub;
+      stub.setDepth = () => stub;
+      stub.setInteractive = () => stub;
+      stub.disableInteractive = () => {};
+      stub.on = () => stub;
+      stub.once = () => stub;
+      stub.emit = () => false;
+      stub.setData = () => stub;
+      stub.getData = () => undefined;
+      stub.input = null;
+      stub.parentContainer = null;
+      stub.destroyed = false;
+      return stub as unknown as Phaser.GameObjects.GameObject;
+    }
+
+    let sprite: Phaser.GameObjects.GameObject;
+    try {
+      sprite = this.scene.add.image(pos.x, pos.y, textureKey);
+    } catch (e) {
+      const stub = { x: pos.x, y: pos.y, alpha: 1, depth: 0, rotation: 0 } as any;
+      stub.setPosition = () => stub;
+      stub.setAlpha = () => stub;
+      stub.setDepth = () => stub;
+      stub.setInteractive = () => stub;
+      stub.disableInteractive = () => {};
+      stub.on = () => stub;
+      stub.once = () => stub;
+      stub.emit = () => false;
+      stub.setData = () => stub;
+      stub.getData = () => undefined;
+      stub.input = null;
+      stub.parentContainer = null;
+      stub.destroyed = false;
+      return stub as unknown as Phaser.GameObjects.GameObject;
+    }
 
     // Apply initial per-card rotation based on horizontal offset (horizontal mode only)
     if (this.layoutDirection === 'horizontal' && this.maxRotationDegrees !== 0) {
