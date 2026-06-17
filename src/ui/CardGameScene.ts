@@ -33,6 +33,7 @@ import { HelpButton } from './HelpButton';
 import { SettingsPanel } from './SettingsPanel';
 import { SettingsButton } from './SettingsButton';
 import type { HelpSection } from './HelpPanel';
+import { createActionButton } from './Renderer';
 
 /**
  * Abstract base class for card game scenes.
@@ -102,6 +103,13 @@ export abstract class CardGameScene extends Phaser.Scene {
   protected settingsPanel!: SettingsPanel;
   /** Settings toggle button. */
   protected settingsButton!: SettingsButton;
+
+  // ── Undo/Redo buttons ─────────────────────────────────────
+
+  /** Undo button container (null before {@link initUndoRedoButtons}). */
+  protected undoButton: Phaser.GameObjects.Container | null = null;
+  /** Redo button container (null before {@link initUndoRedoButtons}). */
+  protected redoButton: Phaser.GameObjects.Container | null = null;
 
   // ── Replay mode ──────────────────────────────────────────
 
@@ -212,6 +220,71 @@ export abstract class CardGameScene extends Phaser.Scene {
     this.settingsButton = this.settingsPanel.settingsButton!;
   }
 
+  // ── Undo/Redo buttons ─────────────────────────────────────
+
+  /**
+   * Initialize standard undo/redo action buttons positioned to avoid overlap
+   * with the settings and help toggle buttons.
+   *
+   * The buttons are placed to the left of the settings button, with undo on the
+   * left and redo to its right. Positioning is resolution-independent — computed
+   * dynamically from the scene viewport using the same formula as the settings
+   * button's default position.
+   *
+   * This method is opt-in: only scenes that call it get undo/redo buttons.
+   * Safe to call only after {@link initHUDContainer}.
+   *
+   * @param onUndo - Callback invoked when the Undo button is clicked.
+   * @param onRedo - Callback invoked when the Redo button is clicked.
+   */
+  protected initUndoRedoButtons(onUndo: () => void, onRedo: () => void): void {
+    const buttonW = 60;
+    const buttonGap = 8;
+    const redoToSettingsGap = 12;
+    const BUTTON_RADIUS = 16;
+    const MARGIN = 16;
+    const BUTTON_H = 32;
+
+    // Settings button center (mirrors SettingsButton default position formula)
+    const settingsCenterX = this.scale.width - MARGIN - BUTTON_RADIUS - (BUTTON_RADIUS * 2 + MARGIN);
+    const settingsLeftEdge = settingsCenterX - BUTTON_RADIUS;
+
+    // Position buttons to the left of settings
+    const redoRightEdge = settingsLeftEdge - redoToSettingsGap;
+    const redoLeftEdge = redoRightEdge - buttonW;
+    const undoLeftEdge = redoLeftEdge - buttonGap - buttonW;
+
+    // Vertically align with the settings button center
+    const buttonY = MARGIN + BUTTON_RADIUS - BUTTON_H / 2;
+
+    this.undoButton = createActionButton(this, undoLeftEdge, buttonY, buttonW, 'Undo', onUndo);
+    this.redoButton = createActionButton(this, redoLeftEdge, buttonY, buttonW, 'Redo', onRedo);
+
+    // Parent into HUD container for consistent depth ordering
+    if (this.hudContainer) {
+      this.hudContainer.add(this.undoButton);
+      this.hudContainer.add(this.redoButton);
+    }
+  }
+
+  /**
+   * Update the enabled/disabled visual state of the undo/redo buttons.
+   *
+   * Sets button alpha to 1.0 when enabled, 0.5 when disabled.
+   * Safe to call before {@link initUndoRedoButtons} (does nothing).
+   *
+   * @param canUndo - Whether undo is currently available.
+   * @param canRedo - Whether redo is currently available.
+   */
+  protected refreshUndoRedoButtons(canUndo: boolean, canRedo: boolean): void {
+    if (this.undoButton) {
+      this.undoButton.setAlpha(canUndo ? 1 : 0.5);
+    }
+    if (this.redoButton) {
+      this.redoButton.setAlpha(canRedo ? 1 : 0.5);
+    }
+  }
+
   // ── Event helpers ────────────────────────────────────────
 
   /**
@@ -245,6 +318,10 @@ export abstract class CardGameScene extends Phaser.Scene {
     this.helpButton?.destroy();
     this.settingsPanel?.destroy();
     this.settingsButton?.destroy();
+    this.undoButton?.destroy();
+    this.undoButton = null;
+    this.redoButton?.destroy();
+    this.redoButton = null;
     this.hudContainer?.destroy();
   }
 }
