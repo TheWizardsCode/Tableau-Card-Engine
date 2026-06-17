@@ -3,6 +3,11 @@
 A digital implementation of the Feudalism board game, built using the
 Tableau Card Engine.
 
+> **Ruleset credit:** The core gameplay mechanics are derived from the
+> Splendor board game (Marc André / Space Cowboys). This implementation
+> uses original code and assets; no copyrighted rulebook text or artwork
+> from the original game is copied.
+
 ## Overview
 
 Feudalism is a worker-placement / card-drafting game where players
