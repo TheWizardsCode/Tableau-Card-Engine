@@ -1694,6 +1694,8 @@ The `CardGameScene` abstract class (at `src/ui/CardGameScene.ts`) provides share
 - Event system setup (`GameEventEmitter` + `PhaserEventBridge`)
 - Sound system setup (`SoundManager` + SFX registration)
 - Help and Settings panel initialization via `initHelpPanel()` and `initSettingsPanel()`
+- Undo/redo button creation via `initUndoRedoButtons()` with resolution-independent positioning
+- Undo/redo button state updates via `refreshUndoRedoButtons(canUndo, canRedo)`
 - Replay mode detection
 - Standard shutdown/cleanup via `shutdownBase()`
 
@@ -1710,6 +1712,10 @@ export class MyGameScene extends CardGameScene {
     if (!this.replayMode) {
       this.initHelpPanel(helpContent as HelpSection[]);
       this.initSettingsPanel();
+      this.initUndoRedoButtons(
+        () => this.turnController.performUndo(),
+        () => this.turnController.performRedo(),
+      );
     }
     // ... game-specific setup ...
   }
@@ -1721,6 +1727,23 @@ export class MyGameScene extends CardGameScene {
 ```
 
 The `initHelpPanel()` method creates both `HelpPanel` and `HelpButton`. The `initSettingsPanel()` method creates both `SettingsPanel` and `SettingsButton`. These are accessed via `this.helpPanel`, `this.helpButton`, `this.settingsPanel`, and `this.settingsButton` respectively.
+
+### Undo/Redo Buttons
+
+The `initUndoRedoButtons(onUndo, onRedo)` method creates standard undo/redo
+action buttons positioned to avoid overlap with the settings and help toggle
+buttons. The positioning is resolution-independent — computed dynamically from
+the scene viewport using the same formula as the settings button's default
+position.
+
+- **Undo button** is placed to the left of the settings button
+- **Redo button** is placed to the right of the undo button
+- Both buttons are parented into `hudContainer` for consistent depth ordering
+- Use `refreshUndoRedoButtons(canUndo, canRedo)` to update enabled/disabled
+  state (alpha 1.0 when enabled, 0.5 when disabled)
+- Both buttons are destroyed in `shutdownBase()`
+- This method is **opt-in**: only scenes that explicitly call it get undo/redo
+  buttons (games without undo/redo are unaffected)
 
 ### HUD Container Pattern
 
