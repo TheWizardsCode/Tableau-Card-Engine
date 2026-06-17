@@ -88,13 +88,8 @@ export interface DiscardCardOptions {
   };
 }
 
-/** Payload for the 'card:discarded' event. */
-export interface CardDiscardedPayload {
-  /** Card ID (optional, for tracking). */
-  cardId?: string;
-  /** Player index (optional, for multi-player). */
-  playerIndex?: number;
-}
+import type { CardDiscardedPayload } from '../core-engine';
+export type { CardDiscardedPayload };
 
 /**
  * Check if reduced motion is preferred (accessibility).

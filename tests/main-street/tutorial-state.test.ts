@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
+  TUTORIAL_SEED,
   createDefaultTutorialState,
   parseTutorialState,
   serializeTutorialState,
@@ -28,6 +29,13 @@ function createInMemoryStorage(): TutorialStorageAdapter {
 }
 
 // ── Default State ────────────────────────────────────────────
+
+describe('TUTORIAL_SEED', () => {
+  it('is a non-empty string', () => {
+    expect(TUTORIAL_SEED).toBe('tutorial-seed');
+    expect(TUTORIAL_SEED.length).toBeGreaterThan(0);
+  });
+});
 
 describe('createDefaultTutorialState', () => {
   it('returns a not_seen state with null fields', () => {

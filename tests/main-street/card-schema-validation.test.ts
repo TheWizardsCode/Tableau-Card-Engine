@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CARD_TEMPLATE_NAMES,
   createBusinessDeck,
+  createCommunitySpaceDeck,
   createEventDeck,
   createUpgradeDeck,
 } from '../../example-games/main-street/MainStreetCards';
@@ -19,12 +20,14 @@ describe('Main Street card schema and registry validation', () => {
   const events = createEventDeck(1, undefined, rng, 1);
   const upgrades = createUpgradeDeck(1);
 
+  const communitySpaces = createCommunitySpaceDeck(1);
   const businessTemplateIds = uniqueTemplateIds(business.map(card => card.id));
+  const communitySpaceTemplateIds = uniqueTemplateIds(communitySpaces.map(card => card.id));
   const eventTemplateIds = uniqueTemplateIds(events.map(card => card.id));
   const upgradeTemplateIds = uniqueTemplateIds(upgrades.map(card => card.id));
 
   it('all template IDs are represented in CARD_TEMPLATE_NAMES', () => {
-    const allTemplateIds = [...businessTemplateIds, ...eventTemplateIds, ...upgradeTemplateIds];
+    const allTemplateIds = [...businessTemplateIds, ...communitySpaceTemplateIds, ...eventTemplateIds, ...upgradeTemplateIds];
     for (const templateId of allTemplateIds) {
       expect(CARD_TEMPLATE_NAMES.has(templateId)).toBe(true);
       expect(CARD_TEMPLATE_NAMES.get(templateId)).toBeTruthy();
@@ -39,10 +42,12 @@ describe('Main Street card schema and registry validation', () => {
     }
   });
 
-  it('all upgrade targetBusiness values map to an existing business card name', () => {
+  it('all upgrade targetBusiness values map to an existing business or community space name', () => {
     const businessNames = new Set(business.map(card => card.name));
+    const communitySpaceNames = new Set(communitySpaces.map(card => card.name));
+    const allNames = new Set([...businessNames, ...communitySpaceNames]);
     for (const upgrade of upgrades) {
-      expect(businessNames.has(upgrade.targetBusiness)).toBe(true);
+      expect(allNames.has(upgrade.targetBusiness), `${upgrade.id} targets "${upgrade.targetBusiness}" which is not a known card name`).toBe(true);
     }
   });
 
@@ -51,7 +56,7 @@ describe('Main Street card schema and registry validation', () => {
     const registered = new Set(CARD_TEMPLATE_NAMES.keys());
 
     const runtimeCardIds = [
-      ...state.market.business.map(card => card.id),
+      ...state.market.development.map(card => card.id),
       ...state.market.investments.map(card => card.id),
       ...state.incidentQueue.map(card => card.id),
       ...state.decks.business.map(card => card.id),

@@ -152,8 +152,7 @@ export class TutorialOfferModal {
       centerX,
       panelTop + 74,
       'Would you like a guided tutorial to learn\n' +
-        'the basics? You can replay it later from\n' +
-        'the Settings menu.',
+        'the basics of Main Street?',
       {
         fontSize: '15px',
         color: BODY_COLOR,

@@ -1,15 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
-import { createBusinessDeck, createEventDeck, createUpgradeDeck } from '../../example-games/main-street/MainStreetCards';
+import { createBusinessDeck, createCommunitySpaceDeck, createEventDeck, createUpgradeDeck } from '../../example-games/main-street/MainStreetCards';
 import { TIER_DEFINITIONS } from '../../example-games/main-street/MainStreetTiers';
 import { createSeededRng } from '../../src/core-engine';
 
 function allTemplateIds(): Set<string> {
   const rng = createSeededRng(42);
   const business = createBusinessDeck(1).map(c => c.id.replace(/-\d+$/, ''));
+  const communitySpaces = createCommunitySpaceDeck(1).map(c => c.id.replace(/-\d+$/, ''));
   const events = createEventDeck(1, undefined, rng, 1).map(c => c.id.replace(/-\d+$/, ''));
   const upgrades = createUpgradeDeck(1).map(c => c.id.replace(/-\d+$/, ''));
-  return new Set([...business, ...events, ...upgrades]);
+  return new Set([...business, ...communitySpaces, ...events, ...upgrades]);
 }
 
 describe('Main Street tier catalog coverage', () => {
@@ -30,13 +31,13 @@ describe('Main Street tier catalog coverage', () => {
     const expanded = [...all].filter(id => !tier1.has(id));
     // expanded cards in tier1 = cards in tier1 that are outside original M1 baseline (13 fixed IDs)
     const baselineM1 = new Set([
-      'biz-bakery', 'biz-diner', 'biz-bookshop', 'biz-park', 'biz-hardware',
+      'biz-bakery', 'biz-diner', 'biz-bookshop', 'cs-park', 'biz-hardware',
       'evt-festival', 'evt-rainy', 'evt-tax', 'evt-award', 'evt-inspection',
       'upg-patisserie', 'upg-bistro', 'upg-library',
     ]);
     const expandedCountInTier1 = TIER_DEFINITIONS['tier-1'].newCardIds.filter(id => !baselineM1.has(id)).length;
 
     expect(expanded.length).toBeGreaterThan(0);
-    expect(expandedCountInTier1).toBe(5);
+    expect(expandedCountInTier1).toBe(7); // 5 original M2 sample + 2 community space cards
   });
 });

@@ -113,8 +113,10 @@ export interface CardSwappedPayload {
  * Emitted when a drawn card is discarded (not swapped into the grid).
  */
 export interface CardDiscardedPayload {
+  /** Card ID (optional, for tracking). */
+  cardId?: string;
   /** Index of the player who discarded. */
-  readonly playerIndex: number;
+  playerIndex?: number;
 }
 
 /**
@@ -295,6 +297,7 @@ export interface GameEventMap {
   'card-flipped': CardFlippedPayload;
   'card-swapped': CardSwappedPayload;
   'card-discarded': CardDiscardedPayload;
+  'card:discarded': CardDiscardedPayload;
   'card:dealt': CardDealtPayload;
   'card:placed': CardPlacedPayload;
   'ui-interaction': UIInteractionPayload;

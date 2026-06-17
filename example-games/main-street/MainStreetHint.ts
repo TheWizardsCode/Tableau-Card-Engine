@@ -87,7 +87,7 @@ export function buildRationale(
   switch (action.type) {
     case 'buy-business': {
       const a = action as BuyBusinessAction;
-      const card = state.market.business.find(c => c.id === a.cardId) as BusinessCard | undefined;
+      const card = state.market.development.find(c => c.id === a.cardId) as BusinessCard | undefined;
       const cardName = card?.name ?? a.cardId;
 
       // Compute projected synergy bonus at the candidate slot

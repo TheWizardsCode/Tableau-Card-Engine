@@ -41,9 +41,11 @@ class AutoMoveCommand implements Command {
 export interface TurnControllerCallbacks {
   onRefresh: () => void;
   onCheckGameEnd: () => void;
-  onAutoCompleteVisual: (moves: BCMove[], moveCards: Array<{ suit: string; rank: string; foundationIndex: number }>) => void;
+  onAutoCompleteVisual: (moves: BCMove[], moveCards: Array<{ suit: string; rank: string; foundationIndex: number }>, isSafeAutoMove?: boolean) => void;
   onAutoCompleteDone: () => void;
   onSoundEvent: (event: string, data?: any) => void;
+  /** Called after each player-initiated move (including auto-moves that follow). */
+  onSaveCheckpoint?: () => void;
 }
 
 export class BeleagueredCastleTurnController {
@@ -136,12 +138,13 @@ export class BeleagueredCastleTurnController {
 
     // If we deferred commands (autoMoves present), trigger visuals and return; finalizeAutoComplete will execute commands when visuals complete
     if (this.pendingAutoCompleteCmds) {
-      this.callbacks.onAutoCompleteVisual(autoMoves, moveCardsForVisuals);
+      this.callbacks.onAutoCompleteVisual(autoMoves, moveCardsForVisuals, true);
       // Do not call onRefresh or checkGameEnd here; finalizeAutoComplete will call onRefresh after applying commands
       return;
     }
 
     this.callbacks.onRefresh();
+    this.callbacks.onSaveCheckpoint?.();
     this.checkGameEnd();
   }
 
@@ -262,6 +265,7 @@ export class BeleagueredCastleTurnController {
     this.pendingAutoCompleteCmds = null;
     this.undoManager.execute(new CompoundCommand(cmds, 'Auto-complete'));
     this.callbacks.onRefresh();
+    this.callbacks.onSaveCheckpoint?.();
     this.autoCompleting = false;
     this.callbacks.onAutoCompleteDone();
   }

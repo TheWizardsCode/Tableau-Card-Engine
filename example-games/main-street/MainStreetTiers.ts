@@ -45,7 +45,7 @@ const TIER_1_CARD_IDS: string[] = [
   'biz-bakery',
   'biz-diner',
   'biz-bookshop',
-  'biz-park',
+  'cs-park',
   'biz-hardware',
   // Event (5)
   'evt-festival',
@@ -64,6 +64,10 @@ const TIER_1_CARD_IDS: string[] = [
   'evt-grand-opening',
   'upg-garden',
   'upg-vintage-shop',
+
+  // Community space cards (new community spaces)
+  'cs-library',
+  'upg-community-hub',
 ];
 
 // ── Tier 2 Card IDs (Rising Street) ────────────────────────

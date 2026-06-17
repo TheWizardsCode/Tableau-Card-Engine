@@ -31,9 +31,10 @@ import {
   GAME_W, GAME_H, FONT_FAMILY,
   dismissOverlay,
   PhaseManager,
-  layoutCardPositions,
+  HandView,
   createSceneTitle, createSceneMenuButton,
   TooltipManager,
+  audioPathWithFallback,
 } from '../../../src/ui';
 import type { HelpSection, TooltipRenderContext } from '../../../src/ui';
 import helpContent from '../help-content.json';
@@ -74,6 +75,12 @@ export class SushiGoScene extends CardGameScene {
   replayStepIndex: number = -1;
 
   // Display containers
+  /** HandView for player's hand — replaces bespoke hand rendering with shared component. */
+  handView!: HandView;
+  /** 
+   * Hand container (legacy — kept for backward-compat with zone-metadata tests).
+   * Actual card rendering is managed by {@link handView}.
+   */
   handContainer!: Phaser.GameObjects.Container;
   playerTableauContainer!: Phaser.GameObjects.Container;
   aiTableauContainer!: Phaser.GameObjects.Container;
@@ -107,12 +114,14 @@ export class SushiGoScene extends CardGameScene {
   // ── Preload ─────────────────────────────────────────────
 
   preload(): void {
-    this.load.audio(SFX_KEYS.CARD_PICK, 'assets/audio/card-draw.wav');
-    this.load.audio(SFX_KEYS.CARD_FLIP, 'assets/audio/card-flip.wav');
-    this.load.audio(SFX_KEYS.TURN_CHANGE, 'assets/audio/turn-change.wav');
-    this.load.audio(SFX_KEYS.ROUND_END, 'assets/audio/round-end.wav');
-    this.load.audio(SFX_KEYS.SCORE_REVEAL, 'assets/audio/score-reveal.wav');
-    this.load.audio(SFX_KEYS.UI_CLICK, 'assets/audio/ui-click.wav');
+    const ns = 'sushi-go';
+    const audioDir = 'sushi-go';
+    this.load.audio(`${ns}:${SFX_KEYS.CARD_PICK}`, audioPathWithFallback(audioDir, 'card-draw.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.CARD_FLIP}`, audioPathWithFallback(audioDir, 'card-flip.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.TURN_CHANGE}`, audioPathWithFallback(audioDir, 'turn-change.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.ROUND_END}`, audioPathWithFallback(audioDir, 'round-end.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.SCORE_REVEAL}`, audioPathWithFallback(audioDir, 'score-reveal.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.UI_CLICK}`, audioPathWithFallback(audioDir, 'ui-click.wav'));
 
     for (const filename of SUSHI_ICON_FILES) {
       const key = filename.replace(/\.svg$/, '');
@@ -186,7 +195,7 @@ export class SushiGoScene extends CardGameScene {
       'turn-started': SFX_KEYS.TURN_CHANGE,
       'game-ended': SFX_KEYS.ROUND_END,
     };
-    this.initSoundSystem(Object.values(SFX_KEYS), mapping);
+    this.initSoundSystem(Object.values(SFX_KEYS), mapping, { namespace: 'sushi-go' });
 
     this.session = setupSushiGoGame({
       playerCount: 2,
@@ -202,6 +211,23 @@ export class SushiGoScene extends CardGameScene {
     this.replayController = new SushiGoReplayController(this, { value: this.replayMode });
     this.cardFactory = new SushiGoCardFactory(this);
     this.tableauRenderer = new SushiGoTableauRenderer(this, this.session, this.cardFactory, this.goRenderer, this.tooltipManager);
+
+    // Create HandView for player hand with custom card renderer
+    this.handView = new HandView(this, {
+      baseX: GAME_W / 2,
+      baseY: HAND_Y,
+      spacing: HAND_CARD_W + HAND_GAP,
+      cardWidth: HAND_CARD_W,
+      showLabels: false,
+      selectionEnabled: false,
+      clickEnabled: false,
+      renderCard: (card, index) => {
+        const sgCard = card as SushiGoCard;
+        const isInteractive = this.phaseManager.current === 'picking';
+        // createCardRect positions at (0,0) — HandView applies the layout position
+        return this.createCardRect(0, 0, HAND_CARD_W, HAND_CARD_H, sgCard, isInteractive, index);
+      },
+    });
 
     this.createHeader();
     this.createLabels();
@@ -419,38 +445,33 @@ export class SushiGoScene extends CardGameScene {
   }
 
   private refreshHand(): void {
-    this.handContainer.removeAll(true);
-
     const hand = this.session.players[0].hand;
-    if (hand.length === 0) return;
+    if (hand.length === 0) {
+      this.handView.setCards([]);
+      return;
+    }
 
-    const { positions } = layoutCardPositions({
-      count: hand.length,
-      cardWidth: HAND_CARD_W,
-      gap: HAND_GAP,
-      centerX: GAME_W / 2,
-    });
+    // Center the hand horizontally — baseX is the leftmost card X in HandView
+    const handSize = hand.length;
+    const spacing = HAND_CARD_W + HAND_GAP;
+    const leftmostX = GAME_W / 2 - (handSize - 1) * spacing / 2;
+    this.handView.setBaseX(leftmostX);
 
-    for (let i = 0; i < hand.length; i++) {
-      const x = positions[i];
-      const isInteractive = this.phaseManager.current === 'picking';
-      const cardContainer = this.createCardRect(
-        x, HAND_Y, HAND_CARD_W, HAND_CARD_H,
-        hand[i],
-        isInteractive,
-        i,
-      );
+    // HandView manages layout and card creation via renderCard callback
+    this.handView.setCards(hand as any);
 
-      if (this.chopsticksMode && this.chopsticksFirstPick === i) {
+    // Apply chopsticks highlight to the first picked card (if in chopsticks mode)
+    if (this.chopsticksMode && this.chopsticksFirstPick !== null) {
+      const sprite = this.handView.getSpriteAt(this.chopsticksFirstPick);
+      if (sprite) {
+        const container = sprite as Phaser.GameObjects.Container;
         const highlight = this.add.rectangle(
           0, 0, HAND_CARD_W + 6, HAND_CARD_H + 6,
         );
         highlight.setStrokeStyle(3, 0x00ff88);
         highlight.setFillStyle(0x00ff88, 0.15);
-        cardContainer.addAt(highlight, 0);
+        container.addAt(highlight, 0);
       }
-
-      this.handContainer.add(cardContainer);
     }
   }
 
@@ -662,6 +683,9 @@ export class SushiGoScene extends CardGameScene {
 
   shutdown(): void {
     this.tooltipManager.destroy();
+    if (this.handView) {
+      this.handView.destroy();
+    }
     if (this.chopsticksButton) {
       this.chopsticksButton.destroy();
       this.chopsticksButton = null;

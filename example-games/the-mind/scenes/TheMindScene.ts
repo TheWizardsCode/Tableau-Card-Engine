@@ -30,6 +30,7 @@ import {
   createSceneHeader,
   createParameterizedOverlay,
   overlayCenterY,
+  audioPathWithFallback,
 } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
 import helpContent from '../help-content.json';
@@ -103,12 +104,14 @@ export class TheMindScene extends CardGameScene {
   preload(): void {
     preloadMindCardAssets(this, 120, 164);
 
-    this.load.audio(SFX_KEYS.CARD_PLAY, 'assets/audio/the-mind/card-play.wav');
-    this.load.audio(SFX_KEYS.LIFE_LOST, 'assets/audio/the-mind/life-lost.wav');
-    this.load.audio(SFX_KEYS.LEVEL_COMPLETE, 'assets/audio/the-mind/level-complete.wav');
-    this.load.audio(SFX_KEYS.GAME_WIN, 'assets/audio/the-mind/game-win.wav');
-    this.load.audio(SFX_KEYS.GAME_LOST, 'assets/audio/the-mind/game-lost.wav');
-    this.load.audio(SFX_KEYS.UI_CLICK, 'assets/audio/the-mind/ui-click.wav');
+    const ns = 'the-mind';
+    const audioDir = 'the-mind';
+    this.load.audio(`${ns}:${SFX_KEYS.CARD_PLAY}`, audioPathWithFallback(audioDir, 'card-play.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.LIFE_LOST}`, audioPathWithFallback(audioDir, 'life-lost.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.LEVEL_COMPLETE}`, audioPathWithFallback(audioDir, 'level-complete.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.GAME_WIN}`, audioPathWithFallback(audioDir, 'game-win.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.GAME_LOST}`, audioPathWithFallback(audioDir, 'game-lost.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.UI_CLICK}`, audioPathWithFallback(audioDir, 'ui-click.wav'));
   }
 
   // ── Create ──────────────────────────────────────────────
@@ -151,6 +154,7 @@ export class TheMindScene extends CardGameScene {
   private createReplayView(): void {
     this.createHeader();
     this.createStatusDisplay();
+    // In replay mode, the replay controller handles rendering; skip shared view init.
     this.createPile();
     this.createInstruction();
     this.instructionText.setText('');
@@ -176,6 +180,7 @@ export class TheMindScene extends CardGameScene {
   private createPrimaryView(): void {
     this.mindRenderer.createHeader();
     this.mindRenderer.createStatusDisplay();
+    this.mindRenderer.createHands();
     this.mindRenderer.createPile();
     this.mindRenderer.createInstruction();
     this.createAutoPlayButton();
@@ -230,7 +235,7 @@ export class TheMindScene extends CardGameScene {
     const mapping: EventSoundMapping = {
       'game-ended': SFX_KEYS.UI_CLICK,
     };
-    this.initSoundSystem(Object.values(SFX_KEYS), mapping);
+    this.initSoundSystem(Object.values(SFX_KEYS), mapping, { namespace: 'the-mind' });
     this.initSettingsPanel();
   }
 

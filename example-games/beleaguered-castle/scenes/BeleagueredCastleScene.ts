@@ -19,6 +19,7 @@ import {
   CardGameScene,
   preloadCardAssets,
   OverlayManager,
+  audioPathWithFallback,
 } from '../../../src/ui';
 import type { EventSoundMapping } from '../../../src/core-engine/SoundManager';
 import type { HelpSection } from '../../../src/ui';
@@ -33,6 +34,9 @@ import {
   createOverlayButton, createOverlayMenuButton,
 } from '../../../src/ui';
 import { createHudText } from '../../../src/ui/Renderer/adapters/BeleagueredCastleAdapter';
+import { SaveLoadStore } from '../../../src/core-engine';
+import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
+import { saveBCSnapshot, loadBCSnapshot, clearBCSnapshot } from '../BeleagueredCastleSaveLoad';
 
 export class BeleagueredCastleScene extends CardGameScene {
   private gameState!: BeleagueredCastleState;
@@ -43,6 +47,9 @@ export class BeleagueredCastleScene extends CardGameScene {
   private timerEvent: Phaser.Time.TimerEvent | null = null;
   private gameEnded: boolean = false;
   private transcript: BCGameTranscript | null = null;
+
+  private saveLoadStore!: SaveLoadStore;
+  private transcriptStore!: TranscriptStore;
 
   private bcRenderer!: BeleagueredCastleRenderer;
   private overlayManager!: OverlayManager;
@@ -62,21 +69,22 @@ export class BeleagueredCastleScene extends CardGameScene {
 
   preload(): void {
     preloadCardAssets(this, 90, 126);
-    const audioDir = 'assets/audio/beleaguered-castle';
-    this.load.audio(SFX_KEYS.CARD_PICKUP, `${audioDir}/card-pickup.wav`);
-    this.load.audio(SFX_KEYS.CARD_TO_FOUNDATION, `${audioDir}/card-to-foundation.wav`);
-    this.load.audio(SFX_KEYS.CARD_TO_TABLEAU, `${audioDir}/card-to-tableau.wav`);
-    this.load.audio(SFX_KEYS.CARD_SNAP_BACK, `${audioDir}/card-snap-back.wav`);
-    this.load.audio(SFX_KEYS.DEAL_CARD, `${audioDir}/deal-card.wav`);
-    this.load.audio(SFX_KEYS.WIN_FANFARE, `${audioDir}/win-fanfare.wav`);
-    this.load.audio(SFX_KEYS.LOSS_SOUND, `${audioDir}/loss-sound.wav`);
-    this.load.audio(SFX_KEYS.AUTO_COMPLETE_START, `${audioDir}/auto-complete-start.wav`);
-    this.load.audio(SFX_KEYS.AUTO_COMPLETE_CARD, `${audioDir}/auto-complete-card.wav`);
-    this.load.audio(SFX_KEYS.UNDO, `${audioDir}/undo.wav`);
-    this.load.audio(SFX_KEYS.REDO, `${audioDir}/redo.wav`);
-    this.load.audio(SFX_KEYS.CARD_SELECT, `${audioDir}/card-select.wav`);
-    this.load.audio(SFX_KEYS.CARD_DESELECT, `${audioDir}/card-deselect.wav`);
-    this.load.audio(SFX_KEYS.UI_CLICK, `${audioDir}/ui-click.wav`);
+    const ns = 'beleaguered-castle';
+    const audioDir = 'beleaguered-castle';
+    this.load.audio(`${ns}:${SFX_KEYS.CARD_PICKUP}`, audioPathWithFallback(audioDir, 'card-pickup.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.CARD_TO_FOUNDATION}`, audioPathWithFallback(audioDir, 'card-to-foundation.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.CARD_TO_TABLEAU}`, audioPathWithFallback(audioDir, 'card-to-tableau.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.CARD_SNAP_BACK}`, audioPathWithFallback(audioDir, 'card-snap-back.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.DEAL_CARD}`, audioPathWithFallback(audioDir, 'deal-card.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.WIN_FANFARE}`, audioPathWithFallback(audioDir, 'win-fanfare.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.LOSS_SOUND}`, audioPathWithFallback(audioDir, 'loss-sound.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.AUTO_COMPLETE_START}`, audioPathWithFallback(audioDir, 'auto-complete-start.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.AUTO_COMPLETE_CARD}`, audioPathWithFallback(audioDir, 'auto-complete-card.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.UNDO}`, audioPathWithFallback(audioDir, 'undo.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.REDO}`, audioPathWithFallback(audioDir, 'redo.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.CARD_SELECT}`, audioPathWithFallback(audioDir, 'card-select.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.CARD_DESELECT}`, audioPathWithFallback(audioDir, 'card-deselect.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.UI_CLICK}`, audioPathWithFallback(audioDir, 'ui-click.wav'));
   }
 
   create(): void {
@@ -87,6 +95,8 @@ export class BeleagueredCastleScene extends CardGameScene {
     this.seed = seedParam ? parseInt(seedParam, 10) : Date.now();
 
     this.detectReplayMode();
+
+    // Create a placeholder game state; will be replaced if resuming from checkpoint
     this.gameState = deal(this.seed);
     this.dealComplete = false;
     this.selectedCol = null;
@@ -96,14 +106,18 @@ export class BeleagueredCastleScene extends CardGameScene {
 
     const recorder = new BCTranscriptRecorder(this.seed, this.gameState);
 
+    this.saveLoadStore = new SaveLoadStore();
+    this.transcriptStore = new TranscriptStore();
+
     this.bcRenderer = new BeleagueredCastleRenderer(this, this.gameState);
     this.overlayManager = new OverlayManager(this);
     this.turnController = new BeleagueredCastleTurnController(this.gameState, recorder, {
       onRefresh: () => this.refreshAll(),
       onCheckGameEnd: () => this.handleGameEnd(),
-      onAutoCompleteVisual: (moves, moveCards) => this.runAutoCompleteVisuals(moves, moveCards),
+      onAutoCompleteVisual: (moves, moveCards, isSafeAutoMove) => this.runAutoCompleteVisuals(moves, moveCards, isSafeAutoMove),
       onAutoCompleteDone: () => this.handleAutoCompleteDone(),
       onSoundEvent: (event, data) => this.handleSoundEvent(event, data),
+      onSaveCheckpoint: () => this.saveCheckpoint(),
     });
 
     this.onNewGame = () => { this.seed = Date.now(); this.scene.restart(); };
@@ -112,12 +126,16 @@ export class BeleagueredCastleScene extends CardGameScene {
 
     this.bcRenderer.createTitle();
     this.bcRenderer.createFoundationSlots();
+    this.bcRenderer.initTableauHandViews();
     this.bcRenderer.createTableauDropZones();
     this.bcRenderer.createHUD(this.seed);
-    this.bcRenderer.onUndoClick = () => this.turnController.performUndo();
-    this.bcRenderer.onRedoClick = () => this.turnController.performRedo();
     this.bcRenderer.onDealCard = (info) => this.gameEvents.emit('deal-card', info);
-    this.bcRenderer.onDealComplete = () => { this.dealComplete = true; this.bcRenderer.makeDraggable(this.interactionBlocked); this.bcRenderer.refreshUndoRedoButtons(this.turnController.canUndo, this.turnController.canRedo); };
+    this.bcRenderer.onDealComplete = () => {
+      this.dealComplete = true;
+      this.bcRenderer.makeDraggable(this.interactionBlocked);
+      this.refreshUndoRedoButtons(this.turnController.canUndo, this.turnController.canRedo);
+      this.saveCheckpoint();
+    };
     this.bcRenderer.onCardClick = (col) => this.handleCardClick(col);
 
     this.initEventSystem();
@@ -140,8 +158,12 @@ export class BeleagueredCastleScene extends CardGameScene {
         'card-deselected': SFX_KEYS.CARD_DESELECT,
         'ui-interaction': SFX_KEYS.UI_CLICK,
       };
-      this.initSoundSystem(Object.values(SFX_KEYS), mapping);
+      this.initSoundSystem(Object.values(SFX_KEYS), mapping, { namespace: 'beleaguered-castle' });
       this.initSettingsPanel();
+      this.initUndoRedoButtons(
+        () => this.turnController.performUndo(),
+        () => this.turnController.performRedo(),
+      );
     }
 
     this.bcRenderer.refreshFoundations();
@@ -152,10 +174,10 @@ export class BeleagueredCastleScene extends CardGameScene {
       this.bcRenderer.refreshHUD();
       this.emitStateSettled(this.gameState.moveCount, this.gameEnded ? 'ended' : 'playing');
     } else {
-      this.bcRenderer.dealTableauAnimated();
-      this.setupDragAndDrop();
-      this.setupClickToMove();
-      this.setupKeyboard();
+      // First check for a saved checkpoint. If one exists, show the resume
+      // overlay — no deal animation runs until the user decides. If no
+      // checkpoint, start a fresh deal on the next frame.
+      this.time.delayedCall(0, () => this.checkForSavedCheckpoint());
     }
   }
 
@@ -306,12 +328,14 @@ export class BeleagueredCastleScene extends CardGameScene {
       this.stopTimer();
       this.transcript = this.turnController['recorder'].finalize('win', this.gameState.moveCount, this.elapsedSeconds);
       this.soundManager?.play(SFX_KEYS.WIN_FANFARE);
+      this.autoSaveTranscript();
       this.showWinOverlay(this.elapsedSeconds);
     } else {
       this.gameEnded = true;
       this.stopTimer();
       this.transcript = this.turnController['recorder'].finalize('loss', this.gameState.moveCount, this.elapsedSeconds);
       this.gameEvents.emit('game-ended', { finalTurnNumber: this.gameState.moveCount, winnerIndex: -1, reason: 'no-moves' });
+      this.autoSaveTranscript();
       this.showNoMovesOverlay();
     }
   }
@@ -321,11 +345,12 @@ export class BeleagueredCastleScene extends CardGameScene {
       this.gameEnded = true;
       this.stopTimer();
       this.transcript = this.turnController['recorder'].finalize('win', this.gameState.moveCount, this.elapsedSeconds);
+      this.autoSaveTranscript();
       this.showWinOverlay(this.elapsedSeconds, this.soundManager);
     }
   }
 
-  private runAutoCompleteVisuals(moves: BCMove[], moveCards: Array<{ suit: string; rank: string; foundationIndex: number }>): void {
+  private runAutoCompleteVisuals(moves: BCMove[], moveCards: Array<{ suit: string; rank: string; foundationIndex: number }>, isSafeAutoMove?: boolean): void {
     const STAGGER_MS = 100;
 
 
@@ -338,6 +363,11 @@ export class BeleagueredCastleScene extends CardGameScene {
       this.turnController.finalizeAutoComplete();
       return;
     }
+
+    // Use card-to-foundation sound for safe auto-moves to match manual foundation move feedback,
+    // and auto-complete-card sound for endgame auto-complete.
+    const endSfx = isSafeAutoMove ? SFX_KEYS.CARD_TO_FOUNDATION : SFX_KEYS.AUTO_COMPLETE_CARD;
+    const gameEventName = isSafeAutoMove ? 'card-to-foundation' : 'auto-complete-card';
 
     for (let j = 0; j < animIndices.length; j++) {
       const i = animIndices[j];
@@ -388,10 +418,10 @@ export class BeleagueredCastleScene extends CardGameScene {
           destY,
           duration: Math.max(50, ANIM_DURATION),
           soundManager: this.soundManager ?? null,
-          sfx: { start: SFX_KEYS.CARD_PICKUP, end: SFX_KEYS.AUTO_COMPLETE_CARD },
+          sfx: { start: SFX_KEYS.CARD_PICKUP, end: endSfx },
           onComplete: () => {
             try { moving.destroy(); } catch {}
-            this.gameEvents.emit('auto-complete-card', { suit: cardInfo.suit, rank: cardInfo.rank, foundationIndex: destIndex });
+            this.gameEvents.emit(gameEventName, { suit: cardInfo.suit, rank: cardInfo.rank, foundationIndex: destIndex });
 
             // restore visibility; final refresh after command execution will re-render settled board
             try { sourceSprite.setVisible(true); } catch {}
@@ -434,10 +464,183 @@ export class BeleagueredCastleScene extends CardGameScene {
     if (this.timerEvent) this.timerEvent.paused = false;
   }
 
+  // ── Resume / Fresh start ────────────────────────────────
+  /**
+   * Asynchronously check for a saved checkpoint.
+   * Called on the frame after create() completes, so the deal animation
+   * (started synchronously) is already in progress. If a checkpoint is
+   * found, the resume overlay is shown over the dealing board.
+   *
+   * When the user clicks "Resume", the deal state is replaced by the
+   * saved checkpoint (the half-dealt animation is discarded). When the
+   * user clicks "New Game", the checkpoint is deleted and the scene
+   * restarts fresh.
+   */
+  private checkForSavedCheckpoint(): void {
+    loadBCSnapshot(this.saveLoadStore).then((savedState) => {
+      if (savedState) {
+        // Checkpoint found — show the resume overlay. No deal animation
+        // will play until the user picks an option.
+        this.showResumeOverlay(savedState);
+      } else {
+        // No checkpoint — start a fresh game with the deal animation.
+        this.startFreshGame();
+      }
+    }).catch((err) => {
+      console.warn('[BeleagueredCastle] Error loading checkpoint:', err);
+      // On error, fall through to a fresh deal so the game is still playable.
+      this.startFreshGame();
+    });
+  }
+
+  /**
+   * Show a "Resume Saved Game?" overlay with Resume and New Game options.
+   */
+  private showResumeOverlay(savedState: BeleagueredCastleState): void {
+    const OVERLAY_DEPTH = 2000;
+    const BUTTON_DEPTH = OVERLAY_DEPTH + 1;
+
+    this.overlayManager.showOverlay({
+      type: 'custom',
+      backgroundOptions: { depth: OVERLAY_DEPTH, alpha: 0.75 },
+    });
+
+    const title = this.add.text(GAME_W / 2, GAME_H / 2 - 60, 'Resume Saved Game?', {
+      fontSize: '36px',
+      color: '#ffcc00',
+      fontFamily: FONT_FAMILY,
+      fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(BUTTON_DEPTH);
+    this.overlayManager.add(title);
+
+    const infoText = this.add.text(GAME_W / 2, GAME_H / 2 - 15,
+      `A checkpoint was found from a previous game.\nResume where you left off or start fresh.`,
+      { fontSize: '18px', color: '#cccccc', fontFamily: FONT_FAMILY, align: 'center' },
+    ).setOrigin(0.5).setDepth(BUTTON_DEPTH);
+    this.overlayManager.add(infoText);
+
+    const resumeBtn = createOverlayButton(this, GAME_W / 2 - 110, GAME_H / 2 + 50, '[ Resume ]', BUTTON_DEPTH);
+    resumeBtn.on('pointerdown', () => {
+      this.overlayManager.dismiss();
+      this.restoreFromCheckpoint(savedState);
+    });
+    this.overlayManager.add(resumeBtn);
+
+    const newGameBtn = createOverlayButton(this, GAME_W / 2 + 110, GAME_H / 2 + 50, '[ New Game ]', BUTTON_DEPTH);
+    newGameBtn.on('pointerdown', () => {
+      this.overlayManager.dismiss();
+      this.clearCheckpointAndStartFresh();
+    });
+    this.overlayManager.add(newGameBtn);
+  }
+
+  /**
+   * Restore the game from a saved checkpoint.
+   *
+   * Mutates the existing game state's piles (rather than replacing the state
+   * object) so that the renderer and turn controller — which hold references
+   * to the original gameState — stay synchronised.
+   *
+   * Skips the deal animation and wires up interactions immediately.
+   */
+  private restoreFromCheckpoint(savedState: BeleagueredCastleState): void {
+    // Mutate existing piles (don't replace the state object, since renderer
+    // and turn controller hold references to the original)
+    for (let i = 0; i < FOUNDATION_COUNT; i++) {
+      this.gameState.foundations[i].clear();
+      for (const card of savedState.foundations[i].toArray()) {
+        this.gameState.foundations[i].push(card);
+      }
+    }
+    for (let i = 0; i < TABLEAU_COUNT; i++) {
+      this.gameState.tableau[i].clear();
+      for (const card of savedState.tableau[i].toArray()) {
+        this.gameState.tableau[i].push(card);
+      }
+    }
+    // seed is readonly on the interface; use the class field instead
+    this.gameState.moveCount = savedState.moveCount;
+    this.seed = savedState.seed;
+    this.dealComplete = true;
+
+    // Rebuild the turn controller with a fresh undo stack
+    const recorder = new BCTranscriptRecorder(this.seed, this.gameState);
+    this.turnController = new BeleagueredCastleTurnController(this.gameState, recorder, {
+      onRefresh: () => this.refreshAll(),
+      onCheckGameEnd: () => this.handleGameEnd(),
+      onAutoCompleteVisual: (moves, moveCards, isSafeAutoMove) => this.runAutoCompleteVisuals(moves, moveCards, isSafeAutoMove),
+      onAutoCompleteDone: () => this.handleAutoCompleteDone(),
+      onSoundEvent: (event, data) => this.handleSoundEvent(event, data),
+      onSaveCheckpoint: () => this.saveCheckpoint(),
+    });
+
+    // Reassign callbacks that reference the new turn controller
+    this.initUndoRedoButtons(
+      () => this.turnController.performUndo(),
+      () => this.turnController.performRedo(),
+    );
+    this.onNewGame = () => { this.seed = Date.now(); this.scene.restart(); };
+    this.onRestart = () => this.scene.restart();
+    this.onUndoLast = () => { this.overlayManager.dismiss(); this.gameEnded = false; this.resumeTimer(); this.turnController.performUndo(); };
+
+    // Refresh the renderer with the restored state
+    this.bcRenderer.refreshAll(true, false);
+    this.refreshUndoRedoButtons(this.turnController.canUndo, this.turnController.canRedo);
+
+    // Wire up interactions (no deal animation since dealComplete is already true)
+    this.setupDragAndDrop();
+    this.setupClickToMove();
+    this.setupKeyboard();
+  }
+
+  /**
+   * Delete the saved checkpoint and restart the scene for a fresh game.
+   * Used when the user clicks "New Game" on the resume overlay.
+   */
+  private clearCheckpointAndStartFresh(): void {
+    clearBCSnapshot(this.saveLoadStore).then(() => {
+      this.scene.restart();
+    }).catch((err) => {
+      console.warn('[BeleagueredCastle] Failed to clear checkpoint:', err);
+      this.scene.restart();
+    });
+  }
+
+  /**
+   * Start a fresh game (no saved checkpoint).
+   * Runs the deal animation and wires up interactions as normal.
+   */
+  private startFreshGame(): void {
+    this.bcRenderer.dealTableauAnimated();
+    this.setupDragAndDrop();
+    this.setupClickToMove();
+    this.setupKeyboard();
+  }
+
+  // ── Save/Load ───────────────────────────────────────────
+  /**
+   * Save a game-state checkpoint after deal or each player move.
+   * Fire-and-forget (not awaited) to avoid blocking the input handler.
+   */
+  private saveCheckpoint(): void {
+    saveBCSnapshot(this.saveLoadStore, this.gameState).catch((err) =>
+      console.warn('[BeleagueredCastle] Failed to save checkpoint:', err),
+    );
+  }
+
+  /**
+   * Auto-save the finalized transcript to browser storage.
+   * Fire-and-forget (not awaited). Skips if no transcript has been finalized.
+   */
+  private autoSaveTranscript(): void {
+    if (!this.transcript) return;
+    autoSaveTranscript(this.transcriptStore, 'beleaguered-castle', this.transcript, '[BeleagueredCastle]');
+  }
+
   // ── Refresh ─────────────────────────────────────────────
   private refreshAll(): void {
     this.bcRenderer.refreshAll(this.dealComplete, this.interactionBlocked);
-    this.bcRenderer.refreshUndoRedoButtons(this.turnController.canUndo, this.turnController.canRedo);
+    this.refreshUndoRedoButtons(this.turnController.canUndo, this.turnController.canRedo);
   }
 
   // ── Replay API ──────────────────────────────────────────
@@ -479,7 +682,7 @@ export class BeleagueredCastleScene extends CardGameScene {
   getTranscript(): BCGameTranscript | null { return this.transcript; }
   getRecorder(): BCTranscriptRecorder { return this.turnController['recorder']; }
   get tableauSprites(): Phaser.GameObjects.Image[][] { return this.bcRenderer.tableauSprs; }
-  get foundationSprites(): Phaser.GameObjects.Image[] { return (this.bcRenderer as any).foundationSprites; }
+  get foundationSprites(): Phaser.GameObjects.Image[] { return this.bcRenderer.foundationSprites; }
   get foundationDropZones(): Phaser.GameObjects.Zone[] { return this.bcRenderer.foundationDZs; }
 
   // ── Cleanup ─────────────────────────────────────────────

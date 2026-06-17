@@ -21,7 +21,7 @@ import {
   purchaseBusiness,
   purchaseUpgrade,
   purchaseEvent,
-  refillBusinessMarket,
+  refillDevelopmentMarket,
   refillInvestmentsMarket,
   refillIncidentQueue,
   refillAllMarkets,
@@ -235,7 +235,7 @@ describe('MarketOfferEngine — negative-path buy eligibility', () => {
   describe('canPurchaseBusiness — insufficient coins', () => {
     it('should reject when coins equal cost minus 1', () => {
       const state = createTestState();
-      const card = state.market.business[0];
+      const card = state.market.development[0];
       state.resourceBank.coins = card.cost - 1;
       const result = canPurchaseBusiness(state, card.id, 0);
       expect(result.legal).toBe(false);
@@ -248,7 +248,7 @@ describe('MarketOfferEngine — negative-path buy eligibility', () => {
     it('should reject when coins are exactly zero and card costs more than zero', () => {
       const state = createTestState();
       state.resourceBank.coins = 0;
-      const card = state.market.business.find(c => c.cost > 0);
+      const card = state.market.development.find(c => c.cost > 0);
       if (!card) return;
       const result = canPurchaseBusiness(state, card.id, 0);
       expect(result.legal).toBe(false);
@@ -413,7 +413,7 @@ describe('MarketOfferEngine — positive-path buy eligibility', () => {
   describe('canPurchaseBusiness — success', () => {
     it('should allow purchase when player has enough coins and slot is empty', () => {
       const state = createTestState();
-      const card = state.market.business[0];
+      const card = state.market.development[0];
       state.resourceBank.coins = card.cost;
       const result = canPurchaseBusiness(state, card.id, 0);
       expect(result.legal).toBe(true);
@@ -459,7 +459,7 @@ describe('MarketOfferEngine — positive-path purchase results', () => {
   describe('purchaseBusiness — success', () => {
     it('should deduct coins, place card in slot, and remove from market', () => {
       const state = createTestState();
-      const card = state.market.business[0];
+      const card = state.market.development[0];
       state.resourceBank.coins = 100;
       const coinsBefore = state.resourceBank.coins;
 
@@ -470,15 +470,15 @@ describe('MarketOfferEngine — positive-path purchase results', () => {
       expect(state.resourceBank.coins).toBe(coinsBefore - card.cost);
       expect(state.streetGrid[0]).not.toBeNull();
       expect(state.streetGrid[0]!.id).toBe(card.id);
-      expect(state.market.business.map(c => c.id)).not.toContain(card.id);
+      expect(state.market.development.map(c => c.id)).not.toContain(card.id);
     });
 
     it('should not refill the market immediately after purchase', () => {
       const state = createTestState();
-      const card = state.market.business[0];
+      const card = state.market.development[0];
       state.resourceBank.coins = 100;
       purchaseBusiness(state, card.id, 0);
-      expect(state.market.business).toHaveLength(MARKET_BUSINESS_SLOTS - 1);
+      expect(state.market.development).toHaveLength(MARKET_BUSINESS_SLOTS - 1);
     });
   });
 
@@ -572,21 +572,21 @@ describe('MarketOfferEngine — negative-path invalid row/slot', () => {
   describe('purchaseBusiness — invalid slot', () => {
     it('should throw when slot index equals GRID_SIZE', () => {
       const state = createTestState();
-      const card = state.market.business[0];
+      const card = state.market.development[0];
       state.resourceBank.coins = 100;
       expect(() => purchaseBusiness(state, card.id, GRID_SIZE)).toThrow('Invalid slot');
     });
 
     it('should throw when slot index is negative', () => {
       const state = createTestState();
-      const card = state.market.business[0];
+      const card = state.market.development[0];
       state.resourceBank.coins = 100;
       expect(() => purchaseBusiness(state, card.id, -1)).toThrow('Invalid slot');
     });
 
     it('should throw when slot is occupied', () => {
       const state = createTestState();
-      const card = state.market.business[0];
+      const card = state.market.development[0];
       state.resourceBank.coins = 100;
       state.streetGrid[0] = state.decks.business[0];
       expect(() => purchaseBusiness(state, card.id, 0)).toThrow('occupied');
@@ -748,27 +748,29 @@ describe('MarketOfferEngine — refill policy: exhaustion edge cases', () => {
     });
   });
 
-  describe('refillBusinessMarket — complete exhaustion', () => {
+  describe('refillDevelopmentMarket — complete exhaustion', () => {
     it('should leave market partially empty when deck and discard are both empty', () => {
       const state = createTestState();
-      state.market.business = [];
+      state.market.development = [];
       state.decks.business = [];
       state.discards.business = [];
+      state.decks.communitySpace = [];
+      state.discards.communitySpace = [];
 
-      refillBusinessMarket(state);
-      expect(state.market.business).toHaveLength(0);
+      refillDevelopmentMarket(state);
+      expect(state.market.development).toHaveLength(0);
     });
   });
 
   describe('refillAllMarkets — idempotency', () => {
     it('should not change a fully-refilled market when called again', () => {
       const state = createTestState();
-      const bizBefore = state.market.business.map(c => c.id).slice();
+      const bizBefore = state.market.development.map(c => c.id).slice();
       const invBefore = state.market.investments.map(c => c.id).slice();
 
       refillAllMarkets(state);
 
-      expect(state.market.business.map(c => c.id)).toEqual(bizBefore);
+      expect(state.market.development.map(c => c.id)).toEqual(bizBefore);
       expect(state.market.investments.map(c => c.id)).toEqual(invBefore);
     });
   });
@@ -784,10 +786,13 @@ describe('MarketOfferEngine — refill policy: reshuffle from discard', () => {
       const moved = state.decks.business.splice(0, 3);
       state.discards.business.push(...moved);
       state.decks.business.length = 0;
+      // Also empty the community space deck to avoid mixed-deck refill
+      state.decks.communitySpace.length = 0;
+      state.discards.communitySpace.length = 0;
       // Clear visible market so refill must draw from reshuffled deck
-      state.market.business = [];
-      refillBusinessMarket(state);
-      expect(state.market.business.length).toBeGreaterThan(0);
+      state.market.development = [];
+      refillDevelopmentMarket(state);
+      expect(state.market.development.length).toBeGreaterThan(0);
       expect(state.discards.business.length).toBe(0);
     });
 
@@ -795,9 +800,11 @@ describe('MarketOfferEngine — refill policy: reshuffle from discard', () => {
       const state = createTestState();
       state.decks.business = [];
       state.discards.business = [];
-      state.market.business = [];
-      refillBusinessMarket(state);
-      expect(state.market.business).toHaveLength(0);
+      state.decks.communitySpace = [];
+      state.discards.communitySpace = [];
+      state.market.development = [];
+      refillDevelopmentMarket(state);
+      expect(state.market.development).toHaveLength(0);
     });
   });
 
@@ -874,18 +881,18 @@ describe('MarketOfferEngine — multi-turn market flow parity', () => {
 
       // Day 1: buy a business
       executeDayStart(state);
-      expect(state.market.business).toHaveLength(MARKET_BUSINESS_SLOTS);
-      const card = state.market.business[0];
+      expect(state.market.development).toHaveLength(MARKET_BUSINESS_SLOTS);
+      const card = state.market.development[0];
       executeAction(state, { type: 'buy-business', cardId: card.id, slotIndex: 0 });
       // After purchase, market should have one fewer card (no immediate refill)
-      expect(state.market.business).toHaveLength(MARKET_BUSINESS_SLOTS - 1);
+      expect(state.market.development).toHaveLength(MARKET_BUSINESS_SLOTS - 1);
 
       // End turn → Day 2: market should be refilled
       processEndOfTurn(state);
       executeDayStart(state);
       // Market should be refilled to capacity (or deck limit)
-      expect(state.market.business.length).toBeGreaterThanOrEqual(1);
-      expect(state.market.business.length).toBeLessThanOrEqual(MARKET_BUSINESS_SLOTS);
+      expect(state.market.development.length).toBeGreaterThanOrEqual(1);
+      expect(state.market.development.length).toBeLessThanOrEqual(MARKET_BUSINESS_SLOTS);
     });
 
     it('should refill the investments row at DayStart after purchasing an upgrade', () => {
@@ -926,10 +933,10 @@ describe('MarketOfferEngine — multi-turn market flow parity', () => {
         if (state.gameResult !== 'playing') break;
         playGreedyTurn(state);
 
-        const ids = state.market.business.map(c => c.id);
+        const ids = state.market.development.map(c => c.id);
         const uniqueIds = new Set(ids);
         expect(uniqueIds.size, `Turn ${turn + 1}: duplicate IDs found`).toBe(ids.length);
-        expect(state.market.business.length).toBeLessThanOrEqual(MARKET_BUSINESS_SLOTS);
+        expect(state.market.development.length).toBeLessThanOrEqual(MARKET_BUSINESS_SLOTS);
       }
     });
 
@@ -977,8 +984,8 @@ describe('MarketOfferEngine — multi-turn market flow parity', () => {
         playGreedyTurn(state1);
         playGreedyTurn(state2);
 
-        expect(state1.market.business.map(c => c.id)).toEqual(
-          state2.market.business.map(c => c.id),
+        expect(state1.market.development.map(c => c.id)).toEqual(
+          state2.market.development.map(c => c.id),
         );
         expect(state1.market.investments.map(c => c.id)).toEqual(
           state2.market.investments.map(c => c.id),

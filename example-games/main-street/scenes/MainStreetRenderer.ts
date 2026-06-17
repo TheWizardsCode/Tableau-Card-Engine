@@ -26,6 +26,7 @@ import {
 } from '../MainStreetMarket';
 import {
   FONT_FAMILY,
+  HandView,
   attachSelection,
   markHudTransient,
   clearTransientHud,
@@ -69,6 +70,9 @@ import { computeMainStreetLayoutWithSll } from './MainStreetLayoutAdapter';
 // markHudTransient and clearTransientHud are now imported from src/ui/Renderer
 
 export class MainStreetRenderer {
+  /** HandView for player hand — uses renderCard for SVG event card rendering. */
+  handView!: HandView;
+
   constructor(private readonly scene: any) {}
 
   public createHeader(): void {
@@ -102,6 +106,45 @@ export class MainStreetRenderer {
     s.marketContainer = createGameZone(s, 0, 0, s.layout.gameW, s.layout.gameH, 'marketContainer');
     s.incidentQueueContainer = createGameZone(s, 0, 0, s.layout.gameW, s.layout.gameH, 'incidentQueueContainer');
     s.handContainer = createGameZone(s, 0, 0, s.layout.gameW, s.layout.gameH, 'handContainer');
+
+    // Create HandView for the player's hand (anticipates multi-event-card support)
+    const { handX, handY, handCardW, handCardH } = s.layout;
+    // HandView is created at the hand slot centre — renderCard positions cards via HandView layout
+    this.handView = new HandView(s, {
+      baseX: handX + handCardW / 2,
+      baseY: handY + handCardH / 2,
+      spacing: handCardW + 10,
+      cardWidth: handCardW,
+      showLabels: false,
+      selectionEnabled: false,
+      clickEnabled: false,
+      renderCard: (_card, _index) => {
+        // The callback returns a Container with SVG-rendered card + hover overlay
+        const card = _card as any;
+        const container = s.add.container(0, 0);
+        const renderW = Math.max(1, Math.round(handCardW - 4));
+        const renderH = Math.max(1, Math.round(handCardH - 4));
+
+        // Render SVG card via shared adapter
+        mainStreetRenderCardSvg(s, container, card.id, renderW, renderH);
+
+        if (!s.replayMode) {
+          const hover = s.add.rectangle(0, 0, handCardW, handCardH, 0x000000, 0.001);
+          hover.setInteractive({ useHandCursor: s.uiPhase === 'market' });
+          hover.on('pointerover', () => {
+            const info = `Event: ${card.name}\nCost: ${card.cost}\nEffect: ${card.effect}`;
+            s.tooltipManager?.show(info, container.x, container.y);
+          });
+          hover.on('pointerout', () => s.tooltipManager?.hide());
+          if (s.uiPhase === 'market') {
+            hover.on('pointerdown', () => s.onPlayHeldEvent());
+          }
+          container.add(hover);
+        }
+
+        return container;
+      },
+    });
     s.actionContainer = createGameZone(s, 0, 0, s.layout.gameW, s.layout.gameH, 'actionContainer');
 
     // Ensure depth ordering is applied after container creation.
@@ -544,12 +587,12 @@ export class MainStreetRenderer {
     }).setOrigin(0.5, 1);
     s.marketContainer.add(sectionLabel);
 
-    // Business row
+    // Development row (business + community space cards)
     this.drawMarketRow(
       marketTop + 6,
-      'Business',
-      'business',
-      s.state.market.business,
+      'Development',
+      'development',
+      s.state.market.development,
       MARKET_BUSINESS_SLOTS,
       (card) => s.onBusinessCardClick(card as BusinessCard),
     );
@@ -719,6 +762,22 @@ export class MainStreetRenderer {
     // Render card via shared adapter
     mainStreetRenderCardSvg(s, container, card.id, renderW, renderH);
 
+    // For upgrade cards, add a dynamic text overlay showing the target business
+    if (card.family === 'upgrade') {
+      const u = card as UpgradeCard;
+      const targetLabel = `for ${u.targetBusiness}`;
+      const targetText = s.add.text(0, Math.round(-renderH / 2 + 24), targetLabel, {
+        fontSize: '9px',
+        color: '#ddbb88',
+        fontFamily: FONT_FAMILY,
+        fontStyle: 'bold',
+        align: 'center',
+      });
+      targetText.setOrigin(0.5, 0);
+      targetText.setName('upgradeTargetLabel');
+      container.add(targetText);
+    }
+
     const selectionRing = s.add.rectangle(0, 0, marketCardW, marketCardH);
     selectionRing.setFillStyle(0x000000, 0);
     selectionRing.setStrokeStyle(2, 0x44ff66);
@@ -775,7 +834,7 @@ export class MainStreetRenderer {
             info = `Event: ${e.name}\nCost: ${e.cost}\nEffect: ${e.effect}\nCoins: ${e.coinDelta >= 0 ? '+' : ''}${e.coinDelta}, Rep: ${e.reputationDelta >= 0 ? '+' : ''}${e.reputationDelta}`;
           } else if (card.family === 'upgrade') {
             const u = card as any;
-            info = `Upgrade: ${u.name}\nCost: ${u.cost}\nIncome Bonus: +${u.incomeBonus}\nRequires: Lv${u.requiredLevel ?? 0}\n${u.description ?? ''}`;
+            info = `Upgrade: ${u.name}\nCost: ${u.cost}\nApplies to: ${u.targetBusiness}\nIncome Bonus: +${u.incomeBonus}\nRequires: Lv${u.requiredLevel ?? 0}\n${u.description ?? ''}`;
           }
           s.tooltipManager?.show(info, container.x, container.y);
         }
@@ -875,37 +934,28 @@ export class MainStreetRenderer {
 
   public refreshPlayerHand(): void {
     const s = this.scene;
+    // handContainer zone kept for backward-compat (zone-metadata tests)
     s.handContainer.removeAll(true);
 
     const held = s.state.heldEvent;
-    const { handY, handX, handCardW, handCardH } = s.layout;
-
-    // Your Hand label removed
 
     if (held) {
-      const cardContainer = this.drawHeldEventCard(handX, handY, held);
-      s.handContainer.add(cardContainer);
+      // Use HandView with renderCard callback — anticipates multi-card support
+      this.handView.setCards([held] as any);
     } else {
-      // Empty hand slot
-      const empty = s.add.rectangle(
-        40 + handCardW / 2, handY + handCardH / 2,
-        handCardW, handCardH, 0x222211, 0.2,
-      );
-      empty.setStrokeStyle(1, 0x333322, 0.4);
-      s.handContainer.add(empty);
-
-      const emptyText = s.add.text(
-        40 + handCardW / 2, handY + handCardH / 2,
-        'No held event',
-        { fontSize: '11px', color: '#555544', fontFamily: FONT_FAMILY },
-      ).setOrigin(0.5);
-      s.handContainer.add(emptyText);
+      // Empty hand — HandView gracefully handles empty array (no sprites)
+      this.handView.setCards([]);
     }
   }
 
   /**
    * Render held-event cards via the shared adapter using the same Phaser
    * texture pipeline used by market/street/incident cards.
+   */
+  /**
+   * Legacy single-event-card renderer — kept for backward compat.
+   * New code should use the HandView renderCard callback instead.
+   * @deprecated Use HandView with renderCard callback.
    */
   public drawHeldEventCard(
     x: number,
@@ -970,7 +1020,6 @@ export class MainStreetRenderer {
       // End Turn button (right-aligned)
       const btnW = s.layout.actionButtonW;
       const hintBtnW = s.layout.hintButtonW;
-      const smallW = s.layout.smallButtonW;
 
       const endBtn = createActionButton(s, rightX - btnW, by + 4, btnW, 'End Turn', () => {
         s.endTurn();
@@ -983,13 +1032,6 @@ export class MainStreetRenderer {
         s.hintUsedThisTurn, () => s.onHintClick(),
       );
       s.actionContainer.add(hintBtn);
-
-      // Undo / Redo buttons (to the left of Hint)
-      const undoBaseX = rightX - btnW - 12 - hintBtnW - 12 - smallW - 12 - smallW;
-      const undoBtn = createActionButton(s, undoBaseX, by + 4, smallW, 'Undo', () => s.performUndo());
-      s.actionContainer.add(undoBtn);
-      const redoBtn = createActionButton(s, undoBaseX + smallW + 12, by + 4, smallW, 'Redo', () => s.performRedo());
-      s.actionContainer.add(redoBtn);
 
     } else if (s.uiPhase === 'placing-business') {
       const rightX = s.layout.gameW - 24;

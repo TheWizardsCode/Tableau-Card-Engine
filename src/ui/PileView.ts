@@ -13,7 +13,30 @@ import type { Card } from '../card-system/Card';
 import { Pile } from '../card-system/Pile';
 import { getCardTexture } from './CardTextureHelpers';
 
-// ── Types ────────────────────────────────────────────────────
+// ── Types ───────────────────────────────────────────────────
+
+/**
+ * Custom card texture resolver for non-standard card models.
+ *
+ * Used by {@link PileView} when the card type does not have `rank`/`suit`
+ * properties (e.g. Lost Cities cards with expedition color and type).
+ *
+ * @param card  - The card object to resolve a texture for.
+ * @returns The texture key to use for the card sprite.
+ */
+export type CardTextureResolver = (card: unknown) => string;
+
+// ── Types ───────────────────────────────────────────────────
+
+/** Minimal interface for a card pile model. PileView works with any
+ *  object that provides `size()`, `isEmpty()`, and `peek()` methods.
+ *  This enables usage with `Pile<Card>` from card-system as well as
+ *  plain arrays or wrapper objects (e.g. Golf's `Card[]` stock pile). */
+export interface CardPile<T = Card> {
+  size(): number;
+  isEmpty(): boolean;
+  peek(): T | undefined;
+}
 
 /** Options for creating a {@link PileView}. */
 export interface PileViewOptions {
@@ -43,6 +66,14 @@ export interface PileViewOptions {
 
   /** Y offset of the count label below the pile sprite. @default 60 */
   countOffsetY?: number;
+
+  /**
+   * Custom texture resolver for non-standard card models (e.g. Lost Cities
+   * cards with expedition color and type instead of rank/suit). When
+   * provided, this function is called instead of `getCardTexture()` to
+   * determine the texture key for the top card of the pile.
+   */
+  cardTextureFn?: CardTextureResolver;
 }
 
 /** Event map for {@link PileView}. */
@@ -80,9 +111,10 @@ export class PileView {
   private fullAlpha: number;
   private countOffsetY: number;
   private labelPrefix: string;
+  private cardTextureFn: CardTextureResolver | undefined;
 
-  // Pile model
-  private pile: Pile<Card> | null = null;
+  // Pile model (accepts both Pile<Card> and generic CardPile objects)
+  private pile: CardPile<Card> | null = null;
 
   // Display objects
   private sprite: Phaser.GameObjects.Image;
@@ -101,6 +133,7 @@ export class PileView {
     this.fullAlpha = opts.fullAlpha ?? 1;
     this.countOffsetY = opts.countOffsetY ?? 60;
     this.labelPrefix = opts.label ? `${opts.label}: ` : '';
+    this.cardTextureFn = opts.cardTextureFn;
 
     // Create sprite (starts as empty/back)
     this.sprite = scene.add.image(this._x, this._y, this.emptyTexture)
@@ -125,8 +158,8 @@ export class PileView {
    * Set (or replace) the pile model. Call {@link update} to
    * refresh the visual state after mutating the pile.
    */
-  setPile(pile: Pile<Card>): void {
-    this.pile = pile;
+  setPile<T = Card>(pile: CardPile<T>): void {
+    this.pile = pile as unknown as Pile<Card>;
     this.update();
   }
 
@@ -153,10 +186,15 @@ export class PileView {
     if (this.pile.isEmpty()) {
       this.sprite.setTexture(this.emptyTexture);
       this.sprite.setAlpha(this.emptyAlpha);
+      this.sprite.setVisible(false);
     } else {
       const top = this.pile.peek()!;
-      this.sprite.setTexture(getCardTexture(top));
+      const textureKey = this.cardTextureFn
+        ? this.cardTextureFn(top)
+        : getCardTexture(top as Card);
+      this.sprite.setTexture(textureKey);
       this.sprite.setAlpha(this.fullAlpha);
+      this.sprite.setVisible(true);
     }
 
     this.countText.setText(`${this.labelPrefix}${this.pile.size()}`);
@@ -168,6 +206,18 @@ export class PileView {
    */
   onClick(cb: () => void): void {
     this.clickCallbacks.push(cb);
+  }
+
+  /**
+   * Enable or disable pointer interaction on the pile sprite.
+   * Useful for disabling interaction in replay mode.
+   */
+  setInteractive(flag: boolean): void {
+    if (flag) {
+      this.sprite.setInteractive({ useHandCursor: true });
+    } else {
+      this.sprite.disableInteractive();
+    }
   }
 
   /**
@@ -188,8 +238,8 @@ export class PileView {
   /**
    * Get the current pile model, or null if not set.
    */
-  getPile(): Pile<Card> | null {
-    return this.pile;
+  getPile(): CardPile<Card> | null {
+    return this.pile as unknown as CardPile<Card>;
   }
 
   /**

@@ -35,11 +35,11 @@ describe('moveGameObject', () => {
       target: { x: 0, y: 0 } as Phaser.GameObjects.Components.Transform & Phaser.GameObjects.GameObject,
       destX: 10,
       destY: 20,
-      sfx: { move: 'ms-move-loop', moveLoop: true },
+      sfx: { move: 'sfx-move-loop', moveLoop: true },
     });
 
     (tweenConfig?.onStart as () => void)?.();
-    expect(scene.sound.add).toHaveBeenCalledWith('ms-move-loop', { loop: true });
+    expect(scene.sound.add).toHaveBeenCalledWith('sfx-move-loop', { loop: true });
     expect(createdSound.play).toHaveBeenCalledOnce();
 
     (tweenConfig?.onComplete as () => void)?.();
@@ -64,7 +64,7 @@ describe('moveGameObject', () => {
       destX: 10,
       destY: 20,
       soundManager,
-      sfx: { move: 'ms-move', moveIntervalMs: 200 },
+      sfx: { move: 'sfx-move', moveIntervalMs: 200 },
     });
 
     (tweenConfig?.onStart as () => void)?.();

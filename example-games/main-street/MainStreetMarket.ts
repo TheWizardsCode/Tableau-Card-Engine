@@ -15,7 +15,7 @@
 import type { LegalityResult } from '../../src/rule-engine';
 import type { MainStreetState } from './MainStreetState';
 import { addLog } from './MainStreetState';
-import type { BusinessCard, UpgradeCard, EventCard, AnyCard } from './MainStreetCards';
+import type { BusinessCard, CommunitySpaceCard, UpgradeCard, EventCard, AnyCard } from './MainStreetCards';
 import {
   GRID_SIZE,
   INCIDENT_QUEUE_SIZE,
@@ -51,14 +51,14 @@ function reshuffleIfNeeded<T>(state: MainStreetState, deck: T[], discard: T[], n
 
 /**
  * Builds a MarketOfferEngine snapshot from the current Main Street state.
- * The engine provides row-based access to business and investments markets.
+ * The engine provides row-based access to development and investments markets.
  */
 function buildMarketEngine(state: MainStreetState): MarketOfferEngine<AnyCard> {
   return createMarketOfferEngine<AnyCard>([
     {
-      id: 'business',
+      id: 'development',
       slots: MARKET_BUSINESS_SLOTS,
-      cards: state.market.business,
+      cards: state.market.development,
     },
     {
       id: 'investments',
@@ -69,18 +69,18 @@ function buildMarketEngine(state: MainStreetState): MarketOfferEngine<AnyCard> {
 }
 
 /**
- * Syncs only the business row from the engine back to state.market.business.
+ * Syncs only the development row from the engine back to state.market.development.
  */
-function syncBusinessFromEngine(
+function syncDevelopmentFromEngine(
   state: MainStreetState,
   engine: MarketOfferEngine<AnyCard>,
 ): void {
-  const bizRow = engine.getRow('business');
-  if (bizRow) {
-    state.market.business = [];
-    for (const slot of bizRow.slots) {
+  const devRow = engine.getRow('development');
+  if (devRow) {
+    state.market.development = [];
+    for (const slot of devRow.slots) {
       if (slot.card !== null) {
-        state.market.business.push(slot.card as BusinessCard);
+        state.market.development.push(slot.card as BusinessCard | CommunitySpaceCard);
       }
     }
   }
@@ -121,9 +121,9 @@ export function canPurchaseBusiness(
   slotIndex: number,
 ): LegalityResult {
   // Find card in market
-  const card = state.market.business.find(c => c.id === cardId);
+  const card = state.market.development.find(c => c.id === cardId);
   if (!card) {
-    return { legal: false, reason: 'Card not found in the business market.' };
+    return { legal: false, reason: 'Card not found in the development market.' };
   }
 
   // Check coins
@@ -238,16 +238,7 @@ export function canPurchaseEvent(
  * Refills all empty slots in the business market from the business deck.
  * Called after initial setup or if the market is partially empty.
  */
-export function refillBusinessMarket(state: MainStreetState): void {
-  const { decks } = state;
-  // If the business deck is exhausted but there are discarded business cards,
-  // reshuffle them back into the deck immediately so refill can proceed.
-  reshuffleIfNeeded(state, decks.business, state.discards.business, 'business');
 
-  const engine = buildMarketEngine(state);
-  engine.refillRow('business', decks.business);
-  syncBusinessFromEngine(state, engine);
-}
 
 /**
  * Refills the mixed investments row to MARKET_INVESTMENT_SLOTS
@@ -283,6 +274,39 @@ export function refillInvestmentsMarket(state: MainStreetState): void {
     }
     market.investments.push(decks.event.splice(idx, 1)[0]);
     eventCount++;
+  }
+}
+
+/**
+ * Refills the development row from the combined business + community-space deck.
+ */
+export function refillDevelopmentMarket(state: MainStreetState): void {
+  const { decks } = state;
+  // If the development decks are exhausted but there are discarded cards,
+  // reshuffle them back into their decks immediately so refill can proceed.
+  reshuffleIfNeeded(state, decks.business, state.discards.business, 'business');
+  reshuffleIfNeeded(state, decks.communitySpace, state.discards.communitySpace, 'community-space');
+
+  // Build a combined deck from business and community space cards
+  const combinedDeck: (BusinessCard | CommunitySpaceCard)[] = [];
+  while (decks.business.length > 0) combinedDeck.push(decks.business.pop()!);
+  while (decks.communitySpace.length > 0) combinedDeck.push(decks.communitySpace.pop()!);
+
+  // Shuffle the combined deck
+  shuffleArray(combinedDeck, state.rng);
+
+  const engine = buildMarketEngine(state);
+  engine.refillRow('development', combinedDeck);
+  syncDevelopmentFromEngine(state, engine);
+
+  // Return remaining cards to their respective decks
+  // (combinedDeck was consumed by refillRow, any leftovers go back)
+  for (const card of combinedDeck) {
+    if (card.family === 'business') {
+      decks.business.push(card as BusinessCard);
+    } else if (card.family === 'community-space') {
+      decks.communitySpace.push(card as CommunitySpaceCard);
+    }
   }
 }
 
@@ -339,7 +363,7 @@ export function refreshInvestments(state: MainStreetState): RefreshResult {
  * Refills all market rows to their maximum slot counts.
  */
 export function refillAllMarkets(state: MainStreetState): void {
-  refillBusinessMarket(state);
+  refillDevelopmentMarket(state);
   refillInvestmentsMarket(state);
 }
 
@@ -386,17 +410,17 @@ export function purchaseBusiness(
     throw new Error(legality.reason);
   }
 
-  const marketIndex = state.market.business.findIndex(c => c.id === cardId);
-  const card = state.market.business[marketIndex];
+  const marketIndex = state.market.development.findIndex(c => c.id === cardId);
+  const card = state.market.development[marketIndex];
 
   // Deduct cost
   state.resourceBank.coins -= card.cost;
 
   // Remove from market
-  state.market.business.splice(marketIndex, 1);
+  state.market.development.splice(marketIndex, 1);
 
-  // Place on grid
-  state.streetGrid[slotIndex] = card;
+  // Place on grid (card may be BusinessCard or CommunitySpaceCard; both have same grid mechanics)
+  state.streetGrid[slotIndex] = card as BusinessCard;
 
   // Note: market is not refilled immediately. Replenishment occurs at start of next turn.
   const refilled = false;
@@ -520,8 +544,8 @@ export function purchaseEvent(
  * Returns the list of Business cards in the market that the player can
  * currently afford (has enough coins for).
  */
-export function getAffordableBusinessCards(state: MainStreetState): BusinessCard[] {
-  return state.market.business.filter(c => c.cost <= state.resourceBank.coins);
+export function getAffordableBusinessCards(state: MainStreetState): (BusinessCard | CommunitySpaceCard)[] {
+  return state.market.development.filter(c => c.cost <= state.resourceBank.coins);
 }
 
 /**

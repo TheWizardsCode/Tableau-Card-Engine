@@ -13,9 +13,11 @@ import { createSeededRng } from '../../src/core-engine';
 import { createEconomyLedger, type EconomyLedger } from '../../src/rule-engine/EconomyLedger';
 import {
   type BusinessCard,
+  type CommunitySpaceCard,
   type EventCard,
   type UpgradeCard,
   createBusinessDeck,
+  createCommunitySpaceDeck,
   createEventDeck,
   createUpgradeDeck,
   GRID_SIZE,
@@ -117,7 +119,8 @@ export const PHASE_ORDER: readonly DayPhase[] = [
 
 /** The face-up cards available for purchase. */
 export interface MarketState {
-  business: BusinessCard[];
+  /** Cards in the development row (business and community space cards). */
+  development: (BusinessCard | CommunitySpaceCard)[];
   /**
    * Mixed investment row: upgrade cards and Investment-trigger event cards.
    * Typically 2 upgrades + 1 investment event = 3 slots.
@@ -163,8 +166,8 @@ export interface MainStreetState {
   turn: number;
   /** Current phase within the turn. */
   phase: DayPhase;
-  /** The 10-slot linear street grid (null = empty slot). */
-  streetGrid: (BusinessCard | null)[];
+  /** The 10-slot linear street grid (null = empty slot). Supports BusinessCard and CommunitySpaceCard. */
+  streetGrid: (BusinessCard | CommunitySpaceCard | null)[];
   /** Face-up cards available for purchase. */
   market: MarketState;
   /** Player resources. */
@@ -174,12 +177,14 @@ export interface MainStreetState {
   /** Remaining cards in each deck (draw from end = top). */
   decks: {
     business: BusinessCard[];
+    communitySpace: CommunitySpaceCard[];
     event: EventCard[];
     upgrade: UpgradeCard[];
   };
   /** Discard piles for each deck (cards removed from markets are placed here). */
   discards: {
     business: BusinessCard[];
+    communitySpace: CommunitySpaceCard[];
     event: EventCard[];
     upgrade: UpgradeCard[];
   };
@@ -213,17 +218,19 @@ export interface MainStreetSerializedState {
   config: GameConfig;
   turn: number;
   phase: DayPhase;
-  streetGrid: (BusinessCard | null)[];
+  streetGrid: (BusinessCard | CommunitySpaceCard | null)[];
   market: MarketState;
   resourceBank: ResourceBank;
   decks: {
     business: BusinessCard[];
+    communitySpace: CommunitySpaceCard[];
     event: EventCard[];
     upgrade: UpgradeCard[];
   };
   /** Discard piles snapshot (for save/restore) */
   discards: {
     business: BusinessCard[];
+    communitySpace: CommunitySpaceCard[];
     event: EventCard[];
     upgrade: UpgradeCard[];
   };
@@ -376,6 +383,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
 
   // Create and shuffle decks
   const businessDeck = createBusinessDeck(3, options.unlockedCardIds);
+  const communitySpaceDeck = createCommunitySpaceDeck(3, options.unlockedCardIds);
   // Apply positive-incident weighting from the runtime difficulty config.
   // Pass the game's seeded RNG into createEventDeck so fractional duplicates
   // are selected deterministically per-game-seed rather than by template order.
@@ -383,10 +391,13 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
   const upgradeDeck = createUpgradeDeck(2, options.unlockedCardIds);
 
   shuffleArray(businessDeck, rng);
+  shuffleArray(communitySpaceDeck, rng);
   shuffleArray(eventDeck, rng);
   shuffleArray(upgradeDeck, rng);
 
   // Populate initial market
+  // Development row: fill from business deck (community space cards are
+  // integrated into the development row via the community-space deck during refill)
   // Investments row: 2 upgrades + 1 investment event
   const investments: (import('./MainStreetCards').UpgradeCard | import('./MainStreetCards').EventCard)[] = [];
   // Draw upgrades
@@ -401,7 +412,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
   }
 
   const market: MarketState = {
-    business: fillMarketSlots(businessDeck, MARKET_BUSINESS_SLOTS),
+    development: fillMarketSlots(businessDeck, MARKET_BUSINESS_SLOTS),
     investments,
   };
 
@@ -420,7 +431,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     config,
     turn: 1,
     phase: 'DayStart',
-    streetGrid: new Array<BusinessCard | null>(GRID_SIZE).fill(null),
+    streetGrid: new Array<BusinessCard | CommunitySpaceCard | null>(GRID_SIZE).fill(null),
     market,
     resourceBank: {
       coins: initCoins,
@@ -433,12 +444,14 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     }),
     decks: {
       business: businessDeck,
+      communitySpace: communitySpaceDeck,
       event: eventDeck,
       upgrade: upgradeDeck,
     },
-    // New discard piles for removed market cards
+    // Discard piles for removed market cards
     discards: {
       business: [],
+      communitySpace: [],
       event: [],
       upgrade: [],
     },
@@ -497,9 +510,80 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
 }
 
 /**
+ * Migrates an old-format serialized state to the current schema.
+ *
+ * Handles:
+ * - `market.business` → `market.development` rename
+ * - Park cards with `family: 'business'` → `family: 'community-space'`
+ * - Missing `communitySpace` deck/discard in old saves
+ */
+function migrateSerializedState(saved: Record<string, unknown>): void {
+  // ── Market: rename business → development ────────────────
+  const market = saved.market as Record<string, unknown> | undefined;
+  if (market && 'business' in market && !('development' in market)) {
+    market.development = market.business;
+    delete market.business;
+  }
+
+  // ── Street grid: convert Park cards from business → community-space ──
+  const grid = saved.streetGrid as Record<string, unknown>[] | undefined;
+  if (grid) {
+    for (const slot of grid) {
+      if (slot && slot.family === 'business' && slot.name === 'Park') {
+        slot.family = 'community-space';
+      }
+    }
+  }
+
+  // ── Development row cards: convert Park cards from business → community-space ──
+  if (market) {
+    const devCards = market.development as Record<string, unknown>[] | undefined;
+    if (devCards) {
+      for (const card of devCards) {
+        if (card && card.family === 'business' && card.name === 'Park') {
+          card.family = 'community-space';
+        }
+      }
+    }
+  }
+
+  // ── Decks: add missing communitySpace deck ────────────────
+  const decks = saved.decks as Record<string, unknown> | undefined;
+  if (decks && !('communitySpace' in decks)) {
+    decks.communitySpace = [];
+  }
+
+  // Convert Park cards in business deck from business → community-space
+  if (decks) {
+    const bizDeck = decks.business as Record<string, unknown>[] | undefined;
+    if (bizDeck) {
+      for (let i = bizDeck.length - 1; i >= 0; i--) {
+        const card = bizDeck[i];
+        if (card && card.family === 'business' && card.name === 'Park') {
+          card.family = 'community-space';
+          // Move to community space deck
+          if (Array.isArray(decks.communitySpace)) {
+            (decks.communitySpace as unknown[]).push(card);
+          }
+          bizDeck.splice(i, 1);
+        }
+      }
+    }
+  }
+
+  // ── Discards: add missing communitySpace discard ──────────
+  const discards = saved.discards as Record<string, unknown> | undefined;
+  if (discards && !('communitySpace' in discards)) {
+    discards.communitySpace = [];
+  }
+}
+
+/**
  * Rehydrates runtime state from a serialized checkpoint.
  */
 export function deserializeMainStreetState(saved: MainStreetSerializedState): MainStreetState {
+  migrateSerializedState(saved as unknown as Record<string, unknown>);
+
   const baseRng = createSeededRng(saved.numericSeed);
   for (let i = 0; i < saved.rngCalls; i++) {
     baseRng();

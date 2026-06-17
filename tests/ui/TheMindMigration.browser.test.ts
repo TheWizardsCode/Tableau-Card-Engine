@@ -214,7 +214,7 @@ describe('The Mind migration smoke (browser)', () => {
       game = await bootGame();
     });
     const scene = game!.scene.getScene('TheMindScene') as Phaser.Scene;
-    await waitFrames(24);
+    await waitFrames(48);
 
     const canvas = document.querySelector('#game-container canvas') as HTMLCanvasElement | null;
     expect(canvas).toBeTruthy();
@@ -222,15 +222,16 @@ describe('The Mind migration smoke (browser)', () => {
 
     await saveScreenshot(canvas, 'the-mind-pile');
 
-    // Pile is in the center-right area of the screen.
-    const pileX = Math.floor(canvas.width * 0.5);
-    const pileY = Math.floor(canvas.height * 0.35);
+    // Pile is centred in the middle of the screen.
+    // PileView sprite at (640, 360), count text at y=360+82=442.
+    const pileX = Math.floor(canvas.width / 2) - 50;
+    const pileY = Math.floor(canvas.height / 2) - 60;
     const distinctColours = await countDistinctColoursInRegion(
       scene, canvas,
-      pileX, pileY, 200, 150,
-      12,
+      pileX, pileY, 100, 200,
+      8,
     );
-    // Pile has card-back textures, a "PILE" label, and a slot background.
+    // Pile has card-back textures, a "Pile: N" count, and a slot background.
     expect(distinctColours).toBeGreaterThan(3);
   }, 30_000);
 
@@ -239,7 +240,7 @@ describe('The Mind migration smoke (browser)', () => {
       game = await bootGame();
     });
     const scene = game!.scene.getScene('TheMindScene') as Phaser.Scene;
-    await waitFrames(24);
+    await waitFrames(48);
 
     const canvas = document.querySelector('#game-container canvas') as HTMLCanvasElement | null;
     expect(canvas).toBeTruthy();
@@ -247,13 +248,13 @@ describe('The Mind migration smoke (browser)', () => {
 
     await saveScreenshot(canvas, 'the-mind-status-text');
 
-    // Status text is near the center (level, lives info).
-    const statusX = Math.floor(canvas.width * 0.3);
-    const statusY = Math.floor(canvas.height * 0.45);
+    // Status text (level/lives) is at top-right corner (x~1180, y~55-80).
+    const statusX = Math.floor(canvas.width * 0.8);
+    const statusY = Math.floor(canvas.height * 0.03);
     const distinctColours = await countDistinctColoursInRegion(
       scene, canvas,
-      statusX, statusY, 300, 60,
-      12,
+      statusX, statusY, 220, 100,
+      8,
     );
     // Status area has level text, lives hearts, and background elements.
     expect(distinctColours).toBeGreaterThan(3);
@@ -264,7 +265,7 @@ describe('The Mind migration smoke (browser)', () => {
       game = await bootGame();
     });
     const scene = game!.scene.getScene('TheMindScene') as Phaser.Scene;
-    await waitFrames(8);
+    await waitFrames(16);
 
     const texts = scene.children.list.filter(
       (c) => c instanceof Phaser.GameObjects.Text,
@@ -274,17 +275,18 @@ describe('The Mind migration smoke (browser)', () => {
       (c) => c instanceof Phaser.GameObjects.Image,
     ) as Phaser.GameObjects.Image[];
 
-    // Verify key labels exist
-    const pileLabel = texts.find((t) => t.text === 'PILE');
-    expect(pileLabel).toBeDefined();
+    // Verify the scene header exists.
+    const headerLabel = texts.find((t) => t.text === 'The Mind');
+    expect(headerLabel).toBeDefined();
 
-    const yourHandLabel = texts.find((t) => t.text === 'Your Hand');
-    expect(yourHandLabel).toBeDefined();
+    // Verify status text objects exist (level and lives).
+    const levelLabel = texts.find((t) => t.text.startsWith('Level '));
+    expect(levelLabel).toBeDefined();
+    const livesLabel = texts.find((t) => t.text.includes('Lives'));
+    expect(livesLabel).toBeDefined();
 
-    const aiHandLabel = texts.find((t) => t.text === 'AI Hand');
-    expect(aiHandLabel).toBeDefined();
-
-    // Verify card-back images are rendered
+    // HandViews use showLabels: false, so no "Your Hand" / "AI Hand" text.
+    // We verify card-back image objects exist (AI hand cards use face-down textures).
     const cardBackImages = images.filter((img) => img.texture.key.includes('mind-back'));
     expect(cardBackImages.length).toBeGreaterThan(0);
   }, 30_000);

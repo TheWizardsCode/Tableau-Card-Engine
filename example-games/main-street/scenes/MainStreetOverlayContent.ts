@@ -108,6 +108,7 @@ export class MainStreetOverlayContent {
         'Challenge Details:',
         { fontSize: '14px', fontStyle: 'bold', color: '#aa9977', fontFamily: FONT_FAMILY },
       ).setOrigin(0.5, 0).setDepth(101);
+      if (s.hudContainer) s.hudContainer.add(sectionTitle);
       s.overlayObjects.push(sectionTitle);
       cursorY += 22;
 
@@ -185,6 +186,7 @@ export class MainStreetOverlayContent {
         s.layout.gameW / 2, cursorY, tierLabel,
         { fontSize: '14px', fontStyle: 'bold', color: '#ddbb88', fontFamily: FONT_FAMILY },
       ).setOrigin(0.5, 0).setDepth(101);
+      if (s.hudContainer) s.hudContainer.add(tierIndicator);
       s.overlayObjects.push(tierIndicator);
       cursorY += 22;
 
@@ -199,6 +201,7 @@ export class MainStreetOverlayContent {
         s.layout.gameW / 2, cursorY, statsLines.join('\n'),
         { fontSize: '13px', color: '#bbaa99', fontFamily: FONT_FAMILY, align: 'center', lineSpacing: 4 },
       ).setOrigin(0.5, 0).setDepth(101);
+      if (s.hudContainer) s.hudContainer.add(statsText);
       s.overlayObjects.push(statsText);
     }
 
@@ -209,6 +212,7 @@ export class MainStreetOverlayContent {
       `Difficulty: ${s.selectedDifficulty}`,
       { fontSize: '14px', color: '#ccbbaa', fontFamily: FONT_FAMILY },
     ).setOrigin(0, 0.5).setDepth(101);
+    if (s.hudContainer) s.hudContainer.add(diffLabel);
     s.overlayObjects.push(diffLabel);
 
     const cycleBtn = s.add.text(
@@ -221,6 +225,7 @@ export class MainStreetOverlayContent {
       s.selectedDifficulty = DIFFICULTY_NAMES[(idx + 1) % DIFFICULTY_NAMES.length];
       diffLabel.setText(`Difficulty: ${s.selectedDifficulty}`);
     });
+    if (s.hudContainer) s.hudContainer.add(cycleBtn);
     s.overlayObjects.push(cycleBtn);
 
     // Buttons (positioned relative to panel bottom)
@@ -234,11 +239,13 @@ export class MainStreetOverlayContent {
       s.overlayObjects = [];
       s.scene.restart();
     });
+    if (s.hudContainer) s.hudContainer.add(playAgainBtn);
     s.overlayObjects.push(playAgainBtn);
 
     const menuBtn = createOverlayMenuButton(
       s, s.layout.gameW / 2 + 30, btnY, 101,
     );
+    if (s.hudContainer) s.hudContainer.add(menuBtn);
     s.overlayObjects.push(menuBtn);
   }
 }
