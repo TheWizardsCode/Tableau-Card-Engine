@@ -111,13 +111,5 @@ describe('Undo/Redo button positioning (via initUndoRedoButtons)', () => {
     await runPositionTest(1920, 1080);
   });
 
-  it('does not create undo/redo buttons when initUndoRedoButtons is not called (opt-in)', async () => {
-    game = await bootGame(1280, 720);
-    const scene = game.scene.getScene('BeleagueredCastleScene') as any;
-    await waitFrames(8);
 
-    // The mechanism's undoButton/redoButton should be null if not initialized
-    expect((scene as any).undoButton).toBeNull();
-    expect((scene as any).redoButton).toBeNull();
-  });
 });

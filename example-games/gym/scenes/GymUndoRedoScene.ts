@@ -17,7 +17,7 @@ import { UndoRedoManager, CompoundCommand } from '../../../src/core-engine/UndoR
 import type { Command } from '../../../src/core-engine/UndoRedoManager';
 import { popTextOrIcon } from '../../../src/ui/popTextOrIcon';
 import { GAME_W } from '../../../src/ui/constants';
-import { createHudText, createActionButton } from '../../../src/ui/Renderer';
+import { createHudText, createStandardUndoRedoButtons } from '../../../src/ui/Renderer';
 import { createEventLog } from '../../../src/ui/GymSceneUtils';
 import type { EventLogResult } from '../../../src/ui/GymSceneUtils';
 
@@ -49,8 +49,8 @@ export class GymUndoRedoScene extends GymSceneBase {
   private historyText!: Phaser.GameObjects.Text;
   private eventLog: string[] = [];
   private eventLogResult!: EventLogResult;
-  private undoActionBtn!: Phaser.GameObjects.Container | null;
-  private redoActionBtn!: Phaser.GameObjects.Container | null;
+  private undoActionBtn!: Phaser.GameObjects.Container;
+  private redoActionBtn!: Phaser.GameObjects.Container;
 
   constructor() {
     super({ key: GYM_UNDO_REDO_KEY });
@@ -75,10 +75,14 @@ export class GymUndoRedoScene extends GymSceneBase {
     this.addButton(cx - 320, y, '[ +5 ]', () => this.executeAction(5));
     this.addButton(cx - 240, y, '[ -3 ]', () => this.executeAction(-3));
     this.addButton(cx - 140, y, '[ Compound (+2,+3) ]', () => this.executeCompound());
-    // Use proper visual action buttons for Undo/Redo (shared createActionButton style)
-    this.undoActionBtn = createActionButton(this, cx + 60, y, 60, 'Undo', () => this.doUndo());
-    this.redoActionBtn = createActionButton(this, cx + 130, y, 60, 'Redo', () => this.doRedo());
-    this.addButton(cx + 220, y, '[ Clear History ]', () => this.clearHistory());
+    // Use standard-positioned undo/redo buttons (shared mechanism)
+    const { undoButton, redoButton } = createStandardUndoRedoButtons(
+      this, () => this.doUndo(), () => this.doRedo(),
+    );
+    this.undoActionBtn = undoButton;
+    this.redoActionBtn = redoButton;
+
+    this.addButton(cx + 40, y, '[ Clear History ]', () => this.clearHistory());
 
     y += 50;
 

@@ -184,8 +184,36 @@ const mockCreateActionButton = vi.hoisted(() =>
   })),
 );
 
+// Helper to create a mock button container (used by both mocks below).
+function makeMockContainer() {
+  return {
+    setAlpha: mockContainerSetAlpha,
+    destroy: mockContainerDestroy,
+    setDepth: mockContainerSetDepth,
+    list: [] as unknown[],
+    add: vi.fn(),
+    remove: vi.fn(),
+    removeAll: vi.fn(),
+    on: vi.fn(),
+    once: vi.fn(),
+    off: vi.fn(),
+    setVisible: vi.fn(),
+    setScale: vi.fn(),
+    x: 0,
+    y: 0,
+  };
+}
+
+const mockCreateStandardUndoRedoButtons = vi.hoisted(() =>
+  vi.fn((_scene: unknown, _onUndo: () => void, _onRedo: () => void, _options?: { parent?: unknown }) => ({
+    undoButton: makeMockContainer(),
+    redoButton: makeMockContainer(),
+  })),
+);
+
 vi.mock('../../src/ui/Renderer', () => ({
   createActionButton: mockCreateActionButton,
+  createStandardUndoRedoButtons: mockCreateStandardUndoRedoButtons,
 }));
 
 // Import after mocks are set up
@@ -488,52 +516,30 @@ describe('CardGameScene', () => {
       scene.callInitHUDContainer();
     });
 
-    it('creates two action buttons (Undo and Redo)', () => {
-      scene.callInitUndoRedoButtons(vi.fn(), vi.fn());
-      expect(mockCreateActionButton).toHaveBeenCalledTimes(2);
-      expect(mockCreateActionButton.mock.calls[0][4]).toBe('Undo');
-      expect(mockCreateActionButton.mock.calls[1][4]).toBe('Redo');
-    });
-
-    it('passes callbacks to the buttons (onUndo to first, onRedo to second)', () => {
+    it('calls createStandardUndoRedoButtons with onUndo/onRedo callbacks', () => {
       const onUndo = vi.fn();
       const onRedo = vi.fn();
       scene.callInitUndoRedoButtons(onUndo, onRedo);
-      expect(mockCreateActionButton.mock.calls[0][5]).toBe(onUndo);
-      expect(mockCreateActionButton.mock.calls[1][5]).toBe(onRedo);
+      expect(mockCreateStandardUndoRedoButtons).toHaveBeenCalledOnce();
+      expect(mockCreateStandardUndoRedoButtons.mock.calls[0][1]).toBe(onUndo);
+      expect(mockCreateStandardUndoRedoButtons.mock.calls[0][2]).toBe(onRedo);
     });
 
-    it('positions buttons relative to scene width for resolution independence', () => {
+    it('passes hudContainer as parent for depth ordering', () => {
       scene.callInitUndoRedoButtons(vi.fn(), vi.fn());
-      // Button positions are computed dynamically from scene scale width
-      // so they should be resolution-independent. Verify the x values
-      // are derived from scene width (not hard-coded absolute pixels).
-      const width = scene.scale.width;
-      const undoX = mockCreateActionButton.mock.calls[0][1] as number;
-      const redoX = mockCreateActionButton.mock.calls[1][1] as number;
-      expect(undoX).toBeGreaterThan(0);
-      expect(redoX).toBeGreaterThan(undoX);
-      expect(undoX).toBeLessThan(width);
-      expect(redoX).toBeLessThan(width);
+      const options = mockCreateStandardUndoRedoButtons.mock.calls[0][3] as { parent: unknown };
+      expect(options.parent).toBe(scene._hudContainer);
     });
 
-    it('creates buttons with consistent Y position', () => {
+    it('stores undoButton and redoButton from the factory result', () => {
       scene.callInitUndoRedoButtons(vi.fn(), vi.fn());
-      const undoY = mockCreateActionButton.mock.calls[0][2] as number;
-      const redoY = mockCreateActionButton.mock.calls[1][2] as number;
-      expect(undoY).toBe(redoY);
-    });
-
-    it('uses default button width of 60', () => {
-      scene.callInitUndoRedoButtons(vi.fn(), vi.fn());
-      const undoW = mockCreateActionButton.mock.calls[0][3] as number;
-      const redoW = mockCreateActionButton.mock.calls[1][3] as number;
-      expect(undoW).toBeGreaterThan(0);
-      expect(redoW).toBeGreaterThan(0);
+      const result = mockCreateStandardUndoRedoButtons.mock.results[0]?.value;
+      expect(result).toBeDefined();
+      expect(result!.undoButton).toBeDefined();
+      expect(result!.redoButton).toBeDefined();
     });
 
     it('does not throw if hudContainer is not initialized', () => {
-      // Create a fresh scene without initHUDContainer
       const freshScene = new TestScene();
       expect(() => freshScene.callInitUndoRedoButtons(vi.fn(), vi.fn())).not.toThrow();
     });
@@ -587,7 +593,7 @@ describe('CardGameScene', () => {
 
   describe('opt-in behavior', () => {
     it('does not create undo/redo buttons when initUndoRedoButtons is not called', () => {
-      expect(mockCreateActionButton).not.toHaveBeenCalled();
+      expect(mockCreateStandardUndoRedoButtons).not.toHaveBeenCalled();
     });
 
     it('allows scenes to skip undo/redo entirely without side effects', () => {
@@ -599,7 +605,7 @@ describe('CardGameScene', () => {
       scene.callInitSettingsPanel();
       scene.callShutdownBase();
       // No undo/redo buttons were created
-      expect(mockCreateActionButton).not.toHaveBeenCalled();
+      expect(mockCreateStandardUndoRedoButtons).not.toHaveBeenCalled();
     });
   });
 });

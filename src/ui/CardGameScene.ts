@@ -33,7 +33,7 @@ import { HelpButton } from './HelpButton';
 import { SettingsPanel } from './SettingsPanel';
 import { SettingsButton } from './SettingsButton';
 import type { HelpSection } from './HelpPanel';
-import { createActionButton } from './Renderer';
+import { createStandardUndoRedoButtons } from './Renderer';
 
 /**
  * Abstract base class for card game scenes.
@@ -238,33 +238,12 @@ export abstract class CardGameScene extends Phaser.Scene {
    * @param onRedo - Callback invoked when the Redo button is clicked.
    */
   protected initUndoRedoButtons(onUndo: () => void, onRedo: () => void): void {
-    const buttonW = 60;
-    const buttonGap = 8;
-    const redoToSettingsGap = 12;
-    const BUTTON_RADIUS = 16;
-    const MARGIN = 16;
-    const BUTTON_H = 32;
-
-    // Settings button center (mirrors SettingsButton default position formula)
-    const settingsCenterX = this.scale.width - MARGIN - BUTTON_RADIUS - (BUTTON_RADIUS * 2 + MARGIN);
-    const settingsLeftEdge = settingsCenterX - BUTTON_RADIUS;
-
-    // Position buttons to the left of settings
-    const redoRightEdge = settingsLeftEdge - redoToSettingsGap;
-    const redoLeftEdge = redoRightEdge - buttonW;
-    const undoLeftEdge = redoLeftEdge - buttonGap - buttonW;
-
-    // Vertically align with the settings button center
-    const buttonY = MARGIN + BUTTON_RADIUS - BUTTON_H / 2;
-
-    this.undoButton = createActionButton(this, undoLeftEdge, buttonY, buttonW, 'Undo', onUndo);
-    this.redoButton = createActionButton(this, redoLeftEdge, buttonY, buttonW, 'Redo', onRedo);
-
-    // Parent into HUD container for consistent depth ordering
-    if (this.hudContainer) {
-      this.hudContainer.add(this.undoButton);
-      this.hudContainer.add(this.redoButton);
-    }
+    const { undoButton, redoButton } = createStandardUndoRedoButtons(
+      this, onUndo, onRedo,
+      { parent: this.hudContainer ?? undefined },
+    );
+    this.undoButton = undoButton;
+    this.redoButton = redoButton;
   }
 
   /**
