@@ -53,14 +53,11 @@ function _assertHelperIllegal(): LegalityResult {
 }
 
 /** Narrowing verification using the helper constructors. */
-function _assertHelperNarrowing(
-  legal: LegalityResult,
-  illegal: LegalityResult
-): string {
-  if (legal.legal) {
+function _assertHelperNarrowing(result: LegalityResult): string {
+  if (result.legal) {
     return 'legal';
   }
-  return illegal.reason;
+  return result.reason;
 }
 
 // Prevent "unused" lint warnings for the compile-time helpers.

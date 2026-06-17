@@ -35,6 +35,44 @@ export type LegalityResult =
   | { legal: true }
   | { legal: false; reason: string };
 
+// ── Legality helpers ────────────────────────────────────────
+
+/**
+ * Convenience constructor for a legal (permitted) result.
+ *
+ * @returns `{ legal: true }`
+ *
+ * @example
+ * ```ts
+ * import { legalAction, illegalAction } from '@rule-engine/index';
+ *
+ * function validateMove(card: Card): LegalityResult {
+ *   if (!card) return illegalAction('No card provided');
+ *   return legalAction();
+ * }
+ * ```
+ */
+export function legalAction(): LegalityResult {
+  return { legal: true };
+}
+
+/**
+ * Convenience constructor for an illegal (forbidden) result.
+ *
+ * @param reason - Human-readable explanation of why the action
+ *   is illegal.
+ * @returns `{ legal: false, reason }`
+ *
+ * @example
+ * ```ts
+ * const result = illegalAction('Out of bounds');
+ * // => { legal: false, reason: 'Out of bounds' }
+ * ```
+ */
+export function illegalAction(reason: string): LegalityResult {
+  return { legal: false, reason };
+}
+
 // ── Economy Ledger ──────────────────────────────────────────
 
 export {
