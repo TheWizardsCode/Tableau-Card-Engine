@@ -377,6 +377,10 @@ export class MainStreetLifecycleManager {
     // The HelpPanel toggle no longer needs tutorial intercept.
     // Provide the ordered difficulty names so the Settings panel can render a selector
     s.initSettingsPanel(DIFFICULTY_NAMES);
+    s.initUndoRedoButtons(
+      () => s.performUndo(),
+      () => s.performRedo(),
+    );
     if (!s.replayMode) {
       s.tooltipManager = new TooltipManager(s, s.settingsPanel);
     }

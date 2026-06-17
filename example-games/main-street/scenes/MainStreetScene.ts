@@ -455,7 +455,10 @@ export class MainStreetScene extends CardGameScene {
 
     const rightX = l.gameW - 24;
     const actionRowY = l.actionY + 4;
-    const actionW = l.actionButtonW + 12 + l.hintButtonW + 12 + l.smallButtonW + 12 + l.smallButtonW;
+    // Note: undo/redo buttons were removed from the action bar in the MS
+    // migration (CG-0MQHARH7J004XP4V). They are now placed via the shared
+    // initUndoRedoButtons() mechanism in the header area, not the action bar.
+    const actionW = l.actionButtonW + 12 + l.hintButtonW;
     const action = {
       x: rightX - actionW,
       y: actionRowY,

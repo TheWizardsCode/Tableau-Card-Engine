@@ -1020,7 +1020,6 @@ export class MainStreetRenderer {
       // End Turn button (right-aligned)
       const btnW = s.layout.actionButtonW;
       const hintBtnW = s.layout.hintButtonW;
-      const smallW = s.layout.smallButtonW;
 
       const endBtn = createActionButton(s, rightX - btnW, by + 4, btnW, 'End Turn', () => {
         s.endTurn();
@@ -1033,13 +1032,6 @@ export class MainStreetRenderer {
         s.hintUsedThisTurn, () => s.onHintClick(),
       );
       s.actionContainer.add(hintBtn);
-
-      // Undo / Redo buttons (to the left of Hint)
-      const undoBaseX = rightX - btnW - 12 - hintBtnW - 12 - smallW - 12 - smallW;
-      const undoBtn = createActionButton(s, undoBaseX, by + 4, smallW, 'Undo', () => s.performUndo());
-      s.actionContainer.add(undoBtn);
-      const redoBtn = createActionButton(s, undoBaseX + smallW + 12, by + 4, smallW, 'Redo', () => s.performRedo());
-      s.actionContainer.add(redoBtn);
 
     } else if (s.uiPhase === 'placing-business') {
       const rightX = s.layout.gameW - 24;
