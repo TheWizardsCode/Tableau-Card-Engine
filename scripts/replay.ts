@@ -30,6 +30,7 @@ import type { Browser, Page } from 'playwright';
 import { DEV_SERVER_URL, ensureDevServer, killDevServer } from './dev-server-utils';
 import { adapterRegistry } from './adapters';
 import type { ReplayAdapter } from './adapters';
+import { generateContactSheet } from './contact-sheet';
 
 // ── Types ───────────────────────────────────────────────────
 
@@ -49,6 +50,7 @@ interface ReplaySummary {
   screenshots: TurnSummary[];
   totalDurationMs: number;
   errors: string[];
+  contactSheetPath?: string;
 }
 
 // ── Constants ───────────────────────────────────────────────
@@ -662,6 +664,19 @@ async function main(): Promise<void> {
     console.error(msg);
   } finally {
     summary.totalDurationMs = Date.now() - totalStart;
+
+    // Generate contact sheet from captured screenshots
+    try {
+      const contactSheetPath = await generateContactSheet(outputDir);
+      if (contactSheetPath) {
+        summary.contactSheetPath = contactSheetPath;
+        console.log(`\nContact sheet: ${contactSheetPath}`);
+      }
+    } catch (err) {
+      const msg = `Contact sheet generation error: ${(err as Error).message}`;
+      summary.errors.push(msg);
+      console.warn(msg);
+    }
 
     // Write summary report
     const summaryPath = path.join(outputDir, 'replay-summary.json');
