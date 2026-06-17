@@ -114,7 +114,7 @@ export class BeleagueredCastleScene extends CardGameScene {
     this.turnController = new BeleagueredCastleTurnController(this.gameState, recorder, {
       onRefresh: () => this.refreshAll(),
       onCheckGameEnd: () => this.handleGameEnd(),
-      onAutoCompleteVisual: (moves, moveCards) => this.runAutoCompleteVisuals(moves, moveCards),
+      onAutoCompleteVisual: (moves, moveCards, isSafeAutoMove) => this.runAutoCompleteVisuals(moves, moveCards, isSafeAutoMove),
       onAutoCompleteDone: () => this.handleAutoCompleteDone(),
       onSoundEvent: (event, data) => this.handleSoundEvent(event, data),
       onSaveCheckpoint: () => this.saveCheckpoint(),
@@ -350,7 +350,7 @@ export class BeleagueredCastleScene extends CardGameScene {
     }
   }
 
-  private runAutoCompleteVisuals(moves: BCMove[], moveCards: Array<{ suit: string; rank: string; foundationIndex: number }>): void {
+  private runAutoCompleteVisuals(moves: BCMove[], moveCards: Array<{ suit: string; rank: string; foundationIndex: number }>, isSafeAutoMove?: boolean): void {
     const STAGGER_MS = 100;
 
 
@@ -363,6 +363,11 @@ export class BeleagueredCastleScene extends CardGameScene {
       this.turnController.finalizeAutoComplete();
       return;
     }
+
+    // Use card-to-foundation sound for safe auto-moves to match manual foundation move feedback,
+    // and auto-complete-card sound for endgame auto-complete.
+    const endSfx = isSafeAutoMove ? SFX_KEYS.CARD_TO_FOUNDATION : SFX_KEYS.AUTO_COMPLETE_CARD;
+    const gameEventName = isSafeAutoMove ? 'card-to-foundation' : 'auto-complete-card';
 
     for (let j = 0; j < animIndices.length; j++) {
       const i = animIndices[j];
@@ -413,10 +418,10 @@ export class BeleagueredCastleScene extends CardGameScene {
           destY,
           duration: Math.max(50, ANIM_DURATION),
           soundManager: this.soundManager ?? null,
-          sfx: { start: SFX_KEYS.CARD_PICKUP, end: SFX_KEYS.AUTO_COMPLETE_CARD },
+          sfx: { start: SFX_KEYS.CARD_PICKUP, end: endSfx },
           onComplete: () => {
             try { moving.destroy(); } catch {}
-            this.gameEvents.emit('auto-complete-card', { suit: cardInfo.suit, rank: cardInfo.rank, foundationIndex: destIndex });
+            this.gameEvents.emit(gameEventName, { suit: cardInfo.suit, rank: cardInfo.rank, foundationIndex: destIndex });
 
             // restore visibility; final refresh after command execution will re-render settled board
             try { sourceSprite.setVisible(true); } catch {}
@@ -563,7 +568,7 @@ export class BeleagueredCastleScene extends CardGameScene {
     this.turnController = new BeleagueredCastleTurnController(this.gameState, recorder, {
       onRefresh: () => this.refreshAll(),
       onCheckGameEnd: () => this.handleGameEnd(),
-      onAutoCompleteVisual: (moves, moveCards) => this.runAutoCompleteVisuals(moves, moveCards),
+      onAutoCompleteVisual: (moves, moveCards, isSafeAutoMove) => this.runAutoCompleteVisuals(moves, moveCards, isSafeAutoMove),
       onAutoCompleteDone: () => this.handleAutoCompleteDone(),
       onSoundEvent: (event, data) => this.handleSoundEvent(event, data),
       onSaveCheckpoint: () => this.saveCheckpoint(),
