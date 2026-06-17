@@ -17,7 +17,7 @@ import { UndoRedoManager, CompoundCommand } from '../../../src/core-engine/UndoR
 import type { Command } from '../../../src/core-engine/UndoRedoManager';
 import { popTextOrIcon } from '../../../src/ui/popTextOrIcon';
 import { GAME_W } from '../../../src/ui/constants';
-import { createHudText } from '../../../src/ui/Renderer';
+import { createHudText, createActionButton } from '../../../src/ui/Renderer';
 import { createEventLog } from '../../../src/ui/GymSceneUtils';
 import type { EventLogResult } from '../../../src/ui/GymSceneUtils';
 
@@ -49,6 +49,8 @@ export class GymUndoRedoScene extends GymSceneBase {
   private historyText!: Phaser.GameObjects.Text;
   private eventLog: string[] = [];
   private eventLogResult!: EventLogResult;
+  private undoActionBtn!: Phaser.GameObjects.Container | null;
+  private redoActionBtn!: Phaser.GameObjects.Container | null;
 
   constructor() {
     super({ key: GYM_UNDO_REDO_KEY });
@@ -62,7 +64,7 @@ export class GymUndoRedoScene extends GymSceneBase {
 
     this.initHelp([
       { heading: 'Overview', body: 'Demonstrates reversible actions and stack semantics using the UndoRedoManager. Useful to verify undo/redo boundaries and compound commands.' },
-      { heading: 'Controls', body: '[ +1 ], [ +5 ], [ -3 ]: Execute simple increment/decrement actions.\n[ Compound (+2,+3) ]: Execute a grouped command.\n[ Undo ] / [ Redo ]: Step backward/forward through action history.\n[ Clear History ]: Reset undo/redo stacks.' }
+      { heading: 'Controls', body: '[ +1 ], [ +5 ], [ -3 ]: Execute simple increment/decrement actions.\n[ Compound (+2,+3) ]: Execute a grouped command.\nUndo / Redo (action buttons): Step backward/forward through action history.\n[ Clear History ]: Reset undo/redo stacks.' }
     ]);
 
     const cx = GAME_W / 2;
@@ -73,9 +75,10 @@ export class GymUndoRedoScene extends GymSceneBase {
     this.addButton(cx - 320, y, '[ +5 ]', () => this.executeAction(5));
     this.addButton(cx - 240, y, '[ -3 ]', () => this.executeAction(-3));
     this.addButton(cx - 140, y, '[ Compound (+2,+3) ]', () => this.executeCompound());
-    this.addButton(cx + 60, y, '[ Undo ]', () => this.doUndo());
-    this.addButton(cx + 160, y, '[ Redo ]', () => this.doRedo());
-    this.addButton(cx + 280, y, '[ Clear History ]', () => this.clearHistory());
+    // Use proper visual action buttons for Undo/Redo (shared createActionButton style)
+    this.undoActionBtn = createActionButton(this, cx + 60, y, 60, 'Undo', () => this.doUndo());
+    this.redoActionBtn = createActionButton(this, cx + 130, y, 60, 'Redo', () => this.doRedo());
+    this.addButton(cx + 220, y, '[ Clear History ]', () => this.clearHistory());
 
     y += 50;
 
@@ -158,6 +161,10 @@ export class GymUndoRedoScene extends GymSceneBase {
     this.undoAvailText.setColor(canUndo ? '#88ff88' : '#888888');
     this.redoAvailText.setText(`Can Redo: ${canRedo ? 'yes' : 'no'}`);
     this.redoAvailText.setColor(canRedo ? '#88ff88' : '#888888');
+
+    // Mirror standard refreshUndoRedoButtons visual state
+    if (this.undoActionBtn) this.undoActionBtn.setAlpha(canUndo ? 1 : 0.5);
+    if (this.redoActionBtn) this.redoActionBtn.setAlpha(canRedo ? 1 : 0.5);
 
     const hist = this.undoRedo.history.map((c) => c.description ?? '?').join(', ');
     this.historyText.setText(`History: [${hist}]`);
