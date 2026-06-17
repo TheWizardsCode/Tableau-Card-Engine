@@ -58,7 +58,7 @@ describe('Beleaguered Castle HandView/PileView migration smoke test', () => {
     const { createBeleagueredCastleGame } = await import(
       '../../example-games/beleaguered-castle/createBeleagueredCastleGame'
     );
-    game = createBeleagueredCastleGame();
+    game = createBeleagueredCastleGame({ type: Phaser.CANVAS });
     await waitForScene(game, 'BeleagueredCastleScene');
     // Wait for the deal to complete so it's ready for all tests
     const scene = game.scene.getScene('BeleagueredCastleScene') as any;

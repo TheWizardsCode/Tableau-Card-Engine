@@ -39,7 +39,7 @@ async function bootGame(): Promise<{
   const { createMainStreetGame } = await import(
     '../../example-games/main-street/createMainStreetGame'
   );
-  const game = createMainStreetGame({ parent: 'game-container', width: 1280, height: 720 });
+  const game = createMainStreetGame({ type: Phaser.CANVAS, parent: 'game-container', width: 1280, height: 720 });
   await waitForScene(game, 'MainStreetScene');
 
   const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;

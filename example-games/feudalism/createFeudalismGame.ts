@@ -6,7 +6,7 @@ import { createCardGame } from '../../src/ui/createCardGame';
 import type { CardGameOptions } from '../../src/ui/createCardGame';
 import { FeudalismScene } from './scenes/FeudalismScene';
 
-export type FeudalismGameOptions = Partial<Pick<CardGameOptions, 'parent' | 'width' | 'height'>>;
+export type FeudalismGameOptions = Partial<Pick<CardGameOptions, 'parent' | 'width' | 'height' | 'type'>>;
 
 export function createFeudalismGame(options: FeudalismGameOptions = {}): Phaser.Game {
   return createCardGame({

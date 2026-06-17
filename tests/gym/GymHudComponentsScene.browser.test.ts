@@ -34,8 +34,7 @@ describe('GymHudComponentsScene browser integration', () => {
     container.id = 'game-container';
     document.body.appendChild(container);
 
-    game = new Phaser.Game({
-      type: Phaser.AUTO,
+    game = new Phaser.Game({ type: Phaser.CANVAS,
       width: GAME_W,
       height: GAME_H,
       parent: 'game-container',

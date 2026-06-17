@@ -34,7 +34,7 @@ async function bootGame(): Promise<{
   const { createMainStreetGame } = await import(
     '../../example-games/main-street/createMainStreetGame'
   );
-  const game = createMainStreetGame();
+  const game = createMainStreetGame({ type: Phaser.CANVAS });
   await waitForScene(game, 'MainStreetScene');
 
   const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;

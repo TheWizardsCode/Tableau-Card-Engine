@@ -23,8 +23,7 @@ describe('GymTooltipScene browser integration', () => {
     document.body.appendChild(container);
 
     await new Promise<void>((resolve, reject) => {
-      game = new Phaser.Game({
-        type: Phaser.AUTO,
+      game = new Phaser.Game({ type: Phaser.CANVAS,
         width: 800,
         height: 600,
         parent: 'game-container',
@@ -61,8 +60,7 @@ describe('GymTooltipScene browser integration', () => {
         }
       }
 
-      game = new Phaser.Game({
-        type: Phaser.AUTO,
+      game = new Phaser.Game({ type: Phaser.CANVAS,
         width: 200,
         height: 200,
         parent: 'game-container',

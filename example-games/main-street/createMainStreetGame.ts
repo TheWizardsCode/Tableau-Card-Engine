@@ -6,7 +6,7 @@ import { createCardGame } from '../../src/ui/createCardGame';
 import type { CardGameOptions } from '../../src/ui/createCardGame';
 import { MainStreetScene } from './scenes/MainStreetScene';
 
-export type MainStreetGameOptions = Partial<Pick<CardGameOptions, 'parent' | 'width' | 'height'>>;
+export type MainStreetGameOptions = Partial<Pick<CardGameOptions, 'parent' | 'width' | 'height' | 'type'>>;
 
 export function createMainStreetGame(options: MainStreetGameOptions = {}): Phaser.Game {
   return createCardGame({

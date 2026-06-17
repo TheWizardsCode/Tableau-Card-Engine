@@ -12,7 +12,7 @@ async function bootGame(): Promise<Phaser.Game> {
   document.body.appendChild(container);
 
   const { createMainStreetGame } = await import('../../example-games/main-street/createMainStreetGame');
-  const game = createMainStreetGame();
+  const game = createMainStreetGame({ type: Phaser.CANVAS });
   await waitForScene(game, 'MainStreetScene');
   return game;
 }

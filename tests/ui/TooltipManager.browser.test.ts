@@ -82,8 +82,7 @@ describe('TooltipManager (browser integration)', () => {
         }
       }
 
-      game = new Phaser.Game({
-        type: Phaser.AUTO,
+      game = new Phaser.Game({ type: Phaser.CANVAS,
         width: 200,
         height: 200,
         parent: 'game-container',
@@ -141,8 +140,7 @@ describe('TooltipManager (browser integration)', () => {
         }
       }
 
-      game = new Phaser.Game({
-        type: Phaser.AUTO,
+      game = new Phaser.Game({ type: Phaser.CANVAS,
         width: 200,
         height: 200,
         parent: 'game-container',

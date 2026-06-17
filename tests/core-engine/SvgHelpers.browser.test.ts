@@ -59,8 +59,7 @@ describe('SvgHelpers (browser integration)', () => {
         }
       }
 
-      game = new Phaser.Game({
-        type: Phaser.AUTO,
+      game = new Phaser.Game({ type: Phaser.CANVAS,
         width: 128,
         height: 128,
         parent: 'game-container',

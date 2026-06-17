@@ -36,7 +36,7 @@ async function bootGameWithTutorial(): Promise<Phaser.Game> {
   const { createMainStreetGame } = await import(
     '../../example-games/main-street/createMainStreetGame'
   );
-  const game = createMainStreetGame({ parent: 'game-container', width: 1280, height: 720 });
+  const game = createMainStreetGame({ type: Phaser.CANVAS, parent: 'game-container', width: 1280, height: 720 });
   await waitForScene(game, 'MainStreetScene', SCENE_LOAD_TIMEOUT);
   // The tutorial offer modal is shown inside an async .then() callback
   // (loadCampaignProgress) in the LifecycleManager. Wait for that promise

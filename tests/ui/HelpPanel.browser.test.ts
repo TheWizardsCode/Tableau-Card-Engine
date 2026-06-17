@@ -22,7 +22,7 @@ async function bootGame(): Promise<Phaser.Game> {
   const { createGolfGame } = await import(
     '../../example-games/golf/createGolfGame'
   );
-  const game = createGolfGame();
+  const game = createGolfGame({ type: Phaser.CANVAS });
   await waitForScene(game, 'GolfScene');
   return game;
 }
@@ -164,7 +164,7 @@ describe('HelpPanel browser tests', () => {
     const { createGolfGame } = await import(
       '../../example-games/golf/createGolfGame'
     );
-    game = createGolfGame();
+    game = createGolfGame({ type: Phaser.CANVAS });
     await waitForScene(game, 'GolfScene');
     const scene = game.scene.getScene('GolfScene') as Phaser.Scene;
 
@@ -192,7 +192,7 @@ describe('HelpPanel browser tests', () => {
     const { createGolfGame } = await import(
       '../../example-games/golf/createGolfGame'
     );
-    game = createGolfGame();
+    game = createGolfGame({ type: Phaser.CANVAS });
     await waitForScene(game, 'GolfScene');
     const scene = game.scene.getScene('GolfScene') as Phaser.Scene;
 
@@ -219,7 +219,7 @@ describe('HelpPanel browser tests', () => {
     const { createGolfGame } = await import(
       '../../example-games/golf/createGolfGame'
     );
-    game = createGolfGame();
+    game = createGolfGame({ type: Phaser.CANVAS });
     await waitForScene(game, 'GolfScene');
     const scene = game.scene.getScene('GolfScene') as Phaser.Scene;
 

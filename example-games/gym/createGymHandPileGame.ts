@@ -8,7 +8,7 @@ import { createCardGame } from '../../src/ui/createCardGame';
 import type { CardGameOptions } from '../../src/ui/createCardGame';
 import { GymHandPileScene } from './scenes/GymHandPileScene';
 
-export type GymHandPileGameOptions = Partial<Pick<CardGameOptions, 'parent' | 'width' | 'height'>>;
+export type GymHandPileGameOptions = Partial<Pick<CardGameOptions, 'parent' | 'width' | 'height' | 'type'>>;
 
 export function createGymHandPileGame(
   options: GymHandPileGameOptions = {},

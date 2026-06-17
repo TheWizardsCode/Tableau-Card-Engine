@@ -20,7 +20,7 @@ describe('The Mind — AI out-of-turn play (browser integration)', () => {
     document.body.appendChild(container);
 
     // Create the game (TheMindScene will run its create() lifecycle)
-    game = createTheMindGame({ parent: 'game-container', width: 900, height: 700 });
+    game = createTheMindGame({ type: Phaser.CANVAS, parent: 'game-container', width: 900, height: 700 });
 
     // Wait for the TheMindScene to be initialized and contain an AI hand.
     const scene = () => game?.scene.getScene('TheMindScene') as any | undefined;

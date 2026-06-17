@@ -46,7 +46,7 @@ async function bootGame(): Promise<Phaser.Game> {
   const { createTheMindGame } = await import(
     '../../example-games/the-mind/createTheMindGame'
   );
-  const game = createTheMindGame({ parent: 'game-container', width: 1280, height: 720 });
+  const game = createTheMindGame({ type: Phaser.CANVAS, parent: 'game-container', width: 1280, height: 720 });
   await waitForScene(game, 'TheMindScene');
   return game;
 }

@@ -30,8 +30,7 @@ describe('GymTranscriptScene event log smoke', () => {
     container.id = 'game-container';
     document.body.appendChild(container);
 
-    game = new Phaser.Game({
-      type: Phaser.AUTO,
+    game = new Phaser.Game({ type: Phaser.CANVAS,
       width: 1280,
       height: 720,
       parent: 'game-container',

@@ -6,7 +6,7 @@ import { createCardGame } from '../../src/ui/createCardGame';
 import type { CardGameOptions } from '../../src/ui/createCardGame';
 import { LostCitiesScene } from './scenes/LostCitiesScene';
 
-export type LostCitiesGameOptions = Partial<Pick<CardGameOptions, 'parent' | 'width' | 'height'>>;
+export type LostCitiesGameOptions = Partial<Pick<CardGameOptions, 'parent' | 'width' | 'height' | 'type'>>;
 
 export function createLostCitiesGame(options: LostCitiesGameOptions = {}): Phaser.Game {
   return createCardGame({

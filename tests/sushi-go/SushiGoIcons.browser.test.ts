@@ -26,8 +26,7 @@ describe('SushiGoScene SVG icon rendering', () => {
 
     // Use direct game creation matching the original test pattern
     const { SushiGoScene } = await import('../../example-games/sushi-go/scenes/SushiGoScene');
-    game = new Phaser.Game({
-      type: Phaser.AUTO,
+    game = new Phaser.Game({ type: Phaser.CANVAS,
       width: 1280,
       height: 720,
       parent: 'game-container',

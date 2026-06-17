@@ -6,7 +6,7 @@ import { createCardGame } from '../../src/ui/createCardGame';
 import type { CardGameOptions } from '../../src/ui/createCardGame';
 import { BeleagueredCastleScene } from './scenes/BeleagueredCastleScene';
 
-export type BeleagueredCastleGameOptions = Partial<Pick<CardGameOptions, 'parent' | 'width' | 'height'>>;
+export type BeleagueredCastleGameOptions = Partial<Pick<CardGameOptions, 'parent' | 'width' | 'height' | 'type'>>;
 
 export function createBeleagueredCastleGame(
   options: BeleagueredCastleGameOptions = {},

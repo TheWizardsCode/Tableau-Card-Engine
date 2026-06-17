@@ -27,7 +27,7 @@ async function bootGame(): Promise<Phaser.Game> {
   const { createGymHandPileGame } = await import(
     '../../example-games/gym/createGymHandPileGame'
   );
-  const game = createGymHandPileGame();
+  const game = createGymHandPileGame({ type: Phaser.CANVAS });
   await waitForScene(game, SCENE_KEY);
   return game;
 }

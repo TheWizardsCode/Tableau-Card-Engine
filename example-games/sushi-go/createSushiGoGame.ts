@@ -6,7 +6,7 @@ import { createCardGame } from '../../src/ui/createCardGame';
 import type { CardGameOptions } from '../../src/ui/createCardGame';
 import { SushiGoScene } from './scenes/SushiGoScene';
 
-export type SushiGoGameOptions = Partial<Pick<CardGameOptions, 'parent' | 'width' | 'height'>>;
+export type SushiGoGameOptions = Partial<Pick<CardGameOptions, 'parent' | 'width' | 'height' | 'type'>>;
 
 export function createSushiGoGame(options: SushiGoGameOptions = {}): Phaser.Game {
   return createCardGame({

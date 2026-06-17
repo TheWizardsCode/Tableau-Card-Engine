@@ -41,7 +41,7 @@ async function bootGame(): Promise<Phaser.Game> {
   const { createBeleagueredCastleGame } = await import(
     '../../example-games/beleaguered-castle/createBeleagueredCastleGame'
   );
-  const game = createBeleagueredCastleGame();
+  const game = createBeleagueredCastleGame({ type: Phaser.CANVAS });
   await waitForScene(game, 'BeleagueredCastleScene');
   return game;
 }

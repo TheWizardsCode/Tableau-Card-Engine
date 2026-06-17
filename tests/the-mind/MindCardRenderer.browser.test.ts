@@ -17,7 +17,7 @@ describe('TheMind browser smoke', () => {
     container.id = 'game-container';
     document.body.appendChild(container);
 
-    game = createTheMindGame({ parent: 'game-container', width: 900, height: 700 });
+    game = createTheMindGame({ type: Phaser.CANVAS, parent: 'game-container', width: 900, height: 700 });
 
     // Wait for the Phaser texture manager to contain at least one Mind card
     // texture using DPR-aware keys (e.g. 'ms_card_mind-42_120x164@...').

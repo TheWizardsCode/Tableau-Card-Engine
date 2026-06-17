@@ -6,7 +6,7 @@ import { createCardGame } from '../../src/ui/createCardGame';
 import type { CardGameOptions } from '../../src/ui/createCardGame';
 import { TheMindScene } from './scenes/TheMindScene';
 
-export type TheMindGameOptions = Partial<Pick<CardGameOptions, 'parent' | 'width' | 'height'>>;
+export type TheMindGameOptions = Partial<Pick<CardGameOptions, 'parent' | 'width' | 'height' | 'type'>>;
 
 export function createTheMindGame(
   options: TheMindGameOptions = {},

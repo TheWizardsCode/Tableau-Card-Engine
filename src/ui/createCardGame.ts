@@ -52,6 +52,18 @@ export interface CardGameOptions {
   height?: number;
 
   /**
+   * Phaser render type override. Defaults to `Phaser.AUTO` (WebGL with
+   * Canvas fallback). Pass `Phaser.CANVAS` to force Canvas2D rendering,
+   * which is significantly faster in headless CI environments where
+   * WebGL is emulated via software rendering (SwiftShader).
+   *
+   * Cards are 2D rectangles with text — Canvas mode produces visually
+   * identical output and avoids the ~10x WebGL initialization overhead
+   * on CPU-bound runners.
+   */
+  type?: number;
+
+  /**
    * Optional Phaser `callbacks` config (e.g. `preBoot`).
    * Merged into the final config as-is.
    */
@@ -101,13 +113,14 @@ export function createCardGame(options: CardGameOptions): Phaser.Game {
     height = DEFAULT_HEIGHT,
     callbacks,
     render: renderOverrides,
+    type: renderType,
     exposeOnWindow = false,
   } = options;
 
   const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) ? window.devicePixelRatio : 1;
 
   const config: Phaser.Types.Core.GameConfig = {
-    type: Phaser.AUTO,
+    type: renderType ?? Phaser.AUTO,
     parent,
     width,
     height,
