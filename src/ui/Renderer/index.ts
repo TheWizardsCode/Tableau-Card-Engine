@@ -426,6 +426,74 @@ export function createActionButton(
 }
 
 // ---------------------------------------------------------------------------
+// Standard undo/redo buttons
+// ---------------------------------------------------------------------------
+
+/**
+ * Result of {@link createStandardUndoRedoButtons}.
+ */
+export interface StandardUndoRedoButtons {
+  /** The Undo action button container. */
+  undoButton: Phaser.GameObjects.Container;
+  /** The Redo action button container. */
+  redoButton: Phaser.GameObjects.Container;
+}
+
+/**
+ * Create standard undo/redo action buttons positioned in the top-right
+ * header area, mirroring the settings button's default position formula.
+ *
+ * The positioning is resolution-independent — computed dynamically from
+ * `scene.scale.width` using the same constants as `SettingsButton`.
+ *
+ * Use this from any game scene (not just CardGameScene subclasses) to get
+ * the same standard undo/redo layout used by Beleaguered Castle and Main
+ * Street.  To update the enabled/disabled visual state after creation, call
+ * `container.setAlpha(0.5)` when disabled, `setAlpha(1)` when enabled.
+ *
+ * @param scene   - The Phaser scene.
+ * @param onUndo  - Callback invoked when the Undo button is pressed.
+ * @param onRedo  - Callback invoked when the Redo button is pressed.
+ * @param options - Optional parent container for automatic depth ordering.
+ * @returns Both button containers.
+ */
+export function createStandardUndoRedoButtons(
+  scene: Phaser.Scene,
+  onUndo: () => void,
+  onRedo: () => void,
+  options?: { parent?: Phaser.GameObjects.Container },
+): StandardUndoRedoButtons {
+  const buttonW = 60;
+  const buttonGap = 8;
+  const redoToSettingsGap = 12;
+  const BUTTON_RADIUS = 16;
+  const MARGIN = 16;
+  const BUTTON_H = 32;
+
+  // Settings button center (mirrors SettingsButton default position formula)
+  const settingsCenterX = scene.scale.width - MARGIN - BUTTON_RADIUS - (BUTTON_RADIUS * 2 + MARGIN);
+  const settingsLeftEdge = settingsCenterX - BUTTON_RADIUS;
+
+  // Position buttons to the left of settings
+  const redoRightEdge = settingsLeftEdge - redoToSettingsGap;
+  const redoLeftEdge = redoRightEdge - buttonW;
+  const undoLeftEdge = redoLeftEdge - buttonGap - buttonW;
+
+  // Vertically align with the settings button center
+  const buttonY = MARGIN + BUTTON_RADIUS - BUTTON_H / 2;
+
+  const undoButton = createActionButton(scene, undoLeftEdge, buttonY, buttonW, 'Undo', onUndo);
+  const redoButton = createActionButton(scene, redoLeftEdge, buttonY, buttonW, 'Redo', onRedo);
+
+  if (options?.parent) {
+    options.parent.add(undoButton);
+    options.parent.add(redoButton);
+  }
+
+  return { undoButton, redoButton };
+}
+
+// ---------------------------------------------------------------------------
 // Zone & Container Best Practices
 // ---------------------------------------------------------------------------
 //

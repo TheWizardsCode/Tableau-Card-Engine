@@ -86,19 +86,23 @@ export const ANIM_DURATION = 300;
 export const AI_ANIM_DURATION = 450;
 
 // ── Audio asset keys ──────────────────────────────────────
+// All SFX keys use the standard `sfx-` prefix — no game-specific prefix.
+// See docs/SFX_CONVENTION.md for the naming convention.
+import { COMMON_SFX_KEYS } from '../../../src/core-engine/SoundManager';
+
 export const SFX_KEYS = {
-  CARD_SELECT: 'lc-sfx-card-select',
-  CARD_DESELECT: 'lc-sfx-card-deselect',
-  CARD_PLAY: 'lc-sfx-card-play',
-  CARD_DISCARD: 'lc-sfx-card-discard',
-  CARD_DRAW: 'lc-sfx-card-draw',
-  ILLEGAL_MOVE: 'lc-sfx-illegal-move',
-  TURN_CHANGE: 'lc-sfx-turn-change',
-  ROUND_END: 'lc-sfx-round-end',
-  MATCH_WIN: 'lc-sfx-match-win',
-  MATCH_LOSE: 'lc-sfx-match-lose',
-  SCORE_REVEAL: 'lc-sfx-score-reveal',
-  UI_CLICK: 'lc-sfx-ui-click',
+  CARD_SELECT: 'sfx-card-select',
+  CARD_DESELECT: 'sfx-card-deselect',
+  CARD_PLAY: 'sfx-card-play',
+  CARD_DISCARD: 'sfx-card-discard',
+  CARD_DRAW: 'sfx-card-draw',
+  ILLEGAL_MOVE: 'sfx-illegal-move',
+  TURN_CHANGE: COMMON_SFX_KEYS.TURN_CHANGE,
+  ROUND_END: COMMON_SFX_KEYS.ROUND_END,
+  MATCH_WIN: 'sfx-match-win',
+  MATCH_LOSE: 'sfx-match-lose',
+  SCORE_REVEAL: COMMON_SFX_KEYS.SCORE_REVEAL,
+  UI_CLICK: COMMON_SFX_KEYS.UI_CLICK,
 } as const;
 
 // Text styles

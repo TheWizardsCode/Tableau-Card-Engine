@@ -39,6 +39,12 @@ npx vitest run --project browser tests/gym/*.browser.test.ts
 | Lighting Spike | `GymGraphicsLightingSpikeScene` | Point light, shadow evaluation, WebGL fallback | [`scenes/GymGraphicsLightingSpikeScene.ts`](../../example-games/gym/scenes/GymGraphicsLightingSpikeScene.ts) | [`GymSceneSmoke.browser.test.ts`](../../tests/gym/GymSceneSmoke.browser.test.ts) |
 | Screen Layout Language (SLL) | `GymSllScene` | `validateScreenLayoutDocument`, `parseScreenLayoutDocument`, `normalizedToPixels`, `getZoneRect`, `anchorPoint` | [`scenes/GymSllScene.ts`](../../example-games/gym/scenes/GymSllScene.ts) | [`GymSllLayout.test.ts`](../../tests/gym/GymSllLayout.test.ts), [`GymSllScene.browser.test.ts`](../../tests/gym/GymSllScene.browser.test.ts) |
 
+## Scene Navigation
+
+All Gym demo scenes that extend `GymSceneBase` include `[ < Prev ]` and `[ Next > ]` buttons in the header bar, positioned to the right of the `[ Menu ]` button. These cycle through the `GYM_SCENE_CATALOGUE` with wrap-around navigation.
+
+The `getAdjacentGymSceneKey()` helper in `GymRegistry.ts` provides the scene key for the previous or next scene. Unit tests in `GymSceneHeaderNavigation.test.ts` verify wrap-around behaviour and that the Router scene is excluded.
+
 ## Deterministic Headless Tests
 
 All Gym scenes are validated by deterministic headless smoke tests in [`GymHeadlessDeterminism.test.ts`](../../tests/gym/GymHeadlessDeterminism.test.ts), which assert:

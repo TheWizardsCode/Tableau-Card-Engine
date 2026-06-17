@@ -159,7 +159,7 @@ describe('MainStreetEngine', () => {
     it('should execute a buy-business action in MarketPhase', () => {
       const state = createTestState();
       state.phase = 'MarketPhase';
-      const card = state.market.business[0];
+      const card = state.market.development[0];
       state.resourceBank.coins = 100;
 
       const result = executeAction(state, {
@@ -593,11 +593,11 @@ describe('MainStreetEngine', () => {
 
     it('should refill the market', () => {
       const state = createTestState();
-      state.market.business = state.market.business.slice(0, 2);
+      state.market.development = state.market.development.slice(0, 2);
 
       executeDayStart(state);
 
-      expect(state.market.business.length).toBeGreaterThanOrEqual(3);
+      expect(state.market.development.length).toBeGreaterThanOrEqual(3);
     });
 
     it('should throw if not in DayStart phase', () => {
@@ -639,7 +639,7 @@ describe('MainStreetEngine', () => {
       const state = createTestState();
       state.resourceBank.coins = 100;
 
-      const card = state.market.business[0];
+      const card = state.market.development[0];
       const actions: PlayerAction[] = [
         { type: 'buy-business', cardId: card.id, slotIndex: 0 },
         { type: 'end-turn' },
@@ -726,7 +726,7 @@ describe('MainStreetEngine', () => {
           executeDayStart(state);
         }
 
-        const card = state.market.business[0];
+        const card = state.market.development[0];
         const emptySlot = state.streetGrid.findIndex(s => s === null);
         if (card && emptySlot !== -1) {
           actions.push({
@@ -760,7 +760,7 @@ describe('MainStreetEngine', () => {
           if (s.gameResult !== 'playing') break;
           executeDayStart(s);
 
-          const card = s.market.business[0];
+          const card = s.market.development[0];
           const slot = s.streetGrid.findIndex(sl => sl === null);
           if (card && slot !== -1) {
             executeAction(s, { type: 'buy-business', cardId: card.id, slotIndex: slot });

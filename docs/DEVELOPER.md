@@ -197,6 +197,13 @@ This runs `scripts/tf-generate-synths.sh` and writes generated outputs under `bu
 
 See `docs/the-build/audio.md` for full details (module shape, mapping, runtime wiring, CI guidance).
 
+### SFX Key Naming Convention
+
+All sound effects use the `sfx-` prefix with no game identifier. Common cross-game
+keys are defined in `COMMON_SFX_KEYS` (exported from `src/core-engine/SoundManager.ts`).
+Audio assets are organized in `public/assets/audio/<game>/` with a fallback to
+`public/assets/audio/default/`. See `docs/SFX_CONVENTION.md` for the full convention.
+
 ## Project Structure
 
 ```
@@ -526,6 +533,22 @@ Screenshots are written as `turn-000.png`, `turn-001.png`, etc. in the output di
 4. The scene reconstructs visual state from the snapshot and emits a `state-settled` event when rendering is complete
 5. The tool captures a screenshot of the canvas after each `state-settled` event
 
+### Contact Sheet
+
+After a replay completes, a contact sheet image is automatically generated showing all per-turn screenshots arranged in a grid. The contact sheet is written to `contact-sheet.png` in the output directory.
+
+- Thumbnails are 225x175px arranged in 4 columns
+- Each thumbnail is labeled with its turn number
+- Generated using `sharp` (MIT-licensed, already a dependency)
+- The contact sheet path is included in `replay-summary.json` as `contactSheetPath`
+
+### In-Game Transcript Export Button
+
+During gameplay, an **Export Transcript** button appears on the end-of-round results screen, allowing you to download the current game transcript as a JSON file directly from the browser.
+
+- **End-of-round screen:** After the game ends, click `[ Export Transcript ]` to download the transcript as `golf-transcript-<timestamp>.json`
+- **Error-triggered export:** If an unhandled JavaScript error occurs during gameplay, an overlay appears with an `[ Export Transcript ]` button so the transcript can be saved for debugging before reloading
+
 ### Replay Adapters
 
 Each game has a `ReplayAdapter` implementation in `scripts/adapters/` that bridges the replay tool to the game's scene:
@@ -549,6 +572,76 @@ Adapters are registered in `scripts/adapters/index.ts`. Registration order matte
 3. Register the adapter in `scripts/adapters/index.ts` before the Golf adapter
 4. Ensure the game scene implements `loadBoardState()` and emits `state-settled` events
 5. Test with: `npm run replay -- tests/fixtures/transcripts/<game>/fixture-game.json`
+
+## Engine Event System
+
+The core engine provides a typed event system for turn lifecycle events. It consists of two parts:
+
+- **`GameEventEmitter`** (`src/core-engine/GameEventEmitter.ts`) — A type-safe event emitter that works in both Node.js and browser environments. Events are defined with typed payloads.
+- **`PhaserEventBridge`** (`src/core-engine/PhaserEventBridge.ts`) — Bridges `GameEventEmitter` events to Phaser's scene event system and vice versa, allowing Phaser-based consumers (scenes, UI components) to subscribe to engine events using Phaser's native `scene.events`.
+
+### Event Types
+
+| Event | Payload | Fires When |
+|-------|---------|------------|
+| `turn-started` | `{ turnNumber: number, playerIndex: number, phase: string }` | A player's turn begins |
+| `turn-completed` | `{ turnNumber: number, playerIndex: number }` | A move is applied and recorded |
+| `animation-complete` | `{ turnNumber: number }` | All tween animations for a turn finish |
+| `state-settled` | `{ turnNumber: number, phase: string }` | The board is visually stable and safe to screenshot |
+| `game-ended` | `{ finalTurnNumber: number, winnerIndex: number, reason: string }` | The game ends after scoring |
+| `resume-replay` | (none) | Signals the replay tool to resume after takeover |
+
+### Subscribing to Events
+
+```typescript
+import { GameEventEmitter } from '@core-engine';
+
+const emitter = new GameEventEmitter();
+
+// Subscribe with full type safety
+emitter.on('state-settled', (payload) => {
+  console.log(`Turn ${payload.turnNumber} settled, phase: ${payload.phase}`);
+});
+
+// Unsubscribe
+const handler = (p: StateSettledPayload) => {};
+emitter.on('state-settled', handler);
+emitter.off('state-settled', handler);
+```
+
+### Emitting Events
+
+```typescript
+emitter.emit('state-settled', { turnNumber: 5, phase: 'draw' });
+```
+
+### Global Access
+
+During gameplay, the emitter is exposed globally as `window.__GAME_EVENTS__` so that tools (replay, testing) can subscribe from outside the Phaser scene:
+
+```typescript
+const emitter = (window as any).__GAME_EVENTS__;
+emitter.on('state-settled', (payload) => {
+  // e.g., capture screenshot
+});
+```
+
+### PhaserEventBridge
+
+When using Phaser scenes, the `PhaserEventBridge` forwards engine events to Phaser's scene events and vice versa:
+
+```typescript
+import { GameEventEmitter, PhaserEventBridge } from '@core-engine';
+
+const emitter = new GameEventEmitter();
+const bridge = new PhaserEventBridge(emitter, scene.events);
+
+// Now scene.events receives forwarded engine events:
+this.events.on('state-settled', (payload) => { /* ... */ });
+
+// Destroy on scene shutdown:
+bridge.destroy();
+```
 
 ## Managing Assets
 
@@ -1359,7 +1452,7 @@ reusing base layout zones through composition.
 | `example-games/main-street/layouts/main-street.layout.json` | Canonical base layout (8 zones, position-only) |
 | `example-games/main-street/layouts/main-street-tutorial.layout.json` | Tutorial-specific layout (7 zones, position + dimensions) |
 | `example-games/main-street/scenes/MainStreetTutorialHints.ts` | Tutorial overlay manager |
-| `example-games/main-street/TutorialFlow.ts` | T1-T10 step definitions with `TutorialHighlightZone` type |
+| `example-games/main-street/TutorialFlow.ts` | T1-T13 unified step definitions with `TutorialHighlightZone` / `TutorialActionType` types |
 
 #### How composition works
 
@@ -1608,6 +1701,8 @@ The `CardGameScene` abstract class (at `src/ui/CardGameScene.ts`) provides share
 - Event system setup (`GameEventEmitter` + `PhaserEventBridge`)
 - Sound system setup (`SoundManager` + SFX registration)
 - Help and Settings panel initialization via `initHelpPanel()` and `initSettingsPanel()`
+- Undo/redo button creation via `initUndoRedoButtons()` with resolution-independent positioning
+- Undo/redo button state updates via `refreshUndoRedoButtons(canUndo, canRedo)`
 - Replay mode detection
 - Standard shutdown/cleanup via `shutdownBase()`
 
@@ -1624,6 +1719,10 @@ export class MyGameScene extends CardGameScene {
     if (!this.replayMode) {
       this.initHelpPanel(helpContent as HelpSection[]);
       this.initSettingsPanel();
+      this.initUndoRedoButtons(
+        () => this.turnController.performUndo(),
+        () => this.turnController.performRedo(),
+      );
     }
     // ... game-specific setup ...
   }
@@ -1635,6 +1734,23 @@ export class MyGameScene extends CardGameScene {
 ```
 
 The `initHelpPanel()` method creates both `HelpPanel` and `HelpButton`. The `initSettingsPanel()` method creates both `SettingsPanel` and `SettingsButton`. These are accessed via `this.helpPanel`, `this.helpButton`, `this.settingsPanel`, and `this.settingsButton` respectively.
+
+### Undo/Redo Buttons
+
+The `initUndoRedoButtons(onUndo, onRedo)` method creates standard undo/redo
+action buttons positioned to avoid overlap with the settings and help toggle
+buttons. The positioning is resolution-independent — computed dynamically from
+the scene viewport using the same formula as the settings button's default
+position.
+
+- **Undo button** is placed to the left of the settings button
+- **Redo button** is placed to the right of the undo button
+- Both buttons are parented into `hudContainer` for consistent depth ordering
+- Use `refreshUndoRedoButtons(canUndo, canRedo)` to update enabled/disabled
+  state (alpha 1.0 when enabled, 0.5 when disabled)
+- Both buttons are destroyed in `shutdownBase()`
+- This method is **opt-in**: only scenes that explicitly call it get undo/redo
+  buttons (games without undo/redo are unaffected)
 
 ### HUD Container Pattern
 
@@ -1701,3 +1817,24 @@ wl close <id> --reason "..." --json  # close when done
 **Large bundle warning:**
 - The Phaser library is ~1.4 MB minified -- this is expected
 - Code-splitting can be added later via `build.rollupOptions.output.manualChunks` in `vite.config.ts`
+
+**Replay tool: Dev server not running:**
+- The replay tool (`npm run replay`) and transcript export (`npm run transcripts:export`) auto-start the dev server if `localhost:3000` is not responding
+- If auto-start fails, start the dev server manually: `npm run dev`
+- Check port 3000 availability: `lsof -i :3000`
+
+**Replay tool: Unsupported transcript version error:**
+- The transcript schema includes a `version` field; the replay tool validates this and exits with a clear error if the version is unsupported
+- Re-record the game to generate a transcript with the current version
+- Transcripts evolve independently per game type; check the game's adapter for supported versions
+
+**Transcript persistence: IndexedDB storage quota:**
+- The `TranscriptStore` uses IndexedDB with a rolling window of the last 10 transcripts per game type
+- If IndexedDB is unavailable (private browsing, storage quota exceeded), it falls back to localStorage with a console warning
+- Individual large transcripts can exceed localStorage's ~5-10MB limit; a size warning is logged to console
+- Use `npm run transcripts:export -- <game>` to offload transcripts to disk
+
+**Playwright not installed:**
+- The replay tool and transcript export use Playwright's Chromium browser
+- Install it: `npx playwright install chromium`
+- Verify installation: `npx playwright install --list`

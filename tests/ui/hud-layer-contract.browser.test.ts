@@ -10,7 +10,7 @@
  * Tests run against the Beleaguered Castle game as a representative scene.
  */
 
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import Phaser from 'phaser';
 import { waitForScene } from '../helpers/waitForScene';
 import { createOverlayBackground, dismissOverlay } from '../../src/ui/Overlay';
@@ -71,20 +71,25 @@ function getDepth(obj: unknown): number {
 
 // ── Tests ──────────────────────────────────────────────────
 
+let hudGame: Phaser.Game | null = null;
+
+beforeAll(async () => {
+  hudGame = await bootBeleagueredCastle();
+}, 120_000);
+
+afterAll(() => {
+  destroyGame(hudGame);
+  hudGame = null;
+});
+
 describe('HUD Layer Contract (browser)', () => {
-  let game: Phaser.Game | null = null;
-
-  afterEach(() => {
-    destroyGame(game);
-    game = null;
-  });
-
   it('HUD container exists at depth ≥ 1000 when initialized', async () => {
+    // Re-seed random for reproducibility (only matters on first test since seed is set at boot)
     await withSeededRandom(TEST_SEED, async () => {
-      game = await bootBeleagueredCastle();
+      // game already booted in beforeAll
     });
 
-    const scene = game!.scene.getScene('BeleagueredCastleScene') as unknown as Record<string, unknown>;
+    const scene = hudGame!.scene.getScene('BeleagueredCastleScene') as unknown as Record<string, unknown>;
 
     // Check if HUD container exists (will be undefined until Feature 3 is implemented)
     // This test documents the expected contract and will pass once Feature 3 is complete
@@ -100,11 +105,7 @@ describe('HUD Layer Contract (browser)', () => {
   }, 30_000);
 
   it('HelpPanel and SettingsPanel are created during scene initialization', async () => {
-    await withSeededRandom(TEST_SEED, async () => {
-      game = await bootBeleagueredCastle();
-    });
-
-    const scene = game!.scene.getScene('BeleagueredCastleScene') as unknown as Record<string, unknown>;
+    const scene = hudGame!.scene.getScene('BeleagueredCastleScene') as unknown as Record<string, unknown>;
 
     // Check if panels were created (will be undefined until Feature 3/4 are implemented)
     // This test documents the expected behavior that panels exist and are parented correctly
@@ -127,11 +128,7 @@ describe('HUD Layer Contract (browser)', () => {
   }, 30_000);
 
   it('Overlay background creates at correct depth for HUD vs game state overlays', async () => {
-    await withSeededRandom(TEST_SEED, async () => {
-      game = await bootBeleagueredCastle();
-    });
-
-    const scene = game!.scene.getScene('BeleagueredCastleScene') as Phaser.Scene;
+    const scene = hudGame!.scene.getScene('BeleagueredCastleScene') as Phaser.Scene;
 
     // Test HUD overlay depth (should be ≥ 1000)
     const hudOverlayOptions = { depth: 1000 };
@@ -155,11 +152,7 @@ describe('HUD Layer Contract (browser)', () => {
   }, 30_000);
 
   it('Overlay background blocks input (is interactive)', async () => {
-    await withSeededRandom(TEST_SEED, async () => {
-      game = await bootBeleagueredCastle();
-    });
-
-    const scene = game!.scene.getScene('BeleagueredCastleScene') as Phaser.Scene;
+    const scene = hudGame!.scene.getScene('BeleagueredCastleScene') as Phaser.Scene;
 
     // Create an overlay background
     const overlayOptions = { depth: 1000 };
@@ -174,11 +167,7 @@ describe('HUD Layer Contract (browser)', () => {
   }, 30_000);
 
   it('Overlay dismissal cleans up all objects', async () => {
-    await withSeededRandom(TEST_SEED, async () => {
-      game = await bootBeleagueredCastle();
-    });
-
-    const scene = game!.scene.getScene('BeleagueredCastleScene') as Phaser.Scene;
+    const scene = hudGame!.scene.getScene('BeleagueredCastleScene') as Phaser.Scene;
 
     // Create an overlay background with a box
     const overlayOptions = { depth: 1000 };

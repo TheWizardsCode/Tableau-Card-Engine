@@ -185,9 +185,6 @@ export class SettingsPanel {
   private _awaitingEndTurnKey = false;
   private _endTurnCaptureListener: ((event: KeyboardEvent) => void) | null = null;
 
-  // Replay Tutorial modal
-  private _modalContainer: Phaser.GameObjects.Container | null = null;
-  private _modalOpen = false;
 
   constructor(scene: Phaser.Scene, config: SettingsPanelConfig) {
     this.scene = scene;
@@ -571,16 +568,6 @@ export class SettingsPanel {
       });
       tip.setDepth(DEPTH_PANEL_CONTENT);
       this.container.add(tip);
-
-      // Replay Tutorial button (shows confirmation modal, then dispatches event)
-      const replayTutorialY = difficultyY + 56;
-      const replayTutorial = scene.add.text(PADDING, replayTutorialY, 'Replay Tutorial', {
-        fontSize: '14px', color: (HEADING_STYLE.color as string) ?? '#f0c040', fontFamily: 'Arial, sans-serif',
-      });
-      replayTutorial.setDepth(DEPTH_PANEL_CONTENT + 1);
-      replayTutorial.setInteractive({ useHandCursor: true });
-      replayTutorial.on('pointerdown', () => this._showReplayTutorialModal());
-      this.container.add(replayTutorial);
     }
 
     // Scene-level pointer events for slider dragging
@@ -617,71 +604,6 @@ export class SettingsPanel {
 
     // Set entire container invisible initially
     this.container.setVisible(false);
-  }
-
-  // ── Replay Tutorial modal ─────────────────────────────────
-
-  private _showReplayTutorialModal(): void {
-    if (this._modalOpen) return;
-    this._modalOpen = true;
-
-    // Modal dimensions
-    const w = Math.min(480, Math.max(320, Math.floor(this.canvasWidth * 0.5)));
-    const h = 160;
-
-    // Create a centered modal container (global canvas coordinates)
-    const container = this.scene.add.container(this.canvasWidth / 2, this.canvasHeight / 2);
-    container.setDepth(DEPTH_PANEL_CONTENT + 100);
-
-    // Full-screen dark overlay (blocks input and visually centers modal)
-    const bg = this.scene.add.rectangle(0, 0, this.canvasWidth, this.canvasHeight, 0x000000, 0.6);
-    bg.setOrigin(0.5, 0.5);
-    bg.setInteractive();
-    // Clicking the background should close the modal (like Cancel)
-    bg.on('pointerdown', () => this._closeReplayTutorialModal());
-
-    // Modal box
-    const box = this.scene.add.rectangle(0, 0, w, h, 0x1a2a1a, 1);
-    box.setOrigin(0.5, 0.5);
-
-    const title = this.scene.add.text(-w / 2 + 12, -h / 2 + 12, 'Replay Tutorial?', { fontSize: '16px', color: '#f0c040', fontFamily: 'Arial, sans-serif' });
-    title.setOrigin(0, 0);
-
-    const body = this.scene.add.text(-w / 2 + 12, -h / 2 + 36, 'Replaying the tutorial will end the current game and restart a tutorial run. Continue?', { fontSize: '13px', color: '#dddddd', fontFamily: 'Arial, sans-serif', wordWrap: { width: w - 24 } as any });
-    body.setOrigin(0, 0);
-
-    const cancel = this.scene.add.text(-w / 2 + 12, h / 2 - 36, 'Cancel', { fontSize: '13px', color: '#aa8866', fontFamily: 'Arial, sans-serif' }).setInteractive({ useHandCursor: true });
-    cancel.setOrigin(0, 0);
-
-    const confirm = this.scene.add.text(w / 2 - 12, h / 2 - 36, 'Continue', { fontSize: '13px', color: '#002200', backgroundColor: '#88ff88', padding: { left: 6, right: 6 } as any, fontFamily: 'Arial, sans-serif' }).setInteractive({ useHandCursor: true });
-    confirm.setOrigin(1, 0);
-
-    container.add([bg, box, title, body, cancel, confirm]);
-
-    cancel.on('pointerdown', () => this._closeReplayTutorialModal());
-    confirm.on('pointerdown', () => {
-      try {
-        if (typeof window !== 'undefined' && (window as any).dispatchEvent) {
-          const ev = new CustomEvent('tce:replay-tutorial');
-          (window as any).dispatchEvent(ev);
-        }
-      } catch (e) { /* eslint-disable-next-line no-console */ console.error('[SettingsPanel] failed to dispatch tce:replay-tutorial', e); }
-
-      // Close modal first then the settings panel
-      this._closeReplayTutorialModal();
-      try { this.close(); } catch (_) { /* ignore */ }
-    });
-
-    this._modalContainer = container;
-  }
-
-  private _closeReplayTutorialModal(): void {
-    if (!this._modalOpen) return;
-    this._modalOpen = false;
-    try {
-      this._modalContainer?.destroy();
-    } catch (_) { /* ignore */ }
-    this._modalContainer = null;
   }
 
   // ── End Turn keybind capture ─────────────────────────

@@ -59,7 +59,7 @@ export class MainStreetSvgTextureManager {
     const s = this.scene;
     const visibleTemplates = new Set<string>();
 
-    for (const card of s.state.market.business) {
+    for (const card of s.state.market.development) {
       if (card) visibleTemplates.add(this.templateIdFromCardId(card.id));
     }
 

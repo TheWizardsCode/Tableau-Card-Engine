@@ -16,7 +16,7 @@ These tests serve as the regression oracle during migration.
 | Positive-path purchase results | `purchaseBusiness`, `purchaseUpgrade`, `purchaseEvent`, `refreshInvestments` | 5 |
 | Invalid row/slot selection | `purchaseBusiness`, `purchaseUpgrade`, `purchaseEvent`, `refreshInvestments` | 7 |
 | Refill policy — incident queue | `refillIncidentQueue` | 5 |
-| Refill policy — exhaustion | `refillInvestmentsMarket`, `refillBusinessMarket`, `refillAllMarkets` | 3 |
+| Refill policy — exhaustion | `refillInvestmentsMarket`, `refillDevelopmentMarket`, `refillAllMarkets` | 3 |
 | Refill policy — reshuffle from discard | `reshuffleIfNeeded` (business/upgrade/event decks) | 5 |
 | Multi-turn integration | `executeDayStart`, `processEndOfTurn`, `executeAction` | 7 |
 

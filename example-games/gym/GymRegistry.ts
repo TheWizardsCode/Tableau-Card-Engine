@@ -140,3 +140,36 @@ export const GYM_SCENE_CATALOGUE: GymSceneEntry[] = [
       'Interact with the shared HUD component library: open/close HelpPanel, SettingsPanel, and observe depth layering and toggle controls.',
   },
 ];
+
+// ── Navigation helpers ──────────────────────────────────────
+
+/**
+ * Get the adjacent Gym scene key for Prev/Next navigation.
+ *
+ * Resolves the current scene's key against `GYM_SCENE_CATALOGUE` to find its
+ * index, then returns the previous or next entry.  Wraps around at both ends
+ * (first → last when going prev, last → first when going next).
+ *
+ * @param currentKey  The Phaser scene key of the current scene.
+ * @param direction   'prev' for previous scene, 'next' for next scene.
+ * @returns The scene key of the adjacent scene.
+ * @throws If `currentKey` is not found in `GYM_SCENE_CATALOGUE`.
+ */
+export function getAdjacentGymSceneKey(
+  currentKey: string,
+  direction: 'prev' | 'next',
+): string {
+  const idx = GYM_SCENE_CATALOGUE.findIndex(
+    (entry) => entry.sceneKey === currentKey,
+  );
+  if (idx === -1) {
+    throw new Error(
+      `Scene key "${currentKey}" not found in GYM_SCENE_CATALOGUE`,
+    );
+  }
+  const count = GYM_SCENE_CATALOGUE.length;
+  const offset = direction === 'prev' ? -1 : 1;
+  return GYM_SCENE_CATALOGUE[
+    (idx + offset + count) % count
+  ].sceneKey;
+}

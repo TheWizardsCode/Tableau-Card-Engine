@@ -150,7 +150,7 @@ describe('buildRationale', () => {
 
   it('rationale for buy-business includes card name and slot (Appendix B.2)', () => {
     const state = makeMarketState('rationale-biz');
-    const businessCards = state.market.business as BusinessCard[];
+    const businessCards = state.market.development as BusinessCard[];
     if (businessCards.length === 0) return; // skip if no business cards
 
     const card = businessCards[0];
@@ -164,7 +164,7 @@ describe('buildRationale', () => {
   it('rationale for buy-business with synergy mentions synergy bonus', () => {
     const state = makeMarketState('rationale-synergy');
     // Place a business to create potential synergy
-    const businessCards = state.market.business as BusinessCard[];
+    const businessCards = state.market.development as BusinessCard[];
     if (businessCards.length < 2) return;
 
     // Place first card at slot 0

@@ -35,6 +35,7 @@ import {
 } from '../../example-games/main-street/MainStreetSaveLoad';
 import {
   createBusinessDeck,
+  createCommunitySpaceDeck,
   createEventDeck,
   createUpgradeDeck,
 } from '../../example-games/main-street/MainStreetCards';
@@ -153,9 +154,9 @@ describe('Meta-Progression System', () => {
       }
     });
 
-    it('Tier 1 has baseline plus early expanded sample (18 cards total)', () => {
-      expect(TIER_DEFINITIONS['tier-1'].newCardIds).toHaveLength(18);
-      expect(TIER_DEFINITIONS['tier-1'].cumulativeCardIds).toHaveLength(18);
+    it('Tier 1 has baseline plus early expanded sample plus community space cards (20 cards total)', () => {
+      expect(TIER_DEFINITIONS['tier-1'].newCardIds).toHaveLength(20);
+      expect(TIER_DEFINITIONS['tier-1'].cumulativeCardIds).toHaveLength(20);
     });
 
     it('each subsequent tier adds additional cards', () => {
@@ -164,8 +165,8 @@ describe('Meta-Progression System', () => {
       }
     });
 
-    it('Tier 5 cumulative pool covers full catalog (59 templates)', () => {
-      expect(TIER_DEFINITIONS['tier-5'].cumulativeCardIds).toHaveLength(59);
+    it('Tier 5 cumulative pool covers full catalog (61 templates)', () => {
+      expect(TIER_DEFINITIONS['tier-5'].cumulativeCardIds).toHaveLength(61);
     });
 
     it('cumulative card IDs are actually cumulative', () => {
@@ -204,9 +205,10 @@ describe('Meta-Progression System', () => {
     it('all card IDs in tier definitions reference valid template IDs', () => {
       // Build the set of template IDs from unfiltered deck builders (1 copy each)
       const allBizIds = createBusinessDeck(1).map((c) => c.id.replace(/-\d+$/, ''));
+      const allCsIds = createCommunitySpaceDeck(1).map((c) => c.id.replace(/-\d+$/, ''));
       const allEvtIds = createEventDeck(1, undefined, createSeededRng(42)).map((c) => c.id.replace(/-\d+$/, ''));
       const allUpgIds = createUpgradeDeck(1).map((c) => c.id.replace(/-\d+$/, ''));
-      const allTemplateIds = new Set([...allBizIds, ...allEvtIds, ...allUpgIds]);
+      const allTemplateIds = new Set([...allBizIds, ...allCsIds, ...allEvtIds, ...allUpgIds]);
 
       for (const tierDef of ORDERED_TIER_DEFINITIONS) {
         for (const cardId of tierDef.newCardIds) {
@@ -676,7 +678,7 @@ describe('Meta-Progression System', () => {
       const tier1BizIds = tier1CardIds.filter((id) => id.startsWith('biz-'));
 
       // All market business cards should also be from tier-1
-      for (const card of state.market.business) {
+      for (const card of state.market.development) {
         const baseId = card.id.replace(/-\d+$/, '');
         expect(tier1BizIds).toContain(baseId);
       }
@@ -715,10 +717,10 @@ describe('Meta-Progression System', () => {
       expect(campaign.schemaVersion).toBe(2);
     });
 
-    it('default campaign has tier-1 unlocked with 18 card IDs', () => {
+    it('default campaign has tier-1 unlocked with 20 card IDs', () => {
       const campaign = createDefaultCampaignProgress();
       expect(campaign.unlockedTiers).toEqual(['tier-1']);
-      expect(campaign.unlockedCardIds).toHaveLength(18);
+      expect(campaign.unlockedCardIds).toHaveLength(20);
       expect(campaign.milestoneHistory).toEqual([]);
     });
 
@@ -1055,18 +1057,18 @@ describe('Meta-Progression System', () => {
   describe('deriveUnlockedCardIds', () => {
     it('returns tier-1 cards for ["tier-1"]', () => {
       const ids = deriveUnlockedCardIds(['tier-1']);
-      expect(ids).toHaveLength(18);
-      expect(new Set(ids).size).toBe(18); // no duplicates
+      expect(ids).toHaveLength(20);
+      expect(new Set(ids).size).toBe(20); // no duplicates
     });
 
     it('returns cumulative cards for ["tier-1", "tier-2"]', () => {
       const ids = deriveUnlockedCardIds(['tier-1', 'tier-2']);
-      expect(ids).toHaveLength(28); // 18 + 10
+      expect(ids).toHaveLength(30); // 20 + 10
     });
 
-    it('returns all 59 cards for all 5 tiers', () => {
+    it('returns all 61 cards for all 5 tiers', () => {
       const ids = deriveUnlockedCardIds(['tier-1', 'tier-2', 'tier-3', 'tier-4', 'tier-5']);
-      expect(ids).toHaveLength(59);
+      expect(ids).toHaveLength(61);
     });
 
     it('handles empty array', () => {
@@ -1076,7 +1078,7 @@ describe('Meta-Progression System', () => {
 
     it('ignores unknown tier IDs gracefully', () => {
       const ids = deriveUnlockedCardIds(['tier-1', 'tier-99']);
-      expect(ids).toHaveLength(18); // only tier-1 cards
+      expect(ids).toHaveLength(20); // only tier-1 cards
     });
 
     it('does not produce duplicates even if tiers are listed twice', () => {
@@ -1140,7 +1142,7 @@ describe('Meta-Progression System', () => {
         const baseId = card.id.replace(/-\d+$/, '');
         expect(allowedIds.has(baseId)).toBe(true);
       }
-      for (const card of nextRun.market.business) {
+      for (const card of nextRun.market.development) {
         const baseId = card.id.replace(/-\d+$/, '');
         expect(allowedIds.has(baseId)).toBe(true);
       }

@@ -14,6 +14,22 @@ import {
 import { SFX_KEYS } from './GolfConstants';
 import type { GolfSession } from '../GolfGame';
 
+/**
+ * Triggers a browser file download of the transcript JSON.
+ * Creates a Blob, generates an object URL, and clicks an anchor element.
+ */
+function triggerTranscriptDownload(transcriptJson: string, filename: string): void {
+  const blob = new Blob([transcriptJson], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 export class GolfOverlayHelper {
   constructor(
     private scene: Phaser.Scene,
@@ -62,7 +78,7 @@ export class GolfOverlayHelper {
     this.overlayManager.showOverlay({
       type: 'custom',
       backgroundOptions: { depth: 10, alpha: 0.01 },
-      box: { width: 520, height: 300, alpha: 0.85 },
+      box: { width: 520, height: 350, alpha: 0.85 },
     });
 
     const winnerText = results.winnerIndex === 0 ? 'You Win!' : 'AI Wins!';
@@ -100,5 +116,60 @@ export class GolfOverlayHelper {
       depth: 11,
     });
     this.overlayManager.add(menuBtn);
+
+    // Export Transcript button
+    const exportBtn = createActionButton(
+      this.scene,
+      GAME_W / 2 - 90,
+      GAME_H / 2 + 135,
+      180,
+      '[ Export Transcript ]',
+      () => {
+        this.soundManager?.play(SFX_KEYS.UI_CLICK);
+        const json = JSON.stringify(transcript, null, 2);
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        triggerTranscriptDownload(json, `golf-transcript-${timestamp}.json`);
+      },
+      { depth: 11, fontSize: '13px' },
+    );
+    this.overlayManager.add(exportBtn);
+  }
+
+  /**
+   * Show an error overlay with an Export Transcript button.
+   * Triggered by window.onerror when an unhandled runtime error occurs.
+   */
+  showErrorExportOverlay(): void {
+    this.overlayManager.showOverlay({
+      type: 'custom',
+      backgroundOptions: { depth: 10, alpha: 0.01 },
+      box: { width: 460, height: 180, alpha: 0.85 },
+    });
+
+    const text = createGolfHudText(
+      this.scene,
+      GAME_W / 2,
+      GAME_H / 2 - 40,
+      'An error occurred during gameplay.\nExport the transcript to debug.',
+      '#ff6666',
+      { fontSize: '18px', originX: 0.5, align: 'center' },
+    );
+    this.overlayManager.add(text);
+
+    const exportBtn = createActionButton(
+      this.scene,
+      GAME_W / 2 - 90,
+      GAME_H / 2 + 40,
+      180,
+      '[ Export Transcript ]',
+      () => {
+        this.soundManager?.play(SFX_KEYS.UI_CLICK);
+        const json = JSON.stringify(this.recorder.finalize(), null, 2);
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        triggerTranscriptDownload(json, `golf-transcript-${timestamp}.json`);
+      },
+      { depth: 11, fontSize: '13px' },
+    );
+    this.overlayManager.add(exportBtn);
   }
 }

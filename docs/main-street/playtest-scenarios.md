@@ -53,12 +53,14 @@ npx vitest run --project unit tests/main-street/smoke-scenario.test.ts
 
 ### Adding or updating tutorial text
 
-Tutorial steps are defined in `example-games/main-street/scenes/MainStreetTutorialOverlayManager.ts` in the `TUTORIAL_STEPS` array. Each step has:
+Tutorial steps are defined in `example-games/main-street/TutorialFlow.ts` in the `UNIFIED_TUTORIAL_STEPS` array. There are currently 13 steps (T1–T13), each with:
 - `title` — short heading shown in bold
 - `body` — multi-line description text
-- `anchor` — function that returns the `{x, y, w, h}` bounding box to highlight, or `null` for centred
+- `highlightZone` — zone identifier for the area to highlight (resolved via the tutorial layout system), or `'centerModal'`/`'completionModal'` for centered overlays
+- `gate` — `'confirm'` for informational steps, `'action'` for action-gated steps
+- `requiredAction` — (only for action-gated steps) the in-game action required to advance
 
-To add a step, append a new `TutorialStep` object to `TUTORIAL_STEPS`. To change copy, edit the `title` and `body` strings. All strings are localizable by replacing the string literals with i18n key lookups when i18n support is added.
+To add a step, append a new `UnifiedTutorialStepDef` object to `UNIFIED_TUTORIAL_STEPS`. To change copy, edit the `title` and `body` strings. All strings are localizable by replacing the string literals with i18n key lookups when i18n support is added.
 
 ---
 

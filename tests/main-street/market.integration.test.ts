@@ -14,7 +14,7 @@ import { describe, it, expect } from 'vitest';
 import { setupMainStreetGame, type MainStreetState } from '../../example-games/main-street/MainStreetState';
 import { createSeededRng } from '../../src/core-engine';
 import {
-  refillBusinessMarket,
+  refillDevelopmentMarket,
   refillInvestmentsMarket,
   refillIncidentQueue,
   getAffordableBusinessCards,
@@ -72,7 +72,7 @@ describe('Market Refill Integration (Expanded Pool)', () => {
   describe('no duplicate cards in market', () => {
     it('business market has no duplicate ids after initial setup', () => {
       const state = createState('market-int-1');
-      const dupes = hasDuplicateIds(state.market.business);
+      const dupes = hasDuplicateIds(state.market.development);
       expect(dupes).toEqual([]);
     });
 
@@ -86,11 +86,11 @@ describe('Market Refill Integration (Expanded Pool)', () => {
       const state = createState('market-int-refill');
       for (let i = 0; i < 10; i++) {
         // Remove one card and refill
-        if (state.market.business.length > 0) {
-          state.market.business.pop();
+        if (state.market.development.length > 0) {
+          state.market.development.pop();
         }
-        refillBusinessMarket(state);
-        const dupes = hasDuplicateIds(state.market.business);
+        refillDevelopmentMarket(state);
+        const dupes = hasDuplicateIds(state.market.development);
         expect(dupes, `Duplicate at iteration ${i}`).toEqual([]);
       }
     });
@@ -117,8 +117,8 @@ describe('Market Refill Integration (Expanded Pool)', () => {
       for (let turn = 0; turn < 15; turn++) {
         if (state.gameResult !== 'playing') break;
         playGreedyTurn(state);
-        expect(state.market.business.length).toBeLessThanOrEqual(MARKET_BUSINESS_SLOTS);
-        expect(state.market.business.length).toBeGreaterThanOrEqual(0);
+        expect(state.market.development.length).toBeLessThanOrEqual(MARKET_BUSINESS_SLOTS);
+        expect(state.market.development.length).toBeGreaterThanOrEqual(0);
       }
     });
 
@@ -171,7 +171,7 @@ describe('Market Refill Integration (Expanded Pool)', () => {
       const totalBusinessCards = createBusinessDeck().length;
       // Initial deck + market = total
       const inDeck = state.decks.business.length;
-      const inMarket = state.market.business.length;
+      const inMarket = state.market.development.length;
       expect(inDeck + inMarket).toBe(totalBusinessCards);
     });
 
@@ -218,8 +218,8 @@ describe('Monte Carlo: Market Refill Stability', () => {
           turnCount++;
 
           // Invariant checks
-          if (state.market.business.length > MARKET_BUSINESS_SLOTS) {
-            failures.push(`seed=${seed} turn=${turnCount}: business market overflow (${state.market.business.length})`);
+          if (state.market.development.length > MARKET_BUSINESS_SLOTS) {
+            failures.push(`seed=${seed} turn=${turnCount}: business market overflow (${state.market.development.length})`);
           }
           if (state.market.investments.length > MARKET_INVESTMENT_SLOTS) {
             failures.push(`seed=${seed} turn=${turnCount}: investments overflow (${state.market.investments.length})`);
@@ -228,7 +228,7 @@ describe('Monte Carlo: Market Refill Stability', () => {
             failures.push(`seed=${seed} turn=${turnCount}: incident queue overflow (${state.incidentQueue.length})`);
           }
 
-          const bizDupes = hasDuplicateIds(state.market.business);
+          const bizDupes = hasDuplicateIds(state.market.development);
           if (bizDupes.length > 0) {
             failures.push(`seed=${seed} turn=${turnCount}: business market duplicates: ${bizDupes.join(',')}`);
           }

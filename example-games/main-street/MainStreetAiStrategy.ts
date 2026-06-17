@@ -88,7 +88,7 @@ export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
 
   // ── buy-business ─────────────────────────────────────────
   const emptySlots = getEmptySlots(state);
-  for (const card of state.market.business as BusinessCard[]) {
+  for (const card of state.market.development as (BusinessCard | import('./MainStreetCards').CommunitySpaceCard)[]) {
     for (const slotIndex of emptySlots) {
       const result = canPurchaseBusiness(state, card.id, slotIndex);
       if (result.legal) {
@@ -299,7 +299,7 @@ function scoreBusinessAction(
   state: MainStreetState,
   action: BuyBusinessAction,
 ): number {
-  const card = state.market.business.find(c => c.id === action.cardId) as BusinessCard | undefined;
+  const card = state.market.development.find(c => c.id === action.cardId) as BusinessCard | undefined;
   if (!card) return 0;
 
   // Simulate placement: shallow-clone the grid and insert the new card

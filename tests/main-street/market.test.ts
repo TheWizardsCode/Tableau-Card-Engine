@@ -13,7 +13,7 @@ import {
   purchaseBusiness,
   purchaseUpgrade,
   purchaseEvent,
-  refillBusinessMarket,
+  refillDevelopmentMarket,
   refillInvestmentsMarket,
   refillAllMarkets,
   refillIncidentQueue,
@@ -43,7 +43,7 @@ describe('MainStreetMarket', () => {
   describe('canPurchaseBusiness', () => {
     it('should allow purchase when player has enough coins and slot is empty', () => {
       const state = createTestState();
-      const card = state.market.business[0];
+      const card = state.market.development[0];
       const result = canPurchaseBusiness(state, card.id, 0);
       expect(result.legal).toBe(true);
     });
@@ -60,7 +60,7 @@ describe('MainStreetMarket', () => {
     it('should reject purchase when player lacks coins', () => {
       const state = createTestState();
       state.resourceBank.coins = 0;
-      const card = state.market.business[0];
+      const card = state.market.development[0];
       const result = canPurchaseBusiness(state, card.id, 0);
       expect(result.legal).toBe(false);
       if (!result.legal) {
@@ -70,7 +70,7 @@ describe('MainStreetMarket', () => {
 
     it('should reject purchase when slot is occupied', () => {
       const state = createTestState();
-      const card = state.market.business[0];
+      const card = state.market.development[0];
       // Place a dummy business in slot 0
       state.streetGrid[0] = { ...card, id: 'dummy' };
       const result = canPurchaseBusiness(state, card.id, 0);
@@ -82,7 +82,7 @@ describe('MainStreetMarket', () => {
 
     it('should reject purchase when slot index is out of range', () => {
       const state = createTestState();
-      const card = state.market.business[0];
+      const card = state.market.development[0];
       const result = canPurchaseBusiness(state, card.id, GRID_SIZE);
       expect(result.legal).toBe(false);
       if (!result.legal) {
@@ -92,7 +92,7 @@ describe('MainStreetMarket', () => {
 
     it('should reject purchase when slot index is negative', () => {
       const state = createTestState();
-      const card = state.market.business[0];
+      const card = state.market.development[0];
       const result = canPurchaseBusiness(state, card.id, -1);
       expect(result.legal).toBe(false);
       if (!result.legal) {
@@ -106,7 +106,7 @@ describe('MainStreetMarket', () => {
   describe('purchaseBusiness', () => {
     it('should deduct coins, place card, and remove from market', () => {
       const state = createTestState();
-      const card = state.market.business[0];
+      const card = state.market.development[0];
       const coinsBefore = state.resourceBank.coins;
 
       const result = purchaseBusiness(state, card.id, 0);
@@ -121,13 +121,13 @@ describe('MainStreetMarket', () => {
     it('should not refill the market slot immediately (refill occurs at start of next turn)', () => {
       const state = createTestState();
       const deckSizeBefore = state.decks.business.length;
-      const card = state.market.business[0];
+      const card = state.market.development[0];
 
       const result = purchaseBusiness(state, card.id, 0);
 
       expect(result.refilled).toBe(false);
       // Market should have one fewer visible card until end of turn
-      expect(state.market.business).toHaveLength(MARKET_BUSINESS_SLOTS - 1);
+      expect(state.market.development).toHaveLength(MARKET_BUSINESS_SLOTS - 1);
       // Deck should be unchanged until refill
       expect(state.decks.business.length).toBe(deckSizeBefore);
     });
@@ -136,12 +136,12 @@ describe('MainStreetMarket', () => {
       const state = createTestState();
       // Empty the deck
       state.decks.business.length = 0;
-      const card = state.market.business[0];
+      const card = state.market.development[0];
 
       const result = purchaseBusiness(state, card.id, 0);
 
       expect(result.refilled).toBe(false);
-      expect(state.market.business).toHaveLength(MARKET_BUSINESS_SLOTS - 1);
+      expect(state.market.development).toHaveLength(MARKET_BUSINESS_SLOTS - 1);
     });
 
     it('should throw on illegal purchase', () => {
@@ -153,16 +153,16 @@ describe('MainStreetMarket', () => {
       const state1 = createTestState('deterministic-market');
       const state2 = createTestState('deterministic-market');
 
-      const card1 = state1.market.business[0];
-      const card2 = state2.market.business[0];
+      const card1 = state1.market.development[0];
+      const card2 = state2.market.development[0];
       expect(card1.id).toBe(card2.id);
 
       purchaseBusiness(state1, card1.id, 0);
       purchaseBusiness(state2, card2.id, 0);
 
       // After purchase, visible markets (with one slot removed) should be identical
-      expect(state1.market.business.map(c => c.id)).toEqual(
-        state2.market.business.map(c => c.id),
+      expect(state1.market.development.map(c => c.id)).toEqual(
+        state2.market.development.map(c => c.id),
       );
     });
   });
@@ -178,7 +178,7 @@ describe('MainStreetMarket', () => {
       const targetName = upgrade.targetBusiness;
 
       // Find a business card matching the target and place it
-      const biz = state.market.business.find(b => b.name === targetName)
+      const biz = state.market.development.find(b => b.name === targetName)
         || state.decks.business.find(b => b.name === targetName);
       if (biz) {
         // Ensure the placed business meets the upgrade's requiredLevel
@@ -352,9 +352,9 @@ describe('MainStreetMarket', () => {
   describe('refill', () => {
     it('should refill business market to full slot count', () => {
       const state = createTestState();
-      state.market.business = state.market.business.slice(0, 2); // Remove 2
-      refillBusinessMarket(state);
-      expect(state.market.business).toHaveLength(MARKET_BUSINESS_SLOTS);
+      state.market.development = state.market.development.slice(0, 2); // Remove 2
+      refillDevelopmentMarket(state);
+      expect(state.market.development).toHaveLength(MARKET_BUSINESS_SLOTS);
     });
 
     it('should refill investments market to correct slot counts', () => {
@@ -371,16 +371,18 @@ describe('MainStreetMarket', () => {
     it('should not exceed slot count when already full', () => {
       const state = createTestState();
       refillAllMarkets(state);
-      expect(state.market.business.length).toBeLessThanOrEqual(MARKET_BUSINESS_SLOTS);
+      expect(state.market.development.length).toBeLessThanOrEqual(MARKET_BUSINESS_SLOTS);
       expect(state.market.investments.length).toBeLessThanOrEqual(MARKET_INVESTMENT_SLOTS);
     });
 
     it('should partially fill when deck has fewer cards than slots', () => {
       const state = createTestState();
-      state.market.business = [];
+      state.market.development = [];
       state.decks.business = state.decks.business.slice(0, 2); // Only 2 left
-      refillBusinessMarket(state);
-      expect(state.market.business).toHaveLength(2);
+      state.decks.communitySpace.length = 0; // No community space cards either
+      state.discards.communitySpace.length = 0;
+      refillDevelopmentMarket(state);
+      expect(state.market.development).toHaveLength(2);
     });
 
     it('should produce exactly MARKET_INVESTMENT_UPGRADE_COUNT upgrades + MARKET_INVESTMENT_EVENT_COUNT events', () => {
@@ -522,7 +524,7 @@ describe('MainStreetMarket', () => {
 
     it('should exclude occupied slots', () => {
       const state = createTestState();
-      const card = state.market.business[0];
+      const card = state.market.development[0];
       state.streetGrid[3] = card;
       state.streetGrid[7] = card;
       const empty = getEmptySlots(state);
@@ -535,14 +537,17 @@ describe('MainStreetMarket', () => {
   describe('reshuffle behavior', () => {
     it('should reshuffle business discards into deck when deck empty and refill', () => {
       const state = createTestState();
-      // Move some business cards into the discard pile and empty the deck
+      // Move some business cards into the discard pile and empty both decks
       const moved = state.decks.business.splice(0, 3);
       state.discards.business.push(...moved);
       state.decks.business.length = 0;
+      // Also empty the community space deck to avoid mixed-deck refill
+      state.decks.communitySpace.length = 0;
+      state.discards.communitySpace.length = 0;
       // Clear visible market so refill must draw
-      state.market.business = [];
-      refillBusinessMarket(state);
-      expect(state.market.business.length).toBeGreaterThan(0);
+      state.market.development = [];
+      refillDevelopmentMarket(state);
+      expect(state.market.development.length).toBeGreaterThan(0);
       expect(state.discards.business.length).toBe(0);
     });
 
@@ -575,9 +580,11 @@ describe('MainStreetMarket', () => {
       const state = createTestState();
       state.decks.business = [];
       state.discards.business = [];
-      state.market.business = [];
-      refillBusinessMarket(state);
-      expect(state.market.business.length).toBe(0);
+      state.decks.communitySpace = [];
+      state.discards.communitySpace = [];
+      state.market.development = [];
+      refillDevelopmentMarket(state);
+      expect(state.market.development.length).toBe(0);
     });
   });
 });

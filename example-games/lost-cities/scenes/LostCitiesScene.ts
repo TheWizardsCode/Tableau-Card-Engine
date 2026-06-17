@@ -36,6 +36,7 @@ import {
   TooltipManager,
   FONT_FAMILY,
   GAME_W, GAME_H,
+  audioPathWithFallback,
 } from '../../../src/ui';
 import type { HelpSection, TooltipRenderContext } from '../../../src/ui';
 import helpContent from '../help-content.json';
@@ -92,18 +93,20 @@ export class LostCitiesScene extends CardGameScene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => markSceneInvalid(this));
 
     // Audio
-    this.load.audio(SFX_KEYS.CARD_SELECT, 'assets/audio/lost-cities/card-select.wav');
-    this.load.audio(SFX_KEYS.CARD_DESELECT, 'assets/audio/lost-cities/card-deselect.wav');
-    this.load.audio(SFX_KEYS.CARD_PLAY, 'assets/audio/lost-cities/card-play.wav');
-    this.load.audio(SFX_KEYS.CARD_DISCARD, 'assets/audio/lost-cities/card-discard.wav');
-    this.load.audio(SFX_KEYS.CARD_DRAW, 'assets/audio/lost-cities/card-draw.wav');
-    this.load.audio(SFX_KEYS.ILLEGAL_MOVE, 'assets/audio/lost-cities/illegal-move.wav');
-    this.load.audio(SFX_KEYS.TURN_CHANGE, 'assets/audio/lost-cities/turn-change.wav');
-    this.load.audio(SFX_KEYS.ROUND_END, 'assets/audio/lost-cities/round-end.wav');
-    this.load.audio(SFX_KEYS.MATCH_WIN, 'assets/audio/lost-cities/match-win.wav');
-    this.load.audio(SFX_KEYS.MATCH_LOSE, 'assets/audio/lost-cities/match-lose.wav');
-    this.load.audio(SFX_KEYS.SCORE_REVEAL, 'assets/audio/lost-cities/score-reveal.wav');
-    this.load.audio(SFX_KEYS.UI_CLICK, 'assets/audio/lost-cities/ui-click.wav');
+    const ns = 'lost-cities';
+    const audioDir = 'lost-cities';
+    this.load.audio(`${ns}:${SFX_KEYS.CARD_SELECT}`, audioPathWithFallback(audioDir, 'card-select.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.CARD_DESELECT}`, audioPathWithFallback(audioDir, 'card-deselect.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.CARD_PLAY}`, audioPathWithFallback(audioDir, 'card-play.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.CARD_DISCARD}`, audioPathWithFallback(audioDir, 'card-discard.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.CARD_DRAW}`, audioPathWithFallback(audioDir, 'card-draw.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.ILLEGAL_MOVE}`, audioPathWithFallback(audioDir, 'illegal-move.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.TURN_CHANGE}`, audioPathWithFallback(audioDir, 'turn-change.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.ROUND_END}`, audioPathWithFallback(audioDir, 'round-end.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.MATCH_WIN}`, audioPathWithFallback(audioDir, 'match-win.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.MATCH_LOSE}`, audioPathWithFallback(audioDir, 'match-lose.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.SCORE_REVEAL}`, audioPathWithFallback(audioDir, 'score-reveal.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.UI_CLICK}`, audioPathWithFallback(audioDir, 'ui-click.wav'));
   }
 
   // ── Create ──────────────────────────────────────────────
@@ -197,7 +200,7 @@ export class LostCitiesScene extends CardGameScene {
       const mapping: EventSoundMapping = {
         'turn-started': SFX_KEYS.TURN_CHANGE,
       };
-      this.initSoundSystem(Object.values(SFX_KEYS), mapping);
+      this.initSoundSystem(Object.values(SFX_KEYS), mapping, { namespace: 'lost-cities' });
       this.initSettingsPanel();
     }
 

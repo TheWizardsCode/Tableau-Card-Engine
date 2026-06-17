@@ -15,6 +15,7 @@ import { describe, it, expect } from 'vitest';
 
 import {
   createBusinessDeck,
+  createCommunitySpaceDeck,
   createEventDeck,
   createUpgradeDeck,
   synergyColor,
@@ -55,16 +56,16 @@ const upgradeDeck = createUpgradeDeck(1);
 // ── Template Completeness ───────────────────────────────────
 
 describe('Expanded Card Pool: Template Completeness', () => {
-  it('should have exactly 17 business templates', () => {
-    expect(businessDeck).toHaveLength(17);
+  it('should have exactly 16 business templates', () => {
+    expect(businessDeck).toHaveLength(16);
   });
 
   it('should have exactly 17 event templates', () => {
     expect(eventDeck).toHaveLength(17);
   });
 
-  it('should have exactly 25 upgrade templates', () => {
-    expect(upgradeDeck).toHaveLength(25);
+  it('should have exactly 26 upgrade templates', () => {
+    expect(upgradeDeck).toHaveLength(26);
   });
 
   it('should have unique business IDs', () => {
@@ -335,10 +336,12 @@ describe('Expanded Card Pool: Upgrade Coverage', () => {
     }
   });
 
-  it('every upgrade card should reference a valid business name', () => {
+  it('every upgrade card should reference a valid business or community space name', () => {
     const businessNames = new Set(businessDeck.map(b => b.name));
+    const communitySpaceNames = new Set(createCommunitySpaceDeck(1).map(cs => cs.name));
+    const allNames = new Set([...businessNames, ...communitySpaceNames]);
     for (const upg of upgradeDeck) {
-      expect(businessNames.has(upg.targetBusiness)).toBe(true);
+      expect(allNames.has(upg.targetBusiness), `${upg.id} targets "${upg.targetBusiness}" which is neither a business nor a community space`).toBe(true);
     }
   });
 
@@ -439,16 +442,16 @@ describe('Expanded Card Pool: Event Card Fields', () => {
 // ── Deck Building ───────────────────────────────────────────
 
 describe('Expanded Card Pool: Deck Building', () => {
-  it('business deck with 3 copies should have 51 cards', () => {
-    expect(createBusinessDeck(3)).toHaveLength(51);
+  it('business deck with 3 copies should have 48 cards', () => {
+    expect(createBusinessDeck(3)).toHaveLength(48);
   });
 
     it('event deck with 3 copies should have 51 cards', () => {
     expect(createEventDeck(3, undefined, _rng, 1)).toHaveLength(51);
   });
 
-  it('upgrade deck with 2 copies should have 50 cards', () => {
-    expect(createUpgradeDeck(2)).toHaveLength(50);
+  it('upgrade deck with 2 copies should have 52 cards', () => {
+    expect(createUpgradeDeck(2)).toHaveLength(52);
   });
 
   it('deck copies should have distinct IDs', () => {
@@ -507,7 +510,7 @@ describe('Expanded Card Pool: Seeded Deck Resolution', () => {
     const state2 = setupMainStreetGame({ seed: 'expanded-pool-test' });
 
     // Market should be identical
-    expect(state1.market.business.map(c => c.id)).toEqual(state2.market.business.map(c => c.id));
+    expect(state1.market.development.map(c => c.id)).toEqual(state2.market.development.map(c => c.id));
     expect(state1.market.investments.map(c => c.id)).toEqual(state2.market.investments.map(c => c.id));
     expect(state1.incidentQueue.map(c => c.id)).toEqual(state2.incidentQueue.map(c => c.id));
   });
@@ -517,8 +520,8 @@ describe('Expanded Card Pool: Seeded Deck Resolution', () => {
     const state2 = setupMainStreetGame({ seed: 'seed-beta' });
 
     // At least one market row should differ
-    const biz1 = state1.market.business.map(c => c.id).join(',');
-    const biz2 = state2.market.business.map(c => c.id).join(',');
+    const biz1 = state1.market.development.map(c => c.id).join(',');
+    const biz2 = state2.market.development.map(c => c.id).join(',');
     const inv1 = state1.market.investments.map(c => c.id).join(',');
     const inv2 = state2.market.investments.map(c => c.id).join(',');
 
@@ -528,7 +531,7 @@ describe('Expanded Card Pool: Seeded Deck Resolution', () => {
   it('setup should account for all cards (market + deck + queue = total)', () => {
     const state = setupMainStreetGame({ seed: 'accounting-test' });
 
-    const bizTotal = state.market.business.length + state.decks.business.length;
+    const bizTotal = state.market.development.length + state.decks.business.length;
     expect(bizTotal).toBe(createBusinessDeck().length);
 
     const eventTotal = state.market.investments.filter(c => c.family === 'event').length

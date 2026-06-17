@@ -94,8 +94,17 @@ The Gym Router supports optional animated scene transitions (fade) when navigati
 ## Architecture
 
 - **GymRouterScene**: Landing page with navigation cards for all demo scenes.
-- **GymSceneBase**: Abstract base providing standard header, label, button, and divider helpers.
-- **GymRegistry**: Central catalogue of scene keys, titles, and descriptions.
+- **GymSceneBase**: Abstract base providing standard header (title, `[ Menu ]`, `[ < Prev ]`, `[ Next > ]` buttons), label, button, and divider helpers.
+- **GymRegistry**: Central catalogue of scene keys, titles, and descriptions, plus the `getAdjacentGymSceneKey` navigation helper.
+
+## Navigating Between Demo Scenes
+
+Each Gym demo scene includes **Prev** and **Next** navigation buttons in the header bar, positioned to the right of the `[ Menu ]` button. These cycle through the scene catalogue with wrap-around:
+
+- `[ < Prev ]` — jumps to the previous scene in the catalogue (wraps to the last scene when on the first).
+- `[ Next > ]` — jumps to the next scene in the catalogue (wraps to the first scene when on the last).
+
+The Gym Router landing page is unaffected since it does not extend `GymSceneBase`.
 
 Each demo scene uses core-engine APIs directly (SeededRng, UndoRedoManager, TranscriptRecorderBase, SaveLoadStore, SoundManager, etc.) without duplicating engine code.
 
@@ -105,8 +114,9 @@ The Gym scenes use and demonstrate several reusable UI components from `src/ui/`
 
 ### HandView (`src/ui/HandView.ts`)
 
-Displays a player's hand of cards as a horizontal row of interactive sprites with selection highlighting and event emission.
+Displays a player's hand of cards as a horizontal row (default) or vertical cascade of interactive sprites with selection highlighting and event emission.
 
+**Horizontal layout (default):**
 ```ts
 import { HandView } from '@ui/HandView';
 
@@ -131,7 +141,46 @@ handView.setSelected(null);
 handView.destroy();
 ```
 
-**API**: `setCards(cards)`, `getCards()`, `addCard(card, opts?)`, `removeCard(index, opts?)`, `setSelected(index|null)`, `getSelected()`, `setArcRadius(radius)`, `getArcRadius()`, `setMaxRotationDegrees(degrees)`, `getMaxRotationDegrees()`, `on(event, cb)`, `off(event, cb)`, `getSpriteAt(index)`, `getSprites()`, `getCardCenters()`, `setReducedMotion(bool)`, `destroy()`.
+**Vertical cascade layout:**
+```ts
+const cascade = new HandView(scene, {
+  baseX: 200,
+  baseY: 100,       // Y position of the top card
+  spacing: 42,       // vertical centre-to-centre distance (negative overlap)
+  layoutDirection: 'vertical',
+});
+cascade.setCards(tableauCards);
+cascade.on('cardclick', (idx) => cascade.setSelected(idx)); // selects cards [0..idx]
+cascade.getCascadeRange(); // { from: 0, to: idx }
+```
+
+**Animated insertion**: `animateAddCard(card, options)` adds a card to the hand with a dealing animation, computing the destination using HandView's own layout algorithm so the animation lands exactly where the card will appear. This is the preferred way to draw cards into a hand — it avoids destination-coordinate mismatches by centralising the layout math.
+
+```ts
+// Draw a card from the deck position with a 400ms animation
+await handView.animateAddCard(drawnCard, {
+  sourceX: deckX,     // where the animation starts
+  sourceY: deckY,
+  duration: 400,       // optional, default 400ms
+});
+
+// Reduced-motion is handled automatically — no tween is created
+handView.setReducedMotion(true);
+await handView.animateAddCard(drawnCard, { sourceX: deckX, sourceY: deckY });
+// Card is placed instantly, Promise resolves immediately
+```
+
+When using `animateAddCard`, the caller should also update its own model array (e.g., `this.hand.push(card)`) after the Promise resolves, and update any pile views that may have changed.
+
+**API**: `setCards(cards)`, `getCards()`, `addCard(card, opts?)`, `animateAddCard(card, animOpts)`, `removeCard(index, opts?)`, `setSelected(index|null)`, `getSelected()`, `getCascadeRange()`, `setArcRadius(radius)`, `getArcRadius()`, `setMaxRotationDegrees(degrees)`, `getMaxRotationDegrees()`, `on(event, cb)`, `off(event, cb)`, `getSpriteAt(index)`, `getSprites()`, `getCardCenters()`, `setReducedMotion(bool)`, `destroy()`.
+
+**New in vertical cascade mode:**
+- `layoutDirection: 'vertical'` — renders cards stacked vertically from top to bottom.
+- `baseY` positions the top card; `spacing` becomes vertical centre-to-centre distance.
+- Selecting index `i` selects cards `[0..i]` (the clicked card and all cards above it).
+- `getCascadeRange()` returns `{ from: 0, to: index }` when a selection is active.
+- `arcRadius`, `maxWidth`, and `maxRotationDegrees` are ignored in vertical mode.
+- Labels are positioned to the right of each card to avoid overlap with stacked cards.
 
 ### PileView (`src/ui/PileView.ts`)
 

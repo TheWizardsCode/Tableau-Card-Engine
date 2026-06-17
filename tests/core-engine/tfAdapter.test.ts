@@ -11,16 +11,16 @@ describe('createTfPlayer', () => {
 
     const tfModule: TfGeneratedModule = {
       factories: {
-        'ms-place': () => ({ play, stop, setVolume, setMute }),
+        'sfx-place': () => ({ play, stop, setVolume, setMute }),
       },
     };
 
     const player = createTfPlayer(tfModule);
 
-    player.play('ms-place');
+    player.play('sfx-place');
     expect(play).toHaveBeenCalledOnce();
 
-    player.stop('ms-place');
+    player.stop('sfx-place');
     expect(stop).toHaveBeenCalledOnce();
   });
 
@@ -34,11 +34,11 @@ describe('createTfPlayer', () => {
 
     const player = createTfPlayer(tfModule, {
       keyMap: {
-        'ms-place': 'card-place',
+        'sfx-place': 'card-place',
       },
     });
 
-    player.play('ms-place');
+    player.play('sfx-place');
     expect(play).toHaveBeenCalledOnce();
   });
 

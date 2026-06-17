@@ -1,11 +1,17 @@
 /**
  * GolfRenderer -- creates and refreshes all visual game objects for 9-Card Golf.
+ *
+ * Uses shared PileView for stock/discard pile rendering, and bespoke sprite
+ * management for the 3×3 grid layouts (which don't fit the single-row HandView
+ * pattern).
  */
 
 import { scoreVisibleCards, scoreGrid } from '../GolfScoring';
+import type { Card } from '../../../src/card-system/Card';
 import type { GolfSession } from '../GolfGame';
 import { GAME_W, GAME_H } from '../../../src/ui';
 import { createSceneTitle, createSceneMenuButton } from '@ui/Renderer';
+import { PileView } from '../../../src/ui/PileView';
 import {
   createGolfHudText,
   getCardTexture,
@@ -20,12 +26,30 @@ import {
   type GolfLayout,
 } from './GolfLayoutAdapter';
 
+import type { CardPile } from '../../../src/ui/PileView';
+
+/**
+ * Lightweight adapter that wraps a plain Card[] with the PileView CardPile
+ * interface (`size()`, `isEmpty()`, `peek()`). Golf's stock pile is a plain
+ * array, not a Pile<T>, so this adapter enables PileView to render it.
+ */
+class ArrayPileAdapter implements CardPile<Card> {
+  constructor(private cards: Card[]) {}
+  size(): number { return this.cards.length; }
+  isEmpty(): boolean { return this.cards.length === 0; }
+  peek(): Card | undefined { return this.cards.length > 0 ? this.cards[this.cards.length - 1] : undefined; }
+}
+
 export class GolfRenderer {
   // Display objects -- grids
   humanCardSprites: Phaser.GameObjects.Image[] = [];
   aiCardSprites: Phaser.GameObjects.Image[] = [];
 
-  // Display objects -- piles
+  // Shared PileView components (Phase 1 migration: CG-0MQ6IEM920091HF6)
+  stockPileView!: PileView;
+  discardPileView!: PileView;
+
+  // Legacy pile sprite refs (kept for backward compat with animator / tests)
   stockSprite!: Phaser.GameObjects.Image;
   discardSprite!: Phaser.GameObjects.Image;
   drawnCardSprite: Phaser.GameObjects.Image | null = null;
@@ -81,41 +105,65 @@ export class GolfRenderer {
     );
   }
 
+  /**
+   * Create PileView components for the stock and discard piles.
+   *
+   * @param onStockClick  - Callback when the stock pile is clicked.
+   * @param onDiscardClick - Callback when the discard pile is clicked.
+   * @param stockPile     - The card-system Pile for the stock (or an array with
+   *                        `length` property). Golf uses `Card[]` for the stock.
+   * @param discardPile   - The card-system Pile for the discard.
+   */
   createPiles(
     onStockClick: () => void,
     onDiscardClick: () => void,
+    stockPile: Card[],
+    discardPile: CardPile<Card>,
   ): void {
-    // Stock pile (upper center)
-    this.stockSprite = this.scene.add.image(this.layout.stockPileCenterX, this.layout.stockPileCenterY, 'card_back');
+    const ghostAlpha = this.replayMode ? 0.3 : 0.8;
+
+    // Stock pile (upper center) -- rendered via shared PileView
+    // Golf's stock is a plain Card[] so we wrap it with a minimal adapter.
+    this.stockPileView = new PileView(this.scene, {
+      x: this.layout.stockPileCenterX,
+      y: this.layout.stockPileCenterY,
+      label: 'Stock',
+      emptyTexture: 'card_back',
+      emptyAlpha: ghostAlpha,
+      fullAlpha: 1,
+      countOffsetY: GOLF_CARD_H / 2 + 16,
+      countFontSize: '16px',
+      countColor: '#aaccaa',
+    });
+    this.stockPileView.setPile(new ArrayPileAdapter(stockPile));
     if (!this.replayMode) {
-      this.stockSprite.setInteractive({ useHandCursor: true });
-      this.stockSprite.on('pointerdown', onStockClick);
+      this.stockPileView.onClick(onStockClick);
+    } else {
+      this.stockPileView.setInteractive(false);
     }
+    this.stockSprite = this.stockPileView.getSprite();
 
-    createGolfHudText(
-      this.scene,
-      this.layout.stockPileCenterX,
-      this.layout.stockPileCenterY + GOLF_CARD_H / 2 + 16,
-      'Stock',
-      '#aaccaa',
-      { fontSize: '16px', originX: 0.5 },
-    );
-
-    // Discard pile (lower center)
-    this.discardSprite = this.scene.add.image(this.layout.discardPileCenterX, this.layout.discardPileCenterY, 'card_back');
+    // Discard pile (lower center) -- rendered via shared PileView
+    // The discard pile already implements the CardPile interface so we pass
+    // it directly rather than wrapping it in ArrayPileAdapter.
+    this.discardPileView = new PileView(this.scene, {
+      x: this.layout.discardPileCenterX,
+      y: this.layout.discardPileCenterY,
+      label: 'Discard',
+      emptyTexture: 'card_back',
+      emptyAlpha: this.replayMode ? 0.3 : 0.25,
+      fullAlpha: 1,
+      countOffsetY: GOLF_CARD_H / 2 + 16,
+      countFontSize: '16px',
+      countColor: '#aaccaa',
+    });
+    this.discardPileView.setPile(discardPile);
     if (!this.replayMode) {
-      this.discardSprite.setInteractive({ useHandCursor: true });
-      this.discardSprite.on('pointerdown', onDiscardClick);
+      this.discardPileView.onClick(onDiscardClick);
+    } else {
+      this.discardPileView.setInteractive(false);
     }
-
-    createGolfHudText(
-      this.scene,
-      this.layout.discardPileCenterX,
-      this.layout.discardPileCenterY + GOLF_CARD_H / 2 + 16,
-      'Discard',
-      '#aaccaa',
-      { fontSize: '16px', originX: 0.5 },
-    );
+    this.discardSprite = this.discardPileView.getSprite();
   }
 
   createGrids(onHumanCardClick: (index: number) => void): void {
@@ -212,34 +260,22 @@ export class GolfRenderer {
   }
 
   refreshPiles(): void {
-    // Stock: always shows card_back (or nothing if empty)
-    if (this.session.shared.stockPile.length > 0) {
-      this.stockSprite.setVisible(true);
-      this.stockSprite.setTexture('card_back');
-      this.stockSprite.setAlpha(1);
-    } else {
-      this.stockSprite.setVisible(false);
-    }
-
-    // Discard: shows top card face-up, or a dimmed placeholder when empty
-    const top = this.session.shared.discardPile.peek();
-    if (top) {
-      this.discardSprite.setVisible(true);
-      this.discardSprite.setTexture(getCardTexture(top));
-      this.discardSprite.setAlpha(1);
-    } else if (this.replayMode) {
-      this.discardSprite.setVisible(false);
-    } else {
-      this.showDiscardPlaceholder();
+    // Refresh PileViews -- they handle their own sprite/text updates internally
+    try { this.stockPileView.update(); } catch (_) { /* ignore if not created yet */ }
+    try { this.discardPileView.update(); } catch (_) { /* ignore if not created yet */ }
+    // Also update the animator's reference to the drawn card sprite depth
+    if (this.drawnCardSprite) {
+      // Ensure drawn card sprite is above pile views
+      this.drawnCardSprite.setDepth(15);
     }
   }
 
   /** Show a dimmed card-back as an empty-pile placeholder so the discard
-   *  area remains visible and clickable even when no cards are on it. */
+   *  area remains visible and clickable even when no cards are on it.
+   *  @deprecated Use PileView.emptyAlpha instead; kept for backward compat. */
   showDiscardPlaceholder(): void {
-    this.discardSprite.setVisible(true);
-    this.discardSprite.setTexture('card_back');
-    this.discardSprite.setAlpha(0.25);
+    // PileView handles this internally; this method is a no-op now.
+    // Kept for backward compatibility with callers that may reference it.
   }
 
   refreshScores(): void {
@@ -301,5 +337,14 @@ export class GolfRenderer {
 
   get gridCellPos() {
     return this.gridCellPosition.bind(this);
+  }
+
+  // ── Destroy (Phase 1 migration) ─────────────────────────
+
+  /** Clean up all display objects including PileView components. */
+  destroy(): void {
+    this.stockPileView?.destroy();
+    this.discardPileView?.destroy();
+    this.clearSprites();
   }
 }

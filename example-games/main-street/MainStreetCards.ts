@@ -22,8 +22,8 @@ export type EventTrigger = 'Investment' | 'Incident';
 /** Scope of an Event card's effect. */
 export type EventTarget = 'All' | 'SpecificSynergy' | 'RandomBusiness';
 
-/** Discriminator for the three card families. */
-export type CardFamily = 'business' | 'event' | 'upgrade';
+/** Discriminator for the four card families (business, event, upgrade, community-space). */
+export type CardFamily = 'business' | 'event' | 'upgrade' | 'community-space';
 
 // ── Card Interfaces ─────────────────────────────────────────
 
@@ -104,7 +104,7 @@ export interface UpgradeCard {
 }
 
 /** Union of all card types in Main Street. */
-export type AnyCard = BusinessCard | EventCard | UpgradeCard;
+export type AnyCard = BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard;
 
 // ── Constants ───────────────────────────────────────────────
 
@@ -179,6 +179,52 @@ function makeBusiness(template: Omit<BusinessCard, 'family' | 'level' | 'incomeB
   };
 }
 
+/**
+ * A Community Space card placed on the street grid, parallel to BusinessCard.
+ * Community spaces share the same mechanical behavior as businesses (grid placement,
+ * synergy bonuses, upgrade path, level tracking) but are classified as 'community-space'
+ * rather than 'business'.
+ */
+export interface CommunitySpaceCard {
+  readonly family: 'community-space';
+  readonly id: string;
+  readonly name: string;
+  readonly cost: number;
+  readonly baseIncome: number;
+  readonly synergyTypes: readonly SynergyType[];
+  readonly upgradePath?: string;
+  readonly maxLevel: number;
+  readonly description: string;
+  /** Current upgrade level (starts at 0, incremented by upgrades). */
+  level: number;
+  /** Cumulative income bonus from applied upgrades. */
+  incomeBonus: number;
+  /** Cumulative synergy range extension from applied upgrades. */
+  synergyRangeBonus: number;
+  /**
+   * IDs of upgrade cards that have been applied to this community space instance,
+   * in application order.
+   *
+   * Omitting this field is treated as an empty array.
+   */
+  appliedUpgrades?: string[];
+}
+
+/**
+ * Creates a fresh copy of a CommunitySpaceCard from template data.
+ * Mutable fields (level, incomeBonus, synergyRangeBonus, appliedUpgrades) are reset.
+ */
+function makeCommunitySpace(template: Omit<CommunitySpaceCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'appliedUpgrades'>): CommunitySpaceCard {
+  return {
+    family: 'community-space',
+    level: 0,
+    incomeBonus: 0,
+    synergyRangeBonus: 0,
+    appliedUpgrades: [],
+    ...template,
+  };
+}
+
 /** Template data for all Business cards (M1 + M2 pool). */
 const BUSINESS_TEMPLATES: Omit<BusinessCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus'>[] = [
   {
@@ -210,16 +256,6 @@ const BUSINESS_TEMPLATES: Omit<BusinessCard, 'family' | 'level' | 'incomeBonus' 
     upgradePath: 'Bookshop',
     maxLevel: 1,
     description: 'Sells books. Gains +1 coin per adjacent Culture business.',
-  },
-  {
-    id: 'biz-park',
-    name: 'Park',
-    cost: 4,
-    baseIncome: 0,
-    synergyTypes: ['Culture'],
-    upgradePath: 'Park',
-    maxLevel: 1,
-    description: 'Offers leisure. Gains +1 coin per adjacent Culture business.',
   },
   {
     id: 'biz-hardware',
@@ -356,6 +392,30 @@ const BUSINESS_TEMPLATES: Omit<BusinessCard, 'family' | 'level' | 'incomeBonus' 
     upgradePath: 'Clinic',
     maxLevel: 1,
     description: 'Walk-in medical care for the community. Gains +1 coin per adjacent Service business.',
+  },
+];
+
+/** Template data for all Community Space cards (reclassified Park + new community spaces). */
+const COMMUNITY_SPACE_TEMPLATES: Omit<CommunitySpaceCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus'>[] = [
+  {
+    id: 'cs-park',
+    name: 'Park',
+    cost: 4,
+    baseIncome: 0,
+    synergyTypes: ['Culture'],
+    upgradePath: 'Park',
+    maxLevel: 1,
+    description: 'Offers leisure space. Gains +1 coin per adjacent Culture business or community space.',
+  },
+  {
+    id: 'cs-library',
+    name: 'Library',
+    cost: 6,
+    baseIncome: 1,
+    synergyTypes: ['Culture'],
+    upgradePath: 'Library',
+    maxLevel: 1,
+    description: 'A quiet community space for reading and learning. Gains +1 coin per adjacent Culture business or community space.',
   },
 ];
 
@@ -852,6 +912,18 @@ const UPGRADE_TEMPLATES: UpgradeCard[] = [
     requiredLevel: 1,
     description: 'A destination Luxury Retreat — the most prestigious business on the street.',
   },
+  // ── Community Space Upgrades ────────────────────────────────
+  {
+    family: 'upgrade',
+    id: 'upg-community-hub',
+    name: 'Upgrade to Community Hub',
+    targetBusiness: 'Library',
+    cost: 4,
+    incomeBonus: 1,
+    synergyRangeBonus: 1,
+    requiredLevel: 0,
+    description: 'Expands the Library into a Community Hub with extended cultural reach.',
+  },
 ];
 
 // ── Deck Building ───────────────────────────────────────────
@@ -877,6 +949,33 @@ export function createBusinessDeck(
   for (let c = 0; c < copies; c++) {
     for (const template of templates) {
       deck.push(makeBusiness({ ...template, id: `${template.id}-${c}` }));
+    }
+  }
+  return deck;
+}
+
+/**
+ * Creates the full Community Space deck for a game (each template repeated
+ * `copies` times). Community space cards are mixed into the development market
+ * row alongside business cards.
+ *
+ * @param copies          Number of copies per template (default 3).
+ * @param unlockedCardIds Optional list of unlocked card IDs for tier filtering.
+ *                        When provided, only templates whose ID is in this list
+ *                        are included. When omitted, the full pool is used.
+ */
+export function createCommunitySpaceDeck(
+  copies: number = 3,
+  unlockedCardIds?: string[],
+): CommunitySpaceCard[] {
+  const templates = unlockedCardIds
+    ? COMMUNITY_SPACE_TEMPLATES.filter((t) => unlockedCardIds.includes(t.id))
+    : COMMUNITY_SPACE_TEMPLATES;
+
+  const deck: CommunitySpaceCard[] = [];
+  for (let c = 0; c < copies; c++) {
+    for (const template of templates) {
+      deck.push(makeCommunitySpace({ ...template, id: `${template.id}-${c}` }));
     }
   }
   return deck;
@@ -1020,9 +1119,10 @@ export function synergyColor(type: SynergyType): number {
  */
 export function cardLabel(card: AnyCard): string {
   switch (card.family) {
-    case 'business': return `${card.name} ($${card.cost})`;
-    case 'event':    return card.cost > 0 ? `${card.name} ($${card.cost})` : card.name;
-    case 'upgrade':  return `${card.name} ($${card.cost})`;
+    case 'business':        return `${card.name} ($${card.cost})`;
+    case 'community-space': return `${card.name} ($${card.cost})`;
+    case 'event':           return card.cost > 0 ? `${card.name} ($${card.cost})` : card.name;
+    case 'upgrade':         return `${card.name} ($${card.cost})`;
   }
 }
 
@@ -1039,8 +1139,9 @@ export function cardLabel(card: AnyCard): string {
  */
 export const CARD_TEMPLATE_NAMES: ReadonlyMap<string, string> = (() => {
   const m = new Map<string, string>();
-  for (const t of BUSINESS_TEMPLATES) m.set(t.id, t.name);
-  for (const t of EVENT_TEMPLATES)   m.set(t.id, t.name);
-  for (const t of UPGRADE_TEMPLATES) m.set(t.id, t.name);
+  for (const t of BUSINESS_TEMPLATES)       m.set(t.id, t.name);
+  for (const t of COMMUNITY_SPACE_TEMPLATES) m.set(t.id, t.name);
+  for (const t of EVENT_TEMPLATES)          m.set(t.id, t.name);
+  for (const t of UPGRADE_TEMPLATES)        m.set(t.id, t.name);
   return m;
 })();

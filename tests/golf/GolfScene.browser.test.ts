@@ -116,8 +116,13 @@ describe('GolfScene browser tests', () => {
     expect(textContents).toContain('9-Card Golf');
     expect(textContents).toContain('You');
     expect(textContents).toContain('AI');
-    expect(textContents).toContain('Stock');
-    expect(textContents).toContain('Discard');
+
+    // Check that stock and discard pile labels are present (PileView shows "Stock: N")
+    const hasStock = textContents.some((t) => t.startsWith('Stock:'));
+    expect(hasStock).toBe(true);
+
+    const hasDiscard = textContents.some((t) => t.startsWith('Discard:'));
+    expect(hasDiscard).toBe(true);
 
     // Check that there's a score display
     const hasScore = textContents.some((t) => t.startsWith('Score:'));

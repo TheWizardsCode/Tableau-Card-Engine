@@ -22,6 +22,27 @@ import {
   type GameEventName,
 } from './GameEventEmitter';
 
+// ── Shared SFX key constants ──────────────────────────────────
+
+/**
+ * Common SFX key constants shared across all games.
+ * All keys use the `sfx-` prefix with no game identifier.
+ *
+ * Games import and use these constants alongside their own game-specific keys.
+ */
+export const COMMON_SFX_KEYS = {
+  /** Generic UI click / tap feedback. */
+  UI_CLICK: 'sfx-ui-click',
+  /** Active player changes. */
+  TURN_CHANGE: 'sfx-turn-change',
+  /** A round has ended. */
+  ROUND_END: 'sfx-round-end',
+  /** Scores are being revealed / calculated. */
+  SCORE_REVEAL: 'sfx-score-reveal',
+} as const;
+
+export type CommonSfxKey = (typeof COMMON_SFX_KEYS)[keyof typeof COMMON_SFX_KEYS];
+
 // ── localStorage keys ───────────────────────────────────────
 
 const STORAGE_KEY_MUTE = 'tce-sound-muted';
@@ -111,9 +132,29 @@ export interface SoundManagerOptions {
 
   /**
    * Map logical sound keys to tf-generated key names/factory IDs.
-   * Example: `{ 'ms-place': 'card-place' }`.
+   * Example: `{ 'sfx-place': 'card-place' }`.
    */
   synthKeyMap?: Record<string, string>;
+
+  /**
+   * Optional game namespace to scope Phaser audio asset keys.
+   *
+   * When set, every {@link register} call automatically prepends
+   * `"{namespace}:"` to the **asset key** stored in the registry.
+   * Game code still addresses sounds by the unprefixed logical key.
+   *
+   * This prevents Phaser audio key collisions when multiple games
+   * are loaded in the same session.
+   *
+   * @example
+   * ```ts
+   * const sm = new SoundManager(player, { namespace: 'golf' });
+   * sm.register('sfx-card-draw');           // logical key: 'sfx-card-draw'
+   *                                        // stored asset key: 'golf:sfx-card-draw'
+   * sm.play('sfx-card-draw');              // plays 'golf:sfx-card-draw' via player
+   * ```
+   */
+  namespace?: string;
 }
 
 /**
@@ -135,6 +176,7 @@ export class SoundManager {
   private synthKeyMap: Record<string, string>;
   private readonly registry = new Map<string, string>();
   private readonly eventUnsubs: Array<() => void> = [];
+  private readonly namespace: string;
 
   private _muted: boolean;
   private _volume: number;
@@ -144,6 +186,7 @@ export class SoundManager {
 
     this.synthPlayer = options?.synthPlayer ?? null;
     this.synthKeyMap = options?.synthKeyMap ?? {};
+    this.namespace = options?.namespace ?? '';
 
     // Resolve storage backend
     if (options?.storage !== undefined) {
@@ -175,12 +218,22 @@ export class SoundManager {
   /**
    * Register a sound effect by logical key.
    *
-   * @param key       Logical name used by game code (e.g. 'card-draw').
+   * When a {@link SoundManagerOptions.namespace} is set on the manager,
+   * the stored asset key is automatically scoped as `"{namespace}:{assetKey}"`.
+   * This prevents Phaser audio key collisions when multiple games coexist.
+   *
+   * @param key       Logical name used by game code (e.g. 'sfx-card-draw').
    * @param assetKey  The Phaser asset key loaded via `scene.load.audio()`.
-   *                  If omitted, `key` is used as the asset key.
+   *                  If omitted, `key` is used as the asset key. When a
+   *                  namespace is configured it is **not** automatically
+   *                  prepended to an explicit assetKey – the caller is
+   *                  responsible for using the same scoped key in preload.
    */
   register(key: string, assetKey?: string): void {
-    this.registry.set(key, assetKey ?? key);
+    const resolvedKey = this.namespace && !assetKey
+      ? `${this.namespace}:${key}`
+      : (assetKey ?? key);
+    this.registry.set(key, resolvedKey);
   }
 
   // ── Playback ────────────────────────────────────────────
@@ -305,6 +358,22 @@ export class SoundManager {
     }
   }
 
+  // ── Inspection ───────────────────────────────────────────
+
+  /**
+   * Check if a logical key has been registered.
+   */
+  has(key: string): boolean {
+    return this.registry.has(key);
+  }
+
+  /**
+   * Return all registered logical keys.
+   */
+  keys(): IterableIterator<string> {
+    return this.registry.keys();
+  }
+
   // ── Cleanup ─────────────────────────────────────────────
 
   /**
@@ -316,6 +385,15 @@ export class SoundManager {
       unsub();
     }
     this.eventUnsubs.length = 0;
+  }
+
+  /**
+   * Remove all registered sound keys.
+   * Call this when unloading a game scene to free up registrations
+   * for the next game.
+   */
+  clearRegistrations(): void {
+    this.registry.clear();
   }
 
   // ── Private helpers ─────────────────────────────────────

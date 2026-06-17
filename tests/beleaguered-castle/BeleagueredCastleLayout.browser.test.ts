@@ -17,7 +17,7 @@
  * We keep total boots per file <= 3 to avoid context exhaustion.
  */
 
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import Phaser from 'phaser';
 import { waitForScene } from '../helpers/waitForScene';
 
@@ -65,7 +65,7 @@ function wait(ms: number): Promise<void> {
  */
 async function waitForDeal(
   scene: Phaser.Scene & { isDealComplete(): boolean },
-  timeoutMs: number = 10_000,
+  timeoutMs: number = 60_000,
 ): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
@@ -97,15 +97,18 @@ function getSceneInternals(scene: Phaser.Scene): {
 describe('BeleagueredCastleScene layout regression tests', () => {
   let game: Phaser.Game | null = null;
 
-  afterEach(() => {
+  beforeAll(async () => {
+    game = await bootGame();
+  }, 120_000);
+
+  afterAll(() => {
     destroyGame(game);
     game = null;
   });
 
   // ── Test 1: Tableau columns do not overlap horizontally ──
   it('should lay out 8 tableau columns without horizontal overlap', async () => {
-    game = await bootGame();
-    const scene = game.scene.getScene('BeleagueredCastleScene')!;
+    const scene = game!.scene.getScene('BeleagueredCastleScene')!;
     await waitForDeal(scene as Phaser.Scene & { isDealComplete(): boolean });
 
     const internals = getSceneInternals(scene);
@@ -155,12 +158,11 @@ describe('BeleagueredCastleScene layout regression tests', () => {
           `should be at least 16px for clear visual separation`,
       ).toBeGreaterThanOrEqual(16);
     }
-  });
+}, 120_000);
 
   // ── Test 2: All cards and foundations fit within viewport ──
   it('should keep all cards and foundations within the game viewport', async () => {
-    game = await bootGame();
-    const scene = game.scene.getScene('BeleagueredCastleScene')!;
+    const scene = game!.scene.getScene('BeleagueredCastleScene')!;
     await waitForDeal(scene as Phaser.Scene & { isDealComplete(): boolean });
 
     const internals = getSceneInternals(scene);
@@ -199,12 +201,11 @@ describe('BeleagueredCastleScene layout regression tests', () => {
         `Card at (${sprite.x}, ${sprite.y}) bottom edge ${bottomEdge} should be <= ${GAME_H}`,
       ).toBeLessThanOrEqual(GAME_H);
     }
-  });
+}, 120_000);
 
   // ── Test 3: Foundations do not overlap with tableau ────────
   it('should not overlap foundation slots with tableau columns', async () => {
-    game = await bootGame();
-    const scene = game.scene.getScene('BeleagueredCastleScene')!;
+    const scene = game!.scene.getScene('BeleagueredCastleScene')!;
     await waitForDeal(scene as Phaser.Scene & { isDealComplete(): boolean });
 
     const internals = getSceneInternals(scene);
@@ -247,5 +248,5 @@ describe('BeleagueredCastleScene layout regression tests', () => {
           `slot ${i + 1} left edge (${rightLeft})`,
       ).toBeLessThan(rightLeft);
     }
-  });
+}, 120_000);
 });

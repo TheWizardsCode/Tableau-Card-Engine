@@ -93,7 +93,7 @@ describe('Integration: Full Turn Cycle', () => {
     // Execute DayStart
     executeDayStart(state);
     expect(state.phase).toBe('MarketPhase');
-    expect(state.market.business.length).toBeGreaterThan(0);
+    expect(state.market.development.length).toBeGreaterThan(0);
 
     // Buy the first affordable business
     const affordable = getAffordableBusinessCards(state);
@@ -302,8 +302,8 @@ describe('Integration: Seeded Determinism', () => {
     const state2 = setupMainStreetGame({ seed: 'seed-B' });
 
     // Markets should differ (different shuffle order)
-    const market1Ids = state1.market.business.map(c => c.id).sort().join(',');
-    const market2Ids = state2.market.business.map(c => c.id).sort().join(',');
+    const market1Ids = state1.market.development.map(c => c.id).sort().join(',');
+    const market2Ids = state2.market.development.map(c => c.id).sort().join(',');
 
     // While it's theoretically possible for two different seeds to produce
     // the same shuffle, it's extremely unlikely. We check that at least
@@ -359,7 +359,7 @@ describe('Integration: Income & Synergy', () => {
 
     // Turn 1: Place first Food business
     executeDayStart(s);
-    const food1 = s.market.business.find(c => c.synergyTypes.includes('Food'));
+    const food1 = s.market.development.find(c => c.synergyTypes.includes('Food'));
     if (!food1) return; // Skip if no food card available
     executeAction(s, { type: 'buy-business', cardId: food1.id, slotIndex: 4 });
     const result1 = processEndOfTurn(s);
@@ -369,7 +369,7 @@ describe('Integration: Income & Synergy', () => {
 
     // Turn 2: Place second Food business adjacent
     executeDayStart(s);
-    const food2 = s.market.business.find(c => c.synergyTypes.includes('Food'));
+    const food2 = s.market.development.find(c => c.synergyTypes.includes('Food'));
     if (!food2) return;
     executeAction(s, { type: 'buy-business', cardId: food2.id, slotIndex: 5 });
     const result2 = processEndOfTurn(s);

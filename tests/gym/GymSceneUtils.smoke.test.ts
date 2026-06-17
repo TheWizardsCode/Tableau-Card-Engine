@@ -1,8 +1,10 @@
 /**
  * GymSceneUtils Smoke Test Suite
  *
- * Integration smoke tests for the createEventLog, createDeckGrid,
- * and createSlider utilities exported from src/ui/GymSceneUtils.ts.
+ * Integration smoke tests for the createEventLog and createDeckGrid
+ * utilities exported from src/ui/GymSceneUtils.ts.
+ *
+ * Slider tests have been migrated to tests/ui/Slider.test.ts.
  *
  * Uses a minimal Phaser mock to test each helper's public API surface.
  * Mocks the Renderer module to avoid Phaser import in node environment.
@@ -38,7 +40,7 @@ vi.mock('../../src/ui/constants', () => ({
   CARD_H: 65,
 }));
 
-import { createEventLog, createDeckGrid, createSlider } from '../../src/ui/GymSceneUtils';
+import { createEventLog, createDeckGrid } from '../../src/ui/GymSceneUtils';
 import type { Card } from '../../src/card-system/Card';
 
 // ── Minimal Phaser mock ─────────────────────────────────────
@@ -245,97 +247,3 @@ describe('createDeckGrid', () => {
   });
 });
 
-// ── createSlider tests ──────────────────────────────────────
-
-describe('createSlider', () => {
-  it('returns config object with visual elements and handlers', () => {
-    const scene = createMockScene();
-    const result = createSlider(scene, 100, 200, {
-      initialValue: 0.5, minValue: 0, maxValue: 1, label: 'Test',
-    });
-
-    expect(result).toBeDefined();
-    expect(result.track).toBeDefined();
-    expect(result.fill).toBeDefined();
-    expect(result.handle).toBeDefined();
-    expect(result.valueText).toBeDefined();
-    expect(result.hitArea).toBeDefined();
-    expect(typeof result.setValue).toBe('function');
-    expect(typeof result.handlePointerMove).toBe('function');
-    expect(typeof result.handlePointerUp).toBe('function');
-    expect(typeof result.destroy).toBe('function');
-  });
-
-  it('initializes with correct default value', () => {
-    const scene = createMockScene();
-    const result = createSlider(scene, 100, 200, {
-      initialValue: 0.75, minValue: 0, maxValue: 1,
-    });
-
-    expect(result.value).toBeCloseTo(0.75, 5);
-  });
-
-  it('setValue clamps to min/max', () => {
-    const scene = createMockScene();
-    const result = createSlider(scene, 100, 200, {
-      initialValue: 0.5, minValue: 0, maxValue: 100,
-    });
-
-    result.setValue(150);
-    expect(result.value).toBe(100);
-
-    result.setValue(-10);
-    expect(result.value).toBe(0);
-  });
-
-  it('handlePointerMove updates value while dragging', () => {
-    const scene = createMockScene();
-    const result = createSlider(scene, 100, 200, {
-      initialValue: 0, minValue: 0, maxValue: 100, width: 200,
-    });
-
-    // Simulate pointerdown via hitArea
-    const onMock = result.hitArea.on as unknown as ReturnType<typeof vi.fn>;
-    for (const call of onMock.mock.calls) {
-      if (call[0] === 'pointerdown') {
-        call[1]({ x: 150 });
-      }
-    }
-
-    result.handlePointerMove(200);
-    expect(result.value).toBeGreaterThan(0);
-
-    const valueBeforeUp = result.value;
-    result.handlePointerUp();
-
-    // After pointer up, pointermove should not change value
-    expect(result.value).toBe(valueBeforeUp);
-  });
-
-  it('destroy cleans up all objects', () => {
-    const scene = createMockScene();
-    const result = createSlider(scene, 100, 200);
-    result.destroy();
-    // No crash on second destroy
-    result.destroy();
-  });
-
-  it('fires onValueChange when value changes', () => {
-    const scene = createMockScene();
-    const onChange = vi.fn();
-    const result = createSlider(scene, 100, 200, {
-      initialValue: 0, minValue: 0, maxValue: 100, width: 200,
-    });
-
-    result.onValueChange = onChange;
-
-    const onMock = result.hitArea.on as unknown as ReturnType<typeof vi.fn>;
-    for (const call of onMock.mock.calls) {
-      if (call[0] === 'pointerdown') {
-        call[1]({ x: 200 });
-      }
-    }
-
-    expect(onChange).toHaveBeenCalled();
-  });
-});

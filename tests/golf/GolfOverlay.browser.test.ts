@@ -335,4 +335,44 @@ describe('Golf overlay button tests', () => {
     );
     expect(fullScreenBlocker).toBeDefined();
   });
+
+  it('should show an Export Transcript button on the end-of-round overlay', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('GolfScene')!;
+
+    forceEndScreen(scene);
+    await waitFrames(3);
+
+    // Helper: find a container that contains a Text child with the given label
+    const findButtonContainer = (
+      label: string,
+    ): Phaser.GameObjects.Container | undefined => {
+      const findIn = (items: Phaser.GameObjects.GameObject[]) => {
+        return items.find(
+          (child: Phaser.GameObjects.GameObject) =>
+            child instanceof Phaser.GameObjects.Container &&
+            (child as Phaser.GameObjects.Container).list.some(
+              (c: Phaser.GameObjects.GameObject) =>
+                c instanceof Phaser.GameObjects.Text && c.text === label,
+            ),
+        ) as Phaser.GameObjects.Container | undefined;
+      };
+      let result = findIn(scene.children.list);
+      if (result) return result;
+      const hud = (scene as any).hudContainer as { list: Phaser.GameObjects.GameObject[] } | undefined;
+      if (hud && hud.list) result = findIn(hud.list);
+      return result;
+    };
+
+    const exportBtn = findButtonContainer('[ Export Transcript ]');
+    expect(exportBtn).toBeDefined();
+
+    // The button should be interactive
+    const exportBg = (exportBtn!.list as Phaser.GameObjects.GameObject[]).find(
+      (c) => c instanceof Phaser.GameObjects.Rectangle,
+    );
+    expect(exportBg).toBeDefined();
+    expect((exportBg as Phaser.GameObjects.Rectangle).input?.enabled).toBe(true);
+  });
+
 });

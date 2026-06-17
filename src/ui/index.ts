@@ -19,7 +19,7 @@
 export const UI_VERSION = '0.1.0';
 
 // Card game scene base class
-export { CardGameScene } from './CardGameScene';
+export { CardGameScene, audioPathWithFallback } from './CardGameScene';
 
 // Phase state machine
 export { PhaseManager } from './PhaseManager';
@@ -181,13 +181,29 @@ export { HandView } from './HandView';
 export type {
   HandViewOptions,
   AddCardOptions,
+  AnimateAddCardOptions,
   RemoveCardOptions,
   HandViewEvents,
+  CardTextureResolver,
+  RenderCardFn,
 } from './HandView';
 
 // PileView – reusable card-pile display component
 export { PileView } from './PileView';
-export type { PileViewOptions, PileViewEvents } from './PileView';
+export type {
+  PileViewOptions,
+  PileViewEvents,
+  CardPile,
+  CardTextureResolver as PileViewCardTextureResolver,
+} from './PileView';
+
+// TokenPileView – reusable token-pile display for non-standard card models
+export { TokenPileView, createSimpleTokenRenderer, createCardBackTokenRenderer } from './TokenPileView';
+export type {
+  TokenPileViewOptions,
+  TokenPileViewEvents,
+  TokenRenderer,
+} from './TokenPileView';
 
 // Hi-DPI text rendering (side-effect import for patching)
 export { TEXT_DPR } from './hiDpiText';
@@ -232,18 +248,23 @@ export type {
   EnsureTextureResult,
 } from './Renderer';
 
-// Shared Gym scene utilities – event log, deck grid, slider
+// Slider – reusable horizontal slider widget
+export { Slider } from './Slider';
+export type { SliderOptions } from './Slider';
+
+// Shared Gym scene utilities – event log, deck grid
 // These helpers extract common rendering patterns from Gym demo scenes.
 export {
   createEventLog,
   createDeckGrid,
-  createSlider,
 } from './GymSceneUtils';
 export type {
   EventLogOptions,
   EventLogResult,
   DeckGridOptions,
   DeckGridResult,
-  SliderOptions,
-  SliderResult,
 } from './GymSceneUtils';
+
+// HighlightManager – reusable highlight zone manager
+export { HighlightManager } from './HighlightManager';
+export type { HighlightZoneConfig, HighlightStyle } from './HighlightManager';

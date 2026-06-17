@@ -45,15 +45,16 @@ This document lists every card template in the Main Street card pool, organised 
 
 Business cards are placed on the 10-slot street grid. Each generates base income plus synergy bonuses from adjacent businesses sharing a synergy type.
 
-### M1 Business Templates (5)
+### M1 Business Templates (4)
 
 | ID | Name | Cost | Income | Synergy | Upgrade Path | Description | Rationale |
 |----|------|------|--------|---------|--------------|-------------|-----------|
 | `biz-bakery` | Bakery | 3 | 2 | Food | Bakery | Warm pastries. +1/adj Food. | Affordable Food starter. |
 | `biz-diner` | Diner | 4 | 3 | Food | Diner | Quick meals. +1/adj Food. | Higher-cost, higher-income Food option. |
 | `biz-bookshop` | Bookshop | 4 | 2 | Culture | Bookshop | Sells books. +1/adj Culture. | Mid-cost Culture business. |
-| `biz-park` | Park | 2 | 1 | Culture | Park | Leisure space. +1/adj Culture. | Cheapest card in M1; synergy filler. |
 | `biz-hardware` | Hardware Store | 5 | 3 | Commerce | Hardware Store | Supplies tools. +1/adj Commerce. | M1's only Commerce card; expensive but strong income. |
+
+Park has been reclassified as a **Community Space** card (see below).
 
 ### M2 Business Templates (12)
 
@@ -90,6 +91,26 @@ Bridge cards belong to two synergy types simultaneously, enabling cross-type adj
 | `biz-gallery` | Art Gallery | 4 | 2 | Culture + Entertainment | Art Gallery | Showcases local artists. | Connects M1 Culture with new Entertainment. |
 | `biz-spa` | Day Spa | 5 | 3 | Service + Entertainment | Day Spa | Relaxation and pampering. | Premium bridge; high synergy potential across 2 new types. |
 | `biz-florist` | Florist | 2 | 1 | Commerce + Culture | Florist | Arrangements for every occasion. | Budget bridge linking Commerce and Culture. |
+
+---
+
+## Community Space Cards
+
+Community space cards are a separate card family (`community-space`) placed on the street grid alongside business cards.
+They share the same mechanical behavior as businesses (grid placement, synergy bonuses, upgrade path, level tracking)
+but are classified differently for thematic clarity. Community space cards appear in the **Development** market row
+alongside business cards.
+
+| ID | Name | Cost | Income | Synergy | Upgrade Path | Description | Rationale |
+|----|------|------|--------|---------|--------------|-------------|-----------|
+| `cs-park` | Park | 4 | 0 | Culture | Park | Offers leisure space. +1/adj Culture. | Reclassified from M1 Business; cheapest community space; synergy filler. |
+| `cs-library` | Library | 6 | 1 | Culture | Library | Quiet community space for reading. +1/adj Culture. | New community space; slightly more expensive but generates income. |
+
+### Community Space Upgrades
+
+| ID | Name | Target | Cost | Income+ | Range+ | Description | Rationale |
+|----|------|--------|------|---------|--------|-------------|-----------|
+| `upg-community-hub` | Upgrade to Community Hub | Library | 4 | +1 | +1 | Library -> Community Hub. | Extends Library's cultural reach. |
 
 ---
 
@@ -164,7 +185,8 @@ Each Upgrade targets a specific Business by name. Applying an upgrade increments
 
 | ID | Name | Target | Cost | Income+ | Range+ | Description | Rationale |
 |----|------|--------|------|---------|--------|-------------|-----------|
-| `upg-garden` | Upgrade to Garden | Park | 3 | +1 | +1 | Park -> Garden. | Completes M1 Culture upgrade coverage. |
+| `upg-community-hub` | Upgrade to Community Hub | Library | 4 | +1 | +1 | Library -> Community Hub. | Community space upgrade for Library. |
+| `upg-garden` | Upgrade to Garden | Park | 3 | +1 | +1 | Park -> Garden. | Completes M1 Culture upgrade / community space upgrade coverage. |
 | `upg-home-improvement` | Upgrade to Home Improvement | Hardware Store | 4 | +1 | +1 | Hardware Store -> Home Improvement. | Completes M1 Commerce upgrade. |
 | `upg-vintage-shop` | Upgrade to Vintage Shop | Pawn Shop | 3 | +1 | +0 | Pawn Shop -> Vintage Shop. | Budget upgrade; income only. |
 | `upg-designer-store` | Upgrade to Designer Store | Boutique | 4 | +1 | +1 | Boutique -> Designer Store. | Premium Commerce upgrade. |
@@ -206,8 +228,8 @@ Multi-level upgrades require the business to already be at Level 1 (`requiredLev
 | Cost | Count | Cards |
 |------|-------|-------|
 | 2 | 1 | Gourmet Truck |
-| 3 | 9 | Library, Garden, Vintage Shop, Dry Cleaners, Salon, Roastery, Garden Center, Bread Factory, Fast Food |
-| 4 | 7 | Patisserie, Bistro, Designer Store, Gaming Lounge, Museum, Drive-In Theater, Wellness Center |
+| 3 | 9 | Library (Bookshop upgrade), Garden, Vintage Shop, Dry Cleaners, Salon, Roastery, Garden Center, Bread Factory, Fast Food |
+| 4 | 8 | Patisserie, Bistro, Designer Store, Gaming Lounge, Museum, Drive-In Theater, Wellness Center, Community Hub |
 | 5 | 6 | Home Improvement, IMAX Theater, Resort Spa, Medical Center, Grand Bakehouse, Restaurant |
 | 6 | 2 | Multiplex, Luxury Retreat |
 
@@ -224,7 +246,7 @@ M2 introduces 5 bridge cards that belong to two synergy types simultaneously. Th
 | Synergy | Single-type | Bridge (shared) | Total |
 |---------|-------------|-----------------|-------|
 | Food | 2 (Bakery, Diner) | 2 (Cafe, Food Truck) | 4 |
-| Culture | 2 (Bookshop, Park) | 3 (Cafe, Art Gallery, Florist) | 5 |
+| Culture | 1 (Bookshop) | 3 (Cafe, Art Gallery, Florist) | 4 (plus Park as Community Space) |
 | Commerce | 3 (Hardware, Pawn Shop, Boutique) | 1 (Florist) | 4 |
 | Service | 3 (Laundromat, Barbershop, Clinic) | 1 (Day Spa) | 4 |
 | Entertainment | 2 (Arcade, Cinema) | 3 (Food Truck, Art Gallery, Day Spa) | 5 |

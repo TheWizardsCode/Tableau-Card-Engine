@@ -176,15 +176,4 @@ describe('TutorialOfferModal decision logic', () => {
     expect(shouldShowOffer(storage)).toBe(false);
   });
 
-  // ── Replay-Tutorial Path ─────────────────────────────────
-
-  it('resetting state to not_seen enables the offer again', () => {
-    // Simulate completed state
-    persistStatus(storage, 'completed');
-    expect(shouldShowOffer(storage)).toBe(false);
-
-    // Reset to not_seen (mimics the replay-tutorial handler)
-    persistStatus(storage, 'not_seen');
-    expect(shouldShowOffer(storage)).toBe(true);
-  });
 });

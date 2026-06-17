@@ -20,12 +20,12 @@ describe('SoundManager tf integration', () => {
       storage: null,
       synthPlayer,
       synthKeyMap: {
-        'ms-place': 'card-place',
+        'sfx-place': 'card-place',
       },
     });
 
-    manager.register('ms-place', 'ms-place-wav');
-    manager.play('ms-place');
+    manager.register('sfx-place', 'sfx-place-wav');
+    manager.play('sfx-place');
 
     expect(synthPlayer.play).toHaveBeenCalledWith('card-place');
     expect(wavPlayer.play).not.toHaveBeenCalled();
@@ -39,12 +39,12 @@ describe('SoundManager tf integration', () => {
       storage: null,
       synthPlayer,
       synthKeyMap: {
-        'ms-place': 'card-place',
+        'sfx-place': 'card-place',
       },
     });
 
-    manager.register('ms-click', 'click.wav');
-    manager.play('ms-click');
+    manager.register('sfx-click', 'click.wav');
+    manager.play('sfx-click');
 
     expect(wavPlayer.play).toHaveBeenCalledWith('click.wav');
     expect(synthPlayer.play).not.toHaveBeenCalled();
@@ -58,7 +58,7 @@ describe('SoundManager tf integration', () => {
       storage: null,
       synthPlayer,
       synthKeyMap: {
-        'ms-place': 'card-place',
+        'sfx-place': 'card-place',
       },
     });
 
@@ -79,12 +79,12 @@ describe('SoundManager tf integration', () => {
       storage: null,
     });
 
-    manager.register('ms-place', 'ms-place-wav');
-    manager.play('ms-place');
-    expect(wavPlayer.play).toHaveBeenCalledWith('ms-place-wav');
+    manager.register('sfx-place', 'sfx-place-wav');
+    manager.play('sfx-place');
+    expect(wavPlayer.play).toHaveBeenCalledWith('sfx-place-wav');
 
-    manager.setSynthIntegration(synthPlayer, { 'ms-place': 'card-place' });
-    manager.play('ms-place');
+    manager.setSynthIntegration(synthPlayer, { 'sfx-place': 'card-place' });
+    manager.play('sfx-place');
     expect(synthPlayer.play).toHaveBeenCalledWith('card-place');
   });
 });
