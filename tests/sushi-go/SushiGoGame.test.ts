@@ -78,8 +78,8 @@ describe('SushiGoGame', () => {
         totalScore: 0,
       };
 
-      expect(validatePick(player, { cardIndex: 0 })).toEqual({ valid: true });
-      expect(validatePick(player, { cardIndex: 1 })).toEqual({ valid: true });
+      expect(validatePick(player, { cardIndex: 0 })).toEqual({ legal: true });
+      expect(validatePick(player, { cardIndex: 1 })).toEqual({ legal: true });
     });
 
     it('rejects out-of-bounds card index', () => {
@@ -94,7 +94,7 @@ describe('SushiGoGame', () => {
       };
 
       const result = validatePick(player, { cardIndex: 5 });
-      expect(result.valid).toBe(false);
+      expect(result).toEqual({ legal: false, reason: expect.any(String) });
     });
 
     it('rejects chopsticks usage without chopsticks in tableau', () => {
@@ -115,7 +115,7 @@ describe('SushiGoGame', () => {
         cardIndex: 0,
         secondCardIndex: 1,
       });
-      expect(result.valid).toBe(false);
+      expect(result).toEqual({ legal: false, reason: expect.any(String) });
     });
 
     it('accepts chopsticks usage with chopsticks in tableau', () => {
@@ -136,7 +136,7 @@ describe('SushiGoGame', () => {
         cardIndex: 0,
         secondCardIndex: 1,
       });
-      expect(result).toEqual({ valid: true });
+      expect(result).toEqual({ legal: true });
     });
 
     it('rejects picking the same card twice', () => {
@@ -157,7 +157,7 @@ describe('SushiGoGame', () => {
         cardIndex: 0,
         secondCardIndex: 0,
       });
-      expect(result.valid).toBe(false);
+      expect(result).toEqual({ legal: false, reason: expect.any(String) });
     });
   });
 
