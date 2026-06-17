@@ -193,6 +193,9 @@ export class GolfScene extends CardGameScene {
       this.gameEvents,
       this.soundManager,
     );
+
+    // Window error handler for crash export
+    this.setupErrorExportHandler();
     this.replayController = new GolfReplayController(
       this,
       this.session,
@@ -446,6 +449,21 @@ export class GolfScene extends CardGameScene {
   }
 
   // ── End screen ──────────────────────────────────────────
+
+  private setupErrorExportHandler(): void {
+    // Only register in non-replay mode (replay has its own error handling)
+    if (this.replayMode) return;
+
+    const handler = (_event: Event, _source?: string, _lineno?: number, _colno?: number, error?: Error) => {
+      console.warn('[GolfScene] Unhandled error detected, showing export button:', error?.message);
+      this.overlayHelper.showErrorExportOverlay();
+    };
+    window.addEventListener('error', handler);
+    // Store reference for cleanup
+    this.events.once('shutdown', () => {
+      window.removeEventListener('error', handler);
+    });
+  }
 
   private showEndScreen(): void {
     this.overlayHelper.showEndScreen(
