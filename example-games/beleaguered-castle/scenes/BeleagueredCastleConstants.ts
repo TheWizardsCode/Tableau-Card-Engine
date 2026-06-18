@@ -46,3 +46,35 @@ export const AUTO_COMPLETE_DELAY = 100;
 export const HIGHLIGHT_VALID = 0x44ff44;
 export const HIGHLIGHT_ALPHA = 0.3;
 export const SELECTION_TINT = 0xaaffaa;
+
+// ── Overlay display ───────────────────────────────────────
+export const OVERLAY_DEPTH = 2000;
+export const OVERLAY_BG_ALPHA = 0.75;
+export const OVERLAY_TITLE_FONT_SIZE = '42px';
+export const OVERLAY_INFO_FONT_SIZE = '18px';
+export const OVERLAY_STATS_FONT_SIZE = '22px';
+export const OVERLAY_WIN_TITLE_Y_OFFSET = -80;
+export const OVERLAY_CONTENT_Y_OFFSET = -20;
+export const OVERLAY_BUTTON_Y_OFFSET = 50;
+
+// ── HUD ────────────────────────────────────────────────────
+export const HUD_MARGIN = 28;
+export const HUD_FONT_SIZE = '20px';
+export const HUD_SEED_FONT_SIZE = '18px';
+
+// ── Foundation slot ────────────────────────────────────────
+export const FOUNDATION_SLOT_ALPHA = 0.6;
+export const FOUNDATION_BORDER_RADIUS = 6;
+export const FOUNDATION_COUNT_FONT_SIZE = '12px';
+
+// ── Auto-complete animation ────────────────────────────────
+export const AUTO_COMPLETE_STAGGER_MS = 100;
+export const AUTO_COMPLETE_MIN_DURATION = 50;
+
+// ── Resume overlay ─────────────────────────────────────────
+export const RESUME_TITLE_FONT_SIZE = '36px';
+export const RESUME_TITLE_Y_OFFSET = -60;
+export const RESUME_INFO_Y_OFFSET = -15;
+export const RESUME_BUTTON_Y_OFFSET = 50;
+export const RESUME_BUTTON_SPACING = 110;
+export const RESUME_INFO_FONT_SIZE = '18px';

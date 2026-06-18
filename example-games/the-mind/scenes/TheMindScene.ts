@@ -39,6 +39,17 @@ import {
   PRE_PENALTY_PAUSE,
   DEPTH_OVERLAY,
   DEPTH_OVERLAY_CONTENT,
+  DEPTH_UI,
+  OVERLAY_BG_ALPHA,
+  OVERLAY_BOX_WIDTH,
+  OVERLAY_BOX_HEIGHT,
+  OVERLAY_BOX_ALPHA,
+  OVERLAY_BUTTON_FONT_SIZE,
+  OVERLAY_BUTTON_Y_OFFSET,
+  OVERLAY_BUTTON_SPACING,
+  AUTO_PLAY_BUTTON_X,
+  AUTO_PLAY_BUTTON_MARGIN,
+  AUTO_PLAY_FONT_SIZE,
   type GamePhase,
 } from './MindConstants';
 import { SFX_KEYS } from './MindAudioKeys';
@@ -244,13 +255,13 @@ export class TheMindScene extends CardGameScene {
   private createAutoPlayButton(): void {
     const label = this.autoPlayEnabled ? '[ Auto-Play: ON ]' : '[ Auto-Play: OFF ]';
     this.autoPlayButton = this.add
-      .text(20, this.scale.height - 20, label, {
-        fontSize: '12px',
+      .text(AUTO_PLAY_BUTTON_X, this.scale.height - AUTO_PLAY_BUTTON_MARGIN, label, {
+        fontSize: AUTO_PLAY_FONT_SIZE,
         color: this.autoPlayEnabled ? '#88ff88' : '#888888',
         fontFamily: 'sans-serif',
       })
       .setOrigin(0, 1)
-      .setDepth(5)
+      .setDepth(DEPTH_UI)
       .setInteractive({ useHandCursor: true });
 
     this.autoPlayButton.on('pointerdown', () => this.toggleAutoPlay());
@@ -482,14 +493,14 @@ export class TheMindScene extends CardGameScene {
       detailY: overlayCenterY(-15),
       titleDepth: DEPTH_OVERLAY_CONTENT,
       detailDepth: DEPTH_OVERLAY_CONTENT,
-      background: { depth: DEPTH_OVERLAY, alpha: 0.75 },
-      box: { width: 460, height: 280, alpha: 0.9 },
+      background: { depth: DEPTH_OVERLAY, alpha: OVERLAY_BG_ALPHA },
+      box: { width: OVERLAY_BOX_WIDTH, height: OVERLAY_BOX_HEIGHT, alpha: OVERLAY_BOX_ALPHA },
       buttons: [
         {
           label: config.primaryButtonLabel,
-          x: GAME_W / 2 - 90,
-          y: GAME_H / 2 + 60,
-          config: { fontSize: '18px' },
+          x: GAME_W / 2 - OVERLAY_BUTTON_SPACING,
+          y: GAME_H / 2 + OVERLAY_BUTTON_Y_OFFSET,
+          config: { fontSize: OVERLAY_BUTTON_FONT_SIZE },
           onClick: () => {
             this.soundManager?.play(SFX_KEYS.UI_CLICK);
             this.gameEvents.emit('ui-interaction', {
@@ -501,9 +512,9 @@ export class TheMindScene extends CardGameScene {
         },
         {
           label: '[ Menu ]',
-          x: GAME_W / 2 + 90,
-          y: GAME_H / 2 + 60,
-          config: { fontSize: '18px' },
+          x: GAME_W / 2 + OVERLAY_BUTTON_SPACING,
+          y: GAME_H / 2 + OVERLAY_BUTTON_Y_OFFSET,
+          config: { fontSize: OVERLAY_BUTTON_FONT_SIZE },
           onClick: () => {
             this.soundManager?.play(SFX_KEYS.UI_CLICK);
             this.gameEvents.emit('ui-interaction', {

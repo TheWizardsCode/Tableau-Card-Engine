@@ -400,14 +400,14 @@ export class SushiGoScene extends CardGameScene {
         const boxH = textH + TOOLTIP_PADDING * 2;
 
         let tooltipX = (ctx.x ?? 0) - boxW / 2;
-        let tooltipY = (ctx.y ?? 0) + 40;
+        let tooltipY = (ctx.y ?? 0) + TOOLTIP_Y_OFFSET;
 
-        tooltipX = Phaser.Math.Clamp(tooltipX, 4, GAME_W - boxW - 4);
-        tooltipY = Phaser.Math.Clamp(tooltipY, 4, GAME_H - boxH - 4);
+        tooltipX = Phaser.Math.Clamp(tooltipX, TOOLTIP_CLAMP_BOUNDARY, GAME_W - boxW - TOOLTIP_CLAMP_BOUNDARY);
+        tooltipY = Phaser.Math.Clamp(tooltipY, TOOLTIP_CLAMP_BOUNDARY, GAME_H - boxH - TOOLTIP_CLAMP_BOUNDARY);
 
-        if (tooltipY < (ctx.y ?? 0) + 30 && tooltipY + boxH > (ctx.y ?? 0) - 30) {
-          tooltipY = (ctx.y ?? 0) - 40 - boxH;
-          tooltipY = Phaser.Math.Clamp(tooltipY, 4, GAME_H - boxH - 4);
+        if (tooltipY < (ctx.y ?? 0) + TOOLTIP_FLIP_THRESHOLD && tooltipY + boxH > (ctx.y ?? 0) - TOOLTIP_FLIP_THRESHOLD) {
+          tooltipY = (ctx.y ?? 0) - TOOLTIP_Y_OFFSET - boxH;
+          tooltipY = Phaser.Math.Clamp(tooltipY, TOOLTIP_CLAMP_BOUNDARY, GAME_H - boxH - TOOLTIP_CLAMP_BOUNDARY);
         }
 
         const bg = scene.add.rectangle(
@@ -466,10 +466,10 @@ export class SushiGoScene extends CardGameScene {
       if (sprite) {
         const container = sprite as Phaser.GameObjects.Container;
         const highlight = this.add.rectangle(
-          0, 0, HAND_CARD_W + 6, HAND_CARD_H + 6,
+          0, 0, HAND_CARD_W + HIGHLIGHT_PADDING, HAND_CARD_H + HIGHLIGHT_PADDING,
         );
-        highlight.setStrokeStyle(3, 0x00ff88);
-        highlight.setFillStyle(0x00ff88, 0.15);
+        highlight.setStrokeStyle(HIGHLIGHT_STROKE_WIDTH, 0x00ff88);
+        highlight.setFillStyle(0x00ff88, HIGHLIGHT_FILL_ALPHA);
         container.addAt(highlight, 0);
       }
     }
@@ -561,12 +561,12 @@ export class SushiGoScene extends CardGameScene {
     const color = this.chopsticksMode ? '#ff8888' : '#88ddff';
 
     this.chopsticksButton = this.add
-      .text(GAME_W / 2, HAND_Y - HAND_CARD_H / 2 - 25, label, {
-        fontSize: '16px',
+      .text(GAME_W / 2, HAND_Y - HAND_CARD_H / 2 - CHOPSTICKS_BUTTON_Y_OFFSET, label, {
+        fontSize: CHOPSTICKS_BUTTON_FONT_SIZE,
         color,
         fontFamily: FONT_FAMILY,
         backgroundColor: '#2a3a4a',
-        padding: { x: 12, y: 6 },
+        padding: { x: CHOPSTICKS_BUTTON_PADDING_X, y: CHOPSTICKS_BUTTON_PADDING_Y },
       })
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true })
@@ -624,7 +624,7 @@ export class SushiGoScene extends CardGameScene {
     this.pendingHumanPick = null;
     this.pendingHumanSecondPick = null;
 
-    this.time.delayedCall(300, () => {
+    this.time.delayedCall(TURN_ANIMATION_DELAY, () => {
       this.refreshAll();
 
       if (this.session.phase === 'round-scoring') {

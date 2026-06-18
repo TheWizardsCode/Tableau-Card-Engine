@@ -74,6 +74,43 @@ export const SFX_KEYS = {
   UI_CLICK: 'sfx-ui-click',
 } as const;
 
+// ── Scene text labels ──────────────────────────────────────
+export const LABEL_X = 25;
+export const LABEL_Y_OFFSET = -50;
+export const LABEL_FONT_SIZE = '18px';
+
+// ── Score display ──────────────────────────────────────────
+export const ROUND_TEXT_Y = 51;
+export const ROUND_TEXT_FONT_SIZE = '20px';
+export const TURN_TEXT_Y = 75;
+export const TURN_TEXT_FONT_SIZE = '16px';
+export const CARDS_LEFT_TEXT_Y = 95;
+export const CARDS_LEFT_TEXT_FONT_SIZE = '14px';
+export const SCORE_TEXT_FONT_SIZE = '20px';
+
+// ── Instruction text ───────────────────────────────────────
+export const INSTRUCTION_MARGIN = 14;
+export const INSTRUCTION_FONT_SIZE = '15px';
+
+// ── Chopsticks button ──────────────────────────────────────
+export const CHOPSTICKS_BUTTON_FONT_SIZE = '16px';
+export const CHOPSTICKS_BUTTON_Y_OFFSET = 25;
+export const CHOPSTICKS_BUTTON_PADDING_X = 12;
+export const CHOPSTICKS_BUTTON_PADDING_Y = 6;
+
+// ── Tooltip positioning ────────────────────────────────────
+export const TOOLTIP_Y_OFFSET = 40;
+export const TOOLTIP_CLAMP_BOUNDARY = 4;
+export const TOOLTIP_FLIP_THRESHOLD = 30;
+
+// ── Card highlight (chopsticks mode) ───────────────────────
+export const HIGHLIGHT_PADDING = 6;
+export const HIGHLIGHT_STROKE_WIDTH = 3;
+export const HIGHLIGHT_FILL_ALPHA = 0.15;
+
+// ── Turn animation delay ───────────────────────────────────
+export const TURN_ANIMATION_DELAY = 300;
+
 // Turn phase
 export type TurnPhase =
   | 'picking'

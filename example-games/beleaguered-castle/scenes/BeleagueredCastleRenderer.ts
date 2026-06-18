@@ -15,6 +15,12 @@ import {
   BC_CARD_W, BC_CARD_H, CARD_GAP, CASCADE_OFFSET_Y,
   DRAG_DEPTH, DEAL_STAGGER, ANIM_DURATION, SNAP_BACK_DURATION,
   HIGHLIGHT_VALID, HIGHLIGHT_ALPHA, SELECTION_TINT,
+  HUD_MARGIN,
+  HUD_FONT_SIZE,
+  HUD_SEED_FONT_SIZE,
+  FOUNDATION_SLOT_ALPHA,
+  FOUNDATION_BORDER_RADIUS,
+  FOUNDATION_COUNT_FONT_SIZE,
 } from './BeleagueredCastleConstants';
 import {
   computeBeleagueredCastleLayout,
@@ -92,8 +98,8 @@ export class BeleagueredCastleRenderer {
     for (let i = 0; i < FOUNDATION_COUNT; i++) {
       const x = startX + i * (BC_CARD_W + FOUNDATION_GAP);
       const slotGraphics = this.scene.add.graphics();
-      slotGraphics.lineStyle(2, 0x448844, 0.6);
-      slotGraphics.strokeRoundedRect(x - BC_CARD_W / 2, this.layout.foundationCenterY - BC_CARD_H / 2, BC_CARD_W, BC_CARD_H, 6);
+      slotGraphics.lineStyle(2, 0x448844, FOUNDATION_SLOT_ALPHA);
+      slotGraphics.strokeRoundedRect(x - BC_CARD_W / 2, this.layout.foundationCenterY - BC_CARD_H / 2, BC_CARD_W, BC_CARD_H, FOUNDATION_BORDER_RADIUS);
 
       // Foundation pile rendered via shared PileView
       const pileView = new PileView(this.scene, {
@@ -103,7 +109,7 @@ export class BeleagueredCastleRenderer {
         emptyAlpha: 0,
         fullAlpha: 1,
         countOffsetY: BC_CARD_H / 2 + 16,
-        countFontSize: '12px',
+        countFontSize: FOUNDATION_COUNT_FONT_SIZE,
         countColor: '#aaccaa',
       });
       pileView.setPile(this.state.foundations[i]);
@@ -155,12 +161,12 @@ export class BeleagueredCastleRenderer {
   }
 
   createHUD(seed: number): void {
-    this.moveCountText = createBcHudText(this.scene, 20, GAME_H - 28, 'Moves: 0', '#aaccaa', { fontSize: '20px' });
+    this.moveCountText = createBcHudText(this.scene, 20, GAME_H - HUD_MARGIN, 'Moves: 0', '#aaccaa', { fontSize: HUD_FONT_SIZE });
 
-    this.timerText = createBcHudText(this.scene, GAME_W / 2, GAME_H - 28, '00:00', '#aaccaa', { fontSize: '20px' });
+    this.timerText = createBcHudText(this.scene, GAME_W / 2, GAME_H - HUD_MARGIN, '00:00', '#aaccaa', { fontSize: HUD_FONT_SIZE });
 
-    this.seedText = createBcHudText(this.scene, GAME_W - 20, GAME_H - 28, `Seed: ${seed}`, '#668866', {
-      fontSize: '18px',
+    this.seedText = createBcHudText(this.scene, GAME_W - 20, GAME_H - HUD_MARGIN, `Seed: ${seed}`, '#668866', {
+      fontSize: HUD_SEED_FONT_SIZE,
       originX: 1,
     });
   }

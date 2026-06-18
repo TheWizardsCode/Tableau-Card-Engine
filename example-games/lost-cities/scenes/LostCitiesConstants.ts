@@ -141,6 +141,8 @@ export const TOOLTIP_BG_ALPHA = 0.9;
 export const TOOLTIP_PAD = 10;
 export const TOOLTIP_DEPTH = 800;
 export const TOOLTIP_MAX_W = 260;
+export const TOOLTIP_DETAIL_FONT_SIZE = '12px';
+export const TOOLTIP_TITLE_FONT_SIZE = '13px';
 
 // ── Turn state machine ────────────────────────────────────
 export type SceneTurnPhase =

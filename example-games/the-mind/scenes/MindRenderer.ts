@@ -25,6 +25,20 @@ import { MAX_LEVEL } from '../TheMindGameState';
 import {
   CARD_W, CARD_H, CARD_GAP, MAX_HAND_WIDTH,
   DEPTH_CARDS, DEPTH_UI,
+  STATUS_X_OFFSET,
+  STATUS_LEVEL_Y,
+  STATUS_LIVES_Y,
+  PILE_COUNT_Y_OFFSET,
+  PILE_COUNT_FONT_SIZE,
+  PILE_VALUE_Y_OFFSET,
+  PILE_VALUE_FONT_SIZE,
+  INSTRUCTION_MARGIN,
+  INSTRUCTION_FONT_SIZE,
+  HOVER_SCALE,
+  HOVER_Y_OFFSET,
+  FLASH_DELAY,
+  FLASH_REPEATS,
+  FLASH_TIMER_OFFSET,
 } from './MindConstants';
 import {
   computeMindLayout,
@@ -116,13 +130,13 @@ export class MindRenderer {
   createStatusDisplay(): void {
     this.levelText = createMindHudText(
       this.scene,
-      this.sceneW - 100, 55, '',
+      this.sceneW - STATUS_X_OFFSET, STATUS_LEVEL_Y, '',
       '#aaccff',
     );
 
     this.livesText = createMindHudText(
       this.scene,
-      this.sceneW - 100, 79, '',
+      this.sceneW - STATUS_X_OFFSET, STATUS_LIVES_Y, '',
       '#ff6666',
     );
   }
@@ -137,8 +151,8 @@ export class MindRenderer {
       emptyTexture: backKey,
       emptyAlpha: 0.3,
       fullAlpha: 1,
-      countOffsetY: CARD_H / 2 + 32,
-      countFontSize: '11px',
+      countOffsetY: CARD_H / 2 + PILE_COUNT_Y_OFFSET,
+      countFontSize: PILE_COUNT_FONT_SIZE,
       countColor: '#888888',
       label: 'Pile',
     });
@@ -154,8 +168,8 @@ export class MindRenderer {
 
     // Value overlay (numeric value of the top card)
     this.pileValueText = this.scene.add
-      .text(this.layout.playPileCenterX, this.layout.playPileCenterY + CARD_H / 2 + 14, '', {
-        fontSize: '14px',
+      .text(this.layout.playPileCenterX, this.layout.playPileCenterY + CARD_H / 2 + PILE_VALUE_Y_OFFSET, '', {
+        fontSize: PILE_VALUE_FONT_SIZE,
         color: '#ffffff',
         fontFamily: FONT_FAMILY,
       })
@@ -165,8 +179,8 @@ export class MindRenderer {
 
   createInstruction(): void {
     this.instructionText = this.scene.add
-      .text(this.sceneW / 2, this.sceneH - 20, '', {
-        fontSize: '12px',
+      .text(this.sceneW / 2, this.sceneH - INSTRUCTION_MARGIN, '', {
+        fontSize: INSTRUCTION_FONT_SIZE,
         color: '#aaaaaa',
         fontFamily: FONT_FAMILY,
       })
@@ -300,8 +314,8 @@ export class MindRenderer {
       // Hover feedback (only during playing phase, not auto-play)
       sprite.on('pointerover', () => {
         if (phase === 'playing' && !autoPlayEnabled) {
-          sprite.setDisplaySize(CARD_W * 1.03, CARD_H * 1.03);
-          sprite.setY(this.layout.humanHandCenterY - 4);
+          sprite.setDisplaySize(CARD_W * HOVER_SCALE, CARD_H * HOVER_SCALE);
+          sprite.setY(this.layout.humanHandCenterY + HOVER_Y_OFFSET);
         }
       });
       sprite.on('pointerout', () => {
@@ -504,15 +518,15 @@ export class MindRenderer {
   flashLives(): void {
     let flashes = 0;
     const flashTimer = this.scene.time.addEvent({
-      delay: 150,
-      repeat: 5,
+      delay: FLASH_DELAY,
+      repeat: FLASH_REPEATS,
       callback: () => {
         flashes++;
         this.livesText.setColor(flashes % 2 === 0 ? '#ff6666' : '#ffffff');
       },
     });
 
-    this.scene.time.delayedCall(150 * 6 + 50, () => {
+    this.scene.time.delayedCall(FLASH_DELAY * 6 + FLASH_TIMER_OFFSET, () => {
       flashTimer.destroy();
       this.livesText.setColor('#ff6666');
     });

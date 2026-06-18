@@ -17,6 +17,11 @@ import {
   CARD_W, CARD_H,
   ANIM_DURATION, PENALTY_REVEAL_DELAY,
   DEPTH_PLAYED_CARD, DEPTH_OVERLAY_CONTENT,
+  PENALTY_CARD_ALPHA,
+  PENALTY_CLEANUP_EXTRA_DELAY,
+  LEVEL_COMPLETE_TEXT_Y_OFFSET,
+  LEVEL_COMPLETE_FADE_IN_DURATION,
+  LEVEL_COMPLETE_DISPLAY_DURATION,
 } from './MindConstants';
 import { pickPenaltyStartPositions } from './penaltyAnimation';
 import type { MindRenderer } from './MindRenderer';
@@ -205,7 +210,7 @@ export class MindAnimator {
         targets: sprite,
         x: this.layout.playPileCenterX,
         y: this.layout.playPileCenterY,
-        alpha: 0.8,
+        alpha: PENALTY_CARD_ALPHA,
         duration: ANIM_DURATION,
       });
     }
@@ -220,7 +225,7 @@ export class MindAnimator {
         });
       }
 
-      this.scene.time.delayedCall(ANIM_DURATION + 50, () => {
+      this.scene.time.delayedCall(ANIM_DURATION + PENALTY_CLEANUP_EXTRA_DELAY, () => {
         onComplete();
       });
     });
@@ -251,7 +256,7 @@ export class MindAnimator {
     const levelText = this.scene.add
       .text(
         this.layout.playPileCenterX,
-        this.layout.playPileCenterY + 40,
+        this.layout.playPileCenterY + LEVEL_COMPLETE_TEXT_Y_OFFSET,
         `Level ${completedLevel} Complete!${bonusText}`,
         {
           fontSize: '28px',
@@ -267,10 +272,10 @@ export class MindAnimator {
     this.scene.tweens.add({
       targets: levelText,
       alpha: 1,
-      duration: 300,
+      duration: LEVEL_COMPLETE_FADE_IN_DURATION,
     });
 
-    this.scene.time.delayedCall(2000, () => {
+    this.scene.time.delayedCall(LEVEL_COMPLETE_DISPLAY_DURATION, () => {
       levelText.destroy();
       onComplete();
     });

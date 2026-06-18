@@ -54,7 +54,7 @@ import {
 import { LostCitiesRenderer } from './LostCitiesRenderer';
 import { LostCitiesAnimator } from './LostCitiesAnimator';
 import { LostCitiesOverlayHelper } from './LostCitiesOverlays';
-import { TOOLTIP_BG_COLOR, TOOLTIP_BG_ALPHA, TOOLTIP_PAD, TOOLTIP_DEPTH, TOOLTIP_MAX_W } from './LostCitiesConstants';
+import { TOOLTIP_BG_COLOR, TOOLTIP_BG_ALPHA, TOOLTIP_PAD, TOOLTIP_DEPTH, TOOLTIP_MAX_W, TOOLTIP_DETAIL_FONT_SIZE, TOOLTIP_TITLE_FONT_SIZE } from './LostCitiesConstants';
 // TooltipManager imported from shared src/ui (LostCitiesTooltipManager migrated)
 import { LostCitiesReplayController } from './LostCitiesReplayController';
 import { LostCitiesTurnController } from './LostCitiesTurnController';
@@ -274,7 +274,7 @@ export class LostCitiesScene extends CardGameScene {
         ];
 
         const text = scene.add.text(0, 0, detailLines.join('\n'), {
-          fontSize: '12px',
+          fontSize: TOOLTIP_DETAIL_FONT_SIZE,
           color: '#dddddd',
           fontFamily: FONT_FAMILY,
           lineSpacing: 4,
@@ -282,7 +282,7 @@ export class LostCitiesScene extends CardGameScene {
         }).setOrigin(0, 0);
 
         const title = scene.add.text(TOOLTIP_PAD, TOOLTIP_PAD, `${color.toUpperCase()} Expedition`, {
-          fontSize: '13px',
+          fontSize: TOOLTIP_TITLE_FONT_SIZE,
           color: '#f0c040',
           fontFamily: FONT_FAMILY,
           fontStyle: 'bold',

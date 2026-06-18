@@ -468,7 +468,7 @@ export class MainStreetScene extends CardGameScene {
 
     const instruction = {
       x: this.instructionText.x - this.instructionText.displayWidth,
-      y: this.instructionText.y - this.instructionText.displayHeight * 0.5,
+      y: this.instructionText.y - this.instructionText.displayHeight / 2,
       w: this.instructionText.displayWidth,
       h: this.instructionText.displayHeight,
     };

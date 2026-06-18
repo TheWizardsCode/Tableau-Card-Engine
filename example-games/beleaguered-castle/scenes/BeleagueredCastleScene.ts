@@ -351,7 +351,7 @@ export class BeleagueredCastleScene extends CardGameScene {
   }
 
   private runAutoCompleteVisuals(moves: BCMove[], moveCards: Array<{ suit: string; rank: string; foundationIndex: number }>, isSafeAutoMove?: boolean): void {
-    const STAGGER_MS = 100;
+    const STAGGER_MS = AUTO_COMPLETE_STAGGER_MS;
 
 
     const animIndices: number[] = [];
@@ -416,7 +416,7 @@ export class BeleagueredCastleScene extends CardGameScene {
           target: moving,
           destX,
           destY,
-          duration: Math.max(50, ANIM_DURATION),
+          duration: Math.max(AUTO_COMPLETE_MIN_DURATION, ANIM_DURATION),
           soundManager: this.soundManager ?? null,
           sfx: { start: SFX_KEYS.CARD_PICKUP, end: endSfx },
           onComplete: () => {
@@ -497,36 +497,35 @@ export class BeleagueredCastleScene extends CardGameScene {
    * Show a "Resume Saved Game?" overlay with Resume and New Game options.
    */
   private showResumeOverlay(savedState: BeleagueredCastleState): void {
-    const OVERLAY_DEPTH = 2000;
     const BUTTON_DEPTH = OVERLAY_DEPTH + 1;
 
     this.overlayManager.showOverlay({
       type: 'custom',
-      backgroundOptions: { depth: OVERLAY_DEPTH, alpha: 0.75 },
+      backgroundOptions: { depth: OVERLAY_DEPTH, alpha: OVERLAY_BG_ALPHA },
     });
 
-    const title = this.add.text(GAME_W / 2, GAME_H / 2 - 60, 'Resume Saved Game?', {
-      fontSize: '36px',
+    const title = this.add.text(GAME_W / 2, GAME_H / 2 + RESUME_TITLE_Y_OFFSET, 'Resume Saved Game?', {
+      fontSize: RESUME_TITLE_FONT_SIZE,
       color: '#ffcc00',
       fontFamily: FONT_FAMILY,
       fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(BUTTON_DEPTH);
     this.overlayManager.add(title);
 
-    const infoText = this.add.text(GAME_W / 2, GAME_H / 2 - 15,
+    const infoText = this.add.text(GAME_W / 2, GAME_H / 2 + RESUME_INFO_Y_OFFSET,
       `A checkpoint was found from a previous game.\nResume where you left off or start fresh.`,
-      { fontSize: '18px', color: '#cccccc', fontFamily: FONT_FAMILY, align: 'center' },
+      { fontSize: RESUME_INFO_FONT_SIZE, color: '#cccccc', fontFamily: FONT_FAMILY, align: 'center' },
     ).setOrigin(0.5).setDepth(BUTTON_DEPTH);
     this.overlayManager.add(infoText);
 
-    const resumeBtn = createOverlayButton(this, GAME_W / 2 - 110, GAME_H / 2 + 50, '[ Resume ]', BUTTON_DEPTH);
+    const resumeBtn = createOverlayButton(this, GAME_W / 2 - RESUME_BUTTON_SPACING, GAME_H / 2 + RESUME_BUTTON_Y_OFFSET, '[ Resume ]', BUTTON_DEPTH);
     resumeBtn.on('pointerdown', () => {
       this.overlayManager.dismiss();
       this.restoreFromCheckpoint(savedState);
     });
     this.overlayManager.add(resumeBtn);
 
-    const newGameBtn = createOverlayButton(this, GAME_W / 2 + 110, GAME_H / 2 + 50, '[ New Game ]', BUTTON_DEPTH);
+    const newGameBtn = createOverlayButton(this, GAME_W / 2 + RESUME_BUTTON_SPACING, GAME_H / 2 + RESUME_BUTTON_Y_OFFSET, '[ New Game ]', BUTTON_DEPTH);
     newGameBtn.on('pointerdown', () => {
       this.overlayManager.dismiss();
       this.clearCheckpointAndStartFresh();
@@ -697,12 +696,11 @@ export class BeleagueredCastleScene extends CardGameScene {
   // ── Overlay helpers ────────────────────────────────────
 
   private showWinOverlay(elapsedSeconds: number, _soundManager?: { play: (key: string) => void } | null): void {
-    const OVERLAY_DEPTH = 2000;
     const BUTTON_DEPTH = OVERLAY_DEPTH + 1;
 
     this.overlayManager.showOverlay({
       type: 'game-over',
-      backgroundOptions: { depth: OVERLAY_DEPTH, alpha: 0.75 },
+      backgroundOptions: { depth: OVERLAY_DEPTH, alpha: OVERLAY_BG_ALPHA },
     });
 
     const minutes = Math.floor(elapsedSeconds / 60);
@@ -710,44 +708,43 @@ export class BeleagueredCastleScene extends CardGameScene {
     const mm = String(minutes).padStart(2, '0');
     const ss = String(seconds).padStart(2, '0');
 
-    const title = this.add.text(GAME_W / 2, GAME_H / 2 - 80, 'You Win!', {
-      fontSize: '42px', color: '#88ff88', fontFamily: FONT_FAMILY, fontStyle: 'bold',
+    const title = this.add.text(GAME_W / 2, GAME_H / 2 + OVERLAY_WIN_TITLE_Y_OFFSET, 'You Win!', {
+      fontSize: OVERLAY_TITLE_FONT_SIZE, color: '#88ff88', fontFamily: FONT_FAMILY, fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(BUTTON_DEPTH);
     this.overlayManager.add(title);
 
-    const stats = createHudText(this, GAME_W / 2, GAME_H / 2 - 20,
+    const stats = createHudText(this, GAME_W / 2, GAME_H / 2 + OVERLAY_CONTENT_Y_OFFSET,
       `Moves: ${this.gameState.moveCount}    Time: ${mm}:${ss}`, '#aaccaa', {
-        fontSize: '22px',
+        fontSize: OVERLAY_STATS_FONT_SIZE,
         originX: 0.5,
         originY: 0.5,
       });
     stats.setDepth(BUTTON_DEPTH);
     this.overlayManager.add(stats);
 
-    const newGameBtn = createOverlayButton(this, GAME_W / 2 - 150, GAME_H / 2 + 50, '[ New Game ]', BUTTON_DEPTH);
+    const newGameBtn = createOverlayButton(this, GAME_W / 2 - 150, GAME_H / 2 + OVERLAY_BUTTON_Y_OFFSET, '[ New Game ]', BUTTON_DEPTH);
     newGameBtn.on('pointerdown', () => this.onNewGame?.());
     this.overlayManager.add(newGameBtn);
 
-    const restartBtn = createOverlayButton(this, GAME_W / 2, GAME_H / 2 + 50, '[ Restart ]', BUTTON_DEPTH);
+    const restartBtn = createOverlayButton(this, GAME_W / 2, GAME_H / 2 + OVERLAY_BUTTON_Y_OFFSET, '[ Restart ]', BUTTON_DEPTH);
     restartBtn.on('pointerdown', () => this.onRestart?.());
     this.overlayManager.add(restartBtn);
 
-    const menuBtn = createOverlayMenuButton(this, GAME_W / 2 + 150, GAME_H / 2 + 50, BUTTON_DEPTH);
+    const menuBtn = createOverlayMenuButton(this, GAME_W / 2 + 150, GAME_H / 2 + OVERLAY_BUTTON_Y_OFFSET, BUTTON_DEPTH);
     this.overlayManager.add(menuBtn);
   }
 
   private showNoMovesOverlay(): void {
-    const OVERLAY_DEPTH = 2000;
     const BUTTON_DEPTH = OVERLAY_DEPTH + 1;
 
     this.overlayManager.showOverlay({
       type: 'game-over',
-      backgroundOptions: { depth: OVERLAY_DEPTH, alpha: 0.75 },
+      backgroundOptions: { depth: OVERLAY_DEPTH, alpha: OVERLAY_BG_ALPHA },
     });
 
-    const title = createHudText(this, GAME_W / 2, GAME_H / 2 - 60,
+    const title = createHudText(this, GAME_W / 2, GAME_H / 2 + OVERLAY_CONTENT_Y_OFFSET,
       'No Productive Moves Available', '#ff8888', {
-        fontSize: '34px',
+        fontSize: OVERLAY_STATS_FONT_SIZE,
         originX: 0.5,
         originY: 0.5,
       });

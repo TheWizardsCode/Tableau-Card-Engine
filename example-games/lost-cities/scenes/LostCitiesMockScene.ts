@@ -120,6 +120,13 @@ const SMALL_LABEL: Phaser.Types.GameObjects.Text.TextStyle = {
   align: 'center',
 };
 
+// ── Card slot rendering ────────────────────────────────────
+const CARD_SLOT_RADIUS = 4;
+const CARD_SLOT_STROKE_ALPHA = 0.15;
+
+// ── Section box label font size ────────────────────────────
+const MOCK_BOX_LABEL_FONT = '9px';
+
 // ════════════════════════════════════════════════════════════
 export class LostCitiesMockScene extends Phaser.Scene {
   constructor() {
@@ -332,7 +339,7 @@ export class LostCitiesMockScene extends Phaser.Scene {
       this.add
         .text(x + 6, y - 1, label, {
           ...SMALL_LABEL,
-          fontSize: '9px',
+          fontSize: MOCK_BOX_LABEL_FONT,
           color: '#667766',
         })
         .setOrigin(0, 1);
@@ -350,8 +357,8 @@ export class LostCitiesMockScene extends Phaser.Scene {
     alpha: number,
   ): void {
     gfx.fillStyle(fillColor, alpha);
-    gfx.fillRoundedRect(x, y, w, h, 4);
-    gfx.lineStyle(1, 0xffffff, 0.15);
-    gfx.strokeRoundedRect(x, y, w, h, 4);
+    gfx.fillRoundedRect(x, y, w, h, CARD_SLOT_RADIUS);
+    gfx.lineStyle(1, 0xffffff, CARD_SLOT_STROKE_ALPHA);
+    gfx.strokeRoundedRect(x, y, w, h, CARD_SLOT_RADIUS);
   }
 }
