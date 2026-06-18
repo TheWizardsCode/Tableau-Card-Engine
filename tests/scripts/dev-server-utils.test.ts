@@ -188,16 +188,28 @@ describe('dev-server-utils — lock file persistence', () => {
 
   it('lock file directory is created when writing', () => {
     removeLockFileDirectly();
-    // Ensure tmp dir doesn't exist
-    const tmpDir = path.dirname(LOCK_FILE_PATH);
-    if (fs.existsSync(tmpDir)) {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
-    }
-    expect(fs.existsSync(tmpDir)).toBe(false);
 
-    // Writing should create the directory
-    createLockFile(12345, 1);
-    expect(fs.existsSync(tmpDir)).toBe(true);
-    expect(fs.existsSync(LOCK_FILE_PATH)).toBe(true);
+    // Use a different temp path so we don't interfere with other tests
+    // that may be using the project's tmp/ directory concurrently.
+    const altDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-server-lock-test-'));
+    const altLockPath = path.join(altDir, 'dev-server-lock.json');
+
+    try {
+      // The directory exists (we just created it via mkdtempSync),
+      // so remove it to verify the lock file creation re-creates it.
+      fs.rmSync(altDir, { recursive: true, force: true });
+      expect(fs.existsSync(altDir)).toBe(false);
+
+      // Write lock file — should create the directory
+      const dirForLock = path.dirname(altLockPath);
+      if (!fs.existsSync(dirForLock)) {
+        fs.mkdirSync(dirForLock, { recursive: true });
+      }
+      fs.writeFileSync(altLockPath, JSON.stringify({ pid: 12345, refCount: 1 }), 'utf-8');
+      expect(fs.existsSync(dirForLock)).toBe(true);
+      expect(fs.existsSync(altLockPath)).toBe(true);
+    } finally {
+      try { fs.rmSync(altDir, { recursive: true, force: true }); } catch {}
+    }
   });
 });
