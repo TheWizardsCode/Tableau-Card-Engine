@@ -225,9 +225,9 @@ export class BeleagueredCastleScene extends CardGameScene {
     const zoneIndex = zone.getData('index') as number;
     let move: BCMove | null = null;
 
-    if (zoneType === 'foundation' && isLegalFoundationMove(this.gameState, fromCol, zoneIndex)) {
+    if (zoneType === 'foundation' && isLegalFoundationMove(this.gameState, fromCol, zoneIndex).legal) {
       move = { kind: 'tableau-to-foundation', fromCol, toFoundation: zoneIndex };
-    } else if (zoneType === 'tableau' && zoneIndex !== fromCol && isLegalTableauMove(this.gameState, fromCol, zoneIndex)) {
+    } else if (zoneType === 'tableau' && zoneIndex !== fromCol && isLegalTableauMove(this.gameState, fromCol, zoneIndex).legal) {
       move = { kind: 'tableau-to-tableau', fromCol, toCol: zoneIndex };
     }
 
@@ -247,7 +247,7 @@ export class BeleagueredCastleScene extends CardGameScene {
       zone.on('pointerdown', () => {
         if (this.interactionBlocked) return;
         if (this.selectedCol === null) return;
-        if (isLegalFoundationMove(this.gameState, this.selectedCol, fi)) {
+        if (isLegalFoundationMove(this.gameState, this.selectedCol, fi).legal) {
           const move: BCMove = { kind: 'tableau-to-foundation', fromCol: this.selectedCol, toFoundation: fi };
           this.deselectColumn();
           this.turnController.executePlayerMove(move);
@@ -264,7 +264,7 @@ export class BeleagueredCastleScene extends CardGameScene {
         if (this.interactionBlocked) return;
         if (this.selectedCol === null) return;
         if (col === this.selectedCol) { this.deselectColumn(); return; }
-        if (isLegalTableauMove(this.gameState, this.selectedCol, col)) {
+        if (isLegalTableauMove(this.gameState, this.selectedCol, col).legal) {
           const move: BCMove = { kind: 'tableau-to-tableau', fromCol: this.selectedCol, toCol: col };
           this.deselectColumn();
           this.turnController.executePlayerMove(move);
@@ -279,7 +279,7 @@ export class BeleagueredCastleScene extends CardGameScene {
     if (this.interactionBlocked) return;
     if (this.selectedCol === colIndex) { this.deselectColumn(); return; }
     if (this.selectedCol !== null) {
-      if (isLegalTableauMove(this.gameState, this.selectedCol, colIndex)) {
+      if (isLegalTableauMove(this.gameState, this.selectedCol, colIndex).legal) {
         const move: BCMove = { kind: 'tableau-to-tableau', fromCol: this.selectedCol, toCol: colIndex };
         this.deselectColumn();
         this.turnController.executePlayerMove(move);

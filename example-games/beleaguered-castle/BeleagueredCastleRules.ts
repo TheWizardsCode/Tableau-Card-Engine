@@ -34,6 +34,7 @@ import {
   CARDS_PER_COLUMN,
   FOUNDATION_SUITS,
 } from './BeleagueredCastleState';
+import type { LegalityResult } from '../../src/rule-engine/index';
 
 // Re-export rankValue so existing consumers importing from this file
 // continue to work without import-path changes.
@@ -162,27 +163,40 @@ export function isLegalFoundationMove(
   state: BeleagueredCastleState,
   fromCol: number,
   toFoundation: number,
-): boolean {
-  if (fromCol < 0 || fromCol >= TABLEAU_COUNT) return false;
-  if (toFoundation < 0 || toFoundation >= FOUNDATION_COUNT) return false;
+): LegalityResult {
+  if (fromCol < 0 || fromCol >= TABLEAU_COUNT) {
+    return { legal: false, reason: `Column index ${fromCol} out of bounds` };
+  }
+  if (toFoundation < 0 || toFoundation >= FOUNDATION_COUNT) {
+    return { legal: false, reason: `Foundation index ${toFoundation} out of bounds` };
+  }
 
   const sourceCol = state.tableau[fromCol];
   const card = sourceCol.peek();
-  if (!card) return false;
+  if (!card) {
+    return { legal: false, reason: `Column ${fromCol} is empty` };
+  }
 
   const foundation = state.foundations[toFoundation];
   const expectedSuit = FOUNDATION_SUITS[toFoundation];
 
-  if (card.suit !== expectedSuit) return false;
+  if (card.suit !== expectedSuit) {
+    return { legal: false, reason: `Card suit ${card.suit} does not match foundation ${expectedSuit}` };
+  }
 
   const topFoundationCard = foundation.peek();
   if (!topFoundationCard) {
     // Foundation is empty; only Ace goes here (but aces are pre-placed)
-    return card.rank === 'A';
+    return card.rank === 'A'
+      ? { legal: true }
+      : { legal: false, reason: `Only Ace can start a foundation, got ${card.rank}` };
   }
 
   const expected = nextRank(topFoundationCard.rank);
-  return expected !== undefined && card.rank === expected;
+  if (expected === undefined || card.rank !== expected) {
+    return { legal: false, reason: `Expected ${expected ?? 'unknown'} on foundation, got ${card.rank}` };
+  }
+  return { legal: true };
 }
 
 /**
@@ -200,20 +214,33 @@ export function isLegalTableauMove(
   state: BeleagueredCastleState,
   fromCol: number,
   toCol: number,
-): boolean {
-  if (fromCol < 0 || fromCol >= TABLEAU_COUNT) return false;
-  if (toCol < 0 || toCol >= TABLEAU_COUNT) return false;
-  if (fromCol === toCol) return false;
+): LegalityResult {
+  if (fromCol < 0 || fromCol >= TABLEAU_COUNT) {
+    return { legal: false, reason: `Source column index ${fromCol} out of bounds` };
+  }
+  if (toCol < 0 || toCol >= TABLEAU_COUNT) {
+    return { legal: false, reason: `Destination column index ${toCol} out of bounds` };
+  }
+  if (fromCol === toCol) {
+    return { legal: false, reason: 'Source and destination columns are the same' };
+  }
 
   const sourceCol = state.tableau[fromCol];
   const card = sourceCol.peek();
-  if (!card) return false;
+  if (!card) {
+    return { legal: false, reason: `Source column ${fromCol} is empty` };
+  }
 
   const destCol = state.tableau[toCol];
-  if (destCol.isEmpty()) return true; // Any card on empty column
+  if (destCol.isEmpty()) {
+    return { legal: true }; // Any card on empty column
+  }
 
   const destTop = destCol.peek()!;
-  return rankValue(card.rank) === rankValue(destTop.rank) - 1;
+  if (rankValue(card.rank) !== rankValue(destTop.rank) - 1) {
+    return { legal: false, reason: `Card ${card.rank} does not build on ${destTop.rank} (must be one lower)` };
+  }
+  return { legal: true };
 }
 
 // ── Move application ────────────────────────────────────────
@@ -230,16 +257,7 @@ export function applyFoundationMove(
   fromCol: number,
   toFoundation: number,
 ): Card {
-  if (!isLegalFoundationMove(state, fromCol, toFoundation)) {
-    const card = state.tableau[fromCol]?.peek();
-    const foundationSuit = FOUNDATION_SUITS[toFoundation];
-    throw new Error(
-      `Illegal foundation move: column ${fromCol} ` +
-        `(${card?.rank ?? 'empty'} of ${card?.suit ?? '?'}) ` +
-        `to foundation ${toFoundation} (${foundationSuit})`,
-    );
-  }
-
+  // Caller must check legality via isLegalFoundationMove before calling.
   const card = state.tableau[fromCol].popOrThrow();
   state.foundations[toFoundation].push(card);
   state.moveCount++;
@@ -258,17 +276,7 @@ export function applyTableauMove(
   fromCol: number,
   toCol: number,
 ): Card {
-  if (!isLegalTableauMove(state, fromCol, toCol)) {
-    const card = state.tableau[fromCol]?.peek();
-    const destTop = state.tableau[toCol]?.peek();
-    throw new Error(
-      `Illegal tableau move: column ${fromCol} ` +
-        `(${card?.rank ?? 'empty'} of ${card?.suit ?? '?'}) ` +
-        `to column ${toCol} ` +
-        `(top: ${destTop?.rank ?? 'empty'} of ${destTop?.suit ?? '?'})`,
-    );
-  }
-
+  // Caller must check legality via isLegalTableauMove before calling.
   const card = state.tableau[fromCol].popOrThrow();
   state.tableau[toCol].push(card);
   state.moveCount++;
@@ -358,7 +366,7 @@ export function getLegalMoves(state: BeleagueredCastleState): BCMove[] {
 
     // Check foundation moves
     for (let fi = 0; fi < FOUNDATION_COUNT; fi++) {
-      if (isLegalFoundationMove(state, fromCol, fi)) {
+      if (isLegalFoundationMove(state, fromCol, fi).legal) {
         moves.push({
           kind: 'tableau-to-foundation',
           fromCol,
@@ -369,7 +377,7 @@ export function getLegalMoves(state: BeleagueredCastleState): BCMove[] {
 
     // Check tableau-to-tableau moves
     for (let toCol = 0; toCol < TABLEAU_COUNT; toCol++) {
-      if (isLegalTableauMove(state, fromCol, toCol)) {
+      if (isLegalTableauMove(state, fromCol, toCol).legal) {
         moves.push({
           kind: 'tableau-to-tableau',
           fromCol,
@@ -559,7 +567,7 @@ export function findSafeAutoMoves(
     const fi = foundationIndex(topCard.suit);
 
     // Check if this card is the next expected on its foundation
-    if (!isLegalFoundationMove(state, col, fi)) continue;
+    if (!isLegalFoundationMove(state, col, fi).legal) continue;
 
     const cardRank = rankValue(topCard.rank);
 
