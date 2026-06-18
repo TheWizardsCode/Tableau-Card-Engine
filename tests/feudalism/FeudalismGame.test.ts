@@ -268,7 +268,7 @@ describe('FeudalismGame', () => {
         type: 'take-different',
         colors: ['wheat', 'oats', 'flax', 'barley'] as any,
       });
-      expect(error).toBeTruthy();
+      expect(error).toEqual({ legal: false, reason: expect.any(String) });
     });
 
     it('rejects duplicate colors', () => {
@@ -277,7 +277,7 @@ describe('FeudalismGame', () => {
         type: 'take-different',
         colors: ['wheat', 'wheat', 'oats'],
       });
-      expect(error).toBeTruthy();
+      expect(error).toEqual({ legal: false, reason: expect.any(String) });
     });
 
     it('rejects taking fewer than 3 when 3+ colors available', () => {
@@ -286,7 +286,7 @@ describe('FeudalismGame', () => {
         type: 'take-different',
         colors: ['wheat', 'oats'],
       });
-      expect(error).toBeTruthy();
+      expect(error).toEqual({ legal: false, reason: expect.any(String) });
     });
 
     it('allows fewer than 3 when supply is limited', () => {
@@ -299,7 +299,7 @@ describe('FeudalismGame', () => {
         type: 'take-different',
         colors: ['oats', 'flax'],
       });
-      expect(error).toBeNull();
+      expect(error).toEqual({ legal: true });
     });
 
     it('rejects taking from empty supply color', () => {
@@ -311,7 +311,7 @@ describe('FeudalismGame', () => {
         type: 'take-different',
         colors: ['oats', 'wheat'],
       });
-      expect(error).toBeTruthy();
+      expect(error).toEqual({ legal: false, reason: expect.any(String) });
     });
   });
 
@@ -330,7 +330,7 @@ describe('FeudalismGame', () => {
       const session = createTestSession();
       session.tokenSupply.wheat = 3;
       const error = validateAction(session, { type: 'take-same', color: 'wheat' });
-      expect(error).toBeTruthy();
+      expect(error).toEqual({ legal: false, reason: expect.any(String) });
     });
   });
 

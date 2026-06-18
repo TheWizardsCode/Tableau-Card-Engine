@@ -40,7 +40,7 @@ describe('AiStrategy', () => {
       for (let seed = 0; seed < 10; seed++) {
         const session = createTestSession(seed);
         const action = RandomStrategy.chooseTurn(session, 0, rng);
-        expect(validateAction(session, action)).toBeNull();
+        expect(validateAction(session, action)).toEqual({ legal: true });
       }
     });
 
@@ -69,7 +69,7 @@ describe('AiStrategy', () => {
       for (let seed = 0; seed < 10; seed++) {
         const session = createTestSession(seed);
         const action = GreedyStrategy.chooseTurn(session, 0, rng);
-        expect(validateAction(session, action)).toBeNull();
+        expect(validateAction(session, action)).toEqual({ legal: true });
       }
     });
 
@@ -134,7 +134,7 @@ describe('AiStrategy', () => {
       const ai = new FeudalismAiPlayer(GreedyStrategy, createSeededRng(42));
       const session = createTestSession();
       const action = ai.chooseTurn(session, 0);
-      expect(validateAction(session, action)).toBeNull();
+      expect(validateAction(session, action)).toEqual({ legal: true });
     });
 
     it('chooseDiscard returns valid discard', () => {
