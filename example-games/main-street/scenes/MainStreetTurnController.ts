@@ -99,6 +99,11 @@ export class MainStreetTurnController {
           autoSaveTranscript(transcriptStore, 'main-street', transcript, '[MainStreet]');
         }
 
+        // Update standalone player statistics (fire-and-forget, independent
+        // of campaign progress update). Guarded against replay mode internally
+        // by the lifecycle manager.
+        s.updateStats(result.gameResult, result.finalScore);
+
         s.updateCampaignProgress().then(() => {
           const tiersAfter = s.campaign
             ? s.campaign.unlockedTiers

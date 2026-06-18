@@ -25,6 +25,12 @@ import {
   type TutorialVisibilityOptions,
 } from '../TutorialState';
 import {
+  BrowserStatsStorageAdapter,
+  loadStats,
+  saveStats,
+  updateStatsAfterRun,
+} from '../StatsDomain';
+import {
   createTutorialControllerState,
   startTutorial,
   exitTutorial,
@@ -712,6 +718,35 @@ export class MainStreetLifecycleManager {
       .catch(() => {
         // Silently ignore save failures -- campaign will be retried next run
       });
+  }
+
+  /**
+   * Updates standalone player statistics after a completed run.
+   *
+   * Fires independently from updateCampaignProgress() — both update their
+   * respective stores. Guarded by replayMode: stats are NOT updated during
+   * replay runs so the player's record is not polluted by replay data.
+   *
+   * Uses the BrowserStatsStorageAdapter (localStorage) for persistence.
+   *
+   * @param gameResult  'win' or 'loss'.
+   * @param finalScore  The final score of the completed run.
+   */
+  public async updateStats(
+    gameResult: 'win' | 'loss',
+    finalScore: number,
+  ): Promise<void> {
+    const s = this.scene;
+    if (s.replayMode) return;
+
+    try {
+      const adapter = new BrowserStatsStorageAdapter();
+      const current = loadStats(adapter);
+      const updated = updateStatsAfterRun(current, gameResult === 'win', finalScore);
+      await saveStats(adapter, updated);
+    } catch {
+      // Silently ignore stats persistence failures — non-critical
+    }
   }
 
   public loadBoardState(state: any): void {

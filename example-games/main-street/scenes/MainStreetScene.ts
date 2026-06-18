@@ -201,6 +201,14 @@ export class MainStreetScene extends CardGameScene {
     return (this.msLifecycleManager as any).updateCampaignProgress.apply(this.msLifecycleManager, args);
   }
 
+  /**
+   * Updates standalone player statistics after a completed run.
+   * Delegates to MainStreetLifecycleManager.updateStats().
+   */
+  public updateStats(gameResult: 'win' | 'loss', finalScore: number): Promise<void> {
+    return (this.msLifecycleManager as any).updateStats(gameResult, finalScore);
+  }
+
   // ── Day flow ────────────────────────────────────────────
   public startDayPhase(...args: any[]): any {
     return (this.msTurnController as any).startDayPhase.apply(this.msTurnController, args);
