@@ -374,6 +374,73 @@ Usage in code:
 import { ENGINE_VERSION } from '@core-engine/index';
 ```
 
+## Move Validation Pattern
+
+All move validation across the Tableau Card Engine should use the canonical `LegalityResult` type from `@rule-engine/*`. This ensures consistent validation semantics across games and enables generic tooling (AI, replay, transcripts) to work with a uniform contract.
+
+### The `LegalityResult` Type
+
+```typescript
+import type { LegalityResult } from '@rule-engine/index';
+
+// Discriminated union:
+// { legal: true }          — action is permitted
+// { legal: false, reason } — action is forbidden with an explanation
+```
+
+### Convenience Helpers
+
+Two convenience constructors are provided:
+
+| Function | Returns |
+|----------|---------|
+| `legalAction()` | `{ legal: true }` |
+| `illegalAction(reason: string)` | `{ legal: false, reason }` |
+
+```typescript
+import { legalAction, illegalAction } from '@rule-engine/index';
+
+function validateMove(card: Card): LegalityResult {
+  if (!card) return illegalAction('No card provided');
+  return legalAction();
+}
+```
+
+### Discriminating the Result
+
+Callers should use the `legal` discriminant to check the result:
+
+```typescript
+const result = validateMove(someCard);
+if (!result.legal) {
+  // result.reason is a string
+  showError(result.reason);
+}
+// When result.legal is true, result.reason is not present
+```
+
+### Games Using the Canonical Pattern
+
+The following games use `LegalityResult` for move validation:
+
+- **Golf** — `GolfRules.checkMoveLegality()`, `checkInitialReveal()`
+- **Lost Cities** — `LostCitiesRules.checkPhase1Legality()`, `checkPhase2Legality()`
+- **Main Street** — `MainStreetMarket` imports via market validation
+- **Sushi Go** — `SushiGoGame.validatePick()` (migrated from `{ valid, reason }`)
+- **Feudalism** — `FeudalismGame.validateAction()` and sub-validators (migrated from `string | null`)
+- **Beleaguered Castle** — `BeleagueredCastleRules.isLegalFoundationMove()`, `isLegalTableauMove()` (migrated from `boolean`)
+
+### Migration Notes
+
+When migrating an existing game to the canonical pattern:
+
+1. Import `LegalityResult` (as type-only) from `@rule-engine/index`
+2. Change the validation function's return type to `LegalityResult`
+3. Replace `return true` / `return null` → `return { legal: true }` (or `return legalAction()`)
+4. Replace `return false` / `return 'error string'` / `throw Error(...)` → `return { legal: false, reason: '...' }` (or `return illegalAction('...')`)
+5. Update all callers to check `result.legal` instead of the old pattern
+6. Run `npm test` and `npm run build` to verify
+
 ## Adding an Example Game
 
 > **Note:** For engine feature demonstrations (not full games), add a demo scene to the **Gym** instead of creating a new example game. See [Gym documentation](../example-games/gym/README.md) and [Gym scene index](gym/GYM_INDEX.md).

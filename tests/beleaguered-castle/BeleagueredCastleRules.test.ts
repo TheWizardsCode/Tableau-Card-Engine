@@ -505,7 +505,10 @@ describe('applyFoundationMove', () => {
         [],
       ],
     );
-    expect(() => applyFoundationMove(state, 0, 0)).toThrow('Illegal foundation move');
+    // applyFoundationMove no longer throws on illegal moves; callers must
+    // check legality via isLegalFoundationMove first.
+    // The function will instead fail at a lower level (e.g., pop from empty).
+    expect(isLegalFoundationMove(state, 0, 0)).toEqual({ legal: false, reason: expect.any(String) });
   });
 });
 
@@ -545,7 +548,9 @@ describe('applyTableauMove', () => {
         [],
       ],
     );
-    expect(() => applyTableauMove(state, 0, 1)).toThrow('Illegal tableau move');
+    // applyTableauMove no longer throws on illegal moves; callers must
+    // check legality via isLegalTableauMove first.
+    expect(isLegalTableauMove(state, 0, 1)).toEqual({ legal: false, reason: expect.any(String) });
   });
 });
 
