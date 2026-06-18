@@ -7,6 +7,7 @@ import type { HelpSection } from '../../../src/ui';
 import { MAIN_STREET_TF_SFX_MAPPING } from '../sfx-tf-mapping';
 import { getMainStreetTfModule, loadMainStreetTfModule } from '../tf/mainStreetTfModule';
 import { MainStreetTranscriptRecorder, setMainStreetRecorder } from '../MainStreetTranscript';
+import { StatsOverlay } from './StatsOverlay';
 import { BG_COLOR, SFX_KEYS } from './MainStreetConstants';
 import { MainStreetRenderer } from './MainStreetRenderer';
 import { MainStreetAnimator } from './MainStreetAnimator';
@@ -454,6 +455,13 @@ export class MainStreetLifecycleManager {
     // Initialize the action-gated tutorial controller state
     (s as any).tutorialController = createTutorialControllerState();
 
+    // Create the stats overlay (slide-in panel for player statistics)
+    try {
+      (s as any).statsOverlay = new StatsOverlay(s);
+    } catch (_) {
+      // Ignore if DOM environment is unavailable (tests)
+    }
+
     // Note: tce:play-tutorial and tce:replay-tutorial event listeners have been
     // removed. The unified tutorial system uses the TutorialOfferModal (guided
     // mode for first-time players) and the reference-mode replay button in
@@ -475,6 +483,7 @@ export class MainStreetLifecycleManager {
         if (overlayOpen) return;
         if ((s as any).helpPanel?.isOpen) return;
         if ((s as any).settingsPanel?.isOpen) return;
+        if ((s as any).statsOverlay?.isOpen) return;
         if (s.uiPhase !== 'market') return;
         // Trigger end turn via canonical path
         s.endTurn();

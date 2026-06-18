@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
   MAIN_STREET_STATS_STORAGE_KEY,
   MAIN_STREET_STATS_SCHEMA_VERSION,
