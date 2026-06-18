@@ -229,58 +229,88 @@ export class LostCitiesTurnController {
     this.callbacks.onPlaySound(SFX_KEYS.TURN_CHANGE);
 
     (this.renderer.getScene() as Phaser.Scene).time.delayedCall(AI_DELAY, () => {
-      if (this.session.matchPhase !== 'playing') return;
-
-      const aiId: PlayerId = 1;
-      const state = getVisibleState(this.session, aiId);
-
-      const phase1Action = this.aiPlayer.choosePhase1(state);
-      const phase1Phase = this.session.round.turnPhase;
-      const phase1Result = executeAction(this.session, phase1Action);
-      this.recorder.recordAction(this.session, phase1Result, phase1Action, phase1Phase);
-
-      // Don't refresh expeditions before animation — that would create a
-      // destination sprite with card back before the animated card arrives.
-      // Instead, the card hand sprite is animated to the destination via
-      // flipCard, then refreshAll after phase 2 creates the correct state.
-      this.renderer.refreshDiscardPiles();
-      this.renderer.refreshScores();
-      this.renderer.refreshDrawPile();
-
-      this.animator.animateAiPhase1(phase1Action, () => {
+      try {
         if (this.session.matchPhase !== 'playing') return;
 
-        // After the card has animated from hand to expedition, refresh the
-        // expedition display so the card is visible (with correct texture if
-        // available, or card-back fallback if async generation hasn't finished).
-        this.renderer.refreshExpeditions();
+        const aiId: PlayerId = 1;
+        const state = getVisibleState(this.session, aiId);
 
-        const state2 = getVisibleState(this.session, aiId);
-        const phase2Action = this.aiPlayer.choosePhase2(state2);
+        const phase1Action = this.aiPlayer.choosePhase1(state);
+        const phase1Phase = this.session.round.turnPhase;
+        const phase1Result = executeAction(this.session, phase1Action);
+        this.recorder.recordAction(this.session, phase1Result, phase1Action, phase1Phase);
 
-        const phase2Phase = this.session.round.turnPhase;
-        const phase2Result = executeAction(this.session, phase2Action);
-        this.recorder.recordAction(this.session, phase2Result, phase2Action, phase2Phase);
-
+        // Don't refresh expeditions before animation — that would create a
+        // destination sprite with card back before the animated card arrives.
+        // Instead, the card hand sprite is animated to the destination via
+        // flipCard, then refreshAll after phase 2 creates the correct state.
         this.renderer.refreshDiscardPiles();
+        this.renderer.refreshScores();
         this.renderer.refreshDrawPile();
 
-        this.animator.animateAiPhase2(phase2Action, () => {
-          this.callbacks.onRefreshAll();
+        this.animator.animateAiPhase1(phase1Action, () => {
+          try {
+            if (this.session.matchPhase !== 'playing') return;
 
-          if (phase2Result.roundEnded) {
-            if (phase2Result.matchEnded) {
-              this.callbacks.onShowMatchSummary(phase2Result.roundScore!);
-            } else {
-              this.callbacks.onShowRoundSummary(phase2Result.roundScore!);
-            }
-          } else {
-            this.callbacks.onPlaySound(SFX_KEYS.TURN_CHANGE);
-            this.setPhase('waiting-for-card-select');
+            // After the card has animated from hand to expedition, refresh the
+            // expedition display so the card is visible (with correct texture if
+            // available, or card-back fallback if async generation hasn't finished).
+            this.renderer.refreshExpeditions();
+
+            const state2 = getVisibleState(this.session, aiId);
+            const phase2Action = this.aiPlayer.choosePhase2(state2);
+
+            const phase2Phase = this.session.round.turnPhase;
+            const phase2Result = executeAction(this.session, phase2Action);
+            this.recorder.recordAction(this.session, phase2Result, phase2Action, phase2Phase);
+
+            this.renderer.refreshDiscardPiles();
+            this.renderer.refreshDrawPile();
+
+            this.animator.animateAiPhase2(phase2Action, () => {
+              this.callbacks.onRefreshAll();
+
+              if (phase2Result.roundEnded) {
+                if (phase2Result.matchEnded) {
+                  this.callbacks.onShowMatchSummary(phase2Result.roundScore!);
+                } else {
+                  this.callbacks.onShowRoundSummary(phase2Result.roundScore!);
+                }
+              } else {
+                this.callbacks.onPlaySound(SFX_KEYS.TURN_CHANGE);
+                this.setPhase('waiting-for-card-select');
+              }
+            });
+          } catch (err) {
+            console.error('[LostCitiesTurnController] Error in Phase 1 animation callback:', err);
+            this.recoverFromFailure();
           }
         });
-      });
+      } catch (err) {
+        console.error('[LostCitiesTurnController] Error in AI turn execution:', err);
+        this.recoverFromFailure();
+      }
     });
+  }
+
+  /**
+   * Attempt to recover from an unexpected error during AI turn execution.
+   * Transitions to a safe phase so the game is not permanently frozen.
+   */
+  private recoverFromFailure(): void {
+    try {
+      if (this.session.matchPhase === 'playing' || this.session.matchPhase === 'round-over') {
+        this.callbacks.onRefreshAll();
+        this.setPhase('waiting-for-card-select');
+      } else if (this.session.matchPhase === 'match-over') {
+        this.setPhase('match-over');
+      } else {
+        this.setPhase('waiting-for-card-select');
+      }
+    } catch {
+      // Last-resort fallback: at least clear the AI-thinking phase
+      this.turnPhase = 'waiting-for-card-select' as SceneTurnPhase;
+    }
   }
 
   checkNextTurn(): void {

@@ -4,7 +4,7 @@
 import Phaser from 'phaser';
 import { EXPEDITION_COLORS } from '../LostCitiesCards';
 import type { LostCitiesSession, RoundScoreResult } from '../LostCitiesGame';
-import { getMatchWinner } from '../LostCitiesGame';
+import { getMatchWinner, startNextRound } from '../LostCitiesGame';
 import { autoSaveTranscript, TranscriptStore } from '../../../src/core-engine/transcript';
 import { GAME_W, GAME_H, OverlayManager } from '../../../src/ui';
 import {
@@ -111,6 +111,11 @@ export class LostCitiesOverlayHelper {
     btn.on('pointerdown', () => {
       this.scene.sound.play?.(SFX_KEYS.UI_CLICK);
       this.dismiss();
+      // Advance to the next round now that the overlay is dismissed.
+      // (executeAction no longer calls advanceMatch automatically —
+      // the 'round-over' pause phase allows the overlay to render
+      // with the correct round-final state.)
+      startNextRound(this.session);
       this.onNextRound?.();
     });
     this.overlayManager.add(btn);

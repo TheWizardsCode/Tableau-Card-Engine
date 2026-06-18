@@ -18,6 +18,7 @@ import {
   executeAction,
   getVisibleState,
   isMatchOver,
+  startNextRound,
 } from '../../example-games/lost-cities/LostCitiesGame';
 import type {
   LostCitiesSession,
@@ -97,8 +98,9 @@ function runFullAiMatch(
     recorder.recordAction(session, turnResult, action, phase);
     actionCount++;
 
-    // Reset AI draw history at round boundaries
+    // Reset AI draw history at round boundaries and advance to next round
     if (turnResult.roundEnded && !turnResult.matchEnded) {
+      startNextRound(session);
       ai0.resetRoundHistory();
       ai1.resetRoundHistory();
     }

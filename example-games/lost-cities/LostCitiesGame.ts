@@ -505,6 +505,13 @@ function advanceMatch(session: LostCitiesSession): void {
  * Call this with a Phase1Action when in PlayOrDiscard phase,
  * or a Phase2Action when in Draw phase.
  *
+ * When a round ends (draw pile exhausted), this function scores the round
+ * and transitions to 'round-over' (non-final) or 'match-over' (final round)
+ * match phase. It does NOT call advanceMatch() — the caller (UI overlay)
+ * is responsible for calling startNextRound() when the user clicks
+ * "Next Round". This ensures the round-final state (hands, expeditions,
+ * discard piles) is preserved for the round-summary overlay.
+ *
  * @returns TurnResult with round/match status
  * @throws Error if the action is invalid for the current phase
  */
@@ -544,11 +551,20 @@ export function executeAction(
 
     if (roundEnded) {
       const roundScore = scoreCurrentRound(session);
-      advanceMatch(session);
+
+      // Determine if this is the final round (do NOT call advanceMatch —
+      // that resets state before the UI can show the round-summary overlay).
+      // Instead, transition to the appropriate pause phase so the overlay
+      // renders with the correct round-final state. The caller (turn
+      // controller / overlay) is responsible for calling startNextRound()
+      // when the user clicks "Next Round".
+      const isFinalRound = session.roundNumber >= ROUND_COUNT;
+      session.matchPhase = isFinalRound ? 'match-over' : 'round-over';
+
       return {
         action,
         roundEnded: true,
-        matchEnded: isMatchOver(session),
+        matchEnded: isFinalRound,
         roundScore,
       };
     }

@@ -12,6 +12,7 @@ import {
 import {
   setupLostCitiesGame,
   executeAction,
+  startNextRound,
   getCurrentPlayer,
   getOpponent,
   getVisibleState,
@@ -414,6 +415,24 @@ describe('round progression', () => {
     return executeAction(session, { kind: 'draw-from-pile' });
   }
 
+  /**
+   * Play until the round ends and advance to the next round.
+   * Returns the TurnResult from the round-ending action.
+   */
+  function playThroughRound(session: LostCitiesSession): TurnResult {
+    let lastResult: TurnResult | null = null;
+    while (session.matchPhase === 'playing') {
+      lastResult = playTurn(session);
+      if (lastResult.roundEnded) break;
+    }
+    // Advance to next round (now that executeAction sets 'round-over'/
+    // 'match-over' instead of calling advanceMatch automatically)
+    if (lastResult!.roundEnded && !lastResult!.matchEnded) {
+      startNextRound(session);
+    }
+    return lastResult!;
+  }
+
   it('should detect when a round ends (draw pile exhausted)', () => {
     const session = setupLostCitiesGame({ rng: createSeededRng() });
 
@@ -453,10 +472,10 @@ describe('round progression', () => {
   it('should advance to round 2 after round 1 ends', () => {
     const session = setupLostCitiesGame({ rng: createSeededRng() });
 
-    while (session.roundNumber === 1 && session.matchPhase === 'playing') {
-      playTurn(session);
-    }
+    const result = playThroughRound(session);
 
+    expect(result.roundEnded).toBe(true);
+    expect(result.matchEnded).toBe(false);
     expect(session.roundNumber).toBe(2);
     expect(session.matchPhase).toBe('playing');
     expect(session.roundScores).toHaveLength(1);
@@ -466,10 +485,7 @@ describe('round progression', () => {
     const session = setupLostCitiesGame({ rng: createSeededRng() });
     expect(session.startingPlayer).toBe(0);
 
-    // Play through round 1
-    while (session.roundNumber === 1 && session.matchPhase === 'playing') {
-      playTurn(session);
-    }
+    playThroughRound(session);
 
     expect(session.startingPlayer).toBe(1);
     expect(session.round.currentPlayer).toBe(1);
@@ -478,10 +494,7 @@ describe('round progression', () => {
   it('should reset hands and expeditions for new round', () => {
     const session = setupLostCitiesGame({ rng: createSeededRng() });
 
-    // Play through round 1
-    while (session.roundNumber === 1 && session.matchPhase === 'playing') {
-      playTurn(session);
-    }
+    playThroughRound(session);
 
     // New round should have fresh hands and empty expeditions
     for (const player of session.players) {
@@ -504,18 +517,14 @@ describe('round progression', () => {
     const session = setupLostCitiesGame({ rng: createSeededRng() });
 
     // Play through round 1
-    while (session.roundNumber === 1 && session.matchPhase === 'playing') {
-      playTurn(session);
-    }
+    playThroughRound(session);
 
     const r1 = session.roundScores[0];
     expect(session.cumulativeScores[0]).toBe(r1.totals[0]);
     expect(session.cumulativeScores[1]).toBe(r1.totals[1]);
 
     // Play through round 2
-    while (session.roundNumber === 2 && session.matchPhase === 'playing') {
-      playTurn(session);
-    }
+    playThroughRound(session);
 
     const r2 = session.roundScores[1];
     expect(session.cumulativeScores[0]).toBe(r1.totals[0] + r2.totals[0]);
@@ -535,8 +544,11 @@ describe('full match', () => {
     const session = setupLostCitiesGame({ rng: createSeededRng() });
 
     let turnCount = 0;
-    while (session.matchPhase === 'playing') {
-      playTurn(session);
+    while (session.matchPhase !== 'match-over') {
+      const result = playTurn(session);
+      if (result.roundEnded && !result.matchEnded) {
+        startNextRound(session);
+      }
       turnCount++;
       if (turnCount > 500) throw new Error('infinite loop guard');
     }
@@ -549,8 +561,11 @@ describe('full match', () => {
   it('should determine a winner based on cumulative scores', () => {
     const session = setupLostCitiesGame({ rng: createSeededRng() });
 
-    while (session.matchPhase === 'playing') {
-      playTurn(session);
+    while (session.matchPhase !== 'match-over') {
+      const result = playTurn(session);
+      if (result.roundEnded && !result.matchEnded) {
+        startNextRound(session);
+      }
     }
 
     const winner = getMatchWinner(session);
@@ -568,8 +583,11 @@ describe('full match', () => {
   it('should not allow actions after match ends', () => {
     const session = setupLostCitiesGame({ rng: createSeededRng() });
 
-    while (session.matchPhase === 'playing') {
-      playTurn(session);
+    while (session.matchPhase !== 'match-over') {
+      const result = playTurn(session);
+      if (result.roundEnded && !result.matchEnded) {
+        startNextRound(session);
+      }
     }
 
     const card = session.players[0].hand[0];

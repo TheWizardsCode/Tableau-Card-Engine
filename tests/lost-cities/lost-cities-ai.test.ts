@@ -11,6 +11,7 @@ import {
   executeAction,
   getVisibleState,
   isMatchOver,
+  startNextRound,
   type VisibleState,
 } from '../../example-games/lost-cities/LostCitiesGame';
 import {
@@ -417,6 +418,9 @@ describe('AI-vs-AI integration', () => {
         const action = ai.choosePhase2(state);
         const result = executeAction(session, action);
         if (result.roundEnded) {
+          if (!result.matchEnded) {
+            startNextRound(session);
+          }
           ai0.resetRoundHistory();
           ai1.resetRoundHistory();
         }
@@ -456,6 +460,9 @@ describe('AI-vs-AI integration', () => {
         const action = ai.choosePhase2(state);
         const result = executeAction(session, action);
         if (result.roundEnded) {
+          if (!result.matchEnded) {
+            startNextRound(session);
+          }
           ai0.resetRoundHistory();
           ai1.resetRoundHistory();
         }
@@ -494,6 +501,9 @@ describe('AI-vs-AI integration', () => {
         const action = ai.choosePhase2(state);
         const result = executeAction(session, action);
         if (result.roundEnded) {
+          if (!result.matchEnded) {
+            startNextRound(session);
+          }
           ai0.resetRoundHistory();
           ai1.resetRoundHistory();
         }
