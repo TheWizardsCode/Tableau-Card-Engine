@@ -32,9 +32,11 @@ export class LostCitiesOverlayHelper {
   }
 
   showRoundSummary(roundScore: RoundScoreResult): void {
-    this.scene.sound.play?.(SFX_KEYS.ROUND_END);
+    // Gracefully handle missing audio — the overlay must appear even if
+    // sounds failed to load (browser test, audio policy, or preload issue).
+    try { this.scene.sound.play?.(SFX_KEYS.ROUND_END); } catch { /* ignore */ }
     this.scene.time.delayedCall(400, () => {
-      this.scene.sound.play?.(SFX_KEYS.SCORE_REVEAL);
+      try { this.scene.sound.play?.(SFX_KEYS.SCORE_REVEAL); } catch { /* ignore */ }
     });
 
     this.overlayManager.showOverlay({
@@ -109,7 +111,7 @@ export class LostCitiesOverlayHelper {
     const btn = createOverlayButton(this.scene, cx, y, '[ Next Round ]');
     try { btn.setDepth(11); } catch { /* ignore */ }
     btn.on('pointerdown', () => {
-      this.scene.sound.play?.(SFX_KEYS.UI_CLICK);
+      try { this.scene.sound.play?.(SFX_KEYS.UI_CLICK); } catch { /* ignore */ }
       this.dismiss();
       // Advance to the next round now that the overlay is dismissed.
       // (executeAction no longer calls advanceMatch automatically —
@@ -137,13 +139,15 @@ export class LostCitiesOverlayHelper {
     const winnerId = getMatchWinner(this.session);
     const winnerText = winnerId === 0 ? 'You Win!' : winnerId === 1 ? 'AI Wins!' : "It's a Tie!";
 
-    if (winnerId === 0) {
-      this.scene.sound.play?.(SFX_KEYS.MATCH_WIN);
-    } else {
-      this.scene.sound.play?.(SFX_KEYS.MATCH_LOSE);
-    }
+    try {
+      if (winnerId === 0) {
+        this.scene.sound.play?.(SFX_KEYS.MATCH_WIN);
+      } else {
+        this.scene.sound.play?.(SFX_KEYS.MATCH_LOSE);
+      }
+    } catch { /* ignore missing audio */ }
     this.scene.time.delayedCall(600, () => {
-      this.scene.sound.play?.(SFX_KEYS.SCORE_REVEAL);
+      try { this.scene.sound.play?.(SFX_KEYS.SCORE_REVEAL); } catch { /* ignore */ }
     });
 
     const title = createLcHudText(this.scene, cx, topY, winnerText, '#f0c040', {
@@ -212,7 +216,7 @@ export class LostCitiesOverlayHelper {
     y += 20;
     const newMatchBtn = createOverlayButton(this.scene, cx - 85, y, '[ New Match ]');
     newMatchBtn.on('pointerdown', () => {
-      this.scene.sound.play?.(SFX_KEYS.UI_CLICK);
+      try { this.scene.sound.play?.(SFX_KEYS.UI_CLICK); } catch { /* ignore */ }
       this.dismiss();
       this.onRestart?.();
     });
