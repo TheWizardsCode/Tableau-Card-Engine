@@ -32,6 +32,7 @@ import {
 } from './SushiGoScoring';
 import type { MultiplayerSetupOptions } from '../../src/core-engine/SetupOptions';
 import { resolveSetupOptions } from '../../src/core-engine/SetupOptions';
+import type { LegalityResult } from '../../src/rule-engine/index';
 
 // ── Player state ────────────────────────────────────────────
 
@@ -161,9 +162,9 @@ export interface PickAction {
 export function validatePick(
   player: SushiGoPlayerState,
   action: PickAction,
-): { valid: true } | { valid: false; reason: string } {
+): LegalityResult {
   if (action.cardIndex < 0 || action.cardIndex >= player.hand.length) {
-    return { valid: false, reason: `Card index ${action.cardIndex} out of bounds` };
+    return { legal: false, reason: `Card index ${action.cardIndex} out of bounds` };
   }
 
   if (action.secondCardIndex !== undefined) {
@@ -171,7 +172,7 @@ export function validatePick(
     const hasChopsticks = player.tableau.some((c) => c.type === 'chopsticks');
     if (!hasChopsticks) {
       return {
-        valid: false,
+        legal: false,
         reason: 'Cannot pick two cards without chopsticks in tableau',
       };
     }
@@ -180,16 +181,16 @@ export function validatePick(
       action.secondCardIndex >= player.hand.length
     ) {
       return {
-        valid: false,
+        legal: false,
         reason: `Second card index ${action.secondCardIndex} out of bounds`,
       };
     }
     if (action.cardIndex === action.secondCardIndex) {
-      return { valid: false, reason: 'Cannot pick the same card twice' };
+      return { legal: false, reason: 'Cannot pick the same card twice' };
     }
   }
 
-  return { valid: true };
+  return { legal: true };
 }
 
 /**
@@ -218,7 +219,7 @@ export function executeAllPicks(
   // Validate all picks first
   for (let i = 0; i < picks.length; i++) {
     const result = validatePick(session.players[i], picks[i]);
-    if (!result.valid) {
+    if (!result.legal) {
       throw new Error(`Invalid pick for player ${i}: ${result.reason}`);
     }
   }
