@@ -30,6 +30,7 @@ import {
 import type { MultiplayerSetupOptions } from '../../src/core-engine/SetupOptions';
 import { resolveSetupOptions } from '../../src/core-engine/SetupOptions';
 import { getCurrentPlayer } from '../../src/core-engine/TurnSequencer';
+import type { LegalityResult } from '../../src/rule-engine/index';
 
 // Re-export getCurrentPlayer so consumers can import from FeudalismGame
 export { getCurrentPlayer };
@@ -310,8 +311,8 @@ export function getWinnerIndex(session: FeudalismSession): number {
 export function validateAction(
   session: FeudalismSession,
   action: TurnAction,
-): string | null {
-  if (session.phase === 'game-over') return 'Game is over';
+): LegalityResult {
+  if (session.phase === 'game-over') return { legal: false, reason: 'Game is over' };
 
   const player = getCurrentPlayer(session);
 
@@ -331,28 +332,28 @@ function validateTakeDifferent(
   session: FeudalismSession,
   _player: FeudalismPlayerState,
   action: TakeDifferentTokensAction,
-): string | null {
+): LegalityResult {
   const { colors } = action;
   if (colors.length === 0 || colors.length > 3) {
-    return 'Must take 1-3 tokens of different colors';
+    return { legal: false, reason: 'Must take 1-3 tokens of different colors' };
   }
 
   // Check for duplicates
   if (new Set(colors).size !== colors.length) {
-    return 'Colors must be unique when taking different tokens';
+    return { legal: false, reason: 'Colors must be unique when taking different tokens' };
   }
 
   // Check each color is a valid resource type (not mead)
   for (const c of colors) {
     if (!RESOURCE_TYPES.includes(c)) {
-      return `Invalid resource type: ${c}`;
+      return { legal: false, reason: `Invalid resource type: ${c}` };
     }
   }
 
   // Check supply availability
   for (const c of colors) {
     if (tokenCount(session.tokenSupply, c) <= 0) {
-      return `No ${c} tokens available in supply`;
+      return { legal: false, reason: `No ${c} tokens available in supply` };
     }
   }
 
@@ -362,65 +363,65 @@ function validateTakeDifferent(
       c => tokenCount(session.tokenSupply, c) > 0,
     );
     if (availableColors.length >= 3) {
-      return 'Must take 3 different colors when 3+ colors are available';
+      return { legal: false, reason: 'Must take 3 different colors when 3+ colors are available' };
     }
   }
 
-  return null;
+  return { legal: true };
 }
 
 function validateTakeSame(
   session: FeudalismSession,
   _player: FeudalismPlayerState,
   action: TakeSameTokensAction,
-): string | null {
+): LegalityResult {
   const { color } = action;
   if (!RESOURCE_TYPES.includes(color)) {
-    return `Invalid resource type: ${color}`;
+    return { legal: false, reason: `Invalid resource type: ${color}` };
   }
   if (tokenCount(session.tokenSupply, color) < 4) {
-    return `Need at least 4 ${color} tokens in supply to take 2 (only ${tokenCount(session.tokenSupply, color)} available)`;
+    return { legal: false, reason: `Need at least 4 ${color} tokens in supply to take 2 (only ${tokenCount(session.tokenSupply, color)} available)` };
   }
-  return null;
+  return { legal: true };
 }
 
 function validateReserve(
   session: FeudalismSession,
   player: FeudalismPlayerState,
   action: ReserveCardAction,
-): string | null {
+): LegalityResult {
   if (player.reservedCards.length >= MAX_RESERVED) {
-    return `Cannot reserve more than ${MAX_RESERVED} cards`;
+    return { legal: false, reason: `Cannot reserve more than ${MAX_RESERVED} cards` };
   }
 
   if (action.cardId !== null) {
     // Reserve from market
     const found = findCardInMarket(session, action.cardId);
-    if (!found) return `Card ${action.cardId} not found in market`;
+    if (!found) return { legal: false, reason: `Card ${action.cardId} not found in market` };
   } else {
     // Reserve from top of deck
-    if (!action.tier) return 'Must specify tier when reserving from deck';
-    if (![1, 2, 3].includes(action.tier)) return `Invalid tier: ${action.tier}`;
+    if (!action.tier) return { legal: false, reason: 'Must specify tier when reserving from deck' };
+    if (![1, 2, 3].includes(action.tier)) return { legal: false, reason: `Invalid tier: ${action.tier}` };
     if (session.market[action.tier].deck.length === 0) {
-      return `Tier ${action.tier} deck is empty`;
+      return { legal: false, reason: `Tier ${action.tier} deck is empty` };
     }
   }
 
-  return null;
+  return { legal: true };
 }
 
 function validatePurchase(
   session: FeudalismSession,
   player: FeudalismPlayerState,
   action: PurchaseCardAction,
-): string | null {
+): LegalityResult {
   const { cardId } = action;
 
   // Find the card (market or reserved)
   const inMarket = findCardInMarket(session, cardId);
   const reservedIdx = findReservedCard(player, cardId);
   if (!inMarket && reservedIdx === -1) {
-    return `Card ${cardId} not found in market or reserved cards`;
+    return { legal: false, reason: `Card ${cardId} not found in market or reserved cards` };
   }
 
   const card = inMarket
@@ -428,10 +429,10 @@ function validatePurchase(
     : player.reservedCards[reservedIdx];
 
   if (!canAfford(player, card)) {
-    return 'Cannot afford this card';
+    return { legal: false, reason: 'Cannot afford this card' };
   }
 
-  return null;
+  return { legal: true };
 }
 
 // ---------------------------------------------------------------------------
@@ -447,8 +448,8 @@ export function executeTurn(
   session: FeudalismSession,
   action: TurnAction,
 ): TurnResult {
-  const error = validateAction(session, action);
-  if (error) throw new Error(error);
+  const result = validateAction(session, action);
+  if (!result.legal) throw new Error(result.reason);
 
   const player = getCurrentPlayer(session);
 
