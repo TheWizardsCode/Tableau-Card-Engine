@@ -273,7 +273,7 @@ describe('isLegalFoundationMove', () => {
         [],
       ],
     );
-    expect(isLegalFoundationMove(state, 0, 0)).toBe(true);
+    expect(isLegalFoundationMove(state, 0, 0)).toEqual({ legal: true });
   });
 
   it('should reject a card that is not the next in sequence', () => {
@@ -295,7 +295,7 @@ describe('isLegalFoundationMove', () => {
         [],
       ],
     );
-    expect(isLegalFoundationMove(state, 0, 0)).toBe(false);
+    expect(isLegalFoundationMove(state, 0, 0)).toEqual({ legal: false, reason: expect.any(String) });
   });
 
   it('should reject a card of the wrong suit', () => {
@@ -317,7 +317,7 @@ describe('isLegalFoundationMove', () => {
         [],
       ],
     );
-    expect(isLegalFoundationMove(state, 0, 0)).toBe(false);
+    expect(isLegalFoundationMove(state, 0, 0)).toEqual({ legal: false, reason: expect.any(String) });
   });
 
   it('should reject move from empty column', () => {
@@ -330,19 +330,19 @@ describe('isLegalFoundationMove', () => {
       ],
       [[], [], [], [], [], [], [], []],
     );
-    expect(isLegalFoundationMove(state, 0, 0)).toBe(false);
+    expect(isLegalFoundationMove(state, 0, 0)).toEqual({ legal: false, reason: expect.any(String) });
   });
 
   it('should reject out-of-bounds column index', () => {
     const state = deal(42);
-    expect(isLegalFoundationMove(state, -1, 0)).toBe(false);
-    expect(isLegalFoundationMove(state, 8, 0)).toBe(false);
+    expect(isLegalFoundationMove(state, -1, 0)).toEqual({ legal: false, reason: expect.any(String) });
+    expect(isLegalFoundationMove(state, 8, 0)).toEqual({ legal: false, reason: expect.any(String) });
   });
 
   it('should reject out-of-bounds foundation index', () => {
     const state = deal(42);
-    expect(isLegalFoundationMove(state, 0, -1)).toBe(false);
-    expect(isLegalFoundationMove(state, 0, 4)).toBe(false);
+    expect(isLegalFoundationMove(state, 0, -1)).toEqual({ legal: false, reason: expect.any(String) });
+    expect(isLegalFoundationMove(state, 0, 4)).toEqual({ legal: false, reason: expect.any(String) });
   });
 });
 
@@ -361,7 +361,7 @@ describe('isLegalTableauMove', () => {
         [],
       ],
     );
-    expect(isLegalTableauMove(state, 0, 1)).toBe(true);
+    expect(isLegalTableauMove(state, 0, 1)).toEqual({ legal: true });
   });
 
   it('should accept any card on an empty column', () => {
@@ -378,7 +378,7 @@ describe('isLegalTableauMove', () => {
         [],
       ],
     );
-    expect(isLegalTableauMove(state, 0, 1)).toBe(true);
+    expect(isLegalTableauMove(state, 0, 1)).toEqual({ legal: true });
   });
 
   it('should reject a card not one rank lower', () => {
@@ -395,7 +395,7 @@ describe('isLegalTableauMove', () => {
         [],
       ],
     );
-    expect(isLegalTableauMove(state, 0, 1)).toBe(false);
+    expect(isLegalTableauMove(state, 0, 1)).toEqual({ legal: false, reason: expect.any(String) });
   });
 
   it('should reject move from empty source column', () => {
@@ -412,7 +412,7 @@ describe('isLegalTableauMove', () => {
         [],
       ],
     );
-    expect(isLegalTableauMove(state, 0, 1)).toBe(false);
+    expect(isLegalTableauMove(state, 0, 1)).toEqual({ legal: false, reason: expect.any(String) });
   });
 
   it('should reject move to same column', () => {
@@ -429,7 +429,7 @@ describe('isLegalTableauMove', () => {
         [],
       ],
     );
-    expect(isLegalTableauMove(state, 0, 0)).toBe(false);
+    expect(isLegalTableauMove(state, 0, 0)).toEqual({ legal: false, reason: expect.any(String) });
   });
 
   it('should reject a card of higher rank onto lower', () => {
@@ -446,7 +446,7 @@ describe('isLegalTableauMove', () => {
         [],
       ],
     );
-    expect(isLegalTableauMove(state, 0, 1)).toBe(false);
+    expect(isLegalTableauMove(state, 0, 1)).toEqual({ legal: false, reason: expect.any(String) });
   });
 
   it('should allow regardless of suit', () => {
@@ -464,7 +464,7 @@ describe('isLegalTableauMove', () => {
         [],
       ],
     );
-    expect(isLegalTableauMove(state, 0, 1)).toBe(true);
+    expect(isLegalTableauMove(state, 0, 1)).toEqual({ legal: true });
   });
 });
 
