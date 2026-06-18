@@ -25,7 +25,17 @@ import type { EventSoundMapping } from '../../../src/core-engine/SoundManager';
 import type { HelpSection } from '../../../src/ui';
 import helpContent from '../help-content.json';
 
-import { SFX_KEYS, ANIM_DURATION } from './BeleagueredCastleConstants';
+import {
+  SFX_KEYS, ANIM_DURATION,
+  AUTO_COMPLETE_STAGGER_MS, AUTO_COMPLETE_MIN_DURATION,
+  OVERLAY_DEPTH, OVERLAY_BG_ALPHA,
+  OVERLAY_TITLE_FONT_SIZE, OVERLAY_STATS_FONT_SIZE,
+  OVERLAY_WIN_TITLE_Y_OFFSET, OVERLAY_CONTENT_Y_OFFSET,
+  OVERLAY_BUTTON_Y_OFFSET,
+  RESUME_TITLE_FONT_SIZE, RESUME_TITLE_Y_OFFSET,
+  RESUME_INFO_FONT_SIZE, RESUME_INFO_Y_OFFSET,
+  RESUME_BUTTON_SPACING, RESUME_BUTTON_Y_OFFSET,
+} from './BeleagueredCastleConstants';
 import { BeleagueredCastleRenderer } from './BeleagueredCastleRenderer';
 import { BeleagueredCastleTurnController } from './BeleagueredCastleTurnController';
 import { moveGameObject, cardTextureKey } from '../../../src/ui';
