@@ -9,6 +9,17 @@
  * profitable expeditions across 5 color lanes. Each turn has two
  * mandatory phases: play/discard, then draw. A round ends when the
  * draw pile is exhausted. A match consists of 3 rounds.
+ *
+ * Round-end flow:
+ * - executeAction() scores the round and sets matchPhase to 'round-over'
+ *   (non-final) or 'match-over' (final round). It does NOT call
+ *   advanceMatch() — the UI overlay is responsible for calling
+ *   startNextRound() when the user clicks "[Next Round]".
+ * - startNextRound() calls advanceMatch() which increments roundNumber,
+ *   alternates startingPlayer, and calls dealRound() to reset state.
+ * - This 'round-over' pause phase preserves the round-final state
+ *   (hands, expeditions, discard piles) so the overlay can display
+ *   correct score data before state is reset for the next round.
  */
 
 import type {

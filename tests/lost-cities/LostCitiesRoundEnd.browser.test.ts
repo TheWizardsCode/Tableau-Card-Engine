@@ -18,10 +18,8 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import Phaser from 'phaser';
 import { waitForScene } from '../helpers/waitForScene';
-import type { LostCitiesCard, ExpeditionColor } from '../../example-games/lost-cities/LostCitiesCards';
+import type { LostCitiesCard, ExpeditionColor, NumberedRank } from '../../example-games/lost-cities/LostCitiesCards';
 import { EXPEDITION_COLORS } from '../../example-games/lost-cities/LostCitiesCards';
-import { setupLostCitiesGame } from '../../example-games/lost-cities/LostCitiesGame';
-import { createSeededRng } from '../../src/core-engine/SeededRng';
 
 // ── Helpers ─────────────────────────────────────────────────
 
@@ -50,34 +48,6 @@ function destroyGame(game: Phaser.Game | null): void {
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function waitFrames(n: number): Promise<void> {
-  return new Promise((resolve) => {
-    let count = 0;
-    const step = () => {
-      count++;
-      if (count >= n) {
-        resolve();
-      } else {
-        requestAnimationFrame(step);
-      }
-    };
-    requestAnimationFrame(step);
-  });
-}
-
-async function waitForCondition(
-  predicate: () => boolean,
-  timeoutMs = 10_000,
-  pollMs = 25,
-): Promise<void> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    if (predicate()) return;
-    await new Promise((resolve) => setTimeout(resolve, pollMs));
-  }
-  throw new Error(`Timed out waiting for condition after ${timeoutMs}ms`);
 }
 
 /**
@@ -169,20 +139,21 @@ function clickAtGameCoords(
 
 let nextCardId = 1000;
 
-function makeCard(color: ExpeditionColor, rank: number): LostCitiesCard {
+function makeCard(color: ExpeditionColor, rank: NumberedRank): LostCitiesCard {
   return { id: nextCardId++, color, type: 'numbered', rank, faceUp: true };
 }
 
-function makeHand(...ranks: [ExpeditionColor, number][]): LostCitiesCard[] {
+function makeHand(...ranks: [ExpeditionColor, NumberedRank][]): LostCitiesCard[] {
   return ranks.map(([color, rank]) => makeCard(color, rank));
 }
 
 function makeDrawPile(...colors: ExpeditionColor[]): LostCitiesCard[] {
+  const ranks: NumberedRank[] = [2, 3, 4, 5, 6, 7, 8, 9, 10];
   return colors.map((color, i) => ({
     id: nextCardId++,
     color,
     type: 'numbered' as const,
-    rank: 2 + i % 8,
+    rank: ranks[i % ranks.length],
     faceUp: false,
   }));
 }
@@ -456,5 +427,43 @@ describe('Lost Cities round-end overlay tests', () => {
     const overlayText = findOverlayText(scene, 'Round');
     expect(overlayText).toBeDefined();
     expect(overlayText!.text).toContain('Round');
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // Error recovery tests
+  // ═══════════════════════════════════════════════════════════
+
+  describe('error recovery', () => {
+    it('should transition from ai-thinking to waiting-for-card-select when recoverFromFailure is called while playing', async () => {
+      game = await bootGame();
+      const scene = game.scene.getScene('LostCitiesScene')!;
+      const internals = getSceneInternals(scene);
+
+      // Set phase to ai-thinking (simulating error during AI turn)
+      internals.turnController.setPhase('ai-thinking');
+      expect(internals.turnController.phase).toBe('ai-thinking');
+
+      // Call recoverFromFailure directly
+      internals.turnController.recoverFromFailure();
+
+      // Should transition to waiting-for-card-select
+      expect(internals.turnController.phase).toBe('waiting-for-card-select');
+    });
+
+    it('should transition from ai-thinking to match-over when recoverFromFailure is called after match ends', async () => {
+      game = await bootGame();
+      const scene = game.scene.getScene('LostCitiesScene')!;
+      const internals = getSceneInternals(scene);
+      const session = internals.session;
+
+      session.matchPhase = 'match-over';
+      internals.turnController.setPhase('ai-thinking');
+      expect(internals.turnController.phase).toBe('ai-thinking');
+
+      internals.turnController.recoverFromFailure();
+
+      // Should transition to match-over
+      expect(internals.turnController.phase).toBe('match-over');
+    });
   });
 });

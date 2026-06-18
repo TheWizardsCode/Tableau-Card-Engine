@@ -1,5 +1,19 @@
 /**
  * LostCitiesTurnController — turn flow, input handling, and AI execution.
+ *
+ * Round-end flow:
+ * 1. executeAction() scores the round and transitions matchPhase to
+ *    'round-over' (non-final) or 'match-over' (final round) — it does
+ *    NOT call advanceMatch()/dealRound() immediately.
+ * 2. The animation callback fires onRefreshAll() (showing round-final
+ *    state) then onShowRoundSummary() / onShowMatchSummary().
+ * 3. The user clicks "[Next Round]" in the overlay, which calls
+ *    startNextRound() to advance to the next round.
+ *
+ * Error handling:
+ * runAiTurn() wraps executeAction calls in try/catch. On failure,
+ * recoverFromFailure() transitions to a safe phase so the game is
+ * never permanently stuck at "AI is thinking...".
  */
 import type { ExpeditionColor } from '../LostCitiesCards';
 import { EXPEDITION_COLORS } from '../LostCitiesCards';
@@ -296,8 +310,11 @@ export class LostCitiesTurnController {
   /**
    * Attempt to recover from an unexpected error during AI turn execution.
    * Transitions to a safe phase so the game is not permanently frozen.
+   *
+   * @internal Exposed for unit testing. Callers outside the turn
+   * controller should rely on the try/catch in runAiTurn().
    */
-  private recoverFromFailure(): void {
+  recoverFromFailure(): void {
     try {
       if (this.session.matchPhase === 'playing' || this.session.matchPhase === 'round-over') {
         this.callbacks.onRefreshAll();
