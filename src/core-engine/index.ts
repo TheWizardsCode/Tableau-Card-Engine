@@ -99,7 +99,7 @@ export { PhaserEventBridge } from './PhaserEventBridge';
 
 // Sound management
 export type { SoundPlayer, EventSoundMapping, StorageLike, SoundManagerOptions, CommonSfxKey } from './SoundManager';
-export { SoundManager, COMMON_SFX_KEYS } from './SoundManager';
+export { SoundManager, COMMON_SFX_KEYS, safePlaySound } from './SoundManager';
 
 // ToneForge runtime adapter
 export type {
