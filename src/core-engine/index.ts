@@ -73,6 +73,12 @@ export type {
 export {
   CheckpointManager,
 } from './CheckpointManager';
+export type {
+  ResumeOverlayScene,
+} from './CheckpointResumeOverlay';
+export {
+  createDefaultResumeOverlay,
+} from './CheckpointResumeOverlay';
 
 // Game event system
 export type {

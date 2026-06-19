@@ -26,10 +26,14 @@
  *
  * - **Callback-based (preferred for games):** Provide a `createResumeOverlay`
  *   callback. The manager will not create any overlay; the game renders its own.
- * - **Built-in default:** Omit `createResumeOverlay`. The manager checks for a
- *   checkpoint and, if found, calls `freshStartFn` (since there's no default
- *   Phaser overlay in the non-Phaser core engine — games should provide their
- *   own overlay via the callback).
+ * - **Built-in default:** Import `createDefaultResumeOverlay` from
+ *   `@core-engine` and pass it as the `createResumeOverlay` callback. This
+ *   renders a standard "Resume Saved Game?" overlay with [Resume] and
+ *   [New Game] buttons.
+ *
+ *   If no overlay callback is provided at all, the manager falls through to
+ *   `freshStartFn()` (no overlay is shown). Games should always provide an
+ *   overlay callback — either the built-in default or a custom one.
  *
  * @module core-engine/CheckpointManager
  */
@@ -147,11 +151,12 @@ export class CheckpointManager<TState, TSerialized> {
    * - **No checkpoint:** Calls `freshStartFn()` immediately.
    * - **Checkpoint found + `createResumeOverlay` provided:** Calls
    *   `createResumeOverlay(state, onResume, onNewGame)`. The overlay renders
-   *   the choice; the manager wires the callbacks.
+   *   the choice; the manager wires the callbacks. Use the exported
+   *   {@link createDefaultResumeOverlay} for a built-in Phaser-compatible
+   *   default overlay, or provide a game-specific callback.
    * - **Checkpoint found + no overlay callback:** Calls `freshStartFn()`
-   *   (since the non-Phaser core engine has no built-in overlay to show).
-   *   Games should always provide an overlay callback when they want the
-   *   resume UI.
+   *   (no overlay is shown). Games should always provide an overlay callback
+   *   when they want resume UI.
    * - **Storage error:** Falls through to `freshStartFn()` so the game is
    *   still playable.
    *
@@ -201,9 +206,9 @@ export class CheckpointManager<TState, TSerialized> {
         },
       );
     } else {
-      // No overlay callback provided — use built-in behaviour
-      // Since the core engine doesn't ship a Phaser overlay by default,
-      // we call freshStartFn. Games should provide an overlay callback.
+      // No overlay callback provided — fall through to freshStartFn.
+      // Games should provide a createResumeOverlay callback (either the
+      // built-in createDefaultResumeOverlay or a custom one).
       freshStartFn();
     }
   }
