@@ -46,32 +46,14 @@ export class LostCitiesAnimator {
     this.renderer = renderer;
   }
 
-  animatePhase1(action: Phase1Action, onComplete: () => void): void {
+  animatePhase1(action: Phase1Action, handIndex: number, onComplete: () => void): void {
     const handSprites = this.renderer.handSpriteList;
-    if (handSprites.length === 0) {
+    if (handSprites.length === 0 || handIndex < 0 || handIndex >= handSprites.length) {
       onComplete();
       return;
     }
 
-    // Use DPR-aware key for sprite lookup (hand sprites use CARD_W x CARD_H).
-    const targetTemplateId = cardAssetKey(action.card);
-    const targetKey = getLcTextureKey(targetTemplateId, CARD_W, CARD_H);
-    let spriteIdx = -1;
-    for (let i = 0; i < handSprites.length; i++) {
-      const spriteKey = handSprites[i].texture.key;
-      // Match DPR-aware keys; fall back to template ID for legacy compatibility.
-      if (spriteKey === targetKey || spriteKey === targetTemplateId) {
-        spriteIdx = i;
-        break;
-      }
-    }
-
-    if (spriteIdx < 0) {
-      onComplete();
-      return;
-    }
-
-    const sprite = handSprites[spriteIdx];
+    const sprite = handSprites[handIndex];
     sprite.setDepth(100);
 
     let targetX: number;

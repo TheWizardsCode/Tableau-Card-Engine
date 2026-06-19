@@ -230,7 +230,7 @@ describe('Lost Cities round-end overlay tests', () => {
 
     // Phase 1: Play it to the card's own color expedition (it's 'blue')
     internals.turnController.onExpeditionClick();
-    await wait(200); // Allow animation to start
+    await wait(400); // Allow 300ms animation to complete
 
     // The turn controller should now be in 'waiting-for-draw' phase
     expect(internals.turnController.phase).toBe('waiting-for-draw');
@@ -288,7 +288,7 @@ describe('Lost Cities round-end overlay tests', () => {
     internals.turnController.onHandCardClick(0);
     await wait(50);
     internals.turnController.onExpeditionClick();
-    await wait(200);
+    await wait(400); // Allow 300ms animation to complete
     expect(internals.turnController.phase).toBe('waiting-for-draw');
     internals.turnController.onDrawPileClick();
     await wait(800);
@@ -317,7 +317,7 @@ describe('Lost Cities round-end overlay tests', () => {
     internals.turnController.onHandCardClick(0);
     await wait(50);
     internals.turnController.onExpeditionClick();
-    await wait(200);
+    await wait(400); // Allow 300ms animation to complete
     internals.turnController.onDrawPileClick();
     await wait(800);
 
@@ -409,7 +409,7 @@ describe('Lost Cities round-end overlay tests', () => {
     internals.turnController.onHandCardClick(0);
     await wait(50);
     internals.turnController.onExpeditionClick();
-    await wait(150);
+    await wait(400); // Allow 300ms animation to complete
     expect(internals.turnController.phase).toBe('waiting-for-draw');
     internals.turnController.onDrawPileClick();
     await wait(150);
