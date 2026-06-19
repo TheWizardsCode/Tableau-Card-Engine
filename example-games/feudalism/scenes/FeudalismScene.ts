@@ -109,6 +109,7 @@ export class FeudalismScene extends CardGameScene {
       onShowDiscardDialog: (excess) => this.showDiscardDialog(excess),
       onShowGameOver: () => this.overlayHelper.showGameOverOverlay(this.recorder, () => this.scene.restart()),
       onPlaySound: (key) => this.soundManager?.play(key),
+      onSetPatronAnimationCache: (patron, index) => this.feudRenderer.cachePatronForAnimation(patron, index),
       onEmitTurnStarted: () => {
         this.gameEvents.emit('turn-started', {
           turnNumber: 0,
