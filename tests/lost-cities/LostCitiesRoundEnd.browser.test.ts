@@ -240,10 +240,10 @@ describe('Lost Cities round-end overlay tests', () => {
     await wait(800); // Allow animation + overlay to render
 
     // After the draw, the round should have ended and the overlay should appear
-    // Look for text containing "Round" (from "Round 1 Complete")
-    const overlayText = findOverlayText(scene, 'Round');
+    // Look for text containing "Round 1 Complete" (setupPlayerLastCard sets roundNumber = 1)
+    const overlayText = findOverlayText(scene, 'Round 1 Complete');
     expect(overlayText).toBeDefined();
-    expect(overlayText!.text).toContain('Round');
+    expect(overlayText!.text).toContain('Round 1 Complete');
 
     // Also verify session state reflects the round-end
     const session = internals.session;
@@ -424,9 +424,10 @@ describe('Lost Cities round-end overlay tests', () => {
     expect(session.roundScores).toHaveLength(1);
 
     // Overlay should show round summary
-    const overlayText = findOverlayText(scene, 'Round');
+    // setupAiLastCard sets roundNumber = 1, so we expect "Round 1 Complete"
+    const overlayText = findOverlayText(scene, 'Round 1 Complete');
     expect(overlayText).toBeDefined();
-    expect(overlayText!.text).toContain('Round');
+    expect(overlayText!.text).toContain('Round 1 Complete');
   });
 
   // ═══════════════════════════════════════════════════════════

@@ -48,7 +48,11 @@ export class LostCitiesOverlayHelper {
     const cx = GAME_W / 2;
     const topY = GAME_H / 2 - 200;
 
-    const title = createLcHudText(this.scene, cx, topY, `Round ${this.session.roundNumber - 1} Complete`, '#f0c040', {
+    // roundNumber is already 1-based and is NOT incremented before the overlay
+    // is rendered — advanceMatch/startNextRound happens *after* the overlay is
+    // dismissed (the 'round-over' pause phase preserves round-final state).
+    // Using roundNumber directly (not roundNumber - 1) gives the correct display.
+    const title = createLcHudText(this.scene, cx, topY, `Round ${this.session.roundNumber} Complete`, '#f0c040', {
       fontSize: '28px',
       originX: 0.5,
       originY: 0,
