@@ -164,9 +164,16 @@ export class FeudalismTurnController {
           () => this.afterTurnComplete(result),
           () => this.callbacks.onRefreshAll(),
           () => {
-            // Patron has flown and been destroyed; clear cache so next
-            // refresh shows it only in the player area.
+            // Clear cache before patron fly animation starts so the static
+            // patron tile is removed from the Patrons section, leaving only
+            // the flying patron visible during its flight.
             this.callbacks.onSetPatronAnimationCache(null, -1);
+            this.callbacks.onRefreshAll();
+          },
+          () => {
+            // Patron has flown and been destroyed; do a full refresh to
+            // show the patron in the player area and update the Patrons
+            // section to reflect remaining available patrons.
             this.callbacks.onRefreshAll();
           },
         );
@@ -320,9 +327,16 @@ export class FeudalismTurnController {
             patronSourceIndex, aiIndex, afterAnim,
             () => this.callbacks.onRefreshAll(),
             () => {
-              // Patron has flown and been destroyed; clear cache so next
-              // refresh shows it only in the player/AI area.
+              // Clear cache before patron fly animation starts so the static
+              // patron tile is removed from the Patrons section, leaving only
+              // the flying patron visible during its flight.
               this.callbacks.onSetPatronAnimationCache(null, -1);
+              this.callbacks.onRefreshAll();
+            },
+            () => {
+              // Patron has flown and been destroyed; do a full refresh to
+              // show the patron in the player area and update the Patrons
+              // section to reflect remaining available patrons.
               this.callbacks.onRefreshAll();
             },
           );
