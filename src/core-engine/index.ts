@@ -64,6 +64,16 @@ export {
   deserializeWithVersion,
 } from './SaveLoad';
 
+// Checkpoint save-and-resume abstraction
+// @module CheckpointManager
+// @since 0.1.0
+export type {
+  CheckpointManagerOverlayOptions,
+} from './CheckpointManager';
+export {
+  CheckpointManager,
+} from './CheckpointManager';
+
 // Game event system
 export type {
   TurnStartedPayload,
