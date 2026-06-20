@@ -122,7 +122,7 @@ export function flipCard(opts: FlipCardOptions): Phaser.Tweens.Tween {
     onStart: () => {
       if (sfx?.start) {
         if (soundManager) soundManager.play(sfx.start);
-        else scene.sound?.play(sfx.start);
+        else { try { scene.sound?.play(sfx.start); } catch { /* ignore */ } }
       }
 
       if (sfx?.move) {
@@ -134,7 +134,7 @@ export function flipCard(opts: FlipCardOptions): Phaser.Tweens.Tween {
           } catch { loopSound = null; }
         } else {
           if (soundManager) soundManager.play(sfx.move);
-          else scene.sound?.play(sfx.move);
+          else { try { scene.sound?.play(sfx.move); } catch { /* ignore */ } }
           (closeConfig as any).__lastMovePlay = Date.now();
         }
       }
@@ -146,7 +146,7 @@ export function flipCard(opts: FlipCardOptions): Phaser.Tweens.Tween {
       const now = Date.now();
       if (now - last >= moveInterval) {
         if (soundManager) soundManager.play(sfx.move);
-        else scene.sound?.play(sfx.move);
+        else { try { scene.sound?.play(sfx.move); } catch { /* ignore */ } }
         (closeConfig as any).__lastMovePlay = now;
       }
     },
@@ -180,7 +180,7 @@ export function flipCard(opts: FlipCardOptions): Phaser.Tweens.Tween {
           const now = Date.now();
           if (now - last >= moveInterval) {
             if (soundManager) soundManager.play(sfx.move);
-            else scene.sound?.play(sfx.move);
+            else { try { scene.sound?.play(sfx.move); } catch { /* ignore */ } }
             (openConfig as any).__lastMovePlay = now;
           }
         },
@@ -192,7 +192,7 @@ export function flipCard(opts: FlipCardOptions): Phaser.Tweens.Tween {
 
           if (sfx?.end) {
             if (soundManager) soundManager.play(sfx.end);
-            else scene.sound?.play(sfx.end);
+            else { try { scene.sound?.play(sfx.end); } catch { /* ignore */ } }
           }
 
           if (onComplete) onComplete();

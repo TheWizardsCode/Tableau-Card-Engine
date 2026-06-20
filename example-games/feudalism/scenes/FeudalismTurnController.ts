@@ -1,7 +1,7 @@
 /**
  * FeudalismTurnController — turn flow, action execution, and AI scheduling.
  */
-import type { ResourceType, DevelopmentCard, Tier } from '../FeudalismCards';
+import type { PatronTile, ResourceType, DevelopmentCard, Tier } from '../FeudalismCards';
 import { resourceAbbrev, resourceDisplayName } from '../FeudalismCards';
 import type { FeudalismSession, TurnAction, TurnResult } from '../FeudalismGame';
 import { executeTurn, discardTokens, isGameOver } from '../FeudalismGame';
@@ -21,6 +21,10 @@ export interface TurnControllerCallbacks {
   onPlaySound: (key: string) => void;
   onEmitTurnStarted: () => void;
   onEmitGameEnded: (winnerIdx: number) => void;
+  /** Cache a patron to keep it visible in the patron column during animation. */
+  onSetPatronAnimationCache: (patron: PatronTile | null, index: number) => void;
+  /** Callback after each complete turn (human or AI) to save a checkpoint. */
+  onSaveCheckpoint?: () => void;
 }
 
 export class FeudalismTurnController {
@@ -148,6 +152,11 @@ export class FeudalismTurnController {
           ? this.animator.getPlayerCardDest(playerIndex)
           : this.animator.getPlayerReserveDest(playerIndex);
 
+        // Cache the patron so refreshPatrons keeps it visible during animation
+        if (result.patronVisit) {
+          this.callbacks.onSetPatronAnimationCache(result.patronVisit, patronSourceIndex);
+        }
+
         this.setPhase('animating');
         this.callbacks.onRefreshAll();
 
@@ -156,7 +165,19 @@ export class FeudalismTurnController {
           patronSourceIndex, playerIndex,
           () => this.afterTurnComplete(result),
           () => this.callbacks.onRefreshAll(),
-          () => this.callbacks.onRefreshAll(),
+          () => {
+            // Clear cache before patron fly animation starts so the static
+            // patron tile is removed from the Patrons section, leaving only
+            // the flying patron visible during its flight.
+            this.callbacks.onSetPatronAnimationCache(null, -1);
+            this.callbacks.onRefreshAll();
+          },
+          () => {
+            // Patron has flown and been destroyed; do a full refresh to
+            // show the patron in the player area and update the Patrons
+            // section to reflect remaining available patrons.
+            this.callbacks.onRefreshAll();
+          },
         );
       } else {
         this.afterTurnComplete(result);
@@ -190,6 +211,9 @@ export class FeudalismTurnController {
   private afterTurnComplete(result: TurnResult): void {
     this.setPhase('animating');
     this.callbacks.onRefreshAll();
+
+    // Save checkpoint after every completed turn (human or AI)
+    this.callbacks.onSaveCheckpoint?.();
 
     if (result.gameOver) {
       (this.animator as any).scene.time.delayedCall(ANIM_DURATION, () => {
@@ -296,13 +320,30 @@ export class FeudalismTurnController {
             ? this.animator.getPlayerCardDest(aiIndex)
             : this.animator.getPlayerReserveDest(aiIndex);
 
+          // Cache the patron so refreshPatrons keeps it visible during animation
+          if (result.patronVisit) {
+            this.callbacks.onSetPatronAnimationCache(result.patronVisit, patronSourceIndex);
+          }
+
           this.callbacks.onRefreshAll();
 
           this.animator.playCardAnimation(
             sourcePos, destPos, card, marketSlot, result.patronVisit,
             patronSourceIndex, aiIndex, afterAnim,
             () => this.callbacks.onRefreshAll(),
-            () => this.callbacks.onRefreshAll(),
+            () => {
+              // Clear cache before patron fly animation starts so the static
+              // patron tile is removed from the Patrons section, leaving only
+              // the flying patron visible during its flight.
+              this.callbacks.onSetPatronAnimationCache(null, -1);
+              this.callbacks.onRefreshAll();
+            },
+            () => {
+              // Patron has flown and been destroyed; do a full refresh to
+              // show the patron in the player area and update the Patrons
+              // section to reflect remaining available patrons.
+              this.callbacks.onRefreshAll();
+            },
           );
         } else {
           this.callbacks.onRefreshAll();

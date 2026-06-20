@@ -1,7 +1,7 @@
 import { setupMainStreetGame, deserializeMainStreetState } from '../MainStreetState';
-import { createDefaultCampaignProgress, loadCampaignProgress, updateCampaignAfterRun, saveCampaignProgress } from '../MainStreetSaveLoad';
+import { createDefaultCampaignProgress, loadCampaignProgress, updateCampaignAfterRun, saveCampaignProgress, createMainStreetCheckpointManager } from '../MainStreetSaveLoad';
 import { DIFFICULTY_NAMES } from '../MainStreetDifficulty';
-import { SaveLoadStore, markSceneValid, markSceneInvalid, createTfPlayer, UndoRedoManager } from '../../../src/core-engine';
+import { SaveLoadStore, createDefaultResumeOverlay, markSceneValid, markSceneInvalid, createTfPlayer, UndoRedoManager } from '../../../src/core-engine';
 import { createSingleSelectionManager, TooltipManager } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
 import { MAIN_STREET_TF_SFX_MAPPING } from '../sfx-tf-mapping';
@@ -240,6 +240,22 @@ export class MainStreetLifecycleManager {
 
     // Game setup -- load campaign for tier-filtered deck building
     s.saveStore = new SaveLoadStore();
+    s.checkpointManager = createMainStreetCheckpointManager(s.saveStore);
+
+    // Wire checkpoint callbacks to the turn controller
+    s.msTurnController.onSaveCheckpoint = () => {
+      if (s.state) {
+        s.checkpointManager.save(s.state).catch((_err: unknown) => {
+          console.warn('[MainStreet] Failed to save checkpoint:', _err);
+        });
+      }
+    };
+    s.msTurnController.onGameEnd = () => {
+      s.checkpointManager.clear().catch((_err: unknown) => {
+        console.warn('[MainStreet] Failed to clear checkpoint:', _err);
+      });
+    };
+
     this.loadCampaignAndSetup();
 
     // Undo/Redo manager (per-scene)
@@ -695,12 +711,17 @@ export class MainStreetLifecycleManager {
           // the market is empty, making interactive tutorial steps impossible.
           try { s.startDayPhase(); } catch (_) { /* ignore */ }
         }
-        // After attempting to load (saved or not), show the tutorial offer modal
-        // if eligibility checks pass (Milestone 5 onboarding flow).
+        // Check for a saved run checkpoint. If one exists, the resume overlay
+        // takes priority over the tutorial offer modal.
         try {
-          const legacySeen = s.campaign ? (s.campaign as any).tutorialSeen : undefined;
-          (s as any).tutorialOfferModal?.showIfEligible(tutorialOpts, legacySeen);
-        } catch (e) { /* eslint-disable-next-line no-console */ console.error('[MainStreet] tutorial offer check failed', e); }
+          s.checkForSavedCheckpoint(tutorialOpts);
+        } catch (e) {
+          // If checkpoint check fails, fall through to tutorial offer
+          try {
+            const legacySeen = s.campaign ? (s.campaign as any).tutorialSeen : undefined;
+            (s as any).tutorialOfferModal?.showIfEligible(tutorialOpts, legacySeen);
+          } catch (_) { /* ignore */ }
+        }
         return saved;
       }).catch(() => {
         // If load fails, continue with defaults and show offer modal
@@ -796,5 +817,50 @@ export class MainStreetLifecycleManager {
 
     // Signal board is visually stable
     s.emitStateSettled(stepIdx, 'playing');
+  }
+
+  /**
+   * Check for a saved run checkpoint on startup.
+   *
+   * If a checkpoint exists, shows a resume overlay with [Resume] and
+   * [New Game] buttons (takes priority over the tutorial offer).
+   * If no checkpoint exists, the tutorial offer modal is shown.
+   *
+   * @param tutorialOpts  Options for the tutorial offer modal (shown if no checkpoint).
+   */
+  public checkForSavedCheckpoint(tutorialOpts: TutorialVisibilityOptions): void {
+    const s = this.scene;
+    if (!s.checkpointManager) return;
+
+    s.checkpointManager.checkAndResume(
+      // No checkpoint — show tutorial offer (if eligible)
+      () => {
+        try {
+          const legacySeen = s.campaign ? (s.campaign as any).tutorialSeen : undefined;
+          (s as any).tutorialOfferModal?.showIfEligible(tutorialOpts, legacySeen);
+        } catch (_) { /* ignore */ }
+      },
+      // Resume from checkpoint — replace state and rebuild UI
+      (savedState: any) => {
+        s.state = savedState;
+        // Mark tutorial as seen (resumed game means player already played)
+        if (s.campaign) {
+          s.campaign.tutorialSeen = true;
+        }
+        // Rebuild renderer and start day phase from checkpoint state
+        try { s.refreshAll(); } catch (_) { /* ignore */ }
+        try { s.startDayPhase(); } catch (_) { /* ignore */ }
+      },
+      // Resume overlay callback — use built-in default overlay
+      (state: any, onResume: () => void, onNewGame: () => void) => {
+        createDefaultResumeOverlay(s, state, onResume, onNewGame);
+      },
+    ).catch(() => {
+      // On error (e.g., storage unavailable), show tutorial offer
+      try {
+        const legacySeen = s.campaign ? (s.campaign as any).tutorialSeen : undefined;
+        (s as any).tutorialOfferModal?.showIfEligible(tutorialOpts, legacySeen);
+      } catch (_) { /* ignore */ }
+    });
   }
 }

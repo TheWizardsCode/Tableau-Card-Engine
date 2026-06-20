@@ -64,6 +64,22 @@ export {
   deserializeWithVersion,
 } from './SaveLoad';
 
+// Checkpoint save-and-resume abstraction
+// @module CheckpointManager
+// @since 0.1.0
+export type {
+  CheckpointManagerOverlayOptions,
+} from './CheckpointManager';
+export {
+  CheckpointManager,
+} from './CheckpointManager';
+export type {
+  ResumeOverlayScene,
+} from './CheckpointResumeOverlay';
+export {
+  createDefaultResumeOverlay,
+} from './CheckpointResumeOverlay';
+
 // Game event system
 export type {
   TurnStartedPayload,
@@ -99,7 +115,7 @@ export { PhaserEventBridge } from './PhaserEventBridge';
 
 // Sound management
 export type { SoundPlayer, EventSoundMapping, StorageLike, SoundManagerOptions, CommonSfxKey } from './SoundManager';
-export { SoundManager, COMMON_SFX_KEYS } from './SoundManager';
+export { SoundManager, COMMON_SFX_KEYS, safePlaySound } from './SoundManager';
 
 // ToneForge runtime adapter
 export type {

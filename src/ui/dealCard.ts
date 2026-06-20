@@ -185,7 +185,7 @@ export function dealCard(opts: DealCardOptions): Phaser.Tweens.Tween {
     onStart: () => {
       if (sfx?.start) {
         if (soundManager) soundManager.play(sfx.start);
-        else scene.sound?.play(sfx.start);
+        else { try { scene.sound?.play(sfx.start); } catch { /* ignore */ } }
       }
 
       if (sfx?.move) {
@@ -197,7 +197,7 @@ export function dealCard(opts: DealCardOptions): Phaser.Tweens.Tween {
           } catch { loopSound = null; }
         } else {
           if (soundManager) soundManager.play(sfx.move);
-          else scene.sound?.play(sfx.move);
+          else { try { scene.sound?.play(sfx.move); } catch { /* ignore */ } }
           lastMovePlay = Date.now();
         }
       }
@@ -208,7 +208,7 @@ export function dealCard(opts: DealCardOptions): Phaser.Tweens.Tween {
       const now = Date.now();
       if (now - lastMovePlay >= moveInterval) {
         if (soundManager) soundManager.play(sfx.move);
-        else scene.sound?.play(sfx.move);
+        else { try { scene.sound?.play(sfx.move); } catch { /* ignore */ } }
         lastMovePlay = now;
       }
     },
@@ -230,7 +230,7 @@ export function dealCard(opts: DealCardOptions): Phaser.Tweens.Tween {
           const now = Date.now();
           if (now - lastMovePlay >= moveInterval) {
             if (soundManager) soundManager.play(sfx.move);
-            else scene.sound?.play(sfx.move);
+            else { try { scene.sound?.play(sfx.move); } catch { /* ignore */ } }
             lastMovePlay = now;
           }
         },
@@ -238,7 +238,7 @@ export function dealCard(opts: DealCardOptions): Phaser.Tweens.Tween {
           if (loopSound) { try { loopSound.stop(); } catch {} loopSound = null; }
           if (sfx?.end) {
             if (soundManager) soundManager.play(sfx.end);
-            else scene.sound?.play(sfx.end);
+            else { try { scene.sound?.play(sfx.end); } catch { /* ignore */ } }
           }
           if (gameEvents && cardId) {
             gameEvents.emit('card:dealt', { cardId, playerIndex });

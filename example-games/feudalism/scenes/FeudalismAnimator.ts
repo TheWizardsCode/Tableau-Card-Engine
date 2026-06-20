@@ -96,6 +96,7 @@ export class FeudalismAnimator {
     playerIndex: number,
     onAllComplete: () => void,
     onRefreshMarket: () => void,
+    onBeforePatronAnimation: () => void,
     onRefreshPatronsAndPlayer: () => void,
   ): void {
     const flyingCard = this.createFlyingCard(sourcePos.x, sourcePos.y, card);
@@ -110,10 +111,10 @@ export class FeudalismAnimator {
         flyingCard.destroy();
         if (marketSlot) {
           this.playMarketRefillAnimation(marketSlot.tier, marketSlot.col, () => {
-            this.chainPatronAnimation(patronVisit, patronSourceIndex, playerIndex, onAllComplete, onRefreshPatronsAndPlayer);
+            this.chainPatronAnimation(patronVisit, patronSourceIndex, playerIndex, onAllComplete, onBeforePatronAnimation, onRefreshPatronsAndPlayer);
           }, onRefreshMarket);
         } else {
-          this.chainPatronAnimation(patronVisit, patronSourceIndex, playerIndex, onAllComplete, onRefreshPatronsAndPlayer);
+          this.chainPatronAnimation(patronVisit, patronSourceIndex, playerIndex, onAllComplete, onBeforePatronAnimation, onRefreshPatronsAndPlayer);
         }
       },
     });
@@ -148,12 +149,18 @@ export class FeudalismAnimator {
     patronSourceIndex: number,
     playerIndex: number,
     onComplete: () => void,
+    onBeforePatronAnimation: () => void,
     onRefreshPatronsAndPlayer: () => void,
   ): void {
     if (!patronVisit || patronSourceIndex < 0) {
       onComplete();
       return;
     }
+
+    // Remove the static patron tile from the Patrons section before the
+    // flying patron appears, so there is only one visible patron during flight.
+    onBeforePatronAnimation();
+
     const patronSource = this.getPatronCenter(patronSourceIndex);
     const patronDest = this.getPlayerPatronDest(playerIndex);
     const flyingPatron = this.createFlyingPatron(patronSource.x, patronSource.y, patronVisit);

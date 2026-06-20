@@ -29,7 +29,7 @@ export class FeudalismOverlayHelper {
   }
 
   showGameOverOverlay(recorder: FeudalismTranscriptRecorder | null, onRestart: () => void): void {
-    this.scene.sound.play?.(SFX_KEYS.GAME_END);
+    try { this.scene.sound.play?.(SFX_KEYS.GAME_END); } catch { /* ignore */ }
     const winnerIdx = getWinnerIndex(this.session);
 
     if (recorder && !recorder.isSealed()) {
@@ -69,7 +69,7 @@ export class FeudalismOverlayHelper {
 
     const playBtn = createOverlayButton(this.scene, GAME_W / 2 - 80, GAME_H / 2 + 110, '[ Play Again ]');
     playBtn.on('pointerdown', () => {
-      this.scene.sound.play?.(SFX_KEYS.UI_CLICK);
+      try { this.scene.sound.play?.(SFX_KEYS.UI_CLICK); } catch { /* ignore */ }
       this.dismiss();
       onRestart();
     });
@@ -124,7 +124,7 @@ export class FeudalismOverlayHelper {
 
     const cancelBtn = createOverlayButton(this.scene, bx, GAME_H / 2 + 40, '[ Cancel ]');
     cancelBtn.on('pointerdown', () => {
-      this.scene.sound.play?.(SFX_KEYS.UI_CLICK);
+      try { this.scene.sound.play?.(SFX_KEYS.UI_CLICK); } catch { /* ignore */ }
       this.dismiss();
       onCancel();
     });

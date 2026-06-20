@@ -230,7 +230,7 @@ describe('Lost Cities round-end overlay tests', () => {
 
     // Phase 1: Play it to the card's own color expedition (it's 'blue')
     internals.turnController.onExpeditionClick();
-    await wait(200); // Allow animation to start
+    await wait(400); // Allow 300ms animation to complete
 
     // The turn controller should now be in 'waiting-for-draw' phase
     expect(internals.turnController.phase).toBe('waiting-for-draw');
@@ -240,10 +240,10 @@ describe('Lost Cities round-end overlay tests', () => {
     await wait(800); // Allow animation + overlay to render
 
     // After the draw, the round should have ended and the overlay should appear
-    // Look for text containing "Round" (from "Round 1 Complete")
-    const overlayText = findOverlayText(scene, 'Round');
+    // Look for text containing "Round 1 Complete" (setupPlayerLastCard sets roundNumber = 1)
+    const overlayText = findOverlayText(scene, 'Round 1 Complete');
     expect(overlayText).toBeDefined();
-    expect(overlayText!.text).toContain('Round');
+    expect(overlayText!.text).toContain('Round 1 Complete');
 
     // Also verify session state reflects the round-end
     const session = internals.session;
@@ -288,7 +288,7 @@ describe('Lost Cities round-end overlay tests', () => {
     internals.turnController.onHandCardClick(0);
     await wait(50);
     internals.turnController.onExpeditionClick();
-    await wait(200);
+    await wait(400); // Allow 300ms animation to complete
     expect(internals.turnController.phase).toBe('waiting-for-draw');
     internals.turnController.onDrawPileClick();
     await wait(800);
@@ -317,7 +317,7 @@ describe('Lost Cities round-end overlay tests', () => {
     internals.turnController.onHandCardClick(0);
     await wait(50);
     internals.turnController.onExpeditionClick();
-    await wait(200);
+    await wait(400); // Allow 300ms animation to complete
     internals.turnController.onDrawPileClick();
     await wait(800);
 
@@ -409,7 +409,7 @@ describe('Lost Cities round-end overlay tests', () => {
     internals.turnController.onHandCardClick(0);
     await wait(50);
     internals.turnController.onExpeditionClick();
-    await wait(150);
+    await wait(400); // Allow 300ms animation to complete
     expect(internals.turnController.phase).toBe('waiting-for-draw');
     internals.turnController.onDrawPileClick();
     await wait(150);
@@ -424,9 +424,10 @@ describe('Lost Cities round-end overlay tests', () => {
     expect(session.roundScores).toHaveLength(1);
 
     // Overlay should show round summary
-    const overlayText = findOverlayText(scene, 'Round');
+    // setupAiLastCard sets roundNumber = 1, so we expect "Round 1 Complete"
+    const overlayText = findOverlayText(scene, 'Round 1 Complete');
     expect(overlayText).toBeDefined();
-    expect(overlayText!.text).toContain('Round');
+    expect(overlayText!.text).toContain('Round 1 Complete');
   });
 
   // ═══════════════════════════════════════════════════════════

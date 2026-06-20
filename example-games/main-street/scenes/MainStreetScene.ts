@@ -9,8 +9,9 @@ import {
   TooltipManager,
 } from '../../../src/ui';
 import type { SelectionController, SingleSelectionManager } from '../../../src/ui';
-import { SaveLoadStore } from '../../../src/core-engine';
+import { SaveLoadStore, CheckpointManager } from '../../../src/core-engine';
 import { UndoRedoManager } from '../../../src/core-engine';
+import type { MainStreetSerializedState } from '../MainStreetState';
 import { MainStreetRenderer } from './MainStreetRenderer';
 import { MainStreetAnimator } from './MainStreetAnimator';
 import { MainStreetTurnController } from './MainStreetTurnController';
@@ -48,6 +49,9 @@ export class MainStreetScene extends CardGameScene {
   // Campaign / meta-progression
   public campaign: MainStreetCampaignProgress | null = null;
   public saveStore: SaveLoadStore | null = null;
+
+  // Checkpoint (auto-save/resume after each turn)
+  public checkpointManager!: CheckpointManager<MainStreetState, MainStreetSerializedState>;
 
   // Selected difficulty (persisted across replays)
   public selectedDifficulty: DifficultyName = 'Medium';
@@ -189,6 +193,15 @@ export class MainStreetScene extends CardGameScene {
    */
   public loadCampaignAndSetup(...args: any[]): any {
     return (this.msLifecycleManager as any).loadCampaignAndSetup.apply(this.msLifecycleManager, args);
+  }
+
+  /**
+   * Check for a saved run checkpoint on startup.
+   * If found, shows a resume overlay with [Resume] and [New Game] buttons.
+   * Delegates to MainStreetLifecycleManager.checkForSavedCheckpoint().
+   */
+  public checkForSavedCheckpoint(...args: any[]): any {
+    return (this.msLifecycleManager as any).checkForSavedCheckpoint.apply(this.msLifecycleManager, args);
   }
 
   /**

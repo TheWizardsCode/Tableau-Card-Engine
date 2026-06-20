@@ -193,6 +193,10 @@ export class LostCitiesTurnController {
   private executePlayerPhase1(action: Phase1Action): void {
     this.setPhase('animating');
     this.renderer.clearSelectionHighlight();
+    // Save the selected card index before clearing (needed by animatePhase1
+    // to find the correct hand sprite to animate — after executeAction() the
+    // sprite list is still unchanged since refreshAll() hasn't been called yet).
+    const savedCardIndex = this.selectedCardIndex;
     this.selectedCardIndex = -1;
 
     if (action.kind === 'play-to-expedition') {
@@ -205,7 +209,7 @@ export class LostCitiesTurnController {
     const result = executeAction(this.session, action);
     this.recorder.recordAction(this.session, result, action, phase);
 
-    this.animator.animatePhase1(action, () => {
+    this.animator.animatePhase1(action, savedCardIndex, () => {
       this.callbacks.onRefreshAll();
       this.setPhase('waiting-for-draw');
     });

@@ -69,6 +69,38 @@ import { audioPathWithFallback } from '@ui/CardGameScene';
 this.load.audio('golf:sfx-card-draw', audioPathWithFallback('golf', 'card-draw.wav'));
 ```
 
+## Safe Sound Playback (Overlay Helpers)
+
+Overlay helper classes (e.g., `FeudalismOverlays`, `LostCitiesOverlays`) often do not have access to the namespaced `SoundManager` instance. In these cases, calling `this.scene.sound.play()` directly bypasses the namespace resolution and can crash the game loop if the audio key is not found.
+
+### Recommended approach: `safePlaySound()`
+
+For overlay helpers, use the exported `safePlaySound()` utility from `@core-engine/SoundManager`:
+
+```ts
+import { safePlaySound } from '@core-engine/SoundManager';
+
+// Inside an overlay helper:
+safePlaySound(this.scene, SFX_KEYS.GAME_END);
+```
+
+The function wraps `scene.sound.play?.()` in try/catch, gracefully handling:
+- Missing audio keys (the audio file was not loaded)
+- Null sound manager (e.g., during scene transitions)
+- Any other playback errors
+
+### Legacy fallback: inline try/catch
+
+If you prefer not to import the utility, always wrap `scene.sound.play` calls in try/catch:
+
+```ts
+try { this.scene.sound.play?.(SFX_KEYS.XXX); } catch { /* ignore */ }
+```
+
+### Prohibition
+
+Direct calls to `this.scene.sound.play()` or `this.sound.play()` without try/catch protection **must not** be committed. A custom ESLint rule (`no-direct-sound-play`) enforces this at build time.
+
 ## Collision Protection
 
 To prevent Phaser audio key collisions when multiple games are loaded:

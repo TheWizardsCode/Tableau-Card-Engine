@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   SoundManager,
   COMMON_SFX_KEYS,
+  safePlaySound,
   type SoundPlayer,
   type StorageLike,
 } from '../../src/core-engine/SoundManager';
@@ -416,6 +417,82 @@ describe('SoundManager', () => {
     it('should export SoundManager from core-engine index', async () => {
       const mod = await import('../../src/core-engine/index');
       expect(mod.SoundManager).toBeDefined();
+    });
+
+    it('should export safePlaySound from core-engine index', async () => {
+      const mod = await import('../../src/core-engine/index');
+      expect(mod.safePlaySound).toBeDefined();
+      expect(typeof mod.safePlaySound).toBe('function');
+    });
+  });
+
+  // ── safePlaySound utility ───────────────────────────────
+
+  describe('safePlaySound', () => {
+    it('should not throw when given a valid scene and key', () => {
+      const play = vi.fn();
+      const scene = { sound: { play } };
+
+      expect(() => safePlaySound(scene as any, 'sfx-test')).not.toThrow();
+      expect(play).toHaveBeenCalledWith('sfx-test');
+    });
+
+    it('should not throw when sound.play throws', () => {
+      const play = vi.fn(() => { throw new Error('Audio key not found'); });
+      const scene = { sound: { play } };
+
+      expect(() => safePlaySound(scene as any, 'sfx-missing')).not.toThrow();
+    });
+
+    it('should not throw when sound is null', () => {
+      const scene = { sound: null };
+
+      expect(() => safePlaySound(scene as any, 'sfx-test')).not.toThrow();
+    });
+
+    it('should not throw when scene is null', () => {
+      expect(() => safePlaySound(null, 'sfx-test')).not.toThrow();
+    });
+
+    it('should not throw when sound.play is undefined', () => {
+      const scene = { sound: {} };
+
+      expect(() => safePlaySound(scene as any, 'sfx-test')).not.toThrow();
+    });
+
+    it('should preserve optional-chaining behaviour (no-op if sound is null)', () => {
+      const scene = { sound: null };
+      // Should complete without error and without calling any function
+      safePlaySound(scene as any, 'sfx-test');
+    });
+
+    it('should not produce console errors when audio key is missing', () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const play = vi.fn(() => { throw new Error('Audio key not found'); });
+      const scene = { sound: { play } };
+
+      safePlaySound(scene as any, 'sfx-missing');
+
+      expect(consoleSpy).not.toHaveBeenCalled();
+      consoleSpy.mockRestore();
+    });
+
+    it('should work with Phaser-like scene structure', () => {
+      // Phaser.Scene has this.sound.play(key) — simulate the interface
+      const play = vi.fn();
+      const scene = {
+        sound: {
+          play,
+          // Phaser sound manager has many other methods
+          stop: vi.fn(),
+          add: vi.fn(),
+          remove: vi.fn(),
+          setVolume: vi.fn(),
+        },
+      };
+
+      expect(() => safePlaySound(scene as any, 'sfx-ui-click')).not.toThrow();
+      expect(play).toHaveBeenCalledWith('sfx-ui-click');
     });
   });
 });
