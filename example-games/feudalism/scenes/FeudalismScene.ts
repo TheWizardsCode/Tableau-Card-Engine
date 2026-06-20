@@ -8,6 +8,14 @@ import { setupFeudalismGame } from '../FeudalismGame';
 import { FeudalismAiPlayer, GreedyStrategy } from '../AiStrategy';
 import { FeudalismTranscriptRecorder } from '../GameTranscript';
 import type { EventSoundMapping } from '../../../src/core-engine/SoundManager';
+import { SaveLoadStore, CheckpointManager, createDefaultResumeOverlay } from '../../../src/core-engine';
+import {
+  createFeudalismSerializer,
+  FEUDALISM_GAME_TYPE,
+  FEUDALISM_RUN_SLOT,
+  clearFeudalismCheckpoint,
+  type FeudalismSerializedState,
+} from '../FeudalismSaveLoad';
 import {
   CardGameScene,
   GAME_W, GAME_H,
@@ -47,6 +55,8 @@ export class FeudalismScene extends CardGameScene {
   private turnController!: FeudalismTurnController;
   private replayController!: FeudalismReplayController;
 
+  private saveLoadStore!: SaveLoadStore;
+  private checkpointManager!: CheckpointManager<FeudalismSession, FeudalismSerializedState>;
   private replayStepIndex: number = -1;
 
   constructor() {
@@ -90,10 +100,15 @@ export class FeudalismScene extends CardGameScene {
     };
     this.initSoundSystem(Object.values(SFX_KEYS), mapping, { namespace: 'feudalism' });
 
+    this.saveLoadStore = new SaveLoadStore();
+
+    // Use a random seed for new games (Date.now() so each game is unique)
+    const gameSeed = Date.now();
     this.session = setupFeudalismGame({
       playerCount: 2,
       playerNames: ['You', 'AI'],
       isAI: [false, true],
+      seed: gameSeed,
     });
     this.aiPlayer = new FeudalismAiPlayer(GreedyStrategy);
     this.recorder = new FeudalismTranscriptRecorder(this.session);
@@ -102,12 +117,24 @@ export class FeudalismScene extends CardGameScene {
     this.animator = new FeudalismAnimator(this, this.session);
     this.overlayManager = new OverlayManager(this);
     this.overlayHelper = new FeudalismOverlayHelper(this, this.overlayManager, this.session);
+    // Wire up checkpoint saving after each turn
+    this.checkpointManager = new CheckpointManager(
+      this.saveLoadStore,
+      FEUDALISM_GAME_TYPE,
+      FEUDALISM_RUN_SLOT,
+      createFeudalismSerializer(gameSeed),
+    );
+    const checkpointManager = this.checkpointManager;
+
     this.turnController = new FeudalismTurnController(this.session, this.aiPlayer, this.animator, {
       onPhaseChange: (phase) => this.setPhase(phase),
       onRefreshAll: () => this.refreshAll(),
       onShowToast: (msg) => this.feudRenderer.showToast(msg),
       onShowDiscardDialog: (excess) => this.showDiscardDialog(excess),
-      onShowGameOver: () => this.overlayHelper.showGameOverOverlay(this.recorder, () => this.scene.restart()),
+      onShowGameOver: () => {
+        clearFeudalismCheckpoint(this.saveLoadStore).catch(() => {});
+        this.overlayHelper.showGameOverOverlay(this.recorder, () => this.scene.restart());
+      },
       onPlaySound: (key) => this.soundManager?.play(key),
       onSetPatronAnimationCache: (patron, index) => this.feudRenderer.cachePatronForAnimation(patron, index),
       onEmitTurnStarted: () => {
@@ -124,6 +151,9 @@ export class FeudalismScene extends CardGameScene {
           winnerIndex: winnerIdx,
         });
       },
+      onSaveCheckpoint: () => {
+        checkpointManager.save(this.session).catch(() => {});
+      },
     });
 
     this.turnController.setRecorder(this.recorder);
@@ -138,6 +168,9 @@ export class FeudalismScene extends CardGameScene {
 
     this.refreshAll();
     this.turnController.setPhase('player-turn');
+
+    // Async checkpoint check (deferred to next frame for scene readiness)
+    this.time.delayedCall(0, () => this.checkForSavedCheckpoint());
   }
 
   private createHeader(): void {
@@ -385,6 +418,106 @@ export class FeudalismScene extends CardGameScene {
 
   getTurnPhaseForTest(): TurnPhase {
     return this.turnController.phase;
+  }
+
+  // ── Checkpoint / Resume ─────────────────────────────────
+
+  /**
+   * Asynchronously check for a saved checkpoint on startup.
+   *
+   * If found, shows a resume overlay with [Resume] and [New Game] buttons.
+   * If not found, the normal fresh game flow continues.
+   */
+  private checkForSavedCheckpoint(): void {
+    if (!this.checkpointManager) return;
+
+    this.checkpointManager.checkAndResume(
+      // No checkpoint — start fresh (already done in create())
+      () => {
+        // Already set up in create(); nothing extra to do
+      },
+      // Resume from checkpoint
+      (savedState) => {
+        this.restoreFromCheckpoint(savedState);
+      },
+      // Custom resume overlay matching Feudalism visual style
+      (state, onResume, onNewGame) => {
+        // Use the built-in default overlay from core engine
+        createDefaultResumeOverlay(this, state, onResume, onNewGame);
+      },
+    ).catch(() => {
+      // On error (e.g., storage unavailable), continue with fresh game
+    });
+  }
+
+  /**
+   * Restore the game state from a saved checkpoint.
+   * Rebuilds the turn controller, renderer, and interactions.
+   */
+  private restoreFromCheckpoint(savedState: FeudalismSession): void {
+    this.session = savedState;
+    this.aiPlayer = new FeudalismAiPlayer(GreedyStrategy);
+    this.recorder = new FeudalismTranscriptRecorder(this.session);
+
+    this.feudRenderer = new FeudalismRenderer(this, this.session);
+    this.animator = new FeudalismAnimator(this, this.session);
+
+    const checkpointManager = new CheckpointManager(
+      this.saveLoadStore,
+      FEUDALISM_GAME_TYPE,
+      FEUDALISM_RUN_SLOT,
+      createFeudalismSerializer(savedState.seed),
+    );
+
+    this.turnController = new FeudalismTurnController(this.session, this.aiPlayer, this.animator, {
+      onPhaseChange: (phase) => this.setPhase(phase),
+      onRefreshAll: () => this.refreshAll(),
+      onShowToast: (msg) => this.feudRenderer.showToast(msg),
+      onShowDiscardDialog: (excess) => this.showDiscardDialog(excess),
+      onShowGameOver: () => {
+        clearFeudalismCheckpoint(this.saveLoadStore).catch(() => {});
+        this.overlayHelper.showGameOverOverlay(this.recorder, () => this.scene.restart());
+      },
+      onPlaySound: (key) => this.soundManager?.play(key),
+      onSetPatronAnimationCache: (patron, index) => this.feudRenderer.cachePatronForAnimation(patron, index),
+      onEmitTurnStarted: () => {
+        this.gameEvents.emit('turn-started', {
+          turnNumber: 0,
+          playerIndex: 0,
+          playerName: 'You',
+          isAI: false,
+        });
+      },
+      onEmitGameEnded: (winnerIdx) => {
+        this.gameEvents.emit('game-ended', {
+          finalTurnNumber: 0,
+          winnerIndex: winnerIdx,
+        });
+      },
+      onSaveCheckpoint: () => {
+        checkpointManager.save(this.session).catch(() => {});
+      },
+    });
+
+    this.turnController.setRecorder(this.recorder);
+
+    this.feudRenderer.createContainers();
+    this.feudRenderer.createInstructions();
+    this.feudRenderer.createInfluenceDisplay();
+    this.refreshAll();
+    this.turnController.setPhase('player-turn');
+
+    // Wire up interactions for the restored state
+    this.feudRenderer.refreshAll({
+      onMarketCardClick: (card) => this.onMarketCardClick(card),
+      onReserveDeck: (tier) => this.onReserveDeck(tier),
+      onSupplyTokenClick: (color) => this.onSupplyTokenClick(color),
+      onTakeTokens: () => this.onTakeTokens(),
+      onTakeSame: (color) => this.turnController.executeTakeSame(color),
+      onConfirmDifferent: () => this.onConfirmDifferent(),
+      onCancelSelection: () => this.onCancelSelection(),
+      onReservedCardClick: (card) => this.onReservedCardClick(card),
+    });
   }
 
   // ── Cleanup ─────────────────────────────────────────────

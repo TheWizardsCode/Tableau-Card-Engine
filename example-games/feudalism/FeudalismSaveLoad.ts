@@ -165,6 +165,7 @@ export function deserializeFeudalismState(
     currentPlayerIndex: saved.currentPlayerIndex,
     startingPlayerIndex: saved.startingPlayerIndex,
     triggerPlayerIndex: saved.triggerPlayerIndex,
+    seed: saved.seed,
     rng,
   };
 }

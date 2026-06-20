@@ -23,6 +23,8 @@ export interface TurnControllerCallbacks {
   onEmitGameEnded: (winnerIdx: number) => void;
   /** Cache a patron to keep it visible in the patron column during animation. */
   onSetPatronAnimationCache: (patron: PatronTile | null, index: number) => void;
+  /** Callback after each complete turn (human or AI) to save a checkpoint. */
+  onSaveCheckpoint?: () => void;
 }
 
 export class FeudalismTurnController {
@@ -209,6 +211,9 @@ export class FeudalismTurnController {
   private afterTurnComplete(result: TurnResult): void {
     this.setPhase('animating');
     this.callbacks.onRefreshAll();
+
+    // Save checkpoint after every completed turn (human or AI)
+    this.callbacks.onSaveCheckpoint?.();
 
     if (result.gameOver) {
       (this.animator as any).scene.time.delayedCall(ANIM_DURATION, () => {
