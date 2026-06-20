@@ -47,6 +47,16 @@ interface PhaserLikeInteractiveOptions {
 }
 
 /**
+ * Minimal subset of the Phaser.GameObjects.Rectangle API.
+ * Avoids importing Phaser at compile time.
+ */
+interface OverlayRect {
+  setDepth(depth: number): this;
+  setInteractive(useHandCursor?: PhaserLikeInteractiveOptions): this;
+  destroy(): void;
+}
+
+/**
  * Minimal subset of a Phaser.Scene that the default overlay needs.
  * Avoids importing Phaser at compile time while remaining compatible
  * with any Phaser scene at runtime.
@@ -59,10 +69,21 @@ export interface ResumeOverlayScene {
       text: string,
       style?: Record<string, unknown>,
     ): OverlayText;
+    rectangle(
+      x: number,
+      y: number,
+      width: number,
+      height: number,
+      fillColor?: number,
+      fillAlpha?: number,
+    ): OverlayRect;
   };
 }
 
 // ── Constants ───────────────────────────────────────────────
+
+/** Display depth for the overlay background. */
+const BACKGROUND_DEPTH = 2000;
 
 /** Display depth for overlay text and buttons (above background). */
 const TEXT_DEPTH = 2001;
@@ -111,6 +132,15 @@ export function createDefaultResumeOverlay<TState>(
   const centerX = 640; // GAME_W / 2
   const centerY = 360; // GAME_H / 2
 
+  // Full-screen semi-transparent dark background to make overlay readable
+  const background: OverlayRect = scene.add.rectangle(
+    centerX, centerY,
+    1280, 720, // GAME_W, GAME_H
+    0x000000, 0.75,
+  );
+  background.setDepth(BACKGROUND_DEPTH);
+  background.setInteractive();
+
   // Title: "Resume Saved Game?"
   const title: OverlayText = scene.add.text(centerX, centerY + TITLE_Y_OFFSET, 'Resume Saved Game?', {
     fontSize: '22px',
@@ -152,7 +182,8 @@ export function createDefaultResumeOverlay<TState>(
   resumeBtn.on('pointerover', () => resumeBtn.setColor('#aaffaa'));
   resumeBtn.on('pointerout', () => resumeBtn.setColor('#88ff88'));
   resumeBtn.on('pointerdown', () => {
-    // Clean up overlay objects
+    // Clean up all overlay objects including background
+    background.destroy();
     title.destroy();
     infoText.destroy();
     resumeBtn.destroy();
@@ -178,7 +209,8 @@ export function createDefaultResumeOverlay<TState>(
   newGameBtn.on('pointerover', () => newGameBtn.setColor('#aaffaa'));
   newGameBtn.on('pointerout', () => newGameBtn.setColor('#88ff88'));
   newGameBtn.on('pointerdown', () => {
-    // Clean up overlay objects
+    // Clean up all overlay objects including background
+    background.destroy();
     title.destroy();
     infoText.destroy();
     resumeBtn.destroy();
