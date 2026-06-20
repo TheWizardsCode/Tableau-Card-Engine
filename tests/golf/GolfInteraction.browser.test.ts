@@ -243,7 +243,12 @@ describe('GolfScene interaction tests', () => {
 
     expect(internals.phaseManager.current).toBe('waiting-for-draw');
 
-    // Click the discard pile
+    // The discard pile starts with exactly 1 face-up card
+    expect(internals.session.shared.discardPile.size()).toBe(1);
+    const initialDiscardTextureKey = internals.discardSprite.texture.key;
+    expect(initialDiscardTextureKey).not.toBe('card_back');
+
+    // Click the discard pile to draw the only card
     clickGameObject(internals.discardSprite);
     await nextFrame();
 
@@ -251,17 +256,15 @@ describe('GolfScene interaction tests', () => {
     expect(internals.drawnCard).not.toBeNull();
     expect(internals.drawSource).toBe('discard');
 
-    // The sprite key should still be defined after draw
-    expect(internals.discardSprite.texture.key).toBeDefined();
+    // The card is peeked but NOT popped yet (pop happens later in executeTurn).
+    // The discard pile model still shows 1 card.
+    expect(internals.session.shared.discardPile.size()).toBe(1);
 
-    // Verify the discard pile peek returns a card or undefined
-    // (depending on whether it's now empty after the draw)
-    const discardTop = internals.session.shared.discardPile.peek();
-    if (discardTop) {
-      expect(
-        (discardTop as { faceUp: boolean }).faceUp,
-      ).toBe(true);
-    }
+    // But the discard pile sprite should have updated to the empty-pile
+    // placeholder (ghosted card-back) to visually preview the post-draw state.
+    expect(internals.discardSprite.texture.key).toBe('card_back');
+    expect(internals.discardSprite.visible).toBe(true);
+    expect(internals.discardSprite.alpha).toBeCloseTo(0.25, 1);
   });
 
   // ── Test 4: Swap move ──────────────────────────────────

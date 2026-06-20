@@ -407,3 +407,33 @@ export class SoundManager {
     }
   }
 }
+
+// ── Shared safe-play utility ──────────────────────────
+
+/**
+ * Safely play a sound on a scene-like object with a `sound.play` method,
+ * ignoring any errors (e.g. missing audio key, null sound manager).
+ *
+ * This is a drop-in replacement for bare `this.scene.sound.play?.()` calls
+ * in overlay helpers that don't have access to the namespaced SoundManager.
+ * It preserves the optional-chaining behaviour (no-op if `sound` is null).
+ *
+ * @param scene  A Phaser Scene (or any object with a `sound.play?` method).
+ * @param key    The audio key to play.
+ *
+ * @example
+ * ```ts
+ * import { safePlaySound } from '@core-engine/SoundManager';
+ * safePlaySound(this.scene, SFX_KEYS.GAME_END);
+ * ```
+ */
+export function safePlaySound(
+  scene: { sound: { play?: (key: string) => void } | null } | null,
+  key: string,
+): void {
+  try {
+    scene?.sound?.play?.(key);
+  } catch {
+    /* ignore — missing audio keys must not crash the game loop */
+  }
+}

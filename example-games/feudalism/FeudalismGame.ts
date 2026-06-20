@@ -28,7 +28,7 @@ import {
 } from './FeudalismCards';
 
 import type { MultiplayerSetupOptions } from '../../src/core-engine/SetupOptions';
-import { resolveSetupOptions } from '../../src/core-engine/SetupOptions';
+import { resolveSetupOptions, createSeededRng } from '../../src/core-engine';
 import { getCurrentPlayer } from '../../src/core-engine/TurnSequencer';
 import type { LegalityResult } from '../../src/rule-engine/index';
 
@@ -69,6 +69,8 @@ export interface FeudalismSession {
   startingPlayerIndex: number;
   /** Index of the player who first reached WIN_THRESHOLD, or -1. */
   triggerPlayerIndex: number;
+  /** The numeric seed used for RNG creation, for checkpoint serialization. */
+  seed: number;
   rng: () => number;
 }
 
@@ -127,14 +129,35 @@ export interface TurnResult {
 // Setup options
 // ---------------------------------------------------------------------------
 
-export type FeudalismSetupOptions = MultiplayerSetupOptions;
+export interface FeudalismSetupOptions extends MultiplayerSetupOptions {
+  /**
+   * Numeric seed for deterministic RNG.
+   *
+   * When provided, a seeded RNG is created automatically (overriding any
+   * `rng` in the base options). The seed is stored in the session so it
+   * can be serialized for checkpoint save/load.
+   *
+   * When omitted, the RNG from `MultiplayerSetupOptions.rng` is used
+   * (defaulting to `Math.random`), and the session seed is set to 0.
+   */
+  seed?: number;
+}
 
 // ---------------------------------------------------------------------------
 // Setup
 // ---------------------------------------------------------------------------
 
 export function setupFeudalismGame(options?: FeudalismSetupOptions): FeudalismSession {
-  const { players: playerInfos, rng } = resolveSetupOptions(options ?? {});
+  // Resolve seed: if explicitly provided, create seeded RNG; otherwise use
+  // the RNG from options (or a default). Track the seed for serialization.
+  const seed = options?.seed ?? 0;
+  const setupOptions: MultiplayerSetupOptions = {
+    ...options,
+    rng: options?.seed !== undefined
+      ? createSeededRng(options.seed)
+      : options?.rng,
+  };
+  const { players: playerInfos, rng } = resolveSetupOptions(setupOptions);
   const playerCount = playerInfos.length;
 
   if (playerCount < 2 || playerCount > 4) {
@@ -173,6 +196,7 @@ export function setupFeudalismGame(options?: FeudalismSetupOptions): FeudalismSe
     currentPlayerIndex: 0,
     startingPlayerIndex: 0,
     triggerPlayerIndex: -1,
+    seed,
     rng,
   };
 }

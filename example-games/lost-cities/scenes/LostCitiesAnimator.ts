@@ -3,7 +3,7 @@
  */
 import Phaser from 'phaser';
 import type { Phase1Action, Phase2Action } from '../LostCitiesRules';
-import { cardAssetKey } from '../LostCitiesCards';
+import { cardAssetKey, compactAssetKey } from '../LostCitiesCards';
 import type { LostCitiesSession } from '../LostCitiesGame';
 import { EXPEDITION_COLORS } from '../LostCitiesCards';
 import { getLcTextureKey, getLcBackFallbackKey, getLcFaceKey } from '../LostCitiesTextureHelpers';
@@ -46,32 +46,14 @@ export class LostCitiesAnimator {
     this.renderer = renderer;
   }
 
-  animatePhase1(action: Phase1Action, onComplete: () => void): void {
+  animatePhase1(action: Phase1Action, handIndex: number, onComplete: () => void): void {
     const handSprites = this.renderer.handSpriteList;
-    if (handSprites.length === 0) {
+    if (handSprites.length === 0 || handIndex < 0 || handIndex >= handSprites.length) {
       onComplete();
       return;
     }
 
-    // Use DPR-aware key for sprite lookup (hand sprites use CARD_W x CARD_H).
-    const targetTemplateId = cardAssetKey(action.card);
-    const targetKey = getLcTextureKey(targetTemplateId, CARD_W, CARD_H);
-    let spriteIdx = -1;
-    for (let i = 0; i < handSprites.length; i++) {
-      const spriteKey = handSprites[i].texture.key;
-      // Match DPR-aware keys; fall back to template ID for legacy compatibility.
-      if (spriteKey === targetKey || spriteKey === targetTemplateId) {
-        spriteIdx = i;
-        break;
-      }
-    }
-
-    if (spriteIdx < 0) {
-      onComplete();
-      return;
-    }
-
-    const sprite = handSprites[spriteIdx];
+    const sprite = handSprites[handIndex];
     sprite.setDepth(100);
 
     let targetX: number;
@@ -126,9 +108,11 @@ export class LostCitiesAnimator {
       const colorIdx = EXPEDITION_COLORS.indexOf(action.color);
       sourceX = laneX(colorIdx);
       sourceY = DISCARD_Y + DISCARD_CARD_H / 2;
-      // Use DPR-aware key for the drawn card texture.
-      const templateId = cardAssetKey(drawnCard);
-      textureKey = getLcTextureKey(templateId, DISCARD_CARD_W, DISCARD_CARD_H);
+      // Use compact template ID (with -sm suffix) + getLcFaceKey so the
+      // texture matches what prewarmTextures() creates, and getLcFaceKey
+      // provides fallback to card-back if synchronous rasterisation fails.
+      const templateId = compactAssetKey(drawnCard);
+      textureKey = getLcFaceKey(this.scene, templateId, DISCARD_CARD_W, DISCARD_CARD_H);
     }
 
     const tempSprite = this.scene.add.image(sourceX, sourceY, textureKey);

@@ -2,7 +2,7 @@
  * FeudalismRenderer — UI creation and refresh logic for Feudalism.
  */
 import Phaser from 'phaser';
-import type { ResourceType, ResourceOrWild, DevelopmentCard, Tier } from '../FeudalismCards';
+import type { ResourceType, ResourceOrWild, DevelopmentCard, PatronTile, Tier } from '../FeudalismCards';
 import {
   RESOURCE_TYPES,
   tokenCount,
@@ -88,6 +88,10 @@ export class FeudalismRenderer {
   discardSelection: Partial<Record<ResourceOrWild, number>> = {};
   discardNeeded = 0;
 
+  // Patron animation cache: keep a patron visible in the patron column
+  // during card-purchase/reserve animation before its own fly animation starts.
+  private patronAnimationCache: { tile: PatronTile; index: number } | null = null;
+
   constructor(scene: Phaser.Scene, session: FeudalismSession) {
     this.scene = scene;
     this.session = session;
@@ -96,6 +100,11 @@ export class FeudalismRenderer {
   // ── Getters ─────────────────────────────────────────────
   get instruction(): Phaser.GameObjects.Text { return this.instructionText; }
   get selectedCardId(): number | null { return this.selectedMarketCardId; }
+
+  /** Cache a patron that should remain visible during animation. */
+  cachePatronForAnimation(patron: PatronTile | null, index: number): void {
+    this.patronAnimationCache = patron ? { tile: patron, index } : null;
+  }
   get marketContainers(): Map<number, Phaser.GameObjects.Container> { return this.marketCardContainerById; }
   get marketSelections(): Map<number, SelectionController> { return this.marketSelectionByCardId; }
   get marketMgr(): SingleSelectionManager { return this.marketSelectionManager; }
@@ -337,41 +346,53 @@ export class FeudalismRenderer {
     this.patronContainer.removeAll(true);
     for (let i = 0; i < this.session.patrons.length; i++) {
       const patron = this.session.patrons[i];
-      const y = MARKET_Y + i * (MARKET_CARD_H + MARKET_TIER_GAP);
+      this.renderPatronTile(i, patron);
+    }
 
-      const bg = this.scene.add.rectangle(PATRON_X + PATRON_W / 2, y + PATRON_H / 2, PATRON_W, PATRON_H, 0x6633aa, 0.7);
-      bg.setStrokeStyle(1, 0x9966cc);
-      this.patronContainer.add(bg);
+    // If a patron is being animated, keep it rendered at its original position
+    // (it was removed from session.patrons by executeTurn but the fly animation
+    // hasn't started yet).
+    if (this.patronAnimationCache) {
+      this.renderPatronTile(this.patronAnimationCache.index, this.patronAnimationCache.tile);
+    }
+  }
 
-      const pts = this.scene.add.text(PATRON_X + PATRON_W / 2, y + 20, '3 pt', {
-        fontSize: '20px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY,
+  /** Render a single patron tile at the given row index. */
+  private renderPatronTile(i: number, patron: PatronTile): void {
+    const y = MARKET_Y + i * (MARKET_CARD_H + MARKET_TIER_GAP);
+
+    const bg = this.scene.add.rectangle(PATRON_X + PATRON_W / 2, y + PATRON_H / 2, PATRON_W, PATRON_H, 0x6633aa, 0.7);
+    bg.setStrokeStyle(1, 0x9966cc);
+    this.patronContainer.add(bg);
+
+    const pts = this.scene.add.text(PATRON_X + PATRON_W / 2, y + 20, '3 pt', {
+      fontSize: '20px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY,
+    }).setOrigin(0.5);
+    this.patronContainer.add(pts);
+
+    const patronLabel = this.scene.add.text(PATRON_X + PATRON_W / 2, y + 42, 'Patron', {
+      fontSize: '13px', color: '#ccaaee', fontFamily: FONT_FAMILY,
+    }).setOrigin(0.5);
+    this.patronContainer.add(patronLabel);
+
+    const reqs: { color: ResourceType; count: number }[] = [];
+    for (const c of RESOURCE_TYPES) {
+      const n = patron.requirements[c] ?? 0;
+      if (n > 0) reqs.push({ color: c, count: n });
+    }
+    const chipSpacing = 30;
+    const reqStartX = PATRON_X + PATRON_W / 2 - (reqs.length - 1) * chipSpacing / 2;
+    for (let j = 0; j < reqs.length; j++) {
+      const rx = reqStartX + j * chipSpacing;
+      const ry = y + PATRON_H - 26;
+      const chip = this.scene.add.circle(rx, ry, 13, RESOURCE_FILL[reqs[j].color], 0.9);
+      chip.setStrokeStyle(1, 0x888888);
+      this.patronContainer.add(chip);
+      const ct = this.scene.add.text(rx, ry, `${reqs[j].count}`, {
+        fontSize: '15px', fontStyle: 'bold',
+        color: RESOURCE_TEXT_COLOR[reqs[j].color], fontFamily: FONT_FAMILY,
       }).setOrigin(0.5);
-      this.patronContainer.add(pts);
-
-      const patronLabel = this.scene.add.text(PATRON_X + PATRON_W / 2, y + 42, 'Patron', {
-        fontSize: '13px', color: '#ccaaee', fontFamily: FONT_FAMILY,
-      }).setOrigin(0.5);
-      this.patronContainer.add(patronLabel);
-
-      const reqs: { color: ResourceType; count: number }[] = [];
-      for (const c of RESOURCE_TYPES) {
-        const n = patron.requirements[c] ?? 0;
-        if (n > 0) reqs.push({ color: c, count: n });
-      }
-      const chipSpacing = 30;
-      const reqStartX = PATRON_X + PATRON_W / 2 - (reqs.length - 1) * chipSpacing / 2;
-      for (let j = 0; j < reqs.length; j++) {
-        const rx = reqStartX + j * chipSpacing;
-        const ry = y + PATRON_H - 26;
-        const chip = this.scene.add.circle(rx, ry, 13, RESOURCE_FILL[reqs[j].color], 0.9);
-        chip.setStrokeStyle(1, 0x888888);
-        this.patronContainer.add(chip);
-        const ct = this.scene.add.text(rx, ry, `${reqs[j].count}`, {
-          fontSize: '15px', fontStyle: 'bold',
-          color: RESOURCE_TEXT_COLOR[reqs[j].color], fontFamily: FONT_FAMILY,
-        }).setOrigin(0.5);
-        this.patronContainer.add(ct);
-      }
+      this.patronContainer.add(ct);
     }
   }
 

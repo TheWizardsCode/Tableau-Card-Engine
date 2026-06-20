@@ -237,7 +237,13 @@ export class GolfAnimator {
   updateDiscardPileAfterDraw(): void {
     const pile = this.session.shared.discardPile;
     if (pile.size() <= 1) {
-      this.renderer.showDiscardPlaceholder();
+      // Pile will be empty after the draw — show the ghosted card-back
+      // placeholder.  Direct sprite manipulation here (matching the else
+      // branch) because the card hasn't been popped from the pile yet
+      // (that happens later in executeTurn()).
+      this.renderer.discardSprite.setTexture('card_back');
+      this.renderer.discardSprite.setAlpha(0.25);
+      this.renderer.discardSprite.setVisible(true);
     } else {
       const arr = pile.toArray();
       const nextTop = arr[arr.length - 2];

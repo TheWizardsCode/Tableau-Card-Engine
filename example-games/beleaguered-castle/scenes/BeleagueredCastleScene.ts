@@ -46,7 +46,9 @@ import {
 import { createHudText } from '../../../src/ui/Renderer/adapters/BeleagueredCastleAdapter';
 import { SaveLoadStore } from '../../../src/core-engine';
 import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
-import { saveBCSnapshot, loadBCSnapshot, clearBCSnapshot } from '../BeleagueredCastleSaveLoad';
+import { CheckpointManager } from '../../../src/core-engine';
+import { bcStateSerializer } from '../BeleagueredCastleSaveLoad';
+import type { BCSerializedState } from '../BeleagueredCastleSaveLoad';
 
 export class BeleagueredCastleScene extends CardGameScene {
   private gameState!: BeleagueredCastleState;
@@ -59,6 +61,7 @@ export class BeleagueredCastleScene extends CardGameScene {
   private transcript: BCGameTranscript | null = null;
 
   private saveLoadStore!: SaveLoadStore;
+  private checkpointManager!: CheckpointManager<BeleagueredCastleState, BCSerializedState>;
   private transcriptStore!: TranscriptStore;
 
   private bcRenderer!: BeleagueredCastleRenderer;
@@ -117,6 +120,7 @@ export class BeleagueredCastleScene extends CardGameScene {
     const recorder = new BCTranscriptRecorder(this.seed, this.gameState);
 
     this.saveLoadStore = new SaveLoadStore();
+    this.checkpointManager = new CheckpointManager(this.saveLoadStore, 'beleaguered-castle', 'run-checkpoint', bcStateSerializer);
     this.transcriptStore = new TranscriptStore();
 
     this.bcRenderer = new BeleagueredCastleRenderer(this, this.gameState);
@@ -487,26 +491,20 @@ export class BeleagueredCastleScene extends CardGameScene {
    * restarts fresh.
    */
   private checkForSavedCheckpoint(): void {
-    loadBCSnapshot(this.saveLoadStore).then((savedState) => {
-      if (savedState) {
-        // Checkpoint found — show the resume overlay. No deal animation
-        // will play until the user picks an option.
-        this.showResumeOverlay(savedState);
-      } else {
-        // No checkpoint — start a fresh game with the deal animation.
-        this.startFreshGame();
-      }
-    }).catch((err) => {
-      console.warn('[BeleagueredCastle] Error loading checkpoint:', err);
-      // On error, fall through to a fresh deal so the game is still playable.
-      this.startFreshGame();
-    });
+    this.checkpointManager.checkAndResume(
+      () => this.startFreshGame(),
+      (state) => this.restoreFromCheckpoint(state),
+      (state, onResume) => this.showResumeOverlay(state, onResume),
+    );
   }
 
   /**
    * Show a "Resume Saved Game?" overlay with Resume and New Game options.
    */
-  private showResumeOverlay(savedState: BeleagueredCastleState): void {
+  private showResumeOverlay(
+    _savedState: BeleagueredCastleState,
+    onResume: () => void,
+  ): void {
     const BUTTON_DEPTH = OVERLAY_DEPTH + 1;
 
     this.overlayManager.showOverlay({
@@ -531,14 +529,18 @@ export class BeleagueredCastleScene extends CardGameScene {
     const resumeBtn = createOverlayButton(this, GAME_W / 2 - RESUME_BUTTON_SPACING, GAME_H / 2 + RESUME_BUTTON_Y_OFFSET, '[ Resume ]', BUTTON_DEPTH);
     resumeBtn.on('pointerdown', () => {
       this.overlayManager.dismiss();
-      this.restoreFromCheckpoint(savedState);
+      onResume();
     });
     this.overlayManager.add(resumeBtn);
 
     const newGameBtn = createOverlayButton(this, GAME_W / 2 + RESUME_BUTTON_SPACING, GAME_H / 2 + RESUME_BUTTON_Y_OFFSET, '[ New Game ]', BUTTON_DEPTH);
     newGameBtn.on('pointerdown', () => {
       this.overlayManager.dismiss();
-      this.clearCheckpointAndStartFresh();
+      this.checkpointManager.clear().then(() => {
+        this.scene.restart();
+      }).catch(() => {
+        this.scene.restart();
+      });
     });
     this.overlayManager.add(newGameBtn);
   }
@@ -603,19 +605,6 @@ export class BeleagueredCastleScene extends CardGameScene {
   }
 
   /**
-   * Delete the saved checkpoint and restart the scene for a fresh game.
-   * Used when the user clicks "New Game" on the resume overlay.
-   */
-  private clearCheckpointAndStartFresh(): void {
-    clearBCSnapshot(this.saveLoadStore).then(() => {
-      this.scene.restart();
-    }).catch((err) => {
-      console.warn('[BeleagueredCastle] Failed to clear checkpoint:', err);
-      this.scene.restart();
-    });
-  }
-
-  /**
    * Start a fresh game (no saved checkpoint).
    * Runs the deal animation and wires up interactions as normal.
    */
@@ -632,7 +621,7 @@ export class BeleagueredCastleScene extends CardGameScene {
    * Fire-and-forget (not awaited) to avoid blocking the input handler.
    */
   private saveCheckpoint(): void {
-    saveBCSnapshot(this.saveLoadStore, this.gameState).catch((err) =>
+    this.checkpointManager.save(this.gameState).catch((err) =>
       console.warn('[BeleagueredCastle] Failed to save checkpoint:', err),
     );
   }

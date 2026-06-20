@@ -1,5 +1,6 @@
 import {
   SaveLoadStore,
+  CheckpointManager,
   type SaveSerializer,
 } from '../../src/core-engine';
 import {
@@ -69,6 +70,43 @@ export function createDefaultCampaignProgress(): MainStreetCampaignProgress {
     lastUpdatedAt: new Date().toISOString(),
     tutorialSeen: false,
   };
+}
+
+/**
+ * Create a canonical {@link CheckpointManager} for Main Street run checkpoints.
+ *
+ * Uses the existing {@link mainStreetStateSerializer} and the shared
+ * `MAIN_STREET_GAME_TYPE` / `MAIN_STREET_RUN_SLOT` constants so that all
+ * checkpoint operations follow the same pattern as Feudalism and
+ * Beleaguered Castle.
+ *
+ * @param store - Initialized SaveLoadStore instance.
+ * @returns A new CheckpointManager bound to Main Street's slot and serializer.
+ */
+export function createMainStreetCheckpointManager(
+  store: SaveLoadStore,
+): CheckpointManager<MainStreetState, MainStreetSerializedState> {
+  return new CheckpointManager(
+    store,
+    MAIN_STREET_GAME_TYPE,
+    MAIN_STREET_RUN_SLOT,
+    mainStreetStateSerializer,
+  );
+}
+
+/**
+ * Remove the saved turn-start checkpoint.
+ *
+ * Safe to call even when no checkpoint exists. Delegates to
+ * {@link CheckpointManager.clear}.
+ *
+ * @param store - Initialized SaveLoadStore instance.
+ */
+export async function clearTurnStartCheckpoint(
+  store: SaveLoadStore,
+): Promise<void> {
+  const mgr = createMainStreetCheckpointManager(store);
+  await mgr.clear();
 }
 
 /**
@@ -142,25 +180,18 @@ export async function updateCampaignAfterRun(
 export async function saveTurnStartCheckpoint(
   store: SaveLoadStore,
   state: MainStreetState,
-  slotId: string = MAIN_STREET_RUN_SLOT,
+  _slotId: string = MAIN_STREET_RUN_SLOT,
 ): Promise<void> {
-  await store.saveRunCheckpoint(
-    MAIN_STREET_GAME_TYPE,
-    slotId,
-    mainStreetStateSerializer,
-    state,
-  );
+  const mgr = createMainStreetCheckpointManager(store);
+  await mgr.save(state);
 }
 
 export async function loadTurnStartCheckpoint(
   store: SaveLoadStore,
-  slotId: string = MAIN_STREET_RUN_SLOT,
+  _slotId: string = MAIN_STREET_RUN_SLOT,
 ): Promise<MainStreetState | null> {
-  return store.loadRunCheckpoint(
-    MAIN_STREET_GAME_TYPE,
-    slotId,
-    mainStreetStateSerializer,
-  );
+  const mgr = createMainStreetCheckpointManager(store);
+  return mgr.load();
 }
 
 export async function saveCampaignProgress(
