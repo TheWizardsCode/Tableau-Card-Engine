@@ -80,7 +80,7 @@ describe('Main Street save/load integration', () => {
     );
   });
 
-  it('rejects incompatible checkpoint version', async () => {
+  it('rejects incompatible checkpoint version (returns null via CheckpointManager)', async () => {
     const store = new SaveLoadStore();
     const state = setupMainStreetGame({ seed: 'save-load-version-mismatch' });
     const payload = {
@@ -90,7 +90,9 @@ describe('Main Street save/load integration', () => {
 
     await store.save('run-checkpoint', 'main-street', 'turn-start', payload.schemaVersion, payload);
 
-    await expect(loadTurnStartCheckpoint(store)).rejects.toThrow(/Incompatible save version/);
+    // CheckpointManager.load() catches schema version mismatch and returns null
+    const result = await loadTurnStartCheckpoint(store);
+    expect(result).toBeNull();
   });
 
   it('persists and restores campaign progression separately from run checkpoint', async () => {

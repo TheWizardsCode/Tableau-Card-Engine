@@ -19,6 +19,18 @@ import { getCurrentStep, type TutorialActionType } from '../TutorialFlow';
 export class MainStreetTurnController {
   constructor(private readonly scene: any) {}
 
+  /**
+   * Callback invoked after each completed turn (when game is still playing).
+   * Used by the lifecycle manager to save a checkpoint via CheckpointManager.
+   */
+  public onSaveCheckpoint: (() => void) | null = null;
+
+  /**
+   * Callback invoked on game end (win/loss/bankruptcy).
+   * Used by the lifecycle manager to clear the checkpoint.
+   */
+  public onGameEnd: (() => void) | null = null;
+
   public startDayPhase(): void {
     const s = this.scene;
     // Execute DayStart (refills market, transitions to MarketPhase)
@@ -76,6 +88,9 @@ export class MainStreetTurnController {
       return;
     }
 
+    // Save checkpoint after each completed turn (fire-and-forget)
+    try { this.onSaveCheckpoint?.(); } catch (e) { /* ignore */ }
+
     // Clear undo stack on end-of-turn (per acceptance criteria)
     try { s.undoManager.clear(); } catch (e) { /* ignore */ }
 
@@ -104,6 +119,8 @@ export class MainStreetTurnController {
         // by the lifecycle manager.
         s.updateStats(result.gameResult, result.finalScore);
 
+        // Clear checkpoint on game end
+        try { this.onGameEnd?.(); } catch (e) { /* ignore */ }
         s.updateCampaignProgress().then(() => {
           const tiersAfter = s.campaign
             ? s.campaign.unlockedTiers
