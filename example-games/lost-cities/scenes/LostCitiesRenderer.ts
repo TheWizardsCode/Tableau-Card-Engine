@@ -139,7 +139,7 @@ function lcDrawPileTextureFn(scene: Phaser.Scene): () => string {
  * A PileView that uses the card back texture and supports
  * lazy card-back texture updates for Lost Cities.
  */
-class DrawPileView extends PileView {
+export class DrawPileView extends PileView {
   private scene: Phaser.Scene;
   private cardW: number;
   private cardH: number;
@@ -155,6 +155,7 @@ class DrawPileView extends PileView {
       label: 'Draw Pile',
       emptyTexture: 'card_back',
       cardTextureFn: lcDrawPileTextureFn(scene),
+      countOffsetY: opts.cardH / 2 + 16,
     });
     this.scene = scene;
     this.cardW = opts.cardW;
