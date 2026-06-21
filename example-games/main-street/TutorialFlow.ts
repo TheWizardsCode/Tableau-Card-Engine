@@ -48,6 +48,9 @@
  * @module
  */
 
+import { t } from '../../src/core-engine/I18n';
+import { tutorialKey } from './i18n/tutorial-en';
+
 // ── Step Types ──────────────────────────────────────────────
 
 /**
@@ -104,10 +107,16 @@ export type TutorialGateType = 'confirm' | 'action';
 export interface UnifiedTutorialStepDef {
   /** Step identifier (T1, T2, ..., T13). */
   id: string;
-  /** Short title shown in the overlay. */
-  title: string;
-  /** Body copy explaining the concept. */
-  body: string;
+  /**
+   * i18n key for the short title shown in the overlay.
+   * Resolve via `t(titleKey)` or `resolveTutorialStepText(step).title`.
+   */
+  titleKey: string;
+  /**
+   * i18n key for the body copy explaining the concept.
+   * Resolve via `t(bodyKey)` or `resolveTutorialStepText(step).body`.
+   */
+  bodyKey: string;
   /** Screen zone to highlight (null zones: centerModal, completionModal). */
   highlightZone: TutorialHighlightZone;
   /** Whether this step requires a gameplay action to advance. */
@@ -144,29 +153,22 @@ export interface UnifiedTutorialStepDef {
 export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
   {
     id: 'T1',
-    title: 'Welcome to Main Street',
-    body:
-      'Build the best Main Street in 20 turns. I\'ll guide your first few actions.\n\n' +
-      'This is "Scenario: Tutorial" — Easy difficulty, 25 turns, and a lower score target.',
+    titleKey: tutorialKey('T1', 'title'),
+    bodyKey: tutorialKey('T1', 'body'),
     highlightZone: 'centerModal',
     gate: 'confirm',
   },
   {
     id: 'T2',
-    title: 'Resource HUD',
-    body:
-      'Track Coins, Reputation, and Score here. Running out of reputation or coins can end your run.',
+    titleKey: tutorialKey('T2', 'title'),
+    bodyKey: tutorialKey('T2', 'body'),
     highlightZone: 'hud',
     gate: 'confirm',
   },
   {
     id: 'T3',
-    title: 'Development Row',
-    body:
-      'Click any card from the Development row to buy it.\n' +
-      'Cards go on your street to earn income.\n\n' +
-      'Buy the **Laundromat** card (cost $6) — it is the cheapest card and will earn you income each turn.\n\n' +
-      'The bottom row shows Investment cards with one-time effects.',
+    titleKey: tutorialKey('T3', 'title'),
+    bodyKey: tutorialKey('T3', 'body'),
     highlightZone: 'marketBusinessRow',
     gate: 'action',
     requiredAction: 'select-business',
@@ -176,38 +178,31 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
   },
   {
     id: 'T4',
-    title: 'Place a Business',
-    body:
-      'Place this business in a highlighted slot. Adjacent matching types create synergy bonuses.',
+    titleKey: tutorialKey('T4', 'title'),
+    bodyKey: tutorialKey('T4', 'body'),
     highlightZone: 'streetGrid',
     gate: 'action',
     requiredAction: 'place-business',
   },
   {
     id: 'T5',
-    title: 'Upcoming Incidents',
-    body:
-      'Blue cards show incidents that will hit at the end of each turn — plan around them!\n' +
-      'Negative incidents (Tax Audit, Vandalism) cost coins or reputation.\n' +
-      'Positive ones help you. Queue scrolls left: the leftmost card fires next.',
+    titleKey: tutorialKey('T5', 'title'),
+    bodyKey: tutorialKey('T5', 'body'),
     highlightZone: 'incidentQueue',
     gate: 'confirm',
   },
   {
     id: 'T6',
-    title: 'End Turn',
-    body:
-      'End Turn resolves income and incidents, then starts a new market day.',
+    titleKey: tutorialKey('T6', 'title'),
+    bodyKey: tutorialKey('T6', 'body'),
     highlightZone: 'endTurnButton',
     gate: 'action',
     requiredAction: 'end-turn',
   },
   {
     id: 'T7',
-    title: 'Held Event Card',
-    body:
-      'Buy the **Grand Opening Sale** event card from the investments row.\n' +
-      'You can hold one event card and play it when timing is best.',
+    titleKey: tutorialKey('T7', 'title'),
+    bodyKey: tutorialKey('T7', 'body'),
     highlightZone: 'investmentsRow',
     gate: 'action',
     requiredAction: 'buy-event',
@@ -217,62 +212,44 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
   },
   {
     id: 'T8',
-    title: 'Upgrade Concept',
-    body:
-      'Upgrades improve an existing business. Strong upgrades compound over remaining turns.',
+    titleKey: tutorialKey('T8', 'title'),
+    bodyKey: tutorialKey('T8', 'body'),
     highlightZone: 'investmentsRow',
     gate: 'confirm',
   },
   {
     id: 'T9',
-    title: 'Your Hand',
-    body:
-      'You can hold one Investment event at a time.\n' +
-      'When you buy an event it appears here.\n' +
-      'Click the card in your hand to play it for its one-time effect.',
+    titleKey: tutorialKey('T9', 'title'),
+    bodyKey: tutorialKey('T9', 'body'),
     highlightZone: 'centerModal',
     gate: 'confirm',
   },
 
   {
     id: 'T10',
-    title: 'Action Controls',
-    body:
-      'Use the buttons along the bottom to:\n' +
-      '• End Turn — collect income and advance the day\n' +
-      '• Undo / Redo — step back a market action\n' +
-      '• Hint — get a suggested move\n' +
-      '• Refresh — swap the investment row (costs coins)\n\n' +
-      'You can also press the keyboard shortcut for End Turn (configurable in Settings).',
+    titleKey: tutorialKey('T10', 'title'),
+    bodyKey: tutorialKey('T10', 'body'),
     highlightZone: 'endTurnButton',
     gate: 'confirm',
   },
   {
     id: 'T11',
-    title: 'Challenges',
-    body:
-      'Each run gives you challenges to complete for bonus points (visible in the Challenge Tracker).\n\n' +
-      'Completing challenges unlocks new cards for future games —' +
-      ' the more challenges you complete across runs, the more businesses,' +
-      ' upgrades, and events you will have access to!',
+    titleKey: tutorialKey('T11', 'title'),
+    bodyKey: tutorialKey('T11', 'body'),
     highlightZone: 'challengePanel',
     gate: 'confirm',
   },
   {
     id: 'T12',
-    title: 'Scoring',
-    body:
-      'Your score is shown at the top of the screen.\n\n' +
-      'Final Score = Coins + Reputation × multiplier + Challenges × bonus\n\n' +
-      'Reach the target score within the turn limit to win the game — good luck!',
+    titleKey: tutorialKey('T12', 'title'),
+    bodyKey: tutorialKey('T12', 'body'),
     highlightZone: 'hud',
     gate: 'confirm',
   },
   {
     id: 'T13',
-    title: 'Tutorial Complete',
-    body:
-      'Great job! You\'re ready for a full run. Tutorial can be replayed from menu/settings.',
+    titleKey: tutorialKey('T13', 'title'),
+    bodyKey: tutorialKey('T13', 'body'),
     highlightZone: 'completionModal',
     gate: 'confirm',
   },
@@ -380,3 +357,25 @@ export function shouldAllowAction(
   if (!state.isActive) return true;
   return isRequiredAction(state, actionType);
 }
+
+// ── i18n Resolution ─────────────────────────────────────────
+
+/**
+ * Resolve a tutorial step's title and body through the i18n system.
+ *
+ * Looks up `step.titleKey` and `step.bodyKey` via `t()`, falling back to
+ * the key itself if no locale bundle has been registered.
+ *
+ * Utility glue for the overlay manager (`MainStreetTutorialHints`).
+ */
+export function resolveTutorialStepText(
+  step: UnifiedTutorialStepDef,
+): { title: string; body: string } {
+  return {
+    title: t(step.titleKey),
+    body: t(step.bodyKey),
+  };
+}
+
+/** Re-export `tutorialKey` for convenience. */
+export { tutorialKey } from './i18n/tutorial-en';

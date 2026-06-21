@@ -20,6 +20,7 @@
  */
 
 import { FONT_FAMILY } from '../../../src/ui';
+import { t, registerLocale } from '../../../src/core-engine/I18n';
 import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
 import { composeResolvedLayouts } from '../../../src/ui/screen-layout-compose';
 import { type LayoutViewport } from '../../../src/ui/screen-layout';
@@ -31,8 +32,12 @@ import {
   type TutorialControllerState,
   type TutorialHighlightZone,
 } from '../TutorialFlow';
+import { TUTORIAL_EN_BUNDLE } from '../i18n/tutorial-en';
 import baseLayout from '../layouts/main-street.layout.json';
 import tutorialLayout from '../layouts/main-street-tutorial.layout.json';
+
+// ── Register English locale bundle at module load time ───────
+registerLocale('en', TUTORIAL_EN_BUNDLE);
 
 // ── Pre-parse layouts at module load ──────────────────────────
 
@@ -270,13 +275,13 @@ export class MainStreetTutorialHints {
       titleEl.style.fontWeight = '700';
       titleEl.style.color = '#aaffaa';
       titleEl.style.marginBottom = `${padBetweenTitleAndBody}px`;
-      titleEl.textContent = step.title;
+      titleEl.textContent = t(step.titleKey);
       container.appendChild(titleEl);
 
       const bodyEl = document.createElement('div');
       bodyEl.style.whiteSpace = 'pre-wrap';
       bodyEl.style.color = '#ddccbb';
-      bodyEl.textContent = step.body;
+      bodyEl.textContent = t(step.bodyKey);
       container.appendChild(bodyEl);
 
       const btnRow = document.createElement('div');
@@ -418,8 +423,8 @@ export class MainStreetTutorialHints {
 
       const bg = s.add.rectangle(domX + TOOLTIP_W / 2, tooltipY + tooltipH / 2, TOOLTIP_W, tooltipH, 0x1a2a1a).setDepth(TOOLTIP_DEPTH + 1000);
       const border = s.add.rectangle(domX + TOOLTIP_W / 2, tooltipY + tooltipH / 2, TOOLTIP_W, tooltipH).setStrokeStyle(2, 0x44aa44).setDepth(TOOLTIP_DEPTH + 1001);
-      const titleTxt = s.add.text(domX + 12, tooltipY + 12, step.title, { fontSize: '16px', color: '#aaffaa', fontFamily: FONT_FAMILY }).setDepth(TOOLTIP_DEPTH + 1002).setOrigin(0, 0);
-      const bodyTxt = s.add.text(domX + 12, tooltipY + 40, step.body, { fontSize: '13px', color: '#ddccbb', fontFamily: FONT_FAMILY, wordWrap: { width: TOOLTIP_W - 24 } as any }).setDepth(TOOLTIP_DEPTH + 1002).setOrigin(0, 0);
+      const titleTxt = s.add.text(domX + 12, tooltipY + 12, t(step.titleKey), { fontSize: '16px', color: '#aaffaa', fontFamily: FONT_FAMILY }).setDepth(TOOLTIP_DEPTH + 1002).setOrigin(0, 0);
+      const bodyTxt = s.add.text(domX + 12, tooltipY + 40, t(step.bodyKey), { fontSize: '13px', color: '#ddccbb', fontFamily: FONT_FAMILY, wordWrap: { width: TOOLTIP_W - 24 } as any }).setDepth(TOOLTIP_DEPTH + 1002).setOrigin(0, 0);
 
       const isLast = index === UNIFIED_TUTORIAL_STEP_COUNT - 1;
       const isActionStep = step.gate === 'action';
