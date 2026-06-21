@@ -9,7 +9,7 @@ import { autoSaveTranscript, TranscriptStore } from '../../../src/core-engine/tr
 import { GAME_W, GAME_H, OverlayManager } from '../../../src/ui';
 import {
   createLcHudText,
-  createOverlayButton,
+  createActionButton,
   createLcMenuButton,
 } from '../../../src/ui/Renderer/adapters/LostCitiesAdapter';
 import { SFX_KEYS } from './LostCitiesConstants';
@@ -112,9 +112,7 @@ export class LostCitiesOverlayHelper {
     this.overlayManager.add(cumRow);
 
     y += 50;
-    const btn = createOverlayButton(this.scene, cx, y, '[ Next Round ]');
-    try { btn.setDepth(11); } catch { /* ignore */ }
-    btn.on('pointerdown', () => {
+    const btn = createActionButton(this.scene, cx - 75, y, 150, '[ Next Round ]', () => {
       try { this.scene.sound.play?.(SFX_KEYS.UI_CLICK); } catch { /* ignore */ }
       this.dismiss();
       // Advance to the next round now that the overlay is dismissed.
@@ -123,7 +121,7 @@ export class LostCitiesOverlayHelper {
       // with the correct round-final state.)
       startNextRound(this.session);
       this.onNextRound?.();
-    });
+    }, { depth: 11 });
     this.overlayManager.add(btn);
   }
 
@@ -218,12 +216,11 @@ export class LostCitiesOverlayHelper {
     }
 
     y += 20;
-    const newMatchBtn = createOverlayButton(this.scene, cx - 85, y, '[ New Match ]');
-    newMatchBtn.on('pointerdown', () => {
+    const newMatchBtn = createActionButton(this.scene, cx - 155, y, 140, '[ New Match ]', () => {
       try { this.scene.sound.play?.(SFX_KEYS.UI_CLICK); } catch { /* ignore */ }
       this.dismiss();
       this.onRestart?.();
-    });
+    }, { depth: 11 });
     this.overlayManager.add(newMatchBtn);
 
     const menuBtn = createLcMenuButton(this.scene, cx + 85, y, 60, { depth: 11 });
