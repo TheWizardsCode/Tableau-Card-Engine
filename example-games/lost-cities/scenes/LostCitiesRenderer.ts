@@ -155,7 +155,7 @@ export class DrawPileView extends PileView {
       label: 'Draw Pile',
       emptyTexture: 'card_back',
       cardTextureFn: lcDrawPileTextureFn(scene),
-      countOffsetY: opts.cardH / 2 + 16,
+      countOffsetY: opts.cardH / 2 + 5.5,
     });
     this.scene = scene;
     this.cardW = opts.cardW;

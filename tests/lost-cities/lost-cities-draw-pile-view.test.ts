@@ -159,8 +159,8 @@ describe('DrawPileView', () => {
     const sprite = dpv.getSprite();
     const countText = dpv.getCountText();
 
-    // countOffsetY should be cardH/2 + 16 = 65 + 16 = 81
-    const expectedOffset = testCardH / 2 + 16;
+    // countOffsetY should be cardH/2 + 5.5 = 65 + 5.5 = 70.5
+    const expectedOffset = testCardH / 2 + 5.5;
     const actualOffset = countText.y - sprite.y;
 
     expect(actualOffset).toBeGreaterThan(testCardH / 2);
@@ -206,7 +206,7 @@ describe('DrawPileView', () => {
 
     // Test initial state (empty draw pile) - count text should show "Draw Pile: 0"
     // at the correct position
-    const expectedOffset = testCardH / 2 + 16;
+    const expectedOffset = testCardH / 2 + 5.5;
     const actualOffset = dpv.getCountText().y - dpv.getSprite().y;
 
     expect(actualOffset).toBe(expectedOffset);
