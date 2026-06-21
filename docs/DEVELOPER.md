@@ -1917,6 +1917,8 @@ wl close <id> --reason "..." --json  # close when done
 **Vite dev server won't start:**
 - Check port 3000 is not already in use: `lsof -i :3000`
 - Try `npm run dev -- --port 3001` for an alternate port
+- **Stale lock file:** If port 3000 appears free but the dev server fails, remove any stale lock file: `rm -f tmp/dev-server-lock.json`
+- **Orphaned Vite process:** If `lsof -i :3000` shows a Node.js process, kill it: `kill -9 $(lsof -t -i :3000)`
 
 **TypeScript errors on build:**
 - Run `npx tsc --noEmit` to see detailed errors
@@ -1932,6 +1934,7 @@ wl close <id> --reason "..." --json  # close when done
 - Check that `@vitest/browser` version matches `vitest` version
 - Browser tests boot a real Phaser game and may take 8-10 seconds each
 - If tests hang, check for unresolved game instances (ensure `afterEach` destroys the game)
+- **Process/resource leak cleanup:** All browser tests should clean up Phaser.Game instances in `afterEach` using `game.destroy(true, false)` and remove the game container div. The dev server utilities (`scripts/dev-server-utils.ts`) include SIGTERM/SIGINT handlers to clean up orphaned Vite processes and stale lock files on forced exit.
 
 **Large bundle warning:**
 - The Phaser library is ~1.4 MB minified -- this is expected
@@ -1941,6 +1944,7 @@ wl close <id> --reason "..." --json  # close when done
 - The replay tool (`npm run replay`) and transcript export (`npm run transcripts:export`) auto-start the dev server if `localhost:3000` is not responding
 - If auto-start fails, start the dev server manually: `npm run dev`
 - Check port 3000 availability: `lsof -i :3000`
+- **Port conflict detection:** The `ensureDevServer()` helper now checks for existing processes on port 3000 before starting, logs warnings for potential conflicts, and cleans up stale lock files automatically.
 
 **Replay tool: Unsupported transcript version error:**
 - The transcript schema includes a `version` field; the replay tool validates this and exits with a clear error if the version is unsupported
