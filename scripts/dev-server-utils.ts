@@ -286,14 +286,12 @@ export async function ensureDevServer(): Promise<ChildProcess | null> {
 /**
  * Release a reference to the dev server.
  *
- * Decrements the reference count in the lock file. Only kills the
- * server when the ref count reaches zero (i.e., all consumers have
- * finished using it).
- *
- * If `child` is provided and the lock file PID matches, the child
- * is killed when refCount reaches zero. If `child` is null (i.e.,
- * this consumer did not start the server), the lock file is still
- * decremented to ensure proper cleanup.
+ * Decrements the reference count in the lock file. When the ref count
+ * reaches zero (i.e., all consumers have finished using it):
+ * - If `child` is provided (we started the server), the server is killed.
+ * - If `child` is null (server was already running, e.g. user started it
+ *   with `npm run dev`), only the lock file is cleaned up — the existing
+ *   dev server on port 3000 is left running.
  */
 export function killDevServer(child: ChildProcess | null): void {
   const lock = readLockFile();
@@ -327,9 +325,11 @@ export function killDevServer(child: ChildProcess | null): void {
     return;
   }
 
-  // Ref count reached zero — kill the server and clean up
+  // Ref count reached zero — clean up the lock file
   removeLockFile();
+
   if (child && !child.killed) {
+    // We started this server, so kill it
     child.kill('SIGTERM');
     child.on('exit', () => {
       // Untrack after exit
@@ -337,14 +337,9 @@ export function killDevServer(child: ChildProcess | null): void {
       if (idx !== -1) trackedChildren.splice(idx, 1);
     });
     console.log('Dev server stopped.');
-  } else if (isPidAlive(lock.pid)) {
-    // Child handle is null (this consumer didn't start the server),
-    // but the server PID is alive and refCount is 0 — kill by PID
-    try {
-      process.kill(lock.pid, 'SIGTERM');
-      console.log('Dev server stopped (by PID).');
-    } catch {
-      // May already be dead
-    }
+  } else {
+    // We did not start this server (e.g. user started it with `npm run dev`).
+    // Leave the server running on port 3000 — only clean up our lock file.
+    console.log('Dev server lock file cleaned up; leaving existing server on port 3000.');
   }
 }
