@@ -143,6 +143,10 @@ export class TheMindScene extends CardGameScene {
     this.createSoundSystem();
     this.initHUDContainer();
     this.initializeGameControllers();
+    // Propagate reduced motion preference to the animator
+    if (this.settingsPanel) {
+      this.mindAnimator.reducedMotion = this.settingsPanel.reducedMotion;
+    }
     this.createPrimaryView();
     this.renderInitialState();
     this.startLevel();

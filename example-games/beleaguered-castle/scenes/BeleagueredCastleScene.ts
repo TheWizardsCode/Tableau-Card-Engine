@@ -174,6 +174,10 @@ export class BeleagueredCastleScene extends CardGameScene {
       };
       this.initSoundSystem(Object.values(SFX_KEYS), mapping, { namespace: 'beleaguered-castle' });
       this.initSettingsPanel();
+      // Propagate reduced motion preference to the renderer
+      if (this.settingsPanel) {
+        this.bcRenderer.reducedMotion = this.settingsPanel.reducedMotion;
+      }
       this.initUndoRedoButtons(
         () => this.turnController.performUndo(),
         () => this.turnController.performRedo(),

@@ -32,6 +32,9 @@ import { LostCitiesRenderer } from './LostCitiesRenderer';
 import { flipCard, moveGameObject, shakeIllegalMove, FONT_FAMILY } from '../../../src/ui';
 
 export class LostCitiesAnimator {
+  /** When true, all animations are skipped and sprites snap to final state. */
+  reducedMotion = false;
+
   private scene: Phaser.Scene;
   private session: LostCitiesSession;
   private renderer: LostCitiesRenderer;
@@ -47,6 +50,10 @@ export class LostCitiesAnimator {
   }
 
   animatePhase1(action: Phase1Action, handIndex: number, onComplete: () => void): void {
+    if (this.reducedMotion) {
+      onComplete();
+      return;
+    }
     const handSprites = this.renderer.handSpriteList;
     if (handSprites.length === 0 || handIndex < 0 || handIndex >= handSprites.length) {
       onComplete();
@@ -92,6 +99,10 @@ export class LostCitiesAnimator {
   }
 
   animatePhase2(action: Phase2Action, onComplete: () => void): void {
+    if (this.reducedMotion) {
+      onComplete();
+      return;
+    }
     let sourceX: number;
     let sourceY: number;
     let textureKey: string;
@@ -143,6 +154,10 @@ export class LostCitiesAnimator {
   }
 
   animateAiPhase1(action: Phase1Action, onComplete: () => void): void {
+    if (this.reducedMotion) {
+      onComplete();
+      return;
+    }
     const sprites = this.renderer.aiHandSpriteList;
     if (sprites.length === 0) {
       onComplete();
@@ -230,6 +245,7 @@ export class LostCitiesAnimator {
           destX: AI_HAND_CENTER,
           destY: newY,
           duration: 200,
+          reducedMotion: this.reducedMotion,
         });
       }
       sprites[i].setDepth(i + 1);
@@ -237,6 +253,10 @@ export class LostCitiesAnimator {
   }
 
   animateAiPhase2(action: Phase2Action, onComplete: () => void): void {
+    if (this.reducedMotion) {
+      onComplete();
+      return;
+    }
     let sourceX: number;
     let sourceY: number;
     let annotationText: string;
@@ -294,6 +314,7 @@ export class LostCitiesAnimator {
       destX: targetX,
       destY: targetY,
       duration: AI_ANIM_DURATION,
+      reducedMotion: this.reducedMotion,
       onComplete: () => {
         tempSprite.destroy();
         onComplete();
