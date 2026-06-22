@@ -107,6 +107,9 @@ export type {
   ComposeResolvedLayoutsOptions,
 } from './screen-layout-compose';
 
+// Reduced motion utility
+export { getEffectiveReducedMotion } from './ReducedMotion';
+
 // Card game factory helper
 export { createCardGame } from './createCardGame';
 export type { CardGameOptions } from './createCardGame';
