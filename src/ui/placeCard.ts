@@ -79,6 +79,13 @@ export interface PlaceCardOptions {
    */
   slotIndex?: number;
 
+  /**
+   * When true, placement is instant — target snaps to destination and fires
+   * callbacks synchronously without tweens.  Overrides CSS media query.
+   * Default: false (animate).
+   */
+  reducedMotion?: boolean;
+
   /** Optional SoundManager to play SFX during the placement. */
   soundManager?: SoundManager | null;
 
@@ -135,21 +142,20 @@ export function placeCard(opts: PlaceCardOptions): Phaser.Tweens.Tween {
     cardId,
     playerIndex,
     slotIndex,
+    reducedMotion,
     soundManager = null,
     sfx,
   } = opts;
 
-  // Check for reduced motion preference
-  const reducedMotion = prefersReducedMotion();
+  // Check for reduced motion preference (explicit param takes precedence)
+  const shouldReduce = reducedMotion ?? prefersReducedMotion();
 
   // Handle simple case for reduced motion
-  if (reducedMotion) {
+  if (shouldReduce) {
     target.setPosition(destX, destY);
     // Emit event after reduced motion placement
     if (gameEvents && cardId) {
-      setTimeout(() => {
-        gameEvents.emit('card:placed', { cardId, playerIndex, slotIndex });
-      }, 0);
+      gameEvents.emit('card:placed', { cardId, playerIndex, slotIndex });
     }
     return scene.tweens.add({
       targets: target,

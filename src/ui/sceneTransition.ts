@@ -1,3 +1,5 @@
+import { getEffectiveReducedMotion } from './ReducedMotion';
+
 export type SceneTransitionType = 'fade' | 'slide';
 export type SceneTransitionMode = 'enter' | 'exit';
 
@@ -11,13 +13,6 @@ export interface SceneTransitionOptions {
   reducedMotion?: boolean;
 }
 
-function prefersReducedMotion(): boolean {
-  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-    return false;
-  }
-  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-}
-
 export function runSceneTransition(options: SceneTransitionOptions): Promise<void> {
   const {
     scene,
@@ -29,7 +24,7 @@ export function runSceneTransition(options: SceneTransitionOptions): Promise<voi
     reducedMotion,
   } = options;
 
-  const shouldReduce = reducedMotion ?? prefersReducedMotion();
+  const shouldReduce = reducedMotion ?? getEffectiveReducedMotion();
   if (shouldReduce) return Promise.resolve();
 
   const camera = scene.cameras.main;

@@ -1,3 +1,5 @@
+import { getEffectiveReducedMotion } from './ReducedMotion';
+
 export interface PopTextOrIconOptions {
   scene: Phaser.Scene;
   target?: Phaser.GameObjects.GameObject & {
@@ -17,13 +19,6 @@ export interface PopTextOrIconOptions {
   ease?: string;
   reducedMotion?: boolean;
   style?: Phaser.Types.GameObjects.Text.TextStyle;
-}
-
-function prefersReducedMotion(): boolean {
-  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-    return false;
-  }
-  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
 export function popTextOrIcon(options: PopTextOrIconOptions): Promise<void> {
@@ -54,7 +49,7 @@ export function popTextOrIcon(options: PopTextOrIconOptions): Promise<void> {
     return Promise.resolve();
   }
 
-  const shouldReduce = reducedMotion ?? prefersReducedMotion();
+  const shouldReduce = reducedMotion ?? getEffectiveReducedMotion();
   if (shouldReduce) {
     textTarget.destroy();
     return Promise.resolve();
