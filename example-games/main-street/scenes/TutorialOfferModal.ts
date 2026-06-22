@@ -14,6 +14,7 @@ import {
   createOverlayButton,
   FONT_FAMILY,
 } from '../../../src/ui';
+import { t } from '../../../src/core-engine/I18n';
 import type { TutorialStorageAdapter } from '../TutorialState';
 import {
   loadTutorialState,
@@ -135,7 +136,7 @@ export class TutorialOfferModal {
     const title = s.add.text(
       centerX,
       panelTop + 32,
-      'Welcome to Main Street!',
+      t('tutorial.modal.title'),
       {
         fontSize: '24px',
         fontStyle: 'bold',
@@ -151,8 +152,7 @@ export class TutorialOfferModal {
     const body = s.add.text(
       centerX,
       panelTop + 74,
-      'Would you like a guided tutorial to learn\n' +
-        'the basics of Main Street?',
+      t('tutorial.modal.body'),
       {
         fontSize: '15px',
         color: BODY_COLOR,
@@ -175,13 +175,13 @@ export class TutorialOfferModal {
     const leftX = centerX - buttonGap / 2;
     const rightX = centerX + buttonGap / 2;
 
-    // Skip for Now button (left — consistent with other tutorial overlays
+    // Skip button (left — consistent with other tutorial overlays
     // where the dismiss/exit action appears on the left)
     const skipBtn = createOverlayButton(
       s,
       leftX,
       buttonY,
-      '[ Skip for Now ]',
+      '[ ' + t('tutorial.modal.skipBtn') + ' ]',
       CONTENT_DEPTH,
       { fontSize: '15px', color: SKIP_COLOR, hoverColor: SKIP_HOVER_COLOR },
     );
@@ -198,7 +198,7 @@ export class TutorialOfferModal {
       s,
       rightX,
       buttonY,
-      '[ Start Tutorial ]',
+      '[ ' + t('tutorial.modal.startBtn') + ' ]',
       CONTENT_DEPTH,
       { fontSize: '15px', color: '#88ff88', hoverColor: '#aaffaa' },
     );

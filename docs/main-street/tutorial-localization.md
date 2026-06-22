@@ -28,7 +28,7 @@ as a fallback.
 
 ### Key naming convention
 
-All tutorial keys follow the pattern:
+All tutorial step keys follow the pattern:
 
 ```
 tutorial.<STEP_ID>.<field>
@@ -51,14 +51,55 @@ import { tutorialKey } from '../../example-games/main-street/i18n/tutorial-en';
 tutorialKey('T3', 'title'); // → 'tutorial.T3.title'
 ```
 
+### Offer modal and overlay button keys
+
+The tutorial offer modal and overlay button labels are also externalized:
+
+| Key pattern | Description | Example value (English) |
+|------------|-------------|------------------------|
+| `tutorial.modal.title` | Offer modal title | `Welcome to Main Street!` |
+| `tutorial.modal.body` | Offer modal body text | `Would you like a tour to learn the basics of Main Street?` |
+| `tutorial.modal.skipBtn` | Skip button label | `Skip` |
+| `tutorial.modal.startBtn` | Start Tutorial button | `Start Tutorial` |
+| `tutorial.overlay.dismiss` | Dismiss overlay button | `Dismiss` |
+| `tutorial.overlay.next` | Next step button | `Next >` |
+| `tutorial.overlay.exit` | Exit tutorial button | `Exit Tutorial` |
+| `tutorial.overlay.startFullGame` | Start full game button | `Start Full Game` |
+
+Helper functions:
+
+```ts
+import { modalKey, overlayKey } from '../../example-games/main-street/i18n/tutorial-en';
+
+modalKey('title');     // → 'tutorial.modal.title'
+overlayKey('dismiss'); // → 'tutorial.overlay.dismiss'
+```
+
 ## Updating Tutorial Copy
+
+### Plain-language guidelines
+
+Tutorial text follows these editorial principles:
+
+- **Reading level:** ~10-year-old reading level (Flesch-Kincaid Grade Level ≤ 5-6)
+- **Word count:** Each step body under 50 words (soft boundary — conciseness preferred)
+- **Concepts:** At most 1–2 distinct gameplay concepts per step (soft boundary)
+- **Plain language:** Short sentences, common words, active voice, no jargon without explanation
+- **Consistency:** Use consistent terminology across all steps (e.g. "Coins" not "gold", "turns" not "days")
 
 ### Changing existing text
 
 1. Open [`i18n/tutorial-en.ts`](../../example-games/main-street/i18n/tutorial-en.ts).
-2. Find the key for the step you want to update (e.g. `tutorial.T3.body`).
+2. Find the key for the string you want to update (e.g. `tutorial.T3.body`).
 3. Change the string value.
 4. The change takes effect immediately — no gameplay code changes needed.
+
+For offer modal or button label changes:
+
+1. Open [`i18n/tutorial-en.ts`](../../example-games/main-street/i18n/tutorial-en.ts).
+2. Find the relevant `tutorial.modal.*` or `tutorial.overlay.*` key.
+3. Update the value.
+4. The change takes effect immediately.
 
 ### Verification
 
@@ -67,6 +108,7 @@ Run the i18n tests to confirm all keys resolve:
 ```bash
 npx vitest run tests/main-street/tutorial-i18n.test.ts
 npx vitest run tests/main-street/tutorial-text-updates.test.ts
+npx vitest run tests/main-street/tutorial-flow.test.ts
 ```
 
 The build will also fail if any step key is missing from the English bundle.
