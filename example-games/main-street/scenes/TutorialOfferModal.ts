@@ -170,30 +170,16 @@ export class TutorialOfferModal {
     // Two buttons centered within the modal panel. A 240px gap between
     // button centres keeps them well inside the 420px panel width with
     // comfortable padding on the outer edges.
+    // Convention: left = dismiss/exit action, right = proceed/continue action.
     const buttonGap = 240;
-    const startX = centerX - buttonGap / 2;
-    const endX = centerX + buttonGap / 2;
+    const leftX = centerX - buttonGap / 2;
+    const rightX = centerX + buttonGap / 2;
 
-    // Start Tutorial button (left)
-    const startBtn = createOverlayButton(
-      s,
-      startX,
-      buttonY,
-      '[ Start Tutorial ]',
-      CONTENT_DEPTH,
-      { fontSize: '15px', color: '#88ff88', hoverColor: '#aaffaa' },
-    );
-    startBtn.on('pointerdown', () => {
-      this.dismiss();
-      this.persistStatus('not_seen');
-      this.callbacks.onStartTutorial();
-    });
-    this.overlayObjects.push(startBtn);
-
-    // Skip for Now button (right)
+    // Skip for Now button (left — consistent with other tutorial overlays
+    // where the dismiss/exit action appears on the left)
     const skipBtn = createOverlayButton(
       s,
-      endX,
+      leftX,
       buttonY,
       '[ Skip for Now ]',
       CONTENT_DEPTH,
@@ -205,6 +191,23 @@ export class TutorialOfferModal {
       this.callbacks.onSkip();
     });
     this.overlayObjects.push(skipBtn);
+
+    // Start Tutorial button (right — consistent with other tutorial overlays
+    // where the proceed/continue action appears on the right)
+    const startBtn = createOverlayButton(
+      s,
+      rightX,
+      buttonY,
+      '[ Start Tutorial ]',
+      CONTENT_DEPTH,
+      { fontSize: '15px', color: '#88ff88', hoverColor: '#aaffaa' },
+    );
+    startBtn.on('pointerdown', () => {
+      this.dismiss();
+      this.persistStatus('not_seen');
+      this.callbacks.onStartTutorial();
+    });
+    this.overlayObjects.push(startBtn);
   }
 
   /** Dismisses the modal and restores interactivity. */
