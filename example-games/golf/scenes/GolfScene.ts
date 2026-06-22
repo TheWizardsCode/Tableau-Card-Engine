@@ -235,6 +235,10 @@ export class GolfScene extends CardGameScene {
     if (!this.replayMode) {
       this.initHelpPanel(helpContent as HelpSection[]);
       this.initSettingsPanel();
+      // Propagate reduced motion preference to the animator
+      if (this.settingsPanel) {
+        this.animator.reducedMotion = this.settingsPanel.reducedMotion;
+      }
     }
 
     // Initial render
