@@ -33,6 +33,7 @@ import { HelpButton } from './HelpButton';
 import { SettingsPanel } from './SettingsPanel';
 import { SettingsButton } from './SettingsButton';
 import type { HelpSection } from './HelpPanel';
+import { createSceneMenuButton } from './SceneHeader';
 import { createStandardUndoRedoButtons } from './Renderer';
 
 // ── Audio path utility ───────────────────────────────────────
@@ -131,6 +132,8 @@ export abstract class CardGameScene extends Phaser.Scene {
   protected settingsPanel!: SettingsPanel;
   /** Settings toggle button. */
   protected settingsButton!: SettingsButton;
+  /** Menu button – navigates to GameSelectorScene. */
+  protected menuButton!: Phaser.GameObjects.Container;
 
   // ── Undo/Redo buttons ─────────────────────────────────────
 
@@ -247,6 +250,24 @@ export abstract class CardGameScene extends Phaser.Scene {
       difficultyNames,
     });
     this.settingsButton = this.settingsPanel.settingsButton!;
+  }
+
+  /**
+   * Create a "Menu" button in the top-left header bar that navigates
+   * to the GameSelectorScene on click.
+   *
+   * Styled as a compact action button – call this after initHUDContainer
+   * so the button is parented into the HUD layer.
+   */
+  protected initMenuButton(): void {
+    this.menuButton = createSceneMenuButton(this);
+    try {
+      if (this.hudContainer) {
+        this.hudContainer.add(this.menuButton);
+      }
+    } catch {
+      // ignore
+    }
   }
 
   // ── Undo/Redo buttons ─────────────────────────────────────

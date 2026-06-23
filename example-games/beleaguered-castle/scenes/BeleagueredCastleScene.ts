@@ -154,6 +154,7 @@ export class BeleagueredCastleScene extends CardGameScene {
 
     this.initEventSystem();
     this.initHUDContainer();
+    this.initMenuButton();
 
     if (!this.replayMode) {
       this.initHelpPanel(helpContent as HelpSection[]);

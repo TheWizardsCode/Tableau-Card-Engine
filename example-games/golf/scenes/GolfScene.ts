@@ -145,6 +145,7 @@ export class GolfScene extends CardGameScene {
     // Event system: create emitter and bridge to Phaser scene events
     this.initEventSystem();
     this.initHUDContainer();
+    this.initMenuButton();
 
     // Sound system: wrap Phaser's sound manager as a SoundPlayer
     if (!this.replayMode) {

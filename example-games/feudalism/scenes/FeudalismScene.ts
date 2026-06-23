@@ -82,6 +82,7 @@ export class FeudalismScene extends CardGameScene {
     this.detectReplayMode();
     this.initEventSystem();
     this.initHUDContainer();
+    this.initMenuButton();
 
     if (this.replayMode) {
       this.createHeader();

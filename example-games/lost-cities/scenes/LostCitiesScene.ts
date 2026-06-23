@@ -116,6 +116,7 @@ export class LostCitiesScene extends CardGameScene {
     this.detectReplayMode();
     this.initEventSystem();
     this.initHUDContainer();
+    this.initMenuButton();
 
     this.session = setupLostCitiesGame({
       playerNames: ['You', 'AI'],

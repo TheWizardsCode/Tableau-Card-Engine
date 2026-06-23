@@ -172,6 +172,7 @@ export class MainStreetLifecycleManager {
     s.detectReplayMode();
     s.initEventSystem();
     s.initHUDContainer();
+    s.initMenuButton();
 
     // Sound (re-use existing audio assets)
     // Register Main Street SFX and map common events to logical sound keys.
