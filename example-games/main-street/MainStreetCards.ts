@@ -704,6 +704,21 @@ const EVENT_TEMPLATES: EventCard[] = [
     coinDelta: -1,
     reputationDelta: -1,
   },
+  // ── Duration-based Event (M2 Tier 4) ────────────────────────
+  {
+    family: 'event',
+    id: 'evt-flu-outbreak',
+    name: 'Flu Outbreak',
+    trigger: 'Incident',
+    cost: 0,
+    effect: 'All businesses generate 80% income for 5 turns. Duration reduced by Clinic/Medical Center.',
+    target: 'All',
+    coinDelta: 0,
+    reputationDelta: 0,
+    duration: 5,
+    effectType: 'income-multiplier',
+    multiplier: 0.8,
+  } as DurationEventCard,
 ];
 
 /** Template data for all Upgrade cards (M1 + M2 pool). */

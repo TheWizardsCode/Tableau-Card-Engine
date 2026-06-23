@@ -111,6 +111,7 @@ const TIER_4_NEW_CARD_IDS: string[] = [
   'evt-noise-complaint',
   'evt-pipe-burst',
   'evt-power-outage',
+  'evt-flu-outbreak',
   'upg-grand-bakehouse',
   'upg-home-improvement',
   'upg-medical-center',
