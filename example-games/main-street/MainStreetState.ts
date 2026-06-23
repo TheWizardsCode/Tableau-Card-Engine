@@ -9,7 +9,7 @@
  */
 
 import { shuffleArray } from '../../src/card-system';
-import { createSeededRng } from '../../src/core-engine';
+import { type ActiveEffect, createSeededRng } from '../../src/core-engine';
 import { createEconomyLedger, type EconomyLedger } from '../../src/rule-engine/EconomyLedger';
 import {
   type BusinessCard,
@@ -212,6 +212,8 @@ export interface MainStreetState {
   rng: () => number;
   /** Chronological log of game activities for the UI activity log panel. */
   activityLog: LogEntry[];
+  /** Active duration-based modifiers (e.g. Flu outbreak income reduction). */
+  activeEffects: ActiveEffect[];
 }
 
 export interface MainStreetSerializedState {
@@ -248,6 +250,7 @@ export interface MainStreetSerializedState {
   numericSeed: number;
   rngCalls: number;
   activityLog: LogEntry[];
+  activeEffects: ActiveEffect[];
 }
 
 /** Record of a single milestone (tier unlock) achievement. */
@@ -467,6 +470,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     rngCalls,
     rng,
     activityLog: [],
+    activeEffects: [],
   };
 
   // Select challenges for this run using seeded RNG and config count
@@ -506,6 +510,7 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
     numericSeed: state.numericSeed,
     rngCalls: state.rngCalls,
     activityLog: structuredClone(state.activityLog),
+    activeEffects: structuredClone(state.activeEffects),
   };
 }
 
@@ -516,6 +521,7 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
  * - `market.business` → `market.development` rename
  * - Park cards with `family: 'business'` → `family: 'community-space'`
  * - Missing `communitySpace` deck/discard in old saves
+ * - Missing `activeEffects` field (defaults to [])
  */
 function migrateSerializedState(saved: Record<string, unknown>): void {
   // ── Market: rename business → development ────────────────
@@ -576,6 +582,11 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
   if (discards && !('communitySpace' in discards)) {
     discards.communitySpace = [];
   }
+
+  // ── ActiveEffects: add missing activeEffects field ────────
+  if (!('activeEffects' in saved)) {
+    (saved as Record<string, unknown>).activeEffects = [];
+  }
 }
 
 /**
@@ -632,6 +643,7 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
     rngCalls: saved.rngCalls,
     rng,
     activityLog: structuredClone(saved.activityLog),
+    activeEffects: structuredClone(saved.activeEffects),
   };
 
   return state;
