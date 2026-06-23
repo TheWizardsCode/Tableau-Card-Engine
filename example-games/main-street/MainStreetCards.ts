@@ -85,6 +85,41 @@ export interface EventCard {
 }
 
 /**
+ * A Duration-based Event card that creates an ActiveEffect rather than
+ * applying a one-shot coin/reputation delta.
+ *
+ * Extends EventCard with fields needed for duration-based modifiers:
+ * - `duration`: number of turns the effect lasts
+ * - `effectType`: discriminator for which aspect of the game is modified
+ *   (e.g. 'income-multiplier', 'rep-multiplier')
+ * - `multiplier`: the scalar value applied each turn (e.g. 0.8 for 80% income)
+ */
+export interface DurationEventCard extends EventCard {
+  readonly duration: number;
+  readonly effectType: string;
+  readonly multiplier: number;
+}
+
+/**
+ * Type guard: returns true if the given card is a DurationEventCard.
+ *
+ * Checks for the presence of the `duration` field (an optional field not
+ * present on regular EventCard instances).
+ *
+ * @param card  Any card object to check.
+ * @returns true if the card has DurationEventCard-specific fields.
+ */
+export function isDurationEventCard(card: unknown): card is DurationEventCard {
+  if (card === null || card === undefined) return false;
+  if (typeof card !== 'object') return false;
+  const maybe = card as Record<string, unknown>;
+  return (
+    maybe.family === 'event' &&
+    typeof maybe.duration === 'number'
+  );
+}
+
+/**
  * An Upgrade card that enhances a specific Business card.
  *
  * Branching upgrades: multiple `UpgradeCard` entries may share the same
@@ -120,7 +155,7 @@ export interface UpgradeCard {
 }
 
 /** Union of all card types in Main Street. */
-export type AnyCard = BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard;
+export type AnyCard = BusinessCard | CommunitySpaceCard | EventCard | DurationEventCard | UpgradeCard;
 
 // ── Constants ───────────────────────────────────────────────
 
