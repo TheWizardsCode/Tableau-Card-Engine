@@ -78,11 +78,7 @@ export function audioPathWithFallback(gameDir: string, filename: string): string
  *   constructor() { super({ key: 'MyGameScene' }); }
  *
  *   create(): void {
- *     // Replay detection (call early)
- *     this.detectReplayMode();
- *
- *     // Event system (must come before sound)
- *     this.initEventSystem();
+ *     super.create();  // auto-runs replay detection, event system, HUD, menu button
  *
  *     // Sound system (skipped in replay mode)
  *     if (!this.replayMode) {
@@ -146,6 +142,22 @@ export abstract class CardGameScene extends Phaser.Scene {
 
   /** When true, the scene suppresses input and AI turns for replay use. */
   protected replayMode = false;
+
+  /**
+   * Called automatically by Phaser's lifecycle.
+   *
+   * Detects replay mode, initialises the event system, creates the
+   * shared HUD container, and adds a Menu button to the header bar.
+   *
+   * Subclasses **must** call `super.create()` at the **start** of
+   * their own `create()` method to inherit this common setup.
+   */
+  create(): void {
+    this.detectReplayMode();
+    this.initEventSystem();
+    this.initHUDContainer();
+    this.initMenuButton();
+  }
 
   // ── Initializers ─────────────────────────────────────────
 

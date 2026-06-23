@@ -179,10 +179,7 @@ export class SushiGoScene extends CardGameScene {
     this.recorder = null;
     this.replayStepIndex = -1;
 
-    this.detectReplayMode();
-    this.initEventSystem();
-    this.initHUDContainer();
-    this.initMenuButton();
+    super.create();
 
     if (this.replayMode) {
       this.createHeader();

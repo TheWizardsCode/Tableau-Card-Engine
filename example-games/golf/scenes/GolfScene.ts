@@ -135,17 +135,11 @@ export class GolfScene extends CardGameScene {
     this.drawnCard = null;
     this.drawSource = null;
 
-    // Check for replay mode via URL parameter (?mode=replay)
-    this.detectReplayMode();
+    super.create();
 
     // Select AI strategy
     const strategy: AiStrategy =
       this.aiStrategyName === 'random' ? RandomStrategy : GreedyStrategy;
-
-    // Event system: create emitter and bridge to Phaser scene events
-    this.initEventSystem();
-    this.initHUDContainer();
-    this.initMenuButton();
 
     // Sound system: wrap Phaser's sound manager as a SoundPlayer
     if (!this.replayMode) {

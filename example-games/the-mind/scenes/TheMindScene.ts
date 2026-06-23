@@ -131,8 +131,7 @@ export class TheMindScene extends CardGameScene {
     this.events.on('shutdown', this.shutdown, this);
 
     this.resetSceneState();
-    this.detectReplayMode();
-    this.initEventSystem();
+    super.create();
 
     if (this.replayMode) {
       this.createReplayView();
@@ -140,8 +139,6 @@ export class TheMindScene extends CardGameScene {
     }
 
     this.createSoundSystem();
-    this.initHUDContainer();
-    this.initMenuButton();
     this.initializeGameControllers();
     // Propagate reduced motion preference to the animator
     if (this.settingsPanel) {

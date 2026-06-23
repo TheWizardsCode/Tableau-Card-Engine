@@ -107,7 +107,7 @@ export class BeleagueredCastleScene extends CardGameScene {
     const seedParam = params.get('seed');
     this.seed = seedParam ? parseInt(seedParam, 10) : Date.now();
 
-    this.detectReplayMode();
+    super.create();
 
     // Create a placeholder game state; will be replaced if resuming from checkpoint
     this.gameState = deal(this.seed);
@@ -151,10 +151,6 @@ export class BeleagueredCastleScene extends CardGameScene {
       this.saveCheckpoint();
     };
     this.bcRenderer.onCardClick = (col) => this.handleCardClick(col);
-
-    this.initEventSystem();
-    this.initHUDContainer();
-    this.initMenuButton();
 
     if (!this.replayMode) {
       this.initHelpPanel(helpContent as HelpSection[]);

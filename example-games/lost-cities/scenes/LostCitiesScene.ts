@@ -113,10 +113,7 @@ export class LostCitiesScene extends CardGameScene {
   create(): void {
     this.cameras.main.setBackgroundColor('#1a2a1a');
 
-    this.detectReplayMode();
-    this.initEventSystem();
-    this.initHUDContainer();
-    this.initMenuButton();
+    super.create();
 
     this.session = setupLostCitiesGame({
       playerNames: ['You', 'AI'],

@@ -79,10 +79,7 @@ export class FeudalismScene extends CardGameScene {
     this.cameras.main.setBackgroundColor('#1a2a1a');
     this.replayStepIndex = -1;
 
-    this.detectReplayMode();
-    this.initEventSystem();
-    this.initHUDContainer();
-    this.initMenuButton();
+    super.create();
 
     if (this.replayMode) {
       this.createHeader();
