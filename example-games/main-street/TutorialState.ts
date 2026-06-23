@@ -187,8 +187,8 @@ export function shouldShowTutorialOffer(
 ): boolean {
   if (opts.forceShowOffer) return true;
   if (opts.replayMode || opts.disableTutorial) return false;
-  if (state.status === 'completed') return false;
-  // 'not_seen' and 'skipped' both show the offer
+  if (state.status === 'completed' || state.status === 'skipped') return false;
+  // Only 'not_seen' shows the offer
   return true;
 }
 

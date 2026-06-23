@@ -68,9 +68,9 @@ describe('TutorialOfferModal decision logic', () => {
     expect(shouldShowOffer(storage)).toBe(true);
   });
 
-  it('shows offer when state is skipped (player can be re-prompted)', () => {
+  it('does NOT show offer when state is skipped', () => {
     persistStatus(storage, 'skipped');
-    expect(shouldShowOffer(storage)).toBe(true);
+    expect(shouldShowOffer(storage)).toBe(false);
   });
 
   // ── Start Path ──────────────────────────────────────────
@@ -93,8 +93,8 @@ describe('TutorialOfferModal decision logic', () => {
     expect(raw).not.toBeNull();
     const parsed = JSON.parse(raw!);
     expect(parsed.status).toBe('skipped');
-    // After skip, offer should still show (player can change mind)
-    expect(shouldShowOffer(storage)).toBe(true);
+    // After skip, offer is suppressed (skip is permanent)
+    expect(shouldShowOffer(storage)).toBe(false);
   });
 
   // ── Completed-State Suppression ──────────────────────────
@@ -154,8 +154,9 @@ describe('TutorialOfferModal decision logic', () => {
   it('new-style state takes precedence over legacy flag', () => {
     // Write a new-style skipped state
     persistStatus(storage, 'skipped');
-    // Even though legacy says true (completed), new-style takes precedence
-    expect(shouldShowOffer(storage, {}, true)).toBe(true);
+    // Even though legacy says true (completed), new-style 'skipped' takes precedence
+    // and suppresses the offer
+    expect(shouldShowOffer(storage, {}, true)).toBe(false);
   });
 
   // ── Completion Persistence ──────────────────────────────
