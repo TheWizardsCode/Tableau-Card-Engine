@@ -425,7 +425,7 @@ export class MainStreetRenderer {
       tooltipZone.setOrigin(0.5);
       tooltipZone.setInteractive({ useHandCursor: true });
       tooltipZone.on('pointerover', () => {
-        const synergyNote = isPawnShopCard(biz) ? ' (no contribution)' : '';
+        const synergyNote = isPawnShopCard(biz) ? ' (excluded from synergy)' : '';
         const info = `Business: ${biz.name}\nIncome: +${biz.baseIncome + biz.incomeBonus}\nSynergy: ${biz.synergyTypes.join('/')}${synergyNote}\nLevel: ${biz.level}`;
         s.tooltipManager?.show(info, tooltipZone.x, tooltipZone.y);
       });
@@ -828,7 +828,7 @@ export class MainStreetRenderer {
           let info = '';
           if (card.family === 'business') {
             const b = card as any;
-            const bSynergyNote = isPawnShopCard(b) ? ' (no contribution)' : '';
+            const bSynergyNote = isPawnShopCard(b) ? ' (excluded from synergy)' : '';
             info = `Business: ${b.name}\nCost: ${b.cost}\nIncome: +${b.baseIncome + (b.incomeBonus || 0)}/turn\nSynergy: ${(b.synergyTypes || []).join('/')}${bSynergyNote}\n${b.description ?? ''}`;
           } else if (card.family === 'event') {
             const e = card as any;

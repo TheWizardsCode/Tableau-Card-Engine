@@ -67,7 +67,10 @@ export function neighbors(index: number, range: number = 1): number[] {
  * slot that contains a business sharing at least one SynergyType.
  * The range considered is 1 + business.synergyRangeBonus (from upgrades).
  *
- * Pawn Shop cards are excluded from contributing synergy bonuses.
+ * Pawn Shop cards are excluded entirely from synergy — they neither
+ * receive nor contribute synergy bonuses. This special case will be
+ * removed once synergy bonuses are generalized to per-card values
+ * (see CG-0MQRA9QTA0012PNZ).
  *
  * @param grid               The street grid.
  * @param index              The slot index of the business.
@@ -82,6 +85,11 @@ export function computeSynergyBonus(
   const business = grid[index];
   if (!business) return 0;
 
+  // Pawn Shop cards neither receive nor contribute synergy bonuses.
+  // This special case will be removed once synergy bonuses are generalized
+  // to per-card values (see CG-0MQRA9QTA0012PNZ).
+  if (isPawnShopCard(business)) return 0;
+
   const range = 1 + business.synergyRangeBonus;
   const neighborIndices = neighbors(index, range);
 
@@ -91,7 +99,6 @@ export function computeSynergyBonus(
     if (!neighbor) continue;
 
     // Pawn Shop cards do not contribute to synergy bonuses
-    // (identified by the isPawnShopCard helper imported from MainStreetCards)
     if (isPawnShopCard(neighbor)) continue;
 
     // Check if any synergy type is shared
@@ -110,6 +117,8 @@ export function computeSynergyBonus(
  * Computes the total income for a single business at a given slot.
  *
  * totalIncome = baseIncome + incomeBonus (from upgrades) + synergyBonus
+ *
+ * Pawn Shop cards receive no synergy bonus (see computeSynergyBonus).
  *
  * @param grid               The street grid.
  * @param index              The slot index of the business.

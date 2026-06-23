@@ -340,7 +340,7 @@ const BUSINESS_TEMPLATES: Omit<BusinessCard, 'family' | 'level' | 'incomeBonus' 
     synergyTypes: ['Commerce'],
     upgradePath: 'Pawn Shop',
     maxLevel: 1,
-    description: 'Trades second-hand goods. Does not provide synergy bonuses. Gains +1 coin per adjacent Commerce business.',
+    description: 'Trades second-hand goods. Does not provide or receive synergy bonuses.',
   },
   {
     id: 'biz-boutique',
@@ -1240,9 +1240,12 @@ export function cardLabel(card: AnyCard): string {
 /**
  * Determines if a card is a Pawn Shop card (biz-pawnshop).
  *
- * Pawn Shop cards do not contribute to synergy bonuses.
+ * Pawn Shop cards neither receive nor contribute synergy bonuses.
  * This holds true even after upgrading to Vintage Shop — the card's
  * base synergy restriction remains.
+ *
+ * This special case should be removed once synergy bonuses are generalized
+ * to per-card values (see CG-0MQRA9QTA0012PNZ).
  *
  * @param card  A card object with an `id` field.
  * @returns true if the card's base template ID is `biz-pawnshop`.

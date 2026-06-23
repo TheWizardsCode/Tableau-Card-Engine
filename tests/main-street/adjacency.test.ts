@@ -136,13 +136,13 @@ describe('MainStreetAdjacency (2x5 grid)', () => {
       expect(computeSynergyBonus(grid, 0)).toBe(0);
     });
 
-    it('Pawn Shop still receives synergy from adjacent Commerce businesses', () => {
+    it('Pawn Shop does not receive synergy from adjacent Commerce businesses', () => {
       const grid = emptyGrid();
       // Pawn Shop next to Hardware Store
       grid[0] = makeBiz({ id: 'biz-pawnshop-0', name: 'Pawn Shop', synergyTypes: ['Commerce'] });
       grid[1] = makeBiz({ id: 'biz-hardware-0', name: 'Hardware Store', synergyTypes: ['Commerce'] });
-      // Pawn Shop should still benefit from Hardware Store's synergy
-      expect(computeSynergyBonus(grid, 0)).toBe(SYNERGY_BONUS_PER_NEIGHBOR);
+      // Pawn Shop should NOT receive synergy from Hardware Store
+      expect(computeSynergyBonus(grid, 0)).toBe(0);
     });
 
     it('multiple Pawn Shops do not contribute synergy to each other', () => {
@@ -154,7 +154,7 @@ describe('MainStreetAdjacency (2x5 grid)', () => {
       expect(computeSynergyBonus(grid, 1)).toBe(0);
     });
 
-    it('Pawn Shop with upgraded Vintage Shop status still does not contribute synergy', () => {
+    it('Pawn Shop with upgraded Vintage Shop status still does not contribute or receive synergy', () => {
       const grid = emptyGrid();
       // Pawn Shop with upgrade applied (level=1, incomeBonus=1)
       grid[0] = makeBiz({
@@ -168,8 +168,8 @@ describe('MainStreetAdjacency (2x5 grid)', () => {
       grid[1] = makeBiz({ id: 'biz-hardware-0', name: 'Hardware Store', synergyTypes: ['Commerce'] });
       // Hardware Store should NOT receive synergy from upgraded Pawn Shop
       expect(computeSynergyBonus(grid, 1)).toBe(0);
-      // Upgraded Pawn Shop still receives synergy from Hardware Store
-      expect(computeSynergyBonus(grid, 0)).toBe(SYNERGY_BONUS_PER_NEIGHBOR);
+      // Upgraded Pawn Shop also does NOT receive synergy from Hardware Store
+      expect(computeSynergyBonus(grid, 0)).toBe(0);
     });
   });
 
@@ -186,6 +186,14 @@ describe('MainStreetAdjacency (2x5 grid)', () => {
       grid[2] = makeBiz({ id: 'n2', baseIncome: 1, synergyTypes: ['Food'] });
       // base 3 + two matching neighbors
       expect(computeBusinessIncome(grid, 1)).toBe(5);
+    });
+
+    it('Pawn Shop generates only base income with no synergy', () => {
+      const grid = emptyGrid();
+      // Pawn Shop with Commerce neighbors — should only get base income
+      grid[0] = makeBiz({ id: 'biz-pawnshop-0', name: 'Pawn Shop', baseIncome: 1, synergyTypes: ['Commerce'] });
+      grid[1] = makeBiz({ id: 'biz-hardware-0', name: 'Hardware Store', baseIncome: 1, synergyTypes: ['Commerce'] });
+      expect(computeBusinessIncome(grid, 0)).toBe(1); // base only, no synergy
     });
   });
 
@@ -210,6 +218,21 @@ describe('MainStreetAdjacency (2x5 grid)', () => {
       expect(result.total).toBe(8);
       expect(result.breakdown).toHaveLength(3);
       expect(result.breakdown.find((b) => b.slotIndex === 0)?.businessName).toBe('A');
+    });
+
+    it('Pawn Shop shows 0 synergy bonus in income breakdown', () => {
+      const grid = emptyGrid();
+      // Pawn Shop adjacent to two Commerce businesses
+      grid[5] = makeBiz({ id: 'biz-pawnshop-0', name: 'Pawn Shop', baseIncome: 1, synergyTypes: ['Commerce'] });
+      grid[4] = makeBiz({ id: 'biz-hardware-0', name: 'Hardware Store', baseIncome: 1, synergyTypes: ['Commerce'] });
+      grid[6] = makeBiz({ id: 'biz-boutique-0', name: 'Boutique', baseIncome: 1, synergyTypes: ['Commerce'] });
+
+      const result = computeIncome(grid);
+      const pawnEntry = result.breakdown.find((b) => b.slotIndex === 5);
+      expect(pawnEntry).toBeDefined();
+      expect(pawnEntry!.businessName).toBe('Pawn Shop');
+      expect(pawnEntry!.synergyBonus).toBe(0);
+      expect(pawnEntry!.total).toBe(1); // base income only
     });
   });
 
