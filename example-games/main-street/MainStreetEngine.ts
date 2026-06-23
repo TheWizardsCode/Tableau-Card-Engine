@@ -18,6 +18,9 @@
 import type { MainStreetState, DayPhase } from './MainStreetState';
 import { PHASE_ORDER, addLog, syncResourceBankToLedger } from './MainStreetState';
 import type { EventCard, SynergyType } from './MainStreetCards';
+import { isDurationEventCard, type DurationEventCard } from './MainStreetCards';
+import { createActiveEffect } from '../../src/core-engine/ActiveEffect';
+import { recordMainStreetEvent } from './MainStreetTranscript';
 import { applyIncome, type IncomeResult } from './MainStreetAdjacency';
 import {
   purchaseBusiness,
@@ -212,7 +215,91 @@ function classifyEffect(coinChange: number, repChange: number): 'gain' | 'loss' 
  * (CG-0MMLR38NJ1N11DOS). Negative deltas (penalties) pass through
  * unchanged.
  */
+/**
+ * Computes the effective duration for a DurationEventCard by scanning
+ * the street grid for Clinic and Medical Center cards.
+ *
+ * Rules (from Flu event AC):
+ * - Medical Center (upg-medical-center) reduces duration by 3
+ * - Clinic (biz-clinic) reduces duration by 2
+ * - Only the stronger reduction applies (Medical Center > Clinic)
+ * - Minimum duration floor is 1
+ *
+ * @param baseDuration  Base duration before reductions
+ * @param state         Current game state (street grid is scanned)
+ * @returns Effective duration after reductions (min 1).
+ */
+function computeDurationWithClinicReduction(baseDuration: number, state: MainStreetState): number {
+  let hasMedicalCenter = false;
+  let hasClinic = false;
+
+  for (const slot of state.streetGrid) {
+    if (slot === null) continue;
+    if (slot.id.startsWith('upg-medical-center')) {
+      hasMedicalCenter = true;
+    } else if (slot.id.startsWith('biz-clinic')) {
+      hasClinic = true;
+    }
+  }
+
+  let reduction = 0;
+  if (hasMedicalCenter) {
+    reduction = 3;
+  } else if (hasClinic) {
+    reduction = 2;
+  }
+
+  return Math.max(1, baseDuration - reduction);
+}
+
+/**
+ * Resolves a single event card's effects on the game state.
+ *
+ * DurationEventCards branch to ActiveEffect creation instead of applying
+ * one-shot coin/reputation deltas. Regular EventCards apply deltas as before.
+ */
 export function resolveEvent(state: MainStreetState, event: EventCard): void {
+  // ── DurationEventCard branch ────────────────────────────────
+  if (isDurationEventCard(event)) {
+    const dEvent = event as DurationEventCard;
+
+    // Compute effective duration (check clinic/medical center for flu)
+    let effectiveDuration = dEvent.duration;
+    if (dEvent.id === 'evt-flu-outbreak') {
+      effectiveDuration = computeDurationWithClinicReduction(dEvent.duration, state);
+    }
+
+    // Create the ActiveEffect
+    const effect = createActiveEffect(
+      dEvent.effectType,
+      dEvent.multiplier,
+      effectiveDuration,
+      dEvent.id,
+      `${dEvent.name}: ${dEvent.effect}`,
+    );
+    state.activeEffects.push(effect);
+
+    // Log the onset
+    const logText = effectiveDuration > 0
+      ? `${dEvent.name}: Income reduced to ${Math.round(dEvent.multiplier * 100)}% for ${effectiveDuration} turns`
+      : `${dEvent.name}: Resolved with no effect (fully neutralized)`;
+    addLog(state, logText, 'loss');
+
+    // Record transcript event
+    recordMainStreetEvent({
+      type: 'active-effect',
+      turn: state.turn,
+      effectType: dEvent.effectType,
+      sourceEventId: dEvent.id,
+      duration: effectiveDuration,
+      description: logText,
+    });
+
+    syncResourceBankToLedger(state);
+    return;
+  }
+
+  // ── Regular EventCard resolution ────────────────────────────
   const rep = state.resourceBank.reputation;
   const cfg = state.config;
 
