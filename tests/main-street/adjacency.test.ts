@@ -126,6 +126,51 @@ describe('MainStreetAdjacency (2x5 grid)', () => {
       expect(computeSynergyBonus(grid, 0)).toBe(SYNERGY_BONUS_PER_NEIGHBOR);
       expect(computeSynergyBonus(grid, 2)).toBe(0);
     });
+
+    it('Pawn Shop does not contribute synergy to adjacent Commerce businesses', () => {
+      const grid = emptyGrid();
+      // Hardware Store (Commerce) adjacent to Pawn Shop (Commerce)
+      grid[0] = makeBiz({ id: 'biz-hardware-0', name: 'Hardware Store', synergyTypes: ['Commerce'] });
+      grid[1] = makeBiz({ id: 'biz-pawnshop-0', name: 'Pawn Shop', synergyTypes: ['Commerce'] });
+      // Hardware Store should NOT receive synergy from Pawn Shop
+      expect(computeSynergyBonus(grid, 0)).toBe(0);
+    });
+
+    it('Pawn Shop still receives synergy from adjacent Commerce businesses', () => {
+      const grid = emptyGrid();
+      // Pawn Shop next to Hardware Store
+      grid[0] = makeBiz({ id: 'biz-pawnshop-0', name: 'Pawn Shop', synergyTypes: ['Commerce'] });
+      grid[1] = makeBiz({ id: 'biz-hardware-0', name: 'Hardware Store', synergyTypes: ['Commerce'] });
+      // Pawn Shop should still benefit from Hardware Store's synergy
+      expect(computeSynergyBonus(grid, 0)).toBe(SYNERGY_BONUS_PER_NEIGHBOR);
+    });
+
+    it('multiple Pawn Shops do not contribute synergy to each other', () => {
+      const grid = emptyGrid();
+      grid[0] = makeBiz({ id: 'biz-pawnshop-0', name: 'Pawn Shop', synergyTypes: ['Commerce'] });
+      grid[1] = makeBiz({ id: 'biz-pawnshop-1', name: 'Pawn Shop', synergyTypes: ['Commerce'] });
+      // Neither Pawn Shop contributes synergy to the other
+      expect(computeSynergyBonus(grid, 0)).toBe(0);
+      expect(computeSynergyBonus(grid, 1)).toBe(0);
+    });
+
+    it('Pawn Shop with upgraded Vintage Shop status still does not contribute synergy', () => {
+      const grid = emptyGrid();
+      // Pawn Shop with upgrade applied (level=1, incomeBonus=1)
+      grid[0] = makeBiz({
+        id: 'biz-pawnshop-0',
+        name: 'Pawn Shop',
+        synergyTypes: ['Commerce'],
+        level: 1,
+        incomeBonus: 1,
+        appliedUpgrades: ['upg-vintage-shop-0'],
+      });
+      grid[1] = makeBiz({ id: 'biz-hardware-0', name: 'Hardware Store', synergyTypes: ['Commerce'] });
+      // Hardware Store should NOT receive synergy from upgraded Pawn Shop
+      expect(computeSynergyBonus(grid, 1)).toBe(0);
+      // Upgraded Pawn Shop still receives synergy from Hardware Store
+      expect(computeSynergyBonus(grid, 0)).toBe(SYNERGY_BONUS_PER_NEIGHBOR);
+    });
   });
 
   describe('computeBusinessIncome', () => {

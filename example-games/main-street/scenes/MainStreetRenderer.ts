@@ -10,6 +10,7 @@ import {
   MARKET_INVESTMENT_SLOTS,
   INCIDENT_QUEUE_SIZE,
   REFRESH_INVESTMENTS_COST,
+  isPawnShopCard,
 } from '../MainStreetCards';
 import { computeScore } from '../MainStreetEngine';
 import {
@@ -424,7 +425,8 @@ export class MainStreetRenderer {
       tooltipZone.setOrigin(0.5);
       tooltipZone.setInteractive({ useHandCursor: true });
       tooltipZone.on('pointerover', () => {
-        const info = `Business: ${biz.name}\nIncome: +${biz.baseIncome + biz.incomeBonus}\nSynergy: ${biz.synergyTypes.join('/') }\nLevel: ${biz.level}`;
+        const synergyNote = isPawnShopCard(biz) ? ' (no contribution)' : '';
+        const info = `Business: ${biz.name}\nIncome: +${biz.baseIncome + biz.incomeBonus}\nSynergy: ${biz.synergyTypes.join('/')}${synergyNote}\nLevel: ${biz.level}`;
         s.tooltipManager?.show(info, tooltipZone.x, tooltipZone.y);
       });
       tooltipZone.on('pointerout', () => {
@@ -826,7 +828,8 @@ export class MainStreetRenderer {
           let info = '';
           if (card.family === 'business') {
             const b = card as any;
-            info = `Business: ${b.name}\nCost: ${b.cost}\nIncome: +${b.baseIncome + (b.incomeBonus || 0)}/turn\nSynergy: ${(b.synergyTypes || []).join('/')}\n${b.description ?? ''}`;
+            const bSynergyNote = isPawnShopCard(b) ? ' (no contribution)' : '';
+            info = `Business: ${b.name}\nCost: ${b.cost}\nIncome: +${b.baseIncome + (b.incomeBonus || 0)}/turn\nSynergy: ${(b.synergyTypes || []).join('/')}${bSynergyNote}\n${b.description ?? ''}`;
           } else if (card.family === 'event') {
             const e = card as any;
             info = `Event: ${e.name}\nCost: ${e.cost}\nEffect: ${e.effect}\nCoins: ${e.coinDelta >= 0 ? '+' : ''}${e.coinDelta}, Rep: ${e.reputationDelta >= 0 ? '+' : ''}${e.reputationDelta}`;

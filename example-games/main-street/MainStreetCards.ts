@@ -340,7 +340,7 @@ const BUSINESS_TEMPLATES: Omit<BusinessCard, 'family' | 'level' | 'incomeBonus' 
     synergyTypes: ['Commerce'],
     upgradePath: 'Pawn Shop',
     maxLevel: 1,
-    description: 'Trades second-hand goods. Gains +1 coin per adjacent Commerce business.',
+    description: 'Trades second-hand goods. Does not provide synergy bonuses. Gains +1 coin per adjacent Commerce business.',
   },
   {
     id: 'biz-boutique',
@@ -1235,6 +1235,22 @@ export function cardLabel(card: AnyCard): string {
     case 'event':           return card.cost > 0 ? `${card.name} ($${card.cost})` : card.name;
     case 'upgrade':         return `${card.name} ($${card.cost})`;
   }
+}
+
+/**
+ * Determines if a card is a Pawn Shop card (biz-pawnshop).
+ *
+ * Pawn Shop cards do not contribute to synergy bonuses.
+ * This holds true even after upgrading to Vintage Shop — the card's
+ * base synergy restriction remains.
+ *
+ * @param card  A card object with an `id` field.
+ * @returns true if the card's base template ID is `biz-pawnshop`.
+ */
+export function isPawnShopCard(card: { id: string } | null | undefined): boolean {
+  if (!card) return false;
+  const baseId = card.id.replace(/-\d+$/, '');
+  return baseId === 'biz-pawnshop';
 }
 
 // ---------------------------------------------------------------------------

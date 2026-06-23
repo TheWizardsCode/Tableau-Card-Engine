@@ -10,7 +10,7 @@
  */
 
 import type { BusinessCard, CommunitySpaceCard, SynergyType } from './MainStreetCards';
-import { GRID_SIZE, SYNERGY_BONUS_PER_NEIGHBOR } from './MainStreetCards';
+import { GRID_SIZE, SYNERGY_BONUS_PER_NEIGHBOR, isPawnShopCard } from './MainStreetCards';
 import type { MainStreetState } from './MainStreetState';
 import { addLog, syncResourceBankToLedger } from './MainStreetState';
 import { applyReputationMultiplier } from './MainStreetDifficulty';
@@ -67,6 +67,8 @@ export function neighbors(index: number, range: number = 1): number[] {
  * slot that contains a business sharing at least one SynergyType.
  * The range considered is 1 + business.synergyRangeBonus (from upgrades).
  *
+ * Pawn Shop cards are excluded from contributing synergy bonuses.
+ *
  * @param grid               The street grid.
  * @param index              The slot index of the business.
  * @param bonusPerNeighbor   Coins per matching neighbor (defaults to SYNERGY_BONUS_PER_NEIGHBOR for backward compat).
@@ -87,6 +89,10 @@ export function computeSynergyBonus(
   for (const ni of neighborIndices) {
     const neighbor = grid[ni];
     if (!neighbor) continue;
+
+    // Pawn Shop cards do not contribute to synergy bonuses
+    // (identified by the isPawnShopCard helper imported from MainStreetCards)
+    if (isPawnShopCard(neighbor)) continue;
 
     // Check if any synergy type is shared
     const hasSharedSynergy = business.synergyTypes.some(
