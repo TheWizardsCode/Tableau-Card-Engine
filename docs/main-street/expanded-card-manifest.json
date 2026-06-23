@@ -1,6 +1,6 @@
 {
   "source": "Generated from MainStreetCards.ts and Tier 1 IDs from MainStreetTiers.ts",
-  "generatedAt": "2026-06-15T12:00:00.000Z",
+  "generatedAt": "2026-06-23T09:15:31.973Z",
   "baselineTier1CardIds": [
     "biz-bakery",
     "biz-bookshop",
@@ -8,8 +8,8 @@
     "biz-hardware",
     "biz-laundromat",
     "biz-pawnshop",
-    "cs-park",
     "cs-library",
+    "cs-park",
     "evt-award",
     "evt-festival",
     "evt-grand-opening",
@@ -34,6 +34,8 @@
       "biz-florist",
       "biz-food-truck",
       "biz-gallery",
+      "biz-pharmacy",
+      "biz-private-clinic",
       "biz-spa"
     ],
     "event": [
@@ -65,6 +67,7 @@
       "upg-medical-center",
       "upg-multiplex",
       "upg-museum",
+      "upg-private-medical-center",
       "upg-resort-spa",
       "upg-restaurant",
       "upg-roastery",

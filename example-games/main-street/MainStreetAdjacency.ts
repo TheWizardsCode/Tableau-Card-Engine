@@ -161,12 +161,36 @@ export function computeIncome(
 }
 
 /**
+ * Computes total reputation per turn from all occupied grid slots.
+ *
+ * Each business/community-space card may contribute:
+ * - Its base `reputationPerTurn` (from the card definition)
+ * - Its accumulated `reputationBonus` (from applied upgrades)
+ *
+ * @param grid  The street grid.
+ * @returns Total reputation per turn.
+ */
+export function computeReputationPerTurn(
+  grid: (BusinessCard | CommunitySpaceCard | null)[],
+): number {
+  let total = 0;
+  for (const slot of grid) {
+    if (!slot) continue;
+    total += slot.reputationPerTurn ?? 0;
+    total += slot.reputationBonus;
+  }
+  return total;
+}
+
+/**
  * Applies income to the player's resource bank.
  * Mutates state in-place. Uses config.synergyBonusPerNeighbor from the
  * active difficulty preset.
  *
  * Income is scaled by the reputation coin multiplier (CG-0MMLR38NJ1N11DOS)
  * so that higher reputation yields proportionally more income.
+ *
+ * Reputation-per-turn from cards (e.g. Clinic) is applied during this phase.
  *
  * @param state  Current game state (mutated).
  * @returns The IncomeResult for UI display (pre-multiplier breakdown,
@@ -180,11 +204,21 @@ export function applyIncome(state: MainStreetState): IncomeResult {
     state.config,
   );
   state.resourceBank.coins += multiplied;
+
+  // Apply reputation per turn from cards
+  const repPerTurn = computeReputationPerTurn(state.streetGrid);
+  if (repPerTurn !== 0) {
+    state.resourceBank.reputation += repPerTurn;
+  }
+
   syncResourceBankToLedger(state);
   if (multiplied > 0) {
     addLog(state, `Income: +${multiplied} coins`, 'gain');
   } else {
     addLog(state, `Income: +0 coins`, 'neutral');
+  }
+  if (repPerTurn > 0) {
+    addLog(state, `Reputation from cards: +${repPerTurn}`, 'gain');
   }
   return result;
 }

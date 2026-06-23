@@ -14,7 +14,7 @@
 // ── Synergy & Phase Enums ───────────────────────────────────
 
 /** Synergy types used by Business cards for adjacency bonuses. */
-export type SynergyType = 'Food' | 'Culture' | 'Commerce' | 'Service' | 'Entertainment';
+export type SynergyType = 'Food' | 'Culture' | 'Commerce' | 'Service' | 'Entertainment' | 'Health';
 
 /** When an Event card resolves. */
 export type EventTrigger = 'Investment' | 'Incident';
@@ -47,6 +47,16 @@ export interface BusinessCard {
   incomeBonus: number;
   /** Cumulative synergy range extension from applied upgrades. */
   synergyRangeBonus: number;
+  /**
+   * Cumulative reputation bonus from applied upgrades.
+   * Initialized to 0 for all cards.
+   */
+  reputationBonus: number;
+  /**
+   * Base reputation generated per turn by this business (without upgrades).
+   * Fractional values are supported (e.g. 0.2 for the Clinic).
+   */
+  reputationPerTurn?: number;
   /**
    * IDs of upgrade cards that have been applied to this business instance,
    * in application order. Used to enforce multi-level chain requirements and
@@ -101,6 +111,12 @@ export interface UpgradeCard {
    * Omitting this field is equivalent to setting it to 0.
    */
   readonly requiredLevel?: number;
+  /**
+   * Additional reputation generated per turn when this upgrade is applied.
+   * Works like incomeBonus but for reputation instead of coins.
+   * Fractional values are supported (e.g. 0.1 for the Medical Center upgrade).
+   */
+  readonly reputationBonus?: number;
 }
 
 /** Union of all card types in Main Street. */
@@ -168,12 +184,13 @@ export const CHALLENGE_BONUS_POINTS = 10;
  * Creates a fresh copy of a BusinessCard from template data.
  * Mutable fields (level, incomeBonus, synergyRangeBonus, appliedUpgrades) are reset.
  */
-function makeBusiness(template: Omit<BusinessCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'appliedUpgrades'>): BusinessCard {
+function makeBusiness(template: Omit<BusinessCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'appliedUpgrades' | 'reputationBonus'>): BusinessCard {
   return {
     family: 'business',
     level: 0,
     incomeBonus: 0,
     synergyRangeBonus: 0,
+    reputationBonus: 0,
     appliedUpgrades: [],
     ...template,
   };
@@ -202,6 +219,16 @@ export interface CommunitySpaceCard {
   /** Cumulative synergy range extension from applied upgrades. */
   synergyRangeBonus: number;
   /**
+   * Cumulative reputation bonus from applied upgrades.
+   * Initialized to 0 for all cards.
+   */
+  reputationBonus: number;
+  /**
+   * Base reputation generated per turn by this community space (without upgrades).
+   * Fractional values are supported (e.g. 0.2).
+   */
+  reputationPerTurn?: number;
+  /**
    * IDs of upgrade cards that have been applied to this community space instance,
    * in application order.
    *
@@ -214,19 +241,20 @@ export interface CommunitySpaceCard {
  * Creates a fresh copy of a CommunitySpaceCard from template data.
  * Mutable fields (level, incomeBonus, synergyRangeBonus, appliedUpgrades) are reset.
  */
-function makeCommunitySpace(template: Omit<CommunitySpaceCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'appliedUpgrades'>): CommunitySpaceCard {
+function makeCommunitySpace(template: Omit<CommunitySpaceCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'appliedUpgrades' | 'reputationBonus'>): CommunitySpaceCard {
   return {
     family: 'community-space',
     level: 0,
     incomeBonus: 0,
     synergyRangeBonus: 0,
+    reputationBonus: 0,
     appliedUpgrades: [],
     ...template,
   };
 }
 
 /** Template data for all Business cards (M1 + M2 pool). */
-const BUSINESS_TEMPLATES: Omit<BusinessCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus'>[] = [
+const BUSINESS_TEMPLATES: Omit<BusinessCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'reputationBonus'>[] = [
   {
     id: 'biz-bakery',
     name: 'Bakery',
@@ -387,16 +415,36 @@ const BUSINESS_TEMPLATES: Omit<BusinessCard, 'family' | 'level' | 'incomeBonus' 
     id: 'biz-clinic',
     name: 'Clinic',
     cost: 10,
-    baseIncome: 1,
-    synergyTypes: ['Service'],
+    baseIncome: 0,
+    synergyTypes: ['Health'],
     upgradePath: 'Clinic',
     maxLevel: 1,
-    description: 'Walk-in medical care for the community. Gains +1 coin per adjacent Service business.',
+    reputationPerTurn: 0.2,
+    description: 'Walk-in medical care for the community. Provides +0.2 reputation per turn. Gains +1 coin per adjacent Health business.',
+  },
+  {
+    id: 'biz-private-clinic',
+    name: 'Private Clinic',
+    cost: 8,
+    baseIncome: 2,
+    synergyTypes: ['Health'],
+    upgradePath: 'Private Clinic',
+    maxLevel: 1,
+    description: 'A private medical practice focused on profitability. Gains +1 coin per adjacent Health business.',
+  },
+  {
+    id: 'biz-pharmacy',
+    name: 'Pharmacy',
+    cost: 6,
+    baseIncome: 1,
+    synergyTypes: ['Health'],
+    maxLevel: 0,
+    description: 'Provides essential medications. Gains +1 coin per adjacent Health business.',
   },
 ];
 
 /** Template data for all Community Space cards (reclassified Park + new community spaces). */
-const COMMUNITY_SPACE_TEMPLATES: Omit<CommunitySpaceCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus'>[] = [
+const COMMUNITY_SPACE_TEMPLATES: Omit<CommunitySpaceCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'reputationBonus'>[] = [
   {
     id: 'cs-park',
     name: 'Park',
@@ -809,10 +857,22 @@ const UPGRADE_TEMPLATES: UpgradeCard[] = [
     name: 'Upgrade to Medical Center',
     targetBusiness: 'Clinic',
     cost: 5,
-    incomeBonus: 2,
+    incomeBonus: 0,
     synergyRangeBonus: 1,
+    reputationBonus: 0.1,
     requiredLevel: 0,
-    description: 'Upgrades the Clinic to a comprehensive Medical Center.',
+    description: 'Upgrades the Clinic to a comprehensive Medical Center. Provides +0.1 reputation per turn.',
+  },
+  {
+    family: 'upgrade',
+    id: 'upg-private-medical-center',
+    name: 'Upgrade to Private Medical Center',
+    targetBusiness: 'Private Clinic',
+    cost: 4,
+    incomeBonus: 2,
+    synergyRangeBonus: 0,
+    requiredLevel: 0,
+    description: 'Expands the Private Clinic into a high-revenue Private Medical Center.',
   },
   // ── Branching Upgrades (alternative level-0 paths) ──────────
   // Bakery branches: Patisserie (above, food-artisan) vs Bread Factory (volume)
@@ -1111,6 +1171,7 @@ export function synergyColor(type: SynergyType): number {
     case 'Commerce':      return 0x27AE60; // Green
     case 'Service':       return 0x9B59B6; // Purple
     case 'Entertainment': return 0xE74C3C; // Red
+    case 'Health':        return 0x1ABC9C; // Teal/Cyan
   }
 }
 

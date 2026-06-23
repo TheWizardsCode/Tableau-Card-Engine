@@ -106,6 +106,8 @@ const TIER_4_NEW_CARD_IDS: string[] = [
   'biz-gallery',
   'biz-florist',
   'biz-clinic',
+  'biz-private-clinic',
+  'biz-pharmacy',
   'evt-noise-complaint',
   'evt-pipe-burst',
   'evt-power-outage',
@@ -113,6 +115,7 @@ const TIER_4_NEW_CARD_IDS: string[] = [
   'upg-home-improvement',
   'upg-medical-center',
   'upg-museum',
+  'upg-private-medical-center',
 ];
 
 // ── Tier 5 Card IDs (Landmark) ─────────────────────────────

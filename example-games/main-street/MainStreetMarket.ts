@@ -486,6 +486,7 @@ export function purchaseUpgrade(
   business.level += 1;
   business.incomeBonus += card.incomeBonus;
   business.synergyRangeBonus += card.synergyRangeBonus;
+  business.reputationBonus += card.reputationBonus ?? 0;
   if (!business.appliedUpgrades) {
     business.appliedUpgrades = [];
   }

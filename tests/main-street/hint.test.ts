@@ -206,7 +206,7 @@ describe('buildRationale', () => {
     const fakeBiz: BusinessCard = {
       id: 'fake-biz', name: card.targetBusiness, family: 'business',
       description: 'Test business', cost: 3, baseIncome: 2, incomeBonus: 0,
-      synergyRangeBonus: 0, synergyTypes: [], level: 0, maxLevel: 2, appliedUpgrades: [],
+      synergyRangeBonus: 0, reputationBonus: 0, synergyTypes: [], level: 0, maxLevel: 2, appliedUpgrades: [],
     };
     state.streetGrid[2] = fakeBiz;
 

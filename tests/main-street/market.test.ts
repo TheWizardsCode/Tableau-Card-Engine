@@ -44,6 +44,7 @@ describe('MainStreetMarket', () => {
     it('should allow purchase when player has enough coins and slot is empty', () => {
       const state = createTestState();
       const card = state.market.development[0];
+      state.resourceBank.coins = card.cost;
       const result = canPurchaseBusiness(state, card.id, 0);
       expect(result.legal).toBe(true);
     });
@@ -70,6 +71,7 @@ describe('MainStreetMarket', () => {
 
     it('should reject purchase when slot is occupied', () => {
       const state = createTestState();
+      state.resourceBank.coins = 100;
       const card = state.market.development[0];
       // Place a dummy business in slot 0
       state.streetGrid[0] = { ...card, id: 'dummy' };
@@ -82,6 +84,7 @@ describe('MainStreetMarket', () => {
 
     it('should reject purchase when slot index is out of range', () => {
       const state = createTestState();
+      state.resourceBank.coins = 100;
       const card = state.market.development[0];
       const result = canPurchaseBusiness(state, card.id, GRID_SIZE);
       expect(result.legal).toBe(false);
@@ -92,6 +95,7 @@ describe('MainStreetMarket', () => {
 
     it('should reject purchase when slot index is negative', () => {
       const state = createTestState();
+      state.resourceBank.coins = 100;
       const card = state.market.development[0];
       const result = canPurchaseBusiness(state, card.id, -1);
       expect(result.legal).toBe(false);
@@ -107,6 +111,7 @@ describe('MainStreetMarket', () => {
     it('should deduct coins, place card, and remove from market', () => {
       const state = createTestState();
       const card = state.market.development[0];
+      state.resourceBank.coins = card.cost;
       const coinsBefore = state.resourceBank.coins;
 
       const result = purchaseBusiness(state, card.id, 0);
@@ -120,6 +125,7 @@ describe('MainStreetMarket', () => {
 
     it('should not refill the market slot immediately (refill occurs at start of next turn)', () => {
       const state = createTestState();
+      state.resourceBank.coins = 100;
       const deckSizeBefore = state.decks.business.length;
       const card = state.market.development[0];
 
@@ -134,6 +140,7 @@ describe('MainStreetMarket', () => {
 
     it('should not refill when deck is empty', () => {
       const state = createTestState();
+      state.resourceBank.coins = 100;
       // Empty the deck
       state.decks.business.length = 0;
       const card = state.market.development[0];

@@ -72,6 +72,8 @@ function createCommunitySpaceFixture(overrides?: Record<string, unknown>): Recor
     level: 0,
     incomeBonus: 0,
     synergyRangeBonus: 0,
+    reputationBonus: 0,
+    reputationPerTurn: undefined,
     appliedUpgrades: [] as string[],
     ...overrides,
   };

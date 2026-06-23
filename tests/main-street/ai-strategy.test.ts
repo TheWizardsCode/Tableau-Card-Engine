@@ -202,6 +202,7 @@ describe('enumerateLegalActions', () => {
       level: 0,
       incomeBonus: 0,
       synergyRangeBonus: 0,
+      reputationBonus: 0,
     };
     for (let i = 0; i < GRID_SIZE; i++) {
       state.streetGrid[i] = { ...dummyCard, id: `dummy-${i}` };

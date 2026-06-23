@@ -32,6 +32,7 @@ function makeBiz(overrides: Partial<BusinessCard> = {}): BusinessCard {
     level: overrides.level ?? 0,
     incomeBonus: overrides.incomeBonus ?? 0,
     synergyRangeBonus: overrides.synergyRangeBonus ?? 0,
+    reputationBonus: overrides.reputationBonus ?? 0,
   };
 }
 
