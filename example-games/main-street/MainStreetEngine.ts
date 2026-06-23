@@ -19,7 +19,7 @@ import type { MainStreetState, DayPhase } from './MainStreetState';
 import { PHASE_ORDER, addLog, syncResourceBankToLedger } from './MainStreetState';
 import type { EventCard, SynergyType } from './MainStreetCards';
 import { isDurationEventCard, type DurationEventCard } from './MainStreetCards';
-import { createActiveEffect } from '../../src/core-engine/ActiveEffect';
+import { createActiveEffect, decayActiveEffects } from '../../src/core-engine/ActiveEffect';
 import { recordMainStreetEvent } from './MainStreetTranscript';
 import { applyIncome, type IncomeResult } from './MainStreetAdjacency';
 import {
@@ -583,6 +583,18 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
 
   // Phase: EndCheck
   state.phase = 'EndCheck';
+
+  // Decay active effects (decrement turnsRemaining, remove expired)
+  const decayResult = decayActiveEffects(state.activeEffects);
+  state.activeEffects = decayResult.active;
+  for (const expired of decayResult.expired) {
+    addLog(state, `${expired.description} has expired.`, 'neutral');
+    recordMainStreetEvent({
+      type: 'info',
+      turn: state.turn,
+      message: `${expired.description} has expired.`,
+    });
+  }
 
   // Evaluate challenges before checking end conditions (so score includes any new bonus points)
   evaluateChallenges(state.activeChallenges, state);

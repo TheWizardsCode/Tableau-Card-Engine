@@ -14,6 +14,7 @@ import { GRID_SIZE, SYNERGY_BONUS_PER_NEIGHBOR } from './MainStreetCards';
 import type { MainStreetState } from './MainStreetState';
 import { addLog, syncResourceBankToLedger } from './MainStreetState';
 import { applyReputationMultiplier } from './MainStreetDifficulty';
+import { applyActiveEffectMultiplier } from '../../src/core-engine/ActiveEffect';
 
 // ── Adjacency Resolver ──────────────────────────────────────
 
@@ -198,8 +199,21 @@ export function computeReputationPerTurn(
  */
 export function applyIncome(state: MainStreetState): IncomeResult {
   const result = computeIncome(state.streetGrid, state.config.synergyBonusPerNeighbor);
+
+  // Apply active effect income modifiers per-slot, before reputation multiplier.
+  // Each slot's income is individually multiplied, then summed.
+  let modifiedTotal = 0;
+  for (const slot of result.breakdown) {
+    const modifiedSlotIncome = applyActiveEffectMultiplier(
+      state.activeEffects,
+      'income-multiplier',
+      slot.total,
+    );
+    modifiedTotal += modifiedSlotIncome;
+  }
+
   const multiplied = applyReputationMultiplier(
-    result.total,
+    modifiedTotal,
     state.resourceBank.reputation,
     state.config,
   );

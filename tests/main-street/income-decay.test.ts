@@ -48,9 +48,10 @@ describe('Active effect income modifier', () => {
       state.streetGrid[0] = makeBiz({ baseIncome: 10, id: 'biz-test-1' });
 
       // Compute income without active effects
-      const normalIncome = applyIncome(state).total;
-      // Reset the state resources since applyIncome mutated them
-      state.resourceBank.coins -= normalIncome;
+      const coinsBefore = state.resourceBank.coins;
+      applyIncome(state);
+      const coinsAfterFirst = state.resourceBank.coins;
+      const normalIncome = coinsAfterFirst - coinsBefore;
 
       // Add active effect
       state.activeEffects.push(
@@ -58,9 +59,12 @@ describe('Active effect income modifier', () => {
       );
 
       // Compute income with active effect
-      const reducedIncome = applyIncome(state).total;
+      const coinsBeforeSecond = state.resourceBank.coins;
+      applyIncome(state);
+      const coinsAfterSecond = state.resourceBank.coins;
+      const reducedIncome = coinsAfterSecond - coinsBeforeSecond;
 
-      // Income should be reduced (the test checks applyIncome checks activeEffects)
+      // Income should be reduced
       expect(reducedIncome).toBeLessThan(normalIncome);
     });
 
@@ -106,8 +110,9 @@ describe('Active effect income modifier', () => {
       state.streetGrid[0] = makeBiz({ baseIncome: 100, id: 'biz-test' });
 
       // Compute income without active effects first
-      const incomeBefore = applyIncome(state).total;
-      state.resourceBank.coins -= incomeBefore;
+      const coinsBefore = state.resourceBank.coins;
+      applyIncome(state);
+      const normalIncome = state.resourceBank.coins - coinsBefore;
 
       // Add two income-multiplier effects
       state.activeEffects.push(
@@ -115,10 +120,14 @@ describe('Active effect income modifier', () => {
         createActiveEffect('income-multiplier', 0.8, 3, 'evt-flu-2', 'Second flu'),
       );
 
-      const incomeAfter = applyIncome(state).total;
+      const coinsBeforeSecond = state.resourceBank.coins;
+      applyIncome(state);
+      const reducedIncome = state.resourceBank.coins - coinsBeforeSecond;
 
       // Two 0.8× effects compose to 0.64×
-      expect(incomeAfter).toBeLessThan(incomeBefore);
+      expect(reducedIncome).toBeLessThan(normalIncome);
+      // With 100 base income, no synergy, no rep multiplier: 100 * 0.64 = 64
+      expect(reducedIncome).toBeLessThanOrEqual(Math.round(normalIncome * 0.64) + 1);
     });
   });
 
@@ -167,7 +176,9 @@ describe('Active effect income modifier', () => {
       state.activeEffects.push(effect);
 
       // Income for THIS turn should still be reduced (effect hasn't decayed yet)
-      const incomeWithEffect = applyIncome(state).total;
+      const coinsBefore = state.resourceBank.coins;
+      applyIncome(state);
+      const incomeWithEffect = state.resourceBank.coins - coinsBefore;
 
       // Advance to MarketPhase and process end of turn
       advanceToEndOfTurn();
@@ -177,7 +188,9 @@ describe('Active effect income modifier', () => {
       expect(state.activeEffects).toHaveLength(0);
 
       // Income for NEXT turn should be back to normal
-      const incomeAfterExpiry = applyIncome(state).total;
+      const coinsAfterExpiry = state.resourceBank.coins;
+      applyIncome(state);
+      const incomeAfterExpiry = state.resourceBank.coins - coinsAfterExpiry;
       expect(incomeAfterExpiry).toBeGreaterThan(incomeWithEffect);
     });
   });
