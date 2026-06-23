@@ -61,8 +61,8 @@ describe('Expanded Card Pool: Template Completeness', () => {
     expect(businessDeck).toHaveLength(18);
   });
 
-  it('should have exactly 17 event templates', () => {
-    expect(eventDeck).toHaveLength(17);
+  it('should have exactly 18 event templates', () => {
+    expect(eventDeck).toHaveLength(18);
   });
 
   it('should have exactly 27 upgrade templates', () => {
@@ -427,16 +427,21 @@ describe('Expanded Card Pool: Event Card Fields', () => {
 
   it('at least 25% of incident templates are positive (US-9 AC#3)', () => {
     const incidents = eventDeck.filter(e => e.trigger === 'Incident');
-    const positive = incidents.filter(i => i.coinDelta > 0 || i.reputationDelta > 0);
+    // Exclude neutral events (0/0 deltas, e.g. duration-based incidents)
+    // from the ratio since they are neither positive nor negative.
+    const effectful = incidents.filter(i => i.coinDelta !== 0 || i.reputationDelta !== 0);
+    const positive = effectful.filter(i => i.coinDelta > 0 || i.reputationDelta > 0);
     // Template pool intentionally skews negative; positiveIncidentMultiplier
     // boosts positive frequency at runtime per difficulty preset.
-    expect(positive.length / incidents.length).toBeGreaterThanOrEqual(0.25);
+    expect(positive.length / effectful.length).toBeGreaterThanOrEqual(0.25);
   });
 
   it('at least 25% of incident templates are positive (US-21 AC#1)', () => {
     const incidents = eventDeck.filter(e => e.trigger === 'Incident');
-    const positive = incidents.filter(i => i.coinDelta > 0 || i.reputationDelta > 0);
-    expect(positive.length / incidents.length).toBeGreaterThanOrEqual(0.25);
+    // Exclude neutral events from the ratio.
+    const effectful = incidents.filter(i => i.coinDelta !== 0 || i.reputationDelta !== 0);
+    const positive = effectful.filter(i => i.coinDelta > 0 || i.reputationDelta > 0);
+    expect(positive.length / effectful.length).toBeGreaterThanOrEqual(0.25);
   });
 });
 
@@ -447,8 +452,8 @@ describe('Expanded Card Pool: Deck Building', () => {
     expect(createBusinessDeck(3)).toHaveLength(54);
   });
 
-    it('event deck with 3 copies should have 51 cards', () => {
-    expect(createEventDeck(3, undefined, _rng, 1)).toHaveLength(51);
+    it('event deck with 3 copies should have 54 cards', () => {
+    expect(createEventDeck(3, undefined, _rng, 1)).toHaveLength(54);
   });
 
   it('upgrade deck with 2 copies should have 54 cards', () => {
