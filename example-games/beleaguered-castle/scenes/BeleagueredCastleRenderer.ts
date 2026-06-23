@@ -231,6 +231,7 @@ export class BeleagueredCastleRenderer {
   // ── Deal animation ──────────────────────────────────────
   dealTableauAnimated(): void {
     if (this.reducedMotion) {
+      this.syncTableauHandViews();
       this.onDealComplete?.();
       return;
     }

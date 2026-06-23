@@ -152,17 +152,18 @@ describe('tmp directory management', () => {
   const tmpDir = path.dirname(LOCK_FILE_PATH);
 
   beforeEach(() => {
-    // Remove lock file and tmp directory
+    // Only clean up the lock file itself — do NOT delete the entire tmp/ directory
+    // as that would race with other parallel test files that use tmp/ (e.g., replay e2e).
     removeLockFileDirectly();
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
   });
 
   afterEach(() => {
     removeLockFileDirectly();
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
   });
 
   it('creates tmp directory when writing lock file', () => {
+    removeLockFileDirectly();
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
     expect(fs.existsSync(tmpDir)).toBe(false);
     createLockFile(12345, 1);
     expect(fs.existsSync(tmpDir)).toBe(true);
@@ -170,6 +171,7 @@ describe('tmp directory management', () => {
   });
 
   it('recovers after tmp directory is deleted while lock exists', () => {
+    removeLockFileDirectly();
     createLockFile(12345, 1);
     expect(fs.existsSync(tmpDir)).toBe(true);
 
