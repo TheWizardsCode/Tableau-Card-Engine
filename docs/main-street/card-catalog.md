@@ -153,6 +153,7 @@ Events fall into two categories:
 | `evt-construction` | Road Construction | Incident | 0 | All | -- | -1 | 0 | -1 coin to all biz. | Mild universal disruption. |
 | `evt-viral-review` | Viral Review | Incident | 0 | All | -- | +2 | +1 | +2 coins, +1 rep from online fame. | Positive windfall; universal. |
 | `evt-vandalism` | Vandalism | Incident | 0 | All | -- | -1 | -1 | -1 coin, -1 rep. | Dual-penalty universal disruption. |
+| `evt-flu-outbreak` | Flu Outbreak | Incident | 0 | All | -- | 0 | 0 | 80% income for 5 turns. Duration reduced by Clinic/Medical Center. | Duration-based modifier (see ActiveEffect system). |
 
 ### Event Balance Summary
 
@@ -164,6 +165,9 @@ Events fall into two categories:
 | M1 Incident (positive) | 1 | 0.0 | +2.0 |
 | M2 Incident (negative) | 5 | -1.4 | -0.4 |
 | M2 Incident (positive) | 3 | +1.33 | +1.0 |
+| M2 Incident (duration) | 1 | 0.0 | 0.0 |
+
+> Duration-based incidents (e.g. `evt-flu-outbreak`) apply an ActiveEffect instead of a one-shot delta. Their impact is listed as 0 coin/rep delta because the effect is applied over multiple turns via an income multiplier.
 
 The M2 incident pool is more balanced than M1: 5 negative vs. 3 positive incidents (compared to M1's 3 negative vs. 1 positive). This reduces the punishing feel while maintaining strategic tension.
 

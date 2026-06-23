@@ -212,6 +212,7 @@ src/
 │   ├── GameState.ts        GameState<T>, createGameState (deprecated for setup — use SetupOptions)
 │   ├── SetupOptions.ts     BaseSetupOptions, MultiplayerSetupOptions, resolveSetupOptions
 │   ├── SeededRng.ts        createSeededRng — deterministic PRNG (LCG) for shuffles and AI
+│   ├── ActiveEffect.ts     Duration-based modifier system (create, decay, apply, query)
 │   ├── CheckpointManager.ts   Checkpoint save-and-resume abstraction (save, load, clear, checkAndResume)
 │   ├── CheckpointResumeOverlay.ts Built-in default resume overlay component
 │   ├── TranscriptRecorder.ts BaseTranscript interface, TranscriptRecorderBase<T> abstract base class
@@ -614,6 +615,48 @@ manager.checkAndResume(
 The `CheckpointManager` delegates all storage to `SaveLoadStore` (IndexedDB
 with localStorage fallback). See `src/core-engine/CheckpointManager.ts` for
 full API documentation.
+
+## ActiveEffect System
+
+The `ActiveEffect` module (`src/core-engine/ActiveEffect.ts`) provides a
+duration-based modifier system that tracks ongoing effects over multiple turns.
+
+### Core Types
+
+- **`ActiveEffect`** – interface with `effectType`, `multiplier`, `turnsRemaining`,
+  `sourceEventId`, and `description`.
+- **`DecayResult`** – result of a decay operation with `active`, `expired`, and
+  `effects` arrays.
+
+### API Functions
+
+All functions are exported from `@core-engine/index`:
+
+| Function | Purpose |
+|----------|---------|
+| `createActiveEffect(type, mult, turns, sourceId, desc)` | Create a new effect |
+| `decayActiveEffects(effects)` | Decrement all effects, return active/expired sets |
+| `applyActiveEffectMultiplier(effects, type, baseValue)` | Apply matching multipliers (rounded) |
+| `hasActiveEffectOfType(effects, type)` | Check if any effect of given type exists |
+
+### Usage Pattern
+
+Duration-based Event cards (e.g. `evt-flu-outbreak`) extend `EventCard` with
+`duration`, `effectType`, and `multiplier` fields. The engine's `resolveEvent()`
+function detects `DurationEventCard` instances via the `isDurationEventCard()`
+type guard and creates an `ActiveEffect` instead of applying one-shot deltas.
+
+Income-modifier effects are applied per-slot during `applyIncome()` _before_
+the reputation coin multiplier. Effects decay at the end of each turn during
+`EndCheck` in `processEndOfTurn()`.
+
+### Main Street Integration
+
+- `MainStreetState.activeEffects` stores the active effects array
+- Serialization/deserialization includes `activeEffects` with migration for
+  old saves (missing field defaults to `[]`)
+- Duration computation for `evt-flu-outbreak` scans the street grid for
+  Clinic/Medical Center cards
 
 ## Replay Tool
 
