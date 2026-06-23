@@ -9,7 +9,7 @@ import type { BeleagueredCastleState } from '../BeleagueredCastleState';
 import { FOUNDATION_COUNT, TABLEAU_COUNT } from '../BeleagueredCastleState';
 import { HandView, PileView } from '../../../src/ui';
 import { GAME_W, GAME_H } from '../../../src/ui';
-import { createSceneTitle, createSceneMenuButton } from '@ui/Renderer';
+import { createSceneTitle } from '@ui/Renderer';
 import { createBcHudText } from '../../../src/ui/Renderer/adapters/BeleagueredCastleAdapter';
 import {
   BC_CARD_W, BC_CARD_H, CARD_GAP, CASCADE_OFFSET_Y,
@@ -89,7 +89,6 @@ export class BeleagueredCastleRenderer {
 
   // ── UI creation ─────────────────────────────────────────
   createTitle(): void {
-    createSceneMenuButton(this.scene, { y: this.layout.headerY });
     createSceneTitle(this.scene, 'Beleaguered Castle', { y: this.layout.headerY });
   }
 

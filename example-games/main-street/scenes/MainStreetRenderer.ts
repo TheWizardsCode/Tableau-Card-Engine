@@ -33,7 +33,6 @@ import {
 } from '../../../src/ui';
 import {
   createSceneTitle,
-  createSceneMenuButton,
   createGameZone,
 } from '@ui/Renderer';
 import { createActionButton } from '@ui/Renderer';
@@ -77,7 +76,6 @@ export class MainStreetRenderer {
 
   public createHeader(): void {
     const s = this.scene;
-    createSceneMenuButton(s);
     createSceneTitle(s, 'Main Street');
   }
 

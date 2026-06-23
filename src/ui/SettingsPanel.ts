@@ -570,6 +570,65 @@ export class SettingsPanel {
       this.container.add(tip);
     }
 
+    // ── Navigation section ───────────────────────────────
+    // Menu button – navigates back to the GameSelectorScene.
+    // Placed below all other controls with a separator line.
+    const navSectionY = (this.difficultyNames ? (endTurnY + 100) : (endTurnY + 46));
+
+    // Separator line
+    const navSeparator = scene.add.rectangle(
+      PADDING + (this.panelWidth - PADDING * 2) / 2,
+      navSectionY,
+      this.panelWidth - PADDING * 2,
+      1,
+      0x444466,
+    );
+    navSeparator.setDepth(DEPTH_PANEL_CONTENT);
+    this.container.add(navSeparator);
+
+    // Menu button – a clickable button area styled like other panel controls
+    const menuBtnY = navSectionY + 28;
+    const menuLabel = scene.add.text(PADDING, menuBtnY, 'Menu', {
+      ...HEADING_STYLE,
+      fontSize: '18px',
+    });
+    menuLabel.setOrigin(0, 0.5);
+    menuLabel.setDepth(DEPTH_PANEL_CONTENT);
+    this.container.add(menuLabel);
+
+    // Arrow / indicator
+    const menuArrow = scene.add.text(
+      this.panelWidth - PADDING,
+      menuBtnY,
+      '>',
+      { ...VALUE_STYLE, fontSize: '18px', color: '#f0c040' },
+    );
+    menuArrow.setOrigin(1, 0.5);
+    menuArrow.setDepth(DEPTH_PANEL_CONTENT);
+    this.container.add(menuArrow);
+
+    // Hit area for the entire row
+    const menuHitArea = scene.add.zone(
+      PADDING + (this.panelWidth - PADDING * 2) / 2,
+      menuBtnY,
+      this.panelWidth - PADDING * 2,
+      36,
+    );
+    menuHitArea.setDepth(DEPTH_PANEL_CONTENT);
+    menuHitArea.setInteractive({ useHandCursor: true });
+    menuHitArea.on('pointerdown', () => {
+      this.scene.scene.start('GameSelectorScene');
+    });
+    menuHitArea.on('pointerover', () => {
+      menuLabel.setColor('#ffffff');
+      menuArrow.setColor('#ffffff');
+    });
+    menuHitArea.on('pointerout', () => {
+      menuLabel.setColor((HEADING_STYLE.color as string) ?? '#f0c040');
+      menuArrow.setColor('#f0c040');
+    });
+    this.container.add(menuHitArea);
+
     // Scene-level pointer events for slider dragging
     scene.input.on('pointermove', this.handlePointerMove, this);
     scene.input.on('pointerup', this.handlePointerUp, this);

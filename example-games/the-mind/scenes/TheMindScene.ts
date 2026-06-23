@@ -46,7 +46,6 @@ import {
   OVERLAY_BOX_ALPHA,
   OVERLAY_BUTTON_FONT_SIZE,
   OVERLAY_BUTTON_Y_OFFSET,
-  OVERLAY_BUTTON_SPACING,
   AUTO_PLAY_BUTTON_X,
   AUTO_PLAY_BUTTON_MARGIN,
   AUTO_PLAY_FONT_SIZE,
@@ -502,7 +501,7 @@ export class TheMindScene extends CardGameScene {
       buttons: [
         {
           label: config.primaryButtonLabel,
-          x: GAME_W / 2 - OVERLAY_BUTTON_SPACING,
+          x: GAME_W / 2,
           y: GAME_H / 2 + OVERLAY_BUTTON_Y_OFFSET,
           config: { fontSize: OVERLAY_BUTTON_FONT_SIZE },
           onClick: () => {
@@ -512,22 +511,6 @@ export class TheMindScene extends CardGameScene {
               action: 'click',
             });
             this.time.delayedCall(0, () => this.scene.restart());
-          },
-        },
-        {
-          label: '[ Menu ]',
-          x: GAME_W / 2 + OVERLAY_BUTTON_SPACING,
-          y: GAME_H / 2 + OVERLAY_BUTTON_Y_OFFSET,
-          config: { fontSize: OVERLAY_BUTTON_FONT_SIZE },
-          onClick: () => {
-            this.soundManager?.play(SFX_KEYS.UI_CLICK);
-            this.gameEvents.emit('ui-interaction', {
-              elementId: 'menu',
-              action: 'click',
-            });
-            this.time.delayedCall(0, () =>
-              this.scene.start('GameSelectorScene'),
-            );
           },
         },
       ],

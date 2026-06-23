@@ -20,7 +20,7 @@ import {
   CardGameScene,
   GAME_W, GAME_H,
   OverlayManager,
-  createSceneTitle, createSceneMenuButton,
+  createSceneTitle,
   audioPathWithFallback,
 } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
@@ -178,7 +178,6 @@ export class FeudalismScene extends CardGameScene {
   }
 
   private createHeader(): void {
-    createSceneMenuButton(this);
     createSceneTitle(this, 'Feudalism');
   }
 

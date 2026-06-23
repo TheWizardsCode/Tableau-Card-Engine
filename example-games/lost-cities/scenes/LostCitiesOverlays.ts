@@ -10,7 +10,6 @@ import { GAME_W, GAME_H, OverlayManager } from '../../../src/ui';
 import {
   createLcHudText,
   createActionButton,
-  createLcMenuButton,
 } from '../../../src/ui/Renderer/adapters/LostCitiesAdapter';
 import { SFX_KEYS } from './LostCitiesConstants';
 import type { LCTranscriptRecorder } from '../GameTranscript';
@@ -223,14 +222,11 @@ export class LostCitiesOverlayHelper {
     }
 
     y += 20;
-    const newMatchBtn = createActionButton(this.scene, cx - 155, y, 140, '[ New Match ]', () => {
+    const newMatchBtn = createActionButton(this.scene, cx - 70, y, 140, '[ New Match ]', () => {
       try { this.scene.sound.play?.(SFX_KEYS.UI_CLICK); } catch { /* ignore */ }
       this.dismiss();
       this.onRestart?.();
     }, { depth: 11 });
     this.overlayManager.add(newMatchBtn);
-
-    const menuBtn = createLcMenuButton(this.scene, cx + 85, y, 60, { depth: 11 });
-    this.overlayManager.add(menuBtn);
   }
 }

@@ -179,7 +179,7 @@ describe('Main Street overlay button tests', () => {
     game = null;
   });
 
-  it('should show Play Again and Menu buttons that exist in the HUD container', async () => {
+  it('should show Play Again button in the HUD container', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('MainStreetScene')!;
 
@@ -200,14 +200,11 @@ describe('Main Street overlay button tests', () => {
     };
 
     const playAgainBtn = findButtonText('[ Play Again ]');
-    const menuBtn = findButtonText('[ Menu ]');
 
     expect(playAgainBtn).toBeDefined();
-    expect(menuBtn).toBeDefined();
 
-    // Verify buttons are interactive
+    // Verify button is interactive
     expect(playAgainBtn!.input?.enabled).toBe(true);
-    expect(menuBtn!.input?.enabled).toBe(true);
   });
 
   it('should have the difficulty change button in the HUD container', async () => {

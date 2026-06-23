@@ -10,7 +10,7 @@ import { FeudalismTranscriptRecorder } from '../GameTranscript';
 import { autoSaveTranscript, TranscriptStore } from '../../../src/core-engine/transcript';
 import {
   GAME_W, GAME_H, FONT_FAMILY,
-  createOverlayButton, createOverlayMenuButton,
+  createOverlayButton,
   OverlayManager,
 } from '../../../src/ui';
 import { SFX_KEYS } from './FeudalismConstants';
@@ -67,16 +67,13 @@ export class FeudalismOverlayHelper {
       .setDepth(11);
     this.overlayManager.add(text);
 
-    const playBtn = createOverlayButton(this.scene, GAME_W / 2 - 80, GAME_H / 2 + 110, '[ Play Again ]');
+    const playBtn = createOverlayButton(this.scene, GAME_W / 2, GAME_H / 2 + 110, '[ Play Again ]');
     playBtn.on('pointerdown', () => {
       try { this.scene.sound.play?.(SFX_KEYS.UI_CLICK); } catch { /* ignore */ }
       this.dismiss();
       onRestart();
     });
     this.overlayManager.add(playBtn);
-
-    const menuBtn = createOverlayMenuButton(this.scene, GAME_W / 2 + 80, GAME_H / 2 + 110);
-    this.overlayManager.add(menuBtn);
   }
 
   showCardActionMenu(

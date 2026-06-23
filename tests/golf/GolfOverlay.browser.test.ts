@@ -224,21 +224,14 @@ describe('Golf overlay button tests', () => {
     };
 
     const playAgainBtn = findContainerByText('[ Play Again ]');
-    const menuBtn = findContainerByText('Menu');
 
     expect(playAgainBtn).toBeDefined();
-    expect(menuBtn).toBeDefined();
-    // Buttons are interactive containers (the container itself is the hit target)
+    // Button is an interactive container (the container itself is the hit target)
     const playBg = (playAgainBtn!.list as Phaser.GameObjects.GameObject[]).find(
       (c) => c instanceof Phaser.GameObjects.Rectangle,
     );
-    const menuBg = (menuBtn!.list as Phaser.GameObjects.GameObject[]).find(
-      (c) => c instanceof Phaser.GameObjects.Rectangle,
-    );
     expect(playBg).toBeDefined();
-    expect(menuBg).toBeDefined();
     expect((playBg as Phaser.GameObjects.Rectangle).input?.enabled).toBe(true);
-    expect((menuBg as Phaser.GameObjects.Rectangle).input?.enabled).toBe(true);
   });
 
   it('should restart the scene when "Play Again" is clicked via DOM pointer event', async () => {

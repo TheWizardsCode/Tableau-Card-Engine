@@ -32,7 +32,7 @@ import {
   dismissOverlay,
   PhaseManager,
   HandView,
-  createSceneTitle, createSceneMenuButton,
+  createSceneTitle,
   TooltipManager,
   audioPathWithFallback,
 } from '../../../src/ui';
@@ -260,7 +260,6 @@ export class SushiGoScene extends CardGameScene {
   // ── UI creation ─────────────────────────────────────────
 
   private createHeader(): void {
-    createSceneMenuButton(this);
     createSceneTitle(this, 'Sushi Go!');
   }
 

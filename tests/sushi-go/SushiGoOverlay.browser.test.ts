@@ -129,7 +129,7 @@ describe('Sushi Go game-over overlay', () => {
     game = null;
   });
 
-  it('renders Play Again and Menu buttons when game-over overlay is shown', async () => {
+  it('renders Play Again button when game-over overlay is shown', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('SushiGoScene') as any;
 
@@ -165,19 +165,13 @@ describe('Sushi Go game-over overlay', () => {
     };
 
     const playAgainBtn = containers.find((c) => findButtonLabel(c, 'Play Again'));
-    const menuBtn = containers.find((c) => findButtonLabel(c, 'Menu'));
 
     expect(playAgainBtn).toBeDefined();
-    expect(menuBtn).toBeDefined();
     // Verify the background rectangle is interactive
     const playBg = (playAgainBtn as any).list?.find(
       (child: any) => child instanceof Phaser.GameObjects.Rectangle,
     );
-    const menuBg = (menuBtn as any).list?.find(
-      (child: any) => child instanceof Phaser.GameObjects.Rectangle,
-    );
     expect(playBg?.input?.enabled).toBe(true);
-    expect(menuBg?.input?.enabled).toBe(true);
 
     // Verify the full-screen input blocker exists and is interactive
     const rects = collectFromSceneAndHud(scene, (child): child is Phaser.GameObjects.Rectangle =>
@@ -356,11 +350,9 @@ describe('Sushi Go game-over overlay', () => {
       );
     };
 
-    // Both game-over buttons should be in hudContainer so they render above the overlay box
+    // The Play Again button should be in hudContainer so it renders above the overlay box
     const playAgainBtn = hudContainers.find((c) => findButtonLabel(c, 'Play Again'));
-    const menuBtn = hudContainers.find((c) => findButtonLabel(c, 'Menu'));
     expect(playAgainBtn).toBeDefined();
-    expect(menuBtn).toBeDefined();
   });
 
   it('displays correct final totals including pudding bonuses when provided', async () => {

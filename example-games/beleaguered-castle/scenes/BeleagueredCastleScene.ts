@@ -41,7 +41,7 @@ import { BeleagueredCastleTurnController } from './BeleagueredCastleTurnControll
 import { moveGameObject, cardTextureKey } from '../../../src/ui';
 import {
   GAME_W, GAME_H, FONT_FAMILY,
-  createOverlayButton, createOverlayMenuButton,
+  createOverlayButton,
 } from '../../../src/ui';
 import { createHudText } from '../../../src/ui/Renderer/adapters/BeleagueredCastleAdapter';
 import { SaveLoadStore } from '../../../src/core-engine';
@@ -732,9 +732,6 @@ export class BeleagueredCastleScene extends CardGameScene {
     const restartBtn = createOverlayButton(this, GAME_W / 2, GAME_H / 2 + OVERLAY_BUTTON_Y_OFFSET, '[ Restart ]', BUTTON_DEPTH);
     restartBtn.on('pointerdown', () => this.onRestart?.());
     this.overlayManager.add(restartBtn);
-
-    const menuBtn = createOverlayMenuButton(this, GAME_W / 2 + 150, GAME_H / 2 + OVERLAY_BUTTON_Y_OFFSET, BUTTON_DEPTH);
-    this.overlayManager.add(menuBtn);
   }
 
   private showNoMovesOverlay(): void {
@@ -765,8 +762,5 @@ export class BeleagueredCastleScene extends CardGameScene {
     const restartBtn = createOverlayButton(this, GAME_W / 2 + 110, GAME_H / 2 + 30, '[ Restart ]', BUTTON_DEPTH);
     restartBtn.on('pointerdown', () => this.onRestart?.());
     this.overlayManager.add(restartBtn);
-
-    const menuBtn = createOverlayMenuButton(this, GAME_W / 2 + 230, GAME_H / 2 + 30, BUTTON_DEPTH);
-    this.overlayManager.add(menuBtn);
   }
 }
