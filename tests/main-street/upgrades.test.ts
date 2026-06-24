@@ -490,3 +490,50 @@ describe('upgrade card target business display', () => {
     }
   });
 });
+
+// ── Direct-apply upgrade with duplicate cards ───────────────
+
+describe('direct-apply upgrade with duplicate market cards', () => {
+  it('purchases an upgrade directly even when duplicate copies exist in the market', () => {
+    const state = createTestState('duplicate-upgrade-test');
+    const biz = makeBiz({ level: 0 });
+    state.streetGrid[0] = biz;
+    state.resourceBank.coins = 100;
+
+    // Simulate the duplicate-cards scenario: the market has 2 copies
+    // of the same upgrade (as created by createUpgradeDeck's default copies: 2).
+    clearInvestmentsUpgrades(state);
+    const upg1 = makeUpg({ id: 'upg-duplicate-a', name: 'Duplicate A' });
+    const upg2 = makeUpg({ id: 'upg-duplicate-b', name: 'Duplicate B' });
+    injectUpgrade(state, upg1);
+    injectUpgrade(state, upg2);
+
+    // Both should be individually purchasable
+    const result1 = canPurchaseUpgrade(state, upg1.id);
+    expect(result1.legal).toBe(true);
+    const result2 = canPurchaseUpgrade(state, upg2.id);
+    expect(result2.legal).toBe(true);
+
+    // Clicking one upgrade applies it directly (no choice modal)
+    purchaseUpgrade(state, upg1.id, 0);
+    expect(state.streetGrid[0]!.level).toBe(1);
+
+    // The other copy remains in the market (not consumed)
+    expect(state.market.investments.some(c => c.id === upg2.id)).toBe(true);
+  });
+
+  it('purchases via findTargetBusinessSlot when no explicit slot is given', () => {
+    const state = createTestState('find-slot-test');
+    const biz = makeBiz({ level: 0 });
+    state.streetGrid[3] = biz;
+    state.resourceBank.coins = 100;
+
+    clearInvestmentsUpgrades(state);
+    const upg = makeUpg({ id: 'upg-find-slot' });
+    injectUpgrade(state, upg);
+
+    // purchaseUpgrade without targetSlot uses findTargetBusinessSlot
+    purchaseUpgrade(state, upg.id);
+    expect(state.streetGrid[3]!.level).toBe(1);
+  });
+});

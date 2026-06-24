@@ -605,9 +605,8 @@ export function findTargetBusinessSlot(
  * the business occupying `slotIndex` — i.e. cards whose `targetBusiness`
  * matches and whose `requiredLevel` equals the business's current level.
  *
- * This is the set of upgrade *branches* the player can choose from for
- * that business. When the set has more than one entry the UI should
- * present an upgrade-choice modal so the player can pick a branch.
+ * The upgrade the player clicks is applied directly; this helper is
+ * used for validation and display purposes.
  *
  * @param state     Current game state.
  * @param slotIndex Street grid slot index of the target business.

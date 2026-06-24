@@ -2,7 +2,6 @@ import { addLog } from '../MainStreetState';
 import { executeDayStart, processEndOfTurn, type TurnResult } from '../MainStreetEngine';
 import {
   getEmptySlots,
-  getUpgradeBranchesForBusiness,
   findTargetBusinessSlot,
   canPurchaseBusiness,
   canPurchaseUpgrade,
@@ -13,7 +12,6 @@ import type { BusinessCard, EventCard, UpgradeCard } from '../MainStreetCards';
 import { buyBusinessCommand, buyUpgradeCommand, buyEventCommand, playEventCommand, refreshInvestmentsCommand } from '../MainStreetCommands';
 import { recordMainStreetEvent, finalizeMainStreetTranscript } from '../MainStreetTranscript';
 import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
-import { FONT_FAMILY, createOverlayBackground, createOverlayButton, dismissOverlay } from '../../../src/ui';
 import { getCurrentStep, type TutorialActionType } from '../TutorialFlow';
 
 export class MainStreetTurnController {
@@ -485,14 +483,8 @@ export class MainStreetTurnController {
     // Determine which business slot this upgrade targets (first eligible match)
     const targetSlot = findTargetBusinessSlot(s.state, card);
 
-    // If there are multiple upgrade branches for that business, show a choice modal
-    const branches = getUpgradeBranchesForBusiness(s.state, targetSlot);
-    if (branches.length > 1) {
-      this.showUpgradeChoiceModal(branches, targetSlot, sourceIndex);
-      return;
-    }
-
-    // Single upgrade available — apply after transfer animation
+    // Apply the upgrade directly — no intermediate choice modal.
+    // The player clicked the upgrade card; that is the upgrade to apply.
     s.uiPhase = 'animating';
     s.instructionText.setText(`Applying upgrade "${card.name}"...`);
     s.hiddenTransferSourceCardIds.add(card.id);
@@ -529,121 +521,5 @@ export class MainStreetTurnController {
     } else {
       afterTransfer();
     }
-  }
-
-  public showUpgradeChoiceModal(branches: UpgradeCard[], targetSlot: number, sourceIndex: number): void {
-    const s = this.scene;
-    const MODAL_DEPTH = 20;
-    const MODAL_W = 500;
-    const BTN_H = 60;
-    const HEADER_H = 60;
-    const FOOTER_H = 50;
-    const MODAL_H = HEADER_H + branches.length * BTN_H + FOOTER_H;
-
-    const overlay = createOverlayBackground(
-      s,
-      { depth: MODAL_DEPTH, alpha: 0.8 },
-      { width: MODAL_W, height: MODAL_H, color: 0x1a1208, alpha: 0.95, depth: MODAL_DEPTH },
-    );
-    s.overlayObjects.push(...overlay.objects);
-
-    const cx = s.layout.gameW / 2;
-    const cy = s.layout.gameH / 2;
-    const top = cy - MODAL_H / 2;
-
-    // Title
-    const title = s.add
-      .text(cx, top + 24, 'Choose an Upgrade Path', {
-        fontSize: '18px', fontStyle: 'bold', color: '#ffdd88', fontFamily: FONT_FAMILY,
-      })
-      .setOrigin(0.5, 0.5)
-      .setDepth(MODAL_DEPTH + 1);
-    s.overlayObjects.push(title);
-
-    // Branch buttons
-    branches.forEach((branch, idx) => {
-      const btnY = top + HEADER_H + idx * BTN_H + BTN_H / 2;
-
-      // Button background
-      const btnBg = s.add.rectangle(cx, btnY, MODAL_W - 40, BTN_H - 8, 0x2a1f14, 0.9)
-        .setDepth(MODAL_DEPTH + 1)
-        .setStrokeStyle(1, 0x665544)
-        .setInteractive({ useHandCursor: true });
-      s.overlayObjects.push(btnBg);
-
-      // Branch label
-      const costLabel = `$${branch.cost}`;
-      const bonusLabel = `+${branch.incomeBonus} income, +${branch.synergyRangeBonus} range`;
-      const btnText = s.add
-        .text(cx, btnY - 8, branch.name, {
-          fontSize: '14px', fontStyle: 'bold', color: '#ffffff', fontFamily: FONT_FAMILY,
-        })
-        .setOrigin(0.5, 0.5)
-        .setDepth(MODAL_DEPTH + 2);
-      s.overlayObjects.push(btnText);
-
-      const detailText = s.add
-        .text(cx, btnY + 10, `${costLabel} — ${bonusLabel}`, {
-          fontSize: '11px', color: '#aaaaaa', fontFamily: FONT_FAMILY,
-        })
-        .setOrigin(0.5, 0.5)
-        .setDepth(MODAL_DEPTH + 2);
-      s.overlayObjects.push(detailText);
-
-      const onChoose = (): void => {
-        // Dismiss modal first
-        dismissOverlay(s.overlayObjects);
-        s.overlayObjects = [];
-
-        s.uiPhase = 'animating';
-        s.instructionText.setText(`Applying upgrade "${branch.name}"...`);
-        s.hiddenTransferSourceCardIds.add(branch.id);
-        s.refreshAll();
-
-        const afterTransfer = (): void => {
-          try {
-            s.undoManager.execute(buyUpgradeCommand(s.state, branch.id, targetSlot));
-            s.instructionText.setText(`Applied upgrade: "${branch.name}"`);
-          } catch (e) {
-            s.instructionText.setText(`Error: ${(e as Error).message}`);
-          }
-
-          s.hiddenTransferSourceCardIds.delete(branch.id);
-          s.uiPhase = 'market';
-          s.refreshAll();
-        };
-
-        if (sourceIndex >= 0) {
-          void s.animateTransferFromMarket({
-            cardId: branch.id,
-            family: 'upgrade',
-            row: 'investments',
-            slotIndex: sourceIndex,
-            destination: s.getStreetSlotCenter(targetSlot),
-          }).then(afterTransfer);
-        } else {
-          afterTransfer();
-        }
-      };
-
-      btnBg.on('pointerdown', onChoose);
-      btnBg.on('pointerover', () => btnBg.setFillStyle(0x3a2f24, 0.95));
-      btnBg.on('pointerout', () => btnBg.setFillStyle(0x2a1f14, 0.9));
-    });
-
-    // Cancel button
-    const cancelBtn = createOverlayButton(
-      s,
-      cx,
-      top + MODAL_H - FOOTER_H / 2,
-      '[ Cancel ]',
-      MODAL_DEPTH + 2,
-      { color: '#ff8888', hoverColor: '#ffaaaa' },
-    );
-    s.overlayObjects.push(cancelBtn);
-    cancelBtn.on('pointerdown', () => {
-      dismissOverlay(s.overlayObjects);
-      s.overlayObjects = [];
-    });
   }
 }

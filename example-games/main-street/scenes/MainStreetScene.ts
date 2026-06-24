@@ -365,20 +365,6 @@ export class MainStreetScene extends CardGameScene {
     return (this.msTurnController as any).onUpgradeCardClick.apply(this.msTurnController, args);
   }
 
-  /**
-   * Shows a modal overlay that lets the player choose between multiple
-   * upgrade branches available for the business at `targetSlot`.
-   *
-   * When a branch button is clicked the modal is dismissed, the chosen
-   * upgrade is applied via `executeAction`, and the scene is refreshed.
-   *
-   * @param branches   Eligible UpgradeCards the player may choose from.
-   * @param targetSlot Street grid slot of the business to be upgraded.
-   */
-  public showUpgradeChoiceModal(...args: any[]): any {
-    return (this.msTurnController as any).showUpgradeChoiceModal.apply(this.msTurnController, args);
-  }
-
   // ── Activity Log ─────────────────────────────────────────
 
   /**
