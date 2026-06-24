@@ -3,7 +3,7 @@
  */
 
 import Phaser from 'phaser';
-import type { BusinessCard, CommunitySpaceCard, EventCard, UpgradeCard } from '../MainStreetCards';
+import type { BusinessCard, CommunitySpaceCard, EventCard, UpgradeCard, DurationEventCard } from '../MainStreetCards';
 import {
   GRID_SIZE,
   MARKET_BUSINESS_SLOTS,
@@ -11,6 +11,7 @@ import {
   INCIDENT_QUEUE_SIZE,
   REFRESH_INVESTMENTS_COST,
   isPawnShopCard,
+  isDurationEventCard,
 } from '../MainStreetCards';
 import { computeScore } from '../MainStreetEngine';
 import {
@@ -863,12 +864,17 @@ export class MainStreetRenderer {
 
     const queue = s.state.incidentQueue;
     const deckRemaining = s.state.decks.event.length;
+    const activeEffects = s.state.activeEffects;
 
     const { queueLabelW, queueCardW, queueCardH, queueCardGap, queueTop } = s.layout;
 
+    // Calculate dynamic height — extend if there are active effects
+    const activeEffectLines = activeEffects.length;
+    const extraH = activeEffectLines > 0 ? 24 + activeEffectLines * 16 : 0;
+
     // Section background - width to just fit cards with small right margin
     const queueW = queueLabelW + 50 + INCIDENT_QUEUE_SIZE * (queueCardW + queueCardGap) - queueCardGap + 20;
-    const queueH = queueCardH + 24;
+    const queueH = queueCardH + 24 + extraH;
     const bgBox = s.add.graphics();
     bgBox.fillStyle(0x1a1830, 0.35);
     bgBox.fillRoundedRect(110, queueTop - 10, queueW, queueH, BOX_RADIUS);
@@ -908,6 +914,35 @@ export class MainStreetRenderer {
       fontSize: '11px', color: '#556677', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0);
     s.incidentQueueContainer.add(deckText);
+
+    // ── Active Effects indicator ────────────────────────────────
+    if (activeEffectLines > 0) {
+      const aeStartY = queueTop + 48;
+
+      for (let i = 0; i < activeEffects.length; i++) {
+        const effect = activeEffects[i];
+        const yPos = aeStartY + i * 16;
+
+        const effectText = s.add.text(40, yPos, `⚠ ${effect.description} — ${effect.turnsRemaining} turn${effect.turnsRemaining !== 1 ? 's' : ''}`, {
+          fontSize: '10px', color: '#ff6644', fontFamily: FONT_FAMILY,
+        }).setOrigin(0, 0);
+        s.incidentQueueContainer.add(effectText);
+
+        if (!s.replayMode) {
+          const hitArea = s.add.rectangle(
+            queueLabelW / 2 + 20, yPos + 8, queueW - 40, 14, 0x000000, 0.001,
+          ).setInteractive({ useHandCursor: true });
+          hitArea.on('pointerover', () => {
+            s.tooltipManager?.show(
+              `Active: ${effect.description}\n${Math.round(effect.multiplier * 100)}% modifier — ${effect.turnsRemaining} turn${effect.turnsRemaining !== 1 ? 's' : ''} remaining`,
+              hitArea.x, hitArea.y,
+            );
+          });
+          hitArea.on('pointerout', () => s.tooltipManager?.hide());
+          s.incidentQueueContainer.add(hitArea);
+        }
+      }
+    }
   }
 
   public drawIncidentCard(
@@ -929,7 +964,13 @@ export class MainStreetRenderer {
       const hover = s.add.rectangle(0, 0, queueCardW, queueCardH, 0x000000, 0.001);
       hover.setInteractive({ useHandCursor: true });
       hover.on('pointerover', () => {
-        const info = `Event: ${card.name}\nEffect: ${card.effect}\nCoins: ${card.coinDelta >= 0 ? '+' : ''}${card.coinDelta}, Rep: ${card.reputationDelta >= 0 ? '+' : ''}${card.reputationDelta}`;
+        let info: string;
+        if (isDurationEventCard(card)) {
+          const dCard = card as DurationEventCard;
+          info = `Event: ${card.name}\nEffect: ${card.effect}\nDuration: ${dCard.duration} turns\n${Math.round(dCard.multiplier * 100)}% income modifier`;
+        } else {
+          info = `Event: ${card.name}\nEffect: ${card.effect}\nCoins: ${card.coinDelta >= 0 ? '+' : ''}${card.coinDelta}, Rep: ${card.reputationDelta >= 0 ? '+' : ''}${card.reputationDelta}`;
+        }
         s.tooltipManager?.show(info, container.x, container.y);
       });
       hover.on('pointerout', () => s.tooltipManager?.hide());
