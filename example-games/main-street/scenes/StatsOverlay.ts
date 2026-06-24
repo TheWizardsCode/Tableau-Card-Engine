@@ -88,8 +88,9 @@ const STATS_BUTTON_DEPTH = 1100;
 /**
  * A circular stats button ("Σ") that toggles the StatsOverlay.
  *
- * Placed in the HUD header area, next to the Help and Settings buttons.
- * Follows the same pattern as HelpButton.
+ * Placed in the lower-left corner of the screen to avoid overlap
+ * with the Settings button (upper-right). Follows the same visual
+ * style as HelpButton and SettingsButton.
  */
 export class StatsButton {
   private circle: Phaser.GameObjects.Graphics;
@@ -110,7 +111,7 @@ export class StatsButton {
 
     this.label = scene.add.text(0, 0, '\u03A3', {  // Greek capital Sigma for stats
       fontSize: '16px',
-      color: '#88ccff',
+      color: '#f0c040',
       fontFamily: FONT_FAMILY,
       fontStyle: 'bold',
     });
@@ -121,7 +122,7 @@ export class StatsButton {
     this.hitArea.setDepth(STATS_BUTTON_DEPTH);
     this.hitArea.setInteractive({ useHandCursor: true });
 
-    this.drawCircle(x, y, radius, 0x333366, 0.9);
+    this.drawCircle(x, y, radius, 0x333355, 0.9);
 
     // Parent into HUD container
     try {
@@ -139,22 +140,22 @@ export class StatsButton {
 
     this.hitArea.on('pointerover', () => {
       if (!this.destroyed) {
-        this.drawCircle(x, y, radius, 0x444488, 1);
+        this.drawCircle(x, y, radius, 0x4444aa, 1);
         this.label.setColor('#ffffff');
       }
     });
 
     this.hitArea.on('pointerout', () => {
       if (!this.destroyed) {
-        this.drawCircle(x, y, radius, 0x333366, 0.9);
-        this.label.setColor('#88ccff');
+        this.drawCircle(x, y, radius, 0x333355, 0.9);
+        this.label.setColor('#f0c040');
       }
     });
   }
 
   private drawCircle(x: number, y: number, radius: number, color: number, alpha: number): void {
     this.circle.clear();
-    this.circle.lineStyle(2, 0x88ccff, 1);
+    this.circle.lineStyle(2, 0xf0c040, 1);
     this.circle.strokeCircle(x, y, radius);
     this.circle.fillStyle(color, alpha);
     this.circle.fillCircle(x, y, radius);
@@ -617,12 +618,12 @@ export class StatsOverlay {
 
   private createStatsButton(): void {
     const s = this.scene;
-    // Position: right side of the header area, before the help button.
-    // The help button is at (canvasWidth - MARGIN - 16, MARGIN + 16)
-    // Place stats button to its left with some spacing.
-    const canvasWidth = s.scale.width;
-    const x = canvasWidth - MARGIN - 16 - 48; // left of help button (~48px spacing)
-    const y = MARGIN + 16;
+    // Position: lower-left corner to avoid overlap with the Settings button
+    // (which is in the upper-right). Uses the same margin + radius formula as
+    // the HelpButton/SettingsButton default positioning.
+    const radius = 16;
+    const x = MARGIN + radius;
+    const y = s.scale.height - MARGIN - radius;
     this.statsButton = new StatsButton(s, this, x, y);
   }
 
