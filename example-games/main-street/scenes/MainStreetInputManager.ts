@@ -144,12 +144,14 @@ export class MainStreetInputManager {
     const BOTTOM_THRESHOLD = 4;
     s.logAutoScroll = s.logScrollOffset >= s.logMaxScroll - BOTTOM_THRESHOLD;
 
-    s.applyLogScroll();
+    // Container re-rendering and mask update is handled by the caller (scene.handleLogWheel -> refreshLog)
   }
 
   public applyLogScroll(): void {
     const s = this.scene;
-    s.logContentContainer.setY(LOG_TITLE_H + 2 - s.logScrollOffset);
+    // Content is positioned by refreshLog which renders entries at their natural y.
+    // This method only needs to update the mask to reflect the current panel position.
+    s.logContentContainer.setY(LOG_TITLE_H + 2);
     s.updateLogMask();
   }
 }

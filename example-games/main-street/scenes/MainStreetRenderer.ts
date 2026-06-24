@@ -1072,11 +1072,41 @@ export class MainStreetRenderer {
     const entries = s.state.activityLog;
     const newCount = entries.length;
 
-    // Skip rebuild if nothing changed
-    if (newCount === s.logPrevEntryCount) return;
+    // Visible area inside the panel (below title bar, above bottom edge)
+    const visibleH = Math.max(1, s.layout.logH - LOG_TITLE_H - 4);
+    const maxDisplayEntries = Math.max(1, Math.ceil(visibleH / LOG_LINE_H));
 
-    const hadAutoScroll = s.logAutoScroll;
+    // Compute scroll bounds and start index
+    let startIdx: number;
+    if (entries.length <= maxDisplayEntries) {
+      // All entries fit — no scrolling needed
+      startIdx = 0;
+      s.logMaxScroll = 0;
+      if (s.logAutoScroll) s.logScrollOffset = 0;
+    } else {
+      const hiddenCount = entries.length - maxDisplayEntries;
+      const newMaxScroll = hiddenCount * LOG_LINE_H;
+      s.logMaxScroll = newMaxScroll;
+
+      if (s.logAutoScroll) {
+        s.logScrollOffset = newMaxScroll;
+      }
+      s.logScrollOffset = Phaser.Math.Clamp(s.logScrollOffset, 0, s.logMaxScroll);
+
+      startIdx = Math.round(s.logScrollOffset / LOG_LINE_H);
+      // Clamp to valid range
+      startIdx = Math.max(0, Math.min(startIdx, entries.length - maxDisplayEntries));
+    }
+
+    // Track whether the scroll position counts as 'at the bottom' for auto-scroll
+    const atBottom = s.logScrollOffset >= s.logMaxScroll - 4;
+    s.logAutoScroll = atBottom;
+
+    // Skip rebuild if neither entry count nor visible window changed
+    if (newCount === s.logPrevEntryCount && startIdx === s.logRenderedStartIdx) return;
+
     s.logPrevEntryCount = newCount;
+    s.logRenderedStartIdx = startIdx;
 
     // Clear existing content
     s.logContentContainer.removeAll(true);
@@ -1084,7 +1114,12 @@ export class MainStreetRenderer {
     const contentW = s.layout.logW - LOG_PAD * 2;
     let yOff = 0;
 
-    for (const entry of entries) {
+    // Render only the visible window (plus one extra for partial visibility)
+    const endIdx = Math.min(entries.length, startIdx + maxDisplayEntries + 1);
+    for (let i = startIdx; i < endIdx; i++) {
+      const entry = entries[i];
+      if (!entry) continue;
+
       const color = LOG_COLORS[entry.type] ?? LOG_COLORS.neutral;
       const isTurnHeader = entry.type === 'turn-header';
 
@@ -1111,19 +1146,8 @@ export class MainStreetRenderer {
 
     s.logTotalContentH = yOff;
 
-    // Visible area inside the panel (below title bar, above bottom edge)
-    const visibleH = s.layout.logH - LOG_TITLE_H - 4;
-    s.logMaxScroll = Math.max(0, s.logTotalContentH - visibleH);
-
-    // Keep scroll position valid for the current content height.
-    // On scene restart we can transition from a long previous run to a short
-    // new log; without clamping, stale offsets can hide all entries.
-    if (hadAutoScroll) {
-      s.logScrollOffset = s.logMaxScroll;
-    } else {
-      s.logScrollOffset = Phaser.Math.Clamp(s.logScrollOffset, 0, s.logMaxScroll);
-    }
-
-    s.applyLogScroll();
+    // Reset container to its default position — entries are rendered at correct y
+    s.logContentContainer.setY(LOG_TITLE_H + 2);
+    s.updateLogMask();
   }
 }

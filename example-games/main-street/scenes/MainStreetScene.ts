@@ -81,6 +81,8 @@ export class MainStreetScene extends CardGameScene {
   public logTotalContentH = 0;
   public logAutoScroll = true;
   public logPrevEntryCount = 0;
+  /** The index of the first entry displayed in the current log window (for windowed rendering). */
+  public logRenderedStartIdx = 0;
 
   // Challenge Tracker panel
   public challengeContainer!: Phaser.GameObjects.Container;
@@ -382,7 +384,10 @@ export class MainStreetScene extends CardGameScene {
 
   /** Handles mouse wheel events over the log panel area. */
   public handleLogWheel = (...args: any[]): any => {
-    return (this.msInputManager as any).handleLogWheel.apply(this.msInputManager, args);
+    const ret = (this.msInputManager as any).handleLogWheel.apply(this.msInputManager, args);
+    // After updating scroll offset, refresh the log to render the new entry window
+    this.msRenderer?.refreshLog();
+    return ret;
   };
 
   /** Applies the current scroll offset to the log content container. */
