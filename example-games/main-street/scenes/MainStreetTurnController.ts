@@ -14,6 +14,20 @@ import { recordMainStreetEvent, finalizeMainStreetTranscript } from '../MainStre
 import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
 import { getCurrentStep, type TutorialActionType } from '../TutorialFlow';
 
+/**
+ * Match a card ID against a requiredCardId using prefix matching.
+ *
+ * Card IDs include a copy-number suffix (e.g. `biz-laundromat-2`). The
+ * `requiredCardId` in tutorial steps is the template ID with a specific copy
+ * number (e.g. `biz-laundromat-0`). This helper strips trailing `-<number>`
+ * from both IDs and compares the template prefix, so any copy of the required
+ * card template satisfies the requirement.
+ */
+function matchesRequiredCard(cardId: string, requiredCardId: string): boolean {
+  const stripCopy = (id: string): string => id.replace(/-\d+$/, '');
+  return stripCopy(cardId) === stripCopy(requiredCardId);
+}
+
 export class MainStreetTurnController {
   constructor(private readonly scene: any) {}
 
@@ -210,16 +224,18 @@ export class MainStreetTurnController {
       return;
     }
 
-    // Tutorial: enforce specific card purchase if requiredCardId is set on the current step
+    // Tutorial: enforce specific card purchase if requiredCardId is set on the current step.
+    // Uses prefix matching (template ID without copy number suffix) so any copy of the
+    // required card template satisfies the requirement.
     const controller = (s as any).tutorialController as any;
     if (controller?.isActive) {
       const step = controller.currentStepIndex >= 0
         ? getCurrentStep(controller)
         : null;
-      if (step?.requiredCardId && card.id !== step.requiredCardId) {
+      if (step?.requiredCardId && !matchesRequiredCard(card.id, step.requiredCardId)) {
         // Find the card name from the market for the error message
         const requiredCard = s.state.market.development.find(
-          (c: any) => c.id === step.requiredCardId
+          (c: any) => matchesRequiredCard(c.id, step.requiredCardId!)
         );
         const requiredName = requiredCard?.name ?? 'the specified card';
         const msg = `This is not the card you should buy right now. Please buy ${requiredName} first.`;
@@ -352,15 +368,17 @@ export class MainStreetTurnController {
       return;
     }
 
-    // Tutorial: enforce specific event card purchase if requiredCardId is set
+    // Tutorial: enforce specific event card purchase if requiredCardId is set.
+    // Uses prefix matching (template ID without copy number suffix) so any copy of the
+    // required card template satisfies the requirement.
     const evtController = (s as any).tutorialController as any;
     if (evtController?.isActive) {
       const step = evtController.currentStepIndex >= 0
         ? getCurrentStep(evtController)
         : null;
-      if (step?.requiredCardId && card.id !== step.requiredCardId) {
+      if (step?.requiredCardId && !matchesRequiredCard(card.id, step.requiredCardId)) {
         const requiredCard = s.state.market.investments.find(
-          (c: any) => c.id === step.requiredCardId
+          (c: any) => matchesRequiredCard(c.id, step.requiredCardId!)
         );
         const requiredName = requiredCard?.name ?? 'the specified event card';
         const msg = `This is not the card you should buy right now. Please buy ${requiredName} first.`;

@@ -25,8 +25,20 @@ let game: Phaser.Game | null = null;
 // ── Helpers ──────────────────────────────────────────────
 
 async function bootGameWithTutorial(): Promise<Phaser.Game> {
+  // Clean up any stale DOM or state from previous runs
+  document.querySelectorAll('canvas').forEach((el) => el.remove());
   const existing = document.getElementById('game-container');
   if (existing) existing.remove();
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const keys = Object.keys(localStorage);
+      for (const key of keys) {
+        if (key.startsWith('tce-') || key.startsWith('main-street:') || key.startsWith('TCE_')) {
+          localStorage.removeItem(key);
+        }
+      }
+    }
+  } catch { /* ignore non-browser environments */ }
   const container = document.createElement('div');
   container.id = 'game-container';
   document.body.appendChild(container);
@@ -59,20 +71,43 @@ function destroyGame(game: Phaser.Game | null): void {
  * Find a Phaser text game object by its text content within a container.
  */
 function findPhaserTextByLabel(scene: Phaser.Scene, label: string): Phaser.GameObjects.Text | null {
-  const overlayObjects = (scene as any).overlayObjects as Phaser.GameObjects.GameObject[] | undefined;
-  if (overlayObjects) {
-    for (const obj of overlayObjects) {
+  // Search the tutorial offer modal's overlayObjects (which includes the start button)
+  const modal = (scene as any).tutorialOfferModal as { overlayObjects: Phaser.GameObjects.GameObject[] } | undefined;
+  if (modal?.overlayObjects) {
+    for (const obj of modal.overlayObjects) {
       if (obj instanceof Phaser.GameObjects.Text && obj.text === label) {
         return obj;
       }
     }
   }
+
+  // Search the scene's own overlayObjects
+  const sceneObjects = (scene as any).overlayObjects as Phaser.GameObjects.GameObject[] | undefined;
+  if (sceneObjects) {
+    for (const obj of sceneObjects) {
+      if (obj instanceof Phaser.GameObjects.Text && obj.text === label) {
+        return obj;
+      }
+    }
+  }
+
+  // Search scene children (Phaser 4 display list)
+  const displayList = (scene as any).displayList;
+  if (displayList?.getAll) {
+    return (displayList.getAll() as Phaser.GameObjects.GameObject[]).find(
+      (obj): obj is Phaser.GameObjects.Text =>
+        obj instanceof Phaser.GameObjects.Text && obj.text === label,
+    ) ?? null;
+  }
+
+  // Fallback: scene.children (Phaser 3 compat)
   const allChildren = (scene as any).children?.getAll?.() ?? [];
   for (const obj of allChildren) {
     if (obj instanceof Phaser.GameObjects.Text && obj.text === label) {
       return obj;
     }
   }
+
   return null;
 }
 
@@ -144,18 +179,25 @@ function maybeAdvanceTutorial(scene: Phaser.Scene, expectedBefore: number): void
  * Click the business card that matches the current tutorial step's requiredCardId.
  * Falls back to the first market card if no requiredCardId is set.
  */
+/** Strip the copy-number suffix from a card ID for prefix matching. */
+function matchesCardId(cardId: string, requiredCardId: string): boolean {
+  const stripCopy = (id: string): string => id.replace(/-\d+$/, '');
+  return stripCopy(cardId) === stripCopy(requiredCardId);
+}
+
 function clickRequiredBusinessCard(scene: Phaser.Scene): void {
   const s = scene as any;
   const controller = s.tutorialController;
   const devCards = s.state?.market?.development;
   if (!devCards || devCards.length === 0) return;
 
-  // Find the card matching requiredCardId from the current step
+  // Find the card matching requiredCardId from the current step.
+  // Uses prefix matching so any copy of the required card works.
   let cardToClick = devCards[0]; // fallback
   if (controller?.isActive) {
     const step = getCurrentStep(controller);
     if (step?.requiredCardId) {
-      const found = devCards.find((c: any) => c.id === step.requiredCardId);
+      const found = devCards.find((c: any) => matchesCardId(c.id, step.requiredCardId!));
       if (found) {
         cardToClick = found;
       }
@@ -175,6 +217,8 @@ function clickRequiredBusinessCard(scene: Phaser.Scene): void {
 
 /**
  * Click the event card that matches the current tutorial step's requiredCardId.
+ * Uses prefix matching so any copy of the required card template satisfies.
+ * Falls back to the first Event card (has a `trigger` property) in investments.
  */
 function clickRequiredEventCard(scene: Phaser.Scene): void {
   const s = scene as any;
@@ -182,15 +226,19 @@ function clickRequiredEventCard(scene: Phaser.Scene): void {
   const investments = s.state?.market?.investments;
   if (!investments || investments.length === 0) return;
 
-  let cardToClick = investments[0]; // fallback
+  let cardToClick: any = null;
   if (controller?.isActive) {
     const step = getCurrentStep(controller);
     if (step?.requiredCardId) {
-      const found = investments.find((c: any) => c.id === step.requiredCardId);
+      const found = investments.find((c: any) => matchesCardId(c.id, step.requiredCardId!));
       if (found) {
         cardToClick = found;
       }
     }
+  }
+  // Fallback: find the first Event card (has a trigger property) in investments
+  if (!cardToClick) {
+    cardToClick = investments.find((c: any) => c.trigger !== undefined) ?? investments[0];
   }
 
   if (s.uiPhase !== 'market') { s.uiPhase = 'market'; }
@@ -237,11 +285,25 @@ async function clickEndTurn(scene: Phaser.Scene): Promise<void> {
 // ── Tests ────────────────────────────────────────────────
 
 describe('Main Street Tutorial E2E', () => {
+/**
+ * Wait for the Start Tutorial button to appear in the scene.
+ * Retries with a timeout to handle async rendering delays.
+ */
+async function waitForStartButton(scene: Phaser.Scene, timeoutMs = 8_000): Promise<Phaser.GameObjects.Text | null> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const btn = findPhaserTextByLabel(scene, '[ Start Tutorial ]');
+    if (btn) return btn;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  return null;
+}
+
   beforeEach(async () => {
     game = await bootGameWithTutorial();
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
     // Wait for tutorial offer modal to appear and start tutorial
-    const startBtn = findPhaserTextByLabel(scene, '[ Start Tutorial ]');
+    const startBtn = await waitForStartButton(scene, 10_000);
     expect(startBtn).toBeTruthy();
     startBtn!.emit('pointerdown', {
       x: startBtn!.x, y: startBtn!.y, worldX: startBtn!.x, worldY: startBtn!.y,
@@ -265,23 +327,28 @@ describe('Main Street Tutorial E2E', () => {
     expect(devCards).toBeTruthy();
     expect(devCards.length).toBe(4);
 
-    // With tutorial seed 'tutorial-seed' and Easy difficulty, the
-    // first development card in the market is always Cinema (index 0).
-    expect(devCards[0].id).toBe('biz-cinema-1');
-    expect(devCards[0].name).toBe('Cinema');
-    expect(devCards[0].cost).toBe(10);
+    // With tutorial seed 'tutorial-seed', Easy difficulty, and Tier 1 cards,
+    // the first development card in the market is always Bookshop (index 0).
+    expect(devCards[0].id).toBe('biz-bookshop-1');
+    expect(devCards[0].name).toBe('Bookshop');
+    expect(devCards[0].cost).toBe(8);
 
-    // The second card is always Barbershop (index 1) — deck now includes
-    // community space cards in the development row, shifting the order.
-    expect(devCards[1].id).toBe('biz-barbershop-0');
-    expect(devCards[1].name).toBe('Barbershop');
-    expect(devCards[1].cost).toBe(6);
+    // The second card is also a Bookshop (different copy).
+    expect(devCards[1].id).toBe('biz-bookshop-0');
+    expect(devCards[1].name).toBe('Bookshop');
+    expect(devCards[1].cost).toBe(8);
 
-    // The investments row always has Grand Opening Sale
+    // Laundromat (the required card for T3) is at index 2
+    expect(devCards[2].id).toBe('biz-laundromat-2');
+    expect(devCards[2].name).toBe('Laundromat');
+    expect(devCards[2].cost).toBe(6);
+
+    // The investments row — with Tier 1 cards and the tutorial seed the only
+    // Investment event available is Local Festival.
     const investments = s.state?.market?.investments;
-    const grandOpening = investments?.find((c: any) => c.name === 'Grand Opening Sale');
-    expect(grandOpening).toBeTruthy();
-    expect(grandOpening.cost).toBe(2);
+    const festival = investments?.find((c: any) => c.name === 'Local Festival');
+    expect(festival).toBeTruthy();
+    expect(festival.cost).toBe(3);
   }, 30_000);
 
   // ── T1: Welcome (confirm) ────────────────────────────
@@ -329,10 +396,12 @@ describe('Main Street Tutorial E2E', () => {
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
     expect(getStepIndex(scene)).toBe(2); // T3
 
-    // Try to click the first business card (Cinema) instead of the
+    // Try to click the first business card (Bookshop) instead of the
     // required Laundromat. This should show an error and NOT advance.
     const s = scene as any;
-    const wrongCard = s.state.market.development[0]; // Cinema
+    const wrongCard = s.state.market.development[0]; // Bookshop
+    // With prefix matching, the requiredCardId is 'biz-laundromat-0' and the
+    // wrong card is 'biz-bookshop-1', which don't match on template prefix.
     expect(wrongCard.id).not.toBe('biz-laundromat-0');
 
     if (s.uiPhase !== 'market') { s.uiPhase = 'market'; }
@@ -403,7 +472,7 @@ describe('Main Street Tutorial E2E', () => {
 
   // ── T7: Buy Event (action) ──────────────────────────
 
-  it('T7: Buy Grand Opening Sale event card advances to T8', async () => {
+  it('T7: Buy event card advances to T8', async () => {
     await clickOverlayButtonByText('Next >'); await clickOverlayButtonByText('Next >'); // T1,T2
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
     clickRequiredBusinessCard(scene); // T3
@@ -415,7 +484,7 @@ describe('Main Street Tutorial E2E', () => {
     await clickEndTurn(scene); // T6
     await waitForOverlayVisible(10_000);
 
-    // T7 action: click the Grand Opening Sale event card
+    // T7 action: click the available event card
     clickRequiredEventCard(scene);
     await waitForOverlayVisible(5_000);
     expect(getStepIndex(scene)).toBe(7); // T8

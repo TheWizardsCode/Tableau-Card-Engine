@@ -206,9 +206,9 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     highlightZone: 'investmentsRow',
     gate: 'action',
     requiredAction: 'buy-event',
-    // With the fixed tutorial seed 'tutorial-seed', Grand Opening Sale (evt-grand-opening-15)
-    // is always at investments index 2 and costs $2 (affordable after T3+T6 income).
-    requiredCardId: 'evt-grand-opening-15',
+    // With Tier 1 cards and the tutorial seed, the only Investment event in the
+    // market is Local Festival (cost $3, affordable after T3 purchase + T6 income).
+    // No specific card is required — the player can buy any Investment event card.
   },
   {
     id: 'T8',

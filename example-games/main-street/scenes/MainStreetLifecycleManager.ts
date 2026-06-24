@@ -1,6 +1,7 @@
 import { setupMainStreetGame, deserializeMainStreetState } from '../MainStreetState';
 import { createDefaultCampaignProgress, loadCampaignProgress, updateCampaignAfterRun, saveCampaignProgress, createMainStreetCheckpointManager } from '../MainStreetSaveLoad';
 import { DIFFICULTY_NAMES } from '../MainStreetDifficulty';
+import { deriveUnlockedCardIds } from '../MainStreetTiers';
 import { SaveLoadStore, createDefaultResumeOverlay, markSceneValid, markSceneInvalid, createTfPlayer, UndoRedoManager } from '../../../src/core-engine';
 import { createSingleSelectionManager, TooltipManager } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
@@ -438,9 +439,13 @@ export class MainStreetLifecycleManager {
               // composition and therefore the market lineup, breaking the
               // hardcoded requiredCardId references in the tutorial steps.
               s.selectedDifficulty = 'Easy';
+              // Lock the tutorial to Tier 1 cards only, ensuring deterministic
+              // card selection regardless of the player's campaign progression.
+              const tier1CardIds = deriveUnlockedCardIds(['tier-1']);
               s.state = setupMainStreetGame({
                 difficulty: 'Easy',
                 seed: TUTORIAL_SEED,
+                unlockedCardIds: tier1CardIds,
               });
               // Re-initialize the transcript recorder with the new seed
               try {
