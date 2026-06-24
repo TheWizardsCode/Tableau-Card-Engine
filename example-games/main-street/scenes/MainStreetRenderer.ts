@@ -3,7 +3,7 @@
  */
 
 import Phaser from 'phaser';
-import type { BusinessCard, EventCard, UpgradeCard } from '../MainStreetCards';
+import type { BusinessCard, CommunitySpaceCard, EventCard, UpgradeCard } from '../MainStreetCards';
 import {
   GRID_SIZE,
   MARKET_BUSINESS_SLOTS,
@@ -390,7 +390,7 @@ export class MainStreetRenderer {
     }
   }
 
-  public drawBusinessSlot(x: number, y: number, _index: number, biz: BusinessCard): void {
+  public drawBusinessSlot(x: number, y: number, _index: number, biz: BusinessCard | CommunitySpaceCard): void {
     const s = this.scene;
     const { slotW, slotH } = s.layout;
     const isHinted = s.hintedSlotIndex === _index;
@@ -426,7 +426,9 @@ export class MainStreetRenderer {
       tooltipZone.setInteractive({ useHandCursor: true });
       tooltipZone.on('pointerover', () => {
         const synergyNote = isPawnShopCard(biz) ? ' (excluded from synergy)' : '';
-        const info = `Business: ${biz.name}\nIncome: +${biz.baseIncome + biz.incomeBonus}\nSynergy: ${biz.synergyTypes.join('/')}${synergyNote}\nLevel: ${biz.level}`;
+        const isCommunitySpace = (biz as any).family === 'community-space';
+        const label = isCommunitySpace ? 'Community Space' : 'Business';
+        const info = `${label}: ${biz.name}\nIncome: +${biz.baseIncome + biz.incomeBonus}\nSynergy: ${biz.synergyTypes.join('/')}${synergyNote}\nLevel: ${biz.level}`;
         s.tooltipManager?.show(info, tooltipZone.x, tooltipZone.y);
       });
       tooltipZone.on('pointerout', () => {
@@ -449,7 +451,7 @@ export class MainStreetRenderer {
    */
   private applyUpgradeOverlays(
     container: Phaser.GameObjects.Container,
-    biz: BusinessCard,
+    biz: BusinessCard | CommunitySpaceCard,
     width: number,
     height: number,
   ): void {
@@ -618,9 +620,9 @@ export class MainStreetRenderer {
     y: number,
     rowLabel: string,
     rowKey: string,
-    cards: readonly (BusinessCard | EventCard | UpgradeCard)[],
+    cards: readonly (BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard)[],
     maxSlots: number,
-    onClick: (card: BusinessCard | EventCard | UpgradeCard) => void,
+    onClick: (card: BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard) => void,
   ): void {
     const s = this.scene;
     const { marketCardW, marketCardH, marketCardGap, marketLabelW } = s.layout;
@@ -740,8 +742,8 @@ export class MainStreetRenderer {
   public drawMarketCard(
     x: number,
     y: number,
-    card: BusinessCard | EventCard | UpgradeCard,
-    onClick: (card: BusinessCard | EventCard | UpgradeCard) => void,
+    card: BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard,
+    onClick: (card: BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard) => void,
     _rowKey: string,
     _slotIndex: number,
   ): Phaser.GameObjects.Container {
@@ -830,6 +832,10 @@ export class MainStreetRenderer {
             const b = card as any;
             const bSynergyNote = isPawnShopCard(b) ? ' (excluded from synergy)' : '';
             info = `Business: ${b.name}\nCost: ${b.cost}\nIncome: +${b.baseIncome + (b.incomeBonus || 0)}/turn\nSynergy: ${(b.synergyTypes || []).join('/')}${bSynergyNote}\n${b.description ?? ''}`;
+          } else if (card.family === 'community-space') {
+            const cs = card as any;
+            const csSynergyNote = isPawnShopCard(cs) ? ' (excluded from synergy)' : '';
+            info = `Community Space: ${cs.name}\nCost: ${cs.cost}\nIncome: +${cs.baseIncome + (cs.incomeBonus || 0)}/turn\nSynergy: ${(cs.synergyTypes || []).join('/')}${csSynergyNote}\n${cs.description ?? ''}`;
           } else if (card.family === 'event') {
             const e = card as any;
             info = `Event: ${e.name}\nCost: ${e.cost}\nEffect: ${e.effect}\nCoins: ${e.coinDelta >= 0 ? '+' : ''}${e.coinDelta}, Rep: ${e.reputationDelta >= 0 ? '+' : ''}${e.reputationDelta}`;

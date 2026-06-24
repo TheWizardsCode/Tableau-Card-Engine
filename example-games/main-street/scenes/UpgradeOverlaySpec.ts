@@ -25,7 +25,7 @@
  * @module UpgradeOverlaySpec
  */
 
-import type { BusinessCard } from '../MainStreetCards';
+import type { BusinessCard, CommunitySpaceCard } from '../MainStreetCards';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -78,7 +78,7 @@ export interface UpgradeOverlaySpec {
  * @returns An UpgradeOverlaySpec describing all overlays to render.
  */
 export function buildUpgradeOverlaySpec(
-  biz: BusinessCard,
+  biz: BusinessCard | CommunitySpaceCard,
   width: number,
   height: number,
 ): UpgradeOverlaySpec {
