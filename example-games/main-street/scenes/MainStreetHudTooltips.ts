@@ -40,6 +40,11 @@ export const HUD_TOOLTIP_I18N_KEYS = {
   repEffectLabel: 'hud.tooltip.rep.effect',
   scoreTitle: 'hud.tooltip.score.title',
   scoreEstimateLabel: 'hud.tooltip.score.estimate',
+  scoreBreakdownCoins: 'hud.tooltip.score.breakdownCoins',
+  scoreBreakdownReputation: 'hud.tooltip.score.breakdownReputation',
+  scoreBreakdownChallenges: 'hud.tooltip.score.breakdownChallenges',
+  scoreRemainingToWin: 'hud.tooltip.score.remainingToWin',
+  scoreThresholdMet: 'hud.tooltip.score.thresholdMet',
   scoreNextTierLabel: 'hud.tooltip.score.nextTier',
   scoreAllTiersUnlocked: 'hud.tooltip.score.allTiersUnlocked',
 } as const;
@@ -75,6 +80,11 @@ export const HUD_TOOLTIP_STRINGS = {
   repEffectLabel: 'Higher reputation multiplies coin income (capped)',
   scoreTitle: 'Score Estimate',
   scoreEstimateLabel: 'Estimated score',
+  scoreBreakdownCoins: 'Coins',
+  scoreBreakdownReputation: 'Reputation ×',
+  scoreBreakdownChallenges: 'Challenges',
+  scoreRemainingToWin: 'more needed to win',
+  scoreThresholdMet: 'Win threshold met!',
   scoreNextTierLabel: 'Next tier',
   scoreAllTiersUnlocked: 'All tiers unlocked',
 } as const;
@@ -165,7 +175,9 @@ export function buildReputationTooltip(state: MainStreetState): string {
  * Builds the tooltip content string for the Score HUD element.
  *
  * Shows:
- * - Current final-score estimate
+ * - Current final-score estimate in "x / y" format (where y is the win threshold)
+ * - Score breakdown by source (coins, reputation multiplier, challenge bonus)
+ * - How close the player is to the win threshold
  * - Next locked tier name and reputation threshold (or "All tiers unlocked")
  */
 export function buildScoreTooltip(
@@ -173,6 +185,14 @@ export function buildScoreTooltip(
   campaign: MainStreetCampaignProgress | null,
 ): string {
   const score = computeScore(state);
+  const threshold = state.config.winThreshold;
+
+  // Score breakdown components
+  const coins = state.resourceBank.coins;
+  const rep = state.resourceBank.reputation;
+  const repContribution = rep * state.config.reputationScoreMultiplier;
+  const challengeContribution = state.challengesCompleted.length * state.config.challengeBonusPoints;
+  const remaining = threshold - score;
 
   // Determine next locked tier
   const unlockedTiers = campaign?.unlockedTiers ?? ['tier-1'];
@@ -180,15 +200,35 @@ export function buildScoreTooltip(
 
   const lines = [
     t(HUD_TOOLTIP_I18N_KEYS.scoreTitle),
-    `${t(HUD_TOOLTIP_I18N_KEYS.scoreEstimateLabel)}: ${score}`,
+    `${t(HUD_TOOLTIP_I18N_KEYS.scoreEstimateLabel)}: ${score}/${threshold}`,
+    '',
+    `${t(HUD_TOOLTIP_I18N_KEYS.scoreBreakdownCoins)}: ${coins}`,
+    `${t(HUD_TOOLTIP_I18N_KEYS.scoreBreakdownReputation)} ${state.config.reputationScoreMultiplier}: ${repContribution}`,
+    `${t(HUD_TOOLTIP_I18N_KEYS.scoreBreakdownChallenges)}: ${challengeContribution}`,
   ];
+
+  if (remaining > 0) {
+    lines.push(
+      '',
+      `${remaining} ${t(HUD_TOOLTIP_I18N_KEYS.scoreRemainingToWin)}`,
+    );
+  } else {
+    lines.push(
+      '',
+      t(HUD_TOOLTIP_I18N_KEYS.scoreThresholdMet),
+    );
+  }
 
   if (nextTier) {
     lines.push(
+      '',
       `${t(HUD_TOOLTIP_I18N_KEYS.scoreNextTierLabel)}: ${nextTier.name} (requires Rep ≥ ${nextTier.reputationThreshold})`,
     );
   } else {
-    lines.push(t(HUD_TOOLTIP_I18N_KEYS.scoreAllTiersUnlocked));
+    lines.push(
+      '',
+      t(HUD_TOOLTIP_I18N_KEYS.scoreAllTiersUnlocked),
+    );
   }
 
   return lines.join('\n');
