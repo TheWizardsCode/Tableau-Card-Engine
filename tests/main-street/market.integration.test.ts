@@ -175,11 +175,11 @@ describe('Market Refill Integration (Expanded Pool)', () => {
       expect(inDeck + inMarket).toBe(totalBusinessCards);
     });
 
-    it('event deck has correct count (templates x 3 copies minus queue/market)', () => {
+    it('event deck has correct count (templates x 6 copies minus queue/market)', () => {
       const state = createState('deck-size-evt');
     const multiplier = getPreset(undefined).positiveIncidentMultiplier;
     const _rng = createSeededRng(42);
-    const totalEventCards = createEventDeck(3, undefined, _rng, multiplier).length;
+    const totalEventCards = createEventDeck(6, undefined, _rng, multiplier).length;
       const inDeck = state.decks.event.length;
       const inQueue = state.incidentQueue.length;
       const investmentEvents = state.market.investments.filter(c => c.family === 'event').length;

@@ -47,6 +47,22 @@ function reshuffleIfNeeded<T>(state: MainStreetState, deck: T[], discard: T[], n
   }
 }
 
+/**
+ * Force-reshuffles the discard pile into the deck regardless of whether the
+ * deck is empty. Used when the deck still holds cards but none of the required
+ * trigger type (e.g. only Incident cards remain when we need an Investment),
+ * and reshuffleIfNeeded (which requires deck.length === 0) was insufficient.
+ */
+function forceReshuffleFromDiscards<T>(state: MainStreetState, deck: T[], discard: T[], name: string): void {
+  if (discard.length > 0) {
+    shuffleArray(discard, state.rng);
+    while (discard.length > 0) {
+      deck.push(discard.pop()!);
+    }
+    addLog(state, `Reshuffled ${name} discard into deck`, 'neutral');
+  }
+}
+
 // ── Shared Market Engine Integration ──────────────────────
 
 /**
@@ -269,6 +285,9 @@ export function refillInvestmentsMarket(state: MainStreetState): void {
     if (idx === -1) {
       // Maybe the event deck was empty and discards can be reshuffled now
       reshuffleIfNeeded(state, decks.event, state.discards.event, 'event');
+      // If the deck still has cards but none are Investment-trigger,
+      // force a reshuffle from discards (e.g. only Incidents remain).
+      forceReshuffleFromDiscards(state, decks.event, state.discards.event, 'event');
       idx = decks.event.findIndex(e => e.trigger === 'Investment');
       if (idx === -1) break;
     }
@@ -381,6 +400,9 @@ export function refillIncidentQueue(state: MainStreetState): void {
     if (idx === -1) {
       // Attempt a reshuffle in case the deck was empty earlier
       reshuffleIfNeeded(state, state.decks.event, state.discards.event, 'event');
+      // If the deck still has cards but none are Incident-trigger,
+      // force a reshuffle from discards (e.g. only Investments remain).
+      forceReshuffleFromDiscards(state, state.decks.event, state.discards.event, 'event');
       idx = state.decks.event.findIndex(e => e.trigger === 'Incident');
       if (idx === -1) break;
     }

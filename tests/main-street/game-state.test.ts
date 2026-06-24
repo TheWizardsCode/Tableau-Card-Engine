@@ -37,7 +37,7 @@ const BUSINESS_TEMPLATE_COUNT = 18;
 const EVENT_TEMPLATE_COUNT = 18;
 const UPGRADE_TEMPLATE_COUNT = 27;
 const DEFAULT_BUSINESS_COPIES = 3;
-const DEFAULT_EVENT_COPIES = 3;
+const DEFAULT_EVENT_COPIES = 6;
 const DEFAULT_UPGRADE_COPIES = 2;
 
 // ── Helpers ─────────────────────────────────────────────────

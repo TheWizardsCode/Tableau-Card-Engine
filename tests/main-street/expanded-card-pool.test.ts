@@ -452,8 +452,8 @@ describe('Expanded Card Pool: Deck Building', () => {
     expect(createBusinessDeck(3)).toHaveLength(54);
   });
 
-    it('event deck with 3 copies should have 54 cards', () => {
-    expect(createEventDeck(3, undefined, _rng, 1)).toHaveLength(54);
+    it('event deck with 6 copies should have 108 cards', () => {
+    expect(createEventDeck(6, undefined, _rng, 1)).toHaveLength(108);
   });
 
   it('upgrade deck with 2 copies should have 54 cards', () => {
@@ -545,7 +545,7 @@ describe('Expanded Card Pool: Seeded Deck Resolution', () => {
       + state.incidentQueue.length
       + (state.heldEvent ? 1 : 0);
     const multiplier = getPreset(undefined).positiveIncidentMultiplier;
-    expect(eventTotal).toBe(createEventDeck(3, undefined, _rng, multiplier).length);
+    expect(eventTotal).toBe(createEventDeck(6, undefined, _rng, multiplier).length);
 
     const upgTotal = state.market.investments.filter(c => c.family === 'upgrade').length
       + state.decks.upgrade.length;
