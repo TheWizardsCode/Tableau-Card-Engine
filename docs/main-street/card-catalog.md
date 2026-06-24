@@ -9,22 +9,22 @@ This document lists every card template in the Main Street card pool, organised 
 
 | Family   | Templates | Copies each | Total cards |
 |----------|-----------|-------------|-------------|
-| Business | 17        | 3           | 51          |
-| Event    | 17        | 3           | 51          |
-| Upgrade  | 25        | 2           | 50          |
+| Business | 18        | 3           | 54          |
+| Event    | 18        | 3           | 54          |
+| Upgrade  | 27        | 2           | 54          |
 
-**Synergy types:** Food, Culture, Commerce, Service (M2), Entertainment (M2)
+**Synergy types:** Food, Culture, Commerce, Service (M2), Entertainment (M2), Health (M2)
 
 ## Expansion summary (baseline vs current)
 
 | Snapshot | Business | Event | Upgrade | Total templates |
 |---|---:|---:|---:|---:|
 | Tier 1 baseline (`docs/main-street/card-catalog-baseline.json`) | 7 | 6 | 5 | 18 |
-| Current catalog (`MainStreetCards.ts`) | 17 | 17 | 25 | 59 |
-| Net increase | +10 | +11 | +20 | +41 |
+| Current catalog (`MainStreetCards.ts`) | 18 | 18 | 27 | 63 |
+| Net increase | +11 | +12 | +22 | +45 |
 
 - 2x target from baseline: `>= 36` templates
-- Current total: `59` templates (`3.28x` baseline)
+- Current total: `63` templates (`3.50x` baseline)
 - Non-baseline card IDs are tracked in `docs/main-street/expanded-card-manifest.json`
 
 ### Guidance: adding more cards safely
@@ -71,7 +71,14 @@ Park has been reclassified as a **Community Space** card (see below).
 |----|------|------|--------|---------|--------------|-------------|-----------|
 | `biz-laundromat` | Laundromat | 3 | 2 | Service | Laundromat | Self-serve laundry. +1/adj Service. | Budget Service entry point. |
 | `biz-barbershop` | Barbershop | 3 | 2 | Service | Barbershop | Classic cuts. +1/adj Service. | Pairs with Laundromat for early Service cluster. |
-| `biz-clinic` | Clinic | 5 | 3 | Service | Clinic | Walk-in medical care. +1/adj Service. | Premium Service; high cost/income mirrors Hardware Store. |
+
+#### Health (new synergy type)
+
+| ID | Name | Cost | Income | Synergy | Upgrade Path | Description | Rationale |
+|----|------|------|--------|---------|--------------|-------------|-----------|
+| `biz-clinic` | Clinic | 10 | 0 (rep +0.2/turn) | Health | Clinic | Walk-in medical care. Provides +0.2 rep/turn. | Non-profit community health provider; reputation instead of income. |
+| `biz-private-clinic` | Private Clinic | 8 | 2 | Health | Private Clinic | Private medical practice. Gains +1 coin per adjacent Health business. | For-profit counterpart to Clinic; income-focused. |
+| `biz-pharmacy` | Pharmacy | 6 | 1 | Health | — | Provides essential medications. Gains +1 coin per adjacent Health business. | Standalone Health card (no upgrade). |
 
 #### Entertainment (new synergy type)
 
@@ -203,7 +210,8 @@ Each Upgrade targets a specific Business by name. Applying an upgrade increments
 | `upg-museum` | Upgrade to Museum | Art Gallery | 4 | +1 | +1 | Art Gallery -> Museum. | Premium bridge upgrade. |
 | `upg-resort-spa` | Upgrade to Resort Spa | Day Spa | 5 | +2 | +1 | Day Spa -> Resort Spa. | Tied with IMAX for highest cost/power. |
 | `upg-garden-center` | Upgrade to Garden Center | Florist | 3 | +1 | +1 | Florist -> Garden Center. | Budget bridge upgrade with range. |
-| `upg-medical-center` | Upgrade to Medical Center | Clinic | 5 | +2 | +1 | Clinic -> Medical Center. | Premium Service upgrade. |
+| `upg-medical-center` | Upgrade to Medical Center | Clinic | 5 | 0 (rep +0.1/turn) | +1 | Clinic -> Medical Center. Provides +0.1 rep/turn. | Reputation bonus upgrade; no income. |
+| `upg-private-medical-center` | Upgrade to Private Medical Center | Private Clinic | 4 | +2 | 0 | Private Clinic -> Private Medical Center. | Income-focused upgrade; no range or reputation. |
 
 ### M2 Branching Upgrade Templates (4)
 
@@ -252,8 +260,9 @@ M2 introduces 5 bridge cards that belong to two synergy types simultaneously. Th
 | Food | 2 (Bakery, Diner) | 2 (Cafe, Food Truck) | 4 |
 | Culture | 1 (Bookshop) | 3 (Cafe, Art Gallery, Florist) | 4 (plus Park as Community Space) |
 | Commerce | 3 (Hardware, Pawn Shop, Boutique) | 1 (Florist) | 4 |
-| Service | 3 (Laundromat, Barbershop, Clinic) | 1 (Day Spa) | 4 |
+| Service | 2 (Laundromat, Barbershop) | 1 (Day Spa) | 3 |
 | Entertainment | 2 (Arcade, Cinema) | 3 (Food Truck, Art Gallery, Day Spa) | 5 |
+| Health | 3 (Clinic, Private Clinic, Pharmacy) | 0 | 3 |
 
 Culture and Entertainment have the most bridge-card representation, making them easiest to chain synergies with. Commerce and Service rely more on dedicated single-type cards.
 

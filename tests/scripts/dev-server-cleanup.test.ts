@@ -9,6 +9,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { LOCK_FILE_PATH } from '../../scripts/dev-server-utils';
 
@@ -149,8 +150,6 @@ describe('dev server crash resilience', () => {
 });
 
 describe('tmp directory management', () => {
-  const tmpDir = path.dirname(LOCK_FILE_PATH);
-
   beforeEach(() => {
     // Only clean up the lock file itself — do NOT delete the entire tmp/ directory
     // as that would race with other parallel test files that use tmp/ (e.g., replay e2e).
@@ -162,29 +161,65 @@ describe('tmp directory management', () => {
   });
 
   it('creates tmp directory when writing lock file', () => {
-    removeLockFileDirectly();
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
-    expect(fs.existsSync(tmpDir)).toBe(false);
-    createLockFile(12345, 1);
-    expect(fs.existsSync(tmpDir)).toBe(true);
-    expect(fs.existsSync(LOCK_FILE_PATH)).toBe(true);
+    // Use a unique temp directory to avoid racing with parallel tests that share
+    // the project tmp/ directory (e.g., replay e2e which writes screenshots there).
+    const uniqueDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-server-cleanup-test-'));
+    const uniqueLockPath = path.join(uniqueDir, 'dev-server-lock.json');
+
+    function createLockInDir(pid: number, refCount: number): void {
+      const dir = path.dirname(uniqueLockPath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.writeFileSync(
+        uniqueLockPath,
+        JSON.stringify({ pid, refCount }),
+        'utf-8',
+      );
+    }
+
+    createLockInDir(12345, 1);
+    expect(fs.existsSync(uniqueDir)).toBe(true);
+    expect(fs.existsSync(uniqueLockPath)).toBe(true);
+
+    // Cleanup
+    try { fs.rmSync(uniqueDir, { recursive: true, force: true }); } catch {}
   });
 
   it('recovers after tmp directory is deleted while lock exists', () => {
-    removeLockFileDirectly();
-    createLockFile(12345, 1);
-    expect(fs.existsSync(tmpDir)).toBe(true);
+    // Use a unique temp directory to avoid racing with parallel tests.
+    const uniqueDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-server-cleanup-test-'));
+    const uniqueLockPath = path.join(uniqueDir, 'dev-server-lock.json');
 
-    // Simulate someone deleting tmp/
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
-    expect(fs.existsSync(tmpDir)).toBe(false);
+    function createLockInDir(pid: number, refCount: number): void {
+      const dir = path.dirname(uniqueLockPath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.writeFileSync(
+        uniqueLockPath,
+        JSON.stringify({ pid, refCount }),
+        'utf-8',
+      );
+    }
+
+    createLockInDir(12345, 1);
+    expect(fs.existsSync(uniqueDir)).toBe(true);
+    expect(fs.existsSync(uniqueLockPath)).toBe(true);
+
+    // Simulate someone deleting the directory
+    try { fs.rmSync(uniqueDir, { recursive: true, force: true }); } catch {}
+    expect(fs.existsSync(uniqueDir)).toBe(false);
 
     // Should be able to write a new lock file
-    createLockFile(54321, 2);
-    expect(fs.existsSync(tmpDir)).toBe(true);
-    expect(fs.existsSync(LOCK_FILE_PATH)).toBe(true);
-    const lock = JSON.parse(fs.readFileSync(LOCK_FILE_PATH, 'utf-8'));
+    createLockInDir(54321, 2);
+    expect(fs.existsSync(uniqueDir)).toBe(true);
+    expect(fs.existsSync(uniqueLockPath)).toBe(true);
+    const lock = JSON.parse(fs.readFileSync(uniqueLockPath, 'utf-8'));
     expect(lock.pid).toBe(54321);
     expect(lock.refCount).toBe(2);
+
+    // Cleanup
+    try { fs.rmSync(uniqueDir, { recursive: true, force: true }); } catch {}
   });
 });

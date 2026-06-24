@@ -129,7 +129,7 @@ interface GameState {
 - **Market** – two rows: Business row (4 face‑up cards from the Business deck) and Investments row (2 Upgrades + 1 Investment event = 3 slots). Cards are replenished after purchase.
 - **Incident Queue** – visible FIFO queue of 2 Incident cards drawn from the event deck. The front card resolves each turn during IncidentPhase; a replacement is drawn from the deck afterward. If the deck runs out, the queue shrinks naturally.
 - **ActiveEffect System** – some events (e.g. `evt-flu-outbreak`) create duration-based modifiers instead of one-shot deltas. ActiveEffects are tracked in `state.activeEffects: ActiveEffect[]` and decay each turn during EndCheck. See [ActiveEffect System](#-activeeffect-system) below.
-- **ResourceBank** – tracks `coins` (start 8) and `reputation` (start 3). Reputation is a multiplier applied at final score calculation (`finalScore = coins + reputation * 5 + challengeBonuses`).
+- **ResourceBank** – tracks `coins` (start 8) and `reputation` (start 3). Reputation can increase during the IncomePhase via `reputationPerTurn` from certain Health-synergy cards (e.g. Clinic provides +0.2 rep/turn). Reputation is also a multiplier applied at final score calculation (`finalScore = coins + reputation * 5 + challengeBonuses`).
 
 ### Spatial API migration note
 
@@ -165,6 +165,8 @@ stateDiagram-v2
 5. **IncomePhase** – For each placed Business, compute:
    - `totalIncome = baseIncome + synergyBonus` where `synergyBonus = countMatchingNeighbors * 1`.
    - `resourceBank.coins += totalIncome`.
+   - `totalReputationPerTurn` is calculated from all placed cards (some Health-synergy cards like the Clinic provide `reputationPerTurn`). Upgrades may also contribute `reputationBonus`.
+   - `resourceBank.reputation += totalReputationPerTurn`.
 6. **IncidentPhase** – Resolve the front Incident card from the visible FIFO incident queue. After resolution, draw a replacement Incident from the event deck to the back of the queue (maintaining queue size of 2). If the deck has no more Incidents, the queue shrinks naturally.
 7. **EndCheck** – Evaluate win/loss conditions.
 8. Loop back to **DayStart** for the next turn.
