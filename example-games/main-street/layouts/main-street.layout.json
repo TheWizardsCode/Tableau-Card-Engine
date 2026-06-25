@@ -67,17 +67,17 @@
       },
       "anchors": {
         "topLeft": { "x": 0.640625, "y": 0.111111 },
-        "bottomRight": { "x": 0.976563, "y": 0.583333 }
+        "bottomRight": { "x": 0.976563, "y": 0.414 }
       }
     },
     "challengePanel": {
       "rect": {
-        "x": 0.359375,
-        "y": 0.444444
+        "x": 0.640625,
+        "y": 0.414
       },
       "anchors": {
-        "topLeft": { "x": 0.359375, "y": 0.444444 },
-        "bottomRight": { "x": 0.632813, "y": 0.597222 }
+        "topLeft": { "x": 0.640625, "y": 0.414 },
+        "bottomRight": { "x": 0.914062, "y": 0.567 }
       }
     },
     "endTurnButton": {

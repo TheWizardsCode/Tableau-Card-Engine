@@ -294,8 +294,11 @@ export class MainStreetRenderer {
     const challenges = s.state.activeChallenges;
     if (challenges.length === 0) return;
 
-    // Dynamic height based on number of challenges
-    const panelH = CHALLENGE_TITLE_H + challenges.length * CHALLENGE_LINE_H + CHALLENGE_PAD * 2;
+    // Dynamic height based on number of challenges, with minimum height matching the Upcoming/Events section
+    const panelH = Math.max(
+      CHALLENGE_TITLE_H + challenges.length * CHALLENGE_LINE_H + CHALLENGE_PAD * 2,
+      s.layout.eventsHeight,
+    );
     const challengeW = s.layout.challengeW;
 
     // Panel background

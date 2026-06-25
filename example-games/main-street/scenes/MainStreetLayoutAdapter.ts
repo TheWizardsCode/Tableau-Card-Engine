@@ -53,6 +53,7 @@ export function computeMainStreetLayoutWithSll(): SceneLayout {
 
   const marketTopLeft = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'market', 'topLeft', viewport, 1);
   const queueTopLeft = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'incidentQueue', 'topLeft', viewport, 1);
+  const queueBottomLeft = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'incidentQueue', 'bottomLeft', viewport, 1);
   const streetTopCenter = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'street', 'topCenter', viewport, 1);
 
   // Compute a horizontally centered streetX. The 2×5 grid row width is:
@@ -77,6 +78,7 @@ export function computeMainStreetLayoutWithSll(): SceneLayout {
   const logW = Math.round(logBottomRight.x - logTopLeft.x);
   const logH = Math.round(logBottomRight.y - logTopLeft.y);
   const challengeW = Math.round(challengeBottomRight.x - challengeTopLeft.x);
+  const eventsHeight = Math.round(queueBottomLeft.y - queueTopLeft.y);
 
   return {
     gameW,
@@ -94,6 +96,7 @@ export function computeMainStreetLayoutWithSll(): SceneLayout {
     queueCardH: BASE_QUEUE_CARD_H,
     queueCardGap: BASE_QUEUE_CARD_GAP,
     queueLabelW: BASE_MARKET_LABEL_W,
+    eventsHeight,
     // Shift streetTop down by half the action button height (34 / 2 ≈ 17px) for vertical spacing
     streetTop: Math.round(streetTopCenter.y) + 17,
     slotW: BASE_SLOT_W,

@@ -89,6 +89,7 @@ export interface SceneLayout {
   queueCardH: number;
   queueCardGap: number;
   queueLabelW: number;
+  eventsHeight: number;
   streetTop: number;
   slotW: number;
   slotH: number;
