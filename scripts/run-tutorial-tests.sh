@@ -8,6 +8,6 @@ cd "$PROJECT_DIR"
 
 for part in part1 part2 part4 part5 part6 part3; do
   echo "=== Tutorial E2E ${part} ==="
-  npx vitest run --project browser "tests/e2e/main-street-tutorial-e2e-${part}.browser.test.ts" 2>&1 | grep -E "^===|^( ✓| ×| Test )|Tests|Test Files"
+  npx vitest run --project tutorial "tests/e2e/main-street-tutorial-e2e-${part}.browser.test.ts" 2>&1 | grep -E "^===|^( ✓| ×| Test )|Tests|Test Files"
   echo ""
 done

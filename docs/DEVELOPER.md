@@ -125,14 +125,17 @@ MONTE_SEEDS=50 npm run monte-carlo
 MONTE_SEEDS=200 MONTE_MIN_WIN_RATE=0.20 MONTE_MAX_WIN_RATE=0.80 npm test
 ```
 
-Tests use [Vitest](https://vitest.dev/) configured inline in `vite.config.ts` with two test projects:
+Tests use [Vitest](https://vitest.dev/) configured inline in `vite.config.ts` with three test projects:
 
 | Project | Environment | File Pattern | Purpose |
 |---------|-------------|-------------|---------|
 | `unit` | Node.js | `tests/**/*.test.ts` | Logic, data, and integration tests |
-| `browser` | Chromium (Playwright) | `tests/**/*.browser.test.ts` | Phaser UI and rendering tests |
+| `browser` | Chromium (Playwright) | `tests/**/*.browser.test.ts` (excludes tutorial E2E) | Phaser UI and rendering tests |
+| `tutorial` | Chromium (Playwright) | `tests/e2e/main-street-tutorial-e2e-*.browser.test.ts` | Main Street tutorial E2E tests (run separately to avoid GPU context exhaustion) |
 
-Both projects run together via `npm test`. The browser project runs in headless Chromium using `@vitest/browser` with the Playwright provider.
+All three projects run together via `npm test`. The browser and tutorial projects run in headless Chromium using `@vitest/browser` with the Playwright provider.
+
+The tutorial E2E tests are split into 6 part files (1-6 tests per file) and run via `scripts/run-tutorial-tests.sh`, which spawns a separate Chromium instance for each part to avoid the Phaser 4 RC GPU/Canvas context exhaustion that occurs after ~8 game create/destroy cycles in a single browser process. The helper module at `tests/helpers/main-street-tutorial-e2e.ts` contains shared game lifecycle utilities (`bootGameWithTutorial`, `destroyGame` with CanvasPool drain) and click helpers for tutorial step advancement.
 
 During Vitest runs, the dev-only transcript persistence middleware (`POST /api/transcripts`) is intentionally disabled even though Vitest browser mode uses an internal Vite server. This prevents file-system side effects and reduces harness noise/flakiness during test execution.
 
