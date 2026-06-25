@@ -683,7 +683,7 @@ export class MainStreetRenderer {
         const btnX = Math.round(labelCenter - btnW / 2);
         const btnY = deckY + 22; // further below deck text to avoid overlap
 
-        const labelText = `Discover (${REFRESH_INVESTMENTS_COST})`;
+        const labelText = `Research (${REFRESH_INVESTMENTS_COST})`;
 
         const btn = createActionButton(s, btnX, btnY, btnW, labelText, canRefresh ? () => { s.onRefreshInvestmentsClick(); } : () => {}, {
           disabled: !canRefresh,
@@ -697,7 +697,7 @@ export class MainStreetRenderer {
               bg.setFillStyle(0x333333, 0.6);
             }
 
-            // Tooltip for the Discover button (attach to bg so it receives pointer events)
+            // Tooltip for the Research button (attach to bg so it receives pointer events)
             const info = `Pay $${REFRESH_INVESTMENTS_COST} to research new investment opportunities and replace the visible investments row. Removed cards go to their discard piles. Available only during Market phase.`;
             try {
               bg.on('pointerover', (pointer: any) => {
@@ -707,14 +707,14 @@ export class MainStreetRenderer {
                 }
                 // Fallback: create an in-canvas text tooltip if DOM tooltip manager isn't available
                 try {
-                  if ((s as any)._tempDiscoverTooltip) {
-                    (s as any)._tempDiscoverTooltip.destroy();
-                    (s as any)._tempDiscoverTooltip = null;
+                  if ((s as any)._tempResearchTooltip) {
+                    (s as any)._tempResearchTooltip.destroy();
+                    (s as any)._tempResearchTooltip = null;
                   }
                   const tt = s.add.text(btn.x, btn.y - s.layout.actionButtonH / 2 - 6, info, {
                     fontSize: '12px', color: '#ffffff', fontFamily: FONT_FAMILY, backgroundColor: 'rgba(0,0,0,0.85)', padding: { x: 6, y: 4 }, wordWrap: { width: 280 }, align: 'center'
                   }).setOrigin(0.5, 1).setDepth(1000);
-                  (s as any)._tempDiscoverTooltip = tt;
+                  (s as any)._tempResearchTooltip = tt;
                 } catch (e) { /* ignore fallback errors */ }
               });
               bg.on('pointerout', () => {
@@ -723,9 +723,9 @@ export class MainStreetRenderer {
                   return;
                 }
                 try {
-                  if ((s as any)._tempDiscoverTooltip) {
-                    (s as any)._tempDiscoverTooltip.destroy();
-                    (s as any)._tempDiscoverTooltip = null;
+                  if ((s as any)._tempResearchTooltip) {
+                    (s as any)._tempResearchTooltip.destroy();
+                    (s as any)._tempResearchTooltip = null;
                   }
                 } catch (_) { /* ignore */ }
               });
