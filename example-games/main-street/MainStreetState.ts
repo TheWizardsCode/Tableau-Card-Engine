@@ -390,7 +390,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
   // Apply positive-incident weighting from the runtime difficulty config.
   // Pass the game's seeded RNG into createEventDeck so fractional duplicates
   // are selected deterministically per-game-seed rather than by template order.
-  const eventDeck = createEventDeck(6, options.unlockedCardIds, rng, config.positiveIncidentMultiplier);
+  const eventDeck = createEventDeck(3, options.unlockedCardIds, rng, config.positiveIncidentMultiplier);
   const upgradeDeck = createUpgradeDeck(2, options.unlockedCardIds);
 
   shuffleArray(businessDeck, rng);

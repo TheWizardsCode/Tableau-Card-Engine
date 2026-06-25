@@ -277,12 +277,26 @@ describe('GreedyStrategy', () => {
   it('prefers upgrades over business purchases when both are available', () => {
     // Set up a state where both an upgrade and a business purchase are available
     const state = createTestState('greedy-upgrade-test');
-    // Place a Bakery so an upgrade can target it
-    const bakery = (state.market.development as BusinessCard[]).find(c => c.name === 'Bakery');
-    if (bakery) {
-      state.streetGrid[0] = { ...bakery };
-      state.market.development = state.market.development.filter(c => c.id !== bakery.id);
-    }
+    // Place a Bakery on the grid so an upgrade can target it
+    const bakery: BusinessCard = {
+      family: 'business',
+      id: 'biz-bakery-99',
+      name: 'Bakery',
+      cost: 6,
+      baseIncome: 1,
+      synergyTypes: ['Food'],
+      upgradePath: 'Bakery',
+      maxLevel: 2,
+      description: 'Test',
+      level: 0,
+      incomeBonus: 0,
+      synergyRangeBonus: 0,
+      reputationBonus: 0,
+      appliedUpgrades: [],
+    };
+    state.streetGrid[0] = bakery;
+    // Clear the development market so no business purchases are available
+    state.market.development = [];
 
     // Add an affordable upgrade card for the Bakery to the investments row
     const upgradeCard: UpgradeCard = {

@@ -640,19 +640,15 @@ describe('MainStreetMarket', () => {
     });
   });
 
-  describe('event deck size', () => {
-    it('should have doubled event deck size (6 copies per template)', () => {
+  describe('unique event templates', () => {
+    it('should have doubled unique event templates (36 instead of 18)', () => {
       const state = createTestState();
-      // Total event cards in deck at setup: Investment events + Incidents
-      // After setup draws 1 investment + 2 incidents from the deck, the remaining count
-      // should reflect 6 copies per template.
-      // Total with 6 copies = 18 templates * 6 = 108 cards baseline (before positiveIncidentMultiplier)
-      const eventDeckSize = state.decks.event.length;
-      // After setup draws 3 cards from deck
-      // Baseline with 6 copies = 108 cards, after setup = 105
-      // With positiveIncidentMultiplier=1.5 (Medium): positive incidents multiplied
-      // Minimum expected: 18 * 6 - 3 = 105
-      expect(eventDeckSize).toBeGreaterThanOrEqual(100);
+      // Count unique event templates by stripping the copy-number suffix
+      const uniqueTemplateIds = new Set(
+        state.decks.event.map(e => e.id.replace(/-\d+$/, '')),
+      );
+      // Should now have 36 unique event templates (doubled from 18)
+      expect(uniqueTemplateIds.size).toBe(36);
     });
   });
 });
