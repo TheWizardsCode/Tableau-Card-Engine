@@ -24,7 +24,7 @@ export const BASE_QUEUE_CARD_GAP = 10;
 // Make street slots match market placeholder size (market slots: 140x80)
 export const BASE_SLOT_W = 140;
 export const BASE_SLOT_H = 80;
-export const BASE_SLOT_GAP = 10;
+export const BASE_SLOT_GAP = 20;
 export const STREET_COLS = 5;
 export const STREET_ROWS = 2;
 export const STREET_ROW_GAP = 12;

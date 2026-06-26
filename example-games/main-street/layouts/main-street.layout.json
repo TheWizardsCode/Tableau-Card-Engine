@@ -24,22 +24,22 @@
     },
     "incidentQueue": {
       "rect": {
-        "x": 0.085938,
-        "y": 0.444444
+        "x": 0.640625,
+        "y": 0.567
       },
       "anchors": {
-        "topLeft": { "x": 0.085938, "y": 0.444444 },
-        "bottomLeft": { "x": 0.085938, "y": 0.597222 }
+        "topLeft": { "x": 0.640625, "y": 0.567 },
+        "bottomLeft": { "x": 0.640625, "y": 0.861111 }
       }
     },
     "street": {
       "rect": {
         "x": 0.265625,
-        "y": 0.586111
+        "y": 0.444444
       },
       "anchors": {
-        "topCenter": { "x": 0.5, "y": 0.586111 },
-        "bottomCenter": { "x": 0.5, "y": 0.858333 }
+        "topCenter": { "x": 0.3203125, "y": 0.444444 },
+        "bottomCenter": { "x": 0.3203125, "y": 0.716667 }
       }
     },
     "hand": {
@@ -67,7 +67,7 @@
       },
       "anchors": {
         "topLeft": { "x": 0.640625, "y": 0.111111 },
-        "bottomRight": { "x": 0.976563, "y": 0.414 }
+        "bottomRight": { "x": 0.875, "y": 0.414 }
       }
     },
     "challengePanel": {
@@ -77,7 +77,7 @@
       },
       "anchors": {
         "topLeft": { "x": 0.640625, "y": 0.414 },
-        "bottomRight": { "x": 0.914062, "y": 0.567 }
+        "bottomRight": { "x": 0.875, "y": 0.567 }
       }
     },
     "endTurnButton": {

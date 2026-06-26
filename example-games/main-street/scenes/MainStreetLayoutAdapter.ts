@@ -56,11 +56,12 @@ export function computeMainStreetLayoutWithSll(): SceneLayout {
   const queueBottomLeft = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'incidentQueue', 'bottomLeft', viewport, 1);
   const streetTopCenter = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'street', 'topCenter', viewport, 1);
 
-  // Compute a horizontally centered streetX. The 2×5 grid row width is:
-  //   STREET_COLS × BASE_SLOT_W + (STREET_COLS - 1) × BASE_SLOT_GAP = 5 × 140 + 4 × 10 = 740px
-  // Centered on a 1280px screen: (1280 - 740) / 2 = 270px
+  // Compute streetX using the SLL anchor as the center, so it aligns with the
+  // left-area column (x≈20 to x≈800). With 5×140px slots and 4×20px gaps:
+  //   rowWidth = 5*140 + 4*20 = 780px
+  // Centered at streetTopCenter.x = 0.3203125 (410px): streetX = 410 - 390 = 20
   const rowWidth = STREET_COLS * BASE_SLOT_W + (STREET_COLS - 1) * BASE_SLOT_GAP;
-  const streetX = Math.round((gameW - rowWidth) / 2);
+  const streetX = Math.round(streetTopCenter.x - rowWidth / 2);
   const handTopLeft = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'hand', 'topLeft', viewport, 1);
   const challengeTopLeft = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'challengePanel', 'topLeft', viewport, 1);
   const challengeBottomRight = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'challengePanel', 'bottomRight', viewport, 1);

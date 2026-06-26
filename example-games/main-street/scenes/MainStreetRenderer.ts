@@ -3,7 +3,7 @@
  */
 
 import Phaser from 'phaser';
-import type { BusinessCard, CommunitySpaceCard, EventCard, UpgradeCard, DurationEventCard } from '../MainStreetCards';
+import type { BusinessCard, CommunitySpaceCard, EventCard, UpgradeCard } from '../MainStreetCards';
 import {
   GRID_SIZE,
   MARKET_BUSINESS_SLOTS,
@@ -11,7 +11,6 @@ import {
   INCIDENT_QUEUE_SIZE,
   REFRESH_INVESTMENTS_COST,
   isPawnShopCard,
-  isDurationEventCard,
 } from '../MainStreetCards';
 import { computeScore } from '../MainStreetEngine';
 import {
@@ -294,11 +293,8 @@ export class MainStreetRenderer {
     const challenges = s.state.activeChallenges;
     if (challenges.length === 0) return;
 
-    // Dynamic height based on number of challenges, with minimum height matching the Upcoming/Events section
-    const panelH = Math.max(
-      CHALLENGE_TITLE_H + challenges.length * CHALLENGE_LINE_H + CHALLENGE_PAD * 2,
-      s.layout.eventsHeight,
-    );
+    // Dynamic height based on number of challenges
+    const panelH = CHALLENGE_TITLE_H + challenges.length * CHALLENGE_LINE_H + CHALLENGE_PAD * 2;
     const challengeW = s.layout.challengeW;
 
     // Panel background
@@ -574,21 +570,21 @@ export class MainStreetRenderer {
     s.marketSelectionByCardId.clear();
     s.selectedMarketCardId = null;
 
-    const { gameW, marketTop, marketRowH, marketRowGap, marketCardW, marketCardGap, marketLabelW } = s.layout;
+    const { marketTop, marketRowH, marketRowGap, logX } = s.layout;
 
-    // Section background (2 rows: business + investments)
-    // Calculate actual right edge from the widest row (business: 4 slots)
-    const marketStartX = marketLabelW + 50;
-    const marketRight = marketStartX + (MARKET_BUSINESS_SLOTS - 1) * (marketCardW + marketCardGap) + marketCardW + 20;
+    // Wider section background — extends from left edge to near the activity log (logX - 20px margin)
+    const bgLeft = 20;
+    const bgRight = logX - 20; // 820 - 20 = 800
     const totalH = 2 * marketRowH + marketRowGap + 20;
     const bgBox = s.add.graphics();
     bgBox.fillStyle(BOX_FILL, 0.3);
-    bgBox.fillRoundedRect(20, marketTop - 10, marketRight - 20, totalH, BOX_RADIUS);
+    bgBox.fillRoundedRect(bgLeft, marketTop - 10, bgRight - bgLeft, totalH, BOX_RADIUS);
     bgBox.lineStyle(1, BOX_STROKE, 0.4);
-    bgBox.strokeRoundedRect(20, marketTop - 10, marketRight - 20, totalH, BOX_RADIUS);
+    bgBox.strokeRoundedRect(bgLeft, marketTop - 10, bgRight - bgLeft, totalH, BOX_RADIUS);
     s.marketContainer.add(bgBox);
 
-    const sectionLabel = s.add.text(gameW / 2, marketTop - 4, 'Market', {
+    // Section label centered over the wider box
+    const sectionLabel = s.add.text((bgLeft + bgRight) / 2, marketTop - 4, 'Market', {
       fontSize: '13px', fontStyle: 'bold', color: '#887766', fontFamily: FONT_FAMILY,
     }).setOrigin(0.5, 1);
     s.marketContainer.add(sectionLabel);
@@ -629,7 +625,7 @@ export class MainStreetRenderer {
     onClick: (card: BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard) => void,
   ): void {
     const s = this.scene;
-    const { marketCardW, marketCardH, marketCardGap, marketLabelW } = s.layout;
+    const { marketCardW, marketCardH, marketCardGap, logX } = s.layout;
 
     // Row label - also use for positioning deck count
     const label = s.add.text(40, y, rowLabel, {
@@ -637,7 +633,12 @@ export class MainStreetRenderer {
     }).setOrigin(0, 0.5);
     s.marketContainer.add(label);
 
-    const startX = marketLabelW + 50;
+    // Centre cards in the wider market box (20 to logX-20)
+    const boxLeft = 20;
+    const boxRight = logX - 20;
+    const boxCenter = (boxLeft + boxRight) / 2;
+    const totalCardsW = maxSlots * marketCardW + (maxSlots - 1) * marketCardGap;
+    const startX = Math.round(boxCenter - totalCardsW / 2);
 
     for (let i = 0; i < maxSlots; i++) {
       const cx = startX + i * (marketCardW + marketCardGap);
@@ -869,118 +870,118 @@ export class MainStreetRenderer {
     const deckRemaining = s.state.decks.event.length;
     const activeEffects = s.state.activeEffects;
 
-    const { queueLabelW, queueCardW, queueCardH, queueCardGap, queueTop } = s.layout;
+    const { logX, logW, queueTop, queueCardH } = s.layout;
 
-    // Calculate dynamic height — extend if there are active effects
+    // Same panel width and left-edge as the activity log
+    const panelX = logX;
+    const panelW = logW;
+    const pad = 8;
+    const titleH = 22;
+    const contentX = panelX + pad;
+
+    // Calculate dynamic height
     const activeEffectLines = activeEffects.length;
-    const extraH = activeEffectLines > 0 ? 24 + activeEffectLines * 16 : 0;
+    const extraH = activeEffectLines > 0 ? 16 + activeEffectLines * 16 : 0;
+    const maxCards = Math.min(INCIDENT_QUEUE_SIZE, queue.length);
+    const cardAreaH = maxCards * (queueCardH + 6) - 6 + 12; // cards + deck count
+    const panelH = titleH + pad + cardAreaH + extraH + pad;
 
-    // Section background - width to just fit cards with small right margin
-    const queueW = queueLabelW + 50 + INCIDENT_QUEUE_SIZE * (queueCardW + queueCardGap) - queueCardGap + 20;
-    const queueH = queueCardH + 24 + extraH;
-    const bgBox = s.add.graphics();
-    bgBox.fillStyle(0x1a1830, 0.35);
-    bgBox.fillRoundedRect(110, queueTop - 10, queueW, queueH, BOX_RADIUS);
-    bgBox.lineStyle(1, 0x445577, 0.5);
-    bgBox.strokeRoundedRect(110, queueTop - 10, queueW, queueH, BOX_RADIUS);
-    s.incidentQueueContainer.add(bgBox);
+    // Panel background — same warm-dark style as activity log
+    const bg = s.add.graphics();
+    bg.fillStyle(0x1a1408, 0.85);
+    bg.fillRoundedRect(panelX, queueTop, panelW, panelH, 4);
+    bg.lineStyle(1, BOX_STROKE, 0.5);
+    bg.strokeRoundedRect(panelX, queueTop, panelW, panelH, 4);
+    s.incidentQueueContainer.add(bg);
 
-    // Section label
-    const label = s.add.text(40, queueTop + queueCardH / 2 - 2, 'Upcoming', {
-      fontSize: '13px', fontStyle: 'bold', color: '#7788aa', fontFamily: FONT_FAMILY,
-      align: 'center',
-    }).setOrigin(0, 0.5);
-    s.incidentQueueContainer.add(label);
+    // Title bar — same style as activity log
+    const titleBg = s.add.graphics();
+    titleBg.fillStyle(0x332816, 0.9);
+    titleBg.fillRoundedRect(panelX, queueTop, panelW, titleH, { tl: 4, tr: 4, bl: 0, br: 0 });
+    s.incidentQueueContainer.add(titleBg);
 
-    const startX = queueLabelW + 50;
+    const titleText = s.add.text(panelX + panelW / 2, queueTop + titleH / 2, 'Upcoming', {
+      fontSize: '12px', fontStyle: 'bold', color: '#aa9977', fontFamily: FONT_FAMILY,
+    }).setOrigin(0.5);
+    s.incidentQueueContainer.add(titleText);
 
-    for (let i = 0; i < INCIDENT_QUEUE_SIZE; i++) {
-      const cx = startX + i * (queueCardW + queueCardGap);
+    // Queue cards — stacked vertically, centred in the panel
+    let cardY = queueTop + titleH + pad;
+    const cardRenderW = Math.max(1, Math.round(panelW - pad * 2 - 8));
+    const cardRenderH = Math.max(1, Math.round(queueCardH));
+
+    for (let i = 0; i < maxCards; i++) {
       const card = queue[i];
+      const cx = panelX + (panelW - cardRenderW) / 2;
 
       if (card) {
-        const cardContainer = this.drawIncidentCard(cx, queueTop, card);
-        s.incidentQueueContainer.add(cardContainer);
+        const container = s.add.container(Math.round(cx + cardRenderW / 2), Math.round(cardY + cardRenderH / 2));
+        mainStreetRenderCardSvg(s, container, card.id, cardRenderW, cardRenderH);
+        s.incidentQueueContainer.add(container);
+
+        if (!s.replayMode) {
+          const hover = s.add.rectangle(0, 0, cardRenderW, cardRenderH, 0x000000, 0.001);
+          hover.setInteractive({ useHandCursor: true });
+          hover.on('pointerover', () => {
+            let info: string;
+            const dCard = card as any;
+            if (dCard.duration !== undefined) {
+              info = 'Event: ' + card.name + '\nEffect: ' + card.effect + '\nDuration: ' + dCard.duration + ' turns\n' + Math.round(dCard.multiplier * 100) + '% income modifier';
+            } else {
+              info = 'Event: ' + card.name + '\nEffect: ' + card.effect + '\nCoins: ' + (card.coinDelta >= 0 ? '+' : '') + card.coinDelta + ', Rep: ' + (card.reputationDelta >= 0 ? '+' : '') + card.reputationDelta;
+            }
+            s.tooltipManager?.show(info, container.x, container.y);
+          });
+          hover.on('pointerout', () => s.tooltipManager?.hide());
+          container.add(hover);
+        }
       } else {
         // Empty queue slot
         const empty = s.add.rectangle(
-          cx + queueCardW / 2, queueTop + queueCardH / 2,
-          queueCardW, queueCardH, 0x111122, 0.3,
+          cx + cardRenderW / 2, cardY + cardRenderH / 2,
+          cardRenderW, cardRenderH, 0x111122, 0.3,
         );
         empty.setStrokeStyle(1, 0x223344);
         s.incidentQueueContainer.add(empty);
       }
+
+      cardY += cardRenderH + 6;
     }
 
-    // Deck count - immediately below the label
-    const deckText = s.add.text(40, queueTop + 32, `Deck: ${deckRemaining}`, {
-      fontSize: '11px', color: '#556677', fontFamily: FONT_FAMILY,
+    // Deck count below cards
+    const deckText = s.add.text(contentX, cardY, 'Deck: ' + deckRemaining, {
+      fontSize: '11px', color: '#776655', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0);
     s.incidentQueueContainer.add(deckText);
+    cardY += 18;
 
-    // ── Active Effects indicator ────────────────────────────────
+    // Active Effects indicator
     if (activeEffectLines > 0) {
-      const aeStartY = queueTop + 48;
-
       for (let i = 0; i < activeEffects.length; i++) {
         const effect = activeEffects[i];
-        const yPos = aeStartY + i * 16;
-
-        const effectText = s.add.text(40, yPos, `⚠ ${effect.description} — ${effect.turnsRemaining} turn${effect.turnsRemaining !== 1 ? 's' : ''}`, {
+        const warnIcon = String.fromCodePoint(0x26A0);
+        const dash = String.fromCodePoint(0x2014);
+        const effectText = s.add.text(contentX, cardY, warnIcon + ' ' + effect.description + ' ' + dash + ' ' + effect.turnsRemaining + ' turn' + (effect.turnsRemaining !== 1 ? 's' : ''), {
           fontSize: '10px', color: '#ff6644', fontFamily: FONT_FAMILY,
         }).setOrigin(0, 0);
         s.incidentQueueContainer.add(effectText);
 
         if (!s.replayMode) {
           const hitArea = s.add.rectangle(
-            queueLabelW / 2 + 20, yPos + 8, queueW - 40, 14, 0x000000, 0.001,
+            panelX + panelW / 2, cardY + 8, panelW - 20, 14, 0x000000, 0.001,
           ).setInteractive({ useHandCursor: true });
           hitArea.on('pointerover', () => {
             s.tooltipManager?.show(
-              `Active: ${effect.description}\n${Math.round(effect.multiplier * 100)}% modifier — ${effect.turnsRemaining} turn${effect.turnsRemaining !== 1 ? 's' : ''} remaining`,
+              'Active: ' + effect.description + '\n' + Math.round(effect.multiplier * 100) + '% modifier ' + dash + ' ' + effect.turnsRemaining + ' turn' + (effect.turnsRemaining !== 1 ? 's' : '') + ' remaining',
               hitArea.x, hitArea.y,
             );
           });
           hitArea.on('pointerout', () => s.tooltipManager?.hide());
           s.incidentQueueContainer.add(hitArea);
         }
+        cardY += 16;
       }
     }
-  }
-
-  public drawIncidentCard(
-    x: number,
-    y: number,
-    card: EventCard,
-  ): Phaser.GameObjects.Container {
-    const s = this.scene;
-    const { queueCardW, queueCardH } = s.layout;
-    const container = s.add.container(Math.round(x + queueCardW / 2), Math.round(y + queueCardH / 2));
-
-    const renderW = Math.max(1, Math.round(queueCardW - 4));
-    const renderH = Math.max(1, Math.round(queueCardH - 4));
-
-    // Render card via shared adapter
-    mainStreetRenderCardSvg(s, container, card.id, renderW, renderH);
-
-    if (!s.replayMode) {
-      const hover = s.add.rectangle(0, 0, queueCardW, queueCardH, 0x000000, 0.001);
-      hover.setInteractive({ useHandCursor: true });
-      hover.on('pointerover', () => {
-        let info: string;
-        if (isDurationEventCard(card)) {
-          const dCard = card as DurationEventCard;
-          info = `Event: ${card.name}\nEffect: ${card.effect}\nDuration: ${dCard.duration} turns\n${Math.round(dCard.multiplier * 100)}% income modifier`;
-        } else {
-          info = `Event: ${card.name}\nEffect: ${card.effect}\nCoins: ${card.coinDelta >= 0 ? '+' : ''}${card.coinDelta}, Rep: ${card.reputationDelta >= 0 ? '+' : ''}${card.reputationDelta}`;
-        }
-        s.tooltipManager?.show(info, container.x, container.y);
-      });
-      hover.on('pointerout', () => s.tooltipManager?.hide());
-      container.add(hover);
-    }
-
-    return container;
   }
 
   public refreshPlayerHand(): void {
