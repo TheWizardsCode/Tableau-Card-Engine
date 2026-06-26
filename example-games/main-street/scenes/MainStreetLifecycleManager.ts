@@ -552,7 +552,9 @@ export class MainStreetLifecycleManager {
     s.prewarmVisibleCardTextures();
     s.challengeContainer.setPosition(s.layout.challengeX, s.layout.challengeY);
     s.logContainer.setPosition(s.layout.logX, s.layout.logY);
-    s.instructionText.setPosition(s.layout.gameW - 24, s.layout.instructionY);
+    // Centre instruction text in the main content area (between left margin and right column)
+    const instructionCX = Math.round(s.layout.logX / 2);
+    s.instructionText.setPosition(instructionCX, s.layout.instructionY);
     s.refreshAll();
   }
 

@@ -17,9 +17,9 @@ describe('MainStreetLayoutAdapter', () => {
     expect(layout.streetX).toBe(20);
     // hand zone: x = 0.03125 * 1280 = 40
     expect(layout.handX).toBe(40);
-    // activityLog zone: x = 0.640625 * 1280 = 820
-    expect(layout.logX).toBe(820);
-    // activityLog zone: width = (0.875 - 0.640625) * 1280 ≈ 300
+    // activityLog zone: x = 0.75 * 1280 = 960
+    expect(layout.logX).toBe(960);
+    // activityLog zone: width = (0.984375 - 0.75) * 1280 ≈ 300
     expect(layout.logW).toBe(300);
     // activityLog height: bottomRight.y = 0.414 * 720 ≈ 298, topLeft.y = 0.111111 * 720 = 80
     // height = 298 - 80 = 218
@@ -27,8 +27,8 @@ describe('MainStreetLayoutAdapter', () => {
     // endTurnButton zone: width = 0.109375 * 1280 = 140
     expect(layout.actionButtonW).toBe(140);
 
-    // challengePanel moved to align with activityLog: topLeft.x = 0.640625 * 1280 = 820
-    expect(layout.challengeX).toBe(820);
+    // challengePanel moved to align with activityLog: topLeft.x = 0.75 * 1280 = 960
+    expect(layout.challengeX).toBe(960);
     // challengePanel positioned below shortened activityLog: topLeft.y = 0.414 * 720 ≈ 298
     expect(layout.challengeY).toBe(298);
     // challengePanel width: (0.875 - 0.640625) * 1280 = 300 (same as activity log)
@@ -76,7 +76,7 @@ describe('MainStreetLayoutAdapter', () => {
 
   it('right column does not overlap with left-area sections horizontally', () => {
     const layout = computeMainStreetLayoutWithSll();
-    // Right column starts at logX (820). Street grid ends at streetX + rowWidth (20 + 780 = 800).
+    // Right column starts at logX (960). Street grid ends at streetX + rowWidth (20 + 780 = 800).
     const streetRightEdge = layout.streetX + (layout.streetCols * layout.slotW + (layout.streetCols - 1) * layout.slotGap);
     expect(streetRightEdge).toBeLessThanOrEqual(layout.logX - 10);
   });

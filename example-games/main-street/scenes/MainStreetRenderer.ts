@@ -8,7 +8,6 @@ import {
   GRID_SIZE,
   MARKET_BUSINESS_SLOTS,
   MARKET_INVESTMENT_SLOTS,
-  INCIDENT_QUEUE_SIZE,
   REFRESH_INVESTMENTS_COST,
   isPawnShopCard,
 } from '../MainStreetCards';
@@ -244,12 +243,12 @@ export class MainStreetRenderer {
     const { gameW, hudY } = s.layout;
 
     // Background strip - 2/3 width, centered
-    const strip = markHudTransient(s.add.rectangle(gameW / 2, hudY, gameW * 0.66, 28, 0x1a1408, 0.6));
+    const strip = markHudTransient(s.add.rectangle(gameW / 2, hudY, gameW * 0.5, 28, 0x1a1408, 0.6));
     strip.setStrokeStyle(1, BOX_STROKE, 0.5);
     s.hudContainer.add(strip);
 
     // Coins - centered in strip
-    const stripWidth = gameW * 0.66;
+    const stripWidth = gameW * 0.5;
     const stripLeft = (gameW - stripWidth) / 2;
     const coinText = markHudTransient(s.add.text(stripLeft + stripWidth * 0.25, hudY, `Coins: ${coins}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#ffcc44', fontFamily: FONT_FAMILY,
@@ -870,7 +869,7 @@ export class MainStreetRenderer {
     const deckRemaining = s.state.decks.event.length;
     const activeEffects = s.state.activeEffects;
 
-    const { logX, logW, queueTop, queueCardH } = s.layout;
+    const { logX, logW, queueTop } = s.layout;
 
     // Same panel width and left-edge as the activity log
     const panelX = logX;
@@ -882,8 +881,9 @@ export class MainStreetRenderer {
     // Calculate dynamic height
     const activeEffectLines = activeEffects.length;
     const extraH = activeEffectLines > 0 ? 16 + activeEffectLines * 16 : 0;
-    const maxCards = Math.min(INCIDENT_QUEUE_SIZE, queue.length);
-    const cardAreaH = maxCards * (queueCardH + 6) - 6 + 12; // cards + deck count
+    const cardRenderH = 50;
+    const maxCards = Math.min(2, queue.length);
+    const cardAreaH = maxCards * (cardRenderH + 6) - 6 + 12; // cards + deck count
     const panelH = titleH + pad + cardAreaH + extraH + pad;
 
     // Panel background — same warm-dark style as activity log
@@ -908,7 +908,6 @@ export class MainStreetRenderer {
     // Queue cards — stacked vertically, centred in the panel
     let cardY = queueTop + titleH + pad;
     const cardRenderW = Math.max(1, Math.round(panelW - pad * 2 - 8));
-    const cardRenderH = Math.max(1, Math.round(queueCardH));
 
     for (let i = 0; i < maxCards; i++) {
       const card = queue[i];
