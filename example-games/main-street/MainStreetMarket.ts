@@ -23,6 +23,7 @@ import {
   MARKET_INVESTMENT_SLOTS,
   MARKET_INVESTMENT_UPGRADE_COUNT,
   MARKET_INVESTMENT_EVENT_COUNT,
+  REFRESH_DEVELOPMENT_COST,
   REFRESH_INVESTMENTS_COST,
 } from './MainStreetCards';
 import { shuffleArray } from '../../src/card-system';
@@ -376,6 +377,55 @@ export function refreshInvestments(state: MainStreetState): RefreshResult {
   addLog(state, `Refreshed investments (-$${REFRESH_INVESTMENTS_COST}): replaced ${replacedStrings.join(', ')}`, 'loss');
 
   return { replaced: removed, cost: REFRESH_INVESTMENTS_COST };
+}
+
+/**
+ * Checks whether the player can pay to refresh the development row.
+ */
+export function canRefreshDevelopment(state: MainStreetState): LegalityResult {
+  if (state.phase !== 'MarketPhase') {
+    return { legal: false, reason: 'Refresh development is only allowed during MarketPhase.' };
+  }
+  if (state.resourceBank.coins < REFRESH_DEVELOPMENT_COST) {
+    return { legal: false, reason: `Not enough coins. Need ${REFRESH_DEVELOPMENT_COST}, have ${state.resourceBank.coins}.` };
+  }
+  return { legal: true };
+}
+
+/**
+ * Refreshes the development row by charging the player, discarding the
+ * currently-visible development cards to their respective discard piles,
+ * and drawing replacements using the same rules as refillDevelopmentMarket.
+ */
+export function refreshDevelopment(state: MainStreetState): RefreshResult {
+  const legality = canRefreshDevelopment(state);
+  if (!legality.legal) throw new Error(legality.reason);
+
+  // Deduct cost
+  state.resourceBank.coins -= REFRESH_DEVELOPMENT_COST;
+
+  // Move visible development cards to discard piles
+  const removed: AnyCard[] = state.market.development.slice();
+  for (const c of removed) {
+    if (c.family === 'business') {
+      state.discards.business.push(c as BusinessCard);
+    } else if (c.family === 'community-space') {
+      state.discards.communitySpace.push(c as CommunitySpaceCard);
+    }
+  }
+
+  // Clear the visible development row and draw replacements
+  state.market.development.length = 0;
+  refillDevelopmentMarket(state);
+
+  // Build a detailed replacement summary for the activity log
+  const replacedStrings = removed.map(c => {
+    const name = (c as any).name ?? c.id;
+    return `${c.id}${name ? ` (${name})` : ''}`;
+  });
+  addLog(state, `Refreshed development (-$${REFRESH_DEVELOPMENT_COST}): replaced ${replacedStrings.join(', ')}`, 'loss');
+
+  return { replaced: removed, cost: REFRESH_DEVELOPMENT_COST };
 }
 
 /**

@@ -6,10 +6,11 @@ import {
   canPurchaseBusiness,
   canPurchaseUpgrade,
   canPurchaseEvent,
+  canRefreshDevelopment,
   canRefreshInvestments,
 } from '../MainStreetMarket';
 import type { BusinessCard, EventCard, UpgradeCard } from '../MainStreetCards';
-import { buyBusinessCommand, buyUpgradeCommand, buyEventCommand, playEventCommand, refreshInvestmentsCommand } from '../MainStreetCommands';
+import { buyBusinessCommand, buyUpgradeCommand, buyEventCommand, playEventCommand, refreshDevelopmentCommand, refreshInvestmentsCommand } from '../MainStreetCommands';
 import { recordMainStreetEvent, finalizeMainStreetTranscript } from '../MainStreetTranscript';
 import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
 import { getCurrentStep, type TutorialActionType } from '../TutorialFlow';
@@ -444,6 +445,35 @@ export class MainStreetTurnController {
     } else {
       afterTransfer();
     }
+  }
+
+  public onRefreshDevelopmentClick(): void {
+    const s = this.scene;
+    if (s.uiPhase !== 'market') return;
+
+    const legality = canRefreshDevelopment(s.state);
+    if (!legality.legal) {
+      s.instructionText.setText(`Cannot refresh: ${legality.reason ?? 'unknown'}`);
+      return;
+    }
+
+    s.uiPhase = 'animating';
+    s.instructionText.setText('Discovering new development opportunities...');
+    s.refreshAll();
+
+    try {
+      const cmd = refreshDevelopmentCommand(s.state);
+      s.undoManager.execute(cmd);
+      try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'refresh-development' }, description: cmd.description }); } catch (_) {}
+      s.instructionText.setText('Refreshed development');
+      addLog(s.state, 'Refreshed development (via UI)', 'neutral');
+    } catch (e) {
+      console.error('[MS] RefreshDevelopment failed', e);
+      s.instructionText.setText(`Error: ${(e as Error).message}`);
+    }
+
+    s.uiPhase = 'market';
+    s.refreshAll();
   }
 
   public onRefreshInvestmentsClick(): void {

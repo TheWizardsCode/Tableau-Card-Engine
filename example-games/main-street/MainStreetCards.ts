@@ -204,6 +204,9 @@ export const INCIDENT_QUEUE_SIZE = 2;
 /** Fixed coin cost to refresh the investments row (buy new opportunities). */
 export const REFRESH_INVESTMENTS_COST = 2;
 
+/** Fixed coin cost to refresh the development row (discover new opportunities). */
+export const REFRESH_DEVELOPMENT_COST = 2;
+
 /** Coins earned per adjacent business sharing a synergy type. */
 export const SYNERGY_BONUS_PER_NEIGHBOR = 1;
 

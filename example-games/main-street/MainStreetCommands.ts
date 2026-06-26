@@ -15,6 +15,7 @@ import {
   purchaseBusiness,
   purchaseUpgrade,
   purchaseEvent,
+  refreshDevelopment,
   refreshInvestments,
 } from './MainStreetMarket';
 import { playHeldEvent } from './MainStreetEngine';
@@ -146,6 +147,17 @@ export function playEventCommand(state: MainStreetState) {
     snapshotAction(
       (s) => playHeldEvent(s),
       'PlayHeldEvent',
+    ),
+  );
+}
+
+/** Command: Refresh Development Row */
+export function refreshDevelopmentCommand(state: MainStreetState) {
+  return toCommand(
+    state,
+    snapshotAction(
+      (s) => refreshDevelopment(s),
+      'RefreshDevelopment',
     ),
   );
 }

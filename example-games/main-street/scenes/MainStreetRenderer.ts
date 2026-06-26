@@ -8,6 +8,7 @@ import {
   GRID_SIZE,
   MARKET_BUSINESS_SLOTS,
   MARKET_INVESTMENT_SLOTS,
+  REFRESH_DEVELOPMENT_COST,
   REFRESH_INVESTMENTS_COST,
   isPawnShopCard,
 } from '../MainStreetCards';
@@ -22,6 +23,7 @@ import {
   getAffordableBusinessCards,
   getAffordableUpgradeCards,
   getEmptySlots,
+  canRefreshDevelopment,
   canRefreshInvestments,
 } from '../MainStreetMarket';
 import {
@@ -657,14 +659,78 @@ export class MainStreetRenderer {
       }
     }
 
-    // Deck count - immediately below the label
+    // Deck info and refresh button - immediately below the label
     const deckY = y + 16;
-    if (rowLabel === 'Business') {
-      const deckCount = s.state.decks.business.length;
-      const deckText = s.add.text(40, deckY, `Deck: ${deckCount}`, {
-        fontSize: '12px', color: '#776655', fontFamily: FONT_FAMILY,
+    if (rowKey === 'development') {
+      // Development row: show deck count + Discover button
+      const bizCount = s.state.decks.business.length;
+      const csCount = s.state.decks.communitySpace.length;
+      const deckText = s.add.text(40, deckY, `Biz: ${bizCount}  CS: ${csCount}`, {
+        fontSize: '11px', color: '#776655', fontFamily: FONT_FAMILY,
       }).setOrigin(0, 0);
       s.marketContainer.add(deckText);
+
+      // Discover button for Development row
+      try {
+        const canRefresh = canRefreshDevelopment(s.state).legal;
+        const btnW = Math.max(s.layout.smallButtonW, 96);
+        const labelCenter = 40 + s.layout.marketLabelW / 2;
+        const btnX = Math.round(labelCenter - btnW / 2);
+        const btnY = deckY + 22;
+
+        const labelText = `Discover (${REFRESH_DEVELOPMENT_COST})`;
+
+        const btn = createActionButton(s, btnX, btnY, btnW, labelText, canRefresh ? () => { s.onRefreshDevelopmentClick(); } : () => {}, {
+          disabled: !canRefresh,
+          ...(canRefresh ? {} : { fillColor: 0x333333, fillAlpha: 0.6 }),
+        });
+        // Dim visual when not allowed, but keep interactive so tooltip can show
+        try {
+          const bg = (btn.list && btn.list[0]) as Phaser.GameObjects.Rectangle | undefined;
+          if (bg) {
+            if (!canRefresh && typeof bg.setFillStyle === 'function') {
+              bg.setFillStyle(0x333333, 0.6);
+            }
+
+            // Tooltip for the Discover button
+            const info = `Pay $${REFRESH_DEVELOPMENT_COST} to discover new development opportunities and replace the visible development row. Removed cards go to their discard piles. Available only during Market phase.`;
+            try {
+              bg.on('pointerover', (pointer: any) => {
+                if (s.tooltipManager) {
+                  s.tooltipManager.show(info, (pointer && pointer.worldX) || btn.x, (pointer && pointer.worldY) || btn.y);
+                  return;
+                }
+                try {
+                  if ((s as any)._tempDiscoverTooltip) {
+                    (s as any)._tempDiscoverTooltip.destroy();
+                    (s as any)._tempDiscoverTooltip = null;
+                  }
+                  const tt = s.add.text(btn.x, btn.y - s.layout.actionButtonH / 2 - 6, info, {
+                    fontSize: '12px', color: '#ffffff', fontFamily: FONT_FAMILY, backgroundColor: 'rgba(0,0,0,0.85)', padding: { x: 6, y: 4 }, wordWrap: { width: 280 }, align: 'center'
+                  }).setOrigin(0.5, 1).setDepth(1000);
+                  (s as any)._tempDiscoverTooltip = tt;
+                } catch (e) { /* ignore fallback errors */ }
+              });
+              bg.on('pointerout', () => {
+                if (s.tooltipManager) {
+                  s.tooltipManager.hide();
+                  return;
+                }
+                try {
+                  if ((s as any)._tempDiscoverTooltip) {
+                    (s as any)._tempDiscoverTooltip.destroy();
+                    (s as any)._tempDiscoverTooltip = null;
+                  }
+                } catch (_) { /* ignore */ }
+              });
+            } catch (_) { /* ignore */ }
+          }
+        } catch (_) { /* ignore tooltip attach errors in tests */ }
+
+        s.marketContainer.add(btn);
+      } catch (_) {
+        // ignore UI errors in tests
+      }
     } else {
       // Investments row: show both upgrade and event deck counts - below label
       const upgCount = s.state.decks.upgrade.length;
