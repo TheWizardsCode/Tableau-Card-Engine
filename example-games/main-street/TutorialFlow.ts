@@ -13,14 +13,13 @@
  * A pure controller manages tutorial progression. This module has NO Phaser
  * dependency so it can be unit tested in Node.
  *
- * ## Coin Budget Analysis (Tutorial seed, Easy difficulty)
+ * ## Coin Budget Analysis (TutorialScenario, Easy difficulty)
  *
- * With the fixed tutorial seed and Easy difficulty (12 coins, 5 reputation):
+ * With the TutorialScenario system and Easy difficulty (12 coins, 5 reputation):
  *
- * - Market business cards: Cinema ($10), **Laundromat ($6)**, Hardware Store ($10), Clinic ($10)
- * - Investments: Upgrade to Garden ($3), Upgrade to Bistro ($4), Grand Opening Sale ($2)
- * - Incidents in queue: varies by RNG, but per-turn income from the placed business
- *   ensures sufficient coins remain throughout the 13-step flow.
+ * - Market development row: Bakery ($6), **Laundromat ($6)**, Park ($4), Hardware Store ($10)
+ * - Investments: Upgrade to Patisserie ($4), Upgrade to Garden ($3), Grand Opening Sale ($2)
+ * - Incidents in queue: Community Award (+2 rep), Rainy Day (-1 coin per Food)
  *
  * ### Budget Walkthrough
  *
@@ -172,8 +171,9 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     highlightZone: 'marketBusinessRow',
     gate: 'action',
     requiredAction: 'select-business',
-    // With the fixed tutorial seed 'tutorial-seed', the Laundromat (biz-laundromat-0) is
-    // always at market index 1 and costs $6 (most affordable, leaves 6 coins for later steps).
+    // The TutorialScenario system (TutorialScenario.ts) guarantees the Laundromat
+    // (biz-laundromat-0) is present in the development row. It costs $6 (most
+    // affordable, leaves 6 coins for later steps).
     requiredCardId: 'biz-laundromat-0',
   },
   {
@@ -206,9 +206,10 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     highlightZone: 'investmentsRow',
     gate: 'action',
     requiredAction: 'buy-event',
-    // With Tier 1 cards and the tutorial seed, the only Investment event in the
-    // market is Local Festival (cost $3, affordable after T3 purchase + T6 income).
-    // No specific card is required — the player can buy any Investment event card.
+    // The TutorialScenario system puts Grand Opening Sale (evt-grand-opening, $2)
+    // in the investments row. This is affordable after the T3 Laundromat purchase
+    // ($6) and T6 income (~1 coin). No specific card is required — the player can
+    // buy any Investment event card.
   },
   {
     id: 'T8',

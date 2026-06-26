@@ -1,7 +1,7 @@
 import { setupMainStreetGame, deserializeMainStreetState } from '../MainStreetState';
 import { createDefaultCampaignProgress, loadCampaignProgress, updateCampaignAfterRun, saveCampaignProgress, createMainStreetCheckpointManager } from '../MainStreetSaveLoad';
 import { DIFFICULTY_NAMES } from '../MainStreetDifficulty';
-import { deriveUnlockedCardIds } from '../MainStreetTiers';
+import { createTutorialScenario } from '../TutorialScenario';
 import { SaveLoadStore, createDefaultResumeOverlay, markSceneValid, markSceneInvalid, createTfPlayer, UndoRedoManager } from '../../../src/core-engine';
 import { createSingleSelectionManager, TooltipManager } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
@@ -23,7 +23,6 @@ import {
   loadTutorialState,
   saveTutorialState,
   updateTutorialStatus,
-  TUTORIAL_SEED,
   type TutorialVisibilityOptions,
 } from '../TutorialState';
 import {
@@ -424,29 +423,20 @@ export class MainStreetLifecycleManager {
         {
           onStartTutorial: () => {
             try {
-              // ── Deterministic Tutorial Setup ─────────────────
-              // When the tutorial starts, force Easy difficulty and use a
-              // fixed seed so the same cards appear in the same order.
-              // This ensures the player has enough coins for all actions
-              // (12 starting coins, 5 starting reputation) and that the
-              // required cards are always available.
+              // ── Tutorial Scenario Setup ──────────────────────
+              // When the tutorial starts, create the game state using the
+              // explicit TutorialScenario system instead of seed-based
+              // shuffling. This guarantees exactly which cards appear in
+              // the market and incident queue, independent of deck
+              // composition. The tutorial always uses Easy difficulty
+              // (12 starting coins, 5 starting reputation) for sufficient
+              // coin budget throughout all 13 steps.
               //
-              // NOTE: We intentionally do NOT filter by campaign-unlocked
-              // card IDs here. The tutorial must use the FULL card pool so
-              // that the fixed seed 'tutorial-seed' produces a deterministic
-              // market every time regardless of the player's campaign
-              // progress. Filtering by unlockedCardIds would change the deck
-              // composition and therefore the market lineup, breaking the
-              // hardcoded requiredCardId references in the tutorial steps.
+              // The scenario system uses the STANDARD_TUTORIAL_SCENARIO
+              // definition which references only Tier-1 cards, ensuring
+              // all requiredCardId values in TutorialFlow.ts resolve.
               s.selectedDifficulty = 'Easy';
-              // Lock the tutorial to Tier 1 cards only, ensuring deterministic
-              // card selection regardless of the player's campaign progression.
-              const tier1CardIds = deriveUnlockedCardIds(['tier-1']);
-              s.state = setupMainStreetGame({
-                difficulty: 'Easy',
-                seed: TUTORIAL_SEED,
-                unlockedCardIds: tier1CardIds,
-              });
+              s.state = createTutorialScenario();
               // Re-initialize the transcript recorder with the new seed
               try {
                 const { MainStreetTranscriptRecorder, setMainStreetRecorder } = require('../MainStreetTranscript');
