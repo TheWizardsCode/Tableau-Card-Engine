@@ -409,7 +409,10 @@ export function createActionButton(
   }).setOrigin(0.5);
   container.add(label);
 
-  if (!disabled) {
+  if (disabled) {
+    // Keep interactive for tooltip hover events, but no hand cursor and no click/hover effects.
+    bg.setInteractive({ useHandCursor: false });
+  } else {
     bg.setInteractive({ useHandCursor: true });
     bg.on('pointerdown', callback);
     bg.on('pointerover', () => {

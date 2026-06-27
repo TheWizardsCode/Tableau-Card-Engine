@@ -672,7 +672,8 @@ export class MainStreetRenderer {
 
       // Discover button for Development row
       try {
-        const canRefresh = canRefreshDevelopment(s.state).legal;
+        const refreshDevResult = canRefreshDevelopment(s.state);
+        const canRefresh = refreshDevResult.legal;
         const btnW = Math.max(s.layout.smallButtonW, 96);
         const labelCenter = 40 + s.layout.marketLabelW / 2;
         const btnX = Math.round(labelCenter - btnW / 2);
@@ -693,7 +694,8 @@ export class MainStreetRenderer {
             }
 
             // Tooltip for the Discover button
-            const info = `Pay $${REFRESH_DEVELOPMENT_COST} to discover new development opportunities and replace the visible development row. Removed cards go to their discard piles. Available only during Market phase.`;
+            const reasonSuffix = !canRefresh && refreshDevResult.reason ? `\n\n${refreshDevResult.reason}` : '';
+            const info = `Pay $${REFRESH_DEVELOPMENT_COST} to discover new development opportunities and replace the visible development row. Removed cards go to their discard piles. Available only during Market phase.${reasonSuffix}`;
             try {
               bg.on('pointerover', (pointer: any) => {
                 if (s.tooltipManager) {
@@ -744,7 +746,8 @@ export class MainStreetRenderer {
 
       // Refresh Investments button (centered under Investments label / deck count)
       try {
-        const canRefresh = canRefreshInvestments(s.state).legal;
+        const refreshInvResult = canRefreshInvestments(s.state);
+        const canRefresh = refreshInvResult.legal;
         // Make button wider so label fits, and move it lower to avoid overlapping deck text
         const btnW = Math.max(s.layout.smallButtonW, 96);
         // center under the label area: label left (40) + half label width
@@ -767,7 +770,8 @@ export class MainStreetRenderer {
             }
 
             // Tooltip for the Research button (attach to bg so it receives pointer events)
-            const info = `Pay $${REFRESH_INVESTMENTS_COST} to research new investment opportunities and replace the visible investments row. Removed cards go to their discard piles. Available only during Market phase.`;
+            const reasonSuffix = !canRefresh && refreshInvResult.reason ? `\n\n${refreshInvResult.reason}` : '';
+            const info = `Pay $${REFRESH_INVESTMENTS_COST} to research new investment opportunities and replace the visible investments row. Removed cards go to their discard piles. Available only during Market phase.${reasonSuffix}`;
             try {
               bg.on('pointerover', (pointer: any) => {
                 if (s.tooltipManager) {
