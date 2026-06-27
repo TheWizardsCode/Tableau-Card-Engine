@@ -99,7 +99,6 @@ export class MainStreetLifecycleManager {
       }
     } catch (e) {
       // If svg loader is unavailable in the current environment, ignore
-      // eslint-disable-next-line no-console
       console.debug('[MS] preload: svg load failed', e);
     }
   }
@@ -131,7 +130,6 @@ export class MainStreetLifecycleManager {
     } catch (e) {
       // Non-fatal: if texture generation fails let the scene continue
       // and fall back to colored rectangles.
-      // eslint-disable-next-line no-console
       console.debug('[MS] placeholder generation failed', e);
     }
 
@@ -727,7 +725,7 @@ export class MainStreetLifecycleManager {
         try {
           const legacySeen = s.campaign ? (s.campaign as any).tutorialSeen : undefined;
           (s as any).tutorialOfferModal?.showIfEligible(tutorialOpts, legacySeen);
-        } catch (e) { /* eslint-disable-next-line no-console */ console.error('[MainStreet] tutorial offer fallback failed', e); }
+        } catch (e) { console.error('[MainStreet] tutorial offer fallback failed', e); }
         return null;
       });
     } else {

@@ -414,7 +414,6 @@ export class MainStreetTutorialHints {
       this.objects.push(stepLabel);
     } catch (e) {
       // Fallback to in-canvas tooltip if DOM is not available or fails
-      // eslint-disable-next-line no-console
       // DOM tooltip creation failed; fall back to in-canvas rendering
 
       const tooltipH = TOOLTIP_H_BASE;
@@ -492,7 +491,6 @@ export class MainStreetTutorialHints {
     for (const obj of this.objects) {
       try { obj.destroy(); } catch (e) {
         // Non-fatal: Phaser may throw when destroying already-destroyed objects in tests.
-        // eslint-disable-next-line no-console
         console.debug('[Tutorial] clearObjects: destroy failed', e);
       }
     }
