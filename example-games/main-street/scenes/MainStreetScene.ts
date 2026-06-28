@@ -2,9 +2,6 @@ import type { MainStreetState, MainStreetCampaignProgress } from '../MainStreetS
 import type { DifficultyName } from '../MainStreetDifficulty';
 import type { BusinessCard } from '../MainStreetCards';
 import {
-  INCIDENT_QUEUE_SIZE,
-} from '../MainStreetCards';
-import {
   CardGameScene,
   TooltipManager,
 } from '../../../src/ui';
@@ -451,9 +448,9 @@ export class MainStreetScene extends CardGameScene {
       h: 2 * l.marketRowH + l.marketRowGap + 20,
     };
     const queue = {
-      x: 20,
+      x: l.logX,
       y: l.queueTop - 10,
-      w: l.queueLabelW + INCIDENT_QUEUE_SIZE * (l.queueCardW + l.queueCardGap) + 100,
+      w: l.logW,
       h: l.queueCardH + 24,
     };
     const street = {

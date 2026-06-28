@@ -63,11 +63,13 @@ function computeExpectedZoneBounds(
         (MARKET_BUSINESS_SLOTS - 1) * (BASE_MARKET_CARD_W + BASE_MARKET_CARD_GAP) +
         BASE_MARKET_CARD_W +
         20;
+      // marketBusinessRow zone covers both business and investments rows
+      const bothRowsH = 2 * marketRowH + BASE_MARKET_ROW_GAP;
       return {
         x: 20,
         y: 90 - 10,
         w: marketRight - 20,
-        h: marketRowH + 10,
+        h: bothRowsH + 10,
       };
     }
     case 'streetGrid': {

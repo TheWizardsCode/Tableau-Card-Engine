@@ -392,49 +392,53 @@ describe('TutorialOverlayManager highlight zones', () => {
     expect(bounds!.y).toBeGreaterThanOrEqual(layout!.marketTop - 10);
   });
 
-  // ── AC 13: T11 endTurnButton highlight (confirm, action controls) ──
+  // ── AC 13: T11 challengePanel highlight (confirm, challenges info) ──
 
-  it('endTurnButton highlight (T11) covers the action button area for action controls', async () => {
+  it('challengePanel highlight (T11) covers the challenge panel area', async () => {
     const layout = scene.layout as {
-      actionY: number;
-      actionButtonH: number;
-      actionButtonW: number;
-      gameW: number;
+      challengeX: number;
+      challengeY: number;
+      challengeW: number;
     } | undefined;
     expect(layout).toBeTruthy();
 
-    const highlight = showStepAndGetHighlight('T11'); // T11 = confirm, endTurnButton zone
+    const highlight = showStepAndGetHighlight('T11'); // T11 = confirm, challengePanel zone
     expect(highlight).toBeTruthy();
 
     const bounds = getHighlightBounds(highlight!);
     expect(bounds).toBeTruthy();
 
-    // Should be in the bottom-right area
-    expect(bounds!.y).toBeGreaterThanOrEqual(layout!.actionY - 10);
-    expect(bounds!.h).toBeGreaterThan(layout!.actionButtonH - 10);
+    // Should be in the right sidebar area
+    expect(bounds!.x).toBeGreaterThanOrEqual(layout!.challengeX - 5);
+    expect(bounds!.y).toBeGreaterThanOrEqual(layout!.challengeY - 5);
+    expect(bounds!.w).toBeGreaterThan(0);
+    expect(bounds!.h).toBeGreaterThan(0);
   });
 
-  // ── AC 14: T12 investments row highlight (confirm, challenges) ──
+  // ── AC 14: T12 HUD highlight (confirm, challenges info) ──
 
-  it('investmentsRow highlight (T12) covers the investments row for challenges info', async () => {
-    const layout = scene.layout as {
-      marketTop: number;
-      marketRowH: number;
-      marketRowGap: number;
-      gameW: number;
-    } | undefined;
+  it('HUD highlight (T12) covers the HUD area for challenges info', async () => {
+    const layout = scene.layout as { hudY: number; gameW: number } | undefined;
     expect(layout).toBeTruthy();
+    expect(layout!.hudY).toBeGreaterThan(0);
 
-    const highlight = showStepAndGetHighlight('T12'); // T12 = confirm, investmentsRow zone
+    const highlight = showStepAndGetHighlight('T12'); // T12 = confirm, hud zone
     expect(highlight).toBeTruthy();
 
     const bounds = getHighlightBounds(highlight!);
     expect(bounds).toBeTruthy();
 
-    // The investments row is the second (bottom) market row
-    const expectedTopY = layout!.marketTop + layout!.marketRowH + layout!.marketRowGap;
-    expect(bounds!.y).toBeLessThanOrEqual(expectedTopY + 4);
-    expect(bounds!.y).toBeGreaterThanOrEqual(layout!.marketTop - 10);
+    const hudY = layout!.hudY;
+    // The highlight should cover the HUD strip (28px tall, centered at hudY)
+    expect(bounds!.y).toBeLessThanOrEqual(hudY + 2);
+    expect(bounds!.y).toBeGreaterThanOrEqual(hudY - 16);
+
+    // Width should cover most of the screen
+    expect(bounds!.w).toBeGreaterThan(layout!.gameW * 0.6);
+
+    // Height should be reasonable for a HUD strip
+    expect(bounds!.h).toBeLessThan(60);
+    expect(bounds!.h).toBeGreaterThan(20);
   });
 
   // ── Coverage: all 13 unified steps have valid highlight zones ─
@@ -451,6 +455,7 @@ describe('TutorialOverlayManager highlight zones', () => {
         'incidentQueue',
         'investmentsRow',
         'helpButton',
+        'challengePanel',
         'completionModal',
       ];
       expect(validZones).toContain(zone);
