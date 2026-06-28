@@ -11,7 +11,12 @@ import {
   REFRESH_DEVELOPMENT_COST,
   REFRESH_INVESTMENTS_COST,
   isPawnShopCard,
+  synergyColor,
 } from '../MainStreetCards';
+import {
+  computeSynergyBonus,
+  computeSynergyPairs,
+} from '../MainStreetAdjacency';
 import { computeScore } from '../MainStreetEngine';
 import {
   buildCoinsTooltip,
@@ -389,6 +394,51 @@ export class MainStreetRenderer {
         this.drawEmptySlot(x, y, i);
       }
     }
+
+    // Draw synergy lines between adjacent synergistic businesses
+    this.drawSynergyLines();
+  }
+
+  /**
+   * Draws visual lines between adjacent businesses that share a synergy type.
+   * Each line uses the colour of the shared synergy type (from synergyColor).
+   * Lines are drawn over the street grid but behind tooltip zones.
+   */
+  private drawSynergyLines(): void {
+    const s = this.scene;
+    const { streetX, streetTop, slotW, slotGap, slotH, streetCols, streetRowGap } = s.layout;
+
+    const pairs = computeSynergyPairs(s.state.streetGrid);
+
+    for (const pair of pairs) {
+      const fromCol = pair.fromIndex % streetCols;
+      const fromRow = Math.floor(pair.fromIndex / streetCols);
+      const toCol = pair.toIndex % streetCols;
+      const toRow = Math.floor(pair.toIndex / streetCols);
+
+      const x1 = streetX + fromCol * (slotW + slotGap) + slotW / 2;
+      const y1 = streetTop + fromRow * (slotH + streetRowGap) + slotH / 2;
+      const x2 = streetX + toCol * (slotW + slotGap) + slotW / 2;
+      const y2 = streetTop + toRow * (slotH + streetRowGap) + slotH / 2;
+
+      const color = synergyColor(pair.sharedSynergy);
+
+      const line = s.add.graphics();
+      line.lineStyle(3, color, 0.7);
+      line.beginPath();
+      line.moveTo(x1, y1);
+      line.lineTo(x2, y2);
+      line.strokePath();
+
+      // Add a subtle outer glow by drawing a thicker, more transparent line underneath
+      line.lineStyle(6, color, 0.2);
+      line.beginPath();
+      line.moveTo(x1, y1);
+      line.lineTo(x2, y2);
+      line.strokePath();
+
+      s.streetContainer.add(line);
+    }
   }
 
   public drawBusinessSlot(x: number, y: number, _index: number, biz: BusinessCard | CommunitySpaceCard): void {
@@ -431,7 +481,9 @@ export class MainStreetRenderer {
         const label = isCommunitySpace ? 'Community Space' : 'Business';
         const totalRep = (biz.reputationPerTurn ?? 0) + biz.reputationBonus;
         const repInfo = totalRep > 0 ? `\nReputation: +${totalRep}/turn` : '';
-        const info = `${label}: ${biz.name}\nIncome: +${biz.baseIncome + biz.incomeBonus}/turn${repInfo}\nSynergy: ${biz.synergyTypes.join('/')}${synergyNote}\nLevel: ${biz.level}`;
+        const synergyBonus = isPawnShopCard(biz) ? 0 : computeSynergyBonus(s.state.streetGrid, _index, s.state.config.synergyBonusPerNeighbor);
+        const synergyInfo = isPawnShopCard(biz) ? '' : `\nSynergy bonus: +${synergyBonus}/turn`;
+        const info = `${label}: ${biz.name}\nIncome: +${biz.baseIncome + biz.incomeBonus}/turn${repInfo}\nSynergy: ${biz.synergyTypes.join('/')}${synergyInfo}${synergyNote}\nLevel: ${biz.level}`;
         s.tooltipManager?.show(info, tooltipZone.x, tooltipZone.y);
       });
       tooltipZone.on('pointerout', () => {

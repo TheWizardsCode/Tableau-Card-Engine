@@ -252,6 +252,75 @@ export function applyIncome(state: MainStreetState): IncomeResult {
   return result;
 }
 
+// ── Synergy Pairs for Visual Lines ──────────────────────────
+
+/**
+ * Represents a synergy connection between two adjacent slots on the street grid.
+ * Used by the renderer to draw visual lines between synergistic businesses.
+ */
+export interface SynergyPair {
+  /** The lower slot index of the pair. */
+  fromIndex: number;
+  /** The higher slot index of the pair. */
+  toIndex: number;
+  /** The shared synergy type used to determine line color. */
+  sharedSynergy: SynergyType;
+}
+
+/**
+ * Computes all synergy pairs on the street grid for visual line rendering.
+ *
+ * A pair exists when two occupied slots share at least one SynergyType and
+ * are within Manhattan distance range (1 + card's synergyRangeBonus). Each pair
+ * is reported only once (fromIndex < toIndex). Pawn Shop cards are excluded
+ * entirely — they neither contribute nor receive synergy connections.
+ *
+ * Community-space cards are included in the same manner as business cards.
+ *
+ * @param grid  The street grid.
+ * @returns Array of synergy pairs for visual line drawing.
+ */
+export function computeSynergyPairs(
+  grid: (BusinessCard | CommunitySpaceCard | null)[],
+): SynergyPair[] {
+  const pairs: SynergyPair[] = [];
+  const seen = new Set<string>();
+
+  for (let i = 0; i < grid.length; i++) {
+    const card = grid[i];
+    if (!card) continue;
+    if (isPawnShopCard(card)) continue;
+
+    const range = 1 + card.synergyRangeBonus;
+    const neighborIndices = neighbors(i, range);
+
+    for (const ni of neighborIndices) {
+      if (ni <= i) continue; // avoid duplicates and self-pairs
+      const neighbor = grid[ni];
+      if (!neighbor) continue;
+      if (isPawnShopCard(neighbor)) continue;
+
+      // Find the first shared synergy type
+      const shared = card.synergyTypes.find(
+        (st: SynergyType) => neighbor.synergyTypes.includes(st),
+      );
+      if (shared) {
+        const key = `${Math.min(i, ni)}-${Math.max(i, ni)}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          pairs.push({
+            fromIndex: Math.min(i, ni),
+            toIndex: Math.max(i, ni),
+            sharedSynergy: shared,
+          });
+        }
+      }
+    }
+  }
+
+  return pairs.sort((a, b) => a.fromIndex - b.fromIndex || a.toIndex - b.toIndex);
+}
+
 // ── Result Types ────────────────────────────────────────────
 
 /** Income breakdown for a single occupied slot. */
