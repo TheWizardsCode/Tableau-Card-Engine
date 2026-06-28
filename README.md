@@ -96,7 +96,7 @@ When a Business card is upgraded (level > 0), the renderer applies visual overla
 |---------|----------|-------------|
 | **Level badge** | Top-right | Gold bold text showing "Lvl N" (e.g., "Lvl 2") |
 | **Income display** | Bottom-center | Green bold text showing combined income (baseIncome + incomeBonus), e.g., "+8" |
-| **Name overlay** | Top-center | White bold text with dark semi-transparent background showing the upgraded card name (e.g., "Library" instead of "Bookshop") |
+| **Name overlay** | Top-center | White bold text with dark semi-transparent background showing the upgraded card name (e.g., "Reader's Café" instead of "Bookshop") |
 | **Upgrade border** | Card perimeter | 3px golden stroke (`#ffaa22`) for visual distinction from base cards |
 
 ### Architecture

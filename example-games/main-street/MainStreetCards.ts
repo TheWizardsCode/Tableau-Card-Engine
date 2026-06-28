@@ -964,14 +964,15 @@ const UPGRADE_TEMPLATES: UpgradeCard[] = [
   },
   {
     family: 'upgrade',
-    id: 'upg-library',
-    name: 'Upgrade to Library',
+    id: 'upg-readers-cafe',
+    name: "Upgrade to Reader's Café",
     targetBusiness: 'Bookshop',
     cost: 3,
     incomeBonus: 1,
     synergyRangeBonus: 0,
+    reputationBonus: 0.1,
     requiredLevel: 0,
-    description: 'Adds a cultural boost to the Bookshop.',
+    description: 'Transforms the Bookshop into a Reader\'s Café, blending books with café culture for a reputation boost.',
   },
   // ── M2 Expanded Upgrade Templates ───────────────────────────
   {

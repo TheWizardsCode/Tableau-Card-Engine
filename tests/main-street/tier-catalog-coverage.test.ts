@@ -33,7 +33,7 @@ describe('Main Street tier catalog coverage', () => {
     const baselineM1 = new Set([
       'biz-bakery', 'biz-diner', 'biz-bookshop', 'cs-park', 'biz-hardware',
       'evt-festival', 'evt-rainy', 'evt-tax', 'evt-award', 'evt-inspection',
-      'upg-patisserie', 'upg-bistro', 'upg-library',
+      'upg-patisserie', 'upg-bistro', 'upg-readers-cafe',
     ]);
     const expandedCountInTier1 = TIER_DEFINITIONS['tier-1'].newCardIds.filter(id => !baselineM1.has(id)).length;
 

@@ -253,7 +253,7 @@ The **Main Street** game uses three distinct card families. Below is the current
 |------|--------------|--------------------------|----------------|--------------|-------------|
 | Bakery | 3 | 2 | Food | Bakery → Patisserie | Provides warm pastries. Gains +1 coin for each adjacent Food business. |
 | Diner | 4 | 3 | Food | Diner → Bistro | Serves quick meals. Gains +1 coin per adjacent Food business. |
-| Bookshop | 4 | 2 | Culture | Bookshop → Library | Sells books. Gains +1 coin per adjacent Culture business. |
+| Bookshop | 4 | 2 | Culture | Bookshop → Reader's Café | Sells books. Gains +1 coin per adjacent Culture business. |
 | Park | 2 | 1 | Culture | Park → Garden | Offers leisure. Gains +1 coin per adjacent Culture business. |
 | Hardware Store | 5 | 3 | Commerce | Hardware Store → Home Improvement | Supplies tools. Gains +1 coin per adjacent Commerce business. |
 | ... *(additional business cards may be added later)* |
@@ -280,7 +280,7 @@ Event cards are split into two trigger types:
 |------|----------------|--------------|--------------|----------------------|-------------|
 | Upgrade to Patisserie | Bakery | 4 | +1 | +1 (adjacency range) | Turns a Bakery into a Patisserie, increasing income and allowing synergy with businesses two slots away. |
 | Upgrade to Bistro | Diner | 4 | +1 | +1 | Turns a Diner into a Bistro with higher foot‑traffic. |
-| Upgrade to Library | Bookshop | 3 | +1 | 0 | Adds a cultural boost to adjacent Culture businesses. |
+| Upgrade to Reader's Café | Bookshop | 3 | +1 | 0 | Transforms the Bookshop into a Reader's Café, blending books with café culture for +0.1 reputation per turn. |
 | ... *(more upgrades as new businesses are introduced)* |
 
 ---

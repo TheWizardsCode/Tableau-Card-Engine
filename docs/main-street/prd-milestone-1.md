@@ -39,7 +39,7 @@ Deliver a playable walking skeleton of Main Street that a human player can compl
 | Area | Details |
 |------|---------|
 | **Game State Model** | TypeScript types/interfaces for `MainStreetState` including street grid (10 slots), resource bank (coins + reputation), market, deck state, turn counter, day/night phase, and challenges completed. |
-| **Card Types** | 5 Business cards (Bakery, Diner, Bookshop, Park, Hardware Store), 5 Event cards (Local Festival, Rainy Day, Tax Audit, Community Award, Health Inspection), 3 Upgrade cards (Patisserie, Bistro, Library). Defined as typed JSON fixtures. |
+| **Card Types** | 5 Business cards (Bakery, Diner, Bookshop, Park, Hardware Store), 5 Event cards (Local Festival, Rainy Day, Tax Audit, Community Award, Health Inspection), 3 Upgrade cards (Patisserie, Bistro, Reader's Café). Defined as typed JSON fixtures. |
 | **Turn Structure** | 6-phase day cycle: DayStart -> MarketPhase -> InvestmentResolution -> IncomePhase -> IncidentPhase -> EndCheck. Implemented via `PhaseManager`. |
 | **Core Actions** | Buy Business, Buy Upgrade, Buy Event, Place Business, End Turn. All with legality validation returning `LegalityResult`. |
 | **Win/Loss Detection** | Score threshold (>=150), all-challenges-complete, turn-limit victory (turn 20 with reputation > 0 and coins >= 0). Loss: bankruptcy (coins < 0), reputation collapse (reputation <= 0), turn exhaustion without victory. |
@@ -547,7 +547,7 @@ The walking skeleton emits the following events through the `GameEventEmitter` f
 |----|------|------|-------------|---------------|--------------|
 | `biz-bakery` | Bakery | 3 | 2 | Food | Bakery -> Patisserie |
 | `biz-diner` | Diner | 4 | 3 | Food | Diner -> Bistro |
-| `biz-bookshop` | Bookshop | 4 | 2 | Culture | Bookshop -> Library |
+| `biz-bookshop` | Bookshop | 4 | 2 | Culture | Bookshop -> Reader's Café |
 | `biz-park` | Park | 2 | 1 | Culture | Park -> Garden |
 | `biz-hardware` | Hardware Store | 5 | 3 | Commerce | Hardware Store -> Home Improvement |
 
@@ -563,11 +563,11 @@ The walking skeleton emits the following events through the `GameEventEmitter` f
 
 ### Upgrade Cards
 
-| ID | Name | Target | Cost | Income Bonus | Synergy Range Bonus |
-|----|------|--------|------|-------------|-------------------|
-| `upg-patisserie` | Upgrade to Patisserie | Bakery | 4 | +1 | +1 |
-| `upg-bistro` | Upgrade to Bistro | Diner | 4 | +1 | +1 |
-| `upg-library` | Upgrade to Library | Bookshop | 3 | +1 | 0 |
+| ID | Name | Target | Cost | Income Bonus | Synergy Range Bonus | Reputation Bonus |
+|----|------|--------|------|-------------|-------------------|------------------|
+| `upg-patisserie` | Upgrade to Patisserie | Bakery | 4 | +1 | +1 | 0 |
+| `upg-bistro` | Upgrade to Bistro | Diner | 4 | +1 | +1 | 0 |
+| `upg-readers-cafe` | Upgrade to Reader's Café | Bookshop | 3 | +1 | 0 | +0.1 |
 
 ### Deck Composition (for shuffling)
 

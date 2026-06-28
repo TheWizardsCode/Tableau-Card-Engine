@@ -56,7 +56,7 @@ const TIER_1_CARD_IDS: string[] = [
   // Upgrade (3)
   'upg-patisserie',
   'upg-bistro',
-  'upg-library',
+  'upg-readers-cafe',
 
   // Early expanded sample (~10% of expanded set => 5 cards)
   'biz-pawnshop',

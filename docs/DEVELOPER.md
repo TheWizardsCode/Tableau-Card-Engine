@@ -1152,7 +1152,7 @@ this.applyUpgradeOverlays(cardContainer, biz, renderW, renderH);
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                     Game State Update                           │
-│  Player upgrades Bookshop → Library (level 1→2, income +3→+8)  │
+│  Player upgrades Bookshop → Reader's Café (level 1→2, income +3→+8)  │
 └──────────────────────────┬──────────────────────────────────────┘
                            │
                            ▼

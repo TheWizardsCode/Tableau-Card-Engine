@@ -190,7 +190,7 @@ Each Upgrade targets a specific Business by name. Applying an upgrade increments
 |----|------|--------|------|---------|--------|-------------|-----------|
 | `upg-patisserie` | Upgrade to Patisserie | Bakery | 4 | +1 | +1 | Bakery -> Patisserie. | Classic upgrade; income + range. |
 | `upg-bistro` | Upgrade to Bistro | Diner | 4 | +1 | +1 | Diner -> Bistro. | Matches Patisserie in cost/power. |
-| `upg-library` | Upgrade to Library | Bookshop | 3 | +1 | +0 | Bookshop -> Library. | Cheaper; income only, no range. |
+| `upg-readers-cafe` | Upgrade to Reader's Café | Bookshop | 3 | +1 | +0 | Bookshop -> Reader's Café (+0.1 rep/turn). | Cheaper; income only, no range; reputation bonus. |
 
 ### M2 Standard Upgrade Templates (14)
 
@@ -240,7 +240,7 @@ Multi-level upgrades require the business to already be at Level 1 (`requiredLev
 | Cost | Count | Cards |
 |------|-------|-------|
 | 2 | 1 | Gourmet Truck |
-| 3 | 9 | Library (Bookshop upgrade), Garden, Vintage Shop, Dry Cleaners, Salon, Roastery, Garden Center, Bread Factory, Fast Food |
+| 3 | 9 | Reader's Café (Bookshop upgrade), Garden, Vintage Shop, Dry Cleaners, Salon, Roastery, Garden Center, Bread Factory, Fast Food |
 | 4 | 8 | Patisserie, Bistro, Designer Store, Gaming Lounge, Museum, Drive-In Theater, Wellness Center, Community Hub |
 | 5 | 6 | Home Improvement, IMAX Theater, Resort Spa, Medical Center, Grand Bakehouse, Restaurant |
 | 6 | 2 | Multiplex, Luxury Retreat |
