@@ -429,7 +429,9 @@ export class MainStreetRenderer {
         const synergyNote = isPawnShopCard(biz) ? ' (excluded from synergy)' : '';
         const isCommunitySpace = (biz as any).family === 'community-space';
         const label = isCommunitySpace ? 'Community Space' : 'Business';
-        const info = `${label}: ${biz.name}\nIncome: +${biz.baseIncome + biz.incomeBonus}\nSynergy: ${biz.synergyTypes.join('/')}${synergyNote}\nLevel: ${biz.level}`;
+        const totalRep = (biz.reputationPerTurn ?? 0) + biz.reputationBonus;
+        const repInfo = totalRep > 0 ? `\nReputation: +${totalRep}/turn` : '';
+        const info = `${label}: ${biz.name}\nIncome: +${biz.baseIncome + biz.incomeBonus}/turn${repInfo}\nSynergy: ${biz.synergyTypes.join('/')}${synergyNote}\nLevel: ${biz.level}`;
         s.tooltipManager?.show(info, tooltipZone.x, tooltipZone.y);
       });
       tooltipZone.on('pointerout', () => {
@@ -513,21 +515,38 @@ export class MainStreetRenderer {
       container.add(nameText);
     }
 
-    // Income text (bottom center)
+    // Income text (bottom-left)
     if (spec.incomeText) {
       const incomeText = this.scene.add.text(
         spec.incomeText.x,
         spec.incomeText.y,
         spec.incomeText.text,
         {
-          fontSize: spec.incomeText.fontSize ?? '12px',
+          fontSize: spec.incomeText.fontSize ?? '11px',
           fontStyle: spec.incomeText.fontStyle,
           color: spec.incomeText.color,
           fontFamily: FONT_FAMILY,
         },
       );
-      incomeText.setOrigin(0.5, 1);
+      incomeText.setOrigin(0, 1);
       container.add(incomeText);
+    }
+
+    // Reputation text (bottom-right)
+    if (spec.reputationText) {
+      const repText = this.scene.add.text(
+        spec.reputationText.x,
+        spec.reputationText.y,
+        spec.reputationText.text,
+        {
+          fontSize: spec.reputationText.fontSize ?? '11px',
+          fontStyle: spec.reputationText.fontStyle,
+          color: spec.reputationText.color,
+          fontFamily: FONT_FAMILY,
+        },
+      );
+      repText.setOrigin(1, 1);
+      container.add(repText);
     }
   }
 
@@ -905,11 +924,15 @@ export class MainStreetRenderer {
           if (card.family === 'business') {
             const b = card as any;
             const bSynergyNote = isPawnShopCard(b) ? ' (excluded from synergy)' : '';
-            info = `Business: ${b.name}\nCost: ${b.cost}\nIncome: +${b.baseIncome + (b.incomeBonus || 0)}/turn\nSynergy: ${(b.synergyTypes || []).join('/')}${bSynergyNote}\n${b.description ?? ''}`;
+            const bTotalRep = (b.reputationPerTurn ?? 0) + (b.reputationBonus ?? 0);
+            const bRepInfo = bTotalRep > 0 ? `\nReputation: +${bTotalRep}/turn` : '';
+            info = `Business: ${b.name}\nCost: ${b.cost}\nIncome: +${b.baseIncome + (b.incomeBonus || 0)}/turn${bRepInfo}\nSynergy: ${(b.synergyTypes || []).join('/')}${bSynergyNote}\n${b.description ?? ''}`;
           } else if (card.family === 'community-space') {
             const cs = card as any;
             const csSynergyNote = isPawnShopCard(cs) ? ' (excluded from synergy)' : '';
-            info = `Community Space: ${cs.name}\nCost: ${cs.cost}\nIncome: +${cs.baseIncome + (cs.incomeBonus || 0)}/turn\nSynergy: ${(cs.synergyTypes || []).join('/')}${csSynergyNote}\n${cs.description ?? ''}`;
+            const csTotalRep = (cs.reputationPerTurn ?? 0) + (cs.reputationBonus ?? 0);
+            const csRepInfo = csTotalRep > 0 ? `\nReputation: +${csTotalRep}/turn` : '';
+            info = `Community Space: ${cs.name}\nCost: ${cs.cost}\nIncome: +${cs.baseIncome + (cs.incomeBonus || 0)}/turn${csRepInfo}\nSynergy: ${(cs.synergyTypes || []).join('/')}${csSynergyNote}\n${cs.description ?? ''}`;
           } else if (card.family === 'event') {
             const e = card as any;
             info = `Event: ${e.name}\nCost: ${e.cost}\nEffect: ${e.effect}\nCoins: ${e.coinDelta >= 0 ? '+' : ''}${e.coinDelta}, Rep: ${e.reputationDelta >= 0 ? '+' : ''}${e.reputationDelta}`;

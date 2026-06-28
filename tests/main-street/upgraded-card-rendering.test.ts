@@ -88,10 +88,11 @@ describe('buildUpgradeOverlaySpec', () => {
       expect(spec.incomeText!.text).toContain('8'); // 3 + 5 = 8
     });
 
-    it('shows no income overlay for an un-upgraded card', () => {
+    it('shows income overlay for an un-upgraded card when income > 0', () => {
       const biz = makeBiz({ baseIncome: 3, incomeBonus: 0, level: 0 });
       const spec = buildUpgradeOverlaySpec(biz, 200, 280);
-      expect(spec.incomeText).toBeNull();
+      expect(spec.incomeText).not.toBeNull();
+      expect(spec.incomeText!.text).toContain('3');
     });
 
     it('positions the income text near the bottom of the card', () => {

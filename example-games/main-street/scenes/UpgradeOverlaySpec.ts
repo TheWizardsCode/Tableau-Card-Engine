@@ -51,8 +51,10 @@ export interface OverlayBorderSpec {
 export interface UpgradeOverlaySpec {
   /** Level badge text (e.g. "Lvl 2"), null for base cards. */
   levelBadge: OverlayTextSpec | null;
-  /** Combined income text (e.g. "+8"), null for base cards, always shown for upgraded. */
+  /** Per-turn income text (e.g. "+3/turn"), null when total income is 0. */
   incomeText: OverlayTextSpec | null;
+  /** Per-turn reputation text (e.g. "+0.2/turn"), null when total reputation is 0. */
+  reputationText: OverlayTextSpec | null;
   /** Upgraded name text, null for base cards. */
   nameText: OverlayTextSpec | null;
   /** Border/glow for upgraded cards, null for base cards. */
@@ -84,6 +86,7 @@ export function buildUpgradeOverlaySpec(
 ): UpgradeOverlaySpec {
   const isUpgraded = biz.level > 0;
   const totalIncome = biz.baseIncome + biz.incomeBonus;
+  const totalReputation = (biz.reputationPerTurn ?? 0) + biz.reputationBonus;
 
   // Level badge: top-right corner, only for upgraded cards
   const levelBadge: OverlayTextSpec | null = isUpgraded
@@ -97,15 +100,30 @@ export function buildUpgradeOverlaySpec(
       }
     : null;
 
-  // Income text: bottom center, only shown for upgraded cards to keep
-  // base cards looking clean (the SVG already shows base income)
-  const incomeText: OverlayTextSpec | null = isUpgraded
+  // Income text: bottom-left, shown for any card with income > 0
+  const incomeText: OverlayTextSpec | null = totalIncome > 0
     ? {
-        text: `+${totalIncome}`,
-        x: Math.round(width / 2),
+        text: `+${totalIncome}/turn`,
+        x: 8,
         y: Math.round(height - 8),
-        fontSize: '12px',
+        fontSize: '11px',
         color: '#44ff44',
+        fontStyle: 'bold',
+      }
+    : null;
+
+  // Reputation text: bottom-right, shown for any card with reputation > 0
+  // Format to at most 1 decimal place, stripping trailing zeros (e.g. 0.2, 0.3, 1.0 -> 1)
+  const repFormatted = totalReputation > 0
+    ? (Number.isInteger(totalReputation) ? `${totalReputation}` : totalReputation.toFixed(1))
+    : '0';
+  const reputationText: OverlayTextSpec | null = totalReputation > 0
+    ? {
+        text: `+${repFormatted}/turn`,
+        x: Math.round(width - 8),
+        y: Math.round(height - 8),
+        fontSize: '11px',
+        color: '#88bbff',
         fontStyle: 'bold',
       }
     : null;
@@ -130,5 +148,5 @@ export function buildUpgradeOverlaySpec(
       }
     : null;
 
-  return { levelBadge, incomeText, nameText, upgradeBorder };
+  return { levelBadge, incomeText, reputationText, nameText, upgradeBorder };
 }
