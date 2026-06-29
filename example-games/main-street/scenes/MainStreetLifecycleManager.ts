@@ -402,7 +402,7 @@ export class MainStreetLifecycleManager {
     // has been removed. The tutorial no longer has an open-help action step.
     // The HelpPanel toggle no longer needs tutorial intercept.
     // Provide the ordered difficulty names so the Settings panel can render a selector
-    s.initSettingsPanel(DIFFICULTY_NAMES);
+    s.initSettingsPanel(DIFFICULTY_NAMES, 'Medium');
     s.initUndoRedoButtons(
       () => s.performUndo(),
       () => s.performRedo(),

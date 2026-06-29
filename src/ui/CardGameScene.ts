@@ -255,11 +255,12 @@ export abstract class CardGameScene extends Phaser.Scene {
    *
    * @param difficultyNames  Optional ordered list of difficulty names.
    */
-  protected initSettingsPanel(difficultyNames?: readonly string[]): void {
+  protected initSettingsPanel(difficultyNames?: readonly string[], defaultDifficulty?: string): void {
     if (!this.soundManager) return;
     this.settingsPanel = new SettingsPanel(this, {
       soundManager: this.soundManager,
       difficultyNames,
+      defaultDifficulty,
     });
     this.settingsButton = this.settingsPanel.settingsButton!;
   }
