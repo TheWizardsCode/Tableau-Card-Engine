@@ -403,6 +403,29 @@ export class MainStreetLifecycleManager {
     // The HelpPanel toggle no longer needs tutorial intercept.
     // Provide the ordered difficulty names so the Settings panel can render a selector
     s.initSettingsPanel(DIFFICULTY_NAMES, 'Medium');
+    // Listen for difficulty changes and restart the game with the new difficulty
+    if (typeof window !== 'undefined') {
+      const difficultyChangeHandler = (ev: Event) => {
+        const detail = (ev as CustomEvent).detail;
+        const newDifficulty = detail?.difficulty as string | undefined;
+        if (!newDifficulty || !DIFFICULTY_NAMES.includes(newDifficulty as any)) return;
+        if (newDifficulty === s.selectedDifficulty) return;
+        s.selectedDifficulty = newDifficulty as any;
+        // Clear any checkpoint from the previous difficulty
+        try { s.checkpointManager?.clear().catch(() => {}); } catch { /* ignore */ }
+        // Create a fresh game with the new difficulty
+        s.state = setupMainStreetGame({
+          difficulty: s.selectedDifficulty,
+          unlockedCardIds: s.campaign?.unlockedCardIds,
+        });
+        s.startDayPhase();
+        s.refreshAll();
+      };
+      window.addEventListener('tce:difficulty-changed', difficultyChangeHandler);
+      s.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+        window.removeEventListener('tce:difficulty-changed', difficultyChangeHandler);
+      });
+    }
     s.initUndoRedoButtons(
       () => s.performUndo(),
       () => s.performRedo(),
