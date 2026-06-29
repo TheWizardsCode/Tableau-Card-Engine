@@ -61,6 +61,11 @@ export class GymHandPileScene extends GymSceneBase {
   private highlightManager!: HighlightManager;
   // Active move tween reference (for cancellation)
   private activeMoveTween: Phaser.Tweens.Tween | null = null;
+  // State for tracking the moved card so Cancel Move can return it
+  private movedCardIndex: number = -1;
+  private movedCardOrigX: number = 0;
+  private movedCardOrigY: number = 0;
+  private cardMoved: boolean = false;
   // Discard pile visual drop zone graphics
   private discardZoneGraphics!: Phaser.GameObjects.Graphics;
 
@@ -582,6 +587,12 @@ export class GymHandPileScene extends GymSceneBase {
       return;
     }
 
+    // Store original position and index so Cancel Move can return the card
+    this.movedCardIndex = this.selectedIdx;
+    this.movedCardOrigX = (sprite as any).x;
+    this.movedCardOrigY = (sprite as any).y;
+    this.cardMoved = true;
+
     const destX = GAME_W / 2 + 200;
     const destY = 200;
 
@@ -597,6 +608,7 @@ export class GymHandPileScene extends GymSceneBase {
         duration: 500,
         onComplete: () => {
           this.activeMoveTween = null;
+          // cardMoved remains true so Cancel Move can still return the card
           this.logEvent('Move completed (animated)');
         },
       });
@@ -604,10 +616,36 @@ export class GymHandPileScene extends GymSceneBase {
   }
 
   private cancelMove(): void {
+    // Stop any active move tween
     if (this.activeMoveTween) {
       this.activeMoveTween.stop();
       this.activeMoveTween = null;
-      this.logEvent('Move cancelled');
+    }
+
+    // If a card was moved, return it to its original hand position
+    if (this.cardMoved && this.movedCardIndex >= 0) {
+      const sprite = this.handView.getSpriteAt(this.movedCardIndex);
+      if (sprite) {
+        if (this.reducedMotion) {
+          (sprite as any).setPosition(this.movedCardOrigX, this.movedCardOrigY);
+          this.logEvent('Move cancelled — card returned to hand (instant)');
+        } else {
+          this.tweens.add({
+            targets: sprite as any,
+            x: this.movedCardOrigX,
+            y: this.movedCardOrigY,
+            duration: 250,
+            ease: 'Quad.easeOut',
+            onComplete: () => {
+              this.logEvent('Move cancelled — card returned to hand');
+            },
+          });
+        }
+      }
+
+      // Clear the moved state
+      this.cardMoved = false;
+      this.movedCardIndex = -1;
     } else {
       this.logEvent('No active move to cancel');
     }
