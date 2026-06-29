@@ -349,9 +349,9 @@ describe('Lost Cities hand/pile migration', () => {
     pileView.setPile(emptyPile);
     pileView.update();
 
-    // Verify the sprite is invisible for empty pile
+    // Verify the sprite shows ghosted state for empty pile
     const sprite = scene.images[scene.images.length - 1];
-    expect(sprite.setVisible).toHaveBeenCalledWith(false);
+    // Sprite should be visible (ghosted) so it stays interactive
     expect(sprite.setAlpha).toHaveBeenCalledWith(0.3);
   });
 
@@ -654,9 +654,8 @@ describe('Lost Cities hand/pile migration', () => {
     pileView.setPile(emptyPile);
     pileView.update();
 
-    // Sprite should be set invisible for empty pile
+    // Sprite should be ghosted (visible with low alpha) for empty pile
     const sprite = scene.images[scene.images.length - 1];
-    expect(sprite.setVisible).toHaveBeenCalledWith(false);
     expect(sprite.setAlpha).toHaveBeenCalledWith(0.3);
 
     pileView.destroy();

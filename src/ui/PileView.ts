@@ -186,7 +186,7 @@ export class PileView {
     if (this.pile.isEmpty()) {
       this.sprite.setTexture(this.emptyTexture);
       this.sprite.setAlpha(this.emptyAlpha);
-      this.sprite.setVisible(false);
+      // Sprite remains visible (ghosted) so it stays interactive
     } else {
       const top = this.pile.peek()!;
       const textureKey = this.cardTextureFn
