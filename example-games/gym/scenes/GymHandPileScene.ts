@@ -88,7 +88,7 @@ export class GymHandPileScene extends GymSceneBase {
   private readonly ROTATION_DEGREES_DEFAULT = 25;
   // Cascade / vertical layout state
   private readonly CASCADE_SPACING = 42;
-  private readonly CASCADE_X = 120;
+  private readonly CASCADE_X = GAME_W / 2;
   private readonly CASCADE_TOP_Y = 220;
   private isVerticalLayout = false;
   private layoutLabel!: Phaser.GameObjects.Text;
