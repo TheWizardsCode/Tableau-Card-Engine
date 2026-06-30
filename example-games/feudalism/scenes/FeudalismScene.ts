@@ -28,6 +28,7 @@ import helpContent from '../help-content.json';
 
 import {
   SFX_KEYS,
+  ANIM_DURATION,
   type TurnPhase,
 } from './FeudalismConstants';
 import { FeudalismRenderer } from './FeudalismRenderer';
@@ -521,7 +522,20 @@ export class FeudalismScene extends CardGameScene {
     // re-creating them from the restored session data.
     this.feudRenderer.clearMarketSelection();
     this.refreshAll();
-    this.turnController.setPhase('player-turn');
+
+    // Determine whose turn it is and set the phase accordingly.
+    // Previously this unconditionally set 'player-turn', which caused the
+    // bug where resuming into the AI's turn allowed human interaction.
+    // See CG-0MQZYDCMY007DHTI.
+    const currentPlayer = this.session.players[this.session.currentPlayerIndex];
+    if (currentPlayer.isAI) {
+      this.turnController.setPhase('ai-turn');
+      this.time.delayedCall(ANIM_DURATION + 200, () => {
+        this.turnController.executeAiTurn();
+      });
+    } else {
+      this.turnController.setPhase('player-turn');
+    }
   }
 
   // ── Cleanup ─────────────────────────────────────────────
