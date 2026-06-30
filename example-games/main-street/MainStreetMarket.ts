@@ -436,6 +436,51 @@ export function refillAllMarkets(state: MainStreetState): void {
   refillInvestmentsMarket(state);
 }
 
+// ── Market Cycling (Multi-Use Card Economy) ──────────────────
+
+/**
+ * Cycles all unpurchased market cards to their respective discard piles
+ * and refills the market from the decks.
+ *
+ * Called at the end of each MarketPhase (before IncomePhase) to ensure
+ * fresh cards are available each turn. Player-owned cards (hand, tableau)
+ * are not affected.
+ *
+ * Uses the existing seeded RNG for any reshuffles that occur during refill.
+ *
+ * @param state  Current game state (mutated in-place).
+ */
+export function cycleMarketCards(state: MainStreetState): void {
+  // ── Cycle development row cards to discards ──────────────
+  const developmentCards = state.market.development.splice(0);
+  for (const card of developmentCards) {
+    if (card.family === 'business') {
+      state.discards.business.push(card as BusinessCard);
+    } else if (card.family === 'community-space') {
+      state.discards.communitySpace.push(card as CommunitySpaceCard);
+    }
+  }
+
+  // ── Cycle investments row cards to discards ──────────────
+  const investmentCards = state.market.investments.splice(0);
+  for (const card of investmentCards) {
+    if (card.family === 'upgrade') {
+      state.discards.upgrade.push(card as UpgradeCard);
+    } else if (card.family === 'event') {
+      state.discards.event.push(card as EventCard);
+    }
+  }
+
+  // Log the cycle
+  const totalCycled = developmentCards.length + investmentCards.length;
+  if (totalCycled > 0) {
+    addLog(state, `Market cycled: ${totalCycled} unpurchased cards moved to discard`, 'neutral');
+  }
+
+  // ── Refill all market rows from decks ────────────────────
+  refillAllMarkets(state);
+}
+
 /**
  * Tops up the incident queue to INCIDENT_QUEUE_SIZE by drawing
  * Incident-trigger cards from the event deck. If the deck has no

@@ -29,6 +29,7 @@ import {
   purchaseEvent,
   refillAllMarkets,
   refillIncidentQueue,
+  cycleMarketCards,
   type PurchaseResult,
 } from './MainStreetMarket';
 import { evaluateChallenges } from './MainStreetChallenges';
@@ -556,6 +557,9 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
   if (state.phase !== 'MarketPhase') {
     throw new Error(`Cannot end turn during ${state.phase}. Must be in MarketPhase.`);
   }
+
+  // Cycle unpurchased market cards to discard piles before advancing phases
+  cycleMarketCards(state);
 
   // Phase: InvestmentResolution
   // Held Investment events are NO LONGER auto-resolved. The player must
