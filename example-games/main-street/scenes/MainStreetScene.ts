@@ -66,6 +66,10 @@ export class MainStreetScene extends CardGameScene {
   public marketContainer!: Phaser.GameObjects.Container;
   public incidentQueueContainer!: Phaser.GameObjects.Container;
   public handContainer!: Phaser.GameObjects.Container;
+  /** Container for business cards in the player's hand (Multi-Use Card Economy). */
+  public handBusinessContainer!: Phaser.GameObjects.Container;
+  /** Text element showing hand capacity (e.g. "Hand: 2/5"). */
+  public handSizeText!: Phaser.GameObjects.Text;
   public actionContainer!: Phaser.GameObjects.Container;
 
   // Activity Log panel

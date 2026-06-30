@@ -24,6 +24,7 @@ import { recordMainStreetEvent } from './MainStreetTranscript';
 import { applyIncome, type IncomeResult } from './MainStreetAdjacency';
 import {
   purchaseBusiness,
+  purchaseBusinessToHand,
   purchaseUpgrade,
   purchaseEvent,
   refillAllMarkets,
@@ -63,6 +64,12 @@ export interface PlayEventAction {
   type: 'play-event';
 }
 
+/** Buy a business card and add it to the player's hand (Multi-Use Card Economy). */
+export interface BuyBusinessToHandAction {
+  type: 'buy-business-to-hand';
+  cardId: string;
+}
+
 /** End the current market/action phase. */
 export interface EndTurnAction {
   type: 'end-turn';
@@ -73,6 +80,7 @@ export type PlayerAction =
   | BuyBusinessAction
   | BuyUpgradeAction
   | BuyEventAction
+  | BuyBusinessToHandAction
   | PlayEventAction
   | EndTurnAction;
 
@@ -169,6 +177,8 @@ export function executeAction(
   switch (action.type) {
     case 'buy-business':
       return purchaseBusiness(state, action.cardId, action.slotIndex);
+    case 'buy-business-to-hand':
+      return purchaseBusinessToHand(state, action.cardId);
     case 'buy-upgrade':
       return purchaseUpgrade(state, action.cardId, action.targetSlot);
     case 'buy-event':

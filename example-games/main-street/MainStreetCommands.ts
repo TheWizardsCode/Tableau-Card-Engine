@@ -13,6 +13,7 @@ import { toCommand, type ReversibleAction } from '../../src/core-engine/ActionCo
 import type { MainStreetState } from './MainStreetState';
 import {
   purchaseBusiness,
+  purchaseBusinessToHand,
   purchaseUpgrade,
   purchaseEvent,
   refreshDevelopment,
@@ -122,6 +123,20 @@ export function buyUpgradeCommand(
     snapshotAction(
       (s) => purchaseUpgrade(s, cardId, targetSlot),
       `BuyUpgrade ${cardId} -> slot ${targetSlot ?? 'auto'}`,
+    ),
+  );
+}
+
+/** Command: Buy Business to Hand */
+export function buyBusinessToHandCommand(
+  state: MainStreetState,
+  cardId: string,
+) {
+  return toCommand(
+    state,
+    snapshotAction(
+      (s) => purchaseBusinessToHand(s, cardId),
+      `BuyBusinessToHand ${cardId}`,
     ),
   );
 }

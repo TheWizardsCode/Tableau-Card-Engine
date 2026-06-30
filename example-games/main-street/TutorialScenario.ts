@@ -314,6 +314,10 @@ export function createTutorialScenario(
     rng,
     activityLog: [],
     activeEffects: [],
+    hand: [],
+    maxHandSize: 2,
+    discardPile: [],
+    staffCards: [],
   };
 
   // Select challenges for this run using seeded RNG

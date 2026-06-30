@@ -502,6 +502,72 @@ export function purchaseBusiness(
   return { card, cost: card.cost, refilled };
 }
 
+// ── Purchase-to-Hand (Multi-Use Card Economy) ────────────────
+
+/**
+ * Checks whether the player can add a card to their hand.
+ *
+ * The hand is full when its length >= maxHandSize.
+ *
+ * @param state  Current game state.
+ * @returns LegalityResult indicating whether the action is permitted.
+ */
+export function canAddToHand(state: MainStreetState): LegalityResult {
+  const hand = state.hand ?? [];
+  const maxSize = state.maxHandSize ?? 2;
+  if (hand.length >= maxSize) {
+    return { legal: false, reason: `Hand is full (${hand.length}/${maxSize}). Place on tableau or sell a card first.` };
+  }
+  return { legal: true };
+}
+
+/**
+ * Purchases a Business card from the market and adds it to the player's hand
+ * instead of placing it on the tableau.
+ *
+ * @param state   Current game state (mutated in-place).
+ * @param cardId  ID of the Business card in the development market.
+ * @returns PurchaseResult on success.
+ * @throws Error if the action is illegal or hand is full.
+ */
+export function purchaseBusinessToHand(
+  state: MainStreetState,
+  cardId: string,
+): PurchaseResult {
+  // Validate the card exists and player can afford it
+  const card = state.market.development.find(c => c.id === cardId);
+  if (!card) {
+    throw new Error(`Card ${cardId} not found in the development market.`);
+  }
+  if (state.resourceBank.coins < card.cost) {
+    throw new Error(`Not enough coins. Need ${card.cost}, have ${state.resourceBank.coins}.`);
+  }
+
+  // Check hand capacity
+  const handCheck = canAddToHand(state);
+  if (!handCheck.legal) {
+    throw new Error(handCheck.reason);
+  }
+
+  const marketIndex = state.market.development.findIndex(c => c.id === cardId);
+
+  // Deduct cost
+  state.resourceBank.coins -= card.cost;
+
+  // Remove from market
+  state.market.development.splice(marketIndex, 1);
+
+  // Add to hand
+  state.hand.push({ ...card } as BusinessCard);
+
+  // Note: market is not refilled immediately.
+  const refilled = false;
+
+  addLog(state, `Added ${card.name} to hand (-$${card.cost})`, 'loss');
+
+  return { card, cost: card.cost, refilled };
+}
+
 /**
  * Purchases an Upgrade card from the market and applies it to the first
  * matching eligible business on the street.

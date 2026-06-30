@@ -16,6 +16,7 @@ import {
   type CommunitySpaceCard,
   type EventCard,
   type UpgradeCard,
+  type StaffCard,
   createBusinessDeck,
   createCommunitySpaceDeck,
   createEventDeck,
@@ -214,6 +215,14 @@ export interface MainStreetState {
   activityLog: LogEntry[];
   /** Active duration-based modifiers (e.g. Flu outbreak income reduction). */
   activeEffects: ActiveEffect[];
+  /** Cards held in the player's hand (not placed on tableau). */
+  hand: BusinessCard[];
+  /** Maximum number of cards the player can hold in hand (default 2, expanded by staff cards). */
+  maxHandSize: number;
+  /** Discard pile for cycled and sold cards (unified discard pool). */
+  discardPile: BusinessCard[];
+  /** Active staff cards providing hand capacity bonuses. */
+  staffCards: StaffCard[];
 }
 
 export interface MainStreetSerializedState {
@@ -251,6 +260,14 @@ export interface MainStreetSerializedState {
   rngCalls: number;
   activityLog: LogEntry[];
   activeEffects: ActiveEffect[];
+  /** Serialized hand cards. */
+  hand: BusinessCard[];
+  /** Maximum hand size at the time of save. */
+  maxHandSize: number;
+  /** Serialized discard pile. */
+  discardPile: BusinessCard[];
+  /** Serialized active staff cards. */
+  staffCards: StaffCard[];
 }
 
 /** Record of a single milestone (tier unlock) achievement. */
@@ -471,6 +488,10 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     rng,
     activityLog: [],
     activeEffects: [],
+    hand: [],
+    maxHandSize: 2,
+    discardPile: [],
+    staffCards: [],
   };
 
   // Select challenges for this run using seeded RNG and config count
@@ -511,6 +532,10 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
     rngCalls: state.rngCalls,
     activityLog: structuredClone(state.activityLog),
     activeEffects: structuredClone(state.activeEffects),
+    hand: structuredClone(state.hand),
+    maxHandSize: state.maxHandSize,
+    discardPile: structuredClone(state.discardPile),
+    staffCards: structuredClone(state.staffCards),
   };
 }
 
@@ -587,6 +612,20 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
   if (!('activeEffects' in saved)) {
     (saved as Record<string, unknown>).activeEffects = [];
   }
+
+  // ── Hand management fields (Multi-Use Card Economy) ──────
+  if (!('hand' in saved)) {
+    (saved as Record<string, unknown>).hand = [];
+  }
+  if (!('maxHandSize' in saved)) {
+    (saved as Record<string, unknown>).maxHandSize = 2;
+  }
+  if (!('discardPile' in saved)) {
+    (saved as Record<string, unknown>).discardPile = [];
+  }
+  if (!('staffCards' in saved)) {
+    (saved as Record<string, unknown>).staffCards = [];
+  }
 }
 
 /**
@@ -644,6 +683,10 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
     rng,
     activityLog: structuredClone(saved.activityLog),
     activeEffects: structuredClone(saved.activeEffects),
+    hand: structuredClone(saved.hand),
+    maxHandSize: saved.maxHandSize,
+    discardPile: structuredClone(saved.discardPile),
+    staffCards: structuredClone(saved.staffCards),
   };
 
   return state;

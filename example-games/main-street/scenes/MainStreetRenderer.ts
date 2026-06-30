@@ -1133,6 +1133,7 @@ export class MainStreetRenderer {
     // handContainer zone kept for backward-compat (zone-metadata tests)
     s.handContainer.removeAll(true);
 
+    // Show held event card if present (existing behavior)
     const held = s.state.heldEvent;
 
     if (held) {
@@ -1142,6 +1143,115 @@ export class MainStreetRenderer {
       // Empty hand — HandView gracefully handles empty array (no sprites)
       this.handView.setCards([]);
     }
+
+    // Render hand cards from state.hand (Multi-Use Card Economy)
+    this.refreshBusinessHandCards();
+  }
+
+  /**
+   * Renders business cards held in the player's hand.
+   * Shows each card as a small card below the tableau with synergy indicator.
+   */
+  private refreshBusinessHandCards(): void {
+    const s = this.scene;
+    const hand = s.state.hand ?? [];
+
+    // Remove previous hand card display
+    if (s.handBusinessContainer) {
+      s.handBusinessContainer.removeAll(true);
+    } else {
+      s.handBusinessContainer = s.add.container(0, 0);
+    }
+
+    if (hand.length === 0) {
+      // Update hand size indicator
+      this.updateHandSizeIndicator(0);
+      return;
+    }
+
+    const { handCardW, handCardH, handY } = s.layout;
+    const startX = 40;
+    const y = handY;
+    const spacing = handCardW + 8;
+
+    for (let i = 0; i < hand.length; i++) {
+      const card = hand[i];
+      const x = startX + i * spacing;
+
+      const container = s.add.container(x, y);
+
+      // Card background
+      const bg = s.add.rectangle(0, 0, handCardW, handCardH, 0x3a2a1a, 0.9);
+      bg.setStrokeStyle(1, 0x8b7355);
+      container.add(bg);
+
+      // Card name
+      const nameText = s.add.text(0, -handCardH / 2 + 6, card.name, {
+        fontSize: '11px',
+        color: '#ffffff',
+        fontFamily: 'Arial',
+      }).setOrigin(0.5, 0);
+      container.add(nameText);
+
+      // Synergy type indicator
+      if (card.synergyTypes && card.synergyTypes.length > 0) {
+        const synergyLabel = card.synergyTypes.join('/');
+        const synergyColor = this.getSynergyDisplayColor(card.synergyTypes[0]);
+        const synText = s.add.text(0, 6, synergyLabel, {
+          fontSize: '9px',
+          color: synergyColor,
+          fontFamily: 'Arial',
+        }).setOrigin(0.5, 0);
+        container.add(synText);
+      }
+
+      // Income info
+      const incomeText = s.add.text(0, 18, `$${card.baseIncome}/turn`, {
+        fontSize: '9px',
+        color: '#c8b88a',
+        fontFamily: 'Arial',
+      }).setOrigin(0.5, 0);
+      container.add(incomeText);
+
+      s.handBusinessContainer!.add(container);
+    }
+
+    // Update hand size indicator
+    this.updateHandSizeIndicator(hand.length);
+  }
+
+  /**
+   * Updates the hand size indicator text (e.g. "Hand: 2/5").
+   */
+  private updateHandSizeIndicator(current: number): void {
+    const s = this.scene;
+    const maxSize = s.state.maxHandSize ?? 2;
+
+    if (s.handSizeText) {
+      s.handSizeText.destroy();
+    }
+
+    s.handSizeText = s.add.text(10, s.layout.handY - 14, 
+      `Hand: ${current}/${maxSize}`, {
+      fontSize: '12px',
+      color: current >= maxSize ? '#ff6666' : '#c8b88a',
+      fontFamily: 'Arial',
+    });
+  }
+
+  /**
+   * Returns a CSS color string for the given synergy type.
+   */
+  private getSynergyDisplayColor(type: string): string {
+    const colors: Record<string, string> = {
+      'Food': '#E67E22',
+      'Culture': '#3498DB',
+      'Commerce': '#27AE60',
+      'Service': '#9B59B6',
+      'Entertainment': '#E74C3C',
+      'Health': '#1ABC9C',
+    };
+    return colors[type] ?? '#ffffff';
   }
 
   /**

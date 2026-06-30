@@ -22,8 +22,8 @@ export type EventTrigger = 'Investment' | 'Incident';
 /** Scope of an Event card's effect. */
 export type EventTarget = 'All' | 'SpecificSynergy' | 'RandomBusiness';
 
-/** Discriminator for the four card families (business, event, upgrade, community-space). */
-export type CardFamily = 'business' | 'event' | 'upgrade' | 'community-space';
+/** Discriminator for the card families (business, event, upgrade, community-space, staff). */
+export type CardFamily = 'business' | 'event' | 'upgrade' | 'community-space' | 'staff';
 
 // ── Card Interfaces ─────────────────────────────────────────
 
@@ -154,8 +154,23 @@ export interface UpgradeCard {
   readonly reputationBonus?: number;
 }
 
+/**
+ * A Staff card that increases hand capacity.
+ * Staff cards are a new card family distinct from business/event/upgrade.
+ * They do NOT occupy hand slots and have an ongoing per-turn coin cost.
+ */
+export interface StaffCard {
+  readonly family: 'staff';
+  readonly id: string;
+  readonly name: string;
+  readonly cost: number;
+  readonly ongoingCost: number;
+  readonly handSlotsAdded: number;
+  readonly description: string;
+}
+
 /** Union of all card types in Main Street. */
-export type AnyCard = BusinessCard | CommunitySpaceCard | EventCard | DurationEventCard | UpgradeCard;
+export type AnyCard = BusinessCard | CommunitySpaceCard | EventCard | DurationEventCard | UpgradeCard | StaffCard;
 
 // ── Constants ───────────────────────────────────────────────
 
