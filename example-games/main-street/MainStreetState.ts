@@ -21,6 +21,7 @@ import {
   createCommunitySpaceDeck,
   createEventDeck,
   createUpgradeDeck,
+  createStaffDeck,
   GRID_SIZE,
   MARKET_BUSINESS_SLOTS,
   MARKET_INVESTMENT_UPGRADE_COUNT,
@@ -223,6 +224,8 @@ export interface MainStreetState {
   discardPile: BusinessCard[];
   /** Active staff cards providing hand capacity bonuses. */
   staffCards: StaffCard[];
+  /** Staff cards available for purchase in the market. */
+  staffCardMarket: StaffCard[];
 }
 
 export interface MainStreetSerializedState {
@@ -268,6 +271,8 @@ export interface MainStreetSerializedState {
   discardPile: BusinessCard[];
   /** Serialized active staff cards. */
   staffCards: StaffCard[];
+  /** Serialized staff card market. */
+  staffCardMarket: StaffCard[];
 }
 
 /** Record of a single milestone (tier unlock) achievement. */
@@ -409,11 +414,13 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
   // are selected deterministically per-game-seed rather than by template order.
   const eventDeck = createEventDeck(3, options.unlockedCardIds, rng, config.positiveIncidentMultiplier);
   const upgradeDeck = createUpgradeDeck(2, options.unlockedCardIds);
+  const staffDeck = createStaffDeck(1);
 
   shuffleArray(businessDeck, rng);
   shuffleArray(communitySpaceDeck, rng);
   shuffleArray(eventDeck, rng);
   shuffleArray(upgradeDeck, rng);
+  shuffleArray(staffDeck, rng);
 
   // Populate initial market
   // Development row: fill from business deck (community space cards are
@@ -492,6 +499,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     maxHandSize: 2,
     discardPile: [],
     staffCards: [],
+    staffCardMarket: staffDeck,
   };
 
   // Select challenges for this run using seeded RNG and config count
@@ -536,6 +544,7 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
     maxHandSize: state.maxHandSize,
     discardPile: structuredClone(state.discardPile),
     staffCards: structuredClone(state.staffCards),
+    staffCardMarket: structuredClone(state.staffCardMarket),
   };
 }
 
@@ -626,6 +635,9 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
   if (!('staffCards' in saved)) {
     (saved as Record<string, unknown>).staffCards = [];
   }
+  if (!('staffCardMarket' in saved)) {
+    (saved as Record<string, unknown>).staffCardMarket = [];
+  }
 }
 
 /**
@@ -687,6 +699,7 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
     maxHandSize: saved.maxHandSize,
     discardPile: structuredClone(saved.discardPile),
     staffCards: structuredClone(saved.staffCards),
+    staffCardMarket: structuredClone(saved.staffCardMarket),
   };
 
   return state;

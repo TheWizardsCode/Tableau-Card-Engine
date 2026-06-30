@@ -809,3 +809,44 @@ export function getUpgradeBranchesForBusiness(
       (card.requiredLevel ?? 0) === business.level,
   );
 }
+
+// ── Staff Card Operations (Multi-Use Card Economy) ───────────
+
+/**
+ * Purchases a staff card from the staff card market.
+ * Deducts coins, adds the staff card to active staffCards[],
+ * and increases maxHandSize by the card's handSlotsAdded.
+ *
+ * @param state  Current game state (mutated in-place).
+ * @param cardId ID of the staff card in the staff card market.
+ * @throws Error if the card is not found or player cannot afford it.
+ */
+export function purchaseStaffCard(
+  state: MainStreetState,
+  cardId: string,
+): void {
+  const marketIndex = state.staffCardMarket.findIndex(c => c.id === cardId);
+  if (marketIndex === -1) {
+    throw new Error(`Staff card ${cardId} not found in the market.`);
+  }
+
+  const card = state.staffCardMarket[marketIndex];
+
+  if (state.resourceBank.coins < card.cost) {
+    throw new Error(`Not enough coins. Need ${card.cost}, have ${state.resourceBank.coins}.`);
+  }
+
+  // Deduct cost
+  state.resourceBank.coins -= card.cost;
+
+  // Remove from market
+  state.staffCardMarket.splice(marketIndex, 1);
+
+  // Add to active staff cards
+  state.staffCards.push({ ...card });
+
+  // Increase max hand size
+  state.maxHandSize += card.handSlotsAdded;
+
+  addLog(state, `Hired ${card.name} (+${card.handSlotsAdded} hand slots, -$${card.cost}, ongoing $${card.ongoingCost}/turn)`, 'loss');
+}

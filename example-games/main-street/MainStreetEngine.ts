@@ -581,6 +581,9 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
   state.phase = 'IncomePhase';
   const income = applyIncome(state);
 
+  // Apply staff card ongoing costs (Multi-Use Card Economy)
+  applyStaffOngoingCosts(state);
+
   // Phase: IncidentPhase
   state.phase = 'IncidentPhase';
   const incident = resolveIncident(state);
@@ -656,4 +659,94 @@ export function executeFullTurn(
 
   // Process end of turn
   return processEndOfTurn(state);
+}
+
+// ── Staff Card Operations (Multi-Use Card Economy) ───────────
+
+/**
+ * Applies staff card ongoing costs for the current turn.
+ * Deducts each active staff card's ongoingCost from coins.
+ * If coins are insufficient, deducts what's available (down to 0).
+ *
+ * @param state  Current game state (mutated in-place).
+ */
+export function applyStaffOngoingCosts(state: MainStreetState): void {
+  const staffCards = state.staffCards ?? [];
+  if (staffCards.length === 0) return;
+
+  let totalCost = 0;
+  for (const card of staffCards) {
+    totalCost += card.ongoingCost;
+  }
+
+  if (totalCost > 0) {
+    const actualDeduction = Math.min(totalCost, state.resourceBank.coins);
+    state.resourceBank.coins -= actualDeduction;
+    if (actualDeduction > 0) {
+      addLog(state, `Staff costs: -${actualDeduction} coins (${staffCards.length} staff)`, 'loss');
+    }
+    if (actualDeduction < totalCost) {
+      addLog(state, `Insufficient coins for staff costs: owed ${totalCost}, paid ${actualDeduction}`, 'loss');
+    }
+  }
+}
+
+/**
+ * Lays off (removes) a staff card, decreasing maxHandSize and randomly
+ * removing hand cards equal to the staff card's handSlotsAdded.
+ *
+ * Uses the game's seeded RNG for deterministic random card selection.
+ * If hand has fewer cards than slots to remove, all hand cards are removed.
+ *
+ * @param state    Current game state (mutated in-place).
+ * @param cardId   ID of the staff card to lay off (must be in staffCards).
+ * @throws Error if the staff card is not found.
+ */
+export function layoffStaffCard(
+  state: MainStreetState,
+  cardId: string,
+): void {
+  const staffIndex = state.staffCards.findIndex(c => c.id === cardId);
+  if (staffIndex === -1) {
+    throw new Error(`Staff card ${cardId} not found in active staff.`);
+  }
+
+  const card = state.staffCards[staffIndex];
+  const slotsToRemove = card.handSlotsAdded;
+
+  // Remove the staff card
+  state.staffCards.splice(staffIndex, 1);
+
+  // Decrease maxHandSize (minimum 2)
+  state.maxHandSize = Math.max(2, state.maxHandSize - slotsToRemove);
+
+  // Randomly remove hand cards equal to slots added (uses seeded RNG)
+  const hand = state.hand ?? [];
+  const cardsToRemove = Math.min(slotsToRemove, hand.length);
+
+  if (cardsToRemove > 0) {
+    // Use Fisher-Yates shuffle on indices for deterministic random selection
+    const indices = hand.map((_, i) => i);
+    for (let i = indices.length - 1; i > 0; i--) {
+      const j = Math.floor(state.rng() * (i + 1));
+      const tmp = indices[i];
+      indices[i] = indices[j];
+      indices[j] = tmp;
+    }
+
+    // Remove the first `cardsToRemove` randomly-selected cards
+    const toRemove = indices.slice(0, cardsToRemove).sort((a, b) => b - a);
+    const removedCards: string[] = [];
+    for (const idx of toRemove) {
+      removedCards.push(hand[idx].name ?? hand[idx].id);
+      hand.splice(idx, 1);
+    }
+
+    addLog(state, `Laid off ${card.name}: removed ${cardsToRemove} hand card(s) (${removedCards.join(', ')})`, 'loss');
+  } else {
+    addLog(state, `Laid off ${card.name}: no hand cards to remove`, 'neutral');
+  }
+
+  // Return the staff card to the market
+  state.staffCardMarket.push({ ...card });
 }

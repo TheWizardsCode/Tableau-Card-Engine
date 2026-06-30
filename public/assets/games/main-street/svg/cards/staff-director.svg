@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="140" height="80" viewBox="0 0 140 80" role="img" aria-label="Director">
+  <defs>
+    <linearGradient id="g-staff-director" x1="0" x2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.06"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.02"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="140" height="80" rx="6" ry="6" fill="#333333" />
+  <rect x="4" y="4" width="132" height="72" rx="4" ry="4" fill="url(#g-staff-director)" />
+  <rect x="4" y="4" width="132" height="20" rx="3" ry="3" fill="#cccccc" opacity="0.18" />
+  <text x="70" y="19" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="11" fill="#ffffff" font-weight="400" text-anchor="middle">Director</text>
+<circle cx="124" cy="56" r="12" fill="#e0c7a0" stroke="#c8b79a" stroke-width="1.5" />
+<text x="124" y="60" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="11" fill="#3a2a14" text-anchor="middle" font-weight="500">10</text>
+
+
+</svg>

@@ -1268,6 +1268,55 @@ const UPGRADE_TEMPLATES: UpgradeCard[] = [
   },
 ];
 
+// ── Staff Card Templates (Multi-Use Card Economy) ───────────
+
+/** Template data for Staff cards. */
+export const STAFF_CARD_TEMPLATES: StaffCard[] = [
+  {
+    family: 'staff',
+    id: 'staff-assistant',
+    name: 'Assistant',
+    cost: 3,
+    ongoingCost: 1,
+    handSlotsAdded: 1,
+    description: 'Hire an assistant to help manage your hand. Adds +1 hand slot with a small ongoing cost.',
+  },
+  {
+    family: 'staff',
+    id: 'staff-manager',
+    name: 'Manager',
+    cost: 6,
+    ongoingCost: 2,
+    handSlotsAdded: 2,
+    description: 'A skilled manager keeps things organised. Adds +2 hand slots with a moderate ongoing cost.',
+  },
+  {
+    family: 'staff',
+    id: 'staff-director',
+    name: 'Director',
+    cost: 10,
+    ongoingCost: 3,
+    handSlotsAdded: 3,
+    description: 'An experienced director oversees your operations. Adds +3 hand slots with a high ongoing cost.',
+  },
+];
+
+/**
+ * Creates the full Staff deck for a game.
+ *
+ * @param copies  Number of copies per template (default 1).
+ * @returns Array of StaffCard instances.
+ */
+export function createStaffDeck(copies: number = 1): StaffCard[] {
+  const deck: StaffCard[] = [];
+  for (let c = 0; c < copies; c++) {
+    for (const template of STAFF_CARD_TEMPLATES) {
+      deck.push({ ...template, id: `${template.id}-${c}` });
+    }
+  }
+  return deck;
+}
+
 // ── Deck Building ───────────────────────────────────────────
 
 /**

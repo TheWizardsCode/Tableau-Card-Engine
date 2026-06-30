@@ -318,6 +318,7 @@ export function createTutorialScenario(
     maxHandSize: 2,
     discardPile: [],
     staffCards: [],
+    staffCardMarket: [],
   };
 
   // Select challenges for this run using seeded RNG
