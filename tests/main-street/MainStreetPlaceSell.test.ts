@@ -263,11 +263,12 @@ describe('MainStreet Place/Sell System', () => {
         addCardToHand(state, { ...card });
         const handIndex = getHand(state).length - 1;
 
-        // Purchase a different card and place it in slot 0 to occupy it
-        const otherCard = state.market.development.find(
-          c => c.id !== card.id && c.cost <= state.resourceBank.coins,
-        );
-        if (!otherCard) return;
+        // Place a card directly on slot 0 to occupy it
+        // Use a card from the market's development row
+        const existingCard = state.market.development[0];
+        if (existingCard) {
+          state.streetGrid[0] = existingCard as any;
+        }
 
         const engine = await import('../../example-games/main-street/MainStreetEngine');
 

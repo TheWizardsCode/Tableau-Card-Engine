@@ -18,7 +18,7 @@
 import type { MainStreetState, DayPhase } from './MainStreetState';
 import { PHASE_ORDER, addLog, syncResourceBankToLedger } from './MainStreetState';
 import type { EventCard, SynergyType } from './MainStreetCards';
-import { isDurationEventCard, type DurationEventCard } from './MainStreetCards';
+import { PLACE_COST_RATIO, SELL_VALUE_RATIO, isDurationEventCard, type DurationEventCard } from './MainStreetCards';
 import { createActiveEffect, decayActiveEffects } from '../../src/core-engine/ActiveEffect';
 import { recordMainStreetEvent } from './MainStreetTranscript';
 import { applyIncome, type IncomeResult } from './MainStreetAdjacency';
@@ -659,6 +659,134 @@ export function executeFullTurn(
 
   // Process end of turn
   return processEndOfTurn(state);
+}
+
+// ── Card Placement & Sell Operations (Multi-Use Card Economy) ─
+
+/**
+ * Places a card from the player's hand onto an empty tableau slot.
+ * Costs 80% of the card's purchase price.
+ *
+ * @param state      Current game state (mutated in-place).
+ * @param handIndex  Index of the card in state.hand to place.
+ * @param slotIndex  Target street grid slot (0-based, must be empty).
+ * @throws Error if the hand index is invalid, slot is occupied, or coins insufficient.
+ */
+export function placeFromHand(
+  state: MainStreetState,
+  handIndex: number,
+  slotIndex: number,
+): void {
+  const hand = state.hand ?? [];
+
+  // Validate hand index
+  if (handIndex < 0 || handIndex >= hand.length) {
+    throw new Error(`Invalid hand index: ${handIndex}. Hand has ${hand.length} cards.`);
+  }
+
+  const card = hand[handIndex];
+
+  // Validate slot index
+  if (slotIndex < 0 || slotIndex >= 10) {
+    throw new Error(`Invalid slot index: ${slotIndex}. Must be 0-9.`);
+  }
+
+  // Check slot is empty
+  if (state.streetGrid[slotIndex] !== null) {
+    throw new Error(`Slot ${slotIndex} is already occupied.`);
+  }
+
+  // Calculate placement cost (80% of purchase price)
+  const placementCost = Math.floor(card.cost * PLACE_COST_RATIO);
+
+  // Check coins
+  if (state.resourceBank.coins < placementCost) {
+    throw new Error(`Not enough coins. Need ${placementCost} to place, have ${state.resourceBank.coins}.`);
+  }
+
+  // Deduct cost
+  state.resourceBank.coins -= placementCost;
+
+  // Remove from hand and place on tableau
+  hand.splice(handIndex, 1);
+  state.streetGrid[slotIndex] = card;
+
+  addLog(state, `Placed ${card.name} from hand in slot ${slotIndex} (-$${placementCost})`, 'loss');
+}
+
+/**
+ * Sells a card from the player's hand for 75% of purchase value.
+ * The card goes to the discard pile.
+ *
+ * @param state      Current game state (mutated in-place).
+ * @param handIndex  Index of the card in state.hand to sell.
+ * @throws Error if the hand index is invalid.
+ */
+export function sellFromHand(
+  state: MainStreetState,
+  handIndex: number,
+): void {
+  const hand = state.hand ?? [];
+
+  // Validate hand index
+  if (handIndex < 0 || handIndex >= hand.length) {
+    throw new Error(`Invalid hand index: ${handIndex}. Hand has ${hand.length} cards.`);
+  }
+
+  const card = hand[handIndex];
+
+  // Calculate sell value (75% of purchase price)
+  const sellValue = Math.floor(card.cost * SELL_VALUE_RATIO);
+
+  // Remove from hand
+  hand.splice(handIndex, 1);
+
+  // Credit coins
+  state.resourceBank.coins += sellValue;
+
+  // Add to discard pile
+  state.discardPile.push(card as any);
+
+  addLog(state, `Sold ${card.name} from hand for +${sellValue} coins`, 'gain');
+}
+
+/**
+ * Sells a card from the tableau for 75% of purchase value.
+ * The card goes to the discard pile and the slot becomes empty.
+ *
+ * @param state      Current game state (mutated in-place).
+ * @param slotIndex  Street grid slot index of the card to sell.
+ * @throws Error if the slot is empty or index is invalid.
+ */
+export function sellFromTableau(
+  state: MainStreetState,
+  slotIndex: number,
+): void {
+  // Validate slot index
+  if (slotIndex < 0 || slotIndex >= 10) {
+    throw new Error(`Invalid slot index: ${slotIndex}. Must be 0-9.`);
+  }
+
+  const card = state.streetGrid[slotIndex];
+
+  // Check slot is occupied
+  if (card === null) {
+    throw new Error(`Slot ${slotIndex} is empty. Nothing to sell.`);
+  }
+
+  // Calculate sell value (75% of purchase price)
+  const sellValue = Math.floor(card.cost * SELL_VALUE_RATIO);
+
+  // Remove from tableau
+  state.streetGrid[slotIndex] = null;
+
+  // Credit coins
+  state.resourceBank.coins += sellValue;
+
+  // Add to discard pile
+  state.discardPile.push(card as any);
+
+  addLog(state, `Sold ${card.name} from slot ${slotIndex} for +${sellValue} coins`, 'gain');
 }
 
 // ── Staff Card Operations (Multi-Use Card Economy) ───────────

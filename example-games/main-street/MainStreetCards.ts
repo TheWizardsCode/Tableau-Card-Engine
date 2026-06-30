@@ -231,6 +231,14 @@ export const REPUTATION_SCORE_MULTIPLIER = 5;
 /** Points awarded per completed challenge. */
 export const CHALLENGE_BONUS_POINTS = 10;
 
+// ── Multi-Use Card Economy Ratios ───────────────────────────
+
+/** Cost ratio when placing a card from hand to tableau (80% of purchase cost). */
+export const PLACE_COST_RATIO = 0.8;
+
+/** Value ratio when selling a card (75% of purchase value). */
+export const SELL_VALUE_RATIO = 0.75;
+
 // ── Card Fixture Data ───────────────────────────────────────
 
 /**
