@@ -139,21 +139,71 @@ export function computeBusinessIncome(
 }
 
 /**
- * Computes the total income across all businesses on the street grid.
+ * Computes the total synergy bonus contributed by hand cards to tableau businesses.
+ *
+ * Each hand card contributes Math.floor(card.baseIncome / 3) to each tableau
+ * business that shares at least one synergy type. Pawn Shop cards do not
+ * receive hand card synergy even when the types match.
+ *
+ * @param grid  The street grid (tableau businesses).
+ * @param hand  Cards held in the player's hand.
+ * @returns The total hand card synergy bonus added to all tableau businesses.
+ */
+export function computeHandCardSynergyBonus(
+  grid: (BusinessCard | CommunitySpaceCard | null)[],
+  hand: BusinessCard[],
+): number {
+  if (!hand || hand.length === 0) return 0;
+
+  let total = 0;
+
+  for (const handCard of hand) {
+    if (!handCard.synergyTypes || handCard.synergyTypes.length === 0) continue;
+
+    // Each hand card provides floor(baseIncome/3) to each matching synergy business
+    const bonusPerMatch = Math.floor(handCard.baseIncome / 3);
+    if (bonusPerMatch <= 0) continue;
+
+    for (let i = 0; i < grid.length; i++) {
+      const business = grid[i];
+      if (!business) continue;
+
+      // Pawn Shop cards do not receive synergy from any source
+      if (isPawnShopCard(business)) continue;
+
+      // Check if any of the hand card's synergy types match the business's types
+      const hasMatch = handCard.synergyTypes.some(
+        (st: SynergyType) => business.synergyTypes.includes(st),
+      );
+      if (hasMatch) {
+        total += bonusPerMatch;
+      }
+    }
+  }
+
+  return total;
+}
+
+/**
+ * Computes the total income across all businesses on the street grid,
+ * optionally including synergy bonuses from hand cards.
  *
  * Returns both the total and a per-slot breakdown for UI display.
  *
  * @param grid               The street grid.
  * @param bonusPerNeighbor   Coins per matching neighbor (defaults to SYNERGY_BONUS_PER_NEIGHBOR).
+ * @param hand               Optional: hand cards to include for synergy bonuses.
  * @returns Object with `total` income and `breakdown` per slot.
  */
 export function computeIncome(
   grid: (BusinessCard | CommunitySpaceCard | null)[],
   bonusPerNeighbor: number = SYNERGY_BONUS_PER_NEIGHBOR,
+  hand?: BusinessCard[],
 ): IncomeResult {
   const breakdown: SlotIncome[] = [];
   let total = 0;
 
+  // Compute per-slot tableau income
   for (let i = 0; i < grid.length; i++) {
     const business = grid[i];
     if (!business) continue;
@@ -173,7 +223,44 @@ export function computeIncome(
     total += slotTotal;
   }
 
-  return { total, breakdown };
+  // Add hand card synergy bonuses to the total
+  let handSynergyTotal = 0;
+  if (hand && hand.length > 0) {
+    handSynergyTotal = computeHandCardSynergyBonus(grid, hand);
+    total += handSynergyTotal;
+
+    // Add hand synergy to each slot's total in the breakdown
+    // Distribute proportionally for accurate per-slot display
+    if (handSynergyTotal > 0) {
+      for (let i = 0; i < grid.length; i++) {
+        const business = grid[i];
+        if (!business) continue;
+
+        // Calculate hand synergy contribution per business
+        let perSlotHandSynergy = 0;
+        for (const handCard of hand) {
+          if (!handCard.synergyTypes || handCard.synergyTypes.length === 0) continue;
+          if (isPawnShopCard(business)) continue;
+
+          const hasMatch = handCard.synergyTypes.some(
+            (st: SynergyType) => business.synergyTypes.includes(st),
+          );
+          if (hasMatch) {
+            perSlotHandSynergy += Math.floor(handCard.baseIncome / 3);
+          }
+        }
+
+        if (perSlotHandSynergy > 0) {
+          const slot = breakdown.find(s => s.slotIndex === i);
+          if (slot) {
+            slot.total += perSlotHandSynergy;
+          }
+        }
+      }
+    }
+  }
+
+  return { total, breakdown, handSynergyTotal };
 }
 
 /**
@@ -213,7 +300,8 @@ export function computeReputationPerTurn(
  *          but total reflects the multiplied amount actually credited).
  */
 export function applyIncome(state: MainStreetState): IncomeResult {
-  const result = computeIncome(state.streetGrid, state.config.synergyBonusPerNeighbor);
+  const hand = state.hand ?? [];
+  const result = computeIncome(state.streetGrid, state.config.synergyBonusPerNeighbor, hand);
 
   // Apply active effect income modifiers per-slot, before reputation multiplier.
   // Each slot's income is individually multiplied, then summed.
@@ -248,6 +336,9 @@ export function applyIncome(state: MainStreetState): IncomeResult {
   }
   if (repPerTurn > 0) {
     addLog(state, `Reputation from cards: +${repPerTurn}`, 'gain');
+  }
+  if (result.handSynergyTotal > 0) {
+    addLog(state, `Hand card synergy: +${result.handSynergyTotal} coins`, 'gain');
   }
   return result;
 }
@@ -323,19 +414,22 @@ export function computeSynergyPairs(
 
 // ── Result Types ────────────────────────────────────────────
 
-/** Income breakdown for a single occupied slot. */
+/** Per-slot income breakdown. */
 export interface SlotIncome {
   slotIndex: number;
   businessName: string;
   baseIncome: number;
   synergyBonus: number;
+  /** Total income from this slot including hand synergy contributions. */
   total: number;
 }
 
 /** Full income computation result. */
 export interface IncomeResult {
-  /** Total coins earned from all businesses. */
+  /** Total coins earned from all businesses (includes hand synergy if provided). */
   total: number;
   /** Per-slot breakdown. */
   breakdown: SlotIncome[];
+  /** Total synergy contributed by hand cards. */
+  handSynergyTotal: number;
 }

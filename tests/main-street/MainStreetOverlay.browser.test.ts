@@ -127,7 +127,7 @@ function forceGameOver(scene: Phaser.Scene, isWin = false): void {
   }
 
   const result: TurnResult = {
-    income: { total: 0, breakdown: [] },
+    income: { total: 0, breakdown: [], handSynergyTotal: 0 },
     incident: null,
     finalScore: isWin ? 100 : 0,
     gameResult: isWin ? 'win' : 'loss',
