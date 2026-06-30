@@ -125,3 +125,61 @@ describe('Gym Audio & Feedback scenarios', () => {
     expect(mgr.muted).toBe(false);
   });
 });
+
+describe('Gym Audio Feedback Scene - visual feedback quality', () => {
+  it('showPopText uses a music note icon and readable duration (>= 1500ms)', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const source = fs.readFileSync(
+      path.resolve(__dirname, '../../example-games/gym/scenes/GymAudioFeedbackScene.ts'),
+      'utf-8',
+    );
+
+    // Verify the showPopText method exists (kept, not removed)
+    expect(source).toContain('private showPopText');
+
+    // Scope to showPopText method block
+    const showPopTextStart = source.indexOf('private showPopText');
+    const showPopTextEnd = source.indexOf('}\n', showPopTextStart) + 2;
+    const showPopTextBlock = source.substring(showPopTextStart, showPopTextEnd);
+
+    // Verify the label includes a music note character
+    expect(showPopTextBlock).toContain('♪');
+
+    // Verify duration is at least 1500ms for normal mode and readable for reduced motion
+    expect(showPopTextBlock).toContain('duration: this.reducedMotion ? 500 : 1800');
+  });
+
+  it('showPopText uses font size >= 18px', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const source = fs.readFileSync(
+      path.resolve(__dirname, '../../example-games/gym/scenes/GymAudioFeedbackScene.ts'),
+      'utf-8',
+    );
+
+    // Find showPopText method block and check fontSize inside it
+    const showPopTextStart = source.indexOf('private showPopText');
+    const showPopTextEnd = source.indexOf('}\n', showPopTextStart) + 2;
+    const showPopTextBlock = source.substring(showPopTextStart, showPopTextEnd);
+
+    const fontSizeMatch = showPopTextBlock.match(/fontSize: '(\d+)px'/);
+    expect(fontSizeMatch).toBeTruthy();
+    if (fontSizeMatch) {
+      const size = parseInt(fontSizeMatch[1], 10);
+      expect(size).toBeGreaterThanOrEqual(18);
+    }
+  });
+
+  it('showPopText is called from emitEvent (keep decision)', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const source = fs.readFileSync(
+      path.resolve(__dirname, '../../example-games/gym/scenes/GymAudioFeedbackScene.ts'),
+      'utf-8',
+    );
+
+    // Verify showPopText is still called from emitEvent (kept, not removed)
+    expect(source).toContain('this.showPopText(eventName, lastCall.key)');
+  });
+});
