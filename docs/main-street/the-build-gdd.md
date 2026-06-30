@@ -471,6 +471,64 @@ All tests are run via `npm test` (Vitest). Build validation via `npm run build`.
 
 ---
 
+## Appendix D: Multi-Use Card Economy (Digital Adaptation)
+
+*Added in CG-0MQRXN2CT0076OW7 (v0.1.2+)*
+
+Main Street's economy was extended with a **multi-use card economy** where every purchased business card has dual purpose: tableau placement OR hand-held synergy generation. This section summarises the digital-only mechanics.
+
+### D.1 Player Hand
+
+- Each player has a **hand** holding business cards (initial capacity: 2).
+- Cards purchased from the market can be placed in the hand instead of on the tableau.
+- Hand capacity is displayed in the UI as "Hand: N/M".
+
+### D.2 Hand Card Synergy
+
+- During IncomePhase, each hand card provides `Math.floor(card.baseIncome / 3)` coins to each tableau business sharing a synergy type.
+- Multiple hand cards stack their bonuses.
+- Pawn Shop cards are excluded from receiving hand synergy.
+
+### D.3 Market Cycling
+
+- At the end of each MarketPhase, all unpurchased market cards move to their respective discard piles.
+- The market is then refilled from the decks.
+- Discard piles reshuffle into decks when depleted.
+
+### D.4 Staff Cards
+
+Staff cards are a new purchasable card type that increase hand capacity:
+
+| Tier | Cost | Ongoing Cost | Slots |
+|------|------|-------------|-------|
+| Assistant | 3 | 1 | +1 |
+| Manager | 6 | 2 | +2 |
+| Director | 10 | 3 | +3 |
+
+- Staff cards do NOT occupy hand slots.
+- Ongoing costs are deducted each IncomePhase.
+- Staff can be laid off, removing random hand cards equal to slots provided.
+
+### D.5 Removed Mechanics
+
+The following mechanics from the physical design are **removed** in the digital adaptation:
+
+| Mechanic | Replacement |
+|----------|-------------|
+| Stock/Tuck | Multi-use hand economy |
+| Dedicated Sell action | Card sell at 75% value |
+| Renovate action | Card sell |
+| Restock action | Market cycling |
+| Open Shop action | Tableau placement from hand |
+
+### D.6 Implementation
+
+See `docs/main-street/prd-multi-use-card-economy.md` for the complete technical specification, architecture, and test coverage details.
+
+---
+
 *Document status*: AWAITING PRODUCER REVIEW.
 
 *Prepared by*: `opencode` – implementation of work item **CG-0MM4RDIMT1HLP2DE**.
+
+*Multi-Use Card Economy section by*: `Map` – implementation of work item **CG-0MQRXN2CT0076OW7**.
