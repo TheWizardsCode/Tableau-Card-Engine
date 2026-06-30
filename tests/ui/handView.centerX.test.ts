@@ -2,12 +2,13 @@
  * HandView centerX Tests
  *
  * Unit tests that verify the optional `centerX` property in HandViewOptions
- * anchors the hand at a fixed horizontal centre when set, and that the
- * existing baseX-based behaviour is preserved when centerX is not set.
+ * anchors the hand at a fixed horizontal centre when set, and that when
+ * centerX is not set, `baseX` is used as the hand centre.
  *
  * Tests cover: construction, spacing changes, addCard, removeCard, arc
- * layout compatibility, backward compatibility, vertical mode (no effect),
- * setCenterX runtime updates, and reduced-motion mode.
+ * layout compatibility, backward compatibility (baseX as default centre),
+ * vertical mode (no effect), setCenterX runtime updates, and reduced-motion
+ * mode.
  *
  * @module tests/ui/handView.centerX.test
  */
@@ -355,7 +356,7 @@ describe('HandView centerX', () => {
     hv.destroy();
   });
 
-  it('setCenterX with undefined restores baseX-derived centre', () => {
+  it('setCenterX with undefined restores baseX as centre', () => {
     const hv = new HandView(scene, {
       baseX: 100,
       baseY: 100,
@@ -367,19 +368,19 @@ describe('HandView centerX', () => {
 
     expect(computeHandCenter(hv)).toBeCloseTo(400, 0);
 
-    // Clear centerX via public API — should fall back to baseX-based calculation
+    // Clear centerX via public API — should fall back to baseX as centre
     hv.setCenterX(undefined);
-    hv.setSpacing(56); // triggers applyLayout, should use baseX-based centre
-    // With baseX=100 and 3 cards at 56px spacing, centre = 100 + 2*56/2 = 156
+    hv.setSpacing(56); // triggers applyLayout, should use baseX as centre
+    // With the default (centerX not set), baseX is used as the centre
     const centerAfter = computeHandCenter(hv);
-    expect(centerAfter).toBeCloseTo(156, 0);
+    expect(centerAfter).toBeCloseTo(100, 0);
 
     hv.destroy();
   });
 
   // ── Backward compatibility (centerX not set) ───────────────
 
-  it('when centerX is not set, behaviour is unchanged (baseX-derived centre)', () => {
+  it('when centerX is not set, hand centres on baseX', () => {
     const hv = new HandView(scene, {
       baseX: 100,
       baseY: 100,
@@ -388,14 +389,14 @@ describe('HandView centerX', () => {
 
     hv.setCards([card('A', 'spades'), card('2', 'hearts'), card('3', 'clubs')]);
 
-    // Without centerX, centre = baseX + (n-1)*spacing/2 = 100 + 2*56/2 = 156
+    // Without centerX, baseX is used as the centre
     const center = computeHandCenter(hv);
-    expect(center).toBeCloseTo(156, 0);
+    expect(center).toBeCloseTo(100, 0);
 
     hv.destroy();
   });
 
-  it('when centerX is not set, spacing changes still shift center (original behaviour)', () => {
+  it('when centerX is not set, hand stays centred on baseX when spacing changes', () => {
     const hv = new HandView(scene, {
       baseX: 100,
       baseY: 100,
@@ -404,14 +405,14 @@ describe('HandView centerX', () => {
 
     hv.setCards([card('A', 'spades'), card('2', 'hearts'), card('3', 'clubs')]);
 
-    // With spacing=20: centre = 100 + 2*20/2 = 120
-    expect(computeHandCenter(hv)).toBeCloseTo(120, 0);
+    // Without centerX, baseX is used as centre regardless of spacing
+    expect(computeHandCenter(hv)).toBeCloseTo(100, 0);
 
     hv.setSpacing(56);
 
-    // With spacing=56: centre = 100 + 2*56/2 = 156
+    // Centre should remain at baseX
     const centerAfter = computeHandCenter(hv);
-    expect(centerAfter).toBeCloseTo(156, 0);
+    expect(centerAfter).toBeCloseTo(100, 0);
 
     hv.destroy();
   });

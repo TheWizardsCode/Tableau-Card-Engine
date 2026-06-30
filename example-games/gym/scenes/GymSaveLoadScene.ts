@@ -73,10 +73,11 @@ const HAND_SPACING = 74;
 const HAND_ARC_RADIUS = 350;
 
 /*
- * HandView baseX is computed at runtime so the full hand is centred.
+ * HandView baseX is the horizontal centre of the hand.
  * baseY is the Y centre of the first card; we place it a card-height
  * below the previous position.
  */
+const HAND_BASE_X = GAME_W / 2;
 const HAND_BASE_Y = GAME_H * 0.65 + CARD_H; // ~598
 
 /** Full-screen RenderTexture for the screenshot, displayed at this scale. */
@@ -144,11 +145,9 @@ export class GymSaveLoadScene extends GymSceneBase {
     this.store = new SaveLoadStore({ dbName: 'gym-save-load', localStoragePrefix: 'gym-sl' });
 
     // ── HandView (lower centre, arc, full-size cards) ─────────
-    const handWidth = (STARTING_HAND_SIZE - 1) * HAND_SPACING;
-    const handBaseX = GAME_W / 2 - handWidth / 2;
 
     this.handView = new HandView(this, {
-      baseX: handBaseX,
+      baseX: HAND_BASE_X,
       baseY: HAND_BASE_Y,
       spacing: HAND_SPACING,
       cardWidth: CARD_W,

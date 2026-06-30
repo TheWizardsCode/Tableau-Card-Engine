@@ -255,6 +255,149 @@ describe('HandView', () => {
     hv.destroy();
   });
 
+  // ── Centering (baseX as center in horizontal mode) ────────
+
+  it('single card is centered at baseX', () => {
+    const hv = new HandView(scene, {
+      baseX: 400,
+      baseY: 300,
+      spacing: 56,
+      arcRadius: 0,
+    });
+
+    hv.setCards([card('A', 'spades')]);
+
+    const centers = hv.getCardCenters();
+    expect(centers).toHaveLength(1);
+    // Single card should sit at (baseX, baseY)
+    expect(centers[0].x).toBe(400);
+    expect(centers[0].y).toBe(300);
+    hv.destroy();
+  });
+
+  it('multiple cards are centered around baseX', () => {
+    const hv = new HandView(scene, {
+      baseX: 400,
+      baseY: 300,
+      spacing: 56,
+      arcRadius: 0,
+    });
+
+    hv.setCards([
+      card('A', 'spades'),
+      card('2', 'hearts'),
+      card('3', 'clubs'),
+      card('4', 'diamonds'),
+      card('5', 'spades'),
+    ]);
+
+    const centers = hv.getCardCenters();
+    expect(centers).toHaveLength(5);
+
+    // The average of the first and last X should be baseX (hand is centered)
+    const avgX = (centers[0].x + centers[4].x) / 2;
+    expect(Math.abs(avgX - 400)).toBeLessThanOrEqual(1);
+
+    // Symmetry: left and right pairs should be equidistant from center
+    expect(Math.abs(centers[0].x - centers[1].x)).toBeCloseTo(Math.abs(centers[3].x - centers[4].x), 6);
+    expect(Math.abs(centers[1].x - centers[2].x)).toBeCloseTo(Math.abs(centers[2].x - centers[3].x), 6);
+    hv.destroy();
+  });
+
+  it('hand stays centered around baseX after addCard', () => {
+    const hv = new HandView(scene, {
+      baseX: 400,
+      baseY: 300,
+      spacing: 56,
+      arcRadius: 0,
+    });
+
+    hv.setCards([card('A', 'spades'), card('2', 'hearts'), card('3', 'clubs')]);
+
+    // Add a 4th card
+    hv.addCard(card('4', 'diamonds'));
+
+    const centers = hv.getCardCenters();
+    expect(centers).toHaveLength(4);
+
+    // Hand should still be centered around baseX
+    const avgX = (centers[0].x + centers[3].x) / 2;
+    expect(Math.abs(avgX - 400)).toBeLessThanOrEqual(1);
+    hv.destroy();
+  });
+
+  it('hand stays centered around baseX after removeCard', () => {
+    const hv = new HandView(scene, {
+      baseX: 400,
+      baseY: 300,
+      spacing: 56,
+      arcRadius: 0,
+    });
+
+    hv.setCards([
+      card('A', 'spades'),
+      card('2', 'hearts'),
+      card('3', 'clubs'),
+      card('4', 'diamonds'),
+      card('5', 'spades'),
+    ]);
+
+    // Remove middle card
+    hv.removeCard(2);
+
+    const centers = hv.getCardCenters();
+    expect(centers).toHaveLength(4);
+
+    // Hand should still be centered around baseX
+    const avgX = (centers[0].x + centers[3].x) / 2;
+    expect(Math.abs(avgX - 400)).toBeLessThanOrEqual(1);
+    hv.destroy();
+  });
+
+  it('centerX option overrides the default centering behavior', () => {
+    const hv = new HandView(scene, {
+      baseX: 400,
+      baseY: 300,
+      spacing: 56,
+      arcRadius: 0,
+      centerX: 500,  // Explicit center, different from baseX
+    });
+
+    hv.setCards([
+      card('A', 'spades'),
+      card('2', 'hearts'),
+      card('3', 'clubs'),
+    ]);
+
+    const centers = hv.getCardCenters();
+    expect(centers).toHaveLength(3);
+
+    // Hand should be centered around centerX=500, not baseX=400
+    const avgX = (centers[0].x + centers[2].x) / 2;
+    expect(Math.abs(avgX - 500)).toBeLessThanOrEqual(1);
+    hv.destroy();
+  });
+
+  it('setCenterX dynamically updates the centering point', () => {
+    const hv = new HandView(scene, {
+      baseX: 400,
+      baseY: 300,
+      spacing: 56,
+      arcRadius: 0,
+    });
+
+    hv.setCards([card('A', 'spades'), card('2', 'hearts'), card('3', 'clubs')]);
+    hv.setCenterX(600);
+
+    const centers = hv.getCardCenters();
+    expect(centers).toHaveLength(3);
+
+    // Hand should now be centered around 600
+    const avgX = (centers[0].x + centers[2].x) / 2;
+    expect(Math.abs(avgX - 600)).toBeLessThanOrEqual(1);
+    hv.destroy();
+  });
+
   // ── addCard ────────────────────────────────────────────────
 
   it('addCard adds a card to the end of the hand without animation', () => {
@@ -1487,8 +1630,8 @@ describe('HandView', () => {
 
       // Initially containers have x=0, y=0 (renderCard returns them at origin)
       expect(hv.getCardCenters()).toEqual([
-        { x: 60, y: 130 },
-        { x: 116, y: 130 },
+        { x: 32, y: 130 },
+        { x: 88, y: 130 },
       ]);
       // The containers' own positions were set by applyLayout
       // Note: renderCard returns containers at (0,0), applyLayout sets them
