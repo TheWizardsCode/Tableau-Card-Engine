@@ -315,4 +315,134 @@ describe('GymHudComponentsScene browser integration', () => {
     );
     expect(blockers.length).toBeGreaterThanOrEqual(1);
   });
+
+  // ── AC 10: Status lines initial display ──────────────────
+
+  it('displays status lines for both panels initially showing closed', async () => {
+    const scene = await bootScene();
+
+    const helpStatus = findTextContaining(scene, 'HelpPanel:');
+    expect(helpStatus).toBeTruthy();
+    expect(helpStatus!.text).toBe('HelpPanel: closed');
+
+    const settingsStatus = findTextContaining(scene, 'SettingsPanel:');
+    expect(settingsStatus).toBeTruthy();
+    expect(settingsStatus!.text).toBe('SettingsPanel: closed');
+  });
+
+  // ── AC 11: SettingsPanel status line updates on toggle ───
+
+  it('updates SettingsPanel status line when panel opens', async () => {
+    const scene = await bootScene();
+
+    const openBtn = findText(scene, '[ Open Settings ]')!;
+    openBtn.emit('pointerdown');
+    await advanceFrames(10);
+
+    const settingsStatus = findTextContaining(scene, 'SettingsPanel:');
+    expect(settingsStatus).toBeTruthy();
+    expect(settingsStatus!.text).toBe('SettingsPanel: open');
+  });
+
+  it('updates SettingsPanel status line when panel closes', async () => {
+    const scene = await bootScene();
+
+    // Open then close
+    const openBtn = findText(scene, '[ Open Settings ]')!;
+    openBtn.emit('pointerdown');
+    await advanceFrames(5);
+
+    const closeBtn = findText(scene, '[ Close Settings ]')!;
+    closeBtn.emit('pointerdown');
+    await advanceFrames(10);
+
+    const settingsStatus = findTextContaining(scene, 'SettingsPanel:');
+    expect(settingsStatus).toBeTruthy();
+    expect(settingsStatus!.text).toBe('SettingsPanel: closed');
+  });
+
+  it('updates SettingsPanel status line on toggle', async () => {
+    const scene = await bootScene();
+
+    const toggleBtn = findText(scene, '[ Toggle Settings ]')!;
+
+    // Toggle open
+    toggleBtn.emit('pointerdown');
+    await advanceFrames(5);
+    let settingsStatus = findTextContaining(scene, 'SettingsPanel:');
+    expect(settingsStatus!.text).toBe('SettingsPanel: open');
+
+    // Toggle closed
+    toggleBtn.emit('pointerdown');
+    await advanceFrames(10);
+    settingsStatus = findTextContaining(scene, 'SettingsPanel:');
+    expect(settingsStatus!.text).toBe('SettingsPanel: closed');
+  });
+
+  // ── AC 12: HelpPanel status line updates on toggle ───────
+
+  it('updates HelpPanel status line when panel opens', async () => {
+    const scene = await bootScene();
+
+    const openBtn = findText(scene, '[ Open HelpPanel ]')!;
+    openBtn.emit('pointerdown');
+    await advanceFrames(10);
+
+    const helpStatus = findTextContaining(scene, 'HelpPanel:');
+    expect(helpStatus).toBeTruthy();
+    expect(helpStatus!.text).toBe('HelpPanel: open');
+  });
+
+  it('updates HelpPanel status line when panel closes', async () => {
+    const scene = await bootScene();
+
+    // Open then close
+    const openBtn = findText(scene, '[ Open HelpPanel ]')!;
+    openBtn.emit('pointerdown');
+    await advanceFrames(5);
+
+    const closeBtn = findText(scene, '[ Close HelpPanel ]')!;
+    closeBtn.emit('pointerdown');
+    await advanceFrames(10);
+
+    const helpStatus = findTextContaining(scene, 'HelpPanel:');
+    expect(helpStatus).toBeTruthy();
+    expect(helpStatus!.text).toBe('HelpPanel: closed');
+  });
+
+  it('updates HelpPanel status line on toggle', async () => {
+    const scene = await bootScene();
+
+    const toggleBtn = findText(scene, '[ Toggle HelpPanel ]')!;
+
+    // Toggle open
+    toggleBtn.emit('pointerdown');
+    await advanceFrames(5);
+    let helpStatus = findTextContaining(scene, 'HelpPanel:');
+    expect(helpStatus!.text).toBe('HelpPanel: open');
+
+    // Toggle closed
+    toggleBtn.emit('pointerdown');
+    await advanceFrames(10);
+    helpStatus = findTextContaining(scene, 'HelpPanel:');
+    expect(helpStatus!.text).toBe('HelpPanel: closed');
+  });
+
+  // ── AC 13: HelpPanel status line is visible when panel is open ──
+
+  it('HelpPanel status line is positioned visibly when panel opens', async () => {
+    const scene = await bootScene();
+
+    // The HelpPanel is 35% of GAME_W=1280 = 448px wide.
+    // The status line should be positioned to the right of the open panel.
+    const openBtn = findText(scene, '[ Open HelpPanel ]')!;
+    openBtn.emit('pointerdown');
+    await advanceFrames(10);
+
+    const helpStatus = findTextContaining(scene, 'HelpPanel:');
+    expect(helpStatus).toBeTruthy();
+    // The HelpPanel is 448px wide; status line should be at x > 448
+    // so it's visible when the panel is open.
+    expect(helpStatus!.x).toBeGreaterThan(448);
+  });
 });
