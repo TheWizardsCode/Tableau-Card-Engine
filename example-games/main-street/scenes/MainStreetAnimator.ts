@@ -44,7 +44,9 @@ export class MainStreetAnimator {
       try {
         if (delta > 0) {
           try { s.gameEvents?.emit('income-gained', { amount: delta }); } catch (_) {}
-        } else if (delta === 0) {
+        } else if (delta < 0) {
+          try { s.soundManager?.play(SFX_KEYS.INCOME_NEGATIVE); } catch (_) {}
+        } else {
           try { s.soundManager?.play(SFX_KEYS.INCOME_NEUTRAL); } catch (_) {}
         }
       } catch (_) {}

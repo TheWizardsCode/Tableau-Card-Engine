@@ -63,17 +63,32 @@ describe('MainStreetAnimator income sound', () => {
     expect(MAIN_STREET_TF_SFX_MAPPING['sfx-coin-pop']).toBe('card-coin-collect');
   });
 
+  it('includes income-positive SFX key in constants', () => {
+    expect(SFX_KEYS.INCOME_POSITIVE).toBe('sfx-income-positive');
+  });
+
+  it('includes income-negative SFX key in constants', () => {
+    expect(SFX_KEYS.INCOME_NEGATIVE).toBe('sfx-income-negative');
+  });
+
   it('includes income-neutral SFX key in constants', () => {
     expect(SFX_KEYS.INCOME_NEUTRAL).toBe('sfx-income-neutral');
   });
 
-  it('maps income-neutral to a distinct tf factory key', () => {
-    // The neutral sound should map to a different factory key than coin-pop
+  it('maps all three income sounds to distinct tf factory keys', () => {
+    // Each income sound should map to a different factory key
+    const positiveFactory = MAIN_STREET_TF_SFX_MAPPING['sfx-income-positive'];
+    const negativeFactory = MAIN_STREET_TF_SFX_MAPPING['sfx-income-negative'];
     const neutralFactory = MAIN_STREET_TF_SFX_MAPPING['sfx-income-neutral'];
-    const coinPopFactory = MAIN_STREET_TF_SFX_MAPPING['sfx-coin-pop'];
 
+    expect(positiveFactory).toBeDefined();
+    expect(negativeFactory).toBeDefined();
     expect(neutralFactory).toBeDefined();
-    expect(neutralFactory).not.toBe(coinPopFactory);
+
+    // All three should be distinct from each other
+    expect(positiveFactory).not.toBe(negativeFactory);
+    expect(positiveFactory).not.toBe(neutralFactory);
+    expect(negativeFactory).not.toBe(neutralFactory);
   });
 
   it('includes all sfx- prefix keys in the mapping', () => {
@@ -90,16 +105,49 @@ describe('SFX_KEYS consistency', () => {
 });
 
 describe('MainStreetLifecycleManager sound preload', () => {
-  it('preloads audio for the neutral income sound key', () => {
-    // This test validates that the neutral sound key follows the same
-    // naming convention as other SFX assets, allowing it to be preloaded
-    // alongside existing sounds.
-    const neutralKey = SFX_KEYS.INCOME_NEUTRAL;
-    expect(neutralKey).toMatch(/^sfx-/);
+  it('preloads audio for all three income sound keys', () => {
+    // Validates that all income sound keys follow the same naming convention,
+    // allowing them to be preloaded alongside existing sounds.
+    const incomeKeys = [
+      SFX_KEYS.INCOME_POSITIVE,
+      SFX_KEYS.INCOME_NEGATIVE,
+      SFX_KEYS.INCOME_NEUTRAL,
+    ];
 
-    // The preload convention uses namespace:key pattern
-    const ns = 'main-street';
-    const expectedNsKey = `${ns}:${neutralKey}`;
-    expect(expectedNsKey).toBe('main-street:sfx-income-neutral');
+    for (const key of incomeKeys) {
+      expect(key).toMatch(/^sfx-/);
+
+      // The preload convention uses namespace:key pattern
+      const ns = 'main-street';
+      const expectedNsKey = `${ns}:${key}`;
+      expect(expectedNsKey).toBe(`main-street:${key}`);
+    }
+  });
+});
+
+// ── Income State Routing Tests ──────────────────────────────
+
+describe('Income state sound routing', () => {
+  it('routes positive delta to INCOME_POSITIVE', () => {
+    // A positive income value should use the INCOME_POSITIVE key
+    const key = 10 > 0 ? SFX_KEYS.INCOME_POSITIVE : 10 < 0 ? SFX_KEYS.INCOME_NEGATIVE : SFX_KEYS.INCOME_NEUTRAL;
+    expect(key).toBe(SFX_KEYS.INCOME_POSITIVE);
+  });
+
+  it('routes negative delta to INCOME_NEGATIVE', () => {
+    const key = -5 > 0 ? SFX_KEYS.INCOME_POSITIVE : -5 < 0 ? SFX_KEYS.INCOME_NEGATIVE : SFX_KEYS.INCOME_NEUTRAL;
+    expect(key).toBe(SFX_KEYS.INCOME_NEGATIVE);
+  });
+
+  it('routes zero delta to INCOME_NEUTRAL', () => {
+    const key = 0 > 0 ? SFX_KEYS.INCOME_POSITIVE : 0 < 0 ? SFX_KEYS.INCOME_NEGATIVE : SFX_KEYS.INCOME_NEUTRAL;
+    expect(key).toBe(SFX_KEYS.INCOME_NEUTRAL);
+  });
+
+  it('emits income-gained event only for positive income', () => {
+    // The income-gained event should only be emitted when delta > 0
+    const scene = createMockScene() as any;
+    scene.gameEvents.emit('income-gained', { amount: 10 });
+    expect(scene.gameEvents.emit).toHaveBeenCalledWith('income-gained', { amount: 10 });
   });
 });

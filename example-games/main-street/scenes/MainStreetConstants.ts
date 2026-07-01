@@ -43,6 +43,8 @@ export const SFX_KEYS = {
   PLACE: 'sfx-place',
   DISCARD: 'sfx-discard',
   COIN_POP: 'sfx-coin-pop',
+  INCOME_POSITIVE: 'sfx-income-positive',
+  INCOME_NEGATIVE: 'sfx-income-negative',
   INCOME_NEUTRAL: 'sfx-income-neutral',
   CLICK: COMMON_SFX_KEYS.UI_CLICK,
   BG_LOOP: 'sfx-bg-loop',

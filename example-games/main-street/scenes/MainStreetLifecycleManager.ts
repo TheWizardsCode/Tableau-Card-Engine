@@ -74,6 +74,8 @@ export class MainStreetLifecycleManager {
         s.load.audio(`${ns}:${SFX_KEYS.UPGRADE_START}`, `${audioDir}/click.wav`);
         s.load.audio(`${ns}:${SFX_KEYS.UPGRADE_END}`, `${audioDir}/place.wav`);
         s.load.audio(`${ns}:${SFX_KEYS.EVENT_CHEER}`, `${audioDir}/coin-pop.wav`);
+        s.load.audio(`${ns}:${SFX_KEYS.INCOME_POSITIVE}`, `${audioDir}/coin-pop.wav`);
+        s.load.audio(`${ns}:${SFX_KEYS.INCOME_NEGATIVE}`, `${audioDir}/discard.wav`);
         s.load.audio(`${ns}:${SFX_KEYS.INCOME_NEUTRAL}`, `${audioDir}/click.wav`);
       } catch (e) {
         // Some test environments may lack an audio loader; ignore preload failures
@@ -182,8 +184,8 @@ export class MainStreetLifecycleManager {
       'card-drawn': SFX_KEYS.DEAL,
       'card:placed': SFX_KEYS.PLACE,
       'card-discarded': SFX_KEYS.DISCARD,
-      // income-gained is an example domain event emitted when coins are earned
-      'income-gained': SFX_KEYS.COIN_POP,
+      // income-gained is emitted when coins are earned; mapped to dedicated positive sound
+      'income-gained': SFX_KEYS.INCOME_POSITIVE,
     } as const;
 
     const tfModule = getMainStreetTfModule();
