@@ -34,6 +34,14 @@ import {
 } from '../TutorialFlow';
 import { TUTORIAL_EN_BUNDLE } from '../i18n/tutorial-en';
 import baseLayout from '../layouts/main-street.layout.json';
+
+/*
+ * WARNING: Keep main-street-tutorial.layout.json zone coordinates in sync with
+ * the base layout (main-street.layout.json) and MainStreetRenderer positions.
+ * The tutorial layout uses sceneWins policy, so its zone rects override base
+ * zones with the same name. If the base layout or rendering constants change,
+ * update the corresponding tutorial zone rects to match.
+ */
 import tutorialLayout from '../layouts/main-street-tutorial.layout.json';
 
 // ── Register English locale bundle at module load time ───────

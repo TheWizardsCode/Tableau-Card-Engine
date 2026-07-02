@@ -27,19 +27,9 @@ import {
 import baseLayout from '../../example-games/main-street/layouts/main-street.layout.json';
 import tutorialLayout from '../../example-games/main-street/layouts/main-street-tutorial.layout.json';
 import {
-  MARKET_BUSINESS_SLOTS,
-  INCIDENT_QUEUE_SIZE,
-} from '../../example-games/main-street/MainStreetCards';
-import {
   BASE_HUD_Y,
-  BASE_MARKET_CARD_W,
   BASE_MARKET_CARD_H,
   BASE_MARKET_ROW_GAP,
-  BASE_MARKET_CARD_GAP,
-  BASE_MARKET_LABEL_W,
-  BASE_QUEUE_CARD_W,
-  BASE_QUEUE_CARD_H,
-  BASE_QUEUE_CARD_GAP,
   BASE_SLOT_H,
   STREET_ROW_GAP,
 } from '../../example-games/main-street/scenes/MainStreetConstants';
@@ -51,68 +41,79 @@ function computeExpectedZoneBounds(
   viewport: LayoutViewport = VIEWPORT,
 ): { x: number; y: number; w: number; h: number } | null {
   const gameW = viewport.width;
-  const marketRowH = BASE_MARKET_CARD_H + 14;
+  const gameH = viewport.height;
+  const marketRowH = BASE_MARKET_CARD_H + 14; // 94
+
+  // Right sidebar starts at x=0.75 (960px at 1280) — derived from base layout's
+  // activityLog zone. The market/street area extends from left to logX-20.
+  const logX = Math.round(0.75 * gameW); // 960 at 1280px width
 
   switch (zone) {
     case 'hud':
-      return { x: 0, y: BASE_HUD_Y - 14, w: gameW, h: 28 };
+      // HUD strip: 50% screen width centered, 28px tall, center at hudY=50
+      return { x: Math.round(gameW * 0.25), y: BASE_HUD_Y - 14, w: Math.round(gameW * 0.5), h: 28 };
     case 'marketBusinessRow': {
-      const marketStartX = BASE_MARKET_LABEL_W + 50;
-      const marketRight =
-        marketStartX +
-        (MARKET_BUSINESS_SLOTS - 1) * (BASE_MARKET_CARD_W + BASE_MARKET_CARD_GAP) +
-        BASE_MARKET_CARD_W +
-        20;
-      // marketBusinessRow zone covers both business and investments rows
-      const bothRowsH = 2 * marketRowH + BASE_MARKET_ROW_GAP;
+      // Market background box: bgLeft=20, bgRight=logX-20, covers both rows
+      const bgLeft = 20;
+      const bgRight = logX - 20;
+      const bothRowsH = 2 * marketRowH + BASE_MARKET_ROW_GAP + 20;
       return {
-        x: 20,
-        y: 90 - 10,
-        w: marketRight - 20,
-        h: bothRowsH + 10,
+        x: bgLeft,
+        y: 80,
+        w: bgRight - bgLeft,
+        h: bothRowsH,
       };
     }
     case 'streetGrid': {
+      // Street grid starts at streetTop=337, covers 2 rows of slots
+      const streetTop = 337;
       const streetH = 2 * BASE_SLOT_H + STREET_ROW_GAP + 12;
-      return { x: 0, y: 439 - 6, w: gameW, h: streetH };
+      return { x: 0, y: streetTop, w: gameW, h: streetH };
     }
     case 'endTurnButton': {
+      // End Turn button: rightX-140, by+4, 140w x 32h (actionButton default height)
       const rightX = gameW - 24;
+      const by = 648;
       return {
-        x: rightX - 140 - 20,
-        y: 648 - 4,
-        w: 140 + 20,
-        h: 34 + 8,
+        x: rightX - 140,
+        y: by + 4,
+        w: 140,
+        h: 32,
       };
     }
     case 'incidentQueue': {
-      const totalW =
-        BASE_MARKET_LABEL_W +
-        INCIDENT_QUEUE_SIZE * (BASE_QUEUE_CARD_W + BASE_QUEUE_CARD_GAP) +
-        32;
+      // Incident queue moved to right column: same x as activity log
+      const queueTop = 408;
+      const queueH = Math.round(0.294444 * gameH); // eventsHeight
       return {
-        x: 20,
-        y: 320 - 6,
-        w: totalW,
-        h: BASE_QUEUE_CARD_H + 16,
+        x: logX,
+        y: queueTop,
+        w: Math.round(0.234375 * gameW), // Same width as challenge panel
+        h: queueH,
       };
     }
     case 'investmentsRow': {
-      const marketStartX = BASE_MARKET_LABEL_W + 50;
-      const marketRight =
-        marketStartX +
-        (MARKET_BUSINESS_SLOTS - 1) * (BASE_MARKET_CARD_W + BASE_MARKET_CARD_GAP) +
-        BASE_MARKET_CARD_W +
-        20;
+      // Investments row width matches the market background box
+      const bgLeft = 20;
+      const bgRight = logX - 20;
       return {
-        x: 20,
+        x: bgLeft,
         y: 90 + marketRowH + BASE_MARKET_ROW_GAP,
-        w: marketRight - 20,
+        w: bgRight - bgLeft,
         h: marketRowH,
       };
     }
-    case 'helpButton':
-      return { x: gameW - 120, y: 648 - 4, w: 100, h: 34 + 8 };
+    case 'helpButton': {
+      // Hint button is to the left of End Turn button
+      const rightX = gameW - 24;
+      const by = 648;
+      return {
+        x: rightX - 140 - 12 - 104,
+        y: by + 4,
+        w: 104,
+        h: 34,
+      };
+    }
     case 'centerModal':
     case 'completionModal':
       return null;
@@ -541,9 +542,10 @@ describe('Tutorial layout resolution', () => {
       expect(resolved.viewport.pixelWidth).toBe(2560);
       expect(resolved.viewport.pixelHeight).toBe(1440);
 
-      expect(resolved.zones.hud.rect.x).toBe(0);
+      // HUD is 50% centered; at 2x DPR the x is scaled from 0.25*1280*2=640
+      expect(resolved.zones.hud.rect.x).toBe(640);
       expect(resolved.zones.hud.rect.y).toBe(72);
-      expect(resolved.zones.hud.rect.width).toBe(2560);
+      expect(resolved.zones.hud.rect.width).toBe(1280);
       expect(resolved.zones.hud.rect.height).toBeCloseTo(56, 0);
     });
 
@@ -556,9 +558,10 @@ describe('Tutorial layout resolution', () => {
         1,
       );
 
-      expect(resolved.zones.hud.rect.x).toBe(0);
+      // HUD is 50% centered; at 800px: x=0.25*800=200, w=0.5*800=400
+      expect(resolved.zones.hud.rect.x).toBe(200);
       expect(resolved.zones.hud.rect.y).toBeCloseTo(30, 0);
-      expect(resolved.zones.hud.rect.width).toBe(800);
+      expect(resolved.zones.hud.rect.width).toBe(400);
       expect(resolved.zones.hud.rect.height).toBeCloseTo(23.33, 0);
     });
   });

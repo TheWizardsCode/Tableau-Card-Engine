@@ -6,10 +6,10 @@
  * unified T1–T13 tutorial system.
  *
  * Unified step mapping:
- *   0=T1 centerModal(confirm) 1=T2 hud(confirm) 2=T3 marketBusinessRow(action)
- *   3=T4 streetGrid(action) 4=T5 incidentQueue(confirm) 5=T6 endTurnButton(action)
- *   6=T7 investmentsRow(action) 7=T8 investmentsRow(action) 8=T9 centerModal(confirm)
- *   9=T10 helpButton(action) 10=T11 endTurnButton(confirm) 11=T12 investmentsRow(confirm)
+ *   0=T1 centerModal(confirm)  1=T2 hud(confirm)  2=T3 marketBusinessRow(action)
+ *   3=T4 streetGrid(action)  4=T5 incidentQueue(confirm)  5=T6 endTurnButton(action)
+ *   6=T7 investmentsRow(action)  7=T8 investmentsRow(confirm)  8=T9 centerModal(confirm)
+ *   9=T10 endTurnButton(confirm)  10=T11 challengePanel(confirm)  11=T12 hud(confirm)
  *   12=T13 completionModal(confirm)
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -161,8 +161,9 @@ describe('TutorialOverlayManager highlight zones', () => {
     expect(bounds!.y).toBeLessThanOrEqual(hudY + 2);
     expect(bounds!.y).toBeGreaterThanOrEqual(hudY - 16);
 
-    // Width should cover most of the screen
-    expect(bounds!.w).toBeGreaterThan(layout!.gameW * 0.6);
+    // HUD strip is now 50% screen width (centered) after the layout refinement
+    expect(bounds!.w).toBeLessThan(layout!.gameW * 0.55);
+    expect(bounds!.w).toBeGreaterThan(layout!.gameW * 0.45);
 
     // Height should be reasonable for a single HUD row (28px strip + padding = ~34px)
     // Should NOT be the full screen height or more than 60px
@@ -433,8 +434,9 @@ describe('TutorialOverlayManager highlight zones', () => {
     expect(bounds!.y).toBeLessThanOrEqual(hudY + 2);
     expect(bounds!.y).toBeGreaterThanOrEqual(hudY - 16);
 
-    // Width should cover most of the screen
-    expect(bounds!.w).toBeGreaterThan(layout!.gameW * 0.6);
+    // HUD strip is now 50% screen width (centered) after the layout refinement
+    expect(bounds!.w).toBeLessThan(layout!.gameW * 0.55);
+    expect(bounds!.w).toBeGreaterThan(layout!.gameW * 0.45);
 
     // Height should be reasonable for a HUD strip
     expect(bounds!.h).toBeLessThan(60);

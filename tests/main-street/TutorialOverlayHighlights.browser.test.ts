@@ -10,8 +10,8 @@
  * Unified step mapping for screenshot tests:
  *   T2 (hud, index 1)  T3 (marketBusinessRow, index 2)
  *   T4 (streetGrid, index 3)  T5 (incidentQueue, index 4)
- *   T6 (endTurnButton, index 5)  T11 (challengePanel, index 10)
- *   T12 (hud, index 11)  T13 (completionModal, index 12)
+ *   T6 (endTurnButton, index 5)  T7 (investmentsRow, index 6)
+ *   T11 (challengePanel, index 10)  T13 (completionModal, index 12)
  *
  * This allows visual verification that the highlights are correctly
  * aligned with their target UI elements.
@@ -20,7 +20,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import Phaser from 'phaser';
 import { waitForScene } from '../helpers/waitForScene';
 import { page } from '@vitest/browser/context';
-import { MARKET_BUSINESS_SLOTS } from '../../example-games/main-street/MainStreetCards';
+
 import {
   UNIFIED_TUTORIAL_STEPS,
   type TutorialHighlightZone,
@@ -181,14 +181,17 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
     ({ game, scene } = await bootGame());
     await new Promise((r) => setTimeout(r, 200));
 
-    const layout = scene.layout as { hudY: number } | undefined;
+    const layout = scene.layout as { hudY: number; gameW: number } | undefined;
     expect(layout).toBeTruthy();
 
     const hudY = layout!.hudY; // 50
+    const gameW = layout!.gameW; // 1280
+    const hudW = Math.round(gameW * 0.5); // 50% screen width (centered)
+    const hudX = Math.round((gameW - hudW) / 2);
     const expectedRef = {
-      x: 0,
+      x: hudX,
       y: hudY - 14, // HUD strip top (rectangle center at hudY, height 28)
-      w: 1280,
+      w: hudW,
       h: 28,        // Actual HUD strip height
     };
 
@@ -220,19 +223,20 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
       marketCardW: number;
       marketCardGap: number;
       gameW: number;
+      logX: number;
     } | undefined;
     expect(layout).toBeTruthy();
 
     const marketTop = layout!.marketTop;
     const totalH = 2 * layout!.marketRowH + layout!.marketRowGap + 20;
 
-    // Calculate correct market width from card layout
-    const marketStartX = layout!.marketLabelW + 50;
-    const marketRight = marketStartX + (MARKET_BUSINESS_SLOTS - 1) * (layout!.marketCardW + layout!.marketCardGap) + layout!.marketCardW + 20;
+    // Market background box extends from left edge to logX-20 (right column start)
+    const logX = layout!.logX;
+    const bgRight = logX - 20; // 940
     const expectedRef = {
       x: 20,
       y: marketTop - 10,
-      w: marketRight - 20,
+      w: bgRight - 20,
       h: totalH,
     };
 
@@ -332,13 +336,14 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
       queueCardGap: number;
       gameW: number;
       logX: number;
+      logW: number;
     } | undefined;
     expect(layout).toBeTruthy();
 
     const expectedRef = {
-      x: 20,
+      x: layout!.logX,
       y: layout!.queueTop - 6,
-      w: layout!.queueLabelW + 2 * (layout!.queueCardW + layout!.queueCardGap) + 32,
+      w: layout!.logW,
       h: layout!.queueCardH + 16,
     };
 
@@ -369,16 +374,17 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
       marketCardW: number;
       marketCardGap: number;
       gameW: number;
+      logX: number;
     } | undefined;
     expect(layout).toBeTruthy();
 
-    // Calculate correct investments row width (same as business row)
-    const invMarketStartX = layout!.marketLabelW + 50;
-    const invMarketRight = invMarketStartX + (MARKET_BUSINESS_SLOTS - 1) * (layout!.marketCardW + layout!.marketCardGap) + layout!.marketCardW + 20;
+    // Investments row width matches the market background box (extends to logX-20)
+    const logX = layout!.logX;
+    const bgRight = logX - 20; // 940
     const expectedRef = {
       x: 20,
       y: layout!.marketTop + layout!.marketRowH + layout!.marketRowGap,
-      w: invMarketRight - 20,
+      w: bgRight - 20,
       h: layout!.marketRowH,
     };
 
