@@ -124,8 +124,6 @@ const LAYOUT_PROFILES: LayoutProfile[] = [
   },
 ];
 
-const OVERLAY_COLORS = [0x66ddff, 0x66ff99, 0xffcc66, 0xff8899, 0xd9a5ff, 0x99ffdd];
-
 const SHELL_ONLY_PLACEMENT: PlacementMapping = {
   title: { zone: 'shell', anchor: 'title' },
   help: { zone: 'shell', anchor: 'help' },
@@ -156,11 +154,9 @@ const COMPOSED_PLACEMENT: PlacementMapping = {
 export class GymSllScene extends GymSceneBase {
   private layouts: LayoutOption[] = [];
   private layoutIndex = 0;
-  private profileIndex = 0;
   private overlayVisible = false;
-  private shellVisible = false;
+  private shellVisible = true;
 
-  private layoutButton!: Phaser.GameObjects.Text;
   private profileButton!: Phaser.GameObjects.Text;
   private overlayButton!: Phaser.GameObjects.Text;
   private shellToggleButton!: Phaser.GameObjects.Text;
@@ -195,7 +191,7 @@ export class GymSllScene extends GymSceneBase {
       {
         heading: 'Controls',
         body:
-          '[ Layout ] starts on the composed shell + scene example, then cycles through the shell-only example, the scene-only layout, and the pixel override layout. [ Toggle Shell ] hides or restores the shared shell chrome without changing the selected layout. [ Profile ] simulates viewport + DPR combinations. [ Overlay ] toggles zone and anchor debug visualization.',
+          '[ Profile ] cycles through layout examples: composed shell + scene, shell-only, scene-only, and pixel override. [ Toggle Shell ] hides or restores the shared shell chrome without changing the selected layout. [ Overlay ] toggles element position markers and legend.',
       },
       {
         heading: 'Notes',
@@ -326,12 +322,7 @@ export class GymSllScene extends GymSceneBase {
   private createControlRow(): void {
     const y1 = 58;
     const y2 = 82;
-    this.layoutButton = this.addButton(28, y1, '[ Layout ]', () => this.cycleLayout(), {
-      fontSize: '13px',
-      color: '#88ffcc',
-    });
-
-    this.profileButton = this.addButton(320, y1, '[ Profile ]', () => this.cycleProfile(), {
+    this.profileButton = this.addButton(28, y1, '[ Profile ]', () => this.cycleProfile(), {
       fontSize: '13px',
       color: '#88ddff',
     });
@@ -392,13 +383,8 @@ export class GymSllScene extends GymSceneBase {
       .setDepth(35);
   }
 
-  private cycleLayout(): void {
-    this.layoutIndex = (this.layoutIndex + 1) % this.layouts.length;
-    this.applyLayout();
-  }
-
   private cycleProfile(): void {
-    this.profileIndex = (this.profileIndex + 1) % LAYOUT_PROFILES.length;
+    this.layoutIndex = (this.layoutIndex + 1) % this.layouts.length;
     this.applyLayout();
   }
 
@@ -457,7 +443,6 @@ export class GymSllScene extends GymSceneBase {
       this.visibilityController.register(this.helpButton, 'shell');
     }
 
-    this.visibilityController.register(this.layoutButton, 'shell');
     this.visibilityController.register(this.profileButton, 'shell');
     this.visibilityController.register(this.overlayButton, 'shell');
     this.visibilityController.register(this.statusLine, 'shell');
@@ -487,7 +472,7 @@ export class GymSllScene extends GymSceneBase {
 
   private applyLayout(): void {
     const currentLayout = this.layouts[this.layoutIndex]!;
-    const currentProfile = LAYOUT_PROFILES[this.profileIndex]!;
+    const currentProfile = LAYOUT_PROFILES[0]!;
 
     const resolved =
       currentLayout.kind === 'direct'
@@ -508,12 +493,6 @@ export class GymSllScene extends GymSceneBase {
     const toDisplayPoint = (point: PixelPoint): PixelPoint => ({
       x: point.x * previewScaleX,
       y: point.y * previewScaleY,
-    });
-
-    // Zones are position-only; overlay shows anchors, not zone rectangles.
-    const _toDisplayRect = (rect: PixelPoint): PixelPoint => ({
-      x: rect.x * previewScaleX,
-      y: rect.y * previewScaleY,
     });
 
     const titleAnchorPx = this.getAnchorPoint(resolved, currentLayout.placement.title);
@@ -548,16 +527,36 @@ export class GymSllScene extends GymSceneBase {
       this.contentLabel.setVisible(false);
     }
 
-    this.redrawOverlay(resolved, _toDisplayRect, toDisplayPoint);
+    // Collect element positions for overlay visualization
+    const elementColors = [0x66ddff, 0x66ff99, 0xffcc66, 0xff8899];
+    const elementPositions: Array<{
+      name: string;
+      pixel: PixelPoint;
+      display: PixelPoint;
+      color: number;
+    }> = [
+      { name: 'Title', pixel: titleAnchorPx, display: titleAnchorDisplay, color: elementColors[0] },
+      { name: 'Help', pixel: helpAnchorPx, display: helpAnchorDisplay, color: elementColors[1] },
+      { name: 'Action', pixel: actionAnchorPx, display: actionAnchorDisplay, color: elementColors[2] },
+    ];
 
-    this.layoutButton.setText(
-      `[ Layout: ${currentLayout.kind === 'composed' ? 'Shell+Scene' : currentLayout.name} ]`,
-    );
-    this.profileButton.setText(`[ Profile: ${currentProfile.id} ]`);
+    if (currentLayout.showContent && contentPlacement) {
+      const contentPx = this.getAnchorPoint(resolved, contentPlacement);
+      const contentDisplay = toDisplayPoint(contentPx);
+      elementPositions.push({
+        name: 'Content',
+        pixel: contentPx,
+        display: contentDisplay,
+        color: elementColors[3],
+      });
+    }
+
+    this.redrawOverlay(elementPositions);
+
+    const layoutLabel = currentLayout.kind === 'composed' ? 'Shell+Scene' : currentLayout.name;
+    this.profileButton.setText(`[ Profile: ${layoutLabel} ]`);
     this.statusLine.setText(
-      currentLayout.kind === 'composed'
-        ? `Composed shell + scene | ${currentProfile.label} | previewScale x${previewScaleX.toFixed(3)} y${previewScaleY.toFixed(3)}`
-        : `${currentLayout.name} | ${currentProfile.label} | previewScale x${previewScaleX.toFixed(3)} y${previewScaleY.toFixed(3)}`,
+      `${layoutLabel} | ${currentProfile.label} | previewScale x${previewScaleX.toFixed(3)} y${previewScaleY.toFixed(3)}`,
     );
 
     this.publishReadyMarker({
@@ -579,9 +578,12 @@ export class GymSllScene extends GymSceneBase {
   }
 
   private redrawOverlay(
-    resolved: ReturnType<typeof normalizedToPixels>,
-    toDisplayPointFn: (point: PixelPoint) => PixelPoint,
-    toDisplayPoint: (point: PixelPoint) => PixelPoint,
+    elementPositions: Array<{
+      name: string;
+      pixel: PixelPoint;
+      display: PixelPoint;
+      color: number;
+    }>,
   ): void {
     this.overlayGraphics.clear();
     for (const label of this.overlayLabels) label.destroy();
@@ -591,35 +593,27 @@ export class GymSllScene extends GymSceneBase {
       return;
     }
 
-    let colorIndex = 0;
     const legendLines: string[] = ['Overlay legend'];
+    const separator = '─'.repeat(36);
 
-    for (const [zoneName, zone] of Object.entries(resolved.zones)) {
-      const color = OVERLAY_COLORS[colorIndex % OVERLAY_COLORS.length];
-      colorIndex += 1;
-
-      const pixelPos = zone.rect;
-      const displayPos = toDisplayPointFn(pixelPos);
-
-      // Zones are position-only; show anchor points but not zone rectangles
-      this.overlayGraphics.lineStyle(2, color, 0.95);
-      this.overlayGraphics.strokeCircle(displayPos.x, displayPos.y, 6);
+    for (const elem of elementPositions) {
+      // Draw a dot at the element's display position
+      this.overlayGraphics.fillStyle(elem.color, 0.95);
+      this.overlayGraphics.fillCircle(elem.display.x, elem.display.y, 5);
+      this.overlayGraphics.lineStyle(1.5, elem.color, 0.8);
+      this.overlayGraphics.strokeCircle(elem.display.x, elem.display.y, 8);
 
       legendLines.push(
-        `${zoneName}: [${pixelPos.x.toFixed(0)}, ${pixelPos.y.toFixed(0)}]`,
+        `${elem.name}: (${elem.pixel.x.toFixed(0)}, ${elem.pixel.y.toFixed(0)})`,
       );
-
-      for (const [anchorName, anchorPixel] of Object.entries(zone.anchors)) {
-        const anchorDisplay = toDisplayPoint(anchorPixel);
-
-        this.overlayGraphics.fillStyle(color, 0.95);
-        this.overlayGraphics.fillCircle(anchorDisplay.x, anchorDisplay.y, 4);
-
-        legendLines.push(
-          `  ${anchorName}: (${anchorPixel.x.toFixed(0)}, ${anchorPixel.y.toFixed(0)})`,
-        );
-      }
     }
+
+    legendLines.push('');
+    legendLines.push(separator);
+    legendLines.push('Positions shown are the pixel');
+    legendLines.push('coordinates of each placed element');
+    legendLines.push('as determined by the current SLL');
+    legendLines.push('layout and placement mapping.');
 
     const legendPanelX = 864;
     const legendPanelY = 122;
