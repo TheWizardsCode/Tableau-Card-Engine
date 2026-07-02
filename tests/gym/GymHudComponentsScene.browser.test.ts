@@ -6,6 +6,13 @@
  *  - Interactive buttons open/close HelpPanel and SettingsPanel
  *  - The HelpButton (?) and SettingsButton (⚙) toggle controls exist
  *  - Multiple open/close cycles work without errors
+ *
+ * NOTE: All advanceFrames calls use 20 frames (~333ms at 60fps) to
+ * accommodate the 300ms panel open/close animations. Using fewer frames
+ * causes assertions on post-animation state (e.g., input blocker removal)
+ * to fail, which in turn triggers a RangeError in Vitest's pretty-format
+ * when it tries to serialize the deeply-nested Phaser game objects.
+ * See CG-0MR2PHIEZ007TNDC for details.
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import Phaser from 'phaser';
@@ -116,7 +123,7 @@ describe('GymHudComponentsScene browser integration', () => {
     const openBtn = findText(scene, '[ Open HelpPanel ]');
     expect(openBtn).toBeTruthy();
     openBtn!.emit('pointerdown');
-    await advanceFrames(10);
+    await advanceFrames(20);
 
     // After opening, the input blocker rectangle at depth 900 should exist
     const blocker = scene.children.list.find(
@@ -135,14 +142,14 @@ describe('GymHudComponentsScene browser integration', () => {
     const openBtn = findText(scene, '[ Open HelpPanel ]');
     expect(openBtn).toBeTruthy();
     openBtn!.emit('pointerdown');
-    await advanceFrames(5);
+    await advanceFrames(20);
     expect(scene.isHelpOpen).toBe(true);
 
     // Now close
     const closeBtn = findText(scene, '[ Close HelpPanel ]');
     expect(closeBtn).toBeTruthy();
     closeBtn!.emit('pointerdown');
-    await advanceFrames(10);
+    await advanceFrames(20);
 
     expect(scene.isHelpOpen).toBe(false);
 
@@ -163,7 +170,7 @@ describe('GymHudComponentsScene browser integration', () => {
     const openBtn = findText(scene, '[ Open Settings ]');
     expect(openBtn).toBeTruthy();
     openBtn!.emit('pointerdown');
-    await advanceFrames(10);
+    await advanceFrames(20);
 
     // After opening, the input blocker rectangle at depth 900 should exist
     const blocker = scene.children.list.find(
@@ -182,14 +189,14 @@ describe('GymHudComponentsScene browser integration', () => {
     const openBtn = findText(scene, '[ Open Settings ]');
     expect(openBtn).toBeTruthy();
     openBtn!.emit('pointerdown');
-    await advanceFrames(5);
+    await advanceFrames(20);
     expect(scene.isSettingsOpen).toBe(true);
 
     // Now close
     const closeBtn = findText(scene, '[ Close Settings ]');
     expect(closeBtn).toBeTruthy();
     closeBtn!.emit('pointerdown');
-    await advanceFrames(10);
+    await advanceFrames(20);
 
     expect(scene.isSettingsOpen).toBe(false);
 
@@ -210,12 +217,12 @@ describe('GymHudComponentsScene browser integration', () => {
 
     // Toggle open
     toggleBtn!.emit('pointerdown');
-    await advanceFrames(10);
+    await advanceFrames(20);
     expect(scene.isHelpOpen).toBe(true);
 
     // Toggle closed
     toggleBtn!.emit('pointerdown');
-    await advanceFrames(10);
+    await advanceFrames(20);
     expect(scene.isHelpOpen).toBe(false);
   });
 
@@ -227,12 +234,12 @@ describe('GymHudComponentsScene browser integration', () => {
 
     // Toggle open
     toggleBtn!.emit('pointerdown');
-    await advanceFrames(10);
+    await advanceFrames(20);
     expect(scene.isSettingsOpen).toBe(true);
 
     // Toggle closed
     toggleBtn!.emit('pointerdown');
-    await advanceFrames(10);
+    await advanceFrames(20);
     expect(scene.isSettingsOpen).toBe(false);
   });
 
@@ -249,22 +256,22 @@ describe('GymHudComponentsScene browser integration', () => {
     for (let cycle = 0; cycle < 3; cycle++) {
       // Open HelpPanel
       openHelp.emit('pointerdown');
-      await advanceFrames(5);
+      await advanceFrames(20);
       expect(scene.isHelpOpen, `HelpPanel open cycle ${cycle}`).toBe(true);
 
       // Open SettingsPanel
       openSettings.emit('pointerdown');
-      await advanceFrames(5);
+      await advanceFrames(20);
       expect(scene.isSettingsOpen, `SettingsPanel open cycle ${cycle}`).toBe(true);
 
       // Close HelpPanel
       closeHelp.emit('pointerdown');
-      await advanceFrames(5);
+      await advanceFrames(20);
       expect(scene.isHelpOpen, `HelpPanel close cycle ${cycle}`).toBe(false);
 
       // Close SettingsPanel
       closeSettings.emit('pointerdown');
-      await advanceFrames(10);
+      await advanceFrames(20);
       expect(scene.isSettingsOpen, `SettingsPanel close cycle ${cycle}`).toBe(false);
     }
   });
@@ -300,9 +307,9 @@ describe('GymHudComponentsScene browser integration', () => {
 
     // Open both panels
     openHelp.emit('pointerdown');
-    await advanceFrames(5);
+    await advanceFrames(20);
     openSettings.emit('pointerdown');
-    await advanceFrames(10);
+    await advanceFrames(20);
 
     expect(scene.isHelpOpen).toBe(true);
     expect(scene.isSettingsOpen).toBe(true);
@@ -337,7 +344,7 @@ describe('GymHudComponentsScene browser integration', () => {
 
     const openBtn = findText(scene, '[ Open Settings ]')!;
     openBtn.emit('pointerdown');
-    await advanceFrames(10);
+    await advanceFrames(20);
 
     const settingsStatus = findTextContaining(scene, 'SettingsPanel:');
     expect(settingsStatus).toBeTruthy();
@@ -350,11 +357,11 @@ describe('GymHudComponentsScene browser integration', () => {
     // Open then close
     const openBtn = findText(scene, '[ Open Settings ]')!;
     openBtn.emit('pointerdown');
-    await advanceFrames(5);
+    await advanceFrames(20);
 
     const closeBtn = findText(scene, '[ Close Settings ]')!;
     closeBtn.emit('pointerdown');
-    await advanceFrames(10);
+    await advanceFrames(20);
 
     const settingsStatus = findTextContaining(scene, 'SettingsPanel:');
     expect(settingsStatus).toBeTruthy();
@@ -368,13 +375,13 @@ describe('GymHudComponentsScene browser integration', () => {
 
     // Toggle open
     toggleBtn.emit('pointerdown');
-    await advanceFrames(5);
+    await advanceFrames(20);
     let settingsStatus = findTextContaining(scene, 'SettingsPanel:');
     expect(settingsStatus!.text).toBe('SettingsPanel: open');
 
     // Toggle closed
     toggleBtn.emit('pointerdown');
-    await advanceFrames(10);
+    await advanceFrames(20);
     settingsStatus = findTextContaining(scene, 'SettingsPanel:');
     expect(settingsStatus!.text).toBe('SettingsPanel: closed');
   });
@@ -386,7 +393,7 @@ describe('GymHudComponentsScene browser integration', () => {
 
     const openBtn = findText(scene, '[ Open HelpPanel ]')!;
     openBtn.emit('pointerdown');
-    await advanceFrames(10);
+    await advanceFrames(20);
 
     const helpStatus = findTextContaining(scene, 'HelpPanel:');
     expect(helpStatus).toBeTruthy();
@@ -399,11 +406,11 @@ describe('GymHudComponentsScene browser integration', () => {
     // Open then close
     const openBtn = findText(scene, '[ Open HelpPanel ]')!;
     openBtn.emit('pointerdown');
-    await advanceFrames(5);
+    await advanceFrames(20);
 
     const closeBtn = findText(scene, '[ Close HelpPanel ]')!;
     closeBtn.emit('pointerdown');
-    await advanceFrames(10);
+    await advanceFrames(20);
 
     const helpStatus = findTextContaining(scene, 'HelpPanel:');
     expect(helpStatus).toBeTruthy();
@@ -417,13 +424,13 @@ describe('GymHudComponentsScene browser integration', () => {
 
     // Toggle open
     toggleBtn.emit('pointerdown');
-    await advanceFrames(5);
+    await advanceFrames(20);
     let helpStatus = findTextContaining(scene, 'HelpPanel:');
     expect(helpStatus!.text).toBe('HelpPanel: open');
 
     // Toggle closed
     toggleBtn.emit('pointerdown');
-    await advanceFrames(10);
+    await advanceFrames(20);
     helpStatus = findTextContaining(scene, 'HelpPanel:');
     expect(helpStatus!.text).toBe('HelpPanel: closed');
   });
@@ -437,7 +444,7 @@ describe('GymHudComponentsScene browser integration', () => {
     // The status line should be positioned to the right of the open panel.
     const openBtn = findText(scene, '[ Open HelpPanel ]')!;
     openBtn.emit('pointerdown');
-    await advanceFrames(10);
+    await advanceFrames(20);
 
     const helpStatus = findTextContaining(scene, 'HelpPanel:');
     expect(helpStatus).toBeTruthy();
