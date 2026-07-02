@@ -65,10 +65,12 @@ function computeExpectedZoneBounds(
       };
     }
     case 'streetGrid': {
-      // Street grid starts at streetTop=337, covers 2 rows of slots
-      const streetTop = 337;
+      // Street grid highlight: top aligns with base street anchor y=0.444444,
+      // width stops before the right column (activity log/challenges) at x=0.75
+      const streetY = Math.round(0.444444 * gameH);
+      const streetW = Math.round(0.73 * gameW);
       const streetH = 2 * BASE_SLOT_H + STREET_ROW_GAP + 12;
-      return { x: 0, y: streetTop, w: gameW, h: streetH };
+      return { x: 0, y: streetY, w: streetW, h: streetH };
     }
     case 'endTurnButton': {
       // End Turn button: rightX-140, by+4, 140w x 32h (actionButton default height)

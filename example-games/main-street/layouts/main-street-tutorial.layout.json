@@ -40,12 +40,12 @@
     "streetGrid": {
       "rect": {
         "x": 0,
-        "y": 0.468056,
-        "w": 1,
+        "y": 0.444444,
+        "w": 0.73,
         "h": 0.255556
       },
       "anchors": {
-        "topCenter": { "x": 0.5, "y": 0.468056 }
+        "topCenter": { "x": 0.5, "y": 0.444444 }
       }
     },
     "endTurnButton": {

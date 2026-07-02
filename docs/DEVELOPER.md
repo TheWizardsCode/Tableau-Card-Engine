@@ -1656,7 +1656,7 @@ The tutorial layout defines these zones (all use normalized coordinates with opt
 |---------|-------------|-----------------|
 | `hud` | HUD strip (top bar with coins, reputation, score) | Yes (full-width bounding box) |
 | `marketBusinessRow` | Business card row in the market area | Yes |
-| `streetGrid` | The 2×5 street grid for placing businesses | Yes (full-width) |
+| `streetGrid` | The 2×5 street grid for placing businesses | Yes (stops before right column) |
 | `endTurnButton` | End Turn action button area | Yes |
 | `incidentQueue` | Scrollable incident cards queue | Yes |
 | `investmentsRow` | Investment/upgrade card row | Yes |
