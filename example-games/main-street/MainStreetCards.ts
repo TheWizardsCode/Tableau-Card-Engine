@@ -1523,6 +1523,7 @@ export function cardLabel(card: AnyCard): string {
     case 'community-space': return `${card.name} ($${card.cost})`;
     case 'event':           return card.cost > 0 ? `${card.name} ($${card.cost})` : card.name;
     case 'upgrade':         return `${card.name} ($${card.cost})`;
+    case 'staff':           return `${card.name} ($${card.cost})`;
   }
 }
 

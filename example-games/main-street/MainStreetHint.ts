@@ -139,6 +139,8 @@ export function buildRationale(
       return `Play ${cardName} now for immediate benefit`;
     }
 
+    case 'buy-business-to-hand':
+      return 'Buy business card to hand for later placement';
     case 'end-turn':
       return 'No good buys available -- end your turn';
   }
