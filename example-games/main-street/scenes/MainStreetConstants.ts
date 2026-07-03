@@ -53,6 +53,7 @@ export const SFX_KEYS = {
   UPGRADE_START: 'sfx-upgrade-start',
   UPGRADE_END: 'sfx-upgrade-end',
   EVENT_CHEER: 'sfx-event-cheer',
+  CELEBRATE: 'sfx-challenge-complete',
 } as const;
 
 // Activity Log panel layout

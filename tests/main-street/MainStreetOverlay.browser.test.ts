@@ -131,6 +131,7 @@ function forceGameOver(scene: Phaser.Scene, isWin = false): void {
     incident: null,
     finalScore: isWin ? 100 : 0,
     gameResult: isWin ? 'win' : 'loss',
+    newlyCompletedChallenges: [],
   };
 
   s.showGameOverOverlay(result, []);

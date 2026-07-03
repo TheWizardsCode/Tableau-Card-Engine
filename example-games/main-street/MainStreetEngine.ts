@@ -97,6 +97,8 @@ export interface TurnResult {
   gameResult: 'playing' | 'win' | 'loss';
   /** Current final score. */
   finalScore: number;
+  /** Challenge IDs that were newly completed during this turn's evaluation. */
+  newlyCompletedChallenges: string[];
 }
 
 // ── Score Calculation ───────────────────────────────────────
@@ -580,6 +582,7 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
       incident: null,
       gameResult: state.gameResult,
       finalScore: state.finalScore,
+      newlyCompletedChallenges: [],
     };
   }
 
@@ -601,6 +604,7 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
       incident,
       gameResult: state.gameResult,
       finalScore: state.finalScore,
+      newlyCompletedChallenges: [],
     };
   }
 
@@ -620,7 +624,7 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
   }
 
   // Evaluate challenges before checking end conditions (so score includes any new bonus points)
-  evaluateChallenges(state.activeChallenges, state);
+  const newlyCompletedChallenges = evaluateChallenges(state.activeChallenges, state);
 
   checkEndConditions(state);
 
@@ -635,6 +639,7 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
     incident,
     gameResult: state.gameResult,
     finalScore: state.finalScore,
+    newlyCompletedChallenges,
   };
 }
 

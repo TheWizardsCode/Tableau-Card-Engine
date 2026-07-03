@@ -22,4 +22,5 @@ export const MAIN_STREET_TF_SFX_MAPPING: Record<string, string> = {
   'sfx-income-positive': 'income-positive-chime',
   'sfx-income-negative': 'income-negative-chime',
   'sfx-income-neutral': 'income-neutral-chime',
+  'sfx-challenge-complete': 'success-fanfare',
 };

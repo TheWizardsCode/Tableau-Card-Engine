@@ -74,6 +74,104 @@ export class MainStreetAnimator {
     s.previousReputation = reputation;
   }
 
+  /**
+   * Plays a celebration VFX (particle burst + pop text) and sound for a
+   * newly completed challenge.
+   *
+   * Centers the effect on the challenge tracker panel. Respects the
+   * reduced-motion accessibility setting: when enabled, only a brief pop
+   * text is shown (no particles). Falls back to pop text if the Phaser
+   * particle system is unavailable.
+   *
+   * @param challengeTitle  The title of the completed challenge (for pop text).
+   * @returns A promise that resolves when the celebration animation finishes.
+   */
+  public animateCelebration(challengeTitle: string): Promise<void> {
+    const s = this.scene;
+    const reducedMotion = s.settingsPanel?.reducedMotion;
+
+    // Center of the challenge tracker panel
+    const cx = s.layout.challengeX + s.layout.challengeW / 2;
+    const cy = s.layout.challengeY + 30;
+
+    // Play the celebration sound
+    try {
+      s.soundManager?.play(SFX_KEYS.CELEBRATE);
+    } catch (_) { /* ignore */ }
+
+    if (reducedMotion) {
+      // Reduced-motion: pop text only (no particles)
+      return popTextOrIcon({
+        scene: s,
+        label: `\uD83C\uDF89 ${challengeTitle}`,
+        x: cx,
+        y: cy,
+        duration: 200,
+        reducedMotion: true,
+        scale: 1.5,
+      });
+    }
+
+    // Try particle burst
+    try {
+      const particleKey = 'celebrate-particle';
+      if (!s.textures.exists(particleKey)) {
+        const g = s.add.graphics();
+        g.fillStyle(0xffdd44, 1);
+        g.fillCircle(4, 4, 4);
+        g.generateTexture(particleKey, 8, 8);
+        g.destroy();
+      }
+
+      const texture = s.textures.get(particleKey);
+      if (texture && s.add.particles) {
+        const emitter = s.add.particles(cx, cy, particleKey, {
+          speed: { min: 60, max: 200 },
+          angle: { min: 0, max: 360 },
+          scale: { start: 0.8, end: 0 },
+          lifespan: 1000,
+          quantity: 25,
+          emitting: false,
+          tint: [0xffdd44, 0x44ff44, 0x44aaff, 0xff6644, 0xdd88ff],
+        });
+
+        emitter.explode(25);
+
+        // Show pop text alongside particles
+        void popTextOrIcon({
+          scene: s,
+          label: `\uD83C\uDF89 ${challengeTitle}`,
+          x: cx,
+          y: cy - 30,
+          duration: 1500,
+          scale: 1.3,
+          riseY: 40,
+          style: { fontSize: '16px', fontStyle: 'bold', color: '#ffdd44' },
+        });
+
+        // Clean up after particles finish
+        return new Promise<void>((resolve) => {
+          s.time.delayedCall(1500, () => {
+            try { emitter.destroy(); } catch (_) { /* ignore */ }
+            resolve();
+          });
+        });
+      }
+    } catch (_) { /* ignore */ }
+
+    // Fallback: pop text if particle system unavailable or errored
+    return popTextOrIcon({
+      scene: s,
+      label: `\uD83C\uDF89 ${challengeTitle}`,
+      x: cx,
+      y: cy,
+      duration: 600,
+      scale: 2,
+      riseY: 40,
+      style: { fontSize: '18px', fontStyle: 'bold', color: '#ffdd44' },
+    });
+  }
+
   public getMarketCardCenter(row: 'development' | 'investments', slotIndex: number): { x: number; y: number } | null {
     const s = this.scene;
     if (slotIndex < 0) return null;

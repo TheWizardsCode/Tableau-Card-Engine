@@ -77,6 +77,7 @@ export class MainStreetLifecycleManager {
         s.load.audio(`${ns}:${SFX_KEYS.INCOME_POSITIVE}`, `${audioDir}/coin-pop.wav`);
         s.load.audio(`${ns}:${SFX_KEYS.INCOME_NEGATIVE}`, `${audioDir}/discard.wav`);
         s.load.audio(`${ns}:${SFX_KEYS.INCOME_NEUTRAL}`, `${audioDir}/click.wav`);
+        s.load.audio(`${ns}:${SFX_KEYS.CELEBRATE}`, `${audioDir}/coin-pop.wav`);
       } catch (e) {
         // Some test environments may lack an audio loader; ignore preload failures
       }

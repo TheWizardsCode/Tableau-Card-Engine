@@ -126,6 +126,30 @@ export class MainStreetTurnController {
     // Clear undo stack on end-of-turn (per acceptance criteria)
     try { s.undoManager.clear(); } catch (e) { /* ignore */ }
 
+    // ── Challenge Celebration VFX & Sound ────────────────────────
+    // If any challenges were newly completed this turn, trigger celebration
+    // animations with staggered timing so they don't overlap.
+    if (result.newlyCompletedChallenges.length > 0) {
+      // Build a lookup from challenge ID to title
+      const challengeTitleById = new Map<string, string>();
+      for (const ac of s.state.activeChallenges) {
+        challengeTitleById.set(ac.challenge.id, ac.challenge.title);
+      }
+
+      result.newlyCompletedChallenges.forEach((challengeId, index) => {
+        const title = challengeTitleById.get(challengeId) ?? 'Challenge Complete!';
+        s.time.delayedCall(index * 600, () => {
+          void s.msAnimator.animateCelebration(title);
+        });
+      });
+
+      // Refresh the challenge tracker after all celebrations
+      s.time.delayedCall(
+        result.newlyCompletedChallenges.length * 600 + 200,
+        () => s.refreshAll(),
+      );
+    }
+
     // Brief delay then show result / advance
     s.time.delayedCall(400, () => {
       if (result.gameResult !== 'playing') {
