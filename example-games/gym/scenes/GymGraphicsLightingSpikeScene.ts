@@ -143,12 +143,11 @@ export class GymGraphicsLightingSpikeScene extends GymSceneBase {
 
     try {
       this.lightActive = !this.lightActive;
-      if (this.lightActive) {
-        this.lights.enable();
-        this.logEvent('Lighting system enabled.');
+      if (this.light && this.light.intensity !== undefined) {
+        this.light.setIntensity(this.lightActive ? 1.0 : 0.0);
+        this.logEvent(`Light ${this.lightActive ? 'enabled' : 'disabled'} (intensity=${this.lightActive ? '1.0' : '0.0'}).`);
       } else {
-        this.lights.disable();
-        this.logEvent('Lighting system disabled.');
+        this.logEvent('No light reference available to toggle.');
       }
     } catch (e) {
       this.logEvent(`Light toggle error: ${(e as Error).message}`);

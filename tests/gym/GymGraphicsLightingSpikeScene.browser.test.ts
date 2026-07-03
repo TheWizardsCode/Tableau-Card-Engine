@@ -141,8 +141,8 @@ describe('GymGraphicsLightingSpikeScene browser integration', () => {
     expect(toggleBtn).toBeTruthy();
     toggleBtn!.emit('pointerdown');
 
-    // After toggling, the log should indicate the lighting system was enabled/disabled
-    const toggleLog = findTextContaining(scene, 'Lighting system');
+    // After toggling, the log should indicate the light was enabled/disabled
+    const toggleLog = findTextContaining(scene, 'Light ');
     expect(toggleLog).toBeTruthy();
   });
 
@@ -203,7 +203,7 @@ describe('GymGraphicsLightingSpikeScene browser integration', () => {
     toggleBtn!.emit('pointerdown');
 
     // After toggling twice, the lighting should be back on
-    const enabledLog = findTextContaining(scene, 'Lighting system enabled');
+    const enabledLog = findTextContaining(scene, 'Light enabled');
     expect(enabledLog).toBeTruthy();
   });
 });
