@@ -558,8 +558,14 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
     throw new Error(`Cannot end turn during ${state.phase}. Must be in MarketPhase.`);
   }
 
-  // Cycle unpurchased market cards to discard piles before advancing phases
-  cycleMarketCards(state);
+  // Cycle unpurchased market cards to discard piles before advancing phases.
+  // During the tutorial (before T7 completes), market cycling is skipped to
+  // preserve scenario-placed cards (e.g. Local Festival for T7). The
+  // `skipMarketCycleOnEndTurn` flag is set by the turn controller when the
+  // tutorial is active and the current step requires the scenario cards.
+  if (!state.skipMarketCycleOnEndTurn) {
+    cycleMarketCards(state);
+  }
 
   // Phase: InvestmentResolution
   // Held Investment events are NO LONGER auto-resolved. The player must

@@ -33,7 +33,7 @@
  * | T4   | Place business (free)      | 0        | 0         | 6       |
  * | T5   | Confirm (no cost)          | 0        | 0         | 6       |
  * | T6   | End Turn + income (~1 coin)| 1        | 0         | 7       |
- * | T7   | Buy event ($2)             | 0        | 2         | 5       |
+ * | T7   | Buy event ($3)             | 0        | 3         | 4       |
  * | T8+  | Confirm steps (no cost)    | 0        | 0         | ≥5      |
  *
  * @module
@@ -115,14 +115,14 @@ export interface TutorialScenario {
  * **Investments Row (3 slots: 2 upgrades + 1 investment event):**
  *   - `upg-patisserie` (Upgrade to Patisserie, $4, targets Bakery)
  *   - `upg-garden` (Upgrade to Garden, $3, targets Park)
- *   - `evt-grand-opening` (Grand Opening Sale, $2) — T7 purchase target
+ *   - `evt-festival` (Local Festival, $3) — T7 purchase target
  *
  * **Incident Queue (2 cards):**
  *   - `evt-award` (Community Award, +2 reputation)
  *   - `evt-rainy` (Rainy Day, -1 coin per Food business)
  *
- * **Coin Budget:** 12 starting (Easy), $6 Laundromat, $2 Grand Opening Sale,
- * remaining ≥4 coins after both purchases. RNG-independent.
+ * **Coin Budget:** 12 starting (Easy), $6 Laundromat, $3 Local Festival,
+ * remaining ≥3 coins after both purchases. RNG-independent.
  */
 export const STANDARD_TUTORIAL_SCENARIO: TutorialScenario = {
   difficulty: 'Easy',
@@ -137,7 +137,7 @@ export const STANDARD_TUTORIAL_SCENARIO: TutorialScenario = {
     investments: [
       'upg-patisserie',
       'upg-garden',
-      'evt-grand-opening',
+      'evt-festival',
     ],
   },
   incidentQueue: [
@@ -319,6 +319,7 @@ export function createTutorialScenario(
     discardPile: [],
     staffCards: [],
     staffCardMarket: [],
+    skipMarketCycleOnEndTurn: false,
   };
 
   // Select challenges for this run using seeded RNG

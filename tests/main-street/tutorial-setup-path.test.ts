@@ -275,7 +275,7 @@ describe('AC3: All 13 tutorial steps complete with scenario-based setup', () => 
     const invTemplateIds = state.market.investments.map(c => stripSerialSuffix(c.id));
 
     // T7 requires buying an event from the investments row
-    // The scenario has 'evt-grand-opening' as its investment event
+    // The scenario has 'evt-festival' as its investment event
     const invEvent = state.market.investments.find(c => c.family === 'event');
     expect(invEvent).toBeDefined();
     expect(invTemplateIds).toContain(stripSerialSuffix(invEvent!.id));
@@ -295,8 +295,8 @@ describe('AC3: All 13 tutorial steps complete with scenario-based setup', () => 
     const afterIncome = afterLaundromat + 1;
     expect(afterIncome).toBe(7);
 
-    // Should be enough for a $2 event
-    expect(afterIncome).toBeGreaterThanOrEqual(2);
+    // Should be enough for a $3 event (Local Festival)
+    expect(afterIncome).toBeGreaterThanOrEqual(3);
   });
 });
 

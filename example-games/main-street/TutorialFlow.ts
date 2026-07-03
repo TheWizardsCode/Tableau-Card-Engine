@@ -18,7 +18,7 @@
  * With the TutorialScenario system and Easy difficulty (12 coins, 5 reputation):
  *
  * - Market development row: Bakery ($6), **Laundromat ($6)**, Park ($4), Hardware Store ($10)
- * - Investments: Upgrade to Patisserie ($4), Upgrade to Garden ($3), Grand Opening Sale ($2)
+ * - Investments: Upgrade to Patisserie ($4), Upgrade to Garden ($3), Local Festival ($3)
  * - Incidents in queue: Community Award (+2 rep), Rainy Day (-1 coin per Food)
  *
  * ### Budget Walkthrough
@@ -31,9 +31,9 @@
  * | T4   | Place business (free)      | 0        | 0         | 6       |
  * | T5   | Confirm (no cost)          | 0        | 0         | 6       |
  * | T6   | End Turn + income (~1 coin)| 1        | 0         | 7       |
- * | T7   | Buy Grand Opening Sale ($2)| 0        | 2         | 5       |
- * | T8   | Confirm (no cost)          | 0        | 0         | 5       |
- * | T9   | Confirm (no cost)          | 0        | 0         | 5       |
+ * | T7   | Buy Local Festival ($3)   | 0        | 3         | 4       |
+ * | T8   | Confirm (no cost)          | 0        | 0         | 4       |
+ * | T9   | Confirm (no cost)          | 0        | 0         | 4       |
  * | T10  | Confirm (no cost)          | 0        | 0         | ~6      |
  * | T11  | Confirm (no cost)          | 0        | 0         | ~6      |
  * | T12  | Confirm (no cost)          | 0        | 0         | ~6      |
@@ -41,7 +41,7 @@
  *
  * **Conclusion:** Even with worst-case incidents, the budget is sufficient
  * for all tutorial actions. The cheapest viable business card (Laundromat,
- * $6) leaves enough coins for the Grand Opening Sale ($2) after one turn's
+ * $6) leaves enough coins for the Local Festival ($3) after one turn's
  * income.
  *
  * @module
@@ -206,7 +206,7 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     highlightZone: 'investmentsRow',
     gate: 'action',
     requiredAction: 'buy-event',
-    // The TutorialScenario system puts Grand Opening Sale (evt-grand-opening, $2)
+    // The TutorialScenario system puts Local Festival (evt-festival, $3)
     // in the investments row. This is affordable after the T3 Laundromat purchase
     // ($6) and T6 income (~1 coin). No specific card is required — the player can
     // buy any Investment event card.

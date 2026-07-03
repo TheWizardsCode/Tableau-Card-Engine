@@ -58,9 +58,9 @@ describe('Main Street Tutorial E2E — Part 1', () => {
     expect(devCards.length).toBe(4);
     expect(devCards[0].id).toBe('biz-bakery-0');
     const investments = s.state?.market?.investments;
-    const grandOpening = investments?.find((c: any) => c.name === 'Grand Opening Sale');
-    expect(grandOpening).toBeTruthy();
-    expect(grandOpening.cost).toBe(2);
+    const localFestival = investments?.find((c: any) => c.name === 'Local Festival');
+    expect(localFestival).toBeTruthy();
+    expect(localFestival.cost).toBe(3);
   }, 30_000);
 
   it('T1: Welcome shows and advances to T2', async () => {

@@ -130,7 +130,7 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
   [tutorialKey('T7', 'title')]:
     'Held Event Card',
   [tutorialKey('T7', 'body')]:
-    'Buy the **Grand Opening Sale** card from the investments row.\n' +
+    'Buy the **Local Festival** card from the investments row.\n' +
     'You can hold one event card and play it when the time is right.',
 
   // ── T8: Upgrade Concept ─────────────────────────────────────

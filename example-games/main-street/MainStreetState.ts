@@ -226,6 +226,12 @@ export interface MainStreetState {
   staffCards: StaffCard[];
   /** Staff cards available for purchase in the market. */
   staffCardMarket: StaffCard[];
+  /**
+   * If true, `processEndOfTurn()` will skip `cycleMarketCards()`.
+   * Used during the tutorial to preserve scenario-placed market cards
+   * until the T7 purchase step completes.
+   */
+  skipMarketCycleOnEndTurn: boolean;
 }
 
 export interface MainStreetSerializedState {
@@ -273,6 +279,8 @@ export interface MainStreetSerializedState {
   staffCards: StaffCard[];
   /** Serialized staff card market. */
   staffCardMarket: StaffCard[];
+  /** Whether market cycling should be skipped on next end-of-turn. */
+  skipMarketCycleOnEndTurn: boolean;
 }
 
 /** Record of a single milestone (tier unlock) achievement. */
@@ -500,6 +508,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     discardPile: [],
     staffCards: [],
     staffCardMarket: staffDeck,
+    skipMarketCycleOnEndTurn: false,
   };
 
   // Select challenges for this run using seeded RNG and config count
@@ -545,6 +554,7 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
     discardPile: structuredClone(state.discardPile),
     staffCards: structuredClone(state.staffCards),
     staffCardMarket: structuredClone(state.staffCardMarket),
+    skipMarketCycleOnEndTurn: state.skipMarketCycleOnEndTurn,
   };
 }
 
@@ -638,6 +648,11 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
   if (!('staffCardMarket' in saved)) {
     (saved as Record<string, unknown>).staffCardMarket = [];
   }
+
+  // ── skipMarketCycleOnEndTurn: add missing flag (defaults to false) ─
+  if (!('skipMarketCycleOnEndTurn' in saved)) {
+    (saved as Record<string, unknown>).skipMarketCycleOnEndTurn = false;
+  }
 }
 
 /**
@@ -700,6 +715,7 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
     discardPile: structuredClone(saved.discardPile),
     staffCards: structuredClone(saved.staffCards),
     staffCardMarket: structuredClone(saved.staffCardMarket),
+    skipMarketCycleOnEndTurn: saved.skipMarketCycleOnEndTurn ?? false,
   };
 
   return state;
