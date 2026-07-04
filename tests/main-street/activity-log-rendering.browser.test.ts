@@ -222,6 +222,69 @@ describe('MainStreet Activity Log scroll bounds', () => {
     }
   });
 
+  it('does not position content above the log display area when entries first overflow', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene') as any;
+
+    await waitFrames(10);
+
+    const { LOG_TITLE_H } = await import(
+      '../../example-games/main-street/scenes/MainStreetConstants'
+    );
+
+    // ── Phase 1: Few entries that fit ──
+    // This simulates the initial game setup where a handful of entries exist.
+    for (let i = 0; i < 5; i++) {
+      scene.state.activityLog.push({
+        text: `Entry ${i}`,
+        type: 'neutral',
+        turn: 1,
+      });
+    }
+    scene.msRenderer.refreshLog();
+    await waitFrames(3);
+
+    // All entries fit — container at default position, no scroll
+    expect(scene.logScrollOffset).toBe(0);
+    expect(scene.logContentContainer.y).toBe(LOG_TITLE_H + 2);
+
+    // ── Phase 2: Add enough entries to overflow ──
+    // This simulates gameplay adding enough entries that they exceed visibleH.
+    // After the fix, logAutoScroll should STILL be false (it was never
+    // re-enabled in the "all fit" branch), so scrollOffset stays at 0.
+    for (let i = 0; i < 50; i++) {
+      scene.state.activityLog.push({
+        text: `Overflow entry ${i}`,
+        type: 'neutral',
+        turn: 1,
+      });
+    }
+    scene.msRenderer.refreshLog();
+    await waitFrames(3);
+
+    // Scroll offset should remain 0 — no auto-scroll on initial overflow
+    expect(scene.logScrollOffset).toBe(0);
+    expect(scene.logAutoScroll).toBe(false);
+
+    // The container should NOT be shifted up — content should start
+    // right below the title bar.
+    expect(scene.logContentContainer.y).toBe(LOG_TITLE_H + 2);
+
+    // Verify all text objects have non-negative Y within the container
+    const textEntries = scene.logContentContainer.list.filter(
+      (obj: any) => obj instanceof Phaser.GameObjects.Text,
+    );
+    expect(textEntries.length).toBeGreaterThan(0);
+
+    for (const txt of textEntries) {
+      // Every text's local Y should be >= 0 (no entry positioned above
+      // the container origin). Combined with the container being at
+      // LOG_TITLE_H + 2 (not shifted up), this means no content renders
+      // above the title bar.
+      expect(txt.y).toBeGreaterThanOrEqual(0);
+    }
+  });
+
   it('renders all log entries and uses mask clipping for off-screen entries', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('MainStreetScene') as any;

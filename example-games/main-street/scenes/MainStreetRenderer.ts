@@ -1423,7 +1423,9 @@ export class MainStreetRenderer {
     if (s.logTotalContentH <= visibleH) {
       s.logMaxScroll = 0;
       s.logScrollOffset = 0;
-      s.logAutoScroll = true;
+      // Keep logAutoScroll unchanged — if the user was at the bottom before
+      // (entries overflowing) it stays true; if they haven't scrolled yet
+      // or scrolled up, it stays false.
     } else {
       s.logMaxScroll = s.logTotalContentH - visibleH;
 
