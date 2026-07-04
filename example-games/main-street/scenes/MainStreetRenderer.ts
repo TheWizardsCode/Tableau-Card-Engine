@@ -1373,80 +1373,74 @@ export class MainStreetRenderer {
 
     // Visible area inside the panel (below title bar, above bottom edge)
     const visibleH = Math.max(1, s.layout.logH - LOG_TITLE_H - 4);
-    const maxDisplayEntries = Math.max(1, Math.ceil(visibleH / LOG_LINE_H));
 
-    // Compute scroll bounds and start index
-    let startIdx: number;
-    if (entries.length <= maxDisplayEntries) {
-      // All entries fit — no scrolling needed
-      startIdx = 0;
+    // ── Re-render only if the entry count changed ────────────────
+    // Scroll offset changes just shift the container (no re-render needed).
+    if (newCount !== s.logPrevEntryCount) {
+      s.logPrevEntryCount = newCount;
+
+      // Render ALL entries to get the true total content height.
+      // The mask clips off-screen entries; scrolling shifts the container.
+      s.logContentContainer.removeAll(true);
+
+      const contentW = s.layout.logW - LOG_PAD * 2;
+      let yOff = 0;
+
+      for (let i = 0; i < entries.length; i++) {
+        const entry = entries[i];
+        if (!entry) continue;
+
+        const color = LOG_COLORS[entry.type] ?? LOG_COLORS.neutral;
+        const isTurnHeader = entry.type === 'turn-header';
+
+        if (isTurnHeader) {
+          // Subtle background bar for turn headers
+          const barBg = s.add.graphics();
+          barBg.fillStyle(0x443311, 0.5);
+          barBg.fillRect(0, yOff, s.layout.logW, LOG_LINE_H);
+          s.logContentContainer.add(barBg);
+        }
+
+        const txt = s.add.text(LOG_PAD, yOff, entry.text, {
+          fontSize: `${LOG_FONT_SIZE}px`,
+          fontStyle: isTurnHeader ? 'bold' : 'normal',
+          color,
+          fontFamily: FONT_FAMILY,
+          wordWrap: { width: contentW },
+        });
+        s.logContentContainer.add(txt);
+
+        // Use actual rendered height to handle word-wrapped lines
+        yOff += Math.max(LOG_LINE_H, txt.height + 2);
+      }
+
+      s.logTotalContentH = yOff;
+    }
+
+    // ── Compute scroll bounds using actual total content height ──
+    // This ensures logMaxScroll accounts for word-wrapped entries that are
+    // taller than LOG_LINE_H, preventing content from extending past the mask.
+    if (s.logTotalContentH <= visibleH) {
       s.logMaxScroll = 0;
-      if (s.logAutoScroll) s.logScrollOffset = 0;
+      s.logScrollOffset = 0;
+      s.logAutoScroll = true;
     } else {
-      const hiddenCount = entries.length - maxDisplayEntries;
-      const newMaxScroll = hiddenCount * LOG_LINE_H;
-      s.logMaxScroll = newMaxScroll;
+      s.logMaxScroll = s.logTotalContentH - visibleH;
 
       if (s.logAutoScroll) {
-        s.logScrollOffset = newMaxScroll;
-      }
-      s.logScrollOffset = Phaser.Math.Clamp(s.logScrollOffset, 0, s.logMaxScroll);
-
-      startIdx = Math.round(s.logScrollOffset / LOG_LINE_H);
-      // Clamp to valid range
-      startIdx = Math.max(0, Math.min(startIdx, entries.length - maxDisplayEntries));
-    }
-
-    // Track whether the scroll position counts as 'at the bottom' for auto-scroll
-    const atBottom = s.logScrollOffset >= s.logMaxScroll - 4;
-    s.logAutoScroll = atBottom;
-
-    // Skip rebuild if neither entry count nor visible window changed
-    if (newCount === s.logPrevEntryCount && startIdx === s.logRenderedStartIdx) return;
-
-    s.logPrevEntryCount = newCount;
-    s.logRenderedStartIdx = startIdx;
-
-    // Clear existing content
-    s.logContentContainer.removeAll(true);
-
-    const contentW = s.layout.logW - LOG_PAD * 2;
-    let yOff = 0;
-
-    // Render only the visible window (plus one extra for partial visibility)
-    const endIdx = Math.min(entries.length, startIdx + maxDisplayEntries + 1);
-    for (let i = startIdx; i < endIdx; i++) {
-      const entry = entries[i];
-      if (!entry) continue;
-
-      const color = LOG_COLORS[entry.type] ?? LOG_COLORS.neutral;
-      const isTurnHeader = entry.type === 'turn-header';
-
-      if (isTurnHeader) {
-        // Subtle background bar for turn headers
-        const barBg = s.add.graphics();
-        barBg.fillStyle(0x443311, 0.5);
-        barBg.fillRect(0, yOff, s.layout.logW, LOG_LINE_H);
-        s.logContentContainer.add(barBg);
+        s.logScrollOffset = s.logMaxScroll;
+      } else {
+        s.logScrollOffset = Phaser.Math.Clamp(s.logScrollOffset, 0, s.logMaxScroll);
       }
 
-      const txt = s.add.text(LOG_PAD, yOff, entry.text, {
-        fontSize: `${LOG_FONT_SIZE}px`,
-        fontStyle: isTurnHeader ? 'bold' : 'normal',
-        color,
-        fontFamily: FONT_FAMILY,
-        wordWrap: { width: contentW },
-      });
-      s.logContentContainer.add(txt);
-
-      // Use actual rendered height to handle word-wrapped lines
-      yOff += Math.max(LOG_LINE_H, txt.height + 2);
+      // Update auto-scroll state based on current position
+      const atBottom = s.logScrollOffset >= s.logMaxScroll - 4;
+      s.logAutoScroll = atBottom;
     }
 
-    s.logTotalContentH = yOff;
-
-    // Reset container to its default position — entries are rendered at correct y
-    s.logContentContainer.setY(LOG_TITLE_H + 2);
+    // Apply scroll by shifting the content container upward.
+    // The mask clips content above/below the visible area.
+    s.logContentContainer.setY(LOG_TITLE_H + 2 - s.logScrollOffset);
     s.updateLogMask();
   }
 }

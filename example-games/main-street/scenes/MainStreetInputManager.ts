@@ -149,9 +149,9 @@ export class MainStreetInputManager {
 
   public applyLogScroll(): void {
     const s = this.scene;
-    // Content is positioned by refreshLog which renders entries at their natural y.
-    // This method only needs to update the mask to reflect the current panel position.
-    s.logContentContainer.setY(LOG_TITLE_H + 2);
+    // Apply the scroll offset by shifting the content container upward.
+    // The mask clips off-screen content above and below the visible area.
+    s.logContentContainer.setY(LOG_TITLE_H + 2 - s.logScrollOffset);
     s.updateLogMask();
   }
 }
