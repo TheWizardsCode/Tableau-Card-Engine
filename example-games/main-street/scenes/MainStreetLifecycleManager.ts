@@ -168,7 +168,7 @@ export class MainStreetLifecycleManager {
     s.logScrollOffset = 0;
     s.logMaxScroll = 0;
     s.logTotalContentH = 0;
-    s.logAutoScroll = true;
+    s.logAutoScroll = false;
     s.logPrevEntryCount = 0;
 
     s.detectReplayMode();

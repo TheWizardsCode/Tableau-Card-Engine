@@ -80,7 +80,7 @@ export class MainStreetScene extends CardGameScene {
   public logScrollOffset = 0;
   public logMaxScroll = 0;
   public logTotalContentH = 0;
-  public logAutoScroll = true;
+  public logAutoScroll = false;
   public logPrevEntryCount = 0;
   /** The index of the first entry displayed in the current log window (for windowed rendering). */
   public logRenderedStartIdx = 0;
