@@ -25,6 +25,7 @@ import type {
   GolfAction,
 } from './GolfGame';
 import { enumerateAiLegalMoves, enumerateAiDrawSources } from './GolfGame';
+import { GRID_ROWS, GRID_COLS } from './GolfGrid';
 import type { AiStrategyBase } from '../../src/ai';
 import { AiPlayer as AiPlayerBase, pickRandom, pickBest } from '../../src/ai';
 
@@ -125,11 +126,14 @@ export const GreedyStrategy: AiStrategy = {
     const drawSource = chooseDrawSource(playerState, shared, rng);
 
     if (drawSource === 'discard' && shared.discardTop) {
+      // Compute visible rank counts for column-feasibility weighting
+      const visibleRanks = countVisibleRanks(playerState, shared);
       // We know the discard card — evaluate moves with it
       const move = chooseMoveForCard(
         playerState.grid,
         shared.discardTop,
         rng,
+        visibleRanks,
       );
       return { drawSource, move };
     }
@@ -201,8 +205,153 @@ export function chooseDrawSource(
     return 'discard';
   }
 
+  // Even if discard doesn't immediately improve the score, check if it
+  // helps build a column match and unknown copies of that rank remain.
+  const visibleRanks = countVisibleRanks(playerState, shared);
+
+  // Check if any legal swap move with the discard card would build toward
+  // a column match (2 matching cards in column) with feasible potential
+  for (const move of legalMoves) {
+    const bonus = computeColumnBonus(
+      playerState.grid,
+      discardCard,
+      move,
+      visibleRanks,
+    );
+    if (bonus < 0) {
+      // Discard card helps build a column with feasible potential
+      return 'discard';
+    }
+  }
+
   // Discard card doesn't help — draw from stock (unknown, might be better)
   return 'stock';
+}
+
+// ── Visible rank counting (for column-feasibility weighting) ──
+
+/**
+ * Maximum copies of any rank in a standard 52-card deck.
+ */
+const MAX_RANK_COPIES = 4;
+
+/**
+ * Weight (in score points) for the column-building feasibility bonus.
+ * A negative adjustment means the AI prefers moves that build toward
+ * column matches, scaled by remaining unknown copies of the target rank.
+ */
+const COLUMN_BONUS_WEIGHT = 2;
+
+/**
+ * Count how many instances of each card rank are visible to the AI.
+ *
+ * Visible cards include:
+ * - Face-up cards in the AI's own grid
+ * - The discard pile top card (visible to all players)
+ *
+ * Face-down cards are NOT counted (the AI doesn't know their ranks).
+ *
+ * The counts are used by the GreedyStrategy to determine whether
+ * pursuing a column match is feasible: if all 4 copies of a rank
+ * are already visible, no more unknown copies remain, so trying
+ * to complete a column of that rank is futile.
+ *
+ * Information boundary: uses only AI-visible state projections.
+ *
+ * @param playerState  AI-visible per-player state
+ * @param shared       AI-visible shared state (discard top, stock flag)
+ * @returns            Record mapping rank strings to their visible count
+ */
+export function countVisibleRanks(
+  playerState: AiVisiblePlayerState,
+  shared: AiVisibleSharedState,
+): Record<string, number> {
+  const counts: Record<string, number> = {};
+
+  // Count face-up cards in the AI's own grid
+  for (const slot of playerState.grid) {
+    if (slot.faceUp && 'rank' in slot) {
+      const rank = (slot as Card).rank;
+      counts[rank] = (counts[rank] || 0) + 1;
+    }
+  }
+
+  // Count the discard top card (visible to all players)
+  if (shared.discardTop && 'rank' in shared.discardTop) {
+    const rank = shared.discardTop.rank;
+    counts[rank] = (counts[rank] || 0) + 1;
+  }
+
+  return counts;
+}
+
+/**
+ * Compute a column-building feasibility bonus for a move.
+ *
+ * When a swap move would place the drawn card in a column where it
+ * matches other face-up cards, the move builds toward a column match.
+ * The bonus (negative, reducing the score) is proportional to how many
+ * unknown copies of the target rank remain in play.
+ *
+ * If all 4 copies of the rank are already visible, the bonus is 0
+ * (pursuing the column is futile because no unknown copies remain
+ * to complete the match).
+ *
+ * @param grid         AI-visible grid
+ * @param drawnCard    The card the player drew
+ * @param move         The move to evaluate
+ * @param visibleRanks Count of visible instances per rank
+ * @returns A negative score adjustment (better) or 0 if no bonus applies
+ */
+export function computeColumnBonus(
+  grid: AiVisibleGrid,
+  drawnCard: Card,
+  move: GolfMove,
+  visibleRanks: Record<string, number>,
+): number {
+  // Only swap moves can contribute to column matches
+  if (move.kind === 'discard-and-flip') return 0;
+
+  const col = move.col;
+  const idx = move.row * GRID_COLS + move.col;
+  const matchingRank = drawnCard.rank;
+  let matchingCount = 1; // The drawn card itself
+  let unknownInColumn = 0;
+
+  for (let row = 0; row < GRID_ROWS; row++) {
+    const flatIdx = row * GRID_COLS + col;
+    if (flatIdx === idx) continue;
+
+    const slot = grid[flatIdx];
+    if (
+      slot.faceUp &&
+      'rank' in slot &&
+      (slot as Card).rank === matchingRank
+    ) {
+      matchingCount++;
+    }
+    if (!slot.faceUp) {
+      unknownInColumn++;
+    }
+  }
+
+  // After the move, if we have 2+ matching and at least 1 unknown in column,
+  // the move contributes to building a column match
+  if (matchingCount >= 2 && unknownInColumn >= 1) {
+    const visibleCount = visibleRanks[matchingRank] || 0;
+    const unknownCopies = Math.max(0, MAX_RANK_COPIES - visibleCount);
+
+    // Bonus is proportional to unknown copies remaining
+    // If all 4 are visible (unknownCopies = 0), bonus = 0 (futile)
+    // If 0 visible (unknownCopies = 4), bonus = full weight
+    const feasibilityRatio = unknownCopies / MAX_RANK_COPIES;
+
+    // Return a negative bonus (or 0 for +0, avoiding -0 which causes test issues)
+    const bonus = -feasibilityRatio * COLUMN_BONUS_WEIGHT;
+    return bonus || 0;
+  }
+
+  return 0;
 }
 
 /**
@@ -213,24 +362,39 @@ export function chooseDrawSource(
  * - Discard-and-flip discards the drawn card and flips a face-down
  *   card (whose value is unknown, estimated as the average).
  *
+ * When {@link visibleRanks} data is provided, a column-building
+ * feasibility bonus is applied: moves that build toward a column
+ * match get a score bonus (lower score) proportional to remaining
+ * unknown copies of the target rank. If all 4 copies are already
+ * visible, no bonus is applied (pursuit is futile).
+ *
  * Picks the move that minimizes the resulting score. Ties are broken
  * randomly.
+ *
+ * @param visibleRanks Optional. Count of visible instances per rank.
+ *                     When provided, enables column-feasibility weighting.
  */
 export function chooseMoveForCard(
   grid: AiVisibleGrid,
   drawnCard: Card,
   rng: () => number,
+  visibleRanks?: Record<string, number>,
 ): GolfMove {
   const legalMoves = enumerateAiLegalMoves(grid);
   if (legalMoves.length === 0) {
     throw new Error('No legal moves available');
   }
 
-  // Score each legal move
-  const scored = legalMoves.map((move) => ({
-    move,
-    score: simulateAiMoveScore(grid, drawnCard, move),
-  }));
+  // Score each legal move with optional column bonus
+  const scored = legalMoves.map((move) => {
+    let score = simulateAiMoveScore(grid, drawnCard, move);
+
+    if (visibleRanks) {
+      score += computeColumnBonus(grid, drawnCard, move, visibleRanks);
+    }
+
+    return { move, score };
+  });
 
   // Pick the best (lowest score), breaking ties randomly
   const best = pickBest(scored, (c) => -c.score, rng);
@@ -273,8 +437,15 @@ export class AiPlayer extends AiPlayerBase<AiStrategy> {
   /**
    * Phase 2: Given a drawn card, choose the best move.
    * Used by the scene after the actual draw for stock draws.
+   *
+   * @param visibleRanks Optional. When provided, enables column-feasibility
+   *                     weighting in move selection.
    */
-  chooseMoveForCard(grid: AiVisibleGrid, drawnCard: Card): GolfMove {
-    return chooseMoveForCard(grid, drawnCard, this.rng);
+  chooseMoveForCard(
+    grid: AiVisibleGrid,
+    drawnCard: Card,
+    visibleRanks?: Record<string, number>,
+  ): GolfMove {
+    return chooseMoveForCard(grid, drawnCard, this.rng, visibleRanks);
   }
 }
