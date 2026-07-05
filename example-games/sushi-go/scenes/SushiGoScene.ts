@@ -32,7 +32,7 @@ import {
   dismissOverlay,
   PhaseManager,
   HandView,
-  createSceneTitle, createSceneMenuButton,
+  createSceneTitle,
   TooltipManager,
   audioPathWithFallback,
 } from '../../../src/ui';
@@ -179,9 +179,7 @@ export class SushiGoScene extends CardGameScene {
     this.recorder = null;
     this.replayStepIndex = -1;
 
-    this.detectReplayMode();
-    this.initEventSystem();
-    this.initHUDContainer();
+    super.create();
 
     if (this.replayMode) {
       this.createHeader();
@@ -260,7 +258,6 @@ export class SushiGoScene extends CardGameScene {
   // ── UI creation ─────────────────────────────────────────
 
   private createHeader(): void {
-    createSceneMenuButton(this);
     createSceneTitle(this, 'Sushi Go!');
   }
 

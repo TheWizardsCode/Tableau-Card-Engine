@@ -9,17 +9,19 @@
  */
 
 import { shuffleArray } from '../../src/card-system';
-import { createSeededRng } from '../../src/core-engine';
+import { type ActiveEffect, createSeededRng } from '../../src/core-engine';
 import { createEconomyLedger, type EconomyLedger } from '../../src/rule-engine/EconomyLedger';
 import {
   type BusinessCard,
   type CommunitySpaceCard,
   type EventCard,
   type UpgradeCard,
+  type StaffCard,
   createBusinessDeck,
   createCommunitySpaceDeck,
   createEventDeck,
   createUpgradeDeck,
+  createStaffDeck,
   GRID_SIZE,
   MARKET_BUSINESS_SLOTS,
   MARKET_INVESTMENT_UPGRADE_COUNT,
@@ -212,6 +214,24 @@ export interface MainStreetState {
   rng: () => number;
   /** Chronological log of game activities for the UI activity log panel. */
   activityLog: LogEntry[];
+  /** Active duration-based modifiers (e.g. Flu outbreak income reduction). */
+  activeEffects: ActiveEffect[];
+  /** Cards held in the player's hand (not placed on tableau). */
+  hand: BusinessCard[];
+  /** Maximum number of cards the player can hold in hand (default 2, expanded by staff cards). */
+  maxHandSize: number;
+  /** Discard pile for cycled and sold cards (unified discard pool). */
+  discardPile: BusinessCard[];
+  /** Active staff cards providing hand capacity bonuses. */
+  staffCards: StaffCard[];
+  /** Staff cards available for purchase in the market. */
+  staffCardMarket: StaffCard[];
+  /**
+   * If true, `processEndOfTurn()` will skip `cycleMarketCards()`.
+   * Used during the tutorial to preserve scenario-placed market cards
+   * until the T7 purchase step completes.
+   */
+  skipMarketCycleOnEndTurn: boolean;
 }
 
 export interface MainStreetSerializedState {
@@ -248,6 +268,19 @@ export interface MainStreetSerializedState {
   numericSeed: number;
   rngCalls: number;
   activityLog: LogEntry[];
+  activeEffects: ActiveEffect[];
+  /** Serialized hand cards. */
+  hand: BusinessCard[];
+  /** Maximum hand size at the time of save. */
+  maxHandSize: number;
+  /** Serialized discard pile. */
+  discardPile: BusinessCard[];
+  /** Serialized active staff cards. */
+  staffCards: StaffCard[];
+  /** Serialized staff card market. */
+  staffCardMarket: StaffCard[];
+  /** Whether market cycling should be skipped on next end-of-turn. */
+  skipMarketCycleOnEndTurn: boolean;
 }
 
 /** Record of a single milestone (tier unlock) achievement. */
@@ -389,11 +422,13 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
   // are selected deterministically per-game-seed rather than by template order.
   const eventDeck = createEventDeck(3, options.unlockedCardIds, rng, config.positiveIncidentMultiplier);
   const upgradeDeck = createUpgradeDeck(2, options.unlockedCardIds);
+  const staffDeck = createStaffDeck(1);
 
   shuffleArray(businessDeck, rng);
   shuffleArray(communitySpaceDeck, rng);
   shuffleArray(eventDeck, rng);
   shuffleArray(upgradeDeck, rng);
+  shuffleArray(staffDeck, rng);
 
   // Populate initial market
   // Development row: fill from business deck (community space cards are
@@ -467,6 +502,13 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     rngCalls,
     rng,
     activityLog: [],
+    activeEffects: [],
+    hand: [],
+    maxHandSize: 2,
+    discardPile: [],
+    staffCards: [],
+    staffCardMarket: staffDeck,
+    skipMarketCycleOnEndTurn: false,
   };
 
   // Select challenges for this run using seeded RNG and config count
@@ -506,6 +548,13 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
     numericSeed: state.numericSeed,
     rngCalls: state.rngCalls,
     activityLog: structuredClone(state.activityLog),
+    activeEffects: structuredClone(state.activeEffects),
+    hand: structuredClone(state.hand),
+    maxHandSize: state.maxHandSize,
+    discardPile: structuredClone(state.discardPile),
+    staffCards: structuredClone(state.staffCards),
+    staffCardMarket: structuredClone(state.staffCardMarket),
+    skipMarketCycleOnEndTurn: state.skipMarketCycleOnEndTurn,
   };
 }
 
@@ -516,6 +565,7 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
  * - `market.business` → `market.development` rename
  * - Park cards with `family: 'business'` → `family: 'community-space'`
  * - Missing `communitySpace` deck/discard in old saves
+ * - Missing `activeEffects` field (defaults to [])
  */
 function migrateSerializedState(saved: Record<string, unknown>): void {
   // ── Market: rename business → development ────────────────
@@ -576,6 +626,33 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
   if (discards && !('communitySpace' in discards)) {
     discards.communitySpace = [];
   }
+
+  // ── ActiveEffects: add missing activeEffects field ────────
+  if (!('activeEffects' in saved)) {
+    (saved as Record<string, unknown>).activeEffects = [];
+  }
+
+  // ── Hand management fields (Multi-Use Card Economy) ──────
+  if (!('hand' in saved)) {
+    (saved as Record<string, unknown>).hand = [];
+  }
+  if (!('maxHandSize' in saved)) {
+    (saved as Record<string, unknown>).maxHandSize = 2;
+  }
+  if (!('discardPile' in saved)) {
+    (saved as Record<string, unknown>).discardPile = [];
+  }
+  if (!('staffCards' in saved)) {
+    (saved as Record<string, unknown>).staffCards = [];
+  }
+  if (!('staffCardMarket' in saved)) {
+    (saved as Record<string, unknown>).staffCardMarket = [];
+  }
+
+  // ── skipMarketCycleOnEndTurn: add missing flag (defaults to false) ─
+  if (!('skipMarketCycleOnEndTurn' in saved)) {
+    (saved as Record<string, unknown>).skipMarketCycleOnEndTurn = false;
+  }
 }
 
 /**
@@ -632,6 +709,13 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
     rngCalls: saved.rngCalls,
     rng,
     activityLog: structuredClone(saved.activityLog),
+    activeEffects: structuredClone(saved.activeEffects),
+    hand: structuredClone(saved.hand),
+    maxHandSize: saved.maxHandSize,
+    discardPile: structuredClone(saved.discardPile),
+    staffCards: structuredClone(saved.staffCards),
+    staffCardMarket: structuredClone(saved.staffCardMarket),
+    skipMarketCycleOnEndTurn: saved.skipMarketCycleOnEndTurn ?? false,
   };
 
   return state;

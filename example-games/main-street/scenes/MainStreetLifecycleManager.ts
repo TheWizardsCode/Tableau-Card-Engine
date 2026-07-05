@@ -1,6 +1,7 @@
 import { setupMainStreetGame, deserializeMainStreetState } from '../MainStreetState';
 import { createDefaultCampaignProgress, loadCampaignProgress, updateCampaignAfterRun, saveCampaignProgress, createMainStreetCheckpointManager } from '../MainStreetSaveLoad';
 import { DIFFICULTY_NAMES } from '../MainStreetDifficulty';
+import { createTutorialScenario } from '../TutorialScenario';
 import { SaveLoadStore, createDefaultResumeOverlay, markSceneValid, markSceneInvalid, createTfPlayer, UndoRedoManager } from '../../../src/core-engine';
 import { createSingleSelectionManager, TooltipManager } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
@@ -22,7 +23,6 @@ import {
   loadTutorialState,
   saveTutorialState,
   updateTutorialStatus,
-  TUTORIAL_SEED,
   type TutorialVisibilityOptions,
 } from '../TutorialState';
 import {
@@ -74,6 +74,10 @@ export class MainStreetLifecycleManager {
         s.load.audio(`${ns}:${SFX_KEYS.UPGRADE_START}`, `${audioDir}/click.wav`);
         s.load.audio(`${ns}:${SFX_KEYS.UPGRADE_END}`, `${audioDir}/place.wav`);
         s.load.audio(`${ns}:${SFX_KEYS.EVENT_CHEER}`, `${audioDir}/coin-pop.wav`);
+        s.load.audio(`${ns}:${SFX_KEYS.INCOME_POSITIVE}`, `${audioDir}/coin-pop.wav`);
+        s.load.audio(`${ns}:${SFX_KEYS.INCOME_NEGATIVE}`, `${audioDir}/discard.wav`);
+        s.load.audio(`${ns}:${SFX_KEYS.INCOME_NEUTRAL}`, `${audioDir}/click.wav`);
+        s.load.audio(`${ns}:${SFX_KEYS.CELEBRATE}`, `${audioDir}/coin-pop.wav`);
       } catch (e) {
         // Some test environments may lack an audio loader; ignore preload failures
       }
@@ -98,7 +102,6 @@ export class MainStreetLifecycleManager {
       }
     } catch (e) {
       // If svg loader is unavailable in the current environment, ignore
-      // eslint-disable-next-line no-console
       console.debug('[MS] preload: svg load failed', e);
     }
   }
@@ -130,7 +133,6 @@ export class MainStreetLifecycleManager {
     } catch (e) {
       // Non-fatal: if texture generation fails let the scene continue
       // and fall back to colored rectangles.
-      // eslint-disable-next-line no-console
       console.debug('[MS] placeholder generation failed', e);
     }
 
@@ -166,12 +168,13 @@ export class MainStreetLifecycleManager {
     s.logScrollOffset = 0;
     s.logMaxScroll = 0;
     s.logTotalContentH = 0;
-    s.logAutoScroll = true;
+    s.logAutoScroll = false;
     s.logPrevEntryCount = 0;
 
     s.detectReplayMode();
     s.initEventSystem();
     s.initHUDContainer();
+    s.initMenuButton();
 
     // Sound (re-use existing audio assets)
     // Register Main Street SFX and map common events to logical sound keys.
@@ -182,8 +185,8 @@ export class MainStreetLifecycleManager {
       'card-drawn': SFX_KEYS.DEAL,
       'card:placed': SFX_KEYS.PLACE,
       'card-discarded': SFX_KEYS.DISCARD,
-      // income-gained is an example domain event emitted when coins are earned
-      'income-gained': SFX_KEYS.COIN_POP,
+      // income-gained is emitted when coins are earned; mapped to dedicated positive sound
+      'income-gained': SFX_KEYS.INCOME_POSITIVE,
     } as const;
 
     const tfModule = getMainStreetTfModule();
@@ -402,7 +405,30 @@ export class MainStreetLifecycleManager {
     // has been removed. The tutorial no longer has an open-help action step.
     // The HelpPanel toggle no longer needs tutorial intercept.
     // Provide the ordered difficulty names so the Settings panel can render a selector
-    s.initSettingsPanel(DIFFICULTY_NAMES);
+    s.initSettingsPanel(DIFFICULTY_NAMES, 'Medium');
+    // Listen for difficulty changes and restart the game with the new difficulty
+    if (typeof window !== 'undefined') {
+      const difficultyChangeHandler = (ev: Event) => {
+        const detail = (ev as CustomEvent).detail;
+        const newDifficulty = detail?.difficulty as string | undefined;
+        if (!newDifficulty || !DIFFICULTY_NAMES.includes(newDifficulty as any)) return;
+        if (newDifficulty === s.selectedDifficulty) return;
+        s.selectedDifficulty = newDifficulty as any;
+        // Clear any checkpoint from the previous difficulty
+        try { s.checkpointManager?.clear().catch(() => {}); } catch { /* ignore */ }
+        // Create a fresh game with the new difficulty
+        s.state = setupMainStreetGame({
+          difficulty: s.selectedDifficulty,
+          unlockedCardIds: s.campaign?.unlockedCardIds,
+        });
+        s.startDayPhase();
+        s.refreshAll();
+      };
+      window.addEventListener('tce:difficulty-changed', difficultyChangeHandler);
+      s.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+        window.removeEventListener('tce:difficulty-changed', difficultyChangeHandler);
+      });
+    }
     s.initUndoRedoButtons(
       () => s.performUndo(),
       () => s.performRedo(),
@@ -421,25 +447,20 @@ export class MainStreetLifecycleManager {
         {
           onStartTutorial: () => {
             try {
-              // ── Deterministic Tutorial Setup ─────────────────
-              // When the tutorial starts, force Easy difficulty and use a
-              // fixed seed so the same cards appear in the same order.
-              // This ensures the player has enough coins for all actions
-              // (12 starting coins, 5 starting reputation) and that the
-              // required cards are always available.
+              // ── Tutorial Scenario Setup ──────────────────────
+              // When the tutorial starts, create the game state using the
+              // explicit TutorialScenario system instead of seed-based
+              // shuffling. This guarantees exactly which cards appear in
+              // the market and incident queue, independent of deck
+              // composition. The tutorial always uses Easy difficulty
+              // (12 starting coins, 5 starting reputation) for sufficient
+              // coin budget throughout all 13 steps.
               //
-              // NOTE: We intentionally do NOT filter by campaign-unlocked
-              // card IDs here. The tutorial must use the FULL card pool so
-              // that the fixed seed 'tutorial-seed' produces a deterministic
-              // market every time regardless of the player's campaign
-              // progress. Filtering by unlockedCardIds would change the deck
-              // composition and therefore the market lineup, breaking the
-              // hardcoded requiredCardId references in the tutorial steps.
+              // The scenario system uses the STANDARD_TUTORIAL_SCENARIO
+              // definition which references only Tier-1 cards, ensuring
+              // all requiredCardId values in TutorialFlow.ts resolve.
               s.selectedDifficulty = 'Easy';
-              s.state = setupMainStreetGame({
-                difficulty: 'Easy',
-                seed: TUTORIAL_SEED,
-              });
+              s.state = createTutorialScenario();
               // Re-initialize the transcript recorder with the new seed
               try {
                 const { MainStreetTranscriptRecorder, setMainStreetRecorder } = require('../MainStreetTranscript');
@@ -545,7 +566,9 @@ export class MainStreetLifecycleManager {
     s.prewarmVisibleCardTextures();
     s.challengeContainer.setPosition(s.layout.challengeX, s.layout.challengeY);
     s.logContainer.setPosition(s.layout.logX, s.layout.logY);
-    s.instructionText.setPosition(s.layout.gameW - 24, s.layout.instructionY);
+    // Centre instruction text in the main content area (between left margin and right column)
+    const instructionCX = Math.round(s.layout.logX / 2);
+    s.instructionText.setPosition(instructionCX, s.layout.instructionY);
     s.refreshAll();
   }
 
@@ -728,7 +751,7 @@ export class MainStreetLifecycleManager {
         try {
           const legacySeen = s.campaign ? (s.campaign as any).tutorialSeen : undefined;
           (s as any).tutorialOfferModal?.showIfEligible(tutorialOpts, legacySeen);
-        } catch (e) { /* eslint-disable-next-line no-console */ console.error('[MainStreet] tutorial offer fallback failed', e); }
+        } catch (e) { console.error('[MainStreet] tutorial offer fallback failed', e); }
         return null;
       });
     } else {

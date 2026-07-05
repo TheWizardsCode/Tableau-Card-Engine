@@ -61,6 +61,13 @@ export class GymHandPileScene extends GymSceneBase {
   private highlightManager!: HighlightManager;
   // Active move tween reference (for cancellation)
   private activeMoveTween: Phaser.Tweens.Tween | null = null;
+  // State for tracking the moved card so Cancel Move can return it
+  private movedCardIndex: number = -1;
+  private movedCardOrigX: number = 0;
+  private movedCardOrigY: number = 0;
+  private cardMoved: boolean = false;
+  // Discard pile visual drop zone graphics
+  private discardZoneGraphics!: Phaser.GameObjects.Graphics;
 
   // Pile position constants — deck and discard on the right side
   private readonly DECK_X = GAME_W - 300;
@@ -81,7 +88,7 @@ export class GymHandPileScene extends GymSceneBase {
   private readonly ROTATION_DEGREES_DEFAULT = 25;
   // Cascade / vertical layout state
   private readonly CASCADE_SPACING = 42;
-  private readonly CASCADE_X = 120;
+  private readonly CASCADE_X = GAME_W / 2;
   private readonly CASCADE_TOP_Y = 220;
   private isVerticalLayout = false;
   private layoutLabel!: Phaser.GameObjects.Text;
@@ -129,6 +136,7 @@ export class GymHandPileScene extends GymSceneBase {
       if (idx >= 0 && idx < this.hand.length) {
         this.selectedIdx = idx;
         this.logEvent(`Selected card ${idx}: ${this.hand[idx].rank}${this.hand[idx].suit}`);
+        this.showDiscardZoneHighlight();
       }
     });
 
@@ -173,7 +181,18 @@ export class GymHandPileScene extends GymSceneBase {
       y: this.PILE_Y,
       label: 'Discard',
     });
-    this.discardView.onClick(() => this.recallFromDiscard());
+
+    // Create a visual drop zone indicator behind the discard pile
+    this.createDiscardZoneIndicator();
+
+    // Click handler: if a card is selected, discard it; otherwise recall from discard
+    this.discardView.onClick(() => {
+      if (this.selectedIdx >= 0 && this.selectedIdx < this.hand.length) {
+        this.discardSelected();
+      } else {
+        this.recallFromDiscard();
+      }
+    });
 
     this.initHelp([
       { heading: 'Overview', body: 'Demonstrates hand/pile card movement with animations: deal, place, discard, move, flip, shake (illegal), and drop-zone highlights. Uses HandView and PileView components.' },
@@ -268,6 +287,13 @@ export class GymHandPileScene extends GymSceneBase {
 
     // Initialize highlight manager for drop-zone rendering
     this.highlightManager = new HighlightManager(this);
+
+    // Also wire selection change to update discard zone highlight
+    this.handView.on('selectionchange', (index: number | null) => {
+      if (index === null) {
+        this.hideDiscardZoneHighlight();
+      }
+    });
 
     // Register shutdown lifecycle handler for explicit cleanup
     this.events.on('shutdown', this.shutdown, this);
@@ -561,6 +587,12 @@ export class GymHandPileScene extends GymSceneBase {
       return;
     }
 
+    // Store original position and index so Cancel Move can return the card
+    this.movedCardIndex = this.selectedIdx;
+    this.movedCardOrigX = (sprite as any).x;
+    this.movedCardOrigY = (sprite as any).y;
+    this.cardMoved = true;
+
     const destX = GAME_W / 2 + 200;
     const destY = 200;
 
@@ -576,6 +608,7 @@ export class GymHandPileScene extends GymSceneBase {
         duration: 500,
         onComplete: () => {
           this.activeMoveTween = null;
+          // cardMoved remains true so Cancel Move can still return the card
           this.logEvent('Move completed (animated)');
         },
       });
@@ -583,10 +616,36 @@ export class GymHandPileScene extends GymSceneBase {
   }
 
   private cancelMove(): void {
+    // Stop any active move tween
     if (this.activeMoveTween) {
       this.activeMoveTween.stop();
       this.activeMoveTween = null;
-      this.logEvent('Move cancelled');
+    }
+
+    // If a card was moved, return it to its original hand position
+    if (this.cardMoved && this.movedCardIndex >= 0) {
+      const sprite = this.handView.getSpriteAt(this.movedCardIndex);
+      if (sprite) {
+        if (this.reducedMotion) {
+          (sprite as any).setPosition(this.movedCardOrigX, this.movedCardOrigY);
+          this.logEvent('Move cancelled — card returned to hand (instant)');
+        } else {
+          this.tweens.add({
+            targets: sprite as any,
+            x: this.movedCardOrigX,
+            y: this.movedCardOrigY,
+            duration: 250,
+            ease: 'Quad.easeOut',
+            onComplete: () => {
+              this.logEvent('Move cancelled — card returned to hand');
+            },
+          });
+        }
+      }
+
+      // Clear the moved state
+      this.cardMoved = false;
+      this.movedCardIndex = -1;
     } else {
       this.logEvent('No active move to cancel');
     }
@@ -706,6 +765,65 @@ export class GymHandPileScene extends GymSceneBase {
     this.highlightManager.clearAll();
   }
 
+  // ── Discard pile visual zone ─────────────────────────────
+
+  /**
+   * Create a persistent visual drop zone indicator behind the discard pile.
+   *
+   * Draws a semi-transparent rounded rectangle that serves as a visual
+   * cue for where the discard pile is located, making it clear that
+   * clicking here performs a discard action.
+   */
+  private createDiscardZoneIndicator(): void {
+    this.discardZoneGraphics = this.add.graphics();
+
+    // Zone slightly larger than a card for a generous drop target
+    const zoneW = CARD_W + 24;
+    const zoneH = CARD_H + 24;
+    const zoneX = this.DISCARD_X - zoneW / 2;
+    const zoneY = this.PILE_Y - zoneH / 2;
+
+    // Default subtle outline (shown when no card is selected)
+    this.discardZoneGraphics.lineStyle(2, 0x88aa88, 0.5);
+    this.discardZoneGraphics.fillStyle(0x335533, 0.15);
+    this.discardZoneGraphics.fillRoundedRect(zoneX, zoneY, zoneW, zoneH, 10);
+    this.discardZoneGraphics.strokeRoundedRect(zoneX, zoneY, zoneW, zoneH, 10);
+
+    // Move the discard pile sprite in front of the zone
+    this.discardView.getSprite().setDepth(1);
+    this.discardView.getCountText().setDepth(1);
+  }
+
+  /**
+   * Show a green highlight on the discard drop zone when a card
+   * is selected, indicating it can be clicked to discard.
+   */
+  private showDiscardZoneHighlight(): void {
+    const highlightW = CARD_W + 24;
+    const highlightH = CARD_H + 24;
+    const zoneX = this.DISCARD_X - highlightW / 2;
+    const zoneY = this.PILE_Y - highlightH / 2;
+
+    this.highlightManager.addZone('discard-click-target', {
+      x: zoneX,
+      y: zoneY,
+      w: highlightW,
+      h: highlightH,
+      style: 'fill',
+      color: 0x44ff44,
+      alpha: 0.25,
+      strokeColor: 0x44ff44,
+      strokeWidth: 3,
+    });
+  }
+
+  /**
+   * Remove the discard zone highlight when the card selection is cleared.
+   */
+  private hideDiscardZoneHighlight(): void {
+    this.highlightManager.removeZone('discard-click-target');
+  }
+
   // ── Drag-and-drop demo helpers ──────────────────────────
 
   /** Toggle drag-and-drop mode on/off. */
@@ -821,6 +939,9 @@ export class GymHandPileScene extends GymSceneBase {
 
     // Destroy highlight manager
     try { this.highlightManager?.destroy(); } catch (_) { /* ignore */ }
+
+    // Destroy discard zone graphics
+    try { this.discardZoneGraphics?.destroy(); } catch (_) { /* ignore */ }
 
     // Destroy sliders (each has a built-in destroy() that cleans up
     // sub-objects — track, fill, handle, valueText, hitArea — and

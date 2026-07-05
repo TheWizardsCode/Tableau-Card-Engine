@@ -133,6 +133,15 @@ export { createSeededRng } from './SeededRng';
 
 // Transcript auto-save helper — re-exported from consolidated transcript module
 
+// ActiveEffect system for duration-based modifiers
+export type { ActiveEffect, DecayResult } from './ActiveEffect';
+export {
+  createActiveEffect,
+  decayActiveEffects,
+  applyActiveEffectMultiplier,
+  hasActiveEffectOfType,
+} from './ActiveEffect';
+
 // Challenge system generic API (CG-0MMJ8S9850MV4L0A)
 export type {
   ChallengeDefinition,

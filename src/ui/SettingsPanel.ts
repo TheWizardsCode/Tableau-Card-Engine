@@ -28,6 +28,8 @@ export interface SettingsPanelConfig {
   soundManager: SoundManager;
   /** Optional ordered list of difficulty names to present in the panel (game-specific). */
   difficultyNames?: readonly string[];
+  /** Default difficulty name when no localStorage preference exists. Falls back to difficultyNames[0] if omitted. */
+  defaultDifficulty?: string;
   /** Panel width as a percentage of canvas width (0-100). Default: 30. */
   widthPercent?: number;
   /** Slide animation duration in ms. Default: 300. */
@@ -209,7 +211,7 @@ export class SettingsPanel {
     if (config.difficultyNames && config.difficultyNames.length > 0) {
       this.difficultyNames = config.difficultyNames;
       // Load persisted selected difficulty (fall back to first provided name)
-      this._selectedDifficulty = this.loadSelectedDifficulty() ?? String(this.difficultyNames[0]);
+      this._selectedDifficulty = this.loadSelectedDifficulty() ?? config.defaultDifficulty ?? String(this.difficultyNames[0]);
     }
 
     // Build the panel (hidden off-screen to the right)

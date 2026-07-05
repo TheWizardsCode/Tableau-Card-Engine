@@ -48,6 +48,7 @@ export default defineConfig(({ mode, command }) => ({
         test: {
           name: 'browser',
           include: ['tests/**/*.browser.test.ts'],
+          exclude: ['tests/e2e/main-street-tutorial-e2e-*.browser.test.ts'],
           fileParallelism: false,
           sequence: {
             concurrent: false,
@@ -59,6 +60,27 @@ export default defineConfig(({ mode, command }) => ({
             headless: true,
             instances: [{ browser: 'chromium' }],
             viewport: { width: 900, height: 700 },
+            isolate: true,
+          },
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'tutorial',
+          include: ['tests/e2e/main-street-tutorial-e2e-*.browser.test.ts'],
+          fileParallelism: false,
+          sequence: {
+            concurrent: false,
+          },
+          testTimeout: 30_000,
+          browser: {
+            enabled: true,
+            provider: 'playwright',
+            headless: true,
+            instances: [{ browser: 'chromium' }],
+            viewport: { width: 900, height: 700 },
+            isolate: true,
           },
         },
       },

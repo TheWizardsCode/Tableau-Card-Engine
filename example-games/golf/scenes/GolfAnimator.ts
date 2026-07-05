@@ -15,6 +15,9 @@ import type { GolfRenderer } from './GolfRenderer';
 import type { GolfSession } from '../GolfGame';
 
 export class GolfAnimator {
+  /** When true, all animations are skipped and sprites snap to final state. */
+  reducedMotion = false;
+
   constructor(
     private scene: Phaser.Scene,
     private session: GolfSession,
@@ -31,6 +34,13 @@ export class GolfAnimator {
     drawnCard: Card | null,
     onComplete: () => void,
   ): void {
+    // When reduced motion is enabled, skip all animations
+    if (this.reducedMotion) {
+      this.renderer.hideDrawnCard();
+      onComplete();
+      return;
+    }
+
     const playerKey = result.playerIndex === 0 ? 'human' : 'ai';
     const sprites = playerKey === 'human'
       ? this.renderer.humanCardSprites
@@ -163,6 +173,18 @@ export class GolfAnimator {
   // ── Drawn card display ──────────────────────────────────
 
   showDrawnCard(card: Card, source: 'stock' | 'discard' = 'stock'): void {
+    if (this.reducedMotion) {
+      // Just create the sprite at the destination without animation
+      const faceTexture = cardTextureKey(card.rank, card.suit);
+      const destX = this.layout.discardPileCenterX + GOLF_CARD_W * 3 / 4 + 33;
+      const destY = this.layout.discardPileCenterY;
+      const sprite = this.scene.add.image(destX, destY, faceTexture);
+      sprite.setDepth(0);
+      this.renderer.setDrawnCardSprite(sprite);
+      this.renderer.turnText.setText(`Drew: ${card.rank} of ${card.suit}`);
+      return;
+    }
+
     // Destination: to the right of the discard pile, between piles and AI grid.
     // Original position (discardPileCenterX + GOLF_CARD_W + 24) was too far right.
     // Moved left by half the distance from the deck right edge, but that was too far.
@@ -261,6 +283,17 @@ export class GolfAnimator {
   animateDrawnCardToDiscard(drawnCard: Card | null, onComplete: () => void): void {
     const drawnCardSprite = this.renderer.drawnCardSprite;
     if (!drawnCardSprite) {
+      onComplete();
+      return;
+    }
+
+    if (this.reducedMotion) {
+      this.renderer.hideDrawnCard();
+      if (drawnCard) {
+        this.renderer.discardSprite.setTexture(cardTextureKey(drawnCard.rank, drawnCard.suit));
+        this.renderer.discardSprite.setAlpha(1);
+        this.renderer.discardSprite.setVisible(true);
+      }
       onComplete();
       return;
     }

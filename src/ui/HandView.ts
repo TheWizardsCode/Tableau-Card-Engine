@@ -553,7 +553,7 @@ export class HandView {
       destY = this.baseY + insertIndex * this.spacing;
     } else {
       const gap = this.spacing - this.cardWidth;
-      const centerX = this._centerX ?? (this.baseX + (newCount - 1) * this.spacing / 2);
+      const centerX = this._centerX ?? this.baseX;
 
       const { positions } = layoutCardPositions({
         count: newCount,
@@ -1206,7 +1206,7 @@ export class HandView {
 
     // ── Horizontal layout ──
     const gap = this.spacing - this.cardWidth;
-    const centerX = this._centerX ?? (this.baseX + (this.cards.length - 1) * this.spacing / 2);
+    const centerX = this._centerX ?? this.baseX;
 
     const { positions } = layoutCardPositions({
       count: this.cards.length,

@@ -23,6 +23,34 @@ import { EXPEDITION_COLORS } from '../../example-games/lost-cities/LostCitiesCar
 
 // ── Helpers ─────────────────────────────────────────────────
 
+/**
+ * Find the container that holds a Text child with the exact given text.
+ * Needed because createActionButton wraps text in a container, so the
+ * Text object's .x/.y are local to the container, not world coordinates.
+ */
+function findContainerWithText(
+  scene: Phaser.Scene,
+  text: string,
+): Phaser.GameObjects.Container | undefined {
+  const walk = (items: Phaser.GameObjects.GameObject[]) => {
+    for (const child of items) {
+      if (child instanceof Phaser.GameObjects.Container) {
+        const hasText = (child as any).list?.some(
+          (grandchild: any) =>
+            grandchild instanceof Phaser.GameObjects.Text &&
+            grandchild.text === text,
+        );
+        if (hasText) return child;
+      }
+    }
+  };
+  const fromScene = walk(scene.children.list);
+  if (fromScene) return fromScene;
+  const hud = (scene as any).hudContainer as { list: Phaser.GameObjects.GameObject[] } | undefined;
+  if (hud?.list) return walk(hud.list);
+  return undefined;
+}
+
 async function bootGame(): Promise<Phaser.Game> {
   let container = document.getElementById('game-container');
   if (container) container.remove();
@@ -77,28 +105,6 @@ function findOverlayText(scene: Phaser.Scene, search: string): Phaser.GameObject
   const hud = (scene as any).hudContainer as { list: Phaser.GameObjects.GameObject[] } | undefined;
   if (hud?.list) walk(hud.list);
   return candidates.find(t => (t as Phaser.GameObjects.Text).text.includes(search)) as Phaser.GameObjects.Text | undefined;
-}
-
-/**
- * Collect display objects from scene children and the HUD container.
- */
-function collectFromSceneAndHud<T extends Phaser.GameObjects.GameObject>(
-  scene: Phaser.Scene,
-  predicate: (obj: Phaser.GameObjects.GameObject) => obj is T,
-): T[] {
-  const result: T[] = [];
-  const walk = (parent: Phaser.GameObjects.GameObject[]) => {
-    for (const child of parent) {
-      if (predicate(child)) result.push(child);
-      if (child instanceof Phaser.GameObjects.Container && (child as any).list) {
-        walk((child as any).list);
-      }
-    }
-  };
-  walk(scene.children.list);
-  const hud = (scene as any).hudContainer as { list: Phaser.GameObjects.GameObject[] } | undefined;
-  if (hud?.list) walk(hud.list);
-  return result;
 }
 
 /**
@@ -326,24 +332,18 @@ describe('Lost Cities round-end overlay tests', () => {
     expect(overlayText).toBeDefined();
     expect(overlayText!.text).toContain('Next Round');
 
-    // Find the button container by searching for its text child.
-    // LostCitiesOverlays.showRoundSummary creates a button via
-    // createOverlayButton(this.scene, cx, y, '[ Next Round ]').
-    // This button is what Phaser returns from `scene.add.text()`
-    // when text ends with ' ]'; the actual interactive hit area is
-    // the text object itself (or a container wrapping it).
-    // Search both scene children and HUD container for a Text with "[ Next Round ]".
-    const allTexts = collectFromSceneAndHud(scene, (obj): obj is Phaser.GameObjects.Text =>
-      obj instanceof Phaser.GameObjects.Text,
-    );
-    const nextRoundText = allTexts.find(t => t.text === '[ Next Round ]');
-    expect(nextRoundText).toBeDefined();
+    // LostCitiesOverlays.showRoundSummary now creates the button via
+    // createActionButton(...), which wraps the Text in a Phaser.Container.
+    // The actual interactive hit area is the background rectangle inside
+    // the container, so we find the container and click at its world position.
+    const nextRoundContainer = findContainerWithText(scene, '[ Next Round ]');
+    expect(nextRoundContainer).toBeDefined();
 
     // Record session round number before clicking
     const sessionBefore = internals.session.roundNumber;
 
-    // Click the button at its world position
-    clickAtGameCoords(game, nextRoundText!.x, nextRoundText!.y);
+    // Click the container at its world position
+    clickAtGameCoords(game, nextRoundContainer!.x, nextRoundContainer!.y);
     await wait(500);
 
     // After clicking, the overlay should be dismissed and round should advance

@@ -48,6 +48,7 @@ function makeBiz(opts: {
   level?: number;
   incomeBonus?: number;
   synergyRangeBonus?: number;
+  reputationBonus?: number;
 }): BusinessCard {
   return {
     family: 'business',
@@ -61,6 +62,7 @@ function makeBiz(opts: {
     level: opts.level ?? 0,
     incomeBonus: opts.incomeBonus ?? 0,
     synergyRangeBonus: opts.synergyRangeBonus ?? 0,
+    reputationBonus: opts.reputationBonus ?? 0,
   };
 }
 

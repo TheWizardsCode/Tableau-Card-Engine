@@ -1,7 +1,7 @@
 import { DIFFICULTY_NAMES } from '../MainStreetDifficulty';
 import { CARD_TEMPLATE_NAMES } from '../MainStreetCards';
 import type { TurnResult } from '../MainStreetEngine';
-import { FONT_FAMILY, createOverlayBackground, createOverlayButton, createOverlayMenuButton, dismissOverlay } from '../../../src/ui';
+import { FONT_FAMILY, createOverlayBackground, createOverlayButton, dismissOverlay } from '../../../src/ui';
 import { TIER_DEFINITIONS, ORDERED_TIER_DEFINITIONS, highestUnlockedTier } from '../MainStreetTiers';
 
 export class MainStreetOverlayContent {
@@ -241,11 +241,5 @@ export class MainStreetOverlayContent {
     });
     if (s.hudContainer) s.hudContainer.add(playAgainBtn);
     s.overlayObjects.push(playAgainBtn);
-
-    const menuBtn = createOverlayMenuButton(
-      s, s.layout.gameW / 2 + 30, btnY, 101,
-    );
-    if (s.hudContainer) s.hudContainer.add(menuBtn);
-    s.overlayObjects.push(menuBtn);
   }
 }

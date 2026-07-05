@@ -48,6 +48,7 @@ export class GymGraphicsShaderSpikeScene extends GymSceneBase {
   private eventLogResult!: EventLogResult;
   private shaderAttempted = false;
   private shaderResult = '';
+  private statusLineText!: Phaser.GameObjects.Text;
 
   constructor() {
     super({ key: GYM_GRAPHICS_SHADER_SPIKE_KEY });
@@ -116,7 +117,7 @@ export class GymGraphicsShaderSpikeScene extends GymSceneBase {
     this.addButton(cx + 120, y, '[ Attempt Shader ]', () => this.attemptShader());
 
     y += 30;
-    createHudText(this, cx, y, 'Blend: NORMAL | Tint: None', '#88ff88', { fontSize: '12px' }).setOrigin(0.5);
+    this.statusLineText = createHudText(this, cx, y, 'Blend: NORMAL | Tint: None', '#88ff88', { fontSize: '12px' }).setOrigin(0.5);
 
     y += 30;
     // Create sample sprites
@@ -146,6 +147,7 @@ export class GymGraphicsShaderSpikeScene extends GymSceneBase {
     for (const sprite of this.sprites) {
       sprite.setTint(tint.value);
     }
+    this.updateStatusLine();
     this.logEvent(`Tint: ${tint.name} (0x${tint.value.toString(16)})`);
   }
 
@@ -163,6 +165,7 @@ export class GymGraphicsShaderSpikeScene extends GymSceneBase {
     for (const sprite of this.sprites) {
       sprite.setBlendMode(modeValue);
     }
+    this.updateStatusLine();
     this.logEvent(`Blend: ${modeName}`);
   }
 
@@ -171,7 +174,14 @@ export class GymGraphicsShaderSpikeScene extends GymSceneBase {
     for (const sprite of this.sprites) {
       sprite.clearTint();
     }
+    this.updateStatusLine();
     this.logEvent('Tint reset (none/white)');
+  }
+
+  private updateStatusLine(): void {
+    const modeName = BLEND_MODES[this.blendModeIndex];
+    const tint = TINT_COLORS[this.tintColorIndex];
+    this.statusLineText.setText(`Blend: ${modeName} | Tint: ${tint.name}`);
   }
 
   private attemptShader(): void {

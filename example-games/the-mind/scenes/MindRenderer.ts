@@ -508,10 +508,14 @@ export class MindRenderer {
 
   disableGameInteraction(autoPlayButton?: Phaser.GameObjects.Text): void {
     for (const sprite of this.humanCardSprites) {
-      sprite.disableInteractive();
+      if (sprite && sprite.scene) {
+        sprite.disableInteractive();
+      }
     }
     if (autoPlayButton) {
-      autoPlayButton.disableInteractive();
+      if (autoPlayButton.scene) {
+        autoPlayButton.disableInteractive();
+      }
     }
   }
 

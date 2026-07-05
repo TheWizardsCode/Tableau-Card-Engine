@@ -362,6 +362,8 @@ export function scoreAction(state: MainStreetState, action: PlayerAction): numbe
       return scoreEventAction(state, action);
     case 'play-event':
       return PLAY_EVENT_SCORE;
+    case 'buy-business-to-hand':
+      return 0;
     case 'end-turn':
       return 0;
   }

@@ -111,7 +111,7 @@ export class MainStreetInputManager {
     const s = this.scene;
     if (!s.logMaskGraphics) return;
     s.logMaskGraphics.clear();
-    s.logMaskGraphics.fillStyle(0xffffff);
+    s.logMaskGraphics.fillStyle(0xffffff, 0);
     s.logMaskGraphics.fillRect(
       s.layout.logX,
       s.layout.logY + LOG_TITLE_H,
@@ -144,12 +144,27 @@ export class MainStreetInputManager {
     const BOTTOM_THRESHOLD = 4;
     s.logAutoScroll = s.logScrollOffset >= s.logMaxScroll - BOTTOM_THRESHOLD;
 
-    s.applyLogScroll();
+    // Container re-rendering and mask update is handled by the caller (scene.handleLogWheel -> refreshLog)
   }
 
   public applyLogScroll(): void {
     const s = this.scene;
+    // Apply the scroll offset by shifting the content container upward.
     s.logContentContainer.setY(LOG_TITLE_H + 2 - s.logScrollOffset);
+
+    // Per-entry visibility safety net (see refreshLog for details)
+    const visibleH = Math.max(1, s.layout.logH - LOG_TITLE_H - 4);
+    const visibleStart = s.logScrollOffset;
+    const visibleEnd = s.logScrollOffset + visibleH;
+    for (const child of s.logContentContainer.list) {
+      const localY = (child as any).y;
+      if (localY >= visibleStart && localY < visibleEnd) {
+        child.setVisible(true);
+      } else {
+        child.setVisible(false);
+      }
+    }
+
     s.updateLogMask();
   }
 }

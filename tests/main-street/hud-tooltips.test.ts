@@ -290,6 +290,80 @@ describe('buildScoreTooltip', () => {
 
     expect(tooltip).toContain(`${HUD_TOOLTIP_STRINGS.scoreEstimateLabel}: ${expectedScore}`);
   });
+
+  it('includes the win threshold as the target score', () => {
+    const state = setupMainStreetGame({ seed: 'test-score-target' });
+    const expectedThreshold = state.config.winThreshold;
+
+    const tooltip = buildScoreTooltip(state, null);
+
+    // Should contain the win threshold (shown in x/y format)
+    expect(tooltip).toContain(`/${expectedThreshold}`);
+    // Should contain a line about remaining score needed to win
+    expect(tooltip).toContain(HUD_TOOLTIP_STRINGS.scoreRemainingToWin);
+  });
+
+  it('includes score breakdown with coins, reputation, and challenge contributions', () => {
+    const state = setupMainStreetGame({ seed: 'test-score-breakdown' });
+    // Set values to get a meaningful breakdown
+    state.resourceBank.coins = 30;
+    state.resourceBank.reputation = 8;
+    state.challengesCompleted = ['ch-1'];
+
+    const repContribution = state.resourceBank.reputation * state.config.reputationScoreMultiplier;
+    const challengeContribution = state.challengesCompleted.length * state.config.challengeBonusPoints;
+
+    const tooltip = buildScoreTooltip(state, null);
+
+    // Should contain breakdown labels
+    expect(tooltip).toContain(HUD_TOOLTIP_STRINGS.scoreBreakdownCoins);
+    expect(tooltip).toContain(HUD_TOOLTIP_STRINGS.scoreBreakdownReputation);
+    expect(tooltip).toContain(HUD_TOOLTIP_STRINGS.scoreBreakdownChallenges);
+
+    // Should contain contribution values
+    expect(tooltip).toContain(`${30}`);
+    expect(tooltip).toContain(`${repContribution}`);
+    expect(tooltip).toContain(`${challengeContribution}`);
+  });
+
+  it('shows remaining score needed to reach win threshold when score is below target', () => {
+    const state = setupMainStreetGame({ seed: 'test-score-remaining' });
+    // Starting game: score should be well below threshold
+    const score = computeScore(state);
+    const remaining = state.config.winThreshold - score;
+
+    const tooltip = buildScoreTooltip(state, null);
+
+    if (remaining > 0) {
+      expect(tooltip).toContain(`${remaining} ${HUD_TOOLTIP_STRINGS.scoreRemainingToWin}`);
+    }
+  });
+
+  it('shows that win threshold is met when score is at or above target', () => {
+    const state = setupMainStreetGame({ seed: 'test-score-won' });
+    // Give enough resources to meet or exceed the win threshold
+    const threshold = state.config.winThreshold;
+    state.resourceBank.coins = threshold;
+    state.resourceBank.reputation = 0;
+
+    const score = computeScore(state);
+    expect(score).toBeGreaterThanOrEqual(threshold);
+
+    const tooltip = buildScoreTooltip(state, null);
+
+    expect(tooltip).toContain(HUD_TOOLTIP_STRINGS.scoreThresholdMet);
+  });
+
+  it('score estimate label includes win threshold as x of y format', () => {
+    const state = setupMainStreetGame({ seed: 'test-score-xy' });
+    const score = computeScore(state);
+    const threshold = state.config.winThreshold;
+
+    const tooltip = buildScoreTooltip(state, null);
+
+    // The score estimate should show "score / threshold" or "score of threshold"
+    expect(tooltip).toContain(`${score}/${threshold}`);
+  });
 });
 
 // ── Integration-style tests: tooltip zone attachment ─────────

@@ -246,14 +246,14 @@ describe('shouldShowTutorialOffer', () => {
     expect(shouldShowTutorialOffer(state)).toBe(true);
   });
 
-  it('shows offer for skipped state', () => {
+  it('does NOT show offer for skipped state', () => {
     const state: MainStreetTutorialStateV1 = {
       schemaVersion: 1,
       status: 'skipped',
       completedAt: null,
       lastStepId: null,
     };
-    expect(shouldShowTutorialOffer(state)).toBe(true);
+    expect(shouldShowTutorialOffer(state)).toBe(false);
   });
 
   it('does NOT show offer for completed state', () => {

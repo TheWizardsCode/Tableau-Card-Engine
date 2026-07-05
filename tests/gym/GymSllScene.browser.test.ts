@@ -104,56 +104,50 @@ describe('GymSllScene browser integration', () => {
       policy: 'sceneWins',
     });
 
-    // Shell starts OFF (hidden) on first load
-    expect(findTextObject(scene, text => text === 'Screen Layout Language (SLL)')?.visible).toBe(false);
-    expect(findTextObject(scene, text => text === '[ Menu ]')?.visible).toBe(false);
-    expect(findTextObject(scene, text => text === '[ Layout: Shell+Scene ]')?.visible).toBe(false);
-    expect(findTextObject(scene, text => text === '[ Profile: desktop-1x ]')?.visible).toBe(false);
-    expect(findTextObject(scene, text => text === '[ Overlay: OFF ]')?.visible).toBe(false);
+    // Shell starts ON (visible) by default
+    // (shell title is a Text object, menu button is a Container so not checked here)
+    expect(findTextObject(scene, text => text === 'Screen Layout Language (SLL)')?.visible).toBe(true);
+    expect(findTextObject(scene, text => text === '[ Profile: Shell+Scene ]')?.visible).toBe(true);
+    expect(findTextObject(scene, text => text === '[ Overlay: OFF ]')?.visible).toBe(true);
 
+    // Help icon (?) and action button should be visible
     const helpIcon = findTextObject(scene, text => text === '?');
     expect(helpIcon).toBeTruthy();
-    expect(helpIcon?.visible).toBe(false);
+    expect(helpIcon?.visible).toBe(true);
 
     const actionButton = findTextObject(scene, text => text === '[ Toggle Fill ]');
     expect(actionButton).toBeTruthy();
     expect(actionButton?.visible).toBe(true);
 
-    const shellToggleButton = findTextObject(scene, text => text.startsWith('[ Toggle Shell: OFF ]'));
+    // No Layout button (removed)
+    const layoutButton = findTextObject(scene, text => text.startsWith('[ Layout:'));
+    expect(layoutButton).toBeNull();
+
+    // Toggle Shell starts ON
+    const shellToggleButton = findTextObject(scene, text => text.startsWith('[ Toggle Shell: ON ]'));
     expect(shellToggleButton).toBeTruthy();
     expect(shellToggleButton?.visible).toBe(true);
-
-    // Toggle ON → shell becomes visible
-    shellToggleButton?.emit('pointerdown');
-    expect(shellToggleButton?.text).toContain('ON');
-    expect(findTextObject(scene, text => text === 'Screen Layout Language (SLL)')?.visible).toBe(true);
-    expect(findTextObject(scene, text => text === '[ Menu ]')?.visible).toBe(true);
-    expect(findTextObject(scene, text => text === '[ Layout: Shell+Scene ]')?.visible).toBe(true);
-    expect(findTextObject(scene, text => text === '[ Profile: desktop-1x ]')?.visible).toBe(true);
-    expect(findTextObject(scene, text => text === '[ Overlay: OFF ]')?.visible).toBe(true);
     expect(findTextObject(scene, text => text === 'SLL Title Anchor')?.visible).toBe(true);
-    expect(findTextObject(scene, text => text === 'SLL Title Anchor')?.y).toBeGreaterThan(120);
-    expect(findTextObject(scene, text => text === 'SLL Title Anchor')?.y).toBeLessThan(132);
 
-    // Toggle OFF → shell hidden again
+    // Toggle OFF → shell elements hidden
     shellToggleButton?.emit('pointerdown');
     expect(shellToggleButton?.text).toContain('OFF');
     expect(findTextObject(scene, text => text === 'Screen Layout Language (SLL)')?.visible).toBe(false);
-    expect(findTextObject(scene, text => text === '[ Menu ]')?.visible).toBe(false);
-    expect(findTextObject(scene, text => text === '[ Layout: Shell+Scene ]')?.visible).toBe(false);
+    expect(findTextObject(scene, text => text === '[ Profile: Shell+Scene ]')?.visible).toBe(false);
+    expect(findTextObject(scene, text => text === '[ Overlay: OFF ]')?.visible).toBe(false);
 
-    // Toggle ON again → shell visible
+    // Toggle ON again → shell elements visible
     shellToggleButton?.emit('pointerdown');
     expect(shellToggleButton?.text).toContain('ON');
     expect(findTextObject(scene, text => text === 'Screen Layout Language (SLL)')?.visible).toBe(true);
-    expect(findTextObject(scene, text => text === '[ Menu ]')?.visible).toBe(true);
-    expect(findTextObject(scene, text => text === '[ Layout: Shell+Scene ]')?.visible).toBe(true);
+    expect(findTextObject(scene, text => text === '[ Profile: Shell+Scene ]')?.visible).toBe(true);
+    expect(findTextObject(scene, text => text === '[ Overlay: OFF ]')?.visible).toBe(true);
 
-    const layoutButton = findTextObject(scene, text => text === '[ Layout: Shell+Scene ]');
-    expect(layoutButton).toBeTruthy();
+    // Cycle to shell-only layout using Profile button (Layout button was removed)
+    const profileButton = findTextObject(scene, text => text === '[ Profile: Shell+Scene ]');
+    expect(profileButton).toBeTruthy();
 
-    // Cycle to shell-only layout, then toggle shell OFF/ON
-    layoutButton?.emit('pointerdown');
+    profileButton?.emit('pointerdown');
     const shellOnlyMarker = await waitForSllReadyMarker('gym-shell-layout');
     expect(shellOnlyMarker.layoutId).toBe('gym-shell-layout');
     expect(findTextObject(scene, text => text === 'SLL Title Anchor')?.visible).toBe(false);
@@ -165,8 +159,8 @@ describe('GymSllScene browser integration', () => {
     shellToggleButton?.emit('pointerdown');
     expect(shellToggleButton?.text).toContain('ON');
     expect(findTextObject(scene, text => text === 'Screen Layout Language (SLL)')?.visible).toBe(true);
-    expect(findTextObject(scene, text => text === '[ Menu ]')?.visible).toBe(true);
-    expect(findTextObject(scene, text => text === '[ Layout: Shell-only ]')?.visible).toBe(true);
+    // After cycling to shell-only, the profile button shows '[ Profile: Shell-only ]'
+    expect(findTextObject(scene, text => text === '[ Profile: Shell-only ]')?.visible).toBe(true);
   });
 
   it('cycles to the scene-only layout example', async () => {
@@ -185,21 +179,22 @@ describe('GymSllScene browser integration', () => {
     await waitForScene(game, GYM_SLL_KEY);
     const scene = game.scene.getScene(GYM_SLL_KEY) as Phaser.Scene;
 
-    const layoutButton = findTextObject(scene, text => text === '[ Layout: Shell+Scene ]');
-    expect(layoutButton).toBeTruthy();
+    // Use the Profile button to cycle layouts (Layout button was removed)
+    const profileButton = findTextObject(scene, text => text === '[ Profile: Shell+Scene ]');
+    expect(profileButton).toBeTruthy();
 
-    layoutButton?.emit('pointerdown');
+    // Cycle to shell-only (index 1)
+    profileButton?.emit('pointerdown');
     await waitForSllReadyMarker('gym-shell-layout');
 
-    layoutButton?.emit('pointerdown');
+    // Cycle to scene-only (index 2)
+    profileButton?.emit('pointerdown');
 
     const marker = await waitForSllReadyMarker('gym-scene-layout');
 
     expect(marker.layoutId).toBe('gym-scene-layout');
-    expect(findTextObject(scene, text => text === '[ Layout: Scene-only ]')?.visible).toBe(false);
+    expect(findTextObject(scene, text => text === '[ Profile: Scene-only ]')?.visible).toBe(false);
     expect(findTextObject(scene, text => text === 'Screen Layout Language (SLL)')?.visible).toBe(false);
-    expect(findTextObject(scene, text => text === '[ Menu ]')?.visible).toBe(false);
-    expect(findTextObject(scene, text => text === '[ Profile: desktop-1x ]')?.visible).toBe(false);
     expect(findTextObject(scene, text => text === '[ Overlay: OFF ]')?.visible).toBe(false);
 
     const helpIcon = findTextObject(scene, text => text === '?');
@@ -217,6 +212,8 @@ describe('GymSllScene browser integration', () => {
     expect(marker.anchorsDisplay.help.x).toBeLessThan(470);
     expect(marker.anchorsDisplay.action.x).toBeGreaterThan(560);
     expect(marker.anchorsDisplay.action.x).toBeLessThan(600);
+    expect(marker.anchorsDisplay.action.y).toBeGreaterThan(189);
+    expect(marker.anchorsDisplay.action.y).toBeLessThan(201);
   });
 
   it('positions anchor-derived elements in expected pixel ranges', async () => {
@@ -250,8 +247,8 @@ describe('GymSllScene browser integration', () => {
 
     expect(marker.anchorsDisplay.action.x).toBeGreaterThan(560);
     expect(marker.anchorsDisplay.action.x).toBeLessThan(600);
-    expect(marker.anchorsDisplay.action.y).toBeGreaterThan(120);
-    expect(marker.anchorsDisplay.action.y).toBeLessThan(132);
+    expect(marker.anchorsDisplay.action.y).toBeGreaterThan(189);
+    expect(marker.anchorsDisplay.action.y).toBeLessThan(201);
   });
 
   it('renders a readable overlay legend when toggled on', async () => {
@@ -279,9 +276,12 @@ describe('GymSllScene browser integration', () => {
 
     const overlayLegend = findTextObject(scene, text => text.startsWith('Overlay legend'));
     expect(overlayLegend).toBeTruthy();
-    expect(overlayLegend?.x).toBeGreaterThanOrEqual(20);
+    // Legend panel is positioned at x=864
+    expect(overlayLegend?.x).toBeGreaterThanOrEqual(860);
     expect(overlayLegend?.y).toBeGreaterThanOrEqual(120);
-    expect(overlayLegend?.text).toContain('shell');
-    expect(overlayLegend?.text).toContain('banner');
+    // Legend shows element names (not zone names)
+    expect(overlayLegend?.text).toContain('Title');
+    expect(overlayLegend?.text).toContain('Help');
+    expect(overlayLegend?.text).toContain('Action');
   });
 });

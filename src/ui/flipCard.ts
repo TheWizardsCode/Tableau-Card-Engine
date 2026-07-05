@@ -65,6 +65,13 @@ export interface FlipCardOptions {
    */
   onComplete?: () => void;
 
+  /**
+   * When true, flipping is instant — texture swap and position change happen
+   * immediately without tweens.  onMidpoint and onComplete fire synchronously.
+   * Default: false (animate).
+   */
+  reducedMotion?: boolean;
+
   /** Optional SoundManager to play SFX during the flip. */
   soundManager?: SoundManager | null;
 
@@ -104,9 +111,25 @@ export function flipCard(opts: FlipCardOptions): Phaser.Tweens.Tween {
     destY,
     onMidpoint,
     onComplete,
+    reducedMotion = false,
     soundManager = null,
     sfx,
   } = opts;
+
+  // When reduced motion is enabled, apply texture, position, and fire callbacks immediately
+  if (reducedMotion) {
+    target.setTexture(newTexture);
+    onMidpoint?.();
+    if (destX !== undefined && destY !== undefined) {
+      target.x = destX;
+      target.y = destY;
+    }
+    onComplete?.();
+    return scene.tweens.add({
+      targets: target,
+      duration: 0,
+    });
+  }
 
   const half = duration / 2;
   const moveInterval = sfx?.moveIntervalMs ?? 120;

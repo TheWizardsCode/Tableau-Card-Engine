@@ -28,6 +28,7 @@ import { FONT_FAMILY } from '../../../ui/constants';
 // Re-export shared helpers so callers can import from a single adapter module.
 export { sharedCreateHudText as createHudText };
 export { sharedCreateOverlayBackground as createOverlayBackground };
+export { sharedCreateActionButton as createActionButton };
 export { sharedCreateOverlayButton as createOverlayButton };
 export { sharedDismissOverlay as dismissOverlay };
 export type { HudTextOptions, ActionButtonOptions };

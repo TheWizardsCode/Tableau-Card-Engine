@@ -9,13 +9,19 @@ import { autoSaveTranscript, TranscriptStore } from '../../../src/core-engine/tr
 import { GAME_W, GAME_H, OverlayManager } from '../../../src/ui';
 import {
   createLcHudText,
-  createOverlayButton,
-  createLcMenuButton,
+  createActionButton,
 } from '../../../src/ui/Renderer/adapters/LostCitiesAdapter';
 import { SFX_KEYS } from './LostCitiesConstants';
 import type { LCTranscriptRecorder } from '../GameTranscript';
 
 const transcriptStore = new TranscriptStore();
+
+// ── Column layout constants ──────────────────────────────────────
+// Fixed pixel offsets relative to screen center (cx = GAME_W / 2 = 640)
+// These are chosen to fit within the 600px-wide overlay box centered at cx=640.
+const COL_LABEL_X_OFFSET = -230;  // Left-aligned label column (color name, round, etc.)
+const COL_P0_X_OFFSET = -20;      // Right-aligned Player 0 score column
+const COL_P1_X_OFFSET = 160;      // Right-aligned Player 1 score column
 
 export class LostCitiesOverlayHelper {
   constructor(
@@ -64,12 +70,12 @@ export class LostCitiesOverlayHelper {
 
     let y = topY + 50;
 
-    const header = createLcHudText(this.scene, cx, y, 'Color             You     AI', '#aaaaaa', {
-      fontSize: '14px',
-      originX: 0.5,
-      originY: 0,
-    });
-    this.overlayManager.add(header);
+    const hdrColor = createLcHudText(this.scene, cx + COL_LABEL_X_OFFSET, y, 'Color', '#aaaaaa', { fontSize: '14px', originX: 0, originY: 0 });
+    const hdrYou = createLcHudText(this.scene, cx + COL_P0_X_OFFSET, y, 'You', '#aaaaaa', { fontSize: '14px', originX: 1, originY: 0 });
+    const hdrAi = createLcHudText(this.scene, cx + COL_P1_X_OFFSET, y, 'AI', '#aaaaaa', { fontSize: '14px', originX: 1, originY: 0 });
+    this.overlayManager.add(hdrColor);
+    this.overlayManager.add(hdrYou);
+    this.overlayManager.add(hdrAi);
     y += 26;
 
     for (let i = 0; i < EXPEDITION_COLORS.length; i++) {
@@ -85,36 +91,34 @@ export class LostCitiesOverlayHelper {
       const p0Str = p0Cards > 0 ? `${p0Score}` : '-';
       const p1Str = p1Cards > 0 ? `${p1Score}` : '-';
 
-      const row = createLcHudText(this.scene, cx, y, `${colorName.padEnd(14)}${p0Str.padStart(8)}${p1Str.padStart(8)}`, '#dddddd', {
-        fontSize: '14px',
-        originX: 0.5,
-        originY: 0,
-      });
-      this.overlayManager.add(row);
+      const lbl = createLcHudText(this.scene, cx + COL_LABEL_X_OFFSET, y, colorName, '#dddddd', { fontSize: '14px', originX: 0, originY: 0 });
+      const p0Txt = createLcHudText(this.scene, cx + COL_P0_X_OFFSET, y, p0Str, '#dddddd', { fontSize: '14px', originX: 1, originY: 0 });
+      const p1Txt = createLcHudText(this.scene, cx + COL_P1_X_OFFSET, y, p1Str, '#dddddd', { fontSize: '14px', originX: 1, originY: 0 });
+      this.overlayManager.add(lbl);
+      this.overlayManager.add(p0Txt);
+      this.overlayManager.add(p1Txt);
       y += 22;
     }
 
     y += 8;
-    const totalRow = createLcHudText(this.scene, cx, y, `Round Total${String(p0Total).padStart(11)}${String(p1Total).padStart(8)}`, '#ffffff', {
-      fontSize: '16px',
-      originX: 0.5,
-      originY: 0,
-    });
-    this.overlayManager.add(totalRow);
+    const totalLbl = createLcHudText(this.scene, cx + COL_LABEL_X_OFFSET, y, 'Round Total', '#ffffff', { fontSize: '16px', originX: 0, originY: 0 });
+    const totalP0 = createLcHudText(this.scene, cx + COL_P0_X_OFFSET, y, String(p0Total), '#ffffff', { fontSize: '16px', originX: 1, originY: 0 });
+    const totalP1 = createLcHudText(this.scene, cx + COL_P1_X_OFFSET, y, String(p1Total), '#ffffff', { fontSize: '16px', originX: 1, originY: 0 });
+    this.overlayManager.add(totalLbl);
+    this.overlayManager.add(totalP0);
+    this.overlayManager.add(totalP1);
 
     y += 30;
     const [cum0, cum1] = this.session.cumulativeScores;
-    const cumRow = createLcHudText(this.scene, cx, y, `Cumulative${String(cum0).padStart(12)}${String(cum1).padStart(8)}`, '#f0c040', {
-      fontSize: '16px',
-      originX: 0.5,
-      originY: 0,
-    });
-    this.overlayManager.add(cumRow);
+    const cumLbl = createLcHudText(this.scene, cx + COL_LABEL_X_OFFSET, y, 'Cumulative', '#f0c040', { fontSize: '16px', originX: 0, originY: 0 });
+    const cumP0 = createLcHudText(this.scene, cx + COL_P0_X_OFFSET, y, String(cum0), '#f0c040', { fontSize: '16px', originX: 1, originY: 0 });
+    const cumP1 = createLcHudText(this.scene, cx + COL_P1_X_OFFSET, y, String(cum1), '#f0c040', { fontSize: '16px', originX: 1, originY: 0 });
+    this.overlayManager.add(cumLbl);
+    this.overlayManager.add(cumP0);
+    this.overlayManager.add(cumP1);
 
     y += 50;
-    const btn = createOverlayButton(this.scene, cx, y, '[ Next Round ]');
-    try { btn.setDepth(11); } catch { /* ignore */ }
-    btn.on('pointerdown', () => {
+    const btn = createActionButton(this.scene, cx - 75, y, 150, '[ Next Round ]', () => {
       try { this.scene.sound.play?.(SFX_KEYS.UI_CLICK); } catch { /* ignore */ }
       this.dismiss();
       // Advance to the next round now that the overlay is dismissed.
@@ -123,7 +127,7 @@ export class LostCitiesOverlayHelper {
       // with the correct round-final state.)
       startNextRound(this.session);
       this.onNextRound?.();
-    });
+    }, { depth: 11 });
     this.overlayManager.add(btn);
   }
 
@@ -163,33 +167,33 @@ export class LostCitiesOverlayHelper {
 
     let y = topY + 55;
 
-    const header = createLcHudText(this.scene, cx, y, 'Round             You     AI', '#aaaaaa', {
-      fontSize: '14px',
-      originX: 0.5,
-      originY: 0,
-    });
-    this.overlayManager.add(header);
+    const hdrRound = createLcHudText(this.scene, cx + COL_LABEL_X_OFFSET, y, 'Round', '#aaaaaa', { fontSize: '14px', originX: 0, originY: 0 });
+    const hdrYou2 = createLcHudText(this.scene, cx + COL_P0_X_OFFSET, y, 'You', '#aaaaaa', { fontSize: '14px', originX: 1, originY: 0 });
+    const hdrAi2 = createLcHudText(this.scene, cx + COL_P1_X_OFFSET, y, 'AI', '#aaaaaa', { fontSize: '14px', originX: 1, originY: 0 });
+    this.overlayManager.add(hdrRound);
+    this.overlayManager.add(hdrYou2);
+    this.overlayManager.add(hdrAi2);
     y += 26;
 
     for (let r = 0; r < this.session.roundScores.length; r++) {
       const rs = this.session.roundScores[r];
-      const row = createLcHudText(this.scene, cx, y, `Round ${r + 1}${String(rs.totals[0]).padStart(14)}${String(rs.totals[1]).padStart(8)}`, '#dddddd', {
-        fontSize: '14px',
-        originX: 0.5,
-        originY: 0,
-      });
-      this.overlayManager.add(row);
+      const roundLbl = createLcHudText(this.scene, cx + COL_LABEL_X_OFFSET, y, `Round ${r + 1}`, '#dddddd', { fontSize: '14px', originX: 0, originY: 0 });
+      const roundP0 = createLcHudText(this.scene, cx + COL_P0_X_OFFSET, y, String(rs.totals[0]), '#dddddd', { fontSize: '14px', originX: 1, originY: 0 });
+      const roundP1 = createLcHudText(this.scene, cx + COL_P1_X_OFFSET, y, String(rs.totals[1]), '#dddddd', { fontSize: '14px', originX: 1, originY: 0 });
+      this.overlayManager.add(roundLbl);
+      this.overlayManager.add(roundP0);
+      this.overlayManager.add(roundP1);
       y += 22;
     }
 
     y += 10;
     const [cum0, cum1] = this.session.cumulativeScores;
-    const totalRow = createLcHudText(this.scene, cx, y, `Final Total${String(cum0).padStart(11)}${String(cum1).padStart(8)}`, '#ffffff', {
-      fontSize: '18px',
-      originX: 0.5,
-      originY: 0,
-    });
-    this.overlayManager.add(totalRow);
+    const finalLbl = createLcHudText(this.scene, cx + COL_LABEL_X_OFFSET, y, 'Final Total', '#ffffff', { fontSize: '18px', originX: 0, originY: 0 });
+    const finalP0 = createLcHudText(this.scene, cx + COL_P0_X_OFFSET, y, String(cum0), '#ffffff', { fontSize: '18px', originX: 1, originY: 0 });
+    const finalP1 = createLcHudText(this.scene, cx + COL_P1_X_OFFSET, y, String(cum1), '#ffffff', { fontSize: '18px', originX: 1, originY: 0 });
+    this.overlayManager.add(finalLbl);
+    this.overlayManager.add(finalP0);
+    this.overlayManager.add(finalP1);
 
     y += 40;
     const detailsTitle = createLcHudText(this.scene, cx, y, `Round ${this.session.roundNumber} Breakdown`, '#aaccaa', {
@@ -208,25 +212,21 @@ export class LostCitiesOverlayHelper {
       const p1Score = p1Bd && p1Bd.cardCount > 0 ? `${p1Bd.score}` : '-';
       const colorName = color.charAt(0).toUpperCase() + color.slice(1);
 
-      const row = createLcHudText(this.scene, cx, y, `${colorName.padEnd(14)}${p0Score.padStart(8)}${p1Score.padStart(8)}`, '#bbbbbb', {
-        fontSize: '12px',
-        originX: 0.5,
-        originY: 0,
-      });
-      this.overlayManager.add(row);
+      const brkLbl = createLcHudText(this.scene, cx + COL_LABEL_X_OFFSET, y, colorName, '#bbbbbb', { fontSize: '12px', originX: 0, originY: 0 });
+      const brkP0 = createLcHudText(this.scene, cx + COL_P0_X_OFFSET, y, p0Score, '#bbbbbb', { fontSize: '12px', originX: 1, originY: 0 });
+      const brkP1 = createLcHudText(this.scene, cx + COL_P1_X_OFFSET, y, p1Score, '#bbbbbb', { fontSize: '12px', originX: 1, originY: 0 });
+      this.overlayManager.add(brkLbl);
+      this.overlayManager.add(brkP0);
+      this.overlayManager.add(brkP1);
       y += 18;
     }
 
     y += 20;
-    const newMatchBtn = createOverlayButton(this.scene, cx - 85, y, '[ New Match ]');
-    newMatchBtn.on('pointerdown', () => {
+    const newMatchBtn = createActionButton(this.scene, cx - 70, y, 140, '[ New Match ]', () => {
       try { this.scene.sound.play?.(SFX_KEYS.UI_CLICK); } catch { /* ignore */ }
       this.dismiss();
       this.onRestart?.();
-    });
+    }, { depth: 11 });
     this.overlayManager.add(newMatchBtn);
-
-    const menuBtn = createLcMenuButton(this.scene, cx + 85, y, 60, { depth: 11 });
-    this.overlayManager.add(menuBtn);
   }
 }

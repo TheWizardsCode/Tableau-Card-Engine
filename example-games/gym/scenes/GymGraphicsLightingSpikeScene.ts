@@ -27,6 +27,8 @@ export class GymGraphicsLightingSpikeScene extends GymSceneBase {
   private eventLogResult!: EventLogResult;
   private lightingAvailable = false;
   private lightActive = true;
+  /** Reference to the LightsManager Light object created via addLight(). */
+  private light: Phaser.GameObjects.Light | null = null;
 
   constructor() {
     super({ key: GYM_GRAPHICS_LIGHTING_SPIKE_KEY });
@@ -75,18 +77,21 @@ export class GymGraphicsLightingSpikeScene extends GymSceneBase {
         this.lightingAvailable = true;
         this.logEvent('WebGL renderer detected. Lighting may be available.');
 
-        // Create sprites for the lit scene
-        const spriteA = this.add.image(cx - 150, y + 120, 'lighting-sprite-a');
-        const spriteB = this.add.image(cx + 150, y + 120, 'lighting-sprite-b');
-
-        // Try to set Light2D pipeline (may not be available in all builds)
-        try { (spriteA as any).setPipeline('Light2D'); } catch (_e) { /* pipeline not available */ }
-        try { (spriteB as any).setPipeline('Light2D'); } catch (_e) { /* pipeline not available */ }
-
-        // Try to add a point light
+        // Create sprites for the lit scene and enable lighting on them (Phaser 4 API)
         try {
-          this.lights.enable().addLight(cx, y + 100, 300, 0xffffff, 1.0);
-          this.logEvent('Point light added successfully.');
+          const spriteA = this.add.image(cx - 150, y + 120, 'lighting-sprite-a');
+          spriteA.setLighting(true);
+        } catch (_e) { /* lighting component not available */ }
+        try {
+          const spriteB = this.add.image(cx + 150, y + 120, 'lighting-sprite-b');
+          spriteB.setLighting(true);
+        } catch (_e) { /* lighting component not available */ }
+
+        // Try to add a Light via the LightsManager
+        try {
+          this.lights.enable();
+          this.light = this.lights.addLight(cx, y + 100, 300, 0xffffff, 1.0);
+          this.logEvent('Light added successfully via LightsManager.');
         } catch (e) {
           this.logEvent(`Light add error: ${(e as Error).message}`);
           this.lightingAvailable = false;
@@ -138,8 +143,12 @@ export class GymGraphicsLightingSpikeScene extends GymSceneBase {
 
     try {
       this.lightActive = !this.lightActive;
-      this.lights.enable();
-      this.logEvent(`Light: ${this.lightActive ? 'ON' : 'OFF'}`);
+      if (this.light && this.light.intensity !== undefined) {
+        this.light.setIntensity(this.lightActive ? 1.0 : 0.0);
+        this.logEvent(`Light ${this.lightActive ? 'enabled' : 'disabled'} (intensity=${this.lightActive ? '1.0' : '0.0'}).`);
+      } else {
+        this.logEvent('No light reference available to toggle.');
+      }
     } catch (e) {
       this.logEvent(`Light toggle error: ${(e as Error).message}`);
     }
@@ -156,17 +165,13 @@ export class GymGraphicsLightingSpikeScene extends GymSceneBase {
       const cx = GAME_W / 2;
       const newX = cx + (Math.random() - 0.5) * 300;
       const newY = 160 + Math.random() * 200;
-      // Phaser 4 lights API: try to move any existing point lights
-      try {
-        const pointLights = this.lights.lights;
-        if (Array.isArray(pointLights) && pointLights.length > 0) {
-          pointLights[0].setPosition(newX, newY);
-          this.logEvent(`Light moved to (${Math.round(newX)}, ${Math.round(newY)})`);
-        } else {
-          this.logEvent('No point lights to move.');
-        }
-      } catch (err) {
-        this.logEvent('Could not access light list for movement.');
+      // Move the stored light reference directly
+      if (this.light) {
+        this.light.x = newX;
+        this.light.y = newY;
+        this.logEvent(`Light moved to (${Math.round(newX)}, ${Math.round(newY)})`);
+      } else {
+        this.logEvent('No light reference available to move.');
       }
     } catch (e) {
       this.logEvent(`Move light error: ${(e as Error).message}`);

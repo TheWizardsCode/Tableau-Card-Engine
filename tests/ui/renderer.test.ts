@@ -427,11 +427,46 @@ describe('createActionButton', () => {
     expect(rect.on).toHaveBeenCalledWith('pointerdown', callback);
   });
 
-  it('does not attach interaction when disabled', () => {
+  it('makes disabled button interactive for hover but with no hand cursor', () => {
     const scene = createMockScene();
     createActionButton(scene, 0, 0, 100, 'Disabled', () => {}, { disabled: true });
     const rect = (scene.add.rectangle as ReturnType<typeof vi.fn>).mock.results[0].value;
-    expect(rect.setInteractive).not.toHaveBeenCalled();
+    // Must be interactive so that pointer events (for tooltips) can fire
+    expect(rect.setInteractive).toHaveBeenCalledWith({ useHandCursor: false });
+  });
+
+  it('disabled button has no pointerdown handler (non-clickable)', () => {
+    const scene = createMockScene();
+    const callback = vi.fn();
+    createActionButton(scene, 0, 0, 100, 'Disabled', callback, { disabled: true });
+    const rect = (scene.add.rectangle as ReturnType<typeof vi.fn>).mock.results[0].value;
+    const pointerdownCalls = (rect.on as ReturnType<typeof vi.fn>).mock.calls
+      .filter((call: any[]) => call[0] === 'pointerdown');
+    expect(pointerdownCalls).toHaveLength(0);
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  it('disabled button has no hover visual effects', () => {
+    const scene = createMockScene();
+    createActionButton(scene, 0, 0, 100, 'Disabled', () => {}, { disabled: true });
+    const rect = (scene.add.rectangle as ReturnType<typeof vi.fn>).mock.results[0].value;
+    // pointerover should NOT have been registered by createActionButton (no hover effects)
+    const pointeroverCalls = (rect.on as ReturnType<typeof vi.fn>).mock.calls
+      .filter((call: any[]) => call[0] === 'pointerover');
+    expect(pointeroverCalls).toHaveLength(0);
+  });
+
+  it('disabled button bg can still receive externally-attached pointer events', () => {
+    const scene = createMockScene();
+    createActionButton(scene, 0, 0, 100, 'Disabled', () => {}, { disabled: true });
+    const rect = (scene.add.rectangle as ReturnType<typeof vi.fn>).mock.results[0].value;
+    // External code (e.g. tooltip system) can attach its own pointerover/pointerout handlers
+    const externalHandler = vi.fn();
+    rect.on('pointerover', externalHandler);
+    const pointeroverCalls = (rect.on as ReturnType<typeof vi.fn>).mock.calls
+      .filter((call: any[]) => call[0] === 'pointerover');
+    // External handler is registered (i.e., no internal handler blocking)
+    expect(pointeroverCalls.length).toBeGreaterThanOrEqual(1);
   });
 
   it('applies custom styling options', () => {

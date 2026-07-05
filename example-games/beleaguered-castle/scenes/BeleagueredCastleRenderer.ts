@@ -9,7 +9,7 @@ import type { BeleagueredCastleState } from '../BeleagueredCastleState';
 import { FOUNDATION_COUNT, TABLEAU_COUNT } from '../BeleagueredCastleState';
 import { HandView, PileView } from '../../../src/ui';
 import { GAME_W, GAME_H } from '../../../src/ui';
-import { createSceneTitle, createSceneMenuButton } from '@ui/Renderer';
+import { createSceneTitle } from '@ui/Renderer';
 import { createBcHudText } from '../../../src/ui/Renderer/adapters/BeleagueredCastleAdapter';
 import {
   BC_CARD_W, BC_CARD_H, CARD_GAP, CASCADE_OFFSET_Y,
@@ -36,6 +36,9 @@ export interface CardSpriteData {
 }
 
 export class BeleagueredCastleRenderer {
+  /** When true, deal animation is skipped and all cards appear immediately. */
+  reducedMotion = false;
+
   private scene: Phaser.Scene;
   private state: BeleagueredCastleState;
 
@@ -86,7 +89,6 @@ export class BeleagueredCastleRenderer {
 
   // ── UI creation ─────────────────────────────────────────
   createTitle(): void {
-    createSceneMenuButton(this.scene, { y: this.layout.headerY });
     createSceneTitle(this.scene, 'Beleaguered Castle', { y: this.layout.headerY });
   }
 
@@ -227,6 +229,11 @@ export class BeleagueredCastleRenderer {
 
   // ── Deal animation ──────────────────────────────────────
   dealTableauAnimated(): void {
+    if (this.reducedMotion) {
+      this.syncTableauHandViews();
+      this.onDealComplete?.();
+      return;
+    }
     const centerX = GAME_W / 2;
     const centerY = GAME_H / 2;
 
@@ -392,6 +399,11 @@ export class BeleagueredCastleRenderer {
   snapBack(sprite: Phaser.GameObjects.Image): void {
     const data = sprite.getData('cardData') as CardSpriteData | undefined;
     if (!data) return;
+    if (this.reducedMotion) {
+      sprite.setPosition(data.originX, data.originY);
+      sprite.setDepth(data.originDepth);
+      return;
+    }
     this.scene.tweens.add({
       targets: sprite,
       x: data.originX,

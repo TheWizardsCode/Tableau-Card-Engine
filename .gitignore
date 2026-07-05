@@ -93,3 +93,4 @@ Worklog Specific Ignores
 .opencode/tmp/
 
 ### End of Worklog Specific Ignores
+.pi/

@@ -59,7 +59,7 @@ describe('Main Street save/load integration', () => {
     const state = setupMainStreetGame({ seed: 'save-load-turn-start' });
 
     executeDayStart(state);
-    const card = state.market.development[0];
+    const card = state.market.development.find(c => c.cost <= state.resourceBank.coins)!;
     executeAction(state, { type: 'buy-business', cardId: card.id, slotIndex: 0 });
     processEndOfTurn(state);
 
@@ -69,7 +69,8 @@ describe('Main Street save/load integration', () => {
 
     const expected = setupMainStreetGame({ seed: 'save-load-turn-start' });
     executeDayStart(expected);
-    executeAction(expected, { type: 'buy-business', cardId: card.id, slotIndex: 0 });
+    const expectedCard = expected.market.development.find(c => c.cost <= expected.resourceBank.coins)!;
+    executeAction(expected, { type: 'buy-business', cardId: expectedCard.id, slotIndex: 0 });
     processEndOfTurn(expected);
 
     expect(restored!.turn).toBe(expected.turn);

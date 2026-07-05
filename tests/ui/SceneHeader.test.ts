@@ -20,6 +20,8 @@ import {
   SCENE_MENU_BUTTON_FONT_SIZE,
   SCENE_MENU_BUTTON_COLOR,
   SCENE_MENU_BUTTON_HOVER_COLOR,
+  SCENE_MENU_BUTTON_WIDTH,
+  SCENE_MENU_BUTTON_HEIGHT,
 } from '../../src/ui/SceneHeader';
 import { GAME_W, FONT_FAMILY } from '../../src/ui/constants';
 
@@ -27,32 +29,69 @@ import { GAME_W, FONT_FAMILY } from '../../src/ui/constants';
 
 /** Create a mock Phaser.GameObjects.Text. */
 function mockText() {
-  const handlers: Record<string, Function> = {};
-  const text = {
+  return {
     setOrigin: vi.fn().mockReturnThis(),
     setDepth: vi.fn().mockReturnThis(),
     setInteractive: vi.fn().mockReturnThis(),
     setColor: vi.fn().mockReturnThis(),
+    on: vi.fn().mockReturnThis(),
+    destroy: vi.fn(),
+  };
+}
+
+/** Create a mock Phaser.GameObjects.Rectangle. */
+function mockRect() {
+  const handlers: Record<string, Function> = {};
+  return {
+    setStrokeStyle: vi.fn().mockReturnThis(),
+    setDepth: vi.fn().mockReturnThis(),
+    setInteractive: vi.fn().mockReturnThis(),
+    setOrigin: vi.fn().mockReturnThis(),
     on: vi.fn((event: string, handler: Function) => {
       handlers[event] = handler;
-      return text;
+      return handlers;
     }),
     destroy: vi.fn(),
+    input: { enabled: true },
     _handlers: handlers,
   };
-  return text;
+}
+
+/** Create a mock Phaser.GameObjects.Container. */
+function mockContainer() {
+  const children: any[] = [];
+  return {
+    add: vi.fn((child: any) => { children.push(child); }),
+    setDepth: vi.fn().mockReturnThis(),
+    setScale: vi.fn().mockReturnThis(),
+    setVisible: vi.fn().mockReturnThis(),
+    destroy: vi.fn(),
+    list: children,
+  };
 }
 
 /** Create a minimal mock Phaser.Scene. */
 function mockScene() {
+  const mockRectInstance = mockRect();
+  const mockContainerInstance = mockContainer();
+  const mockTextInstance = mockText();
+  const add = {
+    text: vi.fn(() => mockTextInstance),
+    rectangle: vi.fn(() => mockRectInstance),
+    container: vi.fn(() => mockContainerInstance),
+  };
   return {
-    add: {
-      text: vi.fn(() => mockText()),
-    },
+    add,
     scene: {
       start: vi.fn(),
     },
-  } as unknown as Phaser.Scene;
+    /** Test helper to access the created rectangle. */
+    _mockRect: mockRectInstance,
+    /** Test helper to access the created container. */
+    _mockContainer: mockContainerInstance,
+    /** Test helper to access the created text. */
+    _mockText: mockTextInstance,
+  } as unknown as Phaser.Scene & { _mockRect: any; _mockContainer: any; _mockText: any };
 }
 
 // ── Constants ───────────────────────────────────────────────
@@ -62,8 +101,8 @@ describe('scene header constants', () => {
     expect(SCENE_HEADER_Y).toBe(14);
   });
 
-  it('exports SCENE_MENU_BUTTON_X = 30', () => {
-    expect(SCENE_MENU_BUTTON_X).toBe(30);
+  it('exports SCENE_MENU_BUTTON_X = 14', () => {
+    expect(SCENE_MENU_BUTTON_X).toBe(14);
   });
 
   it('exports SCENE_TITLE_FONT_SIZE = 18px', () => {
@@ -78,12 +117,20 @@ describe('scene header constants', () => {
     expect(SCENE_MENU_BUTTON_FONT_SIZE).toBe('12px');
   });
 
-  it('exports SCENE_MENU_BUTTON_COLOR = #aaccaa', () => {
-    expect(SCENE_MENU_BUTTON_COLOR).toBe('#aaccaa');
+  it('exports SCENE_MENU_BUTTON_COLOR = #ffcc88 (action button gold)', () => {
+    expect(SCENE_MENU_BUTTON_COLOR).toBe('#ffcc88');
   });
 
   it('exports SCENE_MENU_BUTTON_HOVER_COLOR = #88ff88', () => {
     expect(SCENE_MENU_BUTTON_HOVER_COLOR).toBe('#88ff88');
+  });
+
+  it('exports SCENE_MENU_BUTTON_WIDTH = 60', () => {
+    expect(SCENE_MENU_BUTTON_WIDTH).toBe(60);
+  });
+
+  it('exports SCENE_MENU_BUTTON_HEIGHT = 24', () => {
+    expect(SCENE_MENU_BUTTON_HEIGHT).toBe(24);
   });
 });
 
@@ -165,87 +212,66 @@ describe('createSceneMenuButton', () => {
     scene = mockScene();
   });
 
-  it('creates [ Menu ] button at default position', () => {
+  it('returns a Container', () => {
+    const btn = createSceneMenuButton(scene);
+    // The mock container doesn't have instanceof, so check its structure
+    expect(btn).toBeDefined();
+    expect(typeof btn.add).toBe('function');
+  });
+
+  it('creates a container with background rectangle and label', () => {
     createSceneMenuButton(scene);
 
-    expect(scene.add.text).toHaveBeenCalledWith(
-      SCENE_MENU_BUTTON_X,
-      SCENE_HEADER_Y,
-      '[ Menu ]',
-      {
-        fontSize: SCENE_MENU_BUTTON_FONT_SIZE,
-        color: SCENE_MENU_BUTTON_COLOR,
-        fontFamily: FONT_FAMILY,
-      },
+    expect(scene.add.container).toHaveBeenCalledOnce();
+    expect(scene.add.rectangle).toHaveBeenCalledOnce();
+    expect(scene.add.text).toHaveBeenCalledOnce();
+  });
+
+  it('positions the container at default header position', () => {
+    createSceneMenuButton(scene);
+
+    // Container is positioned at (x + w/2, y + h/2)
+    expect(scene.add.container).toHaveBeenCalledWith(
+      SCENE_MENU_BUTTON_X + SCENE_MENU_BUTTON_WIDTH / 2,
+      SCENE_HEADER_Y + SCENE_MENU_BUTTON_HEIGHT / 2,
     );
   });
 
-  it('centers with setOrigin(0.5)', () => {
-    const btn = createSceneMenuButton(scene);
-    expect(btn.setOrigin).toHaveBeenCalledWith(0.5);
-  });
+  it('creates label text with "Menu"', () => {
+    createSceneMenuButton(scene);
 
-  it('sets interactive with hand cursor', () => {
-    const btn = createSceneMenuButton(scene);
-    expect(btn.setInteractive).toHaveBeenCalledWith({ useHandCursor: true });
+    expect(scene.add.text).toHaveBeenCalledWith(
+      0, 0, 'Menu',
+      expect.objectContaining({
+        fontSize: SCENE_MENU_BUTTON_FONT_SIZE,
+        color: expect.any(String),
+      }),
+    );
   });
 
   it('navigates to GameSelectorScene on pointerdown', () => {
-    const btn = createSceneMenuButton(scene);
-    const handlers = (btn as any)._handlers;
+    createSceneMenuButton(scene);
 
-    handlers['pointerdown']();
+    const rect = (scene as any)._mockRect;
+    rect._handlers['pointerdown']();
     expect(scene.scene.start).toHaveBeenCalledWith('GameSelectorScene');
-  });
-
-  it('changes color on pointerover and restores on pointerout', () => {
-    const btn = createSceneMenuButton(scene);
-    const handlers = (btn as any)._handlers;
-
-    handlers['pointerover']();
-    expect(btn.setColor).toHaveBeenCalledWith(SCENE_MENU_BUTTON_HOVER_COLOR);
-
-    handlers['pointerout']();
-    expect(btn.setColor).toHaveBeenCalledWith(SCENE_MENU_BUTTON_COLOR);
   });
 
   it('accepts custom position', () => {
     createSceneMenuButton(scene, { x: 50, y: 20 });
 
-    expect(scene.add.text).toHaveBeenCalledWith(
-      50, 20, '[ Menu ]',
-      expect.objectContaining({ fontSize: SCENE_MENU_BUTTON_FONT_SIZE }),
+    expect(scene.add.container).toHaveBeenCalledWith(
+      50 + SCENE_MENU_BUTTON_WIDTH / 2,
+      20 + SCENE_MENU_BUTTON_HEIGHT / 2,
     );
   });
 
-  it('accepts custom colors', () => {
-    const btn = createSceneMenuButton(scene, {
-      color: '#ffffff',
-      hoverColor: '#cccccc',
-    });
-    const handlers = (btn as any)._handlers;
+  it('accepts custom width and height', () => {
+    createSceneMenuButton(scene, { width: 80, height: 30 });
 
-    handlers['pointerover']();
-    expect(btn.setColor).toHaveBeenCalledWith('#cccccc');
-
-    handlers['pointerout']();
-    expect(btn.setColor).toHaveBeenCalledWith('#ffffff');
-  });
-
-  it('accepts custom font size and family', () => {
-    createSceneMenuButton(scene, {
-      fontSize: '16px',
-      fontFamily: 'Courier',
-    });
-
-    expect(scene.add.text).toHaveBeenCalledWith(
-      SCENE_MENU_BUTTON_X,
-      SCENE_HEADER_Y,
-      '[ Menu ]',
-      expect.objectContaining({
-        fontSize: '16px',
-        fontFamily: 'Courier',
-      }),
+    expect(scene.add.container).toHaveBeenCalledWith(
+      SCENE_MENU_BUTTON_X + 80 / 2,
+      SCENE_HEADER_Y + 30 / 2,
     );
   });
 });
@@ -266,32 +292,17 @@ describe('createSceneHeader', () => {
     expect(result.menuButton).toBeDefined();
     // Two calls: one for title, one for menu button
     expect(scene.add.text).toHaveBeenCalledTimes(2);
-  });
-
-  it('uses default Y for both elements', () => {
-    createSceneHeader(scene, 'Default Y');
-
-    // Both calls should use SCENE_HEADER_Y
-    const calls = (scene.add.text as any).mock.calls;
-    // Title call: y = SCENE_HEADER_Y
-    expect(calls[0][1]).toBe(SCENE_HEADER_Y);
-    // Menu button call: y = SCENE_HEADER_Y
-    expect(calls[1][1]).toBe(SCENE_HEADER_Y);
-  });
-
-  it('passes custom Y to both elements', () => {
-    createSceneHeader(scene, 'Custom Y', 30);
-
-    const calls = (scene.add.text as any).mock.calls;
-    expect(calls[0][1]).toBe(30);
-    expect(calls[1][1]).toBe(30);
+    // One container for menu button
+    expect(scene.add.container).toHaveBeenCalledTimes(1);
+    // One rectangle for menu button
+    expect(scene.add.rectangle).toHaveBeenCalledTimes(1);
   });
 
   it('menu button navigates to GameSelectorScene', () => {
-    const result = createSceneHeader(scene, 'Nav Test');
-    const handlers = (result.menuButton as any)._handlers;
+    createSceneHeader(scene, 'Nav Test');
 
-    handlers['pointerdown']();
+    const rect = (scene as any)._mockRect;
+    rect._handlers['pointerdown']();
     expect(scene.scene.start).toHaveBeenCalledWith('GameSelectorScene');
   });
 });

@@ -92,7 +92,7 @@ Run N+1 starts with expanded card pool
 |------|-------|
 | Business (5) | Bakery (`biz-bakery`), Diner (`biz-diner`), Bookshop (`biz-bookshop`), Park (`biz-park`), Hardware Store (`biz-hardware`) |
 | Event (5) | Local Festival (`evt-festival`), Rainy Day (`evt-rainy`), Tax Audit (`evt-tax`), Community Award (`evt-award`), Health Inspection (`evt-inspection`) |
-| Upgrade (3) | Patisserie (`upg-patisserie`), Bistro (`upg-bistro`), Library (`upg-library`) |
+| Upgrade (3) | Patisserie (`upg-patisserie`), Bistro (`upg-bistro`), Reader's Café (`upg-readers-cafe`) |
 
 **Total: 13 card templates (5 Business + 5 Event + 3 Upgrade)**
 
@@ -283,7 +283,7 @@ interface MilestoneRecord {
   "unlockedCardIds": [
     "biz-bakery", "biz-diner", "biz-bookshop", "biz-park", "biz-hardware",
     "evt-festival", "evt-rainy", "evt-tax", "evt-award", "evt-inspection",
-    "upg-patisserie", "upg-bistro", "upg-library"
+    "upg-patisserie", "upg-bistro", "upg-readers-cafe"
   ],
   "milestoneHistory": [],
   "persistentReputation": 0,
@@ -307,7 +307,7 @@ interface MilestoneRecord {
     "evt-festival", "evt-rainy", "evt-tax", "evt-award", "evt-inspection",
     "evt-grand-opening",
     "evt-wellness-fair",
-    "upg-patisserie", "upg-bistro", "upg-library",
+    "upg-patisserie", "upg-bistro", "upg-readers-cafe",
     "upg-garden"
   ],
   "milestoneHistory": [
@@ -355,7 +355,7 @@ interface MilestoneRecord {
     "evt-wellness-fair",
     "evt-block-party",
     "evt-charity-drive",
-    "upg-patisserie", "upg-bistro", "upg-library",
+    "upg-patisserie", "upg-bistro", "upg-readers-cafe",
     "upg-garden",
     "upg-bread-factory",
     "upg-grand-bakehouse"
@@ -812,7 +812,7 @@ Verification artifacts:
 | `evt-inspection` | Health Inspection | Event (Incident) | Food | 0 |
 | `upg-patisserie` | Patisserie | Upgrade | Bakery | 4 |
 | `upg-bistro` | Bistro | Upgrade | Diner | 4 |
-| `upg-library` | Library | Upgrade | Bookshop | 3 |
+| `upg-readers-cafe` | Reader's Café | Upgrade | Bookshop | 3 |
 
 ### Tier 2 -- Rising Street (+3 templates)
 
@@ -899,7 +899,7 @@ Challenge-based unlock paths are designed to be achievable by skilled players wh
 
 1. The game includes at least 10 distinct Business card templates (up from 5 in M1).
 2. Each Business template has all required fields: id, name, cost, baseIncome, synergyTypes, maxLevel, and description.
-3. Every synergy type (Food, Culture, Commerce, Service, Entertainment) is represented by at least 2 single-type Business cards.
+3. Every synergy type (Food, Culture, Commerce, Service, Entertainment, Health) is represented by at least 2 single-type Business cards.
 4. `createBusinessDeck(3)` produces 3 copies of each template and all cards are valid BusinessCard instances.
 5. The market refill logic draws from the expanded Business deck without errors or infinite loops across 200+ seeded runs.
 6. All existing M1 Business cards remain in the pool with unchanged attributes.
@@ -909,7 +909,7 @@ Challenge-based unlock paths are designed to be achievable by skilled players wh
 - `BUSINESS_TEMPLATES.length >= 10`.
 - Given `createBusinessDeck(3)`, the resulting deck has `BUSINESS_TEMPLATES.length * 3` cards.
 - Every Business template has non-empty `id`, `name`, `description`; `cost > 0`; `baseIncome >= 0`; `synergyTypes.length >= 1`.
-- For each synergy type S in `['Food', 'Culture', 'Commerce', 'Service', 'Entertainment']`, at least 2 Business templates have S in their `synergyTypes` (counting bridge cards).
+- For each synergy type S in `['Food', 'Culture', 'Commerce', 'Service', 'Entertainment', 'Health']`, at least 2 Business templates have S in their `synergyTypes` (counting bridge cards).
 - Monte Carlo sweep of 200 seeds over 25 turns completes with no deck starvation or refill errors.
 
 ### US-9: Diverse Event Card Pool
@@ -969,7 +969,7 @@ Challenge-based unlock paths are designed to be achievable by skilled players wh
 
 **Testable Conditions:**
 
-- `SynergyType` union includes `'Service'` and `'Entertainment'`.
+- `SynergyType` union includes `'Service'`, `'Entertainment'`, and `'Health'`.
 - At least 2 Business templates have `synergyTypes: ['Service']` (single-type Service cards).
 - At least 2 Business templates have `synergyTypes: ['Entertainment']` (single-type Entertainment cards).
 - Given two adjacent Service businesses, `computeSynergyBonus()` returns `synergyBonusPerNeighbor` (1 on Medium).

@@ -53,13 +53,15 @@ export function computeMainStreetLayoutWithSll(): SceneLayout {
 
   const marketTopLeft = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'market', 'topLeft', viewport, 1);
   const queueTopLeft = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'incidentQueue', 'topLeft', viewport, 1);
+  const queueBottomLeft = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'incidentQueue', 'bottomLeft', viewport, 1);
   const streetTopCenter = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'street', 'topCenter', viewport, 1);
 
-  // Compute a horizontally centered streetX. The 2×5 grid row width is:
-  //   STREET_COLS × BASE_SLOT_W + (STREET_COLS - 1) × BASE_SLOT_GAP = 5 × 140 + 4 × 10 = 740px
-  // Centered on a 1280px screen: (1280 - 740) / 2 = 270px
+  // Compute streetX using the SLL anchor as the center, so it aligns with the
+  // left-area column (x≈20 to x≈800). With 5×140px slots and 4×20px gaps:
+  //   rowWidth = 5*140 + 4*20 = 780px
+  // Centered at streetTopCenter.x = 0.3203125 (410px): streetX = 410 - 390 = 20
   const rowWidth = STREET_COLS * BASE_SLOT_W + (STREET_COLS - 1) * BASE_SLOT_GAP;
-  const streetX = Math.round((gameW - rowWidth) / 2);
+  const streetX = Math.round(streetTopCenter.x - rowWidth / 2);
   const handTopLeft = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'hand', 'topLeft', viewport, 1);
   const challengeTopLeft = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'challengePanel', 'topLeft', viewport, 1);
   const challengeBottomRight = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'challengePanel', 'bottomRight', viewport, 1);
@@ -77,6 +79,7 @@ export function computeMainStreetLayoutWithSll(): SceneLayout {
   const logW = Math.round(logBottomRight.x - logTopLeft.x);
   const logH = Math.round(logBottomRight.y - logTopLeft.y);
   const challengeW = Math.round(challengeBottomRight.x - challengeTopLeft.x);
+  const eventsHeight = Math.round(queueBottomLeft.y - queueTopLeft.y);
 
   return {
     gameW,
@@ -94,6 +97,7 @@ export function computeMainStreetLayoutWithSll(): SceneLayout {
     queueCardH: BASE_QUEUE_CARD_H,
     queueCardGap: BASE_QUEUE_CARD_GAP,
     queueLabelW: BASE_MARKET_LABEL_W,
+    eventsHeight,
     // Shift streetTop down by half the action button height (34 / 2 ≈ 17px) for vertical spacing
     streetTop: Math.round(streetTopCenter.y) + 17,
     slotW: BASE_SLOT_W,

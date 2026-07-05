@@ -68,6 +68,25 @@ describe('popTextOrIcon', () => {
     expect(target.destroy).toHaveBeenCalled();
   });
 
+  it('can create text target with longer readable duration', async () => {
+    const { scene, tweenConfigs } = createMockScene();
+    const target = scene.add.text(50, 60, '♪ Sound!');
+
+    await popTextOrIcon({
+      scene: scene as any,
+      target: target as any,
+      duration: 1800,
+      riseY: 30,
+      scale: 1.3,
+    });
+
+    expect(scene.tweens.add).toHaveBeenCalledTimes(1);
+    expect(tweenConfigs[0].duration).toBe(1800);
+    expect(tweenConfigs[0].scaleX).toBe(1.3);
+    expect(tweenConfigs[0].y).toBe(30);
+    expect(target.destroy).toHaveBeenCalled();
+  });
+
   it('can create text target when label and position are provided', async () => {
     const { scene } = createMockScene();
 

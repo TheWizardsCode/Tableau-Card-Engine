@@ -20,7 +20,7 @@ import {
   CardGameScene,
   GAME_W, GAME_H,
   OverlayManager,
-  createSceneTitle, createSceneMenuButton,
+  createSceneTitle,
   audioPathWithFallback,
 } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
@@ -28,6 +28,7 @@ import helpContent from '../help-content.json';
 
 import {
   SFX_KEYS,
+  ANIM_DURATION,
   type TurnPhase,
 } from './FeudalismConstants';
 import { FeudalismRenderer } from './FeudalismRenderer';
@@ -79,9 +80,7 @@ export class FeudalismScene extends CardGameScene {
     this.cameras.main.setBackgroundColor('#1a2a1a');
     this.replayStepIndex = -1;
 
-    this.detectReplayMode();
-    this.initEventSystem();
-    this.initHUDContainer();
+    super.create();
 
     if (this.replayMode) {
       this.createHeader();
@@ -165,6 +164,10 @@ export class FeudalismScene extends CardGameScene {
     this.feudRenderer.createInfluenceDisplay();
     this.initHelpPanel(helpContent as HelpSection[]);
     this.initSettingsPanel();
+    // Propagate reduced motion preference to the animator
+    if (this.settingsPanel) {
+      this.animator.reducedMotion = this.settingsPanel.reducedMotion;
+    }
 
     this.refreshAll();
     this.turnController.setPhase('player-turn');
@@ -174,7 +177,6 @@ export class FeudalismScene extends CardGameScene {
   }
 
   private createHeader(): void {
-    createSceneMenuButton(this);
     createSceneTitle(this, 'Feudalism');
   }
 
@@ -452,15 +454,28 @@ export class FeudalismScene extends CardGameScene {
 
   /**
    * Restore the game state from a saved checkpoint.
-   * Rebuilds the turn controller, renderer, and interactions.
+   *
+   * Mutates the existing session in-place and reuses the existing renderer
+   * and animator (following the Beleaguered Castle pattern). This avoids
+   * creating duplicate Phaser game objects that caused the original bug:
+   * see CG-0MQMEH2IX0050WNR.
+   *
+   * Only the turn controller and checkpoint manager are rebuilt, since they
+   * hold transient state (undo stack, serializer) that must be fresh.
    */
   private restoreFromCheckpoint(savedState: FeudalismSession): void {
-    this.session = savedState;
+    // Mutate existing session in-place so the existing renderer and animator
+    // (which hold references to this.session) see the restored state.
+    // This avoids creating duplicate containers / game objects.
+    Object.assign(this.session, savedState);
+
     this.aiPlayer = new FeudalismAiPlayer(GreedyStrategy);
     this.recorder = new FeudalismTranscriptRecorder(this.session);
 
-    this.feudRenderer = new FeudalismRenderer(this, this.session);
-    this.animator = new FeudalismAnimator(this, this.session);
+    // Reuse existing renderer and animator — their containers and text objects
+    // are already in the scene's display list. refreshAll() calls removeAll(true)
+    // on each container before re-populating, so no orphaned objects remain.
+    // Do NOT call createContainers / createInstructions / createInfluenceDisplay.
 
     const checkpointManager = new CheckpointManager(
       this.saveLoadStore,
@@ -501,23 +516,26 @@ export class FeudalismScene extends CardGameScene {
 
     this.turnController.setRecorder(this.recorder);
 
-    this.feudRenderer.createContainers();
-    this.feudRenderer.createInstructions();
-    this.feudRenderer.createInfluenceDisplay();
+    // Clear old selection state and re-render from the mutated session.
+    // refreshAll() (Scene method) calls feudRenderer.refreshAll() which
+    // calls removeAll(true) on each container, clearing children before
+    // re-creating them from the restored session data.
+    this.feudRenderer.clearMarketSelection();
     this.refreshAll();
-    this.turnController.setPhase('player-turn');
 
-    // Wire up interactions for the restored state
-    this.feudRenderer.refreshAll({
-      onMarketCardClick: (card) => this.onMarketCardClick(card),
-      onReserveDeck: (tier) => this.onReserveDeck(tier),
-      onSupplyTokenClick: (color) => this.onSupplyTokenClick(color),
-      onTakeTokens: () => this.onTakeTokens(),
-      onTakeSame: (color) => this.turnController.executeTakeSame(color),
-      onConfirmDifferent: () => this.onConfirmDifferent(),
-      onCancelSelection: () => this.onCancelSelection(),
-      onReservedCardClick: (card) => this.onReservedCardClick(card),
-    });
+    // Determine whose turn it is and set the phase accordingly.
+    // Previously this unconditionally set 'player-turn', which caused the
+    // bug where resuming into the AI's turn allowed human interaction.
+    // See CG-0MQZYDCMY007DHTI.
+    const currentPlayer = this.session.players[this.session.currentPlayerIndex];
+    if (currentPlayer.isAI) {
+      this.turnController.setPhase('ai-turn');
+      this.time.delayedCall(ANIM_DURATION + 200, () => {
+        this.turnController.executeAiTurn();
+      });
+    } else {
+      this.turnController.setPhase('player-turn');
+    }
   }
 
   // ── Cleanup ─────────────────────────────────────────────

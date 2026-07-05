@@ -14,6 +14,7 @@ import {
   createOverlayButton,
   FONT_FAMILY,
 } from '../../../src/ui';
+import { t } from '../../../src/core-engine/I18n';
 import type { TutorialStorageAdapter } from '../TutorialState';
 import {
   loadTutorialState,
@@ -135,7 +136,7 @@ export class TutorialOfferModal {
     const title = s.add.text(
       centerX,
       panelTop + 32,
-      'Welcome to Main Street!',
+      t('tutorial.modal.title'),
       {
         fontSize: '24px',
         fontStyle: 'bold',
@@ -151,8 +152,7 @@ export class TutorialOfferModal {
     const body = s.add.text(
       centerX,
       panelTop + 74,
-      'Would you like a guided tutorial to learn\n' +
-        'the basics of Main Street?',
+      t('tutorial.modal.body'),
       {
         fontSize: '15px',
         color: BODY_COLOR,
@@ -170,32 +170,18 @@ export class TutorialOfferModal {
     // Two buttons centered within the modal panel. A 240px gap between
     // button centres keeps them well inside the 420px panel width with
     // comfortable padding on the outer edges.
+    // Convention: left = dismiss/exit action, right = proceed/continue action.
     const buttonGap = 240;
-    const startX = centerX - buttonGap / 2;
-    const endX = centerX + buttonGap / 2;
+    const leftX = centerX - buttonGap / 2;
+    const rightX = centerX + buttonGap / 2;
 
-    // Start Tutorial button (left)
-    const startBtn = createOverlayButton(
-      s,
-      startX,
-      buttonY,
-      '[ Start Tutorial ]',
-      CONTENT_DEPTH,
-      { fontSize: '15px', color: '#88ff88', hoverColor: '#aaffaa' },
-    );
-    startBtn.on('pointerdown', () => {
-      this.dismiss();
-      this.persistStatus('not_seen');
-      this.callbacks.onStartTutorial();
-    });
-    this.overlayObjects.push(startBtn);
-
-    // Skip for Now button (right)
+    // Skip button (left — consistent with other tutorial overlays
+    // where the dismiss/exit action appears on the left)
     const skipBtn = createOverlayButton(
       s,
-      endX,
+      leftX,
       buttonY,
-      '[ Skip for Now ]',
+      '[ ' + t('tutorial.modal.skipBtn') + ' ]',
       CONTENT_DEPTH,
       { fontSize: '15px', color: SKIP_COLOR, hoverColor: SKIP_HOVER_COLOR },
     );
@@ -205,6 +191,23 @@ export class TutorialOfferModal {
       this.callbacks.onSkip();
     });
     this.overlayObjects.push(skipBtn);
+
+    // Start Tutorial button (right — consistent with other tutorial overlays
+    // where the proceed/continue action appears on the right)
+    const startBtn = createOverlayButton(
+      s,
+      rightX,
+      buttonY,
+      '[ ' + t('tutorial.modal.startBtn') + ' ]',
+      CONTENT_DEPTH,
+      { fontSize: '15px', color: '#88ff88', hoverColor: '#aaffaa' },
+    );
+    startBtn.on('pointerdown', () => {
+      this.dismiss();
+      this.persistStatus('not_seen');
+      this.callbacks.onStartTutorial();
+    });
+    this.overlayObjects.push(startBtn);
   }
 
   /** Dismisses the modal and restores interactivity. */

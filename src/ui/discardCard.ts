@@ -68,6 +68,12 @@ export interface DiscardCardOptions {
   playerIndex?: number;
 
   /**
+   * When true, discarding is instant — sprite is hidden/destroyed immediately
+   * without tweens.  Overrides CSS media query.  Default: false (animate).
+   */
+  reducedMotion?: boolean;
+
+  /**
    * Whether to destroy the sprite after animation completes.
    * Set to false if you'll reuse the sprite.
    * @default true
@@ -123,15 +129,16 @@ export function discardCard(opts: DiscardCardOptions): Phaser.Tweens.Tween {
     cardId,
     playerIndex,
     destroyAfter = true,
+    reducedMotion,
     soundManager = null,
     sfx,
   } = opts;
 
-  // Check for reduced motion preference
-  const reducedMotion = prefersReducedMotion();
+  // Check for reduced motion preference (explicit param takes precedence)
+  const shouldReduce = reducedMotion ?? prefersReducedMotion();
 
   // If reduced motion, just hide immediately
-  if (reducedMotion) {
+  if (shouldReduce) {
     target.setAlpha(0);
     target.setScale(0);
     if (gameEvents && cardId) {

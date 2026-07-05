@@ -13,15 +13,13 @@
 // ── Tutorial Constants ────────────────────────────────────────
 
 /**
- * Fixed seed used when the tutorial is active.
+ * @deprecated Since the TutorialScenario system (CG-0MQSR0H7Z0049BAD).
+ * The tutorial now uses `createTutorialScenario()` from `TutorialScenario.ts`
+ * instead of seed-based shuffling. This seed constant is retained only for
+ * backward compatibility with any external references and will be removed
+ * in a future cleanup pass.
  *
- * This seed ensures the tutorial always presents the same cards in the same
- * order, making the tutorial fully deterministic and playable end-to-end
- * without running out of money or encountering impossible actions.
- *
- * The seed is NOT persisted to any storage — it is purely for tutorial
- * gameplay and is only used when the tutorial controller is active.
- * Normal gameplay uses a random seed.
+ * See `TutorialScenario.ts` for the new scenario-based approach.
  */
 export const TUTORIAL_SEED = 'tutorial-seed';
 
@@ -187,8 +185,8 @@ export function shouldShowTutorialOffer(
 ): boolean {
   if (opts.forceShowOffer) return true;
   if (opts.replayMode || opts.disableTutorial) return false;
-  if (state.status === 'completed') return false;
-  // 'not_seen' and 'skipped' both show the offer
+  if (state.status === 'completed' || state.status === 'skipped') return false;
+  // Only 'not_seen' shows the offer
   return true;
 }
 

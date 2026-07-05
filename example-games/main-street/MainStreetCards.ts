@@ -14,7 +14,7 @@
 // ── Synergy & Phase Enums ───────────────────────────────────
 
 /** Synergy types used by Business cards for adjacency bonuses. */
-export type SynergyType = 'Food' | 'Culture' | 'Commerce' | 'Service' | 'Entertainment';
+export type SynergyType = 'Food' | 'Culture' | 'Commerce' | 'Service' | 'Entertainment' | 'Health';
 
 /** When an Event card resolves. */
 export type EventTrigger = 'Investment' | 'Incident';
@@ -22,8 +22,8 @@ export type EventTrigger = 'Investment' | 'Incident';
 /** Scope of an Event card's effect. */
 export type EventTarget = 'All' | 'SpecificSynergy' | 'RandomBusiness';
 
-/** Discriminator for the four card families (business, event, upgrade, community-space). */
-export type CardFamily = 'business' | 'event' | 'upgrade' | 'community-space';
+/** Discriminator for the card families (business, event, upgrade, community-space, staff). */
+export type CardFamily = 'business' | 'event' | 'upgrade' | 'community-space' | 'staff';
 
 // ── Card Interfaces ─────────────────────────────────────────
 
@@ -47,6 +47,16 @@ export interface BusinessCard {
   incomeBonus: number;
   /** Cumulative synergy range extension from applied upgrades. */
   synergyRangeBonus: number;
+  /**
+   * Cumulative reputation bonus from applied upgrades.
+   * Initialized to 0 for all cards.
+   */
+  reputationBonus: number;
+  /**
+   * Base reputation generated per turn by this business (without upgrades).
+   * Fractional values are supported (e.g. 0.2 for the Clinic).
+   */
+  reputationPerTurn?: number;
   /**
    * IDs of upgrade cards that have been applied to this business instance,
    * in application order. Used to enforce multi-level chain requirements and
@@ -72,6 +82,41 @@ export interface EventCard {
   readonly targetSynergy?: SynergyType;
   readonly coinDelta: number;
   readonly reputationDelta: number;
+}
+
+/**
+ * A Duration-based Event card that creates an ActiveEffect rather than
+ * applying a one-shot coin/reputation delta.
+ *
+ * Extends EventCard with fields needed for duration-based modifiers:
+ * - `duration`: number of turns the effect lasts
+ * - `effectType`: discriminator for which aspect of the game is modified
+ *   (e.g. 'income-multiplier', 'rep-multiplier')
+ * - `multiplier`: the scalar value applied each turn (e.g. 0.8 for 80% income)
+ */
+export interface DurationEventCard extends EventCard {
+  readonly duration: number;
+  readonly effectType: string;
+  readonly multiplier: number;
+}
+
+/**
+ * Type guard: returns true if the given card is a DurationEventCard.
+ *
+ * Checks for the presence of the `duration` field (an optional field not
+ * present on regular EventCard instances).
+ *
+ * @param card  Any card object to check.
+ * @returns true if the card has DurationEventCard-specific fields.
+ */
+export function isDurationEventCard(card: unknown): card is DurationEventCard {
+  if (card === null || card === undefined) return false;
+  if (typeof card !== 'object') return false;
+  const maybe = card as Record<string, unknown>;
+  return (
+    maybe.family === 'event' &&
+    typeof maybe.duration === 'number'
+  );
 }
 
 /**
@@ -101,10 +146,31 @@ export interface UpgradeCard {
    * Omitting this field is equivalent to setting it to 0.
    */
   readonly requiredLevel?: number;
+  /**
+   * Additional reputation generated per turn when this upgrade is applied.
+   * Works like incomeBonus but for reputation instead of coins.
+   * Fractional values are supported (e.g. 0.1 for the Medical Center upgrade).
+   */
+  readonly reputationBonus?: number;
+}
+
+/**
+ * A Staff card that increases hand capacity.
+ * Staff cards are a new card family distinct from business/event/upgrade.
+ * They do NOT occupy hand slots and have an ongoing per-turn coin cost.
+ */
+export interface StaffCard {
+  readonly family: 'staff';
+  readonly id: string;
+  readonly name: string;
+  readonly cost: number;
+  readonly ongoingCost: number;
+  readonly handSlotsAdded: number;
+  readonly description: string;
 }
 
 /** Union of all card types in Main Street. */
-export type AnyCard = BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard;
+export type AnyCard = BusinessCard | CommunitySpaceCard | EventCard | DurationEventCard | UpgradeCard | StaffCard;
 
 // ── Constants ───────────────────────────────────────────────
 
@@ -153,6 +219,9 @@ export const INCIDENT_QUEUE_SIZE = 2;
 /** Fixed coin cost to refresh the investments row (buy new opportunities). */
 export const REFRESH_INVESTMENTS_COST = 2;
 
+/** Fixed coin cost to refresh the development row (discover new opportunities). */
+export const REFRESH_DEVELOPMENT_COST = 2;
+
 /** Coins earned per adjacent business sharing a synergy type. */
 export const SYNERGY_BONUS_PER_NEIGHBOR = 1;
 
@@ -162,18 +231,27 @@ export const REPUTATION_SCORE_MULTIPLIER = 5;
 /** Points awarded per completed challenge. */
 export const CHALLENGE_BONUS_POINTS = 10;
 
+// ── Multi-Use Card Economy Ratios ───────────────────────────
+
+/** Cost ratio when placing a card from hand to tableau (80% of purchase cost). */
+export const PLACE_COST_RATIO = 0.8;
+
+/** Value ratio when selling a card (75% of purchase value). */
+export const SELL_VALUE_RATIO = 0.75;
+
 // ── Card Fixture Data ───────────────────────────────────────
 
 /**
  * Creates a fresh copy of a BusinessCard from template data.
  * Mutable fields (level, incomeBonus, synergyRangeBonus, appliedUpgrades) are reset.
  */
-function makeBusiness(template: Omit<BusinessCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'appliedUpgrades'>): BusinessCard {
+function makeBusiness(template: Omit<BusinessCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'appliedUpgrades' | 'reputationBonus'>): BusinessCard {
   return {
     family: 'business',
     level: 0,
     incomeBonus: 0,
     synergyRangeBonus: 0,
+    reputationBonus: 0,
     appliedUpgrades: [],
     ...template,
   };
@@ -202,6 +280,16 @@ export interface CommunitySpaceCard {
   /** Cumulative synergy range extension from applied upgrades. */
   synergyRangeBonus: number;
   /**
+   * Cumulative reputation bonus from applied upgrades.
+   * Initialized to 0 for all cards.
+   */
+  reputationBonus: number;
+  /**
+   * Base reputation generated per turn by this community space (without upgrades).
+   * Fractional values are supported (e.g. 0.2).
+   */
+  reputationPerTurn?: number;
+  /**
    * IDs of upgrade cards that have been applied to this community space instance,
    * in application order.
    *
@@ -214,19 +302,20 @@ export interface CommunitySpaceCard {
  * Creates a fresh copy of a CommunitySpaceCard from template data.
  * Mutable fields (level, incomeBonus, synergyRangeBonus, appliedUpgrades) are reset.
  */
-function makeCommunitySpace(template: Omit<CommunitySpaceCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'appliedUpgrades'>): CommunitySpaceCard {
+function makeCommunitySpace(template: Omit<CommunitySpaceCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'appliedUpgrades' | 'reputationBonus'>): CommunitySpaceCard {
   return {
     family: 'community-space',
     level: 0,
     incomeBonus: 0,
     synergyRangeBonus: 0,
+    reputationBonus: 0,
     appliedUpgrades: [],
     ...template,
   };
 }
 
 /** Template data for all Business cards (M1 + M2 pool). */
-const BUSINESS_TEMPLATES: Omit<BusinessCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus'>[] = [
+const BUSINESS_TEMPLATES: Omit<BusinessCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'reputationBonus'>[] = [
   {
     id: 'biz-bakery',
     name: 'Bakery',
@@ -277,7 +366,7 @@ const BUSINESS_TEMPLATES: Omit<BusinessCard, 'family' | 'level' | 'incomeBonus' 
     synergyTypes: ['Commerce'],
     upgradePath: 'Pawn Shop',
     maxLevel: 1,
-    description: 'Trades second-hand goods. Gains +1 coin per adjacent Commerce business.',
+    description: 'Trades second-hand goods. Does not provide or receive synergy bonuses.',
   },
   {
     id: 'biz-boutique',
@@ -387,16 +476,36 @@ const BUSINESS_TEMPLATES: Omit<BusinessCard, 'family' | 'level' | 'incomeBonus' 
     id: 'biz-clinic',
     name: 'Clinic',
     cost: 10,
-    baseIncome: 1,
-    synergyTypes: ['Service'],
+    baseIncome: 0,
+    synergyTypes: ['Health'],
     upgradePath: 'Clinic',
     maxLevel: 1,
-    description: 'Walk-in medical care for the community. Gains +1 coin per adjacent Service business.',
+    reputationPerTurn: 0.2,
+    description: 'Walk-in medical care for the community. Provides +0.2 reputation per turn. Gains +1 coin per adjacent Health business.',
+  },
+  {
+    id: 'biz-private-clinic',
+    name: 'Private Clinic',
+    cost: 8,
+    baseIncome: 2,
+    synergyTypes: ['Health'],
+    upgradePath: 'Private Clinic',
+    maxLevel: 1,
+    description: 'A private medical practice focused on profitability. Gains +1 coin per adjacent Health business.',
+  },
+  {
+    id: 'biz-pharmacy',
+    name: 'Pharmacy',
+    cost: 6,
+    baseIncome: 1,
+    synergyTypes: ['Health'],
+    maxLevel: 0,
+    description: 'Provides essential medications. Gains +1 coin per adjacent Health business.',
   },
 ];
 
 /** Template data for all Community Space cards (reclassified Park + new community spaces). */
-const COMMUNITY_SPACE_TEMPLATES: Omit<CommunitySpaceCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus'>[] = [
+const COMMUNITY_SPACE_TEMPLATES: Omit<CommunitySpaceCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'reputationBonus'>[] = [
   {
     id: 'cs-park',
     name: 'Park',
@@ -621,6 +730,234 @@ const EVENT_TEMPLATES: EventCard[] = [
     coinDelta: -1,
     reputationDelta: -1,
   },
+  // ── Duration-based Event (M2 Tier 4) ────────────────────────
+  {
+    family: 'event',
+    id: 'evt-flu-outbreak',
+    name: 'Flu Outbreak',
+    trigger: 'Incident',
+    cost: 0,
+    effect: 'All businesses generate 80% income for 5 turns. Duration reduced by Clinic/Medical Center.',
+    target: 'All',
+    coinDelta: 0,
+    reputationDelta: 0,
+    duration: 5,
+    effectType: 'income-multiplier',
+    multiplier: 0.8,
+  } as DurationEventCard,
+  // ── M3 Expanded Event Templates (doubled unique event count) ─────
+  // Investment events (positive, purchased)
+  {
+    family: 'event',
+    id: 'evt-harvest-festival',
+    name: 'Harvest Festival',
+    trigger: 'Investment',
+    cost: 3,
+    effect: '+2 coins to each Food business and +1 reputation from a bountiful harvest celebration.',
+    target: 'SpecificSynergy',
+    targetSynergy: 'Food',
+    coinDelta: 2,
+    reputationDelta: 1,
+  },
+  {
+    family: 'event',
+    id: 'evt-health-campaign',
+    name: 'Health Campaign',
+    trigger: 'Investment',
+    cost: 3,
+    effect: '+1 coin to each Health business and +1 reputation from a wellness initiative.',
+    target: 'SpecificSynergy',
+    targetSynergy: 'Health',
+    coinDelta: 1,
+    reputationDelta: 1,
+  },
+  {
+    family: 'event',
+    id: 'evt-street-performer',
+    name: 'Street Performer',
+    trigger: 'Investment',
+    cost: 2,
+    effect: '+2 coins to each Entertainment business from a popular busker drawing crowds.',
+    target: 'SpecificSynergy',
+    targetSynergy: 'Entertainment',
+    coinDelta: 2,
+    reputationDelta: 0,
+  },
+  {
+    family: 'event',
+    id: 'evt-bulk-purchase',
+    name: 'Bulk Purchase',
+    trigger: 'Investment',
+    cost: 3,
+    effect: '+1 coin to each Commerce business and +2 reputation from collective buying power.',
+    target: 'SpecificSynergy',
+    targetSynergy: 'Commerce',
+    coinDelta: 1,
+    reputationDelta: 2,
+  },
+  {
+    family: 'event',
+    id: 'evt-book-fair',
+    name: 'Book Fair',
+    trigger: 'Investment',
+    cost: 3,
+    effect: '+1 coin to each Culture business and +2 reputation from literary events.',
+    target: 'SpecificSynergy',
+    targetSynergy: 'Culture',
+    coinDelta: 1,
+    reputationDelta: 2,
+  },
+  {
+    family: 'event',
+    id: 'evt-volunteer-day',
+    name: 'Volunteer Day',
+    trigger: 'Investment',
+    cost: 2,
+    effect: '+1 coin to each Service business and +2 reputation from community volunteering.',
+    target: 'SpecificSynergy',
+    targetSynergy: 'Service',
+    coinDelta: 1,
+    reputationDelta: 2,
+  },
+  {
+    family: 'event',
+    id: 'evt-community-garden',
+    name: 'Community Garden',
+    trigger: 'Investment',
+    cost: 2,
+    effect: '+1 coin and +1 reputation from a new community garden project.',
+    target: 'All',
+    coinDelta: 1,
+    reputationDelta: 1,
+  },
+  {
+    family: 'event',
+    id: 'evt-festival-season',
+    name: 'Festival Season',
+    trigger: 'Investment',
+    cost: 4,
+    effect: '+3 coins from increased tourist spending during festival season.',
+    target: 'All',
+    coinDelta: 3,
+    reputationDelta: 0,
+  },
+  // Incident events (mixed positive/negative, drawn automatically)
+  {
+    family: 'event',
+    id: 'evt-protest',
+    name: 'Protest',
+    trigger: 'Incident',
+    cost: 0,
+    effect: '-2 coins from reduced foot traffic and -1 reputation from negative publicity.',
+    target: 'All',
+    coinDelta: -2,
+    reputationDelta: -1,
+  },
+  {
+    family: 'event',
+    id: 'evt-supply-chain',
+    name: 'Supply Chain Delay',
+    trigger: 'Incident',
+    cost: 0,
+    effect: '-2 coins per Commerce business from delayed inventory.',
+    target: 'SpecificSynergy',
+    targetSynergy: 'Commerce',
+    coinDelta: -2,
+    reputationDelta: 0,
+  },
+  {
+    family: 'event',
+    id: 'evt-power-surge',
+    name: 'Power Surge',
+    trigger: 'Incident',
+    cost: 0,
+    effect: '-2 coins per Service business from equipment damage.',
+    target: 'SpecificSynergy',
+    targetSynergy: 'Service',
+    coinDelta: -2,
+    reputationDelta: 0,
+  },
+  {
+    family: 'event',
+    id: 'evt-strike',
+    name: 'Strike',
+    trigger: 'Incident',
+    cost: 0,
+    effect: '-2 coins from work stoppages affecting the street.',
+    target: 'All',
+    coinDelta: -2,
+    reputationDelta: 0,
+  },
+  {
+    family: 'event',
+    id: 'evt-heatwave',
+    name: 'Heatwave',
+    trigger: 'Incident',
+    cost: 0,
+    effect: '-1 coin per Food business from spoiled goods and -1 reputation.',
+    target: 'SpecificSynergy',
+    targetSynergy: 'Food',
+    coinDelta: -1,
+    reputationDelta: -1,
+  },
+  {
+    family: 'event',
+    id: 'evt-pest-infestation',
+    name: 'Pest Infestation',
+    trigger: 'Incident',
+    cost: 0,
+    effect: '-2 coins per Food business from health-related closures.',
+    target: 'SpecificSynergy',
+    targetSynergy: 'Food',
+    coinDelta: -2,
+    reputationDelta: 0,
+  },
+  {
+    family: 'event',
+    id: 'evt-slow-season',
+    name: 'Slow Season',
+    trigger: 'Incident',
+    cost: 0,
+    effect: '-1 coin to all businesses from reduced customer traffic.',
+    target: 'All',
+    coinDelta: -1,
+    reputationDelta: 0,
+  },
+  {
+    family: 'event',
+    id: 'evt-good-press',
+    name: 'Good Press',
+    trigger: 'Incident',
+    cost: 0,
+    effect: '+1 reputation from a favourable news article about Main Street.',
+    target: 'All',
+    coinDelta: 0,
+    reputationDelta: 1,
+  },
+  {
+    family: 'event',
+    id: 'evt-tourist-bus',
+    name: 'Tourist Bus',
+    trigger: 'Incident',
+    cost: 0,
+    effect: '+2 coins per Entertainment business from a tour bus dropping visitors.',
+    target: 'SpecificSynergy',
+    targetSynergy: 'Entertainment',
+    coinDelta: 2,
+    reputationDelta: 0,
+  },
+  {
+    family: 'event',
+    id: 'evt-cultural-grant',
+    name: 'Cultural Grant',
+    trigger: 'Incident',
+    cost: 0,
+    effect: '+1 coin per Culture business and +1 reputation from a government arts grant.',
+    target: 'SpecificSynergy',
+    targetSynergy: 'Culture',
+    coinDelta: 1,
+    reputationDelta: 1,
+  },
 ];
 
 /** Template data for all Upgrade cards (M1 + M2 pool). */
@@ -650,14 +987,15 @@ const UPGRADE_TEMPLATES: UpgradeCard[] = [
   },
   {
     family: 'upgrade',
-    id: 'upg-library',
-    name: 'Upgrade to Library',
+    id: 'upg-readers-cafe',
+    name: "Upgrade to Reader's Café",
     targetBusiness: 'Bookshop',
     cost: 3,
     incomeBonus: 1,
     synergyRangeBonus: 0,
+    reputationBonus: 0.1,
     requiredLevel: 0,
-    description: 'Adds a cultural boost to the Bookshop.',
+    description: 'Transforms the Bookshop into a Reader\'s Café, blending books with café culture for a reputation boost.',
   },
   // ── M2 Expanded Upgrade Templates ───────────────────────────
   {
@@ -809,10 +1147,22 @@ const UPGRADE_TEMPLATES: UpgradeCard[] = [
     name: 'Upgrade to Medical Center',
     targetBusiness: 'Clinic',
     cost: 5,
-    incomeBonus: 2,
+    incomeBonus: 0,
     synergyRangeBonus: 1,
+    reputationBonus: 0.1,
     requiredLevel: 0,
-    description: 'Upgrades the Clinic to a comprehensive Medical Center.',
+    description: 'Upgrades the Clinic to a comprehensive Medical Center. Provides +0.1 reputation per turn.',
+  },
+  {
+    family: 'upgrade',
+    id: 'upg-private-medical-center',
+    name: 'Upgrade to Private Medical Center',
+    targetBusiness: 'Private Clinic',
+    cost: 4,
+    incomeBonus: 2,
+    synergyRangeBonus: 0,
+    requiredLevel: 0,
+    description: 'Expands the Private Clinic into a high-revenue Private Medical Center.',
   },
   // ── Branching Upgrades (alternative level-0 paths) ──────────
   // Bakery branches: Patisserie (above, food-artisan) vs Bread Factory (volume)
@@ -925,6 +1275,55 @@ const UPGRADE_TEMPLATES: UpgradeCard[] = [
     description: 'Expands the Library into a Community Hub with extended cultural reach.',
   },
 ];
+
+// ── Staff Card Templates (Multi-Use Card Economy) ───────────
+
+/** Template data for Staff cards. */
+export const STAFF_CARD_TEMPLATES: StaffCard[] = [
+  {
+    family: 'staff',
+    id: 'staff-assistant',
+    name: 'Assistant',
+    cost: 3,
+    ongoingCost: 1,
+    handSlotsAdded: 1,
+    description: 'Hire an assistant to help manage your hand. Adds +1 hand slot with a small ongoing cost.',
+  },
+  {
+    family: 'staff',
+    id: 'staff-manager',
+    name: 'Manager',
+    cost: 6,
+    ongoingCost: 2,
+    handSlotsAdded: 2,
+    description: 'A skilled manager keeps things organised. Adds +2 hand slots with a moderate ongoing cost.',
+  },
+  {
+    family: 'staff',
+    id: 'staff-director',
+    name: 'Director',
+    cost: 10,
+    ongoingCost: 3,
+    handSlotsAdded: 3,
+    description: 'An experienced director oversees your operations. Adds +3 hand slots with a high ongoing cost.',
+  },
+];
+
+/**
+ * Creates the full Staff deck for a game.
+ *
+ * @param copies  Number of copies per template (default 1).
+ * @returns Array of StaffCard instances.
+ */
+export function createStaffDeck(copies: number = 1): StaffCard[] {
+  const deck: StaffCard[] = [];
+  for (let c = 0; c < copies; c++) {
+    for (const template of STAFF_CARD_TEMPLATES) {
+      deck.push({ ...template, id: `${template.id}-${c}` });
+    }
+  }
+  return deck;
+}
 
 // ── Deck Building ───────────────────────────────────────────
 
@@ -1111,6 +1510,7 @@ export function synergyColor(type: SynergyType): number {
     case 'Commerce':      return 0x27AE60; // Green
     case 'Service':       return 0x9B59B6; // Purple
     case 'Entertainment': return 0xE74C3C; // Red
+    case 'Health':        return 0x1ABC9C; // Teal/Cyan
   }
 }
 
@@ -1123,7 +1523,27 @@ export function cardLabel(card: AnyCard): string {
     case 'community-space': return `${card.name} ($${card.cost})`;
     case 'event':           return card.cost > 0 ? `${card.name} ($${card.cost})` : card.name;
     case 'upgrade':         return `${card.name} ($${card.cost})`;
+    case 'staff':           return `${card.name} ($${card.cost})`;
   }
+}
+
+/**
+ * Determines if a card is a Pawn Shop card (biz-pawnshop).
+ *
+ * Pawn Shop cards neither receive nor contribute synergy bonuses.
+ * This holds true even after upgrading to Vintage Shop — the card's
+ * base synergy restriction remains.
+ *
+ * This special case should be removed once synergy bonuses are generalized
+ * to per-card values (see CG-0MQRA9QTA0012PNZ).
+ *
+ * @param card  A card object with an `id` field.
+ * @returns true if the card's base template ID is `biz-pawnshop`.
+ */
+export function isPawnShopCard(card: { id: string } | null | undefined): boolean {
+  if (!card) return false;
+  const baseId = card.id.replace(/-\d+$/, '');
+  return baseId === 'biz-pawnshop';
 }
 
 // ---------------------------------------------------------------------------

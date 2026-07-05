@@ -44,6 +44,7 @@ describe('MainStreetMarket', () => {
     it('should allow purchase when player has enough coins and slot is empty', () => {
       const state = createTestState();
       const card = state.market.development[0];
+      state.resourceBank.coins = card.cost;
       const result = canPurchaseBusiness(state, card.id, 0);
       expect(result.legal).toBe(true);
     });
@@ -70,6 +71,7 @@ describe('MainStreetMarket', () => {
 
     it('should reject purchase when slot is occupied', () => {
       const state = createTestState();
+      state.resourceBank.coins = 100;
       const card = state.market.development[0];
       // Place a dummy business in slot 0
       state.streetGrid[0] = { ...card, id: 'dummy' };
@@ -82,6 +84,7 @@ describe('MainStreetMarket', () => {
 
     it('should reject purchase when slot index is out of range', () => {
       const state = createTestState();
+      state.resourceBank.coins = 100;
       const card = state.market.development[0];
       const result = canPurchaseBusiness(state, card.id, GRID_SIZE);
       expect(result.legal).toBe(false);
@@ -92,6 +95,7 @@ describe('MainStreetMarket', () => {
 
     it('should reject purchase when slot index is negative', () => {
       const state = createTestState();
+      state.resourceBank.coins = 100;
       const card = state.market.development[0];
       const result = canPurchaseBusiness(state, card.id, -1);
       expect(result.legal).toBe(false);
@@ -107,6 +111,7 @@ describe('MainStreetMarket', () => {
     it('should deduct coins, place card, and remove from market', () => {
       const state = createTestState();
       const card = state.market.development[0];
+      state.resourceBank.coins = card.cost;
       const coinsBefore = state.resourceBank.coins;
 
       const result = purchaseBusiness(state, card.id, 0);
@@ -120,6 +125,7 @@ describe('MainStreetMarket', () => {
 
     it('should not refill the market slot immediately (refill occurs at start of next turn)', () => {
       const state = createTestState();
+      state.resourceBank.coins = 100;
       const deckSizeBefore = state.decks.business.length;
       const card = state.market.development[0];
 
@@ -134,6 +140,7 @@ describe('MainStreetMarket', () => {
 
     it('should not refill when deck is empty', () => {
       const state = createTestState();
+      state.resourceBank.coins = 100;
       // Empty the deck
       state.decks.business.length = 0;
       const card = state.market.development[0];
@@ -585,6 +592,63 @@ describe('MainStreetMarket', () => {
       state.market.development = [];
       refillDevelopmentMarket(state);
       expect(state.market.development.length).toBe(0);
+    });
+
+    it('should reshuffle event discards when no Investment events remain in deck (but Incident cards still exist)', () => {
+      const state = createTestState();
+      // Remove all Investment-trigger events from the deck, but keep Incidents
+      const investmentEvents = state.decks.event.filter(e => e.trigger === 'Investment');
+      // Put some into discards (simulating refresh-investments) and remove the rest
+      state.discards.event.push(...investmentEvents.slice(0, 2));
+      // The rest of investment events are removed (purchased/resolved)
+      state.decks.event = state.decks.event.filter(e => e.trigger !== 'Investment');
+      // Deck now has only Incident cards, discards have some Investment cards
+      expect(state.decks.event.every(e => e.trigger === 'Incident')).toBe(true);
+      expect(state.decks.event.length).toBeGreaterThan(0);
+      expect(state.discards.event.length).toBeGreaterThan(0);
+
+      // Clear investments row so refill must draw
+      state.market.investments = [];
+      state.heldEvent = null;
+      refillInvestmentsMarket(state);
+
+      // Should have drawn an Investment event from the reshuffled discards
+      const investEvents = state.market.investments.filter(c => c.family === 'event' && c.trigger === 'Investment');
+      expect(investEvents.length).toBe(1);
+    });
+
+    it('should reshuffle event discards when no Incident events remain in deck (but Investment cards still exist)', () => {
+      const state = createTestState();
+      // Remove all Incident-trigger events from the deck, but keep Investments
+      const incidentEvents = state.decks.event.filter(e => e.trigger === 'Incident');
+      // Put some into discards
+      state.discards.event.push(...incidentEvents.slice(0, 2));
+      // Remove the rest of incident events
+      state.decks.event = state.decks.event.filter(e => e.trigger !== 'Incident');
+      // Deck now has only Investment cards, discards have some Incident cards
+      expect(state.decks.event.every(e => e.trigger === 'Investment')).toBe(true);
+      expect(state.decks.event.length).toBeGreaterThan(0);
+      expect(state.discards.event.length).toBeGreaterThan(0);
+
+      // Clear incident queue so refill must draw
+      state.incidentQueue = [];
+      refillIncidentQueue(state);
+
+      // Should have drawn Incident events from the reshuffled discards
+      expect(state.incidentQueue.length).toBeGreaterThan(0);
+      expect(state.discards.event.length).toBe(0);
+    });
+  });
+
+  describe('unique event templates', () => {
+    it('should have doubled unique event templates (36 instead of 18)', () => {
+      const state = createTestState();
+      // Count unique event templates by stripping the copy-number suffix
+      const uniqueTemplateIds = new Set(
+        state.decks.event.map(e => e.id.replace(/-\d+$/, '')),
+      );
+      // Should now have 36 unique event templates (doubled from 18)
+      expect(uniqueTemplateIds.size).toBe(36);
     });
   });
 });
