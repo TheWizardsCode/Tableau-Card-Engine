@@ -111,7 +111,7 @@ export class MainStreetInputManager {
     const s = this.scene;
     if (!s.logMaskGraphics) return;
     s.logMaskGraphics.clear();
-    s.logMaskGraphics.fillStyle(0xffffff);
+    s.logMaskGraphics.fillStyle(0xffffff, 0);
     s.logMaskGraphics.fillRect(
       s.layout.logX,
       s.layout.logY + LOG_TITLE_H,

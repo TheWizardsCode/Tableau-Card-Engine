@@ -222,6 +222,97 @@ describe('MainStreet Activity Log scroll bounds', () => {
     }
   });
 
+  it('text objects are correctly parented to logContentContainer', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene') as any;
+
+    await waitFrames(10);
+
+    // Add a few entries
+    for (let i = 0; i < 5; i++) {
+      scene.state.activityLog.push({
+        text: `Entry ${i}`,
+        type: 'neutral',
+        turn: 1,
+      });
+    }
+    scene.msRenderer.refreshLog();
+    await waitFrames(3);
+
+    const textEntries = scene.logContentContainer.list.filter(
+      (obj: any) => obj instanceof Phaser.GameObjects.Text,
+    );
+    expect(textEntries.length).toBeGreaterThan(0);
+
+    // Every text object must have logContentContainer as its parent
+    for (const txt of textEntries) {
+      expect(txt.parentContainer).toBe(scene.logContentContainer);
+    }
+  });
+
+  it('mask is applied to the content container', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene') as any;
+
+    await waitFrames(10);
+
+    // The content container should have a mask that clips scrollable content
+    expect(scene.logContentContainer.mask).toBeDefined();
+    expect(scene.logContentContainer.mask).toBeTruthy();
+
+    // Verify the mask graphics exists
+    expect(scene.logMaskGraphics).toBeDefined();
+
+    // Verify the contentMask was created
+    expect(scene.logContentMask).toBeDefined();
+  });
+
+  it('mask clips content when scrolled to bottom (coordinate verification)', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene') as any;
+
+    await waitFrames(15);
+
+    // Add enough entries to overflow the log
+    for (let i = 0; i < 100; i++) {
+      scene.state.activityLog.push({
+        text: `Entry ${i} - with some wrapping text to ensure overflow`,
+        type: 'neutral',
+        turn: 1,
+      });
+    }
+    scene.msRenderer.refreshLog();
+    await waitFrames(5);
+
+    const { LOG_TITLE_H } = await import(
+      '../../example-games/main-street/scenes/MainStreetConstants'
+    );
+
+    // Simulate being at the bottom of the log
+    scene.logScrollOffset = scene.logMaxScroll;
+    scene.msRenderer.refreshLog();
+    await waitFrames(5);
+
+    // Container should have shifted up by logMaxScroll
+    expect(scene.logContentContainer.y).toBeLessThan(LOG_TITLE_H + 2);
+
+    // The container should be at LOG_TITLE_H + 2 - logMaxScroll
+    const expectedY = LOG_TITLE_H + 2 - scene.logMaxScroll;
+    expect(scene.logContentContainer.y).toBeCloseTo(expectedY, 0);
+
+    // The MASK geometry should cover from logY + LOG_TITLE_H downward.
+    // At scroll=bottom, the container has shifted up, so most entries
+    // are now ABOVE the mask top. The mask should clip them.
+    const maskTopY = scene.layout.logY + LOG_TITLE_H;
+    const containerWorldY = scene.layout.logY + scene.logContentContainer.y;
+
+    // When scrolled to bottom, the ENTIRE container top should be
+    // above the mask top (since we shifted up by logMaxScroll which
+    // is totalContentH - visibleH, so only the last visibleH pixels
+    // of content are within the mask)
+    expect(containerWorldY).toBeLessThan(maskTopY);
+  });
+
   it('does not position content above the log display area when entries first overflow', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('MainStreetScene') as any;

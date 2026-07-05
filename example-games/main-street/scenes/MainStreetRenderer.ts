@@ -199,8 +199,17 @@ export class MainStreetRenderer {
     s.logContainer.add(s.logContentContainer);
 
     // Geometry mask for clipping scrollable content
+    // IMPORTANT: Do NOT call setVisible(false) on the mask graphics!
+    // In Phaser 4 RC7, GeometryMask.preRenderCanvas calls
+    // graphics.renderCanvas() directly to draw the clip path to the
+    // canvas context. If the graphics is invisible, the Canvas Renderer's
+    // SetTransform function may still process it (it checks alpha, not
+    // visibility), but some internal paths skip invisible objects entirely.
+    // To be safe, we keep the graphics visible and use alpha=0 instead,
+    // so the mask shape is drawn to the context for clipping but has no
+    // visible appearance on screen.
     s.logMaskGraphics = s.add.graphics();
-    s.logMaskGraphics.setVisible(false);
+    s.logMaskGraphics.fillStyle(0xffffff, 0);  // transparent fill
     s.logContentMask = new Phaser.Display.Masks.GeometryMask(s, s.logMaskGraphics);
     s.logContentContainer.setMask(s.logContentMask);
     s.updateLogMask();
