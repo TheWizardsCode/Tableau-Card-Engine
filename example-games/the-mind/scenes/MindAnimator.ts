@@ -28,6 +28,9 @@ import type { MindRenderer } from './MindRenderer';
 import type { TheMindSession } from '../TheMindGameState';
 
 export class MindAnimator {
+  /** When true, all animations are skipped and sprites snap to final state. */
+  reducedMotion = false;
+
   constructor(
     private scene: Phaser.Scene,
     private session: TheMindSession,
@@ -44,6 +47,10 @@ export class MindAnimator {
     cardValue: number,
     onComplete: () => void,
   ): void {
+    if (this.reducedMotion) {
+      onComplete();
+      return;
+    }
     if (playerId === 0) {
       this.animateHumanCardToPile(cardValue, onComplete);
     } else {
@@ -181,6 +188,10 @@ export class MindAnimator {
   // ── Penalty display ────────────────────────────────────
 
   showPenaltyCards(result: PlayResult, onComplete: () => void): void {
+    if (this.reducedMotion) {
+      onComplete();
+      return;
+    }
     const penaltySprites: Phaser.GameObjects.Image[] = [];
 
     const startPositions = pickPenaltyStartPositions(
@@ -249,6 +260,10 @@ export class MindAnimator {
     bonusLifeAwarded: boolean,
     onComplete: () => void,
   ): void {
+    if (this.reducedMotion) {
+      onComplete();
+      return;
+    }
     const bonusText = bonusLifeAwarded
       ? '\nBonus life awarded!'
       : '';

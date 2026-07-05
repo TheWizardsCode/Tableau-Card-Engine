@@ -2,9 +2,6 @@ import type { MainStreetState, MainStreetCampaignProgress } from '../MainStreetS
 import type { DifficultyName } from '../MainStreetDifficulty';
 import type { BusinessCard } from '../MainStreetCards';
 import {
-  INCIDENT_QUEUE_SIZE,
-} from '../MainStreetCards';
-import {
   CardGameScene,
   TooltipManager,
 } from '../../../src/ui';
@@ -69,6 +66,10 @@ export class MainStreetScene extends CardGameScene {
   public marketContainer!: Phaser.GameObjects.Container;
   public incidentQueueContainer!: Phaser.GameObjects.Container;
   public handContainer!: Phaser.GameObjects.Container;
+  /** Container for business cards in the player's hand (Multi-Use Card Economy). */
+  public handBusinessContainer!: Phaser.GameObjects.Container;
+  /** Text element showing hand capacity (e.g. "Hand: 2/5"). */
+  public handSizeText!: Phaser.GameObjects.Text;
   public actionContainer!: Phaser.GameObjects.Container;
 
   // Activity Log panel
@@ -79,8 +80,10 @@ export class MainStreetScene extends CardGameScene {
   public logScrollOffset = 0;
   public logMaxScroll = 0;
   public logTotalContentH = 0;
-  public logAutoScroll = true;
+  public logAutoScroll = false;
   public logPrevEntryCount = 0;
+  /** The index of the first entry displayed in the current log window (for windowed rendering). */
+  public logRenderedStartIdx = 0;
 
   // Challenge Tracker panel
   public challengeContainer!: Phaser.GameObjects.Container;
@@ -323,6 +326,10 @@ export class MainStreetScene extends CardGameScene {
   }
 
   // Refresh investments proxy (forward to turn controller)
+  public onRefreshDevelopmentClick(...args: any[]): any {
+    return (this.msTurnController as any).onRefreshDevelopmentClick.apply(this.msTurnController, args);
+  }
+
   public onRefreshInvestmentsClick(...args: any[]): any {
     return (this.msTurnController as any).onRefreshInvestmentsClick.apply(this.msTurnController, args);
   }
@@ -365,20 +372,6 @@ export class MainStreetScene extends CardGameScene {
     return (this.msTurnController as any).onUpgradeCardClick.apply(this.msTurnController, args);
   }
 
-  /**
-   * Shows a modal overlay that lets the player choose between multiple
-   * upgrade branches available for the business at `targetSlot`.
-   *
-   * When a branch button is clicked the modal is dismissed, the chosen
-   * upgrade is applied via `executeAction`, and the scene is refreshed.
-   *
-   * @param branches   Eligible UpgradeCards the player may choose from.
-   * @param targetSlot Street grid slot of the business to be upgraded.
-   */
-  public showUpgradeChoiceModal(...args: any[]): any {
-    return (this.msTurnController as any).showUpgradeChoiceModal.apply(this.msTurnController, args);
-  }
-
   // ── Activity Log ─────────────────────────────────────────
 
   /**
@@ -396,7 +389,10 @@ export class MainStreetScene extends CardGameScene {
 
   /** Handles mouse wheel events over the log panel area. */
   public handleLogWheel = (...args: any[]): any => {
-    return (this.msInputManager as any).handleLogWheel.apply(this.msInputManager, args);
+    const ret = (this.msInputManager as any).handleLogWheel.apply(this.msInputManager, args);
+    // After updating scroll offset, refresh the log to render the new entry window
+    this.msRenderer?.refreshLog();
+    return ret;
   };
 
   /** Applies the current scroll offset to the log content container. */
@@ -456,9 +452,9 @@ export class MainStreetScene extends CardGameScene {
       h: 2 * l.marketRowH + l.marketRowGap + 20,
     };
     const queue = {
-      x: 20,
+      x: l.logX,
       y: l.queueTop - 10,
-      w: l.queueLabelW + INCIDENT_QUEUE_SIZE * (l.queueCardW + l.queueCardGap) + 100,
+      w: l.logW,
       h: l.queueCardH + 24,
     };
     const street = {

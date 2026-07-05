@@ -128,7 +128,8 @@ interface GameState {
 - **AdjacencyResolver** – computes synergy bonuses based on shared `synergyTypes` and proximity (default range 1, can be extended by upgrades) via `@core-engine/SpatialRules`.
 - **Market** – two rows: Business row (4 face‑up cards from the Business deck) and Investments row (2 Upgrades + 1 Investment event = 3 slots). Cards are replenished after purchase.
 - **Incident Queue** – visible FIFO queue of 2 Incident cards drawn from the event deck. The front card resolves each turn during IncidentPhase; a replacement is drawn from the deck afterward. If the deck runs out, the queue shrinks naturally.
-- **ResourceBank** – tracks `coins` (start 8) and `reputation` (start 3). Reputation is a multiplier applied at final score calculation (`finalScore = coins + reputation * 5 + challengeBonuses`).
+- **ActiveEffect System** – some events (e.g. `evt-flu-outbreak`) create duration-based modifiers instead of one-shot deltas. ActiveEffects are tracked in `state.activeEffects: ActiveEffect[]` and decay each turn during EndCheck. See [ActiveEffect System](#-activeeffect-system) below.
+- **ResourceBank** – tracks `coins` (start 8) and `reputation` (start 3). Reputation can increase during the IncomePhase via `reputationPerTurn` from certain Health-synergy cards (e.g. Clinic provides +0.2 rep/turn). Reputation is also a multiplier applied at final score calculation (`finalScore = coins + reputation * 5 + challengeBonuses`).
 
 ### Spatial API migration note
 
@@ -164,6 +165,8 @@ stateDiagram-v2
 5. **IncomePhase** – For each placed Business, compute:
    - `totalIncome = baseIncome + synergyBonus` where `synergyBonus = countMatchingNeighbors * 1`.
    - `resourceBank.coins += totalIncome`.
+   - `totalReputationPerTurn` is calculated from all placed cards (some Health-synergy cards like the Clinic provide `reputationPerTurn`). Upgrades may also contribute `reputationBonus`.
+   - `resourceBank.reputation += totalReputationPerTurn`.
 6. **IncidentPhase** – Resolve the front Incident card from the visible FIFO incident queue. After resolution, draw a replacement Incident from the event deck to the back of the queue (maintaining queue size of 2). If the deck has no more Incidents, the queue shrinks naturally.
 7. **EndCheck** – Evaluate win/loss conditions.
 8. Loop back to **DayStart** for the next turn.
@@ -247,6 +250,43 @@ flowchart TD
     EndCheck -->|Loss| EndLoss((Defeat))
     EndCheck -->|Continue| TurnStart
 ```
+
+---
+
+## 9. ActiveEffect System (Duration-Based Modifiers)
+
+Certain events (e.g., `evt-flu-outbreak`) create **ActiveEffect** instances that modify game parameters over multiple turns instead of applying one-shot coin/reputation deltas.
+
+### ActiveEffect Data Structure
+
+Each ActiveEffect tracks:
+- **`effectType`** – discriminator (e.g. `income-multiplier`)
+- **`multiplier`** – scalar applied (e.g. `0.8` for 80% income)
+- **`turnsRemaining`** – number of turns before the effect expires
+- **`sourceEventId`** – the card/event ID that created the effect
+- **`description`** – human-readable summary for logging/UI
+
+### Storage
+
+ActiveEffects are stored in `state.activeEffects: ActiveEffect[]` (part of `MainStreetState`). The array is serialized/deserialized for save/load; missing field in old saves defaults to `[]`.
+
+### Turn Flow
+
+1. **IncomePhase** – `applyIncome()` checks `state.activeEffects` for `income-multiplier` effects and applies the multiplier per-slot *before* the reputation multiplier.
+2. **EndCheck** – `decayActiveEffects()` decrements `turnsRemaining` on all active effects. Effects that reach 0 are removed and logged.
+
+### Example: Flu Outbreak (`evt-flu-outbreak`)
+
+- **Trigger**: Incident (automatic draw from incident queue)
+- **Base duration**: 5 turns
+- **Effect**: All businesses generate 80% income (0.8× multiplier)
+- **Duration reduction**: If a Clinic (`biz-clinic`) is on the street grid, duration → 3 turns. If a Medical Center (`upg-medical-center`) is present, duration → 2 turns. Only the stronger reduction applies.
+- **Minimum duration**: 1 turn (floor)
+- **Income application**: The 0.8× multiplier is applied to each slot's base + synergy income *before* the reputation coin multiplier.
+
+### Extensibility
+
+The ActiveEffect system is designed for future duration-based events. New effect types can be added by using a new `effectType` string and implementing the corresponding modifier in the relevant game computation function.
 
 ---
 

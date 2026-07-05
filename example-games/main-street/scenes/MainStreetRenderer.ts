@@ -3,14 +3,20 @@
  */
 
 import Phaser from 'phaser';
-import type { BusinessCard, EventCard, UpgradeCard } from '../MainStreetCards';
+import type { BusinessCard, CommunitySpaceCard, EventCard, UpgradeCard } from '../MainStreetCards';
 import {
   GRID_SIZE,
   MARKET_BUSINESS_SLOTS,
   MARKET_INVESTMENT_SLOTS,
-  INCIDENT_QUEUE_SIZE,
+  REFRESH_DEVELOPMENT_COST,
   REFRESH_INVESTMENTS_COST,
+  isPawnShopCard,
+  synergyColor,
 } from '../MainStreetCards';
+import {
+  computeSynergyBonus,
+  computeSynergyPairs,
+} from '../MainStreetAdjacency';
 import { computeScore } from '../MainStreetEngine';
 import {
   buildCoinsTooltip,
@@ -22,6 +28,7 @@ import {
   getAffordableBusinessCards,
   getAffordableUpgradeCards,
   getEmptySlots,
+  canRefreshDevelopment,
   canRefreshInvestments,
 } from '../MainStreetMarket';
 import {
@@ -33,7 +40,6 @@ import {
 } from '../../../src/ui';
 import {
   createSceneTitle,
-  createSceneMenuButton,
   createGameZone,
 } from '@ui/Renderer';
 import { createActionButton } from '@ui/Renderer';
@@ -77,7 +83,6 @@ export class MainStreetRenderer {
 
   public createHeader(): void {
     const s = this.scene;
-    createSceneMenuButton(s);
     createSceneTitle(s, 'Main Street');
   }
 
@@ -194,8 +199,17 @@ export class MainStreetRenderer {
     s.logContainer.add(s.logContentContainer);
 
     // Geometry mask for clipping scrollable content
+    // IMPORTANT: Do NOT call setVisible(false) on the mask graphics!
+    // In Phaser 4 RC7, GeometryMask.preRenderCanvas calls
+    // graphics.renderCanvas() directly to draw the clip path to the
+    // canvas context. If the graphics is invisible, the Canvas Renderer's
+    // SetTransform function may still process it (it checks alpha, not
+    // visibility), but some internal paths skip invisible objects entirely.
+    // To be safe, we keep the graphics visible and use alpha=0 instead,
+    // so the mask shape is drawn to the context for clipping but has no
+    // visible appearance on screen.
     s.logMaskGraphics = s.add.graphics();
-    s.logMaskGraphics.setVisible(false);
+    s.logMaskGraphics.fillStyle(0xffffff, 0);  // transparent fill
     s.logContentMask = new Phaser.Display.Masks.GeometryMask(s, s.logMaskGraphics);
     s.logContentContainer.setMask(s.logContentMask);
     s.updateLogMask();
@@ -245,12 +259,12 @@ export class MainStreetRenderer {
     const { gameW, hudY } = s.layout;
 
     // Background strip - 2/3 width, centered
-    const strip = markHudTransient(s.add.rectangle(gameW / 2, hudY, gameW * 0.66, 28, 0x1a1408, 0.6));
+    const strip = markHudTransient(s.add.rectangle(gameW / 2, hudY, gameW * 0.5, 28, 0x1a1408, 0.6));
     strip.setStrokeStyle(1, BOX_STROKE, 0.5);
     s.hudContainer.add(strip);
 
     // Coins - centered in strip
-    const stripWidth = gameW * 0.66;
+    const stripWidth = gameW * 0.5;
     const stripLeft = (gameW - stripWidth) / 2;
     const coinText = markHudTransient(s.add.text(stripLeft + stripWidth * 0.25, hudY, `Coins: ${coins}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#ffcc44', fontFamily: FONT_FAMILY,
@@ -263,8 +277,8 @@ export class MainStreetRenderer {
     }).setOrigin(0, 0.5));
     s.hudContainer.add(repText);
 
-    // Score - right side of strip
-    const scoreText = markHudTransient(s.add.text(stripLeft + stripWidth * 0.85, hudY, `Score: ${score}`, {
+    // Score - right side of strip (shows x / y where y is the win threshold)
+    const scoreText = markHudTransient(s.add.text(stripLeft + stripWidth * 0.85, hudY, `Score: ${score}/${s.state.config.winThreshold}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#ff8844', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0.5));
     s.hudContainer.add(scoreText);
@@ -389,9 +403,54 @@ export class MainStreetRenderer {
         this.drawEmptySlot(x, y, i);
       }
     }
+
+    // Draw synergy lines between adjacent synergistic businesses
+    this.drawSynergyLines();
   }
 
-  public drawBusinessSlot(x: number, y: number, _index: number, biz: BusinessCard): void {
+  /**
+   * Draws visual lines between adjacent businesses that share a synergy type.
+   * Each line uses the colour of the shared synergy type (from synergyColor).
+   * Lines are drawn over the street grid but behind tooltip zones.
+   */
+  private drawSynergyLines(): void {
+    const s = this.scene;
+    const { streetX, streetTop, slotW, slotGap, slotH, streetCols, streetRowGap } = s.layout;
+
+    const pairs = computeSynergyPairs(s.state.streetGrid);
+
+    for (const pair of pairs) {
+      const fromCol = pair.fromIndex % streetCols;
+      const fromRow = Math.floor(pair.fromIndex / streetCols);
+      const toCol = pair.toIndex % streetCols;
+      const toRow = Math.floor(pair.toIndex / streetCols);
+
+      const x1 = streetX + fromCol * (slotW + slotGap) + slotW / 2;
+      const y1 = streetTop + fromRow * (slotH + streetRowGap) + slotH / 2;
+      const x2 = streetX + toCol * (slotW + slotGap) + slotW / 2;
+      const y2 = streetTop + toRow * (slotH + streetRowGap) + slotH / 2;
+
+      const color = synergyColor(pair.sharedSynergy);
+
+      const line = s.add.graphics();
+      line.lineStyle(3, color, 0.7);
+      line.beginPath();
+      line.moveTo(x1, y1);
+      line.lineTo(x2, y2);
+      line.strokePath();
+
+      // Add a subtle outer glow by drawing a thicker, more transparent line underneath
+      line.lineStyle(6, color, 0.2);
+      line.beginPath();
+      line.moveTo(x1, y1);
+      line.lineTo(x2, y2);
+      line.strokePath();
+
+      s.streetContainer.add(line);
+    }
+  }
+
+  public drawBusinessSlot(x: number, y: number, _index: number, biz: BusinessCard | CommunitySpaceCard): void {
     const s = this.scene;
     const { slotW, slotH } = s.layout;
     const isHinted = s.hintedSlotIndex === _index;
@@ -426,7 +485,14 @@ export class MainStreetRenderer {
       tooltipZone.setOrigin(0.5);
       tooltipZone.setInteractive({ useHandCursor: true });
       tooltipZone.on('pointerover', () => {
-        const info = `Business: ${biz.name}\nIncome: +${biz.baseIncome + biz.incomeBonus}\nSynergy: ${biz.synergyTypes.join('/') }\nLevel: ${biz.level}`;
+        const synergyNote = isPawnShopCard(biz) ? ' (excluded from synergy)' : '';
+        const isCommunitySpace = (biz as any).family === 'community-space';
+        const label = isCommunitySpace ? 'Community Space' : 'Business';
+        const totalRep = (biz.reputationPerTurn ?? 0) + biz.reputationBonus;
+        const repInfo = totalRep > 0 ? `\nReputation: +${totalRep}/turn` : '';
+        const synergyBonus = isPawnShopCard(biz) ? 0 : computeSynergyBonus(s.state.streetGrid, _index, s.state.config.synergyBonusPerNeighbor);
+        const synergyInfo = isPawnShopCard(biz) ? '' : `\nSynergy bonus: +${synergyBonus}/turn`;
+        const info = `${label}: ${biz.name}\nIncome: +${biz.baseIncome + biz.incomeBonus}/turn${repInfo}\nSynergy: ${biz.synergyTypes.join('/')}${synergyInfo}${synergyNote}\nLevel: ${biz.level}`;
         s.tooltipManager?.show(info, tooltipZone.x, tooltipZone.y);
       });
       tooltipZone.on('pointerout', () => {
@@ -449,7 +515,7 @@ export class MainStreetRenderer {
    */
   private applyUpgradeOverlays(
     container: Phaser.GameObjects.Container,
-    biz: BusinessCard,
+    biz: BusinessCard | CommunitySpaceCard,
     width: number,
     height: number,
   ): void {
@@ -510,21 +576,38 @@ export class MainStreetRenderer {
       container.add(nameText);
     }
 
-    // Income text (bottom center)
+    // Income text (bottom-left)
     if (spec.incomeText) {
       const incomeText = this.scene.add.text(
         spec.incomeText.x,
         spec.incomeText.y,
         spec.incomeText.text,
         {
-          fontSize: spec.incomeText.fontSize ?? '12px',
+          fontSize: spec.incomeText.fontSize ?? '11px',
           fontStyle: spec.incomeText.fontStyle,
           color: spec.incomeText.color,
           fontFamily: FONT_FAMILY,
         },
       );
-      incomeText.setOrigin(0.5, 1);
+      incomeText.setOrigin(0, 1);
       container.add(incomeText);
+    }
+
+    // Reputation text (bottom-right)
+    if (spec.reputationText) {
+      const repText = this.scene.add.text(
+        spec.reputationText.x,
+        spec.reputationText.y,
+        spec.reputationText.text,
+        {
+          fontSize: spec.reputationText.fontSize ?? '11px',
+          fontStyle: spec.reputationText.fontStyle,
+          color: spec.reputationText.color,
+          fontFamily: FONT_FAMILY,
+        },
+      );
+      repText.setOrigin(1, 1);
+      container.add(repText);
     }
   }
 
@@ -568,21 +651,21 @@ export class MainStreetRenderer {
     s.marketSelectionByCardId.clear();
     s.selectedMarketCardId = null;
 
-    const { gameW, marketTop, marketRowH, marketRowGap, marketCardW, marketCardGap, marketLabelW } = s.layout;
+    const { marketTop, marketRowH, marketRowGap, logX } = s.layout;
 
-    // Section background (2 rows: business + investments)
-    // Calculate actual right edge from the widest row (business: 4 slots)
-    const marketStartX = marketLabelW + 50;
-    const marketRight = marketStartX + (MARKET_BUSINESS_SLOTS - 1) * (marketCardW + marketCardGap) + marketCardW + 20;
+    // Wider section background — extends from left edge to near the activity log (logX - 20px margin)
+    const bgLeft = 20;
+    const bgRight = logX - 20; // 820 - 20 = 800
     const totalH = 2 * marketRowH + marketRowGap + 20;
     const bgBox = s.add.graphics();
     bgBox.fillStyle(BOX_FILL, 0.3);
-    bgBox.fillRoundedRect(20, marketTop - 10, marketRight - 20, totalH, BOX_RADIUS);
+    bgBox.fillRoundedRect(bgLeft, marketTop - 10, bgRight - bgLeft, totalH, BOX_RADIUS);
     bgBox.lineStyle(1, BOX_STROKE, 0.4);
-    bgBox.strokeRoundedRect(20, marketTop - 10, marketRight - 20, totalH, BOX_RADIUS);
+    bgBox.strokeRoundedRect(bgLeft, marketTop - 10, bgRight - bgLeft, totalH, BOX_RADIUS);
     s.marketContainer.add(bgBox);
 
-    const sectionLabel = s.add.text(gameW / 2, marketTop - 4, 'Market', {
+    // Section label centered over the wider box
+    const sectionLabel = s.add.text((bgLeft + bgRight) / 2, marketTop - 4, 'Market', {
       fontSize: '13px', fontStyle: 'bold', color: '#887766', fontFamily: FONT_FAMILY,
     }).setOrigin(0.5, 1);
     s.marketContainer.add(sectionLabel);
@@ -618,12 +701,12 @@ export class MainStreetRenderer {
     y: number,
     rowLabel: string,
     rowKey: string,
-    cards: readonly (BusinessCard | EventCard | UpgradeCard)[],
+    cards: readonly (BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard)[],
     maxSlots: number,
-    onClick: (card: BusinessCard | EventCard | UpgradeCard) => void,
+    onClick: (card: BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard) => void,
   ): void {
     const s = this.scene;
-    const { marketCardW, marketCardH, marketCardGap, marketLabelW } = s.layout;
+    const { marketCardW, marketCardH, marketCardGap, logX } = s.layout;
 
     // Row label - also use for positioning deck count
     const label = s.add.text(40, y, rowLabel, {
@@ -631,7 +714,12 @@ export class MainStreetRenderer {
     }).setOrigin(0, 0.5);
     s.marketContainer.add(label);
 
-    const startX = marketLabelW + 50;
+    // Centre cards in the wider market box (20 to logX-20)
+    const boxLeft = 20;
+    const boxRight = logX - 20;
+    const boxCenter = (boxLeft + boxRight) / 2;
+    const totalCardsW = maxSlots * marketCardW + (maxSlots - 1) * marketCardGap;
+    const startX = Math.round(boxCenter - totalCardsW / 2);
 
     for (let i = 0; i < maxSlots; i++) {
       const cx = startX + i * (marketCardW + marketCardGap);
@@ -651,38 +739,29 @@ export class MainStreetRenderer {
       }
     }
 
-    // Deck count - immediately below the label
+    // Deck info and refresh button - immediately below the label
     const deckY = y + 16;
-    if (rowLabel === 'Business') {
-      const deckCount = s.state.decks.business.length;
-      const deckText = s.add.text(40, deckY, `Deck: ${deckCount}`, {
-        fontSize: '12px', color: '#776655', fontFamily: FONT_FAMILY,
+    if (rowKey === 'development') {
+      // Development row: show deck count + Discover button
+      const bizCount = s.state.decks.business.length;
+      const csCount = s.state.decks.communitySpace.length;
+      const deckText = s.add.text(40, deckY, `Biz: ${bizCount}  CS: ${csCount}`, {
+        fontSize: '11px', color: '#776655', fontFamily: FONT_FAMILY,
       }).setOrigin(0, 0);
       s.marketContainer.add(deckText);
-    } else {
-      // Investments row: show both upgrade and event deck counts - below label
-      const upgCount = s.state.decks.upgrade.length;
-      const evtCount = s.state.decks.event.length;
-      const deckText = s.add.text(
-        40, deckY,
-        `Upg: ${upgCount}  Evt: ${evtCount}`,
-        { fontSize: '11px', color: '#776655', fontFamily: FONT_FAMILY },
-      ).setOrigin(0, 0);
-      s.marketContainer.add(deckText);
 
-      // Refresh Investments button (centered under Investments label / deck count)
+      // Discover button for Development row
       try {
-        const canRefresh = canRefreshInvestments(s.state).legal;
-        // Make button wider so label fits, and move it lower to avoid overlapping deck text
+        const refreshDevResult = canRefreshDevelopment(s.state);
+        const canRefresh = refreshDevResult.legal;
         const btnW = Math.max(s.layout.smallButtonW, 96);
-        // center under the label area: label left (40) + half label width
         const labelCenter = 40 + s.layout.marketLabelW / 2;
         const btnX = Math.round(labelCenter - btnW / 2);
-        const btnY = deckY + 22; // further below deck text to avoid overlap
+        const btnY = deckY + 22;
 
-        const labelText = `Discover (${REFRESH_INVESTMENTS_COST})`;
+        const labelText = `Discover (${REFRESH_DEVELOPMENT_COST})`;
 
-        const btn = createActionButton(s, btnX, btnY, btnW, labelText, canRefresh ? () => { s.onRefreshInvestmentsClick(); } : () => {}, {
+        const btn = createActionButton(s, btnX, btnY, btnW, labelText, canRefresh ? () => { s.onRefreshDevelopmentClick(); } : () => {}, {
           disabled: !canRefresh,
           ...(canRefresh ? {} : { fillColor: 0x333333, fillAlpha: 0.6 }),
         });
@@ -694,15 +773,15 @@ export class MainStreetRenderer {
               bg.setFillStyle(0x333333, 0.6);
             }
 
-            // Tooltip for the Discover button (attach to bg so it receives pointer events)
-            const info = `Pay $${REFRESH_INVESTMENTS_COST} to research new investment opportunities and replace the visible investments row. Removed cards go to their discard piles. Available only during Market phase.`;
+            // Tooltip for the Discover button
+            const reasonSuffix = !canRefresh && refreshDevResult.reason ? `\n\n${refreshDevResult.reason}` : '';
+            const info = `Pay $${REFRESH_DEVELOPMENT_COST} to discover new development opportunities and replace the visible development row. Removed cards go to their discard piles. Available only during Market phase.${reasonSuffix}`;
             try {
               bg.on('pointerover', (pointer: any) => {
                 if (s.tooltipManager) {
                   s.tooltipManager.show(info, (pointer && pointer.worldX) || btn.x, (pointer && pointer.worldY) || btn.y);
                   return;
                 }
-                // Fallback: create an in-canvas text tooltip if DOM tooltip manager isn't available
                 try {
                   if ((s as any)._tempDiscoverTooltip) {
                     (s as any)._tempDiscoverTooltip.destroy();
@@ -734,14 +813,91 @@ export class MainStreetRenderer {
       } catch (_) {
         // ignore UI errors in tests
       }
+    } else {
+      // Investments row: show both upgrade and event deck counts - below label
+      const upgCount = s.state.decks.upgrade.length;
+      const evtCount = s.state.decks.event.length;
+      const deckText = s.add.text(
+        40, deckY,
+        `Upg: ${upgCount}  Evt: ${evtCount}`,
+        { fontSize: '11px', color: '#776655', fontFamily: FONT_FAMILY },
+      ).setOrigin(0, 0);
+      s.marketContainer.add(deckText);
+
+      // Refresh Investments button (centered under Investments label / deck count)
+      try {
+        const refreshInvResult = canRefreshInvestments(s.state);
+        const canRefresh = refreshInvResult.legal;
+        // Make button wider so label fits, and move it lower to avoid overlapping deck text
+        const btnW = Math.max(s.layout.smallButtonW, 96);
+        // center under the label area: label left (40) + half label width
+        const labelCenter = 40 + s.layout.marketLabelW / 2;
+        const btnX = Math.round(labelCenter - btnW / 2);
+        const btnY = deckY + 22; // further below deck text to avoid overlap
+
+        const labelText = `Research (${REFRESH_INVESTMENTS_COST})`;
+
+        const btn = createActionButton(s, btnX, btnY, btnW, labelText, canRefresh ? () => { s.onRefreshInvestmentsClick(); } : () => {}, {
+          disabled: !canRefresh,
+          ...(canRefresh ? {} : { fillColor: 0x333333, fillAlpha: 0.6 }),
+        });
+        // Dim visual when not allowed, but keep interactive so tooltip can show
+        try {
+          const bg = (btn.list && btn.list[0]) as Phaser.GameObjects.Rectangle | undefined;
+          if (bg) {
+            if (!canRefresh && typeof bg.setFillStyle === 'function') {
+              bg.setFillStyle(0x333333, 0.6);
+            }
+
+            // Tooltip for the Research button (attach to bg so it receives pointer events)
+            const reasonSuffix = !canRefresh && refreshInvResult.reason ? `\n\n${refreshInvResult.reason}` : '';
+            const info = `Pay $${REFRESH_INVESTMENTS_COST} to research new investment opportunities and replace the visible investments row. Removed cards go to their discard piles. Available only during Market phase.${reasonSuffix}`;
+            try {
+              bg.on('pointerover', (pointer: any) => {
+                if (s.tooltipManager) {
+                  s.tooltipManager.show(info, (pointer && pointer.worldX) || btn.x, (pointer && pointer.worldY) || btn.y);
+                  return;
+                }
+                // Fallback: create an in-canvas text tooltip if DOM tooltip manager isn't available
+                try {
+                  if ((s as any)._tempResearchTooltip) {
+                    (s as any)._tempResearchTooltip.destroy();
+                    (s as any)._tempResearchTooltip = null;
+                  }
+                  const tt = s.add.text(btn.x, btn.y - s.layout.actionButtonH / 2 - 6, info, {
+                    fontSize: '12px', color: '#ffffff', fontFamily: FONT_FAMILY, backgroundColor: 'rgba(0,0,0,0.85)', padding: { x: 6, y: 4 }, wordWrap: { width: 280 }, align: 'center'
+                  }).setOrigin(0.5, 1).setDepth(1000);
+                  (s as any)._tempResearchTooltip = tt;
+                } catch (e) { /* ignore fallback errors */ }
+              });
+              bg.on('pointerout', () => {
+                if (s.tooltipManager) {
+                  s.tooltipManager.hide();
+                  return;
+                }
+                try {
+                  if ((s as any)._tempResearchTooltip) {
+                    (s as any)._tempResearchTooltip.destroy();
+                    (s as any)._tempResearchTooltip = null;
+                  }
+                } catch (_) { /* ignore */ }
+              });
+            } catch (_) { /* ignore */ }
+          }
+        } catch (_) { /* ignore tooltip attach errors in tests */ }
+
+        s.marketContainer.add(btn);
+      } catch (_) {
+        // ignore UI errors in tests
+      }
     }
   }
 
   public drawMarketCard(
     x: number,
     y: number,
-    card: BusinessCard | EventCard | UpgradeCard,
-    onClick: (card: BusinessCard | EventCard | UpgradeCard) => void,
+    card: BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard,
+    onClick: (card: BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard) => void,
     _rowKey: string,
     _slotIndex: number,
   ): Phaser.GameObjects.Container {
@@ -828,7 +984,16 @@ export class MainStreetRenderer {
           let info = '';
           if (card.family === 'business') {
             const b = card as any;
-            info = `Business: ${b.name}\nCost: ${b.cost}\nIncome: +${b.baseIncome + (b.incomeBonus || 0)}/turn\nSynergy: ${(b.synergyTypes || []).join('/')}\n${b.description ?? ''}`;
+            const bSynergyNote = isPawnShopCard(b) ? ' (excluded from synergy)' : '';
+            const bTotalRep = (b.reputationPerTurn ?? 0) + (b.reputationBonus ?? 0);
+            const bRepInfo = bTotalRep > 0 ? `\nReputation: +${bTotalRep}/turn` : '';
+            info = `Business: ${b.name}\nCost: ${b.cost}\nIncome: +${b.baseIncome + (b.incomeBonus || 0)}/turn${bRepInfo}\nSynergy: ${(b.synergyTypes || []).join('/')}${bSynergyNote}\n${b.description ?? ''}`;
+          } else if (card.family === 'community-space') {
+            const cs = card as any;
+            const csSynergyNote = isPawnShopCard(cs) ? ' (excluded from synergy)' : '';
+            const csTotalRep = (cs.reputationPerTurn ?? 0) + (cs.reputationBonus ?? 0);
+            const csRepInfo = csTotalRep > 0 ? `\nReputation: +${csTotalRep}/turn` : '';
+            info = `Community Space: ${cs.name}\nCost: ${cs.cost}\nIncome: +${cs.baseIncome + (cs.incomeBonus || 0)}/turn${csRepInfo}\nSynergy: ${(cs.synergyTypes || []).join('/')}${csSynergyNote}\n${cs.description ?? ''}`;
           } else if (card.family === 'event') {
             const e = card as any;
             info = `Event: ${e.name}\nCost: ${e.cost}\nEffect: ${e.effect}\nCoins: ${e.coinDelta >= 0 ? '+' : ''}${e.coinDelta}, Rep: ${e.reputationDelta >= 0 ? '+' : ''}${e.reputationDelta}`;
@@ -856,80 +1021,120 @@ export class MainStreetRenderer {
 
     const queue = s.state.incidentQueue;
     const deckRemaining = s.state.decks.event.length;
+    const activeEffects = s.state.activeEffects;
 
-    const { queueLabelW, queueCardW, queueCardH, queueCardGap, queueTop } = s.layout;
+    const { logX, logW, queueTop } = s.layout;
 
-    // Section background - width to just fit cards with small right margin
-    const queueW = queueLabelW + 50 + INCIDENT_QUEUE_SIZE * (queueCardW + queueCardGap) - queueCardGap + 20;
-    const queueH = queueCardH + 24;
-    const bgBox = s.add.graphics();
-    bgBox.fillStyle(0x1a1830, 0.35);
-    bgBox.fillRoundedRect(110, queueTop - 10, queueW, queueH, BOX_RADIUS);
-    bgBox.lineStyle(1, 0x445577, 0.5);
-    bgBox.strokeRoundedRect(110, queueTop - 10, queueW, queueH, BOX_RADIUS);
-    s.incidentQueueContainer.add(bgBox);
+    // Same panel width and left-edge as the activity log
+    const panelX = logX;
+    const panelW = logW;
+    const pad = 8;
+    const titleH = 22;
+    const contentX = panelX + pad;
 
-    // Section label
-    const label = s.add.text(40, queueTop + queueCardH / 2 - 2, 'Upcoming', {
-      fontSize: '13px', fontStyle: 'bold', color: '#7788aa', fontFamily: FONT_FAMILY,
-      align: 'center',
-    }).setOrigin(0, 0.5);
-    s.incidentQueueContainer.add(label);
+    // Calculate dynamic height
+    const activeEffectLines = activeEffects.length;
+    const extraH = activeEffectLines > 0 ? 16 + activeEffectLines * 16 : 0;
+    const cardRenderH = 50;
+    const maxCards = Math.min(2, queue.length);
+    const cardAreaH = maxCards * (cardRenderH + 6) - 6 + 12; // cards + deck count
+    const panelH = titleH + pad + cardAreaH + extraH + pad;
 
-    const startX = queueLabelW + 50;
+    // Panel background — same warm-dark style as activity log
+    const bg = s.add.graphics();
+    bg.fillStyle(0x1a1408, 0.85);
+    bg.fillRoundedRect(panelX, queueTop, panelW, panelH, 4);
+    bg.lineStyle(1, BOX_STROKE, 0.5);
+    bg.strokeRoundedRect(panelX, queueTop, panelW, panelH, 4);
+    s.incidentQueueContainer.add(bg);
 
-    for (let i = 0; i < INCIDENT_QUEUE_SIZE; i++) {
-      const cx = startX + i * (queueCardW + queueCardGap);
+    // Title bar — same style as activity log
+    const titleBg = s.add.graphics();
+    titleBg.fillStyle(0x332816, 0.9);
+    titleBg.fillRoundedRect(panelX, queueTop, panelW, titleH, { tl: 4, tr: 4, bl: 0, br: 0 });
+    s.incidentQueueContainer.add(titleBg);
+
+    const titleText = s.add.text(panelX + panelW / 2, queueTop + titleH / 2, 'Upcoming', {
+      fontSize: '12px', fontStyle: 'bold', color: '#aa9977', fontFamily: FONT_FAMILY,
+    }).setOrigin(0.5);
+    s.incidentQueueContainer.add(titleText);
+
+    // Queue cards — stacked vertically, centred in the panel
+    let cardY = queueTop + titleH + pad;
+    const cardRenderW = Math.max(1, Math.round(panelW - pad * 2 - 8));
+
+    for (let i = 0; i < maxCards; i++) {
       const card = queue[i];
+      const cx = panelX + (panelW - cardRenderW) / 2;
 
       if (card) {
-        const cardContainer = this.drawIncidentCard(cx, queueTop, card);
-        s.incidentQueueContainer.add(cardContainer);
+        const container = s.add.container(Math.round(cx + cardRenderW / 2), Math.round(cardY + cardRenderH / 2));
+        mainStreetRenderCardSvg(s, container, card.id, cardRenderW, cardRenderH);
+        s.incidentQueueContainer.add(container);
+
+        if (!s.replayMode) {
+          const hover = s.add.rectangle(0, 0, cardRenderW, cardRenderH, 0x000000, 0.001);
+          hover.setInteractive({ useHandCursor: true });
+          hover.on('pointerover', () => {
+            let info: string;
+            const dCard = card as any;
+            if (dCard.duration !== undefined) {
+              info = 'Event: ' + card.name + '\nEffect: ' + card.effect + '\nDuration: ' + dCard.duration + ' turns\n' + Math.round(dCard.multiplier * 100) + '% income modifier';
+            } else {
+              info = 'Event: ' + card.name + '\nEffect: ' + card.effect + '\nCoins: ' + (card.coinDelta >= 0 ? '+' : '') + card.coinDelta + ', Rep: ' + (card.reputationDelta >= 0 ? '+' : '') + card.reputationDelta;
+            }
+            s.tooltipManager?.show(info, container.x, container.y);
+          });
+          hover.on('pointerout', () => s.tooltipManager?.hide());
+          container.add(hover);
+        }
       } else {
         // Empty queue slot
         const empty = s.add.rectangle(
-          cx + queueCardW / 2, queueTop + queueCardH / 2,
-          queueCardW, queueCardH, 0x111122, 0.3,
+          cx + cardRenderW / 2, cardY + cardRenderH / 2,
+          cardRenderW, cardRenderH, 0x111122, 0.3,
         );
         empty.setStrokeStyle(1, 0x223344);
         s.incidentQueueContainer.add(empty);
       }
+
+      cardY += cardRenderH + 6;
     }
 
-    // Deck count - immediately below the label
-    const deckText = s.add.text(40, queueTop + 32, `Deck: ${deckRemaining}`, {
-      fontSize: '11px', color: '#556677', fontFamily: FONT_FAMILY,
+    // Deck count below cards
+    const deckText = s.add.text(contentX, cardY, 'Deck: ' + deckRemaining, {
+      fontSize: '11px', color: '#776655', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0);
     s.incidentQueueContainer.add(deckText);
-  }
+    cardY += 18;
 
-  public drawIncidentCard(
-    x: number,
-    y: number,
-    card: EventCard,
-  ): Phaser.GameObjects.Container {
-    const s = this.scene;
-    const { queueCardW, queueCardH } = s.layout;
-    const container = s.add.container(Math.round(x + queueCardW / 2), Math.round(y + queueCardH / 2));
+    // Active Effects indicator
+    if (activeEffectLines > 0) {
+      for (let i = 0; i < activeEffects.length; i++) {
+        const effect = activeEffects[i];
+        const warnIcon = String.fromCodePoint(0x26A0);
+        const dash = String.fromCodePoint(0x2014);
+        const effectText = s.add.text(contentX, cardY, warnIcon + ' ' + effect.description + ' ' + dash + ' ' + effect.turnsRemaining + ' turn' + (effect.turnsRemaining !== 1 ? 's' : ''), {
+          fontSize: '10px', color: '#ff6644', fontFamily: FONT_FAMILY,
+        }).setOrigin(0, 0);
+        s.incidentQueueContainer.add(effectText);
 
-    const renderW = Math.max(1, Math.round(queueCardW - 4));
-    const renderH = Math.max(1, Math.round(queueCardH - 4));
-
-    // Render card via shared adapter
-    mainStreetRenderCardSvg(s, container, card.id, renderW, renderH);
-
-    if (!s.replayMode) {
-      const hover = s.add.rectangle(0, 0, queueCardW, queueCardH, 0x000000, 0.001);
-      hover.setInteractive({ useHandCursor: true });
-      hover.on('pointerover', () => {
-        const info = `Event: ${card.name}\nEffect: ${card.effect}\nCoins: ${card.coinDelta >= 0 ? '+' : ''}${card.coinDelta}, Rep: ${card.reputationDelta >= 0 ? '+' : ''}${card.reputationDelta}`;
-        s.tooltipManager?.show(info, container.x, container.y);
-      });
-      hover.on('pointerout', () => s.tooltipManager?.hide());
-      container.add(hover);
+        if (!s.replayMode) {
+          const hitArea = s.add.rectangle(
+            panelX + panelW / 2, cardY + 8, panelW - 20, 14, 0x000000, 0.001,
+          ).setInteractive({ useHandCursor: true });
+          hitArea.on('pointerover', () => {
+            s.tooltipManager?.show(
+              'Active: ' + effect.description + '\n' + Math.round(effect.multiplier * 100) + '% modifier ' + dash + ' ' + effect.turnsRemaining + ' turn' + (effect.turnsRemaining !== 1 ? 's' : '') + ' remaining',
+              hitArea.x, hitArea.y,
+            );
+          });
+          hitArea.on('pointerout', () => s.tooltipManager?.hide());
+          s.incidentQueueContainer.add(hitArea);
+        }
+        cardY += 16;
+      }
     }
-
-    return container;
   }
 
   public refreshPlayerHand(): void {
@@ -937,6 +1142,7 @@ export class MainStreetRenderer {
     // handContainer zone kept for backward-compat (zone-metadata tests)
     s.handContainer.removeAll(true);
 
+    // Show held event card if present (existing behavior)
     const held = s.state.heldEvent;
 
     if (held) {
@@ -946,6 +1152,115 @@ export class MainStreetRenderer {
       // Empty hand — HandView gracefully handles empty array (no sprites)
       this.handView.setCards([]);
     }
+
+    // Render hand cards from state.hand (Multi-Use Card Economy)
+    this.refreshBusinessHandCards();
+  }
+
+  /**
+   * Renders business cards held in the player's hand.
+   * Shows each card as a small card below the tableau with synergy indicator.
+   */
+  private refreshBusinessHandCards(): void {
+    const s = this.scene;
+    const hand = s.state.hand ?? [];
+
+    // Remove previous hand card display
+    if (s.handBusinessContainer) {
+      s.handBusinessContainer.removeAll(true);
+    } else {
+      s.handBusinessContainer = s.add.container(0, 0);
+    }
+
+    if (hand.length === 0) {
+      // Update hand size indicator
+      this.updateHandSizeIndicator(0);
+      return;
+    }
+
+    const { handCardW, handCardH, handY } = s.layout;
+    const startX = 40;
+    const y = handY;
+    const spacing = handCardW + 8;
+
+    for (let i = 0; i < hand.length; i++) {
+      const card = hand[i];
+      const x = startX + i * spacing;
+
+      const container = s.add.container(x, y);
+
+      // Card background
+      const bg = s.add.rectangle(0, 0, handCardW, handCardH, 0x3a2a1a, 0.9);
+      bg.setStrokeStyle(1, 0x8b7355);
+      container.add(bg);
+
+      // Card name
+      const nameText = s.add.text(0, -handCardH / 2 + 6, card.name, {
+        fontSize: '11px',
+        color: '#ffffff',
+        fontFamily: 'Arial',
+      }).setOrigin(0.5, 0);
+      container.add(nameText);
+
+      // Synergy type indicator
+      if (card.synergyTypes && card.synergyTypes.length > 0) {
+        const synergyLabel = card.synergyTypes.join('/');
+        const synergyColor = this.getSynergyDisplayColor(card.synergyTypes[0]);
+        const synText = s.add.text(0, 6, synergyLabel, {
+          fontSize: '9px',
+          color: synergyColor,
+          fontFamily: 'Arial',
+        }).setOrigin(0.5, 0);
+        container.add(synText);
+      }
+
+      // Income info
+      const incomeText = s.add.text(0, 18, `$${card.baseIncome}/turn`, {
+        fontSize: '9px',
+        color: '#c8b88a',
+        fontFamily: 'Arial',
+      }).setOrigin(0.5, 0);
+      container.add(incomeText);
+
+      s.handBusinessContainer!.add(container);
+    }
+
+    // Update hand size indicator
+    this.updateHandSizeIndicator(hand.length);
+  }
+
+  /**
+   * Updates the hand size indicator text (e.g. "Hand: 2/5").
+   */
+  private updateHandSizeIndicator(current: number): void {
+    const s = this.scene;
+    const maxSize = s.state.maxHandSize ?? 2;
+
+    if (s.handSizeText) {
+      s.handSizeText.destroy();
+    }
+
+    s.handSizeText = s.add.text(10, s.layout.handY - 14, 
+      `Hand: ${current}/${maxSize}`, {
+      fontSize: '12px',
+      color: current >= maxSize ? '#ff6666' : '#c8b88a',
+      fontFamily: 'Arial',
+    });
+  }
+
+  /**
+   * Returns a CSS color string for the given synergy type.
+   */
+  private getSynergyDisplayColor(type: string): string {
+    const colors: Record<string, string> = {
+      'Food': '#E67E22',
+      'Culture': '#3498DB',
+      'Commerce': '#27AE60',
+      'Service': '#9B59B6',
+      'Entertainment': '#E74C3C',
+      'Health': '#1ABC9C',
+    };
+    return colors[type] ?? '#ffffff';
   }
 
   /**
@@ -1065,58 +1380,91 @@ export class MainStreetRenderer {
     const entries = s.state.activityLog;
     const newCount = entries.length;
 
-    // Skip rebuild if nothing changed
-    if (newCount === s.logPrevEntryCount) return;
+    // Visible area inside the panel (below title bar, above bottom edge)
+    const visibleH = Math.max(1, s.layout.logH - LOG_TITLE_H - 4);
 
-    const hadAutoScroll = s.logAutoScroll;
-    s.logPrevEntryCount = newCount;
+    // ── Re-render only if the entry count changed ────────────────
+    if (newCount !== s.logPrevEntryCount) {
+      s.logPrevEntryCount = newCount;
 
-    // Clear existing content
-    s.logContentContainer.removeAll(true);
+      // Render ALL entries to compute the true total content height.
+      // Per-entry visibility (applied below) hides off-screen entries.
+      s.logContentContainer.removeAll(true);
 
-    const contentW = s.layout.logW - LOG_PAD * 2;
-    let yOff = 0;
+      const contentW = s.layout.logW - LOG_PAD * 2;
+      let yOff = 0;
 
-    for (const entry of entries) {
-      const color = LOG_COLORS[entry.type] ?? LOG_COLORS.neutral;
-      const isTurnHeader = entry.type === 'turn-header';
+      for (let i = 0; i < entries.length; i++) {
+        const entry = entries[i];
+        if (!entry) continue;
 
-      if (isTurnHeader) {
-        // Subtle background bar for turn headers
-        const barBg = s.add.graphics();
-        barBg.fillStyle(0x443311, 0.5);
-        barBg.fillRect(0, yOff, s.layout.logW, LOG_LINE_H);
-        s.logContentContainer.add(barBg);
+        const color = LOG_COLORS[entry.type] ?? LOG_COLORS.neutral;
+        const isTurnHeader = entry.type === 'turn-header';
+
+        if (isTurnHeader) {
+          // Subtle background bar for turn headers.
+          // Use setPosition(0, yOff) so that barBg.y correctly reflects
+          // the entry position, enabling per-entry visibility checks.
+          const barBg = s.add.graphics();
+          barBg.fillStyle(0x443311, 0.5);
+          barBg.fillRect(0, 0, s.layout.logW, LOG_LINE_H);
+          barBg.setPosition(0, yOff);
+          s.logContentContainer.add(barBg);
+        }
+
+        const txt = s.add.text(LOG_PAD, yOff, entry.text, {
+          fontSize: `${LOG_FONT_SIZE}px`,
+          fontStyle: isTurnHeader ? 'bold' : 'normal',
+          color,
+          fontFamily: FONT_FAMILY,
+          wordWrap: { width: contentW },
+        });
+        s.logContentContainer.add(txt);
+
+        // Use actual rendered height to handle word-wrapped lines
+        yOff += Math.max(LOG_LINE_H, txt.height + 2);
       }
 
-      const txt = s.add.text(LOG_PAD, yOff, entry.text, {
-        fontSize: `${LOG_FONT_SIZE}px`,
-        fontStyle: isTurnHeader ? 'bold' : 'normal',
-        color,
-        fontFamily: FONT_FAMILY,
-        wordWrap: { width: contentW },
-      });
-      s.logContentContainer.add(txt);
-
-      // Use actual rendered height to handle word-wrapped lines
-      yOff += Math.max(LOG_LINE_H, txt.height + 2);
+      s.logTotalContentH = yOff;
     }
 
-    s.logTotalContentH = yOff;
-
-    // Visible area inside the panel (below title bar, above bottom edge)
-    const visibleH = s.layout.logH - LOG_TITLE_H - 4;
-    s.logMaxScroll = Math.max(0, s.logTotalContentH - visibleH);
-
-    // Keep scroll position valid for the current content height.
-    // On scene restart we can transition from a long previous run to a short
-    // new log; without clamping, stale offsets can hide all entries.
-    if (hadAutoScroll) {
-      s.logScrollOffset = s.logMaxScroll;
+    // ── Compute scroll bounds using actual total content height ──
+    if (s.logTotalContentH <= visibleH) {
+      s.logMaxScroll = 0;
+      s.logScrollOffset = 0;
     } else {
-      s.logScrollOffset = Phaser.Math.Clamp(s.logScrollOffset, 0, s.logMaxScroll);
+      s.logMaxScroll = s.logTotalContentH - visibleH;
+
+      if (s.logAutoScroll) {
+        s.logScrollOffset = s.logMaxScroll;
+      } else {
+        s.logScrollOffset = Phaser.Math.Clamp(s.logScrollOffset, 0, s.logMaxScroll);
+      }
+
+      const atBottom = s.logScrollOffset >= s.logMaxScroll - 4;
+      s.logAutoScroll = atBottom;
     }
 
-    s.applyLogScroll();
+    // Apply scroll by shifting the content container upward.
+    s.logContentContainer.setY(LOG_TITLE_H + 2 - s.logScrollOffset);
+
+    // ── Per-entry visibility safety net ────────────────
+    // Phaser 4 RC7's GeometryMask clip is unreliable. As a safety net,
+    // explicitly hide any child whose local Y falls outside the visible
+    // window [scrollOffset, scrollOffset + visibleH).
+    // This ensures no content renders above the title bar or below the
+    // panel bottom, regardless of whether the mask clips.
+    const visibleStart = s.logScrollOffset;
+    const visibleEnd = s.logScrollOffset + visibleH;
+    for (const child of s.logContentContainer.list) {
+      const localY = (child as any).y;
+      if (localY >= visibleStart && localY < visibleEnd) {
+        child.setVisible(true);
+      } else {
+        child.setVisible(false);
+      }
+    }
+
+    s.updateLogMask();
   }
 }

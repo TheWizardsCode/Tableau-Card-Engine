@@ -9,9 +9,7 @@ import {
   OverlayManager,
 } from '../../../src/ui';
 import { createActionButton } from '@ui/Renderer';
-import {
-  createSushiGoMenuButton,
-} from '../../../src/ui/Renderer/adapters/SushiGoAdapter';
+
 import { scoreTableauBreakdown } from '../SushiGoScoring';
 import type { SushiGoSession, RoundResult } from '../SushiGoGame';
 import { getWinnerIndex } from '../SushiGoGame';
@@ -208,7 +206,7 @@ export class SushiGoOverlayContent {
 
     const playBtn = createActionButton(
       this.scene,
-      GAME_W / 2 - 140,
+      GAME_W / 2 - 20,
       buttonY - 16,
       120,
       'Play Again',
@@ -219,9 +217,6 @@ export class SushiGoOverlayContent {
       { depth: 11 },
     );
     this.overlayManager.add(playBtn);
-
-    const menuBtn = createSushiGoMenuButton(this.scene, GAME_W / 2 + 20, buttonY - 16, 120, { depth: 11 });
-    this.overlayManager.add(menuBtn);
   }
 
   private resolveOverlayAnchors(

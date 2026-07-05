@@ -184,12 +184,9 @@ describe('The Mind overlay button tests', () => {
       );
 
     const tryAgainBtn = texts.find((t) => t.text === '[ Try Again ]');
-    const menuBtn = texts.find((t) => t.text === '[ Menu ]');
 
     expect(tryAgainBtn).toBeDefined();
-    expect(menuBtn).toBeDefined();
     expect(tryAgainBtn!.input?.enabled).toBe(true);
-    expect(menuBtn!.input?.enabled).toBe(true);
   });
 
   it('should restart the scene when "Try Again" is clicked via DOM pointer event', async () => {

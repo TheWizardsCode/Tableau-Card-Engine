@@ -21,6 +21,7 @@ import { SettingsButton } from '../../../src/ui/SettingsButton';
 import { createHudText } from '../../../src/ui/Renderer';
 import { createEventLog } from '../../../src/ui/GymSceneUtils';
 import type { EventLogResult } from '../../../src/ui/GymSceneUtils';
+import type Phaser from 'phaser';
 
 // ── Mock SoundManager for SettingsPanel demo ─────────────────
 
@@ -81,6 +82,10 @@ export class GymHudComponentsScene extends GymSceneBase {
   private eventLog: string[] = [];
   private readonly mockSound = new MockSoundManager();
 
+  // Status line text references for update on panel toggle
+  private helpStatusText!: Phaser.GameObjects.Text;
+  private settingsStatusText!: Phaser.GameObjects.Text;
+
   // Track panel visibility manually since HelpPanel/SettingsPanel
   // do not expose a public isOpen property.
   private _helpOpen = false;
@@ -116,16 +121,19 @@ export class GymHudComponentsScene extends GymSceneBase {
     this.addButton(cx - 250, y, '[ Open HelpPanel ]', () => {
       this.helpPanel!.open();
       this._helpOpen = true;
+      this.updateStatusLines();
       this.logEvent('HelpPanel: open() called');
     });
     this.addButton(cx - 110, y, '[ Close HelpPanel ]', () => {
       this.helpPanel!.close();
       this._helpOpen = false;
+      this.updateStatusLines();
       this.logEvent('HelpPanel: close() called');
     });
     this.addButton(cx + 30, y, '[ Toggle HelpPanel ]', () => {
       this.helpPanel!.toggle();
       this._helpOpen = !this._helpOpen;
+      this.updateStatusLines();
       this.logEvent(`HelpPanel: toggle() → ${this._helpOpen ? 'open' : 'closed'}`);
     });
 
@@ -134,26 +142,29 @@ export class GymHudComponentsScene extends GymSceneBase {
     this.addButton(cx - 130, y, '[ Open Settings ]', () => {
       this.settingsPanel.open();
       this._settingsOpen = true;
+      this.updateStatusLines();
       this.logEvent('SettingsPanel: open() called');
     });
     this.addButton(cx + 10, y, '[ Close Settings ]', () => {
       this.settingsPanel.close();
       this._settingsOpen = false;
+      this.updateStatusLines();
       this.logEvent('SettingsPanel: close() called');
     });
     this.addButton(cx + 150, y, '[ Toggle Settings ]', () => {
       this.settingsPanel.toggle();
       this._settingsOpen = !this._settingsOpen;
+      this.updateStatusLines();
       this.logEvent(`SettingsPanel: toggle() → ${this._settingsOpen ? 'open' : 'closed'}`);
     });
 
     // ── Panel state indicators ──────────────────────────
 
     y += 36;
-    createHudText(
-      this, 60, y, 'HelpPanel: closed', '#88ff88', { fontSize: '14px' },
+    this.helpStatusText = createHudText(
+      this, 460, y, 'HelpPanel: closed', '#88ff88', { fontSize: '14px' },
     );
-    createHudText(
+    this.settingsStatusText = createHudText(
       this, 440, y, 'SettingsPanel: closed', '#ffcc44', { fontSize: '14px' },
     );
 
@@ -240,6 +251,15 @@ export class GymHudComponentsScene extends GymSceneBase {
    */
   get isSettingsOpen(): boolean {
     return this._settingsOpen;
+  }
+
+  /**
+   * Update both panel status line text objects to reflect
+   * the current open/closed state of each panel.
+   */
+  private updateStatusLines(): void {
+    this.helpStatusText.setText(`HelpPanel: ${this._helpOpen ? 'open' : 'closed'}`);
+    this.settingsStatusText.setText(`SettingsPanel: ${this._settingsOpen ? 'open' : 'closed'}`);
   }
 
   private logEvent(msg: string): void {

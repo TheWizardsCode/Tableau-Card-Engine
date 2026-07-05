@@ -24,7 +24,7 @@ export const BASE_QUEUE_CARD_GAP = 10;
 // Make street slots match market placeholder size (market slots: 140x80)
 export const BASE_SLOT_W = 140;
 export const BASE_SLOT_H = 80;
-export const BASE_SLOT_GAP = 10;
+export const BASE_SLOT_GAP = 20;
 export const STREET_COLS = 5;
 export const STREET_ROWS = 2;
 export const STREET_ROW_GAP = 12;
@@ -43,6 +43,9 @@ export const SFX_KEYS = {
   PLACE: 'sfx-place',
   DISCARD: 'sfx-discard',
   COIN_POP: 'sfx-coin-pop',
+  INCOME_POSITIVE: 'sfx-income-positive',
+  INCOME_NEGATIVE: 'sfx-income-negative',
+  INCOME_NEUTRAL: 'sfx-income-neutral',
   CLICK: COMMON_SFX_KEYS.UI_CLICK,
   BG_LOOP: 'sfx-bg-loop',
   BUSINESS_START: 'sfx-business-start',
@@ -50,6 +53,7 @@ export const SFX_KEYS = {
   UPGRADE_START: 'sfx-upgrade-start',
   UPGRADE_END: 'sfx-upgrade-end',
   EVENT_CHEER: 'sfx-event-cheer',
+  CELEBRATE: 'sfx-challenge-complete',
 } as const;
 
 // Activity Log panel layout
@@ -88,6 +92,7 @@ export interface SceneLayout {
   queueCardH: number;
   queueCardGap: number;
   queueLabelW: number;
+  eventsHeight: number;
   streetTop: number;
   slotW: number;
   slotH: number;

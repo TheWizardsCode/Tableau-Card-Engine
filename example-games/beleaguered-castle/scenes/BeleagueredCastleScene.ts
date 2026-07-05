@@ -41,7 +41,7 @@ import { BeleagueredCastleTurnController } from './BeleagueredCastleTurnControll
 import { moveGameObject, cardTextureKey } from '../../../src/ui';
 import {
   GAME_W, GAME_H, FONT_FAMILY,
-  createOverlayButton, createOverlayMenuButton,
+  createOverlayButton,
 } from '../../../src/ui';
 import { createHudText } from '../../../src/ui/Renderer/adapters/BeleagueredCastleAdapter';
 import { SaveLoadStore } from '../../../src/core-engine';
@@ -107,7 +107,7 @@ export class BeleagueredCastleScene extends CardGameScene {
     const seedParam = params.get('seed');
     this.seed = seedParam ? parseInt(seedParam, 10) : Date.now();
 
-    this.detectReplayMode();
+    super.create();
 
     // Create a placeholder game state; will be replaced if resuming from checkpoint
     this.gameState = deal(this.seed);
@@ -152,9 +152,6 @@ export class BeleagueredCastleScene extends CardGameScene {
     };
     this.bcRenderer.onCardClick = (col) => this.handleCardClick(col);
 
-    this.initEventSystem();
-    this.initHUDContainer();
-
     if (!this.replayMode) {
       this.initHelpPanel(helpContent as HelpSection[]);
       const mapping: EventSoundMapping = {
@@ -174,6 +171,10 @@ export class BeleagueredCastleScene extends CardGameScene {
       };
       this.initSoundSystem(Object.values(SFX_KEYS), mapping, { namespace: 'beleaguered-castle' });
       this.initSettingsPanel();
+      // Propagate reduced motion preference to the renderer
+      if (this.settingsPanel) {
+        this.bcRenderer.reducedMotion = this.settingsPanel.reducedMotion;
+      }
       this.initUndoRedoButtons(
         () => this.turnController.performUndo(),
         () => this.turnController.performRedo(),
@@ -728,9 +729,6 @@ export class BeleagueredCastleScene extends CardGameScene {
     const restartBtn = createOverlayButton(this, GAME_W / 2, GAME_H / 2 + OVERLAY_BUTTON_Y_OFFSET, '[ Restart ]', BUTTON_DEPTH);
     restartBtn.on('pointerdown', () => this.onRestart?.());
     this.overlayManager.add(restartBtn);
-
-    const menuBtn = createOverlayMenuButton(this, GAME_W / 2 + 150, GAME_H / 2 + OVERLAY_BUTTON_Y_OFFSET, BUTTON_DEPTH);
-    this.overlayManager.add(menuBtn);
   }
 
   private showNoMovesOverlay(): void {
@@ -761,8 +759,5 @@ export class BeleagueredCastleScene extends CardGameScene {
     const restartBtn = createOverlayButton(this, GAME_W / 2 + 110, GAME_H / 2 + 30, '[ Restart ]', BUTTON_DEPTH);
     restartBtn.on('pointerdown', () => this.onRestart?.());
     this.overlayManager.add(restartBtn);
-
-    const menuBtn = createOverlayMenuButton(this, GAME_W / 2 + 230, GAME_H / 2 + 30, BUTTON_DEPTH);
-    this.overlayManager.add(menuBtn);
   }
 }

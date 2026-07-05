@@ -2,19 +2,32 @@ import { addLog } from '../MainStreetState';
 import { executeDayStart, processEndOfTurn, type TurnResult } from '../MainStreetEngine';
 import {
   getEmptySlots,
-  getUpgradeBranchesForBusiness,
   findTargetBusinessSlot,
   canPurchaseBusiness,
   canPurchaseUpgrade,
   canPurchaseEvent,
+  canRefreshDevelopment,
   canRefreshInvestments,
 } from '../MainStreetMarket';
 import type { BusinessCard, EventCard, UpgradeCard } from '../MainStreetCards';
-import { buyBusinessCommand, buyUpgradeCommand, buyEventCommand, playEventCommand, refreshInvestmentsCommand } from '../MainStreetCommands';
+import { buyBusinessCommand, buyUpgradeCommand, buyEventCommand, playEventCommand, refreshDevelopmentCommand, refreshInvestmentsCommand } from '../MainStreetCommands';
 import { recordMainStreetEvent, finalizeMainStreetTranscript } from '../MainStreetTranscript';
 import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
-import { FONT_FAMILY, createOverlayBackground, createOverlayButton, dismissOverlay } from '../../../src/ui';
 import { getCurrentStep, type TutorialActionType } from '../TutorialFlow';
+
+/**
+ * Match a card ID against a requiredCardId using prefix matching.
+ *
+ * Card IDs include a copy-number suffix (e.g. `biz-laundromat-2`). The
+ * `requiredCardId` in tutorial steps is the template ID with a specific copy
+ * number (e.g. `biz-laundromat-0`). This helper strips trailing `-<number>`
+ * from both IDs and compares the template prefix, so any copy of the required
+ * card template satisfies the requirement.
+ */
+function matchesRequiredCard(cardId: string, requiredCardId: string): boolean {
+  const stripCopy = (id: string): string => id.replace(/-\d+$/, '');
+  return stripCopy(cardId) === stripCopy(requiredCardId);
+}
 
 export class MainStreetTurnController {
   constructor(private readonly scene: any) {}
@@ -73,6 +86,22 @@ export class MainStreetTurnController {
     s.instructionText.setText('Processing end of turn...');
     s.refreshActionButtons();
 
+    // ── Tutorial guard: prevent market cycling before T7 ──────────
+    // When the tutorial is active and the current step is action 'end-turn'
+    // (T6), the upcoming processEndOfTurn would call cycleMarketCards(),
+    // which discards all scenario-placed market cards and refills from the
+    // random deck. This would lose the scenario's explicitly-placed
+    // investment event card (Local Festival) before T7 can reference it.
+    // Set skipMarketCycleOnEndTurn to preserve the market state until T7
+    // completes. The flag is reset after processEndOfTurn.
+    const tutController = (s as any).tutorialController as any;
+    if (tutController?.isActive) {
+      const step = getCurrentStep(tutController);
+      if (step?.requiredAction === 'end-turn') {
+        s.state.skipMarketCycleOnEndTurn = true;
+      }
+    }
+
     // Process end-of-turn phases (events, income, night, end check)
     let result: TurnResult;
     try {
@@ -86,6 +115,9 @@ export class MainStreetTurnController {
       s.instructionText.setText(`Error: ${(e as Error).message}`);
       s.refreshAll();
       return;
+    } finally {
+      // Reset the flag after processing so subsequent end-turns cycle normally
+      s.state.skipMarketCycleOnEndTurn = false;
     }
 
     // Save checkpoint after each completed turn (fire-and-forget)
@@ -93,6 +125,30 @@ export class MainStreetTurnController {
 
     // Clear undo stack on end-of-turn (per acceptance criteria)
     try { s.undoManager.clear(); } catch (e) { /* ignore */ }
+
+    // ── Challenge Celebration VFX & Sound ────────────────────────
+    // If any challenges were newly completed this turn, trigger celebration
+    // animations with staggered timing so they don't overlap.
+    if (result.newlyCompletedChallenges.length > 0) {
+      // Build a lookup from challenge ID to title
+      const challengeTitleById = new Map<string, string>();
+      for (const ac of s.state.activeChallenges) {
+        challengeTitleById.set(ac.challenge.id, ac.challenge.title);
+      }
+
+      result.newlyCompletedChallenges.forEach((challengeId, index) => {
+        const title = challengeTitleById.get(challengeId) ?? 'Challenge Complete!';
+        s.time.delayedCall(index * 600, () => {
+          void s.msAnimator.animateCelebration(title);
+        });
+      });
+
+      // Refresh the challenge tracker after all celebrations
+      s.time.delayedCall(
+        result.newlyCompletedChallenges.length * 600 + 200,
+        () => s.refreshAll(),
+      );
+    }
 
     // Brief delay then show result / advance
     s.time.delayedCall(400, () => {
@@ -212,16 +268,18 @@ export class MainStreetTurnController {
       return;
     }
 
-    // Tutorial: enforce specific card purchase if requiredCardId is set on the current step
+    // Tutorial: enforce specific card purchase if requiredCardId is set on the current step.
+    // Uses prefix matching (template ID without copy number suffix) so any copy of the
+    // required card template satisfies the requirement.
     const controller = (s as any).tutorialController as any;
     if (controller?.isActive) {
       const step = controller.currentStepIndex >= 0
         ? getCurrentStep(controller)
         : null;
-      if (step?.requiredCardId && card.id !== step.requiredCardId) {
+      if (step?.requiredCardId && !matchesRequiredCard(card.id, step.requiredCardId)) {
         // Find the card name from the market for the error message
         const requiredCard = s.state.market.development.find(
-          (c: any) => c.id === step.requiredCardId
+          (c: any) => matchesRequiredCard(c.id, step.requiredCardId!)
         );
         const requiredName = requiredCard?.name ?? 'the specified card';
         const msg = `This is not the card you should buy right now. Please buy ${requiredName} first.`;
@@ -354,15 +412,17 @@ export class MainStreetTurnController {
       return;
     }
 
-    // Tutorial: enforce specific event card purchase if requiredCardId is set
+    // Tutorial: enforce specific event card purchase if requiredCardId is set.
+    // Uses prefix matching (template ID without copy number suffix) so any copy of the
+    // required card template satisfies the requirement.
     const evtController = (s as any).tutorialController as any;
     if (evtController?.isActive) {
       const step = evtController.currentStepIndex >= 0
         ? getCurrentStep(evtController)
         : null;
-      if (step?.requiredCardId && card.id !== step.requiredCardId) {
+      if (step?.requiredCardId && !matchesRequiredCard(card.id, step.requiredCardId)) {
         const requiredCard = s.state.market.investments.find(
-          (c: any) => c.id === step.requiredCardId
+          (c: any) => matchesRequiredCard(c.id, step.requiredCardId!)
         );
         const requiredName = requiredCard?.name ?? 'the specified event card';
         const msg = `This is not the card you should buy right now. Please buy ${requiredName} first.`;
@@ -430,6 +490,35 @@ export class MainStreetTurnController {
     }
   }
 
+  public onRefreshDevelopmentClick(): void {
+    const s = this.scene;
+    if (s.uiPhase !== 'market') return;
+
+    const legality = canRefreshDevelopment(s.state);
+    if (!legality.legal) {
+      s.instructionText.setText(`Cannot refresh: ${legality.reason ?? 'unknown'}`);
+      return;
+    }
+
+    s.uiPhase = 'animating';
+    s.instructionText.setText('Discovering new development opportunities...');
+    s.refreshAll();
+
+    try {
+      const cmd = refreshDevelopmentCommand(s.state);
+      s.undoManager.execute(cmd);
+      try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'refresh-development' }, description: cmd.description }); } catch (_) {}
+      s.instructionText.setText('Refreshed development');
+      addLog(s.state, 'Refreshed development (via UI)', 'neutral');
+    } catch (e) {
+      console.error('[MS] RefreshDevelopment failed', e);
+      s.instructionText.setText(`Error: ${(e as Error).message}`);
+    }
+
+    s.uiPhase = 'market';
+    s.refreshAll();
+  }
+
   public onRefreshInvestmentsClick(): void {
     const s = this.scene;
     if (s.uiPhase !== 'market') return;
@@ -485,14 +574,8 @@ export class MainStreetTurnController {
     // Determine which business slot this upgrade targets (first eligible match)
     const targetSlot = findTargetBusinessSlot(s.state, card);
 
-    // If there are multiple upgrade branches for that business, show a choice modal
-    const branches = getUpgradeBranchesForBusiness(s.state, targetSlot);
-    if (branches.length > 1) {
-      this.showUpgradeChoiceModal(branches, targetSlot, sourceIndex);
-      return;
-    }
-
-    // Single upgrade available — apply after transfer animation
+    // Apply the upgrade directly — no intermediate choice modal.
+    // The player clicked the upgrade card; that is the upgrade to apply.
     s.uiPhase = 'animating';
     s.instructionText.setText(`Applying upgrade "${card.name}"...`);
     s.hiddenTransferSourceCardIds.add(card.id);
@@ -529,121 +612,5 @@ export class MainStreetTurnController {
     } else {
       afterTransfer();
     }
-  }
-
-  public showUpgradeChoiceModal(branches: UpgradeCard[], targetSlot: number, sourceIndex: number): void {
-    const s = this.scene;
-    const MODAL_DEPTH = 20;
-    const MODAL_W = 500;
-    const BTN_H = 60;
-    const HEADER_H = 60;
-    const FOOTER_H = 50;
-    const MODAL_H = HEADER_H + branches.length * BTN_H + FOOTER_H;
-
-    const overlay = createOverlayBackground(
-      s,
-      { depth: MODAL_DEPTH, alpha: 0.8 },
-      { width: MODAL_W, height: MODAL_H, color: 0x1a1208, alpha: 0.95, depth: MODAL_DEPTH },
-    );
-    s.overlayObjects.push(...overlay.objects);
-
-    const cx = s.layout.gameW / 2;
-    const cy = s.layout.gameH / 2;
-    const top = cy - MODAL_H / 2;
-
-    // Title
-    const title = s.add
-      .text(cx, top + 24, 'Choose an Upgrade Path', {
-        fontSize: '18px', fontStyle: 'bold', color: '#ffdd88', fontFamily: FONT_FAMILY,
-      })
-      .setOrigin(0.5, 0.5)
-      .setDepth(MODAL_DEPTH + 1);
-    s.overlayObjects.push(title);
-
-    // Branch buttons
-    branches.forEach((branch, idx) => {
-      const btnY = top + HEADER_H + idx * BTN_H + BTN_H / 2;
-
-      // Button background
-      const btnBg = s.add.rectangle(cx, btnY, MODAL_W - 40, BTN_H - 8, 0x2a1f14, 0.9)
-        .setDepth(MODAL_DEPTH + 1)
-        .setStrokeStyle(1, 0x665544)
-        .setInteractive({ useHandCursor: true });
-      s.overlayObjects.push(btnBg);
-
-      // Branch label
-      const costLabel = `$${branch.cost}`;
-      const bonusLabel = `+${branch.incomeBonus} income, +${branch.synergyRangeBonus} range`;
-      const btnText = s.add
-        .text(cx, btnY - 8, branch.name, {
-          fontSize: '14px', fontStyle: 'bold', color: '#ffffff', fontFamily: FONT_FAMILY,
-        })
-        .setOrigin(0.5, 0.5)
-        .setDepth(MODAL_DEPTH + 2);
-      s.overlayObjects.push(btnText);
-
-      const detailText = s.add
-        .text(cx, btnY + 10, `${costLabel} — ${bonusLabel}`, {
-          fontSize: '11px', color: '#aaaaaa', fontFamily: FONT_FAMILY,
-        })
-        .setOrigin(0.5, 0.5)
-        .setDepth(MODAL_DEPTH + 2);
-      s.overlayObjects.push(detailText);
-
-      const onChoose = (): void => {
-        // Dismiss modal first
-        dismissOverlay(s.overlayObjects);
-        s.overlayObjects = [];
-
-        s.uiPhase = 'animating';
-        s.instructionText.setText(`Applying upgrade "${branch.name}"...`);
-        s.hiddenTransferSourceCardIds.add(branch.id);
-        s.refreshAll();
-
-        const afterTransfer = (): void => {
-          try {
-            s.undoManager.execute(buyUpgradeCommand(s.state, branch.id, targetSlot));
-            s.instructionText.setText(`Applied upgrade: "${branch.name}"`);
-          } catch (e) {
-            s.instructionText.setText(`Error: ${(e as Error).message}`);
-          }
-
-          s.hiddenTransferSourceCardIds.delete(branch.id);
-          s.uiPhase = 'market';
-          s.refreshAll();
-        };
-
-        if (sourceIndex >= 0) {
-          void s.animateTransferFromMarket({
-            cardId: branch.id,
-            family: 'upgrade',
-            row: 'investments',
-            slotIndex: sourceIndex,
-            destination: s.getStreetSlotCenter(targetSlot),
-          }).then(afterTransfer);
-        } else {
-          afterTransfer();
-        }
-      };
-
-      btnBg.on('pointerdown', onChoose);
-      btnBg.on('pointerover', () => btnBg.setFillStyle(0x3a2f24, 0.95));
-      btnBg.on('pointerout', () => btnBg.setFillStyle(0x2a1f14, 0.9));
-    });
-
-    // Cancel button
-    const cancelBtn = createOverlayButton(
-      s,
-      cx,
-      top + MODAL_H - FOOTER_H / 2,
-      '[ Cancel ]',
-      MODAL_DEPTH + 2,
-      { color: '#ff8888', hoverColor: '#ffaaaa' },
-    );
-    s.overlayObjects.push(cancelBtn);
-    cancelBtn.on('pointerdown', () => {
-      dismissOverlay(s.overlayObjects);
-      s.overlayObjects = [];
-    });
   }
 }

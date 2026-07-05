@@ -203,7 +203,8 @@ describe('Renderer Development label (AC3)', () => {
 describe('Market logic with renamed array and mixed types (AC4)', () => {
   it('purchase should remove a business card from the development row', () => {
     const state = createTestState();
-    const card = state.market.development[0] as BusinessCard;
+    const card = state.market.development.find(c => c.cost <= state.resourceBank.coins) as BusinessCard;
+    expect(card).toBeDefined();
     const coinsBefore = state.resourceBank.coins;
     purchaseBusiness(state, card.id, 0);
 
@@ -504,7 +505,9 @@ describe('Development market row integration', () => {
 
   it('should handle full purchase lifecycle for business cards', () => {
     const state = createTestState();
-    const card = state.market.development[0] as BusinessCard;
+    // Find the first affordable card in the development market
+    const card = state.market.development.find(c => c.cost <= state.resourceBank.coins) as BusinessCard;
+    expect(card).toBeDefined();
     const coinsBefore = state.resourceBank.coins;
     purchaseBusiness(state, card.id, 0);
 

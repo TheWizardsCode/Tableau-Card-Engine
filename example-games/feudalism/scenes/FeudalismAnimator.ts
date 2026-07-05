@@ -17,6 +17,9 @@ import {
 import { moveGameObject } from '../../../src/ui';
 
 export class FeudalismAnimator {
+  /** When true, all animations are skipped. */
+  reducedMotion = false;
+
   private scene: Phaser.Scene;
   private session: FeudalismSession;
 
@@ -107,6 +110,7 @@ export class FeudalismAnimator {
       destX: destPos.x,
       destY: destPos.y,
       duration: MOVE_DURATION,
+      reducedMotion: this.reducedMotion,
       onComplete: () => {
         flyingCard.destroy();
         if (marketSlot) {
@@ -136,6 +140,7 @@ export class FeudalismAnimator {
       destX: slotPos.x,
       destY: slotPos.y,
       duration: MOVE_DURATION * 0.7,
+      reducedMotion: this.reducedMotion,
       onComplete: () => {
         flyingBack.destroy();
         onRefreshMarket();
@@ -171,6 +176,7 @@ export class FeudalismAnimator {
       destX: patronDest.x,
       destY: patronDest.y,
       duration: MOVE_DURATION,
+      reducedMotion: this.reducedMotion,
       onComplete: () => {
         flyingPatron.destroy();
         onRefreshPatronsAndPlayer();

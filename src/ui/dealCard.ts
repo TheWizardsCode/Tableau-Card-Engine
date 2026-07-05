@@ -79,6 +79,12 @@ export interface DealCardOptions {
    */
   playerIndex?: number;
 
+  /**
+   * When true, dealing is instant — target snaps to destination without tweens.
+   * Overrides CSS media query.  Default: false (animate).
+   */
+  reducedMotion?: boolean;
+
   /** Optional SoundManager to play SFX during the deal. */
   soundManager?: SoundManager | null;
 
@@ -137,6 +143,7 @@ export function dealCard(opts: DealCardOptions): Phaser.Tweens.Tween {
     gameEvents,
     cardId,
     playerIndex,
+    reducedMotion,
     soundManager = null,
     sfx,
   } = opts;
@@ -149,11 +156,11 @@ export function dealCard(opts: DealCardOptions): Phaser.Tweens.Tween {
   target.setPosition(startX, startY);
   target.setRotation(0);
 
-  // Check for reduced motion preference
-  const reducedMotion = prefersReducedMotion();
+  // Check for reduced motion preference (explicit param takes precedence)
+  const shouldReduce = reducedMotion ?? prefersReducedMotion();
 
   // Handle reduced motion - just jump to destination (ease is not used in reduced motion mode)
-  if (reducedMotion) {
+  if (shouldReduce) {
     target.setPosition(destX, destY);
     if (gameEvents && cardId) {
       gameEvents.emit('card:dealt', { cardId, playerIndex });

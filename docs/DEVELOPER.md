@@ -125,14 +125,17 @@ MONTE_SEEDS=50 npm run monte-carlo
 MONTE_SEEDS=200 MONTE_MIN_WIN_RATE=0.20 MONTE_MAX_WIN_RATE=0.80 npm test
 ```
 
-Tests use [Vitest](https://vitest.dev/) configured inline in `vite.config.ts` with two test projects:
+Tests use [Vitest](https://vitest.dev/) configured inline in `vite.config.ts` with three test projects:
 
 | Project | Environment | File Pattern | Purpose |
 |---------|-------------|-------------|---------|
 | `unit` | Node.js | `tests/**/*.test.ts` | Logic, data, and integration tests |
-| `browser` | Chromium (Playwright) | `tests/**/*.browser.test.ts` | Phaser UI and rendering tests |
+| `browser` | Chromium (Playwright) | `tests/**/*.browser.test.ts` (excludes tutorial E2E) | Phaser UI and rendering tests |
+| `tutorial` | Chromium (Playwright) | `tests/e2e/main-street-tutorial-e2e-*.browser.test.ts` | Main Street tutorial E2E tests (run separately to avoid GPU context exhaustion) |
 
-Both projects run together via `npm test`. The browser project runs in headless Chromium using `@vitest/browser` with the Playwright provider.
+All three projects run together via `npm test`. The browser and tutorial projects run in headless Chromium using `@vitest/browser` with the Playwright provider.
+
+The tutorial E2E tests are split into 6 part files (1-6 tests per file) and run via `scripts/run-tutorial-tests.sh`, which spawns a separate Chromium instance for each part to avoid the Phaser 4 RC GPU/Canvas context exhaustion that occurs after ~8 game create/destroy cycles in a single browser process. The helper module at `tests/helpers/main-street-tutorial-e2e.ts` contains shared game lifecycle utilities (`bootGameWithTutorial`, `destroyGame` with CanvasPool drain) and click helpers for tutorial step advancement.
 
 During Vitest runs, the dev-only transcript persistence middleware (`POST /api/transcripts`) is intentionally disabled even though Vitest browser mode uses an internal Vite server. This prevents file-system side effects and reduces harness noise/flakiness during test execution.
 
@@ -212,6 +215,7 @@ src/
 │   ├── GameState.ts        GameState<T>, createGameState (deprecated for setup — use SetupOptions)
 │   ├── SetupOptions.ts     BaseSetupOptions, MultiplayerSetupOptions, resolveSetupOptions
 │   ├── SeededRng.ts        createSeededRng — deterministic PRNG (LCG) for shuffles and AI
+│   ├── ActiveEffect.ts     Duration-based modifier system (create, decay, apply, query)
 │   ├── CheckpointManager.ts   Checkpoint save-and-resume abstraction (save, load, clear, checkAndResume)
 │   ├── CheckpointResumeOverlay.ts Built-in default resume overlay component
 │   ├── TranscriptRecorder.ts BaseTranscript interface, TranscriptRecorderBase<T> abstract base class
@@ -614,6 +618,48 @@ manager.checkAndResume(
 The `CheckpointManager` delegates all storage to `SaveLoadStore` (IndexedDB
 with localStorage fallback). See `src/core-engine/CheckpointManager.ts` for
 full API documentation.
+
+## ActiveEffect System
+
+The `ActiveEffect` module (`src/core-engine/ActiveEffect.ts`) provides a
+duration-based modifier system that tracks ongoing effects over multiple turns.
+
+### Core Types
+
+- **`ActiveEffect`** – interface with `effectType`, `multiplier`, `turnsRemaining`,
+  `sourceEventId`, and `description`.
+- **`DecayResult`** – result of a decay operation with `active`, `expired`, and
+  `effects` arrays.
+
+### API Functions
+
+All functions are exported from `@core-engine/index`:
+
+| Function | Purpose |
+|----------|---------|
+| `createActiveEffect(type, mult, turns, sourceId, desc)` | Create a new effect |
+| `decayActiveEffects(effects)` | Decrement all effects, return active/expired sets |
+| `applyActiveEffectMultiplier(effects, type, baseValue)` | Apply matching multipliers (rounded) |
+| `hasActiveEffectOfType(effects, type)` | Check if any effect of given type exists |
+
+### Usage Pattern
+
+Duration-based Event cards (e.g. `evt-flu-outbreak`) extend `EventCard` with
+`duration`, `effectType`, and `multiplier` fields. The engine's `resolveEvent()`
+function detects `DurationEventCard` instances via the `isDurationEventCard()`
+type guard and creates an `ActiveEffect` instead of applying one-shot deltas.
+
+Income-modifier effects are applied per-slot during `applyIncome()` _before_
+the reputation coin multiplier. Effects decay at the end of each turn during
+`EndCheck` in `processEndOfTurn()`.
+
+### Main Street Integration
+
+- `MainStreetState.activeEffects` stores the active effects array
+- Serialization/deserialization includes `activeEffects` with migration for
+  old saves (missing field defaults to `[]`)
+- Duration computation for `evt-flu-outbreak` scans the street grid for
+  Clinic/Medical Center cards
 
 ## Replay Tool
 
@@ -1106,7 +1152,7 @@ this.applyUpgradeOverlays(cardContainer, biz, renderW, renderH);
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                     Game State Update                           │
-│  Player upgrades Bookshop → Library (level 1→2, income +3→+8)  │
+│  Player upgrades Bookshop → Reader's Café (level 1→2, income +3→+8)  │
 └──────────────────────────┬──────────────────────────────────────┘
                            │
                            ▼
@@ -1610,7 +1656,7 @@ The tutorial layout defines these zones (all use normalized coordinates with opt
 |---------|-------------|-----------------|
 | `hud` | HUD strip (top bar with coins, reputation, score) | Yes (full-width bounding box) |
 | `marketBusinessRow` | Business card row in the market area | Yes |
-| `streetGrid` | The 2×5 street grid for placing businesses | Yes (full-width) |
+| `streetGrid` | The 2×5 street grid for placing businesses | Yes (stops before right column) |
 | `endTurnButton` | End Turn action button area | Yes |
 | `incidentQueue` | Scrollable incident cards queue | Yes |
 | `investmentsRow` | Investment/upgrade card row | Yes |
@@ -1917,6 +1963,8 @@ wl close <id> --reason "..." --json  # close when done
 **Vite dev server won't start:**
 - Check port 3000 is not already in use: `lsof -i :3000`
 - Try `npm run dev -- --port 3001` for an alternate port
+- **Stale lock file:** If port 3000 appears free but the dev server fails, remove any stale lock file: `rm -f tmp/dev-server-lock.json`
+- **Orphaned Vite process:** If `lsof -i :3000` shows a Node.js process, kill it: `kill -9 $(lsof -t -i :3000)`
 
 **TypeScript errors on build:**
 - Run `npx tsc --noEmit` to see detailed errors
@@ -1932,6 +1980,7 @@ wl close <id> --reason "..." --json  # close when done
 - Check that `@vitest/browser` version matches `vitest` version
 - Browser tests boot a real Phaser game and may take 8-10 seconds each
 - If tests hang, check for unresolved game instances (ensure `afterEach` destroys the game)
+- **Process/resource leak cleanup:** All browser tests should clean up Phaser.Game instances in `afterEach` using `game.destroy(true, false)` and remove the game container div. The dev server utilities (`scripts/dev-server-utils.ts`) include SIGTERM/SIGINT handlers to clean up orphaned Vite processes and stale lock files on forced exit.
 
 **Large bundle warning:**
 - The Phaser library is ~1.4 MB minified -- this is expected
@@ -1941,6 +1990,7 @@ wl close <id> --reason "..." --json  # close when done
 - The replay tool (`npm run replay`) and transcript export (`npm run transcripts:export`) auto-start the dev server if `localhost:3000` is not responding
 - If auto-start fails, start the dev server manually: `npm run dev`
 - Check port 3000 availability: `lsof -i :3000`
+- **Port conflict detection:** The `ensureDevServer()` helper now checks for existing processes on port 3000 before starting, logs warnings for potential conflicts, and cleans up stale lock files automatically.
 
 **Replay tool: Unsupported transcript version error:**
 - The transcript schema includes a `version` field; the replay tool validates this and exits with a clear error if the version is unsupported

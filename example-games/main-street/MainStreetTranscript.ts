@@ -11,7 +11,8 @@ export type MainStreetTranscriptEvent =
   | { type: 'redo'; turn: number; reappliedAction: { description?: string; [k: string]: any } }
   | { type: 'turn-end'; turn: number }
   | { type: 'game-end'; turn: number; finalScore: number; result?: any }
-  | { type: 'info'; turn: number; message: string };
+  | { type: 'info'; turn: number; message: string }
+  | { type: 'active-effect'; turn: number; effectType: string; sourceEventId: string; duration: number; description: string };
 
 export interface MainStreetTranscript {
   version: number;

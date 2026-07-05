@@ -10,7 +10,7 @@ import { scoreVisibleCards, scoreGrid } from '../GolfScoring';
 import type { Card } from '../../../src/card-system/Card';
 import type { GolfSession } from '../GolfGame';
 import { GAME_W, GAME_H } from '../../../src/ui';
-import { createSceneTitle, createSceneMenuButton } from '@ui/Renderer';
+import { createSceneTitle } from '@ui/Renderer';
 import { PileView } from '../../../src/ui/PileView';
 import {
   createGolfHudText,
@@ -76,11 +76,6 @@ export class GolfRenderer {
   // ── UI creation ─────────────────────────────────────────
 
   createLabels(): void {
-    // Menu button (top-left) -- returns to game selector
-    if (!this.replayMode) {
-      createSceneMenuButton(this.scene);
-    }
-
     createSceneTitle(this.scene, '9-Card Golf');
 
     // Player labels above each grid

@@ -99,7 +99,9 @@ describe('Beleaguered Castle help panel', () => {
     }
 
     scene.helpPanel.close();
-    await waitFrames(10);
+    // Wait enough frames for the 300ms slide-out animation to complete
+    // (inputBlocker is only removed in the onComplete callback).
+    await waitFrames(20);
     expect(scene.helpPanel.isOpen).toBe(false);
     expect((scene.helpPanel as any).inputBlocker).toBeNull();
   });
@@ -130,7 +132,9 @@ describe('Beleaguered Castle settings panel', () => {
     }
 
     scene.settingsPanel.close();
-    await waitFrames(10);
+    // Wait enough frames for the 300ms slide-out animation to complete
+    // (inputBlocker is only removed in the onComplete callback).
+    await waitFrames(20);
     expect(scene.settingsPanel.isOpen).toBe(false);
     expect((scene.settingsPanel as any).inputBlocker).toBeNull();
   });

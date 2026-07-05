@@ -56,7 +56,7 @@ const TIER_1_CARD_IDS: string[] = [
   // Upgrade (3)
   'upg-patisserie',
   'upg-bistro',
-  'upg-library',
+  'upg-readers-cafe',
 
   // Early expanded sample (~10% of expanded set => 5 cards)
   'biz-pawnshop',
@@ -106,13 +106,17 @@ const TIER_4_NEW_CARD_IDS: string[] = [
   'biz-gallery',
   'biz-florist',
   'biz-clinic',
+  'biz-private-clinic',
+  'biz-pharmacy',
   'evt-noise-complaint',
   'evt-pipe-burst',
   'evt-power-outage',
+  'evt-flu-outbreak',
   'upg-grand-bakehouse',
   'upg-home-improvement',
   'upg-medical-center',
   'upg-museum',
+  'upg-private-medical-center',
 ];
 
 // ── Tier 5 Card IDs (Landmark) ─────────────────────────────
@@ -122,6 +126,25 @@ const TIER_5_NEW_CARD_IDS: string[] = [
   'evt-shoplifting',
   'evt-vandalism',
   'evt-viral-review',
+  // M3 doubled event pool (18 new unique event templates)
+  'evt-harvest-festival',
+  'evt-health-campaign',
+  'evt-street-performer',
+  'evt-bulk-purchase',
+  'evt-book-fair',
+  'evt-volunteer-day',
+  'evt-community-garden',
+  'evt-festival-season',
+  'evt-protest',
+  'evt-supply-chain',
+  'evt-power-surge',
+  'evt-strike',
+  'evt-heatwave',
+  'evt-pest-infestation',
+  'evt-slow-season',
+  'evt-good-press',
+  'evt-tourist-bus',
+  'evt-cultural-grant',
   'upg-luxury-retreat',
   'upg-multiplex',
   'upg-resort-spa',

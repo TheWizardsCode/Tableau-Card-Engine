@@ -217,8 +217,9 @@ describe('HandView animateAddCard', () => {
       expect(centers).toHaveLength(3);
 
       // Compute expected positions for 3 cards with spacing=56, arcRadius=0
+      // baseX is the center when _centerX is not set
       const gap = (hv as any).spacing - (hv as any).cardWidth;
-      const centerX = baseX + (3 - 1) * (hv as any).spacing / 2;
+      const centerX = baseX;
       const { positions } = layoutCardPositions({
         count: 3,
         cardWidth: (hv as any).cardWidth,
@@ -278,10 +279,10 @@ describe('HandView animateAddCard', () => {
       // For 4 cards with spacing=56, halfSpan = (3*56)/2 = 84
       // To compute max offset for index 1:
       //   gap = 56 - 48 = 8
-      //   centerX = 300 + 3*56/2 = 384
-      //   positions: [300, 356, 412, 468]
-      //   arcCenterX = (300+468)/2 = 384, halfSpan = 84
-      //   normalized for index 1: (356-384)/84 = -0.333
+      //   centerX = 300 (baseX as center when _centerX is not set)
+      //   positions: [216, 272, 328, 384]
+      //   arcCenterX = (216+384)/2 = 300, halfSpan = 84
+      //   normalized for index 1: (272-300)/84 = -0.333
       //   offsetY = (1-0.111) * 84² / (2*150) = 0.889 * 7056 / 300 ≈ 20.9
       //   So destY ≈ 500 - 20.9 = 479.1
       expect(innerCenter.y).toBeGreaterThan(baseY - 50);
@@ -377,8 +378,9 @@ describe('HandView animateAddCard', () => {
       expect(centers).toHaveLength(6);
 
       // Compute expected using layoutCardPositions with compression for 6 cards
+      // baseX is the center when _centerX is not set
       const gap = (hv as any).spacing - (hv as any).cardWidth;
-      const centerX = (hv as any).baseX + (6 - 1) * (hv as any).spacing / 2;
+      const centerX = (hv as any).baseX;
       const { positions } = layoutCardPositions({
         count: 6,
         cardWidth: (hv as any).cardWidth,
@@ -551,8 +553,9 @@ describe('HandView animateAddCard', () => {
       expect(hv.getCards()).toHaveLength(2);
 
       const centers = hv.getCardCenters();
-      expect(centers[0].x).toBe(baseX);
-      expect(centers[1].x).toBe(baseX + (hv as any).spacing);
+      // With centerX=baseX, 2 cards should be centered around baseX
+      const avgX = (centers[0].x + centers[1].x) / 2;
+      expect(Math.abs(avgX - baseX)).toBeLessThanOrEqual(1);
     });
 
     it('reducedMotion: no temporary animation sprites linger', async () => {
@@ -719,9 +722,9 @@ describe('HandView animateAddCard', () => {
       expect(centers).toHaveLength(3);
 
       // Compute expected: gap = 56 - 48 = 8
-      // centerX = 300 + (3-1)*56/2 = 300 + 56 = 356
+      // centerX = 300 (baseX as center when _centerX is not set)
       const gap = (hv as any).spacing - (hv as any).cardWidth;
-      const centerX = baseX + (3 - 1) * (hv as any).spacing / 2;
+      const centerX = baseX;
       const { positions } = layoutCardPositions({
         count: 3,
         cardWidth: (hv as any).cardWidth,

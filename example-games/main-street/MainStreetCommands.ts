@@ -13,8 +13,10 @@ import { toCommand, type ReversibleAction } from '../../src/core-engine/ActionCo
 import type { MainStreetState } from './MainStreetState';
 import {
   purchaseBusiness,
+  purchaseBusinessToHand,
   purchaseUpgrade,
   purchaseEvent,
+  refreshDevelopment,
   refreshInvestments,
 } from './MainStreetMarket';
 import { playHeldEvent } from './MainStreetEngine';
@@ -125,6 +127,20 @@ export function buyUpgradeCommand(
   );
 }
 
+/** Command: Buy Business to Hand */
+export function buyBusinessToHandCommand(
+  state: MainStreetState,
+  cardId: string,
+) {
+  return toCommand(
+    state,
+    snapshotAction(
+      (s) => purchaseBusinessToHand(s, cardId),
+      `BuyBusinessToHand ${cardId}`,
+    ),
+  );
+}
+
 /** Command: Buy Event (Investment) */
 export function buyEventCommand(
   state: MainStreetState,
@@ -146,6 +162,17 @@ export function playEventCommand(state: MainStreetState) {
     snapshotAction(
       (s) => playHeldEvent(s),
       'PlayHeldEvent',
+    ),
+  );
+}
+
+/** Command: Refresh Development Row */
+export function refreshDevelopmentCommand(state: MainStreetState) {
+  return toCommand(
+    state,
+    snapshotAction(
+      (s) => refreshDevelopment(s),
+      'RefreshDevelopment',
     ),
   );
 }

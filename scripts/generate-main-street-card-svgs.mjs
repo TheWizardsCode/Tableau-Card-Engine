@@ -43,6 +43,7 @@ const synergyColor = {
   Commerce: '#27AE60',
   Service: '#9B59B6',
   Entertainment: '#E74C3C',
+  Health: '#1ABC9C',
 };
 
 function familyColor(family, trigger) {

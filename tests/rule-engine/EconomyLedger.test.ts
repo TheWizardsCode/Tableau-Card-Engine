@@ -393,8 +393,9 @@ describe('EconomyLedger — Main Street integration parity', () => {
       const ledger = ledgerFromState(state);
 
       const coinsBefore = state.resourceBank.coins;
-      const businessCard = state.market.development[0];
-      purchaseBusiness(state, businessCard.id, 0);
+      const businessCard = state.market.development.find(c => c.cost <= coinsBefore);
+      expect(businessCard).toBeDefined();
+      purchaseBusiness(state, businessCard!.id, 0);
 
       const expectedDelta = state.resourceBank.coins - coinsBefore;
       verifyParity(state, ledger, { coins: expectedDelta, reputation: 0 });

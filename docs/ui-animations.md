@@ -8,7 +8,9 @@ The Tableau Card Engine provides reusable animation helpers in `src/ui/` for com
 |------------|-------------|-------------------|
 | `dealCard` | Card dealing animation with arc motion | 400ms |
 | `placeCard` | Card placement animation with "snap" effect | 350ms |
-| `placeCard` | Card discard animation with fade/shrink | 400ms |
+| `discardCard` | Card discard animation with fade/shrink | 400ms |
+| `flipCard` | Two-phase card flip (scaleX → 0 → texture swap → scaleX → 1) | 300ms |
+| `moveGameObject` | Positional movement tween | 700ms |
 
 ## dealCard
 
@@ -53,6 +55,7 @@ dealCard({
 | `gameEvents` | `GameEventEmitter` | undefined | Event emitter |
 | `cardId` | `string` | undefined | Card ID for event payload |
 | `playerIndex` | `number` | undefined | Player index for event payload |
+| `reducedMotion` | `boolean` | undefined | When true, animation is skipped and snaps to destination instantly |
 
 ### Events
 
@@ -100,6 +103,7 @@ placeCard({
 | `cardId` | `string` | undefined | Card ID for event |
 | `playerIndex` | `number` | undefined | Player index |
 | `slotIndex` | `number` | undefined | Slot index |
+| `reducedMotion` | `boolean` | undefined | When true, animation is skipped and snaps to destination instantly |
 
 ### Events
 
@@ -143,14 +147,116 @@ discardCard({
 | `cardId` | `string` | undefined | Card ID for event |
 | `playerIndex` | `number` | undefined | Player index |
 | `destroyAfter` | `boolean` | true | Destroy sprite after |
+| `reducedMotion` | `boolean` | undefined | When true, animation is skipped and target is hidden/destroyed instantly |
 
 ### Events
 
 Emits `card:discarded` event on completion.
 
+## flipCard
+
+Performs the classic "scaleX → 0 → change texture → scaleX → 1" card flip animation. Optionally translates the sprite to a destination during the flip.
+
+### Import
+
+```ts
+import { flipCard } from '@ui/flipCard';
+```
+
+### Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `scene` | `Phaser.Scene` | required | The Phaser scene |
+| `target` | `Image | Sprite` | required | The sprite to flip |
+| `newTexture` | `string` | required | Texture key for the face side |
+| `duration` | `number` | 300 | Total duration in ms |
+| `easeClose` | `string` | 'Power2' | Easing for close phase |
+| `easeOpen` | `string` | easeClose | Easing for open phase |
+| `destX` | `number` | undefined | Destination X (for flip + translate) |
+| `destY` | `number` | undefined | Destination Y |
+| `onMidpoint` | `function` | undefined | Called at midpoint after texture swap |
+| `onComplete` | `function` | undefined | Called after flip completes |
+| `reducedMotion` | `boolean` | undefined | When true, texture swaps instantly without animation |
+
+## moveGameObject
+
+Animates a Phaser game object from its current position to a target (x, y) with configurable duration, easing, and an onComplete callback. Position-only translation.
+
+### Import
+
+```ts
+import { moveGameObject } from '@ui/moveGameObject';
+```
+
+### Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `scene` | `Phaser.Scene` | required | The Phaser scene |
+| `target` | `GameObject` | required | The object to move |
+| `destX` | `number` | required | Destination X |
+| `destY` | `number` | required | Destination Y |
+| `duration` | `number` | 700 | Duration in ms |
+| `ease` | `string` | 'Quad.easeOut' | Easing function |
+| `onComplete` | `function` | undefined | Called after movement completes |
+| `reducedMotion` | `boolean` | undefined | When true, target snaps to destination instantly |
+| `sfx` | `object` | undefined | Optional SFX configuration (start/move/end keys) |
+
+## popTextOrIcon
+
+Animate a pop-up text or icon (rises, fades, and scales up briefly).
+
+### Import
+
+```ts
+import { popTextOrIcon } from '@ui/popTextOrIcon';
+```
+
+### Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `scene` | `Phaser.Scene` | required | The Phaser scene |
+| `target` | `GameObject` | undefined | Existing text/icon object |
+| `label` | `string` | undefined | Text label (created if no target provided) |
+| `reducedMotion` | `boolean` | undefined | When true, destroys target immediately without animation |
+
+## runSceneTransition
+
+Animate a scene transition (fade or slide enter/exit).
+
+### Import
+
+```ts
+import { runSceneTransition } from '@ui/sceneTransition';
+```
+
+### Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `scene` | `Phaser.Scene` | required | The Phaser scene |
+| `mode` | `'enter' | 'exit'` | required | Transition direction |
+| `type` | `'fade' | 'slide'` | 'fade' | Transition type |
+| `duration` | `number` | 300 | Duration in ms |
+| `reducedMotion` | `boolean` | undefined | When true, transition completes instantly |
+
 ## Accessibility
 
-All animation helpers respect the `prefers-reduced-motion` media query. When reduced motion is preferred, animations complete instantly (50ms) without the visual effects.
+All animation helpers respect the reduced motion preference with the following priority:
+
+1. **Explicit `reducedMotion` parameter** — when passed directly to the animation call, takes highest priority.
+2. **SettingsStore preference** — the in-game "Reduced Motion" toggle in the Settings panel (persisted to `localStorage` under `tce-ui-reduced-motion`).
+3. **CSS media query** — `prefers-reduced-motion: reduce` as fallback when no explicit preference is set.
+
+The utility function `getEffectiveReducedMotion(storage?)` in `src/ui/ReducedMotion.ts` implements this priority chain and can be used directly by any code that needs to check the preference.
+
+When reduced motion is enabled:
+- All tweens are skipped and sprites snap to their final position/state instantly
+- All sound effects (SFX) are suppressed
+- Callbacks (`onComplete`) fire synchronously
+- Events (e.g., `card:placed`) are emitted correctly
 
 ## Event Types
 

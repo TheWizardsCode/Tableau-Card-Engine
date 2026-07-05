@@ -33,6 +33,7 @@ import { HelpButton } from './HelpButton';
 import { SettingsPanel } from './SettingsPanel';
 import { SettingsButton } from './SettingsButton';
 import type { HelpSection } from './HelpPanel';
+import { createSceneMenuButton } from './SceneHeader';
 import { createStandardUndoRedoButtons } from './Renderer';
 
 // ── Audio path utility ───────────────────────────────────────
@@ -77,11 +78,7 @@ export function audioPathWithFallback(gameDir: string, filename: string): string
  *   constructor() { super({ key: 'MyGameScene' }); }
  *
  *   create(): void {
- *     // Replay detection (call early)
- *     this.detectReplayMode();
- *
- *     // Event system (must come before sound)
- *     this.initEventSystem();
+ *     super.create();  // auto-runs replay detection, event system, HUD, menu button
  *
  *     // Sound system (skipped in replay mode)
  *     if (!this.replayMode) {
@@ -131,6 +128,8 @@ export abstract class CardGameScene extends Phaser.Scene {
   protected settingsPanel!: SettingsPanel;
   /** Settings toggle button. */
   protected settingsButton!: SettingsButton;
+  /** Menu button – navigates to GameSelectorScene. */
+  protected menuButton!: Phaser.GameObjects.Container;
 
   // ── Undo/Redo buttons ─────────────────────────────────────
 
@@ -143,6 +142,22 @@ export abstract class CardGameScene extends Phaser.Scene {
 
   /** When true, the scene suppresses input and AI turns for replay use. */
   protected replayMode = false;
+
+  /**
+   * Called automatically by Phaser's lifecycle.
+   *
+   * Detects replay mode, initialises the event system, creates the
+   * shared HUD container, and adds a Menu button to the header bar.
+   *
+   * Subclasses **must** call `super.create()` at the **start** of
+   * their own `create()` method to inherit this common setup.
+   */
+  create(): void {
+    this.detectReplayMode();
+    this.initEventSystem();
+    this.initHUDContainer();
+    this.initMenuButton();
+  }
 
   // ── Initializers ─────────────────────────────────────────
 
@@ -240,13 +255,32 @@ export abstract class CardGameScene extends Phaser.Scene {
    *
    * @param difficultyNames  Optional ordered list of difficulty names.
    */
-  protected initSettingsPanel(difficultyNames?: readonly string[]): void {
+  protected initSettingsPanel(difficultyNames?: readonly string[], defaultDifficulty?: string): void {
     if (!this.soundManager) return;
     this.settingsPanel = new SettingsPanel(this, {
       soundManager: this.soundManager,
       difficultyNames,
+      defaultDifficulty,
     });
     this.settingsButton = this.settingsPanel.settingsButton!;
+  }
+
+  /**
+   * Create a "Menu" button in the top-left header bar that navigates
+   * to the GameSelectorScene on click.
+   *
+   * Styled as a compact action button – call this after initHUDContainer
+   * so the button is parented into the HUD layer.
+   */
+  protected initMenuButton(): void {
+    this.menuButton = createSceneMenuButton(this);
+    try {
+      if (this.hudContainer) {
+        this.hudContainer.add(this.menuButton);
+      }
+    } catch {
+      // ignore
+    }
   }
 
   // ── Undo/Redo buttons ─────────────────────────────────────

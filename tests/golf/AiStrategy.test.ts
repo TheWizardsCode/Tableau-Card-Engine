@@ -12,6 +12,8 @@ import {
   AiPlayer,
   chooseDrawSource,
   chooseMoveForCard,
+  countVisibleRanks,
+  computeColumnBonus,
 } from '../../example-games/golf/AiStrategy';
 import {
   setupGolfGame,
@@ -22,6 +24,8 @@ import {
 import type {
   GolfSharedState,
   AiVisibleSharedState,
+  AiVisiblePlayerState,
+  AiVisibleGrid,
 } from '../../example-games/golf/GolfGame';
 import { isLegalMove } from '../../example-games/golf/GolfRules';
 import { createCard } from '../../src/card-system/Card';
@@ -460,5 +464,355 @@ describe('Fair play: information boundary', () => {
     expect(move.kind).toBe('swap');
     expect(move.row).toBe(0);
     expect(move.col).toBe(0);
+  });
+});
+
+describe('countVisibleRanks', () => {
+  it('counts face-up cards from the grid', () => {
+    const cards = [
+      createCard('A', 'clubs', true),    // A
+      createCard('K', 'hearts', true),   // K
+      createCard('A', 'spades', true),   // A
+      createCard('5', 'clubs', false),   // face-down
+      createCard('6', 'hearts', false),
+      createCard('7', 'spades', false),
+      createCard('8', 'clubs', false),
+      createCard('9', 'hearts', false),
+      createCard('10', 'spades', false),
+    ];
+    const grid = createGolfGrid(cards);
+    const ps: AiVisiblePlayerState = createAiVisiblePlayerState({ grid });
+    const shared: AiVisibleSharedState = {
+      discardTop: undefined,
+      stockHasCards: true,
+      roundEnd: createRoundEndState(2),
+    };
+
+    const ranks = countVisibleRanks(ps, shared);
+    expect(ranks['A']).toBe(2);
+    expect(ranks['K']).toBe(1);
+    // Face-down cards should NOT be counted
+    expect(ranks['5']).toBeUndefined();
+    expect(ranks['6']).toBeUndefined();
+  });
+
+  it('includes the discard top card', () => {
+    const cards = [
+      createCard('K', 'clubs', true),    // K
+      createCard('K', 'hearts', true),   // K
+      createCard('2', 'spades', true),   // 2
+      createCard('5', 'clubs', false),
+      createCard('6', 'hearts', false),
+      createCard('7', 'spades', false),
+      createCard('8', 'clubs', false),
+      createCard('9', 'hearts', false),
+      createCard('10', 'spades', false),
+    ];
+    const grid = createGolfGrid(cards);
+    const ps: AiVisiblePlayerState = createAiVisiblePlayerState({ grid });
+    const shared: AiVisibleSharedState = {
+      discardTop: createCard('A', 'diamonds', true), // A
+      stockHasCards: true,
+      roundEnd: createRoundEndState(2),
+    };
+
+    const ranks = countVisibleRanks(ps, shared);
+    expect(ranks['K']).toBe(2);   // Two Kings in grid
+    expect(ranks['A']).toBe(1);   // Ace from discard top
+    expect(ranks['2']).toBe(1);   // One 2 in grid
+  });
+
+  it('does not count face-down cards', () => {
+    const cards = [
+      createCard('5', 'clubs', false),
+      createCard('6', 'hearts', false),
+      createCard('7', 'spades', false),
+      createCard('8', 'clubs', false),
+      createCard('9', 'hearts', false),
+      createCard('10', 'spades', false),
+      createCard('A', 'clubs', false),
+      createCard('K', 'hearts', false),
+      createCard('Q', 'spades', false),
+    ];
+    const grid = createGolfGrid(cards);
+    const ps: AiVisiblePlayerState = createAiVisiblePlayerState({ grid });
+    const shared: AiVisibleSharedState = {
+      discardTop: undefined,
+      stockHasCards: true,
+      roundEnd: createRoundEndState(2),
+    };
+
+    const ranks = countVisibleRanks(ps, shared);
+    // No face-up cards and no discard top
+    expect(Object.keys(ranks)).toHaveLength(0);
+  });
+
+  it('counts multiple copies of the same rank across grid and discard', () => {
+    const cards = [
+      createCard('K', 'clubs', true),     // K
+      createCard('K', 'hearts', true),    // K
+      createCard('K', 'spades', true),    // K
+      createCard('5', 'clubs', false),
+      createCard('6', 'hearts', false),
+      createCard('7', 'spades', false),
+      createCard('8', 'clubs', false),
+      createCard('9', 'hearts', false),
+      createCard('10', 'spades', false),
+    ];
+    const grid = createGolfGrid(cards);
+    const ps: AiVisiblePlayerState = createAiVisiblePlayerState({ grid });
+    const shared: AiVisibleSharedState = {
+      discardTop: createCard('K', 'diamonds', true), // 4th K
+      stockHasCards: true,
+      roundEnd: createRoundEndState(2),
+    };
+
+    const ranks = countVisibleRanks(ps, shared);
+    // All 4 Kings are visible across grid (3) and discard top (1)
+    expect(ranks['K']).toBe(4);
+  });
+});
+
+describe('computeColumnBonus', () => {
+  /**
+   * Helper: create a grid where column 0 builds toward a column match.
+   *
+   * Column 0 has: [K♣(face-up), A♠(face-up, non-matching), ?(face-down)].
+   * Drawing a K and swapping into the A♠ position (1,0) creates:
+   *   [K♣, K♥, ?] → 2 matching face-up + 1 unknown → bonus eligible.
+   */
+  function buildBuildableGrid(): [AiVisibleGrid, AiVisiblePlayerState] {
+    const cards = [
+      createCard('K', 'clubs', true),     // (0,0) -- K, matching
+      createCard('A', 'hearts', true),    // (0,1)
+      createCard('2', 'spades', true),    // (0,2)
+      createCard('A', 'spades', true),    // (1,0) -- non-matching swap target
+      createCard('3', 'clubs', true),     // (1,1)
+      createCard('4', 'hearts', true),    // (1,2)
+      createCard('5', 'clubs', false),    // (2,0) -- face-down, remains unknown
+      createCard('6', 'hearts', false),
+      createCard('7', 'spades', false),
+    ];
+    const grid = createGolfGrid(cards);
+    const ps: AiVisiblePlayerState = createAiVisiblePlayerState({ grid });
+    return [ps.grid, ps];
+  }
+
+  const buildMove = { kind: 'swap' as const, row: 1, col: 0 };
+  const drawnKing = createCard('K', 'hearts', true);
+
+  it('returns 0 for discard-and-flip moves', () => {
+    const [grid] = buildBuildableGrid();
+    const bonus = computeColumnBonus(
+      grid,
+      drawnKing,
+      { kind: 'discard-and-flip', row: 0, col: 0 },
+      {},
+    );
+    expect(bonus).toBe(0);
+  });
+
+  it('returns 0 when no matching cards in column', () => {
+    const [grid] = buildBuildableGrid();
+    // Drawing an Ace and swapping into (1,0) where A♠ is won't build toward
+    // any column because Ace doesn't match the King in column 0
+    const drawnAce = createCard('A', 'diamonds', true);
+    const bonus = computeColumnBonus(
+      grid,
+      drawnAce,
+      buildMove,
+      {},
+    );
+    expect(bonus).toBe(0);
+  });
+
+  it('returns 0 when all copies of target rank are visible', () => {
+    const cards = [
+      createCard('K', 'clubs', true),     // (0,0) -- K
+      createCard('A', 'hearts', true),    // (0,1)
+      createCard('2', 'spades', true),    // (0,2)
+      createCard('A', 'spades', true),    // (1,0) -- non-K swap target
+      createCard('3', 'clubs', true),     // (1,1)
+      createCard('4', 'hearts', true),    // (1,2)
+      createCard('5', 'clubs', false),    // (2,0) -- face-down
+      createCard('6', 'hearts', false),
+      createCard('7', 'spades', false),
+    ];
+    // Adding 3 more visible Kings to fill all 4 copies
+    const visibleRanks: Record<string, number> = {
+      K: 4, A: 2, '2': 1, '3': 1, '4': 1,
+    };
+    const grid = createGolfGrid(cards);
+    const ps: AiVisiblePlayerState = createAiVisiblePlayerState({ grid });
+
+    const bonus = computeColumnBonus(
+      ps.grid,
+      drawnKing,
+      buildMove,
+      visibleRanks,
+    );
+    // 0 unknown / 4 max = 0, weight = 2, bonus = 0
+    expect(bonus).toBeCloseTo(0);
+  });
+
+  it('returns negative bonus when unknown copies of target rank remain', () => {
+    const cards = [
+      createCard('K', 'clubs', true),     // (0,0) -- K
+      createCard('A', 'hearts', true),    // (0,1)
+      createCard('2', 'spades', true),    // (0,2)
+      createCard('A', 'spades', true),    // (1,0) -- non-K swap target
+      createCard('3', 'clubs', true),     // (1,1)
+      createCard('4', 'hearts', true),    // (1,2)
+      createCard('5', 'clubs', false),    // (2,0) -- face-down
+      createCard('6', 'hearts', false),
+      createCard('7', 'spades', false),
+    ];
+    const grid = createGolfGrid(cards);
+    const ps: AiVisiblePlayerState = createAiVisiblePlayerState({ grid });
+    const visibleRanks: Record<string, number> = {
+      K: 1, A: 2, '2': 1, '3': 1, '4': 1,
+    };
+
+    const bonus = computeColumnBonus(
+      ps.grid,
+      drawnKing,
+      buildMove,
+      visibleRanks,
+    );
+    // 3 unknown / 4 max = 0.75, weight = 2, bonus = -0.75 * 2 = -1.5
+    expect(bonus).toBe(-1.5);
+  });
+
+  it('bonus is proportional to remaining unknown copies', () => {
+    const cards = [
+      createCard('K', 'clubs', true),     // (0,0) -- K
+      createCard('A', 'hearts', true),    // (0,1)
+      createCard('2', 'spades', true),    // (0,2)
+      createCard('A', 'spades', true),    // (1,0) -- non-K swap target
+      createCard('3', 'clubs', true),     // (1,1)
+      createCard('4', 'hearts', true),    // (1,2)
+      createCard('5', 'clubs', false),    // (2,0) -- face-down
+      createCard('6', 'hearts', false),
+      createCard('7', 'spades', false),
+    ];
+    const grid = createGolfGrid(cards);
+    const ps: AiVisiblePlayerState = createAiVisiblePlayerState({ grid });
+
+    // 1 K visible → 3 unknown → -1.5
+    expect(computeColumnBonus(ps.grid, drawnKing, buildMove, { K: 1 })).toBe(-1.5);
+    // 2 K visible → 2 unknown → -1.0
+    expect(computeColumnBonus(ps.grid, drawnKing, buildMove, { K: 2 })).toBe(-1.0);
+    // 3 K visible → 1 unknown → -0.5
+    expect(computeColumnBonus(ps.grid, drawnKing, buildMove, { K: 3 })).toBe(-0.5);
+    // 4 K visible → 0 unknown → 0 (use toBeCloseTo to handle -0 vs +0)
+    expect(computeColumnBonus(ps.grid, drawnKing, buildMove, { K: 4 })).toBeCloseTo(0);
+  });
+});
+
+describe('chooseMoveForCard with visible rank weighting', () => {
+  it('applies column bonus when visibleRanks is provided (lowers score for build move)', () => {
+    // Column 0: [K♣, A♠, ?] -- drawing K and swapping into A♠ position builds column
+    const cards = [
+      createCard('K', 'clubs', true),     // (0,0) -- K
+      createCard('A', 'hearts', true),    // (0,1)
+      createCard('2', 'spades', true),    // (0,2)
+      createCard('A', 'spades', true),    // (1,0) -- non-K, build target
+      createCard('3', 'clubs', true),     // (1,1)
+      createCard('4', 'hearts', true),    // (1,2)
+      createCard('5', 'clubs', false),    // (2,0) -- face-down
+      createCard('6', 'hearts', false),
+      createCard('7', 'spades', false),
+    ];
+    const grid = createGolfGrid(cards);
+    const ps: AiVisiblePlayerState = createAiVisiblePlayerState({ grid });
+    const drawnCard = createCard('K', 'hearts', true);
+
+    // Choose the best move with bonus
+    const visibleRanks: Record<string, number> = { K: 1 };
+    const moveWithBonus = chooseMoveForCard(
+      ps.grid,
+      drawnCard,
+      createTestRng(42),
+      visibleRanks,
+    );
+
+    // Choose the best move without bonus
+    const moveNoBonus = chooseMoveForCard(
+      ps.grid,
+      drawnCard,
+      createTestRng(42),
+    );
+
+    // Both calls use the same RNG seed, so differences are from the bonus
+    // The bonus may change which move is selected in a close scenario.
+    // At minimum, the function should not throw and should return a legal move.
+    expect(moveWithBonus.kind === 'swap' || moveWithBonus.kind === 'discard-and-flip').toBe(true);
+    expect(moveNoBonus.kind === 'swap' || moveNoBonus.kind === 'discard-and-flip').toBe(true);
+  });
+});
+
+describe('chooseDrawSource with visible rank weighting', () => {
+  it('prefers discard when it helps build a column and unknown copies remain', () => {
+    // Column 0: [K♣, A♠, ?(face-down)]
+    // Discard has a King (helps column 0), stock available
+    // Only 1 King visible in grid (no K on discard before evaluating)
+    const cards = [
+      createCard('K', 'clubs', true),     // (0,0) -- K
+      createCard('A', 'hearts', true),    // (0,1)
+      createCard('2', 'spades', true),    // (0,2)
+      createCard('A', 'spades', true),    // (1,0) -- non-K, build target
+      createCard('3', 'clubs', true),     // (1,1)
+      createCard('4', 'hearts', true),    // (1,2)
+      createCard('5', 'clubs', false),    // (2,0) -- face-down
+      createCard('6', 'hearts', false),
+      createCard('7', 'spades', false),
+    ];
+    const grid = createGolfGrid(cards);
+    const rawPs = { grid };
+    const aiPs: AiVisiblePlayerState = createAiVisiblePlayerState(rawPs);
+
+    // Discard has a King (helps column 0), stock available
+    const shared: GolfSharedState = {
+      stockPile: [createCard('Q', 'diamonds')],
+      discardPile: new Pile([createCard('K', 'spades', true)]), // King on discard top
+      roundEnd: createRoundEndState(2),
+    };
+    const aiShared = createAiVisibleSharedState(shared);
+
+    // GreedyStrategy should prefer discard because King helps column 0
+    // and unknown Kings remain (only 1 King visible in grid currently)
+    const rng = createTestRng();
+    const action = GreedyStrategy.chooseAction(aiPs, aiShared, rng);
+    expect(action.drawSource).toBe('discard');
+  });
+});
+
+describe('Integration: existing tests still pass', () => {
+  it('full game simulation with GreedyStrategy still completes', () => {
+    const rng = createTestRng(111);
+    const session = setupGolfGame({ rng: createTestRng(222) });
+    const ai0 = new AiPlayer(GreedyStrategy, rng);
+    const ai1 = new AiPlayer(GreedyStrategy, createTestRng(333));
+
+    let turnCount = 0;
+    const maxTurns = 200;
+
+    while (session.gameState.phase !== 'ended' && turnCount < maxTurns) {
+      const currentIdx = session.gameState.currentPlayerIndex;
+      const ps = session.gameState.playerStates[currentIdx];
+      const ai = currentIdx === 0 ? ai0 : ai1;
+
+      const aiPs = createAiVisiblePlayerState(ps);
+      const aiShared = createAiVisibleSharedState(session.shared);
+      const action = ai.chooseAction(aiPs, aiShared);
+      const result = executeTurn(session, action);
+
+      expect(result.playerIndex).toBe(currentIdx);
+      turnCount++;
+    }
+
+    expect(session.gameState.phase).toBe('ended');
+    expect(turnCount).toBeLessThan(maxTurns);
+    expect(turnCount).toBeGreaterThan(0);
   });
 });

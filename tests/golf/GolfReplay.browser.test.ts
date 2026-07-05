@@ -218,11 +218,13 @@ describe('GolfScene replay mode', () => {
     internals.loadBoardState(testStates, null, 0);
     await nextFrame();
 
-    // Stock should be hidden
-    expect(internals.stockSprite.visible).toBe(false);
+    // Stock should be visible but ghosted (empty pile shows dimmed card back)
+    expect(internals.stockSprite.visible).toBe(true);
+    expect(internals.stockSprite.alpha).toBeLessThanOrEqual(0.3);
 
-    // Discard should be hidden (no card)
-    expect(internals.discardSprite.visible).toBe(false);
+    // Discard should be visible but ghosted (empty pile shows dimmed card back)
+    expect(internals.discardSprite.visible).toBe(true);
+    expect(internals.discardSprite.alpha).toBeLessThanOrEqual(0.3);
 
     // state-settled emitted again
     expect(settledEvents.length).toBeGreaterThanOrEqual(1);

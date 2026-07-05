@@ -44,6 +44,12 @@ export interface MoveGameObjectOptions {
    */
   onComplete?: () => void;
 
+  /**
+   * When true, animation is skipped and the target snaps to the destination
+   * immediately.  `onComplete` fires synchronously.  Default: false (animate).
+   */
+  reducedMotion?: boolean;
+
   /** Optional SoundManager to play SFX during the animation. */
   soundManager?: SoundManager | null;
 
@@ -82,9 +88,21 @@ export function moveGameObject(opts: MoveGameObjectOptions): Phaser.Tweens.Tween
     duration = 700,
     ease = 'Quad.easeOut',
     onComplete,
+    reducedMotion = false,
     soundManager = null,
     sfx,
   } = opts;
+
+  // When reduced motion is enabled, snap to destination immediately and fire callbacks
+  if (reducedMotion) {
+    target.x = destX;
+    target.y = destY;
+    onComplete?.();
+    return scene.tweens.add({
+      targets: target,
+      duration: 0,
+    });
+  }
 
   const moveInterval = sfx?.moveIntervalMs ?? 120;
   let lastMovePlay = 0;

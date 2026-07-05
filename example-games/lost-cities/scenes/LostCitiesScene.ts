@@ -113,9 +113,7 @@ export class LostCitiesScene extends CardGameScene {
   create(): void {
     this.cameras.main.setBackgroundColor('#1a2a1a');
 
-    this.detectReplayMode();
-    this.initEventSystem();
-    this.initHUDContainer();
+    super.create();
 
     this.session = setupLostCitiesGame({
       playerNames: ['You', 'AI'],
@@ -202,6 +200,10 @@ export class LostCitiesScene extends CardGameScene {
       };
       this.initSoundSystem(Object.values(SFX_KEYS), mapping, { namespace: 'lost-cities' });
       this.initSettingsPanel();
+      // Propagate reduced motion preference to the animator
+      if (this.settingsPanel) {
+        this.animator.reducedMotion = this.settingsPanel.reducedMotion;
+      }
     }
 
     this.lcRenderer.refreshAll((idx) => this.turnController.onHandCardClick(idx));

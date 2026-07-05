@@ -20,6 +20,7 @@
  */
 
 import { FONT_FAMILY } from '../../../src/ui';
+import { t, registerLocale } from '../../../src/core-engine/I18n';
 import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
 import { composeResolvedLayouts } from '../../../src/ui/screen-layout-compose';
 import { type LayoutViewport } from '../../../src/ui/screen-layout';
@@ -31,8 +32,20 @@ import {
   type TutorialControllerState,
   type TutorialHighlightZone,
 } from '../TutorialFlow';
+import { TUTORIAL_EN_BUNDLE } from '../i18n/tutorial-en';
 import baseLayout from '../layouts/main-street.layout.json';
+
+/*
+ * WARNING: Keep main-street-tutorial.layout.json zone coordinates in sync with
+ * the base layout (main-street.layout.json) and MainStreetRenderer positions.
+ * The tutorial layout uses sceneWins policy, so its zone rects override base
+ * zones with the same name. If the base layout or rendering constants change,
+ * update the corresponding tutorial zone rects to match.
+ */
 import tutorialLayout from '../layouts/main-street-tutorial.layout.json';
+
+// ── Register English locale bundle at module load time ───────
+registerLocale('en', TUTORIAL_EN_BUNDLE);
 
 // ── Pre-parse layouts at module load ──────────────────────────
 
@@ -270,13 +283,13 @@ export class MainStreetTutorialHints {
       titleEl.style.fontWeight = '700';
       titleEl.style.color = '#aaffaa';
       titleEl.style.marginBottom = `${padBetweenTitleAndBody}px`;
-      titleEl.textContent = step.title;
+      titleEl.textContent = t(step.titleKey);
       container.appendChild(titleEl);
 
       const bodyEl = document.createElement('div');
       bodyEl.style.whiteSpace = 'pre-wrap';
       bodyEl.style.color = '#ddccbb';
-      bodyEl.textContent = step.body;
+      bodyEl.textContent = t(step.bodyKey);
       container.appendChild(bodyEl);
 
       const btnRow = document.createElement('div');
@@ -295,7 +308,7 @@ export class MainStreetTutorialHints {
         const leftGroup = document.createElement('div');
         if (!isLast) {
           const exitBtn = document.createElement('button');
-          exitBtn.textContent = 'Exit Tutorial';
+          exitBtn.textContent = t('tutorial.overlay.exit');
           exitBtn.style.background = '#2a1a1a';
           exitBtn.style.color = '#cc6666';
           exitBtn.style.border = 'none';
@@ -311,7 +324,7 @@ export class MainStreetTutorialHints {
         } else {
           // Last step: "Start Full Game" replaces "Exit Tutorial"
           const startBtn = document.createElement('button');
-          startBtn.textContent = 'Start Full Game';
+          startBtn.textContent = t('tutorial.overlay.startFullGame');
           startBtn.style.background = '#44ff44';
           startBtn.style.color = '#002200';
           startBtn.style.border = 'none';
@@ -335,7 +348,7 @@ export class MainStreetTutorialHints {
         // the player navigates backward (e.g. market cards are consumed).
         const leftGroup = document.createElement('div');
         const dismissBtn = document.createElement('button');
-        dismissBtn.textContent = 'Dismiss';
+        dismissBtn.textContent = t('tutorial.overlay.dismiss');
         dismissBtn.style.background = '#2a2a1a';
         dismissBtn.style.color = '#aa8866';
         dismissBtn.style.border = 'none';
@@ -350,7 +363,7 @@ export class MainStreetTutorialHints {
 
         const rightGroup = document.createElement('div');
         const nextBtn = document.createElement('button');
-        nextBtn.textContent = isLast ? 'Start Full Game' : 'Next >';
+        nextBtn.textContent = isLast ? t('tutorial.overlay.startFullGame') : t('tutorial.overlay.next');
         nextBtn.style.background = isLast ? '#44ff44' : '#88ff88';
         nextBtn.style.color = '#002200';
         nextBtn.style.border = 'none';
@@ -409,7 +422,6 @@ export class MainStreetTutorialHints {
       this.objects.push(stepLabel);
     } catch (e) {
       // Fallback to in-canvas tooltip if DOM is not available or fails
-      // eslint-disable-next-line no-console
       // DOM tooltip creation failed; fall back to in-canvas rendering
 
       const tooltipH = TOOLTIP_H_BASE;
@@ -418,8 +430,8 @@ export class MainStreetTutorialHints {
 
       const bg = s.add.rectangle(domX + TOOLTIP_W / 2, tooltipY + tooltipH / 2, TOOLTIP_W, tooltipH, 0x1a2a1a).setDepth(TOOLTIP_DEPTH + 1000);
       const border = s.add.rectangle(domX + TOOLTIP_W / 2, tooltipY + tooltipH / 2, TOOLTIP_W, tooltipH).setStrokeStyle(2, 0x44aa44).setDepth(TOOLTIP_DEPTH + 1001);
-      const titleTxt = s.add.text(domX + 12, tooltipY + 12, step.title, { fontSize: '16px', color: '#aaffaa', fontFamily: FONT_FAMILY }).setDepth(TOOLTIP_DEPTH + 1002).setOrigin(0, 0);
-      const bodyTxt = s.add.text(domX + 12, tooltipY + 40, step.body, { fontSize: '13px', color: '#ddccbb', fontFamily: FONT_FAMILY, wordWrap: { width: TOOLTIP_W - 24 } as any }).setDepth(TOOLTIP_DEPTH + 1002).setOrigin(0, 0);
+      const titleTxt = s.add.text(domX + 12, tooltipY + 12, t(step.titleKey), { fontSize: '16px', color: '#aaffaa', fontFamily: FONT_FAMILY }).setDepth(TOOLTIP_DEPTH + 1002).setOrigin(0, 0);
+      const bodyTxt = s.add.text(domX + 12, tooltipY + 40, t(step.bodyKey), { fontSize: '13px', color: '#ddccbb', fontFamily: FONT_FAMILY, wordWrap: { width: TOOLTIP_W - 24 } as any }).setDepth(TOOLTIP_DEPTH + 1002).setOrigin(0, 0);
 
       const isLast = index === UNIFIED_TUTORIAL_STEP_COUNT - 1;
       const isActionStep = step.gate === 'action';
@@ -429,14 +441,14 @@ export class MainStreetTutorialHints {
         // No Continue button: the player performs the in-game action and
         // the tutorial auto-advances via onTutorialActionComplete.
         if (!isLast) {
-          const exitBtn = s.add.text(domX + 16, tooltipY + tooltipH - 30, 'Exit Tutorial', { fontSize: '13px', color: '#cc6666', fontFamily: FONT_FAMILY, padding: { left: 8, right: 8, top: 4, bottom: 4 } as any, backgroundColor: '#2a1a1a' }).setInteractive({ useHandCursor: true }).setDepth(TOOLTIP_DEPTH + 1003);
+          const exitBtn = s.add.text(domX + 16, tooltipY + tooltipH - 30, t('tutorial.overlay.exit'), { fontSize: '13px', color: '#cc6666', fontFamily: FONT_FAMILY, padding: { left: 8, right: 8, top: 4, bottom: 4 } as any, backgroundColor: '#2a1a1a' }).setInteractive({ useHandCursor: true }).setDepth(TOOLTIP_DEPTH + 1003);
           exitBtn.on('pointerdown', () => {
             try { (this.scene as any).exitTutorialFlow?.(); } catch (_) { /* ignore */ }
           });
           this.objects.push(exitBtn);
         } else {
           // Last step: "Start Full Game" replaces "Exit Tutorial"
-          const startBtn = s.add.text(domX + 16, tooltipY + tooltipH - 30, 'Start Full Game', { fontSize: '13px', color: '#002200', fontFamily: FONT_FAMILY, fontStyle: 'bold', padding: { left: 12, right: 12, top: 6, bottom: 6 } as any, backgroundColor: '#44ff44' }).setInteractive({ useHandCursor: true }).setDepth(TOOLTIP_DEPTH + 1003);
+          const startBtn = s.add.text(domX + 16, tooltipY + tooltipH - 30, t('tutorial.overlay.startFullGame'), { fontSize: '13px', color: '#002200', fontFamily: FONT_FAMILY, fontStyle: 'bold', padding: { left: 12, right: 12, top: 6, bottom: 6 } as any, backgroundColor: '#44ff44' }).setInteractive({ useHandCursor: true }).setDepth(TOOLTIP_DEPTH + 1003);
           startBtn.on('pointerdown', () => (s as any).confirmTutorialStep?.());
           this.objects.push(startBtn);
         }
@@ -445,12 +457,12 @@ export class MainStreetTutorialHints {
         // ── Confirm canvas row: Dismiss | Next/Finish ────────
         // No Prev button: action-gated steps cannot be retried if
         // the player navigates backward (e.g. market cards are consumed).
-        const dismissBtn = s.add.text(domX + 12, tooltipY + tooltipH - 30, 'Dismiss', { fontSize: '13px', color: '#aa8866', fontFamily: FONT_FAMILY }).setInteractive({ useHandCursor: true }).setDepth(TOOLTIP_DEPTH + 1003);
+        const dismissBtn = s.add.text(domX + 12, tooltipY + tooltipH - 30, t('tutorial.overlay.dismiss'), { fontSize: '13px', color: '#aa8866', fontFamily: FONT_FAMILY }).setInteractive({ useHandCursor: true }).setDepth(TOOLTIP_DEPTH + 1003);
         dismissBtn.on('pointerdown', () => {
           try { (this.scene as any).exitTutorialFlow?.(); } catch (_) { /* ignore */ }
         });
 
-        const nextLabel = isLast ? 'Start Full Game' : 'Next >';
+        const nextLabel = isLast ? t('tutorial.overlay.startFullGame') : t('tutorial.overlay.next');
         const nextBtn = s.add.text(domX + TOOLTIP_W - 12, tooltipY + tooltipH - 30, nextLabel, { fontSize: '13px', color: '#002200', backgroundColor: isLast ? '#44ff44' : '#88ff88', padding: { left: 6, right: 6 } as any, fontFamily: FONT_FAMILY }).setInteractive({ useHandCursor: true }).setOrigin(1, 0).setDepth(TOOLTIP_DEPTH + 1003);
         nextBtn.on('pointerdown', () => this.nextStep());
 
@@ -487,7 +499,6 @@ export class MainStreetTutorialHints {
     for (const obj of this.objects) {
       try { obj.destroy(); } catch (e) {
         // Non-fatal: Phaser may throw when destroying already-destroyed objects in tests.
-        // eslint-disable-next-line no-console
         console.debug('[Tutorial] clearObjects: destroy failed', e);
       }
     }

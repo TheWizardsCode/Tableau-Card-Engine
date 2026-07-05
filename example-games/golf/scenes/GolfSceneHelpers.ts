@@ -9,7 +9,6 @@ import { GAME_W, GAME_H, OverlayManager } from '../../../src/ui';
 import { createActionButton } from '@ui/Renderer';
 import {
   createGolfHudText,
-  createGolfMenuButton,
 } from '../../../src/ui/Renderer/adapters/GolfAdapter';
 import { SFX_KEYS } from './GolfConstants';
 import type { GolfSession } from '../GolfGame';
@@ -110,12 +109,6 @@ export class GolfOverlayHelper {
       { depth: 11 },
     );
     this.overlayManager.add(playBtn);
-
-    // Menu button
-    const menuBtn = createGolfMenuButton(this.scene, GAME_W / 2 + 85, GAME_H / 2 + 85, 80, {
-      depth: 11,
-    });
-    this.overlayManager.add(menuBtn);
 
     // Export Transcript button
     const exportBtn = createActionButton(

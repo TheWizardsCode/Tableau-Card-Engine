@@ -201,17 +201,21 @@ export class GymAudioFeedbackScene extends GymSceneBase {
     this.logCall('Pop text triggered (reduced-motion: ' + this.reducedMotion + ')');
   }
 
-  private showPopText(eventName: string, sfxKey: string): void {
-    const displayText = `${eventName}: ${sfxKey}`;
+  private showPopText(eventName: string, _sfxKey: string): void {
+    // Display a music note icon with the event name as visual feedback
+    // that a sound was triggered. The sound key is omitted since it's
+    // internal debug info — the event name is sufficient to indicate
+    // which action produced the sound.
+    const displayText = `♪ ${eventName}`;
     popTextOrIcon({
       scene: this,
       label: displayText,
       x: GAME_W / 2 + (Math.random() - 0.5) * 100,
       y: 220,
-      duration: this.reducedMotion ? 100 : 400,
+      duration: this.reducedMotion ? 500 : 1800,
       reducedMotion: this.reducedMotion,
       style: {
-        fontSize: '14px',
+        fontSize: '20px',
         color: '#88ff88',
         fontFamily: 'monospace',
       },
