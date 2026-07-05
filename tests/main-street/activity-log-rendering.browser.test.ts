@@ -250,6 +250,59 @@ describe('MainStreet Activity Log scroll bounds', () => {
     }
   });
 
+  it('graphics objects (bar backgrounds) have correct Y position', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene') as any;
+
+    await waitFrames(10);
+
+    // Clear any existing log entries and re-render
+    scene.state.activityLog.length = 0;
+    scene.msRenderer.refreshLog();
+    await waitFrames(3);
+
+    // Add entries including turn headers (which create Graphics objects)
+    scene.state.activityLog.push({
+      text: 'Turn 1',
+      type: 'turn-header',
+      turn: 1,
+    });
+    scene.state.activityLog.push({
+      text: 'Some entry',
+      type: 'neutral',
+      turn: 1,
+    });
+    scene.state.activityLog.push({
+      text: 'Turn 2',
+      type: 'turn-header',
+      turn: 2,
+    });
+    scene.state.activityLog.push({
+      text: 'More entries',
+      type: 'gain',
+      turn: 2,
+    });
+    scene.msRenderer.refreshLog();
+    await waitFrames(3);
+
+    const allChildren = scene.logContentContainer.list;
+    const graphicsObjs = allChildren.filter(
+      (obj: any) => obj instanceof Phaser.GameObjects.Graphics,
+    );
+
+    expect(graphicsObjs.length).toBe(2);
+
+    // The first turn header (Turn 1) is at yOff=0
+    // The second turn header (Turn 2) follows 'Some entry' so y >= font height
+    expect((graphicsObjs[0] as any).y).toBe(0);
+    expect((graphicsObjs[1] as any).y).toBeGreaterThan(0);
+
+    // Verify graphics are parented to logContentContainer
+    for (const g of graphicsObjs) {
+      expect((g as any).parentContainer).toBe(scene.logContentContainer);
+    }
+  });
+
   it('mask is applied to the content container', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('MainStreetScene') as any;
@@ -265,6 +318,81 @@ describe('MainStreet Activity Log scroll bounds', () => {
 
     // Verify the contentMask was created
     expect(scene.logContentMask).toBeDefined();
+  });
+
+  it('per-entry visibility hides entries outside the scrollable window', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene') as any;
+
+    await waitFrames(15);
+
+    const { LOG_TITLE_H } = await import(
+      '../../example-games/main-street/scenes/MainStreetConstants'
+    );
+
+    // Clear existing entries to have a clean starting state
+    scene.state.activityLog.length = 0;
+    scene.msRenderer.refreshLog();
+    await waitFrames(3);
+
+    // Add entries that overflow the visible area
+    for (let i = 0; i < 100; i++) {
+      scene.state.activityLog.push({
+        text: `Entry ${i} - some text`,
+        type: 'neutral',
+        turn: 1,
+      });
+    }
+    scene.msRenderer.refreshLog();
+    await waitFrames(5);
+
+    const visibleH = Math.max(1, scene.layout.logH - LOG_TITLE_H - 4);
+    const maxVisEntries = Math.ceil(visibleH / 18);
+
+    // ── Phase 1: At scrollOffset = 0 ──
+    scene.logScrollOffset = 0;
+    scene.msRenderer.refreshLog();
+    await waitFrames(3);
+
+    const childrenP1 = scene.logContentContainer.list;
+    expect(childrenP1.length).toBe(100);
+
+    const visibleCountP1 = childrenP1.filter((c: any) => c.visible).length;
+    // At scrollOffset=0, only entries fitting in visibleH should be visible
+    expect(visibleCountP1).toBeGreaterThan(0);
+    expect(visibleCountP1).toBeLessThanOrEqual(maxVisEntries);
+
+    // All children should have been created (even if not visible)
+    const hiddenCountP1 = childrenP1.filter((c: any) => !c.visible).length;
+    expect(hiddenCountP1).toBe(100 - visibleCountP1);
+
+    // ── Phase 2: Scroll to the bottom ──
+    scene.logScrollOffset = scene.logMaxScroll;
+    scene.msRenderer.refreshLog();
+    await waitFrames(3);
+
+    const childrenP2 = scene.logContentContainer.list;
+    const visibleCountP2 = childrenP2.filter((c: any) => c.visible).length;
+    const hiddenCountP2 = childrenP2.filter((c: any) => !c.visible).length;
+
+    // At bottom, should still have the same number of visible entries
+    expect(visibleCountP2).toBeGreaterThan(0);
+    expect(visibleCountP2).toBeLessThanOrEqual(maxVisEntries);
+    expect(hiddenCountP2).toBe(100 - visibleCountP2);
+
+    // ── Phase 3: Scroll back to the top ──
+    scene.logScrollOffset = 0;
+    scene.msRenderer.refreshLog();
+    await waitFrames(3);
+
+    const childrenP3 = scene.logContentContainer.list;
+    const visibleCountP3 = childrenP3.filter((c: any) => c.visible).length;
+    expect(visibleCountP3).toBeGreaterThan(0);
+    expect(visibleCountP3).toBeLessThanOrEqual(maxVisEntries);
+
+    // Total should be consistent
+    const hiddenCountP3 = childrenP3.filter((c: any) => !c.visible).length;
+    expect(hiddenCountP3).toBe(100 - visibleCountP3);
   });
 
   it('mask clips content when scrolled to bottom (coordinate verification)', async () => {

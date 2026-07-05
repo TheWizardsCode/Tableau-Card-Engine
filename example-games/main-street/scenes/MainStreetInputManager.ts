@@ -150,8 +150,21 @@ export class MainStreetInputManager {
   public applyLogScroll(): void {
     const s = this.scene;
     // Apply the scroll offset by shifting the content container upward.
-    // The mask clips off-screen content above and below the visible area.
     s.logContentContainer.setY(LOG_TITLE_H + 2 - s.logScrollOffset);
+
+    // Per-entry visibility safety net (see refreshLog for details)
+    const visibleH = Math.max(1, s.layout.logH - LOG_TITLE_H - 4);
+    const visibleStart = s.logScrollOffset;
+    const visibleEnd = s.logScrollOffset + visibleH;
+    for (const child of s.logContentContainer.list) {
+      const localY = (child as any).y;
+      if (localY >= visibleStart && localY < visibleEnd) {
+        child.setVisible(true);
+      } else {
+        child.setVisible(false);
+      }
+    }
+
     s.updateLogMask();
   }
 }

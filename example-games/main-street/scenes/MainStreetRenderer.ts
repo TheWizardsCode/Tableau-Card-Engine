@@ -1384,12 +1384,11 @@ export class MainStreetRenderer {
     const visibleH = Math.max(1, s.layout.logH - LOG_TITLE_H - 4);
 
     // ── Re-render only if the entry count changed ────────────────
-    // Scroll offset changes just shift the container (no re-render needed).
     if (newCount !== s.logPrevEntryCount) {
       s.logPrevEntryCount = newCount;
 
-      // Render ALL entries to get the true total content height.
-      // The mask clips off-screen entries; scrolling shifts the container.
+      // Render ALL entries to compute the true total content height.
+      // Per-entry visibility (applied below) hides off-screen entries.
       s.logContentContainer.removeAll(true);
 
       const contentW = s.layout.logW - LOG_PAD * 2;
@@ -1403,10 +1402,13 @@ export class MainStreetRenderer {
         const isTurnHeader = entry.type === 'turn-header';
 
         if (isTurnHeader) {
-          // Subtle background bar for turn headers
+          // Subtle background bar for turn headers.
+          // Use setPosition(0, yOff) so that barBg.y correctly reflects
+          // the entry position, enabling per-entry visibility checks.
           const barBg = s.add.graphics();
           barBg.fillStyle(0x443311, 0.5);
-          barBg.fillRect(0, yOff, s.layout.logW, LOG_LINE_H);
+          barBg.fillRect(0, 0, s.layout.logW, LOG_LINE_H);
+          barBg.setPosition(0, yOff);
           s.logContentContainer.add(barBg);
         }
 
@@ -1427,14 +1429,9 @@ export class MainStreetRenderer {
     }
 
     // ── Compute scroll bounds using actual total content height ──
-    // This ensures logMaxScroll accounts for word-wrapped entries that are
-    // taller than LOG_LINE_H, preventing content from extending past the mask.
     if (s.logTotalContentH <= visibleH) {
       s.logMaxScroll = 0;
       s.logScrollOffset = 0;
-      // Keep logAutoScroll unchanged — if the user was at the bottom before
-      // (entries overflowing) it stays true; if they haven't scrolled yet
-      // or scrolled up, it stays false.
     } else {
       s.logMaxScroll = s.logTotalContentH - visibleH;
 
@@ -1444,14 +1441,30 @@ export class MainStreetRenderer {
         s.logScrollOffset = Phaser.Math.Clamp(s.logScrollOffset, 0, s.logMaxScroll);
       }
 
-      // Update auto-scroll state based on current position
       const atBottom = s.logScrollOffset >= s.logMaxScroll - 4;
       s.logAutoScroll = atBottom;
     }
 
     // Apply scroll by shifting the content container upward.
-    // The mask clips content above/below the visible area.
     s.logContentContainer.setY(LOG_TITLE_H + 2 - s.logScrollOffset);
+
+    // ── Per-entry visibility safety net ────────────────
+    // Phaser 4 RC7's GeometryMask clip is unreliable. As a safety net,
+    // explicitly hide any child whose local Y falls outside the visible
+    // window [scrollOffset, scrollOffset + visibleH).
+    // This ensures no content renders above the title bar or below the
+    // panel bottom, regardless of whether the mask clips.
+    const visibleStart = s.logScrollOffset;
+    const visibleEnd = s.logScrollOffset + visibleH;
+    for (const child of s.logContentContainer.list) {
+      const localY = (child as any).y;
+      if (localY >= visibleStart && localY < visibleEnd) {
+        child.setVisible(true);
+      } else {
+        child.setVisible(false);
+      }
+    }
+
     s.updateLogMask();
   }
 }
