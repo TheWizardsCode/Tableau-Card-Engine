@@ -1,15 +1,23 @@
 /**
  * Main Street: Card Type Definitions and Fixture Data
  *
- * Defines the three card families (Business, Event, Upgrade), synergy types,
- * and the full card pool for Milestones 1 and 2.
+ * Defines the five card families (Business, Community Space, Event, Upgrade,
+ * Staff), synergy types, game constants, and the full card pool for
+ * Milestones 1–3.
  *
- * M1 pool: 5 Business, 5 Event, 3 Upgrade templates.
- * M2 additions: +12 Business (including multi-synergy bridge cards and
- * two new synergy types: Service, Entertainment), +12 Event, +14 Upgrade.
+ * Card template data is loaded from a single CSV file (`card-data.csv`)
+ * at module load time. The CSV is bundled at build time via Vite's `?raw`
+ * import suffix. Only the fixture data is externalised — type definitions,
+ * constants, and helper functions remain in this module.
  *
  * @module
  */
+
+// ── CSV import & parsing ────────────────────────────────────
+
+import cardDataRaw from './card-data.csv?raw';
+import { parseCsv } from '@core-engine/CsvLoader';
+const csvRows = parseCsv(cardDataRaw);
 
 // ── Synergy & Phase Enums ───────────────────────────────────
 
@@ -258,6 +266,24 @@ function makeBusiness(template: Omit<BusinessCard, 'family' | 'level' | 'incomeB
 }
 
 /**
+ * Creates a fresh copy of a CommunitySpaceCard from template data.
+ * Mutable fields (level, incomeBonus, synergyRangeBonus, appliedUpgrades) are reset.
+ */
+function makeCommunitySpace(template: Omit<CommunitySpaceCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'appliedUpgrades' | 'reputationBonus'>): CommunitySpaceCard {
+  return {
+    family: 'community-space',
+    level: 0,
+    incomeBonus: 0,
+    synergyRangeBonus: 0,
+    reputationBonus: 0,
+    appliedUpgrades: [],
+    ...template,
+  };
+}
+
+// ── Community Space Interface ───────────────────────────────
+
+/**
  * A Community Space card placed on the street grid, parallel to BusinessCard.
  * Community spaces share the same mechanical behavior as businesses (grid placement,
  * synergy bonuses, upgrade path, level tracking) but are classified as 'community-space'
@@ -298,1016 +324,101 @@ export interface CommunitySpaceCard {
   appliedUpgrades?: string[];
 }
 
-/**
- * Creates a fresh copy of a CommunitySpaceCard from template data.
- * Mutable fields (level, incomeBonus, synergyRangeBonus, appliedUpgrades) are reset.
- */
-function makeCommunitySpace(template: Omit<CommunitySpaceCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'appliedUpgrades' | 'reputationBonus'>): CommunitySpaceCard {
-  return {
-    family: 'community-space',
-    level: 0,
-    incomeBonus: 0,
-    synergyRangeBonus: 0,
-    reputationBonus: 0,
-    appliedUpgrades: [],
-    ...template,
-  };
-}
+// ── CSV → typed template arrays ─────────────────────────────
 
-/** Template data for all Business cards (M1 + M2 pool). */
-const BUSINESS_TEMPLATES: Omit<BusinessCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'reputationBonus'>[] = [
-  {
-    id: 'biz-bakery',
-    name: 'Bakery',
-    cost: 6,
-    baseIncome: 1,
-    synergyTypes: ['Food'],
-    upgradePath: 'Bakery',
-    maxLevel: 2,
-    description: 'Provides warm pastries. Gains +1 coin for each adjacent Food business.',
-  },
-  {
-    id: 'biz-diner',
-    name: 'Diner',
-    cost: 8,
-    baseIncome: 1,
-    synergyTypes: ['Food'],
-    upgradePath: 'Diner',
-    maxLevel: 2,
-    description: 'Serves quick meals. Gains +1 coin per adjacent Food business.',
-  },
-  {
-    id: 'biz-bookshop',
-    name: 'Bookshop',
-    cost: 8,
-    baseIncome: 1,
-    synergyTypes: ['Culture'],
-    upgradePath: 'Bookshop',
-    maxLevel: 1,
-    description: 'Sells books. Gains +1 coin per adjacent Culture business.',
-  },
-  {
-    id: 'biz-hardware',
-    name: 'Hardware Store',
-    cost: 10,
-    baseIncome: 1,
-    synergyTypes: ['Commerce'],
-    upgradePath: 'Hardware Store',
-    maxLevel: 1,
-    description: 'Supplies tools. Gains +1 coin per adjacent Commerce business.',
-  },
-  // ── M2 Expanded Business Templates ──────────────────────────
-  // Commerce (fills the gap: M1 had only 1 Commerce business)
-  {
-    id: 'biz-pawnshop',
-    name: 'Pawn Shop',
-    cost: 6,
-    baseIncome: 1,
-    synergyTypes: ['Commerce'],
-    upgradePath: 'Pawn Shop',
-    maxLevel: 1,
-    description: 'Trades second-hand goods. Does not provide or receive synergy bonuses.',
-  },
-  {
-    id: 'biz-boutique',
-    name: 'Boutique',
-    cost: 8,
-    baseIncome: 1,
-    synergyTypes: ['Commerce'],
-    upgradePath: 'Boutique',
-    maxLevel: 1,
-    description: 'Sells curated fashion. Gains +1 coin per adjacent Commerce business.',
-  },
-  // Service (new synergy type)
-  {
-    id: 'biz-laundromat',
-    name: 'Laundromat',
-    cost: 6,
-    baseIncome: 1,
-    synergyTypes: ['Service'],
-    upgradePath: 'Laundromat',
-    maxLevel: 1,
-    description: 'Provides self-serve laundry. Gains +1 coin per adjacent Service business.',
-  },
-  {
-    id: 'biz-barbershop',
-    name: 'Barbershop',
-    cost: 6,
-    baseIncome: 1,
-    synergyTypes: ['Service'],
-    upgradePath: 'Barbershop',
-    maxLevel: 1,
-    description: 'Classic cuts and conversation. Gains +1 coin per adjacent Service business.',
-  },
-  // Entertainment (new synergy type)
-  {
-    id: 'biz-arcade',
-    name: 'Arcade',
-    cost: 8,
-    baseIncome: 1,
-    synergyTypes: ['Entertainment'],
-    upgradePath: 'Arcade',
-    maxLevel: 1,
-    description: 'Retro fun for all ages. Gains +1 coin per adjacent Entertainment business.',
-  },
-  {
-    id: 'biz-cinema',
-    name: 'Cinema',
-    cost: 10,
-    baseIncome: 1,
-    synergyTypes: ['Entertainment'],
-    upgradePath: 'Cinema',
-    maxLevel: 2,
-    description: 'Shows the latest films. Gains +1 coin per adjacent Entertainment business.',
-  },
-  // Multi-synergy bridge cards (belong to two synergy types)
-  {
-    id: 'biz-cafe',
-    name: 'Cafe',
-    cost: 6,
-    baseIncome: 1,
-    synergyTypes: ['Food', 'Culture'],
-    upgradePath: 'Cafe',
-    maxLevel: 1,
-    description: 'Coffee and conversation. Bridges Food and Culture synergies.',
-  },
-  {
-    id: 'biz-food-truck',
-    name: 'Food Truck',
-    cost: 4,
-    baseIncome: 0,
-    synergyTypes: ['Food', 'Entertainment'],
-    upgradePath: 'Food Truck',
-    maxLevel: 1,
-    description: 'Street eats with flair. Bridges Food and Entertainment synergies.',
-  },
-  {
-    id: 'biz-gallery',
-    name: 'Art Gallery',
-    cost: 8,
-    baseIncome: 1,
-    synergyTypes: ['Culture', 'Entertainment'],
-    upgradePath: 'Art Gallery',
-    maxLevel: 1,
-    description: 'Showcases local artists. Bridges Culture and Entertainment synergies.',
-  },
-  {
-    id: 'biz-spa',
-    name: 'Day Spa',
-    cost: 10,
-    baseIncome: 1,
-    synergyTypes: ['Service', 'Entertainment'],
-    upgradePath: 'Day Spa',
-    maxLevel: 2,
-    description: 'Relaxation and pampering. Bridges Service and Entertainment synergies.',
-  },
-  // Additional variety
-  {
-    id: 'biz-florist',
-    name: 'Florist',
-    cost: 4,
-    baseIncome: 0,
-    synergyTypes: ['Commerce', 'Culture'],
-    upgradePath: 'Florist',
-    maxLevel: 1,
-    description: 'Beautiful arrangements for every occasion. Bridges Commerce and Culture synergies.',
-  },
-  {
-    id: 'biz-clinic',
-    name: 'Clinic',
-    cost: 10,
-    baseIncome: 0,
-    synergyTypes: ['Health'],
-    upgradePath: 'Clinic',
-    maxLevel: 1,
-    reputationPerTurn: 0.2,
-    description: 'Walk-in medical care for the community. Provides +0.2 reputation per turn. Gains +1 coin per adjacent Health business.',
-  },
-  {
-    id: 'biz-private-clinic',
-    name: 'Private Clinic',
-    cost: 8,
-    baseIncome: 2,
-    synergyTypes: ['Health'],
-    upgradePath: 'Private Clinic',
-    maxLevel: 1,
-    description: 'A private medical practice focused on profitability. Gains +1 coin per adjacent Health business.',
-  },
-  {
-    id: 'biz-pharmacy',
-    name: 'Pharmacy',
-    cost: 6,
-    baseIncome: 1,
-    synergyTypes: ['Health'],
-    maxLevel: 0,
-    description: 'Provides essential medications. Gains +1 coin per adjacent Health business.',
-  },
-];
+/** All Business card templates parsed from the CSV. */
+const BUSINESS_TEMPLATES: Omit<BusinessCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'reputationBonus'>[] =
+  csvRows
+    .filter(r => r.family === 'business')
+    .map(r => ({
+      id: r.id,
+      name: r.name,
+      cost: Number(r.cost) || 0,
+      baseIncome: Number(r.baseIncome) || 0,
+      synergyTypes: (r.synergyTypes || '').split('|').filter(Boolean) as unknown as SynergyType[],
+      upgradePath: r.upgradePath || undefined,
+      maxLevel: Number(r.maxLevel) || 0,
+      reputationPerTurn: r.reputationPerTurn ? Number(r.reputationPerTurn) : undefined,
+      description: r.description,
+    }));
 
-/** Template data for all Community Space cards (reclassified Park + new community spaces). */
-const COMMUNITY_SPACE_TEMPLATES: Omit<CommunitySpaceCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'reputationBonus'>[] = [
-  {
-    id: 'cs-park',
-    name: 'Park',
-    cost: 4,
-    baseIncome: 0,
-    synergyTypes: ['Culture'],
-    upgradePath: 'Park',
-    maxLevel: 1,
-    description: 'Offers leisure space. Gains +1 coin per adjacent Culture business or community space.',
-  },
-  {
-    id: 'cs-library',
-    name: 'Library',
-    cost: 6,
-    baseIncome: 1,
-    synergyTypes: ['Culture'],
-    upgradePath: 'Library',
-    maxLevel: 1,
-    description: 'A quiet community space for reading and learning. Gains +1 coin per adjacent Culture business or community space.',
-  },
-];
+/** All Community Space card templates parsed from the CSV. */
+const COMMUNITY_SPACE_TEMPLATES: Omit<CommunitySpaceCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'reputationBonus'>[] =
+  csvRows
+    .filter(r => r.family === 'community-space')
+    .map(r => ({
+      id: r.id,
+      name: r.name,
+      cost: Number(r.cost) || 0,
+      baseIncome: Number(r.baseIncome) || 0,
+      synergyTypes: (r.synergyTypes || '').split('|').filter(Boolean) as unknown as SynergyType[],
+      upgradePath: r.upgradePath || undefined,
+      maxLevel: Number(r.maxLevel) || 0,
+      reputationPerTurn: r.reputationPerTurn ? Number(r.reputationPerTurn) : undefined,
+      description: r.description,
+    }));
 
-/** Template data for all Event cards (M1 + M2 pool). */
-const EVENT_TEMPLATES: EventCard[] = [
-  {
-    family: 'event',
-    id: 'evt-festival',
-    name: 'Local Festival',
-    trigger: 'Investment',
-    cost: 3,
-    effect: '+2 coins to all Culture businesses and +1 reputation.',
-    target: 'SpecificSynergy',
-    targetSynergy: 'Culture',
-    coinDelta: 2,
-    reputationDelta: 1,
-  },
-  {
-    family: 'event',
-    id: 'evt-rainy',
-    name: 'Rainy Day',
-    trigger: 'Incident',
-    cost: 0,
-    effect: '-1 coin to all Food businesses this turn.',
-    target: 'SpecificSynergy',
-    targetSynergy: 'Food',
-    coinDelta: -1,
-    reputationDelta: 0,
-  },
-  {
-    family: 'event',
-    id: 'evt-tax',
-    name: 'Tax Audit',
-    trigger: 'Incident',
-    cost: 0,
-    effect: 'Lose 3 coins.',
-    target: 'All',
-    coinDelta: -3,
-    reputationDelta: 0,
-  },
-  {
-    family: 'event',
-    id: 'evt-award',
-    name: 'Community Award',
-    trigger: 'Incident',
-    cost: 0,
-    effect: 'Gain 2 reputation from community recognition.',
-    target: 'All',
-    coinDelta: 0,
-    reputationDelta: 2,
-  },
-  {
-    family: 'event',
-    id: 'evt-inspection',
-    name: 'Health Inspection',
-    trigger: 'Incident',
-    cost: 0,
-    effect: '-2 coins per Food business and -1 reputation.',
-    target: 'SpecificSynergy',
-    targetSynergy: 'Food',
-    coinDelta: -2,
-    reputationDelta: -1,
-  },
-  // ── M2 Expanded Event Templates ─────────────────────────────
-  // Investment events (positive, purchased)
-  {
-    family: 'event',
-    id: 'evt-grand-opening',
-    name: 'Grand Opening Sale',
-    trigger: 'Investment',
-    cost: 2,
-    effect: '+3 coins from a Commerce promotion.',
-    target: 'SpecificSynergy',
-    targetSynergy: 'Commerce',
-    coinDelta: 3,
-    reputationDelta: 0,
-  },
-  {
-    family: 'event',
-    id: 'evt-wellness-fair',
-    name: 'Wellness Fair',
-    trigger: 'Investment',
-    cost: 3,
-    effect: '+2 coins per Service business and +1 reputation.',
-    target: 'SpecificSynergy',
-    targetSynergy: 'Service',
-    coinDelta: 2,
-    reputationDelta: 1,
-  },
-  {
-    family: 'event',
-    id: 'evt-block-party',
-    name: 'Block Party',
-    trigger: 'Investment',
-    cost: 4,
-    effect: '+2 coins per Entertainment business and +2 reputation.',
-    target: 'SpecificSynergy',
-    targetSynergy: 'Entertainment',
-    coinDelta: 2,
-    reputationDelta: 2,
-  },
-  {
-    family: 'event',
-    id: 'evt-charity-drive',
-    name: 'Charity Drive',
-    trigger: 'Investment',
-    cost: 2,
-    effect: '+3 reputation from generous donations.',
-    target: 'All',
-    coinDelta: 0,
-    reputationDelta: 3,
-  },
-  // Incident events (negative/disruptive, drawn automatically)
-  {
-    family: 'event',
-    id: 'evt-power-outage',
-    name: 'Power Outage',
-    trigger: 'Incident',
-    cost: 0,
-    effect: '-2 coins from lost business during the outage.',
-    target: 'All',
-    coinDelta: -2,
-    reputationDelta: 0,
-  },
-  {
-    family: 'event',
-    id: 'evt-shoplifting',
-    name: 'Shoplifting Spree',
-    trigger: 'Incident',
-    cost: 0,
-    effect: '-2 coins per Commerce business from theft losses.',
-    target: 'SpecificSynergy',
-    targetSynergy: 'Commerce',
-    coinDelta: -2,
-    reputationDelta: 0,
-  },
-  {
-    family: 'event',
-    id: 'evt-noise-complaint',
-    name: 'Noise Complaint',
-    trigger: 'Incident',
-    cost: 0,
-    effect: '-1 coin per Entertainment business and -1 reputation.',
-    target: 'SpecificSynergy',
-    targetSynergy: 'Entertainment',
-    coinDelta: -1,
-    reputationDelta: -1,
-  },
-  {
-    family: 'event',
-    id: 'evt-pipe-burst',
-    name: 'Pipe Burst',
-    trigger: 'Incident',
-    cost: 0,
-    effect: '-2 coins per Service business from water damage.',
-    target: 'SpecificSynergy',
-    targetSynergy: 'Service',
-    coinDelta: -2,
-    reputationDelta: 0,
-  },
-  {
-    family: 'event',
-    id: 'evt-food-critic',
-    name: 'Food Critic Visit',
-    trigger: 'Incident',
-    cost: 0,
-    effect: '+1 coin per Food business and +1 reputation from a glowing review.',
-    target: 'SpecificSynergy',
-    targetSynergy: 'Food',
-    coinDelta: 1,
-    reputationDelta: 1,
-  },
-  {
-    family: 'event',
-    id: 'evt-construction',
-    name: 'Road Construction',
-    trigger: 'Incident',
-    cost: 0,
-    effect: '-1 coin to all businesses from reduced foot traffic.',
-    target: 'All',
-    coinDelta: -1,
-    reputationDelta: 0,
-  },
-  {
-    family: 'event',
-    id: 'evt-viral-review',
-    name: 'Viral Review',
-    trigger: 'Incident',
-    cost: 0,
-    effect: '+2 coins and +1 reputation from sudden online fame.',
-    target: 'All',
-    coinDelta: 2,
-    reputationDelta: 1,
-  },
-  {
-    family: 'event',
-    id: 'evt-vandalism',
-    name: 'Vandalism',
-    trigger: 'Incident',
-    cost: 0,
-    effect: '-1 coin to all businesses and -1 reputation.',
-    target: 'All',
-    coinDelta: -1,
-    reputationDelta: -1,
-  },
-  // ── Duration-based Event (M2 Tier 4) ────────────────────────
-  {
-    family: 'event',
-    id: 'evt-flu-outbreak',
-    name: 'Flu Outbreak',
-    trigger: 'Incident',
-    cost: 0,
-    effect: 'All businesses generate 80% income for 5 turns. Duration reduced by Clinic/Medical Center.',
-    target: 'All',
-    coinDelta: 0,
-    reputationDelta: 0,
-    duration: 5,
-    effectType: 'income-multiplier',
-    multiplier: 0.8,
-  } as DurationEventCard,
-  // ── M3 Expanded Event Templates (doubled unique event count) ─────
-  // Investment events (positive, purchased)
-  {
-    family: 'event',
-    id: 'evt-harvest-festival',
-    name: 'Harvest Festival',
-    trigger: 'Investment',
-    cost: 3,
-    effect: '+2 coins to each Food business and +1 reputation from a bountiful harvest celebration.',
-    target: 'SpecificSynergy',
-    targetSynergy: 'Food',
-    coinDelta: 2,
-    reputationDelta: 1,
-  },
-  {
-    family: 'event',
-    id: 'evt-health-campaign',
-    name: 'Health Campaign',
-    trigger: 'Investment',
-    cost: 3,
-    effect: '+1 coin to each Health business and +1 reputation from a wellness initiative.',
-    target: 'SpecificSynergy',
-    targetSynergy: 'Health',
-    coinDelta: 1,
-    reputationDelta: 1,
-  },
-  {
-    family: 'event',
-    id: 'evt-street-performer',
-    name: 'Street Performer',
-    trigger: 'Investment',
-    cost: 2,
-    effect: '+2 coins to each Entertainment business from a popular busker drawing crowds.',
-    target: 'SpecificSynergy',
-    targetSynergy: 'Entertainment',
-    coinDelta: 2,
-    reputationDelta: 0,
-  },
-  {
-    family: 'event',
-    id: 'evt-bulk-purchase',
-    name: 'Bulk Purchase',
-    trigger: 'Investment',
-    cost: 3,
-    effect: '+1 coin to each Commerce business and +2 reputation from collective buying power.',
-    target: 'SpecificSynergy',
-    targetSynergy: 'Commerce',
-    coinDelta: 1,
-    reputationDelta: 2,
-  },
-  {
-    family: 'event',
-    id: 'evt-book-fair',
-    name: 'Book Fair',
-    trigger: 'Investment',
-    cost: 3,
-    effect: '+1 coin to each Culture business and +2 reputation from literary events.',
-    target: 'SpecificSynergy',
-    targetSynergy: 'Culture',
-    coinDelta: 1,
-    reputationDelta: 2,
-  },
-  {
-    family: 'event',
-    id: 'evt-volunteer-day',
-    name: 'Volunteer Day',
-    trigger: 'Investment',
-    cost: 2,
-    effect: '+1 coin to each Service business and +2 reputation from community volunteering.',
-    target: 'SpecificSynergy',
-    targetSynergy: 'Service',
-    coinDelta: 1,
-    reputationDelta: 2,
-  },
-  {
-    family: 'event',
-    id: 'evt-community-garden',
-    name: 'Community Garden',
-    trigger: 'Investment',
-    cost: 2,
-    effect: '+1 coin and +1 reputation from a new community garden project.',
-    target: 'All',
-    coinDelta: 1,
-    reputationDelta: 1,
-  },
-  {
-    family: 'event',
-    id: 'evt-festival-season',
-    name: 'Festival Season',
-    trigger: 'Investment',
-    cost: 4,
-    effect: '+3 coins from increased tourist spending during festival season.',
-    target: 'All',
-    coinDelta: 3,
-    reputationDelta: 0,
-  },
-  // Incident events (mixed positive/negative, drawn automatically)
-  {
-    family: 'event',
-    id: 'evt-protest',
-    name: 'Protest',
-    trigger: 'Incident',
-    cost: 0,
-    effect: '-2 coins from reduced foot traffic and -1 reputation from negative publicity.',
-    target: 'All',
-    coinDelta: -2,
-    reputationDelta: -1,
-  },
-  {
-    family: 'event',
-    id: 'evt-supply-chain',
-    name: 'Supply Chain Delay',
-    trigger: 'Incident',
-    cost: 0,
-    effect: '-2 coins per Commerce business from delayed inventory.',
-    target: 'SpecificSynergy',
-    targetSynergy: 'Commerce',
-    coinDelta: -2,
-    reputationDelta: 0,
-  },
-  {
-    family: 'event',
-    id: 'evt-power-surge',
-    name: 'Power Surge',
-    trigger: 'Incident',
-    cost: 0,
-    effect: '-2 coins per Service business from equipment damage.',
-    target: 'SpecificSynergy',
-    targetSynergy: 'Service',
-    coinDelta: -2,
-    reputationDelta: 0,
-  },
-  {
-    family: 'event',
-    id: 'evt-strike',
-    name: 'Strike',
-    trigger: 'Incident',
-    cost: 0,
-    effect: '-2 coins from work stoppages affecting the street.',
-    target: 'All',
-    coinDelta: -2,
-    reputationDelta: 0,
-  },
-  {
-    family: 'event',
-    id: 'evt-heatwave',
-    name: 'Heatwave',
-    trigger: 'Incident',
-    cost: 0,
-    effect: '-1 coin per Food business from spoiled goods and -1 reputation.',
-    target: 'SpecificSynergy',
-    targetSynergy: 'Food',
-    coinDelta: -1,
-    reputationDelta: -1,
-  },
-  {
-    family: 'event',
-    id: 'evt-pest-infestation',
-    name: 'Pest Infestation',
-    trigger: 'Incident',
-    cost: 0,
-    effect: '-2 coins per Food business from health-related closures.',
-    target: 'SpecificSynergy',
-    targetSynergy: 'Food',
-    coinDelta: -2,
-    reputationDelta: 0,
-  },
-  {
-    family: 'event',
-    id: 'evt-slow-season',
-    name: 'Slow Season',
-    trigger: 'Incident',
-    cost: 0,
-    effect: '-1 coin to all businesses from reduced customer traffic.',
-    target: 'All',
-    coinDelta: -1,
-    reputationDelta: 0,
-  },
-  {
-    family: 'event',
-    id: 'evt-good-press',
-    name: 'Good Press',
-    trigger: 'Incident',
-    cost: 0,
-    effect: '+1 reputation from a favourable news article about Main Street.',
-    target: 'All',
-    coinDelta: 0,
-    reputationDelta: 1,
-  },
-  {
-    family: 'event',
-    id: 'evt-tourist-bus',
-    name: 'Tourist Bus',
-    trigger: 'Incident',
-    cost: 0,
-    effect: '+2 coins per Entertainment business from a tour bus dropping visitors.',
-    target: 'SpecificSynergy',
-    targetSynergy: 'Entertainment',
-    coinDelta: 2,
-    reputationDelta: 0,
-  },
-  {
-    family: 'event',
-    id: 'evt-cultural-grant',
-    name: 'Cultural Grant',
-    trigger: 'Incident',
-    cost: 0,
-    effect: '+1 coin per Culture business and +1 reputation from a government arts grant.',
-    target: 'SpecificSynergy',
-    targetSynergy: 'Culture',
-    coinDelta: 1,
-    reputationDelta: 1,
-  },
-];
+/** All Event card templates parsed from the CSV. */
+const EVENT_TEMPLATES: EventCard[] =
+  csvRows
+    .filter(r => r.family === 'event')
+    .map(r => {
+      const base: EventCard = {
+        family: 'event',
+        id: r.id,
+        name: r.name,
+        cost: Number(r.cost) || 0,
+        trigger: r.trigger as EventTrigger,
+        effect: r.effect,
+        target: r.target as EventTarget,
+        targetSynergy: (r.targetSynergy || undefined) as SynergyType | undefined,
+        coinDelta: Number(r.coinDelta) || 0,
+        reputationDelta: Number(r.reputationDelta) || 0,
+      };
+      // Duration events carry extra fields — cast to DurationEventCard if present
+      if (r.duration) {
+        return {
+          ...base,
+          duration: Number(r.duration),
+          effectType: r.effectType,
+          multiplier: Number(r.multiplier) || 0,
+        } as DurationEventCard;
+      }
+      return base;
+    });
 
-/** Template data for all Upgrade cards (M1 + M2 pool). */
-const UPGRADE_TEMPLATES: UpgradeCard[] = [
-  // ── M1 Base Upgrades (requiredLevel: 0) ─────────────────────
-  {
-    family: 'upgrade',
-    id: 'upg-patisserie',
-    name: 'Upgrade to Patisserie',
-    targetBusiness: 'Bakery',
-    cost: 4,
-    incomeBonus: 1,
-    synergyRangeBonus: 1,
-    requiredLevel: 0,
-    description: 'Turns a Bakery into a Patisserie, increasing income and synergy range.',
-  },
-  {
-    family: 'upgrade',
-    id: 'upg-bistro',
-    name: 'Upgrade to Bistro',
-    targetBusiness: 'Diner',
-    cost: 4,
-    incomeBonus: 1,
-    synergyRangeBonus: 1,
-    requiredLevel: 0,
-    description: 'Turns a Diner into a Bistro with higher foot-traffic.',
-  },
-  {
-    family: 'upgrade',
-    id: 'upg-readers-cafe',
-    name: "Upgrade to Reader's Café",
-    targetBusiness: 'Bookshop',
-    cost: 3,
-    incomeBonus: 1,
-    synergyRangeBonus: 0,
-    reputationBonus: 0.1,
-    requiredLevel: 0,
-    description: 'Transforms the Bookshop into a Reader\'s Café, blending books with café culture for a reputation boost.',
-  },
-  // ── M2 Expanded Upgrade Templates ───────────────────────────
-  {
-    family: 'upgrade',
-    id: 'upg-garden',
-    name: 'Upgrade to Garden',
-    targetBusiness: 'Park',
-    cost: 3,
-    incomeBonus: 1,
-    synergyRangeBonus: 1,
-    requiredLevel: 0,
-    description: 'Expands the Park into a Garden with extended cultural reach.',
-  },
-  {
-    family: 'upgrade',
-    id: 'upg-home-improvement',
-    name: 'Upgrade to Home Improvement',
-    targetBusiness: 'Hardware Store',
-    cost: 4,
-    incomeBonus: 1,
-    synergyRangeBonus: 1,
-    requiredLevel: 0,
-    description: 'Transforms the Hardware Store into a Home Improvement center.',
-  },
-  {
-    family: 'upgrade',
-    id: 'upg-vintage-shop',
-    name: 'Upgrade to Vintage Shop',
-    targetBusiness: 'Pawn Shop',
-    cost: 3,
-    incomeBonus: 1,
-    synergyRangeBonus: 0,
-    requiredLevel: 0,
-    description: 'Rebrands the Pawn Shop as a trendy Vintage Shop.',
-  },
-  {
-    family: 'upgrade',
-    id: 'upg-designer-store',
-    name: 'Upgrade to Designer Store',
-    targetBusiness: 'Boutique',
-    cost: 4,
-    incomeBonus: 1,
-    synergyRangeBonus: 1,
-    requiredLevel: 0,
-    description: 'Elevates the Boutique to a Designer Store with premium clientele.',
-  },
-  {
-    family: 'upgrade',
-    id: 'upg-dry-cleaners',
-    name: 'Upgrade to Dry Cleaners',
-    targetBusiness: 'Laundromat',
-    cost: 3,
-    incomeBonus: 1,
-    synergyRangeBonus: 0,
-    requiredLevel: 0,
-    description: 'Upgrades the Laundromat to a full-service Dry Cleaners.',
-  },
-  {
-    family: 'upgrade',
-    id: 'upg-salon',
-    name: 'Upgrade to Salon',
-    targetBusiness: 'Barbershop',
-    cost: 3,
-    incomeBonus: 1,
-    synergyRangeBonus: 1,
-    requiredLevel: 0,
-    description: 'Expands the Barbershop into a modern Salon.',
-  },
-  {
-    family: 'upgrade',
-    id: 'upg-gaming-lounge',
-    name: 'Upgrade to Gaming Lounge',
-    targetBusiness: 'Arcade',
-    cost: 4,
-    incomeBonus: 1,
-    synergyRangeBonus: 1,
-    requiredLevel: 0,
-    description: 'Transforms the Arcade into a state-of-the-art Gaming Lounge.',
-  },
-  {
-    family: 'upgrade',
-    id: 'upg-imax',
-    name: 'Upgrade to IMAX Theater',
-    targetBusiness: 'Cinema',
-    cost: 5,
-    incomeBonus: 2,
-    synergyRangeBonus: 1,
-    requiredLevel: 0,
-    description: 'Upgrades the Cinema to an IMAX Theater with premium experience.',
-  },
-  {
-    family: 'upgrade',
-    id: 'upg-roastery',
-    name: 'Upgrade to Roastery',
-    targetBusiness: 'Cafe',
-    cost: 3,
-    incomeBonus: 1,
-    synergyRangeBonus: 1,
-    requiredLevel: 0,
-    description: 'Turns the Cafe into a specialty Roastery with artisan appeal.',
-  },
-  {
-    family: 'upgrade',
-    id: 'upg-gourmet-truck',
-    name: 'Upgrade to Gourmet Truck',
-    targetBusiness: 'Food Truck',
-    cost: 2,
-    incomeBonus: 1,
-    synergyRangeBonus: 0,
-    requiredLevel: 0,
-    description: 'Elevates the Food Truck with gourmet offerings.',
-  },
-  {
-    family: 'upgrade',
-    id: 'upg-museum',
-    name: 'Upgrade to Museum',
-    targetBusiness: 'Art Gallery',
-    cost: 4,
-    incomeBonus: 1,
-    synergyRangeBonus: 1,
-    requiredLevel: 0,
-    description: 'Expands the Art Gallery into a full Museum.',
-  },
-  {
-    family: 'upgrade',
-    id: 'upg-resort-spa',
-    name: 'Upgrade to Resort Spa',
-    targetBusiness: 'Day Spa',
-    cost: 5,
-    incomeBonus: 2,
-    synergyRangeBonus: 1,
-    requiredLevel: 0,
-    description: 'Transforms the Day Spa into a luxurious Resort Spa.',
-  },
-  {
-    family: 'upgrade',
-    id: 'upg-garden-center',
-    name: 'Upgrade to Garden Center',
-    targetBusiness: 'Florist',
-    cost: 3,
-    incomeBonus: 1,
-    synergyRangeBonus: 1,
-    requiredLevel: 0,
-    description: 'Expands the Florist into a full Garden Center.',
-  },
-  {
-    family: 'upgrade',
-    id: 'upg-medical-center',
-    name: 'Upgrade to Medical Center',
-    targetBusiness: 'Clinic',
-    cost: 5,
-    incomeBonus: 0,
-    synergyRangeBonus: 1,
-    reputationBonus: 0.1,
-    requiredLevel: 0,
-    description: 'Upgrades the Clinic to a comprehensive Medical Center. Provides +0.1 reputation per turn.',
-  },
-  {
-    family: 'upgrade',
-    id: 'upg-private-medical-center',
-    name: 'Upgrade to Private Medical Center',
-    targetBusiness: 'Private Clinic',
-    cost: 4,
-    incomeBonus: 2,
-    synergyRangeBonus: 0,
-    requiredLevel: 0,
-    description: 'Expands the Private Clinic into a high-revenue Private Medical Center.',
-  },
-  // ── Branching Upgrades (alternative level-0 paths) ──────────
-  // Bakery branches: Patisserie (above, food-artisan) vs Bread Factory (volume)
-  {
-    family: 'upgrade',
-    id: 'upg-bread-factory',
-    name: 'Upgrade to Bread Factory',
-    targetBusiness: 'Bakery',
-    cost: 3,
-    incomeBonus: 2,
-    synergyRangeBonus: 0,
-    requiredLevel: 0,
-    description: 'Scales the Bakery into a high-volume Bread Factory. More income, no range boost.',
-  },
-  // Diner branches: Bistro (above, quality) vs Fast Food (volume)
-  {
-    family: 'upgrade',
-    id: 'upg-fast-food',
-    name: 'Upgrade to Fast Food',
-    targetBusiness: 'Diner',
-    cost: 3,
-    incomeBonus: 2,
-    synergyRangeBonus: 0,
-    requiredLevel: 0,
-    description: 'Converts the Diner to a Fast Food outlet. Higher income, smaller synergy radius.',
-  },
-  // Cinema branches: IMAX (above, premium) vs Drive-In (community)
-  {
-    family: 'upgrade',
-    id: 'upg-drive-in',
-    name: 'Upgrade to Drive-In Theater',
-    targetBusiness: 'Cinema',
-    cost: 4,
-    incomeBonus: 1,
-    synergyRangeBonus: 2,
-    requiredLevel: 0,
-    description: 'Turns the Cinema into a Drive-In Theater with a much wider community reach.',
-  },
-  // Day Spa branches: Resort Spa (above, premium) vs Wellness Center (service-range)
-  {
-    family: 'upgrade',
-    id: 'upg-wellness-center',
-    name: 'Upgrade to Wellness Center',
-    targetBusiness: 'Day Spa',
-    cost: 4,
-    incomeBonus: 1,
-    synergyRangeBonus: 2,
-    requiredLevel: 0,
-    description: 'Expands the Day Spa into a Wellness Center with a broader service footprint.',
-  },
-  // ── Multi-Level Upgrades (requiredLevel: 1) ──────────────────
-  // Level-2 upgrade for Bakery (after Patisserie or Bread Factory)
-  {
-    family: 'upgrade',
-    id: 'upg-grand-bakehouse',
-    name: 'Upgrade to Grand Bakehouse',
-    targetBusiness: 'Bakery',
-    cost: 5,
-    incomeBonus: 2,
-    synergyRangeBonus: 1,
-    requiredLevel: 1,
-    description: 'The pinnacle of baking craft — a Grand Bakehouse drawing visitors from afar.',
-  },
-  // Level-2 upgrade for Diner (after Bistro or Fast Food)
-  {
-    family: 'upgrade',
-    id: 'upg-restaurant',
-    name: 'Upgrade to Restaurant',
-    targetBusiness: 'Diner',
-    cost: 5,
-    incomeBonus: 2,
-    synergyRangeBonus: 1,
-    requiredLevel: 1,
-    description: 'Elevates the Diner all the way to a full-service Restaurant.',
-  },
-  // Level-2 upgrade for Cinema (after IMAX or Drive-In)
-  {
-    family: 'upgrade',
-    id: 'upg-multiplex',
-    name: 'Upgrade to Multiplex',
-    targetBusiness: 'Cinema',
-    cost: 6,
-    incomeBonus: 3,
-    synergyRangeBonus: 1,
-    requiredLevel: 1,
-    description: 'A massive Multiplex complex — the entertainment heart of Main Street.',
-  },
-  // Level-2 upgrade for Day Spa (after Resort Spa or Wellness Center)
-  {
-    family: 'upgrade',
-    id: 'upg-luxury-retreat',
-    name: 'Upgrade to Luxury Retreat',
-    targetBusiness: 'Day Spa',
-    cost: 6,
-    incomeBonus: 3,
-    synergyRangeBonus: 1,
-    requiredLevel: 1,
-    description: 'A destination Luxury Retreat — the most prestigious business on the street.',
-  },
-  // ── Community Space Upgrades ────────────────────────────────
-  {
-    family: 'upgrade',
-    id: 'upg-community-hub',
-    name: 'Upgrade to Community Hub',
-    targetBusiness: 'Library',
-    cost: 4,
-    incomeBonus: 1,
-    synergyRangeBonus: 1,
-    requiredLevel: 0,
-    description: 'Expands the Library into a Community Hub with extended cultural reach.',
-  },
-];
+/** All Upgrade card templates parsed from the CSV. */
+const UPGRADE_TEMPLATES: UpgradeCard[] =
+  csvRows
+    .filter(r => r.family === 'upgrade')
+    .map(r => ({
+      family: 'upgrade',
+      id: r.id,
+      name: r.name,
+      targetBusiness: r.targetBusiness,
+      cost: Number(r.cost) || 0,
+      incomeBonus: Number(r.incomeBonus) || 0,
+      synergyRangeBonus: Number(r.synergyRangeBonus) || 0,
+      description: r.description,
+      requiredLevel: r.requiredLevel ? Number(r.requiredLevel) : undefined,
+      reputationBonus: r.reputationBonus ? Number(r.reputationBonus) : undefined,
+    }));
 
-// ── Staff Card Templates (Multi-Use Card Economy) ───────────
+/** All Staff card templates parsed from the CSV. */
+export const STAFF_CARD_TEMPLATES: StaffCard[] =
+  csvRows
+    .filter(r => r.family === 'staff')
+    .map(r => ({
+      family: 'staff',
+      id: r.id,
+      name: r.name,
+      cost: Number(r.cost) || 0,
+      ongoingCost: Number(r.ongoingCost) || 0,
+      handSlotsAdded: Number(r.handSlotsAdded) || 0,
+      description: r.description,
+    }));
 
-/** Template data for Staff cards. */
-export const STAFF_CARD_TEMPLATES: StaffCard[] = [
-  {
-    family: 'staff',
-    id: 'staff-assistant',
-    name: 'Assistant',
-    cost: 3,
-    ongoingCost: 1,
-    handSlotsAdded: 1,
-    description: 'Hire an assistant to help manage your hand. Adds +1 hand slot with a small ongoing cost.',
-  },
-  {
-    family: 'staff',
-    id: 'staff-manager',
-    name: 'Manager',
-    cost: 6,
-    ongoingCost: 2,
-    handSlotsAdded: 2,
-    description: 'A skilled manager keeps things organised. Adds +2 hand slots with a moderate ongoing cost.',
-  },
-  {
-    family: 'staff',
-    id: 'staff-director',
-    name: 'Director',
-    cost: 10,
-    ongoingCost: 3,
-    handSlotsAdded: 3,
-    description: 'An experienced director oversees your operations. Adds +3 hand slots with a high ongoing cost.',
-  },
-];
+// ── Deck Building ───────────────────────────────────────────
 
 /**
  * Creates the full Staff deck for a game.
@@ -1324,8 +435,6 @@ export function createStaffDeck(copies: number = 1): StaffCard[] {
   }
   return deck;
 }
-
-// ── Deck Building ───────────────────────────────────────────
 
 /**
  * Creates the full Business deck for a game (each template repeated
@@ -1383,14 +492,6 @@ export function createCommunitySpaceDeck(
 /**
  * Creates the full Event deck for a game.
  *
- * @param copies          Number of copies per template (default 3).
- * @param unlockedCardIds Optional list of unlocked card IDs for tier filtering.
- *                        When provided, only templates whose ID is in this list
- *                        are included. When omitted, the full pool is used.
- */
-/**
- * Creates the full Event deck for a game.
- *
  * Supports an optional `positiveIncidentMultiplier` to increase the
  * relative frequency of positive Incident events by duplicating positive
  * Incident templates before deck assembly. This keeps selection deterministic
@@ -1400,6 +501,7 @@ export function createCommunitySpaceDeck(
  * @param copies          Number of copies per template (default 3).
  * @param unlockedCardIds Optional list of unlocked card IDs for tier filtering.
  * @param positiveIncidentMultiplier Multiplier applied to positive Incident templates (>=1).
+ * @param rng             Seeded random function used for deterministic fractional distribution.
  */
 export function createEventDeck(
   copies: number = 3,
@@ -1552,7 +654,7 @@ export function isPawnShopCard(card: { id: string } | null | undefined): boolean
 
 /**
  * Read-only map from card template ID (e.g. `'biz-cafe'`) to its display name
- * (e.g. `'Cafe'`). Built once at module load from the private template arrays.
+ * (e.g. `'Cafe'`). Built once at module load from the CSV-derived template arrays.
  *
  * This is used by the meta-progression UI to show which cards a newly unlocked
  * tier adds to the player's card pool.

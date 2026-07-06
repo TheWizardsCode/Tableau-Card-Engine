@@ -1,40 +1,68 @@
 import fs from 'fs';
 import path from 'path';
 
-const src = fs.readFileSync(path.resolve('example-games/main-street/MainStreetCards.ts'), 'utf8');
+// ---------------------------------------------------------------------------
+// Read card data from CSV (source of truth — CG-0MR6ZR23J006ZDNZ)
+// ---------------------------------------------------------------------------
 
-// Regex to find template objects in the file. We'll look for occurrences of "id: 'id'" and then
-// extract nearby properties (name, cost, family, synergyTypes, trigger).
-const idRe = /\b(id):\s*'([a-z0-9-]+)'/g;
-let match;
+function parseCsvLine(line) {
+  const fields = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        current += ch;
+      }
+    } else {
+      if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ',') {
+        fields.push(current);
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+  }
+  fields.push(current);
+  return fields;
+}
+
+const csvPath = path.resolve('example-games/main-street/card-data.csv');
+const csvText = fs.readFileSync(csvPath, 'utf8');
+const lines = csvText.trim().split('\n');
+const headers = parseCsvLine(lines[0]);
+
 const templates = [];
-
-while ((match = idRe.exec(src)) !== null) {
-  const idx = match.index;
-  // find the enclosing object braces by scanning backwards to previous '{' and forward to next '}'
-  const before = src.lastIndexOf('{', idx);
-  const after = src.indexOf('}', idx);
-  if (before === -1 || after === -1) continue;
-  const block = src.substring(before, after + 1);
-
-  const id = match[2];
-  const nameMatch = block.match(/name:\s*'([^']+)'/);
-  const costMatch = block.match(/cost:\s*([0-9]+)/);
-  const familyMatch = block.match(/family:\s*'([^']+)'/);
-  const triggerMatch = block.match(/trigger:\s*'([^']+)'/);
-  const synergyMatch = block.match(/synergyTypes:\s*\[([^\]]*)\]/);
-
-  const name = nameMatch ? nameMatch[1] : id;
-  const cost = costMatch ? Number(costMatch[1]) : null;
-  const family = familyMatch ? familyMatch[1] : (id.startsWith('biz-') ? 'business' : id.startsWith('evt-') ? 'event' : 'upgrade');
-  const trigger = triggerMatch ? triggerMatch[1] : null;
-  let synergies = [];
-  if (synergyMatch) {
-    synergies = synergyMatch[1].split(',').map(s => s.replace(/['"\s]/g, '')).filter(Boolean);
+for (let i = 1; i < lines.length; i++) {
+  const values = parseCsvLine(lines[i]);
+  const card = {};
+  for (let j = 0; j < headers.length; j++) {
+    card[headers[j]] = values[j] !== undefined ? values[j] : '';
   }
 
-  templates.push({ id, name, cost, family, trigger, synergies });
+  // Determine family from prefix if not in CSV
+  const family = card.family || (card.id.startsWith('biz-') ? 'business' : card.id.startsWith('evt-') ? 'event' : card.id.startsWith('cs-') ? 'community-space' : card.id.startsWith('staff-') ? 'staff' : 'upgrade');
+  const synergies = card.synergyTypes ? card.synergyTypes.split('|').filter(Boolean) : [];
+  const cost = card.cost ? Number(card.cost) : null;
+  const trigger = card.trigger || null;
+
+  templates.push({ id: card.id, name: card.name, cost, family, trigger, synergies });
 }
+
+// ---------------------------------------------------------------------------
+// SVG generation (unchanged)
+// ---------------------------------------------------------------------------
 
 // Color map
 const synergyColor = {
@@ -50,6 +78,8 @@ function familyColor(family, trigger) {
   if (family === 'business') return '#2f2f2f';
   if (family === 'upgrade') return '#6B4C9A';
   if (family === 'event') return trigger === 'Incident' ? '#2B3A67' : '#8B4513';
+  if (family === 'community-space') return '#2f2f2f';
+  if (family === 'staff') return '#555555';
   return '#333333';
 }
 
@@ -87,10 +117,10 @@ for (const t of templates) {
     }
   }
 
-  const priceBadge = displayCost 
+  const priceBadge = displayCost
     ? `<circle cx="${w-16}" cy="56" r="12" fill="#e0c7a0" stroke="#c8b79a" stroke-width="1.5" />`
     : '';
-  const priceText = displayCost 
+  const priceText = displayCost
     ? `<text x="${w-16}" y="60" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="11" fill="#3a2a14" text-anchor="middle" font-weight="500">${t.cost}</text>`
     : '';
 
