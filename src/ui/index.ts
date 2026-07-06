@@ -179,6 +179,16 @@ export type {
   ParameterizedOverlayButton,
 } from './ParameterizedOverlay';
 
+export {
+  createGameOverOverlay,
+  computeAutoScaleFontSize,
+} from './GameOverOverlay';
+export type {
+  GameOverExtraButton,
+  GameOverOverlayConfig,
+  GameOverOverlayResult,
+} from './GameOverOverlay';
+
 // HandView – reusable hand-of-cards display component
 export { HandView } from './HandView';
 export type {
