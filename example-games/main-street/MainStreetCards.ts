@@ -66,6 +66,17 @@ export interface BusinessCard {
    */
   reputationPerTurn?: number;
   /**
+   * Coin synergy contribution per matching neighbor.
+   * Defaults to 1 (the standard +1 coin per matching adjacency) when undefined.
+   * Set to 0 to exclude this card from contributing synergy to neighbors.
+   */
+  readonly synergyCoinBonus?: number;
+  /**
+   * Reputation synergy contribution per matching neighbor.
+   * Defaults to 0 (no reputation from adjacency synergy) when undefined.
+   */
+  readonly synergyRepBonus?: number;
+  /**
    * IDs of upgrade cards that have been applied to this business instance,
    * in application order. Used to enforce multi-level chain requirements and
    * to prevent the same branch being applied twice.
@@ -230,7 +241,15 @@ export const REFRESH_INVESTMENTS_COST = 2;
 /** Fixed coin cost to refresh the development row (discover new opportunities). */
 export const REFRESH_DEVELOPMENT_COST = 2;
 
-/** Coins earned per adjacent business sharing a synergy type. */
+/**
+ * @deprecated Per-card synergy bonus values replace this global constant.
+ * Each BusinessCard and CommunitySpaceCard now has its own `synergyCoinBonus`
+ * (default 1) and `synergyRepBonus` (default 0). The difficulty preset
+ * `synergyBonusPerNeighbor` value still acts as a multiplier on per-card
+ * coin synergy contributions.
+ *
+ * Kept for backward compatibility with existing test code.
+ */
 export const SYNERGY_BONUS_PER_NEIGHBOR = 1;
 
 /** Multiplier applied to reputation in final score. */
@@ -316,6 +335,17 @@ export interface CommunitySpaceCard {
    */
   reputationPerTurn?: number;
   /**
+   * Coin synergy contribution per matching neighbor.
+   * Defaults to 1 (the standard +1 coin per matching adjacency) when undefined.
+   * Set to 0 to exclude this card from contributing synergy to neighbors.
+   */
+  readonly synergyCoinBonus?: number;
+  /**
+   * Reputation synergy contribution per matching neighbor.
+   * Defaults to 0 (no reputation from adjacency synergy) when undefined.
+   */
+  readonly synergyRepBonus?: number;
+  /**
    * IDs of upgrade cards that have been applied to this community space instance,
    * in application order.
    *
@@ -339,6 +369,8 @@ const BUSINESS_TEMPLATES: Omit<BusinessCard, 'family' | 'level' | 'incomeBonus' 
       upgradePath: r.upgradePath || undefined,
       maxLevel: Number(r.maxLevel) || 0,
       reputationPerTurn: r.reputationPerTurn ? Number(r.reputationPerTurn) : undefined,
+      synergyCoinBonus: r.synergyCoinBonus !== undefined && r.synergyCoinBonus !== '' ? Number(r.synergyCoinBonus) : undefined,
+      synergyRepBonus: r.synergyRepBonus !== undefined && r.synergyRepBonus !== '' ? Number(r.synergyRepBonus) : undefined,
       description: r.description,
     }));
 
@@ -355,6 +387,8 @@ const COMMUNITY_SPACE_TEMPLATES: Omit<CommunitySpaceCard, 'family' | 'level' | '
       upgradePath: r.upgradePath || undefined,
       maxLevel: Number(r.maxLevel) || 0,
       reputationPerTurn: r.reputationPerTurn ? Number(r.reputationPerTurn) : undefined,
+      synergyCoinBonus: r.synergyCoinBonus !== undefined && r.synergyCoinBonus !== '' ? Number(r.synergyCoinBonus) : undefined,
+      synergyRepBonus: r.synergyRepBonus !== undefined && r.synergyRepBonus !== '' ? Number(r.synergyRepBonus) : undefined,
       description: r.description,
     }));
 
@@ -629,24 +663,7 @@ export function cardLabel(card: AnyCard): string {
   }
 }
 
-/**
- * Determines if a card is a Pawn Shop card (biz-pawnshop).
- *
- * Pawn Shop cards neither receive nor contribute synergy bonuses.
- * This holds true even after upgrading to Vintage Shop — the card's
- * base synergy restriction remains.
- *
- * This special case should be removed once synergy bonuses are generalized
- * to per-card values (see CG-0MQRA9QTA0012PNZ).
- *
- * @param card  A card object with an `id` field.
- * @returns true if the card's base template ID is `biz-pawnshop`.
- */
-export function isPawnShopCard(card: { id: string } | null | undefined): boolean {
-  if (!card) return false;
-  const baseId = card.id.replace(/-\d+$/, '');
-  return baseId === 'biz-pawnshop';
-}
+
 
 // ---------------------------------------------------------------------------
 // Card template ID → display-name lookup

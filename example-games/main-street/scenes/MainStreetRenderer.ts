@@ -10,7 +10,6 @@ import {
   MARKET_INVESTMENT_SLOTS,
   REFRESH_DEVELOPMENT_COST,
   REFRESH_INVESTMENTS_COST,
-  isPawnShopCard,
   synergyColor,
 } from '../MainStreetCards';
 import {
@@ -485,14 +484,13 @@ export class MainStreetRenderer {
       tooltipZone.setOrigin(0.5);
       tooltipZone.setInteractive({ useHandCursor: true });
       tooltipZone.on('pointerover', () => {
-        const synergyNote = isPawnShopCard(biz) ? ' (excluded from synergy)' : '';
         const isCommunitySpace = (biz as any).family === 'community-space';
         const label = isCommunitySpace ? 'Community Space' : 'Business';
         const totalRep = (biz.reputationPerTurn ?? 0) + biz.reputationBonus;
         const repInfo = totalRep > 0 ? `\nReputation: +${totalRep}/turn` : '';
-        const synergyBonus = isPawnShopCard(biz) ? 0 : computeSynergyBonus(s.state.streetGrid, _index, s.state.config.synergyBonusPerNeighbor);
-        const synergyInfo = isPawnShopCard(biz) ? '' : `\nSynergy bonus: +${synergyBonus}/turn`;
-        const info = `${label}: ${biz.name}\nIncome: +${biz.baseIncome + biz.incomeBonus}/turn${repInfo}\nSynergy: ${biz.synergyTypes.join('/')}${synergyInfo}${synergyNote}\nLevel: ${biz.level}`;
+        const synergyBonus = computeSynergyBonus(s.state.streetGrid, _index, s.state.config.synergyBonusPerNeighbor);
+        const synergyInfo = `\nSynergy bonus: +${synergyBonus}/turn`;
+        const info = `${label}: ${biz.name}\nIncome: +${biz.baseIncome + biz.incomeBonus}/turn${repInfo}\nSynergy: ${biz.synergyTypes.join('/')}${synergyInfo}\nLevel: ${biz.level}`;
         s.tooltipManager?.show(info, tooltipZone.x, tooltipZone.y);
       });
       tooltipZone.on('pointerout', () => {
@@ -984,16 +982,14 @@ export class MainStreetRenderer {
           let info = '';
           if (card.family === 'business') {
             const b = card as any;
-            const bSynergyNote = isPawnShopCard(b) ? ' (excluded from synergy)' : '';
             const bTotalRep = (b.reputationPerTurn ?? 0) + (b.reputationBonus ?? 0);
             const bRepInfo = bTotalRep > 0 ? `\nReputation: +${bTotalRep}/turn` : '';
-            info = `Business: ${b.name}\nCost: ${b.cost}\nIncome: +${b.baseIncome + (b.incomeBonus || 0)}/turn${bRepInfo}\nSynergy: ${(b.synergyTypes || []).join('/')}${bSynergyNote}\n${b.description ?? ''}`;
+            info = `Business: ${b.name}\nCost: ${b.cost}\nIncome: +${b.baseIncome + (b.incomeBonus || 0)}/turn${bRepInfo}\nSynergy: ${(b.synergyTypes || []).join('/')}\n${b.description ?? ''}`;
           } else if (card.family === 'community-space') {
             const cs = card as any;
-            const csSynergyNote = isPawnShopCard(cs) ? ' (excluded from synergy)' : '';
             const csTotalRep = (cs.reputationPerTurn ?? 0) + (cs.reputationBonus ?? 0);
             const csRepInfo = csTotalRep > 0 ? `\nReputation: +${csTotalRep}/turn` : '';
-            info = `Community Space: ${cs.name}\nCost: ${cs.cost}\nIncome: +${cs.baseIncome + (cs.incomeBonus || 0)}/turn${csRepInfo}\nSynergy: ${(cs.synergyTypes || []).join('/')}${csSynergyNote}\n${cs.description ?? ''}`;
+            info = `Community Space: ${cs.name}\nCost: ${cs.cost}\nIncome: +${cs.baseIncome + (cs.incomeBonus || 0)}/turn${csRepInfo}\nSynergy: ${(cs.synergyTypes || []).join('/')}\n${cs.description ?? ''}`;
           } else if (card.family === 'event') {
             const e = card as any;
             info = `Event: ${e.name}\nCost: ${e.cost}\nEffect: ${e.effect}\nCoins: ${e.coinDelta >= 0 ? '+' : ''}${e.coinDelta}, Rep: ${e.reputationDelta >= 0 ? '+' : ''}${e.reputationDelta}`;

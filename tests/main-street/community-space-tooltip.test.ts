@@ -19,7 +19,6 @@ import {
   createBusinessDeck,
   type CommunitySpaceCard,
   type BusinessCard,
-  isPawnShopCard,
 } from '../../example-games/main-street/MainStreetCards';
 
 // ── Deck Data ────────────────────────────────────────────────
@@ -34,13 +33,12 @@ const businessDeck = createBusinessDeck(1);
  * format used in MainStreetRenderer.drawMarketCard for business cards.
  */
 function buildCommunitySpaceTooltip(card: CommunitySpaceCard): string {
-  const synergyNote = isPawnShopCard(card) ? ' (excluded from synergy)' : '';
   const income = card.baseIncome + (card.incomeBonus || 0);
   return [
     `Community Space: ${card.name}`,
     `Cost: ${card.cost}`,
     `Income: +${income}/turn`,
-    `Synergy: ${card.synergyTypes.join('/')}${synergyNote}`,
+    `Synergy: ${card.synergyTypes.join('/')}`,
     card.description ?? '',
   ].join('\n');
 }
@@ -50,13 +48,12 @@ function buildCommunitySpaceTooltip(card: CommunitySpaceCard): string {
  * in MainStreetRenderer.drawMarketCard.
  */
 function buildBusinessTooltip(card: BusinessCard): string {
-  const synergyNote = isPawnShopCard(card) ? ' (excluded from synergy)' : '';
   const income = card.baseIncome + (card.incomeBonus || 0);
   return [
     `Business: ${card.name}`,
     `Cost: ${card.cost}`,
     `Income: +${income}/turn`,
-    `Synergy: ${card.synergyTypes.join('/')}${synergyNote}`,
+    `Synergy: ${card.synergyTypes.join('/')}`,
     card.description ?? '',
   ].join('\n');
 }
@@ -198,9 +195,8 @@ describe('Community space card tooltip content (AC2)', () => {
     }
   });
 
-  it('tooltip does not reference isPawnShopCard exclusion for community spaces', () => {
+  it('tooltip does not reference synergy exclusion message for community spaces', () => {
     const park = communitySpaceDeck.find(c => c.name === 'Park')!;
-    expect(isPawnShopCard(park)).toBe(false);
 
     const tooltip = buildCommunitySpaceTooltip(park);
     expect(tooltip).not.toContain('excluded from synergy');

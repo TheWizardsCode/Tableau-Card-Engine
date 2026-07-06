@@ -66,6 +66,8 @@ function createCommunitySpaceFixture(overrides?: Record<string, unknown>): Recor
     cost: 5,
     baseIncome: 1,
     synergyTypes: ['Culture'] as readonly SynergyType[],
+    synergyCoinBonus: undefined,
+    synergyRepBonus: undefined,
     upgradePath: 'Test Path',
     maxLevel: 1,
     description: 'A test community space card.',
@@ -91,11 +93,14 @@ function makeCommunitySpaceBiz(overrides?: Record<string, unknown>): BusinessCar
     cost: 5,
     baseIncome: 1,
     synergyTypes: ['Culture'] as readonly SynergyType[],
+    synergyCoinBonus: 1,
+    synergyRepBonus: 0,
     maxLevel: 1,
     description: 'A community space card on the grid.',
     level: 0,
     incomeBonus: 0,
     synergyRangeBonus: 0,
+    reputationBonus: 0,
     ...overrides,
   } as unknown as BusinessCard;
 }
@@ -103,7 +108,8 @@ function makeCommunitySpaceBiz(overrides?: Record<string, unknown>): BusinessCar
 /** Expected fields that CommunitySpaceCard should share with BusinessCard (excluding family). */
 const BUSINESS_CARD_FIELDS = [
   'id', 'name', 'cost', 'baseIncome', 'synergyTypes', 'upgradePath',
-  'maxLevel', 'description', 'level', 'incomeBonus', 'synergyRangeBonus', 'appliedUpgrades',
+  'maxLevel', 'description', 'level', 'incomeBonus', 'synergyRangeBonus',
+  'synergyCoinBonus', 'synergyRepBonus', 'appliedUpgrades',
 ] as const;
 
 // ── AC1: CardFamily type union includes 'community-space' ────
