@@ -19,6 +19,28 @@ import { GAME_W } from '../../../src/ui/constants';
 import { createHudText } from '../../../src/ui/Renderer';
 import { createEventLog } from '../../../src/ui/GymSceneUtils';
 import type { EventLogResult } from '../../../src/ui/GymSceneUtils';
+import { anchorPoint } from '../../../src/ui/screen-layout';
+import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
+import gymLightingSpikeLayoutJson from '../layouts/gym-lighting-spike.layout.json';
+
+// Parse the shared Lighting Spike scene layout once at module load.
+const LIGHTING_SPIKE_LAYOUT: import('../../../src/ui/screen-layout-schema').ScreenLayoutDocument | null = (() => {
+  const parsed = parseScreenLayoutDocument(gymLightingSpikeLayoutJson);
+  return parsed.valid ? parsed.layout : null;
+})();
+
+const DEFAULT_VIEWPORT = { width: 1280, height: 720 };
+
+function resolveLightingAnchor(
+  zone: string,
+  anchor: string,
+  viewport = DEFAULT_VIEWPORT,
+): import('../../../src/ui/screen-layout-schema').PixelPoint {
+  if (!LIGHTING_SPIKE_LAYOUT) {
+    return { x: GAME_W / 2, y: 60 };
+  }
+  return anchorPoint(LIGHTING_SPIKE_LAYOUT, zone, anchor, viewport, 1);
+}
 
 export const GYM_GRAPHICS_LIGHTING_SPIKE_KEY = 'GymGraphicsLightingSpikeScene';
 
@@ -59,12 +81,16 @@ export class GymGraphicsLightingSpikeScene extends GymSceneBase {
     ]);
 
     const cx = GAME_W / 2;
-    let y = 60;
+    const controlsAnchor = resolveLightingAnchor('controls', 'center');
+    const contentAnchor = resolveLightingAnchor('content', 'center');
+    const logAnchor = resolveLightingAnchor('log', 'center');
+    const y = controlsAnchor.y;
 
     this.addButton(cx - 100, y, '[ Toggle Light ]', () => this.toggleLight());
     this.addButton(cx + 100, y, '[ Move Light ]', () => this.moveLight());
 
-    y += 30;
+    const spriteY = contentAnchor.y;
+    const lightY = spriteY - 20;
 
     // Attempt to enable lighting
     try {
@@ -79,18 +105,18 @@ export class GymGraphicsLightingSpikeScene extends GymSceneBase {
 
         // Create sprites for the lit scene and enable lighting on them (Phaser 4 API)
         try {
-          const spriteA = this.add.image(cx - 150, y + 120, 'lighting-sprite-a');
+          const spriteA = this.add.image(cx - 150, spriteY, 'lighting-sprite-a');
           spriteA.setLighting(true);
         } catch (_e) { /* lighting component not available */ }
         try {
-          const spriteB = this.add.image(cx + 150, y + 120, 'lighting-sprite-b');
+          const spriteB = this.add.image(cx + 150, spriteY, 'lighting-sprite-b');
           spriteB.setLighting(true);
         } catch (_e) { /* lighting component not available */ }
 
         // Try to add a Light via the LightsManager
         try {
           this.lights.enable();
-          this.light = this.lights.addLight(cx, y + 100, 300, 0xffffff, 1.0);
+          this.light = this.lights.addLight(cx, lightY, 300, 0xffffff, 1.0);
           this.logEvent('Light added successfully via LightsManager.');
         } catch (e) {
           this.logEvent(`Light add error: ${(e as Error).message}`);
@@ -107,16 +133,15 @@ export class GymGraphicsLightingSpikeScene extends GymSceneBase {
 
     if (!this.lightingAvailable) {
       // Show fallback sprites without lighting
-      this.add.image(cx - 150, y + 120, 'lighting-sprite-a');
-      this.add.image(cx + 150, y + 120, 'lighting-sprite-b');
-      createHudText(this, cx, y + 120, 'Lighting unavailable\n(showing fallback sprites)', '#ff8844', {
+      this.add.image(cx - 150, spriteY, 'lighting-sprite-a');
+      this.add.image(cx + 150, spriteY, 'lighting-sprite-b');
+      createHudText(this, cx, spriteY, 'Lighting unavailable\n(showing fallback sprites)', '#ff8844', {
         fontSize: '12px',
         align: 'center',
       }).setOrigin(0.5);
     }
 
-    y += 260;
-    this.eventLogResult = createEventLog(this, y + 20, {
+    this.eventLogResult = createEventLog(this, logAnchor.y + 20, {
       headerText: '── Findings & Event Log ──',
       maxLines: 14,
       lineHeight: 16,

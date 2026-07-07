@@ -21,6 +21,28 @@ import { popTextOrIcon } from '../../../src/ui/popTextOrIcon';
 import { GAME_W } from '../../../src/ui/constants';
 import { createEventLog } from '../../../src/ui/GymSceneUtils';
 import type { EventLogResult } from '../../../src/ui/GymSceneUtils';
+import { anchorPoint } from '../../../src/ui/screen-layout';
+import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
+import gymTranscriptLayoutJson from '../layouts/gym-transcript.layout.json';
+
+// Parse the shared Transcript scene layout once at module load.
+const TRANSCRIPT_LAYOUT: import('../../../src/ui/screen-layout-schema').ScreenLayoutDocument | null = (() => {
+  const parsed = parseScreenLayoutDocument(gymTranscriptLayoutJson);
+  return parsed.valid ? parsed.layout : null;
+})();
+
+const DEFAULT_VIEWPORT = { width: 1280, height: 720 };
+
+function resolveTranscriptAnchor(
+  zone: string,
+  anchor: string,
+  viewport = DEFAULT_VIEWPORT,
+): import('../../../src/ui/screen-layout-schema').PixelPoint {
+  if (!TRANSCRIPT_LAYOUT) {
+    return { x: GAME_W / 2, y: 60 };
+  }
+  return anchorPoint(TRANSCRIPT_LAYOUT, zone, anchor, viewport, 1);
+}
 
 /** Simple event shape for this demo. */
 interface DemoTranscriptEvent {
@@ -88,7 +110,9 @@ export class GymTranscriptScene extends GymSceneBase {
     ]);
 
     const cx = GAME_W / 2;
-    let y = 60;
+    const controlsAnchor = resolveTranscriptAnchor('controls', 'center');
+    const logAnchor = resolveTranscriptAnchor('log', 'center');
+    const y = controlsAnchor.y;
 
     this.addButton(cx - 400, y, '[ New Session ]', () => this.newSession());
     this.addButton(cx - 240, y, '[ Record Event ]', () => this.recordEvent());
@@ -96,8 +120,7 @@ export class GymTranscriptScene extends GymSceneBase {
     this.addButton(cx + 80, y, '[ Playback ]', () => this.playTranscript());
     this.addButton(cx + 200, y, '[ Show Transcript ]', () => this.showTranscript());
 
-    y += 40;
-    this.eventLogResult = createEventLog(this, y + 20, {
+    this.eventLogResult = createEventLog(this, logAnchor.y + 20, {
       headerText: '── Event Log ──',
       maxLines: 16,
       lineHeight: 16,

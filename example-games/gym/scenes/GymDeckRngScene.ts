@@ -21,6 +21,32 @@ import { preloadCardAssets, ensureCardTextureFallbacks } from '../../../src/ui/C
 import { createHudText } from '../../../src/ui/Renderer';
 import { createDeckGrid } from '../../../src/ui/GymSceneUtils';
 import type { DeckGridResult } from '../../../src/ui/GymSceneUtils';
+import { anchorPoint } from '../../../src/ui/screen-layout';
+import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
+import gymDeckRngLayoutJson from '../layouts/gym-deck-rng.layout.json';
+
+// Parse the shared Deck RNG scene layout once at module load.
+const DECK_RNG_LAYOUT: import('../../../src/ui/screen-layout-schema').ScreenLayoutDocument | null = (() => {
+  const parsed = parseScreenLayoutDocument(gymDeckRngLayoutJson);
+  return parsed.valid ? parsed.layout : null;
+})();
+
+const DEFAULT_VIEWPORT = { width: 1280, height: 720 };
+
+/**
+ * Resolve an anchor from the Deck RNG SLL layout.
+ * Falls back to the default viewport if no layout is available.
+ */
+function resolveDeckRngAnchor(
+  zone: string,
+  anchor: string,
+  viewport = DEFAULT_VIEWPORT,
+): import('../../../src/ui/screen-layout-schema').PixelPoint {
+  if (!DECK_RNG_LAYOUT) {
+    return { x: GAME_W / 2, y: 60 };
+  }
+  return anchorPoint(DECK_RNG_LAYOUT, zone, anchor, viewport, 1);
+}
 
 /** Default seed for deterministic demonstrations. */
 const DEFAULT_SEED = 42;
@@ -76,9 +102,9 @@ export class GymDeckRngScene extends GymSceneBase {
     ]);
 
     // ── Controls (positioned via SLL controls zone) ────────────
-    const controlsAnchor = this.getGymAnchor('controls', 'left');
-    const cx = controlsAnchor?.x ?? GAME_W / 2;
-    let y = controlsAnchor?.y ?? 60;
+    const controlsAnchor = resolveDeckRngAnchor('controls', 'center');
+    const cx = controlsAnchor.x;
+    const y = controlsAnchor.y;
 
     this.addLabel(cx, y, 'Seed:');
     this.seedText = createHudText(this, cx + 50, y, String(this.seed), '#ffffff', { fontSize: '16px' });
@@ -128,9 +154,9 @@ export class GymDeckRngScene extends GymSceneBase {
       this.deckGridResult = null;
     }
 
-    const cardDisplay = this.getGymAnchor('cardDisplay', 'center');
-    const centerX = cardDisplay?.x ?? GAME_W / 2;
-    const centerY = (cardDisplay?.y ?? 270) + 100;
+    const cardDisplayAnchor = resolveDeckRngAnchor('cardDisplay', 'center');
+    const centerX = cardDisplayAnchor.x;
+    const centerY = cardDisplayAnchor.y + 100;
 
     this.deckGridResult = createDeckGrid(this, this.deck, {
       cols: GRID_COLUMNS,

@@ -26,6 +26,28 @@ import { GAME_W } from '../../../src/ui/constants';
 import { createHudText } from '../../../src/ui/Renderer';
 import { createEventLog } from '../../../src/ui/GymSceneUtils';
 import type { EventLogResult } from '../../../src/ui/GymSceneUtils';
+import { anchorPoint } from '../../../src/ui/screen-layout';
+import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
+import gymAudioFeedbackLayoutJson from '../layouts/gym-audio-feedback.layout.json';
+
+// Parse the shared Audio Feedback scene layout once at module load.
+const AUDIO_FEEDBACK_LAYOUT: import('../../../src/ui/screen-layout-schema').ScreenLayoutDocument | null = (() => {
+  const parsed = parseScreenLayoutDocument(gymAudioFeedbackLayoutJson);
+  return parsed.valid ? parsed.layout : null;
+})();
+
+const DEFAULT_VIEWPORT = { width: 1280, height: 720 };
+
+function resolveAudioAnchor(
+  zone: string,
+  anchor: string,
+  viewport = DEFAULT_VIEWPORT,
+): import('../../../src/ui/screen-layout-schema').PixelPoint {
+  if (!AUDIO_FEEDBACK_LAYOUT) {
+    return { x: GAME_W / 2, y: 60 };
+  }
+  return anchorPoint(AUDIO_FEEDBACK_LAYOUT, zone, anchor, viewport, 1);
+}
 
 /** A stub SoundPlayer that records play calls instead of producing audio. */
 class StubSoundPlayer implements SoundPlayer {
@@ -119,7 +141,11 @@ export class GymAudioFeedbackScene extends GymSceneBase {
     this.soundManager.setVolume(this.volume);
 
     const cx = GAME_W / 2;
-    let y = 60;
+    const controlsAnchor = resolveAudioAnchor('controls', 'center');
+    const controls2Anchor = resolveAudioAnchor('controls2', 'center');
+    const statusAnchor = resolveAudioAnchor('status', 'center');
+    const logAnchor = resolveAudioAnchor('log', 'center');
+    const y = controlsAnchor.y;
 
     this.addButton(cx - 450, y, '[ Toggle Mute ]', () => this.toggleMute());
     this.addButton(cx - 280, y, '[ Volume - ]', () => this.adjustVolume(-0.1));
@@ -128,17 +154,15 @@ export class GymAudioFeedbackScene extends GymSceneBase {
     this.addButton(cx + 150, y, '[ Discard Card ]', () => this.emitEvent('card-discarded'));
     this.addButton(cx + 330, y, '[ Invalid Key ]', () => this.playInvalid());
 
-    y += 26;
-    this.addButton(cx - 280, y, '[ Pop Text ]', () => this.triggerPopText());
-    this.addButton(cx - 100, y, '[ Pop Undo ]', () => this.emitEvent('undo'));
-    this.addButton(cx + 60, y, '[ Pop Redo ]', () => this.emitEvent('redo'));
-    this.addButton(cx + 220, y, '[ Celebrate ]', () => this.triggerCelebration());
+    const y2 = controls2Anchor.y;
+    this.addButton(cx - 280, y2, '[ Pop Text ]', () => this.triggerPopText());
+    this.addButton(cx - 100, y2, '[ Pop Undo ]', () => this.emitEvent('undo'));
+    this.addButton(cx + 60, y2, '[ Pop Redo ]', () => this.emitEvent('redo'));
+    this.addButton(cx + 220, y2, '[ Celebrate ]', () => this.triggerCelebration());
 
-    y += 50;
-    this.statusText = createHudText(this, cx, y, this.statusString(), '#ffffff', { fontSize: '16px' }).setOrigin(0.5);
+    this.statusText = createHudText(this, cx, statusAnchor.y, this.statusString(), '#ffffff', { fontSize: '16px' }).setOrigin(0.5);
 
-    y += 30;
-    this.eventLogResult = createEventLog(this, y + 40, {
+    this.eventLogResult = createEventLog(this, logAnchor.y + 20, {
       headerText: '── Sound Call Log ──',
       maxLines: 14,
       lineHeight: 17,

@@ -20,6 +20,28 @@ import { GAME_W } from '../../../src/ui/constants';
 import { createHudText, createStandardUndoRedoButtons } from '../../../src/ui/Renderer';
 import { createEventLog } from '../../../src/ui/GymSceneUtils';
 import type { EventLogResult } from '../../../src/ui/GymSceneUtils';
+import { anchorPoint } from '../../../src/ui/screen-layout';
+import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
+import gymUndoRedoLayoutJson from '../layouts/gym-undo-redo.layout.json';
+
+// Parse the shared Undo/Redo scene layout once at module load.
+const UNDO_REDO_LAYOUT: import('../../../src/ui/screen-layout-schema').ScreenLayoutDocument | null = (() => {
+  const parsed = parseScreenLayoutDocument(gymUndoRedoLayoutJson);
+  return parsed.valid ? parsed.layout : null;
+})();
+
+const DEFAULT_VIEWPORT = { width: 1280, height: 720 };
+
+function resolveUndoRedoAnchor(
+  zone: string,
+  anchor: string,
+  viewport = DEFAULT_VIEWPORT,
+): import('../../../src/ui/screen-layout-schema').PixelPoint {
+  if (!UNDO_REDO_LAYOUT) {
+    return { x: GAME_W / 2, y: 60 };
+  }
+  return anchorPoint(UNDO_REDO_LAYOUT, zone, anchor, viewport, 1);
+}
 
 /** A simple command that increments/decrements a counter. */
 class IncrementCommand implements Command {
@@ -68,7 +90,12 @@ export class GymUndoRedoScene extends GymSceneBase {
     ]);
 
     const cx = GAME_W / 2;
-    let y = 60;
+    const controlsAnchor = resolveUndoRedoAnchor('controls', 'center');
+    const counterAnchor = resolveUndoRedoAnchor('counter', 'center');
+    const statusAnchor = resolveUndoRedoAnchor('status', 'center');
+    const historyAnchor = resolveUndoRedoAnchor('history', 'center');
+    const logAnchor = resolveUndoRedoAnchor('log', 'center');
+    const y = controlsAnchor.y;
 
     // Action buttons
     this.addButton(cx - 400, y, '[ +1 ]', () => this.executeAction(1));
@@ -84,22 +111,16 @@ export class GymUndoRedoScene extends GymSceneBase {
 
     this.addButton(cx + 40, y, '[ Clear History ]', () => this.clearHistory());
 
-    y += 50;
-
     // State display
-    this.counterText = createHudText(this, cx, y, 'Counter: 0', '#ffffff', { fontSize: '28px' }).setOrigin(0.5);
+    this.counterText = createHudText(this, cx, counterAnchor.y, 'Counter: 0', '#ffffff', { fontSize: '28px' }).setOrigin(0.5);
 
-    y += 40;
+    this.undoAvailText = createHudText(this, cx - 120, statusAnchor.y, 'Can Undo: no', '#888888', { fontSize: '14px' });
+    this.redoAvailText = createHudText(this, cx + 80, statusAnchor.y, 'Can Redo: no', '#888888', { fontSize: '14px' });
 
-    this.undoAvailText = createHudText(this, cx - 120, y, 'Can Undo: no', '#888888', { fontSize: '14px' });
-    this.redoAvailText = createHudText(this, cx + 80, y, 'Can Redo: no', '#888888', { fontSize: '14px' });
-
-    y += 30;
-    this.historyText = createHudText(this, cx, y, 'History: (empty)', '#669966', { fontSize: '12px' });
+    this.historyText = createHudText(this, cx, historyAnchor.y, 'History: (empty)', '#669966', { fontSize: '12px' });
     this.historyText.setOrigin(0.5);
 
-    y += 20;
-    this.eventLogResult = createEventLog(this, y + 20, {
+    this.eventLogResult = createEventLog(this, logAnchor.y + 20, {
       headerText: '── Event Log ──',
       maxLines: 12,
       lineHeight: 17,

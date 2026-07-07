@@ -22,6 +22,32 @@ import { createHudText } from '../../../src/ui/Renderer';
 import { createEventLog } from '../../../src/ui/GymSceneUtils';
 import type { EventLogResult } from '../../../src/ui/GymSceneUtils';
 import type Phaser from 'phaser';
+import { anchorPoint } from '../../../src/ui/screen-layout';
+import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
+import gymHudComponentsLayoutJson from '../layouts/gym-hud-components.layout.json';
+
+// Parse the shared HUD Components scene layout once at module load.
+const HUD_COMPONENTS_LAYOUT: import('../../../src/ui/screen-layout-schema').ScreenLayoutDocument | null = (() => {
+  const parsed = parseScreenLayoutDocument(gymHudComponentsLayoutJson);
+  return parsed.valid ? parsed.layout : null;
+})();
+
+const DEFAULT_VIEWPORT = { width: 1280, height: 720 };
+
+/**
+ * Resolve an anchor from the HUD Components SLL layout.
+ * Falls back to the default viewport if no layout is available.
+ */
+function resolveHudAnchor(
+  zone: string,
+  anchor: string,
+  viewport = DEFAULT_VIEWPORT,
+): import('../../../src/ui/screen-layout-schema').PixelPoint {
+  if (!HUD_COMPONENTS_LAYOUT) {
+    return { x: GAME_W / 2, y: 60 };
+  }
+  return anchorPoint(HUD_COMPONENTS_LAYOUT, zone, anchor, viewport, 1);
+}
 
 // ── Mock SoundManager for SettingsPanel demo ─────────────────
 
@@ -104,10 +130,16 @@ export class GymHudComponentsScene extends GymSceneBase {
     // ── Instructions ────────────────────────────────────
 
     const cx = GAME_W / 2;
-    let y = 56;
+
+    const instructionsAnchor = resolveHudAnchor('instructions', 'center');
+    const controlsAnchor = resolveHudAnchor('controls', 'center');
+    const controls2Anchor = resolveHudAnchor('controls2', 'center');
+    const statusAnchor = resolveHudAnchor('status', 'center');
+    const depthAnchor = resolveHudAnchor('depth', 'left');
+    const logAnchor = resolveHudAnchor('log', 'center');
 
     const instructions = createHudText(
-      this, cx, y,
+      this, cx, instructionsAnchor.y,
       'Use the buttons below or the ? and ⚙ toggle controls to interact with the shared HUD components.',
       '#88aa88',
       { fontSize: '13px' },
@@ -116,42 +148,38 @@ export class GymHudComponentsScene extends GymSceneBase {
 
     // ── Interactive controls ─────────────────────────────
 
-    y += 30;
-
-    this.addButton(cx - 250, y, '[ Open HelpPanel ]', () => {
+    this.addButton(cx - 250, controlsAnchor.y, '[ Open HelpPanel ]', () => {
       this.helpPanel!.open();
       this._helpOpen = true;
       this.updateStatusLines();
       this.logEvent('HelpPanel: open() called');
     });
-    this.addButton(cx - 110, y, '[ Close HelpPanel ]', () => {
+    this.addButton(cx - 110, controlsAnchor.y, '[ Close HelpPanel ]', () => {
       this.helpPanel!.close();
       this._helpOpen = false;
       this.updateStatusLines();
       this.logEvent('HelpPanel: close() called');
     });
-    this.addButton(cx + 30, y, '[ Toggle HelpPanel ]', () => {
+    this.addButton(cx + 30, controlsAnchor.y, '[ Toggle HelpPanel ]', () => {
       this.helpPanel!.toggle();
       this._helpOpen = !this._helpOpen;
       this.updateStatusLines();
       this.logEvent(`HelpPanel: toggle() → ${this._helpOpen ? 'open' : 'closed'}`);
     });
 
-    y += 30;
-
-    this.addButton(cx - 130, y, '[ Open Settings ]', () => {
+    this.addButton(cx - 130, controls2Anchor.y, '[ Open Settings ]', () => {
       this.settingsPanel.open();
       this._settingsOpen = true;
       this.updateStatusLines();
       this.logEvent('SettingsPanel: open() called');
     });
-    this.addButton(cx + 10, y, '[ Close Settings ]', () => {
+    this.addButton(cx + 10, controls2Anchor.y, '[ Close Settings ]', () => {
       this.settingsPanel.close();
       this._settingsOpen = false;
       this.updateStatusLines();
       this.logEvent('SettingsPanel: close() called');
     });
-    this.addButton(cx + 150, y, '[ Toggle Settings ]', () => {
+    this.addButton(cx + 150, controls2Anchor.y, '[ Toggle Settings ]', () => {
       this.settingsPanel.toggle();
       this._settingsOpen = !this._settingsOpen;
       this.updateStatusLines();
@@ -160,19 +188,17 @@ export class GymHudComponentsScene extends GymSceneBase {
 
     // ── Panel state indicators ──────────────────────────
 
-    y += 36;
     this.helpStatusText = createHudText(
-      this, 460, y, 'HelpPanel: closed', '#88ff88', { fontSize: '14px' },
+      this, 460, statusAnchor.y, 'HelpPanel: closed', '#88ff88', { fontSize: '14px' },
     );
     this.settingsStatusText = createHudText(
-      this, 440, y, 'SettingsPanel: closed', '#ffcc44', { fontSize: '14px' },
+      this, 440, statusAnchor.y, 'SettingsPanel: closed', '#ffcc44', { fontSize: '14px' },
     );
 
     // ── Depth layering info ─────────────────────────────
 
-    y += 28;
     createHudText(
-      this, 60, y,
+      this, 60, depthAnchor.y,
       'Depth: blocker=900, bg=901, content=902, close=903, ? btn=1101, ⚙ btn=1102',
       '#88aa88',
       { fontSize: '12px' },
@@ -184,8 +210,7 @@ export class GymHudComponentsScene extends GymSceneBase {
 
     // ── Event log ───────────────────────────────────────
 
-    y += 44;
-    this.eventLogResult = createEventLog(this, y + 10, {
+    this.eventLogResult = createEventLog(this, logAnchor.y + 10, {
       headerText: '── Event Log ──',
       maxLines: 12,
       lineHeight: 16,

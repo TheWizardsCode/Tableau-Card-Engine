@@ -18,6 +18,28 @@ import { GAME_W } from '../../../src/ui/constants';
 import { createHudText } from '../../../src/ui/Renderer';
 import { createEventLog } from '../../../src/ui/GymSceneUtils';
 import type { EventLogResult } from '../../../src/ui/GymSceneUtils';
+import { anchorPoint } from '../../../src/ui/screen-layout';
+import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
+import gymShaderSpikeLayoutJson from '../layouts/gym-shader-spike.layout.json';
+
+// Parse the shared Shader Spike scene layout once at module load.
+const SHADER_SPIKE_LAYOUT: import('../../../src/ui/screen-layout-schema').ScreenLayoutDocument | null = (() => {
+  const parsed = parseScreenLayoutDocument(gymShaderSpikeLayoutJson);
+  return parsed.valid ? parsed.layout : null;
+})();
+
+const DEFAULT_VIEWPORT = { width: 1280, height: 720 };
+
+function resolveShaderAnchor(
+  zone: string,
+  anchor: string,
+  viewport = DEFAULT_VIEWPORT,
+): import('../../../src/ui/screen-layout-schema').PixelPoint {
+  if (!SHADER_SPIKE_LAYOUT) {
+    return { x: GAME_W / 2, y: 60 };
+  }
+  return anchorPoint(SHADER_SPIKE_LAYOUT, zone, anchor, viewport, 1);
+}
 
 /** The scene key must match the registration in GymRegistry. */
 export const GYM_GRAPHICS_SHADER_SPIKE_KEY = 'GymGraphicsShaderSpikeScene';
@@ -109,27 +131,29 @@ export class GymGraphicsShaderSpikeScene extends GymSceneBase {
     ]);
 
     const cx = GAME_W / 2;
-    let y = 60;
+    const controlsAnchor = resolveShaderAnchor('controls', 'center');
+    const statusAnchor = resolveShaderAnchor('status', 'center');
+    const contentAnchor = resolveShaderAnchor('content', 'center');
+    const logAnchor = resolveShaderAnchor('log', 'center');
+    const y = controlsAnchor.y;
 
     this.addButton(cx - 400, y, '[ Next Tint ]', () => this.cycleTint());
     this.addButton(cx - 240, y, '[ Next Blend ]', () => this.cycleBlendMode());
     this.addButton(cx - 60, y, '[ Reset Tint ]', () => this.resetTint());
     this.addButton(cx + 120, y, '[ Attempt Shader ]', () => this.attemptShader());
 
-    y += 30;
-    this.statusLineText = createHudText(this, cx, y, 'Blend: NORMAL | Tint: None', '#88ff88', { fontSize: '12px' }).setOrigin(0.5);
+    this.statusLineText = createHudText(this, cx, statusAnchor.y, 'Blend: NORMAL | Tint: None', '#88ff88', { fontSize: '12px' }).setOrigin(0.5);
 
-    y += 30;
-    // Create sample sprites
+    // Create sample sprites at content anchor Y
     const spriteX = [cx - 180, cx, cx + 180];
+    const spriteY = contentAnchor.y;
     for (let i = 0; i < 3; i++) {
       const key = ['spike-sprite-a', 'spike-sprite-b', 'spike-sprite-c'][i];
-      const sprite = this.add.image(spriteX[i], y + 80, key);
+      const sprite = this.add.image(spriteX[i], spriteY, key);
       this.sprites.push(sprite);
     }
 
-    y += 200;
-    this.eventLogResult = createEventLog(this, y + 20, {
+    this.eventLogResult = createEventLog(this, logAnchor.y + 20, {
       headerText: '── Event Log ──',
       maxLines: 12,
       lineHeight: 17,
