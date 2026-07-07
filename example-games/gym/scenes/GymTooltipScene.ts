@@ -7,6 +7,10 @@
  *   - Live tooltip positioning relative to interactive objects
  *   - Toggle between modes at runtime
  *
+ * Layout is managed declaratively via the Screen Layout Language (SLL).
+ * Zone anchors define primary positions; secondary positions are derived
+ * relative to those anchors.
+ *
  * @module example-games/gym/scenes/GymTooltipScene
  */
 
@@ -14,6 +18,33 @@ import { GymSceneBase } from './GymSceneBase';
 import { GYM_TOOLTIP_KEY } from '../GymRegistry';
 import { GAME_W, GAME_H, FONT_FAMILY, TooltipManager } from '../../../src/ui';
 import { createHudText } from '../../../src/ui/Renderer';
+import { anchorPoint } from '../../../src/ui/screen-layout';
+import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
+import gymTooltipLayoutJson from '../layouts/gym-tooltip.layout.json';
+
+// Parse the shared Tooltip scene layout once at module load.
+const TOOLTIP_LAYOUT: import('../../../src/ui/screen-layout-schema').ScreenLayoutDocument | null = (() => {
+  const parsed = parseScreenLayoutDocument(gymTooltipLayoutJson);
+  return parsed.valid ? parsed.layout : null;
+})();
+
+const DEFAULT_VIEWPORT = { width: 1280, height: 720 };
+
+/**
+ * Resolve a primary anchor position from the SLL layout.
+ * Falls back to the default viewport if no layout is available.
+ */
+function resolveAnchor(
+  zone: string,
+  anchor: string,
+  viewport?: { width: number; height: number },
+): import('../../../src/ui/screen-layout-schema').PixelPoint {
+  if (!TOOLTIP_LAYOUT) {
+    return { x: 0, y: 0 };
+  }
+  const vp = viewport ?? DEFAULT_VIEWPORT;
+  return anchorPoint(TOOLTIP_LAYOUT, zone, anchor, vp, 1);
+}
 
 export class GymTooltipScene extends GymSceneBase {
   private domTooltipManager!: TooltipManager;
@@ -48,29 +79,30 @@ export class GymTooltipScene extends GymSceneBase {
       },
     ]);
 
-    const cx = GAME_W / 2;
-    let y = 60;
+    const headerAnchor = resolveAnchor('header', 'center');
+    const labelAnchor = resolveAnchor('label', 'center');
+    const contentAnchor = resolveAnchor('content', 'center');
+    const logAnchor = resolveAnchor('log', 'center');
 
-    // Mode toggle buttons
-    this.addButton(cx - 180, y, '[ DOM Mode ]', () => this.setMode(true));
-    this.addButton(cx + 20, y, '[ Phaser Mode ]', () => this.setMode(false));
-    this.addButton(cx + 200, y, '[ Show Demo ]', () => this.showDemoTooltip());
-    this.addButton(cx + 380, y, '[ Hide ]', () => this.hideTooltip());
+    // Mode toggle buttons — centred horizontally on header anchor, offset ±180/20/200/380
+    this.addButton(headerAnchor.x - 180, headerAnchor.y, '[ DOM Mode ]', () => this.setMode(true));
+    this.addButton(headerAnchor.x + 20, headerAnchor.y, '[ Phaser Mode ]', () => this.setMode(false));
+    this.addButton(headerAnchor.x + 200, headerAnchor.y, '[ Show Demo ]', () => this.showDemoTooltip());
+    this.addButton(headerAnchor.x + 380, headerAnchor.y, '[ Hide ]', () => this.hideTooltip());
 
-    y += 40;
-    const modeLabel = createHudText(this, cx, y, 'Mode: DOM overlay', '#88ccff', { fontSize: '16px' });
+    // Mode label — at label anchor y
+    const modeLabel = createHudText(this, labelAnchor.x, labelAnchor.y, 'Mode: DOM overlay', '#88ccff', { fontSize: '16px' });
     modeLabel.setOrigin(0.5);
     modeLabel.setName('modeLabel');
 
-    y += 50;
-    createHudText(this, cx, y, '── Hover over the cards below ──', '#6699aa', { fontSize: '14px' }).setOrigin(0.5);
+    // Hover prompt — 50 px below label
+    createHudText(this, labelAnchor.x, labelAnchor.y + 50, '── Hover over the cards below ──', '#6699aa', { fontSize: '14px' }).setOrigin(0.5);
 
-    // Create interactive demo cards
-    y += 50;
-    this.createDemoCards(y);
+    // Create interactive demo cards — at content anchor y
+    this.createDemoCards(contentAnchor.y);
 
-    y += 180;
-    createHudText(this, cx, y, '── Event Log ──', '#6699aa', { fontSize: '12px' }).setOrigin(0.5);
+    // Event log header — at log anchor y
+    createHudText(this, logAnchor.x, logAnchor.y, '── Event Log ──', '#6699aa', { fontSize: '12px' }).setOrigin(0.5);
 
     // Create tooltip managers
     this.domTooltipManager = new TooltipManager(this);
@@ -184,7 +216,9 @@ export class GymTooltipScene extends GymSceneBase {
     if (this.eventLog.length > 10) this.eventLog.shift();
     for (const t of this.logTexts) t.destroy();
     this.logTexts = [];
-    const baseY = 450;
+    const logAnchor = resolveAnchor('log', 'center');
+    // Event log entries start 70 px below the log header anchor
+    const baseY = logAnchor.y + 70;
     for (let i = 0; i < this.eventLog.length; i++) {
       const txt = createHudText(this, GAME_W / 2, baseY + i * 17, this.eventLog[i], '#aabbcc', { fontSize: '11px' }).setOrigin(0.5);
       this.logTexts.push(txt);
