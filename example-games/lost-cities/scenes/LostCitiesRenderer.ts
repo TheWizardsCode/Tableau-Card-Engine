@@ -773,8 +773,13 @@ export class LostCitiesRenderer {
       if (!discardView) continue;
 
       if (pile.length === 0) {
-        discardView.setPile(new DiscardPileAdapter([]));
-        discardView.update();
+        // Hide the sprite and count text — discard hit areas (createDiscardZones)
+        // handle all interaction, so the ghosted card-back is unnecessary visual
+        // clutter. Using PileView.update() for empty piles would show a
+        // full-size card-back (95×130) instead of the compact discard size
+        // (57×78), appearing oversized and shifting layout when cards arrive.
+        discardView.getSprite().setVisible(false);
+        discardView.getCountText().setVisible(false);
         continue;
       }
 
