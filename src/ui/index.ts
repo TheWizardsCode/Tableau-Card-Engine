@@ -281,3 +281,20 @@ export type {
 // HighlightManager – reusable highlight zone manager
 export { HighlightManager } from './HighlightManager';
 export type { HighlightZoneConfig, HighlightStyle } from './HighlightManager';
+
+// Layout ownership / visibility controller
+// Re-exported from core-engine for convenience: SLL consumers can import
+// ownership helpers directly from the UI barrel without reaching into
+// src/core-engine/.
+export {
+  VisibilityOwnershipController,
+} from '../core-engine/VisibilityOwnership';
+export type {
+  VisibilityMode,
+  VisibilityModeRuleSet,
+  VisibilityTarget,
+  VisibilityOwnershipIssue,
+  VisibilityOwnershipIssueCode,
+  VisibilityOwnershipIssueReporter,
+  VisibilityOwnershipControllerOptions,
+} from '../core-engine/VisibilityOwnership';

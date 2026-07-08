@@ -23,6 +23,7 @@ export { GymGraphicsLightingSpikeScene } from './scenes/GymGraphicsLightingSpike
 export { GymSllScene } from './scenes/GymSllScene';
 export { GymTooltipScene } from './scenes/GymTooltipScene';
 export { GymHudComponentsScene } from './scenes/GymHudComponentsScene';
+export { GymLayoutOwnershipScene } from './scenes/GymLayoutOwnershipScene';
 
 export {
   GYM_ROUTER_KEY,
@@ -38,6 +39,7 @@ export {
   GYM_SLL_KEY,
   GYM_TOOLTIP_KEY,
   GYM_HUD_COMPONENTS_KEY,
+  GYM_LAYOUT_OWNERSHIP_KEY,
   GYM_SCENE_CATALOGUE,
 } from './GymRegistry';
 export type { GymSceneEntry } from './GymRegistry';
