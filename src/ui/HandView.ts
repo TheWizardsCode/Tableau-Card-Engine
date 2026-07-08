@@ -275,6 +275,24 @@ export interface RemoveCardOptions {
   duration?: number;
 }
 
+/**
+ * Animation options for {@link HandView.sortCards}.
+ *
+ * When `animate: true`, existing card sprites tween smoothly from their
+ * current positions to their new sorted positions instead of being
+ * destroyed and recreated.
+ */
+export interface AnimatedSortOptions {
+  /** Whether to animate card positions. @default false */
+  animate?: boolean;
+
+  /** Duration in ms for the sort animation. @default 300 */
+  duration?: number;
+
+  /** Easing function string for the tween. @default 'Quad.easeOut' */
+  ease?: string;
+}
+
 /** Source range for a drag operation (inclusive card indices). */
 export interface DragSourceRange {
   from: number;
@@ -657,6 +675,11 @@ export class HandView {
    * Sort the hand cards in-place using the provided comparison function,
    * then rebuild the display to reflect the new order.
    *
+   * When `opts.animate` is `true`, existing card sprites tween smoothly
+   * from their current positions to their new sorted positions instead of
+   * being destroyed and recreated. When `opts.animate` is `false` or
+   * omitted, the current snap-behaviour is preserved (backwards compatible).
+   *
    * Clears the current selection.
    *
    * @param compareFn - A comparison function following the same contract as
@@ -664,11 +687,19 @@ export class HandView {
    *                    returns a negative number if `a` should come before `b`,
    *                    a positive number if `a` should come after `b`, or 0 if
    *                    they are considered equal.
+   * @param opts      - Optional animation configuration.
    *
    * @example
    * ```ts
-   * // Sort by rank ascending
+   * // Snap sort (default, backwards compatible)
    * handView.sortCards((a, b) => a.rank - b.rank);
+   *
+   * // Animated sort with custom duration and easing
+   * handView.sortCards((a, b) => a.rank - b.rank, {
+   *   animate: true,
+   *   duration: 400,
+   *   ease: 'Quad.easeOut',
+   * });
    *
    * // Sort by suit then rank
    * handView.sortCards((a, b) => {
@@ -677,11 +708,104 @@ export class HandView {
    * });
    * ```
    */
-  sortCards(compareFn: (a: Card, b: Card) => number): void {
+  sortCards(
+    compareFn: (a: Card, b: Card) => number,
+    opts?: AnimatedSortOptions,
+  ): void {
+    const animate = opts?.animate ?? false;
+    const duration = opts?.duration ?? 300;
+    const ease = opts?.ease ?? 'Quad.easeOut';
+
+    if (!animate || this._reducedMotion || this.sprites.length === 0) {
+      // Non-animated path: existing snap behaviour.
+      this.cards.sort(compareFn);
+      this.selectedIndex = null;
+      this.rebuildDisplay();
+      this.emit('selectionchange', this.selectedIndex);
+      return;
+    }
+
+    // ── Animated sort path ──────────────────────────────────────
+
+    // 1. Before sorting, record which sprite index each card currently occupies.
+    //    This mapping uses object references so it remains valid after sorting.
+    const spriteIndexForCard = new Map<Card, number>();
+    for (let i = 0; i < this.sprites.length; i++) {
+      spriteIndexForCard.set(this.cards[i], i);
+    }
+
+    // 2. Sort the cards array.
     this.cards.sort(compareFn);
     this.selectedIndex = null;
-    this.rebuildDisplay();
+
+    // 3. Reorder the sprites array to match the new card order.
+    //    The sprites retain their current (old) positions at this point;
+    //    tweens will animate them to the computed new positions below.
+    this.reorderSpritesForNewCardOrder(spriteIndexForCard);
+
+    // 4. Compute new target positions.
+    const newPositions = this.computeCardPositions();
+
+    // 4. Animate each sprite from its old position to its new position.
+    for (let i = 0; i < this.sprites.length && i < newPositions.length; i++) {
+      const sprite = this.sprites[i];
+      const target = newPositions[i];
+      // Skip sprites whose position hasn't changed.
+      if (
+        Math.abs((sprite as any).x - target.x) < 0.5 &&
+        Math.abs((sprite as any).y - target.y) < 0.5
+      ) {
+        continue;
+      }
+
+      this.scene.tweens.add({
+        targets: sprite as any,
+        x: target.x,
+        y: target.y,
+        duration,
+        ease,
+      });
+    }
+
+    // 5. Emit selection change immediately (selection is cleared).
     this.emit('selectionchange', this.selectedIndex);
+  }
+
+  /**
+   * Reorder the internal `sprites` array so that it matches the order of
+   * the (already sorted) `cards` array.
+   *
+   * This method uses the pre-built mapping (card → original sprite index)
+   * captured before sorting. It does NOT destroy or recreate any display
+   * objects — only the array order is changed.
+   *
+   * @param spriteIndexForCard - Map from card reference to its original
+   *                             position in the sprites array (built
+   *                             before sorting the cards array).
+   */
+  private reorderSpritesForNewCardOrder(
+    spriteIndexForCard: Map<Card, number>,
+  ): void {
+    const n = this.cards.length;
+    if (n !== this.sprites.length) {
+      // Count mismatch — rebuild to stay safe.
+      this.rebuildDisplay();
+      return;
+    }
+
+    // For each position in the sorted cards array, look up the original
+    // sprite index for that card and place the sprite at the new position.
+    const reordered: Phaser.GameObjects.GameObject[] = new Array(n);
+    for (let i = 0; i < n; i++) {
+      const originalIndex = spriteIndexForCard.get(this.cards[i]);
+      if (originalIndex === undefined) {
+        // Card not found in mapping — fall back to rebuild.
+        this.rebuildDisplay();
+        return;
+      }
+      reordered[i] = this.sprites[originalIndex];
+    }
+    this.sprites = reordered;
   }
 
   /**

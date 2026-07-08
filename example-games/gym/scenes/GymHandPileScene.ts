@@ -561,14 +561,15 @@ export class GymHandPileScene extends GymSceneBase {
       this.logEvent('No cards to sort');
       return;
     }
-    // Sort by suit then rank (ascending)
-    this.hand.sort((a, b) => {
-      if (a.suit !== b.suit) return a.suit.localeCompare(b.suit);
-      return rankValue(a.rank) - rankValue(b.rank);
-    });
-    this.selectedIdx = -1;
-    this.handView.setCards(this.hand);
-    this.handView.setSelected(null);
+    // Delegate sort animation to HandView — cards and sprites are
+    // reordered internally; no manual sort + setCards needed.
+    this.handView.sortCards(
+      (a, b) => {
+        if (a.suit !== b.suit) return a.suit.localeCompare(b.suit);
+        return rankValue(a.rank) - rankValue(b.rank);
+      },
+      { animate: !this.reducedMotion },
+    );
     this.logEvent('Hand sorted by suit then rank');
   }
 

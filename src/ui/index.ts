@@ -196,6 +196,7 @@ export type {
   AddCardOptions,
   AnimateAddCardOptions,
   RemoveCardOptions,
+  AnimatedSortOptions,
   HandViewEvents,
   CardTextureResolver,
   RenderCardFn,
