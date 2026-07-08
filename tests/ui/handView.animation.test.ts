@@ -39,6 +39,7 @@ function createMockScene(): any {
       clearTint: vi.fn().mockReturnThis(),
       setOrigin: vi.fn().mockReturnThis(),
       setAlpha: vi.fn().mockReturnThis(),
+      setDepth: vi.fn().mockReturnThis(),
       setPosition: vi.fn((px: number, py: number) => {
         img.x = px;
         img.y = py;

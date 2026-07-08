@@ -756,7 +756,16 @@ export class HandView {
       halfSpan = Math.max((lastX - firstX) / 2, 1);
     }
 
-    // 5. Animate each sprite from its old position and rotation to new.
+    // 5. Update z-ordering to match the sorted card order.
+    //    Sprites later in the array render on top.
+    for (let i = 0; i < this.sprites.length; i++) {
+      const sprite = this.sprites[i];
+      if (typeof (sprite as any).setDepth === 'function') {
+        (sprite as any).setDepth(i);
+      }
+    }
+
+    // 6. Animate each sprite from its old position and rotation to new.
     for (let i = 0; i < this.sprites.length && i < newPositions.length; i++) {
       const sprite = this.sprites[i];
       const target = newPositions[i];
@@ -787,7 +796,7 @@ export class HandView {
       });
     }
 
-    // 5. Emit selection change immediately (selection is cleared).
+    // 7. Emit selection change immediately (selection is cleared).
     this.emit('selectionchange', this.selectedIndex);
   }
 
