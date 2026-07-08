@@ -101,6 +101,7 @@ function createMockScene(): any {
           for (const target of targets) {
             if (config.x !== undefined) target.x = config.x;
             if (config.y !== undefined) target.y = config.y;
+            if (config.rotation !== undefined) target.rotation = config.rotation;
           }
         }
         tweens.push(config);

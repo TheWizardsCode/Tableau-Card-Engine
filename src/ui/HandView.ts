@@ -746,14 +746,33 @@ export class HandView {
     // 4. Compute new target positions.
     const newPositions = this.computeCardPositions();
 
-    // 4. Animate each sprite from its old position to its new position.
+    // Precompute rotation helpers (mirrors applyLayout logic).
+    let arcCenterX = 0;
+    let halfSpan = 1;
+    if (this.layoutDirection === 'horizontal' && newPositions.length >= 2) {
+      const firstX = newPositions[0].x;
+      const lastX = newPositions[newPositions.length - 1].x;
+      arcCenterX = (firstX + lastX) / 2;
+      halfSpan = Math.max((lastX - firstX) / 2, 1);
+    }
+
+    // 5. Animate each sprite from its old position and rotation to new.
     for (let i = 0; i < this.sprites.length && i < newPositions.length; i++) {
       const sprite = this.sprites[i];
       const target = newPositions[i];
-      // Skip sprites whose position hasn't changed.
+
+      // Compute target rotation (same formula as applyLayout).
+      let targetRotation = 0;
+      if (this.layoutDirection === 'horizontal' && this.maxRotationDegrees !== 0) {
+        const normalized = (target.x - arcCenterX) / halfSpan;
+        targetRotation = (this.maxRotationDegrees * normalized * Math.PI) / 180;
+      }
+
+      // Skip sprites whose position and rotation haven't changed.
       if (
         Math.abs((sprite as any).x - target.x) < 0.5 &&
-        Math.abs((sprite as any).y - target.y) < 0.5
+        Math.abs((sprite as any).y - target.y) < 0.5 &&
+        Math.abs((sprite as any).rotation - targetRotation) < 0.005
       ) {
         continue;
       }
@@ -762,6 +781,7 @@ export class HandView {
         targets: sprite as any,
         x: target.x,
         y: target.y,
+        rotation: targetRotation,
         duration,
         ease,
       });
