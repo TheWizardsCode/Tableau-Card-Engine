@@ -37,6 +37,116 @@ npx vitest run tests/main-street/MainStreetScene.browser.test.ts --project brows
 npx vitest run tests/e2e/replay-main-street.e2e.test.ts --project unit
 ```
 
+## Card Data CSV
+
+All card template data is defined in a single CSV file:
+
+- **File:** `example-games/main-street/card-data.csv`
+
+### How it works
+
+The CSV is loaded at build time via Vite's `?raw` import suffix and parsed by
+`@core-engine/CsvLoader` (`parseCsv`). The import and parsing happen in
+`MainStreetCards.ts` at module load time:
+
+```typescript
+import cardDataRaw from './card-data.csv?raw';
+import { parseCsv } from '@core-engine/CsvLoader';
+const csvRows = parseCsv(cardDataRaw);
+```
+
+The parsed rows are then mapped into typed card template arrays (`BusinessCard`,
+`CommunitySpaceCard`, `EventCard`/`DurationEventCard`, `UpgradeCard`, `StaffCard`)
+with the appropriate field coercions (e.g. string → number for cost, pipe-separated
+strings → `SynergyType[]` for synergy types).
+
+### CSV column reference
+
+The first row is the header. Columns common to all card families:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `family` | string | Card family: `business`, `community-space`, `event`, `upgrade`, `staff` |
+| `id` | string | Unique card template ID (e.g. `biz-bakery`, `evt-festival`) |
+| `name` | string | Display name shown in-game |
+| `description` | string | Flavour / effect description |
+
+#### Family-specific columns
+
+**Business / Community Space** (`business`, `community-space`):
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `cost` | number | Coin cost to acquire |
+| `baseIncome` | number | Base income per turn |
+| `synergyTypes` | string | Pipe-separated synergy types: `Food | Culture | Commerce | Service | Entertainment | Health` |
+| `upgradePath` | string | Upgrade family name (e.g. `Bakery`) or empty if unupgradeable |
+| `maxLevel` | number | Maximum upgrade level (0 = unupgradeable) |
+| `reputationPerTurn` | number | Reputation generated per turn (e.g. `0.2` for Clinic) |
+| `synergyCoinBonus` | number | Coin synergy per matching neighbor (defaults to `1`; set `0` to exclude) |
+| `synergyRepBonus` | number | Reputation synergy per matching neighbor (defaults to `0`) |
+
+**Event** (`event`):
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `cost` | number | Purchase cost; `0` for Incident events (drawn automatically) |
+| `trigger` | string | `Investment` (player-chosen) or `Incident` (automatic) |
+| `target` | string | `All`, `SpecificSynergy`, or `RandomBusiness` |
+| `targetSynergy` | string | Synergy type when `target` is `SpecificSynergy` |
+| `coinDelta` | number | Coin change when the event resolves |
+| `reputationDelta` | number | Reputation change when the event resolves |
+| `effect` | string | Human-readable effect description |
+
+Duration events (e.g. Flu Outbreak) also use:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `duration` | number | Number of turns the effect lasts |
+| `effectType` | string | Discriminator (e.g. `income-multiplier`) |
+| `multiplier` | number | Scalar applied each turn (e.g. `0.8` for 80% income) |
+
+**Upgrade** (`upgrade`):
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `cost` | number | Coin cost to apply the upgrade |
+| `targetBusiness` | string | Name of the business this upgrade applies to |
+| `incomeBonus` | number | Additional income per turn |
+| `synergyRangeBonus` | number | Additional synergy range |
+| `requiredLevel` | number | Minimum business level required (0 = base business) |
+| `reputationBonus` | number | Additional reputation per turn |
+
+**Staff** (`staff`):
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `cost` | number | Coin cost to acquire |
+| `ongoingCost` | number | Per-turn coin cost after hiring |
+| `handSlotsAdded` | number | Additional hand slots provided |
+
+### Editing the CSV
+
+To add, remove, or modify cards, edit `card-data.csv` directly. The CSV is
+re-parsed automatically during development (Vite HMR) when `MainStreetCards.ts`
+is re-evaluated. After editing, verify with:
+
+```bash
+npm test
+```
+
+### CSV conventions
+
+- Columns not applicable to a given card family are left empty.
+- Multiple synergy types use pipe (`|`) as a separator.
+- Multi-level upgrade chains are supported: set `requiredLevel` to the
+  business level needed before the upgrade can be applied.
+- Branching upgrades are supported: multiple `upgrade` rows may share the
+  same `targetBusiness` and `requiredLevel`, giving the player a choice.
+- Positive Incident events (events where `coinDelta + reputationDelta > 0`)
+  receive more copies in the deck based on the `positiveIncidentMultiplier`
+  parameter passed to `createEventDeck()`.
+
 ## Follow-up work
 
 The tutorial overlay system (`MainStreetTutorialHints.ts`) currently uses `zoneToAnchor()` with
