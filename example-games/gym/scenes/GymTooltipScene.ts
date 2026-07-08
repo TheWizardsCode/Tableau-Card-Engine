@@ -70,13 +70,21 @@ export class GymTooltipScene extends GymSceneBase {
 
     this.initHelp([
       {
-        heading: 'Overview',
-        body: 'Demonstrates the shared TooltipManager in both DOM-overlay mode and Phaser GameObject mode. Hover over demo cards to see tooltips.',
+        heading: 'Features',
+        body: 'Demonstrates the shared TooltipManager component in two rendering modes: DOM overlay (HTML div) and Phaser GameObject (in-scene containers). Tooltips provide contextual information when hovering over interactive elements, such as card ability descriptions, rule explanations, or score previews. In a real card game, tooltips let players quickly understand card effects without cluttering the main UI.'
       },
       {
         heading: 'Controls',
-        body: '[ DOM Mode ] / [ Phaser Mode ]: Switch tooltip rendering mode.\n[ Show Demo Tooltip ]: Force-show a sample tooltip.\n[ Hide Tooltip ]: Hide any visible tooltip.\nHover over the coloured cards below to trigger contextual tooltips.',
+        body: '[ DOM Mode ]: Switch tooltip rendering to DOM overlay mode (HTML div on top of canvas).\n[ Phaser Mode ]: Switch tooltip rendering to Phaser GameObject mode (in-scene containers with custom styling).\n[ Show Demo ]: Force-show a demo tooltip at the centre of the screen.\n[ Hide ]: Hide any currently visible tooltip.\nHover over coloured cards (Red, Blue, Green) below the controls to see contextual tooltips describing each card\'s ability. Move the pointer within a card to follow the tooltip position.'
       },
+      {
+        heading: 'Usage Example',
+        body: 'In a card game like Lost Cities, hovering over a card in your hand shows its value, colour, and any special abilities in a tooltip. DOM mode works well for simple text tooltips above the canvas, while Phaser mode allows fully styled in-game tooltips with borders, backgrounds, and animations that integrate with the game world.'
+      },
+      {
+        heading: 'Test Plan',
+        body: '1. Press [ DOM Mode ] → mode label updates to "Mode: DOM overlay"\n2. Hover over the red card → tooltip appears showing "Red Card" description\n3. Move pointer within the card → tooltip follows the pointer position\n4. Move pointer away from card → tooltip disappears\n5. Press [ Phaser Mode ] → mode label updates\n6. Hover over the blue card → Phaser GameObject tooltip appears with border styling\n7. Press [ Show Demo ] → demo tooltip appears at centre\n8. Press [ Hide ] → tooltip disappears'
+      }
     ]);
 
     const headerAnchor = resolveAnchor('header', 'center');

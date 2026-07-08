@@ -103,8 +103,22 @@ export class GymAudioFeedbackScene extends GymSceneBase {
     this.initReducedMotion();
 
     this.initHelp([
-      { heading: 'Overview', body: 'Demonstrates audio mapping, mute toggling, feedback configuration, pop text feedback, and particle celebration effects.' },
-      { heading: 'Controls', body: '[ Toggle Mute ]: Mute/unmute audio.\n[ Volume - ] / [ Volume + ]: Adjust global volume.\n[ Draw Card ] / [ Discard Card ]: Emit events with pop text.\n[ Pop Text ]: Trigger a pop text animation.\n[ Celebrate ]: Trigger a particle burst effect.\n[ Invalid Key ]: Attempt to play an unregistered key (safely ignored).' }
+      {
+        heading: 'Features',
+        body: 'Demonstrates audio event mapping and feedback configuration using the SoundManager, along with pop text animations (popTextOrIcon) and particle celebration effects. The SoundManager connects game events to sound keys, providing volume control, mute toggling, and graceful handling of missing or unregistered sound keys. In a real card game, sounds play for card draws, discards, wins, and errors, while pop text provides visual feedback alongside audio.'
+      },
+      {
+        heading: 'Controls',
+        body: '[ Toggle Mute ]: Toggle audio mute on/off. Status shows current mute state and call count.\n[ Volume - ] / [ Volume + ]: Decrease or increase global volume in 0.1 steps (range 0.0-1.0).\n[ Draw Card ]: Emit a "card-drawn" event, which triggers the "sfx-test-ding" sound and a pop text.\n[ Discard Card ]: Emit a "card-discarded" event, triggering "sfx-test-buzz" and pop text.\n[ Pop Text ]: Trigger a standalone pop text animation at a random position near centre.\n[ Pop Undo ]: Emit an "undo" event, triggering "sfx-test-buzz" and pop text.\n[ Pop Redo ]: Emit a "redo" event, triggering "sfx-test-ding" and pop text.\n[ Celebrate ]: Trigger a particle burst effect (or pop text fallback if particles unavailable, or if reduced-motion is on).\n[ Invalid Key ]: Attempt to play an unregistered sound key ("sfx-nonexistent-key") — safely ignored, demonstrating graceful error handling.'
+      },
+      {
+        heading: 'Usage Example',
+        body: 'In a game of Golf, a satisfying "ding" plays when a card is drawn, and a different "buzz" plays when a card is discarded. The player can mute audio during meetings or adjust volume for different environments. After winning a round, a particle celebration bursts across the screen. If the player has reduced-motion enabled, the celebration shows a simple party emoji pop text instead.'
+      },
+      {
+        heading: 'Test Plan',
+        body: '1. Press [ Draw Card ] → event log shows sound call "sfx-test-ding", pop text appears\n2. Press [ Discard Card ] → event log shows "sfx-test-buzz"\n3. Press [ Toggle Mute ] → status shows Muted: true, no sound on subsequent events\n4. Press [ Draw Card ] → event fires but no sound (muted) — only pop text appears\n5. Press [ Volume - ] twice → volume drops to 0.3\n6. Press [ Volume + ] three times → volume returns to 0.6\n7. Press [ Invalid Key ] → event log shows safe handling of unregistered key\n8. Press [ Pop Text ] → pop text animation appears\n9. Press [ Celebrate ] → particle burst or emoji fallback appears\n10. Press [ Toggle Mute ] to unmute, verify sound returns'
+      }
     ]);
 
     // Initialize sound manager

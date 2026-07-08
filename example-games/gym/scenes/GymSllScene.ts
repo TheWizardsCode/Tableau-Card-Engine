@@ -184,20 +184,21 @@ export class GymSllScene extends GymSceneBase {
 
     this.initHelp([
       {
-        heading: 'Overview',
-        body:
-          'This scene demonstrates SLL directly and in composed form. It validates and parses layout JSON, maps zones/anchors to pixels, and positions UI using composeResolvedLayouts + normalizedToPixels.',
+        heading: 'Features',
+        body: 'Demonstrates the Screen Layout Language (SLL) system for declarative UI positioning. Includes layout validation/parsing (validateScreenLayoutDocument, parseScreenLayoutDocument), pixel resolution (normalizedToPixels), composition (composeResolvedLayouts for merging shell + scene layouts), and the VisibilityOwnershipController for showing/hiding objects based on layout mode (shell-only, scene-only, composed). In a real card game, SLL lets designers define responsive layouts that adapt to different screen sizes and orientations without writing position code.'
       },
       {
         heading: 'Controls',
-        body:
-          '[ Profile ] cycles through layout examples: composed shell + scene, shell-only, scene-only, and pixel override. [ Toggle Shell ] hides or restores the shared shell chrome without changing the selected layout. [ Overlay ] toggles element position markers and legend.',
+        body: '[ Profile ]: Cycle through layout examples — Composed Shell + Scene, Shell-only, Scene-only, and Pixel Override. Each profile repositions all demo objects according to the layout JSON.\n[ Overlay: OFF/ON ]: Toggle element position markers and legend overlay showing pixel coordinates of each placed element.\n[ Toggle Shell: ON/OFF ]: Show or hide the shared shell chrome (title, help button, profile button) without changing the selected layout. Demonstrates VisibilityOwnershipController group rules.\n[ Toggle Fill ]: Toggle the content panel fill colour between normal and highlighted state.'
       },
       {
-        heading: 'Notes',
-        body:
-          'The shell-only example uses the shared shell layout by itself. The composed sample uses a shared shell layout plus a scene layout. The overlay shows merged zones and anchors so collision handling and namespacing are easy to inspect.',
+        heading: 'Usage Example',
+        body: 'A card game needs to support both landscape desktop (1280x720) and portrait tablet (720x1280) layouts. Using SLL, the designer defines zones and anchors in normalized coordinates, and the engine resolves them to pixel positions at runtime. The composed layout merges a shared shell (title bar, help button) with scene-specific content, so the shell stays consistent across all game scenes while the scene content adapts independently.'
       },
+      {
+        heading: 'Test Plan',
+        body: '1. Press [ Profile ] to cycle through layouts — verify title, help button, action button, and content panel reposition correctly for each profile\n2. With composed profile active, press [ Toggle Shell: OFF ] → shell elements (title, profile button, overlay button) hide\n3. Press [ Toggle Shell: ON ] → shell elements reappear\n4. Press [ Overlay: OFF/ON ] → marker dots and legend panel appear/disappear\n5. Press [ Toggle Fill ] → content panel colour changes between states\n6. Cycle back to each profile and verify element positions update correctly\n7. Verify no overlapping or off-screen placement across all profiles'
+      }
     ]);
 
     this.bootstrapLayouts();

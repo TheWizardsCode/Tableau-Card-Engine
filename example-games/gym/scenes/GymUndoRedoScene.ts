@@ -85,8 +85,22 @@ export class GymUndoRedoScene extends GymSceneBase {
     this.initReducedMotion();
 
     this.initHelp([
-      { heading: 'Overview', body: 'Demonstrates reversible actions and stack semantics using the UndoRedoManager. Useful to verify undo/redo boundaries and compound commands.' },
-      { heading: 'Controls', body: '[ +1 ], [ +5 ], [ -3 ]: Execute simple increment/decrement actions.\n[ Compound (+2,+3) ]: Execute a grouped command.\nUndo / Redo (action buttons): Step backward/forward through action history.\n[ Clear History ]: Reset undo/redo stacks.' }
+      {
+        heading: 'Features',
+        body: 'Demonstrates the UndoRedoManager for reversible actions with stack semantics, including compound commands (grouped undo/redo) and boundary conditions. In a real card game, undo/redo lets a player reverse a mistaken move — for example, undoing a discard and returning the card to hand, or undoing a series of actions that were grouped as a single turn. Commands are pushed onto a stack, and new actions after an undo invalidate the redo stack.'
+      },
+      {
+        heading: 'Controls',
+        body: '[ +1 ]: Execute an increment action that adds 1 to the counter. Recorded as a single undoable step.\n[ +5 ]: Execute an increment of 5.\n[ -3 ]: Execute a decrement of 3.\n[ Compound (+2,+3) ]: Execute two increment actions grouped as a single compound command, so undo reverses both at once.\nUndo / Redo (action buttons): Step backward or forward through action history. Disabled (dimmed) when no actions are available.\n[ Clear History ]: Reset all undo/redo stacks, clearing the action history.\nStatus lines: Show whether undo and redo are currently available, plus the full command history list.'
+      },
+      {
+        heading: 'Usage Example',
+        body: 'A player in Golf mistakenly discards a valuable card. Pressing Undo reverses the discard, returning the card to hand. If the player then draws a new card, the redo stack is invalidated — they cannot redo the discarded action. Compound commands group an entire turn\'s actions (e.g., draw + discard + score) into a single undo step, letting the player reverse the whole turn at once.'
+      },
+      {
+        heading: 'Test Plan',
+        body: '1. Press [ +1 ] four times → counter reaches 4, history shows "+1, +1, +1, +1"\n2. Press Undo → counter drops to 3, history shows "+1, +1, +1"\n3. Press Redo → counter returns to 4\n4. Press [ Compound (+2,+3) ] → counter jumps to 9, history shows a single "compound(+2,+3)" entry\n5. Press Undo → counter drops back to 4, both +2 and +3 undone at once\n6. Press Undo three more times → counter returns to 0\n7. Verify Undo and Redo buttons are dimmed when no actions available\n8. Press [ Clear History ] → history empties, counter stays at 0'
+      }
     ]);
 
     const cx = GAME_W / 2;

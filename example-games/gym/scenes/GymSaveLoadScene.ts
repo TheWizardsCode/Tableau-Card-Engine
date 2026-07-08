@@ -147,8 +147,22 @@ export class GymSaveLoadScene extends GymSceneBase {
     this.initReducedMotion();
 
     this.initHelp([
-      { heading: 'Overview', body: 'Demonstrates saving and loading scene state via the SaveLoadStore API. Includes handling malformed payloads, full-screen RenderTexture screenshots, a hand of cards displayed via HandView, and verifying invariants after restore.' },
-      { heading: 'Controls', body: '[ Add Card ]: Deal a random card to the hand.\n[ Save State ]: Persist current hand + screenshot.\n[ Load State ]: Restore last saved hand + screenshot.\n[ Load Malformed ]: Simulate a bad payload to verify error handling.\n[ Clear Save ]: Remove persisted save data.\n[ Take Screenshot ]: Capture a full-screen RenderTexture screenshot.\n[ Clear Screenshot ]: Remove the screenshot thumbnail.' },
+      {
+        heading: 'Features',
+        body: 'Demonstrates the SaveLoadStore API for persisting and restoring game state, including serialization/deserialization with schema versioning, malformed payload handling, and full-screen RenderTexture screenshots. In a real card game, this enables save/resume functionality — a player can save their game mid-round, close the browser, and return later to pick up exactly where they left off, including a visual snapshot of the board.'
+      },
+      {
+        heading: 'Controls',
+        body: '[ Add Card ]: Deal a random card from the source deck to the hand. Increases hand size and score.\n[ Save State ]: Persist the current hand of cards and screenshot (if taken) via the SaveLoadStore.\n[ Load State ]: Restore the last saved hand and screenshot. Cards are displayed face-up and any previous screenshot thumbnail is recreated.\n[ Load Malformed ]: Simulate a corrupted save payload to verify error handling and graceful fallback.\n[ Clear Save ]: Remove all persisted save data for this scene.\n[ Take Screenshot ]: Capture a full-screen RenderTexture screenshot displayed as a thumbnail below the controls.\n[ Clear Screenshot ]: Remove the screenshot thumbnail display.'
+      },
+      {
+        heading: 'Usage Example',
+        body: 'A player in the middle of a Golf game needs to step away. They press [ Save State ], which persists their current hand of cards and a screenshot of the board. Returning later, they press [ Load State ] to restore the exact hand and visual state, letting them continue the game without losing progress. The malformed loading test ensures corrupt save files don\'t crash the game.'
+      },
+      {
+        heading: 'Test Plan',
+        body: '1. Press [ Add Card ] three times → hand grows, score updates accordingly\n2. Press [ Take Screenshot ] → RenderTexture thumbnail appears below controls\n3. Press [ Save State ] → event log confirms save with schema version and slot ID\n4. Press [ Add Card ] twice more → hand changes from saved state\n5. Press [ Load State ] → hand returns to 8 cards (5 initial + 3 added), screenshot recreated\n6. Press [ Clear Save ] → persisted data removed\n7. Press [ Load Malformed ] → event log confirms error handling caught the bad payload\n8. Verify state text shows correct hand size and score after each operation'
+      }
     ]);
 
     // Generate fallback card textures if the real SVGs did not load

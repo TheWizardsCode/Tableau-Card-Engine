@@ -81,20 +81,21 @@ export class GymLayoutOwnershipScene extends GymSceneBase {
 
     this.initHelp([
       {
-        heading: 'Overview',
-        body:
-          'This scene demonstrates the Layout Ownership runtime. Objects are registered to ownership groups (shell, scene, shared, ungrouped) and their visibility changes based on the active layout mode.',
+        heading: 'Features',
+        body: 'Demonstrates the VisibilityOwnershipController runtime for managing which UI elements are visible based on the active layout mode. Objects are registered to ownership groups (shell, scene, shared, ungrouped), and their visibility automatically changes when the mode switches between shell-only, scene-only, and composed. Diagnostic warnings are emitted for unregistered or ungrouped targets. In a real card game, this controls whether shell chrome (menu bar, help button), scene content (cards, board), or both are visible depending on the game state.'
       },
       {
         heading: 'Controls',
-        body:
-          'Use the mode buttons to switch between shell-only, scene-only, and composed modes. Toggle individual group rules with the group buttons. Register or remove ungrouped targets to see diagnostic warnings.',
+        body: '[ Mode: Shell ]: Switch to shell-only mode — only objects in the "shell" and "shared" groups are visible. Scene-specific objects hide.\n[ Mode: Scene ]: Switch to scene-only mode — only "scene" and "shared" objects are visible. Shell chrome hides.\n[ Mode: Composed ]: Both shell and scene objects are visible simultaneously.\n[ Shell Chrome ] / [ Scene Chrome ] / [ Shared Chrome ]: Toggle individual group rules ON/OFF, dynamically adding or removing visibility rules for that group.\n[ + Ungrouped ]: Register a new unregistered object (triggers a diagnostic warning for objects without ownership groups).\n[ - Ungrouped ]: Remove the last unregistered object.\n[ Clear All ]: Destroy all demo objects and reset the controller.'
       },
       {
-        heading: 'Visual Feedback',
-        body:
-          'Visible objects are brightly colored with a solid stroke. Hidden objects are dimmed with a dashed-style appearance. The status line shows the current mode and active groups. Diagnostics appear below the status line.',
+        heading: 'Usage Example',
+        body: 'A card game has shell chrome (score bar, menu button, settings icon) that should always be visible during gameplay. When the player opens a modal (e.g., game-over summary), the shell chrome might remain visible while scene-specific cards dim. Using VisibilityOwnershipController, the game switches between "scene-only" mode (showing only cards and board) and "composed" mode (showing both shell chrome and scene), with the controller automatically toggling visibility for all registered objects.'
       },
+      {
+        heading: 'Test Plan',
+        body: '1. Press [ Mode: Scene ] → shell objects (Shell Title, Shell Menu) hide; scene objects remain visible\n2. Press [ Mode: Shell ] → shell objects reappear; scene objects hide\n3. Press [ Mode: Composed ] → both shell and scene objects visible\n4. Press [ Shell Chrome ] → shell group toggles OFF, shell objects hide in current mode\n5. Press [ Shell Chrome ] again → shell group toggles ON, shell objects reappear\n6. Press [ + Ungrouped ] three times → three ungrouped cards appear, diagnostic warnings show\n7. Press [ - Ungrouped ] twice → two ungrouped cards removed\n8. Press [ Clear All ] → all demo objects destroyed, controller reset\n9. Verify that switching modes never leaves orphan objects visible'
+      }
     ]);
 
     this.createController();

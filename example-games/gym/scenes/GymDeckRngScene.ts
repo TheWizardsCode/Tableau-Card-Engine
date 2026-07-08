@@ -92,12 +92,20 @@ export class GymDeckRngScene extends GymSceneBase {
 
     this.initHelp([
       {
-        heading: 'Overview',
-        body: 'Displays all 52 cards face-up in a compact grid, shuffled with the default seed (42) on load.'
+        heading: 'Features',
+        body: 'Demonstrates deterministic seeded RNG for card shuffling using createSeededRng() and shuffleArray(). The same seed always produces the same card order, which is essential for reproducible testing, replay systems, and multiplayer consistency. In a game like Golf or Beleaguered Castle, seeded RNG ensures that a player can replay a specific deal for debugging or fair competition.'
       },
       {
         heading: 'Controls',
-        body: '[ -1 ] / [ +1 ]: Adjust seed and re-shuffle the deck.\n[ Reset Seed ]: Restore default seed (42) and re-shuffle.\n[ Shuffle ]: Re-shuffle using a random seed.\n\nTip: Using the same seed always produces the same card order.'
+        body: '[ -1 ] / [ +1 ]: Decrease or increase the seed value and immediately re-shuffle. Use to explore how different seeds produce different card orders while maintaining determinism.\n[ Reset Seed ]: Restore the default seed (42) and re-shuffle. Useful to return to a known state after experimenting.\n[ Shuffle ]: Generate a random seed and re-shuffle. Demonstrates that any seed works with the deterministic system.\n[ < Prev ] / [ Next > ]: Navigate to the previous or next Gym scene.'
+      },
+      {
+        heading: 'Usage Example',
+        body: 'In a debugging scenario, a developer notices that the 5th card dealt in a Golf game always comes from a specific position in the deck. By setting the seed to the same value used during the game session, the developer can reproduce the exact same deck order and inspect the deal sequence to verify correctness.'
+      },
+      {
+        heading: 'Test Plan',
+        body: '1. Press [ -1 ] twice → seed decreases by 2, grid re-shuffles\n2. Press [ +1 ] → seed increases by 1, grid re-shuffles differently\n3. Press [ Reset Seed ] → seed returns to 42, grid returns to initial order\n4. Press [ Shuffle ] → random seed, grid re-shuffles\n5. Verify all 52 cards are displayed face-up in the compact grid\n6. Verify each re-shuffle produces a visibly different card order'
       }
     ]);
 

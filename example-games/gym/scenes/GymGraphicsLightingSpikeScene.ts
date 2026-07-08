@@ -76,8 +76,22 @@ export class GymGraphicsLightingSpikeScene extends GymSceneBase {
     this.initReducedMotion();
 
     this.initHelp([
-      { heading: 'Overview', body: 'Feasibility spike for Phaser lighting pipeline. Tests point light on sample sprites and evaluates WebGL requirements.' },
-      { heading: 'Controls', body: '[ Toggle Light ]: Turn the point light on/off.\n[ Move Light ]: Move the point light position.\n\nFindings: Lighting requires WebGL. Headless/canvas environments will show a fallback message.' },
+      {
+        heading: 'Features',
+        body: 'Feasibility spike evaluating Phaser 4\'s lighting pipeline for card-glow and shadow effects. Tests point light rendering on sample sprites with WebGL requirements, and provides graceful fallbacks for headless/canvas environments. In a real card game, point lights could highlight selected cards, create glow effects around playable zones, or add atmospheric shadows to the game board.'
+      },
+      {
+        heading: 'Controls',
+        body: '[ Toggle Light ]: Turn the point light on (intensity 1.0) or off (intensity 0.0). When lighting is unavailable, logs a message explaining why.\n[ Move Light ]: Move the point light to a random position within the scene. Demonstrates dynamic light repositioning.\nFindings panel: Records whether WebGL is available, lighting capabilities, and recommendations for production use (feature flag recommended).'
+      },
+      {
+        heading: 'Usage Example',
+        body: 'A developer is evaluating whether to add card glow effects to highlight playable cards in a Solitaire game. This spike tests whether Phaser 4\'s LightsManager can render point lights that follow the pointer over interactive cards, creating a subtle glow that draws attention. The findings help decide whether to invest in lighting features or use simpler alternatives like sprite tinting.'
+      },
+      {
+        heading: 'Test Plan',
+        body: '1. Scene loads → event log records WebGL availability and lighting status\n2. If lighting available, press [ Toggle Light ] → light intensity toggles between 1.0 and 0.0\n3. Press [ Move Light ] → light moves to a new random position\n4. Verify fallback sprites appear when lighting is unavailable (canvas/headless)\n5. Check findings section records limitations and recommendations'
+      }
     ]);
 
     const cx = GAME_W / 2;

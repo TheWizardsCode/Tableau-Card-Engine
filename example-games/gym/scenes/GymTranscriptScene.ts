@@ -105,8 +105,22 @@ export class GymTranscriptScene extends GymSceneBase {
     this.initReducedMotion();
 
     this.initHelp([
-      { heading: 'Overview', body: 'Shows transcript recording and deterministic event ordering. Use a fixed seed to produce stable transcripts for testing and debugging.' },
-      { heading: 'Controls', body: '[ New Session ]: Start a fresh transcript session.\n[ Record Event ]: Append a new event to the transcript.\n[ Finalize ]: Mark the transcript finished.\n[ Playback ]: Sequentially replay recorded events.\n[ Show Transcript ]: Log transcript metadata and events.' }
+      {
+        heading: 'Features',
+        body: 'Demonstrates transcript recording using TranscriptRecorderBase for capturing and replaying game events in sequence. Transcripts provide a deterministic, replayable record of game actions — essential for debugging, automated testing, spectator replays, and fair-play auditing. In a real card game, a transcript records every draw, discard, shuffle, and score change so the full game session can be replayed step by step.'
+      },
+      {
+        heading: 'Controls',
+        body: '[ New Session ]: Start a fresh transcript session with a fixed seed (42) for deterministic event ordering.\n[ Record Event ]: Append a randomly chosen event type (draw, discard, shuffle, score) to the transcript with an incrementing turn number.\n[ Finalize ]: Mark the transcript as complete and record the end timestamp.\n[ Playback ]: Sequentially replay all recorded events with a 600ms delay between each.\n[ Show Transcript ]: Log the full transcript metadata (version, game type, event count) and all recorded events with turn numbers.'
+      },
+      {
+        heading: 'Usage Example',
+        body: 'A developer is debugging a scoring bug in a Golf game. They record a transcript of a complete round, then replay it step by step to verify that each score change corresponds to the correct game action. The deterministic seed ensures the same card draw order can be reproduced for consistent debugging.'
+      },
+      {
+        heading: 'Test Plan',
+        body: '1. Press [ New Session ] → new transcript created, log confirms seed\n2. Press [ Record Event ] five times → five events recorded with various types\n3. Press [ Show Transcript ] → log shows version, game type, and all five events with turn numbers\n4. Press [ Finalize ] → transcript finalized with end timestamp\n5. Press [ Playback ] → events replay sequentially with 600ms delays\n6. Press [ New Session ] again → fresh session started, old transcript discarded\n7. Verify logs accumulate without exceeding the visible limit'
+      }
     ]);
 
     const cx = GAME_W / 2;

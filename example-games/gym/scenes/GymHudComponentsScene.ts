@@ -74,27 +74,20 @@ class MockSoundManager {
 
 const HELP_SECTIONS: HelpSection[] = [
   {
-    heading: 'HelpPanel',
-    body: 'A slide-in left sidebar that displays help content. Accepts an array of HelpSection objects with heading and body/render. Supports keyboard toggle (default: "/" with Shift = "?").',
+    heading: 'Features',
+    body: 'Demonstrates the shared HelpPanel and SettingsPanel slide-out UI components, including their toggle buttons (? and ⚙). These panels provide reusable help content and player configuration (sound, reduced motion, keybindings) that any card game can integrate. The depth layering convention ensures panels always render above gameplay content, with input blockers preventing clicks from passing through to the scene underneath.',
   },
   {
-    heading: 'SettingsPanel',
-    body: 'A slide-in right sidebar with sound controls (mute toggle, volume slider), reduced-motion toggle, end-turn keybind config, and optional difficulty selector. Requires a SoundManager instance.',
+    heading: 'Controls',
+    body: '[ Open HelpPanel ]: Programmatically open the help slide-out panel via the open() method.\n[ Close HelpPanel ]: Programmatically close the help panel via the close() method.\n[ Toggle HelpPanel ]: Toggle the help panel open/closed via the toggle() method.\n[ Open Settings ]: Open the settings panel (right sidebar).\n[ Close Settings ]: Close the settings panel.\n[ Toggle Settings ]: Toggle the settings panel open/closed.\n? button (bottom-left): Toggle help panel via the circular toggle button.\n⚙ button (bottom-left): Toggle settings panel via the circular toggle button.\nStatus lines (centre): Show open/closed state of each panel, updating live as panels are toggled.'
   },
   {
-    heading: 'Depth Layering',
-    body: 'Panel components use the following depth convention:\n' +
-      '  Input blocker: 900\n' +
-      '  Panel background: 901\n' +
-      '  Panel content: 902\n' +
-      '  Close button: 903\n' +
-      '  Help button (?): 1101\n' +
-      '  Settings button (⚙): 1102\n' +
-      'All gameplay content is at depth 0-999, so panels always render above it.',
+    heading: 'Usage Example',
+    body: 'In a real card game, the help panel provides rule explanations triggered by a ? button. The settings panel lets players adjust volume, mute audio, or enable reduced motion for accessibility. The depth layering ensures these panels never clip behind game content, and the input blocker prevents errant clicks on the game board while a panel is open.'
   },
   {
-    heading: 'HelpButton & SettingsButton',
-    body: 'Circular toggle buttons rendered at depths 1101 and 1102 respectively. They automatically toggle their associated panel and handle cleanup on scene shutdown.',
+    heading: 'Test Plan',
+    body: '1. Press [ Open HelpPanel ] → help panel slides in from left, status shows open\n2. Press [ Close HelpPanel ] → help panel slides out, status shows closed\n3. Press [ Toggle HelpPanel ] twice → panel opens then closes\n4. Press [ Open Settings ] → settings panel slides in from right, status shows open\n5. Press [ Toggle Settings ] → settings toggles closed\n6. Verify status lines update correctly after each action\n7. Press the ? button → help panel toggles open/closed\n8. Press the ⚙ button → settings panel toggles open/closed\n9. Verify no depth layering issues (panels always on top)'
   },
 ];
 

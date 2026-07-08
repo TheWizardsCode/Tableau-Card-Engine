@@ -125,9 +125,22 @@ export class GymGraphicsShaderSpikeScene extends GymSceneBase {
     this.initReducedMotion();
 
     this.initHelp([
-      { heading: 'Overview', body: 'Demonstrates sprite tinting, blend modes, and simple shader feasibility. This is a spike scene for evaluating features.' },
-      { heading: 'Controls', body: '[ Next Tint ]: Cycle through tint colors.\n[ Next Blend ]: Cycle through blend modes.\n[ Reset Tint ]: Remove tint (white).\n[ Attempt Shader ]: Try to compile and run a minimal fragment shader.\n\nNote: Shaders are WebGL-only and may not work in all environments. Headless/CI builds will fall back gracefully.' },
-      { heading: 'Findings', body: 'Blend modes work in WebGL renderer only. Fragment shaders require WebGL pipeline support. Headless fallback: shader attempt logs success/failure without crashing.' },
+      {
+        heading: 'Features',
+        body: 'Spike scene evaluating sprite tinting, blend modes (NORMAL, ADD, MULTIPLY, SCREEN), and WebGL shader feasibility. In a real card game, tinting highlights valid plays (green tint for playable cards), blend modes create visual layering effects for card overlaps or ghosted previews, and custom shaders could produce animated card borders, foil effects, or dynamic backgrounds.'
+      },
+      {
+        heading: 'Controls',
+        body: '[ Next Tint ]: Cycle through tint colours — None, Red, Green, Blue, Gold, Purple. Tint is applied to all three sample sprites simultaneously.\n[ Next Blend ]: Cycle through blend modes — NORMAL, ADD, MULTIPLY, SCREEN. Blend mode applies to all sprites.\n[ Reset Tint ]: Remove all tinting from sprites (reset to white/none).\n[ Attempt Shader ]: Try to detect WebGL support and compile a minimal fragment shader. Logs the result — whether shaders are feasible in this environment.'
+      },
+      {
+        heading: 'Usage Example',
+        body: 'A developer building a card game wants to add visual feedback when a card can be played: green tint for valid targets, red tint for invalid ones. This spike verifies that Phaser\'s setTint() works reliably. The blend mode test checks whether ADD mode can create a "glowing" effect when two cards overlap. The shader spike evaluates whether more advanced effects like animated foil borders are feasible for future development.'
+      },
+      {
+        heading: 'Test Plan',
+        body: '1. Press [ Next Tint ] six times → cycles through all 6 tint colours, status line updates\n2. Press [ Next Blend ] four times → cycles through all 4 blend modes, status line updates\n3. Press [ Reset Tint ] → all sprites return to white/none\n4. Press [ Attempt Shader ] → event log records whether shader compilation succeeded or a fallback was used\n5. Verify status line shows current blend mode and tint colour correctly'
+      }
     ]);
 
     const cx = GAME_W / 2;
