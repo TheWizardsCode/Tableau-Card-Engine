@@ -28,8 +28,7 @@ import {
   CardGameScene,
   OverlayManager,
   createSceneHeader,
-  createParameterizedOverlay,
-  overlayCenterY,
+  createGameOverOverlay,
   audioPathWithFallback,
 } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
@@ -37,15 +36,7 @@ import helpContent from '../help-content.json';
 
 import {
   PRE_PENALTY_PAUSE,
-  DEPTH_OVERLAY,
-  DEPTH_OVERLAY_CONTENT,
   DEPTH_UI,
-  OVERLAY_BG_ALPHA,
-  OVERLAY_BOX_WIDTH,
-  OVERLAY_BOX_HEIGHT,
-  OVERLAY_BOX_ALPHA,
-  OVERLAY_BUTTON_FONT_SIZE,
-  OVERLAY_BUTTON_Y_OFFSET,
   AUTO_PLAY_BUTTON_X,
   AUTO_PLAY_BUTTON_MARGIN,
   AUTO_PLAY_FONT_SIZE,
@@ -59,7 +50,7 @@ import { MindAiScheduler } from './MindAiScheduler';
 import { MindReplayController } from './MindReplayController';
 import { MindTurnController } from './MindTurnController';
 
-import { GAME_W, GAME_H } from '../../../src/ui';
+
 
 export class TheMindScene extends CardGameScene {
   // Game state (accessed by tests)
@@ -486,35 +477,24 @@ export class TheMindScene extends CardGameScene {
   }): void {
     this.overlayManager.dismiss();
 
-    const result = createParameterizedOverlay(this, {
+    const result = createGameOverOverlay(this, {
       title: config.title,
       titleColor: config.titleColor,
-      detailText: config.detailText,
-      titleY: overlayCenterY(-60),
-      detailY: overlayCenterY(-15),
-      titleDepth: DEPTH_OVERLAY_CONTENT,
-      detailDepth: DEPTH_OVERLAY_CONTENT,
-      background: { depth: DEPTH_OVERLAY, alpha: OVERLAY_BG_ALPHA },
-      box: { width: OVERLAY_BOX_WIDTH, height: OVERLAY_BOX_HEIGHT, alpha: OVERLAY_BOX_ALPHA },
-      buttons: [
-        {
-          label: config.primaryButtonLabel,
-          x: GAME_W / 2,
-          y: GAME_H / 2 + OVERLAY_BUTTON_Y_OFFSET,
-          config: { fontSize: OVERLAY_BUTTON_FONT_SIZE },
-          onClick: () => {
-            this.soundManager?.play(SFX_KEYS.UI_CLICK);
-            this.gameEvents.emit('ui-interaction', {
-              elementId: config.primaryButtonEvent,
-              action: 'click',
-            });
-            this.time.delayedCall(0, () => this.scene.restart());
-          },
-        },
-      ],
+      summaryText: config.detailText,
+      onPlayAgain: () => {
+        this.soundManager?.play(SFX_KEYS.UI_CLICK);
+        this.gameEvents.emit('ui-interaction', {
+          elementId: config.primaryButtonEvent,
+          action: 'click',
+        });
+        this.time.delayedCall(0, () => this.scene.restart());
+      },
+      onMenu: () => this.scene.start('GameSelectorScene'),
+      playAgainLabel: config.primaryButtonLabel.replace(/\[ | \]/g, '').trim(),
+      menuLabel: 'Menu',
     });
 
-    this.overlayManager.add(...result);
+    this.overlayManager.add(...result.objects);
     this.overlayObjects = this.overlayManager.objects;
   }
 

@@ -20,6 +20,7 @@ import {
   preloadCardAssets,
   OverlayManager,
   audioPathWithFallback,
+  createGameOverOverlay,
 } from '../../../src/ui';
 import type { EventSoundMapping } from '../../../src/core-engine/SoundManager';
 import type { HelpSection } from '../../../src/ui';
@@ -29,9 +30,8 @@ import {
   SFX_KEYS, ANIM_DURATION,
   AUTO_COMPLETE_STAGGER_MS, AUTO_COMPLETE_MIN_DURATION,
   OVERLAY_DEPTH, OVERLAY_BG_ALPHA,
-  OVERLAY_TITLE_FONT_SIZE, OVERLAY_STATS_FONT_SIZE,
-  OVERLAY_WIN_TITLE_Y_OFFSET, OVERLAY_CONTENT_Y_OFFSET,
-  OVERLAY_BUTTON_Y_OFFSET,
+  OVERLAY_STATS_FONT_SIZE,
+  OVERLAY_CONTENT_Y_OFFSET,
   RESUME_TITLE_FONT_SIZE, RESUME_TITLE_Y_OFFSET,
   RESUME_INFO_FONT_SIZE, RESUME_INFO_Y_OFFSET,
   RESUME_BUTTON_SPACING, RESUME_BUTTON_Y_OFFSET,
@@ -696,39 +696,22 @@ export class BeleagueredCastleScene extends CardGameScene {
   // ── Overlay helpers ────────────────────────────────────
 
   private showWinOverlay(elapsedSeconds: number, _soundManager?: { play: (key: string) => void } | null): void {
-    const BUTTON_DEPTH = OVERLAY_DEPTH + 1;
-
-    this.overlayManager.showOverlay({
-      type: 'game-over',
-      backgroundOptions: { depth: OVERLAY_DEPTH, alpha: OVERLAY_BG_ALPHA },
-    });
-
     const minutes = Math.floor(elapsedSeconds / 60);
     const seconds = elapsedSeconds % 60;
     const mm = String(minutes).padStart(2, '0');
     const ss = String(seconds).padStart(2, '0');
 
-    const title = this.add.text(GAME_W / 2, GAME_H / 2 + OVERLAY_WIN_TITLE_Y_OFFSET, 'You Win!', {
-      fontSize: OVERLAY_TITLE_FONT_SIZE, color: '#88ff88', fontFamily: FONT_FAMILY, fontStyle: 'bold',
-    }).setOrigin(0.5).setDepth(BUTTON_DEPTH);
-    this.overlayManager.add(title);
-
-    const stats = createHudText(this, GAME_W / 2, GAME_H / 2 + OVERLAY_CONTENT_Y_OFFSET,
-      `Moves: ${this.gameState.moveCount}    Time: ${mm}:${ss}`, '#aaccaa', {
-        fontSize: OVERLAY_STATS_FONT_SIZE,
-        originX: 0.5,
-        originY: 0.5,
-      });
-    stats.setDepth(BUTTON_DEPTH);
-    this.overlayManager.add(stats);
-
-    const newGameBtn = createOverlayButton(this, GAME_W / 2 - 150, GAME_H / 2 + OVERLAY_BUTTON_Y_OFFSET, '[ New Game ]', BUTTON_DEPTH);
-    newGameBtn.on('pointerdown', () => this.onNewGame?.());
-    this.overlayManager.add(newGameBtn);
-
-    const restartBtn = createOverlayButton(this, GAME_W / 2, GAME_H / 2 + OVERLAY_BUTTON_Y_OFFSET, '[ Restart ]', BUTTON_DEPTH);
-    restartBtn.on('pointerdown', () => this.onRestart?.());
-    this.overlayManager.add(restartBtn);
+    const result = createGameOverOverlay(this, {
+      title: 'You Win!',
+      titleColor: '#88ff88',
+      summaryText: `Moves: ${this.gameState.moveCount}    Time: ${mm}:${ss}`,
+      onPlayAgain: () => this.onNewGame?.(),
+      onMenu: () => this.scene.start('GameSelectorScene'),
+      playAgainLabel: 'Play Again',
+      menuLabel: 'Menu',
+      extraButtons: [{ label: 'Restart', onClick: () => this.onRestart?.() }],
+    });
+    this.overlayManager.add(...result.objects);
   }
 
   private showNoMovesOverlay(): void {
