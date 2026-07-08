@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "id": "gym-sll-default",
+  "baseViewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "requiredZones": [
+    "header",
+    "menu",
+    "controls",
+    "content"
+  ],
+  "zones": {
+    "header": {
+      "rect": {
+        "x": 0.12,
+        "y": 0.05
+      },
+      "anchors": {
+        "title": { "x": 0.4, "y": 0.1 }
+      }
+    },
+    "menu": {
+      "rect": {
+        "x": 0.74,
+        "y": 0.04
+      },
+      "anchors": {
+        "help": { "x": 0.85, "y": 0.09 }
+      }
+    },
+    "controls": {
+      "rect": {
+        "x": 0.12,
+        "y": 0.18
+      },
+      "anchors": {
+        "action": { "x": 0.3, "y": 0.23 }
+      }
+    },
+    "content": {
+      "rect": {
+        "x": 0.12,
+        "y": 0.32
+      },
+      "anchors": {
+        "topLeft": { "x": 0.12, "y": 0.32 },
+        "center": { "x": 0.5, "y": 0.56 },
+        "bottomRight": { "x": 0.88, "y": 0.8 }
+      }
+    }
+  }
+}

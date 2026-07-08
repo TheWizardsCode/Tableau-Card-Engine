@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "id": "feudalism-canonical",
+  "baseViewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "requiredZones": [
+    "patronArea",
+    "supplyArea",
+    "marketArea",
+    "playerArea",
+    "aiArea"
+  ],
+  "zones": {
+    "patronArea": {
+      "rect": {
+        "x": 0.007813,
+        "y": 0.072222
+      },
+      "anchors": {
+        "center": { "x": 0.089844, "y": 0.341667 },
+        "topCenter": { "x": 0.089844, "y": 0.072222 },
+        "bottom": { "x": 0.089844, "y": 0.611111 }
+      }
+    },
+    "supplyArea": {
+      "rect": {
+        "x": 0.859375,
+        "y": 0.1625
+      },
+      "anchors": {
+        "center": { "x": 0.917969, "y": 0.35 }
+      }
+    },
+    "marketArea": {
+      "rect": {
+        "x": 0.195313,
+        "y": 0.094444
+      },
+      "anchors": {
+        "center": { "x": 0.460938, "y": 0.316667 },
+        "topCenter": { "x": 0.460938, "y": 0.094444 }
+      }
+    },
+    "playerArea": {
+      "rect": {
+        "x": 0.015625,
+        "y": 0.627778
+      },
+      "anchors": {
+        "center": { "x": 0.25, "y": 0.756945 }
+      }
+    },
+    "aiArea": {
+      "rect": {
+        "x": 0.515625,
+        "y": 0.627778
+      },
+      "anchors": {
+        "center": { "x": 0.75, "y": 0.756945 }
+      }
+    }
+  }
+}

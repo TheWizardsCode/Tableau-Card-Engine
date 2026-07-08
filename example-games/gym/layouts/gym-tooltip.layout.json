@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "id": "gym-tooltip-layout",
+  "baseViewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "requiredZones": [
+    "header",
+    "label",
+    "content",
+    "log"
+  ],
+  "zones": {
+    "header": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.08333
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.08333 }
+      }
+    },
+    "label": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.13889
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.13889 }
+      }
+    },
+    "content": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.27778
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.27778 }
+      }
+    },
+    "log": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.52778
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.52778 }
+      }
+    }
+  }
+}

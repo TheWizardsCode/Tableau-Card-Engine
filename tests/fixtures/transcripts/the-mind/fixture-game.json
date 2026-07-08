@@ -1,0 +1,148 @@
+{
+  "version": 2,
+  "gameType": "the-mind",
+  "startedAt": "2026-01-01T00:00:00.000Z",
+  "endedAt": "2026-01-01T00:10:00.000Z",
+  "initialState": {
+    "playerNames": [
+      "AI-0",
+      "AI-1"
+    ],
+    "isAI": [
+      true,
+      true
+    ],
+    "startingLives": 2,
+    "startingLevel": 1,
+    "hands": [
+      [
+        3
+      ],
+      [
+        45
+      ]
+    ]
+  },
+  "events": [
+    {
+      "type": "card-played",
+      "timestamp": 1500,
+      "playerId": 0,
+      "cardValue": 3,
+      "pileTopAfter": 3,
+      "pileSizeAfter": 1
+    },
+    {
+      "type": "card-played",
+      "timestamp": 4533.737022429705,
+      "playerId": 1,
+      "cardValue": 45,
+      "pileTopAfter": 0,
+      "pileSizeAfter": 0
+    },
+    {
+      "type": "level-complete",
+      "timestamp": 4533.737022429705,
+      "level": 1,
+      "bonusLifeAwarded": false,
+      "livesAfter": 2,
+      "handsDealt": [
+        [
+          20,
+          52
+        ],
+        [
+          26,
+          32
+        ]
+      ]
+    },
+    {
+      "type": "card-played",
+      "timestamp": 2294.9685607105494,
+      "playerId": 1,
+      "cardValue": 26,
+      "pileTopAfter": 26,
+      "pileSizeAfter": 1
+    },
+    {
+      "type": "penalty",
+      "timestamp": 2294.9685607105494,
+      "livesRemaining": 1,
+      "discardedCards": [
+        {
+          "playerId": 0,
+          "cardValue": 20
+        }
+      ]
+    },
+    {
+      "type": "card-played",
+      "timestamp": 3921.225483715534,
+      "playerId": 1,
+      "cardValue": 32,
+      "pileTopAfter": 32,
+      "pileSizeAfter": 2
+    },
+    {
+      "type": "card-played",
+      "timestamp": 4455.380744859576,
+      "playerId": 0,
+      "cardValue": 52,
+      "pileTopAfter": 0,
+      "pileSizeAfter": 0
+    },
+    {
+      "type": "level-complete",
+      "timestamp": 4455.380744859576,
+      "level": 2,
+      "bonusLifeAwarded": false,
+      "livesAfter": 1,
+      "handsDealt": [
+        [
+          35,
+          68,
+          83
+        ],
+        [
+          29,
+          42,
+          70
+        ]
+      ]
+    },
+    {
+      "type": "card-played",
+      "timestamp": 3312.046142667532,
+      "playerId": 0,
+      "cardValue": 35,
+      "pileTopAfter": 35,
+      "pileSizeAfter": 1
+    },
+    {
+      "type": "penalty",
+      "timestamp": 3312.046142667532,
+      "livesRemaining": 0,
+      "discardedCards": [
+        {
+          "playerId": 1,
+          "cardValue": 29
+        }
+      ]
+    },
+    {
+      "type": "game-over",
+      "timestamp": 1771972865799,
+      "outcome": "loss",
+      "finalLevel": 3,
+      "finalLives": 0
+    }
+  ],
+  "results": {
+    "outcome": "loss",
+    "finalLevel": 3,
+    "finalLives": 0,
+    "totalCardsPlayed": 6,
+    "totalPenalties": 2
+  }
+}
