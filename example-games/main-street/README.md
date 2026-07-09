@@ -70,6 +70,7 @@ The first row is the header. Columns common to all card families:
 | `id` | string | Unique card template ID (e.g. `biz-bakery`, `evt-festival`) |
 | `name` | string | Display name shown in-game |
 | `description` | string | Flavour / effect description |
+| `tier` | string | Progression tier: `1`–`5`. Empty (or absent) for always-available cards (e.g. staff). Tier assignments are consumed by `MainStreetTiers.ts` to build `TIER_DEFINITIONS` arrays. |
 
 #### Family-specific columns
 

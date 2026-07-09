@@ -684,3 +684,24 @@ export const CARD_TEMPLATE_NAMES: ReadonlyMap<string, string> = (() => {
   for (const t of UPGRADE_TEMPLATES)        m.set(t.id, t.name);
   return m;
 })();
+
+// ---------------------------------------------------------------------------
+// Card template ID → tier mapping (from CSV tier column)
+// ---------------------------------------------------------------------------
+
+/**
+ * Read-only map from card template ID (e.g. `'biz-cafe'`) to its tier number
+ * (as a numeric string, e.g. `'1'` through `'5'`).
+ *
+ * Built once at module load from the CSV `tier` column.
+ * Cards without a tier assignment (e.g. staff cards) are omitted from this map.
+ */
+export const CARD_TIER_MAP: ReadonlyMap<string, string> = (() => {
+  const m = new Map<string, string>();
+  for (const row of csvRows) {
+    if (row.tier && row.tier.trim() !== '') {
+      m.set(row.id, row.tier.trim());
+    }
+  }
+  return m;
+})();
