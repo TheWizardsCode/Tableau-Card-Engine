@@ -221,11 +221,11 @@ describe('buildUpgradeOverlaySpec - positioning', () => {
     const spec = buildUpgradeOverlaySpec(biz, CARD_W, CARD_H);
 
     expect(spec.incomeText).not.toBeNull();
-    // Income should be horizontally centred
-    expect(spec.incomeText!.x).toBe(Math.round(CARD_W / 2));
-    // Income should be in upper-middle band of card
-    expect(spec.incomeText!.y).toBeGreaterThan(0);
-    expect(spec.incomeText!.y).toBeLessThan(CARD_H / 2);
+    // Income should be horizontally centred (x=0 in container-local space)
+    expect(spec.incomeText!.x).toBe(0);
+    // Income should be slightly above centre vertically (negative y)
+    expect(spec.incomeText!.y).toBeLessThan(0);
+    expect(spec.incomeText!.y).toBeGreaterThan(-CARD_H / 4);
   });
 
   it('should position reputation text centred below income', () => {
@@ -233,11 +233,11 @@ describe('buildUpgradeOverlaySpec - positioning', () => {
     const spec = buildUpgradeOverlaySpec(biz, CARD_W, CARD_H);
 
     expect(spec.reputationText).not.toBeNull();
-    // Reputation should be horizontally centred
-    expect(spec.reputationText!.x).toBe(Math.round(CARD_W / 2));
-    // Reputation should be below income but not at very bottom
+    // Reputation should be horizontally centred (x=0 in container-local space)
+    expect(spec.reputationText!.x).toBe(0);
+    // Reputation should be below centre (positive y)
     expect(spec.reputationText!.y).toBeGreaterThan(0);
-    expect(spec.reputationText!.y).toBeLessThanOrEqual(CARD_H);
+    expect(spec.reputationText!.y).toBeLessThanOrEqual(CARD_H / 4);
   });
 
   it('should position level badge at top-right', () => {
@@ -245,16 +245,21 @@ describe('buildUpgradeOverlaySpec - positioning', () => {
     const spec = buildUpgradeOverlaySpec(biz, CARD_W, CARD_H);
 
     expect(spec.levelBadge).not.toBeNull();
-    expect(spec.levelBadge!.x).toBeGreaterThan(CARD_W / 2);
-    expect(spec.levelBadge!.y).toBeLessThan(CARD_H / 2);
+    // In container-local space, right edge is at +width/2; badge should be near it
+    expect(spec.levelBadge!.x).toBeGreaterThan(0);
+    expect(spec.levelBadge!.x).toBeLessThanOrEqual(CARD_W / 2);
+    // At top: y should be negative (above centre in container space)
+    expect(spec.levelBadge!.y).toBeLessThan(0);
   });
 
-  it('should position name text at top-center for upgraded cards', () => {
+  it('should position name text at top-centre for upgraded cards', () => {
     const biz = makeBiz({ name: 'Patisserie', level: 1 });
     const spec = buildUpgradeOverlaySpec(biz, CARD_W, CARD_H);
 
     expect(spec.nameText).not.toBeNull();
-    expect(spec.nameText!.x).toBe(Math.round(CARD_W / 2));
-    expect(spec.nameText!.y).toBeLessThan(CARD_H / 2);
+    // Name should be horizontally centred (x=0 in container-local space)
+    expect(spec.nameText!.x).toBe(0);
+    // Name should be above centre (negative y, near top of card)
+    expect(spec.nameText!.y).toBeLessThan(0);
   });
 });

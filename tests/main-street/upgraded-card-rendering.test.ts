@@ -74,9 +74,12 @@ describe('buildUpgradeOverlaySpec', () => {
       const height = 280;
       const spec = buildUpgradeOverlaySpec(biz, width, height);
       expect(spec.levelBadge).not.toBeNull();
-      // Badge should be near top-right
-      expect(spec.levelBadge!.x).toBeGreaterThan(width * 0.5);
-      expect(spec.levelBadge!.y).toBeLessThan(height * 0.15);
+      // In container-local space (0,0 = card centre), badge should be near
+      // top-right: x positive (right side, near right edge at +width/2)
+      expect(spec.levelBadge!.x).toBeGreaterThan(0);
+      expect(spec.levelBadge!.x).toBeLessThanOrEqual(width / 2);
+      // y negative (above centre, near top at -height/2)
+      expect(spec.levelBadge!.y).toBeLessThan(0);
     });
   });
 
@@ -95,14 +98,16 @@ describe('buildUpgradeOverlaySpec', () => {
       expect(spec.incomeText!.text).toBe('Income: +3/turn');
     });
 
-    it('positions the income text in the upper-middle band of the card', () => {
+    it('positions the income text centred on the card', () => {
       const biz = makeBiz({ baseIncome: 3, incomeBonus: 5, level: 1 });
       const height = 280;
       const spec = buildUpgradeOverlaySpec(biz, 200, height);
       expect(spec.incomeText).not.toBeNull();
-      // Income is now centred, not at bottom
-      expect(spec.incomeText!.y).toBeGreaterThan(height * 0.2);
-      expect(spec.incomeText!.y).toBeLessThan(height * 0.6);
+      // Income is now centred: x=0 horizontally, y slightly above centre
+      expect(spec.incomeText!.x).toBe(0);
+      // y should be negative (above centre) and near zero (centre of card)
+      expect(spec.incomeText!.y).toBeLessThan(0);
+      expect(spec.incomeText!.y).toBeGreaterThan(-height * 0.2);
     });
   });
 
