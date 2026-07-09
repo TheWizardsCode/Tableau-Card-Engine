@@ -285,9 +285,9 @@ describe('flipCard', () => {
     expect(tweenConfigs[1].y).toBe(100);
   });
 
-  // ── Equivalence with TheMind's AI flip pattern ─────────
+  // ── Equivalence with The Mind's AI flip pattern ────────
 
-  it('reproduces TheMind AI flip: asymmetric easing, 250ms, flip-only (translation separate)', () => {
+  it('reproduces The Mind AI flip: asymmetric easing, 250ms, flip-only (translation separate)', () => {
     const sprite = createMockTarget(400, 100) as any;
     sprite.scaleX = 1;
     const setDisplaySize = vi.fn(() => {

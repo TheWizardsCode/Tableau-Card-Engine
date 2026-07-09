@@ -697,7 +697,7 @@ export class LostCitiesRenderer {
       baseTop: number,
     ): void => {
       // Wire the pile model via adapter for future unified texture resolution.
-      // Manual setTexture is used currently (The Mind pattern); the adapter
+      // Manual setTexture is used currently (legacy pattern); the adapter
       // enables a later migration to PileView.update() with cardTextureFn.
       pv.setPile(new LcArrayPileAdapter(cards));
 

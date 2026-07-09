@@ -126,7 +126,7 @@ describe('layoutCardPositions', () => {
   // ── Equivalence with The Mind algorithm ───────────────
 
   it('produces the same result as The Mind renderHumanHand pattern', () => {
-    // Reproduce The Mind's algorithm for comparison
+    // Reproduce The Mind's original layout algorithm for comparison
     const CARD_W = 120;
     const CARD_GAP = 8;
     const MAX_HAND_WIDTH = 1200; // GAME_W - 80

@@ -23,10 +23,10 @@ import { GameEventEmitter } from '../core-engine';
  * Custom card texture resolver for non-standard card models.
  *
  * Used by {@link HandView} when the card type does not have `rank`/`suit`
- * properties (e.g. The Mind's `MindCard` with a numeric `value`).
+ * properties (e.g. a custom card with a numeric `value`).
  *
  * The `card` parameter is typed as `any` to allow resolvers for arbitrary
- * card-like types (MindCard, etc.) without requiring casts at the call site.
+ * card-like types without requiring casts at the call site.
  *
  * @param card  - The card object to resolve a texture for.
  * @param index - The card's index in the hand (useful for back-face cards).
@@ -138,7 +138,7 @@ export interface HandViewOptions {
   layoutDirection?: 'horizontal' | 'vertical';
 
   /**
-   * Custom texture resolver for non-standard card models (e.g. MindCard
+   * Custom texture resolver for non-standard card models (e.g. a card
    * with numeric `value` instead of `rank`/`suit`). When provided,
    * this function is called instead of `getCardTexture()` to determine
    * the texture key for each card.
@@ -421,7 +421,7 @@ export class HandView {
   // Display objects
   private sprites: Phaser.GameObjects.GameObject[] = [];
   private labels: Phaser.GameObjects.Text[] = [];
-  /** Custom texture function (used for non-standard card models like MindCard). */
+  /** Custom texture function for non-standard card models. */
   private _customTextureFn: CardTextureResolver | undefined;
   /** Custom card renderer (used for non-standard card visuals). */
   private _renderCardFn: RenderCardFn | undefined;
@@ -501,7 +501,7 @@ export class HandView {
 
   /**
    * Update the custom texture resolver at runtime (e.g. when switching
-   * from standard cards to MindCard rendering mid-game).
+   * from standard cards to a custom card model mid-game).
    */
   setCardTextureFn(fn: CardTextureResolver): void {
     this._customTextureFn = fn;
