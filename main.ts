@@ -18,7 +18,6 @@ import { BeleagueredCastleScene } from './example-games/beleaguered-castle/scene
 import { SushiGoScene } from './example-games/sushi-go/scenes/SushiGoScene';
 import { FeudalismScene } from './example-games/feudalism/scenes/FeudalismScene';
 import { LostCitiesScene } from './example-games/lost-cities/scenes/LostCitiesScene';
-import { TheMindScene } from './example-games/the-mind/scenes/TheMindScene';
 import { MainStreetScene } from './example-games/main-street/scenes/MainStreetScene';
 import {
   GymRouterScene,
@@ -82,13 +81,6 @@ export const GAMES: GameEntry[] = [
     thumbnail: 'games/lost-cities/thumbnail',
   },
   {
-    sceneKey: 'TheMindScene',
-    title: 'The Mind',
-    description:
-      'Cooperative real-time card game (human + AI). Play numbered cards 1-100 onto a shared ascending pile without communicating. Survive 8 levels without losing all lives.',
-    thumbnail: 'games/the-mind/thumbnail',
-  },
-  {
     sceneKey: 'MainStreetScene',
     title: 'Main Street',
     description:
@@ -115,7 +107,6 @@ createCardGame({
     SushiGoScene,
     FeudalismScene,
     LostCitiesScene,
-    TheMindScene,
     MainStreetScene,
     // Gym demo scenes
     GymRouterScene,

@@ -488,13 +488,10 @@ export class SushiGoScene extends CardGameScene {
       return;
     }
 
-    // Center the hand horizontally — baseX is the leftmost card X in HandView
-    const handSize = hand.length;
-    const spacing = HAND_CARD_W + HAND_GAP;
-    const leftmostX = GAME_W / 2 - (handSize - 1) * spacing / 2;
-    this.handView.setBaseX(leftmostX);
-
-    // HandView manages layout and card creation via renderCard callback
+    // HandView manages layout and card creation via renderCard callback.
+    // No need to call setBaseX — layoutCardPositions already centres the
+    // hand around baseX (GAME_W / 2) so the row stays centred regardless
+    // of hand size.
     this.handView.setCards(hand as any);
 
     // Apply chopsticks highlight to the first picked card (if in chopsticks mode)
