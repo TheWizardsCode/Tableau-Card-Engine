@@ -72,13 +72,24 @@ export function computeBusinessExpectedCost(row: CsvRow): number {
   const synergyRepBonus = parseFloat(csvVal(row, 'synergyRepBonus')) || 0;
   const reputationPerTurn = parseFloat(csvVal(row, 'reputationPerTurn')) || 0;
   const incomeBonus = parseFloat(csvVal(row, 'incomeBonus')) || 0;
+  const tier = parseInt(csvVal(row, 'tier'), 10) || 1;
 
-  let cost = baseIncome * 3
-    + synergyCount * 1.5
-    + synergyCoinBonus * 0.5
-    + synergyRepBonus * 0.5
-    + reputationPerTurn * 20
-    + incomeBonus * 2;
+  // Base cost from tier: 1→4, 2→5.5, 3→7, 4→9, 5→11
+  // This ensures the existing tier assignments drive the cost spread
+  let cost = tier * 2 + 2;
+
+  // Modifiers from card stats
+  cost += baseIncome * 4;
+  cost += synergyCount * 3;
+  cost += synergyCoinBonus * 2;
+  cost += synergyRepBonus * 2;
+  cost += reputationPerTurn * 30;
+  cost += incomeBonus * 3;
+
+  // Pawn Shop special case: no synergy bonuses, reduce cost slightly
+  if (baseIncome === 0 && synergyCoinBonus === 0 && synergyRepBonus === 0 && reputationPerTurn === 0) {
+    cost -= 2;
+  }
 
   cost = Math.max(cost, 4);
   return cost;
@@ -89,9 +100,18 @@ export function computeBusinessExpectedCost(row: CsvRow): number {
 export function computeEventExpectedCost(row: CsvRow): number {
   const coinDelta = parseFloat(csvVal(row, 'coinDelta')) || 0;
   const reputationDelta = parseFloat(csvVal(row, 'reputationDelta')) || 0;
-  let cost = coinDelta + reputationDelta;
+  const tier = parseInt(csvVal(row, 'tier'), 10) || 1;
+
+  let cost = tier * 1.5 + 0.5;
+
+  // Add modifiers from event deltas
+  cost += coinDelta * 1.5;
+  cost += reputationDelta * 2;
+
+  // Scope multiplier: SpecificSynergy is worth 1.2x
   const targetScopeMultiplier = (csvVal(row, 'targetSynergy') === 'All') ? 1.0 : 1.2;
   cost *= targetScopeMultiplier;
+
   cost = Math.max(cost, 2);
   return cost;
 }
@@ -103,7 +123,13 @@ export function computeUpgradeExpectedCost(row: CsvRow): number {
   const synergyRangeBonus = parseFloat(csvVal(row, 'synergyRangeBonus')) || 0;
   const requiredLevel = parseFloat(csvVal(row, 'requiredLevel')) || 0;
   const reputationBonus = parseFloat(csvVal(row, 'reputationBonus')) || 0;
-  let cost = incomeBonus * 1.5 + synergyRangeBonus * 2 + requiredLevel * 0.5 + reputationBonus * 2;
+  const tier = parseInt(csvVal(row, 'tier'), 10) || 1;
+
+  let cost = tier * 1.5 + 1;
+  cost += incomeBonus * 3;
+  cost += synergyRangeBonus * 3;
+  cost += requiredLevel * 1;
+  cost += reputationBonus * 10;
   cost = Math.max(cost, 2);
   return cost;
 }
@@ -113,7 +139,7 @@ export function computeUpgradeExpectedCost(row: CsvRow): number {
 export function computeStaffExpectedCost(row: CsvRow): number {
   const ongoingCost = parseFloat(csvVal(row, 'ongoingCost')) || 0;
   const handSlotsAdded = parseFloat(csvVal(row, 'handSlotsAdded')) || 0;
-  return ongoingCost * 3 + handSlotsAdded * 3;
+  return ongoingCost * 5 + handSlotsAdded * 5;
 }
 
 // ── Tier band assignment ──────────────────────────────────────────────
@@ -155,6 +181,60 @@ export function assignTierBands(
   }
 
   return result;
+}
+
+// ── Cost spread enforcement ────────────────────────────────────────────
+// Ensures no single cost value exceeds 1/3 of cards in a family.
+
+function enforceCostSpread(
+  rows: CsvRow[],
+  family: string,
+  adjustments: Adjustment[],
+): void {
+  const familyRows = rows.filter(r => r.family === family);
+  if (familyRows.length === 0) return;
+
+  const threshold = Math.ceil(familyRows.length / 3);
+
+  // Count cost frequencies
+  const freq = new Map<number, CsvRow[]>();
+  for (const row of familyRows) {
+    const cost = parseFloat(csvVal(row, 'cost')) || 0;
+    if (!freq.has(cost)) freq.set(cost, []);
+    freq.get(cost)!.push(row);
+  }
+
+  // Find costs exceeding threshold, sorted by cost ascending
+  const overThreshold = [...freq.entries()]
+    .filter(([_, cards]) => cards.length > threshold)
+    .sort(([a], [b]) => a - b);
+
+  for (const [clusteredCost, clusteredCards] of overThreshold) {
+    // Move excess cards to adjacent cost values (±1, ±2)
+    const excess = clusteredCards.slice(threshold);
+    for (const card of excess) {
+      // Try spreading upward first, then downward
+      for (const delta of [1, -1, 2, -2]) {
+        const newCost = Math.max(1, clusteredCost + delta);
+        const currentCount = [...freq.entries()]
+          .filter(([c]) => c === newCost)
+          .reduce((sum, [_, cards]) => sum + cards.length, 0);
+        if (currentCount < threshold || newCost >= clusteredCost + 2) {
+          const oldVal = parseFloat(csvVal(card, 'cost')) || 0;
+          (card as unknown as Record<string, string>)['cost'] = String(newCost);
+          adjustments.push({
+            cardId: card.id, cardName: card.name, family,
+            field: 'cost', oldValue: oldVal, newValue: newCost,
+            rationale: 'BAND_BALANCE' as RationaleCode,
+          });
+          // Update frequency for subsequent iterations
+          if (!freq.has(newCost)) freq.set(newCost, []);
+          freq.get(newCost)!.push(card);
+          break;
+        }
+      }
+    }
+  }
 }
 
 // ── Reward spread: Business/Community Space ───────────────────────────
@@ -451,6 +531,23 @@ export function runBalancingPass(rows: CsvRow[]): BalancingResult {
 
     adjustments.push(...familyAdjustments);
     resultRows.push(...adjustedRows);
+  }
+
+  // Enforce cost spread for business and community-space families
+  // to prevent >1/3 of cards sharing the same cost
+  for (const fam of ['business', 'community-space', 'upgrade', 'event', 'staff'] as const) {
+    enforceCostSpread(resultRows, fam, adjustments);
+  }
+
+  // Recompute summaries after spread enforcement
+  for (const summary of summaries) {
+    const famRows = resultRows.filter(r => r.family === summary.family);
+    const costs = famRows.map(r => parseFloat(csvVal(r, 'cost')) || 0);
+    summary.newCostMin = Math.min(...costs);
+    summary.newCostMax = Math.max(...costs);
+    summary.cardsAdjusted = adjustments.filter(
+      a => a.family === summary.family && a.oldValue !== a.newValue && a.rationale !== 'INCIDENT_FREE'
+    ).length;
   }
 
   return { rows: resultRows, adjustments, summaries };

@@ -11,6 +11,7 @@ export interface CsvRow {
   maxLevel: string;
   reputationPerTurn: string;
   description: string;
+  tier: string;
   trigger?: string;
   effect?: string;
   target?: string;
@@ -33,7 +34,8 @@ export interface CsvRow {
 
 export const CSV_COLUMNS: readonly string[] = [
   'family', 'id', 'name', 'cost', 'baseIncome', 'synergyTypes', 'upgradePath',
-  'maxLevel', 'reputationPerTurn', 'description', 'trigger', 'effect', 'target',
+  'maxLevel', 'reputationPerTurn', 'synergyCoinBonus', 'synergyRepBonus',
+  'description', 'tier', 'trigger', 'effect', 'target',
   'targetSynergy', 'coinDelta', 'reputationDelta', 'duration', 'effectType',
   'multiplier', 'targetBusiness', 'incomeBonus', 'synergyRangeBonus',
   'requiredLevel', 'reputationBonus', 'ongoingCost', 'handSlotsAdded',

@@ -43,6 +43,7 @@ function makeBusinessRow(overrides: Partial<Record<string, string>> = {}): CsvRo
     maxLevel: '1',
     reputationPerTurn: '',
     description: '',
+    tier: '1',
     ...overrides,
   };
 }
@@ -65,6 +66,7 @@ function makeEventRow(overrides: Partial<Record<string, string>> = {}): CsvRow {
     targetSynergy: '',
     coinDelta: '2',
     reputationDelta: '1',
+    tier: '1',
     ...overrides,
   };
 }
@@ -86,6 +88,7 @@ function makeUpgradeRow(overrides: Partial<Record<string, string>> = {}): CsvRow
     synergyRangeBonus: '1',
     requiredLevel: '0',
     reputationBonus: '',
+    tier: '1',
     ...overrides,
   };
 }
@@ -104,6 +107,7 @@ function makeStaffRow(overrides: Partial<Record<string, string>> = {}): CsvRow {
     description: '',
     ongoingCost: '1',
     handSlotsAdded: '1',
+    tier: '1',
     ...overrides,
   };
 }
@@ -373,7 +377,7 @@ describe('CSV Validation', () => {
   });
 
   it('parseCsv correctly parses a real CSV row', () => {
-    const csv = 'family,id,name,cost,baseIncome,synergyTypes,upgradePath,maxLevel,reputationPerTurn,description,trigger,effect,target,targetSynergy,coinDelta,reputationDelta,duration,effectType,multiplier,targetBusiness,incomeBonus,synergyRangeBonus,requiredLevel,reputationBonus,ongoingCost,handSlotsAdded\nbusiness,biz-test,Test,6,1,Food,,1,,,';
+    const csv = 'family,id,name,cost,baseIncome,synergyTypes,upgradePath,maxLevel,reputationPerTurn,synergyCoinBonus,synergyRepBonus,description,tier,trigger,effect,target,targetSynergy,coinDelta,reputationDelta,duration,effectType,multiplier,targetBusiness,incomeBonus,synergyRangeBonus,requiredLevel,reputationBonus,ongoingCost,handSlotsAdded\nbusiness,biz-test,Test,6,1,Food,,1,,,,,,,,,,,,,,,,,';
     const rows = parseCsv(csv);
     expect(rows.length).toBe(1);
     expect(rows[0].id).toBe('biz-test');
@@ -381,7 +385,7 @@ describe('CSV Validation', () => {
   });
 
   it('toCsvString round-trips correctly', () => {
-    const csv = 'family,id,name,cost,baseIncome,synergyTypes,upgradePath,maxLevel,reputationPerTurn,description,trigger,effect,target,targetSynergy,coinDelta,reputationDelta,duration,effectType,multiplier,targetBusiness,incomeBonus,synergyRangeBonus,requiredLevel,reputationBonus,ongoingCost,handSlotsAdded\nbusiness,biz-test,Test,6,1,Food,,1,,,,';
+    const csv = 'family,id,name,cost,baseIncome,synergyTypes,upgradePath,maxLevel,reputationPerTurn,synergyCoinBonus,synergyRepBonus,description,tier,trigger,effect,target,targetSynergy,coinDelta,reputationDelta,duration,effectType,multiplier,targetBusiness,incomeBonus,synergyRangeBonus,requiredLevel,reputationBonus,ongoingCost,handSlotsAdded\nbusiness,biz-test,Test,6,1,Food,,1,,,,,,,,,,,,,,,,';
     const rows = parseCsv(csv);
     const output = toCsvString(rows);
     const reparsed = parseCsv(output);
