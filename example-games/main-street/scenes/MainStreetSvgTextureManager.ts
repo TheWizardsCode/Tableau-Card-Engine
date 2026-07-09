@@ -90,6 +90,7 @@ export class MainStreetSvgTextureManager {
         { w: s.layout.marketCardW, h: s.layout.marketCardH },
         { w: s.layout.slotW, h: s.layout.slotH },
         { w: s.layout.handW, h: s.layout.handH },
+        { w: s.layout.queueCardW, h: s.layout.queueCardH },
       ];
 
       for (const size of sizes) {

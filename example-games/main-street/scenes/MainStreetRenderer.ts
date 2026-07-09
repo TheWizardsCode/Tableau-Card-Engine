@@ -1036,7 +1036,8 @@ export class MainStreetRenderer {
     // Calculate dynamic height
     const activeEffectLines = activeEffects.length;
     const extraH = activeEffectLines > 0 ? 16 + activeEffectLines * 16 : 0;
-    const cardRenderH = 50;
+    const cardRenderW = s.layout.queueCardW;
+    const cardRenderH = s.layout.queueCardH;
     const maxCards = Math.min(2, queue.length);
     const cardAreaH = maxCards * (cardRenderH + 6) - 6 + 12; // cards + deck count
     const panelH = titleH + pad + cardAreaH + extraH + pad;
@@ -1061,8 +1062,9 @@ export class MainStreetRenderer {
     s.incidentQueueContainer.add(titleText);
 
     // Queue cards — stacked vertically, centred in the panel
+    // Dimensions come from layout.queueCardW/queueCardH (currently 120×69)
+    // to preserve the standard 7:4 SVG aspect ratio.
     let cardY = queueTop + titleH + pad;
-    const cardRenderW = Math.max(1, Math.round(panelW - pad * 2 - 8));
 
     for (let i = 0; i < maxCards; i++) {
       const card = queue[i];

@@ -17,9 +17,10 @@ export const BASE_MARKET_CARD_H = 80;
 export const BASE_MARKET_ROW_GAP = 10;
 export const BASE_MARKET_CARD_GAP = 12;
 export const BASE_MARKET_LABEL_W = 90;
-// Incident queue uses same card size as market for consistency
-export const BASE_QUEUE_CARD_W = BASE_MARKET_CARD_W;
-export const BASE_QUEUE_CARD_H = BASE_MARKET_CARD_H;
+// Incident queue uses custom card size (120×69) for better panel fit
+// while preserving the standard 7:4 aspect ratio of all card SVGs.
+export const BASE_QUEUE_CARD_W = 120;
+export const BASE_QUEUE_CARD_H = 69;
 export const BASE_QUEUE_CARD_GAP = 10;
 // Make street slots match market placeholder size (market slots: 140x80)
 export const BASE_SLOT_W = 140;
