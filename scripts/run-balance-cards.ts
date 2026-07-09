@@ -5,7 +5,8 @@
  *
  * Reads the Main Street card CSV, performs a hybrid curve-fitting + tier-band
  * balancing pass on all 5 card families, prints a summary table to stdout,
- * and writes the balanced CSV to the output path (default: card-data.balanced.csv).
+ * and writes the balanced CSV to the output path (defaults to overwriting
+ * the input; the original is preserved via rotating backups).
  */
 
 import { resolve } from 'node:path';
@@ -23,7 +24,7 @@ import {
 // ── Default paths ─────────────────────────────────────────────────────
 
 const DEFAULT_INPUT = resolve(process.cwd(), 'example-games/main-street/card-data.csv');
-const DEFAULT_OUTPUT = resolve(process.cwd(), 'example-games/main-street/card-data.balanced.csv');
+const DEFAULT_OUTPUT = DEFAULT_INPUT;
 
 // ── Argument parsing ──────────────────────────────────────────────────
 
