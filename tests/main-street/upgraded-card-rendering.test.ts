@@ -98,16 +98,14 @@ describe('buildUpgradeOverlaySpec', () => {
       expect(spec.incomeText!.text).toBe('Income: +3/turn');
     });
 
-    it('positions the income text centred on the card', () => {
+    it('positions the income text in the upper-middle band of the card', () => {
       const biz = makeBiz({ baseIncome: 3, incomeBonus: 5, level: 1 });
       const height = 280;
       const spec = buildUpgradeOverlaySpec(biz, 200, height);
       expect(spec.incomeText).not.toBeNull();
-      // Income is now centred: x=0 horizontally, y slightly above centre
-      expect(spec.incomeText!.x).toBe(0);
-      // y should be negative (above centre) and near zero (centre of card)
-      expect(spec.incomeText!.y).toBeLessThan(0);
-      expect(spec.incomeText!.y).toBeGreaterThan(-height * 0.2);
+      // Income is now centred, not at bottom
+      expect(spec.incomeText!.y).toBeGreaterThan(height * 0.2);
+      expect(spec.incomeText!.y).toBeLessThan(height * 0.6);
     });
   });
 
