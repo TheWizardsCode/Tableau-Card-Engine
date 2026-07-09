@@ -574,7 +574,7 @@ export class MainStreetRenderer {
       container.add(nameText);
     }
 
-    // Income text (bottom-left)
+    // Income text (centred on card)
     if (spec.incomeText) {
       const incomeText = this.scene.add.text(
         spec.incomeText.x,
@@ -587,11 +587,11 @@ export class MainStreetRenderer {
           fontFamily: FONT_FAMILY,
         },
       );
-      incomeText.setOrigin(0, 1);
+      incomeText.setOrigin(spec.incomeText.originX ?? 0, spec.incomeText.originY ?? 0);
       container.add(incomeText);
     }
 
-    // Reputation text (bottom-right)
+    // Reputation text (centred below income)
     if (spec.reputationText) {
       const repText = this.scene.add.text(
         spec.reputationText.x,
@@ -604,7 +604,7 @@ export class MainStreetRenderer {
           fontFamily: FONT_FAMILY,
         },
       );
-      repText.setOrigin(1, 1);
+      repText.setOrigin(spec.reputationText.originX ?? 0, spec.reputationText.originY ?? 0);
       container.add(repText);
     }
   }
@@ -932,6 +932,11 @@ export class MainStreetRenderer {
       container.add(targetText);
     }
 
+    // Apply income/reputation overlays for business and community-space cards
+    if (card.family === 'business' || card.family === 'community-space') {
+      this.applyUpgradeOverlays(container, card as BusinessCard | CommunitySpaceCard, renderW, renderH);
+    }
+
     const selectionRing = s.add.rectangle(0, 0, marketCardW, marketCardH);
     selectionRing.setFillStyle(0x000000, 0);
     selectionRing.setStrokeStyle(2, 0x44ff66);
@@ -1185,38 +1190,13 @@ export class MainStreetRenderer {
 
       const container = s.add.container(x, y);
 
-      // Card background
-      const bg = s.add.rectangle(0, 0, handCardW, handCardH, 0x3a2a1a, 0.9);
-      bg.setStrokeStyle(1, 0x8b7355);
-      container.add(bg);
+      // Render card via shared SVG pipeline for unified appearance
+      const renderW = Math.max(1, Math.round(handCardW - 4));
+      const renderH = Math.max(1, Math.round(handCardH - 4));
+      mainStreetRenderCardSvg(s, container, card.id, renderW, renderH);
 
-      // Card name
-      const nameText = s.add.text(0, -handCardH / 2 + 6, card.name, {
-        fontSize: '11px',
-        color: '#ffffff',
-        fontFamily: 'Arial',
-      }).setOrigin(0.5, 0);
-      container.add(nameText);
-
-      // Synergy type indicator
-      if (card.synergyTypes && card.synergyTypes.length > 0) {
-        const synergyLabel = card.synergyTypes.join('/');
-        const synergyColor = this.getSynergyDisplayColor(card.synergyTypes[0]);
-        const synText = s.add.text(0, 6, synergyLabel, {
-          fontSize: '9px',
-          color: synergyColor,
-          fontFamily: 'Arial',
-        }).setOrigin(0.5, 0);
-        container.add(synText);
-      }
-
-      // Income info
-      const incomeText = s.add.text(0, 18, `$${card.baseIncome}/turn`, {
-        fontSize: '9px',
-        color: '#c8b88a',
-        fontFamily: 'Arial',
-      }).setOrigin(0.5, 0);
-      container.add(incomeText);
+      // Apply income/reputation overlays (uses centered "Income: +X/turn" format)
+      this.applyUpgradeOverlays(container, card, renderW, renderH);
 
       s.handBusinessContainer!.add(container);
     }
@@ -1242,21 +1222,6 @@ export class MainStreetRenderer {
       color: current >= maxSize ? '#ff6666' : '#c8b88a',
       fontFamily: 'Arial',
     });
-  }
-
-  /**
-   * Returns a CSS color string for the given synergy type.
-   */
-  private getSynergyDisplayColor(type: string): string {
-    const colors: Record<string, string> = {
-      'Food': '#E67E22',
-      'Culture': '#3498DB',
-      'Commerce': '#27AE60',
-      'Service': '#9B59B6',
-      'Entertainment': '#E74C3C',
-      'Health': '#1ABC9C',
-    };
-    return colors[type] ?? '#ffffff';
   }
 
   /**

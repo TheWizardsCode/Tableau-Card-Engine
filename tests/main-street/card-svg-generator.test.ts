@@ -65,16 +65,17 @@ describe('generateBusinessCardSvg - base cards (level === 0)', () => {
     expect(svg).toContain('Bakery');
   });
 
-  it('should show income text when baseIncome > 0', () => {
+  it('should show income text with Income: prefix when baseIncome > 0', () => {
     const biz = makeBiz({ baseIncome: 2, level: 0 });
     const svg = generateBusinessCardSvg(biz, CARD_W, CARD_H);
-    expect(svg).toContain('+2/turn');
+    expect(svg).toContain('Income: +2/turn');
   });
 
   it('should omit income text when total income is 0', () => {
     const biz = makeBiz({ baseIncome: 0, incomeBonus: 0, level: 0 });
     const svg = generateBusinessCardSvg(biz, CARD_W, CARD_H);
     expect(svg).not.toContain('+0/turn');
+    expect(svg).not.toContain('Income: +0/turn');
   });
 
   it('should show reputation text when reputationPerTurn > 0', () => {
@@ -125,7 +126,7 @@ describe('generateBusinessCardSvg - upgraded cards (level > 0)', () => {
   it('should show combined income (base + bonus)', () => {
     const biz = makeBiz({ baseIncome: 1, incomeBonus: 2, level: 1 });
     const svg = generateBusinessCardSvg(biz, CARD_W, CARD_H);
-    expect(svg).toContain('+3/turn');
+    expect(svg).toContain('Income: +3/turn');
   });
 
   it('should show combined reputation (base + bonus)', () => {
@@ -151,7 +152,7 @@ describe('generateBusinessCardSvg - community space cards', () => {
   it('should show income for community spaces with income', () => {
     const cs = makeCommunitySpace({ baseIncome: 1, level: 0 });
     const svg = generateBusinessCardSvg(cs, CARD_W, CARD_H);
-    expect(svg).toContain('+1/turn');
+    expect(svg).toContain('Income: +1/turn');
   });
 
   it('should show reputation for community spaces with reputation', () => {

@@ -85,22 +85,24 @@ describe('buildUpgradeOverlaySpec', () => {
       const biz = makeBiz({ baseIncome: 3, incomeBonus: 5, level: 1 });
       const spec = buildUpgradeOverlaySpec(biz, 200, 280);
       expect(spec.incomeText).not.toBeNull();
-      expect(spec.incomeText!.text).toContain('8'); // 3 + 5 = 8
+      expect(spec.incomeText!.text).toBe('Income: +8/turn'); // 3 + 5 = 8
     });
 
     it('shows income overlay for an un-upgraded card when income > 0', () => {
       const biz = makeBiz({ baseIncome: 3, incomeBonus: 0, level: 0 });
       const spec = buildUpgradeOverlaySpec(biz, 200, 280);
       expect(spec.incomeText).not.toBeNull();
-      expect(spec.incomeText!.text).toContain('3');
+      expect(spec.incomeText!.text).toBe('Income: +3/turn');
     });
 
-    it('positions the income text near the bottom of the card', () => {
+    it('positions the income text in the upper-middle band of the card', () => {
       const biz = makeBiz({ baseIncome: 3, incomeBonus: 5, level: 1 });
       const height = 280;
       const spec = buildUpgradeOverlaySpec(biz, 200, height);
       expect(spec.incomeText).not.toBeNull();
-      expect(spec.incomeText!.y).toBeGreaterThan(height * 0.75);
+      // Income is now centred, not at bottom
+      expect(spec.incomeText!.y).toBeGreaterThan(height * 0.2);
+      expect(spec.incomeText!.y).toBeLessThan(height * 0.6);
     });
   });
 

@@ -108,9 +108,10 @@ export function generateBusinessCardSvg(
   const titleText = `<text x="${width / 2}" y="${titleY}" font-family="${FONT}" font-size="11" fill="#ffffff" font-weight="400" text-anchor="middle">${esc(card.name)}</text>`;
 
   // Income label: centred horizontally, middle band of card, omitted when 0
+  // Uses "Income: +X/turn" format for clarity
   const incomeLabel =
     totalIncome > 0
-      ? `<text x="${width / 2}" y="35" font-family="${FONT}" font-size="10" fill="#44ff44" font-weight="bold" text-anchor="middle">+${totalIncome}/turn</text>`
+      ? `<text x="${width / 2}" y="35" font-family="${FONT}" font-size="10" fill="#44ff44" font-weight="bold" text-anchor="middle">Income: +${totalIncome}/turn</text>`
       : '';
 
   // Reputation label: centred, below income, omitted when 0
