@@ -395,10 +395,10 @@ export function applyIncome(state: MainStreetState): IncomeResult {
 
   syncResourceBankToLedger(state);
   if (multiplied > 0) {
-    // CG-0MRER3RE300418SG: show 2 decimal places for fractional coin values
-    addLog(state, `Income: +${multiplied.toFixed(2)} coins`, 'gain');
+    // CG-0MREYZO7E00729S0: show 3 decimal places for fractional coin values
+    addLog(state, `Income: +${multiplied.toFixed(3)} coins`, 'gain');
   } else {
-    addLog(state, `Income: +0.00 coins`, 'neutral');
+    addLog(state, `Income: +0.000 coins`, 'neutral');
   }
   if (repPerTurn > 0) {
     addLog(state, `Reputation from cards: +${repPerTurn}`, 'gain');

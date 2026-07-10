@@ -265,7 +265,7 @@ export class MainStreetRenderer {
     // Coins - centered in strip
     const stripWidth = gameW * 0.5;
     const stripLeft = (gameW - stripWidth) / 2;
-    const coinText = markHudTransient(s.add.text(stripLeft + stripWidth * 0.25, hudY, `Coins: ${coins}`, {
+    const coinText = markHudTransient(s.add.text(stripLeft + stripWidth * 0.25, hudY, `Coins: ${coins.toFixed(3)}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#ffcc44', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0.5));
     s.hudContainer.add(coinText);
@@ -997,7 +997,8 @@ export class MainStreetRenderer {
             info = `Community Space: ${cs.name}\nCost: ${cs.cost}\nIncome: +${cs.baseIncome + (cs.incomeBonus || 0)}/turn${csRepInfo}\nSynergy: ${(cs.synergyTypes || []).join('/')}\n${cs.description ?? ''}`;
           } else if (card.family === 'event') {
             const e = card as any;
-            info = `Event: ${e.name}\nCost: ${e.cost}\nEffect: ${e.effect}\nCoins: ${e.coinDelta >= 0 ? '+' : ''}${e.coinDelta}, Rep: ${e.reputationDelta >= 0 ? '+' : ''}${e.reputationDelta}`;
+            const coinDelta = e.coinDelta >= 0 ? '+' : '';
+            info = `Event: ${e.name}\nCost: ${e.cost}\nEffect: ${e.effect}\nCoins: ${coinDelta}${e.coinDelta.toFixed(3)}, Rep: ${e.reputationDelta >= 0 ? '+' : ''}${e.reputationDelta}`;
           } else if (card.family === 'upgrade') {
             const u = card as any;
             info = `Upgrade: ${u.name}\nCost: ${u.cost}\nApplies to: ${u.targetBusiness}\nIncome Bonus: +${u.incomeBonus}\nRequires: Lv${u.requiredLevel ?? 0}\n${u.description ?? ''}`;
@@ -1084,7 +1085,8 @@ export class MainStreetRenderer {
             if (dCard.duration !== undefined) {
               info = 'Event: ' + card.name + '\nEffect: ' + card.effect + '\nDuration: ' + dCard.duration + ' turns\n' + Math.round(dCard.multiplier * 100) + '% income modifier';
             } else {
-              info = 'Event: ' + card.name + '\nEffect: ' + card.effect + '\nCoins: ' + (card.coinDelta >= 0 ? '+' : '') + card.coinDelta + ', Rep: ' + (card.reputationDelta >= 0 ? '+' : '') + card.reputationDelta;
+              const coinDelta = card.coinDelta >= 0 ? '+' : '';
+              info = 'Event: ' + card.name + '\nEffect: ' + card.effect + '\nCoins: ' + coinDelta + card.coinDelta.toFixed(3) + ', Rep: ' + (card.reputationDelta >= 0 ? '+' : '') + card.reputationDelta;
             }
             s.tooltipManager?.show(info, container.x, container.y);
           });
