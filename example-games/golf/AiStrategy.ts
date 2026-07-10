@@ -17,7 +17,7 @@
 
 import type { Card } from '../../src/card-system/Card';
 import type { GolfMove, DrawSource } from './GolfRules';
-import { scoreAiVisibleGrid, simulateAiMoveScore } from './GolfScoring';
+import { scoreAiVisibleGrid, simulateAiMoveScore, cardPointValue } from './GolfScoring';
 import type {
   AiVisiblePlayerState,
   AiVisibleSharedState,
@@ -170,6 +170,7 @@ export function chooseDrawSource(
   playerState: AiVisiblePlayerState,
   shared: AiVisibleSharedState,
   _rng: () => number,
+  config: GreedyStrategyConfig = DEFAULT_GREEDY_CONFIG,
 ): DrawSource {
   const sources = enumerateAiDrawSources(shared);
   if (sources.length === 1) return sources[0];
@@ -217,6 +218,7 @@ export function chooseDrawSource(
       discardCard,
       move,
       visibleRanks,
+      config,
     );
     if (bonus < 0) {
       // Discard card helps build a column with feasible potential
@@ -228,19 +230,38 @@ export function chooseDrawSource(
   return 'stock';
 }
 
-// ── Visible rank counting (for column-feasibility weighting) ──
+// ── Configurable column-awareness heuristic ──────────────────
+
+/**
+ * Configuration for the column-awareness heuristic in GreedyStrategy.
+ *
+ * `columnWeight` controls the balance between immediate score improvement
+ * and column-completion potential:
+ *   - 0: Ignore column building entirely (score-only evaluation).
+ *   - 0.5: Equal weight to score and column completion (default, 50/50 balance).
+ *   - 1: Maximum column-building priority.
+ */
+export interface GreedyStrategyConfig {
+  /**
+   * Weight of column-completion heuristic vs raw score.
+   * 0 = ignore columns, 0.5 = 50/50 balance, 1 = max columns.
+   * @default 0.5
+   */
+  columnWeight: number;
+}
+
+/**
+ * Default configuration for GreedyStrategy.
+ * Starts at a 50/50 balance between immediate score and column completion.
+ */
+export const DEFAULT_GREEDY_CONFIG: GreedyStrategyConfig = {
+  columnWeight: 0.5,
+};
 
 /**
  * Maximum copies of any rank in a standard 52-card deck.
  */
 const MAX_RANK_COPIES = 4;
-
-/**
- * Weight (in score points) for the column-building feasibility bonus.
- * A negative adjustment means the AI prefers moves that build toward
- * column matches, scaled by remaining unknown copies of the target rank.
- */
-const COLUMN_BONUS_WEIGHT = 2;
 
 /**
  * Count how many instances of each card rank are visible to the AI.
@@ -286,21 +307,31 @@ export function countVisibleRanks(
 }
 
 /**
- * Compute a column-building feasibility bonus for a move.
+ * Compute a column-building bonus for a move.
  *
  * When a swap move would place the drawn card in a column where it
  * matches other face-up cards, the move builds toward a column match.
- * The bonus (negative, reducing the score) is proportional to how many
- * unknown copies of the target rank remain in play.
+ * The bonus (negative, reducing the score) is proportional to:
+ * - The sum of point values of matching face-up cards in the column
+ *   (higher-value cards like Queens=10 benefit more from being zeroed).
+ * - How many unknown copies of the target rank remain in play.
+ * - The configurable columnWeight (default 0.5 = 50/50 balance).
  *
  * If all 4 copies of the rank are already visible, the bonus is 0
  * (pursuing the column is futile because no unknown copies remain
  * to complete the match).
+ * If the matching cards have low or negative point values (e.g., Kings=0,
+ * 2s=-2), the bonus is reduced or zero since zeroing that column saves
+ * few or no points.
+ *
+ * Information boundary: uses only AI-visible state — counts only face-up
+ * cards and the discard top.
  *
  * @param grid         AI-visible grid
  * @param drawnCard    The card the player drew
  * @param move         The move to evaluate
  * @param visibleRanks Count of visible instances per rank
+ * @param config       Optional strategy config (default uses 50/50 balance)
  * @returns A negative score adjustment (better) or 0 if no bonus applies
  */
 export function computeColumnBonus(
@@ -308,6 +339,7 @@ export function computeColumnBonus(
   drawnCard: Card,
   move: GolfMove,
   visibleRanks: Record<string, number>,
+  config: GreedyStrategyConfig = DEFAULT_GREEDY_CONFIG,
 ): number {
   // Only swap moves can contribute to column matches
   if (move.kind === 'discard-and-flip') return 0;
@@ -317,6 +349,7 @@ export function computeColumnBonus(
   const matchingRank = drawnCard.rank;
   let matchingCount = 1; // The drawn card itself
   let unknownInColumn = 0;
+  let cardValueSum = 0; // Sum of point values of matching face-up cards in column
 
   for (let row = 0; row < GRID_ROWS; row++) {
     const flatIdx = row * GRID_COLS + col;
@@ -329,10 +362,16 @@ export function computeColumnBonus(
       (slot as Card).rank === matchingRank
     ) {
       matchingCount++;
+      cardValueSum += cardPointValue((slot as Card).rank);
     }
     if (!slot.faceUp) {
       unknownInColumn++;
     }
+  }
+
+  // Add the drawn card's point value (it participates in the match)
+  if (matchingCount >= 2) {
+    cardValueSum += cardPointValue(drawnCard.rank);
   }
 
   // After the move, if we have 2+ matching and at least 1 unknown in column,
@@ -342,13 +381,18 @@ export function computeColumnBonus(
     const unknownCopies = Math.max(0, MAX_RANK_COPIES - visibleCount);
 
     // Bonus is proportional to unknown copies remaining
-    // If all 4 are visible (unknownCopies = 0), bonus = 0 (futile)
-    // If 0 visible (unknownCopies = 4), bonus = full weight
     const feasibilityRatio = unknownCopies / MAX_RANK_COPIES;
 
-    // Return a negative bonus (or 0 for +0, avoiding -0 which causes test issues)
-    const bonus = -feasibilityRatio * COLUMN_BONUS_WEIGHT;
-    return bonus || 0;
+    // Bonus scales with total card point value in the column:
+    // - High-value cards (Q=10, J=10) → larger bonus (saving more points)
+    // - Low-value cards (K=0) → no bonus (zeroing saves nothing)
+    // - Negative-value cards (2=-2) → reduced or no bonus
+    const weightedBonus = cardValueSum * feasibilityRatio * config.columnWeight;
+
+    // Return a negative bonus (lower score = better) or 0 for +0
+    // Math.min(0, -weightedBonus) ensures negative or zero, never positive
+    const bonus = -Math.max(0, weightedBonus);
+    return bonus || 0; // Avoid -0
   }
 
   return 0;
@@ -379,6 +423,7 @@ export function chooseMoveForCard(
   drawnCard: Card,
   rng: () => number,
   visibleRanks?: Record<string, number>,
+  config: GreedyStrategyConfig = DEFAULT_GREEDY_CONFIG,
 ): GolfMove {
   const legalMoves = enumerateAiLegalMoves(grid);
   if (legalMoves.length === 0) {
@@ -390,7 +435,7 @@ export function chooseMoveForCard(
     let score = simulateAiMoveScore(grid, drawnCard, move);
 
     if (visibleRanks) {
-      score += computeColumnBonus(grid, drawnCard, move, visibleRanks);
+      score += computeColumnBonus(grid, drawnCard, move, visibleRanks, config);
     }
 
     return { move, score };
@@ -416,6 +461,17 @@ export class AiPlayer extends AiPlayerBase<AiStrategy> {
    * Accepts AI-visible state projections only — cannot access
    * hidden game data.
    */
+  private readonly config: GreedyStrategyConfig;
+
+  constructor(
+    strategy: AiStrategy,
+    rng?: () => number,
+    config: GreedyStrategyConfig = DEFAULT_GREEDY_CONFIG,
+  ) {
+    super(strategy, rng);
+    this.config = config;
+  }
+
   chooseAction(
     playerState: AiVisiblePlayerState,
     shared: AiVisibleSharedState,
@@ -425,18 +481,18 @@ export class AiPlayer extends AiPlayerBase<AiStrategy> {
 
   /**
    * Phase 1: Choose whether to draw from stock or discard.
-   * Used by the scene for two-phase AI turn flow.
+   * Uses the configured column-weight heuristic.
    */
   chooseDrawSource(
     playerState: AiVisiblePlayerState,
     shared: AiVisibleSharedState,
   ): DrawSource {
-    return chooseDrawSource(playerState, shared, this.rng);
+    return chooseDrawSource(playerState, shared, this.rng, this.config);
   }
 
   /**
    * Phase 2: Given a drawn card, choose the best move.
-   * Used by the scene after the actual draw for stock draws.
+   * Uses the configured column-weight heuristic.
    *
    * @param visibleRanks Optional. When provided, enables column-feasibility
    *                     weighting in move selection.
@@ -446,6 +502,6 @@ export class AiPlayer extends AiPlayerBase<AiStrategy> {
     drawnCard: Card,
     visibleRanks?: Record<string, number>,
   ): GolfMove {
-    return chooseMoveForCard(grid, drawnCard, this.rng, visibleRanks);
+    return chooseMoveForCard(grid, drawnCard, this.rng, visibleRanks, this.config);
   }
 }

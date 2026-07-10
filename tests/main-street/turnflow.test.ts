@@ -248,7 +248,9 @@ describe('MainStreetEngine', () => {
 
       expect(result).toBeNull();
       expect(state.heldEvent).toBeNull();
-      expect(state.resourceBank.coins).toBe(coinsBefore + 4);
+      // CG-0MRER3RE300418SG: event coinDelta is now multiplied by reputation and not floored
+      // Medium preset rep=3 → multiplier=1.15, 4 * 1.15 = 4.6 (was 4 before fix)
+      expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 4.6);
     });
 
     it('should throw play-event action when no Investment is held', () => {
@@ -286,8 +288,10 @@ describe('MainStreetEngine', () => {
       });
       resolveEvent(state, event);
 
-      // 2 Food businesses * 2 coinDelta = +4
-      expect(state.resourceBank.coins).toBe(coinsBefore + 4);
+      // 2 Food businesses * 2 coinDelta = +4 raw
+      // CG-0MRER3RE300418SG: raw delta multiplied by reputation, not floored
+      // 4 * 1.15 = 4.6 (was 4 before fix)
+      expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 4.6);
     });
 
     it('should apply reputationDelta', () => {
@@ -323,7 +327,9 @@ describe('MainStreetEngine', () => {
       expect(resolved).not.toBeNull();
       expect(resolved!.id).toBe('e1');
       expect(state.heldEvent).toBeNull();
-      expect(state.resourceBank.coins).toBe(coinsBefore + 5);
+      // CG-0MRER3RE300418SG: event coinDelta scaled by reputation, not floored
+      // 5 * 1.15 = 5.75 (was 5 before fix)
+      expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 5.75);
     });
 
     it('should return null when no event is held', () => {
@@ -342,7 +348,9 @@ describe('MainStreetEngine', () => {
       playHeldEvent(state);
 
       expect(state.heldEvent).toBeNull();
-      expect(state.resourceBank.coins).toBe(coinsBefore + 3);
+      // CG-0MRER3RE300418SG: event coinDelta scaled by reputation, not floored
+      // 3 * 1.15 = 3.45 (was 3 before fix)
+      expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 3.45);
     });
 
     it('should throw when no event is held', () => {

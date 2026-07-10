@@ -20,6 +20,32 @@ import { createOverlayBackground, dismissOverlay } from '../../../src/ui/Overlay
 import { createHudText } from '../../../src/ui/Renderer';
 import { createEventLog } from '../../../src/ui/GymSceneUtils';
 import type { EventLogResult } from '../../../src/ui/GymSceneUtils';
+import { anchorPoint } from '../../../src/ui/screen-layout';
+import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
+import gymOverlayUiLayoutJson from '../layouts/gym-overlay-ui.layout.json';
+
+// Parse the shared Overlay UI scene layout once at module load.
+const OVERLAY_LAYOUT: import('../../../src/ui/screen-layout-schema').ScreenLayoutDocument | null = (() => {
+  const parsed = parseScreenLayoutDocument(gymOverlayUiLayoutJson);
+  return parsed.valid ? parsed.layout : null;
+})();
+
+const DEFAULT_VIEWPORT = { width: 1280, height: 720 };
+
+/**
+ * Resolve an anchor from the Overlay UI SLL layout.
+ * Falls back to the default viewport if no layout is available.
+ */
+function resolveOverlayAnchor(
+  zone: string,
+  anchor: string,
+  viewport = DEFAULT_VIEWPORT,
+): import('../../../src/ui/screen-layout-schema').PixelPoint {
+  if (!OVERLAY_LAYOUT) {
+    return { x: GAME_W / 2, y: 60 };
+  }
+  return anchorPoint(OVERLAY_LAYOUT, zone, anchor, viewport, 1);
+}
 
 export class GymOverlayUiScene extends GymSceneBase {
   private overlayObjects: Phaser.GameObjects.GameObject[] | null = null;
@@ -55,24 +81,39 @@ export class GymOverlayUiScene extends GymSceneBase {
     this.initReducedMotion();
 
     this.initHelp([
-      { heading: 'Overview', body: 'Explores overlay lifecycle, live UI configuration, and GeometryMask clipping for scrollable content.' },
-      { heading: 'Controls', body: '[ Show Overlay ]: Open a dismissible overlay with masked scrollable content.\n[ Dismiss Overlay ]: Close the overlay if open.\n[ Intensity - ] / [ Intensity + ]: Adjust feedback intensity which influences overlay appearance.' }
+      {
+        heading: 'Features',
+        body: 'Demonstrates overlay creation and dismissal using createOverlayBackground() and dismissOverlay(), along with live UI configuration via feedback intensity controls. Also showcases GeometryMask clipping for scrollable content regions within overlays. In a real card game, overlays are used for confirmation dialogs ("Are you sure you want to quit?"), rule reminders, or modal messages that temporarily block interaction with the game board.'
+      },
+      {
+        heading: 'Controls',
+        body: '[ Show Overlay ]: Open a dismissible overlay with masked scrollable content area. Click the overlay background to dismiss.\n[ Dismiss Overlay ]: Programmatically close the overlay if it is open.\n[ Intensity - ] / [ Intensity + ]: Decrease or increase feedback intensity by 0.2 steps (range 0-1). Affects overlay brightness and alpha in real time. Also adjustable from inside the overlay via [-] and [+] buttons.\nClose button inside overlay: Click the dismiss link or overlay background to close.'
+      },
+      {
+        heading: 'Usage Example',
+        body: 'In a game of Golf, after a player completes a round, an overlay appears showing the final score, statistics, and a confirmation to start a new game. The overlay uses a semi-transparent background to keep the game board visible underneath, and the intensity controls let the player dim or brighten the overlay for comfort. The GeometryMask clips a scrollable rules summary to a fixed-size region.'
+      },
+      {
+        heading: 'Test Plan',
+        body: '1. Press [ Show Overlay ] → overlay appears with semi-transparent background\n2. Verify overlay contains scrollable masked content area with clipped text\n3. Press [ Intensity - ] three times → intensity drops from 1.0 to 0.4, overlay dims\n4. Press [ Intensity + ] twice → intensity returns to 0.8\n5. Click the overlay background → overlay dismisses, event log confirms\n6. Open overlay again, click [ Dismiss Overlay ] button inside overlay → overlay closes\n7. Press outside overlay interaction guard → verify no accidental dismissal'
+      }
     ]);
 
-    const cx = GAME_W / 2;
-    let y = 60;
+    const controlsAnchor = resolveOverlayAnchor('controls', 'center');
+    const cx = controlsAnchor.x;
+    let y = controlsAnchor.y;
 
     this.addButton(cx - 300, y, '[ Show Overlay ]', () => this.openOverlay());
     this.addButton(cx - 120, y, '[ Dismiss Overlay ]', () => this.closeOverlay());
     this.addButton(cx + 80, y, '[ Intensity - ]', () => this.adjustIntensity(-0.2));
     this.addButton(cx + 260, y, '[ Intensity + ]', () => this.adjustIntensity(0.2));
 
-    y += 40;
-    this.intensityText = createHudText(this, cx, y, 'Feedback Intensity: 1.0', '#88ff88', { fontSize: '16px' });
+    const intensityAnchor = resolveOverlayAnchor('intensity', 'center');
+    this.intensityText = createHudText(this, cx, intensityAnchor.y, 'Feedback Intensity: 1.0', '#88ff88', { fontSize: '16px' });
     this.intensityText.setOrigin(0.5);
 
-    y += 30;
-    this.eventLogResult = createEventLog(this, y + 20, {
+    const logAnchor = resolveOverlayAnchor('log', 'center');
+    this.eventLogResult = createEventLog(this, logAnchor.y + 20, {
       headerText: '── Event Log ──',
       maxLines: 14,
       lineHeight: 17,

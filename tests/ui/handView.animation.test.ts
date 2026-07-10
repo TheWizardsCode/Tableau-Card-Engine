@@ -14,6 +14,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { HandView } from '../../src/ui/HandView';
 import type { Card } from '../../src/card-system/Card';
 import { createCard } from '../../src/card-system/Card';
+import { rankValue } from '../../src/card-system/rankValue';
 import { layoutCardPositions } from '../../src/ui/layoutCardPositions';
 
 // ── Minimal Phaser mock (extended from handView.test.ts) ────
@@ -38,6 +39,7 @@ function createMockScene(): any {
       clearTint: vi.fn().mockReturnThis(),
       setOrigin: vi.fn().mockReturnThis(),
       setAlpha: vi.fn().mockReturnThis(),
+      setDepth: vi.fn().mockReturnThis(),
       setPosition: vi.fn((px: number, py: number) => {
         img.x = px;
         img.y = py;
@@ -94,6 +96,15 @@ function createMockScene(): any {
     },
     tweens: {
       add: vi.fn().mockImplementation((config: any) => {
+        // Apply final positions to targets (simulating Phaser tween behaviour)
+        if (config.targets) {
+          const targets = Array.isArray(config.targets) ? config.targets : [config.targets];
+          for (const target of targets) {
+            if (config.x !== undefined) target.x = config.x;
+            if (config.y !== undefined) target.y = config.y;
+            if (config.rotation !== undefined) target.rotation = config.rotation;
+          }
+        }
         tweens.push(config);
         const tween = { stop: vi.fn() };
         sceneTweens.push(tween);
@@ -748,6 +759,265 @@ describe('HandView animateAddCard', () => {
       const cards = hv.getCards();
       expect(cards).toHaveLength(4);
       expect(cards[3].rank).toBe('5'); // appended at end
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // Sort Animation
+  // ═══════════════════════════════════════════════════════════
+
+  describe('sortCards animation', () => {
+    beforeEach(() => {
+      hv = new HandView(scene, {
+        baseX,
+        baseY,
+        spacing: 56,
+        arcRadius: 0,
+        showLabels: false,
+      });
+    });
+
+    it('non-animated sort (default) preserves snap behaviour', () => {
+      hv.setCards([
+        card('K', 'hearts'),
+        card('2', 'clubs'),
+        card('A', 'diamonds'),
+      ]);
+
+      const spriteCountBefore = hv.getSprites().length;
+      expect(spriteCountBefore).toBe(3);
+
+      // Sort without animate — should rebuild display (destroy + recreate)
+      (hv as any).sortCards((a: Card, b: Card) => rankValue(a.rank) - rankValue(b.rank));
+
+      const sprites = hv.getSprites();
+      const centers = hv.getCardCenters();
+
+      // Same number of sprites (recreated)
+      expect(sprites).toHaveLength(3);
+      expect(centers).toHaveLength(3);
+
+      // Cards should be sorted (ace-low: A, 2, K)
+      const cards = hv.getCards();
+      expect(cards[0].rank).toBe('A');
+      expect(cards[1].rank).toBe('2');
+      expect(cards[2].rank).toBe('K');
+
+      // Positions should match computeCardPositions
+      const gap = (hv as any).spacing - (hv as any).cardWidth;
+      const centerX = (hv as any)._centerX ?? (hv as any).baseX;
+      const { positions } = layoutCardPositions({
+        count: 3,
+        cardWidth: (hv as any).cardWidth,
+        gap,
+        centerX,
+      });
+
+      for (let i = 0; i < 3; i++) {
+        expect(Math.abs(centers[i].x - positions[i])).toBeLessThanOrEqual(1);
+        expect(centers[i].y).toBe(baseY);
+      }
+    });
+
+    it('animated sort tweens sprites to correct destination coordinates', () => {
+      hv.setCards([
+        card('K', 'hearts'),
+        card('2', 'clubs'),
+        card('A', 'diamonds'),
+      ]);
+
+      // Sort — cards will reorder to A, 2, K (ace-low)
+      (hv as any).sortCards(
+        (a: Card, b: Card) => rankValue(a.rank) - rankValue(b.rank),
+        { animate: true, duration: 200 },
+      );
+
+      // After sort, sprites should still exist (not destroyed)
+      const sprites = hv.getSprites();
+      expect(sprites).toHaveLength(3);
+
+      // Cards should be sorted (ace-low: A, 2, K)
+      const cards = hv.getCards();
+      expect(cards[0].rank).toBe('A');
+      expect(cards[1].rank).toBe('2');
+      expect(cards[2].rank).toBe('K');
+
+      // Tween configs should have been created for sprites that moved
+      const tweenConfigs = scene._tweens;
+      expect(tweenConfigs.length).toBeGreaterThan(0);
+
+      // Compute expected positions
+      const gap = (hv as any).spacing - (hv as any).cardWidth;
+      const centerX = (hv as any)._centerX ?? (hv as any).baseX;
+      const { positions } = layoutCardPositions({
+        count: 3,
+        cardWidth: (hv as any).cardWidth,
+        gap,
+        centerX,
+      });
+
+      // After animated sort, sprites should be at the new computed positions
+      // (mock tweens.add applies final positions synchronously)
+      const centers = hv.getCardCenters();
+      for (let i = 0; i < 3; i++) {
+        expect(Math.abs(centers[i].x - positions[i])).toBeLessThanOrEqual(1);
+        expect(centers[i].y).toBe(baseY);
+      }
+    });
+
+    it('animated sort preserves sprites (not destroyed/recreated)', () => {
+      hv.setCards([
+        card('Q', 'hearts'),
+        card('3', 'clubs'),
+        card('7', 'diamonds'),
+        card('J', 'spades'),
+      ]);
+
+      const spritesBefore = hv.getSprites();
+      const spriteIds = spritesBefore.map((s) => s);
+
+      (hv as any).sortCards(
+        (a: Card, b: Card) => rankValue(a.rank) - rankValue(b.rank),
+        { animate: true },
+      );
+
+      const spritesAfter = hv.getSprites();
+
+      // Same sprites — just reordered
+      expect(spritesAfter).toHaveLength(4);
+      const afterIds = spritesAfter.map((s) => s);
+      // All sprites from before should be present (same objects)
+      for (const id of spriteIds) {
+        expect(afterIds).toContain(id);
+      }
+    });
+
+    it('reducedMotion skips animation and places cards instantly', () => {
+      const hvReduced = new HandView(scene, {
+        baseX,
+        baseY,
+        spacing: 56,
+        arcRadius: 0,
+        showLabels: false,
+        reducedMotion: true,
+      });
+
+      hvReduced.setCards([
+        card('K', 'hearts'),
+        card('2', 'clubs'),
+        card('A', 'diamonds'),
+      ]);
+
+      const tweenCountBefore = scene._tweens.length;
+
+      (hvReduced as any).sortCards(
+        (a: Card, b: Card) => rankValue(a.rank) - rankValue(b.rank),
+        { animate: true },
+      );
+
+      // Cards should be sorted
+      const cards = hvReduced.getCards();
+      expect(cards[0].rank).toBe('A');
+      expect(cards[1].rank).toBe('2');
+      expect(cards[2].rank).toBe('K');
+
+      // No tweens should have been created (reduced motion path)
+      expect(scene._tweens.length).toBe(tweenCountBefore);
+
+      // Sprites should be at correct positions (instant placement)
+      const centers = hvReduced.getCardCenters();
+      const gap = (hvReduced as any).spacing - (hvReduced as any).cardWidth;
+      const centerX = (hvReduced as any)._centerX ?? (hvReduced as any).baseX;
+      const { positions } = layoutCardPositions({
+        count: 3,
+        cardWidth: (hvReduced as any).cardWidth,
+        gap,
+        centerX,
+      });
+
+      for (let i = 0; i < 3; i++) {
+        expect(Math.abs(centers[i].x - positions[i])).toBeLessThanOrEqual(1);
+        expect(centers[i].y).toBe(baseY);
+      }
+
+      hvReduced.destroy();
+    });
+
+    it('animated sort with arc layout uses correct arc Y positions', () => {
+      const hvArc = new HandView(scene, {
+        baseX,
+        baseY,
+        spacing: 56,
+        arcRadius: 150,
+        showLabels: false,
+      });
+
+      hvArc.setCards([
+        card('K', 'hearts'),
+        card('2', 'clubs'),
+        card('A', 'diamonds'),
+        card('3', 'spades'),
+      ]);
+
+      (hvArc as any).sortCards(
+        (a: Card, b: Card) => rankValue(a.rank) - rankValue(b.rank),
+        { animate: true },
+      );
+
+      // Cards sorted: 2, 3, A, K
+      const cards = hvArc.getCards();
+      expect(cards[0].rank).toBe('A');
+      expect(cards[1].rank).toBe('2');
+      expect(cards[2].rank).toBe('3');
+      expect(cards[3].rank).toBe('K');
+
+      // Arc layout: center cards should be lifted above baseY
+      const centers = hvArc.getCardCenters();
+      expect(centers).toHaveLength(4);
+
+      // Inner cards (indices 1 and 2) should be higher (lower Y)
+      expect(centers[1].y).toBeLessThan(baseY);
+      expect(centers[2].y).toBeLessThan(baseY);
+
+      // Edge cards at or near baseY
+      expect(centers[0].y).toBe(baseY);
+      expect(centers[3].y).toBe(baseY);
+
+      hvArc.destroy();
+    });
+
+    it('animated sort moves all cards to correct final positions', () => {
+      hv.setCards([
+        card('3', 'clubs'),
+        card('K', 'diamonds'),
+        card('2', 'spades'),
+      ]);
+      // After sort: 2, 3, K
+
+      (hv as any).sortCards(
+        (a: Card, b: Card) => rankValue(a.rank) - rankValue(b.rank),
+        { animate: true },
+      );
+
+      // All 3 cards should have tweens
+      expect(scene._tweens.length).toBe(3);
+
+      // Verify final positions are correct
+      const centers = hv.getCardCenters();
+      expect(centers).toHaveLength(3);
+
+      const gap = (hv as any).spacing - (hv as any).cardWidth;
+      const centerX = (hv as any)._centerX ?? (hv as any).baseX;
+      const { positions } = layoutCardPositions({
+        count: 3,
+        cardWidth: (hv as any).cardWidth,
+        gap,
+        centerX,
+      });
+
+      for (let i = 0; i < 3; i++) {
+        expect(Math.abs(centers[i].x - positions[i])).toBeLessThanOrEqual(1);
+      }
     });
   });
 });

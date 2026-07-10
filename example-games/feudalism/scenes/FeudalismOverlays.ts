@@ -11,6 +11,7 @@ import { autoSaveTranscript, TranscriptStore } from '../../../src/core-engine/tr
 import {
   GAME_W, GAME_H, FONT_FAMILY,
   createOverlayButton,
+  createGameOverOverlay,
   OverlayManager,
 } from '../../../src/ui';
 import { SFX_KEYS } from './FeudalismConstants';
@@ -37,43 +38,29 @@ export class FeudalismOverlayHelper {
       autoSaveTranscript(transcriptStore, 'feudalism', transcript, '[FeudalismScene]');
     }
 
-    this.overlayManager.showOverlay({
-      type: 'custom',
-      backgroundOptions: { depth: 10, alpha: 0.01 },
-      box: { width: 520, height: 340, alpha: 0.9 },
-    });
-
-    const winnerText = winnerIdx === 0 ? 'You Win!' : 'AI Wins!';
+    const winnerText = winnerIdx === 0 ? 'You Win!' : 'Game Over';
+    const winnerColor = winnerIdx === 0 ? '#88ff88' : '#ff6666';
     const human = this.session.players[0];
     const ai = this.session.players[1];
     const humanInfluence = getInfluence(human);
     const aiInfluence = getInfluence(ai);
 
-    const lines = [
-      winnerText,
-      '',
-      `You: ${humanInfluence} influence (${human.purchasedCards.length} cards, ${human.patrons.length} patrons)`,
-      `AI: ${aiInfluence} influence (${ai.purchasedCards.length} cards, ${ai.patrons.length} patrons)`,
-      '',
-      `Tiebreak: fewest cards wins`,
-    ];
-
-    const text = this.scene.add
-      .text(GAME_W / 2, GAME_H / 2 - 55, lines.join('\n'), {
-        fontSize: '20px', color: '#ffffff', fontFamily: FONT_FAMILY,
-        align: 'center', lineSpacing: 6,
-      })
-      .setOrigin(0.5)
-      .setDepth(11);
-    this.overlayManager.add(text);
-
-    const playBtn = createOverlayButton(this.scene, GAME_W / 2, GAME_H / 2 + 110, '[ Play Again ]');
-    playBtn.on('pointerdown', () => {
-      try { this.scene.sound.play?.(SFX_KEYS.UI_CLICK); } catch { /* ignore */ }
-      this.dismiss();
-      onRestart();
+    const result = createGameOverOverlay(this.scene, {
+      title: winnerText,
+      titleColor: winnerColor,
+      summaryText: `You: ${humanInfluence} influence (${human.purchasedCards.length} cards, ${human.patrons.length} patrons)\n` +
+        `AI: ${aiInfluence} influence (${ai.purchasedCards.length} cards, ${ai.patrons.length} patrons)\n\n` +
+        `Tiebreak: fewest cards wins`,
+      onPlayAgain: () => {
+        try { this.scene.sound.play?.(SFX_KEYS.UI_CLICK); } catch { /* ignore */ }
+        this.dismiss();
+        onRestart();
+      },
+      onMenu: () => this.scene.scene.start('GameSelectorScene'),
+      playAgainLabel: 'Play Again',
+      menuLabel: 'Menu',
     });
-    this.overlayManager.add(playBtn);
+    this.overlayManager.add(...result.objects);
   }
 
   showCardActionMenu(

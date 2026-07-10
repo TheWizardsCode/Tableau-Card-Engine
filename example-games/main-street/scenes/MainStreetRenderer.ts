@@ -10,7 +10,6 @@ import {
   MARKET_INVESTMENT_SLOTS,
   REFRESH_DEVELOPMENT_COST,
   REFRESH_INVESTMENTS_COST,
-  isPawnShopCard,
   synergyColor,
 } from '../MainStreetCards';
 import {
@@ -266,7 +265,7 @@ export class MainStreetRenderer {
     // Coins - centered in strip
     const stripWidth = gameW * 0.5;
     const stripLeft = (gameW - stripWidth) / 2;
-    const coinText = markHudTransient(s.add.text(stripLeft + stripWidth * 0.25, hudY, `Coins: ${coins}`, {
+    const coinText = markHudTransient(s.add.text(stripLeft + stripWidth * 0.25, hudY, `Coins: ${coins.toFixed(3)}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#ffcc44', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0.5));
     s.hudContainer.add(coinText);
@@ -485,14 +484,13 @@ export class MainStreetRenderer {
       tooltipZone.setOrigin(0.5);
       tooltipZone.setInteractive({ useHandCursor: true });
       tooltipZone.on('pointerover', () => {
-        const synergyNote = isPawnShopCard(biz) ? ' (excluded from synergy)' : '';
         const isCommunitySpace = (biz as any).family === 'community-space';
         const label = isCommunitySpace ? 'Community Space' : 'Business';
         const totalRep = (biz.reputationPerTurn ?? 0) + biz.reputationBonus;
         const repInfo = totalRep > 0 ? `\nReputation: +${totalRep}/turn` : '';
-        const synergyBonus = isPawnShopCard(biz) ? 0 : computeSynergyBonus(s.state.streetGrid, _index, s.state.config.synergyBonusPerNeighbor);
-        const synergyInfo = isPawnShopCard(biz) ? '' : `\nSynergy bonus: +${synergyBonus}/turn`;
-        const info = `${label}: ${biz.name}\nIncome: +${biz.baseIncome + biz.incomeBonus}/turn${repInfo}\nSynergy: ${biz.synergyTypes.join('/')}${synergyInfo}${synergyNote}\nLevel: ${biz.level}`;
+        const synergyBonus = computeSynergyBonus(s.state.streetGrid, _index, s.state.config.synergyBonusPerNeighbor);
+        const synergyInfo = `\nSynergy bonus: +${synergyBonus}/turn`;
+        const info = `${label}: ${biz.name}\nIncome: +${biz.baseIncome + biz.incomeBonus}/turn${repInfo}\nSynergy: ${biz.synergyTypes.join('/')}${synergyInfo}\nLevel: ${biz.level}`;
         s.tooltipManager?.show(info, tooltipZone.x, tooltipZone.y);
       });
       tooltipZone.on('pointerout', () => {
@@ -576,7 +574,7 @@ export class MainStreetRenderer {
       container.add(nameText);
     }
 
-    // Income text (bottom-left)
+    // Income text (centred on card)
     if (spec.incomeText) {
       const incomeText = this.scene.add.text(
         spec.incomeText.x,
@@ -589,11 +587,11 @@ export class MainStreetRenderer {
           fontFamily: FONT_FAMILY,
         },
       );
-      incomeText.setOrigin(0, 1);
+      incomeText.setOrigin(spec.incomeText.originX ?? 0, spec.incomeText.originY ?? 0);
       container.add(incomeText);
     }
 
-    // Reputation text (bottom-right)
+    // Reputation text (centred below income)
     if (spec.reputationText) {
       const repText = this.scene.add.text(
         spec.reputationText.x,
@@ -606,7 +604,7 @@ export class MainStreetRenderer {
           fontFamily: FONT_FAMILY,
         },
       );
-      repText.setOrigin(1, 1);
+      repText.setOrigin(spec.reputationText.originX ?? 0, spec.reputationText.originY ?? 0);
       container.add(repText);
     }
   }
@@ -934,6 +932,11 @@ export class MainStreetRenderer {
       container.add(targetText);
     }
 
+    // Apply income/reputation overlays for business and community-space cards
+    if (card.family === 'business' || card.family === 'community-space') {
+      this.applyUpgradeOverlays(container, card as BusinessCard | CommunitySpaceCard, renderW, renderH);
+    }
+
     const selectionRing = s.add.rectangle(0, 0, marketCardW, marketCardH);
     selectionRing.setFillStyle(0x000000, 0);
     selectionRing.setStrokeStyle(2, 0x44ff66);
@@ -984,19 +987,18 @@ export class MainStreetRenderer {
           let info = '';
           if (card.family === 'business') {
             const b = card as any;
-            const bSynergyNote = isPawnShopCard(b) ? ' (excluded from synergy)' : '';
             const bTotalRep = (b.reputationPerTurn ?? 0) + (b.reputationBonus ?? 0);
             const bRepInfo = bTotalRep > 0 ? `\nReputation: +${bTotalRep}/turn` : '';
-            info = `Business: ${b.name}\nCost: ${b.cost}\nIncome: +${b.baseIncome + (b.incomeBonus || 0)}/turn${bRepInfo}\nSynergy: ${(b.synergyTypes || []).join('/')}${bSynergyNote}\n${b.description ?? ''}`;
+            info = `Business: ${b.name}\nCost: ${b.cost}\nIncome: +${b.baseIncome + (b.incomeBonus || 0)}/turn${bRepInfo}\nSynergy: ${(b.synergyTypes || []).join('/')}\n${b.description ?? ''}`;
           } else if (card.family === 'community-space') {
             const cs = card as any;
-            const csSynergyNote = isPawnShopCard(cs) ? ' (excluded from synergy)' : '';
             const csTotalRep = (cs.reputationPerTurn ?? 0) + (cs.reputationBonus ?? 0);
             const csRepInfo = csTotalRep > 0 ? `\nReputation: +${csTotalRep}/turn` : '';
-            info = `Community Space: ${cs.name}\nCost: ${cs.cost}\nIncome: +${cs.baseIncome + (cs.incomeBonus || 0)}/turn${csRepInfo}\nSynergy: ${(cs.synergyTypes || []).join('/')}${csSynergyNote}\n${cs.description ?? ''}`;
+            info = `Community Space: ${cs.name}\nCost: ${cs.cost}\nIncome: +${cs.baseIncome + (cs.incomeBonus || 0)}/turn${csRepInfo}\nSynergy: ${(cs.synergyTypes || []).join('/')}\n${cs.description ?? ''}`;
           } else if (card.family === 'event') {
             const e = card as any;
-            info = `Event: ${e.name}\nCost: ${e.cost}\nEffect: ${e.effect}\nCoins: ${e.coinDelta >= 0 ? '+' : ''}${e.coinDelta}, Rep: ${e.reputationDelta >= 0 ? '+' : ''}${e.reputationDelta}`;
+            const coinDelta = e.coinDelta >= 0 ? '+' : '';
+            info = `Event: ${e.name}\nCost: ${e.cost}\nEffect: ${e.effect}\nCoins: ${coinDelta}${e.coinDelta.toFixed(3)}, Rep: ${e.reputationDelta >= 0 ? '+' : ''}${e.reputationDelta}`;
           } else if (card.family === 'upgrade') {
             const u = card as any;
             info = `Upgrade: ${u.name}\nCost: ${u.cost}\nApplies to: ${u.targetBusiness}\nIncome Bonus: +${u.incomeBonus}\nRequires: Lv${u.requiredLevel ?? 0}\n${u.description ?? ''}`;
@@ -1035,7 +1037,8 @@ export class MainStreetRenderer {
     // Calculate dynamic height
     const activeEffectLines = activeEffects.length;
     const extraH = activeEffectLines > 0 ? 16 + activeEffectLines * 16 : 0;
-    const cardRenderH = 50;
+    const cardRenderW = s.layout.queueCardW;
+    const cardRenderH = s.layout.queueCardH;
     const maxCards = Math.min(2, queue.length);
     const cardAreaH = maxCards * (cardRenderH + 6) - 6 + 12; // cards + deck count
     const panelH = titleH + pad + cardAreaH + extraH + pad;
@@ -1060,8 +1063,9 @@ export class MainStreetRenderer {
     s.incidentQueueContainer.add(titleText);
 
     // Queue cards — stacked vertically, centred in the panel
+    // Dimensions come from layout.queueCardW/queueCardH (currently 120×69)
+    // to preserve the standard 7:4 SVG aspect ratio.
     let cardY = queueTop + titleH + pad;
-    const cardRenderW = Math.max(1, Math.round(panelW - pad * 2 - 8));
 
     for (let i = 0; i < maxCards; i++) {
       const card = queue[i];
@@ -1081,7 +1085,8 @@ export class MainStreetRenderer {
             if (dCard.duration !== undefined) {
               info = 'Event: ' + card.name + '\nEffect: ' + card.effect + '\nDuration: ' + dCard.duration + ' turns\n' + Math.round(dCard.multiplier * 100) + '% income modifier';
             } else {
-              info = 'Event: ' + card.name + '\nEffect: ' + card.effect + '\nCoins: ' + (card.coinDelta >= 0 ? '+' : '') + card.coinDelta + ', Rep: ' + (card.reputationDelta >= 0 ? '+' : '') + card.reputationDelta;
+              const coinDelta = card.coinDelta >= 0 ? '+' : '';
+              info = 'Event: ' + card.name + '\nEffect: ' + card.effect + '\nCoins: ' + coinDelta + card.coinDelta.toFixed(3) + ', Rep: ' + (card.reputationDelta >= 0 ? '+' : '') + card.reputationDelta;
             }
             s.tooltipManager?.show(info, container.x, container.y);
           });
@@ -1189,38 +1194,13 @@ export class MainStreetRenderer {
 
       const container = s.add.container(x, y);
 
-      // Card background
-      const bg = s.add.rectangle(0, 0, handCardW, handCardH, 0x3a2a1a, 0.9);
-      bg.setStrokeStyle(1, 0x8b7355);
-      container.add(bg);
+      // Render card via shared SVG pipeline for unified appearance
+      const renderW = Math.max(1, Math.round(handCardW - 4));
+      const renderH = Math.max(1, Math.round(handCardH - 4));
+      mainStreetRenderCardSvg(s, container, card.id, renderW, renderH);
 
-      // Card name
-      const nameText = s.add.text(0, -handCardH / 2 + 6, card.name, {
-        fontSize: '11px',
-        color: '#ffffff',
-        fontFamily: 'Arial',
-      }).setOrigin(0.5, 0);
-      container.add(nameText);
-
-      // Synergy type indicator
-      if (card.synergyTypes && card.synergyTypes.length > 0) {
-        const synergyLabel = card.synergyTypes.join('/');
-        const synergyColor = this.getSynergyDisplayColor(card.synergyTypes[0]);
-        const synText = s.add.text(0, 6, synergyLabel, {
-          fontSize: '9px',
-          color: synergyColor,
-          fontFamily: 'Arial',
-        }).setOrigin(0.5, 0);
-        container.add(synText);
-      }
-
-      // Income info
-      const incomeText = s.add.text(0, 18, `$${card.baseIncome}/turn`, {
-        fontSize: '9px',
-        color: '#c8b88a',
-        fontFamily: 'Arial',
-      }).setOrigin(0.5, 0);
-      container.add(incomeText);
+      // Apply income/reputation overlays (uses centered "Income: +X/turn" format)
+      this.applyUpgradeOverlays(container, card, renderW, renderH);
 
       s.handBusinessContainer!.add(container);
     }
@@ -1246,21 +1226,6 @@ export class MainStreetRenderer {
       color: current >= maxSize ? '#ff6666' : '#c8b88a',
       fontFamily: 'Arial',
     });
-  }
-
-  /**
-   * Returns a CSS color string for the given synergy type.
-   */
-  private getSynergyDisplayColor(type: string): string {
-    const colors: Record<string, string> = {
-      'Food': '#E67E22',
-      'Culture': '#3498DB',
-      'Commerce': '#27AE60',
-      'Service': '#9B59B6',
-      'Entertainment': '#E74C3C',
-      'Health': '#1ABC9C',
-    };
-    return colors[type] ?? '#ffffff';
   }
 
   /**

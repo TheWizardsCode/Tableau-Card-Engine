@@ -195,8 +195,22 @@ export class GymHandPileScene extends GymSceneBase {
     });
 
     this.initHelp([
-      { heading: 'Overview', body: 'Demonstrates hand/pile card movement with animations: deal, place, discard, move, flip, shake (illegal), and drop-zone highlights. Uses HandView and PileView components.' },
-      { heading: 'Controls', body: '[ Draw to Hand ]: Deal a card (with arc animation).\n[ Discard Selected ]: Discard the selected card (with fade animation).\n[ Recall from Discard ]: Move top of discard back to hand.\n[ Flip Selected ]: Flip the selected card (two-phase animation).\n[ Move Selected ]: Tween selected card to display area (move demo).\n[ Cancel Move ]: Cancel an active move animation.\n[ Show Valid Moves ]: Highlight valid drop zones.\n[ Show Illegal ]: Trigger an illegal-move shake demo.\n[ Reset ]: Shuffle a new deck and deal starting hand.\n[ Select Next ]: Cycle selection in your hand.\n[ Enable Drag ]: Turn on drag-and-drop. Drag a card from your hand to the discard pile.\n[ Disable Drag ]: Turn off drag-and-drop restoring normal click-to-select behavior.\nArc slider (right of hand): Adjust hand curvature live (0 = straight).' }
+      {
+        heading: 'Features',
+        body: 'Demonstrates HandView and PileView reusable UI components for card movement, selection, and animation. These components provide draggable hands, arc layouts, pile management, and a rich set of card animations (deal, discard, flip, move tween, illegal-move shake). In a real game like Golf or Lost Cities, HandView renders the player hand and PileView shows draw/discard piles with click-to-interact support.'
+      },
+      {
+        heading: 'Controls',
+        body: '[ Draw ]: Deal a card from the deck to the hand with an arc animation. Demonstrates animateAddCard().\n[ Discard ]: Discard the selected card to the discard pile with a fade animation.\n[ Recall ]: Move the top card of the discard pile back to the hand.\n[ Flip ]: Flip the selected card (two-phase scale animation).\n[ Move ]: Tween the selected card to a display area. Demonstrates moveGameObject().\n[ Cancel Move ]: Cancel an active move tween and return the card to the hand.\n[ Show Valid ]: Highlight deck and discard zones as valid drop targets using HighlightManager.\n[ Show Illegal ]: Trigger an illegal-move shake animation on the selected card.\n[ Select Next ]: Cycle forward through cards in the hand.\n[ Sort Hand ]: Sort hand by suit then rank.\n[ Shuffle Hand ]: Randomly shuffle the hand.\n[ Reset ]: Shuffle a fresh deck and deal a new starting hand.\n[ Enable Drag ] / [ Disable Drag ]: Toggle drag-and-drop mode. When enabled, drag a card from hand to the discard pile.\nArc slider: Adjust hand curvature live (0 = straight, 200 = maximum arc).\nSpacing slider: Adjust gap between cards in the hand.\nRotation slider: Adjust maximum rotation angle for cards at the edges of an arc layout.\n[ Toggle Layout ]: Switch between horizontal row and vertical cascade layout.'
+      },
+      {
+        heading: 'Usage Example',
+        body: 'In a game of Golf, the player needs to draw from a deck, discard unwanted cards, and flip face-down cards. The animated draw and discard demonstrated here show how cards arc-visually move between piles, while the flip animation reveals hidden cards. The illegal-move shake provides instant feedback when the player tries an invalid action like drawing from an empty pile.'
+      },
+      {
+        heading: 'Test Plan',
+        body: '1. Press [ Draw ] → card animates from deck to hand, event log confirms\n2. Press [ Select Next ] twice → second card selected, log shows selection\n3. Press [ Discard ] → selected card fades to discard pile\n4. Press [ Recall ] → card returns from discard to hand\n5. Press [ Flip ] → selected card flips face-down then face-up\n6. Press [ Show Valid ] → green highlights appear on deck and discard zones\n7. Press [ Show Illegal ] → selected card shakes if one is selected\n8. Press [ Enable Drag ] → drag a card from hand to discard pile, verify log shows acceptance\n9. Adjust Arc slider → hand curvature changes live\n10. Press [ Toggle Layout ] → layout switches between horizontal and vertical cascade\n11. Press [ Reset ] → new hand dealt, all state cleared'
+      }
     ]);
 
     const cx = GAME_W / 2;
@@ -547,14 +561,15 @@ export class GymHandPileScene extends GymSceneBase {
       this.logEvent('No cards to sort');
       return;
     }
-    // Sort by suit then rank (ascending)
-    this.hand.sort((a, b) => {
-      if (a.suit !== b.suit) return a.suit.localeCompare(b.suit);
-      return rankValue(a.rank) - rankValue(b.rank);
-    });
-    this.selectedIdx = -1;
-    this.handView.setCards(this.hand);
-    this.handView.setSelected(null);
+    // Delegate sort animation to HandView — cards and sprites are
+    // reordered internally; no manual sort + setCards needed.
+    this.handView.sortCards(
+      (a, b) => {
+        if (a.suit !== b.suit) return a.suit.localeCompare(b.suit);
+        return rankValue(a.rank) - rankValue(b.rank);
+      },
+      { animate: !this.reducedMotion },
+    );
     this.logEvent('Hand sorted by suit then rank');
   }
 

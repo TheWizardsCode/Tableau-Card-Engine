@@ -1,6 +1,6 @@
 {
   "source": "Generated from MainStreetCards.ts and Tier 1 IDs from MainStreetTiers.ts",
-  "generatedAt": "2026-06-24T23:00:00.000Z",
+  "generatedAt": "2026-07-06T01:10:05.874Z",
   "baselineTier1CardIds": [
     "biz-bakery",
     "biz-bookshop",
@@ -19,8 +19,8 @@
     "upg-bistro",
     "upg-community-hub",
     "upg-garden",
-    "upg-readers-cafe",
     "upg-patisserie",
+    "upg-readers-cafe",
     "upg-vintage-shop"
   ],
   "expandedCardIds": {

@@ -95,8 +95,15 @@ export const INSTRUCTION_FONT_SIZE = '15px';
 // ── Chopsticks button ──────────────────────────────────────
 export const CHOPSTICKS_BUTTON_FONT_SIZE = '16px';
 export const CHOPSTICKS_BUTTON_Y_OFFSET = 25;
-export const CHOPSTICKS_BUTTON_PADDING_X = 12;
-export const CHOPSTICKS_BUTTON_PADDING_Y = 6;
+export const CHOPSTICKS_BUTTON_PADDING_X = 16;
+export const CHOPSTICKS_BUTTON_PADDING_Y = 8;
+export const CHOPSTICKS_BUTTON_BG = 0x1a3a2a;
+export const CHOPSTICKS_BUTTON_HOVER_BG = 0x2a5a3a;
+export const CHOPSTICKS_BUTTON_TEXT_COLOR = '#88ddff';
+export const CHOPSTICKS_BUTTON_HOVER_TEXT_COLOR = '#ffffff';
+export const CHOPSTICKS_BUTTON_ACTIVE_TEXT_COLOR = '#ff8888';
+export const CHOPSTICKS_BUTTON_RADIUS = 8;
+export const CHOPSTICKS_BUTTON_DEPTH = 700;
 
 // ── Tooltip positioning ────────────────────────────────────
 export const TOOLTIP_Y_OFFSET = 40;
@@ -108,8 +115,43 @@ export const HIGHLIGHT_PADDING = 6;
 export const HIGHLIGHT_STROKE_WIDTH = 3;
 export const HIGHLIGHT_FILL_ALPHA = 0.15;
 
+// ── Chopsticks tableau highlight (on the chopsticks card in tableau) ────
+export const CHOPSTICKS_TABLEAU_HIGHLIGHT_COLOR = 0x44aaff;
+export const CHOPSTICKS_TABLEAU_ACTIVE_COLOR = 0xffaa44;
+export const CHOPSTICKS_TABLEAU_HIGHLIGHT_ALPHA = 0.2;
+export const CHOPSTICKS_TABLEAU_HIGHLIGHT_PADDING = 8;
+export const CHOPSTICKS_TABLEAU_HIGHLIGHT_STROKE = 2;
+
+// ── First card pick highlight (more prominent than general highlight) ──
+export const HIGHLIGHT_FIRST_PICK_COLOR = 0x00ff66;
+export const HIGHLIGHT_FIRST_PICK_STROKE_WIDTH = 4;
+export const HIGHLIGHT_FIRST_PICK_FILL_ALPHA = 0.25;
+
+// ── Chopsticks cancel button ───────────────────────────────────────────
+export const CHOPSTICKS_CANCEL_FONT_SIZE = '14px';
+export const CHOPSTICKS_CANCEL_TEXT_COLOR = '#ff6666';
+export const CHOPSTICKS_CANCEL_HOVER_COLOR = '#ffffff';
+export const CHOPSTICKS_CANCEL_Y_OFFSET = 55;
+export const CHOPSTICKS_CANCEL_PADDING_X = 14;
+export const CHOPSTICKS_CANCEL_PADDING_Y = 6;
+export const CHOPSTICKS_CANCEL_BG = 0x4a2a2a;
+export const CHOPSTICKS_CANCEL_HOVER_BG = 0x6a3a3a;
+export const CHOPSTICKS_CANCEL_DEPTH = 700;
+
+// ── Step indicator ─────────────────────────────────────────────────────
+export const STEP_INDICATOR_FONT_SIZE = '15px';
+export const STEP_INDICATOR_COLOR = '#ffdd44';
+export const STEP_INDICATOR_Y_OFFSET = -40;
+export const STEP_INDICATOR_DEPTH = 700;
+export const STEP_INDICATOR_1_OF_2 = 'Step 1 of 2';
+export const STEP_INDICATOR_2_OF_2 = 'Step 2 of 2';
+
 // ── Turn animation delay ───────────────────────────────────
 export const TURN_ANIMATION_DELAY = 300;
+
+// ── Chopsticks small card highlight (hand suggestion) ──────────────────
+export const CHOPSTICKS_SUGGEST_HIGHLIGHT_COLOR = 0x4488ff;
+export const CHOPSTICKS_SUGGEST_HIGHLIGHT_ALPHA = 0.08;
 
 // Turn phase
 export type TurnPhase =

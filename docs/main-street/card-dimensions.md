@@ -41,6 +41,7 @@ UI slot mappings (recommendations)
   - Market slot thumbnail / Street slot: 140×80 (Main Street canonical)
   - Street small thumbnail: fit to 105×110
   - UI small (compact hand): CARD_W × CARD_H (48×65 default runtime)
+  - Incident queue thumbnail: 120×69 (preserves 7:4 card SVG aspect ratio)
   - Selector thumbnail: 120×68 (scene screenshot)
 
 ## Layout notes (Main Street)

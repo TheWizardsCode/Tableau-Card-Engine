@@ -238,12 +238,17 @@ export function reputationCoinMultiplier(
  *
  * Only positive coin deltas are scaled -- negative deltas (penalties)
  * pass through unchanged so that reputation does not amplify losses.
- * The result is rounded down (floored) to keep coin amounts integral.
+ *
+ * CG-0MRER3RE300418SG: Removed Math.floor to preserve fractional income
+ * values. The coins field is a JavaScript number (double) and can hold
+ * fractional values. All coin comparisons (<, >=, etc.) work correctly
+ * with fractional values. UI display rounds to 2 decimal places in the
+ * HUD tooltip.
  *
  * @param rawCoinDelta  The base coin amount (positive = gain, negative = penalty).
  * @param reputation    Current player reputation.
  * @param config        Game config with multiplier tuning constants.
- * @returns The adjusted coin delta.
+ * @returns The adjusted coin delta (may be fractional).
  */
 export function applyReputationMultiplier(
   rawCoinDelta: number,
@@ -251,5 +256,5 @@ export function applyReputationMultiplier(
   config: Pick<GameConfig, 'reputationCoinDivisor' | 'maxReputationCoinMultiplier'>,
 ): number {
   if (rawCoinDelta <= 0) return rawCoinDelta;
-  return Math.floor(rawCoinDelta * reputationCoinMultiplier(reputation, config));
+  return rawCoinDelta * reputationCoinMultiplier(reputation, config);
 }

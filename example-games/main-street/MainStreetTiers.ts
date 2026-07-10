@@ -4,7 +4,14 @@
  * Defines the 5-tier meta-progression system. Each tier maps to a set of
  * unlock thresholds (reputation or challenge-based) and card assignments.
  *
- * This is the authoritative source for tier thresholds and card assignments.
+ * **Card-to-tier assignments** are read from the `tier` column in
+ * `card-data.csv` via `CARD_TIER_MAP` (exported from `MainStreetCards.ts`).
+ * This keeps per-card tier data colocated with card templates and editable
+ * without TypeScript.
+ *
+ * **Tier structure** (thresholds, challenge conditions, ordering) remains
+ * in TypeScript and is defined below in `TIER_DEFINITIONS`.
+ *
  * See docs/main-street/prd-milestone-2.md Section 2 and 4.3.5.
  *
  * @module
@@ -12,6 +19,7 @@
 
 import type { MainStreetState } from './MainStreetState';
 import type { ChallengeCategory } from './MainStreetChallenges';
+import { CARD_TIER_MAP } from './MainStreetCards';
 
 // ── Tier Types ──────────────────────────────────────────────
 
@@ -37,122 +45,27 @@ export interface TierDefinition {
   cumulativeCardIds: string[];
 }
 
-// ── Tier 1 Card IDs (M1 Baseline) ──────────────────────────
+// ── Tier Card IDs (from CSV) ───────────────────────────────
 
-const TIER_1_CARD_IDS: string[] = [
-  // M1 baseline (13)
-  // Business (5)
-  'biz-bakery',
-  'biz-diner',
-  'biz-bookshop',
-  'cs-park',
-  'biz-hardware',
-  // Event (5)
-  'evt-festival',
-  'evt-rainy',
-  'evt-tax',
-  'evt-award',
-  'evt-inspection',
-  // Upgrade (3)
-  'upg-patisserie',
-  'upg-bistro',
-  'upg-readers-cafe',
+// Build tier card ID arrays from the CSV-derived CARD_TIER_MAP.
+// This externalises the per-card tier assignment into card-data.csv
+// while keeping TIER_DEFINITIONS structure (thresholds, challenges) in TS.
 
-  // Early expanded sample (~10% of expanded set => 5 cards)
-  'biz-pawnshop',
-  'biz-laundromat',
-  'evt-grand-opening',
-  'upg-garden',
-  'upg-vintage-shop',
+const TIER_1_CARD_IDS: string[] = [];
+const TIER_2_NEW_CARD_IDS: string[] = [];
+const TIER_3_NEW_CARD_IDS: string[] = [];
+const TIER_4_NEW_CARD_IDS: string[] = [];
+const TIER_5_NEW_CARD_IDS: string[] = [];
 
-  // Community space cards (new community spaces)
-  'cs-library',
-  'upg-community-hub',
-];
-
-// ── Tier 2 Card IDs (Rising Street) ────────────────────────
-
-const TIER_2_NEW_CARD_IDS: string[] = [
-  'biz-boutique',
-  'biz-cafe',
-  'biz-arcade',
-  'evt-wellness-fair',
-  'evt-block-party',
-  'upg-bread-factory',
-  'upg-designer-store',
-  'upg-drive-in',
-  'upg-dry-cleaners',
-  'upg-fast-food',
-];
-
-// ── Tier 3 Card IDs (Neighborhood) ─────────────────────────
-
-const TIER_3_NEW_CARD_IDS: string[] = [
-  'biz-barbershop',
-  'biz-cinema',
-  'biz-food-truck',
-  'evt-charity-drive',
-  'evt-construction',
-  'evt-food-critic',
-  'upg-gaming-lounge',
-  'upg-imax',
-  'upg-garden-center',
-  'upg-gourmet-truck',
-];
-
-// ── Tier 4 Card IDs (District) ─────────────────────────────
-
-const TIER_4_NEW_CARD_IDS: string[] = [
-  'biz-gallery',
-  'biz-florist',
-  'biz-clinic',
-  'biz-private-clinic',
-  'biz-pharmacy',
-  'evt-noise-complaint',
-  'evt-pipe-burst',
-  'evt-power-outage',
-  'evt-flu-outbreak',
-  'upg-grand-bakehouse',
-  'upg-home-improvement',
-  'upg-medical-center',
-  'upg-museum',
-  'upg-private-medical-center',
-];
-
-// ── Tier 5 Card IDs (Landmark) ─────────────────────────────
-
-const TIER_5_NEW_CARD_IDS: string[] = [
-  'biz-spa',
-  'evt-shoplifting',
-  'evt-vandalism',
-  'evt-viral-review',
-  // M3 doubled event pool (18 new unique event templates)
-  'evt-harvest-festival',
-  'evt-health-campaign',
-  'evt-street-performer',
-  'evt-bulk-purchase',
-  'evt-book-fair',
-  'evt-volunteer-day',
-  'evt-community-garden',
-  'evt-festival-season',
-  'evt-protest',
-  'evt-supply-chain',
-  'evt-power-surge',
-  'evt-strike',
-  'evt-heatwave',
-  'evt-pest-infestation',
-  'evt-slow-season',
-  'evt-good-press',
-  'evt-tourist-bus',
-  'evt-cultural-grant',
-  'upg-luxury-retreat',
-  'upg-multiplex',
-  'upg-resort-spa',
-  'upg-restaurant',
-  'upg-roastery',
-  'upg-salon',
-  'upg-wellness-center',
-];
+for (const [cardId, tier] of CARD_TIER_MAP) {
+  switch (tier) {
+    case '1': TIER_1_CARD_IDS.push(cardId); break;
+    case '2': TIER_2_NEW_CARD_IDS.push(cardId); break;
+    case '3': TIER_3_NEW_CARD_IDS.push(cardId); break;
+    case '4': TIER_4_NEW_CARD_IDS.push(cardId); break;
+    case '5': TIER_5_NEW_CARD_IDS.push(cardId); break;
+  }
+}
 
 // ── Challenge Condition Helpers ─────────────────────────────
 

@@ -21,6 +21,32 @@ import { preloadCardAssets, ensureCardTextureFallbacks } from '../../../src/ui/C
 import { createHudText } from '../../../src/ui/Renderer';
 import { createDeckGrid } from '../../../src/ui/GymSceneUtils';
 import type { DeckGridResult } from '../../../src/ui/GymSceneUtils';
+import { anchorPoint } from '../../../src/ui/screen-layout';
+import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
+import gymDeckRngLayoutJson from '../layouts/gym-deck-rng.layout.json';
+
+// Parse the shared Deck RNG scene layout once at module load.
+const DECK_RNG_LAYOUT: import('../../../src/ui/screen-layout-schema').ScreenLayoutDocument | null = (() => {
+  const parsed = parseScreenLayoutDocument(gymDeckRngLayoutJson);
+  return parsed.valid ? parsed.layout : null;
+})();
+
+const DEFAULT_VIEWPORT = { width: 1280, height: 720 };
+
+/**
+ * Resolve an anchor from the Deck RNG SLL layout.
+ * Falls back to the default viewport if no layout is available.
+ */
+function resolveDeckRngAnchor(
+  zone: string,
+  anchor: string,
+  viewport = DEFAULT_VIEWPORT,
+): import('../../../src/ui/screen-layout-schema').PixelPoint {
+  if (!DECK_RNG_LAYOUT) {
+    return { x: GAME_W / 2, y: 60 };
+  }
+  return anchorPoint(DECK_RNG_LAYOUT, zone, anchor, viewport, 1);
+}
 
 /** Default seed for deterministic demonstrations. */
 const DEFAULT_SEED = 42;
@@ -66,19 +92,27 @@ export class GymDeckRngScene extends GymSceneBase {
 
     this.initHelp([
       {
-        heading: 'Overview',
-        body: 'Displays all 52 cards face-up in a compact grid, shuffled with the default seed (42) on load.'
+        heading: 'Features',
+        body: 'Demonstrates deterministic seeded RNG for card shuffling using createSeededRng() and shuffleArray(). The same seed always produces the same card order, which is essential for reproducible testing, replay systems, and multiplayer consistency. In a game like Golf or Beleaguered Castle, seeded RNG ensures that a player can replay a specific deal for debugging or fair competition.'
       },
       {
         heading: 'Controls',
-        body: '[ -1 ] / [ +1 ]: Adjust seed and re-shuffle the deck.\n[ Reset Seed ]: Restore default seed (42) and re-shuffle.\n[ Shuffle ]: Re-shuffle using a random seed.\n\nTip: Using the same seed always produces the same card order.'
+        body: '[ -1 ] / [ +1 ]: Decrease or increase the seed value and immediately re-shuffle. Use to explore how different seeds produce different card orders while maintaining determinism.\n[ Reset Seed ]: Restore the default seed (42) and re-shuffle. Useful to return to a known state after experimenting.\n[ Shuffle ]: Generate a random seed and re-shuffle. Demonstrates that any seed works with the deterministic system.\n[ < Prev ] / [ Next > ]: Navigate to the previous or next Gym scene.'
+      },
+      {
+        heading: 'Usage Example',
+        body: 'In a debugging scenario, a developer notices that the 5th card dealt in a Golf game always comes from a specific position in the deck. By setting the seed to the same value used during the game session, the developer can reproduce the exact same deck order and inspect the deal sequence to verify correctness.'
+      },
+      {
+        heading: 'Test Plan',
+        body: '1. Press [ -1 ] twice → seed decreases by 2, grid re-shuffles\n2. Press [ +1 ] → seed increases by 1, grid re-shuffles differently\n3. Press [ Reset Seed ] → seed returns to 42, grid returns to initial order\n4. Press [ Shuffle ] → random seed, grid re-shuffles\n5. Verify all 52 cards are displayed face-up in the compact grid\n6. Verify each re-shuffle produces a visibly different card order'
       }
     ]);
 
     // ── Controls (positioned via SLL controls zone) ────────────
-    const controlsAnchor = this.getGymAnchor('controls', 'left');
-    const cx = controlsAnchor?.x ?? GAME_W / 2;
-    let y = controlsAnchor?.y ?? 60;
+    const controlsAnchor = resolveDeckRngAnchor('controls', 'center');
+    const cx = controlsAnchor.x;
+    const y = controlsAnchor.y;
 
     this.addLabel(cx, y, 'Seed:');
     this.seedText = createHudText(this, cx + 50, y, String(this.seed), '#ffffff', { fontSize: '16px' });
@@ -128,9 +162,9 @@ export class GymDeckRngScene extends GymSceneBase {
       this.deckGridResult = null;
     }
 
-    const cardDisplay = this.getGymAnchor('cardDisplay', 'center');
-    const centerX = cardDisplay?.x ?? GAME_W / 2;
-    const centerY = (cardDisplay?.y ?? 270) + 100;
+    const cardDisplayAnchor = resolveDeckRngAnchor('cardDisplay', 'center');
+    const centerX = cardDisplayAnchor.x;
+    const centerY = cardDisplayAnchor.y + 100;
 
     this.deckGridResult = createDeckGrid(this, this.deck, {
       cols: GRID_COLUMNS,

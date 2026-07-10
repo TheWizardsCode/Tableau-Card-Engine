@@ -47,13 +47,17 @@ function createTestState(seed: string = 'hand-synergy-test'): MainStreetState {
  * Creates a minimal BusinessCard for testing.
  */
 function makeBiz(overrides: Partial<BusinessCard> = {}): BusinessCard {
+  const id = overrides.id ?? 'test-biz';
+  const isPawnShop = id.startsWith('biz-pawnshop-');
   return {
     family: 'business',
-    id: overrides.id ?? 'test-biz',
+    id,
     name: overrides.name ?? 'Test Biz',
     cost: overrides.cost ?? 3,
     baseIncome: overrides.baseIncome ?? 2,
     synergyTypes: overrides.synergyTypes ?? ['Food'],
+    synergyCoinBonus: overrides.synergyCoinBonus ?? (isPawnShop ? 0 : 1),
+    synergyRepBonus: overrides.synergyRepBonus ?? (isPawnShop ? 0 : 0),
     maxLevel: overrides.maxLevel ?? 1,
     description: overrides.description ?? 'A test business',
     level: overrides.level ?? 0,

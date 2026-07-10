@@ -26,6 +26,28 @@ import { GAME_W } from '../../../src/ui/constants';
 import { createHudText } from '../../../src/ui/Renderer';
 import { createEventLog } from '../../../src/ui/GymSceneUtils';
 import type { EventLogResult } from '../../../src/ui/GymSceneUtils';
+import { anchorPoint } from '../../../src/ui/screen-layout';
+import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
+import gymAudioFeedbackLayoutJson from '../layouts/gym-audio-feedback.layout.json';
+
+// Parse the shared Audio Feedback scene layout once at module load.
+const AUDIO_FEEDBACK_LAYOUT: import('../../../src/ui/screen-layout-schema').ScreenLayoutDocument | null = (() => {
+  const parsed = parseScreenLayoutDocument(gymAudioFeedbackLayoutJson);
+  return parsed.valid ? parsed.layout : null;
+})();
+
+const DEFAULT_VIEWPORT = { width: 1280, height: 720 };
+
+function resolveAudioAnchor(
+  zone: string,
+  anchor: string,
+  viewport = DEFAULT_VIEWPORT,
+): import('../../../src/ui/screen-layout-schema').PixelPoint {
+  if (!AUDIO_FEEDBACK_LAYOUT) {
+    return { x: GAME_W / 2, y: 60 };
+  }
+  return anchorPoint(AUDIO_FEEDBACK_LAYOUT, zone, anchor, viewport, 1);
+}
 
 /** A stub SoundPlayer that records play calls instead of producing audio. */
 class StubSoundPlayer implements SoundPlayer {
@@ -81,8 +103,22 @@ export class GymAudioFeedbackScene extends GymSceneBase {
     this.initReducedMotion();
 
     this.initHelp([
-      { heading: 'Overview', body: 'Demonstrates audio mapping, mute toggling, feedback configuration, pop text feedback, and particle celebration effects.' },
-      { heading: 'Controls', body: '[ Toggle Mute ]: Mute/unmute audio.\n[ Volume - ] / [ Volume + ]: Adjust global volume.\n[ Draw Card ] / [ Discard Card ]: Emit events with pop text.\n[ Pop Text ]: Trigger a pop text animation.\n[ Celebrate ]: Trigger a particle burst effect.\n[ Invalid Key ]: Attempt to play an unregistered key (safely ignored).' }
+      {
+        heading: 'Features',
+        body: 'Demonstrates audio event mapping and feedback configuration using the SoundManager, along with pop text animations (popTextOrIcon) and particle celebration effects. The SoundManager connects game events to sound keys, providing volume control, mute toggling, and graceful handling of missing or unregistered sound keys. In a real card game, sounds play for card draws, discards, wins, and errors, while pop text provides visual feedback alongside audio.'
+      },
+      {
+        heading: 'Controls',
+        body: '[ Toggle Mute ]: Toggle audio mute on/off. Status shows current mute state and call count.\n[ Volume - ] / [ Volume + ]: Decrease or increase global volume in 0.1 steps (range 0.0-1.0).\n[ Draw Card ]: Emit a "card-drawn" event, which triggers the "sfx-test-ding" sound and a pop text.\n[ Discard Card ]: Emit a "card-discarded" event, triggering "sfx-test-buzz" and pop text.\n[ Pop Text ]: Trigger a standalone pop text animation at a random position near centre.\n[ Pop Undo ]: Emit an "undo" event, triggering "sfx-test-buzz" and pop text.\n[ Pop Redo ]: Emit a "redo" event, triggering "sfx-test-ding" and pop text.\n[ Celebrate ]: Trigger a particle burst effect (or pop text fallback if particles unavailable, or if reduced-motion is on).\n[ Invalid Key ]: Attempt to play an unregistered sound key ("sfx-nonexistent-key") — safely ignored, demonstrating graceful error handling.'
+      },
+      {
+        heading: 'Usage Example',
+        body: 'In a game of Golf, a satisfying "ding" plays when a card is drawn, and a different "buzz" plays when a card is discarded. The player can mute audio during meetings or adjust volume for different environments. After winning a round, a particle celebration bursts across the screen. If the player has reduced-motion enabled, the celebration shows a simple party emoji pop text instead.'
+      },
+      {
+        heading: 'Test Plan',
+        body: '1. Press [ Draw Card ] → event log shows sound call "sfx-test-ding", pop text appears\n2. Press [ Discard Card ] → event log shows "sfx-test-buzz"\n3. Press [ Toggle Mute ] → status shows Muted: true, no sound on subsequent events\n4. Press [ Draw Card ] → event fires but no sound (muted) — only pop text appears\n5. Press [ Volume - ] twice → volume drops to 0.3\n6. Press [ Volume + ] three times → volume returns to 0.6\n7. Press [ Invalid Key ] → event log shows safe handling of unregistered key\n8. Press [ Pop Text ] → pop text animation appears\n9. Press [ Celebrate ] → particle burst or emoji fallback appears\n10. Press [ Toggle Mute ] to unmute, verify sound returns'
+      }
     ]);
 
     // Initialize sound manager
@@ -119,7 +155,11 @@ export class GymAudioFeedbackScene extends GymSceneBase {
     this.soundManager.setVolume(this.volume);
 
     const cx = GAME_W / 2;
-    let y = 60;
+    const controlsAnchor = resolveAudioAnchor('controls', 'center');
+    const controls2Anchor = resolveAudioAnchor('controls2', 'center');
+    const statusAnchor = resolveAudioAnchor('status', 'center');
+    const logAnchor = resolveAudioAnchor('log', 'center');
+    const y = controlsAnchor.y;
 
     this.addButton(cx - 450, y, '[ Toggle Mute ]', () => this.toggleMute());
     this.addButton(cx - 280, y, '[ Volume - ]', () => this.adjustVolume(-0.1));
@@ -128,17 +168,15 @@ export class GymAudioFeedbackScene extends GymSceneBase {
     this.addButton(cx + 150, y, '[ Discard Card ]', () => this.emitEvent('card-discarded'));
     this.addButton(cx + 330, y, '[ Invalid Key ]', () => this.playInvalid());
 
-    y += 26;
-    this.addButton(cx - 280, y, '[ Pop Text ]', () => this.triggerPopText());
-    this.addButton(cx - 100, y, '[ Pop Undo ]', () => this.emitEvent('undo'));
-    this.addButton(cx + 60, y, '[ Pop Redo ]', () => this.emitEvent('redo'));
-    this.addButton(cx + 220, y, '[ Celebrate ]', () => this.triggerCelebration());
+    const y2 = controls2Anchor.y;
+    this.addButton(cx - 280, y2, '[ Pop Text ]', () => this.triggerPopText());
+    this.addButton(cx - 100, y2, '[ Pop Undo ]', () => this.emitEvent('undo'));
+    this.addButton(cx + 60, y2, '[ Pop Redo ]', () => this.emitEvent('redo'));
+    this.addButton(cx + 220, y2, '[ Celebrate ]', () => this.triggerCelebration());
 
-    y += 50;
-    this.statusText = createHudText(this, cx, y, this.statusString(), '#ffffff', { fontSize: '16px' }).setOrigin(0.5);
+    this.statusText = createHudText(this, cx, statusAnchor.y, this.statusString(), '#ffffff', { fontSize: '16px' }).setOrigin(0.5);
 
-    y += 30;
-    this.eventLogResult = createEventLog(this, y + 40, {
+    this.eventLogResult = createEventLog(this, logAnchor.y + 20, {
       headerText: '── Sound Call Log ──',
       maxLines: 14,
       lineHeight: 17,

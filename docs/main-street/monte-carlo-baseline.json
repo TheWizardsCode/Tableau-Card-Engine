@@ -1,11 +1,12 @@
 {
   "source": "Generated from MainStreetMonteCarlo.runMonteCarlo",
-  "generatedAt": "2026-06-30T14:25:29.089Z",
+  "generatedAt": "2026-07-10T10:29:03.028Z",
   "seeds": 200,
   "maxTurns": 25,
   "strategy": "greedy",
+  "note": "Updated after CG-0MRER3RE300418SG: fractional income fix removed Math.floor from applyReputationMultiplier and Math.round from applyActiveEffectMultiplier. Win rate and coins-per-turn increased because fractional income values are no longer truncated.",
   "metrics": {
-    "winRate": 0.505,
-    "averageCoinsPerTurn": 2.0112805746240356
+    "winRate": 0.65,
+    "averageCoinsPerTurn": 3.300755112659271
   }
 }

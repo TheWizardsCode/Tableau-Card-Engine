@@ -1,38 +1,44 @@
 # Main Street: Card Catalog
 
-> **Source of truth:** `example-games/main-street/MainStreetCards.ts`
-> **Last updated:** Expanded pool verification (work item CG-0MOKJPBOX006UQDO)
+> **Source of truth:** `example-games/main-street/card-data.csv` (CSV) — loaded by `MainStreetCards.ts` at build time (work item CG-0MR6ZR23J006ZDNZ)
+> **Last updated:** CSV externalisation (work item CG-0MR6ZR23J006ZDNZ)
 
-This document lists every card template in the Main Street card pool, organised by family (Business, Event, Upgrade). Each entry includes all gameplay-relevant fields and a short design rationale.
+This document lists every card template in the Main Street card pool, organised by family (Business, Event, Upgrade, Community Space, Staff). Each entry includes all gameplay-relevant fields and a short design rationale.
+
+Card templates are stored as rows in `card-data.csv` and parsed at build time by `MainStreetCards.ts`. To add cards, edit the CSV and regenerate metadata (see guidance below).
 
 **Deck sizes (default copies):**
 
-| Family   | Templates | Copies each | Total cards |
-|----------|-----------|-------------|-------------|
-| Business | 18        | 3           | 54          |
-| Event    | 18        | 3           | 54          |
-| Upgrade  | 27        | 2           | 54          |
+| Family        | Templates | Copies each | Total cards |
+|---------------|-----------|-------------|-------------|
+| Business      | 18        | 3           | 54          |
+| Event         | 36        | 3           | 108         |
+| Upgrade       | 27        | 2           | 54          |
+| Community Space | 2       | 3           | 6           |
+| Staff         | 3         | 3           | 9           |
 
 **Synergy types:** Food, Culture, Commerce, Service (M2), Entertainment (M2), Health (M2)
 
 ## Expansion summary (baseline vs current)
 
-| Snapshot | Business | Event | Upgrade | Total templates |
-|---|---:|---:|---:|---:|
-| Tier 1 baseline (`docs/main-street/card-catalog-baseline.json`) | 7 | 6 | 5 | 18 |
-| Current catalog (`MainStreetCards.ts`) | 18 | 18 | 27 | 63 |
-| Net increase | +11 | +12 | +22 | +45 |
+| Snapshot | Business | Event | Upgrade | Community Space | Staff | Total templates |
+|---|---:|---:|---:|---:|---:|---:|
+| Tier 1 baseline (`docs/main-street/card-catalog-baseline.json`) | 7 | 6 | 5 | — | — | 18 |
+| Current catalog (`card-data.csv`) | 18 | 36 | 27 | 2 | 3 | 86 |
+| Net increase | +11 | +30 | +22 | +2 | +3 | +68 |
 
 - 2x target from baseline: `>= 36` templates
-- Current total: `63` templates (`3.50x` baseline)
+- Current total: `86` templates (`4.78x` baseline)
 - Non-baseline card IDs are tracked in `docs/main-street/expanded-card-manifest.json`
 
 ### Guidance: adding more cards safely
 
-1. Add card templates in `example-games/main-street/MainStreetCards.ts`.
+1. Add rows to `example-games/main-street/card-data.csv` using the correct family column value (`business`, `event`, `upgrade`, `community-space`, or `staff`).
 2. Regenerate metadata artifacts:
+   - `npx tsx scripts/generate-card-csv.ts` — regenerates `card-data.csv` from TS (only if editing TS directly; normally edit CSV)
    - `npx tsx scripts/generate-main-street-catalog-baseline.ts`
-   - `npx tsx scripts/generate-main-street-expanded-card-manifest.ts`
+   - `npx vite-node scripts/generate-main-street-expanded-card-manifest.ts`
+     _(uses Vite-aware ESM loader because it imports deck-building functions from `MainStreetCards.ts`)_
 3. Regenerate placeholder art:
    - `node scripts/generate-main-street-card-svgs.mjs`
 4. Run regression tests:

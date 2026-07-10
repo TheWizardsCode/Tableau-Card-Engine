@@ -114,7 +114,11 @@ export function decayActiveEffects(effects: ActiveEffect[]): DecayResult {
  * @param effects     Array of active effects to check.
  * @param effectType  The type of effects to apply.
  * @param baseValue   The value to apply multipliers to.
- * @returns The modified value (rounded to nearest integer).
+ * @returns The modified value (may be fractional).
+ *
+ * CG-0MRER3RE300418SG: Removed Math.round to preserve fractional income
+ * values instead of rounding to nearest integer. The coins field (number)
+ * handles fractional values correctly; all comparisons work with fractions.
  */
 export function applyActiveEffectMultiplier(
   effects: ActiveEffect[],
@@ -127,7 +131,7 @@ export function applyActiveEffectMultiplier(
       multiplier *= effect.multiplier;
     }
   }
-  return Math.round(baseValue * multiplier);
+  return baseValue * multiplier;
 }
 
 // ── Type Check ──────────────────────────────────────────────

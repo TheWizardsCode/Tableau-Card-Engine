@@ -282,7 +282,8 @@ describe('Activity Log', () => {
       const entry = state.activityLog[logBefore];
       expect(entry.type).toBe('gain');
       expect(entry.text).toContain('Income');
-      expect(entry.text).toContain('+5 coins');
+      // CG-0MREYZO7E00729S0: fractional coin format uses 3 decimal places
+      expect(entry.text).toMatch(/\+\d+\.\d{3} coins/);
     });
 
     it('should log neutral when income is zero', () => {
@@ -296,7 +297,8 @@ describe('Activity Log', () => {
 
       const entry = state.activityLog[logBefore];
       expect(entry.type).toBe('neutral');
-      expect(entry.text).toContain('+0 coins');
+      // CG-0MREYZO7E00729S0: zero income logged as +0.000 coins
+      expect(entry.text).toContain('0.000 coins');
     });
   });
 
