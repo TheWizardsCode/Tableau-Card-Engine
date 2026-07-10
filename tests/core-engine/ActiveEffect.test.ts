@@ -126,7 +126,8 @@ describe('ActiveEffect', () => {
 
       const result = applyActiveEffectMultiplier(effects, 'income-multiplier', 100);
 
-      expect(result).toBe(64); // 100 * 0.8 * 0.8
+      // CG-0MRER3RE300418SG: Math.round removed; use toBeCloseTo for floating point
+      expect(result).toBeCloseTo(64); // 100 * 0.8 * 0.8
     });
 
     it('does not apply effects of a different type', () => {
@@ -146,14 +147,15 @@ describe('ActiveEffect', () => {
       expect(result).toBe(100);
     });
 
-    it('rounds to nearest integer', () => {
+    it('preserves fractional results (no longer rounds)', () => {
+      // CG-0MRER3RE300418SG: Math.round removed; fractional values preserved
       const effects: ActiveEffect[] = [
         createActiveEffect('income-multiplier', 0.8, 5, 'evt-flu', 'Flu'),
       ];
 
       const result = applyActiveEffectMultiplier(effects, 'income-multiplier', 3);
 
-      expect(result).toBe(2); // 3 * 0.8 = 2.4 -> 2
+      expect(result).toBeCloseTo(2.4); // 3 * 0.8 = 2.4 (was 2 before fix)
     });
 
     it('handles base value of 0', () => {
@@ -215,7 +217,7 @@ describe('ActiveEffect', () => {
 
       // During active effect: income reduced
       const reducedIncome = applyActiveEffectMultiplier([effect], 'income-multiplier', income);
-      expect(reducedIncome).toBe(80);
+      expect(reducedIncome).toBe(80); // 100 * 0.8 = 80 (integer, unchanged)
 
       // Decay turn 1: 3 -> 2, still active
       let r1 = decayActiveEffects([effect]);

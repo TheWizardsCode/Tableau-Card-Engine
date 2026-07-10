@@ -537,8 +537,8 @@ describe('Integration: Held Investment Event', () => {
 
     const coinsAfterPlay = state.resourceBank.coins;
     // Reputation multiplier: rep=5, divisor=20 → 1 + 5/20 = 1.25
-    // floor(5 * 1.25) = floor(6.25) = 6
-    expect(coinsAfterPlay).toBe(50 + 6); // Event delta scaled by reputation multiplier
+    // CG-0MRER3RE300418SG: Math.floor removed; 5 * 1.25 = 6.25 (was 6 before fix)
+    expect(coinsAfterPlay).toBeCloseTo(50 + 6.25); // Event delta scaled by reputation multiplier
 
     // End turn — InvestmentResolution should have nothing to auto-resolve
     const result = processEndOfTurn(state);

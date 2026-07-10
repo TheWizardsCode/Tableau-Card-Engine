@@ -248,7 +248,9 @@ describe('MainStreetAdjacency (2x5 grid)', () => {
       const result = applyIncome(state);
 
       expect(result.total).toBe(7); // 4 + 3 pre-multiplier
-      expect(state.resourceBank.coins).toBe(coinsBefore + 8); // medium default multiplier floor(7 * 1.15)
+      // CG-0MRER3RE300418SG: Math.floor removed; fractional values preserved.
+      // 7 * 1.15 = 8.05 (was floor(8.05)=8 before fix)
+      expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 8.05);
     });
   });
 });
