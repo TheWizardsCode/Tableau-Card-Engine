@@ -170,6 +170,9 @@ export {
   setLocale,
   getLocale,
   resetI18n,
+  CURRENCY_SYMBOL_KEY,
+  getCurrencySymbol,
+  formatCurrency,
 } from './I18n';
 export type { I18nBundle } from './I18n';
 

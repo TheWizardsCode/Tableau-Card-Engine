@@ -105,7 +105,7 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
   [tutorialKey('T3', 'title')]:
     'Development Row',
   [tutorialKey('T3', 'body')]:
-    'Buy the **Laundromat** card from the Development row for $6. It is the cheapest card and earns money each turn. Place cards on your street to earn income.',
+    'Buy the **Laundromat** card from the Development row for €6. It is the cheapest card and earns money each turn. Place cards on your street to earn income.',
 
   // ── T4: Place a Business ────────────────────────────────────
   [tutorialKey('T4', 'title')]:

@@ -773,7 +773,7 @@ export class MainStreetRenderer {
 
             // Tooltip for the Discover button
             const reasonSuffix = !canRefresh && refreshDevResult.reason ? `\n\n${refreshDevResult.reason}` : '';
-            const info = `Pay $${REFRESH_DEVELOPMENT_COST} to discover new development opportunities and replace the visible development row. Removed cards go to their discard piles. Available only during Market phase.${reasonSuffix}`;
+            const info = `Pay €${REFRESH_DEVELOPMENT_COST} to discover new development opportunities and replace the visible development row. Removed cards go to their discard piles. Available only during Market phase.${reasonSuffix}`;
             try {
               bg.on('pointerover', (pointer: any) => {
                 if (s.tooltipManager) {
@@ -849,7 +849,7 @@ export class MainStreetRenderer {
 
             // Tooltip for the Research button (attach to bg so it receives pointer events)
             const reasonSuffix = !canRefresh && refreshInvResult.reason ? `\n\n${refreshInvResult.reason}` : '';
-            const info = `Pay $${REFRESH_INVESTMENTS_COST} to research new investment opportunities and replace the visible investments row. Removed cards go to their discard piles. Available only during Market phase.${reasonSuffix}`;
+            const info = `Pay €${REFRESH_INVESTMENTS_COST} to research new investment opportunities and replace the visible investments row. Removed cards go to their discard piles. Available only during Market phase.${reasonSuffix}`;
             try {
               bg.on('pointerover', (pointer: any) => {
                 if (s.tooltipManager) {

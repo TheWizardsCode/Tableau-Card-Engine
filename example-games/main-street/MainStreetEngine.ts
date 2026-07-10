@@ -722,7 +722,7 @@ export function placeFromHand(
   hand.splice(handIndex, 1);
   state.streetGrid[slotIndex] = card;
 
-  addLog(state, `Placed ${card.name} from hand in slot ${slotIndex} (-$${placementCost})`, 'loss');
+  addLog(state, `Placed ${card.name} from hand in slot ${slotIndex} (-€${placementCost})`, 'loss');
 }
 
 /**

@@ -6,10 +6,15 @@
  * be registered at startup; every call to `t()` returns the string for the
  * current locale, falling back to the `en` default when a key is missing.
  *
+ * Also provides currency-symbol support.  The default currency symbol is
+ * `€` (Euro).  Individual locales can override it by including the key
+ * `CURRENCY_SYMBOL_KEY` in their bundle.  Use `getCurrencySymbol()` to
+ * retrieve the symbol for the current locale.
+ *
  * ## Usage
  *
  * ```ts
- * import { t, registerLocale, setLocale } from '@core-engine/I18n';
+ * import { t, registerLocale, setLocale, getCurrencySymbol } from '@core-engine/I18n';
  *
  * // Register the English (default) bundle
  * registerLocale('en', { 'hud.tooltip.coins.title': 'Income This Turn' });
@@ -32,6 +37,17 @@ export type I18nBundle = Record<string, string>;
 
 const bundles: Map<string, I18nBundle> = new Map();
 let currentLocale = 'en';
+
+// ── Constants ───────────────────────────────────────────────
+
+/**
+ * I18n key for the currency symbol.
+ *
+ * Locale bundles can include this key to override the currency symbol
+ * per locale (e.g. `en-US` → `$`, `de-DE` → `€`, `ja-JP` → `¥`).
+ * The default (fallback) is `€` (Euro).
+ */
+export const CURRENCY_SYMBOL_KEY = 'currency.symbol';
 
 // ── Public API ──────────────────────────────────────────────
 
@@ -85,6 +101,40 @@ export function t(key: string): string {
 
   // Last resort: return the key itself
   return key;
+}
+
+/**
+ * Get the currency symbol for the current locale.
+ *
+ * Looks up `CURRENCY_SYMBOL_KEY` ('currency.symbol') in the current locale
+ * bundle.  If not found, falls back to the `en` bundle, and finally to `€`.
+ *
+ * Locale authors can override the symbol by including the key in their
+ * locale bundle:
+ *
+ * ```ts
+ * registerLocale('en-US', { 'currency.symbol': '$' });
+ * registerLocale('de-DE', { 'currency.symbol': '€' });
+ * ```
+ *
+ * Games that do not explicitly register a currency symbol default to Euro.
+ *
+ * @returns The currency symbol string (e.g. `€`, `$`, `¥`).
+ */
+export function getCurrencySymbol(): string {
+  const symbol = t(CURRENCY_SYMBOL_KEY);
+  // If the key itself was returned (not found in any bundle), use Euro
+  return symbol === CURRENCY_SYMBOL_KEY ? '€' : symbol;
+}
+
+/**
+ * Format a monetary value with the current locale's currency symbol.
+ *
+ * @param amount  The numeric amount to format.
+ * @returns       A string like `"€5"` or `"$12"`.
+ */
+export function formatCurrency(amount: number): string {
+  return `${getCurrencySymbol()}${amount}`;
 }
 
 /**
