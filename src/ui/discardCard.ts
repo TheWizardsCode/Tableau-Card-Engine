@@ -21,12 +21,14 @@ export interface DiscardCardOptions {
 
   /**
    * Vertical offset for discard direction (negative = move up, positive = move down).
+   * Only used in shrink mode (when destX/destY are not provided).
    * @default 30
    */
   offsetY?: number;
 
   /**
    * Horizontal offset for discard direction.
+   * Only used in shrink mode (when destX/destY are not provided).
    * @default 0
    */
   offsetX?: number;
@@ -39,6 +41,7 @@ export interface DiscardCardOptions {
 
   /**
    * Easing function for the movement.
+   * Used for the shrink path (when destX/destY not provided).
    * @default 'Quad.easeIn'
    */
   ease?: string;
@@ -79,6 +82,29 @@ export interface DiscardCardOptions {
    * @default true
    */
   destroyAfter?: boolean;
+
+  /**
+   * Destination X for animated discard (animate to discard pile position).
+   * When provided together with destY, the card animates from its current
+   * position to (destX, destY) instead of shrinking in place.
+   */
+  destX?: number;
+
+  /**
+   * Destination Y for animated discard (animate to discard pile position).
+   * When provided together with destX, the card animates from its current
+   * position to (destX, destY) instead of shrinking in place.
+   */
+  destY?: number;
+
+  /**
+   * Optional texture key to flip to when the card arrives at the destination.
+   * When set, the card performs a two-phase flip animation (scaleX→0, change
+   * texture, scaleX→1) after reaching the destination. This is used when
+   * discarding a face-up card to show it face-down in the discard pile.
+   * Only applies when destX and destY are provided.
+   */
+  flipOnArrivalTexture?: string;
 
   /** Optional SoundManager to play SFX during discard. */
   soundManager?: SoundManager | null;
@@ -132,27 +158,101 @@ export function discardCard(opts: DiscardCardOptions): Phaser.Tweens.Tween {
     reducedMotion,
     soundManager = null,
     sfx,
+    destX,
+    destY,
+    flipOnArrivalTexture,
   } = opts;
 
-  // Check for reduced motion preference (explicit param takes precedence)
-  const shouldReduce = reducedMotion ?? prefersReducedMotion();
-
-  // If reduced motion, just hide immediately
-  if (shouldReduce) {
-    target.setAlpha(0);
-    target.setScale(0);
+  // Emit completion event and optionally destroy the target.
+  function emitComplete(): void {
     if (gameEvents && cardId) {
       gameEvents.emit('card:discarded', { cardId, playerIndex });
     }
     if (destroyAfter) {
       target.destroy();
     }
+  }
+
+  // Check for reduced motion preference (explicit param takes precedence)
+  const shouldReduce = reducedMotion ?? prefersReducedMotion();
+
+  // If reduced motion, snap to final state immediately
+  if (shouldReduce) {
+    if (destX !== undefined && destY !== undefined) {
+      target.x = destX;
+      target.y = destY;
+      if (flipOnArrivalTexture && typeof (target as any).setTexture === 'function') {
+        (target as any).setTexture(flipOnArrivalTexture);
+      }
+    }
+    target.setAlpha(0);
+    target.setScale(0);
+    emitComplete();
     return scene.tweens.add({
       targets: target,
       duration: 50,
     });
   }
 
+  // ── Destination animation path (animate to discard pile) ──
+  if (destX !== undefined && destY !== undefined) {
+    const moveDuration = duration * 0.65;
+    const flipHalfDuration = duration * 0.175;
+    const initialScaleX = target.scaleX ?? 1;
+
+    if (flipOnArrivalTexture) {
+      // Phase 1: Move from current position to destination
+      const tween = scene.tweens.add({
+        targets: target,
+        x: destX,
+        y: destY,
+        duration: moveDuration,
+        ease: 'Quad.easeOut',
+        onComplete: () => {
+          // Phase 2a: Flip close (scaleX → 0)
+          scene.tweens.add({
+            targets: target,
+            scaleX: 0,
+            duration: flipHalfDuration,
+            ease: 'Power2',
+            onComplete: () => {
+              // Apply new texture at the midpoint of the flip
+              if (typeof (target as any).setTexture === 'function') {
+                (target as any).setTexture(flipOnArrivalTexture);
+              }
+
+              // Phase 2b: Flip open (scaleX → 1)
+              scene.tweens.add({
+                targets: target,
+                scaleX: initialScaleX,
+                duration: flipHalfDuration,
+                ease: 'Power2',
+                onComplete: () => {
+                  emitComplete();
+                },
+              });
+            },
+          });
+        },
+      });
+
+      return tween;
+    }
+
+    // Move to destination without flip
+    return scene.tweens.add({
+      targets: target,
+      x: destX,
+      y: destY,
+      duration,
+      ease: 'Quad.easeOut',
+      onComplete: () => {
+        emitComplete();
+      },
+    });
+  }
+
+  // ── Original shrink/fade behavior (no destination) ──
   const moveInterval = sfx?.moveIntervalMs ?? 120;
   let lastMovePlay = 0;
   let loopSound: Phaser.Sound.BaseSound | null = null;
