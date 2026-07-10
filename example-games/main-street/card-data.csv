@@ -5,7 +5,7 @@ business,biz-bookshop,Bookshop,8,1,Culture,Bookshop,1,,,,Sells books. Gains +1 c
 business,biz-hardware,Hardware Store,10,1,Commerce,Hardware Store,1,,,,Supplies tools. Gains +1 coin per adjacent Commerce business.,1,,,,,,,,,,,,,,,,
 business,biz-pawnshop,Pawn Shop,6,1,Commerce,Pawn Shop,1,,0,0,Trades second-hand goods. Does not provide or receive synergy bonuses.,1,,,,,,,,,,,,,,,,
 business,biz-boutique,Boutique,8,1,Commerce,Boutique,1,,,,Sells curated fashion. Gains +1 coin per adjacent Commerce business.,2,,,,,,,,,,,,,,,,
-business,biz-laundromat,Laundromat,6,1,Service,Laundromat,1,,,,Provides self-serve laundry. Gains +1 coin per adjacent Service business.,1,,,,,,,,,,,,,,,,
+business,biz-laundromat,Laundromat,3,0.5,Service,Laundromat,1,,,,Provides self-serve laundry. Gains +1 coin per adjacent Service business.,1,,,,,,,,,,,,,,,,
 business,biz-barbershop,Barbershop,6,1,Service,Barbershop,1,,,,Classic cuts and conversation. Gains +1 coin per adjacent Service business.,3,,,,,,,,,,,,,,,,
 business,biz-arcade,Arcade,8,1,Entertainment,Arcade,1,,,,Retro fun for all ages. Gains +1 coin per adjacent Entertainment business.,2,,,,,,,,,,,,,,,,
 business,biz-cinema,Cinema,10,1,Entertainment,Cinema,2,,,,Shows the latest films. Gains +1 coin per adjacent Entertainment business.,3,,,,,,,,,,,,,,,,
