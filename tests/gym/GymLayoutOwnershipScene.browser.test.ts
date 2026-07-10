@@ -100,8 +100,8 @@ describe('GymLayoutOwnershipScene browser integration', () => {
     await waitForScene(game, GYM_LAYOUT_OWNERSHIP_KEY);
     const scene = game.scene.getScene(GYM_LAYOUT_OWNERSHIP_KEY) as Phaser.Scene;
 
-    // Find and click the shell mode button
-    const shellBtn = findTextObject(scene, text => text.includes('Shell'));
+    // Find and click the shell mode button (use '[ Mode:' prefix to distinguish from demo objects)
+    const shellBtn = findTextObject(scene, text => text.startsWith('[ Mode: Shell ]'));
     expect(shellBtn).toBeTruthy();
     shellBtn?.emit('pointerdown');
 
@@ -135,8 +135,8 @@ describe('GymLayoutOwnershipScene browser integration', () => {
     await waitForScene(game, GYM_LAYOUT_OWNERSHIP_KEY);
     const scene = game.scene.getScene(GYM_LAYOUT_OWNERSHIP_KEY) as Phaser.Scene;
 
-    // Find and click the scene mode button
-    const sceneBtn = findTextObject(scene, text => text.includes('Scene'));
+    // Find and click the scene mode button (use '[ Mode:' prefix to distinguish from demo objects)
+    const sceneBtn = findTextObject(scene, text => text.startsWith('[ Mode: Scene ]'));
     expect(sceneBtn).toBeTruthy();
     sceneBtn?.emit('pointerdown');
 
@@ -175,10 +175,12 @@ describe('GymLayoutOwnershipScene browser integration', () => {
     // Click the "+ Ungrouped" button to add an ungrouped target
     const addBtn = findTextObject(scene, text => text.includes('+ Ungrouped'));
     expect(addBtn).toBeTruthy();
+
     addBtn?.emit('pointerdown');
 
     // An ungrouped card should now be visible in the scene area
-    const ungroupedCard = findTextObject(scene, text => text === 'Ungrouped #1');
+    // (idx = registeredTargets.length + 1; there are 6 demo cards, so ungrouped #7)
+    const ungroupedCard = findTextObject(scene, text => text === 'Ungrouped #7');
     expect(ungroupedCard).toBeTruthy();
 
     // In composed mode, ungrouped targets should be hidden by default
@@ -208,9 +210,9 @@ describe('GymLayoutOwnershipScene browser integration', () => {
     const scene = game.scene.getScene(GYM_LAYOUT_OWNERSHIP_KEY) as Phaser.Scene;
 
     // Switch to shell-only, then scene-only, then back to composed
-    const shellBtn = findTextObject(scene, text => text.includes('Shell'));
-    const sceneBtn = findTextObject(scene, text => text.includes('Scene'));
-    const composedBtn = findTextObject(scene, text => text.includes('Composed'));
+    const shellBtn = findTextObject(scene, text => text.startsWith('[ Mode: Shell ]'));
+    const sceneBtn = findTextObject(scene, text => text.startsWith('[ Mode: Scene ]'));
+    const composedBtn = findTextObject(scene, text => text.startsWith('[ Mode: Composed ]'));
 
     expect(shellBtn).toBeTruthy();
     expect(sceneBtn).toBeTruthy();

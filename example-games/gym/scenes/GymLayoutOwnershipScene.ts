@@ -57,12 +57,14 @@ interface ModeButton {
 interface GroupToggle {
   label: Phaser.GameObjects.Text;
   groupName: string;
+  displayName: string;
   active: boolean;
 }
 
 export class GymLayoutOwnershipScene extends GymSceneBase {
   private controller!: VisibilityOwnershipController<VisibilityTarget>;
-  private registeredTargets: Phaser.GameObjects.Container[] = [];
+  private registeredTargets: Phaser.GameObjects.Text[] = [];
+  private bgRects: Phaser.GameObjects.Rectangle[] = [];
   private modeButtons: ModeButton[] = [];
   private groupToggles: GroupToggle[] = [];
   private statusText!: Phaser.GameObjects.Text;
@@ -101,7 +103,6 @@ export class GymLayoutOwnershipScene extends GymSceneBase {
     this.createController();
     this.createDemoObjects();
     this.createControls();
-    this.syncAllVisibility();
 
     this.events.once('shutdown', () => this.cleanup());
   }
@@ -153,9 +154,9 @@ export class GymLayoutOwnershipScene extends GymSceneBase {
     ];
 
     for (const obj of objects) {
-      const container = this.createOwnedCard(obj.label, obj.x, obj.y);
-      this.controller.register(container, obj.group);
-      this.registeredTargets.push(container);
+      const card = this.createOwnedCard(obj.label, obj.x, obj.y);
+      this.controller.register(card, obj.group);
+      this.registeredTargets.push(card);
     }
   }
 
@@ -163,29 +164,29 @@ export class GymLayoutOwnershipScene extends GymSceneBase {
     label: string,
     x: number,
     y: number,
-  ): Phaser.GameObjects.Container {
-    const container = this.add.container(x, y);
-
-    // Card background
+  ): Phaser.GameObjects.Text {
+    // Card background (drawn behind the text at the same position)
     const bg = this.add
-      .rectangle(0, 0, CARD_W, CARD_H, 0x1a3a4a, 0.8)
-      .setStrokeStyle(2, CARD_STROKE, 1);
-    container.add(bg);
+      .rectangle(x + CARD_W / 2, y + CARD_H / 2, CARD_W, CARD_H, 0x1a3a4a, 0.8)
+      .setStrokeStyle(2, CARD_STROKE, 1)
+      .setDepth(0);
+    // Store reference for cleanup
+    this.bgRects.push(bg);
 
-    // Label
+    // Label text — directly on the scene display list, not inside a Container
     const text = this.add
-      .text(CARD_W / 2, CARD_H / 2, label, {
+      .text(x + CARD_W / 2, y + CARD_H / 2, label, {
         fontSize: '14px',
         color: '#ffffff',
         fontFamily: 'monospace',
         fontStyle: 'bold',
       })
-      .setOrigin(0.5);
-    container.add(text);
+      .setOrigin(0.5)
+      .setDepth(1);
 
-    container.setVisible(true);
+    text.setVisible(true);
 
-    return container;
+    return text;
   }
 
   // ── Controls ─────────────────────────────────────────────
@@ -233,9 +234,10 @@ export class GymLayoutOwnershipScene extends GymSceneBase {
       { label: '[ – Ungrouped ]', action: () => this.removeUngrouped() },
     ];
 
-    for (const { label, action } of ungroupedBtns) {
+    for (let i = 0; i < ungroupedBtns.length; i++) {
+      const { label, action } = ungroupedBtns[i];
       this.createClickableButton(
-        groupStartX + ungroupedBtns.indexOf({ label, action }) * (130 + 8),
+        groupStartX + i * (130 + 8),
         CONTROLS_Y + 60,
         label,
         action,
@@ -252,6 +254,10 @@ export class GymLayoutOwnershipScene extends GymSceneBase {
           try { c.destroy(); } catch (_) { /* ignore */ }
         });
         this.registeredTargets = [];
+        this.bgRects.forEach((bg) => {
+          try { bg.destroy(); } catch (_) { /* ignore */ }
+        });
+        this.bgRects = [];
         this.issues = [];
         this.issueList.forEach((t) => t.destroy());
         this.issueList = [];
@@ -310,18 +316,20 @@ export class GymLayoutOwnershipScene extends GymSceneBase {
     groupName: string,
     label: string,
   ): GroupToggle {
+    // Extract the display name from the bracket label (e.g. ' Shell Chrome ' from '[ Shell Chrome ]')
+    const displayName = label.slice(1, label.length - 1).trim();
     // Start active
     const text = this.createClickableButton(
       x,
       y,
-      `[ ${label.slice(1, label.length - 1)}: ON ]`,
+      `[ ${displayName}: ON ]`,
       () => {
         this.toggleGroup(groupName);
       },
       { color: '#88dd88' },
     );
 
-    return { label: text, groupName, active: true };
+    return { label: text, groupName, displayName, active: true };
   }
 
   private createClickableButton(
@@ -358,7 +366,7 @@ export class GymLayoutOwnershipScene extends GymSceneBase {
 
     toggle.active = !toggle.active;
     toggle.label.setText(
-      `[ ${groupName}: ${toggle.active ? 'ON' : 'OFF'} ]`,
+      `[ ${toggle.displayName}: ${toggle.active ? 'ON' : 'OFF'} ]`,
     );
     toggle.label.setColor(toggle.active ? '#88dd88' : '#ff6644');
 
@@ -372,28 +380,30 @@ export class GymLayoutOwnershipScene extends GymSceneBase {
     }
 
     this.controller.setGroupRules(groupName, newRules);
-    this.syncAllVisibility();
     this.updateStatus();
   }
 
   private addUngrouped(): void {
     const idx = this.registeredTargets.length + 1;
-    const container = this.createOwnedCard(`Ungrouped #${idx}`, 20 + idx * (CARD_W + 8), 500);
-    this.controller.register(container); // no group → ungrouped
-    this.registeredTargets.push(container);
-    this.syncAllVisibility();
+    const card = this.createOwnedCard(`Ungrouped #${idx}`, 20 + idx * (CARD_W + 8), 500);
+    this.controller.register(card); // no group → ungrouped
+    this.registeredTargets.push(card);
     this.updateIssues();
   }
 
   private removeUngrouped(): void {
-    if (this.registeredTargets.length === 0) return;
-
-    // Remove the last ungrouped target
-    const removed = this.registeredTargets.pop();
-    if (removed) {
-      try { removed.destroy(); } catch (_) { /* ignore */ }
-      this.syncAllVisibility();
-      this.updateIssues();
+    // Find and remove the last target registered to the 'ungrouped' default group
+    for (let i = this.registeredTargets.length - 1; i >= 0; i--) {
+      const target = this.registeredTargets[i];
+      // Skip targets that have group info — we only track group on registration here,
+      // so we check if this was registered via addUngrouped() (created by that method)
+      const isUngrouped = target.text.startsWith('Ungrouped #');
+      if (isUngrouped) {
+        this.registeredTargets.splice(i, 1);
+        try { target.destroy(); } catch (_) { /* ignore */ }
+        this.updateIssues();
+        return;
+      }
     }
   }
 
@@ -401,16 +411,16 @@ export class GymLayoutOwnershipScene extends GymSceneBase {
     this.issues = [];
     this.issueList.forEach((t) => t.destroy());
     this.issueList = [];
-    this.controller.clear();
-  }
-
-  // ── Visibility sync ──────────────────────────────────────
-
-  private syncAllVisibility(): void {
-    for (const container of this.registeredTargets) {
-      const isVisible = container.visible;
-      container.setVisible(isVisible);
+    // Destroy all registered text targets and their associated backgrounds
+    for (const card of this.registeredTargets) {
+      try { card.destroy(); } catch (_) { /* ignore */ }
     }
+    this.registeredTargets = [];
+    for (const bg of this.bgRects) {
+      try { bg.destroy(); } catch (_) { /* ignore */ }
+    }
+    this.bgRects = [];
+    this.controller.clear();
   }
 
   // ── UI updates ───────────────────────────────────────────
