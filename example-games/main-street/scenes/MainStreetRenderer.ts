@@ -33,6 +33,7 @@ import {
 import {
   FONT_FAMILY,
   HandView,
+  HintBar,
   attachSelection,
   markHudTransient,
   clearTransientHud,
@@ -220,14 +221,12 @@ export class MainStreetRenderer {
 
   public createInstructions(): void {
     const s = this.scene;
-    // Centered at bottom
-    s.instructionText = s.add
-      .text(s.layout.gameW / 2, s.layout.gameH - 20, '', {
-        fontSize: '14px',
-        color: '#ccaa77',
-        fontFamily: FONT_FAMILY,
-      })
-      .setOrigin(0.5, 1);
+    // Shared HintBar for hint/instruction display at bottom-center
+    s.hintBar = new HintBar(s);
+
+    // Keep legacy instructionText for backward compatibility (tests),
+    // referencing the HintBar's underlying text object.
+    s.instructionText = s.hintBar.textObject;
   }
 
   public refreshAll(): void {

@@ -61,7 +61,7 @@ export class MainStreetInputManager {
 
     const hint: HintResult | null = generateHint(s.state);
     if (!hint) {
-      s.instructionText.setText('Hint not available right now.');
+      s.hintBar?.setText('Hint not available right now.');
       return;
     }
 
@@ -84,7 +84,7 @@ export class MainStreetInputManager {
       s.hintedSlotIndex = null;
     }
 
-    s.instructionText.setText(`Hint: ${hint.rationale}`);
+    s.hintBar?.setText(`Hint: ${hint.rationale}`);
     addLog(s.state, `Hint: ${hint.rationale}`, 'neutral');
     try { recordMainStreetEvent({ type: 'hint', turn: s.state.turn, recommendedAction: hint.action, rationale: hint.rationale }); } catch (_) {}
 
