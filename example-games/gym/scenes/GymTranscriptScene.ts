@@ -21,6 +21,28 @@ import { popTextOrIcon } from '../../../src/ui/popTextOrIcon';
 import { GAME_W } from '../../../src/ui/constants';
 import { createEventLog } from '../../../src/ui/GymSceneUtils';
 import type { EventLogResult } from '../../../src/ui/GymSceneUtils';
+import { anchorPoint } from '../../../src/ui/screen-layout';
+import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
+import gymTranscriptLayoutJson from '../layouts/gym-transcript.layout.json';
+
+// Parse the shared Transcript scene layout once at module load.
+const TRANSCRIPT_LAYOUT: import('../../../src/ui/screen-layout-schema').ScreenLayoutDocument | null = (() => {
+  const parsed = parseScreenLayoutDocument(gymTranscriptLayoutJson);
+  return parsed.valid ? parsed.layout : null;
+})();
+
+const DEFAULT_VIEWPORT = { width: 1280, height: 720 };
+
+function resolveTranscriptAnchor(
+  zone: string,
+  anchor: string,
+  viewport = DEFAULT_VIEWPORT,
+): import('../../../src/ui/screen-layout-schema').PixelPoint {
+  if (!TRANSCRIPT_LAYOUT) {
+    return { x: GAME_W / 2, y: 60 };
+  }
+  return anchorPoint(TRANSCRIPT_LAYOUT, zone, anchor, viewport, 1);
+}
 
 /** Simple event shape for this demo. */
 interface DemoTranscriptEvent {
@@ -83,12 +105,28 @@ export class GymTranscriptScene extends GymSceneBase {
     this.initReducedMotion();
 
     this.initHelp([
-      { heading: 'Overview', body: 'Shows transcript recording and deterministic event ordering. Use a fixed seed to produce stable transcripts for testing and debugging.' },
-      { heading: 'Controls', body: '[ New Session ]: Start a fresh transcript session.\n[ Record Event ]: Append a new event to the transcript.\n[ Finalize ]: Mark the transcript finished.\n[ Playback ]: Sequentially replay recorded events.\n[ Show Transcript ]: Log transcript metadata and events.' }
+      {
+        heading: 'Features',
+        body: 'Demonstrates transcript recording using TranscriptRecorderBase for capturing and replaying game events in sequence. Transcripts provide a deterministic, replayable record of game actions — essential for debugging, automated testing, spectator replays, and fair-play auditing. In a real card game, a transcript records every draw, discard, shuffle, and score change so the full game session can be replayed step by step.'
+      },
+      {
+        heading: 'Controls',
+        body: '[ New Session ]: Start a fresh transcript session with a fixed seed (42) for deterministic event ordering.\n[ Record Event ]: Append a randomly chosen event type (draw, discard, shuffle, score) to the transcript with an incrementing turn number.\n[ Finalize ]: Mark the transcript as complete and record the end timestamp.\n[ Playback ]: Sequentially replay all recorded events with a 600ms delay between each.\n[ Show Transcript ]: Log the full transcript metadata (version, game type, event count) and all recorded events with turn numbers.'
+      },
+      {
+        heading: 'Usage Example',
+        body: 'A developer is debugging a scoring bug in a Golf game. They record a transcript of a complete round, then replay it step by step to verify that each score change corresponds to the correct game action. The deterministic seed ensures the same card draw order can be reproduced for consistent debugging.'
+      },
+      {
+        heading: 'Test Plan',
+        body: '1. Press [ New Session ] → new transcript created, log confirms seed\n2. Press [ Record Event ] five times → five events recorded with various types\n3. Press [ Show Transcript ] → log shows version, game type, and all five events with turn numbers\n4. Press [ Finalize ] → transcript finalized with end timestamp\n5. Press [ Playback ] → events replay sequentially with 600ms delays\n6. Press [ New Session ] again → fresh session started, old transcript discarded\n7. Verify logs accumulate without exceeding the visible limit'
+      }
     ]);
 
     const cx = GAME_W / 2;
-    let y = 60;
+    const controlsAnchor = resolveTranscriptAnchor('controls', 'center');
+    const logAnchor = resolveTranscriptAnchor('log', 'center');
+    const y = controlsAnchor.y;
 
     this.addButton(cx - 400, y, '[ New Session ]', () => this.newSession());
     this.addButton(cx - 240, y, '[ Record Event ]', () => this.recordEvent());
@@ -96,8 +134,7 @@ export class GymTranscriptScene extends GymSceneBase {
     this.addButton(cx + 80, y, '[ Playback ]', () => this.playTranscript());
     this.addButton(cx + 200, y, '[ Show Transcript ]', () => this.showTranscript());
 
-    y += 40;
-    this.eventLogResult = createEventLog(this, y + 20, {
+    this.eventLogResult = createEventLog(this, logAnchor.y + 20, {
       headerText: '── Event Log ──',
       maxLines: 16,
       lineHeight: 16,

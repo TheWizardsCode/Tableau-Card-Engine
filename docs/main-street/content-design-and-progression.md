@@ -67,38 +67,9 @@ The core economic loop consists of two primary resources:
 
 ## 4. Difficulty and Balance
 
-Main Street is intended to be approachable for 10‑15‑minute play sessions while still offering strategic depth. Difficulty is managed through the following levers:
+The balancing methodology and targets for Main Street have been consolidated into a dedicated document. See [balancing-methodology.md](balancing-methodology.md) for the full methodology.
 
-| Lever | Effect |
-|-------|--------|
-| **Slot Count** | The base game uses 10 slots; increasing to 12 slots adds decision space without extending playtime significantly. |
-| **Coin Starting Amount** | Adjusting the initial budget (e.g., 8 → 10 coins) can make early rounds easier or tighter. |
-| **Synergy Bonus Value** | Changing the synergy bonus from `+1` to `+2` per matching neighbor raises the impact of placement decisions. |
-| **Event Frequency** | Adding more Incident events to the deck increases variance. The visible incident queue (2 cards) lets the player plan ahead. |
-| **Challenge Targets** | Scaling challenge thresholds (e.g., “Build a Foodie Row” requiring 3 Food businesses) adjusts difficulty. |
-
-Balancing targets are defined in the runtime difficulty config (Medium defaults: `maxTurns = 20`, `winThreshold = 150`, `startingCoins = 8`, `synergyBonusPerNeighbor = 1`). Playtesting should verify that a typical run reaches the score threshold in the mid-to-late game with meaningful risk from incidents.
-
-### 4.1 Provisional Numeric Balance Targets (Medium)
-
-These are draft targets for iterative tuning and are validated using deterministic Monte Carlo sweeps:
-
-| Metric | Target (draft) | Notes |
-|-------|-----------------|-------|
-| Win rate | 85%-97% over 100 deterministic seeds | Greedy market strategy baseline (`market-greedy`) |
-| Median final score | 150-170 | Should stay near the score-threshold band |
-| Dominant loss reason share | >= 50% of losses | Ensures one primary failure mode remains measurable |
-| Avg no-action turns | >= 0.75 turns/run | Confirms meaningful affordability tension |
-| Avg turn street reaches 5/10 slots | 4.5-7.5 | Early/mid-game growth checkpoint |
-| Avg turn street reaches 10/10 slots | 9-12 | Mid/late-game saturation checkpoint |
-
-### 4.2 Tuning Levers
-
-- `startingCoins`: early purchasing power and bankruptcy risk.
-- `winThreshold`: pacing pressure for score-based wins.
-- `synergyBonusPerNeighbor`: strength of adjacency strategy.
-- `maxTurns`: upper bound for pacing and turn-exhaustion pressure.
-- incident/event card composition and penalties: volatility and loss-vector mix.
+> **Migrated content**: Section 4 (Difficulty and Balance), 4.1 (Provisional Numeric Balance Targets), and 4.2 (Tuning Levers) have been moved to `balancing-methodology.md`. This section now serves as a cross-reference.
 
 ---
 

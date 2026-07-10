@@ -58,6 +58,9 @@ export const GYM_TOOLTIP_KEY = 'GymTooltipScene';
 /** HUD Components demo scene key. */
 export const GYM_HUD_COMPONENTS_KEY = 'GymHudComponentsScene';
 
+/** Layout Ownership demo scene key. */
+export const GYM_LAYOUT_OWNERSHIP_KEY = 'GymLayoutOwnershipScene';
+
 // ── Registry ──────────────────────────────────────────────
 
 /**
@@ -126,6 +129,12 @@ export const GYM_SCENE_CATALOGUE: GymSceneEntry[] = [
     title: 'Screen Layout Language (SLL)',
     description:
       'Parses and validates SLL JSON, maps zones/anchors to pixels across viewport+DPR profiles, and visualizes layout overlays interactively.',
+  },
+  {
+    sceneKey: GYM_LAYOUT_OWNERSHIP_KEY,
+    title: 'Layout Ownership',
+    description:
+      'Demonstrates the VisibilityOwnershipController: register objects to shell/scene/shared/ungrouped groups and toggle visibility by mode.',
   },
   {
     sceneKey: GYM_TOOLTIP_KEY,

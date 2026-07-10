@@ -10,7 +10,7 @@
  */
 
 import type { BusinessCard, CommunitySpaceCard, SynergyType } from './MainStreetCards';
-import { GRID_SIZE, SYNERGY_BONUS_PER_NEIGHBOR, isPawnShopCard } from './MainStreetCards';
+import { GRID_SIZE } from './MainStreetCards';
 import type { MainStreetState } from './MainStreetState';
 import { addLog, syncResourceBankToLedger } from './MainStreetState';
 import { applyReputationMultiplier } from './MainStreetDifficulty';
@@ -61,34 +61,53 @@ export function neighbors(index: number, range: number = 1): number[] {
 }
 
 /**
- * Computes the synergy bonus for a single business at a given slot.
+ * Resolves the effective per-neighbor coin synergy contribution for a card.
+ * Returns the card's `synergyCoinBonus` if set, otherwise 1 (the default).
+ */
+function effectiveSynergyCoinBonus(card: BusinessCard | CommunitySpaceCard): number {
+  return card.synergyCoinBonus ?? 1;
+}
+
+/**
+ * Resolves the effective per-neighbor reputation synergy contribution for a card.
+ * Returns the card's `synergyRepBonus` if set, otherwise 0 (the default).
+ */
+function effectiveSynergyRepBonus(card: BusinessCard | CommunitySpaceCard): number {
+  return card.synergyRepBonus ?? 0;
+}
+
+/**
+ * Computes the synergy coin bonus for a single business at a given slot.
  *
- * A business earns +bonusPerNeighbor coins for each neighboring
- * slot that contains a business sharing at least one SynergyType.
+ * A business earns coins for each neighboring slot that contains a business
+ * sharing at least one SynergyType. The contribution from each neighbor is
+ * the neighbor's `synergyCoinBonus` (default 1) multiplied by `bonusPerNeighbor`
+ * (the difficulty preset multiplier).
+ *
  * The range considered is 1 + business.synergyRangeBonus (from upgrades).
  *
- * Pawn Shop cards are excluded entirely from synergy — they neither
- * receive nor contribute synergy bonuses. This special case will be
- * removed once synergy bonuses are generalized to per-card values
- * (see CG-0MQRA9QTA0012PNZ).
+ * Cards with zero synergyCoinBonus naturally don't contribute synergy
+ * to their neighbors, acting as synergy-neutral cards.
  *
  * @param grid               The street grid.
  * @param index              The slot index of the business.
- * @param bonusPerNeighbor   Coins per matching neighbor (defaults to SYNERGY_BONUS_PER_NEIGHBOR for backward compat).
- * @returns The synergy bonus in coins.
+ * @param bonusPerNeighbor   Global multiplier on per-card coin synergy (defaults to 1).
+ * @returns The synergy coin bonus.
  */
 export function computeSynergyBonus(
   grid: (BusinessCard | CommunitySpaceCard | null)[],
   index: number,
-  bonusPerNeighbor: number = SYNERGY_BONUS_PER_NEIGHBOR,
+  bonusPerNeighbor: number = 1,
 ): number {
   const business = grid[index];
   if (!business) return 0;
 
-  // Pawn Shop cards neither receive nor contribute synergy bonuses.
-  // This special case will be removed once synergy bonuses are generalized
-  // to per-card values (see CG-0MQRA9QTA0012PNZ).
-  if (isPawnShopCard(business)) return 0;
+  // A card with zero synergy coin AND zero synergy reputation does not
+  // participate in the synergy system at all: it neither contributes to
+  // nor receives synergy from neighbors.
+  if (effectiveSynergyCoinBonus(business) === 0 && effectiveSynergyRepBonus(business) === 0) {
+    return 0;
+  }
 
   const range = 1 + business.synergyRangeBonus;
   const neighborIndices = neighbors(index, range);
@@ -98,15 +117,59 @@ export function computeSynergyBonus(
     const neighbor = grid[ni];
     if (!neighbor) continue;
 
-    // Pawn Shop cards do not contribute to synergy bonuses
-    if (isPawnShopCard(neighbor)) continue;
+    // Check if any synergy type is shared
+    const hasSharedSynergy = business.synergyTypes.some(
+      (st: SynergyType) => neighbor.synergyTypes.includes(st),
+    );
+    if (hasSharedSynergy) {
+      // Use the neighbor's per-card synergy coin bonus, multiplied by the global modifier
+      bonus += effectiveSynergyCoinBonus(neighbor) * bonusPerNeighbor;
+    }
+  }
+
+  return bonus;
+}
+
+/**
+ * Computes the synergy reputation bonus for a single business at a given slot.
+ *
+ * A business earns reputation for each neighboring slot that contains a business
+ * sharing at least one SynergyType. The contribution from each neighbor is
+ * the neighbor's `synergyRepBonus` (default 0).
+ *
+ * The range considered is 1 + business.synergyRangeBonus (from upgrades).
+ *
+ * @param grid   The street grid.
+ * @param index  The slot index of the business.
+ * @returns The synergy reputation bonus.
+ */
+export function computeSynergyRepBonus(
+  grid: (BusinessCard | CommunitySpaceCard | null)[],
+  index: number,
+): number {
+  const business = grid[index];
+  if (!business) return 0;
+
+  // A card with zero synergy coin AND zero synergy reputation does not
+  // participate in the synergy system at all.
+  if (effectiveSynergyCoinBonus(business) === 0 && effectiveSynergyRepBonus(business) === 0) {
+    return 0;
+  }
+
+  const range = 1 + business.synergyRangeBonus;
+  const neighborIndices = neighbors(index, range);
+
+  let bonus = 0;
+  for (const ni of neighborIndices) {
+    const neighbor = grid[ni];
+    if (!neighbor) continue;
 
     // Check if any synergy type is shared
     const hasSharedSynergy = business.synergyTypes.some(
       (st: SynergyType) => neighbor.synergyTypes.includes(st),
     );
     if (hasSharedSynergy) {
-      bonus += bonusPerNeighbor;
+      bonus += effectiveSynergyRepBonus(neighbor);
     }
   }
 
@@ -118,17 +181,17 @@ export function computeSynergyBonus(
  *
  * totalIncome = baseIncome + incomeBonus (from upgrades) + synergyBonus
  *
- * Pawn Shop cards receive no synergy bonus (see computeSynergyBonus).
+ * @see computeSynergyBonus for details on per-card synergy values.
  *
  * @param grid               The street grid.
  * @param index              The slot index of the business.
- * @param bonusPerNeighbor   Coins per matching neighbor (defaults to SYNERGY_BONUS_PER_NEIGHBOR).
+ * @param bonusPerNeighbor   Global multiplier on per-card coin synergy (defaults to 1).
  * @returns The total income in coins for this business.
  */
 export function computeBusinessIncome(
   grid: (BusinessCard | CommunitySpaceCard | null)[],
   index: number,
-  bonusPerNeighbor: number = SYNERGY_BONUS_PER_NEIGHBOR,
+  bonusPerNeighbor: number = 1,
 ): number {
   const business = grid[index];
   if (!business) return 0;
@@ -142,8 +205,7 @@ export function computeBusinessIncome(
  * Computes the total synergy bonus contributed by hand cards to tableau businesses.
  *
  * Each hand card contributes Math.floor(card.baseIncome / 3) to each tableau
- * business that shares at least one synergy type. Pawn Shop cards do not
- * receive hand card synergy even when the types match.
+ * business that shares at least one synergy type.
  *
  * @param grid  The street grid (tableau businesses).
  * @param hand  Cards held in the player's hand.
@@ -168,9 +230,10 @@ export function computeHandCardSynergyBonus(
       const business = grid[i];
       if (!business) continue;
 
-      // Pawn Shop cards do not receive synergy from any source
-      if (isPawnShopCard(business)) continue;
-
+      // A card with zero synergy values does not participate in synergy
+      if (effectiveSynergyCoinBonus(business) === 0 && effectiveSynergyRepBonus(business) === 0) {
+        continue;
+      }
       // Check if any of the hand card's synergy types match the business's types
       const hasMatch = handCard.synergyTypes.some(
         (st: SynergyType) => business.synergyTypes.includes(st),
@@ -191,13 +254,13 @@ export function computeHandCardSynergyBonus(
  * Returns both the total and a per-slot breakdown for UI display.
  *
  * @param grid               The street grid.
- * @param bonusPerNeighbor   Coins per matching neighbor (defaults to SYNERGY_BONUS_PER_NEIGHBOR).
+ * @param bonusPerNeighbor   Global multiplier on per-card coin synergy (defaults to 1).
  * @param hand               Optional: hand cards to include for synergy bonuses.
  * @returns Object with `total` income and `breakdown` per slot.
  */
 export function computeIncome(
   grid: (BusinessCard | CommunitySpaceCard | null)[],
-  bonusPerNeighbor: number = SYNERGY_BONUS_PER_NEIGHBOR,
+  bonusPerNeighbor: number = 1,
   hand?: BusinessCard[],
 ): IncomeResult {
   const breakdown: SlotIncome[] = [];
@@ -240,9 +303,7 @@ export function computeIncome(
         let perSlotHandSynergy = 0;
         for (const handCard of hand) {
           if (!handCard.synergyTypes || handCard.synergyTypes.length === 0) continue;
-          if (isPawnShopCard(business)) continue;
-
-          const hasMatch = handCard.synergyTypes.some(
+              const hasMatch = handCard.synergyTypes.some(
             (st: SynergyType) => business.synergyTypes.includes(st),
           );
           if (hasMatch) {
@@ -269,6 +330,7 @@ export function computeIncome(
  * Each business/community-space card may contribute:
  * - Its base `reputationPerTurn` (from the card definition)
  * - Its accumulated `reputationBonus` (from applied upgrades)
+ * - Synergy reputation from matching neighbors via `synergyRepBonus`
  *
  * @param grid  The street grid.
  * @returns Total reputation per turn.
@@ -277,10 +339,13 @@ export function computeReputationPerTurn(
   grid: (BusinessCard | CommunitySpaceCard | null)[],
 ): number {
   let total = 0;
-  for (const slot of grid) {
+  for (let i = 0; i < grid.length; i++) {
+    const slot = grid[i];
     if (!slot) continue;
     total += slot.reputationPerTurn ?? 0;
     total += slot.reputationBonus;
+    // Add synergy reputation from matching neighbors
+    total += computeSynergyRepBonus(grid, i);
   }
   return total;
 }
@@ -330,9 +395,10 @@ export function applyIncome(state: MainStreetState): IncomeResult {
 
   syncResourceBankToLedger(state);
   if (multiplied > 0) {
-    addLog(state, `Income: +${multiplied} coins`, 'gain');
+    // CG-0MREYZO7E00729S0: show 3 decimal places for fractional coin values
+    addLog(state, `Income: +${multiplied.toFixed(3)} coins`, 'gain');
   } else {
-    addLog(state, `Income: +0 coins`, 'neutral');
+    addLog(state, `Income: +0.000 coins`, 'neutral');
   }
   if (repPerTurn > 0) {
     addLog(state, `Reputation from cards: +${repPerTurn}`, 'gain');
@@ -363,8 +429,7 @@ export interface SynergyPair {
  *
  * A pair exists when two occupied slots share at least one SynergyType and
  * are within Manhattan distance range (1 + card's synergyRangeBonus). Each pair
- * is reported only once (fromIndex < toIndex). Pawn Shop cards are excluded
- * entirely — they neither contribute nor receive synergy connections.
+ * is reported only once (fromIndex < toIndex).
  *
  * Community-space cards are included in the same manner as business cards.
  *
@@ -380,7 +445,11 @@ export function computeSynergyPairs(
   for (let i = 0; i < grid.length; i++) {
     const card = grid[i];
     if (!card) continue;
-    if (isPawnShopCard(card)) continue;
+
+    // A card with zero synergy values does not participate in synergy
+    if (effectiveSynergyCoinBonus(card) === 0 && effectiveSynergyRepBonus(card) === 0) {
+      continue;
+    }
 
     const range = 1 + card.synergyRangeBonus;
     const neighborIndices = neighbors(i, range);
@@ -389,7 +458,14 @@ export function computeSynergyPairs(
       if (ni <= i) continue; // avoid duplicates and self-pairs
       const neighbor = grid[ni];
       if (!neighbor) continue;
-      if (isPawnShopCard(neighbor)) continue;
+
+      // Neither card participates in synergy (both zero-synergy)
+      if (effectiveSynergyCoinBonus(card) === 0 && effectiveSynergyRepBonus(card) === 0) {
+        continue;
+      }
+      if (effectiveSynergyCoinBonus(neighbor) === 0 && effectiveSynergyRepBonus(neighbor) === 0) {
+        continue;
+      }
 
       // Find the first shared synergy type
       const shared = card.synergyTypes.find(

@@ -6,6 +6,10 @@
  * reputation during income and event resolution.
  *
  * Work item: CG-0MMLR38NJ1N11DOS
+ *
+ * CG-0MRER3RE300418SG: Removed Math.floor from applyReputationMultiplier
+ * so fractional income values (e.g. 0.5 baseIncome) are preserved instead
+ * of being silently truncated. Added fractional-income accumulation tests.
  */
 import { describe, it, expect } from 'vitest';
 
@@ -97,17 +101,18 @@ describe('reputationCoinMultiplier', () => {
 
 describe('applyReputationMultiplier', () => {
   it('scales positive coin deltas', () => {
-    // delta=10, rep=10 → multiplier=1.5 → floor(15) = 15
+    // delta=10, rep=10 → multiplier=1.5 → 15
     expect(applyReputationMultiplier(10, 10, DEFAULT_CFG)).toBe(15);
   });
 
-  it('floors the result for non-integer products', () => {
-    // delta=7, rep=3 → multiplier=1.15 → 7*1.15=8.05 → floor=8
-    expect(applyReputationMultiplier(7, 3, DEFAULT_CFG)).toBe(8);
-    // delta=5, rep=5 → multiplier=1.25 → 5*1.25=6.25 → floor=6
-    expect(applyReputationMultiplier(5, 5, DEFAULT_CFG)).toBe(6);
-    // delta=3, rep=7 → multiplier=1.35 → 3*1.35=4.05 → floor=4
-    expect(applyReputationMultiplier(3, 7, DEFAULT_CFG)).toBe(4);
+  it('preserves fractional products (no longer floors)', () => {
+    // CG-0MRER3RE300418SG: Math.floor removed; fractional values preserved.
+    // delta=7, rep=3 → multiplier=1.15 → 7*1.15=8.05
+    expect(applyReputationMultiplier(7, 3, DEFAULT_CFG)).toBeCloseTo(8.05);
+    // delta=5, rep=5 → multiplier=1.25 → 5*1.25=6.25
+    expect(applyReputationMultiplier(5, 5, DEFAULT_CFG)).toBeCloseTo(6.25);
+    // delta=3, rep=7 → multiplier=1.35 → 3*1.35=4.05
+    expect(applyReputationMultiplier(3, 7, DEFAULT_CFG)).toBeCloseTo(4.05);
   });
 
   it('does not scale negative coin deltas', () => {
@@ -133,6 +138,46 @@ describe('applyReputationMultiplier', () => {
   it('caps multiplied value at max multiplier', () => {
     // delta=10, rep=100 → multiplier capped at 3.0 → 10*3=30
     expect(applyReputationMultiplier(10, 100, DEFAULT_CFG)).toBe(30);
+  });
+
+  // ── Fractional income tests (CG-0MRER3RE300418SG) ──────────────
+
+  it('preserves fractional baseIncome with multiplier=1.0', () => {
+    // baseIncome=0.5, rep=0 → multiplier=1.0 → 0.5 (no loss)
+    expect(applyReputationMultiplier(0.5, 0, DEFAULT_CFG)).toBeCloseTo(0.5);
+  });
+
+  it('accumulates fractional income over multiple turns (no rep)', () => {
+    // Two turns of 0.5 income with multiplier=1.0 → 1.0
+    const turn1 = applyReputationMultiplier(0.5, 0, DEFAULT_CFG);
+    const turn2 = applyReputationMultiplier(0.5, 0, DEFAULT_CFG);
+    expect(turn1 + turn2).toBeCloseTo(1.0);
+  });
+
+  it('accumulates fractional income with reputation multiplier', () => {
+    // rep=3 → multiplier=1.15
+    // Each turn: 0.5 * 1.15 = 0.575
+    const turn1 = applyReputationMultiplier(0.5, 3, DEFAULT_CFG);
+    const turn2 = applyReputationMultiplier(0.5, 3, DEFAULT_CFG);
+    expect(turn1).toBeCloseTo(0.575);
+    expect(turn2).toBeCloseTo(0.575);
+    // After 2 turns: 0.575 + 0.575 = 1.15 (≥ 1 coin, was 0 before fix)
+    expect(turn1 + turn2).toBeGreaterThanOrEqual(1.0);
+  });
+
+  it('integer baseIncome values remain unchanged (backward compat)', () => {
+    // Integer baseIncome with multiplier=1.0 → same integer
+    expect(applyReputationMultiplier(1, 0, DEFAULT_CFG)).toBe(1);
+    expect(applyReputationMultiplier(2, 0, DEFAULT_CFG)).toBe(2);
+    expect(applyReputationMultiplier(3, 0, DEFAULT_CFG)).toBe(3);
+    expect(applyReputationMultiplier(10, 0, DEFAULT_CFG)).toBe(10);
+  });
+
+  it('integer baseIncome with reputation still produces expected values', () => {
+    // delta=1, rep=3 → multiplier=1.15 → 1.15 (was floor(1.15)=1 before fix)
+    expect(applyReputationMultiplier(1, 3, DEFAULT_CFG)).toBeCloseTo(1.15);
+    // delta=2, rep=10 → multiplier=1.5 → 3.0
+    expect(applyReputationMultiplier(2, 10, DEFAULT_CFG)).toBe(3);
   });
 });
 
@@ -166,7 +211,7 @@ describe('Reputation multiplier: income integration', () => {
     const coinsBefore = state.resourceBank.coins;
     const result = applyIncome(state);
 
-    // Base income = 10 (no synergy). Multiplied: floor(10 * 1.5) = 15
+    // Base income = 10 (no synergy). Multiplied: 10 * 1.5 = 15
     expect(result.total).toBe(10); // computeIncome total is raw
     expect(state.resourceBank.coins).toBe(coinsBefore + 15);
   });
@@ -194,6 +239,44 @@ describe('Reputation multiplier: income integration', () => {
 
     expect(state.resourceBank.coins).toBe(coinsBefore + 10);
   });
+
+  // ── Fractional income integration tests (CG-0MRER3RE300418SG) ──
+
+  it('accumulates fractional income over multiple turns (no rep)', () => {
+    const state = setupMainStreetGame({ seed: 'frac-income-no-rep' });
+    state.streetGrid.fill(null);
+    state.streetGrid[0] = makeBiz({ id: 'biz-1', baseIncome: 0.5, synergyTypes: [] });
+    state.resourceBank.reputation = 0;
+
+    // Set initial coins to 0 for predictable counting
+    state.resourceBank.coins = 0;
+
+    // Turn 1: 0.5 * 1.0 = 0.5
+    applyIncome(state);
+    expect(state.resourceBank.coins).toBeCloseTo(0.5);
+
+    // Turn 2: 0.5 * 1.0 = 0.5 → total = 1.0
+    applyIncome(state);
+    expect(state.resourceBank.coins).toBeCloseTo(1.0);
+  });
+
+  it('accumulates fractional income with reputation multiplier', () => {
+    const state = setupMainStreetGame({ seed: 'frac-income-rep' });
+    state.streetGrid.fill(null);
+    state.streetGrid[0] = makeBiz({ id: 'biz-1', baseIncome: 0.5, synergyTypes: [] });
+    state.resourceBank.reputation = 3; // Medium preset, multiplier ≈ 1.15
+
+    state.resourceBank.coins = 0;
+
+    // Turn 1: 0.5 * 1.15 = 0.575
+    applyIncome(state);
+    expect(state.resourceBank.coins).toBeCloseTo(0.575);
+
+    // Turn 2: 0.5 * 1.15 = 0.575 → total = 1.15 (was 0 before fix due to floor)
+    applyIncome(state);
+    expect(state.resourceBank.coins).toBeCloseTo(1.15);
+    expect(state.resourceBank.coins).toBeGreaterThanOrEqual(1.0);
+  });
 });
 
 // ── Integration: multiplier applied in resolveEvent ─────────────────
@@ -217,7 +300,7 @@ describe('Reputation multiplier: event resolution integration', () => {
     };
 
     resolveEvent(state, event);
-    // floor(5 * 2.0) = 10
+    // 5 * 2.0 = 10 (integer, no change from floor behavior)
     expect(state.resourceBank.coins).toBe(coinsBefore + 10);
   });
 

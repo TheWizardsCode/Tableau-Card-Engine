@@ -201,7 +201,7 @@ export function executeAction(
  */
 function describeEventEffects(coinChange: number, repChange: number): string {
   const parts: string[] = [];
-  if (coinChange !== 0) parts.push(`${coinChange > 0 ? '+' : ''}${coinChange} coins`);
+  if (coinChange !== 0) parts.push(`${coinChange > 0 ? '+' : ''}${coinChange.toFixed(3)} coins`);
   if (repChange !== 0) parts.push(`${repChange > 0 ? '+' : ''}${repChange} rep`);
   return parts.length > 0 ? parts.join(', ') : 'no effect';
 }
@@ -446,7 +446,7 @@ export function checkImmediateLoss(state: MainStreetState): boolean {
     state.gameResult = 'loss';
     state.endReason = 'bankruptcy';
     updateScore(state);
-    addLog(state, `Game Over: Bankruptcy (coins: ${state.resourceBank.coins})`, 'loss');
+    addLog(state, `Game Over: Bankruptcy (coins: ${state.resourceBank.coins.toFixed(3)})`, 'loss');
     return true;
   }
 

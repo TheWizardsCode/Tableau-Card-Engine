@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "id": "gym-save-load-layout",
+  "baseViewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "requiredZones": [
+    "controls",
+    "controls2",
+    "state",
+    "backend",
+    "log"
+  ],
+  "zones": {
+    "controls": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.08333
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.08333 }
+      }
+    },
+    "controls2": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.11944
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.11944 }
+      }
+    },
+    "state": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.25
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.25 }
+      }
+    },
+    "backend": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.29167
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.29167 }
+      }
+    },
+    "log": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.31944
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.31944 }
+      }
+    }
+  }
+}

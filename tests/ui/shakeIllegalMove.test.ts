@@ -191,10 +191,10 @@ describe('shakeIllegalMove', () => {
     expect(sprite.setX).toHaveBeenCalledWith(300);
   });
 
-  it('reproduces TheMind showInvalidPlayFeedback pattern', () => {
-    // TheMind: setTint(0xff4444), x: originalX - 5, duration: 50,
-    //          yoyo: true, repeat: 2, clearTint + setX(originalX) on complete
-    // TheMind did not specify ease (used Phaser default), but our default
+  it('reproduces The Mind showInvalidPlayFeedback pattern', () => {
+    // The Mind: setTint(0xff4444), x: originalX - 5, duration: 50,
+    //           yoyo: true, repeat: 2, clearTint + setX(originalX) on complete
+    // The Mind did not specify ease (used Phaser default), but our default
     // 'Sine.inOut' harmonizes both games. The animation is visually identical.
     const sprite = createMockTarget(450);
 

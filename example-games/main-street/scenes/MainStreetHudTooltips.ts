@@ -131,10 +131,13 @@ export function buildCoinsTooltip(state: MainStreetState): string {
   const multiplier = reputationCoinMultiplier(state.resourceBank.reputation, state.config);
   const multiplierStr = Number.isFinite(multiplier) ? multiplier.toFixed(1) : '1.0';
 
+  const preMultiplierStr = Number.isFinite(baseIncome) ? baseIncome.toFixed(3) : '0.000';
+  const postMultiplierStr = Number.isFinite(multipliedIncome) ? multipliedIncome.toFixed(3) : '0.000';
+
   const lines = [
     t(HUD_TOOLTIP_I18N_KEYS.coinsTitle),
-    `${t(HUD_TOOLTIP_I18N_KEYS.coinsPreMultiplierLabel)}: ${baseIncome}`,
-    `${t(HUD_TOOLTIP_I18N_KEYS.coinsPostMultiplierLabel)}: ${multipliedIncome} (×${multiplierStr})`,
+    `${t(HUD_TOOLTIP_I18N_KEYS.coinsPreMultiplierLabel)}: ${preMultiplierStr}`,
+    `${t(HUD_TOOLTIP_I18N_KEYS.coinsPostMultiplierLabel)}: ${postMultiplierStr} (×${multiplierStr})`,
     t(HUD_TOOLTIP_I18N_KEYS.coinsCalcNote),
   ];
 
@@ -202,7 +205,7 @@ export function buildScoreTooltip(
     t(HUD_TOOLTIP_I18N_KEYS.scoreTitle),
     `${t(HUD_TOOLTIP_I18N_KEYS.scoreEstimateLabel)}: ${score}/${threshold}`,
     '',
-    `${t(HUD_TOOLTIP_I18N_KEYS.scoreBreakdownCoins)}: ${coins}`,
+    `${t(HUD_TOOLTIP_I18N_KEYS.scoreBreakdownCoins)}: ${coins.toFixed(3)}`,
     `${t(HUD_TOOLTIP_I18N_KEYS.scoreBreakdownReputation)} ${state.config.reputationScoreMultiplier}: ${repContribution}`,
     `${t(HUD_TOOLTIP_I18N_KEYS.scoreBreakdownChallenges)}: ${challengeContribution}`,
   ];

@@ -1,6 +1,6 @@
 {
   "name": "tableau-card-engine",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Tableau Card Engine (TCE) -- a modular game engine for building single-player tableau card games using Phaser 4 RC and TypeScript",
   "private": true,
   "type": "module",
@@ -8,6 +8,7 @@
     "dev": "vite --host",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
+    "balance-cards": "tsc --noEmit && tsx scripts/run-balance-cards.ts",
     "test": "vitest run --project unit && vitest run --project browser && bash scripts/run-tutorial-tests.sh",
     "monte-carlo": "tsx scripts/monte-carlo.ts --seeds 200 --seed-prefix mc-balance --maxTurns 25 --strategy greedy --out results/main-street-monte-carlo.json --csv-out results/main-street-monte-carlo.csv",
     "replay": "tsx scripts/replay.ts",

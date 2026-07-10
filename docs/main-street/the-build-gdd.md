@@ -308,16 +308,9 @@ The core economic loop consists of two primary resources:
 
 ## 4. Difficulty and Balance
 
-Main Street is intended to be approachable for 10‑15‑minute play sessions while still offering strategic depth. Difficulty is managed through the following levers:
-| Lever | Effect |
-|-------|--------|
-| **Slot Count** | The base game uses 10 slots; increasing to 12 slots adds decision space without extending playtime significantly. |
-| **Coin Starting Amount** | Adjusting the initial budget (e.g., 8 → 10 coins) can make early rounds easier or tighter. |
-| **Synergy Bonus Value** | Changing the synergy bonus from `+1` to `+2` per matching neighbor raises the impact of placement decisions. |
-| **Event Frequency** | Adding more Incident events increases variance and potential swing moments. |
-| **Challenge Targets** | Scaling challenge thresholds (e.g., “Build a Foodie Row” requiring 3 Food businesses) adjusts difficulty. |
+The balancing methodology and targets for Main Street have been consolidated into a dedicated document at `docs/main-street/balancing-methodology.md`. See [balancing-methodology.md](balancing-methodology.md) for the full methodology.
 
-Balancing targets are defined in the **GameState** type (`MAX_TURNS = 20`, `WIN_THRESHOLD = 150`). Playtesting should verify that a typical run ends near the turn limit with a final score around the win threshold.
+> **Migrated content**: Section 4 (Difficulty and Balance) has been moved to `balancing-methodology.md`. This section now serves as a cross-reference.
 
 ---
 

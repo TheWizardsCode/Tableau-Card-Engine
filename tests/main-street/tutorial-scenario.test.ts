@@ -187,26 +187,26 @@ describe('createTutorialScenario', () => {
 
   // ── Coin budget verification (AC5) ───────────────────────────
 
-  it('provides sufficient coin budget for tutorial (12 starting, $6 Laundromat, $2 event)', () => {
+  it('provides sufficient coin budget for tutorial (12 starting, $3 Laundromat, $2 event)', () => {
     const state = createTutorialScenario();
     // Starting with Easy preset: 12 coins
     expect(state.resourceBank.coins).toBe(12);
 
-    // The Laundromat referenced in T3 must exist and cost ≤ 6
+    // The Laundromat referenced in T3 must exist and cost ≤ 3
     const t3 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T3')!;
     const laundromat = state.market.development.find(
       c => matchesTemplate(c.id, t3.requiredCardId ?? ''),
     );
     expect(laundromat).toBeDefined();
-    expect(laundromat!.cost).toBeLessThanOrEqual(6);
+    expect(laundromat!.cost).toBeLessThanOrEqual(3);
 
-    // After buying $6 card: 6 coins remaining
-    const afterLaundromat = state.resourceBank.coins - 6;
-    expect(afterLaundromat).toBe(6);
+    // After buying $3 card: 9 coins remaining
+    const afterLaundromat = state.resourceBank.coins - 3;
+    expect(afterLaundromat).toBe(9);
 
-    // After one turn's income (base income from Laundromat is 1):
-    // 6 + 1 = 7 coins should be enough for a $2 event
-    expect(7).toBeGreaterThanOrEqual(2);
+    // After one turn's income (base income from Laundromat is 0.5):
+    // 9 + 0.5 = 9.5 coins should be enough for a $2 event
+    expect(9.5).toBeGreaterThanOrEqual(2);
   });
 
   // ── Market card integration with tutorial steps ──────────────
@@ -225,7 +225,7 @@ describe('createTutorialScenario', () => {
     // Verify it's the Laundromat
     const laundromat = marketCard as BusinessCard;
     expect(laundromat.name).toBe('Laundromat');
-    expect(laundromat.cost).toBe(6);
+    expect(laundromat.cost).toBe(3);
   });
 
   it('an investment event card is in the investments row matching T7', () => {

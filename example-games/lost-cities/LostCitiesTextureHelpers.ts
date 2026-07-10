@@ -2,7 +2,7 @@
  * LostCitiesTextureHelpers — Inline SVG texture helpers for Lost Cities.
  *
  * Provides lazy rasterisation of card SVG assets via SvgHelpers,
- * following the migration pattern established by The Mind
+ * following the SVG migration pattern established by earlier games
  * (CG-0MP12H40Q003Y7OU).
  *
  * Migration notes (CG-0MOZN33JW004XILY):

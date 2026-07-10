@@ -20,6 +20,7 @@ import {
   GymGraphicsShaderSpikeScene,
   GymGraphicsLightingSpikeScene,
   GymSllScene,
+  GymLayoutOwnershipScene,
 } from '../../example-games/gym';
 import { waitForScene } from '../helpers/waitForScene';
 import {
@@ -34,6 +35,7 @@ import {
   GYM_GRAPHICS_SHADER_SPIKE_KEY,
   GYM_GRAPHICS_LIGHTING_SPIKE_KEY,
   GYM_SLL_KEY,
+  GYM_LAYOUT_OWNERSHIP_KEY,
   GYM_SCENE_CATALOGUE,
 } from '../../example-games/gym/GymRegistry';
 
@@ -69,10 +71,11 @@ describe('GymRouterScene browser smoke', () => {
         GymGraphicsShaderSpikeScene,
         GymGraphicsLightingSpikeScene,
         GymSllScene,
+        GymLayoutOwnershipScene,
       ],
     });
 
-    await waitForScene(game, 'GymRouterScene');
+    await waitForScene(game, 'GymRouterScene')
 
     const activeScene = game.scene.getScene('GymRouterScene');
     expect(activeScene).toBeTruthy();
@@ -121,6 +124,7 @@ describe('GymRouterScene browser smoke', () => {
       GYM_GRAPHICS_SHADER_SPIKE_KEY,
       GYM_GRAPHICS_LIGHTING_SPIKE_KEY,
       GYM_SLL_KEY,
+      GYM_LAYOUT_OWNERSHIP_KEY,
     ];
 
     game = new Phaser.Game({ type: Phaser.CANVAS,
@@ -140,6 +144,7 @@ describe('GymRouterScene browser smoke', () => {
         GymGraphicsShaderSpikeScene,
         GymGraphicsLightingSpikeScene,
         GymSllScene,
+        GymLayoutOwnershipScene,
       ],
     });
 

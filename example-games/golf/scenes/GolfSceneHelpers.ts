@@ -5,7 +5,7 @@
 import type { TranscriptRecorder } from '../GameTranscript';
 import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
 import type { SoundManager, GameEventEmitter } from '../../../src/core-engine';
-import { GAME_W, GAME_H, OverlayManager } from '../../../src/ui';
+import { GAME_W, GAME_H, OverlayManager, createGameOverOverlay } from '../../../src/ui';
 import { createActionButton } from '@ui/Renderer';
 import {
   createGolfHudText,
@@ -73,32 +73,14 @@ export class GolfOverlayHelper {
       reason: `${winnerName} wins (${results.scores[winnerIdx]} pts)`,
     });
 
-    // Overlay -- near-invisible blocker + visible box
-    this.overlayManager.showOverlay({
-      type: 'custom',
-      backgroundOptions: { depth: 10, alpha: 0.01 },
-      box: { width: 520, height: 350, alpha: 0.85 },
-    });
-
-    const winnerText = results.winnerIndex === 0 ? 'You Win!' : 'AI Wins!';
-    const text = createGolfHudText(
-      this.scene,
-      GAME_W / 2,
-      GAME_H / 2 - 50,
-      `${winnerText}\n\nYou: ${results.scores[0]} pts\nAI: ${results.scores[1]} pts`,
-      '#ffffff',
-      { fontSize: '28px', originX: 0.5, align: 'center' },
-    );
-    this.overlayManager.add(text);
-
-    // Play again button
-    const playBtn = createActionButton(
-      this.scene,
-      GAME_W / 2 - 85,
-      GAME_H / 2 + 85,
-      170,
-      '[ Play Again ]',
-      () => {
+    // Shared game-over overlay
+    const winnerText = results.winnerIndex === 0 ? 'You Win!' : 'Game Over';
+    const winnerColor = results.winnerIndex === 0 ? '#88ff88' : '#ff6666';
+    const resultOverlay = createGameOverOverlay(this.scene, {
+      title: winnerText,
+      titleColor: winnerColor,
+      summaryText: `You: ${results.scores[0]} pts\nAI: ${results.scores[1]} pts`,
+      onPlayAgain: () => {
         this.soundManager?.play(SFX_KEYS.UI_CLICK);
         this.gameEvents.emit('ui-interaction', {
           elementId: 'play-again',
@@ -106,26 +88,20 @@ export class GolfOverlayHelper {
         });
         this.scene.scene.restart();
       },
-      { depth: 11 },
-    );
-    this.overlayManager.add(playBtn);
-
-    // Export Transcript button
-    const exportBtn = createActionButton(
-      this.scene,
-      GAME_W / 2 - 90,
-      GAME_H / 2 + 135,
-      180,
-      '[ Export Transcript ]',
-      () => {
-        this.soundManager?.play(SFX_KEYS.UI_CLICK);
-        const json = JSON.stringify(transcript, null, 2);
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        triggerTranscriptDownload(json, `golf-transcript-${timestamp}.json`);
-      },
-      { depth: 11, fontSize: '13px' },
-    );
-    this.overlayManager.add(exportBtn);
+      onMenu: () => this.scene.scene.start('GameSelectorScene'),
+      playAgainLabel: 'Play Again',
+      menuLabel: 'Menu',
+      extraButtons: [{
+        label: 'Export Transcript',
+        onClick: () => {
+          this.soundManager?.play(SFX_KEYS.UI_CLICK);
+          const json = JSON.stringify(transcript, null, 2);
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+          triggerTranscriptDownload(json, `golf-transcript-${timestamp}.json`);
+        },
+      }],
+    });
+    this.overlayManager.add(...resultOverlay.objects);
   }
 
   /**

@@ -18,6 +18,28 @@ import { GAME_W } from '../../../src/ui/constants';
 import { createHudText } from '../../../src/ui/Renderer';
 import { createEventLog } from '../../../src/ui/GymSceneUtils';
 import type { EventLogResult } from '../../../src/ui/GymSceneUtils';
+import { anchorPoint } from '../../../src/ui/screen-layout';
+import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
+import gymShaderSpikeLayoutJson from '../layouts/gym-shader-spike.layout.json';
+
+// Parse the shared Shader Spike scene layout once at module load.
+const SHADER_SPIKE_LAYOUT: import('../../../src/ui/screen-layout-schema').ScreenLayoutDocument | null = (() => {
+  const parsed = parseScreenLayoutDocument(gymShaderSpikeLayoutJson);
+  return parsed.valid ? parsed.layout : null;
+})();
+
+const DEFAULT_VIEWPORT = { width: 1280, height: 720 };
+
+function resolveShaderAnchor(
+  zone: string,
+  anchor: string,
+  viewport = DEFAULT_VIEWPORT,
+): import('../../../src/ui/screen-layout-schema').PixelPoint {
+  if (!SHADER_SPIKE_LAYOUT) {
+    return { x: GAME_W / 2, y: 60 };
+  }
+  return anchorPoint(SHADER_SPIKE_LAYOUT, zone, anchor, viewport, 1);
+}
 
 /** The scene key must match the registration in GymRegistry. */
 export const GYM_GRAPHICS_SHADER_SPIKE_KEY = 'GymGraphicsShaderSpikeScene';
@@ -103,33 +125,48 @@ export class GymGraphicsShaderSpikeScene extends GymSceneBase {
     this.initReducedMotion();
 
     this.initHelp([
-      { heading: 'Overview', body: 'Demonstrates sprite tinting, blend modes, and simple shader feasibility. This is a spike scene for evaluating features.' },
-      { heading: 'Controls', body: '[ Next Tint ]: Cycle through tint colors.\n[ Next Blend ]: Cycle through blend modes.\n[ Reset Tint ]: Remove tint (white).\n[ Attempt Shader ]: Try to compile and run a minimal fragment shader.\n\nNote: Shaders are WebGL-only and may not work in all environments. Headless/CI builds will fall back gracefully.' },
-      { heading: 'Findings', body: 'Blend modes work in WebGL renderer only. Fragment shaders require WebGL pipeline support. Headless fallback: shader attempt logs success/failure without crashing.' },
+      {
+        heading: 'Features',
+        body: 'Spike scene evaluating sprite tinting, blend modes (NORMAL, ADD, MULTIPLY, SCREEN), and WebGL shader feasibility. In a real card game, tinting highlights valid plays (green tint for playable cards), blend modes create visual layering effects for card overlaps or ghosted previews, and custom shaders could produce animated card borders, foil effects, or dynamic backgrounds.'
+      },
+      {
+        heading: 'Controls',
+        body: '[ Next Tint ]: Cycle through tint colours — None, Red, Green, Blue, Gold, Purple. Tint is applied to all three sample sprites simultaneously.\n[ Next Blend ]: Cycle through blend modes — NORMAL, ADD, MULTIPLY, SCREEN. Blend mode applies to all sprites.\n[ Reset Tint ]: Remove all tinting from sprites (reset to white/none).\n[ Attempt Shader ]: Try to detect WebGL support and compile a minimal fragment shader. Logs the result — whether shaders are feasible in this environment.'
+      },
+      {
+        heading: 'Usage Example',
+        body: 'A developer building a card game wants to add visual feedback when a card can be played: green tint for valid targets, red tint for invalid ones. This spike verifies that Phaser\'s setTint() works reliably. The blend mode test checks whether ADD mode can create a "glowing" effect when two cards overlap. The shader spike evaluates whether more advanced effects like animated foil borders are feasible for future development.'
+      },
+      {
+        heading: 'Test Plan',
+        body: '1. Press [ Next Tint ] six times → cycles through all 6 tint colours, status line updates\n2. Press [ Next Blend ] four times → cycles through all 4 blend modes, status line updates\n3. Press [ Reset Tint ] → all sprites return to white/none\n4. Press [ Attempt Shader ] → event log records whether shader compilation succeeded or a fallback was used\n5. Verify status line shows current blend mode and tint colour correctly'
+      }
     ]);
 
     const cx = GAME_W / 2;
-    let y = 60;
+    const controlsAnchor = resolveShaderAnchor('controls', 'center');
+    const statusAnchor = resolveShaderAnchor('status', 'center');
+    const contentAnchor = resolveShaderAnchor('content', 'center');
+    const logAnchor = resolveShaderAnchor('log', 'center');
+    const y = controlsAnchor.y;
 
     this.addButton(cx - 400, y, '[ Next Tint ]', () => this.cycleTint());
     this.addButton(cx - 240, y, '[ Next Blend ]', () => this.cycleBlendMode());
     this.addButton(cx - 60, y, '[ Reset Tint ]', () => this.resetTint());
     this.addButton(cx + 120, y, '[ Attempt Shader ]', () => this.attemptShader());
 
-    y += 30;
-    this.statusLineText = createHudText(this, cx, y, 'Blend: NORMAL | Tint: None', '#88ff88', { fontSize: '12px' }).setOrigin(0.5);
+    this.statusLineText = createHudText(this, cx, statusAnchor.y, 'Blend: NORMAL | Tint: None', '#88ff88', { fontSize: '12px' }).setOrigin(0.5);
 
-    y += 30;
-    // Create sample sprites
+    // Create sample sprites at content anchor Y
     const spriteX = [cx - 180, cx, cx + 180];
+    const spriteY = contentAnchor.y;
     for (let i = 0; i < 3; i++) {
       const key = ['spike-sprite-a', 'spike-sprite-b', 'spike-sprite-c'][i];
-      const sprite = this.add.image(spriteX[i], y + 80, key);
+      const sprite = this.add.image(spriteX[i], spriteY, key);
       this.sprites.push(sprite);
     }
 
-    y += 200;
-    this.eventLogResult = createEventLog(this, y + 20, {
+    this.eventLogResult = createEventLog(this, logAnchor.y + 20, {
       headerText: '── Event Log ──',
       maxLines: 12,
       lineHeight: 17,

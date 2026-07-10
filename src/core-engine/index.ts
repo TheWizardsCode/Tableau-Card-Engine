@@ -191,6 +191,9 @@ export {
   computeAdjacencyBonus,
 } from './SpatialRules';
 
+// CSV data loader (CG-0MR6ZR23J006ZDNZ)
+export { parseCsv } from './CsvLoader';
+
 // Shared SVG rasterisation helpers (CG-0MOZNXU4Y0043NR3)
 export {
   markSceneValid,

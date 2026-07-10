@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "id": "gym-transcript-layout",
+  "baseViewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "requiredZones": [
+    "controls",
+    "log"
+  ],
+  "zones": {
+    "controls": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.08333
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.08333 }
+      }
+    },
+    "log": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.25
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.25 }
+      }
+    }
+  }
+}
