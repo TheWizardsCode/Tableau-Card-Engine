@@ -246,6 +246,17 @@ export class GymAudioFeedbackScene extends GymSceneBase {
 
     const controls2Anchor = resolveAudioAnchor('controls2', 'center');
     const y2 = controls2Anchor.y;
+
+    // Spread sound event buttons across the full width starting from left margin
+    const LEFT_MARGIN = 40;
+    const soundEventCount = Object.entries(DEFAULT_EVENT_MAPPING).filter(
+      ([eventName, soundKey]) => {
+        const label = eventToButtonLabel[eventName];
+        if (!label) return false;
+        return Array.from(this.soundManager.keys()).includes(soundKey);
+      },
+    ).length;
+    const soundSpacing = (GAME_W - LEFT_MARGIN * 2) / Math.max(soundEventCount, 1);
     let btnIndex = 0;
 
     // Generate buttons for each event in DEFAULT_EVENT_MAPPING
@@ -258,7 +269,7 @@ export class GymAudioFeedbackScene extends GymSceneBase {
       if (!keysFromManager.includes(soundKey)) continue; // Only if sound is registered
 
       const btnLabel = `[ ${label} ]`;
-      const xPos = cx - 240 + btnIndex * 140;
+      const xPos = LEFT_MARGIN + btnIndex * soundSpacing;
       const btn = this.addButton(xPos, y2, btnLabel, () => this.emitEvent(eventName));
       this.dynamicButtons.push(btn);
       btnIndex++;
@@ -266,11 +277,12 @@ export class GymAudioFeedbackScene extends GymSceneBase {
 
     // ── Dynamic visual feedback buttons (row 3) ─────────
     const feedbackY = y2 + 28;
+    const feedbackSpacing = (GAME_W - LEFT_MARGIN * 2) / Math.max(FEEDBACK_TYPES.length, 1);
     let feedbackIndex = 0;
 
     for (const ft of FEEDBACK_TYPES) {
       const btnLabel = `[ ${ft.label} ]`;
-      const xPos = cx - 240 + feedbackIndex * 160;
+      const xPos = LEFT_MARGIN + feedbackIndex * feedbackSpacing;
       const btn = this.addButton(xPos, feedbackY, btnLabel, () => {
         if (ft.label === 'Celebrate') {
           this.triggerCelebration();
