@@ -31,6 +31,7 @@ import type {
 } from '../../example-games/golf/GolfGame';
 import { isLegalMove } from '../../example-games/golf/GolfRules';
 import { createCard } from '../../src/card-system/Card';
+import { CardMemoryTracker } from '../../src/ai/CardMemoryTracker';
 import { createGolfGrid } from '../../example-games/golf/GolfGrid';
 import { Pile } from '../../src/card-system/Pile';
 import { createRoundEndState } from '../../example-games/golf/GolfRules';
@@ -584,6 +585,172 @@ describe('countVisibleRanks', () => {
     const ranks = countVisibleRanks(ps, shared);
     // All 4 Kings are visible across grid (3) and discard top (1)
     expect(ranks['K']).toBe(4);
+  });
+
+  describe('with memory tracker', () => {
+    it('behaves identically when tracker has no recorded cards', () => {
+      // skill=100 but no cards recorded → memory is empty
+      const memoryTracker = new CardMemoryTracker(100);
+      const cards = [
+        createCard('K', 'clubs', true),
+        createCard('K', 'hearts', true),
+        createCard('2', 'spades', true),
+        createCard('5', 'clubs', false),
+        createCard('6', 'hearts', false),
+        createCard('7', 'spades', false),
+        createCard('8', 'clubs', false),
+        createCard('9', 'hearts', false),
+        createCard('10', 'spades', false),
+      ];
+      const grid = createGolfGrid(cards);
+      const ps = createAiVisiblePlayerState({ grid });
+      const shared: AiVisibleSharedState = {
+        discardTop: createCard('A', 'diamonds', true),
+        stockHasCards: true,
+        roundEnd: createRoundEndState(2),
+      };
+
+      const ranks = countVisibleRanks(ps, shared, createTestRng(), memoryTracker);
+      expect(ranks['K']).toBe(2);
+      expect(ranks['2']).toBe(1);
+      expect(ranks['A']).toBe(1);
+    });
+
+    it('adds historical discard card counts from memory (skill=100)', () => {
+      const memoryTracker = new CardMemoryTracker(100);
+      // Record historical discards: 2 Queens and 1 King seen before
+      memoryTracker.recordCard(createCard('Q', 'hearts', true));
+      memoryTracker.recordCard(createCard('Q', 'clubs', true));
+      memoryTracker.recordCard(createCard('K', 'diamonds', true));
+
+      const cards = [
+        createCard('K', 'clubs', true),     // K (1 visible)
+        createCard('A', 'hearts', true),    // A
+        createCard('2', 'spades', true),    // 2
+        createCard('5', 'clubs', false),
+        createCard('6', 'hearts', false),
+        createCard('7', 'spades', false),
+        createCard('8', 'clubs', false),
+        createCard('9', 'hearts', false),
+        createCard('10', 'spades', false),
+      ];
+      const grid = createGolfGrid(cards);
+      const ps = createAiVisiblePlayerState({ grid });
+      const shared: AiVisibleSharedState = {
+        discardTop: createCard('K', 'spades', true), // K visible now
+        stockHasCards: true,
+        roundEnd: createRoundEndState(2),
+      };
+
+      const rng = createTestRng(42);
+      const ranks = countVisibleRanks(ps, shared, rng, memoryTracker);
+
+      // Grid has 1 K face-up + discard top is K → 2 Ks visible
+      // Tracker has 1 K historical → total K = 2 + (1 - 1) = 2
+      //   (the current discard top K is also in the tracker, so we add
+      //    trackerCount - 1 = 1 - 1 = 0 for K)
+      // Tracker has 2 Qs historical → total Q = 0 + 2 = 2
+      expect(ranks['K']).toBe(2);
+      expect(ranks['Q']).toBe(2);
+      expect(ranks['A']).toBe(1);
+      expect(ranks['2']).toBe(1);
+    });
+
+    it('discard top rank is counted perfectly even when tracker misremembers', () => {
+      const memoryTracker = new CardMemoryTracker(1); // skill=1, nearly always wrong
+      // Record current discard top
+      memoryTracker.recordCard(createCard('Q', 'hearts', true));
+
+      const cards = [
+        createCard('K', 'clubs', true),
+        createCard('A', 'hearts', true),
+        createCard('2', 'spades', true),
+        createCard('5', 'clubs', false),
+        createCard('6', 'hearts', false),
+        createCard('7', 'spades', false),
+        createCard('8', 'clubs', false),
+        createCard('9', 'hearts', false),
+        createCard('10', 'spades', false),
+      ];
+      const grid = createGolfGrid(cards);
+      const ps = createAiVisiblePlayerState({ grid });
+      const shared: AiVisibleSharedState = {
+        discardTop: createCard('Q', 'diamonds', true), // Q visible now
+        stockHasCards: true,
+        roundEnd: createRoundEndState(2),
+      };
+
+      // The discard top Q should always be counted perfectly (1),
+      // regardless of what the tracker incorrectly remembers.
+      const rng = createTestRng(42);
+      const ranks = countVisibleRanks(ps, shared, rng, memoryTracker);
+
+      // The discard top Q is always counted as 1 (perfect)
+      expect(ranks['Q']).toBe(1);
+    });
+
+    it('combines memory with visible counts correctly at skill=100', () => {
+      const memoryTracker = new CardMemoryTracker(100);
+      memoryTracker.recordCard(createCard('Q', 'hearts', true));  // historical Q
+      memoryTracker.recordCard(createCard('Q', 'clubs', true));   // historical Q
+      memoryTracker.recordCard(createCard('A', 'diamonds', true)); // historical A
+
+      const cards = [
+        createCard('Q', 'spades', true),     // Q visible in grid
+        createCard('A', 'hearts', true),     // A visible in grid
+        createCard('2', 'spades', true),     // 2
+        createCard('5', 'clubs', false),
+        createCard('6', 'hearts', false),
+        createCard('7', 'spades', false),
+        createCard('8', 'clubs', false),
+        createCard('9', 'hearts', false),
+        createCard('10', 'spades', false),
+      ];
+      const grid = createGolfGrid(cards);
+      const ps = createAiVisiblePlayerState({ grid });
+      const shared: AiVisibleSharedState = {
+        discardTop: undefined, // no discard top
+        stockHasCards: true,
+        roundEnd: createRoundEndState(2),
+      };
+
+      const rng = createTestRng(42);
+      const ranks = countVisibleRanks(ps, shared, rng, memoryTracker);
+
+      // Grid: Q=1, A=1, 2=1
+      // Memory: Q=2 (historical), A=1 (historical)
+      // Total: Q=1+2=3, A=1+1=2, 2=1
+      expect(ranks['Q']).toBe(3);
+      expect(ranks['A']).toBe(2);
+      expect(ranks['2']).toBe(1);
+    });
+
+    it('is backward compatible when no tracker is provided', () => {
+      const cards = [
+        createCard('K', 'clubs', true),
+        createCard('K', 'hearts', true),
+        createCard('2', 'spades', true),
+        createCard('5', 'clubs', false),
+        createCard('6', 'hearts', false),
+        createCard('7', 'spades', false),
+        createCard('8', 'clubs', false),
+        createCard('9', 'hearts', false),
+        createCard('10', 'spades', false),
+      ];
+      const grid = createGolfGrid(cards);
+      const ps = createAiVisiblePlayerState({ grid });
+      const shared: AiVisibleSharedState = {
+        discardTop: createCard('A', 'diamonds', true),
+        stockHasCards: true,
+        roundEnd: createRoundEndState(2),
+      };
+
+      // Old-style call: no rng, no memoryTracker
+      const ranks = countVisibleRanks(ps, shared);
+      expect(ranks['K']).toBe(2);
+      expect(ranks['A']).toBe(1);
+      expect(ranks['2']).toBe(1);
+    });
   });
 });
 

@@ -26,7 +26,7 @@ import type {
 } from './GolfGame';
 import { enumerateAiLegalMoves, enumerateAiDrawSources } from './GolfGame';
 import { GRID_ROWS, GRID_COLS } from './GolfGrid';
-import type { AiStrategyBase } from '../../src/ai';
+import type { AiStrategyBase, CardMemoryTracker } from '../../src/ai';
 import { AiPlayer as AiPlayerBase, pickRandom, pickBest } from '../../src/ai';
 
 // ── Strategy interface ──────────────────────────────────────
@@ -269,6 +269,8 @@ const MAX_RANK_COPIES = 4;
  * Visible cards include:
  * - Face-up cards in the AI's own grid
  * - The discard pile top card (visible to all players)
+ * - (When a memory tracker is provided) Historical discard cards the AI
+ *   has observed, with probabilistic recall based on skill rating
  *
  * Face-down cards are NOT counted (the AI doesn't know their ranks).
  *
@@ -279,17 +281,26 @@ const MAX_RANK_COPIES = 4;
  *
  * Information boundary: uses only AI-visible state projections.
  *
- * @param playerState  AI-visible per-player state
- * @param shared       AI-visible shared state (discard top, stock flag)
- * @returns            Record mapping rank strings to their visible count
+ * @param playerState    AI-visible per-player state
+ * @param shared         AI-visible shared state (discard top, stock flag)
+ * @param rng            Optional RNG for probabilistic memory recall.
+ *                       Required when {@link memoryTracker} is provided.
+ * @param memoryTracker  Optional CardMemoryTracker providing probabilistic
+ *                       recall of historical discard cards. When provided,
+ *                       the current discard top card is counted perfectly
+ *                       (not subject to memory loss), and historical discard
+ *                       card counts are merged in.
+ * @returns              Record mapping rank strings to their count estimate
  */
 export function countVisibleRanks(
   playerState: AiVisiblePlayerState,
   shared: AiVisibleSharedState,
+  rng?: () => number,
+  memoryTracker?: CardMemoryTracker,
 ): Record<string, number> {
   const counts: Record<string, number> = {};
 
-  // Count face-up cards in the AI's own grid
+  // Count face-up cards in the AI's own grid (always perfect)
   for (const slot of playerState.grid) {
     if (slot.faceUp && 'rank' in slot) {
       const rank = (slot as Card).rank;
@@ -297,10 +308,27 @@ export function countVisibleRanks(
     }
   }
 
-  // Count the discard top card (visible to all players)
-  if (shared.discardTop && 'rank' in shared.discardTop) {
-    const rank = shared.discardTop.rank;
-    counts[rank] = (counts[rank] || 0) + 1;
+  // Count the discard top card (always perfect, visible to all players)
+  const discardTopRank = shared.discardTop?.rank;
+  if (discardTopRank) {
+    counts[discardTopRank] = (counts[discardTopRank] || 0) + 1;
+  }
+
+  // Merge memory-augmented historical discard card counts
+  if (memoryTracker && rng) {
+    const memoryCounts = memoryTracker.getVisibleRanks(rng);
+
+    for (const [rank, memoryCount] of Object.entries(memoryCounts)) {
+      if (rank === discardTopRank) {
+        // The tracker includes the current discard top in its count.
+        // We've already counted the current top perfectly, so only add
+        // the historical copies: memoryCount - 1 (clamped to 0).
+        const historicalCount = Math.max(0, memoryCount - 1);
+        counts[rank] = (counts[rank] || 0) + historicalCount;
+      } else {
+        counts[rank] = (counts[rank] || 0) + memoryCount;
+      }
+    }
   }
 
   return counts;
