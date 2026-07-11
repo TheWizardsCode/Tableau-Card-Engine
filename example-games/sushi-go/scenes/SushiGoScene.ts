@@ -210,6 +210,8 @@ export class SushiGoScene extends CardGameScene {
 
     super.create();
 
+    this.replayController = new SushiGoReplayController(this, { value: this.replayMode });
+
     if (this.replayMode) {
       this.createHeader();
       this.createLabels();
@@ -242,7 +244,6 @@ export class SushiGoScene extends CardGameScene {
     this.goRenderer = new SushiGoRenderer(this, this.session);
     this.overlayManager = new SushiGoOverlayContent(this, this.session, this.gameEvents, this.soundManager);
     this.tooltipManager = this.createTooltipManager();
-    this.replayController = new SushiGoReplayController(this, { value: this.replayMode });
     this.cardFactory = new SushiGoCardFactory(this);
     this.tableauRenderer = new SushiGoTableauRenderer(this, this.session, this.cardFactory, this.goRenderer, this.tooltipManager);
 

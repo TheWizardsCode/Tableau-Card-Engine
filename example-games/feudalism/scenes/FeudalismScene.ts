@@ -82,6 +82,8 @@ export class FeudalismScene extends CardGameScene {
 
     super.create();
 
+    this.replayController = new FeudalismReplayController();
+
     if (this.replayMode) {
       this.createHeader();
       this.feudRenderer = new FeudalismRenderer(this, this.session);
@@ -156,7 +158,6 @@ export class FeudalismScene extends CardGameScene {
     });
 
     this.turnController.setRecorder(this.recorder);
-    this.replayController = new FeudalismReplayController();
 
     this.createHeader();
     this.feudRenderer.createContainers();
@@ -181,7 +182,9 @@ export class FeudalismScene extends CardGameScene {
   }
 
   private refreshAll(): void {
-    this.feudRenderer.turnPhase = this.turnController.phase;
+    if (this.turnController) {
+      this.feudRenderer.turnPhase = this.turnController.phase;
+    }
     this.feudRenderer.selectedTokens = this.selectedTokens;
     this.feudRenderer.discardSelection = this.discardSelection;
     this.feudRenderer.discardNeeded = this.discardNeeded;
