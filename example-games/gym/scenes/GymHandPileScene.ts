@@ -472,7 +472,7 @@ export class GymHandPileScene extends GymSceneBase {
           target: sprite as any,
           destX: this.DISCARD_X,
           destY: this.PILE_Y,
-          flipOnArrivalTexture: 'card_back',
+          flipOnArrivalTexture: getCardTexture(card),
           duration: 400,
           destroyAfter: true,
           gameEvents,

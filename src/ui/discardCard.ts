@@ -201,11 +201,12 @@ export function discardCard(opts: DiscardCardOptions): Phaser.Tweens.Tween {
     const initialScaleX = target.scaleX ?? 1;
 
     if (flipOnArrivalTexture) {
-      // Phase 1: Move from current position to destination
+      // Phase 1: Move from current position to destination, rotating to match pile orientation
       const tween = scene.tweens.add({
         targets: target,
         x: destX,
         y: destY,
+        rotation: 0,
         duration: moveDuration,
         ease: 'Quad.easeOut',
         onComplete: () => {
@@ -239,11 +240,12 @@ export function discardCard(opts: DiscardCardOptions): Phaser.Tweens.Tween {
       return tween;
     }
 
-    // Move to destination without flip
+    // Move to destination without flip, rotating to match pile orientation
     return scene.tweens.add({
       targets: target,
       x: destX,
       y: destY,
+      rotation: 0,
       duration,
       ease: 'Quad.easeOut',
       onComplete: () => {

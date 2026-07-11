@@ -239,6 +239,8 @@ describe('discardCard', () => {
       // Target should have moved to destination
       expect(target.x).toBe(700);
       expect(target.y).toBe(250);
+      // Rotation should animate to 0 (match pile orientation)
+      expect(mockScene.tweensList[0].rotation).toBe(0);
     });
 
     it('emits card:discarded event on completion with destination animation', () => {
@@ -280,6 +282,8 @@ describe('discardCard', () => {
       expect(target.setTexture).toHaveBeenCalledWith('card_back');
       // Scale should be restored after flip open
       expect(target.scaleX).toBe(1);
+      // Rotation should animate to 0 (match pile orientation) during move phase
+      expect(mockScene.tweensList[0].rotation).toBe(0);
     });
 
     it('destination animation creates three tweens (move, flip-close, flip-open) when flipOnArrivalTexture is provided', () => {
@@ -296,9 +300,10 @@ describe('discardCard', () => {
 
       // Should have 3 tweens: move, flip-close, flip-open
       expect(mockScene.tweensList.length).toBe(3);
-      // First tween should move to destination
+      // First tween should move to destination and rotate to 0
       expect(mockScene.tweensList[0].x).toBe(700);
       expect(mockScene.tweensList[0].y).toBe(250);
+      expect(mockScene.tweensList[0].rotation).toBe(0);
       // Second tween should flip close (scaleX → 0)
       expect(mockScene.tweensList[1].scaleX).toBe(0);
       // Third tween should flip open (scaleX → 1)
@@ -320,6 +325,7 @@ describe('discardCard', () => {
       expect(mockScene.tweensList.length).toBe(1);
       expect(mockScene.tweensList[0].x).toBe(700);
       expect(mockScene.tweensList[0].y).toBe(250);
+      expect(mockScene.tweensList[0].rotation).toBe(0);
     });
 
     it('destination animation emits event and destroys on completion', () => {
