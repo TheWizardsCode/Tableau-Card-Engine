@@ -47,6 +47,14 @@ export interface SettingsPanelConfig {
    * the default position (left of the help button).
    */
   buttonPosition?: SettingsButtonPosition;
+
+  /**
+   * Whether the current game has tooltips. When true (default), a
+   * "Tooltips" toggle is displayed in the settings panel. Games
+   * without any tooltips (e.g. Golf) should set this to false to
+   * hide the toggle.
+   */
+  hasTooltips?: boolean;
 }
 
 // ── Style constants ─────────────────────────────────────────
@@ -114,6 +122,7 @@ export class SettingsPanel {
     difficultyNames?: readonly string[];
     showButton: boolean;
     buttonPosition: SettingsPanelConfig['buttonPosition'];
+    hasTooltips: boolean;
   };
   private readonly panelWidth: number;
   private readonly canvasWidth: number;
@@ -143,11 +152,11 @@ export class SettingsPanel {
   private sliderTrackWidth: number;
   private isDraggingSlider = false;
 
-  // Tooltip toggle
-  private tooltipToggleBg: Phaser.GameObjects.Rectangle;
-  private tooltipToggleKnob: Phaser.GameObjects.Graphics;
-  private tooltipLabel: Phaser.GameObjects.Text;
-  private tooltipStatusText: Phaser.GameObjects.Text;
+  // Tooltip toggle (only created when hasTooltips config is true)
+  private tooltipToggleBg!: Phaser.GameObjects.Rectangle;
+  private tooltipToggleKnob!: Phaser.GameObjects.Graphics;
+  private tooltipLabel!: Phaser.GameObjects.Text;
+  private tooltipStatusText!: Phaser.GameObjects.Text;
 
   // Reduced-motion toggle
   private reducedMotionToggleBg: Phaser.GameObjects.Rectangle;
@@ -199,6 +208,7 @@ export class SettingsPanel {
       toggleKey: config.toggleKey ?? 'Escape',
       showButton,
       buttonPosition: config.buttonPosition,
+      hasTooltips: config.hasTooltips ?? true,
     };
 
     this.canvasWidth = scene.scale.width;
@@ -403,61 +413,67 @@ export class SettingsPanel {
     displayHeading.setDepth(DEPTH_PANEL_CONTENT);
     this.container.add(displayHeading);
 
-    // ── Tooltip toggle ──────────────────────────────────
+    // ── Tooltip toggle (only shown when the game has tooltips) ──
 
-    const tooltipY = displaySectionY + 40;
+    let nextDisplayY = displaySectionY + 40;
 
-    this.tooltipLabel = scene.add.text(PADDING, tooltipY, 'Tooltips', LABEL_STYLE);
-    this.tooltipLabel.setOrigin(0, 0.5);
-    this.tooltipLabel.setDepth(DEPTH_PANEL_CONTENT);
-    this.container.add(this.tooltipLabel);
+    if (this.config.hasTooltips) {
+      const tooltipY = displaySectionY + 40;
 
-    // Toggle background (same pill style as mute toggle)
-    const tooltipToggleX = this.panelWidth - PADDING - TOGGLE_SIZE * 1.8;
+      this.tooltipLabel = scene.add.text(PADDING, tooltipY, 'Tooltips', LABEL_STYLE);
+      this.tooltipLabel.setOrigin(0, 0.5);
+      this.tooltipLabel.setDepth(DEPTH_PANEL_CONTENT);
+      this.container.add(this.tooltipLabel);
 
-    this.tooltipToggleBg = scene.add.rectangle(
-      tooltipToggleX,
-      tooltipY,
-      TOGGLE_SIZE * 1.8,
-      TOGGLE_SIZE,
-      this._showTooltips ? TOGGLE_ON_COLOR : TOGGLE_OFF_COLOR,
-    );
-    this.tooltipToggleBg.setOrigin(0, 0.5);
-    this.tooltipToggleBg.setDepth(DEPTH_PANEL_CONTENT);
-    this.container.add(this.tooltipToggleBg);
+      // Toggle background (same pill style as mute toggle)
+      const tooltipToggleX = this.panelWidth - PADDING - TOGGLE_SIZE * 1.8;
 
-    // Toggle knob
-    this.tooltipToggleKnob = scene.add.graphics();
-    this.tooltipToggleKnob.setDepth(DEPTH_PANEL_CONTENT);
-    this.drawTooltipKnob(this._showTooltips);
-    this.container.add(this.tooltipToggleKnob);
+      this.tooltipToggleBg = scene.add.rectangle(
+        tooltipToggleX,
+        tooltipY,
+        TOGGLE_SIZE * 1.8,
+        TOGGLE_SIZE,
+        this._showTooltips ? TOGGLE_ON_COLOR : TOGGLE_OFF_COLOR,
+      );
+      this.tooltipToggleBg.setOrigin(0, 0.5);
+      this.tooltipToggleBg.setDepth(DEPTH_PANEL_CONTENT);
+      this.container.add(this.tooltipToggleBg);
 
-    // Tooltip status text
-    this.tooltipStatusText = scene.add.text(
-      tooltipToggleX + TOGGLE_SIZE * 1.8 + 8,
-      tooltipY,
-      this._showTooltips ? 'ON' : 'OFF',
-      VALUE_STYLE,
-    );
-    this.tooltipStatusText.setOrigin(0, 0.5);
-    this.tooltipStatusText.setDepth(DEPTH_PANEL_CONTENT);
-    this.container.add(this.tooltipStatusText);
+      // Toggle knob
+      this.tooltipToggleKnob = scene.add.graphics();
+      this.tooltipToggleKnob.setDepth(DEPTH_PANEL_CONTENT);
+      this.drawTooltipKnob(this._showTooltips);
+      this.container.add(this.tooltipToggleKnob);
 
-    // Tooltip hit area
-    const tooltipHitArea = scene.add.zone(
-      tooltipToggleX + TOGGLE_SIZE * 0.9,
-      tooltipY,
-      TOGGLE_SIZE * 2.5,
-      TOGGLE_SIZE + 10,
-    );
-    tooltipHitArea.setDepth(DEPTH_PANEL_CONTENT);
-    tooltipHitArea.setInteractive({ useHandCursor: true });
-    tooltipHitArea.on('pointerdown', () => this.handleTooltipToggle());
-    this.container.add(tooltipHitArea);
+      // Tooltip status text
+      this.tooltipStatusText = scene.add.text(
+        tooltipToggleX + TOGGLE_SIZE * 1.8 + 8,
+        tooltipY,
+        this._showTooltips ? 'ON' : 'OFF',
+        VALUE_STYLE,
+      );
+      this.tooltipStatusText.setOrigin(0, 0.5);
+      this.tooltipStatusText.setDepth(DEPTH_PANEL_CONTENT);
+      this.container.add(this.tooltipStatusText);
+
+      // Tooltip hit area
+      const tooltipHitArea = scene.add.zone(
+        tooltipToggleX + TOGGLE_SIZE * 0.9,
+        tooltipY,
+        TOGGLE_SIZE * 2.5,
+        TOGGLE_SIZE + 10,
+      );
+      tooltipHitArea.setDepth(DEPTH_PANEL_CONTENT);
+      tooltipHitArea.setInteractive({ useHandCursor: true });
+      tooltipHitArea.on('pointerdown', () => this.handleTooltipToggle());
+      this.container.add(tooltipHitArea);
+
+      nextDisplayY = tooltipY + 46;
+    }
 
     // ── Reduced Motion toggle ──────────────────────────
 
-    const reducedMotionY = tooltipY + 46;
+    const reducedMotionY = nextDisplayY;
     this.reducedMotionLabel = scene.add.text(PADDING, reducedMotionY, 'Reduced Motion', LABEL_STYLE);
     this.reducedMotionLabel.setOrigin(0, 0.5);
     this.reducedMotionLabel.setDepth(DEPTH_PANEL_CONTENT);

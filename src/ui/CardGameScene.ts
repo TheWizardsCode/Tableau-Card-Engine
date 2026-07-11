@@ -254,13 +254,17 @@ export abstract class CardGameScene extends Phaser.Scene {
    * if `soundManager` is null.
    *
    * @param difficultyNames  Optional ordered list of difficulty names.
+   * @param defaultDifficulty  Default difficulty name when no preference exists.
+   * @param hasTooltips  Whether the game has tooltips (shows/hides the
+   *                     Tooltips toggle in the settings panel). Default `true`.
    */
-  protected initSettingsPanel(difficultyNames?: readonly string[], defaultDifficulty?: string): void {
+  protected initSettingsPanel(difficultyNames?: readonly string[], defaultDifficulty?: string, hasTooltips?: boolean): void {
     if (!this.soundManager) return;
     this.settingsPanel = new SettingsPanel(this, {
       soundManager: this.soundManager,
       difficultyNames,
       defaultDifficulty,
+      hasTooltips: hasTooltips ?? true,
     });
     this.settingsButton = this.settingsPanel.settingsButton!;
   }
