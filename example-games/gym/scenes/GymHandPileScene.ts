@@ -116,6 +116,8 @@ export class GymHandPileScene extends GymSceneBase {
 
   preload(): void {
     preloadCardAssets(this);
+    // Load the illegal-move sound used by shakeIllegalMove
+    this.load.audio('sfx-illegal-move', 'assets/audio/default/illegal-move.wav');
   }
 
   create(): void {

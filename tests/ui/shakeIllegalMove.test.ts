@@ -18,7 +18,7 @@ function createMockTween(): Phaser.Tweens.Tween {
   return { destroy: vi.fn() } as unknown as Phaser.Tweens.Tween;
 }
 
-/** Create a mock Phaser scene with a tweens.add spy. */
+/** Create a mock Phaser scene with a tweens.add spy and sound.play mock. */
 function createMockScene(): Phaser.Scene {
   tweenConfigs = [];
   return {
@@ -27,6 +27,9 @@ function createMockScene(): Phaser.Scene {
         tweenConfigs.push(config);
         return createMockTween();
       }),
+    },
+    sound: {
+      play: vi.fn(),
     },
   } as unknown as Phaser.Scene;
 }
@@ -147,6 +150,45 @@ describe('shakeIllegalMove', () => {
     shakeIllegalMove({ scene, target, ease: 'Linear' });
 
     expect(tweenConfigs[0].ease).toBe('Linear');
+  });
+
+  // ── Sound integration ─────────────────────────────────
+
+  it('plays the default illegal-move sound when no soundKey is specified', () => {
+    shakeIllegalMove({ scene, target });
+
+    expect(scene.sound.play).toHaveBeenCalledWith('sfx-illegal-move');
+  });
+
+  it('plays a custom soundKey when provided', () => {
+    shakeIllegalMove({ scene, target, soundKey: 'sfx-custom-error' });
+
+    expect(scene.sound.play).toHaveBeenCalledWith('sfx-custom-error');
+  });
+
+  it('does not play any sound when soundKey is empty string', () => {
+    shakeIllegalMove({ scene, target, soundKey: '' });
+
+    expect(scene.sound.play).not.toHaveBeenCalled();
+  });
+
+  it('plays the default sound when soundKey is explicitly undefined (default kicks in)', () => {
+    shakeIllegalMove({ scene, target, soundKey: undefined });
+
+    expect(scene.sound.play).toHaveBeenCalledWith('sfx-illegal-move');
+  });
+
+  it('does not play sound when target is null (guard clause)', () => {
+    shakeIllegalMove({ scene, target: null });
+
+    expect(scene.sound.play).not.toHaveBeenCalled();
+  });
+
+  it('does not throw if sound.play throws (safePlaySound safety)', () => {
+    const mockScene = scene as unknown as { sound: { play: ReturnType<typeof vi.fn> } };
+    mockScene.sound.play.mockImplementation(() => { throw new Error('missing key'); });
+
+    expect(() => shakeIllegalMove({ scene, target })).not.toThrow();
   });
 
   // ── Guard clause (null/undefined target) ──────────────

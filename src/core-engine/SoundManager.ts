@@ -39,6 +39,8 @@ export const COMMON_SFX_KEYS = {
   ROUND_END: 'sfx-round-end',
   /** Scores are being revealed / calculated. */
   SCORE_REVEAL: 'sfx-score-reveal',
+  /** Illegal / invalid action feedback. */
+  ILLEGAL_MOVE: 'sfx-illegal-move',
 } as const;
 
 export type CommonSfxKey = (typeof COMMON_SFX_KEYS)[keyof typeof COMMON_SFX_KEYS];
