@@ -64,7 +64,7 @@ export const PATRON_X = 10;
 export const SUPPLY_TOKEN_R = 28;
 export const SUPPLY_GAP = 62;
 export const SUPPLY_TOTAL_H = 5 * SUPPLY_GAP;
-export const SUPPLY_X = 1170;
+export const SUPPLY_X = GAME_W - 50 - SUPPLY_TOKEN_R;
 export const SUPPLY_Y = UPPER_MID - SUPPLY_TOTAL_H / 2;
 
 // Card market
@@ -95,7 +95,7 @@ export const AI_AREA_Y = LOWER_TOP;
 export const DIVIDER_X = 640;
 
 // Action buttons
-export const ACTION_Y = 652;
+export const ACTION_Y = 670;
 export const INSTRUCTION_Y = 708;
 
 // ── Audio asset keys ──────────────────────────────────────

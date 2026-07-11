@@ -38,7 +38,6 @@ import { FeudalismTurnController } from './FeudalismTurnController';
 import { FeudalismReplayController } from './FeudalismReplayController';
 import {
   SECTION_BOX_PAD, PATRON_X, PATRON_W, MARKET_Y, MARKET_TOTAL_H,
-  DECK_X, MARKET_X, MARKET_CARD_W, MARKET_CARD_GAP,
   SUPPLY_X, SUPPLY_TOKEN_R, SUPPLY_Y, SUPPLY_TOTAL_H,
   LOWER_TOP, LOWER_BOX_H, PLAYER_AREA_X, DIVIDER_X, AI_AREA_X,
   ACTION_Y, INSTRUCTION_Y,
@@ -367,11 +366,14 @@ export class FeudalismScene extends CardGameScene {
   // ── Test accessors ──────────────────────────────────────
   getSectionBoxRects() {
     const p = SECTION_BOX_PAD;
-    const lastCardRight = MARKET_X + 4 * (MARKET_CARD_W + MARKET_CARD_GAP) - MARKET_CARD_GAP;
+    const patronsBoxRight = (PATRON_X - p) + (PATRON_W + p * 2);
+    const supplyBoxLeft = SUPPLY_X - SUPPLY_TOKEN_R - 70 - p;
+    const marketBoxX = patronsBoxRight + p;
+    const marketBoxW = supplyBoxLeft - p - marketBoxX;
     return {
-      patrons: { x: PATRON_X - p, y: MARKET_Y - p - 16, w: PATRON_W + p * 2, h: MARKET_TOTAL_H + p * 2 + 16 },
-      market: { x: DECK_X - 90 - p, y: MARKET_Y - p - 16, w: lastCardRight - (DECK_X - 90 - p) + p, h: MARKET_TOTAL_H + p * 2 + 16 },
-      supply: { x: SUPPLY_X - SUPPLY_TOKEN_R - 70 - p, y: SUPPLY_Y - SUPPLY_TOKEN_R - p - 16, w: SUPPLY_TOKEN_R + 70 + SUPPLY_TOKEN_R + p * 2, h: SUPPLY_TOTAL_H + SUPPLY_TOKEN_R * 2 + p * 2 + 16 },
+      patrons: { x: PATRON_X - p, y: MARKET_Y - p, w: PATRON_W + p * 2, h: MARKET_TOTAL_H + p * 2 },
+      market: { x: marketBoxX, y: MARKET_Y - p, w: marketBoxW, h: MARKET_TOTAL_H + p * 2 },
+      supply: { x: SUPPLY_X - SUPPLY_TOKEN_R - 70 - p, y: SUPPLY_Y - SUPPLY_TOKEN_R - p, w: SUPPLY_TOKEN_R + 70 + SUPPLY_TOKEN_R + p * 2, h: SUPPLY_TOTAL_H + SUPPLY_TOKEN_R * 2 + p * 2 },
       player: { x: PLAYER_AREA_X - p, y: LOWER_TOP - p, w: DIVIDER_X - PLAYER_AREA_X, h: LOWER_BOX_H },
       ai: { x: DIVIDER_X + p, y: LOWER_TOP - p, w: AI_AREA_X - DIVIDER_X + p, h: LOWER_BOX_H },
     };

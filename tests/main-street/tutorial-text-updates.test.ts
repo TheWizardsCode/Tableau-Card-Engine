@@ -88,7 +88,7 @@ describe('Tutorial text updates (AC1-3)', () => {
     });
 
     it('should mention the cost of the card to buy', () => {
-      expect(t(t3Step.bodyKey)).toContain('$6');
+      expect(t(t3Step.bodyKey)).toContain('€6');
     });
   });
 

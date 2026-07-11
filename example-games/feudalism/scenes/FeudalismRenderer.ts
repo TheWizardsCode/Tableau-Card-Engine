@@ -7,9 +7,8 @@ import {
   RESOURCE_TYPES,
   tokenCount,
   resourceAbbrev,
-  resourceDisplayName,
   formatCost,
-  tierShortName,
+  tierDisplayName,
 } from '../FeudalismCards';
 import type { FeudalismSession } from '../FeudalismGame';
 import { getInfluence, getBonuses } from '../FeudalismGame';
@@ -165,34 +164,47 @@ export class FeudalismRenderer {
     this.sectionBoxContainer.removeAll(true);
     const p = SECTION_BOX_PAD;
 
-    this.drawSectionBox(PATRON_X - p, MARKET_Y - p - 16, PATRON_W + p * 2, MARKET_TOTAL_H + p * 2 + 16, 'Patrons');
+    // Patrons section — no label, top border adjusted down
+    this.drawSectionBox(
+      PATRON_X - p,
+      MARKET_Y - p,
+      PATRON_W + p * 2,
+      MARKET_TOTAL_H + p * 2,
+    );
 
-    const lastCardRight = MARKET_X + 4 * (MARKET_CARD_W + MARKET_CARD_GAP) - MARKET_CARD_GAP;
-    const marketBoxX = DECK_X - 90 - p;
-    this.drawSectionBox(marketBoxX, MARKET_Y - p - 16, lastCardRight - marketBoxX + p, MARKET_TOTAL_H + p * 2 + 16, 'Market');
+    // Market section — expanded to fill between Patrons and Supply with small equal margins
+    const patronsBoxRight = (PATRON_X - p) + (PATRON_W + p * 2);
+    const supplyBoxLeft = SUPPLY_X - SUPPLY_TOKEN_R - 70 - p;
+    const marketBoxX = patronsBoxRight + p;
+    const marketBoxW = supplyBoxLeft - p - marketBoxX;
+    this.drawSectionBox(
+      marketBoxX,
+      MARKET_Y - p,
+      marketBoxW,
+      MARKET_TOTAL_H + p * 2,
+    );
 
+    // Supply section — no label, top border adjusted down, right-aligned
     const supplyBoxX = SUPPLY_X - SUPPLY_TOKEN_R - 70 - p;
-    const supplyBoxY = SUPPLY_Y - SUPPLY_TOKEN_R - p - 16;
-    this.drawSectionBox(supplyBoxX, supplyBoxY, SUPPLY_TOKEN_R + 70 + SUPPLY_TOKEN_R + p * 2, SUPPLY_TOTAL_H + SUPPLY_TOKEN_R * 2 + p * 2 + 16, 'Supply');
+    const supplyBoxY = SUPPLY_Y - SUPPLY_TOKEN_R - p;
+    this.drawSectionBox(
+      supplyBoxX,
+      supplyBoxY,
+      SUPPLY_TOKEN_R + 70 + SUPPLY_TOKEN_R + p * 2,
+      SUPPLY_TOTAL_H + SUPPLY_TOKEN_R * 2 + p * 2,
+    );
 
     this.drawSectionBox(PLAYER_AREA_X - p, LOWER_TOP - p, DIVIDER_X - PLAYER_AREA_X, LOWER_BOX_H);
     this.drawSectionBox(DIVIDER_X + p, LOWER_TOP - p, AI_AREA_X - DIVIDER_X + p, LOWER_BOX_H);
   }
 
-  private drawSectionBox(x: number, y: number, w: number, h: number, label?: string): void {
+  private drawSectionBox(x: number, y: number, w: number, h: number): void {
     const gfx = this.scene.add.graphics();
     gfx.fillStyle(SECTION_BOX_FILL, SECTION_BOX_FILL_ALPHA);
     gfx.fillRoundedRect(x, y, w, h, SECTION_BOX_RADIUS);
     gfx.lineStyle(1, SECTION_BOX_STROKE, SECTION_BOX_ALPHA);
     gfx.strokeRoundedRect(x, y, w, h, SECTION_BOX_RADIUS);
     this.sectionBoxContainer.add(gfx);
-
-    if (label) {
-      const txt = this.scene.add.text(x + w / 2, y + 2, label, {
-        fontSize: '12px', fontStyle: 'bold', color: '#667766', fontFamily: FONT_FAMILY,
-      }).setOrigin(0.5, 0);
-      this.sectionBoxContainer.add(txt);
-    }
   }
 
   // ── Refresh all ─────────────────────────────────────────
@@ -222,11 +234,6 @@ export class FeudalismRenderer {
       const y = MARKET_Y + row * (MARKET_CARD_H + MARKET_TIER_GAP);
       const market = this.session.market[tier];
 
-      const tierLabel = this.scene.add.text(DECK_X - 40, y + MARKET_CARD_H / 2, `${tierShortName(tier)}`, {
-        fontSize: '18px', fontStyle: 'bold', color: '#888888', fontFamily: FONT_FAMILY,
-      }).setOrigin(0.5);
-      this.marketContainer.add(tierLabel);
-
       const deckCount = market.deck.length;
       const deckW = 100;
       const deckH = MARKET_CARD_H - 16;
@@ -235,10 +242,15 @@ export class FeudalismRenderer {
       this.marketContainer.add(deckBg);
 
       if (deckCount > 0) {
-        const deckText = this.scene.add.text(DECK_X, y + MARKET_CARD_H / 2, `${deckCount}`, {
+        const deckText = this.scene.add.text(DECK_X, y + MARKET_CARD_H / 2 - 8, `${deckCount}`, {
           fontSize: '20px', fontStyle: 'bold', color: '#aaddaa', fontFamily: FONT_FAMILY,
         }).setOrigin(0.5);
         this.marketContainer.add(deckText);
+
+        const tierName = this.scene.add.text(DECK_X, y + MARKET_CARD_H / 2 + 14, tierDisplayName(tier), {
+          fontSize: '12px', color: '#88aa88', fontFamily: FONT_FAMILY,
+        }).setOrigin(0.5);
+        this.marketContainer.add(tierName);
 
         if (this.turnPhase === 'player-turn') {
           deckBg.setInteractive({ useHandCursor: true });
@@ -400,14 +412,8 @@ export class FeudalismRenderer {
   refreshSupply(callbacks: SupplyCallbacks): void {
     this.supplyContainer.removeAll(true);
 
-    const label = this.scene.add.text(SUPPLY_X, SUPPLY_Y - SUPPLY_TOKEN_R - 8, 'Supply', {
-      fontSize: '13px', fontStyle: 'bold', color: '#99bb99', fontFamily: FONT_FAMILY,
-    }).setOrigin(0.5, 1);
-    this.supplyContainer.add(label);
-
-    const allColors: ResourceOrWild[] = [...RESOURCE_TYPES, 'mead'];
-    for (let i = 0; i < allColors.length; i++) {
-      const color = allColors[i];
+    for (let i = 0; i < RESOURCE_TYPES.length; i++) {
+      const color = RESOURCE_TYPES[i];
       const y = SUPPLY_Y + i * SUPPLY_GAP;
       const count = tokenCount(this.session.tokenSupply, color);
 
@@ -425,19 +431,14 @@ export class FeudalismRenderer {
       }).setOrigin(0.5);
       this.supplyContainer.add(countText);
 
-      const abbr = this.scene.add.text(SUPPLY_X - SUPPLY_TOKEN_R - 8, y, resourceDisplayName(color), {
-        fontSize: '15px', color: '#aaaaaa', fontFamily: FONT_FAMILY,
-      }).setOrigin(1, 0.5);
-      this.supplyContainer.add(abbr);
-
-      if (color !== 'mead' && count > 0 && this.turnPhase === 'selecting-tokens') {
+      if (count > 0 && this.turnPhase === 'selecting-tokens') {
         circle.setInteractive({ useHandCursor: true });
-        circle.on('pointerdown', () => callbacks.onSupplyTokenClick(color as ResourceType));
+        circle.on('pointerdown', () => callbacks.onSupplyTokenClick(color));
         circle.on('pointerover', () => circle.setStrokeStyle(3, 0xffdd44));
         circle.on('pointerout', () => circle.setStrokeStyle(2, 0xffffff));
       }
 
-      if (this.selectedTokens.includes(color as ResourceType)) {
+      if (this.selectedTokens.includes(color)) {
         const check = this.scene.add.text(SUPPLY_X + SUPPLY_TOKEN_R + 10, y, '✓', {
           fontSize: '22px', fontStyle: 'bold', color: '#44ff44', fontFamily: FONT_FAMILY,
         }).setOrigin(0, 0.5);
@@ -542,12 +543,7 @@ export class FeudalismRenderer {
       cursorX += delta;
     }
 
-    if (tokenEntries.length === 0) {
-      const noTok = this.scene.add.text(options.tokenStartX, options.y, '(none)', {
-        fontSize: '14px', color: '#666666', fontFamily: FONT_FAMILY,
-      }).setOrigin(options.emptyAlign === 'right' ? 1 : 0, 0.5);
-      container.add(noTok);
-    }
+    // (none) label removed per CG-0MQK0OM6I00168HD
   }
 
   private renderTokenBubble(
