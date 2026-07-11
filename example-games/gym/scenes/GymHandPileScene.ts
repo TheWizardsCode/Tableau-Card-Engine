@@ -474,6 +474,7 @@ export class GymHandPileScene extends GymSceneBase {
           destY: this.PILE_Y,
           flipOnArrivalTexture: getCardTexture(card),
           duration: 400,
+          depth: 2,
           destroyAfter: true,
           gameEvents,
           cardId: `${card.rank}${card.suit}`,

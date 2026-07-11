@@ -106,6 +106,15 @@ export interface DiscardCardOptions {
    */
   flipOnArrivalTexture?: string;
 
+  /**
+   * Optional depth to set on the target during the destination animation.
+   * Use this to ensure the animating card renders above other game objects
+   * (e.g. above a discard pile sprite). The depth is restored to its
+   * original value on completion (if destroyAfter is false) or ignored
+   * (the sprite is destroyed anyway).
+   */
+  depth?: number;
+
   /** Optional SoundManager to play SFX during discard. */
   soundManager?: SoundManager | null;
 
@@ -161,10 +170,25 @@ export function discardCard(opts: DiscardCardOptions): Phaser.Tweens.Tween {
     destX,
     destY,
     flipOnArrivalTexture,
+    depth,
   } = opts;
 
-  // Emit completion event and optionally destroy the target.
+  // Store original depth for restoration after animation
+  const originalDepth = depth !== undefined ? (target as any).depth : undefined;
+
+  // Set depth if provided (e.g. to render above the discard pile)
+  if (depth !== undefined && typeof (target as any).setDepth === 'function') {
+    (target as any).setDepth(depth);
+  }
+
+  // Emit completion event, restore depth, and optionally destroy the target.
   function emitComplete(): void {
+    // Restore original depth if we're not destroying the sprite
+    if (depth !== undefined && !destroyAfter && originalDepth !== undefined) {
+      if (typeof (target as any).setDepth === 'function') {
+        (target as any).setDepth(originalDepth);
+      }
+    }
     if (gameEvents && cardId) {
       gameEvents.emit('card:discarded', { cardId, playerIndex });
     }

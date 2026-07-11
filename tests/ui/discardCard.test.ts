@@ -64,6 +64,7 @@ const createMockScene = () => {
 // Mock target object
 const createMockTarget = (initialX = 100, initialY = 100) => {
   let _textureKey = 'card_face';
+  let _depth = 0;
   return {
     x: initialX,
     y: initialY,
@@ -71,8 +72,11 @@ const createMockTarget = (initialX = 100, initialY = 100) => {
     scaleX: 1,
     scaleY: 1,
     rotation: 0,
+    get depth() { return _depth; },
+    set depth(v: number) { _depth = v; },
     get texture() { return { key: _textureKey }; },
     setTexture: vi.fn((key: string) => { _textureKey = key; }),
+    setDepth: vi.fn((d: number) => { _depth = d; }),
     setPosition: function(x: number, y: number) {
       this.x = x;
       this.y = y;
@@ -401,6 +405,58 @@ describe('discardCard', () => {
 
       // Move tween should use Quad.easeOut
       expect(mockScene.tweensList[0].ease).toBe('Quad.easeOut');
+    });
+
+    it('sets depth on target during destination animation when depth option is provided', () => {
+      const opts: DiscardCardOptions = {
+        scene: mockScene as any,
+        target: target as any,
+        destX: 700,
+        destY: 250,
+        flipOnArrivalTexture: 'card_back',
+        depth: 10,
+        destroyAfter: false,
+      };
+
+      discardCard(opts);
+
+      // Depth should have been set
+      expect(target.setDepth).toHaveBeenCalledWith(10);
+    });
+
+    it('restores original depth when destroyAfter is false', () => {
+      // Set initial depth
+      target.depth = 3;
+
+      const opts: DiscardCardOptions = {
+        scene: mockScene as any,
+        target: target as any,
+        destX: 700,
+        destY: 250,
+        depth: 10,
+        destroyAfter: false,
+      };
+
+      discardCard(opts);
+
+      // Depth should have been restored to original
+      expect(target.depth).toBe(3);
+    });
+
+    it('sets depth and destroys without restoring when destroyAfter is true', () => {
+      const opts: DiscardCardOptions = {
+        scene: mockScene as any,
+        target: target as any,
+        destX: 700,
+        destY: 250,
+        depth: 10,
+        destroyAfter: true,
+      };
+
+      discardCard(opts);
+
+      expect(target.setDepth).toHaveBeenCalledWith(10);
+      expect(target.destroy).toHaveBeenCalled();
     });
   });
 });
