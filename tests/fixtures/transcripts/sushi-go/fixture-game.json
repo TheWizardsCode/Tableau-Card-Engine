@@ -1,0 +1,4100 @@
+{
+  "version": 1,
+  "gameType": "sushi-go",
+  "startedAt": "2026-01-01T00:00:00.000Z",
+  "endedAt": "2026-01-01T00:10:00.000Z",
+  "initialState": {
+    "playerStates": [
+      {
+        "name": "AI-0",
+        "isAI": true,
+        "hand": [
+          {
+            "id": 27,
+            "type": "sashimi"
+          },
+          {
+            "id": 90,
+            "type": "pudding"
+          },
+          {
+            "id": 28,
+            "type": "dumpling"
+          },
+          {
+            "id": 76,
+            "type": "nigiri",
+            "variant": "salmon"
+          },
+          {
+            "id": 34,
+            "type": "dumpling"
+          },
+          {
+            "id": 79,
+            "type": "nigiri",
+            "variant": "squid"
+          },
+          {
+            "id": 15,
+            "type": "sashimi"
+          },
+          {
+            "id": 100,
+            "type": "wasabi"
+          },
+          {
+            "id": 36,
+            "type": "dumpling"
+          },
+          {
+            "id": 55,
+            "type": "maki",
+            "icons": 3
+          }
+        ],
+        "tableau": [],
+        "puddingCount": 0,
+        "roundScores": [],
+        "totalScore": 0
+      },
+      {
+        "name": "AI-1",
+        "isAI": true,
+        "hand": [
+          {
+            "id": 20,
+            "type": "sashimi"
+          },
+          {
+            "id": 43,
+            "type": "maki",
+            "icons": 2
+          },
+          {
+            "id": 56,
+            "type": "maki",
+            "icons": 3
+          },
+          {
+            "id": 42,
+            "type": "maki",
+            "icons": 2
+          },
+          {
+            "id": 107,
+            "type": "chopsticks"
+          },
+          {
+            "id": 105,
+            "type": "chopsticks"
+          },
+          {
+            "id": 68,
+            "type": "nigiri",
+            "variant": "salmon"
+          },
+          {
+            "id": 85,
+            "type": "nigiri",
+            "variant": "egg"
+          },
+          {
+            "id": 60,
+            "type": "maki",
+            "icons": 3
+          },
+          {
+            "id": 0,
+            "type": "tempura"
+          }
+        ],
+        "tableau": [],
+        "puddingCount": 0,
+        "roundScores": [],
+        "totalScore": 0
+      }
+    ],
+    "currentRound": 0,
+    "cardsPerPlayer": 10
+  },
+  "turns": [
+    {
+      "turnInRound": 0,
+      "round": 0,
+      "globalTurn": 0,
+      "picks": [
+        {
+          "cardIndex": 5
+        },
+        {
+          "cardIndex": 6
+        }
+      ],
+      "playerStates": [
+        {
+          "name": "AI-0",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 20,
+              "type": "sashimi"
+            },
+            {
+              "id": 43,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 56,
+              "type": "maki",
+              "icons": 3
+            },
+            {
+              "id": 42,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 107,
+              "type": "chopsticks"
+            },
+            {
+              "id": 105,
+              "type": "chopsticks"
+            },
+            {
+              "id": 85,
+              "type": "nigiri",
+              "variant": "egg"
+            },
+            {
+              "id": 60,
+              "type": "maki",
+              "icons": 3
+            },
+            {
+              "id": 0,
+              "type": "tempura"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 79,
+              "type": "nigiri",
+              "variant": "squid"
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [],
+          "totalScore": 0
+        },
+        {
+          "name": "AI-1",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 27,
+              "type": "sashimi"
+            },
+            {
+              "id": 90,
+              "type": "pudding"
+            },
+            {
+              "id": 28,
+              "type": "dumpling"
+            },
+            {
+              "id": 76,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 34,
+              "type": "dumpling"
+            },
+            {
+              "id": 15,
+              "type": "sashimi"
+            },
+            {
+              "id": 100,
+              "type": "wasabi"
+            },
+            {
+              "id": 36,
+              "type": "dumpling"
+            },
+            {
+              "id": 55,
+              "type": "maki",
+              "icons": 3
+            }
+          ],
+          "tableau": [
+            {
+              "id": 68,
+              "type": "nigiri",
+              "variant": "salmon"
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [],
+          "totalScore": 0
+        }
+      ]
+    },
+    {
+      "turnInRound": 1,
+      "round": 0,
+      "globalTurn": 1,
+      "picks": [
+        {
+          "cardIndex": 6
+        },
+        {
+          "cardIndex": 3
+        }
+      ],
+      "playerStates": [
+        {
+          "name": "AI-0",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 27,
+              "type": "sashimi"
+            },
+            {
+              "id": 90,
+              "type": "pudding"
+            },
+            {
+              "id": 28,
+              "type": "dumpling"
+            },
+            {
+              "id": 34,
+              "type": "dumpling"
+            },
+            {
+              "id": 15,
+              "type": "sashimi"
+            },
+            {
+              "id": 100,
+              "type": "wasabi"
+            },
+            {
+              "id": 36,
+              "type": "dumpling"
+            },
+            {
+              "id": 55,
+              "type": "maki",
+              "icons": 3
+            }
+          ],
+          "tableau": [
+            {
+              "id": 79,
+              "type": "nigiri",
+              "variant": "squid"
+            },
+            {
+              "id": 85,
+              "type": "nigiri",
+              "variant": "egg"
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [],
+          "totalScore": 0
+        },
+        {
+          "name": "AI-1",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 20,
+              "type": "sashimi"
+            },
+            {
+              "id": 43,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 56,
+              "type": "maki",
+              "icons": 3
+            },
+            {
+              "id": 42,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 107,
+              "type": "chopsticks"
+            },
+            {
+              "id": 105,
+              "type": "chopsticks"
+            },
+            {
+              "id": 60,
+              "type": "maki",
+              "icons": 3
+            },
+            {
+              "id": 0,
+              "type": "tempura"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 68,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 76,
+              "type": "nigiri",
+              "variant": "salmon"
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [],
+          "totalScore": 0
+        }
+      ]
+    },
+    {
+      "turnInRound": 2,
+      "round": 0,
+      "globalTurn": 2,
+      "picks": [
+        {
+          "cardIndex": 2
+        },
+        {
+          "cardIndex": 7
+        }
+      ],
+      "playerStates": [
+        {
+          "name": "AI-0",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 20,
+              "type": "sashimi"
+            },
+            {
+              "id": 43,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 56,
+              "type": "maki",
+              "icons": 3
+            },
+            {
+              "id": 42,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 107,
+              "type": "chopsticks"
+            },
+            {
+              "id": 105,
+              "type": "chopsticks"
+            },
+            {
+              "id": 60,
+              "type": "maki",
+              "icons": 3
+            }
+          ],
+          "tableau": [
+            {
+              "id": 79,
+              "type": "nigiri",
+              "variant": "squid"
+            },
+            {
+              "id": 85,
+              "type": "nigiri",
+              "variant": "egg"
+            },
+            {
+              "id": 28,
+              "type": "dumpling"
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [],
+          "totalScore": 0
+        },
+        {
+          "name": "AI-1",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 27,
+              "type": "sashimi"
+            },
+            {
+              "id": 90,
+              "type": "pudding"
+            },
+            {
+              "id": 34,
+              "type": "dumpling"
+            },
+            {
+              "id": 15,
+              "type": "sashimi"
+            },
+            {
+              "id": 100,
+              "type": "wasabi"
+            },
+            {
+              "id": 36,
+              "type": "dumpling"
+            },
+            {
+              "id": 55,
+              "type": "maki",
+              "icons": 3
+            }
+          ],
+          "tableau": [
+            {
+              "id": 68,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 76,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 0,
+              "type": "tempura"
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [],
+          "totalScore": 0
+        }
+      ]
+    },
+    {
+      "turnInRound": 3,
+      "round": 0,
+      "globalTurn": 3,
+      "picks": [
+        {
+          "cardIndex": 2
+        },
+        {
+          "cardIndex": 5
+        }
+      ],
+      "playerStates": [
+        {
+          "name": "AI-0",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 27,
+              "type": "sashimi"
+            },
+            {
+              "id": 90,
+              "type": "pudding"
+            },
+            {
+              "id": 34,
+              "type": "dumpling"
+            },
+            {
+              "id": 15,
+              "type": "sashimi"
+            },
+            {
+              "id": 100,
+              "type": "wasabi"
+            },
+            {
+              "id": 55,
+              "type": "maki",
+              "icons": 3
+            }
+          ],
+          "tableau": [
+            {
+              "id": 79,
+              "type": "nigiri",
+              "variant": "squid"
+            },
+            {
+              "id": 85,
+              "type": "nigiri",
+              "variant": "egg"
+            },
+            {
+              "id": 28,
+              "type": "dumpling"
+            },
+            {
+              "id": 56,
+              "type": "maki",
+              "icons": 3
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [],
+          "totalScore": 0
+        },
+        {
+          "name": "AI-1",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 20,
+              "type": "sashimi"
+            },
+            {
+              "id": 43,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 42,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 107,
+              "type": "chopsticks"
+            },
+            {
+              "id": 105,
+              "type": "chopsticks"
+            },
+            {
+              "id": 60,
+              "type": "maki",
+              "icons": 3
+            }
+          ],
+          "tableau": [
+            {
+              "id": 68,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 76,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 0,
+              "type": "tempura"
+            },
+            {
+              "id": 36,
+              "type": "dumpling"
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [],
+          "totalScore": 0
+        }
+      ]
+    },
+    {
+      "turnInRound": 4,
+      "round": 0,
+      "globalTurn": 4,
+      "picks": [
+        {
+          "cardIndex": 2
+        },
+        {
+          "cardIndex": 0
+        }
+      ],
+      "playerStates": [
+        {
+          "name": "AI-0",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 43,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 42,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 107,
+              "type": "chopsticks"
+            },
+            {
+              "id": 105,
+              "type": "chopsticks"
+            },
+            {
+              "id": 60,
+              "type": "maki",
+              "icons": 3
+            }
+          ],
+          "tableau": [
+            {
+              "id": 79,
+              "type": "nigiri",
+              "variant": "squid"
+            },
+            {
+              "id": 85,
+              "type": "nigiri",
+              "variant": "egg"
+            },
+            {
+              "id": 28,
+              "type": "dumpling"
+            },
+            {
+              "id": 56,
+              "type": "maki",
+              "icons": 3
+            },
+            {
+              "id": 34,
+              "type": "dumpling"
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [],
+          "totalScore": 0
+        },
+        {
+          "name": "AI-1",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 27,
+              "type": "sashimi"
+            },
+            {
+              "id": 90,
+              "type": "pudding"
+            },
+            {
+              "id": 15,
+              "type": "sashimi"
+            },
+            {
+              "id": 100,
+              "type": "wasabi"
+            },
+            {
+              "id": 55,
+              "type": "maki",
+              "icons": 3
+            }
+          ],
+          "tableau": [
+            {
+              "id": 68,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 76,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 0,
+              "type": "tempura"
+            },
+            {
+              "id": 36,
+              "type": "dumpling"
+            },
+            {
+              "id": 20,
+              "type": "sashimi"
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [],
+          "totalScore": 0
+        }
+      ]
+    },
+    {
+      "turnInRound": 5,
+      "round": 0,
+      "globalTurn": 5,
+      "picks": [
+        {
+          "cardIndex": 1
+        },
+        {
+          "cardIndex": 3
+        }
+      ],
+      "playerStates": [
+        {
+          "name": "AI-0",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 27,
+              "type": "sashimi"
+            },
+            {
+              "id": 90,
+              "type": "pudding"
+            },
+            {
+              "id": 15,
+              "type": "sashimi"
+            },
+            {
+              "id": 55,
+              "type": "maki",
+              "icons": 3
+            }
+          ],
+          "tableau": [
+            {
+              "id": 79,
+              "type": "nigiri",
+              "variant": "squid"
+            },
+            {
+              "id": 85,
+              "type": "nigiri",
+              "variant": "egg"
+            },
+            {
+              "id": 28,
+              "type": "dumpling"
+            },
+            {
+              "id": 56,
+              "type": "maki",
+              "icons": 3
+            },
+            {
+              "id": 34,
+              "type": "dumpling"
+            },
+            {
+              "id": 42,
+              "type": "maki",
+              "icons": 2
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [],
+          "totalScore": 0
+        },
+        {
+          "name": "AI-1",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 43,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 107,
+              "type": "chopsticks"
+            },
+            {
+              "id": 105,
+              "type": "chopsticks"
+            },
+            {
+              "id": 60,
+              "type": "maki",
+              "icons": 3
+            }
+          ],
+          "tableau": [
+            {
+              "id": 68,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 76,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 0,
+              "type": "tempura"
+            },
+            {
+              "id": 36,
+              "type": "dumpling"
+            },
+            {
+              "id": 20,
+              "type": "sashimi"
+            },
+            {
+              "id": 100,
+              "type": "wasabi"
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [],
+          "totalScore": 0
+        }
+      ]
+    },
+    {
+      "turnInRound": 6,
+      "round": 0,
+      "globalTurn": 6,
+      "picks": [
+        {
+          "cardIndex": 0
+        },
+        {
+          "cardIndex": 3
+        }
+      ],
+      "playerStates": [
+        {
+          "name": "AI-0",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 43,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 107,
+              "type": "chopsticks"
+            },
+            {
+              "id": 105,
+              "type": "chopsticks"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 79,
+              "type": "nigiri",
+              "variant": "squid"
+            },
+            {
+              "id": 85,
+              "type": "nigiri",
+              "variant": "egg"
+            },
+            {
+              "id": 28,
+              "type": "dumpling"
+            },
+            {
+              "id": 56,
+              "type": "maki",
+              "icons": 3
+            },
+            {
+              "id": 34,
+              "type": "dumpling"
+            },
+            {
+              "id": 42,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 27,
+              "type": "sashimi"
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [],
+          "totalScore": 0
+        },
+        {
+          "name": "AI-1",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 90,
+              "type": "pudding"
+            },
+            {
+              "id": 15,
+              "type": "sashimi"
+            },
+            {
+              "id": 55,
+              "type": "maki",
+              "icons": 3
+            }
+          ],
+          "tableau": [
+            {
+              "id": 68,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 76,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 0,
+              "type": "tempura"
+            },
+            {
+              "id": 36,
+              "type": "dumpling"
+            },
+            {
+              "id": 20,
+              "type": "sashimi"
+            },
+            {
+              "id": 100,
+              "type": "wasabi"
+            },
+            {
+              "id": 60,
+              "type": "maki",
+              "icons": 3
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [],
+          "totalScore": 0
+        }
+      ]
+    },
+    {
+      "turnInRound": 7,
+      "round": 0,
+      "globalTurn": 7,
+      "picks": [
+        {
+          "cardIndex": 1
+        },
+        {
+          "cardIndex": 1
+        }
+      ],
+      "playerStates": [
+        {
+          "name": "AI-0",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 90,
+              "type": "pudding"
+            },
+            {
+              "id": 55,
+              "type": "maki",
+              "icons": 3
+            }
+          ],
+          "tableau": [
+            {
+              "id": 79,
+              "type": "nigiri",
+              "variant": "squid"
+            },
+            {
+              "id": 85,
+              "type": "nigiri",
+              "variant": "egg"
+            },
+            {
+              "id": 28,
+              "type": "dumpling"
+            },
+            {
+              "id": 56,
+              "type": "maki",
+              "icons": 3
+            },
+            {
+              "id": 34,
+              "type": "dumpling"
+            },
+            {
+              "id": 42,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 27,
+              "type": "sashimi"
+            },
+            {
+              "id": 107,
+              "type": "chopsticks"
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [],
+          "totalScore": 0
+        },
+        {
+          "name": "AI-1",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 43,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 105,
+              "type": "chopsticks"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 68,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 76,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 0,
+              "type": "tempura"
+            },
+            {
+              "id": 36,
+              "type": "dumpling"
+            },
+            {
+              "id": 20,
+              "type": "sashimi"
+            },
+            {
+              "id": 100,
+              "type": "wasabi"
+            },
+            {
+              "id": 60,
+              "type": "maki",
+              "icons": 3
+            },
+            {
+              "id": 15,
+              "type": "sashimi"
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [],
+          "totalScore": 0
+        }
+      ]
+    },
+    {
+      "turnInRound": 8,
+      "round": 0,
+      "globalTurn": 8,
+      "picks": [
+        {
+          "cardIndex": 1
+        },
+        {
+          "cardIndex": 1
+        }
+      ],
+      "playerStates": [
+        {
+          "name": "AI-0",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 43,
+              "type": "maki",
+              "icons": 2
+            }
+          ],
+          "tableau": [
+            {
+              "id": 79,
+              "type": "nigiri",
+              "variant": "squid"
+            },
+            {
+              "id": 85,
+              "type": "nigiri",
+              "variant": "egg"
+            },
+            {
+              "id": 28,
+              "type": "dumpling"
+            },
+            {
+              "id": 56,
+              "type": "maki",
+              "icons": 3
+            },
+            {
+              "id": 34,
+              "type": "dumpling"
+            },
+            {
+              "id": 42,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 27,
+              "type": "sashimi"
+            },
+            {
+              "id": 107,
+              "type": "chopsticks"
+            },
+            {
+              "id": 55,
+              "type": "maki",
+              "icons": 3
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [],
+          "totalScore": 0
+        },
+        {
+          "name": "AI-1",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 90,
+              "type": "pudding"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 68,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 76,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 0,
+              "type": "tempura"
+            },
+            {
+              "id": 36,
+              "type": "dumpling"
+            },
+            {
+              "id": 20,
+              "type": "sashimi"
+            },
+            {
+              "id": 100,
+              "type": "wasabi"
+            },
+            {
+              "id": 60,
+              "type": "maki",
+              "icons": 3
+            },
+            {
+              "id": 15,
+              "type": "sashimi"
+            },
+            {
+              "id": 105,
+              "type": "chopsticks"
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [],
+          "totalScore": 0
+        }
+      ]
+    },
+    {
+      "turnInRound": 9,
+      "round": 0,
+      "globalTurn": 9,
+      "picks": [
+        {
+          "cardIndex": 0
+        },
+        {
+          "cardIndex": 0
+        }
+      ],
+      "playerStates": [
+        {
+          "name": "AI-0",
+          "isAI": true,
+          "hand": [],
+          "tableau": [
+            {
+              "id": 79,
+              "type": "nigiri",
+              "variant": "squid"
+            },
+            {
+              "id": 85,
+              "type": "nigiri",
+              "variant": "egg"
+            },
+            {
+              "id": 28,
+              "type": "dumpling"
+            },
+            {
+              "id": 56,
+              "type": "maki",
+              "icons": 3
+            },
+            {
+              "id": 34,
+              "type": "dumpling"
+            },
+            {
+              "id": 42,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 27,
+              "type": "sashimi"
+            },
+            {
+              "id": 107,
+              "type": "chopsticks"
+            },
+            {
+              "id": 55,
+              "type": "maki",
+              "icons": 3
+            },
+            {
+              "id": 43,
+              "type": "maki",
+              "icons": 2
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [],
+          "totalScore": 0
+        },
+        {
+          "name": "AI-1",
+          "isAI": true,
+          "hand": [],
+          "tableau": [
+            {
+              "id": 68,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 76,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 0,
+              "type": "tempura"
+            },
+            {
+              "id": 36,
+              "type": "dumpling"
+            },
+            {
+              "id": 20,
+              "type": "sashimi"
+            },
+            {
+              "id": 100,
+              "type": "wasabi"
+            },
+            {
+              "id": 60,
+              "type": "maki",
+              "icons": 3
+            },
+            {
+              "id": 15,
+              "type": "sashimi"
+            },
+            {
+              "id": 105,
+              "type": "chopsticks"
+            },
+            {
+              "id": 90,
+              "type": "pudding"
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [],
+          "totalScore": 0
+        }
+      ]
+    },
+    {
+      "turnInRound": 0,
+      "round": 1,
+      "globalTurn": 10,
+      "picks": [
+        {
+          "cardIndex": 8
+        },
+        {
+          "cardIndex": 3
+        }
+      ],
+      "playerStates": [
+        {
+          "name": "AI-0",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 94,
+              "type": "pudding"
+            },
+            {
+              "id": 19,
+              "type": "sashimi"
+            },
+            {
+              "id": 25,
+              "type": "sashimi"
+            },
+            {
+              "id": 53,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 99,
+              "type": "wasabi"
+            },
+            {
+              "id": 63,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 39,
+              "type": "dumpling"
+            },
+            {
+              "id": 14,
+              "type": "sashimi"
+            },
+            {
+              "id": 31,
+              "type": "dumpling"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 35,
+              "type": "dumpling"
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [
+            13
+          ],
+          "totalScore": 13
+        },
+        {
+          "name": "AI-1",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 9,
+              "type": "tempura"
+            },
+            {
+              "id": 64,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 0,
+              "type": "tempura"
+            },
+            {
+              "id": 102,
+              "type": "wasabi"
+            },
+            {
+              "id": 32,
+              "type": "dumpling"
+            },
+            {
+              "id": 90,
+              "type": "pudding"
+            },
+            {
+              "id": 66,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 100,
+              "type": "wasabi"
+            },
+            {
+              "id": 29,
+              "type": "dumpling"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 69,
+              "type": "nigiri",
+              "variant": "salmon"
+            }
+          ],
+          "puddingCount": 1,
+          "roundScores": [
+            8
+          ],
+          "totalScore": 8
+        }
+      ]
+    },
+    {
+      "turnInRound": 1,
+      "round": 1,
+      "globalTurn": 11,
+      "picks": [
+        {
+          "cardIndex": 6
+        },
+        {
+          "cardIndex": 4
+        }
+      ],
+      "playerStates": [
+        {
+          "name": "AI-0",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 9,
+              "type": "tempura"
+            },
+            {
+              "id": 64,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 0,
+              "type": "tempura"
+            },
+            {
+              "id": 102,
+              "type": "wasabi"
+            },
+            {
+              "id": 90,
+              "type": "pudding"
+            },
+            {
+              "id": 66,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 100,
+              "type": "wasabi"
+            },
+            {
+              "id": 29,
+              "type": "dumpling"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 35,
+              "type": "dumpling"
+            },
+            {
+              "id": 39,
+              "type": "dumpling"
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [
+            13
+          ],
+          "totalScore": 13
+        },
+        {
+          "name": "AI-1",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 94,
+              "type": "pudding"
+            },
+            {
+              "id": 19,
+              "type": "sashimi"
+            },
+            {
+              "id": 25,
+              "type": "sashimi"
+            },
+            {
+              "id": 53,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 99,
+              "type": "wasabi"
+            },
+            {
+              "id": 63,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 14,
+              "type": "sashimi"
+            },
+            {
+              "id": 31,
+              "type": "dumpling"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 69,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 32,
+              "type": "dumpling"
+            }
+          ],
+          "puddingCount": 1,
+          "roundScores": [
+            8
+          ],
+          "totalScore": 8
+        }
+      ]
+    },
+    {
+      "turnInRound": 2,
+      "round": 1,
+      "globalTurn": 12,
+      "picks": [
+        {
+          "cardIndex": 7
+        },
+        {
+          "cardIndex": 7
+        }
+      ],
+      "playerStates": [
+        {
+          "name": "AI-0",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 94,
+              "type": "pudding"
+            },
+            {
+              "id": 19,
+              "type": "sashimi"
+            },
+            {
+              "id": 25,
+              "type": "sashimi"
+            },
+            {
+              "id": 53,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 99,
+              "type": "wasabi"
+            },
+            {
+              "id": 63,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 14,
+              "type": "sashimi"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 35,
+              "type": "dumpling"
+            },
+            {
+              "id": 39,
+              "type": "dumpling"
+            },
+            {
+              "id": 29,
+              "type": "dumpling"
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [
+            13
+          ],
+          "totalScore": 13
+        },
+        {
+          "name": "AI-1",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 9,
+              "type": "tempura"
+            },
+            {
+              "id": 64,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 0,
+              "type": "tempura"
+            },
+            {
+              "id": 102,
+              "type": "wasabi"
+            },
+            {
+              "id": 90,
+              "type": "pudding"
+            },
+            {
+              "id": 66,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 100,
+              "type": "wasabi"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 69,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 32,
+              "type": "dumpling"
+            },
+            {
+              "id": 31,
+              "type": "dumpling"
+            }
+          ],
+          "puddingCount": 1,
+          "roundScores": [
+            8
+          ],
+          "totalScore": 8
+        }
+      ]
+    },
+    {
+      "turnInRound": 3,
+      "round": 1,
+      "globalTurn": 13,
+      "picks": [
+        {
+          "cardIndex": 1
+        },
+        {
+          "cardIndex": 3
+        }
+      ],
+      "playerStates": [
+        {
+          "name": "AI-0",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 9,
+              "type": "tempura"
+            },
+            {
+              "id": 64,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 0,
+              "type": "tempura"
+            },
+            {
+              "id": 90,
+              "type": "pudding"
+            },
+            {
+              "id": 66,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 100,
+              "type": "wasabi"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 35,
+              "type": "dumpling"
+            },
+            {
+              "id": 39,
+              "type": "dumpling"
+            },
+            {
+              "id": 29,
+              "type": "dumpling"
+            },
+            {
+              "id": 19,
+              "type": "sashimi"
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [
+            13
+          ],
+          "totalScore": 13
+        },
+        {
+          "name": "AI-1",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 94,
+              "type": "pudding"
+            },
+            {
+              "id": 25,
+              "type": "sashimi"
+            },
+            {
+              "id": 53,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 99,
+              "type": "wasabi"
+            },
+            {
+              "id": 63,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 14,
+              "type": "sashimi"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 69,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 32,
+              "type": "dumpling"
+            },
+            {
+              "id": 31,
+              "type": "dumpling"
+            },
+            {
+              "id": 102,
+              "type": "wasabi"
+            }
+          ],
+          "puddingCount": 1,
+          "roundScores": [
+            8
+          ],
+          "totalScore": 8
+        }
+      ]
+    },
+    {
+      "turnInRound": 4,
+      "round": 1,
+      "globalTurn": 14,
+      "picks": [
+        {
+          "cardIndex": 4
+        },
+        {
+          "cardIndex": 3
+        }
+      ],
+      "playerStates": [
+        {
+          "name": "AI-0",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 94,
+              "type": "pudding"
+            },
+            {
+              "id": 25,
+              "type": "sashimi"
+            },
+            {
+              "id": 53,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 63,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 14,
+              "type": "sashimi"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 35,
+              "type": "dumpling"
+            },
+            {
+              "id": 39,
+              "type": "dumpling"
+            },
+            {
+              "id": 29,
+              "type": "dumpling"
+            },
+            {
+              "id": 19,
+              "type": "sashimi"
+            },
+            {
+              "id": 66,
+              "type": "maki",
+              "icons": 1
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [
+            13
+          ],
+          "totalScore": 13
+        },
+        {
+          "name": "AI-1",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 9,
+              "type": "tempura"
+            },
+            {
+              "id": 64,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 0,
+              "type": "tempura"
+            },
+            {
+              "id": 90,
+              "type": "pudding"
+            },
+            {
+              "id": 100,
+              "type": "wasabi"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 69,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 32,
+              "type": "dumpling"
+            },
+            {
+              "id": 31,
+              "type": "dumpling"
+            },
+            {
+              "id": 102,
+              "type": "wasabi"
+            },
+            {
+              "id": 99,
+              "type": "wasabi"
+            }
+          ],
+          "puddingCount": 1,
+          "roundScores": [
+            8
+          ],
+          "totalScore": 8
+        }
+      ]
+    },
+    {
+      "turnInRound": 5,
+      "round": 1,
+      "globalTurn": 15,
+      "picks": [
+        {
+          "cardIndex": 1
+        },
+        {
+          "cardIndex": 4
+        }
+      ],
+      "playerStates": [
+        {
+          "name": "AI-0",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 9,
+              "type": "tempura"
+            },
+            {
+              "id": 64,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 0,
+              "type": "tempura"
+            },
+            {
+              "id": 90,
+              "type": "pudding"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 35,
+              "type": "dumpling"
+            },
+            {
+              "id": 39,
+              "type": "dumpling"
+            },
+            {
+              "id": 29,
+              "type": "dumpling"
+            },
+            {
+              "id": 19,
+              "type": "sashimi"
+            },
+            {
+              "id": 66,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 25,
+              "type": "sashimi"
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [
+            13
+          ],
+          "totalScore": 13
+        },
+        {
+          "name": "AI-1",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 94,
+              "type": "pudding"
+            },
+            {
+              "id": 53,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 63,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 14,
+              "type": "sashimi"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 69,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 32,
+              "type": "dumpling"
+            },
+            {
+              "id": 31,
+              "type": "dumpling"
+            },
+            {
+              "id": 102,
+              "type": "wasabi"
+            },
+            {
+              "id": 99,
+              "type": "wasabi"
+            },
+            {
+              "id": 100,
+              "type": "wasabi"
+            }
+          ],
+          "puddingCount": 1,
+          "roundScores": [
+            8
+          ],
+          "totalScore": 8
+        }
+      ]
+    },
+    {
+      "turnInRound": 6,
+      "round": 1,
+      "globalTurn": 16,
+      "picks": [
+        {
+          "cardIndex": 2
+        },
+        {
+          "cardIndex": 1
+        }
+      ],
+      "playerStates": [
+        {
+          "name": "AI-0",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 94,
+              "type": "pudding"
+            },
+            {
+              "id": 63,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 14,
+              "type": "sashimi"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 35,
+              "type": "dumpling"
+            },
+            {
+              "id": 39,
+              "type": "dumpling"
+            },
+            {
+              "id": 29,
+              "type": "dumpling"
+            },
+            {
+              "id": 19,
+              "type": "sashimi"
+            },
+            {
+              "id": 66,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 25,
+              "type": "sashimi"
+            },
+            {
+              "id": 0,
+              "type": "tempura"
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [
+            13
+          ],
+          "totalScore": 13
+        },
+        {
+          "name": "AI-1",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 9,
+              "type": "tempura"
+            },
+            {
+              "id": 64,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 90,
+              "type": "pudding"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 69,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 32,
+              "type": "dumpling"
+            },
+            {
+              "id": 31,
+              "type": "dumpling"
+            },
+            {
+              "id": 102,
+              "type": "wasabi"
+            },
+            {
+              "id": 99,
+              "type": "wasabi"
+            },
+            {
+              "id": 100,
+              "type": "wasabi"
+            },
+            {
+              "id": 53,
+              "type": "maki",
+              "icons": 2
+            }
+          ],
+          "puddingCount": 1,
+          "roundScores": [
+            8
+          ],
+          "totalScore": 8
+        }
+      ]
+    },
+    {
+      "turnInRound": 7,
+      "round": 1,
+      "globalTurn": 17,
+      "picks": [
+        {
+          "cardIndex": 2
+        },
+        {
+          "cardIndex": 2
+        }
+      ],
+      "playerStates": [
+        {
+          "name": "AI-0",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 9,
+              "type": "tempura"
+            },
+            {
+              "id": 64,
+              "type": "maki",
+              "icons": 1
+            }
+          ],
+          "tableau": [
+            {
+              "id": 35,
+              "type": "dumpling"
+            },
+            {
+              "id": 39,
+              "type": "dumpling"
+            },
+            {
+              "id": 29,
+              "type": "dumpling"
+            },
+            {
+              "id": 19,
+              "type": "sashimi"
+            },
+            {
+              "id": 66,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 25,
+              "type": "sashimi"
+            },
+            {
+              "id": 0,
+              "type": "tempura"
+            },
+            {
+              "id": 14,
+              "type": "sashimi"
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [
+            13
+          ],
+          "totalScore": 13
+        },
+        {
+          "name": "AI-1",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 94,
+              "type": "pudding"
+            },
+            {
+              "id": 63,
+              "type": "maki",
+              "icons": 1
+            }
+          ],
+          "tableau": [
+            {
+              "id": 69,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 32,
+              "type": "dumpling"
+            },
+            {
+              "id": 31,
+              "type": "dumpling"
+            },
+            {
+              "id": 102,
+              "type": "wasabi"
+            },
+            {
+              "id": 99,
+              "type": "wasabi"
+            },
+            {
+              "id": 100,
+              "type": "wasabi"
+            },
+            {
+              "id": 53,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 90,
+              "type": "pudding"
+            }
+          ],
+          "puddingCount": 1,
+          "roundScores": [
+            8
+          ],
+          "totalScore": 8
+        }
+      ]
+    },
+    {
+      "turnInRound": 8,
+      "round": 1,
+      "globalTurn": 18,
+      "picks": [
+        {
+          "cardIndex": 0
+        },
+        {
+          "cardIndex": 0
+        }
+      ],
+      "playerStates": [
+        {
+          "name": "AI-0",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 63,
+              "type": "maki",
+              "icons": 1
+            }
+          ],
+          "tableau": [
+            {
+              "id": 35,
+              "type": "dumpling"
+            },
+            {
+              "id": 39,
+              "type": "dumpling"
+            },
+            {
+              "id": 29,
+              "type": "dumpling"
+            },
+            {
+              "id": 19,
+              "type": "sashimi"
+            },
+            {
+              "id": 66,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 25,
+              "type": "sashimi"
+            },
+            {
+              "id": 0,
+              "type": "tempura"
+            },
+            {
+              "id": 14,
+              "type": "sashimi"
+            },
+            {
+              "id": 9,
+              "type": "tempura"
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [
+            13
+          ],
+          "totalScore": 13
+        },
+        {
+          "name": "AI-1",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 64,
+              "type": "maki",
+              "icons": 1
+            }
+          ],
+          "tableau": [
+            {
+              "id": 69,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 32,
+              "type": "dumpling"
+            },
+            {
+              "id": 31,
+              "type": "dumpling"
+            },
+            {
+              "id": 102,
+              "type": "wasabi"
+            },
+            {
+              "id": 99,
+              "type": "wasabi"
+            },
+            {
+              "id": 100,
+              "type": "wasabi"
+            },
+            {
+              "id": 53,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 90,
+              "type": "pudding"
+            },
+            {
+              "id": 94,
+              "type": "pudding"
+            }
+          ],
+          "puddingCount": 1,
+          "roundScores": [
+            8
+          ],
+          "totalScore": 8
+        }
+      ]
+    },
+    {
+      "turnInRound": 9,
+      "round": 1,
+      "globalTurn": 19,
+      "picks": [
+        {
+          "cardIndex": 0
+        },
+        {
+          "cardIndex": 0
+        }
+      ],
+      "playerStates": [
+        {
+          "name": "AI-0",
+          "isAI": true,
+          "hand": [],
+          "tableau": [
+            {
+              "id": 35,
+              "type": "dumpling"
+            },
+            {
+              "id": 39,
+              "type": "dumpling"
+            },
+            {
+              "id": 29,
+              "type": "dumpling"
+            },
+            {
+              "id": 19,
+              "type": "sashimi"
+            },
+            {
+              "id": 66,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 25,
+              "type": "sashimi"
+            },
+            {
+              "id": 0,
+              "type": "tempura"
+            },
+            {
+              "id": 14,
+              "type": "sashimi"
+            },
+            {
+              "id": 9,
+              "type": "tempura"
+            },
+            {
+              "id": 63,
+              "type": "maki",
+              "icons": 1
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [
+            13
+          ],
+          "totalScore": 13
+        },
+        {
+          "name": "AI-1",
+          "isAI": true,
+          "hand": [],
+          "tableau": [
+            {
+              "id": 69,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 32,
+              "type": "dumpling"
+            },
+            {
+              "id": 31,
+              "type": "dumpling"
+            },
+            {
+              "id": 102,
+              "type": "wasabi"
+            },
+            {
+              "id": 99,
+              "type": "wasabi"
+            },
+            {
+              "id": 100,
+              "type": "wasabi"
+            },
+            {
+              "id": 53,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 90,
+              "type": "pudding"
+            },
+            {
+              "id": 94,
+              "type": "pudding"
+            },
+            {
+              "id": 64,
+              "type": "maki",
+              "icons": 1
+            }
+          ],
+          "puddingCount": 1,
+          "roundScores": [
+            8
+          ],
+          "totalScore": 8
+        }
+      ]
+    },
+    {
+      "turnInRound": 0,
+      "round": 2,
+      "globalTurn": 20,
+      "picks": [
+        {
+          "cardIndex": 1
+        },
+        {
+          "cardIndex": 4
+        }
+      ],
+      "playerStates": [
+        {
+          "name": "AI-0",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 105,
+              "type": "chopsticks"
+            },
+            {
+              "id": 83,
+              "type": "nigiri",
+              "variant": "egg"
+            },
+            {
+              "id": 65,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 53,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 40,
+              "type": "dumpling"
+            },
+            {
+              "id": 76,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 26,
+              "type": "sashimi"
+            },
+            {
+              "id": 98,
+              "type": "wasabi"
+            },
+            {
+              "id": 33,
+              "type": "dumpling"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 86,
+              "type": "nigiri",
+              "variant": "egg"
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [
+            13,
+            24
+          ],
+          "totalScore": 37
+        },
+        {
+          "name": "AI-1",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 25,
+              "type": "sashimi"
+            },
+            {
+              "id": 46,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 8,
+              "type": "tempura"
+            },
+            {
+              "id": 4,
+              "type": "tempura"
+            },
+            {
+              "id": 96,
+              "type": "pudding"
+            },
+            {
+              "id": 64,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 100,
+              "type": "wasabi"
+            },
+            {
+              "id": 15,
+              "type": "sashimi"
+            },
+            {
+              "id": 20,
+              "type": "sashimi"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 79,
+              "type": "nigiri",
+              "variant": "squid"
+            }
+          ],
+          "puddingCount": 3,
+          "roundScores": [
+            8,
+            11
+          ],
+          "totalScore": 19
+        }
+      ]
+    },
+    {
+      "turnInRound": 1,
+      "round": 2,
+      "globalTurn": 21,
+      "picks": [
+        {
+          "cardIndex": 5
+        },
+        {
+          "cardIndex": 3
+        }
+      ],
+      "playerStates": [
+        {
+          "name": "AI-0",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 25,
+              "type": "sashimi"
+            },
+            {
+              "id": 46,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 8,
+              "type": "tempura"
+            },
+            {
+              "id": 96,
+              "type": "pudding"
+            },
+            {
+              "id": 64,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 100,
+              "type": "wasabi"
+            },
+            {
+              "id": 15,
+              "type": "sashimi"
+            },
+            {
+              "id": 20,
+              "type": "sashimi"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 86,
+              "type": "nigiri",
+              "variant": "egg"
+            },
+            {
+              "id": 76,
+              "type": "nigiri",
+              "variant": "salmon"
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [
+            13,
+            24
+          ],
+          "totalScore": 37
+        },
+        {
+          "name": "AI-1",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 105,
+              "type": "chopsticks"
+            },
+            {
+              "id": 83,
+              "type": "nigiri",
+              "variant": "egg"
+            },
+            {
+              "id": 65,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 53,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 40,
+              "type": "dumpling"
+            },
+            {
+              "id": 26,
+              "type": "sashimi"
+            },
+            {
+              "id": 98,
+              "type": "wasabi"
+            },
+            {
+              "id": 33,
+              "type": "dumpling"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 79,
+              "type": "nigiri",
+              "variant": "squid"
+            },
+            {
+              "id": 4,
+              "type": "tempura"
+            }
+          ],
+          "puddingCount": 3,
+          "roundScores": [
+            8,
+            11
+          ],
+          "totalScore": 19
+        }
+      ]
+    },
+    {
+      "turnInRound": 2,
+      "round": 2,
+      "globalTurn": 22,
+      "picks": [
+        {
+          "cardIndex": 4
+        },
+        {
+          "cardIndex": 4
+        }
+      ],
+      "playerStates": [
+        {
+          "name": "AI-0",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 105,
+              "type": "chopsticks"
+            },
+            {
+              "id": 83,
+              "type": "nigiri",
+              "variant": "egg"
+            },
+            {
+              "id": 65,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 53,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 26,
+              "type": "sashimi"
+            },
+            {
+              "id": 98,
+              "type": "wasabi"
+            },
+            {
+              "id": 33,
+              "type": "dumpling"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 86,
+              "type": "nigiri",
+              "variant": "egg"
+            },
+            {
+              "id": 76,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 64,
+              "type": "maki",
+              "icons": 1
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [
+            13,
+            24
+          ],
+          "totalScore": 37
+        },
+        {
+          "name": "AI-1",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 25,
+              "type": "sashimi"
+            },
+            {
+              "id": 46,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 8,
+              "type": "tempura"
+            },
+            {
+              "id": 96,
+              "type": "pudding"
+            },
+            {
+              "id": 100,
+              "type": "wasabi"
+            },
+            {
+              "id": 15,
+              "type": "sashimi"
+            },
+            {
+              "id": 20,
+              "type": "sashimi"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 79,
+              "type": "nigiri",
+              "variant": "squid"
+            },
+            {
+              "id": 4,
+              "type": "tempura"
+            },
+            {
+              "id": 40,
+              "type": "dumpling"
+            }
+          ],
+          "puddingCount": 3,
+          "roundScores": [
+            8,
+            11
+          ],
+          "totalScore": 19
+        }
+      ]
+    },
+    {
+      "turnInRound": 3,
+      "round": 2,
+      "globalTurn": 23,
+      "picks": [
+        {
+          "cardIndex": 1
+        },
+        {
+          "cardIndex": 2
+        }
+      ],
+      "playerStates": [
+        {
+          "name": "AI-0",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 25,
+              "type": "sashimi"
+            },
+            {
+              "id": 46,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 96,
+              "type": "pudding"
+            },
+            {
+              "id": 100,
+              "type": "wasabi"
+            },
+            {
+              "id": 15,
+              "type": "sashimi"
+            },
+            {
+              "id": 20,
+              "type": "sashimi"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 86,
+              "type": "nigiri",
+              "variant": "egg"
+            },
+            {
+              "id": 76,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 64,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 83,
+              "type": "nigiri",
+              "variant": "egg"
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [
+            13,
+            24
+          ],
+          "totalScore": 37
+        },
+        {
+          "name": "AI-1",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 105,
+              "type": "chopsticks"
+            },
+            {
+              "id": 65,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 53,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 26,
+              "type": "sashimi"
+            },
+            {
+              "id": 98,
+              "type": "wasabi"
+            },
+            {
+              "id": 33,
+              "type": "dumpling"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 79,
+              "type": "nigiri",
+              "variant": "squid"
+            },
+            {
+              "id": 4,
+              "type": "tempura"
+            },
+            {
+              "id": 40,
+              "type": "dumpling"
+            },
+            {
+              "id": 8,
+              "type": "tempura"
+            }
+          ],
+          "puddingCount": 3,
+          "roundScores": [
+            8,
+            11
+          ],
+          "totalScore": 19
+        }
+      ]
+    },
+    {
+      "turnInRound": 4,
+      "round": 2,
+      "globalTurn": 24,
+      "picks": [
+        {
+          "cardIndex": 4
+        },
+        {
+          "cardIndex": 5
+        }
+      ],
+      "playerStates": [
+        {
+          "name": "AI-0",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 105,
+              "type": "chopsticks"
+            },
+            {
+              "id": 65,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 53,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 26,
+              "type": "sashimi"
+            },
+            {
+              "id": 98,
+              "type": "wasabi"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 86,
+              "type": "nigiri",
+              "variant": "egg"
+            },
+            {
+              "id": 76,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 64,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 83,
+              "type": "nigiri",
+              "variant": "egg"
+            },
+            {
+              "id": 15,
+              "type": "sashimi"
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [
+            13,
+            24
+          ],
+          "totalScore": 37
+        },
+        {
+          "name": "AI-1",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 25,
+              "type": "sashimi"
+            },
+            {
+              "id": 46,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 96,
+              "type": "pudding"
+            },
+            {
+              "id": 100,
+              "type": "wasabi"
+            },
+            {
+              "id": 20,
+              "type": "sashimi"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 79,
+              "type": "nigiri",
+              "variant": "squid"
+            },
+            {
+              "id": 4,
+              "type": "tempura"
+            },
+            {
+              "id": 40,
+              "type": "dumpling"
+            },
+            {
+              "id": 8,
+              "type": "tempura"
+            },
+            {
+              "id": 33,
+              "type": "dumpling"
+            }
+          ],
+          "puddingCount": 3,
+          "roundScores": [
+            8,
+            11
+          ],
+          "totalScore": 19
+        }
+      ]
+    },
+    {
+      "turnInRound": 5,
+      "round": 2,
+      "globalTurn": 25,
+      "picks": [
+        {
+          "cardIndex": 3
+        },
+        {
+          "cardIndex": 0
+        }
+      ],
+      "playerStates": [
+        {
+          "name": "AI-0",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 46,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 96,
+              "type": "pudding"
+            },
+            {
+              "id": 100,
+              "type": "wasabi"
+            },
+            {
+              "id": 20,
+              "type": "sashimi"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 86,
+              "type": "nigiri",
+              "variant": "egg"
+            },
+            {
+              "id": 76,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 64,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 83,
+              "type": "nigiri",
+              "variant": "egg"
+            },
+            {
+              "id": 15,
+              "type": "sashimi"
+            },
+            {
+              "id": 26,
+              "type": "sashimi"
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [
+            13,
+            24
+          ],
+          "totalScore": 37
+        },
+        {
+          "name": "AI-1",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 105,
+              "type": "chopsticks"
+            },
+            {
+              "id": 65,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 53,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 98,
+              "type": "wasabi"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 79,
+              "type": "nigiri",
+              "variant": "squid"
+            },
+            {
+              "id": 4,
+              "type": "tempura"
+            },
+            {
+              "id": 40,
+              "type": "dumpling"
+            },
+            {
+              "id": 8,
+              "type": "tempura"
+            },
+            {
+              "id": 33,
+              "type": "dumpling"
+            },
+            {
+              "id": 25,
+              "type": "sashimi"
+            }
+          ],
+          "puddingCount": 3,
+          "roundScores": [
+            8,
+            11
+          ],
+          "totalScore": 19
+        }
+      ]
+    },
+    {
+      "turnInRound": 6,
+      "round": 2,
+      "globalTurn": 26,
+      "picks": [
+        {
+          "cardIndex": 3
+        },
+        {
+          "cardIndex": 3
+        }
+      ],
+      "playerStates": [
+        {
+          "name": "AI-0",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 105,
+              "type": "chopsticks"
+            },
+            {
+              "id": 65,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 53,
+              "type": "maki",
+              "icons": 2
+            }
+          ],
+          "tableau": [
+            {
+              "id": 86,
+              "type": "nigiri",
+              "variant": "egg"
+            },
+            {
+              "id": 76,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 64,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 83,
+              "type": "nigiri",
+              "variant": "egg"
+            },
+            {
+              "id": 15,
+              "type": "sashimi"
+            },
+            {
+              "id": 26,
+              "type": "sashimi"
+            },
+            {
+              "id": 20,
+              "type": "sashimi"
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [
+            13,
+            24
+          ],
+          "totalScore": 37
+        },
+        {
+          "name": "AI-1",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 46,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 96,
+              "type": "pudding"
+            },
+            {
+              "id": 100,
+              "type": "wasabi"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 79,
+              "type": "nigiri",
+              "variant": "squid"
+            },
+            {
+              "id": 4,
+              "type": "tempura"
+            },
+            {
+              "id": 40,
+              "type": "dumpling"
+            },
+            {
+              "id": 8,
+              "type": "tempura"
+            },
+            {
+              "id": 33,
+              "type": "dumpling"
+            },
+            {
+              "id": 25,
+              "type": "sashimi"
+            },
+            {
+              "id": 98,
+              "type": "wasabi"
+            }
+          ],
+          "puddingCount": 3,
+          "roundScores": [
+            8,
+            11
+          ],
+          "totalScore": 19
+        }
+      ]
+    },
+    {
+      "turnInRound": 7,
+      "round": 2,
+      "globalTurn": 27,
+      "picks": [
+        {
+          "cardIndex": 2
+        },
+        {
+          "cardIndex": 2
+        }
+      ],
+      "playerStates": [
+        {
+          "name": "AI-0",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 46,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 96,
+              "type": "pudding"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 86,
+              "type": "nigiri",
+              "variant": "egg"
+            },
+            {
+              "id": 76,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 64,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 83,
+              "type": "nigiri",
+              "variant": "egg"
+            },
+            {
+              "id": 15,
+              "type": "sashimi"
+            },
+            {
+              "id": 26,
+              "type": "sashimi"
+            },
+            {
+              "id": 20,
+              "type": "sashimi"
+            },
+            {
+              "id": 53,
+              "type": "maki",
+              "icons": 2
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [
+            13,
+            24
+          ],
+          "totalScore": 37
+        },
+        {
+          "name": "AI-1",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 105,
+              "type": "chopsticks"
+            },
+            {
+              "id": 65,
+              "type": "maki",
+              "icons": 1
+            }
+          ],
+          "tableau": [
+            {
+              "id": 79,
+              "type": "nigiri",
+              "variant": "squid"
+            },
+            {
+              "id": 4,
+              "type": "tempura"
+            },
+            {
+              "id": 40,
+              "type": "dumpling"
+            },
+            {
+              "id": 8,
+              "type": "tempura"
+            },
+            {
+              "id": 33,
+              "type": "dumpling"
+            },
+            {
+              "id": 25,
+              "type": "sashimi"
+            },
+            {
+              "id": 98,
+              "type": "wasabi"
+            },
+            {
+              "id": 100,
+              "type": "wasabi"
+            }
+          ],
+          "puddingCount": 3,
+          "roundScores": [
+            8,
+            11
+          ],
+          "totalScore": 19
+        }
+      ]
+    },
+    {
+      "turnInRound": 8,
+      "round": 2,
+      "globalTurn": 28,
+      "picks": [
+        {
+          "cardIndex": 0
+        },
+        {
+          "cardIndex": 0
+        }
+      ],
+      "playerStates": [
+        {
+          "name": "AI-0",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 65,
+              "type": "maki",
+              "icons": 1
+            }
+          ],
+          "tableau": [
+            {
+              "id": 86,
+              "type": "nigiri",
+              "variant": "egg"
+            },
+            {
+              "id": 76,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 64,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 83,
+              "type": "nigiri",
+              "variant": "egg"
+            },
+            {
+              "id": 15,
+              "type": "sashimi"
+            },
+            {
+              "id": 26,
+              "type": "sashimi"
+            },
+            {
+              "id": 20,
+              "type": "sashimi"
+            },
+            {
+              "id": 53,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 46,
+              "type": "maki",
+              "icons": 2
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [
+            13,
+            24
+          ],
+          "totalScore": 37
+        },
+        {
+          "name": "AI-1",
+          "isAI": true,
+          "hand": [
+            {
+              "id": 96,
+              "type": "pudding"
+            }
+          ],
+          "tableau": [
+            {
+              "id": 79,
+              "type": "nigiri",
+              "variant": "squid"
+            },
+            {
+              "id": 4,
+              "type": "tempura"
+            },
+            {
+              "id": 40,
+              "type": "dumpling"
+            },
+            {
+              "id": 8,
+              "type": "tempura"
+            },
+            {
+              "id": 33,
+              "type": "dumpling"
+            },
+            {
+              "id": 25,
+              "type": "sashimi"
+            },
+            {
+              "id": 98,
+              "type": "wasabi"
+            },
+            {
+              "id": 100,
+              "type": "wasabi"
+            },
+            {
+              "id": 105,
+              "type": "chopsticks"
+            }
+          ],
+          "puddingCount": 3,
+          "roundScores": [
+            8,
+            11
+          ],
+          "totalScore": 19
+        }
+      ]
+    },
+    {
+      "turnInRound": 9,
+      "round": 2,
+      "globalTurn": 29,
+      "picks": [
+        {
+          "cardIndex": 0
+        },
+        {
+          "cardIndex": 0
+        }
+      ],
+      "playerStates": [
+        {
+          "name": "AI-0",
+          "isAI": true,
+          "hand": [],
+          "tableau": [
+            {
+              "id": 86,
+              "type": "nigiri",
+              "variant": "egg"
+            },
+            {
+              "id": 76,
+              "type": "nigiri",
+              "variant": "salmon"
+            },
+            {
+              "id": 64,
+              "type": "maki",
+              "icons": 1
+            },
+            {
+              "id": 83,
+              "type": "nigiri",
+              "variant": "egg"
+            },
+            {
+              "id": 15,
+              "type": "sashimi"
+            },
+            {
+              "id": 26,
+              "type": "sashimi"
+            },
+            {
+              "id": 20,
+              "type": "sashimi"
+            },
+            {
+              "id": 53,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 46,
+              "type": "maki",
+              "icons": 2
+            },
+            {
+              "id": 65,
+              "type": "maki",
+              "icons": 1
+            }
+          ],
+          "puddingCount": 0,
+          "roundScores": [
+            13,
+            24
+          ],
+          "totalScore": 37
+        },
+        {
+          "name": "AI-1",
+          "isAI": true,
+          "hand": [],
+          "tableau": [
+            {
+              "id": 79,
+              "type": "nigiri",
+              "variant": "squid"
+            },
+            {
+              "id": 4,
+              "type": "tempura"
+            },
+            {
+              "id": 40,
+              "type": "dumpling"
+            },
+            {
+              "id": 8,
+              "type": "tempura"
+            },
+            {
+              "id": 33,
+              "type": "dumpling"
+            },
+            {
+              "id": 25,
+              "type": "sashimi"
+            },
+            {
+              "id": 98,
+              "type": "wasabi"
+            },
+            {
+              "id": 100,
+              "type": "wasabi"
+            },
+            {
+              "id": 105,
+              "type": "chopsticks"
+            },
+            {
+              "id": 96,
+              "type": "pudding"
+            }
+          ],
+          "puddingCount": 3,
+          "roundScores": [
+            8,
+            11
+          ],
+          "totalScore": 19
+        }
+      ]
+    }
+  ],
+  "roundResults": [
+    {
+      "round": 0,
+      "tableauScores": [
+        7,
+        5
+      ],
+      "tableauBreakdowns": [
+        {
+          "tempura": 0,
+          "sashimi": 0,
+          "dumpling": 3,
+          "nigiri": 4,
+          "wasabi": 0,
+          "makiIcons": 10,
+          "puddingCount": 0,
+          "chopsticks": 1
+        },
+        {
+          "tempura": 0,
+          "sashimi": 0,
+          "dumpling": 1,
+          "nigiri": 4,
+          "wasabi": 0,
+          "makiIcons": 3,
+          "puddingCount": 1,
+          "chopsticks": 1
+        }
+      ],
+      "makiCounts": [
+        10,
+        3
+      ],
+      "makiBonuses": [
+        6,
+        3
+      ],
+      "roundScores": [
+        13,
+        8
+      ]
+    },
+    {
+      "round": 1,
+      "tableauScores": [
+        21,
+        5
+      ],
+      "tableauBreakdowns": [
+        {
+          "tempura": 5,
+          "sashimi": 10,
+          "dumpling": 6,
+          "nigiri": 0,
+          "wasabi": 0,
+          "makiIcons": 2,
+          "puddingCount": 0,
+          "chopsticks": 0
+        },
+        {
+          "tempura": 0,
+          "sashimi": 0,
+          "dumpling": 3,
+          "nigiri": 2,
+          "wasabi": 0,
+          "makiIcons": 3,
+          "puddingCount": 2,
+          "chopsticks": 0
+        }
+      ],
+      "makiCounts": [
+        2,
+        3
+      ],
+      "makiBonuses": [
+        3,
+        6
+      ],
+      "roundScores": [
+        24,
+        11
+      ]
+    },
+    {
+      "round": 2,
+      "tableauScores": [
+        14,
+        11
+      ],
+      "tableauBreakdowns": [
+        {
+          "tempura": 0,
+          "sashimi": 10,
+          "dumpling": 0,
+          "nigiri": 4,
+          "wasabi": 0,
+          "makiIcons": 6,
+          "puddingCount": 0,
+          "chopsticks": 0
+        },
+        {
+          "tempura": 5,
+          "sashimi": 0,
+          "dumpling": 3,
+          "nigiri": 3,
+          "wasabi": 0,
+          "makiIcons": 0,
+          "puddingCount": 1,
+          "chopsticks": 1
+        }
+      ],
+      "makiCounts": [
+        6,
+        0
+      ],
+      "makiBonuses": [
+        6,
+        0
+      ],
+      "roundScores": [
+        20,
+        11
+      ],
+      "puddingCounts": [
+        0,
+        4
+      ],
+      "puddingBonuses": [
+        -6,
+        6
+      ]
+    }
+  ],
+  "results": {
+    "finalScores": [
+      51,
+      36
+    ],
+    "winnerIndex": 0,
+    "winnerName": "AI-0",
+    "roundScores": [
+      [
+        13,
+        24,
+        20
+      ],
+      [
+        8,
+        11,
+        11
+      ]
+    ]
+  }
+}

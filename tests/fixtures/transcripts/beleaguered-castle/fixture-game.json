@@ -1,0 +1,146 @@
+{
+  "version": 1,
+  "game": "beleaguered-castle",
+  "seed": 42,
+  "startedAt": "2026-01-15T10:00:00.000Z",
+  "endedAt": "2026-01-15T10:05:30.000Z",
+  "initialState": {
+    "foundations": [
+      { "suit": "clubs", "size": 1, "topRank": "A" },
+      { "suit": "diamonds", "size": 1, "topRank": "A" },
+      { "suit": "hearts", "size": 1, "topRank": "A" },
+      { "suit": "spades", "size": 1, "topRank": "A" }
+    ],
+    "tableau": [
+      {
+        "cards": [
+          { "rank": "5", "suit": "hearts", "faceUp": true },
+          { "rank": "K", "suit": "clubs", "faceUp": true },
+          { "rank": "9", "suit": "diamonds", "faceUp": true },
+          { "rank": "3", "suit": "spades", "faceUp": true },
+          { "rank": "7", "suit": "hearts", "faceUp": true },
+          { "rank": "2", "suit": "clubs", "faceUp": true }
+        ]
+      },
+      {
+        "cards": [
+          { "rank": "Q", "suit": "spades", "faceUp": true },
+          { "rank": "6", "suit": "diamonds", "faceUp": true },
+          { "rank": "10", "suit": "clubs", "faceUp": true },
+          { "rank": "4", "suit": "hearts", "faceUp": true },
+          { "rank": "8", "suit": "spades", "faceUp": true },
+          { "rank": "2", "suit": "diamonds", "faceUp": true }
+        ]
+      },
+      {
+        "cards": [
+          { "rank": "J", "suit": "hearts", "faceUp": true },
+          { "rank": "3", "suit": "clubs", "faceUp": true },
+          { "rank": "K", "suit": "diamonds", "faceUp": true },
+          { "rank": "5", "suit": "spades", "faceUp": true },
+          { "rank": "9", "suit": "hearts", "faceUp": true },
+          { "rank": "2", "suit": "spades", "faceUp": true }
+        ]
+      },
+      {
+        "cards": [
+          { "rank": "7", "suit": "clubs", "faceUp": true },
+          { "rank": "Q", "suit": "diamonds", "faceUp": true },
+          { "rank": "4", "suit": "spades", "faceUp": true },
+          { "rank": "10", "suit": "hearts", "faceUp": true },
+          { "rank": "6", "suit": "clubs", "faceUp": true },
+          { "rank": "3", "suit": "diamonds", "faceUp": true }
+        ]
+      },
+      {
+        "cards": [
+          { "rank": "8", "suit": "diamonds", "faceUp": true },
+          { "rank": "J", "suit": "spades", "faceUp": true },
+          { "rank": "5", "suit": "clubs", "faceUp": true },
+          { "rank": "K", "suit": "hearts", "faceUp": true },
+          { "rank": "9", "suit": "spades", "faceUp": true },
+          { "rank": "2", "suit": "hearts", "faceUp": true }
+        ]
+      },
+      {
+        "cards": [
+          { "rank": "4", "suit": "clubs", "faceUp": true },
+          { "rank": "Q", "suit": "hearts", "faceUp": true },
+          { "rank": "7", "suit": "spades", "faceUp": true },
+          { "rank": "10", "suit": "diamonds", "faceUp": true },
+          { "rank": "6", "suit": "hearts", "faceUp": true },
+          { "rank": "3", "suit": "hearts", "faceUp": true }
+        ]
+      },
+      {
+        "cards": [
+          { "rank": "J", "suit": "clubs", "faceUp": true },
+          { "rank": "8", "suit": "hearts", "faceUp": true },
+          { "rank": "K", "suit": "spades", "faceUp": true },
+          { "rank": "4", "suit": "diamonds", "faceUp": true },
+          { "rank": "Q", "suit": "clubs", "faceUp": true },
+          { "rank": "7", "suit": "diamonds", "faceUp": true }
+        ]
+      },
+      {
+        "cards": [
+          { "rank": "9", "suit": "clubs", "faceUp": true },
+          { "rank": "6", "suit": "spades", "faceUp": true },
+          { "rank": "J", "suit": "diamonds", "faceUp": true },
+          { "rank": "5", "suit": "diamonds", "faceUp": true },
+          { "rank": "10", "suit": "spades", "faceUp": true },
+          { "rank": "8", "suit": "clubs", "faceUp": true }
+        ]
+      }
+    ]
+  },
+  "moves": [
+    {
+      "kind": "player-move",
+      "move": { "kind": "tableau-to-foundation", "fromCol": 0, "toFoundation": 0 },
+      "moveCount": 1
+    },
+    {
+      "kind": "auto-move",
+      "move": { "kind": "tableau-to-foundation", "fromCol": 1, "toFoundation": 1 }
+    },
+    {
+      "kind": "player-move",
+      "move": { "kind": "tableau-to-foundation", "fromCol": 4, "toFoundation": 2 },
+      "moveCount": 2
+    },
+    {
+      "kind": "player-move",
+      "move": { "kind": "tableau-to-foundation", "fromCol": 2, "toFoundation": 3 },
+      "moveCount": 3
+    },
+    {
+      "kind": "player-move",
+      "move": { "kind": "tableau-to-tableau", "fromCol": 5, "toCol": 3 },
+      "moveCount": 4
+    },
+    {
+      "kind": "player-move",
+      "move": { "kind": "tableau-to-foundation", "fromCol": 3, "toFoundation": 1 },
+      "moveCount": 5
+    },
+    {
+      "kind": "undo",
+      "moveCount": 4
+    },
+    {
+      "kind": "redo",
+      "moveCount": 5
+    },
+    {
+      "kind": "player-move",
+      "move": { "kind": "tableau-to-tableau", "fromCol": 6, "toCol": 5 },
+      "moveCount": 6
+    }
+  ],
+  "result": {
+    "outcome": "in-progress",
+    "moveCount": 6,
+    "elapsedSeconds": 330
+  }
+}

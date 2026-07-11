@@ -1,0 +1,437 @@
+/**
+ * Typed Event Emitter for the Tableau Card Engine.
+ *
+ * Provides a type-safe, zero-dependency event emitter for turn lifecycle
+ * events. Designed to work in both Node.js (headless) and browser
+ * environments without any Phaser dependency.
+ *
+ * Games emit these events at key lifecycle points. Tools (replay,
+ * testing, telemetry) subscribe to them for synchronization.
+ */
+
+import type { GamePhase } from './GameState';
+
+// ── Event Payloads ──────────────────────────────────────────
+
+/**
+ * Emitted when a new turn begins.
+ */
+export interface TurnStartedPayload {
+  /** Monotonically increasing turn number (0-based). */
+  readonly turnNumber: number;
+  /** Index of the player whose turn is starting. */
+  readonly playerIndex: number;
+  /** Name of the player whose turn is starting. */
+  readonly playerName: string;
+  /** Whether the active player is AI-controlled. */
+  readonly isAI: boolean;
+}
+
+/**
+ * Emitted when a turn's logical action has been resolved.
+ */
+export interface TurnCompletedPayload {
+  /** The turn number that was just completed. */
+  readonly turnNumber: number;
+  /** Index of the player who completed the turn. */
+  readonly playerIndex: number;
+  /** Name of the player who completed the turn. */
+  readonly playerName: string;
+  /** Current game phase after the turn. */
+  readonly phase: GamePhase;
+}
+
+/**
+ * Emitted when all animations for the current action have finished.
+ */
+export interface AnimationCompletePayload {
+  /** The turn number the animation relates to. */
+  readonly turnNumber: number;
+  /** Optional label for the animation that completed. */
+  readonly animationId?: string;
+}
+
+/**
+ * Emitted when the game state has fully settled: the turn action
+ * is resolved, animations are done, and the UI is in a stable
+ * state ready for the next action or screenshot capture.
+ */
+export interface StateSettledPayload {
+  /** The turn number after which state settled. */
+  readonly turnNumber: number;
+  /** Current game phase. */
+  readonly phase: GamePhase;
+}
+
+/**
+ * Emitted when the game has ended.
+ */
+export interface GameEndedPayload {
+  /** Final turn number. */
+  readonly finalTurnNumber: number;
+  /** Index of the winning player, or -1 for a draw. */
+  readonly winnerIndex: number;
+  /** Optional human-readable reason (e.g. "Player 1 wins by 5 points"). */
+  readonly reason?: string;
+}
+
+// ── Card-level Event Payloads ───────────────────────────────
+
+/**
+ * Emitted when a card is drawn from a pile.
+ */
+export interface CardDrawnPayload {
+  /** Where the card was drawn from: 'stock' or 'discard'. */
+  readonly source: 'stock' | 'discard';
+  /** Index of the player who drew the card. */
+  readonly playerIndex: number;
+}
+
+/**
+ * Emitted when a card is flipped face-up in a player's grid.
+ */
+export interface CardFlippedPayload {
+  /** Grid position (row * cols + col) of the flipped card. */
+  readonly position: number;
+  /** Index of the player whose card was flipped. */
+  readonly playerIndex: number;
+}
+
+/**
+ * Emitted when a drawn card is swapped with a grid card.
+ */
+export interface CardSwappedPayload {
+  /** Grid position (row * cols + col) where the swap occurred. */
+  readonly position: number;
+  /** Where the replacement card was drawn from: 'stock' or 'discard'. */
+  readonly drawnFrom: 'stock' | 'discard';
+  /** Index of the player who performed the swap. */
+  readonly playerIndex: number;
+}
+
+/**
+ * Emitted when a drawn card is discarded (not swapped into the grid).
+ */
+export interface CardDiscardedPayload {
+  /** Card ID (optional, for tracking). */
+  cardId?: string;
+  /** Index of the player who discarded. */
+  playerIndex?: number;
+}
+
+/**
+ * Emitted when a UI element is interacted with.
+ */
+export interface UIInteractionPayload {
+  /** Identifier of the UI element (e.g. 'play-again', 'menu'). */
+  readonly elementId: string;
+  /** The type of interaction (e.g. 'click', 'hover'). */
+  readonly action: string;
+}
+
+// ── Solitaire Event Payloads ────────────────────────────────
+
+/**
+ * Emitted when a card is placed on a foundation pile.
+ */
+export interface CardToFoundationPayload {
+  /** Suit of the card (e.g. 'hearts', 'spades'). */
+  readonly suit: string;
+  /** Rank of the card (e.g. 'A', '2', 'K'). */
+  readonly rank: string;
+  /** Index of the foundation pile (0-based). */
+  readonly foundationIndex: number;
+  /** Index of the player who placed the card (optional for single-player). */
+  readonly playerIndex?: number;
+}
+
+/**
+ * Emitted when a card is placed on a tableau column.
+ */
+export interface CardToTableauPayload {
+  /** Suit of the card. */
+  readonly suit: string;
+  /** Rank of the card. */
+  readonly rank: string;
+  /** Index of the tableau column (0-based). */
+  readonly columnIndex: number;
+}
+
+/**
+ * Emitted when a card is picked up (drag start or click-to-move selection).
+ */
+export interface CardPickupPayload {
+  /** Suit of the card. */
+  readonly suit: string;
+  /** Rank of the card. */
+  readonly rank: string;
+  /** Where the card was picked up from. */
+  readonly source: 'tableau' | 'waste' | 'stock' | 'foundation';
+}
+
+/**
+ * Emitted when an invalid move causes a card to snap back to its origin.
+ */
+export interface CardSnapBackPayload {
+  /** Optional human-readable reason for the snap-back. */
+  readonly reason?: string;
+}
+
+/**
+ * Emitted when the auto-complete cascade begins.
+ */
+export interface AutoCompleteStartPayload {
+  /** Number of cards to be auto-completed. */
+  readonly cardCount: number;
+}
+
+/**
+ * Emitted when an individual card is auto-completed to a foundation.
+ */
+export interface AutoCompleteCardPayload {
+  /** Suit of the card. */
+  readonly suit: string;
+  /** Rank of the card. */
+  readonly rank: string;
+  /** Index of the foundation pile the card was placed on. */
+  readonly foundationIndex: number;
+}
+
+/**
+ * Emitted when an undo action is performed.
+ */
+export interface UndoPayload {
+  /** Optional description of the move that was undone. */
+  readonly moveDescription?: string;
+}
+
+/**
+ * Emitted when a redo action is performed.
+ */
+export interface RedoPayload {
+  /** Optional description of the move that was redone. */
+  readonly moveDescription?: string;
+}
+
+/**
+ * Emitted when a card is selected via click-to-move.
+ */
+export interface CardSelectedPayload {
+  /** Suit of the card. */
+  readonly suit: string;
+  /** Rank of the card. */
+  readonly rank: string;
+  /** Index of the column the card is in. */
+  readonly columnIndex: number;
+}
+
+/**
+ * Emitted when a previously selected card is deselected.
+ */
+export interface CardDeselectedPayload {
+  /** Reason the card was deselected. */
+  readonly reason?: 'click-away' | 'new-selection' | 'move-completed';
+}
+
+/**
+ * Emitted when a card is dealt during the initial deal animation.
+ */
+export interface DealCardPayload {
+  /** 0-based index of the card being dealt. */
+  readonly cardIndex: number;
+  /** Total number of cards being dealt. */
+  readonly totalCards: number;
+}
+
+/**
+ * Emitted when a card is dealt to a player's hand (deal animation complete).
+ */
+export interface CardDealtPayload {
+  /** Card ID (optional, for tracking). */
+  readonly cardId?: string;
+  /** Player index (optional, for multi-player). */
+  readonly playerIndex?: number;
+}
+
+/**
+ * Emitted when a card is placed on a grid/street (placement animation complete).
+ */
+export interface CardPlacedPayload {
+  /** Card ID (optional, for tracking). */
+  readonly cardId?: string;
+  /** Player index (optional, for multi-player). */
+  readonly playerIndex?: number;
+  /** Slot/target index (optional, for locating). */
+  readonly slotIndex?: number;
+  /** Optional action string for contextual events (e.g., 'play-event'). */
+  readonly action?: string;
+  /** Optional target slot for upgrades, placements etc. */
+  readonly targetSlot?: number;
+  /** Optional held event id for play-event actions. */
+  readonly heldEventId?: string;
+}
+
+/**
+ * Emitted when the player gains coins/income.
+ */
+export interface IncomeGainedPayload {
+  /** Amount of coins gained (positive integer). */
+  readonly amount: number;
+}
+
+// ── Event Map ───────────────────────────────────────────────
+
+/**
+ * Maps event names to their payload types.
+ *
+ * Subscribing to an event name not in this map produces a
+ * compile-time TypeScript error.
+ */
+export interface GameEventMap {
+  'turn-started': TurnStartedPayload;
+  'turn-completed': TurnCompletedPayload;
+  'animation-complete': AnimationCompletePayload;
+  'state-settled': StateSettledPayload;
+  'game-ended': GameEndedPayload;
+  'card-drawn': CardDrawnPayload;
+  'card-flipped': CardFlippedPayload;
+  'card-swapped': CardSwappedPayload;
+  'card-discarded': CardDiscardedPayload;
+  'card:discarded': CardDiscardedPayload;
+  'card:dealt': CardDealtPayload;
+  'card:placed': CardPlacedPayload;
+  'ui-interaction': UIInteractionPayload;
+  'income-gained': IncomeGainedPayload;
+  // Solitaire events
+  'card-to-foundation': CardToFoundationPayload;
+  'card-to-tableau': CardToTableauPayload;
+  'card-pickup': CardPickupPayload;
+  'card-snap-back': CardSnapBackPayload;
+  'auto-complete-start': AutoCompleteStartPayload;
+  'auto-complete-card': AutoCompleteCardPayload;
+  'undo': UndoPayload;
+  'redo': RedoPayload;
+  'card-selected': CardSelectedPayload;
+  'card-deselected': CardDeselectedPayload;
+  'deal-card': DealCardPayload;
+}
+
+/** Union of all valid game event names. */
+export type GameEventName = keyof GameEventMap;
+
+// ── Listener types ──────────────────────────────────────────
+
+/** A callback for a specific event type. */
+export type GameEventListener<K extends GameEventName> = (
+  payload: GameEventMap[K],
+) => void;
+
+// ── Emitter ─────────────────────────────────────────────────
+
+/**
+ * A minimal, typed event emitter for game lifecycle events.
+ *
+ * Usage:
+ * ```ts
+ * const emitter = new GameEventEmitter();
+ * emitter.on('turn-started', (payload) => {
+ *   console.log(`Turn ${payload.turnNumber} started for ${payload.playerName}`);
+ * });
+ * emitter.emit('turn-started', { turnNumber: 0, playerIndex: 0, playerName: 'Alice', isAI: false });
+ * ```
+ */
+export class GameEventEmitter {
+  private listeners: {
+    [K in GameEventName]?: Array<GameEventListener<K>>;
+  } = {};
+
+  /**
+   * Subscribe to an event. Returns an unsubscribe function.
+   */
+  on<K extends GameEventName>(
+    event: K,
+    listener: GameEventListener<K>,
+  ): () => void {
+    let list = this.listeners[event] as
+      | Array<GameEventListener<K>>
+      | undefined;
+    if (!list) {
+      list = [];
+      (this.listeners as Record<string, unknown>)[event] = list;
+    }
+    list.push(listener);
+
+    return () => this.off(event, listener);
+  }
+
+  /**
+   * Subscribe to an event for a single emission only.
+   * Returns an unsubscribe function (in case you want to
+   * cancel before it fires).
+   */
+  once<K extends GameEventName>(
+    event: K,
+    listener: GameEventListener<K>,
+  ): () => void {
+    const wrapper = ((payload: GameEventMap[K]) => {
+      this.off(event, wrapper);
+      listener(payload);
+    }) as GameEventListener<K>;
+
+    return this.on(event, wrapper);
+  }
+
+  /**
+   * Remove a specific listener for an event.
+   */
+  off<K extends GameEventName>(
+    event: K,
+    listener: GameEventListener<K>,
+  ): void {
+    const list = this.listeners[event] as
+      | Array<GameEventListener<K>>
+      | undefined;
+    if (!list) return;
+
+    const index = list.indexOf(listener);
+    if (index !== -1) {
+      list.splice(index, 1);
+    }
+  }
+
+  /**
+   * Emit an event with the given payload.
+   * Listeners are called synchronously in registration order.
+   */
+  emit<K extends GameEventName>(event: K, payload: GameEventMap[K]): void {
+    const list = this.listeners[event] as
+      | Array<GameEventListener<K>>
+      | undefined;
+    if (!list || list.length === 0) return;
+
+    // Copy the array so listeners can safely unsubscribe during emission
+    const snapshot = [...list];
+    for (const fn of snapshot) {
+      fn(payload);
+    }
+  }
+
+  /**
+   * Remove all listeners, optionally for a specific event only.
+   */
+  removeAllListeners(event?: GameEventName): void {
+    if (event) {
+      delete this.listeners[event];
+    } else {
+      this.listeners = {};
+    }
+  }
+
+  /**
+   * Return the number of listeners for a given event.
+   */
+  listenerCount(event: GameEventName): number {
+    const list = this.listeners[event];
+    return list ? list.length : 0;
+  }
+}

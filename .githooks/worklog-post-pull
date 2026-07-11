@@ -1,0 +1,26 @@
+#!/bin/sh
+# worklog:post-pull-hook:v1
+# Central Worklog post-pull sync script (committed hooks).
+# Set WORKLOG_SKIP_POST_PULL=1 to bypass.
+set -e
+if [ "$WORKLOG_SKIP_POST_PULL" = "1" ]; then
+  exit 0
+fi
+if command -v wl >/dev/null 2>&1; then
+  WL=wl
+elif command -v worklog >/dev/null 2>&1; then
+  WL=worklog
+else
+  echo "worklog: wl/worklog not found; skipping post-pull sync" >&2
+  exit 0
+fi
+if "$WL" sync >/dev/null 2>&1; then
+  :
+else
+  if [ ! -d ".worklog" ]; then
+    echo "worklog: not initialized in this checkout/worktree. Run \"wl init\" to set up this location." >&2
+  else
+    echo "worklog: sync failed; continuing" >&2
+  fi
+fi
+exit 0

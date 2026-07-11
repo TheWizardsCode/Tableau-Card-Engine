@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "id": "gym-sll-pixel-override",
+  "baseViewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "requiredZones": [
+    "header",
+    "menu",
+    "controls",
+    "content"
+  ],
+  "zones": {
+    "header": {
+      "rect": {
+        "x": 0.08,
+        "y": 0.04
+      },
+      "anchors": {
+        "title": { "x": 0.39, "y": 0.095 }
+      }
+    },
+    "menu": {
+      "rect": {
+        "x": 0.7,
+        "y": 0.04,
+        "pixelOverride": {
+          "x": 1000,
+          "y": 28
+        }
+      },
+      "anchors": {
+        "help": { "x": 0.82, "y": 0.095 }
+      }
+    },
+    "controls": {
+      "rect": {
+        "x": 0.08,
+        "y": 0.18
+      },
+      "anchors": {
+        "action": {
+          "x": 0.3,
+          "y": 0.24,
+          "pixelOverride": {
+            "x": 390,
+            "y": 170
+          }
+        },
+        "center": { "x": 0.3, "y": 0.24 }
+      }
+    },
+    "content": {
+      "rect": {
+        "x": 0.08,
+        "y": 0.34,
+        "pixelOverride": {
+          "x": 120,
+          "y": 250
+        }
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.62 },
+        "topLeft": { "x": 0.08, "y": 0.34 },
+        "bottomRight": { "x": 0.92, "y": 0.9 }
+      }
+    }
+  }
+}
