@@ -1,5 +1,6 @@
-import { CARD_TEMPLATE_NAMES } from '../MainStreetCards';
+import { CARD_TEMPLATE_NAMES, CSV_ROWS } from '../MainStreetCards';
 import { rasteriseSvgToTexture, makeTextureKey } from '../../../src/core-engine';
+import { generateCardSvgFromCsvRow } from './MainStreetCardSvgGenerator';
 
 export class MainStreetSvgTextureManager {
   private lastDevicePixelRatio: number;
@@ -53,6 +54,44 @@ export class MainStreetSvgTextureManager {
       fetches.push(p);
     }
     s.cardSvgLoadPromise = Promise.all(fetches).then(() => {});
+  }
+
+  /**
+   * Regenerates SVG sources from the current CSV data.
+   *
+   * When the card-data.csv has changed since the static SVGs were generated,
+   * this method produces fresh SVG strings in-memory for all card templates
+   * and stores them in `cardSvgSources`, overriding any stale fetched SVGs.
+   *
+   * If regeneration fails (e.g., CSV rows are not yet loaded), a warning is
+   * logged and the scene continues with existing (possibly stale) SVGs.
+   *
+   * @returns The number of SVG sources regenerated, or 0 if regeneration was skipped.
+   */
+  public regenerateSvgSourcesFromCsv(): number {
+    const s = this.scene;
+    let count = 0;
+
+    try {
+      // Generate fresh SVGs from the parsed CSV rows
+      for (const row of CSV_ROWS) {
+        const templateId = row.id;
+        if (!templateId) continue;
+
+        const svg = generateCardSvgFromCsvRow(row);
+        s.cardSvgSources.set(templateId, svg);
+        count++;
+      }
+    } catch (err) {
+      console.warn('[MainStreetSvgTextureManager] Failed to regenerate SVGs from CSV:', err);
+      return 0;
+    }
+
+    if (count > 0) {
+      console.log('[MainStreetSvgTextureManager] Regenerated ' + count + ' card SVGs from CSV data');
+    }
+
+    return count;
   }
 
   public async prewarmVisibleCardTextures(): Promise<void> {

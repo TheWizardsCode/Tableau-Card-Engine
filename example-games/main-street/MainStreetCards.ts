@@ -17,7 +17,15 @@
 
 import cardDataRaw from './card-data.csv?raw';
 import { parseCsv } from '@core-engine/CsvLoader';
+import { computeCsvChecksum } from './CsvChecksum';
 const csvRows = parseCsv(cardDataRaw);
+
+/**
+ * Deterministic checksum of the current card-data.csv content.
+ * Computed once at module load time from the Vite-imported raw CSV.
+ * Used to detect when the CSV has changed between saves/loads.
+ */
+export const CSV_CHECKSUM: string = computeCsvChecksum(cardDataRaw);
 
 // ── Synergy & Phase Enums ───────────────────────────────────
 
@@ -391,6 +399,12 @@ const COMMUNITY_SPACE_TEMPLATES: Omit<CommunitySpaceCard, 'family' | 'level' | '
       synergyRepBonus: r.synergyRepBonus !== undefined && r.synergyRepBonus !== '' ? Number(r.synergyRepBonus) : undefined,
       description: r.description,
     }));
+
+/**
+ * Read-only view of all parsed CSV rows.
+ * Used by the SVG regeneration system to generate card SVGs.
+ */
+export const CSV_ROWS: readonly Record<string, string>[] = csvRows;
 
 /** All Event card templates parsed from the CSV. */
 const EVENT_TEMPLATES: EventCard[] =

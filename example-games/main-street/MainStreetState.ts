@@ -22,6 +22,7 @@ import {
   createEventDeck,
   createUpgradeDeck,
   createStaffDeck,
+  CSV_CHECKSUM,
   GRID_SIZE,
   MARKET_BUSINESS_SLOTS,
   MARKET_INVESTMENT_UPGRADE_COUNT,
@@ -281,6 +282,12 @@ export interface MainStreetSerializedState {
   staffCardMarket: StaffCard[];
   /** Whether market cycling should be skipped on next end-of-turn. */
   skipMarketCycleOnEndTurn: boolean;
+  /**
+   * Checksum of the card-data.csv at the time this save was created.
+   * Used to detect CSV changes between saves, triggering SVG regeneration.
+   * Empty string indicates a legacy save before this field was added.
+   */
+  csvChecksum: string;
 }
 
 /** Record of a single milestone (tier unlock) achievement. */
@@ -555,6 +562,7 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
     staffCards: structuredClone(state.staffCards),
     staffCardMarket: structuredClone(state.staffCardMarket),
     skipMarketCycleOnEndTurn: state.skipMarketCycleOnEndTurn,
+    csvChecksum: CSV_CHECKSUM,
   };
 }
 
@@ -652,6 +660,11 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
   // ── skipMarketCycleOnEndTurn: add missing flag (defaults to false) ─
   if (!('skipMarketCycleOnEndTurn' in saved)) {
     (saved as Record<string, unknown>).skipMarketCycleOnEndTurn = false;
+  }
+
+  // ── csvChecksum: add missing field (defaults to '' for legacy saves) ─
+  if (!('csvChecksum' in saved)) {
+    (saved as Record<string, unknown>).csvChecksum = '';
   }
 }
 
