@@ -48,9 +48,10 @@ describe('MainStreetSvgTextureManager cache invalidation', () => {
     // Should have regenerated SVGs for all CSV rows
     expect(count).toBeGreaterThan(0);
 
-    // Should NOT remove textures — that's handled atomically in
-    // prewarmVisibleCardTextures() to avoid yield points between
-    // clearing a texture and starting its rasterisation.
+    // Should NOT remove textures — SVG source updates are separated from
+    // texture lifecycle. Textures created by prewarm use the correct
+    // CSV-fresh SVGs because regenerateSvgSourcesFromCsv() runs before
+    // any prewarm call.
     expect(remove).not.toHaveBeenCalled();
 
     // SVG sources should be fresh
@@ -60,14 +61,13 @@ describe('MainStreetSvgTextureManager cache invalidation', () => {
     expect(freshBakery).toContain('Bakery');
   });
 
-  it('prewarm removes stale textures per-key before recreating them', async () => {
+  it('prewarm skips existing textures without removing them', async () => {
     setDevicePixelRatio(1);
 
     const remove = vi.fn();
-    const exists = vi.fn(() => true);
+    const exists = vi.fn(() => true); // All keys exist
     const cardSvgSources = new Map<string, string>();
-    // Provide SVG sources that the CSV-based regenerator will produce
-    cardSvgSources.set('biz-bakery', '<svg>stale bakery</svg>');
+    cardSvgSources.set('biz-bakery', '<svg>some bakery</svg>');
 
     const scene: any = {
       cardSvgSources,
@@ -95,22 +95,20 @@ describe('MainStreetSvgTextureManager cache invalidation', () => {
     };
 
     const manager = new MainStreetSvgTextureManager(scene);
-    // First regenerate SVG sources (no texture clearing)
+    // Regenerate SVG sources (no texture change)
     manager.regenerateSvgSourcesFromCsv();
 
-    // Then prewarm — this should remove stale textures per-key
+    // Prewarm — textures already exist, so they should be skipped
+    // (no removal, no rasterisation call that could yield)
     const prewarmPromise = manager.prewarmVisibleCardTextures();
 
-    expect(remove).toHaveBeenCalled();
-    const removedKeys = remove.mock.calls.map((c: string[]) => c[0]);
-    // At minimum the market-card-sized texture for biz-bakery was removed
-    expect(removedKeys).toContain('ms_card_biz-bakery_100x50@1');
+    // Should NOT remove any textures — existing textures are kept
+    expect(remove).not.toHaveBeenCalled();
 
-    // SVG source should be the fresh one (not the stale placeholder)
-    const freshBakery = scene.cardSvgSources.get('biz-bakery');
-    expect(freshBakery).toBeDefined();
-    expect(freshBakery).not.toBe('<svg>stale bakery</svg>');
-    expect(freshBakery).toContain('Bakery');
+    // SVG source should be fresh from CSV regeneration
+    const freshSvg = scene.cardSvgSources.get('biz-bakery');
+    expect(freshSvg).toBeDefined();
+    expect(freshSvg).toContain('Bakery');
 
     await prewarmPromise;
   });
