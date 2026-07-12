@@ -805,7 +805,7 @@ export class SushiGoScene extends CardGameScene {
       );
       if (!isChopsticks) continue;
 
-      // Add highlight rectangle
+      // Add highlight rectangle (tagged for selective cleanup)
       const highlight = this.add.rectangle(
         0, 0,
         TABLEAU_CARD_W + CHOPSTICKS_TABLEAU_HIGHLIGHT_PADDING * 2,
@@ -816,6 +816,7 @@ export class SushiGoScene extends CardGameScene {
         highlightColor,
       );
       highlight.setFillStyle(highlightColor, CHOPSTICKS_TABLEAU_HIGHLIGHT_ALPHA);
+      highlight.setData('chopsticksHighlight', true);
       child.addAt(highlight, 0);
     }
   }
@@ -825,13 +826,16 @@ export class SushiGoScene extends CardGameScene {
     const children = this.playerTableauContainer.getAll();
     for (const child of children) {
       if (!(child instanceof Phaser.GameObjects.Container)) continue;
-      // Remove any highlight rectangles (identified by stroke style + fill)
-      // Phaser rectangles don't have a custom tag, so we search by type and
-      // look for rectangles that were added at index 0 (our highlights)
+      // Remove only the chopsticks highlight rectangles (tagged with
+      // 'chopsticksHighlight' data), leaving other Rectangles (like the
+      // card background bg) intact. See createCardRect.
       const toRemove: Phaser.GameObjects.Rectangle[] = [];
       const grandChildren = child.getAll();
       for (const gc of grandChildren) {
-        if (gc instanceof Phaser.GameObjects.Rectangle) {
+        if (
+          gc instanceof Phaser.GameObjects.Rectangle &&
+          gc.getData('chopsticksHighlight')
+        ) {
           toRemove.push(gc);
         }
       }
