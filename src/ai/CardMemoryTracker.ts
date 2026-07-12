@@ -4,7 +4,7 @@
  * The AI uses this tracker to remember cards it has seen on the discard
  * pile. When queried via {@link getVisibleRanks}, each rank has a
  * P(correct) = skill/100 chance of being recalled with its exact count;
- * otherwise a uniformly random count in [0, MAX_RANK_COPIES] is returned.
+ * otherwise a uniformly random count in [0, maxCopies] is returned.
  *
  * Memory scope: The tracker records **all** cards passed to {@link recordCard}.
  * In the Golf AI, only discard-pile cards are recorded — face-up grid cards
@@ -17,9 +17,38 @@
 import type { Card } from '../../src/card-system/Card';
 
 /**
- * Maximum copies of any rank in a standard 52-card deck.
+ * Configuration options for {@link CardMemoryTracker}.
+ *
+ * All properties are optional. When constructing with a plain number,
+ * it is treated as the `skill` value (backward compatible).
+ *
+ * @example
+ * ```ts
+ * // Full config
+ * const config: CardMemoryTrackerConfig = { skill: 90, maxCopies: 8 };
+ *
+ * // Minimal (uses defaults)
+ * const config: CardMemoryTrackerConfig = {};
+ * ```
  */
-const MAX_RANK_COPIES = 4;
+export interface CardMemoryTrackerConfig {
+  /**
+   * Skill rating 0–100. Controls recall accuracy:
+   * 100 = perfect recall, 50 = chance level, 0 = always wrong.
+   * Clamped to [0, 100]. Default: 80.
+   */
+  skill?: number;
+
+  /**
+   * Maximum number of copies of a single group key (usually rank) that
+   * can appear in the game. Used as the upper bound (inclusive) for the
+   * uniform random count returned when the AI misremembers.
+   *
+   * Set to 4 for a standard 52-card deck, 8 for a double deck, etc.
+   * Default: 4.
+   */
+  maxCopies?: number;
+}
 
 /**
  * Default skill rating used when none is provided.
@@ -28,28 +57,59 @@ const MAX_RANK_COPIES = 4;
 const DEFAULT_SKILL = 80;
 
 /**
+ * Default maximum copies per rank (standard 52-card deck).
+ */
+const DEFAULT_MAX_COPIES = 4;
+
+/**
  * Stateful tracker that records cards seen on the discard pile and returns
- * probabilistically recalled rank counts based on a configurable skill rating.
+ * probabilistically recalled rank counts based on a configurable skill rating
+ * and maximum copies per rank.
+ *
+ * The tracker is fully generic: it accepts a configuration object with
+ * `skill` and `maxCopies` properties, or a plain number for backward
+ * compatibility with the original positional `skill` parameter.
  *
  * @example
  * ```ts
- * const memory = new CardMemoryTracker(80);
+ * // Default config (skill=80, maxCopies=4)
+ * const memory = new CardMemoryTracker();
+ *
+ * // Positional skill (backward compatible)
+ * const memory = new CardMemoryTracker(90);
+ *
+ * // Full configuration object
+ * const memory = new CardMemoryTracker({ skill: 90, maxCopies: 8 });
+ *
  * memory.recordCard(createCard('Q', 'hearts', true));
  * const ranks = memory.getVisibleRng(rng);
- * // ranks['Q'] is either 1 (correct) or a random 0-4 (misremembered)
+ * // ranks['Q'] is either 1 (correct) or a random 0-maxCopies (misremembered)
  * ```
  */
 export class CardMemoryTracker {
   private readonly skill: number;
+  private readonly maxCopies: number;
   private readonly trueCounts: Record<string, number> = {};
 
   /**
-   * @param skill - Skill rating 0–100. Controls recall accuracy:
-   *   100 = perfect recall, 50 = chance level, 0 = always wrong.
-   *   Clamped to [0, 100]. Defaults to 80.
+   * @param options - Configuration object, or a plain skill number (backward
+   *   compatible).
+   *
+   *   When a number is passed, it is treated as `{ skill: <number> }`
+   *   with all other options using their defaults.
+   *
+   *   When an object is passed, each field is optional and defaults to
+   *   the documented value.
    */
-  constructor(skill: number = DEFAULT_SKILL) {
-    this.skill = Math.max(0, Math.min(100, Math.round(skill)));
+  constructor(options: number | CardMemoryTrackerConfig = DEFAULT_SKILL) {
+    const config: CardMemoryTrackerConfig =
+      typeof options === 'number' ? { skill: options } : options;
+
+    this.skill = Math.max(
+      0,
+      Math.min(100, Math.round(config.skill ?? DEFAULT_SKILL)),
+    );
+    this.maxCopies = config.maxCopies ?? DEFAULT_MAX_COPIES;
   }
 
   // ── Public API ───────────────────────────────────────────
@@ -72,7 +132,7 @@ export class CardMemoryTracker {
    *
    * Each recorded rank has a P(correct) = skill / 100 chance of being
    * recalled with its exact true count. When the AI misremembers a rank,
-   * a uniformly random integer between 0 and {@link MAX_RANK_COPIES} is
+   * a uniformly random integer between 0 and {@link maxCopies} is
    * returned instead.
    *
    * The caller must provide an RNG so that test code can use a
@@ -80,7 +140,7 @@ export class CardMemoryTracker {
    * (or a seeded game RNG when fairness/replayability matters).
    *
    * @param rng - A function returning a pseudo-random number in [0, 1).
-   * @returns A map from rank string to the recalled count (0–4).
+   * @returns A map from rank string to the recalled count (0–maxCopies).
    */
   getVisibleRanks(rng: () => number): Record<string, number> {
     const result: Record<string, number> = {};
@@ -90,8 +150,8 @@ export class CardMemoryTracker {
       if (recallCorrectly) {
         result[rank] = trueCount;
       } else {
-        // Misremember: return a random count from 0 to MAX_RANK_COPIES
-        result[rank] = Math.floor(rng() * (MAX_RANK_COPIES + 1));
+        // Misremember: return a random count from 0 to maxCopies
+        result[rank] = Math.floor(rng() * (this.maxCopies + 1));
       }
     }
 

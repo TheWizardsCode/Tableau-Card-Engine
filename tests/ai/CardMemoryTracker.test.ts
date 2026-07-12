@@ -330,5 +330,133 @@ describe('CardMemoryTracker', () => {
       expect(new CardMemoryTracker(-10).getSkill()).toBe(0);
       expect(new CardMemoryTracker(150).getSkill()).toBe(100);
     });
+
+    it('accepts a configuration object with skill only', () => {
+      const tracker = new CardMemoryTracker({ skill: 60 });
+      expect(tracker.getSkill()).toBe(60);
+    });
+
+    it('accepts a configuration object with maxCopies only', () => {
+      const tracker = new CardMemoryTracker({ maxCopies: 8 });
+      expect(tracker.getSkill()).toBe(80);
+      // maxCopies behavior is verified in the maxCopies tests below
+    });
+
+    it('accepts a configuration object with both skill and maxCopies', () => {
+      const tracker = new CardMemoryTracker({ skill: 90, maxCopies: 12 });
+      expect(tracker.getSkill()).toBe(90);
+    });
+
+    it('defaults maxCopies to 4 when not specified', () => {
+      // At skill=0, always misremembers. With maxCopies=4 (default),
+      // the range should be 0-4, which is the same as the original behavior.
+      const tracker = new CardMemoryTracker(0);
+      tracker.recordCard(createCard('Q', 'hearts', true));
+
+      const rng = createTestRng(42);
+      let sum = 0;
+      const trials = 1000;
+      for (let t = 0; t < trials; t++) {
+        const ranks = tracker.getVisibleRanks(rng);
+        sum += ranks['Q'] ?? 0;
+      }
+      const mean = sum / trials;
+      // Random 0-4 has mean 2.0
+      expect(mean).toBeGreaterThan(1.0);
+      expect(mean).toBeLessThan(3.5);
+    });
+
+    it('accepts empty configuration object with defaults', () => {
+      const tracker = new CardMemoryTracker({});
+      expect(tracker.getSkill()).toBe(80);
+    });
+  });
+
+  describe('Configurable maxCopies', () => {
+    it('with maxCopies=1 at skill=0 always returns 0 or 1', () => {
+      const tracker = new CardMemoryTracker({ skill: 0, maxCopies: 1 });
+      tracker.recordCard(createCard('Q', 'hearts', true));
+
+      const rng = createTestRng(42);
+      for (let t = 0; t < 1000; t++) {
+        const ranks = tracker.getVisibleRanks(rng);
+        const count = ranks['Q'] ?? 0;
+        expect(count).toBeGreaterThanOrEqual(0);
+        expect(count).toBeLessThanOrEqual(1);
+      }
+    });
+
+    it('with maxCopies=4 at skill=0 returns 0-4 (default behavior)', () => {
+      const tracker = new CardMemoryTracker({ skill: 0, maxCopies: 4 });
+      tracker.recordCard(createCard('Q', 'hearts', true));
+
+      const rng = createTestRng(42);
+      for (let t = 0; t < 1000; t++) {
+        const ranks = tracker.getVisibleRanks(rng);
+        const count = ranks['Q'] ?? 0;
+        expect(count).toBeGreaterThanOrEqual(0);
+        expect(count).toBeLessThanOrEqual(4);
+      }
+    });
+
+    it('with maxCopies=8 at skill=0 returns 0-8 (double deck)', () => {
+      const tracker = new CardMemoryTracker({ skill: 0, maxCopies: 8 });
+      tracker.recordCard(createCard('Q', 'hearts', true));
+
+      const rng = createTestRng(42);
+      for (let t = 0; t < 1000; t++) {
+        const ranks = tracker.getVisibleRanks(rng);
+        const count = ranks['Q'] ?? 0;
+        expect(count).toBeGreaterThanOrEqual(0);
+        expect(count).toBeLessThanOrEqual(8);
+      }
+    });
+
+    it('with maxCopies=52 at skill=0 returns 0-52', () => {
+      const tracker = new CardMemoryTracker({ skill: 0, maxCopies: 52 });
+      tracker.recordCard(createCard('Q', 'hearts', true));
+
+      const rng = createTestRng(42);
+      for (let t = 0; t < 1000; t++) {
+        const ranks = tracker.getVisibleRanks(rng);
+        const count = ranks['Q'] ?? 0;
+        expect(count).toBeGreaterThanOrEqual(0);
+        expect(count).toBeLessThanOrEqual(52);
+      }
+    });
+
+    it('misremembered mean with maxCopies=8 approximates expected random mean', () => {
+      const tracker = new CardMemoryTracker({ skill: 0, maxCopies: 8 });
+      tracker.recordCard(createCard('Q', 'hearts', true));
+
+      const rng = createTestRng(42);
+      let sum = 0;
+      const trials = 2000;
+      for (let t = 0; t < trials; t++) {
+        const ranks = tracker.getVisibleRanks(rng);
+        sum += ranks['Q'] ?? 0;
+      }
+      const mean = sum / trials;
+      // Random 0-8 has mean 4.0
+      expect(mean).toBeGreaterThan(2.5);
+      expect(mean).toBeLessThan(6.0);
+    });
+
+    it('misremembered mean with maxCopies=52 approximates expected random mean', () => {
+      const tracker = new CardMemoryTracker({ skill: 0, maxCopies: 52 });
+      tracker.recordCard(createCard('Q', 'hearts', true));
+
+      const rng = createTestRng(42);
+      let sum = 0;
+      const trials = 2000;
+      for (let t = 0; t < trials; t++) {
+        const ranks = tracker.getVisibleRanks(rng);
+        sum += ranks['Q'] ?? 0;
+      }
+      const mean = sum / trials;
+      // Random 0-52 has mean 26.0
+      expect(mean).toBeGreaterThan(18);
+      expect(mean).toBeLessThan(35);
+    });
   });
 });
