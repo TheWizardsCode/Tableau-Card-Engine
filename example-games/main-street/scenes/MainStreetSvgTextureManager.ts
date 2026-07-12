@@ -63,19 +63,20 @@ export class MainStreetSvgTextureManager {
    * this method produces fresh SVG strings in-memory for all card templates
    * and stores them in `cardSvgSources`, overriding any stale fetched SVGs.
    *
+   * Texture cache invalidation is handled inside `prewarmVisibleCardTextures()` —
+   * it removes stale textures and recreates them per-key, atomically, so there
+   * is no yield point between clearing a texture and starting its rasterisation.
+   * This eliminates the `drawImage(null)` crash that occurred when textures were
+   * cleared in a separate step that could yield to a render frame.
+   *
    * If regeneration fails (e.g., CSV rows are not yet loaded), a warning is
    * logged and the scene continues with existing (possibly stale) SVGs.
    *
-   * @param clearTextures - If true (default), also clears cached Phaser textures
-   *   for regenerated template IDs so the next rasterization picks up fresh SVGs.
-   *   Set to false when called early in startup (before sprites exist) to avoid
-   *   clearing textures that already-created sprites still reference.
    * @returns The number of SVG sources regenerated, or 0 if regeneration was skipped.
    */
-  public regenerateSvgSourcesFromCsv(clearTextures: boolean = true): number {
+  public regenerateSvgSourcesFromCsv(): number {
     const s = this.scene;
     let count = 0;
-    const regeneratedIds = new Set<string>();
 
     try {
       // Generate fresh SVGs from the parsed CSV rows
@@ -85,7 +86,6 @@ export class MainStreetSvgTextureManager {
 
         const svg = generateCardSvgFromCsvRow(row);
         s.cardSvgSources.set(templateId, svg);
-        regeneratedIds.add(templateId);
         count++;
       }
     } catch (err) {
@@ -94,15 +94,7 @@ export class MainStreetSvgTextureManager {
     }
 
     if (count > 0) {
-      // Only clear cached textures when explicitly requested. The synchronous
-      // early-regeneration call (clearTextures=false) must NOT clear because
-      // sprites may already exist and reference these textures. Texture clearing
-      // should happen just-in-time before prewarming, in the re-apply chain.
-      if (clearTextures) {
-        this.clearCachedTexturesForIds(regeneratedIds);
-      }
-      console.log('[MainStreetSvgTextureManager] Regenerated ' + count + ' card SVGs from CSV data' +
-        (clearTextures ? ' and cleared stale textures' : ''));
+      console.log('[MainStreetSvgTextureManager] Regenerated ' + count + ' card SVGs from CSV data');
     }
 
     return count;
@@ -191,7 +183,20 @@ export class MainStreetSvgTextureManager {
 
       for (const size of sizes) {
         const key = makeTextureKey(templateId, size.w, size.h, dpr);
-        if (s.textures.exists(key)) continue;
+
+        // Remove existing texture first to ensure stale cached textures are
+        // replaced with fresh ones (e.g., after CSV-based SVG regeneration).
+        // We remove-and-rasterize per-key to avoid yield points where the
+        // texture manager has no entry for a key that sprites still reference.
+        // The removal and rasteriseSvgToTexture() call both happen
+        // synchronously in this loop iteration before the await below.
+        if (s.textures.exists(key)) {
+          try {
+            s.textures.remove(key);
+          } catch {
+            // ignore cleanup failures in constrained test environments
+          }
+        }
 
         const p = rasteriseSvgToTexture(s, key, svgText, size.w, size.h, dpr)
           .catch(() => {});

@@ -21,7 +21,7 @@ afterEach(() => {
 });
 
 describe('MainStreetSvgTextureManager cache invalidation', () => {
-  it('clears cached card textures when SVG sources are regenerated from CSV', () => {
+  it('regenerates SVG sources from CSV without removing cached textures', () => {
     setDevicePixelRatio(1);
 
     const remove = vi.fn();
@@ -36,9 +36,6 @@ describe('MainStreetSvgTextureManager cache invalidation', () => {
         getTextureKeys: () => [
           'ms_card_biz-bakery_100x50@1',
           'ms_card_biz-diner_100x50@1',
-          'ms_card_biz-bakery_200x100@2',
-          'ms_card_biz-pawnshop_100x50@1',
-          'ui_button',
         ],
         exists: vi.fn(() => true),
         remove,
@@ -51,27 +48,71 @@ describe('MainStreetSvgTextureManager cache invalidation', () => {
     // Should have regenerated SVGs for all CSV rows
     expect(count).toBeGreaterThan(0);
 
-    // Should have cleared at least the baked goods textures
-    expect(remove).toHaveBeenCalled();
-    const removedKeys = remove.mock.calls.map((c: string[]) => c[0]);
-    expect(removedKeys).toContain('ms_card_biz-bakery_100x50@1');
-    expect(removedKeys).toContain('ms_card_biz-diner_100x50@1');
+    // Should NOT remove textures — that's handled atomically in
+    // prewarmVisibleCardTextures() to avoid yield points between
+    // clearing a texture and starting its rasterisation.
+    expect(remove).not.toHaveBeenCalled();
+
+    // SVG sources should be fresh
+    const freshBakery = scene.cardSvgSources.get('biz-bakery');
+    expect(freshBakery).toBeDefined();
+    expect(freshBakery).not.toBe('<svg>stale bakery</svg>');
+    expect(freshBakery).toContain('Bakery');
   });
 
-  it('does not throw when textures.getTextureKeys is unavailable', () => {
+  it('prewarm removes stale textures per-key before recreating them', async () => {
     setDevicePixelRatio(1);
 
+    const remove = vi.fn();
+    const exists = vi.fn(() => true);
     const cardSvgSources = new Map<string, string>();
-    const scene = {
+    // Provide SVG sources that the CSV-based regenerator will produce
+    cardSvgSources.set('biz-bakery', '<svg>stale bakery</svg>');
+
+    const scene: any = {
       cardSvgSources,
       textures: {
-        // No getTextureKeys — e.g. headless test environment
-        remove: vi.fn(),
+        getTextureKeys: () => ['ms_card_biz-bakery_100x50@1'],
+        exists,
+        remove,
+      },
+      state: {
+        market: { development: [{ id: 'biz-bakery-0' }], investments: [] },
+        incidentQueue: [],
+        streetGrid: [],
+        heldEvent: undefined,
+      },
+      layout: {
+        marketCardW: 100,
+        marketCardH: 50,
+        slotW: 100,
+        slotH: 50,
+        handW: 80,
+        handH: 40,
+        queueCardW: 60,
+        queueCardH: 30,
       },
     };
 
     const manager = new MainStreetSvgTextureManager(scene);
-    expect(() => manager.regenerateSvgSourcesFromCsv()).not.toThrow();
+    // First regenerate SVG sources (no texture clearing)
+    manager.regenerateSvgSourcesFromCsv();
+
+    // Then prewarm — this should remove stale textures per-key
+    const prewarmPromise = manager.prewarmVisibleCardTextures();
+
+    expect(remove).toHaveBeenCalled();
+    const removedKeys = remove.mock.calls.map((c: string[]) => c[0]);
+    // At minimum the market-card-sized texture for biz-bakery was removed
+    expect(removedKeys).toContain('ms_card_biz-bakery_100x50@1');
+
+    // SVG source should be the fresh one (not the stale placeholder)
+    const freshBakery = scene.cardSvgSources.get('biz-bakery');
+    expect(freshBakery).toBeDefined();
+    expect(freshBakery).not.toBe('<svg>stale bakery</svg>');
+    expect(freshBakery).toContain('Bakery');
+
+    await prewarmPromise;
   });
 
   it('replaces stale SVG sources with freshly generated ones from CSV', () => {
@@ -105,59 +146,6 @@ describe('MainStreetSvgTextureManager cache invalidation', () => {
     expect(freshDiner).not.toBe('<svg>stale diner</svg>');
     expect(freshDiner).toContain('Diner');
     expect(freshDiner).toContain('</svg>');
-  });
-
-  it('does not clear cached textures when clearTextures=false', () => {
-    setDevicePixelRatio(1);
-
-    const remove = vi.fn();
-    const cardSvgSources = new Map<string, string>();
-    cardSvgSources.set('biz-bakery', '<svg>stale bakery</svg>');
-
-    const scene = {
-      cardSvgSources,
-      textures: {
-        getTextureKeys: () => [
-          'ms_card_biz-bakery_100x50@1',
-          'ms_card_biz-diner_100x50@1',
-        ],
-        exists: vi.fn(() => true),
-        remove,
-      },
-    };
-
-    const manager = new MainStreetSvgTextureManager(scene);
-    const count = manager.regenerateSvgSourcesFromCsv(false);
-
-    // SVGs should still be regenerated
-    expect(count).toBeGreaterThan(0);
-    const freshBakery = scene.cardSvgSources.get('biz-bakery');
-    expect(freshBakery).toBeDefined();
-    expect(freshBakery).not.toBe('<svg>stale bakery</svg>');
-
-    // But textures should NOT be cleared (sprites may reference them)
-    expect(remove).not.toHaveBeenCalled();
-  });
-
-  it('does not clear textures when regeneration count is 0', () => {
-    setDevicePixelRatio(1);
-
-    const remove = vi.fn();
-    // Empty cardSvgSources — the Map is present but CSV_ROWS will still
-    // populate it, so we can't force count=0 this way.
-    // Instead, the test verifies that the method does not throw when
-    // the texture manager is minimal.
-    const scene = {
-      cardSvgSources: new Map<string, string>(),
-      textures: {
-        getTextureKeys: () => ['ms_card_biz-bakery_100x50@1'],
-        exists: vi.fn(() => true),
-        remove,
-      },
-    };
-
-    const manager = new MainStreetSvgTextureManager(scene);
-    expect(() => manager.regenerateSvgSourcesFromCsv()).not.toThrow();
   });
 
   it('does not invalidate textures when DPR is unchanged', () => {
@@ -204,4 +192,3 @@ describe('MainStreetSvgTextureManager cache invalidation', () => {
     expect(remove).toHaveBeenNthCalledWith(2, 'ms_card_evt-a_100x50@1');
   });
 });
-
