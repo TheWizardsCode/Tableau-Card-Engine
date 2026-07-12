@@ -35,10 +35,12 @@ import {
   RESUME_TITLE_FONT_SIZE, RESUME_TITLE_Y_OFFSET,
   RESUME_INFO_FONT_SIZE, RESUME_INFO_Y_OFFSET,
   RESUME_BUTTON_SPACING, RESUME_BUTTON_Y_OFFSET,
+  SNAP_BACK_DURATION,
 } from './BeleagueredCastleConstants';
 import { BeleagueredCastleRenderer } from './BeleagueredCastleRenderer';
 import { BeleagueredCastleTurnController } from './BeleagueredCastleTurnController';
 import { moveGameObject, cardTextureKey } from '../../../src/ui';
+import { shakeIllegalMove } from '../../../src/ui/shakeIllegalMove';
 import {
   GAME_W, GAME_H, FONT_FAMILY,
   createOverlayButton,
@@ -98,6 +100,8 @@ export class BeleagueredCastleScene extends CardGameScene {
     this.load.audio(`${ns}:${SFX_KEYS.CARD_SELECT}`, audioPathWithFallback(audioDir, 'card-select.wav'));
     this.load.audio(`${ns}:${SFX_KEYS.CARD_DESELECT}`, audioPathWithFallback(audioDir, 'card-deselect.wav'));
     this.load.audio(`${ns}:${SFX_KEYS.UI_CLICK}`, audioPathWithFallback(audioDir, 'ui-click.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.ILLEGAL_MOVE}`, audioPathWithFallback(audioDir, 'illegal-move.wav'));
+    this.load.audio(SFX_KEYS.ILLEGAL_MOVE, 'assets/audio/default/illegal-move.wav');
   }
 
   create(): void {
@@ -222,7 +226,12 @@ export class BeleagueredCastleScene extends CardGameScene {
     this.input.on('dragend', (_pointer: Phaser.Input.Pointer, gameObject: Phaser.GameObjects.Image, dropped: boolean) => {
       if (this.interactionBlocked) return;
       this.bcRenderer.clearDropHighlights();
-      if (!dropped) this.bcRenderer.snapBack(gameObject);
+      if (!dropped) {
+        this.bcRenderer.snapBack(gameObject);
+        this.time.delayedCall(SNAP_BACK_DURATION, () => {
+          shakeIllegalMove({ scene: this, target: gameObject });
+        });
+      }
     });
 
     this.input.on('drop', (_pointer: Phaser.Input.Pointer, gameObject: Phaser.GameObjects.Image, dropZone: Phaser.GameObjects.Zone) => {
@@ -250,6 +259,9 @@ export class BeleagueredCastleScene extends CardGameScene {
       this.turnController.executePlayerMove(move);
     } else {
       this.bcRenderer.snapBack(sprite);
+      this.time.delayedCall(SNAP_BACK_DURATION, () => {
+        shakeIllegalMove({ scene: this, target: sprite });
+      });
     }
   }
 
@@ -267,6 +279,11 @@ export class BeleagueredCastleScene extends CardGameScene {
           this.deselectColumn();
           this.turnController.executePlayerMove(move);
         } else {
+          // Illegal move feedback
+          const sprs = this.bcRenderer.tableauSprs[this.selectedCol];
+          if (sprs && sprs.length > 0) {
+            shakeIllegalMove({ scene: this, target: sprs[sprs.length - 1] });
+          }
           this.deselectColumn();
         }
       });
@@ -284,6 +301,11 @@ export class BeleagueredCastleScene extends CardGameScene {
           this.deselectColumn();
           this.turnController.executePlayerMove(move);
         } else {
+          // Illegal move feedback
+          const sprs = this.bcRenderer.tableauSprs[this.selectedCol];
+          if (sprs && sprs.length > 0) {
+            shakeIllegalMove({ scene: this, target: sprs[sprs.length - 1] });
+          }
           this.deselectColumn();
         }
       });
@@ -299,6 +321,11 @@ export class BeleagueredCastleScene extends CardGameScene {
         this.deselectColumn();
         this.turnController.executePlayerMove(move);
         return;
+      }
+      // Illegal move feedback
+      const sprs = this.bcRenderer.tableauSprs[this.selectedCol];
+      if (sprs && sprs.length > 0) {
+        shakeIllegalMove({ scene: this, target: sprs[sprs.length - 1] });
       }
       this.deselectColumn();
     }
