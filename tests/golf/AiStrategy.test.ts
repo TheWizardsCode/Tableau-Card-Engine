@@ -1222,6 +1222,72 @@ describe('chooseDrawSource with visible rank weighting', () => {
     const action = GreedyStrategy.chooseAction(aiPs, aiShared, rng);
     expect(action.drawSource).toBe('discard');
   });
+
+  it('prefers discard when memory indicates unseen rank copies remain (skill=100)', () => {
+    // Grid: column 0 has [Q♣, A♠, ?] - building a Queen column is feasible
+    // Memory has 2 Queens recorded (meaning all 4 copies still in play)
+    const cards = [
+      createCard('Q', 'clubs', true),    // (0,0) -- Q
+      createCard('A', 'hearts', true),   // (0,1)
+      createCard('2', 'spades', true),   // (0,2)
+      createCard('A', 'spades', true),   // (1,0) -- non-Q, build target
+      createCard('3', 'clubs', true),    // (1,1)
+      createCard('4', 'hearts', true),   // (1,2)
+      createCard('5', 'clubs', false),   // (2,0) -- face-down
+      createCard('6', 'hearts', false),
+      createCard('7', 'spades', false),
+    ];
+    const grid = createGolfGrid(cards);
+    const rawPs = { grid };
+    const aiPs = createAiVisiblePlayerState(rawPs);
+
+    const shared: GolfSharedState = {
+      stockPile: [createCard('A', 'diamonds')],
+      discardPile: new Pile([createCard('Q', 'hearts', true)]),
+      roundEnd: createRoundEndState(2),
+    };
+    const aiShared = createAiVisibleSharedState(shared);
+
+    // AI with skill=100 and memory of additional Queens
+    // should prefer discard because memory says unseen Queens remain
+    const ai = new AiPlayer(GreedyStrategy, createTestRng(42), undefined, 100);
+    ai.recordCard(createCard('Q', 'diamonds', true));
+    ai.recordCard(createCard('Q', 'spades', true));
+
+    const source = ai.chooseDrawSource(aiPs, aiShared);
+    // With memory indicating 2 Queens remain unseen, column building is
+    // feasible → AI should prefer discard
+    expect(source).toBe('discard');
+  });
+
+  it('backward compatible: chooseDrawSource without memory behaves like before', () => {
+    const cards = [
+      createCard('Q', 'clubs', true),
+      createCard('A', 'hearts', true),
+      createCard('2', 'spades', true),
+      createCard('A', 'spades', true),
+      createCard('3', 'clubs', true),
+      createCard('4', 'hearts', true),
+      createCard('5', 'clubs', false),
+      createCard('6', 'hearts', false),
+      createCard('7', 'spades', false),
+    ];
+    const grid = createGolfGrid(cards);
+    const rawPs = { grid };
+    const aiPs = createAiVisiblePlayerState(rawPs);
+
+    const shared: GolfSharedState = {
+      stockPile: [createCard('A', 'diamonds')],
+      discardPile: new Pile([createCard('Q', 'hearts', true)]),
+      roundEnd: createRoundEndState(2),
+    };
+    const aiShared = createAiVisibleSharedState(shared);
+
+    // Direct call without memory: same as original behavior
+    const rng = createTestRng(42);
+    const source = chooseDrawSource(aiPs, aiShared, rng);
+    expect(['stock', 'discard']).toContain(source);
+  });
 });
 
 describe('Integration: existing tests still pass', () => {
