@@ -374,6 +374,33 @@ describe('AiPlayer', () => {
       expect(ranks1['Q'] ?? 0).toBeLessThanOrEqual(4);
     });
 
+    it('skill rating 25 produces lower rank accuracy than skill 75', () => {
+      const ai25 = new AiPlayer(GreedyStrategy, createTestRng(42), undefined, 25);
+      const ai75 = new AiPlayer(GreedyStrategy, createTestRng(42), undefined, 75);
+
+      // Record the same cards on both
+      for (let i = 0; i < 10; i++) {
+        ai25.recordCard(createCard('K', 'hearts', true));
+        ai75.recordCard(createCard('K', 'hearts', true));
+      }
+
+      const rng25 = createTestRng(42);
+      const rng75 = createTestRng(42);
+      const memory25 = ai25.memoryTracker.getVisibleRanks(rng25);
+      const memory75 = ai75.memoryTracker.getVisibleRanks(rng75);
+
+      const count25 = memory25['K'] ?? 0;
+      const count75 = memory75['K'] ?? 0;
+
+      // Both use same RNG, but skill=75 has higher probability of correct recall
+      // Skill=75 is more likely to be closer to the true count of 10
+      // Skill=25 is more likely to be lower/farther from truth
+      // True: 10 Kings → at skill=75 ~75% recall, so likely >0
+      // At skill=25 only ~25% correct recall
+      // With same RNG seed and high trials (10), skill=75 should recall more
+      expect(count75).toBeGreaterThanOrEqual(count25);
+    });
+
     it('chooseAction returns a legal move when memory tracker is present', () => {
       const ai = new AiPlayer(GreedyStrategy, createTestRng(), undefined, 80);
       const session = setupGolfGame({ rng: createTestRng(1) });
