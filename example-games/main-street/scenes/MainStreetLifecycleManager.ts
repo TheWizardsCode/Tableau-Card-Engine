@@ -709,8 +709,13 @@ export class MainStreetLifecycleManager {
     // data before any async SVG prewarming occurs. This eliminates the race
     // condition where texture prewarming rasterizes stale static SVGs before
     // the CSV mismatch check has a chance to run (see CG-0MRH36Z6800065JC).
+    //
+    // IMPORTANT: clearTextures=false here because sprites may already exist
+    // and reference cached textures (e.g., from a previous game or checkpoint
+    // resume). Texture clearing happens just-in-time in the re-apply chain
+    // below, right before prewarmVisibleCardTextures() runs.
     try {
-      s.msSvgTextureManager?.regenerateSvgSourcesFromCsv();
+      s.msSvgTextureManager?.regenerateSvgSourcesFromCsv(false);
     } catch (_) {
       // Non-fatal: scene continues with fetched SVGs if regeneration fails
     }
@@ -929,7 +934,12 @@ export class MainStreetLifecycleManager {
 
     if (mismatch) {
       console.log(`[MainStreetLifecycleManager] CSV mismatch detected (${source}), regenerating SVGs in-memory`);
-      s.msSvgTextureManager.regenerateSvgSourcesFromCsv();
+      // clearTextures=false to avoid clearing textures that existing sprites
+      // reference. This runs long after scene setup and prewarming, when
+      // sprites are already rendered. The early regeneration in
+      // loadCampaignAndSetup() already set fresh SVG sources, and the
+      // re-apply chain cleared textures just-in-time before prewarm.
+      s.msSvgTextureManager.regenerateSvgSourcesFromCsv(false);
     }
   }
 

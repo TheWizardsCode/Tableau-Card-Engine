@@ -66,9 +66,13 @@ export class MainStreetSvgTextureManager {
    * If regeneration fails (e.g., CSV rows are not yet loaded), a warning is
    * logged and the scene continues with existing (possibly stale) SVGs.
    *
+   * @param clearTextures - If true (default), also clears cached Phaser textures
+   *   for regenerated template IDs so the next rasterization picks up fresh SVGs.
+   *   Set to false when called early in startup (before sprites exist) to avoid
+   *   clearing textures that already-created sprites still reference.
    * @returns The number of SVG sources regenerated, or 0 if regeneration was skipped.
    */
-  public regenerateSvgSourcesFromCsv(): number {
+  public regenerateSvgSourcesFromCsv(clearTextures: boolean = true): number {
     const s = this.scene;
     let count = 0;
     const regeneratedIds = new Set<string>();
@@ -90,10 +94,15 @@ export class MainStreetSvgTextureManager {
     }
 
     if (count > 0) {
-      // Clear any cached Phaser textures for regenerated template IDs so the
-      // next prewarm or lazy request will rasterize from the fresh SVG sources.
-      this.clearCachedTexturesForIds(regeneratedIds);
-      console.log('[MainStreetSvgTextureManager] Regenerated ' + count + ' card SVGs from CSV data and cleared stale textures');
+      // Only clear cached textures when explicitly requested. The synchronous
+      // early-regeneration call (clearTextures=false) must NOT clear because
+      // sprites may already exist and reference these textures. Texture clearing
+      // should happen just-in-time before prewarming, in the re-apply chain.
+      if (clearTextures) {
+        this.clearCachedTexturesForIds(regeneratedIds);
+      }
+      console.log('[MainStreetSvgTextureManager] Regenerated ' + count + ' card SVGs from CSV data' +
+        (clearTextures ? ' and cleared stale textures' : ''));
     }
 
     return count;

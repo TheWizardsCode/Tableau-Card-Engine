@@ -107,6 +107,38 @@ describe('MainStreetSvgTextureManager cache invalidation', () => {
     expect(freshDiner).toContain('</svg>');
   });
 
+  it('does not clear cached textures when clearTextures=false', () => {
+    setDevicePixelRatio(1);
+
+    const remove = vi.fn();
+    const cardSvgSources = new Map<string, string>();
+    cardSvgSources.set('biz-bakery', '<svg>stale bakery</svg>');
+
+    const scene = {
+      cardSvgSources,
+      textures: {
+        getTextureKeys: () => [
+          'ms_card_biz-bakery_100x50@1',
+          'ms_card_biz-diner_100x50@1',
+        ],
+        exists: vi.fn(() => true),
+        remove,
+      },
+    };
+
+    const manager = new MainStreetSvgTextureManager(scene);
+    const count = manager.regenerateSvgSourcesFromCsv(false);
+
+    // SVGs should still be regenerated
+    expect(count).toBeGreaterThan(0);
+    const freshBakery = scene.cardSvgSources.get('biz-bakery');
+    expect(freshBakery).toBeDefined();
+    expect(freshBakery).not.toBe('<svg>stale bakery</svg>');
+
+    // But textures should NOT be cleared (sprites may reference them)
+    expect(remove).not.toHaveBeenCalled();
+  });
+
   it('does not clear textures when regeneration count is 0', () => {
     setDevicePixelRatio(1);
 
