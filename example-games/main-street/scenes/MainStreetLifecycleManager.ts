@@ -705,6 +705,31 @@ export class MainStreetLifecycleManager {
       unlockedCardIds: s.campaign.unlockedCardIds,
     });
 
+    // Early regeneration: ensure card SVG sources are fresh from the parsed CSV
+    // data before any async SVG prewarming occurs. This eliminates the race
+    // condition where texture prewarming rasterizes stale static SVGs before
+    // the CSV mismatch check has a chance to run (see CG-0MRH36Z6800065JC).
+    try {
+      s.msSvgTextureManager?.regenerateSvgSourcesFromCsv();
+    } catch (_) {
+      // Non-fatal: scene continues with fetched SVGs if regeneration fails
+    }
+
+    // Re-apply regenerated SVGs after all SVG fetches complete. Individual
+    // fetch() callbacks from loadCardSvgSources() may overwrite the freshly
+    // regenerated SVGs in cardSvgSources if they resolve after the synchronous
+    // regeneration above. By chaining onto cardSvgLoadPromise, we ensure fresh
+    // CSV-based SVGs are present before prewarmVisibleCardTextures() runs.
+    if (s.cardSvgLoadPromise) {
+      s.cardSvgLoadPromise = s.cardSvgLoadPromise.then(() => {
+        try {
+          s.msSvgTextureManager?.regenerateSvgSourcesFromCsv();
+        } catch (_) {
+          // Non-fatal: scene continues with fetched SVGs if re-generation fails
+        }
+      });
+    }
+
     // Determine tutorial visibility options from scene state
     const tutorialOpts: TutorialVisibilityOptions = {
       replayMode: s.replayMode === true,

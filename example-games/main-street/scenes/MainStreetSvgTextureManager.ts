@@ -71,6 +71,7 @@ export class MainStreetSvgTextureManager {
   public regenerateSvgSourcesFromCsv(): number {
     const s = this.scene;
     let count = 0;
+    const regeneratedIds = new Set<string>();
 
     try {
       // Generate fresh SVGs from the parsed CSV rows
@@ -80,6 +81,7 @@ export class MainStreetSvgTextureManager {
 
         const svg = generateCardSvgFromCsvRow(row);
         s.cardSvgSources.set(templateId, svg);
+        regeneratedIds.add(templateId);
         count++;
       }
     } catch (err) {
@@ -88,10 +90,56 @@ export class MainStreetSvgTextureManager {
     }
 
     if (count > 0) {
-      console.log('[MainStreetSvgTextureManager] Regenerated ' + count + ' card SVGs from CSV data');
+      // Clear any cached Phaser textures for regenerated template IDs so the
+      // next prewarm or lazy request will rasterize from the fresh SVG sources.
+      this.clearCachedTexturesForIds(regeneratedIds);
+      console.log('[MainStreetSvgTextureManager] Regenerated ' + count + ' card SVGs from CSV data and cleared stale textures');
     }
 
     return count;
+  }
+
+  /**
+   * Clears cached Phaser textures whose template ID is in the given set.
+   *
+   * Texture keys follow the format: ms_card_{templateId}_{width}x{height}@{dpr}
+   * (see makeTextureKey). We extract the template ID by taking everything
+   * between the prefix "ms_card_" and the last underscore (which separates
+   * the template ID from the dimension suffix).
+   *
+   * @param templateIds - Set of template IDs whose cached textures to clear.
+   */
+  private clearCachedTexturesForIds(templateIds: Set<string>): void {
+    const s = this.scene;
+    if (!s.textures || typeof s.textures.getTextureKeys !== 'function') {
+      return;
+    }
+
+    const allKeys = s.textures.getTextureKeys() as string[];
+    const prefix = 'ms_card_';
+    const keysToRemove: string[] = [];
+
+    for (const key of allKeys) {
+      if (!key.startsWith(prefix)) continue;
+
+      // Extract the template ID between the prefix and the last underscore.
+      // Key format: ms_card_{templateId}_{width}x{height}@{dpr}
+      const lastUnderscore = key.lastIndexOf('_');
+      if (lastUnderscore <= prefix.length) continue;
+      const extractedId = key.substring(prefix.length, lastUnderscore);
+
+      if (templateIds.has(extractedId)) {
+        keysToRemove.push(key);
+      }
+    }
+
+    for (const key of keysToRemove) {
+      try {
+        s.textures.remove(key);
+      } catch {
+        // ignore cleanup failures in constrained test environments
+      }
+    }
   }
 
   public async prewarmVisibleCardTextures(): Promise<void> {
