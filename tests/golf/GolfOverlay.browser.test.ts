@@ -160,50 +160,6 @@ function collectFromSceneAndHud<T extends Phaser.GameObjects.GameObject>(
  * we set both pageX and clientX explicitly (they are equal when scroll
  * offset is zero, which is typical in game canvases).
  */
-function clickAtGameCoords(
-  game: Phaser.Game,
-  gameX: number,
-  gameY: number,
-): void {
-  const canvas = game.canvas;
-  const scale = game.scale;
-
-  // Ensure ScaleManager bounds are up to date before computing coords
-  scale.refresh();
-
-  // Convert game-world coords to page/screen coords using Phaser's scale
-  // transform methods which handle all DPR and viewport scaling.
-  // transformX/Y converts page coords to game coords, so we need the
-  // inverse. For a scale that maps page→game via:
-  //   gameX = (pageX - canvasBounds.left) * displayScale.x
-  // The inverse is:
-  //   pageX = gameX / displayScale.x + canvasBounds.left
-  const pageX =
-    gameX / scale.displayScale.x + scale.canvasBounds.left;
-  const pageY =
-    gameY / scale.displayScale.y + scale.canvasBounds.top;
-
-  // Phaser 4 RC7's MouseManager natively listens for native DOM `mousedown`
-  // and `mouseup` events (not `pointerdown`/`pointerup`). Synthetic
-  // PointerEvents dispatched via dispatchEvent do NOT auto-generate the
-  // corresponding MouseEvent, so we must dispatch MouseEvent directly.
-  const dispatch = (type: string, buttons: number) => {
-    const e = new MouseEvent(type, {
-      clientX: Math.round(pageX),
-      clientY: Math.round(pageY),
-      screenX: Math.round(pageX),
-      screenY: Math.round(pageY),
-      button: 0,
-      buttons,
-      bubbles: true,
-      cancelable: true,
-    });
-    canvas.dispatchEvent(e);
-  };
-
-  dispatch('mousedown', 1);
-  dispatch('mouseup', 0);
-}
 
 /**
  * Force the Golf scene into game-over state and show the end screen.

@@ -738,6 +738,7 @@ export class BeleagueredCastleScene extends CardGameScene {
       playAgainLabel: 'Play Again',
       menuLabel: 'Menu',
       extraButtons: [{ label: 'Restart', onClick: () => this.onRestart?.() }],
+      background: { depth: OVERLAY_DEPTH, alpha: OVERLAY_BG_ALPHA },
     });
     this.overlayManager.add(...result.objects);
   }
