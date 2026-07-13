@@ -157,6 +157,7 @@ export class BeleagueredCastleScene extends CardGameScene {
     this.bcRenderer.onCardClick = (col) => this.handleCardClick(col);
 
     if (!this.replayMode) {
+      this.initHUDContainer();
       this.initHelpPanel(helpContent as HelpSection[]);
       const mapping: EventSoundMapping = {
         'card-pickup': SFX_KEYS.CARD_PICKUP,
