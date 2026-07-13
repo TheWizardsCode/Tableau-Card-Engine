@@ -240,7 +240,15 @@ export class GolfScene extends CardGameScene {
     this.phaseManager.setTextObject(this.instructionText);
     if (!this.replayMode) {
       this.initHelpPanel(helpContent as HelpSection[]);
-      this.initSettingsPanel(undefined, undefined, false);
+      this.initSettingsPanel(undefined, undefined, false, {
+        value: this.aiSkillRating,
+        min: 1,
+        max: 100,
+        onChange: (value) => {
+          this.aiSkillRating = value;
+          this.aiPlayer.memoryTracker.setSkill(value);
+        },
+      });
       // Propagate reduced motion preference to the animator
       if (this.settingsPanel) {
         this.animator.reducedMotion = this.settingsPanel.reducedMotion;

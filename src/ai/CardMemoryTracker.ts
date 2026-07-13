@@ -87,7 +87,7 @@ const DEFAULT_MAX_COPIES = 4;
  * ```
  */
 export class CardMemoryTracker {
-  private readonly skill: number;
+  private skill: number;
   private readonly maxCopies: number;
   private readonly trueCounts: Record<string, number> = {};
 
@@ -163,5 +163,14 @@ export class CardMemoryTracker {
    */
   getSkill(): number {
     return this.skill;
+  }
+
+  /**
+   * Update the skill rating dynamically.
+   * Affects all subsequent calls to {@link getVisibleRanks}.
+   * Clamped to [0, 100].
+   */
+  setSkill(skill: number): void {
+    this.skill = Math.max(0, Math.min(100, Math.round(skill)));
   }
 }

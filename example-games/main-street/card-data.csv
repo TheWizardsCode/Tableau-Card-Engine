@@ -1,6 +1,6 @@
 family,id,name,cost,baseIncome,synergyTypes,upgradePath,maxLevel,reputationPerTurn,synergyCoinBonus,synergyRepBonus,description,tier,trigger,effect,target,targetSynergy,coinDelta,reputationDelta,duration,effectType,multiplier,targetBusiness,incomeBonus,synergyRangeBonus,requiredLevel,reputationBonus,ongoingCost,handSlotsAdded
-business,biz-bakery,Bakery Test,6,1,Food,Bakery,2,,,,Provides warm pastries. Gains +1 coin for each adjacent Food business.,1,,,,,,,,,,,,,,,,
-business,biz-diner,Diner Test,8,1,Food,Diner,2,,,,Serves quick meals. Gains +1 coin per adjacent Food business.,2,,,,,,,,,,,,,,,,
+business,biz-bakery,Bakery,6,1,Food,Bakery,2,,,,Provides warm pastries. Gains +1 coin for each adjacent Food business.,1,,,,,,,,,,,,,,,,
+business,biz-diner,Diner,8,1,Food,Diner,2,,,,Serves quick meals. Gains +1 coin per adjacent Food business.,2,,,,,,,,,,,,,,,,
 business,biz-bookshop,Bookshop,8,1,Culture,Bookshop,1,,,,Sells books. Gains +1 coin per adjacent Culture business.,1,,,,,,,,,,,,,,,,
 business,biz-hardware,Hardware Store,10,2,Commerce,Hardware Store,1,,,,Supplies tools. Gains +1 coin per adjacent Commerce business.,1,,,,,,,,,,,,,,,,
 business,biz-pawnshop,Pawn Shop,3,0.5,Commerce,Pawn Shop,1,,0,0,Trades second-hand goods. Does not provide or receive synergy bonuses.,1,,,,,,,,,,,,,,,,
