@@ -1,3 +1,4 @@
+import { CSV_CHECKSUM } from '../MainStreetCards';
 import { setupMainStreetGame, deserializeMainStreetState } from '../MainStreetState';
 import { createDefaultCampaignProgress, loadCampaignProgress, updateCampaignAfterRun, saveCampaignProgress, createMainStreetCheckpointManager } from '../MainStreetSaveLoad';
 import { DIFFICULTY_NAMES } from '../MainStreetDifficulty';
@@ -704,6 +705,33 @@ export class MainStreetLifecycleManager {
       unlockedCardIds: s.campaign.unlockedCardIds,
     });
 
+    // Early regeneration: ensure card SVG sources are fresh from the parsed CSV
+    // data before any async SVG prewarming occurs. This eliminates the race
+    // condition where texture prewarming rasterizes stale static SVGs before
+    // the CSV mismatch check has a chance to run (see CG-0MRH36Z6800065JC).
+    // Texture cache invalidation is handled atomically inside
+    // prewarmVisibleCardTextures() — per-key remove-and-rasterize.
+    try {
+      s.msSvgTextureManager?.regenerateSvgSourcesFromCsv();
+    } catch (_) {
+      // Non-fatal: scene continues with fetched SVGs if regeneration fails
+    }
+
+    // Re-apply regenerated SVGs after all SVG fetches complete. Individual
+    // fetch() callbacks from loadCardSvgSources() may overwrite the freshly
+    // regenerated SVGs in cardSvgSources if they resolve after the synchronous
+    // regeneration above. By chaining onto cardSvgLoadPromise, we ensure fresh
+    // CSV-based SVGs are present before prewarmVisibleCardTextures() runs.
+    if (s.cardSvgLoadPromise) {
+      s.cardSvgLoadPromise = s.cardSvgLoadPromise.then(() => {
+        try {
+          s.msSvgTextureManager?.regenerateSvgSourcesFromCsv();
+        } catch (_) {
+          // Non-fatal: scene continues with fetched SVGs if re-generation fails
+        }
+      });
+    }
+
     // Determine tutorial visibility options from scene state
     const tutorialOpts: TutorialVisibilityOptions = {
       replayMode: s.replayMode === true,
@@ -851,6 +879,64 @@ export class MainStreetLifecycleManager {
    *
    * @param tutorialOpts  Options for the tutorial offer modal (shown if no checkpoint).
    */
+  /**
+   * Checks whether the static SVGs match the current CSV and regenerates them
+   * in-memory if needed.
+   *
+   * **New game scenario**: Fetches `csv-checksum.json` from the SVG output
+   * directory (written by the build-time Node.js script). If the file doesn't
+   * exist or its checksum differs from `CSV_CHECKSUM`, SVG sources are
+   * regenerated from the parsed CSV data.
+   *
+   * **Load game scenario**: When a non-empty `savedChecksum` is provided,
+   * compares it directly against `CSV_CHECKSUM`.
+   *
+   * This is an async fire-and-forget operation. It resolves after SVG
+   * sources have been regenerated (if needed), so the caller should `await`
+   * if they need SVGs to be fresh before proceeding.
+   *
+   * @param savedChecksum - Optional checksum from a loaded checkpoint.
+   */
+  public async checkForCsvMismatchAndRegenerate(savedChecksum?: string): Promise<void> {
+    const s = this.scene;
+    let mismatch = false;
+    let source = 'none';
+
+    if (savedChecksum && savedChecksum.length > 0) {
+      // Load game scenario: compare against saved state's csvChecksum
+      if (savedChecksum !== CSV_CHECKSUM) {
+        mismatch = true;
+        source = 'load';
+      }
+    } else {
+      // New game scenario: fetch checksum file from SVG output directory
+      try {
+        const resp = await fetch('assets/games/main-street/svg/cards/csv-checksum.json');
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.checksum !== CSV_CHECKSUM) {
+            mismatch = true;
+            source = 'new-game';
+          }
+        } else {
+          // No checksum file — assume SVGs need regeneration
+          mismatch = true;
+          source = 'no-checksum-file';
+        }
+      } catch {
+        // Fetch failed — assume SVGs are up-to-date (fallback to static SVGs)
+        console.warn('[MainStreetLifecycleManager] Could not fetch csv-checksum.json');
+      }
+    }
+
+    if (mismatch) {
+      console.log(`[MainStreetLifecycleManager] CSV mismatch detected (${source}), regenerating SVGs in-memory`);
+      // Only update SVG sources — no texture clearing. Texture invalidation
+      // is handled atomically by prewarmVisibleCardTextures() per-key.
+      s.msSvgTextureManager.regenerateSvgSourcesFromCsv();
+    }
+  }
+
   public checkForSavedCheckpoint(tutorialOpts: TutorialVisibilityOptions): void {
     const s = this.scene;
     if (!s.checkpointManager) return;
@@ -862,9 +948,13 @@ export class MainStreetLifecycleManager {
           const legacySeen = s.campaign ? (s.campaign as any).tutorialSeen : undefined;
           (s as any).tutorialOfferModal?.showIfEligible(tutorialOpts, legacySeen);
         } catch (_) { /* ignore */ }
+        // New game: check if static SVGs match current CSV
+        this.checkForCsvMismatchAndRegenerate().catch(() => {});
       },
       // Resume from checkpoint — replace state and rebuild UI
       (savedState: any) => {
+        const savedChecksum = savedState?.csvChecksum || '';
+
         s.state = savedState;
         // Mark tutorial as seen (resumed game means player already played)
         if (s.campaign) {
@@ -873,6 +963,9 @@ export class MainStreetLifecycleManager {
         // Rebuild renderer and start day phase from checkpoint state
         try { s.refreshAll(); } catch (_) { /* ignore */ }
         try { s.startDayPhase(); } catch (_) { /* ignore */ }
+
+        // Load game: compare saved checksum against current CSV
+        this.checkForCsvMismatchAndRegenerate(savedChecksum).catch(() => {});
       },
       // Resume overlay callback — use built-in default overlay
       (state: any, onResume: () => void, onNewGame: () => void) => {

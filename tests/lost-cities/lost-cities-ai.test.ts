@@ -21,6 +21,9 @@ import {
   createOpponentDrawHistory,
 } from '../../example-games/lost-cities/AiStrategy';
 import { createSeededRng } from '../../src/core-engine/SeededRng';
+import type {
+  InvestmentCard,
+} from '../../example-games/lost-cities/LostCitiesCards';
 
 
 
@@ -45,6 +48,21 @@ function makeTestVisibleState(overrides: Partial<VisibleState>): VisibleState {
     roundNumber: 1,
     cumulativeScores: [0, 0],
     ...overrides,
+  };
+}
+
+/** Create an investment card for testing. */
+function makeInvestment(
+  color: ExpeditionColor,
+  index: 1 | 2 | 3 = 1,
+  id?: number,
+): InvestmentCard {
+  return {
+    id: id ?? 1000 + EXPEDITION_COLORS.indexOf(color) * 10 + index,
+    color,
+    type: 'investment',
+    investmentIndex: index,
+    faceUp: true,
   };
 }
 
@@ -597,3 +615,189 @@ function countOpponentColorDiscards(
 
   return opponentColorDiscards;
 }
+
+// ═══════════════════════════════════════════════════════════
+// Improved AI Behavior Tests
+// ═══════════════════════════════════════════════════════════
+
+describe('Improved AI - Investment Card Placement', () => {
+  it('should NOT place an investment card starting a new expedition without enough cards of that color in hand', () => {
+    // Hand: yellow investment only (no other yellow cards)
+    const hand = [
+      makeInvestment('yellow', 1, 200),
+      makeNumbered('blue', 7, 201),
+      makeNumbered('red', 3, 202),
+    ];
+    const state = makeTestVisibleState({ hand });
+    const rng = createSeededRng(1);
+
+    const action = GreedyStrategy.choosePhase1(state, rng);
+
+    // AI should not play yellow investment to a new expedition
+    // (only has 1 yellow card = the investment itself)
+    // Better to play blue 7 or red 3, or discard
+    if (action.kind === 'play-to-expedition') {
+      expect(action.color).not.toBe('yellow');
+    }
+  });
+
+  it('should place an investment card in an expedition when holding many cards of that color', () => {
+    // Hand: yellow 2, yellow 5, yellow 8, yellow investment, plus filler
+    const hand = [
+      makeInvestment('yellow', 1, 300),
+      makeNumbered('yellow', 2, 301),
+      makeNumbered('yellow', 5, 302),
+      makeNumbered('yellow', 8, 303),
+      makeNumbered('blue', 3, 304),
+    ];
+    const state = makeTestVisibleState({ hand });
+    const rng = createSeededRng(1);
+
+    const action = GreedyStrategy.choosePhase1(state, rng);
+
+    // AI should consider playing the investment since it has 3 numbered cards
+    // of the same color. At minimum it should play SOMETHING to yellow.
+    // (might play the numbered card first, which is also fine)
+    if (action.kind === 'play-to-expedition') {
+      // Allowed: playing investment or numbered card to yellow
+      expect(action.color).toBe('yellow');
+    }
+  });
+
+  it('should NOT place multiple investment cards when starting a new expedition', () => {
+    // Hand: yellow investment x2, plus a few non-yellow cards
+    const hand = [
+      makeInvestment('yellow', 1, 400),
+      makeInvestment('yellow', 2, 401),
+      makeNumbered('blue', 4, 402),
+      makeNumbered('red', 5, 403),
+    ];
+    const state = makeTestVisibleState({ hand });
+    const rng = createSeededRng(1);
+
+    const action = GreedyStrategy.choosePhase1(state, rng);
+
+    // AI should not play yellow investment since it has zero numbered yellow cards
+    // It should play a blue or red card, or discard
+    if (action.kind === 'play-to-expedition') {
+      expect(action.color).not.toBe('yellow');
+    }
+  });
+
+  it('should place an investment card in an existing expedition with cards', () => {
+    // Existing yellow expedition with [2, 5]
+    const myExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+    myExpeditions.set('yellow', [
+      makeNumbered('yellow', 2, 500),
+      makeNumbered('yellow', 5, 501),
+    ]);
+
+    // Hand: yellow investment, plus a numbered yellow card
+    const hand = [
+      makeInvestment('yellow', 1, 502),
+      makeNumbered('yellow', 8, 503),
+      makeNumbered('blue', 3, 504),
+    ];
+
+    const state = makeTestVisibleState({ hand, myExpeditions });
+    const rng = createSeededRng(1);
+
+    const action = GreedyStrategy.choosePhase1(state, rng);
+
+    // AI should play to yellow (either investment or 8)
+    expect(action.kind).toBe('play-to-expedition');
+    expect(action.color).toBe('yellow');
+  });
+});
+
+describe('Improved AI - Card Ordering', () => {
+  it('should play a lower numbered card before a higher one when starting a new expedition', () => {
+    // Hand: yellow 9 and yellow 4 — both playable on empty expedition
+    const hand = [
+      makeNumbered('yellow', 9, 600),
+      makeNumbered('yellow', 4, 601),
+      makeNumbered('blue', 3, 602),
+    ];
+    const state = makeTestVisibleState({ hand });
+    const rng = createSeededRng(1);
+
+    const action = GreedyStrategy.choosePhase1(state, rng);
+
+    // Should play to yellow expedition (preferred over starting blue)
+    expect(action.kind).toBe('play-to-expedition');
+    expect(action.color).toBe('yellow');
+    // Should play the lower card (4) before the higher card (9)
+    if (action.kind === 'play-to-expedition') {
+      expect(action.card.type).toBe('numbered');
+      if (action.card.type === 'numbered') {
+        expect(action.card.rank).toBe(4);
+      }
+    }
+  });
+
+  it('should play a lower numbered card before a higher one in an existing expedition', () => {
+    // Existing yellow expedition with [2]
+    const myExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+    myExpeditions.set('yellow', [
+      makeNumbered('yellow', 2, 700),
+    ]);
+
+    // Hand: yellow 8 and yellow 5 — both playable after 2
+    const hand = [
+      makeNumbered('yellow', 8, 701),
+      makeNumbered('yellow', 5, 702),
+      makeNumbered('blue', 3, 703),
+    ];
+
+    const state = makeTestVisibleState({ hand, myExpeditions });
+    const rng = createSeededRng(1);
+
+    const action = GreedyStrategy.choosePhase1(state, rng);
+
+    // Should play to yellow and prefer 5 over 8
+    expect(action.kind).toBe('play-to-expedition');
+    expect(action.color).toBe('yellow');
+    if (action.kind === 'play-to-expedition') {
+      expect(action.card.type).toBe('numbered');
+      if (action.card.type === 'numbered') {
+        expect(action.card.rank).toBe(5);
+      }
+    }
+  });
+
+  it('should play a higher card when no lower one exists in hand', () => {
+    // Existing yellow expedition with [6]
+    const myExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+    myExpeditions.set('yellow', [
+      makeNumbered('yellow', 6, 800),
+    ]);
+
+    // Hand: yellow 8 only (4 is too low to play after 6)
+    const hand = [
+      makeNumbered('yellow', 8, 801),
+      makeNumbered('blue', 3, 802),
+    ];
+
+    const state = makeTestVisibleState({ hand, myExpeditions });
+    const rng = createSeededRng(1);
+
+    const action = GreedyStrategy.choosePhase1(state, rng);
+
+    // Should play yellow 8 (the only playable yellow card)
+    expect(action.kind).toBe('play-to-expedition');
+    expect(action.color).toBe('yellow');
+    if (action.kind === 'play-to-expedition') {
+      expect(action.card.type).toBe('numbered');
+      if (action.card.type === 'numbered') {
+        expect(action.card.rank).toBe(8);
+      }
+    }
+  });
+});
+

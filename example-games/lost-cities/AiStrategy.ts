@@ -163,6 +163,54 @@ function opponentInterest(
 }
 
 /**
+ * Count numbered cards of a specific color in the AI's hand.
+ * Investment cards are excluded since they don't contribute to score value.
+ */
+function countNumberedCardsInHandOfColor(
+  hand: LostCitiesCard[],
+  color: ExpeditionColor,
+): number {
+  return hand.filter(
+    c => c.color === color && c.type === 'numbered',
+  ).length;
+}
+
+/**
+ * Check if there is a lower-value numbered card of the same color
+ * in hand that could legally be played to the expedition before
+ * the given action card. If so, playing the higher card first would
+ * waste the lower card.
+ */
+function hasLowerNumberedCardInHand(
+  hand: LostCitiesCard[],
+  color: ExpeditionColor,
+  actionCard: LostCitiesCard,
+  expedition: LostCitiesCard[],
+): boolean {
+  if (actionCard.type !== 'numbered') return false;
+
+  const actionValue = cardValue(actionCard);
+  const lastCard = expedition.length > 0 ? expedition[expedition.length - 1] : null;
+
+  for (const card of hand) {
+    if (card.id === actionCard.id) continue;
+    if (card.color !== color) continue;
+    if (card.type !== 'numbered') continue;
+
+    const cardValue_ = cardValue(card);
+
+    // Skip if this lower card can't legally be played after the last card
+    // (it's already lower than or equal to the last card in the expedition)
+    if (lastCard && lastCard.type === 'numbered' && cardValue_ <= cardValue(lastCard)) continue;
+
+    // Found a lower card of the same color that could be played first
+    if (cardValue_ < actionValue) return true;
+  }
+
+  return false;
+}
+
+/**
  * Score a Phase 1 action for the greedy strategy.
  * Higher score = more preferred.
  */
@@ -182,9 +230,16 @@ function scorePhase1Action(
     if (laneSize > 0) {
       score += 50 + laneSize * 10;
     } else {
-      // Starting a new expedition: investments are cheaper, but risky
+          // Starting a new expedition: only invest if we have enough cards of this color
       if (action.card.type === 'investment') {
-        score += 20; // Investment early is okay
+        // Count numbered cards of this color in hand + already in expedition
+        const numberedInHand = countNumberedCardsInHandOfColor(state.hand, action.color);
+        const totalColorCards = numberedInHand + laneSize;
+        if (totalColorCards >= 3) {
+          score += 20; // Investment is reasonable with enough support
+        } else {
+          score -= 100; // Penalize investment without enough support
+        }
       } else {
         // Starting with a low number is safer
         score += 10 + (10 - cardValue(action.card));
@@ -194,6 +249,21 @@ function scorePhase1Action(
     // Prefer playing high-value cards to expeditions we're committed to
     if (laneSize >= 2) {
       score += cardValue(action.card);
+    }
+
+    // When starting a new expedition, prefer colors with more cards in hand
+    if (laneSize === 0 && action.card.type !== 'investment') {
+      const numberedInHand = countNumberedCardsInHandOfColor(state.hand, action.color);
+      score += numberedInHand * 5;
+    }
+
+    // Penalize playing a higher card when a lower one of the same color
+    // exists in hand (would waste the lower card since it must be played
+    // in ascending order)
+    if (hasLowerNumberedCardInHand(
+      state.hand, action.color, action.card, lane ?? [],
+    )) {
+      score -= 80;
     }
 
     return score;

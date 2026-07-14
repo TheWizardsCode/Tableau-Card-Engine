@@ -1,5 +1,6 @@
-import { CARD_TEMPLATE_NAMES } from '../MainStreetCards';
+import { CARD_TEMPLATE_NAMES, CSV_ROWS } from '../MainStreetCards';
 import { rasteriseSvgToTexture, makeTextureKey } from '../../../src/core-engine';
+import { generateCardSvgFromCsvRow } from './MainStreetCardSvgGenerator';
 
 export class MainStreetSvgTextureManager {
   private lastDevicePixelRatio: number;
@@ -55,6 +56,50 @@ export class MainStreetSvgTextureManager {
     s.cardSvgLoadPromise = Promise.all(fetches).then(() => {});
   }
 
+  /**
+   * Regenerates SVG sources from the current CSV data.
+   *
+   * When the card-data.csv has changed since the static SVGs were generated,
+   * this method produces fresh SVG strings in-memory for all card templates
+   * and stores them in `cardSvgSources`, overriding any stale fetched SVGs.
+   *
+   * Texture cache invalidation is NOT performed here — SVG source updates are
+   * separated from texture lifecycle. Textures created by prewarm use the
+   * correct CSV-fresh SVGs because this method runs before any prewarm call
+   * (both the synchronous early call in loadCampaignAndSetup() and the re-apply
+   * chain on cardSvgLoadPromise).
+   *
+   * If regeneration fails (e.g., CSV rows are not yet loaded), a warning is
+   * logged and the scene continues with existing (possibly stale) SVGs.
+   *
+   * @returns The number of SVG sources regenerated, or 0 if regeneration was skipped.
+   */
+  public regenerateSvgSourcesFromCsv(): number {
+    const s = this.scene;
+    let count = 0;
+
+    try {
+      // Generate fresh SVGs from the parsed CSV rows
+      for (const row of CSV_ROWS) {
+        const templateId = row.id;
+        if (!templateId) continue;
+
+        const svg = generateCardSvgFromCsvRow(row);
+        s.cardSvgSources.set(templateId, svg);
+        count++;
+      }
+    } catch (err) {
+      console.warn('[MainStreetSvgTextureManager] Failed to regenerate SVGs from CSV:', err);
+      return 0;
+    }
+
+    if (count > 0) {
+      console.log('[MainStreetSvgTextureManager] Regenerated ' + count + ' card SVGs from CSV data');
+    }
+
+    return count;
+  }
+
   public async prewarmVisibleCardTextures(): Promise<void> {
     const s = this.scene;
     const visibleTemplates = new Set<string>();
@@ -95,6 +140,13 @@ export class MainStreetSvgTextureManager {
 
       for (const size of sizes) {
         const key = makeTextureKey(templateId, size.w, size.h, dpr);
+
+        // If a texture already exists for this key, keep it — it was created
+        // from the correct CSV-based SVG sources by a prior prewarm call
+        // (regenerateSvgSourcesFromCsv() runs before any prewarm). Skipping
+        // existing textures avoids a race where removing+recreating triggers
+        // rasteriseSvgToTexture's internal textureCache, which awaits pending
+        // promises and yields to a render frame with a missing texture.
         if (s.textures.exists(key)) continue;
 
         const p = rasteriseSvgToTexture(s, key, svgText, size.w, size.h, dpr)

@@ -106,13 +106,15 @@ export function buildUpgradeOverlaySpec(
       }
     : null;
 
-  // Income text: centred horizontally in the middle band of the card, shown for any card with income > 0
+  // Income text: centred on the card, shown for any card with income > 0
   // Uses "Income: +X/turn" format for clarity
+  // Container origin is at card centre, so x=0 is horizontal centre
+  // and a small negative y offset centres the label slightly above middle.
   const incomeText: OverlayTextSpec | null = totalIncome > 0
     ? {
         text: `Income: +${totalIncome}/turn`,
-        x: Math.round(width / 2),
-        y: Math.round(height * 0.38),
+        x: 0,
+        y: Math.round(-height * 0.06),
         fontSize: '11px',
         color: '#44ff44',
         fontStyle: 'bold',
@@ -122,6 +124,8 @@ export function buildUpgradeOverlaySpec(
     : null;
 
   // Reputation text: centred below income, shown for any card with reputation > 0
+  // Container origin is at card centre, so x=0 is horizontal centre
+  // and a small positive y offset places it below the income label.
 
   // Format to at most 1 decimal place, stripping trailing zeros (e.g. 0.2, 0.3, 1.0 -> 1)
   const repFormatted = totalReputation > 0
@@ -130,8 +134,8 @@ export function buildUpgradeOverlaySpec(
   const reputationText: OverlayTextSpec | null = totalReputation > 0
     ? {
         text: `+${repFormatted}/turn`,
-        x: Math.round(width / 2),
-        y: Math.round(height * 0.5),
+        x: 0,
+        y: Math.round(height * 0.1),
         fontSize: '11px',
         color: '#88bbff',
         fontStyle: 'bold',

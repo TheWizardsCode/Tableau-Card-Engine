@@ -24,6 +24,84 @@ import { anchorPoint } from '../../../src/ui/screen-layout';
 import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
 import gymOverlayUiLayoutJson from '../layouts/gym-overlay-ui.layout.json';
 
+// ── Scrollable content generation ────────────────────────────
+
+// Line of text repeated to pad content to desired length.
+// Use descriptive content about the overlay/mask rather than lorem ipsum.
+const CONTENT_PAD = [
+  'The GeometryMask clips this',
+  'content to a fixed rectangle.',
+  '',
+  'Scroll to see more details',
+  'about how the engine works.',
+  '',
+  'Each line is added as a child',
+  'of the masked container, which',
+  'is positioned at the mask origin.',
+  '',
+  'When the overlay closes, all',
+  'mask resources are freed.',
+  '',
+  'This creates a clean lifecycle',
+  'with no memory leaks.',
+];
+
+/**
+ * Generate enough text lines to require scrolling.
+ * 14 header + 4 * 14 pad = 70 lines → 70 * 16 = 1120px >> 200px mask.
+ */
+function generateScrollableContent(): string[] {
+  const lines: string[] = [];
+  lines.push('Masked Content Area');
+  lines.push('─────────────────────');
+  lines.push('');
+  lines.push('This overlay demonstrates a');
+  lines.push('GeometryMask-clipped region');
+  lines.push('that can be scrolled using');
+  lines.push('the mouse wheel or touch drag.');
+  lines.push('');
+  lines.push('─ Mask Properties ─');
+  lines.push('Size: 300 x 200 px');
+  lines.push('Lines: uses 16px spacing');
+  lines.push('Scroll: wheel + drag');
+  lines.push('');
+  lines.push('─ How Scrolling Works ─');
+  lines.push('The masked container moves');
+  lines.push('vertically inside the clip');
+  lines.push('region, revealing different');
+  lines.push('parts of the text content.');
+  lines.push('');
+  lines.push('The scrollbar on the right');
+  lines.push('shows the current position');
+  lines.push('relative to total content.');
+  lines.push('');
+  lines.push('─ Implementation ─');
+  lines.push('1. A Graphics object defines');
+  lines.push('   the clip region shape.');
+  lines.push('2. A GeometryMask is created');
+  lines.push('   from that graphics shape.');
+  lines.push('3. A Container holds all the');
+  lines.push('   scrollable child objects.');
+  lines.push('4. The mask is applied to the');
+  lines.push('   container via setMask().');
+  lines.push('5. Adjusting the container Y');
+  lines.push('   scrolls content within the');
+  lines.push('   fixed clip region.');
+  lines.push('');
+  lines.push('─ Scroll Tips ─');
+  lines.push('Use mouse wheel to scroll.');
+  lines.push('Scrollbar shows position.');
+  lines.push('Position resets on reopen.');
+  lines.push('');
+  // Add padding lines to ensure scrolling is necessary
+  for (let pass = 0; pass < 4; pass++) {
+    for (const pad of CONTENT_PAD) {
+      lines.push(pad);
+    }
+  }
+  return lines;
+}
+
 // Parse the shared Overlay UI scene layout once at module load.
 const OVERLAY_LAYOUT: import('../../../src/ui/screen-layout-schema').ScreenLayoutDocument | null = (() => {
   const parsed = parseScreenLayoutDocument(gymOverlayUiLayoutJson);
@@ -59,6 +137,17 @@ export class GymOverlayUiScene extends GymSceneBase {
   // Mask references for GeometryMask demo
   private contentMask: Phaser.Display.Masks.GeometryMask | null = null;
   private maskedContainer: Phaser.GameObjects.Container | null = null;
+
+  // Scroll state for the masked content area
+  private _overlayScroller: {
+    scrollY: number;
+    maxScrollY: number;
+    lineCount: number;
+  } | null = null;
+  private _wheelHandlerRef: ((pointer: any, gameObjects: any[], deltaX: number, deltaY: number, deltaZ: number) => void) | null = null;
+  private _scrollAreaBaseY = 280;
+  private _maskW = 300;
+  private _maskH = 200;
 
   // Guard to prevent background clicks from immediately closing the overlay
   private overlayInteractionGuard = false;
@@ -152,10 +241,17 @@ export class GymOverlayUiScene extends GymSceneBase {
 
     // ── GeometryMask demo: scrollable content ─────────────
     try {
-      // Create a shaped mask for clipping
+      const areaX = GAME_W / 2 - this._maskW / 2;
+      const areaY = this._scrollAreaBaseY;
+      const areaW = this._maskW;
+      const areaH = this._maskH;
+      const lineH = 16;
+
+      // Create a shaped mask for clipping — positioned at the content area
       const maskShape = this.add.graphics();
+      maskShape.setPosition(areaX, areaY);
       maskShape.fillStyle(0xffffff, 1);
-      maskShape.fillRect(0, 0, 300, 200);
+      maskShape.fillRect(0, 0, areaW, areaH);
       this.contentMask = new Phaser.Display.Masks.GeometryMask(this, maskShape);
       // Hide the mask shape — it provides geometry data for the mask but
       // should not be rendered as a visible white rectangle at (0,0) behind
@@ -163,35 +259,88 @@ export class GymOverlayUiScene extends GymSceneBase {
       maskShape.setVisible(false);
       this.overlayObjects.push(maskShape);
 
-      // Create a container for content that will be clipped
-      this.maskedContainer = this.add.container(GAME_W / 2 - 150, 280);
+      // Create a container for content that will be clipped.
+      // Position at same origin as the mask shape so the clip region
+      // aligns with the container's local coordinate space.
+      this.maskedContainer = this.add.container(areaX, areaY);
       this.maskedContainer.setMask(this.contentMask);
       this.maskedContainer.setDepth(12);
       this.overlayObjects.push(this.maskedContainer);
 
-      // Add scrollable content inside the clipped area
-      const contentLines = [
-        'Masked Content Area',
-        '─────────────────────',
-        'This text is inside a',
-        'GeometryMask-clipped',
-        'scrollable region.',
-        '',
-        'The mask clips content',
-        'to a 300×200 rectangle.',
-        '',
-        'When the overlay closes,',
-        'the mask is destroyed',
-        'and resources freed.',
-        '',
-        'Intensity setting affects',
-        'overlay brightness.',
-      ];
+      // Generate scrollable content lines (enough to overflow the mask)
+      const contentLines = generateScrollableContent();
+      const contentH = contentLines.length * lineH;
+      const maxScrollY = Math.max(0, contentH - areaH);
+
       for (let i = 0; i < contentLines.length; i++) {
-        const line = createHudText(this, 10, i * 16, contentLines[i], '#ccddcc', { fontSize: '12px' });
+        const line = createHudText(this, 10, i * lineH, contentLines[i], '#ccddcc', { fontSize: '12px' });
         this.maskedContainer.add(line);
       }
-      this.logEvent('Overlay opened with GeometryMask content area');
+
+      // Initialize scroll state (exposed for testing via public getter)
+      this._overlayScroller = { scrollY: 0, maxScrollY, lineCount: contentLines.length };
+
+      // ── Scrollbar ───────────────────────────────────────
+      // Track: vertical bar at right edge of mask area
+      const scrollbarTrack = this.add.rectangle(
+        areaX + areaW - 8,
+        areaY + areaH / 2,
+        4,
+        areaH,
+        0x333333,
+        0.5,
+      );
+      scrollbarTrack.setDepth(13);
+      this.overlayObjects.push(scrollbarTrack);
+
+      // Thumb: moves to indicate scroll position
+      const thumbHeight = Math.max(20, (areaH / contentH) * areaH);
+      const scrollbarThumb = this.add.rectangle(
+        areaX + areaW - 8,
+        areaY + thumbHeight / 2,
+        4,
+        thumbHeight,
+        0x88ff88,
+        0.8,
+      );
+      scrollbarThumb.setDepth(14);
+      this.overlayObjects.push(scrollbarThumb);
+
+      // ── Wheel event handler ─────────────────────────────
+      const wheelHandler = (
+        _pointer: any,
+        _gameObjects: any[],
+        _deltaX: number,
+        deltaY: number,
+        _deltaZ: number,
+      ) => {
+        const scroller = this._overlayScroller;
+        if (!scroller) return;
+
+        // deltaY > 0 = scroll down
+        scroller.scrollY = Math.max(
+          0,
+          Math.min(scroller.maxScrollY, scroller.scrollY + deltaY * 0.5),
+        );
+
+        // Move the container up (negative shift) to reveal later content
+        if (this.maskedContainer) {
+          this.maskedContainer.y = areaY - scroller.scrollY;
+        }
+
+        // Update scrollbar thumb position
+        const scrollRatio =
+          scroller.maxScrollY > 0 ? scroller.scrollY / scroller.maxScrollY : 0;
+        const thumbRange = areaH - thumbHeight;
+        scrollbarThumb.y = areaY + thumbHeight / 2 + scrollRatio * thumbRange;
+      };
+
+      this.input.on('wheel', wheelHandler);
+      this._wheelHandlerRef = wheelHandler;
+
+      this.logEvent(
+        `Overlay opened with GeometryMask scrollable area (${contentLines.length} lines, maxScroll=${maxScrollY})`,
+      );
     } catch (e) {
       // GeometryMask may not be available in all environments (e.g., headless)
       this.logEvent('Overlay opened (GeometryMask unavailable, text fallback)');
@@ -246,6 +395,15 @@ export class GymOverlayUiScene extends GymSceneBase {
       this.logEvent('No overlay open; ignoring');
       return;
     }
+
+    // Remove wheel event handler before cleanup
+    if (this._wheelHandlerRef) {
+      try { this.input.off('wheel', this._wheelHandlerRef); } catch (_) { /* ignore */ }
+      this._wheelHandlerRef = null;
+    }
+
+    // Reset scroll state
+    this._overlayScroller = null;
 
     // Destroy GeometryMask references before dismissing overlay objects
     if (this.maskedContainer) {

@@ -153,6 +153,16 @@ export type GolfSetupOptions = MultiplayerSetupOptions & {
    * If omitted, the first 3 grid positions are revealed by default.
    */
   initialReveals?: Array<Array<{ row: number; col: number }>>;
+
+  /**
+   * Skill rating (1-100) for the AI player's probabilistic card memory.
+   *   - 100: Perfect recall of all seen discard cards.
+   *   - 80:  Strong but slightly imperfect recall (default).
+   *   - 50:  Chance-level accuracy (50% correct).
+   *   - 1:   Nearly always misremembers.
+   * @default 80
+   */
+  skillRating?: number;
 };
 
 /**

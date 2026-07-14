@@ -156,10 +156,10 @@ describe('Beleaguered Castle overlays', () => {
     const blocker = allRects.find((r) => r.width === 1280 && r.height === 720 && r.input?.enabled);
     expect(blocker).toBeDefined();
 
-    // Check buttons at depth 2001
-    const labels = ['[ New Game ]', '[ Restart ]', '[ Menu ]'];
+    // Check buttons — createGameOverOverlay creates them at DEFAULT_BUTTON_DEPTH = 11
+    const labels = ['Play Again', 'Restart', 'Menu'];
     const btns = collectFromSceneAndHud(scene, (child): child is Phaser.GameObjects.Text =>
-      child instanceof Phaser.GameObjects.Text && labels.includes(child.text) && child.depth === 2001,
+      child instanceof Phaser.GameObjects.Text && labels.includes(child.text) && child.depth === 11,
     );
     expect(btns.length).toBeGreaterThanOrEqual(2);
     for (const btn of btns) expect(btn.input?.enabled).toBe(true);
