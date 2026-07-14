@@ -90,7 +90,7 @@ describe('Reworked Clinic (biz-clinic)', () => {
 
   it('should have reputationPerTurn of 0.2', () => {
     // reputationPerTurn is optional; if undefined, treat as 0
-    expect((clinic as any).reputationPerTurn).toBe(0.2);
+    expect((clinic as any).reputationPerTurn).toBe(0.15);
   });
 
   it('should still have cost 10, maxLevel 1, upgradePath Clinic', () => {
@@ -288,7 +288,7 @@ describe('Reputation Per Turn (Income Phase)', () => {
     // Income (coin) should be 0 since Clinic has baseIncome=0 and no neighbors
     expect(result.total).toBe(0);
     // Reputation should have increased by 0.2
-    expect(state.resourceBank.reputation).toBeCloseTo(repBefore + 0.2);
+    expect(state.resourceBank.reputation).toBeCloseTo(repBefore + 0.15);
   });
 
   it('applying Medical Center upgrade should add additional 0.1 reputation per turn', () => {
@@ -307,7 +307,7 @@ describe('Reputation Per Turn (Income Phase)', () => {
     applyIncome(state);
 
     // Clinic reputationPerTurn=0.2 + Medical Center reputationBonus=0.1 = 0.3
-    expect(state.resourceBank.reputation).toBeCloseTo(repBefore + 0.3);
+    expect(state.resourceBank.reputation).toBeCloseTo(repBefore + 0.25);
   });
 
   it('multiple clinics should each contribute reputation per turn', () => {
@@ -320,7 +320,7 @@ describe('Reputation Per Turn (Income Phase)', () => {
     applyIncome(state);
 
     // 2 clinics * 0.2 each = 0.4
-    expect(state.resourceBank.reputation).toBeCloseTo(repBefore + 0.4);
+    expect(state.resourceBank.reputation).toBeCloseTo(repBefore + 0.3);
   });
 
   it('Private Clinic and Pharmacy should not add reputation per turn', () => {

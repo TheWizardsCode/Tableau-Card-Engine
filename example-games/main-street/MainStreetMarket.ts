@@ -374,7 +374,7 @@ export function refreshInvestments(state: MainStreetState): RefreshResult {
     const name = (c as any).name ?? c.id;
     return `${c.id}${name ? ` (${name})` : ''}`;
   });
-  addLog(state, `Refreshed investments (-$${REFRESH_INVESTMENTS_COST}): replaced ${replacedStrings.join(', ')}`, 'loss');
+  addLog(state, `Refreshed investments (-€${REFRESH_INVESTMENTS_COST}): replaced ${replacedStrings.join(', ')}`, 'loss');
 
   return { replaced: removed, cost: REFRESH_INVESTMENTS_COST };
 }
@@ -423,7 +423,7 @@ export function refreshDevelopment(state: MainStreetState): RefreshResult {
     const name = (c as any).name ?? c.id;
     return `${c.id}${name ? ` (${name})` : ''}`;
   });
-  addLog(state, `Refreshed development (-$${REFRESH_DEVELOPMENT_COST}): replaced ${replacedStrings.join(', ')}`, 'loss');
+  addLog(state, `Refreshed development (-€${REFRESH_DEVELOPMENT_COST}): replaced ${replacedStrings.join(', ')}`, 'loss');
 
   return { replaced: removed, cost: REFRESH_DEVELOPMENT_COST };
 }
@@ -542,7 +542,7 @@ export function purchaseBusiness(
   // Note: market is not refilled immediately. Replenishment occurs at start of next turn.
   const refilled = false;
 
-  addLog(state, `Placed ${card.name} in slot ${slotIndex} (-$${card.cost})`, 'loss');
+  addLog(state, `Placed ${card.name} in slot ${slotIndex} (-€${card.cost})`, 'loss');
 
   return { card, cost: card.cost, refilled };
 }
@@ -608,7 +608,7 @@ export function purchaseBusinessToHand(
   // Note: market is not refilled immediately.
   const refilled = false;
 
-  addLog(state, `Added ${card.name} to hand (-$${card.cost})`, 'loss');
+  addLog(state, `Added ${card.name} to hand (-€${card.cost})`, 'loss');
 
   return { card, cost: card.cost, refilled };
 }
@@ -678,7 +678,7 @@ export function purchaseUpgrade(
   // Note: market is not refilled immediately. Replenishment occurs at start of next turn.
   const refilled = false;
 
-  addLog(state, `Upgraded ${business.name} with ${card.name} (-$${card.cost})`, 'loss');
+  addLog(state, `Upgraded ${business.name} with ${card.name} (-€${card.cost})`, 'loss');
 
   return { card, cost: card.cost, refilled };
 }
@@ -718,7 +718,7 @@ export function purchaseEvent(
   // Note: market is not refilled immediately. Replenishment occurs at start of next turn.
   const refilled = false;
 
-  const costLabel = card.cost > 0 ? ` (-$${card.cost})` : '';
+  const costLabel = card.cost > 0 ? ` (-€${card.cost})` : '';
   addLog(state, `Bought event: ${card.name}${costLabel} (held)`, 'neutral');
 
   return { card, cost: card.cost, refilled };
@@ -848,5 +848,5 @@ export function purchaseStaffCard(
   // Increase max hand size
   state.maxHandSize += card.handSlotsAdded;
 
-  addLog(state, `Hired ${card.name} (+${card.handSlotsAdded} hand slots, -$${card.cost}, ongoing $${card.ongoingCost}/turn)`, 'loss');
+  addLog(state, `Hired ${card.name} (+${card.handSlotsAdded} hand slots, -€${card.cost}, ongoing €${card.ongoingCost}/turn)`, 'loss');
 }

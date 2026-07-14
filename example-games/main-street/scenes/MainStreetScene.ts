@@ -3,6 +3,7 @@ import type { DifficultyName } from '../MainStreetDifficulty';
 import type { BusinessCard } from '../MainStreetCards';
 import {
   CardGameScene,
+  HintBar,
   TooltipManager,
 } from '../../../src/ui';
 import type { SelectionController, SingleSelectionManager } from '../../../src/ui';
@@ -88,8 +89,10 @@ export class MainStreetScene extends CardGameScene {
   // Challenge Tracker panel
   public challengeContainer!: Phaser.GameObjects.Container;
 
-  // Instruction text
+  // Instruction text (managed by HintBar; kept as public property for backward compat)
   public instructionText!: Phaser.GameObjects.Text;
+  /** Shared HintBar instance for standardised hint/instruction display at bottom-centre. */
+  public hintBar!: HintBar;
 
   // Overlay objects
   public overlayObjects: Phaser.GameObjects.GameObject[] = [];

@@ -14,6 +14,18 @@ import { getReducedMotion, setReducedMotion, getEndTurnKeybind, setEndTurnKeybin
 
 // ── Public types ────────────────────────────────────────────
 
+/** Configuration for a game-specific AI skill rating slider. */
+export interface SkillRatingConfig {
+  /** Current skill rating value (min–max). */
+  value: number;
+  /** Minimum value (typically 1). */
+  min: number;
+  /** Maximum value (typically 100). */
+  max: number;
+  /** Called when the slider value changes. */
+  onChange: (value: number) => void;
+}
+
 /** Optional position override for the integrated settings button. */
 export interface SettingsButtonPosition {
   /** X position. Defaults to left of help button. */
@@ -47,6 +59,21 @@ export interface SettingsPanelConfig {
    * the default position (left of the help button).
    */
   buttonPosition?: SettingsButtonPosition;
+
+  /**
+   * Whether the current game has tooltips. When true (default), a
+   * "Tooltips" toggle is displayed in the settings panel. Games
+   * without any tooltips (e.g. Golf) should set this to false to
+   * hide the toggle.
+   */
+  hasTooltips?: boolean;
+
+  /**
+   * Optional AI skill rating slider configuration.
+   * When provided, a labeled slider (min–max) is shown in the
+   * settings panel to control AI difficulty in real time.
+   */
+  skillRating?: SkillRatingConfig;
 }
 
 // ── Style constants ─────────────────────────────────────────
@@ -114,6 +141,8 @@ export class SettingsPanel {
     difficultyNames?: readonly string[];
     showButton: boolean;
     buttonPosition: SettingsPanelConfig['buttonPosition'];
+    hasTooltips: boolean;
+    skillRating?: SkillRatingConfig;
   };
   private readonly panelWidth: number;
   private readonly canvasWidth: number;
@@ -143,11 +172,11 @@ export class SettingsPanel {
   private sliderTrackWidth: number;
   private isDraggingSlider = false;
 
-  // Tooltip toggle
-  private tooltipToggleBg: Phaser.GameObjects.Rectangle;
-  private tooltipToggleKnob: Phaser.GameObjects.Graphics;
-  private tooltipLabel: Phaser.GameObjects.Text;
-  private tooltipStatusText: Phaser.GameObjects.Text;
+  // Tooltip toggle (only created when hasTooltips config is true)
+  private tooltipToggleBg!: Phaser.GameObjects.Rectangle;
+  private tooltipToggleKnob!: Phaser.GameObjects.Graphics;
+  private tooltipLabel!: Phaser.GameObjects.Text;
+  private tooltipStatusText!: Phaser.GameObjects.Text;
 
   // Reduced-motion toggle
   private reducedMotionToggleBg: Phaser.GameObjects.Rectangle;
@@ -160,6 +189,18 @@ export class SettingsPanel {
   private difficultyLabel?: Phaser.GameObjects.Text;
   private difficultyTextObjects: Phaser.GameObjects.Text[] = [];
   private _selectedDifficulty?: string;
+
+  // Skill rating slider (optional; provided by scene via SettingsPanelConfig)
+  private skillLabel!: Phaser.GameObjects.Text;
+  private skillSliderTrack!: Phaser.GameObjects.Rectangle;
+  private skillSliderFill!: Phaser.GameObjects.Rectangle;
+  private skillSliderHandle!: Phaser.GameObjects.Graphics;
+  private skillSliderHitArea!: Phaser.GameObjects.Zone;
+  private skillValueText!: Phaser.GameObjects.Text;
+  private skillTrackX!: number;
+  private skillTrackWidth!: number;
+  private isDraggingSkillSlider = false;
+  private _skillRatingValue: number = 80;
 
   // State
   private _isOpen = false;
@@ -199,6 +240,8 @@ export class SettingsPanel {
       toggleKey: config.toggleKey ?? 'Escape',
       showButton,
       buttonPosition: config.buttonPosition,
+      hasTooltips: config.hasTooltips ?? true,
+      skillRating: config.skillRating,
     };
 
     this.canvasWidth = scene.scale.width;
@@ -403,61 +446,67 @@ export class SettingsPanel {
     displayHeading.setDepth(DEPTH_PANEL_CONTENT);
     this.container.add(displayHeading);
 
-    // ── Tooltip toggle ──────────────────────────────────
+    // ── Tooltip toggle (only shown when the game has tooltips) ──
 
-    const tooltipY = displaySectionY + 40;
+    let nextDisplayY = displaySectionY + 40;
 
-    this.tooltipLabel = scene.add.text(PADDING, tooltipY, 'Tooltips', LABEL_STYLE);
-    this.tooltipLabel.setOrigin(0, 0.5);
-    this.tooltipLabel.setDepth(DEPTH_PANEL_CONTENT);
-    this.container.add(this.tooltipLabel);
+    if (this.config.hasTooltips) {
+      const tooltipY = displaySectionY + 40;
 
-    // Toggle background (same pill style as mute toggle)
-    const tooltipToggleX = this.panelWidth - PADDING - TOGGLE_SIZE * 1.8;
+      this.tooltipLabel = scene.add.text(PADDING, tooltipY, 'Tooltips', LABEL_STYLE);
+      this.tooltipLabel.setOrigin(0, 0.5);
+      this.tooltipLabel.setDepth(DEPTH_PANEL_CONTENT);
+      this.container.add(this.tooltipLabel);
 
-    this.tooltipToggleBg = scene.add.rectangle(
-      tooltipToggleX,
-      tooltipY,
-      TOGGLE_SIZE * 1.8,
-      TOGGLE_SIZE,
-      this._showTooltips ? TOGGLE_ON_COLOR : TOGGLE_OFF_COLOR,
-    );
-    this.tooltipToggleBg.setOrigin(0, 0.5);
-    this.tooltipToggleBg.setDepth(DEPTH_PANEL_CONTENT);
-    this.container.add(this.tooltipToggleBg);
+      // Toggle background (same pill style as mute toggle)
+      const tooltipToggleX = this.panelWidth - PADDING - TOGGLE_SIZE * 1.8;
 
-    // Toggle knob
-    this.tooltipToggleKnob = scene.add.graphics();
-    this.tooltipToggleKnob.setDepth(DEPTH_PANEL_CONTENT);
-    this.drawTooltipKnob(this._showTooltips);
-    this.container.add(this.tooltipToggleKnob);
+      this.tooltipToggleBg = scene.add.rectangle(
+        tooltipToggleX,
+        tooltipY,
+        TOGGLE_SIZE * 1.8,
+        TOGGLE_SIZE,
+        this._showTooltips ? TOGGLE_ON_COLOR : TOGGLE_OFF_COLOR,
+      );
+      this.tooltipToggleBg.setOrigin(0, 0.5);
+      this.tooltipToggleBg.setDepth(DEPTH_PANEL_CONTENT);
+      this.container.add(this.tooltipToggleBg);
 
-    // Tooltip status text
-    this.tooltipStatusText = scene.add.text(
-      tooltipToggleX + TOGGLE_SIZE * 1.8 + 8,
-      tooltipY,
-      this._showTooltips ? 'ON' : 'OFF',
-      VALUE_STYLE,
-    );
-    this.tooltipStatusText.setOrigin(0, 0.5);
-    this.tooltipStatusText.setDepth(DEPTH_PANEL_CONTENT);
-    this.container.add(this.tooltipStatusText);
+      // Toggle knob
+      this.tooltipToggleKnob = scene.add.graphics();
+      this.tooltipToggleKnob.setDepth(DEPTH_PANEL_CONTENT);
+      this.drawTooltipKnob(this._showTooltips);
+      this.container.add(this.tooltipToggleKnob);
 
-    // Tooltip hit area
-    const tooltipHitArea = scene.add.zone(
-      tooltipToggleX + TOGGLE_SIZE * 0.9,
-      tooltipY,
-      TOGGLE_SIZE * 2.5,
-      TOGGLE_SIZE + 10,
-    );
-    tooltipHitArea.setDepth(DEPTH_PANEL_CONTENT);
-    tooltipHitArea.setInteractive({ useHandCursor: true });
-    tooltipHitArea.on('pointerdown', () => this.handleTooltipToggle());
-    this.container.add(tooltipHitArea);
+      // Tooltip status text
+      this.tooltipStatusText = scene.add.text(
+        tooltipToggleX + TOGGLE_SIZE * 1.8 + 8,
+        tooltipY,
+        this._showTooltips ? 'ON' : 'OFF',
+        VALUE_STYLE,
+      );
+      this.tooltipStatusText.setOrigin(0, 0.5);
+      this.tooltipStatusText.setDepth(DEPTH_PANEL_CONTENT);
+      this.container.add(this.tooltipStatusText);
+
+      // Tooltip hit area
+      const tooltipHitArea = scene.add.zone(
+        tooltipToggleX + TOGGLE_SIZE * 0.9,
+        tooltipY,
+        TOGGLE_SIZE * 2.5,
+        TOGGLE_SIZE + 10,
+      );
+      tooltipHitArea.setDepth(DEPTH_PANEL_CONTENT);
+      tooltipHitArea.setInteractive({ useHandCursor: true });
+      tooltipHitArea.on('pointerdown', () => this.handleTooltipToggle());
+      this.container.add(tooltipHitArea);
+
+      nextDisplayY = tooltipY + 46;
+    }
 
     // ── Reduced Motion toggle ──────────────────────────
 
-    const reducedMotionY = tooltipY + 46;
+    const reducedMotionY = nextDisplayY;
     this.reducedMotionLabel = scene.add.text(PADDING, reducedMotionY, 'Reduced Motion', LABEL_STYLE);
     this.reducedMotionLabel.setOrigin(0, 0.5);
     this.reducedMotionLabel.setDepth(DEPTH_PANEL_CONTENT);
@@ -536,9 +585,82 @@ export class SettingsPanel {
     this._endTurnInstruction.setDepth(DEPTH_PANEL_CONTENT);
     this.container.add(this._endTurnInstruction);
 
+    // ── AI Skill Rating slider ──────────────────────────
+    if (this.config.skillRating) {
+      const srConfig = this.config.skillRating;
+      this._skillRatingValue = srConfig.value;
+
+      const skillY = endTurnY + 46;
+
+      this.skillLabel = scene.add.text(PADDING, skillY, 'AI Skill', LABEL_STYLE);
+      this.skillLabel.setOrigin(0, 0.5);
+      this.skillLabel.setDepth(DEPTH_PANEL_CONTENT);
+      this.container.add(this.skillLabel);
+
+      // Value text (right-aligned)
+      this.skillValueText = scene.add.text(
+        this.panelWidth - PADDING,
+        skillY,
+        `${this._skillRatingValue}`,
+        VALUE_STYLE,
+      );
+      this.skillValueText.setOrigin(1, 0.5);
+      this.skillValueText.setDepth(DEPTH_PANEL_CONTENT);
+      this.container.add(this.skillValueText);
+
+      // Slider track
+      const sliderY = skillY + 30;
+      this.skillTrackX = PADDING;
+      this.skillTrackWidth = this.panelWidth - PADDING * 2;
+
+      this.skillSliderTrack = scene.add.rectangle(
+        this.skillTrackX + this.skillTrackWidth / 2,
+        sliderY,
+        this.skillTrackWidth,
+        SLIDER_TRACK_HEIGHT,
+        SLIDER_TRACK_COLOR,
+      );
+      this.skillSliderTrack.setDepth(DEPTH_PANEL_CONTENT);
+      this.container.add(this.skillSliderTrack);
+
+      // Slider fill (proportional to current value)
+      const ratio = (this._skillRatingValue - srConfig.min) / (srConfig.max - srConfig.min);
+      const fillWidth = Math.max(1, this.skillTrackWidth * ratio);
+      this.skillSliderFill = scene.add.rectangle(
+        this.skillTrackX + fillWidth / 2,
+        sliderY,
+        fillWidth,
+        SLIDER_TRACK_HEIGHT,
+        SLIDER_FILL_COLOR,
+      );
+      this.skillSliderFill.setDepth(DEPTH_PANEL_CONTENT);
+      this.container.add(this.skillSliderFill);
+
+      // Slider handle
+      this.skillSliderHandle = scene.add.graphics();
+      this.skillSliderHandle.setDepth(DEPTH_CLOSE_BUTTON);
+      this.drawSkillSliderHandle(this.skillTrackX + fillWidth, sliderY);
+      this.container.add(this.skillSliderHandle);
+
+      // Slider hit area
+      this.skillSliderHitArea = scene.add.zone(
+        this.skillTrackX + this.skillTrackWidth / 2,
+        sliderY,
+        this.skillTrackWidth + SLIDER_HANDLE_RADIUS * 2,
+        SLIDER_HANDLE_RADIUS * 4,
+      );
+      this.skillSliderHitArea.setDepth(DEPTH_PANEL_CONTENT);
+      this.skillSliderHitArea.setInteractive({ useHandCursor: true, draggable: false });
+      this.skillSliderHitArea.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+        this.isDraggingSkillSlider = true;
+        this.handleSkillSliderInteraction(pointer);
+      });
+      this.container.add(this.skillSliderHitArea);
+    }
+
     // If difficulty names were provided, render a horizontal selectable list here
     if (this.difficultyNames) {
-      const difficultyY = endTurnY + 46; // place below end-turn control to avoid overlap
+      const difficultyY = (this.config.skillRating ? endTurnY + 46 + 46 : endTurnY + 46); // place below end-turn control or skill slider
       this.difficultyLabel = scene.add.text(PADDING, difficultyY, 'Difficulty', LABEL_STYLE);
       this.difficultyLabel.setOrigin(0, 0.5);
       this.difficultyLabel.setDepth(DEPTH_PANEL_CONTENT);
@@ -965,12 +1087,20 @@ export class SettingsPanel {
   }
 
   private handlePointerMove = (_pointer: Phaser.Input.Pointer): void => {
-    if (!this.isDraggingSlider || this.destroyed || !this._isOpen) return;
-    this.handleSliderInteraction(_pointer);
+    if (this.destroyed || !this._isOpen) return;
+    if (this.isDraggingSlider) {
+      this.handleSliderInteraction(_pointer);
+      return;
+    }
+    if (this.isDraggingSkillSlider) {
+      this.handleSkillSliderInteraction(_pointer);
+      return;
+    }
   };
 
   private handlePointerUp = (): void => {
     this.isDraggingSlider = false;
+    this.isDraggingSkillSlider = false;
   };
 
   private updateSliderVisuals(ratio: number): void {
@@ -994,6 +1124,57 @@ export class SettingsPanel {
     // Border
     this.sliderHandle.lineStyle(2, SLIDER_FILL_COLOR, 1);
     this.sliderHandle.strokeCircle(x, y, SLIDER_HANDLE_RADIUS);
+  }
+
+  // ── Private: Skill rating slider ───────────────────────────
+
+  private handleSkillSliderInteraction(pointer: Phaser.Input.Pointer): void {
+    if (this.destroyed || !this.config.skillRating) return;
+
+    // Convert world pointer position to container-local x
+    const localX = pointer.x - this.container.x;
+    const clampedX = Phaser.Math.Clamp(
+      localX,
+      this.skillTrackX,
+      this.skillTrackX + this.skillTrackWidth,
+    );
+    const ratio = (clampedX - this.skillTrackX) / this.skillTrackWidth;
+
+    const srConfig = this.config.skillRating;
+    const range = srConfig.max - srConfig.min;
+    const value = Math.round(srConfig.min + ratio * range);
+    const clampedValue = Phaser.Math.Clamp(value, srConfig.min, srConfig.max);
+
+    this._skillRatingValue = clampedValue;
+    this.updateSkillSliderVisuals(clampedValue, srConfig);
+    srConfig.onChange(clampedValue);
+  }
+
+  private updateSkillSliderVisuals(
+    value: number,
+    config: { min: number; max: number },
+  ): void {
+    if (!this.skillSliderFill) return;
+    const ratio = (value - config.min) / (config.max - config.min);
+    const fillWidth = Math.max(1, this.skillTrackWidth * ratio);
+    try {
+      this.skillSliderFill.setSize(fillWidth, SLIDER_TRACK_HEIGHT);
+      this.skillSliderFill.setX(this.skillTrackX + fillWidth / 2);
+    } catch (_) { /* ignore runtime layout failures in tests */ }
+
+    const handleX = this.skillTrackX + this.skillTrackWidth * ratio;
+    this.drawSkillSliderHandle(handleX, this.skillSliderTrack ? this.skillSliderTrack.y : 0);
+
+    try { this.skillValueText.setText(`${value}`); } catch (_) { /* ignore */ }
+  }
+
+  private drawSkillSliderHandle(x: number, y: number): void {
+    this.skillSliderHandle.clear();
+    this.skillSliderHandle.fillStyle(SLIDER_HANDLE_COLOR, 1);
+    this.skillSliderHandle.fillCircle(x, y, SLIDER_HANDLE_RADIUS);
+    // Border
+    this.skillSliderHandle.lineStyle(2, SLIDER_FILL_COLOR, 1);
+    this.skillSliderHandle.strokeCircle(x, y, SLIDER_HANDLE_RADIUS);
   }
 
   // ── Private: Sync controls ───────────────────────────────

@@ -25,6 +25,7 @@ export const SFX_KEYS = {
   CARD_SELECT: 'sfx-card-select',
   CARD_DESELECT: 'sfx-card-deselect',
   UI_CLICK: COMMON_SFX_KEYS.UI_CLICK,
+  ILLEGAL_MOVE: COMMON_SFX_KEYS.ILLEGAL_MOVE,
 } as const;
 
 // ── Card dimensions ───────────────────────────────────────

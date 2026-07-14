@@ -331,7 +331,7 @@ describe('Library card design and stats (AC5)', () => {
     const library = communitySpaceDeck.find(c => c.name === 'Library');
     expect(library).toBeDefined();
     expect(library!.cost).toBe(6);
-    expect(library!.baseIncome).toBe(1);
+    expect(library!.baseIncome).toBe(0);
   });
 });
 

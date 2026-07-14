@@ -68,12 +68,17 @@ export class GolfAiController {
         drawnCard = this.session.shared.discardPile.popOrThrow();
       }
 
-      // When AI draws from discard, refresh the pile display to show the new
-      // top card (or empty placeholder). The card has already been popped, so
-      // we use refreshPiles() — updateDiscardPileAfterDraw() is designed for
-      // the human peek-not-pop path and would incorrectly compute the display
-      // when the card is already removed from the pile.
+      // Record the drawn card in the AI's memory tracker (only for discard
+      // draws, since the discard top is visible information the AI should
+      // remember across turns). Stock draws are hidden information and not
+      // recorded.
       if (drawSource === 'discard') {
+        this.aiPlayer.recordCard(drawnCard);
+        // Refresh the pile display to show the new top card (or empty
+        // placeholder). The card has already been popped, so we use
+        // refreshPiles() — updateDiscardPileAfterDraw() is designed for
+        // the human peek-not-pop path and would incorrectly compute the
+        // display when the card is already removed from the pile.
         refreshPiles();
       }
 

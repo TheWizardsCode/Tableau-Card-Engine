@@ -71,11 +71,11 @@ describe('Tutorial i18n: English bundle registration', () => {
     expect(t(step.titleKey)).toBe('Development Row');
   });
 
-  it('T3 body contains "Laundromat" and "$6"', () => {
+  it('T3 body contains "Laundromat" and "€6"', () => {
     const step = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T3')!;
     const body = t(step.bodyKey);
     expect(body).toContain('Laundromat');
-    expect(body).toContain('$6');
+    expect(body).toContain('€6');
   });
 
   it('T13 title resolves to "Tutorial Complete"', () => {

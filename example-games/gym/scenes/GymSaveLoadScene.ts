@@ -128,6 +128,27 @@ export class GymSaveLoadScene extends GymSceneBase {
   /** Whether a screenshot is currently displayed. Read-only for external checks. */
   get screenshotAvailable(): boolean { return this._screenshotAvailable; }
 
+  /**
+   * Replace the current hand with a random hand of 5 cards.
+   *
+   * Creates a fresh deck, shuffles it, and deals 5 cards face-up.
+   * The existing hand is replaced (not appended to).
+   */
+  private randomizeHand(): void {
+    // Create a fresh deck, shuffle, and draw 5 cards
+    const freshDeck = shuffleArray(createStandardDeck());
+    const newHand: Card[] = [];
+    for (let i = 0; i < STARTING_HAND_SIZE; i++) {
+      const card = freshDeck.pop()!;
+      card.faceUp = true;
+      newHand.push(card);
+    }
+    this.state.hand = newHand;
+    this.handView.setCards(this.state.hand);
+    this.updateStateDisplay();
+    this.logEvent('Hand randomized (5 new cards)');
+  }
+
   constructor() {
     super({ key: GYM_SAVE_LOAD_KEY });
   }
@@ -153,7 +174,7 @@ export class GymSaveLoadScene extends GymSceneBase {
       },
       {
         heading: 'Controls',
-        body: '[ Add Card ]: Deal a random card from the source deck to the hand. Increases hand size and score.\n[ Save State ]: Persist the current hand of cards and screenshot (if taken) via the SaveLoadStore.\n[ Load State ]: Restore the last saved hand and screenshot. Cards are displayed face-up and any previous screenshot thumbnail is recreated.\n[ Load Malformed ]: Simulate a corrupted save payload to verify error handling and graceful fallback.\n[ Clear Save ]: Remove all persisted save data for this scene.\n[ Take Screenshot ]: Capture a full-screen RenderTexture screenshot displayed as a thumbnail below the controls.\n[ Clear Screenshot ]: Remove the screenshot thumbnail display.'
+        body: '[ Add Card ]: Deal a random card from the source deck to the hand. Increases hand size and score.\n[ Save State ]: Persist the current hand of cards and screenshot (if taken) via the SaveLoadStore.\n[ Load State ]: Restore the last saved hand and screenshot. Cards are displayed face-up and any previous screenshot thumbnail is recreated.\n[ Load Malformed ]: Simulate a corrupted save payload to verify error handling and graceful fallback.\n[ Clear Save ]: Remove all persisted save data for this scene.\n[ Take Screenshot ]: Capture a full-screen RenderTexture screenshot displayed as a thumbnail below the controls.\n[ Clear Screenshot ]: Remove the screenshot thumbnail display.\n[ Randomize Hand ]: Replace the current hand with 5 random cards from a fresh shuffled deck.'
       },
       {
         heading: 'Usage Example',
@@ -212,6 +233,7 @@ export class GymSaveLoadScene extends GymSceneBase {
     const y2 = controls2Anchor.y;
     this.addButton(cx - 300, y2, '[ Take Screenshot ]', () => this.takeScreenshot());
     this.addButton(cx - 100, y2, '[ Clear Screenshot ]', () => this.clearScreenshot());
+    this.addButton(cx + 100, y2, '[ Randomize Hand ]', () => this.randomizeHand());
 
     // ── State text ────────────────────────────────────────────
     try {

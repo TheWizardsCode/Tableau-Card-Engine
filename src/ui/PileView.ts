@@ -11,7 +11,7 @@
 
 import type { Card } from '../card-system/Card';
 import { Pile } from '../card-system/Pile';
-import { getCardTexture } from './CardTextureHelpers';
+import { getCardTexture, cardTextureKey } from './CardTextureHelpers';
 
 // ── Types ───────────────────────────────────────────────────
 
@@ -120,6 +120,9 @@ export class PileView {
   private sprite: Phaser.GameObjects.Image;
   private countText: Phaser.GameObjects.Text;
 
+  // Display face-up state (independent of card model's faceUp)
+  private _faceUp: boolean = true;
+
   // Events
   private clickCallbacks: Array<() => void> = [];
 
@@ -189,10 +192,23 @@ export class PileView {
       // Sprite remains visible (ghosted) so it stays interactive
     } else {
       const top = this.pile.peek()!;
-      const textureKey = this.cardTextureFn
-        ? this.cardTextureFn(top)
-        : getCardTexture(top as Card);
-      this.sprite.setTexture(textureKey);
+
+      if (!this._faceUp) {
+        // Display face-down regardless of the card model's faceUp state
+        this.sprite.setTexture(this.emptyTexture);
+      } else {
+        // Face-up display: show the card's face texture
+        // Use cardTextureFn when available, otherwise build the key directly
+        // (bypassing getCardTexture so the pile's _faceUp takes priority
+        // over the individual card's faceUp state).
+        if (this.cardTextureFn) {
+          this.sprite.setTexture(this.cardTextureFn(top));
+        } else if (top && typeof top === 'object' && 'rank' in top && 'suit' in top) {
+          this.sprite.setTexture(cardTextureKey((top as Card).rank, (top as Card).suit));
+        } else {
+          this.sprite.setTexture(getCardTexture(top as Card));
+        }
+      }
       this.sprite.setAlpha(this.fullAlpha);
       this.sprite.setVisible(true);
     }
@@ -218,6 +234,33 @@ export class PileView {
     } else {
       this.sprite.disableInteractive();
     }
+  }
+
+  /**
+   * Set the display face-up state for the pile.
+   *
+   * When `true` (default), cards in the pile are displayed face-up.
+   * When `false`, all cards are shown as card backs regardless of
+   * the individual card model's `faceUp` property.
+   *
+   * This only affects the visual display — the underlying card model
+   * is never modified.
+   *
+   * @param value  `true` to show faces, `false` to show card backs.
+   * @returns `this` for method chaining.
+   */
+  setFaceUp(value: boolean): this {
+    this._faceUp = value;
+    this.update();
+    return this;
+  }
+
+  /**
+   * Get the current display face-up state.
+   * @returns `true` if cards are displayed face-up, `false` otherwise.
+   */
+  getFaceUp(): boolean {
+    return this._faceUp;
   }
 
   /**
