@@ -10,6 +10,7 @@
  * game scenes can return to the selector without needing to
  * know the catalogue themselves.
  */
+import Phaser from 'phaser';
 import { createCardGame } from './src/ui/createCardGame';
 import { GameSelectorScene, REGISTRY_KEY_GAMES } from './src/ui/GameSelectorScene';
 import type { GameEntry } from './src/ui/GameSelectorScene';
@@ -124,6 +125,7 @@ createCardGame({
     GymHudComponentsScene,
     GymLayoutOwnershipScene,
   ],
+  type: Phaser.CANVAS,
   render: isReplayMode ? { preserveDrawingBuffer: true } : undefined,
   callbacks: {
     preBoot: (game: Phaser.Game) => {

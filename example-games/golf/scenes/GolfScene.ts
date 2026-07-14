@@ -53,6 +53,16 @@ export class GolfScene extends CardGameScene {
   drawSource: import('../GolfRules').DrawSource | null = null;
   aiStrategyName: string = 'greedy';
 
+  /**
+   * AI skill rating (1-100) for probabilistic card memory.
+   *   - 100: Perfect recall
+   *   - 80:  Strong but slightly imperfect (default)
+   *   - 50:  Chance-level accuracy
+   *   - 1:   Nearly always misremembers
+   * Set before scene launch.
+   */
+  aiSkillRating: number = 80;
+
   /** Tracks whether loadBoardState() has been called (required before enableInteractiveMode). */
   boardStateInjected: boolean = false;
 
@@ -158,12 +168,13 @@ export class GolfScene extends CardGameScene {
     this.session = setupGolfGame({
       playerNames: ['You', 'AI'],
       isAI: [false, true],
+      skillRating: this.aiSkillRating,
     });
     this.recorder = new TranscriptRecorder(this.session, [
       undefined,
       this.aiStrategyName,
     ]);
-    this.aiPlayer = new AiPlayer(strategy);
+    this.aiPlayer = new AiPlayer(strategy, undefined, undefined, this.aiSkillRating);
 
     // Create helpers
     this.golfRenderer = new GolfRenderer(this, this.session, this.replayMode);
@@ -229,7 +240,15 @@ export class GolfScene extends CardGameScene {
     this.phaseManager.setTextObject(this.instructionText);
     if (!this.replayMode) {
       this.initHelpPanel(helpContent as HelpSection[]);
-      this.initSettingsPanel();
+      this.initSettingsPanel(undefined, undefined, false, {
+        value: this.aiSkillRating,
+        min: 1,
+        max: 100,
+        onChange: (value) => {
+          this.aiSkillRating = value;
+          this.aiPlayer.memoryTracker.setSkill(value);
+        },
+      });
       // Propagate reduced motion preference to the animator
       if (this.settingsPanel) {
         this.animator.reducedMotion = this.settingsPanel.reducedMotion;

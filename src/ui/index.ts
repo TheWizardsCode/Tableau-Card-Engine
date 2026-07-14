@@ -283,6 +283,10 @@ export type {
 export { HighlightManager } from './HighlightManager';
 export type { HighlightZoneConfig, HighlightStyle } from './HighlightManager';
 
+// HintBar – shared hint/instruction text component
+export { HintBar } from './HintBar';
+export type { HintBarOptions } from './HintBar';
+
 // Layout ownership / visibility controller
 // Re-exported from core-engine for convenience: SLL consumers can import
 // ownership helpers directly from the UI barrel without reaching into

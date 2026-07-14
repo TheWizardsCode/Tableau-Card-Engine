@@ -6,6 +6,8 @@
  *  - The overlay background rectangle is centered (not in top-left corner)
  *  - Overlay positioning is correct relative to the game viewport
  *  - Visual regression via screenshot comparison
+ *  - Scrollable masked content area with wheel-based scrolling
+ *  - Scrollbar indicator visible when content overflows
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import Phaser from 'phaser';
@@ -310,6 +312,181 @@ describe('GymOverlayUiScene browser integration', () => {
 
     // After dismissing, the overlay should be gone
     expect(getOverlayBackground(scene)).toBeNull();
+  });
+
+  // ── AC 8: Scrollable content has enough lines to overflow the mask ──
+
+  it('scrollable content has enough lines to overflow the 200px mask', async () => {
+    const scene = await bootScene();
+
+    // Open overlay
+    const showBtn = findText(scene, '[ Show Overlay ]');
+    expect(showBtn).toBeTruthy();
+    showBtn!.emit('pointerdown');
+    await advanceFrames(5);
+
+    // Verify the scene has scroll state tracking
+    const scroller = (scene as any)._overlayScroller as {
+      scrollY: number;
+      maxScrollY: number;
+      lineCount: number;
+    } | undefined;
+    expect(scroller, 'Overlay should have a scroll state object (_overlayScroller)').toBeTruthy();
+
+    if (scroller) {
+      // Content should overflow mask (200px tall mask, lineHeight ~16px)
+      // With at least 30 lines, content height = 30*16 = 480px >> 200px
+      expect(scroller.lineCount).toBeGreaterThanOrEqual(30);
+      expect(scroller.maxScrollY).toBeGreaterThan(0);
+    }
+  });
+
+  // ── AC 9: Scroll wheel changes the scroll position ────────
+
+  it('scroll wheel changes the masked container Y position', async () => {
+    const scene = await bootScene();
+
+    // Open overlay
+    const showBtn = findText(scene, '[ Show Overlay ]');
+    expect(showBtn).toBeTruthy();
+    showBtn!.emit('pointerdown');
+    await advanceFrames(5);
+
+    const scroller = (scene as any)._overlayScroller as {
+      scrollY: number;
+      maxScrollY: number;
+    } | undefined;
+
+    expect(scroller, 'Scroll state should exist').toBeTruthy();
+    const initialScrollY = scroller!.scrollY;
+
+    // Simulate a wheel event (scroll down) via the scene input
+    // Phaser's input plugin emits 'wheel' with (pointer, gameObjects, deltaX, deltaY, deltaZ)
+    scene.input.emit('wheel' as any, null, [], 0, 120, 0);
+
+    await advanceFrames(3);
+
+    // After scrolling down, scrollY should have increased
+    expect(scroller!.scrollY).toBeGreaterThan(initialScrollY);
+  });
+
+  // ── AC 10: Scroll position is clamped at boundaries ───────
+
+  it('scroll position is clamped to [0, maxScrollY]', async () => {
+    const scene = await bootScene();
+
+    // Open overlay
+    const showBtn = findText(scene, '[ Show Overlay ]');
+    expect(showBtn).toBeTruthy();
+    showBtn!.emit('pointerdown');
+    await advanceFrames(5);
+
+    const scroller = (scene as any)._overlayScroller as {
+      scrollY: number;
+      maxScrollY: number;
+    } | undefined;
+
+    expect(scroller, 'Scroll state should exist').toBeTruthy();
+
+    // Scroll way past the bottom
+    for (let i = 0; i < 50; i++) {
+      scene.input.emit('wheel' as any, null, [], 0, 120, 0);
+    }
+    await advanceFrames(5);
+
+    // Should be clamped to maxScrollY
+    expect(scroller!.scrollY).toBe(scroller!.maxScrollY);
+
+    // Reset to top by scrolling way up
+    for (let i = 0; i < 100; i++) {
+      scene.input.emit('wheel' as any, null, [], 0, -120, 0);
+    }
+    await advanceFrames(5);
+
+    // Should be clamped to 0
+    expect(scroller!.scrollY).toBe(0);
+  });
+
+  // ── AC 11: Scroll position resets when overlay reopened ────
+
+  it('scroll position resets to 0 when overlay is reopened', async () => {
+    const scene = await bootScene();
+
+    // Open overlay
+    const showBtn = findText(scene, '[ Show Overlay ]');
+    expect(showBtn).toBeTruthy();
+    showBtn!.emit('pointerdown');
+    await advanceFrames(5);
+
+    const scroller = (scene as any)._overlayScroller as {
+      scrollY: number;
+      maxScrollY: number;
+    } | undefined;
+    expect(scroller, 'Scroll state should exist').toBeTruthy();
+
+    // Scroll down
+    for (let i = 0; i < 10; i++) {
+      scene.input.emit('wheel' as any, null, [], 0, 120, 0);
+    }
+    await advanceFrames(5);
+
+    expect(scroller!.scrollY).toBeGreaterThan(0);
+
+    // Close overlay
+    const dismissTexts = scene.children.list.filter(
+      (child): child is Phaser.GameObjects.Text =>
+        child instanceof Phaser.GameObjects.Text &&
+        child.text === '[ Dismiss Overlay ]',
+    );
+    const overlayDismiss = dismissTexts.find((t) => (t as any).depth >= 11);
+    expect(overlayDismiss).toBeTruthy();
+    overlayDismiss!.emit('pointerdown');
+    await advanceFrames(10);
+
+    // Reopen
+    const showBtn2 = findText(scene, '[ Show Overlay ]');
+    expect(showBtn2).toBeTruthy();
+    showBtn2!.emit('pointerdown');
+    await advanceFrames(5);
+
+    const scroller2 = (scene as any)._overlayScroller as {
+      scrollY: number;
+      maxScrollY: number;
+    } | undefined;
+    expect(scroller2, 'Scroll state should exist after reopen').toBeTruthy();
+
+    // Scroll position should reset to 0
+    expect(scroller2!.scrollY).toBe(0);
+  });
+
+  // ── AC 12: Scrollbar is visible when overlay is open ──────
+
+  it('scrollbar exists when overlay is open and content overflows', async () => {
+    const scene = await bootScene();
+
+    // Open overlay
+    const showBtn = findText(scene, '[ Show Overlay ]');
+    expect(showBtn).toBeTruthy();
+    showBtn!.emit('pointerdown');
+    await advanceFrames(5);
+
+    // Find the scrollbar track and thumb
+    const children = scene.children.list;
+    const overlayChildren = children.filter(
+      (child) => child instanceof Phaser.GameObjects.Rectangle &&
+        (child as any).depth >= 12,
+    );
+
+    // The overlay should contain rectangles at depth >= 12 for the scrollbar
+    // We're looking specifically for small rectangles (not the full-screen background)
+    const smallRects = overlayChildren.filter(
+      (r: any) => r.width < 20 && r.height < 300,
+    );
+
+    // Should have at least 2 small rectangles: track + thumb
+    // But to be more robust, just check there are some small rectangles
+    // which would be the scrollbar elements
+    expect(smallRects.length).toBeGreaterThanOrEqual(2);
   });
 
   // ── Visual screenshot test ─────────────────────────────

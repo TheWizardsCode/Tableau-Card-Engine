@@ -1,7 +1,7 @@
 # SFX Key Naming Convention
 
-> **Last updated:** 2026-06-17
-> **Related work-item:** CG-0MM1OQN4E153GJY3 — SFX key naming inconsistency and potential collision
+> **Last updated:** 2026-07-11
+> **Related work-items:** CG-0MM1OQN4E153GJY3 — SFX key naming inconsistency and potential collision; CG-0MQK1GC79000CQIJ — Illegal Move sound
 
 ## Overview
 
@@ -36,6 +36,7 @@ const MY_SFX_KEYS = {
 | `COMMON_SFX_KEYS.TURN_CHANGE` | `sfx-turn-change` | Active player changes |
 | `COMMON_SFX_KEYS.ROUND_END` | `sfx-round-end` | A round has ended |
 | `COMMON_SFX_KEYS.SCORE_REVEAL` | `sfx-score-reveal` | Scores are being revealed |
+| `COMMON_SFX_KEYS.ILLEGAL_MOVE` | `sfx-illegal-move` | Illegal / invalid action feedback (played automatically by {@link shakeIllegalMove}) |
 
 ## Audio Asset Organization
 
@@ -46,6 +47,7 @@ public/assets/audio/
 ├── default/            # Fallback sounds for common SFX keys
 │   ├── card-draw.wav
 │   ├── card-flip.wav
+│   ├── illegal-move.wav
 │   ├── ui-click.wav
 │   └── ...
 ├── golf/               # Game-specific audio

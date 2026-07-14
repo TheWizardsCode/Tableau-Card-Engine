@@ -33,6 +33,7 @@ import {
 import {
   FONT_FAMILY,
   HandView,
+  HintBar,
   attachSelection,
   markHudTransient,
   clearTransientHud,
@@ -220,14 +221,12 @@ export class MainStreetRenderer {
 
   public createInstructions(): void {
     const s = this.scene;
-    // Centered at bottom
-    s.instructionText = s.add
-      .text(s.layout.gameW / 2, s.layout.gameH - 20, '', {
-        fontSize: '14px',
-        color: '#ccaa77',
-        fontFamily: FONT_FAMILY,
-      })
-      .setOrigin(0.5, 1);
+    // Shared HintBar for hint/instruction display at bottom-center
+    s.hintBar = new HintBar(s);
+
+    // Keep legacy instructionText for backward compatibility (tests),
+    // referencing the HintBar's underlying text object.
+    s.instructionText = s.hintBar.textObject;
   }
 
   public refreshAll(): void {
@@ -773,7 +772,7 @@ export class MainStreetRenderer {
 
             // Tooltip for the Discover button
             const reasonSuffix = !canRefresh && refreshDevResult.reason ? `\n\n${refreshDevResult.reason}` : '';
-            const info = `Pay $${REFRESH_DEVELOPMENT_COST} to discover new development opportunities and replace the visible development row. Removed cards go to their discard piles. Available only during Market phase.${reasonSuffix}`;
+            const info = `Pay €${REFRESH_DEVELOPMENT_COST} to discover new development opportunities and replace the visible development row. Removed cards go to their discard piles. Available only during Market phase.${reasonSuffix}`;
             try {
               bg.on('pointerover', (pointer: any) => {
                 if (s.tooltipManager) {
@@ -849,7 +848,7 @@ export class MainStreetRenderer {
 
             // Tooltip for the Research button (attach to bg so it receives pointer events)
             const reasonSuffix = !canRefresh && refreshInvResult.reason ? `\n\n${refreshInvResult.reason}` : '';
-            const info = `Pay $${REFRESH_INVESTMENTS_COST} to research new investment opportunities and replace the visible investments row. Removed cards go to their discard piles. Available only during Market phase.${reasonSuffix}`;
+            const info = `Pay €${REFRESH_INVESTMENTS_COST} to research new investment opportunities and replace the visible investments row. Removed cards go to their discard piles. Available only during Market phase.${reasonSuffix}`;
             try {
               bg.on('pointerover', (pointer: any) => {
                 if (s.tooltipManager) {

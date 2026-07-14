@@ -98,6 +98,13 @@ export class GymHandPileScene extends GymSceneBase {
   private spacingSlider!: Slider;
   private rotationSlider!: Slider;
 
+  // Discard animation mode
+  private discardMode: 'shrink' | 'animate' = 'animate';
+  private discardModeLabel!: Phaser.GameObjects.Text;
+
+  // Discard pile face-up display state
+  private faceUpLabel!: Phaser.GameObjects.Text;
+
   // Drag-and-drop demo state
   private dragEnabled: boolean = false;
   private dragLabel!: Phaser.GameObjects.Text;
@@ -109,6 +116,8 @@ export class GymHandPileScene extends GymSceneBase {
 
   preload(): void {
     preloadCardAssets(this);
+    // Load the illegal-move sound used by shakeIllegalMove
+    this.load.audio('sfx-illegal-move', 'assets/audio/default/illegal-move.wav');
   }
 
   create(): void {
@@ -201,7 +210,7 @@ export class GymHandPileScene extends GymSceneBase {
       },
       {
         heading: 'Controls',
-        body: '[ Draw ]: Deal a card from the deck to the hand with an arc animation. Demonstrates animateAddCard().\n[ Discard ]: Discard the selected card to the discard pile with a fade animation.\n[ Recall ]: Move the top card of the discard pile back to the hand.\n[ Flip ]: Flip the selected card (two-phase scale animation).\n[ Move ]: Tween the selected card to a display area. Demonstrates moveGameObject().\n[ Cancel Move ]: Cancel an active move tween and return the card to the hand.\n[ Show Valid ]: Highlight deck and discard zones as valid drop targets using HighlightManager.\n[ Show Illegal ]: Trigger an illegal-move shake animation on the selected card.\n[ Select Next ]: Cycle forward through cards in the hand.\n[ Sort Hand ]: Sort hand by suit then rank.\n[ Shuffle Hand ]: Randomly shuffle the hand.\n[ Reset ]: Shuffle a fresh deck and deal a new starting hand.\n[ Enable Drag ] / [ Disable Drag ]: Toggle drag-and-drop mode. When enabled, drag a card from hand to the discard pile.\nArc slider: Adjust hand curvature live (0 = straight, 200 = maximum arc).\nSpacing slider: Adjust gap between cards in the hand.\nRotation slider: Adjust maximum rotation angle for cards at the edges of an arc layout.\n[ Toggle Layout ]: Switch between horizontal row and vertical cascade layout.'
+        body: '[ Draw ]: Deal a card from the deck to the hand with an arc animation. Demonstrates animateAddCard().\n[ Discard ]: Discard the selected card to the discard pile (animates based on mode).\n[ Recall ]: Move the top card of the discard pile back to the hand.\n[ Flip ]: Flip the selected card (two-phase scale animation).\n[ Move ]: Tween the selected card to a display area. Demonstrates moveGameObject().\n[ Cancel Move ]: Cancel an active move tween and return the card to the hand.\n[ Show Valid ]: Highlight deck and discard zones as valid drop targets using HighlightManager.\n[ Show Illegal ]: Trigger an illegal-move shake animation on the selected card.\n[ Select Next ]: Cycle forward through cards in the hand.\n[ Sort Hand ]: Sort hand by suit then rank.\n[ Shuffle Hand ]: Randomly shuffle the hand.\n[ Reset ]: Shuffle a fresh deck and deal a new starting hand.\n[ Enable Drag ] / [ Disable Drag ]: Toggle drag-and-drop mode. When enabled, drag a card from hand to the discard pile.\n[ Toggle Discard Mode ]: Switch between animate (move+flip to discard pile, default) and shrink (fade+shrink in place).\n[ Toggle Face Up ]: Toggle the discard pile between face-up and face-down display. The order of cards is preserved — only the visible face changes.\nArc slider: Adjust hand curvature live (0 = straight, 200 = maximum arc).\nSpacing slider: Adjust gap between cards in the hand.\nRotation slider: Adjust maximum rotation angle for cards at the edges of an arc layout.\n[ Toggle Layout ]: Switch between horizontal row and vertical cascade layout.'
       },
       {
         heading: 'Usage Example',
@@ -209,7 +218,7 @@ export class GymHandPileScene extends GymSceneBase {
       },
       {
         heading: 'Test Plan',
-        body: '1. Press [ Draw ] → card animates from deck to hand, event log confirms\n2. Press [ Select Next ] twice → second card selected, log shows selection\n3. Press [ Discard ] → selected card fades to discard pile\n4. Press [ Recall ] → card returns from discard to hand\n5. Press [ Flip ] → selected card flips face-down then face-up\n6. Press [ Show Valid ] → green highlights appear on deck and discard zones\n7. Press [ Show Illegal ] → selected card shakes if one is selected\n8. Press [ Enable Drag ] → drag a card from hand to discard pile, verify log shows acceptance\n9. Adjust Arc slider → hand curvature changes live\n10. Press [ Toggle Layout ] → layout switches between horizontal and vertical cascade\n11. Press [ Reset ] → new hand dealt, all state cleared'
+        body: '1. Press [ Draw ] → card animates from deck to hand, event log confirms\n2. Press [ Select Next ] twice → second card selected, log shows selection\n3. Press [ Discard ] → selected card animates to discard pile (animate mode by default)\n4. Press [ Recall ] → card returns from discard to hand\n5. Press [ Flip ] → selected card flips face-down then face-up\n6. Press [ Show Valid ] → green highlights appear on deck and discard zones\n7. Press [ Show Illegal ] → selected card shakes if one is selected\n8. Press [ Toggle Discard Mode ] → switches to shrink mode\n9. Press [ Discard ] → card fades+shrinks in place (shrink mode)\n10. Press [ Toggle Discard Mode ] → switches back to animate mode\n11. Press [ Enable Drag ] → drag a card from hand to discard pile, verify log shows acceptance\n12. Adjust Arc slider → hand curvature changes live\n13. Press [ Toggle Layout ] → layout switches between horizontal and vertical cascade\n14. Press [ Toggle Face Up ] → discard pile shows face-down; press again → face-up\n15. Press [ Reset ] → new hand dealt, all state cleared, face-up state resets to face-up'
       }
     ]);
 
@@ -234,9 +243,17 @@ export class GymHandPileScene extends GymSceneBase {
     this.addButton(cx + 340, y, '[ Reset ]', () => this.reset());
 
     y += 26;
-    // Controls row 3 — Drag-and-drop demo
-    this.dragButton = this.addButton(cx - 280, y, '[ Enable Drag ]', () => this.toggleDrag());
-    this.dragLabel = createHudText(this, cx - 120, y, 'Drag: off  (click card, then drag to discard)', '#777777', { fontSize: '11px' }).setOrigin(0, 0.5);
+    // Controls row 3 — Drag-and-drop demo and discard mode toggle
+    this.dragButton = this.addButton(cx - 420, y, '[ Enable Drag ]', () => this.toggleDrag());
+    this.dragLabel = createHudText(this, cx - 250, y, 'Drag: off  (click card, then drag to discard)', '#777777', { fontSize: '11px' }).setOrigin(0, 0.5);
+
+    // Discard mode toggle — animate (default) vs shrink
+    this.addButton(cx + 30, y, '[ Toggle Discard Mode ]', () => this.toggleDiscardMode());
+    this.discardModeLabel = createHudText(this, cx + 190, y, 'Discard: animate', '#88ff88', { fontSize: '11px' }).setOrigin(0, 0.5);
+
+    // Discard pile face-up toggle
+    this.addButton(cx + 300, y, '[ Toggle Face Up ]', () => this.toggleDiscardFaceUp());
+    this.faceUpLabel = createHudText(this, cx + 470, y, 'Face: up', '#88ff88', { fontSize: '11px' }).setOrigin(0, 0.5);
 
     y += 35;
     createHudText(this, cx, y, '── Event Log ──', '#669966', { fontSize: '12px' }).setOrigin(0.5);
@@ -445,7 +462,6 @@ export class GymHandPileScene extends GymSceneBase {
     const sprite = this.handView.getSpriteAt(spriteIdx);
 
     if (sprite && !this.reducedMotion) {
-      // Animated discard — data model already consistent, only UI cleanup needed
       const gameEvents = new GameEventEmitter();
       gameEvents.on('card:discarded', () => {
         this.selectedIdx = -1;
@@ -454,18 +470,36 @@ export class GymHandPileScene extends GymSceneBase {
         this.handView.setSelected(null);
         this.discardView.update();
         gameEvents.removeAllListeners();
-        this.logEvent(`Discarded ${card.rank}${card.suit} (animated)`);
+        const modeLabel = this.discardMode === 'animate' ? 'move+flip' : 'fade';
+        this.logEvent(`Discarded ${card.rank}${card.suit} (${modeLabel})`);
       });
 
-      discardCard({
-        scene: this,
-        target: sprite as any,
-        offsetY: 30,
-        duration: 350,
-        destroyAfter: true,
-        gameEvents,
-        cardId: `${card.rank}${card.suit}`,
-      });
+      if (this.discardMode === 'animate') {
+        // Animate card from its hand position to the discard pile, flipping on arrival
+        discardCard({
+          scene: this,
+          target: sprite as any,
+          destX: this.DISCARD_X,
+          destY: this.PILE_Y,
+          flipOnArrivalTexture: getCardTexture(card),
+          duration: 400,
+          depth: 2,
+          destroyAfter: true,
+          gameEvents,
+          cardId: `${card.rank}${card.suit}`,
+        });
+      } else {
+        // Shrink/fade in place (original behavior)
+        discardCard({
+          scene: this,
+          target: sprite as any,
+          offsetY: 30,
+          duration: 350,
+          destroyAfter: true,
+          gameEvents,
+          cardId: `${card.rank}${card.suit}`,
+        });
+      }
     } else {
       if (sprite) {
         // For reduced-motion, immediately clean up the sprite
@@ -477,7 +511,8 @@ export class GymHandPileScene extends GymSceneBase {
       this.handView.setCards(this.hand);
       this.handView.setSelected(null);
       this.discardView.update();
-      this.logEvent(`Discarded ${card.rank}${card.suit} (instant)`);
+      const modeLabel = this.discardMode === 'animate' ? 'move+flip' : 'fade';
+      this.logEvent(`Discarded ${card.rank}${card.suit} (${modeLabel}, instant)`);
     }
   }
 
@@ -767,6 +802,11 @@ export class GymHandPileScene extends GymSceneBase {
     this.rotationSlider.setValue(this.ROTATION_DEGREES_DEFAULT);
     this.handView.setMaxRotationDegrees(this.ROTATION_DEGREES_DEFAULT);
 
+    // Reset face-up state to face-up
+    this.discardView.setFaceUp(true);
+    this.faceUpLabel.setText('Face: up');
+    this.faceUpLabel.setColor('#88ff88');
+
     // Sync UI components
     this.handView.setCards(this.hand);
     this.handView.setSelected(null);
@@ -861,6 +901,37 @@ export class GymHandPileScene extends GymSceneBase {
       this.handView.setSelected(null);
       this.clearHighlights();
       this.logEvent('Drag mode OFF — restored click-to-select behavior');
+    }
+  }
+
+  /** Toggle discard pile display between face-up and face-down. */
+  private toggleDiscardFaceUp(): void {
+    const isFaceUp = this.discardView.getFaceUp();
+    this.discardView.setFaceUp(!isFaceUp);
+
+    if (!isFaceUp) {
+      this.faceUpLabel.setText('Face: up');
+      this.faceUpLabel.setColor('#88ff88');
+      this.logEvent('Discard pile set to face-up');
+    } else {
+      this.faceUpLabel.setText('Face: down');
+      this.faceUpLabel.setColor('#ff8888');
+      this.logEvent('Discard pile set to face-down (visual only, card order preserved)');
+    }
+  }
+
+  /** Toggle discard animation mode between animate and shrink. */
+  private toggleDiscardMode(): void {
+    if (this.discardMode === 'animate') {
+      this.discardMode = 'shrink';
+      this.discardModeLabel.setText('Discard: shrink');
+      this.discardModeLabel.setColor('#ffaa44');
+      this.logEvent('Discard mode switched to shrink (fade+shrink in place)');
+    } else {
+      this.discardMode = 'animate';
+      this.discardModeLabel.setText('Discard: animate');
+      this.discardModeLabel.setColor('#88ff88');
+      this.logEvent('Discard mode switched to animate (move to discard pile)');
     }
   }
 
@@ -971,10 +1042,12 @@ export class GymHandPileScene extends GymSceneBase {
     try { this.deckView?.destroy(); } catch (_) { /* ignore */ }
     try { this.discardView?.destroy(); } catch (_) { /* ignore */ }
 
-    // Destroy layout and drag UI text labels
+    // Destroy layout, drag, and discard mode UI text labels
     try { this.layoutLabel?.destroy(); } catch (_) { /* ignore */ }
     try { this.dragLabel?.destroy(); } catch (_) { /* ignore */ }
     try { this.dragButton?.destroy(); } catch (_) { /* ignore */ }
+    try { this.discardModeLabel?.destroy(); } catch (_) { /* ignore */ }
+    try { this.faceUpLabel?.destroy(); } catch (_) { /* ignore */ }
 
     // Destroy all event log text objects
     for (const t of this.logTexts) {

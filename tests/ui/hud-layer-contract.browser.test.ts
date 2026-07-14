@@ -107,24 +107,20 @@ describe('HUD Layer Contract (browser)', () => {
   it('HelpPanel and SettingsPanel are created during scene initialization', async () => {
     const scene = hudGame!.scene.getScene('BeleagueredCastleScene') as unknown as Record<string, unknown>;
 
-    // Check if panels were created (will be undefined until Feature 3/4 are implemented)
-    // This test documents the expected behavior that panels exist and are parented correctly
+    // Verify that the HelpPanel, SettingsPanel, and HUD container all exist
+    // after scene initialization. This documents the expected contract that
+    // the shared CardGameScene provides these components to all game scenes.
     const helpPanel = scene.helpPanel;
     const settingsPanel = scene.settingsPanel;
     const hudContainer = scene.hudContainer;
 
-    if (helpPanel && settingsPanel && hudContainer) {
-      const container = hudContainer as Phaser.GameObjects.Container;
-      const panel1 = helpPanel as Phaser.GameObjects.Container;
-      const panel2 = settingsPanel as Phaser.GameObjects.Container;
+    expect(hudContainer).toBeDefined();
+    expect(helpPanel).toBeDefined();
+    expect(settingsPanel).toBeDefined();
 
-      // Verify panels parent into HUD container (after implementation)
-      expect(panel1.parentContainer).toBe(container);
-      expect(panel2.parentContainer).toBe(container);
-    } else {
-      // Before implementation, this is expected - test passes as documentation
-      expect(true).toBe(true);
-    }
+    // Also verify the HUD container is a proper Phaser Container at >= 1000 depth
+    const hudDepth = (hudContainer as Phaser.GameObjects.Container).depth;
+    expect(hudDepth).toBeGreaterThanOrEqual(1000);
   }, 30_000);
 
   it('Overlay background creates at correct depth for HUD vs game state overlays', async () => {

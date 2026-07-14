@@ -33,6 +33,8 @@ import {
   RESUME_BUTTON_Y_OFFSET,
   RESUME_BUTTON_SPACING,
   RESUME_INFO_FONT_SIZE,
+  // Audio
+  SFX_KEYS,
 } from '../../example-games/beleaguered-castle/scenes/BeleagueredCastleConstants';
 
 describe('BeleagueredCastleConstants', () => {
@@ -99,6 +101,12 @@ describe('BeleagueredCastleConstants', () => {
     });
     it('AUTO_COMPLETE_MIN_DURATION is 50', () => {
       expect(AUTO_COMPLETE_MIN_DURATION).toBe(50);
+    });
+  });
+
+  describe('audio SFX keys', () => {
+    it('SFX_KEYS.ILLEGAL_MOVE is "sfx-illegal-move"', () => {
+      expect(SFX_KEYS.ILLEGAL_MOVE).toBe('sfx-illegal-move');
     });
   });
 

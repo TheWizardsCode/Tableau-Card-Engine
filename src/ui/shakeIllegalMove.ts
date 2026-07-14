@@ -5,8 +5,15 @@
  * tint and resets the x position.  Encapsulates the common
  * "illegal move feedback" pattern used by multiple game scenes.
  *
+ * When a {@link ShakeIllegalMoveOptions.soundKey} is provided, the
+ * sound is played via {@link safePlaySound} at the start of the shake.
+ * By default this plays the `sfx-illegal-move` key if the asset has
+ * been loaded. Callers can suppress the sound by passing `soundKey: ''`.
+ *
  * @module ui/shakeIllegalMove
  */
+
+import { safePlaySound, COMMON_SFX_KEYS } from '../core-engine/SoundManager';
 
 /** Options for the {@link shakeIllegalMove} animation. */
 export interface ShakeIllegalMoveOptions {
@@ -52,6 +59,18 @@ export interface ShakeIllegalMoveOptions {
   ease?: string;
 
   /**
+   * Optional SFX key to play when the shake starts.
+   *
+   * Defaults to {@link COMMON_SFX_KEYS.ILLEGAL_MOVE} (`'sfx-illegal-move'`).
+   * Set to `''` or `undefined` to suppress the sound.
+   *
+   * The sound is played via {@link safePlaySound} which silently ignores
+   * missing audio keys, so callers do not need to check whether the asset
+   * was loaded.
+   */
+  soundKey?: string;
+
+  /**
    * Called after the tint is cleared and x is reset.
    */
   onComplete?: () => void;
@@ -60,9 +79,11 @@ export interface ShakeIllegalMoveOptions {
 /**
  * Play an illegal-move shake animation on a sprite.
  *
- * 1. Applies a red tint (configurable via `tint`).
- * 2. Shakes the sprite left by `shakeDistance` pixels with `yoyo: true`.
- * 3. On completion, clears the tint and resets the x position.
+ * 1. (Optional) Plays the `soundKey` SFX if provided (defaults to
+ *    {@link COMMON_SFX_KEYS.ILLEGAL_MOVE}).
+ * 2. Applies a red tint (configurable via `tint`).
+ * 3. Shakes the sprite left by `shakeDistance` pixels with `yoyo: true`.
+ * 4. On completion, clears the tint and resets the x position.
  *
  * If `target` is `null` or `undefined` the function returns `undefined`
  * without creating a tween, making it safe to call without a guard.
@@ -81,10 +102,16 @@ export function shakeIllegalMove(
     duration = 50,
     repeat = 2,
     ease = 'Sine.inOut',
+    soundKey = COMMON_SFX_KEYS.ILLEGAL_MOVE,
     onComplete,
   } = opts;
 
   if (!target) return undefined;
+
+  // Play the illegal-move sound if a key is provided
+  if (soundKey) {
+    safePlaySound(scene as any, soundKey);
+  }
 
   const originalX = target.x;
 

@@ -164,7 +164,7 @@ describe('Activity Log', () => {
       expect(entry.type).toBe('loss');
       expect(entry.text).toContain(name);
       expect(entry.text).toContain('slot 0');
-      expect(entry.text).toContain(`$${cost}`);
+      expect(entry.text).toContain(`€${cost}`);
       expect(entry.turn).toBe(1);
     });
   });
@@ -216,7 +216,7 @@ describe('Activity Log', () => {
       expect(entry.text).toContain('Upgraded');
       expect(entry.text).toContain('Bakery');
       expect(entry.text).toContain('Better Ovens');
-      expect(entry.text).toContain('$4');
+      expect(entry.text).toContain('€4');
     });
   });
 

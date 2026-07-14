@@ -363,6 +363,10 @@ describe('SoundManager', () => {
       expect(COMMON_SFX_KEYS.SCORE_REVEAL).toBe('sfx-score-reveal');
     });
 
+    it('should define ILLEGAL_MOVE', () => {
+      expect(COMMON_SFX_KEYS.ILLEGAL_MOVE).toBe('sfx-illegal-move');
+    });
+
     it('should be exported from core-engine barrel', async () => {
       const mod = await import('../../src/core-engine/index');
       expect(mod.COMMON_SFX_KEYS).toBeDefined();

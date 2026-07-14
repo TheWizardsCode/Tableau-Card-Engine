@@ -101,6 +101,8 @@ export class LostCitiesScene extends CardGameScene {
     this.load.audio(`${ns}:${SFX_KEYS.CARD_DISCARD}`, audioPathWithFallback(audioDir, 'card-discard.wav'));
     this.load.audio(`${ns}:${SFX_KEYS.CARD_DRAW}`, audioPathWithFallback(audioDir, 'card-draw.wav'));
     this.load.audio(`${ns}:${SFX_KEYS.ILLEGAL_MOVE}`, audioPathWithFallback(audioDir, 'illegal-move.wav'));
+    // Also load with the un-namespaced key so shakeIllegalMove can play it via safePlaySound
+    this.load.audio(SFX_KEYS.ILLEGAL_MOVE, 'assets/audio/default/illegal-move.wav');
     this.load.audio(`${ns}:${SFX_KEYS.TURN_CHANGE}`, audioPathWithFallback(audioDir, 'turn-change.wav'));
     this.load.audio(`${ns}:${SFX_KEYS.ROUND_END}`, audioPathWithFallback(audioDir, 'round-end.wav'));
     this.load.audio(`${ns}:${SFX_KEYS.MATCH_WIN}`, audioPathWithFallback(audioDir, 'match-win.wav'));

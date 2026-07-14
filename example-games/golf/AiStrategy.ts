@@ -27,7 +27,7 @@ import type {
 import { enumerateAiLegalMoves, enumerateAiDrawSources } from './GolfGame';
 import { GRID_ROWS, GRID_COLS } from './GolfGrid';
 import type { AiStrategyBase } from '../../src/ai';
-import { AiPlayer as AiPlayerBase, pickRandom, pickBest } from '../../src/ai';
+import { AiPlayer as AiPlayerBase, pickRandom, pickBest, CardMemoryTracker } from '../../src/ai';
 
 // ── Strategy interface ──────────────────────────────────────
 
@@ -42,15 +42,18 @@ export interface AiStrategy extends AiStrategyBase {
   /**
    * Choose an action (draw source + move) for the current player.
    *
-   * @param playerState  The AI player's visible state (face-down cards hidden).
-   * @param shared       Visible shared game state (no stock pile access).
-   * @param rng          Random number generator (for tie-breaking or random choice).
-   * @returns            The chosen action.
+   * @param playerState    The AI player's visible state (face-down cards hidden).
+   * @param shared         Visible shared game state (no stock pile access).
+   * @param rng            Random number generator (for tie-breaking or random choice).
+   * @param memoryTracker  Optional memory tracker for probabilistic recall
+   *                       of historical discard cards.
+   * @returns              The chosen action.
    */
   chooseAction(
     playerState: AiVisiblePlayerState,
     shared: AiVisibleSharedState,
     rng: () => number,
+    memoryTracker?: CardMemoryTracker,
   ): GolfAction;
 }
 
@@ -122,12 +125,13 @@ export const GreedyStrategy: AiStrategy = {
     playerState: AiVisiblePlayerState,
     shared: AiVisibleSharedState,
     rng: () => number,
+    memoryTracker?: CardMemoryTracker,
   ): GolfAction {
-    const drawSource = chooseDrawSource(playerState, shared, rng);
+    const drawSource = chooseDrawSource(playerState, shared, rng, undefined, memoryTracker);
 
     if (drawSource === 'discard' && shared.discardTop) {
       // Compute visible rank counts for column-feasibility weighting
-      const visibleRanks = countVisibleRanks(playerState, shared);
+      const visibleRanks = countVisibleRanks(playerState, shared, rng, memoryTracker);
       // We know the discard card — evaluate moves with it
       const move = chooseMoveForCard(
         playerState.grid,
@@ -171,6 +175,7 @@ export function chooseDrawSource(
   shared: AiVisibleSharedState,
   _rng: () => number,
   config: GreedyStrategyConfig = DEFAULT_GREEDY_CONFIG,
+  memoryTracker?: CardMemoryTracker,
 ): DrawSource {
   const sources = enumerateAiDrawSources(shared);
   if (sources.length === 1) return sources[0];
@@ -208,7 +213,7 @@ export function chooseDrawSource(
 
   // Even if discard doesn't immediately improve the score, check if it
   // helps build a column match and unknown copies of that rank remain.
-  const visibleRanks = countVisibleRanks(playerState, shared);
+  const visibleRanks = countVisibleRanks(playerState, shared, _rng, memoryTracker);
 
   // Check if any legal swap move with the discard card would build toward
   // a column match (2 matching cards in column) with feasible potential
@@ -269,6 +274,8 @@ const MAX_RANK_COPIES = 4;
  * Visible cards include:
  * - Face-up cards in the AI's own grid
  * - The discard pile top card (visible to all players)
+ * - (When a memory tracker is provided) Historical discard cards the AI
+ *   has observed, with probabilistic recall based on skill rating
  *
  * Face-down cards are NOT counted (the AI doesn't know their ranks).
  *
@@ -279,17 +286,26 @@ const MAX_RANK_COPIES = 4;
  *
  * Information boundary: uses only AI-visible state projections.
  *
- * @param playerState  AI-visible per-player state
- * @param shared       AI-visible shared state (discard top, stock flag)
- * @returns            Record mapping rank strings to their visible count
+ * @param playerState    AI-visible per-player state
+ * @param shared         AI-visible shared state (discard top, stock flag)
+ * @param rng            Optional RNG for probabilistic memory recall.
+ *                       Required when {@link memoryTracker} is provided.
+ * @param memoryTracker  Optional CardMemoryTracker providing probabilistic
+ *                       recall of historical discard cards. When provided,
+ *                       the current discard top card is counted perfectly
+ *                       (not subject to memory loss), and historical discard
+ *                       card counts are merged in.
+ * @returns              Record mapping rank strings to their count estimate
  */
 export function countVisibleRanks(
   playerState: AiVisiblePlayerState,
   shared: AiVisibleSharedState,
+  rng?: () => number,
+  memoryTracker?: CardMemoryTracker,
 ): Record<string, number> {
   const counts: Record<string, number> = {};
 
-  // Count face-up cards in the AI's own grid
+  // Count face-up cards in the AI's own grid (always perfect)
   for (const slot of playerState.grid) {
     if (slot.faceUp && 'rank' in slot) {
       const rank = (slot as Card).rank;
@@ -297,10 +313,27 @@ export function countVisibleRanks(
     }
   }
 
-  // Count the discard top card (visible to all players)
-  if (shared.discardTop && 'rank' in shared.discardTop) {
-    const rank = shared.discardTop.rank;
-    counts[rank] = (counts[rank] || 0) + 1;
+  // Count the discard top card (always perfect, visible to all players)
+  const discardTopRank = shared.discardTop?.rank;
+  if (discardTopRank) {
+    counts[discardTopRank] = (counts[discardTopRank] || 0) + 1;
+  }
+
+  // Merge memory-augmented historical discard card counts
+  if (memoryTracker && rng) {
+    const memoryCounts = memoryTracker.getVisibleRanks(rng);
+
+    for (const [rank, memoryCount] of Object.entries(memoryCounts)) {
+      if (rank === discardTopRank) {
+        // The tracker includes the current discard top in its count.
+        // We've already counted the current top perfectly, so only add
+        // the historical copies: memoryCount - 1 (clamped to 0).
+        const historicalCount = Math.max(0, memoryCount - 1);
+        counts[rank] = (counts[rank] || 0) + historicalCount;
+      } else {
+        counts[rank] = (counts[rank] || 0) + memoryCount;
+      }
+    }
   }
 
   return counts;
@@ -455,39 +488,50 @@ export function chooseMoveForCard(
  * binding and the `strategyName` getter.
  */
 export class AiPlayer extends AiPlayerBase<AiStrategy> {
-  /**
-   * Choose an action for the current game state.
-   *
-   * Accepts AI-visible state projections only — cannot access
-   * hidden game data.
-   */
+  /** The memory tracker for probabilistic recall of discard cards. */
+  readonly memoryTracker: CardMemoryTracker;
+
   private readonly config: GreedyStrategyConfig;
 
   constructor(
     strategy: AiStrategy,
     rng?: () => number,
     config: GreedyStrategyConfig = DEFAULT_GREEDY_CONFIG,
+    skillRating?: number,
   ) {
     super(strategy, rng);
     this.config = config;
+    this.memoryTracker = new CardMemoryTracker(skillRating ?? 80);
+  }
+
+  /**
+   * Record a card the AI has observed (e.g., drawn from the discard pile)
+   * in its memory tracker for later probabilistic recall.
+   */
+  recordCard(card: Card): void {
+    this.memoryTracker.recordCard(card);
   }
 
   chooseAction(
     playerState: AiVisiblePlayerState,
     shared: AiVisibleSharedState,
   ): GolfAction {
-    return this.strategy.chooseAction(playerState, shared, this.rng);
+    return this.strategy.chooseAction(
+      playerState, shared, this.rng, this.memoryTracker,
+    );
   }
 
   /**
    * Phase 1: Choose whether to draw from stock or discard.
-   * Uses the configured column-weight heuristic.
+   * Uses the configured column-weight heuristic and memory tracker.
    */
   chooseDrawSource(
     playerState: AiVisiblePlayerState,
     shared: AiVisibleSharedState,
   ): DrawSource {
-    return chooseDrawSource(playerState, shared, this.rng, this.config);
+    return chooseDrawSource(
+      playerState, shared, this.rng, this.config, this.memoryTracker,
+    );
   }
 
   /**

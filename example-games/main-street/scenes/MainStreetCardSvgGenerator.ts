@@ -1,19 +1,25 @@
 /**
  * Main Street SVG Card Generator
  *
- * Generates SVG strings dynamically for BusinessCard and CommunitySpaceCard
- * based on their current state (income, reputation, name/level). This replaces
- * the static-SVG + Phaser-overlay approach with a single rendering path:
- * card state → SVG string → rasterised texture.
+ * Generates SVG strings dynamically for all card families (Business,
+ * Community Space, Event, Upgrade, Staff) based on card state or
+ * from CSV template data.
  *
- * Event and Upgrade cards remain static SVGs — they have no dynamic visual
- * state. Only Business and Community Space cards change appearance based on
- * game state (upgrades, synergy bonuses, etc.).
+ * Business and Community Space cards include dynamic state (income,
+ * reputation, level). Event, Upgrade, and Staff cards are generated
+ * from template data only (no dynamic visual state).
  *
  * @module MainStreetCardSvgGenerator
  */
 
-import type { BusinessCard, CommunitySpaceCard, SynergyType } from '../MainStreetCards';
+import type {
+  BusinessCard,
+  CommunitySpaceCard,
+  EventCard,
+  UpgradeCard,
+  StaffCard,
+  SynergyType,
+} from '../MainStreetCards';
 import { synergyColor } from '../MainStreetCards';
 
 // ---------------------------------------------------------------------------
@@ -168,4 +174,168 @@ export function generateBusinessCardSvg(
 function fmtRep(v: number): string {
   if (Number.isInteger(v)) return String(v);
   return v.toFixed(1);
+}
+
+/**
+ * Generate an SVG string for an EventCard from template data.
+ * Shows card name, trigger type, and cost.
+ */
+export function generateEventCardSvg(
+  card: EventCard,
+  width: number = CARD_W,
+  height: number = CARD_H,
+): string {
+  const bgFill = card.trigger === 'Incident' ? '#2B3A67' : '#8B4513';
+  const inner: string[] = [];
+
+  inner.push('  <rect x="4" y="4" width="' + (width - 8) + '" height="20" rx="3" ry="3" fill="#cccccc" opacity="0.18" />');
+  inner.push('  <text x="' + (width / 2) + '" y="19" font-family="' + FONT + '" font-size="11" fill="#ffffff" font-weight="400" text-anchor="middle">' + esc(card.name) + '</text>');
+  inner.push('  <text x="' + (width / 2) + '" y="40" font-family="' + FONT + '" font-size="9" fill="#aaaacc" font-weight="400" text-anchor="middle">[' + esc(card.trigger) + ']</text>');
+  inner.push('  ' + costBadgeSvg(card.cost, width, height));
+
+  return svgShell(card.id, card.name, bgFill, inner, width, height);
+}
+
+/**
+ * Generate an SVG string for an UpgradeCard from template data.
+ * Shows upgrade name, target business, and cost.
+ */
+export function generateUpgradeCardSvg(
+  card: UpgradeCard,
+  width: number = CARD_W,
+  height: number = CARD_H,
+): string {
+  const inner: string[] = [];
+  inner.push('  <rect x="4" y="4" width="' + (width - 8) + '" height="20" rx="3" ry="3" fill="#9B59B6" opacity="0.18" />');
+  inner.push('  <text x="' + (width / 2) + '" y="19" font-family="' + FONT + '" font-size="11" fill="#ffffff" font-weight="400" text-anchor="middle">' + esc(card.name) + '</text>');
+  inner.push('  <text x="' + (width / 2) + '" y="40" font-family="' + FONT + '" font-size="9" fill="#bb99dd" font-weight="400" text-anchor="middle">for ' + esc(card.targetBusiness) + '</text>');
+  inner.push('  ' + costBadgeSvg(card.cost, width, height));
+
+  return svgShell(card.id, card.name, '#6B4C9A', inner, width, height);
+}
+
+/**
+ * Generate an SVG string for a StaffCard from template data.
+ * Shows staff name, ongoing cost, hand slots, and purchase cost.
+ */
+export function generateStaffCardSvg(
+  card: StaffCard,
+  width: number = CARD_W,
+  height: number = CARD_H,
+): string {
+  const inner: string[] = [];
+  inner.push('  <rect x="4" y="4" width="' + (width - 8) + '" height="20" rx="3" ry="3" fill="#888888" opacity="0.18" />');
+  inner.push('  <text x="' + (width / 2) + '" y="19" font-family="' + FONT + '" font-size="11" fill="#ffffff" font-weight="400" text-anchor="middle">' + esc(card.name) + '</text>');
+  inner.push('  <text x="' + (width / 2) + '" y="38" font-family="' + FONT + '" font-size="9" fill="#ff8844" font-weight="400" text-anchor="middle">-' + card.ongoingCost + '/turn</text>');
+  if (card.handSlotsAdded > 0) {
+    inner.push('  <text x="' + (width / 2) + '" y="48" font-family="' + FONT + '" font-size="9" fill="#88bbff" font-weight="400" text-anchor="middle">+' + card.handSlotsAdded + ' slots</text>');
+  }
+  inner.push('  ' + costBadgeSvg(card.cost, width, height));
+
+  return svgShell(card.id, card.name, '#555555', inner, width, height);
+}
+
+/**
+ * Determine background/accent color scheme for CSV-row-based SVG generation.
+ */
+function cardColorScheme(family: string, trigger?: string): { bg: string; accent: string } {
+  if (family === 'event') {
+    if (trigger === 'Incident') return { bg: '#2B3A67', accent: '#3D5A80' };
+    return { bg: '#8B4513', accent: '#A0522D' };
+  }
+  if (family === 'upgrade')       return { bg: '#6B4C9A', accent: '#9B59B6' };
+  if (family === 'staff')         return { bg: '#555555', accent: '#888888' };
+  if (family === 'community-space') return { bg: '#2f2f2f', accent: '#cccccc' };
+  return { bg: '#2f2f2f', accent: '#cccccc' };
+}
+
+/** Build the cost badge SVG (shared helper). */
+function costBadgeSvg(cost: number, width: number, height: number): string {
+  const cx = width - 16;
+  const cy = height - 16;
+  return (
+    '<circle cx="' + cx + '" cy="' + cy + '" r="12" fill="#e0c7a0" stroke="#c8b79a" stroke-width="1.5" />\n' +
+    '  <text x="' + cx + '" y="' + (cy + 4) + '" font-family="' + FONT + '" font-size="11" fill="#3a2a14" text-anchor="middle" font-weight="500">' + cost + '</text>'
+  );
+}
+
+/** Build the common SVG shell with defs, background, and gradient. */
+function svgShell(
+  cardId: string,
+  name: string,
+  bgFill: string,
+  innerElements: string[],
+  width: number,
+  height: number,
+): string {
+  const lines: string[] = [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '" viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="' + esc(name) + '">',
+    '  <defs>',
+    '    <linearGradient id="g-' + cardId + '" x1="0" x2="1">',
+    '      <stop offset="0" stop-color="#ffffff" stop-opacity="0.06"/>',
+    '      <stop offset="1" stop-color="#ffffff" stop-opacity="0.02"/>',
+    '    </linearGradient>',
+    '  </defs>',
+    '  <rect x="0" y="0" width="' + width + '" height="' + height + '" rx="6" ry="6" fill="' + bgFill + '" />',
+    '  <rect x="4" y="4" width="' + (width - 8) + '" height="' + (height - 8) + '" rx="4" ry="4" fill="url(#g-' + cardId + ')" />',
+  ];
+  for (const elem of innerElements) {
+    lines.push(elem);
+  }
+  lines.push('</svg>');
+  return lines.join('\n');
+}
+
+/**
+ * Generate an SVG string for a card from its parsed CSV row data.
+ *
+ * Produces a card image matching the format of the static SVGs generated
+ * by scripts/generate-main-street-card-svgs.mjs. Used as a runtime fallback
+ * when the static SVGs are out of date with the CSV.
+ *
+ * @param row - A single row from the parsed card-data.csv.
+ * @param width - SVG width (default 140).
+ * @param height - SVG height (default 80).
+ * @returns A complete SVG string.
+ */
+export function generateCardSvgFromCsvRow(
+  row: Record<string, string>,
+  width: number = CARD_W,
+  height: number = CARD_H,
+): string {
+  const id = row.id || 'unknown';
+  const name = row.name || 'Unknown';
+  const family = row.family || 'business';
+  const cost = row.cost ? Number(row.cost) : null;
+  const trigger = row.trigger || undefined;
+
+  const scheme = cardColorScheme(family, trigger);
+  const inner: string[] = [];
+
+  // Header bar
+  inner.push('  <rect x="4" y="4" width="' + (width - 8) + '" height="20" rx="3" ry="3" fill="' + scheme.accent + '" opacity="0.18" />');
+  inner.push('  <text x="' + (width / 2) + '" y="19" font-family="' + FONT + '" font-size="11" fill="#ffffff" font-weight="400" text-anchor="middle">' + esc(name) + '</text>');
+
+  // Trigger label for event cards
+  if (family === 'event' && trigger) {
+    inner.push('  <text x="' + (width / 2) + '" y="40" font-family="' + FONT + '" font-size="9" fill="#aaaacc" font-weight="400" text-anchor="middle">[' + esc(trigger) + ']</text>');
+  }
+
+  // Staff card details
+  if (family === 'staff') {
+    if (row.ongoingCost && Number(row.ongoingCost) > 0) {
+      inner.push('  <text x="' + (width / 2) + '" y="38" font-family="' + FONT + '" font-size="9" fill="#ff8844" font-weight="400" text-anchor="middle">-' + row.ongoingCost + '/turn</text>');
+    }
+    if (row.handSlotsAdded && Number(row.handSlotsAdded) > 0) {
+      inner.push('  <text x="' + (width / 2) + '" y="48" font-family="' + FONT + '" font-size="9" fill="#88bbff" font-weight="400" text-anchor="middle">+' + row.handSlotsAdded + ' slots</text>');
+    }
+  }
+
+  // Cost badge
+  if (cost !== null) {
+    inner.push('  ' + costBadgeSvg(cost, width, height));
+  }
+
+  return svgShell(id, name, scheme.bg, inner, width, height);
 }

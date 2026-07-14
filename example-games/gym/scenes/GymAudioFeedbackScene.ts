@@ -4,6 +4,8 @@
  * using the core-engine SoundManager and UI helper APIs.
  *
  * Features:
+ *   - Auto-discovers all default sound keys and generates buttons dynamically
+ *   - Auto-discovers visual feedback types and generates trigger buttons
  *   - Toggle mute and observe immediate effect
  *   - Predefined event-to-sound mappings
  *   - Invalid sound mapping handled safely
@@ -63,16 +65,55 @@ class StubSoundPlayer implements SoundPlayer {
   setMute(_m: boolean): void { /* no-op for stub */ }
 }
 
-/** A simple event map for this demo. */
-const DEMO_SFX_KEYS = ['sfx-test-ding', 'sfx-test-buzz'] as const;
+// ── Auto-discovered defaults ──────────────────────────────────
 
-const DEMO_EVENT_MAPPING: EventSoundMapping = {
-  'card-drawn': 'sfx-test-ding',
-  'card-discarded': 'sfx-test-buzz',
-  'game-ended': 'sfx-test-ding',
-  'undo': 'sfx-test-buzz',
-  'redo': 'sfx-test-ding',
+/**
+ * All default sound keys that the gym scene registers and demonstrates.
+ * These correspond to WAV files in `public/assets/audio/default/` and
+ * the COMMON_SFX_KEYS from SoundManager.
+ */
+const DEFAULT_SFX_KEYS = [
+  'sfx-ui-click',
+  'sfx-turn-change',
+  'sfx-round-end',
+  'sfx-score-reveal',
+  'sfx-card-draw',
+  'sfx-card-flip',
+  'sfx-card-discard',
+  'sfx-card-swap',
+] as const;
+
+/**
+ * Default event-to-sound mappings for the gym demo.
+ * Each event triggers the corresponding sound when emitted.
+ */
+const DEFAULT_EVENT_MAPPING: EventSoundMapping = {
+  'card-drawn': 'sfx-card-draw',
+  'card-flipped': 'sfx-card-flip',
+  'card-discarded': 'sfx-card-discard',
+  'card-swapped': 'sfx-card-swap',
+  'ui-interaction': 'sfx-ui-click',
+  'turn-started': 'sfx-turn-change',
+  'game-ended': 'sfx-round-end',
+  'turn-completed': 'sfx-score-reveal',
 };
+
+/**
+ * Visual feedback types that can be triggered from the scene.
+ * Each entry describes a type of visual feedback with a label and
+ * a trigger function that will be called from the generated button.
+ */
+interface FeedbackTypeEntry {
+  label: string;
+  description: string;
+}
+
+const FEEDBACK_TYPES: FeedbackTypeEntry[] = [
+  { label: 'popTextOrIcon', description: 'Pop text or icon animation' },
+  { label: 'Celebrate', description: 'Particle celebration burst' },
+];
+
+// ── Scene class ───────────────────────────────────────────────
 
 export class GymAudioFeedbackScene extends GymSceneBase {
   private gameEvents = new GameEventEmitter();
@@ -83,6 +124,8 @@ export class GymAudioFeedbackScene extends GymSceneBase {
   private statusText!: Phaser.GameObjects.Text;
   private callLog: string[] = [];
   private eventLogResult!: EventLogResult;
+  // Track dynamically generated buttons for cleanup
+  private dynamicButtons: Phaser.GameObjects.Text[] = [];
   // Track pop text targets for cleanup
   private popTargets: Phaser.GameObjects.Text[] = [];
 
@@ -91,9 +134,15 @@ export class GymAudioFeedbackScene extends GymSceneBase {
   }
 
   preload(): void {
-    // Load demo audio assets
-    this.load.audio('sfx-test-ding', 'assets/audio/card-draw.wav');
-    this.load.audio('sfx-test-buzz', 'assets/audio/card-discard.wav');
+    // Load default audio assets
+    this.load.audio('sfx-ui-click', 'assets/audio/default/ui-click.wav');
+    this.load.audio('sfx-turn-change', 'assets/audio/default/turn-change.wav');
+    this.load.audio('sfx-round-end', 'assets/audio/default/round-end.wav');
+    this.load.audio('sfx-score-reveal', 'assets/audio/default/score-reveal.wav');
+    this.load.audio('sfx-card-draw', 'assets/audio/default/card-draw.wav');
+    this.load.audio('sfx-card-flip', 'assets/audio/default/card-flip.wav');
+    this.load.audio('sfx-card-discard', 'assets/audio/default/card-discard.wav');
+    this.load.audio('sfx-card-swap', 'assets/audio/default/card-swap.wav');
   }
 
   create(): void {
@@ -105,19 +154,15 @@ export class GymAudioFeedbackScene extends GymSceneBase {
     this.initHelp([
       {
         heading: 'Features',
-        body: 'Demonstrates audio event mapping and feedback configuration using the SoundManager, along with pop text animations (popTextOrIcon) and particle celebration effects. The SoundManager connects game events to sound keys, providing volume control, mute toggling, and graceful handling of missing or unregistered sound keys. In a real card game, sounds play for card draws, discards, wins, and errors, while pop text provides visual feedback alongside audio.'
+        body: 'Demonstrates audio event mapping and feedback configuration using the SoundManager, along with pop text animations (popTextOrIcon) and particle celebration effects. The SoundManager connects game events to sound keys, providing volume control, mute toggling, and graceful handling of missing or unregistered sound keys. Sounds and feedback types are auto-discovered and dynamically generate buttons.'
       },
       {
         heading: 'Controls',
-        body: '[ Toggle Mute ]: Toggle audio mute on/off. Status shows current mute state and call count.\n[ Volume - ] / [ Volume + ]: Decrease or increase global volume in 0.1 steps (range 0.0-1.0).\n[ Draw Card ]: Emit a "card-drawn" event, which triggers the "sfx-test-ding" sound and a pop text.\n[ Discard Card ]: Emit a "card-discarded" event, triggering "sfx-test-buzz" and pop text.\n[ Pop Text ]: Trigger a standalone pop text animation at a random position near centre.\n[ Pop Undo ]: Emit an "undo" event, triggering "sfx-test-buzz" and pop text.\n[ Pop Redo ]: Emit a "redo" event, triggering "sfx-test-ding" and pop text.\n[ Celebrate ]: Trigger a particle burst effect (or pop text fallback if particles unavailable, or if reduced-motion is on).\n[ Invalid Key ]: Attempt to play an unregistered sound key ("sfx-nonexistent-key") — safely ignored, demonstrating graceful error handling.'
+        body: '[ Toggle Mute ]: Toggle audio mute on/off.\n[ Volume - ] / [ Volume + ]: Adjust global volume in 0.1 steps.\n[ Invalid Key ]: Demonstrate safe handling of unregistered keys.\nSound event buttons: Auto-generated for each registered sound key.\nFeedback type buttons: Auto-generated for each visual feedback type.'
       },
       {
         heading: 'Usage Example',
-        body: 'In a game of Golf, a satisfying "ding" plays when a card is drawn, and a different "buzz" plays when a card is discarded. The player can mute audio during meetings or adjust volume for different environments. After winning a round, a particle celebration bursts across the screen. If the player has reduced-motion enabled, the celebration shows a simple party emoji pop text instead.'
-      },
-      {
-        heading: 'Test Plan',
-        body: '1. Press [ Draw Card ] → event log shows sound call "sfx-test-ding", pop text appears\n2. Press [ Discard Card ] → event log shows "sfx-test-buzz"\n3. Press [ Toggle Mute ] → status shows Muted: true, no sound on subsequent events\n4. Press [ Draw Card ] → event fires but no sound (muted) — only pop text appears\n5. Press [ Volume - ] twice → volume drops to 0.3\n6. Press [ Volume + ] three times → volume returns to 0.6\n7. Press [ Invalid Key ] → event log shows safe handling of unregistered key\n8. Press [ Pop Text ] → pop text animation appears\n9. Press [ Celebrate ] → particle burst or emoji fallback appears\n10. Press [ Toggle Mute ] to unmute, verify sound returns'
+        body: 'In a game of Golf, a "ding" plays when a card is drawn, and a "buzz" when discarded. The player can mute audio or adjust volume. After winning a round, a particle celebration bursts across the screen.'
       }
     ]);
 
@@ -148,37 +193,25 @@ export class GymAudioFeedbackScene extends GymSceneBase {
     }
 
     this.soundManager = new SoundManager(player, { storage: null });
-    for (const key of DEMO_SFX_KEYS) {
+    for (const key of DEFAULT_SFX_KEYS) {
       this.soundManager.register(key);
     }
-    this.soundManager.connectToEvents(this.gameEvents, DEMO_EVENT_MAPPING);
+    this.soundManager.connectToEvents(this.gameEvents, DEFAULT_EVENT_MAPPING);
     this.soundManager.setVolume(this.volume);
 
+    // ── Status and log ──────────────────────────────────
     const cx = GAME_W / 2;
-    const controlsAnchor = resolveAudioAnchor('controls', 'center');
-    const controls2Anchor = resolveAudioAnchor('controls2', 'center');
     const statusAnchor = resolveAudioAnchor('status', 'center');
     const logAnchor = resolveAudioAnchor('log', 'center');
-    const y = controlsAnchor.y;
 
-    this.addButton(cx - 450, y, '[ Toggle Mute ]', () => this.toggleMute());
-    this.addButton(cx - 280, y, '[ Volume - ]', () => this.adjustVolume(-0.1));
-    this.addButton(cx - 140, y, '[ Volume + ]', () => this.adjustVolume(0.1));
-    this.addButton(cx + 10, y, '[ Draw Card ]', () => this.emitEvent('card-drawn'));
-    this.addButton(cx + 150, y, '[ Discard Card ]', () => this.emitEvent('card-discarded'));
-    this.addButton(cx + 330, y, '[ Invalid Key ]', () => this.playInvalid());
-
-    const y2 = controls2Anchor.y;
-    this.addButton(cx - 280, y2, '[ Pop Text ]', () => this.triggerPopText());
-    this.addButton(cx - 100, y2, '[ Pop Undo ]', () => this.emitEvent('undo'));
-    this.addButton(cx + 60, y2, '[ Pop Redo ]', () => this.emitEvent('redo'));
-    this.addButton(cx + 220, y2, '[ Celebrate ]', () => this.triggerCelebration());
-
-    this.statusText = createHudText(this, cx, statusAnchor.y, this.statusString(), '#ffffff', { fontSize: '16px' }).setOrigin(0.5);
+    this.statusText = createHudText(
+      this, cx, statusAnchor.y,
+      this.statusString(), '#ffffff', { fontSize: '16px' },
+    ).setOrigin(0.5);
 
     this.eventLogResult = createEventLog(this, logAnchor.y + 20, {
-      headerText: '── Sound Call Log ──',
-      maxLines: 14,
+      headerText: '── Activity Log ──',
+      maxLines: 16,
       lineHeight: 17,
       textColor: '#aaddaa',
       fontSize: '11px',
@@ -186,6 +219,86 @@ export class GymAudioFeedbackScene extends GymSceneBase {
       headerColor: '#669966',
       lineX: 40,
     });
+
+    // ── Control buttons (row 1: core controls) ──────────
+    const controlsAnchor = resolveAudioAnchor('controls', 'center');
+    const y = controlsAnchor.y;
+
+    this.addButton(cx - 480, y, '[ Toggle Mute ]', () => this.toggleMute());
+    this.addButton(cx - 310, y, '[ Volume - ]', () => this.adjustVolume(-0.1));
+    this.addButton(cx - 170, y, '[ Volume + ]', () => this.adjustVolume(0.1));
+    this.addButton(cx - 20, y, '[ Invalid Key ]', () => this.playInvalid());
+
+    // ── Dynamic sound event buttons ─────────────────────
+    // Auto-discover registered sound keys from SoundManager
+    // and generate a button for each one that emits the
+    // corresponding event.
+    const eventToButtonLabel: Record<string, string> = {
+      'card-drawn': 'Draw Card',
+      'card-flipped': 'Flip Card',
+      'card-discarded': 'Discard Card',
+      'card-swapped': 'Swap Card',
+      'ui-interaction': 'UI Click',
+      'turn-started': 'Turn Change',
+      'game-ended': 'Round End',
+      'turn-completed': 'Score Reveal',
+    };
+
+    const controls2Anchor = resolveAudioAnchor('controls2', 'center');
+    const y2 = controls2Anchor.y;
+
+    // Spread sound event buttons across the full width starting from left margin
+    const LEFT_MARGIN = 40;
+    const soundEventCount = Object.entries(DEFAULT_EVENT_MAPPING).filter(
+      ([eventName, soundKey]) => {
+        const label = eventToButtonLabel[eventName];
+        if (!label) return false;
+        return Array.from(this.soundManager.keys()).includes(soundKey);
+      },
+    ).length;
+    const soundSpacing = (GAME_W - LEFT_MARGIN * 2) / Math.max(soundEventCount, 1);
+    let btnIndex = 0;
+
+    // Generate buttons for each event in DEFAULT_EVENT_MAPPING
+    // that has a corresponding label in eventToButtonLabel
+    for (const [eventName, soundKey] of Object.entries(DEFAULT_EVENT_MAPPING)) {
+      const label = eventToButtonLabel[eventName];
+      if (!label) continue; // Skip unmapped events
+
+      const keysFromManager = Array.from(this.soundManager.keys());
+      if (!keysFromManager.includes(soundKey)) continue; // Only if sound is registered
+
+      const btnLabel = `[ ${label} ]`;
+      const xPos = LEFT_MARGIN + btnIndex * soundSpacing;
+      const btn = this.addButton(xPos, y2, btnLabel, () => this.emitEvent(eventName));
+      this.dynamicButtons.push(btn);
+      btnIndex++;
+    }
+
+    // ── Dynamic visual feedback buttons (row 3) ─────────
+    const feedbackY = y2 + 28;
+    const feedbackSpacing = (GAME_W - LEFT_MARGIN * 2) / Math.max(FEEDBACK_TYPES.length, 1);
+    let feedbackIndex = 0;
+
+    for (const ft of FEEDBACK_TYPES) {
+      const btnLabel = `[ ${ft.label} ]`;
+      const xPos = LEFT_MARGIN + feedbackIndex * feedbackSpacing;
+      const btn = this.addButton(xPos, feedbackY, btnLabel, () => {
+        if (ft.label === 'Celebrate') {
+          this.triggerCelebration();
+        } else {
+          this.triggerPopText();
+        }
+      });
+      this.dynamicButtons.push(btn);
+      feedbackIndex++;
+    }
+
+    // Log the auto-discovery
+    this.logCall(
+      `Auto-discovered ${Array.from(this.soundManager.keys()).length} sound keys, ` +
+      `${FEEDBACK_TYPES.length} feedback types`,
+    );
   }
 
   private statusString(): string {
@@ -341,7 +454,7 @@ export class GymAudioFeedbackScene extends GymSceneBase {
 
   private logCall(msg: string): void {
     this.callLog.push(msg);
-    if (this.callLog.length > 14) this.callLog.shift();
+    if (this.callLog.length > 16) this.callLog.shift();
     this.eventLogResult.render(this.callLog);
   }
 
@@ -352,5 +465,10 @@ export class GymAudioFeedbackScene extends GymSceneBase {
       try { t.destroy(); } catch (_) { /* ignore */ }
     }
     this.popTargets = [];
+    // Clean up dynamic buttons
+    for (const btn of this.dynamicButtons) {
+      try { btn.destroy(); } catch (_) { /* ignore */ }
+    }
+    this.dynamicButtons = [];
   }
 }
