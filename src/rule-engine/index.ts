@@ -1,0 +1,85 @@
+/**
+ * Rule Engine Module
+ *
+ * Provides a component for creating and enforcing game rules,
+ * enabling complex gameplay mechanics, turn logic, and validation.
+ */
+export const RULE_ENGINE_VERSION = '0.1.0';
+
+// ── Legality types ──────────────────────────────────────────
+
+/**
+ * Result of a legality check on a game action or move.
+ *
+ * Discriminated union on the `legal` property:
+ * - `{ legal: true }` when the action is permitted.
+ * - `{ legal: false; reason: string }` when the action is
+ *   forbidden, with a human-readable explanation.
+ *
+ * @example
+ * ```ts
+ * function checkMove(move: Move): LegalityResult {
+ *   if (!isValid(move)) {
+ *     return { legal: false, reason: 'Invalid move' };
+ *   }
+ *   return { legal: true };
+ * }
+ *
+ * const result = checkMove(someMove);
+ * if (!result.legal) {
+ *   console.warn(result.reason);
+ * }
+ * ```
+ */
+export type LegalityResult =
+  | { legal: true }
+  | { legal: false; reason: string };
+
+// ── Legality helpers ────────────────────────────────────────
+
+/**
+ * Convenience constructor for a legal (permitted) result.
+ *
+ * @returns `{ legal: true }`
+ *
+ * @example
+ * ```ts
+ * import { legalAction, illegalAction } from '@rule-engine/index';
+ *
+ * function validateMove(card: Card): LegalityResult {
+ *   if (!card) return illegalAction('No card provided');
+ *   return legalAction();
+ * }
+ * ```
+ */
+export function legalAction(): LegalityResult {
+  return { legal: true };
+}
+
+/**
+ * Convenience constructor for an illegal (forbidden) result.
+ *
+ * @param reason - Human-readable explanation of why the action
+ *   is illegal.
+ * @returns `{ legal: false, reason }`
+ *
+ * @example
+ * ```ts
+ * const result = illegalAction('Out of bounds');
+ * // => { legal: false, reason: 'Out of bounds' }
+ * ```
+ */
+export function illegalAction(reason: string): LegalityResult {
+  return { legal: false, reason };
+}
+
+// ── Economy Ledger ──────────────────────────────────────────
+
+export {
+  createEconomyLedger,
+  type EconomyLedger,
+  type EconomyLedgerConfig,
+  type EconomyConstraints,
+  type ResourceDelta,
+  type ResourceSnapshot,
+} from './EconomyLedger';

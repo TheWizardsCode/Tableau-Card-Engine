@@ -1,0 +1,112 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Main Street Transcript",
+  "type": "object",
+  "required": ["version", "gameType", "startedAt", "initialState", "events"],
+  "properties": {
+    "version": { "type": "number" },
+    "gameType": { "type": "string", "const": "main-street" },
+    "startedAt": { "type": "string" },
+    "endedAt": { "type": ["string", "null" ] },
+    "initialState": { "type": "object" },
+    "results": { "type": ["object", "null"] },
+    "events": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": ["type","turn","action"],
+            "properties": {
+              "type": { "const": "action" },
+              "turn": { "type": "number" },
+              "action": { "type": "object" },
+              "timestamp": { "type": "string" }
+            },
+            "additionalProperties": true
+          },
+          {
+            "type": "object",
+            "required": ["type","turn","strategy","action"],
+            "properties": {
+              "type": { "const": "ai-action" },
+              "turn": { "type": "number" },
+              "strategy": { "type": "string" },
+              "action": { "type": "object" },
+              "timestamp": { "type": "string" }
+            },
+            "additionalProperties": true
+          },
+          {
+            "type": "object",
+            "required": ["type","turn","recommendedAction","rationale"],
+            "properties": {
+              "type": { "const": "hint" },
+              "turn": { "type": "number" },
+              "recommendedAction": { "type": "object" },
+              "rationale": { "type": "string" },
+              "timestamp": { "type": "string" }
+            },
+            "additionalProperties": true
+          },
+          {
+            "type": "object",
+            "required": ["type","turn"],
+            "properties": {
+              "type": { "const": "turn-end" },
+              "turn": { "type": "number" },
+              "timestamp": { "type": "string" }
+            },
+            "additionalProperties": true
+          },
+          {
+            "type": "object",
+            "required": ["type","turn","finalScore"],
+            "properties": {
+              "type": { "const": "game-end" },
+              "turn": { "type": "number" },
+              "finalScore": { "type": "number" },
+              "result": { "type": "object" },
+              "timestamp": { "type": "string" }
+            },
+            "additionalProperties": true
+          },
+          {
+            "type": "object",
+            "required": ["type","turn","reversedAction"],
+            "properties": {
+              "type": { "const": "undo" },
+              "turn": { "type": "number" },
+              "reversedAction": { "type": "object" },
+              "timestamp": { "type": "string" }
+            },
+            "additionalProperties": true
+          },
+          {
+            "type": "object",
+            "required": ["type","turn","reappliedAction"],
+            "properties": {
+              "type": { "const": "redo" },
+              "turn": { "type": "number" },
+              "reappliedAction": { "type": "object" },
+              "timestamp": { "type": "string" }
+            },
+            "additionalProperties": true
+          },
+          {
+            "type": "object",
+            "required": ["type","turn"],
+            "properties": {
+              "type": { "const": "info" },
+              "turn": { "type": "number" },
+              "message": { "type": "string" },
+              "timestamp": { "type": "string" }
+            },
+            "additionalProperties": true
+          }
+        ]
+      }
+    }
+  },
+  "additionalProperties": true
+}

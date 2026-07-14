@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "id": "gym-undo-redo-layout",
+  "baseViewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "requiredZones": [
+    "controls",
+    "counter",
+    "status",
+    "history",
+    "log"
+  ],
+  "zones": {
+    "controls": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.08333
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.08333 }
+      }
+    },
+    "counter": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.15278
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.15278 }
+      }
+    },
+    "status": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.20833
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.20833 }
+      }
+    },
+    "history": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.25
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.25 }
+      }
+    },
+    "log": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.31944
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.31944 }
+      }
+    }
+  }
+}
