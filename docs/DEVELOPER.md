@@ -263,7 +263,8 @@ example-games/
 │   ├── GolfRules.ts            Turn legality, move application, round-end detection
 │   ├── GolfScoring.ts          Card point values, grid scoring, column matching
 │   ├── GolfGame.ts             Game orchestration (session setup, turn execution)
-│   ├── AiStrategy.ts           AI strategies (RandomStrategy, GreedyStrategy)
+│   ├── AiStrategy.ts           AI players with configurable skillRating (default 80) and
+│   │                        CardMemoryTracker for discard-pile memory across turns
 │   ├── GameTranscript.ts       Transcript recording (TranscriptRecorder)
 │   └── scenes/
 │       └── GolfScene.ts        Phaser scene (full visual interface)
