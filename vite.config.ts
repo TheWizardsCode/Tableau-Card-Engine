@@ -32,6 +32,7 @@ export default defineConfig(({ mode, command }) => ({
   },
   test: {
     projects: [
+      // ── Unit Tests (Node environment) ─────────────────
       {
         extends: true,
         test: {
@@ -43,6 +44,7 @@ export default defineConfig(({ mode, command }) => ({
           testTimeout: 15_000,
         },
       },
+      // ── Non-Tutorial Browser Tests ────────────────────
       {
         extends: true,
         test: {
@@ -50,9 +52,7 @@ export default defineConfig(({ mode, command }) => ({
           include: ['tests/**/*.browser.test.ts'],
           exclude: ['tests/e2e/main-street-tutorial-e2e-*.browser.test.ts'],
           fileParallelism: false,
-          sequence: {
-            concurrent: false,
-          },
+          sequence: { concurrent: false },
           testTimeout: 30_000,
           browser: {
             enabled: true,
@@ -64,21 +64,113 @@ export default defineConfig(({ mode, command }) => ({
           },
         },
       },
+      // ── Tutorial E2E Tests (each in its own browser context) ──
+      // Each part gets its own project with a uniquely-named browser
+      // instance to prevent canvas/GPU context exhaustion from
+      // sequential Phaser game create/destroy cycles.
       {
         extends: true,
         test: {
-          name: 'tutorial',
-          include: ['tests/e2e/main-street-tutorial-e2e-*.browser.test.ts'],
+          name: 'tutorial-part1',
+          include: ['tests/e2e/main-street-tutorial-e2e-part1.browser.test.ts'],
           fileParallelism: false,
-          sequence: {
-            concurrent: false,
-          },
+          sequence: { concurrent: false },
           testTimeout: 30_000,
           browser: {
             enabled: true,
             provider: 'playwright',
             headless: true,
-            instances: [{ browser: 'chromium' }],
+            instances: [{ browser: 'chromium', name: 't1' }],
+            viewport: { width: 900, height: 700 },
+            isolate: true,
+          },
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'tutorial-part2',
+          include: ['tests/e2e/main-street-tutorial-e2e-part2.browser.test.ts'],
+          fileParallelism: false,
+          sequence: { concurrent: false },
+          testTimeout: 30_000,
+          browser: {
+            enabled: true,
+            provider: 'playwright',
+            headless: true,
+            instances: [{ browser: 'chromium', name: 't2' }],
+            viewport: { width: 900, height: 700 },
+            isolate: true,
+          },
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'tutorial-part3',
+          include: ['tests/e2e/main-street-tutorial-e2e-part3.browser.test.ts'],
+          fileParallelism: false,
+          sequence: { concurrent: false },
+          testTimeout: 30_000,
+          browser: {
+            enabled: true,
+            provider: 'playwright',
+            headless: true,
+            instances: [{ browser: 'chromium', name: 't3' }],
+            viewport: { width: 900, height: 700 },
+            isolate: true,
+          },
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'tutorial-part4',
+          include: ['tests/e2e/main-street-tutorial-e2e-part4.browser.test.ts'],
+          fileParallelism: false,
+          sequence: { concurrent: false },
+          testTimeout: 30_000,
+          browser: {
+            enabled: true,
+            provider: 'playwright',
+            headless: true,
+            instances: [{ browser: 'chromium', name: 't4' }],
+            viewport: { width: 900, height: 700 },
+            isolate: true,
+          },
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'tutorial-part5',
+          include: ['tests/e2e/main-street-tutorial-e2e-part5.browser.test.ts'],
+          fileParallelism: false,
+          sequence: { concurrent: false },
+          testTimeout: 30_000,
+          browser: {
+            enabled: true,
+            provider: 'playwright',
+            headless: true,
+            instances: [{ browser: 'chromium', name: 't5' }],
+            viewport: { width: 900, height: 700 },
+            isolate: true,
+          },
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'tutorial-part6',
+          include: ['tests/e2e/main-street-tutorial-e2e-part6.browser.test.ts'],
+          fileParallelism: false,
+          sequence: { concurrent: false },
+          testTimeout: 30_000,
+          browser: {
+            enabled: true,
+            provider: 'playwright',
+            headless: true,
+            instances: [{ browser: 'chromium', name: 't6' }],
             viewport: { width: 900, height: 700 },
             isolate: true,
           },
