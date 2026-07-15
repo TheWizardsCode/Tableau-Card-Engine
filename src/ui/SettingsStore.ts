@@ -3,6 +3,7 @@ import type { StorageLike } from '../core-engine/SoundManager';
 const STORAGE_KEY_SELECTED_DIFFICULTY = 'tce-selected-difficulty';
 const STORAGE_KEY_REDUCED_MOTION = 'tce-ui-reduced-motion';
 const STORAGE_KEY_END_TURN_KEYBIND = 'tce-endturn-keybind';
+const STORAGE_KEY_TOOLTIPS = 'tce-show-tooltips';
 
 function resolveStorage(storage?: StorageLike | null): StorageLike | null {
   let backend = storage;
@@ -71,6 +72,39 @@ export function setReducedMotion(enabled: boolean, storage: StorageLike | null =
 
   try {
     backend.setItem(STORAGE_KEY_REDUCED_MOTION, enabled ? 'true' : 'false');
+  } catch {
+    // ignore storage failures
+  }
+}
+
+// ── Tooltip helpers ────────────────────────────────────
+
+/**
+ * Read tooltip preference from storage. Returns true when not set or
+ * storage is unavailable (tooltips shown by default).
+ */
+export function getTooltips(storage: StorageLike | null = null): boolean {
+  const backend = resolveStorage(storage);
+  if (!backend) return true;
+
+  try {
+    const raw = backend.getItem(STORAGE_KEY_TOOLTIPS);
+    if (raw === null) return true;
+    return raw === 'true';
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Persist tooltip preference to storage.
+ */
+export function setTooltips(enabled: boolean, storage: StorageLike | null = null): void {
+  const backend = resolveStorage(storage);
+  if (!backend) return;
+
+  try {
+    backend.setItem(STORAGE_KEY_TOOLTIPS, enabled ? 'true' : 'false');
   } catch {
     // ignore storage failures
   }

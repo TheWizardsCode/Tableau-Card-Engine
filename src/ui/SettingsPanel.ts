@@ -10,7 +10,7 @@
 import Phaser from 'phaser';
 import type { SoundManager } from '../core-engine/SoundManager';
 import { SettingsButton } from './SettingsButton';
-import { getReducedMotion, setReducedMotion, getEndTurnKeybind, setEndTurnKeybind } from './SettingsStore';
+import { getReducedMotion, setReducedMotion, getEndTurnKeybind, setEndTurnKeybind, getTooltips, setTooltips } from './SettingsStore';
 
 // ── Public types ────────────────────────────────────────────
 
@@ -205,7 +205,7 @@ export class SettingsPanel {
   // State
   private _isOpen = false;
   private _isAnimating = false;
-  private _showTooltips = true;
+  private _showTooltips: boolean;
   private _reducedMotion = false;
   private currentTween: Phaser.Tweens.Tween | null = null;
   private destroyed = false;
@@ -249,6 +249,7 @@ export class SettingsPanel {
     this.panelWidth = Math.floor(this.canvasWidth * (this.config.widthPercent / 100));
 
     this._reducedMotion = this.loadReducedMotionPreference();
+    this._showTooltips = this.loadTooltipPreference();
 
     // Pull optional difficulty names from config
     if (config.difficultyNames && config.difficultyNames.length > 0) {
@@ -948,6 +949,7 @@ export class SettingsPanel {
     if (this.destroyed) return;
     this._showTooltips = !this._showTooltips;
     this.updateTooltipVisuals(this._showTooltips);
+    this.saveTooltipPreference(this._showTooltips);
   }
 
   private updateTooltipVisuals(enabled: boolean): void {
@@ -1052,6 +1054,20 @@ export class SettingsPanel {
 
     this.reducedMotionToggleKnob.fillStyle(0xffffff, 1);
     this.reducedMotionToggleKnob.fillCircle(knobX, reducedMotionY, knobRadius);
+  }
+
+  private loadTooltipPreference(): boolean {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return true;
+    }
+    return getTooltips(window.localStorage);
+  }
+
+  private saveTooltipPreference(enabled: boolean): void {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return;
+    }
+    setTooltips(enabled, window.localStorage);
   }
 
   private loadReducedMotionPreference(): boolean {
