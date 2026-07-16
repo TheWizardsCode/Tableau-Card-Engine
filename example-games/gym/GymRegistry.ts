@@ -67,6 +67,9 @@ export const GYM_PARAMETERIZED_OVERLAY_KEY = 'GymParameterizedOverlayScene';
 /** SvgHelpers (SVG Rasterisation Pipeline) demo scene key. */
 export const GYM_SVG_HELPERS_KEY = 'GymSvgHelpersScene';
 
+/** Market Offer Engine demo scene key. */
+export const GYM_MARKET_OFFER_ENGINE_KEY = 'GymMarketOfferEngineScene';
+
 // ── Registry ──────────────────────────────────────────────
 
 /**
@@ -165,6 +168,12 @@ export const GYM_SCENE_CATALOGUE: GymSceneEntry[] = [
     title: 'SVG Rasterisation Pipeline',
     description:
       'Fetch SVG text from an asset URL, rasterise it to a Phaser texture at configurable sizes, verify texture caching via getOrCreateTexture, and toggle scene validity with markSceneValid/markSceneInvalid.',
+  },
+  {
+    sceneKey: GYM_MARKET_OFFER_ENGINE_KEY,
+    title: 'Market Offer Engine',
+    description:
+      'Create market rows with configurable slots, purchase cards, refill from a deck, and lock/unlock slots. Demonstrates the MarketOfferEngine API.',
   },
 ];
 
