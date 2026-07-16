@@ -12,6 +12,7 @@
 import type { Card, Rank, Suit } from '@card-system/Card';
 import { RANKS, SUITS } from '@card-system/Card';
 import { CARD_W, CARD_H } from './constants';
+import { getCardDesign, getCardDesignAssetPath } from './SettingsStore';
 
 /**
  * Map a rank abbreviation to the full name used in SVG file names.
@@ -62,16 +63,28 @@ export function getCardTexture(card: Card): string {
  * Call this from your scene's `preload()` method instead of manually
  * iterating over ranks and suits.
  *
- * @param scene  The Phaser scene whose loader should be used.
- * @param width  Card sprite width in pixels (defaults to `CARD_W`).
- * @param height Card sprite height in pixels (defaults to `CARD_H`).
+ * When `designKey` is omitted or undefined, the current design is read
+ * from storage (via {@link getCardDesign}), so scenes that call this
+ * function without arguments automatically pick up the player's
+ * selected card design.
+ *
+ * @param scene     The Phaser scene whose loader should be used.
+ * @param width     Card sprite width in pixels (defaults to `CARD_W`).
+ * @param height    Card sprite height in pixels (defaults to `CARD_H`).
+ * @param designKey Optional design key override. When omitted, the
+ *                  current design is read from localStorage.
  */
 export function preloadCardAssets(
   scene: Phaser.Scene,
   width: number = CARD_W,
   height: number = CARD_H,
+  designKey?: string,
 ): void {
   const tex = scene.textures;
+
+  // Resolve the effective design key and asset path
+  const effectiveDesignKey = designKey ?? getCardDesign();
+  const assetBasePath = getCardDesignAssetPath(effectiveDesignKey);
 
   // Remove existing card textures so each scene can load at its own size.
   // Textures are global to the Phaser Game, so without this a scene that
@@ -85,7 +98,7 @@ export function preloadCardAssets(
   }
 
   // Card back
-  scene.load.svg('card_back', 'assets/cards/card_back.svg', {
+  scene.load.svg('card_back', `${assetBasePath}card_back.svg`, {
     width,
     height,
   });
@@ -95,7 +108,7 @@ export function preloadCardAssets(
     for (const rank of RANKS) {
       const key = cardTextureKey(rank, suit);
       const file = cardFileName(rank, suit);
-      scene.load.svg(key, `assets/cards/${file}`, { width, height });
+      scene.load.svg(key, `${assetBasePath}${file}`, { width, height });
     }
   }
 }

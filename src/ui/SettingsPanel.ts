@@ -10,7 +10,7 @@
 import Phaser from 'phaser';
 import type { SoundManager } from '../core-engine/SoundManager';
 import { SettingsButton } from './SettingsButton';
-import { getReducedMotion, setReducedMotion, getEndTurnKeybind, setEndTurnKeybind, getTooltips, setTooltips } from './SettingsStore';
+import { getReducedMotion, setReducedMotion, getEndTurnKeybind, setEndTurnKeybind, getTooltips, setTooltips, getCardDesign, setCardDesign, getAvailableCardDesigns } from './SettingsStore';
 
 // ── Public types ────────────────────────────────────────────
 
@@ -202,6 +202,11 @@ export class SettingsPanel {
   private isDraggingSkillSlider = false;
   private _skillRatingValue: number = 80;
 
+  // Card design selector
+  private cardDesignLabel!: Phaser.GameObjects.Text;
+  private cardDesignTextObjects: Phaser.GameObjects.Text[] = [];
+  private _cardDesignKey: string;
+
   // State
   private _isOpen = false;
   private _isAnimating = false;
@@ -250,6 +255,7 @@ export class SettingsPanel {
 
     this._reducedMotion = this.loadReducedMotionPreference();
     this._showTooltips = this.loadTooltipPreference();
+    this._cardDesignKey = this.loadCardDesignPreference();
 
     // Pull optional difficulty names from config
     if (config.difficultyNames && config.difficultyNames.length > 0) {
@@ -551,8 +557,45 @@ export class SettingsPanel {
     reducedMotionHitArea.on('pointerdown', () => this.handleReducedMotionToggle());
     this.container.add(reducedMotionHitArea);
 
+    // ── Card Design selector ─────────────────────────────
+    const cardDesignY = reducedMotionY + 46;
+
+    this.cardDesignLabel = scene.add.text(PADDING, cardDesignY, 'Card Design', LABEL_STYLE);
+    this.cardDesignLabel.setOrigin(0, 0.5);
+    this.cardDesignLabel.setDepth(DEPTH_PANEL_CONTENT);
+    this.container.add(this.cardDesignLabel);
+
+    // Layout design names horizontally
+    const designs = getAvailableCardDesigns();
+    const designStartX = PADDING + 120;
+    const designGap = 8;
+    this.cardDesignTextObjects = [];
+    let designX = designStartX;
+    for (const design of designs) {
+      const isSelected = design.key === this._cardDesignKey;
+      const style = isSelected
+        ? { ...VALUE_STYLE, color: (HEADING_STYLE.color as string) ?? '#f0c040' }
+        : VALUE_STYLE;
+      const txt = scene.add.text(designX, cardDesignY, design.displayName, style as Phaser.Types.GameObjects.Text.TextStyle);
+      txt.setOrigin(0, 0.5);
+      txt.setDepth(DEPTH_PANEL_CONTENT + 1);
+      txt.setInteractive({ useHandCursor: true });
+      (txt as any).tceCardDesignKey = design.key;
+      txt.on('pointerdown', () => this.handleCardDesignSelect(design.key));
+      this.container.add(txt);
+      this.cardDesignTextObjects.push(txt);
+      designX += txt.width + designGap;
+    }
+
+    // Tooltip about scope
+    const designTip = scene.add.text(PADDING, cardDesignY + 26, 'Takes effect on next game start', {
+      fontSize: '12px', color: '#aaaaaa', fontFamily: 'Arial, sans-serif',
+    });
+    designTip.setDepth(DEPTH_PANEL_CONTENT);
+    this.container.add(designTip);
+
     // ── End Turn keybind control ──────────────────────────
-    const endTurnY = reducedMotionY + 46;
+    const endTurnY = cardDesignY + 46;
     const endTurnLabel = scene.add.text(PADDING, endTurnY, 'End Turn Key', LABEL_STYLE);
     endTurnLabel.setOrigin(0, 0.5);
     endTurnLabel.setDepth(DEPTH_PANEL_CONTENT);
@@ -1030,6 +1073,44 @@ export class SettingsPanel {
     if (typeof window === 'undefined' || !window.localStorage) return;
     try {
       window.localStorage.setItem(DIFFICULTY_STORAGE_KEY, name);
+    } catch {
+      // ignore storage failures
+    }
+  }
+
+  // ── Card Design selector helpers ────────────────────────
+
+  /** Handle a card design selection click. */
+  private handleCardDesignSelect(designKey: string): void {
+    if (this.destroyed) return;
+    this._cardDesignKey = designKey;
+    this.saveCardDesignPreference(designKey);
+
+    // Update visual state of the design name list
+    for (const txt of this.cardDesignTextObjects) {
+      const txtKey = (txt as any).tceCardDesignKey as string | undefined;
+      if (!txtKey) continue;
+      if (txtKey === designKey) {
+        txt.setColor((HEADING_STYLE.color as string) ?? '#f0c040');
+      } else {
+        txt.setColor(VALUE_STYLE.color as string);
+      }
+    }
+  }
+
+  /** Load persisted card design from localStorage. */
+  private loadCardDesignPreference(): string {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return getCardDesign(null);
+    }
+    return getCardDesign(window.localStorage);
+  }
+
+  /** Save card design preference to localStorage. */
+  private saveCardDesignPreference(designKey: string): void {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    try {
+      setCardDesign(designKey, window.localStorage);
     } catch {
       // ignore storage failures
     }

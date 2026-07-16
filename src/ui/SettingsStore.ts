@@ -4,6 +4,96 @@ const STORAGE_KEY_SELECTED_DIFFICULTY = 'tce-selected-difficulty';
 const STORAGE_KEY_REDUCED_MOTION = 'tce-ui-reduced-motion';
 const STORAGE_KEY_END_TURN_KEYBIND = 'tce-endturn-keybind';
 const STORAGE_KEY_TOOLTIPS = 'tce-show-tooltips';
+const STORAGE_KEY_CARD_DESIGN = 'tce-card-design';
+
+// ── Card Design system ─────────────────────────────────
+
+/** Descriptor for an available card design. */
+export interface CardDesign {
+  /** Unique key used for storage lookup (e.g. "default", "webisso"). */
+  key: string;
+  /** Human-readable name shown in the settings panel (e.g. "Classic", "Modern"). */
+  displayName: string;
+  /** Relative asset path where card SVGs are stored (e.g. "assets/cards/"). */
+  assetPath: string;
+}
+
+/** The key used for the default (built-in) card design. */
+export const CARD_DESIGN_DEFAULT = 'default';
+
+/** Registry of all available card designs. */
+const CARD_DESIGNS: CardDesign[] = [
+  {
+    key: CARD_DESIGN_DEFAULT,
+    displayName: 'Classic',
+    assetPath: 'assets/cards/',
+  },
+  {
+    key: 'webisso',
+    displayName: 'Modern',
+    assetPath: 'assets/cards/alternative/webisso/',
+  },
+];
+
+/**
+ * Returns the list of all available card designs.
+ */
+export function getAvailableCardDesigns(): readonly CardDesign[] {
+  return CARD_DESIGNS;
+}
+
+/**
+ * Looks up the asset path for a given design key.
+ * Falls back to the default design path when the key is unknown.
+ */
+export function getCardDesignAssetPath(designKey: string): string {
+  const design = CARD_DESIGNS.find(d => d.key === designKey);
+  return design ? design.assetPath : CARD_DESIGNS[0].assetPath;
+}
+
+/**
+ * Looks up the display name for a given design key.
+ * Falls back to the key itself when unknown.
+ */
+export function getCardDesignDisplayName(designKey: string): string {
+  const design = CARD_DESIGNS.find(d => d.key === designKey);
+  return design ? design.displayName : designKey;
+}
+
+/**
+ * Read the selected card design from storage.
+ * Returns the default design key when nothing is stored or the stored
+ * key is not in the available designs registry.
+ */
+export function getCardDesign(storage: StorageLike | null = null): string {
+  const backend = resolveStorage(storage);
+  if (!backend) return CARD_DESIGN_DEFAULT;
+
+  try {
+    const raw = backend.getItem(STORAGE_KEY_CARD_DESIGN);
+    if (raw === null) return CARD_DESIGN_DEFAULT;
+    // Validate against available designs
+    if (!CARD_DESIGNS.some(d => d.key === raw)) return CARD_DESIGN_DEFAULT;
+    return raw;
+  } catch {
+    return CARD_DESIGN_DEFAULT;
+  }
+}
+
+/**
+ * Persist the selected card design key to storage.
+ */
+export function setCardDesign(designKey: string, storage: StorageLike | null = null): void {
+  const backend = resolveStorage(storage);
+  if (!backend) return;
+
+  try {
+    backend.setItem(STORAGE_KEY_CARD_DESIGN, designKey);
+  } catch {
+    // ignore storage failures
+  }
+}
+
 
 function resolveStorage(storage?: StorageLike | null): StorageLike | null {
   let backend = storage;
