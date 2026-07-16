@@ -76,6 +76,9 @@ export const GYM_SPATIAL_RULES_KEY = 'GymSpatialRulesScene';
 /** TokenPileView demo scene key. */
 export const GYM_TOKEN_PILE_VIEW_KEY = 'GymTokenPileViewScene';
 
+/** Rule Engine demo scene key. */
+export const GYM_RULE_ENGINE_KEY = 'GymRuleEngineScene';
+
 // ── Registry ──────────────────────────────────────────────
 
 /**
@@ -192,6 +195,12 @@ export const GYM_SCENE_CATALOGUE: GymSceneEntry[] = [
     title: 'Token Pile View',
     description:
       'Demonstrates the TokenPileView reusable component with four different renderers (simple tokens, card-back tokens, custom shapes, feudalism-style). Add/remove tokens interactively and observe live count updates.',
+  },
+  {
+    sceneKey: GYM_RULE_ENGINE_KEY,
+    title: 'Rule Engine: LegalityResult + EconomyLedger',
+    description:
+      'Interactively explore the LegalityResult discriminated union pattern (legal/illegal actions) and EconomyLedger resource tracking with constraint enforcement.',
   },
 ];
 

@@ -33,6 +33,7 @@ Open `http://localhost:3000` and select **Gym** from the game selector. From the
 | Screen Layout Language (SLL) | `GymSllScene` | Starts on the composed shell+scene layout, then cycles through shell-only, scene-only, and pixel override examples while mapping zones+anchors across viewport/DPR profiles and visualizing merged overlays |
 | Spatial Rules: Grid & Pathfinding | `GymSpatialRulesScene` | Configurable grid with interactive cells, A* pathfinding, distance metric selection (Manhattan/Chebyshev/Euclidean), adjacency bonus computation, and blockable obstacles |
 | Token Pile View | `GymTokenPileViewScene` | Four token piles with different renderers (simple coloured tokens, card-back tokens, custom shaped tokens, feudalism-style). Add/remove tokens interactively with live count updates and click events. |
+| Rule Engine: LegalityResult + EconomyLedger | `GymRuleEngineScene` | Interactively explore the LegalityResult discriminated union pattern (legal/illegal actions with multiple reason types) and EconomyLedger resource tracking (coins, reputation, score) with constraint enforcement. |
 
 ## SLL Demo
 
