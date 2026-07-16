@@ -166,7 +166,7 @@ export class GymSpatialRulesScene extends GymSceneBase {
       },
       {
         heading: 'Controls',
-        body: '[ -W ] / [ +W ]: Decrease or increase grid width (min 3, max 10).\n[ -H ] / [ +H ]: Decrease or increase grid height (min 3, max 10).\n[ Randomise ]: Randomise all cell values.\n[ Metric: ]: Cycle distance metric (Manhattan → Chebyshev → Euclidean).\n[ Toggle Diag ]: Toggle diagonal inclusion for neighbors/pathfinding.\n[ Neighbors ]: Show neighbors of the selected cell (highlighted in yellow).\n[ Shortest Path ]: Show shortest path between start (green) and goal (red) cells.\n[ Path Exists ]: Report whether a path exists between start and goal cells.\n[ Adj Bonus ]: Compute adjacency bonus for the selected cell (values matching origin get a bonus point).\n[ Clear Sel ]: Clear the selected start/goal cells.\n[ Clear Path ]: Clear all highlights.\n[ Reset Grid ]: Reset all cells to random values and clear selections.\nClick a cell: Toggle it as blocked (obstacle). Right-click a cell: Select as start (green). Ctrl+Click a cell: Select as goal (red).',
+        body: '[ -W ] / [ +W ]: Decrease or increase grid width (min 3, max 10).\n[ -H ] / [ +H ]: Decrease or increase grid height (min 3, max 10).\n[ Randomise ]: Randomise all cell values.\n[ Metric: ]: Cycle distance metric (Manhattan → Chebyshev → Euclidean).\n[ Toggle Diag ]: Toggle diagonal inclusion for neighbors/pathfinding.\n[ Neighbors ]: Show neighbors of the selected cell (highlighted in yellow).\n[ Shortest Path ]: Show shortest path between start (green) and goal (red) cells.\n[ Path Exists ]: Report whether a path exists between start and goal cells.\n[ Adj Bonus ]: Compute adjacency bonus for the selected cell (values matching origin get a bonus point).\n[ Clear Sel ]: Clear the selected start/goal cells.\n[ Clear Path ]: Clear all highlights.\n[ Reset Grid ]: Reset all cells to random values and clear selections.\nLeft-click a cell: Select as start (green). Ctrl+Click a cell: Select as goal (red). Right-click a cell: Toggle it as blocked (obstacle).',
       },
       {
         heading: 'Usage Example',
@@ -174,7 +174,7 @@ export class GymSpatialRulesScene extends GymSceneBase {
       },
       {
         heading: 'Test Plan',
-        body: '1. Click [ +W ] → grid width increases by 1\n2. Click [ -H ] → grid height decreases by 1\n3. Right-click a cell → it becomes the start cell (green highlight)\n4. Ctrl+click another cell → it becomes the goal cell (red highlight)\n5. Click [ Shortest Path ] → path is highlighted (blue) and length is logged\n6. Click a cell → it becomes blocked (dark / cross-hatched)\n7. Click [ Path Exists ] → reports whether a path is still possible\n8. Click [ Metric: ] → cycles through Manhattan, Chebyshev, Euclidean\n9. Click [ Neighbors ] → neighbor cells highlighted (yellow)\n10. Click [ Clear Path ] → all highlights removed'
+        body: '1. Click [ +W ] → grid width increases by 1\n2. Click [ -H ] → grid height decreases by 1\n3. Left-click a cell → it becomes the start cell (green highlight)\n4. Ctrl+click another cell → it becomes the goal cell (red highlight)\n5. Click [ Shortest Path ] → path is highlighted (blue) and length is logged\n6. Right-click a cell → it becomes blocked (dark / cross-hatched)\n7. Click [ Path Exists ] → reports whether a path is still possible\n8. Click [ Metric: ] → cycles through Manhattan, Chebyshev, Euclidean\n9. Click [ Neighbors ] → neighbor cells highlighted (yellow)\n10. Click [ Clear Path ] → all highlights removed'
       },
     ]);
 
@@ -351,7 +351,7 @@ export class GymSpatialRulesScene extends GymSceneBase {
   /** Demonstrate shortestPath() between start and goal cells. */
   private demoShortestPath(): void {
     if (!this.selectedStart || !this.selectedGoal) {
-      this.logEvent('Select start and goal cells (right-click start, Ctrl+click goal)');
+      this.logEvent('Select start and goal cells (left-click start, Ctrl+click goal)');
       return;
     }
 
@@ -547,15 +547,15 @@ export class GymSpatialRulesScene extends GymSceneBase {
           .setInteractive({ useHandCursor: true });
 
         zone.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-          if (pointer.rightButtonDown()) {
-            // Right-click: set as start
-            this.handleCellRightClick(x, y);
-          } else if (pointer.leftButtonDown() && pointer.event?.shiftKey) {
-            // Shift+click: set as goal
+          if (pointer.leftButtonDown() && pointer.event?.ctrlKey) {
+            // Ctrl+click: set as goal
             this.setGoal(x, y);
           } else if (pointer.leftButtonDown()) {
-            // Left-click: toggle blocked state
+            // Left-click: select as start
             this.handleCellClick(x, y);
+          } else if (pointer.rightButtonDown()) {
+            // Right-click: toggle blocked state
+            this.handleCellRightClick(x, y);
           }
         });
 
@@ -565,20 +565,20 @@ export class GymSpatialRulesScene extends GymSceneBase {
   }
 
   /**
-   * Apply right-click context: set start cell.
+   * Handle left-click on a cell: select it as start.
    */
-  private handleCellRightClick(x: number, y: number): void {
+  private handleCellClick(x: number, y: number): void {
     this.selectedStart = { x, y };
     this.renderGrid();
     this.highlightGraphics.clear();
     this.logEvent(`Start cell set to (${x},${y}) — value=${this.grid.get({ x, y })}`);
-    this.statusText.setText(`Start: (${x},${y}) — now select goal (Shift+click) or run a query`);
+    this.statusText.setText(`Start: (${x},${y}) — now select goal (Ctrl+click) or run a query`);
   }
 
   /**
-   * Handle left-click on a cell: toggle blocked state.
+   * Handle right-click on a cell: toggle blocked state.
    */
-  private handleCellClick(x: number, y: number): void {
+  private handleCellRightClick(x: number, y: number): void {
     const pos: Position = { x, y };
     const currentVal = this.grid.get(pos);
 
