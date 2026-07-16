@@ -17,13 +17,19 @@ import { createStandardDeck, shuffleArray } from '../../../src/card-system/Deck'
 import type { Card } from '../../../src/card-system/Card';
 import { createSeededRng } from '../../../src/core-engine/SeededRng';
 import { GAME_W } from '../../../src/ui/constants';
-import { preloadCardAssets, ensureCardTextureFallbacks } from '../../../src/ui/CardTextureHelpers';
+import { preloadCardAssets, ensureCardTextureFallbacks, reloadCardTexturesForDesign } from '../../../src/ui/CardTextureHelpers';
 import { createHudText } from '../../../src/ui/Renderer';
 import { createDeckGrid } from '../../../src/ui/GymSceneUtils';
 import type { DeckGridResult } from '../../../src/ui/GymSceneUtils';
 import { anchorPoint } from '../../../src/ui/screen-layout';
 import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
 import gymDeckRngLayoutJson from '../layouts/gym-deck-rng.layout.json';
+import {
+  getAvailableCardDesigns,
+  getCardDesignDisplayName,
+  getCardDesign,
+  setCardDesign,
+} from '../../../src/ui/SettingsStore';
 
 // Parse the shared Deck RNG scene layout once at module load.
 const DECK_RNG_LAYOUT: import('../../../src/ui/screen-layout-schema').ScreenLayoutDocument | null = (() => {
@@ -97,7 +103,7 @@ export class GymDeckRngScene extends GymSceneBase {
       },
       {
         heading: 'Controls',
-        body: '[ -1 ] / [ +1 ]: Decrease or increase the seed value and immediately re-shuffle. Use to explore how different seeds produce different card orders while maintaining determinism.\n[ Reset Seed ]: Restore the default seed (42) and re-shuffle. Useful to return to a known state after experimenting.\n[ Shuffle ]: Generate a random seed and re-shuffle. Demonstrates that any seed works with the deterministic system.\n[ < Prev ] / [ Next > ]: Navigate to the previous or next Gym scene.'
+        body: '[ -1 ] / [ +1 ]: Decrease or increase the seed value and immediately re-shuffle. Use to explore how different seeds produce different card orders while maintaining determinism.\n[ Reset Seed ]: Restore the default seed (42) and re-shuffle. Useful to return to a known state after experimenting.\n[ Shuffle ]: Generate a random seed and re-shuffle. Demonstrates that any seed works with the deterministic system.\n[ Classic ] / [ Modern ]: Switch the card face design. Textures are hot-swapped in-place and the deck is re-shuffled so the new design is visible immediately.\n[ < Prev ] / [ Next > ]: Navigate to the previous or next Gym scene.'
       },
       {
         heading: 'Usage Example',
@@ -105,7 +111,7 @@ export class GymDeckRngScene extends GymSceneBase {
       },
       {
         heading: 'Test Plan',
-        body: '1. Press [ -1 ] twice → seed decreases by 2, grid re-shuffles\n2. Press [ +1 ] → seed increases by 1, grid re-shuffles differently\n3. Press [ Reset Seed ] → seed returns to 42, grid returns to initial order\n4. Press [ Shuffle ] → random seed, grid re-shuffles\n5. Verify all 52 cards are displayed face-up in the compact grid\n6. Verify each re-shuffle produces a visibly different card order'
+        body: '1. Press [ -1 ] twice → seed decreases by 2, grid re-shuffles\n2. Press [ +1 ] → seed increases by 1, grid re-shuffles differently\n3. Press [ Reset Seed ] → seed returns to 42, grid returns to initial order\n4. Press [ Shuffle ] → random seed, grid re-shuffles\n5. Click [ Modern ] → card faces switch to webisso design, deck re-shuffles\n6. Click [ Classic ] → card faces switch back to saulspatz design, deck re-shuffles\n7. Verify all 52 cards are displayed face-up in the compact grid\n8. Verify each re-shuffle produces a visibly different card order'
       }
     ]);
 
@@ -128,6 +134,60 @@ export class GymDeckRngScene extends GymSceneBase {
 
     // ── Status ───────────────────────────────────────────
     this.statusText = createHudText(this, cx + 600, y, '52 cards displayed', '#88ff88', { fontSize: '16px' });
+
+    // ── Card Design Selector (second row) ────────────────
+    const designRowY = y + 30;
+    const designs = getAvailableCardDesigns();
+    const currentDesignKey = getCardDesign();
+
+    this.addLabel(cx - 20, designRowY, 'Design:');
+
+    const designButtons: Phaser.GameObjects.Text[] = [];
+    let btnX = cx + 60;
+
+    for (const d of designs) {
+      const displayName = getCardDesignDisplayName(d.key);
+      const isActive = d.key === currentDesignKey;
+      const btn = createHudText(
+        this,
+        btnX,
+        designRowY,
+        displayName,
+        isActive ? '#ffffff' : '#88ff88',
+        { fontSize: '14px' },
+      ).setInteractive({ useHandCursor: true });
+
+      btn.on('pointerover', () => {
+        if (btn.getData('active') !== true) btn.setColor('#bbffbb');
+      });
+      btn.on('pointerout', () => {
+        if (btn.getData('active') !== true) btn.setColor('#88ff88');
+      });
+
+      btn.on('pointerdown', async () => {
+        if (btn.getData('active') === true) return; // already active
+        setCardDesign(d.key);
+        await reloadCardTexturesForDesign(this, d.key);
+
+        // Update active state for all design buttons
+        for (const b of designButtons) {
+          b.setColor('#88ff88');
+          b.setData('active', false);
+          b.setStyle({ color: '#88ff88' });
+        }
+        btn.setColor('#ffffff');
+        btn.setData('active', true);
+        btn.setStyle({ color: '#ffffff' });
+
+        // Re-shuffle to re-render the grid with the new textures
+        this.shuffleAndRedraw();
+      });
+
+      btn.setData('active', isActive);
+      designButtons.push(btn);
+
+      btnX += 100;
+    }
 
     // ── Initialize deck, shuffle with default seed, and render ──
     this.seed = DEFAULT_SEED;
@@ -174,6 +234,6 @@ export class GymDeckRngScene extends GymSceneBase {
       centerY,
     });
 
-    this.statusText.setText(`${this.deck.length} cards displayed · seed=${this.seed}`);
+    this.statusText.setText(`${this.deck.length} cards displayed · seed=${this.seed} · design: ${getCardDesignDisplayName(getCardDesign())}`);
   }
 }
