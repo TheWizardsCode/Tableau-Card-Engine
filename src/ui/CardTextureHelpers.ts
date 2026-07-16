@@ -112,11 +112,13 @@ export function preloadCardAssets(
  * This is the key function for design switching. It:
  * 1. Fetches SVG text for every card in the new design
  * 2. Rasterises each SVG into an off-screen canvas
- * 3. Atomically removes old textures and adds new canvases
+ * 3. Replaces each existing texture's source image in-place
+ *    with the new canvas
  *
- * Because the texture keys remain the same, all existing sprites
- * automatically update to show the new design — no scene restart
- * or sprite recreation is needed.
+ * Because the Texture object is never destroyed or replaced,
+ * existing sprites that reference these textures automatically
+ * show the new design — no scene restart or sprite recreation
+ * is needed.
  *
  * @param scene     The active Phaser scene (used for texture manager access).
  * @param designKey The design key to switch to (e.g. 'default', 'webisso').
@@ -133,46 +135,7 @@ export async function reloadCardTexturesForDesign(
   const tex = scene.textures;
   const assetBasePath = getCardDesignAssetPath(designKey);
 
-  // ── Phase 1 (async): fetch SVGs and rasterise to off-screen canvases ──
-
-  /** Return a canvas with the SVG rendered at the given dimensions. */
-  async function svgToCanvas(svgText: string): Promise<HTMLCanvasElement> {
-    const blob = new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' });
-    const dataUrl = URL.createObjectURL(blob);
-    const img = new Image();
-
-    return new Promise<HTMLCanvasElement>((resolve, reject) => {
-      img.onload = () => {
-        URL.revokeObjectURL(dataUrl);
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-        }
-        resolve(canvas);
-      };
-      img.onerror = () => {
-        URL.revokeObjectURL(dataUrl);
-        reject(new Error('SVG image load failed'));
-      };
-      img.src = dataUrl;
-    });
-  }
-
-  /** Fetch SVG text for one card. Returns null on failure. */
-  async function fetchSvgText(url: string): Promise<string | null> {
-    try {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      return await response.text();
-    } catch {
-      return null;
-    }
-  }
-
-  // Collect all entries: { key, fileName }
+  // Build the list of texture entries: { key, fileName }
   const entries: { key: string; fileName: string }[] = [];
   entries.push({ key: 'card_back', fileName: 'card_back.svg' });
   for (const suit of SUITS) {
@@ -184,41 +147,74 @@ export async function reloadCardTexturesForDesign(
     }
   }
 
-  // Fetch all SVGs in parallel
-  const svgResults = await Promise.all(
-    entries.map(e => fetchSvgText(`${assetBasePath}${e.fileName}`)),
-  );
+  // ── Phase 1 (async): fetch SVGs and rasterise to off-screen canvases ──
 
-  // Rasterise all fetched SVGs to canvases (in parallel)
-  // Filter out entries where fetch failed
-  const newTextures: { key: string; canvas: HTMLCanvasElement }[] = [];
-  const rasterOps: Promise<void>[] = [];
-
-  for (let i = 0; i < entries.length; i++) {
-    const svgText = svgResults[i];
-    if (svgText === null) continue; // fetch failed, leave existing texture
-    const entry = entries[i];
-    rasterOps.push(
-      svgToCanvas(svgText).then(canvas => {
-        newTextures.push({ key: entry.key, canvas });
-      }),
-    );
-  }
-
-  await Promise.all(rasterOps);
-
-  // ── Phase 2 (sync): atomically swap all textures ──
-
-  // Remove old textures
-  for (const { key } of newTextures) {
-    if (tex.exists(key)) {
-      tex.remove(key);
+  /** Fetch SVG text. Returns null on failure. */
+  async function fetchSvg(url: string): Promise<string | null> {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return await response.text();
+    } catch {
+      return null;
     }
   }
 
-  // Add new canvases as textures
-  for (const { key, canvas } of newTextures) {
-    tex.addCanvas(key, canvas);
+  /** Rasterise SVG text to an HTMLCanvasElement. */
+  function svgToCanvas(svgText: string): Promise<HTMLCanvasElement | null> {
+    return new Promise((resolve) => {
+      const blob = new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' });
+      const dataUrl = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(dataUrl);
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(dataUrl);
+        resolve(null);
+      };
+      img.src = dataUrl;
+    });
+  }
+
+  // Fetch all SVGs in parallel
+  const svgTexts = await Promise.all(
+    entries.map(e => fetchSvg(`${assetBasePath}${e.fileName}`)),
+  );
+
+  // Rasterise all successfully-fetched SVGs to canvases (in parallel)
+  const replacementCanvases: { key: string; canvas: HTMLCanvasElement }[] = [];
+  await Promise.all(
+    svgTexts.map(async (svgText, i) => {
+      if (svgText === null) return; // fetch failed, leave existing in place
+      const canvas = await svgToCanvas(svgText);
+      if (canvas !== null) {
+        replacementCanvases.push({ key: entries[i].key, canvas });
+      }
+    }),
+  );
+
+  // ── Phase 2 (sync): replace each texture's source in-place ──
+  for (const { key, canvas } of replacementCanvases) {
+    const existing = tex.get(key);
+    if (!existing) continue;
+    const source = existing.source[0];
+    if (!source) continue;
+
+    // Replace the image data
+    source.image = canvas;
+    source.width = canvas.width;
+    source.height = canvas.height;
+    source.isCanvas = true;
+
+    // Re-upload to WebGL if applicable
+    source.update();
   }
 }
 
