@@ -28,6 +28,7 @@ export { GymParameterizedOverlayScene } from './scenes/GymParameterizedOverlaySc
 export { GymSvgHelpersScene } from './scenes/GymSvgHelpersScene';
 export { GymMarketOfferEngineScene } from './scenes/GymMarketOfferEngineScene';
 export { GymSpatialRulesScene } from './scenes/GymSpatialRulesScene';
+export { GymTokenPileViewScene } from './scenes/GymTokenPileViewScene';
 
 export {
   GYM_ROUTER_KEY,
@@ -48,6 +49,7 @@ export {
   GYM_SVG_HELPERS_KEY,
   GYM_MARKET_OFFER_ENGINE_KEY,
   GYM_SPATIAL_RULES_KEY,
+  GYM_TOKEN_PILE_VIEW_KEY,
   GYM_SCENE_CATALOGUE,
 } from './GymRegistry';
 export type { GymSceneEntry } from './GymRegistry';

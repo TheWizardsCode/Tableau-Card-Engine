@@ -73,6 +73,9 @@ export const GYM_MARKET_OFFER_ENGINE_KEY = 'GymMarketOfferEngineScene';
 /** SpatialRules (Grid + pathfinding) demo scene key. */
 export const GYM_SPATIAL_RULES_KEY = 'GymSpatialRulesScene';
 
+/** TokenPileView demo scene key. */
+export const GYM_TOKEN_PILE_VIEW_KEY = 'GymTokenPileViewScene';
+
 // ── Registry ──────────────────────────────────────────────
 
 /**
@@ -183,6 +186,12 @@ export const GYM_SCENE_CATALOGUE: GymSceneEntry[] = [
     title: 'Spatial Rules: Grid & Pathfinding',
     description:
       'Configurable grid with interactive cells, A* pathfinding with distance metrics (Manhattan/Chebyshev/Euclidean), adjacency bonus computation, and blockable cells for obstacle testing.',
+  },
+  {
+    sceneKey: GYM_TOKEN_PILE_VIEW_KEY,
+    title: 'Token Pile View',
+    description:
+      'Demonstrates the TokenPileView reusable component with four different renderers (simple tokens, card-back tokens, custom shapes, feudalism-style). Add/remove tokens interactively and observe live count updates.',
   },
 ];
 
