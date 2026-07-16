@@ -111,7 +111,9 @@ export function preloadCardAssets(
  *
  * This is the key function for design switching. It:
  * 1. Fetches SVG text for every card in the new design
- * 2. Rasterises each SVG into an off-screen canvas
+ * 2. Rasterises each SVG into an off-screen canvas at the same
+ *    dimensions as the existing texture (preserving each game's
+ *    card size)
  * 3. Replaces each existing texture's source image in-place
  *    with the new canvas
  *
@@ -122,28 +124,35 @@ export function preloadCardAssets(
  *
  * @param scene     The active Phaser scene (used for texture manager access).
  * @param designKey The design key to switch to (e.g. 'default', 'webisso').
- * @param width     Card sprite width in pixels (defaults to `CARD_W`).
- * @param height    Card sprite height in pixels (defaults to `CARD_H`).
- * @returns A promise that resolves when all textures have been reloaded.
  */
 export async function reloadCardTexturesForDesign(
   scene: Phaser.Scene,
   designKey: string,
-  width: number = CARD_W,
-  height: number = CARD_H,
 ): Promise<void> {
   const tex = scene.textures;
   const assetBasePath = getCardDesignAssetPath(designKey);
 
   // Build the list of texture entries: { key, fileName }
-  const entries: { key: string; fileName: string }[] = [];
-  entries.push({ key: 'card_back', fileName: 'card_back.svg' });
+  const entries: { key: string; fileName: string; origW: number; origH: number }[] = [];
+
+  function addEntry(key: string, fileName: string): void {
+    const existing = tex.get(key);
+    let origW = CARD_W;
+    let origH = CARD_H;
+    if (existing) {
+      const frame = (existing.frames as Record<string, Phaser.Textures.Frame>)[existing.firstFrame];
+      if (frame) {
+        origW = frame.width;
+        origH = frame.height;
+      }
+    }
+    entries.push({ key, fileName, origW, origH });
+  }
+
+  addEntry('card_back', 'card_back.svg');
   for (const suit of SUITS) {
     for (const rank of RANKS) {
-      entries.push({
-        key: cardTextureKey(rank, suit),
-        fileName: cardFileName(rank, suit),
-      });
+      addEntry(cardTextureKey(rank, suit), cardFileName(rank, suit));
     }
   }
 
@@ -160,8 +169,8 @@ export async function reloadCardTexturesForDesign(
     }
   }
 
-  /** Rasterise SVG text to an HTMLCanvasElement. */
-  function svgToCanvas(svgText: string): Promise<HTMLCanvasElement | null> {
+  /** Rasterise SVG text to an HTMLCanvasElement at the given dimensions. */
+  function svgToCanvas(svgText: string, w: number, h: number): Promise<HTMLCanvasElement | null> {
     return new Promise((resolve) => {
       const blob = new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' });
       const dataUrl = URL.createObjectURL(blob);
@@ -169,10 +178,10 @@ export async function reloadCardTexturesForDesign(
       img.onload = () => {
         URL.revokeObjectURL(dataUrl);
         const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
+        canvas.width = w;
+        canvas.height = h;
         const ctx = canvas.getContext('2d');
-        if (ctx) ctx.drawImage(img, 0, 0, width, height);
+        if (ctx) ctx.drawImage(img, 0, 0, w, h);
         resolve(canvas);
       };
       img.onerror = () => {
@@ -193,7 +202,7 @@ export async function reloadCardTexturesForDesign(
   await Promise.all(
     svgTexts.map(async (svgText, i) => {
       if (svgText === null) return; // fetch failed, leave existing in place
-      const canvas = await svgToCanvas(svgText);
+      const canvas = await svgToCanvas(svgText, entries[i].origW, entries[i].origH);
       if (canvas !== null) {
         replacementCanvases.push({ key: entries[i].key, canvas });
       }
