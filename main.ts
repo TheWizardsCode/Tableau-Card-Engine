@@ -36,6 +36,7 @@ import {
   GymHudComponentsScene,
   GymLayoutOwnershipScene,
   GymParameterizedOverlayScene,
+  GymSvgHelpersScene,
 } from './example-games/gym';
 
 // ── Game catalogue ─────────────────────────────────────────
@@ -126,6 +127,7 @@ createCardGame({
     GymHudComponentsScene,
     GymLayoutOwnershipScene,
     GymParameterizedOverlayScene,
+    GymSvgHelpersScene,
   ],
   type: Phaser.CANVAS,
   render: isReplayMode ? { preserveDrawingBuffer: true } : undefined,

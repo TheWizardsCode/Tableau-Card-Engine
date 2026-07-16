@@ -28,6 +28,7 @@ Open `http://localhost:3000` and select **Gym** from the game selector. From the
 | Shader & Blend Spike | `GymGraphicsShaderSpikeScene` | Sprite tinting, blend modes, shader feasibility evaluation |
 | Lighting Spike | `GymGraphicsLightingSpikeScene` | Point light, shadow evaluation, WebGL fallback behavior |
 | Parameterized Overlay | `GymParameterizedOverlayScene` | Open game-over, round-end, and confirmation overlays built with `createParameterizedOverlay()`. Demonstrates declarative config format, button callbacks, and `overlayCenterY` offset positioning with multiple vertical offsets. |
+| SVG Rasterisation Pipeline | `GymSvgHelpersScene` | Fetch SVG text from an asset URL, rasterise it to a Phaser texture at configurable sizes, verify texture caching via getOrCreateTexture, and toggle scene validity with markSceneValid/markSceneInvalid. |
 | Screen Layout Language (SLL) | `GymSllScene` | Starts on the composed shell+scene layout, then cycles through shell-only, scene-only, and pixel override examples while mapping zones+anchors across viewport/DPR profiles and visualizing merged overlays |
 
 ## SLL Demo

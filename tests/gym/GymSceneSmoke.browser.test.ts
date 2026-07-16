@@ -12,6 +12,7 @@ import { GymOverlayUiScene } from '../../example-games/gym/scenes/GymOverlayUiSc
 import { GymUndoRedoScene } from '../../example-games/gym/scenes/GymUndoRedoScene';
 import { GymTranscriptScene } from '../../example-games/gym/scenes/GymTranscriptScene';
 import { GymSaveLoadScene } from '../../example-games/gym/scenes/GymSaveLoadScene';
+import { GymSvgHelpersScene } from '../../example-games/gym/scenes/GymSvgHelpersScene';
 import { GymAudioFeedbackScene } from '../../example-games/gym/scenes/GymAudioFeedbackScene';
 import { GymGraphicsShaderSpikeScene } from '../../example-games/gym/scenes/GymGraphicsShaderSpikeScene';
 import { GymGraphicsLightingSpikeScene } from '../../example-games/gym/scenes/GymGraphicsLightingSpikeScene';
@@ -32,6 +33,7 @@ import {
   GYM_SLL_KEY,
   GYM_LAYOUT_OWNERSHIP_KEY,
   GYM_PARAMETERIZED_OVERLAY_KEY,
+  GYM_SVG_HELPERS_KEY,
 } from '../../example-games/gym/GymRegistry';
 
 const SCENES = [
@@ -47,6 +49,7 @@ const SCENES = [
   { key: GYM_SLL_KEY, Scene: GymSllScene },
   { key: GYM_LAYOUT_OWNERSHIP_KEY, Scene: GymLayoutOwnershipScene },
   { key: GYM_PARAMETERIZED_OVERLAY_KEY, Scene: GymParameterizedOverlayScene },
+  { key: GYM_SVG_HELPERS_KEY, Scene: GymSvgHelpersScene },
 ];
 
 describe('Gym individual scene smoke', () => {

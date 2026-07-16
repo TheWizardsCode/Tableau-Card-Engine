@@ -64,6 +64,9 @@ export const GYM_LAYOUT_OWNERSHIP_KEY = 'GymLayoutOwnershipScene';
 /** Parameterized Overlay demo scene key. */
 export const GYM_PARAMETERIZED_OVERLAY_KEY = 'GymParameterizedOverlayScene';
 
+/** SvgHelpers (SVG Rasterisation Pipeline) demo scene key. */
+export const GYM_SVG_HELPERS_KEY = 'GymSvgHelpersScene';
+
 // ── Registry ──────────────────────────────────────────────
 
 /**
@@ -156,6 +159,12 @@ export const GYM_SCENE_CATALOGUE: GymSceneEntry[] = [
     title: 'Parameterized Overlay',
     description:
       'Open game-over, round-end, and confirmation overlays built with createParameterizedOverlay(). Demonstrate declarative config, button callbacks, and overlayCenterY offset positioning.',
+  },
+  {
+    sceneKey: GYM_SVG_HELPERS_KEY,
+    title: 'SVG Rasterisation Pipeline',
+    description:
+      'Fetch SVG text from an asset URL, rasterise it to a Phaser texture at configurable sizes, verify texture caching via getOrCreateTexture, and toggle scene validity with markSceneValid/markSceneInvalid.',
   },
 ];
 
