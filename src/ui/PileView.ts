@@ -11,8 +11,7 @@
 
 import type { Card } from '../card-system/Card';
 import { Pile } from '../card-system/Pile';
-import { getCardTexture, cardTextureKey, cardBackKey } from './CardTextureHelpers';
-import { getCardDesign } from './SettingsStore';
+import { getCardTexture, cardTextureKey } from './CardTextureHelpers';
 
 // ── Types ───────────────────────────────────────────────────
 
@@ -108,14 +107,6 @@ export class PileView {
   private readonly _x: number;
   private readonly _y: number;
   private emptyTexture: string;
-
-  /** Resolve the correct card back texture for the current design. */
-  private currentBackTexture(): string {
-    const design = getCardDesign();
-    if (this.emptyTexture === 'card_back') return cardBackKey(design);
-    return this.emptyTexture;
-  }
-
   private emptyAlpha: number;
   private fullAlpha: number;
   private countOffsetY: number;
@@ -148,7 +139,7 @@ export class PileView {
     this.cardTextureFn = opts.cardTextureFn;
 
     // Create sprite (starts as empty/back)
-    this.sprite = scene.add.image(this._x, this._y, this.currentBackTexture())
+    this.sprite = scene.add.image(this._x, this._y, this.emptyTexture)
       .setInteractive({ useHandCursor: true })
       .setAlpha(this.emptyAlpha);
 
@@ -189,14 +180,14 @@ export class PileView {
    */
   update(): void {
     if (!this.pile) {
-      this.sprite.setTexture(this.currentBackTexture());
+      this.sprite.setTexture(this.emptyTexture);
       this.sprite.setAlpha(this.emptyAlpha);
       this.countText.setText(`${this.labelPrefix}0`);
       return;
     }
 
     if (this.pile.isEmpty()) {
-      this.sprite.setTexture(this.currentBackTexture());
+      this.sprite.setTexture(this.emptyTexture);
       this.sprite.setAlpha(this.emptyAlpha);
       // Sprite remains visible (ghosted) so it stays interactive
     } else {
@@ -204,7 +195,7 @@ export class PileView {
 
       if (!this._faceUp) {
         // Display face-down regardless of the card model's faceUp state
-        this.sprite.setTexture(this.currentBackTexture());
+        this.sprite.setTexture(this.emptyTexture);
       } else {
         // Face-up display: show the card's face texture
         // Use cardTextureFn when available, otherwise build the key directly
@@ -213,7 +204,7 @@ export class PileView {
         if (this.cardTextureFn) {
           this.sprite.setTexture(this.cardTextureFn(top));
         } else if (top && typeof top === 'object' && 'rank' in top && 'suit' in top) {
-          this.sprite.setTexture(cardTextureKey((top as Card).rank, (top as Card).suit, getCardDesign()));
+          this.sprite.setTexture(cardTextureKey((top as Card).rank, (top as Card).suit));
         } else {
           this.sprite.setTexture(getCardTexture(top as Card));
         }

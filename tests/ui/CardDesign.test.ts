@@ -18,7 +18,7 @@ import {
   getCardDesignDisplayName,
   CARD_DESIGN_DEFAULT,
 } from '../../src/ui/SettingsStore';
-import { cardTextureKey, cardBackKey } from '../../src/ui/CardTextureHelpers';
+import { cardTextureKey } from '../../src/ui/CardTextureHelpers';
 import type { StorageLike } from '../../src/core-engine/SoundManager';
 
 function createMockStorage(): StorageLike {
@@ -124,28 +124,13 @@ describe('CardDesign display name lookup', () => {
   });
 });
 
-describe('cardTextureKey design-awareness', () => {
-  // When no designKey (or 'default') is passed, bare keys are returned.
-  it('texture keys are bare for default design', () => {
+describe('CardTextureHelpers design integration', () => {
+  // Texture keys are derived solely from rank and suit, not from the design.
+  // This ensures game scenes don't need to change when switching designs.
+  it('texture keys should be the same regardless of design', () => {
     expect(cardTextureKey('A', 'spades')).toBe('ace_of_spades');
     expect(cardTextureKey('K', 'hearts')).toBe('king_of_hearts');
     expect(cardTextureKey('10', 'diamonds')).toBe('10_of_diamonds');
     expect(cardTextureKey('7', 'clubs')).toBe('7_of_clubs');
-  });
-
-  it('texture keys are prefixed for alternative designs', () => {
-    expect(cardTextureKey('A', 'spades', 'webisso')).toBe('webisso_ace_of_spades');
-    expect(cardTextureKey('K', 'hearts', 'webisso')).toBe('webisso_king_of_hearts');
-    expect(cardTextureKey('10', 'diamonds', 'webisso')).toBe('webisso_10_of_diamonds');
-  });
-
-  it('default design key produces bare texture keys', () => {
-    expect(cardTextureKey('A', 'spades', 'default')).toBe('ace_of_spades');
-    expect(cardTextureKey('K', 'hearts', 'default')).toBe('king_of_hearts');
-  });
-
-  it('cardBackKey produces design-specific back texture keys', () => {
-    expect(cardBackKey('default')).toBe('card_back');
-    expect(cardBackKey('webisso')).toBe('webisso_card_back');
   });
 });

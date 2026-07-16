@@ -588,7 +588,7 @@ export class SettingsPanel {
     }
 
     // Tooltip about scope
-    const designTip = scene.add.text(PADDING, cardDesignY + 26, 'Takes effect on next game start', {
+    const designTip = scene.add.text(PADDING, cardDesignY + 26, 'Takes effect immediately', {
       fontSize: '12px', color: '#aaaaaa', fontFamily: 'Arial, sans-serif',
     });
     designTip.setDepth(DEPTH_PANEL_CONTENT);

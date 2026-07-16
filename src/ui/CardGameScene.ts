@@ -36,6 +36,7 @@ import { SettingsButton } from './SettingsButton';
 import type { HelpSection } from './HelpPanel';
 import { createSceneMenuButton } from './SceneHeader';
 import { createStandardUndoRedoButtons } from './Renderer';
+import { reloadCardTexturesForDesign } from './CardTextureHelpers';
 
 // ── Audio path utility ───────────────────────────────────────
 
@@ -359,14 +360,16 @@ export abstract class CardGameScene extends Phaser.Scene {
 
   /**
    * Listen for card design changes from the Settings panel.
-   * When triggered, restart the scene so new textures are loaded
-   * in preload.
+   * When triggered, reload card textures in-place so that all
+   * existing sprites automatically update to the new design.
    */
   private initCardDesignListener(): void {
     if (typeof window === 'undefined') return;
-    this._cardDesignListener = (): void => {
+    this._cardDesignListener = async (event: Event): Promise<void> => {
       if (!this.scene.isActive()) return;
-      this.scene.restart();
+      const detail = (event as CustomEvent).detail;
+      if (!detail || !detail.designKey) return;
+      await reloadCardTexturesForDesign(this, detail.designKey);
     };
     window.addEventListener('tce:card-design-changed', this._cardDesignListener);
   }
