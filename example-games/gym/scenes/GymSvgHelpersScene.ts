@@ -44,8 +44,7 @@ const SVG_TEXT_COLOUR = '#aaddaa';
 /** Maximum length to display from the raw SVG content. */
 const MAX_SVG_DISPLAY_LENGTH = 1200;
 
-/** Display scale applied to rasterised texture images (2x for visibility). */
-const TEXTURE_DISPLAY_SCALE = 2;
+
 
 /** Y position for the first row of controls. */
 const CONTROLS_ROW_1_Y = 100;
@@ -356,12 +355,15 @@ export class GymSvgHelpersScene extends GymSceneBase {
       this.textureImage = null;
     }
 
-    // Create new image from the rasterised texture
+    // Create new image from the rasterised texture and display it at the
+    // requested logical dimensions. The texture itself may be rasterised at
+    // a higher internal resolution (qualityScale) for crispness, but the
+    // display size matches what the user selected.
     this.textureImage = this.add.image(TEXTURE_DISPLAY_X, TEXTURE_DISPLAY_Y, key);
-    this.textureImage.setScale(TEXTURE_DISPLAY_SCALE);
+    this.textureImage.setDisplaySize(width, height);
 
     this.textureTimestampLabel.setText(
-      `Texture: ${width}×${height} @${dpr.toFixed(1)}x (scaled ${TEXTURE_DISPLAY_SCALE}×)`,
+      `Displayed at ${width}×${height} logical px @${dpr.toFixed(1)}x DPR`,
     );
   }
 
