@@ -1096,6 +1096,18 @@ export class SettingsPanel {
         txt.setColor(VALUE_STYLE.color as string);
       }
     }
+
+    // Dispatch a DOM event so that the current game scene can reload
+    // card textures immediately.
+    try {
+      if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+        window.dispatchEvent(new CustomEvent('tce:card-design-changed', {
+          detail: { designKey },
+        }));
+      }
+    } catch {
+      // ignore dispatch failures
+    }
   }
 
   /** Load persisted card design from localStorage. */

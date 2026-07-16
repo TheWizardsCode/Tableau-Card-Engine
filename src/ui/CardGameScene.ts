@@ -158,6 +158,7 @@ export abstract class CardGameScene extends Phaser.Scene {
     this.initEventSystem();
     this.initHUDContainer();
     this.initMenuButton();
+    this.initCardDesignListener();
   }
 
   // ── Initializers ─────────────────────────────────────────
@@ -351,6 +352,33 @@ export abstract class CardGameScene extends Phaser.Scene {
     this.gameEvents.emit('state-settled', { turnNumber, phase });
   }
 
+  // ── Card design change listener ─────────────────────────
+
+  /** Bound listener for the tce:card-design-changed event. */
+  private _cardDesignListener: ((event: Event) => void) | null = null;
+
+  /**
+   * Listen for card design changes from the Settings panel.
+   * When triggered, restart the scene so new textures are loaded
+   * in preload.
+   */
+  private initCardDesignListener(): void {
+    if (typeof window === 'undefined') return;
+    this._cardDesignListener = (): void => {
+      if (!this.scene.isActive()) return;
+      this.scene.restart();
+    };
+    window.addEventListener('tce:card-design-changed', this._cardDesignListener);
+  }
+
+  /** Remove the card design change listener. */
+  private removeCardDesignListener(): void {
+    if (this._cardDesignListener && typeof window !== 'undefined') {
+      window.removeEventListener('tce:card-design-changed', this._cardDesignListener);
+      this._cardDesignListener = null;
+    }
+  }
+
   // ── Shutdown ─────────────────────────────────────────────
 
   /**
@@ -376,5 +404,6 @@ export abstract class CardGameScene extends Phaser.Scene {
     this.redoButton?.destroy();
     this.redoButton = null;
     this.hudContainer?.destroy();
+    this.removeCardDesignListener();
   }
 }
