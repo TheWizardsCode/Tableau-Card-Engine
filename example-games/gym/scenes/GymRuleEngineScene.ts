@@ -164,6 +164,32 @@ export class GymRuleEngineScene extends GymSceneBase {
           'This scene lets you explore both APIs interactively to understand their behavior before ' +
           'using them in a game implementation.',
       },
+      {
+        heading: 'How Rules Are Defined in TCE',
+        body: 'The shared rule engine (`src/rule-engine/`) provides only building blocks — ' +
+          'each game defines its own rules as standalone functions in a `GameRules.ts` file.\n\n' +
+          'Architecture:\n' +
+          '  1. Move/action types — discriminated unions of possible actions\n' +
+          '     (e.g. SwapMove | DiscardAndFlipMove in Golf, Phase1Action | Phase2Action in Lost Cities).\n' +
+          '  2. `checkXxxLegality(state, ...args): LegalityResult` — pure validation functions\n' +
+          '     that return `{ legal: true }` or `{ legal: false, reason: "..." }`.\n' +
+          '  3. `applyXxx(state, ...args): void` — state mutation, usually calling the check first.\n' +
+          '  4. Round-end / win-loss detection — separate functions or a state machine.\n\n' +
+          'Real examples:\n' +
+          '  - Golf (`example-games/golf/GolfRules.ts`): defines a 3x3 grid with swap/discard-and-flip\n' +
+          '    moves, checks grid bounds and face-down status, manages end-of-round triggering with\n' +
+          '    final-turns tracking.\n' +
+          '  - Lost Cities (`example-games/lost-cities/LostCitiesRules.ts`): two-phase turn system\n' +
+          '    (PlayOrDiscard then Draw), ascending-play rule for expeditions, round ends when draw\n' +
+          '    pile empties. Also generates all legal actions for AI consumption.\n' +
+          '  - Beleaguered Castle (`example-games/beleaguered-castle/BeleagueredCastleRules.ts`):\n' +
+          '    tableau-to-foundation and tableau-to-tableau move validation with SpatialRules\n' +
+          '    integration for grid-based pathfinding.\n\n' +
+          'Each rules file is self-contained, testable, and has zero coupling to the Phaser\n' +
+          'scene layer — they are pure functions that operate on game state objects and return\n' +
+          'LegalityResult values. AI strategies and undo/redo both rely on the same check\n' +
+          'functions for validation.',
+      },
     ]);
 
     const cx = GAME_W / 2;
