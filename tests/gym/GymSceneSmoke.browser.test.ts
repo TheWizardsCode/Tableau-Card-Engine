@@ -17,6 +17,7 @@ import { GymGraphicsShaderSpikeScene } from '../../example-games/gym/scenes/GymG
 import { GymGraphicsLightingSpikeScene } from '../../example-games/gym/scenes/GymGraphicsLightingSpikeScene';
 import { GymSllScene } from '../../example-games/gym/scenes/GymSllScene';
 import { GymLayoutOwnershipScene } from '../../example-games/gym/scenes/GymLayoutOwnershipScene';
+import { GymParameterizedOverlayScene } from '../../example-games/gym/scenes/GymParameterizedOverlayScene';
 import { waitForScene } from '../helpers/waitForScene';
 import {
   GYM_DECK_RNG_KEY,
@@ -30,6 +31,7 @@ import {
   GYM_GRAPHICS_LIGHTING_SPIKE_KEY,
   GYM_SLL_KEY,
   GYM_LAYOUT_OWNERSHIP_KEY,
+  GYM_PARAMETERIZED_OVERLAY_KEY,
 } from '../../example-games/gym/GymRegistry';
 
 const SCENES = [
@@ -44,6 +46,7 @@ const SCENES = [
   { key: GYM_GRAPHICS_LIGHTING_SPIKE_KEY, Scene: GymGraphicsLightingSpikeScene },
   { key: GYM_SLL_KEY, Scene: GymSllScene },
   { key: GYM_LAYOUT_OWNERSHIP_KEY, Scene: GymLayoutOwnershipScene },
+  { key: GYM_PARAMETERIZED_OVERLAY_KEY, Scene: GymParameterizedOverlayScene },
 ];
 
 describe('Gym individual scene smoke', () => {

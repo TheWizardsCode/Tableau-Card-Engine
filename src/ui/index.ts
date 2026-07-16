@@ -173,6 +173,7 @@ export { OverlayManager, type OverlayConfig, type OverlayType } from './OverlayM
 export {
   createParameterizedOverlay,
   overlayCenterY,
+  dismissParameterizedOverlay,
 } from './ParameterizedOverlay';
 export type {
   ParameterizedOverlayConfig,

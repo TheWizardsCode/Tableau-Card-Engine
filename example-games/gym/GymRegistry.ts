@@ -61,6 +61,9 @@ export const GYM_HUD_COMPONENTS_KEY = 'GymHudComponentsScene';
 /** Layout Ownership demo scene key. */
 export const GYM_LAYOUT_OWNERSHIP_KEY = 'GymLayoutOwnershipScene';
 
+/** Parameterized Overlay demo scene key. */
+export const GYM_PARAMETERIZED_OVERLAY_KEY = 'GymParameterizedOverlayScene';
+
 // ── Registry ──────────────────────────────────────────────
 
 /**
@@ -147,6 +150,12 @@ export const GYM_SCENE_CATALOGUE: GymSceneEntry[] = [
     title: 'HUD Components',
     description:
       'Interact with the shared HUD component library: open/close HelpPanel, SettingsPanel, and observe depth layering and toggle controls.',
+  },
+  {
+    sceneKey: GYM_PARAMETERIZED_OVERLAY_KEY,
+    title: 'Parameterized Overlay',
+    description:
+      'Open game-over, round-end, and confirmation overlays built with createParameterizedOverlay(). Demonstrate declarative config, button callbacks, and overlayCenterY offset positioning.',
   },
 ];
 
