@@ -20,6 +20,7 @@ import { GAME_W, GAME_H, FONT_FAMILY, TooltipManager } from '../../../src/ui';
 import { createHudText } from '../../../src/ui/Renderer';
 import { anchorPoint } from '../../../src/ui/screen-layout';
 import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
+import { getTooltips, setTooltips } from '../../../src/ui/SettingsStore';
 import gymTooltipLayoutJson from '../layouts/gym-tooltip.layout.json';
 
 // Parse the shared Tooltip scene layout once at module load.
@@ -58,8 +59,13 @@ export class GymTooltipScene extends GymSceneBase {
   // Mode toggle
   private useDomMode = true;
 
+  // Tooltip enable/disable state (default: enabled, persisted to localStorage)
+  private tooltipsEnabled = true;
+
   constructor() {
     super({ key: GYM_TOOLTIP_KEY });
+    // Load persisted tooltip preference (default: enabled)
+    this.tooltipsEnabled = getTooltips();
   }
 
   create(): void {
@@ -75,7 +81,7 @@ export class GymTooltipScene extends GymSceneBase {
       },
       {
         heading: 'Controls',
-        body: '[ DOM Mode ]: Switch tooltip rendering to DOM overlay mode (HTML div on top of canvas).\n[ Phaser Mode ]: Switch tooltip rendering to Phaser GameObject mode (in-scene containers with custom styling).\n[ Show Demo ]: Force-show a demo tooltip at the centre of the screen.\n[ Hide ]: Hide any currently visible tooltip.\nHover over coloured cards (Red, Blue, Green) below the controls to see contextual tooltips describing each card\'s ability. Move the pointer within a card to follow the tooltip position.'
+        body: '[ DOM Mode ]: Switch tooltip rendering to DOM overlay mode (HTML div on top of canvas).\n[ Phaser Mode ]: Switch tooltip rendering to Phaser GameObject mode (in-scene containers with custom styling).\n[ Show Demo ]: Force-show a demo tooltip at the centre of the screen.\n[ Disable/Enable ]: Toggle all tooltips on or off. When disabled, tooltips do not appear on hover or demo.\nHover over coloured cards (Red, Blue, Green) below the controls to see contextual tooltips describing each card\'s ability. Move the pointer within a card to follow the tooltip position.'
       },
       {
         heading: 'Usage Example',
@@ -83,7 +89,7 @@ export class GymTooltipScene extends GymSceneBase {
       },
       {
         heading: 'Test Plan',
-        body: '1. Press [ DOM Mode ] → mode label updates to "Mode: DOM overlay"\n2. Hover over the red card → tooltip appears showing "Red Card" description\n3. Move pointer within the card → tooltip follows the pointer position\n4. Move pointer away from card → tooltip disappears\n5. Press [ Phaser Mode ] → mode label updates\n6. Hover over the blue card → Phaser GameObject tooltip appears with border styling\n7. Press [ Show Demo ] → demo tooltip appears at centre\n8. Press [ Hide ] → tooltip disappears'
+        body: '1. Press [ DOM Mode ] → mode label updates to "Mode: DOM overlay"\n2. Hover over the red card → tooltip appears showing "Red Card" description\n3. Move pointer within the card → tooltip follows the pointer position\n4. Move pointer away from card → tooltip disappears\n5. Press [ Phaser Mode ] → mode label updates\n6. Hover over the blue card → Phaser GameObject tooltip appears with border styling\n7. Press [ Show Demo ] → demo tooltip appears at centre\n8. Press [ Disable ] → tooltips stop appearing; button shows "[ Enable ]"\n9. Press [ Enable ] → tooltips reappear on hover'
       }
     ]);
 
@@ -96,12 +102,26 @@ export class GymTooltipScene extends GymSceneBase {
     this.addButton(headerAnchor.x - 180, headerAnchor.y, '[ DOM Mode ]', () => this.setMode(true));
     this.addButton(headerAnchor.x + 20, headerAnchor.y, '[ Phaser Mode ]', () => this.setMode(false));
     this.addButton(headerAnchor.x + 200, headerAnchor.y, '[ Show Demo ]', () => this.showDemoTooltip());
-    this.addButton(headerAnchor.x + 380, headerAnchor.y, '[ Hide ]', () => this.hideTooltip());
+    this.addButton(
+      headerAnchor.x + 380, headerAnchor.y,
+      this.tooltipsEnabled ? '[ Disable ]' : '[ Enable ]',
+      () => this.toggleTooltips(),
+    );
 
     // Mode label — at label anchor y
     const modeLabel = createHudText(this, labelAnchor.x, labelAnchor.y, 'Mode: DOM overlay', '#88ccff', { fontSize: '16px' });
     modeLabel.setOrigin(0.5);
     modeLabel.setName('modeLabel');
+
+    // Tooltip status label — below mode label
+    const tooltipLabel = createHudText(
+      this, labelAnchor.x, labelAnchor.y + 25,
+      `Tooltips: ${this.tooltipsEnabled ? 'Enabled' : 'Disabled'}`,
+      this.tooltipsEnabled ? '#88ff88' : '#ff8888',
+      { fontSize: '14px' },
+    );
+    tooltipLabel.setOrigin(0.5);
+    tooltipLabel.setName('tooltipLabel');
 
     // Hover prompt — 50 px below label
     createHudText(this, labelAnchor.x, labelAnchor.y + 50, '── Hover over the cards below ──', '#6699aa', { fontSize: '14px' }).setOrigin(0.5);
@@ -186,7 +206,41 @@ export class GymTooltipScene extends GymSceneBase {
     this.hideTooltip();
   }
 
+  /** Toggle tooltips on/off and update the toggle button and status label. */
+  private toggleTooltips(): void {
+    this.tooltipsEnabled = !this.tooltipsEnabled;
+    setTooltips(this.tooltipsEnabled);
+
+    // Update the toggle button text
+    const toggleText = this.tooltipsEnabled ? '[ Disable ]' : '[ Enable ]';
+    // Find the toggle button (the one that shows [ Disable ] or [ Enable ])
+    const toggleBtn = this.children.list.find(
+      (c) =>
+        c instanceof Phaser.GameObjects.Text &&
+        (c.text === '[ Disable ]' || c.text === '[ Enable ]'),
+    ) as Phaser.GameObjects.Text | undefined;
+    if (toggleBtn) {
+      toggleBtn.setText(toggleText);
+    }
+
+    // Update the status label
+    const label = this.children.getByName('tooltipLabel') as Phaser.GameObjects.Text | undefined;
+    if (label) {
+      label.setText(`Tooltips: ${this.tooltipsEnabled ? 'Enabled' : 'Disabled'}`);
+      label.setColor(this.tooltipsEnabled ? '#88ff88' : '#ff8888');
+    }
+
+    // Hide any active tooltips when disabling
+    if (!this.tooltipsEnabled) {
+      this.hideTooltip();
+    }
+
+    this.logEvent(`Tooltips ${this.tooltipsEnabled ? 'enabled' : 'disabled'}`);
+  }
+
   private showCardTooltip(content: string, x: number, y: number, color: number): void {
+    if (!this.tooltipsEnabled) return;
+
     if (this.useDomMode) {
       this.domTooltipManager.show(content, x, y);
     } else {
@@ -198,6 +252,8 @@ export class GymTooltipScene extends GymSceneBase {
   }
 
   private showDemoTooltip(): void {
+    if (!this.tooltipsEnabled) return;
+
     const cx = GAME_W / 2;
     const cy = GAME_H / 2;
     if (this.useDomMode) {
