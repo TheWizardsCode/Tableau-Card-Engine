@@ -70,6 +70,9 @@ export const GYM_SVG_HELPERS_KEY = 'GymSvgHelpersScene';
 /** Market Offer Engine demo scene key. */
 export const GYM_MARKET_OFFER_ENGINE_KEY = 'GymMarketOfferEngineScene';
 
+/** SpatialRules (Grid + pathfinding) demo scene key. */
+export const GYM_SPATIAL_RULES_KEY = 'GymSpatialRulesScene';
+
 // ── Registry ──────────────────────────────────────────────
 
 /**
@@ -174,6 +177,12 @@ export const GYM_SCENE_CATALOGUE: GymSceneEntry[] = [
     title: 'Market Offer Engine',
     description:
       'Create market rows with configurable slots, purchase cards, refill from a deck, and lock/unlock slots. Demonstrates the MarketOfferEngine API.',
+  },
+  {
+    sceneKey: GYM_SPATIAL_RULES_KEY,
+    title: 'Spatial Rules: Grid & Pathfinding',
+    description:
+      'Configurable grid with interactive cells, A* pathfinding with distance metrics (Manhattan/Chebyshev/Euclidean), adjacency bonus computation, and blockable cells for obstacle testing.',
   },
 ];
 

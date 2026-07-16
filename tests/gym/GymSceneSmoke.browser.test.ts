@@ -14,6 +14,7 @@ import { GymTranscriptScene } from '../../example-games/gym/scenes/GymTranscript
 import { GymSaveLoadScene } from '../../example-games/gym/scenes/GymSaveLoadScene';
 import { GymSvgHelpersScene } from '../../example-games/gym/scenes/GymSvgHelpersScene';
 import { GymMarketOfferEngineScene } from '../../example-games/gym/scenes/GymMarketOfferEngineScene';
+import { GymSpatialRulesScene } from '../../example-games/gym/scenes/GymSpatialRulesScene';
 import { GymAudioFeedbackScene } from '../../example-games/gym/scenes/GymAudioFeedbackScene';
 import { GymGraphicsShaderSpikeScene } from '../../example-games/gym/scenes/GymGraphicsShaderSpikeScene';
 import { GymGraphicsLightingSpikeScene } from '../../example-games/gym/scenes/GymGraphicsLightingSpikeScene';
@@ -36,6 +37,7 @@ import {
   GYM_PARAMETERIZED_OVERLAY_KEY,
   GYM_SVG_HELPERS_KEY,
   GYM_MARKET_OFFER_ENGINE_KEY,
+  GYM_SPATIAL_RULES_KEY,
 } from '../../example-games/gym/GymRegistry';
 
 const SCENES = [
@@ -53,6 +55,7 @@ const SCENES = [
   { key: GYM_PARAMETERIZED_OVERLAY_KEY, Scene: GymParameterizedOverlayScene },
   { key: GYM_SVG_HELPERS_KEY, Scene: GymSvgHelpersScene },
   { key: GYM_MARKET_OFFER_ENGINE_KEY, Scene: GymMarketOfferEngineScene },
+  { key: GYM_SPATIAL_RULES_KEY, Scene: GymSpatialRulesScene },
 ];
 
 describe('Gym individual scene smoke', () => {

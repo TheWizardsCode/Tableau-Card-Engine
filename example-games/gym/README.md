@@ -31,6 +31,7 @@ Open `http://localhost:3000` and select **Gym** from the game selector. From the
 | SVG Rasterisation Pipeline | `GymSvgHelpersScene` | Fetch SVG text from an asset URL, rasterise it to a Phaser texture at configurable sizes, verify texture caching via getOrCreateTexture, and toggle scene validity with markSceneValid/markSceneInvalid. |
 | Market Offer Engine | `GymMarketOfferEngineScene` | Create market rows with configurable slots, purchase cards, refill from a deck, and lock/unlock slots. Demonstrates the MarketOfferEngine API. |
 | Screen Layout Language (SLL) | `GymSllScene` | Starts on the composed shell+scene layout, then cycles through shell-only, scene-only, and pixel override examples while mapping zones+anchors across viewport/DPR profiles and visualizing merged overlays |
+| Spatial Rules: Grid & Pathfinding | `GymSpatialRulesScene` | Configurable grid with interactive cells, A* pathfinding, distance metric selection (Manhattan/Chebyshev/Euclidean), adjacency bonus computation, and blockable obstacles |
 
 ## SLL Demo
 
