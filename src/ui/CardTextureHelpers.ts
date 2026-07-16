@@ -169,10 +169,24 @@ export async function reloadCardTexturesForDesign(
     }
   }
 
-  /** Rasterise SVG text to an HTMLCanvasElement at the given dimensions. */
+  /**
+   * Rasterise SVG text to an HTMLCanvasElement at the given dimensions.
+   *
+   * First modifies the SVG XML to set explicit width/height attributes
+   * (in pixels), matching how Phaser's SVGFile.onProcess() prepares the
+   * SVG before loading it into an Image. This ensures consistent rendering
+   * of internal elements (stroke widths, text sizes, layout) regardless of
+   * the SVG's original width/height units.
+   */
   function svgToCanvas(svgText: string, w: number, h: number): Promise<HTMLCanvasElement | null> {
     return new Promise((resolve) => {
-      const blob = new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' });
+      // Modify the SVG width/height to match target dimensions (like Phaser does)
+      const processed = svgText.replace(
+        /(<svg[^>]*\s)(width\s*=\s*")([^"]+)("[^>]*height\s*=\s*")([^"]+)("[^>]*>)/i,
+        `$1$2${w}px$4${h}px$6`,
+      );
+
+      const blob = new Blob([processed], { type: 'image/svg+xml;charset=utf-8' });
       const dataUrl = URL.createObjectURL(blob);
       const img = new Image();
       img.onload = () => {
