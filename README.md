@@ -60,6 +60,17 @@ tableau-card-engine/
 └── .gitignore
 ```
 
+### Shared HUD Components
+
+The engine provides a reusable HUD component library under `src/ui/` that
+standardises overlay, sidebar, and button UI across all example games.
+Components include HelpPanel, SettingsPanel, OverlayManager, Parameterized
+Overlay, CardGameScene base class with initHelpPanel/initSettingsPanel
+helpers, and depth conventions for consistent layering.
+
+See [Shared HUD Components](docs/DEVELOPER.md#shared-hud-components) in the
+Developer Guide for full documentation and usage examples.
+
 ## Technology Stack
 
 | Tool | Purpose |

@@ -18,6 +18,7 @@ This document covers everything you need to develop, test, and build the Tableau
 - [Managing Assets](#managing-assets)
 - [SVG Rendering & Migration](#svg-rendering--migration)
 - [HUD Layer](#hud-layer)
+- [Shared HUD Components](#shared-hud-components)
 - [Card Upgrade Rendering Pipeline](#card-upgrade-rendering-pipeline)
 - [Shared Renderer](#shared-renderer)
 - [Screen Layout Language (SLL)](#screen-layout-language-sll)
@@ -1010,6 +1011,14 @@ render consistently above gameplay content across all example games.
 |----------------------|--------|--------------------------------------------|
 | HUD container        | 1000   | Help/settings panels, buttons              |
 | Game-state overlays  | 2000   | Win, loss, game-over, round-end overlays   |
+
+### Full Component Reference
+
+For comprehensive documentation covering all shared HUD components
+(HelpPanel, SettingsPanel, HelpButton, SettingsButton, Overlay Manager,
+Parameterized Overlay, CardGameScene base class, undo/redo buttons, and
+HUD container patterns) see the
+[Shared HUD Components](#shared-hud-components) section below.
 
 ### Migration Guide
 
