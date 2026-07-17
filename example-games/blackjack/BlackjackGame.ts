@@ -281,6 +281,50 @@ export function dealerPlay(state: BlackjackGameState): void {
   }
 }
 
+// ── Undo/Redo Support ─────────────────────────────────────
+
+/**
+ * Revert the last player hit: remove the last card from the player's
+ * hand and return it to the top of the deck.
+ *
+ * @param state  The game state to modify.
+ * @returns The reverted card, or undefined if the player hand is empty.
+ */
+export function revertHit(state: BlackjackGameState): import('../../src/card-system/Card').Card | undefined {
+  if (state.playerHand.cards.isEmpty()) return undefined;
+
+  const removed = state.playerHand.cards.pop();
+  if (removed) {
+    removed.faceUp = false;
+    state.deck.push(removed);
+  }
+  // Restore PLAYER_TURN phase (in case player busted)
+  state.phase = 'PLAYER_TURN';
+  state.message = '';
+  return removed;
+}
+
+/**
+ * Revert the initial deal: return all cards from player and dealer
+ * hands to the deck and reset to IDLE phase.
+ *
+ * @param state  The game state to modify.
+ */
+export function revertDeal(state: BlackjackGameState): void {
+  const allCards = [
+    ...state.playerHand.cards.toArray(),
+    ...state.dealerHand.cards.toArray(),
+  ];
+  state.playerHand.cards.clear();
+  state.dealerHand.cards.clear();
+  for (const card of allCards) {
+    card.faceUp = false;
+    state.deck.push(card);
+  }
+  state.phase = 'IDLE';
+  state.message = '';
+}
+
 // ── Winner Determination ──────────────────────────────────
 
 /**

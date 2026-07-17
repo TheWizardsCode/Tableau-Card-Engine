@@ -21,6 +21,8 @@ import {
   playerStand,
   dealerPlay,
   determineWinner,
+  revertHit,
+  revertDeal,
   type BlackjackGameState,
   type BlackjackHand,
 } from '../example-games/blackjack/BlackjackGame';
@@ -537,5 +539,94 @@ describe('Blackjack end-to-end flow', () => {
     // Verify decks are consistent
     const totalCards = state.playerHand.cards.size() + state.dealerHand.cards.size() + state.deck.size();
     expect(totalCards).toBe(52);
+  });
+});
+
+// ── Undo/Redo Tests ────────────────────────────────────────
+
+describe('Blackjack undo/redo support', () => {
+  describe('revertHit', () => {
+    it('should return the last hit card to the deck', () => {
+      const state = createBlackjackGameState({ seed: 99 });
+      dealInitialHands(state);
+      const deckSizeBefore = state.deck.size();
+      const handSizeBefore = state.playerHand.cards.size();
+
+      playerHit(state);
+      expect(state.playerHand.cards.size()).toBe(handSizeBefore + 1);
+
+      const reverted = revertHit(state);
+      expect(reverted).toBeDefined();
+      expect(state.playerHand.cards.size()).toBe(handSizeBefore);
+      expect(state.deck.size()).toBe(deckSizeBefore);
+    });
+
+    it('should restore PLAYER_TURN phase after bust', () => {
+      const state = createBlackjackGameState();
+      state.playerHand.cards = new Pile([
+        { faceUp: false, rank: '10', suit: 'hearts' } as Card,
+        { faceUp: false, rank: 'Q', suit: 'diamonds' } as Card,
+      ]);
+      state.deck = new Pile([
+        { faceUp: false, rank: 'J', suit: 'spades' } as Card,
+      ]);
+      state.phase = 'PLAYER_TURN';
+
+      playerHit(state);
+      expect(state.phase).toBe('ROUND_OVER');
+      expect(state.message).toContain('Bust');
+
+      revertHit(state);
+      expect(state.phase).toBe('PLAYER_TURN');
+      expect(state.message).toBe('');
+    });
+
+    it('should return undefined if hand is empty', () => {
+      const state = createBlackjackGameState();
+      const result = revertHit(state);
+      expect(result).toBeUndefined();
+    });
+
+    it('should preserve total card count after revert', () => {
+      const state = createBlackjackGameState({ seed: 42 });
+      dealInitialHands(state);
+
+      const totalBefore = state.playerHand.cards.size() + state.dealerHand.cards.size() + state.deck.size();
+
+      playerHit(state);
+      const totalAfterHit = state.playerHand.cards.size() + state.dealerHand.cards.size() + state.deck.size();
+      expect(totalAfterHit).toBe(totalBefore); // drawn from deck, same total
+
+      revertHit(state);
+      const totalAfterUndo = state.playerHand.cards.size() + state.dealerHand.cards.size() + state.deck.size();
+      expect(totalAfterUndo).toBe(totalBefore);
+    });
+  });
+
+  describe('revertDeal', () => {
+    it('should return all dealt cards to the deck', () => {
+      const state = createBlackjackGameState({ seed: 99 });
+      const deckSizeBefore = state.deck.size();
+
+      dealInitialHands(state);
+      expect(state.deck.size()).toBe(deckSizeBefore - 4);
+      expect(state.playerHand.cards.size()).toBe(2);
+      expect(state.dealerHand.cards.size()).toBe(2);
+
+      revertDeal(state);
+      expect(state.deck.size()).toBe(deckSizeBefore);
+      expect(state.playerHand.cards.size()).toBe(0);
+      expect(state.dealerHand.cards.size()).toBe(0);
+      expect(state.phase).toBe('IDLE');
+    });
+
+    it('should be idempotent on empty hands', () => {
+      const state = createBlackjackGameState();
+      const deckSizeBefore = state.deck.size();
+
+      revertDeal(state);
+      expect(state.deck.size()).toBe(deckSizeBefore);
+      expect(state.phase).toBe('IDLE');
+    });
   });
 });
