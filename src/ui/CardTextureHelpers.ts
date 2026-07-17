@@ -172,19 +172,32 @@ export async function reloadCardTexturesForDesign(
   /**
    * Rasterise SVG text to an HTMLCanvasElement at the given dimensions.
    *
-   * First modifies the SVG XML to set explicit width/height attributes
-   * (in pixels), matching how Phaser's SVGFile.onProcess() prepares the
-   * SVG before loading it into an Image. This ensures consistent rendering
-   * of internal elements (stroke widths, text sizes, layout) regardless of
-   * the SVG's original width/height units.
+   * Sets explicit width/height attributes (in pixels) matching how Phaser's
+   * SVGFile.onProcess() prepares the SVG, and sets preserveAspectRatio="none"
+   * so the SVG content fills the entire canvas without letterboxing.
+   *
+   * The preserveAspectRatio override is essential because different SVG
+   * designs have different viewBox aspect ratios (e.g., classic saulspatz
+   * is 210×315 = 0.667, webisso is 167×243 = 0.688). Without it, the
+   * default "xMidYMid meet" behaviour centres content and adds margins,
+   * causing cards from different designs to appear at different visual
+   * sizes within the same canvas dimensions.
    */
   function svgToCanvas(svgText: string, w: number, h: number): Promise<HTMLCanvasElement | null> {
     return new Promise((resolve) => {
       // Modify the SVG width/height to match target dimensions (like Phaser does)
-      const processed = svgText.replace(
+      let processed = svgText.replace(
         /(<svg[^>]*\s)(width\s*=\s*")([^"]+)("[^>]*height\s*=\s*")([^"]+)("[^>]*>)/i,
         `$1$2${w}px$4${h}px$6`,
       );
+
+      // Add preserveAspectRatio="none" so the SVG fills the canvas uniformly
+      if (!/preserveAspectRatio\s*=\s*"/i.test(processed)) {
+        processed = processed.replace(
+          /(<svg[^>]*)(>)/i,
+          '$1 preserveAspectRatio="none"$2',
+        );
+      }
 
       const blob = new Blob([processed], { type: 'image/svg+xml;charset=utf-8' });
       const dataUrl = URL.createObjectURL(blob);
