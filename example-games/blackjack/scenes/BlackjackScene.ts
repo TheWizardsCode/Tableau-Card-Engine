@@ -20,6 +20,10 @@ import {
   getScore,
 } from '../BlackjackGame';
 import type { BlackjackGameState } from '../BlackjackGame';
+import { anchorPoint } from '../../../src/ui/screen-layout';
+import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
+import type { ScreenLayoutDocument, PixelPoint } from '../../../src/ui/screen-layout-schema';
+import blackjackLayoutJson from '../layouts/blackjack.layout.json';
 
 // ── Constants ──────────────────────────────────────────────
 
@@ -39,6 +43,29 @@ const COLOR_BG = '#1a2a2a';
 const COLOR_TEXT = '#ffffff';
 const COLOR_ACCENT = '#88ff88';
 const COLOR_WARNING = '#ffaa44';
+
+// Parse the Blackjack scene layout once at module load.
+const BK_LAYOUT: ScreenLayoutDocument | null = (() => {
+  const parsed = parseScreenLayoutDocument(blackjackLayoutJson);
+  return parsed.valid ? parsed.layout : null;
+})();
+
+const DEFAULT_VIEWPORT = { width: 1280, height: 720 };
+
+/**
+ * Resolve an anchor from the Blackjack SLL layout.
+ * Falls back to the default viewport center if no layout is available.
+ */
+function resolveBkAnchor(
+  zone: string,
+  anchor: string,
+  viewport = DEFAULT_VIEWPORT,
+): PixelPoint {
+  if (!BK_LAYOUT) {
+    return { x: GAME_W / 2, y: 60 };
+  }
+  return anchorPoint(BK_LAYOUT, zone, anchor, viewport, 1);
+}
 
 // ── Scene ──────────────────────────────────────────────────
 
@@ -68,8 +95,9 @@ export class BlackjackScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(COLOR_BG);
 
     // Title
+    const titlePos = resolveBkAnchor('title', 'center');
     this.add
-      .text(GAME_W / 2, 24, 'Blackjack', {
+      .text(titlePos.x, titlePos.y, 'Blackjack', {
         fontSize: '28px',
         color: COLOR_ACCENT,
         fontFamily: FONT_FAMILY,
@@ -78,8 +106,9 @@ export class BlackjackScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     // Back to menu button
+    const menuPos = resolveBkAnchor('menuButton', 'center');
     this.menuButton = this.add
-      .text(20, 16, '[ Menu ]', {
+      .text(menuPos.x, menuPos.y, '[ Menu ]', {
         fontSize: '12px',
         color: '#aaccaa',
         fontFamily: FONT_FAMILY,
@@ -93,8 +122,9 @@ export class BlackjackScene extends Phaser.Scene {
     this.menuButton.on('pointerout', () => this.menuButton.setColor('#aaccaa'));
 
     // Dealer label
+    const dealerLabelPos = resolveBkAnchor('dealerLabel', 'center');
     this.add
-      .text(GAME_W / 2, 64, 'Dealer', {
+      .text(dealerLabelPos.x, dealerLabelPos.y, 'Dealer', {
         fontSize: '14px',
         color: '#88aaaa',
         fontFamily: FONT_FAMILY,
@@ -103,13 +133,15 @@ export class BlackjackScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     // Dealer score
-    this.dealerScoreText = createHudText(this, GAME_W / 2, 84, '', COLOR_TEXT, {
+    const dealerScorePos = resolveBkAnchor('dealerScore', 'center');
+    this.dealerScoreText = createHudText(this, dealerScorePos.x, dealerScorePos.y, '', COLOR_TEXT, {
       fontSize: '13px',
     }).setOrigin(0.5);
 
     // Player label
+    const playerLabelPos = resolveBkAnchor('playerLabel', 'center');
     this.add
-      .text(GAME_W / 2, 340, 'Player', {
+      .text(playerLabelPos.x, playerLabelPos.y, 'Player', {
         fontSize: '14px',
         color: '#88aaaa',
         fontFamily: FONT_FAMILY,
@@ -118,13 +150,15 @@ export class BlackjackScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     // Player score
-    this.playerScoreText = createHudText(this, GAME_W / 2, 360, '', COLOR_TEXT, {
+    const playerScorePos = resolveBkAnchor('playerScore', 'center');
+    this.playerScoreText = createHudText(this, playerScorePos.x, playerScorePos.y, '', COLOR_TEXT, {
       fontSize: '13px',
     }).setOrigin(0.5);
 
     // Message / result text
+    const messagePos = resolveBkAnchor('message', 'center');
     this.messageText = this.add
-      .text(GAME_W / 2, 440, '', {
+      .text(messagePos.x, messagePos.y, '', {
         fontSize: '20px',
         color: COLOR_WARNING,
         fontFamily: FONT_FAMILY,
@@ -133,15 +167,19 @@ export class BlackjackScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     // Action buttons
-    this.hitButton = this.createActionButton(GAME_W / 2 - 120, 490, '[ Hit ]', COLOR_ACCENT, () => {
+    const hitBtnPos = resolveBkAnchor('hitButton', 'center');
+    const standBtnPos = resolveBkAnchor('standButton', 'center');
+    const dealBtnPos = resolveBkAnchor('dealButton', 'center');
+
+    this.hitButton = this.createActionButton(hitBtnPos.x, hitBtnPos.y, '[ Hit ]', COLOR_ACCENT, () => {
       this.onHit();
     });
 
-    this.standButton = this.createActionButton(GAME_W / 2 + 40, 490, '[ Stand ]', COLOR_ACCENT, () => {
+    this.standButton = this.createActionButton(standBtnPos.x, standBtnPos.y, '[ Stand ]', COLOR_ACCENT, () => {
       this.onStand();
     });
 
-    this.dealButton = this.createActionButton(GAME_W / 2 - 60, 490, '[ Deal ]', COLOR_ACCENT, () => {
+    this.dealButton = this.createActionButton(dealBtnPos.x, dealBtnPos.y, '[ Deal ]', COLOR_ACCENT, () => {
       this.onDeal();
     });
 
@@ -290,8 +328,9 @@ export class BlackjackScene extends Phaser.Scene {
   private renderPlayerCards(): void {
     const hand = this.state.playerHand;
     const totalW = hand.cards.length * CARD_WIDTH + (hand.cards.length - 1) * CARD_GAP;
-    const startX = GAME_W / 2 - totalW / 2 + CARD_WIDTH / 2;
-    const y = 380;
+    const playerCardsPos = resolveBkAnchor('playerCards', 'center');
+    const startX = playerCardsPos.x - totalW / 2 + CARD_WIDTH / 2;
+    const y = playerCardsPos.y;
 
     hand.cards.forEach((card, i) => {
       const x = startX + i * (CARD_WIDTH + CARD_GAP);
@@ -304,8 +343,9 @@ export class BlackjackScene extends Phaser.Scene {
   private renderDealerCards(): void {
     const hand = this.state.dealerHand;
     const totalW = hand.cards.length * CARD_WIDTH + (hand.cards.length - 1) * CARD_GAP;
-    const startX = GAME_W / 2 - totalW / 2 + CARD_WIDTH / 2;
-    const y = 100;
+    const dealerCardsPos = resolveBkAnchor('dealerCards', 'center');
+    const startX = dealerCardsPos.x - totalW / 2 + CARD_WIDTH / 2;
+    const y = dealerCardsPos.y;
 
     hand.cards.forEach((card, i) => {
       const x = startX + i * (CARD_WIDTH + CARD_GAP);

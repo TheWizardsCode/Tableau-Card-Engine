@@ -1,0 +1,132 @@
+{
+  "version": 1,
+  "id": "blackjack-layout",
+  "baseViewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "requiredZones": [
+    "title",
+    "menuButton",
+    "dealerLabel",
+    "dealerScore",
+    "dealerCards",
+    "playerLabel",
+    "playerScore",
+    "playerCards",
+    "message",
+    "hitButton",
+    "standButton",
+    "dealButton"
+  ],
+  "zones": {
+    "title": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.03333
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.03333 }
+      }
+    },
+    "menuButton": {
+      "rect": {
+        "x": 0.01562,
+        "y": 0.02222
+      },
+      "anchors": {
+        "center": { "x": 0.01562, "y": 0.02222 }
+      }
+    },
+    "dealerLabel": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.08889
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.08889 }
+      }
+    },
+    "dealerScore": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.11667
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.11667 }
+      }
+    },
+    "dealerCards": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.13889
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.13889 }
+      }
+    },
+    "playerLabel": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.47222
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.47222 }
+      }
+    },
+    "playerScore": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.5 }
+      }
+    },
+    "playerCards": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.52778
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.52778 }
+      }
+    },
+    "message": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.61111
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.61111 }
+      }
+    },
+    "hitButton": {
+      "rect": {
+        "x": 0.40625,
+        "y": 0.68056
+      },
+      "anchors": {
+        "center": { "x": 0.40625, "y": 0.68056 }
+      }
+    },
+    "standButton": {
+      "rect": {
+        "x": 0.53125,
+        "y": 0.68056
+      },
+      "anchors": {
+        "center": { "x": 0.53125, "y": 0.68056 }
+      }
+    },
+    "dealButton": {
+      "rect": {
+        "x": 0.45313,
+        "y": 0.68056
+      },
+      "anchors": {
+        "center": { "x": 0.45313, "y": 0.68056 }
+      }
+    }
+  }
+}
