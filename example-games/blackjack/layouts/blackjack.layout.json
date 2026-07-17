@@ -59,10 +59,10 @@
     "dealerCards": {
       "rect": {
         "x": 0.5,
-        "y": 0.29722
+        "y": 0.25625
       },
       "anchors": {
-        "center": { "x": 0.5, "y": 0.29722 }
+        "center": { "x": 0.5, "y": 0.25625 }
       }
     },
     "playerLabel": {
@@ -86,19 +86,19 @@
     "playerCards": {
       "rect": {
         "x": 0.5,
-        "y": 0.66944
+        "y": 0.68681
       },
       "anchors": {
-        "center": { "x": 0.5, "y": 0.66944 }
+        "center": { "x": 0.5, "y": 0.68681 }
       }
     },
     "message": {
       "rect": {
         "x": 0.5,
-        "y": 0.82222
+        "y": 0.84444
       },
       "anchors": {
-        "center": { "x": 0.5, "y": 0.82222 }
+        "center": { "x": 0.5, "y": 0.84444 }
       }
     },
     "hitButton": {
