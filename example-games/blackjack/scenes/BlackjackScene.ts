@@ -23,7 +23,10 @@ import type { BlackjackGameState } from '../BlackjackGame';
 import { anchorPoint } from '../../../src/ui/screen-layout';
 import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
 import type { ScreenLayoutDocument, PixelPoint } from '../../../src/ui/screen-layout-schema';
+import { CardGameScene } from '../../../src/ui';
+import type { HelpSection } from '../../../src/ui';
 import blackjackLayoutJson from '../layouts/blackjack.layout.json';
+import helpContent from '../help-content.json';
 
 // ── Constants ──────────────────────────────────────────────
 
@@ -69,7 +72,7 @@ function resolveBkAnchor(
 
 // ── Scene ──────────────────────────────────────────────────
 
-export class BlackjackScene extends Phaser.Scene {
+export class BlackjackScene extends CardGameScene {
   static readonly KEY = SCENE_KEY;
 
   private state!: BlackjackGameState;
@@ -79,7 +82,6 @@ export class BlackjackScene extends Phaser.Scene {
   private hitButton!: Phaser.GameObjects.Text;
   private standButton!: Phaser.GameObjects.Text;
   private dealButton!: Phaser.GameObjects.Text;
-  private menuButton!: Phaser.GameObjects.Text;
   private playerCards: Phaser.GameObjects.Graphics[] = [];
   private playerCardTexts: Phaser.GameObjects.Text[] = [];
   private dealerCards: Phaser.GameObjects.Graphics[] = [];
@@ -94,6 +96,8 @@ export class BlackjackScene extends Phaser.Scene {
   create(): void {
     this.cameras.main.setBackgroundColor(COLOR_BG);
 
+    super.create();
+
     // Title
     const titlePos = resolveBkAnchor('title', 'center');
     this.add
@@ -104,22 +108,6 @@ export class BlackjackScene extends Phaser.Scene {
         fontStyle: 'bold',
       })
       .setOrigin(0.5);
-
-    // Back to menu button
-    const menuPos = resolveBkAnchor('menuButton', 'center');
-    this.menuButton = this.add
-      .text(menuPos.x, menuPos.y, '[ Menu ]', {
-        fontSize: '12px',
-        color: '#aaccaa',
-        fontFamily: FONT_FAMILY,
-      })
-      .setInteractive({ useHandCursor: true });
-
-    this.menuButton.on('pointerdown', () => {
-      this.scene.start('GameSelectorScene');
-    });
-    this.menuButton.on('pointerover', () => this.menuButton.setColor(COLOR_ACCENT));
-    this.menuButton.on('pointerout', () => this.menuButton.setColor('#aaccaa'));
 
     // Dealer label
     const dealerLabelPos = resolveBkAnchor('dealerLabel', 'center');
@@ -183,8 +171,18 @@ export class BlackjackScene extends Phaser.Scene {
       this.onDeal();
     });
 
+    // Help panel and settings panel
+    if (!this.replayMode) {
+      this.initHelpPanel(helpContent as HelpSection[]);
+      this.initSettingsPanel();
+    }
+
     // Start a new game
     this.startNewRound();
+  }
+
+  shutdown(): void {
+    this.shutdownBase();
   }
 
   // ── Button helper ──────────────────────────────────────
