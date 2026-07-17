@@ -56,6 +56,7 @@ export {
   GYM_SPATIAL_RULES_KEY,
   GYM_TOKEN_PILE_VIEW_KEY,
   GYM_RULE_ENGINE_KEY,
+  GYM_BLACKJACK_KEY,
   GYM_SCENE_CATALOGUE,
 } from './GymRegistry';
 export type { GymSceneEntry } from './GymRegistry';

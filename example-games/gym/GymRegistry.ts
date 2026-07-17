@@ -85,6 +85,9 @@ export const GYM_TOKEN_PILE_VIEW_KEY = 'GymTokenPileViewScene';
 /** Rule Engine demo scene key. */
 export const GYM_RULE_ENGINE_KEY = 'GymRuleEngineScene';
 
+/** Blackjack game scene key for Gym demonstration access. */
+export const GYM_BLACKJACK_KEY = 'BlackjackScene';
+
 // ── Registry ──────────────────────────────────────────────
 
 /**
@@ -219,6 +222,12 @@ export const GYM_SCENE_CATALOGUE: GymSceneEntry[] = [
     title: 'Rule Engine: LegalityResult + EconomyLedger',
     description:
       'Interactively explore the LegalityResult discriminated union pattern (legal/illegal actions) and EconomyLedger resource tracking with constraint enforcement.',
+  },
+  {
+    sceneKey: GYM_BLACKJACK_KEY,
+    title: 'Blackjack',
+    description:
+      'Play a round of Blackjack against the dealer. Demonstrates transcript recording and save/load features in a real game context.',
   },
 ];
 

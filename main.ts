@@ -20,6 +20,7 @@ import { SushiGoScene } from './example-games/sushi-go/scenes/SushiGoScene';
 import { FeudalismScene } from './example-games/feudalism/scenes/FeudalismScene';
 import { LostCitiesScene } from './example-games/lost-cities/scenes/LostCitiesScene';
 import { MainStreetScene } from './example-games/main-street/scenes/MainStreetScene';
+import { BlackjackScene } from './example-games/blackjack/scenes/BlackjackScene';
 import {
   GymRouterScene,
   GymDeckRngScene,
@@ -96,6 +97,12 @@ export const GAMES: GameEntry[] = [
       'Single-player tableau builder. Purchase businesses, place them along a 10-slot street for synergy bonuses, manage coins and reputation, and build the highest-scoring Main Street in 20 turns.',
     thumbnail: 'games/main-street/thumbnail',
   },
+  {
+    sceneKey: 'BlackjackScene',
+    title: 'Blackjack',
+    description:
+      'Classic single-player Blackjack vs the dealer. Hit or stand to reach 21 without going bust.',
+  },
 ];
 
 // ── Phaser boot ────────────────────────────────────────────
@@ -117,6 +124,7 @@ createCardGame({
     FeudalismScene,
     LostCitiesScene,
     MainStreetScene,
+    BlackjackScene,
     // Gym demo scenes
     GymRouterScene,
     GymDeckRngScene,
