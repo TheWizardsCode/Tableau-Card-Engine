@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "id": "gym-hud-components-layout",
+  "baseViewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "requiredZones": [
+    "instructions",
+    "controls",
+    "controls2",
+    "status",
+    "depth",
+    "log"
+  ],
+  "zones": {
+    "instructions": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.07778
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.07778 }
+      }
+    },
+    "controls": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.11944
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.11944 }
+      }
+    },
+    "controls2": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.16111
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.16111 }
+      }
+    },
+    "status": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.21111
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.21111 }
+      }
+    },
+    "depth": {
+      "rect": {
+        "x": 0.05,
+        "y": 0.25
+      },
+      "anchors": {
+        "left": { "x": 0.05, "y": 0.25 }
+      }
+    },
+    "log": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.325
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.325 }
+      }
+    }
+  }
+}

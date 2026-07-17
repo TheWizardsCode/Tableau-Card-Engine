@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- Two tempura pieces -->
+  <rect width="128" height="128" fill="none" />
+  <g stroke="#2E3B2E" stroke-width="2" fill="#FFD37A">
+    <ellipse cx="42" cy="66" rx="18" ry="30" />
+    <ellipse cx="86" cy="66" rx="18" ry="30" />
+  </g>
+  <path d="M30 44 C40 36, 54 36, 60 44" stroke="#2E3B2E" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.6" />
+</svg>

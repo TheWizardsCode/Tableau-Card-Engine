@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "id": "gym-parameterized-overlay-layout",
+  "baseViewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "requiredZones": [
+    "header",
+    "controls",
+    "offsetIndicators",
+    "log"
+  ],
+  "zones": {
+    "header": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.08333
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.08333 }
+      }
+    },
+    "controls": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.16667
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.16667 }
+      }
+    },
+    "offsetIndicators": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.25
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.25 }
+      }
+    },
+    "log": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.5 }
+      }
+    }
+  }
+}
