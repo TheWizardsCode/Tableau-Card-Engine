@@ -23,7 +23,7 @@ import type { BlackjackGameState } from '../BlackjackGame';
 import { anchorPoint } from '../../../src/ui/screen-layout';
 import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
 import type { ScreenLayoutDocument, PixelPoint } from '../../../src/ui/screen-layout-schema';
-import { CardGameScene } from '../../../src/ui';
+import { CardGameScene, getCardTexture, preloadCardAssets } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
 import blackjackLayoutJson from '../layouts/blackjack.layout.json';
 import helpContent from '../help-content.json';
@@ -32,15 +32,9 @@ import helpContent from '../help-content.json';
 
 const SCENE_KEY = 'BlackjackScene';
 
-const CARD_WIDTH = 80;
-const CARD_HEIGHT = 110;
+const CARD_WIDTH = 90;
+const CARD_HEIGHT = 126;
 const CARD_GAP = 10;
-const CARD_RADIUS = 6;
-
-const COLOR_CARD_BG = 0x2a2a3a;
-const COLOR_CARD_BORDER = 0x555577;
-const COLOR_CARD_BG_HIDDEN = 0x3a2a2a;
-const COLOR_CARD_BORDER_HIDDEN = 0x775555;
 
 const COLOR_BG = '#1a2a2a';
 const COLOR_TEXT = '#ffffff';
@@ -82,13 +76,17 @@ export class BlackjackScene extends CardGameScene {
   private hitButton!: Phaser.GameObjects.Text;
   private standButton!: Phaser.GameObjects.Text;
   private dealButton!: Phaser.GameObjects.Text;
-  private playerCards: Phaser.GameObjects.Graphics[] = [];
-  private playerCardTexts: Phaser.GameObjects.Text[] = [];
-  private dealerCards: Phaser.GameObjects.Graphics[] = [];
-  private dealerCardTexts: Phaser.GameObjects.Text[] = [];
+  private playerCardSprites: Phaser.GameObjects.Image[] = [];
+  private dealerCardSprites: Phaser.GameObjects.Image[] = [];
 
   constructor() {
     super({ key: SCENE_KEY });
+  }
+
+  // ── Preload ───────────────────────────────────────────
+
+  preload(): void {
+    preloadCardAssets(this, CARD_WIDTH, CARD_HEIGHT);
   }
 
   // ── Lifecycle ──────────────────────────────────────────
@@ -174,6 +172,7 @@ export class BlackjackScene extends CardGameScene {
     // Help panel and settings panel
     if (!this.replayMode) {
       this.initHelpPanel(helpContent as HelpSection[]);
+      this.initSoundSystem([], {});
       this.initSettingsPanel();
     }
 
@@ -313,14 +312,10 @@ export class BlackjackScene extends CardGameScene {
   }
 
   private clearCardDisplays(): void {
-    for (const g of this.playerCards) g.destroy();
-    for (const t of this.playerCardTexts) t.destroy();
-    for (const g of this.dealerCards) g.destroy();
-    for (const t of this.dealerCardTexts) t.destroy();
-    this.playerCards = [];
-    this.playerCardTexts = [];
-    this.dealerCards = [];
-    this.dealerCardTexts = [];
+    for (const s of this.playerCardSprites) s.destroy();
+    for (const s of this.dealerCardSprites) s.destroy();
+    this.playerCardSprites = [];
+    this.dealerCardSprites = [];
   }
 
   private renderPlayerCards(): void {
@@ -330,12 +325,12 @@ export class BlackjackScene extends CardGameScene {
     const startX = playerCardsPos.x - totalW / 2 + CARD_WIDTH / 2;
     const y = playerCardsPos.y;
 
-    hand.cards.forEach((card, i) => {
-      const x = startX + i * (CARD_WIDTH + CARD_GAP);
-      const { bg, txt } = this.createCard(x, y, CARD_WIDTH, CARD_HEIGHT, card, false);
-      this.playerCards.push(bg);
-      this.playerCardTexts.push(txt);
-    });
+    for (const card of hand.cards) {
+      const x = startX + this.playerCardSprites.length * (CARD_WIDTH + CARD_GAP);
+      const sprite = this.add.image(x, y, getCardTexture(card));
+      sprite.setDisplaySize(CARD_WIDTH, CARD_HEIGHT);
+      this.playerCardSprites.push(sprite);
+    }
   }
 
   private renderDealerCards(): void {
@@ -345,83 +340,11 @@ export class BlackjackScene extends CardGameScene {
     const startX = dealerCardsPos.x - totalW / 2 + CARD_WIDTH / 2;
     const y = dealerCardsPos.y;
 
-    hand.cards.forEach((card, i) => {
-      const x = startX + i * (CARD_WIDTH + CARD_GAP);
-      const isHidden = i === 0 && this.state.dealerHoleCardHidden;
-      const { bg, txt } = this.createCard(x, y, CARD_WIDTH, CARD_HEIGHT, card, isHidden);
-      this.dealerCards.push(bg);
-      this.dealerCardTexts.push(txt);
-    });
-  }
-
-  private createCard(
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    card: { rank: string; suit: string },
-    hidden: boolean,
-  ): { bg: Phaser.GameObjects.Graphics; txt: Phaser.GameObjects.Text } {
-    const bg = this.add.graphics();
-
-    if (hidden) {
-      bg.fillStyle(COLOR_CARD_BG_HIDDEN, 1);
-      bg.fillRoundedRect(x - w / 2, y, w, h, CARD_RADIUS);
-      bg.lineStyle(2, COLOR_CARD_BORDER_HIDDEN, 1);
-      bg.strokeRoundedRect(x - w / 2, y, w, h, CARD_RADIUS);
-
-      // Draw card back pattern (simple X)
-      bg.lineStyle(2, 0x884444, 0.5);
-      bg.beginPath();
-      bg.moveTo(x - w / 2 + 8, y + 8);
-      bg.lineTo(x + w / 2 - 8, y + h - 8);
-      bg.moveTo(x + w / 2 - 8, y + 8);
-      bg.lineTo(x - w / 2 + 8, y + h - 8);
-      bg.strokePath();
-
-      const txt = this.add
-        .text(x, y + h / 2, '?', {
-          fontSize: '28px',
-          color: '#884444',
-          fontFamily: FONT_FAMILY,
-          fontStyle: 'bold',
-        })
-        .setOrigin(0.5);
-      return { bg, txt };
-    }
-
-    // Card background
-    const isRed = card.suit === 'hearts' || card.suit === 'diamonds';
-    const displayRank = card.rank;
-    const cardColor = isRed ? '#ff8888' : '#ffffff';
-
-    bg.fillStyle(COLOR_CARD_BG, 1);
-    bg.fillRoundedRect(x - w / 2, y, w, h, CARD_RADIUS);
-    bg.lineStyle(2, COLOR_CARD_BORDER, 1);
-    bg.strokeRoundedRect(x - w / 2, y, w, h, CARD_RADIUS);
-
-    const displaySuit = this.suitSymbol(card.suit);
-
-    const txt = this.add
-      .text(x, y + h / 2, `${displayRank}\n${displaySuit}`, {
-        fontSize: '16px',
-        color: cardColor,
-        fontFamily: FONT_FAMILY,
-        fontStyle: 'bold',
-        align: 'center',
-      })
-      .setOrigin(0.5);
-
-    return { bg, txt };
-  }
-
-  private suitSymbol(suit: string): string {
-    switch (suit) {
-      case 'hearts': return '\u2665';
-      case 'diamonds': return '\u2666';
-      case 'clubs': return '\u2663';
-      case 'spades': return '\u2660';
-      default: return suit;
+    for (const card of hand.cards) {
+      const x = startX + this.dealerCardSprites.length * (CARD_WIDTH + CARD_GAP);
+      const sprite = this.add.image(x, y, getCardTexture(card));
+      sprite.setDisplaySize(CARD_WIDTH, CARD_HEIGHT);
+      this.dealerCardSprites.push(sprite);
     }
   }
 }

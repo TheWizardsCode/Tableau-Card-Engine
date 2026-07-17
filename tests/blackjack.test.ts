@@ -214,7 +214,7 @@ describe('Blackjack dealing', () => {
   let state: BlackjackGameState;
 
   beforeEach(() => {
-    state = createBlackjackGameState();
+    state = createBlackjackGameState({ seed: 99 });
   });
 
   it('should deal 2 cards to player and 2 to dealer', () => {
@@ -260,7 +260,7 @@ describe('Blackjack player hit', () => {
   let state: BlackjackGameState;
 
   beforeEach(() => {
-    state = createBlackjackGameState();
+    state = createBlackjackGameState({ seed: 99 });
     dealInitialHands(state);
   });
 
@@ -330,7 +330,7 @@ describe('Blackjack player stand', () => {
   let state: BlackjackGameState;
 
   beforeEach(() => {
-    state = createBlackjackGameState();
+    state = createBlackjackGameState({ seed: 99 });
     dealInitialHands(state);
   });
 

@@ -177,10 +177,16 @@ export function dealInitialHands(state: BlackjackGameState): void {
   }
 
   // Deal: player, dealer, player, dealer
-  state.playerHand.cards.push(state.deck.pop()!);
-  state.dealerHand.cards.push(state.deck.pop()!);
-  state.playerHand.cards.push(state.deck.pop()!);
-  state.dealerHand.cards.push(state.deck.pop()!);
+  const p1 = state.deck.pop()!;
+  const d1 = state.deck.pop()!;
+  const p2 = state.deck.pop()!;
+  const d2 = state.deck.pop()!;
+  p1.faceUp = true;
+  p2.faceUp = true;
+  d2.faceUp = true; // dealer's second card face-up
+  // d1 stays faceDown (hole card)
+  state.playerHand.cards.push(p1, p2);
+  state.dealerHand.cards.push(d1, d2);
 
   state.dealerHoleCardHidden = true;
   state.phase = 'PLAYER_TURN';
@@ -208,7 +214,9 @@ export function playerHit(state: BlackjackGameState): void {
   if (state.phase !== 'PLAYER_TURN') return;
   if (state.deck.length === 0) return;
 
-  state.playerHand.cards.push(state.deck.pop()!);
+  const hitCard = state.deck.pop()!;
+  hitCard.faceUp = true;
+  state.playerHand.cards.push(hitCard);
 
   if (isBust(state.playerHand)) {
     state.phase = 'ROUND_OVER';
@@ -225,6 +233,9 @@ export function playerStand(state: BlackjackGameState): void {
   if (state.phase !== 'PLAYER_TURN') return;
 
   state.dealerHoleCardHidden = false;
+  if (state.dealerHand.cards[0]) {
+    state.dealerHand.cards[0].faceUp = true; // reveal hole card
+  }
   state.phase = 'DEALER_TURN';
 }
 
@@ -247,7 +258,9 @@ export function dealerPlay(state: BlackjackGameState): void {
 
   while (getScore(state.dealerHand) <= DEALER_HIT_THRESHOLD && !isBust(state.dealerHand)) {
     if (state.deck.length === 0 || iterations >= MAX_ITERATIONS) break;
-    state.dealerHand.cards.push(state.deck.pop()!);
+    const dealerCard = state.deck.pop()!;
+    dealerCard.faceUp = true;
+    state.dealerHand.cards.push(dealerCard);
     iterations++;
   }
 
