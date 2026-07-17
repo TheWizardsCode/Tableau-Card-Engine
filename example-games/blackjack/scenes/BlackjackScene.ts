@@ -32,8 +32,8 @@ import helpContent from '../help-content.json';
 
 const SCENE_KEY = 'BlackjackScene';
 
-const CARD_WIDTH = 90;
-const CARD_HEIGHT = 126;
+const CARD_WIDTH = 100;
+const CARD_HEIGHT = 140;
 const CARD_GAP = 10;
 
 const COLOR_BG = '#1a2a2a';
