@@ -41,40 +41,22 @@
     "dealerLabel": {
       "rect": {
         "x": 0.5,
-        "y": 0.08889
+        "y": 0.39028
       },
       "anchors": {
-        "center": { "x": 0.5, "y": 0.08889 }
+        "center": { "x": 0.5, "y": 0.39028 }
       }
     },
     "dealerScore": {
       "rect": {
         "x": 0.5,
-        "y": 0.11667
+        "y": 0.42083
       },
       "anchors": {
-        "center": { "x": 0.5, "y": 0.11667 }
+        "center": { "x": 0.5, "y": 0.42083 }
       }
     },
     "dealerCards": {
-      "rect": {
-        "x": 0.5,
-        "y": 0.13889
-      },
-      "anchors": {
-        "center": { "x": 0.5, "y": 0.13889 }
-      }
-    },
-    "playerLabel": {
-      "rect": {
-        "x": 0.5,
-        "y": 0.47222
-      },
-      "anchors": {
-        "center": { "x": 0.5, "y": 0.47222 }
-      }
-    },
-    "playerScore": {
       "rect": {
         "x": 0.5,
         "y": 0.5
@@ -83,49 +65,67 @@
         "center": { "x": 0.5, "y": 0.5 }
       }
     },
+    "playerLabel": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.62083
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.62083 }
+      }
+    },
+    "playerScore": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.65139
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.65139 }
+      }
+    },
     "playerCards": {
       "rect": {
         "x": 0.5,
-        "y": 0.52778
+        "y": 0.73056
       },
       "anchors": {
-        "center": { "x": 0.5, "y": 0.52778 }
+        "center": { "x": 0.5, "y": 0.73056 }
       }
     },
     "message": {
       "rect": {
         "x": 0.5,
-        "y": 0.61111
+        "y": 0.84583
       },
       "anchors": {
-        "center": { "x": 0.5, "y": 0.61111 }
+        "center": { "x": 0.5, "y": 0.84583 }
       }
     },
     "hitButton": {
       "rect": {
         "x": 0.40625,
-        "y": 0.79167
+        "y": 0.93056
       },
       "anchors": {
-        "center": { "x": 0.40625, "y": 0.79167 }
+        "center": { "x": 0.40625, "y": 0.93056 }
       }
     },
     "standButton": {
       "rect": {
         "x": 0.53125,
-        "y": 0.79167
+        "y": 0.93056
       },
       "anchors": {
-        "center": { "x": 0.53125, "y": 0.79167 }
+        "center": { "x": 0.53125, "y": 0.93056 }
       }
     },
     "dealButton": {
       "rect": {
         "x": 0.45313,
-        "y": 0.75
+        "y": 0.88889
       },
       "anchors": {
-        "center": { "x": 0.45313, "y": 0.75 }
+        "center": { "x": 0.45313, "y": 0.88889 }
       }
     }
   }
