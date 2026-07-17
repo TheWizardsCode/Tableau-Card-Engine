@@ -21,6 +21,7 @@ import {
   GYM_SLL_KEY,
   GYM_LAYOUT_OWNERSHIP_KEY,
   GYM_SVG_HELPERS_KEY,
+  GYM_AI_STRATEGY_KEY,
   GYM_SCENE_CATALOGUE,
 } from '../../example-games/gym/GymRegistry';
 import type { GymSceneEntry } from '../../example-games/gym/GymRegistry';
@@ -39,6 +40,7 @@ describe('GymRegistry', () => {
     expect(GYM_SLL_KEY).toBe('GymSllScene');
     expect(GYM_LAYOUT_OWNERSHIP_KEY).toBe('GymLayoutOwnershipScene');
     expect(GYM_SVG_HELPERS_KEY).toBe('GymSvgHelpersScene');
+    expect(GYM_AI_STRATEGY_KEY).toBe('GymAiStrategyScene');
   });
 
   it('catalogue contains all demo scene entries', () => {
@@ -54,6 +56,7 @@ describe('GymRegistry', () => {
     expect(catalogueKeys).toContain(GYM_SLL_KEY);
     expect(catalogueKeys).toContain(GYM_LAYOUT_OWNERSHIP_KEY);
     expect(catalogueKeys).toContain(GYM_SVG_HELPERS_KEY);
+    expect(catalogueKeys).toContain(GYM_AI_STRATEGY_KEY);
   });
 
   it('every catalogue entry has a non-empty title and description', () => {

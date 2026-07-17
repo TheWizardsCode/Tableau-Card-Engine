@@ -19,6 +19,7 @@ export { GymTranscriptScene } from './scenes/GymTranscriptScene';
 export { GymSaveLoadScene } from './scenes/GymSaveLoadScene';
 export { GymAudioFeedbackScene } from './scenes/GymAudioFeedbackScene';
 export { GymI18nScene } from './scenes/GymI18nScene';
+export { GymAiStrategyScene } from './scenes/GymAiStrategyScene';
 export { GymGraphicsShaderSpikeScene } from './scenes/GymGraphicsShaderSpikeScene';
 export { GymGraphicsLightingSpikeScene } from './scenes/GymGraphicsLightingSpikeScene';
 export { GymSllScene } from './scenes/GymSllScene';
@@ -50,6 +51,7 @@ export {
   GYM_LAYOUT_OWNERSHIP_KEY,
   GYM_PARAMETERIZED_OVERLAY_KEY,
   GYM_SVG_HELPERS_KEY,
+  GYM_AI_STRATEGY_KEY,
   GYM_MARKET_OFFER_ENGINE_KEY,
   GYM_SPATIAL_RULES_KEY,
   GYM_TOKEN_PILE_VIEW_KEY,

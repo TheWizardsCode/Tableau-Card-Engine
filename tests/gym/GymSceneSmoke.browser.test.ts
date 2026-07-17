@@ -16,6 +16,7 @@ import { GymSvgHelpersScene } from '../../example-games/gym/scenes/GymSvgHelpers
 import { GymMarketOfferEngineScene } from '../../example-games/gym/scenes/GymMarketOfferEngineScene';
 import { GymSpatialRulesScene } from '../../example-games/gym/scenes/GymSpatialRulesScene';
 import { GymRuleEngineScene } from '../../example-games/gym/scenes/GymRuleEngineScene';
+import { GymAiStrategyScene } from '../../example-games/gym/scenes/GymAiStrategyScene';
 import { GymAudioFeedbackScene } from '../../example-games/gym/scenes/GymAudioFeedbackScene';
 import { GymI18nScene } from '../../example-games/gym/scenes/GymI18nScene';
 import { GymGraphicsShaderSpikeScene } from '../../example-games/gym/scenes/GymGraphicsShaderSpikeScene';
@@ -39,6 +40,7 @@ import {
   GYM_LAYOUT_OWNERSHIP_KEY,
   GYM_PARAMETERIZED_OVERLAY_KEY,
   GYM_SVG_HELPERS_KEY,
+  GYM_AI_STRATEGY_KEY,
   GYM_MARKET_OFFER_ENGINE_KEY,
   GYM_SPATIAL_RULES_KEY,
   GYM_RULE_ENGINE_KEY,
@@ -59,6 +61,7 @@ const SCENES = [
   { key: GYM_LAYOUT_OWNERSHIP_KEY, Scene: GymLayoutOwnershipScene },
   { key: GYM_PARAMETERIZED_OVERLAY_KEY, Scene: GymParameterizedOverlayScene },
   { key: GYM_SVG_HELPERS_KEY, Scene: GymSvgHelpersScene },
+  { key: GYM_AI_STRATEGY_KEY, Scene: GymAiStrategyScene },
   { key: GYM_MARKET_OFFER_ENGINE_KEY, Scene: GymMarketOfferEngineScene },
   { key: GYM_SPATIAL_RULES_KEY, Scene: GymSpatialRulesScene },
   { key: GYM_RULE_ENGINE_KEY, Scene: GymRuleEngineScene },
