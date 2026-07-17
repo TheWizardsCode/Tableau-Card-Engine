@@ -6,7 +6,9 @@
  * dealer AI, and winner determination.
  *
  * Uses the shared card-system types for card representation and
- * the core-engine's seeded RNG for reproducible shuffles.
+ * the core-engine's seeded RNG for reproducible shuffles. Game
+ * state collections (deck, player hand, dealer hand) use the
+ * {@link Pile} abstraction from the card system.
  *
  * @module example-games/blackjack/BlackjackGame
  */
@@ -15,12 +17,13 @@ import type { Card } from '../../src/card-system/Card';
 import { createStandardDeck } from '../../src/card-system/Deck';
 import { createSeededRng } from '../../src/core-engine/SeededRng';
 import { shuffle } from '../../src/card-system/Deck';
+import { Pile } from '../../src/card-system/Pile';
 
 // ── Types ──────────────────────────────────────────────────
 
-/** A hand of cards in Blackjack. */
+/** A hand of cards in Blackjack, managed as a LIFO pile. */
 export interface BlackjackHand {
-  cards: Card[];
+  cards: Pile<Card>;
 }
 
 /**
@@ -35,7 +38,7 @@ export type BlackjackPhase = 'IDLE' | 'PLAYER_TURN' | 'DEALER_TURN' | 'ROUND_OVE
 /** Full game state for a single round of Blackjack. */
 export interface BlackjackGameState {
   /** The remaining deck (cards not yet dealt). */
-  deck: Card[];
+  deck: Pile<Card>;
   /** The player's hand. */
   playerHand: BlackjackHand;
   /** The dealer's hand (first card face-down until dealer turn). */
@@ -87,12 +90,12 @@ function rankToValue(rank: string): number {
  * count as 1.  Returns 0 for an empty hand.
  */
 export function getScore(hand: BlackjackHand): number {
-  if (!hand.cards.length) return 0;
+  if (hand.cards.isEmpty()) return 0;
 
   let score = 0;
   let aceCount = 0;
 
-  for (const card of hand.cards) {
+  for (const card of hand.cards.toArray()) {
     const value = rankToValue(card.rank);
     score += value;
     if (card.rank === 'A') {
@@ -114,7 +117,7 @@ export function getScore(hand: BlackjackHand): number {
  * An empty hand is never bust.
  */
 export function isBust(hand: BlackjackHand): boolean {
-  if (!hand.cards.length) return false;
+  if (hand.cards.isEmpty()) return false;
   return getScore(hand) > 21;
 }
 
@@ -123,7 +126,7 @@ export function isBust(hand: BlackjackHand): boolean {
  * an Ace and a 10-value card, totalling 21).
  */
 export function isBlackjack(hand: BlackjackHand): boolean {
-  if (hand.cards.length !== 2) return false;
+  if (hand.cards.size() !== 2) return false;
   return getScore(hand) === 21;
 }
 
@@ -142,19 +145,19 @@ export function createBlackjackGameState(options: BlackjackGameOptions = {}): Bl
   } = options;
 
   const rng = createSeededRng(seed);
-  let deck: Card[] = [];
+  let cards: Card[] = [];
 
   for (let i = 0; i < deckCount; i++) {
     const singleDeck = createStandardDeck();
-    deck = deck.concat(singleDeck);
+    cards = cards.concat(singleDeck);
   }
 
-  shuffle(deck, rng);
+  shuffle(cards, rng);
 
   return {
-    deck,
-    playerHand: { cards: [] },
-    dealerHand: { cards: [] },
+    deck: new Pile(cards),
+    playerHand: { cards: new Pile<Card>() },
+    dealerHand: { cards: new Pile<Card>() },
     phase: 'IDLE',
     dealerHoleCardHidden: true,
     message: '',
@@ -172,7 +175,7 @@ export function createBlackjackGameState(options: BlackjackGameOptions = {}): Bl
  */
 export function dealInitialHands(state: BlackjackGameState): void {
   // Verify we have enough cards
-  if (state.deck.length < 4) {
+  if (state.deck.size() < 4) {
     throw new Error('Not enough cards in the deck to deal');
   }
 
@@ -212,7 +215,7 @@ export function dealInitialHands(state: BlackjackGameState): void {
  */
 export function playerHit(state: BlackjackGameState): void {
   if (state.phase !== 'PLAYER_TURN') return;
-  if (state.deck.length === 0) return;
+  if (state.deck.isEmpty()) return;
 
   const hitCard = state.deck.pop()!;
   hitCard.faceUp = true;
@@ -233,8 +236,9 @@ export function playerStand(state: BlackjackGameState): void {
   if (state.phase !== 'PLAYER_TURN') return;
 
   state.dealerHoleCardHidden = false;
-  if (state.dealerHand.cards[0]) {
-    state.dealerHand.cards[0].faceUp = true; // reveal hole card
+  const cards = state.dealerHand.cards.toArray();
+  if (cards[0]) {
+    cards[0].faceUp = true; // reveal hole card
   }
   state.phase = 'DEALER_TURN';
 }
@@ -257,7 +261,7 @@ export function dealerPlay(state: BlackjackGameState): void {
   const MAX_ITERATIONS = 20;
 
   while (getScore(state.dealerHand) <= DEALER_HIT_THRESHOLD && !isBust(state.dealerHand)) {
-    if (state.deck.length === 0 || iterations >= MAX_ITERATIONS) break;
+    if (state.deck.isEmpty() || iterations >= MAX_ITERATIONS) break;
     const dealerCard = state.deck.pop()!;
     dealerCard.faceUp = true;
     state.dealerHand.cards.push(dealerCard);

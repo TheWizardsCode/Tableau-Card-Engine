@@ -288,7 +288,7 @@ export class BlackjackScene extends CardGameScene {
         this.dealerScoreText.setText(`Score: ${getScore(this.state.dealerHand)}`);
       } else {
         // Show only visible card score
-        const visibleCards = this.state.dealerHand.cards.slice(1); // Skip hole card
+        const visibleCards = this.state.dealerHand.cards.toArray().slice(1); // Skip hole card
         const visibleScore = this.calculateVisibleScore(visibleCards);
         this.dealerScoreText.setText(`Visible: ${visibleScore}`);
       }
@@ -320,12 +320,12 @@ export class BlackjackScene extends CardGameScene {
 
   private renderPlayerCards(): void {
     const hand = this.state.playerHand;
-    const totalW = hand.cards.length * CARD_WIDTH + (hand.cards.length - 1) * CARD_GAP;
+    const totalW = hand.cards.size() * CARD_WIDTH + (hand.cards.size() - 1) * CARD_GAP;
     const playerCardsPos = resolveBkAnchor('playerCards', 'center');
     const startX = playerCardsPos.x - totalW / 2 + CARD_WIDTH / 2;
     const y = playerCardsPos.y;
 
-    for (const card of hand.cards) {
+    for (const card of hand.cards.toArray()) {
       const x = startX + this.playerCardSprites.length * (CARD_WIDTH + CARD_GAP);
       const sprite = this.add.image(x, y, getCardTexture(card));
       sprite.setDisplaySize(CARD_WIDTH, CARD_HEIGHT);
@@ -335,12 +335,12 @@ export class BlackjackScene extends CardGameScene {
 
   private renderDealerCards(): void {
     const hand = this.state.dealerHand;
-    const totalW = hand.cards.length * CARD_WIDTH + (hand.cards.length - 1) * CARD_GAP;
+    const totalW = hand.cards.size() * CARD_WIDTH + (hand.cards.size() - 1) * CARD_GAP;
     const dealerCardsPos = resolveBkAnchor('dealerCards', 'center');
     const startX = dealerCardsPos.x - totalW / 2 + CARD_WIDTH / 2;
     const y = dealerCardsPos.y;
 
-    for (const card of hand.cards) {
+    for (const card of hand.cards.toArray()) {
       const x = startX + this.dealerCardSprites.length * (CARD_WIDTH + CARD_GAP);
       const sprite = this.add.image(x, y, getCardTexture(card));
       sprite.setDisplaySize(CARD_WIDTH, CARD_HEIGHT);
