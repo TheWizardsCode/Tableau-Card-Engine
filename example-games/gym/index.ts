@@ -18,6 +18,7 @@ export { GymUndoRedoScene } from './scenes/GymUndoRedoScene';
 export { GymTranscriptScene } from './scenes/GymTranscriptScene';
 export { GymSaveLoadScene } from './scenes/GymSaveLoadScene';
 export { GymAudioFeedbackScene } from './scenes/GymAudioFeedbackScene';
+export { GymI18nScene } from './scenes/GymI18nScene';
 export { GymGraphicsShaderSpikeScene } from './scenes/GymGraphicsShaderSpikeScene';
 export { GymGraphicsLightingSpikeScene } from './scenes/GymGraphicsLightingSpikeScene';
 export { GymSllScene } from './scenes/GymSllScene';
@@ -40,6 +41,7 @@ export {
   GYM_TRANSCRIPT_KEY,
   GYM_SAVE_LOAD_KEY,
   GYM_AUDIO_FEEDBACK_KEY,
+  GYM_I18N_KEY,
   GYM_GRAPHICS_SHADER_SPIKE_KEY,
   GYM_GRAPHICS_LIGHTING_SPIKE_KEY,
   GYM_SLL_KEY,

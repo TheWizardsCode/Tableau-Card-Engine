@@ -17,6 +17,7 @@ import { GymMarketOfferEngineScene } from '../../example-games/gym/scenes/GymMar
 import { GymSpatialRulesScene } from '../../example-games/gym/scenes/GymSpatialRulesScene';
 import { GymRuleEngineScene } from '../../example-games/gym/scenes/GymRuleEngineScene';
 import { GymAudioFeedbackScene } from '../../example-games/gym/scenes/GymAudioFeedbackScene';
+import { GymI18nScene } from '../../example-games/gym/scenes/GymI18nScene';
 import { GymGraphicsShaderSpikeScene } from '../../example-games/gym/scenes/GymGraphicsShaderSpikeScene';
 import { GymGraphicsLightingSpikeScene } from '../../example-games/gym/scenes/GymGraphicsLightingSpikeScene';
 import { GymSllScene } from '../../example-games/gym/scenes/GymSllScene';
@@ -31,6 +32,7 @@ import {
   GYM_TRANSCRIPT_KEY,
   GYM_SAVE_LOAD_KEY,
   GYM_AUDIO_FEEDBACK_KEY,
+  GYM_I18N_KEY,
   GYM_GRAPHICS_SHADER_SPIKE_KEY,
   GYM_GRAPHICS_LIGHTING_SPIKE_KEY,
   GYM_SLL_KEY,
@@ -50,6 +52,7 @@ const SCENES = [
   { key: GYM_TRANSCRIPT_KEY, Scene: GymTranscriptScene },
   { key: GYM_SAVE_LOAD_KEY, Scene: GymSaveLoadScene },
   { key: GYM_AUDIO_FEEDBACK_KEY, Scene: GymAudioFeedbackScene },
+  { key: GYM_I18N_KEY, Scene: GymI18nScene },
   { key: GYM_GRAPHICS_SHADER_SPIKE_KEY, Scene: GymGraphicsShaderSpikeScene },
   { key: GYM_GRAPHICS_LIGHTING_SPIKE_KEY, Scene: GymGraphicsLightingSpikeScene },
   { key: GYM_SLL_KEY, Scene: GymSllScene },

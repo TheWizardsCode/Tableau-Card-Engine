@@ -17,6 +17,7 @@ import {
   GYM_TRANSCRIPT_KEY,
   GYM_SAVE_LOAD_KEY,
   GYM_AUDIO_FEEDBACK_KEY,
+  GYM_I18N_KEY,
   GYM_SLL_KEY,
   GYM_LAYOUT_OWNERSHIP_KEY,
   GYM_SVG_HELPERS_KEY,
@@ -34,6 +35,7 @@ describe('GymRegistry', () => {
     expect(GYM_TRANSCRIPT_KEY).toBe('GymTranscriptScene');
     expect(GYM_SAVE_LOAD_KEY).toBe('GymSaveLoadScene');
     expect(GYM_AUDIO_FEEDBACK_KEY).toBe('GymAudioFeedbackScene');
+    expect(GYM_I18N_KEY).toBe('GymI18nScene');
     expect(GYM_SLL_KEY).toBe('GymSllScene');
     expect(GYM_LAYOUT_OWNERSHIP_KEY).toBe('GymLayoutOwnershipScene');
     expect(GYM_SVG_HELPERS_KEY).toBe('GymSvgHelpersScene');
@@ -48,6 +50,7 @@ describe('GymRegistry', () => {
     expect(catalogueKeys).toContain(GYM_TRANSCRIPT_KEY);
     expect(catalogueKeys).toContain(GYM_SAVE_LOAD_KEY);
     expect(catalogueKeys).toContain(GYM_AUDIO_FEEDBACK_KEY);
+    expect(catalogueKeys).toContain(GYM_I18N_KEY);
     expect(catalogueKeys).toContain(GYM_SLL_KEY);
     expect(catalogueKeys).toContain(GYM_LAYOUT_OWNERSHIP_KEY);
     expect(catalogueKeys).toContain(GYM_SVG_HELPERS_KEY);

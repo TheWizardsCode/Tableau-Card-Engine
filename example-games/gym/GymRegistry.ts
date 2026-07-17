@@ -43,6 +43,9 @@ export const GYM_SAVE_LOAD_KEY = 'GymSaveLoadScene';
 /** Audio & Feedback Configuration demo scene key. */
 export const GYM_AUDIO_FEEDBACK_KEY = 'GymAudioFeedbackScene';
 
+/** I18n / Localisation demo scene key. */
+export const GYM_I18N_KEY = 'GymI18nScene';
+
 /** Graphics Shader Spike scene key. */
 export const GYM_GRAPHICS_SHADER_SPIKE_KEY = 'GymGraphicsShaderSpikeScene';
 
@@ -129,6 +132,12 @@ export const GYM_SCENE_CATALOGUE: GymSceneEntry[] = [
     title: 'Audio & Feedback Config',
     description:
       'Toggle mute, switch sound mappings at runtime, and adjust feedback intensity. Validate event-to-sound resolution.',
+  },
+  {
+    sceneKey: GYM_I18N_KEY,
+    title: 'I18n / Localisation',
+    description:
+      'Register locale bundles (en, fr, de), switch locales interactively, observe live UI text updates, missing-key fallback, and locale reset via the core-engine I18n module.',
   },
   {
     sceneKey: GYM_GRAPHICS_SHADER_SPIKE_KEY,

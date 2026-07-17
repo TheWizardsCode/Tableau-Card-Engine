@@ -25,6 +25,7 @@ Open `http://localhost:3000` and select **Gym** from the game selector. From the
 | Transcript Recording | `GymTranscriptScene` | Record game events, inspect transcripts; pop text feedback |
 | Save / Load State | `GymSaveLoadScene` | Save and restore state; RenderTexture snapshot; handle malformed payloads |
 | Audio & Feedback Config | `GymAudioFeedbackScene` | Toggle mute, adjust volume, map events to sounds; pop text; particle celebration |
+| I18n / Localisation | `GymI18nScene` | Register locale bundles, switch locales interactively, observe live UI text updates, missing-key fallback to English, and reset all bundles |
 | Shader & Blend Spike | `GymGraphicsShaderSpikeScene` | Sprite tinting, blend modes, shader feasibility evaluation |
 | Lighting Spike | `GymGraphicsLightingSpikeScene` | Point light, shadow evaluation, WebGL fallback behavior |
 | Parameterized Overlay | `GymParameterizedOverlayScene` | Open game-over, round-end, and confirmation overlays built with `createParameterizedOverlay()`. Demonstrates declarative config format, button callbacks, and `overlayCenterY` offset positioning with multiple vertical offsets. |
