@@ -154,9 +154,9 @@ describe('Meta-Progression System', () => {
       }
     });
 
-    it('Tier 1 has baseline plus early expanded sample plus community space cards (21 cards total)', () => {
-      expect(TIER_DEFINITIONS['tier-1'].newCardIds).toHaveLength(21);
-      expect(TIER_DEFINITIONS['tier-1'].cumulativeCardIds).toHaveLength(21);
+    it('Tier 1 has baseline plus early expanded sample plus community space cards (20 cards total)', () => {
+      expect(TIER_DEFINITIONS['tier-1'].newCardIds).toHaveLength(20);
+      expect(TIER_DEFINITIONS['tier-1'].cumulativeCardIds).toHaveLength(20);
     });
 
     it('each subsequent tier adds additional cards', () => {
@@ -717,10 +717,10 @@ describe('Meta-Progression System', () => {
       expect(campaign.schemaVersion).toBe(2);
     });
 
-    it('default campaign has tier-1 unlocked with 21 card IDs', () => {
+    it('default campaign has tier-1 unlocked with 20 card IDs', () => {
       const campaign = createDefaultCampaignProgress();
       expect(campaign.unlockedTiers).toEqual(['tier-1']);
-      expect(campaign.unlockedCardIds).toHaveLength(21);
+      expect(campaign.unlockedCardIds).toHaveLength(20);
       expect(campaign.milestoneHistory).toEqual([]);
     });
 
@@ -1057,13 +1057,13 @@ describe('Meta-Progression System', () => {
   describe('deriveUnlockedCardIds', () => {
     it('returns tier-1 cards for ["tier-1"]', () => {
       const ids = deriveUnlockedCardIds(['tier-1']);
-      expect(ids).toHaveLength(21);
-      expect(new Set(ids).size).toBe(21); // no duplicates
+      expect(ids).toHaveLength(20);
+      expect(new Set(ids).size).toBe(20); // no duplicates
     });
 
     it('returns cumulative cards for ["tier-1", "tier-2"]', () => {
       const ids = deriveUnlockedCardIds(['tier-1', 'tier-2']);
-      expect(ids).toHaveLength(32); // 21 + 11
+      expect(ids).toHaveLength(30); // 20 + 10
     });
 
     it('returns all 83 cards for all 5 tiers', () => {
@@ -1078,7 +1078,7 @@ describe('Meta-Progression System', () => {
 
     it('ignores unknown tier IDs gracefully', () => {
       const ids = deriveUnlockedCardIds(['tier-1', 'tier-99']);
-      expect(ids).toHaveLength(21); // only tier-1 cards
+      expect(ids).toHaveLength(20); // only tier-1 cards
     });
 
     it('does not produce duplicates even if tiers are listed twice', () => {

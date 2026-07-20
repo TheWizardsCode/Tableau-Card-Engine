@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "id": "gym-rule-engine-layout",
+  "baseViewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "requiredZones": [
+    "legality",
+    "economy",
+    "log"
+  ],
+  "zones": {
+    "legality": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.11111
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.11111 }
+      }
+    },
+    "economy": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.29167
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.29167 }
+      }
+    },
+    "log": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.47222
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.47222 }
+      }
+    }
+  }
+}

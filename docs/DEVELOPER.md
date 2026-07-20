@@ -18,6 +18,7 @@ This document covers everything you need to develop, test, and build the Tableau
 - [Managing Assets](#managing-assets)
 - [SVG Rendering & Migration](#svg-rendering--migration)
 - [HUD Layer](#hud-layer)
+- [Shared HUD Components](#shared-hud-components)
 - [Card Upgrade Rendering Pipeline](#card-upgrade-rendering-pipeline)
 - [Shared Renderer](#shared-renderer)
 - [Screen Layout Language (SLL)](#screen-layout-language-sll)
@@ -125,17 +126,19 @@ MONTE_SEEDS=50 npm run monte-carlo
 MONTE_SEEDS=200 MONTE_MIN_WIN_RATE=0.20 MONTE_MAX_WIN_RATE=0.80 npm test
 ```
 
-Tests use [Vitest](https://vitest.dev/) configured inline in `vite.config.ts` with three test projects:
+Tests use [Vitest](https://vitest.dev/) with projects configured inline in `vite.config.ts`:
 
 | Project | Environment | File Pattern | Purpose |
 |---------|-------------|-------------|---------|
 | `unit` | Node.js | `tests/**/*.test.ts` | Logic, data, and integration tests |
 | `browser` | Chromium (Playwright) | `tests/**/*.browser.test.ts` (excludes tutorial E2E) | Phaser UI and rendering tests |
-| `tutorial` | Chromium (Playwright) | `tests/e2e/main-street-tutorial-e2e-*.browser.test.ts` | Main Street tutorial E2E tests (run separately to avoid GPU context exhaustion) |
+| `tutorial-part1..6` | Chromium (Playwright, one per part) | `tests/e2e/main-street-tutorial-e2e-part{1-6}.browser.test.ts` | Main Street tutorial E2E tests (each in own browser instance) |
 
-All three projects run together via `npm test`. The browser and tutorial projects run in headless Chromium using `@vitest/browser` with the Playwright provider.
+All projects run via `npm test`. The browser and tutorial projects run in headless Chromium using `@vitest/browser` with the Playwright provider.
 
-The tutorial E2E tests are split into 6 part files (1-6 tests per file) and run via `scripts/run-tutorial-tests.sh`, which spawns a separate Chromium instance for each part to avoid the Phaser 4 RC GPU/Canvas context exhaustion that occurs after ~8 game create/destroy cycles in a single browser process. The helper module at `tests/helpers/main-street-tutorial-e2e.ts` contains shared game lifecycle utilities (`bootGameWithTutorial`, `destroyGame` with CanvasPool drain) and click helpers for tutorial step advancement.
+The tutorial E2E tests are split into 6 part files (1-6 tests per file). Each part is a separate Vitest project with its own uniquely-named browser instance (`t1` through `t6`) to prevent the Phaser 4 RC GPU/Canvas context exhaustion that occurs after ~8 game create/destroy cycles in a single browser process. The runner script `scripts/run-tutorial-tests.sh` invokes each project sequentially.
+
+The helper module at `tests/helpers/main-street-tutorial-e2e.ts` contains shared game lifecycle utilities (`bootGameWithTutorial`, `destroyGame` with CanvasPool drain), diagnostic error messages, and click helpers for tutorial step advancement.
 
 During Vitest runs, the dev-only transcript persistence middleware (`POST /api/transcripts`) is intentionally disabled even though Vitest browser mode uses an internal Vite server. This prevents file-system side effects and reduces harness noise/flakiness during test execution.
 
@@ -181,6 +184,17 @@ describe('MyScene browser tests', () => {
   });
 });
 ```
+
+### Tutorial E2E Tests
+
+The Main Street tutorial E2E tests are defined in `tests/e2e/main-street-tutorial-e2e-part{1-6}.browser.test.ts`. Each part tests a subset of the tutorial flow. They use shared helpers from `tests/helpers/main-street-tutorial-e2e.ts`.
+
+**Key design decisions:**
+
+- **Per-file browser isolation:** Each tutorial part is a separate Vitest project with its own browser instance. This avoids Phaser 4 RC's canvas/GPU context exhaustion from sequential game create/destroy cycles.
+- **Enhanced cleanup:** The `destroyGame` helper drains Phaser's CanvasPool after each test, force-releases canvas contexts by resetting canvas dimensions to 0, and removes orphaned canvases from the DOM.
+- **Diagnostic tracking:** `bootGameWithTutorial` tracks boot cycles and provides detailed error messages if canvas context is null, including the cycle number, remaining canvas count, and CanvasPool state.
+- **New project:** `scripts/run-ci-tests.sh` orchestrates the full CI test suite (unit → browser → tutorial E2E).
 
 **Browser test dependencies:**
 
@@ -997,6 +1011,14 @@ render consistently above gameplay content across all example games.
 |----------------------|--------|--------------------------------------------|
 | HUD container        | 1000   | Help/settings panels, buttons              |
 | Game-state overlays  | 2000   | Win, loss, game-over, round-end overlays   |
+
+### Full Component Reference
+
+For comprehensive documentation covering all shared HUD components
+(HelpPanel, SettingsPanel, HelpButton, SettingsButton, Overlay Manager,
+Parameterized Overlay, CardGameScene base class, undo/redo buttons, and
+HUD container patterns) see the
+[Shared HUD Components](#shared-hud-components) section below.
 
 ### Migration Guide
 

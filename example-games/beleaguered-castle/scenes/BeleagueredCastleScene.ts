@@ -180,6 +180,10 @@ export class BeleagueredCastleScene extends CardGameScene {
       if (this.settingsPanel) {
         this.bcRenderer.reducedMotion = this.settingsPanel.reducedMotion;
       }
+      // Allow tests to force reduced motion via a window flag
+      if ((window as any).__BC_TEST_REDUCED_MOTION__) {
+        this.bcRenderer.reducedMotion = true;
+      }
       this.initUndoRedoButtons(
         () => this.turnController.performUndo(),
         () => this.turnController.performRedo(),
@@ -193,6 +197,10 @@ export class BeleagueredCastleScene extends CardGameScene {
       this.bcRenderer.refreshTableau();
       this.bcRenderer.refreshHUD();
       this.emitStateSettled(this.gameState.moveCount, this.gameEnded ? 'ended' : 'playing');
+    } else if ((window as any).__BC_TEST_REDUCED_MOTION__) {
+      // Test mode: skip checkpoint check and deal animation, go straight
+      // to the game-ready state with reduced motion (instant deal).
+      this.startFreshGame();
     } else {
       // First check for a saved checkpoint. If one exists, show the resume
       // overlay — no deal animation runs until the user decides. If no

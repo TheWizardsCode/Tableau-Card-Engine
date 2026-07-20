@@ -141,7 +141,7 @@ describe('Community space card tooltip content (AC2)', () => {
 
     // Must contain key information
     expect(tooltip).toContain('Community Space: Park');
-    expect(tooltip).toContain('Cost: 4');
+    expect(tooltip).toContain('Cost: 3');
     expect(tooltip).toContain('Income: +0');
     expect(tooltip).toContain('Synergy: Culture');
     expect(tooltip).toContain(park!.description);

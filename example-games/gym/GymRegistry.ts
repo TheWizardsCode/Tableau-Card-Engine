@@ -43,6 +43,12 @@ export const GYM_SAVE_LOAD_KEY = 'GymSaveLoadScene';
 /** Audio & Feedback Configuration demo scene key. */
 export const GYM_AUDIO_FEEDBACK_KEY = 'GymAudioFeedbackScene';
 
+/** I18n / Localisation demo scene key. */
+export const GYM_I18N_KEY = 'GymI18nScene';
+
+/** AI Strategy Framework demo scene key. */
+export const GYM_AI_STRATEGY_KEY = 'GymAiStrategyScene';
+
 /** Graphics Shader Spike scene key. */
 export const GYM_GRAPHICS_SHADER_SPIKE_KEY = 'GymGraphicsShaderSpikeScene';
 
@@ -60,6 +66,27 @@ export const GYM_HUD_COMPONENTS_KEY = 'GymHudComponentsScene';
 
 /** Layout Ownership demo scene key. */
 export const GYM_LAYOUT_OWNERSHIP_KEY = 'GymLayoutOwnershipScene';
+
+/** Parameterized Overlay demo scene key. */
+export const GYM_PARAMETERIZED_OVERLAY_KEY = 'GymParameterizedOverlayScene';
+
+/** SvgHelpers (SVG Rasterisation Pipeline) demo scene key. */
+export const GYM_SVG_HELPERS_KEY = 'GymSvgHelpersScene';
+
+/** Market Offer Engine demo scene key. */
+export const GYM_MARKET_OFFER_ENGINE_KEY = 'GymMarketOfferEngineScene';
+
+/** SpatialRules (Grid + pathfinding) demo scene key. */
+export const GYM_SPATIAL_RULES_KEY = 'GymSpatialRulesScene';
+
+/** TokenPileView demo scene key. */
+export const GYM_TOKEN_PILE_VIEW_KEY = 'GymTokenPileViewScene';
+
+/** Rule Engine demo scene key. */
+export const GYM_RULE_ENGINE_KEY = 'GymRuleEngineScene';
+
+/** Blackjack game scene key for Gym demonstration access. */
+export const GYM_BLACKJACK_KEY = 'BlackjackScene';
 
 // ── Registry ──────────────────────────────────────────────
 
@@ -113,6 +140,18 @@ export const GYM_SCENE_CATALOGUE: GymSceneEntry[] = [
       'Toggle mute, switch sound mappings at runtime, and adjust feedback intensity. Validate event-to-sound resolution.',
   },
   {
+    sceneKey: GYM_I18N_KEY,
+    title: 'I18n / Localisation',
+    description:
+      'Register locale bundles (en, fr, de), switch locales interactively, observe live UI text updates, missing-key fallback, and locale reset via the core-engine I18n module.',
+  },
+  {
+    sceneKey: GYM_AI_STRATEGY_KEY,
+    title: 'AI Strategy Framework',
+    description:
+      'Define numeric AI strategies (Highest, Lowest, Random), wrap them in AiPlayer with seeded RNG, and explore pickRandom/pickBest with tie-breaking.',
+  },
+  {
     sceneKey: GYM_GRAPHICS_SHADER_SPIKE_KEY,
     title: 'Shader & Blend Spike',
     description:
@@ -147,6 +186,48 @@ export const GYM_SCENE_CATALOGUE: GymSceneEntry[] = [
     title: 'HUD Components',
     description:
       'Interact with the shared HUD component library: open/close HelpPanel, SettingsPanel, and observe depth layering and toggle controls.',
+  },
+  {
+    sceneKey: GYM_PARAMETERIZED_OVERLAY_KEY,
+    title: 'Parameterized Overlay',
+    description:
+      'Open game-over, round-end, and confirmation overlays built with createParameterizedOverlay(). Demonstrate declarative config, button callbacks, and overlayCenterY offset positioning.',
+  },
+  {
+    sceneKey: GYM_SVG_HELPERS_KEY,
+    title: 'SVG Rasterisation Pipeline',
+    description:
+      'Fetch SVG text from an asset URL, rasterise it to a Phaser texture at configurable sizes, verify texture caching via getOrCreateTexture, and toggle scene validity with markSceneValid/markSceneInvalid.',
+  },
+  {
+    sceneKey: GYM_MARKET_OFFER_ENGINE_KEY,
+    title: 'Market Offer Engine',
+    description:
+      'Create market rows with configurable slots, purchase cards, refill from a deck, and lock/unlock slots. Demonstrates the MarketOfferEngine API.',
+  },
+  {
+    sceneKey: GYM_SPATIAL_RULES_KEY,
+    title: 'Spatial Rules: Grid & Pathfinding',
+    description:
+      'Configurable grid with interactive cells, A* pathfinding with distance metrics (Manhattan/Chebyshev/Euclidean), adjacency bonus computation, and blockable cells for obstacle testing.',
+  },
+  {
+    sceneKey: GYM_TOKEN_PILE_VIEW_KEY,
+    title: 'Token Pile View',
+    description:
+      'Demonstrates the TokenPileView reusable component with four different renderers (simple tokens, card-back tokens, custom shapes, feudalism-style). Add/remove tokens interactively and observe live count updates.',
+  },
+  {
+    sceneKey: GYM_RULE_ENGINE_KEY,
+    title: 'Rule Engine: LegalityResult + EconomyLedger',
+    description:
+      'Interactively explore the LegalityResult discriminated union pattern (legal/illegal actions) and EconomyLedger resource tracking with constraint enforcement.',
+  },
+  {
+    sceneKey: GYM_BLACKJACK_KEY,
+    title: 'Blackjack',
+    description:
+      'Play a round of Blackjack against the dealer. Demonstrates transcript recording and save/load features in a real game context.',
   },
 ];
 

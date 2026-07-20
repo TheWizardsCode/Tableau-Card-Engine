@@ -8,7 +8,7 @@
  *     when the tooltips toggle is hidden.
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 import Phaser from 'phaser';
 import { SoundManager } from '../../src/core-engine/SoundManager';
 import { SettingsPanel } from '../../src/ui/SettingsPanel';
@@ -186,5 +186,69 @@ describe('SettingsPanel tooltips toggle conditional display', () => {
       const tooltipLabels = findTextObjects(container, 'Tooltips');
       expect(tooltipLabels.length).toBe(1);
     });
+  });
+
+  describe('tooltip preference persistence', () => {
+    beforeEach(() => {
+      // Clear any leftover test keys
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.removeItem('tce-show-tooltips');
+      }
+    });
+
+    it('loads the tooltip preference from localStorage on creation', () => {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem('tce-show-tooltips', 'false');
+      }
+
+      const game = new Phaser.Game({
+        type: Phaser.CANVAS,
+        width: 800,
+        height: 600,
+        scene: [TestSettingsWithTooltips],
+        parent: (() => {
+          const el = document.createElement('div');
+          el.id = 'game-tt-pref';
+          document.body.appendChild(el);
+          return el;
+        })(),
+      });
+
+      return waitForScene(game, 'TestSettingsWithTooltips').then(() => {
+        const scene = game.scene.getScene('TestSettingsWithTooltips') as any;
+        const showTooltips = scene.settingsPanel['_showTooltips'];
+        expect(showTooltips).toBe(false);
+        game.destroy(true, false);
+        const el = document.getElementById('game-tt-pref');
+        if (el) el.remove();
+        if (typeof window !== 'undefined' && window.localStorage) {
+          window.localStorage.removeItem('tce-show-tooltips');
+        }
+      });
+    }, 30_000);
+
+    it('defaults to true when no stored preference exists', () => {
+      const game = new Phaser.Game({
+        type: Phaser.CANVAS,
+        width: 800,
+        height: 600,
+        scene: [TestSettingsWithTooltips],
+        parent: (() => {
+          const el = document.createElement('div');
+          el.id = 'game-tt-default';
+          document.body.appendChild(el);
+          return el;
+        })(),
+      });
+
+      return waitForScene(game, 'TestSettingsWithTooltips').then(() => {
+        const scene = game.scene.getScene('TestSettingsWithTooltips') as any;
+        const showTooltips = scene.settingsPanel['_showTooltips'];
+        expect(showTooltips).toBe(true);
+        game.destroy(true, false);
+        const el = document.getElementById('game-tt-default');
+        if (el) el.remove();
+      });
+    }, 30_000);
   });
 });

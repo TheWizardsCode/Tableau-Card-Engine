@@ -2,8 +2,10 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   getReducedMotion,
   getSelectedDifficulty,
+  getTooltips,
   setReducedMotion,
   setSelectedDifficulty,
+  setTooltips,
 } from '../../src/ui/SettingsStore';
 import type { StorageLike } from '../../src/core-engine/SoundManager';
 
@@ -50,5 +52,33 @@ describe('SettingsStore persistence', () => {
     setReducedMotion(false, storage);
     expect(storage.setItem).toHaveBeenCalledWith('tce-ui-reduced-motion', 'false');
     expect(getReducedMotion(storage)).toBe(false);
+  });
+
+  // ── Tooltip helpers ─────────────────────────────────────
+
+  it('returns true for tooltips when storage is null', () => {
+    expect(getTooltips(null)).toBe(true);
+  });
+
+  it('returns true for tooltips when nothing stored', () => {
+    const storage = createMockStorage();
+    expect(getTooltips(storage)).toBe(true);
+  });
+
+  it('persists and restores tooltip preference', () => {
+    const storage = createMockStorage();
+    setTooltips(false, storage);
+    expect(storage.setItem).toHaveBeenCalledWith('tce-show-tooltips', 'false');
+    expect(getTooltips(storage)).toBe(false);
+
+    setTooltips(true, storage);
+    expect(storage.setItem).toHaveBeenCalledWith('tce-show-tooltips', 'true');
+    expect(getTooltips(storage)).toBe(true);
+  });
+
+  it('returns false when stored value is not the string true', () => {
+    const storage = createMockStorage();
+    (storage as any).setItem('tce-show-tooltips', 'not-a-boolean');
+    expect(getTooltips(storage)).toBe(false);
   });
 });

@@ -8,6 +8,7 @@ async function bootGame(): Promise<Phaser.Game> {
   container = document.createElement('div');
   container.id = 'game-container';
   document.body.appendChild(container);
+  (window as any).__BC_TEST_REDUCED_MOTION__ = true;
   const { createBeleagueredCastleGame } = await import('../../example-games/beleaguered-castle/createBeleagueredCastleGame');
   const game = createBeleagueredCastleGame({ type: Phaser.CANVAS });
   await waitForScene(game, 'BeleagueredCastleScene');
@@ -140,6 +141,60 @@ describe('Beleaguered Castle settings panel', () => {
   });
 });
 
+describe('Beleaguered Castle overlay z-ordering', () => {
+  it('help panel and settings panel are parented into hudContainer for correct z-ordering', async () => {
+    const scene = game!.scene.getScene('BeleagueredCastleScene') as any;
+    await waitFrames(8);
+
+    // Verify hudContainer exists at convention depth
+    expect(scene.hudContainer).toBeDefined();
+    expect(scene.hudContainer.depth).toBe(1000);
+
+    // Open help panel and verify its container is parented into hudContainer
+    scene.helpPanel.open();
+    await waitFrames(10);
+    const helpContainer = (scene.helpPanel as any).container as Phaser.GameObjects.Container;
+    expect(helpContainer.parentContainer).toBe(scene.hudContainer);
+    scene.helpPanel.close();
+    await waitFrames(10);
+
+    // Open settings panel and verify its container is parented into hudContainer
+    scene.settingsPanel.open();
+    await waitFrames(10);
+    const settingsContainer = (scene.settingsPanel as any).container as Phaser.GameObjects.Container;
+    expect(settingsContainer.parentContainer).toBe(scene.hudContainer);
+    scene.settingsPanel.close();
+    await waitFrames(10);
+  });
+});
+
+describe('Beleaguered Castle overlay z-ordering', () => {
+  it('help panel and settings panel are parented into hudContainer for correct z-ordering', async () => {
+    const scene = game!.scene.getScene('BeleagueredCastleScene') as any;
+    await waitFrames(8);
+
+    // Verify hudContainer exists at convention depth
+    expect(scene.hudContainer).toBeDefined();
+    expect(scene.hudContainer.depth).toBe(1000);
+
+    // Open help panel and verify its container is parented into hudContainer
+    scene.helpPanel.open();
+    await waitFrames(10);
+    const helpContainer = (scene.helpPanel as any).container as Phaser.GameObjects.Container;
+    expect(helpContainer.parentContainer).toBe(scene.hudContainer);
+    scene.helpPanel.close();
+    await waitFrames(10);
+
+    // Open settings panel and verify its container is parented into hudContainer
+    scene.settingsPanel.open();
+    await waitFrames(10);
+    const settingsContainer = (scene.settingsPanel as any).container as Phaser.GameObjects.Container;
+    expect(settingsContainer.parentContainer).toBe(scene.hudContainer);
+    scene.settingsPanel.close();
+    await waitFrames(10);
+  });
+});
+
 describe('Beleaguered Castle overlays', () => {
   it('win overlay has input blocker, buttons at correct depths, and dismissal', async () => {
     const scene = game!.scene.getScene('BeleagueredCastleScene') as any;
@@ -163,6 +218,16 @@ describe('Beleaguered Castle overlays', () => {
     );
     expect(btns.length).toBeGreaterThanOrEqual(2);
     for (const btn of btns) expect(btn.input?.enabled).toBe(true);
+
+    // Verify overlay objects are parented into hudContainer
+    const hud = scene.hudContainer as { list: Phaser.GameObjects.GameObject[] };
+    const hudTexts = hud.list?.filter(
+      (child) => child instanceof Phaser.GameObjects.Text,
+    ) as Phaser.GameObjects.Text[];
+    const titleInHud = hudTexts.find((t) => t.text === 'You Win!');
+    expect(titleInHud).toBeDefined();
+    const summaryInHud = hudTexts.find((t) => (t.text as string).includes('Moves:'));
+    expect(summaryInHud).toBeDefined();
 
     // Dismiss
     getOverlayManager(scene).dismiss();
@@ -195,6 +260,14 @@ describe('Beleaguered Castle overlays', () => {
     );
     expect(btns.length).toBeGreaterThanOrEqual(3);
     for (const btn of btns) expect(btn.input?.enabled).toBe(true);
+
+    // Verify overlay content is parented into hudContainer for correct z-ordering
+    const hud = scene.hudContainer as { list: Phaser.GameObjects.GameObject[] };
+    const hudTexts = hud.list?.filter(
+      (child) => child instanceof Phaser.GameObjects.Text,
+    ) as Phaser.GameObjects.Text[];
+    const titleInHud = hudTexts.find((t) => t.text === 'No Productive Moves Available');
+    expect(titleInHud).toBeDefined();
 
     // Dismiss
     getOverlayManager(scene).dismiss();

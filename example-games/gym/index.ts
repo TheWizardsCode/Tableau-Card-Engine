@@ -18,12 +18,20 @@ export { GymUndoRedoScene } from './scenes/GymUndoRedoScene';
 export { GymTranscriptScene } from './scenes/GymTranscriptScene';
 export { GymSaveLoadScene } from './scenes/GymSaveLoadScene';
 export { GymAudioFeedbackScene } from './scenes/GymAudioFeedbackScene';
+export { GymI18nScene } from './scenes/GymI18nScene';
+export { GymAiStrategyScene } from './scenes/GymAiStrategyScene';
 export { GymGraphicsShaderSpikeScene } from './scenes/GymGraphicsShaderSpikeScene';
 export { GymGraphicsLightingSpikeScene } from './scenes/GymGraphicsLightingSpikeScene';
 export { GymSllScene } from './scenes/GymSllScene';
 export { GymTooltipScene } from './scenes/GymTooltipScene';
 export { GymHudComponentsScene } from './scenes/GymHudComponentsScene';
 export { GymLayoutOwnershipScene } from './scenes/GymLayoutOwnershipScene';
+export { GymParameterizedOverlayScene } from './scenes/GymParameterizedOverlayScene';
+export { GymSvgHelpersScene } from './scenes/GymSvgHelpersScene';
+export { GymMarketOfferEngineScene } from './scenes/GymMarketOfferEngineScene';
+export { GymSpatialRulesScene } from './scenes/GymSpatialRulesScene';
+export { GymTokenPileViewScene } from './scenes/GymTokenPileViewScene';
+export { GymRuleEngineScene } from './scenes/GymRuleEngineScene';
 
 export {
   GYM_ROUTER_KEY,
@@ -34,12 +42,21 @@ export {
   GYM_TRANSCRIPT_KEY,
   GYM_SAVE_LOAD_KEY,
   GYM_AUDIO_FEEDBACK_KEY,
+  GYM_I18N_KEY,
   GYM_GRAPHICS_SHADER_SPIKE_KEY,
   GYM_GRAPHICS_LIGHTING_SPIKE_KEY,
   GYM_SLL_KEY,
   GYM_TOOLTIP_KEY,
   GYM_HUD_COMPONENTS_KEY,
   GYM_LAYOUT_OWNERSHIP_KEY,
+  GYM_PARAMETERIZED_OVERLAY_KEY,
+  GYM_SVG_HELPERS_KEY,
+  GYM_AI_STRATEGY_KEY,
+  GYM_MARKET_OFFER_ENGINE_KEY,
+  GYM_SPATIAL_RULES_KEY,
+  GYM_TOKEN_PILE_VIEW_KEY,
+  GYM_RULE_ENGINE_KEY,
+  GYM_BLACKJACK_KEY,
   GYM_SCENE_CATALOGUE,
 } from './GymRegistry';
 export type { GymSceneEntry } from './GymRegistry';

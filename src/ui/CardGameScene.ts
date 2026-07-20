@@ -36,6 +36,7 @@ import { SettingsButton } from './SettingsButton';
 import type { HelpSection } from './HelpPanel';
 import { createSceneMenuButton } from './SceneHeader';
 import { createStandardUndoRedoButtons } from './Renderer';
+import { reloadCardTexturesForDesign } from './CardTextureHelpers';
 
 // ── Audio path utility ───────────────────────────────────────
 
@@ -158,6 +159,7 @@ export abstract class CardGameScene extends Phaser.Scene {
     this.initEventSystem();
     this.initHUDContainer();
     this.initMenuButton();
+    this.initCardDesignListener();
   }
 
   // ── Initializers ─────────────────────────────────────────
@@ -351,6 +353,35 @@ export abstract class CardGameScene extends Phaser.Scene {
     this.gameEvents.emit('state-settled', { turnNumber, phase });
   }
 
+  // ── Card design change listener ─────────────────────────
+
+  /** Bound listener for the tce:card-design-changed event. */
+  private _cardDesignListener: ((event: Event) => void) | null = null;
+
+  /**
+   * Listen for card design changes from the Settings panel.
+   * When triggered, reload card textures in-place so that all
+   * existing sprites automatically update to the new design.
+   */
+  private initCardDesignListener(): void {
+    if (typeof window === 'undefined') return;
+    this._cardDesignListener = async (event: Event): Promise<void> => {
+      if (!this.scene.isActive()) return;
+      const detail = (event as CustomEvent).detail;
+      if (!detail || !detail.designKey) return;
+      await reloadCardTexturesForDesign(this, detail.designKey);
+    };
+    window.addEventListener('tce:card-design-changed', this._cardDesignListener);
+  }
+
+  /** Remove the card design change listener. */
+  private removeCardDesignListener(): void {
+    if (this._cardDesignListener && typeof window !== 'undefined') {
+      window.removeEventListener('tce:card-design-changed', this._cardDesignListener);
+      this._cardDesignListener = null;
+    }
+  }
+
   // ── Shutdown ─────────────────────────────────────────────
 
   /**
@@ -376,5 +407,6 @@ export abstract class CardGameScene extends Phaser.Scene {
     this.redoButton?.destroy();
     this.redoButton = null;
     this.hudContainer?.destroy();
+    this.removeCardDesignListener();
   }
 }

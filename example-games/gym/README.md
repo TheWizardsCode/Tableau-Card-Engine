@@ -25,9 +25,17 @@ Open `http://localhost:3000` and select **Gym** from the game selector. From the
 | Transcript Recording | `GymTranscriptScene` | Record game events, inspect transcripts; pop text feedback |
 | Save / Load State | `GymSaveLoadScene` | Save and restore state; RenderTexture snapshot; handle malformed payloads |
 | Audio & Feedback Config | `GymAudioFeedbackScene` | Toggle mute, adjust volume, map events to sounds; pop text; particle celebration |
+| I18n / Localisation | `GymI18nScene` | Register locale bundles, switch locales interactively, observe live UI text updates, missing-key fallback to English, and reset all bundles |
+| AI Strategy Framework | `GymAiStrategyScene` | Define numeric AI strategies (Highest, Lowest, Random), wrap in AiPlayer with seeded RNG, and explore pickRandom/pickBest with tie-breaking |
 | Shader & Blend Spike | `GymGraphicsShaderSpikeScene` | Sprite tinting, blend modes, shader feasibility evaluation |
 | Lighting Spike | `GymGraphicsLightingSpikeScene` | Point light, shadow evaluation, WebGL fallback behavior |
+| Parameterized Overlay | `GymParameterizedOverlayScene` | Open game-over, round-end, and confirmation overlays built with `createParameterizedOverlay()`. Demonstrates declarative config format, button callbacks, and `overlayCenterY` offset positioning with multiple vertical offsets. |
+| SVG Rasterisation Pipeline | `GymSvgHelpersScene` | Fetch SVG text from an asset URL, rasterise it to a Phaser texture at configurable sizes, verify texture caching via getOrCreateTexture, and toggle scene validity with markSceneValid/markSceneInvalid. |
+| Market Offer Engine | `GymMarketOfferEngineScene` | Create market rows with configurable slots, purchase cards, refill from a deck, and lock/unlock slots. Demonstrates the MarketOfferEngine API. |
 | Screen Layout Language (SLL) | `GymSllScene` | Starts on the composed shell+scene layout, then cycles through shell-only, scene-only, and pixel override examples while mapping zones+anchors across viewport/DPR profiles and visualizing merged overlays |
+| Spatial Rules: Grid & Pathfinding | `GymSpatialRulesScene` | Configurable grid with interactive cells, A* pathfinding, distance metric selection (Manhattan/Chebyshev/Euclidean), adjacency bonus computation, and blockable obstacles |
+| Token Pile View | `GymTokenPileViewScene` | Four token piles with different renderers (simple coloured tokens, card-back tokens, custom shaped tokens, feudalism-style). Add/remove tokens interactively with live count updates and click events. |
+| Rule Engine: LegalityResult + EconomyLedger | `GymRuleEngineScene` | Interactively explore the LegalityResult discriminated union pattern (legal/illegal actions with multiple reason types) and EconomyLedger resource tracking (coins, reputation, score) with constraint enforcement. |
 
 ## SLL Demo
 
@@ -89,7 +97,8 @@ The Gym Router supports optional animated scene transitions (fade) when navigati
 3. Add a `GymSceneEntry` to the `GYM_SCENE_CATALOGUE` array.
 4. Export the scene class from `index.ts`.
 5. Register the scene class in `main.ts`.
-6. Add a smoke test in `tests/gym/`.
+6. Add the scene class to the `GymSceneSmoke.browser.test.ts` smoke test.
+7. Optionally add a dedicated browser integration test in `tests/gym/`.
 
 ## Architecture
 

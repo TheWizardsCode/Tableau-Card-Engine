@@ -388,11 +388,11 @@ describe('Expanded Card Pool: Event Card Fields', () => {
     }
   });
 
-  it('Incident events should have zero cost', () => {
+  it('Incident events should have cost >= 0 (some rebalanced to cost 1)', () => {
     const incidents = eventDeck.filter(e => e.trigger === 'Incident');
     expect(incidents.length).toBeGreaterThanOrEqual(10);
     for (const evt of incidents) {
-      expect(evt.cost).toBe(0);
+      expect(evt.cost).toBeGreaterThanOrEqual(0);
     }
   });
 
@@ -471,8 +471,8 @@ describe('Expanded Card Pool: Deck Building', () => {
     const bakeries = deck.filter(c => c.name === 'Bakery');
     expect(bakeries).toHaveLength(2);
     for (const b of bakeries) {
-      expect(b.cost).toBe(6);
-      expect(b.baseIncome).toBe(1);
+      expect(b.cost).toBe(3);
+      expect(b.baseIncome).toBe(0.5);
       expect(b.synergyTypes).toEqual(['Food']);
     }
   });

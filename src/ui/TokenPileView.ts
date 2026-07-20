@@ -149,7 +149,22 @@ export class TokenPileView<T = unknown> {
 
     // Create container for all token display objects
     this.container = scene.add.container(this._x, this._y);
-    this.container.setInteractive({ useHandCursor: true });
+
+    // Phaser 4 RC7 requires a hit area (Shape) before setInteractive
+    // on a Container. We define a circular hit area matching the token
+    // visual extent with a generous grab zone, passed as a config object
+    // so Phaser's InputPlugin.setHitArea routes it correctly.
+    const hitRadius = this.tokenRadius + 12;
+    const hitShape = { x: 0, y: 0, radius: hitRadius };
+    this.container.setInteractive({
+      hitArea: hitShape,
+      hitAreaCallback: (shape: typeof hitShape, x: number, y: number) => {
+        const dx = x - shape.x;
+        const dy = y - shape.y;
+        return dx * dx + dy * dy <= shape.radius * shape.radius;
+      },
+      useHandCursor: true,
+    });
 
     // Create background graphics for the pile base
     this.backgroundGraphics = scene.add.graphics();
@@ -245,7 +260,12 @@ export class TokenPileView<T = unknown> {
    */
   setInteractive(flag: boolean): void {
     if (flag) {
-      this.container.setInteractive({ useHandCursor: true });
+      // Re-enable: the hit area shape from the constructor is preserved
+      // on the container after disableInteractive.
+      this.container.setInteractive();
+      if (this.container.input) {
+        this.container.input.cursor = 'pointer';
+      }
     } else {
       this.container.disableInteractive();
     }

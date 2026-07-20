@@ -20,6 +20,16 @@ Rendering guidance: The project's canonical card art is 140×190 (portrait). All
 
 Files: `ace_of_clubs.svg` through `king_of_spades.svg` (52 card faces) and `card_back.svg`.
 
+## Alternative Playing Card Assets (Webisso)
+
+52 card face SVGs and 1 card back SVG for the alternative "Modern" card design:
+
+- **Source**: [webisso/playing-cards](https://github.com/webisso/playing-cards)
+- **License**: MIT License
+- **Modifications**: Downloaded as-is from upstream; card back created in-house to match the design style.
+
+Files (in `cards/alternative/webisso/`): `ace_of_clubs.svg` through `king_of_spades.svg` (52 card faces) and `card_back.svg`.
+
 ## Audio Sound Effects — Golf Game
 
 8 synthesized WAV sound effects generated for the Golf solitaire game:
