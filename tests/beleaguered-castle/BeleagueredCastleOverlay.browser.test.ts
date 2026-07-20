@@ -8,6 +8,7 @@ async function bootGame(): Promise<Phaser.Game> {
   container = document.createElement('div');
   container.id = 'game-container';
   document.body.appendChild(container);
+  (window as any).__BC_TEST_REDUCED_MOTION__ = true;
   const { createBeleagueredCastleGame } = await import('../../example-games/beleaguered-castle/createBeleagueredCastleGame');
   const game = createBeleagueredCastleGame({ type: Phaser.CANVAS });
   await waitForScene(game, 'BeleagueredCastleScene');
