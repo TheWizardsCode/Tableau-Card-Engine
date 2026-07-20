@@ -8,6 +8,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import Phaser from 'phaser';
 import { GymTooltipScene } from '../../example-games/gym/scenes/GymTooltipScene';
+import { GYM_TOOLTIP_KEY } from '../../example-games/gym/GymRegistry';
+import { waitForScene } from '../helpers/waitForScene';
 
 describe('GymTooltipScene toggle button (Disable/Enable)', () => {
   let game: Phaser.Game | null = null;
@@ -26,7 +28,7 @@ describe('GymTooltipScene toggle button (Disable/Enable)', () => {
 
   /** Helper: find the toggle button by its text content. */
   function findToggleButton(
-    scene: GymTooltipScene,
+    scene: Phaser.Scene,
   ): Phaser.GameObjects.Text | undefined {
     return scene.children.list.find(
       (c) =>
@@ -37,46 +39,31 @@ describe('GymTooltipScene toggle button (Disable/Enable)', () => {
 
   /** Helper: find the tooltip status label by its name. */
   function findTooltipLabel(
-    scene: GymTooltipScene,
+    scene: Phaser.Scene,
   ): Phaser.GameObjects.Text | undefined {
     return scene.children.getByName('tooltipLabel') as
       | Phaser.GameObjects.Text
       | undefined;
   }
 
-  function bootScene(): Promise<GymTooltipScene> {
-    return new Promise<GymTooltipScene>((resolve, reject) => {
-      const container = document.createElement('div');
-      container.id = 'game-container';
-      document.body.appendChild(container);
+  async function bootScene(): Promise<Phaser.Scene> {
+    const container = document.createElement('div');
+    container.id = 'game-container';
+    document.body.appendChild(container);
 
-      const scene = new GymTooltipScene();
-      game = new Phaser.Game({
-        type: Phaser.CANVAS,
-        width: 800,
-        height: 600,
-        parent: 'game-container',
-        scene: [scene],
-      });
-
-      // Listen for when the scene finishes its create()
-      scene.events.once('postcreate', () => {
-        resolve(scene);
-      });
-
-      // Fallback: wait for the Phaser ready event
-      game.events.once('ready', () => {
-        setTimeout(() => {
-          try {
-            resolve(scene);
-          } catch {
-            // ignore if already resolved
-          }
-        }, 500);
-      });
-
-      setTimeout(() => reject(new Error('Scene did not boot within 5s')), 5000);
+    game = new Phaser.Game({
+      type: Phaser.CANVAS,
+      width: 800,
+      height: 600,
+      parent: 'game-container',
+      scene: [GymTooltipScene],
     });
+
+    await waitForScene(game, GYM_TOOLTIP_KEY);
+    const scene = game.scene.getScene(GYM_TOOLTIP_KEY);
+    expect(scene).toBeTruthy();
+    expect(scene.sys.isActive()).toBe(true);
+    return scene;
   }
 
   it('shows a toggle button instead of a Hide button', async () => {
