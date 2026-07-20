@@ -70,7 +70,10 @@ function drainCanvasPool(): void {
     (canvasPool as any).pool;
 
   if (poolArray) {
-    for (const container of poolArray) {
+    // Iterate backwards to avoid skipping entries when canvasPool.remove
+    // mutates the array by splicing out the current index.
+    for (let i = poolArray.length - 1; i >= 0; i--) {
+      const container = poolArray[i];
       try { canvasPool.remove(container.canvas); } catch { /* ignore */ }
       releaseCanvasContext(container.canvas);
     }
@@ -185,7 +188,10 @@ export let _gameBootCount = 0;
 
 export async function destroyGame(game: Phaser.Game | null): Promise<void> {
   if (game) {
-    game.destroy(true);
+    // game.destroy() is async — it only sets pendingDestroy = true and waits
+    // for the next game step to call runDestroy(). Since the game loop stops,
+    // runDestroy() never fires. We call it directly instead.
+    (game as any).runDestroy();
   }
 
   // Remove the game container from DOM
