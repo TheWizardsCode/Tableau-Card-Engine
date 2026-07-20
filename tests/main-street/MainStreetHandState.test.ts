@@ -197,6 +197,8 @@ describe('MainStreet Hand State', () => {
         const canAddFn = (market as any).canAddToHand;
         if (typeof purchaseFn !== 'function' || typeof canAddFn !== 'function') return;
 
+        // Boost coins to ensure enough budget for hand-filling purchases
+        state.resourceBank.coins = 100;
         // Fill hand to capacity
         const maxSize = getMaxHandSize(state);
         const cards = state.market.development.filter(
@@ -419,6 +421,8 @@ describe('MainStreet Hand State', () => {
         const fn = (market as any).purchaseBusinessToHand ?? (market as any).buyBusinessToHand;
         if (typeof fn !== 'function') return;
 
+        // Boost coins to ensure enough budget for purchasing 2 cards
+        state.resourceBank.coins = 100;
         const cards = state.market.development.filter(
           c => c.cost <= state.resourceBank.coins,
         );

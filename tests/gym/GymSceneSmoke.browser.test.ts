@@ -12,11 +12,19 @@ import { GymOverlayUiScene } from '../../example-games/gym/scenes/GymOverlayUiSc
 import { GymUndoRedoScene } from '../../example-games/gym/scenes/GymUndoRedoScene';
 import { GymTranscriptScene } from '../../example-games/gym/scenes/GymTranscriptScene';
 import { GymSaveLoadScene } from '../../example-games/gym/scenes/GymSaveLoadScene';
+import { GymSvgHelpersScene } from '../../example-games/gym/scenes/GymSvgHelpersScene';
+import { GymMarketOfferEngineScene } from '../../example-games/gym/scenes/GymMarketOfferEngineScene';
+import { GymSpatialRulesScene } from '../../example-games/gym/scenes/GymSpatialRulesScene';
+import { GymTokenPileViewScene } from '../../example-games/gym/scenes/GymTokenPileViewScene';
+import { GymRuleEngineScene } from '../../example-games/gym/scenes/GymRuleEngineScene';
+import { GymAiStrategyScene } from '../../example-games/gym/scenes/GymAiStrategyScene';
 import { GymAudioFeedbackScene } from '../../example-games/gym/scenes/GymAudioFeedbackScene';
+import { GymI18nScene } from '../../example-games/gym/scenes/GymI18nScene';
 import { GymGraphicsShaderSpikeScene } from '../../example-games/gym/scenes/GymGraphicsShaderSpikeScene';
 import { GymGraphicsLightingSpikeScene } from '../../example-games/gym/scenes/GymGraphicsLightingSpikeScene';
 import { GymSllScene } from '../../example-games/gym/scenes/GymSllScene';
 import { GymLayoutOwnershipScene } from '../../example-games/gym/scenes/GymLayoutOwnershipScene';
+import { GymParameterizedOverlayScene } from '../../example-games/gym/scenes/GymParameterizedOverlayScene';
 import { waitForScene } from '../helpers/waitForScene';
 import {
   GYM_DECK_RNG_KEY,
@@ -26,10 +34,18 @@ import {
   GYM_TRANSCRIPT_KEY,
   GYM_SAVE_LOAD_KEY,
   GYM_AUDIO_FEEDBACK_KEY,
+  GYM_I18N_KEY,
   GYM_GRAPHICS_SHADER_SPIKE_KEY,
   GYM_GRAPHICS_LIGHTING_SPIKE_KEY,
   GYM_SLL_KEY,
   GYM_LAYOUT_OWNERSHIP_KEY,
+  GYM_PARAMETERIZED_OVERLAY_KEY,
+  GYM_SVG_HELPERS_KEY,
+  GYM_AI_STRATEGY_KEY,
+  GYM_MARKET_OFFER_ENGINE_KEY,
+  GYM_SPATIAL_RULES_KEY,
+  GYM_TOKEN_PILE_VIEW_KEY,
+  GYM_RULE_ENGINE_KEY,
 } from '../../example-games/gym/GymRegistry';
 
 const SCENES = [
@@ -40,10 +56,18 @@ const SCENES = [
   { key: GYM_TRANSCRIPT_KEY, Scene: GymTranscriptScene },
   { key: GYM_SAVE_LOAD_KEY, Scene: GymSaveLoadScene },
   { key: GYM_AUDIO_FEEDBACK_KEY, Scene: GymAudioFeedbackScene },
+  { key: GYM_I18N_KEY, Scene: GymI18nScene },
   { key: GYM_GRAPHICS_SHADER_SPIKE_KEY, Scene: GymGraphicsShaderSpikeScene },
   { key: GYM_GRAPHICS_LIGHTING_SPIKE_KEY, Scene: GymGraphicsLightingSpikeScene },
   { key: GYM_SLL_KEY, Scene: GymSllScene },
   { key: GYM_LAYOUT_OWNERSHIP_KEY, Scene: GymLayoutOwnershipScene },
+  { key: GYM_PARAMETERIZED_OVERLAY_KEY, Scene: GymParameterizedOverlayScene },
+  { key: GYM_SVG_HELPERS_KEY, Scene: GymSvgHelpersScene },
+  { key: GYM_AI_STRATEGY_KEY, Scene: GymAiStrategyScene },
+  { key: GYM_MARKET_OFFER_ENGINE_KEY, Scene: GymMarketOfferEngineScene },
+  { key: GYM_SPATIAL_RULES_KEY, Scene: GymSpatialRulesScene },
+  { key: GYM_TOKEN_PILE_VIEW_KEY, Scene: GymTokenPileViewScene },
+  { key: GYM_RULE_ENGINE_KEY, Scene: GymRuleEngineScene },
 ];
 
 describe('Gym individual scene smoke', () => {

@@ -38,6 +38,12 @@ async function bootGame(): Promise<Phaser.Game> {
   container.id = 'game-container';
   document.body.appendChild(container);
 
+  // Signal to the scene that this is a test run, so the deal animation
+  // should skip tweens (reduced motion). This prevents timeouts when
+  // the Phaser game loop does not advance tweens in headless Chromium
+  // after sequential game create/destroy cycles.
+  (window as any).__BC_TEST_REDUCED_MOTION__ = true;
+
   const { createBeleagueredCastleGame } = await import(
     '../../example-games/beleaguered-castle/createBeleagueredCastleGame'
   );
@@ -62,6 +68,11 @@ function wait(ms: number): Promise<void> {
 /**
  * Wait for the deal animation to finish.
  * Polls the scene's isDealComplete() accessor.
+ *
+ * Also manually steps the Phaser game loop (game.loop.tick())
+ * to ensure tweens advance even if requestAnimationFrame does not
+ * fire consistently in headless Chromium when many Phaser games
+ * are created and destroyed sequentially during the full test suite.
  */
 async function waitForDeal(
   scene: Phaser.Scene & { isDealComplete(): boolean },
@@ -70,6 +81,17 @@ async function waitForDeal(
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     if (scene.isDealComplete()) return;
+    // Manually advance all tweens via the TweenManager's tick() method,
+    // which is designed for manual stepping and always advances tweens
+    // regardless of the internal timing state.
+    // This handles the case where requestAnimationFrame may not fire
+    // consistently in headless Chromium when many Phaser games are
+    // created and destroyed sequentially during the full test suite.
+    try {
+      scene.tweens.tick();
+    } catch {
+      // If the tween manager is not available, fall through to polling
+    }
     await wait(100);
   }
   throw new Error(

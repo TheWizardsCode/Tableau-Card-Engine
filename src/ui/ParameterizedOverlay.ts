@@ -1,5 +1,5 @@
 import { FONT_FAMILY, GAME_H, GAME_W } from './constants';
-import { createOverlayBackground, type OverlayBackgroundOptions, type OverlayBoxOptions } from './Overlay';
+import { createOverlayBackground, dismissOverlay, type OverlayBackgroundOptions, type OverlayBoxOptions } from './Overlay';
 import { createOverlayButton, type OverlayButtonConfig } from './OverlayButton';
 
 export interface ParameterizedOverlayButton {
@@ -78,4 +78,18 @@ export function createParameterizedOverlay(
 
 export function overlayCenterY(offset: number): number {
   return GAME_H / 2 + offset;
+}
+
+/**
+ * Dismiss a parameterized overlay created by createParameterizedOverlay.
+ *
+ * Destroys all game objects (background, title, detail, buttons) created
+ * by the overlay factory.
+ *
+ * @param objects  The array of game objects returned by createParameterizedOverlay.
+ */
+export function dismissParameterizedOverlay(
+  objects: Phaser.GameObjects.GameObject[],
+): void {
+  dismissOverlay(objects);
 }

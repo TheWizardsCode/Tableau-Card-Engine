@@ -437,6 +437,11 @@ describe('EconomyLedger — Main Street integration parity', () => {
         return; // skip if no investment event available
       }
 
+      // Ensure enough coins for the event purchase
+      if (state.resourceBank.coins < eventCard.cost) {
+        state.resourceBank.coins = eventCard.cost;
+      }
+
       const ledger = ledgerFromState(state);
       const coinsBefore = state.resourceBank.coins;
 

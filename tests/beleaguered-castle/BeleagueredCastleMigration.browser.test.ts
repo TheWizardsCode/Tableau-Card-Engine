@@ -30,6 +30,11 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * Wait for the deal animation to finish (up to 60s).
  * Phaser browser tests in headless Chromium run the game loop at
  * a reduced frame rate, which proportionally slows tween animations.
+ *
+ * Also manually steps the Phaser game loop (game.loop.tick())
+ * to ensure tweens advance even if requestAnimationFrame does not
+ * fire consistently in headless Chromium when many Phaser games
+ * are created and destroyed sequentially during the full test suite.
  */
 async function waitForDeal(
   scene: Phaser.Scene & { isDealComplete(): boolean },
@@ -38,6 +43,17 @@ async function waitForDeal(
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     if (scene.isDealComplete()) return;
+    // Manually advance all tweens via the TweenManager's tick() method,
+    // which is designed for manual stepping and always advances tweens
+    // regardless of the internal timing state.
+    // This handles the case where requestAnimationFrame may not fire
+    // consistently in headless Chromium when many Phaser games are
+    // created and destroyed sequentially during the full test suite.
+    try {
+      scene.tweens.tick();
+    } catch {
+      // If the tween manager is not available, fall through to polling
+    }
     await wait(100);
   }
   throw new Error(`Deal animation did not complete within ${timeoutMs}ms`);
@@ -54,6 +70,10 @@ describe('Beleaguered Castle HandView/PileView migration smoke test', () => {
     container = document.createElement('div');
     container.id = 'game-container';
     document.body.appendChild(container);
+
+    // Signal test mode: skip deal animation tweens to avoid timeouts
+    // when game loop doesn't advance properly in headless Chromium.
+    (window as any).__BC_TEST_REDUCED_MOTION__ = true;
 
     const { createBeleagueredCastleGame } = await import(
       '../../example-games/beleaguered-castle/createBeleagueredCastleGame'

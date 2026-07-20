@@ -32,43 +32,58 @@ export const SCREENSHOT_DIR = 'main-street-tutorial-e2e';
 // The pool array IS exposed as Phaser.Display.Canvas.CanvasPool.pool,
 // so we drain it completely after each game destroy: we call remove()
 // on every canvas to free its parent reference, remove all canvases
-// from the DOM, and clear the pool so Phaser creates fresh canvases.
-// This keeps the context count bounded at ~1-2 per create/destroy cycle.
+// from the DOM, clear the pool so Phaser creates fresh canvases,
+// and force-release contexts by resetting canvas dimensions to 0.
+//
+// The primary fix for cross-test-file exhaustion is vitest workspace
+// isolation (each file runs in its own browser context), but the
+// enhanced drain still helps within a single file's lifecycle.
+
+/**
+ * Force-release a canvas element's rendering context by resizing
+ * it to 0 and removing it from the DOM. This triggers the browser
+ * to release the underlying CanvasRenderingContext2D resource.
+ */
+function releaseCanvasContext(canvas: HTMLCanvasElement | null): void {
+  if (!canvas) return;
+  try {
+    canvas.width = 0;
+    canvas.height = 0;
+  } catch { /* ignore */ }
+  try {
+    (canvas as any).getContext = null;
+  } catch { /* ignore */ }
+  if (canvas.parentNode) {
+    try { canvas.parentNode.removeChild(canvas); } catch { /* ignore */ }
+  }
+}
 
 /**
  * Drain Phaser's CanvasPool completely: free all canvases, remove
- * them from the DOM, and clear the pool so Phaser starts fresh.
+ * them from the DOM, clear the pool, and force-release canvas contexts.
  */
 function drainCanvasPool(): void {
   const canvasPool = (Phaser as any).Display?.Canvas?.CanvasPool;
   if (!canvasPool) return;
 
-  // 1. The pool array IS exposed (line 29150 of phaser.js: `pool: pool`)
-  const poolArray: Array<{ parent: any; canvas: HTMLCanvasElement; type: number }> | undefined =
+  const poolArray: Array<{ parent: any; canvas: HTMLCanvasElement }> | undefined =
     (canvasPool as any).pool;
 
   if (poolArray) {
-    // Free every canvas in the pool
-    for (const container of poolArray) {
-      try {
-        canvasPool.remove(container.canvas);
-      } catch { /* ignore */ }
-      // Remove from DOM if attached
-      const canvas = container.canvas;
-      if (canvas && canvas.parentNode) {
-        try {
-          canvas.parentNode.removeChild(canvas);
-        } catch { /* ignore */ }
-      }
+    // Iterate backwards to avoid skipping entries when canvasPool.remove
+    // mutates the array by splicing out the current index.
+    for (let i = poolArray.length - 1; i >= 0; i--) {
+      const container = poolArray[i];
+      try { canvasPool.remove(container.canvas); } catch { /* ignore */ }
+      releaseCanvasContext(container.canvas);
     }
-    // Clear the pool array so Phaser creates new canvases next time
     poolArray.length = 0;
-  } else {
-    // Fallback: remove all canvases from DOM
-    document.querySelectorAll('canvas').forEach((el) => {
-      if (el.parentNode) el.parentNode.removeChild(el);
-    });
   }
+
+  // Also clear any orphaned canvases from the DOM
+  document.querySelectorAll('canvas').forEach((el) => {
+    releaseCanvasContext(el);
+  });
 }
 
 // ── Game Lifecycle ───────────────────────────────────────
@@ -76,8 +91,15 @@ function drainCanvasPool(): void {
 /**
  * Boot a fresh Main Street game with tutorial mode forced on.
  * Cleans up any stale DOM, localStorage, or canvas state first.
+ *
+ * Tracks boot count for diagnostic purposes. If canvas context
+ * is null, throws a detailed diagnostic error including the
+ * number of previous boot/destroy cycles in this session.
  */
 export async function bootGameWithTutorial(): Promise<Phaser.Game> {
+  _gameBootCount++;
+  const cycleNumber = _gameBootCount;
+
   document.querySelectorAll('canvas').forEach((el) => el.remove());
   const existing = document.getElementById('game-container');
   if (existing) existing.remove();
@@ -105,11 +127,29 @@ export async function bootGameWithTutorial(): Promise<Phaser.Game> {
   // Check canvas and rendering context validity
   const gameCanvas = document.querySelector('#game-container canvas') as HTMLCanvasElement | null;
   if (!gameCanvas) {
-    throw new Error('Phaser did not create a canvas element');
+    throw new Error(
+      `[bootGameWithTutorial #${cycleNumber}] Phaser did not create a canvas element. ` +
+      `This is boot cycle #${cycleNumber}. Previous game may not have fully cleaned up.`
+    );
   }
   const ctx = gameCanvas.getContext('2d');
   if (!ctx) {
-    throw new Error('Canvas 2D context is null (browser context limit reached)');
+    // Diagnostic: report how many cycles have occurred and list remaining canvases
+    const remCanvasCount = document.querySelectorAll('canvas').length;
+    const poolInfo = (() => {
+      const cp = (Phaser as any).Display?.Canvas?.CanvasPool;
+      if (!cp) return 'CanvasPool not found';
+      const poolLen = cp.pool?.length ?? 'N/A';
+      const htmlPoolLen = cp.htmlCanvasPool?.length ?? 'N/A';
+      return `pool=${poolLen}, htmlCanvasPool=${htmlPoolLen}`;
+    })();
+    throw new Error(
+      `[bootGameWithTutorial #${cycleNumber}] Canvas 2D context is null ` +
+      `(browser context limit reached). Boot cycle #${cycleNumber}. ` +
+      `Remaining canvases in DOM: ${remCanvasCount}. ` +
+      `CanvasPool state: ${poolInfo}. ` +
+      `Try increasing cleanup delay or enabling process isolation.`
+    );
   }
 
   await waitForScene(game, 'MainStreetScene', SCENE_LOAD_TIMEOUT);
@@ -139,13 +179,19 @@ export async function bootGameWithTutorial(): Promise<Phaser.Game> {
  * cycles. These orphaned canvases hold CanvasRenderingContext2D
  * objects that count toward the browser's per-origin limit.
  *
- * We patch CanvasPool.create at module load time to track every
- * canvas Phaser creates, and free them all here via CanvasPool.remove
- * before resetting the tracked array.
+ * We drain the CanvasPool completely after each game destroy:
+ * call remove() on every canvas, force-release its context by
+ * resizing to 0, remove all canvases from the DOM, and clear
+ * the pool so Phaser creates fresh canvases on the next boot.
  */
+export let _gameBootCount = 0;
+
 export async function destroyGame(game: Phaser.Game | null): Promise<void> {
   if (game) {
-    game.destroy(true, false);
+    // game.destroy() is async — it only sets pendingDestroy = true and waits
+    // for the next game step to call runDestroy(). Since the game loop stops,
+    // runDestroy() never fires. We call it directly instead.
+    (game as any).runDestroy();
   }
 
   // Remove the game container from DOM
@@ -155,8 +201,8 @@ export async function destroyGame(game: Phaser.Game | null): Promise<void> {
   // Drain Phaser's CanvasPool completely to release all canvas contexts
   drainCanvasPool();
 
-  // Small delay for browser cleanup
-  await new Promise((r) => setTimeout(r, 50));
+  // Delay for browser GC and context release
+  await new Promise((r) => setTimeout(r, 100));
 }
 
 // ── Scene & Overlay Queries ──────────────────────────────
