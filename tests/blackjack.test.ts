@@ -513,7 +513,7 @@ describe('Blackjack winner determination', () => {
 
 describe('Blackjack end-to-end flow', () => {
   it('should play a full round from deal to conclusion', () => {
-    const state = createBlackjackGameState();
+    const state = createBlackjackGameState({ seed: 99 });
 
     // Deal
     dealInitialHands(state);
