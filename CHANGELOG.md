@@ -1,5 +1,36 @@
 # Changelog
 
+## v0.1.6 (2026-07-20)
+### Features
+- Create a playable instance of Blackjack (CG-0MQK6UBQK003MA0T)
+- Add sound effects to Blackjack (CG-0MRPHA3XH0014H5T)
+- Add game-over overlay to Blackjack (CG-0MRPHAFIA000G0J2)
+- Add undo/redo to Blackjack (CG-0MRPHAQ12008U2YR)
+- Add card animations to Blackjack (CG-0MRPHBBRN000EHTD)
+- Add reduced-motion / accessibility support to Blackjack (CG-0MRPHB0BG0079XMN)
+- Add new playing card graphics (CG-0MQK8PXL40090XFY)
+- Tooltip Demo hide option is pointless (CG-0MQK7FAAX004VRJJ)
+### Bug Fixes
+- [test-failure] blackjack.test.ts — failing test (CG-0MRTF03MJ002GZHB)
+- Fix TokenPileView setInteractive hit area (Phaser 4 RC7 Container requirement) (CG-0MRO1U5HU000TP8X)
+- [test-failure] BeleagueredCastleLayout.browser.test.ts: deal animation timeout when run in full test suite (CG-0MRTABK3E008FS3N)
+### Other
+- Create Blackjack example game structure (CG-0MQQIMOBU006N09G)
+- Register Blackjack in game selector and Gym (CG-0MQQIMPFI008CC52)
+- Migrate Blackjack scene layout to use standardised Screen Layout Language (SLL) (CG-0MROYYV12009RW2L)
+- Source and integrate alternative playing card SVGs (CG-0MQQIMOFG0003OGT)
+- Add card design selector to Settings menu (CG-0MQQIMPG0002CFY4)
+- Gym: Rule Engine demo scene (LegalityResult + EconomyLedger) (CG-0MQK9N82B002Z6WJ)
+- Gym: MarketOfferEngine demo scene (CG-0MQK9Y8LV006LC4R)
+- Gym: TokenPileView demo scene (CG-0MQK9ZMCA001EFXF)
+- Gym: SvgHelpers demo scene (SVG rasterisation pipeline) (CG-0MQK9ZMCI0043712)
+- Replace Hide button with Enable/Disable toggle for tooltips (CG-0MQQIMO6R005LKUK)
+- Gym: I18n / Localisation demo scene (CG-0MQK9OKMK005OPNT)
+- Gym: AI strategy framework demo scene (CG-0MQK9Y8L9009TK5J)
+- Gym: ParameterizedOverlay demo scene (CG-0MQKA533D0076F6L)
+- Gym: SpatialRules demo scene (Grid + pathfinding) (CG-0MQKA533D003P55Y)
+- Update documentation for shared HUD components (CG-0MQ14RL4V005GC80)
+
 ## v0.1.5 (2026-07-14)
 ### Features
 - Golf AI should consider vertical columns (CG-0MQ7W12C3002HP7L)
