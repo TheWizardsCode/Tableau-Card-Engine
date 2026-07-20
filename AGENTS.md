@@ -133,6 +133,72 @@ Any change that alters developer workflows **must** include a corresponding docu
 2. If the doc update cannot be included in the same commit, create a **child work item** in Worklog for the doc update. The parent work item **cannot be closed** until the doc-update child is also closed.
 3. Reviewers should verify that docs are updated before approving any PR that touches infrastructure or workflow files.
 
+## UI Best Practices: Creating Modal Dialogs
+
+When adding a new modal dialog overlay (e.g. a sell confirmation dialog, settings panel, or any popup), follow the established pattern used by `showSellConfirmation` in `MainStreetOverlayContent.ts`. The key rules are:
+
+### 1. Use the overlay infrastructure from `@ui/`
+
+```ts
+import { createOverlayBackground, createOverlayButton, dismissOverlay } from '../../../src/ui';
+```
+
+### 2. Create the background + box with `createOverlayBackground`
+
+```ts
+const boxConfig = { width: 360, height: 260, color: 0x000000, alpha: 1.0, depth: 200 };
+const overlay = createOverlayBackground(
+  s,
+  { depth: 199, alpha: 0.6 },  // backdrop: darker, slightly lower depth
+  boxConfig,                     // visible centered box
+);
+s.overlayObjects.push(...overlay.objects);
+```
+
+### 3. Parent ALL text and button objects into `hudContainer` (CRITICAL)
+
+This is the single most common mistake. Every text label, button, or interactive element you add to the overlay **must** be parented into `s.hudContainer`, otherwise it renders **behind** the overlay box and becomes invisible:
+
+```ts
+const titleText = s.add.text(x, y, 'My Title', { ... })
+  .setOrigin(0.5).setDepth(201);
+if (s.hudContainer) s.hudContainer.add(titleText);   // ← REQUIRED
+s.overlayObjects.push(titleText);
+
+const btn = createOverlayButton(s, x, y, '[ OK ]', 201);
+if (s.hudContainer) s.hudContainer.add(btn);          // ← REQUIRED
+s.overlayObjects.push(btn);
+```
+
+### 4. Depth ordering
+
+Use consistent depth values to ensure correct z-ordering:
+
+| Layer | Depth |
+|-------|-------|
+| Backdrop (semi-transparent overlay) | 199 |
+| Visible overlay box | 200 |
+| Text labels, buttons, interactive elements | 201 |
+
+### 5. Cleanup on dismiss
+
+When the user confirms or cancels, call `dismissOverlay` and reset the objects array:
+
+```ts
+dismissOverlay(s.overlayObjects);
+s.overlayObjects = [];
+s.refreshAll();  // re-render the game state if it changed
+```
+
+### 6. Reference the sell dialog for a complete example
+
+The best reference implementation is `showSellConfirmation` in `example-games/main-street/scenes/MainStreetOverlayContent.ts`. It demonstrates:
+- Using `createOverlayBackground` for the backdrop + box
+- Parenting all text and buttons into `hudContainer`
+- Using `createOverlayButton` for styled interactive buttons
+- Handling both confirm (sell) and cancel actions
+- Proper cleanup and state refresh
+
 <!-- Start base Worklog AGENTS.md file -->
 
 ## work-item Tracking with Worklog (wl)
