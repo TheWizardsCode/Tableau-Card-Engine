@@ -92,6 +92,11 @@ export interface BusinessCard {
    * Omitting this field is treated as an empty array.
    */
   appliedUpgrades?: string[];
+  /**
+   * Cumulative cost of all upgrade cards applied to this business instance.
+   * Used for sell value calculation. Defaults to 0 for cards without upgrades.
+   */
+  totalUpgradeCost?: number;
 }
 
 /**

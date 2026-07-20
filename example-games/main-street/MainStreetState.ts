@@ -233,6 +233,12 @@ export interface MainStreetState {
    * until the T7 purchase step completes.
    */
   skipMarketCycleOnEndTurn: boolean;
+  /**
+   * Tracks which street grid slots have been sold. Length = GRID_SIZE.
+   * true = card in this slot has been sold (non-functional, no income/synergy).
+   * false = card is active (default).
+   */
+  soldSlots: boolean[];
 }
 
 export interface MainStreetSerializedState {
@@ -288,6 +294,11 @@ export interface MainStreetSerializedState {
    * Empty string indicates a legacy save before this field was added.
    */
   csvChecksum: string;
+  /**
+   * Tracks which street grid slots have been sold. Length = GRID_SIZE.
+   * true = card in this slot has been sold (non-functional).
+   */
+  soldSlots: boolean[];
 }
 
 /** Record of a single milestone (tier unlock) achievement. */
@@ -516,6 +527,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     staffCards: [],
     staffCardMarket: staffDeck,
     skipMarketCycleOnEndTurn: false,
+    soldSlots: new Array<boolean>(GRID_SIZE).fill(false),
   };
 
   // Select challenges for this run using seeded RNG and config count
@@ -562,6 +574,7 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
     staffCards: structuredClone(state.staffCards),
     staffCardMarket: structuredClone(state.staffCardMarket),
     skipMarketCycleOnEndTurn: state.skipMarketCycleOnEndTurn,
+    soldSlots: [...state.soldSlots],
     csvChecksum: CSV_CHECKSUM,
   };
 }
@@ -666,6 +679,11 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
   if (!('csvChecksum' in saved)) {
     (saved as Record<string, unknown>).csvChecksum = '';
   }
+
+  // ── soldSlots: add missing field (defaults to all false for legacy saves) ─
+  if (!('soldSlots' in saved)) {
+    (saved as Record<string, unknown>).soldSlots = new Array<boolean>(GRID_SIZE).fill(false);
+  }
 }
 
 /**
@@ -729,6 +747,7 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
     staffCards: structuredClone(saved.staffCards),
     staffCardMarket: structuredClone(saved.staffCardMarket),
     skipMarketCycleOnEndTurn: saved.skipMarketCycleOnEndTurn ?? false,
+    soldSlots: saved.soldSlots ?? new Array<boolean>(GRID_SIZE).fill(false),
   };
 
   return state;

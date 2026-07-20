@@ -517,6 +517,23 @@ export class MainStreetScene extends CardGameScene {
     return (this.msOverlayManager as any).showGameOverOverlay.apply(this.msOverlayManager, args);
   }
 
+  /**
+   * Shows a sell confirmation overlay for a card on the street grid.
+   *
+   * @param slotIndex The grid slot index of the card being sold.
+   * @param cardName  The display name of the card.
+   * @param refund    The calculated refund amount in coins.
+   * @param info      The detailed info text to display.
+   */
+  public showSellConfirmation(slotIndex: number, cardName: string, refund: number, info: string): void {
+    if (this.msOverlayManager && typeof (this.msOverlayManager as any).showSellConfirmation === 'function') {
+      (this.msOverlayManager as any).showSellConfirmation(slotIndex, cardName, refund, info);
+      return;
+    }
+    // Fallback: if no overlay manager method exists, execute sell directly
+    this.msTurnController?.onSlotClick?.(slotIndex);
+  }
+
   // ── Tutorial Flow (Milestone 5 action-gated) ────────────
   public confirmTutorialStep(...args: any[]): any {
     return (this.msLifecycleManager as any).confirmTutorialStep.apply(this.msLifecycleManager, args);

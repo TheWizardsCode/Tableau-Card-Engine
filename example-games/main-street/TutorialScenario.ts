@@ -320,6 +320,7 @@ export function createTutorialScenario(
     staffCards: [],
     staffCardMarket: [],
     skipMarketCycleOnEndTurn: false,
+    soldSlots: new Array<boolean>(GRID_SIZE).fill(false),
   };
 
   // Select challenges for this run using seeded RNG

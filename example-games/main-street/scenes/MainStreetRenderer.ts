@@ -415,7 +415,8 @@ export class MainStreetRenderer {
     const s = this.scene;
     const { streetX, streetTop, slotW, slotGap, slotH, streetCols, streetRowGap } = s.layout;
 
-    const pairs = computeSynergyPairs(s.state.streetGrid);
+    const soldSlots: boolean[] = s.state.soldSlots ?? [];
+    const pairs = computeSynergyPairs(s.state.streetGrid, soldSlots);
 
     for (const pair of pairs) {
       const fromCol = pair.fromIndex % streetCols;
@@ -472,6 +473,24 @@ export class MainStreetRenderer {
       s.streetContainer.add(hintRect);
     }
 
+    // ── Sold card dimmed overlay ────────────────────────────────
+    const soldSlots: boolean[] = s.state.soldSlots ?? [];
+    const isSold = soldSlots[_index] === true;
+    if (isSold) {
+      // Semi-transparent dark overlay to indicate sold state
+      const soldOverlay = s.add.rectangle(0, 0, renderW, renderH, 0x000000, 0.5);
+      cardContainer.add(soldOverlay);
+
+      // "SOLD" text on the overlay
+      const soldText = s.add.text(0, 0, 'SOLD', {
+        fontSize: '16px',
+        fontStyle: 'bold',
+        color: '#ff4444',
+        fontFamily: FONT_FAMILY,
+      }).setOrigin(0.5);
+      cardContainer.add(soldText);
+    }
+
     if (!s.replayMode) {
       // Tooltip hit area for this business slot
       const tooltipZone = s.add.zone(
@@ -483,11 +502,16 @@ export class MainStreetRenderer {
       tooltipZone.setOrigin(0.5);
       tooltipZone.setInteractive({ useHandCursor: true });
       tooltipZone.on('pointerover', () => {
+        if (isSold) {
+          const info = `Sold: ${biz.name}\nThis card no longer produces income or synergy.`;
+          s.tooltipManager?.show(info, tooltipZone.x, tooltipZone.y);
+          return;
+        }
         const isCommunitySpace = (biz as any).family === 'community-space';
         const label = isCommunitySpace ? 'Community Space' : 'Business';
         const totalRep = (biz.reputationPerTurn ?? 0) + biz.reputationBonus;
         const repInfo = totalRep > 0 ? `\nReputation: +${totalRep}/turn` : '';
-        const synergyBonus = computeSynergyBonus(s.state.streetGrid, _index, s.state.config.synergyBonusPerNeighbor);
+        const synergyBonus = computeSynergyBonus(s.state.streetGrid, _index, s.state.config.synergyBonusPerNeighbor, soldSlots);
         const synergyInfo = `\nSynergy bonus: +${synergyBonus}/turn`;
         const info = `${label}: ${biz.name}\nIncome: +${biz.baseIncome + biz.incomeBonus}/turn${repInfo}\nSynergy: ${biz.synergyTypes.join('/')}${synergyInfo}\nLevel: ${biz.level}`;
         s.tooltipManager?.show(info, tooltipZone.x, tooltipZone.y);
@@ -495,6 +519,14 @@ export class MainStreetRenderer {
       tooltipZone.on('pointerout', () => {
         s.tooltipManager?.hide();
       });
+
+      // Click handler for selling (only in MarketPhase, for non-sold cards)
+      if (s.uiPhase === 'market' && !isSold) {
+        tooltipZone.on('pointerdown', () => {
+          s.onSellCard(_index);
+        });
+      }
+
       s.streetContainer.add(tooltipZone);
     }
   }

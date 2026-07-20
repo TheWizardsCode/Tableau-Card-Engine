@@ -98,7 +98,10 @@ export function computeSynergyBonus(
   grid: (BusinessCard | CommunitySpaceCard | null)[],
   index: number,
   bonusPerNeighbor: number = 1,
+  soldSlots: boolean[] = [],
 ): number {
+  // If this slot or the business itself is sold, it contributes no synergy
+  if (soldSlots[index]) return 0;
   const business = grid[index];
   if (!business) return 0;
 
@@ -114,6 +117,8 @@ export function computeSynergyBonus(
 
   let bonus = 0;
   for (const ni of neighborIndices) {
+    // Skip sold neighbor slots (sold cards don't contribute synergy)
+    if (soldSlots[ni]) continue;
     const neighbor = grid[ni];
     if (!neighbor) continue;
 
@@ -146,7 +151,10 @@ export function computeSynergyBonus(
 export function computeSynergyRepBonus(
   grid: (BusinessCard | CommunitySpaceCard | null)[],
   index: number,
+  soldSlots: boolean[] = [],
 ): number {
+  // If this slot is sold, it contributes no synergy reputation
+  if (soldSlots[index]) return 0;
   const business = grid[index];
   if (!business) return 0;
 
@@ -161,6 +169,8 @@ export function computeSynergyRepBonus(
 
   let bonus = 0;
   for (const ni of neighborIndices) {
+    // Skip sold neighbor slots
+    if (soldSlots[ni]) continue;
     const neighbor = grid[ni];
     if (!neighbor) continue;
 
@@ -192,12 +202,15 @@ export function computeBusinessIncome(
   grid: (BusinessCard | CommunitySpaceCard | null)[],
   index: number,
   bonusPerNeighbor: number = 1,
+  soldSlots: boolean[] = [],
 ): number {
+  // Sold cards produce no income
+  if (soldSlots[index]) return 0;
   const business = grid[index];
   if (!business) return 0;
 
   const base = business.baseIncome + business.incomeBonus;
-  const synergy = computeSynergyBonus(grid, index, bonusPerNeighbor);
+  const synergy = computeSynergyBonus(grid, index, bonusPerNeighbor, soldSlots);
   return base + synergy;
 }
 
@@ -214,6 +227,7 @@ export function computeBusinessIncome(
 export function computeHandCardSynergyBonus(
   grid: (BusinessCard | CommunitySpaceCard | null)[],
   hand: BusinessCard[],
+  soldSlots: boolean[] = [],
 ): number {
   if (!hand || hand.length === 0) return 0;
 
@@ -227,6 +241,8 @@ export function computeHandCardSynergyBonus(
     if (bonusPerMatch <= 0) continue;
 
     for (let i = 0; i < grid.length; i++) {
+      // Skip sold slots (sold cards don't benefit from synergy)
+      if (soldSlots[i]) continue;
       const business = grid[i];
       if (!business) continue;
 
@@ -262,17 +278,19 @@ export function computeIncome(
   grid: (BusinessCard | CommunitySpaceCard | null)[],
   bonusPerNeighbor: number = 1,
   hand?: BusinessCard[],
+  soldSlots: boolean[] = [],
 ): IncomeResult {
   const breakdown: SlotIncome[] = [];
   let total = 0;
 
-  // Compute per-slot tableau income
+  // Compute per-slot tableau income (skip sold slots)
   for (let i = 0; i < grid.length; i++) {
+    if (soldSlots[i]) continue;
     const business = grid[i];
     if (!business) continue;
 
     const base = business.baseIncome + business.incomeBonus;
-    const synergy = computeSynergyBonus(grid, i, bonusPerNeighbor);
+    const synergy = computeSynergyBonus(grid, i, bonusPerNeighbor, soldSlots);
     const slotTotal = base + synergy;
 
     breakdown.push({
@@ -289,7 +307,7 @@ export function computeIncome(
   // Add hand card synergy bonuses to the total
   let handSynergyTotal = 0;
   if (hand && hand.length > 0) {
-    handSynergyTotal = computeHandCardSynergyBonus(grid, hand);
+    handSynergyTotal = computeHandCardSynergyBonus(grid, hand, soldSlots);
     total += handSynergyTotal;
 
     // Add hand synergy to each slot's total in the breakdown
@@ -337,15 +355,18 @@ export function computeIncome(
  */
 export function computeReputationPerTurn(
   grid: (BusinessCard | CommunitySpaceCard | null)[],
+  soldSlots: boolean[] = [],
 ): number {
   let total = 0;
   for (let i = 0; i < grid.length; i++) {
+    // Skip sold slots (sold cards don't generate reputation)
+    if (soldSlots[i]) continue;
     const slot = grid[i];
     if (!slot) continue;
     total += slot.reputationPerTurn ?? 0;
     total += slot.reputationBonus;
     // Add synergy reputation from matching neighbors
-    total += computeSynergyRepBonus(grid, i);
+    total += computeSynergyRepBonus(grid, i, soldSlots);
   }
   return total;
 }
@@ -366,7 +387,8 @@ export function computeReputationPerTurn(
  */
 export function applyIncome(state: MainStreetState): IncomeResult {
   const hand = state.hand ?? [];
-  const result = computeIncome(state.streetGrid, state.config.synergyBonusPerNeighbor, hand);
+  const soldSlots = state.soldSlots ?? [];
+  const result = computeIncome(state.streetGrid, state.config.synergyBonusPerNeighbor, hand, soldSlots);
 
   // Apply active effect income modifiers per-slot, before reputation multiplier.
   // Each slot's income is individually multiplied, then summed.
@@ -387,8 +409,8 @@ export function applyIncome(state: MainStreetState): IncomeResult {
   );
   state.resourceBank.coins += multiplied;
 
-  // Apply reputation per turn from cards
-  const repPerTurn = computeReputationPerTurn(state.streetGrid);
+  // Apply reputation per turn from cards (skip sold slots)
+  const repPerTurn = computeReputationPerTurn(state.streetGrid, soldSlots);
   if (repPerTurn !== 0) {
     state.resourceBank.reputation += repPerTurn;
   }
@@ -438,11 +460,14 @@ export interface SynergyPair {
  */
 export function computeSynergyPairs(
   grid: (BusinessCard | CommunitySpaceCard | null)[],
+  soldSlots: boolean[] = [],
 ): SynergyPair[] {
   const pairs: SynergyPair[] = [];
   const seen = new Set<string>();
 
   for (let i = 0; i < grid.length; i++) {
+    // Skip sold slots (sold cards don't participate in synergy)
+    if (soldSlots[i]) continue;
     const card = grid[i];
     if (!card) continue;
 
@@ -456,6 +481,8 @@ export function computeSynergyPairs(
 
     for (const ni of neighborIndices) {
       if (ni <= i) continue; // avoid duplicates and self-pairs
+      // Skip sold neighbor slots
+      if (soldSlots[ni]) continue;
       const neighbor = grid[ni];
       if (!neighbor) continue;
 
