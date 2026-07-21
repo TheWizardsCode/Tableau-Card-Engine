@@ -37,6 +37,7 @@
 | **Synergy Types** | string[] | One or more tags that interact with adjacent cards (e.g., `Food`). |
 | **Upgrade Path** | string (optional) | Identifier of the Upgrade card that can transform this business. |
 | **Max Level** | number (optional) | Number of upgrade steps (default 1). |
+| **Reputation Per Turn** | number (optional) | Reputation contributed each turn during IncomePhase (e.g., Clinic provides +0.2 rep/turn). Default 0. |
 | **Description** | string | Flavor text and any special rules. |
 
 **Example Business Card (JSON‑like)**
@@ -78,6 +79,7 @@
 | **Target Business** | string | Exact name of the business this upgrade applies to. |
 | **Cost** | number (coins) | Purchase price from the market. |
 | **Income Bonus** | number (coins) | Additional income added to the base income after upgrade. |
+| **Reputation Bonus** | number (optional) | Additional reputation contributed each turn (e.g., Medical Center provides +0.1 rep/turn). Default 0. |
 | **Synergy Range Bonus** | number (optional) | Extends the adjacency range for synergy (e.g., from 1 slot to 2 slots). |
 | **Description** | string | Flavor text. |
 
