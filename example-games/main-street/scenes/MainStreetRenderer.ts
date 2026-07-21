@@ -256,7 +256,7 @@ export class MainStreetRenderer {
     const { coins, reputation } = s.state.resourceBank;
     const { gameW, hudY } = s.layout;
 
-    // Background strip - 2/3 width, centered
+    // Background strip - 50% width, centered
     const strip = markHudTransient(s.add.rectangle(gameW / 2, hudY, gameW * 0.5, 28, 0x1a1408, 0.6));
     strip.setStrokeStyle(1, BOX_STROKE, 0.5);
     s.hudContainer.add(strip);
