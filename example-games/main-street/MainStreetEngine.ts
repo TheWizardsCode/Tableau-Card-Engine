@@ -21,7 +21,7 @@ import type { EventCard, SynergyType } from './MainStreetCards';
 import { PLACE_COST_RATIO, SELL_VALUE_RATIO, isDurationEventCard, type DurationEventCard } from './MainStreetCards';
 import { createActiveEffect, decayActiveEffects } from '../../src/core-engine/ActiveEffect';
 import { recordMainStreetEvent } from './MainStreetTranscript';
-import { applyIncome, type IncomeResult } from './MainStreetAdjacency';
+import { applyIncome, type IncomeResult, updateNeighborsOnPlacement, updateNeighborsOnSale } from './MainStreetAdjacency';
 import {
   purchaseBusiness,
   purchaseBusinessToHand,
@@ -724,6 +724,9 @@ export function placeFromHand(
   hand.splice(handIndex, 1);
   state.streetGrid[slotIndex] = card;
 
+  // Incrementally update the new card's and all affected neighbors' cached values
+  updateNeighborsOnPlacement(state, slotIndex);
+
   addLog(state, `Placed ${card.name} from hand in slot ${slotIndex} (-€${placementCost})`, 'loss');
 }
 
@@ -790,8 +793,14 @@ export function sellFromTableau(
   // Calculate sell value (75% of purchase price)
   const sellValue = Math.floor(card.cost * SELL_VALUE_RATIO);
 
+  // Incrementally update affected neighbors' cached values before removing the card
+  // We pass the slot index and sold slot is simulated for the recalculation
+  state.soldSlots[slotIndex] = true;
+  updateNeighborsOnSale(state, slotIndex);
+
   // Remove from tableau
   state.streetGrid[slotIndex] = null;
+  state.soldSlots[slotIndex] = false;
 
   // Credit coins
   state.resourceBank.coins += sellValue;

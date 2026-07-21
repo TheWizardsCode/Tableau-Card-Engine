@@ -684,6 +684,13 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
   if (!('soldSlots' in saved)) {
     (saved as Record<string, unknown>).soldSlots = new Array<boolean>(GRID_SIZE).fill(false);
   }
+
+  // ── currentIncome / currentReputationPerTurn: add missing fields for legacy saves ─
+  // These fields were introduced by CG-0MRV84ZT60069PW6 (per-card incremental tracking).
+  // Legacy saves won't have them. We leave them as undefined so the income phase
+  // can detect them and fall back to computing from scratch. After any placement or
+  // sale, the incremental update system will populate them correctly.
+  // No explicit migration needed — undefined is the natural default.
 }
 
 /**

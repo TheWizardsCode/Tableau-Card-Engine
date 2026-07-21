@@ -268,6 +268,151 @@ export function computeBusinessIncome(
   return base + synergy;
 }
 
+/**
+ * Computes the per-card reputation contribution at a given grid slot.
+ *
+ * total = reputationPerTurn + reputationBonus + synergyRepBonus
+ *
+ * @param grid      The street grid.
+ * @param index     The slot index of the card.
+ * @param soldSlots Array of sold slot flags (sold slots return 0).
+ * @returns The total reputation per turn contributed by this card.
+ */
+export function computeSingleCardReputation(
+  grid: (BusinessCard | CommunitySpaceCard | null)[],
+  index: number,
+  soldSlots: boolean[] = [],
+): number {
+  if (soldSlots[index]) return 0;
+  const slot = grid[index];
+  if (!slot) return 0;
+  return (slot.reputationPerTurn ?? 0) + slot.reputationBonus + computeSynergyRepBonus(grid, index, soldSlots);
+}
+
+/**
+ * Sets a card's `currentIncome` field to match what `computeBusinessIncome()`
+ * would return for the given grid state.
+ *
+ * This is the core incremental-update primitive: it syncs one card's cached
+ * income value using the existing compute function, so the cached value is
+ * guaranteed to match the full-recalculation result.
+ *
+ * @param grid              The street grid.
+ * @param index             The slot index to update.
+ * @param bonusPerNeighbor  Global multiplier on per-card coin synergy (defaults to 1).
+ * @param soldSlots         Array of sold slot flags.
+ */
+export function syncCardCurrentIncome(
+  grid: (BusinessCard | CommunitySpaceCard | null)[],
+  index: number,
+  bonusPerNeighbor: number = 1,
+  soldSlots: boolean[] = [],
+): void {
+  const card = grid[index];
+  if (!card) return;
+  card.currentIncome = computeBusinessIncome(grid, index, bonusPerNeighbor, soldSlots);
+}
+
+/**
+ * Sets a card's `currentReputationPerTurn` field to match the per-card
+ * reputation contribution (base rep + bonus + synergy).
+ *
+ * @param grid      The street grid.
+ * @param index     The slot index to update.
+ * @param soldSlots Array of sold slot flags.
+ */
+export function syncCardCurrentRepPerTurn(
+  grid: (BusinessCard | CommunitySpaceCard | null)[],
+  index: number,
+  soldSlots: boolean[] = [],
+): void {
+  const card = grid[index];
+  if (!card) return;
+  card.currentReputationPerTurn = computeSingleCardReputation(grid, index, soldSlots);
+}
+
+/**
+ * Recalculates both `currentIncome` and `currentReputationPerTurn` for a
+ * single card at `index`, using the existing compute functions.
+ *
+ * Reads `config.synergyBonusPerNeighbor` from the game state and respects
+ * the `soldSlots` array (sold cards are skipped).
+ *
+ * @param state Current game state.
+ * @param index The slot index to recalculate.
+ */
+export function recalculateCard(
+  state: MainStreetState,
+  index: number,
+): void {
+  if (state.soldSlots[index]) return;
+  if (!state.streetGrid[index]) return;
+  syncCardCurrentIncome(
+    state.streetGrid,
+    index,
+    state.config.synergyBonusPerNeighbor,
+    state.soldSlots,
+  );
+  syncCardCurrentRepPerTurn(
+    state.streetGrid,
+    index,
+    state.soldSlots,
+  );
+}
+
+/**
+ * Updates all cards whose cached income/reputation could be affected by the
+ * placement of a new card at `index`.
+ *
+ * The newly placed card itself is recalculated, and every other occupied
+ * (non-sold) slot on the grid is also recalculated since any card could be
+ * affected by synergy or same-type penalty changes.
+ *
+ * @param state Current game state.
+ * @param index The slot index of the newly placed card.
+ */
+export function updateNeighborsOnPlacement(
+  state: MainStreetState,
+  index: number,
+): void {
+  // Recalculate the newly placed card
+  recalculateCard(state, index);
+
+  // Recalculate all other occupied non-sold slots (neighbors could be affected)
+  for (let i = 0; i < state.streetGrid.length; i++) {
+    if (i === index) continue;
+    if (state.soldSlots[i]) continue;
+    if (state.streetGrid[i] !== null) {
+      recalculateCard(state, i);
+    }
+  }
+}
+
+/**
+ * Updates all cards whose cached income/reputation could be affected by the
+ * sale of a card at `index`.
+ *
+ * The sold card is already marked in `soldSlots`; this function recalculates
+ * all other occupied non-sold slots since any neighbor could have lost synergy
+ * or had a same-type penalty removed.
+ *
+ * @param state Current game state.
+ * @param index The slot index of the sold card.
+ */
+export function updateNeighborsOnSale(
+  state: MainStreetState,
+  index: number,
+): void {
+  // Recalculate all occupied non-sold slots (neighbors could be affected)
+  for (let i = 0; i < state.streetGrid.length; i++) {
+    if (i === index) continue;
+    if (state.soldSlots[i]) continue;
+    if (state.streetGrid[i] !== null) {
+      recalculateCard(state, i);
+    }
+  }
+}
+
 
 /**
  * Computes the total synergy bonus contributed by hand cards to tableau businesses.
@@ -447,12 +592,39 @@ export function computeReputationPerTurn(
 export function applyIncome(state: MainStreetState): IncomeResult {
   const hand = state.hand ?? [];
   const soldSlots = state.soldSlots ?? [];
-  const result = computeIncome(state.streetGrid, state.config.synergyBonusPerNeighbor, hand, soldSlots);
+  const grid = state.streetGrid;
+
+  // Read cached currentIncome for each active slot instead of calling
+  // computeBusinessIncome from scratch every turn.
+  // If a card doesn't have currentIncome set (undefined, e.g. legacy saves
+  // or tests that place cards directly on the grid), fall back to computing
+  // it from scratch.
+  const breakdown: SlotIncome[] = [];
+  let total = 0;
+  const bonusPerNeighbor = state.config.synergyBonusPerNeighbor;
+
+  for (let i = 0; i < grid.length; i++) {
+    if (soldSlots[i]) continue;
+    const card = grid[i];
+    if (!card) continue;
+
+    const slotIncome = card.currentIncome !== undefined
+      ? card.currentIncome
+      : computeBusinessIncome(grid, i, bonusPerNeighbor, soldSlots);
+    breakdown.push({
+      slotIndex: i,
+      businessName: card.name,
+      baseIncome: slotIncome,
+      synergyBonus: 0,
+      total: slotIncome,
+    });
+    total += slotIncome;
+  }
 
   // Apply active effect income modifiers per-slot, before reputation multiplier.
   // Each slot's income is individually multiplied, then summed.
   let modifiedTotal = 0;
-  for (const slot of result.breakdown) {
+  for (const slot of breakdown) {
     const modifiedSlotIncome = applyActiveEffectMultiplier(
       state.activeEffects,
       'income-multiplier',
@@ -468,10 +640,30 @@ export function applyIncome(state: MainStreetState): IncomeResult {
   );
   state.resourceBank.coins += multiplied;
 
-  // Apply reputation per turn from cards (skip sold slots)
-  const repPerTurn = computeReputationPerTurn(state.streetGrid, soldSlots);
+  // Apply reputation per turn from cached values (skip sold slots)
+  // If a card doesn't have currentReputationPerTurn set (undefined),
+  // fall back to computing it from scratch.
+  let repPerTurn = 0;
+  for (let i = 0; i < grid.length; i++) {
+    if (soldSlots[i]) continue;
+    const card = grid[i];
+    if (!card) continue;
+    if (card.currentReputationPerTurn !== undefined) {
+      repPerTurn += card.currentReputationPerTurn;
+    } else {
+      repPerTurn += computeSingleCardReputation(grid, i, soldSlots);
+    }
+  }
   if (repPerTurn !== 0) {
     state.resourceBank.reputation += repPerTurn;
+  }
+
+  // Hand card synergy is still computed fresh each turn (it is not adjacency-based
+  // and operates on hand cards whose state changes independently).
+  let handSynergyTotal = 0;
+  if (hand && hand.length > 0) {
+    handSynergyTotal = computeHandCardSynergyBonus(grid, hand, soldSlots);
+    total += handSynergyTotal;
   }
 
   syncResourceBankToLedger(state);
@@ -484,10 +676,10 @@ export function applyIncome(state: MainStreetState): IncomeResult {
   if (repPerTurn > 0) {
     addLog(state, `Reputation from cards: +${repPerTurn}`, 'gain');
   }
-  if (result.handSynergyTotal > 0) {
-    addLog(state, `Hand card synergy: +${result.handSynergyTotal} coins`, 'gain');
+  if (handSynergyTotal > 0) {
+    addLog(state, `Hand card synergy: +${handSynergyTotal} coins`, 'gain');
   }
-  return result;
+  return { total, breakdown, handSynergyTotal };
 }
 
 // ── Synergy Pairs for Visual Lines ──────────────────────────

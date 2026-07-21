@@ -27,6 +27,7 @@ import {
   REFRESH_INVESTMENTS_COST,
 } from './MainStreetCards';
 import { shuffleArray } from '../../src/card-system';
+import { updateNeighborsOnPlacement, updateNeighborsOnSale } from './MainStreetAdjacency';
 import {
   createMarketOfferEngine,
   type MarketOfferEngine,
@@ -539,6 +540,9 @@ export function purchaseBusiness(
   // Place on grid (card may be BusinessCard or CommunitySpaceCard; both have same grid mechanics)
   state.streetGrid[slotIndex] = card as BusinessCard;
 
+  // Incrementally update the new card's and all affected neighbors' cached values
+  updateNeighborsOnPlacement(state, slotIndex);
+
   // Note: market is not refilled immediately. Replenishment occurs at start of next turn.
   const refilled = false;
 
@@ -675,6 +679,11 @@ export function purchaseUpgrade(
   }
   business.appliedUpgrades.push(card.id);
   (business as any).totalUpgradeCost = ((business as any).totalUpgradeCost ?? 0) + card.cost;
+
+  // Recalculate the upgraded card's cached values (incomeBonus and reputationBonus changed)
+  // Import is at top of file via updateNeighborsOnPlacement/updateNeighborsOnSale
+  // We use recalculateCard to update the upgraded card and all neighbors
+  updateNeighborsOnPlacement(state, businessIndex);
 
   // Note: market is not refilled immediately. Replenishment occurs at start of next turn.
   const refilled = false;
@@ -908,6 +917,9 @@ export function sellBusiness(
 
   // Mark slot as sold
   state.soldSlots[slotIndex] = true;
+
+  // Incrementally update all affected neighbors' cached values (they lost synergy/same-type from this card)
+  updateNeighborsOnSale(state, slotIndex);
 
   addLog(state, `Sold ${card.name} from slot ${slotIndex} for +${refund} coins (50% of €${purchasePrice + upgradeCosts})`, 'gain');
 
