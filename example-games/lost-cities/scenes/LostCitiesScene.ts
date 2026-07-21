@@ -202,9 +202,10 @@ export class LostCitiesScene extends CardGameScene {
       };
       this.initSoundSystem(Object.values(SFX_KEYS), mapping, { namespace: 'lost-cities' });
       this.initSettingsPanel();
-      // Propagate reduced motion preference to the animator
+      // Propagate reduced motion preference to the animator and turn controller
       if (this.settingsPanel) {
         this.animator.reducedMotion = this.settingsPanel.reducedMotion;
+        this.turnController.reducedMotion = this.settingsPanel.reducedMotion;
       }
     }
 

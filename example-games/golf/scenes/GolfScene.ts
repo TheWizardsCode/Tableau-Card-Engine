@@ -249,9 +249,10 @@ export class GolfScene extends CardGameScene {
           this.aiPlayer.memoryTracker.setSkill(value);
         },
       });
-      // Propagate reduced motion preference to the animator
+      // Propagate reduced motion preference to the animator and AI controller
       if (this.settingsPanel) {
         this.animator.reducedMotion = this.settingsPanel.reducedMotion;
+        this.aiController.reducedMotion = this.settingsPanel.reducedMotion;
       }
     }
 
