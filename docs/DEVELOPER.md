@@ -52,6 +52,16 @@ npm run dev
 
 Starts the Vite dev server at `http://localhost:3000` with hot module replacement (HMR). The root `index.html` loads the **Game Selector** landing page, which displays all available example games as clickable cards. Click a game to launch it.
 
+### ToneForge Synth Module
+
+If you plan to use Main Street's ToneForge-backed audio synthesis, generate the synth module first:
+
+```bash
+npm run tf:generate
+```
+
+If the synth module is missing, `loadMainStreetTfModule()` logs a clear warning and gracefully degrades (returns `null`). Synthesis-based audio will be unavailable but WAV-based sound effects continue to work normally.
+
 ### Multi-Game Routing
 
 The project uses a unified entry point (`main.ts` at the project root) that registers a `GameSelectorScene` as the initial Phaser scene alongside all example game scenes. Navigation works as follows:
@@ -211,6 +221,8 @@ npm run tf:generate
 ```
 
 This runs `scripts/tf-generate-synths.sh` and writes generated outputs under `build/tf-synths/`, including a runtime synth module (`main-street-runtime-synth.mjs`) used for on-the-fly synthesis.
+
+> **Missing module handling:** If the runtime synth module is absent, `loadMainStreetTfModule()` in `mainStreetTfModule.ts` logs a clear `console.warn` message with instructions to run `npm run tf:generate`, then gracefully returns `null` without triggering a Chromium module-loading error. Synthesis-based audio degrades silently; WAV-based SFX and game logic are unaffected.
 
 See `docs/the-build/audio.md` for full details (module shape, mapping, runtime wiring, CI guidance).
 
