@@ -42,7 +42,6 @@ tableau-card-engine/
 │   ├── sushi-go/          Sushi Go! (card drafting, human vs. AI)
 │   ├── feudalism/          Feudalism (engine-building, human vs. AI)
 │   ├── lost-cities/       Lost Cities (2-player expedition lanes, human vs. AI)
-│   ├── the-mind/          The Mind (cooperative real-time, human vs. AI)
 │   └── main-street/       Main Street (single-player tableau builder)
 ├── public/assets/         Static assets (cards, fonts, images)
 │   └── cards/             52 standard card SVGs + card back + game-specific cards (140x190px)
