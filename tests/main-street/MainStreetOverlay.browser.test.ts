@@ -286,4 +286,33 @@ describe('Main Street overlay button tests', () => {
       expect(allTexts).toContain(text);
     }
   });
+
+  it('should show Menu button in the HUD container', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene')!;
+
+    forceGameOver(scene);
+    await waitFrames(3);
+
+    // Find buttons in the HUD container by text label
+    const hud = (scene as any).hudContainer as { list: Phaser.GameObjects.GameObject[] } | undefined;
+    expect(hud).toBeDefined();
+    expect(hud!.list).toBeDefined();
+
+    const findButtonText = (label: string): Phaser.GameObjects.Text | undefined => {
+      return hud!.list.find(
+        (child: Phaser.GameObjects.GameObject) =>
+          child instanceof Phaser.GameObjects.Text && child.text === label,
+      ) as Phaser.GameObjects.Text | undefined;
+    };
+
+    // Verify Menu button exists and is interactive
+    const menuBtn = findButtonText('[ Menu ]');
+    expect(menuBtn).toBeDefined();
+    expect(menuBtn!.input?.enabled).toBe(true);
+
+    // Verify Play Again button still exists
+    const playAgainBtn = findButtonText('[ Play Again ]');
+    expect(playAgainBtn).toBeDefined();
+  });
 });

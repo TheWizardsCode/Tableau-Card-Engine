@@ -243,6 +243,18 @@ export class MainStreetOverlayContent {
     });
     if (s.hudContainer) s.hudContainer.add(playAgainBtn);
     s.overlayObjects.push(playAgainBtn);
+
+    const menuBtn = createOverlayButton(
+      s, s.layout.gameW / 2 + 110, btnY,
+      '[ Menu ]', 101,
+    );
+    menuBtn.on('pointerdown', () => {
+      dismissOverlay(s.overlayObjects);
+      s.overlayObjects = [];
+      s.scene.start('GameSelectorScene');
+    });
+    if (s.hudContainer) s.hudContainer.add(menuBtn);
+    s.overlayObjects.push(menuBtn);
   }
 
   /**
