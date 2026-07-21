@@ -321,6 +321,19 @@ function makeCommunitySpace(template: Omit<CommunitySpaceCard, 'family' | 'level
  * synergy bonuses, upgrade path, level tracking) but are classified as 'community-space'
  * rather than 'business'.
  */
+/**
+ * Returns the base template ID for a card by stripping the serial suffix (`-\d+$`)
+ * added during deck creation (e.g., `'biz-bakery-0'` → `'biz-bakery'`).
+ *
+ * Cards without a serial suffix are returned as-is.
+ *
+ * @param id  The card's `id` field (e.g. `'biz-bakery-0'` or `'cs-park-1'`).
+ * @returns The base template ID (e.g. `'biz-bakery'` or `'cs-park'`).
+ */
+export function getBaseTypeId(id: string): string {
+  return id.replace(/-\d+$/, '');
+}
+
 export interface CommunitySpaceCard {
   readonly family: 'community-space';
   readonly id: string;

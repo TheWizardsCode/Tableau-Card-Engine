@@ -10,6 +10,7 @@
  */
 
 import type { BusinessCard, CommunitySpaceCard, SynergyType } from './MainStreetCards';
+import { getBaseTypeId } from './MainStreetCards';
 import { GRID_SIZE } from './MainStreetCards';
 import type { MainStreetState } from './MainStreetState';
 import { addLog, syncResourceBankToLedger } from './MainStreetState';
@@ -77,6 +78,38 @@ function effectiveSynergyRepBonus(card: BusinessCard | CommunitySpaceCard): numb
 }
 
 /**
+ * Returns true if the given business has at least one adjacent neighbor with the
+ * same base type (template ID). Used to determine when synergy is nullified and
+ * the 60% base-income penalty applies.
+ *
+ * Sold slots are excluded from the check.
+ */
+function hasAdjacentSameType(
+  grid: (BusinessCard | CommunitySpaceCard | null)[],
+  index: number,
+  soldSlots: boolean[] = [],
+): boolean {
+  const card = grid[index];
+  if (!card) return false;
+  if (soldSlots[index]) return false;
+
+  const baseType = getBaseTypeId(card.id);
+  // Use range 1 (default) for same-type check; upgrades don't affect this penalty
+  const neighborIndices = neighbors(index, 1);
+
+  for (const ni of neighborIndices) {
+    if (soldSlots[ni]) continue;
+    const neighbor = grid[ni];
+    if (!neighbor) continue;
+    if (getBaseTypeId(neighbor.id) === baseType) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * Computes the synergy coin bonus for a single business at a given slot.
  *
  * A business earns coins for each neighboring slot that contains a business
@@ -88,6 +121,11 @@ function effectiveSynergyRepBonus(card: BusinessCard | CommunitySpaceCard): numb
  *
  * Cards with zero synergyCoinBonus naturally don't contribute synergy
  * to their neighbors, acting as synergy-neutral cards.
+ *
+ * **Same-type rule:** If a neighbor has the same base type (template ID) as the
+ * source business, that neighbor's synergy contribution is nullified (returns 0).
+ * This encourages diverse streets rather than placing multiple copies of the
+ * same business type.
  *
  * @param grid               The street grid.
  * @param index              The slot index of the business.
@@ -112,6 +150,7 @@ export function computeSynergyBonus(
     return 0;
   }
 
+  const baseType = getBaseTypeId(business.id);
   const range = 1 + business.synergyRangeBonus;
   const neighborIndices = neighbors(index, range);
 
@@ -121,6 +160,9 @@ export function computeSynergyBonus(
     if (soldSlots[ni]) continue;
     const neighbor = grid[ni];
     if (!neighbor) continue;
+
+    // Same-type rule: skip synergy contribution from same-type neighbors
+    if (getBaseTypeId(neighbor.id) === baseType) continue;
 
     // Check if any synergy type is shared
     const hasSharedSynergy = business.synergyTypes.some(
@@ -144,6 +186,10 @@ export function computeSynergyBonus(
  *
  * The range considered is 1 + business.synergyRangeBonus (from upgrades).
  *
+ * **Same-type rule:** If a neighbor has the same base type (template ID) as the
+ * source business, the reputation synergy contribution is nullified (returns 0).
+ * The business's own `reputationPerTurn` and `reputationBonus` are unaffected.
+ *
  * @param grid   The street grid.
  * @param index  The slot index of the business.
  * @returns The synergy reputation bonus.
@@ -164,6 +210,7 @@ export function computeSynergyRepBonus(
     return 0;
   }
 
+  const baseType = getBaseTypeId(business.id);
   const range = 1 + business.synergyRangeBonus;
   const neighborIndices = neighbors(index, range);
 
@@ -173,6 +220,9 @@ export function computeSynergyRepBonus(
     if (soldSlots[ni]) continue;
     const neighbor = grid[ni];
     if (!neighbor) continue;
+
+    // Same-type rule: skip reputation synergy from same-type neighbors
+    if (getBaseTypeId(neighbor.id) === baseType) continue;
 
     // Check if any synergy type is shared
     const hasSharedSynergy = business.synergyTypes.some(
@@ -209,10 +259,15 @@ export function computeBusinessIncome(
   const business = grid[index];
   if (!business) return 0;
 
-  const base = business.baseIncome + business.incomeBonus;
+  let base = business.baseIncome + business.incomeBonus;
+  // Same-type penalty: reduce base income to 60% when adjacent to a same-type business
+  if (hasAdjacentSameType(grid, index, soldSlots)) {
+    base = base * 0.6;
+  }
   const synergy = computeSynergyBonus(grid, index, bonusPerNeighbor, soldSlots);
   return base + synergy;
 }
+
 
 /**
  * Computes the total synergy bonus contributed by hand cards to tableau businesses.
@@ -289,7 +344,11 @@ export function computeIncome(
     const business = grid[i];
     if (!business) continue;
 
-    const base = business.baseIncome + business.incomeBonus;
+    let base = business.baseIncome + business.incomeBonus;
+    // Same-type penalty: reduce base income to 60% when adjacent to a same-type business
+    if (hasAdjacentSameType(grid, i, soldSlots)) {
+      base = base * 0.6;
+    }
     const synergy = computeSynergyBonus(grid, i, bonusPerNeighbor, soldSlots);
     const slotTotal = base + synergy;
 
@@ -493,6 +552,9 @@ export function computeSynergyPairs(
       if (effectiveSynergyCoinBonus(neighbor) === 0 && effectiveSynergyRepBonus(neighbor) === 0) {
         continue;
       }
+
+      // Same-type rule: do not draw synergy lines between same-type businesses
+      if (getBaseTypeId(card.id) === getBaseTypeId(neighbor.id)) continue;
 
       // Find the first shared synergy type
       const shared = card.synergyTypes.find(

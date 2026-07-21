@@ -318,8 +318,8 @@ describe('Reputation Per Turn (Income Phase)', () => {
     const repBefore = state.resourceBank.reputation;
     applyIncome(state);
 
-    // 2 clinics * 0.2 each + 0.1 each = 0.6
-    expect(state.resourceBank.reputation).toBeCloseTo(repBefore + 0.6);
+    // 2 clinics * 0.2 each (synergyRepBonus nullified by same-type rule) = 0.4
+    expect(state.resourceBank.reputation).toBeCloseTo(repBefore + 0.4);
   });
 
   it('Private Clinic and Pharmacy should not add reputation per turn', () => {
