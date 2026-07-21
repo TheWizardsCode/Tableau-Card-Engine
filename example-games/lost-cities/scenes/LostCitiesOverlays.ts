@@ -222,11 +222,18 @@ export class LostCitiesOverlayHelper {
     }
 
     y += 20;
-    const newMatchBtn = createActionButton(this.scene, cx - 70, y, 140, '[ New Match ]', () => {
+    const newMatchBtn = createActionButton(this.scene, cx - 150, y, 120, '[ New Match ]', () => {
       try { this.scene.sound.play?.(SFX_KEYS.UI_CLICK); } catch { /* ignore */ }
       this.dismiss();
       this.onRestart?.();
     }, { depth: 11 });
     this.overlayManager.add(newMatchBtn);
+
+    const menuBtn = createActionButton(this.scene, cx + 30, y, 120, '[ Menu ]', () => {
+      try { this.scene.sound.play?.(SFX_KEYS.UI_CLICK); } catch { /* ignore */ }
+      this.dismiss();
+      this.scene.scene.start('GameSelectorScene');
+    }, { depth: 11 });
+    this.overlayManager.add(menuBtn);
   }
 }

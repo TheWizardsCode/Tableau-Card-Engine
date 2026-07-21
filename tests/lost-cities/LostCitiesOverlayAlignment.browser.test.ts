@@ -302,4 +302,54 @@ describe('Lost Cities overlay column alignment', () => {
     );
     expect(rightAlignedScoreP1).toBeDefined();
   });
+
+  it('should render Menu button in match-end overlay', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('LostCitiesScene')!;
+    const internals = getSceneInternals(scene);
+    const session = internals.session;
+
+    session.round.drawPile = makeDrawPile('red');
+    session.players[0].hand = makeHand(['blue', 5]);
+    session.players[1].hand = makeHand(['green', 3]);
+    for (const p of session.players) {
+      for (const color of EXPEDITION_COLORS) {
+        p.expeditions.set(color, []);
+      }
+    }
+    session.matchPhase = 'playing';
+    session.roundNumber = 3; // Final round
+    session.round.currentPlayer = 0;
+    session.round.turnPhase = 'PlayOrDiscard';
+    session.round.justDiscardedColor = null;
+    session.round.turnNumber = 1;
+    session.roundScores = [
+      { totals: [10, 5], details: [[], []] },
+      { totals: [8, 12], details: [[], []] },
+    ];
+    session.cumulativeScores = [18, 17];
+
+    internals.lcRenderer.refreshAll((idx: number) => internals.turnController.onHandCardClick(idx));
+    internals.turnController.setPhase('waiting-for-card-select');
+
+    internals.turnController.onHandCardClick(0);
+    await wait(50);
+    internals.turnController.onExpeditionClick();
+    await wait(400);
+    internals.turnController.onDrawPileClick();
+    await wait(800);
+
+    expect(session.matchPhase).toBe('match-over');
+
+    const allTexts = collectTexts(scene);
+
+    // Verify Menu button exists
+    const menuBtn = allTexts.find(t => t.text === '[ Menu ]');
+    expect(menuBtn).toBeDefined();
+
+    // Verify New Match button still exists
+    const newMatchBtn = allTexts.find(t => t.text === '[ New Match ]');
+    expect(newMatchBtn).toBeDefined();
+
+  });
 });
