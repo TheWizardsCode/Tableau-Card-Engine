@@ -699,6 +699,14 @@ export class MainStreetRenderer {
     }).setOrigin(0.5, 1);
     s.marketContainer.add(sectionLabel);
 
+    // Compute the development row's startX so the investments row can align
+    // its card slots to the first 3 development columns instead of independently
+    // centering (which would create a ~76px horizontal offset).
+    const { marketCardW, marketCardGap } = s.layout;
+    const boxCenter = (bgLeft + bgRight) / 2;
+    const devTotalCardsW = MARKET_BUSINESS_SLOTS * marketCardW + (MARKET_BUSINESS_SLOTS - 1) * marketCardGap;
+    const devStartX = Math.round(boxCenter - devTotalCardsW / 2);
+
     // Development row (business + community space cards)
     this.drawMarketRow(
       marketTop + 6,
@@ -707,9 +715,12 @@ export class MainStreetRenderer {
       s.state.market.development,
       MARKET_BUSINESS_SLOTS,
       (card) => s.onBusinessCardClick(card as BusinessCard),
+      devStartX,
     );
 
     // Investments row (mixed upgrades + investment events)
+    // Uses devStartX for alignment so investment cards sit directly below
+    // the first 3 development cards.
     this.drawMarketRow(
       marketTop + 6 + marketRowH + marketRowGap,
       'Investments',
@@ -723,6 +734,7 @@ export class MainStreetRenderer {
           s.onEventCardClick(card as EventCard);
         }
       },
+      devStartX,
     );
   }
 
@@ -733,6 +745,7 @@ export class MainStreetRenderer {
     cards: readonly (BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard)[],
     maxSlots: number,
     onClick: (card: BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard) => void,
+    alignmentStartX?: number,
   ): void {
     const s = this.scene;
     const { marketCardW, marketCardH, marketCardGap, logX } = s.layout;
@@ -743,12 +756,14 @@ export class MainStreetRenderer {
     }).setOrigin(0, 0.5);
     s.marketContainer.add(label);
 
-    // Centre cards in the wider market box (20 to logX-20)
+    // Determine card startX: when alignmentStartX is provided (investments row),
+    // use it to align with the development row's slot grid. Otherwise,
+    // independently centre the row in the market box.
     const boxLeft = 20;
     const boxRight = logX - 20;
     const boxCenter = (boxLeft + boxRight) / 2;
     const totalCardsW = maxSlots * marketCardW + (maxSlots - 1) * marketCardGap;
-    const startX = Math.round(boxCenter - totalCardsW / 2);
+    const startX = alignmentStartX ?? Math.round(boxCenter - totalCardsW / 2);
 
     for (let i = 0; i < maxSlots; i++) {
       const cx = startX + i * (marketCardW + marketCardGap);
