@@ -14,7 +14,7 @@ import {
   createGameOverOverlay,
   OverlayManager,
 } from '../../../src/ui';
-import { SFX_KEYS } from './FeudalismConstants';
+import { SFX_KEYS, OVERLAY_DEPTH, OVERLAY_BG_ALPHA } from './FeudalismConstants';
 
 const transcriptStore = new TranscriptStore();
 
@@ -67,6 +67,7 @@ export class FeudalismOverlayHelper {
       onMenu: () => this.scene.scene.start('GameSelectorScene'),
       playAgainLabel: 'Play Again',
       menuLabel: 'Menu',
+      background: { depth: OVERLAY_DEPTH, alpha: OVERLAY_BG_ALPHA },
     });
     this.overlayManager.add(...result.objects);
   }
