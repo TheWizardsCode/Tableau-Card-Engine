@@ -10,7 +10,7 @@ business,biz-barbershop,Barbershop,5,1,Service,Barbershop,1,,,,Classic cuts and 
 business,biz-arcade,Arcade,4,0.5,Entertainment,Arcade,1,,,,Retro fun for all ages. Gains +1 coin per adjacent Entertainment business.,2,,,,,,,,,,,,,,,,
 business,biz-cinema,Cinema,5,0.5,Entertainment,Cinema,2,,,,Shows the latest films. Gains +1 coin per adjacent Entertainment business.,3,,,,,,,,,,,,,,,,
 business,biz-cafe,Cafe,7,1,Food|Culture,Cafe,1,,,,Coffee and conversation. Bridges Food and Culture synergies.,2,,,,,,,,,,,,,,,,
-business,biz-food-truck,Food Truck,4,0,Food|Entertainment,Food Truck,1,,,,Street eats with flair. Bridges Food and Entertainment synergies.,3,,,,,,,,,,,,,,,,
+business,biz-food-truck,Food Truck,4,0.5,Food|Entertainment,Food Truck,1,,,,Street eats with flair. Bridges Food and Entertainment synergies.,3,,,,,,,,,,,,,,,,
 business,biz-gallery,Art Gallery,14,1,Culture|Entertainment,Art Gallery,1,,1,0.1,Showcases local artists. Bridges Culture and Entertainment synergies.,4,,,,,,,,,,,,,,,,
 business,biz-spa,Day Spa,14,1,Service|Entertainment,Day Spa,2,,1,0.1,Relaxation and pampering. Bridges Service and Entertainment synergies.,5,,,,,,,,,,,,,,,,
 business,biz-florist,Florist,5,0,Commerce|Culture,Florist,1,,,,Beautiful arrangements for every occasion. Bridges Commerce and Culture synergies.,4,,,,,,,,,,,,,,,,

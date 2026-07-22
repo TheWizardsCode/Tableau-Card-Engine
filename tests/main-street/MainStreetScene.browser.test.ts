@@ -431,7 +431,7 @@ describe('MainStreetScene browser tests', () => {
 
     // Find specific text objects by content
     const coinText = textObjects.find((t) => t.text.startsWith('Coins:'));
-    const repText = textObjects.find((t) => t.text.startsWith('Rep:'));
+    const repText = textObjects.find((t) => t.text.startsWith('Reputation:'));
     const scoreText = textObjects.find((t) => t.text.startsWith('Score:'));
 
     expect(coinText).toBeTruthy();

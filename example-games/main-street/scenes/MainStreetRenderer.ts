@@ -261,24 +261,24 @@ export class MainStreetRenderer {
     strip.setStrokeStyle(1, BOX_STROKE, 0.5);
     s.hudContainer.add(strip);
 
-    // Coins - centered in strip
+    // Coins - left-aligned in strip
     const stripWidth = gameW * 0.5;
     const stripLeft = (gameW - stripWidth) / 2;
-    const coinText = markHudTransient(s.add.text(stripLeft + stripWidth * 0.25, hudY, `Coins: ${coins.toFixed(3)}`, {
+    const coinText = markHudTransient(s.add.text(stripLeft + 10, hudY, `Coins: ${coins.toFixed(3)}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#ffcc44', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0.5));
     s.hudContainer.add(coinText);
 
     // Reputation - centered in strip
-    const repText = markHudTransient(s.add.text(stripLeft + stripWidth * 0.5, hudY, `Rep: ${reputation}`, {
+    const repText = markHudTransient(s.add.text(stripLeft + stripWidth * 0.5, hudY, `Reputation: ${reputation}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#88bbff', fontFamily: FONT_FAMILY,
-    }).setOrigin(0, 0.5));
+    }).setOrigin(0.5, 0.5));
     s.hudContainer.add(repText);
 
-    // Score - right side of strip (shows x / y where y is the win threshold)
-    const scoreText = markHudTransient(s.add.text(stripLeft + stripWidth * 0.85, hudY, `Score: ${score}/${s.state.config.winThreshold}`, {
+    // Score - right-aligned in strip (shows x / y where y is the win threshold)
+    const scoreText = markHudTransient(s.add.text(stripLeft + stripWidth - 10, hudY, `Score: ${score}/${s.state.config.winThreshold}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#ff8844', fontFamily: FONT_FAMILY,
-    }).setOrigin(0, 0.5));
+    }).setOrigin(1, 0.5));
     s.hudContainer.add(scoreText);
 
     // HUD tooltip zones (desktop: pointer hover, mobile: tap toggle)
@@ -291,8 +291,8 @@ export class MainStreetRenderer {
     s.animateHudValueChanges({
       coins,
       reputation,
-      coinX: stripLeft + stripWidth * 0.25 + 80,
-      repX: stripLeft + stripWidth * 0.5 + 65,
+      coinX: stripLeft + 70,
+      repX: stripLeft + stripWidth * 0.5,
       hudY,
     });
   }
