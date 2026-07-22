@@ -62,11 +62,11 @@ export function neighbors(index: number, range: number = 1): number[] {
 }
 
 /**
- * Resolves the effective per-neighbor coin synergy contribution for a card.
- * Returns the card's `synergyCoinBonus` if set, otherwise 1 (the default).
+ * Resolves the effective per-card coin synergy rate for a card.
+ * Returns the card's `synergyCoinBonus` if set, otherwise 0.5 (the default, 50% of base income).
  */
 function effectiveSynergyCoinBonus(card: BusinessCard | CommunitySpaceCard): number {
-  return card.synergyCoinBonus ?? 1;
+  return card.synergyCoinBonus ?? 0.5;
 }
 
 /**
@@ -112,20 +112,20 @@ function hasAdjacentSameType(
 /**
  * Computes the synergy coin bonus for a single business at a given slot.
  *
- * A business earns coins for each neighboring slot that contains a business
- * sharing at least one SynergyType. The contribution from each neighbor is
- * the neighbor's `synergyCoinBonus` (default 1) multiplied by `bonusPerNeighbor`
- * (the difficulty preset multiplier).
+ * Uses a percentage-based formula:
+ *   synergy = effectiveBase * synergyCoinBonus * bonusPerNeighbor * N
+ * where:
+ *   - effectiveBase = (baseIncome + incomeBonus) * sameTypePenalty
+ *   - synergyCoinBonus = the source card's synergy rate as a decimal (e.g., 0.50 = 50%)
+ *   - bonusPerNeighbor = the difficulty preset multiplier (e.g., 1.0 at Medium)
+ *   - N = number of matching, different-type neighbors
  *
- * The range considered is 1 + business.synergyRangeBonus (from upgrades).
+ * Cards with zero synergyCoinBonus (e.g., Pawn Shop) opt out entirely, receiving
+ * and contributing no synergy. Synergy-neutral neighbors (synergyCoinBonus=0 AND
+ * synergyRepBonus=0) are not counted toward N.
  *
- * Cards with zero synergyCoinBonus naturally don't contribute synergy
- * to their neighbors, acting as synergy-neutral cards.
- *
- * **Same-type rule:** If a neighbor has the same base type (template ID) as the
- * source business, that neighbor's synergy contribution is nullified (returns 0).
- * This encourages diverse streets rather than placing multiple copies of the
- * same business type.
+ * **Same-type rule:** Neighbors with the same base type (template ID) as the source
+ * business are not counted toward N, preserving the 0.6 base-income penalty.
  *
  * @param grid               The street grid.
  * @param index              The slot index of the business.
@@ -143,23 +143,24 @@ export function computeSynergyBonus(
   const business = grid[index];
   if (!business) return 0;
 
-  // A card with zero synergy coin AND zero synergy reputation does not
-  // participate in the synergy system at all: it neither contributes to
-  // nor receives synergy from neighbors.
-  if (effectiveSynergyCoinBonus(business) === 0 && effectiveSynergyRepBonus(business) === 0) {
-    return 0;
-  }
+  const rate = effectiveSynergyCoinBonus(business);
+  // A card with zero synergy coin opts out entirely
+  if (rate === 0) return 0;
 
   const baseType = getBaseTypeId(business.id);
   const range = 1 + business.synergyRangeBonus;
   const neighborIndices = neighbors(index, range);
 
-  let bonus = 0;
+  // Count matching, different-type neighbors (N)
+  let matchingCount = 0;
   for (const ni of neighborIndices) {
-    // Skip sold neighbor slots (sold cards don't contribute synergy)
+    // Skip sold neighbor slots
     if (soldSlots[ni]) continue;
     const neighbor = grid[ni];
     if (!neighbor) continue;
+
+    // Skip synergy-neutral neighbors (they don't participate in synergy at all)
+    if (effectiveSynergyCoinBonus(neighbor) === 0 && effectiveSynergyRepBonus(neighbor) === 0) continue;
 
     // Same-type rule: skip synergy contribution from same-type neighbors
     if (getBaseTypeId(neighbor.id) === baseType) continue;
@@ -169,12 +170,20 @@ export function computeSynergyBonus(
       (st: SynergyType) => neighbor.synergyTypes.includes(st),
     );
     if (hasSharedSynergy) {
-      // Use the neighbor's per-card synergy coin bonus, multiplied by the global modifier
-      bonus += effectiveSynergyCoinBonus(neighbor) * bonusPerNeighbor;
+      matchingCount++;
     }
   }
 
-  return bonus;
+  if (matchingCount === 0) return 0;
+
+  // Compute effective base (base income + income bonus, with same-type penalty)
+  let effectiveBase = business.baseIncome + business.incomeBonus;
+  if (hasAdjacentSameType(grid, index, soldSlots)) {
+    effectiveBase = effectiveBase * 0.6;
+  }
+
+  // Percentage-based synergy: effectiveBase * rate * bonusPerNeighbor * N
+  return effectiveBase * rate * bonusPerNeighbor * matchingCount;
 }
 
 /**
@@ -239,9 +248,12 @@ export function computeSynergyRepBonus(
 /**
  * Computes the total income for a single business at a given slot.
  *
- * totalIncome = baseIncome + incomeBonus (from upgrades) + synergyBonus
+ * totalIncome = effectiveBase + synergyBonus
  *
- * @see computeSynergyBonus for details on per-card synergy values.
+ * Where effectiveBase = (baseIncome + incomeBonus) * sameTypePenalty
+ * and synergyBonus uses the percentage-based formula from computeSynergyBonus.
+ *
+ * @see computeSynergyBonus for details on the percentage-based synergy formula.
  *
  * @param grid               The street grid.
  * @param index              The slot index of the business.

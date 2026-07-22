@@ -269,10 +269,11 @@ describe('Reputation Per Turn (Income Phase)', () => {
     const grid = emptyGrid();
     grid[0] = { ...findBizTemplate('biz-private-clinic')!, level: 0, incomeBonus: 0, synergyRangeBonus: 0 };
     grid[1] = { ...findBizTemplate('biz-pharmacy')!, level: 0, incomeBonus: 0, synergyRangeBonus: 0 };
-    // Private Clinic: base 2 + 1 synergy from Pharmacy
-    expect(computeBusinessIncome(grid, 0)).toBe(3.5);
-    // Pharmacy: base 1 + 1 synergy from Private Clinic
-    expect(computeBusinessIncome(grid, 1)).toBe(2);
+    // Percentage-based formula:
+    // Private Clinic: base=2.5, synergyCoinBonus=0.5, N=1, synergy=2.5*0.5=1.25, total=3.75
+    expect(computeBusinessIncome(grid, 0)).toBe(3.75);
+    // Pharmacy: base=1, synergyCoinBonus=0.5, N=1, synergy=1*0.5=0.5, total=1.5
+    expect(computeBusinessIncome(grid, 1)).toBe(1.5);
   });
 
   it('applyIncome should add reputation from Clinic reputationPerTurn', () => {

@@ -270,11 +270,11 @@ export const REFRESH_INVESTMENTS_COST = 2;
 export const REFRESH_DEVELOPMENT_COST = 2;
 
 /**
- * @deprecated Per-card synergy bonus values replace this global constant.
- * Each BusinessCard and CommunitySpaceCard now has its own `synergyCoinBonus`
- * (default 1) and `synergyRepBonus` (default 0). The difficulty preset
- * `synergyBonusPerNeighbor` value still acts as a multiplier on per-card
- * coin synergy contributions.
+ * @deprecated Synergy is now percentage-based. Each BusinessCard and
+ * CommunitySpaceCard has its own `synergyCoinBonus` rate (default 0.5 = 50%)
+ * and `synergyRepBonus` (default 0). The difficulty preset
+ * `synergyBonusPerNeighbor` value acts as a multiplier on the per-card
+ * percentage rate.
  *
  * Kept for backward compatibility with existing test code.
  */

@@ -300,10 +300,10 @@ describe('Expanded Card Pool: Service & Entertainment Income', () => {
 
     // Laundromat: base 2 + 1 (Barbershop) = 3
     expect(computeBusinessIncome(grid, 0)).toBe(3);
-    // Barbershop: base 2 + 1 (Laundromat) + 1 (Clinic) = 4
+    // Barbershop: base 2 + 2 (Laundromat+Clinic) = 4
     expect(computeBusinessIncome(grid, 1)).toBe(4);
-    // Clinic: base 3 + 1 (Barbershop) = 4
-    expect(computeBusinessIncome(grid, 2)).toBe(4);
+    // Clinic: base 3 + 1.5 (Barbershop 50%) = 4.5
+    expect(computeBusinessIncome(grid, 2)).toBe(4.5);
   });
 
   it('Entertainment cluster should generate synergy income', () => {
@@ -312,7 +312,7 @@ describe('Expanded Card Pool: Service & Entertainment Income', () => {
     grid[1] = makeBiz({ name: 'Cinema', synergyTypes: ['Entertainment'], baseIncome: 3 });
 
     expect(computeBusinessIncome(grid, 0)).toBe(3); // 2 + 1
-    expect(computeBusinessIncome(grid, 1)).toBe(4); // 3 + 1
+    expect(computeBusinessIncome(grid, 1)).toBe(4.5); // 3 + 1.5
   });
 });
 

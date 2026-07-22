@@ -35,6 +35,8 @@ function makeBiz(overrides: Partial<BusinessCard> = {}): BusinessCard {
     cost: overrides.cost ?? 3,
     baseIncome: overrides.baseIncome ?? 2,
     synergyTypes: overrides.synergyTypes ?? ['Food'],
+    synergyCoinBonus: overrides.synergyCoinBonus ?? 0.5,
+    synergyRepBonus: overrides.synergyRepBonus ?? 0,
     maxLevel: overrides.maxLevel ?? 1,
     description: overrides.description ?? 'A test business',
     level: overrides.level ?? 0,
@@ -53,6 +55,8 @@ function makeCommunitySpace(overrides: Partial<CommunitySpaceCard> = {}): Commun
     cost: overrides.cost ?? 3,
     baseIncome: overrides.baseIncome ?? 2,
     synergyTypes: overrides.synergyTypes ?? ['Culture'],
+    synergyCoinBonus: overrides.synergyCoinBonus ?? 0.5,
+    synergyRepBonus: overrides.synergyRepBonus ?? 0,
     maxLevel: overrides.maxLevel ?? 1,
     description: overrides.description ?? 'A test community space',
     level: overrides.level ?? 0,
@@ -97,8 +101,8 @@ describe('Same-type synergy nullification', () => {
     // AC #1: Synergy is nullified between same-type adjacent businesses
     it('returns 0 synergy between two adjacent same-type Food businesses', () => {
       const grid = emptyGrid();
-      grid[0] = makeBiz({ id: 'biz-bakery-0', synergyTypes: ['Food'], synergyCoinBonus: 1 });
-      grid[1] = makeBiz({ id: 'biz-bakery-1', synergyTypes: ['Food'], synergyCoinBonus: 1 });
+      grid[0] = makeBiz({ id: 'biz-bakery-0', synergyTypes: ['Food'] });
+      grid[1] = makeBiz({ id: 'biz-bakery-1', synergyTypes: ['Food'] });
 
       // Both should get 0 synergy because they're the same base type (biz-bakery)
       expect(computeSynergyBonus(grid, 0)).toBe(0);
@@ -108,10 +112,11 @@ describe('Same-type synergy nullification', () => {
     // AC #2: Different-type businesses still get full synergy
     it('returns full synergy between two different-type Food businesses', () => {
       const grid = emptyGrid();
-      grid[0] = makeBiz({ id: 'biz-bakery-0', synergyTypes: ['Food'], synergyCoinBonus: 1 });
-      grid[1] = makeBiz({ id: 'biz-diner-0', synergyTypes: ['Food'], synergyCoinBonus: 1 });
+      grid[0] = makeBiz({ id: 'biz-bakery-0', synergyTypes: ['Food'] });
+      grid[1] = makeBiz({ id: 'biz-diner-0', synergyTypes: ['Food'] });
 
       // Different base types (biz-bakery vs biz-diner), so full synergy
+      // effectiveBase=2, rate=0.5, N=1, synergy=2*0.5*1*1=1
       expect(computeSynergyBonus(grid, 0)).toBe(1);
       expect(computeSynergyBonus(grid, 1)).toBe(1);
     });
@@ -119,8 +124,8 @@ describe('Same-type synergy nullification', () => {
     // AC #5: Same-type non-adjacent — no penalty
     it('does not nullify synergy for same-type businesses that are not adjacent', () => {
       const grid = emptyGrid();
-      grid[0] = makeBiz({ id: 'biz-bakery-0', synergyTypes: ['Food'], synergyCoinBonus: 1 });
-      grid[2] = makeBiz({ id: 'biz-bakery-1', synergyTypes: ['Food'], synergyCoinBonus: 1 });
+      grid[0] = makeBiz({ id: 'biz-bakery-0', synergyTypes: ['Food'] });
+      grid[2] = makeBiz({ id: 'biz-bakery-1', synergyTypes: ['Food'] });
       // Both only have range-1 adjacency; index 0 and 2 are not adjacent (distance 2)
       expect(computeSynergyBonus(grid, 0)).toBe(0);
       expect(computeSynergyBonus(grid, 2)).toBe(0);
@@ -130,19 +135,22 @@ describe('Same-type synergy nullification', () => {
     it('gets synergy only from different-type neighbor when both same-type and different-type are adjacent', () => {
       const grid = emptyGrid();
       // Slot 0: Bakery (Food), Slot 1: Bakery (Food) same-type, Slot 2: Diner (Food) different-type
-      grid[0] = makeBiz({ id: 'biz-bakery-0', synergyTypes: ['Food'], synergyCoinBonus: 1 });
-      grid[1] = makeBiz({ id: 'biz-bakery-1', synergyTypes: ['Food'], synergyCoinBonus: 1 });
-      grid[2] = makeBiz({ id: 'biz-diner-0', synergyTypes: ['Food'], synergyCoinBonus: 1 });
+      grid[0] = makeBiz({ id: 'biz-bakery-0', synergyTypes: ['Food'], synergyCoinBonus: 0.5 });
+      grid[1] = makeBiz({ id: 'biz-bakery-1', synergyTypes: ['Food'], synergyCoinBonus: 0.5 });
+      grid[2] = makeBiz({ id: 'biz-diner-0', synergyTypes: ['Food'], synergyCoinBonus: 0.5 });
 
-      // Bakery at slot 1 has neighbors: Bakery (same-type, 0 synergy) and Diner (diff-type, 1 synergy)
-      expect(computeSynergyBonus(grid, 1)).toBe(1);
+      // Bakery at slot 1 has same-type neighbor (slot 0) and diff-type neighbor (slot 2).
+      // Same-type penalty reduces base to 60%: effectiveBase = 2 * 0.6 = 1.2
+      // Only the Diner (diff-type) counts: N=1
+      // synergy = 1.2 * 0.5 * 1 * 1 = 0.6
+      expect(computeSynergyBonus(grid, 1)).toBe(0.6);
     });
 
     // AC #5: Upgraded business next to base same-type business
     it('applies same-type rule to upgraded businesses (upgrades do not change base type)', () => {
       const grid = emptyGrid();
-      grid[0] = makeBiz({ id: 'biz-bakery-0', synergyTypes: ['Food'], synergyCoinBonus: 1, level: 0 });
-      grid[1] = makeBiz({ id: 'biz-bakery-1', synergyTypes: ['Food'], synergyCoinBonus: 1, level: 1, incomeBonus: 2 });
+      grid[0] = makeBiz({ id: 'biz-bakery-0', synergyTypes: ['Food'], level: 0 });
+      grid[1] = makeBiz({ id: 'biz-bakery-1', synergyTypes: ['Food'], level: 1, incomeBonus: 2 });
 
       // Even though one is upgraded, they're the same base type
       expect(computeSynergyBonus(grid, 0)).toBe(0);
@@ -152,8 +160,8 @@ describe('Same-type synergy nullification', () => {
     // Same-type check with CommunitySpaceCard
     it('nullifies synergy between same-type Community Spaces', () => {
       const grid = emptyGrid();
-      grid[0] = makeCommunitySpace({ id: 'cs-park-0', synergyTypes: ['Culture'], synergyCoinBonus: 1 });
-      grid[1] = makeCommunitySpace({ id: 'cs-park-1', synergyTypes: ['Culture'], synergyCoinBonus: 1 });
+      grid[0] = makeCommunitySpace({ id: 'cs-park-0', synergyTypes: ['Culture'] });
+      grid[1] = makeCommunitySpace({ id: 'cs-park-1', synergyTypes: ['Culture'] });
 
       expect(computeSynergyBonus(grid, 0)).toBe(0);
       expect(computeSynergyBonus(grid, 1)).toBe(0);
@@ -163,10 +171,11 @@ describe('Same-type synergy nullification', () => {
     it('applies same-type rule across Business and Community Space cards with matching template IDs', () => {
       // A biz-cafe and a cs-park have different template IDs, so they synergize
       const grid = emptyGrid();
-      grid[0] = makeBiz({ id: 'biz-cafe-0', synergyTypes: ['Culture'], synergyCoinBonus: 1 });
-      grid[1] = makeCommunitySpace({ id: 'cs-park-0', synergyTypes: ['Culture'], synergyCoinBonus: 1 });
+      grid[0] = makeBiz({ id: 'biz-cafe-0', synergyTypes: ['Culture'] });
+      grid[1] = makeCommunitySpace({ id: 'cs-park-0', synergyTypes: ['Culture'] });
 
       // Different base types (biz-cafe vs cs-park), so synergy applies
+      // effectiveBase=2, rate=0.5, N=1, synergy=2*0.5*1*1=1
       expect(computeSynergyBonus(grid, 0)).toBe(1);
       expect(computeSynergyBonus(grid, 1)).toBe(1);
     });
@@ -175,22 +184,22 @@ describe('Same-type synergy nullification', () => {
     it('preserves Pawn Shop zero-synergy behavior alongside same-type rule', () => {
       const grid = emptyGrid();
       grid[0] = makeBiz({ id: 'biz-pawnshop-0', synergyTypes: ['Commerce'], synergyCoinBonus: 0 });
-      grid[1] = makeBiz({ id: 'biz-hardware-0', synergyTypes: ['Commerce'], synergyCoinBonus: 1 });
+      grid[1] = makeBiz({ id: 'biz-hardware-0', synergyTypes: ['Commerce'] });
 
-      // Pawn Shop contributes 0 to hardware store (synergyCoinBonus=0), and
-      // hardware store would normally contribute 1 to pawn shop, but they're different
-      // types, so the synergyCoinBonus=0 is what stops it, not the same-type rule.
+      // Pawn Shop has rate=0, so receives 0 synergy.
+      // Hardware Store has rate=0.5, but Pawn Shop is synergy-neutral (synergyCoinBonus=0, synergyRepBonus=0),
+      // so it's skipped in neighbor counting → N=0 → synergy=0.
       expect(computeSynergyBonus(grid, 0)).toBe(0); // Pawn Shop receives 0 from hardware
       expect(computeSynergyBonus(grid, 1)).toBe(0); // Hardware receives 0 from pawn
     });
 
-    // Synergy with same-type but same card has synergyCoinBonus=1 — same-type rule overrides
+    // Synergy with same-type but same card has synergyCoinBonus=2 — same-type rule overrides
     it('same-type rule overrides non-zero synergyCoinBonus', () => {
       const grid = emptyGrid();
       grid[0] = makeBiz({ id: 'biz-bakery-0', synergyTypes: ['Food'], synergyCoinBonus: 2 });
       grid[1] = makeBiz({ id: 'biz-bakery-1', synergyTypes: ['Food'], synergyCoinBonus: 2 });
 
-      // Even though synergyCoinBonus=2, same-type rule overrides to 0
+      // Even though synergyCoinBonus=2 (200%), same-type rule overrides to 0
       expect(computeSynergyBonus(grid, 0)).toBe(0);
       expect(computeSynergyBonus(grid, 1)).toBe(0);
     });
@@ -283,8 +292,8 @@ describe('Same-type synergy nullification', () => {
       grid[2] = makeBiz({ id: 'biz-diner-0', baseIncome: 2, synergyTypes: ['Food'] });
 
       // Slot 1 has: same-type neighbor (slot 0) + diff-type neighbor (slot 2)
-      // base = 2 * 0.6 = 1.2, synergy = 1 (from slot 2 only), total = 2.2
-      expect(computeBusinessIncome(grid, 1)).toBeCloseTo(2.2);
+      // effectiveBase = 2 * 0.6 = 1.2, rate=0.5, N=1, synergy = 1.2 * 0.5 * 1 * 1 = 0.6, total = 1.2 + 0.6 = 1.8
+      expect(computeBusinessIncome(grid, 1)).toBeCloseTo(1.8);
     });
 
     // AC #5: Income bonus from upgrades is included in the base before 0.6 multiplier

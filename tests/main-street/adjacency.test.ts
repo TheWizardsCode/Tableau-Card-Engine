@@ -42,7 +42,7 @@ function emptyGrid(): (BusinessCard | null)[] {
   return new Array<BusinessCard | null>(GRID_SIZE).fill(null);
 }
 
-describe('MainStreetAdjacency (2x5 grid)', () => {
+describe('MainStreetAdjacency (2x5 grid, percentage-based synergy)', () => {
   describe('neighbors', () => {
     it('returns orthogonal neighbors for a corner (index 0)', () => {
       expect(neighbors(0, 1)).toEqual([1, 5]);
@@ -182,13 +182,13 @@ describe('MainStreetAdjacency (2x5 grid)', () => {
       expect(computeBusinessIncome(grid, 3)).toBe(0);
     });
 
-    it('adds base + upgrade income bonus + synergy bonus', () => {
+    it('adds base + upgrade income bonus + percentage synergy bonus', () => {
       const grid = emptyGrid();
       grid[1] = makeBiz({ id: 'target', baseIncome: 2, incomeBonus: 1, synergyTypes: ['Food'] });
       grid[0] = makeBiz({ id: 'n1', baseIncome: 1, synergyTypes: ['Food'] });
       grid[2] = makeBiz({ id: 'n2', baseIncome: 1, synergyTypes: ['Food'] });
-      // base 3 + two matching neighbors
-      expect(computeBusinessIncome(grid, 1)).toBe(5);
+      // base=3, rate=0.5, N=2, synergy=3*0.5*2=3, total=3+3=6
+      expect(computeBusinessIncome(grid, 1)).toBe(6);
     });
 
     it('Pawn Shop generates only base income with no synergy', () => {
@@ -215,10 +215,11 @@ describe('MainStreetAdjacency (2x5 grid)', () => {
 
       const result = computeIncome(grid);
 
-      // slot 0: base 2 + synergy with slot 1 = 3
-      // slot 1: base 3 + synergy with slot 0 = 4
-      // slot 5: base 1 + no matching neighbors = 1
-      expect(result.total).toBe(8);
+      // Percentage-based formula:
+      // slot 0: base 2, rate=0.5, N=1, synergy=2*0.5=1, total=3
+      // slot 1: base 3, rate=0.5, N=1, synergy=3*0.5=1.5, total=4.5
+      // slot 5: base 1, N=0, synergy=0, total=1
+      expect(result.total).toBe(8.5);
       expect(result.breakdown).toHaveLength(3);
       expect(result.breakdown.find((b) => b.slotIndex === 0)?.businessName).toBe('A');
     });
@@ -250,10 +251,13 @@ describe('MainStreetAdjacency (2x5 grid)', () => {
       const coinsBefore = state.resourceBank.coins;
       const result = applyIncome(state);
 
-      expect(result.total).toBe(7); // 4 + 3 pre-multiplier
+      // Percentage-based formula:
+      // slot 0: base=3, rate=0.5, N=1, synergy=1.5, total=4.5
+      // slot 1: base=2, rate=0.5, N=1, synergy=1, total=3
+      expect(result.total).toBe(7.5); // 4.5 + 3 pre-multiplier
       // CG-0MRER3RE300418SG: Math.floor removed; fractional values preserved.
-      // 7 * 1.15 = 8.05 (was floor(8.05)=8 before fix)
-      expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 8.05);
+      // 7.5 * 1.15 = 8.625
+      expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 8.625);
     });
   });
 });
