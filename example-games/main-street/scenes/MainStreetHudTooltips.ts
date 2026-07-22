@@ -121,7 +121,8 @@ registerLocale('en', enBundle);
  * - Brief calculation note
  */
 export function buildCoinsTooltip(state: MainStreetState): string {
-  const incomeResult = computeIncome(state.streetGrid, state.config.synergyBonusPerNeighbor);
+  const soldSlots = state.soldSlots ?? [];
+  const incomeResult = computeIncome(state.streetGrid, state.config.synergyBonusPerNeighbor, undefined, soldSlots);
   const baseIncome = incomeResult.total;
   const multipliedIncome = applyReputationMultiplier(
     baseIncome,
@@ -148,7 +149,8 @@ export function buildCoinsTooltip(state: MainStreetState): string {
  * Builds the full IncomeResult for external use (e.g. tests).
  */
 export function getIncomeResult(state: MainStreetState): IncomeResult {
-  return computeIncome(state.streetGrid, state.config.synergyBonusPerNeighbor);
+  const soldSlots = state.soldSlots ?? [];
+  return computeIncome(state.streetGrid, state.config.synergyBonusPerNeighbor, undefined, soldSlots);
 }
 
 /**
