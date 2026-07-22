@@ -8,6 +8,7 @@ import {
   canPurchaseEvent,
   canRefreshDevelopment,
   canRefreshInvestments,
+  canSellBusiness,
 } from '../MainStreetMarket';
 import type { BusinessCard, EventCard, UpgradeCard } from '../MainStreetCards';
 import { buyBusinessCommand, buyUpgradeCommand, buyEventCommand, playEventCommand, refreshDevelopmentCommand, refreshInvestmentsCommand } from '../MainStreetCommands';
@@ -632,7 +633,6 @@ export class MainStreetTurnController {
     if (soldSlots[slotIndex]) return;
 
     // Check legality
-    const { canSellBusiness } = require('../MainStreetMarket');
     const legality = canSellBusiness(s.state, slotIndex, false);
     if (!legality.legal) {
       s.instructionText.setText(`Cannot sell: ${legality.reason ?? 'unknown'}`);

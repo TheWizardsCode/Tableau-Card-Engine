@@ -297,6 +297,7 @@ export class MainStreetOverlayContent {
     const titleText = s.add.text(s.layout.gameW / 2, panelY + 25, 'Sell Card', {
       fontSize: '22px', fontStyle: 'bold', color: '#ffcc44', fontFamily: FONT_FAMILY,
     }).setOrigin(0.5).setDepth(201);
+    if (s.hudContainer) s.hudContainer.add(titleText);
     s.overlayObjects.push(titleText);
 
     // Card info text
@@ -307,12 +308,14 @@ export class MainStreetOverlayContent {
       align: 'center',
       lineSpacing: 4,
     }).setOrigin(0.5, 0).setDepth(201);
+    if (s.hudContainer) s.hudContainer.add(infoText);
     s.overlayObjects.push(infoText);
 
     // Refund highlight
     const refundText = s.add.text(s.layout.gameW / 2, panelY + 155, `Refund: +€${refund}`, {
       fontSize: '20px', fontStyle: 'bold', color: '#44ff44', fontFamily: FONT_FAMILY,
     }).setOrigin(0.5).setDepth(201);
+    if (s.hudContainer) s.hudContainer.add(refundText);
     s.overlayObjects.push(refundText);
 
     // Sell button
@@ -320,6 +323,7 @@ export class MainStreetOverlayContent {
       s, s.layout.gameW / 2 - 100, panelY + 190,
       '[ Sell ]', 201,
     );
+    if (s.hudContainer) s.hudContainer.add(sellBtn);
     sellBtn.on('pointerdown', () => {
       // Execute the sell
       try {
@@ -349,6 +353,7 @@ export class MainStreetOverlayContent {
       s, s.layout.gameW / 2 + 30, panelY + 190,
       '[ Cancel ]', 201,
     );
+    if (s.hudContainer) s.hudContainer.add(cancelBtn);
     cancelBtn.on('pointerdown', () => {
       dismissOverlay(s.overlayObjects);
       s.overlayObjects = [];

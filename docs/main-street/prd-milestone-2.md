@@ -148,7 +148,7 @@ Run N+1 starts with expanded card pool
 
 **Reputation Threshold:** >= 64 reputation at end-of-run
 
-**Challenge Milestone:** Complete the "Diversified" challenge (`ch-diversified`: all 5 synergy types present) in a single run
+**Challenge Milestone:** Complete the "Diversified" challenge (`ch-diversified`: all 6 synergy types present) in a single run
 
 **New Cards Unlocked (3):**
 
@@ -187,6 +187,8 @@ The list below is retained as historical context for prior milestone discussions
 | Upgrade | Home Improvement, Vintage Shop, Designer Store, Dry Cleaners, Salon, Gaming Lounge, IMAX Theater, Roastery, Gourmet Truck, Museum, Resort Spa, Garden Center, Medical Center, Fast Food, Drive-In Theater, Restaurant, Multiplex, Luxury Retreat, Wellness Center |
 
 > **Design note:** The tier-gated cards were selected to introduce one new mechanic or synergy type per tier (Commerce gap-fill, Service type, bridge cards, Entertainment type, multi-level upgrades). The remaining M2 cards provide breadth and variety within the existing mechanics and are available from the start of M2 content.
+
+> **Synergy reclassification (Health type):** The Clinic (`biz-clinic`) was originally assigned the Service synergy type alongside Laundromat and Barbershop. It was reclassified to **Health** as part of introducing the new Health synergy type to M2. The Health type is a non-profit community health axis represented by Clinic, Private Clinic, and Pharmacy — cards that generate reputation per turn instead of (or in addition to) coin income. This reclassification affects the following cards: Clinic (cost 10, income 0, rep +0.2/turn, Health), Private Clinic (cost 8, income 2, Health), Pharmacy (cost 6, income 1, Health), and their upgrades Medical Center (rep +0.1/turn) and Private Medical Center (income +2). The Service synergy type retains Laundromat, Barbershop, and Day Spa (bridge).
 
 ---
 
@@ -883,7 +885,7 @@ Challenge-based unlock paths are designed to be achievable by skilled players wh
 | 2 | Any 2 challenges | Low barrier. Most winning runs complete 2+ of the 3 assigned challenges. |
 | 3 | 1 synergy + 1 resource | Requires two different play dimensions. Encourages varied strategy. |
 | 4 | Any 3 (incl. 1 cross-cutting/placement) | Requires completing all assigned challenges with at least one requiring spatial or diversity awareness. |
-| 5 | Diversified challenge | Specific high-difficulty challenge requiring all 5 synergy types. Only achievable at Tier 4+ (when Entertainment is unlocked). |
+| 5 | Diversified challenge | Specific high-difficulty challenge requiring all 6 synergy types (Food, Culture, Commerce, Service, Entertainment, Health). Only achievable at Tier 4+ (when Entertainment and Health are unlocked). |
 
 > **Note:** These thresholds are initial estimates based on analysis of the current game parameters. Balance tuning is deferred to Milestone 3 (CG-0MM4REQ4C01X8C08), where AI auto-play will validate achievement rates across difficulty presets and suggest adjustments.
 
