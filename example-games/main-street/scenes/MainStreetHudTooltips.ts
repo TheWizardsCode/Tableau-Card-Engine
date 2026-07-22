@@ -17,7 +17,7 @@
  * @module
  */
 
-import { computeIncome, type IncomeResult } from '../MainStreetAdjacency';
+import { computeBusinessIncome, type IncomeResult, type SlotIncome } from '../MainStreetAdjacency';
 import { reputationCoinMultiplier, applyReputationMultiplier } from '../MainStreetDifficulty';
 import { ORDERED_TIER_DEFINITIONS } from '../MainStreetTiers';
 import { computeScore } from '../MainStreetEngine';
@@ -122,8 +122,21 @@ registerLocale('en', enBundle);
  */
 export function buildCoinsTooltip(state: MainStreetState): string {
   const soldSlots = state.soldSlots ?? [];
-  const incomeResult = computeIncome(state.streetGrid, state.config.synergyBonusPerNeighbor, undefined, soldSlots);
-  const baseIncome = incomeResult.total;
+  const grid = state.streetGrid;
+  const bonusPerNeighbor = state.config.synergyBonusPerNeighbor;
+
+  // Use cached currentIncome values (CG-0MRV84ZT60069PW6).
+  // Fall back to computeBusinessIncome for cards without cached values
+  // (e.g. legacy saves or test setups that place cards directly on the grid).
+  let baseIncome = 0;
+  for (let i = 0; i < grid.length; i++) {
+    if (soldSlots[i]) continue;
+    const card = grid[i];
+    if (!card) continue;
+    baseIncome += card.currentIncome !== undefined
+      ? card.currentIncome
+      : computeBusinessIncome(grid, i, bonusPerNeighbor, soldSlots);
+  }
   const multipliedIncome = applyReputationMultiplier(
     baseIncome,
     state.resourceBank.reputation,
@@ -150,7 +163,31 @@ export function buildCoinsTooltip(state: MainStreetState): string {
  */
 export function getIncomeResult(state: MainStreetState): IncomeResult {
   const soldSlots = state.soldSlots ?? [];
-  return computeIncome(state.streetGrid, state.config.synergyBonusPerNeighbor, undefined, soldSlots);
+  const grid = state.streetGrid;
+  const bonusPerNeighbor = state.config.synergyBonusPerNeighbor;
+  const breakdown: SlotIncome[] = [];
+  let total = 0;
+
+  for (let i = 0; i < grid.length; i++) {
+    if (soldSlots[i]) continue;
+    const card = grid[i];
+    if (!card) continue;
+
+    const slotTotal = card.currentIncome !== undefined
+      ? card.currentIncome
+      : computeBusinessIncome(grid, i, bonusPerNeighbor, soldSlots);
+
+    breakdown.push({
+      slotIndex: i,
+      businessName: card.name,
+      baseIncome: slotTotal,
+      synergyBonus: 0,
+      total: slotTotal,
+    });
+    total += slotTotal;
+  }
+
+  return { total, breakdown, handSynergyTotal: 0 };
 }
 
 /**
