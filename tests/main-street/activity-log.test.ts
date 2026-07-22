@@ -25,7 +25,7 @@ import {
   purchaseEvent,
   purchaseUpgrade,
 } from '../../example-games/main-street/MainStreetMarket';
-import { applyIncome } from '../../example-games/main-street/MainStreetAdjacency';
+import { applyIncome, recalculateCard } from '../../example-games/main-street/MainStreetAdjacency';
 import {
   MAX_TURNS,
   WIN_THRESHOLD,
@@ -274,6 +274,7 @@ describe('Activity Log', () => {
 
       // Place a business so there is income
       state.streetGrid[0] = makeBiz({ baseIncome: 5 });
+      recalculateCard(state, 0);
       state.phase = 'IncomePhase';
 
       const logBefore = state.activityLog.length;

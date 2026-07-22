@@ -7,6 +7,7 @@
 import { describe, it, expect } from 'vitest';
 
 import { setupMainStreetGame, type MainStreetState } from '../../example-games/main-street/MainStreetState';
+import { recalculateCard } from '../../example-games/main-street/MainStreetAdjacency';
 import {
   computeScore,
   updateScore,
@@ -624,6 +625,7 @@ describe('MainStreetEngine', () => {
       const state = createTestState();
       state.phase = 'MarketPhase';
       state.streetGrid[0] = makeBiz({ id: 'food-1', baseIncome: 3, synergyTypes: ['Food'] });
+      recalculateCard(state, 0);
 
       const result = processEndOfTurn(state);
 

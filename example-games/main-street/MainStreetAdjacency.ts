@@ -601,16 +601,12 @@ export function applyIncome(state: MainStreetState): IncomeResult {
   // it from scratch.
   const breakdown: SlotIncome[] = [];
   let total = 0;
-  const bonusPerNeighbor = state.config.synergyBonusPerNeighbor;
-
   for (let i = 0; i < grid.length; i++) {
     if (soldSlots[i]) continue;
     const card = grid[i];
     if (!card) continue;
 
-    const slotIncome = card.currentIncome !== undefined
-      ? card.currentIncome
-      : computeBusinessIncome(grid, i, bonusPerNeighbor, soldSlots);
+    const slotIncome = card.currentIncome ?? 0;
     breakdown.push({
       slotIndex: i,
       businessName: card.name,
@@ -640,19 +636,13 @@ export function applyIncome(state: MainStreetState): IncomeResult {
   );
   state.resourceBank.coins += multiplied;
 
-  // Apply reputation per turn from cached values (skip sold slots)
-  // If a card doesn't have currentReputationPerTurn set (undefined),
-  // fall back to computing it from scratch.
+  // Sum reputation per turn from cached values (skip sold slots)
   let repPerTurn = 0;
   for (let i = 0; i < grid.length; i++) {
     if (soldSlots[i]) continue;
     const card = grid[i];
     if (!card) continue;
-    if (card.currentReputationPerTurn !== undefined) {
-      repPerTurn += card.currentReputationPerTurn;
-    } else {
-      repPerTurn += computeSingleCardReputation(grid, i, soldSlots);
-    }
+    repPerTurn += card.currentReputationPerTurn ?? 0;
   }
   if (repPerTurn !== 0) {
     state.resourceBank.reputation += repPerTurn;

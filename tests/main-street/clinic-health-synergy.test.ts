@@ -23,6 +23,7 @@ import {
 import {
   computeBusinessIncome,
   applyIncome,
+  recalculateCard,
 } from '../../example-games/main-street/MainStreetAdjacency';
 import {
   GRID_SIZE,
@@ -280,6 +281,7 @@ describe('Reputation Per Turn (Income Phase)', () => {
     // Place a Clinic at slot 0
     const clinicTemplate = findBizTemplate('biz-clinic')!;
     state.streetGrid[0] = { ...clinicTemplate, level: 0, incomeBonus: 0, synergyRangeBonus: 0 };
+    recalculateCard(state, 0);
 
     const repBefore = state.resourceBank.reputation;
     const result = applyIncome(state);
@@ -301,6 +303,7 @@ describe('Reputation Per Turn (Income Phase)', () => {
       reputationBonus: 0.1,
       appliedUpgrades: ['upg-medical-center'],
     };
+    recalculateCard(state, 0);
 
     const repBefore = state.resourceBank.reputation;
     applyIncome(state);
@@ -313,7 +316,9 @@ describe('Reputation Per Turn (Income Phase)', () => {
     const state = setupMainStreetGame({ seed: 'multi-clinic-test' });
     const clinicTemplate = findBizTemplate('biz-clinic')!;
     state.streetGrid[0] = { ...clinicTemplate, level: 0, incomeBonus: 0, synergyRangeBonus: 0 };
+    recalculateCard(state, 0);
     state.streetGrid[5] = { ...clinicTemplate, level: 0, incomeBonus: 0, synergyRangeBonus: 0 };
+    recalculateCard(state, 5);
 
     const repBefore = state.resourceBank.reputation;
     applyIncome(state);
@@ -327,7 +332,9 @@ describe('Reputation Per Turn (Income Phase)', () => {
     const pcTemplate = findBizTemplate('biz-private-clinic')!;
     const pharmTemplate = findBizTemplate('biz-pharmacy')!;
     state.streetGrid[0] = { ...pcTemplate, level: 0, incomeBonus: 0, synergyRangeBonus: 0 };
+    recalculateCard(state, 0);
     state.streetGrid[1] = { ...pharmTemplate, level: 0, incomeBonus: 0, synergyRangeBonus: 0 };
+    recalculateCard(state, 1);
 
     const repBefore = state.resourceBank.reputation;
     applyIncome(state);

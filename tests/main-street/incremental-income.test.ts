@@ -454,8 +454,8 @@ describe('Per-card incremental income/reputation tracking', () => {
       expect(restored.streetGrid[1]!.currentReputationPerTurn).toBe(state.streetGrid[1]!.currentReputationPerTurn);
     });
 
-    it('legacy serialized data (missing fields) falls back to computation in applyIncome', () => {
-      const state = createRichState('legacy-migrate');
+    it('legacy serialized data (missing fields) produces zero income', () => {
+      const state = createRichState('legacy-zero');
       state.streetGrid[0] = makeBiz({ id: 'biz-cafe-0', baseIncome: 3, synergyTypes: ['Food'] });
 
       // Simulate legacy save: serialize, then strip the new fields
@@ -463,16 +463,16 @@ describe('Per-card incremental income/reputation tracking', () => {
       delete serialized.streetGrid[0].currentIncome;
       delete serialized.streetGrid[0].currentReputationPerTurn;
 
-      // Deserialize should leave fields undefined (income phase will compute on demand)
+      // Deserialize should leave fields undefined
       const restored = deserializeMainStreetState(serialized as any);
       expect(restored.streetGrid[0]!.currentIncome).toBeUndefined();
       expect(restored.streetGrid[0]!.currentReputationPerTurn).toBeUndefined();
 
-      // applyIncome should still produce correct income (using fallback computation)
+      // Cards without currentIncome contribute 0 (legacy saves are not supported)
       const coinsBefore = restored.resourceBank.coins;
       const result = applyIncome(restored);
-      expect(result.total).toBeGreaterThan(0);
-      expect(restored.resourceBank.coins).toBeGreaterThan(coinsBefore);
+      expect(result.total).toBe(0);
+      expect(restored.resourceBank.coins).toBe(coinsBefore);
     });
   });
 

@@ -11,6 +11,7 @@ import {
   computeBusinessIncome,
   computeIncome,
   applyIncome,
+  recalculateCard,
 } from '../../example-games/main-street/MainStreetAdjacency';
 import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
 import {
@@ -243,6 +244,8 @@ describe('MainStreetAdjacency (2x5 grid)', () => {
       const state = setupMainStreetGame({ seed: 'income-grid-test' });
       state.streetGrid[0] = makeBiz({ id: 'a', baseIncome: 3, synergyTypes: ['Food'] });
       state.streetGrid[1] = makeBiz({ id: 'b', baseIncome: 2, synergyTypes: ['Food'] });
+      recalculateCard(state, 0);
+      recalculateCard(state, 1);
 
       const coinsBefore = state.resourceBank.coins;
       const result = applyIncome(state);
