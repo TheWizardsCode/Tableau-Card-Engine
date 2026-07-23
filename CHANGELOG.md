@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.1.7 (2026-07-23)
+### Features
+- Narrow Main Street HUD header to avoid overlapping undo button (CG-0MQS25QSO0031OHU)
+- 9 Card Golf Stock/Deck is face up (CG-0MRV9QH8V002JD7S)
+- Multiple sound triggers? (CG-0MRV9RTIJ005ONVA)
+- Convert Main Street synergy bonuses from absolute values to percentage multipliers (CG-0MRVCWNEQ009H52Z)
+- Feudalism game-over overlay uses non-standard type and button layout (CG-0MQNOTVIH0052HW0)
+- Sell cards in Main Street (CG-0MQOA5U4H000J37N)
+- Need delay if reduced motion is on (CG-0MQPSVDTD002JCX5)
+- The stats button has no icon (CG-0MQSF2FU40072RL9)
+### Bug Fixes
+- Feudalism win screen shows tiebreaker text unconditionally (CG-0MQN31CD400709UC)
+- Synergy only works for different businesses (CG-0MQQT9X45002WM4H)
+- No Menu button in end of game dialog (CG-0MQR7QSRH007YXZC)
+- Investment cards misaligned (SA-0MQW86QL30064M83)
+### Other
+- Per-card incremental income/reputation tracking (replace monolithic per-turn recalculation) (CG-0MRV84ZT60069PW6)
+- Consolidate and deduplicate AGENTS.md (CG-0MRW7JGSS0080N9P)
+- Update documentation for Clinic rework (Health synergy, reputation per turn) (CG-0MQRB9RMF003PRNO)
+- Refacactor AGENTS.md (CG-0MRP1AY0L008J5VL)
+- Missing build/tf-synths/main-street-runtime-synth.mjs — run npm run tf:generate (CG-0MQR54BSD007FQTA)
+- Identify and delete all The Mind files (CG-0MQQHESNA006MOCK)
+
 ## v0.1.6 (2026-07-20)
 ### Features
 - Create a playable instance of Blackjack (CG-0MQK6UBQK003MA0T)
