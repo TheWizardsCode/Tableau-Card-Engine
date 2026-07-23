@@ -29,6 +29,7 @@ import { LostCitiesAiPlayer } from '../AiStrategy';
 import type { LCTranscriptRecorder } from '../GameTranscript';
 import {
   AI_DELAY,
+  ANIM_DURATION,
   SFX_KEYS,
   laneX as laneXFn,
   type SceneTurnPhase,
@@ -47,6 +48,12 @@ export interface TurnControllerCallbacks {
 }
 
 export class LostCitiesTurnController {
+  /**
+   * When true, add extra delay to compensate for skipped animations
+   * so the AI's turn remains perceptible as thoughtful/measured.
+   */
+  reducedMotion = false;
+
   private session: LostCitiesSession;
   private aiPlayer: LostCitiesAiPlayer;
   private recorder: LCTranscriptRecorder;
@@ -246,7 +253,8 @@ export class LostCitiesTurnController {
     this.setPhase('ai-thinking');
     this.callbacks.onPlaySound(SFX_KEYS.TURN_CHANGE);
 
-    (this.renderer.getScene() as Phaser.Scene).time.delayedCall(AI_DELAY, () => {
+    const aiDelay = this.reducedMotion ? AI_DELAY + ANIM_DURATION : AI_DELAY;
+    (this.renderer.getScene() as Phaser.Scene).time.delayedCall(aiDelay, () => {
       try {
         if (this.session.matchPhase !== 'playing') return;
 

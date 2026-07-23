@@ -41,6 +41,7 @@ import helpContent from '../help-content.json';
 
 import {
   SUSHI_ICON_FILES,
+  ANIM_DURATION,
   HAND_Y, HAND_CARD_W, HAND_CARD_H, HAND_GAP,
   TABLEAU_CARD_W, TABLEAU_CARD_H,
   PLAYER_TABLEAU_Y, AI_TABLEAU_Y,
@@ -83,6 +84,15 @@ export class SushiGoScene extends CardGameScene {
   // Game state
   session!: SushiGoSession;
   aiPlayer!: SushiGoAiPlayer;
+
+  /**
+   * Whether reduced motion is currently enabled.
+   * Reads from the settings panel to always reflect the current preference.
+   * When true, extra delay is added to compensate for skipped animations.
+   */
+  get reducedMotion(): boolean {
+    return this.settingsPanel?.reducedMotion ?? false;
+  }
   phaseManager!: PhaseManager<TurnPhase>;
   pendingHumanPick: number | null = null;
   pendingHumanSecondPick: number | null = null;
@@ -865,7 +875,11 @@ export class SushiGoScene extends CardGameScene {
     this.pendingHumanPick = null;
     this.pendingHumanSecondPick = null;
 
-    this.time.delayedCall(TURN_ANIMATION_DELAY, () => {
+    const transitionDelay = this.reducedMotion
+      ? TURN_ANIMATION_DELAY + ANIM_DURATION
+      : TURN_ANIMATION_DELAY;
+
+    this.time.delayedCall(transitionDelay, () => {
       this.refreshAll();
 
       if (this.session.phase === 'round-scoring') {

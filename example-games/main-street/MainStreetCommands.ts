@@ -18,6 +18,7 @@ import {
   purchaseEvent,
   refreshDevelopment,
   refreshInvestments,
+  sellBusiness,
 } from './MainStreetMarket';
 import { playHeldEvent } from './MainStreetEngine';
 
@@ -30,6 +31,7 @@ interface MarketActionSnapshot {
   heldEvent: any | null;
   incidentQueue: any | null;
   activityLog: any | null;
+  soldSlots: boolean[] | null;
 }
 
 /** Safe cloning helper that uses structuredClone when available, else falls back to JSON clone. */
@@ -56,6 +58,7 @@ function captureSnapshot(state: MainStreetState): MarketActionSnapshot {
     heldEvent: safeClone(state.heldEvent),
     incidentQueue: safeClone(state.incidentQueue),
     activityLog: safeClone(state.activityLog),
+    soldSlots: safeClone(state.soldSlots ?? new Array(10).fill(false)) as boolean[],
   };
 }
 
@@ -71,6 +74,7 @@ function restoreSnapshot(state: MainStreetState, snap: MarketActionSnapshot): vo
   state.heldEvent = snap.heldEvent as any;
   state.incidentQueue = snap.incidentQueue as any;
   state.activityLog = snap.activityLog as any;
+  state.soldSlots = snap.soldSlots ?? new Array(10).fill(false);
 }
 
 /**
@@ -173,6 +177,20 @@ export function refreshDevelopmentCommand(state: MainStreetState) {
     snapshotAction(
       (s) => refreshDevelopment(s),
       'RefreshDevelopment',
+    ),
+  );
+}
+
+/** Command: Sell Business */
+export function sellBusinessCommand(
+  state: MainStreetState,
+  slotIndex: number,
+) {
+  return toCommand(
+    state,
+    snapshotAction(
+      (s) => sellBusiness(s, slotIndex),
+      `SellBusiness slot ${slotIndex}`,
     ),
   );
 }

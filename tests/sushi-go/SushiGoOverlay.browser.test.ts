@@ -647,4 +647,61 @@ describe('Sushi Go game-over overlay', () => {
     expect(finalTextObj).toBeDefined();
     expect(finalTextObj!.text).toContain(`Final: You ${9 + 1} -- AI ${8 - 1}`);
   });
+
+  it('renders Menu button in game-over overlay', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('SushiGoScene') as any;
+
+    // Prepare session roundScores so computeDisplayedTotal can sum them
+    scene.session.players[0].roundScores = [9];
+    scene.session.players[1].roundScores = [8];
+
+    const fakeRoundResult = {
+      round: 2,
+      tableauScores: [9, 8],
+      tableauBreakdowns: [
+        { tempura: 0, sashimi: 0, dumpling: 0, nigiri: 0, chopsticks: 0, puddingCount: 0 },
+        { tempura: 0, sashimi: 0, dumpling: 0, nigiri: 0, chopsticks: 0, puddingCount: 0 },
+      ],
+      makiCounts: [0, 0],
+      makiBonuses: [0, 0],
+      roundScores: [9, 8],
+      puddingCounts: [0, 0],
+      puddingBonuses: [0, 0],
+    };
+
+    scene.overlayManager.showGameOverOverlay(fakeRoundResult, null, () => {});
+    await waitFrames(3);
+
+    // Collect containers from scene and hud
+    const containers = collectFromSceneAndHud(scene, (child): child is Phaser.GameObjects.Container =>
+      child instanceof Phaser.GameObjects.Container,
+    );
+
+    const findButtonLabel = (container: Phaser.GameObjects.Container, label: string): boolean => {
+      return (container as any).list?.some(
+        (child: any) => child instanceof Phaser.GameObjects.Text && child.text === label,
+      );
+    };
+
+    // Verify Menu button exists
+    const menuBtn = containers.find((c) => findButtonLabel(c, 'Menu'));
+    expect(menuBtn).toBeDefined();
+
+    // Verify Menu button is interactive
+    const menuBg = (menuBtn as any)?.list?.find(
+      (child: any) => child instanceof Phaser.GameObjects.Rectangle,
+    );
+    expect(menuBg?.input?.enabled).toBe(true);
+
+    // Verify Play Again still exists
+    const playAgainBtn = containers.find((c) => findButtonLabel(c, 'Play Again'));
+    expect(playAgainBtn).toBeDefined();
+
+    // Verify the Menu button's background rectangle is interactive
+    const menuBg2 = (menuBtn as any)?.list?.find(
+      (child: any) => child instanceof Phaser.GameObjects.Rectangle,
+    );
+    expect(menuBg2?.input?.enabled).toBe(true);
+  });
 });

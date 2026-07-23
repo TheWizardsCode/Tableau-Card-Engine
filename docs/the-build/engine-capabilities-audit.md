@@ -199,12 +199,6 @@ A 2-player expedition card game with 60 custom cards (5 colors, investment multi
 - **Engine APIs used:** `shuffleArray`, `MultiplayerSetupOptions`, `resolveSetupOptions`, `LegalityResult`, `CardGameScene`, `AiPlayer`, `pickRandom`, `TranscriptRecorderBase`, overlay helpers, `createSceneHeader`, `HelpPanel`, `SettingsPanel`
 - **Notable patterns:** Only game to use `LegalityResult` from rule-engine; two-phase turn system; discard-then-draw restriction enforcement; `VisibleState` for information hiding; opponent draw-history tracking for AI; investment multiplier scoring.
 
-### The Mind (`example-games/the-mind/`)
-A 2-player cooperative real-time card game where players simultaneously play numbered cards (1-100) onto a shared ascending pile without turns. Features 8-level progression, lives/penalty system, and real-time AI.
-
-- **Engine APIs used:** `Pile<MindCard>` (generic), `shuffleArray`, `MultiplayerSetupOptions`, `resolveSetupOptions`, `CardGameScene`, `AiPlayer`, `TranscriptRecorderBase`, `createSeededRng`, `SoundManager`, `flipCard`, `shakeIllegalMove`, `layoutCardPositions`, overlay helpers, `HelpPanel`, `SettingsPanel`, `createSceneHeader`
-- **Notable patterns:** Real-time (not turn-based) gameplay -- only non-turn-based example; AI uses linear proportional timing with per-card committed delays; penalty system (life lost + lower cards discarded on error); level progression with bonus lives; headless `runGame()` for Phaser-free AI-vs-AI simulation; `MindCard` custom type.
-
 ---
 
 ## 3. Minor Extensions (< 1 day each)
@@ -225,7 +219,7 @@ A 2-player cooperative real-time card game where players simultaneously play num
 **Effort:** ~3 hours.
 
 ### 3.4 Timer / Countdown Utility for Timed Phases
-**What:** Extract The Mind's timing logic into a reusable `GameTimer` class in `src/core-engine/` that emits `tick`, `expired`, and `paused` events through the `GameEventEmitter`.
+**What:** Create a reusable `GameTimer` class in `src/core-engine/` that emits `tick`, `expired`, and `paused` events through the `GameEventEmitter`.
 **How it helps "The Build":** Timed building phases, production cycles, or real-time market events become trivial to implement with a shared timer that integrates with the existing event system.
 **Effort:** ~4 hours.
 

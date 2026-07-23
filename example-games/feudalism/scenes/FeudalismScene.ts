@@ -164,9 +164,10 @@ export class FeudalismScene extends CardGameScene {
     this.feudRenderer.createInfluenceDisplay();
     this.initHelpPanel(helpContent as HelpSection[]);
     this.initSettingsPanel(undefined, undefined, false);
-    // Propagate reduced motion preference to the animator
+    // Propagate reduced motion preference to the animator and turn controller
     if (this.settingsPanel) {
       this.animator.reducedMotion = this.settingsPanel.reducedMotion;
+      this.turnController.reducedMotion = this.settingsPanel.reducedMotion;
     }
 
     this.refreshAll();

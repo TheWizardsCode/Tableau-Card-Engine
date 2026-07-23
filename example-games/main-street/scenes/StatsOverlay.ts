@@ -86,7 +86,11 @@ const STATS_BUTTON_DEPTH = 1100;
 // ── Stats Button ────────────────────────────────────────────
 
 /**
- * A circular stats button ("Σ") that toggles the StatsOverlay.
+ * A circular stats button that toggles the StatsOverlay.
+ *
+ * Displays the ms-icon-stats SVG icon (bar chart) when the texture is
+ * available, falling back to the Greek Sigma "Σ" text character if the
+ * texture failed to load.
  *
  * Placed in the lower-left corner of the screen to avoid overlap
  * with the Settings button (upper-right). Follows the same visual
@@ -94,6 +98,9 @@ const STATS_BUTTON_DEPTH = 1100;
  */
 export class StatsButton {
   private circle: Phaser.GameObjects.Graphics;
+  /** Primary icon (Image) when ms-icon-stats texture is loaded. */
+  private icon: Phaser.GameObjects.Image | null = null;
+  /** Fallback text label (Σ) when the texture is unavailable. */
   private label: Phaser.GameObjects.Text;
   private hitArea: Phaser.GameObjects.Zone;
   private destroyed = false;
@@ -105,11 +112,13 @@ export class StatsButton {
     y: number,
   ) {
     const radius = 16;
+    const iconSize = 14;
 
     this.circle = scene.add.graphics();
     this.circle.setDepth(STATS_BUTTON_DEPTH);
 
-    this.label = scene.add.text(0, 0, '\u03A3', {  // Greek capital Sigma for stats
+    // Fallback text label (Σ) - always created, hidden when icon is displayed
+    this.label = scene.add.text(0, 0, '\u03A3', {
       fontSize: '16px',
       color: '#f0c040',
       fontFamily: FONT_FAMILY,
@@ -117,6 +126,17 @@ export class StatsButton {
     });
     this.label.setOrigin(0.5);
     this.label.setDepth(STATS_BUTTON_DEPTH);
+
+    // Try to display the SVG icon; fall back to text if texture is missing
+    if (scene.textures.exists('ms-icon-stats')) {
+      this.icon = scene.add.image(x, y, 'ms-icon-stats');
+      this.icon.setDisplaySize(iconSize, iconSize);
+      this.icon.setDepth(STATS_BUTTON_DEPTH);
+      this.icon.setTint(0xf0c040);  // Match the text color
+      this.label.setVisible(false);  // Hide fallback text
+    } else {
+      this.icon = null;
+    }
 
     this.hitArea = scene.add.zone(x, y, radius * 2, radius * 2);
     this.hitArea.setDepth(STATS_BUTTON_DEPTH);
@@ -128,7 +148,12 @@ export class StatsButton {
     try {
       const hudRoot: any = (scene as any).hudContainer ?? null;
       if (hudRoot && typeof hudRoot.add === 'function') {
-        try { hudRoot.add(this.circle); hudRoot.add(this.label); hudRoot.add(this.hitArea); } catch (_) { /* ignore */ }
+        try {
+          hudRoot.add(this.circle);
+          if (this.icon) hudRoot.add(this.icon);
+          hudRoot.add(this.label);
+          hudRoot.add(this.hitArea);
+        } catch (_) { /* ignore */ }
       }
     } catch (_) { /* ignore */ }
 
@@ -141,14 +166,22 @@ export class StatsButton {
     this.hitArea.on('pointerover', () => {
       if (!this.destroyed) {
         this.drawCircle(x, y, radius, 0x4444aa, 1);
-        this.label.setColor('#ffffff');
+        if (this.icon) {
+          this.icon.setTint(0xffffff);
+        } else {
+          this.label.setColor('#ffffff');
+        }
       }
     });
 
     this.hitArea.on('pointerout', () => {
       if (!this.destroyed) {
         this.drawCircle(x, y, radius, 0x333355, 0.9);
-        this.label.setColor('#f0c040');
+        if (this.icon) {
+          this.icon.setTint(0xf0c040);
+        } else {
+          this.label.setColor('#f0c040');
+        }
       }
     });
   }
@@ -165,6 +198,7 @@ export class StatsButton {
     if (this.destroyed) return;
     this.destroyed = true;
     this.circle.destroy();
+    if (this.icon) this.icon.destroy();
     this.label.destroy();
     this.hitArea.destroy();
   }

@@ -93,8 +93,9 @@ export class MainStreetLifecycleManager {
       // can display them in the sidebar. Use image loader to avoid DOM parsing
       // differences in headless/test environments.
       try {
-        const icons = ['food','culture','commerce','service','entertainment'];
+        const icons = ['food','culture','commerce','service','entertainment','stats'];
         const iconsDir = 'assets/games/main-street/svg/icons';
+        
         for (const k of icons) {
           s.load.image(`ms-icon-${k}`, `${iconsDir}/ms-icon-${k}.svg`);
         }

@@ -57,7 +57,6 @@ public/assets/audio/
 ├── feudalism/
 ├── beleaguered-castle/
 ├── lost-cities/
-├── the-mind/
 └── main-street/        # (Main Street uses assets/games/main-street/audio/)
 ```
 

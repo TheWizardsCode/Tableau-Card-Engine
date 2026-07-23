@@ -31,6 +31,7 @@ import {
 
 import {
   applyIncome,
+  recalculateCard,
 } from '../../example-games/main-street/MainStreetAdjacency';
 
 import {
@@ -206,6 +207,7 @@ describe('Reputation multiplier: income integration', () => {
     // Use a single business so income is predictable
     state.streetGrid.fill(null);
     state.streetGrid[0] = makeBiz({ id: 'shop-1', baseIncome: 10, synergyTypes: [] });
+    recalculateCard(state, 0);
     state.resourceBank.reputation = 10; // multiplier = 1.5
 
     const coinsBefore = state.resourceBank.coins;
@@ -220,6 +222,7 @@ describe('Reputation multiplier: income integration', () => {
     const state = setupMainStreetGame({ seed: 'rep-zero-income' });
     state.streetGrid.fill(null);
     state.streetGrid[0] = makeBiz({ id: 'shop-1', baseIncome: 10, synergyTypes: [] });
+    recalculateCard(state, 0);
     state.resourceBank.reputation = 0; // multiplier = 1.0
 
     const coinsBefore = state.resourceBank.coins;
@@ -232,6 +235,7 @@ describe('Reputation multiplier: income integration', () => {
     const state = setupMainStreetGame({ seed: 'rep-neg-income' });
     state.streetGrid.fill(null);
     state.streetGrid[0] = makeBiz({ id: 'shop-1', baseIncome: 10, synergyTypes: [] });
+    recalculateCard(state, 0);
     state.resourceBank.reputation = -3; // multiplier clamped to 1.0
 
     const coinsBefore = state.resourceBank.coins;
@@ -246,6 +250,7 @@ describe('Reputation multiplier: income integration', () => {
     const state = setupMainStreetGame({ seed: 'frac-income-no-rep' });
     state.streetGrid.fill(null);
     state.streetGrid[0] = makeBiz({ id: 'biz-1', baseIncome: 0.5, synergyTypes: [] });
+    recalculateCard(state, 0);
     state.resourceBank.reputation = 0;
 
     // Set initial coins to 0 for predictable counting
@@ -264,6 +269,7 @@ describe('Reputation multiplier: income integration', () => {
     const state = setupMainStreetGame({ seed: 'frac-income-rep' });
     state.streetGrid.fill(null);
     state.streetGrid[0] = makeBiz({ id: 'biz-1', baseIncome: 0.5, synergyTypes: [] });
+    recalculateCard(state, 0);
     state.resourceBank.reputation = 3; // Medium preset, multiplier ≈ 1.15
 
     state.resourceBank.coins = 0;

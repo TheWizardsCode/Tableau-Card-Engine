@@ -56,7 +56,7 @@ function makeBiz(overrides: Partial<BusinessCard> = {}): BusinessCard {
     cost: overrides.cost ?? 3,
     baseIncome: overrides.baseIncome ?? 2,
     synergyTypes: overrides.synergyTypes ?? ['Food'],
-    synergyCoinBonus: overrides.synergyCoinBonus ?? (isPawnShop ? 0 : 1),
+    synergyCoinBonus: overrides.synergyCoinBonus ?? (isPawnShop ? 0 : 0.5),
     synergyRepBonus: overrides.synergyRepBonus ?? (isPawnShop ? 0 : 0),
     maxLevel: overrides.maxLevel ?? 1,
     description: overrides.description ?? 'A test business',
@@ -392,8 +392,8 @@ describe('MainStreet Hand Card Synergy Bonus', () => {
 
       const result = computeIncome(state.streetGrid);
 
-      // Standard adjacency: each gets 1 base + 1 neighbor synergy = 2, total = 4
-      expect(result.total).toBe(4);
+      // Percentage-based: each gets 1 base + 0.5 synergy = 1.5, total = 3
+      expect(result.total).toBe(3);
     });
   });
 

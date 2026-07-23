@@ -131,6 +131,7 @@ export class GolfRenderer {
       countColor: '#aaccaa',
     });
     this.stockPileView.setPile(new ArrayPileAdapter(stockPile));
+    this.stockPileView.setFaceUp(false);
     if (!this.replayMode) {
       this.stockPileView.onClick(onStockClick);
     } else {

@@ -52,6 +52,16 @@ npm run dev
 
 Starts the Vite dev server at `http://localhost:3000` with hot module replacement (HMR). The root `index.html` loads the **Game Selector** landing page, which displays all available example games as clickable cards. Click a game to launch it.
 
+### ToneForge Synth Module
+
+If you plan to use Main Street's ToneForge-backed audio synthesis, generate the synth module first:
+
+```bash
+npm run tf:generate
+```
+
+If the synth module is missing, `loadMainStreetTfModule()` logs a clear warning and gracefully degrades (returns `null`). Synthesis-based audio will be unavailable but WAV-based sound effects continue to work normally.
+
 ### Multi-Game Routing
 
 The project uses a unified entry point (`main.ts` at the project root) that registers a `GameSelectorScene` as the initial Phaser scene alongside all example game scenes. Navigation works as follows:
@@ -212,6 +222,8 @@ npm run tf:generate
 
 This runs `scripts/tf-generate-synths.sh` and writes generated outputs under `build/tf-synths/`, including a runtime synth module (`main-street-runtime-synth.mjs`) used for on-the-fly synthesis.
 
+> **Missing module handling:** If the runtime synth module is absent, `loadMainStreetTfModule()` in `mainStreetTfModule.ts` logs a clear `console.warn` message with instructions to run `npm run tf:generate`, then gracefully returns `null` without triggering a Chromium module-loading error. Synthesis-based audio degrades silently; WAV-based SFX and game logic are unaffected.
+
 See `docs/the-build/audio.md` for full details (module shape, mapping, runtime wiring, CI guidance).
 
 ### SFX Key Naming Convention
@@ -321,16 +333,6 @@ example-games/
     └── scenes/
         ├── LostCitiesMockScene.ts  Static layout mockup (development aid)
         └── LostCitiesScene.ts      Phaser scene (interactive play with animations)
-├── the-mind/
-    ├── MindCards.ts                Card types and deck creation
-    ├── MindGame.ts                 Game orchestration (levels, lives, card play, penalties)
-    ├── AiStrategy.ts               AI strategies (timing-based play decisions)
-    ├── GameTranscript.ts           Transcript types and MindTranscriptRecorder (event-based)
-    ├── headlessGame.ts             Headless AI-vs-AI runner for fixture generation
-    ├── help-content.json           Help panel content
-    └── scenes/
-        └── TheMindScene.ts         Phaser scene (real-time card play interface)
-
 scripts/
 ├── replay.ts                       Replay CLI (Playwright-driven transcript replay + screenshots)
 ├── generate-thumbnail.ts           Thumbnail generator (midpoint frame -> 120x68 PNG)
@@ -342,7 +344,6 @@ scripts/
     ├── index.ts                    Barrel file (imports and registers all adapters)
     ├── BeleagueredCastleReplayAdapter.ts
     ├── LostCitiesReplayAdapter.ts
-    ├── TheMindReplayAdapter.ts
     ├── SushiGoReplayAdapter.ts
     ├── FeudalismReplayAdapter.ts
     ├── MainStreetReplayAdapter.ts
@@ -355,7 +356,6 @@ public/assets/
 │   ├── golf/thumbnail.png
 │   ├── beleaguered-castle/thumbnail.png
 │   ├── lost-cities/thumbnail.png
-│   ├── the-mind/thumbnail.png
 │   ├── sushi-go/thumbnail.png
 │   └── feudalism/thumbnail.png
 └── CREDITS.md              Asset attribution
@@ -370,7 +370,6 @@ tests/
 ├── beleaguered-castle/     Beleaguered Castle unit + integration tests
 ├── sushi-go/               Sushi Go! cards, scoring, game, AI tests
 ├── feudalism/               Feudalism cards, game, AI tests
-├── the-mind/               The Mind cards, game state, AI, transcript, auto-play, integration tests
 ├── lost-cities/            Lost Cities cards, scoring, rules, game, AI, transcript tests
 └── replay/                 Replay CLI validation tests
 ```
@@ -515,7 +514,6 @@ Open `http://localhost:3000` and click the desired game card. Each game also has
 | Sushi Go! | `example-games/sushi-go/` | Card drafting (pick-and-pass hands), custom card types with set-collection scoring, multi-round match, procedural card-back textures | `tests/sushi-go/` (4 files) |
 | Feudalism | `example-games/feudalism/` | Resource management (gem tokens), tiered development cards with costs/bonuses, noble attraction, multi-action turns (take/reserve/purchase), checkpoint autosave after each turn (human + AI) with startup recovery | `tests/feudalism/` (4 files) |
 | Lost Cities | `example-games/lost-cities/` | Two-player expeditions, two-phase turn model (play/discard then draw), ascending-play rules, investment multipliers (x2/x3/x4), multi-round match scoring, procedurally generated SVG card assets | `tests/lost-cities/` (6 files) |
-| The Mind | `example-games/the-mind/` | Cooperative real-time game, event-based transcript, timing-based AI, level progression (1-100 cards, 8 levels), headless AI-vs-AI runner for fixture generation | `tests/the-mind/` (7 files) |
 | Main Street | `example-games/main-street/` | Single-player tableau builder, responsive 2x5 grid layout, SLL integration, ToneForge audio adapter, Monte Carlo balance testing, tutorial scene | `tests/main-street/` |
 
 ### Lost Cities card assets
@@ -577,7 +575,6 @@ All example games have fixture transcripts checked into version control:
 | Golf | `tests/fixtures/transcripts/golf/fixture-game.json` |
 | Beleaguered Castle | `tests/fixtures/transcripts/beleaguered-castle/fixture-game.json` |
 | Lost Cities | `tests/fixtures/transcripts/lost-cities/fixture-game.json` |
-| The Mind | `tests/fixtures/transcripts/the-mind/fixture-game.json` |
 | Sushi Go | `tests/fixtures/transcripts/sushi-go/fixture-game.json` |
 | Feudalism | `tests/fixtures/transcripts/feudalism/fixture-game.json` |
 | Main Street | `tests/fixtures/transcripts/main-street/fixture-game.json` |
@@ -737,7 +734,6 @@ Each game has a `ReplayAdapter` implementation in `scripts/adapters/` that bridg
 |------|---------|-----------|
 | Beleaguered Castle | `BeleagueredCastleReplayAdapter` | `beleaguered-castle` |
 | Lost Cities | `LostCitiesReplayAdapter` | `lost-cities` |
-| The Mind | `TheMindReplayAdapter` | `the-mind` |
 | Sushi Go | `SushiGoReplayAdapter` | `sushi-go` |
 | Feudalism | `FeudalismReplayAdapter` | `feudalism` |
 | Main Street | `MainStreetReplayAdapter` | `main-street` |
@@ -872,7 +868,7 @@ Use the `scripts/refresh-thumbnails.sh` script to replay fixture transcripts and
 bash scripts/refresh-thumbnails.sh
 ```
 
-The script processes all supported games (`golf`, `beleaguered-castle`, `lost-cities`, `sushi-go`, `feudalism`, `the-mind`, `main-street`). For each game it runs the replay tool to capture screenshots, then invokes the thumbnail generator. Games that lack a fixture transcript or replay adapter are skipped with a warning (not a failure). The `gym` is excluded -- it has no replay transcript. A summary table is printed at the end showing which games were refreshed and which were skipped. The script exits non-zero if any supported game fails during replay or thumbnail generation.
+The script processes all supported games (`golf`, `beleaguered-castle`, `lost-cities`, `sushi-go`, `feudalism`, `main-street`). For each game it runs the replay tool to capture screenshots, then invokes the thumbnail generator. Games that lack a fixture transcript or replay adapter are skipped with a warning (not a failure). The `gym` is excluded -- it has no replay transcript. A summary table is printed at the end showing which games were refreshed and which were skipped. The script exits non-zero if any supported game fails during replay or thumbnail generation.
 
 ### Main Street visual smoke runbook
 
@@ -955,15 +951,15 @@ if (!texture.ready && texture.promise) await texture.promise;
 - Add or update browser smoke tests with pixel-sample assertions (non-solid texture checks).
 - Keep per-test runtime at or below 10 seconds for SVG smoke checks.
 
-### The Mind migration (CG-0MP12H40Q003Y7OU)
+### Migration pattern: SvgHelpers lazy rasterisation
 
-The Mind was the first example game migrated from `scene.load.svg` to SvgHelpers lazy rasterisation. Key changes:
+The following pattern is used when migrating a game from `scene.load.svg` to SvgHelpers lazy rasterisation. Key changes:
 
-- **MindCardRenderer.ts**: `preloadMindCardAssets` is now registration-only in browser runtimes (calls `markSceneValid(scene)`); it does NOT eagerly rasterise SVGs. The Node/test preload path still populates the `svgTextCache` for headless access.
-- **MindCardTextureAdapter.ts**: New module providing a stable, DPR-aware API for callers. Use `resolveTemplateId()`, `getCanonicalTextureKey()`, and `ensureTexture()` instead of legacy template IDs when setting sprite textures.
-- **Scene callers**: `MindRenderer`, `MindAnimator`, and `MindReplayController` now import from `MindCardTextureAdapter` instead of using `CARD_BACK_KEY` or `getMindCardTexture` directly.
-- **Texture keys**: Lazy rasterisation via `SvgHelpers.getOrCreateTexture` produces DPR-aware keys (e.g. `ms_card_mind-42_48x65@2`). The legacy template IDs (`mind-42`, `mind-back`) are still returned by `getMindCardTexture()` and `mindCardTextureKey()` but should not be used for sprite texture lookups.
-- **Tests**: Unit and integration tests updated to assert DPR-aware key format. A headless integration smoke test (`tests/the-mind/headless.test.ts`) verifies the full preload → ensure → key resolution pipeline.
+- **Preload**: SVG assets are registration-only in browser runtimes (call `markSceneValid(scene)`); SVG source text is loaded via `this.load.text()` for later rasterisation. The Node/test preload path populates a module-level `svgTextCache` for headless access.
+- **Texture adapter**: A new module provides a stable, DPR-aware API for callers, with `resolveTemplateId()`, `getCanonicalTextureKey()`, and `ensureTexture()` wrappers replacing legacy template IDs.
+- **Scene callers**: All scene code imports from the texture adapter instead of using legacy keys or direct texture lookups.
+- **Texture keys**: Lazy rasterisation via `SvgHelpers.getOrCreateTexture` produces DPR-aware keys. Legacy template IDs should not be used for sprite texture lookups.
+- **Tests**: Unit and integration tests assert DPR-aware key format. A headless integration smoke test verifies the full preload → ensure → key resolution pipeline.
 
 **Pattern for migrating other games:**
 1. Create a texture adapter module with `resolveTemplateId()`, `getCanonicalTextureKey()`, and `ensureTexture()` wrappers.
@@ -973,7 +969,7 @@ The Mind was the first example game migrated from `scene.load.svg` to SvgHelpers
 
 ### Lost Cities migration (CG-0MOZN33JW004XILY)
 
-Lost Cities was the third example game migrated from `scene.load.svg` to SvgHelpers lazy rasterisation, following the pattern established by The Mind. Key changes:
+Lost Cities was the third example game migrated from `scene.load.svg` to SvgHelpers lazy rasterisation. Key changes:
 
 - **LostCitiesTextureHelpers.ts**: New co-located helper module providing `preloadLostCitiesAssets()`, `getLcTextureKey()`, `ensureLcCardTexture()`, `ensureLcCompactTexture()`, and `ensureLcBackTexture()`. The preload function is registration-only in browser runtimes (marks scene valid via `markSceneValid`); the Node/test path reads all 121 SVGs into a module-level cache.
 - **LostCitiesScene.ts**: Removed 5 `this.load.svg()` blocks (121 SVG files) from `preload()`. Replaced with `preloadLostCitiesAssets(this)` and added `markSceneInvalid(this)` on shutdown.
@@ -1044,7 +1040,6 @@ The following games have been migrated to use SLL layout helpers:
 | Game | Layout file | Adapter |
 |------|------------|---------|
 | Golf | `example-games/golf/layouts/golf.layout.json` | `example-games/golf/scenes/GolfLayoutAdapter.ts` |
-| The Mind | `example-games/the-mind/layouts/the-mind.layout.json` | `example-games/the-mind/scenes/MindLayoutAdapter.ts` |
 | Beleaguered Castle | `example-games/beleaguered-castle/layouts/beleaguered-castle.layout.json` | `example-games/beleaguered-castle/scenes/BeleagueredCastleLayoutAdapter.ts` |
 | Main Street | `example-games/main-street/layouts/main-street.layout.json` | `example-games/main-street/scenes/MainStreetLayoutAdapter.ts` |
 
@@ -1465,24 +1460,6 @@ mainStreetRenderCardSvg(this, slotContainer, card.id, CARD_W, CARD_H);
 createMainStreetHintButton(this, x, y, 80, 32, hintUsed, () => showHint());
 ```
 
-#### The Mind adapter (`src/ui/Renderer/adapters/MindAdapter.ts`)
-
-Re-exports `createHudContainer` and `renderCardSvg`. Provides `createMindHudText` (centred origin, game depth) and `mindRenderCardSvg` (pre-configured with The Mind's card dimensions):
-
-```typescript
-import {
-  createMindHudText,
-  mindRenderCardSvg,
-  createHudContainer,
-} from '@ui/Renderer/adapters/MindAdapter';
-
-const hud = createHudContainer(this);
-const levelText = createMindHudText(this, 640, 20, 'Level 3', '#ffcc44', { fontSize: '20px' });
-hud.add(levelText);
-
-mindRenderCardSvg(this, cardContainer, 'mind-42');
-```
-
 ### Migration reference: helpers moved from game scenes
 
 The following table lists helpers that were extracted from individual game scenes into the shared Renderer module.
@@ -1494,10 +1471,6 @@ The following table lists helpers that were extracted from individual game scene
 | `example-games/main-street/scenes/MainStreetScene.ts` | Inline tooltip zone setup | `@ui/Renderer` | `attachHudTooltipZone` |
 | `example-games/main-street/scenes/MainStreetScene.ts` | Inline action button creation | `@ui/Renderer` | `createActionButton` |
 | `example-games/main-street/scenes/MainStreetRenderer.ts` | `renderCardSvg` (local) | `@ui/Renderer` | `renderCardSvg` |
-| `example-games/the-mind/scenes/TheMindScene.ts` | Inline HUD container creation | `@ui/Renderer` | `createHudContainer` |
-| `example-games/the-mind/scenes/TheMindScene.ts` | Inline HUD text styling | `@ui/Renderer` | `createHudText` |
-| `example-games/the-mind/scenes/MindRenderer.ts` | `createMindHudText` (local) | `@ui/Renderer/adapters/MindAdapter` | `createMindHudText` |
-
 ### Before and after migration examples
 
 **Before (Main Street — inline in scene):**
@@ -1551,8 +1524,6 @@ createActionButton(this, x, y, 120, 'Buy', () => buyCard());
 | `42a3916` | CG-0MPOLH2U9001P7BC | Shared Renderer API scaffold and core helpers |
 | `7d80ec1` | CG-0MPOLHCAN004D753 | Card rendering SVG wrapper helper (`renderCardSvg`) |
 | `9f1272f` | CG-0MPOLHCAN0037UUS | Main Street adapter and migration |
-| `14fa97f` | CG-0MPOLHCB400363VZ | The Mind adapter and migration |
-| `7192f1f` | CG-0MPOLHCB400363VZ | Migrate MindRenderer to use shared `applyEnsuredTexture` |
 | `f173bfd` | CG-0MPOLHCBV005SD2L | Migration documentation in DEVELOPER.md |
 
 ### Related work items
@@ -1561,9 +1532,8 @@ createActionButton(this, x, y, 120, 'Buy', () => buyCard());
 - **Shared Renderer API scaffold and core helpers** (CG-0MPOLH2U9001P7BC)
 - **Card rendering SVG wrapper helper** (CG-0MPOLHCAN004D753)
 - **Main Street adapter and migration** (CG-0MPOLHCAN0037UUS)
-- **The Mind adapter and migration** (CG-0MPOLHCB400363VZ)
 - **Unit test specification for shared Renderer helpers** (CG-0MPOLGVTH009NSTM)
-- **Browser integration smoke tests for Main Street and The Mind** (CG-0MPOLGZ70000Q9J1)
+- **Browser integration smoke tests for Main Street** (CG-0MPOLGZ70000Q9J1)
 
 See the Gym SLL demo (`example-games/gym/scenes/GymSllScene.ts`) for a working example with shell toggling.
 

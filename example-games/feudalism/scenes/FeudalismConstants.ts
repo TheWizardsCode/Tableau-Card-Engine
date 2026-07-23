@@ -98,6 +98,10 @@ export const DIVIDER_X = 640;
 export const ACTION_Y = 670;
 export const INSTRUCTION_Y = 708;
 
+// ── Overlay constants ───────────────────────────────────────
+export const OVERLAY_DEPTH = 2000;
+export const OVERLAY_BG_ALPHA = 0.01;
+
 // ── Audio asset keys ──────────────────────────────────────
 export const SFX_KEYS = {
   TOKEN_TAKE: 'sfx-card-draw',

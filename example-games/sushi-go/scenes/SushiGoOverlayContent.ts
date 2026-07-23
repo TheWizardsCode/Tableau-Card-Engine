@@ -206,9 +206,9 @@ export class SushiGoOverlayContent {
 
     const playBtn = createActionButton(
       this.scene,
-      GAME_W / 2 - 20,
+      GAME_W / 2 - 130,
       buttonY - 16,
-      120,
+      100,
       'Play Again',
       () => {
         this.soundManager?.play(SFX_KEYS.UI_CLICK);
@@ -217,6 +217,21 @@ export class SushiGoOverlayContent {
       { depth: 11 },
     );
     this.overlayManager.add(playBtn);
+
+    const menuBtn = createActionButton(
+      this.scene,
+      GAME_W / 2 + 30,
+      buttonY - 16,
+      100,
+      'Menu',
+      () => {
+        this.soundManager?.play(SFX_KEYS.UI_CLICK);
+        this.overlayManager.dismiss();
+        this.scene.scene.start('GameSelectorScene');
+      },
+      { depth: 11 },
+    );
+    this.overlayManager.add(menuBtn);
   }
 
   private resolveOverlayAnchors(
