@@ -1,6 +1,0 @@
-{
-  "event_type": "pi_started",
-  "timestamp": "2026-06-14T22:46:53.758097+00:00",
-  "work_item_ids": [],
-  "cmd": "pi -p --session-id ralph-no-target-implementation-ae302828 --mode json --model Proxy/qwen3 'implement-single CG-0MQBOK2SQ0067ZBP\nComplete only this work item.\nContinue until the work item is completed, but do not merge.\nDo not ask the producer questions or pause for interactive input.\nIf you cannot continue safely without explicit producer input, stop and return a structured no_safe_path response with the missing decision.\nIMPORTANT: Use the existing feature branch '\"'\"'wl-CG-0MQ6IEM9F001JTQD-phase-3-port-high-risk-games-to-shared-handview-pi'\"'\"' for all commits. Run '\"'\"'git checkout wl-CG-0MQ6IEM9F001JTQD-phase-3-port-high-risk-games-to-shared-handview-pi'\"'\"' if not already on this branch. Do NOT create a new branch.\nWhen creating commit messages, include a '\"'\"'Related-Work: <child-id>'\"'\"' trailer where <child-id> is '\"'\"'CG-0MQBOK2SQ0067ZBP'\"'\"'. Example format:\n  CG-0MQBOK2SQ0067ZBP: <concise summary of changes>\n\n  Related-Work: CG-0MQBOK2SQ0067ZBP'"
-}
