@@ -17,7 +17,7 @@
  * @module
  */
 
-import { computeIncome, type IncomeResult } from '../MainStreetAdjacency';
+import { type IncomeResult, type SlotIncome } from '../MainStreetAdjacency';
 import { reputationCoinMultiplier, applyReputationMultiplier } from '../MainStreetDifficulty';
 import { ORDERED_TIER_DEFINITIONS } from '../MainStreetTiers';
 import { computeScore } from '../MainStreetEngine';
@@ -121,8 +121,17 @@ registerLocale('en', enBundle);
  * - Brief calculation note
  */
 export function buildCoinsTooltip(state: MainStreetState): string {
-  const incomeResult = computeIncome(state.streetGrid, state.config.synergyBonusPerNeighbor);
-  const baseIncome = incomeResult.total;
+  const soldSlots = state.soldSlots ?? [];
+  const grid = state.streetGrid;
+
+  // Use cached currentIncome values (CG-0MRV84ZT60069PW6).
+  let baseIncome = 0;
+  for (let i = 0; i < grid.length; i++) {
+    if (soldSlots[i]) continue;
+    const card = grid[i];
+    if (!card) continue;
+    baseIncome += card.currentIncome ?? 0;
+  }
   const multipliedIncome = applyReputationMultiplier(
     baseIncome,
     state.resourceBank.reputation,
@@ -148,7 +157,29 @@ export function buildCoinsTooltip(state: MainStreetState): string {
  * Builds the full IncomeResult for external use (e.g. tests).
  */
 export function getIncomeResult(state: MainStreetState): IncomeResult {
-  return computeIncome(state.streetGrid, state.config.synergyBonusPerNeighbor);
+  const soldSlots = state.soldSlots ?? [];
+  const grid = state.streetGrid;
+  const breakdown: SlotIncome[] = [];
+  let total = 0;
+
+  for (let i = 0; i < grid.length; i++) {
+    if (soldSlots[i]) continue;
+    const card = grid[i];
+    if (!card) continue;
+
+    const slotTotal = card.currentIncome ?? 0;
+
+    breakdown.push({
+      slotIndex: i,
+      businessName: card.name,
+      baseIncome: slotTotal,
+      synergyBonus: 0,
+      total: slotTotal,
+    });
+    total += slotTotal;
+  }
+
+  return { total, breakdown, handSynergyTotal: 0 };
 }
 
 /**

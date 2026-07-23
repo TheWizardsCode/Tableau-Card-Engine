@@ -188,6 +188,47 @@ describe('buildCoinsTooltip', () => {
     const tooltip = buildCoinsTooltip(state);
     expect(tooltip).toContain('×2.0');
   });
+
+  it('excludes sold cards from income display', () => {
+    const state = setupMainStreetGame({ seed: 'test-sold-income' });
+
+    // Place a business card on the grid
+    const card = state.market.development.find(
+      c => c.cost <= state.resourceBank.coins && c.family === 'business',
+    );
+    if (!card) return;
+    const marketIdx = state.market.development.findIndex(c => c.id === card.id);
+    state.resourceBank.coins -= card.cost;
+    state.market.development.splice(marketIdx, 1);
+    state.streetGrid[0] = { ...card };
+    state.streetGrid[0]!.currentIncome = card.baseIncome;
+
+    // Compute income before selling — should be > 0
+    const incomeBefore = computeIncome(
+      state.streetGrid,
+      state.config.synergyBonusPerNeighbor,
+      undefined,
+      state.soldSlots,
+    );
+    expect(incomeBefore.total).toBeGreaterThan(0);
+
+    // Mark the slot as sold
+    state.soldSlots[0] = true;
+
+    // Compute income after selling — should be 0
+    const incomeAfter = computeIncome(
+      state.streetGrid,
+      state.config.synergyBonusPerNeighbor,
+      undefined,
+      state.soldSlots,
+    );
+    expect(incomeAfter.total).toBe(0);
+
+    // Tooltip should show 0 income after selling
+    const tooltip = buildCoinsTooltip(state);
+    expect(tooltip).toContain(`${HUD_TOOLTIP_STRINGS.coinsPreMultiplierLabel}: 0`);
+    expect(tooltip).toContain(`${HUD_TOOLTIP_STRINGS.coinsPostMultiplierLabel}: 0`);
+  });
 });
 
 // ── Unit tests: buildReputationTooltip ───────────────────────

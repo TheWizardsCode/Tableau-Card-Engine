@@ -15,9 +15,15 @@ import type { GameEventEmitter } from '../../../src/core-engine';
 import type { TurnPhase } from './GolfConstants';
 import type { PhaseManager } from '../../../src/ui';
 import type { GolfSession } from '../GolfGame';
-import { AI_DELAY, AI_SHOW_DRAW_DELAY } from './GolfConstants';
+import { AI_DELAY, AI_SHOW_DRAW_DELAY, SWAP_ANIM_DURATION } from './GolfConstants';
 
 export class GolfAiController {
+  /**
+   * When true, add extra delay to compensate for skipped animations
+   * so the AI's turn remains perceptible as thoughtful/measured.
+   */
+  reducedMotion = false;
+
   constructor(
     private scene: Phaser.Scene,
     private session: GolfSession,
@@ -47,7 +53,8 @@ export class GolfAiController {
   ): void {
     this.phaseManager.set('ai-thinking');
 
-    this.scene.time.delayedCall(AI_DELAY, () => {
+    const initialDelay = this.reducedMotion ? AI_DELAY + SWAP_ANIM_DURATION : AI_DELAY;
+    this.scene.time.delayedCall(initialDelay, () => {
       // If the game ended while this callback was pending, bail out early.
       if (this.session.gameState.phase === 'ended') return;
       const idx = this.session.gameState.currentPlayerIndex;

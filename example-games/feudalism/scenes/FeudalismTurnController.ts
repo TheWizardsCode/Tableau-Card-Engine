@@ -8,7 +8,7 @@ import { executeTurn, discardTokens, isGameOver } from '../FeudalismGame';
 import { FeudalismAiPlayer } from '../AiStrategy';
 import type { FeudalismTranscriptRecorder } from '../GameTranscript';
 import {
-  ANIM_DURATION, AI_PRE_PAUSE, SFX_KEYS, type TurnPhase,
+  ANIM_DURATION, AI_PRE_PAUSE, MOVE_DURATION, SFX_KEYS, type TurnPhase,
 } from './FeudalismConstants';
 import type { FeudalismAnimator } from './FeudalismAnimator';
 
@@ -28,6 +28,12 @@ export interface TurnControllerCallbacks {
 }
 
 export class FeudalismTurnController {
+  /**
+   * When true, add extra delay to compensate for skipped animations
+   * so the AI's turn remains perceptible as thoughtful/measured.
+   */
+  reducedMotion = false;
+
   private session: FeudalismSession;
   private aiPlayer: FeudalismAiPlayer;
   private recorder: FeudalismTranscriptRecorder | null = null;
@@ -224,7 +230,8 @@ export class FeudalismTurnController {
 
     if (this.session.players[this.session.currentPlayerIndex].isAI) {
       this.setPhase('ai-turn');
-      (this.animator as any).scene.time.delayedCall(ANIM_DURATION + 200, () => {
+      const aiTransitionDelay = ANIM_DURATION + 200 + (this.reducedMotion ? MOVE_DURATION : 0);
+      (this.animator as any).scene.time.delayedCall(aiTransitionDelay, () => {
         this.executeAiTurn();
       });
     } else {

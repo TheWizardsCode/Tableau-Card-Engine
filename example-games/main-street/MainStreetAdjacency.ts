@@ -10,6 +10,7 @@
  */
 
 import type { BusinessCard, CommunitySpaceCard, SynergyType } from './MainStreetCards';
+import { getBaseTypeId } from './MainStreetCards';
 import { GRID_SIZE } from './MainStreetCards';
 import type { MainStreetState } from './MainStreetState';
 import { addLog, syncResourceBankToLedger } from './MainStreetState';
@@ -61,11 +62,11 @@ export function neighbors(index: number, range: number = 1): number[] {
 }
 
 /**
- * Resolves the effective per-neighbor coin synergy contribution for a card.
- * Returns the card's `synergyCoinBonus` if set, otherwise 1 (the default).
+ * Resolves the effective per-card coin synergy rate for a card.
+ * Returns the card's `synergyCoinBonus` if set, otherwise 0.5 (the default, 50% of base income).
  */
 function effectiveSynergyCoinBonus(card: BusinessCard | CommunitySpaceCard): number {
-  return card.synergyCoinBonus ?? 1;
+  return card.synergyCoinBonus ?? 0.5;
 }
 
 /**
@@ -77,17 +78,54 @@ function effectiveSynergyRepBonus(card: BusinessCard | CommunitySpaceCard): numb
 }
 
 /**
+ * Returns true if the given business has at least one adjacent neighbor with the
+ * same base type (template ID). Used to determine when synergy is nullified and
+ * the 60% base-income penalty applies.
+ *
+ * Sold slots are excluded from the check.
+ */
+function hasAdjacentSameType(
+  grid: (BusinessCard | CommunitySpaceCard | null)[],
+  index: number,
+  soldSlots: boolean[] = [],
+): boolean {
+  const card = grid[index];
+  if (!card) return false;
+  if (soldSlots[index]) return false;
+
+  const baseType = getBaseTypeId(card.id);
+  // Use range 1 (default) for same-type check; upgrades don't affect this penalty
+  const neighborIndices = neighbors(index, 1);
+
+  for (const ni of neighborIndices) {
+    if (soldSlots[ni]) continue;
+    const neighbor = grid[ni];
+    if (!neighbor) continue;
+    if (getBaseTypeId(neighbor.id) === baseType) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * Computes the synergy coin bonus for a single business at a given slot.
  *
- * A business earns coins for each neighboring slot that contains a business
- * sharing at least one SynergyType. The contribution from each neighbor is
- * the neighbor's `synergyCoinBonus` (default 1) multiplied by `bonusPerNeighbor`
- * (the difficulty preset multiplier).
+ * Uses a percentage-based formula:
+ *   synergy = effectiveBase * synergyCoinBonus * bonusPerNeighbor * N
+ * where:
+ *   - effectiveBase = (baseIncome + incomeBonus) * sameTypePenalty
+ *   - synergyCoinBonus = the source card's synergy rate as a decimal (e.g., 0.50 = 50%)
+ *   - bonusPerNeighbor = the difficulty preset multiplier (e.g., 1.0 at Medium)
+ *   - N = number of matching, different-type neighbors
  *
- * The range considered is 1 + business.synergyRangeBonus (from upgrades).
+ * Cards with zero synergyCoinBonus (e.g., Pawn Shop) opt out entirely, receiving
+ * and contributing no synergy. Synergy-neutral neighbors (synergyCoinBonus=0 AND
+ * synergyRepBonus=0) are not counted toward N.
  *
- * Cards with zero synergyCoinBonus naturally don't contribute synergy
- * to their neighbors, acting as synergy-neutral cards.
+ * **Same-type rule:** Neighbors with the same base type (template ID) as the source
+ * business are not counted toward N, preserving the 0.6 base-income penalty.
  *
  * @param grid               The street grid.
  * @param index              The slot index of the business.
@@ -98,36 +136,54 @@ export function computeSynergyBonus(
   grid: (BusinessCard | CommunitySpaceCard | null)[],
   index: number,
   bonusPerNeighbor: number = 1,
+  soldSlots: boolean[] = [],
 ): number {
+  // If this slot or the business itself is sold, it contributes no synergy
+  if (soldSlots[index]) return 0;
   const business = grid[index];
   if (!business) return 0;
 
-  // A card with zero synergy coin AND zero synergy reputation does not
-  // participate in the synergy system at all: it neither contributes to
-  // nor receives synergy from neighbors.
-  if (effectiveSynergyCoinBonus(business) === 0 && effectiveSynergyRepBonus(business) === 0) {
-    return 0;
-  }
+  const rate = effectiveSynergyCoinBonus(business);
+  // A card with zero synergy coin opts out entirely
+  if (rate === 0) return 0;
 
+  const baseType = getBaseTypeId(business.id);
   const range = 1 + business.synergyRangeBonus;
   const neighborIndices = neighbors(index, range);
 
-  let bonus = 0;
+  // Count matching, different-type neighbors (N)
+  let matchingCount = 0;
   for (const ni of neighborIndices) {
+    // Skip sold neighbor slots
+    if (soldSlots[ni]) continue;
     const neighbor = grid[ni];
     if (!neighbor) continue;
+
+    // Skip synergy-neutral neighbors (they don't participate in synergy at all)
+    if (effectiveSynergyCoinBonus(neighbor) === 0 && effectiveSynergyRepBonus(neighbor) === 0) continue;
+
+    // Same-type rule: skip synergy contribution from same-type neighbors
+    if (getBaseTypeId(neighbor.id) === baseType) continue;
 
     // Check if any synergy type is shared
     const hasSharedSynergy = business.synergyTypes.some(
       (st: SynergyType) => neighbor.synergyTypes.includes(st),
     );
     if (hasSharedSynergy) {
-      // Use the neighbor's per-card synergy coin bonus, multiplied by the global modifier
-      bonus += effectiveSynergyCoinBonus(neighbor) * bonusPerNeighbor;
+      matchingCount++;
     }
   }
 
-  return bonus;
+  if (matchingCount === 0) return 0;
+
+  // Compute effective base (base income + income bonus, with same-type penalty)
+  let effectiveBase = business.baseIncome + business.incomeBonus;
+  if (hasAdjacentSameType(grid, index, soldSlots)) {
+    effectiveBase = effectiveBase * 0.6;
+  }
+
+  // Percentage-based synergy: effectiveBase * rate * bonusPerNeighbor * N
+  return effectiveBase * rate * bonusPerNeighbor * matchingCount;
 }
 
 /**
@@ -139,6 +195,10 @@ export function computeSynergyBonus(
  *
  * The range considered is 1 + business.synergyRangeBonus (from upgrades).
  *
+ * **Same-type rule:** If a neighbor has the same base type (template ID) as the
+ * source business, the reputation synergy contribution is nullified (returns 0).
+ * The business's own `reputationPerTurn` and `reputationBonus` are unaffected.
+ *
  * @param grid   The street grid.
  * @param index  The slot index of the business.
  * @returns The synergy reputation bonus.
@@ -146,7 +206,10 @@ export function computeSynergyBonus(
 export function computeSynergyRepBonus(
   grid: (BusinessCard | CommunitySpaceCard | null)[],
   index: number,
+  soldSlots: boolean[] = [],
 ): number {
+  // If this slot is sold, it contributes no synergy reputation
+  if (soldSlots[index]) return 0;
   const business = grid[index];
   if (!business) return 0;
 
@@ -156,13 +219,19 @@ export function computeSynergyRepBonus(
     return 0;
   }
 
+  const baseType = getBaseTypeId(business.id);
   const range = 1 + business.synergyRangeBonus;
   const neighborIndices = neighbors(index, range);
 
   let bonus = 0;
   for (const ni of neighborIndices) {
+    // Skip sold neighbor slots
+    if (soldSlots[ni]) continue;
     const neighbor = grid[ni];
     if (!neighbor) continue;
+
+    // Same-type rule: skip reputation synergy from same-type neighbors
+    if (getBaseTypeId(neighbor.id) === baseType) continue;
 
     // Check if any synergy type is shared
     const hasSharedSynergy = business.synergyTypes.some(
@@ -179,9 +248,12 @@ export function computeSynergyRepBonus(
 /**
  * Computes the total income for a single business at a given slot.
  *
- * totalIncome = baseIncome + incomeBonus (from upgrades) + synergyBonus
+ * totalIncome = effectiveBase + synergyBonus
  *
- * @see computeSynergyBonus for details on per-card synergy values.
+ * Where effectiveBase = (baseIncome + incomeBonus) * sameTypePenalty
+ * and synergyBonus uses the percentage-based formula from computeSynergyBonus.
+ *
+ * @see computeSynergyBonus for details on the percentage-based synergy formula.
  *
  * @param grid               The street grid.
  * @param index              The slot index of the business.
@@ -192,14 +264,167 @@ export function computeBusinessIncome(
   grid: (BusinessCard | CommunitySpaceCard | null)[],
   index: number,
   bonusPerNeighbor: number = 1,
+  soldSlots: boolean[] = [],
 ): number {
+  // Sold cards produce no income
+  if (soldSlots[index]) return 0;
   const business = grid[index];
   if (!business) return 0;
 
-  const base = business.baseIncome + business.incomeBonus;
-  const synergy = computeSynergyBonus(grid, index, bonusPerNeighbor);
+  let base = business.baseIncome + business.incomeBonus;
+  // Same-type penalty: reduce base income to 60% when adjacent to a same-type business
+  if (hasAdjacentSameType(grid, index, soldSlots)) {
+    base = base * 0.6;
+  }
+  const synergy = computeSynergyBonus(grid, index, bonusPerNeighbor, soldSlots);
   return base + synergy;
 }
+
+/**
+ * Computes the per-card reputation contribution at a given grid slot.
+ *
+ * total = reputationPerTurn + reputationBonus + synergyRepBonus
+ *
+ * @param grid      The street grid.
+ * @param index     The slot index of the card.
+ * @param soldSlots Array of sold slot flags (sold slots return 0).
+ * @returns The total reputation per turn contributed by this card.
+ */
+export function computeSingleCardReputation(
+  grid: (BusinessCard | CommunitySpaceCard | null)[],
+  index: number,
+  soldSlots: boolean[] = [],
+): number {
+  if (soldSlots[index]) return 0;
+  const slot = grid[index];
+  if (!slot) return 0;
+  return (slot.reputationPerTurn ?? 0) + slot.reputationBonus + computeSynergyRepBonus(grid, index, soldSlots);
+}
+
+/**
+ * Sets a card's `currentIncome` field to match what `computeBusinessIncome()`
+ * would return for the given grid state.
+ *
+ * This is the core incremental-update primitive: it syncs one card's cached
+ * income value using the existing compute function, so the cached value is
+ * guaranteed to match the full-recalculation result.
+ *
+ * @param grid              The street grid.
+ * @param index             The slot index to update.
+ * @param bonusPerNeighbor  Global multiplier on per-card coin synergy (defaults to 1).
+ * @param soldSlots         Array of sold slot flags.
+ */
+export function syncCardCurrentIncome(
+  grid: (BusinessCard | CommunitySpaceCard | null)[],
+  index: number,
+  bonusPerNeighbor: number = 1,
+  soldSlots: boolean[] = [],
+): void {
+  const card = grid[index];
+  if (!card) return;
+  card.currentIncome = computeBusinessIncome(grid, index, bonusPerNeighbor, soldSlots);
+}
+
+/**
+ * Sets a card's `currentReputationPerTurn` field to match the per-card
+ * reputation contribution (base rep + bonus + synergy).
+ *
+ * @param grid      The street grid.
+ * @param index     The slot index to update.
+ * @param soldSlots Array of sold slot flags.
+ */
+export function syncCardCurrentRepPerTurn(
+  grid: (BusinessCard | CommunitySpaceCard | null)[],
+  index: number,
+  soldSlots: boolean[] = [],
+): void {
+  const card = grid[index];
+  if (!card) return;
+  card.currentReputationPerTurn = computeSingleCardReputation(grid, index, soldSlots);
+}
+
+/**
+ * Recalculates both `currentIncome` and `currentReputationPerTurn` for a
+ * single card at `index`, using the existing compute functions.
+ *
+ * Reads `config.synergyBonusPerNeighbor` from the game state and respects
+ * the `soldSlots` array (sold cards are skipped).
+ *
+ * @param state Current game state.
+ * @param index The slot index to recalculate.
+ */
+export function recalculateCard(
+  state: MainStreetState,
+  index: number,
+): void {
+  if (state.soldSlots[index]) return;
+  if (!state.streetGrid[index]) return;
+  syncCardCurrentIncome(
+    state.streetGrid,
+    index,
+    state.config.synergyBonusPerNeighbor,
+    state.soldSlots,
+  );
+  syncCardCurrentRepPerTurn(
+    state.streetGrid,
+    index,
+    state.soldSlots,
+  );
+}
+
+/**
+ * Updates all cards whose cached income/reputation could be affected by the
+ * placement of a new card at `index`.
+ *
+ * The newly placed card itself is recalculated, and every other occupied
+ * (non-sold) slot on the grid is also recalculated since any card could be
+ * affected by synergy or same-type penalty changes.
+ *
+ * @param state Current game state.
+ * @param index The slot index of the newly placed card.
+ */
+export function updateNeighborsOnPlacement(
+  state: MainStreetState,
+  index: number,
+): void {
+  // Recalculate the newly placed card
+  recalculateCard(state, index);
+
+  // Recalculate all other occupied non-sold slots (neighbors could be affected)
+  for (let i = 0; i < state.streetGrid.length; i++) {
+    if (i === index) continue;
+    if (state.soldSlots[i]) continue;
+    if (state.streetGrid[i] !== null) {
+      recalculateCard(state, i);
+    }
+  }
+}
+
+/**
+ * Updates all cards whose cached income/reputation could be affected by the
+ * sale of a card at `index`.
+ *
+ * The sold card is already marked in `soldSlots`; this function recalculates
+ * all other occupied non-sold slots since any neighbor could have lost synergy
+ * or had a same-type penalty removed.
+ *
+ * @param state Current game state.
+ * @param index The slot index of the sold card.
+ */
+export function updateNeighborsOnSale(
+  state: MainStreetState,
+  index: number,
+): void {
+  // Recalculate all occupied non-sold slots (neighbors could be affected)
+  for (let i = 0; i < state.streetGrid.length; i++) {
+    if (i === index) continue;
+    if (state.soldSlots[i]) continue;
+    if (state.streetGrid[i] !== null) {
+      recalculateCard(state, i);
+    }
+  }
+}
+
 
 /**
  * Computes the total synergy bonus contributed by hand cards to tableau businesses.
@@ -214,6 +439,7 @@ export function computeBusinessIncome(
 export function computeHandCardSynergyBonus(
   grid: (BusinessCard | CommunitySpaceCard | null)[],
   hand: BusinessCard[],
+  soldSlots: boolean[] = [],
 ): number {
   if (!hand || hand.length === 0) return 0;
 
@@ -227,6 +453,8 @@ export function computeHandCardSynergyBonus(
     if (bonusPerMatch <= 0) continue;
 
     for (let i = 0; i < grid.length; i++) {
+      // Skip sold slots (sold cards don't benefit from synergy)
+      if (soldSlots[i]) continue;
       const business = grid[i];
       if (!business) continue;
 
@@ -262,17 +490,23 @@ export function computeIncome(
   grid: (BusinessCard | CommunitySpaceCard | null)[],
   bonusPerNeighbor: number = 1,
   hand?: BusinessCard[],
+  soldSlots: boolean[] = [],
 ): IncomeResult {
   const breakdown: SlotIncome[] = [];
   let total = 0;
 
-  // Compute per-slot tableau income
+  // Compute per-slot tableau income (skip sold slots)
   for (let i = 0; i < grid.length; i++) {
+    if (soldSlots[i]) continue;
     const business = grid[i];
     if (!business) continue;
 
-    const base = business.baseIncome + business.incomeBonus;
-    const synergy = computeSynergyBonus(grid, i, bonusPerNeighbor);
+    let base = business.baseIncome + business.incomeBonus;
+    // Same-type penalty: reduce base income to 60% when adjacent to a same-type business
+    if (hasAdjacentSameType(grid, i, soldSlots)) {
+      base = base * 0.6;
+    }
+    const synergy = computeSynergyBonus(grid, i, bonusPerNeighbor, soldSlots);
     const slotTotal = base + synergy;
 
     breakdown.push({
@@ -289,7 +523,7 @@ export function computeIncome(
   // Add hand card synergy bonuses to the total
   let handSynergyTotal = 0;
   if (hand && hand.length > 0) {
-    handSynergyTotal = computeHandCardSynergyBonus(grid, hand);
+    handSynergyTotal = computeHandCardSynergyBonus(grid, hand, soldSlots);
     total += handSynergyTotal;
 
     // Add hand synergy to each slot's total in the breakdown
@@ -337,15 +571,18 @@ export function computeIncome(
  */
 export function computeReputationPerTurn(
   grid: (BusinessCard | CommunitySpaceCard | null)[],
+  soldSlots: boolean[] = [],
 ): number {
   let total = 0;
   for (let i = 0; i < grid.length; i++) {
+    // Skip sold slots (sold cards don't generate reputation)
+    if (soldSlots[i]) continue;
     const slot = grid[i];
     if (!slot) continue;
     total += slot.reputationPerTurn ?? 0;
     total += slot.reputationBonus;
     // Add synergy reputation from matching neighbors
-    total += computeSynergyRepBonus(grid, i);
+    total += computeSynergyRepBonus(grid, i, soldSlots);
   }
   return total;
 }
@@ -366,12 +603,36 @@ export function computeReputationPerTurn(
  */
 export function applyIncome(state: MainStreetState): IncomeResult {
   const hand = state.hand ?? [];
-  const result = computeIncome(state.streetGrid, state.config.synergyBonusPerNeighbor, hand);
+  const soldSlots = state.soldSlots ?? [];
+  const grid = state.streetGrid;
+
+  // Read cached currentIncome for each active slot instead of calling
+  // computeBusinessIncome from scratch every turn.
+  // If a card doesn't have currentIncome set (undefined, e.g. legacy saves
+  // or tests that place cards directly on the grid), fall back to computing
+  // it from scratch.
+  const breakdown: SlotIncome[] = [];
+  let total = 0;
+  for (let i = 0; i < grid.length; i++) {
+    if (soldSlots[i]) continue;
+    const card = grid[i];
+    if (!card) continue;
+
+    const slotIncome = card.currentIncome ?? 0;
+    breakdown.push({
+      slotIndex: i,
+      businessName: card.name,
+      baseIncome: slotIncome,
+      synergyBonus: 0,
+      total: slotIncome,
+    });
+    total += slotIncome;
+  }
 
   // Apply active effect income modifiers per-slot, before reputation multiplier.
   // Each slot's income is individually multiplied, then summed.
   let modifiedTotal = 0;
-  for (const slot of result.breakdown) {
+  for (const slot of breakdown) {
     const modifiedSlotIncome = applyActiveEffectMultiplier(
       state.activeEffects,
       'income-multiplier',
@@ -387,10 +648,24 @@ export function applyIncome(state: MainStreetState): IncomeResult {
   );
   state.resourceBank.coins += multiplied;
 
-  // Apply reputation per turn from cards
-  const repPerTurn = computeReputationPerTurn(state.streetGrid);
+  // Sum reputation per turn from cached values (skip sold slots)
+  let repPerTurn = 0;
+  for (let i = 0; i < grid.length; i++) {
+    if (soldSlots[i]) continue;
+    const card = grid[i];
+    if (!card) continue;
+    repPerTurn += card.currentReputationPerTurn ?? 0;
+  }
   if (repPerTurn !== 0) {
     state.resourceBank.reputation += repPerTurn;
+  }
+
+  // Hand card synergy is still computed fresh each turn (it is not adjacency-based
+  // and operates on hand cards whose state changes independently).
+  let handSynergyTotal = 0;
+  if (hand && hand.length > 0) {
+    handSynergyTotal = computeHandCardSynergyBonus(grid, hand, soldSlots);
+    total += handSynergyTotal;
   }
 
   syncResourceBankToLedger(state);
@@ -403,10 +678,10 @@ export function applyIncome(state: MainStreetState): IncomeResult {
   if (repPerTurn > 0) {
     addLog(state, `Reputation from cards: +${repPerTurn}`, 'gain');
   }
-  if (result.handSynergyTotal > 0) {
-    addLog(state, `Hand card synergy: +${result.handSynergyTotal} coins`, 'gain');
+  if (handSynergyTotal > 0) {
+    addLog(state, `Hand card synergy: +${handSynergyTotal} coins`, 'gain');
   }
-  return result;
+  return { total, breakdown, handSynergyTotal };
 }
 
 // ── Synergy Pairs for Visual Lines ──────────────────────────
@@ -438,11 +713,14 @@ export interface SynergyPair {
  */
 export function computeSynergyPairs(
   grid: (BusinessCard | CommunitySpaceCard | null)[],
+  soldSlots: boolean[] = [],
 ): SynergyPair[] {
   const pairs: SynergyPair[] = [];
   const seen = new Set<string>();
 
   for (let i = 0; i < grid.length; i++) {
+    // Skip sold slots (sold cards don't participate in synergy)
+    if (soldSlots[i]) continue;
     const card = grid[i];
     if (!card) continue;
 
@@ -456,6 +734,8 @@ export function computeSynergyPairs(
 
     for (const ni of neighborIndices) {
       if (ni <= i) continue; // avoid duplicates and self-pairs
+      // Skip sold neighbor slots
+      if (soldSlots[ni]) continue;
       const neighbor = grid[ni];
       if (!neighbor) continue;
 
@@ -466,6 +746,9 @@ export function computeSynergyPairs(
       if (effectiveSynergyCoinBonus(neighbor) === 0 && effectiveSynergyRepBonus(neighbor) === 0) {
         continue;
       }
+
+      // Same-type rule: do not draw synergy lines between same-type businesses
+      if (getBaseTypeId(card.id) === getBaseTypeId(neighbor.id)) continue;
 
       // Find the first shared synergy type
       const shared = card.synergyTypes.find(

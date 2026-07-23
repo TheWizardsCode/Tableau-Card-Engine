@@ -97,31 +97,22 @@ export class GolfAnimator {
       destX: discardPos.x,
       destY: discardPos.y,
       soundManager: this.soundManager,
-      sfx: { start: SFX_KEYS.CARD_SWAP, move: SFX_KEYS.CARD_SWAP, end: SFX_KEYS.CARD_FLIP, moveIntervalMs: 100 },
+      // Play CARD_SWAP once at the start of the swap, and CARD_FLIP
+      // when the grid card is revealed at the midpoint.
+      sfx: { start: SFX_KEYS.CARD_SWAP, end: SFX_KEYS.CARD_FLIP },
       onComplete: checkDone,
     });
 
     // 2. Drawn card: translate from display position to vacated grid slot
+    //    No separate sound here — flipCard's start already plays CARD_SWAP.
     const drawnCardSprite = this.renderer.drawnCardSprite;
     if (drawnCardSprite) {
-      let lastMove = 0;
       this.scene.tweens.add({
         targets: drawnCardSprite,
         x: gridSlotPos.x,
         y: gridSlotPos.y,
         duration: SWAP_ANIM_DURATION,
         ease: 'Power2',
-        onStart: () => {
-          this.soundManager?.play(SFX_KEYS.CARD_SWAP);
-          lastMove = Date.now();
-        },
-        onUpdate: () => {
-          const now = Date.now();
-          if (now - lastMove >= 100) {
-            this.soundManager?.play(SFX_KEYS.CARD_SWAP);
-            lastMove = now;
-          }
-        },
         onComplete: checkDone,
       });
     } else {
@@ -143,6 +134,8 @@ export class GolfAnimator {
     const phase2 = () => {
       this.renderer.hideDrawnCard();
 
+      // Play CARD_FLIP when the grid card is revealed. CARD_DISCARD was
+      // already played during the drawn-card-to-discard animation phase 1.
       flipCard({
         scene: this.scene,
         target: sprite,
@@ -150,7 +143,7 @@ export class GolfAnimator {
         duration: SWAP_ANIM_DURATION / 2,
         easeClose: 'Power2',
         soundManager: this.soundManager,
-        sfx: { start: SFX_KEYS.CARD_DISCARD, move: SFX_KEYS.CARD_DISCARD, end: SFX_KEYS.CARD_FLIP, moveIntervalMs: 100 },
+        sfx: { end: SFX_KEYS.CARD_FLIP },
         onComplete: onComplete,
       });
     };
@@ -212,18 +205,20 @@ export class GolfAnimator {
         destX,
         destY,
         soundManager: this.soundManager,
-        sfx: { start: SFX_KEYS.CARD_DRAW, move: SFX_KEYS.CARD_DRAW, end: SFX_KEYS.CARD_FLIP, moveIntervalMs: 100 },
+        // Play CARD_DRAW once at the start, and CARD_FLIP when the card
+        // is revealed at the midpoint.
+        sfx: { start: SFX_KEYS.CARD_DRAW, end: SFX_KEYS.CARD_FLIP },
         onComplete: () => {
           if (this.renderer.drawnCardSprite) this.renderer.drawnCardSprite.setDepth(0);
         },
       });
     } else {
-      // Discard draw: card is already face-up, slide to held position
+      // Discard draw: card is already face-up, slide to held position.
+      // Play CARD_DRAW once at the start of the slide.
       const sprite = this.scene.add.image(startX, startY, faceTexture);
       sprite.setDepth(15);
       this.renderer.setDrawnCardSprite(sprite);
 
-      let lastMove = 0;
       this.scene.tweens.add({
         targets: sprite,
         x: destX,
@@ -232,14 +227,6 @@ export class GolfAnimator {
         ease: 'Power2',
         onStart: () => {
           this.soundManager?.play(SFX_KEYS.CARD_DRAW);
-          lastMove = Date.now();
-        },
-        onUpdate: () => {
-          const now = Date.now();
-          if (now - lastMove >= 100) {
-            this.soundManager?.play(SFX_KEYS.CARD_DRAW);
-            lastMove = now;
-          }
         },
         onComplete: () => {
           if (this.renderer.drawnCardSprite) this.renderer.drawnCardSprite.setDepth(0);
@@ -300,7 +287,6 @@ export class GolfAnimator {
 
     drawnCardSprite.setDepth(15);
 
-    let lastMove = 0;
     this.scene.tweens.add({
       targets: drawnCardSprite,
       x: this.layout.discardPileCenterX,
@@ -309,14 +295,6 @@ export class GolfAnimator {
       ease: 'Power2',
       onStart: () => {
         this.soundManager?.play(SFX_KEYS.CARD_DISCARD);
-        lastMove = Date.now();
-      },
-      onUpdate: () => {
-        const now = Date.now();
-        if (now - lastMove >= 100) {
-          this.soundManager?.play(SFX_KEYS.CARD_DISCARD);
-          lastMove = now;
-        }
       },
       onComplete: () => {
         this.renderer.hideDrawnCard();
@@ -325,7 +303,6 @@ export class GolfAnimator {
           this.renderer.discardSprite.setAlpha(1);
           this.renderer.discardSprite.setVisible(true);
         }
-        this.soundManager?.play(SFX_KEYS.CARD_DISCARD);
         onComplete();
       },
     });

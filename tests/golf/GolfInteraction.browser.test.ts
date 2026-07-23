@@ -225,6 +225,11 @@ describe('GolfScene interaction tests', () => {
     expect(internals.instructionText.text).toContain('Stock');
     expect(internals.instructionText.text).toContain('Discard');
 
+    // Stock pile should display face-down (card back) — not revealing the top card
+    expect(internals.stockSprite.texture.key).toBe('card_back');
+    // Discard pile should display face-up
+    expect(internals.discardSprite.texture.key).not.toBe('card_back');
+
     // Click the stock pile
     clickGameObject(internals.stockSprite);
     await nextFrame();

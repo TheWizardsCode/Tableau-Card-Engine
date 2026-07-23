@@ -138,36 +138,6 @@ Files (in `audio/lost-cities/`):
 - `score-reveal.wav` — artifact chimes when scores are displayed
 - `ui-click.wav` — map pin click for UI button presses
 
-## The Mind Card Assets
-
-101 SVG card images (100 numbered cards + 1 card back) generated for The Mind game:
-
-- **Source**: Procedurally generated using `scripts/generate-mind-cards.ts`
-- **License**: MIT (original procedural generation, no external assets used)
-- **Format**: SVG, 140x190px
-- **Generator**: Run `npx tsx scripts/generate-mind-cards.ts` to regenerate
-
-Files (in `cards/the-mind/`):
-- `mind-{1-100}.svg` — numbered cards (dark teal background, gold accents, white number)
-- `mind-back.svg` — card back with mystery theme (radiating lines, "?" symbol)
-
-## Audio Sound Effects — The Mind
-
-6 zen/pulse-themed WAV sound effects generated for The Mind game:
-
-- **Source**: Procedurally generated using `scripts/generate-mind-sfx.mjs` with Tone.js frequency utilities
-- **License**: CC0 / Public Domain (original procedural synthesis, no external samples used)
-- **Format**: 16-bit PCM WAV, 22050 Hz, mono
-- **Generator**: Run `node scripts/generate-mind-sfx.mjs` to regenerate
-
-Files (in `audio/the-mind/`):
-- `card-play.wav` — heartbeat pulse when a card is played onto the pile
-- `life-lost.wav` — dissonant warning tone when a life is lost from a penalty
-- `level-complete.wav` — zen bowl chime when a level is completed
-- `game-win.wav` — triumphant ascending bell cascade on victory
-- `game-lost.wav` — descending minor tones with fading heartbeat on defeat
-- `ui-click.wav` — zen wooden tap for UI button presses
-
 ## Game Thumbnails
 
 Thumbnail images displayed on the Game Selector landing page:

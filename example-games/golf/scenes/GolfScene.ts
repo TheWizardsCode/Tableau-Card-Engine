@@ -153,11 +153,13 @@ export class GolfScene extends CardGameScene {
 
     // Sound system: wrap Phaser's sound manager as a SoundPlayer
     if (!this.replayMode) {
+      // Only map non-animation events to sounds. Card-movement events
+      // (card-drawn, card-flipped, card-swapped, card-discarded) are NOT
+      // mapped because the animation layer in GolfAnimator already plays
+      // the corresponding SFX. Mapping them here would cause each action
+      // to play a sound twice — once from the animator and once from the
+      // event system.
       const mapping: EventSoundMapping = {
-        'card-drawn': SFX_KEYS.CARD_DRAW,
-        'card-flipped': SFX_KEYS.CARD_FLIP,
-        'card-swapped': SFX_KEYS.CARD_SWAP,
-        'card-discarded': SFX_KEYS.CARD_DISCARD,
         'turn-started': SFX_KEYS.TURN_CHANGE,
         'game-ended': SFX_KEYS.ROUND_END,
       };
@@ -249,9 +251,10 @@ export class GolfScene extends CardGameScene {
           this.aiPlayer.memoryTracker.setSkill(value);
         },
       });
-      // Propagate reduced motion preference to the animator
+      // Propagate reduced motion preference to the animator and AI controller
       if (this.settingsPanel) {
         this.animator.reducedMotion = this.settingsPanel.reducedMotion;
+        this.aiController.reducedMotion = this.settingsPanel.reducedMotion;
       }
     }
 

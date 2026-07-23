@@ -8,6 +8,7 @@ import {
   canPurchaseEvent,
   canRefreshDevelopment,
   canRefreshInvestments,
+  canSellBusiness,
 } from '../MainStreetMarket';
 import type { BusinessCard, EventCard, UpgradeCard } from '../MainStreetCards';
 import { buyBusinessCommand, buyUpgradeCommand, buyEventCommand, playEventCommand, refreshDevelopmentCommand, refreshInvestmentsCommand } from '../MainStreetCommands';
@@ -612,5 +613,46 @@ export class MainStreetTurnController {
     } else {
       afterTransfer();
     }
+  }
+
+  /**
+   * Handles clicking on a placed business/community-space card during the
+   * MarketPhase to open a sell confirmation dialog.
+   *
+   * @param slotIndex  Street grid slot index of the card to sell.
+   */
+  public onSellCard(slotIndex: number): void {
+    const s = this.scene;
+    if (s.uiPhase !== 'market') return;
+
+    const card = s.state.streetGrid[slotIndex];
+    if (!card) return;
+
+    // Check if already sold
+    const soldSlots: boolean[] = s.state.soldSlots ?? [];
+    if (soldSlots[slotIndex]) return;
+
+    // Check legality
+    const legality = canSellBusiness(s.state, slotIndex, false);
+    if (!legality.legal) {
+      s.instructionText.setText(`Cannot sell: ${legality.reason ?? 'unknown'}`);
+      return;
+    }
+
+    // Calculate refund for display
+    const upgradeCosts = (card as any).totalUpgradeCost ?? 0;
+    const refund = Math.ceil((card.cost + upgradeCosts) / 2);
+
+    // Build card info for dialog
+    const isCommunitySpace = card.family === 'community-space';
+    const cardLabel = isCommunitySpace ? 'Community Space' : 'Business';
+    const info = `${cardLabel}: ${card.name}\n` +
+      `Purchase: €${card.cost}\n` +
+      `Upgrades: €${upgradeCosts}\n` +
+      `Refund: €${refund} (50%)\n\n` +
+      `Sell this card? It will remain on the grid but produce no further income.`;
+
+    // Show sell confirmation via overlay
+    s.showSellConfirmation(slotIndex, card.name, refund, info);
   }
 }

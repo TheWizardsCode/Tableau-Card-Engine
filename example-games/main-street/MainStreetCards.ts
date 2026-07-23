@@ -92,6 +92,26 @@ export interface BusinessCard {
    * Omitting this field is treated as an empty array.
    */
   appliedUpgrades?: string[];
+  /**
+   * Cumulative cost of all upgrade cards applied to this business instance.
+   * Used for sell value calculation. Defaults to 0 for cards without upgrades.
+   */
+  totalUpgradeCost?: number;
+
+  /**
+   * Current effective income per turn (base + upgrade bonus + synergy + same-type penalty).
+   * Updated incrementally when neighbors are placed/sold, so the income phase
+   * reads this cached value instead of recalculating from scratch every turn.
+   * Undefined until the card is placed on the grid and recalculateCard is called.
+   */
+  currentIncome?: number;
+
+  /**
+   * Current effective reputation per turn (base repPerTurn + upgrade repBonus + synergy rep).
+   * Updated incrementally when neighbors are placed/sold.
+   * Undefined until the card is placed on the grid and recalculateCard is called.
+   */
+  currentReputationPerTurn?: number;
 }
 
 /**
@@ -250,11 +270,11 @@ export const REFRESH_INVESTMENTS_COST = 2;
 export const REFRESH_DEVELOPMENT_COST = 2;
 
 /**
- * @deprecated Per-card synergy bonus values replace this global constant.
- * Each BusinessCard and CommunitySpaceCard now has its own `synergyCoinBonus`
- * (default 1) and `synergyRepBonus` (default 0). The difficulty preset
- * `synergyBonusPerNeighbor` value still acts as a multiplier on per-card
- * coin synergy contributions.
+ * @deprecated Synergy is now percentage-based. Each BusinessCard and
+ * CommunitySpaceCard has its own `synergyCoinBonus` rate (default 0.5 = 50%)
+ * and `synergyRepBonus` (default 0). The difficulty preset
+ * `synergyBonusPerNeighbor` value acts as a multiplier on the per-card
+ * percentage rate.
  *
  * Kept for backward compatibility with existing test code.
  */
@@ -280,8 +300,8 @@ export const SELL_VALUE_RATIO = 0.75;
  * Creates a fresh copy of a BusinessCard from template data.
  * Mutable fields (level, incomeBonus, synergyRangeBonus, appliedUpgrades) are reset.
  */
-function makeBusiness(template: Omit<BusinessCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'appliedUpgrades' | 'reputationBonus'>): BusinessCard {
-  return {
+function makeBusiness(template: Omit<BusinessCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'appliedUpgrades' | 'reputationBonus' | 'currentIncome' | 'currentReputationPerTurn'>): BusinessCard {
+  const card: BusinessCard = {
     family: 'business',
     level: 0,
     incomeBonus: 0,
@@ -290,14 +310,20 @@ function makeBusiness(template: Omit<BusinessCard, 'family' | 'level' | 'incomeB
     appliedUpgrades: [],
     ...template,
   };
+  // Cached values (currentIncome, currentReputationPerTurn) are intentionally
+  // left undefined until the card is placed on the grid. applyIncome falls back
+  // to computing from scratch for cards with undefined cached values.
+  // After placement, updateNeighborsOnPlacement calls recalculateCard which
+  // sets both fields via syncCardCurrentIncome / syncCardCurrentRepPerTurn.
+  return card;
 }
 
 /**
  * Creates a fresh copy of a CommunitySpaceCard from template data.
  * Mutable fields (level, incomeBonus, synergyRangeBonus, appliedUpgrades) are reset.
  */
-function makeCommunitySpace(template: Omit<CommunitySpaceCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'appliedUpgrades' | 'reputationBonus'>): CommunitySpaceCard {
-  return {
+function makeCommunitySpace(template: Omit<CommunitySpaceCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'appliedUpgrades' | 'reputationBonus' | 'currentIncome' | 'currentReputationPerTurn'>): CommunitySpaceCard {
+  const card: CommunitySpaceCard = {
     family: 'community-space',
     level: 0,
     incomeBonus: 0,
@@ -306,6 +332,8 @@ function makeCommunitySpace(template: Omit<CommunitySpaceCard, 'family' | 'level
     appliedUpgrades: [],
     ...template,
   };
+  // Cached values left undefined until the card is placed on the grid.
+  return card;
 }
 
 // ── Community Space Interface ───────────────────────────────
@@ -316,6 +344,19 @@ function makeCommunitySpace(template: Omit<CommunitySpaceCard, 'family' | 'level
  * synergy bonuses, upgrade path, level tracking) but are classified as 'community-space'
  * rather than 'business'.
  */
+/**
+ * Returns the base template ID for a card by stripping the serial suffix (`-\d+$`)
+ * added during deck creation (e.g., `'biz-bakery-0'` → `'biz-bakery'`).
+ *
+ * Cards without a serial suffix are returned as-is.
+ *
+ * @param id  The card's `id` field (e.g. `'biz-bakery-0'` or `'cs-park-1'`).
+ * @returns The base template ID (e.g. `'biz-bakery'` or `'cs-park'`).
+ */
+export function getBaseTypeId(id: string): string {
+  return id.replace(/-\d+$/, '');
+}
+
 export interface CommunitySpaceCard {
   readonly family: 'community-space';
   readonly id: string;
@@ -360,6 +401,20 @@ export interface CommunitySpaceCard {
    * Omitting this field is treated as an empty array.
    */
   appliedUpgrades?: string[];
+
+  /**
+   * Current effective income per turn (base + upgrade bonus + synergy + same-type penalty).
+   * Updated incrementally when neighbors are placed/sold.
+   * Undefined until the card is placed on the grid and recalculateCard is called.
+   */
+  currentIncome?: number;
+
+  /**
+   * Current effective reputation per turn (base repPerTurn + upgrade repBonus + synergy rep).
+   * Updated incrementally when neighbors are placed/sold.
+   * Undefined until the card is placed on the grid and recalculateCard is called.
+   */
+  currentReputationPerTurn?: number;
 }
 
 // ── CSV → typed template arrays ─────────────────────────────

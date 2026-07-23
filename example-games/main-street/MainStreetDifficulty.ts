@@ -72,7 +72,11 @@ export interface GameConfig extends DifficultyConfig {
   readonly challengeBonusPoints: number;
 
   // ── Synergy ─────────────────────────────────────────────
-  /** Coins earned per adjacent business sharing a synergy type. */
+  /**
+   * Multiplier applied to the per-card synergy percentage rate.
+   * At 1.0 (Medium), the per-card rate is used as-is.
+   * Higher values increase synergy impact; lower values reduce it.
+   */
   readonly synergyBonusPerNeighbor: number;
 
   // ── Challenges ──────────────────────────────────────────
@@ -112,7 +116,7 @@ export const EASY_PRESET: Readonly<GameConfig> = {
   winThreshold: 120,
   reputationScoreMultiplier: 5,
   challengeBonusPoints: 15,
-  synergyBonusPerNeighbor: 2,
+  synergyBonusPerNeighbor: 1.5,
   challengesPerRun: 2,
   positiveIncidentMultiplier: 1.2,
   reputationCoinDivisor: 20,
@@ -131,7 +135,7 @@ export const MEDIUM_PRESET: Readonly<GameConfig> = {
   winThreshold: 150,
   reputationScoreMultiplier: 5,
   challengeBonusPoints: 10,
-  synergyBonusPerNeighbor: 1,
+  synergyBonusPerNeighbor: 1.0,
   challengesPerRun: 3,
   // Increase positive incident frequency by 50% for the Medium baseline
   // as requested by work item CG-0MMLR20XP1IPPD03.
@@ -152,7 +156,7 @@ export const HARD_PRESET: Readonly<GameConfig> = {
   winThreshold: 180,
   reputationScoreMultiplier: 5,
   challengeBonusPoints: 8,
-  synergyBonusPerNeighbor: 1,
+  synergyBonusPerNeighbor: 0.75,
   challengesPerRun: 4,
   positiveIncidentMultiplier: 1,
   reputationCoinDivisor: 20,

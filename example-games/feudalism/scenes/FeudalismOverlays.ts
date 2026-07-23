@@ -14,7 +14,7 @@ import {
   createGameOverOverlay,
   OverlayManager,
 } from '../../../src/ui';
-import { SFX_KEYS } from './FeudalismConstants';
+import { SFX_KEYS, OVERLAY_DEPTH, OVERLAY_BG_ALPHA } from './FeudalismConstants';
 
 const transcriptStore = new TranscriptStore();
 
@@ -45,12 +45,20 @@ export class FeudalismOverlayHelper {
     const humanInfluence = getInfluence(human);
     const aiInfluence = getInfluence(ai);
 
+    // Build summary lines; only show tiebreaker text when scores are actually tied
+    const summaryLines: string[] = [
+      `You: ${humanInfluence} influence (${human.purchasedCards.length} cards, ${human.patrons.length} patrons)`,
+      `AI: ${aiInfluence} influence (${ai.purchasedCards.length} cards, ${ai.patrons.length} patrons)`,
+    ];
+    if (humanInfluence === aiInfluence) {
+      summaryLines.push('', `Tiebreak: fewest cards wins`);
+    }
+    const summaryText = summaryLines.join('\n');
+
     const result = createGameOverOverlay(this.scene, {
       title: winnerText,
       titleColor: winnerColor,
-      summaryText: `You: ${humanInfluence} influence (${human.purchasedCards.length} cards, ${human.patrons.length} patrons)\n` +
-        `AI: ${aiInfluence} influence (${ai.purchasedCards.length} cards, ${ai.patrons.length} patrons)\n\n` +
-        `Tiebreak: fewest cards wins`,
+      summaryText,
       onPlayAgain: () => {
         try { this.scene.sound.play?.(SFX_KEYS.UI_CLICK); } catch { /* ignore */ }
         this.dismiss();
@@ -59,6 +67,7 @@ export class FeudalismOverlayHelper {
       onMenu: () => this.scene.scene.start('GameSelectorScene'),
       playAgainLabel: 'Play Again',
       menuLabel: 'Menu',
+      background: { depth: OVERLAY_DEPTH, alpha: OVERLAY_BG_ALPHA },
     });
     this.overlayManager.add(...result.objects);
   }

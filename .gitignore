@@ -94,3 +94,4 @@ Worklog Specific Ignores
 
 ### End of Worklog Specific Ignores
 .pi/
+.implement_state.json

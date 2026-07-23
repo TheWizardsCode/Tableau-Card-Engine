@@ -27,6 +27,7 @@ import {
   REFRESH_INVESTMENTS_COST,
 } from './MainStreetCards';
 import { shuffleArray } from '../../src/card-system';
+import { updateNeighborsOnPlacement, updateNeighborsOnSale } from './MainStreetAdjacency';
 import {
   createMarketOfferEngine,
   type MarketOfferEngine,
@@ -539,6 +540,9 @@ export function purchaseBusiness(
   // Place on grid (card may be BusinessCard or CommunitySpaceCard; both have same grid mechanics)
   state.streetGrid[slotIndex] = card as BusinessCard;
 
+  // Incrementally update the new card's and all affected neighbors' cached values
+  updateNeighborsOnPlacement(state, slotIndex);
+
   // Note: market is not refilled immediately. Replenishment occurs at start of next turn.
   const refilled = false;
 
@@ -674,6 +678,12 @@ export function purchaseUpgrade(
     business.appliedUpgrades = [];
   }
   business.appliedUpgrades.push(card.id);
+  (business as any).totalUpgradeCost = ((business as any).totalUpgradeCost ?? 0) + card.cost;
+
+  // Recalculate the upgraded card's cached values (incomeBonus and reputationBonus changed)
+  // Import is at top of file via updateNeighborsOnPlacement/updateNeighborsOnSale
+  // We use recalculateCard to update the upgraded card and all neighbors
+  updateNeighborsOnPlacement(state, businessIndex);
 
   // Note: market is not refilled immediately. Replenishment occurs at start of next turn.
   const refilled = false;
@@ -849,4 +859,113 @@ export function purchaseStaffCard(
   state.maxHandSize += card.handSlotsAdded;
 
   addLog(state, `Hired ${card.name} (+${card.handSlotsAdded} hand slots, -€${card.cost}, ongoing €${card.ongoingCost}/turn)`, 'loss');
+}
+
+// ── Sell Business (Street Grid) ──────────────────────────────
+
+/** Result returned after selling a business from the street grid. */
+export interface SellResult {
+  /** The card that was sold. */
+  card: BusinessCard | CommunitySpaceCard;
+  /** Coins refunded to the player. */
+  refund: number;
+  /** The slot index of the sold card. */
+  slotIndex: number;
+}
+
+/**
+ * Sells a business or community-space card from the street grid.
+ *
+ * The card remains on the grid but is marked as sold (non-functional).
+ * The player receives `Math.ceil((card.cost + totalUpgradeCost) / 2)` coins.
+ * Upgrades are lost (included in the refund calculation but no longer provide benefits).
+ *
+ * @param state     Current game state (mutated in-place).
+ * @param slotIndex Street grid slot index of the card to sell.
+ * @returns SellResult on success.
+ * @throws Error if the slot is empty, already sold, or not in MarketPhase.
+ */
+export function sellBusiness(
+  state: MainStreetState,
+  slotIndex: number,
+): SellResult {
+  // Validate slot index
+  if (slotIndex < 0 || slotIndex >= GRID_SIZE) {
+    throw new Error(`Invalid slot index: ${slotIndex}. Must be 0-${GRID_SIZE - 1}.`);
+  }
+
+  const card = state.streetGrid[slotIndex];
+
+  // Check slot is occupied
+  if (card === null) {
+    throw new Error(`Slot ${slotIndex} is empty. Nothing to sell.`);
+  }
+
+  // Check not already sold
+  const soldSlots: boolean[] = state.soldSlots ?? [];
+  if (soldSlots[slotIndex]) {
+    throw new Error(`Slot ${slotIndex} has already been sold.`);
+  }
+
+  // Calculate refund: Math.ceil((purchasePrice + sumOfAllUpgradeCosts) / 2)
+  const purchasePrice = card.cost;
+  const upgradeCosts = (card as any).totalUpgradeCost ?? 0;
+  const refund = Math.ceil((purchasePrice + upgradeCosts) / 2);
+
+  // Credit coins
+  state.resourceBank.coins += refund;
+
+  // Mark slot as sold
+  state.soldSlots[slotIndex] = true;
+
+  // Incrementally update all affected neighbors' cached values (they lost synergy/same-type from this card)
+  updateNeighborsOnSale(state, slotIndex);
+
+  addLog(state, `Sold ${card.name} from slot ${slotIndex} for +${refund} coins (50% of €${purchasePrice + upgradeCosts})`, 'gain');
+
+  return { card, refund, slotIndex };
+}
+
+/**
+ * Checks whether a business at the given slot can be sold.
+ *
+ * @param state         Current game state.
+ * @param slotIndex     Street grid slot index to check.
+ * @param isPlacingMode Whether the player is currently in card-placement mode (selling not allowed).
+ * @returns LegalityResult indicating whether the action is permitted.
+ */
+export function canSellBusiness(
+  state: MainStreetState,
+  slotIndex: number,
+  isPlacingMode: boolean = false,
+): LegalityResult {
+  // Must be in MarketPhase
+  if (state.phase !== 'MarketPhase') {
+    return { legal: false, reason: 'Selling is only allowed during the MarketPhase.' };
+  }
+
+  // Must not be in card-placement mode
+  if (isPlacingMode) {
+    return { legal: false, reason: 'Cannot sell a card while in card-placement mode.' };
+  }
+
+  // Validate slot index
+  if (slotIndex < 0 || slotIndex >= GRID_SIZE) {
+    return { legal: false, reason: `Invalid slot index: ${slotIndex}.` };
+  }
+
+  const card = state.streetGrid[slotIndex];
+
+  // Check slot is occupied
+  if (card === null) {
+    return { legal: false, reason: `Slot ${slotIndex} is empty. Nothing to sell.` };
+  }
+
+  // Check not already sold
+  const soldSlots: boolean[] = state.soldSlots ?? [];
+  if (soldSlots[slotIndex]) {
+    return { legal: false, reason: `Slot ${slotIndex} has already been sold.` };
+  }
+
+  return { legal: true };
 }

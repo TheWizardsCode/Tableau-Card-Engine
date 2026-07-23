@@ -23,6 +23,7 @@ import {
 import {
   computeBusinessIncome,
   applyIncome,
+  recalculateCard,
 } from '../../example-games/main-street/MainStreetAdjacency';
 import {
   GRID_SIZE,
@@ -268,10 +269,11 @@ describe('Reputation Per Turn (Income Phase)', () => {
     const grid = emptyGrid();
     grid[0] = { ...findBizTemplate('biz-private-clinic')!, level: 0, incomeBonus: 0, synergyRangeBonus: 0 };
     grid[1] = { ...findBizTemplate('biz-pharmacy')!, level: 0, incomeBonus: 0, synergyRangeBonus: 0 };
-    // Private Clinic: base 2 + 1 synergy from Pharmacy
-    expect(computeBusinessIncome(grid, 0)).toBe(3.5);
-    // Pharmacy: base 1 + 1 synergy from Private Clinic
-    expect(computeBusinessIncome(grid, 1)).toBe(2);
+    // Percentage-based formula:
+    // Private Clinic: base=2.5, synergyCoinBonus=0.5, N=1, synergy=2.5*0.5=1.25, total=3.75
+    expect(computeBusinessIncome(grid, 0)).toBe(3.75);
+    // Pharmacy: base=1, synergyCoinBonus=0.5, N=1, synergy=1*0.5=0.5, total=1.5
+    expect(computeBusinessIncome(grid, 1)).toBe(1.5);
   });
 
   it('applyIncome should add reputation from Clinic reputationPerTurn', () => {
@@ -280,6 +282,7 @@ describe('Reputation Per Turn (Income Phase)', () => {
     // Place a Clinic at slot 0
     const clinicTemplate = findBizTemplate('biz-clinic')!;
     state.streetGrid[0] = { ...clinicTemplate, level: 0, incomeBonus: 0, synergyRangeBonus: 0 };
+    recalculateCard(state, 0);
 
     const repBefore = state.resourceBank.reputation;
     const result = applyIncome(state);
@@ -301,6 +304,7 @@ describe('Reputation Per Turn (Income Phase)', () => {
       reputationBonus: 0.1,
       appliedUpgrades: ['upg-medical-center'],
     };
+    recalculateCard(state, 0);
 
     const repBefore = state.resourceBank.reputation;
     applyIncome(state);
@@ -313,13 +317,15 @@ describe('Reputation Per Turn (Income Phase)', () => {
     const state = setupMainStreetGame({ seed: 'multi-clinic-test' });
     const clinicTemplate = findBizTemplate('biz-clinic')!;
     state.streetGrid[0] = { ...clinicTemplate, level: 0, incomeBonus: 0, synergyRangeBonus: 0 };
+    recalculateCard(state, 0);
     state.streetGrid[5] = { ...clinicTemplate, level: 0, incomeBonus: 0, synergyRangeBonus: 0 };
+    recalculateCard(state, 5);
 
     const repBefore = state.resourceBank.reputation;
     applyIncome(state);
 
-    // 2 clinics * 0.2 each + 0.1 each = 0.6
-    expect(state.resourceBank.reputation).toBeCloseTo(repBefore + 0.6);
+    // 2 clinics * 0.2 each (synergyRepBonus nullified by same-type rule) = 0.4
+    expect(state.resourceBank.reputation).toBeCloseTo(repBefore + 0.4);
   });
 
   it('Private Clinic and Pharmacy should not add reputation per turn', () => {
@@ -327,7 +333,9 @@ describe('Reputation Per Turn (Income Phase)', () => {
     const pcTemplate = findBizTemplate('biz-private-clinic')!;
     const pharmTemplate = findBizTemplate('biz-pharmacy')!;
     state.streetGrid[0] = { ...pcTemplate, level: 0, incomeBonus: 0, synergyRangeBonus: 0 };
+    recalculateCard(state, 0);
     state.streetGrid[1] = { ...pharmTemplate, level: 0, incomeBonus: 0, synergyRangeBonus: 0 };
+    recalculateCard(state, 1);
 
     const repBefore = state.resourceBank.reputation;
     applyIncome(state);

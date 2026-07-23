@@ -21,7 +21,7 @@ import type { EventCard, SynergyType } from './MainStreetCards';
 import { PLACE_COST_RATIO, SELL_VALUE_RATIO, isDurationEventCard, type DurationEventCard } from './MainStreetCards';
 import { createActiveEffect, decayActiveEffects } from '../../src/core-engine/ActiveEffect';
 import { recordMainStreetEvent } from './MainStreetTranscript';
-import { applyIncome, type IncomeResult } from './MainStreetAdjacency';
+import { applyIncome, type IncomeResult, updateNeighborsOnPlacement, updateNeighborsOnSale } from './MainStreetAdjacency';
 import {
   purchaseBusiness,
   purchaseBusinessToHand,
@@ -30,6 +30,8 @@ import {
   refillAllMarkets,
   refillIncidentQueue,
   cycleMarketCards,
+  sellBusiness,
+  canSellBusiness as canSellBusinessFromMarket,
   type PurchaseResult,
 } from './MainStreetMarket';
 import { evaluateChallenges } from './MainStreetChallenges';
@@ -722,6 +724,9 @@ export function placeFromHand(
   hand.splice(handIndex, 1);
   state.streetGrid[slotIndex] = card;
 
+  // Incrementally update the new card's and all affected neighbors' cached values
+  updateNeighborsOnPlacement(state, slotIndex);
+
   addLog(state, `Placed ${card.name} from hand in slot ${slotIndex} (-€${placementCost})`, 'loss');
 }
 
@@ -788,8 +793,14 @@ export function sellFromTableau(
   // Calculate sell value (75% of purchase price)
   const sellValue = Math.floor(card.cost * SELL_VALUE_RATIO);
 
+  // Incrementally update affected neighbors' cached values before removing the card
+  // We pass the slot index and sold slot is simulated for the recalculation
+  state.soldSlots[slotIndex] = true;
+  updateNeighborsOnSale(state, slotIndex);
+
   // Remove from tableau
   state.streetGrid[slotIndex] = null;
+  state.soldSlots[slotIndex] = false;
 
   // Credit coins
   state.resourceBank.coins += sellValue;
@@ -798,6 +809,45 @@ export function sellFromTableau(
   state.discardPile.push(card as any);
 
   addLog(state, `Sold ${card.name} from slot ${slotIndex} for +${sellValue} coins`, 'gain');
+}
+
+// ── Sell Operations (Street Grid) ──────────────────────────────
+
+/**
+ * Executes a sell of a business/community-space card from the street grid.
+ *
+ * The card remains on the grid but is marked as sold and no longer produces
+ * income, synergy, or reputation. The player receives
+ * `Math.ceil((card.cost + totalUpgradeCost) / 2)` coins.
+ *
+ * @param state     Current game state (mutated in-place).
+ * @param slotIndex Street grid slot index of the card to sell.
+ * @throws Error if the slot is empty, already sold, or not in MarketPhase.
+ */
+export function executeSell(
+  state: MainStreetState,
+  slotIndex: number,
+): void {
+  if (state.phase !== 'MarketPhase') {
+    throw new Error(`Cannot sell during ${state.phase}. Must be in MarketPhase.`);
+  }
+  sellBusiness(state, slotIndex);
+}
+
+/**
+ * Checks whether a business at the given slot can be sold.
+ *
+ * @param state         Current game state.
+ * @param slotIndex     Street grid slot index to check.
+ * @param isPlacingMode Whether the player is currently in card-placement mode (selling not allowed).
+ * @returns LegalityResult indicating whether the action is permitted.
+ */
+export function canSellBusiness(
+  state: MainStreetState,
+  slotIndex: number,
+  isPlacingMode: boolean = false,
+): import('../../src/rule-engine').LegalityResult {
+  return canSellBusinessFromMarket(state, slotIndex, isPlacingMode);
 }
 
 // ── Staff Card Operations (Multi-Use Card Economy) ───────────

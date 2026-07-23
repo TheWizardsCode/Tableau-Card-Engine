@@ -8,7 +8,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { setupMainStreetGame, type MainStreetState } from '../../example-games/main-street/MainStreetState';
-import { applyIncome } from '../../example-games/main-street/MainStreetAdjacency';
+import { applyIncome, recalculateCard } from '../../example-games/main-street/MainStreetAdjacency';
 import { executeDayStart, processEndOfTurn } from '../../example-games/main-street/MainStreetEngine';
 import { createActiveEffect } from '../../src/core-engine/ActiveEffect';
 import type { BusinessCard } from '../../example-games/main-street/MainStreetCards';
@@ -46,6 +46,7 @@ describe('Active effect income modifier', () => {
     it('applies 0.8× multiplier to income when an income-multiplier active effect exists', () => {
       // Place a business with known income
       state.streetGrid[0] = makeBiz({ baseIncome: 10, id: 'biz-test-1' });
+      recalculateCard(state, 0);
 
       // Compute income without active effects
       const coinsBefore = state.resourceBank.coins;
@@ -71,7 +72,9 @@ describe('Active effect income modifier', () => {
     it('applies the 0.8× multiplier per-slot before summing and before reputation multiplication', () => {
       // Place two businesses with different incomes
       state.streetGrid[0] = makeBiz({ baseIncome: 10, id: 'biz-slot0' });
+      recalculateCard(state, 0);
       state.streetGrid[1] = makeBiz({ baseIncome: 5, id: 'biz-slot1' });
+      recalculateCard(state, 1);
 
       // Add active effect
       state.activeEffects.push(
@@ -89,6 +92,7 @@ describe('Active effect income modifier', () => {
 
     it('leaves income unchanged when no income-modifier active effects exist', () => {
       state.streetGrid[0] = makeBiz({ baseIncome: 10, id: 'biz-test' });
+      recalculateCard(state, 0);
 
       // No active effects
       const income1 = applyIncome(state).total;
@@ -108,6 +112,7 @@ describe('Active effect income modifier', () => {
   describe('multiple effects compose', () => {
     it('applies two 0.8× income-multiplier effects as 0.64×', () => {
       state.streetGrid[0] = makeBiz({ baseIncome: 100, id: 'biz-test' });
+      recalculateCard(state, 0);
 
       // Compute income without active effects first
       const coinsBefore = state.resourceBank.coins;
@@ -170,6 +175,7 @@ describe('Active effect income modifier', () => {
 
     it('effect with turnsRemaining=1 still affects income for the current turn, then is removed', () => {
       state.streetGrid[0] = makeBiz({ baseIncome: 100, id: 'biz-test' });
+      recalculateCard(state, 0);
 
       // Add effect with 1 turn remaining
       const effect = createActiveEffect('income-multiplier', 0.8, 1, 'evt-flu', 'Flu');

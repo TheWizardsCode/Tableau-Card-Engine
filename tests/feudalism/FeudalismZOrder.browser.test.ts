@@ -7,7 +7,8 @@
  * Feudalism does NOT use explicit depth values on its gameplay containers
  * (patron, market, supply, player, AI, action, discard) — it relies on
  * Phaser's default creation-order depth sorting.  The overlay system
- * assigns depth 10–20 to its elements.
+ * assigns depth 10–11 for discard/action overlays and depth 2000 for
+ * game-over overlays (via OVERLAY_DEPTH).
  *
  * Expected ordering (bottom → top):
  *   1. sectionBoxContainer      – background section boxes
@@ -18,7 +19,7 @@
  *   6. aiContainer              – AI area
  *   7. actionContainer          – action buttons
  *   8. discardContainer         – discard area
- *   9. Overlay elements (depth 10–20)
+ *   9. Overlay elements (depth 10–2000)
  *  10. HUD elements (depth ≥ 1000, when implemented)
  */
 
