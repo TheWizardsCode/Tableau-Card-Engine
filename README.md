@@ -92,10 +92,6 @@ Developer Guide for full documentation and usage examples.
 | Main Street | `example-games/main-street/` | Single-player tableau builder. Buy businesses/upgrades/events, place businesses on a 10-slot street rendered as a responsive 2x5 grid, and optimize score over 20 turns. **Multi-Use Card Economy**: cards can be held in hand for synergy bonuses; staff cards expand hand capacity with ongoing costs. Market cycles each turn. Tutorial overlay zones are defined in a separate SLL layout file (`main-street-tutorial.layout.json`) composed with the base layout. |
 | Scenario: Tutorial | `example-games/main-street/scenes/MainStreetTutorialScene.ts` | Guided introduction to Main Street. Non-interactive tutorial overlays walk through the market, street placement, synergies, events, and scoring. Easy difficulty, 25 turns. Accessible from the Game Selector. |
 
-For Main Street balance documentation, see:
-- [Balancing Methodology](docs/main-street/balancing-methodology.md) — Static cost-and-reward balancing via `run-balance-cards`
-- [Game Balance Process & Tooling PRD](docs/main-street/prd-balance-process-and-tooling.md) — Structured balance review process, micro/macro metrics, CLI tool architecture, and baseline management
-
 More games are planned: Coloretto.
 
 ## Main Street Card Upgrade Visualization

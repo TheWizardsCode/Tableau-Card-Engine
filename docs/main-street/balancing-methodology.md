@@ -117,12 +117,6 @@ npx tsx scripts/run-balance-cards.ts
 npx tsx scripts/run-balance-cards.ts --input path/to/input.csv --output path/to/output.csv
 ```
 
-## Related Documents
-
-For a broader perspective on game balance beyond static cost-and-reward analysis, see:
-
-- **[Game Balance Process & Tooling PRD](prd-balance-process-and-tooling.md)** — Defines a structured balance review process, micro/macro metrics using Monte Carlo output, and CLI tool architecture for data-driven balance insights.
-
 ## Migration
 
 This document consolidates all balancing methodology content previously scattered across:

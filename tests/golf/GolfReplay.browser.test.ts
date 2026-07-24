@@ -1,0 +1,296 @@
+/**
+ * GolfScene replay mode browser tests.
+ *
+ * Verifies that:
+ *   - GolfScene enters replay mode when ?mode=replay is in the URL
+ *   - In replay mode, input is suppressed (no interactive sprites)
+ *   - loadBoardState() updates card textures and emits state-settled
+ *   - loadBoardState() throws when called outside of replay mode
+ *
+ * Boots a real Phaser game in headless Chromium.
+ * Limited to 2 game boots to avoid WebGL context exhaustion.
+ */
+
+import { describe, it, expect, afterEach, afterAll } from 'vitest';
+import Phaser from 'phaser';
+import type { GameEventEmitter } from '../../src/core-engine/GameEventEmitter';
+import type { BoardSnapshot, CardSnapshot } from '../../example-games/golf/GameTranscript';
+import { waitForScene } from '../helpers/waitForScene';
+
+// ── Helpers ─────────────────────────────────────────────────
+
+/** Set the URL search params without a navigation. */
+function setUrlParams(params: string): void {
+  const url = new URL(window.location.href);
+  url.search = params;
+  history.replaceState(null, '', url.toString());
+}
+
+/** Restore URL to no search params. */
+function clearUrlParams(): void {
+  const url = new URL(window.location.href);
+  url.search = '';
+  history.replaceState(null, '', url.toString());
+}
+
+async function bootGame(): Promise<Phaser.Game> {
+  let container = document.getElementById('game-container');
+  if (container) container.remove();
+  container = document.createElement('div');
+  container.id = 'game-container';
+  document.body.appendChild(container);
+
+  const { createGolfGame } = await import(
+    '../../example-games/golf/createGolfGame'
+  );
+  const game = createGolfGame({ type: Phaser.CANVAS });
+  await waitForScene(game, 'GolfScene');
+  return game;
+}
+
+function destroyGame(game: Phaser.Game | null): void {
+  if (game) {
+    game.destroy(true, false);
+  }
+  const container = document.getElementById('game-container');
+  if (container) container.remove();
+}
+
+function getSceneInternals(scene: Phaser.Scene): {
+  replayMode: boolean;
+  phaseManager: { current: string; set: (phase: string) => void };
+  boardStateInjected: boolean;
+  session: {
+    gameState: {
+      currentPlayerIndex: number;
+      phase: string;
+      playerStates: Array<{
+        grid: Array<{ rank: string; suit: string; faceUp: boolean }>;
+      }>;
+    };
+    shared: {
+      stockPile: unknown[];
+      discardPile: { peek: () => { rank: string; suit: string; faceUp: boolean } | undefined };
+    };
+  };
+  humanCardSprites: Phaser.GameObjects.Image[];
+  aiCardSprites: Phaser.GameObjects.Image[];
+  stockSprite: Phaser.GameObjects.Image;
+  discardSprite: Phaser.GameObjects.Image;
+  gameEvents: GameEventEmitter;
+  instructionText: Phaser.GameObjects.Text;
+  takeoverOverlayObjects: Phaser.GameObjects.GameObject[];
+  loadBoardState: (
+    boardStates: BoardSnapshot[],
+    discardTop: CardSnapshot | null,
+    stockRemaining: number,
+  ) => void;
+  enableInteractiveMode: (options: { nextPlayer: number }) => void;
+  showTakeoverOverlay: (options: { turnNumber: number; lastAction: string }) => void;
+} {
+   
+  return scene as any;
+}
+
+function nextFrame(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+}
+
+// ── Test data ───────────────────────────────────────────────
+
+/** A synthetic board state for testing loadBoardState(). */
+function makeTestBoardStates(): BoardSnapshot[] {
+  const makeGrid = (faceUp: boolean): CardSnapshot[] => [
+    { rank: 'A', suit: 'spades', faceUp },
+    { rank: '2', suit: 'hearts', faceUp },
+    { rank: '3', suit: 'diamonds', faceUp },
+    { rank: '4', suit: 'clubs', faceUp },
+    { rank: '5', suit: 'spades', faceUp },
+    { rank: '6', suit: 'hearts', faceUp },
+    { rank: '7', suit: 'diamonds', faceUp },
+    { rank: '8', suit: 'clubs', faceUp },
+    { rank: '9', suit: 'spades', faceUp },
+  ];
+
+  return [
+    { grid: makeGrid(true), faceUpCount: 9, visibleScore: 45, totalScore: 45 },
+    { grid: makeGrid(false), faceUpCount: 0, visibleScore: 0, totalScore: 45 },
+  ];
+}
+
+// ── Tests ───────────────────────────────────────────────────
+
+describe('GolfScene replay mode', () => {
+  let game: Phaser.Game | null = null;
+
+  afterEach(() => {
+    destroyGame(game);
+    game = null;
+  });
+
+  afterAll(() => {
+    clearUrlParams();
+  });
+
+  // ── Test 1: Replay mode setup + loadBoardState ──
+  it('should enter replay mode and support loadBoardState()', async () => {
+    setUrlParams('?mode=replay');
+    game = await bootGame();
+
+    const scene = game.scene.getScene('GolfScene')!;
+    const internals = getSceneInternals(scene);
+
+    // Verify replay mode flag is set
+    expect(internals.replayMode).toBe(true);
+
+    // Instruction text should be empty (suppressed in replay mode)
+    expect(internals.instructionText.text).toBe('');
+
+    // No interactive images except possibly the menu button
+    const images = scene.children.list.filter(
+      (child) => child instanceof Phaser.GameObjects.Image,
+    ) as Phaser.GameObjects.Image[];
+    const interactiveImages = images.filter((img) => img.input?.enabled);
+    expect(interactiveImages.length).toBe(0);
+
+    // ── enableInteractiveMode() before loadBoardState() should throw ──
+    expect(internals.boardStateInjected).toBe(false);
+    expect(() => {
+      internals.enableInteractiveMode({ nextPlayer: 0 });
+    }).toThrow('enableInteractiveMode() requires loadBoardState() to be called first');
+
+    // ── loadBoardState() ──
+
+    // Track state-settled events
+    const settledEvents: unknown[] = [];
+    internals.gameEvents.on('state-settled', (p: unknown) => settledEvents.push(p));
+
+    const testStates = makeTestBoardStates();
+    const testDiscardTop: CardSnapshot = { rank: 'K', suit: 'hearts', faceUp: true };
+
+    // Call loadBoardState
+    internals.loadBoardState(testStates, testDiscardTop, 20);
+    await nextFrame();
+
+    // Verify the internal game state was updated
+    const humanGrid = internals.session.gameState.playerStates[0].grid;
+    expect(humanGrid[0].rank).toBe('A');
+    expect(humanGrid[0].suit).toBe('spades');
+    expect(humanGrid[0].faceUp).toBe(true);
+    expect(humanGrid[8].rank).toBe('9');
+    expect(humanGrid[8].suit).toBe('spades');
+
+    const aiGrid = internals.session.gameState.playerStates[1].grid;
+    expect(aiGrid[0].rank).toBe('A');
+    expect(aiGrid[0].faceUp).toBe(false);
+
+    // Verify discard pile was updated
+    const discardTop = internals.session.shared.discardPile.peek();
+    expect(discardTop).toBeDefined();
+    expect(discardTop!.rank).toBe('K');
+    expect(discardTop!.suit).toBe('hearts');
+
+    // Verify stock pile length
+    expect(internals.session.shared.stockPile.length).toBe(20);
+
+    // Verify card textures were updated by refreshAll()
+    // Human cards are all face-up so should show card textures, not 'card_back'
+    const humanSprite0Texture = internals.humanCardSprites[0].texture.key;
+    expect(humanSprite0Texture).toBe('ace_of_spades');
+
+    // AI cards are all face-down so should show card_back
+    const aiSprite0Texture = internals.aiCardSprites[0].texture.key;
+    expect(aiSprite0Texture).toBe('card_back');
+
+    // Discard pile sprite should show the K of hearts
+    const discardTexture = internals.discardSprite.texture.key;
+    expect(discardTexture).toBe('king_of_hearts');
+
+    // Stock sprite should be visible (20 remaining)
+    expect(internals.stockSprite.visible).toBe(true);
+
+    // state-settled should have been emitted (at least the one from loadBoardState;
+    // there's also one from create())
+    expect(settledEvents.length).toBeGreaterThanOrEqual(1);
+
+    // ── loadBoardState with empty discard and 0 stock ──
+    settledEvents.length = 0;
+    internals.loadBoardState(testStates, null, 0);
+    await nextFrame();
+
+    // Stock should be visible but ghosted (empty pile shows dimmed card back)
+    expect(internals.stockSprite.visible).toBe(true);
+    expect(internals.stockSprite.alpha).toBeLessThanOrEqual(0.3);
+
+    // Discard should be visible but ghosted (empty pile shows dimmed card back)
+    expect(internals.discardSprite.visible).toBe(true);
+    expect(internals.discardSprite.alpha).toBeLessThanOrEqual(0.3);
+
+    // state-settled emitted again
+    expect(settledEvents.length).toBeGreaterThanOrEqual(1);
+
+    // ── enableInteractiveMode() ──
+
+    // Reload a valid board state first (stock > 0 so game can proceed)
+    internals.loadBoardState(testStates, testDiscardTop, 20);
+    await nextFrame();
+
+    // Verify boardStateInjected is true
+    expect(internals.boardStateInjected).toBe(true);
+
+    // Verify still in replay mode before enabling interactive
+    expect(internals.replayMode).toBe(true);
+
+    // Call enableInteractiveMode with nextPlayer = 0 (human)
+    internals.enableInteractiveMode({ nextPlayer: 0 });
+    await nextFrame();
+
+    // replayMode should now be false
+    expect(internals.replayMode).toBe(false);
+
+    // turnPhase should be 'waiting-for-draw' (human's turn)
+    expect(internals.phaseManager.current).toBe('waiting-for-draw');
+
+    // currentPlayerIndex should be 0
+    expect(internals.session.gameState.currentPlayerIndex).toBe(0);
+
+    // Input handlers should be registered on stock, discard, and human grid sprites
+    expect(internals.stockSprite.input?.enabled).toBe(true);
+    expect(internals.discardSprite.input?.enabled).toBe(true);
+    for (const sprite of internals.humanCardSprites) {
+      expect(sprite.input?.enabled).toBe(true);
+    }
+
+    // Instruction text should show the draw prompt
+    expect(internals.instructionText.text).toContain('Stock');
+    expect(internals.instructionText.text).toContain('Discard');
+
+    // ── enableInteractiveMode() throws when not in replay mode ──
+    expect(() => {
+      internals.enableInteractiveMode({ nextPlayer: 0 });
+    }).toThrow('enableInteractiveMode() can only be called in replay mode');
+  });
+
+  // ── Test 2: Normal mode rejects loadBoardState ──
+  it('should throw if loadBoardState() is called outside replay mode', async () => {
+    clearUrlParams();
+    game = await bootGame();
+
+    const scene = game.scene.getScene('GolfScene')!;
+    const internals = getSceneInternals(scene);
+
+    // Verify NOT in replay mode
+    expect(internals.replayMode).toBe(false);
+
+    // loadBoardState should throw
+    const testStates = makeTestBoardStates();
+    expect(() => {
+      internals.loadBoardState(testStates, null, 10);
+    }).toThrow('loadBoardState() is only available in replay mode');
+
+    // enableInteractiveMode should throw (not in replay mode)
+    expect(() => {
+      internals.enableInteractiveMode({ nextPlayer: 0 });
+    }).toThrow('enableInteractiveMode() can only be called in replay mode');
+  });
+});

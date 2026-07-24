@@ -558,12 +558,6 @@ The following targets validate M2's economy across difficulty presets:
 
 These targets are guidelines, not hard gates. If results fall outside ranges, they indicate areas for economy tuning rather than test failures. The Monte Carlo test suite should include a "CI guardrail" test that fails only if Greedy win rate on Medium is outside 20-80% (wide band to catch regressions, not tune balance).
 
-### 6.5 Related Documents
-
-For a comprehensive balance review process and detailed metric framework building on this Monte Carlo harness, see:
-
-- **[Game Balance Process & Tooling PRD](prd-balance-process-and-tooling.md)** — Defines the balance review workflow, micro/macro metrics (extending the metrics in §6.3), baseline management, and CLI tool architecture.
-
 ---
 
 ## 7. Suggested Engineering Tasks

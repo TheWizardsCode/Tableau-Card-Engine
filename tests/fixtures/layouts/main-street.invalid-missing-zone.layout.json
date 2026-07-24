@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "id": "main-street-missing-market",
+  "baseViewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "requiredZones": [
+    "market",
+    "activityLog"
+  ],
+  "zones": {
+    "activityLog": {
+      "rect": {
+        "x": 0.81,
+        "y": 0.12
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.5 }
+      }
+    }
+  }
+}

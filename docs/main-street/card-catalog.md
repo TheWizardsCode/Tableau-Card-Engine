@@ -316,9 +316,3 @@ npm run monte-carlo
 This writes per-run and aggregate metrics to:
 - `results/main-street-monte-carlo.json`
 - `results/main-street-monte-carlo.csv`
-
-## Related Documents
-
-For a structured balance review process and comprehensive metric framework using this Monte Carlo output, see:
-
-- **[Game Balance Process & Tooling PRD](prd-balance-process-and-tooling.md)** — Defines the balance review workflow, micro/macro metrics, baseline management, and CLI tool architecture for data-driven balance insights.

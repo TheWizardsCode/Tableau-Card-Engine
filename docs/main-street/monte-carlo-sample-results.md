@@ -35,9 +35,3 @@ Run date: 2026-03-10
 - The baseline sits inside the CI guardrail thresholds documented in tests.
 - The run profile confirms an early-to-mid game street fill and meaningful affordability pressure.
 - Losses concentrate in one failure mode (`reputation_collapse`), which makes balance drift easy to spot in later runs.
-
-## Related Documents
-
-For a structured balance review process and comprehensive metric framework, see:
-
-- **[Game Balance Process & Tooling PRD](prd-balance-process-and-tooling.md)** — Defines the balance review workflow, micro/macro metrics, baseline management, and tool architecture for data-driven balance insights.

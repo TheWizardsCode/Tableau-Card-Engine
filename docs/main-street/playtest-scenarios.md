@@ -241,9 +241,3 @@ npm run monte-carlo -- --seeds 50 --seed-prefix batch --maxTurns 25 --strategy g
 ```
 
 Then analyse transcripts with standard JSON tools (`jq`, Python, etc.) to extract aggregate statistics.
-
-## Related Documents
-
-For a structured balance review process and data-driven metric definitions, see:
-
-- **[Game Balance Process & Tooling PRD](prd-balance-process-and-tooling.md)** — Defines micro/macro metrics, guardrail thresholds, baseline management, and CLI tool architecture for systematic balance analysis.
