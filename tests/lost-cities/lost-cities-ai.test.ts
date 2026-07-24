@@ -19,6 +19,7 @@ import {
   GreedyStrategy,
   LostCitiesAiPlayer,
   createOpponentDrawHistory,
+  estimatePositiveScoreProbability,
 } from '../../example-games/lost-cities/AiStrategy';
 import { createSeededRng } from '../../src/core-engine/SeededRng';
 import type {
@@ -798,6 +799,372 @@ describe('Improved AI - Card Ordering', () => {
         expect(action.card.rank).toBe(8);
       }
     }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+// Probabilistic Positive Score Evaluation Tests
+// ═══════════════════════════════════════════════════════════
+
+describe('Improved AI - Probabilistic Positive Score Evaluation', () => {
+  it('should NOT place a numbered card in a new expedition when opponent holds key blocking cards', () => {
+    // Scenario from description: AI has yellow 7 and yellow 10 in hand
+    // Opponent already placed yellow 4, 5, 6 — blocking those values
+    // This means only 8, 9 (or 2, 3) can be played after 7
+    // The column has little chance of becoming positive
+    const myExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+
+    // Hand: yellow 7, yellow 10, plus a few non-yellow cards
+    const hand = [
+      makeNumbered('yellow', 7, 900),
+      makeNumbered('yellow', 10, 901),
+      makeNumbered('blue', 4, 902),
+      makeNumbered('blue', 5, 903),
+      makeNumbered('green', 3, 904),
+    ];
+
+    // Opponent has yellow 4, 5, 6
+    const opponentExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+    opponentExpeditions.set('yellow', [
+      makeNumbered('yellow', 4, 910),
+      makeNumbered('yellow', 5, 911),
+      makeNumbered('yellow', 6, 912),
+    ]);
+
+    const state = makeTestVisibleState({
+      hand,
+      myExpeditions,
+      opponentExpeditions,
+      drawPileSize: 20,
+    });
+    const rng = createSeededRng(1);
+
+    const action = GreedyStrategy.choosePhase1(state, rng);
+
+    // AI should not play yellow 7 to start a new expedition
+    // (too many yellow cards already visible in opponent's expedition
+    //  — not enough remaining to make the column positive)
+    if (action.kind === 'play-to-expedition') {
+      expect(action.color).not.toBe('yellow');
+    }
+  });
+
+  it('should place a low card in a new expedition when many follow-up cards are available', () => {
+    // Scenario from description: AI has yellow 2 and yellow 10 in hand
+    // No other yellow cards on the table — many follow-up cards available
+    // It may place the 2 since it's a low-risk investment
+    const myExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+
+    const hand = [
+      makeNumbered('yellow', 2, 1000),
+      makeNumbered('yellow', 10, 1001),
+      makeNumbered('blue', 4, 1002),
+      makeNumbered('blue', 5, 1003),
+      makeNumbered('green', 3, 1004),
+    ];
+
+    // No opponent yellow cards
+    const opponentExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+
+    const state = makeTestVisibleState({
+      hand,
+      myExpeditions,
+      opponentExpeditions,
+      drawPileSize: 30, // Many cards left in pile
+    });
+    const rng = createSeededRng(1);
+
+    const action = GreedyStrategy.choosePhase1(state, rng);
+
+    // AI should play yellow 2 (low card, many follow-ups available)
+    expect(action.kind).toBe('play-to-expedition');
+    expect(action.color).toBe('yellow');
+    if (action.kind === 'play-to-expedition') {
+      expect(action.card.type).toBe('numbered');
+      if (action.card.type === 'numbered') {
+        expect(action.card.rank).toBe(2);
+      }
+    }
+  });
+
+  it('should avoid placing a high card when insufficient follow-up cards are likely', () => {
+    // AI has yellow 10 only. Starting a yellow expedition with 10 means
+    // no follow-up cards are possible (nothing > 10). The column will
+    // only have 10 points value, so score = (10-20)*1 = -10, which is negative.
+    // The AI should prefer another action.
+    const myExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+
+    const hand = [
+      makeNumbered('yellow', 10, 1100),
+      makeNumbered('blue', 4, 1101),
+      makeNumbered('blue', 5, 1102),
+    ];
+
+    const state = makeTestVisibleState({
+      hand,
+      myExpeditions,
+      drawPileSize: 25,
+    });
+    const rng = createSeededRng(1);
+
+    const action = GreedyStrategy.choosePhase1(state, rng);
+
+    // AI should not start with yellow 10 (can't follow up, negative score)
+    // It should prefer blue (has two cards there) or another action
+    if (action.kind === 'play-to-expedition') {
+      expect(action.color).not.toBe('yellow');
+    }
+  });
+
+  it('should place a high card in an existing expedition with enough existing value', () => {
+    // Existing yellow expedition with [2, 5, 8] — valueSum = 15
+    // Playing yellow 10 makes valueSum = 25 which is > 20, so positive!
+    const myExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+    myExpeditions.set('yellow', [
+      makeNumbered('yellow', 2, 1200),
+      makeNumbered('yellow', 5, 1201),
+      makeNumbered('yellow', 8, 1202),
+    ]);
+
+    const hand = [
+      makeNumbered('yellow', 10, 1203),
+      makeNumbered('blue', 4, 1204),
+    ];
+
+    const state = makeTestVisibleState({
+      hand,
+      myExpeditions,
+      drawPileSize: 20,
+    });
+    const rng = createSeededRng(1);
+
+    const action = GreedyStrategy.choosePhase1(state, rng);
+
+    // AI should play yellow 10 to extend the already-strong expedition
+    expect(action.kind).toBe('play-to-expedition');
+    expect(action.color).toBe('yellow');
+    if (action.kind === 'play-to-expedition') {
+      expect(action.card.type).toBe('numbered');
+    }
+  });
+
+  it('should be more willing to start a risky expedition when the draw pile is large', () => {
+    // Scenario: AI has yellow 7 only for yellow. With large pile, there's
+    // still a good chance of drawing follow-up cards.
+    // With small pile, the chance is lower.
+
+    const smallPileChoosesYellow = (() => {
+      const myExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+        EXPEDITION_COLORS.map(c => [c, []]),
+      );
+      const hand = [
+        makeNumbered('yellow', 7, 1300),
+        makeNumbered('blue', 4, 1301),
+      ];
+      const state = makeTestVisibleState({
+        hand,
+        myExpeditions,
+        drawPileSize: 3, // Very few cards left
+      });
+      return GreedyStrategy.choosePhase1(state, createSeededRng(42));
+    })();
+
+    const largePileChoosesYellow = (() => {
+      const myExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+        EXPEDITION_COLORS.map(c => [c, []]),
+      );
+      const hand = [
+        makeNumbered('yellow', 7, 1302),
+        makeNumbered('blue', 4, 1303),
+      ];
+      const state = makeTestVisibleState({
+        hand,
+        myExpeditions,
+        drawPileSize: 35, // Many cards left
+      });
+      return GreedyStrategy.choosePhase1(state, createSeededRng(42));
+    })();
+
+    // With large pile, AI should be more willing to start yellow expedition
+    const smallPileIsYellow = smallPileChoosesYellow.kind === 'play-to-expedition' && smallPileChoosesYellow.color === 'yellow';
+    const largePileIsYellow = largePileChoosesYellow.kind === 'play-to-expedition' && largePileChoosesYellow.color === 'yellow';
+
+    // Large pile should at least not be less likely to choose yellow
+    // (it could be equally likely, but not less)
+    expect(largePileIsYellow ? 1 : 0).toBeGreaterThanOrEqual(smallPileIsYellow ? 1 : 0);
+  });
+
+  it('should evaluate the deficit correctly when considering whether to place a card', () => {
+    // Scenario: AI has yellow 2 and yellow 10 in hand, expedition empty.
+    // Placing yellow 2 first gives valueSum = 2, deficit = 18
+    // Placing yellow 10 first gives valueSum = 10, deficit = 10
+    // BUT placing 10 first means no follow-ups > 10 are possible
+    // The AI should prefer to place the 2 first
+    const myExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+
+    const hand = [
+      makeNumbered('yellow', 2, 1400),
+      makeNumbered('yellow', 10, 1401),
+      makeNumbered('blue', 4, 1402),
+    ];
+
+    const state = makeTestVisibleState({
+      hand,
+      myExpeditions,
+      drawPileSize: 30,
+    });
+    const rng = createSeededRng(1);
+
+    const action = GreedyStrategy.choosePhase1(state, rng);
+
+    // Should play to yellow
+    expect(action.kind).toBe('play-to-expedition');
+    expect(action.color).toBe('yellow');
+    // Should play the lower card (2) before the higher card (10)
+    // because 2 leaves room for follow-ups
+    if (action.kind === 'play-to-expedition' && action.card.type === 'numbered') {
+      expect(action.card.rank).toBe(2);
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+// Probabilistic Evaluation Helper Tests (direct unit tests)
+// ═══════════════════════════════════════════════════════════
+
+describe('estimatePositiveScoreProbability', () => {
+  it('should return 1.0 when the expedition is already positive', () => {
+    // Existing expedition: cards with total value > 20
+    const expedition = [
+      makeNumbered('yellow', 6, 1500),
+      makeNumbered('yellow', 8, 1501),
+      makeNumbered('yellow', 9, 1502),
+    ];
+    // valueSum = 23, already > 20
+    const prob = estimatePositiveScoreProbability(
+      'yellow',
+      expedition,
+      makeNumbered('yellow', 10, 1503), // proposed card
+      [], // hand (additional cards of this color)
+      [], // opponent expedition
+      20, // draw pile size
+    );
+    expect(prob).toBe(1.0);
+  });
+
+  it('should return 0.0 when no follow-up cards exist', () => {
+    // Starting with 10 — nothing can follow
+    const expedition: LostCitiesCard[] = [];
+    const prob = estimatePositiveScoreProbability(
+      'yellow',
+      expedition,
+      makeNumbered('yellow', 10, 1600), // proposed card (10)
+      [], // hand
+      [], // opponent expedition
+      20,
+    );
+    expect(prob).toBe(0.0);
+  });
+
+  it('should return a higher probability for a low card than a high card when both available', () => {
+    // Same state, same visible cards
+    const expedition: LostCitiesCard[] = [];
+    const hand: LostCitiesCard[] = [];
+    const opponentExpedition: LostCitiesCard[] = [];
+    const drawPileSize = 30;
+
+    const probLow = estimatePositiveScoreProbability(
+      'yellow',
+      expedition,
+      makeNumbered('yellow', 2, 1700), // 2 — many can follow
+      hand,
+      opponentExpedition,
+      drawPileSize,
+    );
+
+    const probHigh = estimatePositiveScoreProbability(
+      'yellow',
+      expedition,
+      makeNumbered('yellow', 9, 1701), // 9 — only 10 can follow
+      hand,
+      opponentExpedition,
+      drawPileSize,
+    );
+
+    expect(probLow).toBeGreaterThan(probHigh);
+  });
+
+  it('should return a lower probability when opponent has many cards of this color', () => {
+    const expedition: LostCitiesCard[] = [];
+    const hand: LostCitiesCard[] = [];
+    const drawPileSize = 25;
+
+    // No opponent cards of this color
+    const probNoOpponent = estimatePositiveScoreProbability(
+      'yellow',
+      expedition,
+      makeNumbered('yellow', 4, 1800),
+      hand,
+      [],
+      drawPileSize,
+    );
+
+    // Opponent has yellow 4, 5, 6 — blocking those values
+    const opponentWithCards = [
+      makeNumbered('yellow', 4, 1801),
+      makeNumbered('yellow', 5, 1802),
+      makeNumbered('yellow', 6, 1803),
+    ];
+    const probWithOpponent = estimatePositiveScoreProbability(
+      'yellow',
+      expedition,
+      makeNumbered('yellow', 7, 1804),
+      hand,
+      opponentWithCards,
+      drawPileSize,
+    );
+
+    expect(probWithOpponent).toBeLessThan(probNoOpponent);
+  });
+
+  it('should return a higher probability with more cards left in the draw pile', () => {
+    const expedition: LostCitiesCard[] = [];
+    const hand: LostCitiesCard[] = [];
+    const opponentExpedition: LostCitiesCard[] = [];
+
+    const probSmallPile = estimatePositiveScoreProbability(
+      'yellow',
+      expedition,
+      makeNumbered('yellow', 4, 1900),
+      hand,
+      opponentExpedition,
+      3, // Very few cards left
+    );
+
+    const probLargePile = estimatePositiveScoreProbability(
+      'yellow',
+      expedition,
+      makeNumbered('yellow', 4, 1901),
+      hand,
+      opponentExpedition,
+      35, // Many cards left
+    );
+
+    expect(probLargePile).toBeGreaterThan(probSmallPile);
   });
 });
 

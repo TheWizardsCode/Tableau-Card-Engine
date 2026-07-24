@@ -210,6 +210,151 @@ function hasLowerNumberedCardInHand(
   return false;
 }
 
+// ---------------------------------------------------------------------------
+// Probabilistic positive-score evaluation
+// ---------------------------------------------------------------------------
+
+/**
+ * Cards of a single color in a Lost Cities deck (3 investments + 9 numbered).
+ */
+const CARDS_PER_COLOR = 12;
+
+/**
+ * Estimate the probability that placing a card in a tableau column will
+ * lead to a positive final score for that column.
+ *
+ * Uses a heuristic based on:
+ *  - Cards still remaining in the draw pile of this color
+ *  - Visible cards on both players' expeditions
+ *  - How many cards can legally follow the proposed card in ascending order
+ *  - The current deficit (how many points needed to reach positive after -20 base cost)
+ *
+ * @returns A value in [0, 1] representing the estimated probability.
+ *   Returns 1.0 if the column is already positive with the proposed card.
+ *   Returns 0.0 if no follow-up cards are available to make it positive.
+ */
+export function estimatePositiveScoreProbability(
+  _color: ExpeditionColor,
+  currentExpedition: LostCitiesCard[],
+  proposedCard: LostCitiesCard,
+  handCardsOfColor: LostCitiesCard[],
+  opponentCardsOfColor: LostCitiesCard[],
+  drawPileSize: number,
+): number {
+  // Total visible cards of this color (the proposed card counts as placed)
+  const visibleCards =
+    currentExpedition.length +
+    handCardsOfColor.length +
+    opponentCardsOfColor.length +
+    1; // the proposed card itself
+  const remainingInDeck = Math.max(0, CARDS_PER_COLOR - visibleCards);
+
+  // No more cards of this color are available
+  if (remainingInDeck === 0) {
+    const totalValue = [...currentExpedition, proposedCard].reduce(
+      (s, c) => s + cardValue(c),
+      0,
+    );
+    const invCount = [...currentExpedition, proposedCard].filter(
+      c => c.type === 'investment',
+    ).length;
+    const finalScore = (totalValue - 20) * (1 + invCount);
+    return finalScore > 0 ? 1.0 : 0.0;
+  }
+
+  // Value sum after placing the proposed card
+  const newValueSum = [...currentExpedition, proposedCard].reduce(
+    (s, c) => s + cardValue(c),
+    0,
+  );
+
+  // Already positive (value > 20 covers the -20 base cost)
+  if (newValueSum > 20) return 1.0;
+
+  // For investment cards (no direct value contribution)
+  if (proposedCard.type === 'investment') {
+    // Investment is valuable only if we have or can get enough numbered cards
+    // With investments, remaining numbered cards matter more
+    const numberedInExpedition = currentExpedition.filter(c => c.type === 'numbered').length;
+    const numberedInHand = handCardsOfColor.filter(c => c.type === 'numbered').length;
+    const totalNumberedNow = numberedInExpedition + numberedInHand;
+
+    // Rough estimate: investments are worthwhile if we have 3+ numbered cards
+    if (totalNumberedNow >= 3) return 0.7;
+    // With enough remaining cards, we might draw more
+    if (remainingInDeck >= 3) return 0.3;
+    return 0.1;
+  }
+
+  // For numbered cards: evaluate follow-up potential
+  const proposedRank = proposedCard.rank;
+
+  // Collect all visible numbered ranks of this color
+  const visibleRanks = new Set<number>();
+  for (const c of currentExpedition) {
+    if (c.type === 'numbered') visibleRanks.add(c.rank);
+  }
+  for (const c of handCardsOfColor) {
+    if (c.type === 'numbered') visibleRanks.add(c.rank);
+  }
+  for (const c of opponentCardsOfColor) {
+    if (c.type === 'numbered') visibleRanks.add(c.rank);
+  }
+  visibleRanks.add(proposedRank);
+
+  // Count remaining unseen higher ranks that can legally follow
+  const availableFollowUps: number[] = [];
+  for (let r = proposedRank + 1; r <= 10; r++) {
+    if (!visibleRanks.has(r)) {
+      availableFollowUps.push(r);
+    }
+  }
+
+  // No follow-up cards possible
+  if (availableFollowUps.length === 0) return 0.0;
+
+  // Total potential value from follow-up cards
+  const followUpValue = availableFollowUps.reduce((s, r) => s + r, 0);
+
+  // Deficit: how many more points we need after the -20 base cost
+  const deficit = 20 - newValueSum;
+
+  // Even if we draw every remaining follow-up card, can we reach positive?
+  if (followUpValue < deficit) return 0.0;
+
+  // ---- Compute probability factors ----
+
+  // Coverage: what fraction of the deficit can follow-ups potentially cover?
+  const coverageRatio = Math.min(1, followUpValue / Math.max(1, deficit));
+
+  // Concentration: what fraction of the remaining unseen numbered cards
+  // of this color are usable follow-ups?
+  const totalNumberedRanks = 9;
+  const visibleNumberedCount = visibleRanks.size;
+  const remainingNumberedCount = totalNumberedRanks - visibleNumberedCount;
+  const concentrationFactor =
+    remainingNumberedCount > 0
+      ? availableFollowUps.length / remainingNumberedCount
+      : 0;
+
+  // Draw pile factor: more cards left = more chances to draw what we need
+  const drawFactor = Math.min(1, drawPileSize / 44); // 44 = initial draw pile
+
+  // Probability = weighted combination of factors
+  return coverageRatio * (0.3 + 0.4 * concentrationFactor + 0.3 * drawFactor);
+}
+
+/**
+ * Get cards of a specific color from a collection, excluding a specific card.
+ */
+function cardsOfColor(
+  cards: LostCitiesCard[],
+  color: ExpeditionColor,
+  excludeId?: number,
+): LostCitiesCard[] {
+  return cards.filter(c => c.color === color && c.id !== excludeId);
+}
+
 /**
  * Score a Phase 1 action for the greedy strategy.
  * Higher score = more preferred.
@@ -264,6 +409,36 @@ function scorePhase1Action(
       state.hand, action.color, action.card, lane ?? [],
     )) {
       score -= 80;
+    }
+
+    // ---- Probabilistic positive-score evaluation ----
+    // Evaluate the probability that this column will reach a positive score.
+    // Penalize plays with low probability; reward plays with high probability.
+    const handOfColor = cardsOfColor(state.hand, action.color, action.card.id);
+    const opponentOfColor = cardsOfColor(
+      Array.from(state.opponentExpeditions.get(action.color) ?? []),
+      action.color,
+    );
+    const prob = estimatePositiveScoreProbability(
+      action.color,
+      lane ?? [],
+      action.card,
+      handOfColor,
+      opponentOfColor,
+      state.drawPileSize,
+    );
+
+    // Apply probability-based adjustment
+    // The modifier fine-tunes the score without overwhelming the existing
+    // preference structure (extending existing expeditions, card ordering).
+    if (prob >= 0.8) {
+      score += 20; // High confidence — bonus
+    } else if (prob >= 0.5) {
+      score += 10; // Moderate confidence — slight bonus
+    } else if (prob >= 0.2) {
+      score -= 15; // Low confidence — penalty
+    } else {
+      score -= 60; // Very low confidence — strong penalty
     }
 
     return score;
