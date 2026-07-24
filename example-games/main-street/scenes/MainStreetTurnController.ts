@@ -311,7 +311,72 @@ export class MainStreetTurnController {
       return;
     }
 
-    // Enter placement mode
+    // ── Auto-place mode (buy + place in one step) ──────────────
+    // If the current tutorial step is an action gate with select-business
+    // AND has a requiredCardId set, the card should be bought and
+    // auto-placed without a separate placement step.
+    // This is used for T8 (buy Bookshop + auto-place).
+    const isAutoPlaceStep = controller?.isActive &&
+      controller.currentStepIndex >= 0 &&
+      getCurrentStep(controller)?.gate === 'action' &&
+      getCurrentStep(controller)?.requiredAction === 'select-business' &&
+      getCurrentStep(controller)?.requiredCardId !== undefined;
+
+    if (isAutoPlaceStep) {
+      // Auto-place: buy the card and place it in the first empty slot
+      const sourceIndex = s.state.market.development.findIndex((c: any) => c.id === card.id);
+      const pendingCardId = card.id;
+      const pendingCardName = card.name;
+      const targetSlot = firstSlot;
+
+      // Ensure stale hover tooltip is cleared
+      s.tooltipManager?.hide();
+
+      s.pendingBusinessCard = null;
+      s.pendingBusinessSourceIndex = null;
+      s.clearMarketSelection();
+      s.uiPhase = 'animating';
+      s.instructionText.setText(`Buying and placing "${pendingCardName}"...`);
+      s.hiddenTransferSourceCardIds.add(pendingCardId);
+      s.refreshAll();
+
+      const afterTransfer = () => {
+        try {
+          const cmd = buyBusinessCommand(s.state, pendingCardId, targetSlot);
+          s.undoManager.execute(cmd);
+          try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'buy-business', cardId: pendingCardId, slotIndex: targetSlot }, description: cmd.description }); } catch (_) {}
+          try { s.gameEvents?.emit('card:placed', { cardId: pendingCardId, slotIndex: targetSlot }); } catch (_) {}
+          s.instructionText.setText(`Placed "${pendingCardName}" on slot ${targetSlot}`);
+        } catch (e) {
+          console.error('[MS] Auto-place BuyBusiness failed', e);
+          s.instructionText.setText(`Error: ${(e as Error).message}`);
+        }
+
+        s.hiddenTransferSourceCardIds.delete(pendingCardId);
+        s.uiPhase = 'market';
+        s.refreshAll();
+
+        // Tutorial: mark select-business step complete (auto-place step is done)
+        try {
+          (s.msLifecycleManager as any).onTutorialActionComplete?.('select-business' as TutorialActionType);
+        } catch (_) { /* ignore */ }
+      };
+
+      if (sourceIndex >= 0) {
+        void s.animateTransferFromMarket({
+          cardId: pendingCardId,
+          family: 'business',
+          row: 'development',
+          slotIndex: sourceIndex,
+          destination: s.getStreetSlotCenter(targetSlot),
+        }).then(afterTransfer);
+      } else {
+        afterTransfer();
+      }
+      return;
+    }
+
+    // ── Normal placement mode (select then place) ──────────────
     s.pendingBusinessCard = card;
     s.pendingBusinessSourceIndex = s.state.market.development.findIndex((c: any) => c.id === card.id);
     s.uiPhase = 'placing-business';
