@@ -35,3 +35,9 @@ Run date: 2026-03-10
 - The baseline sits inside the CI guardrail thresholds documented in tests.
 - The run profile confirms an early-to-mid game street fill and meaningful affordability pressure.
 - Losses concentrate in one failure mode (`reputation_collapse`), which makes balance drift easy to spot in later runs.
+
+## See Also
+
+- **[Balance Process & Tooling PRD](prd-balance-process-and-tooling.md)** — Defines the structured balance review process, micro/macro metrics, and baseline management strategy that build on these Monte Carlo results.
+- **[Balancing Methodology](balancing-methodology.md)** — Technical description of the `run-balance-cards` balancing algorithm.
+- **[Playtest Scenarios](playtest-scenarios.md)** — Curated deterministic seeds for manual balance validation.

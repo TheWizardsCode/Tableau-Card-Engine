@@ -126,3 +126,10 @@ This document consolidates all balancing methodology content previously scattere
 - `docs/main-street/card-catalog.md` — Event Balance Summary table, Upgrade Cost Distribution table
 
 The origin documents now contain cross-references to this document.
+
+## See Also
+
+- **[Balance Process & Tooling PRD](prd-balance-process-and-tooling.md)** — Defines the structured balance review process, micro/macro metrics, and CLI tool specifications that build on this balancing algorithm.
+- **[Monte Carlo Sample Results](monte-carlo-sample-results.md)** — Example output from the Monte Carlo simulation harness used for balance validation.
+- **[Card Catalog](card-catalog.md)** — Complete card template reference with balance-relevant stats.
+- **[Playtest Scenarios](playtest-scenarios.md)** — Curated deterministic seeds for manual balance validation.

@@ -241,3 +241,9 @@ npm run monte-carlo -- --seeds 50 --seed-prefix batch --maxTurns 25 --strategy g
 ```
 
 Then analyse transcripts with standard JSON tools (`jq`, Python, etc.) to extract aggregate statistics.
+
+## See Also
+
+- **[Balance Process & Tooling PRD](prd-balance-process-and-tooling.md)** — Defines the structured balance review process and CLI tools that integrate with these playtest scenarios.
+- **[Balancing Methodology](balancing-methodology.md)** — Technical description of the `run-balance-cards` balancing algorithm.
+- **[Monte Carlo Sample Results](monte-carlo-sample-results.md)** — Example output from the Monte Carlo simulation harness.

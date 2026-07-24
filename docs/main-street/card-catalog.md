@@ -316,3 +316,10 @@ npm run monte-carlo
 This writes per-run and aggregate metrics to:
 - `results/main-street-monte-carlo.json`
 - `results/main-street-monte-carlo.csv`
+
+## See Also
+
+- **[Balance Process & Tooling PRD](prd-balance-process-and-tooling.md)** — Defines the structured balance review process, micro/macro metrics, and CLI tool specifications that read card-data.csv alongside Monte Carlo output.
+- **[Balancing Methodology](balancing-methodology.md)** — Technical description of the `run-balance-cards` balancing algorithm.
+- **[Monte Carlo Sample Results](monte-carlo-sample-results.md)** — Example output from the Monte Carlo simulation harness.
+- **[Playtest Scenarios](playtest-scenarios.md)** — Curated deterministic seeds for manual balance validation.
