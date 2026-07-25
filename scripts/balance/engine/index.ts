@@ -31,3 +31,25 @@ export type {
   SurvivalRateResult,
   CardDeltas,
 } from './card-metrics';
+
+export {
+  computeWinRateByStrategyDifficulty,
+  computeScoreDistribution,
+  computeEconomyHealth,
+  computeSynergyDiversity,
+  computeLossModeDecomposition,
+  computeCardUsageDiversity,
+  computeTurnByTurnSnapshots,
+  computeTrapCardPrevalence,
+} from './global-metrics';
+export type {
+  WinRateMatrixEntry,
+  ScoreDistributionResult,
+  EconomyHealthResult,
+  SynergyDiversityResult,
+  LossModeDecompositionResult,
+  CardUsageDiversityResult,
+  TurnByTurnSnapshotsResult,
+  TrapCardPrevalenceResult,
+  CardMetricSummary,
+} from './global-metrics';
