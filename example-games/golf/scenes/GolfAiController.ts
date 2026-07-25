@@ -10,6 +10,7 @@ import {
   createAiVisiblePlayerState,
 } from '../GolfGame';
 import type { AiPlayer } from '../AiStrategy';
+import { countVisibleRanks } from '../AiStrategy';
 import type { TranscriptRecorder } from '../GameTranscript';
 import type { GameEventEmitter } from '../../../src/core-engine';
 import type { TurnPhase } from './GolfConstants';
@@ -101,8 +102,13 @@ export class GolfAiController {
       });
 
       // Phase 2: AI sees the drawn card and chooses the best move
-      const aiGridForMove = createAiVisiblePlayerState(ps).grid;
-      const move = this.aiPlayer.chooseMoveForCard(aiGridForMove, drawnCard);
+      const aiGridForMove = aiPlayer.grid;
+      // Compute visible rank counts for column-feasibility weighting,
+      // consistent with Phase 1's chooseDrawSource reasoning.
+      const visibleRanks = countVisibleRanks(aiPlayer, aiShared);
+      const move = this.aiPlayer.chooseMoveForCard(
+        aiGridForMove, drawnCard, visibleRanks,
+      );
 
       const action: GolfAction = { drawSource, move };
 
