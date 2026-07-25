@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- Two maki icons -->
+  <rect width="128" height="128" fill="none" />
+  <g transform="translate(-16,0)">
+    <circle cx="56" cy="64" r="22" fill="#F6F6F4" stroke="#2E3B2E" stroke-width="3" />
+    <circle cx="56" cy="64" r="10" fill="#FF7B6B" />
+  </g>
+  <g transform="translate(24,0)">
+    <circle cx="72" cy="64" r="22" fill="#F6F6F4" stroke="#2E3B2E" stroke-width="3" />
+    <circle cx="72" cy="64" r="10" fill="#FF7B6B" />
+  </g>
+</svg>

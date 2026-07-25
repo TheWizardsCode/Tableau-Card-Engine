@@ -1,0 +1,4 @@
+#!/bin/sh
+# worklog:post-pull-hook:v1
+# Wrapper that delegates to central Worklog post-pull script (committed hooks).
+exec "/home/rgardler/projects/Tableau-Card-Engine/.githooks/worklog-post-pull" "$@"

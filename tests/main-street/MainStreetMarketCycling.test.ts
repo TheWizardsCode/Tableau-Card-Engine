@@ -1,0 +1,423 @@
+/**
+ * Main Street: Market Cycling System Tests
+ *
+ * Tests for the market cycling system where unpurchased market cards move to
+ * the discard pile after each MarketPhase, the discard pile reshuffles into
+ * the main deck when the deck is empty, and sold cards enter the discard pile.
+ *
+ * NOTE: These tests validate the market cycling feature added by the Multi-Use
+ * Card Economy implementation (CG-0MQRXN2CT0076OW7). Some tests reference
+ * functions that may not exist until the implementation child
+ * (CG-0MQSFGOU30078033) is complete. Feature-detection flags control which
+ * tests run.
+ *
+ * @module
+ */
+
+import { describe, it, expect } from 'vitest';
+
+import {
+  setupMainStreetGame,
+  type MainStreetState,
+} from '../../example-games/main-street/MainStreetState';
+import {
+  type BusinessCard,
+  type CommunitySpaceCard,
+  MARKET_BUSINESS_SLOTS,
+} from '../../example-games/main-street/MainStreetCards';
+import {
+  executeDayStart,
+  processEndOfTurn,
+  executeAction,
+} from '../../example-games/main-street/MainStreetEngine';
+import {
+  refillAllMarkets,
+} from '../../example-games/main-street/MainStreetMarket';
+
+// ── Feature Detection ───────────────────────────────────────
+
+/** True once hand fields exist on MainStreetState (I1). */
+const HAND_FEATURE_AVAILABLE = 'hand' in (setupMainStreetGame() as any);
+
+/** True once cycle/discard-pile features are available (I4). */
+let CYCLING_FEATURE_AVAILABLE = false;
+(async () => {
+  try {
+    const engine = await import('../../example-games/main-street/MainStreetEngine');
+    CYCLING_FEATURE_AVAILABLE = typeof (engine as any).cycleMarketCards === 'function';
+    if (!CYCLING_FEATURE_AVAILABLE) {
+      const market = await import('../../example-games/main-street/MainStreetMarket');
+      CYCLING_FEATURE_AVAILABLE = typeof (market as any).cycleMarketCards === 'function';
+    }
+  } catch {
+    // feature not yet implemented
+  }
+})();
+
+// ── Helpers ─────────────────────────────────────────────────
+
+function createTestState(seed: string = 'market-cycling-test'): MainStreetState {
+  return setupMainStreetGame({ seed });
+}
+
+/**
+ * Returns all market card IDs (both rows combined).
+ */
+function getMarketIDs(state: MainStreetState): string[] {
+  return [
+    ...state.market.development.map(c => c.id),
+    ...state.market.investments.map(c => c.id),
+  ];
+}
+
+/**
+ * Returns the total discard pile size across all deck types.
+ */
+function getTotalDiscardCount(state: MainStreetState): number {
+  return (
+    state.discards.business.length +
+    state.discards.communitySpace.length +
+    state.discards.event.length +
+    state.discards.upgrade.length
+  );
+}
+
+// ── Tests ───────────────────────────────────────────────────
+
+describe('MainStreet Market Cycling', () => {
+  // ── Discard Pile State ─────────────────────────────────────
+
+  describe('Discard pile state', () => {
+    it('should initialize with empty discard piles', () => {
+      const state = createTestState();
+      expect(state.discards.business).toHaveLength(0);
+      expect(state.discards.communitySpace).toHaveLength(0);
+      expect(state.discards.event).toHaveLength(0);
+      expect(state.discards.upgrade).toHaveLength(0);
+    });
+
+    it('should have discard piles present as arrays', () => {
+      const state = createTestState();
+      expect(Array.isArray(state.discards.business)).toBe(true);
+      expect(Array.isArray(state.discards.communitySpace)).toBe(true);
+      expect(Array.isArray(state.discards.event)).toBe(true);
+      expect(Array.isArray(state.discards.upgrade)).toBe(true);
+    });
+  });
+
+  // ── Unpurchased Cards Move to Discard ──────────────────────
+
+  describe('Unpurchased cards cycle to discard', () => {
+    it.runIf(CYCLING_FEATURE_AVAILABLE)(
+      'should capture unpurchased market cards in discard after MarketPhase',
+      async () => {
+        const state = createTestState();
+        executeDayStart(state);
+
+        // Get market cards before cycling
+        const marketIDsBefore = getMarketIDs(state);
+        expect(marketIDsBefore.length).toBeGreaterThan(0);
+
+        // Trigger cycling
+        const engine = await import('../../example-games/main-street/MainStreetEngine');
+        const cycleFn = (engine as any).cycleMarketCards;
+        if (typeof cycleFn === 'function') {
+          cycleFn(state);
+        }
+
+        // Market cards should now be in discard piles
+        const totalDiscards = getTotalDiscardCount(state);
+        expect(totalDiscards).toBeGreaterThan(0);
+      },
+    );
+
+    it('should not remove player-owned tableau cards during cycling', () => {
+      const state = createTestState();
+      executeDayStart(state);
+
+      // Buy a card and place on tableau
+      const card = state.market.development.find(
+        c => c.cost <= state.resourceBank.coins,
+      );
+      if (!card) return;
+
+      const slot = state.streetGrid.findIndex(s => s === null);
+      if (slot >= 0) {
+        executeAction(state, { type: 'buy-business', cardId: card.id, slotIndex: slot });
+      }
+
+      const tableauCountBefore = state.streetGrid.filter(s => s !== null).length;
+
+      // End turn — cycling should not affect tableau
+      processEndOfTurn(state);
+
+      const tableauCountAfter = state.streetGrid.filter(s => s !== null).length;
+      expect(tableauCountAfter).toBe(tableauCountBefore);
+    });
+
+    it('should not remove player-owned hand cards during cycling', () => {
+      const state = createTestState();
+      executeDayStart(state);
+
+      // If hand exists, add a card to simulate hand ownership
+      if (HAND_FEATURE_AVAILABLE) {
+        const hand = (state as any).hand;
+        if (Array.isArray(hand)) {
+          const card = state.market.development.find(
+            c => c.cost <= state.resourceBank.coins,
+          );
+          if (card) {
+            hand.push({ ...card });
+            const idx = state.market.development.findIndex(c => c.id === card.id);
+            if (idx >= 0) state.market.development.splice(idx, 1);
+          }
+        }
+      }
+
+      const handSizeBefore = Array.isArray((state as any).hand) ? (state as any).hand.length : 0;
+
+      processEndOfTurn(state);
+
+      const handSizeAfter = Array.isArray((state as any).hand) ? (state as any).hand.length : 0;
+      expect(handSizeAfter).toBe(handSizeBefore);
+    });
+  });
+
+  // ── Market Refill After Cycling ────────────────────────────
+
+  describe('Market refill after cycling', () => {
+    it('should refill the development market to full slots after DayStart', () => {
+      const state = createTestState();
+
+      // Initially full
+      expect(state.market.development.length).toBe(MARKET_BUSINESS_SLOTS);
+
+      // Run a full turn
+      executeDayStart(state);
+      processEndOfTurn(state);
+
+      // Next day start refills
+      if (state.phase === 'DayStart') {
+        executeDayStart(state);
+        expect(state.market.development.length).toBe(MARKET_BUSINESS_SLOTS);
+      }
+    });
+
+    it.runIf(CYCLING_FEATURE_AVAILABLE)(
+      'should have deterministically different market cards after cycling + refill',
+      async () => {
+        const state = createTestState();
+        const firstMarketIds = getMarketIDs(state);
+
+        executeDayStart(state);
+
+        // Apply cycling
+        const engine = await import('../../example-games/main-street/MainStreetEngine');
+        const cycleFn = (engine as any).cycleMarketCards;
+        if (typeof cycleFn !== 'function') return;
+
+        cycleFn(state);
+
+        // Refill
+        refillAllMarkets(state);
+
+        const secondMarketIds = getMarketIDs(state);
+
+        // At least some cards should be different (new draws replaced cycled ones)
+        const hasNewCards = secondMarketIds.some(id => !firstMarketIds.includes(id));
+        expect(hasNewCards).toBe(true);
+      },
+    );
+
+    it('should not crash when deck is near empty during refill', () => {
+      const state = createTestState();
+      executeDayStart(state);
+
+      // Drain the business deck
+      state.decks.business.length = 0;
+
+      expect(() => processEndOfTurn(state)).not.toThrow();
+
+      if (state.phase === 'DayStart') {
+        expect(() => executeDayStart(state)).not.toThrow();
+      }
+    });
+  });
+
+  // ── Discard Reshuffle ──────────────────────────────────────
+
+  describe('Discard reshuffle into deck', () => {
+    it.runIf(CYCLING_FEATURE_AVAILABLE)(
+      'should reshuffle discard into deck when deck is empty',
+      async () => {
+        const state = createTestState();
+        executeDayStart(state);
+
+        // Simulate deck depletion: move all deck cards to discard
+        const bizCards = state.decks.business.splice(0);
+        state.discards.business.push(...bizCards);
+        const csCards = state.decks.communitySpace.splice(0);
+        state.discards.communitySpace.push(...csCards);
+        const totalDiscarded = bizCards.length + csCards.length;
+
+        // Refill should reshuffle from discards
+        refillAllMarkets(state);
+
+        // Either deck got cards or discard got smaller
+        const inDeck = state.decks.business.length + state.decks.communitySpace.length;
+        const inDiscard = getTotalDiscardCount(state);
+        expect(inDeck > 0 || inDiscard < totalDiscarded).toBe(true);
+      },
+    );
+
+    it('should maintain deterministic RNG during reshuffle', () => {
+      const state1 = createTestState('cycling-rng-test');
+      const state2 = createTestState('cycling-rng-test');
+
+      // Same initial state
+      expect(getMarketIDs(state1)).toEqual(getMarketIDs(state2));
+
+      executeDayStart(state1);
+      executeDayStart(state2);
+      processEndOfTurn(state1);
+      processEndOfTurn(state2);
+
+      if (state1.phase === 'DayStart' && state2.phase === 'DayStart') {
+        executeDayStart(state1);
+        executeDayStart(state2);
+
+        // After same operations, markets should be identical
+        expect(getMarketIDs(state1)).toEqual(getMarketIDs(state2));
+      }
+    });
+
+    it.runIf(CYCLING_FEATURE_AVAILABLE)(
+      'should survive multiple rounds of discard reshuffle',
+      async () => {
+        const state = createTestState();
+        const engine = await import('../../example-games/main-street/MainStreetEngine');
+        const cycleFn = (engine as any).cycleMarketCards;
+        if (typeof cycleFn !== 'function') return;
+
+        for (let i = 0; i < 3 && state.gameResult === 'playing'; i++) {
+          executeDayStart(state);
+
+          // Buy a card if possible
+          const card = state.market.development.find(
+            c => c.cost <= state.resourceBank.coins,
+          );
+          if (card) {
+            const slot = state.streetGrid.findIndex(s => s === null);
+            if (slot >= 0) {
+              executeAction(state, { type: 'buy-business', cardId: card.id, slotIndex: slot });
+            }
+          }
+
+          // Cycle after MarketPhase
+          cycleFn(state);
+          processEndOfTurn(state);
+        }
+
+        // Should still be playing after 3+ turns
+        expect(state.gameResult).not.toBe('loss');
+      },
+    );
+  });
+
+  // ── Sold Cards Go to Discard ───────────────────────────────
+
+  describe('Sold cards go to discard', () => {
+    it('should accept cards into discard piles by family', () => {
+      const state = createTestState();
+      const discardBefore = getTotalDiscardCount(state);
+
+      // Manually add a card to discard (simulating sell)
+      if (state.market.development.length > 0) {
+        const card = state.market.development.pop()!;
+        if (card.family === 'business') {
+          state.discards.business.push(card as BusinessCard);
+        } else if (card.family === 'community-space') {
+          state.discards.communitySpace.push(card as CommunitySpaceCard);
+        }
+      }
+
+      expect(getTotalDiscardCount(state)).toBe(discardBefore + 1);
+    });
+  });
+
+  // ── Edge Cases ─────────────────────────────────────────────
+
+  describe('Edge Cases', () => {
+    it('should handle empty market without crashing', () => {
+      const state = createTestState();
+      executeDayStart(state);
+
+      state.market.development.length = 0;
+      state.market.investments.length = 0;
+
+      expect(() => processEndOfTurn(state)).not.toThrow();
+    });
+
+    it('should handle all decks empty without crashing', () => {
+      const state = createTestState();
+
+      state.decks.business.length = 0;
+      state.decks.communitySpace.length = 0;
+      state.decks.event.length = 0;
+      state.decks.upgrade.length = 0;
+
+      executeDayStart(state);
+      expect(() => processEndOfTurn(state)).not.toThrow();
+    });
+
+    it('should handle full turn cycle with no player purchases', () => {
+      const state = createTestState();
+      executeDayStart(state);
+      expect(() => processEndOfTurn(state)).not.toThrow();
+
+      if (state.phase === 'DayStart') {
+        executeDayStart(state);
+        expect(state.market.development.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('should advance turns correctly across multiple cycles', () => {
+      const state = createTestState();
+
+      for (let i = 0; i < 3 && state.gameResult === 'playing'; i++) {
+        const turnBefore = state.turn;
+        executeDayStart(state);
+        processEndOfTurn(state);
+
+        if (state.gameResult === 'playing') {
+          expect(state.turn).toBe(turnBefore + 1);
+        }
+      }
+
+      expect(state.gameResult).toBe('playing');
+    });
+
+    it.runIf(CYCLING_FEATURE_AVAILABLE)(
+      'should have different discard contents after each cycling turn',
+      async () => {
+        const state = createTestState();
+        const engine = await import('../../example-games/main-street/MainStreetEngine');
+        const cycleFn = (engine as any).cycleMarketCards;
+        if (typeof cycleFn !== 'function') return;
+
+        executeDayStart(state);
+        cycleFn(state);
+        const discardsAfterTurn1 = getTotalDiscardCount(state);
+
+        processEndOfTurn(state);
+
+        if (state.gameResult === 'playing') {
+          executeDayStart(state);
+          cycleFn(state);
+          const discardsAfterTurn2 = getTotalDiscardCount(state);
+          expect(discardsAfterTurn2).toBeGreaterThanOrEqual(discardsAfterTurn1);
+        }
+      },
+    );
+  });
+});
