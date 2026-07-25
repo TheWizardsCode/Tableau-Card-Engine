@@ -293,6 +293,10 @@ export type {
   DeckGridResult,
 } from './GymSceneUtils';
 
+// GymButtonBar – reusable button bar with zones and wrapping
+export { GymButtonBar } from './GymButtonBar';
+export type { ButtonZone, GymButtonOpts, GymButtonBarConfig } from './GymButtonBar';
+
 // HighlightManager – reusable highlight zone manager
 export { HighlightManager } from './HighlightManager';
 export type { HighlightZoneConfig, HighlightStyle } from './HighlightManager';
