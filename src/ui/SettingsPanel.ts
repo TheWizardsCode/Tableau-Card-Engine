@@ -11,6 +11,7 @@ import Phaser from 'phaser';
 import type { SoundManager } from '../core-engine/SoundManager';
 import { SettingsButton } from './SettingsButton';
 import { getReducedMotion, setReducedMotion, getEndTurnKeybind, setEndTurnKeybind, getTooltips, setTooltips, getCardDesign, setCardDesign, getAvailableCardDesigns } from './SettingsStore';
+import { createVersionLabel } from './versionDisplay';
 
 // ── Public types ────────────────────────────────────────────
 
@@ -129,6 +130,9 @@ const DEPTH_CLOSE_BUTTON = 903;
 /** Depth for the SettingsButton -- exported so the button renders above the panel. */
 export const DEPTH_SETTINGS_BUTTON = 1102;
 
+/** Depth used for the version label shown when settings panel is open. */
+const DEPTH_VERSION_LABEL = 899;
+
 // ── SettingsPanel class ─────────────────────────────────────
 
 export class SettingsPanel {
@@ -218,6 +222,9 @@ export class SettingsPanel {
   // Keyboard
   private keyboardListener: ((event: KeyboardEvent) => void) | null = null;
   private _settingsButton: SettingsButton | null = null;
+
+  // Version label (shown when panel is open, on the game canvas)
+  private _versionLabel: Phaser.GameObjects.Text;
 
   /**
    * The integrated settings button, or `null` when `showButton` is false.
@@ -770,6 +777,10 @@ export class SettingsPanel {
       });
     }
 
+    // Version label — created hidden, shown when the panel opens
+    this._versionLabel = createVersionLabel(scene, DEPTH_VERSION_LABEL);
+    this._versionLabel.setVisible(false);
+
     // Set entire container invisible initially
     this.container.setVisible(false);
   }
@@ -843,6 +854,9 @@ export class SettingsPanel {
 
     this._isOpen = true;
     this.container.setVisible(true);
+
+    // Show version label on the canvas
+    this._versionLabel.setVisible(true);
     this.syncControlsToSoundManager();
     this.createInputBlocker();
 
@@ -880,6 +894,9 @@ export class SettingsPanel {
     if (!this._isOpen && !this._isAnimating) return;
 
     this._isOpen = false;
+
+    // Hide version label
+    this._versionLabel.setVisible(false);
 
     // Stop any existing tween
     if (this.currentTween) {
@@ -951,6 +968,11 @@ export class SettingsPanel {
     if (this._settingsButton) {
       this._settingsButton.destroy();
       this._settingsButton = null;
+    }
+
+    // Destroy version label
+    if (this._versionLabel) {
+      this._versionLabel.destroy();
     }
 
     // Destroy the main container (destroys all children)

@@ -11,6 +11,7 @@
  */
 import Phaser from 'phaser';
 import { GAME_W, GAME_H } from './constants';
+import { createVersionLabel } from './versionDisplay';
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -111,6 +112,9 @@ export class GameSelectorScene extends Phaser.Scene {
 
     // Layout game cards
     this.layoutGameCards();
+
+    // Version label (bottom-left corner)
+    createVersionLabel(this);
   }
 
   // ── Adaptive grid layout ────────────────────────────────

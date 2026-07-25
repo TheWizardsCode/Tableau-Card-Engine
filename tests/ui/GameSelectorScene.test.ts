@@ -59,6 +59,8 @@ function mockText() {
     setInteractive: vi.fn().mockReturnThis(),
     setColor: vi.fn().mockReturnThis(),
     setCrop: vi.fn().mockReturnThis(),
+    setAlpha: vi.fn().mockReturnThis(),
+    setVisible: vi.fn().mockReturnThis(),
     on: vi.fn((event: string, handler: Function) => {
       handlers[event] = handler;
       return text;
@@ -66,6 +68,9 @@ function mockText() {
     destroy: vi.fn(),
     width: 100,
     height: 20,
+    visible: true,
+    alpha: 1,
+    inputEnabled: false,
     _handlers: handlers,
   };
   return text;
@@ -453,6 +458,100 @@ describe('GameSelectorScene', () => {
       // Two cards total (two graphics + two zones)
       expect(mocks.add.graphics).toHaveBeenCalledTimes(2);
       expect(mocks.add.zone).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  // ── Version label ────────────────────────────────────────
+
+  describe('version label', () => {
+    it('creates a version text label in create()', () => {
+      const mocks = injectMocks(scene);
+      scene.init({ games: [] });
+      scene.create();
+
+      // Find the version text call -- contains the version string with 'v' prefix
+      const textCalls = mocks.add.text.mock.calls as unknown[][];
+      const versionCall = textCalls.find((c) =>
+        typeof c[2] === 'string' && c[2].startsWith('v'),
+      );
+      expect(versionCall).toBeDefined();
+    });
+
+    it('positions version label at bottom-left corner', () => {
+      const mocks = injectMocks(scene);
+      scene.init({ games: [] });
+      scene.create();
+
+      const textCalls = mocks.add.text.mock.calls as unknown[][];
+      const versionCall = textCalls.find((c) =>
+        typeof c[2] === 'string' && c[2].startsWith('v'),
+      );
+      expect(versionCall).toBeDefined();
+
+      // Position should be at bottom-left: x near left edge, y near bottom
+      const [x, y] = versionCall as [number, number, string];
+      expect(x).toBeLessThan(50); // near left edge
+      expect(y).toBeGreaterThan(650); // near bottom (GAME_H=720)
+    });
+
+    it('uses small readable font size (11-12px) for version label', () => {
+      const mocks = injectMocks(scene);
+      scene.init({ games: [] });
+      scene.create();
+
+      const textCalls = mocks.add.text.mock.calls as unknown[][];
+      const versionCall = textCalls.find((c) =>
+        typeof c[2] === 'string' && c[2].startsWith('v'),
+      );
+      expect(versionCall).toBeDefined();
+      const style = versionCall![3] as Record<string, unknown>;
+      expect(style.fontSize).toMatch(/^1[12]px$/);
+    });
+
+    it('sets version label as non-interactive (no pointer events)', () => {
+      const mocks = injectMocks(scene);
+      scene.init({ games: [] });
+      scene.create();
+
+      const textResults = mocks.add.text.mock.results as { value: ReturnType<typeof mockText> }[];
+      const textCalls = mocks.add.text.mock.calls as unknown[][];
+      const versionIdx = textCalls.findIndex((c) =>
+        typeof c[2] === 'string' && c[2].startsWith('v'),
+      );
+      expect(versionIdx).not.toBe(-1);
+
+      // Should NOT call setInteractive
+      expect(textResults[versionIdx].value.setInteractive).not.toHaveBeenCalled();
+    });
+
+    it('uses semi-transparent or muted color and alpha < 1 for version label', () => {
+      const mocks = injectMocks(scene);
+      scene.init({ games: [] });
+      scene.create();
+
+      const textCalls = mocks.add.text.mock.calls as unknown[][];
+      const versionCall = textCalls.find((c) =>
+        typeof c[2] === 'string' && c[2].startsWith('v'),
+      );
+      expect(versionCall).toBeDefined();
+      const style = versionCall![3] as Record<string, unknown>;
+      // Color should be muted/semi-transparent
+      expect(style.color).toBeDefined();
+    });
+
+    it('version label text includes the version from __APP_VERSION__', () => {
+      const mocks = injectMocks(scene);
+      scene.init({ games: [] });
+      scene.create();
+
+      const textCalls = mocks.add.text.mock.calls as unknown[][];
+      const versionCall = textCalls.find((c) =>
+        typeof c[2] === 'string' && c[2].startsWith('v'),
+      );
+      expect(versionCall).toBeDefined();
+      const text = versionCall![2] as string;
+      // Should have a semantic version after the 'v' prefix
+      expect(text).toMatch(/^v\d+\.\d+\.\d+/);
     });
   });
 });

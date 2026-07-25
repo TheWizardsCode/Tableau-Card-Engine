@@ -394,6 +394,35 @@ Usage in code:
 import { ENGINE_VERSION } from '@core-engine/index';
 ```
 
+## Build-Time Version Injection
+
+The app version (from `package.json`'s `version` field) is injected at build time
+via Vite's `define` in `vite.config.ts`. The global constant `__APP_VERSION__` is
+replaced with the version string during the Vite transform phase (both dev server
+and production builds).
+
+The version is displayed as `v<version>` (e.g. `v0.1.7`) in two locations:
+- The **GameSelectorScene** menu screen (bottom-left corner)
+- The **SettingsPanel** overlay (shown on the game canvas when the panel opens)
+
+Both use the shared factory `createVersionLabel()` from `src/ui/versionDisplay.ts`,
+which provides consistent styling (11px font, muted grey, 60% opacity, bottom-left
+positioning).
+
+```typescript
+// src/ui/versionDisplay.ts provides the factory and style constants:
+import { createVersionLabel, VERSION_LABEL_TEXT } from '@ui/versionDisplay';
+
+// Usage in a scene:
+createVersionLabel(this); // creates a non-interactive version label at bottom-left
+```
+
+The version string can also be referenced directly in code as a `string`:
+
+```typescript
+console.log(`App version: ${__APP_VERSION__}`);
+```
+
 ## Move Validation Pattern
 
 All move validation across the Tableau Card Engine should use the canonical `LegalityResult` type from `@rule-engine/*`. This ensures consistent validation semantics across games and enables generic tooling (AI, replay, transcripts) to work with a uniform contract.

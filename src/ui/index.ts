@@ -140,6 +140,19 @@ export type { SettingsButtonConfig } from './SettingsButton';
 export { GameSelectorScene, REGISTRY_KEY_GAMES } from './GameSelectorScene';
 export type { GameEntry } from './GameSelectorScene';
 
+// Version display
+export {
+  createVersionLabel,
+  VERSION_LABEL_TEXT,
+  VERSION_FONT_SIZE,
+  VERSION_FONT_FAMILY,
+  VERSION_COLOR,
+  VERSION_ALPHA,
+  VERSION_X,
+  VERSION_Y,
+  VERSION_DEPTH,
+} from './versionDisplay';
+
 // Shared constants
 export { CARD_W, CARD_H, GAME_W, GAME_H, FONT_FAMILY } from './constants';
 
