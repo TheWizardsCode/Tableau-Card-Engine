@@ -1,8 +1,11 @@
 # Main Street: Game Balance Process & Tooling PRD
 
 **Work Item:** CG-0MRBDPFPH009Y8M0
-**Status:** DRAFT
+**Status:** IMPLEMENTED (Phase 2: Core Analysis Library)
 **Date:** 2026-07-23
+**Last Updated:** 2026-07-25 (Phase 2 implementation complete)
+
+> **Implementation Status:** Phase 2 (Core Analysis Library) is complete. The balance analysis library lives at `scripts/balance/` with the full API documented at `docs/main-street/balance-analysis-api.md`. See §10 for updated file paths.
 
 ---
 
@@ -1007,14 +1010,23 @@ The current CSV schema is sufficient for all proposed metrics. The following cha
 | E-3 | Add per-run market offer tracking | 1 day |
 | E-4 | Add `getHistory()` to EconomyLedger | 1 day |
 
-### Phase 2: Core Analysis Library (2–3 sprints)
+### Phase 2: Core Analysis Library (Complete)
 
-| Task | Description | Est. Effort |
-|------|-------------|-------------|
-| C-1 | Implement statistics helpers (median, IQR, Gini, HHI) | 1 day |
-| C-2 | Implement card metrics engine (M1–M7) | 3 days |
-| C-3 | Implement global metrics engine (G1–G8) | 3 days |
-| C-4 | Implement comparison engine with guardrail evaluation | 2 days |
+| Task | Description | Actual File(s) | Est. Effort |
+|------|-------------|----------------|-------------|
+| C-1 | Implement statistics helpers (median, IQR, Gini, HHI) | `scripts/balance/engine/statistics.ts`, `tests/balance/statistics.test.ts` | 1 day |
+| C-2 | Implement card metrics engine (M1–M7) | `scripts/balance/engine/card-metrics.ts`, `tests/balance/card-metrics.test.ts` | 3 days |
+| C-3 | Implement global metrics engine (G1–G8) | `scripts/balance/engine/global-metrics.ts`, `tests/balance/global-metrics.test.ts` | 3 days |
+| C-4 | Implement comparison engine with guardrail evaluation | `scripts/balance/engine/comparison.ts`, `tests/balance/comparison.test.ts` | 2 days |
+| C-5 | Scaffolding, guardrail thresholds, baseline module | `scripts/balance/guards/thresholds.ts`, `scripts/balance/engine/baseline.ts`, `tests/balance/thresholds.test.ts`, `tests/balance/baseline.test.ts` | 2 days |
+| C-6 | Documentation & integration tests | `docs/main-street/balance-analysis-api.md`, `tests/balance/integration.test.ts` | 1 day |
+
+> **Implementation Note:** Phase 2 implementation differs from the PRD spec in the following ways:
+> - C-5 was reordered relative to C-2/C-3 (done earlier to unblock scaffold-dependent work).
+> - Guardrail thresholds are defined in `scripts/balance/guards/thresholds.ts` with `evaluateGuardrails()` rather than a dedicated `ThresholdSet` class. The `GUARDRAIL_THRESHOLDS` constant mirrors PRD §3.3 values exactly.
+> - Baseline module lives in `scripts/balance/engine/baseline.ts` (engine sub-module) rather than a top-level `baseline/` directory.
+> - All statistics functions are in a single `statistics.ts` file rather than separate files per function.
+> - Phase 1 harness extensions (`economyHistory`, `cardsOwned`, `marketOffers`) are expected to be added to `MonteCarloRunSummary` but metrics gracefully degrade to `null` when absent.
 
 ### Phase 3: CLI Tools (2 sprints)
 
