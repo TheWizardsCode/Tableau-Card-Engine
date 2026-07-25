@@ -53,3 +53,11 @@ export type {
   TrapCardPrevalenceResult,
   CardMetricSummary,
 } from './global-metrics';
+
+export { compareMetrics } from './comparison';
+export type {
+  ComparisonEntry,
+  ComparisonSummary,
+  ComparisonMeta,
+  ComparisonReport,
+} from './comparison';
