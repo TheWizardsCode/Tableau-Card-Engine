@@ -393,6 +393,18 @@ export class GymSaveLoadScene extends GymSceneBase {
 
   // ── RenderTexture screenshot (full-screen) ───────────────────
 
+  /**
+   * Take a full-screen RenderTexture screenshot of the game content area,
+   * excluding HUD elements (help panel, button, header chrome, event log).
+   *
+   * The screenshot is captured into a 1280×720 RenderTexture and displayed
+   * as a 25%-scale thumbnail centred below the controls for save/load preview.
+   *
+   * HUD exclusion uses a Set-based blacklist of known HUD object references
+   * by identity rather than by type or position. This approach is surgical
+   * and avoids brittle type/position checks. If new HUD elements are added
+   * to the scene, add their references to the exclusion Set.
+   */
   private takeScreenshot(): void {
     this.clearScreenshot();
 
@@ -403,8 +415,29 @@ export class GymSaveLoadScene extends GymSceneBase {
       // their world positions through the main scene camera.
       const rt = this.add.renderTexture(0, 0, GAME_W, GAME_H);
 
-      // Exclude rt itself from the draw
-      const drawables = this.children.getAll().filter((child) => child !== rt);
+      // Exclude HUD elements from the screenshot: help panel, header
+      // chrome (title, menu button, nav buttons, divider), and event log.
+      // Game content (cards, action buttons, state/backend text) remains.
+      // Use identity-based Set for surgical filtering (not type/position).
+      const excluded = new Set<unknown>([
+        rt,
+        this.helpPanel,
+        this.helpButton,
+        this.header?.title,
+        this.header?.menuButton,
+        this.prevButton,
+        this.nextButton,
+        this.headerDivider,
+        this.eventLogResult?.header,
+      ]);
+      // Add dynamically-created event log lines (if any)
+      if (this.eventLogResult) {
+        for (const line of this.eventLogResult.lines) {
+          excluded.add(line);
+        }
+      }
+
+      const drawables = this.children.getAll().filter((child) => !excluded.has(child));
       rt.draw(drawables, 0, 0);
       rt.render();
 
