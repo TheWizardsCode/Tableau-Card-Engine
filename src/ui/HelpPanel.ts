@@ -144,6 +144,21 @@ export class HelpPanel {
     return this._helpButton;
   }
 
+  /**
+   * Returns the direct scene-level children of this HelpPanel.
+   *
+   * Used by scenes that need to exclude HUD overlay objects from
+   * RenderTexture screenshots. The returned array contains the main
+   * panel container which holds all panel visuals (background, close
+   * button, content, scroll mask, track bar).
+   *
+   * @returns An array of Phaser GameObjects that are direct children
+   *          of the scene's display list (i.e., added via scene.add.*).
+   */
+  getSceneChildren(): Phaser.GameObjects.GameObject[] {
+    return [this.container];
+  }
+
   constructor(scene: Phaser.Scene, config: HelpPanelConfig) {
     this.scene = scene;
     const showButton = config.showButton ?? true;

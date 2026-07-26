@@ -402,6 +402,11 @@ export class GymSaveLoadScene extends GymSceneBase {
    * by identity rather than by type or position. This approach is surgical
    * and avoids brittle type/position checks. If new HUD elements are added
    * to the scene, add their references to the exclusion Set.
+   *
+   * IMPORTANT: Do NOT pass x/y offset to `rt.draw()`. In Phaser 4's
+   * DynamicTexture, the x/y parameters replace each object's position
+   * (not add as offsets), causing all non-container objects to render
+   * at the origin. Omitting x/y preserves each object's world position.
    */
   private takeScreenshot(): void {
     this.clearScreenshot();
@@ -419,8 +424,8 @@ export class GymSaveLoadScene extends GymSceneBase {
       // Use identity-based Set for surgical filtering (not type/position).
       const excluded = new Set<unknown>([
         rt,
-        this.helpPanel,
-        this.helpButton,
+        ...(this.helpPanel?.getSceneChildren() ?? []),
+        ...(this.helpButton?.getSceneChildren() ?? []),
         this.header?.title,
         this.header?.menuButton,
         this.prevButton,
@@ -436,7 +441,7 @@ export class GymSaveLoadScene extends GymSceneBase {
       }
 
       const drawables = this.children.getAll().filter((child) => !excluded.has(child));
-      rt.draw(drawables, 0, 0);
+      rt.draw(drawables);
       rt.render();
 
       rt.saveTexture('screenshot-thumb');
