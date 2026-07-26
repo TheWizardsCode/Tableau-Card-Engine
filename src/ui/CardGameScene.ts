@@ -36,6 +36,7 @@ import type { DebugToolsEntry } from './debug/DebugToolsRegistry';
 import { createSessionExportTool } from './debug/SessionExportTool';
 import { createStateInspectorTool } from './debug/StateInspectorOverlay';
 import { createGameEventLogTool } from './debug/GameEventLogOverlay';
+import { createAiDecisionViewerTool } from './debug/AiDecisionOverlay';
 import { SettingsButton } from './SettingsButton';
 import type { HelpSection } from './HelpPanel';
 import { createSceneMenuButton } from './SceneHeader';
@@ -281,6 +282,7 @@ export abstract class CardGameScene extends Phaser.Scene {
       createSessionExportTool(),
       createStateInspectorTool(),
       createGameEventLogTool(),
+      createAiDecisionViewerTool(),
     ];
     this.settingsPanel = new SettingsPanel(this, {
       soundManager: this.soundManager,
