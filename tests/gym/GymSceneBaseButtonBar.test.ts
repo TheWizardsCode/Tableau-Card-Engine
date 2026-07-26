@@ -60,7 +60,7 @@ describe('GymSceneBase button bar integration', () => {
     expect(source).toContain('this.buttonBar.destroy()');
   });
 
-  it('addButton method is preserved with @deprecated annotation', () => {
+  it('legacy addButton method has been removed after migration', () => {
     const fs = require('fs');
     const path = require('path');
     const source = fs.readFileSync(
@@ -68,13 +68,11 @@ describe('GymSceneBase button bar integration', () => {
       'utf-8',
     );
 
-    // Verify addButton still exists (for backward compat during migration)
-    expect(source).toContain('protected addButton(');
-    expect(source).toContain('@deprecated');
-    expect(source).toContain('this.buttonBar.addButton()');
+    // Verify addButton no longer exists (migration complete)
+    expect(source).not.toContain('protected addButton(');
   });
 
-  it('addButtonAtAnchor method is preserved for migration', () => {
+  it('legacy addButtonAtAnchor method has been removed after migration', () => {
     const fs = require('fs');
     const path = require('path');
     const source = fs.readFileSync(
@@ -82,8 +80,8 @@ describe('GymSceneBase button bar integration', () => {
       'utf-8',
     );
 
-    // Verify addButtonAtAnchor still exists
-    expect(source).toContain('protected addButtonAtAnchor(');
+    // Verify addButtonAtAnchor no longer exists (migration complete)
+    expect(source).not.toContain('protected addButtonAtAnchor(');
   });
 
   it('button bar integration section is placed after divider and before scene transition', () => {

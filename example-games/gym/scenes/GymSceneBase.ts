@@ -193,7 +193,7 @@ export abstract class GymSceneBase extends Phaser.Scene {
    *
    * Call this in your scene's `create()` method to create a reusable
    * button bar. Once initialised, use `this.buttonBar.addButton()`
-   * instead of `this.addButton()`.
+   * for all button creation.
    *
    * If a button bar was previously created, it is destroyed before
    * creating the new one (allows re-creation).
@@ -253,33 +253,7 @@ export abstract class GymSceneBase extends Phaser.Scene {
     });
   }
 
-  /**
-   * Utility: create a clickable button text at (x, y).
-   *
-   * Note: This legacy method is kept for backward compatibility during
-   * the migration to GymButtonBar. New scenes should use
-   * `this.buttonBar.addButton(label, callback, opts)` instead.
-   *
-   * @deprecated Use `this.buttonBar.addButton()` after calling `initButtonBar()`.
-   */
-  protected addButton(
-    x: number,
-    y: number,
-    label: string,
-    callback: () => void,
-    opts?: Partial<{ fontSize: string; color: string; hoverColor: string }>,
-  ): Phaser.GameObjects.Text {
-    const color = opts?.color ?? '#88ff88';
-    const hoverColor = opts?.hoverColor ?? '#bbffbb';
-    const btn = createHudText(this, x, y, label, color, {
-      fontSize: opts?.fontSize ?? '14px',
-    }).setInteractive({ useHandCursor: true });
 
-    btn.on('pointerdown', callback);
-    btn.on('pointerover', () => btn.setColor(hoverColor));
-    btn.on('pointerout', () => btn.setColor(color));
-    return btn;
-  }
 
   /**
    * Utility: add a horizontal divider line below the header.
@@ -427,33 +401,5 @@ export abstract class GymSceneBase extends Phaser.Scene {
     const x = anchor?.x ?? fallbackX;
     const y = anchor?.y ?? fallbackY;
     return this.addLabel(x, y, text, opts);
-  }
-
-  /**
-   * Create a button positioned at an SLL anchor point.
-   *
-   * If the SLL layout is unavailable, falls back to the provided fallback coordinates.
-   *
-   * @param zoneName   Zone to position within
-   * @param anchorName Anchor within the zone
-   * @param fallbackX  Fallback X if SLL is unavailable
-   * @param fallbackY  Fallback Y if SLL is unavailable
-   * @param label      Button label
-   * @param callback   Button click handler
-   * @param opts       Optional button styling
-   */
-  protected addButtonAtAnchor(
-    zoneName: string,
-    anchorName: string,
-    fallbackX: number,
-    fallbackY: number,
-    label: string,
-    callback: () => void,
-    opts?: Partial<{ fontSize: string; color: string; hoverColor: string }>,
-  ): Phaser.GameObjects.Text {
-    const anchor = this.getGymAnchor(zoneName, anchorName);
-    const x = anchor?.x ?? fallbackX;
-    const y = anchor?.y ?? fallbackY;
-    return this.addButton(x, y, label, callback, opts);
   }
 }
