@@ -1,12 +1,11 @@
 /**
- * Debug Tools module
+ * Debug Tools barrel module.
  *
- * Provides dev-mode detection, the debug tool entry type, and
- * (in child work items) individual debug tool overlays such as
- * state inspector, game event log, session export, and AI decision viewer.
+ * Re-exports all debug tool factories, the registry, and types
+ * so consumers can import from a single location.
  *
  * @module @ui/debug
  */
 
-export { isDevMode } from './DebugToolsRegistry';
-export type { DebugToolsEntry } from './DebugToolsRegistry';
+export { isDevMode, type DebugToolsEntry } from './DebugToolsRegistry';
+export { createSessionExportTool } from './SessionExportTool';

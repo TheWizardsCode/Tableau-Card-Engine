@@ -33,6 +33,7 @@ import { HelpButton } from './HelpButton';
 import { SettingsPanel } from './SettingsPanel';
 import type { SkillRatingConfig } from './SettingsPanel';
 import type { DebugToolsEntry } from './debug/DebugToolsRegistry';
+import { createSessionExportTool } from './debug/SessionExportTool';
 import { SettingsButton } from './SettingsButton';
 import type { HelpSection } from './HelpPanel';
 import { createSceneMenuButton } from './SceneHeader';
@@ -273,13 +274,15 @@ export abstract class CardGameScene extends Phaser.Scene {
     debugTools?: DebugToolsEntry[],
   ): void {
     if (!this.soundManager) return;
+    // Provide default debug tools when none are explicitly specified
+    const effectiveDebugTools = debugTools ?? [createSessionExportTool()];
     this.settingsPanel = new SettingsPanel(this, {
       soundManager: this.soundManager,
       difficultyNames,
       defaultDifficulty,
       hasTooltips: hasTooltips ?? true,
       skillRating,
-      debugTools,
+      debugTools: effectiveDebugTools,
     });
     this.settingsButton = this.settingsPanel.settingsButton!;
   }

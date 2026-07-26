@@ -63,14 +63,6 @@ export interface SettingsPanelConfig {
   buttonPosition?: SettingsButtonPosition;
 
   /**
-   * Optional list of debug tool entries for the Debug Tools section.
-   * When provided (and `import.meta.env.DEV` is true), a "Debug Tools"
-   * section is rendered at the bottom of the Settings panel.
-   * In production builds, the entire Debug section is tree-shaken away.
-   */
-  debugTools?: DebugToolsEntry[];
-
-  /**
    * Whether the current game has tooltips. When true (default), a
    * "Tooltips" toggle is displayed in the settings panel. Games
    * without any tooltips (e.g. Golf) should set this to false to
@@ -166,7 +158,6 @@ export class SettingsPanel {
     debugTools?: DebugToolsEntry[];
     hasTooltips: boolean;
     skillRating?: SkillRatingConfig;
-    debugTools?: DebugToolsEntry[];
   };
   private readonly panelWidth: number;
   private readonly canvasWidth: number;
@@ -275,7 +266,6 @@ export class SettingsPanel {
       debugTools: config.debugTools,
       hasTooltips: config.hasTooltips ?? true,
       skillRating: config.skillRating,
-      debugTools: config.debugTools,
     };
 
     this.canvasWidth = scene.scale.width;
