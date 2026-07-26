@@ -134,11 +134,6 @@ export class FeudalismTurnController {
     try {
       const result = executeTurn(this.session, action);
 
-      if (result.patronVisit) {
-        this.callbacks.onPlaySound(SFX_KEYS.PATRON_VISIT);
-        this.callbacks.onShowToast('Patron visits you! +3 influence');
-      }
-
       if (result.tokensOverLimit > 0) {
         this.pendingPlayerIndex = playerIndex;
         this.pendingAction = action;
@@ -177,7 +172,12 @@ export class FeudalismTurnController {
         }
 
         this.setPhase('animating');
-        this.callbacks.onRefreshAll();
+
+        // Defer sound and toast to coincide with animation start
+        if (result.patronVisit) {
+          this.callbacks.onPlaySound(SFX_KEYS.PATRON_VISIT);
+          this.callbacks.onShowToast('Patron visits you! +3 influence');
+        }
 
         this.animator.playCardAnimation(
           sourcePos, destPos, card, marketSlot, result.patronVisit,
@@ -306,10 +306,6 @@ export class FeudalismTurnController {
 
         this.recorder?.recordTurn(aiIndex, action, result, tokenDiscard);
 
-        if (result.patronVisit) {
-          this.callbacks.onShowToast('AI earns a patron visit! +3 influence');
-        }
-
         let patronSourceIndex = -1;
         if (result.patronVisit) {
           patronSourceIndex = patronsBefore.indexOf(result.patronVisit.id);
@@ -354,7 +350,10 @@ export class FeudalismTurnController {
             this.callbacks.onSetPendingRefillSlots([marketSlot]);
           }
 
-          this.callbacks.onRefreshAll();
+          // Defer toast to coincide with animation start
+          if (result.patronVisit) {
+            this.callbacks.onShowToast('AI earns a patron visit! +3 influence');
+          }
 
           this.animator.playCardAnimation(
             sourcePos, destPos, card, marketSlot, result.patronVisit,
