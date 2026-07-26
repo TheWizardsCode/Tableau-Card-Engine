@@ -291,7 +291,7 @@ export class GymHandPileScene extends GymSceneBase {
     this.rotationSlider = new Slider(this, rotationSliderX, sliderY, {
       initialValue: this.ROTATION_DEGREES_DEFAULT,
       minValue: 0,
-      maxValue: 45,
+      maxValue: 359,
       label: 'Rotation',
       width: sliderWidth,
       textColor: '#88ff88',

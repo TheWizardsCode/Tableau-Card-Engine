@@ -1877,4 +1877,105 @@ describe('HandView', () => {
       hv.destroy();
     });
   });
+
+  // ── Rotation clamping (maxRotationDegrees) ───────────────
+
+  describe('rotation clamping (maxRotationDegrees)', () => {
+    it('clamps setMaxRotationDegrees(400) to 359', () => {
+      const hv = new HandView(scene, { baseX: 60, baseY: 130, spacing: 56 });
+      hv.setMaxRotationDegrees(400);
+      expect(hv.getMaxRotationDegrees()).toBe(359);
+      hv.destroy();
+    });
+
+    it('clamps setMaxRotationDegrees(360) to 359', () => {
+      const hv = new HandView(scene, { baseX: 60, baseY: 130, spacing: 56 });
+      hv.setMaxRotationDegrees(360);
+      expect(hv.getMaxRotationDegrees()).toBe(359);
+      hv.destroy();
+    });
+
+    it('allows setMaxRotationDegrees(0) (no tilt)', () => {
+      const hv = new HandView(scene, { baseX: 60, baseY: 130, spacing: 56 });
+      hv.setMaxRotationDegrees(0);
+      expect(hv.getMaxRotationDegrees()).toBe(0);
+      hv.destroy();
+    });
+
+    it('allows setMaxRotationDegrees(359)', () => {
+      const hv = new HandView(scene, { baseX: 60, baseY: 130, spacing: 56 });
+      hv.setMaxRotationDegrees(359);
+      expect(hv.getMaxRotationDegrees()).toBe(359);
+      hv.destroy();
+    });
+
+    it('accepts setMaxRotationDegrees(180) (mid-range)', () => {
+      const hv = new HandView(scene, { baseX: 60, baseY: 130, spacing: 56 });
+      hv.setMaxRotationDegrees(180);
+      expect(hv.getMaxRotationDegrees()).toBe(180);
+      hv.destroy();
+    });
+
+    it('clamps negative value to 0', () => {
+      const hv = new HandView(scene, { baseX: 60, baseY: 130, spacing: 56 });
+      hv.setMaxRotationDegrees(-50);
+      expect(hv.getMaxRotationDegrees()).toBe(0);
+      hv.destroy();
+    });
+
+    it('clamps setMaxRotationDegrees(NaN) to 0', () => {
+      const hv = new HandView(scene, { baseX: 60, baseY: 130, spacing: 56 });
+      hv.setMaxRotationDegrees(NaN);
+      expect(hv.getMaxRotationDegrees()).toBe(0);
+      hv.destroy();
+    });
+
+    it('clamps setMaxRotationDegrees(Infinity) to 0', () => {
+      const hv = new HandView(scene, { baseX: 60, baseY: 130, spacing: 56 });
+      hv.setMaxRotationDegrees(Infinity);
+      expect(hv.getMaxRotationDegrees()).toBe(0);
+      hv.destroy();
+    });
+
+    it('clamps setMaxRotationDegrees(-Infinity) to 0', () => {
+      const hv = new HandView(scene, { baseX: 60, baseY: 130, spacing: 56 });
+      hv.setMaxRotationDegrees(-Infinity);
+      expect(hv.getMaxRotationDegrees()).toBe(0);
+      hv.destroy();
+    });
+
+    it('constructor default maxRotationDegrees is 25 and valid', () => {
+      const hv = new HandView(scene, { baseX: 60, baseY: 130, spacing: 56 });
+      expect(hv.getMaxRotationDegrees()).toBe(25);
+      hv.destroy();
+    });
+
+    it('getMaxRotationDegrees always returns a value within [0, 359]', () => {
+      const hv = new HandView(scene, { baseX: 60, baseY: 130, spacing: 56 });
+      // Set to a few valid and invalid values, verify return is always clamped
+      hv.setMaxRotationDegrees(500);
+      expect(hv.getMaxRotationDegrees()).toBeGreaterThanOrEqual(0);
+      expect(hv.getMaxRotationDegrees()).toBeLessThanOrEqual(359);
+
+      hv.setMaxRotationDegrees(-100);
+      expect(hv.getMaxRotationDegrees()).toBeGreaterThanOrEqual(0);
+      expect(hv.getMaxRotationDegrees()).toBeLessThanOrEqual(359);
+
+      hv.setMaxRotationDegrees(200);
+      expect(hv.getMaxRotationDegrees()).toBeGreaterThanOrEqual(0);
+      expect(hv.getMaxRotationDegrees()).toBeLessThanOrEqual(359);
+      hv.destroy();
+    });
+
+    it('clamping does not affect existing valid values < 45', () => {
+      const hv = new HandView(scene, { baseX: 60, baseY: 130, spacing: 56 });
+      hv.setMaxRotationDegrees(10);
+      expect(hv.getMaxRotationDegrees()).toBe(10);
+      hv.setMaxRotationDegrees(25);
+      expect(hv.getMaxRotationDegrees()).toBe(25);
+      hv.setMaxRotationDegrees(44);
+      expect(hv.getMaxRotationDegrees()).toBe(44);
+      hv.destroy();
+    });
+  });
 });
