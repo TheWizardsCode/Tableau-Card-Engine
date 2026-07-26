@@ -32,6 +32,7 @@ import { HelpPanel } from './HelpPanel';
 import { HelpButton } from './HelpButton';
 import { SettingsPanel } from './SettingsPanel';
 import type { SkillRatingConfig } from './SettingsPanel';
+import type { DebugToolsEntry } from './debug/DebugToolsRegistry';
 import { SettingsButton } from './SettingsButton';
 import type { HelpSection } from './HelpPanel';
 import { createSceneMenuButton } from './SceneHeader';
@@ -266,6 +267,7 @@ export abstract class CardGameScene extends Phaser.Scene {
     defaultDifficulty?: string,
     hasTooltips?: boolean,
     skillRating?: SkillRatingConfig,
+    debugTools?: DebugToolsEntry[],
   ): void {
     if (!this.soundManager) return;
     this.settingsPanel = new SettingsPanel(this, {
@@ -274,6 +276,7 @@ export abstract class CardGameScene extends Phaser.Scene {
       defaultDifficulty,
       hasTooltips: hasTooltips ?? true,
       skillRating,
+      debugTools,
     });
     this.settingsButton = this.settingsPanel.settingsButton!;
   }

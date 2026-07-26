@@ -12,6 +12,7 @@ import type { SoundManager } from '../core-engine/SoundManager';
 import { SettingsButton } from './SettingsButton';
 import { getReducedMotion, setReducedMotion, getEndTurnKeybind, setEndTurnKeybind, getTooltips, setTooltips, getCardDesign, setCardDesign, getAvailableCardDesigns } from './SettingsStore';
 import { createVersionLabel } from './versionDisplay';
+import type { DebugToolsEntry } from './debug/DebugToolsRegistry';
 
 // ── Public types ────────────────────────────────────────────
 
@@ -75,6 +76,15 @@ export interface SettingsPanelConfig {
    * settings panel to control AI difficulty in real time.
    */
   skillRating?: SkillRatingConfig;
+
+  /**
+   * Optional debug tool entries for the "Debug Tools" section.
+   * When provided and `import.meta.env.DEV` is true, a "Debug Tools"
+   * section is rendered below all other sections in the settings panel.
+   * Each entry provides a clickable label, description, and activate callback.
+   * In production builds, the entire debug section is tree-shaken.
+   */
+  debugTools?: DebugToolsEntry[];
 }
 
 // ── Style constants ─────────────────────────────────────────
@@ -147,6 +157,7 @@ export class SettingsPanel {
     buttonPosition: SettingsPanelConfig['buttonPosition'];
     hasTooltips: boolean;
     skillRating?: SkillRatingConfig;
+    debugTools?: DebugToolsEntry[];
   };
   private readonly panelWidth: number;
   private readonly canvasWidth: number;
@@ -254,6 +265,7 @@ export class SettingsPanel {
       buttonPosition: config.buttonPosition,
       hasTooltips: config.hasTooltips ?? true,
       skillRating: config.skillRating,
+      debugTools: config.debugTools,
     };
 
     this.canvasWidth = scene.scale.width;
@@ -743,6 +755,66 @@ export class SettingsPanel {
       });
       tip.setDepth(DEPTH_PANEL_CONTENT);
       this.container.add(tip);
+    }
+
+    // ── Debug Tools section (dev mode only) ────────────────
+    const debugTools = this.config.debugTools as DebugToolsEntry[] | undefined;
+    if (debugTools && debugTools.length > 0) {
+      if (import.meta.env.DEV) {
+        // Calculate Y position after all existing sections
+        let debugSectionY = endTurnY + 28;
+        if (this.config.skillRating) {
+          // Skill rating adds ~76px (label + slider)
+          debugSectionY += 76;
+        }
+        if (this.difficultyNames && this.difficultyNames.length > 0) {
+          // Difficulty adds ~52px (label + tip text)
+          debugSectionY += 52;
+        }
+        debugSectionY += 20; // gap after last section
+
+        const debugHeading = scene.add.text(
+          PADDING,
+          debugSectionY,
+          'Debug Tools',
+          { ...HEADING_STYLE, fontSize: '16px' },
+        );
+        debugHeading.setDepth(DEPTH_PANEL_CONTENT);
+        this.container.add(debugHeading);
+
+        let toolY = debugSectionY + 36;
+        for (const tool of debugTools) {
+          // Label (clickable)
+          const label = scene.add.text(PADDING, toolY, tool.label, {
+            ...LABEL_STYLE,
+            color: '#88ccff',
+          });
+          label.setOrigin(0, 0.5);
+          label.setDepth(DEPTH_PANEL_CONTENT);
+          label.setInteractive({ useHandCursor: true });
+          label.on('pointerdown', () => {
+            if (!this.destroyed) {
+              tool.activate(this.scene);
+            }
+          });
+          label.on('pointerover', () => label.setColor('#aaddff'));
+          label.on('pointerout', () => label.setColor('#88ccff'));
+          this.container.add(label);
+
+          // Description (smaller, below label)
+          const desc = scene.add.text(PADDING, toolY + 22, tool.description, {
+            fontSize: '12px',
+            color: '#aaaaaa',
+            fontFamily: 'Arial, sans-serif',
+            wordWrap: { width: this.panelWidth - PADDING * 2 },
+          });
+          desc.setOrigin(0, 0.5);
+          desc.setDepth(DEPTH_PANEL_CONTENT);
+          this.container.add(desc);
+
+          toolY += 52; // spacing for next tool
+        }
+      }
     }
 
     // Scene-level pointer events for slider dragging
