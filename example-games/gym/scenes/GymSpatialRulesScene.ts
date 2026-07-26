@@ -108,55 +108,39 @@ export class GymSpatialRulesScene extends GymSceneBase {
     this.highlightGraphics = this.add.graphics().setDepth(10);
 
     // ── Controls row 1: Grid configuration ──────────────────
-    let cx = 60;
+    const cx = 60;
     const ry = 100;
 
     this.addLabel(cx, ry, 'Grid:');
-    cx += 50;
-    this.addButton(cx, ry, '[ -W ]', () => this.adjustGridWidth(-1));
-    cx += 65;
-    this.gridWidthText = createHudText(this, cx, ry, `W=${this.gridWidth}`, '#ffffff', { fontSize: '14px' });
-    cx += 70;
-    this.addButton(cx, ry, '[ +W ]', () => this.adjustGridWidth(1));
-    cx += 65;
-    this.addButton(cx, ry, '[ -H ]', () => this.adjustGridHeight(-1));
-    cx += 65;
-    this.gridHeightText = createHudText(this, cx, ry, `H=${this.gridHeight}`, '#ffffff', { fontSize: '14px' });
-    cx += 70;
-    this.addButton(cx, ry, '[ +H ]', () => this.adjustGridHeight(1));
-    cx += 65;
-    this.addButton(cx, ry, '[ Randomise ]', () => this.randomiseGrid());
+    this.initButtonBar(ry);
+    this.buttonBar!.addButton('[ -W ]', () => this.adjustGridWidth(-1), { zone: 'left' });
+    this.gridWidthText = createHudText(this, 0, ry, `W=${this.gridWidth}`, '#ffffff', { fontSize: '14px' });
+    this.buttonBar!.addButton('[ +W ]', () => this.adjustGridWidth(1), { zone: 'left' });
+    this.buttonBar!.addButton('[ -H ]', () => this.adjustGridHeight(-1), { zone: 'left' });
+    this.gridHeightText = createHudText(this, 0, ry, `H=${this.gridHeight}`, '#ffffff', { fontSize: '14px' });
+    this.buttonBar!.addButton('[ +H ]', () => this.adjustGridHeight(1), { zone: 'left' });
+    this.buttonBar!.addButton('[ Randomise ]', () => this.randomiseGrid(), { zone: 'left' });
 
     // Controls row 2: Spatial query controls
-    cx = 60;
     const ry2 = ry + 28;
 
-    this.addButton(cx, ry2, '[ Metric: ]', () => this.cycleMetric());
-    cx += 85;
-    this.metricText = createHudText(this, cx, ry2, this.metric.toUpperCase(), '#ffff88', { fontSize: '14px' });
-    cx += 110;
-    this.addButton(cx, ry2, '[ Toggle Diag ]', () => this.toggleDiagonals());
-    cx += 130;
-    this.diagText = createHudText(this, cx, ry2, `Diag: ${this.includeDiagonals ? 'ON' : 'OFF'}`, '#88ff88', { fontSize: '14px' });
-    cx += 120;
-    this.addButton(cx, ry2, '[ Neighbors ]', () => this.demoNeighbors());
-    cx += 120;
-    this.addButton(cx, ry2, '[ Shortest Path ]', () => this.demoShortestPath());
-    cx += 135;
-    this.addButton(cx, ry2, '[ Path Exists ]', () => this.demoPathExists());
-    cx += 120;
-    this.addButton(cx, ry2, '[ Adj Bonus ]', () => this.demoAdjacencyBonus());
+    this.initButtonBar(ry2);
+    this.buttonBar!.addButton('[ Metric: ]', () => this.cycleMetric(), { zone: 'left' });
+    this.metricText = createHudText(this, 0, ry2, this.metric.toUpperCase(), '#ffff88', { fontSize: '14px' });
+    this.buttonBar!.addButton('[ Toggle Diag ]', () => this.toggleDiagonals(), { zone: 'left' });
+    this.diagText = createHudText(this, 0, ry2, `Diag: ${this.includeDiagonals ? 'ON' : 'OFF'}`, '#88ff88', { fontSize: '14px' });
+    this.buttonBar!.addButton('[ Neighbors ]', () => this.demoNeighbors(), { zone: 'left' });
+    this.buttonBar!.addButton('[ Shortest Path ]', () => this.demoShortestPath(), { zone: 'left' });
+    this.buttonBar!.addButton('[ Path Exists ]', () => this.demoPathExists(), { zone: 'left' });
+    this.buttonBar!.addButton('[ Adj Bonus ]', () => this.demoAdjacencyBonus(), { zone: 'left' });
 
     // Controls row 3: Clear / status
-    cx = 60;
     const ry3 = ry2 + 28;
-    this.addButton(cx, ry3, '[ Clear Sel ]', () => this.clearSelection());
-    cx += 110;
-    this.addButton(cx, ry3, '[ Clear Path ]', () => this.clearHighlight());
-    cx += 120;
-    this.addButton(cx, ry3, '[ Reset Grid ]', () => this.resetGrid());
-    cx += 120;
-    this.statusText = createHudText(this, cx, ry3, 'Click a cell to select it', '#88ff88', { fontSize: '13px' });
+    this.initButtonBar(ry3);
+    this.buttonBar!.addButton('[ Clear Sel ]', () => this.clearSelection(), { zone: 'left' });
+    this.buttonBar!.addButton('[ Clear Path ]', () => this.clearHighlight(), { zone: 'left' });
+    this.buttonBar!.addButton('[ Reset Grid ]', () => this.resetGrid(), { zone: 'left' });
+    this.statusText = createHudText(this, 0, ry3, 'Click a cell to select it', '#88ff88', { fontSize: '13px' });
 
     // ── Help panel ────────────────────────────────────────
     this.initHelp([

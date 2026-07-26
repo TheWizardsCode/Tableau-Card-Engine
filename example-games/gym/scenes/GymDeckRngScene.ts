@@ -123,14 +123,15 @@ export class GymDeckRngScene extends GymSceneBase {
     this.addLabel(cx, y, 'Seed:');
     this.seedText = createHudText(this, cx + 50, y, String(this.seed), '#ffffff', { fontSize: '16px' });
 
-    this.addButton(cx + 180, y, '[ -1 ]', () => this.adjustSeed(-1));
-    this.addButton(cx + 240, y, '[ +1 ]', () => this.adjustSeed(1));
-    this.addButton(cx + 310, y, '[ Reset Seed ]', () => this.resetSeed());
-    this.addButton(cx + 450, y, '[ Shuffle ]', () => {
+    this.initButtonBar(y);
+    this.buttonBar!.addButton('[ -1 ]', () => this.adjustSeed(-1), { zone: 'center' });
+    this.buttonBar!.addButton('[ +1 ]', () => this.adjustSeed(1), { zone: 'center' });
+    this.buttonBar!.addButton('[ Reset Seed ]', () => this.resetSeed(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Shuffle ]', () => {
       this.seed = Math.floor(Math.random() * 100000);
       this.seedText.setText(String(this.seed));
       this.shuffleAndRedraw();
-    });
+    }, { zone: 'center' });
 
     // ── Status ───────────────────────────────────────────
     this.statusText = createHudText(this, cx + 600, y, '52 cards displayed', '#88ff88', { fontSize: '16px' });

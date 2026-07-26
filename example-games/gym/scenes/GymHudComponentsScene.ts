@@ -126,7 +126,6 @@ export class GymHudComponentsScene extends GymSceneBase {
 
     const instructionsAnchor = resolveHudAnchor('instructions', 'center');
     const controlsAnchor = resolveHudAnchor('controls', 'center');
-    const controls2Anchor = resolveHudAnchor('controls2', 'center');
     const statusAnchor = resolveHudAnchor('status', 'center');
     const depthAnchor = resolveHudAnchor('depth', 'left');
     const logAnchor = resolveHudAnchor('log', 'center');
@@ -141,38 +140,39 @@ export class GymHudComponentsScene extends GymSceneBase {
 
     // ── Interactive controls ─────────────────────────────
 
-    this.addButton(cx - 250, controlsAnchor.y, '[ Open HelpPanel ]', () => {
+    this.initButtonBar(controlsAnchor.y);
+    this.buttonBar!.addButton('[ Open HelpPanel ]', () => {
       this.helpPanel!.open();
       this._helpOpen = true;
       this.updateStatusLines();
       this.logEvent('HelpPanel: open() called');
-    });
-    this.addButton(cx - 110, controlsAnchor.y, '[ Close HelpPanel ]', () => {
+    }, { zone: 'center' });
+    this.buttonBar!.addButton('[ Close HelpPanel ]', () => {
       this.helpPanel!.close();
       this._helpOpen = false;
       this.updateStatusLines();
       this.logEvent('HelpPanel: close() called');
-    });
-    this.addButton(cx + 30, controlsAnchor.y, '[ Toggle HelpPanel ]', () => {
+    }, { zone: 'center' });
+    this.buttonBar!.addButton('[ Toggle HelpPanel ]', () => {
       this.helpPanel!.toggle();
       this._helpOpen = !this._helpOpen;
       this.updateStatusLines();
       this.logEvent(`HelpPanel: toggle() → ${this._helpOpen ? 'open' : 'closed'}`);
-    });
+    }, { zone: 'center' });
 
-    this.addButton(cx - 130, controls2Anchor.y, '[ Open Settings ]', () => {
+    this.buttonBar!.addButton('[ Open Settings ]', () => {
       this.settingsPanel.open();
       this._settingsOpen = true;
       this.updateStatusLines();
       this.logEvent('SettingsPanel: open() called');
-    });
-    this.addButton(cx + 10, controls2Anchor.y, '[ Close Settings ]', () => {
+    }, { zone: 'center' });
+    this.buttonBar!.addButton('[ Close Settings ]', () => {
       this.settingsPanel.close();
       this._settingsOpen = false;
       this.updateStatusLines();
       this.logEvent('SettingsPanel: close() called');
-    });
-    this.addButton(cx + 150, controls2Anchor.y, '[ Toggle Settings ]', () => {
+    }, { zone: 'center' });
+    this.buttonBar!.addButton('[ Toggle Settings ]', () => {
       this.settingsPanel.toggle();
       this._settingsOpen = !this._settingsOpen;
       this.updateStatusLines();

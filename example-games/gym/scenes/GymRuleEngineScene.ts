@@ -204,36 +204,35 @@ export class GymRuleEngineScene extends GymSceneBase {
       color: '#669966',
     }).setOrigin(0.5);
 
-    // Buttons row 1
-    this.addButton(cx - 380, yLegality + 10, '[ Legal: move card ]', () =>
-      this.simulateLegalityAction('move card', true),
-    );
-    this.addButton(cx - 180, yLegality + 10, '[ Illegal: not your turn ]', () =>
-      this.simulateLegalityAction('not your turn', false, 'Not your turn'),
-    );
-    this.addButton(cx + 20, yLegality + 10, '[ Illegal: insufficient funds ]', () =>
+    // Buttons row 1 + 2 (wrapping)
+    this.initButtonBar(yLegality + 10);
+    this.buttonBar!.addButton('[ Legal: move card ]', () => {
+      this.simulateLegalityAction('move card', true);
+    }, { zone: 'center' });
+    this.buttonBar!.addButton('[ Illegal: not your turn ]', () => {
+      this.simulateLegalityAction('not your turn', false, 'Not your turn');
+    }, { zone: 'center' });
+    this.buttonBar!.addButton('[ Illegal: insufficient funds ]', () => {
       this.simulateLegalityAction(
         'insufficient funds',
         false,
         'Insufficient funds (need 50, have 20)',
-      ),
-    );
-    this.addButton(cx + 280, yLegality + 10, '[ Illegal: out of bounds ]', () =>
+      );
+    }, { zone: 'center' });
+    this.buttonBar!.addButton('[ Illegal: out of bounds ]', () => {
       this.simulateLegalityAction(
         'out of bounds',
         false,
         'Card position out of bounds',
-      ),
-    );
-
-    // Buttons row 2
-    this.addButton(cx - 160, yLegality + 34, '[ Illegal: wrong phase ]', () =>
+      );
+    }, { zone: 'center' });
+    this.buttonBar!.addButton('[ Illegal: wrong phase ]', () => {
       this.simulateLegalityAction(
         'wrong phase',
         false,
         'Cannot act during opponent turn',
-      ),
-    );
+      );
+    }, { zone: 'center' });
 
     // Legality result display
     this.legalityResultText = createHudText(
@@ -272,33 +271,32 @@ export class GymRuleEngineScene extends GymSceneBase {
       { fontSize: '18px' },
     ).setOrigin(0.5);
 
-    // Buttons row 1
-    this.addButton(cx - 420, yEconomy + 28, '[ +5 Coins ]', () =>
-      this.applyResourceDelta({ coins: 5 }),
-    );
-    this.addButton(cx - 310, yEconomy + 28, '[ -3 Coins ]', () =>
-      this.applyResourceDelta({ coins: -3 }),
-    );
-    this.addButton(cx - 200, yEconomy + 28, '[ +2 Reputation ]', () =>
-      this.applyResourceDelta({ reputation: 2 }),
-    );
-    this.addButton(cx - 80, yEconomy + 28, '[ -1 Reputation ]', () =>
-      this.applyResourceDelta({ reputation: -1 }),
-    );
-
-    // Buttons row 2 (violations and set/reset)
-    this.addButton(cx - 370, yEconomy + 52, '[ -25 Coins (violation) ]', () =>
-      this.applyResourceDelta({ coins: -25 }),
-    );
-    this.addButton(cx - 150, yEconomy + 52, '[ -10 Reputation (violation) ]', () =>
-      this.applyResourceDelta({ reputation: -10 }),
-    );
-    this.addButton(cx + 40, yEconomy + 52, '[ Set Score 100 ]', () => {
+    // Buttons row 1 + 2 (wrapping)
+    this.initButtonBar(yEconomy + 28);
+    this.buttonBar!.addButton('[ +5 Coins ]', () => {
+      this.applyResourceDelta({ coins: 5 });
+    }, { zone: 'center' });
+    this.buttonBar!.addButton('[ -3 Coins ]', () => {
+      this.applyResourceDelta({ coins: -3 });
+    }, { zone: 'center' });
+    this.buttonBar!.addButton('[ +2 Reputation ]', () => {
+      this.applyResourceDelta({ reputation: 2 });
+    }, { zone: 'center' });
+    this.buttonBar!.addButton('[ -1 Reputation ]', () => {
+      this.applyResourceDelta({ reputation: -1 });
+    }, { zone: 'center' });
+    this.buttonBar!.addButton('[ -25 Coins (violation) ]', () => {
+      this.applyResourceDelta({ coins: -25 });
+    }, { zone: 'center' });
+    this.buttonBar!.addButton('[ -10 Reputation (violation) ]', () => {
+      this.applyResourceDelta({ reputation: -10 });
+    }, { zone: 'center' });
+    this.buttonBar!.addButton('[ Set Score 100 ]', () => {
       this.ledger.setScore(100);
       this.updateResourceDisplay();
       this.logEvent('Set score to 100');
-    });
-    this.addButton(cx + 200, yEconomy + 52, '[ Reset Ledger ]', () => {
+    }, { zone: 'center' });
+    this.buttonBar!.addButton('[ Reset Ledger ]', () => {
       this.ledger = createEconomyLedger({
         coins: 10,
         reputation: 5,
@@ -307,7 +305,7 @@ export class GymRuleEngineScene extends GymSceneBase {
       });
       this.updateResourceDisplay();
       this.logEvent('Ledger reset to initial values');
-    });
+    }, { zone: 'center' });
 
     // Constraint violation text
     this.constraintViolationText = createHudText(

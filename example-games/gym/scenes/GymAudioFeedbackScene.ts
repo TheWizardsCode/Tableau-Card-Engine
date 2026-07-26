@@ -224,10 +224,11 @@ export class GymAudioFeedbackScene extends GymSceneBase {
     const controlsAnchor = resolveAudioAnchor('controls', 'center');
     const y = controlsAnchor.y;
 
-    this.addButton(cx - 480, y, '[ Toggle Mute ]', () => this.toggleMute());
-    this.addButton(cx - 310, y, '[ Volume - ]', () => this.adjustVolume(-0.1));
-    this.addButton(cx - 170, y, '[ Volume + ]', () => this.adjustVolume(0.1));
-    this.addButton(cx - 20, y, '[ Invalid Key ]', () => this.playInvalid());
+    this.initButtonBar(y);
+    this.buttonBar!.addButton('[ Toggle Mute ]', () => this.toggleMute(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Volume - ]', () => this.adjustVolume(-0.1), { zone: 'center' });
+    this.buttonBar!.addButton('[ Volume + ]', () => this.adjustVolume(0.1), { zone: 'center' });
+    this.buttonBar!.addButton('[ Invalid Key ]', () => this.playInvalid(), { zone: 'center' });
 
     // ── Dynamic sound event buttons ─────────────────────
     // Auto-discover registered sound keys from SoundManager
