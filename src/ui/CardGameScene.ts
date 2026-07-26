@@ -35,6 +35,7 @@ import type { SkillRatingConfig } from './SettingsPanel';
 import type { DebugToolsEntry } from './debug/DebugToolsRegistry';
 import { createSessionExportTool } from './debug/SessionExportTool';
 import { createStateInspectorTool } from './debug/StateInspectorOverlay';
+import { createGameEventLogTool } from './debug/GameEventLogOverlay';
 import { SettingsButton } from './SettingsButton';
 import type { HelpSection } from './HelpPanel';
 import { createSceneMenuButton } from './SceneHeader';
@@ -279,6 +280,7 @@ export abstract class CardGameScene extends Phaser.Scene {
     const effectiveDebugTools = debugTools ?? [
       createSessionExportTool(),
       createStateInspectorTool(),
+      createGameEventLogTool(),
     ];
     this.settingsPanel = new SettingsPanel(this, {
       soundManager: this.soundManager,

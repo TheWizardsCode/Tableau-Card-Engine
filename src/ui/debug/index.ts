@@ -10,3 +10,4 @@
 export { isDevMode, type DebugToolsEntry } from './DebugToolsRegistry';
 export { createSessionExportTool } from './SessionExportTool';
 export { createStateInspectorTool } from './StateInspectorOverlay';
+export { createGameEventLogTool } from './GameEventLogOverlay';
