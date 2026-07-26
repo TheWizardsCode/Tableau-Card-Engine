@@ -193,8 +193,12 @@ export abstract class CardGameScene extends Phaser.Scene {
     this.eventBridge = new PhaserEventBridge(this.gameEvents, this.events);
     (window as unknown as Record<string, unknown>).__GAME_EVENTS__ =
       this.gameEvents;
-    // Subscribe the global event buffer so debug overlays see past events
-    GlobalEventBuffer.getInstance().subscribe(this.gameEvents);
+    // Subscribe the global event buffer so debug overlays see past events.
+    // Gated behind `import.meta.env.DEV` so the GlobalEventBuffer module
+    // is tree-shaken from production builds.
+    if (import.meta.env.DEV) {
+      GlobalEventBuffer.getInstance().subscribe(this.gameEvents);
+    }
   }
 
   /**
@@ -280,13 +284,16 @@ export abstract class CardGameScene extends Phaser.Scene {
     debugTools?: DebugToolsEntry[],
   ): void {
     if (!this.soundManager) return;
-    // Provide default debug tools when none are explicitly specified
-    const effectiveDebugTools = debugTools ?? [
+    // Provide default debug tools when none are explicitly specified.
+    // In production builds, `import.meta.env.DEV` is `false`, so the
+    // creator functions are never called and Vite/Rollup tree-shakes
+    // the entire debug tool modules from the production bundle.
+    const effectiveDebugTools = debugTools ?? (import.meta.env.DEV ? [
       createSessionExportTool(),
       createStateInspectorTool(),
       createGameEventLogTool(),
       createAiDecisionViewerTool(),
-    ];
+    ] : []);
     this.settingsPanel = new SettingsPanel(this, {
       soundManager: this.soundManager,
       difficultyNames,
