@@ -6,11 +6,14 @@
  * - `DebugToolsEntry` — type interface for registering debug tool entries
  *
  * Because `import.meta.env.DEV` is a Vite build-time define, all code gated
- * behind `if (import.meta.env.DEV)` is tree-shaken from production bundles.
+ * behind `if (import.meta.env.DEV)` (or `if (isDevMode())`) is tree-shaken
+ * from production bundles.
  * See {@link https://vite.dev/guide/env-and-mode}.
  *
  * @module @ui/debug/DebugToolsRegistry
  */
+
+import type Phaser from 'phaser';
 
 /** A single debug tool entry for the Settings panel Debug section. */
 export interface DebugToolsEntry {

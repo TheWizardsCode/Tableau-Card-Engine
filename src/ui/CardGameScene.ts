@@ -261,6 +261,9 @@ export abstract class CardGameScene extends Phaser.Scene {
    * @param defaultDifficulty  Default difficulty name when no preference exists.
    * @param hasTooltips  Whether the game has tooltips (shows/hides the
    *                     Tooltips toggle in the settings panel). Default `true`.
+   * @param skillRating  Optional AI skill rating slider configuration.
+   * @param debugTools   Optional list of debug tool entries to show in the
+   *                     Debug Tools section (visible only in dev mode).
    */
   protected initSettingsPanel(
     difficultyNames?: readonly string[],

@@ -276,6 +276,11 @@ export type {
   EnsureTextureResult,
 } from './Renderer';
 
+// Debug tools registry
+// @module @ui/debug/DebugToolsRegistry
+export { isDevMode } from './debug/DebugToolsRegistry';
+export type { DebugToolsEntry } from './debug/DebugToolsRegistry';
+
 // Slider – reusable horizontal slider widget
 export { Slider } from './Slider';
 export type { SliderOptions } from './Slider';

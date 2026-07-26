@@ -12,7 +12,7 @@ import type { SoundManager } from '../core-engine/SoundManager';
 import { SettingsButton } from './SettingsButton';
 import { getReducedMotion, setReducedMotion, getEndTurnKeybind, setEndTurnKeybind, getTooltips, setTooltips, getCardDesign, setCardDesign, getAvailableCardDesigns } from './SettingsStore';
 import { createVersionLabel } from './versionDisplay';
-import type { DebugToolsEntry } from './debug/DebugToolsRegistry';
+import { isDevMode, type DebugToolsEntry } from './debug/DebugToolsRegistry';
 
 // ── Public types ────────────────────────────────────────────
 
@@ -61,6 +61,14 @@ export interface SettingsPanelConfig {
    * the default position (left of the help button).
    */
   buttonPosition?: SettingsButtonPosition;
+
+  /**
+   * Optional list of debug tool entries for the Debug Tools section.
+   * When provided (and `import.meta.env.DEV` is true), a "Debug Tools"
+   * section is rendered at the bottom of the Settings panel.
+   * In production builds, the entire Debug section is tree-shaken away.
+   */
+  debugTools?: DebugToolsEntry[];
 
   /**
    * Whether the current game has tooltips. When true (default), a
@@ -155,6 +163,7 @@ export class SettingsPanel {
     difficultyNames?: readonly string[];
     showButton: boolean;
     buttonPosition: SettingsPanelConfig['buttonPosition'];
+    debugTools?: DebugToolsEntry[];
     hasTooltips: boolean;
     skillRating?: SkillRatingConfig;
     debugTools?: DebugToolsEntry[];
@@ -263,6 +272,7 @@ export class SettingsPanel {
       toggleKey: config.toggleKey ?? 'Escape',
       showButton,
       buttonPosition: config.buttonPosition,
+      debugTools: config.debugTools,
       hasTooltips: config.hasTooltips ?? true,
       skillRating: config.skillRating,
       debugTools: config.debugTools,
@@ -758,62 +768,60 @@ export class SettingsPanel {
     }
 
     // ── Debug Tools section (dev mode only) ────────────────
-    const debugTools = this.config.debugTools as DebugToolsEntry[] | undefined;
-    if (debugTools && debugTools.length > 0) {
-      if (import.meta.env.DEV) {
-        // Calculate Y position after all existing sections
-        let debugSectionY = endTurnY + 28;
-        if (this.config.skillRating) {
-          // Skill rating adds ~76px (label + slider)
-          debugSectionY += 76;
-        }
-        if (this.difficultyNames && this.difficultyNames.length > 0) {
-          // Difficulty adds ~52px (label + tip text)
-          debugSectionY += 52;
-        }
-        debugSectionY += 20; // gap after last section
+    const debugTools = this.config.debugTools;
+    if (isDevMode() && debugTools && debugTools.length > 0) {
+      // Calculate Y position after all existing sections
+      let debugSectionY = endTurnY + 28;
+      if (this.config.skillRating) {
+        // Skill rating adds ~76px (label + slider)
+        debugSectionY += 76;
+      }
+      if (this.difficultyNames && this.difficultyNames.length > 0) {
+        // Difficulty adds ~52px (label + tip text)
+        debugSectionY += 52;
+      }
+      debugSectionY += 20; // gap after last section
 
-        const debugHeading = scene.add.text(
-          PADDING,
-          debugSectionY,
-          'Debug Tools',
-          { ...HEADING_STYLE, fontSize: '16px' },
-        );
-        debugHeading.setDepth(DEPTH_PANEL_CONTENT);
-        this.container.add(debugHeading);
+      const debugHeading = scene.add.text(
+        PADDING,
+        debugSectionY,
+        'Debug Tools',
+        { ...HEADING_STYLE, fontSize: '16px' },
+      );
+      debugHeading.setDepth(DEPTH_PANEL_CONTENT);
+      this.container.add(debugHeading);
 
-        let toolY = debugSectionY + 36;
-        for (const tool of debugTools) {
-          // Label (clickable)
-          const label = scene.add.text(PADDING, toolY, tool.label, {
-            ...LABEL_STYLE,
-            color: '#88ccff',
-          });
-          label.setOrigin(0, 0.5);
-          label.setDepth(DEPTH_PANEL_CONTENT);
-          label.setInteractive({ useHandCursor: true });
-          label.on('pointerdown', () => {
-            if (!this.destroyed) {
-              tool.activate(this.scene);
-            }
-          });
-          label.on('pointerover', () => label.setColor('#aaddff'));
-          label.on('pointerout', () => label.setColor('#88ccff'));
-          this.container.add(label);
+      let toolY = debugSectionY + 36;
+      for (const tool of debugTools) {
+        // Label (clickable)
+        const label = scene.add.text(PADDING, toolY, tool.label, {
+          ...LABEL_STYLE,
+          color: '#88ccff',
+        });
+        label.setOrigin(0, 0.5);
+        label.setDepth(DEPTH_PANEL_CONTENT);
+        label.setInteractive({ useHandCursor: true });
+        label.on('pointerdown', () => {
+          if (!this.destroyed) {
+            tool.activate(this.scene);
+          }
+        });
+        label.on('pointerover', () => label.setColor('#aaddff'));
+        label.on('pointerout', () => label.setColor('#88ccff'));
+        this.container.add(label);
 
-          // Description (smaller, below label)
-          const desc = scene.add.text(PADDING, toolY + 22, tool.description, {
-            fontSize: '12px',
-            color: '#aaaaaa',
-            fontFamily: 'Arial, sans-serif',
-            wordWrap: { width: this.panelWidth - PADDING * 2 },
-          });
-          desc.setOrigin(0, 0.5);
-          desc.setDepth(DEPTH_PANEL_CONTENT);
-          this.container.add(desc);
+        // Description (smaller, below label)
+        const desc = scene.add.text(PADDING, toolY + 22, tool.description, {
+          fontSize: '12px',
+          color: '#aaaaaa',
+          fontFamily: 'Arial, sans-serif',
+          wordWrap: { width: this.panelWidth - PADDING * 2 },
+        });
+        desc.setOrigin(0, 0.5);
+        desc.setDepth(DEPTH_PANEL_CONTENT);
+        this.container.add(desc);
 
-          toolY += 52; // spacing for next tool
-        }
+        toolY += 52; // spacing for next tool
       }
     }
 
