@@ -16,7 +16,7 @@ import type { DebugToolsEntry } from './DebugToolsRegistry';
 // ── Constants ───────────────────────────────────────────────
 
 const TREE_INDENT = 20;
-const LINE_HEIGHT = 18;
+const LINE_HEIGHT = 22;
 const HEADING_HEIGHT = 40;
 const FILTER_HEIGHT = 30;
 const REFRESH_BTN_HEIGHT = 36;
@@ -61,6 +61,8 @@ interface InspectorState {
   filterInput: HTMLInputElement | null;
   treeContainer: Phaser.GameObjects.Container | null;
   refreshFn: (() => void) | null;
+  /** Persisted set of expanded node full-paths, survives re-renders. */
+  expandedKeys: Set<string>;
 }
 
 let activeInspector: InspectorState | null = null;
@@ -173,10 +175,6 @@ function renderInspector(
   } catch { /* ignore */ }
 
   // Build tree nodes with filter
-  const expandedNodes = new Set<string>();
-  // Restore expansion state from current nodes (future: persisting expansion)
-  // Currently rebuilds from scratch each time
-
   // Fresh state extraction
   const extractedState = extractState(scene);
 
@@ -195,7 +193,7 @@ function renderInspector(
     for (const [key, value] of Object.entries(obj)) {
       const fullPath = parentPath ? `${parentPath}.${key}` : key;
       const isExpandable = value !== null && typeof value === 'object';
-      const isExpanded = expandedNodes.has(fullPath);
+      const isExpanded = state.expandedKeys.has(fullPath);
 
       // Filter check
       const matchesFilter = !state.filterText ||
@@ -256,9 +254,9 @@ function renderInspector(
     const x = node.depth * TREE_INDENT;
 
     const textObj = scene.add.text(x, y, node.display, {
-      fontSize: '12px',
+      fontSize: '13px',
       color: node.color,
-      fontFamily: 'Courier New, monospace',
+      fontFamily: 'Consolas, Monaco, "Lucida Console", monospace',
       wordWrap: { width: contentWidth - node.depth * TREE_INDENT },
     });
     textObj.setDepth(DEPTH_CONTENT);
@@ -268,11 +266,11 @@ function renderInspector(
     if (typeof node.expanded !== 'undefined') {
       textObj.setInteractive({ useHandCursor: true });
       textObj.on('pointerdown', () => {
-        // Toggle in our expanded set and re-render
-        if (expandedNodes.has(node.fullPath)) {
-          expandedNodes.delete(node.fullPath);
+        // Toggle in the persisted expanded set and re-render
+        if (state.expandedKeys.has(node.fullPath)) {
+          state.expandedKeys.delete(node.fullPath);
         } else {
-          expandedNodes.add(node.fullPath);
+          state.expandedKeys.add(node.fullPath);
         }
         renderInspector(scene, state, boxX, boxY, boxWidth, boxHeight);
       });
@@ -309,6 +307,7 @@ export function createStateInspectorTool(): DebugToolsEntry {
         filterInput: null,
         treeContainer: null,
         refreshFn: null,
+        expandedKeys: new Set<string>(),
       };
 
       // ── Create overlay background and box ──────────────────
@@ -381,7 +380,7 @@ export function createStateInspectorTool(): DebugToolsEntry {
       filterInput.style.borderRadius = '4px';
       filterInput.style.backgroundColor = '#2a2a3e';
       filterInput.style.color = '#dddddd';
-      filterInput.style.fontFamily = 'Courier New, monospace';
+      filterInput.style.fontFamily = 'Consolas, Monaco, "Lucida Console", monospace';
       filterInput.style.outline = 'none';
       document.body.appendChild(filterInput);
       state.filterInput = filterInput;

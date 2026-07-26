@@ -81,16 +81,16 @@ function renderDecisions(scene: Phaser.Scene, state: ViewerState): void {
   const visible = records.slice(-maxLines);
 
   visible.forEach((record, i) => {
-    const y = i * 18;
+    const y = i * 22;
     const breakdown = record.scoringBreakdown
       ? ` | score: ${JSON.stringify(record.scoringBreakdown)}`
       : '';
     const displayText = `T${record.turnNumber} [${record.strategyName}] ${record.chosenAction}${breakdown}`;
 
     const textObj = scene.add.text(0, y, displayText, {
-      fontSize: '11px',
+      fontSize: '13px',
       color: '#cccccc',
-      fontFamily: 'Courier New, monospace',
+      fontFamily: 'Consolas, Monaco, "Lucida Console", monospace',
     });
     textObj.setDepth(DEPTH_CONTENT);
     container.add(textObj);

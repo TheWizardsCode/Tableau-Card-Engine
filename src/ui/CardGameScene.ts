@@ -37,6 +37,7 @@ import { createSessionExportTool } from './debug/SessionExportTool';
 import { createStateInspectorTool } from './debug/StateInspectorOverlay';
 import { createGameEventLogTool } from './debug/GameEventLogOverlay';
 import { createAiDecisionViewerTool } from './debug/AiDecisionOverlay';
+import { GlobalEventBuffer } from './debug/GlobalEventBuffer';
 import { SettingsButton } from './SettingsButton';
 import type { HelpSection } from './HelpPanel';
 import { createSceneMenuButton } from './SceneHeader';
@@ -192,6 +193,8 @@ export abstract class CardGameScene extends Phaser.Scene {
     this.eventBridge = new PhaserEventBridge(this.gameEvents, this.events);
     (window as unknown as Record<string, unknown>).__GAME_EVENTS__ =
       this.gameEvents;
+    // Subscribe the global event buffer so debug overlays see past events
+    GlobalEventBuffer.getInstance().subscribe(this.gameEvents);
   }
 
   /**

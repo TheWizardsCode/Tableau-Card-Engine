@@ -12,10 +12,7 @@ import {
   dismissOverlay,
 } from '../Overlay';
 import type { DebugToolsEntry } from './DebugToolsRegistry';
-import type {
-  GameEventEmitter,
-  GameEventName,
-} from '../../core-engine/GameEventEmitter';
+import { GlobalEventBuffer } from './GlobalEventBuffer';
 
 // ── Constants ───────────────────────────────────────────────
 
@@ -31,33 +28,7 @@ const BOX_Y = (GAME_H - BOX_HEIGHT) / 2;
 const COLOR_BG = 0x1a1a2e;
 
 // Known event names for subscription
-const ALL_EVENT_NAMES: GameEventName[] = [
-  'turn-started',
-  'turn-completed',
-  'animation-complete',
-  'state-settled',
-  'game-ended',
-  'card-drawn',
-  'card-flipped',
-  'card-swapped',
-  'card-discarded',
-  'card:discarded',
-  'card:dealt',
-  'card:placed',
-  'ui-interaction',
-  'income-gained',
-  'card-to-foundation',
-  'card-to-tableau',
-  'card-pickup',
-  'card-snap-back',
-  'auto-complete-start',
-  'auto-complete-card',
-  'undo',
-  'redo',
-  'card-selected',
-  'card-deselected',
-  'deal-card',
-];
+// All event names are subscribed by GlobalEventBuffer
 
 // ── Event log entry ─────────────────────────────────────────
 
@@ -74,29 +45,25 @@ interface EventLogState {
   objects: Phaser.GameObjects.GameObject[];
   entries: LogEntry[];
   paused: boolean;
-  emitter: GameEventEmitter | null;
   container: Phaser.GameObjects.Container | null;
-  listeners: Array<{ event: string; fn: (payload: unknown) => void }>;
 }
 
 let activeLog: EventLogState | null = null;
 
-// ── Window event accessor ───────────────────────────────────
+// ── Status text — inform user about buffer state ───────────
 
-function getEmitter(): GameEventEmitter | null {
-  const w = window as unknown as Record<string, unknown>;
-  const emitter = w.__GAME_EVENTS__;
-  if (emitter && typeof emitter === 'object' && 'on' in (emitter as Record<string, unknown>)) {
-    return emitter as GameEventEmitter;
+function getBufferStatus(): string {
+  const buf = GlobalEventBuffer.getInstance();
+  if (!buf.subscribed) {
+    return 'No GameEventEmitter detected — __GAME_EVENTS__ not found';
   }
-  return null;
+  const count = buf.getEntries().length;
+  return count === 0
+    ? 'Buffer active — no events received yet'
+    : `Buffer active — ${count} events recorded`;
 }
 
 // ── Formatting helpers ──────────────────────────────────────
-
-function formatTimestamp(): string {
-  return new Date().toISOString().slice(11, 23);
-}
 
 function truncatePayload(payload: unknown, maxLen = 80): string {
   try {
@@ -137,13 +104,13 @@ function renderLog(scene: Phaser.Scene, state: EventLogState): void {
   const visible = state.entries.slice(-maxLines);
 
   visible.forEach((entry, i) => {
-    const y = i * 18;
+    const y = i * 22;
     const displayText = `${entry.timestamp} [${entry.eventName}] ${truncatePayload(entry.payload)}`;
 
     const textObj = scene.add.text(0, y, displayText, {
-      fontSize: '11px',
+      fontSize: '13px',
       color: '#cccccc',
-      fontFamily: 'Courier New, monospace',
+      fontFamily: 'Consolas, Monaco, "Lucida Console", monospace',
     });
     textObj.setDepth(DEPTH_CONTENT);
     container.add(textObj);
@@ -160,39 +127,12 @@ function renderLog(scene: Phaser.Scene, state: EventLogState): void {
   }
 }
 
-// ── Event subscription management ───────────────────────────
+// ── Refresh entries from buffer ────────────────────────────
 
-function subscribe(emitter: GameEventEmitter, state: EventLogState): void {
-  // Unsubscribe existing
-  unsubscribe(state);
-
-  state.listeners = [];
-  for (const eventName of ALL_EVENT_NAMES) {
-    const fn = (payload: unknown) => {
-      if (!state.paused) {
-        state.entries.push({
-          timestamp: formatTimestamp(),
-          eventName,
-          payload,
-        });
-        renderLog(state.scene, state);
-      }
-    };
-    emitter.on(eventName as GameEventName, fn as (payload: unknown) => void);
-    state.listeners.push({ event: eventName, fn });
-  }
-}
-
-function unsubscribe(state: EventLogState): void {
-  if (!state.emitter) return;
-  for (const { event, fn } of state.listeners) {
-    try {
-      state.emitter.off(event as GameEventName, fn as (payload: unknown) => void);
-    } catch {
-      // Ignore unsubscribe errors
-    }
-  }
-  state.listeners = [];
+function refreshFromBuffer(state: EventLogState): void {
+  const buf = GlobalEventBuffer.getInstance();
+  state.entries = buf.getEntries().slice() as LogEntry[];
+  renderLog(state.scene, state);
 }
 
 // ── Factory ─────────────────────────────────────────────────
@@ -209,7 +149,9 @@ export function createGameEventLogTool(): DebugToolsEntry {
     activate: (scene: Phaser.Scene) => {
       // Close existing log if open
       if (activeLog) {
-        unsubscribe(activeLog);
+        if ((activeLog as any)._pollInterval) {
+          (activeLog as any)._pollInterval.destroy();
+        }
         dismissOverlay(activeLog.objects);
         activeLog = null;
       }
@@ -219,9 +161,7 @@ export function createGameEventLogTool(): DebugToolsEntry {
         objects: [],
         entries: [],
         paused: false,
-        emitter: null,
         container: null,
-        listeners: [],
       };
 
       // ── Create overlay background and box ──────────────────
@@ -265,7 +205,9 @@ export function createGameEventLogTool(): DebugToolsEntry {
       closeBtn.setDepth(DEPTH_CONTENT);
       closeBtn.setInteractive({ useHandCursor: true });
       closeBtn.on('pointerdown', () => {
-        unsubscribe(state);
+        if ((state as any)._pollInterval) {
+          (state as any)._pollInterval.destroy();
+        }
         dismissOverlay(state.objects);
         activeLog = null;
       });
@@ -331,8 +273,9 @@ export function createGameEventLogTool(): DebugToolsEntry {
         if (hud && typeof hud.add === 'function') hud.add(pauseBtn);
       } catch { /* ignore */ }
 
+      const buf = GlobalEventBuffer.getInstance();
       // Event count
-      const countText = scene.add.text(BOX_X + BOX_WIDTH - 60, btnY, '0 events', {
+      const countText = scene.add.text(BOX_X + BOX_WIDTH - 60, btnY, buf.getEntries().length + ' events', {
         fontSize: '12px',
         color: '#aaaaaa',
         fontFamily: 'Arial, sans-serif',
@@ -344,18 +287,31 @@ export function createGameEventLogTool(): DebugToolsEntry {
         if (hud && typeof hud.add === 'function') hud.add(countText);
       } catch { /* ignore */ }
 
-      // ── Subscribe to events ────────────────────────────────
-      const emitter = getEmitter();
-      if (emitter) {
-        state.emitter = emitter;
-        subscribe(emitter, state);
-        statusText.setText('Status: Recording...');
-      } else {
-        statusText.setText('Status: No GameEventEmitter found on window.__GAME_EVENTS__');
-      }
+      // ── Load from global buffer ───────────────────────────
+      refreshFromBuffer(state);
 
-      // Initial render
-      renderLog(scene, state);
+
+      // Poll for new entries every 500ms
+      const pollInterval = scene.time.addEvent({
+        delay: 500,
+        loop: true,
+        callback: () => {
+          if (!activeLog) return;
+          const newCount = buf.getEntries().length;
+          if (state.entries.length !== newCount) {
+            refreshFromBuffer(state);
+            statusText.setText('Status: ' + getBufferStatus());
+            countText.setText(newCount + ' events');
+          }
+        },
+      });
+
+      // Store the poll interval for cleanup
+      (state as any)._pollInterval = pollInterval;
+
+      // Update count and status
+      statusText.setText('Status: ' + getBufferStatus());
+      countText.setText(buf.getEntries().length + ' events');
 
       activeLog = state;
     },

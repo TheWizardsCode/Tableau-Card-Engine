@@ -222,6 +222,11 @@ export class SettingsPanel {
   private cardDesignTextObjects: Phaser.GameObjects.Text[] = [];
   private _cardDesignKey: string;
 
+  // Scrollable content sub-container
+  private _scrollContent: Phaser.GameObjects.Container;
+  private _scrollY = 0;
+  private _maxContentY = 0;
+
   // State
   private _isOpen = false;
   private _isAnimating = false;
@@ -324,6 +329,11 @@ export class SettingsPanel {
     title.setDepth(DEPTH_PANEL_CONTENT);
     this.container.add(title);
 
+    // ── Scrollable content container ────────────────────
+    this._scrollContent = scene.add.container(0, 0);
+    this._scrollContent.setDepth(DEPTH_PANEL_CONTENT);
+    this.container.add(this._scrollContent);
+
     // ── Sound section ───────────────────────────────────
 
     const sectionStartY = PADDING + 70;
@@ -335,7 +345,7 @@ export class SettingsPanel {
       { ...HEADING_STYLE, fontSize: '16px' },
     );
     soundHeading.setDepth(DEPTH_PANEL_CONTENT);
-    this.container.add(soundHeading);
+    this._scrollContent.add(soundHeading);
 
     // ── Mute toggle ─────────────────────────────────────
 
@@ -344,7 +354,7 @@ export class SettingsPanel {
     this.muteLabel = scene.add.text(PADDING, muteY, 'Mute', LABEL_STYLE);
     this.muteLabel.setOrigin(0, 0.5);
     this.muteLabel.setDepth(DEPTH_PANEL_CONTENT);
-    this.container.add(this.muteLabel);
+    this._scrollContent.add(this.muteLabel);
 
     // Toggle background (pill shape simulated with rectangle)
     const toggleX = this.panelWidth - PADDING - TOGGLE_SIZE * 1.8;
@@ -359,13 +369,13 @@ export class SettingsPanel {
     );
     this.muteToggleBg.setOrigin(0, 0.5);
     this.muteToggleBg.setDepth(DEPTH_PANEL_CONTENT);
-    this.container.add(this.muteToggleBg);
+    this._scrollContent.add(this.muteToggleBg);
 
     // Toggle knob
     this.muteToggleKnob = scene.add.graphics();
     this.muteToggleKnob.setDepth(DEPTH_PANEL_CONTENT);
     this.drawMuteKnob(isMuted);
-    this.container.add(this.muteToggleKnob);
+    this._scrollContent.add(this.muteToggleKnob);
 
     // Mute status text
     this.muteStatusText = scene.add.text(
@@ -376,7 +386,7 @@ export class SettingsPanel {
     );
     this.muteStatusText.setOrigin(0, 0.5);
     this.muteStatusText.setDepth(DEPTH_PANEL_CONTENT);
-    this.container.add(this.muteStatusText);
+    this._scrollContent.add(this.muteStatusText);
 
     // Mute hit area
     this.muteHitArea = scene.add.zone(
@@ -388,7 +398,7 @@ export class SettingsPanel {
     this.muteHitArea.setDepth(DEPTH_PANEL_CONTENT);
     this.muteHitArea.setInteractive({ useHandCursor: true });
     this.muteHitArea.on('pointerdown', () => this.handleMuteToggle());
-    this.container.add(this.muteHitArea);
+    this._scrollContent.add(this.muteHitArea);
 
     // ── Volume slider ───────────────────────────────────
 
@@ -397,7 +407,7 @@ export class SettingsPanel {
     this.volumeLabel = scene.add.text(PADDING, volumeY, 'Volume', LABEL_STYLE);
     this.volumeLabel.setOrigin(0, 0.5);
     this.volumeLabel.setDepth(DEPTH_PANEL_CONTENT);
-    this.container.add(this.volumeLabel);
+    this._scrollContent.add(this.volumeLabel);
 
     // Volume percentage text
     const currentVolume = this.config.soundManager.volume;
@@ -409,7 +419,7 @@ export class SettingsPanel {
     );
     this.volumeValueText.setOrigin(1, 0.5);
     this.volumeValueText.setDepth(DEPTH_PANEL_CONTENT);
-    this.container.add(this.volumeValueText);
+    this._scrollContent.add(this.volumeValueText);
 
     // Slider track
     const sliderY = volumeY + 30;
@@ -424,7 +434,7 @@ export class SettingsPanel {
       SLIDER_TRACK_COLOR,
     );
     this.sliderTrack.setDepth(DEPTH_PANEL_CONTENT);
-    this.container.add(this.sliderTrack);
+    this._scrollContent.add(this.sliderTrack);
 
     // Slider fill (left portion showing current volume)
     const fillWidth = this.sliderTrackWidth * currentVolume;
@@ -436,13 +446,13 @@ export class SettingsPanel {
       SLIDER_FILL_COLOR,
     );
     this.sliderFill.setDepth(DEPTH_PANEL_CONTENT);
-    this.container.add(this.sliderFill);
+    this._scrollContent.add(this.sliderFill);
 
     // Slider handle
     this.sliderHandle = scene.add.graphics();
     this.sliderHandle.setDepth(DEPTH_CLOSE_BUTTON); // above other content
     this.drawSliderHandle(this.sliderTrackX + fillWidth, sliderY);
-    this.container.add(this.sliderHandle);
+    this._scrollContent.add(this.sliderHandle);
 
     // Slider hit area (wider than the track for easier interaction)
     this.sliderHitArea = scene.add.zone(
@@ -457,7 +467,7 @@ export class SettingsPanel {
       this.isDraggingSlider = true;
       this.handleSliderInteraction(pointer);
     });
-    this.container.add(this.sliderHitArea);
+    this._scrollContent.add(this.sliderHitArea);
 
     // ── Display section ─────────────────────────────────
 
@@ -470,7 +480,7 @@ export class SettingsPanel {
       { ...HEADING_STYLE, fontSize: '16px' },
     );
     displayHeading.setDepth(DEPTH_PANEL_CONTENT);
-    this.container.add(displayHeading);
+    this._scrollContent.add(displayHeading);
 
     // ── Tooltip toggle (only shown when the game has tooltips) ──
 
@@ -482,7 +492,7 @@ export class SettingsPanel {
       this.tooltipLabel = scene.add.text(PADDING, tooltipY, 'Tooltips', LABEL_STYLE);
       this.tooltipLabel.setOrigin(0, 0.5);
       this.tooltipLabel.setDepth(DEPTH_PANEL_CONTENT);
-      this.container.add(this.tooltipLabel);
+      this._scrollContent.add(this.tooltipLabel);
 
       // Toggle background (same pill style as mute toggle)
       const tooltipToggleX = this.panelWidth - PADDING - TOGGLE_SIZE * 1.8;
@@ -496,13 +506,13 @@ export class SettingsPanel {
       );
       this.tooltipToggleBg.setOrigin(0, 0.5);
       this.tooltipToggleBg.setDepth(DEPTH_PANEL_CONTENT);
-      this.container.add(this.tooltipToggleBg);
+      this._scrollContent.add(this.tooltipToggleBg);
 
       // Toggle knob
       this.tooltipToggleKnob = scene.add.graphics();
       this.tooltipToggleKnob.setDepth(DEPTH_PANEL_CONTENT);
       this.drawTooltipKnob(this._showTooltips);
-      this.container.add(this.tooltipToggleKnob);
+      this._scrollContent.add(this.tooltipToggleKnob);
 
       // Tooltip status text
       this.tooltipStatusText = scene.add.text(
@@ -513,7 +523,7 @@ export class SettingsPanel {
       );
       this.tooltipStatusText.setOrigin(0, 0.5);
       this.tooltipStatusText.setDepth(DEPTH_PANEL_CONTENT);
-      this.container.add(this.tooltipStatusText);
+      this._scrollContent.add(this.tooltipStatusText);
 
       // Tooltip hit area
       const tooltipHitArea = scene.add.zone(
@@ -525,7 +535,7 @@ export class SettingsPanel {
       tooltipHitArea.setDepth(DEPTH_PANEL_CONTENT);
       tooltipHitArea.setInteractive({ useHandCursor: true });
       tooltipHitArea.on('pointerdown', () => this.handleTooltipToggle());
-      this.container.add(tooltipHitArea);
+      this._scrollContent.add(tooltipHitArea);
 
       nextDisplayY = tooltipY + 46;
     }
@@ -536,7 +546,7 @@ export class SettingsPanel {
     this.reducedMotionLabel = scene.add.text(PADDING, reducedMotionY, 'Reduced Motion', LABEL_STYLE);
     this.reducedMotionLabel.setOrigin(0, 0.5);
     this.reducedMotionLabel.setDepth(DEPTH_PANEL_CONTENT);
-    this.container.add(this.reducedMotionLabel);
+    this._scrollContent.add(this.reducedMotionLabel);
 
     const reducedMotionToggleX = this.panelWidth - PADDING - TOGGLE_SIZE * 1.8;
     this.reducedMotionToggleBg = scene.add.rectangle(
@@ -548,12 +558,12 @@ export class SettingsPanel {
     );
     this.reducedMotionToggleBg.setOrigin(0, 0.5);
     this.reducedMotionToggleBg.setDepth(DEPTH_PANEL_CONTENT);
-    this.container.add(this.reducedMotionToggleBg);
+    this._scrollContent.add(this.reducedMotionToggleBg);
 
     this.reducedMotionToggleKnob = scene.add.graphics();
     this.reducedMotionToggleKnob.setDepth(DEPTH_PANEL_CONTENT);
     this.drawReducedMotionKnob(this._reducedMotion);
-    this.container.add(this.reducedMotionToggleKnob);
+    this._scrollContent.add(this.reducedMotionToggleKnob);
 
     this.reducedMotionStatusText = scene.add.text(
       reducedMotionToggleX + TOGGLE_SIZE * 1.8 + 8,
@@ -563,7 +573,7 @@ export class SettingsPanel {
     );
     this.reducedMotionStatusText.setOrigin(0, 0.5);
     this.reducedMotionStatusText.setDepth(DEPTH_PANEL_CONTENT);
-    this.container.add(this.reducedMotionStatusText);
+    this._scrollContent.add(this.reducedMotionStatusText);
 
     const reducedMotionHitArea = scene.add.zone(
       reducedMotionToggleX + TOGGLE_SIZE * 0.9,
@@ -574,7 +584,7 @@ export class SettingsPanel {
     reducedMotionHitArea.setDepth(DEPTH_PANEL_CONTENT);
     reducedMotionHitArea.setInteractive({ useHandCursor: true });
     reducedMotionHitArea.on('pointerdown', () => this.handleReducedMotionToggle());
-    this.container.add(reducedMotionHitArea);
+    this._scrollContent.add(reducedMotionHitArea);
 
     // ── Card Design selector ─────────────────────────────
     const cardDesignY = reducedMotionY + 46;
@@ -582,7 +592,7 @@ export class SettingsPanel {
     this.cardDesignLabel = scene.add.text(PADDING, cardDesignY, 'Card Design', LABEL_STYLE);
     this.cardDesignLabel.setOrigin(0, 0.5);
     this.cardDesignLabel.setDepth(DEPTH_PANEL_CONTENT);
-    this.container.add(this.cardDesignLabel);
+    this._scrollContent.add(this.cardDesignLabel);
 
     // Layout design names horizontally
     const designs = getAvailableCardDesigns();
@@ -601,7 +611,7 @@ export class SettingsPanel {
       txt.setInteractive({ useHandCursor: true });
       (txt as any).tceCardDesignKey = design.key;
       txt.on('pointerdown', () => this.handleCardDesignSelect(design.key));
-      this.container.add(txt);
+      this._scrollContent.add(txt);
       this.cardDesignTextObjects.push(txt);
       designX += txt.width + designGap;
     }
@@ -611,21 +621,21 @@ export class SettingsPanel {
       fontSize: '12px', color: '#aaaaaa', fontFamily: 'Arial, sans-serif',
     });
     designTip.setDepth(DEPTH_PANEL_CONTENT);
-    this.container.add(designTip);
+    this._scrollContent.add(designTip);
 
     // ── End Turn keybind control ──────────────────────────
     const endTurnY = cardDesignY + 46;
     const endTurnLabel = scene.add.text(PADDING, endTurnY, 'End Turn Key', LABEL_STYLE);
     endTurnLabel.setOrigin(0, 0.5);
     endTurnLabel.setDepth(DEPTH_PANEL_CONTENT);
-    this.container.add(endTurnLabel);
+    this._scrollContent.add(endTurnLabel);
 
     // Current key label
     const currentKey = getEndTurnKeybind();
     this._endTurnKeyText = scene.add.text(this.panelWidth - PADDING, endTurnY, currentKey, VALUE_STYLE);
     this._endTurnKeyText.setOrigin(1, 0.5);
     this._endTurnKeyText.setDepth(DEPTH_PANEL_CONTENT);
-    this.container.add(this._endTurnKeyText);
+    this._scrollContent.add(this._endTurnKeyText);
 
     // Hit area to change binding
     this._endTurnHitArea = scene.add.zone(
@@ -638,7 +648,7 @@ export class SettingsPanel {
     this._endTurnHitArea.setDepth(DEPTH_PANEL_CONTENT);
     this._endTurnHitArea.setInteractive({ useHandCursor: true });
     this._endTurnHitArea.on('pointerdown', () => this.beginEndTurnKeyCapture());
-    this.container.add(this._endTurnHitArea as any);
+    this._scrollContent.add(this._endTurnHitArea as any);
 
     // Instruction when waiting for key
     this._endTurnInstruction = scene.add.text(this.panelWidth - PADDING - 130, endTurnY + 28, '', {
@@ -646,7 +656,7 @@ export class SettingsPanel {
     });
     this._endTurnInstruction.setOrigin(1, 0.5);
     this._endTurnInstruction.setDepth(DEPTH_PANEL_CONTENT);
-    this.container.add(this._endTurnInstruction);
+    this._scrollContent.add(this._endTurnInstruction);
 
     // ── AI Skill Rating slider ──────────────────────────
     if (this.config.skillRating) {
@@ -658,7 +668,7 @@ export class SettingsPanel {
       this.skillLabel = scene.add.text(PADDING, skillY, 'AI Skill', LABEL_STYLE);
       this.skillLabel.setOrigin(0, 0.5);
       this.skillLabel.setDepth(DEPTH_PANEL_CONTENT);
-      this.container.add(this.skillLabel);
+      this._scrollContent.add(this.skillLabel);
 
       // Value text (right-aligned)
       this.skillValueText = scene.add.text(
@@ -669,7 +679,7 @@ export class SettingsPanel {
       );
       this.skillValueText.setOrigin(1, 0.5);
       this.skillValueText.setDepth(DEPTH_PANEL_CONTENT);
-      this.container.add(this.skillValueText);
+      this._scrollContent.add(this.skillValueText);
 
       // Slider track
       const sliderY = skillY + 30;
@@ -684,7 +694,7 @@ export class SettingsPanel {
         SLIDER_TRACK_COLOR,
       );
       this.skillSliderTrack.setDepth(DEPTH_PANEL_CONTENT);
-      this.container.add(this.skillSliderTrack);
+      this._scrollContent.add(this.skillSliderTrack);
 
       // Slider fill (proportional to current value)
       const ratio = (this._skillRatingValue - srConfig.min) / (srConfig.max - srConfig.min);
@@ -697,13 +707,13 @@ export class SettingsPanel {
         SLIDER_FILL_COLOR,
       );
       this.skillSliderFill.setDepth(DEPTH_PANEL_CONTENT);
-      this.container.add(this.skillSliderFill);
+      this._scrollContent.add(this.skillSliderFill);
 
       // Slider handle
       this.skillSliderHandle = scene.add.graphics();
       this.skillSliderHandle.setDepth(DEPTH_CLOSE_BUTTON);
       this.drawSkillSliderHandle(this.skillTrackX + fillWidth, sliderY);
-      this.container.add(this.skillSliderHandle);
+      this._scrollContent.add(this.skillSliderHandle);
 
       // Slider hit area
       this.skillSliderHitArea = scene.add.zone(
@@ -718,7 +728,7 @@ export class SettingsPanel {
         this.isDraggingSkillSlider = true;
         this.handleSkillSliderInteraction(pointer);
       });
-      this.container.add(this.skillSliderHitArea);
+      this._scrollContent.add(this.skillSliderHitArea);
     }
 
     // If difficulty names were provided, render a horizontal selectable list here
@@ -727,7 +737,7 @@ export class SettingsPanel {
       this.difficultyLabel = scene.add.text(PADDING, difficultyY, 'Difficulty', LABEL_STYLE);
       this.difficultyLabel.setOrigin(0, 0.5);
       this.difficultyLabel.setDepth(DEPTH_PANEL_CONTENT);
-      this.container.add(this.difficultyLabel);
+      this._scrollContent.add(this.difficultyLabel);
 
       // layout names horizontally from left (after label) with spacing
       const startX = PADDING + 120;
@@ -744,7 +754,7 @@ export class SettingsPanel {
         // store name for later reference
         (txt as any).tceName = name;
         txt.on('pointerdown', () => this.setSelectedDifficulty(name));
-        this.container.add(txt);
+        this._scrollContent.add(txt);
         this.difficultyTextObjects.push(txt);
         x += txt.width + gap;
       }
@@ -754,7 +764,7 @@ export class SettingsPanel {
         fontSize: '12px', color: '#aaaaaa', fontFamily: 'Arial, sans-serif',
       });
       tip.setDepth(DEPTH_PANEL_CONTENT);
-      this.container.add(tip);
+      this._scrollContent.add(tip);
     }
 
     // ── Debug Tools section (dev mode only) ────────────────
@@ -779,7 +789,7 @@ export class SettingsPanel {
         { ...HEADING_STYLE, fontSize: '16px' },
       );
       debugHeading.setDepth(DEPTH_PANEL_CONTENT);
-      this.container.add(debugHeading);
+      this._scrollContent.add(debugHeading);
 
       let toolY = debugSectionY + 36;
       for (const tool of debugTools) {
@@ -798,7 +808,7 @@ export class SettingsPanel {
         });
         label.on('pointerover', () => label.setColor('#aaddff'));
         label.on('pointerout', () => label.setColor('#88ccff'));
-        this.container.add(label);
+        this._scrollContent.add(label);
 
         // Description (smaller, below label)
         const desc = scene.add.text(PADDING, toolY + 22, tool.description, {
@@ -809,10 +819,41 @@ export class SettingsPanel {
         });
         desc.setOrigin(0, 0.5);
         desc.setDepth(DEPTH_PANEL_CONTENT);
-        this.container.add(desc);
+        this._scrollContent.add(desc);
 
         toolY += 52; // spacing for next tool
       }
+      // Record bottom of debug tools content for scroll setup
+      this._maxContentY = toolY + 28;
+    }
+
+    // ── Scroll setup if content overflows ─────────────
+    // maxContent was computed inside the debug tools block if present.
+    // Fallback for when there are no debug tools:
+    if (!(isDevMode() && debugTools && debugTools.length > 0)) {
+      let fallbackY = endTurnY + 46;
+      if (this.config.skillRating) fallbackY += 76;
+      if (this.difficultyNames && this.difficultyNames.length > 0) fallbackY += 52;
+      this._maxContentY = fallbackY + 80;
+    }
+
+    if (this._maxContentY > this.canvasHeight) {
+      // Mask clips scrollable content to the panel's visible area
+      const maskShape = scene.add.graphics();
+      maskShape.fillRect(0, 0, this.panelWidth, this.canvasHeight);
+      this._scrollContent.setMask(maskShape.createGeometryMask());
+
+      // Wheel scroll on scene
+      scene.input.on('wheel', (_pointer: Phaser.Input.Pointer, _gameObjects: unknown[], _dx: number, dy: number) => {
+        if (!this._isOpen) return;
+        const maxScroll = this._maxContentY - this.canvasHeight + PADDING;
+        this._scrollY = Phaser.Math.Clamp(
+          this._scrollY - dy * 1.5,
+          -maxScroll,
+          0,
+        );
+        this._scrollContent.y = this._scrollY;
+      });
     }
 
     // Scene-level pointer events for slider dragging
@@ -923,6 +964,9 @@ export class SettingsPanel {
     if (this._isOpen && !this._isAnimating) return;
 
     this._isOpen = true;
+    // Reset scroll position each time the panel opens
+    this._scrollY = 0;
+    this._scrollContent.y = 0;
     this.container.setVisible(true);
 
     // Show version label on the canvas
