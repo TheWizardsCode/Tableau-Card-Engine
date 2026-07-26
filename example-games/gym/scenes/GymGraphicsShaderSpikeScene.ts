@@ -148,9 +148,10 @@ export class GymGraphicsShaderSpikeScene extends GymSceneBase {
     const logAnchor = resolveShaderAnchor('log', 'center');
     const y = controlsAnchor.y;
 
-    this.addButton(cx - 400, y, '[ Next Tint ]', () => this.cycleTint());
-    this.addButton(cx - 240, y, '[ Next Blend ]', () => this.cycleBlendMode());
-    this.addButton(cx - 60, y, '[ Reset Tint ]', () => this.resetTint());
+    this.initButtonBar(y);
+    this.buttonBar!.addButton('[ Next Tint ]', () => this.cycleTint(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Next Blend ]', () => this.cycleBlendMode(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Reset Tint ]', () => this.resetTint(), { zone: 'center' });
     this.statusLineText = createHudText(this, cx, statusAnchor.y, 'Blend: NORMAL | Tint: None', '#88ff88', { fontSize: '12px' }).setOrigin(0.5);
 
     // Create sample sprites at content anchor Y

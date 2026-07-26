@@ -227,15 +227,10 @@ export class GymParameterizedOverlayScene extends GymSceneBase {
     const cx = controlsAnchor.x;
     const cy = controlsAnchor.y;
 
-    this.addButton(cx - 240, cy, '[ Game Over ]', () => {
-      this.openOverlay(0);
-    });
-    this.addButton(cx - 70, cy, '[ Round End ]', () => {
-      this.openOverlay(1);
-    });
-    this.addButton(cx + 100, cy, '[ Confirm Action ]', () => {
-      this.openOverlay(2);
-    });
+    this.initButtonBar(cy);
+    this.buttonBar!.addButton('[ Game Over ]', () => this.openOverlay(0), { zone: 'center' });
+    this.buttonBar!.addButton('[ Round End ]', () => this.openOverlay(1), { zone: 'center' });
+    this.buttonBar!.addButton('[ Confirm Action ]', () => this.openOverlay(2), { zone: 'center' });
 
     // ── Offset indicator labels ───────────────────────────
 

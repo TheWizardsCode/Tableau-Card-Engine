@@ -218,22 +218,20 @@ export class GymSaveLoadScene extends GymSceneBase {
     // ── Buttons ───────────────────────────────────────────────
     const cx = GAME_W / 2;
     const controlsAnchor = resolveSaveLoadAnchor('controls', 'center');
-    const controls2Anchor = resolveSaveLoadAnchor('controls2', 'center');
     const stateAnchor = resolveSaveLoadAnchor('state', 'center');
     const backendAnchor = resolveSaveLoadAnchor('backend', 'center');
     const logAnchor = resolveSaveLoadAnchor('log', 'center');
     const y = controlsAnchor.y;
 
-    this.addButton(cx - 400, y, '[ Add Card ]', () => this.addCard());
-    this.addButton(cx - 240, y, '[ Save State ]', () => this.saveState());
-    this.addButton(cx - 80, y, '[ Load State ]', () => this.loadState());
-    this.addButton(cx + 80, y, '[ Load Malformed ]', () => this.loadMalformed());
-    this.addButton(cx + 240, y, '[ Clear Save ]', () => this.clearSave());
-
-    const y2 = controls2Anchor.y;
-    this.addButton(cx - 300, y2, '[ Take Screenshot ]', () => this.takeScreenshot());
-    this.addButton(cx - 100, y2, '[ Clear Screenshot ]', () => this.clearScreenshot());
-    this.addButton(cx + 100, y2, '[ Randomize Hand ]', () => this.randomizeHand());
+    this.initButtonBar(y);
+    this.buttonBar!.addButton('[ Add Card ]', () => this.addCard(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Save State ]', () => this.saveState(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Load State ]', () => this.loadState(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Load Malformed ]', () => this.loadMalformed(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Clear Save ]', () => this.clearSave(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Take Screenshot ]', () => this.takeScreenshot(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Clear Screenshot ]', () => this.clearScreenshot(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Randomize Hand ]', () => this.randomizeHand(), { zone: 'center' });
 
     // ── State text ────────────────────────────────────────────
     try {

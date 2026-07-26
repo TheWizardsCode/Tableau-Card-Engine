@@ -62,6 +62,9 @@ export class GymTooltipScene extends GymSceneBase {
   // Tooltip enable/disable state (default: enabled, persisted to localStorage)
   private tooltipsEnabled = true;
 
+  /** Reference to the toggle button for dynamic label updates. */
+  private toggleBtnRef: Phaser.GameObjects.Text | null = null;
+
   constructor() {
     super({ key: GYM_TOOLTIP_KEY });
     // Load persisted tooltip preference (default: enabled)
@@ -99,13 +102,14 @@ export class GymTooltipScene extends GymSceneBase {
     const logAnchor = resolveAnchor('log', 'center');
 
     // Mode toggle buttons — centred horizontally on header anchor, offset ±180/20/200/380
-    this.addButton(headerAnchor.x - 180, headerAnchor.y, '[ DOM Mode ]', () => this.setMode(true));
-    this.addButton(headerAnchor.x + 20, headerAnchor.y, '[ Phaser Mode ]', () => this.setMode(false));
-    this.addButton(headerAnchor.x + 200, headerAnchor.y, '[ Show Demo ]', () => this.showDemoTooltip());
-    this.addButton(
-      headerAnchor.x + 380, headerAnchor.y,
+    this.initButtonBar(headerAnchor.y);
+    this.buttonBar!.addButton('[ DOM Mode ]', () => this.setMode(true), { zone: 'center' });
+    this.buttonBar!.addButton('[ Phaser Mode ]', () => this.setMode(false), { zone: 'center' });
+    this.buttonBar!.addButton('[ Show Demo ]', () => this.showDemoTooltip(), { zone: 'center' });
+    this.toggleBtnRef = this.buttonBar!.addButton(
       this.tooltipsEnabled ? '[ Disable ]' : '[ Enable ]',
       () => this.toggleTooltips(),
+      { zone: 'center' },
     );
 
     // Mode label — at label anchor y
@@ -213,14 +217,8 @@ export class GymTooltipScene extends GymSceneBase {
 
     // Update the toggle button text
     const toggleText = this.tooltipsEnabled ? '[ Disable ]' : '[ Enable ]';
-    // Find the toggle button (the one that shows [ Disable ] or [ Enable ])
-    const toggleBtn = this.children.list.find(
-      (c) =>
-        c instanceof Phaser.GameObjects.Text &&
-        (c.text === '[ Disable ]' || c.text === '[ Enable ]'),
-    ) as Phaser.GameObjects.Text | undefined;
-    if (toggleBtn) {
-      toggleBtn.setText(toggleText);
+    if (this.toggleBtnRef) {
+      this.toggleBtnRef.setText(toggleText);
     }
 
     // Update the status label

@@ -190,12 +190,13 @@ export class GymOverlayUiScene extends GymSceneBase {
 
     const controlsAnchor = resolveOverlayAnchor('controls', 'center');
     const cx = controlsAnchor.x;
-    let y = controlsAnchor.y;
+    const y = controlsAnchor.y;
 
-    this.addButton(cx - 300, y, '[ Show Overlay ]', () => this.openOverlay());
-    this.addButton(cx - 120, y, '[ Dismiss Overlay ]', () => this.closeOverlay());
-    this.addButton(cx + 80, y, '[ Intensity - ]', () => this.adjustIntensity(-0.2));
-    this.addButton(cx + 260, y, '[ Intensity + ]', () => this.adjustIntensity(0.2));
+    this.initButtonBar(y);
+    this.buttonBar!.addButton('[ Show Overlay ]', () => this.openOverlay(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Dismiss Overlay ]', () => this.closeOverlay(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Intensity - ]', () => this.adjustIntensity(-0.2), { zone: 'center' });
+    this.buttonBar!.addButton('[ Intensity + ]', () => this.adjustIntensity(0.2), { zone: 'center' });
 
     const intensityAnchor = resolveOverlayAnchor('intensity', 'center');
     this.intensityText = createHudText(this, cx, intensityAnchor.y, 'Feedback Intensity: 1.0', '#88ff88', { fontSize: '16px' });

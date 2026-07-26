@@ -182,18 +182,11 @@ export class GymMarketOfferEngineScene extends GymSceneBase {
     // ── Controls ───────────────────────────────────────────
     const cx = GAME_W / 2;
 
-    this.addButton(cx - 340, CONTROLS_Y, '[ Purchase Selected ]', () =>
-      this.purchaseSelected(),
-    );
-    this.addButton(cx - 140, CONTROLS_Y, '[ Refill Row ]', () =>
-      this.refillSelectedRow(),
-    );
-    this.addButton(cx + 60, CONTROLS_Y, '[ Lock/Unlock ]', () =>
-      this.toggleLock(),
-    );
-    this.addButton(cx + 260, CONTROLS_Y, '[ Reset Market ]', () =>
-      this.resetMarket(),
-    );
+    this.initButtonBar(CONTROLS_Y);
+    this.buttonBar!.addButton('[ Purchase Selected ]', () => this.purchaseSelected(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Refill Row ]', () => this.refillSelectedRow(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Lock/Unlock ]', () => this.toggleLock(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Reset Market ]', () => this.resetMarket(), { zone: 'center' });
 
     // ── Status text ────────────────────────────────────────
     this.statusText = createHudText(

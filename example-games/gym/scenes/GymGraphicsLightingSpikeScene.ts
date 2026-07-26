@@ -100,8 +100,9 @@ export class GymGraphicsLightingSpikeScene extends GymSceneBase {
     const logAnchor = resolveLightingAnchor('log', 'center');
     const y = controlsAnchor.y;
 
-    this.addButton(cx - 100, y, '[ Toggle Light ]', () => this.toggleLight());
-    this.addButton(cx + 100, y, '[ Move Light ]', () => this.moveLight());
+    this.initButtonBar(y);
+    this.buttonBar!.addButton('[ Toggle Light ]', () => this.toggleLight(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Move Light ]', () => this.moveLight(), { zone: 'center' });
 
     const spriteY = contentAnchor.y;
     const lightY = spriteY - 20;
