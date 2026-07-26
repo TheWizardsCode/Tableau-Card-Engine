@@ -1948,6 +1948,69 @@ Games that need to separate persistent overlay elements (help/settings buttons, 
 
 If no `hudOverlayContainer` exists on the scene, the HelpPanel and SettingsPanel will fall back to `hudContainer`, and if neither exists, they use standard depth layering.
 
+### GymButtonBar
+
+The `GymButtonBar` class (at `src/ui/GymButtonBar.ts`) provides a reusable full-width button bar with **left, center, and right zones** and **automatic row wrapping**. It is designed for Gym demo scenes to replace the manual `addButton(x, y, ...)` pattern with a declarative API.
+
+```typescript
+import { GymButtonBar } from '@ui';
+
+const bar = new GymButtonBar(scene, {
+  y: 60,                 // Y position of first row
+  zone: 'center',        // default zone for buttons (optional)
+  padding: 20,           // horizontal padding from screen edges
+  buttonGap: 16,         // gap between buttons within a zone
+  rowSpacing: 28,        // vertical gap between wrapped rows
+  width: GAME_W,         // total bar width (defaults to 1280)
+});
+
+bar.addButton('[ Draw ]', () => this.drawCard(), { zone: 'center' });
+bar.addButton('[ Discard ]', () => this.discardCard(), { zone: 'right' });
+bar.addButton('[ Reset ]', () => this.resetGame(), { zone: 'left' });
+```
+
+#### Zones
+
+Each zone occupies one-third of the bar width:
+- **`'left'`** — Buttons align to the left edge of the left zone
+- **`'center'`** — Buttons are centered in the center zone
+- **`'right'`** — Buttons align to the right edge of the right zone
+
+Buttons that overflow their zone width automatically wrap to a new row below. Multiple rows (1..n) are supported.
+
+#### Per-button overrides
+
+```typescript
+bar.addButton('[ Custom ]', () => { /* ... */ }, {
+  zone: 'left',
+  fontSize: '16px',
+  color: '#ff8888',          // text color
+  hoverColor: '#ffbbbb',     // hover color
+});
+```
+
+#### Instance methods
+
+| Method | Description |
+|--------|-------------|
+| `addButton(label, callback, opts?)` | Add a button to the bar. Returns the `Phaser.GameObjects.Text` instance for further manipulation (e.g., `setVisible()`, `setText()`). |
+| `refresh()` | Re-layout all buttons (call after modifying button visibility or text). |
+| `destroy()` | Remove all buttons and clean up. |
+
+#### Integration with GymSceneBase
+
+Gym scenes call `initButtonBar()` to create a `GymButtonBar` instance and store it as `this.buttonBar`:
+
+```typescript
+protected initButtonBar(y?: number): void {
+  this.buttonBar = new GymButtonBar(this, { y: y ?? 60 });
+}
+```
+
+Scenes with buttons at multiple Y positions create multiple `GymButtonBar` instances at different Y values.
+
+The `GymButtonBar` is exported from the UI barrel (`src/ui/index.ts`) and can be used by any scene, not just Gym scenes.
+
 ### Depth Convention Summary
 
 | Component | Depth |
