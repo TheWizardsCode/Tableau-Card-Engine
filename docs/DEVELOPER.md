@@ -2043,6 +2043,175 @@ wl update <id> --status in_progress --json  # claim a task
 wl close <id> --reason "..." --json  # close when done
 ```
 
+## Developer Mode Debug Tools
+
+The Tableau Card Engine includes a suite of debug tools that appear only when
+running in developer mode (`npm run dev`). In production builds (`npm run build`),
+the entire debug infrastructure is tree-shaken from the bundle using Vite's
+`import.meta.env.DEV` build-time constant.
+
+### How It Works
+
+- **Dev mode detection:** A shared `isDevMode()` function (in
+  `src/ui/debug/DebugToolsRegistry.ts`) returns the value of
+  `import.meta.env.DEV`. During `npm run dev`, this is `true`. In production
+  builds, Vite replaces it with `false` and tree-shakes all dead code gated
+  behind `if (isDevMode())` — no debug code leaks into the production bundle.
+
+- **Debug Tools section:** When `import.meta.env.DEV` is `true` and at least
+  one debug tool is registered, a "Debug Tools" section appears at the bottom
+  of the Settings panel (below all other sections). Each tool is displayed as
+  a clickable label with a short description.
+
+- **Opening the tools:** Press the Settings button (gear icon) in any game
+  scene, scroll to the bottom of the panel, and click a debug tool to open
+  its overlay.
+
+### Available Debug Tools
+
+#### Export Session
+
+- **Label:** "Export Session"
+- **Location:** Debug Tools section of the Settings panel
+- **Function:** Downloads the current game transcript as a JSON file. If the
+  active scene has a `recorder` with a `getTranscript()` method, it serializes
+  the full transcript. Otherwise, it produces an empty transcript with metadata.
+- **Use case:** Developers can export session data for debugging, regression
+  testing, or replay without needing to finish the game or use CLI tools.
+- **Implementation:** `src/ui/debug/SessionExportTool.ts`
+
+#### State Inspector
+
+- **Label:** "State Inspector"
+- **Location:** Debug Tools section of the Settings panel
+- **Function:** Opens a scrollable overlay showing the current game state as a
+  collapsible tree view. Features include:
+  - **Collapsible tree:** Click ▶/▼ icons to expand or collapse objects.
+  - **Text filter:** Type in the filter field to show only matching fields
+    (matched against key names and string values).
+  - **Refresh button:** Re-reads the scene's state and redraws the tree.
+  - **Close button:** Dismisses the overlay.
+- **State detection:** The inspector automatically detects common state patterns
+  (`state`, `gameState`, `session`, `recorder`). Falls back to enumerating all
+  scene properties.
+- **Use case:** Inspect runtime game state to debug AI decisions, rule
+  validation, and rendering issues.
+- **Implementation:** `src/ui/debug/StateInspectorOverlay.ts`
+
+#### Game Events
+
+- **Label:** "Game Events"
+- **Location:** Debug Tools section of the Settings panel
+- **Function:** Opens a scrollable overlay showing a live feed of events
+  emitted by the `GameEventEmitter` during gameplay. Features include:
+  - **Live feed:** Each event displays an ISO timestamp, event name (e.g.,
+    `turn-started`, `turn-completed`, `state-settled`, `card-drawn`), and a
+    truncated view of the event payload.
+  - **Auto-scroll:** Newest events appear at the bottom and are shown
+    automatically.
+  - **Clear button:** Removes all entries from the feed.
+  - **Pause/Resume:** Toggles whether new events are added to the feed.
+- **Event source:** Subscribes to the `GameEventEmitter` instance exposed on
+  `window.__GAME_EVENTS__` (set up automatically by `CardGameScene`).
+- **Use case:** Monitor event flow during gameplay for debugging event-driven
+  interactions or replays.
+- **Implementation:** `src/ui/debug/GameEventLogOverlay.ts`
+
+#### AI Decisions
+
+- **Label:** "AI Decisions"
+- **Location:** Debug Tools section of the Settings panel
+- **Function:** Opens a scrollable overlay showing per-turn AI decision
+  records. Features include:
+  - **Decision records:** Each entry shows turn number, AI strategy name,
+    and a description of the chosen action.
+  - **Clear button:** Removes all entries.
+  - **Pause/Resume:** Toggles whether new decisions are recorded.
+- **Recording:** Game scenes push decision data to the global
+  `AiDecisionRecorder` singleton at decision points. Golf's `GolfAiController`
+  is instrumented out of the box; other games can add recording by importing
+  and calling `AiDecisionRecorder.getInstance().record(...)`.
+- **Use case:** Debug AI behavior, verify strategy selection, and inspect
+  decision patterns across turns.
+- **Implementation:**
+  - `src/ui/debug/AiDecisionRecorder.ts` — Recording singleton
+  - `src/ui/debug/AiDecisionOverlay.ts` — Display overlay
+
+### Adding a New Debug Tool
+
+Adding a new debug tool requires minimal code:
+
+1. **Create a tool factory** in a new file under `src/ui/debug/` that exports a
+   function returning a `DebugToolsEntry` object:
+
+   ```ts
+   import type { DebugToolsEntry } from './DebugToolsRegistry';
+
+   export function createMyTool(): DebugToolsEntry {
+     return {
+       label: 'My Tool',
+       description: 'What my tool does',
+       activate: (scene: Phaser.Scene) => {
+         // Your tool logic here
+       },
+     };
+   }
+   ```
+
+2. **(Optional) Export from the barrel** by adding to `src/ui/debug/index.ts`.
+
+3. **Register the tool** by adding it to the default debug tools array in
+   `CardGameScene.initSettingsPanel()` (in `src/ui/CardGameScene.ts`):
+
+   ```ts
+   import { createMyTool } from './debug/MyTool';
+   // ...
+   const effectiveDebugTools = debugTools ?? [
+     createSessionExportTool(),
+     createStateInspectorTool(),
+     createGameEventLogTool(),
+     createAiDecisionViewerTool(),
+     createMyTool(),   // <-- add yours here
+   ];
+   ```
+
+   Alternatively, pass a custom `debugTools` array directly to
+   `initSettingsPanel()` from any game scene to override the defaults.
+
+4. **Write tests** (at minimum, verify the factory returns a valid entry).
+
+### Production Safety
+
+All debug code is gated behind `if (isDevMode())` (or direct `if (import.meta.env.DEV)`), which Vite evaluates at build time. During `npm run build`:
+
+- `import.meta.env.DEV` is replaced with `false`.
+- All code inside `if (false) { ... }` blocks is eliminated by Vite's
+  tree-shaking (dead code elimination).
+- No debug strings, imports, or logic appear in the production bundle.
+
+To verify production safety:
+
+1. Build the project: `npm run build`
+2. Check the output bundle for any debug-related strings:
+   ```bash
+   grep -i "debug\\|state inspector\\|export session\\|game events\\|ai decisions" dist/assets/*.js
+   ```
+   This should produce no matches.
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/ui/debug/DebugToolsRegistry.ts` | `isDevMode()` function and `DebugToolsEntry` type |
+| `src/ui/debug/SessionExportTool.ts` | Session export debug tool |
+| `src/ui/debug/StateInspectorOverlay.ts` | State inspector overlay |
+| `src/ui/debug/GameEventLogOverlay.ts` | Game event log overlay |
+| `src/ui/debug/AiDecisionRecorder.ts` | AI decision recording singleton |
+| `src/ui/debug/AiDecisionOverlay.ts` | AI decision viewer overlay |
+| `src/ui/debug/index.ts` | Debug tools barrel file |
+| `src/ui/CardGameScene.ts` | Default debug tool registration |
+| `src/ui/SettingsPanel.ts` | Debug section rendering in Settings panel |
+
 ## Troubleshooting
 
 **Vite dev server won't start:**
