@@ -6,7 +6,7 @@
  *
  * Related work item: CG-0MRDKXBAK001GRH0
  */
-import { describe, it, expect, afterEach, beforeEach } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import Phaser from 'phaser';
 import type { FeudalismRenderer } from '../../example-games/feudalism/scenes/FeudalismRenderer';
 import type { Tier } from '../../example-games/feudalism/FeudalismCards';
@@ -19,11 +19,6 @@ import {
   MARKET_TIER_GAP,
 } from '../../example-games/feudalism/scenes/FeudalismConstants';
 import { waitForScene } from '../helpers/waitForScene';
-
-// ── Constants ───────────────────────────────────────────────
-
-const GAME_W = 1280;
-const GAME_H = 720;
 
 // ── Helpers ─────────────────────────────────────────────────
 
@@ -152,7 +147,6 @@ describe('Feudalism market refill animation', () => {
     game = await bootGame();
     const scene = game.scene.getScene('FeudalismScene')!;
     const renderer = getRenderer(scene).feudRenderer;
-    const session = getRenderer(scene).session;
 
     // Find a market slot that has a card
     const slot = findFirstMarketCard(getRenderer(scene));
@@ -247,8 +241,6 @@ describe('Feudalism market refill animation', () => {
   it('should clear pending refill slots before onRefreshMarket callback', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('FeudalismScene')!;
-    const renderer = getRenderer(scene).feudRenderer;
-
     // Access the turn controller
     const turnController = (scene as any).turnController;
     expect(turnController).toBeDefined();
