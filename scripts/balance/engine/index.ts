@@ -41,3 +41,24 @@ export type {
   CardTemplate,
   CardMetricResult,
 } from './card-metrics';
+
+export {
+  computeWinRateByStrategy,
+  computeScoreDistribution,
+  computeEconomyHealth,
+  computeSynergyDiversityIndex,
+  computeLossModeDecomposition,
+  computeCardUsageDiversity,
+  computeTurnByTurnSnapshots,
+  computeTrapCardPrevalence,
+} from './global-metrics';
+export type {
+  ComboLabel,
+  ScoreDistribution,
+  EconomyHealthResult,
+  SynergyDiversityResult,
+  LossModeResult,
+  CardUsageDiversityResult,
+  TurnByTurnSnapshot,
+  TrapCardResult,
+} from './global-metrics';
