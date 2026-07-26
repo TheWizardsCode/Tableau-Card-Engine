@@ -137,6 +137,8 @@ export class FeudalismScene extends CardGameScene {
       },
       onPlaySound: (key) => this.soundManager?.play(key),
       onSetPatronAnimationCache: (patron, index) => this.feudRenderer.cachePatronForAnimation(patron, index),
+      onSetPendingRefillSlots: (slots) => this.feudRenderer.addPendingRefillSlots(slots),
+      onClearPendingRefillSlots: () => this.feudRenderer.clearPendingRefillSlots(),
       onEmitTurnStarted: () => {
         this.gameEvents.emit('turn-started', {
           turnNumber: 0,
@@ -501,6 +503,8 @@ export class FeudalismScene extends CardGameScene {
       },
       onPlaySound: (key) => this.soundManager?.play(key),
       onSetPatronAnimationCache: (patron, index) => this.feudRenderer.cachePatronForAnimation(patron, index),
+      onSetPendingRefillSlots: (slots) => this.feudRenderer.addPendingRefillSlots(slots),
+      onClearPendingRefillSlots: () => this.feudRenderer.clearPendingRefillSlots(),
       onEmitTurnStarted: () => {
         this.gameEvents.emit('turn-started', {
           turnNumber: 0,

@@ -23,6 +23,13 @@ export interface TurnControllerCallbacks {
   onEmitGameEnded: (winnerIdx: number) => void;
   /** Cache a patron to keep it visible in the patron column during animation. */
   onSetPatronAnimationCache: (patron: PatronTile | null, index: number) => void;
+  /**
+   * Mark market slots that are about to be refilled so they render as
+   * empty during the refill animation. Cleared by onClearPendingRefillSlots.
+   */
+  onSetPendingRefillSlots: (slots: { tier: Tier; col: number }[]) => void;
+  /** Clear all pending refill slot flags before a re-render. */
+  onClearPendingRefillSlots: () => void;
   /** Callback after each complete turn (human or AI) to save a checkpoint. */
   onSaveCheckpoint?: () => void;
 }
@@ -163,6 +170,12 @@ export class FeudalismTurnController {
           this.callbacks.onSetPatronAnimationCache(result.patronVisit, patronSourceIndex);
         }
 
+        // Mark the market slot as pending refill so it renders as empty
+        // during the deck-back fly-in animation. Cleared in onRefreshMarket.
+        if (marketSlot) {
+          this.callbacks.onSetPendingRefillSlots([marketSlot]);
+        }
+
         this.setPhase('animating');
         this.callbacks.onRefreshAll();
 
@@ -170,7 +183,10 @@ export class FeudalismTurnController {
           sourcePos, destPos, card, marketSlot, result.patronVisit,
           patronSourceIndex, playerIndex,
           () => this.afterTurnComplete(result),
-          () => this.callbacks.onRefreshAll(),
+          () => {
+            this.callbacks.onClearPendingRefillSlots();
+            this.callbacks.onRefreshAll();
+          },
           () => {
             // Clear cache before patron fly animation starts so the static
             // patron tile is removed from the Patrons section, leaving only
@@ -332,12 +348,21 @@ export class FeudalismTurnController {
             this.callbacks.onSetPatronAnimationCache(result.patronVisit, patronSourceIndex);
           }
 
+          // Mark the market slot as pending refill so it renders as empty
+          // during the deck-back fly-in animation. Cleared in onRefreshMarket.
+          if (marketSlot) {
+            this.callbacks.onSetPendingRefillSlots([marketSlot]);
+          }
+
           this.callbacks.onRefreshAll();
 
           this.animator.playCardAnimation(
             sourcePos, destPos, card, marketSlot, result.patronVisit,
             patronSourceIndex, aiIndex, afterAnim,
-            () => this.callbacks.onRefreshAll(),
+            () => {
+              this.callbacks.onClearPendingRefillSlots();
+              this.callbacks.onRefreshAll();
+            },
             () => {
               // Clear cache before patron fly animation starts so the static
               // patron tile is removed from the Patrons section, leaving only
