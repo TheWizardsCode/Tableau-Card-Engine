@@ -20,6 +20,8 @@ import {
 } from '../../example-games/feudalism/scenes/FeudalismConstants';
 import { waitForScene } from '../helpers/waitForScene';
 
+// ── Constants ───────────────────────────────────────────────
+
 // ── Helpers ─────────────────────────────────────────────────
 
 async function bootGame(): Promise<Phaser.Game> {
@@ -241,6 +243,7 @@ describe('Feudalism market refill animation', () => {
   it('should clear pending refill slots before onRefreshMarket callback', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('FeudalismScene')!;
+
     // Access the turn controller
     const turnController = (scene as any).turnController;
     expect(turnController).toBeDefined();
