@@ -62,3 +62,15 @@ export type {
   TurnByTurnSnapshot,
   TrapCardResult,
 } from './global-metrics';
+
+export {
+  compareMetrics,
+} from './comparison';
+export type {
+  ComparisonInput,
+  MetricComparison,
+  ComparisonSummary,
+  GuardrailSummary,
+  ComparisonMeta,
+  ComparisonReport,
+} from './comparison';
