@@ -27,3 +27,17 @@ export type {
   ValidationResult,
   LoadResult,
 } from './baseline';
+
+export {
+  computePickRate,
+  computeWinRateDelta,
+  computeCostToIncomeRatio,
+  computeSynergyUtilization,
+  computeUpgradeAdoption,
+  computeEventImpactScore,
+  computeSurvivalRate,
+} from './card-metrics';
+export type {
+  CardTemplate,
+  CardMetricResult,
+} from './card-metrics';
