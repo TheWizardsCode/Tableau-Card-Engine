@@ -838,14 +838,23 @@ export class SettingsPanel {
     }
 
     if (this._maxContentY > this.canvasHeight) {
-      // Mask clips scrollable content to the panel's visible area
-      // Mask in container-local coordinates (panel occupies 0,0..panelWidth,canvasHeight)
-      const maskShape = scene.add.graphics();
-      maskShape.fillRect(0, 0, this.panelWidth, this.canvasHeight);
-      this.container.add(maskShape);
-      this._scrollContent.setMask(maskShape.createGeometryMask());
+      // Mask clips scrollable content to the panel's visible area.
+      // Mask is in SCENE space (not added to container), set invisible,
+      // positioned to cover the panel when fully slid in from the right.
+      const maskGraphics = scene.add.graphics();
+      maskGraphics.fillStyle(0xffffff);
+      maskGraphics.fillRect(
+        this.canvasWidth - this.panelWidth,
+        0,
+        this.panelWidth,
+        this.canvasHeight,
+      );
+      maskGraphics.setVisible(false);
+      this._scrollContent.setMask(
+        new Phaser.Display.Masks.GeometryMask(scene, maskGraphics),
+      );
 
-      // Wheel scroll on scene
+      // Scroll on wheel over the scene
       scene.input.on('wheel', (_pointer: Phaser.Input.Pointer, _gameObjects: unknown[], _dx: number, dy: number) => {
         if (!this._isOpen) return;
         const maxScroll = this._maxContentY - this.canvasHeight + PADDING;
