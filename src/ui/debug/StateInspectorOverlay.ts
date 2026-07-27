@@ -63,6 +63,14 @@ interface InspectorState {
   refreshFn: (() => void) | null;
   /** Persisted set of expanded node full-paths, survives re-renders. */
   expandedKeys: Set<string>;
+  /** Scroll offset for tree content (0 = top). */
+  scrollY: number;
+  /** Wrapper container that holds tree items and is scrolled. */
+  scrollContainer: Phaser.GameObjects.Container | null;
+  /** Invisible mask graphics for clipping scroll area. */
+  scrollMaskGraphics: Phaser.GameObjects.Graphics | null;
+  /** Reference to the wheel handler for cleanup. */
+  wheelHandler: ((pointer: Phaser.Input.Pointer, gameObjects: unknown[], dx: number, dy: number) => void) | null;
 }
 
 let activeInspector: InspectorState | null = null;
@@ -152,8 +160,9 @@ function renderInspector(
   boxHeight: number,
 ): void {
   // Remove previous tree content
-  if (state.treeContainer) {
-    state.treeContainer.destroy();
+  if (state.scrollContainer) {
+    state.scrollContainer.destroy();
+    state.scrollContainer = null;
   }
 
   const contentX = boxX + 10;
@@ -161,10 +170,17 @@ function renderInspector(
   const contentWidth = boxWidth - 20;
   const contentHeight = boxHeight - HEADING_HEIGHT - FILTER_HEIGHT - REFRESH_BTN_HEIGHT - BOTTOM_PADDING;
 
+  // Main tree container at the content area origin
   const container = scene.add.container(contentX, contentY);
   container.setDepth(DEPTH_CONTENT);
   state.objects.push(container);
   state.treeContainer = container;
+
+  // Scrollable inner container (holds text objects, moves with scrollY)
+  const scrollContainer = scene.add.container(0, 0);
+  scrollContainer.setDepth(DEPTH_CONTENT);
+  container.add(scrollContainer);
+  state.scrollContainer = scrollContainer;
 
   // Parent into hudContainer
   try {
@@ -244,12 +260,11 @@ function renderInspector(
 
   flatten(extractedState, 0, '');
 
-  // Render tree as text objects
-  const maxVisibleLines = Math.floor(contentHeight / LINE_HEIGHT);
-  const visibleNodes = flatNodes;
+  // Render tree as text objects into the scroll container
+  const totalContentHeight = flatNodes.length * LINE_HEIGHT;
 
-  for (let i = 0; i < Math.min(visibleNodes.length, maxVisibleLines + 20); i++) {
-    const node = visibleNodes[i];
+  for (let i = 0; i < flatNodes.length; i++) {
+    const node = flatNodes[i];
     const y = i * LINE_HEIGHT;
     const x = node.depth * TREE_INDENT;
 
@@ -260,7 +275,7 @@ function renderInspector(
       wordWrap: { width: contentWidth - node.depth * TREE_INDENT },
     });
     textObj.setDepth(DEPTH_CONTENT);
-    container.add(textObj);
+    scrollContainer.add(textObj);
 
     // Click to toggle expand/collapse for expandable nodes
     if (typeof node.expanded !== 'undefined') {
@@ -275,6 +290,16 @@ function renderInspector(
         renderInspector(scene, state, boxX, boxY, boxWidth, boxHeight);
       });
     }
+  }
+
+  // Clamp scrollY and apply position + mask
+  const maxScroll = Math.max(0, totalContentHeight - contentHeight);
+  state.scrollY = Math.min(state.scrollY, maxScroll);
+  scrollContainer.setY(-state.scrollY);
+
+  // Apply mask when content overflows
+  if (maxScroll > 0 && state.scrollMaskGraphics) {
+    scrollContainer.setMask(state.scrollMaskGraphics.createGeometryMask());
   }
 }
 
@@ -308,6 +333,10 @@ export function createStateInspectorTool(): DebugToolsEntry {
         treeContainer: null,
         refreshFn: null,
         expandedKeys: new Set<string>(),
+        scrollY: 0,
+        scrollContainer: null,
+        scrollMaskGraphics: null,
+        wheelHandler: null,
       };
 
       // ── Create overlay background and box ──────────────────
@@ -350,10 +379,44 @@ export function createStateInspectorTool(): DebugToolsEntry {
       });
       closeBtn.setDepth(DEPTH_CONTENT);
       closeBtn.setInteractive({ useHandCursor: true });
+      // Create scroll mask graphics in scene space (invisible)
+      const contentX = BOX_X + 10;
+      const contentY = BOX_Y + HEADING_HEIGHT + FILTER_HEIGHT + 10;
+      const contentWidth = BOX_WIDTH - 20;
+      const contentHeight = BOX_HEIGHT - HEADING_HEIGHT - FILTER_HEIGHT - REFRESH_BTN_HEIGHT - BOTTOM_PADDING;
+
+      const maskGraphics = scene.add.graphics();
+      maskGraphics.fillStyle(0xffffff);
+      maskGraphics.fillRect(contentX, contentY, contentWidth, contentHeight);
+      maskGraphics.setVisible(false);
+      state.objects.push(maskGraphics);
+      state.scrollMaskGraphics = maskGraphics;
+
+      // Wheel handler for scrolling
+      const wheelHandler = (
+        _pointer: Phaser.Input.Pointer,
+        _gameObjects: unknown[],
+        _dx: number,
+        dy: number,
+      ): void => {
+        if (!activeInspector) return;
+        const oldY = state.scrollY;
+        state.scrollY = Math.max(0, state.scrollY + dy * 1.5);
+        if (state.scrollY !== oldY) {
+          renderInspector(scene, state, BOX_X, BOX_Y, BOX_WIDTH, BOX_HEIGHT);
+        }
+      };
+      scene.input.on('wheel', wheelHandler);
+      state.wheelHandler = wheelHandler;
+
       closeBtn.on('pointerdown', () => {
         dismissOverlay(state.objects);
         if (state.filterInput) {
           state.filterInput.remove();
+        }
+        // Remove wheel handler
+        if (state.wheelHandler) {
+          scene.input.off('wheel', state.wheelHandler);
         }
         activeInspector = null;
       });
