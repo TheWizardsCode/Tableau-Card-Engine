@@ -9,58 +9,25 @@
 
 import type Phaser from 'phaser';
 import { GAME_W, GAME_H } from '../constants';
-import {
-  createOverlayBackground,
-  dismissOverlay,
-} from '../Overlay';
+import { createDialog } from '../Dialog';
+import type { DialogHandle } from '../Dialog';
 import type { DebugToolsEntry } from './DebugToolsRegistry';
 import { AiDecisionRecorder } from './AiDecisionRecorder';
 
 // ── Constants ───────────────────────────────────────────────
 
-const DEPTH_BASE = 200;
-const DEPTH_BOX = 201;
-const DEPTH_CONTENT = 202;
-
 const BOX_WIDTH = Math.min(GAME_W - 80, 680);
 const BOX_HEIGHT = Math.min(GAME_H - 80, 520);
-const BOX_X = (GAME_W - BOX_WIDTH) / 2;
-const BOX_Y = (GAME_H - BOX_HEIGHT) / 2;
-
-const COLOR_BG = 0x1a1a2e;
+const HEADER_HEIGHT = 90;
 
 // ── State ───────────────────────────────────────────────────
 
-interface ViewerState {
-  scene: Phaser.Scene;
-  objects: Phaser.GameObjects.GameObject[];
-  container: Phaser.GameObjects.Container | null;
-}
-
-let activeViewer: ViewerState | null = null;
+let activeDialog: DialogHandle | null = null;
 
 // ── Rendering ───────────────────────────────────────────────
 
-function renderDecisions(scene: Phaser.Scene, state: ViewerState): void {
-  if (state.container) {
-    state.container.destroy();
-  }
-
-  const contentX = BOX_X + 10;
-  const contentY = BOX_Y + 100;
-  const contentHeight = BOX_HEIGHT - 140;
-
-  const container = scene.add.container(contentX, contentY);
-  container.setDepth(DEPTH_CONTENT);
-  state.objects.push(container);
-  state.container = container;
-
-  try {
-    const hud = (scene as any).hudContainer;
-    if (hud && typeof hud.add === 'function') {
-      hud.add(container);
-    }
-  } catch { /* ignore */ }
+function renderDecisions(scene: Phaser.Scene, dialog: DialogHandle): void {
+  dialog.scrollContainer.removeAll(true);
 
   const recorder = AiDecisionRecorder.getInstance();
   const records = recorder.getRecords();
@@ -71,16 +38,13 @@ function renderDecisions(scene: Phaser.Scene, state: ViewerState): void {
       color: '#888888',
       fontFamily: 'Arial, sans-serif',
     });
-    emptyText.setDepth(DEPTH_CONTENT);
-    container.add(emptyText);
+    emptyText.setDepth(dialog.depthBase + 2);
+    dialog.scrollContainer.add(emptyText);
+    dialog.refresh(dialog.contentHeight + 1);
     return;
   }
 
-  // Display all records (up to what fits)
-  const maxLines = Math.floor(contentHeight / 18);
-  const visible = records.slice(-maxLines);
-
-  visible.forEach((record, i) => {
+  records.forEach((record, i) => {
     const y = i * 22;
     const breakdown = record.scoringBreakdown
       ? ` | score: ${JSON.stringify(record.scoringBreakdown)}`
@@ -90,11 +54,14 @@ function renderDecisions(scene: Phaser.Scene, state: ViewerState): void {
     const textObj = scene.add.text(0, y, displayText, {
       fontSize: '13px',
       color: '#cccccc',
-      fontFamily: 'Consolas, Monaco, "Lucida Console", monospace',
+      fontFamily: dialog.monoFont,
     });
-    textObj.setDepth(DEPTH_CONTENT);
-    container.add(textObj);
+    textObj.setDepth(dialog.depthBase + 2);
+    dialog.scrollContainer.add(textObj);
   });
+
+  const totalHeight = records.length * 22 + 20;
+  dialog.refresh(totalHeight);
 }
 
 // ── Factory ─────────────────────────────────────────────────
@@ -110,70 +77,26 @@ export function createAiDecisionViewerTool(): DebugToolsEntry {
     description: 'Per-turn AI decision scoring breakdown',
     activate: (scene: Phaser.Scene) => {
       // Close existing viewer if open
-      if (activeViewer) {
-        dismissOverlay(activeViewer.objects);
-        activeViewer = null;
+      if (activeDialog) {
+        activeDialog.close();
+        activeDialog = null;
       }
 
-      const state: ViewerState = {
-        scene,
-        objects: [],
-        container: null,
-      };
-
-      // ── Create overlay background and box ──────────────────
-      const overlay = createOverlayBackground(
-        scene,
-        { depth: DEPTH_BASE, alpha: 0.6, width: GAME_W, height: GAME_H },
-        { width: BOX_WIDTH, height: BOX_HEIGHT, color: COLOR_BG, alpha: 1.0, depth: DEPTH_BOX },
-      );
-      state.objects.push(...overlay.objects);
-
-      try {
-        const hud = (scene as any).hudContainer;
-        if (hud && typeof hud.add === 'function') {
-          for (const obj of overlay.objects) {
-            hud.add(obj);
-          }
-        }
-      } catch { /* ignore */ }
-
-      // ── Title ──────────────────────────────────────────────
-      const title = scene.add.text(BOX_X + 10, BOX_Y + 8, 'AI Decisions', {
-        fontSize: '18px',
-        color: '#f0c040',
-        fontFamily: 'Arial, sans-serif',
-        fontStyle: 'bold',
+      // ── Create the shared dialog ───────────────────────────
+      const dialog = createDialog(scene, {
+        title: 'AI Decisions',
+        width: BOX_WIDTH,
+        height: BOX_HEIGHT,
+        headerHeight: HEADER_HEIGHT,
+        boxColor: 0x1a1a2e,
+        onClose: () => {
+          activeDialog = null;
+        },
       });
-      title.setDepth(DEPTH_CONTENT);
-      state.objects.push(title);
-      try {
-        const hud = (scene as any).hudContainer;
-        if (hud && typeof hud.add === 'function') hud.add(title);
-      } catch { /* ignore */ }
-
-      // ── Close button ───────────────────────────────────────
-      const closeBtn = scene.add.text(BOX_X + BOX_WIDTH - 30, BOX_Y + 6, '✕', {
-        fontSize: '22px',
-        color: '#aaaaaa',
-        fontFamily: 'Arial, sans-serif',
-      });
-      closeBtn.setDepth(DEPTH_CONTENT);
-      closeBtn.setInteractive({ useHandCursor: true });
-      closeBtn.on('pointerdown', () => {
-        dismissOverlay(state.objects);
-        activeViewer = null;
-      });
-      closeBtn.on('pointerover', () => closeBtn.setColor('#ffffff'));
-      closeBtn.on('pointerout', () => closeBtn.setColor('#aaaaaa'));
-      state.objects.push(closeBtn);
-      try {
-        const hud = (scene as any).hudContainer;
-        if (hud && typeof hud.add === 'function') hud.add(closeBtn);
-      } catch { /* ignore */ }
+      activeDialog = dialog;
 
       // ── Control buttons ────────────────────────────────────
-      const btnY = BOX_Y + 65;
+      const btnY = dialog.boxY + 65;
       const btnStyle = {
         fontSize: '13px',
         color: '#88ccff',
@@ -183,24 +106,24 @@ export function createAiDecisionViewerTool(): DebugToolsEntry {
       const recorder = AiDecisionRecorder.getInstance();
 
       // Clear button
-      const clearBtn = scene.add.text(BOX_X + 10, btnY, '[ Clear ]', btnStyle);
-      clearBtn.setDepth(DEPTH_CONTENT);
+      const clearBtn = scene.add.text(dialog.boxX + 10, btnY, '[ Clear ]', btnStyle);
+      clearBtn.setDepth(dialog.depthBase + 2);
       clearBtn.setInteractive({ useHandCursor: true });
       clearBtn.on('pointerdown', () => {
         recorder.clear();
-        renderDecisions(scene, state);
+        renderDecisions(scene, dialog);
       });
       clearBtn.on('pointerover', () => clearBtn.setColor('#aaddff'));
       clearBtn.on('pointerout', () => clearBtn.setColor('#88ccff'));
-      state.objects.push(clearBtn);
+      dialog.objects.push(clearBtn);
       try {
         const hud = (scene as any).hudContainer;
         if (hud && typeof hud.add === 'function') hud.add(clearBtn);
       } catch { /* ignore */ }
 
       // Pause/Resume button
-      const pauseBtn = scene.add.text(BOX_X + 80, btnY, '[ Pause ]', btnStyle);
-      pauseBtn.setDepth(DEPTH_CONTENT);
+      const pauseBtn = scene.add.text(dialog.boxX + 80, btnY, '[ Pause ]', btnStyle);
+      pauseBtn.setDepth(dialog.depthBase + 2);
       pauseBtn.setInteractive({ useHandCursor: true });
       pauseBtn.on('pointerdown', () => {
         recorder.paused = !recorder.paused;
@@ -208,29 +131,27 @@ export function createAiDecisionViewerTool(): DebugToolsEntry {
       });
       pauseBtn.on('pointerover', () => pauseBtn.setColor('#aaddff'));
       pauseBtn.on('pointerout', () => pauseBtn.setColor('#88ccff'));
-      state.objects.push(pauseBtn);
+      dialog.objects.push(pauseBtn);
       try {
         const hud = (scene as any).hudContainer;
         if (hud && typeof hud.add === 'function') hud.add(pauseBtn);
       } catch { /* ignore */ }
 
       // Record count
-      const countText = scene.add.text(BOX_X + BOX_WIDTH - 70, btnY, `${recorder.getRecords().length} records`, {
+      const countText = scene.add.text(dialog.boxX + dialog.boxWidth - 70, btnY, `${recorder.getRecords().length} records`, {
         fontSize: '12px',
         color: '#aaaaaa',
         fontFamily: 'Arial, sans-serif',
       });
-      countText.setDepth(DEPTH_CONTENT);
-      state.objects.push(countText);
+      countText.setDepth(dialog.depthBase + 2);
+      dialog.objects.push(countText);
       try {
         const hud = (scene as any).hudContainer;
         if (hud && typeof hud.add === 'function') hud.add(countText);
       } catch { /* ignore */ }
 
       // ── Render initial content ─────────────────────────────
-      renderDecisions(scene, state);
-
-      activeViewer = state;
+      renderDecisions(scene, dialog);
     },
   };
 }

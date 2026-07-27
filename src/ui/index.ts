@@ -276,6 +276,11 @@ export type {
   EnsureTextureResult,
 } from './Renderer';
 
+// Dialog – reusable modal dialog with scrollable content
+// @module @ui/Dialog
+export { createDialog } from './Dialog';
+export type { DialogOptions, DialogHandle } from './Dialog';
+
 // Debug tools registry
 // @module @ui/debug/DebugToolsRegistry
 export { isDevMode } from './debug/DebugToolsRegistry';

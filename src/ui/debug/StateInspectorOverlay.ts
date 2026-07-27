@@ -7,30 +7,19 @@
 
 import type Phaser from 'phaser';
 import { GAME_W, GAME_H } from '../constants';
-import {
-  createOverlayBackground,
-  dismissOverlay,
-} from '../Overlay';
+import { createDialog } from '../Dialog';
+import type { DialogHandle } from '../Dialog';
 import type { DebugToolsEntry } from './DebugToolsRegistry';
 
 // ── Constants ───────────────────────────────────────────────
 
 const TREE_INDENT = 20;
 const LINE_HEIGHT = 22;
-const HEADING_HEIGHT = 40;
-const FILTER_HEIGHT = 30;
-const BOTTOM_PADDING = 10;
-
-const DEPTH_BASE = 200;
-const DEPTH_BOX = 201;
-const DEPTH_CONTENT = 202;
+const HEADER_HEIGHT = 70;
 
 const BOX_WIDTH = Math.min(GAME_W - 80, 720);
 const BOX_HEIGHT = Math.min(GAME_H - 80, 560);
-const BOX_X = (GAME_W - BOX_WIDTH) / 2;
-const BOX_Y = (GAME_H - BOX_HEIGHT) / 2;
 
-const COLOR_BG = 0x1a1a2e;
 const COLOR_STRING = '#ce9178';
 const COLOR_NUMBER = '#b5cea8';
 const COLOR_BOOL = '#569cd6';
@@ -40,39 +29,18 @@ const COLOR_FILTERED_OUT = '#555555';
 
 // ── Types ───────────────────────────────────────────────────
 
-interface TreeNode {
-  key: string;
-  value: unknown;
-  depth: number;
-  expanded: boolean;
-  isExpandable: boolean;
-  children: TreeNode[];
-  visible: boolean;
-}
-
-// ──── State ──────────────────────────────────────────────────
-
 interface InspectorState {
-  scene: Phaser.Scene;
-  objects: Phaser.GameObjects.GameObject[];
-  treeNodes: TreeNode[];
   filterText: string;
   filterInput: HTMLInputElement | null;
-  treeContainer: Phaser.GameObjects.Container | null;
-  refreshFn: (() => void) | null;
   /** Persisted set of expanded node full-paths, survives re-renders. */
   expandedKeys: Set<string>;
-  /** Scroll offset for tree content (0 = top). */
-  scrollY: number;
-  /** Wrapper container that holds tree items and is scrolled. */
-  scrollContainer: Phaser.GameObjects.Container | null;
-  /** Invisible mask graphics for clipping scroll area. */
-  scrollMaskGraphics: Phaser.GameObjects.Graphics | null;
-  /** Reference to the wheel handler for cleanup. */
-  wheelHandler: ((pointer: Phaser.Input.Pointer, gameObjects: unknown[], dx: number, dy: number) => void) | null;
 }
 
-let activeInspector: InspectorState | null = null;
+/** Reference to the currently open dialog (if any). */
+let activeDialog: DialogHandle | null = null;
+
+/** Reference to the current state. */
+let activeState: InspectorState | null = null;
 
 // ── State extraction ────────────────────────────────────────
 
@@ -148,50 +116,21 @@ function valueColor(val: unknown): string {
   return COLOR_COLLAPSED;
 }
 
-// ── Main overlay rendering ──────────────────────────────────
+// ── Main content rendering ──────────────────────────────────
 
 function renderInspector(
   scene: Phaser.Scene,
+  dialog: DialogHandle,
   state: InspectorState,
-  boxX: number,
-  boxY: number,
   boxWidth: number,
-  boxHeight: number,
 ): void {
-  // Remove previous tree content
-  if (state.scrollContainer) {
-    state.scrollContainer.destroy();
-    state.scrollContainer = null;
-  }
+  // Remove previous tree content from the scroll container
+  dialog.scrollContainer.removeAll(true);
 
-  const contentX = boxX + 10;
-  const contentY = boxY + HEADING_HEIGHT + FILTER_HEIGHT + 10;
-  const contentWidth = boxWidth - 20;
-  const contentHeight = boxHeight - HEADING_HEIGHT - FILTER_HEIGHT - 46 - BOTTOM_PADDING;
-
-  // Main tree container at the content area origin
-  const container = scene.add.container(contentX, contentY);
-  container.setDepth(DEPTH_CONTENT);
-  state.objects.push(container);
-  state.treeContainer = container;
-
-  // Scrollable inner container (holds text objects, moves with scrollY)
-  const scrollContainer = scene.add.container(0, 0);
-  scrollContainer.setDepth(DEPTH_CONTENT);
-  container.add(scrollContainer);
-  state.scrollContainer = scrollContainer;
-
-  // Parent into hudContainer
-  try {
-    const hud = (scene as any).hudContainer;
-    if (hud && typeof hud.add === 'function') {
-      hud.add(container);
-    }
-  } catch { /* ignore */ }
-
-  // Build tree nodes with filter
   // Fresh state extraction
   const extractedState = extractState(scene);
+
+  const contentWidth = dialog.contentWidth;
 
   // Build flat tree for rendering
   const flatNodes: Array<{
@@ -259,8 +198,8 @@ function renderInspector(
 
   flatten(extractedState, 0, '');
 
-  // Render tree as text objects into the scroll container
-  const totalContentHeight = flatNodes.length * LINE_HEIGHT;
+  // Render tree as text objects into the dialog's scroll container
+  const totalContentHeight = flatNodes.length * LINE_HEIGHT + 10;
 
   for (let i = 0; i < flatNodes.length; i++) {
     const node = flatNodes[i];
@@ -270,36 +209,28 @@ function renderInspector(
     const textObj = scene.add.text(x, y, node.display, {
       fontSize: '13px',
       color: node.color,
-      fontFamily: 'Consolas, Monaco, "Lucida Console", monospace',
+      fontFamily: dialog.monoFont,
       wordWrap: { width: contentWidth - node.depth * TREE_INDENT },
     });
-    textObj.setDepth(DEPTH_CONTENT);
-    scrollContainer.add(textObj);
+    textObj.setDepth(dialog.depthBase + 2);
+    dialog.scrollContainer.add(textObj);
 
     // Click to toggle expand/collapse for expandable nodes
     if (typeof node.expanded !== 'undefined') {
       textObj.setInteractive({ useHandCursor: true });
       textObj.on('pointerdown', () => {
-        // Toggle in the persisted expanded set and re-render
         if (state.expandedKeys.has(node.fullPath)) {
           state.expandedKeys.delete(node.fullPath);
         } else {
           state.expandedKeys.add(node.fullPath);
         }
-        renderInspector(scene, state, boxX, boxY, boxWidth, boxHeight);
+        renderInspector(scene, dialog, state, boxWidth);
       });
     }
   }
 
-  // Clamp scrollY and apply position + mask
-  const maxScroll = Math.max(0, totalContentHeight - contentHeight);
-  state.scrollY = Math.min(state.scrollY, maxScroll);
-  scrollContainer.setY(-state.scrollY);
-
-  // Apply mask when content overflows
-  if (maxScroll > 0 && state.scrollMaskGraphics) {
-    scrollContainer.setMask(state.scrollMaskGraphics.createGeometryMask());
-  }
+  // Let the dialog re-clamp scroll and apply mask
+  dialog.refresh(totalContentHeight);
 }
 
 // ── Factory ─────────────────────────────────────────────────
@@ -315,131 +246,47 @@ export function createStateInspectorTool(): DebugToolsEntry {
     description: 'Inspect game state as collapsible tree with filter',
     activate: (scene: Phaser.Scene) => {
       // Close existing inspector if open
-      if (activeInspector) {
-        dismissOverlay(activeInspector.objects);
-        if (activeInspector.filterInput) {
-          activeInspector.filterInput.remove();
+      if (activeDialog) {
+        activeDialog.close();
+        if (activeState?.filterInput) {
+          activeState.filterInput.remove();
         }
-        activeInspector = null;
+        activeDialog = null;
+        activeState = null;
       }
 
       const state: InspectorState = {
-        scene,
-        objects: [],
-        treeNodes: [],
         filterText: '',
         filterInput: null,
-        treeContainer: null,
-        refreshFn: null,
         expandedKeys: new Set<string>(),
-        scrollY: 0,
-        scrollContainer: null,
-        scrollMaskGraphics: null,
-        wheelHandler: null,
       };
+      activeState = state;
 
-      // ── Create overlay background and box ──────────────────
-      const overlay = createOverlayBackground(
-        scene,
-        { depth: DEPTH_BASE, alpha: 0.6, width: GAME_W, height: GAME_H },
-        { width: BOX_WIDTH, height: BOX_HEIGHT, color: COLOR_BG, alpha: 1.0, depth: DEPTH_BOX },
-      );
-      state.objects.push(...overlay.objects);
-
-      // Parent overlay into hudContainer
-      try {
-        const hud = (scene as any).hudContainer;
-        if (hud && typeof hud.add === 'function') {
-          for (const obj of overlay.objects) {
-            hud.add(obj);
+      // ── Create the shared dialog (handles backdrop, title, close, scroll) ──
+      const dialog = createDialog(scene, {
+        title: 'State Inspector',
+        width: BOX_WIDTH,
+        height: BOX_HEIGHT,
+        headerHeight: HEADER_HEIGHT,
+        boxColor: 0x1a1a2e,
+        onClose: () => {
+          if (state.filterInput) {
+            state.filterInput.remove();
           }
-        }
-      } catch { /* ignore */ }
-
-      // ── Title ──────────────────────────────────────────────
-      const title = scene.add.text(BOX_X + 10, BOX_Y + 8, 'State Inspector', {
-        fontSize: '18px',
-        color: '#f0c040',
-        fontFamily: 'Arial, sans-serif',
-        fontStyle: 'bold',
+          activeDialog = null;
+          activeState = null;
+        },
       });
-      title.setDepth(DEPTH_CONTENT);
-      state.objects.push(title);
-      try {
-        const hud = (scene as any).hudContainer;
-        if (hud && typeof hud.add === 'function') hud.add(title);
-      } catch { /* ignore */ }
-
-      // ── Close button ───────────────────────────────────────
-      const closeBtn = scene.add.text(BOX_X + BOX_WIDTH - 30, BOX_Y + 6, '✕', {
-        fontSize: '22px',
-        color: '#aaaaaa',
-        fontFamily: 'Arial, sans-serif',
-      });
-      closeBtn.setDepth(DEPTH_CONTENT);
-      closeBtn.setInteractive({ useHandCursor: true });
-      // Create scroll mask graphics in scene space (invisible)
-      const contentX = BOX_X + 10;
-      const contentY = BOX_Y + HEADING_HEIGHT + FILTER_HEIGHT + 10;
-      const contentWidth = BOX_WIDTH - 20;
-      const contentHeight = BOX_HEIGHT - HEADING_HEIGHT - FILTER_HEIGHT - 46 - BOTTOM_PADDING;
-
-      const maskGraphics = scene.add.graphics();
-      maskGraphics.fillStyle(0xffffff);
-      maskGraphics.fillRect(contentX, contentY, contentWidth, contentHeight);
-      maskGraphics.setVisible(false);
-      state.objects.push(maskGraphics);
-      state.scrollMaskGraphics = maskGraphics;
-
-      // Wheel handler for scrolling
-      const wheelHandler = (
-        pointer: Phaser.Input.Pointer,
-        _gameObjects: unknown[],
-        _dx: number,
-        dy: number,
-      ): void => {
-        if (!activeInspector) return;
-        // Only scroll if pointer is within the dialog box
-        if (
-          pointer.x < BOX_X || pointer.x > BOX_X + BOX_WIDTH ||
-          pointer.y < BOX_Y || pointer.y > BOX_Y + BOX_HEIGHT
-        ) return;
-        const oldY = state.scrollY;
-        state.scrollY = Math.max(0, state.scrollY + dy * 1.5);
-        if (state.scrollY !== oldY) {
-          renderInspector(scene, state, BOX_X, BOX_Y, BOX_WIDTH, BOX_HEIGHT);
-        }
-      };
-      scene.input.on('wheel', wheelHandler);
-      state.wheelHandler = wheelHandler;
-
-      closeBtn.on('pointerdown', () => {
-        dismissOverlay(state.objects);
-        if (state.filterInput) {
-          state.filterInput.remove();
-        }
-        // Remove wheel handler
-        if (state.wheelHandler) {
-          scene.input.off('wheel', state.wheelHandler);
-        }
-        activeInspector = null;
-      });
-      closeBtn.on('pointerover', () => closeBtn.setColor('#ffffff'));
-      closeBtn.on('pointerout', () => closeBtn.setColor('#aaaaaa'));
-      state.objects.push(closeBtn);
-      try {
-        const hud = (scene as any).hudContainer;
-        if (hud && typeof hud.add === 'function') hud.add(closeBtn);
-      } catch { /* ignore */ }
+      activeDialog = dialog;
 
       // ── Filter input (DOM) ─────────────────────────────────
       const filterInput = document.createElement('input');
       filterInput.type = 'text';
       filterInput.placeholder = 'Filter fields...';
       filterInput.style.position = 'absolute';
-      filterInput.style.left = `${BOX_X + 10}px`;
-      filterInput.style.top = `${BOX_Y + HEADING_HEIGHT + 4}px`;
-      filterInput.style.width = `${BOX_WIDTH - 80}px`;
+      filterInput.style.left = `${dialog.boxX + 10}px`;
+      filterInput.style.top = `${dialog.boxY + 44}px`;
+      filterInput.style.width = `${dialog.boxWidth - 80}px`;
       filterInput.style.height = '24px';
       filterInput.style.fontSize = '13px';
       filterInput.style.padding = '2px 8px';
@@ -447,7 +294,7 @@ export function createStateInspectorTool(): DebugToolsEntry {
       filterInput.style.borderRadius = '4px';
       filterInput.style.backgroundColor = '#2a2a3e';
       filterInput.style.color = '#dddddd';
-      filterInput.style.fontFamily = 'Consolas, Monaco, "Lucida Console", monospace';
+      filterInput.style.fontFamily = dialog.monoFont;
       filterInput.style.outline = 'none';
       document.body.appendChild(filterInput);
       state.filterInput = filterInput;
@@ -455,13 +302,13 @@ export function createStateInspectorTool(): DebugToolsEntry {
 
       filterInput.addEventListener('input', () => {
         state.filterText = filterInput.value;
-        renderInspector(scene, state, BOX_X, BOX_Y, BOX_WIDTH, BOX_HEIGHT);
+        renderInspector(scene, dialog, state, dialog.boxWidth);
       });
 
       // ── Refresh button ─────────────────────────────────────
       const refreshBtn = scene.add.text(
-        BOX_X + BOX_WIDTH - 90,
-        BOX_Y + HEADING_HEIGHT + 4,
+        dialog.boxX + dialog.boxWidth - 90,
+        dialog.boxY + 44,
         '[ Refresh ]',
         {
           fontSize: '13px',
@@ -469,24 +316,21 @@ export function createStateInspectorTool(): DebugToolsEntry {
           fontFamily: 'Arial, sans-serif',
         },
       );
-      refreshBtn.setDepth(DEPTH_CONTENT);
+      refreshBtn.setDepth(dialog.depthBase + 2);
       refreshBtn.setInteractive({ useHandCursor: true });
       refreshBtn.on('pointerdown', () => {
-        renderInspector(scene, state, BOX_X, BOX_Y, BOX_WIDTH, BOX_HEIGHT);
+        renderInspector(scene, dialog, state, dialog.boxWidth);
       });
       refreshBtn.on('pointerover', () => refreshBtn.setColor('#aaddff'));
       refreshBtn.on('pointerout', () => refreshBtn.setColor('#88ccff'));
-      state.objects.push(refreshBtn);
+      dialog.objects.push(refreshBtn);
       try {
         const hud = (scene as any).hudContainer;
         if (hud && typeof hud.add === 'function') hud.add(refreshBtn);
       } catch { /* ignore */ }
 
       // ── Render the initial tree ────────────────────────────
-      state.refreshFn = () => renderInspector(scene, state, BOX_X, BOX_Y, BOX_WIDTH, BOX_HEIGHT);
-      renderInspector(scene, state, BOX_X, BOX_Y, BOX_WIDTH, BOX_HEIGHT);
-
-      activeInspector = state;
+      renderInspector(scene, dialog, state, dialog.boxWidth);
     },
   };
 }
