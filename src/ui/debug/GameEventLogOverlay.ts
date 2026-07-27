@@ -8,8 +8,8 @@
 import type Phaser from 'phaser';
 import { GAME_W, GAME_H } from '../constants';
 import {
-  createScrollableOverlay,
-  type ScrollableOverlayHandle,
+  createOverlayDialog,
+  type OverlayDialogHandle,
 } from '../Overlay';
 import type { DebugToolsEntry } from './DebugToolsRegistry';
 import { GlobalEventBuffer } from './GlobalEventBuffer';
@@ -27,7 +27,7 @@ interface EventLogState {
   paused: boolean;
 }
 
-let activeOverlay: ScrollableOverlayHandle | null = null;
+let activeOverlay: OverlayDialogHandle | null = null;
 let activeState: EventLogState | null = null;
 let pollInterval: Phaser.Time.TimerEvent | null = null;
 
@@ -58,7 +58,7 @@ function truncatePayload(payload: unknown, maxLen = 80): string {
 
 // ── Overlay rendering ───────────────────────────────────────
 
-function renderLog(scene: Phaser.Scene, overlay: ScrollableOverlayHandle, state: EventLogState): void {
+function renderLog(scene: Phaser.Scene, overlay: OverlayDialogHandle, state: EventLogState): void {
   overlay.scrollContainer.removeAll(true);
 
   const visible = state.entries.slice();
@@ -92,7 +92,7 @@ function renderLog(scene: Phaser.Scene, overlay: ScrollableOverlayHandle, state:
 
 // ── Refresh entries from buffer ────────────────────────────
 
-function refreshFromBuffer(scene: Phaser.Scene, overlay: ScrollableOverlayHandle, state: EventLogState): void {
+function refreshFromBuffer(scene: Phaser.Scene, overlay: OverlayDialogHandle, state: EventLogState): void {
   const buf = GlobalEventBuffer.getInstance();
   state.entries = buf.getEntries().slice() as EventLogState['entries'];
   renderLog(scene, overlay, state);
@@ -128,7 +128,7 @@ export function createGameEventLogTool(): DebugToolsEntry {
       activeState = state;
 
       // ── Create the scrollable overlay ──────────────────────
-      const overlay = createScrollableOverlay(scene, {
+      const overlay = createOverlayDialog(scene, {
         title: 'Game Events',
         width: BOX_WIDTH,
         height: BOX_HEIGHT,

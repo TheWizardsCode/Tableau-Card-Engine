@@ -5,7 +5,7 @@
  * modal prompts, info panels, and debug tools:
  *
  * - {@link createOverlayBackground} — basic backdrop + optional centered box
- * - {@link createScrollableOverlay} — full dialog with title, close button,
+ * - {@link createOverlayDialog} — full dialog with title, close button,
  *   and scrollable content area (geometry mask + bounds-checked wheel handler)
  * - {@link dismissOverlay} — destroy all overlay game objects
  *
@@ -153,15 +153,15 @@ export function dismissOverlay(
   }
 }
 
-// ── Scrollable Overlay (dialog with scrollable content) ────
+// ── Overlay Dialog ─────────────────────────────────────────
 
 /**
- * Default depth for the scrollable overlay backdrop layer.
+ * Default depth for the overlay dialog backdrop layer.
  */
 const DEFAULT_DIALOG_DEPTH_BASE = 200;
 
 /**
- * Depth offset between layers inside a scrollable overlay.
+ * Depth offset between layers inside an overlay dialog.
  */
 const DIALOG_DEPTH_STEP = 1;
 
@@ -181,20 +181,19 @@ const DIALOG_CLOSE_HOVER = '#ffffff';
 const DIALOG_HEADER_FONT = 'Arial, sans-serif';
 
 /**
- * Monospace font for content text inside scrollable overlays.
+ * Monospace font for content text inside overlay dialogs.
  */
 const DIALOG_MONO_FONT = 'Consolas, Monaco, "Lucida Console", monospace';
 
 /**
- * Configures a scrollable overlay (dialog-style) created via
- * {@link createScrollableOverlay}.
+ * Configures an overlay dialog created via
+ * {@link createOverlayDialog}.
  *
- * Overlays are a good fit for dialogs because they provide a modal
- * backdrop, a consistent close button, and a scrollable content
- * area — all the standard dialog behaviours — without introducing
- * a separate dialog concept.
+ * Overlay Dialogs provide a modal backdrop, a consistent close
+ * button, and a scrollable content area — all the standard dialog
+ * behaviours — built on the shared overlay infrastructure.
  */
-export interface ScrollableOverlayOptions {
+export interface OverlayDialogOptions {
   /** Window title displayed at the top of the overlay box. */
   title: string;
 
@@ -236,10 +235,10 @@ export interface ScrollableOverlayOptions {
 }
 
 /**
- * Handle returned by {@link createScrollableOverlay} for managing the
+ * Handle returned by {@link createOverlayDialog} for managing the
  * overlay lifecycle and content.
  */
-export interface ScrollableOverlayHandle {
+export interface OverlayDialogHandle {
   /** The Phaser scene. */
   readonly scene: Phaser.Scene;
 
@@ -304,12 +303,12 @@ export interface ScrollableOverlayHandle {
 }
 
 /**
- * Create a scrollable overlay (dialog-style) with backdrop, title,
- * close button, and scrollable content area.
+ * Create an overlay dialog with backdrop, title, close button, and
+ * scrollable content area.
  *
  * This is the recommended way to build dialogs, info panels, debug
- * tools, and any other overlay that needs scrollable content.  It
- * builds on {@link createOverlayBackground} and adds:
+ * tools, and any other interactive overlay with dynamic content.
+ * It builds on {@link createOverlayBackground} and adds:
  *
  * - Title text with close (✕) button
  * - Scrollable content container with invisible geometry mask
@@ -322,9 +321,9 @@ export interface ScrollableOverlayHandle {
  *
  * @example
  * ```ts
- * import { createScrollableOverlay } from '@ui/Overlay';
+ * import { createOverlayDialog } from '@ui/Overlay';
  *
- * const overlay = createScrollableOverlay(scene, {
+ * const overlay = createOverlayDialog(scene, {
  *   title: 'Event Log',
  *   width: 600,
  *   height: 400,
@@ -340,12 +339,12 @@ export interface ScrollableOverlayHandle {
  *
  * @param scene   - The active Phaser scene.
  * @param options - Overlay configuration.
- * @returns A {@link ScrollableOverlayHandle} for managing the overlay.
+ * @returns A {@link OverlayDialogHandle} for managing the overlay.
  */
-export function createScrollableOverlay(
+export function createOverlayDialog(
   scene: Phaser.Scene,
-  options: ScrollableOverlayOptions,
-): ScrollableOverlayHandle {
+  options: OverlayDialogOptions,
+): OverlayDialogHandle {
   const boxWidth = options.width ?? Math.min(GAME_W - 80, 680);
   const boxHeight = options.height ?? Math.min(GAME_H - 80, 500);
   const boxX = options.x ?? (GAME_W - boxWidth) / 2;
@@ -425,7 +424,7 @@ export function createScrollableOverlay(
   objects.push(maskGraphics);
 
   // ── Handle (forward-declared so the wheel handler can reference it) ──
-  const handle: ScrollableOverlayHandle = {
+  const handle: OverlayDialogHandle = {
     scene,
     objects,
     boxX,

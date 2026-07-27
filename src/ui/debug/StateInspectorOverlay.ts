@@ -8,8 +8,8 @@
 import type Phaser from 'phaser';
 import { GAME_W, GAME_H } from '../constants';
 import {
-  createScrollableOverlay,
-  type ScrollableOverlayHandle,
+  createOverlayDialog,
+  type OverlayDialogHandle,
 } from '../Overlay';
 import type { DebugToolsEntry } from './DebugToolsRegistry';
 
@@ -39,7 +39,7 @@ interface InspectorState {
 }
 
 /** Reference to the currently open overlay (if any). */
-let activeOverlay: ScrollableOverlayHandle | null = null;
+let activeOverlay: OverlayDialogHandle | null = null;
 
 /** Reference to the current state. */
 let activeState: InspectorState | null = null;
@@ -122,7 +122,7 @@ function valueColor(val: unknown): string {
 
 function renderInspector(
   scene: Phaser.Scene,
-  overlay: ScrollableOverlayHandle,
+  overlay: OverlayDialogHandle,
   state: InspectorState,
   boxWidth: number,
 ): void {
@@ -265,7 +265,7 @@ export function createStateInspectorTool(): DebugToolsEntry {
       activeState = state;
 
       // ── Create the scrollable overlay (dialog-style) ──
-      const overlay = createScrollableOverlay(scene, {
+      const overlay = createOverlayDialog(scene, {
         title: 'State Inspector',
         width: BOX_WIDTH,
         height: BOX_HEIGHT,

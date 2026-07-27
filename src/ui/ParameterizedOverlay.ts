@@ -3,7 +3,7 @@
  * (win, loss, round-end).
  *
  * For dialogs or tools with scrollable content (debug tools, help
- * panels, info dialogs) prefer {@link createScrollableOverlay} from
+ * panels, info dialogs) prefer {@link createOverlayDialog} from
  * `@ui/Overlay`, which provides title, close button, and scrollable
  * content area out of the box.
  *

@@ -174,13 +174,13 @@ export {
 } from './OverlayButton';
 export type { OverlayButtonConfig } from './OverlayButton';
 
-export { createOverlayBackground, dismissOverlay, createScrollableOverlay } from './Overlay';
+export { createOverlayBackground, dismissOverlay, createOverlayDialog } from './Overlay';
 export type {
   OverlayBackgroundOptions,
   OverlayBoxOptions,
   OverlayResult,
-  ScrollableOverlayOptions,
-  ScrollableOverlayHandle,
+  OverlayDialogOptions,
+  OverlayDialogHandle,
 } from './Overlay';
 
 export { createOverlayMenuButton } from './MenuButton';

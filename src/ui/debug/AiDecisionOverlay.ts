@@ -10,8 +10,8 @@
 import type Phaser from 'phaser';
 import { GAME_W, GAME_H } from '../constants';
 import {
-  createScrollableOverlay,
-  type ScrollableOverlayHandle,
+  createOverlayDialog,
+  type OverlayDialogHandle,
 } from '../Overlay';
 import type { DebugToolsEntry } from './DebugToolsRegistry';
 import { AiDecisionRecorder } from './AiDecisionRecorder';
@@ -24,11 +24,11 @@ const HEADER_HEIGHT = 90;
 
 // ── State ───────────────────────────────────────────────────
 
-let activeOverlay: ScrollableOverlayHandle | null = null;
+let activeOverlay: OverlayDialogHandle | null = null;
 
 // ── Rendering ───────────────────────────────────────────────
 
-function renderDecisions(scene: Phaser.Scene, overlay: ScrollableOverlayHandle): void {
+function renderDecisions(scene: Phaser.Scene, overlay: OverlayDialogHandle): void {
   overlay.scrollContainer.removeAll(true);
 
   const recorder = AiDecisionRecorder.getInstance();
@@ -85,7 +85,7 @@ export function createAiDecisionViewerTool(): DebugToolsEntry {
       }
 
       // ── Create the scrollable overlay ──────────────────────
-      const overlay = createScrollableOverlay(scene, {
+      const overlay = createOverlayDialog(scene, {
         title: 'AI Decisions',
         width: BOX_WIDTH,
         height: BOX_HEIGHT,
