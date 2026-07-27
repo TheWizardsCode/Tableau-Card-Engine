@@ -854,9 +854,14 @@ export class SettingsPanel {
         new Phaser.Display.Masks.GeometryMask(scene, maskGraphics),
       );
 
-      // Scroll on wheel over the scene
-      scene.input.on('wheel', (_pointer: Phaser.Input.Pointer, _gameObjects: unknown[], _dx: number, dy: number) => {
+      // Scroll on wheel — only when pointer is within the panel bounds
+      scene.input.on('wheel', (pointer: Phaser.Input.Pointer, _gameObjects: unknown[], _dx: number, dy: number) => {
         if (!this._isOpen) return;
+        const panelLeft = this.canvasWidth - this.panelWidth;
+        if (
+          pointer.x < panelLeft || pointer.x > this.canvasWidth ||
+          pointer.y < 0 || pointer.y > this.canvasHeight
+        ) return;
         const maxScroll = this._maxContentY - this.canvasHeight + PADDING;
         this._scrollY = Phaser.Math.Clamp(
           this._scrollY - dy * 1.5,

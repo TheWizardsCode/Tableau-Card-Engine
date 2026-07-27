@@ -19,8 +19,7 @@ const TREE_INDENT = 20;
 const LINE_HEIGHT = 22;
 const HEADING_HEIGHT = 40;
 const FILTER_HEIGHT = 30;
-const REFRESH_BTN_HEIGHT = 36;
-const BOTTOM_PADDING = 60;
+const BOTTOM_PADDING = 10;
 
 const DEPTH_BASE = 200;
 const DEPTH_BOX = 201;
@@ -168,7 +167,7 @@ function renderInspector(
   const contentX = boxX + 10;
   const contentY = boxY + HEADING_HEIGHT + FILTER_HEIGHT + 10;
   const contentWidth = boxWidth - 20;
-  const contentHeight = boxHeight - HEADING_HEIGHT - FILTER_HEIGHT - REFRESH_BTN_HEIGHT - BOTTOM_PADDING;
+  const contentHeight = boxHeight - HEADING_HEIGHT - FILTER_HEIGHT - 46 - BOTTOM_PADDING;
 
   // Main tree container at the content area origin
   const container = scene.add.container(contentX, contentY);
@@ -383,7 +382,7 @@ export function createStateInspectorTool(): DebugToolsEntry {
       const contentX = BOX_X + 10;
       const contentY = BOX_Y + HEADING_HEIGHT + FILTER_HEIGHT + 10;
       const contentWidth = BOX_WIDTH - 20;
-      const contentHeight = BOX_HEIGHT - HEADING_HEIGHT - FILTER_HEIGHT - REFRESH_BTN_HEIGHT - BOTTOM_PADDING;
+      const contentHeight = BOX_HEIGHT - HEADING_HEIGHT - FILTER_HEIGHT - 46 - BOTTOM_PADDING;
 
       const maskGraphics = scene.add.graphics();
       maskGraphics.fillStyle(0xffffff);
@@ -394,12 +393,17 @@ export function createStateInspectorTool(): DebugToolsEntry {
 
       // Wheel handler for scrolling
       const wheelHandler = (
-        _pointer: Phaser.Input.Pointer,
+        pointer: Phaser.Input.Pointer,
         _gameObjects: unknown[],
         _dx: number,
         dy: number,
       ): void => {
         if (!activeInspector) return;
+        // Only scroll if pointer is within the dialog box
+        if (
+          pointer.x < BOX_X || pointer.x > BOX_X + BOX_WIDTH ||
+          pointer.y < BOX_Y || pointer.y > BOX_Y + BOX_HEIGHT
+        ) return;
         const oldY = state.scrollY;
         state.scrollY = Math.max(0, state.scrollY + dy * 1.5);
         if (state.scrollY !== oldY) {
