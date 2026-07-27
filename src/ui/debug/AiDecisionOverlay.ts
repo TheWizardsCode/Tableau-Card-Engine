@@ -9,8 +9,10 @@
 
 import type Phaser from 'phaser';
 import { GAME_W, GAME_H } from '../constants';
-import { createDialog } from '../Dialog';
-import type { DialogHandle } from '../Dialog';
+import {
+  createScrollableOverlay,
+  type ScrollableOverlayHandle,
+} from '../Overlay';
 import type { DebugToolsEntry } from './DebugToolsRegistry';
 import { AiDecisionRecorder } from './AiDecisionRecorder';
 
@@ -22,12 +24,12 @@ const HEADER_HEIGHT = 90;
 
 // ── State ───────────────────────────────────────────────────
 
-let activeDialog: DialogHandle | null = null;
+let activeOverlay: ScrollableOverlayHandle | null = null;
 
 // ── Rendering ───────────────────────────────────────────────
 
-function renderDecisions(scene: Phaser.Scene, dialog: DialogHandle): void {
-  dialog.scrollContainer.removeAll(true);
+function renderDecisions(scene: Phaser.Scene, overlay: ScrollableOverlayHandle): void {
+  overlay.scrollContainer.removeAll(true);
 
   const recorder = AiDecisionRecorder.getInstance();
   const records = recorder.getRecords();
@@ -38,9 +40,9 @@ function renderDecisions(scene: Phaser.Scene, dialog: DialogHandle): void {
       color: '#888888',
       fontFamily: 'Arial, sans-serif',
     });
-    emptyText.setDepth(dialog.depthBase + 2);
-    dialog.scrollContainer.add(emptyText);
-    dialog.refresh(dialog.contentHeight + 1);
+    emptyText.setDepth(overlay.depthBase + 2);
+    overlay.scrollContainer.add(emptyText);
+    overlay.refresh(overlay.contentHeight + 1);
     return;
   }
 
@@ -54,14 +56,14 @@ function renderDecisions(scene: Phaser.Scene, dialog: DialogHandle): void {
     const textObj = scene.add.text(0, y, displayText, {
       fontSize: '13px',
       color: '#cccccc',
-      fontFamily: dialog.monoFont,
+      fontFamily: overlay.monoFont,
     });
-    textObj.setDepth(dialog.depthBase + 2);
-    dialog.scrollContainer.add(textObj);
+    textObj.setDepth(overlay.depthBase + 2);
+    overlay.scrollContainer.add(textObj);
   });
 
   const totalHeight = records.length * 22 + 20;
-  dialog.refresh(totalHeight);
+  overlay.refresh(totalHeight);
 }
 
 // ── Factory ─────────────────────────────────────────────────
@@ -77,26 +79,26 @@ export function createAiDecisionViewerTool(): DebugToolsEntry {
     description: 'Per-turn AI decision scoring breakdown',
     activate: (scene: Phaser.Scene) => {
       // Close existing viewer if open
-      if (activeDialog) {
-        activeDialog.close();
-        activeDialog = null;
+      if (activeOverlay) {
+        activeOverlay.close();
+        activeOverlay = null;
       }
 
-      // ── Create the shared dialog ───────────────────────────
-      const dialog = createDialog(scene, {
+      // ── Create the scrollable overlay ──────────────────────
+      const overlay = createScrollableOverlay(scene, {
         title: 'AI Decisions',
         width: BOX_WIDTH,
         height: BOX_HEIGHT,
         headerHeight: HEADER_HEIGHT,
         boxColor: 0x1a1a2e,
         onClose: () => {
-          activeDialog = null;
+          activeOverlay = null;
         },
       });
-      activeDialog = dialog;
+      activeOverlay = overlay;
 
       // ── Control buttons ────────────────────────────────────
-      const btnY = dialog.boxY + 65;
+      const btnY = overlay.boxY + 65;
       const btnStyle = {
         fontSize: '13px',
         color: '#88ccff',
@@ -106,24 +108,24 @@ export function createAiDecisionViewerTool(): DebugToolsEntry {
       const recorder = AiDecisionRecorder.getInstance();
 
       // Clear button
-      const clearBtn = scene.add.text(dialog.boxX + 10, btnY, '[ Clear ]', btnStyle);
-      clearBtn.setDepth(dialog.depthBase + 2);
+      const clearBtn = scene.add.text(overlay.boxX + 10, btnY, '[ Clear ]', btnStyle);
+      clearBtn.setDepth(overlay.depthBase + 2);
       clearBtn.setInteractive({ useHandCursor: true });
       clearBtn.on('pointerdown', () => {
         recorder.clear();
-        renderDecisions(scene, dialog);
+        renderDecisions(scene, overlay);
       });
       clearBtn.on('pointerover', () => clearBtn.setColor('#aaddff'));
       clearBtn.on('pointerout', () => clearBtn.setColor('#88ccff'));
-      dialog.objects.push(clearBtn);
+      overlay.objects.push(clearBtn);
       try {
         const hud = (scene as any).hudContainer;
         if (hud && typeof hud.add === 'function') hud.add(clearBtn);
       } catch { /* ignore */ }
 
       // Pause/Resume button
-      const pauseBtn = scene.add.text(dialog.boxX + 80, btnY, '[ Pause ]', btnStyle);
-      pauseBtn.setDepth(dialog.depthBase + 2);
+      const pauseBtn = scene.add.text(overlay.boxX + 80, btnY, '[ Pause ]', btnStyle);
+      pauseBtn.setDepth(overlay.depthBase + 2);
       pauseBtn.setInteractive({ useHandCursor: true });
       pauseBtn.on('pointerdown', () => {
         recorder.paused = !recorder.paused;
@@ -131,27 +133,27 @@ export function createAiDecisionViewerTool(): DebugToolsEntry {
       });
       pauseBtn.on('pointerover', () => pauseBtn.setColor('#aaddff'));
       pauseBtn.on('pointerout', () => pauseBtn.setColor('#88ccff'));
-      dialog.objects.push(pauseBtn);
+      overlay.objects.push(pauseBtn);
       try {
         const hud = (scene as any).hudContainer;
         if (hud && typeof hud.add === 'function') hud.add(pauseBtn);
       } catch { /* ignore */ }
 
       // Record count
-      const countText = scene.add.text(dialog.boxX + dialog.boxWidth - 70, btnY, `${recorder.getRecords().length} records`, {
+      const countText = scene.add.text(overlay.boxX + overlay.boxWidth - 70, btnY, `${recorder.getRecords().length} records`, {
         fontSize: '12px',
         color: '#aaaaaa',
         fontFamily: 'Arial, sans-serif',
       });
-      countText.setDepth(dialog.depthBase + 2);
-      dialog.objects.push(countText);
+      countText.setDepth(overlay.depthBase + 2);
+      overlay.objects.push(countText);
       try {
         const hud = (scene as any).hudContainer;
         if (hud && typeof hud.add === 'function') hud.add(countText);
       } catch { /* ignore */ }
 
       // ── Render initial content ─────────────────────────────
-      renderDecisions(scene, dialog);
+      renderDecisions(scene, overlay);
     },
   };
 }

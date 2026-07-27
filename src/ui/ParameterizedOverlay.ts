@@ -1,3 +1,15 @@
+/**
+ * Parameterized overlay factory for simple game-state overlays
+ * (win, loss, round-end).
+ *
+ * For dialogs or tools with scrollable content (debug tools, help
+ * panels, info dialogs) prefer {@link createScrollableOverlay} from
+ * `@ui/Overlay`, which provides title, close button, and scrollable
+ * content area out of the box.
+ *
+ * @module @ui/ParameterizedOverlay
+ */
+
 import { FONT_FAMILY, GAME_H, GAME_W } from './constants';
 import { createOverlayBackground, dismissOverlay, type OverlayBackgroundOptions, type OverlayBoxOptions } from './Overlay';
 import { createOverlayButton, type OverlayButtonConfig } from './OverlayButton';

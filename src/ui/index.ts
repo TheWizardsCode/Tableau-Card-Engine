@@ -174,11 +174,13 @@ export {
 } from './OverlayButton';
 export type { OverlayButtonConfig } from './OverlayButton';
 
-export { createOverlayBackground, dismissOverlay } from './Overlay';
+export { createOverlayBackground, dismissOverlay, createScrollableOverlay } from './Overlay';
 export type {
   OverlayBackgroundOptions,
   OverlayBoxOptions,
   OverlayResult,
+  ScrollableOverlayOptions,
+  ScrollableOverlayHandle,
 } from './Overlay';
 
 export { createOverlayMenuButton } from './MenuButton';
@@ -275,11 +277,6 @@ export type {
   RequestTextureFn,
   EnsureTextureResult,
 } from './Renderer';
-
-// Dialog – reusable modal dialog with scrollable content
-// @module @ui/Dialog
-export { createDialog } from './Dialog';
-export type { DialogOptions, DialogHandle } from './Dialog';
 
 // Debug tools registry
 // @module @ui/debug/DebugToolsRegistry

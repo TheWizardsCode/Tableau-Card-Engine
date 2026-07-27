@@ -7,8 +7,10 @@
 
 import type Phaser from 'phaser';
 import { GAME_W, GAME_H } from '../constants';
-import { createDialog } from '../Dialog';
-import type { DialogHandle } from '../Dialog';
+import {
+  createScrollableOverlay,
+  type ScrollableOverlayHandle,
+} from '../Overlay';
 import type { DebugToolsEntry } from './DebugToolsRegistry';
 import { GlobalEventBuffer } from './GlobalEventBuffer';
 
@@ -25,7 +27,7 @@ interface EventLogState {
   paused: boolean;
 }
 
-let activeDialog: DialogHandle | null = null;
+let activeOverlay: ScrollableOverlayHandle | null = null;
 let activeState: EventLogState | null = null;
 let pollInterval: Phaser.Time.TimerEvent | null = null;
 
@@ -56,8 +58,8 @@ function truncatePayload(payload: unknown, maxLen = 80): string {
 
 // ── Overlay rendering ───────────────────────────────────────
 
-function renderLog(scene: Phaser.Scene, dialog: DialogHandle, state: EventLogState): void {
-  dialog.scrollContainer.removeAll(true);
+function renderLog(scene: Phaser.Scene, overlay: ScrollableOverlayHandle, state: EventLogState): void {
+  overlay.scrollContainer.removeAll(true);
 
   const visible = state.entries.slice();
 
@@ -68,10 +70,10 @@ function renderLog(scene: Phaser.Scene, dialog: DialogHandle, state: EventLogSta
     const textObj = scene.add.text(0, y, displayText, {
       fontSize: '13px',
       color: '#cccccc',
-      fontFamily: dialog.monoFont,
+      fontFamily: overlay.monoFont,
     });
-    textObj.setDepth(dialog.depthBase + 2);
-    dialog.scrollContainer.add(textObj);
+    textObj.setDepth(overlay.depthBase + 2);
+    overlay.scrollContainer.add(textObj);
   });
 
   if (state.entries.length === 0) {
@@ -80,20 +82,20 @@ function renderLog(scene: Phaser.Scene, dialog: DialogHandle, state: EventLogSta
       color: '#888888',
       fontFamily: 'Arial, sans-serif',
     });
-    emptyText.setDepth(dialog.depthBase + 2);
-    dialog.scrollContainer.add(emptyText);
+    emptyText.setDepth(overlay.depthBase + 2);
+    overlay.scrollContainer.add(emptyText);
   }
 
-  const totalHeight = Math.max(visible.length * 22 + 20, dialog.contentHeight + 1);
-  dialog.refresh(totalHeight);
+  const totalHeight = Math.max(visible.length * 22 + 20, overlay.contentHeight + 1);
+  overlay.refresh(totalHeight);
 }
 
 // ── Refresh entries from buffer ────────────────────────────
 
-function refreshFromBuffer(scene: Phaser.Scene, dialog: DialogHandle, state: EventLogState): void {
+function refreshFromBuffer(scene: Phaser.Scene, overlay: ScrollableOverlayHandle, state: EventLogState): void {
   const buf = GlobalEventBuffer.getInstance();
   state.entries = buf.getEntries().slice() as EventLogState['entries'];
-  renderLog(scene, dialog, state);
+  renderLog(scene, overlay, state);
 }
 
 // ── Factory ─────────────────────────────────────────────────
@@ -109,13 +111,13 @@ export function createGameEventLogTool(): DebugToolsEntry {
     description: 'Live feed of game events with pause/clear',
     activate: (scene: Phaser.Scene) => {
       // Close existing if open
-      if (activeDialog) {
+      if (activeOverlay) {
         if (pollInterval) {
           pollInterval.destroy();
           pollInterval = null;
         }
-        activeDialog.close();
-        activeDialog = null;
+        activeOverlay.close();
+        activeOverlay = null;
         activeState = null;
       }
 
@@ -125,8 +127,8 @@ export function createGameEventLogTool(): DebugToolsEntry {
       };
       activeState = state;
 
-      // ── Create the shared dialog ───────────────────────────
-      const dialog = createDialog(scene, {
+      // ── Create the scrollable overlay ──────────────────────
+      const overlay = createScrollableOverlay(scene, {
         title: 'Game Events',
         width: BOX_WIDTH,
         height: BOX_HEIGHT,
@@ -137,27 +139,27 @@ export function createGameEventLogTool(): DebugToolsEntry {
             pollInterval.destroy();
             pollInterval = null;
           }
-          activeDialog = null;
+          activeOverlay = null;
           activeState = null;
         },
       });
-      activeDialog = dialog;
+      activeOverlay = overlay;
 
       // ── Status indicator ───────────────────────────────────
-      const statusText = scene.add.text(dialog.boxX + 10, dialog.boxY + 38, 'Status: Waiting for events...', {
+      const statusText = scene.add.text(overlay.boxX + 10, overlay.boxY + 38, 'Status: Waiting for events...', {
         fontSize: '12px',
         color: '#88ccff',
         fontFamily: 'Arial, sans-serif',
       });
-      statusText.setDepth(dialog.depthBase + 2);
-      dialog.objects.push(statusText);
+      statusText.setDepth(overlay.depthBase + 2);
+      overlay.objects.push(statusText);
       try {
         const hud = (scene as any).hudContainer;
         if (hud && typeof hud.add === 'function') hud.add(statusText);
       } catch { /* ignore */ }
 
       // ── Control buttons ────────────────────────────────────
-      const btnY = dialog.boxY + 65;
+      const btnY = overlay.boxY + 65;
       const btnStyle = {
         fontSize: '13px',
         color: '#88ccff',
@@ -165,24 +167,24 @@ export function createGameEventLogTool(): DebugToolsEntry {
       } as const;
 
       // Clear button
-      const clearBtn = scene.add.text(dialog.boxX + 10, btnY, '[ Clear ]', btnStyle);
-      clearBtn.setDepth(dialog.depthBase + 2);
+      const clearBtn = scene.add.text(overlay.boxX + 10, btnY, '[ Clear ]', btnStyle);
+      clearBtn.setDepth(overlay.depthBase + 2);
       clearBtn.setInteractive({ useHandCursor: true });
       clearBtn.on('pointerdown', () => {
         state.entries = [];
-        renderLog(scene, dialog, state);
+        renderLog(scene, overlay, state);
       });
       clearBtn.on('pointerover', () => clearBtn.setColor('#aaddff'));
       clearBtn.on('pointerout', () => clearBtn.setColor('#88ccff'));
-      dialog.objects.push(clearBtn);
+      overlay.objects.push(clearBtn);
       try {
         const hud = (scene as any).hudContainer;
         if (hud && typeof hud.add === 'function') hud.add(clearBtn);
       } catch { /* ignore */ }
 
       // Pause/Resume button
-      const pauseBtn = scene.add.text(dialog.boxX + 80, btnY, '[ Pause ]', btnStyle);
-      pauseBtn.setDepth(dialog.depthBase + 2);
+      const pauseBtn = scene.add.text(overlay.boxX + 80, btnY, '[ Pause ]', btnStyle);
+      pauseBtn.setDepth(overlay.depthBase + 2);
       pauseBtn.setInteractive({ useHandCursor: true });
       pauseBtn.on('pointerdown', () => {
         state.paused = !state.paused;
@@ -191,7 +193,7 @@ export function createGameEventLogTool(): DebugToolsEntry {
       });
       pauseBtn.on('pointerover', () => pauseBtn.setColor('#aaddff'));
       pauseBtn.on('pointerout', () => pauseBtn.setColor('#88ccff'));
-      dialog.objects.push(pauseBtn);
+      overlay.objects.push(pauseBtn);
       try {
         const hud = (scene as any).hudContainer;
         if (hud && typeof hud.add === 'function') hud.add(pauseBtn);
@@ -200,33 +202,33 @@ export function createGameEventLogTool(): DebugToolsEntry {
       const buf = GlobalEventBuffer.getInstance();
 
       // Event count
-      const countText = scene.add.text(dialog.boxX + dialog.boxWidth - 60, btnY, `${buf.getEntries().length} events`, {
+      const countText = scene.add.text(overlay.boxX + overlay.boxWidth - 60, btnY, `${buf.getEntries().length} events`, {
         fontSize: '12px',
         color: '#aaaaaa',
         fontFamily: 'Arial, sans-serif',
       });
-      countText.setDepth(dialog.depthBase + 2);
-      dialog.objects.push(countText);
+      countText.setDepth(overlay.depthBase + 2);
+      overlay.objects.push(countText);
       try {
         const hud = (scene as any).hudContainer;
         if (hud && typeof hud.add === 'function') hud.add(countText);
       } catch { /* ignore */ }
 
       // ── Load from global buffer ───────────────────────────
-      refreshFromBuffer(scene, dialog, state);
+      refreshFromBuffer(scene, overlay, state);
 
       // Poll for new entries every 500ms
       pollInterval = scene.time.addEvent({
         delay: 500,
         loop: true,
         callback: () => {
-          if (!activeDialog || !activeState) {
+          if (!activeOverlay || !activeState) {
             if (pollInterval) pollInterval.destroy();
             return;
           }
           const newCount = buf.getEntries().length;
           if (activeState.entries.length !== newCount) {
-            refreshFromBuffer(scene, activeDialog, activeState);
+            refreshFromBuffer(scene, activeOverlay, activeState);
             statusText.setText('Status: ' + getBufferStatus());
             countText.setText(newCount + ' events');
           }
