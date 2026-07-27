@@ -59,6 +59,10 @@ const VIEWPORT = { width: 900, height: 700 };
 const SCENE_READY_TIMEOUT = 30_000;
 const STATE_SETTLED_TIMEOUT = 10_000;
 
+// Navigation timeout for page.goto — increased for cold Vite compilation
+// under parallel test load.
+const NAVIGATION_TIMEOUT = 30_000;
+
 // ── CLI Arg Parsing ─────────────────────────────────────────
 
 interface ParsedArgs {
@@ -317,10 +321,11 @@ async function main(): Promise<void> {
         headlessBrowser = await chromium.launch({ headless: true });
         const headlessContext = await headlessBrowser.newContext({ viewport: VIEWPORT });
         const headlessPage = await headlessContext.newPage();
+        headlessPage.setDefaultTimeout(SCENE_READY_TIMEOUT);
         
         // Navigate to the game in replay mode
         const gameUrl = adapter.getReplayUrl(DEV_SERVER_URL);
-        await headlessPage.goto(gameUrl, { waitUntil: 'domcontentloaded' });
+        await headlessPage.goto(gameUrl, { waitUntil: 'domcontentloaded', timeout: NAVIGATION_TIMEOUT });
         
         // Wait for Phaser to boot
         await waitForGameBoot(headlessPage, SCENE_READY_TIMEOUT);
@@ -399,10 +404,14 @@ async function main(): Promise<void> {
     });
     const page = await context.newPage();
 
+    // Bump Playwright action timeout to match scene-ready timeout for
+    // cold Vite compilation under parallel load.
+    page.setDefaultTimeout(SCENE_READY_TIMEOUT);
+
     // Navigate to the game in replay mode
     const gameUrl = adapter.getReplayUrl(DEV_SERVER_URL);
     console.log(`Navigating to ${gameUrl}`);
-    await page.goto(gameUrl, { waitUntil: 'domcontentloaded' });
+    await page.goto(gameUrl, { waitUntil: 'domcontentloaded', timeout: NAVIGATION_TIMEOUT });
 
     // Wait for Phaser to boot (GameSelectorScene starts first)
     console.log('Waiting for Phaser game to boot...');

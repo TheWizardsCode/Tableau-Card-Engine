@@ -192,9 +192,6 @@ export function installDevServerCleanupHandlers(): void {
     }
     trackedChildren.length = 0;
 
-    // Belt-and-suspenders: kill any process still on port 3000
-    killProcessOnPort(3000);
-
     // Remove lock file
     removeLockFile();
   }
@@ -204,7 +201,6 @@ export function installDevServerCleanupHandlers(): void {
 
   // Don't block exit — these handlers clean up but let the process exit
   process.on('exit', () => {
-    killProcessOnPort(3000);
     removeLockFile();
   });
 }

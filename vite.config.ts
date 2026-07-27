@@ -48,8 +48,28 @@ export default defineConfig(({ mode, command }) => ({
           globals: true,
           environment: 'node',
           include: ['tests/**/*.test.ts'],
-          exclude: ['tests/**/*.browser.test.ts'],
+          exclude: ['tests/**/*.browser.test.ts', 'tests/e2e/replay-*.test.ts'],
           testTimeout: 15_000,
+        },
+      },
+      // ── Replay E2E Tests — isolated from parallel unit tests to avoid
+      // cold Vite compilation timeout under CPU contention ──────────────
+      {
+        extends: true,
+        test: {
+          name: 'replay-e2e',
+          globals: true,
+          environment: 'node',
+          include: ['tests/e2e/replay-*.test.ts'],
+          fileParallelism: false,
+          sequence: { concurrent: false },
+          testTimeout: 180_000,
+          pool: 'forks',
+          poolOptions: {
+            forks: {
+              singleFork: true,
+            },
+          },
         },
       },
       // ── Non-Tutorial Browser Tests ────────────────────

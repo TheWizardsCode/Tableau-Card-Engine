@@ -11,7 +11,7 @@ const FIXTURE_TRANSCRIPT = path.join(
 );
 const OUT_DIR = path.join(PROJECT_ROOT, 'tmp/test-replay-main-street');
 
-function runReplay(args: string[], timeoutMs = 60_000): { stdout: string; stderr: string; exitCode: number } {
+function runReplay(args: string[], timeoutMs = 180_000): { stdout: string; stderr: string; exitCode: number } {
   const result = spawnSync(
     'node',
     ['--import', 'tsx/esm', 'scripts/replay.ts', ...args],
@@ -74,7 +74,7 @@ describe('Main Street replay e2e', () => {
     for (const screenshotPath of screenshotPaths) {
       expect(fs.existsSync(screenshotPath)).toBe(true);
     }
-  }, 90_000);
+  }, 180_000);
 
   it('captures canonical-resolution screenshots for layout assertions', async () => {
     const summaryPath = path.join(OUT_DIR, 'replay-summary.json');
