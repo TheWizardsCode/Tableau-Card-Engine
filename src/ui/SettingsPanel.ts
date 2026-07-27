@@ -839,8 +839,10 @@ export class SettingsPanel {
 
     if (this._maxContentY > this.canvasHeight) {
       // Mask clips scrollable content to the panel's visible area
+      // Mask in container-local coordinates (panel occupies 0,0..panelWidth,canvasHeight)
       const maskShape = scene.add.graphics();
       maskShape.fillRect(0, 0, this.panelWidth, this.canvasHeight);
+      this.container.add(maskShape);
       this._scrollContent.setMask(maskShape.createGeometryMask());
 
       // Wheel scroll on scene
