@@ -2217,8 +2217,7 @@ To verify production safety:
 **Vite dev server won't start:**
 - Check port 3000 is not already in use: `lsof -i :3000`
 - Try `npm run dev -- --port 3001` for an alternate port
-- **Stale lock file:** If port 3000 appears free but the dev server fails, remove any stale lock file: `rm -f tmp/dev-server-lock.json`
-- **Orphaned Vite process:** If `lsof -i :3000` shows a Node.js process, kill it: `kill -9 $(lsof -t -i :3000)`
+- **Stale lock file / orphaned Vite process:** The dev server utilities now auto-clean stale processes and lock files when starting. If port 3000 is stuck, manually clean with: `rm -f tmp/dev-server-lock.json && kill -9 $(lsof -t -i :3000) 2>/dev/null; true`
 
 **TypeScript errors on build:**
 - Run `npx tsc --noEmit` to see detailed errors
@@ -2234,7 +2233,7 @@ To verify production safety:
 - Check that `@vitest/browser` version matches `vitest` version
 - Browser tests boot a real Phaser game and may take 8-10 seconds each
 - If tests hang, check for unresolved game instances (ensure `afterEach` destroys the game)
-- **Process/resource leak cleanup:** All browser tests should clean up Phaser.Game instances in `afterEach` using `game.destroy(true, false)` and remove the game container div. The dev server utilities (`scripts/dev-server-utils.ts`) include SIGTERM/SIGINT handlers to clean up orphaned Vite processes and stale lock files on forced exit.
+- **Process/resource leak cleanup:** All browser tests should clean up Phaser.Game instances in `afterEach` using `game.destroy(true, false)` and remove the game container div. The dev server utilities (`scripts/dev-server-utils.ts`) use a simplified start-stop-per-call pattern with no reference counting. `ensureDevServer()` kills any existing process on port 3000 before starting a fresh server. `killDevServer()` unconditionally kills the child process and any remaining process on port 3000. SIGTERM/SIGINT handlers provide additional cleanup for forced exits.
 
 **Large bundle warning:**
 - The Phaser library is ~1.4 MB minified -- this is expected
@@ -2244,7 +2243,7 @@ To verify production safety:
 - The replay tool (`npm run replay`) and transcript export (`npm run transcripts:export`) auto-start the dev server if `localhost:3000` is not responding
 - If auto-start fails, start the dev server manually: `npm run dev`
 - Check port 3000 availability: `lsof -i :3000`
-- **Port conflict detection:** The `ensureDevServer()` helper now checks for existing processes on port 3000 before starting, logs warnings for potential conflicts, and cleans up stale lock files automatically.
+- **Port conflict detection / stale server cleanup:** Before starting, `ensureDevServer()` kills any process on port 3000 using `fuser` (Linux) or `lsof` (macOS/Linux). This ensures a clean slate even if a previous server was orphaned by a crash or SIGKILL. `killDevServer()` also runs the same port-based cleanup as a belt-and-suspenders measure.
 
 **Replay tool: Unsupported transcript version error:**
 - The transcript schema includes a `version` field; the replay tool validates this and exits with a clear error if the version is unsupported
