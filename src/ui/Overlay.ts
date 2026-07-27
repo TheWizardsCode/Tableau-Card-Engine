@@ -478,7 +478,7 @@ export function createOverlayDialog(
     const th = totalContentHeight ?? estimateContentHeight();
     const maxScroll = Math.max(0, th - contentHeight);
     handle.scrollY = Math.min(handle.scrollY, maxScroll);
-    scrollContainer.setY(-handle.scrollY);
+    scrollContainer.y = contentY - handle.scrollY;
 
     if (maxScroll > 0) {
       scrollContainer.setMask(maskGraphics.createGeometryMask());
