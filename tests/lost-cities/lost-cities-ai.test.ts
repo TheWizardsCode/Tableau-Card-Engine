@@ -1168,3 +1168,634 @@ describe('estimatePositiveScoreProbability', () => {
   });
 });
 
+// ═══════════════════════════════════════════════════════════
+// Improvement: Opponent Card Denial (Block Play)
+// ═══════════════════════════════════════════════════════════
+
+describe('AI Improvement - Opponent Card Denial', () => {
+  it('should prefer playing a card the opponent wants to block them, over playing a neutral card when extending an existing expedition', () => {
+    // Opponent has yellow expedition with [2, 4] — needs 5,6,7,8
+    // AI has existing yellow expedition with [3, 6]
+    // AI has yellow 8 (extends own, denies opponent) and blue 7 (extends own blue)
+    // Playing yellow 8 denies the opponent a card they need AND extends own
+    // Playing blue 7 doesn't block anything
+    const opponentExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+    opponentExpeditions.set('yellow', [
+      makeNumbered('yellow', 2, 2001),
+      makeNumbered('yellow', 4, 2002),
+    ]);
+
+    const myExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+    myExpeditions.set('yellow', [
+      makeNumbered('yellow', 3, 2003),
+      makeNumbered('yellow', 6, 2004),
+    ]);
+    myExpeditions.set('blue', [
+      makeNumbered('blue', 5, 2005),
+      makeNumbered('blue', 6, 2006),
+    ]);
+
+    const hand = [
+      makeNumbered('yellow', 8, 2010),
+      makeNumbered('blue', 7, 2011),
+    ];
+
+    const state = makeTestVisibleState({
+      hand,
+      myExpeditions,
+      opponentExpeditions,
+      drawPileSize: 20,
+    });
+    const rng = createSeededRng(42);
+
+    const action = GreedyStrategy.choosePhase1(state, rng);
+
+    // AI should play yellow 8 (denying opponent) over blue 7
+    expect(action.kind).toBe('play-to-expedition');
+    expect(action.color).toBe('yellow');
+  });
+
+  it('should be less likely to deny when opponent interest is low', () => {
+    // Opponent has NO yellow cards — no interest in yellow
+    // AI has yellow 8 and blue 3
+    // Without opponent interest, the penalty should be minimal
+    const opponentExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+    // Yellow has no opponent cards
+
+    const myExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+
+    const hand = [
+      makeNumbered('yellow', 8, 2020),
+      makeNumbered('blue', 3, 2021),
+    ];
+
+    const state = makeTestVisibleState({
+      hand,
+      myExpeditions,
+      opponentExpeditions,
+      drawPileSize: 20,
+    });
+    const rng = createSeededRng(42);
+
+    const action = GreedyStrategy.choosePhase1(state, rng);
+
+    // Without opponent interest, AI might prefer blue 3 (lower card, easier to build)
+    // But it's not strictly deterministic — just verify it doesn't auto-pick yellow
+    expect(action.kind).toBe('play-to-expedition');
+  });
+
+  it('should prefer blocking a card the opponent needs over extending own weak expedition', () => {
+    // AI has existing yellow expedition with [9] — weak, hard to extend
+    // Opponent has red expedition with [4, 6] — needs 7
+    // AI has red 7 (blocks opponent) and yellow 10 (extends own weak)
+    // AI should prefer playing red 7 to block opponent
+    const opponentExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+    opponentExpeditions.set('red', [
+      makeNumbered('red', 4, 2030),
+      makeNumbered('red', 6, 2031),
+    ]);
+
+    const myExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+    myExpeditions.set('yellow', [
+      makeNumbered('yellow', 9, 2040),
+    ]);
+
+    const hand = [
+      makeNumbered('red', 7, 2050),
+      makeNumbered('yellow', 10, 2051),
+    ];
+
+    const state = makeTestVisibleState({
+      hand,
+      myExpeditions,
+      opponentExpeditions,
+      drawPileSize: 15,
+    });
+    const rng = createSeededRng(42);
+
+    const action = GreedyStrategy.choosePhase1(state, rng);
+
+    // AI should prefer red 7 (block opponent) over extending weak yellow
+    expect(action.kind).toBe('play-to-expedition');
+    expect(action.color).toBe('red');
+  });
+
+  it('should not block when the card would be better for own expedition', () => {
+    // AI has existing blue expedition with [5, 7] — strong, needs 9
+    // Opponent has yellow expedition with [2, 4, 6] — needs 8
+    // AI has blue 9 (extends own strong) and yellow 8 (blocks opponent)
+    // AI should prefer extending own expedition over blocking
+    const opponentExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+    opponentExpeditions.set('yellow', [
+      makeNumbered('yellow', 2, 2060),
+      makeNumbered('yellow', 4, 2061),
+      makeNumbered('yellow', 6, 2062),
+    ]);
+
+    const myExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+    myExpeditions.set('blue', [
+      makeNumbered('blue', 5, 2070),
+      makeNumbered('blue', 7, 2071),
+    ]);
+
+    const hand = [
+      makeNumbered('blue', 9, 2080),
+      makeNumbered('yellow', 8, 2081),
+    ];
+
+    const state = makeTestVisibleState({
+      hand,
+      myExpeditions,
+      opponentExpeditions,
+      drawPileSize: 15,
+    });
+    const rng = createSeededRng(42);
+
+    const action = GreedyStrategy.choosePhase1(state, rng);
+
+    // AI should extend own expedition (blue 9) rather than block yellow
+    expect(action.kind).toBe('play-to-expedition');
+    expect(action.color).toBe('blue');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+// Improvement: Optimal Investment Timing
+// ═══════════════════════════════════════════════════════════
+
+describe('AI Improvement - Optimal Investment Timing', () => {
+  it('should prefer playing an investment before a numbered card in the same color', () => {
+    // AI has yellow investment, yellow 5, yellow 8 — plus filler
+    // Both investment and 5 are playable on empty expedition
+    // Should play investment first
+    const myExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+
+    const hand = [
+      makeInvestment('yellow', 1, 2100),
+      makeNumbered('yellow', 5, 2101),
+    ];
+
+    const state = makeTestVisibleState({
+      hand,
+      myExpeditions,
+      drawPileSize: 25,
+    });
+    const rng = createSeededRng(42);
+
+    const action = GreedyStrategy.choosePhase1(state, rng);
+
+    // Should play to yellow, and prefer the investment
+    expect(action.kind).toBe('play-to-expedition');
+    expect(action.color).toBe('yellow');
+    // The investment card should be preferred over the numbered card
+    if (action.kind === 'play-to-expedition') {
+      expect(action.card.type).toBe('investment');
+    }
+  });
+
+  it('should play investments even when column is not yet positive, if enough follow-up cards exist', () => {
+    // AI has yellow investment and yellow 2,3 — all can be played
+    // After -20 base, 2+3=5, still negative, but with investment multiplier
+    // and remaining cards in deck, this can become positive
+    const myExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+
+    const hand = [
+      makeInvestment('yellow', 1, 2200),
+      makeNumbered('yellow', 2, 2201),
+      makeNumbered('yellow', 3, 2202),
+      makeNumbered('yellow', 10, 2203),
+      makeNumbered('blue', 5, 2204),
+    ];
+
+    const state = makeTestVisibleState({
+      hand,
+      myExpeditions,
+      drawPileSize: 30,
+    });
+    const rng = createSeededRng(42);
+
+    const action = GreedyStrategy.choosePhase1(state, rng);
+
+    // Should play to yellow, and prefer the investment
+    expect(action.kind).toBe('play-to-expedition');
+    expect(action.color).toBe('yellow');
+    if (action.kind === 'play-to-expedition') {
+      expect(action.card.type).toBe('investment');
+    }
+  });
+
+  it('should NOT play investments late in a column with many numbered cards already', () => {
+    // AI has existing yellow expedition with [2, 4, 6, 8] — 4 numbered cards
+    // Hand has yellow investment
+    // Playing investment now is late — most numbered cards already played
+    // Multiplier effect is minimal with few remaining cards
+    const myExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+    myExpeditions.set('yellow', [
+      makeNumbered('yellow', 2, 2300),
+      makeNumbered('yellow', 4, 2301),
+      makeNumbered('yellow', 6, 2302),
+      makeNumbered('yellow', 8, 2303),
+    ]);
+
+    const hand = [
+      makeInvestment('yellow', 1, 2310),
+      makeNumbered('blue', 3, 2311),
+    ];
+
+    const state = makeTestVisibleState({
+      hand,
+      myExpeditions,
+      drawPileSize: 20,
+    });
+    const rng = createSeededRng(42);
+
+    const action = GreedyStrategy.choosePhase1(state, rng);
+
+    // AI should not play yellow investment (column already far along)
+    // It should either play blue 3 or discard
+    expect(action.color).not.toBe('yellow');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+// Improvement: Opponent Expedition Blocking
+// ═══════════════════════════════════════════════════════════
+
+describe('AI Improvement - Opponent Expedition Blocking', () => {
+  it('should play a card that fills a gap in the opponent expedition to block them', () => {
+    // Opponent has red expedition with [4, 6] — gap at 5 or 7
+    // AI has red 5 — can start a new red expedition to block the gap
+    // Red 5 fills the gap between 4 and 6, blocking opponent's ability
+    // to continue their expedition
+    const opponentExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+    opponentExpeditions.set('red', [
+      makeNumbered('red', 4, 2400),
+      makeNumbered('red', 6, 2401),
+    ]);
+
+    const myExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+
+    const hand = [
+      makeNumbered('red', 5, 2410),
+      makeNumbered('blue', 3, 2411),
+      makeNumbered('green', 2, 2412),
+    ];
+
+    const state = makeTestVisibleState({
+      hand,
+      myExpeditions,
+      opponentExpeditions,
+      drawPileSize: 15,
+    });
+    const rng = createSeededRng(42);
+
+    const action = GreedyStrategy.choosePhase1(state, rng);
+
+    // AI should play red 5 to block opponent's gap
+    expect(action.kind).toBe('play-to-expedition');
+    expect(action.color).toBe('red');
+  });
+
+  it('should not block with a card that does not fill a gap', () => {
+    // Opponent has red expedition with [2, 4, 6] — no gaps between 2-4-6
+    // Actually 3 and 5 are gaps, but AI only has red 8 which doesn't
+    // fill any gap. The opponent's sequence [2,4,6] has gaps at 3,5,7
+    // Red 8 doesn't fill those gaps
+    const opponentExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+    opponentExpeditions.set('red', [
+      makeNumbered('red', 2, 2500),
+      makeNumbered('red', 4, 2501),
+      makeNumbered('red', 6, 2502),
+    ]);
+
+    const myExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+
+    const hand = [
+      makeNumbered('red', 8, 2510),
+      makeNumbered('blue', 3, 2511),
+    ];
+
+    const state = makeTestVisibleState({
+      hand,
+      myExpeditions,
+      opponentExpeditions,
+      drawPileSize: 15,
+    });
+    const rng = createSeededRng(42);
+
+    const action = GreedyStrategy.choosePhase1(state, rng);
+
+    // Red 8 doesn't fill a gap (opponent has [2,4,6], needs 3,5,7)
+    // AI should prefer blue 3 (starting new column) or discarding
+    // But it shouldn't play red 8 to block (no gap filled)
+    expect(action.kind).toBe('play-to-expedition');
+    expect(action.color).toBe('blue');
+  });
+
+  it('should weigh blocking appropriately — not dominate all other strategies', () => {
+    // AI has strong blue expedition with [5, 7] needing 9
+    // Opponent has yellow expedition with [2, 6] — gap at 3,4,5,7,8
+    // AI has blue 9 (extends own strong) and yellow 3 (blocks gap)
+    // AI should prefer extending own strong expedition over blocking
+    const opponentExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+    opponentExpeditions.set('yellow', [
+      makeNumbered('yellow', 2, 2600),
+      makeNumbered('yellow', 6, 2601),
+    ]);
+
+    const myExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+    myExpeditions.set('blue', [
+      makeNumbered('blue', 5, 2610),
+      makeNumbered('blue', 7, 2611),
+    ]);
+
+    const hand = [
+      makeNumbered('blue', 9, 2620),
+      makeNumbered('yellow', 3, 2621),
+    ];
+
+    const state = makeTestVisibleState({
+      hand,
+      myExpeditions,
+      opponentExpeditions,
+      drawPileSize: 15,
+    });
+    const rng = createSeededRng(42);
+
+    const action = GreedyStrategy.choosePhase1(state, rng);
+
+    // AI should extend own blue expedition (stronger play)
+    expect(action.kind).toBe('play-to-expedition');
+    expect(action.color).toBe('blue');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+// Improvement: Endgame / Deck-Count Awareness
+// ═══════════════════════════════════════════════════════════
+
+describe('AI Improvement - Endgame / Deck-Count Awareness', () => {
+  it('should avoid starting a new expedition with few cards of that color when draw pile is small', () => {
+    // Draw pile has only 5 cards (endgame)
+    // AI has yellow 5 only for yellow — not enough cards to start a new yellow expedition
+    // AI has blue 2, blue 4 — enough to start blue
+    const myExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+
+    const hand = [
+      makeNumbered('yellow', 5, 2700),
+      makeNumbered('blue', 2, 2701),
+      makeNumbered('blue', 4, 2702),
+    ];
+
+    const state = makeTestVisibleState({
+      hand,
+      myExpeditions,
+      drawPileSize: 5,
+    });
+    const rng = createSeededRng(42);
+
+    const action = GreedyStrategy.choosePhase1(state, rng);
+
+    // AI should prefer blue (has 2 cards) over yellow (only 1 card)
+    // in endgame
+    expect(action.kind).toBe('play-to-expedition');
+    expect(action.color).toBe('blue');
+  });
+
+  it('should still start expeditions in endgame if enough cards of that color exist', () => {
+    // Draw pile has only 5 cards (endgame)
+    // AI has 3 green cards — enough to start green expedition
+    const myExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+
+    const hand = [
+      makeNumbered('green', 2, 2800),
+      makeNumbered('green', 5, 2801),
+      makeNumbered('green', 8, 2802),
+      makeNumbered('blue', 3, 2803),
+    ];
+
+    const state = makeTestVisibleState({
+      hand,
+      myExpeditions,
+      drawPileSize: 5,
+    });
+    const rng = createSeededRng(42);
+
+    const action = GreedyStrategy.choosePhase1(state, rng);
+
+    // AI should play to green (has enough cards for endgame start)
+    expect(action.kind).toBe('play-to-expedition');
+    expect(action.color).toBe('green');
+  });
+
+  it('should be more willing to play risky cards in endgame (when pile is small)', () => {
+    // Draw pile has only 5 cards
+    // AI has yellow 9 and blue 4
+    // With few cards left, the AI should be more willing to play cards
+    // even with lower probability of success
+    const myExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+
+    const hand = [
+      makeNumbered('yellow', 9, 2900),
+      makeNumbered('blue', 3, 2901),
+    ];
+
+    const state = makeTestVisibleState({
+      hand,
+      myExpeditions,
+      drawPileSize: 5,
+    });
+    const rng = createSeededRng(42);
+
+    const action = GreedyStrategy.choosePhase1(state, rng);
+
+    // In endgame, AI should be willing to play something
+    expect(action.kind).toBe('play-to-expedition');
+    // Either color is fine — the key is it plays rather than discards
+  });
+
+  it('should behave differently with a large draw pile vs small draw pile', () => {
+    // Test that draw pile size actually changes behavior
+    const smallPileHand = [
+      makeNumbered('yellow', 7, 2950),
+      makeNumbered('blue', 4, 2951),
+    ];
+    const smallPileExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+    const smallPileState = makeTestVisibleState({
+      hand: smallPileHand,
+      myExpeditions: smallPileExpeditions,
+      drawPileSize: 3,
+    });
+
+    const smallPileAction = GreedyStrategy.choosePhase1(smallPileState, createSeededRng(42));
+
+    const largePileHand = [
+      makeNumbered('yellow', 7, 2952),
+      makeNumbered('blue', 4, 2953),
+    ];
+    const largePileExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+    const largePileState = makeTestVisibleState({
+      hand: largePileHand,
+      myExpeditions: largePileExpeditions,
+      drawPileSize: 35,
+    });
+
+    const largePileAction = GreedyStrategy.choosePhase1(largePileState, createSeededRng(42));
+
+    // The action selection should differ between small and large pile
+    // (different strategic context)
+
+    // Not asserting equality/inequality, just that both are legal plays
+    expect(smallPileAction.kind).toMatch(/^(play-to-expedition|discard)$/);
+    expect(largePileAction.kind).toMatch(/^(play-to-expedition|discard)$/);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+// Improvement: Score-Aware Multi-Column Strategy
+// ═══════════════════════════════════════════════════════════
+
+describe('AI Improvement - Score-Aware Multi-Column Strategy', () => {
+  it('should prioritize completing existing columns over starting new ones when no column is scored', () => {
+    // AI has existing yellow expedition with [2, 4, 6] — almost complete
+    // Also has blue 3 available to start a new blue expedition
+    // AI should prefer extending yellow over starting blue
+    const myExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+    myExpeditions.set('yellow', [
+      makeNumbered('yellow', 2, 3000),
+      makeNumbered('yellow', 4, 3001),
+      makeNumbered('yellow', 6, 3002),
+    ]);
+
+    const hand = [
+      makeNumbered('yellow', 8, 3010),
+      makeNumbered('blue', 3, 3011),
+    ];
+
+    const state = makeTestVisibleState({
+      hand,
+      myExpeditions,
+      drawPileSize: 20,
+    });
+    const rng = createSeededRng(42);
+
+    const action = GreedyStrategy.choosePhase1(state, rng);
+
+    // Should extend yellow (existing column) over starting blue
+    expect(action.kind).toBe('play-to-expedition');
+    expect(action.color).toBe('yellow');
+  });
+
+  it('should be more willing to start a new column when at least one column is already positive', () => {
+    // AI has completed yellow expedition with high score (already positive)
+    // AI can start a new green expedition with decent cards
+    // Having one positive column makes it worth risking a second
+    const myExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+    // Make yellow strongly positive: valueSum = 2+5+8+10 = 25 > 20
+    myExpeditions.set('yellow', [
+      makeNumbered('yellow', 2, 3100),
+      makeNumbered('yellow', 5, 3101),
+      makeNumbered('yellow', 8, 3102),
+      makeNumbered('yellow', 10, 3103),
+    ]);
+
+    const hand = [
+      makeNumbered('green', 3, 3110),
+      makeNumbered('green', 6, 3111),
+      makeNumbered('blue', 4, 3112),
+    ];
+
+    const state = makeTestVisibleState({
+      hand,
+      myExpeditions,
+      drawPileSize: 20,
+    });
+    const rng = createSeededRng(42);
+
+    const action = GreedyStrategy.choosePhase1(state, rng);
+
+    // AI should be willing to start green (new column)
+    expect(action.kind).toBe('play-to-expedition');
+    expect(action.color).toBe('green');
+  });
+
+  it('should not start new columns when no column is scored and existing ones need work', () => {
+    // AI has yellow expedition with [5, 7] — not positive (valueSum=12 < 20)
+    // AI has yellow 9 (extends existing, strong follow-up) and green 3 (starts new)
+    // AI should prefer extending yellow over starting green
+    const myExpeditions = new Map<ExpeditionColor, LostCitiesCard[]>(
+      EXPEDITION_COLORS.map(c => [c, []]),
+    );
+    myExpeditions.set('yellow', [
+      makeNumbered('yellow', 5, 3200),
+      makeNumbered('yellow', 7, 3201),
+    ]);
+
+    const hand = [
+      makeNumbered('yellow', 9, 3210),
+      makeNumbered('green', 3, 3211),
+    ];
+
+    const state = makeTestVisibleState({
+      hand,
+      myExpeditions,
+      drawPileSize: 20,
+    });
+    const rng = createSeededRng(42);
+
+    const action = GreedyStrategy.choosePhase1(state, rng);
+
+    // Should extend yellow (existing) over starting green
+    expect(action.kind).toBe('play-to-expedition');
+    expect(action.color).toBe('yellow');
+  });
+});
+

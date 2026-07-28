@@ -356,6 +356,40 @@ function cardsOfColor(
 }
 
 /**
+ * Calculate the blocking value of playing a numbered card that fills a gap
+ * in the opponent's expedition. Returns a score bonus (0 if no gap is filled).
+ *
+ * A gap exists when the opponent has two numbered cards with a rank gap
+ * that this card would fill (e.g., opponent has [4, 6], playing 5 fills the gap
+ * and prevents them from continuing their expedition chain).
+ */
+function scoreBlockingPlay(
+  card: LostCitiesCard,
+  opponentExpedition: LostCitiesCard[],
+): number {
+  if (card.type !== 'numbered') return 0;
+
+  const cardRank = card.rank;
+  const oppNumbered = opponentExpedition
+    .filter(c => c.type === 'numbered')
+    .map(c => cardValue(c))
+    .sort((a, b) => a - b);
+
+  if (oppNumbered.length < 2) return 0;
+
+  // Check if this card fills a gap between two consecutive opponent cards
+  for (let i = 0; i < oppNumbered.length - 1; i++) {
+    if (cardRank > oppNumbered[i] && cardRank < oppNumbered[i + 1]) {
+      // This card fills a gap! The larger the gap, the more valuable the block
+      const gapSize = oppNumbered[i + 1] - oppNumbered[i];
+      return gapSize * 15;
+    }
+  }
+
+  return 0;
+}
+
+/**
  * Score a Phase 1 action for the greedy strategy.
  * Higher score = more preferred.
  */
@@ -382,8 +416,10 @@ function scorePhase1Action(
         const totalColorCards = numberedInHand + laneSize;
         if (totalColorCards >= 3) {
           score += 20; // Investment is reasonable with enough support
+        } else if (totalColorCards >= 1) {
+          score -= 30; // Mild penalty — some support but not much
         } else {
-          score -= 100; // Penalize investment without enough support
+          score -= 80; // Penalize investment without any numbered cards
         }
       } else {
         // Starting with a low number is safer
@@ -400,6 +436,42 @@ function scorePhase1Action(
     if (laneSize === 0 && action.card.type !== 'investment') {
       const numberedInHand = countNumberedCardsInHandOfColor(state.hand, action.color);
       score += numberedInHand * 5;
+    }
+
+    // ---- Optimal Investment Timing (Improvement 2) ----
+    // Investments are most valuable when played early in a column.
+    // Prefer playing investments before numbered cards in the same color.
+    if (action.card.type === 'investment') {
+      const numberedInExpedition = (lane ?? []).filter(c => c.type === 'numbered').length;
+      const numberedInHand = countNumberedCardsInHandOfColor(state.hand, action.color);
+
+      if (numberedInExpedition < 3) {
+        // Early in the column — investment is valuable
+        if (numberedInHand >= 1) {
+          score += 35; // Good investment timing: numbered cards ready to follow
+        }
+      } else if (numberedInExpedition >= 4) {
+        // Very late in the column — investment adds little value
+        const currentValueSum = (lane ?? []).reduce((s, c) => s + cardValue(c), 0);
+        if (currentValueSum <= 30) {
+          score -= 80; // Strong penalty for late investment
+        }
+      } else {
+        // Moderately late (3 numbered cards)
+        const currentValueSum = (lane ?? []).reduce((s, c) => s + cardValue(c), 0);
+        if (currentValueSum <= 25) {
+          score -= 40; // Mild penalty for moderately late investment
+        }
+      }
+    } else if (action.card.type === 'numbered') {
+      // Penalty for playing a numbered card when an investment is available
+      // in hand for the same color and could be played first
+      const canPlayInvestmentFirst = !lane || lane.length === 0 ||
+        lane.every(c => c.type === 'investment');
+      if (canPlayInvestmentFirst &&
+        state.hand.some(c => c.color === action.color && c.type === 'investment')) {
+        score -= 40; // Prefer playing investment first to maximize multiplier
+      }
     }
 
     // Penalize playing a higher card when a lower one of the same color
@@ -441,6 +513,84 @@ function scorePhase1Action(
       score -= 60; // Very low confidence — strong penalty
     }
 
+    // ---- Endgame / Deck-Count Awareness (Improvement 4) ----
+    // When the draw pile is almost empty, adjust strategy.
+    const isEndgame = state.drawPileSize < 10;
+    if (isEndgame) {
+      // In endgame, avoid starting new expeditions unless we have
+      // enough cards of that color already
+      if (laneSize === 0 && action.card.type !== 'investment') {
+        const numberedInHand = countNumberedCardsInHandOfColor(state.hand, action.color);
+        if (numberedInHand < 2) {
+          score -= 40; // Strong penalty for starting without enough cards
+        }
+      }
+
+      // Reduce severity of probability penalty — in endgame,
+      // remaining cards are limited and predictable
+      if (prob < 0.2) {
+        score += 30; // Mitigate the -60 strong penalty
+      } else if (prob < 0.5) {
+        score += 10; // Mitigate the -15 low confidence penalty
+      }
+
+      // Increase penalty for discarding cards the opponent wants
+      // (handled in discard section below via opponentInterest)
+    }
+
+    // ---- Score-Aware Multi-Column Strategy (Improvement 5) ----
+    // Consider the overall score picture, not just individual columns.
+    let otherHasPositiveColumn = false;
+    for (const [colColor, colLane] of state.myExpeditions) {
+      if (colColor === action.color) continue;
+      if (colLane.length > 0) {
+        const colValueSum = colLane.reduce((s, c) => s + cardValue(c), 0);
+        if (colValueSum > 20) {
+          otherHasPositiveColumn = true;
+          break;
+        }
+      }
+    }
+
+    if (laneSize === 0) {
+      // Starting a new expedition
+      if (otherHasPositiveColumn) {
+        score += 20; // One column already positive — worth trying for round bonus
+      } else {
+        score -= 15; // No positive columns — focus on existing ones
+      }
+    }
+
+    // ---- Opponent Card Denial / Block Play (Improvement 1) ----
+    // Bonus for playing a numbered card the opponent could use to continue
+    // their expedition — denies the card to the opponent.
+    // Only applies when already committed to the expedition (laneSize > 0)
+    // to avoid over-prioritizing blocking over column viability.
+    if (action.card.type === 'numbered' && laneSize > 0) {
+      const oppLane = state.opponentExpeditions.get(action.color);
+      if (oppLane && oppLane.length > 0) {
+        const oppNumbered = oppLane.filter(c => c.type === 'numbered');
+        if (oppNumbered.length > 0) {
+          const oppHighest = Math.max(...oppNumbered.map(c => cardValue(c)));
+          if (cardValue(action.card) > oppHighest) {
+            // This card could extend opponent's expedition — deny them!
+            const interest = opponentInterest(action.color, state, drawHistory);
+            score += interest * 20; // Denial bonus proportional to opponent interest
+          }
+        }
+      }
+    }
+
+    // ---- Opponent Expedition Blocking (Improvement 3) ----
+    // Bonus for playing a card that fills a gap in the opponent's expedition.
+    if (action.card.type === 'numbered') {
+      const oppLane = state.opponentExpeditions.get(action.color);
+      if (oppLane && oppLane.length >= 2) {
+        const blockingScore = scoreBlockingPlay(action.card, oppLane);
+        score += blockingScore;
+      }
+    }
+
     return score;
   }
 
@@ -450,6 +600,11 @@ function scorePhase1Action(
   // Strong penalty for discarding a card the opponent wants
   const interest = opponentInterest(action.color, state, drawHistory);
   score -= interest * 150;
+
+  // In endgame, increase the penalty for discarding opponent-wanted cards
+  if (state.drawPileSize < 10) {
+    score -= interest * 50; // Extra penalty — fewer cards left to draw
+  }
 
   // Penalty for discarding high-value cards (wasted potential)
   score -= cardValue(action.card) * 2;
