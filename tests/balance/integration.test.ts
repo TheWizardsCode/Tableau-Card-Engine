@@ -36,12 +36,12 @@ function syntheticRun(overrides: Partial<MonteCarloRunSummary> & {
     turnWhenGridHalf: overrides.turnWhenGridHalf ?? null,
     turnWhenGridFull: overrides.turnWhenGridFull ?? null,
     noActionTurns: overrides.noActionTurns ?? 0,
+    cardsOwned: overrides.cardsOwned ?? [],
+    marketOffers: overrides.marketOffers ?? [],
+    economyHistory: overrides.economyHistory ?? [],
   };
   const ext: Record<string, unknown> = {};
-  if (overrides.cardsOwned) ext.cardsOwned = overrides.cardsOwned;
-  if (overrides.marketOffers) ext.marketOffers = overrides.marketOffers;
   if (overrides.finalGrid) ext.finalGrid = overrides.finalGrid;
-  if (overrides.economyHistory) ext.economyHistory = overrides.economyHistory;
   return { ...base, ...ext };
 }
 
@@ -250,7 +250,10 @@ describe('Full pipeline: runs → metrics → baseline → comparison', () => {
 // ========================================================================
 describe('Phase 1 data absent — graceful degradation', () => {
   it('card metrics return null when Phase 1 fields missing', () => {
-    const runs = [syntheticRun({ seed: 'bare' })]; // no Phase 1 extensions
+    // Create a run with Phase 1 fields, then delete them to simulate pre-Phase-1 data
+    const runs = [syntheticRun({ seed: 'bare' })];
+    delete (runs[0] as any).cardsOwned;
+    delete (runs[0] as any).marketOffers;
     expect(computePickRate('biz-bakery', runs)).toBeNull();
     expect(computeWinRateDelta('biz-bakery', runs)).toBeNull();
     expect(computeSurvivalRate('biz-bakery', runs)).toBeNull();

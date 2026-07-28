@@ -86,6 +86,7 @@ describe('captureBaseline', () => {
         seed: 'test-001', result: 'win', endReason: 'score_threshold',
         finalScore: 158, finalCoins: 42, turns: 13,
         turnWhenGridHalf: 5, turnWhenGridFull: 10, noActionTurns: 1,
+        cardsOwned: [], marketOffers: [], economyHistory: [],
       },
     ];
 

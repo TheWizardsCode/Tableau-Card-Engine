@@ -28,9 +28,9 @@ function makeRun(overrides: Partial<MonteCarloRunSummary> & {
     turnWhenGridHalf: overrides.turnWhenGridHalf ?? null,
     turnWhenGridFull: overrides.turnWhenGridFull ?? null,
     noActionTurns: overrides.noActionTurns ?? 0,
-    ...(overrides.cardsOwned ? { cardsOwned: overrides.cardsOwned } : {}),
-    ...(overrides.marketOffers ? { marketOffers: overrides.marketOffers } : {}),
-    ...(overrides.economyHistory ? { economyHistory: overrides.economyHistory } : {}),
+    cardsOwned: overrides.cardsOwned ?? [],
+    marketOffers: overrides.marketOffers ?? [],
+    economyHistory: overrides.economyHistory ?? [],
   };
 }
 

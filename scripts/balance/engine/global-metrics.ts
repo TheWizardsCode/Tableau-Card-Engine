@@ -167,7 +167,10 @@ export interface EconomyHealthResult {
 export function computeEconomyHealth(runs: MonteCarloRunSummary[]): EconomyHealthResult | null {
   if (runs.length === 0) return null;
 
-  const hasHistory = runs.some(r => 'economyHistory' in r);
+  const hasHistory = runs.some(r => {
+    const h = (r as any).economyHistory;
+    return Array.isArray(h) && h.length > 0;
+  });
   if (!hasHistory) return null;
 
   let totalCoinsPerTurn = 0;
@@ -441,7 +444,10 @@ export function computeTurnByTurnSnapshots(
 ): TurnByTurnSnapshotsResult | null {
   if (runs.length === 0) return null;
 
-  const hasHistory = runs.some(r => 'economyHistory' in r);
+  const hasHistory = runs.some(r => {
+    const h = (r as any).economyHistory;
+    return Array.isArray(h) && h.length > 0;
+  });
   if (!hasHistory) return null;
 
   // Collect all data points keyed by turn

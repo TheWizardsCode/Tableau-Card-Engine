@@ -31,12 +31,12 @@ function makeRun(overrides: Partial<MonteCarloRunSummary> & {
     turnWhenGridHalf: overrides.turnWhenGridHalf ?? null,
     turnWhenGridFull: overrides.turnWhenGridFull ?? null,
     noActionTurns: overrides.noActionTurns ?? 0,
+    cardsOwned: overrides.cardsOwned ?? [],
+    marketOffers: overrides.marketOffers ?? [],
+    economyHistory: overrides.economyHistory ?? [],
   };
   const extended: Record<string, unknown> = {};
-  if (overrides.cardsOwned) extended.cardsOwned = overrides.cardsOwned;
-  if (overrides.marketOffers) extended.marketOffers = overrides.marketOffers;
   if (overrides.finalGrid) extended.finalGrid = overrides.finalGrid;
-  if (overrides.economyHistory) extended.economyHistory = overrides.economyHistory;
   if (overrides.incomeBreakdown) extended.incomeBreakdown = overrides.incomeBreakdown;
   return { ...base, ...extended };
 }
