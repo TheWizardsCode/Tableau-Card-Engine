@@ -1226,8 +1226,6 @@ export class MainStreetRenderer {
     }
 
     if (hand.length === 0) {
-      // Update hand size indicator
-      this.updateHandSizeIndicator(0);
       return;
     }
 
@@ -1253,27 +1251,6 @@ export class MainStreetRenderer {
       s.handBusinessContainer!.add(container);
     }
 
-    // Update hand size indicator
-    this.updateHandSizeIndicator(hand.length);
-  }
-
-  /**
-   * Updates the hand size indicator text (e.g. "Hand: 2/5").
-   */
-  private updateHandSizeIndicator(current: number): void {
-    const s = this.scene;
-    const maxSize = s.state.maxHandSize ?? 2;
-
-    if (s.handSizeText) {
-      s.handSizeText.destroy();
-    }
-
-    s.handSizeText = s.add.text(10, s.layout.handY - 14, 
-      `Hand: ${current}/${maxSize}`, {
-      fontSize: '12px',
-      color: current >= maxSize ? '#ff6666' : '#c8b88a',
-      fontFamily: 'Arial',
-    });
   }
 
   /**
@@ -1360,6 +1337,30 @@ export class MainStreetRenderer {
         s.hintUsedThisTurn, () => s.onHintClick(),
       );
       s.actionContainer.add(hintBtn);
+
+    } else if (s.uiPhase === 'placing-from-hand') {
+      const rightX = s.layout.gameW - 24;
+      const by = s.layout.actionY;
+
+      const hand = s.state.hand ?? [];
+      const handCount = hand.length;
+      const hint = s.add.text(rightX, by - 4, `Card in hand (${handCount}) — click an empty slot to place`, {
+        fontSize: '14px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY,
+      }).setOrigin(1, 1);
+      s.actionContainer.add(hint);
+
+      // Cancel button (right-aligned) — returns to market, card stays in hand
+      const btnW = s.layout.actionButtonW;
+      const cancelBtn = createActionButton(s, rightX - btnW, by + 4, btnW, 'Cancel', () => {
+        s.pendingHandIndex = null;
+        s.clearMarketSelection();
+        s.uiPhase = 'market';
+        this.refreshAll();
+        s.instructionText.setText(
+          `Turn ${s.state.turn} / ${s.state.config.maxTurns} -- Buy cards from the market or End Turn`,
+        );
+      });
+      s.actionContainer.add(cancelBtn);
 
     } else if (s.uiPhase === 'placing-business') {
       const rightX = s.layout.gameW - 24;

@@ -347,12 +347,15 @@ export class MainStreetTurnController {
     };
 
     if (sourceIndex >= 0) {
+      const handIndex = (s.state.hand ?? []).length;
+      const spacing = s.layout.handCardW + 8;
+      const destX = s.layout.handX + s.layout.handCardW / 2 + handIndex * spacing;
       void s.animateTransferFromMarket({
         cardId: card.id,
         family: 'business',
         row: 'development',
         slotIndex: sourceIndex,
-        destination: s.getHandCardCenter(),
+        destination: { x: destX, y: s.layout.handY },
       }).then(afterTransfer);
     } else {
       afterTransfer();
