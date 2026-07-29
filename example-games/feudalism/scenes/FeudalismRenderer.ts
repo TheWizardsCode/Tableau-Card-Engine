@@ -91,6 +91,11 @@ export class FeudalismRenderer {
   // during card-purchase/reserve animation before its own fly animation starts.
   private patronAnimationCache: { tile: PatronTile; index: number } | null = null;
 
+  // Pending refill slots: market slots that should render as empty during
+  // refill animation. Stored as "${tier}-${col}" strings for O(1) lookup.
+  // Cleared after the refill animation completes.
+  private pendingRefillSlots: Set<string> = new Set();
+
   constructor(scene: Phaser.Scene, session: FeudalismSession) {
     this.scene = scene;
     this.session = session;
@@ -103,6 +108,26 @@ export class FeudalismRenderer {
   /** Cache a patron that should remain visible during animation. */
   cachePatronForAnimation(patron: PatronTile | null, index: number): void {
     this.patronAnimationCache = patron ? { tile: patron, index } : null;
+  }
+
+  /**
+   * Mark market slots as pending refill so they render as empty during
+   * the refill animation. Cleared by clearPendingRefillSlots().
+   */
+  addPendingRefillSlots(slots: { tier: Tier; col: number }[]): void {
+    for (const slot of slots) {
+      this.pendingRefillSlots.add(`${slot.tier}-${slot.col}`);
+    }
+  }
+
+  /** Clear all pending refill slot flags. */
+  clearPendingRefillSlots(): void {
+    this.pendingRefillSlots.clear();
+  }
+
+  /** Check if a market slot is pending refill (should render as empty). */
+  private isPendingRefillSlot(tier: Tier, col: number): boolean {
+    return this.pendingRefillSlots.has(`${tier}-${col}`);
   }
   get marketContainers(): Map<number, Phaser.GameObjects.Container> { return this.marketCardContainerById; }
   get marketSelections(): Map<number, SelectionController> { return this.marketSelectionByCardId; }
@@ -263,7 +288,7 @@ export class FeudalismRenderer {
       for (let col = 0; col < 4; col++) {
         const card = market.visible[col];
         const x = MARKET_X + col * (MARKET_CARD_W + MARKET_CARD_GAP);
-        if (card) {
+        if (card && !this.isPendingRefillSlot(tier, col)) {
           const cardObj = this.createMarketCard(x, y, card, callbacks);
           this.marketContainer.add(cardObj);
         } else {

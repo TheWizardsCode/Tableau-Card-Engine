@@ -63,7 +63,7 @@ export function overlayKey(field: string): string {
 }
 
 /**
- * English locale bundle for all 13 tutorial step strings.
+ * English locale bundle for all 14 tutorial step strings.
  *
  * Maps i18n keys (e.g. `tutorial.T1.title`) to English string values.
  */
@@ -131,51 +131,64 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
     'Held Event Card',
   [tutorialKey('T7', 'body')]:
     'Buy the **Local Festival** card from the investments row.\n' +
+    'Investment cards are most powerful when you time them right. The Local Festival ' +
+    'gives +2 coins to all **Culture** businesses — so you will want a Culture business ' +
+    'on your street before you play it.\n' +
     'You can hold one event card and play it when the time is right.',
 
-  // ── T8: Upgrade Concept ─────────────────────────────────────
+  // ── T8: Culture Business Purchase ───────────────────────────
   [tutorialKey('T8', 'title')]:
-    'Upgrade Concept',
+    'Culture Business',
   [tutorialKey('T8', 'body')]:
+    'Now buy the **Bookshop** from the Development row for €3.\n' +
+    'It is a **Culture** business, which means the Local Festival you just bought ' +
+    'will boost it when you play the event.\n' +
+    'Having the right businesses on your street makes your investment cards stronger!\n' +
+    'This card will be placed automatically.',
+
+  // ── T9: Upgrade Concept ─────────────────────────────────────
+  [tutorialKey('T9', 'title')]:
+    'Upgrade Concept',
+  [tutorialKey('T9', 'body')]:
     'Upgrades make a business better. Strong upgrades earn more money over time.',
 
-  // ── T9: Your Hand ───────────────────────────────────────────
-  [tutorialKey('T9', 'title')]:
+  // ── T10: Your Hand ──────────────────────────────────────────
+  [tutorialKey('T10', 'title')]:
     'Your Hand',
-  [tutorialKey('T9', 'body')]:
+  [tutorialKey('T10', 'body')]:
     'You can hold one event card at a time.\n' +
     'When you buy an event, it appears here.\n' +
     'Click the card in your hand to play it.',
 
-  // ── T10: Action Controls ────────────────────────────────────
-  [tutorialKey('T10', 'title')]:
+  // ── T11: Action Controls ────────────────────────────────────
+  [tutorialKey('T11', 'title')]:
     'Action Controls',
-  [tutorialKey('T10', 'body')]:
+  [tutorialKey('T11', 'body')]:
     'Use the buttons at the bottom:\n' +
     '• End Turn — collect income and advance\n' +
     '• Undo / Redo — go back or forward\n' +
     '• Hint — get a suggested move\n' +
     '• Refresh — swap the investment row (costs coins)',
 
-  // ── T11: Challenges ─────────────────────────────────────────
-  [tutorialKey('T11', 'title')]:
+  // ── T12: Challenges ─────────────────────────────────────────
+  [tutorialKey('T12', 'title')]:
     'Challenges',
-  [tutorialKey('T11', 'body')]:
+  [tutorialKey('T12', 'body')]:
     'Each game gives you challenges for bonus points. See them in the Challenge Tracker.\n\n' +
     'Completing challenges unlocks new cards for future games!',
 
-  // ── T12: Scoring ────────────────────────────────────────────
-  [tutorialKey('T12', 'title')]:
+  // ── T13: Scoring ────────────────────────────────────────────
+  [tutorialKey('T13', 'title')]:
     'Scoring',
-  [tutorialKey('T12', 'body')]:
+  [tutorialKey('T13', 'body')]:
     'Your score appears at the top of the screen.\n\n' +
     'Final Score = Coins + Reputation + Challenge bonuses\n\n' +
     'Reach the target score before running out of turns to win!',
 
-  // ── T13: Tutorial Complete ──────────────────────────────────
-  [tutorialKey('T13', 'title')]:
+  // ── T14: Tutorial Complete ──────────────────────────────────
+  [tutorialKey('T14', 'title')]:
     'Tutorial Complete',
-  [tutorialKey('T13', 'body')]:
+  [tutorialKey('T14', 'body')]:
     'Great job! You are ready to play a full game. Find the tutorial again in the settings menu.',
 } as const;
 

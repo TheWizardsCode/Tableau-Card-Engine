@@ -1,6 +1,6 @@
 {
   "source": "Generated from MainStreetCards.ts and Tier 1 IDs from MainStreetTiers.ts",
-  "generatedAt": "2026-07-06T01:10:05.874Z",
+  "generatedAt": "2026-07-25T23:50:00.000Z",
   "baselineTier1CardIds": [
     "biz-bakery",
     "biz-bookshop",
@@ -59,6 +59,7 @@
       "evt-power-outage",
       "evt-power-surge",
       "evt-protest",
+      "evt-recession",
       "evt-shoplifting",
       "evt-slow-season",
       "evt-street-performer",

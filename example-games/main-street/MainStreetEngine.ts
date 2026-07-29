@@ -234,7 +234,7 @@ function classifyEffect(coinChange: number, repChange: number): 'gain' | 'loss' 
  * Computes the effective duration for a DurationEventCard by scanning
  * the street grid for Clinic and Medical Center cards.
  *
- * Rules (from Flu event AC):
+ * Rules:
  * - Medical Center (upg-medical-center) reduces duration by 3
  * - Clinic (biz-clinic) reduces duration by 2
  * - Only the stronger reduction applies (Medical Center > Clinic)
@@ -278,11 +278,8 @@ export function resolveEvent(state: MainStreetState, event: EventCard): void {
   if (isDurationEventCard(event)) {
     const dEvent = event as DurationEventCard;
 
-    // Compute effective duration (check clinic/medical center for flu)
-    let effectiveDuration = dEvent.duration;
-    if (dEvent.id === 'evt-flu-outbreak') {
-      effectiveDuration = computeDurationWithClinicReduction(dEvent.duration, state);
-    }
+    // Compute effective duration (check clinic/medical center for duration mitigation)
+    let effectiveDuration = computeDurationWithClinicReduction(dEvent.duration, state);
 
     // Create the ActiveEffect
     const effect = createActiveEffect(

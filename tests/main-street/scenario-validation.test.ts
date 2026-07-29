@@ -94,12 +94,15 @@ describe('Scenario Validation: requiredCardId references', () => {
     }
   });
 
-  it('T3 is the only action step with a requiredCardId (current invariant)', () => {
+  it('T3 and T8 are the action steps with a requiredCardId (current invariant)', () => {
     const actionStepsWithRequiredCardId = UNIFIED_TUTORIAL_STEPS.filter(
       (step) => step.gate === 'action' && step.requiredCardId !== undefined,
     );
-    // Currently only T3 has a requiredCardId
-    expect(actionStepsWithRequiredCardId.length).toBe(1);
+    // T3 (Laundromat) and T8 (Bookshop) have requiredCardId
+    expect(actionStepsWithRequiredCardId.length).toBe(2);
     expect(actionStepsWithRequiredCardId[0].id).toBe('T3');
+    expect(actionStepsWithRequiredCardId[1].id).toBe('T8');
+    expect(actionStepsWithRequiredCardId[0].requiredCardId).toBe('biz-laundromat-0');
+    expect(actionStepsWithRequiredCardId[1].requiredCardId).toBe('biz-bookshop-0');
   });
 });

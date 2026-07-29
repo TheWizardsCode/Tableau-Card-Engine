@@ -218,22 +218,20 @@ export class GymSaveLoadScene extends GymSceneBase {
     // ── Buttons ───────────────────────────────────────────────
     const cx = GAME_W / 2;
     const controlsAnchor = resolveSaveLoadAnchor('controls', 'center');
-    const controls2Anchor = resolveSaveLoadAnchor('controls2', 'center');
     const stateAnchor = resolveSaveLoadAnchor('state', 'center');
     const backendAnchor = resolveSaveLoadAnchor('backend', 'center');
     const logAnchor = resolveSaveLoadAnchor('log', 'center');
     const y = controlsAnchor.y;
 
-    this.addButton(cx - 400, y, '[ Add Card ]', () => this.addCard());
-    this.addButton(cx - 240, y, '[ Save State ]', () => this.saveState());
-    this.addButton(cx - 80, y, '[ Load State ]', () => this.loadState());
-    this.addButton(cx + 80, y, '[ Load Malformed ]', () => this.loadMalformed());
-    this.addButton(cx + 240, y, '[ Clear Save ]', () => this.clearSave());
-
-    const y2 = controls2Anchor.y;
-    this.addButton(cx - 300, y2, '[ Take Screenshot ]', () => this.takeScreenshot());
-    this.addButton(cx - 100, y2, '[ Clear Screenshot ]', () => this.clearScreenshot());
-    this.addButton(cx + 100, y2, '[ Randomize Hand ]', () => this.randomizeHand());
+    this.initButtonBar(y);
+    this.buttonBar!.addButton('[ Add Card ]', () => this.addCard(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Save State ]', () => this.saveState(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Load State ]', () => this.loadState(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Load Malformed ]', () => this.loadMalformed(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Clear Save ]', () => this.clearSave(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Take Screenshot ]', () => this.takeScreenshot(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Clear Screenshot ]', () => this.clearScreenshot(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Randomize Hand ]', () => this.randomizeHand(), { zone: 'center' });
 
     // ── State text ────────────────────────────────────────────
     try {
@@ -393,6 +391,23 @@ export class GymSaveLoadScene extends GymSceneBase {
 
   // ── RenderTexture screenshot (full-screen) ───────────────────
 
+  /**
+   * Take a full-screen RenderTexture screenshot of the game content area,
+   * excluding HUD elements (help panel, button, header chrome, event log).
+   *
+   * The screenshot is captured into a 1280×720 RenderTexture and displayed
+   * as a 25%-scale thumbnail centred below the controls for save/load preview.
+   *
+   * HUD exclusion uses a Set-based blacklist of known HUD object references
+   * by identity rather than by type or position. This approach is surgical
+   * and avoids brittle type/position checks. If new HUD elements are added
+   * to the scene, add their references to the exclusion Set.
+   *
+   * IMPORTANT: Do NOT pass x/y offset to `rt.draw()`. In Phaser 4's
+   * DynamicTexture, the x/y parameters replace each object's position
+   * (not add as offsets), causing all non-container objects to render
+   * at the origin. Omitting x/y preserves each object's world position.
+   */
   private takeScreenshot(): void {
     this.clearScreenshot();
 
@@ -403,9 +418,30 @@ export class GymSaveLoadScene extends GymSceneBase {
       // their world positions through the main scene camera.
       const rt = this.add.renderTexture(0, 0, GAME_W, GAME_H);
 
-      // Exclude rt itself from the draw
-      const drawables = this.children.getAll().filter((child) => child !== rt);
-      rt.draw(drawables, 0, 0);
+      // Exclude HUD elements from the screenshot: help panel, header
+      // chrome (title, menu button, nav buttons, divider), and event log.
+      // Game content (cards, action buttons, state/backend text) remains.
+      // Use identity-based Set for surgical filtering (not type/position).
+      const excluded = new Set<unknown>([
+        rt,
+        ...(this.helpPanel?.getSceneChildren() ?? []),
+        ...(this.helpButton?.getSceneChildren() ?? []),
+        this.header?.title,
+        this.header?.menuButton,
+        this.prevButton,
+        this.nextButton,
+        this.headerDivider,
+        this.eventLogResult?.header,
+      ]);
+      // Add dynamically-created event log lines (if any)
+      if (this.eventLogResult) {
+        for (const line of this.eventLogResult.lines) {
+          excluded.add(line);
+        }
+      }
+
+      const drawables = this.children.getAll().filter((child) => !excluded.has(child));
+      rt.draw(drawables);
       rt.render();
 
       rt.saveTexture('screenshot-thumb');

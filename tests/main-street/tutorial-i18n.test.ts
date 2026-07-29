@@ -78,8 +78,8 @@ describe('Tutorial i18n: English bundle registration', () => {
     expect(body).toContain('€6');
   });
 
-  it('T13 title resolves to "Tutorial Complete"', () => {
-    const step = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T13')!;
+  it('T14 title resolves to "Tutorial Complete"', () => {
+    const step = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T14')!;
     expect(t(step.titleKey)).toBe('Tutorial Complete');
   });
 
@@ -147,7 +147,7 @@ describe('Tutorial i18n: resolveTutorialStepText', () => {
     expect(body).toContain('Laundromat');
   });
 
-  it('works for all 13 steps', () => {
+  it('works for all 14 steps', () => {
     for (const step of UNIFIED_TUTORIAL_STEPS) {
       const { title, body } = resolveTutorialStepText(step);
       expect(title.length).toBeGreaterThan(0);

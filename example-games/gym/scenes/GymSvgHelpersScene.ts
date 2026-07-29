@@ -50,8 +50,6 @@ const MAX_SVG_DISPLAY_LENGTH = 1200;
 const CONTROLS_ROW_1_Y = 100;
 
 /** Y position for the second row of controls. */
-const CONTROLS_ROW_2_Y = 135;
-
 /** X position for the SVG text display (left column). */
 const SVG_TEXT_X = 30;
 
@@ -154,18 +152,15 @@ export class GymSvgHelpersScene extends GymSceneBase {
   private createUI(): void {
     const cx = GAME_W / 2;
     const y1 = CONTROLS_ROW_1_Y;
-    const y2 = CONTROLS_ROW_2_Y;
 
-    // ── Controls row 1 ─────────────────────────────────
-    this.addButton(cx - 450, y1, '[ Fetch SVG ]', () => this.fetchSvg());
-    this.addButton(cx - 310, y1, '[ Rasterise 128x128 ]', () => this.rasterise(128, 128));
-    this.addButton(cx - 130, y1, '[ Rasterise 64x64 ]', () => this.rasterise(64, 64));
-    this.addButton(cx + 30, y1, '[ Cache Test ]', () => this.cacheTest());
-    this.addButton(cx + 170, y1, '[ Clear Display ]', () => this.clearDisplay());
-
-    // ── Controls row 2 ─────────────────────────────────
-    this.validToggleBtn = this.addButton(cx - 450, y2, '[ Mark Invalid ]', () => this.toggleValid());
-    this.validToggleBtn.setColor('#ff8888');
+    // ── Controls ───────────────────────────────────────
+    this.initButtonBar(y1, { rowSpacing: 28 });
+    this.buttonBar!.addButton('[ Fetch SVG ]', () => this.fetchSvg(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Rasterise 128x128 ]', () => this.rasterise(128, 128), { zone: 'center' });
+    this.buttonBar!.addButton('[ Rasterise 64x64 ]', () => this.rasterise(64, 64), { zone: 'center' });
+    this.buttonBar!.addButton('[ Cache Test ]', () => this.cacheTest(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Clear Display ]', () => this.clearDisplay(), { zone: 'center' });
+    this.validToggleBtn = this.buttonBar!.addButton('[ Mark Invalid ]', () => this.toggleValid(), { zone: 'center', color: '#ff8888', hoverColor: '#ffaaaa' });
 
     // ── SVG text display (left column) ──────────────────
     createHudText(this, SVG_TEXT_X, SVG_TEXT_HEADER_Y, '── Raw SVG Content ──', '#669966', {

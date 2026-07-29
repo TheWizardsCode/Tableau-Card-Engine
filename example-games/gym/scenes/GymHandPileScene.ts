@@ -223,40 +223,33 @@ export class GymHandPileScene extends GymSceneBase {
     ]);
 
     const cx = GAME_W / 2;
-    let y = 60;
 
-    // Controls row 1
-    this.addButton(cx - 450, y, '[ Draw ]', () => this.drawToHand());
-    this.addButton(cx - 340, y, '[ Discard ]', () => this.discardSelected());
-    this.addButton(cx - 220, y, '[ Recall ]', () => this.recallFromDiscard());
-    this.addButton(cx - 100, y, '[ Flip ]', () => this.flipSelected());
-    this.addButton(cx + 10, y, '[ Move ]', () => this.moveSelectedCard());
-    this.addButton(cx + 110, y, '[ Cancel Move ]', () => this.cancelMove());
+    // Controls rows 1 + 2 (wrapping)
+    this.initButtonBar(60);
+    this.buttonBar!.addButton('[ Draw ]', () => this.drawToHand(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Discard ]', () => this.discardSelected(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Recall ]', () => this.recallFromDiscard(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Flip ]', () => this.flipSelected(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Move ]', () => this.moveSelectedCard(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Cancel Move ]', () => this.cancelMove(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Show Valid ]', () => this.showValidMoves(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Show Illegal ]', () => this.showIllegalMove(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Select Next ]', () => this.selectNext(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Sort Hand ]', () => this.sortHand(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Shuffle Hand ]', () => this.shuffleHand(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Reset ]', () => this.reset(), { zone: 'center' });
 
-    y += 26;
-    // Controls row 2
-    this.addButton(cx - 380, y, '[ Show Valid ]', () => this.showValidMoves());
-    this.addButton(cx - 210, y, '[ Show Illegal ]', () => this.showIllegalMove());
-    this.addButton(cx - 40, y, '[ Select Next ]', () => this.selectNext());
-    this.addButton(cx + 100, y, '[ Sort Hand ]', () => this.sortHand());
-    this.addButton(cx + 230, y, '[ Shuffle Hand ]', () => this.shuffleHand());
-    this.addButton(cx + 340, y, '[ Reset ]', () => this.reset());
-
-    y += 26;
     // Controls row 3 — Drag-and-drop demo and discard mode toggle
-    this.dragButton = this.addButton(cx - 420, y, '[ Enable Drag ]', () => this.toggleDrag());
-    this.dragLabel = createHudText(this, cx - 250, y, 'Drag: off  (click card, then drag to discard)', '#777777', { fontSize: '11px' }).setOrigin(0, 0.5);
+    const row3Y = 112;
+    this.initButtonBar(row3Y);
+    this.dragButton = this.buttonBar!.addButton('[ Enable Drag ]', () => this.toggleDrag(), { zone: 'center' });
+    this.dragLabel = createHudText(this, cx - 250, row3Y, 'Drag: off  (click card, then drag to discard)', '#777777', { fontSize: '11px' }).setOrigin(0, 0.5);
+    this.buttonBar!.addButton('[ Toggle Discard Mode ]', () => this.toggleDiscardMode(), { zone: 'center' });
+    this.discardModeLabel = createHudText(this, cx + 190, row3Y, 'Discard: animate', '#88ff88', { fontSize: '11px' }).setOrigin(0, 0.5);
+    this.buttonBar!.addButton('[ Toggle Face Up ]', () => this.toggleDiscardFaceUp(), { zone: 'center' });
+    this.faceUpLabel = createHudText(this, cx + 470, row3Y, 'Face: up', '#88ff88', { fontSize: '11px' }).setOrigin(0, 0.5);
 
-    // Discard mode toggle — animate (default) vs shrink
-    this.addButton(cx + 30, y, '[ Toggle Discard Mode ]', () => this.toggleDiscardMode());
-    this.discardModeLabel = createHudText(this, cx + 190, y, 'Discard: animate', '#88ff88', { fontSize: '11px' }).setOrigin(0, 0.5);
-
-    // Discard pile face-up toggle
-    this.addButton(cx + 300, y, '[ Toggle Face Up ]', () => this.toggleDiscardFaceUp());
-    this.faceUpLabel = createHudText(this, cx + 470, y, 'Face: up', '#88ff88', { fontSize: '11px' }).setOrigin(0, 0.5);
-
-    y += 35;
-    createHudText(this, cx, y, '── Event Log ──', '#669966', { fontSize: '12px' }).setOrigin(0.5);
+    createHudText(this, cx, 147, '── Event Log ──', '#669966', { fontSize: '12px' }).setOrigin(0.5);
 
     // Create sliders using the shared utility
     const sliderY = this.SLIDER_Y;
@@ -298,7 +291,7 @@ export class GymHandPileScene extends GymSceneBase {
     this.rotationSlider = new Slider(this, rotationSliderX, sliderY, {
       initialValue: this.ROTATION_DEGREES_DEFAULT,
       minValue: 0,
-      maxValue: 45,
+      maxValue: 359,
       label: 'Rotation',
       width: sliderWidth,
       textColor: '#88ff88',
@@ -308,7 +301,8 @@ export class GymHandPileScene extends GymSceneBase {
     };
 
     // Toggle button and layout label — placed alongside the sliders
-    this.addButton(startX + 3 * (sliderWidth + sliderHorizGap) + 20, sliderY - 4, '[ Toggle Layout ]', () => this.toggleLayoutDirection());
+    this.initButtonBar(sliderY - 4);
+    this.buttonBar!.addButton('[ Toggle Layout ]', () => this.toggleLayoutDirection(), { zone: 'left' });
     this.layoutLabel = createHudText(this, startX + 3 * (sliderWidth + sliderHorizGap) + 175, sliderY, 'Layout: horizontal', '#88ff88', { fontSize: '12px' });
 
     // Sliders self-manage their own pointermove/pointerup listeners,

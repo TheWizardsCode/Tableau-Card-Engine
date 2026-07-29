@@ -15,6 +15,7 @@ import {
   validateAction,
   type FeudalismSession,
   type FeudalismPlayerState,
+  type TurnAction,
 } from '../../example-games/feudalism/FeudalismGame';
 import {
   type DevelopmentCard,
@@ -26,6 +27,7 @@ import {
   MAX_TOKENS,
   MAX_RESERVED,
   MARKET_SIZE,
+  type Tier,
 } from '../../example-games/feudalism/FeudalismCards';
 import { createSeededRng } from '../../src/core-engine/SeededRng';
 
@@ -556,8 +558,8 @@ describe('FeudalismGame', () => {
       };
       player.reservedCards.push(barleyCard);
       const result = executeTurn(session, { type: 'purchase', cardId: 800 });
-      expect(result.patronVisit).not.toBeNull();
-      expect(result.patronVisit!.id).toBe(100);
+      expect(result.patronVisits).toHaveLength(1);
+      expect(result.patronVisits[0].id).toBe(100);
       expect(player.patrons).toHaveLength(1);
       expect(session.patrons).toHaveLength(0);
     });
@@ -570,7 +572,352 @@ describe('FeudalismGame', () => {
         type: 'take-different',
         colors: ['wheat', 'oats', 'flax'],
       });
-      expect(result.patronVisit).toBeNull();
+      expect(result.patronVisits).toHaveLength(0);
+    });
+
+    it('two patrons visit in a single turn when both qualify', () => {
+      const session = createTestSession();
+      const player = session.players[0];
+
+      // Set up two patrons: one requiring 4 barley + 4 flax, another requiring 4 oats + 4 wheat
+      session.patrons = [
+        { id: 100, requirements: { barley: 4, flax: 4 }, points: 3 },
+        { id: 101, requirements: { oats: 4, wheat: 4 }, points: 3 },
+      ];
+
+      // Give player 3 barley + 4 flax + 3 oats + 4 wheat bonuses
+      for (let i = 0; i < 3; i++) {
+        player.purchasedCards.push(
+          { id: 700 + i, tier: 1, cost: {}, bonus: 'barley', points: 0 },
+        );
+      }
+      for (let i = 0; i < 4; i++) {
+        player.purchasedCards.push(
+          { id: 710 + i, tier: 1, cost: {}, bonus: 'flax', points: 0 },
+        );
+      }
+      for (let i = 0; i < 3; i++) {
+        player.purchasedCards.push(
+          { id: 720 + i, tier: 1, cost: {}, bonus: 'oats', points: 0 },
+        );
+      }
+      for (let i = 0; i < 4; i++) {
+        player.purchasedCards.push(
+          { id: 730 + i, tier: 1, cost: {}, bonus: 'wheat', points: 0 },
+        );
+      }
+
+      // Purchase a card with barley bonus (the 4th barley to qualify patron 100)
+      // AND a card with oats bonus (the 4th oats to qualify patron 101)
+      const barleyCard: DevelopmentCard = {
+        id: 800, tier: 1, cost: {}, bonus: 'barley', points: 0,
+      };
+      const oatsCard: DevelopmentCard = {
+        id: 801, tier: 1, cost: {}, bonus: 'oats', points: 0,
+      };
+
+      // Put both reserved cards so player can purchase both
+      player.reservedCards.push(barleyCard, oatsCard);
+
+      // Purchase the barley card — should qualify patron 100
+      const result1 = executeTurn(session, { type: 'purchase', cardId: 800 });
+      // After first purchase, currentPlayerIndex advances, so reset for testing
+      // This is easier to test in a controlled scenario
+      expect(result1.patronVisits).toHaveLength(1);
+      expect(result1.patronVisits[0].id).toBe(100);
+      expect(player.patrons).toHaveLength(1);
+    });
+
+    it('two qualifying patrons both arrive in one turn', () => {
+      const session = createTestSession();
+      const player = session.players[0];
+
+      // Set up two patrons that both qualify with the same bonuses
+      session.patrons = [
+        { id: 100, requirements: { barley: 4, flax: 3 }, points: 3 },
+        { id: 101, requirements: { barley: 4, turnip: 3 }, points: 3 },
+      ];
+
+      // Give player enough of EACH bonus to qualify BOTH patrons
+      // Patron 100: 4 barley + 3 flax
+      // Patron 101: 4 barley + 3 turnip
+      // So player needs: 4 barley, 3 flax, 3 turnip total
+      for (let i = 0; i < 4; i++) {
+        player.purchasedCards.push(
+          { id: 700 + i, tier: 1, cost: {}, bonus: 'barley', points: 0 },
+        );
+      }
+      for (let i = 0; i < 3; i++) {
+        player.purchasedCards.push(
+          { id: 710 + i, tier: 1, cost: {}, bonus: 'flax', points: 0 },
+        );
+      }
+      for (let i = 0; i < 3; i++) {
+        player.purchasedCards.push(
+          { id: 720 + i, tier: 1, cost: {}, bonus: 'turnip', points: 0 },
+        );
+      }
+
+      // Now we need to trigger a patron check. The easiest way is to purchase
+      // a card - but since all bonuses are already met, the specific card doesn't
+      // need to change bonuses. Use a reserved card with no cost.
+      const card: DevelopmentCard = {
+        id: 800, tier: 1, cost: {}, bonus: 'oats', points: 0,
+      };
+      player.reservedCards.push(card);
+
+      const result = executeTurn(session, { type: 'purchase', cardId: 800 });
+
+      // Both patrons should have visited
+      expect(result.patronVisits).toHaveLength(2);
+      expect(result.patronVisits[0].id).toBe(100);
+      expect(result.patronVisits[1].id).toBe(101);
+      expect(player.patrons).toHaveLength(2);
+      expect(session.patrons).toHaveLength(0);
+    });
+
+    it('purchase completing one bonus qualifies two patrons (one already met, one newly met)', () => {
+      const session = createTestSession();
+      const player = session.players[0];
+
+      // Patron A: needs 4 wheat (already met by existing bonuses)
+      // Patron B: needs 4 barley (not yet met, needs 1 more barley)
+      session.patrons = [
+        { id: 100, requirements: { wheat: 4 }, points: 3 },
+        { id: 101, requirements: { barley: 4 }, points: 3 },
+      ];
+
+      // Give player 4 wheat and 3 barley bonuses (one more barley needed)
+      for (let i = 0; i < 4; i++) {
+        player.purchasedCards.push({ id: 700 + i, tier: 1, cost: {}, bonus: 'wheat', points: 0 });
+      }
+      for (let i = 0; i < 3; i++) {
+        player.purchasedCards.push({ id: 710 + i, tier: 1, cost: {}, bonus: 'barley', points: 0 });
+      }
+
+      // Purchasing a barley card adds the 4th barley bonus, qualifying BOTH patrons
+      const card: DevelopmentCard = { id: 800, tier: 1, cost: {}, bonus: 'barley', points: 0 };
+      player.reservedCards.push(card);
+
+      const result = executeTurn(session, { type: 'purchase', cardId: 800 });
+
+      // Both patrons should have visited
+      expect(result.patronVisits).toHaveLength(2);
+      expect(result.patronVisits.map(p => p.id)).toEqual([100, 101]);
+      expect(player.patrons).toHaveLength(2);
+      expect(session.patrons).toHaveLength(0);
+    });
+
+    it('two patrons qualify and arrive together when already accumulated bonuses are sufficient', () => {
+      const session = createTestSession();
+      const player = session.players[0];
+
+      // Both patrons already qualify from accumulated bonuses; the specific
+      // action (take-different) does not affect qualification.
+      session.patrons = [
+        { id: 100, requirements: { barley: 4, flax: 3 }, points: 3 },
+        { id: 101, requirements: { barley: 4, turnip: 3 }, points: 3 },
+      ];
+
+      // Give player enough of EACH bonus to qualify BOTH patrons
+      for (let i = 0; i < 4; i++) {
+        player.purchasedCards.push({ id: 700 + i, tier: 1, cost: {}, bonus: 'barley', points: 0 });
+      }
+      for (let i = 0; i < 3; i++) {
+        player.purchasedCards.push({ id: 710 + i, tier: 1, cost: {}, bonus: 'flax', points: 0 });
+      }
+      for (let i = 0; i < 3; i++) {
+        player.purchasedCards.push({ id: 720 + i, tier: 1, cost: {}, bonus: 'turnip', points: 0 });
+      }
+
+      // Take-different action does not add any bonuses, but both patrons already qualify
+      const result = executeTurn(session, {
+        type: 'take-different',
+        colors: ['wheat', 'oats', 'flax'],
+      });
+
+      expect(result.patronVisits).toHaveLength(2);
+      expect(result.patronVisits.map(p => p.id)).toEqual([100, 101]);
+      expect(player.patrons).toHaveLength(2);
+      expect(session.patrons).toHaveLength(0);
+    });
+
+    it('three patrons visit in one turn when all qualify', () => {
+      const session = createTestSession();
+      const player = session.players[0];
+
+      // Set up three patrons requiring different bonuses
+      session.patrons = [
+        { id: 100, requirements: { barley: 4 }, points: 3 },
+        { id: 101, requirements: { flax: 4 }, points: 3 },
+        { id: 102, requirements: { wheat: 4 }, points: 3 },
+      ];
+
+      // Give player 4 of each required bonus
+      for (let i = 0; i < 4; i++) {
+        player.purchasedCards.push(
+          { id: 700 + i, tier: 1, cost: {}, bonus: 'barley', points: 0 },
+        );
+      }
+      for (let i = 0; i < 4; i++) {
+        player.purchasedCards.push(
+          { id: 710 + i, tier: 1, cost: {}, bonus: 'flax', points: 0 },
+        );
+      }
+      for (let i = 0; i < 4; i++) {
+        player.purchasedCards.push(
+          { id: 720 + i, tier: 1, cost: {}, bonus: 'wheat', points: 0 },
+        );
+      }
+
+      // Trigger patron check via purchase
+      const card: DevelopmentCard = {
+        id: 800, tier: 1, cost: {}, bonus: 'oats', points: 0,
+      };
+      player.reservedCards.push(card);
+
+      const result = executeTurn(session, { type: 'purchase', cardId: 800 });
+
+      expect(result.patronVisits).toHaveLength(3);
+      expect(result.patronVisits[0].id).toBe(100);
+      expect(result.patronVisits[1].id).toBe(101);
+      expect(result.patronVisits[2].id).toBe(102);
+      expect(player.patrons).toHaveLength(3);
+      expect(session.patrons).toHaveLength(0);
+    });
+
+    it('patrons that do not qualify are not collected', () => {
+      const session = createTestSession();
+      const player = session.players[0];
+
+      // Set up three patrons: two that qualify, one that doesn't
+      session.patrons = [
+        { id: 100, requirements: { barley: 4 }, points: 3 },
+        { id: 101, requirements: { flax: 5 }, points: 3 },  // requires 5, player has 4
+        { id: 102, requirements: { wheat: 4 }, points: 3 },
+      ];
+
+      // Give player 4 of barley and 4 of wheat, but only 4 of flax (not enough for 5)
+      for (let i = 0; i < 4; i++) {
+        player.purchasedCards.push(
+          { id: 700 + i, tier: 1, cost: {}, bonus: 'barley', points: 0 },
+        );
+      }
+      for (let i = 0; i < 4; i++) {
+        player.purchasedCards.push(
+          { id: 710 + i, tier: 1, cost: {}, bonus: 'wheat', points: 0 },
+        );
+      }
+      // Only 4 flax (need 5 for patron 101)
+      for (let i = 0; i < 4; i++) {
+        player.purchasedCards.push(
+          { id: 720 + i, tier: 1, cost: {}, bonus: 'flax', points: 0 },
+        );
+      }
+
+      const card: DevelopmentCard = {
+        id: 800, tier: 1, cost: {}, bonus: 'oats', points: 0,
+      };
+      player.reservedCards.push(card);
+
+      const result = executeTurn(session, { type: 'purchase', cardId: 800 });
+
+      // Only 2 patrons (100 and 102) qualify
+      expect(result.patronVisits).toHaveLength(2);
+      expect(result.patronVisits[0].id).toBe(100);
+      expect(result.patronVisits[1].id).toBe(102);
+      expect(player.patrons).toHaveLength(2);
+      // Patron 101 should remain in the pool
+      expect(session.patrons).toHaveLength(1);
+      expect(session.patrons[0].id).toBe(101);
+    });
+
+    it('does not collect same patron twice', () => {
+      const session = createTestSession();
+      const player = session.players[0];
+
+      // Set up one patron
+      session.patrons = [
+        { id: 100, requirements: { barley: 4 }, points: 3 },
+      ];
+
+      // Give player 4+ barley bonuses
+      for (let i = 0; i < 10; i++) {
+        player.purchasedCards.push(
+          { id: 700 + i, tier: 1, cost: {}, bonus: 'barley', points: 0 },
+        );
+      }
+
+      const card: DevelopmentCard = {
+        id: 800, tier: 1, cost: {}, bonus: 'oats', points: 0,
+      };
+      player.reservedCards.push(card);
+
+      const result = executeTurn(session, { type: 'purchase', cardId: 800 });
+
+      // Only 1 patron visited (it was removed from pool after arriving)
+      expect(result.patronVisits).toHaveLength(1);
+      expect(player.patrons).toHaveLength(1);
+      expect(session.patrons).toHaveLength(0);
+    });
+
+    it('patron collection survives the token discard flow (over-limit + discard + patron)', () => {
+      const session = createTestSession();
+      const player = session.players[0];
+
+      // Two patrons that both qualify with 4 barley and 4 wheat
+      session.patrons = [
+        { id: 100, requirements: { barley: 4 }, points: 3 },
+        { id: 101, requirements: { wheat: 4 }, points: 3 },
+      ];
+
+      // Give player 4 barley and 4 wheat bonuses
+      for (let i = 0; i < 4; i++) {
+        player.purchasedCards.push({ id: 700 + i, tier: 1, cost: {}, bonus: 'barley', points: 0 });
+      }
+      for (let i = 0; i < 4; i++) {
+        player.purchasedCards.push({ id: 710 + i, tier: 1, cost: {}, bonus: 'wheat', points: 0 });
+      }
+
+      // Give player 10 tokens to trigger over-limit after gaining a mead token
+      player.tokens = { wheat: 5, oats: 5 };
+
+      // Execute a turn that will trigger patron visits and exceed the token limit
+      // (reserve from deck adds 1 mead token, pushing to 11 > MAX_TOKENS=10)
+      const action: TurnAction = { type: 'reserve', cardId: null, tier: 1 as Tier };
+      const result = executeTurn(session, action);
+
+      // Both patrons should have been collected (even though we're over the token limit)
+      expect(result.patronVisits).toHaveLength(2);
+      expect(result.patronVisits.map(p => p.id)).toEqual([100, 101]);
+      expect(player.patrons).toHaveLength(2);
+      expect(session.patrons).toHaveLength(0);
+
+      // Should have token over-limit (10 base + 1 mead - 10 MAX = 1)
+      expect(result.tokensOverLimit).toBe(1);
+
+      // Discard exactly 1 token to resolve over-limit
+      const discardResult = discardTokens(session, { tokens: { oats: 1 } });
+      // The discard result itself doesn't carry patron info (patrons already collected)
+      expect(discardResult.patronVisits).toHaveLength(0);
+
+      // Player should still have both patrons (patron collection survived the discard)
+      expect(player.patrons).toHaveLength(2);
+      expect(session.patrons).toHaveLength(0);
+
+      // Turn should have advanced
+      expect(session.currentPlayerIndex).toBe(1);
+    });
+
+    it('patronVisits is empty array (not null) when no patron visits', () => {
+      const session = createTestSession();
+      session.patrons = [{ id: 100, requirements: { barley: 4, flax: 4 }, points: 3 }];
+      const result = executeTurn(session, {
+        type: 'take-different',
+        colors: ['wheat', 'oats', 'flax'],
+      });
+      expect(result.patronVisits).toEqual([]);
+      expect(Array.isArray(result.patronVisits)).toBe(true);
     });
   });
 

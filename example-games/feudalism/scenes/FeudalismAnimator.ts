@@ -94,7 +94,7 @@ export class FeudalismAnimator {
     destPos: { x: number; y: number },
     card: DevelopmentCard,
     marketSlot: { tier: Tier; col: number } | null,
-    patronVisit: PatronTile | null,
+    patronVisits: PatronTile[],
     patronSourceIndex: number,
     playerIndex: number,
     onAllComplete: () => void,
@@ -113,15 +113,63 @@ export class FeudalismAnimator {
       reducedMotion: this.reducedMotion,
       onComplete: () => {
         flyingCard.destroy();
+        const chainFn = () => {
+          this.chainAllPatronAnimations(
+            patronVisits, patronSourceIndex, playerIndex, onAllComplete,
+            onBeforePatronAnimation, onRefreshPatronsAndPlayer,
+          );
+        };
         if (marketSlot) {
-          this.playMarketRefillAnimation(marketSlot.tier, marketSlot.col, () => {
-            this.chainPatronAnimation(patronVisit, patronSourceIndex, playerIndex, onAllComplete, onBeforePatronAnimation, onRefreshPatronsAndPlayer);
-          }, onRefreshMarket);
+          this.playMarketRefillAnimation(marketSlot.tier, marketSlot.col, chainFn, onRefreshMarket);
         } else {
-          this.chainPatronAnimation(patronVisit, patronSourceIndex, playerIndex, onAllComplete, onBeforePatronAnimation, onRefreshPatronsAndPlayer);
+          chainFn();
         }
       },
     });
+  }
+
+  /**
+   * Animate all qualifying patrons flying to the player area, chained
+   * sequentially so they appear one after another.
+   */
+  private chainAllPatronAnimations(
+    patronVisits: PatronTile[],
+    firstPatronSourceIndex: number,
+    playerIndex: number,
+    onAllComplete: () => void,
+    onBeforePatronAnimation: () => void,
+    onRefreshPatronsAndPlayer: () => void,
+  ): void {
+    if (patronVisits.length === 0) {
+      onAllComplete();
+      return;
+    }
+
+    let currentIndex = 0;
+    const animateNext = () => {
+      if (currentIndex >= patronVisits.length) {
+        onAllComplete();
+        return;
+      }
+
+      const patron = patronVisits[currentIndex];
+      // Each patron flies from the same column position (first patron's source)
+      // since later patrons have shifted positions in the column after earlier
+      // patrons were removed.
+      this.chainPatronAnimation(
+        patron,
+        firstPatronSourceIndex,
+        playerIndex,
+        () => {
+          currentIndex++;
+          animateNext();
+        },
+        onBeforePatronAnimation,
+        onRefreshPatronsAndPlayer,
+      );
+    };
+
+    animateNext();
   }
 
   private playMarketRefillAnimation(tier: Tier, col: number, onComplete: () => void, onRefreshMarket: () => void): void {

@@ -79,7 +79,7 @@ const HELP_SECTIONS: HelpSection[] = [
   },
   {
     heading: 'Controls',
-    body: '[ Open HelpPanel ]: Programmatically open the help slide-out panel via the open() method.\n[ Close HelpPanel ]: Programmatically close the help panel via the close() method.\n[ Toggle HelpPanel ]: Toggle the help panel open/closed via the toggle() method.\n[ Open Settings ]: Open the settings panel (right sidebar).\n[ Close Settings ]: Close the settings panel.\n[ Toggle Settings ]: Toggle the settings panel open/closed.\n? button (bottom-left): Toggle help panel via the circular toggle button.\n⚙ button (bottom-left): Toggle settings panel via the circular toggle button.\nStatus lines (centre): Show open/closed state of each panel, updating live as panels are toggled.'
+    body: '[ Open HelpPanel ]: Programmatically open the help slide-out panel via the open() method.\n[ Close HelpPanel ]: Programmatically close the help panel via the close() method.\n[ Open Settings ]: Open the settings panel (right sidebar).\n[ Close Settings ]: Close the settings panel.\n? button (bottom-left): Toggle help panel via the circular toggle button.\n⚙ button (bottom-left): Toggle settings panel via the circular toggle button.\nStatus lines (centre): Show open/closed state of each panel, updating live as panels are toggled.'
   },
   {
     heading: 'Usage Example',
@@ -87,7 +87,7 @@ const HELP_SECTIONS: HelpSection[] = [
   },
   {
     heading: 'Test Plan',
-    body: '1. Press [ Open HelpPanel ] → help panel slides in from left, status shows open\n2. Press [ Close HelpPanel ] → help panel slides out, status shows closed\n3. Press [ Toggle HelpPanel ] twice → panel opens then closes\n4. Press [ Open Settings ] → settings panel slides in from right, status shows open\n5. Press [ Toggle Settings ] → settings toggles closed\n6. Verify status lines update correctly after each action\n7. Press the ? button → help panel toggles open/closed\n8. Press the ⚙ button → settings panel toggles open/closed\n9. Verify no depth layering issues (panels always on top)'
+    body: '1. Press [ Open HelpPanel ] → help panel slides in from left, status shows open\n2. Press [ Close HelpPanel ] → help panel slides out, status shows closed\n3. Press [ Open Settings ] → settings panel slides in from right, status shows open\n4. Press [ Close Settings ] → settings panel slides out, status shows closed\n5. Verify status lines update correctly after each action\n6. Press the ? button → help panel toggles open/closed\n7. Press the ⚙ button → settings panel toggles open/closed\n8. Verify no depth layering issues (panels always on top)'
   },
 ];
 
@@ -126,7 +126,6 @@ export class GymHudComponentsScene extends GymSceneBase {
 
     const instructionsAnchor = resolveHudAnchor('instructions', 'center');
     const controlsAnchor = resolveHudAnchor('controls', 'center');
-    const controls2Anchor = resolveHudAnchor('controls2', 'center');
     const statusAnchor = resolveHudAnchor('status', 'center');
     const depthAnchor = resolveHudAnchor('depth', 'left');
     const logAnchor = resolveHudAnchor('log', 'center');
@@ -141,51 +140,40 @@ export class GymHudComponentsScene extends GymSceneBase {
 
     // ── Interactive controls ─────────────────────────────
 
-    this.addButton(cx - 250, controlsAnchor.y, '[ Open HelpPanel ]', () => {
+    this.initButtonBar(controlsAnchor.y);
+    this.buttonBar!.addButton('[ Open HelpPanel ]', () => {
       this.helpPanel!.open();
       this._helpOpen = true;
       this.updateStatusLines();
       this.logEvent('HelpPanel: open() called');
-    });
-    this.addButton(cx - 110, controlsAnchor.y, '[ Close HelpPanel ]', () => {
+    }, { zone: 'center' });
+    this.buttonBar!.addButton('[ Close HelpPanel ]', () => {
       this.helpPanel!.close();
       this._helpOpen = false;
       this.updateStatusLines();
       this.logEvent('HelpPanel: close() called');
-    });
-    this.addButton(cx + 30, controlsAnchor.y, '[ Toggle HelpPanel ]', () => {
-      this.helpPanel!.toggle();
-      this._helpOpen = !this._helpOpen;
-      this.updateStatusLines();
-      this.logEvent(`HelpPanel: toggle() → ${this._helpOpen ? 'open' : 'closed'}`);
-    });
-
-    this.addButton(cx - 130, controls2Anchor.y, '[ Open Settings ]', () => {
+    }, { zone: 'center' });
+    this.buttonBar!.addButton('[ Open Settings ]', () => {
       this.settingsPanel.open();
       this._settingsOpen = true;
       this.updateStatusLines();
       this.logEvent('SettingsPanel: open() called');
-    });
-    this.addButton(cx + 10, controls2Anchor.y, '[ Close Settings ]', () => {
+    }, { zone: 'center' });
+    this.buttonBar!.addButton('[ Close Settings ]', () => {
       this.settingsPanel.close();
       this._settingsOpen = false;
       this.updateStatusLines();
       this.logEvent('SettingsPanel: close() called');
-    });
-    this.addButton(cx + 150, controls2Anchor.y, '[ Toggle Settings ]', () => {
-      this.settingsPanel.toggle();
-      this._settingsOpen = !this._settingsOpen;
-      this.updateStatusLines();
-      this.logEvent(`SettingsPanel: toggle() → ${this._settingsOpen ? 'open' : 'closed'}`);
-    });
+    }, { zone: 'center' });
+
 
     // ── Panel state indicators ──────────────────────────
 
     this.helpStatusText = createHudText(
-      this, 460, statusAnchor.y, 'HelpPanel: closed', '#88ff88', { fontSize: '14px' },
+      this, 460, statusAnchor.y - 10, 'HelpPanel: closed', '#88ff88', { fontSize: '14px' },
     );
     this.settingsStatusText = createHudText(
-      this, 440, statusAnchor.y, 'SettingsPanel: closed', '#ffcc44', { fontSize: '14px' },
+      this, 460, statusAnchor.y + 10, 'SettingsPanel: closed', '#ffcc44', { fontSize: '14px' },
     );
 
     // ── Depth layering info ─────────────────────────────
