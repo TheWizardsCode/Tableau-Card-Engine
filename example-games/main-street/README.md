@@ -148,6 +148,45 @@ npm test
   receive more copies in the deck based on the `positiveIncidentMultiplier`
   parameter passed to `createEventDeck()`.
 
+## Balancing
+
+Main Street has a multi-stage balancing pipeline to keep card costs, rewards,
+and gameplay outcomes in a healthy range.
+
+### Quick Start
+
+```bash
+# 1. Static card balancing (adjusts card-data.csv)
+npm run balance-cards
+
+# 2. Verify nothing broke
+npm run build
+npm test
+
+# 3. Run full Monte Carlo sweep (all strategies × difficulties)
+npm run monte-carlo-sweep
+
+# 4. Review results against guardrail thresholds in results/sweep-*.json
+```
+
+### Documentation
+
+| Guide | Description |
+|-------|-------------|
+| **[Full Balancing Workflow](../../docs/main-street/balance-workflow.md)** | Step-by-step guide: static balancing → Monte Carlo → guardrail review → decision gate |
+| **[Balancing Methodology](../../docs/main-street/balancing-methodology.md)** | Algorithm details: curve-fitting formulas, tier bands, exclusion rules |
+| **[Balance Process & Tooling PRD](../../docs/main-street/prd-balance-process-and-tooling.md)** | Full specification: micro/macro metrics, guardrails, baseline management |
+| **[Balance Analysis API](../../docs/main-street/balance-analysis-api.md)** | API reference for the `scripts/balance/` analysis library |
+| **[Monte Carlo Sample Results](../../docs/main-street/monte-carlo-sample-results.md)** | Sample output interpretation and sweep mode docs |
+
+### Related npm Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `npm run balance-cards` | Static card balancing pass (curve-fitting + tier bands) |
+| `npm run monte-carlo` | Single-strategy Monte Carlo simulation (200 seeds) |
+| `npm run monte-carlo-sweep` | Full sweep: all 4 strategies × 3 difficulties |
+
 ## Follow-up work
 
 The tutorial overlay system (`MainStreetTutorialHints.ts`) currently uses `zoneToAnchor()` with
