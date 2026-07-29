@@ -48,7 +48,7 @@ describe('Main Street Tutorial E2E — T10-T13', () => {
     game = null;
   });
 
-  it('T10-T13: Challenges, Scoring, and Completion steps advance', async () => {
+  it('T10-T14: Challenges, Scoring, and Completion steps advance', async () => {
     await clickOverlayButtonByText('Next >'); await clickOverlayButtonByText('Next >');
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
     clickRequiredBusinessCard(scene);
@@ -62,9 +62,12 @@ describe('Main Street Tutorial E2E — T10-T13', () => {
     clickRequiredEventCard(scene);
     await waitForOverlayVisible(5_000);
     expect(getStepIndex(scene)).toBe(7);
-    await clickOverlayButtonByText('Next >');
+    clickRequiredBusinessCard(scene);
+    await waitForOverlayVisible(5_000);
     expect(getStepIndex(scene)).toBe(8);
-    await clickOverlayButtonByText('Next >');
+    clickStreetSlot(scene, 1);
+    await new Promise((r) => setTimeout(r, 500));
+    await waitForOverlayVisible(5_000);
     expect(getStepIndex(scene)).toBe(9);
     await clickOverlayButtonByText('Next >');
     expect(getStepIndex(scene)).toBe(10);
@@ -75,6 +78,9 @@ describe('Main Street Tutorial E2E — T10-T13', () => {
     await clickOverlayButtonByText('Next >');
     expect(getStepIndex(scene)).toBe(12);
     await saveScreenshot('t12-t13');
+    await clickOverlayButtonByText('Next >');
+    expect(getStepIndex(scene)).toBe(13);
+    await saveScreenshot('t13-t14');
     await clickOverlayButtonByText('Start Full Game');
     await new Promise((r) => setTimeout(r, 500));
     const finalOverlay = getOverlay();

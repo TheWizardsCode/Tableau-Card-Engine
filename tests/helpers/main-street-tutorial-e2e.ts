@@ -13,7 +13,7 @@
 import Phaser from 'phaser';
 import { page } from '@vitest/browser/context';
 import { waitForScene } from './waitForScene';
-import { advanceTutorialStep, getCurrentStep } from '../../example-games/main-street/TutorialFlow';
+import { advanceTutorialStep, getCurrentStep, UNIFIED_TUTORIAL_STEPS } from '../../example-games/main-street/TutorialFlow';
 
 // ── Constants ────────────────────────────────────────────
 
@@ -344,6 +344,7 @@ export function clickRequiredBusinessCard(scene: Phaser.Scene): void {
   if (s.uiPhase !== 'market') { s.uiPhase = 'market'; }
   try { s.onBusinessCardClick(cardToClick); } catch (_) { /* ignore */ }
   maybeAdvanceTutorial(scene, 2);
+  maybeAdvanceTutorial(scene, 7);
   if (s.tutorialController?.currentStepIndex === 6) {
     maybeAdvanceTutorial(scene, 6);
   }
@@ -405,8 +406,20 @@ export function clickStreetSlot(scene: Phaser.Scene, slotIdx: number): void {
       if (devCards && devCards.length > 0) {
         let cardToBuy = devCards[0];
         if (step?.requiredCardId) {
+          // Current step has a specific requiredCardId
           const found = devCards.find((c: any) => matchesCardId(c.id, step.requiredCardId!));
           if (found) cardToBuy = found;
+        } else if (step?.requiredAction === 'place-business') {
+          // place-business steps don't have requiredCardId. Find the card that
+          // was specified by the preceding select-business step (e.g., T8→T9).
+          const myIdx = UNIFIED_TUTORIAL_STEPS.findIndex(s => s.id === step.id);
+          for (let i = myIdx - 1; i >= 0; i--) {
+            const prev = UNIFIED_TUTORIAL_STEPS[i];
+            if (prev.requiredAction === 'select-business' && prev.requiredCardId) {
+              const found = devCards.find((c: any) => matchesCardId(c.id, prev.requiredCardId!));
+              if (found) { cardToBuy = found; break; }
+            }
+          }
         }
         const cardIdx = devCards.findIndex((c: any) => c.id === cardToBuy.id);
         if (cardIdx >= 0) {
@@ -447,8 +460,20 @@ export function clickStreetSlot(scene: Phaser.Scene, slotIdx: number): void {
     s.uiPhase = 'placing-business';
   }
   try { s.onSlotClick(slotIdx); } catch (_) { /* ignore */ }
-  maybeAdvanceTutorial(scene, 3);
+
+  // Fallback: if still on a place-business step after the attempt, force-advance.
+  // This handles both T4 (place Laundromat) and T9 (place Bookshop).
+  if (s.tutorialController?.isActive) {
+    const curStep = getCurrentStep(s.tutorialController);
+    if (curStep?.requiredAction === 'place-business') {
+      maybeAdvanceTutorial(scene, s.tutorialController.currentStepIndex);
+    }
+  }
 }
+
+/**
+ * End the current turn and advance the tutorial.
+ */
 
 /**
  * End the current turn and advance the tutorial.
