@@ -164,7 +164,7 @@ describe('MainStreet Place/Sell System', () => {
 
   describe('Place from hand to tableau', () => {
     it.runIf(HAND_FEATURE_AVAILABLE && PLACE_SELL_API_AVAILABLE)(
-      'should deduct 80% of purchase price when placing from hand to tableau',
+      'should place card from hand to tableau without coin deduction',
       async () => {
         const state = createTestState();
         executeDayStart(state);
@@ -179,13 +179,12 @@ describe('MainStreet Place/Sell System', () => {
         if (slot < 0 || handIndex < 0) return;
 
         const coinsBefore = state.resourceBank.coins;
-        const expectedCost = Math.floor(card.cost * EXPECTED_PLACE_COST_RATIO);
 
         const engine = await import('../../example-games/main-street/MainStreetEngine');
         (engine as any).placeFromHand(state, handIndex, slot);
 
-        // Coins deducted by 80% of purchase price
-        expect(state.resourceBank.coins).toBe(coinsBefore - expectedCost);
+        // Coins unchanged (placement is free)
+        expect(state.resourceBank.coins).toBe(coinsBefore);
 
         // Card removed from hand
         expect(getHand(state)).not.toContainEqual(expect.objectContaining({ id: card.id }));
@@ -197,7 +196,7 @@ describe('MainStreet Place/Sell System', () => {
     );
 
     it.runIf(HAND_FEATURE_AVAILABLE && PLACE_SELL_API_AVAILABLE)(
-      'should use PLACE_COST_RATIO of 0.8 for cost calculation',
+      'placement from hand does not deduct coins',
       async () => {
         const state = createTestState();
         executeDayStart(state);
@@ -212,24 +211,12 @@ describe('MainStreet Place/Sell System', () => {
 
         const engine = await import('../../example-games/main-street/MainStreetEngine');
 
-        // Verify ratio constant
-        if (CONSTANTS_AVAILABLE) {
-          let ratio: number;
-          try {
-            const cards = await import('../../example-games/main-street/MainStreetCards');
-            ratio = (cards as any).PLACE_COST_RATIO;
-          } catch {
-            ratio = (engine as any).PLACE_COST_RATIO;
-          }
-          expect(ratio).toBe(EXPECTED_PLACE_COST_RATIO);
-        }
-
         const coinsBefore = state.resourceBank.coins;
-        const expectedCost = Math.floor(card.cost * EXPECTED_PLACE_COST_RATIO);
 
         (engine as any).placeFromHand(state, handIndex, slot);
 
-        expect(state.resourceBank.coins).toBe(coinsBefore - expectedCost);
+        // No coin deduction for placement
+        expect(state.resourceBank.coins).toBe(coinsBefore);
       },
     );
 
@@ -514,7 +501,7 @@ describe('MainStreet Place/Sell System', () => {
     );
 
     it.runIf(HAND_FEATURE_AVAILABLE && PLACE_SELL_API_AVAILABLE)(
-      'should throw on execution when coins are insufficient',
+      'should allow placement even with 0 coins (placement is free)',
       async () => {
         const state = createTestState();
         executeDayStart(state);
@@ -529,10 +516,14 @@ describe('MainStreet Place/Sell System', () => {
 
         const engine = await import('../../example-games/main-street/MainStreetEngine');
 
-        // Executing placement should throw due to insufficient coins
+        // Placement with 0 coins should succeed (no cost)
         expect(() => {
           (engine as any).placeFromHand(state, handIndex, slot);
-        }).toThrow();
+        }).not.toThrow();
+
+        // Card should be placed
+        expect(state.streetGrid[slot]).not.toBeNull();
+        expect(state.hand.length).toBe(0);
       },
     );
   });

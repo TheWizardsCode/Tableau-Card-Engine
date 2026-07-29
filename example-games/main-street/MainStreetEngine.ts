@@ -18,7 +18,7 @@
 import type { MainStreetState, DayPhase } from './MainStreetState';
 import { PHASE_ORDER, addLog, syncResourceBankToLedger } from './MainStreetState';
 import type { EventCard, SynergyType } from './MainStreetCards';
-import { PLACE_COST_RATIO, SELL_VALUE_RATIO, isDurationEventCard, type DurationEventCard } from './MainStreetCards';
+import { SELL_VALUE_RATIO, isDurationEventCard, type DurationEventCard } from './MainStreetCards';
 import { createActiveEffect, decayActiveEffects } from '../../src/core-engine/ActiveEffect';
 import { recordMainStreetEvent } from './MainStreetTranscript';
 import { applyIncome, type IncomeResult, updateNeighborsOnPlacement, updateNeighborsOnSale } from './MainStreetAdjacency';
@@ -706,17 +706,6 @@ export function placeFromHand(
     throw new Error(`Slot ${slotIndex} is already occupied.`);
   }
 
-  // Calculate placement cost (80% of purchase price)
-  const placementCost = Math.floor(card.cost * PLACE_COST_RATIO);
-
-  // Check coins
-  if (state.resourceBank.coins < placementCost) {
-    throw new Error(`Not enough coins. Need ${placementCost} to place, have ${state.resourceBank.coins}.`);
-  }
-
-  // Deduct cost
-  state.resourceBank.coins -= placementCost;
-
   // Remove from hand and place on tableau
   hand.splice(handIndex, 1);
   state.streetGrid[slotIndex] = card;
@@ -724,7 +713,7 @@ export function placeFromHand(
   // Incrementally update the new card's and all affected neighbors' cached values
   updateNeighborsOnPlacement(state, slotIndex);
 
-  addLog(state, `Placed ${card.name} from hand in slot ${slotIndex} (-€${placementCost})`, 'loss');
+  addLog(state, `Placed ${card.name} from hand in slot ${slotIndex}`, 'neutral');
 }
 
 /**

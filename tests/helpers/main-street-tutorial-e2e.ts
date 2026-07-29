@@ -380,10 +380,48 @@ export function clickRequiredEventCard(scene: Phaser.Scene): void {
 
 /**
  * Click a street slot to place the pending business card.
+ * In the new buy-to-hand flow, the card is in state.hand and
+ * pendingHandIndex is used instead of pendingBusinessCard.
+ *
+ * If the async buy-to-hand animation has not completed yet, the
+ * purchase is executed synchronously via state manipulation to
+ * ensure the card is in hand for placement.
  */
 export function clickStreetSlot(scene: Phaser.Scene, slotIdx: number): void {
   const s = scene as any;
-  if (s.pendingBusinessCard === null) {
+  const hand = s.state?.hand ?? [];
+
+  // New flow: if cards exist in hand, use pendingHandIndex
+  if (s.pendingHandIndex === null && hand.length > 0) {
+    s.pendingHandIndex = 0;
+  }
+
+  // If async buy-to-hand hasn't completed, execute it synchronously
+  if (s.pendingHandIndex === null && hand.length === 0 && s.tutorialController?.isActive) {
+    const step = getCurrentStep(s.tutorialController);
+    if (step?.requiredAction === 'select-business' || step?.requiredAction === 'place-business') {
+      // Execute purchase synchronously so the card is in hand for placement
+      const devCards = s.state?.market?.development;
+      if (devCards && devCards.length > 0) {
+        let cardToBuy = devCards[0];
+        if (step?.requiredCardId) {
+          const found = devCards.find((c: any) => matchesCardId(c.id, step.requiredCardId!));
+          if (found) cardToBuy = found;
+        }
+        const cardIdx = devCards.findIndex((c: any) => c.id === cardToBuy.id);
+        if (cardIdx >= 0) {
+          // Deduct coins and add to hand
+          s.state.resourceBank.coins -= cardToBuy.cost;
+          s.state.hand.push({ ...devCards[cardIdx] });
+          devCards.splice(cardIdx, 1);
+          s.pendingHandIndex = s.state.hand.length - 1;
+        }
+      }
+    }
+  }
+
+  // Legacy flow: set pendingBusinessCard if hand is empty
+  if (s.pendingHandIndex === null && s.pendingBusinessCard === null) {
     const controller = s.tutorialController;
     const devCards = s.state?.market?.development;
     if (devCards && controller?.isActive) {
@@ -401,7 +439,13 @@ export function clickStreetSlot(scene: Phaser.Scene, slotIdx: number): void {
       s.pendingBusinessCard = devCards[0];
     }
   }
-  if (s.uiPhase !== 'market') { s.uiPhase = 'market'; }
+
+  // Set the correct UI phase: 'placing-from-hand' for the new flow, 'placing-business' for legacy
+  if (s.pendingHandIndex !== null) {
+    s.uiPhase = 'placing-from-hand';
+  } else {
+    s.uiPhase = 'placing-business';
+  }
   try { s.onSlotClick(slotIdx); } catch (_) { /* ignore */ }
   maybeAdvanceTutorial(scene, 3);
 }

@@ -27,6 +27,7 @@ type UIPhase =
   | 'idle'               // Waiting for DayStart
   | 'market'             // Player can buy or end turn
   | 'placing-business'   // Player selected a business card, picking a slot
+  | 'placing-from-hand'  // Player bought a card to hand, click a slot to place it
   | 'animating'          // Brief pause for feedback
   | 'game-over';         // Final overlay
 
@@ -57,6 +58,9 @@ export class MainStreetScene extends CardGameScene {
   // Pending selection for placing a business
   public pendingBusinessCard: BusinessCard | null = null;
   public pendingBusinessSourceIndex: number | null = null;
+
+  // Pending hand card for placing from hand (index into state.hand)
+  public pendingHandIndex: number | null = null;
 
   // Computed responsive layout metrics
   public layout!: SceneLayout;
