@@ -113,10 +113,11 @@ export class FeudalismAnimator {
       reducedMotion: this.reducedMotion,
       onComplete: () => {
         flyingCard.destroy();
-        // Only animate the first patron; others are recorded but not individually animated
-        const firstPatron = patronVisits.length > 0 ? patronVisits[0] : null;
         const chainFn = () => {
-          this.chainPatronAnimation(firstPatron, patronSourceIndex, playerIndex, onAllComplete, onBeforePatronAnimation, onRefreshPatronsAndPlayer);
+          this.chainAllPatronAnimations(
+            patronVisits, patronSourceIndex, playerIndex, onAllComplete,
+            onBeforePatronAnimation, onRefreshPatronsAndPlayer,
+          );
         };
         if (marketSlot) {
           this.playMarketRefillAnimation(marketSlot.tier, marketSlot.col, chainFn, onRefreshMarket);
@@ -125,6 +126,50 @@ export class FeudalismAnimator {
         }
       },
     });
+  }
+
+  /**
+   * Animate all qualifying patrons flying to the player area, chained
+   * sequentially so they appear one after another.
+   */
+  private chainAllPatronAnimations(
+    patronVisits: PatronTile[],
+    firstPatronSourceIndex: number,
+    playerIndex: number,
+    onAllComplete: () => void,
+    onBeforePatronAnimation: () => void,
+    onRefreshPatronsAndPlayer: () => void,
+  ): void {
+    if (patronVisits.length === 0) {
+      onAllComplete();
+      return;
+    }
+
+    let currentIndex = 0;
+    const animateNext = () => {
+      if (currentIndex >= patronVisits.length) {
+        onAllComplete();
+        return;
+      }
+
+      const patron = patronVisits[currentIndex];
+      // Each patron flies from the same column position (first patron's source)
+      // since later patrons have shifted positions in the column after earlier
+      // patrons were removed.
+      this.chainPatronAnimation(
+        patron,
+        firstPatronSourceIndex,
+        playerIndex,
+        () => {
+          currentIndex++;
+          animateNext();
+        },
+        onBeforePatronAnimation,
+        onRefreshPatronsAndPlayer,
+      );
+    };
+
+    animateNext();
   }
 
   private playMarketRefillAnimation(tier: Tier, col: number, onComplete: () => void, onRefreshMarket: () => void): void {
