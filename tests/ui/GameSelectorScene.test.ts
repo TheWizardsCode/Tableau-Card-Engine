@@ -622,7 +622,7 @@ describe('GameSelectorScene', () => {
       );
     });
 
-    it('positions GitHub icon at bottom-right corner', () => {
+    it('positions GitHub icon at top-right corner with 10px margin', () => {
       const mocks = injectMocks(scene);
       scene.init({ games: [] });
       scene.create();
@@ -631,9 +631,12 @@ describe('GameSelectorScene', () => {
       const githubCall = imageCalls.find((c) => c[2] === 'github-icon');
       expect(githubCall).toBeDefined();
 
-      // X should be near the right edge (GAME_W=1280, ICON_X=GAME_W-16=1264)
+      // X near right edge (GAME_W=1280, ICON_X=GAME_W-10=1270)
       const [x] = githubCall as [number, number, string];
-      expect(x).toBeGreaterThan(1200);
+      expect(x).toBeGreaterThanOrEqual(1260);
+      // Y near top edge (ICON_Y=10)
+      const [, y] = githubCall as [number, number, string];
+      expect(y).toBeLessThanOrEqual(10);
     });
 
     it('GitHub icon is interactive and opens GitHub URL on click', () => {
@@ -675,7 +678,7 @@ describe('GameSelectorScene', () => {
       vi.unstubAllGlobals();
     });
 
-    it('GitHub icon is positioned to the right of the version label', () => {
+    it('GitHub icon is to the right and above the version label', () => {
       const mocks = injectMocks(scene);
       scene.init({ games: [] });
       scene.create();
@@ -691,11 +694,12 @@ describe('GameSelectorScene', () => {
       expect(versionCall).toBeDefined();
       expect(githubCall).toBeDefined();
 
-      const [_vx] = versionCall as [number, number, string];
-      const [gx] = githubCall as [number, number, string];
+      const [_vx, _vy] = versionCall as [number, number, string];
+      const [gx, gy] = githubCall as [number, number, string];
 
-      // GitHub icon should be on the right side, version on the left
-      expect(gx).toBeGreaterThan(_vx);
+      // GitHub icon in top-right, version label in bottom-left
+      expect(gx).toBeGreaterThan(_vx); // icon is further right
+      expect(gy).toBeLessThan(_vy); // icon is higher up
     });
 
     it('includes hidden alt text for accessibility', () => {
@@ -724,6 +728,23 @@ describe('GameSelectorScene', () => {
 
       const githubImage = imageResults[githubIdx].value;
       expect(githubImage.setDepth).toHaveBeenCalledWith(800);
+      expect(githubImage.setOrigin).toHaveBeenCalledWith(1, 0);
+    });
+
+    it('does not set alpha (full opacity for white logo)', () => {
+      const mocks = injectMocks(scene);
+      scene.init({ games: [] });
+      scene.create();
+
+      const imageResults = mocks.add.image.mock.results as {
+        value: ReturnType<typeof mockImage>;
+      }[];
+      const imageCalls = mocks.add.image.mock.calls as unknown[][];
+      const githubIdx = imageCalls.findIndex((c) => c[2] === 'github-icon');
+      expect(githubIdx).not.toBe(-1);
+
+      const githubImage = imageResults[githubIdx].value;
+      expect(githubImage.setAlpha).not.toHaveBeenCalled();
     });
   });
 });
