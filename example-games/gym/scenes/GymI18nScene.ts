@@ -167,32 +167,29 @@ export class GymI18nScene extends GymSceneBase {
       fontSize: '11px',
     });
 
-    // ── Buttons row 1: Register / Reset ────────────────────
-    const cx = GAME_W / 2;
+    // ── Buttons: Register / Reset + Locale switching ────────
     const btnY1 = 340;
 
-    this.addButton(cx - 120, btnY1, '[ Register Locales ]', () => {
+    this.initButtonBar(btnY1, { rowSpacing: 30 });
+    this.buttonBar!.addButton('[ Register Locales ]', () => {
       this.registerDemoLocales();
-    });
+    }, { zone: 'center' });
 
-    this.addButton(cx + 80, btnY1, '[ Reset I18n ]', () => {
+    this.buttonBar!.addButton('[ Reset I18n ]', () => {
       this.resetI18nState();
-    });
+    }, { zone: 'center' });
 
-    // ── Buttons row 2: Locale switching ────────────────────
-    const btnY2 = 370;
-
-    this.enBtn = this.addButton(cx - 180, btnY2, '[ Set en ]', () => {
+    this.enBtn = this.buttonBar!.addButton('[ Set en ]', () => {
       this.switchLocale('en');
-    });
+    }, { zone: 'center' });
 
-    this.frBtn = this.addButton(cx - 40, btnY2, '[ Set fr ]', () => {
+    this.frBtn = this.buttonBar!.addButton('[ Set fr ]', () => {
       this.switchLocale('fr');
-    });
+    }, { zone: 'center' });
 
-    this.deBtn = this.addButton(cx + 100, btnY2, '[ Set de ]', () => {
+    this.deBtn = this.buttonBar!.addButton('[ Set de ]', () => {
       this.switchLocale('de');
-    });
+    }, { zone: 'center' });
 
     // Initially disable locale-switching buttons (no locales registered yet)
     this.enBtn.setAlpha(0.4);

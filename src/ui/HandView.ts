@@ -1014,9 +1014,10 @@ export class HandView {
   /**
    * Set the maximum rotation in degrees applied to cards based on their
    * horizontal offset from the hand centre. A value of 0 disables tilt.
+   * The value is clamped to the range [0, 359].
    */
   setMaxRotationDegrees(maxDegrees: number): void {
-    const next = Number.isFinite(maxDegrees) ? Math.max(0, maxDegrees) : 0;
+    const next = Number.isFinite(maxDegrees) ? Math.max(0, Math.min(359, maxDegrees)) : 0;
     if (next === this.maxRotationDegrees) return;
     this.maxRotationDegrees = next;
     this.applyLayout();

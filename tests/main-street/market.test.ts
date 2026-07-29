@@ -647,8 +647,8 @@ describe('MainStreetMarket', () => {
       const uniqueTemplateIds = new Set(
         state.decks.event.map(e => e.id.replace(/-\d+$/, '')),
       );
-      // Should now have 36 unique event templates (doubled from 18)
-      expect(uniqueTemplateIds.size).toBe(36);
+      // Should now have 37 unique event templates (one added: Recession)
+      expect(uniqueTemplateIds.size).toBe(37);
     });
   });
 });

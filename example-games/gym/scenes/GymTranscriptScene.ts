@@ -243,12 +243,13 @@ export class GymTranscriptScene extends GymSceneBase {
     this.handInfoText = this.addLabel(cx, y + 40, '', { fontSize: '12px', color: '#ccffcc' });
     this.handInfoText.setOrigin(0.5, 0.5).setVisible(false);
 
-    this.addButton(cx - 400, y, '[ New Session ]', () => this.newSession());
-    this.btnHit = this.addButton(cx - 240, y, '[ Hit ]', () => this.playerHit());
-    this.btnStick = this.addButton(cx - 70, y, '[ Stick ]', () => this.playerStick());
-    this.btnNewHand = this.addButton(cx - 70, y, '[ New Hand ]', () => this.newHand());
-    this.addButton(cx + 80, y, '[ Playback ]', () => this.playTranscript());
-    this.addButton(cx + 200, y, '[ Show Transcript ]', () => this.showTranscript());
+    this.initButtonBar(y);
+    this.buttonBar!.addButton('[ New Session ]', () => this.newSession(), { zone: 'center' });
+    this.btnHit = this.buttonBar!.addButton('[ Hit ]', () => this.playerHit(), { zone: 'center' });
+    this.btnStick = this.buttonBar!.addButton('[ Stick ]', () => this.playerStick(), { zone: 'center' });
+    this.btnNewHand = this.buttonBar!.addButton('[ New Hand ]', () => this.newHand(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Playback ]', () => this.playTranscript(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Show Transcript ]', () => this.showTranscript(), { zone: 'center' });
 
     this.eventLogResult = createEventLog(this, logAnchor.y + 20, {
       headerText: '\u2500\u2500 Event Log \u2500\u2500',

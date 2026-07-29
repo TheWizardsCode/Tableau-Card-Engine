@@ -1,20 +1,31 @@
 /**
  * Shared dev server management utilities.
  *
- * Provides helpers to detect, start, and stop the Vite dev server.
- * Uses reference counting (via a lock file) to ensure the server is
- * only killed when ALL consumers have finished, preventing races
- * when parallel Vitest workers share the same dev server.
+ * Provides helpers to start and stop the Vite dev server.
  *
- * Includes crash-resilience improvements:
- * - Stale lock file detection and cleanup on startup
- * - SIGTERM/SIGINT handlers for graceful shutdown
- * - Port conflict detection (checks if something is already on port 3000)
+ * LIFE CYCLE (simplified):
+ *   - `ensureDevServer()`  kills any existing process on port 3000,
+ *                           starts a fresh server, and returns it.
+ *   - `killDevServer()`     unconditionally kills the child process,
+ *                           cleans up any remaining process on port
+ *                           3000, and removes the lock file.
+ *
+ * This replaces the old reference-counting pattern. There is no sharing
+ * of servers across callers — each `ensureDevServer()` call gets its own
+ * fresh server, and each `killDevServer()` call reliably destroys it.
+ *
+ * Crash resilience:
+ *   - Before starting a new server, any process on port 3000 is killed
+ *     (belt-and-suspenders via fuser / lsof).
+ *   - A lock file (PID only) is written so that stale servers from
+ *     previous sessions can be detected and cleaned.
+ *   - SIGTERM/SIGINT handlers kill tracked child processes and remove
+ *     the lock file on forced exit.
  *
  * Used by the replay tool and CLI export scripts.
  */
 
-import { spawn } from 'node:child_process';
+import { spawn, execSync } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as http from 'node:http';
@@ -37,11 +48,6 @@ const trackedChildren: ChildProcess[] = [];
 
 // ── Lock file helpers ───────────────────────────────────────
 
-interface LockFile {
-  pid: number;
-  refCount: number;
-}
-
 function ensureTmpDir(): void {
   const dir = path.dirname(LOCK_FILE_PATH);
   if (!fs.existsSync(dir)) {
@@ -49,18 +55,10 @@ function ensureTmpDir(): void {
   }
 }
 
-function readLockFile(): LockFile | null {
-  try {
-    const raw = fs.readFileSync(LOCK_FILE_PATH, 'utf-8');
-    return JSON.parse(raw) as LockFile;
-  } catch {
-    return null;
-  }
-}
-
-function writeLockFile(pid: number, refCount: number): void {
+/** Write a lock file containing only the PID (no reference count). */
+function writeLockFile(pid: number): void {
   ensureTmpDir();
-  fs.writeFileSync(LOCK_FILE_PATH, JSON.stringify({ pid, refCount }), 'utf-8');
+  fs.writeFileSync(LOCK_FILE_PATH, JSON.stringify({ pid }), 'utf-8');
 }
 
 function removeLockFile(): void {
@@ -68,16 +66,6 @@ function removeLockFile(): void {
     fs.unlinkSync(LOCK_FILE_PATH);
   } catch {
     // Ignore — file may already be gone
-  }
-}
-
-/** Check whether a PID is still alive (Unix: signal 0 test). */
-function isPidAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
   }
 }
 
@@ -124,29 +112,59 @@ export function isPortInUse(port: number): Promise<boolean> {
   });
 }
 
+// ── Port-based process killing ──────────────────────────────
+
 /**
- * Attempt to clean up a stale dev server on port 3000.
+ * Kill any process listening on the given TCP port.
  *
- * Checks if the server is reachable and a lock file exists. If the
- * lock file PID is dead, removes the stale lock. If no lock file
- * exists but something is on the port, logs a warning.
+ * Uses `fuser` (Linux) or `lsof` (macOS/Linux) to find and
+ * terminate processes. This is a belt-and-suspenders fallback
+ * for when the tracked child process is unavailable (e.g. after
+ * a crash).
+ */
+export function killProcessOnPort(port: number): void {
+  // Try fuser first (Linux)
+  try {
+    execSync(`fuser -k ${port}/tcp 2>/dev/null`, { stdio: 'ignore' });
+    return;
+  } catch {
+    // fuser not available — fall through to lsof
+  }
+
+  // Try lsof (macOS / Linux)
+  try {
+    const result = execSync(`lsof -ti :${port} 2>/dev/null`, {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    const pids = result.trim().split('\n').filter(Boolean);
+    for (const pidStr of pids) {
+      const pid = parseInt(pidStr, 10);
+      if (!isNaN(pid)) {
+        try {
+          process.kill(pid, 'SIGTERM');
+        } catch {
+          // Already dead or permission denied
+        }
+      }
+    }
+  } catch {
+    // No process found on this port, or lsof not available
+  }
+}
+
+/**
+ * Check for stale dev servers and clean them up.
+ *
+ * Kills any process on port 3000 and removes stale lock files.
+ * Called automatically by `ensureDevServer()` before starting a
+ * fresh server.
  */
 export async function checkAndCleanupStaleDevServer(): Promise<void> {
-  const ready = await isServerReady(DEV_SERVER_URL);
-  const lock = readLockFile();
-
-  if (ready && lock && !isPidAlive(lock.pid)) {
-    console.warn(
-      `[dev-server-utils] Port 3000 is in use but lock file PID ${lock.pid} is dead. ` +
-        'Removing stale lock file.',
-    );
-    removeLockFile();
-  } else if (ready && !lock) {
-    console.warn(
-      '[dev-server-utils] Port 3000 is in use by an unknown process. ' +
-        'The dev server may fail to start if the port is held by a non-Vite process.',
-    );
-  }
+  // Kill any existing process on port 3000
+  killProcessOnPort(3000);
+  // Clean up stale lock file
+  removeLockFile();
 }
 
 // ── Signal handler registration ────────────────────────────
@@ -199,55 +217,21 @@ export function trackChildProcess(child: ChildProcess): void {
 }
 
 /**
- * Start the dev server if not already running.
+ * Start a fresh dev server on port 3000.
  *
- * Uses reference counting via a lock file: if the server is already
- * running and its PID is alive, the ref count is incremented and
- * `null` is returned. If the server is not running or its PID is
- * dead, a new server is started with refCount = 1.
+ * Before starting, kills any existing process on port 3000
+ * (belt-and-suspenders cleanup). Always starts a new server.
  *
- * Returns the child process (if this call started the server) or
- * `null` (if the server was already running).
+ * Returns the child process that was started.
  */
 export async function ensureDevServer(): Promise<ChildProcess | null> {
-  const ready = await isServerReady(DEV_SERVER_URL);
-  const lock = readLockFile();
-
-  if (ready && lock && isPidAlive(lock.pid)) {
-    // Server is running and lock file is valid — increment ref count
-    const newRefCount = lock.refCount + 1;
-    writeLockFile(lock.pid, newRefCount);
-    console.log(
-      `Dev server already running at ${DEV_SERVER_URL} (refCount: ${lock.refCount} → ${newRefCount})`,
-    );
-    return null;
-  }
-
-  // Stale lock file — clean it up
-  if (lock && !isPidAlive(lock.pid)) {
-    console.log('Removing stale dev server lock file (PID not alive).');
-    removeLockFile();
-  }
-
-  // Check for port conflicts before starting
-  const portInUse = await isPortInUse(3000);
-  if (portInUse) {
-    const serverReady = await isServerReady(DEV_SERVER_URL);
-    if (serverReady) {
-      console.warn(
-        '[dev-server-utils] Port 3000 is in use but server is not responding as expected. ' +
-          'Attempting to start anyway (the existing process may be stale).',
-      );
-    } else {
-      console.warn(
-        '[dev-server-utils] Port 3000 is in use by a non-responsive process. ' +
-          'Attempting to start — the OS will resolve the conflict if possible.',
-      );
-    }
-  }
-
   // Install cleanup handlers once
   installDevServerCleanupHandlers();
+
+  // Kill any existing process on port 3000 — ensures a clean slate
+  // even if a previous server was orphaned (crash, SIGKILL, etc.)
+  killProcessOnPort(3000);
+  removeLockFile();
 
   console.log('Starting dev server (npm run dev)...');
   const child = spawn('npm', ['run', 'dev'], {
@@ -258,9 +242,9 @@ export async function ensureDevServer(): Promise<ChildProcess | null> {
   // Track the child process for cleanup on signal
   trackChildProcess(child);
 
-  // Write lock file with refCount = 1
+  // Write lock file with the server PID
   if (child.pid !== undefined) {
-    writeLockFile(child.pid, 1);
+    writeLockFile(child.pid);
   }
 
   // Wait for the server to become ready
@@ -274,7 +258,7 @@ export async function ensureDevServer(): Promise<ChildProcess | null> {
     }
   }
 
-  // Timeout — kill and exit
+  // Timeout — kill and throw
   child.kill('SIGTERM');
   removeLockFile();
   console.error(
@@ -284,62 +268,35 @@ export async function ensureDevServer(): Promise<ChildProcess | null> {
 }
 
 /**
- * Release a reference to the dev server.
+ * Unconditionally kill the dev server and clean up.
  *
- * Decrements the reference count in the lock file. When the ref count
- * reaches zero (i.e., all consumers have finished using it):
- * - If `child` is provided (we started the server), the server is killed.
- * - If `child` is null (server was already running, e.g. user started it
- *   with `npm run dev`), only the lock file is cleaned up — the existing
- *   dev server on port 3000 is left running.
+ * Kills the provided child process, kills any remaining process on
+ * port 3000 (belt-and-suspenders), and removes the lock file.
+ *
+ * Unlike the old reference-counting implementation, this always
+ * cleans up entirely — there is no sharing across consumers.
  */
 export function killDevServer(child: ChildProcess | null): void {
-  const lock = readLockFile();
-
-  if (!lock) {
-    // No lock file — fall back to unconditional kill (legacy behaviour)
-    if (child && !child.killed) {
+  // Kill the tracked child process
+  if (child && !child.killed) {
+    try {
       child.kill('SIGTERM');
-      // Untrack the child so the exit handler doesn't conflict
-      const idx = trackedChildren.indexOf(child);
-      if (idx !== -1) trackedChildren.splice(idx, 1);
-      console.log('Dev server stopped (no lock file).');
+    } catch {
+      // Already dead
     }
-    return;
   }
 
-  // Verify the lock file PID is still alive before touching ref count
-  if (!isPidAlive(lock.pid)) {
-    // Server already died — clean up stale lock file
-    console.log('Dev server lock file found but PID is dead. Cleaning up.');
-    removeLockFile();
-    return;
+  // Untrack the child so the exit handler doesn't conflict
+  if (child) {
+    const idx = trackedChildren.indexOf(child);
+    if (idx !== -1) trackedChildren.splice(idx, 1);
   }
 
-  const newRefCount = Math.max(0, lock.refCount - 1);
-  console.log(`Dev server refCount: ${lock.refCount} → ${newRefCount}`);
+  // Belt-and-suspenders: kill any remaining process on port 3000
+  killProcessOnPort(3000);
 
-  if (newRefCount > 0) {
-    // Other consumers are still using the server — just decrement
-    writeLockFile(lock.pid, newRefCount);
-    return;
-  }
-
-  // Ref count reached zero — clean up the lock file
+  // Remove lock file
   removeLockFile();
 
-  if (child && !child.killed) {
-    // We started this server, so kill it
-    child.kill('SIGTERM');
-    child.on('exit', () => {
-      // Untrack after exit
-      const idx = trackedChildren.indexOf(child);
-      if (idx !== -1) trackedChildren.splice(idx, 1);
-    });
-    console.log('Dev server stopped.');
-  } else {
-    // We did not start this server (e.g. user started it with `npm run dev`).
-    // Leave the server running on port 3000 — only clean up our lock file.
-    console.log('Dev server lock file cleaned up; leaving existing server on port 3000.');
-  }
+  console.log('Dev server stopped.');
 }

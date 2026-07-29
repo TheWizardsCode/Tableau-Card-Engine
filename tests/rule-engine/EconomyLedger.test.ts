@@ -357,6 +357,86 @@ describe('EconomyLedger — invariants', () => {
       expect(ledger.get('score')).toBe(50);
     });
   });
+
+// ── Unit tests: getHistory ──────────────────────────────────
+
+describe('EconomyLedger — getHistory', () => {
+  it('returns empty array when no mutations have occurred', () => {
+    const ledger = createLedger({ coins: 10, reputation: 5 });
+    expect(ledger.getHistory()).toEqual([]);
+  });
+
+  it('records a snapshot after a single apply call', () => {
+    const ledger = createLedger({ coins: 10, reputation: 5 });
+    ledger.apply({ coins: -3 });
+    const history = ledger.getHistory();
+    expect(history).toHaveLength(1);
+    expect(history[0]).toMatchObject({ coins: 7, reputation: 5, score: 0 });
+  });
+
+  it('records multiple snapshots across multiple apply calls', () => {
+    const ledger = createLedger({ coins: 10, reputation: 5, score: 0 });
+    ledger.apply({ coins: -3 });
+    ledger.apply({ reputation: 2 });
+    ledger.apply({ coins: 5, score: 20 });
+    const history = ledger.getHistory();
+    expect(history).toHaveLength(3);
+    expect(history[0]).toMatchObject({ coins: 7, reputation: 5, score: 0 });
+    expect(history[1]).toMatchObject({ coins: 7, reputation: 7, score: 0 });
+    expect(history[2]).toMatchObject({ coins: 12, reputation: 7, score: 20 });
+  });
+
+  it('records a snapshot after setScore', () => {
+    const ledger = createLedger({ coins: 10, reputation: 5, score: 0 });
+    ledger.apply({ coins: -3 });
+    ledger.setScore(50);
+    const history = ledger.getHistory();
+    expect(history).toHaveLength(2);
+    expect(history[1]).toMatchObject({ coins: 7, reputation: 5, score: 50 });
+  });
+
+  it('history entries are independent — subsequent mutations do not retroactively change them', () => {
+    const ledger = createLedger({ coins: 10 });
+    ledger.apply({ coins: -3 });
+    const afterFirst = ledger.getHistory();
+    expect(afterFirst).toHaveLength(1);
+    expect(afterFirst[0].coins).toBe(7);
+
+    ledger.apply({ coins: -2 });
+    const afterSecond = ledger.getHistory();
+    expect(afterSecond).toHaveLength(2);
+    // First entry unchanged
+    expect(afterSecond[0].coins).toBe(7);
+    expect(afterSecond[1].coins).toBe(5);
+  });
+
+  it('getHistory returns a snapshot of the history at that point in time', () => {
+    const ledger = createLedger({ coins: 10 });
+    ledger.apply({ coins: -3 });
+    const history = ledger.getHistory();
+    // Future mutations should not affect the previously returned array
+    ledger.apply({ coins: -5 });
+    expect(history).toHaveLength(1);
+    expect(history[0].coins).toBe(7);
+  });
+
+  it('records history for empty delta (no-op)', () => {
+    const ledger = createLedger({ coins: 10, reputation: 5 });
+    ledger.apply({});
+    const history = ledger.getHistory();
+    expect(history).toHaveLength(1);
+    expect(history[0]).toMatchObject({ coins: 10, reputation: 5 });
+  });
+
+  it('records negative values correctly in history', () => {
+    const ledger = createLedger({ coins: 3, reputation: 2 });
+    ledger.apply({ coins: -10, reputation: -5 });
+    const history = ledger.getHistory();
+    expect(history[0].coins).toBe(-7);
+    expect(history[0].reputation).toBe(-3);
+  });
+});
+
 });
 
 // ── Integration tests: Main Street economy parity ───────────

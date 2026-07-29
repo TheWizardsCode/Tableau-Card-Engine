@@ -1,9 +1,17 @@
 /// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import path from 'path';
+import fs from 'fs';
 import { transcriptPersistPlugin } from './scripts/vite-transcript-plugin';
 
+// Read version from package.json (single source of truth)
+const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8'));
+const APP_VERSION = pkg.version;
+
 export default defineConfig(({ mode, command }) => ({
+  define: {
+    __APP_VERSION__: JSON.stringify(APP_VERSION),
+  },
   // Use the repo sub-path for production builds (GitHub Pages);
   // keep '/' for local development so localhost:3000 works as expected.
   base: mode === 'production' ? '/Tableau-Card-Engine/' : '/',
@@ -40,8 +48,28 @@ export default defineConfig(({ mode, command }) => ({
           globals: true,
           environment: 'node',
           include: ['tests/**/*.test.ts'],
-          exclude: ['tests/**/*.browser.test.ts'],
+          exclude: ['tests/**/*.browser.test.ts', 'tests/e2e/replay-*.test.ts'],
           testTimeout: 15_000,
+        },
+      },
+      // ── Replay E2E Tests — isolated from parallel unit tests to avoid
+      // cold Vite compilation timeout under CPU contention ──────────────
+      {
+        extends: true,
+        test: {
+          name: 'replay-e2e',
+          globals: true,
+          environment: 'node',
+          include: ['tests/e2e/replay-*.test.ts'],
+          fileParallelism: false,
+          sequence: { concurrent: false },
+          testTimeout: 180_000,
+          pool: 'forks',
+          poolOptions: {
+            forks: {
+              singleFork: true,
+            },
+          },
         },
       },
       // ── Non-Tutorial Browser Tests ────────────────────

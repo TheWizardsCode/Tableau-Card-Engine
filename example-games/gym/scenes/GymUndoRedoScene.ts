@@ -112,18 +112,19 @@ export class GymUndoRedoScene extends GymSceneBase {
     const y = controlsAnchor.y;
 
     // Action buttons
-    this.addButton(cx - 400, y, '[ +1 ]', () => this.executeAction(1));
-    this.addButton(cx - 320, y, '[ +5 ]', () => this.executeAction(5));
-    this.addButton(cx - 240, y, '[ -3 ]', () => this.executeAction(-3));
-    this.addButton(cx - 140, y, '[ Compound (+2,+3) ]', () => this.executeCompound());
+    this.initButtonBar(y);
+    this.buttonBar!.addButton('[ +1 ]', () => this.executeAction(1), { zone: 'center' });
+    this.buttonBar!.addButton('[ +5 ]', () => this.executeAction(5), { zone: 'center' });
+    this.buttonBar!.addButton('[ -3 ]', () => this.executeAction(-3), { zone: 'center' });
+    this.buttonBar!.addButton('[ Compound (+2,+3) ]', () => this.executeCompound(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Clear History ]', () => this.clearHistory(), { zone: 'center' });
+
     // Use standard-positioned undo/redo buttons (shared mechanism)
     const { undoButton, redoButton } = createStandardUndoRedoButtons(
       this, () => this.doUndo(), () => this.doRedo(),
     );
     this.undoActionBtn = undoButton;
     this.redoActionBtn = redoButton;
-
-    this.addButton(cx + 40, y, '[ Clear History ]', () => this.clearHistory());
 
     // State display
     this.counterText = createHudText(this, cx, counterAnchor.y, 'Counter: 0', '#ffffff', { fontSize: '28px' }).setOrigin(0.5);

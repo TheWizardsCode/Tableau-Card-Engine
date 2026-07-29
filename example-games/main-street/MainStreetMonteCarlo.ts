@@ -3,6 +3,8 @@ import { setupMainStreetGame, seedToNumber, type MainStreetState } from './MainS
 import { executeAction, executeDayStart, processEndOfTurn, type PlayerAction } from './MainStreetEngine';
 import { canPurchaseEvent, getAffordableBusinessCards, getAffordableUpgradeCards, getEmptySlots } from './MainStreetMarket';
 import { GreedyStrategy, RandomStrategy, MainStreetAiPlayer } from './MainStreetAiStrategy';
+import { DIFFICULTY_NAMES } from './MainStreetDifficulty';
+import type { DifficultyName } from './MainStreetDifficulty';
 
 export interface MonteCarloRunSummary {
   seed: string;
@@ -14,6 +16,16 @@ export interface MonteCarloRunSummary {
   turnWhenGridHalf: number | null;
   turnWhenGridFull: number | null;
   noActionTurns: number;
+  /** Card IDs purchased during the run (business, event, and upgrade cards). */
+  cardsOwned: string[];
+  /** Card IDs that appeared in the market (offered for purchase) across all turns. */
+  marketOffers: string[];
+  /**
+   * Turn-by-turn economy history recorded after each economy mutation.
+   * Each entry contains a sequence number (turn), coins, reputation, and score
+   * at that point. Captured via EconomyLedger.getHistory() at run end.
+   */
+  economyHistory: Array<{ turn: number; coins: number; reputation: number; score: number }>;
 }
 
 export interface MonteCarloMetrics {
@@ -44,6 +56,51 @@ export interface RunMonteCarloOptions {
 }
 
 export type MonteCarloStrategy = 'market-greedy' | 'demo-greedy' | 'greedy' | 'random';
+
+/** All available Monte Carlo strategies. */
+export const ALL_STRATEGIES: readonly MonteCarloStrategy[] = [
+  'market-greedy',
+  'demo-greedy',
+  'greedy',
+  'random',
+];
+
+/** All available difficulty levels. */
+export const ALL_DIFFICULTIES: readonly DifficultyName[] = DIFFICULTY_NAMES;
+
+/**
+ * Result of running Monte Carlo for a single strategy×difficulty combination.
+ */
+export interface CombinationResult {
+  /** The strategy used for this combination. */
+  strategy: MonteCarloStrategy;
+  /** The difficulty level used for this combination. */
+  difficulty: DifficultyName;
+  /** Aggregate metrics across all runs. */
+  metrics: MonteCarloMetrics;
+  /** Per-run summaries for all seeds. */
+  runs: MonteCarloRunSummary[];
+}
+
+/**
+ * Options for `runAllCombinations()`.
+ */
+export interface RunAllCombinationsOptions {
+  /** Seeds to run for each combination. */
+  seeds: readonly string[];
+  /** Max turns per seed (default: 30). */
+  maxTurns?: number;
+  /**
+   * Optional filter: only run these strategies.
+   * Defaults to all strategies if omitted.
+   */
+  strategies?: readonly MonteCarloStrategy[];
+  /**
+   * Optional filter: only run these difficulties.
+   * Defaults to all difficulties if omitted.
+   */
+  difficulties?: readonly DifficultyName[];
+}
 
 function chooseMarketGreedyActions(state: MainStreetState): PlayerAction[] {
   const actions: PlayerAction[] = [];
@@ -151,15 +208,32 @@ function runSeed(seed: string, maxTurns: number, strategy: MonteCarloStrategy): 
   let noActionTurns = 0;
   let turnWhenGridHalf: number | null = null;
   let turnWhenGridFull: number | null = null;
+  /** Card IDs purchased during this run. */
+  const cardsOwned: string[] = [];
+  /** Set of card IDs seen in the market (across all turns). No duplicates. */
+  const marketOfferSet = new Set<string>();
 
   while (state.gameResult === 'playing' && turns < maxTurns) {
     executeDayStart(state);
+
+    // Record all card IDs currently in the market as offers for this turn.
+    for (const card of state.market.development) {
+      marketOfferSet.add(card.id);
+    }
+    for (const card of state.market.investments) {
+      marketOfferSet.add(card.id);
+    }
+
     let executedAction = false;
 
     if (aiPlayer !== null) {
       // AI strategy: choose actions one at a time until end-turn or game ends.
       let action = aiPlayer.chooseAction(state);
       while (action.type !== 'end-turn' && state.gameResult === 'playing') {
+        // Track purchases before executing the action.
+        if (action.type === 'buy-business' || action.type === 'buy-upgrade' || action.type === 'buy-event') {
+          cardsOwned.push(action.cardId);
+        }
         executeAction(state, action);
         executedAction = true;
         // Record AI action in transcript (if recorder is present)
@@ -178,6 +252,10 @@ function runSeed(seed: string, maxTurns: number, strategy: MonteCarloStrategy): 
       const planned = chooseActionsForStrategy(state, strategy);
       for (const action of planned) {
         if (action.type === 'end-turn') break;
+        // Track purchases before executing the action.
+        if (action.type === 'buy-business' || action.type === 'buy-upgrade' || action.type === 'buy-event') {
+          cardsOwned.push(action.cardId);
+        }
         try {
           executeAction(state, action);
           executedAction = true;
@@ -216,6 +294,9 @@ function runSeed(seed: string, maxTurns: number, strategy: MonteCarloStrategy): 
     turnWhenGridHalf,
     turnWhenGridFull,
     noActionTurns,
+    cardsOwned,
+    marketOffers: [...marketOfferSet],
+    economyHistory: [...state.ledger.getHistory()],
   };
 }
 
@@ -224,6 +305,154 @@ export function runMonteCarlo(options: RunMonteCarloOptions): MonteCarloResult {
   const strategy = options.strategy ?? 'market-greedy';
   const runs = options.seeds.map(seed => runSeed(seed, maxTurns, strategy));
 
+  const wins = runs.filter(run => run.result === 'win').length;
+  const losses = runs.length - wins;
+
+  const lossReasons: Record<string, number> = {};
+  for (const run of runs) {
+    if (run.result !== 'loss') continue;
+    lossReasons[run.endReason] = (lossReasons[run.endReason] ?? 0) + 1;
+  }
+
+  const lossReasonRates: Record<string, number> = {};
+  for (const [reason, count] of Object.entries(lossReasons)) {
+    lossReasonRates[reason] = losses > 0 ? count / losses : 0;
+  }
+
+  const metrics = computeMetrics(runs);
+  return { metrics, runs };
+}
+
+/**
+ * Runs Monte Carlo simulations for all strategy×difficulty combinations
+ * (default: 4 strategies × 3 difficulties = 12 combos).
+ *
+ * Accepts optional `strategies` and `difficulties` filters to run a subset.
+ *
+ * @param options  Seeds, max turns, and optional strategy/difficulty filters.
+ * @returns Array of `CombinationResult` for each combination.
+ */
+export function runAllCombinations(options: RunAllCombinationsOptions): CombinationResult[] {
+  const maxTurns = options.maxTurns ?? 30;
+  const strategies = options.strategies ?? ALL_STRATEGIES;
+  const difficulties = options.difficulties ?? ALL_DIFFICULTIES;
+
+  const results: CombinationResult[] = [];
+
+  for (const strategy of strategies) {
+    for (const difficulty of difficulties) {
+      const runs = options.seeds.map(seed => runSeedWithDifficulty(seed, maxTurns, strategy, difficulty));
+      const metrics = computeMetrics(runs);
+      results.push({ strategy, difficulty, metrics, runs });
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Runs a single seed with a specific difficulty preset.
+ */
+function runSeedWithDifficulty(
+  seed: string,
+  maxTurns: number,
+  strategy: MonteCarloStrategy,
+  difficulty: DifficultyName,
+): MonteCarloRunSummary {
+  const state = setupMainStreetGame({ seed, difficulty });
+  const aiPlayer = createAiPlayerForStrategy(strategy, seed);
+
+  let turns = 0;
+  let noActionTurns = 0;
+  let turnWhenGridHalf: number | null = null;
+  let turnWhenGridFull: number | null = null;
+  const cardsOwned: string[] = [];
+  const marketOfferSet = new Set<string>();
+
+  while (state.gameResult === 'playing' && turns < maxTurns) {
+    executeDayStart(state);
+
+    for (const card of state.market.development) {
+      marketOfferSet.add(card.id);
+    }
+    for (const card of state.market.investments) {
+      marketOfferSet.add(card.id);
+    }
+
+    let executedAction = false;
+
+    if (aiPlayer !== null) {
+      let action = aiPlayer.chooseAction(state);
+      while (action.type !== 'end-turn' && state.gameResult === 'playing') {
+        if (action.type === 'buy-business' || action.type === 'buy-upgrade' || action.type === 'buy-event') {
+          cardsOwned.push(action.cardId);
+        }
+        executeAction(state, action);
+        executedAction = true;
+        try {
+          const { recordMainStreetEvent } = require('./MainStreetTranscript');
+          recordMainStreetEvent({ type: 'ai-action', turn: state.turn, strategy: aiPlayer.strategy.name, action });
+        } catch (_) {
+          // ignore if recorder not wired
+        }
+        action = aiPlayer.chooseAction(state);
+      }
+    } else {
+      const planned = chooseActionsForStrategy(state, strategy);
+      for (const action of planned) {
+        if (action.type === 'end-turn') break;
+        if (action.type === 'buy-business' || action.type === 'buy-upgrade' || action.type === 'buy-event') {
+          cardsOwned.push(action.cardId);
+        }
+        try {
+          executeAction(state, action);
+          executedAction = true;
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    if (!executedAction) {
+      noActionTurns++;
+    }
+
+    processEndOfTurn(state);
+    turns++;
+
+    const occupied = state.streetGrid.filter(slot => slot !== null).length;
+    if (turnWhenGridHalf === null && occupied >= 5) {
+      turnWhenGridHalf = turns;
+    }
+    if (turnWhenGridFull === null && occupied >= 10) {
+      turnWhenGridFull = turns;
+    }
+  }
+
+  const result = state.gameResult === 'playing' ? 'loss' : state.gameResult;
+  const endReason = state.gameResult === 'playing' ? 'max_turns_cap' : (state.endReason ?? 'unknown');
+
+  return {
+    seed,
+    result,
+    endReason,
+    finalScore: state.finalScore,
+    finalCoins: state.resourceBank.coins,
+    turns,
+    turnWhenGridHalf,
+    turnWhenGridFull,
+    noActionTurns,
+    cardsOwned,
+    marketOffers: [...marketOfferSet],
+    economyHistory: [...state.ledger.getHistory()],
+  };
+}
+
+/**
+ * Computes aggregate metrics from an array of run summaries.
+ * Extracted to share between `runMonteCarlo()` and `runAllCombinations()`.
+ */
+function computeMetrics(runs: MonteCarloRunSummary[]): MonteCarloMetrics {
   const wins = runs.filter(run => run.result === 'win').length;
   const losses = runs.length - wins;
 
@@ -251,14 +480,10 @@ export function runMonteCarlo(options: RunMonteCarloOptions): MonteCarloResult {
     averageTurns: average(runs.map(run => run.turns)),
     averageNoActionTurns: average(runs.map(run => run.noActionTurns)),
     averageTurnWhenGridHalf: average(
-      runs
-        .map(run => run.turnWhenGridHalf)
-        .filter((v): v is number => v !== null),
+      runs.map(run => run.turnWhenGridHalf).filter((v): v is number => v !== null),
     ),
     averageTurnWhenGridFull: average(
-      runs
-        .map(run => run.turnWhenGridFull)
-        .filter((v): v is number => v !== null),
+      runs.map(run => run.turnWhenGridFull).filter((v): v is number => v !== null),
     ),
     lossReasons,
     lossReasonRates,
@@ -271,7 +496,7 @@ export function runMonteCarlo(options: RunMonteCarloOptions): MonteCarloResult {
     metrics.averageTurnWhenGridFull = null;
   }
 
-  return { metrics, runs };
+  return metrics;
 }
 
 export function toCsv(runs: readonly MonteCarloRunSummary[]): string {

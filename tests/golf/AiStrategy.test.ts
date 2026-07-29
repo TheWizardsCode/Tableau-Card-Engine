@@ -1216,20 +1216,21 @@ describe('chooseMoveForCard with visible rank weighting', () => {
 });
 
 describe('chooseDrawSource with visible rank weighting', () => {
-  it('prefers discard when it helps build a column and unknown copies remain', () => {
-    // Column 0: [Q♣, A♠, ?(face-down)]
-    // Discard has a Queen (helps column 0), stock available
-    // Only 1 Queen visible in grid (no Q on discard before evaluating)
+  it('prefers discard when column bonus makes swap the best move', () => {
+    // Column 0: [Q♣(10), 7♠(7), ?(face-down)] — swapping Q♥ into (1,0)
+    // replaces 7♠ (7 pts) with Q♥ (10 pts), deteriorating score by 3.
+    // But the column bonus (Q matching, feasibility 0.5, weight 0.5)
+    // gives -5, making swap+bonus = 37.38 < 39.38 current → discard.
     const cards = [
-      createCard('Q', 'clubs', true),    // (0,0) -- Q
+      createCard('Q', 'clubs', true),    // (0,0) -- Q (10 pts), matching
       createCard('A', 'hearts', true),   // (0,1)
       createCard('2', 'spades', true),   // (0,2)
-      createCard('A', 'spades', true),   // (1,0) -- non-Q, build target
+      createCard('7', 'spades', true),   // (1,0) -- 7 (7 pts), swap target
       createCard('3', 'clubs', true),    // (1,1)
       createCard('4', 'hearts', true),   // (1,2)
       createCard('5', 'clubs', false),   // (2,0) -- face-down
       createCard('6', 'hearts', false),
-      createCard('7', 'spades', false),
+      createCard('8', 'diamonds', false),
     ];
     const grid = createGolfGrid(cards);
     const rawPs = { grid };
@@ -1243,26 +1244,30 @@ describe('chooseDrawSource with visible rank weighting', () => {
     };
     const aiShared = createAiVisibleSharedState(shared);
 
-    // GreedyStrategy should prefer discard because Queen helps column 0
-    // and unknown Queens remain (only 1 Queen visible in grid currently)
     const rng = createTestRng();
     const action = GreedyStrategy.chooseAction(aiPs, aiShared, rng);
+    // Column bonus makes the swap strictly better than discard-and-flip
     expect(action.drawSource).toBe('discard');
+    // The best move should be the column-building swap into (1,0)
+    expect(action.move.kind).toBe('swap');
+    expect(action.move.row).toBe(1);
+    expect(action.move.col).toBe(0);
   });
 
-  it('prefers discard when memory indicates unseen rank copies remain (skill=100)', () => {
-    // Grid: column 0 has [Q♣, A♠, ?] - building a Queen column is feasible
-    // Memory has 2 Queens recorded (meaning all 4 copies still in play)
+  it('prefers discard when column bonus works with memory tracker', () => {
+    // Column 0: [Q♣(10), 7♠(7), ?(face-down)] — same scenario as above.
+    // Memory has recorded a non-Queen card, verifying the memory tracker
+    // doesn't interfere with the column bonus decision.
     const cards = [
-      createCard('Q', 'clubs', true),    // (0,0) -- Q
+      createCard('Q', 'clubs', true),    // (0,0) -- Q (10 pts), matching
       createCard('A', 'hearts', true),   // (0,1)
       createCard('2', 'spades', true),   // (0,2)
-      createCard('A', 'spades', true),   // (1,0) -- non-Q, build target
+      createCard('7', 'spades', true),   // (1,0) -- 7 (7 pts), swap target
       createCard('3', 'clubs', true),    // (1,1)
       createCard('4', 'hearts', true),   // (1,2)
       createCard('5', 'clubs', false),   // (2,0) -- face-down
       createCard('6', 'hearts', false),
-      createCard('7', 'spades', false),
+      createCard('8', 'diamonds', false),
     ];
     const grid = createGolfGrid(cards);
     const rawPs = { grid };
@@ -1275,16 +1280,82 @@ describe('chooseDrawSource with visible rank weighting', () => {
     };
     const aiShared = createAiVisibleSharedState(shared);
 
-    // AI with skill=100 and memory of additional Queens
-    // should prefer discard because memory says unseen Queens remain
+    // AI with skill=100 and memory of non-Queen cards (does not affect
+    // Queen feasibility calculation but verifies tracker integration)
     const ai = new AiPlayer(GreedyStrategy, createTestRng(42), undefined, 100);
-    ai.recordCard(createCard('Q', 'diamonds', true));
-    ai.recordCard(createCard('Q', 'spades', true));
+    ai.recordCard(createCard('K', 'diamonds', true));
+    ai.recordCard(createCard('A', 'spades', true));
 
     const source = ai.chooseDrawSource(aiPs, aiShared);
-    // With memory indicating 2 Queens remain unseen, column building is
-    // feasible → AI should prefer discard
+    // Column bonus makes the swap strictly better than discard-and-flip
     expect(source).toBe('discard');
+  });
+
+  it('prefers stock when best move with discard card is discard-and-flip (no column bonus)', () => {
+    // Grid has only low-value face-up cards and one face-down.
+    // Discard is a high-value Queen (10 pts). Swapping Q♥ anywhere
+    // worsens the score. No matching cards exist → no column bonus.
+    // Best move is DAF → AI should draw from stock (unknown might be better).
+    const cards = [
+      createCard('A', 'hearts', true),   // (0,0) -- 1 pt
+      createCard('A', 'clubs', true),    // (1,0) -- 1 pt
+      createCard('A', 'diamonds', false),// (2,0) -- face-down
+      createCard('A', 'spades', true),   // (0,1) -- 1 pt
+      createCard('K', 'hearts', true),   // (1,1) -- 0 pts
+      createCard('2', 'clubs', true),    // (2,1) -- -2 pts
+      createCard('2', 'diamonds', true), // (0,2) -- -2 pts
+      createCard('2', 'hearts', true),   // (1,2) -- -2 pts
+      createCard('2', 'spades', true),   // (2,2) -- -2 pts
+    ];
+    const grid = createGolfGrid(cards);
+    const rawPs = { grid };
+    const aiPs: AiVisiblePlayerState = createAiVisiblePlayerState(rawPs);
+
+    const shared: GolfSharedState = {
+      stockPile: [createCard('A', 'diamonds')],
+      discardPile: new Pile([createCard('Q', 'hearts', true)]), // 10 pts
+      roundEnd: createRoundEndState(2),
+    };
+    const aiShared = createAiVisibleSharedState(shared);
+
+    const rng = createTestRng();
+    const action = GreedyStrategy.chooseAction(aiPs, aiShared, rng);
+    // No swap improves the score and no column bonus → draw from stock
+    expect(action.drawSource).toBe('stock');
+  });
+
+  it('prefers stock when column bonus exists but is not enough to beat discard-and-flip', () => {
+    // Column 0: [Q♣(10), A♠(1), ?(face-down)].
+    // Discard has Q♥. Swapping Q♥ into (1,0) replaces A♠(1) with Q♥(10),
+    // worsening score by 9 pts. The column bonus (-5) only brings the
+    // swap+bonus to 37.38, which is still worse than current 33.38.
+    // So even though bonus < 0, the AI should NOT prefer discard.
+    const cards = [
+      createCard('Q', 'clubs', true),    // (0,0) -- Q (10 pts)
+      createCard('A', 'hearts', true),   // (0,1)
+      createCard('2', 'spades', true),   // (0,2)
+      createCard('A', 'spades', true),   // (1,0) -- swap target (1 pt)
+      createCard('3', 'clubs', true),    // (1,1)
+      createCard('4', 'hearts', true),   // (1,2)
+      createCard('5', 'clubs', false),   // (2,0) -- face-down
+      createCard('6', 'hearts', false),
+      createCard('7', 'spades', false),
+    ];
+    const grid = createGolfGrid(cards);
+    const rawPs = { grid };
+    const aiPs: AiVisiblePlayerState = createAiVisiblePlayerState(rawPs);
+
+    const shared: GolfSharedState = {
+      stockPile: [createCard('A', 'diamonds')],
+      discardPile: new Pile([createCard('Q', 'hearts', true)]),
+      roundEnd: createRoundEndState(2),
+    };
+    const aiShared = createAiVisibleSharedState(shared);
+
+    const rng = createTestRng();
+    const action = GreedyStrategy.chooseAction(aiPs, aiShared, rng);
+    // Even with column bonus, swap+bonus > current → prefer stock
+    expect(action.drawSource).toBe('stock');
   });
 
   it('backward compatible: chooseDrawSource without memory behaves like before', () => {

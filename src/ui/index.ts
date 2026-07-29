@@ -140,6 +140,19 @@ export type { SettingsButtonConfig } from './SettingsButton';
 export { GameSelectorScene, REGISTRY_KEY_GAMES } from './GameSelectorScene';
 export type { GameEntry } from './GameSelectorScene';
 
+// Version display
+export {
+  createVersionLabel,
+  VERSION_LABEL_TEXT,
+  VERSION_FONT_SIZE,
+  VERSION_FONT_FAMILY,
+  VERSION_COLOR,
+  VERSION_ALPHA,
+  VERSION_X,
+  VERSION_Y,
+  VERSION_DEPTH,
+} from './versionDisplay';
+
 // Shared constants
 export { CARD_W, CARD_H, GAME_W, GAME_H, FONT_FAMILY } from './constants';
 
@@ -161,11 +174,13 @@ export {
 } from './OverlayButton';
 export type { OverlayButtonConfig } from './OverlayButton';
 
-export { createOverlayBackground, dismissOverlay } from './Overlay';
+export { createOverlayBackground, dismissOverlay, createOverlayDialog } from './Overlay';
 export type {
   OverlayBackgroundOptions,
   OverlayBoxOptions,
   OverlayResult,
+  OverlayDialogOptions,
+  OverlayDialogHandle,
 } from './Overlay';
 
 export { createOverlayMenuButton } from './MenuButton';
@@ -263,6 +278,11 @@ export type {
   EnsureTextureResult,
 } from './Renderer';
 
+// Debug tools registry
+// @module @ui/debug/DebugToolsRegistry
+export { isDevMode } from './debug/DebugToolsRegistry';
+export type { DebugToolsEntry } from './debug/DebugToolsRegistry';
+
 // Slider – reusable horizontal slider widget
 export { Slider } from './Slider';
 export type { SliderOptions } from './Slider';
@@ -279,6 +299,10 @@ export type {
   DeckGridOptions,
   DeckGridResult,
 } from './GymSceneUtils';
+
+// GymButtonBar – reusable button bar with zones and wrapping
+export { GymButtonBar } from './GymButtonBar';
+export type { ButtonZone, GymButtonOpts, GymButtonBarConfig } from './GymButtonBar';
 
 // HighlightManager – reusable highlight zone manager
 export { HighlightManager } from './HighlightManager';

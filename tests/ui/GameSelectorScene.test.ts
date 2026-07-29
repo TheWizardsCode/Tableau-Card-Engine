@@ -59,6 +59,8 @@ function mockText() {
     setInteractive: vi.fn().mockReturnThis(),
     setColor: vi.fn().mockReturnThis(),
     setCrop: vi.fn().mockReturnThis(),
+    setAlpha: vi.fn().mockReturnThis(),
+    setVisible: vi.fn().mockReturnThis(),
     on: vi.fn((event: string, handler: Function) => {
       handlers[event] = handler;
       return text;
@@ -66,6 +68,9 @@ function mockText() {
     destroy: vi.fn(),
     width: 100,
     height: 20,
+    visible: true,
+    alpha: 1,
+    inputEnabled: false,
     _handlers: handlers,
   };
   return text;
@@ -85,11 +90,21 @@ function mockGraphics() {
 
 /** Create a mock Phaser.GameObjects.Image. */
 function mockImage() {
-  return {
+  const handlers: Record<string, Function> = {};
+  const image = {
     setDisplaySize: vi.fn().mockReturnThis(),
     setOrigin: vi.fn().mockReturnThis(),
+    setAlpha: vi.fn().mockReturnThis(),
+    setDepth: vi.fn().mockReturnThis(),
+    setInteractive: vi.fn().mockReturnThis(),
+    on: vi.fn((event: string, handler: Function) => {
+      handlers[event] = handler;
+      return image;
+    }),
     destroy: vi.fn(),
+    _handlers: handlers,
   };
+  return image;
 }
 
 /** Create a mock Phaser.GameObjects.Zone. */
@@ -214,27 +229,42 @@ describe('GameSelectorScene', () => {
       scene.init({ games: [GAME_WITH_THUMB, GAME_NO_THUMB] });
       scene.preload();
 
-      expect(mocks.load.image).toHaveBeenCalledTimes(1);
+      // One thumbnail + one github-icon SVG
+      expect(mocks.load.image).toHaveBeenCalledTimes(2);
       expect(mocks.load.image).toHaveBeenCalledWith(
         'games/test/thumbnail',
         'assets/games/test/thumbnail.png',
       );
+      expect(mocks.load.image).toHaveBeenCalledWith(
+        'github-icon',
+        expect.stringContaining('data:image/svg+xml'),
+      );
     });
 
-    it('does not load anything when no games have thumbnails', () => {
+    it('loads only the github-icon when no games have thumbnails', () => {
       const mocks = injectMocks(scene);
       scene.init({ games: [GAME_NO_THUMB] });
       scene.preload();
 
-      expect(mocks.load.image).not.toHaveBeenCalled();
+      // github-icon is always loaded, but no thumbnail images
+      expect(mocks.load.image).toHaveBeenCalledTimes(1);
+      expect(mocks.load.image).toHaveBeenCalledWith(
+        'github-icon',
+        expect.stringContaining('data:image/svg+xml'),
+      );
     });
 
-    it('does not load anything when game list is empty', () => {
+    it('loads only the github-icon when game list is empty', () => {
       const mocks = injectMocks(scene);
       scene.init({ games: [] });
       scene.preload();
 
-      expect(mocks.load.image).not.toHaveBeenCalled();
+      // github-icon is always loaded
+      expect(mocks.load.image).toHaveBeenCalledTimes(1);
+      expect(mocks.load.image).toHaveBeenCalledWith(
+        'github-icon',
+        expect.stringContaining('data:image/svg+xml'),
+      );
     });
   });
 
@@ -280,12 +310,15 @@ describe('GameSelectorScene', () => {
   // ── Text-only card (no thumbnail) ─────────────────────
 
   describe('text-only card (no thumbnail)', () => {
-    it('does not add an image when no thumbnail is available', () => {
+    it('does not add a thumbnail image when no thumbnail is available', () => {
       const mocks = injectMocks(scene);
       scene.init({ games: [GAME_NO_THUMB] });
       scene.create();
 
-      expect(mocks.add.image).not.toHaveBeenCalled();
+      // Only the github-icon should be added, no thumbnail images
+      const imageCalls = mocks.add.image.mock.calls as unknown[][];
+      const thumbCalls = imageCalls.filter((c) => c[2] !== 'github-icon');
+      expect(thumbCalls).toHaveLength(0);
     });
 
     it('centers description text with origin(0.5, 0.5)', () => {
@@ -319,18 +352,23 @@ describe('GameSelectorScene', () => {
   // ── Thumbnail card ────────────────────────────────────
 
   describe('thumbnail card', () => {
-    it('adds an image when the thumbnail texture exists', () => {
+    it('adds a thumbnail image when the thumbnail texture exists', () => {
       const mocks = injectMocks(scene, {
         textureKeys: ['games/test/thumbnail'],
       });
       scene.init({ games: [GAME_WITH_THUMB] });
       scene.create();
 
-      expect(mocks.add.image).toHaveBeenCalledTimes(1);
+      // One thumbnail + one github-icon
       expect(mocks.add.image).toHaveBeenCalledWith(
         expect.any(Number),
         expect.any(Number),
         'games/test/thumbnail',
+      );
+      expect(mocks.add.image).toHaveBeenCalledWith(
+        expect.any(Number),
+        expect.any(Number),
+        'github-icon',
       );
     });
 
@@ -341,8 +379,15 @@ describe('GameSelectorScene', () => {
       scene.init({ games: [GAME_WITH_THUMB] });
       scene.create();
 
-      const imgResult = mocks.add.image.mock.results[0];
-      expect(imgResult.value.setDisplaySize).toHaveBeenCalledWith(120, 68);
+      // Find the image that has setDisplaySize called (the thumbnail)
+      const imageResults = mocks.add.image.mock.results as {
+        value: ReturnType<typeof mockImage>;
+      }[];
+      const thumbResult = imageResults.find(
+        (r) => r.value.setDisplaySize.mock.calls.length > 0,
+      );
+      expect(thumbResult).toBeDefined();
+      expect(thumbResult!.value.setDisplaySize).toHaveBeenCalledWith(120, 68);
     });
 
     it('uses left align for description text when thumbnail is present', () => {
@@ -378,8 +423,10 @@ describe('GameSelectorScene', () => {
       scene.init({ games: [GAME_WITH_THUMB] });
       scene.create();
 
-      // No image should be added
-      expect(mocks.add.image).not.toHaveBeenCalled();
+      // Only the github-icon should be added, no thumbnail images
+      const imageCalls = mocks.add.image.mock.calls as unknown[][];
+      const thumbCalls = imageCalls.filter((c) => c[2] !== 'github-icon');
+      expect(thumbCalls).toHaveLength(0);
 
       // Description should be centered (text-only fallback)
       const textCalls = mocks.add.text.mock.calls as unknown[][];
@@ -447,12 +494,257 @@ describe('GameSelectorScene', () => {
       scene.init({ games: [GAME_WITH_THUMB, GAME_NO_THUMB] });
       scene.create();
 
-      // One image for the thumbnail game, none for the text-only game
-      expect(mocks.add.image).toHaveBeenCalledTimes(1);
+      // Two images: one github-icon + one thumbnail
+      expect(mocks.add.image).toHaveBeenCalledTimes(2);
+      expect(mocks.add.image).toHaveBeenCalledWith(
+        expect.any(Number),
+        expect.any(Number),
+        'games/test/thumbnail',
+      );
+      expect(mocks.add.image).toHaveBeenCalledWith(
+        expect.any(Number),
+        expect.any(Number),
+        'github-icon',
+      );
 
       // Two cards total (two graphics + two zones)
       expect(mocks.add.graphics).toHaveBeenCalledTimes(2);
       expect(mocks.add.zone).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  // ── Version label ────────────────────────────────────────
+
+  describe('version label', () => {
+    it('creates a version text label in create()', () => {
+      const mocks = injectMocks(scene);
+      scene.init({ games: [] });
+      scene.create();
+
+      // Find the version text call -- contains the version string with 'v' prefix
+      const textCalls = mocks.add.text.mock.calls as unknown[][];
+      const versionCall = textCalls.find((c) =>
+        typeof c[2] === 'string' && c[2].startsWith('v'),
+      );
+      expect(versionCall).toBeDefined();
+    });
+
+    it('positions version label at bottom-left corner', () => {
+      const mocks = injectMocks(scene);
+      scene.init({ games: [] });
+      scene.create();
+
+      const textCalls = mocks.add.text.mock.calls as unknown[][];
+      const versionCall = textCalls.find((c) =>
+        typeof c[2] === 'string' && c[2].startsWith('v'),
+      );
+      expect(versionCall).toBeDefined();
+
+      // Position should be at bottom-left: x near left edge, y near bottom
+      const [x, y] = versionCall as [number, number, string];
+      expect(x).toBeLessThan(50); // near left edge
+      expect(y).toBeGreaterThan(650); // near bottom (GAME_H=720)
+    });
+
+    it('uses small readable font size (11-12px) for version label', () => {
+      const mocks = injectMocks(scene);
+      scene.init({ games: [] });
+      scene.create();
+
+      const textCalls = mocks.add.text.mock.calls as unknown[][];
+      const versionCall = textCalls.find((c) =>
+        typeof c[2] === 'string' && c[2].startsWith('v'),
+      );
+      expect(versionCall).toBeDefined();
+      const style = versionCall![3] as Record<string, unknown>;
+      expect(style.fontSize).toMatch(/^1[12]px$/);
+    });
+
+    it('sets version label as non-interactive (no pointer events)', () => {
+      const mocks = injectMocks(scene);
+      scene.init({ games: [] });
+      scene.create();
+
+      const textResults = mocks.add.text.mock.results as { value: ReturnType<typeof mockText> }[];
+      const textCalls = mocks.add.text.mock.calls as unknown[][];
+      const versionIdx = textCalls.findIndex((c) =>
+        typeof c[2] === 'string' && c[2].startsWith('v'),
+      );
+      expect(versionIdx).not.toBe(-1);
+
+      // Should NOT call setInteractive
+      expect(textResults[versionIdx].value.setInteractive).not.toHaveBeenCalled();
+    });
+
+    it('uses semi-transparent or muted color and alpha < 1 for version label', () => {
+      const mocks = injectMocks(scene);
+      scene.init({ games: [] });
+      scene.create();
+
+      const textCalls = mocks.add.text.mock.calls as unknown[][];
+      const versionCall = textCalls.find((c) =>
+        typeof c[2] === 'string' && c[2].startsWith('v'),
+      );
+      expect(versionCall).toBeDefined();
+      const style = versionCall![3] as Record<string, unknown>;
+      // Color should be muted/semi-transparent
+      expect(style.color).toBeDefined();
+    });
+
+    it('version label text includes the version from __APP_VERSION__', () => {
+      const mocks = injectMocks(scene);
+      scene.init({ games: [] });
+      scene.create();
+
+      const textCalls = mocks.add.text.mock.calls as unknown[][];
+      const versionCall = textCalls.find((c) =>
+        typeof c[2] === 'string' && c[2].startsWith('v'),
+      );
+      expect(versionCall).toBeDefined();
+      const text = versionCall![2] as string;
+      // Should have a semantic version after the 'v' prefix
+      expect(text).toMatch(/^v\d+\.\d+\.\d+/);
+    });
+  });
+
+  // ── GitHub icon link ────────────────────────────────────
+
+  describe('GitHub icon link', () => {
+    it('creates a github-icon image in create()', () => {
+      const mocks = injectMocks(scene);
+      scene.init({ games: [] });
+      scene.create();
+
+      expect(mocks.add.image).toHaveBeenCalledWith(
+        expect.any(Number),
+        expect.any(Number),
+        'github-icon',
+      );
+    });
+
+    it('positions GitHub icon at top-right corner with 10px margin', () => {
+      const mocks = injectMocks(scene);
+      scene.init({ games: [] });
+      scene.create();
+
+      const imageCalls = mocks.add.image.mock.calls as unknown[][];
+      const githubCall = imageCalls.find((c) => c[2] === 'github-icon');
+      expect(githubCall).toBeDefined();
+
+      // X near right edge (GAME_W=1280, ICON_X=GAME_W-10=1270)
+      const [x] = githubCall as [number, number, string];
+      expect(x).toBeGreaterThanOrEqual(1260);
+      // Y near top edge (ICON_Y=10)
+      const [, y] = githubCall as [number, number, string];
+      expect(y).toBeLessThanOrEqual(10);
+    });
+
+    it('GitHub icon is interactive and opens GitHub URL on click', () => {
+      const mockOpen = vi.fn();
+      vi.stubGlobal('window', { open: mockOpen });
+
+      const mocks = injectMocks(scene);
+      scene.init({ games: [] });
+      scene.create();
+
+      // Find the github-icon image and check it was made interactive
+      const imageResults = mocks.add.image.mock.results as {
+        value: ReturnType<typeof mockImage>;
+      }[];
+      const imageCalls = mocks.add.image.mock.calls as unknown[][];
+      const githubIdx = imageCalls.findIndex((c) => c[2] === 'github-icon');
+      expect(githubIdx).not.toBe(-1);
+
+      const githubImage = imageResults[githubIdx].value;
+      expect(githubImage.setInteractive).toHaveBeenCalledWith({
+        useHandCursor: true,
+      });
+      expect(githubImage.on).toHaveBeenCalledWith(
+        'pointerdown',
+        expect.any(Function),
+      );
+
+      // Trigger pointerdown to verify URL opening
+      const pointerdownHandler = githubImage.on.mock.calls.find(
+        (c) => c[0] === 'pointerdown',
+      )![1] as Function;
+      pointerdownHandler();
+
+      expect(mockOpen).toHaveBeenCalledWith(
+        'https://github.com/TheWizardsCode/Tableau-Card-Engine',
+        '_blank',
+      );
+
+      vi.unstubAllGlobals();
+    });
+
+    it('GitHub icon is to the right and above the version label', () => {
+      const mocks = injectMocks(scene);
+      scene.init({ games: [] });
+      scene.create();
+
+      const imageCalls = mocks.add.image.mock.calls as unknown[][];
+      const githubCall = imageCalls.find((c) => c[2] === 'github-icon');
+
+      const textCalls = mocks.add.text.mock.calls as unknown[][];
+      const versionCall = textCalls.find((c) =>
+        typeof c[2] === 'string' && c[2].startsWith('v'),
+      );
+
+      expect(versionCall).toBeDefined();
+      expect(githubCall).toBeDefined();
+
+      const [_vx, _vy] = versionCall as [number, number, string];
+      const [gx, gy] = githubCall as [number, number, string];
+
+      // GitHub icon in top-right, version label in bottom-left
+      expect(gx).toBeGreaterThan(_vx); // icon is further right
+      expect(gy).toBeLessThan(_vy); // icon is higher up
+    });
+
+    it('includes hidden alt text for accessibility', () => {
+      const mocks = injectMocks(scene);
+      scene.init({ games: [] });
+      scene.create();
+
+      const textCalls = mocks.add.text.mock.calls as unknown[][];
+      const altCall = textCalls.find((c) =>
+        typeof c[2] === 'string' && c[2].includes('GitHub repository'),
+      );
+      expect(altCall).toBeDefined();
+    });
+
+    it('sets appropriate depth on GitHub icon', () => {
+      const mocks = injectMocks(scene);
+      scene.init({ games: [] });
+      scene.create();
+
+      const imageResults = mocks.add.image.mock.results as {
+        value: ReturnType<typeof mockImage>;
+      }[];
+      const imageCalls = mocks.add.image.mock.calls as unknown[][];
+      const githubIdx = imageCalls.findIndex((c) => c[2] === 'github-icon');
+      expect(githubIdx).not.toBe(-1);
+
+      const githubImage = imageResults[githubIdx].value;
+      expect(githubImage.setDepth).toHaveBeenCalledWith(800);
+      expect(githubImage.setOrigin).toHaveBeenCalledWith(1, 0);
+    });
+
+    it('does not set alpha (full opacity for white logo)', () => {
+      const mocks = injectMocks(scene);
+      scene.init({ games: [] });
+      scene.create();
+
+      const imageResults = mocks.add.image.mock.results as {
+        value: ReturnType<typeof mockImage>;
+      }[];
+      const imageCalls = mocks.add.image.mock.calls as unknown[][];
+      const githubIdx = imageCalls.findIndex((c) => c[2] === 'github-icon');
+      expect(githubIdx).not.toBe(-1);
+
+      const githubImage = imageResults[githubIdx].value;
+      expect(githubImage.setAlpha).not.toHaveBeenCalled();
     });
   });
 });

@@ -128,6 +128,21 @@ export class HelpButton {
     this.hitArea.disableInteractive();
   }
 
+  /**
+   * Returns the direct scene-level children of this HelpButton.
+   *
+   * Used by scenes that need to exclude HUD overlay objects from
+   * RenderTexture screenshots. The returned array contains the circle
+   * graphics, the "?" label, and the interactive hit zone — all of
+   * which are direct children of the scene's display list.
+   *
+   * @returns An array of Phaser GameObjects that are direct children
+   *          of the scene's display list (i.e., added via scene.add.*).
+   */
+  getSceneChildren(): Phaser.GameObjects.GameObject[] {
+    return [this.circle, this.label, this.hitArea];
+  }
+
   /** Clean up all game objects. */
   destroy(): void {
     if (this.destroyed) return;

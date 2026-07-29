@@ -40,6 +40,21 @@ export interface ResourceSnapshot {
 }
 
 /**
+ * A single entry in the economy mutation history, recording the state
+ * after a mutation was applied.
+ */
+export interface EconomyHistoryEntry {
+  /** Sequence number (1-based, increments with each recorded mutation). */
+  turn: number;
+  /** Coins after the mutation. */
+  coins: number;
+  /** Reputation after the mutation. */
+  reputation: number;
+  /** Score after the mutation. */
+  score: number;
+}
+
+/**
  * Optional constraints applied during `canApply` checks.
  * When omitted, `canApply` always returns true (matching Main Street's
  * baseline where negative balances are permitted and checked later).
@@ -104,6 +119,17 @@ export interface EconomyLedger {
    * independent resource rather than a derived computation).
    */
   setScore(value: number): void;
+
+  /**
+   * Returns the turn-by-turn history of economy snapshots recorded after
+   * each `apply()` and `setScore()` call.
+   *
+   * Each entry contains a sequence number (the `turn` field), the resource
+   * values at that point, in chronological order.
+   *
+   * @returns A read-only array of history entries.
+   */
+  getHistory(): ReadonlyArray<EconomyHistoryEntry>;
 }
 
 /**
@@ -131,6 +157,17 @@ export function createEconomyLedger(config: EconomyLedgerConfig = {}): EconomyLe
   let reputation = config.reputation ?? 0;
   let score = config.score ?? 0;
   const constraints = config.constraints ?? {};
+
+  /** Internal history log recording state after each mutation. */
+  const _history: EconomyHistoryEntry[] = [];
+  /** Step counter for history entries (1-based). */
+  let _step = 0;
+
+  /** Pushes a history entry with the current state. */
+  function recordEntry(): void {
+    _step++;
+    _history.push({ turn: _step, coins, reputation, score });
+  }
 
   return {
     get(resource: keyof ResourceDelta): number {
@@ -162,10 +199,16 @@ export function createEconomyLedger(config: EconomyLedgerConfig = {}): EconomyLe
       if (delta.coins !== undefined) coins += delta.coins;
       if (delta.reputation !== undefined) reputation += delta.reputation;
       if (delta.score !== undefined) score += delta.score;
+      recordEntry();
     },
 
     setScore(value: number): void {
       score = value;
+      recordEntry();
+    },
+
+    getHistory(): ReadonlyArray<EconomyHistoryEntry> {
+      return [..._history];
     },
   };
 }

@@ -224,10 +224,11 @@ export class GymAudioFeedbackScene extends GymSceneBase {
     const controlsAnchor = resolveAudioAnchor('controls', 'center');
     const y = controlsAnchor.y;
 
-    this.addButton(cx - 480, y, '[ Toggle Mute ]', () => this.toggleMute());
-    this.addButton(cx - 310, y, '[ Volume - ]', () => this.adjustVolume(-0.1));
-    this.addButton(cx - 170, y, '[ Volume + ]', () => this.adjustVolume(0.1));
-    this.addButton(cx - 20, y, '[ Invalid Key ]', () => this.playInvalid());
+    this.initButtonBar(y);
+    this.buttonBar!.addButton('[ Toggle Mute ]', () => this.toggleMute(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Volume - ]', () => this.adjustVolume(-0.1), { zone: 'center' });
+    this.buttonBar!.addButton('[ Volume + ]', () => this.adjustVolume(0.1), { zone: 'center' });
+    this.buttonBar!.addButton('[ Invalid Key ]', () => this.playInvalid(), { zone: 'center' });
 
     // ── Dynamic sound event buttons ─────────────────────
     // Auto-discover registered sound keys from SoundManager
@@ -247,20 +248,9 @@ export class GymAudioFeedbackScene extends GymSceneBase {
     const controls2Anchor = resolveAudioAnchor('controls2', 'center');
     const y2 = controls2Anchor.y;
 
-    // Spread sound event buttons across the full width starting from left margin
-    const LEFT_MARGIN = 40;
-    const soundEventCount = Object.entries(DEFAULT_EVENT_MAPPING).filter(
-      ([eventName, soundKey]) => {
-        const label = eventToButtonLabel[eventName];
-        if (!label) return false;
-        return Array.from(this.soundManager.keys()).includes(soundKey);
-      },
-    ).length;
-    const soundSpacing = (GAME_W - LEFT_MARGIN * 2) / Math.max(soundEventCount, 1);
-    let btnIndex = 0;
-
-    // Generate buttons for each event in DEFAULT_EVENT_MAPPING
-    // that has a corresponding label in eventToButtonLabel
+    // Dynamic sound event buttons (row 2) — grouped in a second button bar
+    // with left zone so buttons are left-aligned within the zone
+    this.initButtonBar(y2);
     for (const [eventName, soundKey] of Object.entries(DEFAULT_EVENT_MAPPING)) {
       const label = eventToButtonLabel[eventName];
       if (!label) continue; // Skip unmapped events
@@ -269,29 +259,23 @@ export class GymAudioFeedbackScene extends GymSceneBase {
       if (!keysFromManager.includes(soundKey)) continue; // Only if sound is registered
 
       const btnLabel = `[ ${label} ]`;
-      const xPos = LEFT_MARGIN + btnIndex * soundSpacing;
-      const btn = this.addButton(xPos, y2, btnLabel, () => this.emitEvent(eventName));
+      const btn = this.buttonBar!.addButton(btnLabel, () => this.emitEvent(eventName), { zone: 'left' });
       this.dynamicButtons.push(btn);
-      btnIndex++;
     }
 
     // ── Dynamic visual feedback buttons (row 3) ─────────
     const feedbackY = y2 + 28;
-    const feedbackSpacing = (GAME_W - LEFT_MARGIN * 2) / Math.max(FEEDBACK_TYPES.length, 1);
-    let feedbackIndex = 0;
-
+    this.initButtonBar(feedbackY);
     for (const ft of FEEDBACK_TYPES) {
       const btnLabel = `[ ${ft.label} ]`;
-      const xPos = LEFT_MARGIN + feedbackIndex * feedbackSpacing;
-      const btn = this.addButton(xPos, feedbackY, btnLabel, () => {
+      const btn = this.buttonBar!.addButton(btnLabel, () => {
         if (ft.label === 'Celebrate') {
           this.triggerCelebration();
         } else {
           this.triggerPopText();
         }
-      });
+      }, { zone: 'left' });
       this.dynamicButtons.push(btn);
-      feedbackIndex++;
     }
 
     // Log the auto-discovery

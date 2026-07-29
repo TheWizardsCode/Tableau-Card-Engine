@@ -2,9 +2,9 @@
  * Tests for dev server port conflict detection, stale lock file cleanup,
  * and crash resilience improvements.
  *
- * These tests verify the new functions in dev-server-utils.ts without
- * actually starting a real Vite dev server. They use mocks and temp
- * lock files to validate behaviour.
+ * These tests verify the cleanup functions in dev-server-utils.ts without
+ * actually starting a real Vite dev server. They use temp lock files
+ * and process signaling to validate behaviour.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -15,14 +15,14 @@ import { LOCK_FILE_PATH } from '../../scripts/dev-server-utils';
 
 // ── Helpers ─────────────────────────────────────────────────
 
-function createLockFile(pid: number, refCount: number): void {
+function createLockFile(pid: number): void {
   const dir = path.dirname(LOCK_FILE_PATH);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
   fs.writeFileSync(
     LOCK_FILE_PATH,
-    JSON.stringify({ pid, refCount }),
+    JSON.stringify({ pid }),
     'utf-8',
   );
 }
@@ -37,7 +37,7 @@ function removeLockFileDirectly(): void {
 
 // ── Tests ───────────────────────────────────────────────────
 
-describe('dev server port conflict detection', () => {
+describe('dev server stale lock file cleanup', () => {
   beforeEach(() => {
     removeLockFileDirectly();
   });
@@ -46,17 +46,25 @@ describe('dev server port conflict detection', () => {
     removeLockFileDirectly();
   });
 
-  it('detects a stale lock file when PID is not alive', () => {
+  it('detects a stale lock file when PID is not alive (high PID that does not exist)', () => {
     // Create a lock file with a PID that almost certainly doesn't exist
-    createLockFile(99999999, 1);
+    createLockFile(99999999);
     expect(fs.existsSync(LOCK_FILE_PATH)).toBe(true);
 
     // The PID won't be alive, so this simulates a stale lock
-    // We verify the lock file exists to be cleaned up later
+    const isAlive = (pid: number): boolean => {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    expect(isAlive(99999999)).toBe(false);
   });
 
   it('clears stale lock file on cleanup', () => {
-    createLockFile(99999999, 1);
+    createLockFile(99999999);
     expect(fs.existsSync(LOCK_FILE_PATH)).toBe(true);
 
     // Simulate stale cleanup
@@ -67,7 +75,7 @@ describe('dev server port conflict detection', () => {
   it('preserves valid lock file for an alive PID (self-test)', () => {
     // Use current process PID which is alive
     const currentPid = process.pid;
-    createLockFile(currentPid, 1);
+    createLockFile(currentPid);
     expect(fs.existsSync(LOCK_FILE_PATH)).toBe(true);
 
     // Verify the PID is alive (process.kill with signal 0)
@@ -88,11 +96,13 @@ describe('dev server port conflict detection', () => {
     removeLockFileDirectly();
   });
 
-  it('detects lock file with refCount of zero for cleanup', () => {
-    createLockFile(12345, 0);
+  it('detects lock file with missing refCount (simplified format)', () => {
+    createLockFile(12345);
     const raw = fs.readFileSync(LOCK_FILE_PATH, 'utf-8');
     const lock = JSON.parse(raw);
-    expect(lock.refCount).toBe(0);
+    expect(lock.pid).toBe(12345);
+    // New simplified format has no refCount
+    expect(lock.refCount).toBeUndefined();
   });
 });
 
@@ -107,11 +117,10 @@ describe('dev server crash resilience', () => {
 
   it('handles stale lock file from previously crashed server', () => {
     // Simulate: previous server crashed, leaving a lock file with a dead PID
-    createLockFile(99999998, 3); // refCount 3 — consumers didn't clean up
+    createLockFile(99999998);
     expect(fs.existsSync(LOCK_FILE_PATH)).toBe(true);
 
     // On next startup, the stale lock should be detected and cleaned
-    // (PID 99999998 won't be alive)
     const lock = JSON.parse(fs.readFileSync(LOCK_FILE_PATH, 'utf-8'));
     const isAlive = (pid: number): boolean => {
       try {
@@ -128,7 +137,7 @@ describe('dev server crash resilience', () => {
     expect(fs.existsSync(LOCK_FILE_PATH)).toBe(false);
   });
 
-  it('handles multiple stale lock files gracefully', () => {
+  it('handles multiple stale lock file cleanups gracefully', () => {
     // Just test that our cleanup doesn't throw on repeated calls
     removeLockFileDirectly();
     removeLockFileDirectly();
@@ -136,7 +145,7 @@ describe('dev server crash resilience', () => {
     expect(fs.existsSync(LOCK_FILE_PATH)).toBe(false);
   });
 
-  it('schedules cleanup on process exit signals', () => {
+  it('schedules cleanup handlers on process exit signals', () => {
     // Test that process.on('SIGTERM') and process.on('SIGINT') handlers
     // are installed by capturing listener registrations
     const sigtermListeners = process.listeners('SIGTERM');
@@ -166,19 +175,19 @@ describe('tmp directory management', () => {
     const uniqueDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-server-cleanup-test-'));
     const uniqueLockPath = path.join(uniqueDir, 'dev-server-lock.json');
 
-    function createLockInDir(pid: number, refCount: number): void {
+    function createLockInDir(pid: number): void {
       const dir = path.dirname(uniqueLockPath);
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
       }
       fs.writeFileSync(
         uniqueLockPath,
-        JSON.stringify({ pid, refCount }),
+        JSON.stringify({ pid }),
         'utf-8',
       );
     }
 
-    createLockInDir(12345, 1);
+    createLockInDir(12345);
     expect(fs.existsSync(uniqueDir)).toBe(true);
     expect(fs.existsSync(uniqueLockPath)).toBe(true);
 
@@ -191,19 +200,19 @@ describe('tmp directory management', () => {
     const uniqueDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-server-cleanup-test-'));
     const uniqueLockPath = path.join(uniqueDir, 'dev-server-lock.json');
 
-    function createLockInDir(pid: number, refCount: number): void {
+    function createLockInDir(pid: number): void {
       const dir = path.dirname(uniqueLockPath);
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
       }
       fs.writeFileSync(
         uniqueLockPath,
-        JSON.stringify({ pid, refCount }),
+        JSON.stringify({ pid }),
         'utf-8',
       );
     }
 
-    createLockInDir(12345, 1);
+    createLockInDir(12345);
     expect(fs.existsSync(uniqueDir)).toBe(true);
     expect(fs.existsSync(uniqueLockPath)).toBe(true);
 
@@ -212,12 +221,13 @@ describe('tmp directory management', () => {
     expect(fs.existsSync(uniqueDir)).toBe(false);
 
     // Should be able to write a new lock file
-    createLockInDir(54321, 2);
+    createLockInDir(54321);
     expect(fs.existsSync(uniqueDir)).toBe(true);
     expect(fs.existsSync(uniqueLockPath)).toBe(true);
     const lock = JSON.parse(fs.readFileSync(uniqueLockPath, 'utf-8'));
     expect(lock.pid).toBe(54321);
-    expect(lock.refCount).toBe(2);
+    // No refCount in simplified format
+    expect(lock.refCount).toBeUndefined();
 
     // Cleanup
     try { fs.rmSync(uniqueDir, { recursive: true, force: true }); } catch {}

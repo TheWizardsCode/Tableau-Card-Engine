@@ -249,13 +249,15 @@ export class GymAiStrategyScene extends GymSceneBase {
     }
 
     // Make a Pick button
-    this.addButton(cx - 120, startY + 90, '[ Make a Pick ]', () => {
+    this.initButtonBar(startY + 90);
+    this.buttonBar!.addButton('[ Make a Pick ]', () => {
       this.makePick();
-    });
+    }, { zone: 'center' });
 
     // ── Section: pickRandom & pickBest ────────────────────
 
     const utilsY = startY + 130;
+    this.initButtonBar(utilsY + 46);
 
     this.addLabel(cx, utilsY, '── pickRandom & pickBest Demo ──', {
       fontSize: '14px',
@@ -281,16 +283,16 @@ export class GymAiStrategyScene extends GymSceneBase {
     );
 
     // Buttons row
-    this.addButton(cx - 320, utilsY + 46, '[ Run pickRandom ]', () => {
+    this.buttonBar!.addButton('[ Run pickRandom ]', () => {
       this.runPickRandom();
-    });
-    this.addButton(cx - 120, utilsY + 46, '[ Run pickBest ]', () => {
+    }, { zone: 'center' });
+    this.buttonBar!.addButton('[ Run pickBest ]', () => {
       this.runPickBest();
-    });
-    this.addButton(cx + 80, utilsY + 46, '[ Run Both ]', () => {
+    }, { zone: 'center' });
+    this.buttonBar!.addButton('[ Run Both ]', () => {
       this.runPickRandom();
       this.runPickBest();
-    });
+    }, { zone: 'center' });
 
     // ── Section: Seed Management ──────────────────────────
 
@@ -310,18 +312,16 @@ export class GymAiStrategyScene extends GymSceneBase {
       { fontSize: '16px' },
     ).setOrigin(0.5);
 
-    this.addButton(cx - 260, seedY + 46, '[ -1 ]', () => this.adjustSeed(-1), {
-      fontSize: '12px',
-    });
-    this.addButton(cx - 210, seedY + 46, '[ +1 ]', () => this.adjustSeed(1), {
-      fontSize: '12px',
-    });
-    this.addButton(cx - 100, seedY + 46, '[ Re-roll Seed ]', () => {
+    // Re-init button bar for seed management section
+    this.initButtonBar(seedY + 46);
+    this.buttonBar!.addButton('[ -1 ]', () => this.adjustSeed(-1), { zone: 'center', fontSize: '12px' });
+    this.buttonBar!.addButton('[ +1 ]', () => this.adjustSeed(1), { zone: 'center', fontSize: '12px' });
+    this.buttonBar!.addButton('[ Re-roll Seed ]', () => {
       this.setSeed(Math.floor(Math.random() * 100000));
-    }, { fontSize: '12px' });
-    this.addButton(cx + 80, seedY + 46, '[ Reset Seed to 42 ]', () => {
+    }, { zone: 'center', fontSize: '12px' });
+    this.buttonBar!.addButton('[ Reset Seed to 42 ]', () => {
       this.setSeed(DEFAULT_SEED);
-    }, { fontSize: '12px' });
+    }, { zone: 'center', fontSize: '12px' });
 
     // ── Event log ───────────────────────────────────────────
 

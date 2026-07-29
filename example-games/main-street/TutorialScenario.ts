@@ -29,12 +29,13 @@
  * |------|----------------------------|----------|-----------|---------|
  * | T1   | Start (Easy, 12 coins)     | 12       | 0         | 12      |
  * | T2   | Confirm (no cost)          | 0        | 0         | 12      |
- * | T3   | Buy Laundromat ($6)        | 0        | 6         | 6       |
- * | T4   | Place business (free)      | 0        | 0         | 6       |
- * | T5   | Confirm (no cost)          | 0        | 0         | 6       |
- * | T6   | End Turn + income (~1 coin)| 1        | 0         | 7       |
- * | T7   | Buy event ($3)             | 0        | 3         | 4       |
- * | T8+  | Confirm steps (no cost)    | 0        | 0         | ≥5      |
+ * | T3   | Buy Laundromat ($4)        | 0        | 4         | 8       |
+ * | T4   | Place business (free)      | 0        | 0         | 8       |
+ * | T5   | Confirm (no cost)          | 0        | 0         | 8       |
+ * | T6   | End Turn + income (~1 coin)| 1        | 0         | 9       |
+ * | T7   | Buy Local Festival ($3)    | 0        | 3         | 6       |
+ * | T8   | Buy Bookshop ($3) + auto-place | 0     | 3         | 3       |
+ * | T9+  | Confirm steps (no cost)    | 0        | 0         | ≥3      |
  *
  * @module
  */
@@ -107,10 +108,10 @@ export interface TutorialScenario {
  * All card IDs reference Tier-1 pool cards. The market is set up so that:
  *
  * **Development Row (4 slots):**
- *   - `biz-bakery` (Bakery, $6, Food)
- *   - `biz-laundromat` (Laundromat, $6, Service) — T3 purchase target
- *   - `cs-park` (Park, $4, Culture)
- *   - `biz-hardware` (Hardware Store, $10, Commerce)
+ *   - `biz-bakery` (Bakery, $3, Food)
+ *   - `biz-laundromat` (Laundromat, $4, Service) — T3 purchase target
+ *   - `cs-park` (Park, $3, Culture)
+ *   - `biz-bookshop` (Bookshop, $3, Culture) — T8 purchase target
  *
  * **Investments Row (3 slots: 2 upgrades + 1 investment event):**
  *   - `upg-patisserie` (Upgrade to Patisserie, $4, targets Bakery)
@@ -121,8 +122,8 @@ export interface TutorialScenario {
  *   - `evt-award` (Community Award, +2 reputation)
  *   - `evt-rainy` (Rainy Day, -1 coin per Food business)
  *
- * **Coin Budget:** 12 starting (Easy), $6 Laundromat, $3 Local Festival,
- * remaining ≥3 coins after both purchases. RNG-independent.
+ * **Coin Budget:** 12 starting (Easy), $4 Laundromat (T3), $3 Local Festival (T7),
+ * $3 Bookshop (T8), remaining ≥2 coins. RNG-independent.
  */
 export const STANDARD_TUTORIAL_SCENARIO: TutorialScenario = {
   difficulty: 'Easy',
@@ -132,7 +133,7 @@ export const STANDARD_TUTORIAL_SCENARIO: TutorialScenario = {
       'biz-bakery',
       'biz-laundromat',
       'cs-park',
-      'biz-hardware',
+      'biz-bookshop',
     ],
     investments: [
       'upg-patisserie',

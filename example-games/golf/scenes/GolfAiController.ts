@@ -10,10 +10,12 @@ import {
   createAiVisiblePlayerState,
 } from '../GolfGame';
 import type { AiPlayer } from '../AiStrategy';
+import { countVisibleRanks } from '../AiStrategy';
 import type { TranscriptRecorder } from '../GameTranscript';
 import type { GameEventEmitter } from '../../../src/core-engine';
 import type { TurnPhase } from './GolfConstants';
 import type { PhaseManager } from '../../../src/ui';
+import { AiDecisionRecorder } from '../../../src/ui/debug/AiDecisionRecorder';
 import type { GolfSession } from '../GolfGame';
 import { AI_DELAY, AI_SHOW_DRAW_DELAY, SWAP_ANIM_DURATION } from './GolfConstants';
 
@@ -67,6 +69,15 @@ export class GolfAiController {
       // Phase 1: AI chooses draw source without peeking at stock
       const drawSource = this.aiPlayer.chooseDrawSource(aiPlayer, aiShared);
 
+      // Record draw source decision
+      AiDecisionRecorder.getInstance().record({
+        turnNumber: this.session.gameState.turnNumber,
+        playerName: this.session.gameState.players[idx].name,
+        strategyName: this.aiPlayer.strategyName,
+        chosenAction: `draw from ${drawSource}`,
+        timestamp: new Date().toISOString(),
+      });
+
       // Scene performs the actual draw from raw game state
       let drawnCard: Card;
       if (drawSource === 'stock') {
@@ -101,8 +112,25 @@ export class GolfAiController {
       });
 
       // Phase 2: AI sees the drawn card and chooses the best move
-      const aiGridForMove = createAiVisiblePlayerState(ps).grid;
-      const move = this.aiPlayer.chooseMoveForCard(aiGridForMove, drawnCard);
+      const aiGridForMove = aiPlayer.grid;
+      // Compute visible rank counts for column-feasibility weighting,
+      // consistent with Phase 1's chooseDrawSource reasoning.
+      const visibleRanks = countVisibleRanks(aiPlayer, aiShared);
+      const move = this.aiPlayer.chooseMoveForCard(
+        aiGridForMove, drawnCard, visibleRanks,
+      );
+
+      // Record move decision
+      const moveDesc = move.kind === 'swap'
+        ? `swap ${drawnCard.rank}${drawnCard.suit[0]} into (r${move.row},c${move.col})`
+        : `discard-and-flip at (r${move.row},c${move.col})`;
+      AiDecisionRecorder.getInstance().record({
+        turnNumber: this.session.gameState.turnNumber,
+        playerName: this.session.gameState.players[idx].name,
+        strategyName: this.aiPlayer.strategyName,
+        chosenAction: moveDesc,
+        timestamp: new Date().toISOString(),
+      });
 
       const action: GolfAction = { drawSource, move };
 

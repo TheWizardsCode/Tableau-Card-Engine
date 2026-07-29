@@ -322,18 +322,21 @@ export class GymSllScene extends GymSceneBase {
 
   private createControlRow(): void {
     const y1 = 58;
-    const y2 = 82;
-    this.profileButton = this.addButton(28, y1, '[ Profile ]', () => this.cycleProfile(), {
+    this.initButtonBar(y1, { rowSpacing: 24 });
+    this.profileButton = this.buttonBar!.addButton('[ Profile ]', () => this.cycleProfile(), {
+      zone: 'left',
       fontSize: '13px',
       color: '#88ddff',
     });
 
-    this.overlayButton = this.addButton(28, y2, '[ Overlay: OFF ]', () => this.toggleOverlay(), {
+    this.overlayButton = this.buttonBar!.addButton('[ Overlay: OFF ]', () => this.toggleOverlay(), {
+      zone: 'left',
       fontSize: '13px',
       color: '#ffee99',
     });
 
-    this.shellToggleButton = this.addButton(320, y2, `[ Toggle Shell: ${this.shellVisible ? 'ON' : 'OFF'} ]`, () => this.toggleShell(), {
+    this.shellToggleButton = this.buttonBar!.addButton(`[ Toggle Shell: ${this.shellVisible ? 'ON' : 'OFF'} ]`, () => this.toggleShell(), {
+      zone: 'left',
       fontSize: '13px',
       color: '#ffcc88',
     });

@@ -64,8 +64,10 @@ tableau-card-engine/
 The engine provides a reusable HUD component library under `src/ui/` that
 standardises overlay, sidebar, and button UI across all example games.
 Components include HelpPanel, SettingsPanel, OverlayManager, Parameterized
-Overlay, CardGameScene base class with initHelpPanel/initSettingsPanel
-helpers, and depth conventions for consistent layering.
+Overlay, GymButtonBar (reusable button bar with left/center/right zones
+and automatic row wrapping), CardGameScene base class with
+initHelpPanel/initSettingsPanel helpers, and depth conventions for
+consistent layering.
 
 See [Shared HUD Components](docs/DEVELOPER.md#shared-hud-components) in the
 Developer Guide for full documentation and usage examples.
@@ -89,7 +91,7 @@ Developer Guide for full documentation and usage examples.
 | Sushi Go! | `example-games/sushi-go/` | Card drafting game (human vs. AI). Pick and pass hands over 3 rounds, collect sets of sushi dishes, and score the most points |
 | Feudalism | `example-games/feudalism/` | Engine-building card game (human vs. AI). Collect gem tokens, purchase development cards for bonuses, attract nobles, and reach 15 prestige to win. Checkpoint autosaves after each turn (human + AI) with startup recovery |
 | Lost Cities | `example-games/lost-cities/` | Two-player expedition card game (human vs. AI). Bet on up to 5 colored expeditions across a 3-round match with investment multipliers, ascending-play rules, and cumulative scoring |
-| Main Street | `example-games/main-street/` | Single-player tableau builder. Buy businesses/upgrades/events, place businesses on a 10-slot street rendered as a responsive 2x5 grid, and optimize score over 20 turns. **Multi-Use Card Economy**: cards can be held in hand for synergy bonuses; staff cards expand hand capacity with ongoing costs. Market cycles each turn. Tutorial overlay zones are defined in a separate SLL layout file (`main-street-tutorial.layout.json`) composed with the base layout. |
+| Main Street | `example-games/main-street/` | Single-player tableau builder. Buy businesses/upgrades/events, place businesses on a 10-slot street rendered as a responsive 2x5 grid, and optimize score over 20 turns. **Multi-Use Card Economy**: cards can be held in hand for synergy bonuses; staff cards expand hand capacity with ongoing costs. Market cycles each turn. Tutorial overlay zones are defined in a separate SLL layout file (`main-street-tutorial.layout.json`) composed with the base layout. Balance analysis tools are specified in the [Balance Process & Tooling PRD](docs/main-street/prd-balance-process-and-tooling.md). |
 | Scenario: Tutorial | `example-games/main-street/scenes/MainStreetTutorialScene.ts` | Guided introduction to Main Street. Non-interactive tutorial overlays walk through the market, street placement, synergies, events, and scoring. Easy difficulty, 25 turns. Accessible from the Game Selector. |
 
 More games are planned: Coloretto.
@@ -129,6 +131,12 @@ Main Street can optionally route mapped SFX keys through a ToneForge-backed modu
 4. **Asset licensing** -- all assets must be CC0, MIT, Apache 2.0, or similarly permissive. Document attribution in `public/assets/CREDITS.md`.
 
 For detailed development guidance, see [`docs/DEVELOPER.md`](docs/DEVELOPER.md).
+
+## Main Street Balance Documentation
+
+- **[Balance Process & Tooling PRD](docs/main-street/prd-balance-process-and-tooling.md)** — Comprehensive specification for game balance review process, micro/macro metrics, CLI tools, baseline management, and implementation roadmap.
+- **[Balancing Methodology](docs/main-street/balancing-methodology.md)** — Technical description of the `run-balance-cards` balancing algorithm.
+- **[Monte Carlo Sample Results](docs/main-street/monte-carlo-sample-results.md)** — Example output from the Monte Carlo balance simulation harness.
 
 ## AI Assisted Development
 

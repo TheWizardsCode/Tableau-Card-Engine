@@ -165,8 +165,8 @@ describe('Meta-Progression System', () => {
       }
     });
 
-    it('Tier 5 cumulative pool covers full catalog (83 templates)', () => {
-      expect(TIER_DEFINITIONS['tier-5'].cumulativeCardIds).toHaveLength(83);
+    it('Tier 5 cumulative pool covers full catalog (84 templates)', () => {
+      expect(TIER_DEFINITIONS['tier-5'].cumulativeCardIds).toHaveLength(84);
     });
 
     it('cumulative card IDs are actually cumulative', () => {
@@ -689,7 +689,7 @@ describe('Meta-Progression System', () => {
       }
     });
 
-    it('Tier 5 pool yields all 81 unique template IDs across all deck builders', () => {
+    it('Tier 5 pool yields all 82 unique template IDs across all deck builders', () => {
       const tier5CardIds = TIER_DEFINITIONS['tier-5'].cumulativeCardIds;
 
       const bizDeck = createBusinessDeck(1, tier5CardIds);
@@ -702,7 +702,7 @@ describe('Meta-Progression System', () => {
         ...upgDeck.map((c) => c.id.replace(/-\d+$/, '')),
       ]);
 
-      expect(allBaseIds.size).toBe(81);
+      expect(allBaseIds.size).toBe(82);
     });
   });
 
@@ -1066,9 +1066,9 @@ describe('Meta-Progression System', () => {
       expect(ids).toHaveLength(30); // 20 + 10
     });
 
-    it('returns all 83 cards for all 5 tiers', () => {
+    it('returns all 84 cards for all 5 tiers', () => {
       const ids = deriveUnlockedCardIds(['tier-1', 'tier-2', 'tier-3', 'tier-4', 'tier-5']);
-      expect(ids).toHaveLength(83);
+      expect(ids).toHaveLength(84);
     });
 
     it('handles empty array', () => {

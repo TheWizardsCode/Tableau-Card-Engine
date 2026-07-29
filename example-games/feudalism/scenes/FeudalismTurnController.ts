@@ -23,6 +23,13 @@ export interface TurnControllerCallbacks {
   onEmitGameEnded: (winnerIdx: number) => void;
   /** Cache a patron to keep it visible in the patron column during animation. */
   onSetPatronAnimationCache: (patron: PatronTile | null, index: number) => void;
+  /**
+   * Mark market slots that are about to be refilled so they render as
+   * empty during the refill animation. Cleared by onClearPendingRefillSlots.
+   */
+  onSetPendingRefillSlots: (slots: { tier: Tier; col: number }[]) => void;
+  /** Clear all pending refill slot flags before a re-render. */
+  onClearPendingRefillSlots: () => void;
   /** Callback after each complete turn (human or AI) to save a checkpoint. */
   onSaveCheckpoint?: () => void;
 }
@@ -127,11 +134,6 @@ export class FeudalismTurnController {
     try {
       const result = executeTurn(this.session, action);
 
-      if (result.patronVisit) {
-        this.callbacks.onPlaySound(SFX_KEYS.PATRON_VISIT);
-        this.callbacks.onShowToast('Patron visits you! +3 influence');
-      }
-
       if (result.tokensOverLimit > 0) {
         this.pendingPlayerIndex = playerIndex;
         this.pendingAction = action;
@@ -143,9 +145,11 @@ export class FeudalismTurnController {
 
       this.recorder?.recordTurn(playerIndex, action, result, null);
 
+      const patronVisits = result.patronVisits;
+      const firstPatron = patronVisits.length > 0 ? patronVisits[0] : null;
       let patronSourceIndex = -1;
-      if (result.patronVisit) {
-        patronSourceIndex = patronsBefore.indexOf(result.patronVisit.id);
+      if (firstPatron) {
+        patronSourceIndex = patronsBefore.indexOf(firstPatron.id);
       }
 
       if (action.type === 'reserve' && action.cardId == null && !card) {
@@ -159,18 +163,37 @@ export class FeudalismTurnController {
           : this.animator.getPlayerReserveDest(playerIndex);
 
         // Cache the patron so refreshPatrons keeps it visible during animation
-        if (result.patronVisit) {
-          this.callbacks.onSetPatronAnimationCache(result.patronVisit, patronSourceIndex);
+        if (firstPatron) {
+          this.callbacks.onSetPatronAnimationCache(firstPatron, patronSourceIndex);
+        }
+
+        // Mark the market slot as pending refill so it renders as empty
+        // during the deck-back fly-in animation. Cleared in onRefreshMarket.
+        if (marketSlot) {
+          this.callbacks.onSetPendingRefillSlots([marketSlot]);
         }
 
         this.setPhase('animating');
-        this.callbacks.onRefreshAll();
+
+        // Defer sound and toast to coincide with animation start
+        if (patronVisits.length > 0) {
+          this.callbacks.onPlaySound(SFX_KEYS.PATRON_VISIT);
+          const count = patronVisits.length;
+          this.callbacks.onShowToast(
+            count === 1
+              ? 'Patron visits you! +3 influence'
+              : `${count} patrons visit you! +3 influence each`,
+          );
+        }
 
         this.animator.playCardAnimation(
-          sourcePos, destPos, card, marketSlot, result.patronVisit,
+          sourcePos, destPos, card, marketSlot, patronVisits,
           patronSourceIndex, playerIndex,
           () => this.afterTurnComplete(result),
-          () => this.callbacks.onRefreshAll(),
+          () => {
+            this.callbacks.onClearPendingRefillSlots();
+            this.callbacks.onRefreshAll();
+          },
           () => {
             // Clear cache before patron fly animation starts so the static
             // patron tile is removed from the Patrons section, leaving only
@@ -290,13 +313,11 @@ export class FeudalismTurnController {
 
         this.recorder?.recordTurn(aiIndex, action, result, tokenDiscard);
 
-        if (result.patronVisit) {
-          this.callbacks.onShowToast('AI earns a patron visit! +3 influence');
-        }
-
+        const patronVisits = result.patronVisits;
+        const firstPatron = patronVisits.length > 0 ? patronVisits[0] : null;
         let patronSourceIndex = -1;
-        if (result.patronVisit) {
-          patronSourceIndex = patronsBefore.indexOf(result.patronVisit.id);
+        if (firstPatron) {
+          patronSourceIndex = patronsBefore.indexOf(firstPatron.id);
         }
 
         if (action.type === 'reserve' && action.cardId == null && !card) {
@@ -328,16 +349,33 @@ export class FeudalismTurnController {
             : this.animator.getPlayerReserveDest(aiIndex);
 
           // Cache the patron so refreshPatrons keeps it visible during animation
-          if (result.patronVisit) {
-            this.callbacks.onSetPatronAnimationCache(result.patronVisit, patronSourceIndex);
+          if (firstPatron) {
+            this.callbacks.onSetPatronAnimationCache(firstPatron, patronSourceIndex);
           }
 
-          this.callbacks.onRefreshAll();
+          // Mark the market slot as pending refill so it renders as empty
+          // during the deck-back fly-in animation. Cleared in onRefreshMarket.
+          if (marketSlot) {
+            this.callbacks.onSetPendingRefillSlots([marketSlot]);
+          }
+
+          // Defer toast to coincide with animation start
+          if (patronVisits.length > 0) {
+            const count = patronVisits.length;
+            this.callbacks.onShowToast(
+              count === 1
+                ? 'AI earns a patron visit! +3 influence'
+                : `AI earns ${count} patron visits! +3 influence each`,
+            );
+          }
 
           this.animator.playCardAnimation(
-            sourcePos, destPos, card, marketSlot, result.patronVisit,
+            sourcePos, destPos, card, marketSlot, patronVisits,
             patronSourceIndex, aiIndex, afterAnim,
-            () => this.callbacks.onRefreshAll(),
+            () => {
+              this.callbacks.onClearPendingRefillSlots();
+              this.callbacks.onRefreshAll();
+            },
             () => {
               // Clear cache before patron fly animation starts so the static
               // patron tile is removed from the Patrons section, leaving only

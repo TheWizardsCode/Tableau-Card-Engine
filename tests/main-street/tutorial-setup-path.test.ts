@@ -198,21 +198,21 @@ describe('AC2: TUTORIAL_SEED is deprecated and not used in tutorial setup path',
 // ── AC3: All 13 tutorial steps complete with scenario setup ──
 
 describe('AC3: All 13 tutorial steps complete with scenario-based setup', () => {
-  it('UNIFIED_TUTORIAL_STEPS contains exactly 13 steps (T1-T13)', () => {
-    expect(UNIFIED_TUTORIAL_STEPS.length).toBe(13);
-    expect(UNIFIED_TUTORIAL_STEP_COUNT).toBe(13);
+  it('UNIFIED_TUTORIAL_STEPS contains exactly 14 steps (T1-T14)', () => {
+    expect(UNIFIED_TUTORIAL_STEPS.length).toBe(14);
+    expect(UNIFIED_TUTORIAL_STEP_COUNT).toBe(14);
 
-    for (let i = 0; i < 13; i++) {
+    for (let i = 0; i < 14; i++) {
       expect(UNIFIED_TUTORIAL_STEPS[i].id).toBe(`T${i + 1}`);
     }
   });
 
-  it('tutorial controller walks through all 13 steps via completeCurrentStep', () => {
+  it('tutorial controller walks through all 14 steps via completeCurrentStep', () => {
     let controller = startTutorial(createTutorialControllerState());
 
-    // Walk through all 13 steps
+    // Walk through all 14 steps
     const completedIds: string[] = [];
-    for (let i = 0; i < 13; i++) {
+    for (let i = 0; i < 14; i++) {
       expect(controller.isActive).toBe(true);
       const currentStep = getCurrentStep(controller);
       expect(currentStep).toBeDefined();
@@ -223,15 +223,15 @@ describe('AC3: All 13 tutorial steps complete with scenario-based setup', () => 
       controller = result.newState;
     }
 
-    // Verify all 13 steps were completed in order
+    // Verify all 14 steps were completed in order
     expect(completedIds).toEqual([
-      'T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7',
-      'T8', 'T9', 'T10', 'T11', 'T12', 'T13',
+      'T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8',
+      'T9', 'T10', 'T11', 'T12', 'T13', 'T14',
     ]);
 
-    // After the 13th step completes, the controller has advanced past the end
-    expect(controller.lastCompletedStepId).toBe('T13');
-    expect(controller.currentStepIndex).toBe(13); // Past the end
+    // After the 14th step completes, the controller has advanced past the end
+    expect(controller.lastCompletedStepId).toBe('T14');
+    expect(controller.currentStepIndex).toBe(14); // Past the end
     // isActive stays true (only exitTutorial sets it to false)
     // Verify the controller is at end by checking getCurrentStep returns null
     const afterComplete = getCurrentStep(controller);
@@ -281,7 +281,7 @@ describe('AC3: All 13 tutorial steps complete with scenario-based setup', () => 
     expect(invTemplateIds).toContain(stripSerialSuffix(invEvent!.id));
   });
 
-  it('scenario state provides sufficient coins for T3 (buy Laundromat $6) and T7 (buy event $2)', () => {
+  it('scenario state provides sufficient coins for T3 (buy Laundromat $6), T7 (buy event $3), and T8 (buy Florist $4)', () => {
     const state = createTutorialScenario();
 
     // Starting coins: 12 (Easy)
@@ -297,6 +297,13 @@ describe('AC3: All 13 tutorial steps complete with scenario-based setup', () => 
 
     // Should be enough for a $3 event (Local Festival)
     expect(afterIncome).toBeGreaterThanOrEqual(3);
+
+    // After buying Local Festival ($3): 4 coins remaining
+    const afterFestival = afterIncome - 3;
+    expect(afterFestival).toBe(4);
+
+    // Should be enough for a $4 Florist
+    expect(afterFestival).toBeGreaterThanOrEqual(4);
   });
 });
 

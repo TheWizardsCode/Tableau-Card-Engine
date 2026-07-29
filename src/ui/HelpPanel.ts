@@ -144,6 +144,31 @@ export class HelpPanel {
     return this._helpButton;
   }
 
+  /**
+   * Returns the direct scene-level children of this HelpPanel.
+   *
+   * Used by scenes that need to exclude HUD overlay objects from
+   * RenderTexture screenshots. The returned array contains all
+   * Phaser GameObjects that were added directly to the scene's
+   * display list (i.e., via scene.add.*) rather than parented into
+   * the internal container.
+   *
+   * The panel Container holds the background, close button, content,
+   * track bar, and scroll-masked children. The maskGraphics (a white,
+   * invisible Geometry Mask rectangle) and the inputBlocker (a
+   * full-screen transparent input barrier) are added directly to the
+   * scene, so they must also be included here for correct exclusion.
+   *
+   * @returns An array of Phaser GameObjects that are direct children
+   *          of the scene's display list.
+   */
+  getSceneChildren(): Phaser.GameObjects.GameObject[] {
+    const children: Phaser.GameObjects.GameObject[] = [this.container];
+    if (this.maskGraphics) children.push(this.maskGraphics);
+    if (this.inputBlocker) children.push(this.inputBlocker);
+    return children;
+  }
+
   constructor(scene: Phaser.Scene, config: HelpPanelConfig) {
     this.scene = scene;
     const showButton = config.showButton ?? true;

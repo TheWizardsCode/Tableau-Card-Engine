@@ -68,8 +68,6 @@ export class GymGraphicsShaderSpikeScene extends GymSceneBase {
   private tintColorIndex = 0;
   private eventLog: string[] = [];
   private eventLogResult!: EventLogResult;
-  private shaderAttempted = false;
-  private shaderResult = '';
   private statusLineText!: Phaser.GameObjects.Text;
 
   constructor() {
@@ -131,7 +129,7 @@ export class GymGraphicsShaderSpikeScene extends GymSceneBase {
       },
       {
         heading: 'Controls',
-        body: '[ Next Tint ]: Cycle through tint colours — None, Red, Green, Blue, Gold, Purple. Tint is applied to all three sample sprites simultaneously.\n[ Next Blend ]: Cycle through blend modes — NORMAL, ADD, MULTIPLY, SCREEN. Blend mode applies to all sprites.\n[ Reset Tint ]: Remove all tinting from sprites (reset to white/none).\n[ Attempt Shader ]: Try to detect WebGL support and compile a minimal fragment shader. Logs the result — whether shaders are feasible in this environment.'
+        body: '[ Next Tint ]: Cycle through tint colours — None, Red, Green, Blue, Gold, Purple. Tint is applied to all three sample sprites simultaneously.\n[ Next Blend ]: Cycle through blend modes — NORMAL, ADD, MULTIPLY, SCREEN. Blend mode applies to all sprites.\n[ Reset Tint ]: Remove all tinting from sprites (reset to white/none).'
       },
       {
         heading: 'Usage Example',
@@ -139,7 +137,7 @@ export class GymGraphicsShaderSpikeScene extends GymSceneBase {
       },
       {
         heading: 'Test Plan',
-        body: '1. Press [ Next Tint ] six times → cycles through all 6 tint colours, status line updates\n2. Press [ Next Blend ] four times → cycles through all 4 blend modes, status line updates\n3. Press [ Reset Tint ] → all sprites return to white/none\n4. Press [ Attempt Shader ] → event log records whether shader compilation succeeded or a fallback was used\n5. Verify status line shows current blend mode and tint colour correctly'
+        body: '1. Press [ Next Tint ] six times → cycles through all 6 tint colours, status line updates\n2. Press [ Next Blend ] four times → cycles through all 4 blend modes, status line updates\n3. Press [ Reset Tint ] → all sprites return to white/none\n4. Verify status line shows current blend mode and tint colour correctly'
       }
     ]);
 
@@ -150,11 +148,10 @@ export class GymGraphicsShaderSpikeScene extends GymSceneBase {
     const logAnchor = resolveShaderAnchor('log', 'center');
     const y = controlsAnchor.y;
 
-    this.addButton(cx - 400, y, '[ Next Tint ]', () => this.cycleTint());
-    this.addButton(cx - 240, y, '[ Next Blend ]', () => this.cycleBlendMode());
-    this.addButton(cx - 60, y, '[ Reset Tint ]', () => this.resetTint());
-    this.addButton(cx + 120, y, '[ Attempt Shader ]', () => this.attemptShader());
-
+    this.initButtonBar(y);
+    this.buttonBar!.addButton('[ Next Tint ]', () => this.cycleTint(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Next Blend ]', () => this.cycleBlendMode(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Reset Tint ]', () => this.resetTint(), { zone: 'center' });
     this.statusLineText = createHudText(this, cx, statusAnchor.y, 'Blend: NORMAL | Tint: None', '#88ff88', { fontSize: '12px' }).setOrigin(0.5);
 
     // Create sample sprites at content anchor Y
@@ -219,35 +216,6 @@ export class GymGraphicsShaderSpikeScene extends GymSceneBase {
     const modeName = BLEND_MODES[this.blendModeIndex];
     const tint = TINT_COLORS[this.tintColorIndex];
     this.statusLineText.setText(`Blend: ${modeName} | Tint: ${tint.name}`);
-  }
-
-  private attemptShader(): void {
-    if (this.shaderAttempted) {
-      this.logEvent('Shader already attempted. Result: ' + this.shaderResult);
-      return;
-    }
-
-    try {
-      // Check if WebGL is available by attempting to access the renderer
-      const renderer = this.sys.game.renderer;
-      if (!renderer || !(renderer instanceof Phaser.Renderer.WebGL.WebGLRenderer)) {
-        this.shaderResult = 'WebGL renderer not available (canvas mode)';
-        this.logEvent('Shader: ' + this.shaderResult);
-        this.shaderAttempted = true;
-        return;
-      }
-
-      // Attempt to create a simple pipeline
-      // Note: Phaser 4 pipeline creation is different from v3
-      // Document that postfx pipelines require WebGL and are not available in canvas/headless
-      this.shaderResult = 'WebGL available. PostFX pipelines are feasible in Phaser 4 WebGL mode. ' +
-        'Headless/canvas environments must fall back gracefully.';
-      this.logEvent('Shader: ' + this.shaderResult);
-    } catch (e) {
-      this.shaderResult = `Error: ${(e as Error).message}`;
-      this.logEvent('Shader attempt failed: ' + this.shaderResult);
-    }
-    this.shaderAttempted = true;
   }
 
   private logEvent(msg: string): void {

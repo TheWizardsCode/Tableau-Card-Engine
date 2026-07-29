@@ -191,28 +191,27 @@ export class GymTokenPileViewScene extends GymSceneBase {
       { label: '[ -Shape ]', pileIdx: 2, action: 'remove' },
       { label: '[ +Feudal ]', pileIdx: 3, action: 'add' },
       { label: '[ -Feudal ]', pileIdx: 3, action: 'remove' },
+      { label: '[ Reset All ]', pileIdx: -1, action: 'reset' },
     ];
 
-    const btnStartX = 60;
-    const btnSpacing = 130;
-    const btnRow2Y = controlsY + 30;
-
-    btnLabels.forEach((cfg, i) => {
+    this.initButtonBar(controlsY);
+    btnLabels.forEach((cfg) => {
       const isAdd = cfg.action === 'add';
-      const x = btnStartX + (i % 4) * btnSpacing;
-      const y = i < 4 ? controlsY : btnRow2Y;
-      this.addButton(x, y, cfg.label, () => {
-        if (isAdd) {
-          this.addTokenToPile(cfg.pileIdx);
-        } else {
-          this.removeTokenFromPile(cfg.pileIdx);
-        }
-      }, { fontSize: '12px' });
+      const isReset = cfg.action === 'reset';
+      this.buttonBar!.addButton(
+        cfg.label,
+        () => {
+          if (isReset) {
+            this.resetPiles();
+          } else if (isAdd) {
+            this.addTokenToPile(cfg.pileIdx);
+          } else {
+            this.removeTokenFromPile(cfg.pileIdx);
+          }
+        },
+        { zone: 'center', fontSize: '12px' },
+      );
     });
-
-    // Reset button
-    const resetX = btnStartX + 4 * btnSpacing + 20;
-    this.addButton(resetX, controlsY, '[ Reset All ]', () => this.resetPiles(), { fontSize: '12px' });
 
     // ── Pile labels below controls ────────────────────────
 

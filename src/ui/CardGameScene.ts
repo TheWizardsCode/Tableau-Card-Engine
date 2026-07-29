@@ -32,6 +32,12 @@ import { HelpPanel } from './HelpPanel';
 import { HelpButton } from './HelpButton';
 import { SettingsPanel } from './SettingsPanel';
 import type { SkillRatingConfig } from './SettingsPanel';
+import type { DebugToolsEntry } from './debug/DebugToolsRegistry';
+import { createSessionExportTool } from './debug/SessionExportTool';
+import { createStateInspectorTool } from './debug/StateInspectorOverlay';
+import { createGameEventLogTool } from './debug/GameEventLogOverlay';
+import { createAiDecisionViewerTool } from './debug/AiDecisionOverlay';
+import { GlobalEventBuffer } from './debug/GlobalEventBuffer';
 import { SettingsButton } from './SettingsButton';
 import type { HelpSection } from './HelpPanel';
 import { createSceneMenuButton } from './SceneHeader';
@@ -187,6 +193,12 @@ export abstract class CardGameScene extends Phaser.Scene {
     this.eventBridge = new PhaserEventBridge(this.gameEvents, this.events);
     (window as unknown as Record<string, unknown>).__GAME_EVENTS__ =
       this.gameEvents;
+    // Subscribe the global event buffer so debug overlays see past events.
+    // Gated behind `import.meta.env.DEV` so the GlobalEventBuffer module
+    // is tree-shaken from production builds.
+    if (import.meta.env.DEV) {
+      GlobalEventBuffer.getInstance().subscribe(this.gameEvents);
+    }
   }
 
   /**
@@ -260,20 +272,35 @@ export abstract class CardGameScene extends Phaser.Scene {
    * @param defaultDifficulty  Default difficulty name when no preference exists.
    * @param hasTooltips  Whether the game has tooltips (shows/hides the
    *                     Tooltips toggle in the settings panel). Default `true`.
+   * @param skillRating  Optional AI skill rating slider configuration.
+   * @param debugTools   Optional list of debug tool entries to show in the
+   *                     Debug Tools section (visible only in dev mode).
    */
   protected initSettingsPanel(
     difficultyNames?: readonly string[],
     defaultDifficulty?: string,
     hasTooltips?: boolean,
     skillRating?: SkillRatingConfig,
+    debugTools?: DebugToolsEntry[],
   ): void {
     if (!this.soundManager) return;
+    // Provide default debug tools when none are explicitly specified.
+    // In production builds, `import.meta.env.DEV` is `false`, so the
+    // creator functions are never called and Vite/Rollup tree-shakes
+    // the entire debug tool modules from the production bundle.
+    const effectiveDebugTools = debugTools ?? (import.meta.env.DEV ? [
+      createSessionExportTool(),
+      createStateInspectorTool(),
+      createGameEventLogTool(),
+      createAiDecisionViewerTool(),
+    ] : []);
     this.settingsPanel = new SettingsPanel(this, {
       soundManager: this.soundManager,
       difficultyNames,
       defaultDifficulty,
       hasTooltips: hasTooltips ?? true,
       skillRating,
+      debugTools: effectiveDebugTools,
     });
     this.settingsButton = this.settingsPanel.settingsButton!;
   }

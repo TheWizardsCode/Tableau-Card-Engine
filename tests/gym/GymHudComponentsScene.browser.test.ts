@@ -105,14 +105,14 @@ describe('GymHudComponentsScene browser integration', () => {
     const openHelpBtn = findText(scene, '[ Open HelpPanel ]');
     expect(openHelpBtn).toBeTruthy();
 
-    const toggleHelpBtn = findText(scene, '[ Toggle HelpPanel ]');
-    expect(toggleHelpBtn).toBeTruthy();
+    const closeHelpBtn = findText(scene, '[ Close HelpPanel ]');
+    expect(closeHelpBtn).toBeTruthy();
 
     const openSettingsBtn = findText(scene, '[ Open Settings ]');
     expect(openSettingsBtn).toBeTruthy();
 
-    const toggleSettingsBtn = findText(scene, '[ Toggle Settings ]');
-    expect(toggleSettingsBtn).toBeTruthy();
+    const closeSettingsBtn = findText(scene, '[ Close Settings ]');
+    expect(closeSettingsBtn).toBeTruthy();
   });
 
   // ── AC 3: HelpPanel opens and closes via buttons ─────────
@@ -207,38 +207,42 @@ describe('GymHudComponentsScene browser integration', () => {
     expect(blocker).toBeFalsy();
   });
 
-  // ── AC 5: Toggle buttons work ────────────────────────────
+  // ── AC 5: Status line updates via Open/Close buttons ─────
 
-  it('toggles HelpPanel open and closed', async () => {
+  it('opens then closes HelpPanel via sequential Open and Close', async () => {
     const scene = await bootScene();
 
-    const toggleBtn = findText(scene, '[ Toggle HelpPanel ]');
-    expect(toggleBtn).toBeTruthy();
+    const openBtn = findText(scene, '[ Open HelpPanel ]');
+    expect(openBtn).toBeTruthy();
+    const closeBtn = findText(scene, '[ Close HelpPanel ]');
+    expect(closeBtn).toBeTruthy();
 
-    // Toggle open
-    toggleBtn!.emit('pointerdown');
+    // Open via Open button
+    openBtn!.emit('pointerdown');
     await advanceFrames(20);
     expect(scene.isHelpOpen).toBe(true);
 
-    // Toggle closed
-    toggleBtn!.emit('pointerdown');
+    // Close via Close button
+    closeBtn!.emit('pointerdown');
     await advanceFrames(20);
     expect(scene.isHelpOpen).toBe(false);
   });
 
-  it('toggles SettingsPanel open and closed', async () => {
+  it('opens then closes SettingsPanel via sequential Open and Close', async () => {
     const scene = await bootScene();
 
-    const toggleBtn = findText(scene, '[ Toggle Settings ]');
-    expect(toggleBtn).toBeTruthy();
+    const openBtn = findText(scene, '[ Open Settings ]');
+    expect(openBtn).toBeTruthy();
+    const closeBtn = findText(scene, '[ Close Settings ]');
+    expect(closeBtn).toBeTruthy();
 
-    // Toggle open
-    toggleBtn!.emit('pointerdown');
+    // Open via Open button
+    openBtn!.emit('pointerdown');
     await advanceFrames(20);
     expect(scene.isSettingsOpen).toBe(true);
 
-    // Toggle closed
-    toggleBtn!.emit('pointerdown');
+    // Close via Close button
+    closeBtn!.emit('pointerdown');
     await advanceFrames(20);
     expect(scene.isSettingsOpen).toBe(false);
   });
@@ -368,19 +372,20 @@ describe('GymHudComponentsScene browser integration', () => {
     expect(settingsStatus!.text).toBe('SettingsPanel: closed');
   });
 
-  it('updates SettingsPanel status line on toggle', async () => {
+  it('updates SettingsPanel status line on Open/Close', async () => {
     const scene = await bootScene();
 
-    const toggleBtn = findText(scene, '[ Toggle Settings ]')!;
+    const openBtn = findText(scene, '[ Open Settings ]')!;
+    const closeBtn = findText(scene, '[ Close Settings ]')!;
 
-    // Toggle open
-    toggleBtn.emit('pointerdown');
+    // Open
+    openBtn.emit('pointerdown');
     await advanceFrames(20);
     let settingsStatus = findTextContaining(scene, 'SettingsPanel:');
     expect(settingsStatus!.text).toBe('SettingsPanel: open');
 
-    // Toggle closed
-    toggleBtn.emit('pointerdown');
+    // Close
+    closeBtn.emit('pointerdown');
     await advanceFrames(20);
     settingsStatus = findTextContaining(scene, 'SettingsPanel:');
     expect(settingsStatus!.text).toBe('SettingsPanel: closed');
@@ -417,19 +422,20 @@ describe('GymHudComponentsScene browser integration', () => {
     expect(helpStatus!.text).toBe('HelpPanel: closed');
   });
 
-  it('updates HelpPanel status line on toggle', async () => {
+  it('updates HelpPanel status line on Open/Close', async () => {
     const scene = await bootScene();
 
-    const toggleBtn = findText(scene, '[ Toggle HelpPanel ]')!;
+    const openBtn = findText(scene, '[ Open HelpPanel ]')!;
+    const closeBtn = findText(scene, '[ Close HelpPanel ]')!;
 
-    // Toggle open
-    toggleBtn.emit('pointerdown');
+    // Open
+    openBtn.emit('pointerdown');
     await advanceFrames(20);
     let helpStatus = findTextContaining(scene, 'HelpPanel:');
     expect(helpStatus!.text).toBe('HelpPanel: open');
 
-    // Toggle closed
-    toggleBtn.emit('pointerdown');
+    // Close
+    closeBtn.emit('pointerdown');
     await advanceFrames(20);
     helpStatus = findTextContaining(scene, 'HelpPanel:');
     expect(helpStatus!.text).toBe('HelpPanel: closed');

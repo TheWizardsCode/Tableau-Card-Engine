@@ -17,7 +17,7 @@
  *
  * With the TutorialScenario system and Easy difficulty (12 coins, 5 reputation):
  *
- * - Market development row: Bakery ($6), **Laundromat ($6)**, Park ($4), Hardware Store ($10)
+ * - Market development row: Bakery ($3), **Laundromat ($4)**, Park ($3), **Bookshop ($3)**
  * - Investments: Upgrade to Patisserie ($4), Upgrade to Garden ($3), Local Festival ($3)
  * - Incidents in queue: Community Award (+2 rep), Rainy Day (-1 coin per Food)
  *
@@ -27,22 +27,24 @@
  * |------|----------------------------|----------|-----------|---------|
  * | T1   | Start (Easy)               | 12       | 0         | 12      |
  * | T2   | Confirm (no cost)          | 0        | 0         | 12      |
- * | T3   | Buy Laundromat ($6)        | 0        | 6         | 6       |
- * | T4   | Place business (free)      | 0        | 0         | 6       |
- * | T5   | Confirm (no cost)          | 0        | 0         | 6       |
- * | T6   | End Turn + income (~1 coin)| 1        | 0         | 7       |
- * | T7   | Buy Local Festival ($3)   | 0        | 3         | 4       |
- * | T8   | Confirm (no cost)          | 0        | 0         | 4       |
- * | T9   | Confirm (no cost)          | 0        | 0         | 4       |
- * | T10  | Confirm (no cost)          | 0        | 0         | ~6      |
- * | T11  | Confirm (no cost)          | 0        | 0         | ~6      |
+ * | T3   | Buy Laundromat ($4)        | 0        | 4         | 8       |
+ * | T4   | Place business (free)      | 0        | 0         | 8       |
+ * | T5   | Confirm (no cost)          | 0        | 0         | 8       |
+ * | T6   | End Turn + income (~1 coin)| 1        | 0         | 9       |
+ * | T7   | Buy Local Festival ($3)    | 0        | 3         | 6       |
+ * | T8   | Buy Bookshop ($3) + auto-place | 0     | 3         | 3       |
+ * | T9   | Confirm (no cost)          | 0        | 0         | 3       |
+ * | T10  | Confirm (no cost)          | 0        | 0         | 3       |
+ * | T11  | Confirm (no cost)          | 0        | 0         | 3       |
  * | T12  | Confirm (no cost)          | 0        | 0         | ~6      |
  * | T13  | Confirm (no cost)          | 0        | 0         | ~6      |
+ * | T14  | Confirm (no cost)          | 0        | 0         | ~6      |
  *
  * **Conclusion:** Even with worst-case incidents, the budget is sufficient
- * for all tutorial actions. The cheapest viable business card (Laundromat,
- * $6) leaves enough coins for the Local Festival ($3) after one turn's
- * income.
+ * for all tutorial actions. The Laundromat ($4) plus Bookshop ($3) plus
+ * Local Festival ($3) totalling $10 is covered by 12 starting coins with
+ * ~1 income turn. The Bookshop (Culture business) enables the Local Festival
+ * bonus when played later.
  *
  * @module
  */
@@ -94,7 +96,7 @@ export type TutorialActionType =
 export type TutorialGateType = 'confirm' | 'action';
 
 /**
- * A single unified tutorial step definition (13 steps total).
+ * A single unified tutorial step definition (14 steps total T1-T14).
  *
  * Confirm steps only need `gate: 'confirm'`; they do not have a
  * `requiredAction` field because the only way to advance is by
@@ -137,7 +139,7 @@ export interface UnifiedTutorialStepDef {
 // ── Unified Tutorial Script (T1-T13) ────────────────────────
 
 /**
- * The unified set of 13 tutorial steps, in sequential order.
+ * The unified set of 14 tutorial steps, in sequential order.
  *
  * Merged from:
  * - 9 guided (action-gated) steps T1-T9 from the original TutorialFlow
@@ -147,7 +149,7 @@ export interface UnifiedTutorialStepDef {
  * New steps (from the original 13-step set and split Challenges/Scoring)
  * come from the reference system to fill gaps.
  *
- * Gate type distribution: 9 confirm + 4 action.
+ * Gate type distribution: 10 confirm + 4 action.
  */
 export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
   {
@@ -172,8 +174,8 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     gate: 'action',
     requiredAction: 'select-business',
     // The TutorialScenario system (TutorialScenario.ts) guarantees the Laundromat
-    // (biz-laundromat-0) is present in the development row. It costs $6 (most
-    // affordable, leaves 6 coins for later steps).
+    // (biz-laundromat-0) is present in the development row. It costs $4 (most
+    // affordable, leaves 8 coins for later steps).
     requiredCardId: 'biz-laundromat-0',
   },
   {
@@ -208,56 +210,68 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     requiredAction: 'buy-event',
     // The TutorialScenario system puts Local Festival (evt-festival, $3)
     // in the investments row. This is affordable after the T3 Laundromat purchase
-    // ($6) and T6 income (~1 coin). No specific card is required — the player can
+    // ($4) and T6 income (~1 coin). No specific card is required — the player can
     // buy any Investment event card.
   },
   {
     id: 'T8',
     titleKey: tutorialKey('T8', 'title'),
     bodyKey: tutorialKey('T8', 'body'),
-    highlightZone: 'investmentsRow',
-    gate: 'confirm',
+    highlightZone: 'marketBusinessRow',
+    gate: 'action',
+    requiredAction: 'select-business',
+    // The TutorialScenario system (TutorialScenario.ts) guarantees the Bookshop
+    // (biz-bookshop-0) is present in the development row. It costs $3 (Culture
+    // business) and matches the Local Festival's Culture bonus.
+    requiredCardId: 'biz-bookshop-0',
   },
   {
     id: 'T9',
     titleKey: tutorialKey('T9', 'title'),
     bodyKey: tutorialKey('T9', 'body'),
+    highlightZone: 'investmentsRow',
+    gate: 'confirm',
+  },
+  {
+    id: 'T10',
+    titleKey: tutorialKey('T10', 'title'),
+    bodyKey: tutorialKey('T10', 'body'),
     highlightZone: 'centerModal',
     gate: 'confirm',
   },
 
   {
-    id: 'T10',
-    titleKey: tutorialKey('T10', 'title'),
-    bodyKey: tutorialKey('T10', 'body'),
-    highlightZone: 'endTurnButton',
-    gate: 'confirm',
-  },
-  {
     id: 'T11',
     titleKey: tutorialKey('T11', 'title'),
     bodyKey: tutorialKey('T11', 'body'),
-    highlightZone: 'challengePanel',
+    highlightZone: 'endTurnButton',
     gate: 'confirm',
   },
   {
     id: 'T12',
     titleKey: tutorialKey('T12', 'title'),
     bodyKey: tutorialKey('T12', 'body'),
-    highlightZone: 'hud',
+    highlightZone: 'challengePanel',
     gate: 'confirm',
   },
   {
     id: 'T13',
     titleKey: tutorialKey('T13', 'title'),
     bodyKey: tutorialKey('T13', 'body'),
+    highlightZone: 'hud',
+    gate: 'confirm',
+  },
+  {
+    id: 'T14',
+    titleKey: tutorialKey('T14', 'title'),
+    bodyKey: tutorialKey('T14', 'body'),
     highlightZone: 'completionModal',
     gate: 'confirm',
   },
 ] as const;
 
 /** Total number of unified tutorial steps. */
-export const UNIFIED_TUTORIAL_STEP_COUNT = UNIFIED_TUTORIAL_STEPS.length; // 13
+export const UNIFIED_TUTORIAL_STEP_COUNT = UNIFIED_TUTORIAL_STEPS.length; // 14
 
 export const INVALID_ACTION_MESSAGE = 'Complete the highlighted step first.';
 

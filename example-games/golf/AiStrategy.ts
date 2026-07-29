@@ -190,45 +190,38 @@ export function chooseDrawSource(
   const discardCard = shared.discardTop;
   const currentScore = scoreAiVisibleGrid(playerState.grid);
   const legalMoves = enumerateAiLegalMoves(playerState.grid);
-
-  let bestDiscardScore = Infinity;
-  for (const move of legalMoves) {
-    const score = simulateAiMoveScore(
-      playerState.grid,
-      discardCard,
-      move,
-    );
-    if (score < bestDiscardScore) {
-      bestDiscardScore = score;
-    }
-  }
-
-  // If the discard card would improve our score, prefer it
-  const discardImprovement = currentScore - bestDiscardScore;
-
-  if (discardImprovement > 0) {
-    // Discard card helps — take it
-    return 'discard';
-  }
-
-  // Even if discard doesn't immediately improve the score, check if it
-  // helps build a column match and unknown copies of that rank remain.
   const visibleRanks = countVisibleRanks(playerState, shared, _rng, memoryTracker);
 
-  // Check if any legal swap move with the discard card would build toward
-  // a column match (2 matching cards in column) with feasible potential
+  // Evaluate ALL legal moves with the discard card, including column bonus
+  // for swap moves. Only prefer discard if the best-scored move is a SWAP.
+  // Choosing discard to perform a discard-and-flip wastes the known card,
+  // since the same discard-and-flip could be done with a blind stock draw.
+  let bestScore = Infinity;
+  let bestMoveIsSwap = false;
+
   for (const move of legalMoves) {
-    const bonus = computeColumnBonus(
-      playerState.grid,
-      discardCard,
-      move,
-      visibleRanks,
-      config,
-    );
-    if (bonus < 0) {
-      // Discard card helps build a column with feasible potential
-      return 'discard';
+    let score = simulateAiMoveScore(playerState.grid, discardCard, move);
+    if (move.kind === 'swap') {
+      // Add column-building feasibility bonus for swap moves
+      score += computeColumnBonus(
+        playerState.grid,
+        discardCard,
+        move,
+        visibleRanks,
+        config,
+      );
     }
+    if (score < bestScore) {
+      bestScore = score;
+      bestMoveIsSwap = move.kind === 'swap';
+    }
+  }
+
+  // Only choose discard if we'll actually swap the card into the grid.
+  // A swap must be strictly better than discard-and-flip (same as current)
+  // to justify choosing discard over the unknown stock draw.
+  if (bestMoveIsSwap && bestScore < currentScore) {
+    return 'discard';
   }
 
   // Discard card doesn't help — draw from stock (unknown, might be better)

@@ -24,6 +24,7 @@ import { getZoneRect, anchorPoint } from '../../../src/ui/screen-layout';
 import { parseScreenLayoutDocument, type ScreenLayoutDocument, type PixelPoint } from '../../../src/ui/screen-layout-schema';
 import gymScenesLayoutJson from '../layouts/gym-scenes.layout.json';
 import { createHudText } from '../../../src/ui/Renderer';
+import { GymButtonBar, type GymButtonBarConfig } from '../../../src/ui/GymButtonBar';
 
 // Parse the shared Gym scenes layout once at module load.
 const GYM_SCENES_LAYOUT: ScreenLayoutDocument | null = (() => {
@@ -48,6 +49,16 @@ export abstract class GymSceneBase extends Phaser.Scene {
   protected nextButton!: Phaser.GameObjects.Text;
   /** Divider line drawn below the header. */
   protected headerDivider?: Phaser.GameObjects.Graphics;
+
+  /**
+   * Optional GymButtonBar instance for automated button layout.
+   *
+   * Created by calling `initButtonBar()` in the scene's `create()` method.
+   * Once initialised, scene subclasses can use `this.buttonBar.addButton()`
+   * to add buttons that are automatically arranged into left/center/right
+   * zones with even spacing and row wrapping.
+   */
+  protected buttonBar?: GymButtonBar;
 
   /** Whether reduced motion is currently enabled. Scenes and helpers
    *  should consult this property to skip or shorten animations when true. */
@@ -175,6 +186,32 @@ export abstract class GymSceneBase extends Phaser.Scene {
     return btn;
   }
 
+  // ── Button bar integration ────────────────────────────────
+
+  /**
+   * Initialise a GymButtonBar at the given Y position.
+   *
+   * Call this in your scene's `create()` method to create a reusable
+   * button bar. Once initialised, use `this.buttonBar.addButton()`
+   * for all button creation.
+   *
+   * If a button bar was previously created, it is destroyed before
+   * creating the new one (allows re-creation).
+   *
+   * @param y     Y position of the first button row.
+   * @param opts  Optional GymButtonBar configuration overrides.
+   * @returns The created GymButtonBar instance.
+   */
+  protected initButtonBar(y: number, opts?: Partial<GymButtonBarConfig>): GymButtonBar {
+    // Destroy any existing bar first
+    if (this.buttonBar) {
+      try { this.buttonBar.destroy(); } catch (_) { /* ignore */ }
+    }
+
+    this.buttonBar = new GymButtonBar(this, { y, ...opts });
+    return this.buttonBar;
+  }
+
   // ── Scene transition hook ─────────────────────────────────
 
   /**
@@ -216,27 +253,7 @@ export abstract class GymSceneBase extends Phaser.Scene {
     });
   }
 
-  /**
-   * Utility: create a clickable button text at (x, y).
-   */
-  protected addButton(
-    x: number,
-    y: number,
-    label: string,
-    callback: () => void,
-    opts?: Partial<{ fontSize: string; color: string; hoverColor: string }>,
-  ): Phaser.GameObjects.Text {
-    const color = opts?.color ?? '#88ff88';
-    const hoverColor = opts?.hoverColor ?? '#bbffbb';
-    const btn = createHudText(this, x, y, label, color, {
-      fontSize: opts?.fontSize ?? '14px',
-    }).setInteractive({ useHandCursor: true });
 
-    btn.on('pointerdown', callback);
-    btn.on('pointerover', () => btn.setColor(hoverColor));
-    btn.on('pointerout', () => btn.setColor(color));
-    return btn;
-  }
 
   /**
    * Utility: add a horizontal divider line below the header.
@@ -384,33 +401,5 @@ export abstract class GymSceneBase extends Phaser.Scene {
     const x = anchor?.x ?? fallbackX;
     const y = anchor?.y ?? fallbackY;
     return this.addLabel(x, y, text, opts);
-  }
-
-  /**
-   * Create a button positioned at an SLL anchor point.
-   *
-   * If the SLL layout is unavailable, falls back to the provided fallback coordinates.
-   *
-   * @param zoneName   Zone to position within
-   * @param anchorName Anchor within the zone
-   * @param fallbackX  Fallback X if SLL is unavailable
-   * @param fallbackY  Fallback Y if SLL is unavailable
-   * @param label      Button label
-   * @param callback   Button click handler
-   * @param opts       Optional button styling
-   */
-  protected addButtonAtAnchor(
-    zoneName: string,
-    anchorName: string,
-    fallbackX: number,
-    fallbackY: number,
-    label: string,
-    callback: () => void,
-    opts?: Partial<{ fontSize: string; color: string; hoverColor: string }>,
-  ): Phaser.GameObjects.Text {
-    const anchor = this.getGymAnchor(zoneName, anchorName);
-    const x = anchor?.x ?? fallbackX;
-    const y = anchor?.y ?? fallbackY;
-    return this.addButton(x, y, label, callback, opts);
   }
 }
