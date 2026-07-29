@@ -12,6 +12,7 @@
 import Phaser from 'phaser';
 import { GAME_W, GAME_H } from './constants';
 import { createVersionLabel } from './versionDisplay';
+import { VERSION_ALPHA } from './versionDisplay';
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -115,6 +116,33 @@ export class GameSelectorScene extends Phaser.Scene {
 
     // Version label (bottom-left corner)
     createVersionLabel(this);
+
+    // GitHub link (bottom-right corner)
+    this.createGitHubLink();
+  }
+
+  /**
+   * Create a clickable GitHub link in the bottom-right corner.
+   * Opens the repository in a new browser tab.
+   */
+  private createGitHubLink(): void {
+    const GITHUB_URL = 'https://github.com/TheWizardsCode/Tableau-Card-Engine';
+    const LINK_TEXT = '[ GitHub ]';
+    const LINK_X = GAME_W - 8;
+    const LINK_Y = GAME_H - 12;
+
+    const link = this.add.text(LINK_X, LINK_Y, LINK_TEXT, {
+      fontSize: '11px',
+      fontFamily: FONT_FAMILY,
+      color: '#88ff88',
+    });
+    link.setOrigin(1, 1); // bottom-right anchor
+    link.setAlpha(VERSION_ALPHA);
+    link.setDepth(800);
+
+    link.on('pointerdown', () => {
+      window.open(GITHUB_URL, '_blank');
+    });
   }
 
   // ── Adaptive grid layout ────────────────────────────────

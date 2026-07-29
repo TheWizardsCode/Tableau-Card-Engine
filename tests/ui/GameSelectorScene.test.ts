@@ -554,4 +554,98 @@ describe('GameSelectorScene', () => {
       expect(text).toMatch(/^v\d+\.\d+\.\d+/);
     });
   });
+
+  // ── GitHub link ─────────────────────────────────────────
+
+  describe('GitHub link', () => {
+    it('creates a GitHub text label in create()', () => {
+      const mocks = injectMocks(scene);
+      scene.init({ games: [] });
+      scene.create();
+
+      const textCalls = mocks.add.text.mock.calls as unknown[][];
+      const githubCall = textCalls.find((c) =>
+        typeof c[2] === 'string' && c[2].includes('GitHub'),
+      );
+      expect(githubCall).toBeDefined();
+    });
+
+    it('positions GitHub link at bottom-right corner', () => {
+      const mocks = injectMocks(scene);
+      scene.init({ games: [] });
+      scene.create();
+
+      const textCalls = mocks.add.text.mock.calls as unknown[][];
+      const githubCall = textCalls.find((c) =>
+        typeof c[2] === 'string' && c[2].includes('GitHub'),
+      );
+      expect(githubCall).toBeDefined();
+
+      // X should be near the right edge (GAME_W=960)
+      const [x] = githubCall as [number, number, string];
+      expect(x).toBeGreaterThan(900);
+    });
+
+    it('GitHub link is interactive and opens GitHub URL on click', () => {
+      const mockOpen = vi.fn();
+      vi.stubGlobal('window', { open: mockOpen });
+
+      const mocks = injectMocks(scene);
+      scene.init({ games: [] });
+      scene.create();
+
+      const textResults = mocks.add.text.mock.results as {
+        value: ReturnType<typeof mockText>;
+      }[];
+      const textCalls = mocks.add.text.mock.calls as unknown[][];
+      const githubIdx = textCalls.findIndex((c) =>
+        typeof c[2] === 'string' && c[2].includes('GitHub'),
+      );
+      expect(githubIdx).not.toBe(-1);
+
+      const githubText = textResults[githubIdx].value;
+      // Should have pointerdown handler registered
+      expect(githubText.on).toHaveBeenCalledWith(
+        'pointerdown',
+        expect.any(Function),
+      );
+
+      // Trigger the pointerdown handler
+      const pointerdownHandler = githubText.on.mock.calls.find(
+        (c) => c[0] === 'pointerdown',
+      )![1] as Function;
+      pointerdownHandler();
+
+      expect(mockOpen).toHaveBeenCalledWith(
+        'https://github.com/TheWizardsCode/Tableau-Card-Engine',
+        '_blank',
+      );
+
+      vi.unstubAllGlobals();
+    });
+
+    it('GitHub link is positioned to the right of the version label', () => {
+      const mocks = injectMocks(scene);
+      scene.init({ games: [] });
+      scene.create();
+
+      const textCalls = mocks.add.text.mock.calls as unknown[][];
+
+      const versionCall = textCalls.find((c) =>
+        typeof c[2] === 'string' && c[2].startsWith('v'),
+      );
+      const githubCall = textCalls.find((c) =>
+        typeof c[2] === 'string' && c[2].includes('GitHub'),
+      );
+
+      expect(versionCall).toBeDefined();
+      expect(githubCall).toBeDefined();
+
+      const [_vx, , ] = versionCall as [number, number, string];
+      const [gx, ] = githubCall as [number, number, string];
+
+      // GitHub link should be on the right side, version on the left
+      expect(gx).toBeGreaterThan(_vx);
+    });
+  });
 });
