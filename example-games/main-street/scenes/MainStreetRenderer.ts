@@ -151,6 +151,8 @@ export class MainStreetRenderer {
       },
     });
     s.actionContainer = createGameZone(s, 0, 0, s.layout.gameW, s.layout.gameH, 'actionContainer');
+    // Action buttons must render above hand cards for visibility.
+    try { s.actionContainer.setDepth(100); } catch (_) { /* ignore in tests */ }
 
     // Ensure depth ordering is applied after container creation.
     try { s.children?.depthSort?.(); } catch (_) { /* ignore */ }
@@ -1229,8 +1231,8 @@ export class MainStreetRenderer {
       return;
     }
 
-    const { handCardW, handCardH, handY } = s.layout;
-    const startX = 40;
+    const { handCardW, handCardH, handX, handY } = s.layout;
+    const startX = handX + handCardW / 2;
     const y = handY;
     const spacing = handCardW + 8;
 
