@@ -145,9 +145,11 @@ export class FeudalismTurnController {
 
       this.recorder?.recordTurn(playerIndex, action, result, null);
 
+      const patronVisits = result.patronVisits;
+      const firstPatron = patronVisits.length > 0 ? patronVisits[0] : null;
       let patronSourceIndex = -1;
-      if (result.patronVisit) {
-        patronSourceIndex = patronsBefore.indexOf(result.patronVisit.id);
+      if (firstPatron) {
+        patronSourceIndex = patronsBefore.indexOf(firstPatron.id);
       }
 
       if (action.type === 'reserve' && action.cardId == null && !card) {
@@ -161,8 +163,8 @@ export class FeudalismTurnController {
           : this.animator.getPlayerReserveDest(playerIndex);
 
         // Cache the patron so refreshPatrons keeps it visible during animation
-        if (result.patronVisit) {
-          this.callbacks.onSetPatronAnimationCache(result.patronVisit, patronSourceIndex);
+        if (firstPatron) {
+          this.callbacks.onSetPatronAnimationCache(firstPatron, patronSourceIndex);
         }
 
         // Mark the market slot as pending refill so it renders as empty
@@ -174,13 +176,18 @@ export class FeudalismTurnController {
         this.setPhase('animating');
 
         // Defer sound and toast to coincide with animation start
-        if (result.patronVisit) {
+        if (patronVisits.length > 0) {
           this.callbacks.onPlaySound(SFX_KEYS.PATRON_VISIT);
-          this.callbacks.onShowToast('Patron visits you! +3 influence');
+          const count = patronVisits.length;
+          this.callbacks.onShowToast(
+            count === 1
+              ? 'Patron visits you! +3 influence'
+              : `${count} patrons visit you! +3 influence each`,
+          );
         }
 
         this.animator.playCardAnimation(
-          sourcePos, destPos, card, marketSlot, result.patronVisit,
+          sourcePos, destPos, card, marketSlot, patronVisits,
           patronSourceIndex, playerIndex,
           () => this.afterTurnComplete(result),
           () => {
@@ -306,9 +313,11 @@ export class FeudalismTurnController {
 
         this.recorder?.recordTurn(aiIndex, action, result, tokenDiscard);
 
+        const patronVisits = result.patronVisits;
+        const firstPatron = patronVisits.length > 0 ? patronVisits[0] : null;
         let patronSourceIndex = -1;
-        if (result.patronVisit) {
-          patronSourceIndex = patronsBefore.indexOf(result.patronVisit.id);
+        if (firstPatron) {
+          patronSourceIndex = patronsBefore.indexOf(firstPatron.id);
         }
 
         if (action.type === 'reserve' && action.cardId == null && !card) {
@@ -340,8 +349,8 @@ export class FeudalismTurnController {
             : this.animator.getPlayerReserveDest(aiIndex);
 
           // Cache the patron so refreshPatrons keeps it visible during animation
-          if (result.patronVisit) {
-            this.callbacks.onSetPatronAnimationCache(result.patronVisit, patronSourceIndex);
+          if (firstPatron) {
+            this.callbacks.onSetPatronAnimationCache(firstPatron, patronSourceIndex);
           }
 
           // Mark the market slot as pending refill so it renders as empty
@@ -351,12 +360,17 @@ export class FeudalismTurnController {
           }
 
           // Defer toast to coincide with animation start
-          if (result.patronVisit) {
-            this.callbacks.onShowToast('AI earns a patron visit! +3 influence');
+          if (patronVisits.length > 0) {
+            const count = patronVisits.length;
+            this.callbacks.onShowToast(
+              count === 1
+                ? 'AI earns a patron visit! +3 influence'
+                : `AI earns ${count} patron visits! +3 influence each`,
+            );
           }
 
           this.animator.playCardAnimation(
-            sourcePos, destPos, card, marketSlot, result.patronVisit,
+            sourcePos, destPos, card, marketSlot, patronVisits,
             patronSourceIndex, aiIndex, afterAnim,
             () => {
               this.callbacks.onClearPendingRefillSlots();

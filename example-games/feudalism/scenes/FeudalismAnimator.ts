@@ -94,7 +94,7 @@ export class FeudalismAnimator {
     destPos: { x: number; y: number },
     card: DevelopmentCard,
     marketSlot: { tier: Tier; col: number } | null,
-    patronVisit: PatronTile | null,
+    patronVisits: PatronTile[],
     patronSourceIndex: number,
     playerIndex: number,
     onAllComplete: () => void,
@@ -113,12 +113,15 @@ export class FeudalismAnimator {
       reducedMotion: this.reducedMotion,
       onComplete: () => {
         flyingCard.destroy();
+        // Only animate the first patron; others are recorded but not individually animated
+        const firstPatron = patronVisits.length > 0 ? patronVisits[0] : null;
+        const chainFn = () => {
+          this.chainPatronAnimation(firstPatron, patronSourceIndex, playerIndex, onAllComplete, onBeforePatronAnimation, onRefreshPatronsAndPlayer);
+        };
         if (marketSlot) {
-          this.playMarketRefillAnimation(marketSlot.tier, marketSlot.col, () => {
-            this.chainPatronAnimation(patronVisit, patronSourceIndex, playerIndex, onAllComplete, onBeforePatronAnimation, onRefreshPatronsAndPlayer);
-          }, onRefreshMarket);
+          this.playMarketRefillAnimation(marketSlot.tier, marketSlot.col, chainFn, onRefreshMarket);
         } else {
-          this.chainPatronAnimation(patronVisit, patronSourceIndex, playerIndex, onAllComplete, onBeforePatronAnimation, onRefreshPatronsAndPlayer);
+          chainFn();
         }
       },
     });

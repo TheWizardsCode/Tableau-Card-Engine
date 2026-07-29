@@ -117,8 +117,8 @@ export interface TokenDiscard {
 /** Result of executing a turn. */
 export interface TurnResult {
   action: TurnAction;
-  /** Patron that visited this turn, if any. */
-  patronVisit: PatronTile | null;
+  /** Patrons that visited this turn, if any (array, possibly empty). */
+  patronVisits: PatronTile[];
   /** Whether the game has ended after this turn. */
   gameOver: boolean;
   /** Tokens the player needs to discard (empty if within limit). */
@@ -495,17 +495,17 @@ export function executeTurn(
   // Check token limit
   const overLimit = totalTokens(player.tokens) - MAX_TOKENS;
 
-  // Check patron visit
-  const patronVisit = checkPatronVisit(session, player);
+  // Check patron visits — all qualifying patrons visit this turn
+  const patronVisits = collectQualifyingPatrons(session, player);
 
   // If player is within token limit, advance turn
   if (overLimit <= 0) {
-    return finishTurn(session, action, patronVisit);
+    return finishTurn(session, action, patronVisits);
   }
 
   return {
     action,
-    patronVisit,
+    patronVisits,
     gameOver: false,
     tokensOverLimit: overLimit,
   };
@@ -539,8 +539,8 @@ export function discardTokens(
   player.tokens = subtractTokens(player.tokens, discard.tokens);
   session.tokenSupply = addTokens(session.tokenSupply, discard.tokens);
 
-  // Patron visit already happened in executeTurn, so just advance
-  return finishTurn(session, { type: 'take-different', colors: [] }, null);
+  // Patron visit(s) already happened in executeTurn, so just advance
+  return finishTurn(session, { type: 'take-different', colors: [] }, []);
 }
 
 function executeTakeDifferent(
@@ -639,19 +639,24 @@ function executePurchase(
 // Patron visit
 // ---------------------------------------------------------------------------
 
-function checkPatronVisit(
+function collectQualifyingPatrons(
   session: FeudalismSession,
   player: FeudalismPlayerState,
-): PatronTile | null {
-  for (let i = 0; i < session.patrons.length; i++) {
+): PatronTile[] {
+  const qualifying: PatronTile[] = [];
+  let i = 0;
+  while (i < session.patrons.length) {
     if (patronQualifies(player, session.patrons[i])) {
       const patron = session.patrons[i];
       player.patrons.push(patron);
       session.patrons.splice(i, 1);
-      return patron;
+      qualifying.push(patron);
+      // Don't increment i — next patron shifted into this position
+    } else {
+      i++;
     }
   }
-  return null;
+  return qualifying;
 }
 
 // ---------------------------------------------------------------------------
@@ -661,7 +666,7 @@ function checkPatronVisit(
 function finishTurn(
   session: FeudalismSession,
   action: TurnAction,
-  patronVisit: PatronTile | null,
+  patronVisits: PatronTile[],
 ): TurnResult {
   const player = getCurrentPlayer(session);
   const influence = getInfluence(player);
@@ -683,7 +688,7 @@ function finishTurn(
     session.phase = 'game-over';
     return {
       action,
-      patronVisit,
+      patronVisits,
       gameOver: true,
       tokensOverLimit: 0,
     };
@@ -693,7 +698,7 @@ function finishTurn(
 
   return {
     action,
-    patronVisit,
+    patronVisits,
     gameOver: false,
     tokensOverLimit: 0,
   };

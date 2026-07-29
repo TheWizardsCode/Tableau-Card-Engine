@@ -95,7 +95,7 @@ describe('FeudalismTurnController patron animation timing', () => {
       // The patron-visit sound and toast should be in the pre-animation section
       // (deferred from right-after-executeTurn to just-before-playCardAnimation)
       expect(beforeAnim).toContain('this.callbacks.onPlaySound(SFX_KEYS.PATRON_VISIT)');
-      expect(beforeAnim).toContain('this.callbacks.onShowToast(\'Patron visits you! +3 influence\')');
+      expect(beforeAnim).toContain('this.callbacks.onShowToast(');
     });
 
     it('should keep onSetPatronAnimationCache before the deferred sound call', () => {
@@ -138,8 +138,9 @@ describe('FeudalismTurnController patron animation timing', () => {
       expect(aiGuardIndex).toBeGreaterThan(-1);
 
       // The patron toast should be AFTER the animation guard, not before it
-      const toastCall = 'this.callbacks.onShowToast(\'AI earns a patron visit! +3 influence\')';
-      const toastIndex = afterAiExecTurn.indexOf(toastCall);
+      // The toast is now wrapped in a ternary expression, so find the unique substring
+      const toastPattern = 'count === 1';
+      const toastIndex = afterAiExecTurn.indexOf(toastPattern);
       expect(toastIndex).toBeGreaterThan(-1);
       expect(toastIndex).toBeGreaterThan(aiGuardIndex);
     });
@@ -183,7 +184,9 @@ describe('FeudalismTurnController patron animation timing', () => {
       const beforeAnim = block.slice(0, animCallIndex);
 
       // The patron toast should be in the pre-animation section
-      expect(beforeAnim).toContain('this.callbacks.onShowToast(\'AI earns a patron visit! +3 influence\')');
+      // The toast is now wrapped in a ternary; look for the unique close bracket pattern
+      expect(beforeAnim).toContain('onShowToast(');
+      expect(beforeAnim).toContain('AI earns a patron visit! +3 influence');
     });
   });
 
@@ -203,12 +206,15 @@ describe('FeudalismTurnController patron animation timing', () => {
 
       expect(source).toContain('Patron visits you! +3 influence');
       expect(source).toContain('AI earns a patron visit! +3 influence');
+      expect(source).toContain('patrons visit you! +3 influence each');
+      expect(source).toContain('AI earns ');
+      expect(source).toContain('patron visits! +3 influence each');
     });
 
     it('should still have patron animation cache setup in executeAction animation block', () => {
       const source = readFileSync(SOURCE_PATH, 'utf-8');
       // The patron cache infrastructure should remain intact
-      expect(source).toContain('onSetPatronAnimationCache(result.patronVisit, patronSourceIndex)');
+      expect(source).toContain('onSetPatronAnimationCache(firstPatron, patronSourceIndex)');
     });
 
     it('should still have pending refill slot setup in executeAction animation block', () => {

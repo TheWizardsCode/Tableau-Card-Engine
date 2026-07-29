@@ -97,8 +97,8 @@ export interface FeudalismTurnRecord {
   readonly playerIndex: number;
   /** The action that was executed. */
   readonly action: TurnAction;
-  /** Patron that visited as a result of this turn, if any. */
-  readonly patronVisit: PatronTile | null;
+  /** Patrons that visited as a result of this turn (array, possibly empty). */
+  readonly patronVisits: PatronTile[];
   /** Tokens discarded if the player was over the limit. */
   readonly tokenDiscard: TokenDiscard | null;
   /** Game phase after this turn. */
@@ -220,7 +220,7 @@ export class FeudalismTranscriptRecorder extends TranscriptRecorderBase<Feudalis
       turnNumber: this.turnCounter++,
       playerIndex,
       action: { ...action } as TurnAction,
-      patronVisit: result.patronVisit ? { ...result.patronVisit } : null,
+      patronVisits: result.patronVisits.map(n => ({ ...n })),
       tokenDiscard: tokenDiscard ? { tokens: { ...tokenDiscard.tokens } } : null,
       phase: this.session.phase,
       gameOver: result.gameOver,
