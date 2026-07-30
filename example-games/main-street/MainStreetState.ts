@@ -23,11 +23,14 @@ import {
   createUpgradeDeck,
   createStaffDeck,
   CSV_CHECKSUM,
+  CARD_DATA_RAW,
   GRID_SIZE,
   MARKET_BUSINESS_SLOTS,
   MARKET_INVESTMENT_UPGRADE_COUNT,
   MARKET_INVESTMENT_EVENT_COUNT,
   INCIDENT_QUEUE_SIZE,
+  loadTemplatesFromCsv,
+  resetTemplatesToDefault,
 } from './MainStreetCards';
 import {
   type ActiveChallenge,
@@ -295,6 +298,14 @@ export interface MainStreetSerializedState {
    */
   csvChecksum: string;
   /**
+   * Raw content of the card-data.csv at the time this save was created.
+   * Stored as a raw string so that if the game's card-data.csv changes
+   * between save and load, the original CSV data can be recovered and
+   * used to reconstruct card templates that match the saved state.
+   * Empty string indicates a legacy save before this field was added.
+   */
+  csvData: string;
+  /**
    * Tracks which street grid slots have been sold. Length = GRID_SIZE.
    * true = card in this slot has been sold (non-functional).
    */
@@ -416,6 +427,9 @@ function fillMarketSlots<T>(deck: T[], count: number): T[] {
  * @returns A fully initialised MainStreetState ready for turn 1.
  */
 export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainStreetState {
+  // Ensure templates use the bundled CSV data (reset any previous saved-CSV override)
+  resetTemplatesToDefault();
+
   const seed = options.seed ?? generateSeedString();
   const numericSeed = seedToNumber(seed);
   const baseRng = createSeededRng(numericSeed);
@@ -576,6 +590,7 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
     skipMarketCycleOnEndTurn: state.skipMarketCycleOnEndTurn,
     soldSlots: [...state.soldSlots],
     csvChecksum: CSV_CHECKSUM,
+    csvData: CARD_DATA_RAW,
   };
 }
 
@@ -680,6 +695,11 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
     (saved as Record<string, unknown>).csvChecksum = '';
   }
 
+  // ── csvData: add missing field (defaults to '' for legacy saves) ─
+  if (!('csvData' in saved)) {
+    (saved as Record<string, unknown>).csvData = '';
+  }
+
   // ── soldSlots: add missing field (defaults to all false for legacy saves) ─
   if (!('soldSlots' in saved)) {
     (saved as Record<string, unknown>).soldSlots = new Array<boolean>(GRID_SIZE).fill(false);
@@ -698,6 +718,24 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
  */
 export function deserializeMainStreetState(saved: MainStreetSerializedState): MainStreetState {
   migrateSerializedState(saved as unknown as Record<string, unknown>);
+
+  // ── CSV mismatch detection ────────────────────────────────
+  // If the saved checkpoint was created with a different card-data.csv,
+  // detect the mismatch and either use the embedded CSV data or reject
+  // legacy saves that lack it.
+  if (saved.csvChecksum && saved.csvChecksum !== CSV_CHECKSUM) {
+    if (saved.csvData && saved.csvData.length > 0) {
+      // Use the saved CSV data to reconstruct card templates
+      loadTemplatesFromCsv(saved.csvData);
+    } else {
+      // Legacy save without embedded CSV data — reject gracefully
+      throw new Error(
+        'This saved state was created with a different version of card-data.csv ' +
+        'and does not include the embedded card data required for compatibility. ' +
+        'Starting a fresh game instead.',
+      );
+    }
+  }
 
   const baseRng = createSeededRng(saved.numericSeed);
   for (let i = 0; i < saved.rngCalls; i++) {

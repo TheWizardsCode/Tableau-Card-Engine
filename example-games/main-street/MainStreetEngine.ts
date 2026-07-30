@@ -527,18 +527,24 @@ export function checkEndConditions(state: MainStreetState): boolean {
 /**
  * Executes the DayStart phase:
  * - Increments turn counter (except turn 1).
- * - Refills the market.
+ * - Refills the market (unless skipMarketRefill is true, e.g., checkpoint resume).
  * - Transitions to MarketPhase.
+ *
+ * @param state             Current game state (mutated in-place).
+ * @param skipMarketRefill  When true, skips refillAllMarkets. Used during
+ *                          checkpoint resume to preserve saved market state.
  */
-export function executeDayStart(state: MainStreetState): void {
+export function executeDayStart(state: MainStreetState, skipMarketRefill: boolean = false): void {
   if (state.phase !== 'DayStart') {
     throw new Error(`Expected DayStart phase, got ${state.phase}`);
   }
 
   // Turn 1 is already set by setup; subsequent turns increment here
   if (state.turn > 1 || state.phase === 'DayStart') {
-    // Refill market at start of each day
-    refillAllMarkets(state);
+    // Refill market at start of each day (skip on checkpoint resume)
+    if (!skipMarketRefill) {
+      refillAllMarkets(state);
+    }
   }
 
   // Log turn header

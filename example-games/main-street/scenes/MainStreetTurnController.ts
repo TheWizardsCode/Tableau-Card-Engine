@@ -44,10 +44,16 @@ export class MainStreetTurnController {
    */
   public onGameEnd: (() => void) | null = null;
 
-  public startDayPhase(): void {
+  /**
+   * Starts the DayPhase for a new turn.
+   *
+   * @param skipMarketRefill  When true (e.g., checkpoint resume), the market
+   *                          is not refilled and the saved market state is preserved.
+   */
+  public startDayPhase(skipMarketRefill: boolean = false): void {
     const s = this.scene;
-    // Execute DayStart (refills market, transitions to MarketPhase)
-    executeDayStart(s.state);
+    // Execute DayStart (optionally refills market, transitions to MarketPhase)
+    executeDayStart(s.state, skipMarketRefill);
     s.uiPhase = 'market';
 
     // Reset hint state for the new turn
