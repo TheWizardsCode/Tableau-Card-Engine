@@ -645,7 +645,7 @@ export class MainStreetRenderer {
   public drawEmptySlot(x: number, y: number, index: number): void {
     const s = this.scene;
     const { slotW, slotH } = s.layout;
-    const isSelectable = s.uiPhase === 'placing-business';
+    const isSelectable = s.uiPhase === 'placing-business' || s.uiPhase === 'placing-from-hand';
     const isHinted = s.hintedSlotIndex === index && !isSelectable;
     const fillAlpha = isSelectable ? 0.4 : isHinted ? 0.35 : 0.2;
     const strokeColor = isSelectable ? 0xffdd44 : isHinted ? 0x44ffff : 0x555544;
@@ -666,7 +666,7 @@ export class MainStreetRenderer {
     s.streetContainer.add(idxText);
 
     // Click to place
-    if (isSelectable && s.pendingBusinessCard) {
+    if (isSelectable && (s.pendingBusinessCard || s.pendingHandIndex !== null)) {
       bg.setInteractive({ useHandCursor: true });
       bg.on('pointerdown', () => s.onSlotClick(index));
       bg.on('pointerover', () => bg.setStrokeStyle(3, 0x44ff44));
