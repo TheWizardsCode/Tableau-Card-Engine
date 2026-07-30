@@ -163,7 +163,7 @@ export class MainStreetRenderer {
       showLabels: false,
       selectionEnabled: false,
       clickEnabled: true,
-      renderCard: (_card) => {
+      renderCard: (_card, cardIndex) => {
         const card = _card as any;
         const container = s.add.container(0, 0);
         const renderW = Math.max(1, Math.round(handCardW - 4));
@@ -173,6 +173,17 @@ export class MainStreetRenderer {
 
         // Apply income/reputation overlays
         this.applyUpgradeOverlays(container, card, renderW, renderH);
+
+        // Add interactive hit area so cards can be clicked during market phase
+        // to start the placing-from-hand flow.
+        if (!s.replayMode) {
+          const hitArea = s.add.rectangle(0, 0, handCardW, handCardH, 0x000000, 0.001);
+          hitArea.setInteractive({ useHandCursor: true });
+          hitArea.on('pointerdown', () => {
+            s.onHandBusinessCardClick(cardIndex);
+          });
+          container.add(hitArea);
+        }
 
         return container;
       },
@@ -683,7 +694,7 @@ export class MainStreetRenderer {
    * Toggle the selection highlight on business hand cards.
    * Adds or removes a green border from the card at `index`.
    */
-  private updateBusinessHandSelection(index: number | null): void {
+  public updateBusinessHandSelection(index: number | null): void {
     const s = this.scene;
     // Remove existing selection borders from all business hand card sprites
     for (let i = 0; i < this.handBusinessView.getSprites().length; i++) {

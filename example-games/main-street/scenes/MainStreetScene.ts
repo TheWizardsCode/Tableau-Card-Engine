@@ -363,6 +363,9 @@ export class MainStreetScene extends CardGameScene {
   public selectMarketCardById(...args: any[]): any {
     return (this.msInputManager as any).selectMarketCardById.apply(this.msInputManager, args);
   }
+  public onHandBusinessCardClick(...args: any[]): any {
+    return (this.msTurnController as any).onHandBusinessCardClick.apply(this.msTurnController, args);
+  }
   public onBusinessCardClick(...args: any[]): any {
     return (this.msTurnController as any).onBusinessCardClick.apply(this.msTurnController, args);
   }

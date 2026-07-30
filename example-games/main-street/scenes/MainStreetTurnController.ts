@@ -680,6 +680,65 @@ export class MainStreetTurnController {
    *
    * @param slotIndex  Street grid slot index of the card to sell.
    */
+  /**
+   * Handles clicking on a business card in the player's hand during
+   * the market phase. Sets pendingHandIndex and switches to
+   * placing-from-hand phase so the card can be placed on the grid.
+   *
+   * When already in placing-from-hand phase, clicking a different
+   * hand card switches the selection.
+   *
+   * @param index  Index into s.state.hand for the clicked card.
+   */
+  public onHandBusinessCardClick(index: number): void {
+    const s = this.scene;
+    const hand = s.state.hand ?? [];
+    if (index < 0 || index >= hand.length) return;
+
+    // Tutorial gating: only allow if it's the required action or tutorial is inactive
+    const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('select-hand-card' as any);
+    if (check && !check.allowed) {
+      s.instructionText.setText(check.reason ?? 'Complete the highlighted step first.');
+      return;
+    }
+
+    // When already in placing-from-hand, switching selection is allowed
+    // (preserving existing customClickFn behavior)
+    if (s.uiPhase === 'placing-from-hand' && s.pendingHandIndex !== null) {
+      s.pendingHandIndex = index;
+      const cardName = hand[index]?.name ?? 'card';
+      s.instructionText.setText(`Click an empty slot to place "${cardName}"`);
+      s.refreshAll();
+      // Update the selection highlight via the renderer
+      if (s.msRenderer && typeof s.msRenderer.updateBusinessHandSelection === 'function') {
+        s.msRenderer.updateBusinessHandSelection(index);
+      }
+      return;
+    }
+
+    // Only respond during market phase
+    if (s.uiPhase !== 'market') return;
+
+    // Ensure stale hover tooltip is cleared
+    s.tooltipManager?.hide();
+
+    s.pendingHandIndex = index;
+    s.uiPhase = 'placing-from-hand';
+    const cardName = hand[index]?.name ?? 'card';
+    s.instructionText.setText(`Click an empty slot to place "${cardName}"`);
+    s.refreshAll();
+
+    // Update the selection highlight
+    if (s.msRenderer && typeof s.msRenderer.updateBusinessHandSelection === 'function') {
+      s.msRenderer.updateBusinessHandSelection(index);
+    }
+
+    // Tutorial: mark select-hand-card step complete if active
+    try {
+      (s.msLifecycleManager as any).onTutorialActionComplete?.('select-hand-card' as any);
+    } catch (_) { /* ignore */ }
+  }
+
   public onSellCard(slotIndex: number): void {
     const s = this.scene;
     if (s.uiPhase !== 'market') return;
