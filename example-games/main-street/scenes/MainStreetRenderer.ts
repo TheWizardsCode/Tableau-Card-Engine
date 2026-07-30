@@ -315,7 +315,7 @@ export class MainStreetRenderer {
     s.hudContainer.add(repText);
 
     // Score - right-aligned in strip (shows x / y where y is the win threshold)
-    const scoreText = markHudTransient(s.add.text(stripLeft + stripWidth - 10, hudY, `Score: ${score}/${s.state.config.winThreshold}`, {
+    const scoreText = markHudTransient(s.add.text(stripLeft + stripWidth - 10, hudY, `Score: ${Math.round(score)}/${s.state.config.winThreshold}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#ff8844', fontFamily: FONT_FAMILY,
     }).setOrigin(1, 0.5));
     s.hudContainer.add(scoreText);

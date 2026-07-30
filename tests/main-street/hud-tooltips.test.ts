@@ -321,7 +321,7 @@ describe('buildScoreTooltip', () => {
     expect(tooltip).toContain('Rising Street');
   });
 
-  it('includes numeric score estimate', () => {
+  it('includes numeric score estimate (rounded)', () => {
     const state = setupMainStreetGame({ seed: 'test-score-num' });
     state.resourceBank.coins = 50;
     state.resourceBank.reputation = 10;
@@ -329,7 +329,8 @@ describe('buildScoreTooltip', () => {
     const expectedScore = computeScore(state);
     const tooltip = buildScoreTooltip(state, null);
 
-    expect(tooltip).toContain(`${HUD_TOOLTIP_STRINGS.scoreEstimateLabel}: ${expectedScore}`);
+    // Score estimate should be rounded to nearest whole number
+    expect(tooltip).toContain(`${HUD_TOOLTIP_STRINGS.scoreEstimateLabel}: ${Math.round(expectedScore)}`);
   });
 
   it('includes the win threshold as the target score', () => {
@@ -367,7 +368,7 @@ describe('buildScoreTooltip', () => {
     expect(tooltip).toContain(`${challengeContribution}`);
   });
 
-  it('shows remaining score needed to reach win threshold when score is below target', () => {
+  it('shows remaining score needed to reach win threshold when score is below target (rounded)', () => {
     const state = setupMainStreetGame({ seed: 'test-score-remaining' });
     // Starting game: score should be well below threshold
     const score = computeScore(state);
@@ -376,7 +377,8 @@ describe('buildScoreTooltip', () => {
     const tooltip = buildScoreTooltip(state, null);
 
     if (remaining > 0) {
-      expect(tooltip).toContain(`${remaining} ${HUD_TOOLTIP_STRINGS.scoreRemainingToWin}`);
+      // Remaining score should be rounded to nearest whole number
+      expect(tooltip).toContain(`${Math.round(remaining)} ${HUD_TOOLTIP_STRINGS.scoreRemainingToWin}`);
     }
   });
 
@@ -395,15 +397,37 @@ describe('buildScoreTooltip', () => {
     expect(tooltip).toContain(HUD_TOOLTIP_STRINGS.scoreThresholdMet);
   });
 
-  it('score estimate label includes win threshold as x of y format', () => {
+  it('rounds score values to nearest whole number in tooltip', () => {
+    const state = setupMainStreetGame({ seed: 'test-rounding' });
+    // Set fractional values that produce a non-integer score
+    state.resourceBank.coins = 123.456;
+    state.resourceBank.reputation = 15;
+
+    const score = computeScore(state);
+    const tooltip = buildScoreTooltip(state, null);
+
+    // The estimate line should show the rounded score
+    expect(tooltip).toContain(`${HUD_TOOLTIP_STRINGS.scoreEstimateLabel}: ${Math.round(score)}`);
+    // Score should not contain fractional part in the estimate line
+    const estimateLine = tooltip.split('\n').find(l => l.startsWith(HUD_TOOLTIP_STRINGS.scoreEstimateLabel));
+    expect(estimateLine).toBeDefined();
+    const match = estimateLine!.match(/: (\d+)\/\d+/);
+    expect(match).not.toBeNull();
+    const displayedScore = parseInt(match![1], 10);
+    expect(displayedScore).toBe(Math.round(score));
+    // Breakdown values (coins, reputation) should still show their raw unrounded values
+    expect(tooltip).toContain(`${HUD_TOOLTIP_STRINGS.scoreBreakdownCoins}: 123.456`);
+  });
+
+  it('score estimate label includes win threshold as x of y format (rounded)', () => {
     const state = setupMainStreetGame({ seed: 'test-score-xy' });
     const score = computeScore(state);
     const threshold = state.config.winThreshold;
 
     const tooltip = buildScoreTooltip(state, null);
 
-    // The score estimate should show "score / threshold" or "score of threshold"
-    expect(tooltip).toContain(`${score}/${threshold}`);
+    // The score estimate should show rounded "score / threshold"
+    expect(tooltip).toContain(`${Math.round(score)}/${threshold}`);
   });
 });
 

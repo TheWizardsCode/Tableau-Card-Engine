@@ -92,7 +92,7 @@ export class MainStreetOverlayContent {
       `Coins: ${coins}`,
       `Reputation: ${reputation} (x${cfg.reputationScoreMultiplier} = ${reputation * cfg.reputationScoreMultiplier})`,
       `Challenges: ${challenges} (x${cfg.challengeBonusPoints} = ${challenges * cfg.challengeBonusPoints})`,
-      `Final Score: ${result.finalScore}`,
+      `Final Score: ${Math.round(result.finalScore)}`,
     ];
     const breakdownY = panelTop + 110;
     const breakdown = s.add.text(s.layout.gameW / 2, breakdownY, lines.join('\n'), {
@@ -197,7 +197,7 @@ export class MainStreetOverlayContent {
         : 0;
       const statsLines = [
         `Runs: ${s.campaign.totalRuns}  |  Wins: ${s.campaign.totalWins}  (${winRate}%)`,
-        `High Score: ${s.campaign.highestScore}  |  Best Rep: ${s.campaign.persistentReputation}`,
+        `High Score: ${Math.round(s.campaign.highestScore)}  |  Best Rep: ${s.campaign.persistentReputation}`,
       ];
       const statsText = s.add.text(
         s.layout.gameW / 2, cursorY, statsLines.join('\n'),
