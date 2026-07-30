@@ -91,6 +91,18 @@ Each example game is a standalone game that can independently demonstrate the ca
 
 Example games live in `example-games/<game-name>/` with their own `main.ts` entry point and `scenes/` directory. The root `index.html` loads a unified entry point (`main.ts`) that boots the **Game Selector** landing page, allowing players to choose between available games. The games are deployed to GitHub Pages at `https://thewizardscode.github.io/Tableau-Card-Engine/` via a GitHub Actions workflow that runs on every push to `main`.
 
+#### Screen Layout Language (SLL) Requirement
+
+All new example games **must** use the **Screen Layout Language (SLL)** for their UI layouts instead of hardcoded pixel positions. SLL provides a declarative, responsive layout system that ensures consistency, adaptability, and reusability across example games.
+
+- **Do not** use absolute pixel coordinates for positioning UI elements within scenes.
+- **Do** define UI layouts using SLL composition in your scene code.
+- Reference the SLL modules for guidance:
+  - `src/ui/screen-layout.ts` — Core SLL layout engine and utilities
+  - `src/ui/screen-layout-compose.ts` — SLL composition helpers
+  - `src/ui/screen-layout-schema.ts` — SLL schema definitions and type contracts
+- The Gym (`example-games/gym/`) contains SLL examples (see `GymOverlayUiScene.ts`) that demonstrate both direct and composed SLL usage patterns.
+
 ## Technology Stack
 
 - **Phaser 4 RC** (currently 4.0.0-rc.7): The current release-candidate line of the Phaser HTML5 game framework used by this repository. Provides a foundation for building 2D games, including card games, with WebGL/Canvas rendering, input handling, tweens, and scene management.
