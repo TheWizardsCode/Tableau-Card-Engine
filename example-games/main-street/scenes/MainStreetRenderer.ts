@@ -115,11 +115,12 @@ export class MainStreetRenderer {
     s.handContainer = createGameZone(s, 0, 0, s.layout.gameW, s.layout.gameH, 'handContainer');
 
     // Create HandView for the player's hand (anticipates multi-event-card support)
-    const { handX, handY, handCardW, handCardH } = s.layout;
+    const { handX, handY, handCardW, handCardH, handCenterX } = s.layout;
     // HandView is created at the hand slot centre — renderCard positions cards via HandView layout
     this.handView = new HandView(s, {
       baseX: handX + handCardW / 2,
       baseY: handY + handCardH / 2,
+      centerX: handCenterX,
       spacing: handCardW + 10,
       cardWidth: handCardW,
       showLabels: false,
@@ -156,6 +157,7 @@ export class MainStreetRenderer {
     this.handBusinessView = new HandView(s, {
       baseX: handX + handCardW / 2,
       baseY: handY,
+      centerX: handCenterX,
       spacing: handCardW + 8,
       cardWidth: handCardW,
       showLabels: false,

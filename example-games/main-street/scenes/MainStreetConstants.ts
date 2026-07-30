@@ -103,6 +103,7 @@ export interface SceneLayout {
   streetCols: number;
   handY: number;
   handX: number;
+  handCenterX: number;
   handCardW: number;
   handCardH: number;
   instructionY: number;
