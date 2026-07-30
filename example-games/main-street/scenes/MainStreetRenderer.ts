@@ -78,6 +78,8 @@ import { computeMainStreetLayoutWithSll } from './MainStreetLayoutAdapter';
 export class MainStreetRenderer {
   /** HandView for player hand — uses renderCard for SVG event card rendering. */
   handView!: HandView;
+  /** HandView for business cards held in hand — supports selection highlighting. */
+  handBusinessView!: HandView;
 
   constructor(private readonly scene: any) {}
 
@@ -150,6 +152,39 @@ export class MainStreetRenderer {
         return container;
       },
     });
+    // Create HandView for business cards (hand cards from purchase)
+    this.handBusinessView = new HandView(s, {
+      baseX: handX + handCardW / 2,
+      baseY: handY,
+      spacing: handCardW + 8,
+      cardWidth: handCardW,
+      showLabels: false,
+      selectionEnabled: false,
+      clickEnabled: true,
+      renderCard: (_card) => {
+        const card = _card as any;
+        const container = s.add.container(0, 0);
+        const renderW = Math.max(1, Math.round(handCardW - 4));
+        const renderH = Math.max(1, Math.round(handCardH - 4));
+
+        mainStreetRenderCardSvg(s, container, card.id, renderW, renderH);
+
+        // Apply income/reputation overlays
+        this.applyUpgradeOverlays(container, card, renderW, renderH);
+
+        return container;
+      },
+      customClickFn: (cardIndex: number) => {
+        // Allow selecting a different card in the hand during placement
+        if (s.uiPhase === 'placing-from-hand') {
+          s.pendingHandIndex = cardIndex;
+          this.updateBusinessHandSelection(cardIndex);
+          const cardName = s.state.hand?.[cardIndex]?.name ?? 'card';
+          s.instructionText.setText(`Click an empty slot to place "${cardName}"`);
+        }
+      },
+    });
+
     s.actionContainer = createGameZone(s, 0, 0, s.layout.gameW, s.layout.gameH, 'actionContainer');
     // Action buttons must render above hand cards for visibility.
     try { s.actionContainer.setDepth(100); } catch (_) { /* ignore in tests */ }
@@ -639,6 +674,35 @@ export class MainStreetRenderer {
       );
       repText.setOrigin(spec.reputationText.originX ?? 0, spec.reputationText.originY ?? 0);
       container.add(repText);
+    }
+  }
+
+  /**
+   * Toggle the selection highlight on business hand cards.
+   * Adds or removes a green border from the card at `index`.
+   */
+  private updateBusinessHandSelection(index: number | null): void {
+    const s = this.scene;
+    // Remove existing selection borders from all business hand card sprites
+    for (let i = 0; i < this.handBusinessView.getSprites().length; i++) {
+      const sprite = this.handBusinessView.getSpriteAt(i);
+      if (!sprite) continue;
+      const container = sprite as Phaser.GameObjects.Container;
+      const existing = container.getByName('hand-selection-border');
+      if (existing) existing.destroy();
+    }
+
+    // Add selection border to the newly selected card
+    if (index !== null && index >= 0 && index < this.handBusinessView.getSprites().length) {
+      const sprite = this.handBusinessView.getSpriteAt(index);
+      if (!sprite) return;
+      const container = sprite as Phaser.GameObjects.Container;
+      const renderW = Math.max(1, Math.round(s.layout.handCardW - 4));
+      const renderH = Math.max(1, Math.round(s.layout.handCardH - 4));
+      const sel = s.add.rectangle(0, 0, renderW + 4, renderH + 4, 0x88ff88, 0);
+      sel.setStrokeStyle(3, 0x88ff88);
+      sel.setName('hand-selection-border');
+      container.add(sel);
     }
   }
 
@@ -1206,51 +1270,14 @@ export class MainStreetRenderer {
       this.handView.setCards([]);
     }
 
-    // Render hand cards from state.hand (Multi-Use Card Economy)
-    this.refreshBusinessHandCards();
-  }
-
-  /**
-   * Renders business cards held in the player's hand.
-   * Shows each card as a small card below the tableau with synergy indicator.
-   */
-  private refreshBusinessHandCards(): void {
-    const s = this.scene;
+    // Render business hand cards via HandView
     const hand = s.state.hand ?? [];
+    this.handBusinessView.setCards(hand);
 
-    // Remove previous hand card display
-    if (s.handBusinessContainer) {
-      s.handBusinessContainer.removeAll(true);
-    } else {
-      s.handBusinessContainer = s.add.container(0, 0);
+    // Restore selection highlight when in placing-from-hand phase
+    if (s.uiPhase === 'placing-from-hand' && s.pendingHandIndex !== null) {
+      this.updateBusinessHandSelection(s.pendingHandIndex);
     }
-
-    if (hand.length === 0) {
-      return;
-    }
-
-    const { handCardW, handCardH, handX, handY } = s.layout;
-    const startX = handX + handCardW / 2;
-    const y = handY;
-    const spacing = handCardW + 8;
-
-    for (let i = 0; i < hand.length; i++) {
-      const card = hand[i];
-      const x = startX + i * spacing;
-
-      const container = s.add.container(x, y);
-
-      // Render card via shared SVG pipeline for unified appearance
-      const renderW = Math.max(1, Math.round(handCardW - 4));
-      const renderH = Math.max(1, Math.round(handCardH - 4));
-      mainStreetRenderCardSvg(s, container, card.id, renderW, renderH);
-
-      // Apply income/reputation overlays (uses centered "Income: +X/turn" format)
-      this.applyUpgradeOverlays(container, card, renderW, renderH);
-
-      s.handBusinessContainer!.add(container);
-    }
-
   }
 
   /**

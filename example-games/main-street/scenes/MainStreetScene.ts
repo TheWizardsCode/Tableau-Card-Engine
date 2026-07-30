@@ -71,8 +71,6 @@ export class MainStreetScene extends CardGameScene {
   public marketContainer!: Phaser.GameObjects.Container;
   public incidentQueueContainer!: Phaser.GameObjects.Container;
   public handContainer!: Phaser.GameObjects.Container;
-  /** Container for business cards in the player's hand (Multi-Use Card Economy). */
-  public handBusinessContainer!: Phaser.GameObjects.Container;
 
   public actionContainer!: Phaser.GameObjects.Container;
 
