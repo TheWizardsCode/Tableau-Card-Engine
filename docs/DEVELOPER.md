@@ -2002,15 +2002,22 @@ bar.addButton('[ Custom ]', () => { /* ... */ }, {
 
 #### Integration with GymSceneBase
 
-Gym scenes call `initButtonBar()` to create a `GymButtonBar` instance and store it as `this.buttonBar`:
+Gym scenes call `initButtonBar()` once per button row/section. Each call creates a **new** `GymButtonBar` at the given Y position and appends it to an internal registry — previously created bars are **kept** (no destroy-and-recreate). `this.buttonBar` always points at the most recently created bar:
 
 ```typescript
-protected initButtonBar(y?: number): void {
-  this.buttonBar = new GymButtonBar(this, { y: y ?? 60 });
-}
+// Controls row 1
+this.initButtonBar(60);
+this.buttonBar!.addButton('[ Draw ]', () => this.drawToHand(), { zone: 'center' });
+this.buttonBar!.addButton('[ Discard ]', () => this.discardSelected(), { zone: 'center' });
+
+// Controls row 2 — a SECOND bar; row 1 is NOT destroyed
+this.initButtonBar(112);
+this.buttonBar!.addButton('[ Enable Drag ]', () => this.toggleDrag(), { zone: 'center' });
 ```
 
-Scenes with buttons at multiple Y positions create multiple `GymButtonBar` instances at different Y values.
+`initButtonBar(y, opts?)` returns the created bar (also exposed as `this.buttonBar`), and accepts the same `GymButtonBarConfig` overrides as the `GymButtonBar` constructor (e.g. `{ zone: 'left' }`, `{ rowSpacing: 30 }`).
+
+All registered bars are destroyed automatically when the scene shuts down or is destroyed, so scene restarts are leak-free. `GymSceneBase` wires this cleanup to the Phaser scene `shutdown`/`destroy` events on the first `initButtonBar()` call.
 
 The `GymButtonBar` is exported from the UI barrel (`src/ui/index.ts`) and can be used by any scene, not just Gym scenes.
 
