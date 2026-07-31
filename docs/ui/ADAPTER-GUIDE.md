@@ -118,6 +118,27 @@ const tokenPile = new TokenPileView(scene, {
 | `getContainer()` | Return the container for external animation |
 | `destroy()` | Clean up display objects |
 
+#### Built-in renderer: `createCardBackTokenRenderer`
+
+For card-like tokens, `createCardBackTokenRenderer(backTexture)` renders each
+object as an image using the base `backTexture`. Tokens that carry a `cardType`
+property are rendered with the `{backTexture}-{cardType}` variant texture (e.g.
+`card_back-treasure`). If that variant texture does **not** exist in the scene's
+texture manager, the renderer falls back to the base `backTexture` (logging a
+`console.warn`) so tokens never appear as Phaser's missing-texture sprite.
+
+```ts
+import { createCardBackTokenRenderer } from '@ui/TokenPileView';
+
+const cardBackPile = new TokenPileView(this.scene, {
+  x: 300,
+  y: 200,
+  label: 'Card Backs',
+  tokenRadius: 24,
+  tokenRenderer: createCardBackTokenRenderer('my_card_back'),
+});
+```
+
 #### Example: Feudalism resource pile
 
 ```ts
