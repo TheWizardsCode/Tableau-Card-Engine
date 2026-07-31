@@ -86,6 +86,16 @@ describe('CardMemoryTracker', () => {
       expect(ranks['Q']).toBe(1);
     });
 
+    it('delegates to recordKey with the card rank as the key', () => {
+      const tracker = new CardMemoryTracker(100);
+      const card = createCard('7', 'diamonds', true);
+      tracker.recordCard(card);
+
+      const ranks = tracker.getVisibleRanks(createTestRng());
+      // The rank string '7' is the grouping key
+      expect(ranks['7']).toBe(1);
+    });
+
     it('records multiple cards of the same rank', () => {
       const tracker = new CardMemoryTracker(100);
       tracker.recordCard(createCard('Q', 'hearts', true));
@@ -126,6 +136,66 @@ describe('CardMemoryTracker', () => {
       const ranks = tracker.getVisibleRanks(createTestRng());
       // Only rank matters, not suit
       expect(ranks['5']).toBe(2);
+    });
+  });
+
+  describe('recordKey', () => {
+    it('records a card by arbitrary string key', () => {
+      const tracker = new CardMemoryTracker(100);
+      tracker.recordKey('yellow');
+
+      const counts = tracker.getVisibleRanks(createTestRng());
+      expect(counts['yellow']).toBe(1);
+    });
+
+    it('increments counts for duplicate keys', () => {
+      const tracker = new CardMemoryTracker(100);
+      tracker.recordKey('yellow');
+      tracker.recordKey('yellow');
+      tracker.recordKey('red');
+
+      const counts = tracker.getVisibleRanks(createTestRng());
+      expect(counts['yellow']).toBe(2);
+      expect(counts['red']).toBe(1);
+    });
+
+    it('supports non-Card grouping keys (e.g. custom card models)', () => {
+      const tracker = new CardMemoryTracker(100);
+      // Simulate a Lost Cities custom card model: group by expedition color
+      tracker.recordKey('blue');
+      tracker.recordKey('blue');
+      tracker.recordKey('green');
+
+      const counts = tracker.getVisibleRanks(createTestRng());
+      expect(counts['blue']).toBe(2);
+      expect(counts['green']).toBe(1);
+    });
+
+    it('is equivalent to recordCard for rank-based grouping', () => {
+      const byKey = new CardMemoryTracker(100);
+      const byCard = new CardMemoryTracker(100);
+
+      byKey.recordKey('Q');
+      byKey.recordKey('K');
+      byCard.recordCard(createCard('Q', 'hearts', true));
+      byCard.recordCard(createCard('K', 'clubs', true));
+
+      const keyCounts = byKey.getVisibleRanks(createTestRng());
+      const cardCounts = byCard.getVisibleRanks(createTestRng());
+      expect(keyCounts).toEqual(cardCounts);
+    });
+
+    it('respects maxCopies when misremembering', () => {
+      const tracker = new CardMemoryTracker({ skill: 0, maxCopies: 12 });
+      tracker.recordKey('yellow');
+
+      const rng = createTestRng(42);
+      for (let t = 0; t < 1000; t++) {
+        const counts = tracker.getVisibleRanks(rng);
+        const count = counts['yellow'] ?? 0;
+        expect(count).toBeGreaterThanOrEqual(0);
+        expect(count).toBeLessThanOrEqual(12);
+      }
     });
   });
 

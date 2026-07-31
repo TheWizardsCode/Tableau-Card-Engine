@@ -27,6 +27,11 @@ players that need to "remember" previously seen cards with configurable accuracy
 - **Configurable `maxCopies`:** Sets the upper bound for random counts when the
   AI misremembers. Default is 4 (standard 52-card deck). Set to 8 for a double
   deck, or adjust per game requirements.
+- **Generic grouping keys:** `recordKey(key: string)` records observations by
+  any stable string key, supporting custom card models that do not implement
+  the engine `Card` interface (e.g. Lost Cities' `LostCitiesCard`, grouped by
+  expedition color). `recordCard(card: Card)` is a convenience wrapper that
+  derives the key from the card's rank.
 - **Deterministic testing:** Accepts an external RNG function, allowing tests
   to use seeded PRNGs for reproducible results.
 - **Backward compatible:** The constructor accepts either a plain `skill`
@@ -44,11 +49,16 @@ const memory = new CardMemoryTracker();
 // Double deck: skill=90, maxCopies=8
 const memory = new CardMemoryTracker({ skill: 90, maxCopies: 8 });
 
-// Record observed cards
+// Record observed cards (standard Card interface, grouped by rank)
 memory.recordCard(createCard('Q', 'hearts', true));
 
 // Query with a game RNG
 const recalled = memory.getVisibleRanks(gameRng);
+
+// Custom card model (Lost Cities): group by expedition color
+const lcMemory = new CardMemoryTracker({ skill: 80, maxCopies: 12 });
+lcMemory.recordKey('yellow');
+const colorCounts = lcMemory.getVisibleRanks(gameRng);
 ```
 
 ### `AiUtils`
