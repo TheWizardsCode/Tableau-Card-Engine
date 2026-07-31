@@ -209,6 +209,9 @@ export class LostCitiesTurnController {
     if (action.kind === 'play-to-expedition') {
       this.callbacks.onPlaySound(SFX_KEYS.CARD_PLAY);
     } else {
+      // The human player's discard is fully visible — the AI opponent
+      // observes it and records it in its card memory.
+      this.aiPlayer.recordDiscard(action.card);
       this.callbacks.onPlaySound(SFX_KEYS.CARD_DISCARD);
     }
 
@@ -265,6 +268,11 @@ export class LostCitiesTurnController {
         const phase1Phase = this.session.round.turnPhase;
         const phase1Result = executeAction(this.session, phase1Action);
         this.recorder.recordAction(this.session, phase1Result, phase1Action, phase1Phase);
+
+        // The AI observes its own discard (fully visible) and remembers it.
+        if (phase1Action.kind === 'discard') {
+          this.aiPlayer.recordDiscard(phase1Action.card);
+        }
 
         // Don't refresh expeditions before animation — that would create a
         // destination sprite with card back before the animated card arrives.

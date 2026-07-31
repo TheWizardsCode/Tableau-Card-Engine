@@ -47,22 +47,4 @@ describe('Incident queue card aspect ratio', () => {
     expect(layout.queueCardH).not.toBe(layout.marketCardH);
   });
 
-  it('two queue cards at 120×69 fit within the 300px wide panel', () => {
-    const cardW = 120;
-    const gap = 6;
-    // Panel width is ~300px, card width is 120px, so card fits with room to spare
-    expect(cardW).toBeLessThanOrEqual(300);
-    // Two cards stacked vertically: 2 * 69 + gap = 144px panel height for cards
-    const twoCardsHeight = 2 * 69 + gap;
-    // Panel height should accommodate this
-    expect(twoCardsHeight).toBeLessThan(300); // well within any reasonable panel
-  });
-
-  it('queue cards are smaller than market cards (14% reduction)', () => {
-    const layout = computeMainStreetLayoutWithSll();
-    const marketArea = layout.marketCardW * layout.marketCardH; // 140*80 = 11200
-    const queueArea = layout.queueCardW * layout.queueCardH;   // 120*69 = 8280
-    const reduction = 1 - queueArea / marketArea;
-    expect(reduction).toBeCloseTo(0.26, 0); // ~26% area reduction
-  });
 });

@@ -30,14 +30,14 @@ describe('UNIFIED_TUTORIAL_STEPS', () => {
   });
   it('each step has valid highlightZone', () => { for(const step of UNIFIED_TUTORIAL_STEPS) expect(['centerModal','hud','marketBusinessRow','streetGrid','endTurnButton','incidentQueue','investmentsRow','challengePanel','helpButton','completionModal']).toContain(step.highlightZone); });
   it('each step has gate confirm or action', () => { for(const step of UNIFIED_TUTORIAL_STEPS) expect(['confirm','action']).toContain(step.gate); });
-  it('has correct distribution: 9 confirm + 5 action', () => { expect(UNIFIED_TUTORIAL_STEPS.filter(s=>s.gate==='confirm').length).toBe(9); expect(UNIFIED_TUTORIAL_STEPS.filter(s=>s.gate==='action').length).toBe(5); });
+  it('has correct distribution: 8 confirm + 6 action', () => { expect(UNIFIED_TUTORIAL_STEPS.filter(s=>s.gate==='confirm').length).toBe(8); expect(UNIFIED_TUTORIAL_STEPS.filter(s=>s.gate==='action').length).toBe(6); });
   it('confirm steps do not have requiredAction', () => { for(const step of UNIFIED_TUTORIAL_STEPS) if(step.gate==='confirm') expect(step.requiredAction).toBeUndefined(); });
   it('confirm steps do not have requiredCardId', () => { for(const step of UNIFIED_TUTORIAL_STEPS) if(step.gate==='confirm') expect(step.requiredCardId).toBeUndefined(); });
   it('action steps have requiredAction', () => { for(const step of UNIFIED_TUTORIAL_STEPS) if(step.gate==='action') expect(step.requiredAction).toBeDefined(); });
   it('T1 is confirm gate with centerModal highlight', () => { expect(findStep('T1').gate).toBe('confirm'); expect(findStep('T1').highlightZone).toBe('centerModal'); });
   it('T2 is confirm gate with hud highlight', () => { expect(findStep('T2').gate).toBe('confirm'); expect(findStep('T2').highlightZone).toBe('hud'); });
   it('T5 is confirm gate with incidentQueue highlight', () => { expect(findStep('T5').gate).toBe('confirm'); expect(findStep('T5').highlightZone).toBe('incidentQueue'); });
-  it('T9 is confirm gate with investmentsRow highlight (upgrade concept)', () => { const t=findStep('T9'); expect(t.gate).toBe('confirm'); expect(t.highlightZone).toBe('investmentsRow'); });
+  it('T9 is action gate with streetGrid highlight (place from hand)', () => { const t=findStep('T9'); expect(t.gate).toBe('action'); expect(t.requiredAction).toBe('place-business'); expect(t.highlightZone).toBe('streetGrid'); });
   it('T10 is confirm gate with centerModal highlight', () => { expect(findStep('T10').gate).toBe('confirm'); expect(findStep('T10').highlightZone).toBe('centerModal'); });
   it('T11 is confirm gate with endTurnButton highlight', () => { expect(findStep('T11').gate).toBe('confirm'); expect(findStep('T11').highlightZone).toBe('endTurnButton'); });
   it('T12 is confirm gate with challengePanel highlight', () => { expect(findStep('T12').gate).toBe('confirm'); expect(findStep('T12').highlightZone).toBe('challengePanel'); });

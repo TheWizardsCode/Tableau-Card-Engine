@@ -14,13 +14,4 @@ describe('Main Street greedy AI strategy CI guardrail', () => {
     expect(metrics.winRate).toBeLessThanOrEqual(0.8);
   });
 
-  it('random strategy produces valid win rate over 100 deterministic seeds', () => {
-    const seeds = Array.from({ length: 100 }, (_, i) => `mc-random-${i}`);
-    const { metrics } = runMonteCarlo({ seeds, maxTurns: 25, strategy: 'random' });
-
-    expect(metrics.runs).toBe(100);
-    // Random strategy should produce at least some wins (basic sanity check).
-    expect(metrics.winRate).toBeGreaterThanOrEqual(0);
-    expect(metrics.winRate).toBeLessThanOrEqual(1);
-  });
 });

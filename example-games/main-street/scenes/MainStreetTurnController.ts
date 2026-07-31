@@ -1,9 +1,8 @@
 import { addLog } from '../MainStreetState';
-import { executeDayStart, processEndOfTurn, type TurnResult } from '../MainStreetEngine';
+import { executeDayStart, processEndOfTurn, placeFromHand, type TurnResult } from '../MainStreetEngine';
 import {
-  getEmptySlots,
   findTargetBusinessSlot,
-  canPurchaseBusiness,
+  canAddToHand,
   canPurchaseUpgrade,
   canPurchaseEvent,
   canRefreshDevelopment,
@@ -11,7 +10,7 @@ import {
   canSellBusiness,
 } from '../MainStreetMarket';
 import type { BusinessCard, EventCard, UpgradeCard } from '../MainStreetCards';
-import { buyBusinessCommand, buyUpgradeCommand, buyEventCommand, playEventCommand, refreshDevelopmentCommand, refreshInvestmentsCommand } from '../MainStreetCommands';
+import { buyBusinessCommand, buyBusinessToHandCommand, buyUpgradeCommand, buyEventCommand, playEventCommand, refreshDevelopmentCommand, refreshInvestmentsCommand } from '../MainStreetCommands';
 import { recordMainStreetEvent, finalizeMainStreetTranscript } from '../MainStreetTranscript';
 import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
 import { getCurrentStep, type TutorialActionType } from '../TutorialFlow';
@@ -45,10 +44,16 @@ export class MainStreetTurnController {
    */
   public onGameEnd: (() => void) | null = null;
 
-  public startDayPhase(): void {
+  /**
+   * Starts the DayPhase for a new turn.
+   *
+   * @param skipMarketRefill  When true (e.g., checkpoint resume), the market
+   *                          is not refilled and the saved market state is preserved.
+   */
+  public startDayPhase(skipMarketRefill: boolean = false): void {
     const s = this.scene;
-    // Execute DayStart (refills market, transitions to MarketPhase)
-    executeDayStart(s.state);
+    // Execute DayStart (optionally refills market, transitions to MarketPhase)
+    executeDayStart(s.state, skipMarketRefill);
     s.uiPhase = 'market';
 
     // Reset hint state for the new turn
@@ -297,119 +302,75 @@ export class MainStreetTurnController {
 
     s.selectMarketCardById(card.id);
 
-    const emptySlots = getEmptySlots(s.state);
-    if (emptySlots.length === 0) {
-      s.instructionText.setText('No empty slots available!');
+    // Check hand capacity
+    const handCheck = canAddToHand(s.state);
+    if (!handCheck.legal) {
+      s.instructionText.setText(`Hand full: ${handCheck.reason ?? 'Place or sell a card first.'}`);
       return;
     }
 
-    // Check if can afford
-    const firstSlot = emptySlots[0];
-    const legality = canPurchaseBusiness(s.state, card.id, firstSlot);
-    if (!legality.legal) {
-      s.instructionText.setText(`Cannot buy: ${legality.reason ?? 'unknown'}`);
-      return;
-    }
+    // ── Buy to hand (all purchases now go through hand) ─────
+    const sourceIndex = s.state.market.development.findIndex((c: any) => c.id === card.id);
+    const cardName = card.name;
 
-    // ── Auto-place mode (buy + place in one step) ──────────────
-    // If the current tutorial step is an action gate with select-business
-    // AND has a requiredCardId set, the card should be bought and
-    // auto-placed without a separate placement step.
-    // This is used for T8 (buy Bookshop + auto-place).
-    const isAutoPlaceStep = controller?.isActive &&
-      controller.currentStepIndex >= 0 &&
-      getCurrentStep(controller)?.gate === 'action' &&
-      getCurrentStep(controller)?.requiredAction === 'select-business' &&
-      getCurrentStep(controller)?.requiredCardId !== undefined;
+    // Ensure stale hover tooltip is cleared
+    s.tooltipManager?.hide();
 
-    if (isAutoPlaceStep) {
-      // Auto-place: buy the card and place it in the first empty slot
-      const sourceIndex = s.state.market.development.findIndex((c: any) => c.id === card.id);
-      const pendingCardId = card.id;
-      const pendingCardName = card.name;
-      const targetSlot = firstSlot;
+    s.clearMarketSelection();
+    s.uiPhase = 'animating';
+    s.instructionText.setText(`Buying "${cardName}"...`);
+    s.hiddenTransferSourceCardIds.add(card.id);
+    s.refreshAll();
 
-      // Ensure stale hover tooltip is cleared
-      s.tooltipManager?.hide();
+    const afterTransfer = () => {
+      try {
+        const cmd = buyBusinessToHandCommand(s.state, card.id);
+        s.undoManager.execute(cmd);
+        try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'buy-business-to-hand', cardId: card.id }, description: cmd.description }); } catch (_) {}
+        try { s.gameEvents?.emit('card:placed', { cardId: card.id }); } catch (_) {}
+        s.instructionText.setText(`"${cardName}" bought to hand!`);
 
-      s.pendingBusinessCard = null;
-      s.pendingBusinessSourceIndex = null;
-      s.clearMarketSelection();
-      s.uiPhase = 'animating';
-      s.instructionText.setText(`Buying and placing "${pendingCardName}"...`);
-      s.hiddenTransferSourceCardIds.add(pendingCardId);
-      s.refreshAll();
-
-      const afterTransfer = () => {
-        try {
-          const cmd = buyBusinessCommand(s.state, pendingCardId, targetSlot);
-          s.undoManager.execute(cmd);
-          try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'buy-business', cardId: pendingCardId, slotIndex: targetSlot }, description: cmd.description }); } catch (_) {}
-          try { s.gameEvents?.emit('card:placed', { cardId: pendingCardId, slotIndex: targetSlot }); } catch (_) {}
-          s.instructionText.setText(`Placed "${pendingCardName}" on slot ${targetSlot}`);
-        } catch (e) {
-          console.error('[MS] Auto-place BuyBusiness failed', e);
-          s.instructionText.setText(`Error: ${(e as Error).message}`);
-        }
-
-        s.hiddenTransferSourceCardIds.delete(pendingCardId);
+        // Set pending hand index for placement (last card added to hand)
+        const hand = s.state.hand ?? [];
+        s.pendingHandIndex = hand.length - 1;
+        s.uiPhase = 'placing-from-hand';
+        s.instructionText.setText(`Click an empty slot to place "${cardName}"`);
+      } catch (e) {
+        console.error('[MS] BuyBusinessToHand failed', e);
+        s.instructionText.setText(`Error: ${(e as Error).message}`);
         s.uiPhase = 'market';
-        s.refreshAll();
-
-        // Tutorial: mark select-business step complete (auto-place step is done)
-        try {
-          (s.msLifecycleManager as any).onTutorialActionComplete?.('select-business' as TutorialActionType);
-        } catch (_) { /* ignore */ }
-      };
-
-      if (sourceIndex >= 0) {
-        void s.animateTransferFromMarket({
-          cardId: pendingCardId,
-          family: 'business',
-          row: 'development',
-          slotIndex: sourceIndex,
-          destination: s.getStreetSlotCenter(targetSlot),
-        }).then(afterTransfer);
-      } else {
-        afterTransfer();
       }
-      return;
+
+      s.hiddenTransferSourceCardIds.delete(card.id);
+      s.refreshAll();
+      s.refreshStreetGrid();
+      s.refreshActionButtons();
+
+      // Tutorial: mark select-business step complete if active
+      try {
+        (s.msLifecycleManager as any).onTutorialActionComplete?.('select-business' as TutorialActionType);
+      } catch (_) { /* ignore */ }
+    };
+
+    if (sourceIndex >= 0) {
+      const handIndex = (s.state.hand ?? []).length;
+      const spacing = s.layout.handCardW + 8;
+      const destX = s.layout.handX + s.layout.handCardW / 2 + handIndex * spacing;
+      void s.animateTransferFromMarket({
+        cardId: card.id,
+        family: 'business',
+        row: 'development',
+        slotIndex: sourceIndex,
+        destination: { x: destX, y: s.layout.handY },
+      }).then(afterTransfer);
+    } else {
+      afterTransfer();
     }
-
-    // ── Normal placement mode (select then place) ──────────────
-    s.pendingBusinessCard = card;
-    s.pendingBusinessSourceIndex = s.state.market.development.findIndex((c: any) => c.id === card.id);
-    s.uiPhase = 'placing-business';
-    s.instructionText.setText(`Click an empty slot to place "${card.name}"`);
-    s.refreshStreetGrid();
-    s.refreshActionButtons();
-
-    // Tutorial: mark select-business step complete if active
-    try {
-      (s.msLifecycleManager as any).onTutorialActionComplete?.('select-business' as TutorialActionType);
-    } catch (_) { /* ignore */ }
   }
 
   public onSlotClick(slotIndex: number): void {
     const s = this.scene;
-    if (s.uiPhase !== 'placing-business') return;
-
-    // Tutorial: if no card is pending (because it was rejected by requiredCardId check),
-    // show a helpful message directing the player to buy a business card first
-    if (!s.pendingBusinessCard) {
-      const controller = (s as any).tutorialController as any;
-      if (controller?.isActive) {
-        const msg = 'You must first buy a business card. Click on a business card in the market.';
-        s.instructionText.setText(msg);
-        // Clear the error message after 2 seconds
-        s.time.delayedCall(2000, () => {
-          if (s.instructionText?.text === msg) {
-            s.instructionText.setText('Complete the highlighted step.');
-          }
-        });
-      }
-      return;
-    }
+    if (s.uiPhase !== 'placing-from-hand' && s.uiPhase !== 'placing-business') return;
 
     // Tutorial gating: only allow place-business if it's the required action or tutorial is inactive
     const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('place-business' as TutorialActionType);
@@ -418,8 +379,51 @@ export class MainStreetTurnController {
       return;
     }
 
-    // Ensure stale hover tooltip is cleared when a card is played.
+    // Ensure stale hover tooltip is cleared when a card is placed.
     s.tooltipManager?.hide();
+
+    // ── New flow: place from hand ──────────────────────────────
+    if (s.pendingHandIndex !== null) {
+      const handIndex = s.pendingHandIndex;
+      s.pendingHandIndex = null;
+      s.uiPhase = 'animating';
+      s.refreshAll();
+
+      try {
+        placeFromHand(s.state, handIndex, slotIndex);
+        try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'place', handIndex, slotIndex }, description: `Placed from hand to slot ${slotIndex}` }); } catch (_) {}
+        try { s.gameEvents?.emit('card:placed', { handIndex, slotIndex }); } catch (_) {}
+        s.instructionText.setText(`Placed on slot ${slotIndex}`);
+      } catch (e) {
+        console.error('[MS] placeFromHand failed', e);
+        s.instructionText.setText(`Error: ${(e as Error).message}`);
+      }
+
+      s.uiPhase = 'market';
+      s.refreshAll();
+      // Tutorial: mark place-business step complete if active
+      try {
+        (s.msLifecycleManager as any).onTutorialActionComplete?.('place-business' as TutorialActionType);
+      } catch (_) { /* ignore */ }
+      return;
+    }
+
+    // ── Legacy flow: direct buy to grid (pendingBusinessCard) ──
+    // This path is kept for backward compatibility but should not be
+    // triggered in normal gameplay since all purchases go through hand.
+    if (!s.pendingBusinessCard) {
+      const tutController = (s as any).tutorialController as any;
+      if (tutController?.isActive) {
+        const msg = 'You must first buy a business card. Click on a business card in the market.';
+        s.instructionText.setText(msg);
+        s.time.delayedCall(2000, () => {
+          if (s.instructionText?.text === msg) {
+            s.instructionText.setText('Complete the highlighted step.');
+          }
+        });
+      }
+      return;
+    }
 
     const sourceIndex = s.pendingBusinessSourceIndex;
     const pendingCardId = s.pendingBusinessCard.id;
@@ -434,13 +438,10 @@ export class MainStreetTurnController {
     s.refreshAll();
 
     const afterTransfer = (): void => {
-      console.debug('[MS] onSlotClick: attempting BuyBusiness', { cardId: pendingCardId, slotIndex, coinsBefore: s.state.resourceBank.coins, marketBefore: s.state.market.development.map((c: any)=>c.id) });
       try {
         const cmd = buyBusinessCommand(s.state, pendingCardId, slotIndex);
         s.undoManager.execute(cmd);
-        // Record action event
         try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'buy-business', cardId: pendingCardId, slotIndex }, description: cmd.description }); } catch (_) {}
-        // Emit a game event for audio / integrations
         try { s.gameEvents?.emit('card:placed', { cardId: pendingCardId, slotIndex }); } catch (_) {}
         s.instructionText.setText(`Placed "${pendingCardName}" on slot ${slotIndex}`);
       } catch (e) {
@@ -451,7 +452,6 @@ export class MainStreetTurnController {
       s.hiddenTransferSourceCardIds.delete(pendingCardId);
       s.uiPhase = 'market';
       s.refreshAll();
-      // Tutorial: mark place-business step complete if active
       (s.msLifecycleManager as any).onTutorialActionComplete?.('place-business' as TutorialActionType);
     };
 
@@ -686,6 +686,65 @@ export class MainStreetTurnController {
    *
    * @param slotIndex  Street grid slot index of the card to sell.
    */
+  /**
+   * Handles clicking on a business card in the player's hand during
+   * the market phase. Sets pendingHandIndex and switches to
+   * placing-from-hand phase so the card can be placed on the grid.
+   *
+   * When already in placing-from-hand phase, clicking a different
+   * hand card switches the selection.
+   *
+   * @param index  Index into s.state.hand for the clicked card.
+   */
+  public onHandBusinessCardClick(index: number): void {
+    const s = this.scene;
+    const hand = s.state.hand ?? [];
+    if (index < 0 || index >= hand.length) return;
+
+    // Tutorial gating: only allow if it's the required action or tutorial is inactive
+    const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('select-hand-card' as any);
+    if (check && !check.allowed) {
+      s.instructionText.setText(check.reason ?? 'Complete the highlighted step first.');
+      return;
+    }
+
+    // When already in placing-from-hand, switching selection is allowed
+    // (preserving existing customClickFn behavior)
+    if (s.uiPhase === 'placing-from-hand' && s.pendingHandIndex !== null) {
+      s.pendingHandIndex = index;
+      const cardName = hand[index]?.name ?? 'card';
+      s.instructionText.setText(`Click an empty slot to place "${cardName}"`);
+      s.refreshAll();
+      // Update the selection highlight via the renderer
+      if (s.msRenderer && typeof s.msRenderer.updateBusinessHandSelection === 'function') {
+        s.msRenderer.updateBusinessHandSelection(index);
+      }
+      return;
+    }
+
+    // Only respond during market phase
+    if (s.uiPhase !== 'market') return;
+
+    // Ensure stale hover tooltip is cleared
+    s.tooltipManager?.hide();
+
+    s.pendingHandIndex = index;
+    s.uiPhase = 'placing-from-hand';
+    const cardName = hand[index]?.name ?? 'card';
+    s.instructionText.setText(`Click an empty slot to place "${cardName}"`);
+    s.refreshAll();
+
+    // Update the selection highlight
+    if (s.msRenderer && typeof s.msRenderer.updateBusinessHandSelection === 'function') {
+      s.msRenderer.updateBusinessHandSelection(index);
+    }
+
+    // Tutorial: mark select-hand-card step complete if active
+    try {
+      (s.msLifecycleManager as any).onTutorialActionComplete?.('select-hand-card' as any);
+    } catch (_) { /* ignore */ }
+  }
+
   public onSellCard(slotIndex: number): void {
     const s = this.scene;
     if (s.uiPhase !== 'market') return;

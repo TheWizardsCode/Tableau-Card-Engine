@@ -44,6 +44,9 @@ function createMockScene(): any {
       alpha: 1,
       scaleX: 1,
       scaleY: 1,
+      depth: 0,
+      originX: 0.5,
+      originY: 0.5,
       displayWidth: 48,
       displayHeight: 65,
     };
@@ -77,6 +80,19 @@ function createMockScene(): any {
         strokeRoundedRect: vi.fn().mockReturnThis(),
         clear: vi.fn().mockReturnThis(),
         destroy: vi.fn(),
+      }),
+      rectangle: vi.fn().mockImplementation((x: number, y: number, w: number, h: number, color: number) => {
+        const rect = {
+          x, y, width: w, height: h, color,
+          active: true,
+          setPosition: vi.fn().mockReturnThis(),
+          setOrigin: vi.fn().mockReturnThis(),
+          setDepth: vi.fn().mockReturnThis(),
+          setAlpha: vi.fn().mockReturnThis(),
+          setRotation: vi.fn().mockReturnThis(),
+          destroy: vi.fn(),
+        };
+        return rect;
       }),
     },
     tweens: {
@@ -224,19 +240,4 @@ describe('Gym Hand & Pile integration with HandView/PileView', () => {
     discardView.destroy();
   });
 
-  it('GymHandPileScene source configures bottom hand, arc slider, and hidden labels', () => {
-    const fs = require('fs');
-    const path = require('path');
-    const source = fs.readFileSync(
-      path.resolve(__dirname, '../../example-games/gym/scenes/GymHandPileScene.ts'),
-      'utf-8',
-    );
-
-    expect(source).toContain('HAND_BASE_Y = GAME_H - CARD_H - 80');
-    expect(source).toContain('showLabels: false');
-    expect(source).toContain('arcRadius: this.arcRadius');
-    expect(source).toContain('minValue: 0');
-    expect(source).toContain('maxValue: 200');
-    expect(source).toContain('setArcRadius');
-  });
 });

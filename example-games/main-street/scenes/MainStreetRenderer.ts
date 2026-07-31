@@ -78,6 +78,8 @@ import { computeMainStreetLayoutWithSll } from './MainStreetLayoutAdapter';
 export class MainStreetRenderer {
   /** HandView for player hand — uses renderCard for SVG event card rendering. */
   handView!: HandView;
+  /** HandView for business cards held in hand — supports selection highlighting. */
+  handBusinessView!: HandView;
 
   constructor(private readonly scene: any) {}
 
@@ -113,11 +115,12 @@ export class MainStreetRenderer {
     s.handContainer = createGameZone(s, 0, 0, s.layout.gameW, s.layout.gameH, 'handContainer');
 
     // Create HandView for the player's hand (anticipates multi-event-card support)
-    const { handX, handY, handCardW, handCardH } = s.layout;
+    const { handX, handY, handCardW, handCardH, handCenterX } = s.layout;
     // HandView is created at the hand slot centre — renderCard positions cards via HandView layout
     this.handView = new HandView(s, {
       baseX: handX + handCardW / 2,
       baseY: handY + handCardH / 2,
+      centerX: handCenterX,
       spacing: handCardW + 10,
       cardWidth: handCardW,
       showLabels: false,
@@ -150,7 +153,54 @@ export class MainStreetRenderer {
         return container;
       },
     });
+    // Create HandView for business cards (hand cards from purchase)
+    this.handBusinessView = new HandView(s, {
+      baseX: handX + handCardW / 2,
+      baseY: handY,
+      centerX: handCenterX,
+      spacing: handCardW + 8,
+      cardWidth: handCardW,
+      showLabels: false,
+      selectionEnabled: false,
+      clickEnabled: true,
+      renderCard: (_card, cardIndex) => {
+        const card = _card as any;
+        const container = s.add.container(0, 0);
+        const renderW = Math.max(1, Math.round(handCardW - 4));
+        const renderH = Math.max(1, Math.round(handCardH - 4));
+
+        mainStreetRenderCardSvg(s, container, card.id, renderW, renderH);
+
+        // Apply income/reputation overlays
+        this.applyUpgradeOverlays(container, card, renderW, renderH);
+
+        // Add interactive hit area so cards can be clicked during market phase
+        // to start the placing-from-hand flow.
+        if (!s.replayMode) {
+          const hitArea = s.add.rectangle(0, 0, handCardW, handCardH, 0x000000, 0.001);
+          hitArea.setInteractive({ useHandCursor: true });
+          hitArea.on('pointerdown', () => {
+            s.onHandBusinessCardClick(cardIndex);
+          });
+          container.add(hitArea);
+        }
+
+        return container;
+      },
+      customClickFn: (cardIndex: number) => {
+        // Allow selecting a different card in the hand during placement
+        if (s.uiPhase === 'placing-from-hand') {
+          s.pendingHandIndex = cardIndex;
+          this.updateBusinessHandSelection(cardIndex);
+          const cardName = s.state.hand?.[cardIndex]?.name ?? 'card';
+          s.instructionText.setText(`Click an empty slot to place "${cardName}"`);
+        }
+      },
+    });
+
     s.actionContainer = createGameZone(s, 0, 0, s.layout.gameW, s.layout.gameH, 'actionContainer');
+    // Action buttons must render above hand cards for visibility.
+    try { s.actionContainer.setDepth(100); } catch (_) { /* ignore in tests */ }
 
     // Ensure depth ordering is applied after container creation.
     try { s.children?.depthSort?.(); } catch (_) { /* ignore */ }
@@ -264,7 +314,7 @@ export class MainStreetRenderer {
     // Coins - left-aligned in strip
     const stripWidth = gameW * 0.5;
     const stripLeft = (gameW - stripWidth) / 2;
-    const coinText = markHudTransient(s.add.text(stripLeft + 10, hudY, `Coins: ${coins.toFixed(3)}`, {
+    const coinText = markHudTransient(s.add.text(stripLeft + 10, hudY, `Coins: ${Math.round(coins)}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#ffcc44', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0.5));
     s.hudContainer.add(coinText);
@@ -276,7 +326,7 @@ export class MainStreetRenderer {
     s.hudContainer.add(repText);
 
     // Score - right-aligned in strip (shows x / y where y is the win threshold)
-    const scoreText = markHudTransient(s.add.text(stripLeft + stripWidth - 10, hudY, `Score: ${score}/${s.state.config.winThreshold}`, {
+    const scoreText = markHudTransient(s.add.text(stripLeft + stripWidth - 10, hudY, `Score: ${Math.round(score)}/${s.state.config.winThreshold}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#ff8844', fontFamily: FONT_FAMILY,
     }).setOrigin(1, 0.5));
     s.hudContainer.add(scoreText);
@@ -640,10 +690,39 @@ export class MainStreetRenderer {
     }
   }
 
+  /**
+   * Toggle the selection highlight on business hand cards.
+   * Adds or removes a green border from the card at `index`.
+   */
+  public updateBusinessHandSelection(index: number | null): void {
+    const s = this.scene;
+    // Remove existing selection borders from all business hand card sprites
+    for (let i = 0; i < this.handBusinessView.getSprites().length; i++) {
+      const sprite = this.handBusinessView.getSpriteAt(i);
+      if (!sprite) continue;
+      const container = sprite as Phaser.GameObjects.Container;
+      const existing = container.getByName('hand-selection-border');
+      if (existing) existing.destroy();
+    }
+
+    // Add selection border to the newly selected card
+    if (index !== null && index >= 0 && index < this.handBusinessView.getSprites().length) {
+      const sprite = this.handBusinessView.getSpriteAt(index);
+      if (!sprite) return;
+      const container = sprite as Phaser.GameObjects.Container;
+      const renderW = Math.max(1, Math.round(s.layout.handCardW - 4));
+      const renderH = Math.max(1, Math.round(s.layout.handCardH - 4));
+      const sel = s.add.rectangle(0, 0, renderW + 4, renderH + 4, 0x88ff88, 0);
+      sel.setStrokeStyle(3, 0x88ff88);
+      sel.setName('hand-selection-border');
+      container.add(sel);
+    }
+  }
+
   public drawEmptySlot(x: number, y: number, index: number): void {
     const s = this.scene;
     const { slotW, slotH } = s.layout;
-    const isSelectable = s.uiPhase === 'placing-business';
+    const isSelectable = s.uiPhase === 'placing-business' || s.uiPhase === 'placing-from-hand';
     const isHinted = s.hintedSlotIndex === index && !isSelectable;
     const fillAlpha = isSelectable ? 0.4 : isHinted ? 0.35 : 0.2;
     const strokeColor = isSelectable ? 0xffdd44 : isHinted ? 0x44ffff : 0x555544;
@@ -664,7 +743,7 @@ export class MainStreetRenderer {
     s.streetContainer.add(idxText);
 
     // Click to place
-    if (isSelectable && s.pendingBusinessCard) {
+    if (isSelectable && (s.pendingBusinessCard || s.pendingHandIndex !== null)) {
       bg.setInteractive({ useHandCursor: true });
       bg.on('pointerdown', () => s.onSlotClick(index));
       bg.on('pointerover', () => bg.setStrokeStyle(3, 0x44ff44));
@@ -1204,74 +1283,14 @@ export class MainStreetRenderer {
       this.handView.setCards([]);
     }
 
-    // Render hand cards from state.hand (Multi-Use Card Economy)
-    this.refreshBusinessHandCards();
-  }
-
-  /**
-   * Renders business cards held in the player's hand.
-   * Shows each card as a small card below the tableau with synergy indicator.
-   */
-  private refreshBusinessHandCards(): void {
-    const s = this.scene;
+    // Render business hand cards via HandView
     const hand = s.state.hand ?? [];
+    this.handBusinessView.setCards(hand);
 
-    // Remove previous hand card display
-    if (s.handBusinessContainer) {
-      s.handBusinessContainer.removeAll(true);
-    } else {
-      s.handBusinessContainer = s.add.container(0, 0);
+    // Restore selection highlight when in placing-from-hand phase
+    if (s.uiPhase === 'placing-from-hand' && s.pendingHandIndex !== null) {
+      this.updateBusinessHandSelection(s.pendingHandIndex);
     }
-
-    if (hand.length === 0) {
-      // Update hand size indicator
-      this.updateHandSizeIndicator(0);
-      return;
-    }
-
-    const { handCardW, handCardH, handY } = s.layout;
-    const startX = 40;
-    const y = handY;
-    const spacing = handCardW + 8;
-
-    for (let i = 0; i < hand.length; i++) {
-      const card = hand[i];
-      const x = startX + i * spacing;
-
-      const container = s.add.container(x, y);
-
-      // Render card via shared SVG pipeline for unified appearance
-      const renderW = Math.max(1, Math.round(handCardW - 4));
-      const renderH = Math.max(1, Math.round(handCardH - 4));
-      mainStreetRenderCardSvg(s, container, card.id, renderW, renderH);
-
-      // Apply income/reputation overlays (uses centered "Income: +X/turn" format)
-      this.applyUpgradeOverlays(container, card, renderW, renderH);
-
-      s.handBusinessContainer!.add(container);
-    }
-
-    // Update hand size indicator
-    this.updateHandSizeIndicator(hand.length);
-  }
-
-  /**
-   * Updates the hand size indicator text (e.g. "Hand: 2/5").
-   */
-  private updateHandSizeIndicator(current: number): void {
-    const s = this.scene;
-    const maxSize = s.state.maxHandSize ?? 2;
-
-    if (s.handSizeText) {
-      s.handSizeText.destroy();
-    }
-
-    s.handSizeText = s.add.text(10, s.layout.handY - 14, 
-      `Hand: ${current}/${maxSize}`, {
-      fontSize: '12px',
-      color: current >= maxSize ? '#ff6666' : '#c8b88a',
-      fontFamily: 'Arial',
-    });
   }
 
   /**
@@ -1358,6 +1377,30 @@ export class MainStreetRenderer {
         s.hintUsedThisTurn, () => s.onHintClick(),
       );
       s.actionContainer.add(hintBtn);
+
+    } else if (s.uiPhase === 'placing-from-hand') {
+      const rightX = s.layout.gameW - 24;
+      const by = s.layout.actionY;
+
+      const hand = s.state.hand ?? [];
+      const handCount = hand.length;
+      const hint = s.add.text(rightX, by - 4, `Card in hand (${handCount}) — click an empty slot to place`, {
+        fontSize: '14px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY,
+      }).setOrigin(1, 1);
+      s.actionContainer.add(hint);
+
+      // Cancel button (right-aligned) — returns to market, card stays in hand
+      const btnW = s.layout.actionButtonW;
+      const cancelBtn = createActionButton(s, rightX - btnW, by + 4, btnW, 'Cancel', () => {
+        s.pendingHandIndex = null;
+        s.clearMarketSelection();
+        s.uiPhase = 'market';
+        this.refreshAll();
+        s.instructionText.setText(
+          `Turn ${s.state.turn} / ${s.state.config.maxTurns} -- Buy cards from the market or End Turn`,
+        );
+      });
+      s.actionContainer.add(cancelBtn);
 
     } else if (s.uiPhase === 'placing-business') {
       const rightX = s.layout.gameW - 24;

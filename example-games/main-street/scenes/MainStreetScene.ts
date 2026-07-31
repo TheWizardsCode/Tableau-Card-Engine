@@ -27,6 +27,7 @@ type UIPhase =
   | 'idle'               // Waiting for DayStart
   | 'market'             // Player can buy or end turn
   | 'placing-business'   // Player selected a business card, picking a slot
+  | 'placing-from-hand'  // Player bought a card to hand, click a slot to place it
   | 'animating'          // Brief pause for feedback
   | 'game-over';         // Final overlay
 
@@ -58,6 +59,9 @@ export class MainStreetScene extends CardGameScene {
   public pendingBusinessCard: BusinessCard | null = null;
   public pendingBusinessSourceIndex: number | null = null;
 
+  // Pending hand card for placing from hand (index into state.hand)
+  public pendingHandIndex: number | null = null;
+
   // Computed responsive layout metrics
   public layout!: SceneLayout;
 
@@ -67,10 +71,7 @@ export class MainStreetScene extends CardGameScene {
   public marketContainer!: Phaser.GameObjects.Container;
   public incidentQueueContainer!: Phaser.GameObjects.Container;
   public handContainer!: Phaser.GameObjects.Container;
-  /** Container for business cards in the player's hand (Multi-Use Card Economy). */
-  public handBusinessContainer!: Phaser.GameObjects.Container;
-  /** Text element showing hand capacity (e.g. "Hand: 2/5"). */
-  public handSizeText!: Phaser.GameObjects.Text;
+
   public actionContainer!: Phaser.GameObjects.Container;
 
   // Activity Log panel
@@ -361,6 +362,9 @@ export class MainStreetScene extends CardGameScene {
   }
   public selectMarketCardById(...args: any[]): any {
     return (this.msInputManager as any).selectMarketCardById.apply(this.msInputManager, args);
+  }
+  public onHandBusinessCardClick(...args: any[]): any {
+    return (this.msTurnController as any).onHandBusinessCardClick.apply(this.msTurnController, args);
   }
   public onBusinessCardClick(...args: any[]): any {
     return (this.msTurnController as any).onBusinessCardClick.apply(this.msTurnController, args);

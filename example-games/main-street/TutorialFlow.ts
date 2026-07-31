@@ -32,8 +32,8 @@
  * | T5   | Confirm (no cost)          | 0        | 0         | 8       |
  * | T6   | End Turn + income (~1 coin)| 1        | 0         | 9       |
  * | T7   | Buy Local Festival ($3)    | 0        | 3         | 6       |
- * | T8   | Buy Bookshop ($3) + auto-place | 0     | 3         | 3       |
- * | T9   | Confirm (no cost)          | 0        | 0         | 3       |
+ * | T8   | Buy Bookshop ($3) to hand   | 0        | 3         | 3       |
+ * | T9   | Place Bookshop from hand (free) | 0    | 0         | 3       |
  * | T10  | Confirm (no cost)          | 0        | 0         | 3       |
  * | T11  | Confirm (no cost)          | 0        | 0         | 3       |
  * | T12  | Confirm (no cost)          | 0        | 0         | ~6      |
@@ -149,7 +149,7 @@ export interface UnifiedTutorialStepDef {
  * New steps (from the original 13-step set and split Challenges/Scoring)
  * come from the reference system to fill gaps.
  *
- * Gate type distribution: 10 confirm + 4 action.
+ * Gate type distribution: 8 confirm + 6 action (T3, T4, T6, T7, T8, T9).
  */
 export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
   {
@@ -229,8 +229,9 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     id: 'T9',
     titleKey: tutorialKey('T9', 'title'),
     bodyKey: tutorialKey('T9', 'body'),
-    highlightZone: 'investmentsRow',
-    gate: 'confirm',
+    highlightZone: 'streetGrid',
+    gate: 'action',
+    requiredAction: 'place-business',
   },
   {
     id: 'T10',

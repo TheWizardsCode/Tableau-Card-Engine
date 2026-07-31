@@ -146,11 +146,14 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
     'Having the right businesses on your street makes your investment cards stronger!\n' +
     'This card will be placed automatically.',
 
-  // ── T9: Upgrade Concept ─────────────────────────────────────
+  // ── T9: Place from Hand ──────────────────────────────────
   [tutorialKey('T9', 'title')]:
-    'Upgrade Concept',
+    'Place from Hand',
   [tutorialKey('T9', 'body')]:
-    'Upgrades make a business better. Strong upgrades earn more money over time.',
+    'The Bookshop is now in your hand.\n' +
+    'Click an empty street slot to place it.\n\n' +
+    'Tip: You can hold multiple cards in your hand\n' +
+    'before deciding where to place them.',
 
   // ── T10: Your Hand ──────────────────────────────────────────
   [tutorialKey('T10', 'title')]:

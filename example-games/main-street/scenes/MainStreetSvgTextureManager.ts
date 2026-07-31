@@ -1,4 +1,4 @@
-import { CARD_TEMPLATE_NAMES, CSV_ROWS } from '../MainStreetCards';
+import { CARD_TEMPLATE_NAMES, getCsvRows } from '../MainStreetCards';
 import { rasteriseSvgToTexture, makeTextureKey } from '../../../src/core-engine';
 import { generateCardSvgFromCsvRow } from './MainStreetCardSvgGenerator';
 
@@ -80,7 +80,7 @@ export class MainStreetSvgTextureManager {
 
     try {
       // Generate fresh SVGs from the parsed CSV rows
-      for (const row of CSV_ROWS) {
+      for (const row of getCsvRows()) {
         const templateId = row.id;
         if (!templateId) continue;
 

@@ -961,9 +961,12 @@ export class MainStreetLifecycleManager {
         if (s.campaign) {
           s.campaign.tutorialSeen = true;
         }
-        // Rebuild renderer and start day phase from checkpoint state
+        // Rebuild renderer and start day phase from checkpoint state.
+        // Pass skipMarketRefill=true to preserve the saved market state
+        // (the saved state already has the correct market from save time;
+        // calling refillAllMarkets would replace it with fresh deck draws).
         try { s.refreshAll(); } catch (_) { /* ignore */ }
-        try { s.startDayPhase(); } catch (_) { /* ignore */ }
+        try { s.startDayPhase(true); } catch (_) { /* ignore */ }
 
         // Load game: compare saved checksum against current CSV
         this.checkForCsvMismatchAndRegenerate(savedChecksum).catch(() => {});

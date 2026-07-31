@@ -18,7 +18,18 @@
 import cardDataRaw from './card-data.csv?raw';
 import { parseCsv } from '@core-engine/CsvLoader';
 import { computeCsvChecksum } from './CsvChecksum';
-const csvRows = parseCsv(cardDataRaw);
+
+/**
+ * The raw text content of card-data.csv, bundled at build time via Vite's `?raw` import.
+ * Exported so that save-game serializers can embed the CSV data in checkpoints.
+ */
+export const CARD_DATA_RAW: string = cardDataRaw;
+
+/** Mutable CSV rows container, initialized from the module-level import.
+ * Can be replaced at runtime by loadTemplatesFromCsv() when a saved
+ * checkpoint carries different card-data.csv content.
+ */
+let _csvRows: Record<string, string>[] = parseCsv(cardDataRaw);
 
 /**
  * Deterministic checksum of the current card-data.csv content.
@@ -26,6 +37,172 @@ const csvRows = parseCsv(cardDataRaw);
  * Used to detect when the CSV has changed between saves/loads.
  */
 export const CSV_CHECKSUM: string = computeCsvChecksum(cardDataRaw);
+
+/**
+ * The currently active parsed CSV rows.
+ * Initially loaded from the bundled card-data.csv at module load time.
+ * When a saved checkpoint carries different CSV data (mismatched checksum),
+ * loadTemplatesFromCsv() replaces this with the saved CSV's rows.
+ *
+ * This is a mutable reference so consumers (SVG regeneration, card lookups)
+ * always use the currently active card data without needing per-call arguments.
+ */
+/**
+ * Returns the currently active parsed CSV rows.
+ * Initially loaded from the bundled card-data.csv at module load time.
+ * When a saved checkpoint carries different CSV data (mismatched checksum),
+ * loadTemplatesFromCsv() replaces this with the saved CSV's rows.
+ *
+ * This is a getter so consumers (SVG regeneration, card lookups)
+ * always use the currently active card data without needing per-call arguments.
+ */
+export function getCsvRows(): readonly Record<string, string>[] {
+  return _csvRows;
+}
+
+/**
+ * Reloads all module-level card template arrays from the given CSV string.
+ *
+ * This allows the deserializer to use saved checkpoint CSV data when the
+ * bundled card-data.csv has changed, ensuring card templates match the
+ * saved game state. After a new game setup, resetTemplatesToDefault()
+ * restores the bundled import.
+ *
+ * @param csvData  Raw CSV string (same format as card-data.csv).
+ */
+export function loadTemplatesFromCsv(csvData: string): void {
+  _csvRows = parseCsv(csvData);
+  rebuildTemplateArrays(_csvRows);
+}
+
+/**
+ * Resets all module-level card template arrays to their original
+ * values from the bundled card-data.csv import.
+ */
+export function resetTemplatesToDefault(): void {
+  _csvRows = parseCsv(cardDataRaw);
+  rebuildTemplateArrays(_csvRows);
+}
+
+/**
+ * Rebuilds the module-level BUSINESS_TEMPLATES, COMMUNITY_SPACE_TEMPLATES,
+ * EVENT_TEMPLATES, UPGRADE_TEMPLATES arrays from the given parsed CSV rows.
+ * Also rebuilds derived lookup maps (CARD_TEMPLATE_NAMES, CARD_TIER_MAP).
+ */
+function rebuildTemplateArrays(rows: Record<string, string>[]): void {
+  // Rebuild template arrays from parsed CSV rows
+  const bizTemplates = rows
+    .filter(r => r.family === 'business')
+    .map(r => ({
+      id: r.id,
+      name: r.name,
+      cost: Number(r.cost) || 0,
+      baseIncome: Number(r.baseIncome) || 0,
+      synergyTypes: (r.synergyTypes || '').split('|').filter(Boolean) as unknown as SynergyType[],
+      upgradePath: r.upgradePath || undefined,
+      maxLevel: Number(r.maxLevel) || 0,
+      reputationPerTurn: r.reputationPerTurn ? Number(r.reputationPerTurn) : undefined,
+      synergyCoinBonus: r.synergyCoinBonus !== undefined && r.synergyCoinBonus !== '' ? Number(r.synergyCoinBonus) : undefined,
+      synergyRepBonus: r.synergyRepBonus !== undefined && r.synergyRepBonus !== '' ? Number(r.synergyRepBonus) : undefined,
+      description: r.description,
+    }));
+
+  const csTemplates = rows
+    .filter(r => r.family === 'community-space')
+    .map(r => ({
+      id: r.id,
+      name: r.name,
+      cost: Number(r.cost) || 0,
+      baseIncome: Number(r.baseIncome) || 0,
+      synergyTypes: (r.synergyTypes || '').split('|').filter(Boolean) as unknown as SynergyType[],
+      upgradePath: r.upgradePath || undefined,
+      maxLevel: Number(r.maxLevel) || 0,
+      reputationPerTurn: r.reputationPerTurn ? Number(r.reputationPerTurn) : undefined,
+      synergyCoinBonus: r.synergyCoinBonus !== undefined && r.synergyCoinBonus !== '' ? Number(r.synergyCoinBonus) : undefined,
+      synergyRepBonus: r.synergyRepBonus !== undefined && r.synergyRepBonus !== '' ? Number(r.synergyRepBonus) : undefined,
+      description: r.description,
+    }));
+
+  const evtTemplates: EventCard[] = rows
+    .filter(r => r.family === 'event')
+    .map(r => {
+      const base: EventCard = {
+        family: 'event',
+        id: r.id,
+        name: r.name,
+        cost: Number(r.cost) || 0,
+        trigger: r.trigger as EventTrigger,
+        effect: r.effect,
+        target: r.target as EventTarget,
+        targetSynergy: (r.targetSynergy || undefined) as SynergyType | undefined,
+        coinDelta: Number(r.coinDelta) || 0,
+        reputationDelta: Number(r.reputationDelta) || 0,
+      };
+      if (r.duration) {
+        return {
+          ...base,
+          duration: Number(r.duration),
+          effectType: r.effectType,
+          multiplier: Number(r.multiplier) || 0,
+        } as DurationEventCard;
+      }
+      return base;
+    });
+
+  const upgTemplates: UpgradeCard[] = rows
+    .filter(r => r.family === 'upgrade')
+    .map(r => ({
+      family: 'upgrade',
+      id: r.id,
+      name: r.name,
+      targetBusiness: r.targetBusiness,
+      cost: Number(r.cost) || 0,
+      incomeBonus: Number(r.incomeBonus) || 0,
+      synergyRangeBonus: Number(r.synergyRangeBonus) || 0,
+      description: r.description,
+      requiredLevel: r.requiredLevel ? Number(r.requiredLevel) : undefined,
+      reputationBonus: r.reputationBonus ? Number(r.reputationBonus) : undefined,
+    }));
+
+  // Assign to the mutable module-level variables
+  _BUSINESS_TEMPLATES.length = 0;
+  _BUSINESS_TEMPLATES.push(...bizTemplates);
+  _COMMUNITY_SPACE_TEMPLATES.length = 0;
+  _COMMUNITY_SPACE_TEMPLATES.push(...csTemplates);
+  _EVENT_TEMPLATES.length = 0;
+  _EVENT_TEMPLATES.push(...evtTemplates);
+  _UPGRADE_TEMPLATES.length = 0;
+  _UPGRADE_TEMPLATES.push(...upgTemplates);
+
+  // Rebuild derived lookup maps
+  _CARD_TEMPLATE_NAMES.clear();
+  for (const t of bizTemplates) _CARD_TEMPLATE_NAMES.set(t.id, t.name);
+  for (const t of csTemplates) _CARD_TEMPLATE_NAMES.set(t.id, t.name);
+  for (const t of evtTemplates) _CARD_TEMPLATE_NAMES.set(t.id, t.name);
+  for (const t of upgTemplates) _CARD_TEMPLATE_NAMES.set(t.id, t.name);
+
+  _CARD_TIER_MAP.clear();
+  for (const row of rows) {
+    if (row.tier && row.tier.trim() !== '') {
+      _CARD_TIER_MAP.set(row.id, row.tier.trim());
+    }
+  }
+
+  // Rebuild STAFF_CARD_TEMPLATES
+  _STAFF_CARD_TEMPLATES.length = 0;
+  const staffRows = rows.filter(r => r.family === 'staff');
+  for (const r of staffRows) {
+    _STAFF_CARD_TEMPLATES.push({
+      family: 'staff',
+      id: r.id,
+      name: r.name,
+      cost: Number(r.cost) || 0,
+      ongoingCost: Number(r.ongoingCost) || 0,
+      handSlotsAdded: Number(r.handSlotsAdded) || 0,
+      description: r.description,
+    });
+  }
+}
 
 // ── Synergy & Phase Enums ───────────────────────────────────
 
@@ -419,107 +596,78 @@ export interface CommunitySpaceCard {
 
 // ── CSV → typed template arrays ─────────────────────────────
 
-/** All Business card templates parsed from the CSV. */
-const BUSINESS_TEMPLATES: Omit<BusinessCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'reputationBonus'>[] =
-  csvRows
-    .filter(r => r.family === 'business')
-    .map(r => ({
-      id: r.id,
-      name: r.name,
-      cost: Number(r.cost) || 0,
-      baseIncome: Number(r.baseIncome) || 0,
-      synergyTypes: (r.synergyTypes || '').split('|').filter(Boolean) as unknown as SynergyType[],
-      upgradePath: r.upgradePath || undefined,
-      maxLevel: Number(r.maxLevel) || 0,
-      reputationPerTurn: r.reputationPerTurn ? Number(r.reputationPerTurn) : undefined,
-      synergyCoinBonus: r.synergyCoinBonus !== undefined && r.synergyCoinBonus !== '' ? Number(r.synergyCoinBonus) : undefined,
-      synergyRepBonus: r.synergyRepBonus !== undefined && r.synergyRepBonus !== '' ? Number(r.synergyRepBonus) : undefined,
-      description: r.description,
-    }));
+/** All Business card templates parsed from the CSV. Mutable for runtime CSV reload support. */
+let _BUSINESS_TEMPLATES: Omit<BusinessCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'reputationBonus'>[] = [];
 
-/** All Community Space card templates parsed from the CSV. */
-const COMMUNITY_SPACE_TEMPLATES: Omit<CommunitySpaceCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'reputationBonus'>[] =
-  csvRows
-    .filter(r => r.family === 'community-space')
-    .map(r => ({
-      id: r.id,
-      name: r.name,
-      cost: Number(r.cost) || 0,
-      baseIncome: Number(r.baseIncome) || 0,
-      synergyTypes: (r.synergyTypes || '').split('|').filter(Boolean) as unknown as SynergyType[],
-      upgradePath: r.upgradePath || undefined,
-      maxLevel: Number(r.maxLevel) || 0,
-      reputationPerTurn: r.reputationPerTurn ? Number(r.reputationPerTurn) : undefined,
-      synergyCoinBonus: r.synergyCoinBonus !== undefined && r.synergyCoinBonus !== '' ? Number(r.synergyCoinBonus) : undefined,
-      synergyRepBonus: r.synergyRepBonus !== undefined && r.synergyRepBonus !== '' ? Number(r.synergyRepBonus) : undefined,
-      description: r.description,
-    }));
+/** All Community Space card templates parsed from the CSV. Mutable for runtime CSV reload support. */
+let _COMMUNITY_SPACE_TEMPLATES: Omit<CommunitySpaceCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'reputationBonus'>[] = [];
+
+/** All Event card templates parsed from the CSV. Mutable for runtime CSV reload support. */
+let _EVENT_TEMPLATES: EventCard[] = [];
+
+/** All Upgrade card templates parsed from the CSV. Mutable for runtime CSV reload support. */
+let _UPGRADE_TEMPLATES: UpgradeCard[] = [];
+
+/** All Staff card templates parsed from the CSV. Mutable for runtime CSV reload support. */
+let _STAFF_CARD_TEMPLATES: StaffCard[] = [];
+
+/** Mutable map from card template ID to display name. Updated by rebuildTemplateArrays(). */
+let _CARD_TEMPLATE_NAMES: Map<string, string> = new Map();
+
+/** Mutable map from card template ID to tier number. Updated by rebuildTemplateArrays(). */
+let _CARD_TIER_MAP: Map<string, string> = new Map();
 
 /**
- * Read-only view of all parsed CSV rows.
- * Used by the SVG regeneration system to generate card SVGs.
+ * Returns the currently active Business card template arrays.
  */
-export const CSV_ROWS: readonly Record<string, string>[] = csvRows;
+export function getBusinessTemplates(): typeof _BUSINESS_TEMPLATES {
+  return _BUSINESS_TEMPLATES;
+}
 
-/** All Event card templates parsed from the CSV. */
-const EVENT_TEMPLATES: EventCard[] =
-  csvRows
-    .filter(r => r.family === 'event')
-    .map(r => {
-      const base: EventCard = {
-        family: 'event',
-        id: r.id,
-        name: r.name,
-        cost: Number(r.cost) || 0,
-        trigger: r.trigger as EventTrigger,
-        effect: r.effect,
-        target: r.target as EventTarget,
-        targetSynergy: (r.targetSynergy || undefined) as SynergyType | undefined,
-        coinDelta: Number(r.coinDelta) || 0,
-        reputationDelta: Number(r.reputationDelta) || 0,
-      };
-      // Duration events carry extra fields — cast to DurationEventCard if present
-      if (r.duration) {
-        return {
-          ...base,
-          duration: Number(r.duration),
-          effectType: r.effectType,
-          multiplier: Number(r.multiplier) || 0,
-        } as DurationEventCard;
-      }
-      return base;
-    });
+/**
+ * Returns the currently active Community Space card template arrays.
+ */
+export function getCommunitySpaceTemplates(): typeof _COMMUNITY_SPACE_TEMPLATES {
+  return _COMMUNITY_SPACE_TEMPLATES;
+}
 
-/** All Upgrade card templates parsed from the CSV. */
-const UPGRADE_TEMPLATES: UpgradeCard[] =
-  csvRows
-    .filter(r => r.family === 'upgrade')
-    .map(r => ({
-      family: 'upgrade',
-      id: r.id,
-      name: r.name,
-      targetBusiness: r.targetBusiness,
-      cost: Number(r.cost) || 0,
-      incomeBonus: Number(r.incomeBonus) || 0,
-      synergyRangeBonus: Number(r.synergyRangeBonus) || 0,
-      description: r.description,
-      requiredLevel: r.requiredLevel ? Number(r.requiredLevel) : undefined,
-      reputationBonus: r.reputationBonus ? Number(r.reputationBonus) : undefined,
-    }));
+/**
+ * Returns the currently active Event card template arrays.
+ */
+export function getEventTemplates(): EventCard[] {
+  return _EVENT_TEMPLATES;
+}
 
-/** All Staff card templates parsed from the CSV. */
-export const STAFF_CARD_TEMPLATES: StaffCard[] =
-  csvRows
-    .filter(r => r.family === 'staff')
-    .map(r => ({
-      family: 'staff',
-      id: r.id,
-      name: r.name,
-      cost: Number(r.cost) || 0,
-      ongoingCost: Number(r.ongoingCost) || 0,
-      handSlotsAdded: Number(r.handSlotsAdded) || 0,
-      description: r.description,
-    }));
+/**
+ * Returns the currently active Upgrade card template arrays.
+ */
+export function getUpgradeTemplates(): UpgradeCard[] {
+  return _UPGRADE_TEMPLATES;
+}
+
+/**
+ * Returns the currently active Staff card templates.
+ */
+export function getStaffCardTemplates(): StaffCard[] {
+  return _STAFF_CARD_TEMPLATES;
+}
+
+// Initialize all template arrays from the bundled CSV
+rebuildTemplateArrays(_csvRows);
+
+/**
+ * @deprecated Use getCsvRows() instead.
+ * Kept for backward compatibility. This reference is set at module init time
+ * and will NOT update after loadTemplatesFromCsv() is called. Consumers
+ * should use getCsvRows() for the live value.
+ */
+export const CSV_ROWS: readonly Record<string, string>[] = _csvRows;
+
+/**
+ * @deprecated Use getStaffCardTemplates() instead.
+ * Kept for backward compatibility with existing test code.
+ */
+export const STAFF_CARD_TEMPLATES: StaffCard[] = _STAFF_CARD_TEMPLATES;
 
 // ── Deck Building ───────────────────────────────────────────
 
@@ -532,7 +680,7 @@ export const STAFF_CARD_TEMPLATES: StaffCard[] =
 export function createStaffDeck(copies: number = 1): StaffCard[] {
   const deck: StaffCard[] = [];
   for (let c = 0; c < copies; c++) {
-    for (const template of STAFF_CARD_TEMPLATES) {
+    for (const template of _STAFF_CARD_TEMPLATES) {
       deck.push({ ...template, id: `${template.id}-${c}` });
     }
   }
@@ -553,8 +701,8 @@ export function createBusinessDeck(
   unlockedCardIds?: string[],
 ): BusinessCard[] {
   const templates = unlockedCardIds
-    ? BUSINESS_TEMPLATES.filter((t) => unlockedCardIds.includes(t.id))
-    : BUSINESS_TEMPLATES;
+    ? _BUSINESS_TEMPLATES.filter((t) => unlockedCardIds.includes(t.id))
+    : _BUSINESS_TEMPLATES;
 
   const deck: BusinessCard[] = [];
   for (let c = 0; c < copies; c++) {
@@ -580,8 +728,8 @@ export function createCommunitySpaceDeck(
   unlockedCardIds?: string[],
 ): CommunitySpaceCard[] {
   const templates = unlockedCardIds
-    ? COMMUNITY_SPACE_TEMPLATES.filter((t) => unlockedCardIds.includes(t.id))
-    : COMMUNITY_SPACE_TEMPLATES;
+    ? _COMMUNITY_SPACE_TEMPLATES.filter((t) => unlockedCardIds.includes(t.id))
+    : _COMMUNITY_SPACE_TEMPLATES;
 
   const deck: CommunitySpaceCard[] = [];
   for (let c = 0; c < copies; c++) {
@@ -613,8 +761,8 @@ export function createEventDeck(
   positiveIncidentMultiplier: number = 1,
 ): EventCard[] {
   const templates = unlockedCardIds
-    ? EVENT_TEMPLATES.filter((t) => unlockedCardIds.includes(t.id))
-    : EVENT_TEMPLATES;
+    ? _EVENT_TEMPLATES.filter((t) => unlockedCardIds.includes(t.id))
+    : _EVENT_TEMPLATES;
 
   // If multiplier > 1, positive Incident templates should appear more often.
   // Implement fractional multipliers deterministically without introducing
@@ -693,8 +841,8 @@ export function createUpgradeDeck(
   unlockedCardIds?: string[],
 ): UpgradeCard[] {
   const templates = unlockedCardIds
-    ? UPGRADE_TEMPLATES.filter((t) => unlockedCardIds.includes(t.id))
-    : UPGRADE_TEMPLATES;
+    ? _UPGRADE_TEMPLATES.filter((t) => unlockedCardIds.includes(t.id))
+    : _UPGRADE_TEMPLATES;
 
   const deck: UpgradeCard[] = [];
   for (let c = 0; c < copies; c++) {
@@ -740,19 +888,16 @@ export function cardLabel(card: AnyCard): string {
 
 /**
  * Read-only map from card template ID (e.g. `'biz-cafe'`) to its display name
- * (e.g. `'Cafe'`). Built once at module load from the CSV-derived template arrays.
+ * (e.g. `'Cafe'`). Updated at runtime when loadTemplatesFromCsv() is called.
  *
  * This is used by the meta-progression UI to show which cards a newly unlocked
  * tier adds to the player's card pool.
+ *
+ * NOTE: This is a mutable Map object that is cleared and re-populated when
+ * templates are reloaded. Consumers receive a reference to the same Map object,
+ * so they always see the current data without re-importing.
  */
-export const CARD_TEMPLATE_NAMES: ReadonlyMap<string, string> = (() => {
-  const m = new Map<string, string>();
-  for (const t of BUSINESS_TEMPLATES)       m.set(t.id, t.name);
-  for (const t of COMMUNITY_SPACE_TEMPLATES) m.set(t.id, t.name);
-  for (const t of EVENT_TEMPLATES)          m.set(t.id, t.name);
-  for (const t of UPGRADE_TEMPLATES)        m.set(t.id, t.name);
-  return m;
-})();
+export const CARD_TEMPLATE_NAMES: ReadonlyMap<string, string> = _CARD_TEMPLATE_NAMES;
 
 // ---------------------------------------------------------------------------
 // Card template ID → tier mapping (from CSV tier column)
@@ -764,13 +909,6 @@ export const CARD_TEMPLATE_NAMES: ReadonlyMap<string, string> = (() => {
  *
  * Built once at module load from the CSV `tier` column.
  * Cards without a tier assignment (e.g. staff cards) are omitted from this map.
+ * Updated at runtime when loadTemplatesFromCsv() is called.
  */
-export const CARD_TIER_MAP: ReadonlyMap<string, string> = (() => {
-  const m = new Map<string, string>();
-  for (const row of csvRows) {
-    if (row.tier && row.tier.trim() !== '') {
-      m.set(row.id, row.tier.trim());
-    }
-  }
-  return m;
-})();
+export const CARD_TIER_MAP: ReadonlyMap<string, string> = _CARD_TIER_MAP;

@@ -19,7 +19,7 @@ Open `http://localhost:3000` and select **Gym** from the game selector. From the
 | Scene | Key | What it Demonstrates |
 |---|---|---|
 | Deck & Seeded RNG | `GymDeckRngScene` | Create/shuffle/draw with deterministic seeded randomness; flip and deal animations |
-| Hand & Pile Interactions | `GymHandPileScene` | Move cards with deal/place/discard/move/shake animations; bottom-anchored arc hand layout with live radius and per-card rotation sliders; drop-zone highlights; flip support |
+| Hand & Pile Interactions | `GymHandPileScene` | Move cards with deal/place/discard/move/shake animations; bottom-anchored arc hand layout with live radius, per-card rotation, and selection-raise sliders; drop-zone highlights; flip support |
 | Overlay & UI Config | `GymOverlayUiScene` | Open/close overlays; toggle feedback intensity; GeometryMask scrollable content |
 | Undo / Redo | `GymUndoRedoScene` | Execute, undo, and redo actions; pop text feedback on undo/redo |
 | Transcript Recording | `GymTranscriptScene` | Record game events, inspect transcripts; pop text feedback |

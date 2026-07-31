@@ -234,9 +234,9 @@ export function buildScoreTooltip(
 
   const lines = [
     t(HUD_TOOLTIP_I18N_KEYS.scoreTitle),
-    `${t(HUD_TOOLTIP_I18N_KEYS.scoreEstimateLabel)}: ${score}/${threshold}`,
+    `${t(HUD_TOOLTIP_I18N_KEYS.scoreEstimateLabel)}: ${Math.round(score)}/${threshold}`,
     '',
-    `${t(HUD_TOOLTIP_I18N_KEYS.scoreBreakdownCoins)}: ${coins.toFixed(3)}`,
+    `${t(HUD_TOOLTIP_I18N_KEYS.scoreBreakdownCoins)}: ${Math.round(coins)}`,
     `${t(HUD_TOOLTIP_I18N_KEYS.scoreBreakdownReputation)} ${state.config.reputationScoreMultiplier}: ${repContribution}`,
     `${t(HUD_TOOLTIP_I18N_KEYS.scoreBreakdownChallenges)}: ${challengeContribution}`,
   ];
@@ -244,7 +244,7 @@ export function buildScoreTooltip(
   if (remaining > 0) {
     lines.push(
       '',
-      `${remaining} ${t(HUD_TOOLTIP_I18N_KEYS.scoreRemainingToWin)}`,
+      `${Math.round(remaining)} ${t(HUD_TOOLTIP_I18N_KEYS.scoreRemainingToWin)}`,
     );
   } else {
     lines.push(

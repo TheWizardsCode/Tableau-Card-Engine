@@ -50,7 +50,6 @@ tableau-card-engine/
 │       ├── cards/         # Card sprite assets (CC0/permissive)
 │       └── CREDITS.md     # Asset attribution
 ├── tests/                 # Vitest test files
-│   └── smoke.test.ts
 ├── dist/                  # Production build output (gitignored)
 ├── AGENTS.md
 ├── package.json
@@ -90,6 +89,18 @@ Each example game should have its own set of tests to ensure that the game mecha
 Each example game is a standalone game that can independently demonstrate the capabilities of the engine. They also serve as reference implementations for how to use the engine's features and components effectively.
 
 Example games live in `example-games/<game-name>/` with their own `main.ts` entry point and `scenes/` directory. The root `index.html` loads a unified entry point (`main.ts`) that boots the **Game Selector** landing page, allowing players to choose between available games. The games are deployed to GitHub Pages at `https://thewizardscode.github.io/Tableau-Card-Engine/` via a GitHub Actions workflow that runs on every push to `main`.
+
+#### Screen Layout Language (SLL) Requirement
+
+All new example games **must** use the **Screen Layout Language (SLL)** for their UI layouts instead of hardcoded pixel positions. SLL provides a declarative, responsive layout system that ensures consistency, adaptability, and reusability across example games.
+
+- **Do not** use absolute pixel coordinates for positioning UI elements within scenes.
+- **Do** define UI layouts using SLL composition in your scene code.
+- Reference the SLL modules for guidance:
+  - `src/ui/screen-layout.ts` — Core SLL layout engine and utilities
+  - `src/ui/screen-layout-compose.ts` — SLL composition helpers
+  - `src/ui/screen-layout-schema.ts` — SLL schema definitions and type contracts
+- The Gym (`example-games/gym/`) contains SLL examples (see `GymOverlayUiScene.ts`) that demonstrate both direct and composed SLL usage patterns.
 
 ## Technology Stack
 
@@ -198,6 +209,186 @@ The best reference implementation is `showSellConfirmation` in `example-games/ma
 - Using `createOverlayButton` for styled interactive buttons
 - Handling both confirm (sell) and cancel actions
 - Proper cleanup and state refresh
+
+## Game Architecture Best Practices
+
+This section documents architectural patterns, design decisions, and usage guidance extracted from the Gym demo scenes. Each pattern identifies the Gym scene(s) that serve as canonical reference implementations and links to the relevant core-engine API(s). The help panel text in each Gym scene is the authoritative source for "what this feature does and when to use it."
+
+> **Reference:** See [`docs/gym/GYM_INDEX.md`](docs/gym/GYM_INDEX.md) for the complete scene-to-API mapping, and `docs/DEVELOPER.md` for subsystem-specific deep-dive guidance.
+
+> **Maintenance note:** This section should be reviewed when new Gym scenes are added or existing ones substantially change, to keep patterns aligned with the latest implementations.
+
+### 1. Seeded RNG for Deterministic Randomness
+
+Use `createSeededRng()` and `shuffleArray()` from `@core-engine` to produce deterministic, reproducible random sequences. The same seed always produces the same card order, which is essential for debugging, replay systems, and fairness.
+
+- **Gym scene:** `GymDeckRngScene` — `example-games/gym/scenes/GymDeckRngScene.ts`
+- **Key APIs:** `createSeededRng()`, `shuffleArray()`, `createStandardDeck()`
+- **When to use:** "In a game like Golf or Beleaguered Castle, seeded RNG ensures that a player can replay a specific deal for debugging or fair competition." (GymDeckRngScene Features help text)
+- **Usage example:** By setting the seed to the same value used during a game session, a developer can reproduce the exact same deck order and inspect the deal sequence to verify correctness.
+
+### 2. View/Model Separation with HandView and PileView
+
+Separate card rendering from game logic using `HandView` and `PileView` reusable UI components. These components provide draggable hands, arc layouts, pile management, and rich card animations (deal, discard, flip, move tween).
+
+- **Gym scene:** `GymHandPileScene` — `example-games/gym/scenes/GymHandPileScene.ts`
+- **Key APIs:** `HandView`, `PileView`, `flipCard()`, `discardCard()`, `moveGameObject()`, `shakeIllegalMove()`
+- **When to use:** "In a real game like Golf or Lost Cities, HandView renders the player hand and PileView shows draw/discard piles with click-to-interact support." (GymHandPileScene Features help text)
+- **Key features:** Arc layout with live sliders (arc, spacing, rotation, selection raise), vertical cascade toggle, drag-and-drop, card animations (deal from deck, flip in-place, discard to pile, illegal-move shake), reduced-motion fallbacks. Selected cards raise out of the hand (`HandView.setSelectionLift()`) perpendicular to their rotation in horizontal layout, and shift right in vertical cascade. Card sprites use per-index depth (`sprite.setDepth(index)`) so the Canvas-compatible selection highlight (depth `index + 0.01`) can never render over the card to the right / below; labels sit at `index + 0.005`.
+
+### 3. Command Pattern for Reversible Actions (Undo/Redo)
+
+Use `UndoRedoManager` and `Command` from `@core-engine` to implement reversible actions. Compound commands group multiple sub-actions into a single undo step. New actions after an undo invalidate the redo stack (standard stack semantics).
+
+- **Gym scene:** `GymUndoRedoScene` — `example-games/gym/scenes/GymUndoRedoScene.ts`
+- **Key APIs:** `UndoRedoManager`, `CompoundCommand`, `Command`
+- **When to use:** "In a real card game, undo/redo lets a player reverse a mistaken move — for example, undoing a discard and returning the card to hand, or undoing a series of actions that were grouped as a single turn." (GymUndoRedoScene Features help text)
+- **Usage example:** "Compound commands group an entire turn's actions (e.g., draw + discard + score) into a single undo step, letting the player reverse the whole turn at once."
+
+### 4. Strategy Pattern for AI Decision-Making
+
+Use `AiStrategyBase` (the strategy interface), `AiPlayer<TStrategy>` (generic player wrapper with seeded RNG), `pickRandom<T>()`, and `pickBest<T>()` from `@ai` to build AI players with interchangeable decision-making strategies.
+
+- **Gym scene:** `GymAiStrategyScene` — `example-games/gym/scenes/GymAiStrategyScene.ts`
+- **Key APIs:** `AiStrategyBase`, `AiPlayer<TStrategy>`, `pickRandom<T>()`, `pickBest<T>()`, `createSeededRng()`
+- **When to use:** "In a real game like Lost Cities, an AI strategy implements AiStrategyBase { choosePhase1Action(state, rng): Phase1Action; choosePhase2Action(state, rng): Phase2Action; }. The AiPlayer wraps these strategies and calls them during the game loop." (GymAiStrategyScene Usage Example help text)
+- **Key features:** Same strategy + same seed = same pick (deterministic); `pickBest()` breaks ties randomly using the seeded RNG; strategies can be swapped at runtime.
+
+### 5. Overlay Lifecycle and GeometryMask Clipping
+
+Use `createOverlayBackground()` and `dismissOverlay()` from `@ui` for modal overlays. Overlays use a semi-transparent background with depth-ordering conventions (backdrop 199, box 200, interactive elements 201). GeometryMask scrollable content regions are cleaned up on dismiss.
+
+- **Gym scenes:** `GymOverlayUiScene` — `example-games/gym/scenes/GymOverlayUiScene.ts`, `GymParameterizedOverlayScene` — `example-games/gym/scenes/GymParameterizedOverlayScene.ts`
+- **Key APIs:** `createOverlayBackground()`, `dismissOverlay()`, `createParameterizedOverlay()`, `dismissParameterizedOverlay()`, GeometryMask (Phaser built-in)
+- **When to use:** "In a real card game, overlays are used for confirmation dialogs ('Are you sure you want to quit?'), rule reminders, or modal messages that temporarily block interaction with the game board." (GymOverlayUiScene Features help text)
+- **Lifecycle:** Create overlay via `createOverlayBackground`, parent all interactive elements into `hudContainer`, handle dismiss with proper cleanup (GeometryMask destroy, event listener removal, object array reset). The refined depth convention for modal dialogs is documented in the [UI Best Practices section](#ui-best-practices-creating-modal-dialogs) above.
+
+### 6. Event Sourcing via Transcript Recording
+
+Extend `TranscriptRecorderBase<T>` from `@core-engine` to record game events as an auditable transcript. A transcript is an array of structured events that can be inspected for replay, debugging, or headless validation.
+
+- **Gym scene:** `GymTranscriptScene` — `example-games/gym/scenes/GymTranscriptScene.ts`
+- **Key APIs:** `TranscriptRecorderBase<T>`, `TranscriptStore`, `autoSaveTranscript()`
+- **When to use:** Use transcript recording whenever game state history needs to be captured for replay, debugging, or headless deterministic testing. The Blackjack simulation in this scene demonstrates a realistic multi-event transcript (deal, hit, stick, bust, result) with auto-save on hand end.
+- **Test linkage:** The headless deterministic test suite validates that same seed produces identical transcript sequences.
+
+### 7. Versioned Serialization and Persistence (Save/Load)
+
+Use `SaveLoadStore`, `serializeWithVersion()`, and `deserializeWithVersion()` from `@core-engine` for versioned game state persistence. The version field ensures forward compatibility — deserialization fails on version mismatch instead of silently corrupting data.
+
+- **Gym scene:** `GymSaveLoadScene` — `example-games/gym/scenes/GymSaveLoadScene.ts`
+- **Key APIs:** `SaveLoadStore`, `serializeWithVersion()`, `deserializeWithVersion()`, `RenderTexture.saveTexture()` / `RenderTexture.snapshot()`
+- **When to use:** Any game that needs to persist state between sessions. The scene demonstrates saving a hand of cards along with a RenderTexture screenshot as a visual thumbnail, then restoring both on load.
+- **Key features:** Versioned serialization with mismatch detection, full-screen screenshot snapshot, load from storage with HandView integration.
+
+### 8. Event-Driven Audio and Visual Feedback
+
+Use `SoundManager`, `GameEventEmitter`, and `EventSoundMapping` from `@core-engine` for game audio. Combine with `popTextOrIcon()`, particle effects, and tint/shake animations for multi-modal feedback.
+
+- **Gym scene:** `GymAudioFeedbackScene` — `example-games/gym/scenes/GymAudioFeedbackScene.ts`
+- **Key APIs:** `SoundManager`, `GameEventEmitter`, `EventSoundMapping`, `popTextOrIcon()`, particle emitters
+- **When to use:** Wire `SoundManager` to `GameEventEmitter` for event-driven audio (e.g., card deal → play deal sound). Use `popTextOrIcon()` for lightweight score-change or undo/redo notifications. Add particle effects for celebrations. Provide mute toggle and volume slider with immediate effect.
+- **Key features:** Auto-discovery of sound keys, mute toggling with immediate effect, invalid sound handled safely, volume slider, pop text/icon feedback, particle celebration with reduced-motion fallback.
+
+### 9. Screen Layout Language (SLL) for Declarative Positioning
+
+Define UI layouts declaratively using JSON layout files with **Screen Layout Language (SLL)** instead of hardcoded pixel positions. SLL provides a responsive layout system with zones, anchors, and viewport normalization.
+
+- **Gym scene:** `GymSllScene` — `example-games/gym/scenes/GymSllScene.ts`
+- **Key APIs:** `parseScreenLayoutDocument()`, `validateScreenLayoutDocument()`, `normalizedToPixels()`, `composeResolvedLayouts()`, `getZoneRect()`, `anchorPoint()`, `VisibilityOwnershipController`
+- **When to use:** Every new example game **must** use SLL for all UI layouts. Avoid absolute pixel coordinates for positioning. Reference `src/ui/screen-layout.ts`, `src/ui/screen-layout-compose.ts`, and `src/ui/screen-layout-schema.ts` for the core modules.
+- **Composition:** Multiple SLL layouts can be composed via `composeResolvedLayouts()` to separate scene-specific chrome from scene-specific content.
+- **All Gym scenes** use SLL (via `anchorPoint()` in their `resolve*Anchor()` helpers) as a reference pattern.
+
+### 10. Economy and Legality Pattern for Resource Constraints
+
+Use `EconomyLedger` from `@rule-engine` for resource tracking with constraint enforcement (min/max limits). Use a `LegalityResult` discriminated union (`legalAction` / `illegalAction`) for validating game actions with structured error reasons.
+
+- **Gym scene:** `GymRuleEngineScene` — `example-games/gym/scenes/GymRuleEngineScene.ts`
+- **Key APIs:** `createEconomyLedger()`, `EconomyLedger`, `ResourceDelta`, leglity result helpers
+- **When to use:** Any game with resources (currency, health, points) that need constraint validation. The scene demonstrates illegality for multiple reasons: not your turn, insufficient funds, out of bounds, wrong phase. Use `EconomyLedger` to add/subtract resources with automatic constraint enforcement.
+
+### 11. Tooltip System (DOM and Phaser Modes)
+
+Use `TooltipManager` from `@ui` for contextual information on hover. Supports two rendering modes: **DOM mode** (HTML overlay over the canvas) and **Phaser mode** (game-object containers rendered within the scene).
+
+- **Gym scene:** `GymTooltipScene` — `example-games/gym/scenes/GymTooltipScene.ts`
+- **Key APIs:** `TooltipManager`, `setTooltips()`/`getTooltips()` from SettingsStore
+- **When to use:** Add tooltips to interactive elements (cards, buttons, zones) to explain their function without cluttering the UI. Toggle between modes at runtime via the settings store.
+
+### 12. Grid and Pathfinding with SpatialRules
+
+Use `Grid`, `neighbors()`, `shortestPath()`, and `pathExists()` from `@core-engine/SpatialRules` for tile-based grid mechanics, pathfinding, and adjacency computation.
+
+- **Gym scene:** `GymSpatialRulesScene` — `example-games/gym/scenes/GymSpatialRulesScene.ts`
+- **Key APIs:** `Grid`, `neighbors()`, `shortestPath()`, `pathExists()`, `computeAdjacencyBonus()`, `Position`, `DistanceMetric`
+- **When to use:** Any game with a spatial board (grid-based card layout, token positioning, pathfinding obstacles). Supports Manhattan, Chebyshev, and Euclidean distance metrics.
+
+### 13. HUD Component Architecture (HelpPanel, SettingsPanel)
+
+Use `HelpPanel`, `SettingsPanel`, `HelpButton`, and `SettingsButton` from `@ui` for standard HUD chrome. These provide consistent open/close lifecycle, depth management, and content integration.
+
+- **Gym scene:** `GymHudComponentsScene` — `example-games/gym/scenes/GymHudComponentsScene.ts`
+- **Key APIs:** `HelpPanel`, `SettingsPanel`, `HelpButton`, `SettingsButton`
+- **When to use:** Every game scene should use these components for its help and settings UI rather than building custom panels. The base class `GymSceneBase` provides `initHelp()` which integrates the `HelpPanel` lifecycle.
+
+### 14. Token Pile System for Non-Card Counters
+
+Use `TokenPileView` from `@ui` for token/counter piles where cards are not the visual model. Supports multiple renderers (colored tokens, card-back tokens, custom shape renderers).
+
+- **Gym scene:** `GymTokenPileViewScene` — `example-games/gym/scenes/GymTokenPileViewScene.ts`
+- **Key APIs:** `TokenPileView`, `createSimpleTokenRenderer()`, `createCardBackTokenRenderer()`, `createFeudalismTokenRenderer()`
+- **When to use:** For resource counters, victory point tracks, or any non-card pile that needs add/remove operations with live count labels and click interaction.
+
+### 15. Market/Offer Engine for Purchase Mechanics
+
+Use `MarketOfferEngine` from `@card-system` for generic market/offer systems with rows, slots (occupied/empty/locked), visibility toggles, and purchase processing.
+
+- **Gym scene:** `GymMarketOfferEngineScene` — `example-games/gym/scenes/GymMarketOfferEngineScene.ts`
+- **Key APIs:** `createMarketOfferEngine()`, `MarketOfferEngine`, `PurchaseResult`
+- **When to use:** Any game with a market board — offer rows of purchasable items, refill from a deck, lock/unlock slots, and process purchases with result feedback (success vs failure with reason).
+
+### 16. SVG Rasterisation Pipeline
+
+Use `SvgHelpers` from `@core-engine` (fetchSvgText, rasteriseSvgToTexture, getOrCreateTexture) for rendering SVG assets as Phaser textures with configurable output size and caching.
+
+- **Gym scene:** `GymSvgHelpersScene` — `example-games/gym/scenes/GymSvgHelpersScene.ts`
+- **Key APIs:** `fetchSvgText()`, `rasteriseSvgToTexture()`, `getOrCreateTexture()`, `makeTextureKey()`
+- **When to use:** When card faces or game assets are delivered as SVG files that need to be rasterised to Phaser textures at a specific resolution. Textures are cached by key to avoid redundant rasterisation.
+
+### 17. Internationalisation (I18n)
+
+Use the `I18n` module from `@core-engine` for locale switching with key-based string lookup and fallback support.
+
+- **Gym scene:** `GymI18nScene` — `example-games/gym/scenes/GymI18nScene.ts`
+- **Key APIs:** `registerLocale()`, `setLocale()`, `getLocale()`, `t()`, `resetI18n()`
+- **When to use:** Any game that needs to support multiple languages. Register locale bundles at runtime, switch between locales interactively, and use `t('key')` for automatic lookup. Missing keys return a fallback or the key itself.
+
+### 18. Feasibility Spikes for Graphics Features
+
+Use isolated spike scenes for evaluating new graphics pipelines (shaders, lighting) before integrating into shared engine modules. Document findings (capabilities, limitations, fallback paths) in the scene itself.
+
+- **Gym scenes:** `GymGraphicsShaderSpikeScene` — `example-games/gym/scenes/GymGraphicsShaderSpikeScene.ts`, `GymGraphicsLightingSpikeScene` — `example-games/gym/scenes/GymGraphicsLightingSpikeScene.ts`
+- **Key APIs:** Phaser sprite tinting, blend modes (ADD, MULTIPLY, SCREEN, NORMAL), LightPlugin, point lights
+- **When to use:** When evaluating whether a new graphics feature (custom shaders, lighting pipeline) can be used safely in the engine. Spikes should: attempt the feature, document findings in help text, fall back gracefully when unavailable, and be peer-reviewed before shared code is refactored.
+
+### Scene Base Class Pattern
+
+All Gym demo scenes extend `GymSceneBase` (`example-games/gym/scenes/GymSceneBase.ts`), which provides shared utilities:
+- Standard scene header with title, menu button, prev/next navigation
+- `initHelp()` — structured help panel with Features, Controls, Usage Example, and Test Plan sections
+- `initButtonBar()` — automated button layout via `GymButtonBar`
+- `initReducedMotion()` — reads from SettingsStore and browser prefers-reduced-motion
+- SLL layout loading helpers (`resolve*Anchor()` pattern)
+
+**When to extend:** Any new Gym scene should extend `GymSceneBase`. Non-Gym example game scenes should follow the same patterns (header, help panel, SLL layout, HUD components) to ensure consistency.
+
+---
+
+**Related documentation:**
+- `docs/gym/GYM_INDEX.md` — Complete scene-to-API mapping with source paths and test references
+- `docs/DEVELOPER.md` — Subsystem-specific deep-dive guidance (SLL, HUD, card system, etc.)
+- [UI Best Practices: Creating Modal Dialogs](#ui-best-practices-creating-modal-dialogs) — Depth-ordering convention and overlay implementation patterns
 
 <!-- Start base Worklog AGENTS.md file -->
 

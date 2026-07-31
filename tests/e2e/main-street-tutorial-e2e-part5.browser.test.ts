@@ -49,7 +49,7 @@ describe('Main Street Tutorial E2E — T8-T9', () => {
     game = null;
   });
 
-  it('T8-T9: Upgrade concept and hand steps progress', async () => {
+  it('T8-T9: Buy Bookshop to hand and place from hand', async () => {
     await clickOverlayButtonByText('Next >'); await clickOverlayButtonByText('Next >');
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
     clickRequiredBusinessCard(scene);
@@ -63,8 +63,13 @@ describe('Main Street Tutorial E2E — T8-T9', () => {
     clickRequiredEventCard(scene);
     await waitForOverlayVisible(5_000);
     expect(getStepIndex(scene)).toBe(7);
-    await clickOverlayButtonByText('Next >');
+    clickRequiredBusinessCard(scene);
+    await waitForOverlayVisible(5_000);
     expect(getStepIndex(scene)).toBe(8);
+    clickStreetSlot(scene, 1);
+    await new Promise((r) => setTimeout(r, 500));
+    await waitForOverlayVisible(5_000);
+    expect(getStepIndex(scene)).toBe(9);
     await saveScreenshot('t8-t9');
   }, 30_000);
 });

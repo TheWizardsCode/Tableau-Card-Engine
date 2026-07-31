@@ -9,7 +9,7 @@
  * - Design selection can be persisted and restored
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   getCardDesign,
   setCardDesign,
@@ -27,6 +27,26 @@ function createMockStorage(): StorageLike {
     getItem: vi.fn((k: string) => map.has(k) ? map.get(k)! : null),
     setItem: vi.fn((k: string, v: string) => map.set(k, v)),
   };
+}
+
+// ── globalThis.localStorage stubbing (Node test env has no localStorage) ──
+
+let originalGlobalStorage: unknown;
+
+beforeEach(() => {
+  originalGlobalStorage = (globalThis as any).localStorage;
+});
+
+afterEach(() => {
+  if (originalGlobalStorage === undefined) {
+    delete (globalThis as any).localStorage;
+  } else {
+    (globalThis as any).localStorage = originalGlobalStorage;
+  }
+});
+
+function stubGlobalStorage(storage: StorageLike): void {
+  (globalThis as any).localStorage = storage;
 }
 
 describe('CardDesign registry', () => {
@@ -108,6 +128,33 @@ describe('CardDesign persistence', () => {
       setCardDesign(d.key, storage);
       expect(getCardDesign(storage)).toBe(d.key);
     }
+  });
+
+  it('should read the persisted design from globalThis.localStorage when called without arguments', () => {
+    const storage = createMockStorage();
+    storage.setItem('tce-card-design', 'webisso');
+    stubGlobalStorage(storage);
+
+    // Regression test for CG-0MRO5W3CL000CNGO: getCardDesign() used to
+    // default its storage argument to null, so resolveStorage(null)
+    // returned null immediately and never read globalThis.localStorage.
+    expect(getCardDesign()).toBe('webisso');
+  });
+
+  it('should return the default design when no preference is stored globally', () => {
+    const storage = createMockStorage();
+    stubGlobalStorage(storage);
+
+    expect(getCardDesign()).toBe(CARD_DESIGN_DEFAULT);
+  });
+
+  it('should persist to globalThis.localStorage when called without arguments', () => {
+    const storage = createMockStorage();
+    stubGlobalStorage(storage);
+
+    setCardDesign('webisso');
+    expect(storage.getItem('tce-card-design')).toBe('webisso');
+    expect(getCardDesign()).toBe('webisso');
   });
 });
 

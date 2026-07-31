@@ -68,9 +68,12 @@ describe('Main Street Tutorial E2E — Coin Budget', () => {
     clickRequiredEventCard(scene);
     await waitForOverlayVisible(5_000);
     expect(getStepIndex(scene)).toBe(7);
-    await clickOverlayButtonByText('Next >');
+    clickRequiredBusinessCard(scene);
+    await waitForOverlayVisible(5_000);
     expect(getStepIndex(scene)).toBe(8);
-    await clickOverlayButtonByText('Next >');
+    clickStreetSlot(scene, 1);
+    await new Promise((r) => setTimeout(r, 500));
+    await waitForOverlayVisible(5_000);
     expect(getStepIndex(scene)).toBe(9);
     await clickOverlayButtonByText('Next >');
     expect(getStepIndex(scene)).toBe(10);
@@ -78,6 +81,8 @@ describe('Main Street Tutorial E2E — Coin Budget', () => {
     expect(getStepIndex(scene)).toBe(11);
     await clickOverlayButtonByText('Next >');
     expect(getStepIndex(scene)).toBe(12);
+    await clickOverlayButtonByText('Next >');
+    expect(getStepIndex(scene)).toBe(13);
     await clickOverlayButtonByText('Start Full Game');
     await new Promise((r) => setTimeout(r, 500));
     const finalOverlay = getOverlay();

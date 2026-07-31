@@ -51,14 +51,28 @@ export abstract class GymSceneBase extends Phaser.Scene {
   protected headerDivider?: Phaser.GameObjects.Graphics;
 
   /**
-   * Optional GymButtonBar instance for automated button layout.
+   * The most recently created GymButtonBar instance for automated button layout.
    *
    * Created by calling `initButtonBar()` in the scene's `create()` method.
    * Once initialised, scene subclasses can use `this.buttonBar.addButton()`
    * to add buttons that are automatically arranged into left/center/right
    * zones with even spacing and row wrapping.
+   *
+   * Scenes may call `initButtonBar()` multiple times (one call per button
+   * row/section at its own Y position). This accessor always points at the
+   * latest bar; all bars are retained in `this.buttonBars`.
    */
   protected buttonBar?: GymButtonBar;
+
+  /**
+   * Collection of all GymButtonBar instances created via `initButtonBar()`.
+   *
+   * Successive `initButtonBar()` calls ADD a new bar instead of destroying
+   * previous ones, so scenes can lay out several independent button rows.
+   * All registered bars are destroyed automatically on scene shutdown/destroy
+   * (see `destroyButtonBars()`) so scene restarts are leak-free.
+   */
+  protected buttonBars: GymButtonBar[] = [];
 
   /** Whether reduced motion is currently enabled. Scenes and helpers
    *  should consult this property to skip or shorten animations when true. */
@@ -195,21 +209,52 @@ export abstract class GymSceneBase extends Phaser.Scene {
    * button bar. Once initialised, use `this.buttonBar.addButton()`
    * for all button creation.
    *
-   * If a button bar was previously created, it is destroyed before
-   * creating the new one (allows re-creation).
+   * Multiple calls create ADDITIONAL bars at their own Y positions —
+   * previously created bars are NOT destroyed, so scenes can lay out
+   * several independent button rows. All registered bars are destroyed
+   * automatically when the scene shuts down or is destroyed.
    *
    * @param y     Y position of the first button row.
    * @param opts  Optional GymButtonBar configuration overrides.
-   * @returns The created GymButtonBar instance.
+   * @returns The created GymButtonBar instance (also exposed via `this.buttonBar`).
    */
   protected initButtonBar(y: number, opts?: Partial<GymButtonBarConfig>): GymButtonBar {
-    // Destroy any existing bar first
-    if (this.buttonBar) {
-      try { this.buttonBar.destroy(); } catch (_) { /* ignore */ }
-    }
-
-    this.buttonBar = new GymButtonBar(this, { y, ...opts });
+    const bar = new GymButtonBar(this, { y, ...opts });
+    this.buttonBars.push(bar);
+    this.buttonBar = bar;
+    this.registerButtonBarCleanup();
     return this.buttonBar;
+  }
+
+  /**
+   * Lazily register the button-bar cleanup listeners.
+   *
+   * The Phaser scene event emitter is only wired up once the scene boots,
+   * so the listeners are registered on the first `initButtonBar()` call
+   * (which always happens inside `create()`).
+   */
+  private registerButtonBarCleanup(): void {
+    const key = '__buttonBarCleanup';
+    if ((this as any)[key]) return;
+    const cleanup = () => this.destroyButtonBars();
+    (this as any)[key] = cleanup;
+    this.events.on('shutdown', cleanup);
+    this.events.on('destroy', cleanup);
+  }
+
+  /**
+   * Destroy all registered button bars (buttons and their listeners).
+   *
+   * Called automatically on scene shutdown/destroy to keep restarts
+   * leak-free. Resets the registry and accessor so a restarted scene
+   * starts fresh.
+   */
+  private destroyButtonBars(): void {
+    for (const bar of this.buttonBars) {
+      try { bar.destroy(); } catch (_) { /* ignore */ }
+    }
+    this.buttonBars = [];
+    this.buttonBar = undefined;
   }
 
   // ── Scene transition hook ─────────────────────────────────

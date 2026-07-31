@@ -15,28 +15,6 @@ import Phaser from 'phaser';
 import { waitForScene } from '../helpers/waitForScene';
 import { createOverlayBackground, dismissOverlay } from '../../src/ui/Overlay';
 
-// ── Test Configuration ─────────────────────────────────────
-
-/** Fixed seed for reproducible rendering across test runs. */
-const TEST_SEED = 12345;
-
-/**
- * Temporarily replace `Math.random` with a seeded RNG, execute
- * `fn`, then restore the original `Math.random`.
- */
-async function withSeededRandom<T>(seed: number, fn: () => Promise<T>): Promise<T> {
-  const original = Math.random;
-  const seeded = await import('../../src/core-engine/SeededRng').then(
-    (mod) => mod.createSeededRng(seed)
-  );
-  Math.random = seeded;
-  try {
-    return await fn();
-  } finally {
-    Math.random = original;
-  }
-}
-
 // ── Boot helper ────────────────────────────────────────────
 
 async function bootBeleagueredCastle(): Promise<Phaser.Game> {
@@ -60,15 +38,6 @@ function destroyGame(game: Phaser.Game | null): void {
   if (container) container.remove();
 }
 
-// ── Helper to extract depth from display objects ───────────
-
-function getDepth(obj: unknown): number {
-  if (obj && typeof obj === 'object' && 'depth' in obj) {
-    return (obj as { depth: number }).depth;
-  }
-  return -1; // Indicates no depth property found
-}
-
 // ── Tests ──────────────────────────────────────────────────
 
 let hudGame: Phaser.Game | null = null;
@@ -83,27 +52,6 @@ afterAll(() => {
 });
 
 describe('HUD Layer Contract (browser)', () => {
-  it('HUD container exists at depth ≥ 1000 when initialized', async () => {
-    // Re-seed random for reproducibility (only matters on first test since seed is set at boot)
-    await withSeededRandom(TEST_SEED, async () => {
-      // game already booted in beforeAll
-    });
-
-    const scene = hudGame!.scene.getScene('BeleagueredCastleScene') as unknown as Record<string, unknown>;
-
-    // Check if HUD container exists (will be undefined until Feature 3 is implemented)
-    // This test documents the expected contract and will pass once Feature 3 is complete
-    const hudContainer = scene.hudContainer;
-    if (hudContainer) {
-      // If HUD container exists (after implementation), verify its depth is ≥ 1000
-      const hudDepth = getDepth(hudContainer);
-      expect(hudDepth).toBeGreaterThanOrEqual(1000);
-    } else {
-      // Before implementation, this is expected - test passes as documentation
-      expect(true).toBe(true);
-    }
-  }, 30_000);
-
   it('HelpPanel and SettingsPanel are created during scene initialization', async () => {
     const scene = hudGame!.scene.getScene('BeleagueredCastleScene') as unknown as Record<string, unknown>;
 

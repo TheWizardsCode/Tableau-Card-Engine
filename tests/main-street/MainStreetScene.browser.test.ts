@@ -312,9 +312,8 @@ describe('MainStreetScene browser tests', () => {
 
       const beforeBusinessAnimCount = scene.getTransferAnimationCountForTest();
       scene.onBusinessCardClick(business);
-      scene.onSlotClick(targetSlot);
 
-      // Business should not appear in street immediately while transfer is playing
+      // Business should not appear in street or hand immediately while transfer is playing
       expect(state.streetGrid[targetSlot]).toBeNull();
       expect(scene.getHiddenTransferSourceCardCountForTest()).toBeGreaterThan(0);
 
@@ -322,6 +321,19 @@ describe('MainStreetScene browser tests', () => {
         () => scene.getTransferAnimationCountForTest() > beforeBusinessAnimCount,
         { label: 'business transfer animation start' },
       );
+
+      // New flow: the business is bought to hand first (market → hand transfer),
+      // then placed on the grid (hand → street placement).
+      await waitForCondition(
+        () => scene.uiPhase === 'placing-from-hand',
+        { timeoutMs: 6000, label: 'business bought to hand' },
+      );
+      const handBusiness = (state.hand ?? []).find((c: any) => c.id === business.id);
+      expect(handBusiness).toBeTruthy();
+      expect(scene.getHiddenTransferSourceCardCountForTest()).toBe(0);
+
+      // Now place the business on the target slot.
+      scene.onSlotClick(targetSlot);
 
       await waitForCondition(
         () => state.streetGrid[targetSlot]?.id === business.id,
@@ -464,6 +476,31 @@ describe('MainStreetScene browser tests', () => {
     const scoreCallArgs = tooltipShowSpy.mock.calls[0];
     expect(scoreCallArgs[0]).toContain('Score');
     tooltipShowSpy.mockClear();
+
+    destroyGame(game);
+    game = null;
+  });
+
+  it('rounds the HUD Coins display to a whole number (no fractional digits)', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;
+
+    // Give the player a fractional coin balance (3-decimal precision)
+    scene.state.resourceBank.coins = 123.456;
+    scene.refreshHud();
+
+    // Find the transient HUD coin text
+    const hudList = scene.hudContainer.list as Phaser.GameObjects.GameObject[];
+    const coinText = hudList.find(
+      (obj) => obj instanceof Phaser.GameObjects.Text
+        && (obj as any)._hudTransient
+        && (obj as Phaser.GameObjects.Text).text.startsWith('Coins:'),
+    ) as Phaser.GameObjects.Text | undefined;
+
+    expect(coinText).toBeTruthy();
+    // Rounded whole number, no decimal places (e.g. "Coins: 123", not "Coins: 123.456")
+    expect(coinText!.text).toBe('Coins: 123');
+    expect(coinText!.text).not.toContain('.');
 
     destroyGame(game);
     game = null;
