@@ -70,12 +70,20 @@ function createMockScene(): any {
           width: w,
           height: h,
           color,
+          fillColor: color,
+          fillAlpha: 0.35,
           active: true,
           setPosition: vi.fn().mockReturnThis(),
           setOrigin: vi.fn().mockReturnThis(),
           setDepth: vi.fn().mockReturnThis(),
           setAlpha: vi.fn().mockReturnThis(),
           setRotation: vi.fn().mockReturnThis(),
+          setFillStyle: vi.fn().mockImplementation((c: number, a?: number) => {
+            rect.fillColor = c;
+            rect.color = c;
+            rect.fillAlpha = a ?? rect.fillAlpha;
+            return rect;
+          }),
           destroy: vi.fn().mockImplementation(() => {
             rect.active = false;
           }),
@@ -328,6 +336,72 @@ describe('HandView selection raise (selectionLift)', () => {
     expect(overlay.y).toBe(sprite.y);
     hv.destroy();
   });
+
+  it('animated path: first-selection highlight overlay rides the raise tween with the sprite', () => {
+    const hv = new HandView(scene, { baseX: 100, baseY: 200, spacing: 56 });
+    hv.setSelectionLift(20);
+    hv.setCards([card('A', 'spades')]);
+
+    hv.setSelected(0);
+
+    // The highlight overlay must be created BEFORE the raise tween starts
+    // so it is included in the tween targets and raises with the card — a
+    // card must never rise away from its selection highlight.
+    const overlay = scene._rectangles.find((r: any) => r.active && r.color === 0x88ff88);
+    expect(overlay).toBeDefined();
+    const tween = scene._tweens[scene._tweens.length - 1];
+    expect(tween.targets).toContain(overlay);
+    expect(tween.y).toBeCloseTo(180, 5);
+    hv.destroy();
+  });
+
+  it('hover repaint reuses the highlight overlay instead of recreating it (no orphaning mid-raise)', () => {
+    const hv = new HandView(scene, { baseX: 100, baseY: 200, spacing: 56 });
+    hv.setSelectionLift(20);
+    hv.setCards([card('A', 'spades')]);
+
+    hv.setSelected(0);
+    const overlayBefore = scene._rectangles.find((r: any) => r.active && r.color === 0x88ff88);
+    expect(overlayBefore).toBeDefined();
+
+    // Hover the selected card while the raise tween is in flight: the tint
+    // must be repainted IN PLACE so the raise tween keeps moving the same
+    // overlay object. Destroying + recreating would leave the new overlay
+    // orphaned at the resting position while the card continues to rise.
+    const sprite = scene._images[0];
+    const pointeroverCall = sprite.on.mock.calls.find((c: any[]) => c[0] === 'pointerover');
+    expect(pointeroverCall).toBeDefined();
+    pointeroverCall[1]();
+
+    const overlayAfter = scene._rectangles.find((r: any) => r.active && r.fillColor === 0x66ff66);
+    expect(overlayAfter).toBe(overlayBefore);
+    expect(scene._rectangles.filter((r: any) => r.active).length).toBe(1);
+    hv.destroy();
+  });
+
+  it('vertical cascade: first-selection overlays raise with their cards', () => {
+    const hv = new HandView(scene, {
+      baseX: 200,
+      baseY: 100,
+      spacing: 50,
+      layoutDirection: 'vertical',
+      reducedMotion: true,
+    });
+    hv.setSelectionLift(15);
+    hv.setCards([card('A', 'spades'), card('2', 'hearts'), card('3', 'clubs')]);
+
+    // Cascade selection: index 1 selects cards [0..1], both shift right by 15
+    hv.setSelected(1);
+
+    const overlays = scene._rectangles.filter((r: any) => r.active && r.color === 0x88ff88);
+    expect(overlays.length).toBe(2);
+    for (let i = 0; i < 2; i++) {
+      expect(overlays[i].x).toBe(scene._images[i].x);
+      expect(overlays[i].y).toBe(scene._images[i].y);
+    }
+    hv.destroy();
+  });
+
 
   it('drag lift composes with the selection raise (no stale offsets after a rejected drag)', () => {
     const hv = new HandView(scene, {

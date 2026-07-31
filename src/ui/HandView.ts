@@ -1559,17 +1559,34 @@ export class HandView {
       (sprite as any).setTint(color ?? 0xffffff);
     } catch (_) { /* ignore */ }
 
-    // Destroy existing overlay if present
+    const s = sprite as any;
     const existing = this._tintOverlays[index];
-    if (existing) {
-      existing.destroy();
-      this._tintOverlays[index] = null;
+    if (existing && existing.active) {
+      if (color === null) {
+        existing.destroy();
+        this._tintOverlays[index] = null;
+        return;
+      }
+      // Repaint IN PLACE — never destroy/recreate an active overlay. An
+      // overlay recreated mid-raise-tween would be left at its creation
+      // position while the card continues to rise (the raise tween only
+      // moves the overlay object it was created with), leaving the
+      // highlight detached from the raised card. Repainting keeps the
+      // same overlay glued to the card through the raise.
+      if ((existing as any).fillColor !== color) {
+        (existing as any).setFillStyle(color, (existing as any).fillAlpha ?? 0.35);
+      }
+      // Keep the overlay aligned with the sprite at this instant (the
+      // raise tween / drag updates overwrite it every frame when active).
+      existing.setPosition(s.x ?? 0, s.y ?? 0);
+      existing.setRotation(s.rotation ?? 0);
+      existing.setDepth((s.depth ?? 0) + 0.01);
+      return;
     }
 
     if (color === null) return;
 
-    // Create a new overlay rectangle
-    const s = sprite as any;
+    // Create a new overlay rectangle at the sprite's current position
     const overlay = this.scene.add.rectangle(
       s.x ?? 0,
       s.y ?? 0,
@@ -1608,11 +1625,12 @@ export class HandView {
 
   /** Update visual selection tint on all sprites. */
   private updateSelectionTints(): void {
-    // Apply the selection-raise offset first — position is managed by
-    // HandView for both default and custom-rendered cards.
-    this.applySelectionRaise(true);
-    // Custom-rendered cards manage their own selection visuals
-    if (this._renderCardFn) return;
+    // Custom-rendered cards manage their own selection visuals but
+    // HandView still owns raised positioning.
+    if (this._renderCardFn) {
+      this.applySelectionRaise(true);
+      return;
+    }
     const isVertical = this.layoutDirection === 'vertical';
     for (let i = 0; i < this.sprites.length; i++) {
       const sprite = this.sprites[i];
@@ -1631,6 +1649,9 @@ export class HandView {
         }
       }
     }
+    // Apply the raise AFTER the tints so a newly-created highlight overlay
+    // is included in the raise tween and raises together with the card.
+    this.applySelectionRaise(true);
   }
 
   // ── Selection raise (selected card lift) ──────────────────

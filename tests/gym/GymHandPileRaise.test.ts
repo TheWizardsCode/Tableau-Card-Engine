@@ -17,4 +17,12 @@ describe('GymHandPileScene raise slider presence', () => {
     expect(hv).toContain('Math.sin');
     expect(hv).toContain('Math.cos');
   });
+
+  it('scene raise slider uses max 180 with default 60', () => {
+    const source = fs.readFileSync(path.resolve(__dirname, '../../example-games/gym/scenes/GymHandPileScene.ts'), 'utf-8');
+    expect(source).toContain('RAISE_DEFAULT = 60');
+    expect(source).toContain('RAISE_MAX = 180');
+    // Help text documents the default and max
+    expect(source).toContain('default 60px, max 180px');
+  });
 });

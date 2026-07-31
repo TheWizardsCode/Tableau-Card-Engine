@@ -73,13 +73,18 @@ function createMockScene(): any {
       }),
       rectangle: vi.fn().mockImplementation((x: number, y: number, w: number, h: number, color: number) => {
         const rect = {
-          x, y, width: w, height: h, color,
+          x, y, width: w, height: h, color, fillColor: color,
           active: true,
           setPosition: vi.fn().mockReturnThis(),
           setOrigin: vi.fn().mockReturnThis(),
           setDepth: vi.fn().mockReturnThis(),
           setAlpha: vi.fn().mockReturnThis(),
           setRotation: vi.fn().mockReturnThis(),
+          setFillStyle: vi.fn().mockImplementation((c: number, _a?: number) => {
+            rect.fillColor = c;
+            rect.color = c;
+            return rect;
+          }),
           destroy: vi.fn().mockImplementation(() => {
             rect.active = false;
             destroyed.push(rect);
