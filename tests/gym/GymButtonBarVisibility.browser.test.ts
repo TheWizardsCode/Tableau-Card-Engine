@@ -43,7 +43,7 @@ const HAND_PILE_BUTTONS = [
   '[ Sort Hand ]',
   '[ Shuffle Hand ]',
   '[ Reset ]',
-  '[ Enable Drag ]',
+  '[ Disable Drag ]',
   '[ Toggle Discard Mode ]',
   '[ Toggle Face Up ]',
   '[ Toggle Layout ]',

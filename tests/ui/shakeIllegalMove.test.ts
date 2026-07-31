@@ -33,6 +33,7 @@ function createMockScene(): Phaser.Scene {
           setOrigin: vi.fn().mockReturnThis(),
           setDepth: vi.fn().mockReturnThis(),
           setAlpha: vi.fn().mockReturnThis(),
+          setRotation: vi.fn().mockReturnThis(),
           destroy: vi.fn().mockImplementation(() => {
             rect.active = false;
             destroyed.push(rect);

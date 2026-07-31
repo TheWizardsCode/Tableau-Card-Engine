@@ -31,6 +31,7 @@ function createMockScene(): any {
       scaleX: 1,
       scaleY: 1,
       alpha: 1,
+      rotation: 0,
       displayWidth: 48,
       displayHeight: 65,
     };
@@ -76,6 +77,7 @@ function createMockScene(): any {
           setOrigin: vi.fn().mockReturnThis(),
           setDepth: vi.fn().mockReturnThis(),
           setAlpha: vi.fn().mockReturnThis(),
+          setRotation: vi.fn().mockReturnThis(),
           destroy: vi.fn().mockImplementation(() => {
             rect.active = false;
             destroyed.push(rect);
@@ -546,6 +548,39 @@ describe('HandView', () => {
     const clearedRects = scene._rectangles.filter((r: any) => r.active);
     const greenRects = clearedRects.filter((r: any) => r.color === 0x88ff88);
     expect(greenRects.length).toBe(0);
+
+    hv.destroy();
+  });
+
+  it('tint overlay rectangles match the rotated sprite angle', () => {
+    const hv = new HandView(scene, {
+      baseX: 60,
+      baseY: 130,
+      spacing: 56,
+      maxRotationDegrees: 25,
+    });
+
+    // 5 cards so the outer cards receive non-zero proportional rotation
+    const cards = [
+      card('A', 'spades'),
+      card('2', 'hearts'),
+      card('3', 'clubs'),
+      card('4', 'diamonds'),
+      card('5', 'spades'),
+    ];
+    hv.setCards(cards);
+
+    // Select an edge card — it has a non-zero rotation in an arc layout
+    hv.setSelected(0);
+    const selectedRects = scene._rectangles.filter((r: any) => r.active && r.color === 0x88ff88);
+    expect(selectedRects.length).toBeGreaterThanOrEqual(1);
+
+    // The overlay's setRotation must have been called with the sprite's rotation
+    const spriteRotation = (scene._images[0] as any).rotation ?? 0;
+    const rectRotationCalls = selectedRects[0].setRotation.mock.calls;
+    expect(rectRotationCalls.length).toBeGreaterThanOrEqual(1);
+    const lastRotation = rectRotationCalls[rectRotationCalls.length - 1][0];
+    expect(Math.abs(lastRotation - spriteRotation)).toBeLessThan(0.001);
 
     hv.destroy();
   });
