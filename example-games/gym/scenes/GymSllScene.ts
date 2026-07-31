@@ -37,6 +37,51 @@ import {
   parseScreenLayoutDocument,
   validateScreenLayoutDocument,
 } from '../../../src/ui/screen-layout-schema';
+import {
+  SLL_OVERLAY_GRAPHICS_DEPTH,
+  SLL_BUTTON_BAR_Y,
+  SLL_BUTTON_BAR_ROW_SPACING,
+  SLL_PROFILE_LABEL_FONT_SIZE,
+  SLL_PROFILE_LABEL_COLORS,
+  SLL_STATUS_LINE_X,
+  SLL_STATUS_LINE_Y,
+  SLL_STATUS_FONT_SIZE,
+  SLL_STATUS_TEXT_COLOR,
+  SLL_TITLE_FONT_SIZE,
+  SLL_ACTION_BUTTON_FONT_SIZE,
+  SLL_CONTENT_PANEL_WIDTH,
+  SLL_CONTENT_PANEL_HEIGHT,
+  SLL_CONTENT_PANEL_FILL_COLOR,
+  SLL_CONTENT_PANEL_ALPHA,
+  SLL_CONTENT_PANEL_STROKE_WIDTH,
+  SLL_CONTENT_PANEL_STROKE_COLOR,
+  SLL_CONTENT_PANEL_STROKE_ALPHA,
+  SLL_CONTENT_LABEL_FONT_SIZE,
+  SLL_CONTENT_LABEL_COLOR,
+  SLL_OBJECT_DEPTH,
+  SLL_CONTENT_PANEL_DEPTH,
+  SLL_CONTENT_LABEL_DEPTH,
+  SLL_PULSE_FILL_COLOR,
+  SLL_PULSE_FILL_ALPHA,
+  SLL_PULSE_OFF_FILL_ALPHA,
+  SLL_OVERLAY_DOT_RADIUS,
+  SLL_OVERLAY_RING_RADIUS,
+  SLL_OVERLAY_LINE_WIDTH,
+  SLL_OVERLAY_LINE_ALPHA,
+  SLL_OVERLAY_FILL_ALPHA,
+  SLL_OVERLAY_LEGEND_X,
+  SLL_OVERLAY_LEGEND_Y,
+  SLL_OVERLAY_LEGEND_WIDTH,
+  SLL_OVERLAY_LEGEND_MAX_HEIGHT,
+  SLL_OVERLAY_LEGEND_FONT_SIZE,
+  SLL_OVERLAY_LEGEND_LINE_SPACING,
+  SLL_OVERLAY_LEGEND_DEPTH,
+  SLL_OVERLAY_LEGEND_PAD_X,
+  SLL_OVERLAY_LEGEND_PAD_Y,
+  SLL_OVERLAY_LEGEND_LINE_HEIGHT,
+  SLL_OVERLAY_SEPARATOR_LENGTH,
+  SLL_ELEMENT_COLORS,
+} from './GymConstants';
 
 interface LayoutProfile {
   id: string;
@@ -207,7 +252,7 @@ export class GymSllScene extends GymSceneBase {
     this.configureVisibility();
 
     this.overlayGraphics = this.add.graphics();
-    this.overlayGraphics.setDepth(70);
+    this.overlayGraphics.setDepth(SLL_OVERLAY_GRAPHICS_DEPTH);
 
     this.applyLayout();
 
@@ -321,49 +366,49 @@ export class GymSllScene extends GymSceneBase {
   }
 
   private createControlRow(): void {
-    const y1 = 58;
-    this.initButtonBar(y1, { rowSpacing: 24 });
+    const y1 = SLL_BUTTON_BAR_Y;
+    this.initButtonBar(y1, { rowSpacing: SLL_BUTTON_BAR_ROW_SPACING });
     this.profileButton = this.buttonBar!.addButton('[ Profile ]', () => this.cycleProfile(), {
       zone: 'left',
-      fontSize: '13px',
-      color: '#88ddff',
+      fontSize: SLL_PROFILE_LABEL_FONT_SIZE,
+      color: SLL_PROFILE_LABEL_COLORS.DEFAULT,
     });
 
     this.overlayButton = this.buttonBar!.addButton('[ Overlay: OFF ]', () => this.toggleOverlay(), {
       zone: 'left',
-      fontSize: '13px',
-      color: '#ffee99',
+      fontSize: SLL_PROFILE_LABEL_FONT_SIZE,
+      color: SLL_PROFILE_LABEL_COLORS.PORTRAIT,
     });
 
     this.shellToggleButton = this.buttonBar!.addButton(`[ Toggle Shell: ${this.shellVisible ? 'ON' : 'OFF'} ]`, () => this.toggleShell(), {
       zone: 'left',
-      fontSize: '13px',
-      color: '#ffcc88',
+      fontSize: SLL_PROFILE_LABEL_FONT_SIZE,
+      color: SLL_PROFILE_LABEL_COLORS.DESKTOP_2X,
     });
 
-    this.statusLine = this.addLabel(28, 106, '', { fontSize: '12px', color: '#b7d9e3' });
+    this.statusLine = this.addLabel(SLL_STATUS_LINE_X, SLL_STATUS_LINE_Y, '', { fontSize: SLL_STATUS_FONT_SIZE, color: SLL_STATUS_TEXT_COLOR });
   }
 
   private createDemoObjects(): void {
     this.layoutTitle = this.add
       .text(0, 0, 'SLL Title Anchor', {
-        fontSize: '24px',
+        fontSize: SLL_TITLE_FONT_SIZE,
         color: '#ffffff',
         fontFamily: 'monospace',
         fontStyle: 'bold',
       })
       .setOrigin(0.5)
-      .setDepth(40);
+      .setDepth(SLL_OBJECT_DEPTH);
 
     this.actionButton = this.add
       .text(0, 0, '[ Toggle Fill ]', {
-        fontSize: '15px',
+        fontSize: SLL_ACTION_BUTTON_FONT_SIZE,
         color: '#88ff88',
         fontFamily: 'monospace',
         fontStyle: 'bold',
       })
       .setOrigin(0.5)
-      .setDepth(40)
+      .setDepth(SLL_OBJECT_DEPTH)
       .setInteractive({ useHandCursor: true });
 
     this.actionButton.on('pointerdown', () => this.togglePulse());
@@ -371,20 +416,20 @@ export class GymSllScene extends GymSceneBase {
     this.actionButton.on('pointerout', () => this.actionButton.setColor('#88ff88'));
 
     this.contentPanel = this.add
-      .rectangle(0, 0, 420, 220, 0x133848, 0.78)
-      .setStrokeStyle(2, 0x66ddff, 0.95)
+      .rectangle(0, 0, SLL_CONTENT_PANEL_WIDTH, SLL_CONTENT_PANEL_HEIGHT, SLL_CONTENT_PANEL_FILL_COLOR, SLL_CONTENT_PANEL_ALPHA)
+      .setStrokeStyle(SLL_CONTENT_PANEL_STROKE_WIDTH, SLL_CONTENT_PANEL_STROKE_COLOR, SLL_CONTENT_PANEL_STROKE_ALPHA)
       .setOrigin(0.5)
-      .setDepth(25);
+      .setDepth(SLL_CONTENT_PANEL_DEPTH);
 
     this.contentLabel = this.add
       .text(0, 0, 'SLL content area\n(anchor + zone driven)', {
-        fontSize: '16px',
-        color: '#ffffff',
+        fontSize: SLL_CONTENT_LABEL_FONT_SIZE,
+        color: SLL_CONTENT_LABEL_COLOR,
         fontFamily: 'monospace',
         align: 'center',
       })
       .setOrigin(0.5)
-      .setDepth(35);
+      .setDepth(SLL_CONTENT_LABEL_DEPTH);
   }
 
   private cycleProfile(): void {
@@ -408,7 +453,7 @@ export class GymSllScene extends GymSceneBase {
 
   private togglePulse(): void {
     this.pulseOn = !this.pulseOn;
-    this.contentPanel.setFillStyle(this.pulseOn ? 0x2a5f33 : 0x133848, 0.82);
+    this.contentPanel.setFillStyle(this.pulseOn ? SLL_PULSE_FILL_COLOR : SLL_CONTENT_PANEL_FILL_COLOR, this.pulseOn ? SLL_PULSE_FILL_ALPHA : SLL_PULSE_OFF_FILL_ALPHA);
     this.contentLabel.setText(
       this.pulseOn
         ? 'SLL content area\nstate: FILL ON'
@@ -518,8 +563,8 @@ export class GymSllScene extends GymSceneBase {
       // Zones are position-only; panel dimensions use fixed defaults.
       const contentCenterPx = this.getAnchorPoint(resolved, contentPlacement);
       const contentCenterDisplay = toDisplayPoint(contentCenterPx);
-      const panelWidth = 420;
-      const panelHeight = 220;
+      const panelWidth = SLL_CONTENT_PANEL_WIDTH;
+      const panelHeight = SLL_CONTENT_PANEL_HEIGHT;
       this.contentPanel.setVisible(true);
       this.contentLabel.setVisible(true);
       this.contentPanel
@@ -532,7 +577,7 @@ export class GymSllScene extends GymSceneBase {
     }
 
     // Collect element positions for overlay visualization
-    const elementColors = [0x66ddff, 0x66ff99, 0xffcc66, 0xff8899];
+    const elementColors = SLL_ELEMENT_COLORS;
     const elementPositions: Array<{
       name: string;
       pixel: PixelPoint;
@@ -598,14 +643,14 @@ export class GymSllScene extends GymSceneBase {
     }
 
     const legendLines: string[] = ['Overlay legend'];
-    const separator = '─'.repeat(36);
+    const separator = '─'.repeat(SLL_OVERLAY_SEPARATOR_LENGTH);
 
     for (const elem of elementPositions) {
       // Draw a dot at the element's display position
-      this.overlayGraphics.fillStyle(elem.color, 0.95);
-      this.overlayGraphics.fillCircle(elem.display.x, elem.display.y, 5);
-      this.overlayGraphics.lineStyle(1.5, elem.color, 0.8);
-      this.overlayGraphics.strokeCircle(elem.display.x, elem.display.y, 8);
+      this.overlayGraphics.fillStyle(elem.color, SLL_OVERLAY_FILL_ALPHA);
+      this.overlayGraphics.fillCircle(elem.display.x, elem.display.y, SLL_OVERLAY_DOT_RADIUS);
+      this.overlayGraphics.lineStyle(SLL_OVERLAY_LINE_WIDTH, elem.color, SLL_OVERLAY_LINE_ALPHA);
+      this.overlayGraphics.strokeCircle(elem.display.x, elem.display.y, SLL_OVERLAY_RING_RADIUS);
 
       legendLines.push(
         `${elem.name}: (${elem.pixel.x.toFixed(0)}, ${elem.pixel.y.toFixed(0)})`,
@@ -619,10 +664,10 @@ export class GymSllScene extends GymSceneBase {
     legendLines.push('as determined by the current SLL');
     legendLines.push('layout and placement mapping.');
 
-    const legendPanelX = 864;
-    const legendPanelY = 122;
-    const legendPanelWidth = 392;
-    const legendPanelHeight = Math.min(520, 18 + legendLines.length * 12);
+    const legendPanelX = SLL_OVERLAY_LEGEND_X;
+    const legendPanelY = SLL_OVERLAY_LEGEND_Y;
+    const legendPanelWidth = SLL_OVERLAY_LEGEND_WIDTH;
+    const legendPanelHeight = Math.min(SLL_OVERLAY_LEGEND_MAX_HEIGHT, SLL_OVERLAY_LEGEND_PAD_Y + legendLines.length * SLL_OVERLAY_LEGEND_LINE_HEIGHT);
 
     this.overlayGraphics.fillStyle(0x09151b, 0.82);
     this.overlayGraphics.fillRect(
@@ -640,13 +685,13 @@ export class GymSllScene extends GymSceneBase {
     );
 
     const legendLabel = this.add
-      .text(legendPanelX + 10, legendPanelY + 8, legendLines.join('\n'), {
+      .text(legendPanelX + SLL_OVERLAY_LEGEND_PAD_X, legendPanelY + SLL_OVERLAY_LEGEND_PAD_Y, legendLines.join('\n'), {
         fontFamily: 'monospace',
-        fontSize: '10px',
+        fontSize: SLL_OVERLAY_LEGEND_FONT_SIZE,
         color: '#dff6ff',
-        lineSpacing: 2,
+        lineSpacing: SLL_OVERLAY_LEGEND_LINE_SPACING,
       })
-      .setDepth(75);
+      .setDepth(SLL_OVERLAY_LEGEND_DEPTH);
     this.overlayLabels.push(legendLabel);
   }
 

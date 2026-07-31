@@ -30,6 +30,23 @@ import { HandView } from '../../../src/ui/HandView';
 import { anchorPoint } from '../../../src/ui/screen-layout';
 import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
 import gymSaveLoadLayoutJson from '../layouts/gym-save-load.layout.json';
+import {
+  DEFAULT_VIEWPORT,
+  SCENE_HEADER_Y,
+  EVENT_LOG_Y_OFFSET,
+  EVENT_LOG_MAX_LINES_SAVE,
+  EVENT_LOG_LINE_HEIGHT_SAVE,
+  EVENT_LOG_FONT_SIZE,
+  EVENT_LOG_HEADER_FONT_SIZE,
+  EVENT_LOG_HEADER_COLOR,
+  EVENT_LOG_LINE_X_SAVE,
+  STATE_FONT_SIZE,
+  STATE_TEXT_COLOR,
+  BACKEND_STATUS_FONT_SIZE,
+  BACKEND_STATUS_COLOR,
+  SCREENSHOT_THUMB_Y,
+  SAVE_LOG_MAX_LINES,
+} from './GymConstants';
 
 // Parse the shared Save/Load scene layout once at module load.
 const SAVE_LOAD_LAYOUT: import('../../../src/ui/screen-layout-schema').ScreenLayoutDocument | null = (() => {
@@ -37,15 +54,13 @@ const SAVE_LOAD_LAYOUT: import('../../../src/ui/screen-layout-schema').ScreenLay
   return parsed.valid ? parsed.layout : null;
 })();
 
-const DEFAULT_VIEWPORT = { width: 1280, height: 720 };
-
 function resolveSaveLoadAnchor(
   zone: string,
   anchor: string,
   viewport = DEFAULT_VIEWPORT,
 ): import('../../../src/ui/screen-layout-schema').PixelPoint {
   if (!SAVE_LOAD_LAYOUT) {
-    return { x: GAME_W / 2, y: 60 };
+    return { x: GAME_W / 2, y: SCENE_HEADER_Y };
   }
   return anchorPoint(SAVE_LOAD_LAYOUT, zone, anchor, viewport, 1);
 }
@@ -235,12 +250,12 @@ export class GymSaveLoadScene extends GymSceneBase {
 
     // ── State text ────────────────────────────────────────────
     try {
-      this.stateText = createHudText(this, cx, stateAnchor.y, this.stateString(), '#ffffff', { fontSize: '18px' }).setOrigin(0.5);
+      this.stateText = createHudText(this, cx, stateAnchor.y, this.stateString(), STATE_TEXT_COLOR, { fontSize: STATE_FONT_SIZE }).setOrigin(0.5);
     } catch (e) {
-      this.stateText = this.addLabel(cx, stateAnchor.y, this.stateString(), { fontSize: '18px', color: '#ffffff' }).setOrigin(0.5);
+      this.stateText = this.addLabel(cx, stateAnchor.y, this.stateString(), { fontSize: STATE_FONT_SIZE, color: STATE_TEXT_COLOR }).setOrigin(0.5);
     }
 
-    this.backendText = createHudText(this, cx, backendAnchor.y, 'Storage: checking...', '#888888', { fontSize: '12px' });
+    this.backendText = createHudText(this, cx, backendAnchor.y, 'Storage: checking...', BACKEND_STATUS_COLOR, { fontSize: BACKEND_STATUS_FONT_SIZE });
     this.backendText.setOrigin(0.5);
 
     const backendName = await this.store.getBackendName();
@@ -252,15 +267,15 @@ export class GymSaveLoadScene extends GymSceneBase {
 
     // ── Event log (reduced lines to leave room for screenshot) ─
     if (this.sys && this.sys.isActive && this.sys.isActive()) {
-      this.eventLogResult = createEventLog(this, logAnchor.y + 20, {
+      this.eventLogResult = createEventLog(this, logAnchor.y + EVENT_LOG_Y_OFFSET, {
         headerText: '── Event Log ──',
-        maxLines: 8,
-        lineHeight: 17,
+        maxLines: EVENT_LOG_MAX_LINES_SAVE,
+        lineHeight: EVENT_LOG_LINE_HEIGHT_SAVE,
         textColor: '#aaddaa',
-        fontSize: '11px',
-        headerFontSize: '12px',
-        headerColor: '#669966',
-        lineX: 40,
+        fontSize: EVENT_LOG_FONT_SIZE,
+        headerFontSize: EVENT_LOG_HEADER_FONT_SIZE,
+        headerColor: EVENT_LOG_HEADER_COLOR,
+        lineX: EVENT_LOG_LINE_X_SAVE,
       });
     }
   }
@@ -447,7 +462,7 @@ export class GymSaveLoadScene extends GymSceneBase {
       rt.saveTexture('screenshot-thumb');
 
       // Display as a thumbnail centred below the controls
-      rt.setPosition(GAME_W / 2, 360);
+      rt.setPosition(GAME_W / 2, SCREENSHOT_THUMB_Y);
       rt.setScale(SCREENSHOT_THUMB_SCALE);
 
       this.screenshotDisplay = rt;
@@ -473,7 +488,7 @@ export class GymSaveLoadScene extends GymSceneBase {
       this.logEvent('Screenshot taken (full-screen)');
     } catch (e) {
       this.logEvent(`Screenshot fallback (headless): ${(e as Error).message?.substring(0, 50) ?? 'RenderTexture unavailable'}`);
-      this.screenshotPlaceholder = createHudText(this, GAME_W / 2, 360, '[ Screenshot: Text Placeholder ]', '#888888', { fontSize: '12px' }).setOrigin(0.5);
+      this.screenshotPlaceholder = createHudText(this, GAME_W / 2, SCREENSHOT_THUMB_Y, '[ Screenshot: Text Placeholder ]', BACKEND_STATUS_COLOR, { fontSize: BACKEND_STATUS_FONT_SIZE }).setOrigin(0.5);
       this._screenshotAvailable = false;
     }
   }
@@ -537,7 +552,7 @@ export class GymSaveLoadScene extends GymSceneBase {
 
   private logEvent(msg: string): void {
     this.eventLog.push(msg);
-    if (this.eventLog.length > 8) this.eventLog.shift();
+    if (this.eventLog.length > SAVE_LOG_MAX_LINES) this.eventLog.shift();
     this.eventLogResult.render(this.eventLog);
   }
 }

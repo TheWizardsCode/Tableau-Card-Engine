@@ -25,14 +25,27 @@ import { parseScreenLayoutDocument, type ScreenLayoutDocument, type PixelPoint }
 import gymScenesLayoutJson from '../layouts/gym-scenes.layout.json';
 import { createHudText } from '../../../src/ui/Renderer';
 import { GymButtonBar, type GymButtonBarConfig } from '../../../src/ui/GymButtonBar';
+import {
+  DEFAULT_VIEWPORT,
+  PREV_BUTTON_X,
+  NEXT_BUTTON_X,
+  NAV_BUTTON_FONT_SIZE,
+  ANIMATION_DURATION_DEFAULT,
+  DEFAULT_FONT_SIZE,
+  DIVIDER_DEFAULT_Y_OFFSET,
+  DIVIDER_LINE_WIDTH,
+  DIVIDER_COLOR,
+  DIVIDER_ALPHA,
+  DIVIDER_MARGIN_LEFT,
+  DIVIDER_MARGIN_RIGHT,
+  HELP_PANEL_WIDTH_PERCENT,
+} from './GymConstants';
 
 // Parse the shared Gym scenes layout once at module load.
 const GYM_SCENES_LAYOUT: ScreenLayoutDocument | null = (() => {
   const parsed = parseScreenLayoutDocument(gymScenesLayoutJson);
   return parsed.valid ? parsed.layout : null;
 })();
-
-const DEFAULT_VIEWPORT = { width: 1280, height: 720 };
 
 /**
  * Abstract base class for Gym demo scenes.
@@ -128,10 +141,10 @@ export abstract class GymSceneBase extends Phaser.Scene {
     // Add Previous and Next navigation buttons to the header bar.
     // Positioned to the right of the [ Menu ] button on the same Y line.
     this.prevButton = this.createNavButton(
-      120, SCENE_HEADER_Y, '[ < Prev ]', 'prev',
+      PREV_BUTTON_X, SCENE_HEADER_Y, '[ < Prev ]', 'prev',
     );
     this.nextButton = this.createNavButton(
-      210, SCENE_HEADER_Y, '[ Next > ]', 'next',
+      NEXT_BUTTON_X, SCENE_HEADER_Y, '[ Next > ]', 'next',
     );
 
     return this.header;
@@ -184,7 +197,7 @@ export abstract class GymSceneBase extends Phaser.Scene {
   ): Phaser.GameObjects.Text {
     const btn = this.add
       .text(x, y, label, {
-        fontSize: '12px',
+        fontSize: NAV_BUTTON_FONT_SIZE,
         color: '#aaccaa',
         fontFamily: FONT_FAMILY,
       })
@@ -272,7 +285,7 @@ export abstract class GymSceneBase extends Phaser.Scene {
    */
   protected runEnterTransition(
     type: 'fade' | 'slide' = 'fade',
-    duration: number = 300,
+    duration: number = ANIMATION_DURATION_DEFAULT,
   ): Promise<void> {
     return runSceneTransition({
       scene: this,
@@ -294,7 +307,7 @@ export abstract class GymSceneBase extends Phaser.Scene {
     opts?: Partial<{ fontSize: string; color: string }>,
   ): Phaser.GameObjects.Text {
     return createHudText(this, x, y, text, opts?.color ?? '#aaccaa', {
-      fontSize: opts?.fontSize ?? '14px',
+      fontSize: opts?.fontSize ?? DEFAULT_FONT_SIZE,
     });
   }
 
@@ -303,12 +316,12 @@ export abstract class GymSceneBase extends Phaser.Scene {
   /**
    * Utility: add a horizontal divider line below the header.
    */
-  protected addDivider(yOffset: number = 36): void {
+  protected addDivider(yOffset: number = DIVIDER_DEFAULT_Y_OFFSET): void {
     this.headerDivider = this.add.graphics();
-    this.headerDivider.lineStyle(1, 0x336633, 0.6);
+    this.headerDivider.lineStyle(DIVIDER_LINE_WIDTH, DIVIDER_COLOR, DIVIDER_ALPHA);
     this.headerDivider.beginPath();
-    this.headerDivider.moveTo(20, yOffset);
-    this.headerDivider.lineTo(GAME_W - 20, yOffset);
+    this.headerDivider.moveTo(DIVIDER_MARGIN_LEFT, yOffset);
+    this.headerDivider.lineTo(GAME_W - DIVIDER_MARGIN_RIGHT, yOffset);
     this.headerDivider.strokePath();
   }
 
@@ -327,7 +340,7 @@ export abstract class GymSceneBase extends Phaser.Scene {
    * @param sections  Array of HelpPanel sections describing the scene.
    * @param widthPercent Optional panel width percent (defaults to 35).
    */
-  protected initHelp(sections: HelpSection[], widthPercent: number = 35): void {
+  protected initHelp(sections: HelpSection[], widthPercent: number = HELP_PANEL_WIDTH_PERCENT): void {
     // Tear down any existing help UI first
     if (this.helpPanel) {
       try { this.helpPanel.destroy(); } catch (_) { /* ignore */ }

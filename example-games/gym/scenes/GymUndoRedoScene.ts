@@ -23,6 +23,28 @@ import type { EventLogResult } from '../../../src/ui/GymSceneUtils';
 import { anchorPoint } from '../../../src/ui/screen-layout';
 import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
 import gymUndoRedoLayoutJson from '../layouts/gym-undo-redo.layout.json';
+import {
+  DEFAULT_VIEWPORT,
+  SCENE_HEADER_Y,
+  EVENT_LOG_Y_OFFSET,
+  EVENT_LOG_MAX_LINES_DEFAULT,
+  EVENT_LOG_LINE_HEIGHT_DEFAULT,
+  EVENT_LOG_FONT_SIZE,
+  EVENT_LOG_HEADER_FONT_SIZE,
+  EVENT_LOG_HEADER_COLOR,
+  EVENT_LOG_LINE_X,
+  COUNTER_FONT_SIZE,
+  UNDO_REDO_STATUS_FONT_SIZE,
+  HISTORY_FONT_SIZE,
+  UNDO_STATUS_OFFSET,
+  REDO_STATUS_OFFSET,
+  POP_FEEDBACK_Y_OFFSET,
+  UNDO_REDO_LOG_MAX_LINES,
+  UNDO_POP_DURATION_REDUCED,
+  UNDO_POP_DURATION_NORMAL,
+  UNDO_POP_FONT_SIZE,
+  UNDO_POP_COLOR,
+} from './GymConstants';
 
 // Parse the shared Undo/Redo scene layout once at module load.
 const UNDO_REDO_LAYOUT: import('../../../src/ui/screen-layout-schema').ScreenLayoutDocument | null = (() => {
@@ -30,15 +52,13 @@ const UNDO_REDO_LAYOUT: import('../../../src/ui/screen-layout-schema').ScreenLay
   return parsed.valid ? parsed.layout : null;
 })();
 
-const DEFAULT_VIEWPORT = { width: 1280, height: 720 };
-
 function resolveUndoRedoAnchor(
   zone: string,
   anchor: string,
   viewport = DEFAULT_VIEWPORT,
 ): import('../../../src/ui/screen-layout-schema').PixelPoint {
   if (!UNDO_REDO_LAYOUT) {
-    return { x: GAME_W / 2, y: 60 };
+    return { x: GAME_W / 2, y: SCENE_HEADER_Y };
   }
   return anchorPoint(UNDO_REDO_LAYOUT, zone, anchor, viewport, 1);
 }
@@ -127,23 +147,23 @@ export class GymUndoRedoScene extends GymSceneBase {
     this.redoActionBtn = redoButton;
 
     // State display
-    this.counterText = createHudText(this, cx, counterAnchor.y, 'Counter: 0', '#ffffff', { fontSize: '28px' }).setOrigin(0.5);
+    this.counterText = createHudText(this, cx, counterAnchor.y, 'Counter: 0', '#ffffff', { fontSize: COUNTER_FONT_SIZE }).setOrigin(0.5);
 
-    this.undoAvailText = createHudText(this, cx - 120, statusAnchor.y, 'Can Undo: no', '#888888', { fontSize: '14px' });
-    this.redoAvailText = createHudText(this, cx + 80, statusAnchor.y, 'Can Redo: no', '#888888', { fontSize: '14px' });
+    this.undoAvailText = createHudText(this, cx - UNDO_STATUS_OFFSET, statusAnchor.y, 'Can Undo: no', '#888888', { fontSize: UNDO_REDO_STATUS_FONT_SIZE });
+    this.redoAvailText = createHudText(this, cx + REDO_STATUS_OFFSET, statusAnchor.y, 'Can Redo: no', '#888888', { fontSize: UNDO_REDO_STATUS_FONT_SIZE });
 
-    this.historyText = createHudText(this, cx, historyAnchor.y, 'History: (empty)', '#669966', { fontSize: '12px' });
+    this.historyText = createHudText(this, cx, historyAnchor.y, 'History: (empty)', '#669966', { fontSize: HISTORY_FONT_SIZE });
     this.historyText.setOrigin(0.5);
 
-    this.eventLogResult = createEventLog(this, logAnchor.y + 20, {
+    this.eventLogResult = createEventLog(this, logAnchor.y + EVENT_LOG_Y_OFFSET, {
       headerText: '── Event Log ──',
-      maxLines: 12,
-      lineHeight: 17,
+      maxLines: EVENT_LOG_MAX_LINES_DEFAULT,
+      lineHeight: EVENT_LOG_LINE_HEIGHT_DEFAULT,
       textColor: '#aaddaa',
-      fontSize: '11px',
-      headerFontSize: '12px',
-      headerColor: '#669966',
-      lineX: 40,
+      fontSize: EVENT_LOG_FONT_SIZE,
+      headerFontSize: EVENT_LOG_HEADER_FONT_SIZE,
+      headerColor: EVENT_LOG_HEADER_COLOR,
+      lineX: EVENT_LOG_LINE_X,
     });
   }
 
@@ -151,7 +171,7 @@ export class GymUndoRedoScene extends GymSceneBase {
     const cmd = new IncrementCommand(this.state, delta);
     this.undoRedo.execute(cmd);
     this.logEvent(`Executed ${delta >= 0 ? '+' : ''}${delta} (counter=${this.state.value})`);
-    this.showPop(`+${delta}`, this.counterText.x, this.counterText.y - 20);
+    this.showPop(`+${delta}`, this.counterText.x, this.counterText.y - POP_FEEDBACK_Y_OFFSET);
     this.updateDisplay();
   }
 
@@ -212,7 +232,7 @@ export class GymUndoRedoScene extends GymSceneBase {
 
   private logEvent(msg: string): void {
     this.eventLog.push(msg);
-    if (this.eventLog.length > 12) this.eventLog.shift();
+    if (this.eventLog.length > UNDO_REDO_LOG_MAX_LINES) this.eventLog.shift();
     this.eventLogResult.render(this.eventLog);
   }
 
@@ -223,9 +243,9 @@ export class GymUndoRedoScene extends GymSceneBase {
       label,
       x,
       y,
-      duration: this.reducedMotion ? 100 : 400,
+      duration: this.reducedMotion ? UNDO_POP_DURATION_REDUCED : UNDO_POP_DURATION_NORMAL,
       reducedMotion: this.reducedMotion,
-      style: { fontSize: '14px', color: '#88ff88', fontFamily: 'monospace' },
+      style: { fontSize: UNDO_POP_FONT_SIZE, color: UNDO_POP_COLOR, fontFamily: 'monospace' },
     });
   }
 }

@@ -19,6 +19,27 @@ import { runSceneTransition } from '../../../src/ui/sceneTransition';
 import { GYM_ROUTER_KEY, GYM_SCENE_CATALOGUE } from '../GymRegistry';
 import type { GymSceneEntry } from '../GymRegistry';
 import { createHudText } from '../../../src/ui/Renderer';
+import {
+  ROUTER_TITLE_Y,
+  ROUTER_TITLE_FONT_SIZE,
+  ROUTER_SUBTITLE_Y,
+  ROUTER_SUBTITLE_FONT_SIZE,
+  ROUTER_TOGGLE_X_OFFSET,
+  ROUTER_TOGGLE_Y,
+  ROUTER_TOGGLE_FONT_SIZE,
+  ROUTER_GRID_COLS_MAX,
+  ROUTER_CARD_TITLE_FONT_SIZE,
+  ROUTER_CARD_DESC_FONT_SIZE,
+  ROUTER_CARD_DESC_LINE_SPACING,
+  ROUTER_CARD_DESC_PAD_X,
+  ROUTER_CARD_DESC_RESERVED_H,
+  ROUTER_CARD_TITLE_OFFSET_Y,
+  ROUTER_CARD_DESC_OFFSET_Y,
+  ROUTER_CARD_OPEN_OFFSET_Y,
+  ROUTER_CARD_OPEN_FONT_SIZE,
+  ROUTER_EXIT_TRANSITION_MS,
+  ROUTER_CARD_STROKE_WIDTH,
+} from './GymConstants';
 
 // ── Layout constants ───────────────────────────────────────
 
@@ -53,13 +74,13 @@ export class GymRouterScene extends Phaser.Scene {
     createSceneMenuButton(this);
 
     // Title
-    createHudText(this, GAME_W / 2, 24, 'TCE Gym', '#88ff88', { fontSize: '28px' }).setOrigin(0.5);
+    createHudText(this, GAME_W / 2, ROUTER_TITLE_Y, 'TCE Gym', '#88ff88', { fontSize: ROUTER_TITLE_FONT_SIZE }).setOrigin(0.5);
 
     // Subtitle
-    createHudText(this, GAME_W / 2, 52, 'Select a scene to explore core-engine features', '#669966', { fontSize: '13px' }).setOrigin(0.5);
+    createHudText(this, GAME_W / 2, ROUTER_SUBTITLE_Y, 'Select a scene to explore core-engine features', '#669966', { fontSize: ROUTER_SUBTITLE_FONT_SIZE }).setOrigin(0.5);
 
     // Transition toggle button
-    const toggleBtn = createHudText(this, GAME_W - 20, 10, `Transitions: ${animateTransitions ? 'ON' : 'OFF'}`, animateTransitions ? '#88ff88' : '#666666', { fontSize: '10px', originX: 1, originY: 0 })
+    const toggleBtn = createHudText(this, GAME_W - ROUTER_TOGGLE_X_OFFSET, ROUTER_TOGGLE_Y, `Transitions: ${animateTransitions ? 'ON' : 'OFF'}`, animateTransitions ? '#88ff88' : '#666666', { fontSize: ROUTER_TOGGLE_FONT_SIZE, originX: 1, originY: 0 })
       .setInteractive({ useHandCursor: true });
     toggleBtn.on('pointerdown', () => {
       animateTransitions = !animateTransitions;
@@ -87,9 +108,9 @@ export class GymRouterScene extends Phaser.Scene {
   // ── Adaptive grid layout ────────────────────────────────
 
   private computeGrid(count: number): { cols: number; rows: number } {
-    if (count <= 2) return { cols: count, rows: 1 };
-    if (count <= 6) return { cols: 2, rows: Math.ceil(count / 2) };
-    if (count <= 9) return { cols: 3, rows: Math.ceil(count / 3) };
+    if (count <= ROUTER_GRID_COLS_MAX.two) return { cols: count, rows: 1 };
+    if (count <= ROUTER_GRID_COLS_MAX.four) return { cols: 2, rows: Math.ceil(count / 2) };
+    if (count <= ROUTER_GRID_COLS_MAX.six) return { cols: 3, rows: Math.ceil(count / 3) };
     return { cols: 4, rows: Math.ceil(count / 4) };
   }
 
@@ -128,20 +149,20 @@ export class GymRouterScene extends Phaser.Scene {
     this.drawCard(bg, x, y, cardW, cardH, CARD_BG, CARD_BORDER);
 
     // Title
-    const title = createHudText(this, x, y - cardH / 2 + 18, entry.title, '#ffffff', { fontSize: '15px' }).setOrigin(0.5);
+    const title = createHudText(this, x, y - cardH / 2 + ROUTER_CARD_TITLE_OFFSET_Y, entry.title, '#ffffff', { fontSize: ROUTER_CARD_TITLE_FONT_SIZE }).setOrigin(0.5);
 
     // Description
-    const desc = createHudText(this, x, y + 6, entry.description, '#aaddaa', { fontSize: '10px', align: 'center', lineSpacing: 2 }).setOrigin(0.5);
-    desc.setWordWrapWidth(cardW - 24);
+    const desc = createHudText(this, x, y + ROUTER_CARD_DESC_OFFSET_Y, entry.description, '#aaddaa', { fontSize: ROUTER_CARD_DESC_FONT_SIZE, align: 'center', lineSpacing: ROUTER_CARD_DESC_LINE_SPACING }).setOrigin(0.5);
+    desc.setWordWrapWidth(cardW - ROUTER_CARD_DESC_PAD_X);
 
     // Crop description overflow
-    const maxDescH = cardH - 60;
+    const maxDescH = cardH - ROUTER_CARD_DESC_RESERVED_H;
     if (desc.height > maxDescH) {
       desc.setCrop(0, 0, desc.width, maxDescH);
     }
 
     // "[ Open ]" button label
-    const openLabel = createHudText(this, x, y + cardH / 2 - 16, '[ Open ]', '#88ff88', { fontSize: '13px' }).setOrigin(0.5);
+    const openLabel = createHudText(this, x, y + cardH / 2 - ROUTER_CARD_OPEN_OFFSET_Y, '[ Open ]', '#88ff88', { fontSize: ROUTER_CARD_OPEN_FONT_SIZE }).setOrigin(0.5);
 
     // Interactive hit area
     const hitZone = this.add
@@ -169,7 +190,7 @@ export class GymRouterScene extends Phaser.Scene {
           scene: this,
           mode: 'exit',
           type: 'fade',
-          duration: 200,
+          duration: ROUTER_EXIT_TRANSITION_MS,
         }).then(() => {
           this.scene.start(entry.sceneKey);
         });
@@ -192,7 +213,7 @@ export class GymRouterScene extends Phaser.Scene {
     const top = y - h / 2;
     g.fillStyle(fill, 1);
     g.fillRoundedRect(left, top, w, h, CARD_RADIUS);
-    g.lineStyle(1.5, stroke, 1);
+    g.lineStyle(ROUTER_CARD_STROKE_WIDTH, stroke, 1);
     g.strokeRoundedRect(left, top, w, h, CARD_RADIUS);
   }
 }

@@ -35,6 +35,39 @@ import type { EventLogResult } from '../../../src/ui/GymSceneUtils';
 import { anchorPoint } from '../../../src/ui/screen-layout';
 import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
 import gymTranscriptLayoutJson from '../layouts/gym-transcript.layout.json';
+import {
+  DEFAULT_VIEWPORT,
+  SCENE_HEADER_Y,
+  EVENT_LOG_Y_OFFSET,
+  EVENT_LOG_HEADER_FONT_SIZE,
+  EVENT_LOG_HEADER_COLOR,
+  EVENT_LOG_LINE_X,
+  STATUS_FONT_SIZE,
+  HAND_INFO_FONT_SIZE,
+  HAND_INFO_COLOR,
+  STATUS_FONT_COLOR,
+  TRANSCRIPT_STATUS_Y_OFFSET,
+  TRANSCRIPT_HAND_INFO_Y_OFFSET,
+  TRANSCRIPT_PLAYBACK_DELAY_MS,
+  DEALER_STICK_THRESHOLD,
+  DEALER_DRAW_DELAY_MS,
+  TRANSCRIPT_POP_Y,
+  TRANSCRIPT_POP_DURATION_REDUCED,
+  TRANSCRIPT_POP_DURATION_NORMAL,
+  TRANSCRIPT_POP_FONT_SIZE,
+  TRANSCRIPT_POP_COLOR,
+  TRANSCRIPT_LOG_MAX_LINES,
+  TRANSCRIPT_LOG_MAX_LINES_UI,
+  TRANSCRIPT_LOG_LINE_HEIGHT,
+  TRANSCRIPT_LOG_FONT_SIZE,
+  BLACKJACK_BUST_THRESHOLD,
+  BLACKJACK_ACE_VALUE_HIGH,
+  BLACKJACK_ACE_VALUE_ADJUSTMENT,
+  BLACKJACK_FACE_CARD_VALUE,
+  BLACKJACK_MIN_CARD,
+  BLACKJACK_MAX_CARD_RAW,
+  BLACKJACK_FACE_CARD_RAW,
+} from './GymConstants';
 
 // Parse the shared Transcript scene layout once at module load.
 const TRANSCRIPT_LAYOUT: import('../../../src/ui/screen-layout-schema').ScreenLayoutDocument | null = (() => {
@@ -42,15 +75,13 @@ const TRANSCRIPT_LAYOUT: import('../../../src/ui/screen-layout-schema').ScreenLa
   return parsed.valid ? parsed.layout : null;
 })();
 
-const DEFAULT_VIEWPORT = { width: 1280, height: 720 };
-
 function resolveTranscriptAnchor(
   zone: string,
   anchor: string,
   viewport = DEFAULT_VIEWPORT,
 ): import('../../../src/ui/screen-layout-schema').PixelPoint {
   if (!TRANSCRIPT_LAYOUT) {
-    return { x: GAME_W / 2, y: 60 };
+    return { x: GAME_W / 2, y: SCENE_HEADER_Y };
   }
   return anchorPoint(TRANSCRIPT_LAYOUT, zone, anchor, viewport, 1);
 }
@@ -131,8 +162,8 @@ class BlackjackRecorder extends TranscriptRecorderBase<DemoTranscript> {
 // ── Blackjack game helpers ─────────────────────────────────
 
 function cardValue(raw: number): number {
-  if (raw >= 12) return 10;
-  if (raw === 11) return 11;
+  if (raw >= BLACKJACK_FACE_CARD_RAW) return BLACKJACK_FACE_CARD_VALUE;
+  if (raw === BLACKJACK_ACE_VALUE_HIGH) return BLACKJACK_ACE_VALUE_HIGH;
   return raw;
 }
 
@@ -149,22 +180,22 @@ function handTotal(cards: number[]): number {
   let aces = 0;
   for (const value of cards) {
     const cv = cardValue(value);
-    if (cv === 11) {
+    if (cv === BLACKJACK_ACE_VALUE_HIGH) {
       aces++;
-      total += 11;
+      total += BLACKJACK_ACE_VALUE_HIGH;
     } else {
       total += cv;
     }
   }
-  while (total > 21 && aces > 0) {
-    total -= 10;
+  while (total > BLACKJACK_BUST_THRESHOLD && aces > 0) {
+    total -= BLACKJACK_ACE_VALUE_ADJUSTMENT;
     aces--;
   }
   return total;
 }
 
 function drawCard(rng: () => number): number {
-  return Math.floor(rng() * 13) + 2;
+  return Math.floor(rng() * BLACKJACK_MAX_CARD_RAW) + BLACKJACK_MIN_CARD;
 }
 
 // ── Scene state machine ────────────────────────────────────
@@ -237,10 +268,10 @@ export class GymTranscriptScene extends GymSceneBase {
     const logAnchor = resolveTranscriptAnchor('log', 'center');
     const y = controlsAnchor.y;
 
-    this.statusText = this.addLabel(cx, y - 30, '', { fontSize: '13px', color: '#ffff88' });
+    this.statusText = this.addLabel(cx, y - TRANSCRIPT_STATUS_Y_OFFSET, '', { fontSize: STATUS_FONT_SIZE, color: STATUS_FONT_COLOR });
     this.statusText.setOrigin(0.5, 0.5).setVisible(false);
 
-    this.handInfoText = this.addLabel(cx, y + 40, '', { fontSize: '12px', color: '#ccffcc' });
+    this.handInfoText = this.addLabel(cx, y + TRANSCRIPT_HAND_INFO_Y_OFFSET, '', { fontSize: HAND_INFO_FONT_SIZE, color: HAND_INFO_COLOR });
     this.handInfoText.setOrigin(0.5, 0.5).setVisible(false);
 
     this.initButtonBar(y);
@@ -251,15 +282,15 @@ export class GymTranscriptScene extends GymSceneBase {
     this.buttonBar!.addButton('[ Playback ]', () => this.playTranscript(), { zone: 'center' });
     this.buttonBar!.addButton('[ Show Transcript ]', () => this.showTranscript(), { zone: 'center' });
 
-    this.eventLogResult = createEventLog(this, logAnchor.y + 20, {
+    this.eventLogResult = createEventLog(this, logAnchor.y + EVENT_LOG_Y_OFFSET, {
       headerText: '\u2500\u2500 Event Log \u2500\u2500',
-      maxLines: 18,
-      lineHeight: 15,
+      maxLines: TRANSCRIPT_LOG_MAX_LINES_UI,
+      lineHeight: TRANSCRIPT_LOG_LINE_HEIGHT,
       textColor: '#aaddaa',
-      fontSize: '11px',
-      headerFontSize: '12px',
-      headerColor: '#669966',
-      lineX: 40,
+      fontSize: TRANSCRIPT_LOG_FONT_SIZE,
+      headerFontSize: EVENT_LOG_HEADER_FONT_SIZE,
+      headerColor: EVENT_LOG_HEADER_COLOR,
+      lineX: EVENT_LOG_LINE_X,
     });
   }
 
@@ -376,7 +407,7 @@ export class GymTranscriptScene extends GymSceneBase {
         return;
       }
 
-      if (dTotal >= 17) {
+      if (dTotal >= DEALER_STICK_THRESHOLD) {
         // Dealer sticks
         recorder.recordEvent('dealer_stick', 'dealer', 'Dealer sticks at ' + dTotal, undefined, dTotal);
         this.logEvent('Dealer sticks at ' + dTotal);
@@ -396,7 +427,7 @@ export class GymTranscriptScene extends GymSceneBase {
     };
 
     // Start dealer play with 800ms delay between draws
-    playNextWithDelay(800);
+    playNextWithDelay(DEALER_DRAW_DELAY_MS);
   }
 
   private endHandFromDealer(): void {
@@ -488,7 +519,7 @@ export class GymTranscriptScene extends GymSceneBase {
       return;
     }
     this.logEvent('Playing ' + t.events.length + ' events...');
-    const intervalMs = 600;
+    const intervalMs = TRANSCRIPT_PLAYBACK_DELAY_MS;
     for (let i = 0; i < t.events.length; i++) {
       const evt = t.events[i];
       try {
@@ -528,7 +559,7 @@ export class GymTranscriptScene extends GymSceneBase {
 
   private logEvent(msg: string): void {
     this.eventLog.push(msg);
-    if (this.eventLog.length > 18) this.eventLog.shift();
+    if (this.eventLog.length > TRANSCRIPT_LOG_MAX_LINES) this.eventLog.shift();
     this.eventLogResult.render(this.eventLog);
   }
 
@@ -537,10 +568,10 @@ export class GymTranscriptScene extends GymSceneBase {
       scene: this,
       label,
       x: GAME_W / 2,
-      y: 100,
-      duration: this.reducedMotion ? 100 : 350,
+      y: TRANSCRIPT_POP_Y,
+      duration: this.reducedMotion ? TRANSCRIPT_POP_DURATION_REDUCED : TRANSCRIPT_POP_DURATION_NORMAL,
       reducedMotion: this.reducedMotion,
-      style: { fontSize: '14px', color: '#88ff88', fontFamily: 'monospace' },
+      style: { fontSize: TRANSCRIPT_POP_FONT_SIZE, color: TRANSCRIPT_POP_COLOR, fontFamily: 'monospace' },
     });
   }
 }

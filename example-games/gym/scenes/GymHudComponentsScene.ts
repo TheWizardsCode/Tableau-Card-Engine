@@ -25,14 +25,35 @@ import type Phaser from 'phaser';
 import { anchorPoint } from '../../../src/ui/screen-layout';
 import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
 import gymHudComponentsLayoutJson from '../layouts/gym-hud-components.layout.json';
+import {
+  DEFAULT_VIEWPORT,
+  SCENE_HEADER_Y,
+  HUD_DEFAULT_VOLUME,
+  INSTRUCTIONS_FONT_SIZE,
+  HEADER_SUCCESS_COLOR,
+  PANEL_STATUS_FONT_SIZE,
+  PANEL_STATUS_OFFSET,
+  PANEL_STATUS_X,
+  DEPTH_INFO_FONT_SIZE,
+  DEPTH_INFO_X,
+  DEPTH_INFO_COLOR,
+  EVENT_LOG_Y_OFFSET_HUD,
+  EVENT_LOG_MAX_LINES_HUD,
+  EVENT_LOG_LINE_HEIGHT_HUD,
+  EVENT_LOG_FONT_SIZE,
+  EVENT_LOG_HEADER_FONT_SIZE,
+  EVENT_LOG_HEADER_COLOR,
+  EVENT_LOG_LINE_X_HUD,
+  HUD_LOG_MAX_LINES,
+  HELP_STATUS_COLOR,
+  SETTINGS_STATUS_COLOR,
+} from './GymConstants';
 
 // Parse the shared HUD Components scene layout once at module load.
 const HUD_COMPONENTS_LAYOUT: import('../../../src/ui/screen-layout-schema').ScreenLayoutDocument | null = (() => {
   const parsed = parseScreenLayoutDocument(gymHudComponentsLayoutJson);
   return parsed.valid ? parsed.layout : null;
 })();
-
-const DEFAULT_VIEWPORT = { width: 1280, height: 720 };
 
 /**
  * Resolve an anchor from the HUD Components SLL layout.
@@ -44,7 +65,7 @@ function resolveHudAnchor(
   viewport = DEFAULT_VIEWPORT,
 ): import('../../../src/ui/screen-layout-schema').PixelPoint {
   if (!HUD_COMPONENTS_LAYOUT) {
-    return { x: GAME_W / 2, y: 60 };
+    return { x: GAME_W / 2, y: SCENE_HEADER_Y };
   }
   return anchorPoint(HUD_COMPONENTS_LAYOUT, zone, anchor, viewport, 1);
 }
@@ -58,7 +79,7 @@ function resolveHudAnchor(
  */
 class MockSoundManager {
   public muted = false;
-  public volume = 0.8;
+  public volume = HUD_DEFAULT_VOLUME;
 
   toggleMute(): boolean {
     this.muted = !this.muted;
@@ -133,8 +154,8 @@ export class GymHudComponentsScene extends GymSceneBase {
     const instructions = createHudText(
       this, cx, instructionsAnchor.y,
       'Use the buttons below or the ? and ⚙ toggle controls to interact with the shared HUD components.',
-      '#88aa88',
-      { fontSize: '13px' },
+      HEADER_SUCCESS_COLOR,
+      { fontSize: INSTRUCTIONS_FONT_SIZE },
     );
     instructions.setOrigin(0.5);
 
@@ -170,19 +191,19 @@ export class GymHudComponentsScene extends GymSceneBase {
     // ── Panel state indicators ──────────────────────────
 
     this.helpStatusText = createHudText(
-      this, 460, statusAnchor.y - 10, 'HelpPanel: closed', '#88ff88', { fontSize: '14px' },
+      this, PANEL_STATUS_X, statusAnchor.y - PANEL_STATUS_OFFSET, 'HelpPanel: closed', HELP_STATUS_COLOR, { fontSize: PANEL_STATUS_FONT_SIZE },
     );
     this.settingsStatusText = createHudText(
-      this, 460, statusAnchor.y + 10, 'SettingsPanel: closed', '#ffcc44', { fontSize: '14px' },
+      this, PANEL_STATUS_X, statusAnchor.y + PANEL_STATUS_OFFSET, 'SettingsPanel: closed', SETTINGS_STATUS_COLOR, { fontSize: PANEL_STATUS_FONT_SIZE },
     );
 
     // ── Depth layering info ─────────────────────────────
 
     createHudText(
-      this, 60, depthAnchor.y,
+      this, DEPTH_INFO_X, depthAnchor.y,
       'Depth: blocker=900, bg=901, content=902, close=903, ? btn=1101, ⚙ btn=1102',
-      '#88aa88',
-      { fontSize: '12px' },
+      DEPTH_INFO_COLOR,
+      { fontSize: DEPTH_INFO_FONT_SIZE },
     );
 
     // ── Init shared HUD components ──────────────────────
@@ -191,15 +212,15 @@ export class GymHudComponentsScene extends GymSceneBase {
 
     // ── Event log ───────────────────────────────────────
 
-    this.eventLogResult = createEventLog(this, logAnchor.y + 10, {
+    this.eventLogResult = createEventLog(this, logAnchor.y + EVENT_LOG_Y_OFFSET_HUD, {
       headerText: '── Event Log ──',
-      maxLines: 12,
-      lineHeight: 16,
+      maxLines: EVENT_LOG_MAX_LINES_HUD,
+      lineHeight: EVENT_LOG_LINE_HEIGHT_HUD,
       textColor: '#aaddaa',
-      fontSize: '11px',
-      headerFontSize: '12px',
-      headerColor: '#669966',
-      lineX: 60,
+      fontSize: EVENT_LOG_FONT_SIZE,
+      headerFontSize: EVENT_LOG_HEADER_FONT_SIZE,
+      headerColor: EVENT_LOG_HEADER_COLOR,
+      lineX: EVENT_LOG_LINE_X_HUD,
     });
 
     this.logEvent('Scene ready — interact with HUD components above');
@@ -270,7 +291,7 @@ export class GymHudComponentsScene extends GymSceneBase {
 
   private logEvent(msg: string): void {
     this.eventLog.push(msg);
-    if (this.eventLog.length > 12) this.eventLog.shift();
+    if (this.eventLog.length > HUD_LOG_MAX_LINES) this.eventLog.shift();
     if (this.eventLogResult) {
       this.eventLogResult.render(this.eventLog);
     }
