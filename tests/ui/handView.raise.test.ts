@@ -249,6 +249,41 @@ describe('HandView selection raise (selectionLift)', () => {
     hv.destroy();
   });
 
+  it('getBasePosition returns the un-raised resting position even while selected', () => {
+    const hv = new HandView(scene, {
+      baseX: 300,
+      baseY: 200,
+      spacing: 56,
+      reducedMotion: true,
+      maxRotationDegrees: 25,
+    });
+    hv.setSelectionLift(20);
+    hv.setCards([
+      card('A', 'spades'),
+      card('2', 'hearts'),
+      card('3', 'clubs'),
+      card('4', 'diamonds'),
+      card('5', 'spades'),
+    ]);
+
+    // Select card 0 — the raised sprite position differs from the base position
+    hv.setSelected(0);
+    const sprite = scene._images[0];
+    const rot = (-25 * Math.PI) / 180;
+    expect(sprite.x).toBeCloseTo(188 + 20 * Math.sin(rot), 5); // raised
+    expect(sprite.y).toBeCloseTo(200 - 20 * Math.cos(rot), 5);
+
+    // Base position is the resting spot WITHOUT the selection raise —
+    // callers restoring a moved card (e.g. Cancel Move) must use this,
+    // not the sprite's current x/y which includes the raise offset.
+    expect(hv.getBasePosition(0)).toEqual({ x: 188, y: 200 });
+    expect(hv.getBasePosition(1)).toEqual({ x: 244, y: 200 });
+    expect(hv.getBasePosition(2)).toEqual({ x: 300, y: 200 });
+    expect(hv.getBasePosition(4)).toEqual({ x: 412, y: 200 });
+    expect(hv.getBasePosition(99)).toBeUndefined();
+    hv.destroy();
+  });
+
   it('clearing the selection returns the card to its resting position', () => {
     const hv = new HandView(scene, {
       baseX: 100,

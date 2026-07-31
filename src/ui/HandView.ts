@@ -1137,6 +1137,23 @@ export class HandView {
   }
 
   /**
+   * Return the base (un-raised) layout position for the card at the given
+   * index, or undefined when the index is out of range.
+   *
+   * The base position is the card's resting spot in the hand — the
+   * selection-raise offset (if any) is NOT included. Callers that need to
+   * restore a card to its exact hand position (e.g. cancelling a move)
+   * must use this instead of reading the sprite's current x/y, which may
+   * include the selection raise.
+   *
+   * @param index - The card index.
+   * @returns The base position, or `undefined` if out of bounds.
+   */
+  getBasePosition(index: number): { x: number; y: number } | undefined {
+    return this._basePositions[index];
+  }
+
+  /**
    * Return all card display objects.
    *
    * When using the default sprite creation path, the returned objects are

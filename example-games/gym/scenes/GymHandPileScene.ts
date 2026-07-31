@@ -656,10 +656,14 @@ export class GymHandPileScene extends GymSceneBase {
       return;
     }
 
-    // Store original position and index so Cancel Move can return the card
+    // Store original position and index so Cancel Move can return the card.
+    // Use the hand's base (un-raised) position: the sprite's current x/y
+    // includes the selection-raise offset, which would return the card to
+    // a raised position instead of its true resting spot in the hand.
     this.movedCardIndex = this.selectedIdx;
-    this.movedCardOrigX = (sprite as any).x;
-    this.movedCardOrigY = (sprite as any).y;
+    const basePos = this.handView.getBasePosition(this.selectedIdx);
+    this.movedCardOrigX = basePos ? basePos.x : (sprite as any).x;
+    this.movedCardOrigY = basePos ? basePos.y : (sprite as any).y;
     this.cardMoved = true;
 
     const destX = GAME_W / 2 + 200;
@@ -693,6 +697,14 @@ export class GymHandPileScene extends GymSceneBase {
 
     // If a card was moved, return it to its original hand position
     if (this.cardMoved && this.movedCardIndex >= 0) {
+      // Clear the selection first: applySelectionRaise() kills any
+      // in-flight selection-raise tween and returns the card to its base
+      // position. Clearing selection also prevents the raise offset from
+      // being re-applied on top of the return tween, so the card ends up
+      // exactly at its original hand position.
+      this.selectedIdx = -1;
+      this.handView.setSelected(null);
+
       const sprite = this.handView.getSpriteAt(this.movedCardIndex);
       if (sprite) {
         if (this.reducedMotion) {
