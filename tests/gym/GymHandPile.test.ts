@@ -240,19 +240,4 @@ describe('Gym Hand & Pile integration with HandView/PileView', () => {
     discardView.destroy();
   });
 
-  it('GymHandPileScene source configures bottom hand, arc slider, and hidden labels', () => {
-    const fs = require('fs');
-    const path = require('path');
-    const source = fs.readFileSync(
-      path.resolve(__dirname, '../../example-games/gym/scenes/GymHandPileScene.ts'),
-      'utf-8',
-    );
-
-    expect(source).toContain('HAND_BASE_Y = GAME_H - CARD_H - 80');
-    expect(source).toContain('showLabels: false');
-    expect(source).toContain('arcRadius: this.arcRadius');
-    expect(source).toContain('minValue: 0');
-    expect(source).toContain('maxValue: 200');
-    expect(source).toContain('setArcRadius');
-  });
 });

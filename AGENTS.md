@@ -50,7 +50,6 @@ tableau-card-engine/
 │       ├── cards/         # Card sprite assets (CC0/permissive)
 │       └── CREDITS.md     # Asset attribution
 ├── tests/                 # Vitest test files
-│   └── smoke.test.ts
 ├── dist/                  # Production build output (gitignored)
 ├── AGENTS.md
 ├── package.json

@@ -364,7 +364,6 @@ public/assets/
 └── CREDITS.md              Asset attribution
 
 tests/
-├── smoke.test.ts           Toolchain smoke test
 ├── fixtures/transcripts/   Fixture transcripts for replay tests (one per game)
 ├── ai/                     AiPlayer, pickRandom, pickBest, barrel export tests
 ├── card-system/            Card, Deck, Pile unit tests
