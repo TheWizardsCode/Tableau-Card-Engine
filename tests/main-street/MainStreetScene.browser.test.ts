@@ -312,9 +312,8 @@ describe('MainStreetScene browser tests', () => {
 
       const beforeBusinessAnimCount = scene.getTransferAnimationCountForTest();
       scene.onBusinessCardClick(business);
-      scene.onSlotClick(targetSlot);
 
-      // Business should not appear in street immediately while transfer is playing
+      // Business should not appear in street or hand immediately while transfer is playing
       expect(state.streetGrid[targetSlot]).toBeNull();
       expect(scene.getHiddenTransferSourceCardCountForTest()).toBeGreaterThan(0);
 
@@ -322,6 +321,19 @@ describe('MainStreetScene browser tests', () => {
         () => scene.getTransferAnimationCountForTest() > beforeBusinessAnimCount,
         { label: 'business transfer animation start' },
       );
+
+      // New flow: the business is bought to hand first (market → hand transfer),
+      // then placed on the grid (hand → street placement).
+      await waitForCondition(
+        () => scene.uiPhase === 'placing-from-hand',
+        { timeoutMs: 6000, label: 'business bought to hand' },
+      );
+      const handBusiness = (state.hand ?? []).find((c: any) => c.id === business.id);
+      expect(handBusiness).toBeTruthy();
+      expect(scene.getHiddenTransferSourceCardCountForTest()).toBe(0);
+
+      // Now place the business on the target slot.
+      scene.onSlotClick(targetSlot);
 
       await waitForCondition(
         () => state.streetGrid[targetSlot]?.id === business.id,

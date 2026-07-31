@@ -8,7 +8,7 @@
  * Unified step mapping:
  *   0=T1 centerModal(confirm)  1=T2 hud(confirm)  2=T3 marketBusinessRow(action)
  *   3=T4 streetGrid(action)  4=T5 incidentQueue(confirm)  5=T6 endTurnButton(action)
- *   6=T7 investmentsRow(action)  7=T8 marketBusinessRow(action) 8=T9 investmentsRow(confirm)
+ *   6=T7 investmentsRow(action)  7=T8 marketBusinessRow(action) 8=T9 streetGrid(action)
  *   9=T10 centerModal(confirm)  10=T11 endTurnButton(confirm)  11=T12 challengePanel(confirm)
  *   12=T13 hud(confirm)  13=T14 completionModal(confirm)
  */
@@ -370,27 +370,32 @@ describe('TutorialOverlayManager highlight zones', () => {
     }
   });
 
-  // ── AC 12: T9 investments row highlight (confirm, upgrade concept) ──
+  // ── AC 12: T9 street grid highlight (action, place-business) ──
 
-  it('investmentsRow highlight (T9) covers the investments row for upgrade concept', async () => {
+  it('streetGrid highlight (T9) covers the street grid for place-business', async () => {
     const layout = scene.layout as {
-      marketTop: number;
-      marketRowH: number;
-      marketRowGap: number;
-      gameW: number;
+      streetX: number;
+      slotW: number;
+      slotH: number;
+      slotGap: number;
+      streetCols: number;
+      streetRowGap: number;
     } | undefined;
     expect(layout).toBeTruthy();
 
-    const highlight = showStepAndGetHighlight('T9'); // T9 = confirm, investmentsRow zone
+    const highlight = showStepAndGetHighlight('T9'); // T9 = action, streetGrid zone
     expect(highlight).toBeTruthy();
 
     const bounds = getHighlightBounds(highlight!);
     expect(bounds).toBeTruthy();
 
-    // The investments row is the second (bottom) market row
-    const expectedTopY = layout!.marketTop + layout!.marketRowH + layout!.marketRowGap;
-    expect(bounds!.y).toBeLessThanOrEqual(expectedTopY + 4);
-    expect(bounds!.y).toBeGreaterThanOrEqual(layout!.marketTop - 10);
+    // Width should cover the full street grid width
+    const expectedW = layout!.streetCols * layout!.slotW + (layout!.streetCols - 1) * layout!.slotGap;
+    expect(bounds!.w).toBeGreaterThanOrEqual(expectedW - 10); // small tolerance
+
+    // Height should cover both rows
+    const expectedH = 2 * layout!.slotH + layout!.streetRowGap;
+    expect(bounds!.h).toBeGreaterThanOrEqual(expectedH - 10);
   });
 
   // ── AC 13: T12 challengePanel highlight (confirm, challenges info) ──

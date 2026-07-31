@@ -4,16 +4,17 @@
  * Validates that Main Street's container depth ordering follows the expected
  * convention: HUD depth (1000) > all other zone containers > gameplay containers.
  *
- * Main Street explicitly sets HUD container depth to 1000.  Other containers
- * (street, market, hand, action, incident queue) use default depth (0) and
- * rely on creation-order depth sorting.
+ * Main Street explicitly sets HUD container depth to 1000.  Gameplay
+ * containers (street, market, incident queue, hand) use default depth (0)
+ * and rely on creation-order depth sorting. `actionContainer` is raised to
+ * depth 100 so action buttons render above hand cards.
  *
  * Expected ordering (bottom → top):
  *   1. streetContainer       – business cards on the street (depth 0)
  *   2. marketContainer       – market cards (depth 0)
  *   3. incidentQueueContainer – incident queue (depth 0)
  *   4. handContainer         – player hand cards (depth 0)
- *   5. actionContainer       – action buttons (depth 0)
+ *   5. actionContainer       – action buttons (depth 100)
  *   6. hudContainer          – HUD overlays (depth 1000)
  *   7. Game state overlays   – depth 2000+
  */
@@ -89,23 +90,27 @@ describe('Main Street container z-order', () => {
     expect(hudDepth).toBeGreaterThanOrEqual(1000);
   });
 
-  it('gameplay containers use default depth (0)', async () => {
+  it('gameplay containers use default depth (0) except actionContainer (100)', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('MainStreetScene') as any;
 
-    const containers = [
+    // These containers rely on creation-order depth sorting (default depth 0).
+    const defaultDepthContainers = [
       'streetContainer',
       'marketContainer',
       'incidentQueueContainer',
       'handContainer',
-      'actionContainer',
     ];
 
-    for (const name of containers) {
+    for (const name of defaultDepthContainers) {
       if (scene[name]) {
         expect((scene[name] as any).depth ?? 0, `${name} should use default depth`).toBe(0);
       }
     }
+
+    // actionContainer is deliberately raised above hand cards (depth 100).
+    expect(scene.actionContainer, 'actionContainer should exist').toBeDefined();
+    expect((scene.actionContainer as any).depth, 'actionContainer depth').toBe(100);
   });
 
   it('hudContainer depth is greater than all gameplay container depths', async () => {
