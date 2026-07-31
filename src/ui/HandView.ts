@@ -130,6 +130,16 @@ export interface HandViewOptions {
   maxRotationDegrees?: number;
 
   /**
+   * Distance (px) the selected card is raised from its resting position.
+   * In horizontal layout the raise follows the card's rotation —
+   * perpendicular to the card face (`dx = d·sin(θ)`, `dy = −d·cos(θ)`),
+   * straight up at 0° rotation. In vertical cascade layout the selected
+   * card shifts right (`dx = +d`, `dy = 0`).
+   * @default 0 (no raise)
+   */
+  selectionLift?: number;
+
+  /**
    * Layout direction for the hand.
    * - `'horizontal'`: cards laid out in a row (left to right).
    * - `'vertical'`: cards stacked vertically (top to bottom cascade).
@@ -410,6 +420,12 @@ export class HandView {
   /** Maximum rotation (degrees) applied proportionally based on card offset from centre. */
   private maxRotationDegrees: number = 0;
 
+  /**
+   * Distance (px) the selected card is raised from its resting position.
+   * @default 0
+   */
+  private selectionLift: number = 0;
+
   /** Layout direction for the hand — horizontal row or vertical cascade. */
   private layoutDirection: 'horizontal' | 'vertical';
 
@@ -450,6 +466,13 @@ export class HandView {
    */
   private _tintOverlays: (Phaser.GameObjects.Rectangle | null)[] = [];
 
+  /**
+   * Base (un-raised) layout position for each sprite, parallel to
+   * {@link sprites}. The selection-raise offset is applied on top of
+   * these positions when a card is selected.
+   */
+  private _basePositions: { x: number; y: number }[] = [];
+
   // Events — lightweight listener map
   private listeners: Map<keyof HandViewEvents, Set<EventCallback>> = new Map();
 
@@ -468,6 +491,7 @@ export class HandView {
     this.clickEnabled = opts.clickEnabled ?? true;
     this._reducedMotion = opts.reducedMotion ?? false;
     this.maxRotationDegrees = opts.maxRotationDegrees ?? 25;
+    this.selectionLift = opts.selectionLift ?? 0;
     this.layoutDirection = opts.layoutDirection ?? 'horizontal';
     this._centerX = opts.centerX;
     this._customTextureFn = opts.cardTextureFn;
@@ -753,6 +777,9 @@ export class HandView {
     // 4. Compute new target positions.
     const newPositions = this.computeCardPositions();
 
+    // Track the new base positions so a later selection raise is correct.
+    this._basePositions = newPositions.map((p) => ({ x: p.x, y: p.y }));
+
     // Precompute rotation helpers (mirrors applyLayout logic).
     let arcCenterX = 0;
     let halfSpan = 1;
@@ -1036,6 +1063,27 @@ export class HandView {
   }
 
   /**
+   * Set the distance (px) the selected card is raised from its resting
+   * position. In horizontal layout the raise follows the card's rotation
+   * (perpendicular to the card face); in vertical cascade layout the
+   * selected card shifts right by this amount. Pass 0 to disable.
+   *
+   * Changes apply instantly (no animation) so a live slider can tune the
+   * distance while a card is selected.
+   */
+  setSelectionLift(distance: number): void {
+    const next = Number.isFinite(distance) ? Math.max(0, distance) : 0;
+    if (next === this.selectionLift) return;
+    this.selectionLift = next;
+    this.applySelectionRaise(false);
+  }
+
+  /** Current selection raise distance (px). */
+  getSelectionLift(): number {
+    return this.selectionLift;
+  }
+
+  /**
    * Register an event callback.
    *
    * Supported events:
@@ -1139,6 +1187,7 @@ export class HandView {
     if (this.cards.length === 0) return;
 
     const positions = this.computeCardPositions();
+    this._basePositions = positions.map((p) => ({ x: p.x, y: p.y }));
 
     // Precompute rotation helpers for horizontal mode (centre and half-span)
     // so rotation is proportional to horizontal offset from the hand centre.
@@ -1176,6 +1225,9 @@ export class HandView {
         this.addCardLabel(card, i, positions[i], sprite);
       }
     }
+
+    // Apply the selection-raise offset instantly to the fresh sprites.
+    this.applySelectionRaise(false);
   }
 
   /**
@@ -1200,6 +1252,11 @@ export class HandView {
       // Position the returned object at the computed layout position
       (cardObj as any).x = pos.x;
       (cardObj as any).y = pos.y;
+      // Per-index depth (see below) so the highlight cannot cover the
+      // card to the right / below.
+      if (typeof (cardObj as any).setDepth === 'function') {
+        (cardObj as any).setDepth(index);
+      }
       return cardObj;
     }
 
@@ -1256,6 +1313,14 @@ export class HandView {
       const normalized = (pos.x - arcCenterX) / halfSpan;
       const rotDeg = this.maxRotationDegrees * normalized;
       (sprite as any).rotation = (rotDeg * Math.PI) / 180;
+    }
+
+    // Assign per-index depth so the Canvas-compatible tint overlay
+    // (sprite.depth + 0.01) renders above this card but below the card
+    // to the right / below (which gets a higher index depth). Without
+    // this, the selection highlight bleeds over neighbouring cards.
+    if (typeof (sprite as any).setDepth === 'function') {
+      (sprite as any).setDepth(index);
     }
 
     if (this.clickEnabled || this.selectionEnabled) {
@@ -1347,6 +1412,12 @@ export class HandView {
       color: isSelected ? '#88ff88' : '#aaaaaa',
       fontFamily: 'monospace',
     }).setOrigin(0.5);
+    // Keep the label just above its own card (depth index) but below the
+    // tint overlay (index + 0.01) and below the next card (index + 1), so
+    // the per-index card depth does not push labels behind their cards.
+    if (typeof (label as any).setDepth === 'function') {
+      (label as any).setDepth(index + 0.005);
+    }
     this.labels.push(label);
 
     // Apply selection tint (default Image sprite path only)
@@ -1404,6 +1475,7 @@ export class HandView {
     if (this.sprites.length === 0 || this.cards.length === 0) return;
 
     const positions = this.computeCardPositions();
+    this._basePositions = positions.map((p) => ({ x: p.x, y: p.y }));
 
     // Precompute rotation helpers for horizontal mode
     const firstX = positions[0].x;
@@ -1441,6 +1513,9 @@ export class HandView {
 
     // Update tint overlay positions to stay aligned with repositioned sprites
     this._updateTintOverlayPositions();
+
+    // Re-apply the selection raise on top of the new base positions.
+    this.applySelectionRaise(false);
   }
 
   /** Clear all sprites and labels from the scene. */
@@ -1459,6 +1534,7 @@ export class HandView {
       if (o) { try { o.destroy(); } catch (_) { /* ignore */ } }
     }
     this._tintOverlays = [];
+    this._basePositions = [];
   }
 
   // ── Canvas-compatible tint overlay helpers ───────────────
@@ -1532,6 +1608,9 @@ export class HandView {
 
   /** Update visual selection tint on all sprites. */
   private updateSelectionTints(): void {
+    // Apply the selection-raise offset first — position is managed by
+    // HandView for both default and custom-rendered cards.
+    this.applySelectionRaise(true);
     // Custom-rendered cards manage their own selection visuals
     if (this._renderCardFn) return;
     const isVertical = this.layoutDirection === 'vertical';
@@ -1551,6 +1630,96 @@ export class HandView {
           label.setColor(isSelected ? '#88ff88' : '#aaaaaa');
         }
       }
+    }
+  }
+
+  // ── Selection raise (selected card lift) ──────────────────
+
+  /** Whether the card at `index` is part of the current selection. */
+  private _isCardSelected(index: number): boolean {
+    if (this.selectedIndex === null) return false;
+    if (this.layoutDirection === 'vertical') return index <= this.selectedIndex;
+    return index === this.selectedIndex;
+  }
+
+  /**
+   * Compute the selection-raise offset for a card index.
+   *
+   * Horizontal: the card raises perpendicular to its rotated face —
+   * `dx = d·sin(θ)`, `dy = −d·cos(θ)` where θ is the sprite's rotation in
+   * radians (straight up when θ = 0).
+   * Vertical: the selected card shifts right — `dx = +d`, `dy = 0`.
+   */
+  private _computeRaiseOffset(index: number): { x: number; y: number } {
+    const d = this.selectionLift;
+    if (d <= 0) return { x: 0, y: 0 };
+    if (this.layoutDirection === 'vertical') {
+      return { x: d, y: 0 };
+    }
+    const sprite = this.sprites[index];
+    const rotation = sprite ? ((sprite as any).rotation ?? 0) : 0;
+    return { x: d * Math.sin(rotation), y: -d * Math.cos(rotation) };
+  }
+
+  /**
+   * Apply the selection-raise offset to a single card sprite (plus its
+   * tint overlay and label so they stay attached). The raise animates
+   * with a short tween unless reduced-motion is active or `animate` is
+   * false (used by layout updates and live slider changes).
+   */
+  private _applyRaiseForIndex(index: number, animate: boolean): void {
+    const sprite = this.sprites[index];
+    if (!sprite || !(sprite as any).active) return;
+    const base = this._basePositions[index];
+    if (!base) return;
+
+    const offset = this._isCardSelected(index) ? this._computeRaiseOffset(index) : { x: 0, y: 0 };
+    const targetX = base.x + offset.x;
+    const targetY = base.y + offset.y;
+
+    // No-op when the sprite is already at the target position.
+    if (
+      Math.abs(((sprite as any).x ?? 0) - targetX) < 0.5 &&
+      Math.abs(((sprite as any).y ?? 0) - targetY) < 0.5
+    ) {
+      return;
+    }
+
+    const targets: any[] = [sprite];
+    if (this.labels[index]) targets.push(this.labels[index]);
+    const overlay = this._tintOverlays[index];
+    if (overlay && overlay.active) targets.push(overlay);
+
+    // Stop any in-flight raise tween so it cannot fight the new target.
+    this.scene.tweens.killTweensOf(targets);
+
+    if (this._reducedMotion || !animate) {
+      for (const t of targets) {
+        t.x = targetX;
+        t.y = targetY;
+      }
+    } else {
+      this.scene.tweens.add({
+        targets,
+        x: targetX,
+        y: targetY,
+        duration: 180,
+        ease: 'Quad.easeOut',
+      });
+    }
+  }
+
+  /**
+   * Apply the selection-raise offset to every card sprite.
+   *
+   * @param animate - When true the raise tweens on selection changes
+   *                  (unless reduced-motion); when false it applies
+   *                  instantly (layout updates, live slider changes).
+   */
+  private applySelectionRaise(animate: boolean): void {
+    if (this.sprites.length === 0) return;
+    for (let i = 0; i < this.sprites.length; i++) {
+      this._applyRaiseForIndex(i, animate);
     }
   }
 
@@ -1597,6 +1766,14 @@ export class HandView {
   private _applyDragVisuals(): void {
     if (!this._dragSourceRange) return;
     const { from, to } = this._dragSourceRange;
+
+    // Stop any in-flight selection-raise tween on the dragged sprites so
+    // it cannot fight the drag movement (the raised position is captured
+    // in _originalPositions by _storeOriginalPositions).
+    const dragSprites = this.sprites.slice(from, to + 1);
+    if (dragSprites.length > 0) {
+      this.scene.tweens.killTweensOf(dragSprites);
+    }
 
     // Lift selected cards (Y offset)
     for (let i = from; i <= to; i++) {
@@ -1745,6 +1922,9 @@ export class HandView {
         this._animateDragAccept();
       } else {
         this._animateSnapBack();
+        // Restore selection visuals (tint + raise) only when the card
+        // returns to the hand — an accepted drop keeps its drop position.
+        this._resetDragVisuals();
       }
 
       this.emit('dragend', {
@@ -1752,8 +1932,6 @@ export class HandView {
         targetPileIndex,
         accepted,
       });
-
-      this._resetDragVisuals();
     }
 
     this._dragSourceRange = null;

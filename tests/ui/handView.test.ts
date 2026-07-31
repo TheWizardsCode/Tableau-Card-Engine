@@ -25,6 +25,7 @@ function createMockScene(): any {
       clearTint: vi.fn().mockReturnThis(),
       setOrigin: vi.fn().mockReturnThis(),
       setAlpha: vi.fn().mockReturnThis(),
+      setDepth: vi.fn().mockReturnThis(),
       on: vi.fn().mockReturnThis(),
       off: vi.fn().mockReturnThis(),
       destroy: vi.fn().mockImplementation(() => { destroyed.push(img); }),
@@ -48,6 +49,7 @@ function createMockScene(): any {
       setTint: vi.fn().mockReturnThis(),
       clearTint: vi.fn().mockReturnThis(),
       setColor: vi.fn().mockReturnThis(),
+      setDepth: vi.fn().mockReturnThis(),
       active: true,
       destroy: vi.fn().mockImplementation(() => { destroyed.push(txt); }),
     };
@@ -96,6 +98,7 @@ function createMockScene(): any {
         }
         return { stop: vi.fn() };
       }),
+      killTweensOf: vi.fn(),
     },
     input: {
       on: vi.fn((event: string, handler: any) => {
@@ -581,6 +584,77 @@ describe('HandView', () => {
     expect(rectRotationCalls.length).toBeGreaterThanOrEqual(1);
     const lastRotation = rectRotationCalls[rectRotationCalls.length - 1][0];
     expect(Math.abs(lastRotation - spriteRotation)).toBeLessThan(0.001);
+
+    hv.destroy();
+  });
+
+  it('card sprites get per-index depth so the highlight cannot render over the card to the right', () => {
+    const hv = new HandView(scene, { baseX: 60, baseY: 130, spacing: 56 });
+    hv.setCards([card('A', 'spades'), card('2', 'hearts'), card('3', 'clubs')]);
+
+    // Sprites are assigned depth equal to their index (cards to the right
+    // render on top of the highlight of cards to their left).
+    expect(scene._images[0].setDepth).toHaveBeenCalledWith(0);
+    expect(scene._images[1].setDepth).toHaveBeenCalledWith(1);
+    expect(scene._images[2].setDepth).toHaveBeenCalledWith(2);
+
+    hv.setSelected(0);
+
+    // The green selection overlay renders at sprite depth + 0.01 = 0.01,
+    // i.e. above card 0 but below card 1 (depth 1) — no bleed.
+    const overlay = scene._rectangles.find((r: any) => r.active && r.color === 0x88ff88);
+    expect(overlay).toBeDefined();
+    const overlayDepthCalls = overlay.setDepth.mock.calls;
+    const overlayDepth = overlayDepthCalls[overlayDepthCalls.length - 1][0];
+    expect(overlayDepth).toBe(0.01);
+    expect(overlayDepth).toBeLessThan(1);
+
+    hv.destroy();
+  });
+
+  it('vertical cascade: highlight of selected cards does not render over unselected cards below', () => {
+    const hv = new HandView(scene, {
+      baseX: 200,
+      baseY: 100,
+      spacing: 50,
+      layoutDirection: 'vertical',
+    });
+    hv.setCards([card('A', 'spades'), card('2', 'hearts'), card('3', 'clubs')]);
+
+    // Cascade selection: index 1 selects cards [0..1]
+    hv.setSelected(1);
+
+    const overlays = scene._rectangles.filter((r: any) => r.active && r.color === 0x88ff88);
+    expect(overlays.length).toBeGreaterThanOrEqual(1);
+    // Every selection overlay must sit below the first unselected card (index 2)
+    for (const o of overlays) {
+      const calls = o.setDepth.mock.calls;
+      const depth = calls[calls.length - 1][0];
+      expect(depth).toBeLessThan(2);
+    }
+
+    hv.destroy();
+  });
+
+  it('selected-card raise keeps the highlight depth below the card to the right', () => {
+    const hv = new HandView(scene, {
+      baseX: 60,
+      baseY: 130,
+      spacing: 56,
+      reducedMotion: true,
+    });
+    hv.setSelectionLift(25);
+    hv.setCards([card('A', 'spades'), card('2', 'hearts')]);
+    hv.setSelected(0);
+
+    // The raised sprite keeps depth 0 and its overlay 0.01 → still below
+    // card 1 (depth 1) at any raise distance.
+    const overlay = scene._rectangles.find((r: any) => r.active && r.color === 0x88ff88);
+    expect(overlay).toBeDefined();
+    const calls = overlay.setDepth.mock.calls;
+    const depth = calls[calls.length - 1][0];
+    expect(depth).toBe(0.01);
+    expect(depth).toBeLessThan(1);
 
     hv.destroy();
   });

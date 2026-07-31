@@ -276,7 +276,7 @@ example-games/
 │       ├── GymRouterScene.ts    Landing page with navigation cards
 │       ├── GymSceneBase.ts      Shared base class for all Gym scenes
 │       ├── GymDeckRngScene.ts   Deck lifecycle & seeded RNG demo
-│       ├── GymHandPileScene.ts  Hand/pile interaction demo (bottom-anchored hand arc + live radius slider)
+│       ├── GymHandPileScene.ts  Hand/pile interaction demo (bottom-anchored hand arc + live arc/spacing/rotation/raise sliders)
 │       ├── GymOverlayUiScene.ts Overlay & UI configuration demo
 │       ├── GymUndoRedoScene.ts  Undo/redo workflow demo
 │       ├── GymTranscriptScene.ts Transcript recording demo

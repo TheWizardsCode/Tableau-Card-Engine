@@ -235,7 +235,7 @@ Separate card rendering from game logic using `HandView` and `PileView` reusable
 - **Gym scene:** `GymHandPileScene` — `example-games/gym/scenes/GymHandPileScene.ts`
 - **Key APIs:** `HandView`, `PileView`, `flipCard()`, `discardCard()`, `moveGameObject()`, `shakeIllegalMove()`
 - **When to use:** "In a real game like Golf or Lost Cities, HandView renders the player hand and PileView shows draw/discard piles with click-to-interact support." (GymHandPileScene Features help text)
-- **Key features:** Arc layout with live sliders, vertical cascade toggle, drag-and-drop, card animations (deal from deck, flip in-place, discard to pile, illegal-move shake), reduced-motion fallbacks.
+- **Key features:** Arc layout with live sliders (arc, spacing, rotation, selection raise), vertical cascade toggle, drag-and-drop, card animations (deal from deck, flip in-place, discard to pile, illegal-move shake), reduced-motion fallbacks. Selected cards raise out of the hand (`HandView.setSelectionLift()`) perpendicular to their rotation in horizontal layout, and shift right in vertical cascade. Card sprites use per-index depth (`sprite.setDepth(index)`) so the Canvas-compatible selection highlight (depth `index + 0.01`) can never render over the card to the right / below; labels sit at `index + 0.005`.
 
 ### 3. Command Pattern for Reversible Actions (Undo/Redo)
 
