@@ -130,6 +130,7 @@ export function shakeIllegalMove(
   )
     .setAlpha(0.4)
     .setOrigin(tgt.originX ?? 0.5, tgt.originY ?? 0.5)
+    .setRotation(tgt.rotation ?? 0)
     .setDepth((tgt.depth ?? 0) + 0.1);
 
   return scene.tweens.add({

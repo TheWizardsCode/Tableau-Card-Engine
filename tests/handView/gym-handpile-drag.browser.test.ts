@@ -139,7 +139,15 @@ describe('GymHandPileScene drag-and-drop', () => {
     const discardPile = scene.discardPile as any;
     const initialDiscardSize = discardPile.size();
 
-    // ── Enable drag mode ──────────────────────────────────
+    // ── Drag mode is ON by default ─────────────────────
+    // Verify the default state, then toggle off/on to exercise the button.
+    expect(handView.getDragEnabled()).toBe(true);
+    const disableBtn = findButtonByText(scene, 'Disable Drag');
+    expect(disableBtn).toBeTruthy();
+    clickButton(disableBtn!);
+    await wait(100);
+    expect(handView.getDragEnabled()).toBe(false);
+
     const enableBtn = findButtonByText(scene, 'Enable Drag');
     expect(enableBtn).toBeTruthy();
     clickButton(enableBtn!);
@@ -188,7 +196,12 @@ describe('GymHandPileScene drag-and-drop', () => {
     const handView = getHandView(scene);
     const initialHandSize = handView.getCards().length;
 
-    // Enable drag
+    // Drag mode is ON by default — toggle off then back on
+    const disableBtn = findButtonByText(scene, 'Disable Drag');
+    expect(disableBtn).toBeTruthy();
+    clickButton(disableBtn!);
+    await wait(100);
+
     const enableBtn = findButtonByText(scene, 'Enable Drag');
     expect(enableBtn).toBeTruthy();
     clickButton(enableBtn!);

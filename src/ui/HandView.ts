@@ -1503,6 +1503,7 @@ export class HandView {
     )
       .setAlpha(0.35)
       .setOrigin(s.originX ?? 0.5, s.originY ?? 0.5)
+      .setRotation(s.rotation ?? 0)
       .setDepth((s.depth ?? 0) + 0.01);
 
     this._tintOverlays[index] = overlay;
@@ -1524,6 +1525,7 @@ export class HandView {
       }
       const s = sprite as any;
       overlay.setPosition(s.x ?? 0, s.y ?? 0);
+      overlay.setRotation(s.rotation ?? 0);
       overlay.setDepth((s.depth ?? 0) + 0.01);
     }
   }

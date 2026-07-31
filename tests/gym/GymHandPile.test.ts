@@ -89,6 +89,7 @@ function createMockScene(): any {
           setOrigin: vi.fn().mockReturnThis(),
           setDepth: vi.fn().mockReturnThis(),
           setAlpha: vi.fn().mockReturnThis(),
+          setRotation: vi.fn().mockReturnThis(),
           destroy: vi.fn(),
         };
         return rect;

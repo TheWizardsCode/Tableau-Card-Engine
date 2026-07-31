@@ -2012,7 +2012,7 @@ this.buttonBar!.addButton('[ Discard ]', () => this.discardSelected(), { zone: '
 
 // Controls row 2 — a SECOND bar; row 1 is NOT destroyed
 this.initButtonBar(112);
-this.buttonBar!.addButton('[ Enable Drag ]', () => this.toggleDrag(), { zone: 'center' });
+this.buttonBar!.addButton('[ Disable Drag ]', () => this.toggleDrag(), { zone: 'center' });
 ```
 
 `initButtonBar(y, opts?)` returns the created bar (also exposed as `this.buttonBar`), and accepts the same `GymButtonBarConfig` overrides as the `GymButtonBar` constructor (e.g. `{ zone: 'left' }`, `{ rowSpacing: 30 }`).
