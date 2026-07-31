@@ -67,9 +67,15 @@ function createMockScene(): any {
       y,
       width: w,
       height: h,
-      setInteractive: vi.fn().mockReturnThis(),
-      destroy: vi.fn(),
       active: true,
+      setInteractive: vi.fn().mockReturnThis(),
+      setPosition: vi.fn().mockReturnThis(),
+      setOrigin: vi.fn().mockReturnThis(),
+      setDepth: vi.fn().mockReturnThis(),
+      setAlpha: vi.fn().mockReturnThis(),
+      destroy: vi.fn().mockImplementation(() => {
+        rect.active = false;
+      }),
     };
     rectangles.push(rect);
     return rect;

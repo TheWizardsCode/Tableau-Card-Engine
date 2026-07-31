@@ -734,9 +734,22 @@ export class GymHandPileScene extends GymSceneBase {
 
     if (target) {
       if (this.reducedMotion) {
+        // Use both setTint (WebGL) and overlay (Canvas) for renderer compatibility
         (target as any).setTint(0xff4444);
+        const tgt = target as any;
+        const overlayW = tgt.displayWidth ?? tgt.width ?? 96;
+        const overlayH = tgt.displayHeight ?? tgt.height ?? 130;
+        const tintOverlay = this.add.rectangle(
+          tgt.x, tgt.y,
+          overlayW, overlayH,
+          0xff4444,
+        )
+          .setAlpha(0.4)
+          .setOrigin(tgt.originX ?? 0.5, tgt.originY ?? 0.5)
+          .setDepth((tgt.depth ?? 0) + 0.1);
         this.time?.delayedCall(200, () => {
           try { (target as any).clearTint(); } catch (_) { /* ignore */ }
+          tintOverlay.destroy();
         });
         this.logEvent('Illegal move (brief tint, reduced-motion)');
       } else {

@@ -13,7 +13,7 @@
 import type { Card } from '../card-system/Card';
 import { getCardTexture } from './CardTextureHelpers';
 import { layoutCardPositions } from './layoutCardPositions';
-import { CARD_W } from './constants';
+import { CARD_W, CARD_H } from './constants';
 import { dealCard } from './dealCard';
 import { GameEventEmitter } from '../core-engine';
 
@@ -442,6 +442,13 @@ export class HandView {
   private _dragLiftOffset: number = -8;
   private _dimTint: number = 0x888888;
   private static readonly DRAG_THRESHOLD: number = 5;
+
+  /**
+   * Per-card tint overlay rectangles (Canvas-compatible alternative to setTint).
+   * Same length as {@link sprites}. Each entry is either a Rectangle or null
+   * (no overlay). Managed by {@link _setCardTint}.
+   */
+  private _tintOverlays: (Phaser.GameObjects.Rectangle | null)[] = [];
 
   // Events — lightweight listener map
   private listeners: Map<keyof HandViewEvents, Set<EventCallback>> = new Map();
@@ -1303,15 +1310,15 @@ export class HandView {
       });
     }
 
-    // Hover visual feedback
+    // Hover visual feedback (uses Canvas-compatible tint overlay)
     sprite.on('pointerover', () => {
-      sprite.setTint(0x66ff66);
+      this._setCardTint(idx, 0x66ff66);
     });
     sprite.on('pointerout', () => {
       const isSelected = this.layoutDirection === 'vertical' && this.selectedIndex !== null
         ? idx <= this.selectedIndex
         : idx === this.selectedIndex;
-      sprite.setTint(isSelected ? 0x88ff88 : 0xffffff);
+      this._setCardTint(idx, isSelected ? 0x88ff88 : null);
     });
   }
 
@@ -1322,7 +1329,7 @@ export class HandView {
     card: Card,
     index: number,
     pos: { x: number; y: number },
-    sprite: Phaser.GameObjects.GameObject,
+    _sprite: Phaser.GameObjects.GameObject,
   ): void {
     const isSelected = this.layoutDirection === 'vertical' && this.selectedIndex !== null
       ? index <= this.selectedIndex
@@ -1343,7 +1350,7 @@ export class HandView {
     this.labels.push(label);
 
     // Apply selection tint (default Image sprite path only)
-    (sprite as any).setTint(isSelected ? 0x88ff88 : 0xffffff);
+    this._setCardTint(index, isSelected ? 0x88ff88 : null);
   }
 
   /** Compute current hand card center positions (x/y). */
@@ -1431,6 +1438,9 @@ export class HandView {
         }
       }
     }
+
+    // Update tint overlay positions to stay aligned with repositioned sprites
+    this._updateTintOverlayPositions();
   }
 
   /** Clear all sprites and labels from the scene. */
@@ -1443,6 +1453,79 @@ export class HandView {
     }
     this.sprites = [];
     this.labels = [];
+
+    // Destroy canvas-compatible tint overlays
+    for (const o of this._tintOverlays) {
+      if (o) { try { o.destroy(); } catch (_) { /* ignore */ } }
+    }
+    this._tintOverlays = [];
+  }
+
+  // ── Canvas-compatible tint overlay helpers ───────────────
+
+  /**
+   * Apply or clear a Canvas-compatible tint overlay on a card sprite.
+   *
+   * In Phaser 4's Canvas renderer, `setTint()` on Image/Sprite objects does
+   * not render visible color changes. This method uses a colored
+   * semi-transparent Rectangle overlay instead, which works identically in
+   * both Canvas and WebGL.
+   *
+   * @param index - Card index in the hand.
+   * @param color - Tint color (hex, e.g. 0x88ff88 for green) or null to clear.
+   */
+  private _setCardTint(index: number, color: number | null): void {
+    const sprite = this.sprites[index];
+    if (!sprite || !(sprite as any).active) return;
+
+    // Also call setTint for WebGL renderer (where it works natively)
+    try {
+      (sprite as any).setTint(color ?? 0xffffff);
+    } catch (_) { /* ignore */ }
+
+    // Destroy existing overlay if present
+    const existing = this._tintOverlays[index];
+    if (existing) {
+      existing.destroy();
+      this._tintOverlays[index] = null;
+    }
+
+    if (color === null) return;
+
+    // Create a new overlay rectangle
+    const s = sprite as any;
+    const overlay = this.scene.add.rectangle(
+      s.x ?? 0,
+      s.y ?? 0,
+      this.cardWidth,
+      CARD_H,
+      color,
+    )
+      .setAlpha(0.35)
+      .setOrigin(s.originX ?? 0.5, s.originY ?? 0.5)
+      .setDepth((s.depth ?? 0) + 0.01);
+
+    this._tintOverlays[index] = overlay;
+  }
+
+  /**
+   * Update all tint overlay positions to match the current sprite positions.
+   * Called after sprite positions change (e.g. during drag).
+   */
+  private _updateTintOverlayPositions(): void {
+    for (let i = 0; i < this.sprites.length; i++) {
+      const overlay = this._tintOverlays[i];
+      if (!overlay) continue;
+      const sprite = this.sprites[i];
+      if (!sprite || !(sprite as any).active) {
+        overlay.destroy();
+        this._tintOverlays[i] = null;
+        continue;
+      }
+      const s = sprite as any;
+      overlay.setPosition(s.x ?? 0, s.y ?? 0);
+      overlay.setDepth((s.depth ?? 0) + 0.01);
+    }
   }
 
   /** Update visual selection tint on all sprites. */
@@ -1457,7 +1540,7 @@ export class HandView {
       const isSelected = isVertical && this.selectedIndex !== null
         ? i <= this.selectedIndex
         : i === this.selectedIndex;
-      (sprite as any).setTint(isSelected ? 0x88ff88 : 0xffffff);
+      this._setCardTint(i, isSelected ? 0x88ff88 : null);
 
       // Update label colour
       if (i < this.labels.length) {
@@ -1521,12 +1604,15 @@ export class HandView {
       }
     }
 
+    // Update overlay positions after lift
+    this._updateTintOverlayPositions();
+
     // Dim unselected cards above drag handle (only meaningful in vertical mode)
     if (this.layoutDirection === 'vertical') {
       for (let i = 0; i < from; i++) {
         const sprite = this.sprites[i];
         if (sprite && sprite.active) {
-          (sprite as any).setTint(this._dimTint);
+          this._setCardTint(i, this._dimTint);
         }
       }
     }
@@ -1553,6 +1639,9 @@ export class HandView {
         (sprite as any).y = this._originalPositions[i].y + this._dragLiftOffset + dy;
       }
     }
+
+    // Update overlay positions to stay aligned with dragged sprites
+    this._updateTintOverlayPositions();
   }
 
   /** Animate dragged cards back to original positions (snap-back on rejection). */

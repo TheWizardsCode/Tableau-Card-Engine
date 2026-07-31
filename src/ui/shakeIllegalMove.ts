@@ -115,7 +115,22 @@ export function shakeIllegalMove(
 
   const originalX = target.x;
 
+  // Apply tint. In Phaser 4 Canvas renderer setTint on Image/Sprite
+  // does not render visibly, so we add a Rectangle overlay as well.
   target.setTint(tint);
+
+  // Canvas-compatible tint overlay (also works under WebGL)
+  const tgt = target as any;
+  const overlayW = tgt.displayWidth ?? tgt.width ?? 96;
+  const overlayH = tgt.displayHeight ?? tgt.height ?? 130;
+  const tintOverlay = scene.add.rectangle(
+    target.x, target.y,
+    overlayW, overlayH,
+    tint,
+  )
+    .setAlpha(0.4)
+    .setOrigin(tgt.originX ?? 0.5, tgt.originY ?? 0.5)
+    .setDepth((tgt.depth ?? 0) + 0.1);
 
   return scene.tweens.add({
     targets: target,
@@ -126,6 +141,7 @@ export function shakeIllegalMove(
     ease,
     onComplete: () => {
       target.clearTint();
+      tintOverlay.destroy();
       target.setX(originalX);
       onComplete?.();
     },

@@ -12,6 +12,7 @@ function createMockScene(): any {
   const images: any[] = [];
   const texts: any[] = [];
   const destroyed: any[] = [];
+  const rectangles: any[] = [];
 
   const mockImage = (x: number, y: number, texture: string) => {
     const img = {
@@ -67,6 +68,22 @@ function createMockScene(): any {
         clear: vi.fn().mockReturnThis(),
         destroy: vi.fn(),
       }),
+      rectangle: vi.fn().mockImplementation((x: number, y: number, w: number, h: number, color: number) => {
+        const rect = {
+          x, y, width: w, height: h, color,
+          active: true,
+          setPosition: vi.fn().mockReturnThis(),
+          setOrigin: vi.fn().mockReturnThis(),
+          setDepth: vi.fn().mockReturnThis(),
+          setAlpha: vi.fn().mockReturnThis(),
+          destroy: vi.fn().mockImplementation(() => {
+            rect.active = false;
+            destroyed.push(rect);
+          }),
+        };
+        rectangles.push(rect);
+        return rect;
+      }),
     },
     tweens: {
       add: vi.fn().mockImplementation((config: any) => {
@@ -98,6 +115,7 @@ function createMockScene(): any {
     _images: images,
     _texts: texts,
     _destroyed: destroyed,
+    _rectangles: rectangles,
   };
 }
 
@@ -497,6 +515,89 @@ describe('HandView', () => {
 
     expect(hv.getSelected()).toBeNull();
     hv.destroy();
+  });
+
+  // ── Canvas-compatible tint overlays ───────────────────────
+
+  it('setSelected creates tint overlay rectangles on cards', () => {
+    const hv = new HandView(scene, {
+      baseX: 60,
+      baseY: 130,
+      spacing: 56,
+    });
+
+    const cards = [card('A', 'spades'), card('2', 'hearts'), card('3', 'clubs')];
+    hv.setCards(cards);
+
+    // Initially no tint overlays
+    const beforeRects = scene._rectangles.filter((r: any) => r.active);
+    expect(beforeRects.length).toBe(0);
+
+    // Select card at index 1
+    hv.setSelected(1);
+    const selectedRects = scene._rectangles.filter((r: any) => r.active);
+    expect(selectedRects.length).toBeGreaterThanOrEqual(1);
+    // The selected card should have a green-ish (0x88ff88) overlay
+    const selectedRect = selectedRects.find((r: any) => r.color === 0x88ff88);
+    expect(selectedRect).toBeDefined();
+
+    // Clear selection should remove overlays
+    hv.setSelected(null);
+    const clearedRects = scene._rectangles.filter((r: any) => r.active);
+    const greenRects = clearedRects.filter((r: any) => r.color === 0x88ff88);
+    expect(greenRects.length).toBe(0);
+
+    hv.destroy();
+  });
+
+  it('hover events create and remove tint overlay rectangles', () => {
+    const hv = new HandView(scene, {
+      baseX: 60,
+      baseY: 130,
+      spacing: 56,
+    });
+
+    hv.setCards([card('A', 'spades'), card('2', 'hearts')]);
+    const firstImage = scene._images[0];
+
+    // Find pointerover handler
+    const onCalls = firstImage.on.mock.calls;
+    const pointerOver = onCalls.find((c: any[]) => c[0] === 'pointerover');
+    const pointerOut = onCalls.find((c: any[]) => c[0] === 'pointerout');
+    expect(pointerOver).toBeDefined();
+    expect(pointerOut).toBeDefined();
+
+    // Simulate hover in
+    pointerOver[1]();
+    const hoverRects = scene._rectangles.filter((r: any) => r.active && r.color === 0x66ff66);
+    expect(hoverRects.length).toBeGreaterThanOrEqual(1);
+
+    // Simulate hover out
+    pointerOut[1]();
+    const afterOutRects = scene._rectangles.filter((r: any) => r.active && r.color === 0x66ff66);
+    expect(afterOutRects.length).toBe(0);
+
+    hv.destroy();
+  });
+
+  it('destroy cleans up all tint overlay rectangles', () => {
+    const hv = new HandView(scene, {
+      baseX: 60,
+      baseY: 130,
+      spacing: 56,
+    });
+
+    hv.setCards([card('A', 'spades'), card('2', 'hearts')]);
+    hv.setSelected(0);
+
+    // Verify overlays are created
+    expect(scene._rectangles.length).toBeGreaterThan(0);
+
+    hv.destroy();
+
+    // After destroy, overlays should be inactive/destroyed
+    const activeRects = scene._rectangles.filter((r: any) => r.active);
+    expect(activeRects.length).toBe(0);
   });
 
   // ── Event emission ─────────────────────────────────────────

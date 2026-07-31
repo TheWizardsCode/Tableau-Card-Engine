@@ -56,6 +56,9 @@ function createMockScene(): any {
       scaleX: 1,
       scaleY: 1,
       alpha: 1,
+      depth: 0,
+      originX: 0.5,
+      originY: 0.5,
       displayWidth: CARD_W,
       displayHeight: CARD_H,
       rotation: 0,
@@ -108,6 +111,19 @@ function createMockScene(): any {
       image: vi.fn().mockImplementation(mockImage),
       text: vi.fn().mockImplementation(mockText),
       graphics: vi.fn().mockImplementation(mockGraphics),
+      rectangle: vi.fn().mockImplementation((x: number, y: number, w: number, h: number, color: number) => {
+        const rect = {
+          x, y, width: w, height: h, color,
+          depth: 0,
+          active: true,
+          setPosition: vi.fn().mockReturnThis(),
+          setOrigin: vi.fn().mockReturnThis(),
+          setDepth: vi.fn().mockReturnThis(),
+          setAlpha: vi.fn().mockReturnThis(),
+          destroy: vi.fn(),
+        };
+        return rect;
+      }),
     },
     tweens: {
       add: vi.fn().mockImplementation((config: any) => {
