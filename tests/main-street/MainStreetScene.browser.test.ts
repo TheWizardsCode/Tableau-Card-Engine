@@ -480,4 +480,29 @@ describe('MainStreetScene browser tests', () => {
     destroyGame(game);
     game = null;
   });
+
+  it('rounds the HUD Coins display to a whole number (no fractional digits)', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;
+
+    // Give the player a fractional coin balance (3-decimal precision)
+    scene.state.resourceBank.coins = 123.456;
+    scene.refreshHud();
+
+    // Find the transient HUD coin text
+    const hudList = scene.hudContainer.list as Phaser.GameObjects.GameObject[];
+    const coinText = hudList.find(
+      (obj) => obj instanceof Phaser.GameObjects.Text
+        && (obj as any)._hudTransient
+        && (obj as Phaser.GameObjects.Text).text.startsWith('Coins:'),
+    ) as Phaser.GameObjects.Text | undefined;
+
+    expect(coinText).toBeTruthy();
+    // Rounded whole number, no decimal places (e.g. "Coins: 123", not "Coins: 123.456")
+    expect(coinText!.text).toBe('Coins: 123');
+    expect(coinText!.text).not.toContain('.');
+
+    destroyGame(game);
+    game = null;
+  });
 });

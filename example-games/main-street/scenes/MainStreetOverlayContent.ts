@@ -89,7 +89,7 @@ export class MainStreetOverlayContent {
     const challenges = s.state.challengesCompleted.length;
     const cfg = s.state.config;
     const lines = [
-      `Coins: ${coins}`,
+      `Coins: ${Math.round(coins)}`,
       `Reputation: ${reputation} (x${cfg.reputationScoreMultiplier} = ${reputation * cfg.reputationScoreMultiplier})`,
       `Challenges: ${challenges} (x${cfg.challengeBonusPoints} = ${challenges * cfg.challengeBonusPoints})`,
       `Final Score: ${Math.round(result.finalScore)}`,

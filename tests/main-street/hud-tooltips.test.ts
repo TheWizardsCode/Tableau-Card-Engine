@@ -362,8 +362,9 @@ describe('buildScoreTooltip', () => {
     expect(tooltip).toContain(HUD_TOOLTIP_STRINGS.scoreBreakdownReputation);
     expect(tooltip).toContain(HUD_TOOLTIP_STRINGS.scoreBreakdownChallenges);
 
-    // Should contain contribution values
+    // Should contain contribution values (coins value 30 is already a whole number)
     expect(tooltip).toContain(`${30}`);
+    expect(tooltip).toContain(`${HUD_TOOLTIP_STRINGS.scoreBreakdownCoins}: 30`);
     expect(tooltip).toContain(`${repContribution}`);
     expect(tooltip).toContain(`${challengeContribution}`);
   });
@@ -415,8 +416,9 @@ describe('buildScoreTooltip', () => {
     expect(match).not.toBeNull();
     const displayedScore = parseInt(match![1], 10);
     expect(displayedScore).toBe(Math.round(score));
-    // Breakdown values (coins, reputation) should still show their raw unrounded values
-    expect(tooltip).toContain(`${HUD_TOOLTIP_STRINGS.scoreBreakdownCoins}: 123.456`);
+    // Breakdown coins should be rounded to nearest whole number; other breakdown values stay raw
+    expect(tooltip).toContain(`${HUD_TOOLTIP_STRINGS.scoreBreakdownCoins}: 123`);
+    expect(tooltip).not.toContain(`${HUD_TOOLTIP_STRINGS.scoreBreakdownCoins}: 123.456`);
   });
 
   it('score estimate label includes win threshold as x of y format (rounded)', () => {

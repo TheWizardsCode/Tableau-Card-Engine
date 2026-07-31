@@ -236,7 +236,7 @@ export function buildScoreTooltip(
     t(HUD_TOOLTIP_I18N_KEYS.scoreTitle),
     `${t(HUD_TOOLTIP_I18N_KEYS.scoreEstimateLabel)}: ${Math.round(score)}/${threshold}`,
     '',
-    `${t(HUD_TOOLTIP_I18N_KEYS.scoreBreakdownCoins)}: ${coins.toFixed(3)}`,
+    `${t(HUD_TOOLTIP_I18N_KEYS.scoreBreakdownCoins)}: ${Math.round(coins)}`,
     `${t(HUD_TOOLTIP_I18N_KEYS.scoreBreakdownReputation)} ${state.config.reputationScoreMultiplier}: ${repContribution}`,
     `${t(HUD_TOOLTIP_I18N_KEYS.scoreBreakdownChallenges)}: ${challengeContribution}`,
   ];
