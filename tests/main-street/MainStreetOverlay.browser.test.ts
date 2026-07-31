@@ -287,6 +287,31 @@ describe('Main Street overlay button tests', () => {
     }
   });
 
+  it('rounds Coins in the game-over overlay to a whole number', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene')!;
+
+    // Give the player a fractional coin balance (3-decimal precision)
+    const s = scene as any;
+    s.state.resourceBank.coins = 123.456;
+    forceGameOver(scene);
+    await waitFrames(3);
+
+    const hud = (scene as any).hudContainer as { list: Phaser.GameObjects.GameObject[] } | undefined;
+    expect(hud).toBeDefined();
+
+    const allTexts = hud!.list.filter(
+      (child: Phaser.GameObjects.GameObject) =>
+        child instanceof Phaser.GameObjects.Text,
+    ) as Phaser.GameObjects.Text[];
+
+    // The breakdown block contains Coins and Final Score lines
+    const breakdown = allTexts.find((t) => t.text.includes('Coins:') && t.text.includes('Final Score:'));
+    expect(breakdown).toBeDefined();
+    expect(breakdown!.text).toContain('Coins: 123');
+    expect(breakdown!.text).not.toContain('123.456');
+  });
+
   it('should show Menu button in the HUD container', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('MainStreetScene')!;

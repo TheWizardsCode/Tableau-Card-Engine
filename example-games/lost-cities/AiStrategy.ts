@@ -32,7 +32,11 @@ import {
   getLegalPhase2Actions,
 } from './LostCitiesRules';
 import type { AiStrategyBase } from '../../src/ai';
-import { AiPlayer as AiPlayerBase, pickRandom } from '../../src/ai';
+import {
+  AiPlayer as AiPlayerBase,
+  pickRandom,
+  CardMemoryTracker,
+} from '../../src/ai';
 
 // ---------------------------------------------------------------------------
 // Strategy interface
@@ -712,11 +716,26 @@ function greedyChoosePhase2(state: VisibleState): Phase2Action {
 }
 
 // ---------------------------------------------------------------------------
-// AI Player class — wraps a strategy + maintains draw history
+// AI Player class — wraps a strategy + maintains draw history + card memory
 // ---------------------------------------------------------------------------
+
+/**
+ * Default memory configuration for the Lost Cities AI.
+ *
+ * The deck has 5 expedition colors × 12 cards per color = 60 cards.
+ * The tracker groups observations by expedition color, so the maximum
+ * number of copies of any single key is 12.
+ */
+const LOST_CITIES_MEMORY_CONFIG = { skill: 80, maxCopies: 12 };
 
 export class LostCitiesAiPlayer extends AiPlayerBase<LostCitiesAiStrategy> {
   private drawHistory: OpponentDrawHistory;
+
+  /**
+   * Probabilistic recall of cards the AI has seen discarded (both its
+   * own discards and the opponent's). Grouped by expedition color.
+   */
+  readonly memoryTracker: CardMemoryTracker;
 
   constructor(
     strategy: LostCitiesAiStrategy = GreedyStrategy,
@@ -724,6 +743,7 @@ export class LostCitiesAiPlayer extends AiPlayerBase<LostCitiesAiStrategy> {
   ) {
     super(strategy, rng);
     this.drawHistory = createOpponentDrawHistory();
+    this.memoryTracker = new CardMemoryTracker(LOST_CITIES_MEMORY_CONFIG);
   }
 
   /** Choose a Phase 1 action. */
@@ -749,6 +769,20 @@ export class LostCitiesAiPlayer extends AiPlayerBase<LostCitiesAiStrategy> {
   recordOpponentDiscardDraw(color: ExpeditionColor): void {
     const current = this.drawHistory.get(color) ?? 0;
     this.drawHistory.set(color, current + 1);
+  }
+
+  /**
+   * Record a card the AI has observed being discarded — either its own
+   * discard or the opponent's (both are fully visible on the table).
+   *
+   * The card is grouped by its expedition color in the memory tracker,
+   * so the AI can probabilistically recall how many cards of each color
+   * have cycled through the discard piles.
+   *
+   * @param card - The discarded card to remember.
+   */
+  recordDiscard(card: LostCitiesCard): void {
+    this.memoryTracker.recordKey(card.color);
   }
 
   /** Reset draw history (call at start of each round). */

@@ -64,8 +64,12 @@ export function getCardDesignDisplayName(designKey: string): string {
  * Read the selected card design from storage.
  * Returns the default design key when nothing is stored or the stored
  * key is not in the available designs registry.
+ *
+ * @param storage Optional storage backend. When omitted (undefined), falls
+ *   back to `globalThis.localStorage`. Pass `null` to explicitly disable
+ *   storage access (returns the default design).
  */
-export function getCardDesign(storage: StorageLike | null = null): string {
+export function getCardDesign(storage?: StorageLike | null): string {
   const backend = resolveStorage(storage);
   if (!backend) return CARD_DESIGN_DEFAULT;
 
@@ -82,8 +86,12 @@ export function getCardDesign(storage: StorageLike | null = null): string {
 
 /**
  * Persist the selected card design key to storage.
+ *
+ * @param storage Optional storage backend. When omitted (undefined), falls
+ *   back to `globalThis.localStorage`. Pass `null` to explicitly disable
+ *   storage access (no-op).
  */
-export function setCardDesign(designKey: string, storage: StorageLike | null = null): void {
+export function setCardDesign(designKey: string, storage?: StorageLike | null): void {
   const backend = resolveStorage(storage);
   if (!backend) return;
 
@@ -112,8 +120,12 @@ function resolveStorage(storage?: StorageLike | null): StorageLike | null {
 
 /**
  * Read selected difficulty from storage. Returns null when not set or invalid.
+ *
+ * @param storage Optional storage backend. When omitted (undefined), falls
+ *   back to `globalThis.localStorage`. Pass `null` to explicitly disable
+ *   storage access.
  */
-export function getSelectedDifficulty(storage: StorageLike | null = null, allowedNames?: readonly string[]): string | null {
+export function getSelectedDifficulty(storage?: StorageLike | null, allowedNames?: readonly string[]): string | null {
   const backend = resolveStorage(storage);
   if (!backend) return null;
 
@@ -127,7 +139,7 @@ export function getSelectedDifficulty(storage: StorageLike | null = null, allowe
   }
 }
 
-export function setSelectedDifficulty(name: string, storage: StorageLike | null = null): void {
+export function setSelectedDifficulty(name: string, storage?: StorageLike | null): void {
   const backend = resolveStorage(storage);
   if (!backend) return;
 
@@ -141,8 +153,12 @@ export function setSelectedDifficulty(name: string, storage: StorageLike | null 
 /**
  * Read reduced motion preference from storage.
  * Returns false when not set or storage is unavailable.
+ *
+ * @param storage Optional storage backend. When omitted (undefined), falls
+ *   back to `globalThis.localStorage`. Pass `null` to explicitly disable
+ *   storage access.
  */
-export function getReducedMotion(storage: StorageLike | null = null): boolean {
+export function getReducedMotion(storage?: StorageLike | null): boolean {
   const backend = resolveStorage(storage);
   if (!backend) return false;
 
@@ -156,7 +172,7 @@ export function getReducedMotion(storage: StorageLike | null = null): boolean {
 /**
  * Persist reduced motion preference to storage.
  */
-export function setReducedMotion(enabled: boolean, storage: StorageLike | null = null): void {
+export function setReducedMotion(enabled: boolean, storage?: StorageLike | null): void {
   const backend = resolveStorage(storage);
   if (!backend) return;
 
@@ -172,8 +188,12 @@ export function setReducedMotion(enabled: boolean, storage: StorageLike | null =
 /**
  * Read tooltip preference from storage. Returns true when not set or
  * storage is unavailable (tooltips shown by default).
+ *
+ * @param storage Optional storage backend. When omitted (undefined), falls
+ *   back to `globalThis.localStorage`. Pass `null` to explicitly disable
+ *   storage access.
  */
-export function getTooltips(storage: StorageLike | null = null): boolean {
+export function getTooltips(storage?: StorageLike | null): boolean {
   const backend = resolveStorage(storage);
   if (!backend) return true;
 
@@ -189,7 +209,7 @@ export function getTooltips(storage: StorageLike | null = null): boolean {
 /**
  * Persist tooltip preference to storage.
  */
-export function setTooltips(enabled: boolean, storage: StorageLike | null = null): void {
+export function setTooltips(enabled: boolean, storage?: StorageLike | null): void {
   const backend = resolveStorage(storage);
   if (!backend) return;
 
@@ -205,8 +225,12 @@ export function setTooltips(enabled: boolean, storage: StorageLike | null = null
 /**
  * Read the configured End Turn keybind from storage. Returns the key name
  * (e.g. 'Enter'). If not set, returns the default 'Enter'.
+ *
+ * @param storage Optional storage backend. When omitted (undefined), falls
+ *   back to `globalThis.localStorage`. Pass `null` to explicitly disable
+ *   storage access.
  */
-export function getEndTurnKeybind(storage: StorageLike | null = null): string {
+export function getEndTurnKeybind(storage?: StorageLike | null): string {
   const backend = resolveStorage(storage);
   if (!backend) return 'Enter';
 
@@ -222,7 +246,7 @@ export function getEndTurnKeybind(storage: StorageLike | null = null): string {
 /**
  * Persist the End Turn keybind name to storage.
  */
-export function setEndTurnKeybind(keyName: string, storage: StorageLike | null = null): void {
+export function setEndTurnKeybind(keyName: string, storage?: StorageLike | null): void {
   const backend = resolveStorage(storage);
   if (!backend) return;
 

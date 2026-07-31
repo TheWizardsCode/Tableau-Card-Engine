@@ -75,8 +75,11 @@ export function getCardTexture(card: Card): string {
  * iterating over ranks and suits.
  *
  * Loads SVGs for the player's currently selected card design (read from
- * localStorage via {@link getCardDesign}) so that the initial game start
- * renders the correct design.
+ * `globalThis.localStorage` via {@link getCardDesign}) so that the initial
+ * game start renders the correct design. Because {@link getCardDesign} falls
+ * back to `globalThis.localStorage` when called without arguments, the
+ * player's design preference persists across page reloads and server
+ * restarts.
  *
  * @param scene     The Phaser scene whose loader should be used.
  * @param width     Card sprite width in pixels (defaults to `CARD_W`).

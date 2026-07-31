@@ -637,16 +637,4 @@ describe('MainStreet Sell Cards', () => {
     );
   });
 
-  // ── Sell Dialog UI Specification (AC1) ───────────────────
-
-  describe('Sell dialog (AC1) - UI specification', () => {
-    it('should have sell button visible when clicking a placed card during MarketPhase', () => {
-      // This is primarily a UI test. The specification is:
-      // 1. During MarketPhase, clicking a placed card opens a sell overlay
-      // 2. The overlay shows card info + Sell button + Cancel button
-      // 3. Clicking Sell executes the sell
-      // 4. Clicking Cancel dismisses the overlay
-      expect(true).toBe(true); // Placeholder - UI test
-    });
-  });
 });

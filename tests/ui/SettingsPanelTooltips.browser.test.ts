@@ -46,16 +46,25 @@ function destroyGame(game: Phaser.Game | null): void {
 
 // ── Helper: find text objects by content in a container ────
 
+/**
+ * Find all Text objects whose `text` matches, recursing into nested
+ * containers (e.g. the settings panel's scrollable content container).
+ */
 function findTextObjects(
   container: Phaser.GameObjects.Container,
   text: string,
 ): Phaser.GameObjects.Text[] {
   const results: Phaser.GameObjects.Text[] = [];
-  container.each((child: Phaser.GameObjects.GameObject) => {
-    if (child instanceof Phaser.GameObjects.Text && child.text === text) {
-      results.push(child);
-    }
-  });
+  const visit = (c: Phaser.GameObjects.Container) => {
+    c.each((child: Phaser.GameObjects.GameObject) => {
+      if (child instanceof Phaser.GameObjects.Text && child.text === text) {
+        results.push(child);
+      } else if (child instanceof Phaser.GameObjects.Container) {
+        visit(child);
+      }
+    });
+  };
+  visit(container);
   return results;
 }
 

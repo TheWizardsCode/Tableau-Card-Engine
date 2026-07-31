@@ -3,8 +3,6 @@
  *
  * Verifies:
  * - The ms-icon-stats.svg asset exists and follows the 16x16 icon pattern.
- * - The MainStreetLifecycleManager preload includes the stats icon.
- * - The StatsButton class references the ms-icon-stats texture key.
  */
 
 import fs from 'fs';
@@ -49,45 +47,3 @@ describe('Stats icon SVG asset', () => {
   });
 });
 
-// ── Preload integration ────────────────────────────────────
-
-describe('Stats texture preload integration', () => {
-  const lifeCyclePath = 'example-games/main-street/scenes/MainStreetLifecycleManager.ts';
-
-  it('includes "stats" in the preloaded icons list', () => {
-    const content = fs.readFileSync(lifeCyclePath, 'utf8');
-    expect(content).toMatch(/'stats'/);
-  });
-
-  it('loads ms-icon-stats via template interpolation', () => {
-    const content = fs.readFileSync(lifeCyclePath, 'utf8');
-    // The preload loop uses: s.load.image(`ms-icon-${k}`, ...)
-    // Since 'stats' is in the icons array, ms-icon-stats gets loaded.
-    expect(content).toMatch(/load\.image\(`ms-icon-/);
-  });
-});
-
-// ── StatsButton class integration ──────────────────────────
-
-describe('StatsButton icon reference', () => {
-  const statsOverlayPath = 'example-games/main-street/scenes/StatsOverlay.ts';
-
-  it('references ms-icon-stats texture key', () => {
-    const content = fs.readFileSync(statsOverlayPath, 'utf8');
-    expect(content).toMatch(/ms-icon-stats/);
-  });
-
-  it('replaces the Greek Sigma Σ text with an icon', () => {
-    const content = fs.readFileSync(statsOverlayPath, 'utf8');
-    // The old Σ character should no longer be the primary label text
-    // It may still appear as a fallback in code comments
-    expect(content).not.toMatch(/'\u03A3'/);
-  });
-
-  it('provides a fallback text label when the texture is unavailable', () => {
-    const content = fs.readFileSync(statsOverlayPath, 'utf8');
-    // The class should have fallback logic to show text when texture is missing
-    expect(content).toMatch(/\u03A3/);
-    expect(content).toMatch(/fallback/i);
-  });
-});

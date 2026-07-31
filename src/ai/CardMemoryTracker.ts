@@ -2,14 +2,15 @@
  * CardMemoryTracker — probabilistic recall of observed discard-pile cards.
  *
  * The AI uses this tracker to remember cards it has seen on the discard
- * pile. When queried via {@link getVisibleRanks}, each rank has a
+ * pile. When queried via {@link getVisibleRanks}, each key has a
  * P(correct) = skill/100 chance of being recalled with its exact count;
  * otherwise a uniformly random count in [0, maxCopies] is returned.
  *
- * Memory scope: The tracker records **all** cards passed to {@link recordCard}.
- * In the Golf AI, only discard-pile cards are recorded — face-up grid cards
- * are always visible and do not need memory. This means the AI perfectly
- * knows its own grid at all times but may misremember historical discards.
+ * Memory scope: The tracker records **all** cards passed to
+ * {@link recordCard} or {@link recordKey}. In the Golf AI, only
+ * discard-pile cards are recorded — face-up grid cards are always visible
+ * and do not need memory. This means the AI perfectly knows its own grid
+ * at all times but may misremember historical discards.
  *
  * @module ai
  */
@@ -85,6 +86,16 @@ const DEFAULT_MAX_COPIES = 4;
  * const ranks = memory.getVisibleRng(rng);
  * // ranks['Q'] is either 1 (correct) or a random 0-maxCopies (misremembered)
  * ```
+ *
+ * For custom card models that do not implement the engine {@link Card}
+ * interface (e.g. Lost Cities' `LostCitiesCard` with `color`/`type`),
+ * use {@link recordKey} with a game-specific grouping key instead:
+ *
+ * ```ts
+ * const memory = new CardMemoryTracker({ skill: 80, maxCopies: 12 });
+ * memory.recordKey('yellow'); // Lost Cities: group by expedition color
+ * const counts = memory.getVisibleRanks(rng);
+ * ```
  */
 export class CardMemoryTracker {
   private skill: number;
@@ -118,40 +129,56 @@ export class CardMemoryTracker {
    * Record a card that the AI has observed on the discard pile.
    *
    * Duplicate ranks increment the count. Suit is ignored — only rank
-   * matters for memory.
+   * matters for memory. This is a convenience wrapper around
+   * {@link recordKey} that derives the grouping key from the card's
+   * rank.
    *
    * @param card - The card to record (must have a `rank` property).
    */
   recordCard(card: Card): void {
-    const rank = card.rank.toString();
-    this.trueCounts[rank] = (this.trueCounts[rank] || 0) + 1;
+    this.recordKey(card.rank.toString());
   }
 
   /**
-   * Return rank counts with probabilistic recall based on the skill rating.
+   * Record an observed card identified by an arbitrary string key.
    *
-   * Each recorded rank has a P(correct) = skill / 100 chance of being
-   * recalled with its exact true count. When the AI misremembers a rank,
-   * a uniformly random integer between 0 and {@link maxCopies} is
-   * returned instead.
+   * This is the generic entry point that supports custom card models
+   * which do not implement the engine's {@link Card} interface (e.g.
+   * Lost Cities' `LostCitiesCard` with `color`/`type` fields). The key
+   * can be any stable string — a rank, an expedition color, or a
+   * combination — and counts are tracked per unique key.
+   *
+   * @param key - The grouping key for the observed card.
+   */
+  recordKey(key: string): void {
+    this.trueCounts[key] = (this.trueCounts[key] || 0) + 1;
+  }
+
+  /**
+   * Return key counts with probabilistic recall based on the skill rating.
+   *
+   * Each recorded key (rank string, expedition color, etc.) has a
+   * P(correct) = skill / 100 chance of being recalled with its exact true
+   * count. When the AI misremembers a key, a uniformly random integer
+   * between 0 and {@link maxCopies} is returned instead.
    *
    * The caller must provide an RNG so that test code can use a
    * deterministic source and the game loop can use Math.random
    * (or a seeded game RNG when fairness/replayability matters).
    *
    * @param rng - A function returning a pseudo-random number in [0, 1).
-   * @returns A map from rank string to the recalled count (0–maxCopies).
+   * @returns A map from key string to the recalled count (0–maxCopies).
    */
   getVisibleRanks(rng: () => number): Record<string, number> {
     const result: Record<string, number> = {};
 
-    for (const [rank, trueCount] of Object.entries(this.trueCounts)) {
+    for (const [key, trueCount] of Object.entries(this.trueCounts)) {
       const recallCorrectly = rng() < this.skill / 100;
       if (recallCorrectly) {
-        result[rank] = trueCount;
+        result[key] = trueCount;
       } else {
         // Misremember: return a random count from 0 to maxCopies
-        result[rank] = Math.floor(rng() * (this.maxCopies + 1));
+        result[key] = Math.floor(rng() * (this.maxCopies + 1));
       }
     }
 

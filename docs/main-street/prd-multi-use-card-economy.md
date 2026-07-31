@@ -44,7 +44,7 @@ totalHandSynergy = Σ perBusinessBonus for each (handCard, tableauBusiness) syne
 
 | Action | Cost/Value | Destination |
 |--------|-----------|-------------|
-| Place from hand to tableau | 80% of purchase cost (coins deducted) | Tableau slot |
+| Place from hand to tableau | Free (no coin deduction) | Tableau slot |
 | Sell from hand | 75% of purchase value (coins credited) | Discard pile |
 | Sell from tableau | 75% of purchase value (coins credited) | Discard pile (slot freed) |
 

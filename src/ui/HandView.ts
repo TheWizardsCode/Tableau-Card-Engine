@@ -13,7 +13,7 @@
 import type { Card } from '../card-system/Card';
 import { getCardTexture } from './CardTextureHelpers';
 import { layoutCardPositions } from './layoutCardPositions';
-import { CARD_W } from './constants';
+import { CARD_W, CARD_H } from './constants';
 import { dealCard } from './dealCard';
 import { GameEventEmitter } from '../core-engine';
 
@@ -128,6 +128,16 @@ export interface HandViewOptions {
    * centre. Default: 25 (tilt).
    */
   maxRotationDegrees?: number;
+
+  /**
+   * Distance (px) the selected card is raised from its resting position.
+   * In horizontal layout the raise follows the card's rotation —
+   * perpendicular to the card face (`dx = d·sin(θ)`, `dy = −d·cos(θ)`),
+   * straight up at 0° rotation. In vertical cascade layout the selected
+   * card shifts right (`dx = +d`, `dy = 0`).
+   * @default 0 (no raise)
+   */
+  selectionLift?: number;
 
   /**
    * Layout direction for the hand.
@@ -410,6 +420,12 @@ export class HandView {
   /** Maximum rotation (degrees) applied proportionally based on card offset from centre. */
   private maxRotationDegrees: number = 0;
 
+  /**
+   * Distance (px) the selected card is raised from its resting position.
+   * @default 0
+   */
+  private selectionLift: number = 0;
+
   /** Layout direction for the hand — horizontal row or vertical cascade. */
   private layoutDirection: 'horizontal' | 'vertical';
 
@@ -443,6 +459,20 @@ export class HandView {
   private _dimTint: number = 0x888888;
   private static readonly DRAG_THRESHOLD: number = 5;
 
+  /**
+   * Per-card tint overlay rectangles (Canvas-compatible alternative to setTint).
+   * Same length as {@link sprites}. Each entry is either a Rectangle or null
+   * (no overlay). Managed by {@link _setCardTint}.
+   */
+  private _tintOverlays: (Phaser.GameObjects.Rectangle | null)[] = [];
+
+  /**
+   * Base (un-raised) layout position for each sprite, parallel to
+   * {@link sprites}. The selection-raise offset is applied on top of
+   * these positions when a card is selected.
+   */
+  private _basePositions: { x: number; y: number }[] = [];
+
   // Events — lightweight listener map
   private listeners: Map<keyof HandViewEvents, Set<EventCallback>> = new Map();
 
@@ -461,6 +491,7 @@ export class HandView {
     this.clickEnabled = opts.clickEnabled ?? true;
     this._reducedMotion = opts.reducedMotion ?? false;
     this.maxRotationDegrees = opts.maxRotationDegrees ?? 25;
+    this.selectionLift = opts.selectionLift ?? 0;
     this.layoutDirection = opts.layoutDirection ?? 'horizontal';
     this._centerX = opts.centerX;
     this._customTextureFn = opts.cardTextureFn;
@@ -746,6 +777,9 @@ export class HandView {
     // 4. Compute new target positions.
     const newPositions = this.computeCardPositions();
 
+    // Track the new base positions so a later selection raise is correct.
+    this._basePositions = newPositions.map((p) => ({ x: p.x, y: p.y }));
+
     // Precompute rotation helpers (mirrors applyLayout logic).
     let arcCenterX = 0;
     let halfSpan = 1;
@@ -1029,6 +1063,27 @@ export class HandView {
   }
 
   /**
+   * Set the distance (px) the selected card is raised from its resting
+   * position. In horizontal layout the raise follows the card's rotation
+   * (perpendicular to the card face); in vertical cascade layout the
+   * selected card shifts right by this amount. Pass 0 to disable.
+   *
+   * Changes apply instantly (no animation) so a live slider can tune the
+   * distance while a card is selected.
+   */
+  setSelectionLift(distance: number): void {
+    const next = Number.isFinite(distance) ? Math.max(0, distance) : 0;
+    if (next === this.selectionLift) return;
+    this.selectionLift = next;
+    this.applySelectionRaise(false);
+  }
+
+  /** Current selection raise distance (px). */
+  getSelectionLift(): number {
+    return this.selectionLift;
+  }
+
+  /**
    * Register an event callback.
    *
    * Supported events:
@@ -1082,6 +1137,23 @@ export class HandView {
   }
 
   /**
+   * Return the base (un-raised) layout position for the card at the given
+   * index, or undefined when the index is out of range.
+   *
+   * The base position is the card's resting spot in the hand — the
+   * selection-raise offset (if any) is NOT included. Callers that need to
+   * restore a card to its exact hand position (e.g. cancelling a move)
+   * must use this instead of reading the sprite's current x/y, which may
+   * include the selection raise.
+   *
+   * @param index - The card index.
+   * @returns The base position, or `undefined` if out of bounds.
+   */
+  getBasePosition(index: number): { x: number; y: number } | undefined {
+    return this._basePositions[index];
+  }
+
+  /**
    * Return all card display objects.
    *
    * When using the default sprite creation path, the returned objects are
@@ -1132,6 +1204,7 @@ export class HandView {
     if (this.cards.length === 0) return;
 
     const positions = this.computeCardPositions();
+    this._basePositions = positions.map((p) => ({ x: p.x, y: p.y }));
 
     // Precompute rotation helpers for horizontal mode (centre and half-span)
     // so rotation is proportional to horizontal offset from the hand centre.
@@ -1169,6 +1242,9 @@ export class HandView {
         this.addCardLabel(card, i, positions[i], sprite);
       }
     }
+
+    // Apply the selection-raise offset instantly to the fresh sprites.
+    this.applySelectionRaise(false);
   }
 
   /**
@@ -1193,6 +1269,11 @@ export class HandView {
       // Position the returned object at the computed layout position
       (cardObj as any).x = pos.x;
       (cardObj as any).y = pos.y;
+      // Per-index depth (see below) so the highlight cannot cover the
+      // card to the right / below.
+      if (typeof (cardObj as any).setDepth === 'function') {
+        (cardObj as any).setDepth(index);
+      }
       return cardObj;
     }
 
@@ -1251,6 +1332,14 @@ export class HandView {
       (sprite as any).rotation = (rotDeg * Math.PI) / 180;
     }
 
+    // Assign per-index depth so the Canvas-compatible tint overlay
+    // (sprite.depth + 0.01) renders above this card but below the card
+    // to the right / below (which gets a higher index depth). Without
+    // this, the selection highlight bleeds over neighbouring cards.
+    if (typeof (sprite as any).setDepth === 'function') {
+      (sprite as any).setDepth(index);
+    }
+
     if (this.clickEnabled || this.selectionEnabled) {
       sprite.setInteractive({ useHandCursor: true });
     }
@@ -1303,15 +1392,15 @@ export class HandView {
       });
     }
 
-    // Hover visual feedback
+    // Hover visual feedback (uses Canvas-compatible tint overlay)
     sprite.on('pointerover', () => {
-      sprite.setTint(0x66ff66);
+      this._setCardTint(idx, 0x66ff66);
     });
     sprite.on('pointerout', () => {
       const isSelected = this.layoutDirection === 'vertical' && this.selectedIndex !== null
         ? idx <= this.selectedIndex
         : idx === this.selectedIndex;
-      sprite.setTint(isSelected ? 0x88ff88 : 0xffffff);
+      this._setCardTint(idx, isSelected ? 0x88ff88 : null);
     });
   }
 
@@ -1322,7 +1411,7 @@ export class HandView {
     card: Card,
     index: number,
     pos: { x: number; y: number },
-    sprite: Phaser.GameObjects.GameObject,
+    _sprite: Phaser.GameObjects.GameObject,
   ): void {
     const isSelected = this.layoutDirection === 'vertical' && this.selectedIndex !== null
       ? index <= this.selectedIndex
@@ -1340,10 +1429,16 @@ export class HandView {
       color: isSelected ? '#88ff88' : '#aaaaaa',
       fontFamily: 'monospace',
     }).setOrigin(0.5);
+    // Keep the label just above its own card (depth index) but below the
+    // tint overlay (index + 0.01) and below the next card (index + 1), so
+    // the per-index card depth does not push labels behind their cards.
+    if (typeof (label as any).setDepth === 'function') {
+      (label as any).setDepth(index + 0.005);
+    }
     this.labels.push(label);
 
     // Apply selection tint (default Image sprite path only)
-    (sprite as any).setTint(isSelected ? 0x88ff88 : 0xffffff);
+    this._setCardTint(index, isSelected ? 0x88ff88 : null);
   }
 
   /** Compute current hand card center positions (x/y). */
@@ -1397,6 +1492,7 @@ export class HandView {
     if (this.sprites.length === 0 || this.cards.length === 0) return;
 
     const positions = this.computeCardPositions();
+    this._basePositions = positions.map((p) => ({ x: p.x, y: p.y }));
 
     // Precompute rotation helpers for horizontal mode
     const firstX = positions[0].x;
@@ -1431,6 +1527,12 @@ export class HandView {
         }
       }
     }
+
+    // Update tint overlay positions to stay aligned with repositioned sprites
+    this._updateTintOverlayPositions();
+
+    // Re-apply the selection raise on top of the new base positions.
+    this.applySelectionRaise(false);
   }
 
   /** Clear all sprites and labels from the scene. */
@@ -1443,12 +1545,109 @@ export class HandView {
     }
     this.sprites = [];
     this.labels = [];
+
+    // Destroy canvas-compatible tint overlays
+    for (const o of this._tintOverlays) {
+      if (o) { try { o.destroy(); } catch (_) { /* ignore */ } }
+    }
+    this._tintOverlays = [];
+    this._basePositions = [];
+  }
+
+  // ── Canvas-compatible tint overlay helpers ───────────────
+
+  /**
+   * Apply or clear a Canvas-compatible tint overlay on a card sprite.
+   *
+   * In Phaser 4's Canvas renderer, `setTint()` on Image/Sprite objects does
+   * not render visible color changes. This method uses a colored
+   * semi-transparent Rectangle overlay instead, which works identically in
+   * both Canvas and WebGL.
+   *
+   * @param index - Card index in the hand.
+   * @param color - Tint color (hex, e.g. 0x88ff88 for green) or null to clear.
+   */
+  private _setCardTint(index: number, color: number | null): void {
+    const sprite = this.sprites[index];
+    if (!sprite || !(sprite as any).active) return;
+
+    // Also call setTint for WebGL renderer (where it works natively)
+    try {
+      (sprite as any).setTint(color ?? 0xffffff);
+    } catch (_) { /* ignore */ }
+
+    const s = sprite as any;
+    const existing = this._tintOverlays[index];
+    if (existing && existing.active) {
+      if (color === null) {
+        existing.destroy();
+        this._tintOverlays[index] = null;
+        return;
+      }
+      // Repaint IN PLACE — never destroy/recreate an active overlay. An
+      // overlay recreated mid-raise-tween would be left at its creation
+      // position while the card continues to rise (the raise tween only
+      // moves the overlay object it was created with), leaving the
+      // highlight detached from the raised card. Repainting keeps the
+      // same overlay glued to the card through the raise.
+      if ((existing as any).fillColor !== color) {
+        (existing as any).setFillStyle(color, (existing as any).fillAlpha ?? 0.35);
+      }
+      // Keep the overlay aligned with the sprite at this instant (the
+      // raise tween / drag updates overwrite it every frame when active).
+      existing.setPosition(s.x ?? 0, s.y ?? 0);
+      existing.setRotation(s.rotation ?? 0);
+      existing.setDepth((s.depth ?? 0) + 0.01);
+      return;
+    }
+
+    if (color === null) return;
+
+    // Create a new overlay rectangle at the sprite's current position
+    const overlay = this.scene.add.rectangle(
+      s.x ?? 0,
+      s.y ?? 0,
+      this.cardWidth,
+      CARD_H,
+      color,
+    )
+      .setAlpha(0.35)
+      .setOrigin(s.originX ?? 0.5, s.originY ?? 0.5)
+      .setRotation(s.rotation ?? 0)
+      .setDepth((s.depth ?? 0) + 0.01);
+
+    this._tintOverlays[index] = overlay;
+  }
+
+  /**
+   * Update all tint overlay positions to match the current sprite positions.
+   * Called after sprite positions change (e.g. during drag).
+   */
+  private _updateTintOverlayPositions(): void {
+    for (let i = 0; i < this.sprites.length; i++) {
+      const overlay = this._tintOverlays[i];
+      if (!overlay) continue;
+      const sprite = this.sprites[i];
+      if (!sprite || !(sprite as any).active) {
+        overlay.destroy();
+        this._tintOverlays[i] = null;
+        continue;
+      }
+      const s = sprite as any;
+      overlay.setPosition(s.x ?? 0, s.y ?? 0);
+      overlay.setRotation(s.rotation ?? 0);
+      overlay.setDepth((s.depth ?? 0) + 0.01);
+    }
   }
 
   /** Update visual selection tint on all sprites. */
   private updateSelectionTints(): void {
-    // Custom-rendered cards manage their own selection visuals
-    if (this._renderCardFn) return;
+    // Custom-rendered cards manage their own selection visuals but
+    // HandView still owns raised positioning.
+    if (this._renderCardFn) {
+      this.applySelectionRaise(true);
+      return;
+    }
     const isVertical = this.layoutDirection === 'vertical';
     for (let i = 0; i < this.sprites.length; i++) {
       const sprite = this.sprites[i];
@@ -1457,7 +1656,7 @@ export class HandView {
       const isSelected = isVertical && this.selectedIndex !== null
         ? i <= this.selectedIndex
         : i === this.selectedIndex;
-      (sprite as any).setTint(isSelected ? 0x88ff88 : 0xffffff);
+      this._setCardTint(i, isSelected ? 0x88ff88 : null);
 
       // Update label colour
       if (i < this.labels.length) {
@@ -1466,6 +1665,99 @@ export class HandView {
           label.setColor(isSelected ? '#88ff88' : '#aaaaaa');
         }
       }
+    }
+    // Apply the raise AFTER the tints so a newly-created highlight overlay
+    // is included in the raise tween and raises together with the card.
+    this.applySelectionRaise(true);
+  }
+
+  // ── Selection raise (selected card lift) ──────────────────
+
+  /** Whether the card at `index` is part of the current selection. */
+  private _isCardSelected(index: number): boolean {
+    if (this.selectedIndex === null) return false;
+    if (this.layoutDirection === 'vertical') return index <= this.selectedIndex;
+    return index === this.selectedIndex;
+  }
+
+  /**
+   * Compute the selection-raise offset for a card index.
+   *
+   * Horizontal: the card raises perpendicular to its rotated face —
+   * `dx = d·sin(θ)`, `dy = −d·cos(θ)` where θ is the sprite's rotation in
+   * radians (straight up when θ = 0).
+   * Vertical: the selected card shifts right — `dx = +d`, `dy = 0`.
+   */
+  private _computeRaiseOffset(index: number): { x: number; y: number } {
+    const d = this.selectionLift;
+    if (d <= 0) return { x: 0, y: 0 };
+    if (this.layoutDirection === 'vertical') {
+      return { x: d, y: 0 };
+    }
+    const sprite = this.sprites[index];
+    const rotation = sprite ? ((sprite as any).rotation ?? 0) : 0;
+    return { x: d * Math.sin(rotation), y: -d * Math.cos(rotation) };
+  }
+
+  /**
+   * Apply the selection-raise offset to a single card sprite (plus its
+   * tint overlay and label so they stay attached). The raise animates
+   * with a short tween unless reduced-motion is active or `animate` is
+   * false (used by layout updates and live slider changes).
+   */
+  private _applyRaiseForIndex(index: number, animate: boolean): void {
+    const sprite = this.sprites[index];
+    if (!sprite || !(sprite as any).active) return;
+    const base = this._basePositions[index];
+    if (!base) return;
+
+    const offset = this._isCardSelected(index) ? this._computeRaiseOffset(index) : { x: 0, y: 0 };
+    const targetX = base.x + offset.x;
+    const targetY = base.y + offset.y;
+
+    // No-op when the sprite is already at the target position.
+    if (
+      Math.abs(((sprite as any).x ?? 0) - targetX) < 0.5 &&
+      Math.abs(((sprite as any).y ?? 0) - targetY) < 0.5
+    ) {
+      return;
+    }
+
+    const targets: any[] = [sprite];
+    if (this.labels[index]) targets.push(this.labels[index]);
+    const overlay = this._tintOverlays[index];
+    if (overlay && overlay.active) targets.push(overlay);
+
+    // Stop any in-flight raise tween so it cannot fight the new target.
+    this.scene.tweens.killTweensOf(targets);
+
+    if (this._reducedMotion || !animate) {
+      for (const t of targets) {
+        t.x = targetX;
+        t.y = targetY;
+      }
+    } else {
+      this.scene.tweens.add({
+        targets,
+        x: targetX,
+        y: targetY,
+        duration: 180,
+        ease: 'Quad.easeOut',
+      });
+    }
+  }
+
+  /**
+   * Apply the selection-raise offset to every card sprite.
+   *
+   * @param animate - When true the raise tweens on selection changes
+   *                  (unless reduced-motion); when false it applies
+   *                  instantly (layout updates, live slider changes).
+   */
+  private applySelectionRaise(animate: boolean): void {
+    if (this.sprites.length === 0) return;
+    for (let i = 0; i < this.sprites.length; i++) {
+      this._applyRaiseForIndex(i, animate);
     }
   }
 
@@ -1513,6 +1805,14 @@ export class HandView {
     if (!this._dragSourceRange) return;
     const { from, to } = this._dragSourceRange;
 
+    // Stop any in-flight selection-raise tween on the dragged sprites so
+    // it cannot fight the drag movement (the raised position is captured
+    // in _originalPositions by _storeOriginalPositions).
+    const dragSprites = this.sprites.slice(from, to + 1);
+    if (dragSprites.length > 0) {
+      this.scene.tweens.killTweensOf(dragSprites);
+    }
+
     // Lift selected cards (Y offset)
     for (let i = from; i <= to; i++) {
       const sprite = this.sprites[i];
@@ -1521,12 +1821,15 @@ export class HandView {
       }
     }
 
+    // Update overlay positions after lift
+    this._updateTintOverlayPositions();
+
     // Dim unselected cards above drag handle (only meaningful in vertical mode)
     if (this.layoutDirection === 'vertical') {
       for (let i = 0; i < from; i++) {
         const sprite = this.sprites[i];
         if (sprite && sprite.active) {
-          (sprite as any).setTint(this._dimTint);
+          this._setCardTint(i, this._dimTint);
         }
       }
     }
@@ -1553,6 +1856,9 @@ export class HandView {
         (sprite as any).y = this._originalPositions[i].y + this._dragLiftOffset + dy;
       }
     }
+
+    // Update overlay positions to stay aligned with dragged sprites
+    this._updateTintOverlayPositions();
   }
 
   /** Animate dragged cards back to original positions (snap-back on rejection). */
@@ -1654,6 +1960,9 @@ export class HandView {
         this._animateDragAccept();
       } else {
         this._animateSnapBack();
+        // Restore selection visuals (tint + raise) only when the card
+        // returns to the hand — an accepted drop keeps its drop position.
+        this._resetDragVisuals();
       }
 
       this.emit('dragend', {
@@ -1661,8 +1970,6 @@ export class HandView {
         targetPileIndex,
         accepted,
       });
-
-      this._resetDragVisuals();
     }
 
     this._dragSourceRange = null;

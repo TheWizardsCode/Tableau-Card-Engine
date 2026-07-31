@@ -74,6 +74,12 @@ describe('MainStreetLayoutAdapter', () => {
     expect(layout.logW).toBe(layout.challengeW);
   });
 
+  it('computes handCenterX from the street zone topCenter anchor', () => {
+    const layout = computeMainStreetLayoutWithSll();
+    // street topCenter.x = 0.3203125 * 1280 = 410, representing the midpoint of the left column
+    expect(layout.handCenterX).toBe(410);
+  });
+
   it('right column does not overlap with left-area sections horizontally', () => {
     const layout = computeMainStreetLayoutWithSll();
     // Right column starts at logX (960). Street grid ends at streetX + rowWidth (20 + 780 = 800).

@@ -21,7 +21,28 @@ function createMockTween(): Phaser.Tweens.Tween {
 /** Create a mock Phaser scene with a tweens.add spy and sound.play mock. */
 function createMockScene(): Phaser.Scene {
   tweenConfigs = [];
+  const destroyed: any[] = [];
+  const rectangles: any[] = [];
   return {
+    add: {
+      rectangle: vi.fn().mockImplementation((x: number, y: number, w: number, h: number, color: number) => {
+        const rect = {
+          x, y, width: w, height: h, color,
+          active: true,
+          setPosition: vi.fn().mockReturnThis(),
+          setOrigin: vi.fn().mockReturnThis(),
+          setDepth: vi.fn().mockReturnThis(),
+          setAlpha: vi.fn().mockReturnThis(),
+          setRotation: vi.fn().mockReturnThis(),
+          destroy: vi.fn().mockImplementation(() => {
+            rect.active = false;
+            destroyed.push(rect);
+          }),
+        };
+        rectangles.push(rect);
+        return rect;
+      }),
+    },
     tweens: {
       add: vi.fn((config: Phaser.Types.Tweens.TweenBuilderConfig) => {
         tweenConfigs.push(config);
@@ -31,6 +52,8 @@ function createMockScene(): Phaser.Scene {
     sound: {
       play: vi.fn(),
     },
+    _rectangles: rectangles,
+    _destroyed: destroyed,
   } as unknown as Phaser.Scene;
 }
 
@@ -38,6 +61,13 @@ function createMockScene(): Phaser.Scene {
 function createMockTarget(x = 100): Phaser.GameObjects.Image {
   return {
     x,
+    displayWidth: 96,
+    displayHeight: 130,
+    width: 96,
+    height: 130,
+    originX: 0.5,
+    originY: 0.5,
+    depth: 0,
     setTint: vi.fn(),
     clearTint: vi.fn(),
     setX: vi.fn(),
@@ -110,6 +140,7 @@ describe('shakeIllegalMove', () => {
     (tweenConfigs[0].onComplete as Function)();
 
     expect(onComplete).toHaveBeenCalledOnce();
+    // clearTint and setX are still called; destroy on the overlay is also called
     expect(callOrder).toEqual(['clearTint', 'setX', 'onComplete']);
   });
 

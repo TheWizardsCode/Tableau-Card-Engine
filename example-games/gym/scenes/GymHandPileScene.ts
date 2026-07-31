@@ -86,6 +86,9 @@ export class GymHandPileScene extends GymSceneBase {
   private readonly ARC_SLIDER_WIDTH = 150;
   private readonly ARC_RADIUS_DEFAULT = 150;
   private readonly ROTATION_DEGREES_DEFAULT = 25;
+  // Selection-raise slider bounds — raise defaults to 60px (max 180px)
+  private readonly RAISE_DEFAULT = 60;
+  private readonly RAISE_MAX = 180;
   // Cascade / vertical layout state
   private readonly CASCADE_SPACING = 42;
   private readonly CASCADE_X = GAME_W / 2;
@@ -97,6 +100,7 @@ export class GymHandPileScene extends GymSceneBase {
   private arcSlider!: Slider;
   private spacingSlider!: Slider;
   private rotationSlider!: Slider;
+  private raiseSlider!: Slider;
 
   // Discard animation mode
   private discardMode: 'shrink' | 'animate' = 'animate';
@@ -105,8 +109,9 @@ export class GymHandPileScene extends GymSceneBase {
   // Discard pile face-up display state
   private faceUpLabel!: Phaser.GameObjects.Text;
 
-  // Drag-and-drop demo state
-  private dragEnabled: boolean = false;
+  // Drag-and-drop demo state — enabled by default so the primary
+  // interaction (drag to discard) is available immediately.
+  private dragEnabled: boolean = true;
   private dragLabel!: Phaser.GameObjects.Text;
   private dragButton!: Phaser.GameObjects.Text;
 
@@ -210,7 +215,7 @@ export class GymHandPileScene extends GymSceneBase {
       },
       {
         heading: 'Controls',
-        body: '[ Draw ]: Deal a card from the deck to the hand with an arc animation. Demonstrates animateAddCard().\n[ Discard ]: Discard the selected card to the discard pile (animates based on mode).\n[ Recall ]: Move the top card of the discard pile back to the hand.\n[ Flip ]: Flip the selected card (two-phase scale animation).\n[ Move ]: Tween the selected card to a display area. Demonstrates moveGameObject().\n[ Cancel Move ]: Cancel an active move tween and return the card to the hand.\n[ Show Valid ]: Highlight deck and discard zones as valid drop targets using HighlightManager.\n[ Show Illegal ]: Trigger an illegal-move shake animation on the selected card.\n[ Select Next ]: Cycle forward through cards in the hand.\n[ Sort Hand ]: Sort hand by suit then rank.\n[ Shuffle Hand ]: Randomly shuffle the hand.\n[ Reset ]: Shuffle a fresh deck and deal a new starting hand.\n[ Enable Drag ] / [ Disable Drag ]: Toggle drag-and-drop mode. When enabled, drag a card from hand to the discard pile.\n[ Toggle Discard Mode ]: Switch between animate (move+flip to discard pile, default) and shrink (fade+shrink in place).\n[ Toggle Face Up ]: Toggle the discard pile between face-up and face-down display. The order of cards is preserved — only the visible face changes.\nArc slider: Adjust hand curvature live (0 = straight, 200 = maximum arc).\nSpacing slider: Adjust gap between cards in the hand.\nRotation slider: Adjust maximum rotation angle for cards at the edges of an arc layout.\n[ Toggle Layout ]: Switch between horizontal row and vertical cascade layout.'
+        body: '[ Draw ]: Deal a card from the deck to the hand with an arc animation. Demonstrates animateAddCard().\n[ Discard ]: Discard the selected card to the discard pile (animates based on mode).\n[ Recall ]: Move the top card of the discard pile back to the hand.\n[ Flip ]: Flip the selected card (two-phase scale animation).\n[ Move ]: Tween the selected card to a display area. Demonstrates moveGameObject().\n[ Cancel Move ]: Cancel an active move tween and return the card to the hand.\n[ Show Valid ]: Highlight deck and discard zones as valid drop targets using HighlightManager.\n[ Show Illegal ]: Trigger an illegal-move shake animation on the selected card.\n[ Select Next ]: Cycle forward through cards in the hand.\n[ Sort Hand ]: Sort hand by suit then rank.\n[ Shuffle Hand ]: Randomly shuffle the hand.\n[ Reset ]: Shuffle a fresh deck and deal a new starting hand.\n[ Disable Drag ] / [ Enable Drag ]: Toggle drag-and-drop mode (ON by default). When enabled, drag a card from hand to the discard pile. When disabled, click a card to select it, then click the discard pile to discard it.\n[ Toggle Discard Mode ]: Switch between animate (move+flip to discard pile, default) and shrink (fade+shrink in place).\n[ Toggle Face Up ]: Toggle the discard pile between face-up and face-down display. The order of cards is preserved — only the visible face changes.\nArc slider: Adjust hand curvature live (0 = straight, 200 = maximum arc).\nSpacing slider: Adjust gap between cards in the hand.\nRotation slider: Adjust maximum rotation angle for cards at the edges of an arc layout.\nRaise slider: Adjust how far the selected card lifts out of the hand (default 60px, max 180px; 0 = off). The raise follows the card rotation in arc layout (straight up at 0°); in vertical cascade the selected card shifts right by the slider amount.\n[ Toggle Layout ]: Switch between horizontal row and vertical cascade layout.'
       },
       {
         heading: 'Usage Example',
@@ -218,36 +223,45 @@ export class GymHandPileScene extends GymSceneBase {
       },
       {
         heading: 'Test Plan',
-        body: '1. Press [ Draw ] → card animates from deck to hand, event log confirms\n2. Press [ Select Next ] twice → second card selected, log shows selection\n3. Press [ Discard ] → selected card animates to discard pile (animate mode by default)\n4. Press [ Recall ] → card returns from discard to hand\n5. Press [ Flip ] → selected card flips face-down then face-up\n6. Press [ Show Valid ] → green highlights appear on deck and discard zones\n7. Press [ Show Illegal ] → selected card shakes if one is selected\n8. Press [ Toggle Discard Mode ] → switches to shrink mode\n9. Press [ Discard ] → card fades+shrinks in place (shrink mode)\n10. Press [ Toggle Discard Mode ] → switches back to animate mode\n11. Press [ Enable Drag ] → drag a card from hand to discard pile, verify log shows acceptance\n12. Adjust Arc slider → hand curvature changes live\n13. Press [ Toggle Layout ] → layout switches between horizontal and vertical cascade\n14. Press [ Toggle Face Up ] → discard pile shows face-down; press again → face-up\n15. Press [ Reset ] → new hand dealt, all state cleared, face-up state resets to face-up'
+        body: '1. Press [ Draw ] → card animates from deck to hand, event log confirms\n2. Press [ Select Next ] twice → second card selected, log shows selection\n3. Press [ Discard ] → selected card animates to discard pile (animate mode by default)\n4. Press [ Recall ] → card returns from discard to hand\n5. Press [ Flip ] → selected card flips face-down then face-up\n6. Press [ Show Valid ] → green highlights appear on deck and discard zones\n7. Press [ Show Illegal ] → selected card shakes if one is selected\n8. Press [ Toggle Discard Mode ] → switches to shrink mode\n9. Press [ Discard ] → card fades+shrinks in place (shrink mode)\n10. Press [ Toggle Discard Mode ] → switches back to animate mode\n11. Verify drag is ON by default → drag a card from hand to discard pile, verify log shows acceptance\n12. Press [ Disable Drag ] → drag off; click a card then the discard pile to discard it\n13. Adjust Arc slider → hand curvature changes live\n14. Press [ Toggle Layout ] → layout switches between horizontal and vertical cascade\n15. Press [ Toggle Face Up ] → discard pile shows face-down; press again → face-up\n16. Adjust Raise slider → selected card lifts out of the hand (horizontal: straight up at 0° rotation); select an edge card and verify the raise follows the rotation; switch to vertical cascade and verify the selected card shifts right\n17. Press [ Reset ] → new hand dealt, all state cleared, raise resets to the 60px default, face-up state resets to face-up'
       }
     ]);
 
     const cx = GAME_W / 2;
 
-    // Controls rows 1 + 2 (wrapping)
+    // Controls row 1 — 12 action buttons spread across left/center/right
+    // zones so they all fit on a single row (no vertical wrapping).
     this.initButtonBar(60);
-    this.buttonBar!.addButton('[ Draw ]', () => this.drawToHand(), { zone: 'center' });
-    this.buttonBar!.addButton('[ Discard ]', () => this.discardSelected(), { zone: 'center' });
-    this.buttonBar!.addButton('[ Recall ]', () => this.recallFromDiscard(), { zone: 'center' });
-    this.buttonBar!.addButton('[ Flip ]', () => this.flipSelected(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Draw ]', () => this.drawToHand(), { zone: 'left' });
+    this.buttonBar!.addButton('[ Discard ]', () => this.discardSelected(), { zone: 'left' });
+    this.buttonBar!.addButton('[ Recall ]', () => this.recallFromDiscard(), { zone: 'left' });
+    this.buttonBar!.addButton('[ Flip ]', () => this.flipSelected(), { zone: 'left' });
     this.buttonBar!.addButton('[ Move ]', () => this.moveSelectedCard(), { zone: 'center' });
     this.buttonBar!.addButton('[ Cancel Move ]', () => this.cancelMove(), { zone: 'center' });
     this.buttonBar!.addButton('[ Show Valid ]', () => this.showValidMoves(), { zone: 'center' });
     this.buttonBar!.addButton('[ Show Illegal ]', () => this.showIllegalMove(), { zone: 'center' });
-    this.buttonBar!.addButton('[ Select Next ]', () => this.selectNext(), { zone: 'center' });
-    this.buttonBar!.addButton('[ Sort Hand ]', () => this.sortHand(), { zone: 'center' });
-    this.buttonBar!.addButton('[ Shuffle Hand ]', () => this.shuffleHand(), { zone: 'center' });
-    this.buttonBar!.addButton('[ Reset ]', () => this.reset(), { zone: 'center' });
+    this.buttonBar!.addButton('[ Select Next ]', () => this.selectNext(), { zone: 'right' });
+    this.buttonBar!.addButton('[ Sort Hand ]', () => this.sortHand(), { zone: 'right' });
+    this.buttonBar!.addButton('[ Shuffle Hand ]', () => this.shuffleHand(), { zone: 'right' });
+    this.buttonBar!.addButton('[ Reset ]', () => this.reset(), { zone: 'right' });
 
-    // Controls row 3 — Drag-and-drop demo and discard mode toggle
-    const row3Y = 112;
-    this.initButtonBar(row3Y);
-    this.dragButton = this.buttonBar!.addButton('[ Enable Drag ]', () => this.toggleDrag(), { zone: 'center' });
-    this.dragLabel = createHudText(this, cx - 250, row3Y, 'Drag: off  (click card, then drag to discard)', '#777777', { fontSize: '11px' }).setOrigin(0, 0.5);
+    // Controls row 2 — mode toggles spread across zones on a single row.
+    const row2Y = 112;
+    this.initButtonBar(row2Y);
+    this.dragButton = this.buttonBar!.addButton('[ Disable Drag ]', () => this.toggleDrag(), { zone: 'left' });
     this.buttonBar!.addButton('[ Toggle Discard Mode ]', () => this.toggleDiscardMode(), { zone: 'center' });
-    this.discardModeLabel = createHudText(this, cx + 190, row3Y, 'Discard: animate', '#88ff88', { fontSize: '11px' }).setOrigin(0, 0.5);
-    this.buttonBar!.addButton('[ Toggle Face Up ]', () => this.toggleDiscardFaceUp(), { zone: 'center' });
-    this.faceUpLabel = createHudText(this, cx + 470, row3Y, 'Face: up', '#88ff88', { fontSize: '11px' }).setOrigin(0, 0.5);
+    this.buttonBar!.addButton('[ Toggle Face Up ]', () => this.toggleDiscardFaceUp(), { zone: 'right' });
+    this.buttonBar!.addButton('[ Toggle Layout ]', () => this.toggleLayoutDirection(), { zone: 'right' });
+
+    // Status/info line below the buttons — never overlaps the buttons.
+    const infoY = 134;
+    this.dragLabel = createHudText(this, 170, infoY, 'Drag: ON  (drag card to the discard pile)', '#88ff88', { fontSize: '11px' }).setOrigin(0, 0.5);
+    this.discardModeLabel = createHudText(this, 560, infoY, 'Discard: animate', '#88ff88', { fontSize: '11px' }).setOrigin(0, 0.5);
+    this.faceUpLabel = createHudText(this, 740, infoY, 'Face: up', '#88ff88', { fontSize: '11px' }).setOrigin(0, 0.5);
+    this.layoutLabel = createHudText(this, 960, infoY, 'Layout: horizontal', '#88ff88', { fontSize: '12px' }).setOrigin(0, 0.5);
+
+    // Apply the default drag state (ON) so HandView is configured before use
+    this.applyDragState();
 
     createHudText(this, cx, 147, '── Event Log ──', '#669966', { fontSize: '12px' }).setOrigin(0.5);
 
@@ -260,6 +274,7 @@ export class GymHandPileScene extends GymSceneBase {
     const arcSliderX = startX;
     const spacingSliderX = startX + sliderWidth + sliderHorizGap;
     const rotationSliderX = startX + 2 * (sliderWidth + sliderHorizGap);
+    const raiseSliderX = startX + 3 * (sliderWidth + sliderHorizGap);
 
     this.arcSlider = new Slider(this, arcSliderX, sliderY, {
       initialValue: this.ARC_RADIUS_DEFAULT,
@@ -300,10 +315,20 @@ export class GymHandPileScene extends GymSceneBase {
       this.handView.setMaxRotationDegrees(value);
     };
 
-    // Toggle button and layout label — placed alongside the sliders
-    this.initButtonBar(sliderY - 4);
-    this.buttonBar!.addButton('[ Toggle Layout ]', () => this.toggleLayoutDirection(), { zone: 'left' });
-    this.layoutLabel = createHudText(this, startX + 3 * (sliderWidth + sliderHorizGap) + 175, sliderY, 'Layout: horizontal', '#88ff88', { fontSize: '12px' });
+    // Selection-raise slider — lifts the selected card out of the hand
+    // along its rotation. Stays visible in both layouts (vertical mode
+    // shifts the selected card right by the same amount).
+    this.raiseSlider = new Slider(this, raiseSliderX, sliderY, {
+      initialValue: this.RAISE_DEFAULT,
+      minValue: 0,
+      maxValue: this.RAISE_MAX,
+      label: 'Raise',
+      width: sliderWidth,
+      textColor: '#88ff88',
+    });
+    this.raiseSlider.onValueChange = (value: number) => {
+      this.handView.setSelectionLift(value);
+    };
 
     // Sliders self-manage their own pointermove/pointerup listeners,
     // registering only when actively dragged and unregistering on pointerup.
@@ -631,10 +656,14 @@ export class GymHandPileScene extends GymSceneBase {
       return;
     }
 
-    // Store original position and index so Cancel Move can return the card
+    // Store original position and index so Cancel Move can return the card.
+    // Use the hand's base (un-raised) position: the sprite's current x/y
+    // includes the selection-raise offset, which would return the card to
+    // a raised position instead of its true resting spot in the hand.
     this.movedCardIndex = this.selectedIdx;
-    this.movedCardOrigX = (sprite as any).x;
-    this.movedCardOrigY = (sprite as any).y;
+    const basePos = this.handView.getBasePosition(this.selectedIdx);
+    this.movedCardOrigX = basePos ? basePos.x : (sprite as any).x;
+    this.movedCardOrigY = basePos ? basePos.y : (sprite as any).y;
     this.cardMoved = true;
 
     const destX = GAME_W / 2 + 200;
@@ -668,6 +697,14 @@ export class GymHandPileScene extends GymSceneBase {
 
     // If a card was moved, return it to its original hand position
     if (this.cardMoved && this.movedCardIndex >= 0) {
+      // Clear the selection first: applySelectionRaise() kills any
+      // in-flight selection-raise tween and returns the card to its base
+      // position. Clearing selection also prevents the raise offset from
+      // being re-applied on top of the return tween, so the card ends up
+      // exactly at its original hand position.
+      this.selectedIdx = -1;
+      this.handView.setSelected(null);
+
       const sprite = this.handView.getSpriteAt(this.movedCardIndex);
       if (sprite) {
         if (this.reducedMotion) {
@@ -734,9 +771,23 @@ export class GymHandPileScene extends GymSceneBase {
 
     if (target) {
       if (this.reducedMotion) {
+        // Use both setTint (WebGL) and overlay (Canvas) for renderer compatibility
         (target as any).setTint(0xff4444);
+        const tgt = target as any;
+        const overlayW = tgt.displayWidth ?? tgt.width ?? 96;
+        const overlayH = tgt.displayHeight ?? tgt.height ?? 130;
+        const tintOverlay = this.add.rectangle(
+          tgt.x, tgt.y,
+          overlayW, overlayH,
+          0xff4444,
+        )
+          .setAlpha(0.4)
+          .setOrigin(tgt.originX ?? 0.5, tgt.originY ?? 0.5)
+          .setRotation(tgt.rotation ?? 0)
+          .setDepth((tgt.depth ?? 0) + 0.1);
         this.time?.delayedCall(200, () => {
           try { (target as any).clearTint(); } catch (_) { /* ignore */ }
+          tintOverlay.destroy();
         });
         this.logEvent('Illegal move (brief tint, reduced-motion)');
       } else {
@@ -795,6 +846,10 @@ export class GymHandPileScene extends GymSceneBase {
     // Reset rotation slider to default
     this.rotationSlider.setValue(this.ROTATION_DEGREES_DEFAULT);
     this.handView.setMaxRotationDegrees(this.ROTATION_DEGREES_DEFAULT);
+
+    // Reset selection-raise slider to default (raise off)
+    this.raiseSlider.setValue(this.RAISE_DEFAULT);
+    this.handView.setSelectionLift(this.RAISE_DEFAULT);
 
     // Reset face-up state to face-up
     this.discardView.setFaceUp(true);
@@ -878,6 +933,16 @@ export class GymHandPileScene extends GymSceneBase {
   /** Toggle drag-and-drop mode on/off. */
   private toggleDrag(): void {
     this.dragEnabled = !this.dragEnabled;
+    this.applyDragState();
+  }
+
+  /**
+   * Apply the current dragEnabled state to HandView and the demo UI.
+   *
+   * When enabled, cards are draggable to the discard pile. When disabled,
+   * the scene restores click-to-select + click-discard-pile behaviour.
+   */
+  private applyDragState(): void {
     this.handView.setDragEnabled(this.dragEnabled);
 
     if (this.dragEnabled) {
@@ -889,12 +954,12 @@ export class GymHandPileScene extends GymSceneBase {
       this.logEvent('Drag mode ON — cards are draggable to the discard pile');
     } else {
       this.dragButton.setText('[ Enable Drag ]');
-      this.dragLabel.setText('Drag: off  (click card, then drag to discard)');
+      this.dragLabel.setText('Drag: off  (click card, then click discard pile)');
       this.dragLabel.setColor('#777777');
       this.handView.setDragValidator(null);
       this.handView.setSelected(null);
       this.clearHighlights();
-      this.logEvent('Drag mode OFF — restored click-to-select behavior');
+      this.logEvent('Drag mode OFF — click a card, then click the discard pile to discard');
     }
   }
 
@@ -1029,6 +1094,7 @@ export class GymHandPileScene extends GymSceneBase {
     try { this.arcSlider?.destroy(); } catch (_) { /* ignore */ }
     try { this.spacingSlider?.destroy(); } catch (_) { /* ignore */ }
     try { this.rotationSlider?.destroy(); } catch (_) { /* ignore */ }
+    try { this.raiseSlider?.destroy(); } catch (_) { /* ignore */ }
 
     // Destroy UI view components (HandView and PileView both have
     // destroy() that cleans up sprites, labels, and event listeners)

@@ -393,6 +393,49 @@ describe('LostCitiesAiPlayer', () => {
     // Either color is fine — the key test is that yellow isn't
     // penalized more than blue (no draw history after reset)
   });
+
+  // ── CardMemoryTracker integration ────────────────────────
+
+  it('should have a memory tracker with maxCopies=12 (5 colors × 12 cards)', () => {
+    const ai = new LostCitiesAiPlayer();
+    expect(ai.memoryTracker).toBeDefined();
+    expect(ai.memoryTracker.getSkill()).toBe(80);
+  });
+
+  it('should record discarded cards grouped by expedition color', () => {
+    const ai = new LostCitiesAiPlayer(GreedyStrategy, createSeededRng(42));
+
+    ai.recordDiscard(makeNumbered('yellow', 5, 1));
+    ai.recordDiscard(makeNumbered('yellow', 8, 2));
+    ai.recordDiscard(makeNumbered('red', 3, 3));
+
+    const counts = ai.memoryTracker.getVisibleRanks(createSeededRng(42));
+    // Grouping key is the expedition color
+    expect(counts['yellow']).toBe(2);
+    expect(counts['red']).toBe(1);
+  });
+
+  it('should record investment cards by color as well', () => {
+    const ai = new LostCitiesAiPlayer(GreedyStrategy, createSeededRng(42));
+
+    ai.recordDiscard(makeInvestment('blue', 1, 1));
+    ai.recordDiscard(makeInvestment('blue', 2, 2));
+
+    const counts = ai.memoryTracker.getVisibleRanks(createSeededRng(42));
+    expect(counts['blue']).toBe(2);
+  });
+
+  it('should expose recorded counts through getVisibleRanks', () => {
+    const ai = new LostCitiesAiPlayer(GreedyStrategy, createSeededRng(42));
+
+    ai.recordDiscard(makeNumbered('green', 4, 1));
+    ai.recordDiscard(makeNumbered('green', 6, 2));
+    ai.recordDiscard(makeNumbered('white', 9, 3));
+
+    const counts = ai.memoryTracker.getVisibleRanks(createSeededRng(42));
+    expect(Object.keys(counts)).toContain('green');
+    expect(Object.keys(counts)).toContain('white');
+  });
 });
 
 // ═══════════════════════════════════════════════════════════
