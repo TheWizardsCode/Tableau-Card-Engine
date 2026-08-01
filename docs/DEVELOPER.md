@@ -12,6 +12,7 @@ This document covers everything you need to develop, test, and build the Tableau
 - [Project Structure](#project-structure)
 - [Path Aliases](#path-aliases)
 - [Adding an Example Game](#adding-an-example-game)
+- [Hand & Pile Rendering](#hand--pile-rendering)
 - [Example Games](#example-games)
 - [Transcript Persistence](#transcript-persistence)
 - [Replay Tool](#replay-tool)
@@ -525,6 +526,19 @@ When migrating an existing game to the canonical pattern:
     - Generate and commit the thumbnail at `public/assets/games/<game-name>/thumbnail.png` using `./scripts/refresh-thumbnails.sh <game-name>`
 
 Follow the Golf (original reference) and Sushi Go (most recent) examples as reference implementations.
+
+## Hand & Pile Rendering
+
+**Requirement:** Example games **must** render hands and piles through the core engine's hand-management code — `HandView`, `PileView`, and related helpers such as `flipCard()`. Hand-rolling card rows with manual sprite arrays and hardcoded positioning is not an accepted pattern; using the shared components means engine improvements (animations, reduced-motion fallbacks, DPR-aware textures, selection) propagate to every game automatically.
+
+**Exception carve-outs:** Layouts that genuinely don't fit the single-row `HandView` model may keep bespoke card rendering, but the exception must be documented in code comments and/or the scene's help text:
+
+- **Golf** — the 3×3 tableau grid (exception note in `example-games/golf/scenes/GolfRenderer.ts`); its stock/discard piles still use `PileView`.
+- **Feudalism** — token/crop counters via `CropIconRenderer` (non-card tokens, not a hand).
+
+**Canonical reference:** `example-games/blackjack/scenes/BlackjackScene.ts` — migrated to two SLL-anchored `HandView` instances with `centerX` row anchoring and a `flipCard()`-based hole-card reveal; its browser tests (`tests/blackjack/BlackjackHandView.browser.test.ts`) verify the rendering path.
+
+For non-standard card models (tokens, resource icons, expedition cards), use the `CardTextureResolver` / `renderCard` callbacks documented in the [UI Adapter Guide](ui/ADAPTER-GUIDE.md). See the [Gym scene index](gym/GYM_INDEX.md) for the complete HandView/PileView scene-to-API mapping.
 
 ## Example Games
 
