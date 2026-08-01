@@ -21,6 +21,10 @@ import {
   type CommunitySpaceCard,
   type BusinessCard,
 } from '../../example-games/main-street/MainStreetCards';
+import {
+  resolveDescription,
+} from '../../example-games/main-street/MainStreetFormatting';
+import { MEDIUM_PRESET } from '../../example-games/main-street/MainStreetDifficulty';
 
 // ── Deck Data ────────────────────────────────────────────────
 
@@ -29,6 +33,15 @@ const businessDeck = createBusinessDeck(1);
 const upgradeDeck = createUpgradeDeck(1);
 
 // ── Helpers ─────────────────────────────────────────────────
+
+/**
+ * Resolves a card description the same way the renderer does: the
+ * {SYNERGY_RATE} token is substituted with the effective percentage for the
+ * active difficulty (Medium here, matching the default game config).
+ */
+function resolvedDescription(card: CommunitySpaceCard | BusinessCard): string {
+  return resolveDescription(card.description, card, MEDIUM_PRESET);
+}
 
 /**
  * Builds the tooltip info string for a community space card, mimicking the
@@ -46,7 +59,7 @@ function buildCommunitySpaceTooltip(card: CommunitySpaceCard): string {
     `Cost: ${card.cost}`,
     `Income: +${income}/turn${ongoingInfo}${repInfo}`,
     `Synergy: ${card.synergyTypes.join('/')}`,
-    card.description ?? '',
+    resolvedDescription(card),
   ].join('\n');
 }
 
@@ -61,7 +74,7 @@ function buildBusinessTooltip(card: BusinessCard): string {
     `Cost: ${card.cost}`,
     `Income: +${income}/turn`,
     `Synergy: ${card.synergyTypes.join('/')}`,
-    card.description ?? '',
+    resolvedDescription(card),
   ].join('\n');
 }
 
@@ -158,7 +171,8 @@ describe('Community space card tooltip content (AC2)', () => {
     expect(tooltip).toContain('Cost: 3');
     expect(tooltip).toContain('Income: +0');
     expect(tooltip).toContain('Synergy: Culture');
-    expect(tooltip).toContain(park!.description);
+    expect(tooltip).toContain(resolvedDescription(park!));
+    expect(tooltip).toContain('Gains 50% of base income');
   });
 
   it('builds a tooltip for Library with name and stats', () => {
@@ -172,7 +186,7 @@ describe('Community space card tooltip content (AC2)', () => {
     expect(tooltip).toContain('Cost:');
     expect(tooltip).toContain('Income:');
     expect(tooltip).toContain('Synergy:');
-    expect(tooltip).toContain(library!.description);
+    expect(tooltip).toContain(resolvedDescription(library!));
   });
 
   it('Library tooltip includes an ongoing-cost line', () => {
@@ -218,10 +232,12 @@ describe('Community space card tooltip content (AC2)', () => {
     }
   });
 
-  it('tooltip includes description text', () => {
+  it('tooltip includes resolved description text', () => {
     for (const card of communitySpaceDeck) {
       const tooltip = buildCommunitySpaceTooltip(card);
-      expect(tooltip).toContain(card.description);
+      expect(tooltip).toContain(resolvedDescription(card));
+      // Tokenized synergy descriptions must not leak the raw token.
+      expect(tooltip).not.toContain('{SYNERGY_RATE}');
     }
   });
 

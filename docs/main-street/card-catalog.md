@@ -55,10 +55,10 @@ Business cards are placed on the 10-slot street grid. Each generates base income
 
 | ID | Name | Cost | Income | Synergy | Upgrade Path | Description | Rationale |
 |----|------|------|--------|---------|--------------|-------------|-----------|
-| `biz-bakery` | Bakery | 3 | 2 | Food | Bakery | Warm pastries. +1/adj Food. | Affordable Food starter. |
-| `biz-diner` | Diner | 4 | 3 | Food | Diner | Quick meals. +1/adj Food. | Higher-cost, higher-income Food option. |
-| `biz-bookshop` | Bookshop | 4 | 2 | Culture | Bookshop | Sells books. +1/adj Culture. | Mid-cost Culture business. |
-| `biz-hardware` | Hardware Store | 5 | 3 | Commerce | Hardware Store | Supplies tools. +1/adj Commerce. | M1's only Commerce card; expensive but strong income. |
+| `biz-bakery` | Bakery | 3 | 2 | Food | Bakery | Warm pastries. Gains 50% of base income per adjacent Food business (scales with difficulty). | Affordable Food starter. |
+| `biz-diner` | Diner | 4 | 3 | Food | Diner | Quick meals. Gains 50% of base income per adjacent Food business (scales with difficulty). | Higher-cost, higher-income Food option. |
+| `biz-bookshop` | Bookshop | 4 | 2 | Culture | Bookshop | Sells books. Gains 50% of base income per adjacent Culture business (scales with difficulty). | Mid-cost Culture business. |
+| `biz-hardware` | Hardware Store | 5 | 3 | Commerce | Hardware Store | Supplies tools. Gains 50% of base income per adjacent Commerce business (scales with difficulty). | M1's only Commerce card; expensive but strong income. |
 
 Park has been reclassified as a **Community Space** card (see below).
 
@@ -68,30 +68,30 @@ Park has been reclassified as a **Community Space** card (see below).
 
 | ID | Name | Cost | Income | Synergy | Upgrade Path | Description | Rationale |
 |----|------|------|--------|---------|--------------|-------------|-----------|
-| `biz-pawnshop` | Pawn Shop | 3 | 2 | Commerce | Pawn Shop | Second-hand goods. +1/adj Commerce. | Budget Commerce option; makes Commerce synergies viable. |
-| `biz-boutique` | Boutique | 4 | 2 | Commerce | Boutique | Curated fashion. +1/adj Commerce. | Mid-tier Commerce; distinct flavour from Hardware Store. |
+| `biz-pawnshop` | Pawn Shop | 3 | 2 | Commerce | Pawn Shop | Second-hand goods. Does not provide or receive synergy bonuses. | Budget Commerce option; makes Commerce synergies viable. |
+| `biz-boutique` | Boutique | 4 | 2 | Commerce | Boutique | Curated fashion. Gains 50% of base income per adjacent Commerce business (scales with difficulty). | Mid-tier Commerce; distinct flavour from Hardware Store. |
 
 #### Service (new synergy type)
 
 | ID | Name | Cost | Income | Synergy | Upgrade Path | Description | Rationale |
 |----|------|------|--------|---------|--------------|-------------|-----------|
-| `biz-laundromat` | Laundromat | 3 | 2 | Service | Laundromat | Self-serve laundry. +1/adj Service. | Budget Service entry point. |
-| `biz-barbershop` | Barbershop | 3 | 2 | Service | Barbershop | Classic cuts. +1/adj Service. | Pairs with Laundromat for early Service cluster. |
+| `biz-laundromat` | Laundromat | 3 | 2 | Service | Laundromat | Self-serve laundry. Gains 50% of base income per adjacent Service business (scales with difficulty). | Budget Service entry point. |
+| `biz-barbershop` | Barbershop | 3 | 2 | Service | Barbershop | Classic cuts. Gains 100% of base income per adjacent Service business (scales with difficulty). | Pairs with Laundromat for early Service cluster. |
 
 #### Health (new synergy type)
 
 | ID | Name | Cost | Income | Synergy | Upgrade Path | Description | Rationale |
 |----|------|------|--------|---------|--------------|-------------|-----------|
 | `biz-clinic` | Clinic | 10 | 0 (rep +0.2/turn) | Health | Clinic | Walk-in medical care. Provides +0.2 rep/turn. | Non-profit community health provider; reputation instead of income. |
-| `biz-private-clinic` | Private Clinic | 8 | 2 | Health | Private Clinic | Private medical practice. Gains +1 coin per adjacent Health business. | For-profit counterpart to Clinic; income-focused. |
-| `biz-pharmacy` | Pharmacy | 6 | 1 | Health | — | Provides essential medications. Gains +1 coin per adjacent Health business. | Standalone Health card (no upgrade). |
+| `biz-private-clinic` | Private Clinic | 8 | 2 | Health | Private Clinic | Private medical practice. Gains 50% of base income per adjacent Health business (scales with difficulty). | For-profit counterpart to Clinic; income-focused. |
+| `biz-pharmacy` | Pharmacy | 6 | 1 | Health | — | Provides essential medications. Gains 50% of base income per adjacent Health business (scales with difficulty). | Standalone Health card (no upgrade). |
 
 #### Entertainment (new synergy type)
 
 | ID | Name | Cost | Income | Synergy | Upgrade Path | Description | Rationale |
 |----|------|------|--------|---------|--------------|-------------|-----------|
-| `biz-arcade` | Arcade | 4 | 2 | Entertainment | Arcade | Retro fun. +1/adj Entertainment. | Mid-cost Entertainment starter. |
-| `biz-cinema` | Cinema | 5 | 3 | Entertainment | Cinema | Latest films. +1/adj Entertainment. | Premium Entertainment; anchors the type. |
+| `biz-arcade` | Arcade | 4 | 2 | Entertainment | Arcade | Retro fun. Gains 50% of base income per adjacent Entertainment business (scales with difficulty). | Mid-cost Entertainment starter. |
+| `biz-cinema` | Cinema | 5 | 3 | Entertainment | Cinema | Latest films. Gains 50% of base income per adjacent Entertainment business (scales with difficulty). | Premium Entertainment; anchors the type. |
 
 #### Multi-Synergy Bridge Cards
 
@@ -116,7 +116,7 @@ alongside business cards.
 
 | ID | Name | Cost | Income | Synergy | Upgrade Path | Description | Rationale |
 |----|------|------|--------|---------|--------------|-------------|-----------|
-| `cs-park` | Park | 4 | 0 | Culture | Park | Offers leisure space. +1/adj Culture. | Reclassified from M1 Business; cheapest community space; synergy filler. |
+| `cs-park` | Park | 4 | 0 | Culture | Park | Offers leisure space. Gains 50% of base income per adjacent Culture business or community space (scales with difficulty). | Reclassified from M1 Business; cheapest community space; synergy filler. |
 | `cs-library` | Library | 7 | 0 | Culture | Library | Quiet community space for reading and learning. Costs 0.25 coins/turn to run; +0.1 rep/turn. | Reputation asset: no income; small running cost for steady reputation. |
 
 ### Community Space Upgrades

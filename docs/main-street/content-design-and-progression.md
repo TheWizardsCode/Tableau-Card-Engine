@@ -9,11 +9,11 @@ The **Main Street** game uses three distinct card families. Below is the current
 ### 1.1 Business Cards
 | Name | Cost (coins) | Base Income (coins/turn) | Synergy Types | Upgrade Path | Description |
 |------|--------------|--------------------------|----------------|--------------|-------------|
-| Bakery | 3 | 2 | Food | Bakery → Patisserie | Provides warm pastries. Gains +1 coin for each adjacent Food business. |
-| Diner | 4 | 3 | Food | Diner → Bistro | Serves quick meals. Gains +1 coin per adjacent Food business. |
-| Bookshop | 4 | 2 | Culture | Bookshop → Reader's Café | Sells books. Gains +1 coin per adjacent Culture business. |
-| Park | 2 | 1 | Culture | Park → Garden | Offers leisure. Gains +1 coin per adjacent Culture business. |
-| Hardware Store | 5 | 3 | Commerce | Hardware Store → Home Improvement | Supplies tools. Gains +1 coin per adjacent Commerce business. |
+| Bakery | 3 | 2 | Food | Bakery → Patisserie | Provides warm pastries. Gains 50% of base income per adjacent Food business. |
+| Diner | 4 | 3 | Food | Diner → Bistro | Serves quick meals. Gains 50% of base income per adjacent Food business. |
+| Bookshop | 4 | 2 | Culture | Bookshop → Reader's Café | Sells books. Gains 50% of base income per adjacent Culture business. |
+| Park | 2 | 1 | Culture | Park → Garden | Offers leisure. Gains 50% of base income per adjacent Culture business or community space. |
+| Hardware Store | 5 | 3 | Commerce | Hardware Store → Home Improvement | Supplies tools. Gains 50% of base income per adjacent Commerce business. |
 | ... *(additional business cards may be added later)* |
 
 ### 1.2 Event Cards
