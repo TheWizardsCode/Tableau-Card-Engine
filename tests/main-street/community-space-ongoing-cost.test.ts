@@ -20,6 +20,7 @@ import {
 } from '../../example-games/main-street/MainStreetState';
 import {
   createCommunitySpaceDeck,
+  createBusinessDeck,
   createUpgradeDeck,
   type CommunitySpaceCard,
 } from '../../example-games/main-street/MainStreetCards';
@@ -28,6 +29,10 @@ import {
   processEndOfTurn,
 } from '../../example-games/main-street/MainStreetEngine';
 import { purchaseUpgrade } from '../../example-games/main-street/MainStreetMarket';
+import {
+  computeSynergyBonus,
+  computeSynergyRepBonus,
+} from '../../example-games/main-street/MainStreetAdjacency';
 
 // ── Helpers ─────────────────────────────────────────────────
 
@@ -57,9 +62,52 @@ describe('Library card stats (reputation asset)', () => {
     expect(library!.baseIncome).toBe(0);
     expect(library!.ongoingCost).toBe(0.25);
     expect(library!.reputationPerTurn).toBe(0.1);
-    expect(library!.synergyCoinBonus).toBeUndefined();
-    expect(library!.synergyRepBonus).toBeUndefined();
+    // Explicit 0/0 opts the card out of the synergy system (undefined would
+    // default to a 0.5 coin synergy rate and count toward neighbors' synergy).
+    expect(library!.synergyCoinBonus).toBe(0);
+    expect(library!.synergyRepBonus).toBe(0);
     expect(library!.cost).toBe(7);
+  });
+});
+
+// ── AC: Library synergy-neutral behavior ────────────────────
+
+describe('Library synergy neutrality (behavioral)', () => {
+  it('should receive no coin synergy from a matching Culture neighbor', () => {
+    const state = createTestState('library-no-coin-synergy');
+    const library = placeLibrary(state);
+    // Art Gallery is Culture|Entertainment — shares Culture with the Library
+    const gallery = createBusinessDeck(1).find(c => c.name === 'Art Gallery')!;
+    state.streetGrid[1] = gallery;
+
+    const slot = state.streetGrid.indexOf(library);
+    expect(computeSynergyBonus(state.streetGrid, slot)).toBe(0);
+  });
+
+  it('should receive no reputation synergy from a Culture neighbor with a rep bonus', () => {
+    const state = createTestState('library-no-rep-synergy');
+    const library = placeLibrary(state);
+    // Art Gallery has synergyRepBonus 0.1 — would feed rep synergy to a
+    // non-neutral Culture neighbor, but the Library opts out entirely.
+    const gallery = createBusinessDeck(1).find(c => c.name === 'Art Gallery')!;
+    expect(gallery.synergyRepBonus).toBe(0.1);
+    state.streetGrid[1] = gallery;
+
+    const slot = state.streetGrid.indexOf(library);
+    expect(computeSynergyRepBonus(state.streetGrid, slot)).toBe(0);
+  });
+
+  it('should not be counted toward a neighbor\'s synergy (does not contribute)', () => {
+    const state = createTestState('library-no-contribute');
+    // Cafe (Food|Culture, baseIncome 1) adjacent to the Library
+    const cafe = createBusinessDeck(1).find(c => c.name === 'Cafe')!;
+    const library = createCommunitySpaceDeck(1).find(c => c.name === 'Library')!;
+    state.streetGrid[0] = cafe;
+    state.streetGrid[1] = library;
+
+    // The Library is synergy-neutral, so it is not counted toward N —
+    // the Cafe earns no synergy from the adjacency.
+    expect(computeSynergyBonus(state.streetGrid, 0)).toBe(0);
   });
 });
 

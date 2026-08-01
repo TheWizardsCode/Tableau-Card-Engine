@@ -18,7 +18,7 @@ business,biz-clinic,Clinic,9,0,Health,Clinic,1,0.2,0.5,0.1,Walk-in medical care 
 business,biz-private-clinic,Private Clinic,14,2.5,Health,Private Clinic,1,,0.5,0.1,A private medical practice focused on profitability. Gains {SYNERGY_RATE} of base income per adjacent Health business.,4,,,,,,,,,,,,,,,,
 business,biz-pharmacy,Pharmacy,7,1,Health,,0,,,,Provides essential medications. Gains {SYNERGY_RATE} of base income per adjacent Health business.,4,,,,,,,,,,,,,,,,
 community-space,cs-park,Park,3,0,Culture,Park,1,,,,Offers leisure space. Gains {SYNERGY_RATE} of base income per adjacent Culture business or community space.,1,,,,,,,,,,,,,,,,
-community-space,cs-library,Library,7,0,Culture,Library,1,0.1,,,A quiet community space for reading and learning. Costs 0.25 coins per turn to run and provides +0.1 reputation per turn.,1,,,,,,,,,,,,,,,0.25,
+community-space,cs-library,Library,7,0,Culture,Library,1,0.1,0,0,A quiet community space for reading and learning. Costs 0.25 coins per turn to run and provides +0.1 reputation per turn.,1,,,,,,,,,,,,,,,0.25,
 event,evt-festival,Local Festival,3,,,,,,,,,1,Investment,+2 coins to all Culture businesses and +1 reputation.,SpecificSynergy,Culture,2,1,,,,,,,,,,
 event,evt-rainy,Rainy Day,0,,,,,,,,,1,Incident,-1 coin to all Food businesses this turn.,SpecificSynergy,Food,-1,0,,,,,,,,,,
 event,evt-tax,Tax Audit,0,,,,,,,,,1,Incident,Lose 3 coins.,All,,-3,0,,,,,,,,,,
