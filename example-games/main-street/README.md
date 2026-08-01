@@ -37,6 +37,31 @@ npx vitest run tests/main-street/MainStreetScene.browser.test.ts --project brows
 npx vitest run tests/e2e/replay-main-street.e2e.test.ts --project unit
 ```
 
+## Hand layout prediction (single source of truth)
+
+The player hand is rendered by `HandView` instances configured in
+`MainStreetRenderer.createContainers`:
+
+- `handBusinessView` — business cards bought to hand (centred on `handCenterX`, spacing `handCardW + 8`).
+- `handView` — the held investment event card (centred on `handCenterX`, spacing `handCardW + 10`).
+
+Market→hand buy-transfer animations target the **exact resting position** of the
+purchased card via `HandView.getInsertionPosition(insertIndex)` — the single
+source of truth for hand-layout prediction. This ensures the flying card lands
+precisely where it will be rendered (the hand is re-centred on `handCenterX`
+every time the hand size changes), instead of the old left-edge slot estimate
+that caused a visible sideways snap when the hand re-rendered.
+
+- `MainStreetScene.getBusinessHandInsertionPosition(insertIndex)` delegates to `handBusinessView`
+  (`MainStreetTurnController.onBusinessCardClick` uses it with the append index = current hand length).
+- `MainStreetScene.getEventHandInsertionPosition(insertIndex)` delegates to `handView`
+  (`MainStreetTurnController.onEventCardClick` uses it with index 0 for the single held event).
+- `MainStreetAnimator.getHandCardCenter()` is kept for backward compatibility only; buy transfers no
+  longer use it.
+
+Unit tests: `tests/main-street/buy-transfer-destination.test.ts` (destination equality for both buy
+paths) and `tests/ui/handView.test.ts` (`getInsertionPosition` matches the rendered/computed layout).
+
 ## Card Data CSV
 
 All card template data is defined in a single CSV file:

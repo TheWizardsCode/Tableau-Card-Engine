@@ -1,0 +1,308 @@
+/**
+ * Buy Transfer Destination Tests
+ *
+ * Verifies that market→hand buy transfer animations in Main Street target the
+ * exact resting position of the purchased card in the HandView layout (single
+ * source of truth), rather than the old left-edge slot estimate that caused
+ * the flying card to snap sideways when the hand re-rendered.
+ *
+ * Covers both buy paths:
+ *  - business cards bought to hand (`onBusinessCardClick`)
+ *  - investment events bought as the held event (`onEventCardClick`)
+ *
+ * @module tests/main-street/buy-transfer-destination
+ */
+
+import { describe, it, expect, vi, afterEach } from 'vitest';
+
+import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
+import { MainStreetTurnController } from '../../example-games/main-street/scenes/MainStreetTurnController';
+import { canPurchaseEvent } from '../../example-games/main-street/MainStreetMarket';
+import { HandView } from '../../src/ui/HandView';
+
+// ── Minimal Phaser mock (for real HandView instances) ──────
+// HandView uses scene.add.image(), scene.add.text(), scene.tweens.
+// This mirrors the mock in tests/ui/handView.test.ts.
+function createPhaserMock(): any {
+  const mockImage = (x: number, y: number, texture: string) => {
+    const img = {
+      x,
+      y,
+      texture: { key: texture },
+      active: true,
+      setInteractive: vi.fn().mockReturnThis(),
+      setTint: vi.fn().mockReturnThis(),
+      clearTint: vi.fn().mockReturnThis(),
+      setOrigin: vi.fn().mockReturnThis(),
+      setAlpha: vi.fn().mockReturnThis(),
+      setDepth: vi.fn().mockReturnThis(),
+      on: vi.fn().mockReturnThis(),
+      off: vi.fn().mockReturnThis(),
+      destroy: vi.fn(),
+      scaleX: 1,
+      scaleY: 1,
+      alpha: 1,
+      rotation: 0,
+      displayWidth: 48,
+      displayHeight: 65,
+    };
+    return img;
+  };
+
+  const mockText = (x: number, y: number, text: string, _style?: any) => {
+    const txt = {
+      x,
+      y,
+      text,
+      setOrigin: vi.fn().mockReturnThis(),
+      setTint: vi.fn().mockReturnThis(),
+      clearTint: vi.fn().mockReturnThis(),
+      setColor: vi.fn().mockReturnThis(),
+      setDepth: vi.fn().mockReturnThis(),
+      active: true,
+      destroy: vi.fn(),
+    };
+    return txt;
+  };
+
+  return {
+    add: {
+      image: vi.fn().mockImplementation(mockImage),
+      text: vi.fn().mockImplementation(mockText),
+      graphics: vi.fn().mockReturnValue({
+        fillStyle: vi.fn().mockReturnThis(),
+        fillRoundedRect: vi.fn().mockReturnThis(),
+        lineStyle: vi.fn().mockReturnThis(),
+        strokeRoundedRect: vi.fn().mockReturnThis(),
+        clear: vi.fn().mockReturnThis(),
+        destroy: vi.fn(),
+      }),
+      rectangle: vi.fn().mockReturnValue({
+        setPosition: vi.fn().mockReturnThis(),
+        setOrigin: vi.fn().mockReturnThis(),
+        setDepth: vi.fn().mockReturnThis(),
+        setAlpha: vi.fn().mockReturnThis(),
+        setRotation: vi.fn().mockReturnThis(),
+        setFillStyle: vi.fn().mockReturnThis(),
+        destroy: vi.fn(),
+        active: true,
+      }),
+    },
+    tweens: {
+      add: vi.fn().mockReturnValue({ stop: vi.fn() }),
+      killTweensOf: vi.fn(),
+    },
+    input: {
+      on: vi.fn(),
+      off: vi.fn(),
+    },
+    events: {
+      once: vi.fn(),
+      on: vi.fn(),
+      off: vi.fn(),
+    },
+    time: {
+      delayedCall: vi.fn().mockReturnValue({ remove: vi.fn() }),
+    },
+    sound: {
+      play: vi.fn(),
+    },
+  };
+}
+
+// Layout mirroring the MainStreet hand zone used by the real renderer
+// (MainStreetLayoutAdapter + MainStreetRenderer.createContainers).
+const LAYOUT = {
+  gameW: 1280,
+  gameH: 720,
+  handX: 40,
+  handY: 620,
+  handCardW: 140,
+  handCardH: 80,
+  handCenterX: 400,
+};
+
+/**
+ * Creates a minimal mock MainStreet scene with real HandView instances that
+ * mirror the renderer's `handBusinessView` / `handView` configuration, plus
+ * the scene delegations the turn controller uses for destination prediction.
+ *
+ * `animateTransferFromMarket` returns a never-resolving promise so the
+ * transfer-completion callback (which mutates state) never runs — tests focus
+ * on the destination argument passed to the transfer.
+ */
+function createMockScene(): any {
+  const phaser = createPhaserMock();
+  const state = setupMainStreetGame({ seed: 'buy-transfer-dest' });
+
+  // Business hand — mirrors handBusinessView in MainStreetRenderer.
+  const handBusinessView = new HandView(phaser, {
+    baseX: LAYOUT.handX + LAYOUT.handCardW / 2,
+    baseY: LAYOUT.handY,
+    centerX: LAYOUT.handCenterX,
+    spacing: LAYOUT.handCardW + 8,
+    cardWidth: LAYOUT.handCardW,
+    showLabels: false,
+    selectionEnabled: false,
+    clickEnabled: true,
+  });
+
+  // Held-event hand — mirrors handView in MainStreetRenderer.
+  const handView = new HandView(phaser, {
+    baseX: LAYOUT.handX + LAYOUT.handCardW / 2,
+    baseY: LAYOUT.handY + LAYOUT.handCardH / 2,
+    centerX: LAYOUT.handCenterX,
+    spacing: LAYOUT.handCardW + 10,
+    cardWidth: LAYOUT.handCardW,
+    showLabels: false,
+    selectionEnabled: false,
+    clickEnabled: false,
+  });
+
+  const scene: any = {
+    state,
+    uiPhase: 'market',
+    layout: LAYOUT,
+    handBusinessView,
+    handView,
+    msLifecycleManager: {
+      isTutorialActionAllowed: vi.fn().mockReturnValue({ allowed: true }),
+      onTutorialActionComplete: vi.fn(),
+    },
+    instructionText: { setText: vi.fn() },
+    tooltipManager: { hide: vi.fn(), show: vi.fn() },
+    selectMarketCardById: vi.fn(),
+    clearMarketSelection: vi.fn(),
+    hiddenTransferSourceCardIds: new Set(),
+    refreshAll: vi.fn(),
+    refreshStreetGrid: vi.fn(),
+    refreshActionButtons: vi.fn(),
+    refreshAllAction: vi.fn(),
+    gameEvents: { emit: vi.fn(), on: vi.fn(), off: vi.fn() },
+    time: { delayedCall: vi.fn().mockReturnValue({ remove: vi.fn() }) },
+    undoManager: null,
+    overlayObjects: [],
+    hudContainer: null,
+    hintBar: null,
+    cardSvgLoadPromise: Promise.resolve(),
+    prewarmVisibleCardTextures: vi.fn().mockResolvedValue(undefined),
+    updateSvgDebugOverlay: vi.fn(),
+    previousCoins: null,
+    previousReputation: null,
+    transferAnimationCount: 0,
+    activeTransferTweens: new Set(),
+    activeTransferVisuals: new Set(),
+    // Never resolve — keeps the test focused on the transfer destination.
+    animateTransferFromMarket: vi.fn(() => new Promise(() => {})),
+    // Scene delegations mirroring MainStreetScene.getBusinessHandInsertionPosition /
+    // getEventHandInsertionPosition.
+    getBusinessHandInsertionPosition: (insertIndex: number) =>
+      handBusinessView.getInsertionPosition(insertIndex),
+    getEventHandInsertionPosition: (insertIndex: number) =>
+      handView.getInsertionPosition(insertIndex),
+  };
+
+  return scene;
+}
+
+// ── Tests ───────────────────────────────────────────────────
+
+describe('Buy transfer destinations (market → hand)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('business buy to hand', () => {
+    it('hand size 0: animates to the exact handBusinessView resting position', () => {
+      const scene = createMockScene();
+      const card = scene.state.market.development[0];
+      expect(card).toBeTruthy();
+
+      // Empty hand — keep the renderer HandView in sync with the state.
+      scene.handBusinessView.setCards(scene.state.hand ?? []);
+
+      const controller = new MainStreetTurnController(scene);
+      controller.onBusinessCardClick(card);
+
+      expect(scene.animateTransferFromMarket).toHaveBeenCalledTimes(1);
+      const opts = scene.animateTransferFromMarket.mock.calls[0][0];
+      const predicted = scene.handBusinessView.getInsertionPosition(0);
+
+      expect(opts.destination.x).toBeCloseTo(predicted.x, 5);
+      expect(opts.destination.y).toBeCloseTo(predicted.y, 5);
+      // First card of an empty hand is centred on handCenterX — NOT the old
+      // left-edge estimate (handX + handCardW/2).
+      expect(opts.destination.x).toBeCloseTo(LAYOUT.handCenterX, 5);
+      expect(opts.destination.x).not.toBeCloseTo(LAYOUT.handX + LAYOUT.handCardW / 2, 5);
+    });
+
+    it('hand size 1: animates to the append position of a 2-card hand', () => {
+      const scene = createMockScene();
+      const card = scene.state.market.development[0];
+      const second = scene.state.market.development[1];
+      expect(card).toBeTruthy();
+      expect(second).toBeTruthy();
+
+      scene.state.hand = [card];
+      scene.handBusinessView.setCards(scene.state.hand);
+
+      const controller = new MainStreetTurnController(scene);
+      controller.onBusinessCardClick(second);
+
+      expect(scene.animateTransferFromMarket).toHaveBeenCalledTimes(1);
+      const opts = scene.animateTransferFromMarket.mock.calls[0][0];
+      // Append index = current hand length (1).
+      const predicted = scene.handBusinessView.getInsertionPosition(1);
+
+      expect(opts.destination.x).toBeCloseTo(predicted.x, 5);
+      expect(opts.destination.y).toBeCloseTo(predicted.y, 5);
+      // The rendered 2-card hand is centred on handCenterX, so the appended
+      // card rests to the RIGHT of centre — never at the left edge.
+      expect(opts.destination.x).toBeGreaterThan(LAYOUT.handCenterX);
+    });
+
+    it('hand size 2 (full): buy is blocked, no transfer animation is started', () => {
+      const scene = createMockScene();
+      const card = scene.state.market.development[0];
+      const second = scene.state.market.development[1];
+      const third = scene.state.market.development[2];
+
+      scene.state.hand = [card, second];
+      scene.handBusinessView.setCards(scene.state.hand);
+
+      const controller = new MainStreetTurnController(scene);
+      controller.onBusinessCardClick(third);
+
+      expect(scene.animateTransferFromMarket).not.toHaveBeenCalled();
+      // Hand-full message shown to the player.
+      expect(scene.instructionText.setText).toHaveBeenCalledWith(
+        expect.stringContaining('Hand full'),
+      );
+    });
+  });
+
+  describe('event buy (held event)', () => {
+    it('animates to the exact handView resting position for the held event', () => {
+      const scene = createMockScene();
+      const eventCard = scene.state.market.investments.find(
+        (c: any) => c && c.family === 'event' && canPurchaseEvent(scene.state, c.id).legal,
+      );
+      expect(eventCard).toBeTruthy();
+
+      const controller = new MainStreetTurnController(scene);
+      controller.onEventCardClick(eventCard);
+
+      expect(scene.animateTransferFromMarket).toHaveBeenCalledTimes(1);
+      const opts = scene.animateTransferFromMarket.mock.calls[0][0];
+      // The held event renders via handView.setCards([held]) — insertion at 0.
+      const predicted = scene.handView.getInsertionPosition(0);
+
+      expect(opts.destination.x).toBeCloseTo(predicted.x, 5);
+      expect(opts.destination.y).toBeCloseTo(predicted.y, 5);
+      // Centred on handCenterX, NOT the old left-anchored getHandCardCenter.
+      expect(opts.destination.x).toBeCloseTo(LAYOUT.handCenterX, 5);
+      expect(opts.destination.x).not.toBeCloseTo(LAYOUT.handX + LAYOUT.handCardW / 2, 5);
+      expect(opts.destination.y).toBeCloseTo(LAYOUT.handY + LAYOUT.handCardH / 2, 5);
+    });
+  });
+});

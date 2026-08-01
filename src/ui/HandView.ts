@@ -591,41 +591,12 @@ export class HandView {
    */
   async animateAddCard(card: Card, options: AnimateAddCardOptions): Promise<void> {
     const insertIndex = options.insertAtIndex ?? this.cards.length;
-    const newCount = this.cards.length + 1;
 
-    // ── Compute destination (same layout logic as computeCardPositions) ──
-    let destX: number;
-    let destY: number;
-
-    if (this.layoutDirection === 'vertical') {
-      destX = this.baseX;
-      destY = this.baseY + insertIndex * this.spacing;
-    } else {
-      const gap = this.spacing - this.cardWidth;
-      const centerX = this._centerX ?? this.baseX;
-
-      const { positions } = layoutCardPositions({
-        count: newCount,
-        cardWidth: this.cardWidth,
-        gap,
-        centerX,
-        maxWidth: this.maxWidth,
-      });
-
-      destX = positions[insertIndex];
-
-      if (this.arcRadius <= 0 || newCount < 3) {
-        destY = this.baseY;
-      } else {
-        const first = positions[0];
-        const last = positions[positions.length - 1];
-        const arcCenterX = (first + last) / 2;
-        const halfSpan = Math.max((last - first) / 2, 1);
-        const normalized = (destX - arcCenterX) / halfSpan;
-        const offsetY = ((1 - normalized * normalized) * halfSpan * halfSpan) / (2 * this.arcRadius);
-        destY = this.baseY - offsetY;
-      }
-    }
+    // ── Compute destination via the canonical layout predictor ──
+    // Single source of truth: getInsertionPosition shares the layout code
+    // path with computeCardPositions, so the deal animation always ends
+    // exactly where the card will rest in the hand.
+    const { x: destX, y: destY } = this.getInsertionPosition(insertIndex);
 
     // ── Reduced motion: instant placement ──
     if (this._reducedMotion) {
@@ -676,6 +647,59 @@ export class HandView {
         cardId,
       });
     });
+  }
+
+  /**
+   * Predict the exact resting position a card inserted at the given index will
+   * occupy in the hand, using the same layout code path as
+   * {@link computeCardPositions} and {@link animateAddCard}.
+   *
+   * This is the **single source of truth** for hand-layout prediction: callers
+   * that need to animate a card into the hand (e.g. a market→hand buy
+   * transfer) should use this method instead of duplicating layout math, so
+   * the animation destination always matches the rendered resting position.
+   *
+   * The insert index is clamped to `[0, cards.length]` — an index equal to the
+   * current hand size appends at the end of the hand.
+   *
+   * @param insertIndex - Index at which the new card will be inserted
+   *                      (0 = front of hand, `cards.length` = append at end).
+   * @returns The predicted centre position `{ x, y }` of the card at rest.
+   */
+  public getInsertionPosition(insertIndex: number): { x: number; y: number } {
+    const count = this.cards.length;
+    const index = Math.max(0, Math.min(insertIndex, count));
+    const newCount = count + 1;
+
+    if (this.layoutDirection === 'vertical') {
+      return { x: this.baseX, y: this.baseY + index * this.spacing };
+    }
+
+    const gap = this.spacing - this.cardWidth;
+    const centerX = this._centerX ?? this.baseX;
+
+    const { positions } = layoutCardPositions({
+      count: newCount,
+      cardWidth: this.cardWidth,
+      gap,
+      centerX,
+      maxWidth: this.maxWidth,
+    });
+
+    const destX = positions[index];
+
+    let destY = this.baseY;
+    if (this.arcRadius > 0 && newCount >= 3) {
+      const first = positions[0];
+      const last = positions[positions.length - 1];
+      const arcCenterX = (first + last) / 2;
+      const halfSpan = Math.max((last - first) / 2, 1);
+      const normalized = (destX - arcCenterX) / halfSpan;
+      const offsetY = ((1 - normalized * normalized) * halfSpan * halfSpan) / (2 * this.arcRadius);
+      destY = this.baseY - offsetY;
+    }
+
+    return { x: destX, y: destY };
   }
 
   /**
