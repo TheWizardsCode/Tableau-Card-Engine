@@ -115,6 +115,8 @@ export class GolfScene extends CardGameScene {
     this.load.audio(`${ns}:${SFX_KEYS.ROUND_END}`, audioPathWithFallback(audioDir, 'round-end.wav'));
     this.load.audio(`${ns}:${SFX_KEYS.SCORE_REVEAL}`, audioPathWithFallback(audioDir, 'score-reveal.wav'));
     this.load.audio(`${ns}:${SFX_KEYS.UI_CLICK}`, audioPathWithFallback(audioDir, 'ui-click.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.GAME_WIN}`, audioPathWithFallback(audioDir, 'game-win.wav'));
+    this.load.audio(`${ns}:${SFX_KEYS.GAME_LOST}`, audioPathWithFallback(audioDir, 'game-lost.wav'));
   }
 
   // ── Create ──────────────────────────────────────────────
@@ -161,7 +163,9 @@ export class GolfScene extends CardGameScene {
       // event system.
       const mapping: EventSoundMapping = {
         'turn-started': SFX_KEYS.TURN_CHANGE,
-        'game-ended': SFX_KEYS.ROUND_END,
+        // NOTE: 'game-ended' is intentionally NOT mapped to ROUND_END.
+        // Game win/loss sounds are played directly from showEndScreen()
+        // (sfx-game-win / sfx-game-lost) after the winner is determined.
       };
       this.initSoundSystem(Object.values(SFX_KEYS), mapping, { namespace: 'golf' });
     }

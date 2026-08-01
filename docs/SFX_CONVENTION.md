@@ -47,11 +47,15 @@ public/assets/audio/
 ├── default/            # Fallback sounds for common SFX keys
 │   ├── card-draw.wav
 │   ├── card-flip.wav
+│   ├── game-win.wav    # Game won (victory) — sfx-game-win
+│   ├── game-lost.wav   # Game lost (defeat) — sfx-game-lost
 │   ├── illegal-move.wav
 │   ├── ui-click.wav
 │   └── ...
 ├── golf/               # Game-specific audio
 │   ├── card-draw.wav
+│   ├── game-win.wav
+│   ├── game-lost.wav
 │   └── ...
 ├── sushi-go/
 ├── feudalism/
