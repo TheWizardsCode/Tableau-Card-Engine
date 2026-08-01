@@ -17,6 +17,7 @@ import { describe, it, expect } from 'vitest';
 import {
   createCommunitySpaceDeck,
   createBusinessDeck,
+  createUpgradeDeck,
   type CommunitySpaceCard,
   type BusinessCard,
 } from '../../example-games/main-street/MainStreetCards';
@@ -25,19 +26,25 @@ import {
 
 const communitySpaceDeck = createCommunitySpaceDeck(1);
 const businessDeck = createBusinessDeck(1);
+const upgradeDeck = createUpgradeDeck(1);
 
 // ── Helpers ─────────────────────────────────────────────────
 
 /**
  * Builds the tooltip info string for a community space card, mimicking the
  * format used in MainStreetRenderer.drawMarketCard for business cards.
+ * Includes an ongoing-cost line for cards with a per-turn running cost
+ * (per CG-0MRXYGM9B006I3PE, e.g. Library -0.25/turn).
  */
 function buildCommunitySpaceTooltip(card: CommunitySpaceCard): string {
   const income = card.baseIncome + (card.incomeBonus || 0);
+  const totalRep = (card.reputationPerTurn ?? 0) + (card.reputationBonus || 0);
+  const repInfo = totalRep > 0 ? `\nReputation: +${totalRep}/turn` : '';
+  const ongoingInfo = (card.ongoingCost ?? 0) > 0 ? `\nOngoing cost: -${card.ongoingCost}/turn` : '';
   return [
     `Community Space: ${card.name}`,
     `Cost: ${card.cost}`,
-    `Income: +${income}/turn`,
+    `Income: +${income}/turn${ongoingInfo}${repInfo}`,
     `Synergy: ${card.synergyTypes.join('/')}`,
     card.description ?? '',
   ].join('\n');
@@ -125,6 +132,13 @@ describe('Community space card tooltip data fields (AC1)', () => {
       expect(card.baseIncome).toBeGreaterThanOrEqual(0);
     }
   });
+
+  it('community space card ongoingCost is a non-negative number', () => {
+    for (const card of communitySpaceDeck) {
+      expect(typeof card.ongoingCost).toBe('number');
+      expect(card.ongoingCost).toBeGreaterThanOrEqual(0);
+    }
+  });
 });
 
 // ── AC2: Tooltip for community space card contains meaningful content ──
@@ -159,6 +173,22 @@ describe('Community space card tooltip content (AC2)', () => {
     expect(tooltip).toContain('Income:');
     expect(tooltip).toContain('Synergy:');
     expect(tooltip).toContain(library!.description);
+  });
+
+  it('Library tooltip includes an ongoing-cost line', () => {
+    const library = communitySpaceDeck.find(c => c.name === 'Library');
+    expect(library).toBeDefined();
+
+    const tooltip = buildCommunitySpaceTooltip(library!);
+    expect(tooltip).toContain('Ongoing cost: -0.25/turn');
+  });
+
+  it('Park tooltip has no ongoing-cost line', () => {
+    const park = communitySpaceDeck.find(c => c.name === 'Park');
+    expect(park).toBeDefined();
+
+    const tooltip = buildCommunitySpaceTooltip(park!);
+    expect(tooltip).not.toContain('Ongoing cost:');
   });
 
   it('tooltip distinguishes community space from business', () => {
@@ -232,8 +262,15 @@ describe('Tooltip format consistency (AC3)', () => {
       // Third line should be "Income: +<number>/turn"
       expect(lines[2]).toMatch(/^Income: /);
 
-      // Fourth line(s) should contain synergy info and description
-      expect(lines[3]).toMatch(/^Synergy: /);
+      // Optional ongoing-cost line (cards with a running cost) precedes Synergy
+      const synergyIdx = lines.findIndex(l => l.startsWith('Synergy: '));
+      expect(synergyIdx).toBeGreaterThanOrEqual(3);
+
+      const ongoingIdx = lines.findIndex(l => l.startsWith('Ongoing cost: '));
+      if (ongoingIdx !== -1) {
+        expect(ongoingIdx).toBeGreaterThan(2);
+        expect(ongoingIdx).toBeLessThan(synergyIdx);
+      }
     }
   });
 
@@ -244,5 +281,24 @@ describe('Tooltip format consistency (AC3)', () => {
     const second = buildCommunitySpaceTooltip(park);
 
     expect(first).toBe(second);
+  });
+});
+
+// ── AC4: Community Hub upgrade data for tooltips ──────────────
+
+describe('Community Hub upgrade (repurposed, AC4)', () => {
+  it('should grant reputationBonus 0.1 and no income/range bonus', () => {
+    const communityHub = upgradeDeck.find(u => u.targetBusiness === 'Library');
+    expect(communityHub).toBeDefined();
+    expect(communityHub!.reputationBonus).toBe(0.1);
+    expect(communityHub!.incomeBonus).toBe(0);
+    expect(communityHub!.synergyRangeBonus).toBe(0);
+  });
+
+  it('should have a non-empty description for the tooltip', () => {
+    const communityHub = upgradeDeck.find(u => u.targetBusiness === 'Library');
+    expect(communityHub).toBeDefined();
+    expect(communityHub!.description.length).toBeGreaterThan(0);
+    expect(communityHub!.family).toBe('upgrade');
   });
 });

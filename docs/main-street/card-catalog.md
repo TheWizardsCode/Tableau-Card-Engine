@@ -117,13 +117,13 @@ alongside business cards.
 | ID | Name | Cost | Income | Synergy | Upgrade Path | Description | Rationale |
 |----|------|------|--------|---------|--------------|-------------|-----------|
 | `cs-park` | Park | 4 | 0 | Culture | Park | Offers leisure space. +1/adj Culture. | Reclassified from M1 Business; cheapest community space; synergy filler. |
-| `cs-library` | Library | 6 | 1 | Culture | Library | Quiet community space for reading. +1/adj Culture. | New community space; slightly more expensive but generates income. |
+| `cs-library` | Library | 7 | 0 | Culture | Library | Quiet community space for reading and learning. Costs 0.25 coins/turn to run; +0.1 rep/turn. | Reputation asset: no income; small running cost for steady reputation. |
 
 ### Community Space Upgrades
 
 | ID | Name | Target | Cost | Income+ | Range+ | Description | Rationale |
 |----|------|--------|------|---------|--------|-------------|-----------|
-| `upg-community-hub` | Upgrade to Community Hub | Library | 4 | +1 | +1 | Library -> Community Hub. | Extends Library's cultural reach. |
+| `upg-community-hub` | Upgrade to Community Hub | Library | 4 | 0 | 0 | Library -> Community Hub (+0.1 rep/turn). | Repurposed: grants +0.1 reputation/turn instead of income/range bonuses. |
 
 ---
 
@@ -202,7 +202,7 @@ Each Upgrade targets a specific Business by name. Applying an upgrade increments
 
 | ID | Name | Target | Cost | Income+ | Range+ | Description | Rationale |
 |----|------|--------|------|---------|--------|-------------|-----------|
-| `upg-community-hub` | Upgrade to Community Hub | Library | 4 | +1 | +1 | Library -> Community Hub. | Community space upgrade for Library. |
+| `upg-community-hub` | Upgrade to Community Hub | Library | 4 | 0 | 0 | Library -> Community Hub (+0.1 rep/turn). | Community space upgrade for Library; reputation bonus. |
 | `upg-garden` | Upgrade to Garden | Park | 3 | +1 | +1 | Park -> Garden. | Completes M1 Culture upgrade / community space upgrade coverage. |
 | `upg-home-improvement` | Upgrade to Home Improvement | Hardware Store | 4 | +1 | +1 | Hardware Store -> Home Improvement. | Completes M1 Commerce upgrade. |
 | `upg-vintage-shop` | Upgrade to Vintage Shop | Pawn Shop | 3 | +1 | +0 | Pawn Shop -> Vintage Shop. | Budget upgrade; income only. |

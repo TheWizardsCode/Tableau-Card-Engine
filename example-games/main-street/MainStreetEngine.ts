@@ -598,6 +598,9 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
   // Apply staff card ongoing costs (Multi-Use Card Economy)
   applyStaffOngoingCosts(state);
 
+  // Apply community space ongoing costs (reputation-asset cards, e.g. Library)
+  applyCommunitySpaceOngoingCosts(state);
+
   // Phase: IncidentPhase
   state.phase = 'IncidentPhase';
   const incident = resolveIncident(state);
@@ -868,6 +871,43 @@ export function applyStaffOngoingCosts(state: MainStreetState): void {
     }
     if (actualDeduction < totalCost) {
       addLog(state, `Insufficient coins for staff costs: owed ${totalCost}, paid ${actualDeduction}`, 'loss');
+    }
+  }
+}
+
+/**
+ * Applies community space ongoing costs for the current turn.
+ * Deducts each placed community space's `ongoingCost` (e.g. the Library's
+ * 0.25 coins/turn running cost) from coins, alongside staff costs.
+ * If coins are insufficient, deducts what's available (down to 0).
+ *
+ * Mirrors {@link applyStaffOngoingCosts} clamping/log conventions.
+ *
+ * @param state  Current game state (mutated in-place).
+ */
+export function applyCommunitySpaceOngoingCosts(state: MainStreetState): void {
+  const grid = state.streetGrid;
+
+  let totalCost = 0;
+  let spaceCount = 0;
+  for (const slot of grid) {
+    if (!slot || slot.family !== 'community-space') continue;
+    const cost = slot.ongoingCost ?? 0;
+    if (cost > 0) {
+      totalCost += cost;
+      spaceCount += 1;
+    }
+  }
+  if (spaceCount === 0) return;
+
+  if (totalCost > 0) {
+    const actualDeduction = Math.min(totalCost, state.resourceBank.coins);
+    state.resourceBank.coins -= actualDeduction;
+    if (actualDeduction > 0) {
+      addLog(state, `Community space costs: -${actualDeduction} coins (${spaceCount} spaces)`, 'loss');
+    }
+    if (actualDeduction < totalCost) {
+      addLog(state, `Insufficient coins for community space costs: owed ${totalCost}, paid ${actualDeduction}`, 'loss');
     }
   }
 }

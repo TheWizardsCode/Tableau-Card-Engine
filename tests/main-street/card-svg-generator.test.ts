@@ -42,6 +42,7 @@ function makeCommunitySpace(overrides: Partial<CommunitySpaceCard> = {}): Commun
     name: 'Test Community Space',
     cost: 4,
     baseIncome: 0,
+    ongoingCost: 0,
     synergyTypes: ['Culture'],
     maxLevel: 1,
     description: 'A test community space',

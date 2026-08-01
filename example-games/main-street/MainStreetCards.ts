@@ -114,6 +114,7 @@ function rebuildTemplateArrays(rows: Record<string, string>[]): void {
       name: r.name,
       cost: Number(r.cost) || 0,
       baseIncome: Number(r.baseIncome) || 0,
+      ongoingCost: Number(r.ongoingCost) || 0,
       synergyTypes: (r.synergyTypes || '').split('|').filter(Boolean) as unknown as SynergyType[],
       upgradePath: r.upgradePath || undefined,
       maxLevel: Number(r.maxLevel) || 0,
@@ -499,13 +500,14 @@ function makeBusiness(template: Omit<BusinessCard, 'family' | 'level' | 'incomeB
  * Creates a fresh copy of a CommunitySpaceCard from template data.
  * Mutable fields (level, incomeBonus, synergyRangeBonus, appliedUpgrades) are reset.
  */
-function makeCommunitySpace(template: Omit<CommunitySpaceCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'appliedUpgrades' | 'reputationBonus' | 'currentIncome' | 'currentReputationPerTurn'>): CommunitySpaceCard {
+function makeCommunitySpace(template: Omit<CommunitySpaceCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'appliedUpgrades' | 'reputationBonus' | 'currentIncome' | 'currentReputationPerTurn' | 'ongoingCost'>): CommunitySpaceCard {
   const card: CommunitySpaceCard = {
     family: 'community-space',
     level: 0,
     incomeBonus: 0,
     synergyRangeBonus: 0,
     reputationBonus: 0,
+    ongoingCost: 0,
     appliedUpgrades: [],
     ...template,
   };
@@ -540,6 +542,12 @@ export interface CommunitySpaceCard {
   readonly name: string;
   readonly cost: number;
   readonly baseIncome: number;
+  /**
+   * Ongoing per-turn coin cost paid each IncomePhase (e.g. the Library costs
+   * 0.25 coins/turn to run). Defaults to 0 for community spaces without a
+   * running cost. Mirrors the StaffCard `ongoingCost` mechanic.
+   */
+  readonly ongoingCost: number;
   readonly synergyTypes: readonly SynergyType[];
   readonly upgradePath?: string;
   readonly maxLevel: number;

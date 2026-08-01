@@ -57,6 +57,7 @@ When a card's cost changes, its reward fields (baseIncome, coinDelta, synergy bo
 |------|----------|
 | **Pawn Shop** | No synergy bonuses; cost reduced by 2 from curve estimate |
 | **Clinic** | reputationPerTurn = +0.2 factored into cost calculation (weight × 30) |
+| **Library (`cs-library`)** | Community-space curve formula **excludes `ongoingCost`**. The Library's 0.25 coins/turn running cost is not part of the cost formula; its cost was hand-set to the tier-1 formula result (4 base + 0.1 rep × 30 = 7, Standard band) per planning Q6. Community spaces with a running cost may need manual review. |
 
 ## Per-Family Strategy
 

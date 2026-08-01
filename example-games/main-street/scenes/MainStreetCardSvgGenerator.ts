@@ -332,6 +332,11 @@ export function generateCardSvgFromCsvRow(
     }
   }
 
+  // Community space ongoing cost (reputation-asset cards, e.g. Library -0.25/turn)
+  if (family === 'community-space' && row.ongoingCost && Number(row.ongoingCost) > 0) {
+    inner.push('  <text x="' + (width / 2) + '" y="38" font-family="' + FONT + '" font-size="9" fill="#ff8844" font-weight="400" text-anchor="middle">-' + row.ongoingCost + '/turn</text>');
+  }
+
   // Cost badge
   if (cost !== null) {
     inner.push('  ' + costBadgeSvg(cost, width, height));

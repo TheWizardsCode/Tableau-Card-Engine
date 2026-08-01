@@ -18,7 +18,7 @@ business,biz-clinic,Clinic,9,0,Health,Clinic,1,0.2,0.5,0.1,Walk-in medical care 
 business,biz-private-clinic,Private Clinic,14,2.5,Health,Private Clinic,1,,0.5,0.1,A private medical practice focused on profitability. Gains +1 coin per adjacent Health business.,4,,,,,,,,,,,,,,,,
 business,biz-pharmacy,Pharmacy,7,1,Health,,0,,,,Provides essential medications. Gains +1 coin per adjacent Health business.,4,,,,,,,,,,,,,,,,
 community-space,cs-park,Park,3,0,Culture,Park,1,,,,Offers leisure space. Gains +1 coin per adjacent Culture business or community space.,1,,,,,,,,,,,,,,,,
-community-space,cs-library,Library,14,1.5,Culture,Library,1,,0.5,0.1,A quiet community space for reading and learning. Gains +1 coin per adjacent Culture business or community space.,1,,,,,,,,,,,,,,,,
+community-space,cs-library,Library,7,0,Culture,Library,1,0.1,,,A quiet community space for reading and learning. Costs 0.25 coins per turn to run and provides +0.1 reputation per turn.,1,,,,,,,,,,,,,,,0.25,
 event,evt-festival,Local Festival,3,,,,,,,,,1,Investment,+2 coins to all Culture businesses and +1 reputation.,SpecificSynergy,Culture,2,1,,,,,,,,,,
 event,evt-rainy,Rainy Day,0,,,,,,,,,1,Incident,-1 coin to all Food businesses this turn.,SpecificSynergy,Food,-1,0,,,,,,,,,,
 event,evt-tax,Tax Audit,0,,,,,,,,,1,Incident,Lose 3 coins.,All,,-3,0,,,,,,,,,,
@@ -82,7 +82,7 @@ upgrade,upg-grand-bakehouse,Upgrade to Grand Bakehouse,9,,,,,,,,The pinnacle of 
 upgrade,upg-restaurant,Upgrade to Restaurant,14,,,,,,,,Elevates the Diner all the way to a full-service Restaurant.,5,,,,,,,,,,Diner,5.5,1,1,1,,
 upgrade,upg-multiplex,Upgrade to Multiplex,14,,,,,,,,A massive Multiplex complex — the entertainment heart of Main Street.,5,,,,,,,,,,Cinema,7,1,1,1,,
 upgrade,upg-luxury-retreat,Upgrade to Luxury Retreat,14,,,,,,,,A destination Luxury Retreat — the most prestigious business on the street.,5,,,,,,,,,,Day Spa,7,1,1,1,,
-upgrade,upg-community-hub,Upgrade to Community Hub,3,,,,,,,,Expands the Library into a Community Hub with extended cultural reach.,1,,,,,,,,,,Library,1,1,0,,,
+upgrade,upg-community-hub,Upgrade to Community Hub,4,,,,,,,,Transforms the Library into a Community Hub providing +0.1 reputation per turn.,1,,,,,,,,,,Library,,,0,0.1,,
 staff,staff-assistant,Assistant,3,,,,,,,,Hire an assistant to help manage your hand. Adds +1 hand slot with a small ongoing cost.,,,,,,,,,,,,,,,,1,1
 staff,staff-manager,Manager,7,,,,,,,,A skilled manager keeps things organised. Adds +2 hand slots with a moderate ongoing cost.,,,,,,,,,,,,,,,,2.5,2
 staff,staff-director,Director,14,,,,,,,,An experienced director oversees your operations. Adds +3 hand slots with a high ongoing cost.,,,,,,,,,,,,,,,,4,3

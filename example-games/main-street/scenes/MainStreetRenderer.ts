@@ -1119,7 +1119,8 @@ export class MainStreetRenderer {
             const cs = card as any;
             const csTotalRep = (cs.reputationPerTurn ?? 0) + (cs.reputationBonus ?? 0);
             const csRepInfo = csTotalRep > 0 ? `\nReputation: +${csTotalRep}/turn` : '';
-            info = `Community Space: ${cs.name}\nCost: ${cs.cost}\nIncome: +${cs.baseIncome + (cs.incomeBonus || 0)}/turn${csRepInfo}\nSynergy: ${(cs.synergyTypes || []).join('/')}\n${cs.description ?? ''}`;
+            const csOngoingInfo = (cs.ongoingCost ?? 0) > 0 ? `\nOngoing cost: -${cs.ongoingCost}/turn` : '';
+            info = `Community Space: ${cs.name}\nCost: ${cs.cost}\nIncome: +${cs.baseIncome + (cs.incomeBonus || 0)}/turn${csOngoingInfo}${csRepInfo}\nSynergy: ${(cs.synergyTypes || []).join('/')}\n${cs.description ?? ''}`;
           } else if (card.family === 'event') {
             const e = card as any;
             const coinDelta = e.coinDelta >= 0 ? '+' : '';
