@@ -13,6 +13,7 @@ import {
   getLegalMoves,
   isWon,
 } from '../BeleagueredCastleRules';
+import { BeleagueredCastleAiPlayer, SolverStrategy } from '../BeleagueredCastleAi';
 import { BCTranscriptRecorder } from '../GameTranscript';
 import type { BCGameTranscript, BoardSnapshot } from '../GameTranscript';
 import {
@@ -36,6 +37,7 @@ import {
   RESUME_INFO_FONT_SIZE, RESUME_INFO_Y_OFFSET,
   RESUME_BUTTON_SPACING, RESUME_BUTTON_Y_OFFSET,
   SNAP_BACK_DURATION,
+  HINT_BUTTON_WIDTH, HINT_BAR_Y_OFFSET,
 } from './BeleagueredCastleConstants';
 import { BeleagueredCastleRenderer } from './BeleagueredCastleRenderer';
 import { BeleagueredCastleTurnController } from './BeleagueredCastleTurnController';
@@ -44,6 +46,8 @@ import { shakeIllegalMove } from '../../../src/ui/shakeIllegalMove';
 import {
   GAME_W, GAME_H, FONT_FAMILY,
   createOverlayButton,
+  createActionButton,
+  HintBar,
 } from '../../../src/ui';
 import { createHudText } from '../../../src/ui/Renderer/adapters/BeleagueredCastleAdapter';
 import { SaveLoadStore } from '../../../src/core-engine';
@@ -51,6 +55,16 @@ import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/tr
 import { CheckpointManager } from '../../../src/core-engine';
 import { bcStateSerializer } from '../BeleagueredCastleSaveLoad';
 import type { BCSerializedState } from '../BeleagueredCastleSaveLoad';
+
+/** Unicode suit symbol for hint descriptions. */
+function suitSymbol(suit: Suit): string {
+  switch (suit) {
+    case 'clubs': return '♣';
+    case 'diamonds': return '♦';
+    case 'hearts': return '♥';
+    case 'spades': return '♠';
+  }
+}
 
 export class BeleagueredCastleScene extends CardGameScene {
   private gameState!: BeleagueredCastleState;
@@ -69,6 +83,13 @@ export class BeleagueredCastleScene extends CardGameScene {
   private bcRenderer!: BeleagueredCastleRenderer;
   private overlayManager!: OverlayManager;
   private turnController!: BeleagueredCastleTurnController;
+
+  /** AI player used by the hint system (bound to SolverStrategy). */
+  private hintAiPlayer = new BeleagueredCastleAiPlayer(SolverStrategy);
+  /** HUD hint button (created by initHintButton). */
+  private hintBtn: Phaser.GameObjects.Container | null = null;
+  /** Shared hint bar showing the suggested-move description. */
+  private hintBar: HintBar | null = null;
 
   private onNewGame?: () => void;
   private onRestart?: () => void;
@@ -188,6 +209,8 @@ export class BeleagueredCastleScene extends CardGameScene {
         () => this.turnController.performUndo(),
         () => this.turnController.performRedo(),
       );
+      this.initHintButton();
+      this.hintBar = new HintBar(this, { y: GAME_H - HINT_BAR_Y_OFFSET, startVisible: false });
     }
 
     this.bcRenderer.refreshFoundations();
@@ -370,6 +393,63 @@ export class BeleagueredCastleScene extends CardGameScene {
       }
       if (event.key === 'Escape' && this.helpPanel?.isOpen) this.helpPanel.close();
     });
+  }
+
+  // ── Hint system ──────────────────────────────────────────
+  /**
+   * Create the HUD hint button, positioned to the left of the Undo button
+   * (which itself sits left of Redo / Settings). The button asks the AI
+   * solver for the best move and highlights the suggestion.
+   */
+  private initHintButton(): void {
+    if (!this.undoButton) return;
+    const gap = 12;
+    // undoButton.x is the container centre; half width is 30.
+    const hintLeftEdge = this.undoButton.x - 30 - gap;
+    const hintTopEdge = this.undoButton.y - 16;
+    this.hintBtn = createActionButton(
+      this, hintLeftEdge, hintTopEdge, HINT_BUTTON_WIDTH, 'Hint',
+      () => this.requestHint(),
+      { fillColor: 0x224466, strokeColor: 0x4488aa, textColor: '#88ccff' },
+    );
+    if (this.hudContainer) this.hudContainer.add(this.hintBtn);
+  }
+
+  /**
+   * Ask the AI solver for the best move and display the suggestion:
+   * source and destination highlights plus a text description.
+   * No-op while interaction is blocked (dealing, ended, auto-completing).
+   */
+  requestHint(): void {
+    if (this.interactionBlocked) return;
+    this.deselectColumn();
+
+    const move = this.hintAiPlayer.suggestMove(this.gameState);
+    this.hintBar?.show();
+    if (!move) {
+      this.bcRenderer.clearHint();
+      this.hintBar?.setText('No moves available — try Undo or New Game');
+      this.gameEvents.emit('ui-interaction', { elementId: 'hint-button', action: 'hint-no-move' });
+      return;
+    }
+
+    this.bcRenderer.showHint(move);
+    this.hintBar?.setText(this.describeHint(move));
+    this.gameEvents.emit('ui-interaction', { elementId: 'hint-button', action: 'hint-suggested' });
+  }
+
+  /** Human-readable description of the suggested move. */
+  private describeHint(move: BCMove): string {
+    const source = this.gameState.tableau[move.fromCol].peek();
+    const cardLabel = source ? `${source.rank}${suitSymbol(source.suit)}` : 'card';
+    if (move.kind === 'tableau-to-foundation') {
+      return `Hint: move ${cardLabel} to the foundation`;
+    }
+    const destTop = this.gameState.tableau[move.toCol].peek();
+    if (destTop) {
+      return `Hint: move ${cardLabel} onto ${destTop.rank}${suitSymbol(destTop.suit)}`;
+    }
+    return `Hint: move ${cardLabel} to the empty column`;
   }
 
   // ── Game end ────────────────────────────────────────────
@@ -676,6 +756,9 @@ export class BeleagueredCastleScene extends CardGameScene {
   private refreshAll(): void {
     this.bcRenderer.refreshAll(this.dealComplete, this.interactionBlocked);
     this.refreshUndoRedoButtons(this.turnController.canUndo, this.turnController.canRedo);
+    // The suggestion is tied to the current board state; hide it once the
+    // board changes (move, undo, redo, auto-complete).
+    this.hintBar?.hide();
   }
 
   // ── Replay API ──────────────────────────────────────────
@@ -725,6 +808,9 @@ export class BeleagueredCastleScene extends CardGameScene {
     if (this.timerEvent) { this.timerEvent.destroy(); this.timerEvent = null; }
     this.turnController.cancelAutoComplete();
     this.bcRenderer.clearDropHighlights();
+    this.bcRenderer.clearHint();
+    this.hintBar?.destroy();
+    this.hintBar = null;
     this.overlayManager.dismiss();
     this.shutdownBase();
   }

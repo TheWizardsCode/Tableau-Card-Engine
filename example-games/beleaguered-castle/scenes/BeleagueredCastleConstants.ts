@@ -63,6 +63,20 @@ export const HUD_MARGIN = 28;
 export const HUD_FONT_SIZE = '20px';
 export const HUD_SEED_FONT_SIZE = '18px';
 
+// ── Hint system ────────────────────────────────────────────
+/** Border colour for the suggested source card. */
+export const HINT_SOURCE_COLOR = 0xffdd44;
+/** Border colour for the suggested destination. */
+export const HINT_DEST_COLOR = 0x44ff88;
+/** Alpha for hint highlight rectangles. */
+export const HINT_ALPHA = 0.45;
+/** Depth for hint highlight rectangles (above cards, below HUD). */
+export const HINT_DEPTH = 900;
+/** Width of the HUD hint button. */
+export const HINT_BUTTON_WIDTH = 64;
+/** Vertical offset of the hint bar above the bottom HUD row. */
+export const HINT_BAR_Y_OFFSET = 50;
+
 // ── Foundation slot ────────────────────────────────────────
 export const FOUNDATION_SLOT_ALPHA = 0.6;
 export const FOUNDATION_BORDER_RADIUS = 6;
