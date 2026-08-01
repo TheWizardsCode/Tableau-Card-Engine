@@ -425,7 +425,7 @@ describe('MainStreetScene browser tests', () => {
         () => transferSpy.mock.calls.length > beforeBiz2,
         { label: 'second business transfer started' },
       );
-      const bizDest = transferSpy.mock.calls[beforeBiz2][0].destination;
+      const bizDest = (transferSpy.mock.calls[beforeBiz2][0] as any).destination;
 
       await waitForCondition(
         () => state.hand?.some((c: any) => c.id === biz2.id),
@@ -447,7 +447,7 @@ describe('MainStreetScene browser tests', () => {
           () => transferSpy.mock.calls.length > beforeEvent,
           { label: 'event transfer started' },
         );
-        const eventDest = transferSpy.mock.calls[beforeEvent][0].destination;
+        const eventDest = (transferSpy.mock.calls[beforeEvent][0] as any).destination;
 
         await waitForCondition(
           () => state.heldEvent?.id === eventCard.id,
