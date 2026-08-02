@@ -178,6 +178,32 @@ seeded RNG) produce deterministic deals.
 
 See Section 10.
 
+### Feasibility spikes for graphics features
+
+Evaluate new graphics pipelines (custom shaders, lighting) in **isolated spike
+scenes** before integrating anything into shared engine modules. Spikes should:
+attempt the feature, document findings (capabilities, limitations, fallback
+paths) in the scene's help text, and fall back gracefully when the feature is
+unavailable (headless / WebGL-disabled environments). Peer-review the spike
+before refactoring shared code.
+
+- **Gym scenes:** `GymGraphicsShaderSpikeScene` —
+  `example-games/gym/scenes/GymGraphicsShaderSpikeScene.ts`;
+  `GymGraphicsLightingSpikeScene` —
+  `example-games/gym/scenes/GymGraphicsLightingSpikeScene.ts`
+- **Key APIs:** `sprite.setTint()` / `clearTint()` (tint highlights valid/invalid
+targets, e.g. green for playable cards), `sprite.setBlendMode(Phaser.BlendModes.NORMAL | ADD | MULTIPLY | SCREEN)`
+(layering/glow effects), `this.lights.enable()` +
+`this.lights.addLight(x, y, radius, color, intensity)` + `light.setIntensity()`
+(point lights; WebGL only, lit sprites call `setLighting(true)`)
+- **When to use:** when deciding whether a graphics feature can be used safely in
+the engine (e.g. glow around playable cards, foil card borders, dynamic
+backgrounds). The shader spike generates its own textures via
+`add.graphics()` + `generateTexture()` rather than card assets; the lighting
+spike records findings in its event log and shows plain fallback sprites when
+WebGL is unavailable. Recommend making lighting optional behind a feature flag
+in production.
+
 ## 4. Scene Lifecycle
 
 ### Boot sequence
@@ -734,6 +760,9 @@ For declarative config-driven dialogs, use `createParameterizedOverlay()` /
 15. **Not registering new scenes** in `main.ts` AND the GymRegistry
     (for Gym scenes) — scenes must be exported from `example-games/gym/index.ts`
     and added to `GYM_SCENE_CATALOGUE`.
+16. **Integrating graphics features without a feasibility spike** — evaluate
+    shaders/lighting in an isolated spike scene first; document findings and
+    fall back gracefully when unavailable (headless/WebGL-disabled).
 
 ## 17. Checklist — Reviewing a New Game Against TCE Conventions
 
@@ -747,7 +776,9 @@ that exist in the codebase but are not yet documented or applied.
    (except `GymSceneBase.ts` and `GymConstants.ts`). Cross-check against
    `GYM_SCENE_CATALOGUE` in `example-games/gym/GymRegistry.ts` and the scene
    index in `docs/gym/GYM_INDEX.md`. Every scene must map to a documented
-   pattern/API in this skill. 22 Gym demo scenes + Blackjack are registered.
+   pattern/API in this skill. 21 Gym demo scenes + Blackjack (22 entries) are
+   registered in `GYM_SCENE_CATALOGUE`; the Router navigation scene is excluded
+   from the catalogue.
 2. **Review ALL example games** — `example-games/golf/`, `beleaguered-castle/`,
    `blackjack/`, `sushi-go/`, `feudalism/`, `lost-cities/`, `main-street/`.
    Verify each game's helper-class split, transcript/save-load/replay
@@ -771,6 +802,7 @@ corresponding section of this skill before declaring the review complete.
 - [ ] Complex scenes split into Renderer/Animator/TurnController (+AiController/ReplayController as needed).
 - [ ] State collections use `Pile<T>`; deck built with `createStandardDeck()` + seeded `shuffleArray()`.
 - [ ] AI extends `AiStrategyBase` / `AiPlayer<TStrategy>`; strategies receive only visible state.
+- [ ] Graphics features (shaders, lighting) evaluated in isolated spike scenes with documented findings and graceful fallback.
 
 **SLL Layout**
 - [ ] Layout JSON exists at `example-games/<game>/layouts/<game>.layout.json`.
