@@ -26,11 +26,12 @@ const FIXTURE_TRANSCRIPT = path.join(
 /**
  * Run the replay CLI via `node --import tsx/esm` and return results.
  * Uses spawnSync with a generous timeout to account for Playwright
- * module loading overhead (~6s).
+ * module loading overhead (~6s, but routinely 15-30s under parallel load —
+ * see CG-0MSAZL6O2008PTWY).
  */
 function runReplay(
   args: string[],
-  timeoutMs = 15_000,
+  timeoutMs = 60_000,
 ): { stdout: string; stderr: string; exitCode: number } {
   const result = spawnSync(
     'node',
@@ -66,7 +67,7 @@ describe('Replay CLI -- transcript validation', () => {
       expect(result.stdout).toContain('--output');
       expect(result.stdout).toContain('transcript.json');
     },
-    20_000,
+    90_000,
   );
 
   it(
@@ -78,7 +79,7 @@ describe('Replay CLI -- transcript validation', () => {
       const output = result.stdout + result.stderr;
       expect(output).toContain('not found');
     },
-    20_000,
+    90_000,
   );
 
   describe('invalid transcript files', () => {
@@ -103,7 +104,7 @@ describe('Replay CLI -- transcript validation', () => {
         const output = result.stdout + result.stderr;
         expect(output).toContain('invalid JSON');
       },
-      20_000,
+      90_000,
     );
 
     it(
@@ -130,7 +131,7 @@ describe('Replay CLI -- transcript validation', () => {
         const output = result.stdout + result.stderr;
         expect(output).toContain('version');
       },
-      20_000,
+      90_000,
     );
 
     it(
@@ -154,7 +155,7 @@ describe('Replay CLI -- transcript validation', () => {
         const output = result.stdout + result.stderr;
         expect(output).toContain('initialState');
       },
-      20_000,
+      90_000,
     );
   });
 });
@@ -245,7 +246,7 @@ describe('Replay CLI -- --stop-at argument validation', () => {
       const output = result.stdout + result.stderr;
       expect(output).toContain('non-negative integer');
     },
-    20_000,
+    90_000,
   );
 
   it(
@@ -256,7 +257,7 @@ describe('Replay CLI -- --stop-at argument validation', () => {
       const output = result.stdout + result.stderr;
       expect(output).toContain('non-negative integer');
     },
-    20_000,
+    90_000,
   );
 
   it(
@@ -267,7 +268,7 @@ describe('Replay CLI -- --stop-at argument validation', () => {
       const output = result.stdout + result.stderr;
       expect(output).toContain('non-negative integer');
     },
-    20_000,
+    90_000,
   );
 
   it(
@@ -277,7 +278,7 @@ describe('Replay CLI -- --stop-at argument validation', () => {
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain('--stop-at');
     },
-    20_000,
+    90_000,
   );
 });
 
@@ -292,7 +293,7 @@ describe('Replay CLI -- --skip-to argument validation', () => {
       const output = result.stdout + result.stderr;
       expect(output).toContain('non-negative integer');
     },
-    20_000,
+    90_000,
   );
 
   it(
@@ -303,7 +304,7 @@ describe('Replay CLI -- --skip-to argument validation', () => {
       const output = result.stdout + result.stderr;
       expect(output).toContain('non-negative integer');
     },
-    20_000,
+    90_000,
   );
 
   it(
@@ -314,7 +315,7 @@ describe('Replay CLI -- --skip-to argument validation', () => {
       const output = result.stdout + result.stderr;
       expect(output).toContain('non-negative integer');
     },
-    20_000,
+    90_000,
   );
 
   it(
@@ -324,7 +325,7 @@ describe('Replay CLI -- --skip-to argument validation', () => {
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain('--skip-to');
     },
-    20_000,
+    90_000,
   );
 });
 
@@ -425,17 +426,20 @@ describe('Replay CLI -- v1 transcript handling', () => {
       expect(output).toContain('--stop-at is not supported');
       expect(output).toContain('Re-record the game');
     },
-    20_000,
+    90_000,
   );
 
   it(
     'should accept v1 transcript for regular replay (no --stop-at)',
     () => {
       const filePath = createV1TranscriptFile('v1-regular.json');
-      // Run with a very short timeout -- we only need to verify the CLI
-      // gets past transcript validation. It will fail later trying to
-      // start the dev server / Playwright, which is fine.
-      const result = runReplay([filePath], 10_000);
+      // Run with a bounded timeout -- we only need to verify the CLI
+      // gets past transcript validation and prints the transcript header.
+      // Module loading alone takes 10-20s (tsx + game adapters), so the
+      // timeout must cover that (see CG-0MSAZL6O2008PTWY). The process is
+      // killed before the dev server / Playwright phase completes, which
+      // is fine.
+      const result = runReplay([filePath], 60_000);
       const output = result.stdout + result.stderr;
 
       // Should NOT contain the v1 rejection error
@@ -446,6 +450,6 @@ describe('Replay CLI -- v1 transcript handling', () => {
       expect(output).toContain('Version: 1');
       expect(output).toContain('Turns: 1');
     },
-    20_000,
+    90_000,
   );
 });
