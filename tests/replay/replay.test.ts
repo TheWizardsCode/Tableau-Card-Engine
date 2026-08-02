@@ -441,7 +441,7 @@ describe('Replay CLI -- v1 transcript handling', () => {
       // timeout must cover that (see CG-0MSAZL6O2008PTWY). The process is
       // killed before the dev server / Playwright phase completes, which
       // is fine.
-      const result = runReplay([filePath], 60_000);)
+      const result = runReplay([filePath], 60_000);
       const output = result.stdout + result.stderr;
 
       // Should NOT contain the v1 rejection error
