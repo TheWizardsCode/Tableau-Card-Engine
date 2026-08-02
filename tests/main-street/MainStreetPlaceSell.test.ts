@@ -528,6 +528,119 @@ describe('MainStreet Place/Sell System', () => {
     );
   });
 
+  // ── Legality Checks (AC1-AC4) ──────────────────────────────
+
+  describe('Legality checks (AC1-AC4)', () => {
+    it.runIf(HAND_FEATURE_AVAILABLE && PLACE_SELL_LEGALITY_AVAILABLE)(
+      'canSellFromHand should reject invalid hand index',
+      async () => {
+        const state = createTestState();
+        executeDayStart(state);
+
+        addCardToHand(state, { id: 'test-card', cost: 6 });
+
+        const engine = await import('../../example-games/main-street/MainStreetEngine');
+
+        const result = (engine as any).canSellFromHand(state, 5);
+        expect(result.legal).toBe(false);
+        expect(typeof result.reason).toBe('string');
+      },
+    );
+
+    it.runIf(HAND_FEATURE_AVAILABLE && PLACE_SELL_LEGALITY_AVAILABLE)(
+      'canSellFromHand should allow selling a card in hand',
+      async () => {
+        const state = createTestState();
+        executeDayStart(state);
+
+        addCardToHand(state, { id: 'test-card', cost: 6 });
+
+        const engine = await import('../../example-games/main-street/MainStreetEngine');
+
+        const result = (engine as any).canSellFromHand(state, 0);
+        expect(result.legal).toBe(true);
+      },
+    );
+
+    it.runIf(HAND_FEATURE_AVAILABLE && PLACE_SELL_LEGALITY_AVAILABLE)(
+      'canSellFromTableau should reject invalid slot index',
+      async () => {
+        const state = createTestState();
+        executeDayStart(state);
+
+        const engine = await import('../../example-games/main-street/MainStreetEngine');
+
+        const result = (engine as any).canSellFromTableau(state, GRID_SIZE + 5);
+        expect(result.legal).toBe(false);
+        expect(typeof result.reason).toBe('string');
+      },
+    );
+
+    it.runIf(HAND_FEATURE_AVAILABLE && PLACE_SELL_LEGALITY_AVAILABLE)(
+      'canSellFromTableau should reject empty tableau slot',
+      async () => {
+        const state = createTestState();
+        executeDayStart(state);
+
+        const engine = await import('../../example-games/main-street/MainStreetEngine');
+
+        const result = (engine as any).canSellFromTableau(state, 0);
+        expect(result.legal).toBe(false);
+        expect(typeof result.reason).toBe('string');
+      },
+    );
+
+    it.runIf(HAND_FEATURE_AVAILABLE && PLACE_SELL_LEGALITY_AVAILABLE)(
+      'canSellFromTableau should allow selling an occupied slot',
+      async () => {
+        const state = createTestState();
+        executeDayStart(state);
+
+        const card = getAffordableCard(state);
+        if (!card) return;
+
+        // Occupy slot 0 directly
+        state.streetGrid[0] = card as any;
+
+        const engine = await import('../../example-games/main-street/MainStreetEngine');
+
+        const result = (engine as any).canSellFromTableau(state, 0);
+        expect(result.legal).toBe(true);
+      },
+    );
+
+    it.runIf(HAND_FEATURE_AVAILABLE && PLACE_SELL_LEGALITY_AVAILABLE)(
+      'legality checks do not mutate state',
+      async () => {
+        const state = createTestState();
+        executeDayStart(state);
+
+        const card = getAffordableCard(state);
+        if (!card) return;
+
+        addCardToHand(state, { ...card });
+        const handIndex = getHand(state).length - 1;
+        const slot = findEmptySlot(state);
+        if (slot < 0) return;
+
+        const handBefore = getHand(state).length;
+        const coinsBefore = state.resourceBank.coins;
+        const gridBefore = [...state.streetGrid];
+
+        const engine = await import('../../example-games/main-street/MainStreetEngine');
+
+        (engine as any).canPlaceFromHand(state, handIndex, slot);
+        (engine as any).canSellFromHand(state, handIndex);
+        (engine as any).canSellFromTableau(state, slot);
+
+        // No mutation: hand, coins, and grid unchanged
+        expect(getHand(state).length).toBe(handBefore);
+        expect(state.resourceBank.coins).toBe(coinsBefore);
+        expect(state.streetGrid).toEqual(gridBefore);
+      },
+    );
+  });
+
   // ── Discard Pile Verification (AC5) ────────────────────────
 
   describe('Discard pile tracking (AC5)', () => {

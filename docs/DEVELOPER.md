@@ -303,6 +303,7 @@ example-games/
 │   ├── createBeleagueredCastleGame.ts   Factory function (used by main.ts)
 │   ├── BeleagueredCastleState.ts        State types, move types, constants
 │   ├── BeleagueredCastleRules.ts        Pure game logic (deal, moves, win/loss)
+│   ├── BeleagueredCastleAi.ts           AI solver (search + heuristics) powering the hint system
 │   ├── GameTranscript.ts               Transcript recording (BCTranscriptRecorder)
 │   ├── help-content.json               Help panel content (rules, controls, tips)
 │   └── scenes/
@@ -555,7 +556,7 @@ Open `http://localhost:3000` and click the desired game card. Each game also has
 | Game | Location | Key engine features demonstrated | Tests |
 |------|----------|--------------------------------|-------|
 | 9-Card Golf | `example-games/golf/` | Card/Deck/Pile abstractions, GameState/TurnSequencer, scoring rules (A=1, 2=-2, K=0, column-of-three=0), Random/Greedy AI strategies, transcript recording, Phaser UI with 3x3 grid | `tests/golf/` (8 files) |
-| Beleaguered Castle | `example-games/beleaguered-castle/` | Single-player solitaire, UndoRedoManager (Command pattern), drag-and-drop + click-to-move, auto-move heuristics, auto-complete, win/loss detection, HelpPanel component, checkpoint autosave after each move with startup recovery | `tests/beleaguered-castle/` (2 files) |
+| Beleaguered Castle | `example-games/beleaguered-castle/` | Single-player solitaire, UndoRedoManager (Command pattern), drag-and-drop + click-to-move, auto-move heuristics, auto-complete, win/loss detection, HelpPanel component, checkpoint autosave after each move with startup recovery, hint system (AI solver suggests best move with source/destination highlights) | `tests/beleaguered-castle/` (10 files) |
 | Sushi Go! | `example-games/sushi-go/` | Card drafting (pick-and-pass hands), custom card types with set-collection scoring, multi-round match, procedural card-back textures | `tests/sushi-go/` (4 files) |
 | Feudalism | `example-games/feudalism/` | Resource management (gem tokens), tiered development cards with costs/bonuses, noble attraction, multi-action turns (take/reserve/purchase), checkpoint autosave after each turn (human + AI) with startup recovery | `tests/feudalism/` (4 files) |
 | Lost Cities | `example-games/lost-cities/` | Two-player expeditions, two-phase turn model (play/discard then draw), ascending-play rules, investment multipliers (x2/x3/x4), multi-round match scoring, procedurally generated SVG card assets | `tests/lost-cities/` (6 files) |

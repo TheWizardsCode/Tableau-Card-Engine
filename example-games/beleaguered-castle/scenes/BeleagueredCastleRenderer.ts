@@ -5,7 +5,7 @@
  * rendered via shared HandView (vertical cascade layout).
  */
 import Phaser from 'phaser';
-import type { BeleagueredCastleState } from '../BeleagueredCastleState';
+import type { BeleagueredCastleState, BCMove } from '../BeleagueredCastleState';
 import { FOUNDATION_COUNT, TABLEAU_COUNT } from '../BeleagueredCastleState';
 import { HandView, PileView } from '../../../src/ui';
 import { GAME_W, GAME_H } from '../../../src/ui';
@@ -15,6 +15,7 @@ import {
   BC_CARD_W, BC_CARD_H, CARD_GAP, CASCADE_OFFSET_Y,
   DRAG_DEPTH, DEAL_STAGGER, ANIM_DURATION, SNAP_BACK_DURATION,
   HIGHLIGHT_VALID, HIGHLIGHT_ALPHA, SELECTION_TINT,
+  HINT_SOURCE_COLOR, HINT_DEST_COLOR, HINT_ALPHA, HINT_DEPTH,
   HUD_MARGIN,
   HUD_FONT_SIZE,
   HUD_SEED_FONT_SIZE,
@@ -50,6 +51,9 @@ export class BeleagueredCastleRenderer {
   private foundationPileViews: PileView[] = [];
   private foundationDropZones: Phaser.GameObjects.Zone[] = [];
 
+  /** Hint highlight rectangles (source + destination). */
+  private hintRects: Phaser.GameObjects.Rectangle[] = [];
+
   /** Shared HandView components for tableau columns (vertical cascade layout). */
   private tableauHandViews: HandView[] = [];
   private tableauDropZones: Phaser.GameObjects.Zone[] = [];
@@ -75,6 +79,8 @@ export class BeleagueredCastleRenderer {
   get foundationSprites(): Phaser.GameObjects.Image[] { return this.foundationPileViews.map((pv) => pv.getSprite()); }
   get foundationDZs(): Phaser.GameObjects.Zone[] { return this.foundationDropZones; }
   get tableauDZs(): Phaser.GameObjects.Zone[] { return this.tableauDropZones; }
+  /** Whether a hint highlight is currently displayed. */
+  get hasActiveHint(): boolean { return this.hintRects.length > 0; }
   /** Each tableau column's sprites, derived from HandView components. */
   get tableauSprs(): Phaser.GameObjects.Image[][] { return this.tableauHandViews.map((hv) => hv.getSprites() as Phaser.GameObjects.Image[]); }
   get moveText(): Phaser.GameObjects.Text { return this.moveCountText; }
@@ -376,6 +382,58 @@ export class BeleagueredCastleRenderer {
     this.highlightRects = [];
   }
 
+  // ── Hint highlight ───────────────────────────────────────
+  /**
+   * Highlight the suggested move: the source card (gold border) and the
+   * destination — foundation pile or tableau column top / empty space
+   * (green border).
+   */
+  showHint(move: BCMove): void {
+    this.clearHint();
+
+    // Source: the top card of the source column
+    const sourceSprites = this.tableauSprs[move.fromCol];
+    if (sourceSprites && sourceSprites.length > 0) {
+      const top = sourceSprites[sourceSprites.length - 1];
+      const rect = this.scene.add.rectangle(
+        top.x, top.y, BC_CARD_W + 6, BC_CARD_H + 6,
+        HINT_SOURCE_COLOR, HINT_ALPHA,
+      ).setDepth(HINT_DEPTH);
+      this.hintRects.push(rect);
+    }
+
+    // Destination
+    if (move.kind === 'tableau-to-foundation') {
+      const fSprite = this.foundationPileViews[move.toFoundation]?.getSprite();
+      if (fSprite) {
+        const rect = this.scene.add.rectangle(
+          fSprite.x, fSprite.y, BC_CARD_W + 6, BC_CARD_H + 6,
+          HINT_DEST_COLOR, HINT_ALPHA,
+        ).setDepth(HINT_DEPTH);
+        this.hintRects.push(rect);
+      }
+    } else {
+      const col = move.toCol;
+      const cards = this.state.tableau[col].toArray();
+      const dropY = cards.length > 0
+        ? this.tableauCardYForColumn(cards.length - 1, cards.length)
+        : this.tableauCardYForColumn(0, 1);
+      const rect = this.scene.add.rectangle(
+        this.tableauColumnX(col), dropY, BC_CARD_W + 6, BC_CARD_H + 6,
+        HINT_DEST_COLOR, HINT_ALPHA,
+      ).setDepth(HINT_DEPTH);
+      this.hintRects.push(rect);
+    }
+  }
+
+  /** Remove any active hint highlight. */
+  clearHint(): void {
+    for (const rect of this.hintRects) {
+      rect.destroy();
+    }
+    this.hintRects = [];
+  }
+
   // ── Selection ───────────────────────────────────────────
   selectColumn(colIndex: number): void {
     const hv = this.tableauHandViews[colIndex];
@@ -418,6 +476,7 @@ export class BeleagueredCastleRenderer {
 
   // ── Refresh ─────────────────────────────────────────────
   refreshAll(makeDraggable: boolean, interactionBlocked: boolean): void {
+    this.clearHint();
     this.refreshFoundations();
     this.refreshTableau();
     this.refreshHUD();

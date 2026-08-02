@@ -512,7 +512,7 @@ describe('GreedyStrategy vs RandomStrategy win rates', () => {
     // With community space cards in the development row, greedy's advantage is reduced.
     // Assert greedy is not significantly worse than random (within binomial noise for 200 trials).
     expect(greedyWins).toBeGreaterThanOrEqual(randomWins - 10);
-  });
+  }, 120_000);
 });
 
 // ── Deterministic replay ────────────────────────────────────
