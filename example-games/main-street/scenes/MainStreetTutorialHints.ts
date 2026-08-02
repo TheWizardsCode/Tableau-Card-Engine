@@ -29,6 +29,7 @@ import {
   UNIFIED_TUTORIAL_STEP_COUNT,
   UNIFIED_TUTORIAL_STEPS,
   advanceTutorialStep,
+  resolveTutorialStepText,
   type TutorialControllerState,
   type TutorialHighlightZone,
 } from '../TutorialFlow';
@@ -283,13 +284,15 @@ export class MainStreetTutorialHints {
       titleEl.style.fontWeight = '700';
       titleEl.style.color = '#aaffaa';
       titleEl.style.marginBottom = `${padBetweenTitleAndBody}px`;
-      titleEl.textContent = t(step.titleKey);
+      // Card-data placeholders ({cardName}/{cost}/{bonus}) are resolved at
+      // render time via resolveTutorialStepText — never hardcode card facts.
+      titleEl.textContent = resolveTutorialStepText(step).title;
       container.appendChild(titleEl);
 
       const bodyEl = document.createElement('div');
       bodyEl.style.whiteSpace = 'pre-wrap';
       bodyEl.style.color = '#ddccbb';
-      bodyEl.textContent = t(step.bodyKey);
+      bodyEl.textContent = resolveTutorialStepText(step).body;
       container.appendChild(bodyEl);
 
       const btnRow = document.createElement('div');
@@ -430,8 +433,9 @@ export class MainStreetTutorialHints {
 
       const bg = s.add.rectangle(domX + TOOLTIP_W / 2, tooltipY + tooltipH / 2, TOOLTIP_W, tooltipH, 0x1a2a1a).setDepth(TOOLTIP_DEPTH + 1000);
       const border = s.add.rectangle(domX + TOOLTIP_W / 2, tooltipY + tooltipH / 2, TOOLTIP_W, tooltipH).setStrokeStyle(2, 0x44aa44).setDepth(TOOLTIP_DEPTH + 1001);
-      const titleTxt = s.add.text(domX + 12, tooltipY + 12, t(step.titleKey), { fontSize: '16px', color: '#aaffaa', fontFamily: FONT_FAMILY }).setDepth(TOOLTIP_DEPTH + 1002).setOrigin(0, 0);
-      const bodyTxt = s.add.text(domX + 12, tooltipY + 40, t(step.bodyKey), { fontSize: '13px', color: '#ddccbb', fontFamily: FONT_FAMILY, wordWrap: { width: TOOLTIP_W - 24 } as any }).setDepth(TOOLTIP_DEPTH + 1002).setOrigin(0, 0);
+      const stepText = resolveTutorialStepText(step);
+      const titleTxt = s.add.text(domX + 12, tooltipY + 12, stepText.title, { fontSize: '16px', color: '#aaffaa', fontFamily: FONT_FAMILY }).setDepth(TOOLTIP_DEPTH + 1002).setOrigin(0, 0);
+      const bodyTxt = s.add.text(domX + 12, tooltipY + 40, stepText.body, { fontSize: '13px', color: '#ddccbb', fontFamily: FONT_FAMILY, wordWrap: { width: TOOLTIP_W - 24 } as any }).setDepth(TOOLTIP_DEPTH + 1002).setOrigin(0, 0);
 
       const isLast = index === UNIFIED_TUTORIAL_STEP_COUNT - 1;
       const isActionStep = step.gate === 'action';
