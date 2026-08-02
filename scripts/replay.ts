@@ -683,6 +683,14 @@ async function main(): Promise<void> {
   } finally {
     summary.totalDurationMs = Date.now() - totalStart;
 
+    // Write the summary report FIRST: generateContactSheet() reads
+    // replay-summary.json from disk to find the screenshot list, so the
+    // summary must exist before the contact sheet can be generated
+    // (CG-0MSBX3UA9001QDF3).
+    const summaryPath = path.join(outputDir, 'replay-summary.json');
+    fs.writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
+    console.log(`\nSummary written to ${summaryPath}`);
+
     // Generate contact sheet from captured screenshots. `sharp` (via
     // contact-sheet.ts) is lazy-loaded here so it doesn't slow down
     // validation error paths (see CG-0MSAXWIK70050RDA).
@@ -691,18 +699,18 @@ async function main(): Promise<void> {
       const contactSheetPath = await generateContactSheet(outputDir);
       if (contactSheetPath) {
         summary.contactSheetPath = contactSheetPath;
+        // Re-write summary so contactSheetPath is persisted in the report.
+        fs.writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
         console.log(`\nContact sheet: ${contactSheetPath}`);
       }
     } catch (err) {
       const msg = `Contact sheet generation error: ${(err as Error).message}`;
       summary.errors.push(msg);
       console.warn(msg);
+      // Re-write summary so the contact-sheet error is persisted.
+      fs.writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
     }
 
-    // Write summary report
-    const summaryPath = path.join(outputDir, 'replay-summary.json');
-    fs.writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
-    console.log(`\nSummary written to ${summaryPath}`);
     console.log(`Total: ${summary.turnsReplayed} turns replayed, ${summary.screenshots.length} screenshots, ${summary.totalDurationMs}ms`);
 
     if (summary.errors.length > 0) {

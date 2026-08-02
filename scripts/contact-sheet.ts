@@ -132,9 +132,16 @@ async function generateContactSheet(outputDir: string): Promise<string | null> {
     const x = col * (THUMB_W + GAP);
     const y = row * (THUMB_H + LABEL_H + GAP);
 
-    // Thumbnail
+    // Thumbnail — resize to the thumbnail cell dimensions. Replay
+    // screenshots are full viewport size (e.g. 1280x720); compositing them
+    // at native size breaks sharp ("must have same dimensions or smaller") so
+    // the contact sheet never generated in the integrated flow
+    // (CG-0MSBX3UA9001QDF3). `contain` keeps the whole screenshot visible.
+    const thumbBuffer = await sharp((entry as any)._resolvedPath as string)
+      .resize(THUMB_W, THUMB_H, { fit: 'contain' })
+      .toBuffer();
     composites.push({
-      input: (entry as any)._resolvedPath as string,
+      input: thumbBuffer,
       top: y,
       left: x,
     });
