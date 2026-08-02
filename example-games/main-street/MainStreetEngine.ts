@@ -806,6 +806,106 @@ export function sellFromTableau(
   addLog(state, `Sold ${card.name} from slot ${slotIndex} for +${sellValue} coins`, 'gain');
 }
 
+// ── Legality Checks (Multi-Use Card Economy) ─────────────────
+
+/**
+ * Checks whether the card at the given hand index can be placed onto the
+ * given tableau slot without mutating state.
+ *
+ * Validates hand bounds, slot bounds, slot occupancy, and coin sufficiency
+ * (a card can only be placed if the player can afford its purchase price).
+ *
+ * @param state      Current game state (read-only).
+ * @param handIndex  Index of the card in state.hand to place.
+ * @param slotIndex  Target street grid slot (0-based, must be empty).
+ * @returns LegalityResult — `{ legal: true }` if valid, otherwise
+ *          `{ legal: false, reason }` describing the violation.
+ */
+export function canPlaceFromHand(
+  state: MainStreetState,
+  handIndex: number,
+  slotIndex: number,
+): import('../../src/rule-engine').LegalityResult {
+  const hand = state.hand ?? [];
+
+  // Validate hand index
+  if (handIndex < 0 || handIndex >= hand.length) {
+    return { legal: false, reason: `Invalid hand index: ${handIndex}. Hand has ${hand.length} cards.` };
+  }
+
+  const card = hand[handIndex];
+
+  // Validate slot index
+  if (slotIndex < 0 || slotIndex >= 10) {
+    return { legal: false, reason: `Invalid slot index: ${slotIndex}. Must be 0-9.` };
+  }
+
+  // Check slot is empty
+  if (state.streetGrid[slotIndex] !== null) {
+    return { legal: false, reason: `Slot ${slotIndex} is already occupied.` };
+  }
+
+  // Check coin sufficiency
+  if (state.resourceBank.coins < card.cost) {
+    return { legal: false, reason: `Insufficient coins to place ${card.name}: need ${card.cost}, have ${state.resourceBank.coins}.` };
+  }
+
+  return { legal: true };
+}
+
+/**
+ * Checks whether the card at the given hand index can be sold from hand
+ * without mutating state.
+ *
+ * Validates hand bounds.
+ *
+ * @param state      Current game state (read-only).
+ * @param handIndex  Index of the card in state.hand to sell.
+ * @returns LegalityResult — `{ legal: true }` if valid, otherwise
+ *          `{ legal: false, reason }` describing the violation.
+ */
+export function canSellFromHand(
+  state: MainStreetState,
+  handIndex: number,
+): import('../../src/rule-engine').LegalityResult {
+  const hand = state.hand ?? [];
+
+  // Validate hand index
+  if (handIndex < 0 || handIndex >= hand.length) {
+    return { legal: false, reason: `Invalid hand index: ${handIndex}. Hand has ${hand.length} cards.` };
+  }
+
+  return { legal: true };
+}
+
+/**
+ * Checks whether the card at the given tableau slot can be sold without
+ * mutating state.
+ *
+ * Validates slot bounds and slot occupancy.
+ *
+ * @param state      Current game state (read-only).
+ * @param slotIndex  Street grid slot index of the card to sell.
+ * @returns LegalityResult — `{ legal: true }` if valid, otherwise
+ *          `{ legal: false, reason }` describing the violation.
+ */
+export function canSellFromTableau(
+  state: MainStreetState,
+  slotIndex: number,
+): import('../../src/rule-engine').LegalityResult {
+  // Validate slot index
+  if (slotIndex < 0 || slotIndex >= 10) {
+    return { legal: false, reason: `Invalid slot index: ${slotIndex}. Must be 0-9.` };
+  }
+
+  // Check slot is occupied
+  if (state.streetGrid[slotIndex] === null) {
+    return { legal: false, reason: `Slot ${slotIndex} is empty. Nothing to sell.` };
+  }
+
+  return { legal: true };
+}
+
 // ── Sell Operations (Street Grid) ──────────────────────────────
 
 /**
