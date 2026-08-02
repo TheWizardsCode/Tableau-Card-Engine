@@ -38,7 +38,7 @@ import { evaluateChallenges } from './MainStreetChallenges';
 import { applyReputationMultiplier, reputationCoinMultiplier } from './MainStreetDifficulty';
 
 // Re-export for convenience (tests import from the engine module).
-export { reputationCoinMultiplier, applyReputationMultiplier };
+export { reputationCoinMultiplier, applyReputationMultiplier, cycleMarketCards };
 
 // ── Action Types ────────────────────────────────────────────
 

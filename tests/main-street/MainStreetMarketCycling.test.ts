@@ -6,10 +6,9 @@
  * the main deck when the deck is empty, and sold cards enter the discard pile.
  *
  * NOTE: These tests validate the market cycling feature added by the Multi-Use
- * Card Economy implementation (CG-0MQRXN2CT0076OW7). Some tests reference
- * functions that may not exist until the implementation child
- * (CG-0MQSFGOU30078033) is complete. Feature-detection flags control which
- * tests run.
+ * Card Economy implementation (CG-0MQRXN2CT0076OW7). The feature is fully
+ * implemented; feature-detection is synchronous and deterministic so gating
+ * never skips tests due to an async race.
  *
  * @module
  */
@@ -29,6 +28,7 @@ import {
   executeDayStart,
   processEndOfTurn,
   executeAction,
+  cycleMarketCards,
 } from '../../example-games/main-street/MainStreetEngine';
 import {
   refillAllMarkets,
@@ -39,20 +39,12 @@ import {
 /** True once hand fields exist on MainStreetState (I1). */
 const HAND_FEATURE_AVAILABLE = 'hand' in (setupMainStreetGame() as any);
 
-/** True once cycle/discard-pile features are available (I4). */
-let CYCLING_FEATURE_AVAILABLE = false;
-(async () => {
-  try {
-    const engine = await import('../../example-games/main-street/MainStreetEngine');
-    CYCLING_FEATURE_AVAILABLE = typeof (engine as any).cycleMarketCards === 'function';
-    if (!CYCLING_FEATURE_AVAILABLE) {
-      const market = await import('../../example-games/main-street/MainStreetMarket');
-      CYCLING_FEATURE_AVAILABLE = typeof (market as any).cycleMarketCards === 'function';
-    }
-  } catch {
-    // feature not yet implemented
-  }
-})();
+/**
+ * True once cycle/discard-pile features are available (I4).
+ * Synchronous: the feature is fully implemented and statically imported,
+ * so the gate is evaluated deterministically at collection time.
+ */
+const CYCLING_FEATURE_AVAILABLE = typeof cycleMarketCards === 'function';
 
 // ── Helpers ─────────────────────────────────────────────────
 
@@ -110,7 +102,7 @@ describe('MainStreet Market Cycling', () => {
   describe('Unpurchased cards cycle to discard', () => {
     it.runIf(CYCLING_FEATURE_AVAILABLE)(
       'should capture unpurchased market cards in discard after MarketPhase',
-      async () => {
+      () => {
         const state = createTestState();
         executeDayStart(state);
 
@@ -119,11 +111,7 @@ describe('MainStreet Market Cycling', () => {
         expect(marketIDsBefore.length).toBeGreaterThan(0);
 
         // Trigger cycling
-        const engine = await import('../../example-games/main-street/MainStreetEngine');
-        const cycleFn = (engine as any).cycleMarketCards;
-        if (typeof cycleFn === 'function') {
-          cycleFn(state);
-        }
+        cycleMarketCards(state);
 
         // Market cards should now be in discard piles
         const totalDiscards = getTotalDiscardCount(state);
@@ -205,18 +193,14 @@ describe('MainStreet Market Cycling', () => {
 
     it.runIf(CYCLING_FEATURE_AVAILABLE)(
       'should have deterministically different market cards after cycling + refill',
-      async () => {
+      () => {
         const state = createTestState();
         const firstMarketIds = getMarketIDs(state);
 
         executeDayStart(state);
 
         // Apply cycling
-        const engine = await import('../../example-games/main-street/MainStreetEngine');
-        const cycleFn = (engine as any).cycleMarketCards;
-        if (typeof cycleFn !== 'function') return;
-
-        cycleFn(state);
+        cycleMarketCards(state);
 
         // Refill
         refillAllMarkets(state);
@@ -249,7 +233,7 @@ describe('MainStreet Market Cycling', () => {
   describe('Discard reshuffle into deck', () => {
     it.runIf(CYCLING_FEATURE_AVAILABLE)(
       'should reshuffle discard into deck when deck is empty',
-      async () => {
+      () => {
         const state = createTestState();
         executeDayStart(state);
 
@@ -293,11 +277,8 @@ describe('MainStreet Market Cycling', () => {
 
     it.runIf(CYCLING_FEATURE_AVAILABLE)(
       'should survive multiple rounds of discard reshuffle',
-      async () => {
+      () => {
         const state = createTestState();
-        const engine = await import('../../example-games/main-street/MainStreetEngine');
-        const cycleFn = (engine as any).cycleMarketCards;
-        if (typeof cycleFn !== 'function') return;
 
         for (let i = 0; i < 3 && state.gameResult === 'playing'; i++) {
           executeDayStart(state);
@@ -314,7 +295,7 @@ describe('MainStreet Market Cycling', () => {
           }
 
           // Cycle after MarketPhase
-          cycleFn(state);
+          cycleMarketCards(state);
           processEndOfTurn(state);
         }
 
@@ -399,21 +380,18 @@ describe('MainStreet Market Cycling', () => {
 
     it.runIf(CYCLING_FEATURE_AVAILABLE)(
       'should have different discard contents after each cycling turn',
-      async () => {
+      () => {
         const state = createTestState();
-        const engine = await import('../../example-games/main-street/MainStreetEngine');
-        const cycleFn = (engine as any).cycleMarketCards;
-        if (typeof cycleFn !== 'function') return;
 
         executeDayStart(state);
-        cycleFn(state);
+        cycleMarketCards(state);
         const discardsAfterTurn1 = getTotalDiscardCount(state);
 
         processEndOfTurn(state);
 
         if (state.gameResult === 'playing') {
           executeDayStart(state);
-          cycleFn(state);
+          cycleMarketCards(state);
           const discardsAfterTurn2 = getTotalDiscardCount(state);
           expect(discardsAfterTurn2).toBeGreaterThanOrEqual(discardsAfterTurn1);
         }
