@@ -25,12 +25,16 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { chromium } from 'playwright';
 import type { Browser, Page } from 'playwright';
 import { DEV_SERVER_URL, ensureDevServer, killDevServer } from './dev-server-utils';
 import { adapterRegistry } from './adapters';
 import type { ReplayAdapter } from './adapters';
-import { generateContactSheet } from './contact-sheet';
+
+// NOTE: Playwright (`chromium`) and the contact-sheet module (which imports
+// `sharp`) are intentionally NOT statically imported. Both are heavy native
+// modules whose ESM evaluation would delay CLI argument/transcript
+// validation error paths under parallel CPU load (see CG-0MSAXWIK70050RDA).
+// They are loaded dynamically, only when the replay path actually needs them.
 
 // ── Types ───────────────────────────────────────────────────
 
@@ -307,6 +311,11 @@ async function main(): Promise<void> {
   const totalStart = Date.now();
 
   try {
+    // Lazy-load Playwright at first use: argument/transcript validation
+    // error paths exit before this point, so they never pay the (potentially
+    // 15-30s under parallel load) module-loading cost. See CG-0MSAXWIK70050RDA.
+    const { chromium } = await import('playwright');
+
     // ── Phase 1: Headless fast-forward (when --skip-to is used) ─────────
     // If --skip-to is provided and > 0, we first run headlessly to reach
     // the goal turn without capturing screenshots, then close the browser.
@@ -674,8 +683,11 @@ async function main(): Promise<void> {
   } finally {
     summary.totalDurationMs = Date.now() - totalStart;
 
-    // Generate contact sheet from captured screenshots
+    // Generate contact sheet from captured screenshots. `sharp` (via
+    // contact-sheet.ts) is lazy-loaded here so it doesn't slow down
+    // validation error paths (see CG-0MSAXWIK70050RDA).
     try {
+      const { generateContactSheet } = await import('./contact-sheet');
       const contactSheetPath = await generateContactSheet(outputDir);
       if (contactSheetPath) {
         summary.contactSheetPath = contactSheetPath;

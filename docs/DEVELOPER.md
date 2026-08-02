@@ -748,6 +748,8 @@ npm run replay -- tests/fixtures/transcripts/main-street/fixture-game.json --gam
 
 Screenshots are written as `turn-000.png`, `turn-001.png`, etc. in the output directory. A `replay-summary.json` is also written with metadata.
 
+> **Performance note:** the replay script lazy-loads its heavy modules (Playwright, `sharp` via `contact-sheet.ts`) using dynamic `import()` only when the replay path actually needs them. Argument/transcript validation error paths (`--stop-at`/`--skip-to` validation, missing/invalid transcripts, version rejection) therefore exit in milliseconds-to-seconds instead of waiting for Playwright/sharp module evaluation (which can take 15-30s+ under parallel CPU load). See CG-0MSAXWIK70050RDA.
+
 ### How It Works
 
 1. The replay tool parses the transcript and resolves a `ReplayAdapter` from the adapter registry (`scripts/adapters/index.ts`)
