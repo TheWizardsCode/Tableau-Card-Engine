@@ -4,8 +4,10 @@
  * Tests transcript loading/validation via CLI subprocess invocation
  * and summary report structure by reading previously-generated output.
  *
- * Note: CLI invocation tests use longer timeouts because the replay
- * script imports Playwright, which adds ~5-6s of module loading time.
+ * Note: CLI invocation tests use long timeouts (60s subprocess / 90s test)
+ * because the replay script imports Playwright, which adds ~5-6s of module
+ * loading time, and the full unit suite runs hundreds of parallel test files
+ * that compete for CPU.
  *
  * See CG-0MLU5G2A707CSMKD.
  */
@@ -439,7 +441,7 @@ describe('Replay CLI -- v1 transcript handling', () => {
       // timeout must cover that (see CG-0MSAZL6O2008PTWY). The process is
       // killed before the dev server / Playwright phase completes, which
       // is fine.
-      const result = runReplay([filePath], 60_000);
+      const result = runReplay([filePath], 60_000);)
       const output = result.stdout + result.stderr;
 
       // Should NOT contain the v1 rejection error

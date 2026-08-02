@@ -1066,7 +1066,7 @@ The current CSV schema is sufficient for all proposed metrics. The following cha
 |------|---------|
 | `example-games/main-street/card-data.csv` | Source of truth for all card templates |
 | `src/core-engine/CsvLoader.ts` | CSV parsing utility (used at build time) |
-| `scripts/balance-cards/` | Existing `run-balance-cards` balancing algorithm |
+| `src/balance-cards/` | Existing `run-balance-cards` balancing algorithm |
 
 ### 11.3 Playtest Scenarios
 
@@ -1079,7 +1079,7 @@ The current CSV schema is sufficient for all proposed metrics. The following cha
 
 | File | Purpose |
 |------|---------|
-| `scripts/balance-cards/algorithm.ts` | Core balancing algorithm (curve-fitting + tier band analysis) |
+| `src/balance-cards/algorithm.ts` | Core balancing algorithm (curve-fitting + tier band analysis) |
 | `scripts/run-balance-cards.ts` | CLI entry point for the balancing pass |
 | `docs/main-street/balancing-methodology.md` | Full documentation of the balancing algorithm |
 

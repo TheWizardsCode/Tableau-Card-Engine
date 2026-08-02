@@ -27,7 +27,7 @@ import {
   formatSummaryTable,
   toCsvString,
   type CsvRow,
-} from '../../scripts/balance-cards';
+} from '../../src/balance-cards';
 
 // ── Test helpers ──────────────────────────────────────────────────────
 
