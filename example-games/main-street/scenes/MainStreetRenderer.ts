@@ -17,7 +17,7 @@ import {
 } from '../MainStreetAdjacency';
 import {
   formatSynergyRate,
-  resolveDescription,
+  buildCardTooltipInfo,
 } from '../MainStreetFormatting';
 import { computeScore } from '../MainStreetEngine';
 import {
@@ -143,7 +143,7 @@ export class MainStreetRenderer {
           const hover = s.add.rectangle(0, 0, handCardW, handCardH, 0x000000, 0.001);
           hover.setInteractive({ useHandCursor: s.uiPhase === 'market' });
           hover.on('pointerover', () => {
-            const info = `Event: ${card.name}\nCost: ${card.cost}\nEffect: ${card.effect}`;
+            const info = buildCardTooltipInfo(card, s.state.config);
             s.tooltipManager?.show(info, container.x, container.y);
           });
           hover.on('pointerout', () => s.tooltipManager?.hide());
@@ -1112,26 +1112,7 @@ export class MainStreetRenderer {
       hitArea.on('pointerover', () => {
         selection.setHovered(true);
         if (!s.replayMode) {
-          let info = '';
-          if (card.family === 'business') {
-            const b = card as any;
-            const bTotalRep = (b.reputationPerTurn ?? 0) + (b.reputationBonus ?? 0);
-            const bRepInfo = bTotalRep > 0 ? `\nReputation: +${bTotalRep}/turn` : '';
-            info = `Business: ${b.name}\nCost: ${b.cost}\nIncome: +${b.baseIncome + (b.incomeBonus || 0)}/turn${bRepInfo}\nSynergy: ${(b.synergyTypes || []).join('/')}\n${resolveDescription(b.description ?? '', b, s.state.config)}`;
-          } else if (card.family === 'community-space') {
-            const cs = card as any;
-            const csTotalRep = (cs.reputationPerTurn ?? 0) + (cs.reputationBonus ?? 0);
-            const csRepInfo = csTotalRep > 0 ? `\nReputation: +${csTotalRep}/turn` : '';
-            const csOngoingInfo = (cs.ongoingCost ?? 0) > 0 ? `\nOngoing cost: -${cs.ongoingCost}/turn` : '';
-            info = `Community Space: ${cs.name}\nCost: ${cs.cost}\nIncome: +${cs.baseIncome + (cs.incomeBonus || 0)}/turn${csOngoingInfo}${csRepInfo}\nSynergy: ${(cs.synergyTypes || []).join('/')}\n${resolveDescription(cs.description ?? '', cs, s.state.config)}`;
-          } else if (card.family === 'event') {
-            const e = card as any;
-            const coinDelta = e.coinDelta >= 0 ? '+' : '';
-            info = `Event: ${e.name}\nCost: ${e.cost}\nEffect: ${e.effect}\nCoins: ${coinDelta}${e.coinDelta.toFixed(3)}, Rep: ${e.reputationDelta >= 0 ? '+' : ''}${e.reputationDelta}`;
-          } else if (card.family === 'upgrade') {
-            const u = card as any;
-            info = `Upgrade: ${u.name}\nCost: ${u.cost}\nApplies to: ${u.targetBusiness}\nIncome Bonus: +${u.incomeBonus}\nRequires: Lv${u.requiredLevel ?? 0}\n${u.description ?? ''}`;
-          }
+          const info = buildCardTooltipInfo(card, s.state.config, { includeEventDetail: true });
           s.tooltipManager?.show(info, container.x, container.y);
         }
       });
@@ -1324,7 +1305,7 @@ export class MainStreetRenderer {
       const hover = s.add.rectangle(0, 0, handCardW, handCardH, 0x000000, 0.001);
       hover.setInteractive({ useHandCursor: s.uiPhase === 'market' });
       hover.on('pointerover', () => {
-        const info = `Event: ${card.name}\nCost: ${card.cost}\nEffect: ${card.effect}`;
+        const info = buildCardTooltipInfo(card, s.state.config);
         s.tooltipManager?.show(info, container.x, container.y);
       });
       hover.on('pointerout', () => s.tooltipManager?.hide());

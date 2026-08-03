@@ -21,6 +21,7 @@ import type {
   SynergyType,
 } from '../MainStreetCards';
 import { synergyColor } from '../MainStreetCards';
+import { formatCurrency } from '@core-engine/I18n';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -141,7 +142,7 @@ export function generateBusinessCardSvg(
   const costCx = width - 16;
   const costCy = height - 16;
   const costCircle = `<circle cx="${costCx}" cy="${costCy}" r="12" fill="#e0c7a0" stroke="#c8b79a" stroke-width="1.5" />`;
-  const costText = `<text x="${costCx}" y="${costCy + 4}" font-family="${FONT}" font-size="11" fill="#3a2a14" text-anchor="middle" font-weight="500">${card.cost}</text>`;
+  const costText = `<text x="${costCx}" y="${costCy + 4}" font-family="${FONT}" font-size="11" fill="#3a2a14" text-anchor="middle" font-weight="500">${formatCurrency(card.cost)}</text>`;
 
   // ── Compose SVG ─────────────────────────────────────────
 
@@ -255,7 +256,7 @@ function costBadgeSvg(cost: number, width: number, height: number): string {
   const cy = height - 16;
   return (
     '<circle cx="' + cx + '" cy="' + cy + '" r="12" fill="#e0c7a0" stroke="#c8b79a" stroke-width="1.5" />\n' +
-    '  <text x="' + cx + '" y="' + (cy + 4) + '" font-family="' + FONT + '" font-size="11" fill="#3a2a14" text-anchor="middle" font-weight="500">' + cost + '</text>'
+    '  <text x="' + cx + '" y="' + (cy + 4) + '" font-family="' + FONT + '" font-size="11" fill="#3a2a14" text-anchor="middle" font-weight="500">' + formatCurrency(cost) + '</text>'
   );
 }
 

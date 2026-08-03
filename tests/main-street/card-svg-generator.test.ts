@@ -98,10 +98,10 @@ describe('generateBusinessCardSvg - base cards (level === 0)', () => {
     expect(svg).not.toContain('Lvl 0');
   });
 
-  it('should include cost value', () => {
+  it('should include cost value formatted with the currency symbol', () => {
     const biz = makeBiz({ cost: 6, level: 0 });
     const svg = generateBusinessCardSvg(biz, CARD_W, CARD_H);
-    expect(svg).toContain('>6<');
+    expect(svg).toContain('>€6<');
   });
 
   it('should include synergy icon', () => {
@@ -136,10 +136,10 @@ describe('generateBusinessCardSvg - upgraded cards (level > 0)', () => {
     expect(svg).toContain('+0.3/turn');
   });
 
-  it('should show cost value', () => {
+  it('should show cost value formatted with the currency symbol', () => {
     const biz = makeBiz({ cost: 4, level: 1 });
     const svg = generateBusinessCardSvg(biz, CARD_W, CARD_H);
-    expect(svg).toContain('>4<');
+    expect(svg).toContain('>€4<');
   });
 });
 

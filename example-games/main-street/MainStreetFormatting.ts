@@ -20,6 +20,8 @@
  */
 
 import type { GameConfig } from './MainStreetDifficulty';
+import type { AnyCard } from './MainStreetCards';
+import { formatCurrency } from '@core-engine/I18n';
 
 /** Default per-card coin synergy rate when the CSV does not specify one. */
 export const DEFAULT_SYNERGY_COIN_RATE = 0.5;
@@ -83,6 +85,68 @@ export function formatSynergyRate(
 function formatPercent(rate: number): string {
   const oneDecimal = Math.round(rate * 1000) / 10;
   return Number.isInteger(oneDecimal) ? String(oneDecimal) : oneDecimal.toFixed(1);
+}
+
+/**
+ * Options controlling `buildCardTooltipInfo()` output.
+ */
+export interface CardTooltipInfoOptions {
+  /**
+   * Include the coin/reputation detail lines for event cards (used by the
+   * market-row tooltip). Hand-held event cards omit these lines.
+   */
+  includeEventDetail?: boolean;
+}
+
+/**
+ * Build the hover tooltip text for a Main Street card.
+ *
+ * All families render their cost line through `formatCurrency()` so the
+ * currency symbol follows the active locale (e.g. `€` for `en`, `$` for
+ * `en-US`) instead of a hardcoded symbol or raw number.
+ *
+ * Staff and unknown card families return an empty string (matching the
+ * previous behaviour where those cards showed no tooltip text).
+ *
+ * @param card    The card to describe.
+ * @param config  The active difficulty config (for synergy-rate resolution).
+ * @param options  Optional per-call tweaks (event detail lines).
+ * @returns The tooltip text (may be empty for unsupported families).
+ */
+export function buildCardTooltipInfo(
+  card: AnyCard,
+  config: SynergyFormatConfig,
+  options: CardTooltipInfoOptions = {},
+): string {
+  switch (card.family) {
+    case 'business': {
+      const b = card;
+      const bTotalRep = (b.reputationPerTurn ?? 0) + (b.reputationBonus ?? 0);
+      const bRepInfo = bTotalRep > 0 ? `\nReputation: +${bTotalRep}/turn` : '';
+      return `Business: ${b.name}\nCost: ${formatCurrency(b.cost)}\nIncome: +${b.baseIncome + (b.incomeBonus || 0)}/turn${bRepInfo}\nSynergy: ${(b.synergyTypes || []).join('/')}\n${resolveDescription(b.description ?? '', b, config)}`;
+    }
+    case 'community-space': {
+      const cs = card;
+      const csTotalRep = (cs.reputationPerTurn ?? 0) + (cs.reputationBonus ?? 0);
+      const csRepInfo = csTotalRep > 0 ? `\nReputation: +${csTotalRep}/turn` : '';
+      const csOngoingInfo = (cs.ongoingCost ?? 0) > 0 ? `\nOngoing cost: -${cs.ongoingCost}/turn` : '';
+      return `Community Space: ${cs.name}\nCost: ${formatCurrency(cs.cost)}\nIncome: +${cs.baseIncome + (cs.incomeBonus || 0)}/turn${csOngoingInfo}${csRepInfo}\nSynergy: ${(cs.synergyTypes || []).join('/')}\n${resolveDescription(cs.description ?? '', cs, config)}`;
+    }
+    case 'event': {
+      const e = card;
+      const detail = options.includeEventDetail
+        ? `\nCoins: ${e.coinDelta >= 0 ? '+' : ''}${e.coinDelta.toFixed(3)}, Rep: ${e.reputationDelta >= 0 ? '+' : ''}${e.reputationDelta}`
+        : '';
+      return `Event: ${e.name}\nCost: ${formatCurrency(e.cost)}\nEffect: ${e.effect}${detail}`;
+    }
+    case 'upgrade': {
+      const u = card;
+      return `Upgrade: ${u.name}\nCost: ${formatCurrency(u.cost)}\nApplies to: ${u.targetBusiness}\nIncome Bonus: +${u.incomeBonus}\nRequires: Lv${u.requiredLevel ?? 0}\n${u.description ?? ''}`;
+    }
+    default:
+      // Staff cards (and any future unknown families) show no tooltip text.
+      return '';
+  }
 }
 
 /**
