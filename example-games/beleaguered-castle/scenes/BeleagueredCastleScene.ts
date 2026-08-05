@@ -608,11 +608,35 @@ export class BeleagueredCastleScene extends CardGameScene {
    * restarts fresh.
    */
   private checkForSavedCheckpoint(): void {
+    // The checkpoint load is async (IndexedDB/localStorage) and the promise
+    // may settle after the scene has been shut down (e.g. a browser test
+    // destroys the game while the load is in flight). Guard every callback
+    // against that so we never touch a torn-down scene (CG-0MSBZ7ZW500521ZH).
     this.checkpointManager.checkAndResume(
-      () => this.startFreshGame(),
-      (state) => this.restoreFromCheckpoint(state),
-      (state, onResume) => this.showResumeOverlay(state, onResume),
-    );
+      () => { if (this.isSceneAlive()) this.startFreshGame(); },
+      (state) => { if (this.isSceneAlive()) this.restoreFromCheckpoint(state); },
+      (state, onResume) => { if (this.isSceneAlive()) this.showResumeOverlay(state, onResume); },
+    ).catch((err) => {
+      // Safety net: never surface an unhandled rejection for a check that
+      // settled after teardown. Genuine failures on a live scene are logged.
+      if (this.isSceneAlive()) {
+        console.warn('[BeleagueredCastle] checkpoint resume check failed:', err);
+      }
+    });
+  }
+
+  /**
+   * True while this scene is still running. Used to guard async callbacks
+   * (e.g. the checkpoint resume check) that may resolve after the scene has
+   * been shut down — running scene UI against a torn-down scene throws
+   * obscure errors such as "Cannot read properties of null (reading 'add')".
+   */
+  private isSceneAlive(): boolean {
+    try {
+      return this.scene.isActive();
+    } catch {
+      return false;
+    }
   }
 
   /**

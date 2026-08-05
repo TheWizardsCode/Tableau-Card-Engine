@@ -252,9 +252,10 @@ export interface BusinessCard {
    */
   reputationPerTurn?: number;
   /**
-   * Coin synergy contribution per matching neighbor.
-   * Defaults to 1 (the standard +1 coin per matching adjacency) when undefined.
-   * Set to 0 to exclude this card from contributing synergy to neighbors.
+   * Coin synergy contribution per matching neighbor, as a fraction of the
+   * neighbor's base income. Defaults to 0.5 (50% of base income per matching
+   * adjacency) when undefined. Set to 0 to exclude this card from
+   * contributing synergy to neighbors.
    */
   readonly synergyCoinBonus?: number;
   /**
@@ -569,9 +570,10 @@ export interface CommunitySpaceCard {
    */
   reputationPerTurn?: number;
   /**
-   * Coin synergy contribution per matching neighbor.
-   * Defaults to 1 (the standard +1 coin per matching adjacency) when undefined.
-   * Set to 0 to exclude this card from contributing synergy to neighbors.
+   * Coin synergy contribution per matching neighbor, as a fraction of the
+   * neighbor's base income. Defaults to 0.5 (50% of base income per matching
+   * adjacency) when undefined. Set to 0 to exclude this card from
+   * contributing synergy to neighbors.
    */
   readonly synergyCoinBonus?: number;
   /**
