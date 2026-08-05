@@ -152,7 +152,7 @@ The tutorial E2E tests are split into 6 part files (1-6 tests per file). Each pa
 
 The replay E2E tests live in `tests/e2e/replay-*.test.ts` and use a dedicated Node.js project (`replay-e2e`) with `pool: 'forks'` + `singleFork: true`. This isolates them from the parallel unit test pool, ensuring the Vite dev server started by `scripts/replay.ts` has uncontested CPU for its initial cold compilation. The replay tests start and stop their own dev server per run via `scripts/dev-server-utils.ts`.
 
-#### CPU-contention mitigation (unit tests)
+#### CPU-contention mitigation (unit and browser tests)
 
 Full-suite runs can intermittently fail at teardown with
 `Error: [vitest-worker]: Timeout calling "onTaskUpdate"` even though every test file
@@ -161,21 +161,27 @@ birpc with a hard-coded 60s timeout (`DEFAULT_TIMEOUT = 6e4` in Vitest internals
 not a configurable knob). Under CPU contention (e.g. concurrent vitest processes
 on a 16-core workstation), a worker can miss the 60s window while reporting test
 results back to the main process, and Vitest exits non-zero despite a fully-green
-run. Because `scripts/run-ci-tests.sh` runs with `set -euo pipefail`, that non-zero
-exit previously aborted the CI gate after the unit step.
+run. Browser-mode runs have a sibling failure mode (see CG-0MSCI73RH004VPCE): when
+the browser RPC WebSocket is dropped under load, vitest browser mode closes the
+connection and exits non-zero with
+`[vitest] Browser connection was closed while running tests.` even though every
+file completed. Because `scripts/run-ci-tests.sh` runs with `set -euo pipefail`,
+those non-zero exits previously aborted the CI gate after the unit/browser step.
 
 Two mitigations are in place in this repository:
 
 1. **Worker-pool cap** — the `unit` project in `vite.config.ts` sets
    `maxWorkers: 4` to bound aggregate CPU demand from parallel tinypool workers.
-2. **Retry-once on the transient signature** — the unit step in
-   `scripts/run-ci-tests.sh` runs through `scripts/vitest-run-with-retry.ts`, which
+2. **Retry-once on the transient signatures** — the unit **and** browser steps in
+   `scripts/run-ci-tests.sh` run through `scripts/vitest-run-with-retry.ts`, which
    retries the run exactly once when (and only when) the reporter summary shows
-   **all** files passed **and** the sole error is the `[vitest-worker]: Timeout
-   calling "onTaskUpdate"` signature. The masking guard (`shouldRetryOnce` in that
-   script, unit-tested in `tests/scripts/vitest-run-with-retry.test.ts`) proves
-   "all passed" from the summary before a retry is allowed, so a genuine test
-   failure can never be hidden by a retry.
+   **all** files passed **and** the sole error is one of the transient signatures
+   (`[vitest-worker]: Timeout calling "onTaskUpdate"` or
+   `[vitest] Browser connection was closed while running tests`). The masking
+   guard (`shouldRetryOnce` in that script, unit-tested in
+   `tests/scripts/vitest-run-with-retry.test.ts`) proves "all passed" from the
+   summary before a retry is allowed, so a genuine test failure can never be
+   hidden by a retry.
 
 If you see the worker-timeout error repeatedly under sustained load, run the
 suites sequentially (e.g. `npx vitest run --project unit` alone) rather than

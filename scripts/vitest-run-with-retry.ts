@@ -1,25 +1,34 @@
 #!/usr/bin/env node
 /**
- * Vitest runner with a retry-once strategy for Vitest's transient worker
- * RPC timeout.
+ * Vitest runner with a retry-once strategy for Vitest's transient
+ * contention-induced failures that exit non-zero even when every test
+ * file passed.
  *
- * Problem (see CG-0MS9M5UJP005PWD3): Vitest's worker RPC layer uses birpc
- * with a hard-coded 60s timeout (DEFAULT_TIMEOUT = 6e4 in
- * node_modules/vitest/dist/chunks/index.*.js). Under CPU contention a
- * worker can miss the 60s window while reporting test results back to the
- * main process (`onTaskUpdate`), and Vitest exits non-zero even though
- * every test file passed. The 60s timeout is not configurable via a
- * supported Vitest option, so the mitigation is at the runner level:
+ * Problem (see CG-0MS9M5UJP005PWD3, CG-0MSCI73RH004VPCE): Vitest has two
+ * distinct transient failure signatures that are not fixable via a
+ * supported Vitest option:
+ *
+ *   1. Worker RPC timeout — Vitest's worker RPC layer uses birpc with a
+ *      hard-coded 60s timeout (DEFAULT_TIMEOUT = 6e4 in
+ *      node_modules/vitest/dist/chunks/index.*.js). Under CPU contention a
+ *      worker can miss the 60s window while reporting test results back to
+ *      the main process (`onTaskUpdate`).
+ *   2. Browser WebSocket drop — Vitest browser mode closes the browser RPC
+ *      WebSocket when the page is dropped under load
+ *      (`[vitest] Browser connection was closed while running tests.`),
+ *      poisoning the run with an RPC error after all files completed.
+ *
+ * The mitigation is at the runner level:
  *
  *   - Retry the run exactly once when the output shows ALL files passed
- *     AND the sole error is the transient `[vitest-worker]: Timeout
- *     calling "onTaskUpdate"` signature.
+ *     AND the sole error is one of the transient signatures above.
  *   - Never retry on genuine test failures — the masking guard
  *     (shouldRetryOnce) proves "all passed" from the reporter summary
  *     before a retry is allowed.
  *
  * Usage (mirrors `npx vitest run ...`):
  *   npx tsx scripts/vitest-run-with-retry.ts --project unit
+ *   npx tsx scripts/vitest-run-with-retry.ts --project browser
  *
  * The spawned vitest output is streamed straight through; the process exit
  * code is vitest's exit code (after the optional single retry).
@@ -30,6 +39,13 @@ import { pathToFileURL } from 'node:url';
 /** The exact error signature Vitest's worker RPC layer emits on timeout. */
 export const WORKER_TIMEOUT_SIGNATURE =
   '[vitest-worker]: Timeout calling "onTaskUpdate"';
+
+/**
+ * The error signature Vitest's browser mode emits when the browser RPC
+ * WebSocket is closed mid-run (page dropped under load).
+ */
+export const BROWSER_DROP_SIGNATURE =
+  '[vitest] Browser connection was closed while running tests';
 
 export interface VitestRunResult {
   /** Process exit code (non-zero on failure or timeout). */
@@ -50,7 +66,10 @@ export function shouldRetryOnce(output: string): boolean {
   const hasFailedFiles = /Test Files\s+\d+\s+failed/.test(output);
   const hasFailedTests = /Tests\s+\d+\s+failed/.test(output);
   const allFilesPassed = /Test Files\s+\d+\s+passed \(\d+\)/.test(output);
-  return allFilesPassed && !hasFailedFiles && !hasFailedTests && output.includes(WORKER_TIMEOUT_SIGNATURE);
+  const transient =
+    output.includes(WORKER_TIMEOUT_SIGNATURE) ||
+    output.includes(BROWSER_DROP_SIGNATURE);
+  return allFilesPassed && !hasFailedFiles && !hasFailedTests && transient;
 }
 
 /**
@@ -66,7 +85,8 @@ export function runWithRetry(
   const first = run(args);
   if (first.status !== 0 && shouldRetryOnce(first.output)) {
     warn(
-      '\n[retry] Vitest worker RPC timeout (onTaskUpdate) detected with all tests passing. Retrying once...\n',
+      '\n[retry] Vitest transient failure (worker RPC timeout or browser connection drop) ' +
+        'detected with all tests passing. Retrying once...\n',
     );
     return run(args).status;
   }

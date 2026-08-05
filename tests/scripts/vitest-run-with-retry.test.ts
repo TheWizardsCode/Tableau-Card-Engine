@@ -1,21 +1,27 @@
 /**
- * Unit tests for the vitest worker-RPC timeout retry mitigation
+ * Unit tests for the vitest transient-failure retry mitigation
  * (scripts/vitest-run-with-retry.ts).
  *
- * Vitest's worker RPC layer uses birpc with a hard-coded 60s timeout
- * (DEFAULT_TIMEOUT = 6e4 in node_modules/vitest/dist/chunks/index.*.js).
- * Under CPU contention a worker can miss the 60s window while reporting
- * test results, and vitest exits non-zero even though every test passed.
- * See CG-0MS9M5UJP005PWD3.
+ * Vitest has two distinct transient failure signatures that exit non-zero
+ * even when every test passed:
+ *
+ *   1. Worker RPC timeout — Vitest's worker RPC layer uses birpc with a
+ *      hard-coded 60s timeout (DEFAULT_TIMEOUT = 6e4 in
+ *      node_modules/vitest/dist/chunks/index.*.js). Under CPU contention a
+ *      worker can miss the 60s window while reporting test results.
+ *      See CG-0MS9M5UJP005PWD3.
+ *   2. Browser WebSocket drop — vitest browser mode closes the browser RPC
+ *      WebSocket under load, poisoning the run after all files completed.
+ *      See CG-0MSCI73RH004VPCE.
  *
  * These tests verify the masking guard: retry is ONLY allowed when the
- * run reports all files passed AND the sole error is the transient
- * `[vitest-worker]: Timeout calling "onTaskUpdate"` signature. A genuine
- * test failure must never be hidden by a retry.
+ * run reports all files passed AND the sole error is a transient signature
+ * above. A genuine test failure must never be hidden by a retry.
  */
 import { describe, it, expect } from 'vitest';
 import {
   WORKER_TIMEOUT_SIGNATURE,
+  BROWSER_DROP_SIGNATURE,
   shouldRetryOnce,
   runWithRetry,
   type VitestRunner,
@@ -33,6 +39,9 @@ const PASS_OUTPUT = [
 
 /** A passing run whose exit was poisoned by the transient worker RPC timeout. */
 const TRANSIENT_OUTPUT = `${PASS_OUTPUT}\nError: ${WORKER_TIMEOUT_SIGNATURE}`;
+
+/** A passing run whose exit was poisoned by the transient browser WebSocket drop. */
+const BROWSER_DROP_OUTPUT = `${PASS_OUTPUT}\nError: ${BROWSER_DROP_SIGNATURE}. Was the page closed unexpectedly?`;
 
 /** A run with genuine test failures. */
 const FAIL_OUTPUT = [
@@ -53,12 +62,24 @@ describe('shouldRetryOnce (masking-guarded transient detection)', () => {
     expect(shouldRetryOnce(TRANSIENT_OUTPUT)).toBe(true);
   });
 
+  it('returns true when all files passed and the browser connection drop signature is present', () => {
+    expect(shouldRetryOnce(BROWSER_DROP_OUTPUT)).toBe(true);
+  });
+
   it('returns false when the run passed cleanly (no timeout signature)', () => {
     expect(shouldRetryOnce(PASS_OUTPUT)).toBe(false);
   });
 
   it('returns false when the timeout signature is present alongside genuine file failures', () => {
     expect(shouldRetryOnce(`${FAIL_OUTPUT}\n${WORKER_TIMEOUT_SIGNATURE}`)).toBe(false);
+  });
+
+  it('returns false when the browser drop signature is present alongside genuine file failures', () => {
+    expect(shouldRetryOnce(`${FAIL_OUTPUT}\n${BROWSER_DROP_SIGNATURE}`)).toBe(false);
+  });
+
+  it('returns false when the browser drop signature is present and every file failed', () => {
+    expect(shouldRetryOnce(`${ALL_FAIL_OUTPUT}\n${BROWSER_DROP_SIGNATURE}`)).toBe(false);
   });
 
   it('returns false when the timeout signature is present and every file failed', () => {
@@ -75,6 +96,10 @@ describe('shouldRetryOnce (masking-guarded transient detection)', () => {
     expect(shouldRetryOnce(`${WORKER_TIMEOUT_SIGNATURE}`)).toBe(false);
   });
 
+  it('returns false when the browser drop signature appears without a passing summary', () => {
+    expect(shouldRetryOnce(`${BROWSER_DROP_SIGNATURE}. Was the page closed unexpectedly?`)).toBe(false);
+  });
+
   it('returns false on empty output', () => {
     expect(shouldRetryOnce('')).toBe(false);
   });
@@ -84,6 +109,16 @@ describe('shouldRetryOnce (masking-guarded transient detection)', () => {
 
 describe('runWithRetry (retry-once orchestration)', () => {
   const warnSpy: (msg: string) => void = () => {};
+
+  it('retries exactly once after a transient browser drop and returns the second run status', () => {
+    let calls = 0;
+    const runner: VitestRunner = () => {
+      calls += 1;
+      return calls === 1 ? { status: 1, output: BROWSER_DROP_OUTPUT } : { status: 0, output: PASS_OUTPUT };
+    };
+    expect(runWithRetry([], runner, warnSpy)).toBe(0);
+    expect(calls).toBe(2);
+  });
 
   it('retries exactly once after a transient timeout and returns the second run status', () => {
     let calls = 0;
