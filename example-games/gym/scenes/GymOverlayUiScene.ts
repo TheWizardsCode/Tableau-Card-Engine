@@ -23,6 +23,51 @@ import type { EventLogResult } from '../../../src/ui/GymSceneUtils';
 import { anchorPoint } from '../../../src/ui/screen-layout';
 import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
 import gymOverlayUiLayoutJson from '../layouts/gym-overlay-ui.layout.json';
+import {
+  DEFAULT_VIEWPORT,
+  SCENE_HEADER_Y,
+  EVENT_LOG_Y_OFFSET,
+  EVENT_LOG_MAX_LINES_DEFAULT,
+  EVENT_LOG_LINE_HEIGHT_DEFAULT,
+  EVENT_LOG_FONT_SIZE,
+  EVENT_LOG_HEADER_FONT_SIZE,
+  EVENT_LOG_HEADER_COLOR,
+  EVENT_LOG_LINE_X,
+  INTENSITY_STEP,
+  INTENSITY_FONT_SIZE,
+  INTENSITY_TEXT_COLOR,
+  STATUS_FONT_SIZE,
+  STATUS_TEXT_COLOR,
+  DEFAULT_FONT_SIZE,
+  OVERLAY_INTERACTION_GUARD_MS,
+  OVERLAY_BASE_COLOR,
+  OVERLAY_MIN_BRIGHTNESS,
+  OVERLAY_ALPHA_MIN,
+  OVERLAY_ALPHA_MAX,
+  OVERLAY_MASK_WIDTH,
+  OVERLAY_MASK_HEIGHT,
+  OVERLAY_SCROLL_BASE_Y,
+  OVERLAY_TEXT_LINE_HEIGHT,
+  OVERLAY_TEXT_FONT_SIZE,
+  OVERLAY_TEXT_X,
+  OVERLAY_SCROLLBAR_OFFSET_X,
+  OVERLAY_SCROLLBAR_WIDTH,
+  OVERLAY_SCROLLBAR_TRACK_COLOR,
+  OVERLAY_SCROLLBAR_TRACK_ALPHA,
+  OVERLAY_SCROLLBAR_THUMB_COLOR,
+  OVERLAY_SCROLLBAR_THUMB_ALPHA,
+  OVERLAY_SCROLLBAR_MIN_THUMB,
+  OVERLAY_SCROLL_FACTOR,
+  OVERLAY_MASK_DEPTH,
+  OVERLAY_SCROLLBAR_TRACK_DEPTH,
+  OVERLAY_SCROLLBAR_THUMB_DEPTH,
+  OVERLAY_INFO_Y,
+  OVERLAY_DISMISS_Y,
+  OVERLAY_INTENSITY_Y,
+  OVERLAY_INTENSITY_BTN_X_OFFSET,
+  OVERLAY_INTENSITY_BTN_FONT_SIZE,
+  OVERLAY_LOG_MAX_LINES,
+} from './GymConstants';
 
 // ── Scrollable content generation ────────────────────────────
 
@@ -108,8 +153,6 @@ const OVERLAY_LAYOUT: import('../../../src/ui/screen-layout-schema').ScreenLayou
   return parsed.valid ? parsed.layout : null;
 })();
 
-const DEFAULT_VIEWPORT = { width: 1280, height: 720 };
-
 /**
  * Resolve an anchor from the Overlay UI SLL layout.
  * Falls back to the default viewport if no layout is available.
@@ -120,7 +163,7 @@ function resolveOverlayAnchor(
   viewport = DEFAULT_VIEWPORT,
 ): import('../../../src/ui/screen-layout-schema').PixelPoint {
   if (!OVERLAY_LAYOUT) {
-    return { x: GAME_W / 2, y: 60 };
+    return { x: GAME_W / 2, y: SCENE_HEADER_Y };
   }
   return anchorPoint(OVERLAY_LAYOUT, zone, anchor, viewport, 1);
 }
@@ -145,19 +188,12 @@ export class GymOverlayUiScene extends GymSceneBase {
     lineCount: number;
   } | null = null;
   private _wheelHandlerRef: ((pointer: any, gameObjects: any[], deltaX: number, deltaY: number, deltaZ: number) => void) | null = null;
-  private _scrollAreaBaseY = 280;
-  private _maskW = 300;
-  private _maskH = 200;
+  private _scrollAreaBaseY = OVERLAY_SCROLL_BASE_Y;
+  private _maskW = OVERLAY_MASK_WIDTH;
+  private _maskH = OVERLAY_MASK_HEIGHT;
 
   // Guard to prevent background clicks from immediately closing the overlay
   private overlayInteractionGuard = false;
-  private readonly OVERLAY_INTERACTION_GUARD_MS = 220;
-
-  // Overlay appearance tuning
-  private readonly OVERLAY_BASE_COLOR = 0x0a1a0a;
-  private readonly OVERLAY_MIN_BRIGHTNESS = 0.4; // how dark at intensity=0
-  private readonly OVERLAY_ALPHA_MIN = 0.3; // alpha at intensity=0
-  private readonly OVERLAY_ALPHA_MAX = 0.7; // alpha at intensity=1
 
   constructor() {
     super({ key: GYM_OVERLAY_UI_KEY });
@@ -195,23 +231,23 @@ export class GymOverlayUiScene extends GymSceneBase {
     this.initButtonBar(y);
     this.buttonBar!.addButton('[ Show Overlay ]', () => this.openOverlay(), { zone: 'center' });
     this.buttonBar!.addButton('[ Dismiss Overlay ]', () => this.closeOverlay(), { zone: 'center' });
-    this.buttonBar!.addButton('[ Intensity - ]', () => this.adjustIntensity(-0.2), { zone: 'center' });
-    this.buttonBar!.addButton('[ Intensity + ]', () => this.adjustIntensity(0.2), { zone: 'center' });
+    this.buttonBar!.addButton('[ Intensity - ]', () => this.adjustIntensity(-INTENSITY_STEP), { zone: 'center' });
+    this.buttonBar!.addButton('[ Intensity + ]', () => this.adjustIntensity(INTENSITY_STEP), { zone: 'center' });
 
     const intensityAnchor = resolveOverlayAnchor('intensity', 'center');
-    this.intensityText = createHudText(this, cx, intensityAnchor.y, 'Feedback Intensity: 1.0', '#88ff88', { fontSize: '16px' });
+    this.intensityText = createHudText(this, cx, intensityAnchor.y, 'Feedback Intensity: 1.0', INTENSITY_TEXT_COLOR, { fontSize: INTENSITY_FONT_SIZE });
     this.intensityText.setOrigin(0.5);
 
     const logAnchor = resolveOverlayAnchor('log', 'center');
-    this.eventLogResult = createEventLog(this, logAnchor.y + 20, {
+    this.eventLogResult = createEventLog(this, logAnchor.y + EVENT_LOG_Y_OFFSET, {
       headerText: '── Event Log ──',
-      maxLines: 14,
-      lineHeight: 17,
+      maxLines: EVENT_LOG_MAX_LINES_DEFAULT,
+      lineHeight: EVENT_LOG_LINE_HEIGHT_DEFAULT,
       textColor: '#aaddaa',
-      fontSize: '11px',
-      headerFontSize: '12px',
-      headerColor: '#669966',
-      lineX: 40,
+      fontSize: EVENT_LOG_FONT_SIZE,
+      headerFontSize: EVENT_LOG_HEADER_FONT_SIZE,
+      headerColor: EVENT_LOG_HEADER_COLOR,
+      lineX: EVENT_LOG_LINE_X,
     });
   }
 
@@ -221,7 +257,7 @@ export class GymOverlayUiScene extends GymSceneBase {
       return;
     }
     // Create overlay with base color and seeded alpha
-    const result = createOverlayBackground(this, { color: this.OVERLAY_BASE_COLOR, alpha: this.OVERLAY_ALPHA_MAX });
+    const result = createOverlayBackground(this, { color: OVERLAY_BASE_COLOR, alpha: OVERLAY_ALPHA_MAX });
     this.overlayObjects = result.objects;
     this.overlayOpen = true;
 
@@ -246,7 +282,7 @@ export class GymOverlayUiScene extends GymSceneBase {
       const areaY = this._scrollAreaBaseY;
       const areaW = this._maskW;
       const areaH = this._maskH;
-      const lineH = 16;
+      const lineH = OVERLAY_TEXT_LINE_HEIGHT;
 
       // Create a shaped mask for clipping — positioned at the content area
       const maskShape = this.add.graphics();
@@ -265,7 +301,7 @@ export class GymOverlayUiScene extends GymSceneBase {
       // aligns with the container's local coordinate space.
       this.maskedContainer = this.add.container(areaX, areaY);
       this.maskedContainer.setMask(this.contentMask);
-      this.maskedContainer.setDepth(12);
+      this.maskedContainer.setDepth(OVERLAY_MASK_DEPTH);
       this.overlayObjects.push(this.maskedContainer);
 
       // Generate scrollable content lines (enough to overflow the mask)
@@ -274,7 +310,7 @@ export class GymOverlayUiScene extends GymSceneBase {
       const maxScrollY = Math.max(0, contentH - areaH);
 
       for (let i = 0; i < contentLines.length; i++) {
-        const line = createHudText(this, 10, i * lineH, contentLines[i], '#ccddcc', { fontSize: '12px' });
+        const line = createHudText(this, OVERLAY_TEXT_X, i * lineH, contentLines[i], '#ccddcc', { fontSize: OVERLAY_TEXT_FONT_SIZE });
         this.maskedContainer.add(line);
       }
 
@@ -284,27 +320,27 @@ export class GymOverlayUiScene extends GymSceneBase {
       // ── Scrollbar ───────────────────────────────────────
       // Track: vertical bar at right edge of mask area
       const scrollbarTrack = this.add.rectangle(
-        areaX + areaW - 8,
+        areaX + areaW - OVERLAY_SCROLLBAR_OFFSET_X,
         areaY + areaH / 2,
-        4,
+        OVERLAY_SCROLLBAR_WIDTH,
         areaH,
-        0x333333,
-        0.5,
+        OVERLAY_SCROLLBAR_TRACK_COLOR,
+        OVERLAY_SCROLLBAR_TRACK_ALPHA,
       );
-      scrollbarTrack.setDepth(13);
+      scrollbarTrack.setDepth(OVERLAY_SCROLLBAR_TRACK_DEPTH);
       this.overlayObjects.push(scrollbarTrack);
 
       // Thumb: moves to indicate scroll position
-      const thumbHeight = Math.max(20, (areaH / contentH) * areaH);
+      const thumbHeight = Math.max(OVERLAY_SCROLLBAR_MIN_THUMB, (areaH / contentH) * areaH);
       const scrollbarThumb = this.add.rectangle(
-        areaX + areaW - 8,
+        areaX + areaW - OVERLAY_SCROLLBAR_OFFSET_X,
         areaY + thumbHeight / 2,
-        4,
+        OVERLAY_SCROLLBAR_WIDTH,
         thumbHeight,
-        0x88ff88,
-        0.8,
+        OVERLAY_SCROLLBAR_THUMB_COLOR,
+        OVERLAY_SCROLLBAR_THUMB_ALPHA,
       );
-      scrollbarThumb.setDepth(14);
+      scrollbarThumb.setDepth(OVERLAY_SCROLLBAR_THUMB_DEPTH);
       this.overlayObjects.push(scrollbarThumb);
 
       // ── Wheel event handler ─────────────────────────────
@@ -321,7 +357,7 @@ export class GymOverlayUiScene extends GymSceneBase {
         // deltaY > 0 = scroll down
         scroller.scrollY = Math.max(
           0,
-          Math.min(scroller.maxScrollY, scroller.scrollY + deltaY * 0.5),
+          Math.min(scroller.maxScrollY, scroller.scrollY + deltaY * OVERLAY_SCROLL_FACTOR),
         );
 
         // Move the container up (negative shift) to reveal later content
@@ -351,39 +387,39 @@ export class GymOverlayUiScene extends GymSceneBase {
     const info = createHudText(
       this,
       GAME_W / 2,
-      240,
+      OVERLAY_INFO_Y,
       'Overlay Active\nScrollable content below.',
-      '#ffffff',
-      { fontSize: '16px', align: 'center' },
+      STATUS_TEXT_COLOR,
+      { fontSize: STATUS_FONT_SIZE, align: 'center' },
     ).setOrigin(0.5);
-    info.setDepth(11);
+    info.setDepth(OVERLAY_MASK_DEPTH);
     this.overlayObjects.push(info);
 
     // Dismiss link
-    const dismiss = createHudText(this, GAME_W / 2, 520, '[ Dismiss Overlay ]', '#88ff88', {
-      fontSize: '14px',
+    const dismiss = createHudText(this, GAME_W / 2, OVERLAY_DISMISS_Y, '[ Dismiss Overlay ]', '#88ff88', {
+      fontSize: DEFAULT_FONT_SIZE,
     }).setOrigin(0.5).setInteractive({ useHandCursor: true });
     dismiss.on('pointerdown', () => {
       this.markOverlayInteraction();
       this.closeOverlay();
     });
-    dismiss.setDepth(11);
+    dismiss.setDepth(OVERLAY_MASK_DEPTH);
     this.overlayObjects.push(dismiss);
 
     // Intensity controls within overlay
-    const minus = createHudText(this, GAME_W / 2 - 80, 550, '[-]', '#ff8877', { fontSize: '14px' }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-    minus.on('pointerdown', () => { this.markOverlayInteraction(); this.adjustIntensity(-0.2); });
-    minus.setDepth(11);
+    const minus = createHudText(this, GAME_W / 2 - OVERLAY_INTENSITY_BTN_X_OFFSET, OVERLAY_INTENSITY_Y, '[-]', '#ff8877', { fontSize: OVERLAY_INTENSITY_BTN_FONT_SIZE }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    minus.on('pointerdown', () => { this.markOverlayInteraction(); this.adjustIntensity(-INTENSITY_STEP); });
+    minus.setDepth(OVERLAY_MASK_DEPTH);
     this.overlayObjects.push(minus);
 
-    const intensityLabel = createHudText(this, GAME_W / 2, 550, `Intensity: ${this.feedbackIntensity}`, '#ffffff', { fontSize: '14px' }).setOrigin(0.5);
-    intensityLabel.setDepth(11);
+    const intensityLabel = createHudText(this, GAME_W / 2, OVERLAY_INTENSITY_Y, `Intensity: ${this.feedbackIntensity}`, STATUS_TEXT_COLOR, { fontSize: OVERLAY_INTENSITY_BTN_FONT_SIZE }).setOrigin(0.5);
+    intensityLabel.setDepth(OVERLAY_MASK_DEPTH);
     this.overlayObjects.push(intensityLabel);
     this.overlayIntensityText = intensityLabel;
 
-    const plus = createHudText(this, GAME_W / 2 + 80, 550, '[+]', '#77ff88', { fontSize: '14px' }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-    plus.on('pointerdown', () => { this.markOverlayInteraction(); this.adjustIntensity(0.2); });
-    plus.setDepth(11);
+    const plus = createHudText(this, GAME_W / 2 + OVERLAY_INTENSITY_BTN_X_OFFSET, OVERLAY_INTENSITY_Y, '[+]', '#77ff88', { fontSize: OVERLAY_INTENSITY_BTN_FONT_SIZE }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    plus.on('pointerdown', () => { this.markOverlayInteraction(); this.adjustIntensity(INTENSITY_STEP); });
+    plus.setDepth(OVERLAY_MASK_DEPTH);
     this.overlayObjects.push(plus);
 
     if (!this.contentMask) {
@@ -440,9 +476,9 @@ export class GymOverlayUiScene extends GymSceneBase {
   private updateOverlayAppearance(): void {
     if (!this.overlayObjects || this.overlayObjects.length === 0) return;
 
-    const brightness = this.OVERLAY_MIN_BRIGHTNESS + (1 - this.OVERLAY_MIN_BRIGHTNESS) * this.feedbackIntensity;
-    const alpha = this.OVERLAY_ALPHA_MIN + (this.OVERLAY_ALPHA_MAX - this.OVERLAY_ALPHA_MIN) * this.feedbackIntensity;
-    const color = this.applyBrightnessToColor(this.OVERLAY_BASE_COLOR, brightness);
+    const brightness = OVERLAY_MIN_BRIGHTNESS + (1 - OVERLAY_MIN_BRIGHTNESS) * this.feedbackIntensity;
+    const alpha = OVERLAY_ALPHA_MIN + (OVERLAY_ALPHA_MAX - OVERLAY_ALPHA_MIN) * this.feedbackIntensity;
+    const color = this.applyBrightnessToColor(OVERLAY_BASE_COLOR, brightness);
 
     for (const obj of this.overlayObjects) {
       try {
@@ -469,20 +505,20 @@ export class GymOverlayUiScene extends GymSceneBase {
     this.overlayInteractionGuard = true;
     try {
       if (this.time && typeof this.time.delayedCall === 'function') {
-        this.time.delayedCall(this.OVERLAY_INTERACTION_GUARD_MS, () => {
+        this.time.delayedCall(OVERLAY_INTERACTION_GUARD_MS, () => {
           this.overlayInteractionGuard = false;
         });
       } else {
-        setTimeout(() => { this.overlayInteractionGuard = false; }, this.OVERLAY_INTERACTION_GUARD_MS);
+        setTimeout(() => { this.overlayInteractionGuard = false; }, OVERLAY_INTERACTION_GUARD_MS);
       }
     } catch (_e) {
-      setTimeout(() => { this.overlayInteractionGuard = false; }, this.OVERLAY_INTERACTION_GUARD_MS);
+      setTimeout(() => { this.overlayInteractionGuard = false; }, OVERLAY_INTERACTION_GUARD_MS);
     }
   }
 
   private logEvent(msg: string): void {
     this.eventLog.push(msg);
-    if (this.eventLog.length > 14) this.eventLog.shift();
+    if (this.eventLog.length > OVERLAY_LOG_MAX_LINES) this.eventLog.shift();
     this.eventLogResult.render(this.eventLog);
   }
 }

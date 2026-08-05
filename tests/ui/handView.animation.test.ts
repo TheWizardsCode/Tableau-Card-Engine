@@ -748,6 +748,21 @@ describe('HandView animateAddCard', () => {
       expect(centers[1].y).toBe(baseY);
     });
 
+    it('animateAddCard destination equals getInsertionPosition prediction', async () => {
+      hv.setCards([card('2', 'hearts'), card('4', 'diamonds')]);
+      const predicted = hv.getInsertionPosition(1);
+
+      await (hv as any).animateAddCard(card('3', 'clubs'), {
+        sourceX: 100, sourceY: 200,
+        insertAtIndex: 1,
+      });
+
+      const centers = hv.getCardCenters();
+      expect(centers).toHaveLength(3);
+      expect(Math.abs(centers[1].x - predicted.x)).toBeLessThanOrEqual(1);
+      expect(Math.abs(centers[1].y - predicted.y)).toBeLessThanOrEqual(1);
+    });
+
     it('default behavior (no insertAtIndex) still appends', async () => {
       hv.setCards([card('2', 'hearts'), card('3', 'clubs'), card('4', 'diamonds')]);
 

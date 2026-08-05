@@ -21,6 +21,35 @@ import type { EventLogResult } from '../../../src/ui/GymSceneUtils';
 import { anchorPoint } from '../../../src/ui/screen-layout';
 import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
 import gymShaderSpikeLayoutJson from '../layouts/gym-shader-spike.layout.json';
+import {
+  DEFAULT_VIEWPORT,
+  SCENE_HEADER_Y,
+  EVENT_LOG_Y_OFFSET,
+  EVENT_LOG_MAX_LINES_DEFAULT,
+  EVENT_LOG_LINE_HEIGHT_DEFAULT,
+  EVENT_LOG_FONT_SIZE,
+  EVENT_LOG_HEADER_FONT_SIZE,
+  EVENT_LOG_HEADER_COLOR,
+  EVENT_LOG_LINE_X,
+  SPIKE_SPRITE_WIDTH,
+  SPIKE_SPRITE_HEIGHT,
+  SPIKE_SPRITE_CORNER_RADIUS,
+  SPIKE_SPRITE_STROKE_WIDTH,
+  SPIKE_SPRITE_A_STROKE_COLOR,
+  SPIKE_SPRITE_B_STROKE_COLOR,
+  SPIKE_SPRITE_C_STROKE_COLOR,
+  SPIKE_SPRITE_INNER_PAD,
+  SPIKE_SPRITE_INNER_CORNER_RADIUS,
+  SPIKE_CIRCLE_X,
+  SPIKE_CIRCLE_Y,
+  SPIKE_CIRCLE_RADIUS,
+  SPIKE_STAR_POINTS,
+  SPIKE_TRIANGLE_POINTS,
+  SHADER_STATUS_FONT_SIZE,
+  SHADER_SPRITE_X_GAP,
+  SHADER_NUM_SPRITES,
+  SHADER_STATUS_TEXT_COLOR,
+} from './GymConstants';
 
 // Parse the shared Shader Spike scene layout once at module load.
 const SHADER_SPIKE_LAYOUT: import('../../../src/ui/screen-layout-schema').ScreenLayoutDocument | null = (() => {
@@ -28,15 +57,13 @@ const SHADER_SPIKE_LAYOUT: import('../../../src/ui/screen-layout-schema').Screen
   return parsed.valid ? parsed.layout : null;
 })();
 
-const DEFAULT_VIEWPORT = { width: 1280, height: 720 };
-
 function resolveShaderAnchor(
   zone: string,
   anchor: string,
   viewport = DEFAULT_VIEWPORT,
 ): import('../../../src/ui/screen-layout-schema').PixelPoint {
   if (!SHADER_SPIKE_LAYOUT) {
-    return { x: GAME_W / 2, y: 60 };
+    return { x: GAME_W / 2, y: SCENE_HEADER_Y };
   }
   return anchorPoint(SHADER_SPIKE_LAYOUT, zone, anchor, viewport, 1);
 }
@@ -78,41 +105,36 @@ export class GymGraphicsShaderSpikeScene extends GymSceneBase {
     // Generate simple textures for the spike since we don't want card assets
     const g = this.add.graphics();
     g.fillStyle(0x88cc88, 1);
-    g.fillRoundedRect(0, 0, 80, 110, 8);
-    g.lineStyle(2, 0x446644, 1);
-    g.strokeRoundedRect(1, 1, 78, 108, 7);
+    g.fillRoundedRect(0, 0, SPIKE_SPRITE_WIDTH, SPIKE_SPRITE_HEIGHT, SPIKE_SPRITE_CORNER_RADIUS);
+    g.lineStyle(SPIKE_SPRITE_STROKE_WIDTH, SPIKE_SPRITE_A_STROKE_COLOR, 1);
+    g.strokeRoundedRect(SPIKE_SPRITE_INNER_PAD, SPIKE_SPRITE_INNER_PAD, SPIKE_SPRITE_WIDTH - 2 * SPIKE_SPRITE_INNER_PAD, SPIKE_SPRITE_HEIGHT - 2 * SPIKE_SPRITE_INNER_PAD, SPIKE_SPRITE_INNER_CORNER_RADIUS);
     g.fillStyle(0xffffff, 1);
-    g.fillCircle(40, 55, 12);
-    g.generateTexture('spike-sprite-a', 80, 110);
+    g.fillCircle(SPIKE_CIRCLE_X, SPIKE_CIRCLE_Y, SPIKE_CIRCLE_RADIUS);
+    g.generateTexture('spike-sprite-a', SPIKE_SPRITE_WIDTH, SPIKE_SPRITE_HEIGHT);
     g.clear();
 
     g.fillStyle(0xcc8888, 1);
-    g.fillRoundedRect(0, 0, 80, 110, 8);
-    g.lineStyle(2, 0x664444, 1);
-    g.strokeRoundedRect(1, 1, 78, 108, 7);
+    g.fillRoundedRect(0, 0, SPIKE_SPRITE_WIDTH, SPIKE_SPRITE_HEIGHT, SPIKE_SPRITE_CORNER_RADIUS);
+    g.lineStyle(SPIKE_SPRITE_STROKE_WIDTH, SPIKE_SPRITE_B_STROKE_COLOR, 1);
+    g.strokeRoundedRect(SPIKE_SPRITE_INNER_PAD, SPIKE_SPRITE_INNER_PAD, SPIKE_SPRITE_WIDTH - 2 * SPIKE_SPRITE_INNER_PAD, SPIKE_SPRITE_HEIGHT - 2 * SPIKE_SPRITE_INNER_PAD, SPIKE_SPRITE_INNER_CORNER_RADIUS);
     g.fillStyle(0xffff88, 1);
     // Draw a diamond/star shape manually
     g.beginPath();
-    g.moveTo(40, 26);
-    g.lineTo(46, 40);
-    g.lineTo(54, 36);
-    g.lineTo(48, 50);
-    g.lineTo(40, 70);
-    g.lineTo(32, 50);
-    g.lineTo(26, 36);
-    g.lineTo(34, 40);
+    for (const [px, py] of SPIKE_STAR_POINTS) {
+      g.lineTo(px, py);
+    }
     g.closePath();
     g.fillPath();
-    g.generateTexture('spike-sprite-b', 80, 110);
+    g.generateTexture('spike-sprite-b', SPIKE_SPRITE_WIDTH, SPIKE_SPRITE_HEIGHT);
     g.clear();
 
     g.fillStyle(0x8888cc, 1);
-    g.fillRoundedRect(0, 0, 80, 110, 8);
-    g.lineStyle(2, 0x444466, 1);
-    g.strokeRoundedRect(1, 1, 78, 108, 7);
+    g.fillRoundedRect(0, 0, SPIKE_SPRITE_WIDTH, SPIKE_SPRITE_HEIGHT, SPIKE_SPRITE_CORNER_RADIUS);
+    g.lineStyle(SPIKE_SPRITE_STROKE_WIDTH, SPIKE_SPRITE_C_STROKE_COLOR, 1);
+    g.strokeRoundedRect(SPIKE_SPRITE_INNER_PAD, SPIKE_SPRITE_INNER_PAD, SPIKE_SPRITE_WIDTH - 2 * SPIKE_SPRITE_INNER_PAD, SPIKE_SPRITE_HEIGHT - 2 * SPIKE_SPRITE_INNER_PAD, SPIKE_SPRITE_INNER_CORNER_RADIUS);
     g.fillStyle(0x88ffff, 1);
-    g.fillTriangle(40, 30, 25, 70, 55, 70);
-    g.generateTexture('spike-sprite-c', 80, 110);
+    g.fillTriangle(SPIKE_TRIANGLE_POINTS[0][0], SPIKE_TRIANGLE_POINTS[0][1], SPIKE_TRIANGLE_POINTS[1][0], SPIKE_TRIANGLE_POINTS[1][1], SPIKE_TRIANGLE_POINTS[2][0], SPIKE_TRIANGLE_POINTS[2][1]);
+    g.generateTexture('spike-sprite-c', SPIKE_SPRITE_WIDTH, SPIKE_SPRITE_HEIGHT);
     g.destroy();
   }
 
@@ -152,26 +174,26 @@ export class GymGraphicsShaderSpikeScene extends GymSceneBase {
     this.buttonBar!.addButton('[ Next Tint ]', () => this.cycleTint(), { zone: 'center' });
     this.buttonBar!.addButton('[ Next Blend ]', () => this.cycleBlendMode(), { zone: 'center' });
     this.buttonBar!.addButton('[ Reset Tint ]', () => this.resetTint(), { zone: 'center' });
-    this.statusLineText = createHudText(this, cx, statusAnchor.y, 'Blend: NORMAL | Tint: None', '#88ff88', { fontSize: '12px' }).setOrigin(0.5);
+    this.statusLineText = createHudText(this, cx, statusAnchor.y, 'Blend: NORMAL | Tint: None', SHADER_STATUS_TEXT_COLOR, { fontSize: SHADER_STATUS_FONT_SIZE }).setOrigin(0.5);
 
     // Create sample sprites at content anchor Y
-    const spriteX = [cx - 180, cx, cx + 180];
+    const spriteX = [cx - SHADER_SPRITE_X_GAP, cx, cx + SHADER_SPRITE_X_GAP];
     const spriteY = contentAnchor.y;
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < SHADER_NUM_SPRITES; i++) {
       const key = ['spike-sprite-a', 'spike-sprite-b', 'spike-sprite-c'][i];
       const sprite = this.add.image(spriteX[i], spriteY, key);
       this.sprites.push(sprite);
     }
 
-    this.eventLogResult = createEventLog(this, logAnchor.y + 20, {
+    this.eventLogResult = createEventLog(this, logAnchor.y + EVENT_LOG_Y_OFFSET, {
       headerText: '── Event Log ──',
-      maxLines: 12,
-      lineHeight: 17,
+      maxLines: EVENT_LOG_MAX_LINES_DEFAULT,
+      lineHeight: EVENT_LOG_LINE_HEIGHT_DEFAULT,
       textColor: '#aaddaa',
-      fontSize: '11px',
-      headerFontSize: '12px',
-      headerColor: '#669966',
-      lineX: 40,
+      fontSize: EVENT_LOG_FONT_SIZE,
+      headerFontSize: EVENT_LOG_HEADER_FONT_SIZE,
+      headerColor: EVENT_LOG_HEADER_COLOR,
+      lineX: EVENT_LOG_LINE_X,
     });
   }
 

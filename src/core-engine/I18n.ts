@@ -84,23 +84,87 @@ export function getLocale(): string {
 }
 
 /**
- * Look up a localised string by key.
+ * Look up a localised string by key, with optional placeholder interpolation.
  *
  * Resolution order:
  * 1. Current locale bundle.
  * 2. English (`en`) fallback bundle.
  * 3. The key itself (so missing keys are still meaningful in the UI).
+ *
+ * When `params` is provided, every `{token}` in the resolved string is
+ * replaced with the corresponding value from `params`.  Number values are
+ * converted to strings automatically.
+ *
+ * @param key    The i18n key to look up.
+ * @param params Optional object mapping placeholder names to values.
+ * @returns      The resolved string with placeholders substituted.
+ * @throws       Error if a placeholder exists in the string but has no
+ *               corresponding entry in `params`.
+ *
+ * @example
+ * ```ts
+ * registerLocale('en', { 'greet': 'Hello, {name}!' });
+ * t('greet');                      // → "Hello, {name}!"
+ * t('greet', { name: 'Ada' });     // → "Hello, Ada!"
+ * t('greet', { name: 'Ada', x: 1 });// → "Hello, Ada!" (extra params ignored)
+ * t('greet', {});                  // → throws: missing placeholder: name
+ * ```
  */
-export function t(key: string): string {
+export function t(key: string, params?: Record<string, string | number>): string {
   const current = bundles.get(currentLocale);
-  if (current && key in current) return current[key];
+  let resolved: string;
 
-  // Fallback to English
-  const en = bundles.get('en');
-  if (en && key in en) return en[key];
+  if (current && key in current) {
+    resolved = current[key];
+  } else {
+    // Fallback to English
+    const en = bundles.get('en');
+    if (en && key in en) {
+      resolved = en[key];
+    } else {
+      // Last resort: return the key itself
+      return key;
+    }
+  }
 
-  // Last resort: return the key itself
-  return key;
+  // Interpolate placeholders when params are provided (even an empty
+  // object triggers the check so missing placeholders fail loudly)
+  if (params !== undefined) {
+    resolved = interpolate(resolved, params);
+  }
+
+  return resolved;
+}
+
+/**
+ * Replace `{token}` placeholders in `text` with values from `params`.
+ *
+ * Throws if any placeholder token has no matching entry in `params`.
+ */
+function interpolate(
+  text: string,
+  params: Record<string, string | number>,
+): string {
+  const placeholderPattern = /\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
+  const tokens: string[] = [];
+
+  let match;
+  while ((match = placeholderPattern.exec(text)) !== null) {
+    const token = match[1];
+    tokens.push(token);
+    if (!(token in params)) {
+      throw new Error(
+        `I18n: missing interpolation parameter for placeholder "{${token}}" in key resolution. ` +
+          `Provided params: ${Object.keys(params).join(', ')}; missing: ${token}`,
+      );
+    }
+  }
+
+  // No tokens found — return original string
+  if (tokens.length === 0) return text;
+
+  // All tokens present — perform substitution
+  return text.replace(placeholderPattern, (_, token) => String(params[token]));
 }
 
 /**

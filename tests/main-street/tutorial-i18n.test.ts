@@ -20,7 +20,8 @@ import {
   TUTORIAL_EN_BUNDLE,
   TUTORIAL_I18N_KEY_PREFIX,
 } from '../../example-games/main-street/i18n/tutorial-en';
-import { resetI18n, registerLocale, setLocale, t, getLocale } from '../../src/core-engine/I18n';
+import { resetI18n, registerLocale, setLocale, t, getLocale, formatCurrency } from '../../src/core-engine/I18n';
+import { getCsvRows, getBaseTypeId } from '../../example-games/main-street/MainStreetCards';
 
 describe('Tutorial i18n: English bundle registration', () => {
   beforeEach(() => {
@@ -71,11 +72,12 @@ describe('Tutorial i18n: English bundle registration', () => {
     expect(t(step.titleKey)).toBe('Development Row');
   });
 
-  it('T3 body contains "Laundromat" and "€6"', () => {
+  it('T3 body contains the card name and data-driven cost', () => {
     const step = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T3')!;
-    const body = t(step.bodyKey);
-    expect(body).toContain('Laundromat');
-    expect(body).toContain('€6');
+    const row = getCsvRows().find(r => r.id === getBaseTypeId(step.requiredCardId!))!;
+    const { body } = resolveTutorialStepText(step);
+    expect(body).toContain(row.name);
+    expect(body).toContain(formatCurrency(Number(row.cost)));
   });
 
   it('T14 title resolves to "Tutorial Complete"', () => {
@@ -119,6 +121,21 @@ describe('Tutorial i18n: locale switching', () => {
     expect(t(t1.bodyKey)).toContain('Build the best Main Street');
   });
 
+  it('placeholders resolve with card data in a non-English locale', () => {
+    const t3 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T3')!;
+    const row = getCsvRows().find(r => r.id === getBaseTypeId(t3.requiredCardId!))!;
+    registerLocale('de', {
+      [tutorialKey('T3', 'body')]:
+        'Kaufe die **{cardName}**-Karte aus der Entwicklungsreihe für {cost}.',
+    });
+    setLocale('de');
+
+    const { body } = resolveTutorialStepText(t3);
+    expect(body).toContain(row.name);
+    expect(body).toContain(formatCurrency(Number(row.cost)));
+    expect(body).not.toMatch(/\{[A-Za-z_]+\}/);
+  });
+
   it('returns the key itself when no locale is registered', () => {
     resetI18n(); // Clear everything
     const step = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T1')!;
@@ -141,10 +158,11 @@ describe('Tutorial i18n: resolveTutorialStepText', () => {
 
   it('returns resolved title and body for a step', () => {
     const step = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T3')!;
+    const row = getCsvRows().find(r => r.id === getBaseTypeId(step.requiredCardId!))!;
     const { title, body } = resolveTutorialStepText(step);
 
     expect(title).toBe('Development Row');
-    expect(body).toContain('Laundromat');
+    expect(body).toContain(row.name);
   });
 
   it('works for all 14 steps', () => {

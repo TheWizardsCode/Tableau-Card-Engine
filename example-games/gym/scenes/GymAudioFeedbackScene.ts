@@ -31,6 +31,48 @@ import type { EventLogResult } from '../../../src/ui/GymSceneUtils';
 import { anchorPoint } from '../../../src/ui/screen-layout';
 import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
 import gymAudioFeedbackLayoutJson from '../layouts/gym-audio-feedback.layout.json';
+import {
+  DEFAULT_VIEWPORT,
+  SCENE_HEADER_Y,
+  EVENT_LOG_Y_OFFSET,
+  EVENT_LOG_MAX_LINES_AUDIO,
+  EVENT_LOG_LINE_HEIGHT_DEFAULT,
+  EVENT_LOG_FONT_SIZE,
+  EVENT_LOG_HEADER_FONT_SIZE,
+  EVENT_LOG_HEADER_COLOR,
+  EVENT_LOG_LINE_X,
+  STATUS_FONT_SIZE,
+  VOLUME_STEP,
+  FEEDBACK_CONTROLS_OFFSET,
+  STATUS_TEXT_COLOR,
+  DEFAULT_VOLUME,
+  AUDIO_CALL_LOG_MAX_LINES,
+  POP_TRIGGER_X_SPREAD,
+  POP_TRIGGER_Y,
+  POP_TRIGGER_DURATION_REDUCED,
+  POP_TRIGGER_DURATION_NORMAL,
+  EVENT_POP_X_SPREAD,
+  EVENT_POP_Y,
+  EVENT_POP_DURATION_REDUCED,
+  EVENT_POP_DURATION_NORMAL,
+  EVENT_POP_FONT_SIZE,
+  CELEBRATION_Y,
+  CELEBRATION_DURATION_REDUCED,
+  CELEBRATION_SCALE_REDUCED,
+  CELEBRATION_PARTICLE_RADIUS,
+  CELEBRATION_PARTICLE_SIZE,
+  CELEBRATION_PARTICLE_SPEED_MIN,
+  CELEBRATION_PARTICLE_SPEED_MAX,
+  CELEBRATION_PARTICLE_SCALE_START,
+  CELEBRATION_PARTICLE_SCALE_END,
+  CELEBRATION_PARTICLE_LIFESPAN,
+  CELEBRATION_PARTICLE_QUANTITY,
+  CELEBRATION_PARTICLE_CLEANUP_MS,
+  CELEBRATION_FALLBACK_DURATION,
+  CELEBRATION_FALLBACK_SCALE,
+  CELEBRATION_FALLBACK_RISE_Y,
+  CELEBRATION_CATCH_DURATION,
+} from './GymConstants';
 
 // Parse the shared Audio Feedback scene layout once at module load.
 const AUDIO_FEEDBACK_LAYOUT: import('../../../src/ui/screen-layout-schema').ScreenLayoutDocument | null = (() => {
@@ -38,15 +80,13 @@ const AUDIO_FEEDBACK_LAYOUT: import('../../../src/ui/screen-layout-schema').Scre
   return parsed.valid ? parsed.layout : null;
 })();
 
-const DEFAULT_VIEWPORT = { width: 1280, height: 720 };
-
 function resolveAudioAnchor(
   zone: string,
   anchor: string,
   viewport = DEFAULT_VIEWPORT,
 ): import('../../../src/ui/screen-layout-schema').PixelPoint {
   if (!AUDIO_FEEDBACK_LAYOUT) {
-    return { x: GAME_W / 2, y: 60 };
+    return { x: GAME_W / 2, y: SCENE_HEADER_Y };
   }
   return anchorPoint(AUDIO_FEEDBACK_LAYOUT, zone, anchor, viewport, 1);
 }
@@ -120,7 +160,7 @@ export class GymAudioFeedbackScene extends GymSceneBase {
   private stubPlayer = new StubSoundPlayer();
   private soundManager!: SoundManager;
   private muted = false;
-  private volume = 0.5;
+  private volume = DEFAULT_VOLUME;
   private statusText!: Phaser.GameObjects.Text;
   private callLog: string[] = [];
   private eventLogResult!: EventLogResult;
@@ -206,18 +246,18 @@ export class GymAudioFeedbackScene extends GymSceneBase {
 
     this.statusText = createHudText(
       this, cx, statusAnchor.y,
-      this.statusString(), '#ffffff', { fontSize: '16px' },
+      this.statusString(), STATUS_TEXT_COLOR, { fontSize: STATUS_FONT_SIZE },
     ).setOrigin(0.5);
 
-    this.eventLogResult = createEventLog(this, logAnchor.y + 20, {
+    this.eventLogResult = createEventLog(this, logAnchor.y + EVENT_LOG_Y_OFFSET, {
       headerText: '── Activity Log ──',
-      maxLines: 16,
-      lineHeight: 17,
+      maxLines: EVENT_LOG_MAX_LINES_AUDIO,
+      lineHeight: EVENT_LOG_LINE_HEIGHT_DEFAULT,
       textColor: '#aaddaa',
-      fontSize: '11px',
-      headerFontSize: '12px',
-      headerColor: '#669966',
-      lineX: 40,
+      fontSize: EVENT_LOG_FONT_SIZE,
+      headerFontSize: EVENT_LOG_HEADER_FONT_SIZE,
+      headerColor: EVENT_LOG_HEADER_COLOR,
+      lineX: EVENT_LOG_LINE_X,
     });
 
     // ── Control buttons (row 1: core controls) ──────────
@@ -226,8 +266,8 @@ export class GymAudioFeedbackScene extends GymSceneBase {
 
     this.initButtonBar(y);
     this.buttonBar!.addButton('[ Toggle Mute ]', () => this.toggleMute(), { zone: 'center' });
-    this.buttonBar!.addButton('[ Volume - ]', () => this.adjustVolume(-0.1), { zone: 'center' });
-    this.buttonBar!.addButton('[ Volume + ]', () => this.adjustVolume(0.1), { zone: 'center' });
+    this.buttonBar!.addButton('[ Volume - ]', () => this.adjustVolume(-VOLUME_STEP), { zone: 'center' });
+    this.buttonBar!.addButton('[ Volume + ]', () => this.adjustVolume(VOLUME_STEP), { zone: 'center' });
     this.buttonBar!.addButton('[ Invalid Key ]', () => this.playInvalid(), { zone: 'center' });
 
     // ── Dynamic sound event buttons ─────────────────────
@@ -264,7 +304,7 @@ export class GymAudioFeedbackScene extends GymSceneBase {
     }
 
     // ── Dynamic visual feedback buttons (row 3) ─────────
-    const feedbackY = y2 + 28;
+    const feedbackY = y2 + FEEDBACK_CONTROLS_OFFSET;
     this.initButtonBar(feedbackY);
     for (const ft of FEEDBACK_TYPES) {
       const btnLabel = `[ ${ft.label} ]`;
@@ -328,9 +368,9 @@ export class GymAudioFeedbackScene extends GymSceneBase {
     popTextOrIcon({
       scene: this,
       label: 'Pop!',
-      x: cx + (Math.random() - 0.5) * 200,
-      y: 200,
-      duration: this.reducedMotion ? 100 : 450,
+      x: cx + (Math.random() - 0.5) * POP_TRIGGER_X_SPREAD,
+      y: POP_TRIGGER_Y,
+      duration: this.reducedMotion ? POP_TRIGGER_DURATION_REDUCED : POP_TRIGGER_DURATION_NORMAL,
       reducedMotion: this.reducedMotion,
     });
     this.logCall('Pop text triggered (reduced-motion: ' + this.reducedMotion + ')');
@@ -345,12 +385,12 @@ export class GymAudioFeedbackScene extends GymSceneBase {
     popTextOrIcon({
       scene: this,
       label: displayText,
-      x: GAME_W / 2 + (Math.random() - 0.5) * 100,
-      y: 220,
-      duration: this.reducedMotion ? 500 : 1800,
+      x: GAME_W / 2 + (Math.random() - 0.5) * EVENT_POP_X_SPREAD,
+      y: EVENT_POP_Y,
+      duration: this.reducedMotion ? EVENT_POP_DURATION_REDUCED : EVENT_POP_DURATION_NORMAL,
       reducedMotion: this.reducedMotion,
       style: {
-        fontSize: '20px',
+        fontSize: EVENT_POP_FONT_SIZE,
         color: '#88ff88',
         fontFamily: 'monospace',
       },
@@ -365,10 +405,10 @@ export class GymAudioFeedbackScene extends GymSceneBase {
         scene: this,
         label: '🎉',
         x: GAME_W / 2,
-        y: 300,
-        duration: 200,
+        y: CELEBRATION_Y,
+        duration: CELEBRATION_DURATION_REDUCED,
         reducedMotion: true,
-        scale: 1.5,
+        scale: CELEBRATION_SCALE_REDUCED,
       });
       return;
     }
@@ -384,8 +424,8 @@ export class GymAudioFeedbackScene extends GymSceneBase {
       if (!this.textures.exists(particleKey)) {
         const g = this.add.graphics();
         g.fillStyle(0x88ff88, 1);
-        g.fillCircle(4, 4, 4);
-        g.generateTexture(particleKey, 8, 8);
+        g.fillCircle(CELEBRATION_PARTICLE_RADIUS, CELEBRATION_PARTICLE_RADIUS, CELEBRATION_PARTICLE_RADIUS);
+        g.generateTexture(particleKey, CELEBRATION_PARTICLE_SIZE, CELEBRATION_PARTICLE_SIZE);
         g.destroy();
       }
 
@@ -393,20 +433,20 @@ export class GymAudioFeedbackScene extends GymSceneBase {
       const texture = this.textures.get(particleKey);
       if (texture && this.add.particles) {
         const emitter = this.add.particles(cx, cy, particleKey, {
-          speed: { min: 60, max: 180 },
+          speed: { min: CELEBRATION_PARTICLE_SPEED_MIN, max: CELEBRATION_PARTICLE_SPEED_MAX },
           angle: { min: 0, max: 360 },
-          scale: { start: 0.8, end: 0 },
-          lifespan: 800,
-          quantity: 20,
+          scale: { start: CELEBRATION_PARTICLE_SCALE_START, end: CELEBRATION_PARTICLE_SCALE_END },
+          lifespan: CELEBRATION_PARTICLE_LIFESPAN,
+          quantity: CELEBRATION_PARTICLE_QUANTITY,
           emitting: false,
         });
 
         // Emit a burst
-        emitter.explode(20);
+        emitter.explode(CELEBRATION_PARTICLE_QUANTITY);
         this.logCall('Celebrate: particle burst emitted');
 
         // Clean up after particles finish
-        this.time.delayedCall(1200, () => {
+        this.time.delayedCall(CELEBRATION_PARTICLE_CLEANUP_MS, () => {
           try { emitter.destroy(); } catch (_) { /* ignore */ }
         });
       } else {
@@ -416,9 +456,9 @@ export class GymAudioFeedbackScene extends GymSceneBase {
           label: '🎉',
           x: cx,
           y: cy,
-          duration: 600,
-          scale: 2,
-          riseY: 40,
+          duration: CELEBRATION_FALLBACK_DURATION,
+          scale: CELEBRATION_FALLBACK_SCALE,
+          riseY: CELEBRATION_FALLBACK_RISE_Y,
         });
         this.logCall('Celebrate: pop text fallback');
       }
@@ -428,8 +468,8 @@ export class GymAudioFeedbackScene extends GymSceneBase {
         scene: this,
         label: '🎉',
         x: GAME_W / 2,
-        y: 300,
-        duration: 400,
+        y: CELEBRATION_Y,
+        duration: CELEBRATION_CATCH_DURATION,
         reducedMotion: this.reducedMotion,
       });
       this.logCall('Celebrate: pop text (particle system unavailable)');
@@ -438,7 +478,7 @@ export class GymAudioFeedbackScene extends GymSceneBase {
 
   private logCall(msg: string): void {
     this.callLog.push(msg);
-    if (this.callLog.length > 16) this.callLog.shift();
+    if (this.callLog.length > AUDIO_CALL_LOG_MAX_LINES) this.callLog.shift();
     this.eventLogResult.render(this.callLog);
   }
 

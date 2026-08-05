@@ -138,6 +138,18 @@ Files (in `audio/lost-cities/`):
 - `score-reveal.wav` — artifact chimes when scores are displayed
 - `ui-click.wav` — map pin click for UI button presses
 
+## Audio Sound Effects — Game Win / Game Lost (shared default)
+
+Shared game-outcome sounds used by games that play a distinct victory/defeat tone on game completion (e.g. Golf's `sfx-game-win` / `sfx-game-lost`):
+
+- **Source**: Copied from the Lost Cities procedural synth set (see below; originally generated with `scripts/generate-lost-cities-sfx.mjs`)
+- **License**: CC0 / Public Domain (original procedural synthesis, no external samples used)
+- **Format**: 16-bit PCM WAV, 22050 Hz, mono
+
+Files (in `audio/default/`, mirrored into game dirs as needed):
+- `game-win.wav` — discovery fanfare on victory (copy of `match-win.wav`)
+- `game-lost.wav` — sandstorm loss on defeat (copy of `match-lose.wav`)
+
 ## Game Thumbnails
 
 Thumbnail images displayed on the Game Selector landing page:

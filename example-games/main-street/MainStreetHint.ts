@@ -16,6 +16,7 @@ import { GreedyStrategy, scoreAction } from './MainStreetAiStrategy';
 import type { MainStreetState } from './MainStreetState';
 import type { PlayerAction, BuyBusinessAction, BuyUpgradeAction, BuyEventAction } from './MainStreetEngine';
 import { computeSynergyBonus } from './MainStreetAdjacency';
+import { formatSynergyRate } from './MainStreetFormatting';
 import type { BusinessCard, UpgradeCard, EventCard } from './MainStreetCards';
 
 // ── Types ────────────────────────────────────────────────────
@@ -68,7 +69,8 @@ export function generateHint(state: MainStreetState): HintResult | null {
  * Builds a one-line human-readable rationale for a recommended action.
  *
  * Templates follow the PRD Appendix A spec:
- * - buy-business: "Buy {cardName} at slot {slot} for +{synergyBonus} synergy bonus"
+ * - buy-business: "Buy {cardName} at slot {slot} for {synergyRate} synergy bonus"
+ *   (synergyRate is the effective difficulty-aware percentage, e.g. 50%)
  * - buy-upgrade:  "Upgrade {businessName} for +{incomeBonus}/turn income"
  * - buy-event:    "Buy {eventName} for {coinDelta} coins and {repDelta} reputation"
  * - play-event:   "Play {eventName} now for immediate benefit"
@@ -99,8 +101,11 @@ export function buildRationale(
         state.config.synergyBonusPerNeighbor,
       );
 
-      if (synergyBonus > 0) {
-        return `Buy ${cardName} at slot ${a.slotIndex} for +${synergyBonus} synergy bonus`;
+      // Show the effective percentage rate (difficulty-aware) instead of an
+      // absolute coin value: synergy is a percentage multiplier by design.
+      const synergyRate = card ? formatSynergyRate(card, state.config) : null;
+      if (synergyBonus > 0 && synergyRate !== null) {
+        return `Buy ${cardName} at slot ${a.slotIndex} for ${synergyRate} synergy bonus`;
       }
       return `Buy ${cardName} at slot ${a.slotIndex}`;
     }

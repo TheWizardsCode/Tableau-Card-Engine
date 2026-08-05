@@ -13,12 +13,10 @@
  * @module
  *
  * @remarks
- * Library card design assumptions (following existing BusinessCard patterns):
- * - Library: cost 6, baseIncome 1, Culture synergy, maxLevel 1
- * - Library upgrade (Community Hub): cost 4, incomeBonus 1, synergyRangeBonus 1
- *
- * These stats are used for test fixtures until the actual card data is implemented
- * in {@link CG-0MQF4AJGN006Z06C | Impl: CommunitySpaceCard type and cards}.
+ * Library card design (CG-0MRXYGM9B006I3PE rebalance — reputation asset with running cost):
+ * - Library: cost 7, baseIncome 0, ongoingCost 0.25, reputationPerTurn 0.1, Culture
+ *   synergy, no synergy bonus (synergy-neutral), maxLevel 1
+ * - Library upgrade (Community Hub): cost 4, reputationBonus 0.1, no income/range bonus
  */
 
 import { describe, it, expect } from 'vitest';
@@ -65,6 +63,7 @@ function createCommunitySpaceFixture(overrides?: Record<string, unknown>): Recor
     name: 'Test Community Space',
     cost: 5,
     baseIncome: 1,
+    ongoingCost: 0,
     synergyTypes: ['Culture'] as readonly SynergyType[],
     synergyCoinBonus: undefined,
     synergyRepBonus: undefined,
@@ -188,6 +187,12 @@ describe('CommunitySpaceCard interface shape (AC2)', () => {
 
     const withoutPath = createCommunitySpaceFixture({ upgradePath: undefined });
     expect(withoutPath.upgradePath).toBeUndefined();
+  });
+
+  it('should have an ongoingCost field (default 0)', () => {
+    const communitySpace = createCommunitySpaceFixture();
+    expect(communitySpace).toHaveProperty('ongoingCost');
+    expect(communitySpace.ongoingCost).toBe(0);
   });
 });
 
@@ -317,23 +322,42 @@ describe('Library card design and stats (AC5)', () => {
     expect(libraryUpgrades.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('Library upgrade should have valid fields', () => {
+  it('Library upgrade (Community Hub) should grant reputation, not income/range', () => {
     const libraryUpgrade = upgradeDeck.find(u => u.targetBusiness === 'Library');
     expect(libraryUpgrade).toBeDefined();
 
-    // Validate upgrade card fields
+    // Repurposed per CG-0MRXYGM9B006I3PE: reputationBonus instead of income/range bonuses
     expect(libraryUpgrade!.cost).toBeGreaterThan(0);
-    expect(libraryUpgrade!.incomeBonus).toBeGreaterThan(0);
-    expect(libraryUpgrade!.synergyRangeBonus).toBeGreaterThanOrEqual(0);
+    expect(libraryUpgrade!.incomeBonus).toBe(0);
+    expect(libraryUpgrade!.synergyRangeBonus).toBe(0);
+    expect(libraryUpgrade!.reputationBonus).toBe(0.1);
     expect(libraryUpgrade!.description.length).toBeGreaterThan(0);
     expect(libraryUpgrade!.family).toBe('upgrade');
   });
 
-  it('Library should have cost 14 and baseIncome 1.5', () => {
+  it('Library should be a reputation asset: cost 7, no income, ongoing cost, +0.1 rep/turn', () => {
     const library = communitySpaceDeck.find(c => c.name === 'Library');
     expect(library).toBeDefined();
-    expect(library!.cost).toBe(14);
-    expect(library!.baseIncome).toBe(1.5);
+    expect(library!.cost).toBe(7);
+    expect(library!.baseIncome).toBe(0);
+    expect(library!.ongoingCost).toBe(0.25);
+    expect(library!.reputationPerTurn).toBe(0.1);
+  });
+
+  it('Library should be synergy-neutral (explicit zero synergy bonuses)', () => {
+    const library = communitySpaceDeck.find(c => c.name === 'Library');
+    expect(library).toBeDefined();
+    // Explicit 0/0 (Pawn Shop pattern) opts the card out of the synergy system
+    // entirely — undefined would default to a 0.5 coin synergy rate.
+    expect(library!.synergyCoinBonus).toBe(0);
+    expect(library!.synergyRepBonus).toBe(0);
+  });
+
+  it('Library description should mention the running cost and reputation', () => {
+    const library = communitySpaceDeck.find(c => c.name === 'Library');
+    expect(library).toBeDefined();
+    expect(library!.description).toMatch(/0\.25/);
+    expect(library!.description).toMatch(/0\.1/);
   });
 });
 
@@ -413,6 +437,13 @@ describe('Negative case: non-matching upgrade (AC7)', () => {
     for (const bizName of businessNames) {
       expect(garden!.targetBusiness).not.toBe(bizName);
     }
+  });
+
+  it('Library upgrade (Community Hub) should target Library, not Park', () => {
+    const communityHub = upgradeDeck.find(u => u.targetBusiness === 'Library');
+    expect(communityHub).toBeDefined();
+    expect(communityHub!.targetBusiness).toBe('Library');
+    expect(communityHub!.targetBusiness).not.toBe('Park');
   });
 
   it('empty or undefined targetBusiness should match nothing', () => {

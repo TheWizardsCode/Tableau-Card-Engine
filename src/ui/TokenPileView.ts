@@ -372,6 +372,11 @@ export function createSimpleTokenRenderer(
  * `cardTextureKey` helper from CardTextureHelpers to map tokens
  * to card-like textures based on a `cardType` property.
  *
+ * Tokens with a `cardType` are rendered using the `{backTexture}-{cardType}`
+ * variant texture. If that variant texture does not exist in the scene's
+ * texture manager, the renderer falls back to the base `backTexture` (with a
+ * `console.warn`) so tokens never render as Phaser's missing-texture sprite.
+ *
  * Useful for games that have card-like objects with custom types
  * but no dedicated token renderer.
  */
@@ -379,9 +384,20 @@ export function createCardBackTokenRenderer(
   backTexture: string = 'card_back',
 ): TokenRenderer<{ cardType?: string }> {
   return (token: { cardType?: string }, container: Phaser.GameObjects.Container, _index: number): void => {
-    // Use card back texture for all tokens (or card type if provided)
-    const key = token.cardType ? `${backTexture}-${token.cardType}` : backTexture;
-    const sprite = container.scene.add.image(0, 0, key);
+    const scene = container.scene;
+    // Use card back texture for all tokens (or card type if provided).
+    // When a cardType-variant texture does not exist (e.g. scenes that only
+    // generate a single back texture), fall back to the base back texture so
+    // tokens never render as Phaser's "not found" / missing-texture sprite.
+    let key = token.cardType ? `${backTexture}-${token.cardType}` : backTexture;
+    if (key !== backTexture && !scene.textures.exists(key)) {
+      console.warn(
+        `[TokenPileView] Card-back variant texture "${key}" not found; ` +
+        `falling back to "${backTexture}".`,
+      );
+      key = backTexture;
+    }
+    const sprite = scene.add.image(0, 0, key);
     container.add(sprite);
   };
 }

@@ -60,6 +60,7 @@ describe('Main Street replay e2e', () => {
       gameType: string;
       screenshots: Array<{ screenshotPath: string }>;
       errors: string[];
+      contactSheetPath?: string;
     };
 
     expect(summary.gameType).toBe('main-street');
@@ -74,6 +75,15 @@ describe('Main Street replay e2e', () => {
     for (const screenshotPath of screenshotPaths) {
       expect(fs.existsSync(screenshotPath)).toBe(true);
     }
+
+    // Regression CG-0MSBX3UA9001QDF3: the contact sheet must be generated
+    // after replay-summary.json is written, so both the sheet file and the
+    // summary's contactSheetPath are present in the integrated flow.
+    const contactSheetPath = path.join(OUT_DIR, 'contact-sheet.png');
+    expect(fs.existsSync(contactSheetPath)).toBe(true);
+    expect(summary.contactSheetPath).toBeTruthy();
+    expect(summary.contactSheetPath).toBe(contactSheetPath);
+    expect(fs.existsSync(summary.contactSheetPath as string)).toBe(true);
   }, 180_000);
 
   it('captures canonical-resolution screenshots for layout assertions', async () => {

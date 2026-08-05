@@ -125,7 +125,7 @@ Deliver AI auto-play, a player-facing hint system, and undo/redo functionality f
 - [ ] AC-3.1: A "Hint" button is visible during the MarketPhase.
 - [ ] AC-3.2: Pressing Hint queries the Greedy strategy for the recommended action.
 - [ ] AC-3.3: The recommended card is highlighted in the market (or held-event area) and the target slot is highlighted on the street grid (for buy-business actions).
-- [ ] AC-3.4: A one-line rationale is displayed (e.g., "Buy Cafe and place at slot 5 for +2 synergy bonus").
+- [ ] AC-3.4: A one-line rationale is displayed (e.g., "Buy Cafe and place at slot 5 for 50% synergy bonus").
 - [ ] AC-3.5: If the recommended action is "end turn", the hint displays "No good buys available -- end your turn."
 - [ ] AC-3.6: The hint does not auto-execute the action; the player must act manually.
 - [ ] AC-3.7: Hint is limited to 1 use per turn. After use, the Hint button is disabled until the next turn.
@@ -260,7 +260,7 @@ The hint system reuses the Greedy strategy to generate recommendations:
 5. A `hintUsedThisTurn` flag on the state (or scene) prevents additional hints until the next `DayStart`.
 
 **Rationale generation** maps action types to templates:
-- `buy-business`: "Buy {cardName} at slot {slot} for +{synergyBonus} synergy bonus"
+- `buy-business`: "Buy {cardName} at slot {slot} for {synergyRate} synergy bonus" (synergyRate is the effective difficulty-aware percentage, e.g. 50%)
 - `buy-upgrade`: "Upgrade {businessName} for +{incomeBonus}/turn income"
 - `buy-event`: "Buy {eventName} for {coinDelta} coins and {repDelta} reputation"
 - `play-event`: "Play {eventName} now for immediate benefit"
@@ -743,7 +743,7 @@ score = 0  (fallback when no positive-scoring action exists)
 - `baseIncome = 2`
 - `score = (2 + 0) * 15 - 3 = 27`
 
-**Result:** Greedy recommends "Buy Cafe at slot 2" with rationale "Buy Cafe at slot 2 for +2 synergy bonus".
+**Result:** Greedy recommends "Buy Cafe at slot 2" with rationale "Buy Cafe at slot 2 for 50% synergy bonus".
 
 ---
 

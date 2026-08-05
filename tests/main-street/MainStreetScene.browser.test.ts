@@ -383,6 +383,87 @@ describe('MainStreetScene browser tests', () => {
     }
   }, 45_000);
 
+  it('buy transfer animations end exactly at the rendered hand position (desktop + narrow viewports)', async () => {
+    const viewports = [
+      { width: 1280, height: 720 },
+      { width: 900, height: 1100 },
+    ];
+
+    for (const vp of viewports) {
+      game = await bootGame(vp);
+      const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;
+      const state = scene.state;
+      // Ensure affordability across the whole test.
+      state.resourceBank.coins = 200;
+
+      // Capture the destination argument of every market→hand transfer.
+      const transferSpy = vi.spyOn(scene, 'animateTransferFromMarket');
+
+      // ── Business: buy into a NON-empty hand (hand 1 → 2) ──
+      // First purchase (hand 0 → 1) so the second buy starts with a non-empty hand.
+      const biz1 = state.market.development.find((c: any) =>
+        c && canPurchaseBusiness(state, c.id, 0).legal);
+      expect(biz1).toBeTruthy();
+
+      scene.onBusinessCardClick(biz1);
+      await waitForCondition(
+        () => scene.uiPhase === 'placing-from-hand',
+        { timeoutMs: 6000, label: 'first business bought to hand' },
+      );
+      expect(state.hand).toHaveLength(1);
+
+      // Second purchase (hand 1 → 2) — the transfer target must equal the
+      // rendered resting position of the appended card.
+      const biz2 = state.market.development.find((c: any) =>
+        c && c.id !== biz1.id && canPurchaseBusiness(state, c.id, 0).legal);
+      expect(biz2).toBeTruthy();
+
+      scene.uiPhase = 'market'; // allow the second buy (test control)
+      const beforeBiz2 = transferSpy.mock.calls.length;
+      scene.onBusinessCardClick(biz2);
+      await waitForCondition(
+        () => transferSpy.mock.calls.length > beforeBiz2,
+        { label: 'second business transfer started' },
+      );
+      const bizDest = (transferSpy.mock.calls[beforeBiz2][0] as any).destination;
+
+      await waitForCondition(
+        () => state.hand?.some((c: any) => c.id === biz2.id),
+        { timeoutMs: 6000, label: 'second business materialized in hand' },
+      );
+      const bizIndex = state.hand.findIndex((c: any) => c.id === biz2.id);
+      const bizRendered = scene.msRenderer.handBusinessView.getCardCenters()[bizIndex];
+      expect(Math.abs(bizDest.x - bizRendered.x)).toBeLessThanOrEqual(2);
+      expect(Math.abs(bizDest.y - bizRendered.y)).toBeLessThanOrEqual(2);
+
+      // ── Event: held-event buy destination equals rendered position ──
+      const eventCard = state.market.investments.find((c: any) =>
+        c && c.family === 'event' && canPurchaseEvent(state, c.id).legal);
+      if (eventCard) {
+        const beforeEvent = transferSpy.mock.calls.length;
+        scene.uiPhase = 'market';
+        scene.onEventCardClick(eventCard);
+        await waitForCondition(
+          () => transferSpy.mock.calls.length > beforeEvent,
+          { label: 'event transfer started' },
+        );
+        const eventDest = (transferSpy.mock.calls[beforeEvent][0] as any).destination;
+
+        await waitForCondition(
+          () => state.heldEvent?.id === eventCard.id,
+          { timeoutMs: 6000, label: 'event materialized' },
+        );
+        const eventRendered = scene.msRenderer.handView.getCardCenters()[0];
+        expect(Math.abs(eventDest.x - eventRendered.x)).toBeLessThanOrEqual(2);
+        expect(Math.abs(eventDest.y - eventRendered.y)).toBeLessThanOrEqual(2);
+      }
+
+      transferSpy.mockRestore();
+      destroyGame(game);
+      game = null;
+    }
+  }, 45_000);
+
   it('allows pressing Enter to end the turn when legal', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;

@@ -1,7 +1,7 @@
 /**
  * balance-cards.ts — CLI entry point for the Main Street card balancing tool.
  *
- * Usage: npx tsx scripts/balance-cards.ts [--input <path>] [--output <path>]
+ * Usage: npx tsx scripts/run-balance-cards.ts [--input <path>] [--output <path>]
  *
  * Reads the Main Street card CSV, performs a hybrid curve-fitting + tier-band
  * balancing pass on all 5 card families, prints a summary table to stdout,
@@ -19,7 +19,7 @@ import {
   validateCsvRows,
   runBalancingPass,
   formatSummaryTable,
-} from './balance-cards';
+} from '../src/balance-cards';
 
 // ── Default paths ─────────────────────────────────────────────────────
 
@@ -39,7 +39,7 @@ function parseArgs(): { input: string; output: string } {
     } else if (args[i] === '--output' && i + 1 < args.length) {
       output = resolve(process.cwd(), args[++i]);
     } else if (args[i] === '--help') {
-      console.log('Usage: npx tsx scripts/balance-cards.ts [--input <path>] [--output <path>]');
+      console.log('Usage: npx tsx scripts/run-balance-cards.ts [--input <path>] [--output <path>]');
       process.exit(0);
     }
   }

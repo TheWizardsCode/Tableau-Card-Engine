@@ -105,7 +105,7 @@ Deliver a playable walking skeleton of Main Street that a human player can compl
 
 **Acceptance Criteria:**
 - [ ] AC-3.1: During the Income Phase, each placed business generates `baseIncome + synergyBonus` coins.
-- [ ] AC-3.2: Synergy bonus is +1 coin per adjacent business sharing at least one Synergy Type.
+- [ ] AC-3.2: Synergy bonus is a percentage of the business's effective base income per adjacent business sharing at least one Synergy Type (default per-card rate 50%, scaled by the difficulty preset multiplier).
 - [ ] AC-3.3: Adjacency considers only immediately adjacent slots (index +/- 1) by default.
 - [ ] AC-3.4: Upgraded businesses with `synergyRangeBonus` consider slots within extended range.
 - [ ] AC-3.5: Total income earned is displayed to the player after the Income Phase.

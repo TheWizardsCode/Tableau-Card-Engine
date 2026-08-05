@@ -13,9 +13,12 @@ import {
   synergyColor,
 } from '../MainStreetCards';
 import {
-  computeSynergyBonus,
   computeSynergyPairs,
 } from '../MainStreetAdjacency';
+import {
+  formatSynergyRate,
+  buildCardTooltipInfo,
+} from '../MainStreetFormatting';
 import { computeScore } from '../MainStreetEngine';
 import {
   buildCoinsTooltip,
@@ -140,7 +143,7 @@ export class MainStreetRenderer {
           const hover = s.add.rectangle(0, 0, handCardW, handCardH, 0x000000, 0.001);
           hover.setInteractive({ useHandCursor: s.uiPhase === 'market' });
           hover.on('pointerover', () => {
-            const info = `Event: ${card.name}\nCost: ${card.cost}\nEffect: ${card.effect}`;
+            const info = buildCardTooltipInfo(card, s.state.config);
             s.tooltipManager?.show(info, container.x, container.y);
           });
           hover.on('pointerout', () => s.tooltipManager?.hide());
@@ -561,8 +564,8 @@ export class MainStreetRenderer {
         const label = isCommunitySpace ? 'Community Space' : 'Business';
         const totalRep = (biz.reputationPerTurn ?? 0) + biz.reputationBonus;
         const repInfo = totalRep > 0 ? `\nReputation: +${totalRep}/turn` : '';
-        const synergyBonus = computeSynergyBonus(s.state.streetGrid, _index, s.state.config.synergyBonusPerNeighbor, soldSlots);
-        const synergyInfo = `\nSynergy bonus: +${synergyBonus}/turn`;
+        const synergyRate = formatSynergyRate(biz, s.state.config);
+        const synergyInfo = synergyRate !== null ? `\nSynergy bonus: ${synergyRate} of base income per adjacent matching business` : '';
         const info = `${label}: ${biz.name}\nIncome: +${biz.baseIncome + biz.incomeBonus}/turn${repInfo}\nSynergy: ${biz.synergyTypes.join('/')}${synergyInfo}\nLevel: ${biz.level}`;
         s.tooltipManager?.show(info, tooltipZone.x, tooltipZone.y);
       });
@@ -1109,25 +1112,7 @@ export class MainStreetRenderer {
       hitArea.on('pointerover', () => {
         selection.setHovered(true);
         if (!s.replayMode) {
-          let info = '';
-          if (card.family === 'business') {
-            const b = card as any;
-            const bTotalRep = (b.reputationPerTurn ?? 0) + (b.reputationBonus ?? 0);
-            const bRepInfo = bTotalRep > 0 ? `\nReputation: +${bTotalRep}/turn` : '';
-            info = `Business: ${b.name}\nCost: ${b.cost}\nIncome: +${b.baseIncome + (b.incomeBonus || 0)}/turn${bRepInfo}\nSynergy: ${(b.synergyTypes || []).join('/')}\n${b.description ?? ''}`;
-          } else if (card.family === 'community-space') {
-            const cs = card as any;
-            const csTotalRep = (cs.reputationPerTurn ?? 0) + (cs.reputationBonus ?? 0);
-            const csRepInfo = csTotalRep > 0 ? `\nReputation: +${csTotalRep}/turn` : '';
-            info = `Community Space: ${cs.name}\nCost: ${cs.cost}\nIncome: +${cs.baseIncome + (cs.incomeBonus || 0)}/turn${csRepInfo}\nSynergy: ${(cs.synergyTypes || []).join('/')}\n${cs.description ?? ''}`;
-          } else if (card.family === 'event') {
-            const e = card as any;
-            const coinDelta = e.coinDelta >= 0 ? '+' : '';
-            info = `Event: ${e.name}\nCost: ${e.cost}\nEffect: ${e.effect}\nCoins: ${coinDelta}${e.coinDelta.toFixed(3)}, Rep: ${e.reputationDelta >= 0 ? '+' : ''}${e.reputationDelta}`;
-          } else if (card.family === 'upgrade') {
-            const u = card as any;
-            info = `Upgrade: ${u.name}\nCost: ${u.cost}\nApplies to: ${u.targetBusiness}\nIncome Bonus: +${u.incomeBonus}\nRequires: Lv${u.requiredLevel ?? 0}\n${u.description ?? ''}`;
-          }
+          const info = buildCardTooltipInfo(card, s.state.config, { includeEventDetail: true });
           s.tooltipManager?.show(info, container.x, container.y);
         }
       });
@@ -1320,7 +1305,7 @@ export class MainStreetRenderer {
       const hover = s.add.rectangle(0, 0, handCardW, handCardH, 0x000000, 0.001);
       hover.setInteractive({ useHandCursor: s.uiPhase === 'market' });
       hover.on('pointerover', () => {
-        const info = `Event: ${card.name}\nCost: ${card.cost}\nEffect: ${card.effect}`;
+        const info = buildCardTooltipInfo(card, s.state.config);
         s.tooltipManager?.show(info, container.x, container.y);
       });
       hover.on('pointerout', () => s.tooltipManager?.hide());

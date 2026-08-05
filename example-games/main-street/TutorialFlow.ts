@@ -49,8 +49,9 @@
  * @module
  */
 
-import { t } from '../../src/core-engine/I18n';
+import { t, formatCurrency } from '../../src/core-engine/I18n';
 import { tutorialKey } from './i18n/tutorial-en';
+import { getCsvRows, getBaseTypeId } from './MainStreetCards';
 
 // ── Step Types ──────────────────────────────────────────────
 
@@ -134,6 +135,16 @@ export interface UnifiedTutorialStepDef {
    * clicking any other card shows an error message.
    */
   requiredCardId?: string;
+  /**
+   * If set, this card's live template data (name/cost/income bonus) is used to
+   * resolve `{cardName}` / `{cost}` / `{bonus}` placeholders in the step's body
+   * text, but the step does NOT gate on purchasing this exact card.
+   *
+   * Used for steps whose body references a card purchased earlier or guaranteed
+   * by the tutorial scenario without requiring that purchase here (e.g. T7
+   * references the Local Festival; T9 references the Bookshop bought in T8).
+   */
+  referencedCardId?: string;
 }
 
 // ── Unified Tutorial Script (T1-T13) ────────────────────────
@@ -210,8 +221,10 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     requiredAction: 'buy-event',
     // The TutorialScenario system puts Local Festival (evt-festival, $3)
     // in the investments row. This is affordable after the T3 Laundromat purchase
-    // ($4) and T6 income (~1 coin). No specific card is required — the player can
-    // buy any Investment event card.
+    // ($4) and T6 income (~1 coin). The player can buy any Investment event card
+    // (no requiredCardId gate); referencedCardId only feeds the {cardName}/{bonus}
+    // placeholders in the body text from live card data.
+    referencedCardId: 'evt-festival-0',
   },
   {
     id: 'T8',
@@ -232,6 +245,9 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     highlightZone: 'streetGrid',
     gate: 'action',
     requiredAction: 'place-business',
+    // Body text references the Bookshop bought in T8 — referencedCardId feeds
+    // the {cardName} placeholder from live card data (no purchase gate here).
+    referencedCardId: 'biz-bookshop-0',
   },
   {
     id: 'T10',
@@ -377,19 +393,81 @@ export function shouldAllowAction(
 // ── i18n Resolution ─────────────────────────────────────────
 
 /**
+ * Card-data interpolation params substituted into tutorial step text.
+ *
+ * `{cardName}` / `{cost}` / `{bonus}` placeholders in the i18n bundle are
+ * replaced with these live values from `card-data.csv` at render time.
+ *
+ * Declared as a type alias (not an interface) so it is assignable to
+ * `Record<string, string | number>` for `t(key, params)` interpolation.
+ */
+export type TutorialCardDataParams = {
+  /** The card's `name` column (e.g. `'Laundromat'`). */
+  cardName: string;
+  /** The card's `cost` column formatted via `formatCurrency()` (e.g. `'€4'`). */
+  cost: string;
+  /** Event cards only: the `coinDelta` as `+N coins` (e.g. `'+2 coins'`). */
+  bonus: string;
+};
+
+/**
+ * Resolve card-data interpolation params for a tutorial step.
+ *
+ * Uses `step.requiredCardId` (purchase-gated steps) or `step.referencedCardId`
+ * (text-only references) as the lookup key, strips the copy suffix via
+ * `getBaseTypeId()`, and finds the matching row in the live CSV via
+ * `getCsvRows()`. Returns `null` when the step has no card reference.
+ *
+ * @throws Error if the step references a card that has no row in the live
+ *         card data — the resolver fails loudly rather than rendering a raw
+ *         `{placeholder}` token.
+ */
+export function resolveTutorialCardParams(
+  step: UnifiedTutorialStepDef,
+): TutorialCardDataParams | null {
+  const cardId = step.requiredCardId ?? step.referencedCardId;
+  if (!cardId) return null;
+
+  const baseId = getBaseTypeId(cardId);
+  const row = getCsvRows().find(r => r.id === baseId);
+  if (!row) {
+    throw new Error(
+      `TutorialFlow: no card-data row found for base template "${baseId}" ` +
+      `(from step ${step.id} card id "${cardId}"). Check card-data.csv.`,
+    );
+  }
+
+  const coinDelta = Number(row.coinDelta);
+  const bonus =
+    row.coinDelta !== undefined && row.coinDelta !== '' && Number.isFinite(coinDelta)
+      ? `+${coinDelta} coins`
+      : '+0 coins';
+
+  return {
+    cardName: row.name,
+    cost: formatCurrency(Number(row.cost) || 0),
+    bonus,
+  };
+}
+
+/**
  * Resolve a tutorial step's title and body through the i18n system.
  *
  * Looks up `step.titleKey` and `step.bodyKey` via `t()`, falling back to
- * the key itself if no locale bundle has been registered.
+ * the key itself if no locale bundle has been registered.  When the step
+ * references a card (`requiredCardId` / `referencedCardId`), the live card
+ * data from `card-data.csv` is substituted into `{cardName}` / `{cost}` /
+ * `{bonus}` placeholders so the text can never go stale after rebalancing.
  *
  * Utility glue for the overlay manager (`MainStreetTutorialHints`).
  */
 export function resolveTutorialStepText(
   step: UnifiedTutorialStepDef,
 ): { title: string; body: string } {
+  const params = resolveTutorialCardParams(step);
   return {
-    title: t(step.titleKey),
-    body: t(step.bodyKey),
+    title: params ? t(step.titleKey, params) : t(step.titleKey),
+    body: params ? t(step.bodyKey, params) : t(step.bodyKey),
   };
 }
 

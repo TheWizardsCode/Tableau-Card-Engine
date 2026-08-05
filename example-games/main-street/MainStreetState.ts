@@ -711,6 +711,41 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
   // can detect them and fall back to computing from scratch. After any placement or
   // sale, the incremental update system will populate them correctly.
   // No explicit migration needed — undefined is the natural default.
+
+  // ── ongoingCost: default to 0 for legacy community-space cards ─
+  // Added by CG-0MRXYGM9B006I3PE (community-space ongoing costs). Community space
+  // cards serialized before this field existed must default to 0 so the income
+  // phase never deducts a cost from cards that never had one.
+  const csCardLocations: unknown[][] = [];
+  if (grid) csCardLocations.push(grid);
+  if (market) {
+    const devCards = market.development as unknown[] | undefined;
+    if (devCards) csCardLocations.push(devCards);
+  }
+  if (decks) {
+    const csDeck = decks.communitySpace as unknown[] | undefined;
+    if (csDeck) csCardLocations.push(csDeck);
+    const bizDeck = decks.business as unknown[] | undefined;
+    if (bizDeck) csCardLocations.push(bizDeck);
+  }
+  if (discards) {
+    const csDiscard = discards.communitySpace as unknown[] | undefined;
+    if (csDiscard) csCardLocations.push(csDiscard);
+  }
+  const handArr = saved.hand as unknown[] | undefined;
+  if (handArr) csCardLocations.push(handArr);
+  for (const arr of csCardLocations) {
+    for (const card of arr) {
+      if (
+        card &&
+        typeof card === 'object' &&
+        (card as { family?: unknown }).family === 'community-space' &&
+        !('ongoingCost' in (card as Record<string, unknown>))
+      ) {
+        (card as Record<string, unknown>).ongoingCost = 0;
+      }
+    }
+  }
 }
 
 /**

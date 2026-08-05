@@ -38,6 +38,60 @@ import { createHudText } from '../../../src/ui/Renderer';
 import { Slider } from '../../../src/ui/Slider';
 import { HighlightManager } from '../../../src/ui/HighlightManager';
 import type { Card } from '../../../src/card-system/Card';
+import {
+  DROP_REJECT_DELAY_MS,
+  HAND_BUTTON_ROW_1_Y,
+  HAND_BUTTON_ROW_2_Y,
+  HAND_INFO_Y,
+  HAND_DRAG_LABEL_X,
+  HAND_DISCARD_MODE_LABEL_X,
+  HAND_FACE_UP_LABEL_X,
+  HAND_LAYOUT_LABEL_X,
+  HAND_EVENT_LOG_HEADER_Y,
+  HAND_LABEL_FONT_SIZE,
+  HAND_LAYOUT_LABEL_FONT_SIZE,
+  ARC_SLIDER_MAX,
+  ROTATION_SLIDER_MAX,
+  SPACING_SLIDER_RATIO,
+  VALID_HIGHLIGHT_COLOR,
+  VALID_HIGHLIGHT_ALPHA,
+  VALID_HIGHLIGHT_LIFETIME,
+  ILLEGAL_TINT_COLOR,
+  ILLEGAL_OVERLAY_ALPHA,
+  FALLBACK_CARD_WIDTH,
+  FALLBACK_CARD_HEIGHT,
+  ILLEGAL_TINT_DURATION_MS,
+  ILLEGAL_SHAKE_DISTANCE,
+  ILLEGAL_SHAKE_DURATION_MS,
+  ILLEGAL_SHAKE_REPEAT,
+  DROP_ZONE_PAD,
+  DROP_ZONE_RADIUS,
+  DROP_ZONE_STROKE_WIDTH,
+  DROP_ZONE_STROKE_COLOR,
+  DROP_ZONE_STROKE_ALPHA,
+  DROP_ZONE_FILL_COLOR,
+  DROP_ZONE_FILL_ALPHA,
+  DISCARD_CLICK_ALPHA,
+  DISCARD_CLICK_STROKE_WIDTH,
+  DROP_HIT_TEST_X_PAD,
+  DROP_HIT_TEST_Y_PAD,
+  DROP_HIGHLIGHT_PAD,
+  DROP_ACCEPT_DELAY_MS,
+  HAND_LOG_MAX_LINES,
+  HAND_LOG_BASE_Y,
+  HAND_LOG_LINE_HEIGHT,
+  HAND_LOG_X,
+  HAND_DEAL_DURATION_MS,
+  HAND_DISCARD_ANIMATE_DURATION_MS,
+  HAND_DISCARD_SHRINK_OFFSET_Y,
+  HAND_DISCARD_SHRINK_DURATION_MS,
+  HAND_RECALL_DURATION_MS,
+  HAND_FLIP_DURATION_MS,
+  HAND_MOVE_DEST_X_OFFSET,
+  HAND_MOVE_DEST_Y,
+  HAND_MOVE_DURATION_MS,
+  HAND_CANCEL_MOVE_DURATION_MS,
+} from './GymConstants';
 
 const HAND_SIZE = 5;
 const DEFAULT_SEED = 42;
@@ -175,7 +229,7 @@ export class GymHandPileScene extends GymSceneBase {
       } else {
         this.logEvent(`Drop rejected (target=${payload.targetPileIndex}, accepted=${payload.accepted})`);
         // Rebuild hand so the card sprite is back in its original place
-        this.time.delayedCall(200, () => {
+        this.time.delayedCall(DROP_REJECT_DELAY_MS, () => {
           this.handView.setCards(this.hand);
           this.handView.setSelected(this.selectedIdx >= 0 ? this.selectedIdx : null);
         });
@@ -231,7 +285,7 @@ export class GymHandPileScene extends GymSceneBase {
 
     // Controls row 1 — 12 action buttons spread across left/center/right
     // zones so they all fit on a single row (no vertical wrapping).
-    this.initButtonBar(60);
+    this.initButtonBar(HAND_BUTTON_ROW_1_Y);
     this.buttonBar!.addButton('[ Draw ]', () => this.drawToHand(), { zone: 'left' });
     this.buttonBar!.addButton('[ Discard ]', () => this.discardSelected(), { zone: 'left' });
     this.buttonBar!.addButton('[ Recall ]', () => this.recallFromDiscard(), { zone: 'left' });
@@ -246,7 +300,7 @@ export class GymHandPileScene extends GymSceneBase {
     this.buttonBar!.addButton('[ Reset ]', () => this.reset(), { zone: 'right' });
 
     // Controls row 2 — mode toggles spread across zones on a single row.
-    const row2Y = 112;
+    const row2Y = HAND_BUTTON_ROW_2_Y;
     this.initButtonBar(row2Y);
     this.dragButton = this.buttonBar!.addButton('[ Disable Drag ]', () => this.toggleDrag(), { zone: 'left' });
     this.buttonBar!.addButton('[ Toggle Discard Mode ]', () => this.toggleDiscardMode(), { zone: 'center' });
@@ -254,16 +308,16 @@ export class GymHandPileScene extends GymSceneBase {
     this.buttonBar!.addButton('[ Toggle Layout ]', () => this.toggleLayoutDirection(), { zone: 'right' });
 
     // Status/info line below the buttons — never overlaps the buttons.
-    const infoY = 134;
-    this.dragLabel = createHudText(this, 170, infoY, 'Drag: ON  (drag card to the discard pile)', '#88ff88', { fontSize: '11px' }).setOrigin(0, 0.5);
-    this.discardModeLabel = createHudText(this, 560, infoY, 'Discard: animate', '#88ff88', { fontSize: '11px' }).setOrigin(0, 0.5);
-    this.faceUpLabel = createHudText(this, 740, infoY, 'Face: up', '#88ff88', { fontSize: '11px' }).setOrigin(0, 0.5);
-    this.layoutLabel = createHudText(this, 960, infoY, 'Layout: horizontal', '#88ff88', { fontSize: '12px' }).setOrigin(0, 0.5);
+    const infoY = HAND_INFO_Y;
+    this.dragLabel = createHudText(this, HAND_DRAG_LABEL_X, infoY, 'Drag: ON  (drag card to the discard pile)', '#88ff88', { fontSize: HAND_LABEL_FONT_SIZE }).setOrigin(0, 0.5);
+    this.discardModeLabel = createHudText(this, HAND_DISCARD_MODE_LABEL_X, infoY, 'Discard: animate', '#88ff88', { fontSize: HAND_LABEL_FONT_SIZE }).setOrigin(0, 0.5);
+    this.faceUpLabel = createHudText(this, HAND_FACE_UP_LABEL_X, infoY, 'Face: up', '#88ff88', { fontSize: HAND_LABEL_FONT_SIZE }).setOrigin(0, 0.5);
+    this.layoutLabel = createHudText(this, HAND_LAYOUT_LABEL_X, infoY, 'Layout: horizontal', '#88ff88', { fontSize: HAND_LAYOUT_LABEL_FONT_SIZE }).setOrigin(0, 0.5);
 
     // Apply the default drag state (ON) so HandView is configured before use
     this.applyDragState();
 
-    createHudText(this, cx, 147, '── Event Log ──', '#669966', { fontSize: '12px' }).setOrigin(0.5);
+    createHudText(this, cx, HAND_EVENT_LOG_HEADER_Y, '── Event Log ──', '#669966', { fontSize: HAND_LAYOUT_LABEL_FONT_SIZE }).setOrigin(0.5);
 
     // Create sliders using the shared utility
     const sliderY = this.SLIDER_Y;
@@ -279,7 +333,7 @@ export class GymHandPileScene extends GymSceneBase {
     this.arcSlider = new Slider(this, arcSliderX, sliderY, {
       initialValue: this.ARC_RADIUS_DEFAULT,
       minValue: 0,
-      maxValue: 200,
+      maxValue: ARC_SLIDER_MAX,
       label: 'Arc',
       width: sliderWidth,
       textColor: '#88ff88',
@@ -289,8 +343,8 @@ export class GymHandPileScene extends GymSceneBase {
       this.handView.setArcRadius(value);
     };
 
-    const minSpacing = Math.round(CARD_W * (1 - 0.75));
-    const maxSpacing = Math.round(CARD_W * (1 + 0.75));
+    const minSpacing = Math.round(CARD_W * (1 - SPACING_SLIDER_RATIO));
+    const maxSpacing = Math.round(CARD_W * (1 + SPACING_SLIDER_RATIO));
     this.spacingSlider = new Slider(this, spacingSliderX, sliderY, {
       initialValue: this.HAND_SPACING,
       minValue: minSpacing,
@@ -306,7 +360,7 @@ export class GymHandPileScene extends GymSceneBase {
     this.rotationSlider = new Slider(this, rotationSliderX, sliderY, {
       initialValue: this.ROTATION_DEGREES_DEFAULT,
       minValue: 0,
-      maxValue: 359,
+      maxValue: ROTATION_SLIDER_MAX,
       label: 'Rotation',
       width: sliderWidth,
       textColor: '#88ff88',
@@ -446,7 +500,7 @@ export class GymHandPileScene extends GymSceneBase {
     await this.handView.animateAddCard(card, {
       sourceX: this.DECK_X,
       sourceY: this.PILE_Y,
-      duration: 400,
+      duration: HAND_DEAL_DURATION_MS,
       insertAtIndex: insertIndex,
     });
 
@@ -501,7 +555,7 @@ export class GymHandPileScene extends GymSceneBase {
           destX: this.DISCARD_X,
           destY: this.PILE_Y,
           flipOnArrivalTexture: getCardTexture(card),
-          duration: 400,
+          duration: HAND_DISCARD_ANIMATE_DURATION_MS,
           depth: 2,
           destroyAfter: true,
           gameEvents,
@@ -512,8 +566,8 @@ export class GymHandPileScene extends GymSceneBase {
         discardCard({
           scene: this,
           target: sprite as any,
-          offsetY: 30,
-          duration: 350,
+          offsetY: HAND_DISCARD_SHRINK_OFFSET_Y,
+          duration: HAND_DISCARD_SHRINK_DURATION_MS,
           destroyAfter: true,
           gameEvents,
           cardId: `${card.rank}${card.suit}`,
@@ -551,7 +605,7 @@ export class GymHandPileScene extends GymSceneBase {
     await this.handView.animateAddCard(card, {
       sourceX: this.DISCARD_X,
       sourceY: this.PILE_Y,
-      duration: 350,
+      duration: HAND_RECALL_DURATION_MS,
       insertAtIndex: insertIndex,
     });
 
@@ -602,7 +656,7 @@ export class GymHandPileScene extends GymSceneBase {
         scene: this,
         target: imgSprite,
         newTexture,
-        duration: 300,
+        duration: HAND_FLIP_DURATION_MS,
         onComplete: () => {
           this.logEvent(`Flipped card (animated) -> ${newTexture}`);
         },
@@ -666,8 +720,8 @@ export class GymHandPileScene extends GymSceneBase {
     this.movedCardOrigY = basePos ? basePos.y : (sprite as any).y;
     this.cardMoved = true;
 
-    const destX = GAME_W / 2 + 200;
-    const destY = 200;
+    const destX = GAME_W / 2 + HAND_MOVE_DEST_X_OFFSET;
+    const destY = HAND_MOVE_DEST_Y;
 
     if (this.reducedMotion) {
       (sprite as any).setPosition(destX, destY);
@@ -678,7 +732,7 @@ export class GymHandPileScene extends GymSceneBase {
         target: sprite as unknown as Phaser.GameObjects.Components.Transform & Phaser.GameObjects.GameObject,
         destX,
         destY,
-        duration: 500,
+        duration: HAND_MOVE_DURATION_MS,
         onComplete: () => {
           this.activeMoveTween = null;
           // cardMoved remains true so Cancel Move can still return the card
@@ -715,7 +769,7 @@ export class GymHandPileScene extends GymSceneBase {
             targets: sprite as any,
             x: this.movedCardOrigX,
             y: this.movedCardOrigY,
-            duration: 250,
+            duration: HAND_CANCEL_MOVE_DURATION_MS,
             ease: 'Quad.easeOut',
             onComplete: () => {
               this.logEvent('Move cancelled — card returned to hand');
@@ -735,8 +789,8 @@ export class GymHandPileScene extends GymSceneBase {
   private showValidMoves(): void {
     this.clearHighlights();
 
-    const highlightW = CARD_W + 16;
-    const highlightH = CARD_H + 16;
+    const highlightW = CARD_W + DROP_HIGHLIGHT_PAD;
+    const highlightH = CARD_H + DROP_HIGHLIGHT_PAD;
 
     // Deck zone: centred on the deck pile sprite
     const deckZoneX = this.DECK_X - highlightW / 2;
@@ -748,13 +802,13 @@ export class GymHandPileScene extends GymSceneBase {
 
     this.highlightManager.addZone('deck-valid', {
       x: deckZoneX, y: deckZoneY, w: highlightW, h: highlightH,
-      style: 'fill', color: 0x44ff44, alpha: 0.35,
-      lifetime: 3000,
+      style: 'fill', color: VALID_HIGHLIGHT_COLOR, alpha: VALID_HIGHLIGHT_ALPHA,
+      lifetime: VALID_HIGHLIGHT_LIFETIME,
     });
     this.highlightManager.addZone('discard-valid', {
       x: discardZoneX, y: discardZoneY, w: highlightW, h: highlightH,
-      style: 'fill', color: 0x44ff44, alpha: 0.35,
-      lifetime: 3000,
+      style: 'fill', color: VALID_HIGHLIGHT_COLOR, alpha: VALID_HIGHLIGHT_ALPHA,
+      lifetime: VALID_HIGHLIGHT_LIFETIME,
     });
 
     this.logEvent('Showing valid drop zones (green highlights)');
@@ -772,20 +826,20 @@ export class GymHandPileScene extends GymSceneBase {
     if (target) {
       if (this.reducedMotion) {
         // Use both setTint (WebGL) and overlay (Canvas) for renderer compatibility
-        (target as any).setTint(0xff4444);
+        (target as any).setTint(ILLEGAL_TINT_COLOR);
         const tgt = target as any;
-        const overlayW = tgt.displayWidth ?? tgt.width ?? 96;
-        const overlayH = tgt.displayHeight ?? tgt.height ?? 130;
+        const overlayW = tgt.displayWidth ?? tgt.width ?? FALLBACK_CARD_WIDTH;
+        const overlayH = tgt.displayHeight ?? tgt.height ?? FALLBACK_CARD_HEIGHT;
         const tintOverlay = this.add.rectangle(
           tgt.x, tgt.y,
           overlayW, overlayH,
-          0xff4444,
+          ILLEGAL_TINT_COLOR,
         )
-          .setAlpha(0.4)
+          .setAlpha(ILLEGAL_OVERLAY_ALPHA)
           .setOrigin(tgt.originX ?? 0.5, tgt.originY ?? 0.5)
           .setRotation(tgt.rotation ?? 0)
           .setDepth((tgt.depth ?? 0) + 0.1);
-        this.time?.delayedCall(200, () => {
+        this.time?.delayedCall(ILLEGAL_TINT_DURATION_MS, () => {
           try { (target as any).clearTint(); } catch (_) { /* ignore */ }
           tintOverlay.destroy();
         });
@@ -794,10 +848,10 @@ export class GymHandPileScene extends GymSceneBase {
         shakeIllegalMove({
           scene: this,
           target: target as unknown as Phaser.GameObjects.Image,
-          tint: 0xff4444,
-          shakeDistance: 6,
-          duration: 50,
-          repeat: 2,
+          tint: ILLEGAL_TINT_COLOR,
+          shakeDistance: ILLEGAL_SHAKE_DISTANCE,
+          duration: ILLEGAL_SHAKE_DURATION_MS,
+          repeat: ILLEGAL_SHAKE_REPEAT,
           onComplete: () => {
             this.logEvent('Illegal move shake completed');
           },
@@ -882,16 +936,16 @@ export class GymHandPileScene extends GymSceneBase {
     this.discardZoneGraphics = this.add.graphics();
 
     // Zone slightly larger than a card for a generous drop target
-    const zoneW = CARD_W + 24;
-    const zoneH = CARD_H + 24;
+    const zoneW = CARD_W + DROP_ZONE_PAD;
+    const zoneH = CARD_H + DROP_ZONE_PAD;
     const zoneX = this.DISCARD_X - zoneW / 2;
     const zoneY = this.PILE_Y - zoneH / 2;
 
     // Default subtle outline (shown when no card is selected)
-    this.discardZoneGraphics.lineStyle(2, 0x88aa88, 0.5);
-    this.discardZoneGraphics.fillStyle(0x335533, 0.15);
-    this.discardZoneGraphics.fillRoundedRect(zoneX, zoneY, zoneW, zoneH, 10);
-    this.discardZoneGraphics.strokeRoundedRect(zoneX, zoneY, zoneW, zoneH, 10);
+    this.discardZoneGraphics.lineStyle(DROP_ZONE_STROKE_WIDTH, DROP_ZONE_STROKE_COLOR, DROP_ZONE_STROKE_ALPHA);
+    this.discardZoneGraphics.fillStyle(DROP_ZONE_FILL_COLOR, DROP_ZONE_FILL_ALPHA);
+    this.discardZoneGraphics.fillRoundedRect(zoneX, zoneY, zoneW, zoneH, DROP_ZONE_RADIUS);
+    this.discardZoneGraphics.strokeRoundedRect(zoneX, zoneY, zoneW, zoneH, DROP_ZONE_RADIUS);
 
     // Move the discard pile sprite in front of the zone
     this.discardView.getSprite().setDepth(1);
@@ -903,8 +957,8 @@ export class GymHandPileScene extends GymSceneBase {
    * is selected, indicating it can be clicked to discard.
    */
   private showDiscardZoneHighlight(): void {
-    const highlightW = CARD_W + 24;
-    const highlightH = CARD_H + 24;
+    const highlightW = CARD_W + DROP_ZONE_PAD;
+    const highlightH = CARD_H + DROP_ZONE_PAD;
     const zoneX = this.DISCARD_X - highlightW / 2;
     const zoneY = this.PILE_Y - highlightH / 2;
 
@@ -914,10 +968,10 @@ export class GymHandPileScene extends GymSceneBase {
       w: highlightW,
       h: highlightH,
       style: 'fill',
-      color: 0x44ff44,
-      alpha: 0.25,
-      strokeColor: 0x44ff44,
-      strokeWidth: 3,
+      color: VALID_HIGHLIGHT_COLOR,
+      alpha: DISCARD_CLICK_ALPHA,
+      strokeColor: VALID_HIGHLIGHT_COLOR,
+      strokeWidth: DISCARD_CLICK_STROKE_WIDTH,
     });
   }
 
@@ -1000,8 +1054,8 @@ export class GymHandPileScene extends GymSceneBase {
    * The deck is intentionally excluded as a drop target.
    */
   private hitTestDropZones(pointerX: number, pointerY: number): number | null {
-    const halfW = CARD_W + 40;  // ~136px half-width for generous grab zone
-    const halfH = CARD_H / 2 + 60; // ~125px vertical tolerance
+    const halfW = CARD_W + DROP_HIT_TEST_X_PAD;  // ~136px half-width for generous grab zone
+    const halfH = CARD_H / 2 + DROP_HIT_TEST_Y_PAD; // ~125px vertical tolerance
 
     // Only check discard pile zone
     if (
@@ -1016,15 +1070,15 @@ export class GymHandPileScene extends GymSceneBase {
 
   /** Draw a green highlight on the discard drop zone. */
   private highlightDropZones(): void {
-    const highlightW = CARD_W + 16;
-    const highlightH = CARD_H + 16;
+    const highlightW = CARD_W + DROP_HIGHLIGHT_PAD;
+    const highlightH = CARD_H + DROP_HIGHLIGHT_PAD;
 
     const discardX = this.DISCARD_X - highlightW / 2;
     const discardY = this.PILE_Y - highlightH / 2;
 
     this.highlightManager.addZone('discard-drop', {
       x: discardX, y: discardY, w: highlightW, h: highlightH,
-      style: 'fill', color: 0x44ff44, alpha: 0.35,
+      style: 'fill', color: VALID_HIGHLIGHT_COLOR, alpha: VALID_HIGHLIGHT_ALPHA,
     });
   }
 
@@ -1046,7 +1100,7 @@ export class GymHandPileScene extends GymSceneBase {
     const card = this.hand[cardIdx];
 
     // Wait a brief frame for the acceptance animation to start, then update
-    this.time.delayedCall(50, () => {
+    this.time.delayedCall(DROP_ACCEPT_DELAY_MS, () => {
       // Move card from hand to discard pile
       this.hand.splice(cardIdx, 1);
       card.faceUp = false;
@@ -1126,12 +1180,12 @@ export class GymHandPileScene extends GymSceneBase {
 
   private logEvent(msg: string): void {
     this.eventLog.push(msg);
-    if (this.eventLog.length > 14) this.eventLog.shift();
+    if (this.eventLog.length > HAND_LOG_MAX_LINES) this.eventLog.shift();
     for (const t of this.logTexts) t.destroy();
     this.logTexts = [];
-    const baseY = 230;
+    const baseY = HAND_LOG_BASE_Y;
     for (let i = 0; i < this.eventLog.length; i++) {
-      const txt = createHudText(this, 40, baseY + i * 17, this.eventLog[i], '#aaddaa', { fontSize: '11px' });
+      const txt = createHudText(this, HAND_LOG_X, baseY + i * HAND_LOG_LINE_HEIGHT, this.eventLog[i], '#aaddaa', { fontSize: HAND_LABEL_FONT_SIZE });
       this.logTexts.push(txt);
     }
   }

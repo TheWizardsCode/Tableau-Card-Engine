@@ -93,6 +93,74 @@ describe('I18n (pure)', () => {
       expect(t('hello')).toBe('hello');
     });
   });
+
+  describe('interpolation — t(key, params)', () => {
+    it('replaces {token} placeholders with provided values', () => {
+      registerLocale('en', { 'greet': 'Hello, {name}!' });
+      expect(t('greet', { name: 'Ada' })).toBe('Hello, Ada!');
+    });
+
+    it('replaces multiple distinct tokens', () => {
+      registerLocale('en', { 'intro': '{greeting} {name}. You have {coins} coins.' });
+      expect(t('intro', { greeting: 'Hi', name: 'Bob', coins: 42 })).toBe('Hi Bob. You have 42 coins.');
+    });
+
+    it('accepts number values and converts them to strings', () => {
+      registerLocale('en', { 'cost': 'Cost: {price}' });
+      expect(t('cost', { price: 5 })).toBe('Cost: 5');
+    });
+
+    it('returns the string unchanged when called without params (no tokens in string)', () => {
+      registerLocale('en', { 'simple': 'Just a string' });
+      expect(t('simple')).toBe('Just a string');
+    });
+
+    it('returns the string unchanged when called without params (string has no tokens)', () => {
+      registerLocale('en', { 'simple': 'Just a string' });
+      expect(t('simple', {})).toBe('Just a string');
+    });
+
+    it('throws when a placeholder key is missing from params', () => {
+      registerLocale('en', { 'greet': 'Hello, {name}!' });
+      expect(() => t('greet', {})).toThrow(/missing.*name/);
+    });
+
+    it('throws when any required placeholder is omitted from params', () => {
+      registerLocale('en', { 'intro': '{a} and {b}' });
+      expect(() => t('intro', { a: 'x' })).toThrow(/missing.*b/);
+    });
+
+    it('ignores extra params not referenced by the string', () => {
+      registerLocale('en', { 'greet': 'Hello!' });
+      expect(t('greet', { name: 'Ada', extra: 'ignored' })).toBe('Hello!');
+    });
+
+    it('missing-key fallback (key not in any bundle) returns the key itself', () => {
+      registerLocale('en', {});
+      expect(t('completely.unknown.key')).toBe('completely.unknown.key');
+    });
+
+    it('interpolation works with locale switching', () => {
+      registerLocale('en', { 'greet': 'Hello, {name}!' });
+      registerLocale('de', { 'greet': 'Hallo, {name}!' });
+
+      setLocale('en');
+      expect(t('greet', { name: 'Ada' })).toBe('Hello, Ada!');
+
+      setLocale('de');
+      expect(t('greet', { name: 'Ada' })).toBe('Hallo, Ada!');
+
+      setLocale('en');
+    });
+
+    it('interpolation uses fallback locale when current locale is missing the key', () => {
+      registerLocale('en', { 'greet': 'Hello, {name}!' });
+      registerLocale('fr', {});
+      setLocale('fr');
+      // Key missing in fr — falls back to en, which has tokens
+      expect(t('greet', { name: 'Pierre' })).toBe('Hello, Pierre!');
+    });
+  });
 });
 
 // ── Integration tests with HUD tooltip module ────────────────────

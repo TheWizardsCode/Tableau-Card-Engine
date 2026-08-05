@@ -24,6 +24,7 @@ import {
   GreedyStrategy,
 } from '../../example-games/main-street/MainStreetAiStrategy';
 import type { BusinessCard, UpgradeCard, EventCard } from '../../example-games/main-street/MainStreetCards';
+import { createBusinessDeck } from '../../example-games/main-street/MainStreetCards';
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -161,22 +162,24 @@ describe('buildRationale', () => {
     expect(rationale).toContain('0'); // slot index
   });
 
-  it('rationale for buy-business with synergy mentions synergy bonus', () => {
+  it('rationale for buy-business with synergy shows percentage rate (no absolute coins)', () => {
     const state = makeMarketState('rationale-synergy');
-    // Place a business to create potential synergy
-    const businessCards = state.market.development as BusinessCard[];
-    if (businessCards.length < 2) return;
+    // Override the development row with two Food businesses so synergy is
+    // guaranteed: Bakery at slot 0, Diner proposed at adjacent slot 1.
+    const bakery = createBusinessDeck(1).find(c => c.id === 'biz-bakery-0') as BusinessCard;
+    const diner = createBusinessDeck(1).find(c => c.id === 'biz-diner-0') as BusinessCard;
+    expect(bakery).toBeDefined();
+    expect(diner).toBeDefined();
+    state.market.development = [bakery, diner];
+    state.streetGrid[0] = { ...bakery };
 
-    // Place first card at slot 0
-    state.streetGrid[0] = { ...businessCards[0] };
-
-    // Try placing second card at slot 1 (adjacent)
-    const card = businessCards[1];
-    const action: BuyBusinessAction = { type: 'buy-business', cardId: card.id, slotIndex: 1 };
-
-    // Only check that rationale contains card name; synergy may or may not apply
+    const action: BuyBusinessAction = { type: 'buy-business', cardId: diner.id, slotIndex: 1 };
     const rationale = buildRationale(action, 10, state);
-    expect(rationale).toContain(card.name);
+
+    // Medium difficulty: default rate 0.5 x 1.0 = 50% (no absolute coin value).
+    expect(rationale).toContain('50%');
+    expect(rationale).toContain('synergy bonus');
+    expect(rationale).not.toContain('+1');
   });
 
   it('rationale for buy-upgrade includes business name and income bonus', () => {

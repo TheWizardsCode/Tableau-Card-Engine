@@ -4,8 +4,10 @@
  * Tests transcript loading/validation via CLI subprocess invocation
  * and summary report structure by reading previously-generated output.
  *
- * Note: CLI invocation tests use longer timeouts because the replay
- * script imports Playwright, which adds ~5-6s of module loading time.
+ * Note: the replay script lazy-loads its heavy modules (Playwright, sharp)
+ * via dynamic import() so that argument/transcript validation error paths
+ * exit before module loading. The subprocess tests therefore complete in
+ * seconds even under parallel CPU load (see CG-0MSAXWIK70050RDA).
  *
  * See CG-0MLU5G2A707CSMKD.
  */
@@ -25,13 +27,17 @@ const FIXTURE_TRANSCRIPT = path.join(
 
 /**
  * Run the replay CLI via `node --import tsx/esm` and return results.
- * Uses spawnSync with a generous timeout to account for Playwright
- * module loading overhead (~6s).
+ *
+ * A 30s subprocess timeout is generous: heavy modules (Playwright, sharp)
+ * are lazily imported only on the replay path, so validation/error paths
+ * exit in a few seconds even under parallel CPU load
+ * (see CG-0MSAXWIK70050RDA).
  */
 function runReplay(
   args: string[],
-  timeoutMs = 15_000,
-): { stdout: string; stderr: string; exitCode: number } {
+  timeoutMs = 30_000,
+): { stdout: string; stderr: string; exitCode: number; durationMs: number } {
+  const start = Date.now();
   const result = spawnSync(
     'node',
     ['--import', 'tsx/esm', 'scripts/replay.ts', ...args],
@@ -48,14 +54,17 @@ function runReplay(
     stdout: result.stdout ?? '',
     stderr: result.stderr ?? '',
     exitCode: result.status ?? (result.signal ? 1 : 0),
+    durationMs: Date.now() - start,
   };
 }
 
 // ── Transcript Validation Tests ─────────────────────────────
 
 describe('Replay CLI -- transcript validation', () => {
-  // These tests invoke the full CLI, which loads Playwright (~6s).
-  // They validate that the CLI exits correctly for various error cases.
+  // These tests invoke the CLI subprocess. Heavy modules (Playwright,
+  // sharp) are lazy-loaded only on the replay path, so validation error
+  // paths exit quickly. They validate that the CLI exits correctly for
+  // various error cases.
 
   it(
     'should show help text when --help flag is provided',
@@ -66,7 +75,7 @@ describe('Replay CLI -- transcript validation', () => {
       expect(result.stdout).toContain('--output');
       expect(result.stdout).toContain('transcript.json');
     },
-    20_000,
+    45_000,
   );
 
   it(
@@ -78,7 +87,7 @@ describe('Replay CLI -- transcript validation', () => {
       const output = result.stdout + result.stderr;
       expect(output).toContain('not found');
     },
-    20_000,
+    45_000,
   );
 
   describe('invalid transcript files', () => {
@@ -103,7 +112,7 @@ describe('Replay CLI -- transcript validation', () => {
         const output = result.stdout + result.stderr;
         expect(output).toContain('invalid JSON');
       },
-      20_000,
+      45_000,
     );
 
     it(
@@ -130,7 +139,7 @@ describe('Replay CLI -- transcript validation', () => {
         const output = result.stdout + result.stderr;
         expect(output).toContain('version');
       },
-      20_000,
+      45_000,
     );
 
     it(
@@ -154,7 +163,7 @@ describe('Replay CLI -- transcript validation', () => {
         const output = result.stdout + result.stderr;
         expect(output).toContain('initialState');
       },
-      20_000,
+      45_000,
     );
   });
 });
@@ -245,7 +254,7 @@ describe('Replay CLI -- --stop-at argument validation', () => {
       const output = result.stdout + result.stderr;
       expect(output).toContain('non-negative integer');
     },
-    20_000,
+    45_000,
   );
 
   it(
@@ -256,7 +265,7 @@ describe('Replay CLI -- --stop-at argument validation', () => {
       const output = result.stdout + result.stderr;
       expect(output).toContain('non-negative integer');
     },
-    20_000,
+    45_000,
   );
 
   it(
@@ -267,7 +276,7 @@ describe('Replay CLI -- --stop-at argument validation', () => {
       const output = result.stdout + result.stderr;
       expect(output).toContain('non-negative integer');
     },
-    20_000,
+    45_000,
   );
 
   it(
@@ -277,7 +286,7 @@ describe('Replay CLI -- --stop-at argument validation', () => {
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain('--stop-at');
     },
-    20_000,
+    45_000,
   );
 });
 
@@ -292,7 +301,7 @@ describe('Replay CLI -- --skip-to argument validation', () => {
       const output = result.stdout + result.stderr;
       expect(output).toContain('non-negative integer');
     },
-    20_000,
+    45_000,
   );
 
   it(
@@ -303,7 +312,7 @@ describe('Replay CLI -- --skip-to argument validation', () => {
       const output = result.stdout + result.stderr;
       expect(output).toContain('non-negative integer');
     },
-    20_000,
+    45_000,
   );
 
   it(
@@ -314,7 +323,7 @@ describe('Replay CLI -- --skip-to argument validation', () => {
       const output = result.stdout + result.stderr;
       expect(output).toContain('non-negative integer');
     },
-    20_000,
+    45_000,
   );
 
   it(
@@ -324,7 +333,30 @@ describe('Replay CLI -- --skip-to argument validation', () => {
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain('--skip-to');
     },
-    20_000,
+    45_000,
+  );
+});
+
+// ── Fast Validation Regression Tests ────────────────────────
+
+describe('Replay CLI -- fast validation (lazy module loading)', () => {
+  // Regression for CG-0MSAXWIK70050RDA: argument/transcript validation
+  // must complete well before the subprocess timeout even under parallel
+  // CPU load. Heavy modules (Playwright, sharp) are lazy-loaded only on
+  // the replay path, so error paths exit in a few seconds instead of
+  // being SIGKILLed during module loading (which produced empty output).
+
+  it(
+    'should reject invalid --stop-at promptly',
+    () => {
+      const result = runReplay([FIXTURE_TRANSCRIPT, '--stop-at', '-1']);
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stdout + result.stderr).toContain('non-negative integer');
+      // Generous bound: validation-only paths load no heavy modules, so
+      // they must complete far below the 30s subprocess timeout.
+      expect(result.durationMs).toBeLessThan(20_000);
+    },
+    45_000,
   );
 });
 
@@ -425,17 +457,24 @@ describe('Replay CLI -- v1 transcript handling', () => {
       expect(output).toContain('--stop-at is not supported');
       expect(output).toContain('Re-record the game');
     },
-    20_000,
+    45_000,
   );
 
   it(
     'should accept v1 transcript for regular replay (no --stop-at)',
     () => {
       const filePath = createV1TranscriptFile('v1-regular.json');
-      // Run with a very short timeout -- we only need to verify the CLI
-      // gets past transcript validation. It will fail later trying to
-      // start the dev server / Playwright, which is fine.
-      const result = runReplay([filePath], 10_000);
+      // We only need to verify the CLI gets past transcript validation and
+      // prints the transcript header. With lazy-loaded heavy modules the
+      // header appears quickly; the process then proceeds into the real
+      // replay path (dev server + Playwright) and may be killed by the
+      // subprocess timeout before completing — either way the header
+      // assertions below hold. An explicit --output keeps any partial
+      // replay output in a temp dir instead of data/screenshots/.
+      const result = runReplay(
+        [filePath, '--output', path.join(tmpDir, 'v1-accept-out')],
+        60_000,
+      );
       const output = result.stdout + result.stderr;
 
       // Should NOT contain the v1 rejection error
@@ -446,6 +485,6 @@ describe('Replay CLI -- v1 transcript handling', () => {
       expect(output).toContain('Version: 1');
       expect(output).toContain('Turns: 1');
     },
-    20_000,
+    90_000,
   );
 });

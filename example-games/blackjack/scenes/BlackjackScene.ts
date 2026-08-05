@@ -26,7 +26,7 @@ import type { BlackjackGameState } from '../BlackjackGame';
 import { anchorPoint } from '../../../src/ui/screen-layout';
 import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
 import type { ScreenLayoutDocument, PixelPoint } from '../../../src/ui/screen-layout-schema';
-import { CardGameScene, getCardTexture, preloadCardAssets } from '../../../src/ui';
+import { CardGameScene, getCardTexture, preloadCardAssets, HandView, flipCard } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
 import type { EventSoundMapping } from '../../../src/core-engine/SoundManager';
 import { audioPathWithFallback } from '../../../src/ui/CardGameScene';
@@ -196,8 +196,10 @@ export class BlackjackScene extends CardGameScene {
   private hitButton!: Phaser.GameObjects.Text;
   private standButton!: Phaser.GameObjects.Text;
   private dealButton!: Phaser.GameObjects.Text;
-  private playerCardSprites: Phaser.GameObjects.Image[] = [];
-  private dealerCardSprites: Phaser.GameObjects.Image[] = [];
+  /** Core-engine HandView rendering the player's hand. */
+  public playerHandView!: HandView;
+  /** Core-engine HandView rendering the dealer's hand. */
+  public dealerHandView!: HandView;
   private statsText!: Phaser.GameObjects.Text;
 
   // Overlay
@@ -353,6 +355,17 @@ export class BlackjackScene extends CardGameScene {
       );
     }
 
+    // Hand views — render both hands through the core engine's HandView so
+    // the game inherits shared layout, animation, and reduced-motion behaviour.
+    const playerCardsPos = resolveBkAnchor('playerCards', 'center');
+    const dealerCardsPos = resolveBkAnchor('dealerCards', 'center');
+    this.playerHandView = this.createHandView(playerCardsPos.x, playerCardsPos.y);
+    this.dealerHandView = this.createHandView(dealerCardsPos.x, dealerCardsPos.y);
+
+    // Wire the settings-panel reduced-motion preference into the hand views.
+    this.playerHandView.setReducedMotion(this._reducedMotion);
+    this.dealerHandView.setReducedMotion(this._reducedMotion);
+
     // Start a new game
     this.startNewRound();
   }
@@ -407,7 +420,8 @@ export class BlackjackScene extends CardGameScene {
 
     this.refreshUndoRedoButtons(false, false);
 
-    this.clearCardDisplays();
+    this.playerHandView.setCards([]);
+    this.dealerHandView.setCards([]);
   }
 
   private onDeal(): void {
@@ -582,10 +596,15 @@ export class BlackjackScene extends CardGameScene {
     const centerX = GAME_W / 2;
     const centerY = GAME_H / 2;
 
-    // Animate player cards (first and third dealt — indices 0 and 1 in playerCardSprites)
-    this.playerCardSprites.forEach((sprite, i) => {
-      const destX = sprite.x;
-      const destY = sprite.y;
+    // Snapshot each HandView sprite's resting position, then animate the
+    // cards sliding from a central "deck" position to their final spots.
+    // Player cards are dealt first and third (indices 0 and 1); dealer
+    // cards second and fourth.
+    const playerSprites = this.playerHandView.getSprites() as Phaser.GameObjects.Image[];
+    const playerCenters = this.playerHandView.getCardCenters();
+    playerSprites.forEach((sprite, i) => {
+      const destX = playerCenters[i].x;
+      const destY = playerCenters[i].y;
       sprite.x = centerX;
       sprite.y = centerY;
       sprite.setAlpha(0);
@@ -603,10 +622,11 @@ export class BlackjackScene extends CardGameScene {
       });
     });
 
-    // Animate dealer cards (second and fourth dealt)
-    this.dealerCardSprites.forEach((sprite, i) => {
-      const destX = sprite.x;
-      const destY = sprite.y;
+    const dealerSprites = this.dealerHandView.getSprites() as Phaser.GameObjects.Image[];
+    const dealerCenters = this.dealerHandView.getCardCenters();
+    dealerSprites.forEach((sprite, i) => {
+      const destX = dealerCenters[i].x;
+      const destY = dealerCenters[i].y;
       sprite.x = centerX;
       sprite.y = centerY;
       sprite.setAlpha(0);
@@ -630,9 +650,12 @@ export class BlackjackScene extends CardGameScene {
    * Respects reduced-motion setting.
    */
   private animateHitCard(): void {
-    if (this._reducedMotion || this.playerCardSprites.length === 0) return;
+    if (this._reducedMotion) return;
 
-    const lastSprite = this.playerCardSprites[this.playerCardSprites.length - 1];
+    const sprites = this.playerHandView.getSprites() as Phaser.GameObjects.Image[];
+    if (sprites.length === 0) return;
+
+    const lastSprite = sprites[sprites.length - 1];
     const destX = lastSprite.x;
     const destY = lastSprite.y;
     lastSprite.x = GAME_W / 2;
@@ -658,39 +681,49 @@ export class BlackjackScene extends CardGameScene {
    * Respects reduced-motion setting.
    */
   private animateRevealHoleCard(): void {
-    if (this._reducedMotion || this.dealerCardSprites.length === 0) return;
+    const holeSprite = this.dealerHandView.getSpriteAt(0);
+    if (!holeSprite || !(holeSprite instanceof Phaser.GameObjects.Image)) return;
 
-    const holeCard = this.dealerCardSprites[0];
-    // Reset scale in case of previous reveal
-    holeCard.setScale(1);
+    const holeCard = this.state.dealerHand.cards.toArray()[0];
+    if (!holeCard) return;
 
-    // Flip effect: scale X from full to 0, then swap texture, back to full
-    this.tweens.add({
-      targets: holeCard,
-      scaleX: 0,
-      duration: FLIP_DURATION / 2,
-      ease: 'Quad.easeIn',
-      onComplete: () => {
-        const cards = this.state.dealerHand.cards.toArray();
-        if (cards[0]) {
-          holeCard.setTexture(getCardTexture(cards[0]));
-        }
-        this.tweens.add({
-          targets: holeCard,
-          scaleX: 1,
-          duration: FLIP_DURATION / 2,
-          ease: 'Quad.easeOut',
-        });
-      },
+    // Reset scale in case of a previous reveal, then use the shared flipCard
+    // helper for the classic scaleX → swap texture → scaleX reveal.
+    holeSprite.setScale(1);
+    holeSprite.setTexture('card_back');
+    flipCard({
+      scene: this,
+      target: holeSprite,
+      newTexture: getCardTexture(holeCard),
+      duration: FLIP_DURATION,
+      reducedMotion: this._reducedMotion,
     });
   }
 
   // ── Card rendering ─────────────────────────────────────
 
+  /**
+   * Create a HandView for a hand of standard playing cards anchored at the
+   * given SLL position. `centerX` keeps the row centred as the hand grows.
+   */
+  private createHandView(x: number, y: number): HandView {
+    return new HandView(this, {
+      baseX: x,
+      baseY: y,
+      centerX: x,
+      spacing: CARD_WIDTH + CARD_GAP,
+      cardWidth: CARD_WIDTH,
+      showLabels: false,
+      selectionEnabled: false,
+      clickEnabled: false,
+      maxRotationDegrees: 0,
+      reducedMotion: this._reducedMotion,
+    });
+  }
+
   private renderCards(): void {
-    this.clearCardDisplays();
-    this.renderPlayerCards();
-    this.renderDealerCards();
+    this.playerHandView.setCards(this.state.playerHand.cards.toArray());
+    this.dealerHandView.setCards(this.state.dealerHand.cards.toArray());
 
     // Show scores
     if (this.state.phase !== 'IDLE') {
@@ -720,40 +753,5 @@ export class BlackjackScene extends CardGameScene {
     return score;
   }
 
-  private clearCardDisplays(): void {
-    for (const s of this.playerCardSprites) s.destroy();
-    for (const s of this.dealerCardSprites) s.destroy();
-    this.playerCardSprites = [];
-    this.dealerCardSprites = [];
-  }
-
-  private renderPlayerCards(): void {
-    const hand = this.state.playerHand;
-    const totalW = hand.cards.size() * CARD_WIDTH + (hand.cards.size() - 1) * CARD_GAP;
-    const playerCardsPos = resolveBkAnchor('playerCards', 'center');
-    const startX = playerCardsPos.x - totalW / 2 + CARD_WIDTH / 2;
-    const y = playerCardsPos.y;
-
-    for (const card of hand.cards.toArray()) {
-      const x = startX + this.playerCardSprites.length * (CARD_WIDTH + CARD_GAP);
-      const sprite = this.add.image(x, y, getCardTexture(card));
-      sprite.setDisplaySize(CARD_WIDTH, CARD_HEIGHT);
-      this.playerCardSprites.push(sprite);
-    }
-  }
-
-  private renderDealerCards(): void {
-    const hand = this.state.dealerHand;
-    const totalW = hand.cards.size() * CARD_WIDTH + (hand.cards.size() - 1) * CARD_GAP;
-    const dealerCardsPos = resolveBkAnchor('dealerCards', 'center');
-    const startX = dealerCardsPos.x - totalW / 2 + CARD_WIDTH / 2;
-    const y = dealerCardsPos.y;
-
-    for (const card of hand.cards.toArray()) {
-      const x = startX + this.dealerCardSprites.length * (CARD_WIDTH + CARD_GAP);
-      const sprite = this.add.image(x, y, getCardTexture(card));
-      sprite.setDisplaySize(CARD_WIDTH, CARD_HEIGHT);
-      this.dealerCardSprites.push(sprite);
-    }
-  }
 }
+

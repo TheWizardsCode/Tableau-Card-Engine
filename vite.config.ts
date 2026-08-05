@@ -50,6 +50,11 @@ export default defineConfig(({ mode, command }) => ({
           include: ['tests/**/*.test.ts'],
           exclude: ['tests/**/*.browser.test.ts', 'tests/e2e/replay-*.test.ts'],
           testTimeout: 15_000,
+          // Worker-pool cap (fan-out bounding, SA-0MSAEKOQE009TEB4): bound the
+          // number of concurrent tinypool workers so parallel test runs do not
+          // spawn 15+ node processes per vitest invocation. Mirrors the
+          // ContextHub vitest cap (maxWorkers: 4).
+          maxWorkers: 4,
         },
       },
       // ── Replay E2E Tests — isolated from parallel unit tests to avoid
