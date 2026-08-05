@@ -354,14 +354,16 @@ export class MainStreetTurnController {
 
     if (sourceIndex >= 0) {
       const handIndex = (s.state.hand ?? []).length;
-      const spacing = s.layout.handCardW + 8;
-      const destX = s.layout.handX + s.layout.handCardW / 2 + handIndex * spacing;
       void s.animateTransferFromMarket({
         cardId: card.id,
         family: 'business',
         row: 'development',
         slotIndex: sourceIndex,
-        destination: { x: destX, y: s.layout.handY },
+        // Animate to the exact resting position in the business hand — the
+        // HandView-predicted insertion position (single source of truth),
+        // not a left-edge slot estimate that would make the card snap
+        // sideways when the hand re-renders centred on handCenterX.
+        destination: s.getBusinessHandInsertionPosition(handIndex),
       }).then(afterTransfer);
     } else {
       afterTransfer();
@@ -549,7 +551,10 @@ export class MainStreetTurnController {
         family: 'event',
         row: 'investments',
         slotIndex: sourceIndex,
-        destination: s.getHandCardCenter(),
+        // Animate to the exact resting position of the held event card — the
+        // HandView-predicted position (single source of truth), centred on
+        // handCenterX rather than the left-anchored slot estimate.
+        destination: s.getEventHandInsertionPosition(0),
       }).then(afterTransfer);
     } else {
       afterTransfer();

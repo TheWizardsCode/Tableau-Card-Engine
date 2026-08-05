@@ -1086,17 +1086,17 @@ Challenge-based unlock paths are designed to be achievable by skilled players wh
 
 1. Easy mode gives more starting resources (coins and reputation) and more turns than Medium.
 2. Hard mode gives fewer starting resources, fewer turns, and a higher win threshold than Medium.
-3. Easy mode awards higher synergy bonuses per neighbor (2 vs 1) and higher challenge bonus points (15 vs 10).
+3. Easy mode applies a higher synergy multiplier per neighbor (1.5x vs 1.0x) and higher challenge bonus points (15 vs 10).
 4. Hard mode assigns more challenges per run (4 vs 3) to increase the difficulty of the `all_challenges` win condition.
 5. The game engine reads all configured values from `state.config` rather than hardcoded constants.
 
 **Testable Conditions:**
 
-- `EASY_CONFIG.synergyBonusPerNeighbor === 2` and `MEDIUM_CONFIG.synergyBonusPerNeighbor === 1`.
+- `EASY_CONFIG.synergyBonusPerNeighbor === 1.5`, `MEDIUM_CONFIG.synergyBonusPerNeighbor === 1`, and `HARD_CONFIG.synergyBonusPerNeighbor === 0.75`.
 - `EASY_CONFIG.challengeBonusPoints === 15` and `HARD_CONFIG.challengeBonusPoints === 8`.
 - `HARD_CONFIG.challengesPerRun === 4` and `EASY_CONFIG.challengesPerRun === 2`.
 - Given an Easy game, `computeScore()` uses `config.reputationScoreMultiplier` (5) and `config.challengeBonusPoints` (15) -- not hardcoded values.
-- Given two adjacent matching-synergy businesses on Easy, the synergy bonus is 2 coins (not 1).
+- Given two adjacent matching-synergy businesses on Easy, a default-rate (0.5) card's synergy rate is 75% of effective base income (not an absolute coin value).
 
 ---
 

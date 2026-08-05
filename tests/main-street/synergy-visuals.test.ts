@@ -143,6 +143,7 @@ describe('Synergy Pairs for Visual Lines', () => {
         name: 'Park',
         cost: 4,
         baseIncome: 0,
+        ongoingCost: 0,
         synergyTypes: ['Culture'],
         synergyCoinBonus: 1,
         synergyRepBonus: 0,

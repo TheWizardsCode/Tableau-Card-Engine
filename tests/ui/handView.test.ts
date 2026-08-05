@@ -2193,4 +2193,132 @@ describe('HandView', () => {
       hv.destroy();
     });
   });
+
+  // ── getInsertionPosition (single source of truth for layout prediction) ──
+
+  describe('getInsertionPosition', () => {
+    it('empty hand: inserting at 0 lands at the centre (baseX when no centerX)', () => {
+      const hv = new HandView(scene, { baseX: 300, baseY: 500, spacing: 56, showLabels: false });
+      const pos = hv.getInsertionPosition(0);
+      expect(pos.x).toBe(300);
+      expect(pos.y).toBe(500);
+      hv.destroy();
+    });
+
+    it('empty hand with centerX lands at the fixed centre', () => {
+      const hv = new HandView(scene, {
+        baseX: 60, baseY: 500, spacing: 56, centerX: 410, showLabels: false,
+      });
+      const pos = hv.getInsertionPosition(0);
+      expect(pos.x).toBe(410);
+      expect(pos.y).toBe(500);
+      hv.destroy();
+    });
+
+    it('append prediction matches the final rendered position for hand sizes 0..5', () => {
+      const hv = new HandView(scene, {
+        baseX: 60, baseY: 500, spacing: 56, centerX: 410, showLabels: false,
+      });
+      const cards = [
+        card('A', 'spades'), card('2', 'hearts'), card('3', 'clubs'),
+        card('4', 'diamonds'), card('5', 'spades'), card('6', 'hearts'),
+      ];
+      for (let n = 0; n <= 5; n++) {
+        const current = cards.slice(0, n);
+        hv.setCards(current);
+        const predicted = hv.getInsertionPosition(n); // append at end
+        hv.addCard(cards[n]);
+        const centers = hv.getCardCenters();
+        expect(Math.abs(predicted.x - centers[n].x)).toBeLessThanOrEqual(1);
+        expect(Math.abs(predicted.y - centers[n].y)).toBeLessThanOrEqual(1);
+      }
+      hv.destroy();
+    });
+
+    it('middle/front insert predictions match the final rendered position', () => {
+      const hv = new HandView(scene, {
+        baseX: 60, baseY: 500, spacing: 56, centerX: 410, showLabels: false,
+      });
+      const a = card('A', 'spades');
+      const b = card('2', 'hearts');
+      const c = card('3', 'clubs');
+      const d = card('4', 'diamonds');
+
+      // Insert at the front of a 3-card hand
+      hv.setCards([a, b, c]);
+      const frontPredicted = hv.getInsertionPosition(0);
+      const front = card('K', 'diamonds');
+      hv.setCards([front, a, b, c]);
+      let centers = hv.getCardCenters();
+      expect(Math.abs(frontPredicted.x - centers[0].x)).toBeLessThanOrEqual(1);
+      expect(Math.abs(frontPredicted.y - centers[0].y)).toBeLessThanOrEqual(1);
+
+      // Insert in the middle (index 2) of a 4-card hand
+      hv.setCards([a, b, c, d]);
+      const midPredicted = hv.getInsertionPosition(2);
+      const mid = card('Q', 'clubs');
+      hv.setCards([a, b, mid, c, d]);
+      centers = hv.getCardCenters();
+      expect(Math.abs(midPredicted.x - centers[2].x)).toBeLessThanOrEqual(1);
+      expect(Math.abs(midPredicted.y - centers[2].y)).toBeLessThanOrEqual(1);
+      hv.destroy();
+    });
+
+    it('prediction equals computeCardPositions for the post-insertion hand', () => {
+      const hv = new HandView(scene, {
+        baseX: 60, baseY: 500, spacing: 56, centerX: 410, showLabels: false,
+      });
+      hv.setCards([card('A', 'spades'), card('2', 'hearts')]);
+      const predicted = hv.getInsertionPosition(1);
+      // After the card is in the hand, its computed position must match.
+      hv.addCard(card('3', 'clubs'));
+      const computed = (hv as any).computeCardPositions();
+      expect(Math.abs(predicted.x - computed[1].x)).toBeLessThanOrEqual(1);
+      expect(Math.abs(predicted.y - computed[1].y)).toBeLessThanOrEqual(1);
+      hv.destroy();
+    });
+
+    it('clamps out-of-range insert indices (negative → 0, oversized → append)', () => {
+      const hv = new HandView(scene, {
+        baseX: 60, baseY: 500, spacing: 56, centerX: 410, showLabels: false,
+      });
+      hv.setCards([card('A', 'spades'), card('2', 'hearts')]);
+
+      const neg = hv.getInsertionPosition(-5);
+      const zero = hv.getInsertionPosition(0);
+      expect(neg.x).toBe(zero.x);
+      expect(neg.y).toBe(zero.y);
+
+      const over = hv.getInsertionPosition(99);
+      const append = hv.getInsertionPosition(2);
+      expect(over.x).toBe(append.x);
+      expect(over.y).toBe(append.y);
+      hv.destroy();
+    });
+
+    it('vertical layout predicts (baseX, baseY + i*spacing)', () => {
+      const hv = new HandView(scene, {
+        baseX: 200, baseY: 100, spacing: 42, layoutDirection: 'vertical', showLabels: false,
+      });
+      hv.setCards([card('A', 'spades'), card('2', 'hearts')]);
+      expect(hv.getInsertionPosition(0)).toEqual({ x: 200, y: 100 });
+      expect(hv.getInsertionPosition(1)).toEqual({ x: 200, y: 142 });
+      expect(hv.getInsertionPosition(2)).toEqual({ x: 200, y: 184 });
+      hv.destroy();
+    });
+
+    it('arc layout prediction matches the final rendered position', () => {
+      const hv = new HandView(scene, {
+        baseX: 60, baseY: 500, spacing: 56, centerX: 410, arcRadius: 150, showLabels: false,
+      });
+      const cards = [card('A', 'spades'), card('2', 'hearts'), card('3', 'clubs'), card('4', 'diamonds')];
+      hv.setCards(cards.slice(0, 3));
+      const predicted = hv.getInsertionPosition(3);
+      hv.addCard(cards[3]);
+      const centers = hv.getCardCenters();
+      expect(Math.abs(predicted.x - centers[3].x)).toBeLessThanOrEqual(1);
+      expect(Math.abs(predicted.y - centers[3].y)).toBeLessThanOrEqual(1);
+      hv.destroy();
+    });
+  });
 });

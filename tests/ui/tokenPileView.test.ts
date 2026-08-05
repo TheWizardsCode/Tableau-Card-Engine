@@ -1,18 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { TokenPileView, createSimpleTokenRenderer } from '../../src/ui/TokenPileView';
+import {
+  TokenPileView,
+  createSimpleTokenRenderer,
+  createCardBackTokenRenderer,
+} from '../../src/ui/TokenPileView';
 
 // ── Minimal Phaser mock ─────────────────────────────────────
 
 function createMockScene(): any {
   const containers: any[] = [];
   const texts: any[] = [];
+  const images: any[] = [];
   const destroyed: any[] = [];
+  const textureKeys = new Set<string>();
+  let sceneRef: any;
 
   const mockContainer = (x: number, y: number) => {
     const cont: any = {
       x,
       y,
-      scene: null as any,
+      scene: sceneRef,
       list: [] as any[],
       exclusive: true,
       setInteractive: vi.fn().mockReturnThis(),
@@ -63,13 +70,27 @@ function createMockScene(): any {
 
   const inputHandlers: Record<string, any[]> = {};
 
-  return {
+  const scene: any = {
     add: {
       container: vi.fn().mockImplementation((x: number, y: number) => mockContainer(x, y)),
       text: vi.fn().mockImplementation(mockText),
       graphics: vi.fn().mockImplementation(mockGraphics),
       circle: vi.fn().mockImplementation(mockCircle),
+      image: vi.fn().mockImplementation((x: number, y: number, key: string) => {
+        const img = {
+          x,
+          y,
+          key,
+          destroy: vi.fn().mockImplementation(() => { destroyed.push(img); }),
+        };
+        images.push(img);
+        return img;
+      }),
       existing: vi.fn().mockReturnThis(),
+    },
+    textures: {
+      exists: (key: string) => textureKeys.has(key),
+      add: (key: string) => { textureKeys.add(key); },
     },
     events: {
       once: vi.fn(),
@@ -86,9 +107,13 @@ function createMockScene(): any {
     },
     _containers: containers,
     _texts: texts,
+    _images: images,
+    _textureKeys: textureKeys,
     _destroyed: destroyed,
     _inputHandlers: inputHandlers,
   };
+  sceneRef = scene;
+  return scene;
 }
 
 // ── Tests ───────────────────────────────────────────────────
@@ -321,5 +346,49 @@ describe('createSimpleTokenRenderer', () => {
 
     // Each token renders 3 objects (circle, icon, count label)
     expect(container.list.length).toBe(15);
+  });
+});
+
+// ── createCardBackTokenRenderer tests ───────────────────────
+
+describe('createCardBackTokenRenderer', () => {
+  let scene: ReturnType<typeof createMockScene>;
+
+  beforeEach(() => {
+    scene = createMockScene();
+  });
+
+  it('creates a renderer function', () => {
+    const renderer = createCardBackTokenRenderer('gym_token_card_back');
+    expect(typeof renderer).toBe('function');
+  });
+
+  it('uses the base back texture when the token has no cardType', () => {
+    const renderer = createCardBackTokenRenderer('gym_token_card_back');
+    const container = scene.add.container(0, 0);
+    renderer({}, container, 0);
+    expect(scene._images[0].key).toBe('gym_token_card_back');
+  });
+
+  it('uses the cardType variant texture when it exists', () => {
+    scene.textures.add('gym_token_card_back-treasure');
+    const renderer = createCardBackTokenRenderer('gym_token_card_back');
+    const container = scene.add.container(0, 0);
+    renderer({ cardType: 'treasure' }, container, 0);
+    expect(scene._images[0].key).toBe('gym_token_card_back-treasure');
+  });
+
+  it('falls back to the base back texture when the cardType variant texture is missing', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const renderer = createCardBackTokenRenderer('gym_token_card_back');
+      const container = scene.add.container(0, 0);
+      // 'gym_token_card_back-treasure' is not registered in the texture manager
+      renderer({ cardType: 'treasure' }, container, 0);
+      expect(scene._images[0].key).toBe('gym_token_card_back');
+      expect(warnSpy).toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 });

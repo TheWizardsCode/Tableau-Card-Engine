@@ -38,7 +38,7 @@ import { evaluateChallenges } from './MainStreetChallenges';
 import { applyReputationMultiplier, reputationCoinMultiplier } from './MainStreetDifficulty';
 
 // Re-export for convenience (tests import from the engine module).
-export { reputationCoinMultiplier, applyReputationMultiplier };
+export { reputationCoinMultiplier, applyReputationMultiplier, cycleMarketCards };
 
 // ── Action Types ────────────────────────────────────────────
 
@@ -598,6 +598,9 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
   // Apply staff card ongoing costs (Multi-Use Card Economy)
   applyStaffOngoingCosts(state);
 
+  // Apply community space ongoing costs (reputation-asset cards, e.g. Library)
+  applyCommunitySpaceOngoingCosts(state);
+
   // Phase: IncidentPhase
   state.phase = 'IncidentPhase';
   const incident = resolveIncident(state);
@@ -803,6 +806,106 @@ export function sellFromTableau(
   addLog(state, `Sold ${card.name} from slot ${slotIndex} for +${sellValue} coins`, 'gain');
 }
 
+// ── Legality Checks (Multi-Use Card Economy) ─────────────────
+
+/**
+ * Checks whether the card at the given hand index can be placed onto the
+ * given tableau slot without mutating state.
+ *
+ * Validates hand bounds, slot bounds, slot occupancy, and coin sufficiency
+ * (a card can only be placed if the player can afford its purchase price).
+ *
+ * @param state      Current game state (read-only).
+ * @param handIndex  Index of the card in state.hand to place.
+ * @param slotIndex  Target street grid slot (0-based, must be empty).
+ * @returns LegalityResult — `{ legal: true }` if valid, otherwise
+ *          `{ legal: false, reason }` describing the violation.
+ */
+export function canPlaceFromHand(
+  state: MainStreetState,
+  handIndex: number,
+  slotIndex: number,
+): import('../../src/rule-engine').LegalityResult {
+  const hand = state.hand ?? [];
+
+  // Validate hand index
+  if (handIndex < 0 || handIndex >= hand.length) {
+    return { legal: false, reason: `Invalid hand index: ${handIndex}. Hand has ${hand.length} cards.` };
+  }
+
+  const card = hand[handIndex];
+
+  // Validate slot index
+  if (slotIndex < 0 || slotIndex >= 10) {
+    return { legal: false, reason: `Invalid slot index: ${slotIndex}. Must be 0-9.` };
+  }
+
+  // Check slot is empty
+  if (state.streetGrid[slotIndex] !== null) {
+    return { legal: false, reason: `Slot ${slotIndex} is already occupied.` };
+  }
+
+  // Check coin sufficiency
+  if (state.resourceBank.coins < card.cost) {
+    return { legal: false, reason: `Insufficient coins to place ${card.name}: need ${card.cost}, have ${state.resourceBank.coins}.` };
+  }
+
+  return { legal: true };
+}
+
+/**
+ * Checks whether the card at the given hand index can be sold from hand
+ * without mutating state.
+ *
+ * Validates hand bounds.
+ *
+ * @param state      Current game state (read-only).
+ * @param handIndex  Index of the card in state.hand to sell.
+ * @returns LegalityResult — `{ legal: true }` if valid, otherwise
+ *          `{ legal: false, reason }` describing the violation.
+ */
+export function canSellFromHand(
+  state: MainStreetState,
+  handIndex: number,
+): import('../../src/rule-engine').LegalityResult {
+  const hand = state.hand ?? [];
+
+  // Validate hand index
+  if (handIndex < 0 || handIndex >= hand.length) {
+    return { legal: false, reason: `Invalid hand index: ${handIndex}. Hand has ${hand.length} cards.` };
+  }
+
+  return { legal: true };
+}
+
+/**
+ * Checks whether the card at the given tableau slot can be sold without
+ * mutating state.
+ *
+ * Validates slot bounds and slot occupancy.
+ *
+ * @param state      Current game state (read-only).
+ * @param slotIndex  Street grid slot index of the card to sell.
+ * @returns LegalityResult — `{ legal: true }` if valid, otherwise
+ *          `{ legal: false, reason }` describing the violation.
+ */
+export function canSellFromTableau(
+  state: MainStreetState,
+  slotIndex: number,
+): import('../../src/rule-engine').LegalityResult {
+  // Validate slot index
+  if (slotIndex < 0 || slotIndex >= 10) {
+    return { legal: false, reason: `Invalid slot index: ${slotIndex}. Must be 0-9.` };
+  }
+
+  // Check slot is occupied
+  if (state.streetGrid[slotIndex] === null) {
+    return { legal: false, reason: `Slot ${slotIndex} is empty. Nothing to sell.` };
+  }
+
+  return { legal: true };
+}
+
 // ── Sell Operations (Street Grid) ──────────────────────────────
 
 /**
@@ -868,6 +971,43 @@ export function applyStaffOngoingCosts(state: MainStreetState): void {
     }
     if (actualDeduction < totalCost) {
       addLog(state, `Insufficient coins for staff costs: owed ${totalCost}, paid ${actualDeduction}`, 'loss');
+    }
+  }
+}
+
+/**
+ * Applies community space ongoing costs for the current turn.
+ * Deducts each placed community space's `ongoingCost` (e.g. the Library's
+ * 0.25 coins/turn running cost) from coins, alongside staff costs.
+ * If coins are insufficient, deducts what's available (down to 0).
+ *
+ * Mirrors {@link applyStaffOngoingCosts} clamping/log conventions.
+ *
+ * @param state  Current game state (mutated in-place).
+ */
+export function applyCommunitySpaceOngoingCosts(state: MainStreetState): void {
+  const grid = state.streetGrid;
+
+  let totalCost = 0;
+  let spaceCount = 0;
+  for (const slot of grid) {
+    if (!slot || slot.family !== 'community-space') continue;
+    const cost = slot.ongoingCost ?? 0;
+    if (cost > 0) {
+      totalCost += cost;
+      spaceCount += 1;
+    }
+  }
+  if (spaceCount === 0) return;
+
+  if (totalCost > 0) {
+    const actualDeduction = Math.min(totalCost, state.resourceBank.coins);
+    state.resourceBank.coins -= actualDeduction;
+    if (actualDeduction > 0) {
+      addLog(state, `Community space costs: -${actualDeduction} coins (${spaceCount} spaces)`, 'loss');
+    }
+    if (actualDeduction < totalCost) {
+      addLog(state, `Insufficient coins for community space costs: owed ${totalCost}, paid ${actualDeduction}`, 'loss');
     }
   }
 }

@@ -263,6 +263,28 @@ export class MainStreetScene extends CardGameScene {
     return (this.msAnimator as any).getHandCardCenter.apply(this.msAnimator, args);
   }
 
+  /**
+   * Predicted resting position for a business card bought into the hand at the
+   * given insert index. Single source of truth for market→hand transfer
+   * animation targets — delegates to the business HandView's
+   * `getInsertionPosition` so the animation always ends exactly where the
+   * rendered card will rest (the hand is centred on `handCenterX`).
+   */
+  public getBusinessHandInsertionPosition(insertIndex: number): { x: number; y: number } {
+    return this.msRenderer.handBusinessView.getInsertionPosition(insertIndex);
+  }
+
+  /**
+   * Predicted resting position for a card bought as the held event at the
+   * given insert index. Single source of truth for market→hand transfer
+   * animation targets — delegates to the event HandView's
+   * `getInsertionPosition` so the animation always ends exactly where the
+   * rendered held-event card will rest (centred on `handCenterX`).
+   */
+  public getEventHandInsertionPosition(insertIndex: number): { x: number; y: number } {
+    return this.msRenderer.handView.getInsertionPosition(insertIndex);
+  }
+
   public createTransferCardVisual(...args: any[]): any {
     return (this.msAnimator as any).createTransferCardVisual.apply(this.msAnimator, args);
   }

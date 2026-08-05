@@ -43,4 +43,6 @@ export const SFX_KEYS = {
   ROUND_END: 'sfx-round-end',
   SCORE_REVEAL: 'sfx-score-reveal',
   UI_CLICK: 'sfx-ui-click',
+  GAME_WIN: 'sfx-game-win',
+  GAME_LOST: 'sfx-game-lost',
 } as const;

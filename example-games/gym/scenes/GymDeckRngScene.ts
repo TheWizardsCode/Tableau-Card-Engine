@@ -25,6 +25,20 @@ import { anchorPoint } from '../../../src/ui/screen-layout';
 import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
 import gymDeckRngLayoutJson from '../layouts/gym-deck-rng.layout.json';
 import {
+  DEFAULT_VIEWPORT,
+  SCENE_HEADER_Y,
+  STATUS_FONT_SIZE,
+  DEFAULT_FONT_SIZE,
+  STATUS_TEXT_OFFSET,
+  DESIGN_ROW_OFFSET,
+  LABEL_X_OFFSET,
+  BUTTON_X_OFFSET,
+  TOGGLE_BTN_INCREMENT,
+  SEED_TEXT_X_OFFSET,
+  CARD_DISPLAY_Y_OFFSET,
+  SEED_RANDOM_RANGE,
+} from './GymConstants';
+import {
   getAvailableCardDesigns,
   getCardDesignDisplayName,
   getCardDesign,
@@ -37,8 +51,6 @@ const DECK_RNG_LAYOUT: import('../../../src/ui/screen-layout-schema').ScreenLayo
   return parsed.valid ? parsed.layout : null;
 })();
 
-const DEFAULT_VIEWPORT = { width: 1280, height: 720 };
-
 /**
  * Resolve an anchor from the Deck RNG SLL layout.
  * Falls back to the default viewport if no layout is available.
@@ -49,7 +61,7 @@ function resolveDeckRngAnchor(
   viewport = DEFAULT_VIEWPORT,
 ): import('../../../src/ui/screen-layout-schema').PixelPoint {
   if (!DECK_RNG_LAYOUT) {
-    return { x: GAME_W / 2, y: 60 };
+    return { x: GAME_W / 2, y: SCENE_HEADER_Y };
   }
   return anchorPoint(DECK_RNG_LAYOUT, zone, anchor, viewport, 1);
 }
@@ -121,30 +133,30 @@ export class GymDeckRngScene extends GymSceneBase {
     const y = controlsAnchor.y;
 
     this.addLabel(cx, y, 'Seed:');
-    this.seedText = createHudText(this, cx + 50, y, String(this.seed), '#ffffff', { fontSize: '16px' });
+    this.seedText = createHudText(this, cx + SEED_TEXT_X_OFFSET, y, String(this.seed), '#ffffff', { fontSize: STATUS_FONT_SIZE });
 
     this.initButtonBar(y);
     this.buttonBar!.addButton('[ -1 ]', () => this.adjustSeed(-1), { zone: 'center' });
     this.buttonBar!.addButton('[ +1 ]', () => this.adjustSeed(1), { zone: 'center' });
     this.buttonBar!.addButton('[ Reset Seed ]', () => this.resetSeed(), { zone: 'center' });
     this.buttonBar!.addButton('[ Shuffle ]', () => {
-      this.seed = Math.floor(Math.random() * 100000);
+      this.seed = Math.floor(Math.random() * SEED_RANDOM_RANGE);
       this.seedText.setText(String(this.seed));
       this.shuffleAndRedraw();
     }, { zone: 'center' });
 
     // ── Status ───────────────────────────────────────────
-    this.statusText = createHudText(this, cx + 600, y, '52 cards displayed', '#88ff88', { fontSize: '16px' });
+    this.statusText = createHudText(this, cx + STATUS_TEXT_OFFSET, y, '52 cards displayed', '#88ff88', { fontSize: STATUS_FONT_SIZE });
 
     // ── Card Design Selector (second row) ────────────────
-    const designRowY = y + 30;
+    const designRowY = y + DESIGN_ROW_OFFSET;
     const designs = getAvailableCardDesigns();
     const currentDesignKey = getCardDesign();
 
-    this.addLabel(cx - 20, designRowY, 'Design:');
+    this.addLabel(cx - LABEL_X_OFFSET, designRowY, 'Design:');
 
     const designButtons: Phaser.GameObjects.Text[] = [];
-    let btnX = cx + 60;
+    let btnX = cx + BUTTON_X_OFFSET;
 
     for (const d of designs) {
       const displayName = getCardDesignDisplayName(d.key);
@@ -155,7 +167,7 @@ export class GymDeckRngScene extends GymSceneBase {
         designRowY,
         displayName,
         isActive ? '#ffffff' : '#88ff88',
-        { fontSize: '14px' },
+        { fontSize: DEFAULT_FONT_SIZE },
       ).setInteractive({ useHandCursor: true });
 
       btn.on('pointerover', () => {
@@ -187,7 +199,7 @@ export class GymDeckRngScene extends GymSceneBase {
       btn.setData('active', isActive);
       designButtons.push(btn);
 
-      btnX += 100;
+      btnX += TOGGLE_BTN_INCREMENT;
     }
 
     // ── Initialize deck, shuffle with default seed, and render ──
@@ -225,7 +237,7 @@ export class GymDeckRngScene extends GymSceneBase {
 
     const cardDisplayAnchor = resolveDeckRngAnchor('cardDisplay', 'center');
     const centerX = cardDisplayAnchor.x;
-    const centerY = cardDisplayAnchor.y + 100;
+    const centerY = cardDisplayAnchor.y + CARD_DISPLAY_Y_OFFSET;
 
     this.deckGridResult = createDeckGrid(this, this.deck, {
       cols: GRID_COLUMNS,

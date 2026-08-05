@@ -54,6 +54,7 @@ function makeCommunitySpace(overrides: Partial<CommunitySpaceCard> = {}): Commun
     name: overrides.name ?? 'Test Community Space',
     cost: overrides.cost ?? 3,
     baseIncome: overrides.baseIncome ?? 2,
+    ongoingCost: overrides.ongoingCost ?? 0,
     synergyTypes: overrides.synergyTypes ?? ['Culture'],
     synergyCoinBonus: overrides.synergyCoinBonus ?? 0.5,
     synergyRepBonus: overrides.synergyRepBonus ?? 0,

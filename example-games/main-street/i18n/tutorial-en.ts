@@ -11,8 +11,23 @@
  * - Modal: `tutorial.modal.<field>`
  * - Overlay: `tutorial.overlay.<field>`
  *
+ * ## Card-data placeholders
+ *
+ * Step bodies that reference card facts (name, cost, income bonus) MUST use
+ * `{cardName}` / `{cost}` / `{bonus}` placeholders instead of hardcoded
+ * values.  `resolveTutorialStepText()` in `TutorialFlow.ts` substitutes the
+ * live values from `card-data.csv` at render time, so rebalancing card data
+ * never leaves the tutorial stale.  Never hardcode a card name, cost, or
+ * income figure in a step string.
+ *
+ * Placeholders resolved from card data:
+ * - `{cardName}` — the card's `name` column.
+ * - `{cost}` — the card's `cost` column, formatted via `formatCurrency()`.
+ * - `{bonus}` — an event card's `coinDelta` as `+N coins` (used by T7).
+ *
  * To add a new language variant:
- *  1. Create `tutorial-<lang>.ts` with the translated bundle.
+ *  1. Create `tutorial-<lang>.ts` with the translated bundle (keeping the
+ *     same placeholder tokens in the same positions).
  *  2. Import and call `registerLocale('<lang>', bundle)` at startup.
  *
  * @module
@@ -104,8 +119,11 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
   // ── T3: Development Row ─────────────────────────────────────
   [tutorialKey('T3', 'title')]:
     'Development Row',
+  // {cardName}/{cost} are resolved from card-data.csv at render time via
+  // resolveTutorialStepText() — do NOT hardcode the card name or price here.
   [tutorialKey('T3', 'body')]:
-    'Buy the **Laundromat** card from the Development row for €6. It is the cheapest card and earns money each turn. Place cards on your street to earn income.',
+    'Buy the **{cardName}** card from the Development row for {cost}. ' +
+    'It earns income each turn. Place cards on your street to earn income.',
 
   // ── T4: Place a Business ────────────────────────────────────
   [tutorialKey('T4', 'title')]:
@@ -129,19 +147,21 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
   // ── T7: Held Event Card ─────────────────────────────────────
   [tutorialKey('T7', 'title')]:
     'Held Event Card',
+  // {cardName}/{bonus} resolved from card-data.csv (evt-festival) at render time.
   [tutorialKey('T7', 'body')]:
-    'Buy the **Local Festival** card from the investments row.\n' +
-    'Investment cards are most powerful when you time them right. The Local Festival ' +
-    'gives +2 coins to all **Culture** businesses — so you will want a Culture business ' +
+    'Buy the **{cardName}** card from the investments row.\n' +
+    'Investment cards are most powerful when you time them right. The {cardName} ' +
+    'gives {bonus} to all **Culture** businesses — so you will want a Culture business ' +
     'on your street before you play it.\n' +
     'You can hold one event card and play it when the time is right.',
 
   // ── T8: Culture Business Purchase ───────────────────────────
   [tutorialKey('T8', 'title')]:
     'Culture Business',
+  // {cardName}/{cost} resolved from card-data.csv (biz-bookshop) at render time.
   [tutorialKey('T8', 'body')]:
-    'Now buy the **Bookshop** from the Development row for €3.\n' +
-    'It is a **Culture** business, which means the Local Festival you just bought ' +
+    'Now buy the **{cardName}** from the Development row for {cost}.\n' +
+    'It is a **Culture** business, which means the investment card you just bought ' +
     'will boost it when you play the event.\n' +
     'Having the right businesses on your street makes your investment cards stronger!\n' +
     'This card will be placed automatically.',
@@ -149,8 +169,9 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
   // ── T9: Place from Hand ──────────────────────────────────
   [tutorialKey('T9', 'title')]:
     'Place from Hand',
+  // {cardName} resolved from card-data.csv (biz-bookshop) at render time.
   [tutorialKey('T9', 'body')]:
-    'The Bookshop is now in your hand.\n' +
+    'The {cardName} is now in your hand.\n' +
     'Click an empty street slot to place it.\n\n' +
     'Tip: You can hold multiple cards in your hand\n' +
     'before deciding where to place them.',

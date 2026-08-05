@@ -194,6 +194,15 @@ export class MainStreetAnimator {
     return { x, y };
   }
 
+  /**
+   * Hand-anchored slot centre (left edge of the hand zone + half a card).
+   *
+   * Kept for backward compatibility only — buy-transfer animations now use
+   * the HandView-predicted resting positions via the scene's
+   * `getBusinessHandInsertionPosition` / `getEventHandInsertionPosition`
+   * helpers, which target the actual centred hand layout (`handCenterX`)
+   * instead of this left-anchored estimate.
+   */
   public getHandCardCenter(): { x: number; y: number } {
     const s = this.scene;
     return {

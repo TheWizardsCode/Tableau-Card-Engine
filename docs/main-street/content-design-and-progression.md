@@ -9,11 +9,11 @@ The **Main Street** game uses three distinct card families. Below is the current
 ### 1.1 Business Cards
 | Name | Cost (coins) | Base Income (coins/turn) | Synergy Types | Upgrade Path | Description |
 |------|--------------|--------------------------|----------------|--------------|-------------|
-| Bakery | 3 | 2 | Food | Bakery → Patisserie | Provides warm pastries. Gains +1 coin for each adjacent Food business. |
-| Diner | 4 | 3 | Food | Diner → Bistro | Serves quick meals. Gains +1 coin per adjacent Food business. |
-| Bookshop | 4 | 2 | Culture | Bookshop → Reader's Café | Sells books. Gains +1 coin per adjacent Culture business. |
-| Park | 2 | 1 | Culture | Park → Garden | Offers leisure. Gains +1 coin per adjacent Culture business. |
-| Hardware Store | 5 | 3 | Commerce | Hardware Store → Home Improvement | Supplies tools. Gains +1 coin per adjacent Commerce business. |
+| Bakery | 3 | 2 | Food | Bakery → Patisserie | Provides warm pastries. Gains 50% of base income per adjacent Food business. |
+| Diner | 4 | 3 | Food | Diner → Bistro | Serves quick meals. Gains 50% of base income per adjacent Food business. |
+| Bookshop | 4 | 2 | Culture | Bookshop → Reader's Café | Sells books. Gains 50% of base income per adjacent Culture business. |
+| Park | 2 | 1 | Culture | Park → Garden | Offers leisure. Gains 50% of base income per adjacent Culture business or community space. |
+| Hardware Store | 5 | 3 | Commerce | Hardware Store → Home Improvement | Supplies tools. Gains 50% of base income per adjacent Commerce business. |
 | ... *(additional business cards may be added later)* |
 
 ### 1.2 Event Cards
@@ -58,7 +58,7 @@ The core economic loop consists of two primary resources:
 
 **Flow of Resources**:
 - At the start of each **Day Phase**, the player may spend coins to acquire cards.
-- During the **Income Phase**, each placed Business generates `baseIncome + synergyBonus` coins. Synergy is computed as `+1` coin per adjacent Business sharing a Synergy Type.
+- During the **Income Phase**, each placed Business generates `effectiveBase + synergyBonus` coins. Synergy is computed as a percentage of base income per matching adjacent Business sharing a Synergy Type: `synergyBonus = effectiveBase * synergyCoinBonus * bonusPerNeighbor * matchingNeighborCount`, where `synergyCoinBonus` defaults to 0.5 (50%) and `bonusPerNeighbor` is the difficulty preset multiplier (1.5 Easy / 1.0 Medium / 0.75 Hard).
 - **Event Cards** may grant or remove coins/reputation immediately.
 - **Upgrade Cards** increase future income and may extend synergy range.
 - At the end of each turn, the player's **coin balance** and **reputation** are persisted in the **ResourceBank**.

@@ -334,6 +334,14 @@ export class GymTokenPileViewScene extends GymSceneBase {
     return this.resourcePile.getContainer();
   }
 
+  /**
+   * Get the container for the card-back token pile.
+   * @internal Exposed for testing so tests can inspect rendered sprites.
+   */
+  getCardBackPileContainer(): Phaser.GameObjects.Container {
+    return this.cardBackPile.getContainer();
+  }
+
   // ── Default token data ───────────────────────────────────
 
   private createDefaultResourceTokens(): ResourceToken[] {

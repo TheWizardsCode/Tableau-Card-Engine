@@ -130,4 +130,54 @@ describe('GymTokenPileViewScene smoke test', () => {
     expect(tokenScene.hasSimpleTokenRenderer).toBe(true);
     expect(tokenScene.hasCardBackRenderer).toBe(true);
   });
+
+  // ── AC 1-4: Card-back pile renders visible sprites ────────
+
+  /**
+   * Collect the texture keys of all Image sprites in the card-back pile
+   * container. A "missing texture" sprite reports the '__MISSING' key.
+   */
+  function cardBackImageKeys(container: Phaser.GameObjects.Container): string[] {
+    return container.list
+      .filter((child) => child instanceof Phaser.GameObjects.Image)
+      .map((img) => (img as Phaser.GameObjects.Image).texture.key);
+  }
+
+  it('renders card-back tokens with visible textures across load/add/remove/reset (AC 1-4)', async () => {
+    const scene = await bootScene();
+    const tokenScene = scene as unknown as {
+      getCardBackPileContainer: () => Phaser.GameObjects.Container;
+      addTokenToPile: (pileIndex: number) => void;
+      removeTokenFromPile: (pileIndex: number) => void;
+      // resetPiles is private; invoked through the [ Reset All ] handler path
+      resetPiles: () => void;
+    };
+
+    expect(tokenScene.getCardBackPileContainer).toBeDefined();
+    const container = tokenScene.getCardBackPileContainer();
+
+    const assertAllVisible = (keys: string[], expectedCount: number): void => {
+      expect(keys.length).toBe(expectedCount);
+      for (const key of keys) {
+        // Key must resolve to a real texture (not Phaser's '__MISSING')
+        expect(scene.textures.exists(key)).toBe(true);
+        expect(key).toBe('gym_token_card_back');
+      }
+    };
+
+    // AC 1: 5 default card-back tokens all visible on scene load
+    assertAllVisible(cardBackImageKeys(container), 5);
+
+    // AC 2: [+ Card Back] adds a token that is also visible
+    tokenScene.addTokenToPile(1);
+    assertAllVisible(cardBackImageKeys(container), 6);
+
+    // AC 3: [- Card Back] removes a token without error
+    tokenScene.removeTokenFromPile(1);
+    assertAllVisible(cardBackImageKeys(container), 5);
+
+    // AC 4: [ Reset All ] restores defaults with all tokens visible
+    tokenScene.resetPiles();
+    assertAllVisible(cardBackImageKeys(container), 5);
+  });
 });

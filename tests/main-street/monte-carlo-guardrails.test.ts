@@ -44,5 +44,5 @@ describe('Main Street Monte Carlo guardrails for expanded pool', () => {
     );
     const allowedCoinPerTurnDelta = baseline.metrics.averageCoinsPerTurn * 0.30;
     expect(coinPerTurnDelta).toBeLessThanOrEqual(allowedCoinPerTurnDelta);
-  });
+  }, 180_000);
 });

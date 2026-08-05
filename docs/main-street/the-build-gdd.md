@@ -32,7 +32,7 @@
 |---------|------------|
 | **Slot** | A single cell in the 10‑slot linear **Street Grid** where a Business card may be placed. Slots are indexed 0‑9.
 | **Business Card** | A card representing a shop or service. It has a cost, a base income, one or more **Synergy Types**, and optional **Upgrade Paths**.
-| **Synergy Type** | A tag (e.g., *Food*, *Culture*, *Commerce*) that determines adjacency bonuses. When two adjacent businesses share a synergy type, each gains a **Synergy Bonus** of +1 coin per turn per matching neighbor.
+| **Synergy Type** | A tag (e.g., *Food*, *Culture*, *Commerce*) that determines adjacency bonuses. When two adjacent businesses share a synergy type, each gains a **Synergy Bonus** equal to a percentage of its own effective base income per matching neighbor. The per-card rate defaults to 50% (`synergyCoinBonus` 0.5) and is scaled by the difficulty preset multiplier `synergyBonusPerNeighbor` (Easy 1.5 / Medium 1.0 / Hard 0.75). Same-type adjacent businesses do not receive synergy from each other.
 | **Market** | The face‑up cards the player may purchase each turn. It has two rows: a **Business** row (4 slots) and a mixed **Investments** row (2 Upgrade cards + 1 Investment event card = 3 slots). Incidents are not purchasable; they populate a visible FIFO **Incident Queue** instead.
 | **Resource Bank** | Holds the player's **Coins** (currency) and **Reputation** (score multiplier). Coins start at 8 and Reputation starts at 3.
 | **Turn** | A full day/night cycle consisting of several phases (see Section 5). Turn number increments after the **Night Phase**.
@@ -65,7 +65,7 @@
   "baseIncome": 2,
   "synergyTypes": ["Food"],
   "upgradePath": "Bakery→Patisserie",
-  "description": "Provides warm pastries. Gains +1 coin for each adjacent Food business."
+  "description": "Provides warm pastries. Gains {SYNERGY_RATE} of base income per adjacent Food business."
 }
 ```
 
@@ -176,7 +176,7 @@ stateDiagram-v2
    - **Play Held Investment** → resolve the held Investment event immediately and clear it.
 4. **InvestmentResolution** – If the player still holds an Investment event, it auto‑resolves here.
 5. **IncomePhase** – For each placed Business, compute:
-   - `totalIncome = baseIncome + synergyBonus` where `synergyBonus = countMatchingNeighbors * 1`.
+   - `totalIncome = effectiveBase + synergyBonus` where `effectiveBase = (baseIncome + incomeBonus) * sameTypePenalty` (0.6 for same-type neighbors) and `synergyBonus = effectiveBase * synergyCoinBonus * bonusPerNeighbor * matchingNeighborCount` (percentage-based: `synergyCoinBonus` is the card's rate, defaulting to 0.5 = 50% of base income per matching neighbor; `bonusPerNeighbor` is the difficulty multiplier — 1.5 Easy / 1.0 Medium / 0.75 Hard).
    - `resourceBank.coins += totalIncome`.
 6. **IncidentPhase** – Resolve the front Incident card from the visible FIFO incident queue. After resolution, draw a replacement Incident from the event deck to the back of the queue (maintaining queue size of 2). If the deck has no more Incidents, the queue shrinks naturally.
 7. **EndCheck** – Evaluate win/loss conditions.
@@ -251,11 +251,11 @@ The **Main Street** game uses three distinct card families. Below is the current
 #### 1.1 Business Cards
 | Name | Cost (coins) | Base Income (coins/turn) | Synergy Types | Upgrade Path | Description |
 |------|--------------|--------------------------|----------------|--------------|-------------|
-| Bakery | 3 | 2 | Food | Bakery → Patisserie | Provides warm pastries. Gains +1 coin for each adjacent Food business. |
-| Diner | 4 | 3 | Food | Diner → Bistro | Serves quick meals. Gains +1 coin per adjacent Food business. |
-| Bookshop | 4 | 2 | Culture | Bookshop → Reader's Café | Sells books. Gains +1 coin per adjacent Culture business. |
-| Park | 2 | 1 | Culture | Park → Garden | Offers leisure. Gains +1 coin per adjacent Culture business. |
-| Hardware Store | 5 | 3 | Commerce | Hardware Store → Home Improvement | Supplies tools. Gains +1 coin per adjacent Commerce business. |
+| Bakery | 3 | 2 | Food | Bakery → Patisserie | Provides warm pastries. Gains 50% of base income per adjacent Food business. |
+| Diner | 4 | 3 | Food | Diner → Bistro | Serves quick meals. Gains 50% of base income per adjacent Food business. |
+| Bookshop | 4 | 2 | Culture | Bookshop → Reader's Café | Sells books. Gains 50% of base income per adjacent Culture business. |
+| Park | 2 | 1 | Culture | Park → Garden | Offers leisure. Gains 50% of base income per adjacent Culture business or community space. |
+| Hardware Store | 5 | 3 | Commerce | Hardware Store → Home Improvement | Supplies tools. Gains 50% of base income per adjacent Commerce business. |
 | ... *(additional business cards may be added later)* |
 
 #### 1.2 Event Cards
@@ -299,7 +299,7 @@ The core economic loop consists of two primary resources:
 
 **Flow of Resources**:
 - At the start of each **Day Phase**, the player may spend coins to acquire cards.
-- During the **Income Phase**, each placed Business generates `baseIncome + synergyBonus` coins. Synergy is computed as `+1` coin per adjacent Business sharing a Synergy Type.
+- During the **Income Phase**, each placed Business generates `effectiveBase + synergyBonus` coins. Synergy is computed as a percentage of base income per matching adjacent Business sharing a Synergy Type: `synergyBonus = effectiveBase * synergyCoinBonus * bonusPerNeighbor * matchingNeighborCount`, where `synergyCoinBonus` defaults to 0.5 (50%) and `bonusPerNeighbor` is the difficulty preset multiplier (1.5 Easy / 1.0 Medium / 0.75 Hard).
 - **Event Cards** may grant or remove coins/reputation immediately.
 - **Upgrade Cards** increase future income and may extend synergy range.
 - At the end of each turn, the player's **coin balance** and **reputation** are persisted in the **ResourceBank**.

@@ -64,8 +64,17 @@ export class GolfOverlayHelper {
     // Play score-reveal sound directly (not event-mapped)
     this.soundManager?.play(SFX_KEYS.SCORE_REVEAL);
 
-    // Emit game-ended event
+    // Play the game win/loss sound. This replaces the old
+    // 'game-ended' -> ROUND_END event mapping (see GolfScene.create()).
+    // winnerIndex 0 = human ('You'), 1 = AI.
     const winnerIdx = results.winnerIndex;
+    if (winnerIdx === 0) {
+      this.soundManager?.play(SFX_KEYS.GAME_WIN);
+    } else {
+      this.soundManager?.play(SFX_KEYS.GAME_LOST);
+    }
+
+    // Emit game-ended event
     const winnerName = this.session.gameState.players[winnerIdx].name;
     this.gameEvents.emit('game-ended', {
       finalTurnNumber: this.session.gameState.turnNumber,

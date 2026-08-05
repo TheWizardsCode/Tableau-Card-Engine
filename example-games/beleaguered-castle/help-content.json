@@ -24,6 +24,10 @@
     "body": "Drag and drop: Drag a top card to a valid destination (tableau column or foundation).\n\nClick to move: Click a top card to select it (highlighted green), then click a valid destination. Click the same card again to deselect.\n\nBoth input methods work simultaneously."
   },
   {
+    "heading": "Hints",
+    "body": "Click the Hint button (top-right, next to Undo) to ask the built-in AI solver for the best move.\n\nThe suggested source card is highlighted in gold and the destination in green, and a text description appears at the bottom of the screen. Make the move yourself by clicking or dragging the highlighted card.\n\nThe hint system is powered by an AI that evaluates the board and searches ahead for winning moves."
+  },
+  {
     "heading": "Keyboard Shortcuts",
     "body": "Ctrl+Z -- Undo last move\nCtrl+Y -- Redo\nCtrl+Shift+Z -- Redo\n? -- Toggle this help panel\nEsc -- Close this help panel"
   },

@@ -22,14 +22,43 @@ import { anchorPoint } from '../../../src/ui/screen-layout';
 import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
 import { getTooltips, setTooltips } from '../../../src/ui/SettingsStore';
 import gymTooltipLayoutJson from '../layouts/gym-tooltip.layout.json';
+import {
+  DEFAULT_VIEWPORT,
+  TOOLTIP_MODE_LABEL_FONT_SIZE,
+  TOOLTIP_STATUS_Y_OFFSET,
+  TOOLTIP_SEPARATOR_Y_OFFSET,
+  TOOLTIP_STATUS_FONT_SIZE,
+  TOOLTIP_PROMPT_FONT_SIZE,
+  TOOLTIP_LOG_HEADER_FONT_SIZE,
+  TOOLTIP_CARD_NAME_FONT_SIZE,
+  TOOLTIP_WORD_WRAP_WIDTH,
+  TOOLTIP_BG_PADDING,
+  TOOLTIP_BG_ALPHA,
+  TOOLTIP_BORDER_WIDTH_NORMAL,
+  TOOLTIP_BORDER_COLOR_DEFAULT,
+  TOOLTIP_TEXT_ORIGIN,
+  TOOLTIP_CONTAINER_DEPTH,
+  TOOLTIP_CARD_BG_WIDTH,
+  TOOLTIP_CARD_BG_HEIGHT,
+  TOOLTIP_CARD_BG_ALPHA,
+  TOOLTIP_CARD_BORDER_NORMAL,
+  TOOLTIP_CARD_BORDER_COLOR,
+  TOOLTIP_CARD_LABEL_FONT_SIZE,
+  TOOLTIP_BORDER_WIDTH_HOVER,
+  TOOLTIP_BORDER_COLOR_HOVER,
+  TOOLTIP_HOVER_SCALE,
+  TOOLTIP_CARD_X_OFFSET,
+  TOOLTIP_LOG_MAX_LINES,
+  TOOLTIP_LOG_FONT_SIZE,
+  TOOLTIP_LOG_BASE_Y_OFFSET,
+  TOOLTIP_LOG_LINE_HEIGHT,
+} from './GymConstants';
 
 // Parse the shared Tooltip scene layout once at module load.
 const TOOLTIP_LAYOUT: import('../../../src/ui/screen-layout-schema').ScreenLayoutDocument | null = (() => {
   const parsed = parseScreenLayoutDocument(gymTooltipLayoutJson);
   return parsed.valid ? parsed.layout : null;
 })();
-
-const DEFAULT_VIEWPORT = { width: 1280, height: 720 };
 
 /**
  * Resolve a primary anchor position from the SLL layout.
@@ -113,28 +142,28 @@ export class GymTooltipScene extends GymSceneBase {
     );
 
     // Mode label — at label anchor y
-    const modeLabel = createHudText(this, labelAnchor.x, labelAnchor.y, 'Mode: DOM overlay', '#88ccff', { fontSize: '16px' });
+    const modeLabel = createHudText(this, labelAnchor.x, labelAnchor.y, 'Mode: DOM overlay', '#88ccff', { fontSize: TOOLTIP_MODE_LABEL_FONT_SIZE });
     modeLabel.setOrigin(0.5);
     modeLabel.setName('modeLabel');
 
     // Tooltip status label — below mode label
     const tooltipLabel = createHudText(
-      this, labelAnchor.x, labelAnchor.y + 25,
+      this, labelAnchor.x, labelAnchor.y + TOOLTIP_STATUS_Y_OFFSET,
       `Tooltips: ${this.tooltipsEnabled ? 'Enabled' : 'Disabled'}`,
       this.tooltipsEnabled ? '#88ff88' : '#ff8888',
-      { fontSize: '14px' },
+      { fontSize: TOOLTIP_STATUS_FONT_SIZE },
     );
     tooltipLabel.setOrigin(0.5);
     tooltipLabel.setName('tooltipLabel');
 
     // Hover prompt — 50 px below label
-    createHudText(this, labelAnchor.x, labelAnchor.y + 50, '── Hover over the cards below ──', '#6699aa', { fontSize: '14px' }).setOrigin(0.5);
+    createHudText(this, labelAnchor.x, labelAnchor.y + TOOLTIP_SEPARATOR_Y_OFFSET, '── Hover over the cards below ──', '#6699aa', { fontSize: TOOLTIP_PROMPT_FONT_SIZE }).setOrigin(0.5);
 
     // Create interactive demo cards — at content anchor y
     this.createDemoCards(contentAnchor.y);
 
     // Event log header — at log anchor y
-    createHudText(this, logAnchor.x, logAnchor.y, '── Event Log ──', '#6699aa', { fontSize: '12px' }).setOrigin(0.5);
+    createHudText(this, logAnchor.x, logAnchor.y, '── Event Log ──', '#6699aa', { fontSize: TOOLTIP_LOG_HEADER_FONT_SIZE }).setOrigin(0.5);
 
     // Create tooltip managers
     this.domTooltipManager = new TooltipManager(this);
@@ -145,19 +174,19 @@ export class GymTooltipScene extends GymSceneBase {
         if (!cardName) return container;
 
         const text = scene.add.text(0, 0, cardName, {
-          fontSize: '14px',
+          fontSize: TOOLTIP_CARD_NAME_FONT_SIZE,
           color: '#ffffff',
           fontFamily: FONT_FAMILY,
-          wordWrap: { width: 200 },
+          wordWrap: { width: TOOLTIP_WORD_WRAP_WIDTH },
         }).setOrigin(0, 0);
 
-        const bg = scene.add.rectangle(0, 0, text.width + 16, text.height + 16, 0x000000, 0.9).setOrigin(0, 0);
-        bg.setStrokeStyle(1, (ctx.borderColor as number) ?? 0x888888);
+        const bg = scene.add.rectangle(0, 0, text.width + TOOLTIP_BG_PADDING, text.height + TOOLTIP_BG_PADDING, 0x000000, TOOLTIP_BG_ALPHA).setOrigin(0, 0);
+        bg.setStrokeStyle(TOOLTIP_BORDER_WIDTH_NORMAL, (ctx.borderColor as number) ?? TOOLTIP_BORDER_COLOR_DEFAULT);
 
-        text.setPosition(8, 8);
+        text.setPosition(TOOLTIP_TEXT_ORIGIN, TOOLTIP_TEXT_ORIGIN);
         container.add([bg, text]);
         container.setPosition(ctx.x ?? 0, ctx.y ?? 0);
-        container.setDepth(800);
+        container.setDepth(TOOLTIP_CONTAINER_DEPTH);
         return container;
       },
     });
@@ -165,29 +194,29 @@ export class GymTooltipScene extends GymSceneBase {
 
   private createDemoCards(startY: number): void {
     const cardData = [
-      { name: '🔴 Red Card — Attack: Deal 3 damage', color: 0xcc3333, x: GAME_W / 2 - 200 },
+      { name: '🔴 Red Card — Attack: Deal 3 damage', color: 0xcc3333, x: GAME_W / 2 - TOOLTIP_CARD_X_OFFSET },
       { name: '🔵 Blue Card — Shield: Block 2 damage', color: 0x3366cc, x: GAME_W / 2 },
-      { name: '🟢 Green Card — Heal: Restore 2 HP', color: 0x33aa33, x: GAME_W / 2 + 200 },
+      { name: '🟢 Green Card — Heal: Restore 2 HP', color: 0x33aa33, x: GAME_W / 2 + TOOLTIP_CARD_X_OFFSET },
     ];
 
     for (const data of cardData) {
       const card = this.add.container(data.x, startY);
-      const bg = this.add.rectangle(0, 0, 150, 80, data.color, 0.8);
-      bg.setStrokeStyle(2, 0xffffff);
-      const label = createHudText(this, 0, 0, data.name.split(' — ')[0], '#ffffff', { fontSize: '14px' }).setOrigin(0.5);
+      const bg = this.add.rectangle(0, 0, TOOLTIP_CARD_BG_WIDTH, TOOLTIP_CARD_BG_HEIGHT, data.color, TOOLTIP_CARD_BG_ALPHA);
+      bg.setStrokeStyle(TOOLTIP_CARD_BORDER_NORMAL, TOOLTIP_CARD_BORDER_COLOR);
+      const label = createHudText(this, 0, 0, data.name.split(' — ')[0], '#ffffff', { fontSize: TOOLTIP_CARD_LABEL_FONT_SIZE }).setOrigin(0.5);
 
       card.add([bg, label]);
       // Set hit area on the background rectangle for interactivity
       bg.setInteractive({ useHandCursor: true });
 
       bg.on('pointerover', () => {
-        bg.setStrokeStyle(3, 0xffdd44);
-        card.setScale(1.1);
+        bg.setStrokeStyle(TOOLTIP_BORDER_WIDTH_HOVER, TOOLTIP_BORDER_COLOR_HOVER);
+        card.setScale(TOOLTIP_HOVER_SCALE);
         this.showCardTooltip(data.name, data.x, startY, data.color);
       });
 
       bg.on('pointerout', () => {
-        bg.setStrokeStyle(2, 0xffffff);
+        bg.setStrokeStyle(TOOLTIP_CARD_BORDER_NORMAL, TOOLTIP_CARD_BORDER_COLOR);
         card.setScale(1.0);
         this.hideTooltip();
       });
@@ -275,14 +304,14 @@ export class GymTooltipScene extends GymSceneBase {
 
   private logEvent(msg: string): void {
     this.eventLog.push(msg);
-    if (this.eventLog.length > 10) this.eventLog.shift();
+    if (this.eventLog.length > TOOLTIP_LOG_MAX_LINES) this.eventLog.shift();
     for (const t of this.logTexts) t.destroy();
     this.logTexts = [];
     const logAnchor = resolveAnchor('log', 'center');
-    // Event log entries start 70 px below the log header anchor
-    const baseY = logAnchor.y + 70;
+    // Event log entries start below the log header anchor
+    const baseY = logAnchor.y + TOOLTIP_LOG_BASE_Y_OFFSET;
     for (let i = 0; i < this.eventLog.length; i++) {
-      const txt = createHudText(this, GAME_W / 2, baseY + i * 17, this.eventLog[i], '#aabbcc', { fontSize: '11px' }).setOrigin(0.5);
+      const txt = createHudText(this, GAME_W / 2, baseY + i * TOOLTIP_LOG_LINE_HEIGHT, this.eventLog[i], '#aabbcc', { fontSize: TOOLTIP_LOG_FONT_SIZE }).setOrigin(0.5);
       this.logTexts.push(txt);
     }
   }

@@ -12,6 +12,7 @@ This document covers everything you need to develop, test, and build the Tableau
 - [Project Structure](#project-structure)
 - [Path Aliases](#path-aliases)
 - [Adding an Example Game](#adding-an-example-game)
+- [Hand & Pile Rendering](#hand--pile-rendering)
 - [Example Games](#example-games)
 - [Transcript Persistence](#transcript-persistence)
 - [Replay Tool](#replay-tool)
@@ -140,7 +141,7 @@ Tests use [Vitest](https://vitest.dev/) with projects configured inline in `vite
 
 | Project | Environment | File Pattern | Purpose |
 |---------|-------------|-------------|---------|
-| `unit` | Node.js | `tests/**/*.test.ts` (excludes `replay-*.test.ts`) | Logic, data, and integration tests — runs in parallel |
+| `unit` | Node.js | `tests/**/*.test.ts` (excludes `replay-*.test.ts`) | Logic, data, and integration tests — runs in parallel (worker pool capped at `maxWorkers: 4`; see contention mitigation below) |
 | `replay-e2e` | Node.js (fork pool) | `tests/e2e/replay-*.test.ts` | Playwright-driven replay e2e tests. Runs in its own fork (`singleFork: true`) after unit tests to avoid Vite cold-start CPU contention |
 | `browser` | Chromium (Playwright) | `tests/**/*.browser.test.ts` (excludes tutorial E2E) | Phaser UI and rendering tests |
 | `tutorial-part1..6` | Chromium (Playwright, one per part) | `tests/e2e/main-street-tutorial-e2e-part{1-6}.browser.test.ts` | Main Street tutorial E2E tests (each in own browser instance) |
@@ -150,6 +151,42 @@ All projects run via `npm test`. The browser and tutorial projects run in headle
 The tutorial E2E tests are split into 6 part files (1-6 tests per file). Each part is a separate Vitest project with its own uniquely-named browser instance (`t1` through `t6`) to prevent the Phaser 4 RC GPU/Canvas context exhaustion that occurs after ~8 game create/destroy cycles in a single browser process. The runner script `scripts/run-tutorial-tests.sh` invokes each project sequentially.
 
 The replay E2E tests live in `tests/e2e/replay-*.test.ts` and use a dedicated Node.js project (`replay-e2e`) with `pool: 'forks'` + `singleFork: true`. This isolates them from the parallel unit test pool, ensuring the Vite dev server started by `scripts/replay.ts` has uncontested CPU for its initial cold compilation. The replay tests start and stop their own dev server per run via `scripts/dev-server-utils.ts`.
+
+#### CPU-contention mitigation (unit and browser tests)
+
+Full-suite runs can intermittently fail at teardown with
+`Error: [vitest-worker]: Timeout calling "onTaskUpdate"` even though every test file
+passed. Root cause (see CG-0MS9M5UJP005PWD3): Vitest's worker RPC layer uses
+birpc with a hard-coded 60s timeout (`DEFAULT_TIMEOUT = 6e4` in Vitest internals —
+not a configurable knob). Under CPU contention (e.g. concurrent vitest processes
+on a 16-core workstation), a worker can miss the 60s window while reporting test
+results back to the main process, and Vitest exits non-zero despite a fully-green
+run. Browser-mode runs have a sibling failure mode (see CG-0MSCI73RH004VPCE): when
+the browser RPC WebSocket is dropped under load, vitest browser mode closes the
+connection and exits non-zero with
+`[vitest] Browser connection was closed while running tests.` even though every
+file completed. Because `scripts/run-ci-tests.sh` runs with `set -euo pipefail`,
+those non-zero exits previously aborted the CI gate after the unit/browser step.
+
+Two mitigations are in place in this repository:
+
+1. **Worker-pool cap** — the `unit` project in `vite.config.ts` sets
+   `maxWorkers: 4` to bound aggregate CPU demand from parallel tinypool workers.
+2. **Retry-once on the transient signatures** — the unit **and** browser steps in
+   `scripts/run-ci-tests.sh` run through `scripts/vitest-run-with-retry.ts`, which
+   retries the run exactly once when (and only when) the reporter summary shows
+   **all** files passed **and** the sole error is one of the transient signatures
+   (`[vitest-worker]: Timeout calling "onTaskUpdate"` or
+   `[vitest] Browser connection was closed while running tests`). The masking
+   guard (`shouldRetryOnce` in that script, unit-tested in
+   `tests/scripts/vitest-run-with-retry.test.ts`) proves "all passed" from the
+   summary before a retry is allowed, so a genuine test failure can never be
+   hidden by a retry.
+
+If you see the worker-timeout error repeatedly under sustained load, run the
+suites sequentially (e.g. `npx vitest run --project unit` alone) rather than
+launching concurrent full-suite runs, and check for other vitest processes
+competing for CPU.
 
 The helper module at `tests/helpers/main-street-tutorial-e2e.ts` contains shared game lifecycle utilities (`bootGameWithTutorial`, `destroyGame` with CanvasPool drain), diagnostic error messages, and click helpers for tutorial step advancement.
 
@@ -302,6 +339,7 @@ example-games/
 │   ├── createBeleagueredCastleGame.ts   Factory function (used by main.ts)
 │   ├── BeleagueredCastleState.ts        State types, move types, constants
 │   ├── BeleagueredCastleRules.ts        Pure game logic (deal, moves, win/loss)
+│   ├── BeleagueredCastleAi.ts           AI solver (search + heuristics) powering the hint system
 │   ├── GameTranscript.ts               Transcript recording (BCTranscriptRecorder)
 │   ├── help-content.json               Help panel content (rules, controls, tips)
 │   └── scenes/
@@ -526,6 +564,19 @@ When migrating an existing game to the canonical pattern:
 
 Follow the Golf (original reference) and Sushi Go (most recent) examples as reference implementations.
 
+## Hand & Pile Rendering
+
+**Requirement:** Example games **must** render hands and piles through the core engine's hand-management code — `HandView`, `PileView`, and related helpers such as `flipCard()`. Hand-rolling card rows with manual sprite arrays and hardcoded positioning is not an accepted pattern; using the shared components means engine improvements (animations, reduced-motion fallbacks, DPR-aware textures, selection) propagate to every game automatically.
+
+**Exception carve-outs:** Layouts that genuinely don't fit the single-row `HandView` model may keep bespoke card rendering, but the exception must be documented in code comments and/or the scene's help text:
+
+- **Golf** — the 3×3 tableau grid (exception note in `example-games/golf/scenes/GolfRenderer.ts`); its stock/discard piles still use `PileView`.
+- **Feudalism** — token/crop counters via `CropIconRenderer` (non-card tokens, not a hand).
+
+**Canonical reference:** `example-games/blackjack/scenes/BlackjackScene.ts` — migrated to two SLL-anchored `HandView` instances with `centerX` row anchoring and a `flipCard()`-based hole-card reveal; its browser tests (`tests/blackjack/BlackjackHandView.browser.test.ts`) verify the rendering path.
+
+For non-standard card models (tokens, resource icons, expedition cards), use the `CardTextureResolver` / `renderCard` callbacks documented in the [UI Adapter Guide](ui/ADAPTER-GUIDE.md). See the [Gym scene index](gym/GYM_INDEX.md) for the complete HandView/PileView scene-to-API mapping.
+
 ## Example Games
 
 All example games are playable via the Game Selector after running:
@@ -541,7 +592,7 @@ Open `http://localhost:3000` and click the desired game card. Each game also has
 | Game | Location | Key engine features demonstrated | Tests |
 |------|----------|--------------------------------|-------|
 | 9-Card Golf | `example-games/golf/` | Card/Deck/Pile abstractions, GameState/TurnSequencer, scoring rules (A=1, 2=-2, K=0, column-of-three=0), Random/Greedy AI strategies, transcript recording, Phaser UI with 3x3 grid | `tests/golf/` (8 files) |
-| Beleaguered Castle | `example-games/beleaguered-castle/` | Single-player solitaire, UndoRedoManager (Command pattern), drag-and-drop + click-to-move, auto-move heuristics, auto-complete, win/loss detection, HelpPanel component, checkpoint autosave after each move with startup recovery | `tests/beleaguered-castle/` (2 files) |
+| Beleaguered Castle | `example-games/beleaguered-castle/` | Single-player solitaire, UndoRedoManager (Command pattern), drag-and-drop + click-to-move, auto-move heuristics, auto-complete, win/loss detection, HelpPanel component, checkpoint autosave after each move with startup recovery, hint system (AI solver suggests best move with source/destination highlights) | `tests/beleaguered-castle/` (10 files) |
 | Sushi Go! | `example-games/sushi-go/` | Card drafting (pick-and-pass hands), custom card types with set-collection scoring, multi-round match, procedural card-back textures | `tests/sushi-go/` (4 files) |
 | Feudalism | `example-games/feudalism/` | Resource management (gem tokens), tiered development cards with costs/bonuses, noble attraction, multi-action turns (take/reserve/purchase), checkpoint autosave after each turn (human + AI) with startup recovery | `tests/feudalism/` (4 files) |
 | Lost Cities | `example-games/lost-cities/` | Two-player expeditions, two-phase turn model (play/discard then draw), ascending-play rules, investment multipliers (x2/x3/x4), multi-round match scoring, procedurally generated SVG card assets | `tests/lost-cities/` (6 files) |
@@ -732,6 +783,8 @@ npm run replay -- tests/fixtures/transcripts/main-street/fixture-game.json --gam
 ```
 
 Screenshots are written as `turn-000.png`, `turn-001.png`, etc. in the output directory. A `replay-summary.json` is also written with metadata.
+
+> **Performance note:** the replay script lazy-loads its heavy modules (Playwright, `sharp` via `contact-sheet.ts`) using dynamic `import()` only when the replay path actually needs them. Argument/transcript validation error paths (`--stop-at`/`--skip-to` validation, missing/invalid transcripts, version rejection) therefore exit in milliseconds-to-seconds instead of waiting for Playwright/sharp module evaluation (which can take 15-30s+ under parallel CPU load). See CG-0MSAXWIK70050RDA.
 
 ### How It Works
 

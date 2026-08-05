@@ -229,7 +229,14 @@ Use `createSeededRng()` and `shuffleArray()` from `@core-engine` to produce dete
 
 ### 2. View/Model Separation with HandView and PileView
 
-Separate card rendering from game logic using `HandView` and `PileView` reusable UI components. These components provide draggable hands, arc layouts, pile management, and rich card animations (deal, discard, flip, move tween).
+**Requirement:** Example games **must** render hands and piles through the core engine's hand-management components — `HandView`, `PileView`, and related helpers such as `flipCard()`. Bespoke hand/pile rendering (manual sprite arrays, hardcoded row positioning, hand-rolled deal/flip tweens) is **not** an accepted pattern: improvements to the shared components (animations, reduced-motion, DPR-aware textures, selection) propagate to every game automatically instead of being re-implemented per game.
+
+**Documented exceptions:** Layouts that genuinely don't fit the single-row `HandView` model may keep bespoke card rendering, but only where the exception is documented in code comments and/or the scene's help text:
+
+- **Golf** — the 3×3 tableau grid (see the exception note in `example-games/golf/scenes/GolfRenderer.ts`); Golf's stock/discard piles still use `PileView`.
+- **Feudalism** — token/crop counters rendered via `CropIconRenderer` (a non-card token visual model, not a hand).
+
+New example games must not introduce bespoke hand rendering; `example-games/blackjack/scenes/BlackjackScene.ts` (migrated to `HandView` + `flipCard()`) is the canonical reference for standard hand rendering.
 
 - **Gym scene:** `GymHandPileScene` — `example-games/gym/scenes/GymHandPileScene.ts`
 - **Key APIs:** `HandView`, `PileView`, `flipCard()`, `discardCard()`, `moveGameObject()`, `shakeIllegalMove()`

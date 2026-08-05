@@ -47,6 +47,8 @@ describe('generate-thumbnail script (main-street)', () => {
 
   it('produces a 120x68 thumbnail in public assets', () => {
     // Run the generate-thumbnail script
+    // Generous timeout: the script boots a Phaser scene via Playwright headless,
+    // which routinely takes 30-70s on CI-grade machines (see CG-0MSAZK0FF0069FY3).
     execSync('npx tsx scripts/generate-thumbnail.ts main-street', { stdio: 'inherit' });
 
     expect(existsSync(OUT_PATH)).toBe(true);
@@ -56,5 +58,5 @@ describe('generate-thumbnail script (main-street)', () => {
       expect(meta.width).toBe(120);
       expect(meta.height).toBe(68);
     });
-  });
+  }, 120_000);
 });

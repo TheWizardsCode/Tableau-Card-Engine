@@ -48,9 +48,11 @@
   "baseIncome": 2,
   "synergyTypes": ["Food"],
   "upgradePath": "Bakery→Patisserie",
-  "description": "Provides warm pastries. Gains +1 coin for each adjacent Food business."
+  "description": "Provides warm pastries. Gains {SYNERGY_RATE} of base income per adjacent Food business."
 }
 ```
+
+> **Display note:** Business/community-space synergy descriptions use the `{SYNERGY_RATE}` token, resolved at render time to the **effective percentage** — the card's `synergyCoinBonus` (default 0.5) × the difficulty preset multiplier `synergyBonusPerNeighbor` (Easy 1.5 / Medium 1.0 / Hard 0.75). For example, a default-rate Bakery shows 75% on Easy, 50% on Medium, and 37.5% on Hard. Event-card effects ("+1 coin per X business") are genuine `coinDelta` effects and always remain absolute; reputation synergy (`synergyRepBonus`) also remains absolute by design.
 
 ### 3.2 Event Card
 
@@ -95,6 +97,24 @@
 }
 ```
 
+### 3.4 Community Space Card
+
+Community space cards (e.g. Park, Library) are a separate card family (`community-space`) placed on the street grid alongside business cards. They share the same mechanical behavior as businesses (grid placement, synergy bonuses, upgrade path, level tracking) but are classified differently for thematic clarity.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| **Name** | string | Human‑readable title (e.g., *Library*). |
+| **Cost** | number (coins) | Purchase price from the market. |
+| **Base Income** | number (coins per turn) | Income generated each **IncomePhase** before synergy. Some community spaces earn no income at all (e.g. Library `baseIncome = 0`). |
+| **Ongoing Cost** | number (coins per turn) | Per‑turn running cost deducted each **IncomePhase** (e.g. Library costs 0.25 coins/turn to run). Defaults to 0. Mirrors the StaffCard `ongoingCost` mechanic. |
+| **Reputation Per Turn** | number (optional) | Reputation contributed each turn during IncomePhase (e.g. Library provides +0.1 rep/turn). Default 0. |
+| **Synergy Types** | string[] | One or more tags that interact with adjacent cards (e.g., `Culture`). |
+| **Upgrade Path** | string (optional) | Identifier of the Upgrade card that can transform this community space. |
+| **Max Level** | number (optional) | Number of upgrade steps (default 1). |
+| **Description** | string | Flavor text and any special rules. |
+
+> **Ongoing costs are deducted in the IncomePhase.** Community spaces with `ongoingCost > 0` have their total running cost deducted from coins each turn (after income is credited, alongside staff card costs). The deduction is **clamped at 0 coins** — the player is never driven below zero — and both the deduction and any shortfall are logged to the activity log.
+
 ---
 
 ## 4. Game State Model
@@ -104,10 +124,10 @@ The engine maintains a single **GameState** object with the following fields (il
 ```ts
 interface GameState {
   turn: number; // starts at 1
-  dayPhase: 'Day' | 'Night';
-  streetGrid: (BusinessCard | null)[]; // length = GRID_SIZE (default 10)
+  phase: DayPhase; // DayStart | MarketPhase | InvestmentResolution | IncomePhase | IncidentPhase | EndCheck
+  streetGrid: (BusinessCard | CommunitySpaceCard | null)[]; // length = GRID_SIZE (default 10)
   market: {
-    business: BusinessCard[];                   // 4 face-up slots
+    development: (BusinessCard | CommunitySpaceCard)[];  // 4 face-up slots (business + community space)
     investments: (UpgradeCard | EventCard)[];   // 2 upgrades + 1 investment event = 3 slots
   };
   incidentQueue: EventCard[];  // Visible FIFO queue of upcoming Incidents (size 2)
@@ -115,20 +135,21 @@ interface GameState {
     coins: number; // start = 8
     reputation: number; // start = 3
   };
-  deck: {
-    business: CardDeck<BusinessCard>;
-    event: CardDeck<EventCard>;    // Contains both Investment and Incident cards
-    upgrade: CardDeck<UpgradeCard>;
+  decks: {
+    business: BusinessCard[];
+    communitySpace: CommunitySpaceCard[];
+    event: EventCard[];    // Contains both Investment and Incident cards
+    upgrade: UpgradeCard[];
   };
   heldEvent: EventCard | null;  // Held Investment event awaiting play (max 1)
-  challengesCompleted: Set<string>; // IDs of achieved challenges
+  challengesCompleted: string[]; // IDs of achieved challenges
 }
 ```
 
 **Key components**
 - **Grid<T>** – generic NxM grid (used here as 1x10), now using the reusable `@core-engine` `Grid` type.
 - **AdjacencyResolver** – computes synergy bonuses based on shared `synergyTypes` and proximity (default range 1, can be extended by upgrades) via `@core-engine/SpatialRules`.
-- **Market** – two rows: Business row (4 face‑up cards from the Business deck) and Investments row (2 Upgrades + 1 Investment event = 3 slots). Cards are replenished after purchase.
+- **Market** – two rows: Development row (4 face‑up cards from the Business and Community Space decks) and Investments row (2 Upgrades + 1 Investment event = 3 slots). Cards are replenished after purchase.
 - **Incident Queue** – visible FIFO queue of 2 Incident cards drawn from the event deck. The front card resolves each turn during IncidentPhase; a replacement is drawn from the deck afterward. If the deck runs out, the queue shrinks naturally.
 - **ActiveEffect System** – some events (e.g. `evt-flu-outbreak`) create duration-based modifiers instead of one-shot deltas. ActiveEffects are tracked in `state.activeEffects: ActiveEffect[]` and decay each turn during EndCheck. See [ActiveEffect System](#-activeeffect-system) below.
 - **ResourceBank** – tracks `coins` (start 8) and `reputation` (start 3). Reputation can increase during the IncomePhase via `reputationPerTurn` from certain Health-synergy cards (e.g. Clinic provides +0.2 rep/turn). Reputation is also a multiplier applied at final score calculation (`finalScore = coins + reputation * 5 + challengeBonuses`).
@@ -169,6 +190,7 @@ stateDiagram-v2
    - `resourceBank.coins += totalIncome`.
    - `totalReputationPerTurn` is calculated from all placed cards (some Health-synergy cards like the Clinic provide `reputationPerTurn`). Upgrades may also contribute `reputationBonus`. Synergy reputation from adjacent neighbors is only earned from **different-type** businesses; same-type neighbors contribute 0 reputation synergy.
    - `resourceBank.reputation += totalReputationPerTurn`.
+   - **Ongoing costs** (staff cards and community-space cards with `ongoingCost > 0`, e.g. the Library's 0.25 coins/turn) are deducted from coins after income. Deductions are clamped at 0 coins (the player is never driven below zero) and logged.
 6. **IncidentPhase** – Resolve the front Incident card from the visible FIFO incident queue. After resolution, draw a replacement Incident from the event deck to the back of the queue (maintaining queue size of 2). If the deck has no more Incidents, the queue shrinks naturally.
 7. **EndCheck** – Evaluate win/loss conditions.
 8. Loop back to **DayStart** for the next turn.
@@ -226,7 +248,7 @@ Loss conditions are evaluated at the end of the **Night Income** phase before ch
 
 | Aspect | Random Source | Visibility |
 |--------|----------------|------------|
-| **Market Draw** | Seeded RNG draws from the Business, Upgrade, and Event decks to fill the Business row (4 slots) and Investments row (2 Upgrades + 1 Investment event). | Face‑up – player sees all options before purchasing.
+| **Market Draw** | Seeded RNG draws from the Business, Community Space, Upgrade, and Event decks to fill the Development row (4 slots) and Investments row (2 Upgrades + 1 Investment event). | Face‑up – player sees all options before purchasing.
 | **Event Cards** | Incident events populate a visible FIFO queue (2 cards, face‑up) so the player can plan ahead. Investment events appear in the Investments market row and are purchased/held until played. | Incidents: face‑up in queue. Investments: face‑up in market, then held.
 | **Challenge Generation** | Fixed set defined in `challenges.md`; no randomness.
 | **RNG Seed** | Determined by the **Game Engine** on startup (`Math.seedrandom(seedString)`). | The seed is displayed on the title screen for reproducibility.

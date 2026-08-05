@@ -22,6 +22,31 @@ import type { EventLogResult } from '../../../src/ui/GymSceneUtils';
 import { anchorPoint } from '../../../src/ui/screen-layout';
 import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
 import gymLightingSpikeLayoutJson from '../layouts/gym-lighting-spike.layout.json';
+import {
+  DEFAULT_VIEWPORT,
+  SCENE_HEADER_Y,
+  EVENT_LOG_Y_OFFSET,
+  EVENT_LOG_MAX_LINES_LIGHTING,
+  EVENT_LOG_HEADER_FONT_SIZE,
+  EVENT_LOG_HEADER_COLOR,
+  SPIKE_SPRITE_WIDTH,
+  SPIKE_SPRITE_HEIGHT,
+  SPIKE_SPRITE_CORNER_RADIUS,
+  LIGHT_RADIUS,
+  LIGHT_COLOR,
+  LIGHT_INTENSITY_ON,
+  LIGHT_INTENSITY_OFF,
+  LIGHT_Y_OFFSET,
+  SPRITE_X_OFFSET,
+  LIGHTING_FINDINGS_FONT_SIZE,
+  LIGHTING_EVENT_LOG_FONT_SIZE,
+  LIGHTING_EVENT_LOG_LINE_HEIGHT,
+  LIGHTING_EVENT_LOG_LINE_X,
+  LIGHTING_MOVE_X_SPREAD,
+  LIGHTING_MOVE_Y_BASE,
+  LIGHTING_MOVE_Y_RANGE,
+  LIGHTING_LOG_MAX_LINES,
+} from './GymConstants';
 
 // Parse the shared Lighting Spike scene layout once at module load.
 const LIGHTING_SPIKE_LAYOUT: import('../../../src/ui/screen-layout-schema').ScreenLayoutDocument | null = (() => {
@@ -29,15 +54,13 @@ const LIGHTING_SPIKE_LAYOUT: import('../../../src/ui/screen-layout-schema').Scre
   return parsed.valid ? parsed.layout : null;
 })();
 
-const DEFAULT_VIEWPORT = { width: 1280, height: 720 };
-
 function resolveLightingAnchor(
   zone: string,
   anchor: string,
   viewport = DEFAULT_VIEWPORT,
 ): import('../../../src/ui/screen-layout-schema').PixelPoint {
   if (!LIGHTING_SPIKE_LAYOUT) {
-    return { x: GAME_W / 2, y: 60 };
+    return { x: GAME_W / 2, y: SCENE_HEADER_Y };
   }
   return anchorPoint(LIGHTING_SPIKE_LAYOUT, zone, anchor, viewport, 1);
 }
@@ -60,12 +83,12 @@ export class GymGraphicsLightingSpikeScene extends GymSceneBase {
     // Generate simple textures for lighting demo
     const g = this.add.graphics();
     g.fillStyle(0xcccccc, 1);
-    g.fillRoundedRect(0, 0, 80, 110, 8);
-    g.generateTexture('lighting-sprite-a', 80, 110);
+    g.fillRoundedRect(0, 0, SPIKE_SPRITE_WIDTH, SPIKE_SPRITE_HEIGHT, SPIKE_SPRITE_CORNER_RADIUS);
+    g.generateTexture('lighting-sprite-a', SPIKE_SPRITE_WIDTH, SPIKE_SPRITE_HEIGHT);
     g.clear();
     g.fillStyle(0x888888, 1);
-    g.fillRoundedRect(0, 0, 80, 110, 8);
-    g.generateTexture('lighting-sprite-b', 80, 110);
+    g.fillRoundedRect(0, 0, SPIKE_SPRITE_WIDTH, SPIKE_SPRITE_HEIGHT, SPIKE_SPRITE_CORNER_RADIUS);
+    g.generateTexture('lighting-sprite-b', SPIKE_SPRITE_WIDTH, SPIKE_SPRITE_HEIGHT);
     g.destroy();
   }
 
@@ -105,7 +128,7 @@ export class GymGraphicsLightingSpikeScene extends GymSceneBase {
     this.buttonBar!.addButton('[ Move Light ]', () => this.moveLight(), { zone: 'center' });
 
     const spriteY = contentAnchor.y;
-    const lightY = spriteY - 20;
+    const lightY = spriteY - LIGHT_Y_OFFSET;
 
     // Attempt to enable lighting
     try {
@@ -120,18 +143,18 @@ export class GymGraphicsLightingSpikeScene extends GymSceneBase {
 
         // Create sprites for the lit scene and enable lighting on them (Phaser 4 API)
         try {
-          const spriteA = this.add.image(cx - 150, spriteY, 'lighting-sprite-a');
+          const spriteA = this.add.image(cx - SPRITE_X_OFFSET, spriteY, 'lighting-sprite-a');
           spriteA.setLighting(true);
         } catch (_e) { /* lighting component not available */ }
         try {
-          const spriteB = this.add.image(cx + 150, spriteY, 'lighting-sprite-b');
+          const spriteB = this.add.image(cx + SPRITE_X_OFFSET, spriteY, 'lighting-sprite-b');
           spriteB.setLighting(true);
         } catch (_e) { /* lighting component not available */ }
 
         // Try to add a Light via the LightsManager
         try {
           this.lights.enable();
-          this.light = this.lights.addLight(cx, lightY, 300, 0xffffff, 1.0);
+          this.light = this.lights.addLight(cx, lightY, LIGHT_RADIUS, LIGHT_COLOR, LIGHT_INTENSITY_ON);
           this.logEvent('Light added successfully via LightsManager.');
         } catch (e) {
           this.logEvent(`Light add error: ${(e as Error).message}`);
@@ -148,23 +171,23 @@ export class GymGraphicsLightingSpikeScene extends GymSceneBase {
 
     if (!this.lightingAvailable) {
       // Show fallback sprites without lighting
-      this.add.image(cx - 150, spriteY, 'lighting-sprite-a');
-      this.add.image(cx + 150, spriteY, 'lighting-sprite-b');
+      this.add.image(cx - SPRITE_X_OFFSET, spriteY, 'lighting-sprite-a');
+      this.add.image(cx + SPRITE_X_OFFSET, spriteY, 'lighting-sprite-b');
       createHudText(this, cx, spriteY, 'Lighting unavailable\n(showing fallback sprites)', '#ff8844', {
-        fontSize: '12px',
+        fontSize: LIGHTING_FINDINGS_FONT_SIZE,
         align: 'center',
       }).setOrigin(0.5);
     }
 
-    this.eventLogResult = createEventLog(this, logAnchor.y + 20, {
+    this.eventLogResult = createEventLog(this, logAnchor.y + EVENT_LOG_Y_OFFSET, {
       headerText: '── Findings & Event Log ──',
-      maxLines: 14,
-      lineHeight: 16,
+      maxLines: EVENT_LOG_MAX_LINES_LIGHTING,
+      lineHeight: LIGHTING_EVENT_LOG_LINE_HEIGHT,
       textColor: '#aaddaa',
-      fontSize: '10px',
-      headerFontSize: '12px',
-      headerColor: '#669966',
-      lineX: 20,
+      fontSize: LIGHTING_EVENT_LOG_FONT_SIZE,
+      headerFontSize: EVENT_LOG_HEADER_FONT_SIZE,
+      headerColor: EVENT_LOG_HEADER_COLOR,
+      lineX: LIGHTING_EVENT_LOG_LINE_X,
     });
 
     // Record findings
@@ -184,7 +207,7 @@ export class GymGraphicsLightingSpikeScene extends GymSceneBase {
     try {
       this.lightActive = !this.lightActive;
       if (this.light && this.light.intensity !== undefined) {
-        this.light.setIntensity(this.lightActive ? 1.0 : 0.0);
+        this.light.setIntensity(this.lightActive ? LIGHT_INTENSITY_ON : LIGHT_INTENSITY_OFF);
         this.logEvent(`Light ${this.lightActive ? 'enabled' : 'disabled'} (intensity=${this.lightActive ? '1.0' : '0.0'}).`);
       } else {
         this.logEvent('No light reference available to toggle.');
@@ -203,8 +226,8 @@ export class GymGraphicsLightingSpikeScene extends GymSceneBase {
     // Move light to a new random position
     try {
       const cx = GAME_W / 2;
-      const newX = cx + (Math.random() - 0.5) * 300;
-      const newY = 160 + Math.random() * 200;
+      const newX = cx + (Math.random() - 0.5) * LIGHTING_MOVE_X_SPREAD;
+      const newY = LIGHTING_MOVE_Y_BASE + Math.random() * LIGHTING_MOVE_Y_RANGE;
       // Move the stored light reference directly
       if (this.light) {
         this.light.x = newX;
@@ -220,7 +243,7 @@ export class GymGraphicsLightingSpikeScene extends GymSceneBase {
 
   private logEvent(msg: string): void {
     this.eventLog.push(msg);
-    if (this.eventLog.length > 14) this.eventLog.shift();
+    if (this.eventLog.length > LIGHTING_LOG_MAX_LINES) this.eventLog.shift();
     // Guard against rendering before the eventLogResult has been created.
     if (this.eventLogResult && typeof this.eventLogResult.render === 'function') {
       try {
