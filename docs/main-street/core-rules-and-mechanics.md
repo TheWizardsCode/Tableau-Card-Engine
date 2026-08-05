@@ -124,10 +124,10 @@ The engine maintains a single **GameState** object with the following fields (il
 ```ts
 interface GameState {
   turn: number; // starts at 1
-  dayPhase: 'Day' | 'Night';
-  streetGrid: (BusinessCard | null)[]; // length = GRID_SIZE (default 10)
+  phase: DayPhase; // DayStart | MarketPhase | InvestmentResolution | IncomePhase | IncidentPhase | EndCheck
+  streetGrid: (BusinessCard | CommunitySpaceCard | null)[]; // length = GRID_SIZE (default 10)
   market: {
-    business: BusinessCard[];                   // 4 face-up slots
+    development: (BusinessCard | CommunitySpaceCard)[];  // 4 face-up slots (business + community space)
     investments: (UpgradeCard | EventCard)[];   // 2 upgrades + 1 investment event = 3 slots
   };
   incidentQueue: EventCard[];  // Visible FIFO queue of upcoming Incidents (size 2)
@@ -135,20 +135,21 @@ interface GameState {
     coins: number; // start = 8
     reputation: number; // start = 3
   };
-  deck: {
-    business: CardDeck<BusinessCard>;
-    event: CardDeck<EventCard>;    // Contains both Investment and Incident cards
-    upgrade: CardDeck<UpgradeCard>;
+  decks: {
+    business: BusinessCard[];
+    communitySpace: CommunitySpaceCard[];
+    event: EventCard[];    // Contains both Investment and Incident cards
+    upgrade: UpgradeCard[];
   };
   heldEvent: EventCard | null;  // Held Investment event awaiting play (max 1)
-  challengesCompleted: Set<string>; // IDs of achieved challenges
+  challengesCompleted: string[]; // IDs of achieved challenges
 }
 ```
 
 **Key components**
 - **Grid<T>** – generic NxM grid (used here as 1x10), now using the reusable `@core-engine` `Grid` type.
 - **AdjacencyResolver** – computes synergy bonuses based on shared `synergyTypes` and proximity (default range 1, can be extended by upgrades) via `@core-engine/SpatialRules`.
-- **Market** – two rows: Business row (4 face‑up cards from the Business deck) and Investments row (2 Upgrades + 1 Investment event = 3 slots). Cards are replenished after purchase.
+- **Market** – two rows: Development row (4 face‑up cards from the Business and Community Space decks) and Investments row (2 Upgrades + 1 Investment event = 3 slots). Cards are replenished after purchase.
 - **Incident Queue** – visible FIFO queue of 2 Incident cards drawn from the event deck. The front card resolves each turn during IncidentPhase; a replacement is drawn from the deck afterward. If the deck runs out, the queue shrinks naturally.
 - **ActiveEffect System** – some events (e.g. `evt-flu-outbreak`) create duration-based modifiers instead of one-shot deltas. ActiveEffects are tracked in `state.activeEffects: ActiveEffect[]` and decay each turn during EndCheck. See [ActiveEffect System](#-activeeffect-system) below.
 - **ResourceBank** – tracks `coins` (start 8) and `reputation` (start 3). Reputation can increase during the IncomePhase via `reputationPerTurn` from certain Health-synergy cards (e.g. Clinic provides +0.2 rep/turn). Reputation is also a multiplier applied at final score calculation (`finalScore = coins + reputation * 5 + challengeBonuses`).
@@ -247,7 +248,7 @@ Loss conditions are evaluated at the end of the **Night Income** phase before ch
 
 | Aspect | Random Source | Visibility |
 |--------|----------------|------------|
-| **Market Draw** | Seeded RNG draws from the Business, Upgrade, and Event decks to fill the Business row (4 slots) and Investments row (2 Upgrades + 1 Investment event). | Face‑up – player sees all options before purchasing.
+| **Market Draw** | Seeded RNG draws from the Business, Community Space, Upgrade, and Event decks to fill the Development row (4 slots) and Investments row (2 Upgrades + 1 Investment event). | Face‑up – player sees all options before purchasing.
 | **Event Cards** | Incident events populate a visible FIFO queue (2 cards, face‑up) so the player can plan ahead. Investment events appear in the Investments market row and are purchased/held until played. | Incidents: face‑up in queue. Investments: face‑up in market, then held.
 | **Challenge Generation** | Fixed set defined in `challenges.md`; no randomness.
 | **RNG Seed** | Determined by the **Game Engine** on startup (`Math.seedrandom(seedString)`). | The seed is displayed on the title screen for reproducibility.
