@@ -109,7 +109,7 @@ The first row is the header. Columns common to all card families:
 | `upgradePath` | string | Upgrade family name (e.g. `Bakery`) or empty if unupgradeable |
 | `maxLevel` | number | Maximum upgrade level (0 = unupgradeable) |
 | `reputationPerTurn` | number | Reputation generated per turn (e.g. `0.2` for Clinic) |
-| `synergyCoinBonus` | number | Coin synergy per matching neighbor (defaults to `1`; set `0` to exclude) |
+| `synergyCoinBonus` | number | Coin synergy per matching neighbor as a fraction of base income (defaults to `0.5`, i.e. 50%; set `0` to exclude) |
 | `synergyRepBonus` | number | Reputation synergy per matching neighbor (defaults to `0`) |
 
 **Event** (`event`):
