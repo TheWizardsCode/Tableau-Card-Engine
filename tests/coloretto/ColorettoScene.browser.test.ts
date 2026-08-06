@@ -242,6 +242,27 @@ function flightFaceShown(flight: any): boolean {
   );
 }
 
+/**
+ * Card-face backgrounds rendered at world (0,0): createCardFace() builds its
+ * objects with a depth-0 Rectangle of exactly CARD_W×CARD_H as the face
+ * background. Before the fix, the face was created at scene level at (0,0)
+ * and stayed there for the whole move phase, flashing in the top-left corner
+ * of the screen. The empty-slot outlines live inside rowsContainer at
+ * row-slot positions, so a top-level Rectangle of exactly CARD_W×CARD_H at
+ * (0,0) uniquely identifies a stray face.
+ */
+function strayFaceBgsAtOrigin(scene: Phaser.Scene): Phaser.GameObjects.Rectangle[] {
+  return (scene.children.list as Phaser.GameObjects.GameObject[]).filter(
+    (obj): obj is Phaser.GameObjects.Rectangle =>
+      obj instanceof Phaser.GameObjects.Rectangle &&
+      obj.depth === 0 &&
+      obj.width === CARD_W &&
+      obj.height === CARD_H &&
+      obj.x === 0 &&
+      obj.y === 0,
+  );
+}
+
 describe('ColorettoScene (browser)', () => {
   let game: Phaser.Game | null = null;
 
@@ -564,6 +585,30 @@ describe('ColorettoScene (browser)', () => {
     // human turn is restored.
     await waitForCondition(() => scene.phaseManager.current === 'human-turn');
     expect(scene.flightCard).toBeNull();
+  }, 15000);
+
+  it('never renders a card face at world (0,0) during a placement animation', async () => {
+    game = await bootGame();
+    const scene = await startTwoPlayerGame(game);
+
+    humanPlace(scene, 0);
+
+    // The board gates behind 'animating' and an in-flight card is created.
+    expect(scene.phaseManager.current).toBe('animating');
+    expect(scene.flightCard).not.toBeNull();
+
+    // Poll across the whole move-then-flip animation: a card-face background
+    // (depth-0 Rectangle of CARD_W×CARD_H at world (0,0)) must never exist at
+    // any point. (Regression for the top-left flash: createCardFace built its
+    // objects at scene level at (0,0), where they rendered for the entire
+    // move phase until the flip re-parented them.)
+    while (scene.flightCard) {
+      expect(strayFaceBgsAtOrigin(scene)).toHaveLength(0);
+      await waitFrames(1);
+    }
+
+    // The placement still completes normally: the card is on the row.
+    expect(scene.session.rows[0].cards.length).toBe(1);
   }, 15000);
 
   it('ignores row clicks while a placement animation is in flight', async () => {

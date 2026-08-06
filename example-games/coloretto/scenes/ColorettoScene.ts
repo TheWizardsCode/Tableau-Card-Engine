@@ -883,12 +883,16 @@ export class ColorettoScene extends CardGameScene {
     flight.setPosition(this.layout.deckCenterX, this.layout.deckCenterY);
     this.flightCard = flight;
 
-    const faceObjects = this.createCardFace(drawnCard);
-
+    // The card face is NOT built here: createCardFace() adds its objects to
+    // the scene display list at world (0,0), so building it during the
+    // flight would flash a stray card in the top-left corner for the whole
+    // move phase. Instead a factory is passed to flipContainer, which
+    // builds the face during the swap step -- the same tick it is added to
+    // the flight's inner container -- so it never renders at (0,0).
     if (drawnCard.type === 'last-round') {
       // Last Round card: flip face-up ON the deck, then settle at the
       // resting position between the tableau and the deck.
-      this.flipContainer(flight, faceObjects, () => {
+      this.flipContainer(flight, () => this.createCardFace(drawnCard), () => {
         moveGameObject({
           scene: this,
           target: flight,
@@ -914,7 +918,7 @@ export class ColorettoScene extends CardGameScene {
       destY: this.rowCenterY(action.rowIndex) + CARD_H / 2,
       duration: PLACE_MOVE_DURATION,
       onComplete: () => {
-        this.flipContainer(flight, faceObjects, () => {
+        this.flipContainer(flight, () => this.createCardFace(drawnCard), () => {
           flight.destroy();
           this.flightCard = null;
           finish();
@@ -957,10 +961,17 @@ export class ColorettoScene extends CardGameScene {
    * Coloretto cards are Containers of rectangles + text rather than texture
    * sprites, so the shared flipCard() helper (Image/Sprite only) cannot be
    * used directly.
+   *
+   * The face is supplied as a factory invoked during the swap step (while
+   * the flight is scaled to zero width): createCardFace() builds its objects
+   * at world (0,0), so building them here -- in the same tick they are
+   * added to the flight's inner container -- guarantees the face is never
+   * rendered at the top-left corner (the card is only ever visible at the
+   * flight's position).
    */
   private flipContainer(
     flight: Phaser.GameObjects.Container,
-    faceObjects: Phaser.GameObjects.GameObject[],
+    createFace: () => Phaser.GameObjects.GameObject[],
     onComplete?: () => void,
   ): void {
     const inner = flight.getAt(0) as Phaser.GameObjects.Container;
@@ -972,7 +983,7 @@ export class ColorettoScene extends CardGameScene {
       ease: 'Power2',
       onComplete: () => {
         inner.removeAll(true);
-        inner.add(faceObjects);
+        inner.add(createFace());
         this.tweens.add({
           targets: flight,
           scaleX: 1,
