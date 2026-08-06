@@ -19,7 +19,6 @@ import {
   validateAction,
   executeAction,
   getCurrentPlayerIndex,
-  legalActions,
   isRoundOver,
   beginRoundScoring,
   scoreRound,
