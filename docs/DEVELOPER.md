@@ -444,12 +444,14 @@ replaced with the version string during the Vite transform phase (both dev serve
 and production builds).
 
 The version is displayed as `v<version>` (e.g. `v0.1.7`) in two locations:
-- The **GameSelectorScene** menu screen (bottom-left corner)
+- The **GameSelectorScene** menu screen (top-right corner, below the GitHub icon)
 - The **SettingsPanel** overlay (shown on the game canvas when the panel opens)
 
 Both use the shared factory `createVersionLabel()` from `src/ui/versionDisplay.ts`,
-which provides consistent styling (11px font, muted grey, 60% opacity, bottom-left
-positioning).
+which provides consistent styling (11px font, muted grey, 60% opacity). The default
+placement is the bottom-left corner; scenes may pass optional position and origin
+parameters to place the label elsewhere (e.g. the game selector passes top-right
+coordinates below the GitHub icon).
 
 ```typescript
 // src/ui/versionDisplay.ts provides the factory and style constants:
@@ -457,6 +459,9 @@ import { createVersionLabel, VERSION_LABEL_TEXT } from '@ui/versionDisplay';
 
 // Usage in a scene:
 createVersionLabel(this); // creates a non-interactive version label at bottom-left
+
+// GameSelectorScene: top-right, right-aligned below the GitHub icon:
+createVersionLabel(this, undefined, GAME_W - 10, 10 + 28 + 4, 1, 0);
 ```
 
 The version string can also be referenced directly in code as a `string`:
