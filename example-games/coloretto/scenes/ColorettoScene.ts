@@ -89,6 +89,20 @@ const CHIP_W = 20;
 const CHIP_H = 28;
 const CHIP_GAP = 26;
 const COLLECTION_STEP = 40;
+/** Vertical step between collection rows for 4-player games (the centred block is tall there). */
+const COLLECTION_STEP_4P = 36;
+/** Vertical step between collection rows for 5-player games (the centred block is tallest there). */
+const COLLECTION_STEP_5P = 30;
+/** Tight horizontal gap between a player's name text and their first colour chip. */
+const NAME_CHIP_GAP = 30;
+/** Gap between the last colour chip and the round-state marker (after the chips). */
+const ROUND_MARKER_GAP = 8;
+/**
+ * Mode-button offset below the collections block: half the button height
+ * (~18px) plus an 8px breathing gap, so the buttons stay clear of both the
+ * block and the instruction text for every player count.
+ */
+const MODE_BUTTON_OFFSET = 26;
 /** Total width of the three row card slots (used for slot X and click zones). */
 const ROW_TOTAL_WIDTH = 3 * CARD_W + 2 * ROW_CARD_GAP;
 /** Duration of a single take flyer tween. */
@@ -142,6 +156,13 @@ export class ColorettoScene extends CardGameScene {
 
   // Row click zones
   private rowZones: Phaser.GameObjects.Rectangle[] = [];
+
+  /**
+   * First colour-chip X per player, cached from the last refreshCollections()
+   * render (name right edge + NAME_CHIP_GAP). The take animation reuses this
+   * so flyers land exactly where the chips render.
+   */
+  private chipStartXByPlayer: number[] = [];
 
   // Overlay state
   overlayObjects: Phaser.GameObjects.GameObject[] = [];
@@ -403,17 +424,6 @@ export class ColorettoScene extends CardGameScene {
       const row = this.session.rows[i];
       const rowY = this.rowCenterY(i);
 
-      // Row label
-      this.rowsContainer.add(
-        this.add
-          .text(this.layout.rowsCenterX - CARD_W * 1.5 - 34, rowY, `R${i + 1}`, {
-            fontSize: '15px',
-            color: '#8fb8aa',
-            fontFamily: FONT_FAMILY,
-          })
-          .setOrigin(0.5),
-      );
-
       // Cards
       const cardSlots = 3;
       for (let slot = 0; slot < cardSlots; slot++) {
@@ -466,14 +476,58 @@ export class ColorettoScene extends CardGameScene {
     return this.layout.rowsCenterX - ROW_TOTAL_WIDTH / 2 + slotIndex * (CARD_W + ROW_CARD_GAP);
   }
 
-  /** X of the first collection chip (matches refreshCollections). */
-  private collectionChipStartX(): number {
-    return this.layout.collectionsTopX + 260;
+  /**
+   * Vertical step between collection rows: slightly tighter at 4- and
+   * 5-player counts so the centred block clears the tableau rows and the
+   * mode buttons / instruction text.
+   */
+  private collectionStep(): number {
+    const n = this.session.players.length;
+    if (n >= 5) return COLLECTION_STEP_5P;
+    if (n >= 4) return COLLECTION_STEP_4P;
+    return COLLECTION_STEP;
   }
 
-  /** Y of a player's collection row (matches refreshCollections). */
+  /** Height of the whole collections block (all player name rows + chips). */
+  private collectionBlockHeight(): number {
+    return (this.session.players.length - 1) * this.collectionStep() + CHIP_H;
+  }
+
+  /**
+   * Top Y of the collections block, vertically centred on the SLL
+   * collectionsArea centre anchor (collectionsCenterY).
+   */
+  private collectionBlockTopY(): number {
+    return this.layout.collectionsCenterY - this.collectionBlockHeight() / 2;
+  }
+
+  /** Bottom Y of the collections block (below the last player's chips). */
+  private collectionBlockBottomY(): number {
+    return this.collectionBlockTopY() + this.collectionBlockHeight();
+  }
+
+  /** X of the first collection chip (matches refreshCollections). */
+  private collectionChipStartX(playerIndex: number): number {
+    const cached = this.chipStartXByPlayer[playerIndex];
+    if (cached !== undefined) return cached;
+    // Defensive fallback before the first refreshCollections() render (the
+    // take animation always runs after a refresh, so this rarely triggers).
+    return this.layout.collectionsTopX + 100 + NAME_CHIP_GAP;
+  }
+
+  /** Y of a player's collection row (matches refreshCollections).
+   *
+   * The row lines are centred on collectionsCenterY so the chips (which
+   * extend CHIP_H/2 above and below each row) keep the whole block's
+   * visual centre exactly on the collections-area centre.
+   */
   private collectionRowY(playerIndex: number): number {
-    return this.layout.collectionsTopY + playerIndex * COLLECTION_STEP;
+    const n = this.session.players.length;
+    return (
+      this.layout.collectionsCenterY -
+      ((n - 1) * this.collectionStep()) / 2 +
+      playerIndex * this.collectionStep()
+    );
   }
 
   private createCard(x: number, y: number, card: ColorettoCard): Phaser.GameObjects.Container {
@@ -586,6 +640,7 @@ export class ColorettoScene extends CardGameScene {
 
   private refreshCollections(): void {
     this.collectionsContainer.removeAll(true);
+    this.chipStartXByPlayer = [];
 
     const currentIdx = getCurrentPlayerIndex(this.session);
 
@@ -606,9 +661,14 @@ export class ColorettoScene extends CardGameScene {
         .setOrigin(0, 0.5);
       this.collectionsContainer.add(name);
 
-      // Color chips
+      // Colour chips start a tight gap after the name's rendered right
+      // edge. The value is cached per player so the take animation lands
+      // its flyers exactly where the chips render.
+      const chipStartX = name.x + name.width + NAME_CHIP_GAP;
+      this.chipStartXByPlayer[i] = chipStartX;
+
       const counts = colorCounts(player.collection);
-      let chipX = this.collectionChipStartX();
+      let chipX = chipStartX;
       for (const color of presentColors(counts)) {
         const chip = this.add.rectangle(chipX, y, CHIP_W, CHIP_H, Phaser.Display.Color.HexStringToColor(colorHex(color)).color);
         this.collectionsContainer.add(chip);
@@ -625,19 +685,12 @@ export class ColorettoScene extends CardGameScene {
         chipX += CHIP_GAP;
       }
 
-      // Round-state marker
-      if (player.roundState === 'taken-row') {
+      // Round-state marker after the chips (kept clear of the tight
+      // name→chip gap).
+      if (player.roundState === 'taken-row' || player.roundState === 'final-turn-done') {
+        const markerText = player.roundState === 'taken-row' ? '(taken a row)' : '(done)';
         const done = this.add
-          .text(this.layout.collectionsTopX + 130, y, '(taken a row)', {
-            fontSize: '12px',
-            color: '#77998a',
-            fontFamily: FONT_FAMILY,
-          })
-          .setOrigin(0, 0.5);
-        this.collectionsContainer.add(done);
-      } else if (player.roundState === 'final-turn-done') {
-        const done = this.add
-          .text(this.layout.collectionsTopX + 130, y, '(done)', {
+          .text(chipX + ROUND_MARKER_GAP, y, markerText, {
             fontSize: '12px',
             color: '#77998a',
             fontFamily: FONT_FAMILY,
@@ -654,7 +707,9 @@ export class ColorettoScene extends CardGameScene {
     this.destroyModeButtons();
     if (this.phaseManager.current !== 'human-turn') return;
 
-    const y = this.layout.collectionsTopY + this.session.players.length * COLLECTION_STEP + 8;
+    // Track the block's bottom so the buttons stay clear of both the
+    // collections block and the instruction text for every player count.
+    const y = this.collectionBlockBottomY() + MODE_BUTTON_OFFSET;
     const placeX = GAME_W / 2 - 90;
     const takeX = GAME_W / 2 + 90;
 
@@ -811,7 +866,7 @@ export class ColorettoScene extends CardGameScene {
     // Block input and turn flow while the cards are flying.
     this.phaseManager.set('animating');
 
-    const destStartX = this.collectionChipStartX();
+    const destStartX = this.collectionChipStartX(playerIndex);
     const destY = this.collectionRowY(playerIndex);
 
     // Face-up card sprites: the row cards are always face-up, so the

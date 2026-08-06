@@ -22,6 +22,10 @@ const CARD_W = 58;
 const CARD_H = 78;
 const ROW_CARD_GAP = 10;
 const ROW_STEP_MAX = 92;
+const CHIP_W = 20;
+const CHIP_H = 28;
+/** Total width of the three row card slots (mirrors ROW_TOTAL_WIDTH). */
+const ROW_TOTAL_WIDTH = 3 * CARD_W + 2 * ROW_CARD_GAP;
 
 /** Round-score chip border colors (mirror colorHex('green') / colorHex('red')). */
 const ROUND_POS_STROKE = 0x3aa655;
@@ -132,6 +136,32 @@ function textsInContainer(container: Phaser.GameObjects.Container): string[] {
 /** Find a text object whose content includes the given substring. */
 function findText(scene: Phaser.Scene, fragment: string): Phaser.GameObjects.Text | undefined {
   return textObjects(scene).find((t) => t.text.includes(fragment));
+}
+
+/** Text contents that look like a removed tableau row label (R1, R2, ...). */
+function rowLabelTexts(scene: Phaser.Scene): string[] {
+  return texts(scene).filter((t) => /^R\d+$/.test(t.trim()));
+}
+
+/** Colour chips inside the collections container (Rectangles of CHIP_W×CHIP_H). */
+function collectionChipRectangles(scene: any): Phaser.GameObjects.Rectangle[] {
+  const result: Phaser.GameObjects.Rectangle[] = [];
+  const walk = (list: Phaser.GameObjects.GameObject[]) => {
+    for (const child of list) {
+      if (
+        child instanceof Phaser.GameObjects.Rectangle &&
+        child.width === CHIP_W &&
+        child.height === CHIP_H
+      ) {
+        result.push(child);
+      }
+      if (child instanceof Phaser.GameObjects.Container && (child as any).list) {
+        walk((child as any).list);
+      }
+    }
+  };
+  walk((scene.collectionsContainer as any).list ?? []);
+  return result;
 }
 
 /** Simulate a pointerdown on a text object. */
@@ -326,10 +356,9 @@ describe('ColorettoScene (browser)', () => {
     const allTexts = texts(scene);
     expect(allTexts.some((t) => t.includes('Round 1 of 5'))).toBe(true);
     expect(allTexts.some((t) => t.includes('Deck'))).toBe(true);
-    // 3 rows for a 3-player game are rendered as row labels R1..R3.
-    expect(allTexts.some((t) => t.includes('R1'))).toBe(true);
-    expect(allTexts.some((t) => t.includes('R2'))).toBe(true);
-    expect(allTexts.some((t) => t.includes('R3'))).toBe(true);
+    // Row labels R1..Rn were removed (layout polish work item); no label
+    // texts may render to the left of the tableau after game start.
+    expect(rowLabelTexts(scene)).toHaveLength(0);
   });
 
   it('starts a 2-player game with 7 rounds and 3 rows', async () => {
@@ -342,8 +371,9 @@ describe('ColorettoScene (browser)', () => {
 
     const allTexts = texts(scene);
     expect(allTexts.some((t) => t.includes('Round 1 of 7'))).toBe(true);
-    expect(allTexts.some((t) => t.includes('R1'))).toBe(true);
-    expect(allTexts.some((t) => t.includes('R3'))).toBe(true);
+    // 3 shared rows for a 2-player game; row labels R1..Rn no longer render.
+    expect((scene as any).session.rows).toHaveLength(3);
+    expect(rowLabelTexts(scene)).toHaveLength(0);
   });
 
 
@@ -841,4 +871,77 @@ describe('ColorettoScene (browser)', () => {
     );
     await waitForCondition(() => scene.flightCard === null);
   }, 15000);
+
+  it.each([2, 3, 4, 5])(
+    'centres the collections block, tightens the name→chip gap, clears the tableau, and omits row labels (%i players)',
+    async (count) => {
+      game = await bootGame();
+      const scene = game.scene.getScene('ColorettoScene') as any;
+      await waitFrames(10);
+      expect(clickText(scene, `${count} (${count - 1} AI)`)).toBe(true);
+      await waitFrames(10);
+      expect(scene.phaseManager.current).toBe('human-turn');
+
+      // Row labels R1..Rn no longer render after game start.
+      expect(rowLabelTexts(scene)).toHaveLength(0);
+
+      // Fresh games start with empty collections; seed a full 5-colour
+      // collection for the human so the chips render (and the rightmost
+      // chip is as far right as it ever gets).
+      scene.session.players[0].collection = ['red', 'yellow', 'green', 'blue', 'purple'].map(
+        (color, i) => ({ id: 900 + i, type: 'chameleon', color, count: 1 }),
+      );
+      scene.refreshCollections();
+
+      // The block of player rows (name + chips) is vertically centred on
+      // the collections-area centre (tolerance 2px).
+      const nameTexts = textObjects(scene).filter(
+        (t) => t.text.includes(' — ') && t.text.includes('pts'),
+      );
+      expect(nameTexts).toHaveLength(count);
+      const rowYs = nameTexts.map((n) => n.y);
+      const blockTop = Math.min(...rowYs) - CHIP_H / 2;
+      const blockBottom = Math.max(...rowYs) + CHIP_H / 2;
+      const blockCentre = (blockTop + blockBottom) / 2;
+      expect(Math.abs(blockCentre - scene.layout.collectionsCenterY)).toBeLessThanOrEqual(2);
+
+      // Tight name→chip gap: the whitespace between the name's rendered
+      // right edge and the first chip's left edge is ~20px (was ~260px).
+      const chips = collectionChipRectangles(scene);
+      expect(chips.length).toBeGreaterThanOrEqual(5); // the human holds 5 colours
+      const firstName = nameTexts[0];
+      const firstChip = chips.find((c) => Math.abs(c.y - firstName.y) < 1);
+      expect(firstChip).toBeDefined();
+      const nameRight = firstName.x + firstName.width;
+      const chipLeft = firstChip!.x - CHIP_W / 2;
+      const gap = chipLeft - nameRight;
+      expect(gap).toBeGreaterThanOrEqual(15);
+      expect(gap).toBeLessThanOrEqual(30);
+
+      // Even a full 5-colour collection's rightmost chip stays clear of
+      // the tableau's left edge (the tableau was shifted right).
+      const maxChipRight = Math.max(...chips.map((c) => c.x + CHIP_W / 2));
+      const tableauLeft = scene.layout.rowsCenterX - ROW_TOTAL_WIDTH / 2;
+      expect(maxChipRight).toBeLessThan(tableauLeft);
+
+      // The shifted tableau also stays clear of the Last Round resting
+      // card (its left edge is the closest neighbour on the right).
+      const tableauRight = scene.layout.rowsCenterX + ROW_TOTAL_WIDTH / 2;
+      const lastRoundLeft = scene.layout.lastRoundCenterX - CARD_W / 2;
+      expect(tableauRight).toBeLessThan(lastRoundLeft);
+
+      // Mode buttons track the block's bottom: below the block and clear
+      // of the instruction text.
+      const placeButton = findText(scene, 'Place card')!;
+      expect(placeButton).toBeDefined();
+      expect(placeButton.y - placeButton.height / 2).toBeGreaterThan(blockBottom);
+      const instruction = textObjects(scene).find(
+        (t) => Math.abs(t.y - scene.layout.instructionY) < 2,
+      )!;
+      expect(instruction).toBeDefined();
+      const instructionTop = instruction.y - instruction.height / 2;
+      expect(placeButton.y + placeButton.height / 2).toBeLessThan(instructionTop);
+      expect(blockBottom).toBeLessThan(instructionTop);
+    },
+  );
 });

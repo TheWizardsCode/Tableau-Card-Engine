@@ -37,7 +37,8 @@ export interface ColorettoLayout {
   lastRoundCenterX: number;
   lastRoundCenterY: number;
   collectionsTopX: number;
-  collectionsTopY: number;
+  /** Vertical centre of the collections block (names + colour chips). */
+  collectionsCenterY: number;
   instructionY: number;
 }
 
@@ -57,6 +58,7 @@ export function computeColorettoLayout(): ColorettoLayout {
   const deckLabel = anchorPoint(COLORETTO_SLL_LAYOUT, 'deckArea', 'labelCenter', viewport, 1);
   const lastRoundCenter = anchorPoint(COLORETTO_SLL_LAYOUT, 'lastRoundArea', 'center', viewport, 1);
   const collectionsTop = anchorPoint(COLORETTO_SLL_LAYOUT, 'collectionsArea', 'topLeft', viewport, 1);
+  const collectionsCenter = anchorPoint(COLORETTO_SLL_LAYOUT, 'collectionsArea', 'center', viewport, 1);
   const instruction = anchorPoint(COLORETTO_SLL_LAYOUT, 'instructionArea', 'center', viewport, 1);
 
   return {
@@ -73,7 +75,7 @@ export function computeColorettoLayout(): ColorettoLayout {
     lastRoundCenterX: Math.round(lastRoundCenter.x),
     lastRoundCenterY: Math.round(lastRoundCenter.y),
     collectionsTopX: Math.round(collectionsTop.x),
-    collectionsTopY: Math.round(collectionsTop.y),
+    collectionsCenterY: Math.round(collectionsCenter.y),
     instructionY: Math.round(instruction.y),
   };
 }

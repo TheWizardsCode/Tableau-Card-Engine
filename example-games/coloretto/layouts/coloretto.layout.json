@@ -27,12 +27,12 @@
     },
     "rowsArea": {
       "rect": {
-        "x": 0.04,
+        "x": 0.5,
         "y": 0.14
       },
       "anchors": {
-        "center": { "x": 0.4, "y": 0.42 },
-        "topLeft": { "x": 0.04, "y": 0.16 }
+        "center": { "x": 0.55, "y": 0.42 },
+        "topLeft": { "x": 0.5, "y": 0.16 }
       }
     },
     "deckArea": {
@@ -61,7 +61,7 @@
       },
       "anchors": {
         "topLeft": { "x": 0.015, "y": 0.6 },
-        "center": { "x": 0.5, "y": 0.8 }
+        "center": { "x": 0.5, "y": 0.78 }
       }
     },
     "instructionArea": {
