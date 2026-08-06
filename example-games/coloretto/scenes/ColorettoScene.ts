@@ -24,6 +24,7 @@ import type {
   ColorettoSession,
   ColorettoAction,
   RoundResult,
+  ActionResult,
 } from '../ColorettoGame';
 import {
   setupColorettoGame,
@@ -95,6 +96,11 @@ const TAKE_ANIM_DURATION = 450;
 /** Delay between consecutive take flyers (staggered departure). */
 const TAKE_ANIM_STAGGER = 90;
 
+/** Duration of the deck → destination movement in the place animation (ms). */
+const PLACE_MOVE_DURATION = 450;
+/** Duration of the face-up reveal flip in the place animation (ms). */
+const FLIP_DURATION = 350;
+
 const SFX_KEYS = {
   PLACE: 'place',
   TAKE: 'take',
@@ -118,6 +124,11 @@ export class ColorettoScene extends CardGameScene {
   rowsContainer!: Phaser.GameObjects.Container;
   collectionsContainer!: Phaser.GameObjects.Container;
   deckContainer!: Phaser.GameObjects.Container;
+  /** Holds the Last Round card resting marker between the tableau and deck. */
+  lastRoundContainer!: Phaser.GameObjects.Container;
+
+  /** In-flight card visual during the place animation (null when idle). */
+  flightCard: Phaser.GameObjects.Container | null = null;
 
   // UI text
   roundText!: Phaser.GameObjects.Text;
@@ -284,6 +295,7 @@ export class ColorettoScene extends CardGameScene {
     this.rowsContainer = this.add.container(0, 0);
     this.collectionsContainer = this.add.container(0, 0);
     this.deckContainer = this.add.container(0, 0);
+    this.lastRoundContainer = this.add.container(0, 0);
   }
 
   // ── Start overlay ────────────────────────────────────────
@@ -362,6 +374,7 @@ export class ColorettoScene extends CardGameScene {
     this.refreshDeck();
     this.refreshCollections();
     this.refreshRoundInfo();
+    this.refreshLastRoundCard();
     this.refreshModeButtons();
   }
 
@@ -406,10 +419,12 @@ export class ColorettoScene extends CardGameScene {
       for (let slot = 0; slot < cardSlots; slot++) {
         const cardX = this.rowSlotX(slot);
         const card = row.cards[slot];
-        if (card) {
+        if (card && card.type !== 'last-round') {
           this.rowsContainer.add(this.createCard(cardX, rowY, card));
         } else {
-          // Empty slot outline
+          // Empty slot outline. The Last Round card is omitted from its
+          // logical slot (visual-only, option A) and rendered at the resting
+          // position by refreshLastRoundCard().
           this.rowsContainer.add(
             this.add
               .rectangle(cardX, rowY, CARD_W, CARD_H, 0x22343c)
@@ -463,11 +478,15 @@ export class ColorettoScene extends CardGameScene {
 
   private createCard(x: number, y: number, card: ColorettoCard): Phaser.GameObjects.Container {
     const container = this.add.container(x, y);
+    container.add(this.createCardFace(card));
+    return container;
+  }
 
+  /** Build the display objects for a card face (card-local coordinates). */
+  private createCardFace(card: ColorettoCard): Phaser.GameObjects.GameObject[] {
     if (card.type === 'last-round') {
       const bg = this.add.rectangle(0, 0, CARD_W, CARD_H, 0x555555);
       bg.setStrokeStyle(2, 0xcccccc);
-      container.add(bg);
       const text = this.add
         .text(0, 0, 'LR', {
           fontSize: '22px',
@@ -475,17 +494,12 @@ export class ColorettoScene extends CardGameScene {
           fontFamily: FONT_FAMILY,
         })
         .setOrigin(0.5);
-      container.add(text);
-      return container;
+      return [bg, text];
     }
 
     const bg = this.add.rectangle(0, 0, CARD_W, CARD_H, 0x1b2a33);
     bg.setStrokeStyle(1, 0x4a6a7a);
-    container.add(bg);
-
     const colorRect = this.add.rectangle(0, -8, CARD_W - 8, CARD_H - 24, Phaser.Display.Color.HexStringToColor(colorHex(card.color)).color);
-    container.add(colorRect);
-
     const countText = this.add
       .text(0, 14, `${card.count}×`, {
         fontSize: '20px',
@@ -495,8 +509,6 @@ export class ColorettoScene extends CardGameScene {
         strokeThickness: 3,
       })
       .setOrigin(0.5);
-    container.add(countText);
-
     const nameText = this.add
       .text(0, 32, colorLabel(card.color), {
         fontSize: '10px',
@@ -506,9 +518,7 @@ export class ColorettoScene extends CardGameScene {
         strokeThickness: 2,
       })
       .setOrigin(0.5);
-    container.add(nameText);
-
-    return container;
+    return [bg, colorRect, countText, nameText];
   }
 
   // ── Deck rendering ───────────────────────────────────────
@@ -545,6 +555,30 @@ export class ColorettoScene extends CardGameScene {
         })
         .setOrigin(0.5);
       this.deckContainer.add(this.deckCountText);
+    }
+  }
+
+  /**
+   * Render the Last Round card at its resting position between the tableau
+   * and the deck (omitted from its logical row slot by refreshRows()).
+   */
+  private refreshLastRoundCard(): void {
+    this.lastRoundContainer.removeAll(true);
+    if (this.session.phase !== 'playing' || !this.session.lastRoundTriggered) return;
+    for (const row of this.session.rows) {
+      const lr = row.cards.find((c) => c.type === 'last-round');
+      if (lr) {
+        // createCard() positions the card's top-left at the given point, so
+        // offset by half the card size to centre on the resting anchor.
+        this.lastRoundContainer.add(
+          this.createCard(
+            this.layout.lastRoundCenterX - CARD_W / 2,
+            this.layout.lastRoundCenterY - CARD_H / 2,
+            lr,
+          ),
+        );
+        return;
+      }
     }
   }
 
@@ -725,33 +759,28 @@ export class ColorettoScene extends CardGameScene {
         playerIndex,
         action: 'place',
       });
+      // Animated placement (move-then-flip, or Last Round flip-on-deck then
+      // settle). The turn flow resumes when the animation completes.
+      this.animatePlace(action, result);
+    } else {
+      this.gameEvents.emit('card-swapped', {
+        position: action.rowIndex,
+        drawnFrom: 'stock',
+        playerIndex,
+      });
 
-      this.refreshAll();
-      if (result.roundOver) {
-        this.handleRoundOver();
-      } else {
-        this.runTurn();
-      }
-      return;
+      // Session state is already updated (row → collection, pure TS); the
+      // animation is a visual overlay replaying the captured start positions.
+      // The turn flow advances only after every card reaches the collection.
+      this.playTakeAnimation(playerIndex, action.rowIndex, takenCards, () => {
+        this.refreshAll();
+        if (result.roundOver) {
+          this.handleRoundOver();
+        } else {
+          this.runTurn();
+        }
+      });
     }
-
-    this.gameEvents.emit('card-swapped', {
-      position: action.rowIndex,
-      drawnFrom: 'stock',
-      playerIndex,
-    });
-
-    // Session state is already updated (row → collection, pure TS); the
-    // animation is a visual overlay replaying the captured start positions.
-    // The turn flow advances only after every card reaches the collection.
-    this.playTakeAnimation(playerIndex, action.rowIndex, takenCards, () => {
-      this.refreshAll();
-      if (result.roundOver) {
-        this.handleRoundOver();
-      } else {
-        this.runTurn();
-      }
-    });
   }
 
   // ── Take animation ──────────────────────────────────────
@@ -814,6 +843,144 @@ export class ColorettoScene extends CardGameScene {
           },
         });
       });
+    });
+  }
+
+  // ── Place animation ──────────────────────────────────────
+
+  /**
+   * Animate a place action: an in-flight card visual slides from the deck to
+   * the destination and flips face-up. The Last Round card flips face-up ON
+   * the deck first, then settles at the resting position between the tableau
+   * and the deck.
+   *
+   * The turn flow (refreshAll + runTurn / handleRoundOver) is deferred until
+   * the animation completes, and the board is gated behind the 'animating'
+   * phase so input is blocked while the card is in flight.
+   */
+  private animatePlace(action: ColorettoAction, result: ActionResult): void {
+    const drawnCard = result.drawnCard;
+
+    const finish = () => {
+      this.refreshAll();
+      if (result.roundOver) {
+        this.handleRoundOver();
+      } else {
+        this.runTurn();
+      }
+    };
+
+    if (this.reducedMotion || !drawnCard) {
+      // Reduced motion (or defensive fallback when no card was drawn):
+      // apply the placement instantly.
+      finish();
+      return;
+    }
+
+    this.phaseManager.set('animating');
+
+    const flight = this.createFlightCard();
+    flight.setPosition(this.layout.deckCenterX, this.layout.deckCenterY);
+    this.flightCard = flight;
+
+    const faceObjects = this.createCardFace(drawnCard);
+
+    if (drawnCard.type === 'last-round') {
+      // Last Round card: flip face-up ON the deck, then settle at the
+      // resting position between the tableau and the deck.
+      this.flipContainer(flight, faceObjects, () => {
+        moveGameObject({
+          scene: this,
+          target: flight,
+          destX: this.layout.lastRoundCenterX,
+          destY: this.layout.lastRoundCenterY,
+          duration: PLACE_MOVE_DURATION,
+          onComplete: () => {
+            flight.destroy();
+            this.flightCard = null;
+            finish();
+          },
+        });
+      });
+      return;
+    }
+
+    // Normal place: move to the destination row slot, then flip face-up.
+    const slotIndex = this.session.rows[action.rowIndex].cards.length - 1;
+    moveGameObject({
+      scene: this,
+      target: flight,
+      destX: this.rowSlotX(slotIndex) + CARD_W / 2,
+      destY: this.rowCenterY(action.rowIndex) + CARD_H / 2,
+      duration: PLACE_MOVE_DURATION,
+      onComplete: () => {
+        this.flipContainer(flight, faceObjects, () => {
+          flight.destroy();
+          this.flightCard = null;
+          finish();
+        });
+      },
+    });
+  }
+
+  /**
+   * Create the in-flight card visual used by the place animation: an outer
+   * container centred on the deck position holding a card-back face inside
+   * an inner container offset by (-CARD_W/2, -CARD_H/2) so that scaling the
+   * outer container flips around the card centre.
+   */
+  private createFlightCard(): Phaser.GameObjects.Container {
+    const flight = this.add.container(0, 0);
+    flight.setDepth(50);
+
+    const inner = this.add.container(-CARD_W / 2, -CARD_H / 2);
+    flight.add(inner);
+
+    const backBg = this.add.rectangle(0, 0, CARD_W, CARD_H, 0x2c3e50);
+    backBg.setStrokeStyle(2, 0x7f8c9d);
+    inner.add(backBg);
+
+    const mark = this.add
+      .text(0, 0, '?', {
+        fontSize: '30px',
+        color: '#ffffff',
+        fontFamily: FONT_FAMILY,
+      })
+      .setOrigin(0.5);
+    inner.add(mark);
+
+    return flight;
+  }
+
+  /**
+   * Container-compatible two-phase flip (scaleX → 0, swap face, scaleX → 1).
+   * Coloretto cards are Containers of rectangles + text rather than texture
+   * sprites, so the shared flipCard() helper (Image/Sprite only) cannot be
+   * used directly.
+   */
+  private flipContainer(
+    flight: Phaser.GameObjects.Container,
+    faceObjects: Phaser.GameObjects.GameObject[],
+    onComplete?: () => void,
+  ): void {
+    const inner = flight.getAt(0) as Phaser.GameObjects.Container;
+    const half = FLIP_DURATION / 2;
+    this.tweens.add({
+      targets: flight,
+      scaleX: 0,
+      duration: half,
+      ease: 'Power2',
+      onComplete: () => {
+        inner.removeAll(true);
+        inner.add(faceObjects);
+        this.tweens.add({
+          targets: flight,
+          scaleX: 1,
+          duration: half,
+          ease: 'Power2',
+          onComplete: () => onComplete?.(),
+        });
+      },
     });
   }
 

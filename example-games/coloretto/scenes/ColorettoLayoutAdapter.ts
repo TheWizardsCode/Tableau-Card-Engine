@@ -33,6 +33,9 @@ export interface ColorettoLayout {
   deckCenterX: number;
   deckCenterY: number;
   deckLabelY: number;
+  /** Centre of the Last Round card resting position (between tableau and deck). */
+  lastRoundCenterX: number;
+  lastRoundCenterY: number;
   collectionsTopX: number;
   collectionsTopY: number;
   instructionY: number;
@@ -52,6 +55,7 @@ export function computeColorettoLayout(): ColorettoLayout {
   const rowsCenter = anchorPoint(COLORETTO_SLL_LAYOUT, 'rowsArea', 'center', viewport, 1);
   const deckCenter = anchorPoint(COLORETTO_SLL_LAYOUT, 'deckArea', 'center', viewport, 1);
   const deckLabel = anchorPoint(COLORETTO_SLL_LAYOUT, 'deckArea', 'labelCenter', viewport, 1);
+  const lastRoundCenter = anchorPoint(COLORETTO_SLL_LAYOUT, 'lastRoundArea', 'center', viewport, 1);
   const collectionsTop = anchorPoint(COLORETTO_SLL_LAYOUT, 'collectionsArea', 'topLeft', viewport, 1);
   const instruction = anchorPoint(COLORETTO_SLL_LAYOUT, 'instructionArea', 'center', viewport, 1);
 
@@ -66,6 +70,8 @@ export function computeColorettoLayout(): ColorettoLayout {
     deckCenterX: Math.round(deckCenter.x),
     deckCenterY: Math.round(deckCenter.y),
     deckLabelY: Math.round(deckLabel.y),
+    lastRoundCenterX: Math.round(lastRoundCenter.x),
+    lastRoundCenterY: Math.round(lastRoundCenter.y),
     collectionsTopX: Math.round(collectionsTop.x),
     collectionsTopY: Math.round(collectionsTop.y),
     instructionY: Math.round(instruction.y),

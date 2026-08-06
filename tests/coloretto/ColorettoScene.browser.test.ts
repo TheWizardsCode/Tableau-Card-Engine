@@ -1,13 +1,30 @@
 /**
  * Coloretto browser tests -- boots the Phaser scene and verifies the
+/**
+ * Coloretto browser tests -- boots the Phaser scene and verifies the
  * start overlay and round start flow (acceptance criteria 5/6), plus
- * the positive-color picker chip lifecycle (CG-0MSHF32FY007SNCJ) and
- * the take-a-row fly animation (CG-0MSHFPC0J00155UN).
+ * the positive-color picker chip lifecycle (CG-0MSHF32FY007SNCJ), the
+ * take-a-row fly animation (CG-0MSHFPC0J00155UN), and the animated card
+ * placement: a normal place moves the card from the deck to the row slot
+ * and then flips it face-up, while the Last Round card flips face-up ON
+ * the deck and then settles at its resting position between the tableau
+ * and deck (CG-0MSHI9EAR008SVPD).
  */
 
 import { afterEach, describe, expect, it } from 'vitest';
 import Phaser from 'phaser';
 import { waitForScene } from '../helpers/waitForScene';
+import { createColorettoDeck } from '../../example-games/coloretto/ColorettoCards';
+
+// Visual constants mirrored from ColorettoScene (deliberately kept in
+// sync: the originals are module-private there).
+const CARD_W = 58;
+const CARD_H = 78;
+const ROW_CARD_GAP = 10;
+const ROW_STEP_MAX = 92;
+
+/** SettingsStore localStorage key for reduced motion. */
+const REDUCED_MOTION_KEY = 'tce-ui-reduced-motion';
 
 async function bootGame(): Promise<Phaser.Game> {
   let container = document.getElementById('game-container');
@@ -26,6 +43,7 @@ function destroyGame(game: Phaser.Game | null): void {
   if (game) game.destroy(true, false);
   const container = document.getElementById('game-container');
   if (container) container.remove();
+  localStorage.removeItem(REDUCED_MOTION_KEY);
 }
 
 function waitFrames(n: number): Promise<void> {
@@ -40,6 +58,24 @@ function waitFrames(n: number): Promise<void> {
       }
     };
     requestAnimationFrame(step);
+  });
+}
+
+/** Poll a predicate until it is true or the timeout elapses (16ms interval). */
+function waitForCondition(
+  predicate: () => boolean,
+  timeoutMs = 8000,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    const check = () => {
+      if (predicate()) return resolve();
+      if (Date.now() - start > timeoutMs) {
+        return reject(new Error('waitForCondition timed out'));
+      }
+      setTimeout(check, 16);
+    };
+    check();
   });
 }
 
@@ -74,6 +110,21 @@ function texts(scene: Phaser.Scene): string[] {
   return textObjects(scene).map((t) => t.text);
 }
 
+/** All text contents inside a single container subtree. */
+function textsInContainer(container: Phaser.GameObjects.Container): string[] {
+  const out: string[] = [];
+  const walk = (list: Phaser.GameObjects.GameObject[]) => {
+    for (const child of list) {
+      if (child instanceof Phaser.GameObjects.Text) out.push(child.text);
+      if (child instanceof Phaser.GameObjects.Container && (child as any).list) {
+        walk((child as any).list);
+      }
+    }
+  };
+  walk((container as any).list ?? []);
+  return out;
+}
+
 /** Find a text object whose content includes the given substring. */
 function findText(scene: Phaser.Scene, fragment: string): Phaser.GameObjects.Text | undefined {
   return textObjects(scene).find((t) => t.text.includes(fragment));
@@ -86,6 +137,7 @@ function clickText(scene: Phaser.Scene, fragment: string): boolean {
   obj.emit('pointerdown');
   return true;
 }
+
 
 /**
  * Interactive rectangles at depth 201 uniquely identify the positive-color
@@ -153,6 +205,43 @@ async function waitForPhase(scene: any, phase: string, timeoutMs = 5000): Promis
   );
 }
 
+/** Boot the game, start a 2-player game (you + 1 AI) and await the human turn. */
+async function startTwoPlayerGame(game: Phaser.Game): Promise<any> {
+  const scene = game.scene.getScene('ColorettoScene') as any;
+  await waitFrames(10);
+  expect(clickText(scene, '2 (1 AI)')).toBe(true);
+  await waitForCondition(() => scene.phaseManager?.current === 'human-turn');
+  return scene;
+}
+
+/** Execute a human place action on the given row. */
+function humanPlace(scene: any, rowIndex: number): void {
+  scene.actionMode = 'place';
+  scene.onRowClick(rowIndex);
+}
+
+/** Expected centre of a row slot in scene coordinates (mirrors rowSlotPosition). */
+function slotCenter(scene: any, rowIndex: number, slotIndex: number): { x: number; y: number } {
+  const rows = scene.session.rows.length;
+  const step = Math.min(ROW_STEP_MAX, Math.floor(360 / rows));
+  const startY = scene.layout.rowsCenterY - ((rows - 1) * step) / 2;
+  const rowY = startY + rowIndex * step;
+  const totalWidth = 3 * CARD_W + 2 * ROW_CARD_GAP;
+  const startX = scene.layout.rowsCenterX - totalWidth / 2;
+  const cardX = startX + slotIndex * (CARD_W + ROW_CARD_GAP);
+  return { x: cardX + CARD_W / 2, y: rowY + CARD_H / 2 };
+}
+
+/** True when the flight card has been flipped (its '?' back swapped for the card face). */
+function flightFaceShown(flight: any): boolean {
+  if (!flight) return false;
+  const inner = flight.getAt(0);
+  if (!inner || !inner.list) return false;
+  return inner.list.some(
+    (o: any) => o instanceof Phaser.GameObjects.Text && o.text !== '?',
+  );
+}
+
 describe('ColorettoScene (browser)', () => {
   let game: Phaser.Game | null = null;
 
@@ -204,6 +293,7 @@ describe('ColorettoScene (browser)', () => {
     expect(allTexts.some((t) => t.includes('R1'))).toBe(true);
     expect(allTexts.some((t) => t.includes('R3'))).toBe(true);
   });
+
 
   it('destroys positive-color picker chips on confirm so none leak into the next round', async () => {
     game = await bootGame();
@@ -366,4 +456,170 @@ describe('ColorettoScene (browser)', () => {
     await waitForPhase(scene, 'human-turn');
     expect(flyerContainers(scene)).toHaveLength(0);
   });
+
+
+  it('animates a human placement: card flies from the deck, moves to the row slot, then flips', async () => {
+    game = await bootGame();
+    const scene = await startTwoPlayerGame(game);
+    const deckX = scene.layout.deckCenterX;
+    const deckY = scene.layout.deckCenterY;
+    const dest = slotCenter(scene, 0, 0);
+
+    humanPlace(scene, 0);
+
+    // The turn is gated: the board enters the 'animating' phase and an
+    // in-flight card is created at the deck position.
+    expect(scene.phaseManager.current).toBe('animating');
+    expect(scene.flightCard).not.toBeNull();
+    expect(scene.flightCard.x).toBe(deckX);
+    expect(scene.flightCard.y).toBe(deckY);
+
+    // The card first moves to the destination row slot (move-then-flip):
+    // by the time the face is swapped in, the flight is at the slot centre.
+    await waitForCondition(
+      () =>
+        scene.flightCard &&
+        flightFaceShown(scene.flightCard) &&
+        Math.abs(scene.flightCard.x - dest.x) < 3 &&
+        Math.abs(scene.flightCard.y - dest.y) < 3,
+    );
+
+    // The flight is destroyed after the flip completes (the AI turn then
+    // begins, so the human's card is the only card in row 0 at this point).
+    await waitForCondition(() => scene.flightCard === null);
+    expect(scene.session.rows[0].cards.length).toBe(1);
+
+    // The turn continues: the AI thinks and then places; eventually the
+    // human turn is restored.
+    await waitForCondition(() => scene.phaseManager.current === 'human-turn');
+    expect(scene.flightCard).toBeNull();
+  }, 15000);
+
+  it('ignores row clicks while a placement animation is in flight', async () => {
+    game = await bootGame();
+    const scene = await startTwoPlayerGame(game);
+
+    humanPlace(scene, 0);
+    expect(scene.phaseManager.current).toBe('animating');
+
+    // The mode buttons disappear while the board is gated.
+    expect(scene.placeButton).toBeNull();
+
+    // A row click during the animation must be ignored.
+    scene.onRowClick(1);
+    expect(scene.session.rows[1].cards.length).toBe(0);
+
+    // When the animation completes (before the AI acts), only the human's
+    // card has been placed and the ignored click left row 1 untouched.
+    await waitForCondition(() => scene.flightCard === null);
+    expect(scene.session.rows[0].cards.length).toBe(1);
+    expect(scene.session.rows[1].cards.length).toBe(0);
+  }, 15000);
+
+  it('animates an AI placement and resumes the human turn', async () => {
+    game = await bootGame();
+    const scene = await startTwoPlayerGame(game);
+
+    humanPlace(scene, 0);
+
+    // Human placement completes and the AI turn begins.
+    await waitForCondition(() => scene.phaseManager.current === 'ai-thinking');
+
+    // The AI placement runs through the same animation pipeline.
+    await waitForCondition(
+      () => scene.phaseManager.current === 'animating' && scene.flightCard !== null,
+    );
+    expect(scene.flightCard.x).toBe(scene.layout.deckCenterX);
+
+    await waitForCondition(
+      () => scene.flightCard === null && scene.phaseManager.current === 'human-turn',
+    );
+    // Two placements happened in total: the human's and the AI's (the AI
+    // may pick any non-full row).
+    const totalCards = [0, 1, 2].reduce(
+      (sum, i) => sum + scene.session.rows[i].cards.length,
+      0,
+    );
+    expect(totalCards).toBe(2);
+    expect(scene.session.currentTurnIndex).toBe(0);
+  }, 15000);
+
+  it('applies placements instantly when reduced motion is enabled', async () => {
+    localStorage.setItem(REDUCED_MOTION_KEY, 'true');
+    game = await bootGame();
+    const scene = await startTwoPlayerGame(game);
+    expect(scene.reducedMotion).toBe(true);
+
+    humanPlace(scene, 0);
+
+    // No in-flight card is created and the turn advances synchronously.
+    expect(scene.flightCard).toBeNull();
+    expect(scene.phaseManager.current).toBe('ai-thinking');
+
+    await waitForCondition(() => scene.phaseManager.current === 'human-turn');
+    expect(scene.session.rows[0].cards.length).toBe(1);
+    expect(scene.flightCard).toBeNull();
+  }, 15000);
+
+  it('Last Round card: flips on the deck, settles at the resting position, and is omitted from its slot', async () => {
+    game = await bootGame();
+    const scene = await startTwoPlayerGame(game);
+
+    // Force the human's next draw to be the Last Round card, leaving one
+    // chameleon card so the AI can still take its final turn.
+    const cards = createColorettoDeck();
+    const lr = cards.find((c) => c.type === 'last-round')!;
+    const chameleon = cards.find((c) => c.type === 'chameleon')!;
+    scene.session.deck = [chameleon, lr];
+
+    humanPlace(scene, 0);
+
+    // Gated animation starts with the flight on the deck.
+    expect(scene.phaseManager.current).toBe('animating');
+    expect(scene.flightCard).not.toBeNull();
+    expect(scene.flightCard.x).toBe(scene.layout.deckCenterX);
+    expect(scene.flightCard.y).toBe(scene.layout.deckCenterY);
+
+    // The Last Round card flips face-up ON the deck...
+    await waitForCondition(
+      () =>
+        scene.flightCard &&
+        flightFaceShown(scene.flightCard) &&
+        Math.abs(scene.flightCard.x - scene.layout.deckCenterX) < 3 &&
+        Math.abs(scene.flightCard.y - scene.layout.deckCenterY) < 3,
+    );
+
+    // ...then settles at the resting position between the tableau and deck.
+    await waitForCondition(
+      () =>
+        scene.flightCard &&
+        flightFaceShown(scene.flightCard) &&
+        Math.abs(scene.flightCard.x - scene.layout.lastRoundCenterX) < 3 &&
+        Math.abs(scene.flightCard.y - scene.layout.lastRoundCenterY) < 3,
+    );
+
+    await waitForCondition(() => scene.flightCard === null);
+    expect(scene.session.lastRoundTriggered).toBe(true);
+    expect(scene.session.rows[0].cards[0].type).toBe('last-round');
+    // The human's placement was their final turn; the AI (still active)
+    // gets one more animated turn.
+    expect(scene.phaseManager.current).toBe('ai-thinking');
+
+    // Rendered state while the round is still in play: exactly one 'LR'
+    // face in the scene, at the resting position (the row slot renders an
+    // empty outline instead).
+    expect(scene.lastRoundContainer.list.length).toBe(1);
+    const resting = scene.lastRoundContainer.list[0];
+    expect(resting.x).toBe(scene.layout.lastRoundCenterX - CARD_W / 2);
+    expect(resting.y).toBe(scene.layout.lastRoundCenterY - CARD_H / 2);
+    expect(textsInContainer(scene.rowsContainer)).not.toContain('LR');
+    const lrTexts = textObjects(scene).filter((t) => t.text === 'LR');
+    expect(lrTexts.length).toBe(1);
+
+    // The AI's final turn is also animated; the round then ends.
+    await waitForCondition(
+      () => scene.phaseManager.current === 'animating' && scene.flightCard !== null,
+    );
+    await waitForCondition(() => scene.flightCard === null);
+  }, 15000);
 });

@@ -9,6 +9,7 @@
     "header",
     "rowsArea",
     "deckArea",
+    "lastRoundArea",
     "collectionsArea",
     "instructionArea"
   ],
@@ -42,6 +43,15 @@
       "anchors": {
         "center": { "x": 0.92, "y": 0.3 },
         "labelCenter": { "x": 0.92, "y": 0.44 }
+      }
+    },
+    "lastRoundArea": {
+      "rect": {
+        "x": 0.55,
+        "y": 0.12
+      },
+      "anchors": {
+        "center": { "x": 0.75, "y": 0.3 }
       }
     },
     "collectionsArea": {
