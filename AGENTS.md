@@ -290,7 +290,15 @@ Use `SaveLoadStore`, `serializeWithVersion()`, and `deserializeWithVersion()` fr
 
 ### 8. Event-Driven Audio and Visual Feedback
 
-Use `SoundManager`, `GameEventEmitter`, and `EventSoundMapping` from `@core-engine` for game audio. Combine with `popTextOrIcon()`, particle effects, and tint/shake animations for multi-modal feedback.
+**Requirement:** Every player **and** AI action that uses a core engine animation/feedback helper — `dealCard`, `discardCard`, `flipCard`, `placeCard`, `moveGameObject`, `shakeIllegalMove`, `popTextOrIcon`, and any future helpers — **must** be rendered with the corresponding animation and wired with a sound effect (SFX), so the action is both animated and audible. Satisfy both via each helper's `soundManager` + `sfx` (`start`/`move`/`end`) parameters, or an equivalent event-driven `GameEventEmitter`/`SoundManager` mapping. SFX keys must follow the shared convention — `COMMON_SFX_KEYS` from `src/core-engine/SoundManager.ts` with the `sfx-` prefix per `docs/SFX_CONVENTION.md`; no game-scoped string literals. (`shakeIllegalMove` plays `COMMON_SFX_KEYS.ILLEGAL_MOVE` automatically; `popTextOrIcon()` is the lightweight score/notification popup.)
+
+**AI actions:** AI turns must be animated with a brief delay so the player can see and hear what the AI did (e.g. card placement / row take). Coloretto is the in-repo precedent — `example-games/coloretto/scenes/ColorettoScene.ts` runs AI turns via `time.delayedCall` (750ms, 150ms under reduced motion) then executes the AI's action through the same animated/sounded path as a human turn.
+
+**Accessibility preserved:** Reduced-motion preferences (explicit flag → SettingsStore toggle → `prefers-reduced-motion`) and the settings-panel mute/volume controls must be respected — pass the helper's `reducedMotion` flag and play SFX through `SoundManager` (or `safePlaySound()`); this rule reinforces, never weakens, that behaviour.
+
+**Documented exceptions:** Actions that legitimately have no visible or audible effect, and headless/replay/test/transcript modes (no rendering or audio), are exempt — but the exemption must be documented in code comments and/or the scene's help text.
+
+**Compliant references (not modified):** Golf's `GolfAnimator` (`example-games/golf/scenes/GolfAnimator.ts`) wires `soundManager` + `sfx` into its deal/discard/flip helpers; Coloretto animates AI turns with a short delay (above); Blackjack preserves flip-sound timing and a delayed dealer-AI run (`example-games/blackjack/scenes/BlackjackScene.ts`). New example games must follow these patterns.
 
 - **Gym scene:** `GymAudioFeedbackScene` — `example-games/gym/scenes/GymAudioFeedbackScene.ts`
 - **Key APIs:** `SoundManager`, `GameEventEmitter`, `EventSoundMapping`, `popTextOrIcon()`, particle emitters

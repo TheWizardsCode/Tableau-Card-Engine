@@ -13,6 +13,7 @@ This document covers everything you need to develop, test, and build the Tableau
 - [Path Aliases](#path-aliases)
 - [Adding an Example Game](#adding-an-example-game)
 - [Hand & Pile Rendering](#hand--pile-rendering)
+- [Animation & Sound Feedback for Player and AI Actions](#animation--sound-feedback-for-player-and-ai-actions)
 - [Example Games](#example-games)
 - [Transcript Persistence](#transcript-persistence)
 - [Replay Tool](#replay-tool)
@@ -577,6 +578,20 @@ Follow the Golf (original reference) and Sushi Go (most recent) examples as refe
 **Canonical reference:** `example-games/blackjack/scenes/BlackjackScene.ts` — migrated to two SLL-anchored `HandView` instances with `centerX` row anchoring and a `flipCard()`-based hole-card reveal; its browser tests (`tests/blackjack/BlackjackHandView.browser.test.ts`) verify the rendering path.
 
 For non-standard card models (tokens, resource icons, expedition cards), use the `CardTextureResolver` / `renderCard` callbacks documented in the [UI Adapter Guide](ui/ADAPTER-GUIDE.md). See the [Gym scene index](gym/GYM_INDEX.md) for the complete HandView/PileView scene-to-API mapping.
+
+## Animation & Sound Feedback for Player and AI Actions
+
+**Requirement:** Every player **and** AI action that uses a core engine animation/feedback helper — `dealCard`, `discardCard`, `flipCard`, `placeCard`, `moveGameObject`, `shakeIllegalMove`, `popTextOrIcon`, and any future helpers — must be rendered with the corresponding animation and wired with a sound effect (SFX), so the action is both animated and audible. Each helper accepts a `soundManager` + `sfx` (`start`/`move`/`end`) options map (see [UI Animation Helpers](ui-animations.md)); pass both so the action is never silent or instant by default. SFX keys must follow the shared `sfx-` prefix convention — `COMMON_SFX_KEYS` from `src/core-engine/SoundManager.ts`, detailed in [docs/SFX_CONVENTION.md](SFX_CONVENTION.md); no game-scoped string literals. (`shakeIllegalMove` plays `COMMON_SFX_KEYS.ILLEGAL_MOVE` automatically; `popTextOrIcon()` is the lightweight score/notification popup.)
+
+**AI actions:** AI turns must be animated with a brief delay so the player can see and hear what the AI did (e.g. card placement / row take). Coloretto is the in-repo precedent — `example-games/coloretto/scenes/ColorettoScene.ts` runs AI turns via `time.delayedCall` (750ms, 150ms under reduced motion) then executes the AI's action through the same animated/sounded path as a human turn.
+
+**Accessibility:** Reduced-motion preferences (explicit flag → SettingsStore toggle → `prefers-reduced-motion`; see the [Accessibility](ui-animations.md#accessibility) section of the animation helpers reference) and the settings-panel mute/volume controls must be respected — pass the helper's `reducedMotion` flag and play SFX through `SoundManager` (or `safePlaySound()` for overlay helpers) so mute and volume apply uniformly. This requirement reinforces, never weakens, accessibility behaviour.
+
+**Exceptions:** Actions that legitimately have no visible or audible effect, and headless/replay/test/transcript modes (no rendering or audio), are exempt. Document any exemption in code comments and/or the scene's help text.
+
+**Compliant references:** Golf's `GolfAnimator` (`example-games/golf/scenes/GolfAnimator.ts`) wires `soundManager` + `sfx` into its deal/discard/flip helpers; Coloretto animates and sounds AI turns (above); Blackjack preserves flip-sound timing and runs the dealer AI on a delay (`example-games/blackjack/scenes/BlackjackScene.ts`). New games should follow these patterns.
+
+Gym reference scenes: [`GymAudioFeedbackScene`](../example-games/gym/scenes/GymAudioFeedbackScene.ts) (event-driven audio, mute/volume, pop text/icon) and [`GymHandPileScene`](../example-games/gym/scenes/GymHandPileScene.ts) (animated deal/discard/flip with SFX hooks). See the [Gym scene index](gym/GYM_INDEX.md) for the scene-to-API mapping.
 
 ## Example Games
 
