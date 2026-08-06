@@ -23,6 +23,10 @@ const CARD_H = 78;
 const ROW_CARD_GAP = 10;
 const ROW_STEP_MAX = 92;
 
+/** Round-score chip border colors (mirror colorHex('green') / colorHex('red')). */
+const ROUND_POS_STROKE = 0x3aa655;
+const ROUND_NEG_STROKE = 0xe04444;
+
 /** SettingsStore localStorage key for reduced motion. */
 const REDUCED_MOTION_KEY = 'tce-ui-reduced-motion';
 
@@ -160,6 +164,33 @@ function pickerChipRectangles(
         child instanceof Phaser.GameObjects.Rectangle &&
         child.depth === 201 &&
         Boolean((child as any).input)
+      ) {
+        result.push(child);
+      }
+      if (child instanceof Phaser.GameObjects.Container && (child as any).list) {
+        walk((child as any).list);
+      }
+    }
+  };
+  walk(scene.children.list);
+  return result;
+}
+
+/**
+ * Round-score overlay chips: small coloured rectangles at depth 201 with a
+ * colour-coded border (green = positive group, red = negative group).
+ * Non-interactive, so they never collide with `pickerChipRectangles()`
+ * (which requires an input handler).
+ */
+function roundScoreChips(scene: Phaser.Scene): Phaser.GameObjects.Rectangle[] {
+  const result: Phaser.GameObjects.Rectangle[] = [];
+  const walk = (parent: Phaser.GameObjects.GameObject[]) => {
+    for (const child of parent) {
+      if (
+        child instanceof Phaser.GameObjects.Rectangle &&
+        child.depth === 201 &&
+        child.isStroked &&
+        (child.strokeColor === ROUND_POS_STROKE || child.strokeColor === ROUND_NEG_STROKE)
       ) {
         result.push(child);
       }
@@ -424,13 +455,70 @@ describe('ColorettoScene (browser)', () => {
     expect(clickText(scene, 'Confirm')).toBe(true);
     await waitFrames(10);
 
-    // Round-score overlay shows the per-color breakdown with the negative:
-    // red was not chosen as positive, so it scores against the player.
+    // Round-score overlay shows the per-colour breakdown as chips: the
+    // positive group (green borders) renders before the negative group
+    // (red borders). Red was not chosen as positive, so it scores against
+    // the player.
     expect(findText(scene, 'Round 1 Scores')).toBeDefined();
-    expect(findText(scene, '−Red 1')).toBeDefined();
-    expect(findText(scene, '+Yellow 1')).toBeDefined();
+    const scoreChips = roundScoreChips(scene);
+    expect(scoreChips).toHaveLength(4);
+    expect(scoreChips.filter((c) => c.strokeColor === ROUND_POS_STROKE)).toHaveLength(3);
+    expect(scoreChips.filter((c) => c.strokeColor === ROUND_NEG_STROKE)).toHaveLength(1);
+    // Chip labels carry the +/− sign markers.
+    expect(countPtsLabels('+1')).toBe(3);
+    expect(countPtsLabels('−1')).toBe(1);
     // 1 + 1 + 1 (yellow, green, blue) − 1 (red) = 2.
     expect(findText(scene, '+2 (total 2)')).toBeDefined();
+  });
+
+  it('renders the round-score chips for all 7 colours without overlapping the score', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('ColorettoScene') as any;
+
+    await waitFrames(10);
+    expect(clickText(scene, '2 (1 AI)')).toBe(true);
+    await waitFrames(10);
+
+    // Human holds one card in every colour: the 3 optimal positives
+    // (red, yellow, green) and 4 negatives.
+    const session = scene.session;
+    session.players[0].collection = [
+      { id: 901, type: 'chameleon', color: 'red', count: 1 },
+      { id: 902, type: 'chameleon', color: 'yellow', count: 1 },
+      { id: 903, type: 'chameleon', color: 'green', count: 1 },
+      { id: 904, type: 'chameleon', color: 'blue', count: 1 },
+      { id: 905, type: 'chameleon', color: 'purple', count: 1 },
+      { id: 906, type: 'chameleon', color: 'orange', count: 1 },
+      { id: 907, type: 'chameleon', color: 'brown', count: 1 },
+    ];
+    session.players[0].roundState = 'taken-row';
+    session.players[1].roundState = 'taken-row';
+    scene.handleRoundOver();
+    await waitFrames(10);
+
+    expect(findText(scene, 'Choose 3 colors to score POSITIVELY')).toBeDefined();
+    expect(clickText(scene, 'Confirm')).toBe(true);
+    await waitFrames(10);
+
+    // All 7 colours render as chips: 3 positives (green border) then 4
+    // negatives (red border).
+    expect(findText(scene, 'Round 1 Scores')).toBeDefined();
+    const scoreChips = roundScoreChips(scene);
+    expect(scoreChips).toHaveLength(7);
+    expect(scoreChips.filter((c) => c.strokeColor === ROUND_POS_STROKE)).toHaveLength(3);
+    expect(scoreChips.filter((c) => c.strokeColor === ROUND_NEG_STROKE)).toHaveLength(4);
+
+    // The positive group renders left of the negative group (gap between).
+    const posMaxX = Math.max(...scoreChips.filter((c) => c.strokeColor === ROUND_POS_STROKE).map((c) => c.x));
+    const negMinX = Math.min(...scoreChips.filter((c) => c.strokeColor === ROUND_NEG_STROKE).map((c) => c.x));
+    expect(posMaxX).toBeLessThan(negMinX);
+
+    // The rightmost chip stays clear of the right-aligned round score
+    // (3 − 4 = −1, rendered as "-1 (total -1)").
+    const rightmost = Math.max(...scoreChips.map((c) => c.x + c.width / 2));
+    const scoreText = findText(scene, '-1 (total -1)');
+    expect(scoreText).toBeDefined();
+    expect(rightmost).toBeLessThan(scoreText!.x - scoreText!.width / 2);
   });
 
   it('animates taken row cards into the collector collection on a take', async () => {

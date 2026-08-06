@@ -1189,11 +1189,6 @@ export class ColorettoScene extends CardGameScene {
     result.playerScores.forEach((score, i) => {
       const y = boxY - 110 + i * 52;
       const player = this.session.players[i];
-      // Per-color breakdown with negatives: +Red 6  −Green 6 (unselected
-      // colors count against the player, so their points are negative).
-      const breakdown = score.details
-        .map((d) => `${d.positive ? '+' : '−'}${colorLabel(d.color)} ${Math.abs(d.points)}`)
-        .join('  ');
       const name = this.add
         .text(centerX - 250, y, `${player.name}:`, {
           fontSize: '17px',
@@ -1205,16 +1200,50 @@ export class ColorettoScene extends CardGameScene {
       if (this.hudContainer) this.hudContainer.add(name);
       this.overlayObjects.push(name);
 
-      const detail = this.add
-        .text(centerX - 120, y, breakdown, {
-          fontSize: '14px',
-          color: '#aad8c0',
-          fontFamily: FONT_FAMILY,
-        })
-        .setOrigin(0, 0.5)
-        .setDepth(201);
-      if (this.hudContainer) this.hudContainer.add(detail);
-      this.overlayObjects.push(detail);
+      // Per-colour breakdown rendered as chips (reusing the in-hand
+      // collection chip size and colorHex() fill). Positive colours come
+      // first, then a gap, then negative colours; each chip shows the
+      // signed points value and a colour-coded border (green = positive,
+      // red = negative) so the groups are identifiable at a glance.
+      const positiveStroke = Phaser.Display.Color.HexStringToColor(colorHex('green')).color;
+      const negativeStroke = Phaser.Display.Color.HexStringToColor(colorHex('red')).color;
+      let chipX = centerX - 150;
+      for (const group of [
+        score.details.filter((d) => d.positive),
+        score.details.filter((d) => !d.positive),
+      ]) {
+        for (const d of group) {
+          const chip = this.add
+            .rectangle(
+              chipX,
+              y,
+              CHIP_W,
+              CHIP_H,
+              Phaser.Display.Color.HexStringToColor(colorHex(d.color)).color,
+            )
+            .setStrokeStyle(2, d.positive ? positiveStroke : negativeStroke)
+            .setDepth(201);
+          if (this.hudContainer) this.hudContainer.add(chip);
+          this.overlayObjects.push(chip);
+
+          const label = this.add
+            .text(chipX, y, `${d.positive ? '+' : '−'}${Math.abs(d.points)}`, {
+              fontSize: '11px',
+              color: '#ffffff',
+              fontFamily: FONT_FAMILY,
+              stroke: '#000000',
+              strokeThickness: 2,
+            })
+            .setOrigin(0.5)
+            .setDepth(201);
+          if (this.hudContainer) this.hudContainer.add(label);
+          this.overlayObjects.push(label);
+
+          chipX += CHIP_GAP;
+        }
+        // Visual gap between the positive and negative groups.
+        chipX += 16;
+      }
 
       const roundScore = result.roundScores[i];
       const scoreText = this.add
