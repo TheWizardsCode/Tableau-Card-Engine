@@ -9,7 +9,9 @@
  *   - The canonical round count is played for the player count.
  *   - Cumulative totals equal the sum of round scores.
  *   - The winner is the player with the highest cumulative score.
- *   - All 43 deck cards are always accounted for (deck + rows + collections).
+ *   - Within each round, all 43 deck cards are accounted for
+ *     (deck + rows + cards taken during that round).
+ *   - Player collections persist across rounds (monotonic growth).
  */
 
 import { describe, it, expect } from 'vitest';
@@ -29,14 +31,9 @@ import type { ColorettoSession, ColorettoAction } from '../../example-games/colo
 import { ColorettoAiPlayer, RandomStrategy, HeuristicStrategy } from '../../example-games/coloretto/ColorettoAis';
 import { DECK_SIZE } from '../../example-games/coloretto/ColorettoCards';
 
-/** Total cards currently on the table (deck + rows + all collections). */
-function cardsInPlay(session: ColorettoSession): number {
-  const rowCards = session.rows.reduce((sum, row) => sum + row.cards.length, 0);
-  const collections = session.players.reduce(
-    (sum, p) => sum + p.collection.length,
-    0,
-  );
-  return session.deck.length + rowCards + collections;
+/** Sum of all collection sizes across players. */
+function collectionTotal(session: ColorettoSession): number {
+  return session.players.reduce((sum, p) => sum + p.collection.length, 0);
 }
 
 /**
@@ -63,6 +60,9 @@ function simulateGame(
   const actionsTaken: string[] = [];
 
   while (!isGameOver(session) && roundsPlayed < 20) {
+    // Collections persist across rounds, so each round starts with the
+    // cards taken in all previous rounds already in players' collections.
+    const collectionAtRoundStart = collectionTotal(session);
     let guard = 0;
     while (!isRoundOver(session) && guard < 200) {
       const playerIndex = getCurrentPlayerIndex(session);
@@ -71,6 +71,13 @@ function simulateGame(
       expect(validation.legal).toBe(true);
       executeAction(session, playerIndex, action);
       actionsTaken.push(`${playerIndex}:${action.type}:${action.rowIndex}`);
+
+      // Per-round card conservation: the fresh 43-card deck is the only
+      // source of cards this round; cards taken this round sit in
+      // collections while the rest remain on the table (deck + rows).
+      const rowCards = session.rows.reduce((sum, row) => sum + row.cards.length, 0);
+      const takenThisRound = collectionTotal(session) - collectionAtRoundStart;
+      expect(session.deck.length + rowCards + takenThisRound).toBe(DECK_SIZE);
       guard++;
     }
     expect(isRoundOver(session)).toBe(true);
@@ -84,8 +91,9 @@ function simulateGame(
         session.players[i].roundScores.reduce((a, b) => a + b, 0),
       );
     }
-    // All cards always accounted for (checked at every round boundary).
-    expect(cardsInPlay(session)).toBe(DECK_SIZE);
+    // Collections persist across rounds: nothing is cleared at a round
+    // boundary (this is what makes negative color scoring possible).
+    expect(collectionTotal(session)).toBeGreaterThanOrEqual(collectionAtRoundStart);
   }
 
   expect(isGameOver(session)).toBe(true);

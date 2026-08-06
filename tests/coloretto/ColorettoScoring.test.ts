@@ -129,6 +129,23 @@ describe('ColorettoScoring', () => {
       expect(blue?.points).toBe(-1);
       expect(result.total).toBe(1 - 1);
     });
+
+    it('produces a negative round total when an unselected strong color outweighs the positives', () => {
+      // A player who accumulated cards in 4 colors (only possible once
+      // collections persist across rounds): 1 card each of red/yellow/green
+      // and 6 brown (21 pts). Choosing the 3 weak colors positively leaves
+      // brown scoring −21 → a negative round score.
+      const collection = [
+        chN('red', 1, 0), chN('yellow', 1, 1), chN('green', 1, 2),
+        chN('brown', 2, 3), chN('brown', 2, 4), chN('brown', 2, 5),
+      ];
+      const result = scorePlayerRound(collection, ['red', 'yellow', 'green']);
+      const brown = result.details.find((d) => d.color === 'brown');
+      expect(brown?.positive).toBe(false);
+      expect(brown?.points).toBe(-21);
+      expect(result.total).toBe(1 + 1 + 1 - 21); // -18
+      expect(result.total).toBeLessThan(0);
+    });
   });
 
   describe('selectBestPositiveColors', () => {

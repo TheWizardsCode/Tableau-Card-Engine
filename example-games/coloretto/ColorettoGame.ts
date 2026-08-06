@@ -12,7 +12,10 @@
  *      has not yet taken a row gets exactly one final turn, then the
  *      round ends.
  *   4. Each round is scored (3 colors positive, rest negative) and
- *      scores accumulate across rounds. Highest total wins.
+ *      scores accumulate across rounds. Player collections also
+ *      accumulate across rounds, so once a player holds cards in more
+ *      than 3 colors some of their colors score negatively. Highest
+ *      total wins.
  *
  * Pure TypeScript -- no Phaser dependencies (pattern from Sushi Go!).
  */
@@ -42,7 +45,7 @@ export type ColorettoRoundState = 'active' | 'taken-row' | 'final-turn-done';
 export interface ColorettoPlayerState {
   readonly name: string;
   readonly isAI: boolean;
-  /** Cards collected from taken rows this round. */
+  /** Cards collected from taken rows, accumulated across ALL rounds. */
   collection: ColorettoCard[];
   /** Whether the player still acts this round. */
   roundState: ColorettoRoundState;
@@ -158,7 +161,9 @@ export function setupColorettoGame(
 
 /**
  * Deal the current round: fresh shuffled deck, empty rows, reset
- * player round participation and collections.
+ * player round participation. Player collections are NOT cleared --
+ * per canonical Coloretto rules they accumulate for the whole game,
+ * which is what makes negative color scoring possible from round 2.
  */
 export function dealRound(session: ColorettoSession): void {
   const deck = createColorettoDeck();
@@ -174,7 +179,6 @@ export function dealRound(session: ColorettoSession): void {
   session.phase = 'playing';
 
   for (const player of session.players) {
-    player.collection = [];
     player.roundState = 'active';
   }
 }

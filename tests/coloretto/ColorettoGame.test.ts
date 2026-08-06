@@ -378,6 +378,95 @@ describe('ColorettoGame', () => {
     });
   });
 
+  describe('collection persistence and negative scoring across rounds', () => {
+    /**
+     * Play round 1 of a 2-player game with a crafted deck so that player 0
+     * takes a row of exactly 3 different colors (red, yellow, green) and
+     * player 1 takes a 2-card row. Deck pop order is last-element-first:
+     * deck = [A,B,C,D,E] pops E, D, C, B, A in turn.
+     */
+    function playDeterministicRound1(session: ColorettoSession): void {
+      session.deck = [
+        ch('purple', 1, 90), ch('purple', 1, 91), // never drawn (round ends first)
+        ch('green', 1, 1),  // 5th pop → row 0 third slot
+        ch('purple', 1, 2), // 4th pop → row 1 second slot
+        ch('yellow', 1, 3), // 3rd pop → row 0 second slot
+        ch('purple', 1, 4), // 2nd pop → row 1 first slot
+        ch('red', 1, 5),    // 1st pop → row 0 first slot
+      ];
+      executeAction(session, 0, { type: 'place', rowIndex: 0 });
+      executeAction(session, 1, { type: 'place', rowIndex: 1 });
+      executeAction(session, 0, { type: 'place', rowIndex: 0 });
+      executeAction(session, 1, { type: 'place', rowIndex: 1 });
+      executeAction(session, 0, { type: 'place', rowIndex: 0 });
+      executeAction(session, 1, { type: 'take', rowIndex: 1 });
+      executeAction(session, 0, { type: 'take', rowIndex: 0 });
+      expect(isRoundOver(session)).toBe(true);
+    }
+
+    it('keeps player collections across rounds (dealRound does not clear them)', () => {
+      const session = setupColorettoGame({ playerCount: 2, rng: makeRng() });
+      playDeterministicRound1(session);
+
+      const round1Collection = [...session.players[0].collection];
+      expect(
+        round1Collection.filter((c) => c.type === 'chameleon').map((c) => c.color),
+      ).toEqual(['red', 'yellow', 'green']);
+
+      beginRoundScoring(session);
+      scoreRound(session); // non-final round → deals round 2
+      expect(session.currentRound).toBe(1);
+
+      // The fix: collections survive dealRound, so round 2 starts with the
+      // cards the player collected in round 1.
+      expect(session.players[0].collection).toEqual(round1Collection);
+      expect(session.players[0].roundScores).toEqual([3]); // all 3 colors positive
+    });
+
+    it('scores colors not chosen as positive negatively once a player holds 4+ colors', () => {
+      const session = setupColorettoGame({ playerCount: 2, rng: makeRng() });
+      // Round 1: player 0 accumulates red, yellow, green (persists).
+      playDeterministicRound1(session);
+      beginRoundScoring(session);
+      scoreRound(session);
+      expect(
+        session.players[0].collection.filter((c) => c.type === 'chameleon').map((c) => c.color),
+      ).toEqual(['red', 'yellow', 'green']);
+
+      // Round 2: player 0 takes a row with blue + orange (2 oranges).
+      // Deck pop order: blue (1st), purple (2nd), orange (3rd), purple
+      // (4th), orange (5th) -- player 0 ends with blue(1) and orange(2).
+      session.deck = [
+        ch('orange', 1, 10),  // 5th pop → row 0 third slot
+        ch('purple', 1, 11),  // 4th pop → row 1 second slot
+        ch('orange', 1, 12),  // 3rd pop → row 0 second slot
+        ch('purple', 1, 13),  // 2nd pop → row 1 first slot
+        ch('blue', 1, 14),    // 1st pop → row 0 first slot
+      ];
+      executeAction(session, 0, { type: 'place', rowIndex: 0 });
+      executeAction(session, 1, { type: 'place', rowIndex: 1 });
+      executeAction(session, 0, { type: 'place', rowIndex: 0 });
+      executeAction(session, 1, { type: 'place', rowIndex: 1 });
+      executeAction(session, 0, { type: 'place', rowIndex: 0 });
+      executeAction(session, 1, { type: 'take', rowIndex: 1 });
+      executeAction(session, 0, { type: 'take', rowIndex: 0 });
+      expect(isRoundOver(session)).toBe(true);
+
+      beginRoundScoring(session);
+      const result = scoreRound(session);
+      const p0 = result.playerScores[0];
+
+      // Player 0 now holds 5 colors (red 1, yellow 1, green 1, blue 1,
+      // orange 2). The optimal 3 positives are red + yellow + orange; the
+      // remaining colors score NEGATIVELY (canonical Coloretto rule).
+      expect(result.positiveColors[0]).toEqual(['red', 'yellow', 'orange']);
+      const negatives = p0.details.filter((d) => !d.positive);
+      expect(negatives.map((d) => d.color)).toEqual(['green', 'blue']);
+      expect(negatives.every((d) => d.points < 0)).toBe(true);
+      expect(p0.total).toBe(3); // 1 + 1 + 3 - 1 - 1
+    });
+  });
+
   describe('win/loss detection', () => {
     it('returns the player with the highest cumulative score', () => {
       const session = setupColorettoGame({ rng: makeRng() });

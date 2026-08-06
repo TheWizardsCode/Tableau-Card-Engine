@@ -1175,12 +1175,14 @@ export class ColorettoScene extends CardGameScene {
     if (this.hudContainer) this.hudContainer.add(title);
     this.overlayObjects.push(title);
 
-    result.playerScores.forEach((_score, i) => {
+    result.playerScores.forEach((score, i) => {
       const y = boxY - 110 + i * 52;
       const player = this.session.players[i];
-      const positives = result.positiveColors[i]
-        .map((c) => colorLabel(c))
-        .join(', ');
+      // Per-color breakdown with negatives: +Red 6  −Green 6 (unselected
+      // colors count against the player, so their points are negative).
+      const breakdown = score.details
+        .map((d) => `${d.positive ? '+' : '−'}${colorLabel(d.color)} ${Math.abs(d.points)}`)
+        .join('  ');
       const name = this.add
         .text(centerX - 250, y, `${player.name}:`, {
           fontSize: '17px',
@@ -1193,7 +1195,7 @@ export class ColorettoScene extends CardGameScene {
       this.overlayObjects.push(name);
 
       const detail = this.add
-        .text(centerX - 120, y, `+${positives}`, {
+        .text(centerX - 120, y, breakdown, {
           fontSize: '14px',
           color: '#aad8c0',
           fontFamily: FONT_FAMILY,
@@ -1203,8 +1205,9 @@ export class ColorettoScene extends CardGameScene {
       if (this.hudContainer) this.hudContainer.add(detail);
       this.overlayObjects.push(detail);
 
+      const roundScore = result.roundScores[i];
       const scoreText = this.add
-        .text(centerX + 250, y, `${result.roundScores[i]} (total ${result.cumulativeScores[i]})`, {
+        .text(centerX + 250, y, `${roundScore > 0 ? '+' : ''}${roundScore} (total ${result.cumulativeScores[i]})`, {
           fontSize: '17px',
           color: '#ffffff',
           fontFamily: FONT_FAMILY,

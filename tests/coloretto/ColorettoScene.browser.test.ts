@@ -341,6 +341,77 @@ describe('ColorettoScene (browser)', () => {
     expect(pickerChipRectangles(scene)).toHaveLength(0);
   });
 
+  it('lets the player choose exactly 3 positives from 4+ colors and shows the negative breakdown', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('ColorettoScene') as any;
+
+    await waitFrames(10);
+    expect(clickText(scene, '2 (1 AI)')).toBe(true);
+    await waitFrames(10);
+
+    // Round 2+ scenario: the human holds cards in 4 colors (accumulated
+    // across rounds), so one color must score negatively.
+    const session = scene.session;
+    session.players[0].collection = [
+      { id: 901, type: 'chameleon', color: 'red', count: 1 },
+      { id: 902, type: 'chameleon', color: 'yellow', count: 1 },
+      { id: 903, type: 'chameleon', color: 'green', count: 1 },
+      { id: 904, type: 'chameleon', color: 'blue', count: 1 },
+    ];
+    session.players[0].roundState = 'taken-row';
+    session.players[1].roundState = 'taken-row';
+    scene.handleRoundOver();
+    await waitFrames(10);
+
+    // Picker appears with one chip per present color (4).
+    expect(findText(scene, 'Choose 3 colors to score POSITIVELY')).toBeDefined();
+
+    // The 3 optimal positives (red, yellow, green) start selected; blue is
+    // the single negative (1-card colors → any 3 beat leaving the 4th out).
+    // Note: textObjects() walks the HUD container twice (it is a child of
+    // the scene display list), so dedupe by object identity before counting.
+    const countPtsLabels = (label: string): number =>
+      new Set(textObjects(scene).filter((t) => t.text === label)).size;
+    let chips = pickerChipRectangles(scene);
+    expect(chips).toHaveLength(4);
+    expect(countPtsLabels('+1')).toBe(3);
+    expect(countPtsLabels('−1')).toBe(1);
+
+    // Clicking the unselected 4th chip (blue, index 3) while 3 are already
+    // selected must be refused: no 4th positive is allowed. (The refused
+    // path returns before drawChips(), so the chip references stay valid.)
+    chips[3].emit('pointerdown');
+    await waitFrames(10);
+    expect(countPtsLabels('+1')).toBe(3);
+    expect(countPtsLabels('−1')).toBe(1);
+    expect(findText(scene, 'You may only pick 3 positive colors')).toBeDefined();
+
+    // Swap: deselect red (index 0), then select blue (index 3). drawChips()
+    // destroys and rebuilds the chip objects on every selection change, so
+    // re-query the picker rectangles before each click.
+    chips = pickerChipRectangles(scene);
+    chips[0].emit('pointerdown');
+    await waitFrames(10);
+    expect(countPtsLabels('+1')).toBe(2);
+    expect(countPtsLabels('−1')).toBe(2);
+    chips = pickerChipRectangles(scene);
+    chips[3].emit('pointerdown');
+    await waitFrames(10);
+    expect(countPtsLabels('+1')).toBe(3);
+    expect(countPtsLabels('−1')).toBe(1);
+
+    expect(clickText(scene, 'Confirm')).toBe(true);
+    await waitFrames(10);
+
+    // Round-score overlay shows the per-color breakdown with the negative:
+    // red was not chosen as positive, so it scores against the player.
+    expect(findText(scene, 'Round 1 Scores')).toBeDefined();
+    expect(findText(scene, '−Red 1')).toBeDefined();
+    expect(findText(scene, '+Yellow 1')).toBeDefined();
+    // 1 + 1 + 1 (yellow, green, blue) − 1 (red) = 2.
+    expect(findText(scene, '+2 (total 2)')).toBeDefined();
+  });
+
   it('animates taken row cards into the collector collection on a take', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('ColorettoScene') as any;
@@ -557,7 +628,16 @@ describe('ColorettoScene (browser)', () => {
     expect(scene.phaseManager.current).toBe('ai-thinking');
 
     await waitForCondition(() => scene.phaseManager.current === 'human-turn');
-    expect(scene.session.rows[0].cards.length).toBe(1);
+    // Both turns completed instantly in reduced-motion mode: the human's
+    // card is on row 0 and the AI placed one card on some row. The AI's
+    // row choice is RNG-dependent (all rows are equal value at game start),
+    // so assert the total across rows rather than a specific row.
+    const totalCards = [0, 1, 2].reduce(
+      (sum, i) => sum + scene.session.rows[i].cards.length,
+      0,
+    );
+    expect(totalCards).toBe(2);
+    expect(scene.session.rows[0].cards.length).toBeGreaterThanOrEqual(1);
     expect(scene.flightCard).toBeNull();
   }, 15000);
 
