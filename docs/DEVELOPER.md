@@ -411,6 +411,7 @@ tests/
 ├── sushi-go/               Sushi Go! cards, scoring, game, AI tests
 ├── feudalism/               Feudalism cards, game, AI tests
 ├── lost-cities/            Lost Cities cards, scoring, rules, game, AI, transcript tests
+├── coloretto/              Coloretto cards, scoring, game, AI, integration tests
 └── replay/                 Replay CLI validation tests
 ```
 
@@ -597,6 +598,7 @@ Open `http://localhost:3000` and click the desired game card. Each game also has
 | Feudalism | `example-games/feudalism/` | Resource management (gem tokens), tiered development cards with costs/bonuses, noble attraction, multi-action turns (take/reserve/purchase), checkpoint autosave after each turn (human + AI) with startup recovery | `tests/feudalism/` (4 files) |
 | Lost Cities | `example-games/lost-cities/` | Two-player expeditions, two-phase turn model (play/discard then draw), ascending-play rules, investment multipliers (x2/x3/x4), multi-round match scoring, procedurally generated SVG card assets | `tests/lost-cities/` (6 files) |
 | Main Street | `example-games/main-street/` | Single-player tableau builder, responsive 2x5 grid layout, SLL integration, ToneForge audio adapter, Monte Carlo balance testing, tutorial scene | `tests/main-street/` |
+| Coloretto | `example-games/coloretto/` | Set-building tableau (take-a-row mechanic), custom card types, canonical set-collection scoring (1=1,2=3,3=6,4=10,5=15,6+=21) with positive/negative color selection, multi-round cumulative scoring, Random/Heuristic AI strategies, SLL layout, transcript recording | `tests/coloretto/` (5 files) |
 
 ### Lost Cities card assets
 

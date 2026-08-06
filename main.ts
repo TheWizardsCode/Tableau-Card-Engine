@@ -21,6 +21,7 @@ import { FeudalismScene } from './example-games/feudalism/scenes/FeudalismScene'
 import { LostCitiesScene } from './example-games/lost-cities/scenes/LostCitiesScene';
 import { MainStreetScene } from './example-games/main-street/scenes/MainStreetScene';
 import { BlackjackScene } from './example-games/blackjack/scenes/BlackjackScene';
+import { ColorettoScene } from './example-games/coloretto/scenes/ColorettoScene';
 import {
   GymRouterScene,
   GymDeckRngScene,
@@ -103,6 +104,12 @@ export const GAMES: GameEntry[] = [
     description:
       'Classic single-player Blackjack vs the dealer. Hit or stand to reach 21 without going bust.',
   },
+  {
+    sceneKey: 'ColorettoScene',
+    title: 'Coloretto',
+    description:
+      'Set-building card game (human vs. 1-4 AI). Take rows of chameleon cards from the shared tableau, score 3 colors positively across multiple rounds, and outscore the AI.',
+  },
 ];
 
 // ── Phaser boot ────────────────────────────────────────────
@@ -125,6 +132,7 @@ createCardGame({
     LostCitiesScene,
     MainStreetScene,
     BlackjackScene,
+    ColorettoScene,
     // Gym demo scenes
     GymRouterScene,
     GymDeckRngScene,
