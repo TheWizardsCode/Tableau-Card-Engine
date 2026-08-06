@@ -60,6 +60,7 @@ import {
   createOverlayBackground,
   createOverlayButton,
   shakeIllegalMove,
+  moveGameObject,
 } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
 import helpContent from '../help-content.json';
@@ -87,6 +88,12 @@ const CHIP_W = 20;
 const CHIP_H = 28;
 const CHIP_GAP = 26;
 const COLLECTION_STEP = 40;
+/** Total width of the three row card slots (used for slot X and click zones). */
+const ROW_TOTAL_WIDTH = 3 * CARD_W + 2 * ROW_CARD_GAP;
+/** Duration of a single take flyer tween. */
+const TAKE_ANIM_DURATION = 450;
+/** Delay between consecutive take flyers (staggered departure). */
+const TAKE_ANIM_STAGGER = 90;
 
 const SFX_KEYS = {
   PLACE: 'place',
@@ -378,12 +385,10 @@ export class ColorettoScene extends CardGameScene {
     this.rowZones = [];
 
     const rowCount = this.session.rows.length;
-    const step = Math.min(ROW_STEP_MAX, Math.floor(360 / rowCount));
-    const startY = this.layout.rowsCenterY - ((rowCount - 1) * step) / 2;
 
     for (let i = 0; i < rowCount; i++) {
       const row = this.session.rows[i];
-      const rowY = startY + i * step;
+      const rowY = this.rowCenterY(i);
 
       // Row label
       this.rowsContainer.add(
@@ -398,10 +403,8 @@ export class ColorettoScene extends CardGameScene {
 
       // Cards
       const cardSlots = 3;
-      const totalWidth = cardSlots * CARD_W + (cardSlots - 1) * ROW_CARD_GAP;
-      const startX = this.layout.rowsCenterX - totalWidth / 2;
       for (let slot = 0; slot < cardSlots; slot++) {
-        const cardX = startX + slot * (CARD_W + ROW_CARD_GAP);
+        const cardX = this.rowSlotX(slot);
         const card = row.cards[slot];
         if (card) {
           this.rowsContainer.add(this.createCard(cardX, rowY, card));
@@ -420,7 +423,7 @@ export class ColorettoScene extends CardGameScene {
         .rectangle(
           this.layout.rowsCenterX,
           rowY,
-          totalWidth + 30,
+          ROW_TOTAL_WIDTH + 30,
           CARD_H + 12,
           0xffffff,
           0.001,
@@ -432,6 +435,30 @@ export class ColorettoScene extends CardGameScene {
       }
       this.rowZones.push(zone);
     }
+  }
+
+  // ── Layout helpers (shared by rendering and take animation) ──
+
+  /** Y of a row's center, derived from the SLL rows area and row-count step. */
+  private rowCenterY(rowIndex: number): number {
+    const rowCount = this.session.rows.length;
+    const step = Math.min(ROW_STEP_MAX, Math.floor(360 / rowCount));
+    return this.layout.rowsCenterY - ((rowCount - 1) * step) / 2 + rowIndex * step;
+  }
+
+  /** X of a card slot within a row (0-based slot index). */
+  private rowSlotX(slotIndex: number): number {
+    return this.layout.rowsCenterX - ROW_TOTAL_WIDTH / 2 + slotIndex * (CARD_W + ROW_CARD_GAP);
+  }
+
+  /** X of the first collection chip (matches refreshCollections). */
+  private collectionChipStartX(): number {
+    return this.layout.collectionsTopX + 260;
+  }
+
+  /** Y of a player's collection row (matches refreshCollections). */
+  private collectionRowY(playerIndex: number): number {
+    return this.layout.collectionsTopY + playerIndex * COLLECTION_STEP;
   }
 
   private createCard(x: number, y: number, card: ColorettoCard): Phaser.GameObjects.Container {
@@ -527,10 +554,9 @@ export class ColorettoScene extends CardGameScene {
     this.collectionsContainer.removeAll(true);
 
     const currentIdx = getCurrentPlayerIndex(this.session);
-    const startY = this.layout.collectionsTopY;
 
     this.session.players.forEach((player, i) => {
-      const y = startY + i * COLLECTION_STEP;
+      const y = this.collectionRowY(i);
       const isCurrent = i === currentIdx && this.session.phase === 'playing';
       const isHuman = i === 0;
 
@@ -548,7 +574,7 @@ export class ColorettoScene extends CardGameScene {
 
       // Color chips
       const counts = colorCounts(player.collection);
-      let chipX = this.layout.collectionsTopX + 260;
+      let chipX = this.collectionChipStartX();
       for (const color of presentColors(counts)) {
         const chip = this.add.rectangle(chipX, y, CHIP_W, CHIP_H, Phaser.Display.Color.HexStringToColor(colorHex(color)).color);
         this.collectionsContainer.add(chip);
@@ -684,6 +710,12 @@ export class ColorettoScene extends CardGameScene {
   private executeTurn(playerIndex: number, action: ColorettoAction): void {
     if (this.session.phase !== 'playing') return;
 
+    // Snapshot the taken row cards before the action moves them into the
+    // player's collection -- the take animation replays them as flyers
+    // from their captured row-slot positions.
+    const takenCards =
+      action.type === 'take' ? [...this.session.rows[action.rowIndex].cards] : [];
+
     const result = executeAction(this.session, playerIndex, action);
     this.recorder?.recordTurn(playerIndex, action, result.drawnCard);
 
@@ -693,21 +725,96 @@ export class ColorettoScene extends CardGameScene {
         playerIndex,
         action: 'place',
       });
-    } else {
-      this.gameEvents.emit('card-swapped', {
-        position: action.rowIndex,
-        drawnFrom: 'stock',
-        playerIndex,
+
+      this.refreshAll();
+      if (result.roundOver) {
+        this.handleRoundOver();
+      } else {
+        this.runTurn();
+      }
+      return;
+    }
+
+    this.gameEvents.emit('card-swapped', {
+      position: action.rowIndex,
+      drawnFrom: 'stock',
+      playerIndex,
+    });
+
+    // Session state is already updated (row → collection, pure TS); the
+    // animation is a visual overlay replaying the captured start positions.
+    // The turn flow advances only after every card reaches the collection.
+    this.playTakeAnimation(playerIndex, action.rowIndex, takenCards, () => {
+      this.refreshAll();
+      if (result.roundOver) {
+        this.handleRoundOver();
+      } else {
+        this.runTurn();
+      }
+    });
+  }
+
+  // ── Take animation ──────────────────────────────────────
+
+  /**
+   * Animate the cards of a taken row flying from their row slots to the
+   * collecting player's collection area (staggered departure).
+   *
+   * The session state is already updated by {@link executeAction} -- this is
+   * a visual overlay replaying captured start positions. The turn flow
+   * (via onComplete) advances only after every card has landed, and the
+   * 'animating' phase blocks input while the cards are flying. In
+   * reduced-motion mode the transfer is applied instantly without
+   * animation. Works identically for human and AI take actions because
+   * both reach this through {@link executeTurn}.
+   */
+  private playTakeAnimation(
+    playerIndex: number,
+    rowIndex: number,
+    takenCards: readonly ColorettoCard[],
+    onComplete: () => void,
+  ): void {
+    if (this.reducedMotion || takenCards.length === 0) {
+      onComplete();
+      return;
+    }
+
+    // Block input and turn flow while the cards are flying.
+    this.phaseManager.set('animating');
+
+    const destStartX = this.collectionChipStartX();
+    const destY = this.collectionRowY(playerIndex);
+
+    // Face-up card sprites: the row cards are always face-up, so the
+    // flyers reuse the card-face rendering (chameleon / Last Round).
+    const flyers = takenCards.map((card, i) =>
+      this.createCard(this.rowSlotX(i), this.rowCenterY(rowIndex), card).setDepth(100),
+    );
+
+    // The row has already been emptied in the session; re-render it so the
+    // taken cards visually leave the tableau as the flyers depart.
+    this.refreshRows();
+
+    let landed = 0;
+    flyers.forEach((flyer, i) => {
+      this.time.delayedCall(i * TAKE_ANIM_STAGGER, () => {
+        moveGameObject({
+          scene: this,
+          target: flyer,
+          destX: destStartX + i * CHIP_GAP,
+          destY,
+          duration: TAKE_ANIM_DURATION,
+          ease: 'Quad.easeInOut',
+          onComplete: () => {
+            landed += 1;
+            if (landed === flyers.length) {
+              for (const f of flyers) f.destroy();
+              onComplete();
+            }
+          },
+        });
       });
-    }
-
-    this.refreshAll();
-
-    if (result.roundOver) {
-      this.handleRoundOver();
-    } else {
-      this.runTurn();
-    }
+    });
   }
 
   // ── Round scoring ────────────────────────────────────────
