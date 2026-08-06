@@ -596,11 +596,17 @@ describe('ColorettoScene (browser)', () => {
     // Human placement completes and the AI turn begins.
     await waitForCondition(() => scene.phaseManager.current === 'ai-thinking');
 
-    // The AI placement runs through the same animation pipeline.
+    // The AI placement runs through the same animation pipeline. The flight
+    // is created centred on the deck and the move tween starts immediately,
+    // so catch it near the deck within a small tolerance (the flight can
+    // already be a few pixels into the move when the poll fires).
     await waitForCondition(
-      () => scene.phaseManager.current === 'animating' && scene.flightCard !== null,
+      () =>
+        scene.phaseManager.current === 'animating' &&
+        scene.flightCard !== null &&
+        Math.abs(scene.flightCard.x - scene.layout.deckCenterX) < 20,
     );
-    expect(scene.flightCard.x).toBe(scene.layout.deckCenterX);
+    expect(Math.abs(scene.flightCard.x - scene.layout.deckCenterX)).toBeLessThan(20);
 
     await waitForCondition(
       () => scene.flightCard === null && scene.phaseManager.current === 'human-turn',
