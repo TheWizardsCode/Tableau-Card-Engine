@@ -839,6 +839,14 @@ export class ColorettoScene extends CardGameScene {
     this.overlayObjects.push(confirm);
     confirm.on('pointerdown', () => {
       this.soundManager?.play(SFX_KEYS.UI);
+      // Destroy the picker chips: they are tracked in the local `chips`
+      // array (not in `overlayObjects`), so dismissOverlay() below would
+      // otherwise leave them rendered at depth 201 into the next round.
+      // Mirror drawChips()'s cleanup loop.
+      for (const entry of chips) {
+        for (const obj of entry.objects) obj.destroy();
+      }
+      chips.length = 0;
       dismissOverlay(this.overlayObjects);
       this.overlayObjects = [];
       this.completeRoundScoring([...selected]);
