@@ -52,7 +52,7 @@ describe('ColorettoTranscriptRecorder', () => {
     expect(transcript.gameType).toBe('coloretto');
     expect(transcript.initialState.playerStates).toHaveLength(3);
     expect(transcript.initialState.rows).toHaveLength(3);
-    expect(transcript.initialState.deckSize).toBe(43);
+    expect(transcript.initialState.deckSize).toBe(49);
     expect(transcript.initialState.totalRounds).toBe(5);
     expect(transcript.initialState.playerStates[0].name).toBe('Player 1');
     expect(transcript.turns).toHaveLength(0);
@@ -76,8 +76,8 @@ describe('ColorettoTranscriptRecorder', () => {
     expect(firstTurn.drawnCard).toBeDefined();
     expect(firstTurn.rows.length).toBe(3);
     expect(firstTurn.rows[0].cards.length).toBe(1);
-    // Deck shrinks after the first placement.
-    expect(firstTurn.deckSize).toBe(42);
+    // Deck shrinks after the first placement (49-card full deck).
+    expect(firstTurn.deckSize).toBe(48);
 
     // The last turn of the round has recorded row states.
     const lastTurn = transcript.turns[transcript.turns.length - 1];
@@ -157,6 +157,12 @@ describe('ColorettoTranscriptRecorder', () => {
 
     const lastRound = snapshotCard({ id: 42, type: 'last-round' });
     expect(lastRound).toEqual({ id: 42, type: 'last-round' });
+
+    const joker = snapshotCard({ id: 43, type: 'joker' });
+    expect(joker).toEqual({ id: 43, type: 'joker' });
+
+    const bonus = snapshotCard({ id: 44, type: 'bonus' });
+    expect(bonus).toEqual({ id: 44, type: 'bonus' });
   });
 
   it('is deterministic given the same seeded game', () => {

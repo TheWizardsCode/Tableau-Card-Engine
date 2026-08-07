@@ -41,6 +41,12 @@ export function snapshotCard(card: ColorettoCard): ColorettoCardSnapshot {
   if (card.type === 'last-round') {
     return { id: card.id, type: 'last-round' };
   }
+  if (card.type === 'joker') {
+    return { id: card.id, type: 'joker' };
+  }
+  if (card.type === 'bonus') {
+    return { id: card.id, type: 'bonus' };
+  }
   return { id: card.id, type: 'chameleon', color: card.color, count: card.count };
 }
 

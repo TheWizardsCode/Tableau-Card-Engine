@@ -32,10 +32,11 @@ import type { MultiplayerSetupOptions } from '../../src/core-engine/SetupOptions
 import { resolveSetupOptions } from '../../src/core-engine/SetupOptions';
 import type { LegalityResult } from '../../src/rule-engine/index';
 import {
-  positiveColorsForPlayer,
+  resolvePlayerScoring,
   scorePlayerRound,
 } from './ColorettoScoring';
 import type { PlayerRoundScore } from './ColorettoScoring';
+import type { JokerAssignment } from './ColorettoScoring';
 
 // ── Player state ────────────────────────────────────────────
 
@@ -461,25 +462,34 @@ export interface RoundResult {
  * Score the current round for all players and advance the game.
  *
  * Each player's positive colors are resolved via
- * {@link positiveColorsForPlayer}: an explicit selection wins, otherwise
- * the optimal 3 (or all, when fewer than 3 colors are present).
+ * {@link resolvePlayerScoring}: an explicit selection wins, otherwise
+ * the optimal 3 (or all, when fewer than 3 colors are present). Joker
+ * cards are declared per-joker via {@link providedJokerAssignments};
+ * when omitted, each player's declaration is optimized to maximize
+ * their score for the resolved positive colors.
  *
  * After scoring, either the next round is dealt or the game ends.
  */
 export function scoreRound(
   session: ColorettoSession,
   providedPositives: (readonly ChameleonColor[] | undefined)[] = [],
+  providedJokerAssignments: (JokerAssignment | undefined)[] = [],
 ): RoundResult {
   if (session.phase !== 'round-scoring') {
     throw new Error(`Cannot score in phase: ${session.phase}`);
   }
 
   const playerScores = session.players.map((player, i) => {
-    const positive = positiveColorsForPlayer(
+    const resolved = resolvePlayerScoring(
       player.collection,
       providedPositives[i],
+      providedJokerAssignments[i],
     );
-    return scorePlayerRound(player.collection, positive);
+    return scorePlayerRound(
+      player.collection,
+      resolved.positiveColors,
+      resolved.jokerAssignment,
+    );
   });
 
   const roundScores = playerScores.map((s) => s.total);

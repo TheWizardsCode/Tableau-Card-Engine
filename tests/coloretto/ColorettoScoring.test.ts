@@ -19,6 +19,10 @@ import {
   scorePlayerRound,
   selectBestPositiveColors,
   positiveColorsForPlayer,
+  countJokers,
+  countBonusCards,
+  optimalJokerAssignment,
+  BONUS_POINTS,
 } from '../../example-games/coloretto/ColorettoScoring';
 import type { ChameleonColor, ColorettoCard } from '../../example-games/coloretto/ColorettoCards';
 
@@ -200,6 +204,107 @@ describe('ColorettoScoring', () => {
     it('falls back to the optimal selection when not provided', () => {
       const collection = [chN('red', 3, 0), chN('blue', 3, 1)];
       expect(positiveColorsForPlayer(collection)).toEqual(['red', 'blue']);
+    });
+  });
+
+  describe('joker and bonus cards', () => {
+    it('counts joker and bonus cards in a collection', () => {
+      const collection: ColorettoCard[] = [
+        ch('red', 1, 0),
+        { id: 43, type: 'joker' },
+        { id: 44, type: 'joker' },
+        { id: 45, type: 'bonus' },
+      ];
+      expect(countJokers(collection)).toBe(2);
+      expect(countBonusCards(collection)).toBe(1);
+    });
+
+    it('declares jokers to colors in colorCounts (per-joker assignment)', () => {
+      const collection: ColorettoCard[] = [ch('red', 2, 0), { id: 43, type: 'joker' }];
+      const counts = colorCounts(collection, ['red']);
+      expect(counts.red).toBe(3);
+      expect(countChameleonsOfColor(collection, 'red', ['red'])).toBe(3);
+      expect(countChameleonsOfColor(collection, 'blue', ['red'])).toBe(0);
+    });
+
+    it('adds a flat +2 per bonus card to the round total', () => {
+      expect(BONUS_POINTS).toBe(2);
+      const collection: ColorettoCard[] = [
+        ch('red', 1, 0),
+        { id: 44, type: 'bonus' },
+        { id: 45, type: 'bonus' },
+      ];
+      const result = scorePlayerRound(collection, ['red']);
+      expect(result.bonusPoints).toBe(4);
+      expect(result.total).toBe(1 + 4);
+    });
+
+    it('counts declared jokers toward color counts when scoring', () => {
+      const collection: ColorettoCard[] = [ch('red', 2, 0), { id: 43, type: 'joker' }];
+      // Joker declared red → 3 red = 6 pts.
+      const result = scorePlayerRound(collection, ['red'], ['red']);
+      expect(result.total).toBe(6);
+      const red = result.details.find((d) => d.color === 'red');
+      expect(red?.count).toBe(3);
+      expect(result.jokerAssignment).toEqual(['red']);
+    });
+
+    it('ignores jokers when no assignment is given (zero-count default)', () => {
+      const collection: ColorettoCard[] = [ch('red', 2, 0), { id: 43, type: 'joker' }];
+      expect(scorePlayerRound(collection, ['red']).total).toBe(3);
+      expect(scoreColors(collection, new Set(['red']))).toBe(3);
+    });
+  });
+
+  describe('optimalJokerAssignment', () => {
+    it('assigns jokers to the color that maximizes the score', () => {
+      // 2 red + 2 jokers: both on red → 4 red = 10 beats 3 red + 1 blue = 7.
+      const collection: ColorettoCard[] = [
+        ch('red', 2, 0),
+        { id: 43, type: 'joker' },
+        { id: 44, type: 'joker' },
+      ];
+      const assignment = optimalJokerAssignment(collection);
+      expect(assignment).toEqual(['red', 'red']);
+      expect(scorePlayerRound(collection, ['red'], assignment).total).toBe(10);
+    });
+
+    it('respects a fixed positive-color set when optimizing', () => {
+      // 1 red + 1 blue + 2 jokers, positives fixed to red+blue: both jokers
+      // on red → 3 red (6) + 1 blue (1) = 7 beats spreading them (6).
+      const collection: ColorettoCard[] = [
+        ch('red', 1, 0),
+        ch('blue', 1, 1),
+        { id: 43, type: 'joker' },
+        { id: 44, type: 'joker' },
+      ];
+      const assignment = optimalJokerAssignment(collection, ['red', 'blue']);
+      expect(assignment).toEqual(['red', 'red']);
+    });
+
+    it('returns an empty assignment for a jokerless collection', () => {
+      expect(optimalJokerAssignment([ch('red', 2, 0)])).toEqual([]);
+    });
+  });
+
+  describe('selectBestPositiveColors with jokers', () => {
+    it('selects positives from the joint joker-assignment optimum', () => {
+      // 3 base colors (1 each) + 1 joker: the best play declares the joker
+      // on an existing color (5 pts) rather than creating a 4th color that
+      // would score negatively (2 pts).
+      const collection: ColorettoCard[] = [
+        ch('red', 1, 0),
+        ch('blue', 1, 1),
+        ch('green', 1, 2),
+        { id: 43, type: 'joker' },
+      ];
+      const positives = selectBestPositiveColors(collection);
+      // Present colors follow COLORS order (red, green, blue); all three
+      // stay positive when the joker boosts an existing color.
+      expect(positives).toEqual(['red', 'green', 'blue']);
+      const assignment = optimalJokerAssignment(collection);
+      expect(assignment).toEqual(['red']);
+      expect(scorePlayerRound(collection, positives, assignment).total).toBe(5);
     });
   });
 });

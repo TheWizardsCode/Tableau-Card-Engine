@@ -133,6 +133,19 @@ describe('ColorettoAis', () => {
       const session = setupColorettoGame({ rng: makeRng() });
       expect(marginalGain(session, 0, { id: 42, type: 'last-round' })).toBe(0);
     });
+
+    it('values a bonus card at its flat +2 points', () => {
+      const session = setupColorettoGame({ rng: makeRng() });
+      expect(marginalGain(session, 0, { id: 44, type: 'bonus' })).toBe(2);
+    });
+
+    it('values a joker at its best wild gain across colors', () => {
+      const session = setupColorettoGame({ rng: makeRng() });
+      // Player already has 2 red: a red single is worth +3 (3 red = 6 vs 2 = 3);
+      // a new color is worth +1. The joker's wild value is the max = 3.
+      session.players[0].collection = [ch('red', 2, 0)];
+      expect(marginalGain(session, 0, { id: 43, type: 'joker' })).toBe(3);
+    });
   });
 
   describe('netRowValue', () => {

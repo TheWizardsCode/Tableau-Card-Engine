@@ -141,6 +141,26 @@ function textsInContainer(container: Phaser.GameObjects.Container): string[] {
   return out;
 }
 
+/** First text object inside a container subtree whose content includes the fragment. */
+function findTextInContainer(
+  container: Phaser.GameObjects.Container,
+  fragment: string,
+): Phaser.GameObjects.Text | undefined {
+  const out: Phaser.GameObjects.Text[] = [];
+  const walk = (list: Phaser.GameObjects.GameObject[]) => {
+    for (const child of list) {
+      if (child instanceof Phaser.GameObjects.Text && child.text.includes(fragment)) {
+        out.push(child);
+      }
+      if (child instanceof Phaser.GameObjects.Container && (child as any).list) {
+        walk((child as any).list);
+      }
+    }
+  };
+  walk((container as any).list ?? []);
+  return out[0];
+}
+
 /** Find a text object whose content includes the given substring. */
 function findText(scene: Phaser.Scene, fragment: string): Phaser.GameObjects.Text | undefined {
   return textObjects(scene).find((t) => t.text.includes(fragment));
@@ -1030,10 +1050,14 @@ describe('ColorettoScene (browser)', () => {
     scene.refreshCollections();
 
     // Every chip shows its count (top line) and its color name (bottom line).
+    // Scoped to the collections container: a same-colored card the AI may
+    // have placed on a row earlier (turn order is randomized) carries the
+    // same 'Red' label, so an unscoped findText() could match the wrong
+    // object.
     const chips = collectionChipRectangles(scene);
     expect(chips.length).toBe(3);
     for (const color of ['Red', 'Yellow', 'Green']) {
-      const name = findText(scene, color);
+      const name = findTextInContainer(scene.collectionsContainer, color);
       expect(name, `color name '${color}' should be rendered`).toBeDefined();
       expect(Math.abs(name!.y - chips[0].y) - 10).toBeLessThanOrEqual(4); // bottom line
     }
@@ -1105,12 +1129,13 @@ describe('ColorettoScene (browser)', () => {
     expect(longName.width).toBeLessThanOrEqual(NAME_COLUMN_W - NAME_CHIP_GAP);
 
     // 3) Round-state markers align at the max hand length (COLORS.length
-    //    chips), independent of how many chips each player actually holds.
+    //    colour chips + the joker and +2 chips), independent of how many
+    //    chips each player actually holds.
     const markers = textObjects(scene).filter(
       (t) => t.text === '(taken a row)' || t.text === '(done)',
     );
     expect(markers).toHaveLength(2);
-    const expectedMarkerX = expectedChipStart + COLORS.length * CHIP_GAP + ROUND_MARKER_GAP;
+    const expectedMarkerX = expectedChipStart + (COLORS.length + 2) * CHIP_GAP + ROUND_MARKER_GAP;
     for (const marker of markers) {
       expect(marker.x).toBe(expectedMarkerX);
     }
@@ -1118,5 +1143,78 @@ describe('ColorettoScene (browser)', () => {
     // 4) The take animation flies cards to the same fixed chip column
     //    (AC 5: animated destination == rendered chip position).
     expect(scene.fixedChipStartX()).toBe(expectedChipStart);
+  });
+
+  it('renders joker and +2 chips in the collections panel', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('ColorettoScene') as any;
+    await waitFrames(10);
+    expect(clickText(scene, '2 (1 AI)')).toBe(true);
+    await waitForCondition(() => scene.phaseManager?.current === 'human-turn');
+
+    // Human holds 1 red chameleon + 1 joker + 1 bonus: one colour chip
+    // plus the two extra chip types.
+    scene.session.players[0].collection = [
+      { id: 500, type: 'chameleon', color: 'red', count: 1 },
+      { id: 501, type: 'joker' },
+      { id: 502, type: 'bonus' },
+    ];
+    scene.refreshCollections();
+
+    const chips = collectionChipRectangles(scene);
+    expect(chips).toHaveLength(3);
+    // Joker and +2 chips carry their type labels.
+    const labels = new Set(textsInContainer(scene.collectionsContainer));
+    expect(labels.has('Joker')).toBe(true);
+    expect(labels.has('+2')).toBe(true);
+  });
+
+  it('lets the human declare jokers per-joker in the color picker', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('ColorettoScene') as any;
+
+    await waitFrames(10);
+    expect(clickText(scene, '2 (1 AI)')).toBe(true);
+    await waitForCondition(() => scene.phaseManager?.current === 'human-turn');
+
+    // Human holds 2 red + 2 jokers + 1 bonus. The joint optimum declares
+    // both jokers red (4 red = 10 + 2 bonus = 12).
+    const session = scene.session;
+    session.players[0].collection = [
+      { id: 901, type: 'chameleon', color: 'red', count: 1 },
+      { id: 902, type: 'chameleon', color: 'red', count: 1 },
+      { id: 903, type: 'joker' },
+      { id: 904, type: 'joker' },
+      { id: 905, type: 'bonus' },
+    ];
+    session.players[0].roundState = 'taken-row';
+    session.players[1].roundState = 'taken-row';
+    scene.handleRoundOver();
+    await waitFrames(10);
+
+    // The picker renders a joker declaration row (the human holds jokers).
+    expect(findText(scene, 'Click a joker to change its color')).toBeDefined();
+    expect(findText(scene, 'J1 → Red')).toBeDefined();
+    expect(findText(scene, 'J2 → Red')).toBeDefined();
+    // The joint optimum: 4 red (10 pts) + bonus (2 pts) = 12.
+    expect(findText(scene, '+12 (total 12)')).toBeUndefined(); // overlay not confirmed yet
+
+    // Click the first joker chip (bottom row of the picker) to cycle its
+    // declaration red → yellow.
+    const centerY = scene.layout.gameH / 2;
+    const jokerChips = pickerChipRectangles(scene).filter((r) => r.y > centerY);
+    expect(jokerChips).toHaveLength(2);
+    jokerChips[0].emit('pointerdown');
+    await waitFrames(10);
+    expect(findText(scene, 'J1 → Yellow')).toBeDefined();
+    expect(findText(scene, 'J2 → Red')).toBeDefined();
+
+    // Confirm: red 3 (6) + yellow 1 (−1, not positive) + bonus (2) = 7.
+    expect(clickText(scene, 'Confirm')).toBe(true);
+    await waitFrames(10);
+    expect(findText(scene, 'Round 1 Scores')).toBeDefined();
+    expect(findText(scene, '+7 (total 7)')).toBeDefined();
+    // The declared assignment reached the scoring engine.
+    expect(session.players[0].roundScores[0]).toBe(7);
   });
 });

@@ -13,7 +13,8 @@
 
 import type { ColorettoSession, ColorettoAction } from './ColorettoGame';
 import { legalActions, topCard } from './ColorettoGame';
-import { pointsForCount, colorCounts } from './ColorettoScoring';
+import { pointsForCount, colorCounts, BONUS_POINTS } from './ColorettoScoring';
+import { COLORS } from './ColorettoCards';
 import type { ColorettoCard } from './ColorettoCards';
 import type { AiStrategyBase } from '../../src/ai';
 import { AiPlayer as AiPlayerBase, pickRandom, pickBest } from '../../src/ai';
@@ -41,7 +42,9 @@ export interface ColorettoAiStrategy extends AiStrategyBase {
 /**
  * Marginal point gain for a player of adding a card to their
  * collection. Colors the player already holds gain more than new
- * colors (the set-building incentive). The Last Round card is worth 0.
+ * colors (the set-building incentive). The Last Round card is worth 0;
+ * a “+2” bonus card is worth its flat bonus; a joker is worth the best
+ * single-card marginal gain across colors (wild value).
  */
 export function marginalGain(
   session: ColorettoSession,
@@ -49,8 +52,15 @@ export function marginalGain(
   card: ColorettoCard,
 ): number {
   if (card.type === 'last-round') return 0;
+  if (card.type === 'bonus') return BONUS_POINTS;
   const player = session.players[playerIndex];
   const counts = colorCounts(player.collection);
+  if (card.type === 'joker') {
+    // Wild: worth the best single-card gain across all colors.
+    return Math.max(
+      ...COLORS.map((c) => pointsForCount(counts[c] + 1) - pointsForCount(counts[c])),
+    );
+  }
   const before = counts[card.color] ?? 0;
   return pointsForCount(before + card.count) - pointsForCount(before);
 }

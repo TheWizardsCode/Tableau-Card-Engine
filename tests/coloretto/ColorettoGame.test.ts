@@ -32,6 +32,7 @@ import type {
   ColorettoAction,
 } from '../../example-games/coloretto/ColorettoGame';
 import type { ChameleonColor, ColorettoCard } from '../../example-games/coloretto/ColorettoCards';
+import { BONUS_POINTS } from '../../example-games/coloretto/ColorettoScoring';
 
 // Deterministic RNG for reproducible tests.
 function makeRng(seed: number = 42) {
@@ -112,9 +113,9 @@ describe('ColorettoGame', () => {
       expect(session.players[1].isAI).toBe(true);
     });
 
-    it('deals a full 43-card deck and empty rows', () => {
+    it('deals a full 49-card deck and empty rows', () => {
       const session = setupColorettoGame({ rng: makeRng() });
-      expect(session.deck).toHaveLength(43);
+      expect(session.deck).toHaveLength(49);
       for (const row of session.rows) {
         expect(row.cards).toHaveLength(0);
       }
@@ -142,7 +143,7 @@ describe('ColorettoGame', () => {
       const result = executeAction(session, 0, { type: 'place', rowIndex: 0 });
       expect(result.drawnCard).toEqual(top);
       expect(session.rows[0].cards).toHaveLength(1);
-      expect(session.deck).toHaveLength(42);
+      expect(session.deck).toHaveLength(48);
       expect(getCurrentPlayerIndex(session)).toBe(1);
     });
 
@@ -361,6 +362,46 @@ describe('ColorettoGame', () => {
       expect(result.positiveColors[0]).toEqual(['red']);
       // Player 1 (AI) falls back to the optimal selection.
       expect(result.positiveColors[1].length).toBeGreaterThan(0);
+    });
+
+    it('scores joker declarations and +2 bonus cards in a round', () => {
+      const session = setupColorettoGame({ rng: makeRng() });
+      forceIdentityTurnOrder(session);
+      session.phase = 'round-scoring';
+      // Player 0: 2 red + 1 joker (declared red) + 1 bonus = 3 red (6) + 2 = 8.
+      session.players[0].collection = [
+        ch('red', 2, 0),
+        { id: 43, type: 'joker' },
+        { id: 44, type: 'bonus' },
+      ];
+      session.players[1].collection = [];
+      const result = scoreRound(
+        session,
+        [['red'], ['red']],
+        [['red'], []],
+      );
+      expect(result.roundScores[0]).toBe(8);
+      expect(result.roundScores[1]).toBe(0);
+      expect(result.playerScores[0].bonusPoints).toBe(BONUS_POINTS);
+      expect(result.playerScores[0].jokerAssignment).toEqual(['red']);
+      const red = result.playerScores[0].details.find((d) => d.color === 'red');
+      expect(red?.count).toBe(3);
+    });
+
+    it('auto-assigns jokers optimally when no declaration is provided', () => {
+      const session = setupColorettoGame({ rng: makeRng() });
+      forceIdentityTurnOrder(session);
+      session.phase = 'round-scoring';
+      // 2 red + 2 jokers: optimal = both jokers on red → 4 red = 10.
+      session.players[0].collection = [
+        ch('red', 2, 0),
+        { id: 43, type: 'joker' },
+        { id: 44, type: 'joker' },
+      ];
+      session.players[1].collection = [];
+      const result = scoreRound(session);
+      expect(result.roundScores[0]).toBe(10);
+      expect(result.playerScores[0].jokerAssignment).toEqual(['red', 'red']);
     });
 
     it('throws when scoring outside the round-scoring phase', () => {

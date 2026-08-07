@@ -44,7 +44,11 @@ import {
   presentColors,
   pointsForCount,
   selectBestPositiveColors,
+  countJokers,
+  countBonusCards,
+  optimalJokerAssignment,
 } from '../ColorettoScoring';
+import type { JokerAssignment } from '../ColorettoScoring';
 import { autoSaveTranscript, TranscriptStore } from '../../../src/core-engine/transcript';
 import {
   markSceneValid,
@@ -107,6 +111,13 @@ const NAME_CHIP_GAP = 40;
 const NAME_COLUMN_W = 210;
 /** Gap between the last colour chip and the round-state marker (after the chips). */
 const ROUND_MARKER_GAP = 8;
+/**
+ * Number of non-color collection chip types rendered after the color
+ * chips (a joker chip and a “+2” bonus chip). The round-state marker
+ * aligns at the maximum possible hand length: every color chip plus
+ * these two extra chip types.
+ */
+const EXTRA_CHIP_TYPES = 2;
 /**
  * Mode-button offset below the collections block: half the button height
  * (~18px) plus an 8px breathing gap, so the buttons stay clear of both the
@@ -569,6 +580,57 @@ export class ColorettoScene extends CardGameScene {
       return [bg, text];
     }
 
+    if (card.type === 'joker') {
+      // Wild chameleon: purple face with a star; declared to a color at
+      // scoring time (counts as 1 card of that color).
+      const bg = this.add.rectangle(0, 0, CARD_W, CARD_H, 0x2e2a55);
+      bg.setStrokeStyle(2, 0xbb88ff);
+      const star = this.add
+        .text(0, -8, '★', {
+          fontSize: '28px',
+          color: '#e8c1ff',
+          fontFamily: FONT_FAMILY,
+          stroke: '#000000',
+          strokeThickness: 2,
+        })
+        .setOrigin(0.5);
+      const name = this.add
+        .text(0, 22, 'Joker', {
+          fontSize: '10px',
+          color: '#ffffff',
+          fontFamily: FONT_FAMILY,
+          stroke: '#000000',
+          strokeThickness: 2,
+        })
+        .setOrigin(0.5);
+      return [bg, star, name];
+    }
+
+    if (card.type === 'bonus') {
+      // Flat “+2” bonus point card, independent of color scoring.
+      const bg = this.add.rectangle(0, 0, CARD_W, CARD_H, 0x3d3a22);
+      bg.setStrokeStyle(2, 0xffdd66);
+      const plus = this.add
+        .text(0, -8, '+2', {
+          fontSize: '26px',
+          color: '#ffdd66',
+          fontFamily: FONT_FAMILY,
+          stroke: '#000000',
+          strokeThickness: 3,
+        })
+        .setOrigin(0.5);
+      const name = this.add
+        .text(0, 22, 'Bonus', {
+          fontSize: '10px',
+          color: '#ffffff',
+          fontFamily: FONT_FAMILY,
+          stroke: '#000000',
+          strokeThickness: 2,
+        })
+        .setOrigin(0.5);
+      return [bg, plus, name];
+    }
+
     const bg = this.add.rectangle(0, 0, CARD_W, CARD_H, 0x1b2a33);
     bg.setStrokeStyle(1, 0x4a6a7a);
     const colorRect = this.add.rectangle(0, -8, CARD_W - 8, CARD_H - 24, Phaser.Display.Color.HexStringToColor(colorHex(card.color)).color);
@@ -727,12 +789,70 @@ export class ColorettoScene extends CardGameScene {
         chipX += CHIP_GAP;
       }
 
+      // Joker chip: wild chameleons held (declared to colors at scoring).
+      const jokers = countJokers(player.collection);
+      if (jokers > 0) {
+        const chip = this.add.rectangle(chipX, y, CHIP_W, CHIP_H, 0x2e2a55);
+        chip.setStrokeStyle(2, 0xbb88ff);
+        this.collectionsContainer.add(chip);
+        const label = this.add
+          .text(chipX, y - 6, `${jokers}`, {
+            fontSize: '13px',
+            color: '#ffffff',
+            fontFamily: FONT_FAMILY,
+            stroke: '#000000',
+            strokeThickness: 2,
+          })
+          .setOrigin(0.5);
+        this.collectionsContainer.add(label);
+        const nameLabel = this.add
+          .text(chipX, y + 10, 'Joker', {
+            fontSize: '9px',
+            color: '#e8c1ff',
+            fontFamily: FONT_FAMILY,
+            stroke: '#000000',
+            strokeThickness: 2,
+          })
+          .setOrigin(0.5);
+        this.collectionsContainer.add(nameLabel);
+        chipX += CHIP_GAP;
+      }
+
+      // “+2” bonus chip: flat bonus point cards held.
+      const bonus = countBonusCards(player.collection);
+      if (bonus > 0) {
+        const chip = this.add.rectangle(chipX, y, CHIP_W, CHIP_H, 0x3d3a22);
+        chip.setStrokeStyle(2, 0xffdd66);
+        this.collectionsContainer.add(chip);
+        const label = this.add
+          .text(chipX, y - 6, `${bonus}`, {
+            fontSize: '13px',
+            color: '#ffffff',
+            fontFamily: FONT_FAMILY,
+            stroke: '#000000',
+            strokeThickness: 2,
+          })
+          .setOrigin(0.5);
+        this.collectionsContainer.add(label);
+        const nameLabel = this.add
+          .text(chipX, y + 10, '+2', {
+            fontSize: '9px',
+            color: '#ffdd66',
+            fontFamily: FONT_FAMILY,
+            stroke: '#000000',
+            strokeThickness: 2,
+          })
+          .setOrigin(0.5);
+        this.collectionsContainer.add(nameLabel);
+        chipX += CHIP_GAP;
+      }
+
       // Round-state marker aligned at the maximum possible hand length
       // (all deck colours, COLORS.length) so markers line up across
       // players regardless of how many chips each player holds.
       if (player.roundState === 'taken-row' || player.roundState === 'final-turn-done') {
         const markerText = player.roundState === 'taken-row' ? '(taken a row)' : '(done)';
-        const markerX = chipStartX + COLORS.length * CHIP_GAP + ROUND_MARKER_GAP;
+        const markerX = chipStartX + (COLORS.length + EXTRA_CHIP_TYPES) * CHIP_GAP + ROUND_MARKER_GAP;
         const done = this.add
           .text(markerX, y, markerText, {
             fontSize: '12px',
@@ -1132,32 +1252,45 @@ export class ColorettoScene extends CardGameScene {
     const humanCollection = this.session.players[0].collection;
     const present = presentColors(colorCounts(humanCollection));
 
-    if (present.length >= 3) {
+    // Show the picker whenever the human must choose 3 positives (3+
+    // colors) OR holds jokers (which are declared per-joker at scoring).
+    if (present.length >= 3 || countJokers(humanCollection) > 0) {
       this.showColorPickerOverlay();
     } else {
-      // Fewer than 3 colors: all score positively (auto-confirm).
+      // Fewer than 3 colors and no jokers: all score positively
+      // (auto-confirm).
       this.completeRoundScoring([]);
     }
   }
 
   private showColorPickerOverlay(): void {
     const human = this.session.players[0];
-    const counts = colorCounts(human.collection);
-    const present = presentColors(counts);
+    const jokerCount = countJokers(human.collection);
+    const hasJokers = jokerCount > 0;
+    // With jokers the overlay grows a declaration row (taller box).
+    const boxH = hasJokers ? 460 : 380;
+
+    // Initial state: the joint optimum -- positives and joker declarations
+    // that together maximize the human's round score. Both can be adjusted.
     const selected = new Set<ChameleonColor>(selectBestPositiveColors(human.collection));
+    const jokerAssignment: ChameleonColor[] = [...optimalJokerAssignment(human.collection)];
 
     const { objects } = createOverlayBackground(
       this,
       { depth: 199, alpha: 0.7 },
-      { width: 560, height: 380, color: 0x0d1a21, alpha: 0.95, depth: 200 },
+      { width: 620, height: boxH, color: 0x0d1a21, alpha: 0.95, depth: 200 },
     );
     this.overlayObjects.push(...objects);
 
     const centerX = GAME_W / 2;
     const boxY = GAME_H / 2;
+    const titleY = boxY - (hasJokers ? 190 : 150);
+    const subtitleY = boxY - (hasJokers ? 158 : 118);
+    const chipY = boxY - (hasJokers ? 55 : 30);
+    const confirmY = boxY + (hasJokers ? 165 : 120);
 
     const title = this.add
-      .text(centerX, boxY - 150, 'Choose 3 colors to score POSITIVELY', {
+      .text(centerX, titleY, 'Choose 3 colors to score POSITIVELY', {
         fontSize: '20px',
         color: '#ffdd66',
         fontFamily: FONT_FAMILY,
@@ -1168,7 +1301,7 @@ export class ColorettoScene extends CardGameScene {
     this.overlayObjects.push(title);
 
     const subtitle = this.add
-      .text(centerX, boxY - 118, 'All other colors score negatively', {
+      .text(centerX, subtitleY, 'All other colors score negatively', {
         fontSize: '14px',
         color: '#aacccc',
         fontFamily: FONT_FAMILY,
@@ -1178,16 +1311,38 @@ export class ColorettoScene extends CardGameScene {
     if (this.hudContainer) this.hudContainer.add(subtitle);
     this.overlayObjects.push(subtitle);
 
+    if (hasJokers) {
+      const jokerHint = this.add
+        .text(centerX, boxY + 35, 'Click a joker to change its color', {
+          fontSize: '14px',
+          color: '#e8c1ff',
+          fontFamily: FONT_FAMILY,
+        })
+        .setOrigin(0.5)
+        .setDepth(201);
+      if (this.hudContainer) this.hudContainer.add(jokerHint);
+      this.overlayObjects.push(jokerHint);
+    }
+
     const chips: { color: ChameleonColor; objects: Phaser.GameObjects.GameObject[] }[] = [];
-    const chipStartX = centerX - 240;
-    const chipY = boxY - 30;
+    const jokerChips: { index: number; objects: Phaser.GameObjects.GameObject[] }[] = [];
+    const chipStartX = centerX - 260;
+    const jokerChipY = boxY + 68;
+
+    const destroyChip = (objects: Phaser.GameObjects.GameObject[]): void => {
+      for (const obj of objects) obj.destroy();
+    };
 
     const drawChips = (): void => {
-      // Rebuild the color chips from the current selection state.
-      for (const entry of chips) {
-        for (const obj of entry.objects) obj.destroy();
-      }
+      // Rebuild the color chips from the current selection and joker
+      // declaration (counts include declared jokers).
+      for (const entry of chips) destroyChip(entry.objects);
       chips.length = 0;
+      for (const entry of jokerChips) destroyChip(entry.objects);
+      jokerChips.length = 0;
+
+      const counts = colorCounts(human.collection, jokerAssignment);
+      const present = presentColors(counts);
 
       present.forEach((color, i) => {
         const x = chipStartX + i * 80;
@@ -1243,35 +1398,93 @@ export class ColorettoScene extends CardGameScene {
           drawChips();
         });
       });
+
+      // Per-joker declaration chips: click to cycle the declared color.
+      if (hasJokers) {
+        const startX = centerX - ((jokerCount - 1) * 80) / 2;
+        jokerAssignment.forEach((assigned, i) => {
+          const x = startX + i * 80;
+          const objects: Phaser.GameObjects.GameObject[] = [];
+
+          const bg = this.add.rectangle(x, jokerChipY, 70, 44, 0x2e2a55)
+            .setStrokeStyle(2, 0xbb88ff)
+            .setDepth(201)
+            .setInteractive({ useHandCursor: true });
+          if (this.hudContainer) this.hudContainer.add(bg);
+          objects.push(bg);
+
+          const label = this.add
+            .text(x, jokerChipY - 7, `J${i + 1} → ${colorLabel(assigned)}`, {
+              fontSize: '12px',
+              color: '#ffffff',
+              fontFamily: FONT_FAMILY,
+              stroke: '#000000',
+              strokeThickness: 2,
+            })
+            .setOrigin(0.5)
+            .setDepth(201);
+          if (this.hudContainer) this.hudContainer.add(label);
+          objects.push(label);
+
+          const hint = this.add
+            .text(x, jokerChipY + 12, 'wild', {
+              fontSize: '9px',
+              color: '#a09bd8',
+              fontFamily: FONT_FAMILY,
+            })
+            .setOrigin(0.5)
+            .setDepth(201);
+          if (this.hudContainer) this.hudContainer.add(hint);
+          objects.push(hint);
+
+          jokerChips.push({ index: i, objects });
+
+          bg.on('pointerdown', () => {
+            this.soundManager?.play(SFX_KEYS.UI);
+            const idx = COLORS.indexOf(assigned);
+            jokerAssignment[i] = COLORS[(idx + 1) % COLORS.length];
+            drawChips();
+          });
+        });
+      }
     };
 
     drawChips();
 
-    const confirm = createOverlayButton(this, centerX, boxY + 120, 'Confirm', 201, { fontSize: '18px' });
+    const confirm = createOverlayButton(this, centerX, confirmY, 'Confirm', 201, { fontSize: '18px' });
     if (this.hudContainer) this.hudContainer.add(confirm);
     this.overlayObjects.push(confirm);
     confirm.on('pointerdown', () => {
       this.soundManager?.play(SFX_KEYS.UI);
-      // Destroy the picker chips: they are tracked in the local `chips`
-      // array (not in `overlayObjects`), so dismissOverlay() below would
-      // otherwise leave them rendered at depth 201 into the next round.
-      // Mirror drawChips()'s cleanup loop.
-      for (const entry of chips) {
-        for (const obj of entry.objects) obj.destroy();
-      }
+      // Destroy the picker chips: they are tracked in the local `chips` /
+      // `jokerChips` arrays (not in `overlayObjects`), so dismissOverlay()
+      // below would otherwise leave them rendered at depth 201 into the
+      // next round. Mirror drawChips()'s cleanup loops.
+      for (const entry of chips) destroyChip(entry.objects);
       chips.length = 0;
+      for (const entry of jokerChips) destroyChip(entry.objects);
+      jokerChips.length = 0;
       dismissOverlay(this.overlayObjects);
       this.overlayObjects = [];
-      this.completeRoundScoring([...selected]);
+      this.completeRoundScoring(
+        [...selected],
+        hasJokers ? [...jokerAssignment] : undefined,
+      );
     });
   }
 
-  private completeRoundScoring(humanPositiveColors: ChameleonColor[]): void {
+  private completeRoundScoring(
+    humanPositiveColors: ChameleonColor[],
+    humanJokerAssignment?: JokerAssignment,
+  ): void {
     const positives: (ChameleonColor[] | undefined)[] = this.session.players.map((_, i) =>
       i === 0 ? humanPositiveColors : undefined,
     );
+    const jokerAssignments: (JokerAssignment | undefined)[] = this.session.players.map((_, i) =>
+      i === 0 ? humanJokerAssignment : undefined,
+    );
 
-    const result = scoreRound(this.session, positives);
+    const result = scoreRound(this.session, positives, jokerAssignments);
     this.recorder?.recordRoundResult(result);
     this.soundManager?.play(SFX_KEYS.ROUND);
 

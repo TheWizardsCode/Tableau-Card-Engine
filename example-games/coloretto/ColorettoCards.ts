@@ -1,13 +1,12 @@
 /**
  * Coloretto card type definitions and deck creation.
  *
- * The simplified Coloretto deck (initial spike) contains:
+ * The full Coloretto deck contains:
  *   - 7 chameleon colors × 6 cards each (3 single + 3 double) = 42 cards
+ *   - 3 Joker cards (wild chameleons -- assigned to any color at scoring)
+ *   - 3 “+2” bonus point cards (flat +2 points each)
  *   - 1 Last Round trigger card
- *   - Total: 43 cards
- *
- * Joker (wild chameleon) and "+2" bonus cards are tracked as a separate
- * follow-on work item (CG-0MQGJXW67008DZ39) and are NOT part of this deck.
+ *   - Total: 49 cards
  *
  * Unlike the standard card-system Card (rank/suit), Coloretto uses a
  * custom card type with game-specific properties, following the pattern
@@ -26,7 +25,7 @@ export type ChameleonColor =
   | 'orange'
   | 'brown';
 
-export type ColorettoCardType = 'chameleon' | 'last-round';
+export type ColorettoCardType = 'chameleon' | 'last-round' | 'joker' | 'bonus';
 
 // ── Card interfaces ─────────────────────────────────────────
 
@@ -46,8 +45,25 @@ export interface LastRoundCard extends BaseCard {
   readonly type: 'last-round';
 }
 
+/**
+ * Wild chameleon: counts as any color the player declares at scoring
+ * time (one color per joker held).
+ */
+export interface JokerCard extends BaseCard {
+  readonly type: 'joker';
+}
+
+/** Flat “+2” bonus point card, independent of color scoring. */
+export interface BonusCard extends BaseCard {
+  readonly type: 'bonus';
+}
+
 /** Discriminated union of all Coloretto card types. */
-export type ColorettoCard = ChameleonCard | LastRoundCard;
+export type ColorettoCard =
+  | ChameleonCard
+  | LastRoundCard
+  | JokerCard
+  | BonusCard;
 
 // ── Color display helpers ───────────────────────────────────
 
@@ -93,6 +109,8 @@ export function colorHex(color: ChameleonColor): string {
 /** Human-readable label for a card (used in tooltips and logs). */
 export function cardLabel(card: ColorettoCard): string {
   if (card.type === 'last-round') return 'Last Round';
+  if (card.type === 'joker') return 'Joker';
+  if (card.type === 'bonus') return '+2';
   return `${card.count}× ${colorLabel(card.color)}`;
 }
 
@@ -105,13 +123,22 @@ export const DOUBLE_PER_COLOR = 3;
 /** Total cards per color (single + double). */
 export const CARDS_PER_COLOR = SINGLE_PER_COLOR + DOUBLE_PER_COLOR; // 6
 
-/** Total number of cards in the base deck (42 chameleons + 1 Last Round). */
-export const DECK_SIZE = COLORS.length * CARDS_PER_COLOR + 1; // 43
+/** Number of Joker (wild chameleon) cards in the full deck. */
+export const JOKER_COUNT = 3;
+/** Number of “+2” bonus point cards in the full deck. */
+export const BONUS_COUNT = 3;
+
+/**
+ * Total number of cards in the full deck
+ * (42 chameleons + 3 jokers + 3 bonus + 1 Last Round).
+ */
+export const DECK_SIZE =
+  COLORS.length * CARDS_PER_COLOR + JOKER_COUNT + BONUS_COUNT + 1; // 49
 
 // ── Deck creation ───────────────────────────────────────────
 
 /**
- * Create the 43-card Coloretto deck (unshuffled).
+ * Create the 49-card Coloretto deck (unshuffled).
  *
  * Each card receives a unique sequential id starting from 0. The Last
  * Round card is always the final card in the base (pre-shuffle) order.
@@ -127,6 +154,13 @@ export function createColorettoDeck(): ColorettoCard[] {
     for (let i = 0; i < DOUBLE_PER_COLOR; i++) {
       deck.push({ id: nextId++, type: 'chameleon', color, count: 2 });
     }
+  }
+
+  for (let i = 0; i < JOKER_COUNT; i++) {
+    deck.push({ id: nextId++, type: 'joker' });
+  }
+  for (let i = 0; i < BONUS_COUNT; i++) {
+    deck.push({ id: nextId++, type: 'bonus' });
   }
 
   deck.push({ id: nextId, type: 'last-round' });

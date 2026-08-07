@@ -13,6 +13,8 @@ import {
   DECK_SIZE,
   SINGLE_PER_COLOR,
   DOUBLE_PER_COLOR,
+  JOKER_COUNT,
+  BONUS_COUNT,
   createColorettoDeck,
   rowsForPlayerCount,
   roundsForPlayerCount,
@@ -24,10 +26,10 @@ import {
 
 describe('ColorettoCards', () => {
   describe('deck composition', () => {
-    it('has exactly 43 cards (42 chameleons + 1 Last Round)', () => {
+    it('has exactly 49 cards (42 chameleons + 1 Last Round + 3 jokers + 3 bonus)', () => {
       const deck = createColorettoDeck();
       expect(deck).toHaveLength(DECK_SIZE);
-      expect(DECK_SIZE).toBe(43);
+      expect(DECK_SIZE).toBe(49);
     });
 
     it('contains the 7 canonical chameleon colors', () => {
@@ -66,12 +68,29 @@ describe('ColorettoCards', () => {
       expect(ids[ids.length - 1]).toBe(DECK_SIZE - 1);
     });
 
-    it('has no joker or +2 cards in the simplified deck', () => {
+    it('has exactly 3 joker (wild) cards', () => {
       const deck = createColorettoDeck();
-      const unexpected = deck.filter(
-        (c) => c.type !== 'chameleon' && c.type !== 'last-round',
-      );
-      expect(unexpected).toHaveLength(0);
+      const jokers = deck.filter((c) => c.type === 'joker');
+      expect(jokers).toHaveLength(JOKER_COUNT);
+      expect(JOKER_COUNT).toBe(3);
+      for (const joker of jokers) {
+        expect(joker).toMatchObject({ type: 'joker' });
+      }
+    });
+
+    it('has exactly 3 +2 bonus cards', () => {
+      const deck = createColorettoDeck();
+      const bonus = deck.filter((c) => c.type === 'bonus');
+      expect(bonus).toHaveLength(BONUS_COUNT);
+      expect(BONUS_COUNT).toBe(3);
+      for (const card of bonus) {
+        expect(card).toMatchObject({ type: 'bonus' });
+      }
+    });
+
+    it('places the Last Round card last in the unshuffled base order', () => {
+      const deck = createColorettoDeck();
+      expect(deck[deck.length - 1]).toMatchObject({ type: 'last-round' });
     });
   });
 
@@ -96,6 +115,11 @@ describe('ColorettoCards', () => {
     it('labels the Last Round card', () => {
       const card = { id: 42, type: 'last-round' as const };
       expect(cardLabel(card)).toBe('Last Round');
+    });
+
+    it('labels joker and +2 bonus cards', () => {
+      expect(cardLabel({ id: 43, type: 'joker' as const })).toBe('Joker');
+      expect(cardLabel({ id: 44, type: 'bonus' as const })).toBe('+2');
     });
   });
 
