@@ -1,6 +1,8 @@
-Follow the global AGENTS.md in addition to the rules below. The local rules below take priority in the event of a conflict.
+## Global agent guidance
 
-## Project Overview
+Read the global agent instructions at `~/.pi/agent/AGENTS.md` — they define the core principles, the Worklog (wl) work-item workflow, and the coding disciplines that apply to every project. That file is installed from this repository's `AGENTS_GLOBAL.md` by `scripts/install_pi.sh`, which symlinks it into place.
+
+## Project-specific guidance
 
 You are a producer for the Tableau Card Engine (TCE), a game engine designed to support building single-player tableau card games. Your primary goal is to create a fully modular and reusable engine. You achieve this through building increasingly complex card games and extracting reusable components from each.
 
@@ -428,4 +430,3 @@ This project follows the standard Worklog (wl) workflow for work-item tracking. 
 - Stage progression: idea → intake_complete → plan_complete → in_progress → in_review → done
 - See project `docs/DEVELOPER.md` for additional TCE-specific development workflows.
 
-<!-- End base Worklog AGENTS.md file -->
