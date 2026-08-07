@@ -279,6 +279,13 @@ async function startTwoPlayerGame(game: Phaser.Game): Promise<any> {
   const scene = game.scene.getScene('ColorettoScene') as any;
   await waitFrames(10);
   expect(clickText(scene, '2 (1 AI)')).toBe(true);
+  // The randomized turn order may put the AI first, so strip the Last
+  // Round card from the draw pile IMMEDIATELY (before any AI turn runs)
+  // to prevent an AI turn from triggering an early round end mid-test
+  // (these tests exercise animations, not the Last Round flow).
+  scene.session.deck = createColorettoDeck().filter(
+    (c) => c.type !== 'last-round',
+  );
   await waitForCondition(() => scene.phaseManager?.current === 'human-turn');
   return scene;
 }
@@ -391,7 +398,9 @@ describe('ColorettoScene (browser)', () => {
 
     await waitFrames(10);
     expect(clickText(scene, '2 (1 AI)')).toBe(true);
-    await waitFrames(10);
+    // Await the human turn so no AI delayed turn is pending while the test
+    // forces a round end (turn order is randomized at game start).
+    await waitForCondition(() => scene.phaseManager?.current === 'human-turn');
 
     // Baseline: no interactive rectangles at the picker chip depth (201).
     expect(pickerChipRectangles(scene)).toHaveLength(0);
@@ -437,7 +446,9 @@ describe('ColorettoScene (browser)', () => {
 
     await waitFrames(10);
     expect(clickText(scene, '2 (1 AI)')).toBe(true);
-    await waitFrames(10);
+    // Await the human turn so no AI delayed turn is pending while the test
+    // forces a round end (turn order is randomized at game start).
+    await waitForCondition(() => scene.phaseManager?.current === 'human-turn');
 
     // Round 2+ scenario: the human holds cards in 4 colors (accumulated
     // across rounds), so one color must score negatively.
@@ -515,7 +526,9 @@ describe('ColorettoScene (browser)', () => {
 
     await waitFrames(10);
     expect(clickText(scene, '2 (1 AI)')).toBe(true);
-    await waitFrames(10);
+    // Await the human turn so no AI delayed turn is pending while the test
+    // forces a round end (turn order is randomized at game start).
+    await waitForCondition(() => scene.phaseManager?.current === 'human-turn');
 
     // Human holds one card in every colour: the 3 optimal positives
     // (red, yellow, green) and 4 negatives.
@@ -565,7 +578,14 @@ describe('ColorettoScene (browser)', () => {
 
     await waitFrames(10);
     expect(clickText(scene, '2 (1 AI)')).toBe(true);
-    await waitFrames(10);
+    // Strip the Last Round card so an AI-first randomized turn order can
+    // never end the round mid-test (these tests drive their own turns).
+    scene.session.deck = createColorettoDeck().filter(
+      (c) => c.type !== 'last-round',
+    );
+    // Await the human turn so no AI delayed turn is pending while the test
+    // forces its own turn state (turn order is randomized at game start).
+    await waitForCondition(() => scene.phaseManager?.current === 'human-turn');
 
     // Force a deterministic take: seed row 0 with two face-up cards and
     // make player 0 the current player.
@@ -618,7 +638,14 @@ describe('ColorettoScene (browser)', () => {
 
       expect(scene.reducedMotion).toBe(true);
       expect(clickText(scene, '2 (1 AI)')).toBe(true);
-      await waitFrames(10);
+      // Strip the Last Round card so an AI-first randomized turn order can
+      // never end the round mid-test (these tests drive their own turns).
+      scene.session.deck = createColorettoDeck().filter(
+        (c) => c.type !== 'last-round',
+      );
+      // Await the human turn so no AI delayed turn is pending while the test
+      // forces its own turn state (turn order is randomized at game start).
+      await waitForCondition(() => scene.phaseManager?.current === 'human-turn');
 
       scene.session.rows[0].cards = [
         { id: 902, type: 'chameleon', color: 'green', count: 1 },
@@ -649,7 +676,14 @@ describe('ColorettoScene (browser)', () => {
     const scene = game.scene.getScene('ColorettoScene') as any;
     await waitFrames(10);
     expect(clickText(scene, '2 (1 AI)')).toBe(true);
-    await waitFrames(10);
+    // Strip the Last Round card so an AI-first randomized turn order can
+    // never end the round mid-test (these tests drive their own turns).
+    scene.session.deck = createColorettoDeck().filter(
+      (c) => c.type !== 'last-round',
+    );
+    // Await the human turn so no AI delayed turn is pending while the test
+    // forces its own turn state (turn order is randomized at game start).
+    await waitForCondition(() => scene.phaseManager?.current === 'human-turn');
 
     // Make player 1 (the AI) the current player with a takeable row, then
     // drive the same code path runTurn uses for AI players.
@@ -703,9 +737,10 @@ describe('ColorettoScene (browser)', () => {
     );
 
     // The flight is destroyed after the flip completes (the AI turn then
-    // begins, so the human's card is the only card in row 0 at this point).
+    // begins; the human's card is on row 0 -- an AI card drawn before the
+    // human's first turn may share the row).
     await waitForCondition(() => scene.flightCard === null);
-    expect(scene.session.rows[0].cards.length).toBe(1);
+    expect(scene.session.rows[0].cards.length).toBeGreaterThanOrEqual(1);
 
     // The turn continues: the AI thinks and then places; eventually the
     // human turn is restored.
@@ -733,13 +768,18 @@ describe('ColorettoScene (browser)', () => {
       await waitFrames(1);
     }
 
-    // The placement still completes normally: the card is on the row.
-    expect(scene.session.rows[0].cards.length).toBe(1);
+    // The placement still completes normally: the human's card is on row 0
+    // (an AI card drawn before the human's first turn may share the row).
+    expect(scene.session.rows[0].cards.length).toBeGreaterThanOrEqual(1);
   }, 15000);
 
   it('ignores row clicks while a placement animation is in flight', async () => {
     game = await bootGame();
     const scene = await startTwoPlayerGame(game);
+
+    // Snapshot row counts: the randomized turn order may put the AI first,
+    // leaving an AI card on the board before the human's first turn.
+    const rowCountsBefore = scene.session.rows.map((r: { cards: unknown[] }) => r.cards.length);
 
     humanPlace(scene, 0);
     expect(scene.phaseManager.current).toBe('animating');
@@ -749,18 +789,26 @@ describe('ColorettoScene (browser)', () => {
 
     // A row click during the animation must be ignored.
     scene.onRowClick(1);
-    expect(scene.session.rows[1].cards.length).toBe(0);
+    expect(scene.session.rows[1].cards.length).toBe(rowCountsBefore[1]);
 
     // When the animation completes (before the AI acts), only the human's
     // card has been placed and the ignored click left row 1 untouched.
     await waitForCondition(() => scene.flightCard === null);
-    expect(scene.session.rows[0].cards.length).toBe(1);
-    expect(scene.session.rows[1].cards.length).toBe(0);
+    expect(scene.session.rows[0].cards.length).toBe(rowCountsBefore[0] + 1);
+    expect(scene.session.rows[1].cards.length).toBe(rowCountsBefore[1]);
   }, 15000);
 
   it('animates an AI placement and resumes the human turn', async () => {
     game = await bootGame();
     const scene = await startTwoPlayerGame(game);
+
+    // The board may already hold a card from the AI's lead turn when the
+    // randomized turn order put the AI first (startTwoPlayerGame awaits the
+    // human turn, so the AI's first placement precedes this point).
+    const cardsBefore = [0, 1, 2].reduce(
+      (sum, i) => sum + scene.session.rows[i].cards.length,
+      0,
+    );
 
     humanPlace(scene, 0);
 
@@ -782,13 +830,13 @@ describe('ColorettoScene (browser)', () => {
     await waitForCondition(
       () => scene.flightCard === null && scene.phaseManager.current === 'human-turn',
     );
-    // Two placements happened in total: the human's and the AI's (the AI
-    // may pick any non-full row).
+    // Exactly two placements happened since the snapshot: the human's and
+    // the AI's (the AI may pick any non-full row).
     const totalCards = [0, 1, 2].reduce(
       (sum, i) => sum + scene.session.rows[i].cards.length,
       0,
     );
-    expect(totalCards).toBe(2);
+    expect(totalCards).toBe(cardsBefore + 2);
     expect(scene.session.currentTurnIndex).toBe(0);
   }, 15000);
 
@@ -797,6 +845,13 @@ describe('ColorettoScene (browser)', () => {
     game = await bootGame();
     const scene = await startTwoPlayerGame(game);
     expect(scene.reducedMotion).toBe(true);
+
+    // The board may already hold a card from the AI's lead turn when the
+    // randomized turn order put the AI first (see above).
+    const cardsBefore = [0, 1, 2].reduce(
+      (sum, i) => sum + scene.session.rows[i].cards.length,
+      0,
+    );
 
     humanPlace(scene, 0);
 
@@ -813,7 +868,7 @@ describe('ColorettoScene (browser)', () => {
       (sum, i) => sum + scene.session.rows[i].cards.length,
       0,
     );
-    expect(totalCards).toBe(2);
+    expect(totalCards).toBe(cardsBefore + 2);
     expect(scene.session.rows[0].cards.length).toBeGreaterThanOrEqual(1);
     expect(scene.flightCard).toBeNull();
   }, 15000);
@@ -857,7 +912,9 @@ describe('ColorettoScene (browser)', () => {
 
     await waitForCondition(() => scene.flightCard === null);
     expect(scene.session.lastRoundTriggered).toBe(true);
-    expect(scene.session.rows[0].cards[0].type).toBe('last-round');
+    // The Last Round card was placed onto row 0 (an AI card drawn before
+    // the human's first turn may share the row).
+    expect(scene.session.rows[0].cards.some((c: { type: string }) => c.type === 'last-round')).toBe(true);
     // The human's placement was their final turn; the AI (still active)
     // gets one more animated turn.
     expect(scene.phaseManager.current).toBe('ai-thinking');
@@ -887,8 +944,12 @@ describe('ColorettoScene (browser)', () => {
       const scene = game.scene.getScene('ColorettoScene') as any;
       await waitFrames(10);
       expect(clickText(scene, `${count} (${count - 1} AI)`)).toBe(true);
-      await waitFrames(10);
-      expect(scene.phaseManager.current).toBe('human-turn');
+      // Await the human turn (turn order is randomized at game start), then
+      // force identity order so the layout assertions below are
+      // deterministic: the human's seeded chips render on the first row.
+      await waitForCondition(() => scene.phaseManager?.current === 'human-turn');
+      scene.session.turnOrder = Array.from({ length: count }, (_, i) => i);
+      scene.session.roundStartPlayer = 0;
 
       // Row labels R1..Rn no longer render after game start.
       expect(rowLabelTexts(scene)).toHaveLength(0);
@@ -960,8 +1021,9 @@ describe('ColorettoScene (browser)', () => {
     const scene = game.scene.getScene('ColorettoScene') as any;
     await waitFrames(10);
     expect(clickText(scene, '3 (2 AI)')).toBe(true);
-    await waitFrames(10);
-    expect(scene.phaseManager.current).toBe('human-turn');
+    // Await the human turn so no AI delayed turn is pending while the test
+    // mutates the panel (turn order is randomized at game start).
+    await waitForCondition(() => scene.phaseManager?.current === 'human-turn');
 
     // Deliberately varied name/score widths and chip counts per player:
     // a short name with a low score, an overlong name with the max score,

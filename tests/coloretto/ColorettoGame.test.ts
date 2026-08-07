@@ -17,6 +17,7 @@ import {
   setupColorettoGame,
   topCard,
   getCurrentPlayerIndex,
+  getRoundTurnOrder,
   validateAction,
   legalActions,
   executeAction,
@@ -39,6 +40,17 @@ function makeRng(seed: number = 42) {
     s = (s * 16807) % 2147483647;
     return s / 2147483647;
   };
+}
+
+/**
+ * Force identity turn order (players act in array order, player 0 first)
+ * for mechanics tests that hardcode player indices. The game randomizes
+ * turn order at setup; these tests opt into an explicit order instead.
+ */
+function forceIdentityTurnOrder(session: ColorettoSession): void {
+  session.turnOrder = session.players.map((_, i) => i);
+  session.roundStartPlayer = 0;
+  session.currentTurnIndex = -1;
 }
 
 /** Build a chameleon card quickly. */
@@ -108,9 +120,11 @@ describe('ColorettoGame', () => {
       }
     });
 
-    it('starts with player 0 to move and empty collections', () => {
+    it('starts with the round-1 start player to move and empty collections', () => {
       const session = setupColorettoGame({ rng: makeRng() });
-      expect(getCurrentPlayerIndex(session)).toBe(0);
+      // Round 1 begins with the first player in the randomized turn order.
+      expect(session.roundStartPlayer).toBe(session.turnOrder[0]);
+      expect(getCurrentPlayerIndex(session)).toBe(session.turnOrder[0]);
       for (const player of session.players) {
         expect(player.collection).toHaveLength(0);
         expect(player.roundState).toBe('active');
@@ -123,6 +137,7 @@ describe('ColorettoGame', () => {
   describe('row placement rules', () => {
     it('places the top card onto an empty row', () => {
       const session = setupColorettoGame({ rng: makeRng() });
+      forceIdentityTurnOrder(session);
       const top = topCard(session);
       const result = executeAction(session, 0, { type: 'place', rowIndex: 0 });
       expect(result.drawnCard).toEqual(top);
@@ -133,6 +148,7 @@ describe('ColorettoGame', () => {
 
     it('accepts placement on any non-full row', () => {
       const session = setupColorettoGame({ rng: makeRng() });
+      forceIdentityTurnOrder(session);
       expect(validateAction(session, 0, { type: 'place', rowIndex: 1 }).legal).toBe(true);
       expect(validateAction(session, 0, { type: 'place', rowIndex: 2 }).legal).toBe(true);
       executeAction(session, 0, { type: 'place', rowIndex: 1 });
@@ -141,6 +157,7 @@ describe('ColorettoGame', () => {
 
     it('rejects placement on a full row', () => {
       const session = setupColorettoGame({ rng: makeRng() });
+      forceIdentityTurnOrder(session);
       // Fill row 0 with 3 cards via repeated placement by alternating players.
       session.rows[0].cards = [ch('red', 1, 0), ch('blue', 1, 1), ch('green', 1, 2)];
       session.currentTurnIndex = -1;
@@ -151,23 +168,27 @@ describe('ColorettoGame', () => {
 
     it('rejects placement out of row bounds', () => {
       const session = setupColorettoGame({ rng: makeRng() });
+      forceIdentityTurnOrder(session);
       expect(validateAction(session, 0, { type: 'place', rowIndex: 3 }).legal).toBe(false);
       expect(validateAction(session, 0, { type: 'place', rowIndex: -1 }).legal).toBe(false);
     });
 
     it('rejects placement when it is not the player turn', () => {
       const session = setupColorettoGame({ rng: makeRng() });
+      forceIdentityTurnOrder(session);
       expect(validateAction(session, 1, { type: 'place', rowIndex: 0 }).legal).toBe(false);
     });
 
     it('rejects placement when the deck is empty', () => {
       const session = setupColorettoGame({ rng: makeRng() });
+      forceIdentityTurnOrder(session);
       session.deck = [];
       expect(validateAction(session, 0, { type: 'place', rowIndex: 0 }).legal).toBe(false);
     });
 
     it('advances turns around the table, skipping taken-row players', () => {
       const session = setupColorettoGame({ playerCount: 4, rng: makeRng() });
+      forceIdentityTurnOrder(session);
       expect(getCurrentPlayerIndex(session)).toBe(0);
       executeAction(session, 0, { type: 'place', rowIndex: 0 });
       expect(getCurrentPlayerIndex(session)).toBe(1);
@@ -186,6 +207,7 @@ describe('ColorettoGame', () => {
   describe('take-a-row mechanics', () => {
     it('moves all row cards into the collection and clears the row', () => {
       const session = setupColorettoGame({ rng: makeRng() });
+      forceIdentityTurnOrder(session);
       executeAction(session, 0, { type: 'place', rowIndex: 0 });
       executeAction(session, 1, { type: 'place', rowIndex: 0 });
       const rowCards = [...session.rows[0].cards];
@@ -198,6 +220,7 @@ describe('ColorettoGame', () => {
 
     it('eliminates the player from further action in the round', () => {
       const session = setupColorettoGame({ rng: makeRng() });
+      forceIdentityTurnOrder(session);
       executeAction(session, 0, { type: 'place', rowIndex: 0 });
       executeAction(session, 1, { type: 'take', rowIndex: 0 });
       expect(session.players[1].roundState).toBe('taken-row');
@@ -208,17 +231,20 @@ describe('ColorettoGame', () => {
 
     it('rejects taking an empty row', () => {
       const session = setupColorettoGame({ rng: makeRng() });
+      forceIdentityTurnOrder(session);
       expect(validateAction(session, 0, { type: 'take', rowIndex: 0 }).legal).toBe(false);
     });
 
     it('rejects taking a row out of bounds', () => {
       const session = setupColorettoGame({ rng: makeRng() });
+      forceIdentityTurnOrder(session);
       session.rows[0].cards = [ch('red', 1, 0)];
       expect(validateAction(session, 0, { type: 'take', rowIndex: 5 }).legal).toBe(false);
     });
 
     it('throws on illegal actions', () => {
       const session = setupColorettoGame({ rng: makeRng() });
+      forceIdentityTurnOrder(session);
       expect(() => executeAction(session, 0, { type: 'take', rowIndex: 0 })).toThrow();
     });
   });
@@ -226,6 +252,7 @@ describe('ColorettoGame', () => {
   describe('legalActions', () => {
     it('returns place actions for non-full rows and take actions for non-empty rows', () => {
       const session = setupColorettoGame({ rng: makeRng() });
+      forceIdentityTurnOrder(session);
       let actions = legalActions(session, 0);
       expect(actions).toEqual([
         { type: 'place', rowIndex: 0 },
@@ -241,6 +268,7 @@ describe('ColorettoGame', () => {
 
     it('returns no actions for non-current or eliminated players', () => {
       const session = setupColorettoGame({ rng: makeRng() });
+      forceIdentityTurnOrder(session);
       expect(legalActions(session, 1)).toHaveLength(0);
       session.players[0].roundState = 'taken-row';
       expect(legalActions(session, 0)).toHaveLength(0);
@@ -250,6 +278,7 @@ describe('ColorettoGame', () => {
   describe('Last Round flow', () => {
     it('triggers the Last Round when the Last Round card is placed', () => {
       const session = setupColorettoGame({ rng: makeRng() });
+      forceIdentityTurnOrder(session);
       // Replace the deck so the top card (last element) is the Last Round card.
       session.deck = [ch('red', 1, 0), { id: 42, type: 'last-round' }];
       const result = executeAction(session, 0, { type: 'place', rowIndex: 0 });
@@ -260,6 +289,7 @@ describe('ColorettoGame', () => {
 
     it('gives every active player exactly one final turn after the trigger', () => {
       const session = setupColorettoGame({ playerCount: 4, rng: makeRng() });
+      forceIdentityTurnOrder(session);
       // Player 0 and 1 act normally first.
       executeAction(session, 0, { type: 'place', rowIndex: 0 });
       executeAction(session, 1, { type: 'place', rowIndex: 0 });
@@ -292,6 +322,7 @@ describe('ColorettoGame', () => {
 
     it('ends the round after final turns even if rows have space', () => {
       const session = setupColorettoGame({ playerCount: 2, rng: makeRng() });
+      forceIdentityTurnOrder(session);
       session.deck = [ch('red', 1, 0), { id: 42, type: 'last-round' }];
       executeAction(session, 0, { type: 'place', rowIndex: 0 });
       // Player 1's final turn: they may place one more card.
@@ -386,6 +417,7 @@ describe('ColorettoGame', () => {
      * deck = [A,B,C,D,E] pops E, D, C, B, A in turn.
      */
     function playDeterministicRound1(session: ColorettoSession): void {
+      forceIdentityTurnOrder(session);
       session.deck = [
         ch('purple', 1, 90), ch('purple', 1, 91), // never drawn (round ends first)
         ch('green', 1, 1),  // 5th pop → row 0 third slot
@@ -496,6 +528,155 @@ describe('ColorettoGame', () => {
       scoreRound(session);
       expect(isGameOver(session)).toBe(true);
       expect(getWinnerIndex(session)).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe('turn order randomization', () => {
+    it('assigns a permutation of every player index at setup', () => {
+      const session = setupColorettoGame({ playerCount: 4, rng: makeRng() });
+      expect(session.turnOrder).toHaveLength(4);
+      expect([...session.turnOrder].sort((a, b) => a - b)).toEqual([0, 1, 2, 3]);
+    });
+
+    it('is deterministic for the same seed', () => {
+      const a = setupColorettoGame({ playerCount: 4, rng: makeRng(99) });
+      const b = setupColorettoGame({ playerCount: 4, rng: makeRng(99) });
+      expect(a.turnOrder).toEqual(b.turnOrder);
+    });
+
+    it('varies across seeds so the human is not always first', () => {
+      const orders = [1, 2, 3, 4, 5, 6, 7, 8].map((seed) =>
+        setupColorettoGame({ playerCount: 3, rng: makeRng(seed) }).turnOrder,
+      );
+      // Every order is a valid permutation of the 3 players...
+      for (const order of orders) {
+        expect([...order].sort((a, b) => a - b)).toEqual([0, 1, 2]);
+      }
+      // ...and not every game puts the human (index 0) first.
+      expect(orders.every((o) => o[0] === 0)).toBe(false);
+      // At least two distinct orders appear across seeds.
+      expect(new Set(orders.map((o) => o.join(','))).size).toBeGreaterThan(1);
+    });
+
+    it('begins round 1 with the first player in the randomized order', () => {
+      const session = setupColorettoGame({ playerCount: 4, rng: makeRng(1234) });
+      expect(session.roundStartPlayer).toBe(session.turnOrder[0]);
+      expect(getCurrentPlayerIndex(session)).toBe(session.turnOrder[0]);
+    });
+
+    it('exposes the round play order for display (rotation from the start player)', () => {
+      const session = setupColorettoGame({ playerCount: 4, rng: makeRng() });
+      session.turnOrder = [3, 1, 0, 2];
+      session.roundStartPlayer = 1;
+      expect(getRoundTurnOrder(session)).toEqual([1, 0, 2, 3]);
+      session.roundStartPlayer = 3;
+      expect(getRoundTurnOrder(session)).toEqual([3, 1, 0, 2]);
+    });
+  });
+
+  describe('turn rotation through the turn order', () => {
+    it('rotates turns through a non-identity turn order, wrapping around', () => {
+      const session = setupColorettoGame({ playerCount: 3, rng: makeRng() });
+      // Force a specific non-identity order: player 2 leads, then 0, then 1.
+      session.turnOrder = [2, 0, 1];
+      session.roundStartPlayer = 2;
+      session.currentTurnIndex = -1;
+
+      expect(getCurrentPlayerIndex(session)).toBe(2);
+      executeAction(session, 2, { type: 'place', rowIndex: 0 });
+      expect(getCurrentPlayerIndex(session)).toBe(0);
+      executeAction(session, 0, { type: 'place', rowIndex: 1 });
+      expect(getCurrentPlayerIndex(session)).toBe(1);
+      executeAction(session, 1, { type: 'place', rowIndex: 2 });
+      expect(getCurrentPlayerIndex(session)).toBe(2); // wraps around
+      executeAction(session, 2, { type: 'place', rowIndex: 0 });
+      expect(getCurrentPlayerIndex(session)).toBe(0);
+      executeAction(session, 0, { type: 'place', rowIndex: 1 });
+      expect(getCurrentPlayerIndex(session)).toBe(1);
+
+      // Player 1 takes a row on their own turn and sits out; play skips them.
+      executeAction(session, 1, { type: 'take', rowIndex: 2 });
+      expect(session.players[1].roundState).toBe('taken-row');
+      expect(getCurrentPlayerIndex(session)).toBe(2);
+      executeAction(session, 2, { type: 'place', rowIndex: 0 });
+      expect(getCurrentPlayerIndex(session)).toBe(0);
+      executeAction(session, 0, { type: 'place', rowIndex: 1 });
+      expect(getCurrentPlayerIndex(session)).toBe(2); // player 1 skipped
+    });
+  });
+
+  describe('per-round start player rules', () => {
+    it('starts the next round with the player who took the most cards', () => {
+      const session = setupColorettoGame({ playerCount: 3, rng: makeRng() });
+      forceIdentityTurnOrder(session);
+      // Deck pops last-element-first: 7 places draw c7..c1 in order.
+      session.deck = [
+        ch('red', 1, 1), ch('blue', 1, 2), ch('green', 1, 3),
+        ch('yellow', 1, 4), ch('purple', 1, 5), ch('orange', 1, 6), ch('brown', 1, 7),
+      ];
+      executeAction(session, 0, { type: 'place', rowIndex: 0 });
+      executeAction(session, 1, { type: 'place', rowIndex: 1 });
+      executeAction(session, 2, { type: 'place', rowIndex: 2 });
+      executeAction(session, 0, { type: 'place', rowIndex: 0 });
+      executeAction(session, 1, { type: 'place', rowIndex: 1 });
+      executeAction(session, 2, { type: 'place', rowIndex: 2 });
+      // Player 0 and 1 each take a 2-card row; player 2 places one more
+      // card (3 in row 2) and then takes a 3-card row.
+      executeAction(session, 0, { type: 'take', rowIndex: 0 });
+      executeAction(session, 1, { type: 'take', rowIndex: 1 });
+      executeAction(session, 2, { type: 'place', rowIndex: 2 });
+      executeAction(session, 2, { type: 'take', rowIndex: 2 });
+      expect(isRoundOver(session)).toBe(true);
+
+      beginRoundScoring(session);
+      const result = scoreRound(session);
+      expect(result.isLastRound).toBe(false);
+      // Player 2 took 3 cards vs 2 each for players 0 and 1.
+      expect(session.roundStartPlayer).toBe(2);
+      expect(session.currentRound).toBe(1);
+      expect(getCurrentPlayerIndex(session)).toBe(2);
+    });
+
+    it('breaks a tie by the tied player who most recently took a row', () => {
+      const session = setupColorettoGame({ playerCount: 3, rng: makeRng() });
+      forceIdentityTurnOrder(session);
+      session.deck = [
+        ch('red', 1, 1), ch('blue', 1, 2), ch('green', 1, 3),
+        ch('yellow', 1, 4), ch('purple', 1, 5), ch('orange', 1, 6),
+      ];
+      executeAction(session, 0, { type: 'place', rowIndex: 0 });
+      executeAction(session, 1, { type: 'place', rowIndex: 1 });
+      executeAction(session, 2, { type: 'place', rowIndex: 2 });
+      executeAction(session, 0, { type: 'place', rowIndex: 0 });
+      executeAction(session, 1, { type: 'place', rowIndex: 1 });
+      executeAction(session, 2, { type: 'place', rowIndex: 2 });
+      // Everyone takes exactly 2 cards; row-take sequence is [0, 1, 2].
+      executeAction(session, 0, { type: 'take', rowIndex: 0 });
+      executeAction(session, 1, { type: 'take', rowIndex: 1 });
+      executeAction(session, 2, { type: 'take', rowIndex: 2 });
+      expect(isRoundOver(session)).toBe(true);
+
+      beginRoundScoring(session);
+      scoreRound(session);
+      // Tie at 2 cards each; player 2 took a row most recently.
+      expect(session.roundStartPlayer).toBe(2);
+    });
+
+    it('falls back to the first randomized player when nobody took a row', () => {
+      const session = setupColorettoGame({ playerCount: 2, rng: makeRng() });
+      forceIdentityTurnOrder(session);
+      // The Last Round card is drawn on the first placement; each player
+      // gets exactly one (placing) final turn and nobody ever takes a row.
+      session.deck = [ch('red', 1, 1), ch('blue', 1, 2), { id: 42, type: 'last-round' }];
+      executeAction(session, 0, { type: 'place', rowIndex: 0 });
+      executeAction(session, 1, { type: 'place', rowIndex: 1 });
+      expect(isRoundOver(session)).toBe(true);
+      expect(session.players.every((p) => p.roundState !== 'active')).toBe(true);
+
+      beginRoundScoring(session);
+      scoreRound(session);
+      // Nobody took a row: fall back to the first player in turnOrder (0).
+      expect(session.roundStartPlayer).toBe(0);
     });
   });
 });

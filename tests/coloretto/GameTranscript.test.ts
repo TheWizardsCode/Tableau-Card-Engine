@@ -70,7 +70,8 @@ describe('ColorettoTranscriptRecorder', () => {
 
     const firstTurn = transcript.turns[0];
     expect(firstTurn.round).toBe(0);
-    expect(firstTurn.playerIndex).toBe(0);
+    // Round 1 begins with the first player in the randomized turn order.
+    expect(firstTurn.playerIndex).toBe(session.turnOrder[0]);
     expect(firstTurn.action).toEqual({ type: 'place', rowIndex: 0 });
     expect(firstTurn.drawnCard).toBeDefined();
     expect(firstTurn.rows.length).toBe(3);

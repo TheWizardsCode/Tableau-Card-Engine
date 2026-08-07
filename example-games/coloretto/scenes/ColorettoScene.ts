@@ -31,6 +31,7 @@ import {
   executeAction,
   validateAction,
   getCurrentPlayerIndex,
+  getRoundTurnOrder,
   beginRoundScoring,
   scoreRound,
   isGameOver,
@@ -519,19 +520,32 @@ export class ColorettoScene extends CardGameScene {
     return this.layout.collectionsTopX + NAME_COLUMN_W;
   }
 
-  /** Y of a player's collection row (matches refreshCollections).
+  /** Y of a collection row, derived from the SLL collections area (matches refreshCollections).
    *
+   * `row` is the DISPLAY row (0..n-1) -- the collections panel renders
+   * players in the current round's play order, not array order -- so
+   * callers must map a player index through {@link displayRowForPlayer}.
    * The row lines are centred on collectionsCenterY so the chips (which
    * extend CHIP_H/2 above and below each row) keep the whole block's
    * visual centre exactly on the collections-area centre.
    */
-  private collectionRowY(playerIndex: number): number {
+  private collectionRowY(row: number): number {
     const n = this.session.players.length;
     return (
       this.layout.collectionsCenterY -
       ((n - 1) * this.collectionStep()) / 2 +
-      playerIndex * this.collectionStep()
+      row * this.collectionStep()
     );
+  }
+
+  /**
+   * Display row (0..n-1) for a player index: the collections panel renders
+   * rows in the current round's play order (rotation of the randomized
+   * turn order from the round's start player), so the take animation maps
+   * player indices through this to land flyers on the correct row.
+   */
+  private displayRowForPlayer(playerIndex: number): number {
+    return getRoundTurnOrder(this.session).indexOf(playerIndex);
   }
 
   private createCard(x: number, y: number, card: ColorettoCard): Phaser.GameObjects.Container {
@@ -646,6 +660,10 @@ export class ColorettoScene extends CardGameScene {
     this.collectionsContainer.removeAll(true);
 
     const currentIdx = getCurrentPlayerIndex(this.session);
+    // Render the player list top-to-bottom in the current round's play
+    // order (turn order rotated from the round's start player) so the
+    // player can see at a glance who plays when.
+    const order = getRoundTurnOrder(this.session);
 
     // Every player row shares one fixed chip-start column. The name+score
     // text is right-aligned into the fixed column ahead of it (and
@@ -653,10 +671,11 @@ export class ColorettoScene extends CardGameScene {
     const chipStartX = this.fixedChipStartX();
     const nameColumnW = NAME_COLUMN_W - NAME_CHIP_GAP;
 
-    this.session.players.forEach((player, i) => {
-      const y = this.collectionRowY(i);
-      const isCurrent = i === currentIdx && this.session.phase === 'playing';
-      const isHuman = i === 0;
+    order.forEach((playerIndex, row) => {
+      const player = this.session.players[playerIndex];
+      const y = this.collectionRowY(row);
+      const isCurrent = playerIndex === currentIdx && this.session.phase === 'playing';
+      const isHuman = playerIndex === 0;
 
       // Name + score, right-anchored NAME_CHIP_GAP before the fixed chip
       // column, so its right edge is always the same distance from the
@@ -907,7 +926,9 @@ export class ColorettoScene extends CardGameScene {
     this.phaseManager.set('animating');
 
     const destStartX = this.fixedChipStartX();
-    const destY = this.collectionRowY(playerIndex);
+    // The collections panel renders in round play order, so the flyers
+    // must target the player's DISPLAY row (not their array index).
+    const destY = this.collectionRowY(this.displayRowForPlayer(playerIndex));
 
     // Face-up card sprites: the row cards are always face-up, so the
     // flyers reuse the card-face rendering (chameleon / Last Round).

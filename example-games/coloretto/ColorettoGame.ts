@@ -90,6 +90,27 @@ export interface ColorettoSession {
    * first turn of a round (resolve via {@link getCurrentPlayerIndex}).
    */
   currentTurnIndex: number;
+  /**
+   * Randomized player order for the whole game: a permutation of the
+   * player indices 0..n-1 drawn once at setup from the session RNG.
+   * Within a round, play proceeds in this order (wrapping); round 1
+   * begins with {@link turnOrder}[0] and later rounds begin with the
+   * player who took the most cards in the previous round.
+   */
+  turnOrder: number[];
+  /**
+   * Player index who starts the current round. Round 1: {@link turnOrder}[0].
+   * Later rounds: set by {@link scoreRound} from the previous round's
+   * cards-taken / row-take records.
+   */
+  roundStartPlayer: number;
+  /** Cards taken per player this round (physical cards; reset each round). */
+  cardsTakenThisRound: number[];
+  /**
+   * Players in the order they took a row this round (reset each round);
+   * used to break start-player ties (most recent row take wins).
+   */
+  rowTakeSequence: number[];
   /** RNG for shuffling. */
   readonly rng: () => number;
 }
@@ -141,6 +162,14 @@ export function setupColorettoGame(
     totalScore: 0,
   }));
 
+  // Randomize the turn order once per game from the seeded session RNG:
+  // the same seed always produces the same permutation (canonical rule:
+  // the first player is random, not always "You").
+  const turnOrder = shuffleArray(
+    playerInfos.map((_, i) => i),
+    rng,
+  );
+
   const session: ColorettoSession = {
     players,
     deck: [],
@@ -150,6 +179,10 @@ export function setupColorettoGame(
     totalRounds: roundsForPlayerCount(playerInfos.length),
     lastRoundTriggered: false,
     currentTurnIndex: -1,
+    turnOrder,
+    roundStartPlayer: turnOrder[0],
+    cardsTakenThisRound: players.map(() => 0),
+    rowTakeSequence: [],
     rng,
   };
 
@@ -178,6 +211,12 @@ export function dealRound(session: ColorettoSession): void {
   session.currentTurnIndex = -1;
   session.phase = 'playing';
 
+  // Per-round tracking resets. The round's start player is set by the
+  // caller: setupColorettoGame (round 1: turnOrder[0]) or scoreRound
+  // (later rounds: most-cards-taken rule).
+  session.cardsTakenThisRound = session.players.map(() => 0);
+  session.rowTakeSequence = [];
+
   for (const player of session.players) {
     player.roundState = 'active';
   }
@@ -193,6 +232,21 @@ export function topCard(session: ColorettoSession): ColorettoCard | undefined {
 }
 
 /**
+ * Play order for the current round: the game's randomized
+ * {@link ColorettoSession.turnOrder} rotated so the round's start player
+ * leads. Used both by turn rotation and by the UI to render the player
+ * list in play order.
+ */
+export function getRoundTurnOrder(session: ColorettoSession): number[] {
+  const n = session.players.length;
+  const startPos = session.turnOrder.indexOf(session.roundStartPlayer);
+  return Array.from(
+    { length: n },
+    (_, i) => session.turnOrder[(startPos + i) % n],
+  );
+}
+
+/**
  * Index of the player whose turn it currently is, or -1 when the
  * round is over (no active players remain).
  */
@@ -202,18 +256,22 @@ export function getCurrentPlayerIndex(session: ColorettoSession): number {
       return session.currentTurnIndex;
     }
   }
-  // Fall back to the first active player (round start, or stale index).
-  return session.players.findIndex((p) => p.roundState === 'active');
+  // Fall back to the first active player in the round's turn order
+  // (round start, or a stale index).
+  const order = getRoundTurnOrder(session);
+  return order.find((idx) => session.players[idx].roundState === 'active') ?? -1;
 }
 
-/** Index of the next active player after `afterIndex` (wrapping), or -1. */
+/** Index of the next active player after `afterIndex` (wrapping in round turn order), or -1. */
 function nextActivePlayerIndex(
   session: ColorettoSession,
   afterIndex: number,
 ): number {
+  const order = getRoundTurnOrder(session);
+  const afterPos = order.indexOf(afterIndex);
   const n = session.players.length;
   for (let step = 1; step <= n; step++) {
-    const idx = (afterIndex + step) % n;
+    const idx = order[(afterPos + step) % n];
     if (session.players[idx].roundState === 'active') return idx;
   }
   return -1;
@@ -345,6 +403,11 @@ export function executeAction(
     }
   } else {
     player.collection.push(...row.cards);
+    // Track the take for the next round's start-player rule: physical
+    // cards (each card counts 1, double chameleons included) and the
+    // row-take sequence for the tie-break.
+    session.cardsTakenThisRound[playerIndex] += row.cards.length;
+    session.rowTakeSequence.push(playerIndex);
     row.cards = [];
     player.roundState = 'taken-row';
   }
@@ -440,11 +503,44 @@ export function scoreRound(
   if (isLastRound) {
     session.phase = 'game-over';
   } else {
+    // Canonical rule ("End of a Round"): the next round begins with the
+    // player who took the most cards this round; ties go to the tied
+    // player who most recently took a row. Computed BEFORE dealRound
+    // resets the per-round tracking.
+    session.roundStartPlayer = nextRoundStartPlayer(session);
     session.currentRound++;
     dealRound(session);
   }
 
   return result;
+}
+
+/**
+ * Determine the next round's start player from the round that just ended.
+ *
+ * Canonical Coloretto rules: the player who took the most cards begins;
+ * on a tie, the tied player who most recently took a row begins. If
+ * nobody took a row (degenerate end via the Last Round card), fall back
+ * to the first player in the randomized turn order.
+ */
+function nextRoundStartPlayer(session: ColorettoSession): number {
+  const taken = session.cardsTakenThisRound;
+  const max = Math.max(...taken);
+  if (max <= 0 || session.rowTakeSequence.length === 0) {
+    return session.turnOrder[0];
+  }
+  const leaders = taken
+    .map((count, i) => ({ count, i }))
+    .filter(({ count }) => count === max)
+    .map(({ i }) => i);
+  if (leaders.length === 1) return leaders[0];
+  // Tie: the tied player who most recently took a row (last in the
+  // row-take sequence wins).
+  for (let pos = session.rowTakeSequence.length - 1; pos >= 0; pos--) {
+    const idx = session.rowTakeSequence[pos];
+    if (leaders.includes(idx)) return idx;
+  }
+  return leaders[0]; // unreachable when the sequence is non-empty
 }
 
 // ── Game state queries ──────────────────────────────────────
