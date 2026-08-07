@@ -19,7 +19,7 @@
 
 import Phaser from 'phaser';
 import type { ColorettoCard, ChameleonColor } from '../ColorettoCards';
-import { colorLabel, colorHex } from '../ColorettoCards';
+import { colorLabel, colorHex, COLORS } from '../ColorettoCards';
 import type {
   ColorettoSession,
   ColorettoAction,
@@ -95,6 +95,15 @@ const COLLECTION_STEP_4P = 36;
 const COLLECTION_STEP_5P = 30;
 /** Tight horizontal gap between a player's name text and their first colour chip. */
 const NAME_CHIP_GAP = 30;
+/**
+ * Fixed width of the name+score column. Every player's chips start at
+ * `collectionsTopX + NAME_COLUMN_W` regardless of how wide their rendered
+ * name+score text is, so all hands line up in a single column (see
+ * {@link ColorettoScene.fixedChipStartX}). Sized with headroom for the
+ * longest realistic name + "21 pts" score (and any future turn-order
+ * prefix); overlong labels are truncated rather than widening the column.
+ */
+const NAME_COLUMN_W = 200;
 /** Gap between the last colour chip and the round-state marker (after the chips). */
 const ROUND_MARKER_GAP = 8;
 /**
@@ -156,13 +165,6 @@ export class ColorettoScene extends CardGameScene {
 
   // Row click zones
   private rowZones: Phaser.GameObjects.Rectangle[] = [];
-
-  /**
-   * First colour-chip X per player, cached from the last refreshCollections()
-   * render (name right edge + NAME_CHIP_GAP). The take animation reuses this
-   * so flyers land exactly where the chips render.
-   */
-  private chipStartXByPlayer: number[] = [];
 
   // Overlay state
   overlayObjects: Phaser.GameObjects.GameObject[] = [];
@@ -506,13 +508,15 @@ export class ColorettoScene extends CardGameScene {
     return this.collectionBlockTopY() + this.collectionBlockHeight();
   }
 
-  /** X of the first collection chip (matches refreshCollections). */
-  private collectionChipStartX(playerIndex: number): number {
-    const cached = this.chipStartXByPlayer[playerIndex];
-    if (cached !== undefined) return cached;
-    // Defensive fallback before the first refreshCollections() render (the
-    // take animation always runs after a refresh, so this rarely triggers).
-    return this.layout.collectionsTopX + 100 + NAME_CHIP_GAP;
+  /**
+   * X of the first collection chip, shared by every player row. A fixed
+   * column: the name+score text occupies [collectionsTopX, fixedChipStartX -
+   * NAME_CHIP_GAP] (right-aligned, truncated if overlong) so chips never
+   * shift with name/score width. The take animation flies cards to this
+   * same x, keeping animated destinations identical to the rendered chips.
+   */
+  private fixedChipStartX(): number {
+    return this.layout.collectionsTopX + NAME_COLUMN_W;
   }
 
   /** Y of a player's collection row (matches refreshCollections).
@@ -640,32 +644,39 @@ export class ColorettoScene extends CardGameScene {
 
   private refreshCollections(): void {
     this.collectionsContainer.removeAll(true);
-    this.chipStartXByPlayer = [];
 
     const currentIdx = getCurrentPlayerIndex(this.session);
+
+    // Every player row shares one fixed chip-start column. The name+score
+    // text is right-aligned into the fixed column ahead of it (and
+    // truncated when overlong) so hands never shift with name/score width.
+    const chipStartX = this.fixedChipStartX();
+    const nameColumnW = NAME_COLUMN_W - NAME_CHIP_GAP;
 
     this.session.players.forEach((player, i) => {
       const y = this.collectionRowY(i);
       const isCurrent = i === currentIdx && this.session.phase === 'playing';
       const isHuman = i === 0;
 
-      // Name + score
+      // Name + score, right-anchored NAME_CHIP_GAP before the fixed chip
+      // column, so its right edge is always the same distance from the
+      // chips and every hand starts at the same x.
       const nameColor = isCurrent ? '#ffdd66' : isHuman ? '#ffffff' : '#b8d8c8';
+      const label = `${player.name} — ${player.totalScore} pts`;
       const name = this.add
-        .text(this.layout.collectionsTopX, y, `${player.name} — ${player.totalScore} pts`, {
+        .text(chipStartX - NAME_CHIP_GAP, y, label, {
           fontSize: '16px',
           color: nameColor,
           fontFamily: FONT_FAMILY,
           fontStyle: isCurrent ? 'bold' : 'normal',
         })
-        .setOrigin(0, 0.5);
+        .setOrigin(1, 0.5);
       this.collectionsContainer.add(name);
-
-      // Colour chips start a tight gap after the name's rendered right
-      // edge. The value is cached per player so the take animation lands
-      // its flyers exactly where the chips render.
-      const chipStartX = name.x + name.width + NAME_CHIP_GAP;
-      this.chipStartXByPlayer[i] = chipStartX;
+      // Truncate overlong labels (name portion first, score kept readable)
+      // so the right-anchored text never overshoots the fixed column.
+      if (name.width > nameColumnW) {
+        name.setText(this.fitNameScoreLabel(label, nameColumnW, name));
+      }
 
       const counts = colorCounts(player.collection);
       let chipX = chipStartX;
@@ -685,12 +696,14 @@ export class ColorettoScene extends CardGameScene {
         chipX += CHIP_GAP;
       }
 
-      // Round-state marker after the chips (kept clear of the tight
-      // name→chip gap).
+      // Round-state marker aligned at the maximum possible hand length
+      // (all deck colours, COLORS.length) so markers line up across
+      // players regardless of how many chips each player holds.
       if (player.roundState === 'taken-row' || player.roundState === 'final-turn-done') {
         const markerText = player.roundState === 'taken-row' ? '(taken a row)' : '(done)';
+        const markerX = chipStartX + COLORS.length * CHIP_GAP + ROUND_MARKER_GAP;
         const done = this.add
-          .text(chipX + ROUND_MARKER_GAP, y, markerText, {
+          .text(markerX, y, markerText, {
             fontSize: '12px',
             color: '#77998a',
             fontFamily: FONT_FAMILY,
@@ -699,6 +712,33 @@ export class ColorettoScene extends CardGameScene {
         this.collectionsContainer.add(done);
       }
     });
+  }
+
+  /**
+   * Shorten an overlong name+score label so it fits the fixed name column:
+   * the score ("21 pts") stays fully readable and the name portion is cut
+   * with an ellipsis. Mutates the given text object (which is right-anchored
+   * with origin x = 1, so its right edge stays put as the label shrinks).
+   * Called only when the full label already exceeds the column width.
+   */
+  private fitNameScoreLabel(
+    label: string,
+    maxWidth: number,
+    text: Phaser.GameObjects.Text,
+  ): string {
+    const sep = ' — ';
+    const sepIndex = label.lastIndexOf(sep);
+    if (sepIndex === -1) return label;
+    const scorePart = label.slice(sepIndex); // " — 21 pts"
+    const namePart = label.slice(0, sepIndex);
+    for (let len = namePart.length; len > 0; len--) {
+      const candidate = `${namePart.slice(0, len)}…${scorePart}`;
+      text.setText(candidate);
+      if (text.width <= maxWidth) return candidate;
+    }
+    // Even the shortest name+ellipsis overflows; keep only the score.
+    text.setText(scorePart);
+    return scorePart;
   }
 
   // ── Mode buttons ─────────────────────────────────────────
@@ -866,7 +906,7 @@ export class ColorettoScene extends CardGameScene {
     // Block input and turn flow while the cards are flying.
     this.phaseManager.set('animating');
 
-    const destStartX = this.collectionChipStartX(playerIndex);
+    const destStartX = this.fixedChipStartX();
     const destY = this.collectionRowY(playerIndex);
 
     // Face-up card sprites: the row cards are always face-up, so the

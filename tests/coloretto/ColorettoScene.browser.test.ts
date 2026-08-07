@@ -14,7 +14,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import Phaser from 'phaser';
 import { waitForScene } from '../helpers/waitForScene';
-import { createColorettoDeck } from '../../example-games/coloretto/ColorettoCards';
+import { createColorettoDeck, COLORS } from '../../example-games/coloretto/ColorettoCards';
 
 // Visual constants mirrored from ColorettoScene (deliberately kept in
 // sync: the originals are module-private there).
@@ -24,6 +24,14 @@ const ROW_CARD_GAP = 10;
 const ROW_STEP_MAX = 92;
 const CHIP_W = 20;
 const CHIP_H = 28;
+/** Fixed width of the name+score column (mirrors NAME_COLUMN_W). */
+const NAME_COLUMN_W = 200;
+/** Tight name→chip gap (mirrors NAME_CHIP_GAP). */
+const NAME_CHIP_GAP = 30;
+/** Horizontal step between colour chips (mirrors CHIP_GAP). */
+const CHIP_GAP = 26;
+/** Gap after the last chip before the round-state marker (mirrors ROUND_MARKER_GAP). */
+const ROUND_MARKER_GAP = 8;
 /** Total width of the three row card slots (mirrors ROW_TOTAL_WIDTH). */
 const ROW_TOTAL_WIDTH = 3 * CARD_W + 2 * ROW_CARD_GAP;
 
@@ -907,12 +915,14 @@ describe('ColorettoScene (browser)', () => {
 
       // Tight name→chip gap: the whitespace between the name's rendered
       // right edge and the first chip's left edge is ~20px (was ~260px).
+      // Names are right-anchored to the fixed chip column, so a name's x
+      // position IS its right edge.
       const chips = collectionChipRectangles(scene);
       expect(chips.length).toBeGreaterThanOrEqual(5); // the human holds 5 colours
       const firstName = nameTexts[0];
       const firstChip = chips.find((c) => Math.abs(c.y - firstName.y) < 1);
       expect(firstChip).toBeDefined();
-      const nameRight = firstName.x + firstName.width;
+      const nameRight = firstName.x;
       const chipLeft = firstChip!.x - CHIP_W / 2;
       const gap = chipLeft - nameRight;
       expect(gap).toBeGreaterThanOrEqual(15);
@@ -944,4 +954,82 @@ describe('ColorettoScene (browser)', () => {
       expect(blockBottom).toBeLessThan(instructionTop);
     },
   );
+
+  it('aligns every hand at a fixed chip column and aligns round-state markers at the max hand length', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('ColorettoScene') as any;
+    await waitFrames(10);
+    expect(clickText(scene, '3 (2 AI)')).toBe(true);
+    await waitFrames(10);
+    expect(scene.phaseManager.current).toBe('human-turn');
+
+    // Deliberately varied name/score widths and chip counts per player:
+    // a short name with a low score, an overlong name with the max score,
+    // and a mid-length name with a mid score.
+    const players = scene.session.players as any[];
+    players[0].name = 'You';
+    players[0].totalScore = 0;
+    players[1].name = 'Alexandrina van der Merwe'; // wider than the name column
+    players[1].totalScore = 21;
+    players[2].name = 'AI 2';
+    players[2].totalScore = 7;
+
+    // Varied chip counts: 1, 5 and 3 colours respectively.
+    players[0].collection = [{ id: 100, type: 'chameleon', color: 'red', count: 1 }];
+    players[1].collection = ['red', 'yellow', 'green', 'blue', 'purple'].map((color, i) => ({
+      id: 200 + i,
+      type: 'chameleon',
+      color,
+      count: 1,
+    }));
+    players[2].collection = ['red', 'yellow', 'green'].map((color, i) => ({
+      id: 300 + i,
+      type: 'chameleon',
+      color,
+      count: 1,
+    }));
+
+    // Mark two players as having taken a row so their markers render.
+    players[1].roundState = 'taken-row';
+    players[2].roundState = 'taken-row';
+    scene.refreshCollections();
+
+    // 1) Fixed chip start column: every row's first chip starts at the
+    //    same x, regardless of name/score text width or chip count.
+    const chips = collectionChipRectangles(scene);
+    const nameTexts = textObjects(scene).filter(
+      (t) => t.text.includes(' — ') && t.text.includes('pts'),
+    );
+    expect(nameTexts).toHaveLength(3);
+    const expectedChipStart = scene.layout.collectionsTopX + NAME_COLUMN_W;
+    for (const nameText of nameTexts) {
+      const rowChips = chips.filter((c) => Math.abs(c.y - nameText.y) < 1);
+      expect(rowChips.length).toBeGreaterThan(0);
+      const firstChipX = Math.min(...rowChips.map((c) => c.x));
+      expect(firstChipX).toBe(expectedChipStart);
+    }
+
+    // 2) Overlong name/score is truncated (name portion, ellipsis) while
+    //    the score stays readable, and the label fits the fixed column.
+    const longName = nameTexts.find((n) => n.text.includes('Alexandrina'))!;
+    expect(longName).toBeDefined();
+    expect(longName.text).toContain('…');
+    expect(longName.text).toContain('21 pts');
+    expect(longName.width).toBeLessThanOrEqual(NAME_COLUMN_W - NAME_CHIP_GAP);
+
+    // 3) Round-state markers align at the max hand length (COLORS.length
+    //    chips), independent of how many chips each player actually holds.
+    const markers = textObjects(scene).filter(
+      (t) => t.text === '(taken a row)' || t.text === '(done)',
+    );
+    expect(markers).toHaveLength(2);
+    const expectedMarkerX = expectedChipStart + COLORS.length * CHIP_GAP + ROUND_MARKER_GAP;
+    for (const marker of markers) {
+      expect(marker.x).toBe(expectedMarkerX);
+    }
+
+    // 4) The take animation flies cards to the same fixed chip column
+    //    (AC 5: animated destination == rendered chip position).
+    expect(scene.fixedChipStartX()).toBe(expectedChipStart);
+  });
 });
