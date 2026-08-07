@@ -735,7 +735,13 @@ describe('ColorettoScene (browser)', () => {
     const scene = await startTwoPlayerGame(game);
     const deckX = scene.layout.deckCenterX;
     const deckY = scene.layout.deckCenterY;
-    const dest = slotCenter(scene, 0, 0);
+    // The AI's randomized first turn may already have placed a card on row 0,
+    // so the human's card targets the NEXT free slot, not slot 0. (Regression:
+    // hardcoding slot 0 made this test flaky -- waitForCondition timed out
+    // whenever the AI's random placement landed on row 0 before the human's
+    // first turn; CG-0MSJDDP7R001BHNP.)
+    const slotBefore = scene.session.rows[0].cards.length;
+    const dest = slotCenter(scene, 0, slotBefore);
 
     humanPlace(scene, 0);
 
@@ -766,6 +772,39 @@ describe('ColorettoScene (browser)', () => {
     // human turn is restored.
     await waitForCondition(() => scene.phaseManager.current === 'human-turn');
     expect(scene.flightCard).toBeNull();
+  }, 15000);
+
+  it('targets the next free row slot when an AI card already occupies slot 0 (regression CG-0MSJDDP7R001BHNP)', async () => {
+    game = await bootGame();
+    const scene = await startTwoPlayerGame(game);
+
+    // Deterministically reproduce the flaky scenario: the AI's randomized
+    // first turn placed a card on row 0 before the human's first turn, so the
+    // human's placement must fly to the NEXT free slot (slot 1), not slot 0.
+    scene.session.rows[0].cards = [
+      { id: 901, type: 'chameleon', color: 'red', count: 1 },
+    ];
+    scene.refreshAll();
+
+    const dest = slotCenter(scene, 0, 1);
+    humanPlace(scene, 0);
+
+    // The flight card moves to slot 1 and flips face-up there.
+    expect(scene.phaseManager.current).toBe('animating');
+    await waitForCondition(
+      () =>
+        scene.flightCard &&
+        flightFaceShown(scene.flightCard) &&
+        Math.abs(scene.flightCard.x - dest.x) < 3 &&
+        Math.abs(scene.flightCard.y - dest.y) < 3,
+    );
+
+    // The flight completes; the human's drawn card sits at slot 1 beside the
+    // AI card. (The AI's own follow-up turn may later clear or extend the row,
+    // so assert the placement itself, before the AI acts.)
+    await waitForCondition(() => scene.flightCard === null);
+    expect(scene.session.rows[0].cards[1]).toBeDefined();
+    expect(scene.session.rows[0].cards[1].id).not.toBe(901);
   }, 15000);
 
   it('never renders a card face at world (0,0) during a placement animation', async () => {
