@@ -507,10 +507,53 @@ describe('ColorettoGame', () => {
       expect(getWinnerIndex(session)).toBe(1);
     });
 
-    it('returns the first player on a tie', () => {
+    it('returns the first player when tied with no round history', () => {
+      // No round scores recorded (e.g. unit-level totalScore setup):
+      // all tie-break dimensions are equal, so the first player wins.
       const session = setupColorettoGame({ rng: makeRng() });
       session.players[0].totalScore = 12;
       session.players[1].totalScore = 12;
+      expect(getWinnerIndex(session)).toBe(0);
+    });
+
+    it('breaks a total tie by the most single-round wins', () => {
+      const session = setupColorettoGame({ rng: makeRng() });
+      session.players[0].roundScores = [4, 4, 1]; // wins rounds 0 and 1
+      session.players[1].roundScores = [3, 3, 3]; // wins round 2
+      session.players[0].totalScore = 9;
+      session.players[1].totalScore = 9;
+      expect(getWinnerIndex(session)).toBe(0);
+    });
+
+    it('breaks a total-and-wins tie by the highest single-round score', () => {
+      const session = setupColorettoGame({ rng: makeRng() });
+      // p0 wins round 1, p1 wins round 0 (one win each); p1's peak is higher.
+      session.players[0].roundScores = [2, 5];
+      session.players[1].roundScores = [6, 1];
+      session.players[0].totalScore = 7;
+      session.players[1].totalScore = 7;
+      expect(getWinnerIndex(session)).toBe(1);
+    });
+
+    it('falls back to the first player when every tie-break dimension is equal', () => {
+      const session = setupColorettoGame({ rng: makeRng() });
+      session.players[0].roundScores = [4, 4, 4];
+      session.players[1].roundScores = [4, 4, 4];
+      session.players[0].totalScore = 12;
+      session.players[1].totalScore = 12;
+      expect(getWinnerIndex(session)).toBe(0);
+    });
+
+    it('compares tie-breaks across all players at the maximum total', () => {
+      const session = setupColorettoGame({ playerCount: 3, rng: makeRng() });
+      // p0 wins round 0, p1 wins round 1; p2 wins no round.
+      session.players[0].roundScores = [5, 3]; // 1 win
+      session.players[1].roundScores = [3, 5]; // 1 win
+      session.players[2].roundScores = [4, 4]; // 0 wins
+      session.players[0].totalScore = 8;
+      session.players[1].totalScore = 8;
+      session.players[2].totalScore = 8;
+      // p0 and p1 both have 1 win and a peak of 5: first player wins.
       expect(getWinnerIndex(session)).toBe(0);
     });
 

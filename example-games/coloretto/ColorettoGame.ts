@@ -550,15 +550,50 @@ export function isGameOver(session: ColorettoSession): boolean {
   return session.phase === 'game-over';
 }
 
-/** Get the winning player index (highest total score; ties broken by index). */
-export function getWinnerIndex(session: ColorettoSession): number {
-  let best = -1;
-  let bestScore = -Infinity;
-  for (let i = 0; i < session.players.length; i++) {
-    if (session.players[i].totalScore > bestScore) {
-      bestScore = session.players[i].totalScore;
-      best = i;
-    }
+/**
+ * Number of rounds a player won outright (their round score was the
+ * round's maximum; ties for the round max count for every tied player).
+ */
+export function singleRoundWins(session: ColorettoSession, playerIndex: number): number {
+  const players = session.players;
+  const rounds = Math.max(0, ...players.map((p) => p.roundScores.length));
+  let wins = 0;
+  for (let r = 0; r < rounds; r++) {
+    const scores = players.map((p) => p.roundScores[r] ?? -Infinity);
+    const max = Math.max(...scores);
+    if (scores[playerIndex] === max && max > -Infinity) wins++;
   }
-  return best;
+  return wins;
+}
+
+/**
+ * Get the winning player index with canonical tie-breaks.
+ *
+ * 1. Highest cumulative total score wins.
+ * 2. Tied players: the player with the most single-round wins wins.
+ * 3. Still tied: the player with the highest single-round score wins.
+ * 4. Still tied (e.g. no rounds played): the first player wins.
+ */
+export function getWinnerIndex(session: ColorettoSession): number {
+  const players = session.players;
+  const maxTotal = Math.max(...players.map((p) => p.totalScore));
+  let tied = players
+    .map((_, i) => i)
+    .filter((i) => players[i].totalScore === maxTotal);
+
+  // Most single-round wins.
+  const maxWins = Math.max(...tied.map((i) => singleRoundWins(session, i)));
+  tied = tied.filter((i) => singleRoundWins(session, i) === maxWins);
+  if (tied.length === 1) return tied[0];
+
+  // Highest single-round score (only meaningful when rounds were played).
+  const peaks = players.map((p) =>
+    p.roundScores.length > 0 ? Math.max(...p.roundScores) : -Infinity,
+  );
+  const maxPeak = Math.max(...tied.map((i) => peaks[i]));
+  tied = tied.filter((i) => peaks[i] === maxPeak);
+  if (tied.length === 1) return tied[0];
+
+  // First player wins as the final fallback.
+  return tied[0];
 }
