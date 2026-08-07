@@ -101,23 +101,23 @@ const COLLECTION_STEP_5P = 30;
 /** Tight horizontal gap between a player's name text and their first colour chip. */
 const NAME_CHIP_GAP = 40;
 /**
- * Fixed width of the name+score column. Every player's chips start at
- * `collectionsTopX + NAME_COLUMN_W` regardless of how wide their rendered
- * name+score text is, so all hands line up in a single column (see
- * {@link ColorettoScene.fixedChipStartX}). Sized with headroom for the
- * longest realistic name + "21 pts" score (and any future turn-order
- * prefix); overlong labels are truncated rather than widening the column.
+ * Fixed width of the name+score column. The "Taken" label starts at
+ * `collectionsTopX + NAME_COLUMN_W` regardless of how wide the rendered
+ * name+score text is, so labels and hands line up in a single column for
+ * every player (see {@link ColorettoScene.fixedChipStartX}). Sized with
+ * headroom for the longest realistic name + "21 pts" score (and any
+ * future turn-order prefix); overlong labels are truncated rather than
+ * widening the column.
  */
 const NAME_COLUMN_W = 210;
-/** Gap between the last colour chip and the round-state marker (after the chips). */
-const ROUND_MARKER_GAP = 8;
 /**
- * Number of non-color collection chip types rendered after the color
- * chips (a joker chip and a “+2” bonus chip). The round-state marker
- * aligns at the maximum possible hand length: every color chip plus
- * these two extra chip types.
+ * Reserved width of the "Taken" label column, between the fixed name
+ * column and the colour chips. The label is drawn left-anchored at
+ * `collectionsTopX + NAME_COLUMN_W`; the chips (and the take-animation
+ * landing column) shift right past it so the label fits between the
+ * player name and the cards taken without overlapping either.
  */
-const EXTRA_CHIP_TYPES = 2;
+const TAKEN_COLUMN_W = 80;
 /**
  * Mode-button offset below the collections block: half the button height
  * (~18px) plus an 8px breathing gap, so the buttons stay clear of both the
@@ -522,13 +522,16 @@ export class ColorettoScene extends CardGameScene {
 
   /**
    * X of the first collection chip, shared by every player row. A fixed
-   * column: the name+score text occupies [collectionsTopX, fixedChipStartX -
-   * NAME_CHIP_GAP] (right-aligned, truncated if overlong) so chips never
-   * shift with name/score width. The take animation flies cards to this
-   * same x, keeping animated destinations identical to the rendered chips.
+   * column: the name+score text occupies [collectionsTopX, collectionsTopX
+   * + NAME_COLUMN_W - NAME_CHIP_GAP] (right-aligned, truncated if
+   * overlong), the "Taken" label occupies [collectionsTopX + NAME_COLUMN_W,
+   * collectionsTopX + NAME_COLUMN_W + TAKEN_COLUMN_W], and the chips start
+   * after it, so chips never shift with name/score width. The take
+   * animation flies cards to this same x, keeping animated destinations
+   * identical to the rendered chips.
    */
   private fixedChipStartX(): number {
-    return this.layout.collectionsTopX + NAME_COLUMN_W;
+    return this.layout.collectionsTopX + NAME_COLUMN_W + TAKEN_COLUMN_W;
   }
 
   /** Y of a collection row, derived from the SLL collections area (matches refreshCollections).
@@ -729,8 +732,11 @@ export class ColorettoScene extends CardGameScene {
 
     // Every player row shares one fixed chip-start column. The name+score
     // text is right-aligned into the fixed column ahead of it (and
-    // truncated when overlong) so hands never shift with name/score width.
+    // truncated when overlong), the "Taken" label is left-anchored at the
+    // start of its reserved column, and the chips follow — so hands never
+    // shift with name/score width.
     const chipStartX = this.fixedChipStartX();
+    const nameEndX = this.layout.collectionsTopX + NAME_COLUMN_W - NAME_CHIP_GAP;
     const nameColumnW = NAME_COLUMN_W - NAME_CHIP_GAP;
 
     order.forEach((playerIndex, row) => {
@@ -739,13 +745,13 @@ export class ColorettoScene extends CardGameScene {
       const isCurrent = playerIndex === currentIdx && this.session.phase === 'playing';
       const isHuman = playerIndex === 0;
 
-      // Name + score, right-anchored NAME_CHIP_GAP before the fixed chip
-      // column, so its right edge is always the same distance from the
-      // chips and every hand starts at the same x.
+      // Name + score, right-anchored NAME_CHIP_GAP before the fixed
+      // "Taken" label column, so its right edge is always the same
+      // distance from the label and every hand starts at the same x.
       const nameColor = isCurrent ? '#ffdd66' : isHuman ? '#ffffff' : '#b8d8c8';
       const label = `${player.name} — ${player.totalScore} pts`;
       const name = this.add
-        .text(chipStartX - NAME_CHIP_GAP, y, label, {
+        .text(nameEndX, y, label, {
           fontSize: '16px',
           color: nameColor,
           fontFamily: FONT_FAMILY,
@@ -847,20 +853,23 @@ export class ColorettoScene extends CardGameScene {
         chipX += CHIP_GAP;
       }
 
-      // Round-state marker aligned at the maximum possible hand length
-      // (all deck colours, COLORS.length) so markers line up across
-      // players regardless of how many chips each player holds.
+      // "Taken" label between the player name and the cards taken: shown
+      // for every player whose roundState is 'taken-row' or
+      // 'final-turn-done' (both mean the player has taken a row this
+      // round). Left-anchored at the fixed label column so it lines up
+      // across players regardless of name/score width or chip count.
       if (player.roundState === 'taken-row' || player.roundState === 'final-turn-done') {
-        const markerText = player.roundState === 'taken-row' ? '(taken a row)' : '(done)';
-        const markerX = chipStartX + (COLORS.length + EXTRA_CHIP_TYPES) * CHIP_GAP + ROUND_MARKER_GAP;
-        const done = this.add
-          .text(markerX, y, markerText, {
-            fontSize: '12px',
-            color: '#77998a',
+        const taken = this.add
+          .text(this.layout.collectionsTopX + NAME_COLUMN_W, y, 'Taken', {
+            fontSize: '14px',
+            color: '#ffdd66',
             fontFamily: FONT_FAMILY,
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 2,
           })
           .setOrigin(0, 0.5);
-        this.collectionsContainer.add(done);
+        this.collectionsContainer.add(taken);
       }
     });
   }

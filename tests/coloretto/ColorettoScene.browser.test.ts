@@ -14,7 +14,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import Phaser from 'phaser';
 import { waitForScene } from '../helpers/waitForScene';
-import { createColorettoDeck, COLORS } from '../../example-games/coloretto/ColorettoCards';
+import { createColorettoDeck } from '../../example-games/coloretto/ColorettoCards';
 
 // Visual constants mirrored from ColorettoScene (deliberately kept in
 // sync: the originals are module-private there).
@@ -28,10 +28,8 @@ const CHIP_H = 28;
 const NAME_COLUMN_W = 210;
 /** Tight name→chip gap (mirrors NAME_CHIP_GAP). */
 const NAME_CHIP_GAP = 40;
-/** Horizontal step between colour chips (mirrors CHIP_GAP). */
-const CHIP_GAP = 52;
-/** Gap after the last chip before the round-state marker (mirrors ROUND_MARKER_GAP). */
-const ROUND_MARKER_GAP = 8;
+/** Reserved width of the "Taken" label column (mirrors TAKEN_COLUMN_W). */
+const TAKEN_COLUMN_W = 80;
 /** Total width of the three row card slots (mirrors ROW_TOTAL_WIDTH). */
 const ROW_TOTAL_WIDTH = 3 * CARD_W + 2 * ROW_CARD_GAP;
 
@@ -1034,9 +1032,12 @@ describe('ColorettoScene (browser)', () => {
       expect(Math.abs(blockCentre - scene.layout.collectionsCenterY)).toBeLessThanOrEqual(2);
 
       // Tight name→chip gap: the whitespace between the name's rendered
-      // right edge and the first chip's left edge is ~20px (was ~260px).
-      // Names are right-anchored to the fixed chip column, so a name's x
-      // position IS its right edge.
+      // Reserved "Taken" label column between the name and the chips:
+      // the whitespace between the name's rendered right edge and the
+      // first chip's left edge is the label column plus the name→label
+      // gap, minus half a chip (chips are centred on their column
+      // positions). Names are right-anchored to the fixed name column, so
+      // a name's x position IS its right edge.
       const chips = collectionChipRectangles(scene);
       expect(chips.length).toBeGreaterThanOrEqual(5); // the human holds 5 colours
       const firstName = nameTexts[0];
@@ -1045,8 +1046,7 @@ describe('ColorettoScene (browser)', () => {
       const nameRight = firstName.x;
       const chipLeft = firstChip!.x - CHIP_W / 2;
       const gap = chipLeft - nameRight;
-      expect(gap).toBeGreaterThanOrEqual(15);
-      expect(gap).toBeLessThanOrEqual(30);
+      expect(gap).toBeCloseTo(TAKEN_COLUMN_W + NAME_CHIP_GAP - CHIP_W / 2, 0);
 
       // Even a full 5-colour collection's rightmost chip stays clear of
       // the tableau's left edge (the tableau was shifted right).
@@ -1104,7 +1104,7 @@ describe('ColorettoScene (browser)', () => {
     expect(countLabel).toBeDefined();
   });
 
-  it('aligns every hand at a fixed chip column and aligns round-state markers at the max hand length', async () => {
+  it('aligns every hand at a fixed chip column and places a bold Taken label between name and chips', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('ColorettoScene') as any;
     await waitFrames(10);
@@ -1139,9 +1139,9 @@ describe('ColorettoScene (browser)', () => {
       count: 1,
     }));
 
-    // Mark two players as having taken a row so their markers render.
+    // Mark two players as having taken a row so their Taken labels render.
     players[1].roundState = 'taken-row';
-    players[2].roundState = 'taken-row';
+    players[2].roundState = 'final-turn-done';
     scene.refreshCollections();
 
     // 1) Fixed chip start column: every row's first chip starts at the
@@ -1151,7 +1151,7 @@ describe('ColorettoScene (browser)', () => {
       (t) => t.text.includes(' — ') && t.text.includes('pts'),
     );
     expect(nameTexts).toHaveLength(3);
-    const expectedChipStart = scene.layout.collectionsTopX + NAME_COLUMN_W;
+    const expectedChipStart = scene.layout.collectionsTopX + NAME_COLUMN_W + TAKEN_COLUMN_W;
     for (const nameText of nameTexts) {
       const rowChips = chips.filter((c) => Math.abs(c.y - nameText.y) < 1);
       expect(rowChips.length).toBeGreaterThan(0);
@@ -1167,16 +1167,27 @@ describe('ColorettoScene (browser)', () => {
     expect(longName.text).toContain('21 pts');
     expect(longName.width).toBeLessThanOrEqual(NAME_COLUMN_W - NAME_CHIP_GAP);
 
-    // 3) Round-state markers align at the max hand length (COLORS.length
-    //    colour chips + the joker and +2 chips), independent of how many
-    //    chips each player actually holds.
-    const markers = textObjects(scene).filter(
-      (t) => t.text === '(taken a row)' || t.text === '(done)',
-    );
-    expect(markers).toHaveLength(2);
-    const expectedMarkerX = expectedChipStart + (COLORS.length + 2) * CHIP_GAP + ROUND_MARKER_GAP;
-    for (const marker of markers) {
-      expect(marker.x).toBe(expectedMarkerX);
+    // 3) "Taken" labels sit in the reserved column between the name and
+    //    the chips (left-anchored at collectionsTopX + NAME_COLUMN_W),
+    //    rendered bold in the bright highlight colour, independent of how
+    //    many chips each player actually holds. Both 'taken-row' and
+    //    'final-turn-done' players show it.
+    const takenLabels = textObjects(scene).filter((t) => t.text === 'Taken');
+    expect(takenLabels).toHaveLength(2);
+    const expectedTakenX = scene.layout.collectionsTopX + NAME_COLUMN_W;
+    for (const label of takenLabels) {
+      expect(label.x).toBe(expectedTakenX);
+      expect(label.style.fontStyle).toContain('bold');
+      expect(label.style.color).toBe('#ffdd66');
+      // Same row as its player's name, between the name and the chips,
+      // without overlapping either.
+      const rowName = nameTexts.find((n) => Math.abs(n.y - label.y) < 1);
+      expect(rowName).toBeDefined();
+      expect(label.x).toBeGreaterThan(rowName!.x);
+      const rowChips = chips.filter((c) => Math.abs(c.y - label.y) < 1);
+      expect(rowChips.length).toBeGreaterThan(0);
+      const firstChipLeft = Math.min(...rowChips.map((c) => c.x - CHIP_W / 2));
+      expect(label.x + label.width).toBeLessThan(firstChipLeft);
     }
 
     // 4) The take animation flies cards to the same fixed chip column
