@@ -22,6 +22,12 @@ const CARD_W = 58;
 const CARD_H = 78;
 const ROW_CARD_GAP = 10;
 const ROW_STEP_MAX = 92;
+/** Minimum visible vertical gap between adjacent tableau rows (mirrors ROW_GAP). */
+const ROW_GAP = 4;
+/** Vertical budget shared among the tableau rows (mirrors ROW_BUDGET). */
+const ROW_BUDGET = 360;
+/** Card scale at 5 players (mirrors CARD_SCALE_5P). */
+const CARD_SCALE_5P = 0.75;
 const CHIP_W = 44;
 const CHIP_H = 28;
 /** Fixed width of the name+score column (mirrors NAME_COLUMN_W). */
@@ -317,13 +323,17 @@ function humanPlace(scene: any, rowIndex: number): void {
 /** Expected centre of a row slot in scene coordinates (mirrors rowSlotPosition). */
 function slotCenter(scene: any, rowIndex: number, slotIndex: number): { x: number; y: number } {
   const rows = scene.session.rows.length;
-  const step = Math.min(ROW_STEP_MAX, Math.floor(360 / rows));
+  const scale = scene.session.players.length >= 5 ? CARD_SCALE_5P : 1;
+  const step = Math.max(
+    CARD_H * scale + ROW_GAP,
+    Math.min(ROW_STEP_MAX, Math.floor(ROW_BUDGET / rows)),
+  );
   const startY = scene.layout.rowsCenterY - ((rows - 1) * step) / 2;
   const rowY = startY + rowIndex * step;
   const totalWidth = 3 * CARD_W + 2 * ROW_CARD_GAP;
   const startX = scene.layout.rowsCenterX - totalWidth / 2;
   const cardX = startX + slotIndex * (CARD_W + ROW_CARD_GAP);
-  return { x: cardX + CARD_W / 2, y: rowY + CARD_H / 2 };
+  return { x: cardX + (CARD_W * scale) / 2, y: rowY + (CARD_H * scale) / 2 };
 }
 
 /** True when the flight card has been flipped (its '?' back swapped for the card face). */
@@ -1072,8 +1082,188 @@ describe('ColorettoScene (browser)', () => {
       const instructionTop = instruction.y - instruction.height / 2;
       expect(placeButton.y + placeButton.height / 2).toBeLessThan(instructionTop);
       expect(blockBottom).toBeLessThan(instructionTop);
+
+      // The tableau rows stay clear of the header turn text above and the
+      // collections block below, for every player count (5-player overlap
+      // regression: CG-0MSJFUGB5005YBK8). Row cards render at the scaled
+      // size at 5 players; full size otherwise.
+      const scale = count >= 5 ? CARD_SCALE_5P : 1;
+      const cardH = CARD_H * scale;
+      const topRowCenter = scene.rowCenterY(0);
+      const bottomRowCenter = scene.rowCenterY(scene.session.rows.length - 1);
+      const tableauTop = topRowCenter - cardH / 2;
+      const tableauBottom = bottomRowCenter + cardH / 2;
+      expect(tableauTop).toBeGreaterThan(scene.layout.turnY + 10);
+      expect(tableauBottom).toBeLessThan(blockTop);
     },
   );
+
+  it('keeps 5-player tableau rows disjoint with a visible gap and non-overlapping click zones', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('ColorettoScene') as any;
+    await waitFrames(10);
+    expect(clickText(scene, '5 (4 AI)')).toBe(true);
+    // Await the human turn (turn order is randomized at game start), then
+    // force identity order so the test mutates the board without racing an
+    // AI delayed turn.
+    await waitForCondition(() => scene.phaseManager?.current === 'human-turn');
+    scene.session.turnOrder = Array.from({ length: 5 }, (_, i) => i);
+    scene.session.roundStartPlayer = 0;
+
+    // Fill every row with a full complement of cards (the widest the
+    // tableau renders) and re-render.
+    scene.session.rows.forEach((row: { cards: { id: number; type: string; color: string; count: number }[] }, i: number) => {
+      row.cards = ['red', 'blue', 'green'].map((color, j) => ({
+        id: 1000 + i * 3 + j,
+        type: 'chameleon',
+        color,
+        count: 1,
+      }));
+    });
+    scene.refreshRows();
+
+    // AC1: the row step is budget-bound (72 < ROW_STEP_MAX) and guarantees
+    // the scaled card height plus a visible gap (>= 2px).
+    const rows = scene.session.rows.length; // 5
+    const step = Math.min(ROW_STEP_MAX, Math.floor(ROW_BUDGET / rows));
+    const scaledCardH = CARD_H * CARD_SCALE_5P;
+    expect(step).toBeLessThan(ROW_STEP_MAX);
+    expect(step).toBeGreaterThanOrEqual(scaledCardH + 2);
+
+    // The rendered row cards are scaled down at 5 players (their containers
+    // carry scale 0.75), so their on-screen bounding boxes are the scaled
+    // size and adjacent rows never intersect.
+    const renderedCards = (scene.rowsContainer as any).list.filter(
+      (c: Phaser.GameObjects.GameObject) =>
+        c instanceof Phaser.GameObjects.Container,
+    ) as Phaser.GameObjects.Container[];
+    expect(renderedCards).toHaveLength(15); // 5 rows x 3 slots
+    for (const card of renderedCards) {
+      expect(card.scaleX).toBeCloseTo(CARD_SCALE_5P);
+      expect(card.scaleY).toBeCloseTo(CARD_SCALE_5P);
+    }
+    for (let i = 0; i < 4; i++) {
+      const rowBottom = Math.max(
+        ...renderedCards
+          .slice(i * 3, i * 3 + 3)
+          .map((c) => c.y + (CARD_H * c.scaleX) / 2),
+      );
+      const nextRowTop = Math.min(
+        ...renderedCards
+          .slice((i + 1) * 3, (i + 1) * 3 + 3)
+          .map((c) => c.y - (CARD_H * c.scaleX) / 2),
+      );
+      expect(nextRowTop - rowBottom).toBeGreaterThanOrEqual(2);
+    }
+
+    // AC2: row click zones (height = scaled card height + 12) never overlap.
+    const zoneH = scaledCardH + 12;
+    expect(zoneH).toBeLessThan(step);
+    expect(scene.rowZones).toHaveLength(5);
+    for (let i = 0; i < scene.rowZones.length - 1; i++) {
+      const zoneBottom = scene.rowZones[i].y + zoneH / 2;
+      const zoneTop = scene.rowZones[i + 1].y - zoneH / 2;
+      expect(zoneTop).toBeGreaterThanOrEqual(zoneBottom);
+    }
+
+    // AC3: the resized tableau stays clear of the header turn text above
+    // and the collections block below.
+    const rowCenters = scene.session.rows.map((_: unknown, i: number) =>
+      scene.rowCenterY(i),
+    );
+    const tableauTop = rowCenters[0] - scaledCardH / 2;
+    const tableauBottom = rowCenters[4] + scaledCardH / 2;
+    expect(tableauTop).toBeGreaterThan(scene.layout.turnY + 10);
+    const nameTexts = textObjects(scene).filter(
+      (t) => t.text.includes(' — ') && t.text.includes('pts'),
+    );
+    expect(nameTexts).toHaveLength(5);
+    const collectionsTop = Math.min(...nameTexts.map((n) => n.y)) - CHIP_H / 2;
+    expect(tableauBottom).toBeLessThan(collectionsTop);
+  });
+
+  it('places a card into a 5-player row slot at the scaled size', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('ColorettoScene') as any;
+    await waitFrames(10);
+    expect(clickText(scene, '5 (4 AI)')).toBe(true);
+    // Strip the Last Round card so an AI-first randomized turn order can
+    // never end the round mid-test.
+    scene.session.deck = createColorettoDeck().filter(
+      (c) => c.type !== 'last-round',
+    );
+    await waitForCondition(() => scene.phaseManager?.current === 'human-turn');
+    scene.session.turnOrder = Array.from({ length: 5 }, (_, i) => i);
+    scene.session.roundStartPlayer = 0;
+    // Clear the board so the human's placement targets slot 0 deterministically.
+    scene.session.rows.forEach((row: { cards: unknown[] }) => {
+      row.cards = [];
+    });
+    scene.refreshAll();
+
+    const dest = slotCenter(scene, 0, 0);
+    humanPlace(scene, 0);
+
+    // The board gates behind 'animating' and the flight renders at the
+    // 5-player tableau scale from the start.
+    expect(scene.phaseManager.current).toBe('animating');
+    expect(scene.flightCard).not.toBeNull();
+    expect(scene.flightCard.scaleX).toBeCloseTo(CARD_SCALE_5P);
+    expect(scene.flightCard.scaleY).toBeCloseTo(CARD_SCALE_5P);
+
+    // The flight lands centred on the row slot (the scaled destination).
+    await waitForCondition(
+      () =>
+        scene.flightCard &&
+        flightFaceShown(scene.flightCard) &&
+        Math.abs(scene.flightCard.x - dest.x) < 3 &&
+        Math.abs(scene.flightCard.y - dest.y) < 3,
+    );
+    await waitForCondition(() => scene.flightCard === null);
+    expect(scene.session.rows[0].cards.length).toBeGreaterThanOrEqual(1);
+  }, 15000);
+
+  it('takes a 5-player row with scaled flyers landing in the collection', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('ColorettoScene') as any;
+    await waitFrames(10);
+    expect(clickText(scene, '5 (4 AI)')).toBe(true);
+    scene.session.deck = createColorettoDeck().filter(
+      (c) => c.type !== 'last-round',
+    );
+    await waitForCondition(() => scene.phaseManager?.current === 'human-turn');
+    scene.session.turnOrder = Array.from({ length: 5 }, (_, i) => i);
+    scene.session.roundStartPlayer = 0;
+
+    // Force a deterministic take: seed row 0 with two face-up cards and
+    // make player 0 the current player.
+    scene.session.rows[0].cards = [
+      { id: 920, type: 'chameleon', color: 'red', count: 1 },
+      { id: 921, type: 'chameleon', color: 'blue', count: 1 },
+    ];
+    scene.session.currentTurnIndex = 0;
+    scene.session.players[0].roundState = 'active';
+    scene.refreshAll();
+
+    scene.actionMode = 'take';
+    expect(scene.phaseManager.current).toBe('human-turn');
+    const zones = scene.rowZones as Phaser.GameObjects.Rectangle[];
+    expect(zones[0]).toBeDefined();
+    zones[0].emit('pointerdown');
+
+    // Flyers are scaled to the 5-player tableau size and fly to the
+    // collection; the turn advances only after the last card lands.
+    const flyers = flyerContainers(scene);
+    expect(flyers).toHaveLength(2);
+    for (const f of flyers) {
+      expect(f.scaleX).toBeCloseTo(CARD_SCALE_5P);
+    }
+    await waitForPhase(scene, 'ai-thinking');
+    expect(flyerContainers(scene)).toHaveLength(0);
+    expect(
+      (scene.session.players[0].collection as { id: number }[]).map((c) => c.id),
+    ).toEqual([920, 921]);
+  });
 
   it('renders the chameleon count AND color name on each collection chip (AC2)', async () => {
     game = await bootGame();

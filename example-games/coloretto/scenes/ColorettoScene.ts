@@ -86,8 +86,20 @@ export type ColorettoTurnPhase =
 
 const CARD_W = 58;
 const CARD_H = 78;
+/** Minimum visible vertical gap between adjacent tableau rows (px). */
+const ROW_GAP = 4;
+/** Vertical budget (px) shared among the tableau rows; caps the row step. */
+const ROW_BUDGET = 360;
+/** Largest allowed vertical step between tableau rows (px). */
 const ROW_STEP_MAX = 92;
 const ROW_CARD_GAP = 10;
+/**
+ * Card scale at 5 players: five full-size rows cannot fit the vertical
+ * band between the header and the collections block with a visible gap, so
+ * the tableau cards render smaller (precedent: COLLECTION_STEP_5P already
+ * tightens spacing at high player counts).
+ */
+const CARD_SCALE_5P = 0.75;
 const DECK_W = 58;
 const DECK_H = 78;
 const CHIP_W = 44;
@@ -451,19 +463,20 @@ export class ColorettoScene extends CardGameScene {
           // position by refreshLastRoundCard().
           this.rowsContainer.add(
             this.add
-              .rectangle(cardX, rowY, CARD_W, CARD_H, 0x22343c)
+              .rectangle(cardX, rowY, this.cardW(), this.cardH(), 0x22343c)
               .setStrokeStyle(1, 0x3a5560),
           );
         }
       }
 
-      // Click zone (whole row)
+      // Click zone (whole row). Height derives from the rendered card
+      // height (scaled at 5 players) so zones never overlap.
       const zone = this.add
         .rectangle(
           this.layout.rowsCenterX,
           rowY,
           ROW_TOTAL_WIDTH + 30,
-          CARD_H + 12,
+          this.cardH() + 12,
           0xffffff,
           0.001,
         )
@@ -478,10 +491,41 @@ export class ColorettoScene extends CardGameScene {
 
   // ── Layout helpers (shared by rendering and take animation) ──
 
+  /**
+   * Scale applied to tableau row cards for the current player count. At 5
+   * players the five full-size rows cannot fit the vertical band between
+   * the header and the collections block with a visible gap, so the tableau
+   * cards render smaller. 2-4 players keep full-size cards.
+   */
+  private cardScale(): number {
+    return this.session.players.length >= 5 ? CARD_SCALE_5P : 1;
+  }
+
+  /** Rendered tableau card width for the current player count. */
+  private cardW(): number {
+    return CARD_W * this.cardScale();
+  }
+
+  /** Rendered tableau card height for the current player count. */
+  private cardH(): number {
+    return CARD_H * this.cardScale();
+  }
+
+  /**
+   * Vertical step between tableau rows: at least the rendered card height
+   * plus a minimum visible gap, so adjacent rows can never overlap for any
+   * player count (5 rows at full card height would exceed the band).
+   */
+  private rowStep(): number {
+    const rowCount = this.session.rows.length;
+    const minStep = this.cardH() + ROW_GAP;
+    return Math.max(minStep, Math.min(ROW_STEP_MAX, Math.floor(ROW_BUDGET / rowCount)));
+  }
+
   /** Y of a row's center, derived from the SLL rows area and row-count step. */
   private rowCenterY(rowIndex: number): number {
     const rowCount = this.session.rows.length;
-    const step = Math.min(ROW_STEP_MAX, Math.floor(360 / rowCount));
+    const step = this.rowStep();
     return this.layout.rowsCenterY - ((rowCount - 1) * step) / 2 + rowIndex * step;
   }
 
@@ -562,9 +606,15 @@ export class ColorettoScene extends CardGameScene {
     return getRoundTurnOrder(this.session).indexOf(playerIndex);
   }
 
-  private createCard(x: number, y: number, card: ColorettoCard): Phaser.GameObjects.Container {
+  private createCard(
+    x: number,
+    y: number,
+    card: ColorettoCard,
+    scale = this.cardScale(),
+  ): Phaser.GameObjects.Container {
     const container = this.add.container(x, y);
     container.add(this.createCardFace(card));
+    if (scale !== 1) container.setScale(scale);
     return container;
   }
 
@@ -707,11 +757,15 @@ export class ColorettoScene extends CardGameScene {
       if (lr) {
         // createCard() positions the card's top-left at the given point, so
         // offset by half the card size to centre on the resting anchor.
+        // The resting card keeps the full card size: it is a standalone
+        // marker between the tableau and the deck, not part of the (scaled)
+        // tableau rows, and its flight settles at the same full size.
         this.lastRoundContainer.add(
           this.createCard(
             this.layout.lastRoundCenterX - CARD_W / 2,
             this.layout.lastRoundCenterY - CARD_H / 2,
             lr,
+            1,
           ),
         );
         return;
@@ -1167,12 +1221,16 @@ export class ColorettoScene extends CardGameScene {
     }
 
     // Normal place: move to the destination row slot, then flip face-up.
+    // The flight renders at the tableau card scale (smaller at 5 players),
+    // and its landing position uses the scaled card size so the placed card
+    // ends up centred in its slot at the same size as its row mates.
+    flight.setScale(this.cardScale());
     const slotIndex = this.session.rows[action.rowIndex].cards.length - 1;
     moveGameObject({
       scene: this,
       target: flight,
-      destX: this.rowSlotX(slotIndex) + CARD_W / 2,
-      destY: this.rowCenterY(action.rowIndex) + CARD_H / 2,
+      destX: this.rowSlotX(slotIndex) + this.cardW() / 2,
+      destY: this.rowCenterY(action.rowIndex) + this.cardH() / 2,
       duration: PLACE_MOVE_DURATION,
       onComplete: () => {
         this.flipContainer(flight, () => this.createCardFace(drawnCard), () => {
@@ -1233,6 +1291,10 @@ export class ColorettoScene extends CardGameScene {
   ): void {
     const inner = flight.getAt(0) as Phaser.GameObjects.Container;
     const half = FLIP_DURATION / 2;
+    // Restore the pre-flip horizontal scale: the flight may be scaled for
+    // 5-player tableau cards (scaleY = cardScale); at 2-4 players scaleY
+    // is 1 and the flip is unchanged.
+    const finalScaleX = flight.scaleY;
     this.tweens.add({
       targets: flight,
       scaleX: 0,
@@ -1243,7 +1305,7 @@ export class ColorettoScene extends CardGameScene {
         inner.add(createFace());
         this.tweens.add({
           targets: flight,
-          scaleX: 1,
+          scaleX: finalScaleX,
           duration: half,
           ease: 'Power2',
           onComplete: () => onComplete?.(),
