@@ -86,16 +86,16 @@ const ROW_STEP_MAX = 92;
 const ROW_CARD_GAP = 10;
 const DECK_W = 58;
 const DECK_H = 78;
-const CHIP_W = 20;
+const CHIP_W = 44;
 const CHIP_H = 28;
-const CHIP_GAP = 26;
+const CHIP_GAP = 52;
 const COLLECTION_STEP = 40;
 /** Vertical step between collection rows for 4-player games (the centred block is tall there). */
 const COLLECTION_STEP_4P = 36;
 /** Vertical step between collection rows for 5-player games (the centred block is tallest there). */
 const COLLECTION_STEP_5P = 30;
 /** Tight horizontal gap between a player's name text and their first colour chip. */
-const NAME_CHIP_GAP = 30;
+const NAME_CHIP_GAP = 40;
 /**
  * Fixed width of the name+score column. Every player's chips start at
  * `collectionsTopX + NAME_COLUMN_W` regardless of how wide their rendered
@@ -104,7 +104,7 @@ const NAME_CHIP_GAP = 30;
  * longest realistic name + "21 pts" score (and any future turn-order
  * prefix); overlong labels are truncated rather than widening the column.
  */
-const NAME_COLUMN_W = 200;
+const NAME_COLUMN_W = 210;
 /** Gap between the last colour chip and the round-state marker (after the chips). */
 const ROUND_MARKER_GAP = 8;
 /**
@@ -702,8 +702,10 @@ export class ColorettoScene extends CardGameScene {
       for (const color of presentColors(counts)) {
         const chip = this.add.rectangle(chipX, y, CHIP_W, CHIP_H, Phaser.Display.Color.HexStringToColor(colorHex(color)).color);
         this.collectionsContainer.add(chip);
+        // Count (top) + colour name (bottom): the name satisfies the
+        // 'showing chameleon count and color name' requirement.
         const label = this.add
-          .text(chipX, y, `${counts[color]}`, {
+          .text(chipX, y - 6, `${counts[color]}`, {
             fontSize: '13px',
             color: '#ffffff',
             fontFamily: FONT_FAMILY,
@@ -712,6 +714,16 @@ export class ColorettoScene extends CardGameScene {
           })
           .setOrigin(0.5);
         this.collectionsContainer.add(label);
+        const nameLabel = this.add
+          .text(chipX, y + 10, colorLabel(color), {
+            fontSize: '9px',
+            color: '#ffffff',
+            fontFamily: FONT_FAMILY,
+            stroke: '#000000',
+            strokeThickness: 2,
+          })
+          .setOrigin(0.5);
+        this.collectionsContainer.add(nameLabel);
         chipX += CHIP_GAP;
       }
 

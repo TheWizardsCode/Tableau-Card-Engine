@@ -22,14 +22,14 @@ const CARD_W = 58;
 const CARD_H = 78;
 const ROW_CARD_GAP = 10;
 const ROW_STEP_MAX = 92;
-const CHIP_W = 20;
+const CHIP_W = 44;
 const CHIP_H = 28;
 /** Fixed width of the name+score column (mirrors NAME_COLUMN_W). */
-const NAME_COLUMN_W = 200;
+const NAME_COLUMN_W = 210;
 /** Tight name→chip gap (mirrors NAME_CHIP_GAP). */
-const NAME_CHIP_GAP = 30;
+const NAME_CHIP_GAP = 40;
 /** Horizontal step between colour chips (mirrors CHIP_GAP). */
-const CHIP_GAP = 26;
+const CHIP_GAP = 52;
 /** Gap after the last chip before the round-state marker (mirrors ROUND_MARKER_GAP). */
 const ROUND_MARKER_GAP = 8;
 /** Total width of the three row card slots (mirrors ROW_TOTAL_WIDTH). */
@@ -1015,6 +1015,31 @@ describe('ColorettoScene (browser)', () => {
       expect(blockBottom).toBeLessThan(instructionTop);
     },
   );
+
+  it('renders the chameleon count AND color name on each collection chip (AC2)', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('ColorettoScene') as any;
+    await waitFrames(10);
+    expect(clickText(scene, '2 (1 AI)')).toBe(true);
+    await waitForCondition(() => scene.phaseManager?.current === 'human-turn');
+
+    // Seed a multi-colour collection so chips + names render.
+    scene.session.players[0].collection = ['red', 'yellow', 'green'].map(
+      (color, i) => ({ id: 700 + i, type: 'chameleon', color, count: 1 }),
+    );
+    scene.refreshCollections();
+
+    // Every chip shows its count (top line) and its color name (bottom line).
+    const chips = collectionChipRectangles(scene);
+    expect(chips.length).toBe(3);
+    for (const color of ['Red', 'Yellow', 'Green']) {
+      const name = findText(scene, color);
+      expect(name, `color name '${color}' should be rendered`).toBeDefined();
+      expect(Math.abs(name!.y - chips[0].y) - 10).toBeLessThanOrEqual(4); // bottom line
+    }
+    const countLabel = findText(scene, '1');
+    expect(countLabel).toBeDefined();
+  });
 
   it('aligns every hand at a fixed chip column and aligns round-state markers at the max hand length', async () => {
     game = await bootGame();
