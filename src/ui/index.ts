@@ -33,6 +33,22 @@ export type { FlipCardOptions } from './flipCard';
 export { shakeIllegalMove } from './shakeIllegalMove';
 export type { ShakeIllegalMoveOptions } from './shakeIllegalMove';
 
+// Reusable drag-and-drop lifecycle module
+// (extracted from Beleaguered Castle; consumed by Main Street drag-to-buy)
+export {
+  createDragDropManager,
+  DEFAULT_DRAG_DEPTH,
+  DEFAULT_SNAP_BACK_DURATION,
+  DEFAULT_DRAG_DISTANCE_THRESHOLD,
+} from './dragDrop';
+export type {
+  DragDropManager,
+  DragDropManagerConfig,
+  DragDropObjectConfig,
+  DragDropZoneConfig,
+  DragDropPayload,
+} from './dragDrop';
+
 // Positional movement animation
 export { moveGameObject } from './moveGameObject';
 export type { MoveGameObjectOptions } from './moveGameObject';
