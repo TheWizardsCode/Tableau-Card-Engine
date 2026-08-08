@@ -1439,15 +1439,30 @@ describe('ColorettoScene (browser)', () => {
     // The joint optimum: 4 red (10 pts) + bonus (2 pts) = 12.
     expect(findText(scene, '+12 (total 12)')).toBeUndefined(); // overlay not confirmed yet
 
-    // Click the first joker chip (bottom row of the picker) to cycle its
-    // declaration red → yellow.
+    // AC1: each joker chip's fill shows its initial declared colour (the
+    // joint optimum declares both jokers red), not the generic purple.
     const centerY = scene.layout.gameH / 2;
     const jokerChips = pickerChipRectangles(scene).filter((r) => r.y > centerY);
     expect(jokerChips).toHaveLength(2);
+    expect(jokerChips[0].fillColor).toBe(0xe04444); // red
+    expect(jokerChips[1].fillColor).toBe(0xe04444); // red
+    // AC3: the purple Joker stroke keeps wild chips distinguishable from the
+    // positive-colour chips (which use 1px grey / 4px gold strokes).
+    expect(jokerChips[0].strokeColor).toBe(0xbb88ff);
+
+    // Click the first joker chip (bottom row of the picker) to cycle its
+    // declaration red → yellow.
     jokerChips[0].emit('pointerdown');
     await waitFrames(10);
     expect(findText(scene, 'J1 → Yellow')).toBeDefined();
     expect(findText(scene, 'J2 → Red')).toBeDefined();
+    // AC2: the chip fill updates to the newly selected colour in the same
+    // redraw (chips are rebuilt by drawChips()).
+    const cycledChips = pickerChipRectangles(scene).filter((r) => r.y > centerY);
+    expect(cycledChips).toHaveLength(2);
+    expect(cycledChips[0].fillColor).toBe(0xe8c13d); // yellow
+    expect(cycledChips[1].fillColor).toBe(0xe04444); // red (unchanged)
+    expect(cycledChips[0].strokeColor).toBe(0xbb88ff); // still marked as a joker
 
     // Confirm: red 3 (6) + yellow 1 (−1, not positive) + bonus (2) = 7.
     expect(clickText(scene, 'Confirm')).toBe(true);
