@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "id": "coloretto-canonical",
+  "baseViewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "requiredZones": [
+    "header",
+    "rowsArea",
+    "deckArea",
+    "lastRoundArea",
+    "collectionsArea",
+    "instructionArea"
+  ],
+  "zones": {
+    "header": {
+      "rect": {
+        "x": 0,
+        "y": 0
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.045 },
+        "roundCenter": { "x": 0.5, "y": 0.085 },
+        "turnCenter": { "x": 0.5, "y": 0.125 }
+      }
+    },
+    "rowsArea": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.14
+      },
+      "anchors": {
+        "center": { "x": 0.55, "y": 0.42 },
+        "topLeft": { "x": 0.5, "y": 0.16 }
+      }
+    },
+    "deckArea": {
+      "rect": {
+        "x": 0.85,
+        "y": 0.12
+      },
+      "anchors": {
+        "center": { "x": 0.92, "y": 0.3 },
+        "labelCenter": { "x": 0.92, "y": 0.44 }
+      }
+    },
+    "lastRoundArea": {
+      "rect": {
+        "x": 0.55,
+        "y": 0.12
+      },
+      "anchors": {
+        "center": { "x": 0.75, "y": 0.3 }
+      }
+    },
+    "collectionsArea": {
+      "rect": {
+        "x": 0.015,
+        "y": 0.6
+      },
+      "anchors": {
+        "topLeft": { "x": 0.015, "y": 0.6 },
+        "center": { "x": 0.5, "y": 0.78 }
+      }
+    },
+    "instructionArea": {
+      "rect": {
+        "x": 0,
+        "y": 0.93
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.965 }
+      }
+    }
+  }
+}
