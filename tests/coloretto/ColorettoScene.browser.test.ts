@@ -204,6 +204,41 @@ function clickText(scene: Phaser.Scene, fragment: string): boolean {
   return true;
 }
 
+/**
+ * Dispatch a real DOM MouseEvent on the game canvas at a game object's
+ * screen position, routing through Phaser's full input pipeline
+ * (MouseManager -> InputManager -> hit-test -> pointerdown handler) --
+ * the same path a human mouse click takes. Unlike `emit('pointerdown')`,
+ * this also proves that no overlay, hit-area, or scale transform intercepts
+ * the pointer before it reaches the object.
+ *
+ * Phaser 4 RC7's MouseManager listens for native `mousedown`/`mouseup` DOM
+ * events; synthetic PointerEvents do NOT auto-generate the matching
+ * MouseEvent, so MouseEvent must be dispatched directly (mirrors the
+ * pattern documented in tests/main-street/MainStreetOverlay.browser.test.ts).
+ *
+ * The canvas is scale-fitted (Phaser.Scale.FIT), so game-world coordinates
+ * are mapped to client coordinates via the canvas rect / game size ratio.
+ */
+function realClickGameObject(scene: Phaser.Scene, obj: Phaser.GameObjects.GameObject): void {
+  const canvas = scene.game.canvas;
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = rect.width / scene.scale.width;
+  const scaleY = rect.height / scene.scale.height;
+  // Transform component exposes getWorldTransformMatrix; typings only
+  // surface it on concrete game-object types, so cast through any.
+  const matrix = (obj as unknown as { getWorldTransformMatrix(): { e: number; f: number } }).getWorldTransformMatrix();
+  const options: MouseEventInit = {
+    clientX: rect.left + matrix.e * scaleX,
+    clientY: rect.top + matrix.f * scaleY,
+    bubbles: true,
+    cancelable: true,
+    button: 0,
+  };
+  canvas.dispatchEvent(new MouseEvent('mousedown', options));
+  canvas.dispatchEvent(new MouseEvent('mouseup', options));
+}
+
 
 /**
  * Interactive rectangles at depth 201 uniquely identify the positive-color
@@ -1451,8 +1486,10 @@ describe('ColorettoScene (browser)', () => {
     expect(jokerChips[0].strokeColor).toBe(0xbb88ff);
 
     // Click the first joker chip (bottom row of the picker) to cycle its
-    // declaration red → yellow.
-    jokerChips[0].emit('pointerdown');
+    // declaration red → yellow. Uses a real DOM MouseEvent through Phaser's
+    // input pipeline (a human mouse click), not a direct emit(), so the test
+    // also proves nothing intercepts the pointer before the chip.
+    realClickGameObject(scene, jokerChips[0]);
     await waitFrames(10);
     expect(findText(scene, 'J1 → Yellow')).toBeDefined();
     expect(findText(scene, 'J2 → Red')).toBeDefined();
