@@ -9,6 +9,8 @@ import { describe, it, expect } from 'vitest';
 import {
   setupMainStreetGame,
   seedToNumber,
+  serializeMainStreetState,
+  deserializeMainStreetState,
   type MainStreetState,
 } from '../../example-games/main-street/MainStreetState';
 
@@ -193,7 +195,7 @@ describe('MainStreetState', () => {
 
     it('should have no held event initially', () => {
       const state = createTestState();
-      expect(state.heldEvent).toBeNull();
+      expect(state.hand.some(c => c.family === 'event')).toBe(false);
     });
 
     it('should have incident queue pre-filled with Incident-trigger events', () => {
@@ -385,6 +387,43 @@ describe('MainStreetState', () => {
       for (const upg of upgrades) {
         expect(allNames.has(upg.targetBusiness), `${upg.id} targets "${upg.targetBusiness}" which is not a known card name`).toBe(true);
       }
+    });
+  });
+
+  describe('Legacy heldEvent migration (CG-0MSKU0BE5003I2ZD)', () => {
+    it('folds a legacy heldEvent into the merged hand on deserialize', () => {
+      const state = setupMainStreetGame({ seed: 'migration-held-event' });
+      // Simulate a legacy save that still carries the heldEvent field
+      const legacyEvent = {
+        family: 'event',
+        id: 'evt-legacy-held',
+        name: 'Legacy Held Event',
+        trigger: 'Investment',
+        cost: 3,
+        effect: 'test',
+        target: 'All',
+        coinDelta: 2,
+        reputationDelta: 0,
+      };
+      const serialized = serializeMainStreetState(state) as unknown as Record<string, unknown>;
+      serialized.heldEvent = legacyEvent;
+
+      const restored = deserializeMainStreetState(serialized as any);
+
+      // The event must land in the hand and the heldEvent field must be gone
+      expect((restored as any).heldEvent).toBeUndefined();
+      expect(restored.hand.some(c => c.family === 'event' && c.id === 'evt-legacy-held')).toBe(true);
+    });
+
+    it('leaves hand untouched when legacy heldEvent is null', () => {
+      const state = setupMainStreetGame({ seed: 'migration-held-null' });
+      state.hand = [];
+      const serialized = serializeMainStreetState(state) as unknown as Record<string, unknown>;
+      serialized.heldEvent = null;
+
+      const restored = deserializeMainStreetState(serialized as any);
+      expect((restored as any).heldEvent).toBeUndefined();
+      expect(restored.hand.some(c => c.family === 'event')).toBe(false);
     });
   });
 });

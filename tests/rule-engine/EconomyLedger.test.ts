@@ -644,7 +644,7 @@ describe('EconomyLedger — Main Street integration parity', () => {
         reputationDelta: 1,
         cost: 0,
       };
-      state.heldEvent = event;
+      state.hand = [event];
 
       const ledger = ledgerFromState(state);
       const coinsBefore = state.resourceBank.coins;

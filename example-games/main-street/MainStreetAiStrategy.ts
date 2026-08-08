@@ -133,7 +133,7 @@ export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
   }
 
   // ── play-event ────────────────────────────────────────────
-  if (state.heldEvent !== null) {
+  if ((state.hand ?? []).some(c => c.family === 'event')) {
     actions.push({ type: 'play-event' });
   }
 

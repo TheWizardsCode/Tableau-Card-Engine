@@ -134,7 +134,7 @@ function chooseDemoGreedyActions(state: MainStreetState): PlayerAction[] {
     break;
   }
 
-  if (state.heldEvent !== null) {
+  if ((state.hand ?? []).some(c => c.family === 'event')) {
     actions.push({ type: 'play-event' });
   }
 

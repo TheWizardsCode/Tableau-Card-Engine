@@ -153,7 +153,7 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
     'Investment cards are most powerful when you time them right. The {cardName} ' +
     'gives {bonus} to all **Culture** businesses — so you will want a Culture business ' +
     'on your street before you play it.\n' +
-    'You can hold one event card and play it when the time is right.',
+    'You can hold event cards in your hand and play them when the time is right.',
 
   // ── T8: Culture Business Purchase ───────────────────────────
   [tutorialKey('T8', 'title')]:
@@ -180,7 +180,7 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
   [tutorialKey('T10', 'title')]:
     'Your Hand',
   [tutorialKey('T10', 'body')]:
-    'You can hold one event card at a time.\n' +
+    'You can hold event and business cards together in your hand (up to your hand size).\n' +
     'When you buy an event, it appears here.\n' +
     'Click the card in your hand to play it.',
 

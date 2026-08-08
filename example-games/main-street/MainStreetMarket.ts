@@ -212,8 +212,9 @@ export function canPurchaseUpgrade(
 /**
  * Checks whether the player can purchase an Event card from the market.
  *
- * Investment events are purchased from the market and held (max 1 at a time)
- * until the player chooses to play them during the MarketPhase.
+ * Investment events are purchased from the market and added to the player's
+ * hand (any mix of business and event cards, up to `maxHandSize` total) until
+ * the player chooses to play them during the MarketPhase.
  * Incident events are drawn automatically (not purchased).
  *
  * @param state   Current game state.
@@ -237,9 +238,10 @@ export function canPurchaseEvent(
     return { legal: false, reason: 'Incident events cannot be purchased; they are drawn automatically.' };
   }
 
-  // Only one held Investment at a time
-  if (state.heldEvent !== null) {
-    return { legal: false, reason: 'Already holding an Investment event. Play or discard it before buying another.' };
+  // Hand capacity is the only limit — no separate "max 1 held Investment" rule
+  const handCheck = canAddToHand(state);
+  if (!handCheck.legal) {
+    return handCheck;
   }
 
   // Check coins
@@ -694,8 +696,8 @@ export function purchaseUpgrade(
 }
 
 /**
- * Purchases an Investment-trigger Event card from the market and holds it
- * for the player to play later during the MarketPhase.
+ * Purchases an Investment-trigger Event card from the market and adds it to
+ * the player's hand for the player to play later during the MarketPhase.
  *
  * @param state   Current game state (mutated in-place).
  * @param cardId  ID of the Event card in the market.
@@ -722,14 +724,14 @@ export function purchaseEvent(
   // Remove from market
   state.market.investments.splice(marketIndex, 1);
 
-  // Hold the Investment event (max 1)
-  state.heldEvent = card;
+  // Add the event to the shared hand (appended like any other card)
+  state.hand.push(card);
 
   // Note: market is not refilled immediately. Replenishment occurs at start of next turn.
   const refilled = false;
 
   const costLabel = card.cost > 0 ? ` (-€${card.cost})` : '';
-  addLog(state, `Bought event: ${card.name}${costLabel} (held)`, 'neutral');
+  addLog(state, `Bought event: ${card.name}${costLabel} (to hand)`, 'neutral');
 
   return { card, cost: card.cost, refilled };
 }

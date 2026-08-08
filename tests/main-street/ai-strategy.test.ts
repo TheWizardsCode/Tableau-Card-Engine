@@ -138,10 +138,10 @@ describe('enumerateLegalActions', () => {
     }
   });
 
-  it('includes play-event when player holds an Investment event', () => {
+  it('includes play-event when player holds an Investment event in hand', () => {
     const state = createTestState();
-    // Inject a held event
-    state.heldEvent = {
+    // Inject a held event into the hand
+    state.hand = [{
       family: 'event',
       id: 'test-event',
       name: 'Test Event',
@@ -151,21 +151,21 @@ describe('enumerateLegalActions', () => {
       target: 'All',
       coinDelta: 2,
       reputationDelta: 0,
-    };
+    }];
     const actions = enumerateLegalActions(state);
     expect(actions.some(a => a.type === 'play-event')).toBe(true);
   });
 
   it('excludes play-event when no event is held', () => {
     const state = createTestState();
-    state.heldEvent = null;
+    state.hand = [];
     const actions = enumerateLegalActions(state);
     expect(actions.some(a => a.type === 'play-event')).toBe(false);
   });
 
   it('excludes buy-event when player already holds an event', () => {
     const state = createTestState();
-    state.heldEvent = {
+    state.hand = [{
       family: 'event',
       id: 'held-event',
       name: 'Held Event',
@@ -175,7 +175,19 @@ describe('enumerateLegalActions', () => {
       target: 'All',
       coinDelta: 2,
       reputationDelta: 0,
-    };
+    }];
+    const actions = enumerateLegalActions(state);
+    // Hand holds one card (< maxHandSize 2), so another event purchase is legal.
+    expect(actions.some(a => a.type === 'buy-event')).toBe(true);
+  });
+
+  it('excludes buy-event when the hand is full', () => {
+    const state = createTestState();
+    // Fill the hand to maxHandSize (2) so no further purchases are legal.
+    state.hand = [
+      { family: 'event', id: 'held-1', name: 'Event 1', trigger: 'Investment', cost: 0, effect: 'x', target: 'All', coinDelta: 1, reputationDelta: 0 },
+      { family: 'event', id: 'held-2', name: 'Event 2', trigger: 'Investment', cost: 0, effect: 'x', target: 'All', coinDelta: 1, reputationDelta: 0 },
+    ];
     const actions = enumerateLegalActions(state);
     expect(actions.some(a => a.type === 'buy-event')).toBe(false);
   });
@@ -323,7 +335,7 @@ describe('GreedyStrategy', () => {
     // Remove all market cards and events
     state.market.development = [];
     state.market.investments = [];
-    state.heldEvent = null;
+    state.hand = [];
     const rng = makeRng();
     const action = GreedyStrategy.chooseAction(state, rng);
     expect(action.type).toBe('end-turn');
@@ -394,7 +406,7 @@ describe('scoreAction', () => {
 
   it('scores play-event as a fixed positive value', () => {
     const state = createTestState();
-    state.heldEvent = {
+    state.hand = [{
       family: 'event',
       id: 'test-event',
       name: 'Test Event',
@@ -404,7 +416,7 @@ describe('scoreAction', () => {
       target: 'All',
       coinDelta: 2,
       reputationDelta: 0,
-    };
+    }];
     const score = scoreAction(state, { type: 'play-event' });
     expect(score).toBeGreaterThan(0);
   });
@@ -431,7 +443,7 @@ describe('scoreAction', () => {
 
   it('scores buy-event using coinDelta + reputationDelta * reputationScoreMultiplier - cost', () => {
     const state = createTestState();
-    state.heldEvent = null;
+    state.hand = [];
     const eventCard = state.market.investments.find(c => c.family === 'event');
     if (!eventCard) return; // skip if no event in market for this seed
 

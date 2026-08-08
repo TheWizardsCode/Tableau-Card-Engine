@@ -79,10 +79,13 @@ import { computeMainStreetLayoutWithSll } from './MainStreetLayoutAdapter';
 // markHudTransient and clearTransientHud are now imported from src/ui/Renderer
 
 export class MainStreetRenderer {
-  /** HandView for player hand — uses renderCard for SVG event card rendering. */
+  /**
+   * Single HandView for the merged player hand — one horizontal row holding
+   * any mix of business and event cards (up to `maxHandSize` total).
+   * `renderCard` dispatches on `card.family` to render business or event
+   * cards with their respective interactions.
+   */
   handView!: HandView;
-  /** HandView for business cards held in hand — supports selection highlighting. */
-  handBusinessView!: HandView;
 
   constructor(private readonly scene: any) {}
 
@@ -117,47 +120,10 @@ export class MainStreetRenderer {
     s.incidentQueueContainer = createGameZone(s, 0, 0, s.layout.gameW, s.layout.gameH, 'incidentQueueContainer');
     s.handContainer = createGameZone(s, 0, 0, s.layout.gameW, s.layout.gameH, 'handContainer');
 
-    // Create HandView for the player's hand (anticipates multi-event-card support)
+    // Create the merged HandView for the player's hand. Both business and
+    // event cards render in one horizontal row (centred on handCenterX).
     const { handX, handY, handCardW, handCardH, handCenterX } = s.layout;
-    // HandView is created at the hand slot centre — renderCard positions cards via HandView layout
     this.handView = new HandView(s, {
-      baseX: handX + handCardW / 2,
-      baseY: handY + handCardH / 2,
-      centerX: handCenterX,
-      spacing: handCardW + 10,
-      cardWidth: handCardW,
-      showLabels: false,
-      selectionEnabled: false,
-      clickEnabled: false,
-      renderCard: (_card, _index) => {
-        // The callback returns a Container with SVG-rendered card + hover overlay
-        const card = _card as any;
-        const container = s.add.container(0, 0);
-        const renderW = Math.max(1, Math.round(handCardW - 4));
-        const renderH = Math.max(1, Math.round(handCardH - 4));
-
-        // Render SVG card via shared adapter
-        mainStreetRenderCardSvg(s, container, card.id, renderW, renderH);
-
-        if (!s.replayMode) {
-          const hover = s.add.rectangle(0, 0, handCardW, handCardH, 0x000000, 0.001);
-          hover.setInteractive({ useHandCursor: s.uiPhase === 'market' });
-          hover.on('pointerover', () => {
-            const info = buildCardTooltipInfo(card, s.state.config);
-            s.tooltipManager?.show(info, container.x, container.y);
-          });
-          hover.on('pointerout', () => s.tooltipManager?.hide());
-          if (s.uiPhase === 'market') {
-            hover.on('pointerdown', () => s.onPlayHeldEvent());
-          }
-          container.add(hover);
-        }
-
-        return container;
-      },
-    });
-    // Create HandView for business cards (hand cards from purchase)
-    this.handBusinessView = new HandView(s, {
       baseX: handX + handCardW / 2,
       baseY: handY,
       centerX: handCenterX,
@@ -172,26 +138,48 @@ export class MainStreetRenderer {
         const renderW = Math.max(1, Math.round(handCardW - 4));
         const renderH = Math.max(1, Math.round(handCardH - 4));
 
+        // Render SVG card via shared adapter
         mainStreetRenderCardSvg(s, container, card.id, renderW, renderH);
 
-        // Apply income/reputation overlays
-        this.applyUpgradeOverlays(container, card, renderW, renderH);
+        if (card.family === 'event') {
+          // ── Event card path: tooltip + play-event click (market phase only) ──
+          if (!s.replayMode) {
+            const hover = s.add.rectangle(0, 0, handCardW, handCardH, 0x000000, 0.001);
+            hover.setInteractive({ useHandCursor: s.uiPhase === 'market' });
+            hover.on('pointerover', () => {
+              const info = buildCardTooltipInfo(card, s.state.config);
+              s.tooltipManager?.show(info, container.x, container.y);
+            });
+            hover.on('pointerout', () => s.tooltipManager?.hide());
+            if (s.uiPhase === 'market') {
+              hover.on('pointerdown', () => s.onPlayHeldEvent(cardIndex));
+            }
+            container.add(hover);
+          }
+        } else {
+          // ── Business card path: upgrade overlays + placement click ──
+          this.applyUpgradeOverlays(container, card, renderW, renderH);
 
-        // Add interactive hit area so cards can be clicked during market phase
-        // to start the placing-from-hand flow.
-        if (!s.replayMode) {
-          const hitArea = s.add.rectangle(0, 0, handCardW, handCardH, 0x000000, 0.001);
-          hitArea.setInteractive({ useHandCursor: true });
-          hitArea.on('pointerdown', () => {
-            s.onHandBusinessCardClick(cardIndex);
-          });
-          container.add(hitArea);
+          // Add interactive hit area so cards can be clicked during market phase
+          // to start the placing-from-hand flow.
+          if (!s.replayMode) {
+            const hitArea = s.add.rectangle(0, 0, handCardW, handCardH, 0x000000, 0.001);
+            hitArea.setInteractive({ useHandCursor: true });
+            hitArea.on('pointerdown', () => {
+              s.onHandBusinessCardClick(cardIndex);
+            });
+            container.add(hitArea);
+          }
         }
 
         return container;
       },
       customClickFn: (cardIndex: number) => {
-        // Allow selecting a different card in the hand during placement
+        const card = s.state.hand?.[cardIndex];
+        // Event cards are played (via onPlayHeldEvent), never placed — ignore
+        // HandView-level clicks on them here.
+        if (card && card.family === 'event') return;
+        // Allow selecting a different business card in the hand during placement
         if (s.uiPhase === 'placing-from-hand') {
           s.pendingHandIndex = cardIndex;
           this.updateBusinessHandSelection(cardIndex);
@@ -695,22 +683,25 @@ export class MainStreetRenderer {
 
   /**
    * Toggle the selection highlight on business hand cards.
-   * Adds or removes a green border from the card at `index`.
+   * Adds or removes a green border from the card at `index` in the merged hand.
    */
   public updateBusinessHandSelection(index: number | null): void {
     const s = this.scene;
-    // Remove existing selection borders from all business hand card sprites
-    for (let i = 0; i < this.handBusinessView.getSprites().length; i++) {
-      const sprite = this.handBusinessView.getSpriteAt(i);
+    // Remove existing selection borders from all hand card sprites
+    for (let i = 0; i < this.handView.getSprites().length; i++) {
+      const sprite = this.handView.getSpriteAt(i);
       if (!sprite) continue;
       const container = sprite as Phaser.GameObjects.Container;
       const existing = container.getByName('hand-selection-border');
       if (existing) existing.destroy();
     }
 
-    // Add selection border to the newly selected card
-    if (index !== null && index >= 0 && index < this.handBusinessView.getSprites().length) {
-      const sprite = this.handBusinessView.getSpriteAt(index);
+    // Add selection border to the newly selected card (business cards only —
+    // event cards are played, never placed, so they never carry a selection)
+    if (index !== null && index >= 0 && index < this.handView.getSprites().length) {
+      const card = s.state.hand?.[index];
+      if (card && card.family === 'event') return;
+      const sprite = this.handView.getSpriteAt(index);
       if (!sprite) return;
       const container = sprite as Phaser.GameObjects.Container;
       const renderW = Math.max(1, Math.round(s.layout.handCardW - 4));
@@ -1257,20 +1248,10 @@ export class MainStreetRenderer {
     // handContainer zone kept for backward-compat (zone-metadata tests)
     s.handContainer.removeAll(true);
 
-    // Show held event card if present (existing behavior)
-    const held = s.state.heldEvent;
-
-    if (held) {
-      // Use HandView with renderCard callback — anticipates multi-card support
-      this.handView.setCards([held] as any);
-    } else {
-      // Empty hand — HandView gracefully handles empty array (no sprites)
-      this.handView.setCards([]);
-    }
-
-    // Render business hand cards via HandView
+    // Render the merged hand (any mix of business and event cards) via the
+    // single HandView — HandView gracefully handles an empty array.
     const hand = s.state.hand ?? [];
-    this.handBusinessView.setCards(hand);
+    this.handView.setCards(hand);
 
     // Restore selection highlight when in placing-from-hand phase
     if (s.uiPhase === 'placing-from-hand' && s.pendingHandIndex !== null) {

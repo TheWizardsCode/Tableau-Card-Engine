@@ -225,8 +225,8 @@ describe('Activity Log', () => {
       const state = createTestState();
       executeDayStart(state);
 
-      // Set held event
-      state.heldEvent = makeInvestmentEvent({ id: 'de-1', name: 'Tax Audit', coinDelta: -3, reputationDelta: 0 });
+      // Set held event in hand
+      state.hand = [makeInvestmentEvent({ id: 'de-1', name: 'Tax Audit', coinDelta: -3, reputationDelta: 0 })];
 
       const logBefore = state.activityLog.length;
       state.phase = 'InvestmentResolution';
@@ -245,7 +245,7 @@ describe('Activity Log', () => {
       const state = createTestState();
       executeDayStart(state);
 
-      state.heldEvent = makeInvestmentEvent({ id: 'de-n', name: 'Nothing Happens', coinDelta: 0, reputationDelta: 0 });
+      state.hand = [makeInvestmentEvent({ id: 'de-n', name: 'Nothing Happens', coinDelta: 0, reputationDelta: 0 })];
 
       state.phase = 'InvestmentResolution';
       resolveHeldInvestment(state);

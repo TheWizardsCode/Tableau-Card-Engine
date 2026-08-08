@@ -352,17 +352,31 @@ export function resolveEvent(state: MainStreetState, event: EventCard): void {
 }
 
 /**
- * Plays and resolves the currently held Investment event.
+ * Plays and resolves an Investment event card from the player's hand.
  * Can only be called during the MarketPhase.
  *
- * @throws Error if no Investment event is held.
+ * @param state      Current game state (mutated in-place).
+ * @param handIndex  Optional index of the event card in `state.hand` to play.
+ *                   When omitted, the first event-family card in the hand is
+ *                   played (backward-compatible with the old single-held-event
+ *                   semantics used by tests and the AI).
+ * @throws Error if no Investment event is found at the given index / in the hand.
  */
-export function playHeldEvent(state: MainStreetState): void {
-  if (state.heldEvent === null) {
-    throw new Error('No Investment event is currently held.');
+export function playHeldEvent(state: MainStreetState, handIndex?: number): void {
+  const hand = state.hand ?? [];
+  let index = handIndex;
+  if (index === undefined) {
+    index = hand.findIndex(c => c.family === 'event');
+  }
+  if (index === undefined || index < 0 || index >= hand.length) {
+    throw new Error('No Investment event is currently held in hand.');
+  }
+  const card = hand[index];
+  if (card.family !== 'event') {
+    throw new Error(`Card at hand index ${index} is not an Investment event.`);
   }
 
-  const event = state.heldEvent;
+  const event = card as EventCard;
   const coinsBefore = state.resourceBank.coins;
   const repBefore = state.resourceBank.reputation;
   resolveEvent(state, event);
@@ -373,23 +387,25 @@ export function playHeldEvent(state: MainStreetState): void {
     `Investment: ${event.name} (${describeEventEffects(coinChange, repChange)})`,
     classifyEffect(coinChange, repChange),
   );
-  state.heldEvent = null;
+  hand.splice(index, 1);
 }
 
 /**
- * Resolves any remaining held Investment event.
+ * Resolves any remaining Investment event card from the player's hand.
  *
  * NOTE: This is no longer called automatically during processEndOfTurn.
  * Held events persist across turns until the player actively plays them
  * via the 'play-event' action during the MarketPhase. This function is
  * retained for programmatic / test use.
  *
- * @returns The resolved event, or null if no event was held.
+ * @returns The resolved event, or null if no event was in hand.
  */
 export function resolveHeldInvestment(state: MainStreetState): EventCard | null {
-  if (state.heldEvent === null) return null;
+  const hand = state.hand ?? [];
+  const index = hand.findIndex(c => c.family === 'event');
+  if (index === -1) return null;
 
-  const event = state.heldEvent;
+  const event = hand[index] as EventCard;
   const coinsBefore = state.resourceBank.coins;
   const repBefore = state.resourceBank.reputation;
   resolveEvent(state, event);
@@ -400,7 +416,7 @@ export function resolveHeldInvestment(state: MainStreetState): EventCard | null 
     `Investment (auto): ${event.name} (${describeEventEffects(coinChange, repChange)})`,
     classifyEffect(coinChange, repChange),
   );
-  state.heldEvent = null;
+  hand.splice(index, 1);
   return event;
 }
 
@@ -705,6 +721,11 @@ export function placeFromHand(
 
   const card = hand[handIndex];
 
+  // Event cards are played from the hand, never placed on the street.
+  if (card.family === 'event') {
+    throw new Error(`Event cards cannot be placed on the street. Play ${card.name} from the hand instead.`);
+  }
+
   // Validate slot index
   if (slotIndex < 0 || slotIndex >= 10) {
     throw new Error(`Invalid slot index: ${slotIndex}. Must be 0-9.`);
@@ -745,6 +766,11 @@ export function sellFromHand(
   }
 
   const card = hand[handIndex];
+
+  // Event cards are played from the hand, never sold.
+  if (card.family === 'event') {
+    throw new Error(`Event cards cannot be sold. Play ${card.name} from the hand instead.`);
+  }
 
   // Calculate sell value (75% of purchase price)
   const sellValue = Math.floor(card.cost * SELL_VALUE_RATIO);
@@ -835,6 +861,11 @@ export function canPlaceFromHand(
 
   const card = hand[handIndex];
 
+  // Event cards are played from the hand, never placed on the street.
+  if (card.family === 'event') {
+    return { legal: false, reason: `Event cards cannot be placed on the street. Play ${card.name} from the hand instead.` };
+  }
+
   // Validate slot index
   if (slotIndex < 0 || slotIndex >= 10) {
     return { legal: false, reason: `Invalid slot index: ${slotIndex}. Must be 0-9.` };
@@ -873,6 +904,13 @@ export function canSellFromHand(
   // Validate hand index
   if (handIndex < 0 || handIndex >= hand.length) {
     return { legal: false, reason: `Invalid hand index: ${handIndex}. Hand has ${hand.length} cards.` };
+  }
+
+  const card = hand[handIndex];
+
+  // Event cards are played from the hand, never sold.
+  if (card.family === 'event') {
+    return { legal: false, reason: `Event cards cannot be sold. Play ${card.name} from the hand instead.` };
   }
 
   return { legal: true };

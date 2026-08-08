@@ -306,7 +306,7 @@ export class MainStreetLifecycleManager {
           'Buy businesses from the market and place them on the 2x5 street.\n' +
           'Earn income and score through card value + synergy + reputation.\n' +
           'Buy upgrades to improve existing businesses.\n' +
-          'Hold one event card and play it when timing is best.\n' +
+          'Hold event cards and play them when timing is best.\n' +
           'Complete challenges for bonus points and instant-win conditions.\n' +
           'Manage coins and reputation across 20 turns to build the best street.',
       },

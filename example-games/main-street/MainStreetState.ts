@@ -198,8 +198,6 @@ export interface MainStreetState {
   challengesCompleted: string[];
   /** Active challenges for this run (selected at setup, evaluated each EndCheck). */
   activeChallenges: ActiveChallenge[];
-  /** Held Investment event awaiting play (max 1 at a time, null = none). */
-  heldEvent: EventCard | null;
   /** Visible FIFO queue of upcoming Incident events (front = next to resolve). */
   incidentQueue: EventCard[];
   /** Current game result. */
@@ -220,8 +218,8 @@ export interface MainStreetState {
   activityLog: LogEntry[];
   /** Active duration-based modifiers (e.g. Flu outbreak income reduction). */
   activeEffects: ActiveEffect[];
-  /** Cards held in the player's hand (not placed on tableau). */
-  hand: BusinessCard[];
+  /** Cards held in the player's hand (not placed on tableau). Any mix of business and event cards. */
+  hand: (BusinessCard | EventCard)[];
   /** Maximum number of cards the player can hold in hand (default 2, expanded by staff cards). */
   maxHandSize: number;
   /** Discard pile for cycled and sold cards (unified discard pool). */
@@ -269,7 +267,6 @@ export interface MainStreetSerializedState {
     challengeId: string;
     completed: boolean;
   }[];
-  heldEvent: EventCard | null;
   incidentQueue: EventCard[];
   gameResult: GameResult;
   endReason: EndReason;
@@ -279,8 +276,8 @@ export interface MainStreetSerializedState {
   rngCalls: number;
   activityLog: LogEntry[];
   activeEffects: ActiveEffect[];
-  /** Serialized hand cards. */
-  hand: BusinessCard[];
+  /** Serialized hand cards (any mix of business and event cards). */
+  hand: (BusinessCard | EventCard)[];
   /** Maximum hand size at the time of save. */
   maxHandSize: number;
   /** Serialized discard pile. */
@@ -524,7 +521,6 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     },
     challengesCompleted: [],
     activeChallenges: [],
-    heldEvent: null,
     incidentQueue,
     gameResult: 'playing',
     endReason: null,
@@ -572,7 +568,6 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
       challengeId: ac.challenge.id,
       completed: ac.completed,
     })),
-    heldEvent: structuredClone(state.heldEvent),
     incidentQueue: structuredClone(state.incidentQueue),
     gameResult: state.gameResult,
     endReason: state.endReason,
@@ -671,6 +666,22 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
   // ── Hand management fields (Multi-Use Card Economy) ──────
   if (!('hand' in saved)) {
     (saved as Record<string, unknown>).hand = [];
+  }
+
+  // ── Held event → hand merge (CG-0MSKU0BE5003I2ZD) ────────
+  // Legacy saves stored the held Investment event separately in `heldEvent`.
+  // The merged hand model folds it into `hand` alongside business cards.
+  if ('heldEvent' in saved) {
+    const held = (saved as Record<string, unknown>).heldEvent as Record<string, unknown> | null | undefined;
+    delete (saved as Record<string, unknown>).heldEvent;
+    if (held && typeof held === 'object') {
+      const handArr = saved.hand as unknown[] | undefined;
+      if (Array.isArray(handArr)) {
+        handArr.push(held);
+      } else {
+        (saved as Record<string, unknown>).hand = [held];
+      }
+    }
   }
   if (!('maxHandSize' in saved)) {
     (saved as Record<string, unknown>).maxHandSize = 2;
@@ -810,7 +821,6 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
         completed: ac.completed,
       };
     }),
-    heldEvent: structuredClone(saved.heldEvent),
     incidentQueue: structuredClone(saved.incidentQueue),
     gameResult: saved.gameResult,
     endReason: saved.endReason,

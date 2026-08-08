@@ -304,7 +304,6 @@ export function createTutorialScenario(
     },
     challengesCompleted: [],
     activeChallenges: [],
-    heldEvent: null,
     incidentQueue,
     gameResult: 'playing',
     endReason: null,

@@ -148,7 +148,7 @@ describe('AC1: Tutorial setup uses scenario factory (not seed-based setupWithSee
 
   it('scenario state has no held event', () => {
     const state = createTutorialScenario();
-    expect(state.heldEvent).toBeNull();
+    expect(state.hand.some(c => c.family === 'event')).toBe(false);
   });
 
   it('scenario state has active challenges selected', () => {
@@ -344,7 +344,7 @@ describe('AC4: Scenario-built state produces consistent market indices (backward
     expect(state).toHaveProperty('discards');
     expect(state).toHaveProperty('challengesCompleted');
     expect(state).toHaveProperty('activeChallenges');
-    expect(state).toHaveProperty('heldEvent');
+    expect(state).toHaveProperty('hand');
     expect(state).toHaveProperty('incidentQueue');
     expect(state).toHaveProperty('gameResult');
     expect(state).toHaveProperty('endReason');

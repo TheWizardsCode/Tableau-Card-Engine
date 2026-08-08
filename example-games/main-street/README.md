@@ -39,11 +39,17 @@ npx vitest run tests/e2e/replay-main-street.e2e.test.ts --project unit
 
 ## Hand layout prediction (single source of truth)
 
-The player hand is rendered by `HandView` instances configured in
-`MainStreetRenderer.createContainers`:
+The player hand is rendered by a **single merged `HandView`** configured in
+`MainStreetRenderer.createContainers`. One horizontal row holds any mix of
+business and event cards up to `maxHandSize` total (starting at 2, growable via
+staff upgrade cards' `handSlotsAdded`). Event cards are no longer held in a
+separate slot — a purchased Investment event simply joins the shared hand and
+is played by clicking it during the Market phase.
 
-- `handBusinessView` — business cards bought to hand (centred on `handCenterX`, spacing `handCardW + 8`).
-- `handView` — the held investment event card (centred on `handCenterX`, spacing `handCardW + 10`).
+- `handView` — the merged hand (centred on `handCenterX`, spacing `handCardW + 8`).
+  `renderCard` dispatches on `card.family`: business cards render upgrade
+  overlays and support the placing-from-hand flow; event cards show a tooltip
+  and a play-event click (market phase only).
 
 Market→hand buy-transfer animations target the **exact resting position** of the
 purchased card via `HandView.getInsertionPosition(insertIndex)` — the single
@@ -52,10 +58,11 @@ precisely where it will be rendered (the hand is re-centred on `handCenterX`
 every time the hand size changes), instead of the old left-edge slot estimate
 that caused a visible sideways snap when the hand re-rendered.
 
-- `MainStreetScene.getBusinessHandInsertionPosition(insertIndex)` delegates to `handBusinessView`
+- `MainStreetScene.getBusinessHandInsertionPosition(insertIndex)` delegates to `handView`
   (`MainStreetTurnController.onBusinessCardClick` uses it with the append index = current hand length).
-- `MainStreetScene.getEventHandInsertionPosition(insertIndex)` delegates to `handView`
-  (`MainStreetTurnController.onEventCardClick` uses it with index 0 for the single held event).
+- `MainStreetScene.getEventHandInsertionPosition(insertIndex)` delegates to the same `handView`
+  (`MainStreetTurnController.onEventCardClick` uses it with the append index = current hand length —
+  events append to the shared hand like any other card).
 - `MainStreetAnimator.getHandCardCenter()` is kept for backward compatibility only; buy transfers no
   longer use it.
 

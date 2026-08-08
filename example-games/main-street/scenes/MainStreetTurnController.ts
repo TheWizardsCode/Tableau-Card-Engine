@@ -210,21 +210,31 @@ export class MainStreetTurnController {
     });
   }
 
-  public onPlayHeldEvent(): void {
+  public onPlayHeldEvent(handIndex?: number): void {
     const s = this.scene;
     if (s.uiPhase !== 'market') return;
-    if (!s.state.heldEvent) return;
 
-    console.debug('[MS] onPlayHeldEvent: attempting PlayEvent', { heldEventId: s.state.heldEvent?.id, coinsBefore: s.state.resourceBank.coins });
+    // Resolve the event card to play: an explicit hand index (from clicking a
+    // specific event card in the merged hand) or the first event in the hand.
+    const hand = s.state.hand ?? [];
+    let index = handIndex;
+    if (index === undefined) {
+      index = hand.findIndex((c: any) => c.family === 'event');
+    }
+    if (index === undefined || index < 0 || index >= hand.length) return;
+    const card = hand[index];
+    if (card.family !== 'event') return;
+
+    console.debug('[MS] onPlayHeldEvent: attempting PlayEvent', { eventId: card.id, coinsBefore: s.state.resourceBank.coins });
     try {
-      const cmd = playEventCommand(s.state);
+      const cmd = playEventCommand(s.state, index);
       s.undoManager.execute(cmd);
       // Record action event
       try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'play-event' }, description: cmd.description }); } catch (_) {}
-      try { s.gameEvents?.emit('card:placed', { action: 'play-event', heldEventId: s.state.heldEvent?.id ?? null }); } catch (_) {}
+      try { s.gameEvents?.emit('card:placed', { action: 'play-event', heldEventId: card.id }); } catch (_) {}
       s.instructionText.setText('Played held Investment event!');
       addLog(s.state, 'Played held event (via UI)', 'neutral');
-      console.debug('[MS] PlayEvent executed', { coinsAfter: s.state.resourceBank.coins, heldEventAfter: s.state.heldEvent?.id ?? null });
+      console.debug('[MS] PlayEvent executed', { coinsAfter: s.state.resourceBank.coins });
     } catch (e) {
       console.error('[MS] PlayEvent failed', e);
       s.instructionText.setText(`Error: ${(e as Error).message}`);
@@ -359,7 +369,7 @@ export class MainStreetTurnController {
         family: 'business',
         row: 'development',
         slotIndex: sourceIndex,
-        // Animate to the exact resting position in the business hand — the
+        // Animate to the exact resting position in the merged hand — the
         // HandView-predicted insertion position (single source of truth),
         // not a left-edge slot estimate that would make the card snap
         // sideways when the hand re-renders centred on handCenterX.
@@ -546,15 +556,16 @@ export class MainStreetTurnController {
     };
 
     if (sourceIndex >= 0) {
+      const handIndex = (s.state.hand ?? []).length;
       void s.animateTransferFromMarket({
         cardId: card.id,
         family: 'event',
         row: 'investments',
         slotIndex: sourceIndex,
-        // Animate to the exact resting position of the held event card — the
-        // HandView-predicted position (single source of truth), centred on
-        // handCenterX rather than the left-anchored slot estimate.
-        destination: s.getEventHandInsertionPosition(0),
+        // Animate to the exact resting position of the appended hand card — the
+        // merged HandView-predicted position (single source of truth), centred
+        // on handCenterX rather than the left-anchored slot estimate.
+        destination: s.getEventHandInsertionPosition(handIndex),
       }).then(afterTransfer);
     } else {
       afterTransfer();
@@ -705,6 +716,9 @@ export class MainStreetTurnController {
     const s = this.scene;
     const hand = s.state.hand ?? [];
     if (index < 0 || index >= hand.length) return;
+
+    // Event cards are played (via onPlayHeldEvent), never placed on the street.
+    if (hand[index].family === 'event') return;
 
     // Tutorial gating: only allow if it's the required action or tutorial is inactive
     const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('select-hand-card' as any);

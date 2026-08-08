@@ -162,7 +162,7 @@ describe('createTutorialScenario', () => {
 
   it('has no held event', () => {
     const state = createTutorialScenario();
-    expect(state.heldEvent).toBeNull();
+    expect(state.hand.some(c => c.family === 'event')).toBe(false);
   });
 
   it('has game result of playing', () => {

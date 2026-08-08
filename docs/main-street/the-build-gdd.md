@@ -136,7 +136,8 @@ interface GameState {
     event: CardDeck<EventCard>;    // Contains both Investment and Incident cards
     upgrade: CardDeck<UpgradeCard>;
   };
-  heldEvent: EventCard | null;  // Held Investment event awaiting play (max 1)
+  hand: (BusinessCard | EventCard)[]; // merged hand: any mix, up to maxHandSize
+  maxHandSize: number;                 // starts at 2, growable via staff upgrade cards
   challengesCompleted: Set<string>; // IDs of achieved challenges
 }
 ```
@@ -172,9 +173,9 @@ stateDiagram-v2
 3. **ActionPhase** – The player resolves purchases:
    - **Buy Business** → `resourceBank.coins -= cost` → place card into a chosen empty slot.
    - **Buy Upgrade** → `resourceBank.coins -= cost` → apply upgrade effects to the targeted Business.
-   - **Buy Event (Investment)** → hold the event (max 1 held at a time). The player may play the held Investment during MarketPhase via a `play-event` action.
-   - **Play Held Investment** → resolve the held Investment event immediately and clear it.
-4. **InvestmentResolution** – If the player still holds an Investment event, it auto‑resolves here.
+   - **Buy Event (Investment)** → add the event card to the player's hand (any mix of business/event cards up to `maxHandSize`). The player may play it during MarketPhase via a `play-event` action.
+   - **Play Event (from hand)** → resolve an Investment event card from the hand immediately and remove it.
+4. **InvestmentResolution** – Reserved phase; Investment events are **not** auto‑resolved here. Unplayed events persist in the hand until the player plays them during a later MarketPhase.
 5. **IncomePhase** – For each placed Business, compute:
    - `totalIncome = effectiveBase + synergyBonus` where `effectiveBase = (baseIncome + incomeBonus) * sameTypePenalty` (0.6 for same-type neighbors) and `synergyBonus = effectiveBase * synergyCoinBonus * bonusPerNeighbor * matchingNeighborCount` (percentage-based: `synergyCoinBonus` is the card's rate, defaulting to 0.5 = 50% of base income per matching neighbor; `bonusPerNeighbor` is the difficulty multiplier — 1.5 Easy / 1.0 Medium / 0.75 Hard).
    - `resourceBank.coins += totalIncome`.
@@ -195,8 +196,8 @@ The turn ends when either:
 |--------|-------------|---------------|--------|
 | **Buy Business** | Spend coins to acquire a Business card from the market and place it on an empty slot. | Market contains Business card; `resourceBank.coins >= cost`; at least one empty slot. | Business placed; coins deducted; slot becomes occupied. |
 | **Buy Upgrade** | Spend coins to upgrade an existing Business card. | Market contains Upgrade card targeting a placed Business; `resourceBank.coins >= cost`. | Business card upgraded (income bonus and/or synergy range increased); coins deducted. |
-| **Buy Event** | Spend coins to acquire an Investment event card and hold it. | Market contains Investment event card; `resourceBank.coins >= cost`; no event currently held (`heldEvent === null`). | Event held; coins deducted. Player may play it during MarketPhase or it auto‑resolves during InvestmentResolution. |
-| **Play Held Event** | Play the held Investment event during MarketPhase. | Player holds an Investment event (`heldEvent !== null`); current phase is MarketPhase. | Held event resolved; `heldEvent` cleared to null. |
+| **Buy Event** | Spend coins to acquire an Investment event card and add it to the hand. | Market contains Investment event card; `resourceBank.coins >= cost`; hand has room (`hand.length < maxHandSize`). | Event appended to hand; coins deducted. Player may play it during MarketPhase. There is **no limit on the number of event cards** in hand — only hand capacity (`maxHandSize`) applies. |
+| **Play Event (from hand)** | Play an Investment event card from the hand during MarketPhase. | Player holds an Investment event card in hand; current phase is MarketPhase. | Event resolved and removed from hand. |
 | **Place Business** | Choose an empty slot and put the purchased Business card there. | Business card in hand; slot is empty. | Card is now part of `streetGrid`. |
 | **Resolve Event** | Apply the effect described on an Event card. | Event card active. | Game state mutated per effect (coins, reputation, temporary modifiers). |
 | **End Turn** | Transition to the next phase/state. | All desired actions for the day are complete. | Turn counter increments, flow moves to Night or next Day. |

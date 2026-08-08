@@ -256,20 +256,19 @@ describe('MainStreetEngine', () => {
       });
 
       expect(result).not.toBeNull();
-      expect(state.heldEvent).not.toBeNull();
-      expect(state.heldEvent!.id).toBe('inv-evt-1');
+      expect(state.hand.some(c => c.family === 'event' && c.id === 'inv-evt-1')).toBe(true);
     });
 
     it('should execute play-event action when an Investment is held', () => {
       const state = createTestState();
       state.phase = 'MarketPhase';
-      state.heldEvent = makeInvestmentEvent({ id: 'play-action-1', coinDelta: 4 });
+      state.hand = [makeInvestmentEvent({ id: 'play-action-1', coinDelta: 4 })];
       const coinsBefore = state.resourceBank.coins;
 
       const result = executeAction(state, { type: 'play-event' });
 
       expect(result).toBeNull();
-      expect(state.heldEvent).toBeNull();
+      expect(state.hand.some(c => c.family === 'event')).toBe(false);
       // CG-0MRER3RE300418SG: event coinDelta is now multiplied by reputation and not floored
       // Medium preset rep=3 → multiplier=1.15, 4 * 1.15 = 4.6 (was 4 before fix)
       expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 4.6);
@@ -341,14 +340,14 @@ describe('MainStreetEngine', () => {
   describe('resolveHeldInvestment', () => {
     it('should resolve the held Investment event and clear it', () => {
       const state = createTestState();
-      state.heldEvent = makeInvestmentEvent({ id: 'e1', coinDelta: 5 });
+      state.hand = [makeInvestmentEvent({ id: 'e1', coinDelta: 5 })];
       const coinsBefore = state.resourceBank.coins;
 
       const resolved = resolveHeldInvestment(state);
 
       expect(resolved).not.toBeNull();
       expect(resolved!.id).toBe('e1');
-      expect(state.heldEvent).toBeNull();
+      expect(state.hand.some(c => c.family === 'event')).toBe(false);
       // CG-0MRER3RE300418SG: event coinDelta scaled by reputation, not floored
       // 5 * 1.15 = 5.75 (was 5 before fix)
       expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 5.75);
@@ -364,12 +363,12 @@ describe('MainStreetEngine', () => {
   describe('playHeldEvent', () => {
     it('should resolve the held event and clear it', () => {
       const state = createTestState();
-      state.heldEvent = makeInvestmentEvent({ id: 'play-1', coinDelta: 3 });
+      state.hand = [makeInvestmentEvent({ id: 'play-1', coinDelta: 3 })];
       const coinsBefore = state.resourceBank.coins;
 
       playHeldEvent(state);
 
-      expect(state.heldEvent).toBeNull();
+      expect(state.hand.some(c => c.family === 'event')).toBe(false);
       // CG-0MRER3RE300418SG: event coinDelta scaled by reputation, not floored
       // 3 * 1.15 = 3.45 (was 3 before fix)
       expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 3.45);

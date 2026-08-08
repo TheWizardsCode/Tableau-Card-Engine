@@ -89,7 +89,7 @@ function runGreedyGame(seed: string, maxTurns = 30): RunSummary {
     }
 
     // Play held event if any
-    if (state.heldEvent !== null) {
+    if ((state.hand ?? []).some(c => c.family === 'event')) {
       actions.push({ type: 'play-event' });
     }
 

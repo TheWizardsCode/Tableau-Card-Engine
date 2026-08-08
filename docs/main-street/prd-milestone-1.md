@@ -44,7 +44,7 @@ Deliver a playable walking skeleton of Main Street that a human player can compl
 | **Core Actions** | Buy Business, Buy Upgrade, Buy Event, Place Business, End Turn. All with legality validation returning `LegalityResult`. |
 | **Win/Loss Detection** | Score threshold (>=150), all-challenges-complete, turn-limit victory (turn 20 with reputation > 0 and coins >= 0). Loss: bankruptcy (coins < 0), reputation collapse (reputation <= 0), turn exhaustion without victory. |
 | **Adjacency & Income** | `AdjacencyResolver` computing synergy bonuses for the linear 1x10 grid. `computeIncome()` summing base income + synergy bonuses. Upgrades extending adjacency range. |
-| **Minimal UI** | Phaser scene with: 10-slot street grid, market display (business row + investments row), incident queue area (2 face-up incidents), resource bank display (coins, reputation, turn, score), player hand area (held event), buy/place/upgrade click flow, end-turn button, game-over overlay. Placeholder art (colored rectangles with text labels). Responsive layout for desktop and mobile. |
+| **Minimal UI** | Phaser scene with: 10-slot street grid, market display (business row + investments row), incident queue area (2 face-up incidents), resource bank display (coins, reputation, turn, score), player hand area (any mix of business + event cards), buy/place/upgrade click flow, end-turn button, game-over overlay. Placeholder art (colored rectangles with text labels). Responsive layout for desktop and mobile. |
 | **Seeded RNG** | Deterministic randomness using `createSeededRng()` from `@core-engine`. Seed displayed on title screen and usable for reproducible games. |
 | **Test Suite** | Unit tests for: game state creation, adjacency/synergy, income calculation, buy/place/upgrade legality, event resolution, win/loss detection, deterministic replay. Integration test for a full scripted turn. |
 | **Transcript Recording** | Game transcript using `TranscriptRecorderBase<T>` recording all actions and state transitions for replay and debugging. |
@@ -282,7 +282,8 @@ interface MainStreetState {
     upgrade: UpgradeCard[];
   };
   challengesCompleted: string[];
-  heldEvent: EventCard | null;              // Held Investment event awaiting play or auto-resolution
+  hand: (BusinessCard | EventCard)[]; // merged hand: any mix, up to maxHandSize
+  maxHandSize: number;                 // starts at 2, growable via staff upgrade cards
   incidentQueue: EventCard[];               // Visible FIFO queue of upcoming Incidents (size 2)
   gameResult: 'playing' | 'win' | 'loss';
   finalScore: number;
@@ -345,7 +346,7 @@ The walking skeleton simplifies the 10-phase GDD turn structure to reduce implem
 
 1. **DayStart** -- Increment turn, replenish market.
 2. **MarketPhase / ActionPhase** (combined) -- Player buys/places/upgrades. Market shows 4 Business + 3 Investments (2 Upgrades + 1 Investment event). Multiple purchases allowed per turn. Player clicks "End Turn" when done.
-3. **InvestmentResolution** -- Auto-resolve held Investment event if not played during MarketPhase.
+3. **InvestmentResolution** -- Reserved phase; Investment events are **not** auto-resolved here. Unplayed events persist in the hand until the player plays them during a later MarketPhase.
 4. **IncomePhase** -- Compute and add income from all placed businesses.
 5. **IncidentPhase** -- Resolve the front Incident from the visible FIFO queue. Draw a replacement from the event deck to the back of the queue.
 6. **EndCheck** -- Evaluate win/loss conditions.
@@ -405,7 +406,7 @@ No external image assets are required for Milestone 1. All visuals are programma
 
 ### Mobile Layout (Portrait, ~400px width)
 
-The layout stacks vertically: Market on top (business row + investments row), incident queue below, street grid in middle (2 rows of 5), player hand area (held event) and resource bank with End Turn button at bottom. Cards scale down proportionally.
+The layout stacks vertically: Market on top (business row + investments row), incident queue below, street grid in middle (2 rows of 5), player hand area (any mix of business + event cards) and resource bank with End Turn button at bottom. Cards scale down proportionally.
 
 ---
 
