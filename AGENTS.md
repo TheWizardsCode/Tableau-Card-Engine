@@ -1,6 +1,8 @@
-Follow the global AGENTS.md in addition to the rules below. The local rules below take priority in the event of a conflict.
+## Global agent guidance
 
-## Project Overview
+Read the global agent instructions at `~/.pi/agent/AGENTS.md` — they define the core principles, the Worklog (wl) work-item workflow, and the coding disciplines that apply to every project. That file is installed from this repository's `AGENTS_GLOBAL.md` by `scripts/install_pi.sh`, which symlinks it into place.
+
+## Project-specific guidance
 
 You are a producer for the Tableau Card Engine (TCE), a game engine designed to support building single-player tableau card games. Your primary goal is to create a fully modular and reusable engine. You achieve this through building increasingly complex card games and extracting reusable components from each.
 
@@ -290,7 +292,15 @@ Use `SaveLoadStore`, `serializeWithVersion()`, and `deserializeWithVersion()` fr
 
 ### 8. Event-Driven Audio and Visual Feedback
 
-Use `SoundManager`, `GameEventEmitter`, and `EventSoundMapping` from `@core-engine` for game audio. Combine with `popTextOrIcon()`, particle effects, and tint/shake animations for multi-modal feedback.
+**Requirement:** Every player **and** AI action that uses a core engine animation/feedback helper — `dealCard`, `discardCard`, `flipCard`, `placeCard`, `moveGameObject`, `shakeIllegalMove`, `popTextOrIcon`, and any future helpers — **must** be rendered with the corresponding animation and wired with a sound effect (SFX), so the action is both animated and audible. Satisfy both via each helper's `soundManager` + `sfx` (`start`/`move`/`end`) parameters, or an equivalent event-driven `GameEventEmitter`/`SoundManager` mapping. SFX keys must follow the shared convention — `COMMON_SFX_KEYS` from `src/core-engine/SoundManager.ts` with the `sfx-` prefix per `docs/SFX_CONVENTION.md`; no game-scoped string literals. (`shakeIllegalMove` plays `COMMON_SFX_KEYS.ILLEGAL_MOVE` automatically; `popTextOrIcon()` is the lightweight score/notification popup.)
+
+**AI actions:** AI turns must be animated with a brief delay so the player can see and hear what the AI did (e.g. card placement / row take). Coloretto is the in-repo precedent — `example-games/coloretto/scenes/ColorettoScene.ts` runs AI turns via `time.delayedCall` (750ms, 150ms under reduced motion) then executes the AI's action through the same animated/sounded path as a human turn.
+
+**Accessibility preserved:** Reduced-motion preferences (explicit flag → SettingsStore toggle → `prefers-reduced-motion`) and the settings-panel mute/volume controls must be respected — pass the helper's `reducedMotion` flag and play SFX through `SoundManager` (or `safePlaySound()`); this rule reinforces, never weakens, that behaviour.
+
+**Documented exceptions:** Actions that legitimately have no visible or audible effect, and headless/replay/test/transcript modes (no rendering or audio), are exempt — but the exemption must be documented in code comments and/or the scene's help text.
+
+**Compliant references (not modified):** Golf's `GolfAnimator` (`example-games/golf/scenes/GolfAnimator.ts`) wires `soundManager` + `sfx` into its deal/discard/flip helpers; Coloretto animates AI turns with a short delay (above); Blackjack preserves flip-sound timing and a delayed dealer-AI run (`example-games/blackjack/scenes/BlackjackScene.ts`). New example games must follow these patterns.
 
 - **Gym scene:** `GymAudioFeedbackScene` — `example-games/gym/scenes/GymAudioFeedbackScene.ts`
 - **Key APIs:** `SoundManager`, `GameEventEmitter`, `EventSoundMapping`, `popTextOrIcon()`, particle emitters
@@ -420,4 +430,3 @@ This project follows the standard Worklog (wl) workflow for work-item tracking. 
 - Stage progression: idea → intake_complete → plan_complete → in_progress → in_review → done
 - See project `docs/DEVELOPER.md` for additional TCE-specific development workflows.
 
-<!-- End base Worklog AGENTS.md file -->

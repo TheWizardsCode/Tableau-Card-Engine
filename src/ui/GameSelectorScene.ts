@@ -56,6 +56,15 @@ const HEADER_H = 80;
 /** Horizontal and bottom margin around the card grid. */
 const GRID_MARGIN = 20;
 
+// ── Top-right branding group (GitHub icon + version label) ──
+
+/** Margin from the top-right canvas edges for the branding group. */
+const BRAND_MARGIN = 10;
+/** GitHub Octocat icon size (px) — matches the inline SVG dimensions. */
+const GITHUB_ICON_SIZE = 28;
+/** Vertical gap (px) between the GitHub icon and the version label. */
+const BRAND_GAP = 4;
+
 // ── Scene ──────────────────────────────────────────────────
 
 export class GameSelectorScene extends Phaser.Scene {
@@ -118,8 +127,15 @@ export class GameSelectorScene extends Phaser.Scene {
     // Layout game cards
     this.layoutGameCards();
 
-    // Version label (bottom-left corner)
-    createVersionLabel(this);
+    // Version label (top-right corner, below the GitHub icon)
+    createVersionLabel(
+      this,
+      undefined, // default depth
+      GAME_W - BRAND_MARGIN, // right-aligned with the icon
+      BRAND_MARGIN + GITHUB_ICON_SIZE + BRAND_GAP, // just below the icon
+      1, // originX: right edge
+      0, // originY: top edge
+    );
 
     // GitHub link (top-right corner)
     this.createGitHubLink();
@@ -131,9 +147,8 @@ export class GameSelectorScene extends Phaser.Scene {
    */
   private createGitHubLink(): void {
     const GITHUB_URL = 'https://github.com/TheWizardsCode/Tableau-Card-Engine';
-    const MARGIN = 10;
-    const ICON_X = GAME_W - MARGIN;
-    const ICON_Y = MARGIN;
+    const ICON_X = GAME_W - BRAND_MARGIN;
+    const ICON_Y = BRAND_MARGIN;
 
     // GitHub Octocat icon (loaded from SVG in preload)
     const logo = this.add.image(ICON_X, ICON_Y, 'github-icon');

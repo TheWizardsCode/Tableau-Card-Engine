@@ -1,5 +1,39 @@
 # Changelog
 
+## v0.1.11 (2026-08-08)
+### Features
+- Coloretto (set-building tableau) (CG-0MLSDXY9F1FSGQ38)
+- Coloretto game orchestration (CG-0MQH81AQ60019A97)
+- Coloretto AI strategies (CG-0MQH81B2Q001QFGY)
+- Coloretto Phaser scene (CG-0MQH81RIS0017K94)
+- Coloretto scoring system (CG-0MQH81B06008FF85)
+- Coloretto game integration (CG-0MQH81RAA009UVML)
+- Coloretto sound, settings, and transcript (CG-0MQH81RMN006T1I0)
+- Coloretto card definitions and deck (CG-0MQH81AZ2004CC30)
+- Coloretto: animate card placement (move then flip; Last Round card flips on deck then settles between tableau and deck) (CG-0MSHFFF6G007QUVT)
+- Implement: normal place animation (move-then-flip) with turn gating (CG-0MSHI9NV900883AF)
+- Implement: Last Round card animation and resting rendering (CG-0MSHI9XQ80065OAX)
+- Coloretto: negative color scoring never occurs — collections reset each round (CG-0MSHWY9TT006GJY1)
+- Coloretto: selected positive-color cards remain visible in next round (CG-0MSHF32FY007SNCJ)
+- Coloretto: animate take-a-row — cards fly from the row to the collecting player's collection (CG-0MSHFPC0J00155UN)
+- Coloretto: end-of-round scores dialog — replace colour-name breakdown with positive/negative chip groups (CG-0MSI1B5B5001SRPN)
+- Coloretto: randomize starting turn order, show turn order in player list, implement per-round order rules if the ruleset specifies them (CG-0MSI247SO008HFNX)
+- Hint system for Beleagured Castle (CG-0MQJZZKM6007FELG)
+- Coloretto full rules expansion (jokers, +2 cards, full deck) (CG-0MQGJXW67008DZ39)
+- Coloretto: show bold 'Taken' label between player name and cards, shift chips right (CG-0MSJFWEFN005IB77)
+### Bug Fixes
+- [test-failure] ColorettoScene.browser.test.ts "animates a human placement" — failing test (CG-0MSJDDP7R001BHNP)
+- Coloretto: game seems to end when a player takes their first row (CG-0MSHV272D000VVMA)
+- Coloretto: align player collections (hands) regardless of name/score length (CG-0MSI4IP6A000N7YF)
+- Coloretto: cards in the tableau overlap with 5 players — add row spacing (CG-0MSJFUGB5005YBK8)
+- Coloretto: placed card face flashes at the top-left corner of the screen during every placement (CG-0MSI1HKEN002U1NA)
+### Other
+- Coloretto test suite (CG-0MQH80STI001DDAN)
+- Test: place-animation browser test suite (CG-0MSHI9EAR008SVPD)
+- Add best practices for animations and sounds on player/AI actions (CG-0MSHFOSGV007W8UC)
+- Coloretto: vertically centre collections block, tighten name-to-chip gap, shift tableau right, remove row labels (CG-0MSI1GDT9007THVK)
+- Move the version number on the menu page to below the GitHub logo (CG-0MSHQPDQ80015RF7)
+
 ## v0.1.10 (2026-08-06)
 ### Features
 - Why would a library bring in money (CG-0MRXYGM9B006I3PE)

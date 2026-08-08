@@ -13,6 +13,7 @@ This document covers everything you need to develop, test, and build the Tableau
 - [Path Aliases](#path-aliases)
 - [Adding an Example Game](#adding-an-example-game)
 - [Hand & Pile Rendering](#hand--pile-rendering)
+- [Animation & Sound Feedback for Player and AI Actions](#animation--sound-feedback-for-player-and-ai-actions)
 - [Example Games](#example-games)
 - [Transcript Persistence](#transcript-persistence)
 - [Replay Tool](#replay-tool)
@@ -411,6 +412,7 @@ tests/
 ├── sushi-go/               Sushi Go! cards, scoring, game, AI tests
 ├── feudalism/               Feudalism cards, game, AI tests
 ├── lost-cities/            Lost Cities cards, scoring, rules, game, AI, transcript tests
+├── coloretto/              Coloretto cards, scoring, game, AI, integration tests
 └── replay/                 Replay CLI validation tests
 ```
 
@@ -442,12 +444,14 @@ replaced with the version string during the Vite transform phase (both dev serve
 and production builds).
 
 The version is displayed as `v<version>` (e.g. `v0.1.7`) in two locations:
-- The **GameSelectorScene** menu screen (bottom-left corner)
+- The **GameSelectorScene** menu screen (top-right corner, below the GitHub icon)
 - The **SettingsPanel** overlay (shown on the game canvas when the panel opens)
 
 Both use the shared factory `createVersionLabel()` from `src/ui/versionDisplay.ts`,
-which provides consistent styling (11px font, muted grey, 60% opacity, bottom-left
-positioning).
+which provides consistent styling (11px font, muted grey, 60% opacity). The default
+placement is the bottom-left corner; scenes may pass optional position and origin
+parameters to place the label elsewhere (e.g. the game selector passes top-right
+coordinates below the GitHub icon).
 
 ```typescript
 // src/ui/versionDisplay.ts provides the factory and style constants:
@@ -455,6 +459,9 @@ import { createVersionLabel, VERSION_LABEL_TEXT } from '@ui/versionDisplay';
 
 // Usage in a scene:
 createVersionLabel(this); // creates a non-interactive version label at bottom-left
+
+// GameSelectorScene: top-right, right-aligned below the GitHub icon:
+createVersionLabel(this, undefined, GAME_W - 10, 10 + 28 + 4, 1, 0);
 ```
 
 The version string can also be referenced directly in code as a `string`:
@@ -577,6 +584,20 @@ Follow the Golf (original reference) and Sushi Go (most recent) examples as refe
 
 For non-standard card models (tokens, resource icons, expedition cards), use the `CardTextureResolver` / `renderCard` callbacks documented in the [UI Adapter Guide](ui/ADAPTER-GUIDE.md). See the [Gym scene index](gym/GYM_INDEX.md) for the complete HandView/PileView scene-to-API mapping.
 
+## Animation & Sound Feedback for Player and AI Actions
+
+**Requirement:** Every player **and** AI action that uses a core engine animation/feedback helper — `dealCard`, `discardCard`, `flipCard`, `placeCard`, `moveGameObject`, `shakeIllegalMove`, `popTextOrIcon`, and any future helpers — must be rendered with the corresponding animation and wired with a sound effect (SFX), so the action is both animated and audible. Each helper accepts a `soundManager` + `sfx` (`start`/`move`/`end`) options map (see [UI Animation Helpers](ui-animations.md)); pass both so the action is never silent or instant by default. SFX keys must follow the shared `sfx-` prefix convention — `COMMON_SFX_KEYS` from `src/core-engine/SoundManager.ts`, detailed in [docs/SFX_CONVENTION.md](SFX_CONVENTION.md); no game-scoped string literals. (`shakeIllegalMove` plays `COMMON_SFX_KEYS.ILLEGAL_MOVE` automatically; `popTextOrIcon()` is the lightweight score/notification popup.)
+
+**AI actions:** AI turns must be animated with a brief delay so the player can see and hear what the AI did (e.g. card placement / row take). Coloretto is the in-repo precedent — `example-games/coloretto/scenes/ColorettoScene.ts` runs AI turns via `time.delayedCall` (750ms, 150ms under reduced motion) then executes the AI's action through the same animated/sounded path as a human turn.
+
+**Accessibility:** Reduced-motion preferences (explicit flag → SettingsStore toggle → `prefers-reduced-motion`; see the [Accessibility](ui-animations.md#accessibility) section of the animation helpers reference) and the settings-panel mute/volume controls must be respected — pass the helper's `reducedMotion` flag and play SFX through `SoundManager` (or `safePlaySound()` for overlay helpers) so mute and volume apply uniformly. This requirement reinforces, never weakens, accessibility behaviour.
+
+**Exceptions:** Actions that legitimately have no visible or audible effect, and headless/replay/test/transcript modes (no rendering or audio), are exempt. Document any exemption in code comments and/or the scene's help text.
+
+**Compliant references:** Golf's `GolfAnimator` (`example-games/golf/scenes/GolfAnimator.ts`) wires `soundManager` + `sfx` into its deal/discard/flip helpers; Coloretto animates and sounds AI turns (above); Blackjack preserves flip-sound timing and runs the dealer AI on a delay (`example-games/blackjack/scenes/BlackjackScene.ts`). New games should follow these patterns.
+
+Gym reference scenes: [`GymAudioFeedbackScene`](../example-games/gym/scenes/GymAudioFeedbackScene.ts) (event-driven audio, mute/volume, pop text/icon) and [`GymHandPileScene`](../example-games/gym/scenes/GymHandPileScene.ts) (animated deal/discard/flip with SFX hooks). See the [Gym scene index](gym/GYM_INDEX.md) for the scene-to-API mapping.
+
 ## Example Games
 
 All example games are playable via the Game Selector after running:
@@ -597,6 +618,7 @@ Open `http://localhost:3000` and click the desired game card. Each game also has
 | Feudalism | `example-games/feudalism/` | Resource management (gem tokens), tiered development cards with costs/bonuses, noble attraction, multi-action turns (take/reserve/purchase), checkpoint autosave after each turn (human + AI) with startup recovery | `tests/feudalism/` (4 files) |
 | Lost Cities | `example-games/lost-cities/` | Two-player expeditions, two-phase turn model (play/discard then draw), ascending-play rules, investment multipliers (x2/x3/x4), multi-round match scoring, procedurally generated SVG card assets | `tests/lost-cities/` (6 files) |
 | Main Street | `example-games/main-street/` | Single-player tableau builder, responsive 2x5 grid layout, SLL integration, ToneForge audio adapter, Monte Carlo balance testing, tutorial scene | `tests/main-street/` |
+| Coloretto | `example-games/coloretto/` | Set-building tableau (take-a-row mechanic), custom card types, canonical set-collection scoring (1=1,2=3,3=6,4=10,5=15,6+=21) with positive/negative color selection, wild joker cards (declared per-joker to a color at scoring) and flat +2 bonus cards in the full 49-card deck, multi-round cumulative scoring with canonical winner tie-breaks (most single-round wins, then highest single-round score), randomized turn order with the canonical per-round start-player rule (most cards taken; ties to the most recent row take), Random/Heuristic AI strategies, SLL layout, transcript recording | `tests/coloretto/` (7 files) |
 
 ### Lost Cities card assets
 

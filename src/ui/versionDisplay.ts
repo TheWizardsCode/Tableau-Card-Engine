@@ -4,8 +4,9 @@
  *
  * The version is injected at build time by Vite's `define` as the global
  * constant `__APP_VERSION__`, which is read from `package.json`'s `version`
- * field. The label is intended for the bottom-left corner of the canvas,
- * styled to be readable but unobtrusive.
+ * field. The label defaults to the bottom-left corner of the canvas, styled
+ * to be readable but unobtrusive; callers may override the position via
+ * optional parameters (e.g. below the GitHub icon on the game selector page).
  *
  * @module @ui/versionDisplay
  */
@@ -55,24 +56,34 @@ export const VERSION_LABEL_TEXT = `v${getAppVersion()}`;
 // ── Factory ────────────────────────────────────────────────
 
 /**
- * Create a version label text object configured for bottom-left display.
- * The returned text is non-interactive (no pointer events) and is
- * positioned with a consistent style.
+ * Create a version label text object configured for display on a scene.
+ * By default it is positioned at the bottom-left corner; callers may pass
+ * explicit position and origin to place it elsewhere (e.g. below the GitHub
+ * icon on the game selector page). The returned text is non-interactive
+ * (no pointer events) and is styled consistently.
  *
  * @param scene - The Phaser scene to add the label to.
  * @param depth - Optional depth override (defaults to VERSION_DEPTH).
+ * @param x - Optional x position (defaults to VERSION_X, bottom-left).
+ * @param y - Optional y position (defaults to VERSION_Y, bottom-left).
+ * @param originX - Optional horizontal origin (defaults to 0, left edge).
+ * @param originY - Optional vertical origin (defaults to 1, bottom edge).
  * @returns The configured Phaser text object.
  */
 export function createVersionLabel(
   scene: Phaser.Scene,
   depth: number = VERSION_DEPTH,
+  x: number = VERSION_X,
+  y: number = VERSION_Y,
+  originX: number = 0,
+  originY: number = 1,
 ): Phaser.GameObjects.Text {
-  const label = scene.add.text(VERSION_X, VERSION_Y, VERSION_LABEL_TEXT, {
+  const label = scene.add.text(x, y, VERSION_LABEL_TEXT, {
     fontSize: VERSION_FONT_SIZE,
     fontFamily: VERSION_FONT_FAMILY,
     color: VERSION_COLOR,
   });
-  label.setOrigin(0, 1); // bottom-left anchor
+  label.setOrigin(originX, originY); // default: bottom-left anchor
   label.setAlpha(VERSION_ALPHA);
   label.setDepth(depth);
   // Non-interactive — no pointer events

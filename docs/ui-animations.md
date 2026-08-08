@@ -242,6 +242,32 @@ import { runSceneTransition } from '@ui/sceneTransition';
 | `duration` | `number` | 300 | Duration in ms |
 | `reducedMotion` | `boolean` | undefined | When true, transition completes instantly |
 
+## Game-Specific Usage: Coloretto
+
+Coloretto (`example-games/coloretto/scenes/ColorettoScene.ts`) uses the shared
+animation helpers for every player-facing card action:
+
+| Action | Helper | Notes |
+|--------|--------|-------|
+| Draw + place onto a row | `placeCard` | Card flies from the deck to the target row slot, then flips if drawn face-down |
+| Take a row into a collection | `moveGameObject` | Taken cards fly to the player's collection chips (animated destination == rendered chip position, AC5) |
+| Flip the Last Round card | `flipCard` | Two-phase texture swap at the resting position between tableau and deck |
+| AI turns | `placeCard` / `moveGameObject` | AI actions run through the same animated pipeline as human actions, scheduled via `time.delayedCall` (750ms, 150ms under reduced motion) so the player can see and hear what the AI did |
+| Illegal moves | `shakeIllegalMove` | Plays `COMMON_SFX_KEYS.ILLEGAL_MOVE` automatically |
+
+Key wiring:
+
+- **Sound**: helpers are passed `soundManager` + `sfx` (start/move/end keys) or
+  emit through the scene's `GameEventEmitter` (`EventSoundMapping` from
+  `src/core-engine/SoundManager.ts`) so every animated action is audible.
+- **Reduced motion**: the scene passes its `reducedMotion` flag
+  (SettingsStore toggle → `prefers-reduced-motion`) into every helper call;
+  tweens are skipped and sprites snap instantly.
+- **Test coverage**: `tests/coloretto/ColorettoScene.browser.test.ts` asserts
+  the animation destinations, flip timing, AI-turn delays, and reduced-motion
+  instant placement paths (including the regression test that guards the
+  human placement slot when the AI's randomized first turn places first).
+
 ## Accessibility
 
 All animation helpers respect the reduced motion preference with the following priority:

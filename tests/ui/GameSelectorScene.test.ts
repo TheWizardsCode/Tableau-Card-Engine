@@ -529,7 +529,7 @@ describe('GameSelectorScene', () => {
       expect(versionCall).toBeDefined();
     });
 
-    it('positions version label at bottom-left corner', () => {
+    it('positions version label at top-right, below the GitHub icon', () => {
       const mocks = injectMocks(scene);
       scene.init({ games: [] });
       scene.create();
@@ -540,10 +540,29 @@ describe('GameSelectorScene', () => {
       );
       expect(versionCall).toBeDefined();
 
-      // Position should be at bottom-left: x near left edge, y near bottom
+      // Position should be at top-right: x near right edge, y just below the icon
       const [x, y] = versionCall as [number, number, string];
-      expect(x).toBeLessThan(50); // near left edge
-      expect(y).toBeGreaterThan(650); // near bottom (GAME_H=720)
+      expect(x).toBeGreaterThanOrEqual(1260); // near right edge (GAME_W=1280)
+      expect(y).toBeGreaterThan(38); // below the GitHub icon (icon spans y=10..38)
+      expect(y).toBeLessThan(60); // still near the top of the canvas
+    });
+
+    it('anchors the version label at its top-right corner', () => {
+      const mocks = injectMocks(scene);
+      scene.init({ games: [] });
+      scene.create();
+
+      const textResults = mocks.add.text.mock.results as {
+        value: ReturnType<typeof mockText>;
+      }[];
+      const textCalls = mocks.add.text.mock.calls as unknown[][];
+      const versionIdx = textCalls.findIndex((c) =>
+        typeof c[2] === 'string' && c[2].startsWith('v'),
+      );
+      expect(versionIdx).not.toBe(-1);
+
+      // Top-right anchor so the label right edge aligns with the icon right edge
+      expect(textResults[versionIdx].value.setOrigin).toHaveBeenCalledWith(1, 0);
     });
 
     it('uses small readable font size (11-12px) for version label', () => {
@@ -678,7 +697,7 @@ describe('GameSelectorScene', () => {
       vi.unstubAllGlobals();
     });
 
-    it('GitHub icon is to the right and above the version label', () => {
+    it('GitHub icon is right-aligned with and above the version label', () => {
       const mocks = injectMocks(scene);
       scene.init({ games: [] });
       scene.create();
@@ -694,12 +713,12 @@ describe('GameSelectorScene', () => {
       expect(versionCall).toBeDefined();
       expect(githubCall).toBeDefined();
 
-      const [_vx, _vy] = versionCall as [number, number, string];
+      const [vx, vy] = versionCall as [number, number, string];
       const [gx, gy] = githubCall as [number, number, string];
 
-      // GitHub icon in top-right, version label in bottom-left
-      expect(gx).toBeGreaterThan(_vx); // icon is further right
-      expect(gy).toBeLessThan(_vy); // icon is higher up
+      // GitHub icon at top-right, version label right-aligned directly below it
+      expect(gx).toBe(vx); // version label right edge aligns with the icon right edge
+      expect(gy).toBeLessThan(vy); // icon sits above the version label
     });
 
     it('includes hidden alt text for accessibility', () => {
