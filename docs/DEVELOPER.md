@@ -144,8 +144,8 @@ Tests use [Vitest](https://vitest.dev/) with projects configured inline in `vite
 |---------|-------------|-------------|---------|
 | `unit` | Node.js | `tests/**/*.test.ts` (excludes `replay-*.test.ts`) | Logic, data, and integration tests — runs in parallel (worker pool capped at `maxWorkers: 4`; see contention mitigation below) |
 | `replay-e2e` | Node.js (fork pool) | `tests/e2e/replay-*.test.ts` | Playwright-driven replay e2e tests. Runs in its own fork (`singleFork: true`) after unit tests to avoid Vite cold-start CPU contention |
-| `browser` | Chromium (Playwright) | `tests/**/*.browser.test.ts` (excludes tutorial E2E) | Phaser UI and rendering tests |
-| `tutorial-part1..6` | Chromium (Playwright, one per part) | `tests/e2e/main-street-tutorial-e2e-part{1-6}.browser.test.ts` | Main Street tutorial E2E tests (each in own browser instance) |
+| `browser` | Chromium (Playwright) | `tests/**/*.browser.test.ts` (excludes tutorial E2E) | Phaser UI and rendering tests (requires [browser test setup](#browser-test-setup)) |
+| `tutorial-part1..6` | Chromium (Playwright, one per part) | `tests/e2e/main-street-tutorial-e2e-part{1-6}.browser.test.ts` | Main Street tutorial E2E tests (each in own browser instance; requires [browser test setup](#browser-test-setup)) |
 
 All projects run via `npm test`. The browser and tutorial projects run in headless Chromium using `@vitest/browser` with the Playwright provider.
 
@@ -247,11 +247,36 @@ The Main Street tutorial E2E tests are defined in `tests/e2e/main-street-tutoria
 - **Diagnostic tracking:** `bootGameWithTutorial` tracks boot cycles and provides detailed error messages if canvas context is null, including the cycle number, remaining canvas count, and CanvasPool state.
 - **New project:** `scripts/run-ci-tests.sh` orchestrates the full CI test suite (unit → browser → tutorial E2E).
 
-**Browser test dependencies:**
+### Browser test setup
 
-- `@vitest/browser` (matches vitest version)
-- `playwright` (provides Chromium browser)
-- Install Chromium: `npx playwright install chromium`
+The `browser` and `tutorial-part1..6` projects run in headless Chromium via Playwright. On a clean checkout, the browser binary must be installed once before any browser test can run.
+
+**Required dependencies** (already in `package.json` devDependencies):
+
+- `playwright` — Playwright driver that launches Chromium
+- `@vitest/browser` — Vitest browser-mode provider (must match the `vitest` version)
+
+**Install Chromium:**
+
+```bash
+npx playwright install chromium
+```
+
+On Linux, Playwright also needs a set of system libraries. Install them with the system-dependencies variant (prepend `sudo` if your user lacks write access for the package manager):
+
+```bash
+npx playwright install --with-deps chromium
+```
+
+**Verify the installation:**
+
+```bash
+npx playwright install --list
+```
+
+This lists the installed browsers and their expected locations (e.g. `chromium-1208`).
+
+**Fast-fail pre-check:** `npm test` (`scripts/run-ci-tests.sh`) and a direct `bash scripts/run-tutorial-tests.sh` run `scripts/check-browser-test-env.ts` first. The pre-check detects a missing Chromium binary launch-free (via `chromium.executablePath()` + `fs.existsSync()`, under 2 seconds) and aborts with the exact remediation command above — instead of failing minutes later with an opaque Vitest browser error. CI (`.github/workflows/pr-checks.yml`) installs Chromium before `npm test`, so the pre-check passes there.
 
 ## ToneForge Audio Generation
 
@@ -2313,7 +2338,8 @@ To verify production safety:
 - Verify browser test files match `tests/**/*.browser.test.ts`
 
 **Browser tests fail or time out:**
-- Ensure Playwright's Chromium is installed: `npx playwright install chromium`
+- Check the [browser test setup](#browser-test-setup) section — the most common cause is missing Playwright Chromium: `npx playwright install chromium` (add `--with-deps` on Linux for system libraries)
+- `npm test` runs a fast-fail pre-check (`scripts/check-browser-test-env.ts`) that prints the exact remediation command if Chromium is missing; verify the install with `npx playwright install --list`
 - Check that `@vitest/browser` version matches `vitest` version
 - Browser tests boot a real Phaser game and may take 8-10 seconds each
 - If tests hang, check for unresolved game instances (ensure `afterEach` destroys the game)
