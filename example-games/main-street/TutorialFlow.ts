@@ -1,9 +1,9 @@
 /**
- * Main Street: Unified Tutorial Flow (Milestone 5+)
+ * Main Street: Unified Tutorial Flow
  *
- * Defines the unified T1-T13 tutorial steps that merge the original
- * 8 reference steps and 9 guided (action-gated) steps into a single
- * coherent tutorial system. Each step has a gate type:
+ * Defines the unified T1-T16 tutorial steps (16 steps) that teach the core
+ * Main Street loop (buy → hand → place; invest → optimize → trigger). Each
+ * step has a gate type:
  *
  * - **confirm**: The player clicks "Next"/"Continue" to advance (no gameplay
  *   action required). Used for informational/reference steps.
@@ -15,36 +15,36 @@
  *
  * ## Coin Budget Analysis (TutorialScenario, Easy difficulty)
  *
- * With the TutorialScenario system and Easy difficulty (12 coins, 5 reputation):
+ * With the TutorialScenario system and Easy difficulty (16 coins, 5 reputation):
  *
- * - Market development row: Bakery ($3), **Laundromat ($4)**, Park ($3), **Bookshop ($3)**
+ * - Market development row: Bakery ($3), **Laundromat ($4)**, **Library ($7)**, **Bookshop ($3)**
  * - Investments: Upgrade to Patisserie ($4), Upgrade to Garden ($3), Local Festival ($3)
  * - Incidents in queue: Community Award (+2 rep), Rainy Day (-1 coin per Food)
  *
  * ### Budget Walkthrough
  *
- * | Step | Action                     | Coins In | Coins Out | Balance |
- * |------|----------------------------|----------|-----------|---------|
- * | T1   | Start (Easy)               | 12       | 0         | 12      |
- * | T2   | Confirm (no cost)          | 0        | 0         | 12      |
- * | T3   | Buy Laundromat ($4)        | 0        | 4         | 8       |
- * | T4   | Place business (free)      | 0        | 0         | 8       |
- * | T5   | Confirm (no cost)          | 0        | 0         | 8       |
- * | T6   | End Turn + income (~1 coin)| 1        | 0         | 9       |
- * | T7   | Buy Local Festival ($3)    | 0        | 3         | 6       |
- * | T8   | Buy Bookshop ($3) to hand   | 0        | 3         | 3       |
- * | T9   | Place Bookshop from hand (free) | 0    | 0         | 3       |
- * | T10  | Confirm (no cost)          | 0        | 0         | 3       |
- * | T11  | Confirm (no cost)          | 0        | 0         | 3       |
- * | T12  | Confirm (no cost)          | 0        | 0         | ~6      |
- * | T13  | Confirm (no cost)          | 0        | 0         | ~6      |
- * | T14  | Confirm (no cost)          | 0        | 0         | ~6      |
+ * | Step | Action                           | Coins In | Coins Out | Balance |
+ * |------|----------------------------------|----------|-----------|---------|
+ * | T1   | Start (Easy, 16 coins)           | 16       | 0         | 16      |
+ * | T2   | Confirm (no cost)                | 0        | 0         | 16      |
+ * | T3   | Buy Laundromat ($4)              | 0        | 4         | 12      |
+ * | T4   | Confirm (no cost)                | 0        | 0         | 12      |
+ * | T5   | Place business (free)            | 0        | 0         | 12      |
+ * | T6   | Confirm (no cost)                | 0        | 0         | 12      |
+ * | T7   | End Turn + income (~0.6 coin)    | 0.625    | 0         | 12.625  |
+ * | T8   | Confirm (no cost)                | 0        | 0         | 12.625  |
+ * | T9   | Buy Local Festival ($3)          | 0        | 3         | 9.625   |
+ * | T10  | Buy-and-place Bookshop ($3)      | 0        | 3         | 6.625   |
+ * | T11  | End Turn + income (~1.25 coins)  | 1.25     | 0         | 7.875   |
+ * | T12  | Buy Library ($7)                 | 0        | 7         | 0.875   |
+ * | T13  | Play held event (free)           | 0        | 0         | ~1      |
+ * | T14+ | Confirm steps (no cost)          | 0        | 0         | ~1      |
  *
  * **Conclusion:** Even with worst-case incidents, the budget is sufficient
- * for all tutorial actions. The Laundromat ($4) plus Bookshop ($3) plus
- * Local Festival ($3) totalling $10 is covered by 12 starting coins with
- * ~1 income turn. The Bookshop (Culture business) enables the Local Festival
- * bonus when played later.
+ * for all tutorial actions. Laundromat ($4) + Local Festival ($3) + Bookshop
+ * ($3) + Library ($7) = $17 is covered by 16 starting coins plus ~1.9 income
+ * across the two end-turn steps. The Bookshop (Culture business) and Library
+ * (Culture community space) enable the Local Festival bonus when played in T13.
  *
  * @module
  */
@@ -61,18 +61,26 @@ import { getCsvRows, getBaseTypeId } from './MainStreetCards';
  * For **confirm** (informational) steps this is often `centerModal` or
  * `completionModal` (null zones — tooltip is centred). For **action** steps
  * it points to the UI element the player must interact with.
+ *
+ * Card-level zones (`laundromatCard`, `festivalCard`) are resolved through a
+ * small card-rect resolver in `MainStreetTutorialHints` keyed by the step's
+ * `requiredCardId`/`referencedCardId` (deterministic tutorial-scenario slots).
  */
 export type TutorialHighlightZone =
   | 'centerModal'
   | 'hud'
   | 'marketBusinessRow'
+  | 'developmentRow'   // dev row only (informative Dev Row / Optimizing for Events / Build a Library)
   | 'streetGrid'
   | 'endTurnButton'
   | 'incidentQueue'
   | 'investmentsRow'
   | 'challengePanel'
   | 'helpButton'
-  | 'completionModal';
+  | 'completionModal'
+  | 'hand'             // hand area (Your Hand / Triggering Events)
+  | 'laundromatCard'   // card-level: Laundromat in the dev row (T3)
+  | 'festivalCard';    // card-level: Local Festival in the investments row (T9)
 
 /**
  * The type of player action expected to complete an action-gated step.
@@ -86,8 +94,9 @@ export type TutorialActionType =
   | 'acknowledge-queue'  // Click incident queue
   | 'buy-event'          // Buy an event card from investments row
   | 'apply-upgrade'      // Buy/apply an upgrade
-  // 'open-help' has been removed (T10 "Help + Hint Tools" step was cut)
-  | 'confirm-complete';  // Click "Start Full Game" on completion modal
+  | 'play-event'         // Play a held investment event from the hand
+  | 'buy-and-place'      // Composite: drag a business card and drop it on the street
+  | 'confirm-complete';  // Click "Let's play!" on completion modal
 
 /**
  * The gate type for a tutorial step.
@@ -97,7 +106,7 @@ export type TutorialActionType =
 export type TutorialGateType = 'confirm' | 'action';
 
 /**
- * A single unified tutorial step definition (14 steps total T1-T14).
+ * A single unified tutorial step definition (16 steps total T1-T16).
  *
  * Confirm steps only need `gate: 'confirm'`; they do not have a
  * `requiredAction` field because the only way to advance is by
@@ -107,7 +116,7 @@ export type TutorialGateType = 'confirm' | 'action';
  * specifies the in-game action the player must perform.
  */
 export interface UnifiedTutorialStepDef {
-  /** Step identifier (T1, T2, ..., T13). */
+  /** Step identifier (T1, T2, ..., T16). */
   id: string;
   /**
    * i18n key for the short title shown in the overlay.
@@ -145,22 +154,30 @@ export interface UnifiedTutorialStepDef {
    * references the Local Festival; T9 references the Bookshop bought in T8).
    */
   referencedCardId?: string;
+  /**
+   * If set, this card's live template data (name/cost/income bonus) is used to
+   * resolve `{synergyCardName}` / `{synergyCost}` placeholders in the step's body
+   * text in ADDITION to the primary `requiredCardId` / `referencedCardId` card.
+   *
+   * Used for steps whose body references TWO cards — the purchased card (via
+   * `requiredCardId`, feeding `{cardName}`) and the synergy partner card (via
+   * `synergyCardId`, feeding `{synergyCardName}`). E.g. T12 builds the Library
+   * next to the Bookshop for a Culture adjacency bonus.
+   */
+  synergyCardId?: string;
 }
 
 // ── Unified Tutorial Script (T1-T13) ────────────────────────
 
 /**
- * The unified set of 14 tutorial steps, in sequential order.
+ * The unified set of 16 tutorial steps, in sequential order.
  *
- * Merged from:
- * - 9 guided (action-gated) steps T1-T9 from the original TutorialFlow
- * - 8 reference steps from the original MainStreetTutorialHints
+ * The flow teaches one concept per step: buy → hand → place; invest →
+ * optimize → trigger. See the parent work item's T1–T16 mapping for the
+ * full rationale (steps dropped, split, renamed, and inserted).
  *
- * Overlapping content was deduplicated while preserving all unique information.
- * New steps (from the original 13-step set and split Challenges/Scoring)
- * come from the reference system to fill gaps.
- *
- * Gate type distribution: 8 confirm + 6 action (T3, T4, T6, T7, T8, T9).
+ * Gate type distribution: 8 confirm + 8 action
+ * (action steps: T3, T5, T7, T9, T10, T11, T12, T13).
  */
 export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
   {
@@ -174,121 +191,143 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     id: 'T2',
     titleKey: tutorialKey('T2', 'title'),
     bodyKey: tutorialKey('T2', 'body'),
-    highlightZone: 'hud',
+    // Informative Development Row step: dev-row-only highlight, no action.
+    highlightZone: 'developmentRow',
     gate: 'confirm',
   },
   {
     id: 'T3',
     titleKey: tutorialKey('T3', 'title'),
     bodyKey: tutorialKey('T3', 'body'),
-    highlightZone: 'marketBusinessRow',
+    // Card-level highlight on the Laundromat in the dev row (scenario slot 2).
+    highlightZone: 'laundromatCard',
     gate: 'action',
     requiredAction: 'select-business',
     // The TutorialScenario system (TutorialScenario.ts) guarantees the Laundromat
-    // (biz-laundromat-0) is present in the development row. It costs $4 (most
-    // affordable, leaves 8 coins for later steps).
+    // (biz-laundromat-0) is present in the development row. It costs $4, leaving
+    // 12 coins for the later purchases.
     requiredCardId: 'biz-laundromat-0',
   },
   {
     id: 'T4',
     titleKey: tutorialKey('T4', 'title'),
     bodyKey: tutorialKey('T4', 'body'),
-    highlightZone: 'streetGrid',
-    gate: 'action',
-    requiredAction: 'place-business',
+    // New hand-area step inserted between buying and placing.
+    highlightZone: 'hand',
+    gate: 'confirm',
   },
   {
     id: 'T5',
     titleKey: tutorialKey('T5', 'title'),
     bodyKey: tutorialKey('T5', 'body'),
-    highlightZone: 'incidentQueue',
-    gate: 'confirm',
+    highlightZone: 'streetGrid',
+    gate: 'action',
+    requiredAction: 'place-business',
   },
   {
     id: 'T6',
     titleKey: tutorialKey('T6', 'title'),
     bodyKey: tutorialKey('T6', 'body'),
-    highlightZone: 'endTurnButton',
-    gate: 'action',
-    requiredAction: 'end-turn',
+    highlightZone: 'incidentQueue',
+    gate: 'confirm',
   },
   {
     id: 'T7',
     titleKey: tutorialKey('T7', 'title'),
     bodyKey: tutorialKey('T7', 'body'),
-    highlightZone: 'investmentsRow',
+    highlightZone: 'endTurnButton',
     gate: 'action',
-    requiredAction: 'buy-event',
-    // The TutorialScenario system puts Local Festival (evt-festival, $3)
-    // in the investments row. This is affordable after the T3 Laundromat purchase
-    // ($4) and T6 income (~1 coin). The player can buy any Investment event card
-    // (no requiredCardId gate); referencedCardId only feeds the {cardName}/{bonus}
-    // placeholders in the body text from live card data.
-    referencedCardId: 'evt-festival-0',
+    requiredAction: 'end-turn',
   },
   {
     id: 'T8',
     titleKey: tutorialKey('T8', 'title'),
     bodyKey: tutorialKey('T8', 'body'),
-    highlightZone: 'marketBusinessRow',
-    gate: 'action',
-    requiredAction: 'select-business',
-    // The TutorialScenario system (TutorialScenario.ts) guarantees the Bookshop
-    // (biz-bookshop-0) is present in the development row. It costs $3 (Culture
-    // business) and matches the Local Festival's Culture bonus.
-    requiredCardId: 'biz-bookshop-0',
+    highlightZone: 'investmentsRow',
+    gate: 'confirm',
   },
   {
     id: 'T9',
     titleKey: tutorialKey('T9', 'title'),
     bodyKey: tutorialKey('T9', 'body'),
-    highlightZone: 'streetGrid',
+    // Card-level highlight on the Local Festival in the investments row (slot 3).
+    highlightZone: 'festivalCard',
     gate: 'action',
-    requiredAction: 'place-business',
-    // Body text references the Bookshop bought in T8 — referencedCardId feeds
-    // the {cardName} placeholder from live card data (no purchase gate here).
-    referencedCardId: 'biz-bookshop-0',
+    requiredAction: 'buy-event',
+    // The TutorialScenario system puts Local Festival (evt-festival, $3)
+    // in the investments row, affordable after the T3 purchase + T7 income.
+    requiredCardId: 'evt-festival-0',
   },
   {
     id: 'T10',
     titleKey: tutorialKey('T10', 'title'),
     bodyKey: tutorialKey('T10', 'body'),
-    highlightZone: 'centerModal',
-    gate: 'confirm',
+    // Composite buy-and-place step: drag the Bookshop from the dev row onto
+    // an empty street slot (drag-drop buy-and-place, landed via CG-0MSKSAREE007AYSZ).
+    highlightZone: 'developmentRow',
+    gate: 'action',
+    requiredAction: 'buy-and-place',
+    requiredCardId: 'biz-bookshop-0',
   },
-
   {
     id: 'T11',
     titleKey: tutorialKey('T11', 'title'),
     bodyKey: tutorialKey('T11', 'body'),
     highlightZone: 'endTurnButton',
-    gate: 'confirm',
+    gate: 'action',
+    requiredAction: 'end-turn',
+    // Body text references the Local Festival bought in T9 — referencedCardId
+    // feeds the {cardName} placeholder from live card data (no gate here).
+    referencedCardId: 'evt-festival-0',
   },
   {
     id: 'T12',
     titleKey: tutorialKey('T12', 'title'),
     bodyKey: tutorialKey('T12', 'body'),
-    highlightZone: 'challengePanel',
-    gate: 'confirm',
+    // Build a Library: buy cs-library from the dev row; body text references
+    // the Bookshop synergy partner via {synergyCardName}.
+    highlightZone: 'developmentRow',
+    gate: 'action',
+    requiredAction: 'select-business',
+    requiredCardId: 'cs-library',
+    synergyCardId: 'biz-bookshop-0',
   },
   {
     id: 'T13',
     titleKey: tutorialKey('T13', 'title'),
     bodyKey: tutorialKey('T13', 'body'),
-    highlightZone: 'hud',
-    gate: 'confirm',
+    // Triggering Events: play the held Local Festival from the hand.
+    highlightZone: 'hand',
+    gate: 'action',
+    requiredAction: 'play-event',
+    referencedCardId: 'evt-festival-0',
   },
   {
     id: 'T14',
     titleKey: tutorialKey('T14', 'title'),
     bodyKey: tutorialKey('T14', 'body'),
+    // Success and Failure: the scoring bar (HUD).
+    highlightZone: 'hud',
+    gate: 'confirm',
+  },
+  {
+    id: 'T15',
+    titleKey: tutorialKey('T15', 'title'),
+    bodyKey: tutorialKey('T15', 'body'),
+    highlightZone: 'challengePanel',
+    gate: 'confirm',
+  },
+  {
+    id: 'T16',
+    titleKey: tutorialKey('T16', 'title'),
+    bodyKey: tutorialKey('T16', 'body'),
     highlightZone: 'completionModal',
     gate: 'confirm',
   },
 ] as const;
 
 /** Total number of unified tutorial steps. */
-export const UNIFIED_TUTORIAL_STEP_COUNT = UNIFIED_TUTORIAL_STEPS.length; // 14
+export const UNIFIED_TUTORIAL_STEP_COUNT = UNIFIED_TUTORIAL_STEPS.length; // 16
 
 export const INVALID_ACTION_MESSAGE = 'Complete the highlighted step first.';
 
@@ -379,6 +418,13 @@ export function isRequiredAction(
 ): boolean {
   const step = getCurrentStep(state);
   if (!step || step.gate !== 'action') return false;
+  // Composite buy-and-place step: both the pickup (select-business) and the
+  // drop (place-business) are required/allowable while the step is active;
+  // the step completes only on the terminal drop action (see
+  // MainStreetLifecycleManager.onTutorialActionComplete).
+  if (step.requiredAction === 'buy-and-place') {
+    return actionType === 'select-business' || actionType === 'place-business';
+  }
   return step.requiredAction === actionType;
 }
 
@@ -408,6 +454,8 @@ export type TutorialCardDataParams = {
   cost: string;
   /** Event cards only: the `coinDelta` as `+N coins` (e.g. `'+2 coins'`). */
   bonus: string;
+  /** Synergy-partner card's `name` column (e.g. `'Bookshop'`), when `synergyCardId` is set. */
+  synergyCardName?: string;
 };
 
 /**
@@ -443,11 +491,27 @@ export function resolveTutorialCardParams(
       ? `+${coinDelta} coins`
       : '+0 coins';
 
-  return {
+  const params: TutorialCardDataParams = {
     cardName: row.name,
     cost: formatCurrency(Number(row.cost) || 0),
     bonus,
   };
+
+  // Resolve the synergy-partner card ({synergyCardName}) when the step
+  // references a second card (e.g. T12 builds the Library next to the Bookshop).
+  if (step.synergyCardId) {
+    const synergyBaseId = getBaseTypeId(step.synergyCardId);
+    const synergyRow = getCsvRows().find(r => r.id === synergyBaseId);
+    if (!synergyRow) {
+      throw new Error(
+        `TutorialFlow: no card-data row found for synergy template "${synergyBaseId}" ` +
+        `(from step ${step.id} synergy card id "${step.synergyCardId}"). Check card-data.csv.`,
+      );
+    }
+    params.synergyCardName = synergyRow.name;
+  }
+
+  return params;
 }
 
 /**

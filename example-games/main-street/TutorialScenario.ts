@@ -23,19 +23,23 @@
  *   (without copy/serial suffix) so the scenario is robust across deck
  *   construction ordering.
  *
- * ## Coin Budget (Easy / 12 coins)
+ * ## Coin Budget (Easy / 16 coins)
  *
  * | Step | Action                     | Coins In | Coins Out | Balance |
  * |------|----------------------------|----------|-----------|---------|
- * | T1   | Start (Easy, 12 coins)     | 12       | 0         | 12      |
- * | T2   | Confirm (no cost)          | 0        | 0         | 12      |
- * | T3   | Buy Laundromat ($4)        | 0        | 4         | 8       |
- * | T4   | Place business (free)      | 0        | 0         | 8       |
- * | T5   | Confirm (no cost)          | 0        | 0         | 8       |
- * | T6   | End Turn + income (~1 coin)| 1        | 0         | 9       |
- * | T7   | Buy Local Festival ($3)    | 0        | 3         | 6       |
- * | T8   | Buy Bookshop ($3) + auto-place | 0     | 3         | 3       |
- * | T9+  | Confirm steps (no cost)    | 0        | 0         | ≥3      |
+ * | T1   | Start (Easy, 16 coins)     | 16       | 0         | 16      |
+ * | T2   | Confirm (no cost)          | 0        | 0         | 16      |
+ * | T3   | Buy Laundromat ($4)        | 0        | 4         | 12      |
+ * | T4   | Confirm (no cost)          | 0        | 0         | 12      |
+ * | T5   | Place business (free)      | 0        | 0         | 12      |
+ * | T6   | Confirm (no cost)          | 0        | 0         | 12      |
+ * | T7   | End Turn + income (~0.6)   | 0.625    | 0         | 12.625  |
+ * | T8   | Confirm (no cost)          | 0        | 0         | 12.625  |
+ * | T9   | Buy Local Festival ($3)    | 0        | 3         | 9.625   |
+ * | T10  | Buy-and-place Bookshop ($3)| 0        | 3         | 6.625   |
+ * | T11  | End Turn + income (~1.25)  | 1.25     | 0         | 7.875   |
+ * | T12  | Buy Library ($7)           | 0        | 7         | 0.875   |
+ * | T13+ | Confirm steps (no cost)    | 0        | 0         | ≥0.875  |
  *
  * @module
  */
@@ -111,29 +115,35 @@ export interface TutorialScenario {
  * **Development Row (4 slots):**
  *   - `biz-bakery` (Bakery, $3, Food)
  *   - `biz-laundromat` (Laundromat, $4, Service) — T3 purchase target
- *   - `cs-park` (Park, $3, Culture)
- *   - `biz-bookshop` (Bookshop, $3, Culture) — T8 purchase target
+ *   - `cs-library` (Library, $7, Culture) — T12 purchase target
+ *   - `biz-bookshop` (Bookshop, $3, Culture) — T10 buy-and-place target
  *
  * **Investments Row (3 slots: 2 upgrades + 1 investment event):**
  *   - `upg-patisserie` (Upgrade to Patisserie, $4, targets Bakery)
  *   - `upg-garden` (Upgrade to Garden, $3, targets Park)
- *   - `evt-festival` (Local Festival, $3) — T7 purchase target
+ *   - `evt-festival` (Local Festival, $3) — T9 purchase target
  *
  * **Incident Queue (2 cards):**
  *   - `evt-award` (Community Award, +2 reputation)
  *   - `evt-rainy` (Rainy Day, -1 coin per Food business)
  *
- * **Coin Budget:** 12 starting (Easy), $4 Laundromat (T3), $3 Local Festival (T7),
- * $3 Bookshop (T8), remaining ≥2 coins. RNG-independent.
+ * **Coin Budget:** 16 starting coins (Easy preset raised for the tutorial),
+ * $4 Laundromat (T3) + $3 Local Festival (T9) + $3 Bookshop (T10) + $7 Library
+ * (T12) = $17, covered by 16 + ~1.9 income across the two end-turn steps
+ * (T7: Laundromat ~0.625; T11: Laundromat + Bookshop ~1.25). RNG-independent.
  */
 export const STANDARD_TUTORIAL_SCENARIO: TutorialScenario = {
   difficulty: 'Easy',
-  resourceBank: { coins: 12, reputation: 5 },
+  // 16 starting coins (vs. Easy preset's 12): the 16-step flow buys four
+  // cards (Laundromat $4 + Local Festival $3 + Bookshop $3 + Library $7 = $17)
+  // and earns ~1.9 income across T7 and T11, so 16 + ~2 ≥ 17. The tutorial
+  // scenario's coin budget is intentionally higher than the base preset.
+  resourceBank: { coins: 16, reputation: 5 },
   market: {
     development: [
       'biz-bakery',
       'biz-laundromat',
-      'cs-park',
+      'cs-library',
       'biz-bookshop',
     ],
     investments: [
