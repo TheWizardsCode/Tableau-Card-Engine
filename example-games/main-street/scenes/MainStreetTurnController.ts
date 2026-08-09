@@ -220,6 +220,14 @@ export class MainStreetTurnController {
     const s = this.scene;
     if (s.uiPhase !== 'market') return;
 
+    // Tutorial gating: only allow play-event if it's the required action or
+    // the tutorial is inactive (T13 "Triggering Events" uses this gate).
+    const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('play-event' as TutorialActionType);
+    if (check && !check.allowed) {
+      s.instructionText.setText(check.reason ?? 'Complete the highlighted step first.');
+      return;
+    }
+
     // Resolve the event card to play: an explicit hand index (from clicking a
     // specific event card in the merged hand) or the first event in the hand.
     const hand = s.state.hand ?? [];
@@ -241,6 +249,10 @@ export class MainStreetTurnController {
       s.instructionText.setText('Played held Investment event!');
       addLog(s.state, 'Played held event (via UI)', 'neutral');
       console.debug('[MS] PlayEvent executed', { coinsAfter: s.state.resourceBank.coins });
+      // Tutorial: mark play-event step complete if active
+      try {
+        (s.msLifecycleManager as any).onTutorialActionComplete?.('play-event' as TutorialActionType);
+      } catch (_) { /* ignore */ }
     } catch (e) {
       console.error('[MS] PlayEvent failed', e);
       s.instructionText.setText(`Error: ${(e as Error).message}`);

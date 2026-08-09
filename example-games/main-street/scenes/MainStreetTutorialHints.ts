@@ -35,6 +35,13 @@ import {
 } from '../TutorialFlow';
 import { TUTORIAL_EN_BUNDLE } from '../i18n/tutorial-en';
 import baseLayout from '../layouts/main-street.layout.json';
+import {
+  BASE_MARKET_CARD_W,
+  BASE_MARKET_CARD_H,
+  BASE_MARKET_CARD_GAP,
+} from './MainStreetConstants';
+import { MARKET_BUSINESS_SLOTS } from '../MainStreetCards';
+import { STANDARD_TUTORIAL_SCENARIO } from '../TutorialScenario';
 
 /*
  * WARNING: Keep main-street-tutorial.layout.json zone coordinates in sync with
@@ -72,6 +79,80 @@ const NULL_ZONES: ReadonlySet<TutorialHighlightZone> = new Set([
   'centerModal',
   'completionModal',
 ]);
+
+/**
+ * Card-level highlight zones resolved through the deterministic market slot
+ * resolver (`resolveMarketCardAnchor`) instead of SLL layout zones. Each maps
+ * to the base template ID of the card that the zone highlights.
+ */
+const CARD_LEVEL_ZONE_TEMPLATES: Partial<Record<TutorialHighlightZone, string>> = {
+  laundromatCard: 'biz-laundromat',
+  festivalCard: 'evt-festival',
+};
+
+/**
+ * Resolve a card-level highlight zone to a pixel rect.
+ *
+ * Card positions are deterministic in the tutorial scenario (Laundromat is dev
+ * slot 2, Local Festival is investments slot 3), so the slot index is taken
+ * from `STANDARD_TUTORIAL_SCENARIO` rather than the live market (which is
+ * randomized in a non-scenario game boot). The rect is computed from the
+ * composed SLL layout + shared card dimension constants — the same math the
+ * renderer's `drawMarketRow` uses.
+ *
+ * @param zone   The card-level zone name (e.g. `laundromatCard`).
+ * @param scene  The Phaser scene exposing `layout`.
+ * @returns Pixel rect for the card, or null when the zone has no template.
+ */
+export function resolveMarketCardAnchor(
+  zone: TutorialHighlightZone,
+  scene: any,
+): { x: number; y: number; w: number; h: number } | null {
+  const templateId = CARD_LEVEL_ZONE_TEMPLATES[zone];
+  if (!templateId) return null;
+
+  // Deterministic scenario slot index (source of truth for tutorial steps).
+  const devIdx = STANDARD_TUTORIAL_SCENARIO.market.development.indexOf(templateId);
+  const invIdx = STANDARD_TUTORIAL_SCENARIO.market.investments.indexOf(templateId);
+  const rowIndex = devIdx >= 0 ? devIdx : invIdx;
+  if (rowIndex < 0) return null;
+
+  const layout = scene.layout ?? {};
+  const viewport: LayoutViewport = {
+    width: layout.gameW ?? 1280,
+    height: layout.gameH ?? 720,
+  };
+  const composed = composeResolvedLayouts(
+    BASE_LAYOUT,
+    TUTORIAL_LAYOUT,
+    viewport,
+    1,
+    { policy: 'sceneWins' },
+  );
+
+  // Both rows align their first card to the dev row's startX (the renderer
+  // passes devStartX as the investments row's alignmentStartX). Compute
+  // devStartX from the developmentRow zone rect and shared card constants.
+  const devRect = composed.zones.developmentRow?.rect;
+  if (!devRect) return null;
+  const devTotalCardsW =
+    MARKET_BUSINESS_SLOTS * BASE_MARKET_CARD_W +
+    (MARKET_BUSINESS_SLOTS - 1) * BASE_MARKET_CARD_GAP;
+  const startX = Math.round(devRect.x + ((devRect.width ?? 0) - devTotalCardsW) / 2);
+
+  const rowRect =
+    devIdx >= 0
+      ? devRect
+      : composed.zones.investmentsRow?.rect;
+  if (!rowRect) return null;
+
+  return {
+    x: startX + rowIndex * (BASE_MARKET_CARD_W + BASE_MARKET_CARD_GAP),
+    y: Math.round(rowRect.y),
+    w: BASE_MARKET_CARD_W,
+    h: BASE_MARKET_CARD_H,
+  };
+}
 
 /**
  * Resolve a tutorial highlight zone to pixel-space coordinates using SLL.
@@ -173,8 +254,8 @@ export class MainStreetTutorialHints {
    * Complete the tutorial: dismiss the overlay and call onComplete
    * to persist tutorial completion state.
    *
-   * This is only called when the player reaches the final step (T13)
-   * and clicks "Start Full Game", or when nextStep() reaches the end.
+   * This is only called when the player reaches the final step (T16)
+   * and clicks "Let's play!", or when nextStep() reaches the end.
    */
   public completeDismiss(): void {
     this.clearObjects();
@@ -218,7 +299,7 @@ export class MainStreetTutorialHints {
    * For **confirm** steps the button row shows: Dismiss | Next/Finish
    * For **action** steps the button row shows: Exit Tutorial (no Continue button; auto-advance on action)
    *   (Continue is disabled until the action-complete predicate reports true).
-   *   The final step shows "Start Full Game" instead of Exit Tutorial.
+   *   The final step shows "Let's play!" instead of Exit Tutorial.
    *
    * @param index - Zero-based index into `UNIFIED_TUTORIAL_STEPS`.
    */
@@ -325,7 +406,7 @@ export class MainStreetTutorialHints {
           };
           leftGroup.appendChild(exitBtn);
         } else {
-          // Last step: "Start Full Game" replaces "Exit Tutorial"
+          // Last step: "Let's play!" replaces "Exit Tutorial"
           const startBtn = document.createElement('button');
           startBtn.textContent = t('tutorial.overlay.startFullGame');
           startBtn.style.background = '#44ff44';
@@ -451,7 +532,7 @@ export class MainStreetTutorialHints {
           });
           this.objects.push(exitBtn);
         } else {
-          // Last step: "Start Full Game" replaces "Exit Tutorial"
+          // Last step: "Let's play!" replaces "Exit Tutorial"
           const startBtn = s.add.text(domX + 16, tooltipY + tooltipH - 30, t('tutorial.overlay.startFullGame'), { fontSize: '13px', color: '#002200', fontFamily: FONT_FAMILY, fontStyle: 'bold', padding: { left: 12, right: 12, top: 6, bottom: 6 } as any, backgroundColor: '#44ff44' }).setInteractive({ useHandCursor: true }).setDepth(TOOLTIP_DEPTH + 1003);
           startBtn.on('pointerdown', () => (s as any).confirmTutorialStep?.());
           this.objects.push(startBtn);
@@ -494,6 +575,12 @@ export class MainStreetTutorialHints {
     const layout = scene.layout ?? {};
     const gameW: number = layout.gameW ?? 1280;
     const gameH: number = layout.gameH ?? 720;
+
+    // Card-level zones (laundromatCard, festivalCard) resolve via the
+    // deterministic market slot resolver instead of an SLL layout zone.
+    const cardAnchor = resolveMarketCardAnchor(zone, scene);
+    if (cardAnchor) return cardAnchor;
+
     return resolveZoneToAnchor(zone, { width: gameW, height: gameH }, 1);
   }
 

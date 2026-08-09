@@ -8,10 +8,12 @@
   "requiredZones": [
     "hud",
     "marketBusinessRow",
+    "developmentRow",
     "streetGrid",
     "endTurnButton",
     "incidentQueue",
     "investmentsRow",
+    "hand",
     "helpButton"
   ],
   "zones": {
@@ -35,6 +37,28 @@
       },
       "anchors": {
         "topCenter": { "x": 0.375, "y": 0.125 }
+      }
+    },
+    "developmentRow": {
+      "rect": {
+        "x": 0.015625,
+        "y": 0.111111,
+        "w": 0.71875,
+        "h": 0.130556
+      },
+      "anchors": {
+        "topCenter": { "x": 0.375, "y": 0.125 }
+      }
+    },
+    "hand": {
+      "rect": {
+        "x": 0.15,
+        "y": 0.861111,
+        "w": 0.36,
+        "h": 0.111111
+      },
+      "anchors": {
+        "topLeft": { "x": 0.15, "y": 0.861111 }
       }
     },
     "streetGrid": {

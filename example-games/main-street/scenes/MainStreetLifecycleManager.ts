@@ -688,15 +688,38 @@ export class MainStreetLifecycleManager {
   /**
    * Called when a tutorial action-gated game action succeeds.
    * Advances the tutorial to the next step and shows the next overlay.
+   *
+   * For the composite `buy-and-place` action (T10), only the terminal drop
+   * (`place-business`) completes the step — the pickup (`select-business`)
+   * keeps the step active so the player can still drag the card onto the street.
    */
   public onTutorialActionComplete(actionType: TutorialActionType): void {
     const s = this.scene;
     const controller = (s as any).tutorialController as TutorialControllerState | undefined;
     if (!controller || !controller.isActive) return;
-    if (!isRequiredAction(controller, actionType)) return;
+    const step = getCurrentStep(controller);
+    if (!step || step.gate !== 'action') return;
+
+    // Composite buy-and-place: only the terminal drop completes the step.
+    if (step.requiredAction === 'buy-and-place') {
+      if (actionType !== 'place-business') return;
+    } else if (!isRequiredAction(controller, actionType)) {
+      return;
+    }
 
     const { newState } = completeCurrentStep(controller);
     Object.assign(s, { tutorialController: newState });
+
+    // After T12 (buy Library to hand) the scene is left in 'placing-from-hand'
+    // phase with a pending hand index. T13 (Triggering Events, play-event)
+    // requires the market phase so the held event card is clickable in the hand
+    // (event clicks are only wired while uiPhase === 'market'). Reset the phase
+    // when advancing to a play-event step so the player can play the held event.
+    const nextStep = getCurrentStep(newState);
+    if (nextStep?.requiredAction === 'play-event') {
+      s.uiPhase = 'market';
+      s.pendingHandIndex = null;
+    }
 
     // Show next step immediately (for action steps) or after brief delay
     // For select-business -> place-business transition, show immediately
