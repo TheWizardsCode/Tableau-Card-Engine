@@ -1,25 +1,37 @@
 {
   "version": "1.0",
-  "last_updated": "2026-06-24T15:36:12.984Z",
+  "last_updated": "2026-08-09T16:17:41.062Z",
   "pages": {
+    "sources/container-drag-click-coexistence-phaser": {
+      "type": "source",
+      "title": "Phaser Container drag + click coexistence pattern",
+      "category": "frontend",
+      "status": "insight",
+      "slug": "container-drag-click-coexistence-phaser",
+      "created": "2026-08-09",
+      "updated": "2026-08-09"
+    },
     "sources/direct-sound-playback-for-game-specific-audio": {
       "type": "source",
-      "title": "\"Direct sound playback for game-specific audio events\"",
-      "created": "2026-06-24",
-      "updated": "2026-06-24",
-      "slug": "direct-sound-playback-for-game-specific-audio",
+      "title": "Direct sound playback for game-specific audio events",
+      "category": "audio",
       "status": "insight",
-      "category": "audio"
+      "slug": "direct-sound-playback-for-game-specific-audio",
+      "created": "2026-06-24",
+      "updated": "2026-06-24"
+    },
+    "sources/main-street-merge-hand-plan-review-gaps": {
+      "type": "source",
+      "title": "Main Street merged-hand plan: review found 2 completeness gaps",
+      "category": "planning",
+      "status": "insight",
+      "slug": "main-street-merge-hand-plan-review-gaps",
+      "created": "2026-08-08",
+      "updated": "2026-08-08"
     },
     "sources/obs-2026-06-24-activity-log-windowed-rendering-fix": {
       "type": "source",
-      "title": "\"Observation: Activity Log windowed rendering fix\"",
-      "created": "2026-06-24",
-      "updated": "2026-06-24",
-      "slug": "obs-2026-06-24-activity-log-windowed-rendering-fix",
-      "status": "observation",
-      "relevance": "medium",
-      "observed_at": "2026-06-24T12:10:43.831Z",
+      "title": "Observation: Activity Log windowed rendering fix",
       "tags": [
         "main-street",
         "ui",
@@ -27,17 +39,17 @@
         "scrolling",
         "bugfix"
       ],
-      "source_context": "\"Implementing CG-0MQK4H9180049050: Activity Log scrolls off top of container\""
+      "status": "observation",
+      "slug": "obs-2026-06-24-activity-log-windowed-rendering-fix",
+      "relevance": "medium",
+      "observed_at": "2026-06-24T12:10:43.831Z",
+      "source_context": "Implementing CG-0MQK4H9180049050: Activity Log scrolls off top of container",
+      "created": "2026-06-24",
+      "updated": "2026-06-24"
     },
     "sources/obs-2026-06-24-intake-completed-main-street-challenge-celebration-vfx-sound": {
       "type": "source",
-      "title": "\"Observation: Intake completed: Main Street challenge celebration VFX/sound\"",
-      "created": "2026-06-24",
-      "updated": "2026-06-24",
-      "slug": "obs-2026-06-24-intake-completed-main-street-challenge-celebration-vfx-sound",
-      "status": "observation",
-      "relevance": "medium",
-      "observed_at": "2026-06-24T13:36:23.421Z",
+      "title": "Observation: Intake completed: Main Street challenge celebration VFX/sound",
       "tags": [
         "main-street",
         "intake",
@@ -45,41 +57,254 @@
         "VFX",
         "audio"
       ],
-      "source_context": "\"Intake command for Main Street challenge celebration feature\""
+      "status": "observation",
+      "slug": "obs-2026-06-24-intake-completed-main-street-challenge-celebration-vfx-sound",
+      "relevance": "medium",
+      "observed_at": "2026-06-24T13:36:23.421Z",
+      "source_context": "Intake command for Main Street challenge celebration feature",
+      "created": "2026-06-24",
+      "updated": "2026-06-24"
     },
     "sources/obs-2026-06-24-neutral-income-sound-added-for-zero-income-turns": {
       "type": "source",
-      "title": "\"Observation: Neutral income sound added for zero-income turns\"",
-      "created": "2026-06-24",
-      "updated": "2026-06-24",
-      "slug": "obs-2026-06-24-neutral-income-sound-added-for-zero-income-turns",
-      "status": "observation",
-      "relevance": "medium",
-      "observed_at": "2026-06-24T11:39:05.027Z",
+      "title": "Observation: Neutral income sound added for zero-income turns",
       "tags": [
         "main-street",
         "audio",
         "sound"
       ],
-      "source_context": "\"Implementing CG-0MQK4EGJ0001JN6N: No sound on some turns\""
+      "status": "observation",
+      "slug": "obs-2026-06-24-neutral-income-sound-added-for-zero-income-turns",
+      "relevance": "medium",
+      "observed_at": "2026-06-24T11:39:05.027Z",
+      "source_context": "Implementing CG-0MQK4EGJ0001JN6N: No sound on some turns",
+      "created": "2026-06-24",
+      "updated": "2026-06-24"
     },
     "sources/obs-2026-06-24-stats-button-moved-to-lower-left-to-fix-settings-button-over": {
       "type": "source",
-      "title": "\"Observation: Stats button moved to lower-left to fix Settings button overlap\"",
-      "created": "2026-06-24",
-      "updated": "2026-06-24",
-      "slug": "obs-2026-06-24-stats-button-moved-to-lower-left-to-fix-settings-button-over",
+      "title": "Observation: Stats button moved to lower-left to fix Settings button overlap",
       "status": "observation",
+      "slug": "obs-2026-06-24-stats-button-moved-to-lower-left-to-fix-settings-button-over",
       "relevance": "medium",
-      "observed_at": "2026-06-24T15:36:12.954Z"
+      "observed_at": "2026-06-24T15:36:12.954Z",
+      "created": "2026-06-24",
+      "updated": "2026-06-24"
+    },
+    "sources/obs-2026-08-08-browser-test-fast-fail-plan-approved-for-cg-0msj7zxd5005n9e5": {
+      "type": "source",
+      "title": "Observation: Browser-test fast-fail plan approved for CG-0MSJ7ZXD5005N9E5",
+      "tags": [
+        "testing",
+        "infrastructure",
+        "planning",
+        "worklog"
+      ],
+      "status": "observation",
+      "slug": "obs-2026-08-08-browser-test-fast-fail-plan-approved-for-cg-0msj7zxd5005n9e5",
+      "relevance": "medium",
+      "observed_at": "2026-08-08T21:22:24.566Z",
+      "source_context": "Planning CG-0MSJ7ZXD5005N9E5",
+      "created": "2026-08-08",
+      "updated": "2026-08-08"
+    },
+    "sources/obs-2026-08-08-cg-0msku0be5003i2zd-scope-expanded-to-merge-hands-3-card-any": {
+      "type": "source",
+      "title": "Observation: CG-0MSKU0BE5003I2ZD scope expanded to merge hands + 3-card any-mix limit",
+      "tags": [
+        "main-street",
+        "hand-layout",
+        "merge",
+        "heldEvent",
+        "work-item"
+      ],
+      "status": "observation",
+      "slug": "obs-2026-08-08-cg-0msku0be5003i2zd-scope-expanded-to-merge-hands-3-card-any",
+      "relevance": "high",
+      "observed_at": "2026-08-08T21:04:26.651Z",
+      "source_context": "Updating work item CG-0MSKU0BE5003I2ZD after operator merge decision",
+      "created": "2026-08-08",
+      "updated": "2026-08-08"
+    },
+    "sources/obs-2026-08-08-intake-main-street-drag-and-drop-buy-place-with-core-engine-": {
+      "type": "source",
+      "title": "Observation: Intake: Main Street drag-and-drop buy/place with core-engine drag module",
+      "tags": [
+        "intake",
+        "main-street",
+        "drag-drop",
+        "core-engine",
+        "beleaguered-castle"
+      ],
+      "status": "observation",
+      "slug": "obs-2026-08-08-intake-main-street-drag-and-drop-buy-place-with-core-engine-",
+      "relevance": "medium",
+      "observed_at": "2026-08-08T19:57:29.128Z",
+      "source_context": "Intake for Main Street drag-and-drop buy-and-place feature",
+      "created": "2026-08-08",
+      "updated": "2026-08-08"
+    },
+    "sources/obs-2026-08-08-library-synergy-neutrality-reversed-to-park-model-participat": {
+      "type": "source",
+      "title": "Observation: Library synergy neutrality reversed to Park-model participation",
+      "tags": [
+        "main-street",
+        "synergy",
+        "library",
+        "bookshop",
+        "intake",
+        "balance"
+      ],
+      "status": "observation",
+      "slug": "obs-2026-08-08-library-synergy-neutrality-reversed-to-park-model-participat",
+      "relevance": "high",
+      "observed_at": "2026-08-08T20:02:24.812Z",
+      "source_context": "Intake for CG-0MSKS963N000ZSTU (Library synergy line not drawn)",
+      "created": "2026-08-08",
+      "updated": "2026-08-08"
+    },
+    "sources/obs-2026-08-08-main-street-hand-layout-vertical-stack-bug-root-cause-identi": {
+      "type": "source",
+      "title": "Observation: Main Street hand layout vertical-stack bug root cause identified",
+      "tags": [
+        "main-street",
+        "hand-layout",
+        "intake",
+        "bug"
+      ],
+      "status": "observation",
+      "slug": "obs-2026-08-08-main-street-hand-layout-vertical-stack-bug-root-cause-identi",
+      "relevance": "high",
+      "observed_at": "2026-08-08T20:40:22.319Z",
+      "source_context": "/intake Main Street hand layout vertical should be horizontal",
+      "created": "2026-08-08",
+      "updated": "2026-08-08"
+    },
+    "sources/obs-2026-08-08-main-street-merged-hand-heldevent-folded-into-shared-hand": {
+      "type": "source",
+      "title": "Observation: Main Street merged hand: heldEvent folded into shared hand",
+      "tags": [
+        "main-street",
+        "hand-view",
+        "heldEvent",
+        "merge"
+      ],
+      "status": "observation",
+      "slug": "obs-2026-08-08-main-street-merged-hand-heldevent-folded-into-shared-hand",
+      "relevance": "high",
+      "observed_at": "2026-08-08T23:24:11.250Z",
+      "source_context": "Implementing CG-0MSKU0BE5003I2ZD: merge business hand + held event into one horizontal 3-card hand",
+      "created": "2026-08-08",
+      "updated": "2026-08-08"
+    },
+    "sources/obs-2026-08-08-main-street-merged-hand-maxhandsize-option-b-start-2-growabl": {
+      "type": "source",
+      "title": "Observation: Main Street merged hand: maxHandSize Option B, start 2, growable",
+      "tags": [
+        "main-street",
+        "hand-layout",
+        "maxHandSize",
+        "decision"
+      ],
+      "status": "observation",
+      "slug": "obs-2026-08-08-main-street-merged-hand-maxhandsize-option-b-start-2-growabl",
+      "relevance": "medium",
+      "observed_at": "2026-08-08T21:08:08.564Z",
+      "source_context": "Recording maxHandSize decision for merged Main Street hand",
+      "created": "2026-08-08",
+      "updated": "2026-08-08"
+    },
+    "sources/obs-2026-08-08-plan-structure-for-cg-0msksaree007aysz-drag-and-drop-feature": {
+      "type": "source",
+      "title": "Observation: Plan structure for CG-0MSKSAREE007AYSZ drag-and-drop feature",
+      "tags": [
+        "planning",
+        "main-street",
+        "drag-drop",
+        "core-engine"
+      ],
+      "status": "observation",
+      "slug": "obs-2026-08-08-plan-structure-for-cg-0msksaree007aysz-drag-and-drop-feature",
+      "relevance": "high",
+      "observed_at": "2026-08-08T20:07:12.802Z",
+      "source_context": "Planning CG-0MSKSAREE007AYSZ (Main Street drag-and-drop)",
+      "created": "2026-08-08",
+      "updated": "2026-08-08"
+    },
+    "sources/obs-2026-08-08-pre-push-hook-worklog-sync-conflicts-in-worktrees": {
+      "type": "source",
+      "title": "Observation: Pre-push hook worklog sync conflicts in worktrees",
+      "tags": [
+        "git",
+        "worktree",
+        "pre-push",
+        "worklog"
+      ],
+      "status": "observation",
+      "slug": "obs-2026-08-08-pre-push-hook-worklog-sync-conflicts-in-worktrees",
+      "relevance": "medium",
+      "observed_at": "2026-08-08T23:24:11.257Z",
+      "source_context": "Pushing CG-0MSKU0BE5003I2ZD to dev from worktree",
+      "created": "2026-08-08",
+      "updated": "2026-08-08"
+    },
+    "sources/obs-2026-08-09-browser-test-pitfalls-indexeddb-checkpoint-overlay-blocker-c": {
+      "type": "source",
+      "title": "Observation: Browser-test pitfalls: IndexedDB checkpoint overlay blocker + canvas scaling",
+      "tags": [
+        "testing",
+        "browser",
+        "vitest",
+        "phaser",
+        "main-street"
+      ],
+      "status": "observation",
+      "slug": "obs-2026-08-09-browser-test-pitfalls-indexeddb-checkpoint-overlay-blocker-c",
+      "relevance": "high",
+      "observed_at": "2026-08-09T00:20:48.556Z",
+      "source_context": "Debugging tests/main-street/drag.browser.test.ts flakiness",
+      "created": "2026-08-09",
+      "updated": "2026-08-09"
+    },
+    "sources/obs-2026-08-09-drag-drop-transfer-starts-from-drop-location-f5ac812d": {
+      "type": "source",
+      "title": "Observation: Drag-drop transfer starts from drop location (f5ac812d)",
+      "tags": [
+        "main-street",
+        "drag-drop",
+        "animation"
+      ],
+      "status": "observation",
+      "slug": "obs-2026-08-09-drag-drop-transfer-starts-from-drop-location-f5ac812d",
+      "relevance": "high",
+      "observed_at": "2026-08-09T00:56:07.096Z",
+      "source_context": "Fixing CG-0MSL2WE0Q007HN8L drag-drop transfer origin",
+      "created": "2026-08-09",
+      "updated": "2026-08-09"
+    },
+    "sources/obs-2026-08-09-main-street-drag-to-buy-place-shipped-f2-f3-complete": {
+      "type": "source",
+      "title": "Observation: Main Street drag-to-buy/place shipped (F2+F3 complete)",
+      "tags": [
+        "main-street",
+        "drag-drop",
+        "core-engine"
+      ],
+      "status": "observation",
+      "slug": "obs-2026-08-09-main-street-drag-to-buy-place-shipped-f2-f3-complete",
+      "relevance": "high",
+      "observed_at": "2026-08-09T00:20:41.683Z",
+      "source_context": "Implementing CG-0MSKSAREE007AYSZ F2/F3",
+      "created": "2026-08-09",
+      "updated": "2026-08-09"
     },
     "sources/tutorial-i18n-already-implemented": {
       "type": "source",
-      "title": "\"Main Street tutorial i18n externalization already implemented\"",
-      "created": "2026-06-24",
-      "updated": "2026-06-24",
+      "title": "Main Street tutorial i18n externalization already implemented",
+      "status": "insight",
       "slug": "tutorial-i18n-already-implemented",
-      "status": "insight"
+      "created": "2026-06-24",
+      "updated": "2026-06-24"
     }
   }
 }
