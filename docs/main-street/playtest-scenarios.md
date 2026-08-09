@@ -53,14 +53,14 @@ npx vitest run --project unit tests/main-street/smoke-scenario.test.ts
 
 ### Adding or updating tutorial text
 
-Tutorial steps are defined in `example-games/main-street/TutorialFlow.ts` in the `UNIFIED_TUTORIAL_STEPS` array. There are currently 13 steps (T1–T13), each with:
-- `title` — short heading shown in bold
-- `body` — multi-line description text
+Tutorial steps are defined in `example-games/main-street/TutorialFlow.ts` in the `UNIFIED_TUTORIAL_STEPS` array. There are currently 16 steps (T1–T16), each with:
+- `titleKey` — i18n key for the short heading shown in bold
+- `bodyKey` — i18n key for the body text
 - `highlightZone` — zone identifier for the area to highlight (resolved via the tutorial layout system), or `'centerModal'`/`'completionModal'` for centered overlays
 - `gate` — `'confirm'` for informational steps, `'action'` for action-gated steps
 - `requiredAction` — (only for action-gated steps) the in-game action required to advance
 
-To add a step, append a new `UnifiedTutorialStepDef` object to `UNIFIED_TUTORIAL_STEPS`. To change copy, edit the `title` and `body` strings. All strings are localizable by replacing the string literals with i18n key lookups when i18n support is added.
+All step text lives in the English locale bundle (`example-games/main-street/i18n/tutorial-en.ts`) with card facts resolved from `card-data.csv` via `{cardName}`/`{cost}`/`{bonus}` placeholders. See `docs/main-street/tutorial-localization.md` for the editorial rules (≤3 sentences per box, one point per box) and the T1–T16 step-flow table.
 
 ---
 
