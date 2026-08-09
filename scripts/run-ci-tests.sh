@@ -19,6 +19,15 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_DIR"
 
+# Fast-fail pre-check: the browser stages below need Playwright's Chromium.
+# Detect a missing prerequisite up front (launch-free, <2s) and print the
+# exact remediation commands instead of timing out with an opaque Vitest
+# browser error. Non-zero exit aborts under set -euo pipefail. See
+# CG-0MSJ7ZXD5005N9E5.
+echo "=== Browser Test Env Pre-check ==="
+npx tsx scripts/check-browser-test-env.ts
+echo ""
+
 echo "=== Unit Tests ==="
 npx tsx scripts/vitest-run-with-retry.ts --project unit 2>&1 | tail -20
 echo ""
