@@ -432,8 +432,6 @@ All Gym demo scenes extend `GymSceneBase` (`example-games/gym/scenes/GymSceneBas
 - `docs/DEVELOPER.md` — Subsystem-specific deep-dive guidance (SLL, HUD, card system, etc.)
 - [UI Best Practices: Creating Modal Dialogs](#ui-best-practices-creating-modal-dialogs) — Depth-ordering convention and overlay implementation patterns
 
-<!-- Start base Worklog AGENTS.md file -->
-
 ## Worklog Rules
 
 This project follows the standard Worklog (wl) workflow for work-item tracking. The full ruleset is defined in the global AGENTS.md at `~/.pi/agent/AGENTS.md` under these sections:
