@@ -500,7 +500,15 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
   // findConstrainedIncidentIndex so the initial queue satisfies the same
   // constraints as later refills. No RNG is consumed here — deck order
   // (seeded shuffle) is the source of determinism.
-  const incidentBalance = createIncidentBalanceState();
+  // Incident-draw balance limits come from the difficulty preset's config
+  // (per-difficulty tuning, CG-0MSL0OU1E005WFJB). Configs that omit the
+  // fields (legacy saves) fall back to the engine defaults N=3, M=2 via ??
+  // in createIncidentBalanceState. Applied before the pre-draw below so the
+  // initial queue already honors the tuned limits.
+  const incidentBalance = createIncidentBalanceState({
+    repeatSpacing: config.incidentRepeatSpacing,
+    maxStreak: config.incidentMaxStreak,
+  });
   const incidentQueue: EventCard[] = [];
   for (let i = 0; i < INCIDENT_QUEUE_SIZE; i++) {
     const idx = findConstrainedIncidentIndex(eventDeck, incidentBalance);
