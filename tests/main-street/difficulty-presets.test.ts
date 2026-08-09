@@ -42,6 +42,9 @@ import {
   SYNERGY_BONUS_PER_NEIGHBOR,
   REPUTATION_SCORE_MULTIPLIER,
   CHALLENGE_BONUS_POINTS,
+  createIncidentBalanceState,
+  DEFAULT_INCIDENT_REPEAT_SPACING,
+  DEFAULT_INCIDENT_MAX_STREAK,
 } from '../../example-games/main-street/MainStreetCards';
 
 import { DEFAULT_CHALLENGES_PER_RUN } from '../../example-games/main-street/MainStreetChallenges';
@@ -117,6 +120,8 @@ describe('DifficultyPresets Module', () => {
         'challengeBonusPoints',
         'synergyBonusPerNeighbor',
         'challengesPerRun',
+        'incidentRepeatSpacing',
+        'incidentMaxStreak',
       ];
       for (const preset of [EASY_PRESET, MEDIUM_PRESET, HARD_PRESET]) {
         for (const key of requiredKeys) {
@@ -135,6 +140,8 @@ describe('DifficultyPresets Module', () => {
         'challengeBonusPoints',
         'synergyBonusPerNeighbor',
         'challengesPerRun',
+        'incidentRepeatSpacing',
+        'incidentMaxStreak',
       ];
       for (const preset of [EASY_PRESET, MEDIUM_PRESET, HARD_PRESET]) {
         for (const key of numericKeys) {
@@ -241,6 +248,82 @@ describe('DifficultyPresets Module', () => {
       for (const preset of [EASY_PRESET, MEDIUM_PRESET, HARD_PRESET]) {
         expect(preset.positiveIncidentMultiplier).toBeGreaterThanOrEqual(1);
       }
+    });
+  });
+
+  describe('incident balance limits (CG-0MSL0OU1E005WFJB)', () => {
+    describe('preset values', () => {
+      it('Easy defines incidentRepeatSpacing=4 and incidentMaxStreak=2', () => {
+        expect(EASY_PRESET.incidentRepeatSpacing).toBe(4);
+        expect(EASY_PRESET.incidentMaxStreak).toBe(2);
+      });
+
+      it('Medium defines incidentRepeatSpacing=3 and incidentMaxStreak=2', () => {
+        expect(MEDIUM_PRESET.incidentRepeatSpacing).toBe(3);
+        expect(MEDIUM_PRESET.incidentMaxStreak).toBe(2);
+      });
+
+      it('Hard defines incidentRepeatSpacing=2 and incidentMaxStreak=3', () => {
+        expect(HARD_PRESET.incidentRepeatSpacing).toBe(2);
+        expect(HARD_PRESET.incidentMaxStreak).toBe(3);
+      });
+
+      it('Medium limits equal the engine defaults (backward-compat invariant)', () => {
+        expect(MEDIUM_PRESET.incidentRepeatSpacing).toBe(DEFAULT_INCIDENT_REPEAT_SPACING);
+        expect(MEDIUM_PRESET.incidentMaxStreak).toBe(DEFAULT_INCIDENT_MAX_STREAK);
+      });
+    });
+
+    describe('setup wiring into state.incidentBalance', () => {
+      it.each([
+        ['Easy', 4, 2],
+        ['Medium', 3, 2],
+        ['Hard', 2, 3],
+      ] as const)(
+        '%s state.incidentBalance matches the preset limits (N=%i, M=%i)',
+        (difficulty, n, m) => {
+          const state = createTestState('wiring-' + difficulty, difficulty);
+          expect(state.incidentBalance.repeatSpacing).toBe(n);
+          expect(state.incidentBalance.maxStreak).toBe(m);
+        },
+      );
+    });
+
+    describe('seeded determinism per difficulty', () => {
+      it('same seed + same difficulty => identical incident-queue name sequences', () => {
+        for (const difficulty of ['Easy', 'Medium', 'Hard'] as const) {
+          const a = createTestState('incident-determ', difficulty);
+          const b = createTestState('incident-determ', difficulty);
+          expect(a.incidentQueue.map(c => c.name)).toEqual(b.incidentQueue.map(c => c.name));
+        }
+      });
+
+      it('Medium incident-queue sequence is unchanged from default-limit behavior', () => {
+        // Default (no difficulty) also resolves to the Medium preset; both use
+        // N=3/M=2, so the seeded queue must be identical for the same seed.
+        const medium = createTestState('medium-seq-invariant', 'Medium');
+        const defaulted = createTestState('medium-seq-invariant');
+        expect(medium.incidentQueue.map(c => c.name)).toEqual(
+          defaulted.incidentQueue.map(c => c.name),
+        );
+      });
+    });
+
+    describe('omitted-field fallback (legacy saves)', () => {
+      it('config missing the new fields falls back to defaults with no crash', () => {
+        // structuredClone mirrors deserializeMainStreetState's restore path
+        // (config: structuredClone(saved.config)); a save predating the
+        // incident-limit feature lacks both fields.
+        const legacyConfig = structuredClone(MEDIUM_PRESET) as unknown as Record<string, unknown>;
+        delete legacyConfig.incidentRepeatSpacing;
+        delete legacyConfig.incidentMaxStreak;
+        const balance = createIncidentBalanceState({
+          repeatSpacing: legacyConfig.incidentRepeatSpacing as number,
+          maxStreak: legacyConfig.incidentMaxStreak as number,
+        });
+        expect(balance.repeatSpacing).toBe(DEFAULT_INCIDENT_REPEAT_SPACING);
+        expect(balance.maxStreak).toBe(DEFAULT_INCIDENT_MAX_STREAK);
+      });
     });
   });
 

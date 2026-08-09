@@ -349,6 +349,96 @@ describe('constrained draws in the full game loop', () => {
   });
 });
 
+// ── Preset-driven limits (CG-0MSL0OU1E005WFJB) ─────────────
+
+describe('preset-driven incident limits at setup and refill', () => {
+  it('Easy (N=4, M=2): wider repeat spacing holds through setup and refills', () => {
+    const state = setupMainStreetGame({ seed: 'preset-easy-limits', difficulty: 'Easy' });
+    expect(state.incidentBalance.repeatSpacing).toBe(4);
+    expect(state.incidentBalance.maxStreak).toBe(2);
+    const { names, polarities } = resolveMany(state, 30);
+    expect(names.length).toBeGreaterThan(10);
+
+    // N=4 => window 3: no name within 3 positions
+    for (let i = 3; i < names.length; i++) {
+      expect(names[i]).not.toBe(names[i - 1]);
+      expect(names[i]).not.toBe(names[i - 2]);
+      expect(names[i]).not.toBe(names[i - 3]);
+    }
+
+    // M=2: never 3 consecutive non-neutral same-polarity cards
+    for (let i = 2; i < polarities.length; i++) {
+      const a = polarities[i - 2];
+      const b = polarities[i - 1];
+      const c = polarities[i];
+      if (a !== 'neutral' && b !== 'neutral' && c !== 'neutral') {
+        expect(a === b && b === c).toBe(false);
+      }
+    }
+  });
+
+  it('Hard (N=2, M=3): minimal spacing and longer streaks are allowed', () => {
+    const state = setupMainStreetGame({ seed: 'preset-hard-limits', difficulty: 'Hard' });
+    expect(state.incidentBalance.repeatSpacing).toBe(2);
+    expect(state.incidentBalance.maxStreak).toBe(3);
+    const { names, polarities } = resolveMany(state, 30);
+    expect(names.length).toBeGreaterThan(10);
+
+    // N=2 => window 1: no immediate repeats
+    for (let i = 1; i < names.length; i++) {
+      expect(names[i]).not.toBe(names[i - 1]);
+    }
+
+    // M=3: never 4 consecutive non-neutral same-polarity cards
+    for (let i = 3; i < polarities.length; i++) {
+      const a = polarities[i - 3];
+      const b = polarities[i - 2];
+      const c = polarities[i - 1];
+      const d = polarities[i];
+      if (a !== 'neutral' && b !== 'neutral' && c !== 'neutral' && d !== 'neutral') {
+        expect(a === b && b === c && c === d).toBe(false);
+      }
+    }
+
+    // M=3 must be observable: with the default M=2 the bound would forbid
+    // 3-runs, so at least one 3-run must appear somewhere in the sequence.
+    const maxRun = (): number => {
+      let run = 1;
+      let best = 1;
+      for (let i = 1; i < polarities.length; i++) {
+        const a = polarities[i - 1];
+        const b = polarities[i];
+        if (a !== 'neutral' && b !== 'neutral' && a === b) {
+          run += 1;
+          best = Math.max(best, run);
+        } else {
+          run = 1;
+        }
+      }
+      return best;
+    };
+    expect(maxRun()).toBeGreaterThanOrEqual(3);
+  });
+
+  it('restored legacy configs omitting the incident-limit fields keep working with defaults', () => {
+    const state = setupMainStreetGame({ seed: 'legacy-config-limits', difficulty: 'Medium' });
+    const serialized = serializeMainStreetState(state) as unknown as Record<string, unknown>;
+    delete (serialized.config as Record<string, unknown>).incidentRepeatSpacing;
+    delete (serialized.config as Record<string, unknown>).incidentMaxStreak;
+    const restored = deserializeMainStreetState(serialized as never);
+
+    // Config retains the legacy shape (fields missing)...
+    expect(
+      (restored.config as unknown as Record<string, unknown>).incidentRepeatSpacing,
+    ).toBeUndefined();
+    // ...and the balance keeps the default limits without crashing.
+    expect(restored.incidentBalance.repeatSpacing).toBe(DEFAULT_INCIDENT_REPEAT_SPACING);
+    expect(restored.incidentBalance.maxStreak).toBe(DEFAULT_INCIDENT_MAX_STREAK);
+    const { names } = resolveMany(restored, 6);
+    expect(names.length).toBe(6);
+  });
+});
+
 // ── Seeded determinism ──────────────────────────────────────
 
 describe('seeded determinism', () => {
