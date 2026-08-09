@@ -40,6 +40,7 @@ import {
   attachSelection,
   markHudTransient,
   clearTransientHud,
+  DEFAULT_DRAG_DISTANCE_THRESHOLD,
 } from '../../../src/ui';
 import {
   createSceneTitle,
@@ -86,6 +87,10 @@ export class MainStreetRenderer {
    * cards with their respective interactions.
    */
   handView!: HandView;
+  /** Containers currently registered with the drag-drop manager (unregistered before refresh). */
+  private dragDropRegistered = new Set<Phaser.GameObjects.Container>();
+  /** Outline rectangles shown on empty street slots while a drag is active. */
+  private dragHighlightRects = new Set<Phaser.GameObjects.Rectangle>();
 
   constructor(private readonly scene: any) {}
 
@@ -445,6 +450,11 @@ export class MainStreetRenderer {
 
     // Draw synergy lines between adjacent synergistic businesses
     this.drawSynergyLines();
+
+    // Re-register street-slot drop zones for drag-to-buy/place. Only empty
+    // slots become zones; occupied slots reject the drop because no zone is
+    // hit-tested (and canAccept would veto anyway).
+    this.refreshDragDropZones();
   }
 
   /**
@@ -488,6 +498,70 @@ export class MainStreetRenderer {
 
       s.streetContainer.add(line);
     }
+  }
+
+  // ── Drag-to-buy/place helpers (business cards → street slots) ──
+
+  /** Unregister all market-card draggables (called before refreshMarket clears containers). */
+  private unregisterDragDraggables(): void {
+    const s = this.scene;
+    if (!s.dragDropManager) return;
+    for (const container of this.dragDropRegistered) {
+      try { s.dragDropManager.unregisterDraggable(container); } catch (_) { /* ignore */ }
+    }
+    this.dragDropRegistered.clear();
+  }
+
+  /** Register empty street slots as drag-drop zones for the market phase. */
+  private refreshDragDropZones(): void {
+    const s = this.scene;
+    if (!s.dragDropManager || s.replayMode) return;
+    s.dragDropManager.clearDropZones();
+
+    const { streetX, streetTop, slotW, slotGap, slotH, streetCols, streetRowGap } = s.layout;
+    for (let i = 0; i < GRID_SIZE; i++) {
+      if (s.state.streetGrid[i]) continue; // occupied slots are invalid drop targets
+      const col = i % streetCols;
+      const row = Math.floor(i / streetCols);
+      const cx = streetX + col * (slotW + slotGap) + slotW / 2;
+      const cy = streetTop + row * (slotH + streetRowGap) + slotH / 2;
+      const zone = s.add.zone(cx, cy, slotW, slotH).setOrigin(0.5);
+      zone.setRectangleDropZone(slotW, slotH);
+      s.dragDropManager.registerDropZone({
+        zone,
+        data: i,
+        canAccept: (payload: any) =>
+          s.msTurnController.canDropBusinessCard(payload.data as string, i),
+      });
+      s.streetContainer.add(zone);
+    }
+  }
+
+  /** Outline empty street slots while a drag is active (valid-drop hint). */
+  public showDragHighlights(): void {
+    const s = this.scene;
+    this.clearDragHighlights();
+    const { streetX, streetTop, slotW, slotGap, slotH, streetCols, streetRowGap } = s.layout;
+    for (let i = 0; i < GRID_SIZE; i++) {
+      if (s.state.streetGrid[i]) continue;
+      const col = i % streetCols;
+      const row = Math.floor(i / streetCols);
+      const x = streetX + col * (slotW + slotGap) + slotW / 2;
+      const y = streetTop + row * (slotH + streetRowGap) + slotH / 2;
+      const hl = s.add.rectangle(x, y, slotW, slotH);
+      hl.setStrokeStyle(2, 0x44ff66, 0.8);
+      hl.setFillStyle(0x000000, 0);
+      s.streetContainer.add(hl);
+      this.dragHighlightRects.add(hl);
+    }
+  }
+
+  /** Remove drag highlights (called on dragend and defensively on refresh). */
+  public clearDragHighlights(): void {
+    for (const rect of this.dragHighlightRects) {
+      if (rect?.active) rect.destroy();
+    }
+    this.dragHighlightRects.clear();
   }
 
   public drawBusinessSlot(x: number, y: number, _index: number, biz: BusinessCard | CommunitySpaceCard): void {
@@ -747,6 +821,9 @@ export class MainStreetRenderer {
 
   public refreshMarket(): void {
     const s = this.scene;
+    // Unregister market-card draggables before the containers are destroyed
+    // so the drag-drop manager never holds stale game-object references.
+    this.unregisterDragDraggables();
     s.marketContainer.removeAll(true);
     s.marketSelectionManager.clear();
     s.marketSelectionManager.clearTargets();
@@ -1094,25 +1171,72 @@ export class MainStreetRenderer {
     if (interactiveEnabled) {
       s.marketSelectionByCardId.set(card.id, selection);
 
-      const hitArea = s.add.rectangle(0, 0, marketCardW, marketCardH, 0x000000, 0.001);
-      hitArea.setInteractive({ useHandCursor: true });
-      hitArea.on('pointerdown', () => {
-        s.marketSelectionManager.select(selection);
-        onClick(card);
-      });
-      hitArea.on('pointerover', () => {
-        selection.setHovered(true);
-        if (!s.replayMode) {
+      const isDraggableBusiness =
+        card.family === 'business' && !!s.dragDropManager && !s.replayMode;
+
+      if (isDraggableBusiness) {
+        // ── Draggable business card (drag-to-buy/place) ──────────
+        // The container itself is the interactive object: the reusable
+        // drag-drop module makes it draggable, and click-vs-drag
+        // coexistence is preserved by firing the click path only when the
+        // pointer did not move beyond the drag threshold (a pure click
+        // still reaches onBusinessCardClick → buy-to-hand).
+        const hitAreaRect = new Phaser.Geom.Rectangle(
+          -marketCardW / 2, -marketCardH / 2, marketCardW, marketCardH,
+        );
+        s.dragDropManager.registerDraggable({
+          gameObject: container,
+          data: card.id,
+          hitArea: hitAreaRect,
+          canPickUp: () => s.msTurnController.canPickUpBusinessCard(card.id),
+          onDrop: (payload: any) => s.msTurnController.onDragDropBusiness(payload),
+        });
+        this.dragDropRegistered.add(container);
+        container.setName(`ms-market-card-${card.id}`);
+
+        const dragClickDistance =
+          s.input?.dragDistanceThreshold ?? DEFAULT_DRAG_DISTANCE_THRESHOLD;
+        container.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+          const moved = Phaser.Math.Distance.Between(
+            pointer.downX, pointer.downY, pointer.x, pointer.y,
+          );
+          if (moved > dragClickDistance) return; // was a drag, not a click
+          s.marketSelectionManager.select(selection);
+          onClick(card);
+        });
+        container.on('pointerover', () => {
+          selection.setHovered(true);
           const info = buildCardTooltipInfo(card, s.state.config, { includeEventDetail: true });
           s.tooltipManager?.show(info, container.x, container.y);
-        }
-      });
-      hitArea.on('pointerout', () => {
-        selection.setHovered(false);
-        if (!s.replayMode) s.tooltipManager?.hide();
-      });
-      s.marketSelectionManager.registerTarget(hitArea);
-      container.add(hitArea);
+        });
+        container.on('pointerout', () => {
+          selection.setHovered(false);
+          s.tooltipManager?.hide();
+        });
+        s.marketSelectionManager.registerTarget(container);
+      } else {
+        // ── Click-only card (community-space, event, upgrade) ─────
+        // Existing pointerdown-based path, unchanged.
+        const hitArea = s.add.rectangle(0, 0, marketCardW, marketCardH, 0x000000, 0.001);
+        hitArea.setInteractive({ useHandCursor: true });
+        hitArea.on('pointerdown', () => {
+          s.marketSelectionManager.select(selection);
+          onClick(card);
+        });
+        hitArea.on('pointerover', () => {
+          selection.setHovered(true);
+          if (!s.replayMode) {
+            const info = buildCardTooltipInfo(card, s.state.config, { includeEventDetail: true });
+            s.tooltipManager?.show(info, container.x, container.y);
+          }
+        });
+        hitArea.on('pointerout', () => {
+          selection.setHovered(false);
+          if (!s.replayMode) s.tooltipManager?.hide();
+        });
+        s.marketSelectionManager.registerTarget(hitArea);
+        container.add(hitArea);
+      }
     }
 
     return container;

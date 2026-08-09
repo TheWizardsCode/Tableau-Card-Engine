@@ -79,6 +79,13 @@ export class MainStreetLifecycleManager {
         s.load.audio(`${ns}:${SFX_KEYS.INCOME_NEGATIVE}`, `${audioDir}/discard.wav`);
         s.load.audio(`${ns}:${SFX_KEYS.INCOME_NEUTRAL}`, `${audioDir}/click.wav`);
         s.load.audio(`${ns}:${SFX_KEYS.CELEBRATE}`, `${audioDir}/coin-pop.wav`);
+        // Illegal-move feedback (drag veto / invalid drop): the shared
+        // illegal-move WAV lives in the default audio dir (not the game
+        // audio dir). Load it under BOTH the namespace-scoped key (for the
+        // SoundManager) and the raw COMMON key (played by safePlaySound /
+        // shakeIllegalMove) — same pattern as Beleaguered Castle.
+        s.load.audio(`${ns}:${SFX_KEYS.ILLEGAL_MOVE}`, 'assets/audio/default/illegal-move.wav');
+        s.load.audio(SFX_KEYS.ILLEGAL_MOVE, 'assets/audio/default/illegal-move.wav');
       } catch (e) {
         // Some test environments may lack an audio loader; ignore preload failures
       }
@@ -408,6 +415,15 @@ export class MainStreetLifecycleManager {
     // The HelpPanel toggle no longer needs tutorial intercept.
     // Provide the ordered difficulty names so the Settings panel can render a selector
     s.initSettingsPanel(DIFFICULTY_NAMES, 'Medium');
+    // Drag-and-drop buy-to-slot (business cards → street slots): wire the
+    // reusable core-engine drag-drop module after the settings panel exists
+    // (reads reducedMotion) and before the first startDayPhase refresh.
+    try {
+      s.msTurnController.initDragDrop();
+    } catch (e) {
+      // Non-fatal: if input is unavailable (headless tests) drag is skipped.
+      console.debug('[MS] initDragDrop skipped', e);
+    }
     // Listen for difficulty changes and restart the game with the new difficulty
     if (typeof window !== 'undefined') {
       const difficultyChangeHandler = (ev: Event) => {
@@ -540,6 +556,8 @@ export class MainStreetLifecycleManager {
     s.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       markSceneInvalid(s);
       s.cleanupTransferAnimations();
+      // Tear down the drag-drop manager (removes its scene input listeners).
+      try { s.dragDropManager?.destroy(); s.dragDropManager = undefined; } catch (_) { /* ignore */ }
       try {
         if (s.input && s.input.keyboard) {
           s.input.keyboard.off('keydown', endTurnKeyHandler);

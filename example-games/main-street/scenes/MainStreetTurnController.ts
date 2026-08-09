@@ -5,6 +5,7 @@ import {
   canAddToHand,
   canPurchaseUpgrade,
   canPurchaseEvent,
+  canPurchaseBusiness,
   canRefreshDevelopment,
   canRefreshInvestments,
   canSellBusiness,
@@ -13,6 +14,11 @@ import type { BusinessCard, EventCard, UpgradeCard } from '../MainStreetCards';
 import { buyBusinessCommand, buyBusinessToHandCommand, buyUpgradeCommand, buyEventCommand, playEventCommand, refreshDevelopmentCommand, refreshInvestmentsCommand } from '../MainStreetCommands';
 import { recordMainStreetEvent, finalizeMainStreetTranscript } from '../MainStreetTranscript';
 import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
+import {
+  createDragDropManager,
+  DEFAULT_DRAG_DISTANCE_THRESHOLD,
+  type DragDropPayload,
+} from '../../../src/ui/dragDrop';
 import { getCurrentStep, type TutorialActionType } from '../TutorialFlow';
 
 /**
@@ -374,6 +380,160 @@ export class MainStreetTurnController {
         // not a left-edge slot estimate that would make the card snap
         // sideways when the hand re-renders centred on handCenterX.
         destination: s.getBusinessHandInsertionPosition(handIndex),
+      }).then(afterTransfer);
+    } else {
+      afterTransfer();
+    }
+  }
+
+  // ── Drag-and-drop buy-to-slot (business cards) ─────────────
+  //
+  // Wire the reusable core-engine drag-drop module (src/ui/dragDrop.ts)
+  // to Main Street: business cards in the Development row become draggable
+  // during the market phase and can be dropped straight onto an empty
+  // street slot to buy + place in one undoable step.
+  //
+  // Hand-vs-direct-to-slot semantics: the click flow buys to hand (max
+  // hand size 2) then places; the drag flow buys DIRECTLY to the slot,
+  // bypassing the hand entirely. This matches the one-gesture request.
+
+  /**
+   * Initialise the reusable drag-drop manager for the market phase.
+   *
+   * Business cards in the Development row are registered as draggables by
+   * the renderer; empty street slots are registered as drop zones. The
+   * existing click-to-buy → click-to-place flow is preserved via
+   * `dragDistanceThreshold` (a pointerup without a drag still reaches the
+   * click path).
+   */
+  public initDragDrop(): void {
+    const s = this.scene;
+    if (s.dragDropManager) return;
+    // Guard: in headless unit tests the scene may have no input plugin.
+    if (!s.input || typeof s.input.on !== 'function') return;
+
+    s.dragDropManager = createDragDropManager({
+      scene: s,
+      dragDistanceThreshold: DEFAULT_DRAG_DISTANCE_THRESHOLD,
+      reducedMotion: !!s.settingsPanel?.reducedMotion,
+      onDragStart: () => {
+        try { s.msRenderer?.showDragHighlights?.(); } catch (_) { /* ignore */ }
+      },
+      onDragEnd: () => {
+        try { s.msRenderer?.clearDragHighlights?.(); } catch (_) { /* ignore */ }
+      },
+    });
+  }
+
+  /**
+   * Drag-pickup validation (dragstart veto → illegal-card feedback).
+   *
+   * A business card may only be picked up when the player can afford it,
+   * there is at least one empty street slot to drop it on, and the tutorial
+   * allows the `select-business` action (including requiredCardId matching
+   * for tutorial steps that gate a specific card). Community-space cards
+   * are deliberately NOT draggable (click-only).
+   */
+  public canPickUpBusinessCard(cardId: string): boolean {
+    const s = this.scene;
+    if (s.uiPhase !== 'market') return false;
+    const card = s.state.market.development.find((c: any) => c.id === cardId);
+    if (!card || card.family !== 'business') return false;
+    if (s.state.resourceBank.coins < card.cost) return false;
+    if (!s.state.streetGrid.some((slot: any) => slot === null)) return false;
+
+    // Tutorial gating: only allow select-business if it is the required
+    // action or the tutorial is inactive.
+    const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('select-business' as TutorialActionType);
+    if (check && !check.allowed) return false;
+
+    // Tutorial: enforce specific card purchase if requiredCardId is set on
+    // the current step (same prefix-matching rule as the click path).
+    const controller = (s as any).tutorialController as any;
+    if (controller?.isActive) {
+      const step = controller.currentStepIndex >= 0
+        ? getCurrentStep(controller)
+        : null;
+      if (step?.requiredCardId && !matchesRequiredCard(card.id, step.requiredCardId)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Drop-zone acceptance validation.
+   *
+   * The target slot must pass `canPurchaseBusiness` (card still in the
+   * Development row, enough coins, empty slot, in bounds) and the tutorial
+   * must allow the `place-business` action. A rejected drop snap-backs the
+   * card to the Development row with illegal-move feedback.
+   */
+  public canDropBusinessCard(cardId: string, slotIndex: number): boolean {
+    const s = this.scene;
+    const legality = canPurchaseBusiness(s.state, cardId, slotIndex);
+    if (!legality.legal) return false;
+
+    const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('place-business' as TutorialActionType);
+    if (check && !check.allowed) return false;
+    return true;
+  }
+
+  /**
+   * Execute a drag-drop buy-and-place.
+   *
+   * Buys the dragged business card directly to the drop slot in a single
+   * undoable `buyBusinessCommand` (the same direct buy-to-slot path used by
+   * the AI strategy), with the animated market→street transfer + SFX
+   * matching the click flow's feedback. Note: unlike the click flow (which
+   * buys to hand), the drag flow bypasses the hand entirely.
+   */
+  public onDragDropBusiness(payload: DragDropPayload): void {
+    const s = this.scene;
+    const cardId = payload.data as string;
+    const slotIndex = payload.zoneData as number;
+    const sourceIndex = s.state.market.development.findIndex((c: any) => c.id === cardId);
+    const card = s.state.market.development.find((c: any) => c.id === cardId);
+    if (!card || sourceIndex < 0 || slotIndex == null) return;
+
+    const cardName = card.name;
+    s.tooltipManager?.hide();
+    s.clearMarketSelection();
+    s.hiddenTransferSourceCardIds.add(cardId);
+    s.uiPhase = 'animating';
+    s.instructionText.setText(`Buying "${cardName}"...`);
+    s.refreshAll();
+
+    const afterTransfer = (): void => {
+      try {
+        const cmd = buyBusinessCommand(s.state, cardId, slotIndex);
+        s.undoManager.execute(cmd);
+        try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'buy-business', cardId, slotIndex }, description: cmd.description }); } catch (_) {}
+        try { s.gameEvents?.emit('card:placed', { cardId, slotIndex }); } catch (_) {}
+        s.instructionText.setText(`Placed "${cardName}" on slot ${slotIndex}`);
+      } catch (e) {
+        console.error('[MS] DragBuyBusiness failed', e);
+        s.instructionText.setText(`Error: ${(e as Error).message}`);
+      }
+
+      s.hiddenTransferSourceCardIds.delete(cardId);
+      s.uiPhase = 'market';
+      s.refreshAll();
+      s.refreshStreetGrid();
+      s.refreshActionButtons();
+      // Tutorial: mark place-business step complete if active
+      try {
+        (s.msLifecycleManager as any).onTutorialActionComplete?.('place-business' as TutorialActionType);
+      } catch (_) { /* ignore */ }
+    };
+
+    if (sourceIndex >= 0) {
+      void s.animateTransferFromMarket({
+        cardId,
+        family: 'business',
+        row: 'development',
+        slotIndex: sourceIndex,
+        destination: s.getStreetSlotCenter(slotIndex),
       }).then(afterTransfer);
     } else {
       afterTransfer();

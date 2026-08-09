@@ -9,6 +9,7 @@ import {
 import type { SelectionController, SingleSelectionManager } from '../../../src/ui';
 import { SaveLoadStore, CheckpointManager } from '../../../src/core-engine';
 import { UndoRedoManager } from '../../../src/core-engine';
+import type { DragDropManager } from '../../../src/ui';
 import type { MainStreetSerializedState } from '../MainStreetState';
 import { MainStreetRenderer } from './MainStreetRenderer';
 import { MainStreetAnimator } from './MainStreetAnimator';
@@ -125,6 +126,9 @@ export class MainStreetScene extends CardGameScene {
 
   // Undo/Redo manager for market actions (per-scene)
   public undoManager!: UndoRedoManager;
+
+  // Drag-and-drop buy-to-slot (business cards → street slots)
+  public dragDropManager?: DragDropManager;
 
   constructor(config?: Partial<Phaser.Types.Scenes.SettingsConfig>) {
     super({ key: 'MainStreetScene', ...(config ?? {}) });
