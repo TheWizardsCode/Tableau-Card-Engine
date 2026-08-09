@@ -7,11 +7,15 @@
  *   - A red reference rectangle drawn by this test showing where the
  *     actual UI element should be
  *
- * Unified step mapping for screenshot tests:
- *   T2 (hud, index 1)  T3 (marketBusinessRow, index 2)
- *   T4 (streetGrid, index 3)  T5 (incidentQueue, index 4)
- *   T6 (endTurnButton, index 5)  T7 (investmentsRow, index 6)
- *   T11 (endTurnButton, index 10)  T14 (completionModal, index 13)
+ * Unified step mapping for screenshot tests (16 steps):
+ *   T2 (developmentRow, index 1)  T3 (laundromatCard, index 2)
+ *   T4 (hand, index 3)  T5 (streetGrid, index 4)
+ *   T6 (incidentQueue, index 5)  T7 (endTurnButton, index 6)
+ *   T8 (investmentsRow, index 7)  T9 (festivalCard, index 8)
+ *   T10 (developmentRow, index 9)  T11 (endTurnButton, index 10)
+ *   T12 (developmentRow, index 11)  T13 (hand, index 12)
+ *   T14 (hud, index 13)  T15 (challengePanel, index 14)
+ *   T16 (completionModal, index 15)
  *
  * This allows visual verification that the highlights are correctly
  * aligned with their target UI elements.
@@ -177,7 +181,7 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
     return highlight;
   }
 
-  it('screenshot: HUD highlight (step T2)', async () => {
+  it('screenshot: HUD highlight (step T14, Success and Failure)', async () => {
     ({ game, scene } = await bootGame());
     await new Promise((r) => setTimeout(r, 200));
 
@@ -195,7 +199,7 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
       h: 28,        // Actual HUD strip height
     };
 
-    const highlight = await captureStepScreenshot(1, 'hud-highlight', expectedRef);
+    const highlight = await captureStepScreenshot(13, 'hud-highlight-t14', expectedRef);
 
     // Log the actual highlight bounds for debugging
     const cmdBuf = (highlight as any)?.commandBuffer as unknown[];
@@ -203,7 +207,7 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
       for (let i = 0; i < cmdBuf.length - 4; i++) {
         if (cmdBuf[i] === 3) { // FILL_RECT
           console.log(
-            `[screenshot:hud-highlight] actual={x:${cmdBuf[i+1]},y:${cmdBuf[i+2]},w:${cmdBuf[i+3]},h:${cmdBuf[i+4]}} ref={x:${expectedRef.x},y:${expectedRef.y},w:${expectedRef.w},h:${expectedRef.h}}`,
+            `[screenshot:hud-highlight-t14] actual={x:${cmdBuf[i+1]},y:${cmdBuf[i+2]},w:${cmdBuf[i+3]},h:${cmdBuf[i+4]}} ref={x:${expectedRef.x},y:${expectedRef.y},w:${expectedRef.w},h:${expectedRef.h}}`,
           );
           break;
         }
@@ -211,43 +215,35 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
     }
   }, 30_000);
 
-  it('screenshot: Market highlight (step T3)', async () => {
+  it('screenshot: Development Row highlight (step T2)', async () => {
     ({ game, scene } = await bootGame());
     await new Promise((r) => setTimeout(r, 200));
 
     const layout = scene.layout as {
       marketTop: number;
       marketRowH: number;
-      marketRowGap: number;
-      marketLabelW: number;
-      marketCardW: number;
-      marketCardGap: number;
       gameW: number;
       logX: number;
     } | undefined;
     expect(layout).toBeTruthy();
 
-    const marketTop = layout!.marketTop;
-    const totalH = 2 * layout!.marketRowH + layout!.marketRowGap + 20;
-
-    // Market background box extends from left edge to logX-20 (right column start)
     const logX = layout!.logX;
     const bgRight = logX - 20; // 940
     const expectedRef = {
       x: 20,
-      y: marketTop - 10,
+      y: layout!.marketTop, // dev row top
       w: bgRight - 20,
-      h: totalH,
+      h: layout!.marketRowH,
     };
 
-    const highlight = await captureStepScreenshot(2, 'market-highlight', expectedRef);
+    const highlight = await captureStepScreenshot(1, 'dev-row-highlight-t2', expectedRef);
 
     const cmdBuf = (highlight as any)?.commandBuffer as unknown[];
     if (cmdBuf && Array.isArray(cmdBuf)) {
       for (let i = 0; i < cmdBuf.length - 4; i++) {
         if (cmdBuf[i] === 3) {
           console.log(
-            `[screenshot:market-highlight] actual={x:${cmdBuf[i+1]},y:${cmdBuf[i+2]},w:${cmdBuf[i+3]},h:${cmdBuf[i+4]}} ref={x:${expectedRef.x},y:${expectedRef.y},w:${expectedRef.w},h:${expectedRef.h}}`,
+            `[screenshot:dev-row-highlight-t2] actual={x:${cmdBuf[i+1]},y:${cmdBuf[i+2]},w:${cmdBuf[i+3]},h:${cmdBuf[i+4]}} ref={x:${expectedRef.x},y:${expectedRef.y},w:${expectedRef.w},h:${expectedRef.h}}`,
           );
           break;
         }
@@ -255,7 +251,7 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
     }
   }, 30_000);
 
-  it('screenshot: Street grid highlight (step T4)', async () => {
+  it('screenshot: Street grid highlight (step T5)', async () => {
     ({ game, scene } = await bootGame());
     await new Promise((r) => setTimeout(r, 200));
 
@@ -274,14 +270,14 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
       h: 2 * layout!.slotH + layout!.streetRowGap + 12,
     };
 
-    const highlight = await captureStepScreenshot(3, 'street-highlight', expectedRef);
+    const highlight = await captureStepScreenshot(4, 'street-highlight-t5', expectedRef);
 
     const cmdBuf = (highlight as any)?.commandBuffer as unknown[];
     if (cmdBuf && Array.isArray(cmdBuf)) {
       for (let i = 0; i < cmdBuf.length - 4; i++) {
         if (cmdBuf[i] === 3) {
           console.log(
-            `[screenshot:street-highlight] actual={x:${cmdBuf[i+1]},y:${cmdBuf[i+2]},w:${cmdBuf[i+3]},h:${cmdBuf[i+4]}} ref={x:${expectedRef.x},y:${expectedRef.y},w:${expectedRef.w},h:${expectedRef.h}}`,
+            `[screenshot:street-highlight-t5] actual={x:${cmdBuf[i+1]},y:${cmdBuf[i+2]},w:${cmdBuf[i+3]},h:${cmdBuf[i+4]}} ref={x:${expectedRef.x},y:${expectedRef.y},w:${expectedRef.w},h:${expectedRef.h}}`,
           );
           break;
         }
@@ -289,7 +285,7 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
     }
   }, 30_000);
 
-  it('screenshot: End turn button highlight (step T6)', async () => {
+  it('screenshot: End turn button highlight (step T7)', async () => {
     ({ game, scene } = await bootGame());
     await new Promise((r) => setTimeout(r, 200));
 
@@ -309,14 +305,14 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
       h: layout!.actionButtonH + 8,
     };
 
-    const highlight = await captureStepScreenshot(5, 'end-turn-highlight', expectedRef);
+    const highlight = await captureStepScreenshot(6, 'end-turn-highlight-t7', expectedRef);
 
     const cmdBuf = (highlight as any)?.commandBuffer as unknown[];
     if (cmdBuf && Array.isArray(cmdBuf)) {
       for (let i = 0; i < cmdBuf.length - 4; i++) {
         if (cmdBuf[i] === 3) {
           console.log(
-            `[screenshot:end-turn-highlight] actual={x:${cmdBuf[i+1]},y:${cmdBuf[i+2]},w:${cmdBuf[i+3]},h:${cmdBuf[i+4]}} ref={x:${expectedRef.x},y:${expectedRef.y},w:${expectedRef.w},h:${expectedRef.h}}`,
+            `[screenshot:end-turn-highlight-t7] actual={x:${cmdBuf[i+1]},y:${cmdBuf[i+2]},w:${cmdBuf[i+3]},h:${cmdBuf[i+4]}} ref={x:${expectedRef.x},y:${expectedRef.y},w:${expectedRef.w},h:${expectedRef.h}}`,
           );
           break;
         }
@@ -324,7 +320,7 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
     }
   }, 30_000);
 
-  it('screenshot: Incident queue highlight (step T5)', async () => {
+  it('screenshot: Incident queue highlight (step T6)', async () => {
     ({ game, scene } = await bootGame());
     await new Promise((r) => setTimeout(r, 200));
 
@@ -347,14 +343,14 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
       h: layout!.queueCardH + 16,
     };
 
-    const highlight = await captureStepScreenshot(4, 'incident-queue-highlight', expectedRef);
+    const highlight = await captureStepScreenshot(5, 'incident-queue-highlight-t6', expectedRef);
 
     const cmdBuf = (highlight as any)?.commandBuffer as unknown[];
     if (cmdBuf && Array.isArray(cmdBuf)) {
       for (let i = 0; i < cmdBuf.length - 4; i++) {
         if (cmdBuf[i] === 3) {
           console.log(
-            `[screenshot:incident-queue-highlight] actual={x:${cmdBuf[i+1]},y:${cmdBuf[i+2]},w:${cmdBuf[i+3]},h:${cmdBuf[i+4]}} ref={x:${expectedRef.x},y:${expectedRef.y},w:${expectedRef.w},h:${expectedRef.h}}`,
+            `[screenshot:incident-queue-highlight-t6] actual={x:${cmdBuf[i+1]},y:${cmdBuf[i+2]},w:${cmdBuf[i+3]},h:${cmdBuf[i+4]}} ref={x:${expectedRef.x},y:${expectedRef.y},w:${expectedRef.w},h:${expectedRef.h}}`,
           );
           break;
         }
@@ -362,7 +358,7 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
     }
   }, 30_000);
 
-  it('screenshot: Investments row highlight (step T7)', async () => {
+  it('screenshot: Investments row highlight (step T8)', async () => {
     ({ game, scene } = await bootGame());
     await new Promise((r) => setTimeout(r, 200));
 
@@ -388,7 +384,7 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
       h: layout!.marketRowH,
     };
 
-    const highlight = await captureStepScreenshot(6, 'investments-highlight', expectedRef);
+    const highlight = await captureStepScreenshot(7, 'investments-highlight-t8', expectedRef);
 
     const cmdBuf = (highlight as any)?.commandBuffer as unknown[];
     if (cmdBuf && Array.isArray(cmdBuf)) {
@@ -405,22 +401,22 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
 
 
 
-  // ── Additional unified step screenshots (T11, T12, T13, T14) ──
+  // ── Additional unified step screenshots (T12, T15, T16) ──
 
-  it('screenshot: Challenge panel highlight (step T12)', async () => {
+  it('screenshot: Challenge panel highlight (step T15)', async () => {
     ({ game, scene } = await bootGame());
     await new Promise((r) => setTimeout(r, 200));
 
-    // T12 is index 11 in the unified steps (confirm gate, challengePanel zone)
+    // T15 is index 14 in the unified steps (confirm gate, challengePanel zone)
     // The challengePanel zone is defined in the SLL layout.
-    const highlight = await captureStepScreenshot(11, 'challenge-panel-highlight-t12');
+    const highlight = await captureStepScreenshot(14, 'challenge-panel-highlight-t15');
 
     const cmdBuf = (highlight as any)?.commandBuffer as unknown[];
     if (cmdBuf && Array.isArray(cmdBuf)) {
       for (let i = 0; i < cmdBuf.length - 4; i++) {
         if (cmdBuf[i] === 3) {
           console.log(
-            `[screenshot:challenge-panel-highlight-t12] actual={x:${cmdBuf[i+1]},y:${cmdBuf[i+2]},w:${cmdBuf[i+3]},h:${cmdBuf[i+4]}}`,
+            `[screenshot:challenge-panel-highlight-t15] actual={x:${cmdBuf[i+1]},y:${cmdBuf[i+2]},w:${cmdBuf[i+3]},h:${cmdBuf[i+4]}}`,
           );
           break;
         }
@@ -428,7 +424,7 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
     }
   }, 30_000);
 
-  it('screenshot: Completion modal (step T14) draws no highlight', async () => {
+  it('screenshot: Completion modal (step T16) draws no highlight', async () => {
     ({ game, scene } = await bootGame());
     await new Promise((r) => setTimeout(r, 200));
 
@@ -442,8 +438,8 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
         mgr.dismiss();
       }
 
-      // T14 is index 13 in the unified steps (confirm gate, completionModal zone)
-      mgr.showStep(13);
+      // T16 is index 15 in the unified steps (confirm gate, completionModal zone)
+      mgr.showStep(15);
 
       // Wait a frame for rendering
       await new Promise((r) => setTimeout(r, 50));
@@ -460,7 +456,7 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
     await saveScreenshot('completion-modal-no-highlight');
   }, 30_000);
 
-  // ── Coverage: all 14 unified steps have valid highlight zones ─
+  // ── Coverage: all 16 unified steps have valid highlight zones ─
 
   it.each(UNIFIED_TUTORIAL_STEPS.map((s) => [s.id, s.highlightZone]))(
     'step %s has valid highlightZone: %s',
@@ -469,6 +465,7 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
         'centerModal',
         'hud',
         'marketBusinessRow',
+        'developmentRow',
         'streetGrid',
         'endTurnButton',
         'incidentQueue',
@@ -476,6 +473,9 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
         'challengePanel',
         'helpButton',
         'completionModal',
+        'hand',
+        'laundromatCard',
+        'festivalCard',
       ];
       expect(validZones).toContain(zone);
     },

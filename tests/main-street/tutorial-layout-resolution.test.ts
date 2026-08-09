@@ -105,6 +105,28 @@ function computeExpectedZoneBounds(
         h: marketRowH,
       };
     }
+    case 'developmentRow': {
+      // Dev row only (informative Dev Row / Optimizing for Events / Build a
+      // Library steps). Same box as marketBusinessRow but one row tall.
+      const bgLeft = 20;
+      const bgRight = logX - 20;
+      return {
+        x: bgLeft,
+        y: 80,
+        w: bgRight - bgLeft,
+        h: marketRowH,
+      };
+    }
+    case 'hand': {
+      // Hand area rect (Your Hand / Triggering Events). Matches the tutorial
+      // layout's hand zone: x=0.15, y=0.861111, w=0.36, h=0.111111 at 1280×720.
+      return {
+        x: Math.round(gameW * 0.15),
+        y: Math.round(gameH * 0.861111),
+        w: Math.round(gameW * 0.36),
+        h: Math.round(gameH * 0.111111),
+      };
+    }
     case 'helpButton': {
       // Hint button is to the left of End Turn button
       const rightX = gameW - 24;
@@ -157,10 +179,12 @@ function parseBaseLayout(): ScreenLayoutDocument {
 const TUTORIAL_ZONE_NAMES = [
   'hud',
   'marketBusinessRow',
+  'developmentRow',
   'streetGrid',
   'endTurnButton',
   'incidentQueue',
   'investmentsRow',
+  'hand',
   'helpButton',
 ];
 
@@ -175,7 +199,7 @@ describe('Tutorial layout resolution', () => {
       expect(result.errors).toEqual([]);
     });
 
-    it('accepts all 7 required zones', () => {
+    it('accepts all 9 required zones', () => {
       const layout = parseTutorialLayout();
       expect(layout.requiredZones.sort()).toEqual(TUTORIAL_ZONE_NAMES.sort());
     });
@@ -194,7 +218,7 @@ describe('Tutorial layout resolution', () => {
   });
 
   describe('composeResolvedLayouts resolves all tutorial zones', () => {
-    it('resolves all 7 tutorial zones at 1280x720 @1x', () => {
+    it('resolves all 9 tutorial zones at 1280x720 @1x', () => {
       const issues: ComposeResolvedLayoutsIssue[] = [];
       const resolved = composeResolvedLayouts(
         parseBaseLayout(),
@@ -295,6 +319,24 @@ describe('Tutorial layout resolution', () => {
       const expected = computeExpectedZoneBounds('investmentsRow');
       expect(expected).not.toBeNull();
       boundsAlmostEqual(resolved.zones.investmentsRow.rect, expected!);
+    });
+
+    it('developmentRow zone matches zoneToAnchor() pixel math within 1px', () => {
+      const resolved = composeResolvedLayouts(
+        parseBaseLayout(), parseTutorialLayout(), VIEWPORT, 1,
+      );
+      const expected = computeExpectedZoneBounds('developmentRow');
+      expect(expected).not.toBeNull();
+      boundsAlmostEqual(resolved.zones.developmentRow.rect, expected!);
+    });
+
+    it('hand zone matches zoneToAnchor() pixel math within 1px', () => {
+      const resolved = composeResolvedLayouts(
+        parseBaseLayout(), parseTutorialLayout(), VIEWPORT, 1,
+      );
+      const expected = computeExpectedZoneBounds('hand');
+      expect(expected).not.toBeNull();
+      boundsAlmostEqual(resolved.zones.hand.rect, expected!);
     });
 
     it('helpButton zone matches zoneToAnchor() pixel math within 1px', () => {

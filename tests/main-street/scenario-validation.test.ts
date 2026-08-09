@@ -94,15 +94,16 @@ describe('Scenario Validation: requiredCardId references', () => {
     }
   });
 
-  it('T3 and T8 are the action steps with a requiredCardId (current invariant)', () => {
+  it('T3/T9/T10/T12 are the action steps with a requiredCardId (current invariant)', () => {
     const actionStepsWithRequiredCardId = UNIFIED_TUTORIAL_STEPS.filter(
       (step) => step.gate === 'action' && step.requiredCardId !== undefined,
     );
-    // T3 (Laundromat) and T8 (Bookshop) have requiredCardId
-    expect(actionStepsWithRequiredCardId.length).toBe(2);
-    expect(actionStepsWithRequiredCardId[0].id).toBe('T3');
-    expect(actionStepsWithRequiredCardId[1].id).toBe('T8');
+    // T3 (Laundromat), T9 (Local Festival), T10 (Bookshop), T12 (Library)
+    expect(actionStepsWithRequiredCardId.length).toBe(4);
+    expect(actionStepsWithRequiredCardId.map(s => s.id)).toEqual(['T3', 'T9', 'T10', 'T12']);
     expect(actionStepsWithRequiredCardId[0].requiredCardId).toBe('biz-laundromat-0');
-    expect(actionStepsWithRequiredCardId[1].requiredCardId).toBe('biz-bookshop-0');
+    expect(actionStepsWithRequiredCardId[1].requiredCardId).toBe('evt-festival-0');
+    expect(actionStepsWithRequiredCardId[2].requiredCardId).toBe('biz-bookshop-0');
+    expect(actionStepsWithRequiredCardId[3].requiredCardId).toBe('cs-library');
   });
 });

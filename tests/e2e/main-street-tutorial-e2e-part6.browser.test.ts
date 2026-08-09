@@ -1,5 +1,10 @@
 /**
- * Main Street Tutorial E2E test — T10-T13: Completion.
+ * Main Street Tutorial E2E test — T13 Triggering Events → T16 Tutorial Complete.
+ *
+ * Walks the new flow: after building the Library (T12), the player plays the
+ * held Local Festival from the hand (T13, play-event gate), then confirms
+ * Success and Failure (T14), Challenges (T15), and completes (T16) with the
+ * "Let's play!" button.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Phaser from 'phaser';
@@ -15,6 +20,7 @@ import {
   clickRequiredEventCard,
   clickStreetSlot,
   clickEndTurn,
+  clickPlayHeldEvent,
   saveScreenshot,
   getOverlay,
 } from '../helpers/main-street-tutorial-e2e';
@@ -31,7 +37,38 @@ async function waitForStartButton(scene: Phaser.Scene, timeoutMs = 8_000): Promi
   return null;
 }
 
-describe('Main Street Tutorial E2E — T10-T13', () => {
+/** Walk from T1 to the end of T12 (arrives on T13). */
+async function walkToT13(scene: Phaser.Scene): Promise<void> {
+  await clickOverlayButtonByText('Next >'); // T1 -> T2
+  await clickOverlayButtonByText('Next >'); // T2 -> T3
+  await clickRequiredBusinessCard(scene);  // T3 buy Laundromat -> T4
+  await waitForOverlayVisible(5_000);
+  await clickOverlayButtonByText('Next >'); // T4 -> T5
+  await waitForOverlayVisible(5_000);
+  await clickStreetSlot(scene, 0);  // T5 place -> T6
+  await new Promise((r) => setTimeout(r, 500));
+  await waitForOverlayVisible(5_000);
+  await clickOverlayButtonByText('Next >'); // T6 -> T7
+  await waitForOverlayVisible(5_000);
+  await clickEndTurn(scene);               // T7 -> T8
+  await waitForOverlayVisible(10_000);
+  await clickOverlayButtonByText('Next >'); // T8 -> T9
+  await waitForOverlayVisible(5_000);
+  await clickRequiredEventCard(scene);  // T9 buy Local Festival -> T10
+  await waitForOverlayVisible(5_000);
+  await clickRequiredBusinessCard(scene);  // T3 buy Laundromat -> T4
+  await new Promise((r) => setTimeout(r, 500));
+  await waitForOverlayVisible(5_000);
+  await clickStreetSlot(scene, 1);  // T5 place -> T6
+  await new Promise((r) => setTimeout(r, 500));
+  await waitForOverlayVisible(5_000);
+  await clickEndTurn(scene);               // T11 -> T12
+  await waitForOverlayVisible(10_000);
+  await clickRequiredBusinessCard(scene);  // T3 buy Laundromat -> T4
+  await waitForOverlayVisible(5_000);
+}
+
+describe('Main Street Tutorial E2E — T13-T16', () => {
   beforeEach(async () => {
     game = await bootGameWithTutorial();
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
@@ -48,40 +85,37 @@ describe('Main Street Tutorial E2E — T10-T13', () => {
     game = null;
   });
 
-  it('T10-T14: Challenges, Scoring, and Completion steps advance', async () => {
-    await clickOverlayButtonByText('Next >'); await clickOverlayButtonByText('Next >');
+  it('T13: Triggering Events — play the held Local Festival from the hand', async () => {
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
-    clickRequiredBusinessCard(scene);
+    await walkToT13(scene);
+    expect(getStepIndex(scene)).toBe(12); // T13
+
+    // The held event (Local Festival) is in the hand
+    const s = scene as any;
+    const heldEvent = s.state.hand.find((c: any) => c.family === 'event');
+    expect(heldEvent).toBeTruthy();
+
+    await clickPlayHeldEvent(scene);
     await waitForOverlayVisible(5_000);
-    clickStreetSlot(scene, 0);
-    await new Promise((r) => setTimeout(r, 500));
-    await waitForOverlayVisible(5_000);
-    await clickOverlayButtonByText('Next >');
-    await clickEndTurn(scene);
-    await waitForOverlayVisible(10_000);
-    clickRequiredEventCard(scene);
-    await waitForOverlayVisible(5_000);
-    expect(getStepIndex(scene)).toBe(7);
-    clickRequiredBusinessCard(scene);
-    await waitForOverlayVisible(5_000);
-    expect(getStepIndex(scene)).toBe(8);
-    clickStreetSlot(scene, 1);
-    await new Promise((r) => setTimeout(r, 500));
-    await waitForOverlayVisible(5_000);
-    expect(getStepIndex(scene)).toBe(9);
-    await clickOverlayButtonByText('Next >');
-    expect(getStepIndex(scene)).toBe(10);
-    await saveScreenshot('t10-t11');
-    await clickOverlayButtonByText('Next >');
-    expect(getStepIndex(scene)).toBe(11);
-    await saveScreenshot('t11-t12');
-    await clickOverlayButtonByText('Next >');
-    expect(getStepIndex(scene)).toBe(12);
-    await saveScreenshot('t12-t13');
-    await clickOverlayButtonByText('Next >');
-    expect(getStepIndex(scene)).toBe(13);
+    expect(getStepIndex(scene)).toBe(13); // T14 Success and Failure
     await saveScreenshot('t13-t14');
-    await clickOverlayButtonByText('Start Full Game');
+  }, 60_000);
+
+  it('T14-T16: Success and Failure, Challenges, and Tutorial Complete ("Let\'s play!")', async () => {
+    const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
+    await walkToT13(scene);
+    await clickPlayHeldEvent(scene);             // T13 -> T14
+    await waitForOverlayVisible(5_000);
+    expect(getStepIndex(scene)).toBe(13);
+    await clickOverlayButtonByText('Next >'); // T14 -> T15
+    await waitForOverlayVisible(5_000);
+    expect(getStepIndex(scene)).toBe(14);
+    await clickOverlayButtonByText('Next >'); // T15 -> T16
+    await waitForOverlayVisible(5_000);
+    expect(getStepIndex(scene)).toBe(15);
+    await saveScreenshot('t15-t16');
+    // The completion button is now "Let's play!"
+    await clickOverlayButtonByText('Let\'s play!');
     await new Promise((r) => setTimeout(r, 500));
     const finalOverlay = getOverlay();
     expect(finalOverlay).toBeFalsy();
