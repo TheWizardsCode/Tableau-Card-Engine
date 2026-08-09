@@ -398,6 +398,230 @@ export interface StaffCard {
 /** Union of all card types in Main Street. */
 export type AnyCard = BusinessCard | CommunitySpaceCard | EventCard | DurationEventCard | UpgradeCard | StaffCard;
 
+// ── Incident Balance (CG-0MSL0OP040043KKZ) ─────────────────
+
+/**
+ * Polarity of an Incident card's net effect (`coinDelta + reputationDelta`).
+ * Used by the constrained incident-draw system to bound luck streaks.
+ */
+export type IncidentPolarity = 'good' | 'bad' | 'neutral';
+
+/** A run of consecutive same-polarity drawn incidents (good/bad only; neutral breaks runs). */
+export interface IncidentPolarityRun {
+  polarity: 'good' | 'bad';
+  length: number;
+}
+
+/**
+ * Runtime-mutable state governing constrained Incident draws.
+ *
+ * The incident queue is a visible FIFO of upcoming events. To keep the
+ * sequence of incidents the player actually resolves fair, draws are
+ * constrained by two limits:
+ *
+ * - `repeatSpacing` (N): a card name cannot reappear within the last
+ *   `N - 1` drawn cards (e.g. N=3 blocks a card drawn at position 1 from
+ *   reappearing at positions 2 or 3).
+ * - `maxStreak` (M): never more than M consecutive same-polarity cards
+ *   (good = net > 0, bad = net < 0). Neutral cards (net == 0) break runs.
+ *
+ * Both limits are mutable at runtime via `setIncidentBalanceLimits` in
+ * `MainStreetState.ts`; changes affect subsequent draws only.
+ */
+export interface IncidentBalanceState {
+  /** Repeat-spacing window N (>= 1, default 3). */
+  repeatSpacing: number;
+  /** Max consecutive same-polarity (good/bad) cards M (>= 1, default 2). */
+  maxStreak: number;
+  /**
+   * Names of recently drawn incidents, most recent first, bounded to
+   * `MAX_TRACKED_INCIDENT_HISTORY` entries. The selector uses only the
+   * most recent `repeatSpacing - 1` names for the repeat window, so
+   * increasing N at runtime works up to the stored history depth.
+   */
+  recentNames: string[];
+  /**
+   * Current same-polarity run among recently drawn incidents.
+   * `null` when the last drawn card was neutral or nothing has been drawn.
+   */
+  polarityRun: IncidentPolarityRun | null;
+}
+
+/** Default repeat-spacing window for constrained incident draws. */
+export const DEFAULT_INCIDENT_REPEAT_SPACING = 3;
+
+/** Default max consecutive same-polarity (good/bad) incidents. */
+export const DEFAULT_INCIDENT_MAX_STREAK = 2;
+
+/**
+ * Cap on tracked recent incident names. The selector consumes only the most
+ * recent `repeatSpacing - 1` entries, so runtime increases of N work up to
+ * this depth; beyond it the constraint degrades gracefully (uses all history).
+ */
+export const MAX_TRACKED_INCIDENT_HISTORY = 10;
+
+/**
+ * Returns the polarity of an Incident card's net effect
+ * (`coinDelta + reputationDelta`): > 0 good, < 0 bad, == 0 neutral.
+ */
+export function incidentPolarity(card: EventCard): IncidentPolarity {
+  const net = card.coinDelta + card.reputationDelta;
+  if (net > 0) return 'good';
+  if (net < 0) return 'bad';
+  return 'neutral';
+}
+
+/**
+ * Identity key for the repeat-spacing rule: the named template
+ * (e.g. 'Tax Audit'), not the copy id — the event deck holds multiple
+ * copies per template with distinct serial-suffixed ids but equal names.
+ */
+export function incidentTemplateName(card: EventCard): string {
+  return card.name;
+}
+
+/**
+ * Creates a fresh incident-balance state with default limits
+ * (N = `DEFAULT_INCIDENT_REPEAT_SPACING`, M = `DEFAULT_INCIDENT_MAX_STREAK`)
+ * and empty draw history.
+ */
+export function createIncidentBalanceState(
+  overrides?: Partial<Pick<IncidentBalanceState, 'repeatSpacing' | 'maxStreak'>>,
+): IncidentBalanceState {
+  return {
+    repeatSpacing: overrides?.repeatSpacing ?? DEFAULT_INCIDENT_REPEAT_SPACING,
+    maxStreak: overrides?.maxStreak ?? DEFAULT_INCIDENT_MAX_STREAK,
+    recentNames: [],
+    polarityRun: null,
+  };
+}
+
+/**
+ * Records a drawn Incident card into the balance state: appends its template
+ * name to the recent history and extends/breaks the polarity run.
+ *
+ * Must be called for every constrained draw (setup, refill, reshuffle paths)
+ * so the history mirrors the actual sequence the player resolves. Neutral
+ * cards (net == 0) break streaks: the run resets to null.
+ *
+ * @param balance  Balance state to update (mutated in place).
+ * @param card     The Incident card that was drawn.
+ */
+export function recordIncidentDraw(balance: IncidentBalanceState, card: EventCard): void {
+  const name = incidentTemplateName(card);
+  balance.recentNames.unshift(name);
+  if (balance.recentNames.length > MAX_TRACKED_INCIDENT_HISTORY) {
+    balance.recentNames.pop();
+  }
+
+  const p = incidentPolarity(card);
+  if (p === 'neutral') {
+    // Neutral cards break streaks: a neutral ends a good/bad run and the
+    // next card can be anything.
+    balance.polarityRun = null;
+  } else if (balance.polarityRun && balance.polarityRun.polarity === p) {
+    balance.polarityRun.length += 1;
+  } else {
+    balance.polarityRun = { polarity: p, length: 1 };
+  }
+}
+
+/**
+ * Creates an incident-balance state whose history is backfilled from an
+ * existing incident queue (in draw order). Used when restoring legacy saves
+ * that predate the balance state and when building tutorial scenarios that
+ * place scenario-defined incidents directly into the queue.
+ */
+export function createIncidentBalanceFromQueue(queue: EventCard[]): IncidentBalanceState {
+  const balance = createIncidentBalanceState();
+  for (const card of queue) {
+    recordIncidentDraw(balance, card);
+  }
+  return balance;
+}
+
+/**
+ * Selects the next Incident card to draw from `deck`, honoring the
+ * repeat-spacing and streak constraints encoded in `balance`.
+ *
+ * Returns the array index of the chosen card, or -1 when the deck holds no
+ * Incident-trigger cards at all.
+ *
+ * Selection is deterministic: candidates are scanned in deck order (which is
+ * itself deterministic under the game's seeded RNG shuffle) and the first
+ * match at each constraint tier wins. No RNG is consumed here, preserving the
+ * game's seeded determinism (same seed => same deck order => same draw).
+ *
+ * Constraint relaxation (documented, deterministic, never deadlocks):
+ * 1. Strict: name not in the repeat window AND streak-legal. When the run is
+ *    at/over M, streak-legal requires the opposite polarity (a neutral does
+ *    NOT satisfy it — after two goods the third must be bad).
+ * 2. Relax repeat only: streak-legal regardless of the repeat window.
+ * 3. Relax streak to the invariant only (never > M same polarity in a row):
+ *    name not in the repeat window AND not extending the run past M (a
+ *    neutral is allowed here — it breaks the streak).
+ * 4. Relax both to the invariant only.
+ * 5. Final fallback: prefer an Incident card outside the repeat window (least
+ *    violation), else the first Incident card in deck order. Guaranteed to
+ *    exist, so a constrained draw can never hang or crash.
+ */
+export function findConstrainedIncidentIndex(
+  deck: EventCard[],
+  balance: Pick<
+    IncidentBalanceState,
+    'repeatSpacing' | 'maxStreak' | 'recentNames' | 'polarityRun'
+  >,
+): number {
+  const incidentIndices: number[] = [];
+  for (let i = 0; i < deck.length; i++) {
+    if (deck[i].trigger === 'Incident') incidentIndices.push(i);
+  }
+  if (incidentIndices.length === 0) return -1;
+
+  const windowSize = Math.max(0, balance.repeatSpacing - 1);
+  const windowNames = new Set(balance.recentNames.slice(0, windowSize));
+  const run = balance.polarityRun;
+  const m = balance.maxStreak;
+
+  const inWindow = (i: number): boolean => windowNames.has(incidentTemplateName(deck[i]));
+  const polarity = (i: number): IncidentPolarity => incidentPolarity(deck[i]);
+
+  // Strict streak rule: when the run is at/over M, the next card must be the
+  // opposite polarity (neutral does not satisfy — AC2: after two consecutive
+  // goods the third must be bad, not good, not neutral).
+  const streakStrict = (i: number): boolean => {
+    if (!run || run.length < m) return true;
+    const p = polarity(i);
+    return p !== 'neutral' && p !== run.polarity;
+  };
+
+  // Invariant-only streak rule: never extend the run past M. Opposite polarity
+  // or a neutral (which breaks the run) both satisfy this.
+  const streakInvariant = (i: number): boolean => {
+    if (!run || run.length < m) return true;
+    return polarity(i) !== run.polarity;
+  };
+
+  for (const i of incidentIndices) {
+    if (!inWindow(i) && streakStrict(i)) return i;
+  }
+  for (const i of incidentIndices) {
+    if (streakStrict(i)) return i;
+  }
+  for (const i of incidentIndices) {
+    if (!inWindow(i) && streakInvariant(i)) return i;
+  }
+  for (const i of incidentIndices) {
+    if (streakInvariant(i)) return i;
+  }
+  // Final fallback (never deadlock): prefer a card outside the repeat window
+  // (least violation) before accepting an in-window repeat.
+  for (const i of incidentIndices) {
+    if (!inWindow(i)) return i;
+  }
+  return incidentIndices[0];
+}
+
 // ── Constants ───────────────────────────────────────────────
 
 /** Number of slots in the street grid. */

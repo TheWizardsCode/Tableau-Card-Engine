@@ -25,6 +25,8 @@ import {
   MARKET_INVESTMENT_EVENT_COUNT,
   REFRESH_DEVELOPMENT_COST,
   REFRESH_INVESTMENTS_COST,
+  findConstrainedIncidentIndex,
+  recordIncidentDraw,
 } from './MainStreetCards';
 import { shuffleArray } from '../../src/card-system';
 import { updateNeighborsOnPlacement, updateNeighborsOnSale } from './MainStreetAdjacency';
@@ -488,23 +490,34 @@ export function cycleMarketCards(state: MainStreetState): void {
  * Tops up the incident queue to INCIDENT_QUEUE_SIZE by drawing
  * Incident-trigger cards from the event deck. If the deck has no
  * remaining Incident cards, the queue stays at its current size.
+ *
+ * Draws are constraint-aware (CG-0MSL0OP040043KKZ): every pick routes
+ * through `findConstrainedIncidentIndex`, honoring the runtime-mutable
+ * repeat-spacing window and good/bad streak limits from
+ * `state.incidentBalance`. The reshuffle paths (deck exhausted / no
+ * Incident-trigger cards left) also route through the selector, so AC1's
+ * "every point the next incident is selected" is covered.
  */
 export function refillIncidentQueue(state: MainStreetState): void {
   // If the event deck is empty but incident discards exist, reshuffle them.
   reshuffleIfNeeded(state, state.decks.event, state.discards.event, 'event');
 
   while (state.incidentQueue.length < INCIDENT_QUEUE_SIZE) {
-    let idx = state.decks.event.findIndex(e => e.trigger === 'Incident');
+    let idx = findConstrainedIncidentIndex(state.decks.event, state.incidentBalance);
     if (idx === -1) {
       // Attempt a reshuffle in case the deck was empty earlier
       reshuffleIfNeeded(state, state.decks.event, state.discards.event, 'event');
       // If the deck still has cards but none are Incident-trigger,
       // force a reshuffle from discards (e.g. only Investments remain).
       forceReshuffleFromDiscards(state, state.decks.event, state.discards.event, 'event');
-      idx = state.decks.event.findIndex(e => e.trigger === 'Incident');
+      idx = findConstrainedIncidentIndex(state.decks.event, state.incidentBalance);
       if (idx === -1) break;
     }
-    state.incidentQueue.push(state.decks.event.splice(idx, 1)[0]);
+    const card = state.decks.event.splice(idx, 1)[0];
+    state.incidentQueue.push(card);
+    // Track the draw so subsequent selections respect the repeat/streak
+    // constraints (history mirrors the sequence the player resolves).
+    recordIncidentDraw(state.incidentBalance, card);
   }
 }
 

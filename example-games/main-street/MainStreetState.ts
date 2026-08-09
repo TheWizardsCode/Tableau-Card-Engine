@@ -31,6 +31,11 @@ import {
   INCIDENT_QUEUE_SIZE,
   loadTemplatesFromCsv,
   resetTemplatesToDefault,
+  type IncidentBalanceState,
+  createIncidentBalanceState,
+  createIncidentBalanceFromQueue,
+  findConstrainedIncidentIndex,
+  recordIncidentDraw,
 } from './MainStreetCards';
 import {
   type ActiveChallenge,
@@ -200,6 +205,13 @@ export interface MainStreetState {
   activeChallenges: ActiveChallenge[];
   /** Visible FIFO queue of upcoming Incident events (front = next to resolve). */
   incidentQueue: EventCard[];
+  /**
+   * Runtime-mutable incident-draw balance: repeat-spacing window, streak
+   * limit, and the recent-draw history needed to enforce them. Limits can be
+   * adjusted mid-session via `setIncidentBalanceLimits`; changes affect
+   * subsequent draws only.
+   */
+  incidentBalance: IncidentBalanceState;
   /** Current game result. */
   gameResult: GameResult;
   /** Reason the game ended (null while playing). */
@@ -268,6 +280,8 @@ export interface MainStreetSerializedState {
     completed: boolean;
   }[];
   incidentQueue: EventCard[];
+  /** Incident-draw balance limits + recent-draw history (see MainStreetState). */
+  incidentBalance: IncidentBalanceState;
   gameResult: GameResult;
   endReason: EndReason;
   finalScore: number;
@@ -480,12 +494,20 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     investments,
   };
 
-  // Pre-draw incident cards into the visible FIFO queue
+  // Pre-draw incident cards into the visible FIFO queue (constraint-aware,
+  // CG-0MSL0OP040043KKZ). The balance state carries the repeat-spacing window,
+  // streak limit, and recent-draw history; every draw goes through
+  // findConstrainedIncidentIndex so the initial queue satisfies the same
+  // constraints as later refills. No RNG is consumed here — deck order
+  // (seeded shuffle) is the source of determinism.
+  const incidentBalance = createIncidentBalanceState();
   const incidentQueue: EventCard[] = [];
   for (let i = 0; i < INCIDENT_QUEUE_SIZE; i++) {
-    const idx = eventDeck.findIndex(e => e.trigger === 'Incident');
+    const idx = findConstrainedIncidentIndex(eventDeck, incidentBalance);
     if (idx === -1) break;
-    incidentQueue.push(eventDeck.splice(idx, 1)[0]);
+    const card = eventDeck.splice(idx, 1)[0];
+    incidentQueue.push(card);
+    recordIncidentDraw(incidentBalance, card);
   }
 
   // Build initial state -- use config values instead of hard-coded constants
@@ -522,6 +544,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     challengesCompleted: [],
     activeChallenges: [],
     incidentQueue,
+    incidentBalance,
     gameResult: 'playing',
     endReason: null,
     finalScore: 0,
@@ -551,6 +574,40 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
 }
 
 /**
+ * Live mid-session hook to adjust the incident-draw balance limits.
+ *
+ * Changes take effect on all subsequent constrained incident draws (refills,
+ * reshuffle paths); the currently-visible queue is left untouched. This is
+ * the runtime-manipulation interface for designers/balancers — difficulty
+ * presets wire values here in a follow-up work item (CG-0MSL0OU1E005WFJB).
+ *
+ * @param state   Current game state (mutated in place).
+ * @param limits  Partial limits to update: `repeatSpacing` (N) and/or `maxStreak` (M).
+ * @throws Error if a provided limit is not an integer >= 1.
+ */
+export function setIncidentBalanceLimits(
+  state: MainStreetState,
+  limits: Partial<Pick<IncidentBalanceState, 'repeatSpacing' | 'maxStreak'>>,
+): void {
+  if (limits.repeatSpacing !== undefined) {
+    if (!Number.isInteger(limits.repeatSpacing) || limits.repeatSpacing < 1) {
+      throw new Error(
+        `repeatSpacing must be an integer >= 1, got ${limits.repeatSpacing}`,
+      );
+    }
+    state.incidentBalance.repeatSpacing = limits.repeatSpacing;
+  }
+  if (limits.maxStreak !== undefined) {
+    if (!Number.isInteger(limits.maxStreak) || limits.maxStreak < 1) {
+      throw new Error(
+        `maxStreak must be an integer >= 1, got ${limits.maxStreak}`,
+      );
+    }
+    state.incidentBalance.maxStreak = limits.maxStreak;
+  }
+}
+
+/**
  * Serializes Main Street runtime state into a JSON-safe checkpoint shape.
  */
 export function serializeMainStreetState(state: MainStreetState): MainStreetSerializedState {
@@ -569,6 +626,7 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
       completed: ac.completed,
     })),
     incidentQueue: structuredClone(state.incidentQueue),
+    incidentBalance: structuredClone(state.incidentBalance),
     gameResult: state.gameResult,
     endReason: state.endReason,
     finalScore: state.finalScore,
@@ -716,6 +774,14 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
     (saved as Record<string, unknown>).soldSlots = new Array<boolean>(GRID_SIZE).fill(false);
   }
 
+  // ── incidentBalance (CG-0MSL0OP040043KKZ): backfill from the queue for ──
+  // legacy saves that predate the balance state. The queue cards are recorded
+  // in draw order so subsequent constrained draws see the actual sequence.
+  if (!('incidentBalance' in saved)) {
+    const queue = (saved.incidentQueue as EventCard[] | undefined) ?? [];
+    (saved as Record<string, unknown>).incidentBalance = createIncidentBalanceFromQueue(queue);
+  }
+
   // ── currentIncome / currentReputationPerTurn: add missing fields for legacy saves ─
   // These fields were introduced by CG-0MRV84ZT60069PW6 (per-card incremental tracking).
   // Legacy saves won't have them. We leave them as undefined so the income phase
@@ -822,6 +888,9 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
       };
     }),
     incidentQueue: structuredClone(saved.incidentQueue),
+    incidentBalance: saved.incidentBalance
+      ? structuredClone(saved.incidentBalance)
+      : createIncidentBalanceFromQueue(saved.incidentQueue ?? []),
     gameResult: saved.gameResult,
     endReason: saved.endReason,
     finalScore: saved.finalScore,

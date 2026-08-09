@@ -55,6 +55,7 @@ import {
   createCommunitySpaceDeck,
   createEventDeck,
   createUpgradeDeck,
+  createIncidentBalanceFromQueue,
 } from './MainStreetCards';
 import { getPreset, type DifficultyName } from './MainStreetDifficulty';
 import { deriveUnlockedCardIds } from './MainStreetTiers';
@@ -305,6 +306,10 @@ export function createTutorialScenario(
     challengesCompleted: [],
     activeChallenges: [],
     incidentQueue,
+    // Backfill the balance history from the scenario-defined queue so
+    // subsequent constrained refills see the actual resolved sequence
+    // (CG-0MSL0OP040043KKZ).
+    incidentBalance: createIncidentBalanceFromQueue(incidentQueue),
     gameResult: 'playing',
     endReason: null,
     finalScore: 0,
