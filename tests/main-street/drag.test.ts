@@ -252,16 +252,20 @@ describe('MainStreet drag-to-buy wiring', () => {
       const coinsBefore = scene.state.resourceBank.coins;
 
       controller.onDragDropBusiness({
-        gameObject: createMockContainer(),
+        // Container parked at the drop location (it follows the pointer
+        // during the drag, so x/y == where the card was released).
+        gameObject: createMockContainer(412, 331, 5),
         data: card.id,
         zoneData: slot,
       });
 
-      // Transfer animation targeted the street slot centre.
+      // Transfer animation started from the DROP LOCATION (not the market
+      // slot origin) and targeted the street slot centre.
       expect(scene.animateTransferFromMarket).toHaveBeenCalledTimes(1);
       const opts = scene.animateTransferFromMarket.mock.calls[0][0];
       expect(opts.cardId).toBe(card.id);
       expect(opts.row).toBe('development');
+      expect(opts.source).toEqual({ x: 412, y: 331 });
       expect(opts.destination).toEqual(scene.getStreetSlotCenter(slot));
 
       // Flush the transfer-completion microtask (mock resolves immediately).

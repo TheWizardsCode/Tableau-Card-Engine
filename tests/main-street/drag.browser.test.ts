@@ -218,7 +218,19 @@ describe('MainStreet drag-to-buy/place (browser)', () => {
 
     const container = cardContainer(scene, card.id);
     const target = scene.getStreetSlotCenter(slot);
+    const originY = container.y; // market row Y (the card's slot origin)
     await simulateDrag(container.x, container.y, target.x, target.y);
+
+    // Transfer visual must start at the DROP LOCATION (the card follows the
+    // pointer, so it was released at the street slot) — not at the market
+    // row origin. ~300ms into the 1500ms tween the visual is still near its
+    // source, so a y near the slot end (and far from the market row)
+    // proves the animation did not jump back to the market row.
+    const visuals = [...(scene.activeTransferVisuals ?? [])];
+    expect(visuals.length).toBe(1);
+    const spread = Math.abs(originY - target.y);
+    expect(Math.abs(visuals[0].y - originY)).toBeGreaterThan(spread / 2);
+    expect(Math.abs(visuals[0].y - target.y)).toBeLessThan(spread / 2);
 
     // Direct buy-to-slot: card leaves the market and lands on the slot.
     await waitForCondition(

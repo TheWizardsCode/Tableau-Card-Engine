@@ -496,6 +496,12 @@ export class MainStreetTurnController {
     const card = s.state.market.development.find((c: any) => c.id === cardId);
     if (!card || sourceIndex < 0 || slotIndex == null) return;
 
+    // The dragged container follows the pointer, so its position at drop
+    // time IS the drop location. Capture it BEFORE refreshAll() recreates
+    // the market card at its slot origin, then start the transfer
+    // animation from there (not from the market row).
+    const dropSource = { x: payload.gameObject?.x ?? 0, y: payload.gameObject?.y ?? 0 };
+
     const cardName = card.name;
     s.tooltipManager?.hide();
     s.clearMarketSelection();
@@ -533,6 +539,7 @@ export class MainStreetTurnController {
         family: 'business',
         row: 'development',
         slotIndex: sourceIndex,
+        source: dropSource,
         destination: s.getStreetSlotCenter(slotIndex),
       }).then(afterTransfer);
     } else {
