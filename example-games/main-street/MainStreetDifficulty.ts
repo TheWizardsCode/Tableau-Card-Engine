@@ -85,6 +85,23 @@ export interface GameConfig extends DifficultyConfig {
   /** Multiplier to increase positive Incident frequency (1.0 = baseline). */
   readonly positiveIncidentMultiplier: number;
 
+  // ── Incident Draw Balance ─────────────────────────────
+  /**
+   * Repeat-spacing window N for constrained incident draws: a card name
+   * cannot reappear within the last `N - 1` drawn cards (default 3).
+   * Larger N = fewer same-card repeats (calmer variety); smaller N = cards
+   * can recur sooner (tighter pacing). Wired into `incidentBalance` at game
+   * setup; see `createIncidentBalanceState` in MainStreetCards.ts.
+   */
+  readonly incidentRepeatSpacing: number;
+  /**
+   * Max consecutive same-polarity (good/bad) incident cards M before the
+   * selector forces a polarity change (default 2). Larger M = longer luck
+   * runs (higher variance); smaller M = gentler, more even pacing. Wired
+   * into `incidentBalance` at game setup.
+   */
+  readonly incidentMaxStreak: number;
+
   // ── Reputation-based Coin Multiplier ───────────────────
   /**
    * Divisor used in the reputation coin multiplier formula:
@@ -119,6 +136,10 @@ export const EASY_PRESET: Readonly<GameConfig> = {
   synergyBonusPerNeighbor: 1.5,
   challengesPerRun: 2,
   positiveIncidentMultiplier: 1.2,
+  // Incident pacing: widest repeat spacing (N=4) = fewest same-card
+  // repeats, calmer variety; standard bad-run protection (M=2).
+  incidentRepeatSpacing: 4,
+  incidentMaxStreak: 2,
   reputationCoinDivisor: 20,
   maxReputationCoinMultiplier: 3.0,
 };
@@ -140,6 +161,10 @@ export const MEDIUM_PRESET: Readonly<GameConfig> = {
   // Increase positive incident frequency by 50% for the Medium baseline
   // as requested by work item CG-0MMLR20XP1IPPD03.
   positiveIncidentMultiplier: 1.5,
+  // Incident pacing equals the engine defaults (N=3, M=2), preserving the
+  // "Medium = original hard-coded constants" backward-compat invariant.
+  incidentRepeatSpacing: 3,
+  incidentMaxStreak: 2,
   reputationCoinDivisor: 20,
   maxReputationCoinMultiplier: 3.0,
 };
@@ -159,6 +184,12 @@ export const HARD_PRESET: Readonly<GameConfig> = {
   synergyBonusPerNeighbor: 0.75,
   challengesPerRun: 4,
   positiveIncidentMultiplier: 1,
+  // Incident pacing: minimal repeat guarantee (N=2) = cards can recur
+  // sooner, leaving fewer "safe gaps"; longer streaks (M=3) = higher
+  // variance and harsher bad runs, matching the game's overall
+  // "longer good streaks on Hard" profile.
+  incidentRepeatSpacing: 2,
+  incidentMaxStreak: 3,
   reputationCoinDivisor: 20,
   maxReputationCoinMultiplier: 3.0,
 };
