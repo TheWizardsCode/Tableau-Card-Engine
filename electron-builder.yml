@@ -1,0 +1,56 @@
+# electron-builder configuration for the TCE Electron launcher.
+#
+# Produces a distributable binary for the host platform (Windows NSIS primary
+# for Steam; Linux/macOS best-effort). No publish configuration — this repo
+# is private and binaries are uploaded to Steam manually (`--publish never`
+# in the npm scripts). Steam itself manages updates, so no auto-update is
+# configured.
+#
+# The packaged app contains only the built renderer (dist/), the compiled
+# main process + preload (dist-electron/), and package.json (for version
+# metadata). Phaser and all game code are bundled into dist/ by Vite; the
+# Electron runtime itself is provided by electron-builder.
+
+appId: com.thewizardscode.tableaucardengine
+productName: Tableau Card Engine
+copyright: Copyright © 2026 TheWizardsCode
+
+directories:
+  output: release
+  buildResources: build
+
+# The packaged app loads its content from inside the asar (see
+# electron/content-locator.ts: bundledDir = <asar>/dist). The renderer and
+# Phaser are fully bundled into dist/ by Vite, and the Electron runtime is
+# provided by electron-builder — so no node_modules are needed at runtime.
+files:
+  - dist/**
+  - dist-electron/**
+  - package.json
+  - '!node_modules/**'
+
+asar: true
+
+win:
+  # NSIS installer + win-unpacked directory (primary Steam artifact).
+  target:
+    - nsis
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  artifactName: TCE-Setup-${version}.${ext}
+
+linux:
+  target:
+    - AppImage
+    - tar.gz
+  category: Game
+  artifactName: TCE-${version}.${ext}
+
+mac:
+  target:
+    - dmg
+  category: public.app-category.games
+  artifactName: TCE-${version}.${ext}

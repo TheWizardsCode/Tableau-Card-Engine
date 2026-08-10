@@ -13,6 +13,7 @@ pnpm-debug.log*
 dist/
 dist-electron/
 build/
+release/
 *.js.map
 *.tsbuildinfo
 
