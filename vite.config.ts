@@ -50,7 +50,13 @@ export default defineConfig(({ mode, command }) => ({
           globals: true,
           environment: 'node',
           include: ['tests/**/*.test.ts'],
-          exclude: ['tests/**/*.browser.test.ts', 'tests/e2e/replay-*.test.ts'],
+          exclude: [
+            'tests/**/*.browser.test.ts',
+            'tests/e2e/replay-*.test.ts',
+            // Electron launch smoke test runs in its own project (needs a
+            // display and the built Electron app).
+            'tests/electron/launch-smoke.test.ts',
+          ],
           testTimeout: 15_000,
           // Worker-pool cap (fan-out bounding, SA-0MSAEKOQE009TEB4): bound the
           // number of concurrent tinypool workers so parallel test runs do not
@@ -77,6 +83,23 @@ export default defineConfig(({ mode, command }) => ({
               singleFork: true,
             },
           },
+        },
+      },
+      // ── Electron Launch Smoke Test — isolated project; needs a display
+      // (xvfb on headless Linux) and the built Electron app. Run via
+      // `npx vitest run --project electron` or the CI electron stage.
+      // Excluded from the unit project so the fast unit suite stays fast. ────
+      {
+        extends: true,
+        test: {
+          name: 'electron',
+          globals: true,
+          environment: 'node',
+          include: ['tests/electron/launch-smoke.test.ts'],
+          fileParallelism: false,
+          sequence: { concurrent: false },
+          testTimeout: 180_000,
+          hookTimeout: 240_000,
         },
       },
       // ── Non-Tutorial Browser Tests ────────────────────

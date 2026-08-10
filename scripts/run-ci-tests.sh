@@ -40,4 +40,21 @@ echo "=== Tutorial E2E Tests ==="
 bash scripts/run-tutorial-tests.sh
 echo ""
 
+echo "=== Electron Launch Smoke Test ==="
+# Launches the real Electron app (Playwright _electron). Needs a display:
+# - Linux CI/dev: xvfb-run when no DISPLAY is set (GitHub ubuntu runners ship xvfb)
+# - macOS/Windows: native display available (uname != Linux)
+# - Packaged-binary mode: TCE_SMOKE_BINARY=/path/to/exe (built by the CI
+#   packaging job) bypasses the display heuristic.
+if [ -n "${TCE_SMOKE_BINARY:-}" ]; then
+  npx vitest run --project electron 2>&1 | tail -20
+elif command -v xvfb-run >/dev/null 2>&1 && [ -z "${DISPLAY:-}" ]; then
+  xvfb-run -a npx vitest run --project electron 2>&1 | tail -20
+elif [ -n "${DISPLAY:-}" ] || [ "$(uname -s)" != "Linux" ]; then
+  npx vitest run --project electron 2>&1 | tail -20
+else
+  echo "SKIP: no display and xvfb-run unavailable (Linux). Install xvfb or set TCE_SMOKE_BINARY to run the Electron smoke test."
+fi
+echo ""
+
 echo "=== All Tests Complete ==="
