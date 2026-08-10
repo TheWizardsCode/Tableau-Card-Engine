@@ -250,6 +250,12 @@ this.dragDropManager.registerDropZone({
 });
 ```
 
+Beleaguered Castle also consumes the module for its tableau drag-to-move
+(`example-games/beleaguered-castle/scenes/BeleagueredCastleScene.ts`): the
+scene creates the manager and registers the foundation/tableau drop zones
+(`initDragDrop`), while the renderer registers each column's top card as a
+draggable on every board render (`makeDraggable`).
+
 ### Options (`DragDropManagerConfig`)
 
 | Option | Type | Default | Description |

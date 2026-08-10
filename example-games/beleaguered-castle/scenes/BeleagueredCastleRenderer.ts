@@ -9,11 +9,12 @@ import type { BeleagueredCastleState, BCMove } from '../BeleagueredCastleState';
 import { FOUNDATION_COUNT, TABLEAU_COUNT } from '../BeleagueredCastleState';
 import { HandView, PileView } from '../../../src/ui';
 import { GAME_W, GAME_H } from '../../../src/ui';
+import type { DragDropManager, DragDropPayload } from '../../../src/ui';
 import { createSceneTitle } from '@ui/Renderer';
 import { createBcHudText } from '../../../src/ui/Renderer/adapters/BeleagueredCastleAdapter';
 import {
   BC_CARD_W, BC_CARD_H, CARD_GAP, CASCADE_OFFSET_Y,
-  DRAG_DEPTH, DEAL_STAGGER, ANIM_DURATION, SNAP_BACK_DURATION,
+  DRAG_DEPTH, DEAL_STAGGER, ANIM_DURATION,
   HIGHLIGHT_VALID, HIGHLIGHT_ALPHA, SELECTION_TINT,
   HINT_SOURCE_COLOR, HINT_DEST_COLOR, HINT_ALPHA, HINT_DEPTH,
   HUD_MARGIN,
@@ -28,12 +29,19 @@ import {
   type BeleagueredCastleLayout,
 } from './BeleagueredCastleLayoutAdapter';
 
-export interface CardSpriteData {
+/**
+ * Data attached to each draggable tableau top card (exposed via the
+ * drag-drop module's payload). Origin/depth are tracked by the module.
+ */
+export interface BCTopCardDragData {
   colIndex: number;
   rowIndex: number;
-  originX: number;
-  originY: number;
-  originDepth: number;
+}
+
+/** Data attached to each registered drop zone (foundation/tableau). */
+export interface BCZoneDragData {
+  type: 'foundation' | 'tableau';
+  index: number;
 }
 
 export class BeleagueredCastleRenderer {
@@ -45,6 +53,15 @@ export class BeleagueredCastleRenderer {
 
   /** SLL-derived layout resolved once at construction. */
   private layout: BeleagueredCastleLayout;
+
+  /**
+   * Reusable core-engine drag-drop manager (created by the scene).
+   * The renderer registers tableau top cards as draggables via it.
+   */
+  dragDropManager: DragDropManager | null = null;
+
+  /** Tableau top cards registered as draggables on the current board render. */
+  private dragDropRegistered = new Set<Phaser.GameObjects.Image>();
 
   // Display objects
   /** Shared PileView components for foundation piles. */
@@ -68,6 +85,8 @@ export class BeleagueredCastleRenderer {
   onDealCard?: (info: { cardIndex: number; totalCards: number }) => void;
   onDealComplete?: () => void;
   onCardClick?: (colIndex: number) => void;
+  /** Fired by the drag-drop module for an accepted drag-drop (see scene handleDrop). */
+  onCardDragDrop?: (payload: DragDropPayload) => void;
 
   constructor(scene: Phaser.Scene, state: BeleagueredCastleState) {
     this.scene = scene;
@@ -124,9 +143,7 @@ export class BeleagueredCastleRenderer {
       this.foundationPileViews.push(pileView);
 
       const zone = this.scene.add.zone(x, this.layout.foundationCenterY, BC_CARD_W, BC_CARD_H)
-        .setRectangleDropZone(BC_CARD_W, BC_CARD_H)
-        .setData('type', 'foundation')
-        .setData('index', i);
+        .setRectangleDropZone(BC_CARD_W, BC_CARD_H);
       this.foundationDropZones.push(zone);
     }
   }
@@ -161,9 +178,7 @@ export class BeleagueredCastleRenderer {
     for (let col = 0; col < TABLEAU_COUNT; col++) {
       const x = this.tableauColumnX(col);
       const zone = this.scene.add.zone(x, zoneCenterY, BC_CARD_W + 4, maxColHeight)
-        .setRectangleDropZone(BC_CARD_W + 4, maxColHeight)
-        .setData('type', 'tableau')
-        .setData('index', col);
+        .setRectangleDropZone(BC_CARD_W + 4, maxColHeight);
       this.tableauDropZones.push(zone);
     }
   }
@@ -316,13 +331,21 @@ export class BeleagueredCastleRenderer {
   }
 
   // ── Make draggable ──────────────────────────────────────
-  makeDraggable(interactionBlocked: boolean): void {
-    // Disable interactive on all HandView-managed sprites
-    for (const hv of this.tableauHandViews) {
-      for (const sprite of hv.getSprites()) {
-        sprite.disableInteractive();
-      }
+  /**
+   * Register each tableau column's top card with the shared drag-drop
+   * module and wire the click-to-move pointerdown. Call whenever the
+   * tableau sprites have been (re)built (after deal or refresh).
+   */
+  makeDraggable(): void {
+    const manager = this.dragDropManager;
+    if (!manager) return;
+
+    // Unregister draggables from the previous board render (their sprites
+    // were destroyed by HandView.rebuildDisplay on the last refresh).
+    for (const go of this.dragDropRegistered) {
+      try { manager.unregisterDraggable(go); } catch { /* ignore */ }
     }
+    this.dragDropRegistered.clear();
 
     for (let col = 0; col < TABLEAU_COUNT; col++) {
       const hv = this.tableauHandViews[col];
@@ -330,21 +353,22 @@ export class BeleagueredCastleRenderer {
       const sprites = hv.getSprites();
       if (sprites.length === 0) continue;
 
-      const topSprite = sprites[sprites.length - 1];
+      const topSprite = sprites[sprites.length - 1] as Phaser.GameObjects.Image;
       const rowIndex = sprites.length - 1;
 
-      topSprite.setInteractive({ useHandCursor: true, draggable: !interactionBlocked });
-      topSprite.on('pointerdown', () => this.onCardClick?.(col));
+      manager.registerDraggable({
+        gameObject: topSprite,
+        data: { colIndex: col, rowIndex } satisfies BCTopCardDragData,
+        onDrop: (payload) => this.onCardDragDrop?.(payload),
+      });
+      this.dragDropRegistered.add(topSprite);
 
-      const imgSprite = topSprite as Phaser.GameObjects.Image;
-      const cardData: CardSpriteData = {
-        colIndex: col,
-        rowIndex,
-        originX: imgSprite.x,
-        originY: imgSprite.y,
-        originDepth: imgSprite.depth,
-      };
-      topSprite.setData('cardData', cardData);
+      // Click-to-move: pointerdown selects the column. A pure click never
+      // crosses the drag distance threshold, so it still reaches this
+      // handler even though the card is draggable.
+      topSprite.on('pointerdown', () => this.onCardClick?.(col));
+      // Preserve the hand cursor on hover (module sets draggable without it).
+      if (topSprite.input) topSprite.input.cursor = 'pointer';
     }
   }
 
@@ -453,34 +477,13 @@ export class BeleagueredCastleRenderer {
     }
   }
 
-  // ── Snap back ───────────────────────────────────────────
-  snapBack(sprite: Phaser.GameObjects.Image): void {
-    const data = sprite.getData('cardData') as CardSpriteData | undefined;
-    if (!data) return;
-    if (this.reducedMotion) {
-      sprite.setPosition(data.originX, data.originY);
-      sprite.setDepth(data.originDepth);
-      return;
-    }
-    this.scene.tweens.add({
-      targets: sprite,
-      x: data.originX,
-      y: data.originY,
-      duration: SNAP_BACK_DURATION,
-      ease: 'Power2',
-      onComplete: () => {
-        sprite.setDepth(data.originDepth);
-      },
-    });
-  }
-
   // ── Refresh ─────────────────────────────────────────────
-  refreshAll(makeDraggable: boolean, interactionBlocked: boolean): void {
+  refreshAll(makeDraggable: boolean): void {
     this.clearHint();
     this.refreshFoundations();
     this.refreshTableau();
     this.refreshHUD();
-    if (makeDraggable) this.makeDraggable(interactionBlocked);
+    if (makeDraggable) this.makeDraggable();
   }
 
   refreshTableau(): void {
