@@ -13,6 +13,7 @@ import {
   enumerateLegalActions,
   scoreAction,
   enumerateAndScoreActions,
+  aiPlanningHorizon,
   RandomStrategy,
   GreedyStrategy,
   MainStreetAiPlayer,
@@ -421,7 +422,7 @@ describe('scoreAction', () => {
     expect(score).toBeGreaterThan(0);
   });
 
-  it('scores buy-upgrade using incomeBonus * remainingTurns - cost', () => {
+  it('scores buy-upgrade using incomeBonus * horizon - cost', () => {
     const state = createTestState();
     const upgradeCard: UpgradeCard = {
       family: 'upgrade',
@@ -435,8 +436,8 @@ describe('scoreAction', () => {
       requiredLevel: 0,
     };
     state.market.investments.push(upgradeCard);
-    const remainingTurns = state.config.maxTurns - state.turn;
-    const expected = upgradeCard.incomeBonus * remainingTurns - upgradeCard.cost;
+    // Horizon is derived from distance to the win threshold (CG-0MSLXJCHH001DLIO)
+    const expected = upgradeCard.incomeBonus * aiPlanningHorizon(state) - upgradeCard.cost;
     const actual = scoreAction(state, { type: 'buy-upgrade', cardId: upgradeCard.id, targetSlot: 0 });
     expect(actual).toBe(expected);
   });
@@ -461,6 +462,83 @@ describe('scoreAction', () => {
   it('returns 0 for buy-business with unknown cardId', () => {
     const state = createTestState();
     expect(scoreAction(state, { type: 'buy-business', cardId: 'nonexistent', slotIndex: 0 })).toBe(0);
+  });
+});
+
+// ── aiPlanningHorizon (CG-0MSLXJCHH001DLIO) ─────────────────
+
+describe('aiPlanningHorizon', () => {
+  it('is always within [floor=5, cap=25]', () => {
+    const state = createTestState();
+    for (const score of [0, 5, 40, 75, 120, 145, 149, 150, 200]) {
+      state.resourceBank.coins = score;
+      state.resourceBank.reputation = 0;
+      state.challengesCompleted = [];
+      const h = aiPlanningHorizon(state);
+      expect(h).toBeGreaterThanOrEqual(5);
+      expect(h).toBeLessThanOrEqual(25);
+    }
+  });
+
+  it('is > 0 even when the score is at/near the win threshold (floor)', () => {
+    const state = createTestState();
+    state.resourceBank.coins = state.config.winThreshold;
+    state.resourceBank.reputation = 0;
+    state.challengesCompleted = [];
+    expect(aiPlanningHorizon(state)).toBe(5);
+  });
+
+  it('is larger early in the game (far from threshold) than near the threshold', () => {
+    const state = createTestState();
+    // Far from threshold
+    state.resourceBank.coins = 0;
+    state.resourceBank.reputation = 0;
+    state.challengesCompleted = [];
+    const early = aiPlanningHorizon(state);
+
+    // Near threshold
+    state.resourceBank.coins = state.config.winThreshold - 10;
+    state.resourceBank.reputation = 0;
+    state.challengesCompleted = [];
+    const late = aiPlanningHorizon(state);
+
+    expect(early).toBeGreaterThan(late);
+    expect(late).toBe(5); // clamped at the floor
+  });
+
+  it('derives the horizon from distance to the threshold (documented formula)', () => {
+    const state = createTestState();
+    state.resourceBank.coins = 70;
+    state.resourceBank.reputation = 0;
+    state.challengesCompleted = [];
+    // Medium winThreshold=150, scorePace=8: ceil((150-70)/8) = ceil(10) = 10
+    expect(aiPlanningHorizon(state)).toBe(10);
+  });
+
+  it('prefers early-game upgrades over near-threshold ones (behavioural sanity)', () => {
+    const state = createTestState();
+    const upgradeCard: UpgradeCard = {
+      family: 'upgrade',
+      id: 'test-upgrade-horizon',
+      name: 'Test Upgrade Horizon',
+      targetBusiness: 'Bakery',
+      cost: 3,
+      incomeBonus: 2,
+      synergyRangeBonus: 0,
+      description: 'Test',
+      requiredLevel: 0,
+    };
+    state.market.investments.push(upgradeCard);
+
+    const scoreEarly = scoreAction(state, { type: 'buy-upgrade', cardId: upgradeCard.id, targetSlot: 0 });
+
+    // Near the threshold the same upgrade is valued over fewer turns.
+    state.resourceBank.coins = state.config.winThreshold - 10;
+    state.resourceBank.reputation = 0;
+    state.challengesCompleted = [];
+    const scoreLate = scoreAction(state, { type: 'buy-upgrade', cardId: upgradeCard.id, targetSlot: 0 });
+
+    expect(scoreEarly).toBeGreaterThan(scoreLate);
   });
 });
 

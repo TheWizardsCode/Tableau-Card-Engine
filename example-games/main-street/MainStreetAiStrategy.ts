@@ -37,11 +37,59 @@ import {
 import type { BusinessCard, UpgradeCard, EventCard } from './MainStreetCards';
 import { GRID_SIZE } from './MainStreetCards';
 import { computeSynergyBonus } from './MainStreetAdjacency';
+import { computeScore } from './MainStreetEngine';
 
 // ── Scoring constants ───────────────────────────────────────
 
 /** Fixed score for playing a held event (ensures it is preferred over end-turn). */
 const PLAY_EVENT_SCORE = 5;
+
+// ── AI planning horizon (CG-0MSLXJCHH001DLIO, user Q2b) ───────
+
+/**
+ * Floor for the AI planning horizon. Keeps the horizon > 0 even when the
+ * score is at or near the win threshold, so future income is never valued
+ * at zero/negative. Calibrated during F4 (CG-0MSN1A71G005AF7W): with a
+ * floor of 5, a purchase near the threshold is still valued over ~5 turns
+ * of income, matching the old early-game valuation magnitude.
+ */
+const AI_HORIZON_FLOOR = 5;
+
+/**
+ * Cap for the AI planning horizon. Bounds how many future turns a single
+ * purchase's income is valued over in long unlimited games, preventing an
+ * upgrade/business from being overvalued late in a run.
+ */
+const AI_HORIZON_CAP = 25;
+
+/**
+ * Expected score gained per turn (pts/turn). Used to convert the distance
+ * to the win threshold into a turn count. Calibrated from the balance
+ * baseline: the Medium threshold (150) is reached in ~18 turns on average,
+ * i.e. ~8.3 pts/turn; 8 is the rounded constant.
+ */
+const AI_SCORE_PACE = 8;
+
+/**
+ * Computes the AI planning horizon — the number of future turns whose
+ * income a purchase is expected to yield — derived from the distance to
+ * the win threshold (user Q2b decision, CG-0MSLXJCHH001DLIO):
+ *
+ *   horizon = clamp(ceil((winThreshold - score) / scorePace), floor, cap)
+ *
+ * Replaces the former `remainingTurns = maxTurns - turn` (PRD Appendix A),
+ * which no longer applies now that default presets are unlimited. The floor
+ * prevents degenerate (zero/negative) horizons when the score is at or near
+ * the threshold.
+ *
+ * @param state Current game state (read-only by convention).
+ * @returns The planning horizon in turns (always in [AI_HORIZON_FLOOR, AI_HORIZON_CAP]).
+ */
+export function aiPlanningHorizon(state: MainStreetState): number {
+  const distance = state.config.winThreshold - computeScore(state);
+  const raw = Math.ceil(distance / AI_SCORE_PACE);
+  return Math.min(AI_HORIZON_CAP, Math.max(AI_HORIZON_FLOOR, raw));
+}
 
 // ── Strategy Interface ──────────────────────────────────────
 
@@ -269,11 +317,14 @@ export class MainStreetAiPlayer extends AiPlayerBase<MainStreetAiStrategy> {
 // ── Scoring Helpers ─────────────────────────────────────────
 
 /**
- * Score an upgrade action using the PRD Appendix A formula:
- *   score = incomeBonus * remainingTurns - cost
+ * Score an upgrade action.
  *
- * Higher income bonus upgrades are preferred; `remainingTurns` scales the
- * value of future income so early upgrades score higher.
+ *   score = incomeBonus * horizon - cost
+ *
+ * where `horizon` is the AI planning horizon derived from the distance to
+ * the win threshold (`aiPlanningHorizon`, CG-0MSLXJCHH001DLIO). Higher
+ * income bonus upgrades are preferred; a larger horizon scales the value
+ * of future income, so early-game (far-from-threshold) upgrades score higher.
  */
 function scoreUpgradeAction(
   state: MainStreetState,
@@ -284,16 +335,19 @@ function scoreUpgradeAction(
   ) as UpgradeCard | undefined;
   if (!card) return 0;
 
-  const remainingTurns = state.config.maxTurns - state.turn;
-  return card.incomeBonus * remainingTurns - card.cost;
+  const horizon = aiPlanningHorizon(state);
+  return card.incomeBonus * horizon - card.cost;
 }
 
 /**
- * Score a business placement using the PRD Appendix A formula:
- *   score = (baseIncome + projectedSynergyBonus) * remainingTurns - cost
+ * Score a business placement.
+ *
+ *   score = (baseIncome + projectedSynergyBonus) * horizon - cost
  *
  * `projectedSynergyBonus` is evaluated at `candidateSlot` as if the business
- * were already placed there.  Higher scores favour early high-synergy placements.
+ * were already placed there. `horizon` is the AI planning horizon derived
+ * from the distance to the win threshold (`aiPlanningHorizon`,
+ * CG-0MSLXJCHH001DLIO). Higher scores favour early high-synergy placements.
  */
 function scoreBusinessAction(
   state: MainStreetState,
@@ -313,8 +367,8 @@ function scoreBusinessAction(
     state.config.synergyBonusPerNeighbor,
   );
 
-  const remainingTurns = state.config.maxTurns - state.turn;
-  return (card.baseIncome + projectedSynergyBonus) * remainingTurns - card.cost;
+  const horizon = aiPlanningHorizon(state);
+  return (card.baseIncome + projectedSynergyBonus) * horizon - card.cost;
 }
 
 /**
@@ -338,15 +392,19 @@ function scoreEventAction(
 // ── Public Scoring API ──────────────────────────────────────
 
 /**
- * Score a single PlayerAction for the given state using the Greedy heuristics
- * defined in PRD Appendix A.
+ * Score a single PlayerAction for the given state using the Greedy heuristics.
  *
  * Scores are in "net coin-equivalent value" units:
- *   - `buy-upgrade`:  `incomeBonus * remainingTurns - cost`
- *   - `buy-business`: `(baseIncome + projectedSynergyBonus) * remainingTurns - cost`
+ *   - `buy-upgrade`:  `incomeBonus * horizon - cost`
+ *   - `buy-business`: `(baseIncome + projectedSynergyBonus) * horizon - cost`
  *   - `buy-event`:    `coinDelta + reputationDelta * reputationScoreMultiplier - cost`
  *   - `play-event`:   fixed bonus of 5 (prefer playing over end-turn)
  *   - `end-turn`:     0 (baseline / fallback)
+ *
+ * `horizon` is the AI planning horizon derived from the distance to the
+ * win threshold (`aiPlanningHorizon`, CG-0MSLXJCHH001DLIO), replacing the
+ * former PRD Appendix A `remainingTurns = maxTurns - turn` factor now that
+ * default presets are unlimited.
  *
  * @param state  Current game state (read-only by convention).
  * @param action The action to score.
