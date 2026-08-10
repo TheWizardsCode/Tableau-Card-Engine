@@ -303,6 +303,13 @@ export interface LossModeDecompositionResult {
  * Works immediately on existing Monte Carlo output — `endReason` and
  * `result` fields are always present.
  *
+ * Reachability model (CG-0MSLXJCHH001DLIO): `turn_exhaustion` is now only
+ * reachable via a config that explicitly sets `maxTurns` (default presets
+ * impose no turn limit). Harness runs from default-preset simulations that
+ * hit the Monte Carlo loop cap end with `max_turns_cap` instead — both land
+ * in the same `turn_exhaustion` bucket, preserving the "forced termination"
+ * loss-mode meaning.
+ *
  * @param runs - Monte Carlo run summaries.
  * @returns Loss mode decomposition result.
  */
