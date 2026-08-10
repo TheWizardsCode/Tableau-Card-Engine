@@ -30,23 +30,32 @@ import {
   BASE_HUD_Y,
   BASE_MARKET_CARD_H,
   BASE_MARKET_ROW_GAP,
-  BASE_SLOT_H,
-  STREET_ROW_GAP,
 } from '../../example-games/main-street/scenes/MainStreetConstants';
+import { computeMainStreetLayoutWithSll } from '../../example-games/main-street/scenes/MainStreetLayoutAdapter';
 
 const VIEWPORT: LayoutViewport = { width: 1280, height: 720 };
 
+/**
+ * Reference zone bounds computed from the RENDERER's geometry (the source of
+ * truth) — `computeMainStreetLayoutWithSll()` + shared card constants + the
+ * same renderer math used in `MainStreetRenderer` (`marketTop + 6`,
+ * `streetTop`, `handCenterX`, `actionY + 4`, ...). The tutorial zone rects
+ * must resolve to these bounds (within rounding tolerance), otherwise the
+ * highlight rectangles land on empty space instead of their target element.
+ */
 function computeExpectedZoneBounds(
   zone: string,
   viewport: LayoutViewport = VIEWPORT,
 ): { x: number; y: number; w: number; h: number } | null {
   const gameW = viewport.width;
-  const gameH = viewport.height;
+  const layout = computeMainStreetLayoutWithSll();
   const marketRowH = BASE_MARKET_CARD_H + 14; // 94
 
-  // Right sidebar starts at x=0.75 (960px at 1280) — derived from base layout's
-  // activityLog zone. The market/street area extends from left to logX-20.
-  const logX = Math.round(0.75 * gameW); // 960 at 1280px width
+  // Right sidebar starts at logX (0.75*1280=960). The market/street area
+  // extends from bgLeft=20 to bgRight=logX-20 (=940 at 1280).
+  const logX = layout.logX;
+  const bgLeft = 20;
+  const bgRight = logX - 20;
 
   switch (zone) {
     case 'hud':
@@ -54,88 +63,80 @@ function computeExpectedZoneBounds(
       return { x: Math.round(gameW * 0.25), y: BASE_HUD_Y - 14, w: Math.round(gameW * 0.5), h: 28 };
     case 'marketBusinessRow': {
       // Market background box: bgLeft=20, bgRight=logX-20, covers both rows
-      const bgLeft = 20;
-      const bgRight = logX - 20;
       const bothRowsH = 2 * marketRowH + BASE_MARKET_ROW_GAP + 20;
       return {
         x: bgLeft,
-        y: 80,
+        y: layout.marketTop - 10,
         w: bgRight - bgLeft,
         h: bothRowsH,
       };
     }
     case 'streetGrid': {
-      // Street grid highlight: top aligns with base street anchor y=0.444444,
-      // width stops before the right column (activity log/challenges) at x=0.75
-      const streetY = Math.round(0.444444 * gameH);
-      const streetW = Math.round(0.73 * gameW);
-      const streetH = 2 * BASE_SLOT_H + STREET_ROW_GAP + 12;
-      return { x: 0, y: streetY, w: streetW, h: streetH };
+      // Street slots: streetX + 5×slotW + 4×slotGap, 2 rows of slotH + gap
+      const streetW = layout.streetCols * layout.slotW + (layout.streetCols - 1) * layout.slotGap;
+      const streetH = 2 * layout.slotH + layout.streetRowGap;
+      return { x: layout.streetX, y: layout.streetTop, w: streetW, h: streetH };
     }
     case 'endTurnButton': {
-      // End Turn button: rightX-140, by+4, 140w x 32h (actionButton default height)
-      const rightX = gameW - 24;
-      const by = 648;
+      // End Turn button: right-aligned at gameW-24, top at actionY+4
+      const rightX = layout.gameW - 24;
       return {
-        x: rightX - 140,
-        y: by + 4,
-        w: 140,
-        h: 32,
+        x: rightX - layout.actionButtonW,
+        y: layout.actionY + 4,
+        w: layout.actionButtonW,
+        h: layout.actionButtonH,
       };
     }
     case 'incidentQueue': {
-      // Incident queue moved to right column: same x as activity log
-      const queueTop = 408;
-      const queueH = Math.round(0.294444 * gameH); // eventsHeight
+      // Incident queue panel at boot: queueTop, width logW, height = the
+      // renderer's panelH with 2 cards and 0 active effects (22+8+156+8=194).
+      const cardAreaH = 2 * (layout.queueCardH + 6) - 6 + 12;
+      const panelH = 22 + 8 + cardAreaH + 8;
       return {
         x: logX,
-        y: queueTop,
-        w: Math.round(0.234375 * gameW), // Same width as challenge panel
-        h: queueH,
+        y: layout.queueTop,
+        w: layout.logW,
+        h: panelH,
       };
     }
     case 'investmentsRow': {
-      // Investments row width matches the market background box
-      const bgLeft = 20;
-      const bgRight = logX - 20;
+      // Investments row drawn at marketTop + 6 + marketRowH + marketRowGap
       return {
         x: bgLeft,
-        y: 90 + marketRowH + BASE_MARKET_ROW_GAP,
+        y: layout.marketTop + 6 + marketRowH + BASE_MARKET_ROW_GAP,
         w: bgRight - bgLeft,
         h: marketRowH,
       };
     }
     case 'developmentRow': {
       // Dev row only (informative Dev Row / Optimizing for Events / Build a
-      // Library steps). Same box as marketBusinessRow but one row tall.
-      const bgLeft = 20;
-      const bgRight = logX - 20;
+      // Library steps). Cards drawn at marketTop + 6; row height = marketRowH.
       return {
         x: bgLeft,
-        y: 80,
+        y: layout.marketTop + 6,
         w: bgRight - bgLeft,
         h: marketRowH,
       };
     }
     case 'hand': {
-      // Hand area rect (Your Hand / Triggering Events). Matches the tutorial
-      // layout's hand zone: x=0.15, y=0.861111, w=0.36, h=0.111111 at 1280×720.
+      // Hand row centred on handCenterX covering up to maxHandSize (2) cards:
+      // width = 2×handCardW + 8 (spacing gap), top at handY.
+      const handW = 2 * layout.handCardW + 8;
       return {
-        x: Math.round(gameW * 0.15),
-        y: Math.round(gameH * 0.861111),
-        w: Math.round(gameW * 0.36),
-        h: Math.round(gameH * 0.111111),
+        x: layout.handCenterX - Math.round(handW / 2),
+        y: layout.handY,
+        w: handW,
+        h: layout.handCardH,
       };
     }
     case 'helpButton': {
-      // Hint button is to the left of End Turn button
-      const rightX = gameW - 24;
-      const by = 648;
+      // Hint button sits to the left of End Turn (12px gap)
+      const rightX = layout.gameW - 24;
       return {
-        x: rightX - 140 - 12 - 104,
-        y: by + 4,
-        w: 104,
-        h: 34,
+        x: rightX - layout.actionButtonW - 12 - layout.hintButtonW,
+        y: layout.actionY + 4,
+        w: layout.hintButtonW,
+        h: layout.actionButtonH,
       };
     }
     case 'centerModal':

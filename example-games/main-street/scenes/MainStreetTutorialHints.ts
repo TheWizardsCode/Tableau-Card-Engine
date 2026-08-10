@@ -39,6 +39,9 @@ import {
   BASE_MARKET_CARD_W,
   BASE_MARKET_CARD_H,
   BASE_MARKET_CARD_GAP,
+  CHALLENGE_TITLE_H,
+  CHALLENGE_LINE_H,
+  CHALLENGE_PAD,
 } from './MainStreetConstants';
 import { MARKET_BUSINESS_SLOTS } from '../MainStreetCards';
 import { STANDARD_TUTORIAL_SCENARIO } from '../TutorialScenario';
@@ -49,6 +52,25 @@ import { STANDARD_TUTORIAL_SCENARIO } from '../TutorialScenario';
  * The tutorial layout uses sceneWins policy, so its zone rects override base
  * zones with the same name. If the base layout or rendering constants change,
  * update the corresponding tutorial zone rects to match.
+ *
+ * Alignment contract (verified by TutorialOverlayHighlights.browser.test.ts):
+ * each tutorial zone rect resolves to the ACTUAL rendered element rect as
+ * computed by MainStreetLayoutAdapter/`computeMainStreetLayoutWithSll()` and
+ * MainStreetRenderer (source of truth). At the canonical 1280×720 viewport:
+ *   - hud            (320, 36, 640, 28)  — strip centred at (gameW/2, hudY)
+ *   - developmentRow (20, 96, 920, 94)   — marketTop + 6
+ *   - investmentsRow (20, 200, 920, 94)  — marketTop + 6 + marketRowH + gap
+ *   - streetGrid     (20, 337, 780, 172) — streetTop, 5×140 + 4×20, 2×80 + 12
+ *   - hand           (266, 620, 288, 80) — centred on handCenterX (410), max
+ *                                         2 cards (2×140 + 8 gap)
+ *   - endTurnButton  (1116, 652, 140, 34) — gameW-24-140, actionY + 4
+ *   - incidentQueue  (960, 408, 300, 194) — queueTop, boot-time panel (2 cards,
+ *                                         0 active effects: 22+8+156+8)
+ *   - helpButton     (1000, 652, 104, 34) — to the left of End Turn
+ * The challengePanel highlight is computed DYNAMICALLY from the live state in
+ * `zoneToAnchor` (challengeY + panel height from activeChallenges) because the
+ * rendered panel height varies with difficulty; the static base-layout zone
+ * rect is only a fallback. UI elements must NOT be moved to match highlights.
  */
 import tutorialLayout from '../layouts/main-street-tutorial.layout.json';
 
@@ -580,6 +602,27 @@ export class MainStreetTutorialHints {
     // deterministic market slot resolver instead of an SLL layout zone.
     const cardAnchor = resolveMarketCardAnchor(zone, scene);
     if (cardAnchor) return cardAnchor;
+
+    // The challenge panel's rendered height depends on the number of active
+    // challenges (MainStreetRenderer.refreshChallengeTracker), which varies
+    // with difficulty (Easy tutorial: 2 challenges → 72px; Medium boot: 3
+    // challenges → 92px). Compute it from the live state using the same
+    // shared constants so the highlight always covers the rendered panel.
+    // Falls back to the static SLL zone rect when state is unavailable or
+    // no challenges are active (no panel is drawn in that case anyway).
+    if (zone === 'challengePanel') {
+      const challenges = scene?.state?.activeChallenges;
+      if (Array.isArray(challenges) && challenges.length > 0) {
+        const panelH =
+          CHALLENGE_TITLE_H + challenges.length * CHALLENGE_LINE_H + CHALLENGE_PAD * 2;
+        return {
+          x: Math.round(layout.challengeX ?? 0),
+          y: Math.round(layout.challengeY ?? 0),
+          w: Math.round(layout.challengeW ?? 0),
+          h: Math.round(panelH),
+        };
+      }
+    }
 
     return resolveZoneToAnchor(zone, { width: gameW, height: gameH }, 1);
   }

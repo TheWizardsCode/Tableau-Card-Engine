@@ -338,8 +338,9 @@ describe('TutorialOverlayManager highlight zones', () => {
     const bounds = getHighlightBounds(highlight!);
     expect(bounds).toBeTruthy();
 
-    // The investments row is the second (bottom) market row
-    const expectedTopY = layout!.marketTop + layout!.marketRowH + layout!.marketRowGap;
+    // The investments row is the second (bottom) market row, drawn at
+    // marketTop + 6 + marketRowH + marketRowGap (see MainStreetRenderer)
+    const expectedTopY = layout!.marketTop + 6 + layout!.marketRowH + layout!.marketRowGap;
     expect(bounds!.y).toBeLessThanOrEqual(expectedTopY + 4);
     expect(bounds!.y).toBeGreaterThanOrEqual(layout!.marketTop - 10);
   });
