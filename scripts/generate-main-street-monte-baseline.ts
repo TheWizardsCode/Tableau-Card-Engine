@@ -4,7 +4,9 @@ import { resolve } from 'node:path';
 import { runMonteCarlo } from '../example-games/main-street/MainStreetMonteCarlo';
 
 const seeds = 200;
-const maxTurns = 25;
+// Harness-only termination cap (CG-0MSLXJCHH001DLIO): default presets impose
+// no turn limit, so the baseline generator uses a generous explicit bound.
+const maxTurns = 60;
 const strategy = 'greedy' as const;
 
 const runSeeds = Array.from({ length: seeds }, (_, i) => `mc-balance-${i}`);

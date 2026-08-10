@@ -289,7 +289,7 @@ M2 introduces two new upgrade mechanics that deepen progression decisions:
 
 ### Running the Monte Carlo Balance Sweep
 
-The market integration test suite (`tests/main-street/market.integration.test.ts`) includes a Monte Carlo stability test that runs 200 seeds over 25 turns each:
+The market integration test suite (`tests/main-street/market.integration.test.ts`) includes a Monte Carlo stability test that runs 200 seeds over 60 turns each (harness-only termination cap — default presets impose no turn limit):
 
 ```bash
 # Run just the Monte Carlo sweep

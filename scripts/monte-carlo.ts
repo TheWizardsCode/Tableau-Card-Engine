@@ -42,7 +42,9 @@ function parseArgs(argv: readonly string[]): CliArgs {
   const out = get('--out') ?? 'results/main-street-monte-carlo.json';
   const csvOut = get('--csv-out');
   const seedPrefix = get('--seed-prefix') ?? 'mc-balance';
-  const maxTurns = Number.parseInt(get('--maxTurns') ?? get('--max-turns') ?? '25', 10);
+  // Harness-only termination cap (CG-0MSLXJCHH001DLIO): default presets impose
+  // no turn limit, so the harness needs a generous explicit bound.
+  const maxTurns = Number.parseInt(get('--maxTurns') ?? get('--max-turns') ?? '60', 10);
   const seedFile = get('--seed-file');
   const strategyArg = (get('--strategy') ?? 'greedy') as MonteCarloStrategy;
   const sweep = args.includes('--sweep');

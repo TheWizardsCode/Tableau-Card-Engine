@@ -627,7 +627,11 @@ export function findConstrainedIncidentIndex(
 /** Number of slots in the street grid. */
 export const GRID_SIZE = 10;
 
-/** Maximum number of turns before the game ends. */
+/**
+ * Legacy default turn cap (20). Kept for backward compatibility; default
+ * difficulty presets no longer impose a turn limit (CG-0MSLXJCHH001DLIO) —
+ * turn limits are opt-in via an explicit `config.maxTurns`.
+ */
 export const MAX_TURNS = 20;
 
 /** Score required for a win via score threshold. */
@@ -923,7 +927,10 @@ export function createStaffDeck(copies: number = 1): StaffCard[] {
 
 /**
  * Creates the full Business deck for a game (each template repeated
- * `copies` times to ensure adequate supply for 20 turns).
+ * `copies` times to ensure adequate supply — sized for ~20 turns of play;
+ * default presets impose no turn limit, CG-0MSLXJCHH001DLIO, and the market
+ * cycles unpurchased cards back into the deck, so supply is effectively
+ * unbounded).
  *
  * @param copies          Number of copies per template (default 3).
  * @param unlockedCardIds Optional list of unlocked card IDs for tier filtering.

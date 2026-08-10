@@ -49,7 +49,7 @@ npx vitest run --project unit tests/main-street/smoke-scenario.test.ts
 - Run is deterministic (two runs with the same seed produce identical output)
 - Each turn record has the expected fields
 
-**Tutorial scenario (Easy):** The same seed with Easy difficulty will produce a different outcome since Easy provides more starting coins and 25 turns. This is tested in the `smoke-scenario.test.ts` as the "Tutorial scenario baseline" suite.
+**Tutorial scenario (Easy):** The same seed with Easy difficulty will produce a different outcome since Easy provides more starting coins and a lower win threshold (default presets impose no turn limit — CG-0MSLXJCHH001DLIO). This is tested in the `smoke-scenario.test.ts` as the "Tutorial scenario baseline" suite.
 
 ### Adding or updating tutorial text
 
@@ -125,7 +125,7 @@ The player builds a street of low-cost businesses (Food Trucks, Cafe, Diner) but
 
 ### What happens
 
-The player opens with Florist (cost 2) and invests in Block Party but then faces two turns of inactivity (no affordable actions). Income is very low until turn 8-9 when Service synergies finally kick in with Pawn Shop + Laundromat + Barbershop. The win doesn't arrive until turn 17 -- dangerously close to the 20-turn limit.
+The player opens with Florist (cost 2) and invests in Block Party but then faces two turns of inactivity (no affordable actions). Income is very low until turn 8-9 when Service synergies finally kick in with Pawn Shop + Laundromat + Barbershop. The win doesn't arrive until turn 17 -- a slow build that would previously have been close to the 20-turn limit; with no turn limit by default the game continues until the score threshold, all challenges, bankruptcy, or reputation collapse (CG-0MSLXJCHH001DLIO).
 
 ### Balance observations
 
@@ -237,7 +237,7 @@ For custom sweep sizes, modify the `SEED_COUNT` constant in `tests/main-street/m
 To run a batch of seeds with full transcripts, use the Monte Carlo harness:
 
 ```bash
-npm run monte-carlo -- --seeds 50 --seed-prefix batch --maxTurns 25 --strategy greedy
+npm run monte-carlo -- --seeds 50 --seed-prefix batch --maxTurns 60 --strategy greedy
 ```
 
 Then analyse transcripts with standard JSON tools (`jq`, Python, etc.) to extract aggregate statistics.
