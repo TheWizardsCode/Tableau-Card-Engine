@@ -7,6 +7,7 @@ This document covers everything you need to develop, test, and build the Tableau
 - [Environment Setup](#environment-setup)
 - [Running Locally](#running-locally)
 - [Building for Production](#building-for-production)
+- [Electron Launcher / Desktop Packaging](#electron-launcher--desktop-packaging)
 - [Testing](#testing)
 - [ToneForge Audio Generation](#toneforge-audio-generation)
 - [Project Structure](#project-structure)
@@ -96,6 +97,73 @@ npm run preview
 ## Deployment / Release
 
 See [RELEASE.md](../RELEASE.md) for the full release workflow, checklist, and verification steps. The CI workflow is `.github/workflows/deploy.yml`.
+
+## Electron Launcher / Desktop Packaging
+
+TCE also ships as a native desktop app (Steam distribution) via an **Electron** launcher in `electron/` that boots the same Vite-built web app in a desktop window. The launcher works without Steam during development; Steam integration (DLC management) is designed for later addition behind a small provider interface.
+
+### Build modes
+
+`vite.config.ts` gates the production `base` on the Vite `mode`:
+
+| Mode | `base` | Used by |
+|------|--------|---------|
+| `production` | `/Tableau-Card-Engine/` | GitHub Pages (`npm run build`) — unchanged |
+| `electron` | `./` (relative, `file://`-safe) | Desktop launcher (`npm run build:electron`) |
+| dev/server | `/` | `npm run dev`, tests |
+
+### Prerequisites
+
+- Node.js 20+ (matches CI).
+- Playwright Chromium for the browser tests (`npx playwright install chromium`).
+- The Electron smoke test needs a display: on headless Linux run it under **xvfb** (`apt install xvfb`); macOS/Windows use their native display. The CI ubuntu runner ships xvfb.
+
+### Build & run the desktop app
+
+```bash
+npm run build:electron     # electron-mode Vite build -> dist/ (relative asset URLs)
+npm run build:electron-main # compile electron/*.ts -> dist-electron/ + copy preload.cjs
+npm run start:electron     # both builds + launch `electron .`
+```
+
+`electron .` reads `package.json` `"main": "dist-electron/main.js"`. The main process (ESM) creates the `BrowserWindow`, loads the resolved content entry via `loadFile`, and exposes read-only host info (resolved content dir, app version, runtime versions) to the renderer through the preload context bridge (`window.tce`) with `contextIsolation` on and `nodeIntegration` off.
+
+### Packaging a binary
+
+```bash
+npm run package        # host platform (Windows NSIS on Windows, AppImage/tar.gz on Linux, dmg on macOS)
+npm run package:win    # Windows NSIS installer + win-unpacked (primary Steam artifact)
+npm run package:linux  # AppImage + tar.gz
+npm run package:mac    # dmg
+```
+
+Output goes to the gitignored `release/` directory. Config: `electron-builder.yml` (app id `com.thewizardscode.tableaucardengine`, asar containing only `dist/` + `dist-electron/` + `package.json` — the renderer and Phaser are Vite-bundled, so no `node_modules` are needed). Packaging runs with `--publish never` (private repo; binaries are uploaded to Steam manually). The Windows binary is also built reproducibly by CI on every push to `main` (`.github/workflows/package.yml`) and uploaded as a workflow artifact.
+
+### DLC content directory (Steam model)
+
+Game content defaults to the bundled `dist/` inside the app. For Steam DLC (option a), the launcher reads game content from an external content root — a Steam-managed DLC install directory containing `index.html` + assets — supplied via:
+
+```bash
+npm run start:electron -- --content-dir /path/to/dlc
+# or
+TCE_CONTENT_DIR=/path/to/dlc npm run start:electron
+```
+
+The resolution lives in `electron/content-locator.ts` (pure Node, unit-tested) behind the `ContentDirectoryProvider` interface, so a future Steamworks-backed provider (option b, programmatic DLC management) can be added without changing the launcher's load path. Missing/invalid directories are rejected with a structured `ContentLocatorError` (clear message + exit code).
+
+### Electron smoke test
+
+The Playwright-Electron launch test (`tests/electron/launch-smoke.test.ts`) launches the real Electron app and asserts the Game Selector renders, the preload bridge is exposed, and clicking a selector card boots a game scene. It runs in its own vitest project so it never slows the regular suites:
+
+```bash
+# dev-build mode (rebuilds the electron-mode bundle first)
+npx vitest run --project electron        # needs a display (xvfb on headless Linux)
+
+# packaged-binary mode (CI packaging job uses this)
+TCE_SMOKE_BINARY=/path/to/binary npx vitest run --project electron
+```
+
+`npm test` includes this stage and skips it automatically when no display and no `xvfb-run` are available (see `scripts/run-ci-tests.sh`).
 
 ## Testing
 

@@ -14,11 +14,28 @@ npm run build        # TypeScript check + production build -> dist/
 npm run preview      # serve production build locally
 npm run tf:generate  # generate ToneForge artifacts to build/tf-synths/
 
+# Desktop / Steam packaging (Electron launcher):
+npm run build:electron   # electron-mode Vite build (relative base, file://-safe)
+npm run start:electron   # build + launch the desktop app locally
+npm run package          # package a binary for the host platform (see below)
+
 # Smoke test (headless, part of npm test):
 npx vitest run --project unit tests/main-street/smoke-scenario.test.ts
 ```
 
 Note: Vitest browser runs use an internal Vite server, but the dev-only transcript persistence middleware is disabled in test mode to avoid file-system side effects and reduce harness flakiness.
+
+## Desktop Launcher (Electron) & Steam Packaging
+
+TCE ships as a web app (GitHub Pages) **and** as a native desktop launcher built with **Electron** (`electron/`), for Steam distribution. The launcher boots the same built web app in a desktop window:
+
+- `npm run build:electron` -- Vite build with a **relative base** (`./`) so `dist/index.html` loads under Electron's `file://` protocol; the GitHub Pages build (`npm run build`) is unchanged.
+- `npm run start:electron` -- build + launch the desktop app locally.
+- `npm run package` / `package:win` / `package:linux` / `package:mac` -- produce a distributable binary (Windows NSIS installer is the primary Steam artifact) into the gitignored `release/` directory.
+- Game content can come from the bundled app or an external **Steam DLC install directory** via `--content-dir <dir>` / `TCE_CONTENT_DIR`, resolved behind a small provider interface so a future Steamworks-backed provider can be added without a rewrite.
+- The Windows binary is built reproducibly by CI (`.github/workflows/package.yml`) and uploaded as a workflow artifact on every push to `main`.
+
+See `docs/DEVELOPER.md` (Electron Launcher / Desktop Packaging) and `RELEASE.md` for the full workflow.
 
 ## What Is This?
 
@@ -44,6 +61,7 @@ tableau-card-engine/
 │   ├── lost-cities/       Lost Cities (2-player expedition lanes, human vs. AI)
 │   ├── main-street/       Main Street (single-player tableau builder)
 │   └── coloretto/         Coloretto (set-building rows, human vs. 1-4 AI)
+├── electron/             Desktop launcher (Electron main process, preload, content locator)
 ├── public/assets/         Static assets (cards, fonts, images)
 │   └── cards/             52 standard card SVGs + card back + game-specific cards (140x190px)
 ├── tests/                 Vitest test files
@@ -52,6 +70,8 @@ tableau-card-engine/
 │   ├── core-engine/       Engine API notes (including spatial rules)
 │   └── rule-engine/       Rule engine API docs (including economy ledger)
 ├── dist/                  Production build output (gitignored)
+├── dist-electron/         Compiled Electron main process output (gitignored)
+├── release/               Packaged binaries (gitignored; electron-builder output)
 ├── AGENTS.md              Project guidance and Worklog rules
 ├── package.json
 ├── tsconfig.json
@@ -81,6 +101,8 @@ Developer Guide for full documentation and usage examples.
 | [TypeScript](https://www.typescriptlang.org/) (strict, ES2020) | Static typing and early error detection |
 | [Vite](https://vitejs.dev/) | Dev server with HMR and optimized production builds |
 | [Vitest](https://vitest.dev/) | Vite-native test runner with Jest-compatible API |
+| [Electron](https://www.electronjs.org/) | Desktop launcher for Steam distribution (see Desktop Launcher section) |
+| [electron-builder](https://www.electron.build/) | Native binary packaging (Windows NSIS primary, Linux/macOS best-effort) |
 
 ## Example Games
 

@@ -75,6 +75,9 @@ npm run build        # TypeScript check + production build to dist/
 npm run preview      # Serve production build locally
 npm run monte-carlo  # Run Main Street Monte Carlo harness (JSON + CSV)
 npm run tf:generate  # Generate ToneForge audio artifacts into build/tf-synths/
+npm run build:electron   # Electron-mode Vite build (relative base, file://-safe) for the desktop launcher
+npm run start:electron   # Build + launch the Electron desktop app locally
+npm run package          # Package a desktop binary for the host platform (package:win/linux/mac variants)
 ```
 
 ### Quality Gates
