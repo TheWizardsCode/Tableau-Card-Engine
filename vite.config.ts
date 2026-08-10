@@ -14,7 +14,9 @@ export default defineConfig(({ mode, command }) => ({
   },
   // Use the repo sub-path for production builds (GitHub Pages);
   // keep '/' for local development so localhost:3000 works as expected.
-  base: mode === 'production' ? '/Tableau-Card-Engine/' : '/',
+  // The electron mode emits relative asset URLs ('./') so the built app can
+  // be loaded via Electron's file:// protocol (no server, no absolute paths).
+  base: mode === 'electron' ? './' : mode === 'production' ? '/Tableau-Card-Engine/' : '/',
   plugins: [
     // Only register the transcript persistence plugin during normal dev-server runs.
     // Vitest browser uses an internal Vite server; avoid plugin middleware there to
