@@ -18,6 +18,7 @@ import {
 import {
   formatSynergyRate,
   buildCardTooltipInfo,
+  turnLabel,
 } from '../MainStreetFormatting';
 import { computeScore } from '../MainStreetEngine';
 import {
@@ -1487,7 +1488,7 @@ export class MainStreetRenderer {
         s.uiPhase = 'market';
         this.refreshAll();
         s.instructionText.setText(
-          `Turn ${s.state.turn} / ${s.state.config.maxTurns} -- Buy cards from the market or End Turn`,
+          `${turnLabel(s.state.config, s.state.turn)} -- Buy cards from the market or End Turn`,
         );
       });
       s.actionContainer.add(cancelBtn);
@@ -1511,7 +1512,7 @@ export class MainStreetRenderer {
         s.uiPhase = 'market';
         this.refreshAll();
         s.instructionText.setText(
-          `Turn ${s.state.turn} / ${s.state.config.maxTurns} -- Buy cards from the market or End Turn`,
+          `${turnLabel(s.state.config, s.state.turn)} -- Buy cards from the market or End Turn`,
         );
       });
       s.actionContainer.add(cancelBtn);

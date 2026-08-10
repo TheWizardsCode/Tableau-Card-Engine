@@ -1,5 +1,6 @@
 import { addLog } from '../MainStreetState';
 import { executeDayStart, processEndOfTurn, placeFromHand, type TurnResult } from '../MainStreetEngine';
+import { turnLabel } from '../MainStreetFormatting';
 import {
   findTargetBusinessSlot,
   canAddToHand,
@@ -81,7 +82,7 @@ export class MainStreetTurnController {
       });
 
     s.instructionText.setText(
-      `Turn ${s.state.turn} / ${s.state.config.maxTurns} -- Buy cards from the market or End Turn`,
+      `${turnLabel(s.state.config, s.state.turn)} -- Buy cards from the market or End Turn`,
     );
   }
 

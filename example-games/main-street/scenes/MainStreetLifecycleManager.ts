@@ -315,7 +315,9 @@ export class MainStreetLifecycleManager {
           'Buy upgrades to improve existing businesses.\n' +
           'Hold event cards and play them when timing is best.\n' +
           'Complete challenges for bonus points and instant-win conditions.\n' +
-          'Manage coins and reputation across 20 turns to build the best street.',
+          'Manage coins and reputation to build the best street — games end\n' +
+          'when you win (score threshold / all challenges) or lose\n' +
+          '(bankruptcy / reputation collapse). There is no turn limit.',
       },
       {
         heading: 'Card Types',
@@ -390,14 +392,15 @@ export class MainStreetLifecycleManager {
           'Market Actions: buy businesses, upgrades, or events from the market.\n' +
           'Place businesses on the street grid to earn future income.\n' +
           'End Turn: resolves income, incidents, and advances to the next day.\n' +
-          'Repeat for 20 turns or until you win or go bankrupt.',
+          'Repeat until you win (score threshold / all challenges) or lose\n' +
+          '(bankruptcy / reputation collapse).',
       },
       {
         heading: 'Win / Loss Conditions',
         body:
           `Reach ${cfg.winThreshold} points to win (coins + reputation multiplier + challenges).\n` +
           `Complete all ${cfg.challengesPerRun} challenges for an instant win.\n` +
-          `Survive ${cfg.maxTurns} turns with positive reputation for a turn-limit victory.\n` +
+          'No turn limit: keep playing until you win or lose.\n' +
           'Bankruptcy (coins < 0) or reputation collapse (rep <= 0) loses the game.',
       },
       {
