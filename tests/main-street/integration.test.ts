@@ -63,10 +63,14 @@ function playGreedyTurn(state: MainStreetState): { actions: PlayerAction[]; resu
 /**
  * Runs a full game with a greedy strategy until it ends or hits a safety limit.
  * Returns array of turn records.
+ *
+ * The maxTurns cap is a harness-only termination guard (CG-0MSLXJCHH001DLIO):
+ * default presets impose no turn limit, so long-running simulations need an
+ * explicit bound to terminate deterministically.
  */
 function playFullGame(
   state: MainStreetState,
-  maxTurns = 25,
+  maxTurns = 60,
 ): { turnResults: TurnResult[]; totalTurns: number } {
   const turnResults: TurnResult[] = [];
   let count = 0;
@@ -181,14 +185,16 @@ describe('Integration: Full Game', () => {
     expect(['win', 'loss']).toContain(state.gameResult);
     expect(state.endReason).not.toBeNull();
     expect(totalTurns).toBeGreaterThanOrEqual(1);
-    expect(totalTurns).toBeLessThanOrEqual(21); // MAX_TURNS + 1 safety
+    // Harness termination guard: default presets are unlimited, so this is a
+    // bound on the simulation loop, not a game mechanic (CG-0MSLXJCHH001DLIO).
+    expect(totalTurns).toBeLessThanOrEqual(60);
     expect(turnResults.length).toBe(totalTurns);
 
     // Final score should be computed
     expect(state.finalScore).toBe(computeScore(state));
   });
 
-  it('reaches turn 20 limit with enough income to survive', () => {
+  it('reaches score threshold with enough income to survive', () => {
     // Manually set up a state with high coins to survive
     const state = setupMainStreetGame({ seed: 'integration-survive' });
     state.resourceBank.coins = 100;
@@ -196,12 +202,11 @@ describe('Integration: Full Game', () => {
 
     const { totalTurns: _totalTurns } = playFullGame(state);
 
-    // With high starting resources and reputation, game should reach turn 20
-    // and end with either score_threshold win or turn_limit_victory
-    expect(state.gameResult).not.toBe('playing');
-    if (state.gameResult === 'win') {
-      expect(['score_threshold', 'turn_limit_victory']).toContain(state.endReason);
-    }
+    // With high starting resources and reputation, the game ends via the
+    // score threshold (default presets impose no turn limit, so
+    // turn_limit_victory is not reachable — CG-0MSLXJCHH001DLIO).
+    expect(state.gameResult).toBe('win');
+    expect(state.endReason).toBe('score_threshold');
   });
 
   it('ends in bankruptcy when coins go below 0', () => {

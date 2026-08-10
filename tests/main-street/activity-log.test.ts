@@ -27,7 +27,6 @@ import {
 } from '../../example-games/main-street/MainStreetMarket';
 import { applyIncome, recalculateCard } from '../../example-games/main-street/MainStreetAdjacency';
 import {
-  MAX_TURNS,
   WIN_THRESHOLD,
   type BusinessCard,
   type EventCard,
@@ -361,7 +360,10 @@ describe('Activity Log', () => {
       const state = createTestState();
       executeDayStart(state);
 
-      state.turn = MAX_TURNS;
+      // Turn-based end conditions are opt-in via an explicit config.maxTurns
+      // (CG-0MSLXJCHH001DLIO); default presets impose no turn limit.
+      state.config = { ...state.config, maxTurns: 20 };
+      state.turn = 20;
       state.resourceBank.reputation = 5;
       state.resourceBank.coins = 10;
       state.phase = 'EndCheck';
@@ -411,36 +413,22 @@ describe('Activity Log', () => {
       const state = createTestState();
       executeDayStart(state);
 
-      state.turn = MAX_TURNS;
+      // turn_exhaustion is only reachable when the turn-limit check runs before
+      // the immediate-loss checks: on turn 1 the reputation-collapse guard is
+      // skipped, so rep <= 0 at turn >= maxTurns (maxTurns = 1 here) falls
+      // through to turn_exhaustion instead of reputation_collapse.
+      state.config = { ...state.config, maxTurns: 1 };
+      state.turn = 1;
+      state.resourceBank.coins = 0;
       state.resourceBank.reputation = 0;
-      state.resourceBank.coins = 0;
-      // rep=0 at turn > 1 would trigger reputation collapse first
-      // Instead: negative rep to not match turn-limit victory
-      state.turn = 2; // reset to >1 for rep collapse check
-      state.resourceBank.reputation = -1;
+      state.phase = 'EndCheck';
 
-      // Actually, let's set up turn exhaustion properly:
-      // Need turn >= MAX_TURNS, rep <= 0 but not via checkImmediateLoss
-      // checkEndConditions calls checkImmediateLoss first which will catch rep<=0
-      // So turn exhaustion requires: turn >= MAX_TURNS, coins >= 0, rep <= 0
-      // But checkImmediateLoss catches rep <= 0 when turn > 1
-      // Turn exhaustion is reached when: coins >= 0, rep > 0 is false but not via immediate loss
-      // Actually impossible with current logic if rep <= 0 triggers loss first
-      // Let's just test that turn exhaustion is logged when reached
-      state.turn = MAX_TURNS;
-      state.resourceBank.coins = 0;
-      state.resourceBank.reputation = 1; // positive, won't trigger rep collapse
-      // But coins=0 and rep=1 would be turn-limit victory...
-      // Need: coins < 0 at turn limit? No, that's bankruptcy.
-      // Turn exhaustion: turn >= MAX_TURNS and NOT (rep > 0 && coins >= 0)
-      // So: rep <= 0 || coins < 0 at turn limit
-      // But both trigger immediate loss before reaching turn exhaustion check
-      // Actually looking at the code: checkEndConditions calls checkImmediateLoss first
-      // So if rep <= 0 (turn > 1) -> rep collapse (immediate loss)
-      // If coins < 0 -> bankruptcy (immediate loss)
-      // Turn exhaustion is only reachable if... hmm, it seems unreachable
-      // unless reputation exactly 0 on turn 1 (but turn >= MAX_TURNS > 1)
-      // This is actually a dead code path. Let's skip this subtest.
+      const logBefore = state.activityLog.length;
+      checkEndConditions(state);
+
+      const entry = state.activityLog[logBefore];
+      expect(entry.type).toBe('loss');
+      expect(entry.text).toContain('Turn limit exhausted');
     });
   });
 

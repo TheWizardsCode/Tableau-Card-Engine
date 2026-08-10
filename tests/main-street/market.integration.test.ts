@@ -200,7 +200,9 @@ describe('Market Refill Integration (Expanded Pool)', () => {
 
 describe('Monte Carlo: Market Refill Stability', () => {
   const SEED_COUNT = 200; // Run 200 seeds for reasonable coverage in test suite
-  const MAX_TURNS = 25;
+  // Harness-only termination guard (CG-0MSLXJCHH001DLIO): default presets
+  // impose no turn limit, so the simulation loop uses a generous fixed cap.
+  const MAX_TURNS = 60;
 
   it(`no refill starvation or infinite loops across ${SEED_COUNT} seeds`, () => {
     const failures: string[] = [];

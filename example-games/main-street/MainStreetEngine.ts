@@ -482,13 +482,16 @@ export function checkImmediateLoss(state: MainStreetState): boolean {
  *
  * Win conditions (checked in order):
  * 1. All challenges complete (activeChallenges.length > 0 and all completed)
- * 2. Score threshold: finalScore >= WIN_THRESHOLD
- * 3. Turn 20 with positive reputation and coins >= 0
+ * 2. Score threshold: finalScore >= config.winThreshold
+ * 3. Turn limit (opt-in): turn >= config.maxTurns with positive reputation and
+ *    coins >= 0 — only fires when a config explicitly sets `maxTurns`
+ *    (default presets impose no turn limit, CG-0MSLXJCHH001DLIO).
  *
  * Loss conditions:
  * 1. Bankruptcy (already checked by checkImmediateLoss)
  * 2. Reputation collapse (already checked)
- * 3. Turn exhaustion: turn >= MAX_TURNS and no win condition met
+ * 3. Turn exhaustion (opt-in): turn >= config.maxTurns and no win condition
+ *    met — only fires when a config explicitly sets `maxTurns`.
  *
  * @returns true if a game-ending condition was detected.
  */
@@ -518,8 +521,15 @@ export function checkEndConditions(state: MainStreetState): boolean {
     return true;
   }
 
-  // Turn limit reached
-  if (state.turn >= state.config.maxTurns) {
+  // Turn limit reached (opt-in: only fires when a config explicitly sets
+  // maxTurns; default presets are unlimited, CG-0MSLXJCHH001DLIO).
+  //
+  // Accepted stalemate behaviour: with no turn limit and no deck-exhaustion
+  // end condition, a player who keeps coins >= 0 and reputation > 0 can pass
+  // turns indefinitely without winning — passive play simply never reaches
+  // the score threshold. This is a deliberate design choice (no forced end);
+  // the turn-based end path remains available to opt-in configs.
+  if (state.config.maxTurns !== undefined && state.turn >= state.config.maxTurns) {
     // Turn-limit victory: positive reputation and coins >= 0
     if (state.resourceBank.reputation > 0 && state.resourceBank.coins >= 0) {
       state.gameResult = 'win';

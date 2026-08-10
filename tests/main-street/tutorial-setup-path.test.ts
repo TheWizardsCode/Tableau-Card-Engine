@@ -385,9 +385,10 @@ describe('AC4: Scenario-built state produces consistent market indices (backward
     // without modification. This tests structural backward compatibility.
     const state = createTutorialScenario();
 
-    // State has config with difficulty preset
+    // State has config with difficulty preset; default presets impose no
+    // turn limit (maxTurns is optional and unset — CG-0MSLXJCHH001DLIO).
     expect(state.config.difficultyName).toBe('Easy');
-    expect(state.config.maxTurns).toBeGreaterThan(0);
+    expect(state.config.maxTurns).toBeUndefined();
     expect(state.config.startingCoins).toBe(12);
     expect(state.config.startingReputation).toBe(5);
 

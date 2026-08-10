@@ -37,7 +37,6 @@ import {
 import {
   STARTING_COINS,
   STARTING_REPUTATION,
-  MAX_TURNS,
   WIN_THRESHOLD,
   SYNERGY_BONUS_PER_NEIGHBOR,
   REPUTATION_SCORE_MULTIPLIER,
@@ -114,7 +113,6 @@ describe('DifficultyPresets Module', () => {
         'difficultyName',
         'startingCoins',
         'startingReputation',
-        'maxTurns',
         'winThreshold',
         'reputationScoreMultiplier',
         'challengeBonusPoints',
@@ -134,7 +132,6 @@ describe('DifficultyPresets Module', () => {
       const numericKeys: (keyof GameConfig)[] = [
         'startingCoins',
         'startingReputation',
-        'maxTurns',
         'winThreshold',
         'reputationScoreMultiplier',
         'challengeBonusPoints',
@@ -160,10 +157,6 @@ describe('DifficultyPresets Module', () => {
 
     it('should match STARTING_REPUTATION', () => {
       expect(MEDIUM_PRESET.startingReputation).toBe(STARTING_REPUTATION);
-    });
-
-    it('should match MAX_TURNS', () => {
-      expect(MEDIUM_PRESET.maxTurns).toBe(MAX_TURNS);
     });
 
     it('should match WIN_THRESHOLD', () => {
@@ -196,10 +189,6 @@ describe('DifficultyPresets Module', () => {
       expect(EASY_PRESET.startingReputation).toBeGreaterThan(MEDIUM_PRESET.startingReputation);
     });
 
-    it('should have more turns', () => {
-      expect(EASY_PRESET.maxTurns).toBeGreaterThan(MEDIUM_PRESET.maxTurns);
-    });
-
     it('should have lower win threshold', () => {
       expect(EASY_PRESET.winThreshold).toBeLessThan(MEDIUM_PRESET.winThreshold);
     });
@@ -222,10 +211,6 @@ describe('DifficultyPresets Module', () => {
 
     it('should have fewer starting reputation', () => {
       expect(HARD_PRESET.startingReputation).toBeLessThan(MEDIUM_PRESET.startingReputation);
-    });
-
-    it('should have fewer turns', () => {
-      expect(HARD_PRESET.maxTurns).toBeLessThan(MEDIUM_PRESET.maxTurns);
     });
 
     it('should have higher win threshold', () => {
@@ -470,10 +455,9 @@ describe('Engine uses config values', () => {
       state.challengesCompleted = [];
       state.activeChallenges = [];
       const ended = checkEndConditions(state);
-      if (ended) {
-        // Only end if turn limit
-        expect(state.endReason).not.toBe('score_threshold');
-      }
+      // Default presets impose no turn limit (CG-0MSLXJCHH001DLIO), so a
+      // sub-threshold score can never end the game via any reason.
+      expect(ended).toBe(false);
     });
 
     it('should win when score meets Easy winThreshold', () => {
@@ -499,48 +483,76 @@ describe('Engine uses config values', () => {
       state.activeChallenges = [];
       checkEndConditions(state);
       // The score is EASY_PRESET.winThreshold + 1*5 = 125
-      // That's below Hard's 180 threshold
-      if (state.turn < HARD_PRESET.maxTurns) {
-        expect(state.endReason).not.toBe('score_threshold');
+      // That's below Hard's 180 threshold; no turn limit applies.
+      expect(state.endReason).not.toBe('score_threshold');
+    });
+  });
+
+  describe('no turn-based end conditions by default (CG-0MSLXJCHH001DLIO)', () => {
+    it.each(['Easy', 'Medium', 'Hard'] as const)(
+      '%s preset never ends via a turn-based reason over a 200-turn horizon',
+      (difficulty) => {
+        const state = createTestState('unlimited-horizon-' + difficulty, difficulty);
+        // Keep the game structurally unable to end except via the turn limit:
+        // coins >= 0 (no bankruptcy), rep > 0 (no reputation collapse), score
+        // below winThreshold (no score_threshold), no active challenges.
+        state.resourceBank.coins = 50;
+        state.resourceBank.reputation = 5;
+        state.challengesCompleted = [];
+        state.activeChallenges = [];
+
+        for (let turn = 1; turn <= 200; turn++) {
+          state.turn = turn;
+          state.phase = 'EndCheck';
+          const ended = checkEndConditions(state);
+          expect(ended, `ended at turn ${turn}`).toBe(false);
+        }
+        expect(state.gameResult).toBe('playing');
+        expect(state.endReason).toBeNull();
+      },
+    );
+
+    it('default presets have no maxTurns field (undefined = unlimited)', () => {
+      for (const preset of [EASY_PRESET, MEDIUM_PRESET, HARD_PRESET]) {
+        expect(preset.maxTurns).toBeUndefined();
       }
     });
   });
 
-  describe('checkEndConditions uses config.maxTurns', () => {
-    it('should not end at Easy maxTurns - 1', () => {
-      const state = createTestState('turns-easy', 'Easy');
+  describe('explicit maxTurns remains opt-in (CG-0MSLXJCHH001DLIO)', () => {
+    it('ends via turn_limit_victory at exactly maxTurns when rep > 0 and coins >= 0', () => {
+      const state = createTestState('explicit-limit');
+      state.config = { ...state.config, maxTurns: 8 };
       state.phase = 'EndCheck';
-      state.turn = EASY_PRESET.maxTurns - 1;
-      state.resourceBank.coins = 5;
-      state.resourceBank.reputation = 1;
+      state.resourceBank.coins = 10;
+      state.resourceBank.reputation = 3;
+      state.challengesCompleted = [];
       state.activeChallenges = [];
-      const ended = checkEndConditions(state);
-      // Score is 5 + 5 = 10, below threshold; turn not maxed
-      expect(ended).toBe(false);
-    });
 
-    it('should end at Easy maxTurns with positive rep as turn_limit_victory', () => {
-      const state = createTestState('turns-easy-end', 'Easy');
-      state.phase = 'EndCheck';
-      state.turn = EASY_PRESET.maxTurns;
-      state.resourceBank.coins = 5;
-      state.resourceBank.reputation = 1;
-      state.activeChallenges = [];
+      state.turn = 7;
+      expect(checkEndConditions(state)).toBe(false);
+
+      state.turn = 8;
       const ended = checkEndConditions(state);
       expect(ended).toBe(true);
+      expect(state.gameResult).toBe('win');
       expect(state.endReason).toBe('turn_limit_victory');
     });
 
-    it('should end at Hard maxTurns (15) not Medium maxTurns (20)', () => {
-      const state = createTestState('turns-hard', 'Hard');
+    it('ends via turn_exhaustion at maxTurns when the victory condition is not met', () => {
+      const state = createTestState('explicit-limit-exhaust');
+      state.config = { ...state.config, maxTurns: 1 };
       state.phase = 'EndCheck';
-      state.turn = HARD_PRESET.maxTurns; // 15
-      state.resourceBank.coins = 5;
-      state.resourceBank.reputation = 1;
+      state.turn = 1; // turn-1 guard: reputation collapse is not checked on turn 1
+      state.resourceBank.coins = 10;
+      state.resourceBank.reputation = 0; // <= 0: not a turn-limit victory
+      state.challengesCompleted = [];
       state.activeChallenges = [];
+
       const ended = checkEndConditions(state);
       expect(ended).toBe(true);
-      // Turn 15 is maxTurns for Hard
+      expect(state.gameResult).toBe('loss');
+      expect(state.endReason).toBe('turn_exhaustion');
     });
   });
 });

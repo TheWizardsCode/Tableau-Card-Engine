@@ -60,8 +60,16 @@ export interface GameConfig extends DifficultyConfig {
   readonly startingReputation: number;
 
   // ── Turn Structure ──────────────────────────────────────
-  /** Maximum number of turns before the game ends. */
-  readonly maxTurns: number;
+  /**
+   * Maximum number of turns before the game ends (opt-in).
+   *
+   * Undefined (the default) means **unlimited**: the game ends only via
+   * score threshold, all challenges complete, bankruptcy, or reputation
+   * collapse. When set, the turn-based end path in `checkEndConditions`
+   * fires at `turn >= maxTurns` (turn_limit_victory / turn_exhaustion).
+   * Default presets do not set this field (CG-0MSLXJCHH001DLIO).
+   */
+  readonly maxTurns?: number;
 
   // ── Scoring ─────────────────────────────────────────────
   /** Score required for a win via score threshold. */
@@ -122,14 +130,14 @@ export interface GameConfig extends DifficultyConfig {
 // ── Preset Definitions ──────────────────────────────────────
 
 /**
- * Easy preset: generous resources, more turns, lower win threshold.
- * Designed for new players learning the mechanics.
+ * Easy preset: generous resources, lower win threshold.
+ * Designed for new players learning the mechanics. No turn limit
+ * (CG-0MSLXJCHH001DLIO — turn limits are opt-in via explicit `maxTurns`).
  */
 export const EASY_PRESET: Readonly<GameConfig> = {
   difficultyName: 'Easy',
   startingCoins: 12,
   startingReputation: 5,
-  maxTurns: 25,
   winThreshold: 120,
   reputationScoreMultiplier: 5,
   challengeBonusPoints: 15,
@@ -146,13 +154,13 @@ export const EASY_PRESET: Readonly<GameConfig> = {
 
 /**
  * Medium preset: matches the original hard-coded constants exactly.
- * This is the default and the baseline for balance.
+ * This is the default and the baseline for balance. No turn limit
+ * (CG-0MSLXJCHH001DLIO — turn limits are opt-in via explicit `maxTurns`).
  */
 export const MEDIUM_PRESET: Readonly<GameConfig> = {
   difficultyName: 'Medium',
   startingCoins: 8,
   startingReputation: 3,
-  maxTurns: 20,
   winThreshold: 150,
   reputationScoreMultiplier: 5,
   challengeBonusPoints: 10,
@@ -170,14 +178,14 @@ export const MEDIUM_PRESET: Readonly<GameConfig> = {
 };
 
 /**
- * Hard preset: tight resources, fewer turns, higher win threshold.
- * Designed for experienced players seeking a challenge.
+ * Hard preset: tight resources, higher win threshold.
+ * Designed for experienced players seeking a challenge. No turn limit
+ * (CG-0MSLXJCHH001DLIO — turn limits are opt-in via explicit `maxTurns`).
  */
 export const HARD_PRESET: Readonly<GameConfig> = {
   difficultyName: 'Hard',
   startingCoins: 5,
   startingReputation: 2,
-  maxTurns: 15,
   winThreshold: 180,
   reputationScoreMultiplier: 5,
   challengeBonusPoints: 8,

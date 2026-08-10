@@ -220,7 +220,9 @@ describe('Smoke: Main Street Easy difficulty (Tutorial scenario baseline)', () =
   it('completes an Easy game with seed "smoke-1"', () => {
     const state = setupMainStreetGame({ seed: SMOKE_SEED, difficulty: 'Easy' });
     let turns = 0;
-    const safetyLimit = state.config.maxTurns + 5;
+    // Harness-only termination guard (CG-0MSLXJCHH001DLIO): default presets
+    // impose no turn limit, so the simulation loop uses a fixed safety cap.
+    const safetyLimit = 60;
 
     while (state.gameResult === 'playing' && turns < safetyLimit) {
       executeDayStart(state);

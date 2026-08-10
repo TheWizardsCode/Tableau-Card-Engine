@@ -156,10 +156,10 @@ export type GameResult = 'playing' | 'win' | 'loss';
 export type EndReason =
   | 'score_threshold'
   | 'all_challenges'
-  | 'turn_limit_victory'
+  | 'turn_limit_victory' // opt-in: only when a config sets maxTurns (CG-0MSLXJCHH001DLIO)
   | 'bankruptcy'
   | 'reputation_collapse'
-  | 'turn_exhaustion'
+  | 'turn_exhaustion' // opt-in: only when a config sets maxTurns (CG-0MSLXJCHH001DLIO)
   | null;
 
 // ── Main Street State ───────────────────────────────────────
@@ -173,7 +173,11 @@ export type EndReason =
 export interface MainStreetState {
   /** Runtime configuration derived from the selected difficulty preset. */
   config: GameConfig;
-  /** Current turn number (1-based, max config.maxTurns). */
+  /**
+   * Current turn number (1-based). Unbounded unless `config.maxTurns` is
+   * explicitly set (default presets impose no turn limit —
+   * CG-0MSLXJCHH001DLIO).
+   */
   turn: number;
   /** Current phase within the turn. */
   phase: DayPhase;
