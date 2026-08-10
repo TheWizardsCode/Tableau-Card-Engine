@@ -11,6 +11,7 @@ pnpm-debug.log*
 # Build Output
 ##################################
 dist/
+dist-electron/
 build/
 *.js.map
 *.tsbuildinfo

@@ -5,7 +5,10 @@
  * module resolves that directory, supporting the Steam DLC model:
  *
  *  - **Bundled app (default):** the Vite `dist/` directory shipped inside the
- *    packaged binary (or the repo `dist/` in development).
+ *    packaged binary (or the repo `dist/` in development). The launcher's
+ *    main process computes this path (e.g. `path.join(__dirname, '..', 'dist')`
+ *    from the compiled launcher) and passes it in as `bundledDir` — this
+ *    module stays pure Node and Electron-agnostic.
  *  - **External override (option a, v1):** a Steam-managed DLC install
  *    directory, supplied via the `--content-dir` CLI flag or the
  *    `TCE_CONTENT_DIR` environment variable. Steam downloads/installs the DLC;
@@ -19,7 +22,6 @@
  */
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 
 export type ContentSource = 'bundled' | 'override';
 
@@ -33,8 +35,9 @@ export interface ResolvedContent {
 }
 
 export interface ContentLocatorOptions {
-  /** Bundled app content (the Vite `dist/` directory). */
-  bundledDir?: string;
+  /** Bundled app content (the Vite `dist/` directory). Required — the caller
+   * (launcher main process) computes it from its own compiled location. */
+  bundledDir: string;
   /** Explicit override (CLI `--content-dir`); falls back to TCE_CONTENT_DIR. */
   override?: string | null;
   /** Entry HTML filename within the content root (default: 'index.html'). */
@@ -70,34 +73,23 @@ export interface ContentDirectoryProvider {
   resolve(): ResolvedContent | null;
 }
 
-/** Locate the bundled `dist/` directory relative to this module. */
-function defaultBundledDir(): string {
-  // Compiled launcher (CJS, dist-electron/): ../dist is the sibling renderer.
-  if (typeof __dirname !== 'undefined') {
-    return path.resolve(__dirname, '..', 'dist');
-  }
-  // ESM context (vitest transform of the TS source): same relative layout.
-  const here = path.dirname(fileURLToPath(import.meta.url));
-  return path.resolve(here, '..', 'dist');
-}
-
 /**
  * Resolve the game-content root directory.
  *
  * Precedence: explicit `override` option > `TCE_CONTENT_DIR` env var >
- * `bundledDir` option > bundled `dist/` relative to this module.
+ * the caller-supplied `bundledDir`.
  *
  * @throws {ContentLocatorError} when the resolved root does not exist or does
  * not contain the entry file.
  */
-export function resolveContentDir(options: ContentLocatorOptions = {}): ResolvedContent {
+export function resolveContentDir(options: ContentLocatorOptions): ResolvedContent {
   const entryFileName = options.entryFileName ?? DEFAULT_ENTRY_FILE;
   const override = options.override ?? process.env[CONTENT_DIR_ENV] ?? null;
 
   if (override) {
     return resolveFromRoot(override, entryFileName, 'override');
   }
-  return resolveFromRoot(options.bundledDir ?? defaultBundledDir(), entryFileName, 'bundled');
+  return resolveFromRoot(options.bundledDir, entryFileName, 'bundled');
 }
 
 function resolveFromRoot(
