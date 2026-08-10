@@ -435,6 +435,16 @@ export class MainStreetRenderer {
     }).setOrigin(0.5, 1);
     s.streetContainer.add(label);
 
+    // Register drag-drop drop zones BEFORE drawing slot rectangles. Phaser's
+    // input system uses topOnly by default, meaning pointer events are delivered
+    // only to the top-most hit object (the one with the highest render-list
+    // index). By registering zones first, then drawing slot rects afterward,
+    // the clickable slot rectangles end up on top and receive pointer events
+    // (click-to-place), while drag-drop hit testing still works because the
+    // drop zones are collected from all interactive objects regardless of
+    // render order.
+    this.refreshDragDropZones();
+
     for (let i = 0; i < GRID_SIZE; i++) {
       const col = i % streetCols;
       const row = Math.floor(i / streetCols);
@@ -451,11 +461,6 @@ export class MainStreetRenderer {
 
     // Draw synergy lines between adjacent synergistic businesses
     this.drawSynergyLines();
-
-    // Re-register street-slot drop zones for drag-to-buy/place. Only empty
-    // slots become zones; occupied slots reject the drop because no zone is
-    // hit-tested (and canAccept would veto anyway).
-    this.refreshDragDropZones();
   }
 
   /**

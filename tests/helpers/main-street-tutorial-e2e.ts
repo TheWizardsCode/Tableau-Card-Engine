@@ -446,6 +446,12 @@ export async function clickRequiredEventCard(scene: Phaser.Scene): Promise<void>
 /**
  * Click a street slot to place the pending business card and wait for the
  * async placement to land (slot filled or tutorial advances past the place step).
+ *
+ * The click is dispatched as REAL native mousedown/mouseup DOM events on the
+ * canvas at the slot's coordinates (CSS-scale-aware), exercising Phaser's
+ * actual input pipeline (topOnly hit-testing) rather than calling
+ * onSlotClick() directly — the regression guard for CG-0MSN8ZZX2000B9UP
+ * (drag-drop drop zones used to steal slot clicks).
  */
 export async function clickStreetSlot(scene: Phaser.Scene, slotIdx: number): Promise<void> {
   const s = scene as any;
@@ -518,13 +524,59 @@ export async function clickStreetSlot(scene: Phaser.Scene, slotIdx: number): Pro
   } else {
     s.uiPhase = 'placing-business';
   }
-  try { s.onSlotClick(slotIdx); } catch (_) { /* ignore */ }
+
+  // Rebuild the street grid so the empty-slot rectangles are interactive with
+  // the correct phase AND rendered on top of the drag-drop zones (the fix for
+  // CG-0MSN8ZZX2000B9UP). Without this refresh the slots may have been drawn
+  // while the UI was in a non-placing phase and thus not interactive.
+  try { s.refreshStreetGrid(); } catch (_) { /* ignore */ }
+  // Let the renderer flush a frame so the newly created slot rectangles enter
+  // the camera render list — Phaser's hit test skips objects that haven't been
+  // rendered yet (willRender). Without this wait the click would silently miss.
+  await new Promise((r) => setTimeout(r, 100));
+
+  // Dispatch a real pointer click at the slot centre through the canvas so
+  // Phaser's input pipeline (topOnly hit-test) resolves the target object.
+  const center = s.getStreetSlotCenter(slotIdx);
+  dispatchCanvasMouse('mousedown', center.x, center.y);
+  await new Promise((r) => setTimeout(r, 120)); // separate frames, even under CI contention
+  dispatchCanvasMouse('mouseup', center.x, center.y);
 
   // Wait for the async placement to land: the slot becomes filled (or the
-  // tutorial advances past the place step).
-  await pollUntil(() => s.state.streetGrid[slotIdx] != null, 6_000);
+  // tutorial advances past the place step). A timeout here means the real
+  // pointer click did NOT place the card — a regression, not a flake.
+  const placed = await pollUntil(() => s.state.streetGrid[slotIdx] != null, 6_000);
+  if (!placed) {
+    throw new Error(
+      `clickStreetSlot: real pointer click on slot ${slotIdx} did not place the card ` +
+      `(input pipeline regression — see CG-0MSN8ZZX2000B9UP)`,
+    );
+  }
   // Fallback: if still on a place-business step after the attempt, force-advance.
   maybeAdvanceFromRequiredAction(scene, 'place-business');
+}
+
+/**
+ * Dispatch a native DOM MouseEvent on the game canvas at (world) coordinates.
+ * The canvas may be CSS-scaled, so world coordinates are converted to client
+ * coordinates via the canvas bounding rect (same convention as the drag tests).
+ */
+function dispatchCanvasMouse(type: string, worldX: number, worldY: number): void {
+  const canvas = document.querySelector('#game-container canvas') as HTMLCanvasElement | null;
+  if (!canvas) throw new Error('dispatchCanvasMouse: game canvas not found');
+  const rect = canvas.getBoundingClientRect();
+  const clientX = rect.x + (worldX / 1280) * rect.width;
+  const clientY = rect.y + (worldY / 720) * rect.height;
+  canvas.dispatchEvent(
+    new MouseEvent(type, {
+      clientX,
+      clientY,
+      bubbles: true,
+      cancelable: true,
+      view: window,
+      button: 0,
+    }),
+  );
 }
 
 /**
