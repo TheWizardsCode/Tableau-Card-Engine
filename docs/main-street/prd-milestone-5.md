@@ -6,6 +6,12 @@
 **Date:** 2026-05-09  
 **Status:** IMPLEMENTED -- Milestone 5 delivered via CG-0MOY5TOJK008JFJM
 
+> **Status update (CG-0MSLXJCHH001DLIO):** This historical PRD's step overlay
+> copy and Game Selector description reference a 20-turn game. Default
+> presets no longer impose a turn limit; the Game Selector catalogue entry
+> and tutorial copy have been updated accordingly (no turn limit by default;
+> opt-in via an explicit `maxTurns` config).
+
 ---
 
 ## 1. Goal and Success Criteria
