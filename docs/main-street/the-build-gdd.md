@@ -1,5 +1,7 @@
 # The Build: Game Design Document (GDD)
 
+> **Status update (CG-0MSLXJCHH001DLIO):** This historical GDD describes the original 20-turn design (``MAX_TURNS = 20``, "Turn 20" win/loss conditions). Default difficulty presets no longer impose a turn limit — games end via score threshold, all challenges, bankruptcy, or reputation collapse; a turn limit is opt-in via an explicit `maxTurns` config. See `docs/main-street/core-rules-and-mechanics.md` for the current rules. The 20-turn references below are retained for historical accuracy.
+
 ## Executive Summary
 
 **Main Street** (working title: *The Build*) is a single-player, turn-based tableau card game where the player revitalises a 10-slot linear street by purchasing and placing business cards from a market. Adjacent businesses sharing synergy types generate bonus income. The player manages two resources (Coins and Reputation) across 20 day/night turns, aiming to reach a score threshold of 150 or complete all challenges. The game is built on the Tableau Card Engine using Phaser 3, TypeScript, and seeded deterministic RNG for reproducible sessions.
@@ -23,6 +25,8 @@
 ## 1. Game Overview
 
 **Main Street** is a single‑player, turn‑based tableau card game built on the **Tableau Card Engine**. The player takes the role of a town planner revitalising a small main street by purchasing and placing business cards in a linear row. Each turn represents a day (or night) cycle. Adjacent businesses generate synergy bonuses, earn coins, and increase the town’s reputation. The game ends after a fixed number of turns or when a win condition is met. The design prioritises a fast‑to‑prototype core loop while delivering reusable engine components (grid, adjacency resolver, market, resource bank).
+
+> **Update (CG-0MSLXJCHH001DLIO):** "Fixed number of turns" describes the original design; there is no default turn limit anymore.
 
 ---
 
@@ -188,6 +192,8 @@ The turn ends when either:
 - The player meets a **Win Condition** (Section 7), **or**
 - A **Loss Condition** (Section 8) triggers.
 
+> **Update (CG-0MSLXJCHH001DLIO):** The `MAX_TURNS = 20` end condition is no longer a default game mechanic — it fires only when a config explicitly sets `maxTurns`.
+
 ---
 
 ## 6. Core Actions
@@ -215,6 +221,8 @@ finalScore = resourceBank.coins + resourceBank.reputation * 5 + challengeBonus;
 2. **Challenge Completion** – All **Primary Challenges** (defined in `docs/games/the-build/challenges.md`) are completed, granting an automatic win regardless of numeric score.
 3. **Turn Limit Victory** – The player reaches **Turn 20** with a **positive reputation** (`reputation > 0`) and **coins >= 0**; the final score is then evaluated against the threshold. If the threshold is not met, the game ends as a loss.
 
+> **Update (CG-0MSLXJCHH001DLIO):** Turn Limit Victory is opt-in — it only applies when a config explicitly sets `maxTurns`.
+
 ---
 
 ## 8. Loss Conditions
@@ -223,6 +231,8 @@ The game ends in **loss** if **any** of the following occur **immediately after 
 - **Bankruptcy** – `resourceBank.coins < 0`.
 - **Reputation Collapse** – `resourceBank.reputation <= 0` (the town is considered abandoned).
 - **Turn Exhaustion Without Victory** – Turn 20 is reached and none of the win conditions in Section 7 are met.
+
+> **Update (CG-0MSLXJCHH001DLIO):** Turn Exhaustion is opt-in — it only applies when a config explicitly sets `maxTurns`.
 
 ---
 
