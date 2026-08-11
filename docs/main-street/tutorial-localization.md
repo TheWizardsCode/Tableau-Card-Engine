@@ -149,7 +149,7 @@ Tutorial text follows these editorial principles:
 | 9 | T9 | Buy the Local Festival | action (buy-event) | festivalCard (card-level) |
 | 10 | T10 | Optimizing for Events | action (buy-and-place) | developmentRow |
 | 11 | T11 | End this turn | action (end-turn) | endTurnButton |
-| 12 | T12 | Build a Library | action (select-business) | developmentRow |
+| 12 | T12 | Build a Library | action (buy-and-place) | developmentRow |
 | 13 | T13 | Triggering Events | action (play-event) | hand |
 | 14 | T14 | Success and Failure | confirm | hud (scoring bar) |
 | 15 | T15 | Challenges | confirm | challengePanel |

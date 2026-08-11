@@ -52,6 +52,8 @@
 import { t, formatCurrency } from '../../src/core-engine/I18n';
 import { tutorialKey } from './i18n/tutorial-en';
 import { getCsvRows, getBaseTypeId } from './MainStreetCards';
+import type { BusinessCard, CommunitySpaceCard } from './MainStreetCards';
+import { neighbors } from './MainStreetAdjacency';
 
 // ── Step Types ──────────────────────────────────────────────
 
@@ -284,11 +286,14 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     id: 'T12',
     titleKey: tutorialKey('T12', 'title'),
     bodyKey: tutorialKey('T12', 'body'),
-    // Build a Library: buy cs-library from the dev row; body text references
-    // the Bookshop synergy partner via {synergyCardName}.
+    // Composite buy-and-place step (like T10): the player buys cs-library
+    // from the dev row (drag or click-to-buy) and places it on the street.
+    // The step completes only on the terminal place-business drop; the
+    // Library must be placed NEXT TO the Bookshop (synergyCardId) for the
+    // Culture adjacency bonus — see isSynergyAdjacentPlacement().
     highlightZone: 'developmentRow',
     gate: 'action',
-    requiredAction: 'select-business',
+    requiredAction: 'buy-and-place',
     requiredCardId: 'cs-library',
     synergyCardId: 'biz-bookshop-0',
   },
@@ -434,6 +439,56 @@ export function shouldAllowAction(
 ): boolean {
   if (!state.isActive) return true;
   return isRequiredAction(state, actionType);
+}
+
+/**
+ * Pure placement rule for composite buy-and-place steps with a synergy
+ * partner (currently T12: the Library must be built next to the Bookshop
+ * for the Culture adjacency bonus).
+ *
+ * Enforced by both the drag path (`MainStreetTurnController.canDropBusinessCard`
+ * → snap-back + illegal-move feedback) and the click path (`onSlotClick` →
+ * instruction message) while the step is active.
+ *
+ * @param step        The current tutorial step.
+ * @param streetGrid  The live 2×5 street grid (slot index → card or null).
+ * @param targetSlot  The candidate placement slot index.
+ * @returns `true` when the placement is allowed, `false` when it must be
+ *          rejected because the target is not adjacent to the synergy card.
+ *
+ * The rule ONLY applies to composite `buy-and-place` steps that declare a
+ * `synergyCardId`. For every other step the helper returns `true` (no-op).
+ * "Next to" means orthogonal Manhattan adjacency (distance ≤ 1) via the
+ * shared `neighbors()` resolver from `MainStreetAdjacency` — the same
+ * semantics the synergy bonus system uses.
+ *
+ * The synergy card's slot is resolved dynamically from the live grid (the
+ * operator explicitly rejected a hardcoded slot — "don't assume the player
+ * placed the bookshop in a specific place"). Card IDs are compared by base
+ * template (copy-suffix stripped) so any copy of the synergy template
+ * satisfies the rule. If the synergy card is NOT on the street, the rule
+ * cannot be enforced and returns `true` (allowed) — the partner is
+ * guaranteed to be present when T12 is reached (T10's buy-and-place
+ * completes only on placement), but the helper stays robust regardless.
+ */
+export function isSynergyAdjacentPlacement(
+  step: UnifiedTutorialStepDef,
+  streetGrid: readonly (BusinessCard | CommunitySpaceCard | null)[],
+  targetSlot: number,
+): boolean {
+  // Rule only applies to composite buy-and-place steps with a synergy partner.
+  if (step.requiredAction !== 'buy-and-place' || !step.synergyCardId) return true;
+
+  // Resolve the synergy card's ACTUAL street slot from the live grid.
+  const synergySlot = streetGrid.findIndex(
+    (card) =>
+      card !== null &&
+      getBaseTypeId(card.id) === getBaseTypeId(step.synergyCardId!),
+  );
+  // Synergy card not on the street → cannot enforce an absent partner.
+  if (synergySlot < 0) return true;
+
+  return neighbors(synergySlot).includes(targetSlot);
 }
 
 // ── i18n Resolution ─────────────────────────────────────────

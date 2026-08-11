@@ -87,7 +87,7 @@ describe('Main Street Tutorial E2E — T11-T12', () => {
     await saveScreenshot('t11-t12');
   }, 30_000);
 
-  it('T12: Build a Library (buy cs-library) advances to T13', async () => {
+  it('T12: Build a Library — buy then place next to the Bookshop advances to T13', async () => {
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
     await walkToT11(scene);
     await clickEndTurn(scene);
@@ -99,9 +99,19 @@ describe('Main Street Tutorial E2E — T11-T12', () => {
     const library = s.state.market.development.find((c: any) => c.id.startsWith('cs-library'));
     expect(library).toBeTruthy();
 
-    await clickRequiredBusinessCard(scene);      // T12 buy Library -> T13
+    // T12 is a composite buy-and-place step: buying the Library to hand
+    // keeps the step active (no more click-to-buy soft-lock advance).
+    await clickRequiredBusinessCard(scene);
     await waitForOverlayVisible(5_000);
-    expect(getStepIndex(scene)).toBe(12);
+    expect(getStepIndex(scene)).toBe(11); // still T12
+    expect(s.state.hand.some((c: any) => c.id.startsWith('cs-library'))).toBe(true);
+
+    // Place the Library next to the Bookshop (slot 1 from T10 → slot 2 is
+    // its Manhattan neighbor; non-adjacent slots are rejected during T12).
+    await clickStreetSlot(scene, 2);
+    await waitForOverlayVisible(5_000);
+    expect(getStepIndex(scene)).toBe(12); // T13 Triggering Events
+    expect(s.state.streetGrid[2]?.id.startsWith('cs-library')).toBe(true);
     await saveScreenshot('t12-t13');
   }, 30_000);
 });

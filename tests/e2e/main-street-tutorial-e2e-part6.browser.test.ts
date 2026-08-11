@@ -64,7 +64,9 @@ async function walkToT13(scene: Phaser.Scene): Promise<void> {
   await waitForOverlayVisible(5_000);
   await clickEndTurn(scene);               // T11 -> T12
   await waitForOverlayVisible(10_000);
-  await clickRequiredBusinessCard(scene);  // T3 buy Laundromat -> T4
+  await clickRequiredBusinessCard(scene);  // T12 buy Library to hand (composite step stays active)
+  await waitForOverlayVisible(5_000);
+  await clickStreetSlot(scene, 2);         // T12 place Library next to the Bookshop (slot 1) -> T13
   await waitForOverlayVisible(5_000);
 }
 

@@ -20,7 +20,7 @@ import {
   DEFAULT_DRAG_DISTANCE_THRESHOLD,
   type DragDropPayload,
 } from '../../../src/ui/dragDrop';
-import { getCurrentStep, type TutorialActionType } from '../TutorialFlow';
+import { getCurrentStep, isSynergyAdjacentPlacement, resolveTutorialCardParams, type TutorialActionType } from '../TutorialFlow';
 
 /**
  * Match a card ID against a requiredCardId using prefix matching.
@@ -441,17 +441,22 @@ export class MainStreetTurnController {
   /**
    * Drag-pickup validation (dragstart veto → illegal-card feedback).
    *
-   * A business card may only be picked up when the player can afford it,
-   * there is at least one empty street slot to drop it on, and the tutorial
-   * allows the `select-business` action (including requiredCardId matching
-   * for tutorial steps that gate a specific card). Community-space cards
-   * are deliberately NOT draggable (click-only).
+   * A business or community-space card (both live in the Development row)
+   * may only be picked up when the player can afford it, there is at least
+   * one empty street slot to drop it on, and the tutorial allows the
+   * `select-business` action (including requiredCardId matching for tutorial
+   * steps that gate a specific card). Events and upgrades are NOT draggable
+   * (click-only).
    */
   public canPickUpBusinessCard(cardId: string): boolean {
     const s = this.scene;
     if (s.uiPhase !== 'market') return false;
     const card = s.state.market.development.find((c: any) => c.id === cardId);
-    if (!card || card.family !== 'business') return false;
+    if (!card) return false;
+    // Drag support covers business AND community-space cards (general change,
+    // operator decision A for the T12 Library bug). Events/upgrades stay
+    // click-only (they are not part of the drag-drop module's dev-row model).
+    if (card.family !== 'business' && card.family !== 'community-space') return false;
     if (s.state.resourceBank.coins < card.cost) return false;
     if (!s.state.streetGrid.some((slot: any) => slot === null)) return false;
 
@@ -479,8 +484,10 @@ export class MainStreetTurnController {
    *
    * The target slot must pass `canPurchaseBusiness` (card still in the
    * Development row, enough coins, empty slot, in bounds) and the tutorial
-   * must allow the `place-business` action. A rejected drop snap-backs the
-   * card to the Development row with illegal-move feedback.
+   * must allow the `place-business` action. During a composite buy-and-place
+   * step with a synergy partner (T12: Library next to the Bookshop), the
+   * target must also pass `isSynergyAdjacentPlacement`. A rejected drop
+   * snap-backs the card to the Development row with illegal-move feedback.
    */
   public canDropBusinessCard(cardId: string, slotIndex: number): boolean {
     const s = this.scene;
@@ -489,6 +496,17 @@ export class MainStreetTurnController {
 
     const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('place-business' as TutorialActionType);
     if (check && !check.allowed) return false;
+
+    // Tutorial: synergy adjacency for composite buy-and-place steps (T12).
+    const controller = (s as any).tutorialController as any;
+    if (controller?.isActive) {
+      const step = controller.currentStepIndex >= 0
+        ? getCurrentStep(controller)
+        : null;
+      if (step && !isSynergyAdjacentPlacement(step, s.state.streetGrid, slotIndex)) {
+        return false;
+      }
+    }
     return true;
   }
 
@@ -573,6 +591,22 @@ export class MainStreetTurnController {
 
     // Ensure stale hover tooltip is cleared when a card is placed.
     s.tooltipManager?.hide();
+
+    // Tutorial: synergy adjacency for composite buy-and-place steps (T12 —
+    // the Library must be built next to the Bookshop). A non-adjacent click
+    // placement is rejected with a data-driven instruction message and the
+    // phase stays 'placing-from-hand' so the player can retry.
+    const tutController = (s as any).tutorialController as any;
+    const step = tutController?.isActive && tutController.currentStepIndex >= 0
+      ? getCurrentStep(tutController)
+      : null;
+    if (step && !isSynergyAdjacentPlacement(step, s.state.streetGrid, slotIndex)) {
+      const params = resolveTutorialCardParams(step);
+      const cardName = params?.cardName ?? 'this card';
+      const synergyName = params?.synergyCardName ?? 'the partner card';
+      s.instructionText.setText(`Place ${cardName} next to ${synergyName} for a Culture bonus.`);
+      return;
+    }
 
     // ── New flow: place from hand ──────────────────────────────
     if (s.pendingHandIndex !== null) {

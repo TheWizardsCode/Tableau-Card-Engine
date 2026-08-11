@@ -1177,11 +1177,17 @@ export class MainStreetRenderer {
     if (interactiveEnabled) {
       s.marketSelectionByCardId.set(card.id, selection);
 
-      const isDraggableBusiness =
-        card.family === 'business' && !!s.dragDropManager && !s.replayMode;
+      // Business AND community-space cards in the Development row are
+      // draggable (drag-to-buy/place). Events and upgrades stay click-only:
+      // they live in the investments row and are not part of the drag-drop
+      // module's dev-row model (CG-0MSKSAREE007AYSZ + operator decision A
+      // for the T12 Library drag support).
+      const isDraggableCard =
+        (card.family === 'business' || card.family === 'community-space') &&
+        !!s.dragDropManager && !s.replayMode;
 
-      if (isDraggableBusiness) {
-        // ── Draggable business card (drag-to-buy/place) ──────────
+      if (isDraggableCard) {
+        // ── Draggable card (drag-to-buy/place) ────────────────
         // The container itself is the interactive object: the reusable
         // drag-drop module makes it draggable, and click-vs-drag
         // coexistence is preserved by firing the click path only when the
@@ -1221,7 +1227,7 @@ export class MainStreetRenderer {
         });
         s.marketSelectionManager.registerTarget(container);
       } else {
-        // ── Click-only card (community-space, event, upgrade) ─────
+        // ── Click-only card (event, upgrade) ────────────────
         // Existing pointerdown-based path, unchanged.
         const hitArea = s.add.rectangle(0, 0, marketCardW, marketCardH, 0x000000, 0.001);
         hitArea.setInteractive({ useHandCursor: true });

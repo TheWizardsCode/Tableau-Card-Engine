@@ -3,10 +3,11 @@
  *
  * Covers the Main Street wiring for the reusable core-engine drag-drop
  * module (src/ui/dragDrop.ts):
- *  - pickup validation (`canPickUpBusinessCard`): business-only, affordability,
- *    empty-slot availability, phase, tutorial gating and requiredCardId;
+ *  - pickup validation (`canPickUpBusinessCard`): business/community-space
+ *    pickup, affordability, empty-slot availability, phase, tutorial gating
+ *    and requiredCardId;
  *  - drop-zone validation (`canDropBusinessCard`): canPurchaseBusiness plus
- *    tutorial place-business gating;
+ *    tutorial place-business gating and T12 synergy adjacency enforcement;
  *  - drag → buy+place (`onDragDropBusiness`): single undoable
  *    buyBusinessCommand, state mutation, events, tutorial completion;
  *  - module wiring: pickup veto keeps the card in place with illegal
@@ -150,14 +151,25 @@ describe('MainStreet drag-to-buy wiring', () => {
       expect(controller.canPickUpBusinessCard(card.id)).toBe(true);
     });
 
-    it('rejects community-space cards (click-only)', () => {
+    it('allows an affordable community-space card (general drag support)', () => {
       let cs = scene.state.market.development.find((c: any) => c.family === 'community-space');
       if (!cs) {
         // Deterministic: manufacture a community-space card in the row.
         cs = scene.state.market.development[0];
         cs.family = 'community-space';
       }
-      expect(controller.canPickUpBusinessCard(cs.id)).toBe(false);
+      if (scene.state.resourceBank.coins < cs.cost) scene.state.resourceBank.coins = cs.cost;
+      expect(firstEmptySlot(scene.state)).toBeGreaterThanOrEqual(0);
+      expect(controller.canPickUpBusinessCard(cs.id)).toBe(true);
+    });
+
+    it('rejects non-business/community-space families (event/upgrade stay click-only)', () => {
+      const card = scene.state.market.development[0];
+      if (scene.state.resourceBank.coins < card.cost) scene.state.resourceBank.coins = card.cost;
+      card.family = 'event';
+      expect(controller.canPickUpBusinessCard(card.id)).toBe(false);
+      card.family = 'upgrade';
+      expect(controller.canPickUpBusinessCard(card.id)).toBe(false);
     });
 
     it('rejects a card the player cannot afford (illegal-card case)', () => {
@@ -242,6 +254,60 @@ describe('MainStreet drag-to-buy wiring', () => {
       scene.msLifecycleManager.isTutorialActionAllowed = vi.fn()
         .mockReturnValue({ allowed: false, reason: 'not now' });
       expect(controller.canDropBusinessCard(card.id, slot)).toBe(false);
+    });
+
+    it('enforces synergy adjacency during T12 (Library must be next to the Bookshop)', () => {
+      const t12Index = UNIFIED_TUTORIAL_STEPS.findIndex((s) => s.id === 'T12');
+      expect(t12Index).toBeGreaterThanOrEqual(0);
+      scene.tutorialController = {
+        isActive: true,
+        currentStepIndex: t12Index,
+        lastCompletedStepId: null,
+        exited: false,
+      };
+
+      // Deterministic cs-library card in the dev row, affordable.
+      let cs = scene.state.market.development.find((c: any) => c.family === 'community-space');
+      if (!cs) {
+        cs = scene.state.market.development[0];
+        cs.family = 'community-space';
+      }
+      cs.id = 'cs-library-0';
+      cs.cost = 1;
+      scene.state.resourceBank.coins = 10;
+
+      // Tutorial layout: Laundromat on slot 0, Bookshop (synergy partner) on slot 1.
+      scene.state.streetGrid[0] = { id: 'biz-laundromat-0', family: 'business' } as any;
+      scene.state.streetGrid[1] = { id: 'biz-bookshop-0', family: 'business' } as any;
+
+      // Adjacent slots (2 and 6 are Manhattan neighbors of slot 1) are accepted.
+      expect(controller.canDropBusinessCard(cs.id, 2)).toBe(true);
+      expect(controller.canDropBusinessCard(cs.id, 6)).toBe(true);
+      // Non-adjacent slots are rejected (drag snap-back + illegal feedback).
+      expect(controller.canDropBusinessCard(cs.id, 3)).toBe(false);
+      expect(controller.canDropBusinessCard(cs.id, 5)).toBe(false);
+      // The synergy slot itself (occupied) is also rejected.
+      expect(controller.canDropBusinessCard(cs.id, 1)).toBe(false);
+    });
+
+    it('does not enforce adjacency when the synergy card is not on the street', () => {
+      const t12Index = UNIFIED_TUTORIAL_STEPS.findIndex((s) => s.id === 'T12');
+      scene.tutorialController = {
+        isActive: true,
+        currentStepIndex: t12Index,
+        lastCompletedStepId: null,
+        exited: false,
+      };
+      let cs = scene.state.market.development.find((c: any) => c.family === 'community-space');
+      if (!cs) {
+        cs = scene.state.market.development[0];
+        cs.family = 'community-space';
+      }
+      cs.id = 'cs-library-0';
+      cs.cost = 1;
+      scene.state.resourceBank.coins = 10;
+      // Empty street (no Bookshop) → any empty slot is accepted.
+      expect(controller.canDropBusinessCard(cs.id, 3)).toBe(true);
     });
   });
 

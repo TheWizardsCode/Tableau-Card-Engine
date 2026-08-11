@@ -713,11 +713,12 @@ export class MainStreetLifecycleManager {
     const { newState } = completeCurrentStep(controller);
     Object.assign(s, { tutorialController: newState });
 
-    // After T12 (buy Library to hand) the scene is left in 'placing-from-hand'
-    // phase with a pending hand index. T13 (Triggering Events, play-event)
-    // requires the market phase so the held event card is clickable in the hand
-    // (event clicks are only wired while uiPhase === 'market'). Reset the phase
-    // when advancing to a play-event step so the player can play the held event.
+    // T12 is a composite buy-and-place step (like T10): the terminal
+    // place-business completes it and already returns the scene to the
+    // market phase with pendingHandIndex cleared. This reset for play-event
+    // steps (T13) is therefore a defensive no-op today, but it is kept so
+    // the held event card is always clickable in the hand (event clicks are
+    // only wired while uiPhase === 'market').
     const nextStep = getCurrentStep(newState);
     if (nextStep?.requiredAction === 'play-event') {
       s.uiPhase = 'market';

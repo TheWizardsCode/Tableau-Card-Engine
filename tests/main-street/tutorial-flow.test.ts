@@ -5,8 +5,9 @@ import {
   createTutorialControllerState, advanceTutorialStep, startTutorial,
   exitTutorial, completeCurrentStep, isOnStep, getCurrentStep,
   isRequiredAction, shouldAllowAction,
-  resolveTutorialStepText,
+  resolveTutorialStepText, isSynergyAdjacentPlacement,
 } from '../../example-games/main-street/TutorialFlow';
+import type { BusinessCard, CommunitySpaceCard } from '../../example-games/main-street/MainStreetCards';
 import { resetI18n, registerLocale } from '../../src/core-engine/I18n';
 import { TUTORIAL_EN_BUNDLE } from '../../example-games/main-street/i18n/tutorial-en';
 
@@ -52,7 +53,7 @@ describe('UNIFIED_TUTORIAL_STEPS', () => {
   it('T9 is action gate with buy-event, festivalCard highlight and requiredCardId', () => { const t=findStep('T9'); expect(t.gate).toBe('action'); expect(t.requiredAction).toBe('buy-event'); expect(t.requiredCardId).toBe('evt-festival-0'); expect(t.highlightZone).toBe('festivalCard'); });
   it('T10 is action gate with buy-and-place, developmentRow highlight and requiredCardId', () => { const t=findStep('T10'); expect(t.gate).toBe('action'); expect(t.requiredAction).toBe('buy-and-place'); expect(t.requiredCardId).toBe('biz-bookshop-0'); expect(t.highlightZone).toBe('developmentRow'); });
   it('T11 is action gate with end-turn and endTurnButton highlight', () => { const t=findStep('T11'); expect(t.gate).toBe('action'); expect(t.requiredAction).toBe('end-turn'); expect(t.requiredCardId).toBeUndefined(); expect(t.highlightZone).toBe('endTurnButton'); });
-  it('T12 is action gate with select-business, developmentRow highlight and cs-library requiredCardId', () => { const t=findStep('T12'); expect(t.gate).toBe('action'); expect(t.requiredAction).toBe('select-business'); expect(t.requiredCardId).toBe('cs-library'); expect(t.highlightZone).toBe('developmentRow'); expect(t.synergyCardId).toBe('biz-bookshop-0'); });
+  it('T12 is action gate with buy-and-place, developmentRow highlight and cs-library requiredCardId', () => { const t=findStep('T12'); expect(t.gate).toBe('action'); expect(t.requiredAction).toBe('buy-and-place'); expect(t.requiredCardId).toBe('cs-library'); expect(t.highlightZone).toBe('developmentRow'); expect(t.synergyCardId).toBe('biz-bookshop-0'); });
   it('T13 is action gate with play-event and hand highlight', () => { const t=findStep('T13'); expect(t.gate).toBe('action'); expect(t.requiredAction).toBe('play-event'); expect(t.highlightZone).toBe('hand'); });
 
   // ── No stale gates ──────────────────────────────────────────
@@ -118,6 +119,14 @@ describe('isRequiredAction', () => {
     expect(isRequiredAction(s,'place-business')).toBe(true);
     expect(isRequiredAction(s,'end-turn')).toBe(false);
   });
+  it('returns true for buy-and-place composite (select-business AND place-business) on T12', () => {
+    let s=startTutorial(createTutorialControllerState());
+    for(let i=0;i<11;i++) s=advanceTutorialStep(s); // now on T12
+    const step=getCurrentStep(s); expect(step!.id).toBe('T12');
+    expect(isRequiredAction(s,'select-business')).toBe(true);
+    expect(isRequiredAction(s,'place-business')).toBe(true);
+    expect(isRequiredAction(s,'end-turn')).toBe(false);
+  });
   it('returns true for play-event on T13', () => {
     let s=startTutorial(createTutorialControllerState());
     for(let i=0;i<12;i++) s=advanceTutorialStep(s); // now on T13
@@ -125,6 +134,48 @@ describe('isRequiredAction', () => {
     expect(isRequiredAction(s,'play-event')).toBe(true);
   });
   it('returns false when tutorial is not active', () => { const s=createTutorialControllerState(); expect(isRequiredAction(s,'confirm')).toBe(false); });
+});
+
+describe('isSynergyAdjacentPlacement', () => {
+  const t12 = findStep('T12');
+  const t10 = findStep('T10');
+
+  /** Build a 10-slot grid where the given slot→id pairs are occupied. */
+  const gridWith = (cards: Record<number, string>): (BusinessCard | CommunitySpaceCard | null)[] => {
+    const grid: Array<{ id: string } | null> = new Array(10).fill(null);
+    for (const [slot, id] of Object.entries(cards)) grid[Number(slot)] = { id };
+    return grid as unknown as (BusinessCard | CommunitySpaceCard | null)[];
+  };
+
+  it('returns true when the target slot is a Manhattan neighbor of the synergy card', () => {
+    // Bookshop (T12 synergyCardId) on slot 1. Neighbors: 0, 2 (same row), 6 (below).
+    const grid = gridWith({ 1: 'biz-bookshop-0' });
+    expect(isSynergyAdjacentPlacement(t12, grid, 2)).toBe(true);
+    expect(isSynergyAdjacentPlacement(t12, grid, 6)).toBe(true);
+  });
+
+  it('rejects non-adjacent target slots', () => {
+    const grid = gridWith({ 1: 'biz-bookshop-0' });
+    expect(isSynergyAdjacentPlacement(t12, grid, 3)).toBe(false); // same row, distance 2
+    expect(isSynergyAdjacentPlacement(t12, grid, 5)).toBe(false); // distance 3
+    expect(isSynergyAdjacentPlacement(t12, grid, 1)).toBe(false); // the synergy slot itself
+  });
+
+  it('returns true for composite buy-and-place steps without a synergy card (T10)', () => {
+    const grid = gridWith({ 1: 'biz-bookshop-0' });
+    expect(isSynergyAdjacentPlacement(t10, grid, 3)).toBe(true);
+  });
+
+  it('returns true when the synergy card is not on the street (cannot enforce an absent partner)', () => {
+    const grid = gridWith({ 0: 'biz-laundromat-0' });
+    expect(isSynergyAdjacentPlacement(t12, grid, 3)).toBe(true);
+  });
+
+  it('returns true for non-composite steps even with a synergyCardId (synthetic step)', () => {
+    const synthetic = { ...t12, requiredAction: 'select-business' as const };
+    const grid = gridWith({ 1: 'biz-bookshop-0' });
+    expect(isSynergyAdjacentPlacement(synthetic, grid, 3)).toBe(true);
+  });
 });
 
 describe('shouldAllowAction', () => {
