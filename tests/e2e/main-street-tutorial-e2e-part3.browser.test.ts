@@ -1,5 +1,8 @@
 /**
- * Main Street Tutorial E2E test — Coin Budget.
+ * Main Street Tutorial E2E test — Coin Budget + T8 Investments → T9 Buy Local Festival.
+ *
+ * Verifies the 16-coin starting budget and walks T8 (Investments, confirm) and
+ * T9 (Buy the Local Festival, buy-event gate with requiredCardId evt-festival-0).
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Phaser from 'phaser';
@@ -15,7 +18,6 @@ import {
   clickRequiredEventCard,
   clickStreetSlot,
   clickEndTurn,
-  getOverlay,
 } from '../helpers/main-street-tutorial-e2e';
 
 let game: Phaser.Game | null = null;
@@ -30,7 +32,24 @@ async function waitForStartButton(scene: Phaser.Scene, timeoutMs = 8_000): Promi
   return null;
 }
 
-describe('Main Street Tutorial E2E — Coin Budget', () => {
+/** Walk from T1 to the end of T7 (arrives on T8). */
+async function walkToT8(scene: Phaser.Scene): Promise<void> {
+  await clickOverlayButtonByText('Next >'); // T1 -> T2
+  await clickOverlayButtonByText('Next >'); // T2 -> T3
+  await clickRequiredBusinessCard(scene);  // T3 buy Laundromat -> T4
+  await waitForOverlayVisible(5_000);
+  await clickOverlayButtonByText('Next >'); // T4 -> T5
+  await waitForOverlayVisible(5_000);
+  await clickStreetSlot(scene, 0);  // T5 place -> T6
+  await new Promise((r) => setTimeout(r, 500));
+  await waitForOverlayVisible(5_000);
+  await clickOverlayButtonByText('Next >'); // T6 -> T7
+  await waitForOverlayVisible(5_000);
+  await clickEndTurn(scene);               // T7 end turn -> T8
+  await waitForOverlayVisible(10_000);
+}
+
+describe('Main Street Tutorial E2E — Coin Budget (16 coins)', () => {
   beforeEach(async () => {
     game = await bootGameWithTutorial();
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
@@ -47,45 +66,41 @@ describe('Main Street Tutorial E2E — Coin Budget', () => {
     game = null;
   });
 
-  it('Tutorial walkthrough is stable end-to-end', async () => {
+  it('starts with 16 coins and the Laundromat is affordable', async () => {
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
     const s = scene as any;
-    expect(s.state?.resourceBank?.coins).toBe(12);
+    // 16 coins (raised from the 12-coin Easy preset for the 4-card flow)
+    expect(s.state?.resourceBank?.coins).toBe(16);
+    const laundromat = s.state.market.development.find((c: any) => c.id.startsWith('biz-laundromat'));
+    expect(laundromat).toBeTruthy();
+    expect(laundromat.cost).toBeLessThanOrEqual(4);
+  }, 30_000);
+
+  it('T8: Investments (confirm) advances to T9', async () => {
+    const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
+    await walkToT8(scene);
+    expect(getStepIndex(scene)).toBe(7); // T8 Investments
     await clickOverlayButtonByText('Next >');
-    await clickOverlayButtonByText('Next >');
-    clickRequiredBusinessCard(scene);
     await waitForOverlayVisible(5_000);
-    expect(getStepIndex(scene)).toBe(3);
-    clickStreetSlot(scene, 0);
-    await new Promise((r) => setTimeout(r, 500));
-    await waitForOverlayVisible(5_000);
-    expect(getStepIndex(scene)).toBe(4);
-    await clickOverlayButtonByText('Next >');
-    expect(getStepIndex(scene)).toBe(5);
-    await clickEndTurn(scene);
-    await waitForOverlayVisible(10_000);
-    expect(getStepIndex(scene)).toBe(6);
-    clickRequiredEventCard(scene);
-    await waitForOverlayVisible(5_000);
-    expect(getStepIndex(scene)).toBe(7);
-    clickRequiredBusinessCard(scene);
+    expect(getStepIndex(scene)).toBe(8); // T9 Buy the Local Festival
+    await saveScreenshotForPart3(scene, 't8-t9');
+  }, 30_000);
+
+  it('T9: Buy the Local Festival advances to T10', async () => {
+    const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
+    await walkToT8(scene);
+    await clickOverlayButtonByText('Next >'); // T8 -> T9
     await waitForOverlayVisible(5_000);
     expect(getStepIndex(scene)).toBe(8);
-    clickStreetSlot(scene, 1);
-    await new Promise((r) => setTimeout(r, 500));
+    await clickRequiredEventCard(scene);          // T9 buy Local Festival -> T10
     await waitForOverlayVisible(5_000);
     expect(getStepIndex(scene)).toBe(9);
-    await clickOverlayButtonByText('Next >');
-    expect(getStepIndex(scene)).toBe(10);
-    await clickOverlayButtonByText('Next >');
-    expect(getStepIndex(scene)).toBe(11);
-    await clickOverlayButtonByText('Next >');
-    expect(getStepIndex(scene)).toBe(12);
-    await clickOverlayButtonByText('Next >');
-    expect(getStepIndex(scene)).toBe(13);
-    await clickOverlayButtonByText('Start Full Game');
-    await new Promise((r) => setTimeout(r, 500));
-    const finalOverlay = getOverlay();
-    expect(finalOverlay).toBeFalsy();
-  }, 60_000);
+    await saveScreenshotForPart3(scene, 't9-t10');
+  }, 30_000);
 });
+
+/** Reuse the standard screenshot helper with the part-3 screenshot dir. */
+import { saveScreenshot } from '../helpers/main-street-tutorial-e2e';
+async function saveScreenshotForPart3(_scene: Phaser.Scene, name: string): Promise<void> {
+  await saveScreenshot(name);
+}

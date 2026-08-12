@@ -1,22 +1,32 @@
 /**
- * Tutorial overlay highlight alignment visual regression test.
+ * Tutorial overlay highlight alignment regression test.
  *
- * Boots the Main Street game, triggers each tutorial step,
- * and captures a screenshot that shows:
- *   - The green highlight rectangle (depth 199) as drawn by the overlay
- *   - A red reference rectangle drawn by this test showing where the
- *     actual UI element should be
+ * Boots the Main Street game, triggers each tutorial step, and asserts that
+ * the green highlight rectangle (depth 199) drawn by the overlay ALIGNS with
+ * the actual rendered geometry of its target UI element (within a small
+ * per-edge tolerance).
  *
- * Unified step mapping for screenshot tests:
- *   T2 (hud, index 1)  T3 (marketBusinessRow, index 2)
- *   T4 (streetGrid, index 3)  T5 (incidentQueue, index 4)
- *   T6 (endTurnButton, index 5)  T7 (investmentsRow, index 6)
- *   T11 (endTurnButton, index 10)  T14 (completionModal, index 13)
+ * The target rect for each zone is computed from the renderer's source of
+ * truth — `scene.layout` (from `computeMainStreetLayoutWithSll()`) + shared
+ * constants + the same renderer math used in `MainStreetRenderer` (e.g.
+ * `marketTop + 6`, `streetTop`, `handCenterX`, `actionY + 4`). The tutorial
+ * highlight zones must match these targets, otherwise the highlights land on
+ * empty space instead of on their target element.
  *
- * This allows visual verification that the highlights are correctly
- * aligned with their target UI elements.
+ * Unified step mapping for the alignment checks (16 steps):
+ *   T2 (developmentRow, index 1)  T3 (laundromatCard, index 2)
+ *   T4 (hand, index 3)  T5 (streetGrid, index 4)
+ *   T6 (incidentQueue, index 5)  T7 (endTurnButton, index 6)
+ *   T8 (investmentsRow, index 7)  T9 (festivalCard, index 8)
+ *   T10 (developmentRow, index 9)  T11 (endTurnButton, index 10)
+ *   T12 (developmentRow, index 11)  T13 (hand, index 12)
+ *   T14 (hud, index 13)  T15 (challengePanel, index 14)
+ *   T16 (completionModal, index 15)
+ *
+ * Screenshots are still captured for visual regression review (red reference
+ * rects are drawn at depth 250 as diagnostics), but geometry is now asserted.
  */
-import { describe, it, expect, afterEach } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import Phaser from 'phaser';
 import { waitForScene } from '../helpers/waitForScene';
 import { page } from '@vitest/browser/context';
@@ -25,13 +35,43 @@ import {
   UNIFIED_TUTORIAL_STEPS,
   type TutorialHighlightZone,
 } from '../../example-games/main-street/TutorialFlow';
+import { STANDARD_TUTORIAL_SCENARIO } from '../../example-games/main-street/TutorialScenario';
+import { MARKET_BUSINESS_SLOTS } from '../../example-games/main-street/MainStreetCards';
+import {
+  CHALLENGE_LINE_H,
+  CHALLENGE_PAD,
+  CHALLENGE_TITLE_H,
+} from '../../example-games/main-street/scenes/MainStreetConstants';
 
-// ── Helpers ──────────────────────────────────────────────────
+// ── Constants ───────────────────────────────────────────────
 
-async function bootGame(): Promise<{
-  game: Phaser.Game;
-  scene: Phaser.Scene & Record<string, unknown>;
-}> {
+/**
+ * Per-edge alignment tolerance (px). AC 2 allows ≤ 4–6 px per edge; 6 px
+ * gives headroom for layout rounding while still catching the multi-pixel
+ * misalignments this test was written to prevent (hand 152px, street 17px,
+ * dev row 16px, ...).
+ */
+const TOLERANCE_PX = 6;
+
+/** Zones that must NOT draw a highlight bounding box. */
+const NULL_ZONES: ReadonlySet<TutorialHighlightZone> = new Set([
+  'centerModal',
+  'completionModal',
+]);
+
+/** Card-level zones resolved through the deterministic tutorial scenario. */
+const CARD_LEVEL_TEMPLATES: Partial<Record<TutorialHighlightZone, string>> = {
+  laundromatCard: 'biz-laundromat',
+  festivalCard: 'evt-festival',
+};
+
+// ── Shared game (single boot — Phaser 4 ~8 create/destroy cycles per process) ──
+
+let game: Phaser.Game | null = null;
+let scene: Phaser.Scene & Record<string, unknown>;
+let refRects: Phaser.GameObjects.Graphics[] = [];
+
+async function bootGame(): Promise<void> {
   const container = document.createElement('div');
   container.id = 'game-container';
   document.body.appendChild(container);
@@ -39,34 +79,220 @@ async function bootGame(): Promise<{
   const { createMainStreetGame } = await import(
     '../../example-games/main-street/createMainStreetGame'
   );
-  const game = createMainStreetGame({ type: Phaser.CANVAS, parent: 'game-container', width: 1280, height: 720 });
+  game = createMainStreetGame({ type: Phaser.CANVAS, parent: 'game-container', width: 1280, height: 720 });
   await waitForScene(game, 'MainStreetScene');
 
-  const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
+  scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
   expect(scene).toBeTruthy();
-  return { game, scene };
 }
 
-function destroyGame(game: Phaser.Game | null): void {
+function destroyGame(): void {
   if (game) {
     game.destroy(true, false);
   }
+  game = null;
   const container = document.getElementById('game-container');
   if (container) container?.remove();
 }
 
+// ── Target-rect computation (renderer geometry is the source of truth) ──
+
+/**
+ * Compute the development row's card startX, mirroring
+ * MainStreetRenderer.refreshMarket()/drawMarketRow() exactly.
+ */
+function computeDevStartX(layout: Record<string, number>): number {
+  const boxLeft = 20;
+  const boxRight = (layout.logX ?? 0) - 20;
+  const boxCenter = (boxLeft + boxRight) / 2;
+  const devTotalCardsW =
+    MARKET_BUSINESS_SLOTS * layout.marketCardW +
+    (MARKET_BUSINESS_SLOTS - 1) * layout.marketCardGap;
+  return Math.round(boxCenter - devTotalCardsW / 2);
+}
+
+/**
+ * Compute the actual rendered rect of the UI element a tutorial highlight
+ * zone points at, from `scene.layout` + shared constants + live state —
+ * mirroring MainStreetRenderer / MainStreetLayoutAdapter math.
+ */
+function computeTargetRect(
+  zone: TutorialHighlightZone,
+  sceneObj: Phaser.Scene & Record<string, unknown>,
+): { x: number; y: number; w: number; h: number } | null {
+  const layout = sceneObj.layout as Record<string, number> | undefined;
+  if (!layout) return null;
+  const gameW = layout.gameW;
+  const s = sceneObj as any;
+
+  switch (zone) {
+    case 'hud': {
+      // HUD strip: 50% screen width centred at (gameW/2, hudY), 28px tall
+      const stripW = Math.round(gameW * 0.5);
+      return { x: Math.round((gameW - stripW) / 2), y: layout.hudY - 14, w: stripW, h: 28 };
+    }
+    case 'developmentRow': {
+      // Dev row: market background strip (bgLeft=20 → logX-20), top at marketTop + 6
+      return { x: 20, y: layout.marketTop + 6, w: layout.logX - 40, h: layout.marketRowH };
+    }
+    case 'investmentsRow': {
+      // Investments row: same strip, top at marketTop + 6 + rowH + gap
+      return {
+        x: 20,
+        y: layout.marketTop + 6 + layout.marketRowH + layout.marketRowGap,
+        w: layout.logX - 40,
+        h: layout.marketRowH,
+      };
+    }
+    case 'streetGrid': {
+      // Street slots: 5×140 + 4×20 wide, 2 rows of 80 + 12 gap
+      const gridW = layout.streetCols * layout.slotW + (layout.streetCols - 1) * layout.slotGap;
+      const gridH = 2 * layout.slotH + layout.streetRowGap;
+      return { x: layout.streetX, y: layout.streetTop, w: gridW, h: gridH };
+    }
+    case 'endTurnButton': {
+      // End Turn button: right-aligned at gameW-24, top at actionY + 4
+      const rightX = gameW - 24;
+      return {
+        x: rightX - layout.actionButtonW,
+        y: layout.actionY + 4,
+        w: layout.actionButtonW,
+        h: layout.actionButtonH,
+      };
+    }
+    case 'helpButton': {
+      // Hint button: to the left of End Turn with a 12px gap
+      const rightX = gameW - 24;
+      return {
+        x: rightX - layout.actionButtonW - 12 - layout.hintButtonW,
+        y: layout.actionY + 4,
+        w: layout.hintButtonW,
+        h: layout.actionButtonH,
+      };
+    }
+    case 'incidentQueue': {
+      // Incident queue panel — mirror refreshIncidentQueue() panel math with
+      // the LIVE queue/effects (boot: 2 cards, 0 effects → 194px).
+      const queue = s?.state?.incidentQueue ?? [];
+      const effects = s?.state?.activeEffects ?? [];
+      const titleH = 22;
+      const pad = 8;
+      const maxCards = Math.min(2, queue.length);
+      const cardAreaH = maxCards * (layout.queueCardH + 6) - 6 + 12;
+      const extraH = effects.length > 0 ? 16 + effects.length * 16 : 0;
+      const panelH = titleH + pad + cardAreaH + extraH + pad;
+      return { x: layout.logX, y: layout.queueTop, w: layout.logW, h: panelH };
+    }
+    case 'challengePanel': {
+      // Challenge panel — mirror refreshChallengeTracker() panel math with the
+      // LIVE challenge count (Easy tutorial: 2 → 72px; Medium boot: 3 → 92px).
+      const challenges = s?.state?.activeChallenges;
+      if (!Array.isArray(challenges) || challenges.length === 0) return null;
+      const panelH = CHALLENGE_TITLE_H + challenges.length * CHALLENGE_LINE_H + CHALLENGE_PAD * 2;
+      return { x: layout.challengeX, y: layout.challengeY, w: layout.challengeW, h: panelH };
+    }
+    case 'hand': {
+      // HandView row centred on handCenterX, covering up to maxHandSize (2)
+      // cards: width = 2×handCardW + 8 (spacing gap), top at handY.
+      const handW = 2 * layout.handCardW + 8;
+      return {
+        x: layout.handCenterX - Math.round(handW / 2),
+        y: layout.handY,
+        w: handW,
+        h: layout.handCardH,
+      };
+    }
+    case 'laundromatCard':
+    case 'festivalCard': {
+      // Card-level zones: deterministic scenario slots (dev slot 1 /
+      // investments slot 2), same math as resolveMarketCardAnchor().
+      const templateId = CARD_LEVEL_TEMPLATES[zone];
+      if (!templateId) return null;
+      const devIdx = STANDARD_TUTORIAL_SCENARIO.market.development.indexOf(templateId);
+      const invIdx = STANDARD_TUTORIAL_SCENARIO.market.investments.indexOf(templateId);
+      const rowIndex = devIdx >= 0 ? devIdx : invIdx;
+      if (rowIndex < 0) return null;
+      const devStartX = computeDevStartX(layout);
+      return {
+        x: devStartX + rowIndex * (layout.marketCardW + layout.marketCardGap),
+        y:
+          devIdx >= 0
+            ? layout.marketTop + 6
+            : layout.marketTop + 6 + layout.marketRowH + layout.marketRowGap,
+        w: layout.marketCardW,
+        h: layout.marketCardH,
+      };
+    }
+    default:
+      return null;
+  }
+}
+
+// ── Highlight extraction helpers ────────────────────────────
+
+/**
+ * Extract the filled rectangle bounds from a Graphics object's commandBuffer.
+ * Phaser.Graphics does not implement getBounds(), so we parse the raw
+ * commands (FILL_RECT = command 3): [FILL_RECT, x, y, width, height].
+ */
+function getHighlightBounds(
+  g: Phaser.GameObjects.Graphics,
+): { x: number; y: number; w: number; h: number } | null {
+  const commandBuffer = (g as any).commandBuffer as unknown[];
+  if (!Array.isArray(commandBuffer) || commandBuffer.length === 0) return null;
+
+  for (let i = 0; i < commandBuffer.length - 4; i++) {
+    if (commandBuffer[i] === 3) {
+      const x = commandBuffer[i + 1] as number;
+      const y = commandBuffer[i + 2] as number;
+      const w = commandBuffer[i + 3] as number;
+      const h = commandBuffer[i + 4] as number;
+      if (typeof x === 'number' && typeof y === 'number' && typeof w === 'number' && typeof h === 'number' && w > 0 && h > 0) {
+        return { x, y, w, h };
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Assert the highlight rect aligns with the target rect: every edge within
+ * TOLERANCE_PX of the corresponding target edge.
+ */
+function assertAligned(
+  actual: { x: number; y: number; w: number; h: number },
+  target: { x: number; y: number; w: number; h: number },
+  label: string,
+): void {
+  const dxLeft = Math.abs(actual.x - target.x);
+  const dyTop = Math.abs(actual.y - target.y);
+  const dxRight = Math.abs(actual.x + actual.w - (target.x + target.w));
+  const dyBottom = Math.abs(actual.y + actual.h - (target.y + target.h));
+  // Keep the logged diagnostic (actual-vs-target) for manual review.
+  console.log(
+    `[align:${label}] actual={x:${actual.x},y:${actual.y},w:${actual.w},h:${actual.h}} ` +
+    `target={x:${target.x},y:${target.y},w:${target.w},h:${target.h}} ` +
+    `dxLeft=${dxLeft} dyTop=${dyTop} dxRight=${dxRight} dyBottom=${dyBottom} (tol=${TOLERANCE_PX}px)`,
+  );
+  expect(dxLeft, `${label}: left edge within ${TOLERANCE_PX}px`).toBeLessThanOrEqual(TOLERANCE_PX);
+  expect(dyTop, `${label}: top edge within ${TOLERANCE_PX}px`).toBeLessThanOrEqual(TOLERANCE_PX);
+  expect(dxRight, `${label}: right edge within ${TOLERANCE_PX}px`).toBeLessThanOrEqual(TOLERANCE_PX);
+  expect(dyBottom, `${label}: bottom edge within ${TOLERANCE_PX}px`).toBeLessThanOrEqual(TOLERANCE_PX);
+}
+
 /**
  * Draw a reference rectangle onto the scene's graphics layer.
- * Uses depth 250 (above the highlight at depth 199) so it's clearly visible.
+ * Uses depth 250 (above the highlight at depth 199) so it's clearly visible
+ * in the diagnostic screenshot.
  */
 function drawReferenceRect(
-  scene: Phaser.Scene,
+  sceneObj: Phaser.Scene,
   x: number,
   y: number,
   w: number,
   h: number,
 ): Phaser.GameObjects.Graphics {
-  const ref = scene.add.graphics();
+  const ref = sceneObj.add.graphics();
   (ref as any).setDepth(250);
   ref.lineStyle(2, 0xff0000, 1.0);
   ref.strokeRect(x, y, w, h);
@@ -86,13 +312,13 @@ async function saveScreenshot(name: string): Promise<void> {
 }
 
 /**
- * Helper: trigger a specific tutorial step and return the highlight graphics.
+ * Trigger a specific tutorial step and return the highlight graphics.
  */
 function triggerStepAndGetHighlight(
-  scene: Phaser.Scene & Record<string, unknown>,
+  sceneObj: Phaser.Scene & Record<string, unknown>,
   stepIndex: number,
 ): Promise<Phaser.GameObjects.Graphics | null> {
-  const mgr = scene.tutorialOverlay as {
+  const mgr = sceneObj.tutorialOverlay as {
     showStep?: (index: number) => void;
     dismiss?: () => void;
     objects?: Phaser.GameObjects.GameObject[];
@@ -119,16 +345,12 @@ function triggerStepAndGetHighlight(
       // Wait one frame for the highlight to be drawn
       requestAnimationFrame(() => {
         // Find highlight graphics at depth 199
-        const highlights = scene.children.list.filter(
+        const highlights = sceneObj.children.list.filter(
           (obj): obj is Phaser.GameObjects.Graphics =>
             obj instanceof Phaser.GameObjects.Graphics && (obj as any).depth === 199,
         );
 
-        if (highlights.length > 0) {
-          resolve(highlights[0]);
-        } else {
-          resolve(null);
-        }
+        resolve(highlights.length > 0 ? highlights[0] : null);
       });
     }, 50);
   }).catch(() => null);
@@ -136,339 +358,95 @@ function triggerStepAndGetHighlight(
 
 // ── Tests ────────────────────────────────────────────────────
 
-describe('Tutorial overlay highlight alignment (screenshot)', () => {
-  let game: Phaser.Game | null = null;
-  let scene: Phaser.Scene & Record<string, unknown>;
-  let refRects: Phaser.GameObjects.Graphics[] = [];
+describe('Tutorial overlay highlight alignment (renderer geometry)', () => {
+  beforeAll(async () => {
+    await bootGame();
+    // Allow the first day phase / state to settle before stepping through.
+    await new Promise((r) => setTimeout(r, 200));
+  });
 
   afterEach(() => {
     for (const rect of refRects) {
       try { rect.destroy(); } catch (_) { /* ignore */ }
     }
     refRects = [];
-    destroyGame(game);
-    game = null;
   });
 
+  afterAll(() => {
+    destroyGame();
+  });
+
+  /** All 16 steps with their highlight zones (null zones have no rect). */
+  const alignmentSteps = UNIFIED_TUTORIAL_STEPS
+    .map((step, index) => ({ id: step.id, stepIndex: index, zone: step.highlightZone }))
+    .filter((s) => !NULL_ZONES.has(s.zone));
+
   /**
-   * Capture a screenshot showing the highlight overlay for a given step index.
+   * Show the step, resolve the actual highlight rect and the target element
+   * rect (renderer geometry), assert per-edge alignment, and keep the
+   * screenshot (with a red reference rect) as a diagnostic.
    */
-  async function captureStepScreenshot(
+  async function verifyStepAlignment(
+    id: string,
     stepIndex: number,
-    name: string,
-    expectedRef?: { x: number; y: number; w: number; h: number },
-  ): Promise<Phaser.GameObjects.Graphics | null> {
-    // Clear previous reference rectangles
-    for (const rect of refRects) {
-      try { rect.destroy(); } catch (_) { /* ignore */ }
-    }
-    refRects = [];
+    zone: TutorialHighlightZone,
+  ): Promise<void> {
+    const label = `${id} (${zone})`;
+    const target = computeTargetRect(zone, scene);
+    expect(target, `${label}: target rect from renderer geometry`).toBeTruthy();
 
     const highlight = await triggerStepAndGetHighlight(scene, stepIndex);
-    expect(highlight).toBeTruthy();
+    expect(highlight, `${label}: highlight graphics drawn`).toBeTruthy();
 
-    // Draw a reference rectangle at the expected position if provided
-    if (expectedRef) {
-      const ref = drawReferenceRect(scene, expectedRef.x, expectedRef.y, expectedRef.w, expectedRef.h);
-      refRects.push(ref);
-    }
+    const actual = getHighlightBounds(highlight!);
+    expect(actual, `${label}: highlight rect present`).toBeTruthy();
 
-    await saveScreenshot(name);
-    return highlight;
+    assertAligned(actual!, target!, label);
+
+    // Draw the reference rect and capture the screenshot as a diagnostic.
+    const ref = drawReferenceRect(scene, target!.x, target!.y, target!.w, target!.h);
+    refRects.push(ref);
+    await saveScreenshot(`${id}-${zone}`);
   }
 
-  it('screenshot: HUD highlight (step T2)', async () => {
-    ({ game, scene } = await bootGame());
-    await new Promise((r) => setTimeout(r, 200));
+  it.each(alignmentSteps.map((s) => [s.id, s.stepIndex, s.zone] as const))(
+    'step %s highlight (%s) aligns with its target element (≤ 6px per edge)',
+    async (id, stepIndex, zone) => {
+      await verifyStepAlignment(id, stepIndex, zone);
+    },
+    60_000,
+  );
 
-    const layout = scene.layout as { hudY: number; gameW: number } | undefined;
-    expect(layout).toBeTruthy();
-
-    const hudY = layout!.hudY; // 50
-    const gameW = layout!.gameW; // 1280
-    const hudW = Math.round(gameW * 0.5); // 50% screen width (centered)
-    const hudX = Math.round((gameW - hudW) / 2);
-    const expectedRef = {
-      x: hudX,
-      y: hudY - 14, // HUD strip top (rectangle center at hudY, height 28)
-      w: hudW,
-      h: 28,        // Actual HUD strip height
-    };
-
-    const highlight = await captureStepScreenshot(1, 'hud-highlight', expectedRef);
-
-    // Log the actual highlight bounds for debugging
-    const cmdBuf = (highlight as any)?.commandBuffer as unknown[];
-    if (cmdBuf && Array.isArray(cmdBuf)) {
-      for (let i = 0; i < cmdBuf.length - 4; i++) {
-        if (cmdBuf[i] === 3) { // FILL_RECT
-          console.log(
-            `[screenshot:hud-highlight] actual={x:${cmdBuf[i+1]},y:${cmdBuf[i+2]},w:${cmdBuf[i+3]},h:${cmdBuf[i+4]}} ref={x:${expectedRef.x},y:${expectedRef.y},w:${expectedRef.w},h:${expectedRef.h}}`,
-          );
-          break;
-        }
-      }
-    }
-  }, 30_000);
-
-  it('screenshot: Market highlight (step T3)', async () => {
-    ({ game, scene } = await bootGame());
-    await new Promise((r) => setTimeout(r, 200));
-
-    const layout = scene.layout as {
-      marketTop: number;
-      marketRowH: number;
-      marketRowGap: number;
-      marketLabelW: number;
-      marketCardW: number;
-      marketCardGap: number;
-      gameW: number;
-      logX: number;
-    } | undefined;
-    expect(layout).toBeTruthy();
-
-    const marketTop = layout!.marketTop;
-    const totalH = 2 * layout!.marketRowH + layout!.marketRowGap + 20;
-
-    // Market background box extends from left edge to logX-20 (right column start)
-    const logX = layout!.logX;
-    const bgRight = logX - 20; // 940
-    const expectedRef = {
-      x: 20,
-      y: marketTop - 10,
-      w: bgRight - 20,
-      h: totalH,
-    };
-
-    const highlight = await captureStepScreenshot(2, 'market-highlight', expectedRef);
-
-    const cmdBuf = (highlight as any)?.commandBuffer as unknown[];
-    if (cmdBuf && Array.isArray(cmdBuf)) {
-      for (let i = 0; i < cmdBuf.length - 4; i++) {
-        if (cmdBuf[i] === 3) {
-          console.log(
-            `[screenshot:market-highlight] actual={x:${cmdBuf[i+1]},y:${cmdBuf[i+2]},w:${cmdBuf[i+3]},h:${cmdBuf[i+4]}} ref={x:${expectedRef.x},y:${expectedRef.y},w:${expectedRef.w},h:${expectedRef.h}}`,
-          );
-          break;
-        }
-      }
-    }
-  }, 30_000);
-
-  it('screenshot: Street grid highlight (step T4)', async () => {
-    ({ game, scene } = await bootGame());
-    await new Promise((r) => setTimeout(r, 200));
-
-    const layout = scene.layout as {
-      streetTop: number;
-      slotH: number;
-      streetRowGap: number;
-      gameW: number;
-    } | undefined;
-    expect(layout).toBeTruthy();
-
-    const expectedRef = {
-      x: 0,
-      y: layout!.streetTop - 6,
-      w: layout!.gameW,
-      h: 2 * layout!.slotH + layout!.streetRowGap + 12,
-    };
-
-    const highlight = await captureStepScreenshot(3, 'street-highlight', expectedRef);
-
-    const cmdBuf = (highlight as any)?.commandBuffer as unknown[];
-    if (cmdBuf && Array.isArray(cmdBuf)) {
-      for (let i = 0; i < cmdBuf.length - 4; i++) {
-        if (cmdBuf[i] === 3) {
-          console.log(
-            `[screenshot:street-highlight] actual={x:${cmdBuf[i+1]},y:${cmdBuf[i+2]},w:${cmdBuf[i+3]},h:${cmdBuf[i+4]}} ref={x:${expectedRef.x},y:${expectedRef.y},w:${expectedRef.w},h:${expectedRef.h}}`,
-          );
-          break;
-        }
-      }
-    }
-  }, 30_000);
-
-  it('screenshot: End turn button highlight (step T6)', async () => {
-    ({ game, scene } = await bootGame());
-    await new Promise((r) => setTimeout(r, 200));
-
-    const layout = scene.layout as {
-      actionY: number;
-      actionButtonH: number;
-      actionButtonW: number;
-      gameW: number;
-    } | undefined;
-    expect(layout).toBeTruthy();
-
-    const rightX = layout!.gameW - 24;
-    const expectedRef = {
-      x: rightX - layout!.actionButtonW - 20,
-      y: layout!.actionY - 4,
-      w: layout!.actionButtonW + 20,
-      h: layout!.actionButtonH + 8,
-    };
-
-    const highlight = await captureStepScreenshot(5, 'end-turn-highlight', expectedRef);
-
-    const cmdBuf = (highlight as any)?.commandBuffer as unknown[];
-    if (cmdBuf && Array.isArray(cmdBuf)) {
-      for (let i = 0; i < cmdBuf.length - 4; i++) {
-        if (cmdBuf[i] === 3) {
-          console.log(
-            `[screenshot:end-turn-highlight] actual={x:${cmdBuf[i+1]},y:${cmdBuf[i+2]},w:${cmdBuf[i+3]},h:${cmdBuf[i+4]}} ref={x:${expectedRef.x},y:${expectedRef.y},w:${expectedRef.w},h:${expectedRef.h}}`,
-          );
-          break;
-        }
-      }
-    }
-  }, 30_000);
-
-  it('screenshot: Incident queue highlight (step T5)', async () => {
-    ({ game, scene } = await bootGame());
-    await new Promise((r) => setTimeout(r, 200));
-
-    const layout = scene.layout as {
-      queueTop: number;
-      queueCardH: number;
-      queueLabelW: number;
-      queueCardW: number;
-      queueCardGap: number;
-      gameW: number;
-      logX: number;
-      logW: number;
-    } | undefined;
-    expect(layout).toBeTruthy();
-
-    const expectedRef = {
-      x: layout!.logX,
-      y: layout!.queueTop - 6,
-      w: layout!.logW,
-      h: layout!.queueCardH + 16,
-    };
-
-    const highlight = await captureStepScreenshot(4, 'incident-queue-highlight', expectedRef);
-
-    const cmdBuf = (highlight as any)?.commandBuffer as unknown[];
-    if (cmdBuf && Array.isArray(cmdBuf)) {
-      for (let i = 0; i < cmdBuf.length - 4; i++) {
-        if (cmdBuf[i] === 3) {
-          console.log(
-            `[screenshot:incident-queue-highlight] actual={x:${cmdBuf[i+1]},y:${cmdBuf[i+2]},w:${cmdBuf[i+3]},h:${cmdBuf[i+4]}} ref={x:${expectedRef.x},y:${expectedRef.y},w:${expectedRef.w},h:${expectedRef.h}}`,
-          );
-          break;
-        }
-      }
-    }
-  }, 30_000);
-
-  it('screenshot: Investments row highlight (step T7)', async () => {
-    ({ game, scene } = await bootGame());
-    await new Promise((r) => setTimeout(r, 200));
-
-    const layout = scene.layout as {
-      marketTop: number;
-      marketRowH: number;
-      marketRowGap: number;
-      marketLabelW: number;
-      marketCardW: number;
-      marketCardGap: number;
-      gameW: number;
-      logX: number;
-    } | undefined;
-    expect(layout).toBeTruthy();
-
-    // Investments row width matches the market background box (extends to logX-20)
-    const logX = layout!.logX;
-    const bgRight = logX - 20; // 940
-    const expectedRef = {
-      x: 20,
-      y: layout!.marketTop + layout!.marketRowH + layout!.marketRowGap,
-      w: bgRight - 20,
-      h: layout!.marketRowH,
-    };
-
-    const highlight = await captureStepScreenshot(6, 'investments-highlight', expectedRef);
-
-    const cmdBuf = (highlight as any)?.commandBuffer as unknown[];
-    if (cmdBuf && Array.isArray(cmdBuf)) {
-      for (let i = 0; i < cmdBuf.length - 4; i++) {
-        if (cmdBuf[i] === 3) {
-          console.log(
-            `[screenshot:investments-highlight] actual={x:${cmdBuf[i+1]},y:${cmdBuf[i+2]},w:${cmdBuf[i+3]},h:${cmdBuf[i+4]}} ref={x:${expectedRef.x},y:${expectedRef.y},w:${expectedRef.w},h:${expectedRef.h}}`,
-          );
-          break;
-        }
-      }
-    }
-  }, 30_000);
-
-
-
-  // ── Additional unified step screenshots (T11, T12, T13, T14) ──
-
-  it('screenshot: Challenge panel highlight (step T12)', async () => {
-    ({ game, scene } = await bootGame());
-    await new Promise((r) => setTimeout(r, 200));
-
-    // T12 is index 11 in the unified steps (confirm gate, challengePanel zone)
-    // The challengePanel zone is defined in the SLL layout.
-    const highlight = await captureStepScreenshot(11, 'challenge-panel-highlight-t12');
-
-    const cmdBuf = (highlight as any)?.commandBuffer as unknown[];
-    if (cmdBuf && Array.isArray(cmdBuf)) {
-      for (let i = 0; i < cmdBuf.length - 4; i++) {
-        if (cmdBuf[i] === 3) {
-          console.log(
-            `[screenshot:challenge-panel-highlight-t12] actual={x:${cmdBuf[i+1]},y:${cmdBuf[i+2]},w:${cmdBuf[i+3]},h:${cmdBuf[i+4]}}`,
-          );
-          break;
-        }
-      }
-    }
-  }, 30_000);
-
-  it('screenshot: Completion modal (step T14) draws no highlight', async () => {
-    ({ game, scene } = await bootGame());
-    await new Promise((r) => setTimeout(r, 200));
-
+  it('completionModal (T16) draws no highlight', async () => {
     const mgr = scene.tutorialOverlay as {
       showStep?: (index: number) => void;
       dismiss?: () => void;
     };
-
+    expect(mgr).toBeTruthy();
     if (mgr && typeof mgr.showStep === 'function') {
       if (typeof mgr.dismiss === 'function') {
         mgr.dismiss();
       }
-
-      // T14 is index 13 in the unified steps (confirm gate, completionModal zone)
-      mgr.showStep(13);
-
-      // Wait a frame for rendering
+      mgr.showStep(15); // T16 = completionModal (confirm gate)
       await new Promise((r) => setTimeout(r, 50));
 
-      // completionModal should not draw any highlight graphics at depth 199
       const highlights = scene.children.list.filter(
         (obj): obj is Phaser.GameObjects.Graphics =>
           obj instanceof Phaser.GameObjects.Graphics && (obj as any).depth === 199,
       );
       expect(highlights.length).toBe(0);
     }
-
-    // Save screenshot showing no highlight (for visual regression)
     await saveScreenshot('completion-modal-no-highlight');
   }, 30_000);
 
-  // ── Coverage: all 14 unified steps have valid highlight zones ─
-
-  it.each(UNIFIED_TUTORIAL_STEPS.map((s) => [s.id, s.highlightZone]))(
-    'step %s has valid highlightZone: %s',
+  it.each(UNIFIED_TUTORIAL_STEPS.map((s) => [s.id, s.highlightZone] as const))(
+    'step %s has a valid highlightZone: %s',
     (_stepId, zone) => {
       const validZones: TutorialHighlightZone[] = [
         'centerModal',
         'hud',
         'marketBusinessRow',
+        'developmentRow',
         'streetGrid',
         'endTurnButton',
         'incidentQueue',
@@ -476,6 +454,9 @@ describe('Tutorial overlay highlight alignment (screenshot)', () => {
         'challengePanel',
         'helpButton',
         'completionModal',
+        'hand',
+        'laundromatCard',
+        'festivalCard',
       ];
       expect(validZones).toContain(zone);
     },

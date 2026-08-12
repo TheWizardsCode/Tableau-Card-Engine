@@ -175,3 +175,22 @@ export function resolveDescription(
   }
   return desc.replace(/\{SYNERGY_RATE\}/g, rate);
 }
+
+/**
+ * Renders the turn instruction label (CG-0MSLXJCHH001DLIO).
+ *
+ * - Unlimited config (no `config.maxTurns`): `Turn N`
+ * - Limited config (explicit `config.maxTurns`): `Turn N / M`
+ *
+ * Default presets impose no turn limit, so the label shows only the current
+ * turn unless a limit is explicitly configured.
+ *
+ * @param config  The active difficulty config (maxTurns optional).
+ * @param turn    The current 1-based turn number.
+ * @returns The turn label, e.g. `Turn 3` or `Turn 3 / 20`.
+ */
+export function turnLabel(config: Pick<GameConfig, 'maxTurns'>, turn: number): string {
+  return config.maxTurns !== undefined
+    ? `Turn ${turn} / ${config.maxTurns}`
+    : `Turn ${turn}`;
+}

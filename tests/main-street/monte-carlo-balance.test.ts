@@ -18,7 +18,7 @@ const monteMaxWinRate = Number.parseFloat(process.env['MONTE_MAX_WIN_RATE'] ?? '
 describe('Main Street Monte Carlo balance heuristics', () => {
   it(`stays within CI guardrails over ${monteSeeds} deterministic seeds`, () => {
     const seeds = Array.from({ length: monteSeeds }, (_, i) => `mc-balance-${i}`);
-    const { metrics } = runMonteCarlo({ seeds, maxTurns: 25, strategy: 'market-greedy' });
+    const { metrics } = runMonteCarlo({ seeds, maxTurns: 60, strategy: 'market-greedy' });
 
     expect(metrics.runs).toBe(monteSeeds);
     expect(metrics.winRate).toBeGreaterThanOrEqual(monteMinWinRate);

@@ -77,7 +77,7 @@ export class MainStreetInputManager {
       s.hintedCardId = hint.action.cardId;
       s.hintedSlotIndex = null;
     } else if (hint.action.type === 'play-event') {
-      s.hintedCardId = s.state.heldEvent?.id ?? null;
+      s.hintedCardId = (s.state.hand ?? []).find((c: any) => c.family === 'event')?.id ?? null;
       s.hintedSlotIndex = null;
     } else {
       s.hintedCardId = null;

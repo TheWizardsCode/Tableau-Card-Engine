@@ -1,9 +1,11 @@
 /**
  * Main Street Tutorial E2E browser test — Part 1 (Tests 1-6).
  *
- * Runs 6 tutorial tests. Stays under Phaser 4 RC's ~8-cycle game
- * create/destroy limit per browser process. Part 2 runs in a
- * separate vitest invocation with its own fresh browser process.
+ * Walks the new 16-step tutorial flow (CG-0MSKSJ9SS0069ZWT):
+ * T1 Welcome → T2 Development Row → T3 Buy the Laundromat → T4 Your Hand.
+ *
+ * Stays under Phaser 4 RC's ~8-cycle game create/destroy limit per browser
+ * process. Later parts run in separate vitest invocations with fresh browsers.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Phaser from 'phaser';
@@ -49,7 +51,7 @@ describe('Main Street Tutorial E2E — Part 1', () => {
     game = null;
   });
 
-  it('Tutorial uses scenario: market cards match STANDARD_TUTORIAL_SCENARIO', async () => {
+  it('Tutorial uses scenario: market cards match STANDARD_TUTORIAL_SCENARIO (16 coins)', async () => {
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
     expect(getStepIndex(scene)).toBe(0);
     const s = scene as any;
@@ -57,6 +59,9 @@ describe('Main Street Tutorial E2E — Part 1', () => {
     expect(devCards).toBeTruthy();
     expect(devCards.length).toBe(4);
     expect(devCards[0].id).toBe('biz-bakery-0');
+    // cs-library replaces cs-park in the dev row (16-step flow)
+    expect(devCards.some((c: any) => c.id.startsWith('cs-library'))).toBe(true);
+    expect(s.state.resourceBank.coins).toBe(16);
     const investments = s.state?.market?.investments;
     const localFestival = investments?.find((c: any) => c.name === 'Local Festival');
     expect(localFestival).toBeTruthy();
@@ -72,7 +77,7 @@ describe('Main Street Tutorial E2E — Part 1', () => {
     await saveScreenshot('t1-t2');
   }, 30_000);
 
-  it('T2: HUD advances to T3', async () => {
+  it('T2: Development Row advances to T3', async () => {
     await clickOverlayButtonByText('Next >');
     await clickOverlayButtonByText('Next >');
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
@@ -80,13 +85,14 @@ describe('Main Street Tutorial E2E — Part 1', () => {
     await saveScreenshot('t2-t3');
   }, 30_000);
 
-  it('T3: Select correct business card advances to T4', async () => {
+  it('T3: Select correct business card (Laundromat) advances to T4', async () => {
     await clickOverlayButtonByText('Next >');
     await clickOverlayButtonByText('Next >');
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
     expect(getStepIndex(scene)).toBe(2);
-    clickRequiredBusinessCard(scene);
+    await clickRequiredBusinessCard(scene);
     await waitForOverlayVisible(5_000);
+    // T3 select-business → T4 Your Hand (confirm)
     expect(getStepIndex(scene)).toBe(3);
     await saveScreenshot('t3-t4');
   }, 30_000);
@@ -97,29 +103,44 @@ describe('Main Street Tutorial E2E — Part 1', () => {
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
     expect(getStepIndex(scene)).toBe(2);
     const s = scene as any;
-    const wrongCard = s.state.market.development[0];
+    const wrongCard = s.state.market.development[0]; // Bakery — not the Laundromat
     if (s.uiPhase !== 'market') { s.uiPhase = 'market'; }
     try { s.onBusinessCardClick(wrongCard); } catch (_) { /* ignore */ }
     expect(getStepIndex(scene)).toBe(2);
     const instructionText = s.instructionText?.text ?? '';
     expect(instructionText).toContain('not the card you should buy');
-    clickRequiredBusinessCard(scene);
+    await clickRequiredBusinessCard(scene);
     await waitForOverlayVisible(5_000);
     expect(getStepIndex(scene)).toBe(3);
     await saveScreenshot('t3-wrong-card');
   }, 30_000);
 
-  it('T4: Place business on street advances to T5', async () => {
+  it('T4: Your Hand advances to T5 on Next', async () => {
     await clickOverlayButtonByText('Next >');
     await clickOverlayButtonByText('Next >');
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
-    clickRequiredBusinessCard(scene);
+    await clickRequiredBusinessCard(scene);
     await waitForOverlayVisible(5_000);
     expect(getStepIndex(scene)).toBe(3);
-    clickStreetSlot(scene, 0);
-    await new Promise((r) => setTimeout(r, 500));
+    await clickOverlayButtonByText('Next >');
     await waitForOverlayVisible(5_000);
     expect(getStepIndex(scene)).toBe(4);
     await saveScreenshot('t4-t5');
+  }, 30_000);
+
+  it('T5: Place business on street advances to T6', async () => {
+    await clickOverlayButtonByText('Next >');
+    await clickOverlayButtonByText('Next >');
+    const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
+    await clickRequiredBusinessCard(scene);
+    await waitForOverlayVisible(5_000);
+    await clickOverlayButtonByText('Next >');
+    await waitForOverlayVisible(5_000);
+    expect(getStepIndex(scene)).toBe(4);
+    await clickStreetSlot(scene, 0);
+    await new Promise((r) => setTimeout(r, 500));
+    await waitForOverlayVisible(5_000);
+    expect(getStepIndex(scene)).toBe(5);
+    await saveScreenshot('t5-t6');
   }, 30_000);
 });

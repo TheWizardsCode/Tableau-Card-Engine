@@ -187,6 +187,28 @@ export async function bootGameWithTutorial(): Promise<Phaser.Game> {
 export let _gameBootCount = 0;
 
 export async function destroyGame(game: Phaser.Game | null): Promise<void> {
+  // Clear any saved run checkpoint / campaign progress via the game's own
+  // storage manager BEFORE destroying (the game's SaveLoadStore connection is
+  // still open, so this works where a raw IndexedDB delete would block). This
+  // prevents the next boot in the same file from showing the resume overlay
+  // instead of the tutorial offer modal.
+  if (game) {
+    try {
+      const scene = game.scene.getScene('MainStreetScene') as any;
+      const store = scene?.saveStore;
+      // Clear any saved run checkpoint / campaign progress via the game's own
+      // store BEFORE destroying (its IndexedDB connection is still open, so
+      // this works where a raw IndexedDB delete would block). Prevents the
+      // next boot in the same file from showing the resume overlay instead of
+      // the tutorial offer modal.
+      await scene?.checkpointManager?.clear?.().catch?.(() => {});
+      if (store?.removeBySlot) {
+        await store.removeBySlot('run-checkpoint', 'main-street', 'turn-start').catch?.(() => {});
+        await store.removeBySlot('campaign', 'main-street', 'campaign-default').catch?.(() => {});
+      }
+    } catch { /* ignore */ }
+  }
+
   if (game) {
     // game.destroy() is async — it only sets pendingDestroy = true and waits
     // for the next game step to call runDestroy(). Since the game loop stops,
@@ -297,22 +319,6 @@ export async function saveScreenshot(name: string): Promise<void> {
 // ── Tutorial Step Advancement Helpers ────────────────────
 
 /**
- * Advance the tutorial to the next step (belt-and-suspenders).
- *
- * Phaser 4's input system does NOT trigger .on() handlers via manual
- * emit(), so action-gated tutorial steps may need explicit advancement
- * as a safety net.
- */
-function maybeAdvanceTutorial(scene: Phaser.Scene, expectedBefore: number): void {
-  const s = scene as any;
-  const controller = s.tutorialController;
-  if (controller?.isActive && controller.currentStepIndex === expectedBefore) {
-    s.tutorialController = advanceTutorialStep(controller);
-    s.showTutorialStepOverlay?.();
-  }
-}
-
-/**
  * Strip the copy-number suffix from a card ID for prefix matching.
  */
 function matchesCardId(cardId: string, requiredCardId: string): boolean {
@@ -321,19 +327,39 @@ function matchesCardId(cardId: string, requiredCardId: string): boolean {
 }
 
 /**
- * Click the business card that matches the current tutorial step's requiredCardId.
- * Falls back to the first market card if no requiredCardId is set.
+ * Poll until a predicate is true or the timeout elapses.
+ * Returns true when the predicate became true.
  */
-export function clickRequiredBusinessCard(scene: Phaser.Scene): void {
+async function pollUntil(
+  predicate: () => boolean,
+  timeoutMs = 6_000,
+  intervalMs = 100,
+): Promise<boolean> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (predicate()) return true;
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  return predicate();
+}
+
+/**
+ * Click the business card that matches the current tutorial step's requiredCardId
+ * and wait for the async buy-to-hand animation to land (card appears in hand or
+ * the tutorial advances past the select step).
+ */
+export async function clickRequiredBusinessCard(scene: Phaser.Scene): Promise<void> {
   const s = scene as any;
   const controller = s.tutorialController;
   const devCards = s.state?.market?.development;
   if (!devCards || devCards.length === 0) return;
 
   let cardToClick = devCards[0];
+  let requiredId: string | undefined;
   if (controller?.isActive) {
     const step = getCurrentStep(controller);
     if (step?.requiredCardId) {
+      requiredId = step.requiredCardId;
       const found = devCards.find((c: any) => matchesCardId(c.id, step.requiredCardId!));
       if (found) {
         cardToClick = found;
@@ -343,18 +369,53 @@ export function clickRequiredBusinessCard(scene: Phaser.Scene): void {
 
   if (s.uiPhase !== 'market') { s.uiPhase = 'market'; }
   try { s.onBusinessCardClick(cardToClick); } catch (_) { /* ignore */ }
-  maybeAdvanceTutorial(scene, 2);
-  maybeAdvanceTutorial(scene, 7);
-  if (s.tutorialController?.currentStepIndex === 6) {
-    maybeAdvanceTutorial(scene, 6);
+
+  // Wait for the async buy-to-hand to complete: the bought card appears in hand
+  // (or the tutorial advances past the select step).
+  if (requiredId) {
+    await pollUntil(
+      () => s.state.hand.some((c: any) => matchesCardId(c.id, requiredId!)),
+      6_000,
+    );
+  } else {
+    await pollUntil(() => s.state.hand.length > 0, 6_000);
   }
+  // Belt-and-suspenders: if still on a select-business step after the click
+  // (async animation may not have completed in the test env), force-advance.
+  maybeAdvanceFromRequiredAction(scene, 'select-business');
 }
 
 /**
- * Click the event card that matches the current tutorial step's requiredCardId.
- * Falls back to the first Event card (has a trigger property) in investments.
+ * Force-advance the tutorial if the current step still requires the given
+ * action (async Phaser animations may not have fired onTutorialActionComplete
+ * in the headless test environment). No-op when already past the step.
  */
-export function clickRequiredEventCard(scene: Phaser.Scene): void {
+function maybeAdvanceFromRequiredAction(
+  scene: Phaser.Scene,
+  requiredAction: string,
+): void {
+  const s = scene as any;
+  const controller = s.tutorialController;
+  if (!controller?.isActive) return;
+  const step = getCurrentStep(controller);
+  if (!step || step.gate !== 'action') return;
+  if (step.requiredAction === 'buy-and-place') {
+    // Composite: the drop (place-business) is the terminal action. Only
+    // force-advance when the current step is still the buy-and-place step
+    // and the player has already placed the card (hand empty / slot filled).
+    if (requiredAction !== 'place-business') return;
+  } else if (step.requiredAction !== requiredAction) {
+    return;
+  }
+  s.tutorialController = advanceTutorialStep(controller);
+  s.showTutorialStepOverlay?.();
+}
+
+/**
+ * Click the event card that matches the current tutorial step's requiredCardId
+ * and wait for the async buy animation to land (event appears in hand).
+ */
+export async function clickRequiredEventCard(scene: Phaser.Scene): Promise<void> {
   const s = scene as any;
   const controller = s.tutorialController;
   const investments = s.state?.market?.investments;
@@ -376,19 +437,23 @@ export function clickRequiredEventCard(scene: Phaser.Scene): void {
 
   if (s.uiPhase !== 'market') { s.uiPhase = 'market'; }
   try { s.onEventCardClick(cardToClick); } catch (_) { /* ignore */ }
-  maybeAdvanceTutorial(scene, 6);
+
+  // Wait for the async buy to land (event card appears in hand).
+  await pollUntil(() => s.state.hand.some((c: any) => c.family === 'event'), 6_000);
+  maybeAdvanceFromRequiredAction(scene, 'buy-event');
 }
 
 /**
- * Click a street slot to place the pending business card.
- * In the new buy-to-hand flow, the card is in state.hand and
- * pendingHandIndex is used instead of pendingBusinessCard.
+ * Click a street slot to place the pending business card and wait for the
+ * async placement to land (slot filled or tutorial advances past the place step).
  *
- * If the async buy-to-hand animation has not completed yet, the
- * purchase is executed synchronously via state manipulation to
- * ensure the card is in hand for placement.
+ * The click is dispatched as REAL native mousedown/mouseup DOM events on the
+ * canvas at the slot's coordinates (CSS-scale-aware), exercising Phaser's
+ * actual input pipeline (topOnly hit-testing) rather than calling
+ * onSlotClick() directly — the regression guard for CG-0MSN8ZZX2000B9UP
+ * (drag-drop drop zones used to steal slot clicks).
  */
-export function clickStreetSlot(scene: Phaser.Scene, slotIdx: number): void {
+export async function clickStreetSlot(scene: Phaser.Scene, slotIdx: number): Promise<void> {
   const s = scene as any;
   const hand = s.state?.hand ?? [];
 
@@ -411,7 +476,7 @@ export function clickStreetSlot(scene: Phaser.Scene, slotIdx: number): void {
           if (found) cardToBuy = found;
         } else if (step?.requiredAction === 'place-business') {
           // place-business steps don't have requiredCardId. Find the card that
-          // was specified by the preceding select-business step (e.g., T8→T9).
+          // was specified by the preceding select-business step (e.g., T10→T11).
           const myIdx = UNIFIED_TUTORIAL_STEPS.findIndex(s => s.id === step.id);
           for (let i = myIdx - 1; i >= 0; i--) {
             const prev = UNIFIED_TUTORIAL_STEPS[i];
@@ -459,16 +524,59 @@ export function clickStreetSlot(scene: Phaser.Scene, slotIdx: number): void {
   } else {
     s.uiPhase = 'placing-business';
   }
-  try { s.onSlotClick(slotIdx); } catch (_) { /* ignore */ }
 
-  // Fallback: if still on a place-business step after the attempt, force-advance.
-  // This handles both T4 (place Laundromat) and T9 (place Bookshop).
-  if (s.tutorialController?.isActive) {
-    const curStep = getCurrentStep(s.tutorialController);
-    if (curStep?.requiredAction === 'place-business') {
-      maybeAdvanceTutorial(scene, s.tutorialController.currentStepIndex);
-    }
+  // Rebuild the street grid so the empty-slot rectangles are interactive with
+  // the correct phase AND rendered on top of the drag-drop zones (the fix for
+  // CG-0MSN8ZZX2000B9UP). Without this refresh the slots may have been drawn
+  // while the UI was in a non-placing phase and thus not interactive.
+  try { s.refreshStreetGrid(); } catch (_) { /* ignore */ }
+  // Let the renderer flush a frame so the newly created slot rectangles enter
+  // the camera render list — Phaser's hit test skips objects that haven't been
+  // rendered yet (willRender). Without this wait the click would silently miss.
+  await new Promise((r) => setTimeout(r, 100));
+
+  // Dispatch a real pointer click at the slot centre through the canvas so
+  // Phaser's input pipeline (topOnly hit-test) resolves the target object.
+  const center = s.getStreetSlotCenter(slotIdx);
+  dispatchCanvasMouse('mousedown', center.x, center.y);
+  await new Promise((r) => setTimeout(r, 120)); // separate frames, even under CI contention
+  dispatchCanvasMouse('mouseup', center.x, center.y);
+
+  // Wait for the async placement to land: the slot becomes filled (or the
+  // tutorial advances past the place step). A timeout here means the real
+  // pointer click did NOT place the card — a regression, not a flake.
+  const placed = await pollUntil(() => s.state.streetGrid[slotIdx] != null, 6_000);
+  if (!placed) {
+    throw new Error(
+      `clickStreetSlot: real pointer click on slot ${slotIdx} did not place the card ` +
+      `(input pipeline regression — see CG-0MSN8ZZX2000B9UP)`,
+    );
   }
+  // Fallback: if still on a place-business step after the attempt, force-advance.
+  maybeAdvanceFromRequiredAction(scene, 'place-business');
+}
+
+/**
+ * Dispatch a native DOM MouseEvent on the game canvas at (world) coordinates.
+ * The canvas may be CSS-scaled, so world coordinates are converted to client
+ * coordinates via the canvas bounding rect (same convention as the drag tests).
+ */
+function dispatchCanvasMouse(type: string, worldX: number, worldY: number): void {
+  const canvas = document.querySelector('#game-container canvas') as HTMLCanvasElement | null;
+  if (!canvas) throw new Error('dispatchCanvasMouse: game canvas not found');
+  const rect = canvas.getBoundingClientRect();
+  const clientX = rect.x + (worldX / 1280) * rect.width;
+  const clientY = rect.y + (worldY / 720) * rect.height;
+  canvas.dispatchEvent(
+    new MouseEvent(type, {
+      clientX,
+      clientY,
+      bubbles: true,
+      cancelable: true,
+      view: window,
+      button: 0,
+    }),
+  );
 }
 
 /**
@@ -481,7 +589,29 @@ export function clickStreetSlot(scene: Phaser.Scene, slotIdx: number): void {
 export async function clickEndTurn(scene: Phaser.Scene): Promise<void> {
   const s = scene as any;
   if (s.uiPhase !== 'market') { s.uiPhase = 'market'; }
+  const stepBefore = getStepIndex(scene);
   try { s.endTurn(); } catch (_) { /* ignore */ }
-  maybeAdvanceTutorial(scene, 5);
+  // Wait for the end-turn processing to complete (turn advances or tutorial
+  // advances past the end-turn step).
+  await pollUntil(() => getStepIndex(scene) !== stepBefore || (s.state?.turn ?? 0) > 1, 10_000);
+  maybeAdvanceFromRequiredAction(scene, 'end-turn');
   await new Promise((r) => setTimeout(r, 200));
+}
+
+/**
+ * Play the held investment event from the hand (T13 "Triggering Events").
+ * Finds the first event-family card in the player's hand and calls
+ * onPlayHeldEvent with its index, then waits for the event to leave the hand.
+ */
+export async function clickPlayHeldEvent(scene: Phaser.Scene): Promise<void> {
+  const s = scene as any;
+  const hand = s.state?.hand ?? [];
+  const idx = hand.findIndex((c: any) => c.family === 'event');
+  if (idx >= 0) {
+    if (s.uiPhase !== 'market') { s.uiPhase = 'market'; }
+    try { s.onPlayHeldEvent(idx); } catch (_) { /* ignore */ }
+  }
+  // Wait for the held event to leave the hand (async command execution).
+  await pollUntil(() => !s.state.hand.some((c: any) => c.family === 'event'), 6_000);
+  maybeAdvanceFromRequiredAction(scene, 'play-event');
 }

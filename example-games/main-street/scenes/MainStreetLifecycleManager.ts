@@ -79,6 +79,13 @@ export class MainStreetLifecycleManager {
         s.load.audio(`${ns}:${SFX_KEYS.INCOME_NEGATIVE}`, `${audioDir}/discard.wav`);
         s.load.audio(`${ns}:${SFX_KEYS.INCOME_NEUTRAL}`, `${audioDir}/click.wav`);
         s.load.audio(`${ns}:${SFX_KEYS.CELEBRATE}`, `${audioDir}/coin-pop.wav`);
+        // Illegal-move feedback (drag veto / invalid drop): the shared
+        // illegal-move WAV lives in the default audio dir (not the game
+        // audio dir). Load it under BOTH the namespace-scoped key (for the
+        // SoundManager) and the raw COMMON key (played by safePlaySound /
+        // shakeIllegalMove) — same pattern as Beleaguered Castle.
+        s.load.audio(`${ns}:${SFX_KEYS.ILLEGAL_MOVE}`, 'assets/audio/default/illegal-move.wav');
+        s.load.audio(SFX_KEYS.ILLEGAL_MOVE, 'assets/audio/default/illegal-move.wav');
       } catch (e) {
         // Some test environments may lack an audio loader; ignore preload failures
       }
@@ -306,9 +313,11 @@ export class MainStreetLifecycleManager {
           'Buy businesses from the market and place them on the 2x5 street.\n' +
           'Earn income and score through card value + synergy + reputation.\n' +
           'Buy upgrades to improve existing businesses.\n' +
-          'Hold one event card and play it when timing is best.\n' +
+          'Hold event cards and play them when timing is best.\n' +
           'Complete challenges for bonus points and instant-win conditions.\n' +
-          'Manage coins and reputation across 20 turns to build the best street.',
+          'Manage coins and reputation to build the best street — games end\n' +
+          'when you win (score threshold / all challenges) or lose\n' +
+          '(bankruptcy / reputation collapse). There is no turn limit.',
       },
       {
         heading: 'Card Types',
@@ -383,14 +392,15 @@ export class MainStreetLifecycleManager {
           'Market Actions: buy businesses, upgrades, or events from the market.\n' +
           'Place businesses on the street grid to earn future income.\n' +
           'End Turn: resolves income, incidents, and advances to the next day.\n' +
-          'Repeat for 20 turns or until you win or go bankrupt.',
+          'Repeat until you win (score threshold / all challenges) or lose\n' +
+          '(bankruptcy / reputation collapse).',
       },
       {
         heading: 'Win / Loss Conditions',
         body:
           `Reach ${cfg.winThreshold} points to win (coins + reputation multiplier + challenges).\n` +
           `Complete all ${cfg.challengesPerRun} challenges for an instant win.\n` +
-          `Survive ${cfg.maxTurns} turns with positive reputation for a turn-limit victory.\n` +
+          'No turn limit: keep playing until you win or lose.\n' +
           'Bankruptcy (coins < 0) or reputation collapse (rep <= 0) loses the game.',
       },
       {
@@ -408,6 +418,15 @@ export class MainStreetLifecycleManager {
     // The HelpPanel toggle no longer needs tutorial intercept.
     // Provide the ordered difficulty names so the Settings panel can render a selector
     s.initSettingsPanel(DIFFICULTY_NAMES, 'Medium');
+    // Drag-and-drop buy-to-slot (business cards → street slots): wire the
+    // reusable core-engine drag-drop module after the settings panel exists
+    // (reads reducedMotion) and before the first startDayPhase refresh.
+    try {
+      s.msTurnController.initDragDrop();
+    } catch (e) {
+      // Non-fatal: if input is unavailable (headless tests) drag is skipped.
+      console.debug('[MS] initDragDrop skipped', e);
+    }
     // Listen for difficulty changes and restart the game with the new difficulty
     if (typeof window !== 'undefined') {
       const difficultyChangeHandler = (ev: Event) => {
@@ -540,6 +559,8 @@ export class MainStreetLifecycleManager {
     s.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       markSceneInvalid(s);
       s.cleanupTransferAnimations();
+      // Tear down the drag-drop manager (removes its scene input listeners).
+      try { s.dragDropManager?.destroy(); s.dragDropManager = undefined; } catch (_) { /* ignore */ }
       try {
         if (s.input && s.input.keyboard) {
           s.input.keyboard.off('keydown', endTurnKeyHandler);
@@ -670,15 +691,39 @@ export class MainStreetLifecycleManager {
   /**
    * Called when a tutorial action-gated game action succeeds.
    * Advances the tutorial to the next step and shows the next overlay.
+   *
+   * For the composite `buy-and-place` action (T10), only the terminal drop
+   * (`place-business`) completes the step — the pickup (`select-business`)
+   * keeps the step active so the player can still drag the card onto the street.
    */
   public onTutorialActionComplete(actionType: TutorialActionType): void {
     const s = this.scene;
     const controller = (s as any).tutorialController as TutorialControllerState | undefined;
     if (!controller || !controller.isActive) return;
-    if (!isRequiredAction(controller, actionType)) return;
+    const step = getCurrentStep(controller);
+    if (!step || step.gate !== 'action') return;
+
+    // Composite buy-and-place: only the terminal drop completes the step.
+    if (step.requiredAction === 'buy-and-place') {
+      if (actionType !== 'place-business') return;
+    } else if (!isRequiredAction(controller, actionType)) {
+      return;
+    }
 
     const { newState } = completeCurrentStep(controller);
     Object.assign(s, { tutorialController: newState });
+
+    // T12 is a composite buy-and-place step (like T10): the terminal
+    // place-business completes it and already returns the scene to the
+    // market phase with pendingHandIndex cleared. This reset for play-event
+    // steps (T13) is therefore a defensive no-op today, but it is kept so
+    // the held event card is always clickable in the hand (event clicks are
+    // only wired while uiPhase === 'market').
+    const nextStep = getCurrentStep(newState);
+    if (nextStep?.requiredAction === 'play-event') {
+      s.uiPhase = 'market';
+      s.pendingHandIndex = null;
+    }
 
     // Show next step immediately (for action steps) or after brief delay
     // For select-business -> place-business transition, show immediately

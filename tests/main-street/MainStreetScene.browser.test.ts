@@ -228,7 +228,7 @@ describe('MainStreetScene browser tests', () => {
     const templateId = String(eventCard.id).replace(/-\d+$/, '');
     scene.cardSvgSources.set(templateId, '<svg xmlns="http://www.w3.org/2000/svg" width="140" height="80" viewBox="0 0 140 80"><rect width="140" height="80" fill="#8B4513"/><text x="70" y="44" font-size="14" text-anchor="middle" fill="#fff">Held</text></svg>');
 
-    state.heldEvent = eventCard;
+    state.hand = [eventCard];
 
     scene.refreshAll();
     await new Promise((resolve) => setTimeout(resolve, 30));
@@ -351,7 +351,7 @@ describe('MainStreetScene browser tests', () => {
         scene.onEventCardClick(eventCard);
 
         // Event should not appear in hand immediately while transfer is playing
-        expect(state.heldEvent).toBeNull();
+        expect((state.hand ?? []).some((c: any) => c.id === eventCard.id)).toBe(false);
         expect(scene.getHiddenTransferSourceCardCountForTest()).toBeGreaterThan(0);
 
         await waitForCondition(
@@ -360,7 +360,7 @@ describe('MainStreetScene browser tests', () => {
         );
 
         await waitForCondition(
-          () => state.heldEvent?.id === eventCard.id,
+          () => (state.hand ?? []).some((c: any) => c.id === eventCard.id),
           { timeoutMs: 6000, label: 'event transfer completion' },
         );
         expect(scene.getHiddenTransferSourceCardCountForTest()).toBe(0);
@@ -432,7 +432,7 @@ describe('MainStreetScene browser tests', () => {
         { timeoutMs: 6000, label: 'second business materialized in hand' },
       );
       const bizIndex = state.hand.findIndex((c: any) => c.id === biz2.id);
-      const bizRendered = scene.msRenderer.handBusinessView.getCardCenters()[bizIndex];
+      const bizRendered = scene.msRenderer.handView.getCardCenters()[bizIndex];
       expect(Math.abs(bizDest.x - bizRendered.x)).toBeLessThanOrEqual(2);
       expect(Math.abs(bizDest.y - bizRendered.y)).toBeLessThanOrEqual(2);
 
@@ -450,10 +450,10 @@ describe('MainStreetScene browser tests', () => {
         const eventDest = (transferSpy.mock.calls[beforeEvent][0] as any).destination;
 
         await waitForCondition(
-          () => state.heldEvent?.id === eventCard.id,
+          () => (state.hand ?? []).some((c: any) => c.id === eventCard.id),
           { timeoutMs: 6000, label: 'event materialized' },
         );
-        const eventRendered = scene.msRenderer.handView.getCardCenters()[0];
+        const eventRendered = scene.msRenderer.handView.getCardCenters()[state.hand.findIndex((c: any) => c.id === eventCard.id)];
         expect(Math.abs(eventDest.x - eventRendered.x)).toBeLessThanOrEqual(2);
         expect(Math.abs(eventDest.y - eventRendered.y)).toBeLessThanOrEqual(2);
       }

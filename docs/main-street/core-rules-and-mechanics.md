@@ -4,7 +4,7 @@
 
 ## 1. Game Overview
 
-**Main Street** is a single‑player, turn‑based tableau card game built on the **Tableau Card Engine**. The player takes the role of a town planner revitalising a small main street by purchasing and placing business cards in a linear row. Each turn represents a day (or night) cycle. Adjacent businesses generate synergy bonuses, earn coins, and increase the town’s reputation. The game ends after a fixed number of turns or when a win condition is met. The design prioritises a fast‑to‑prototype core loop while delivering reusable engine components (grid, adjacency resolver, market, resource bank).
+**Main Street** is a single‑player, turn‑based tableau card game built on the **Tableau Card Engine**. The player takes the role of a town planner revitalising a small main street by purchasing and placing business cards in a linear row. Each turn represents a day (or night) cycle. Adjacent businesses generate synergy bonuses, earn coins, and increase the town’s reputation. The game ends when a win or loss condition is met (default presets impose **no turn limit**; a turn limit is opt-in via an explicit `maxTurns` config — CG-0MSLXJCHH001DLIO). The design prioritises a fast‑to‑prototype core loop while delivering reusable engine components (grid, adjacency resolver, market, resource bank).
 
 ---
 
@@ -141,7 +141,8 @@ interface GameState {
     event: EventCard[];    // Contains both Investment and Incident cards
     upgrade: UpgradeCard[];
   };
-  heldEvent: EventCard | null;  // Held Investment event awaiting play (max 1)
+  hand: (BusinessCard | EventCard)[]; // merged hand: any mix, up to maxHandSize
+  maxHandSize: number;                 // starts at 2, growable via staff upgrade cards
   challengesCompleted: string[]; // IDs of achieved challenges
 }
 ```
@@ -182,9 +183,9 @@ stateDiagram-v2
 3. **ActionPhase** – The player resolves purchases:
    - **Buy Business** → `resourceBank.coins -= cost` → place card into a chosen empty slot.
    - **Buy Upgrade** → `resourceBank.coins -= cost` → apply upgrade effects to the targeted Business.
-   - **Buy Event (Investment)** → hold the event (max 1 held at a time). The player may play the held Investment during MarketPhase via a `play-event` action.
-   - **Play Held Investment** → resolve the held Investment event immediately and clear it.
-4. **InvestmentResolution** – If the player still holds an Investment event, it auto‑resolves here.
+   - **Buy Event (Investment)** → add the event card to the player's hand (any mix of business/event cards up to `maxHandSize`). The player may play it during MarketPhase via a `play-event` action.
+   - **Play Event (from hand)** → resolve an Investment event card from the hand immediately and remove it.
+4. **InvestmentResolution** – Reserved phase; Investment events are **not** auto‑resolved here. Unplayed events persist in the hand until the player plays them during a later MarketPhase.
 5. **IncomePhase** – For each placed Business, compute:
    - `totalIncome = effectiveBase + synergyBonus`, where `effectiveBase = (baseIncome + incomeBonus) × sameTypePenalty` and `synergyBonus = effectiveBase × synergyCoinBonus × synergyBonusPerNeighbor × N`. Synergy uses a percentage-based formula: each matching neighbor contributes a percentage of the source business's effective base income, scaled by the difficulty preset multiplier. Synergy is only earned from adjacent neighbors of **different base types** (template IDs). Same-type adjacent businesses: synergy is nullified (0 contribution), and base income (including any income bonus from upgrades) is reduced to **60%**.
    - `resourceBank.coins += totalIncome`.
@@ -196,9 +197,10 @@ stateDiagram-v2
 8. Loop back to **DayStart** for the next turn.
 
 The turn ends when either:
-- The predefined maximum turn count (`MAX_TURNS = 20`) is reached, **or**
 - The player meets a **Win Condition** (Section 7), **or**
 - A **Loss Condition** (Section 8) triggers.
+
+Default presets impose **no turn limit** (CG-0MSLXJCHH001DLIO): a player who keeps coins >= 0 and reputation > 0 can pass turns indefinitely without winning — passive play simply never reaches the score threshold. Configs that explicitly set `maxTurns` additionally end the turn when `turn >= maxTurns` (via the turn-limit victory/exhaustion paths below).
 
 ---
 
@@ -208,8 +210,8 @@ The turn ends when either:
 |--------|-------------|---------------|--------|
 | **Buy Business** | Spend coins to acquire a Business card from the market and place it on an empty slot. | Market contains Business card; `resourceBank.coins >= cost`; at least one empty slot. | Business placed; coins deducted; slot becomes occupied. |
 | **Buy Upgrade** | Spend coins to upgrade an existing Business card. | Market contains Upgrade card targeting a placed Business; `resourceBank.coins >= cost`. | Business card upgraded (income bonus and/or synergy range increased); coins deducted. |
-| **Buy Event** | Spend coins to acquire an Investment event card and hold it. | Market contains Investment event card; `resourceBank.coins >= cost`; no event currently held (`heldEvent === null`). | Event held; coins deducted. Player may play it during MarketPhase or it auto‑resolves during InvestmentResolution. |
-| **Play Held Event** | Play the held Investment event during MarketPhase. | Player holds an Investment event (`heldEvent !== null`); current phase is MarketPhase. | Held event resolved; `heldEvent` cleared to null. |
+| **Buy Event** | Spend coins to acquire an Investment event card and add it to the hand. | Market contains Investment event card; `resourceBank.coins >= cost`; hand has room (`hand.length < maxHandSize`). | Event appended to hand; coins deducted. Player may play it during MarketPhase. There is **no limit on the number of event cards** in hand — only hand capacity (`maxHandSize`) applies. |
+| **Play Event (from hand)** | Play an Investment event card from the hand during MarketPhase. | Player holds an Investment event card in hand; current phase is MarketPhase. | Event resolved and removed from hand. |
 | **Place Business** | Choose an empty slot and put the purchased Business card there. | Business card in hand; slot is empty. | Card is now part of `streetGrid`. |
 | **Resolve Event** | Apply the effect described on an Event card. | Event card active. | Game state mutated per effect (coins, reputation, temporary modifiers). |
 | **End Turn** | Transition to the next phase/state. | All desired actions for the day are complete. | Turn counter increments, flow moves to Night or next Day. |
@@ -226,7 +228,7 @@ The game is considered **won** when **any** of the following conditions are sati
    // challengeBonus = sum of 10 points per completed Challenge.
    ```
 2. **Challenge Completion** – All **Primary Challenges** (defined in `docs/games/the-build/challenges.md`) are completed, granting an automatic win regardless of numeric score.
-3. **Turn Limit Victory** – The player reaches **Turn 20** with a **positive reputation** (`reputation > 0`) and **coins >= 0**; the final score is then evaluated against the threshold. If the threshold is not met, the game ends as a loss.
+3. **Turn Limit Victory** *(opt-in)* – Only when a config explicitly sets `maxTurns` (e.g. `maxTurns: 20`): the player reaches `turn >= maxTurns` with a **positive reputation** (`reputation > 0`) and **coins >= 0**; the final score is then evaluated against the threshold. If the threshold is not met, the game ends as a loss.
 
 All win conditions are **deterministic** given the same seed, ensuring testability.
 
@@ -238,7 +240,7 @@ The game ends in **loss** if **any** of the following occur **immediately after 
 
 - **Bankruptcy** – `resourceBank.coins < 0`.
 - **Reputation Collapse** – `resourceBank.reputation <= 0` (the town is considered abandoned).
-- **Turn Exhaustion Without Victory** – Turn 20 is reached and none of the win conditions in Section 7 are met.
+- **Turn Exhaustion Without Victory** *(opt-in)* – Only when a config explicitly sets `maxTurns`: `turn >= maxTurns` is reached and none of the win conditions in Section 7 are met.
 
 Loss conditions are evaluated at the end of the **Night Income** phase before checking win conditions, guaranteeing a clear order of evaluation.
 

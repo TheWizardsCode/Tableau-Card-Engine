@@ -241,7 +241,7 @@ describe('buildRationale', () => {
       trigger: 'Investment', target: 'All', cost: 0, effect: 'Test',
       coinDelta: 5, reputationDelta: 0,
     };
-    state.heldEvent = fakeEvent;
+    state.hand = [fakeEvent];
 
     const rationale = buildRationale({ type: 'play-event' }, 5, state);
     expect(rationale).toContain('Trade Fair');
@@ -249,7 +249,7 @@ describe('buildRationale', () => {
 
   it('rationale for play-event with no held event uses fallback text', () => {
     const state = makeMarketState('rationale-play-null');
-    state.heldEvent = null;
+    state.hand = [];
 
     const rationale = buildRationale({ type: 'play-event' }, 5, state);
     expect(rationale).toContain('Play');

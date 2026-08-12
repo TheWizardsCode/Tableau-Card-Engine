@@ -1477,7 +1477,10 @@ export class ColorettoScene extends CardGameScene {
           const x = startX + i * 80;
           const objects: Phaser.GameObjects.GameObject[] = [];
 
-          const bg = this.add.rectangle(x, jokerChipY, 70, 44, 0x2e2a55)
+          // Fill the chip with the declared colour (same colourHex() used by
+          // the positive-colour chips) so the declaration is visible at a
+          // glance; the purple stroke keeps wild chips distinguishable.
+          const bg = this.add.rectangle(x, jokerChipY, 70, 44, Phaser.Display.Color.HexStringToColor(colorHex(assigned)).color)
             .setStrokeStyle(2, 0xbb88ff)
             .setDepth(201)
             .setInteractive({ useHandCursor: true });

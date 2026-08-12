@@ -21,6 +21,7 @@ import {
   effectiveSynergyRate,
   formatSynergyRate,
   resolveDescription,
+  turnLabel,
   SYNERGY_RATE_TOKEN,
 } from '../../example-games/main-street/MainStreetFormatting';
 import {
@@ -127,5 +128,25 @@ describe('resolveDescription', () => {
     // pass through untouched even though they contain coin phrasing.
     const eventEffect = 'Gains +1 coin per Food business on your street.';
     expect(resolveDescription(eventEffect, makeCard(), MEDIUM)).toBe(eventEffect);
+  });
+});
+
+// ── turnLabel (CG-0MSLXJCHH001DLIO) ─────────────────────────
+
+describe('turnLabel', () => {
+  it('renders only the current turn when the config has no maxTurns (unlimited)', () => {
+    // Default presets impose no turn limit.
+    expect(turnLabel(MEDIUM, 3)).toBe('Turn 3');
+    expect(turnLabel(MEDIUM, 1)).toBe('Turn 1');
+  });
+
+  it('renders "Turn N / M" when the config explicitly sets maxTurns', () => {
+    const limited = { ...MEDIUM, maxTurns: 20 };
+    expect(turnLabel(limited, 3)).toBe('Turn 3 / 20');
+    expect(turnLabel(limited, 20)).toBe('Turn 20 / 20');
+  });
+
+  it('treats undefined maxTurns as unlimited', () => {
+    expect(turnLabel({}, 7)).toBe('Turn 7');
   });
 });

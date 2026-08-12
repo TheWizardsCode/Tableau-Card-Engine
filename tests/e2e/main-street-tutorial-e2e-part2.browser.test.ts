@@ -1,8 +1,9 @@
 /**
  * Main Street Tutorial E2E browser test — Part 2 (Tests 7-8).
  *
- * Runs 2 tutorial tests. Stays well within the browser's per-process
- * canvas/WebGL context budget (~8 contexts in Chromium).
+ * Walks the new 16-step tutorial flow: T6 Upcoming Incidents → T7 End Turn.
+ *
+ * Stays well within the browser's per-process canvas/WebGL context budget.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Phaser from 'phaser';
@@ -32,6 +33,19 @@ async function waitForStartButton(scene: Phaser.Scene, timeoutMs = 8_000): Promi
   return null;
 }
 
+/** Walk the tutorial from T1 through the T5 place step (arrives on T6). */
+async function walkToT6(scene: Phaser.Scene): Promise<void> {
+  await clickOverlayButtonByText('Next >'); // T1 -> T2
+  await clickOverlayButtonByText('Next >'); // T2 -> T3
+  await clickRequiredBusinessCard(scene);  // T3 buy Laundromat -> T4
+  await waitForOverlayVisible(5_000);
+  await clickOverlayButtonByText('Next >'); // T4 -> T5
+  await waitForOverlayVisible(5_000);
+  await clickStreetSlot(scene, 0);  // T5 place -> T6
+  await new Promise((r) => setTimeout(r, 500));
+  await waitForOverlayVisible(5_000);
+}
+
 describe('Main Street Tutorial E2E — Part 2', () => {
   beforeEach(async () => {
     game = await bootGameWithTutorial();
@@ -49,31 +63,25 @@ describe('Main Street Tutorial E2E — Part 2', () => {
     game = null;
   });
 
-  it('T5: Incident queue advances to T6', async () => {
-    await clickOverlayButtonByText('Next >'); await clickOverlayButtonByText('Next >');
+  it('T6: Incident queue advances to T7', async () => {
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
-    clickRequiredBusinessCard(scene);
-    await waitForOverlayVisible(5_000);
-    clickStreetSlot(scene, 0);
-    await new Promise((r) => setTimeout(r, 500));
-    await waitForOverlayVisible(5_000);
+    await walkToT6(scene);
+    expect(getStepIndex(scene)).toBe(5); // T6 Upcoming Incidents
     await clickOverlayButtonByText('Next >');
-    expect(getStepIndex(scene)).toBe(5);
-    await saveScreenshot('t5-t6');
+    await waitForOverlayVisible(5_000);
+    expect(getStepIndex(scene)).toBe(6); // T7 End Turn
+    await saveScreenshot('t6-t7');
   }, 30_000);
 
-  it('T6: End turn advances to T7', async () => {
-    await clickOverlayButtonByText('Next >'); await clickOverlayButtonByText('Next >');
+  it('T7: End turn advances to T8', async () => {
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
-    clickRequiredBusinessCard(scene);
+    await walkToT6(scene);
+    await clickOverlayButtonByText('Next >'); // T6 -> T7
     await waitForOverlayVisible(5_000);
-    clickStreetSlot(scene, 0);
-    await new Promise((r) => setTimeout(r, 500));
-    await waitForOverlayVisible(5_000);
-    await clickOverlayButtonByText('Next >');
+    expect(getStepIndex(scene)).toBe(6);
     await clickEndTurn(scene);
     await waitForOverlayVisible(10_000);
-    expect(getStepIndex(scene)).toBe(6);
-    await saveScreenshot('t6-t7');
+    expect(getStepIndex(scene)).toBe(7); // T8 Investments
+    await saveScreenshot('t7-t8');
   }, 30_000);
 });

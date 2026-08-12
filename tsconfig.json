@@ -27,6 +27,7 @@
   },
   "include": [
     "src/**/*.ts",
+    "electron/**/*.ts",
     "example-games/**/*.ts",
     "tests/**/*.ts",
     "scripts/**/*.ts",

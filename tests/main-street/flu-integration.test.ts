@@ -265,7 +265,7 @@ describe('Flu event: Monte Carlo balance', () => {
   itIfLong('flu event does not drastically skew win rates on Medium', () => {
     // Run Monte Carlo with the full card pool (includes flu)
     const seeds = Array.from({ length: monteSeeds }, (_, i) => `mc-flu-balance-${i}`);
-    const { metrics } = runMonteCarlo({ seeds, maxTurns: 25, strategy: 'market-greedy' });
+    const { metrics } = runMonteCarlo({ seeds, maxTurns: 60, strategy: 'market-greedy' });
 
     // Sanity: win rate should be reasonable (not trivially 0 or 1)
     expect(metrics.winRate).toBeGreaterThan(0.10);

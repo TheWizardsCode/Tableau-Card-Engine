@@ -37,11 +37,13 @@ import {
 import {
   STARTING_COINS,
   STARTING_REPUTATION,
-  MAX_TURNS,
   WIN_THRESHOLD,
   SYNERGY_BONUS_PER_NEIGHBOR,
   REPUTATION_SCORE_MULTIPLIER,
   CHALLENGE_BONUS_POINTS,
+  createIncidentBalanceState,
+  DEFAULT_INCIDENT_REPEAT_SPACING,
+  DEFAULT_INCIDENT_MAX_STREAK,
 } from '../../example-games/main-street/MainStreetCards';
 
 import { DEFAULT_CHALLENGES_PER_RUN } from '../../example-games/main-street/MainStreetChallenges';
@@ -111,12 +113,13 @@ describe('DifficultyPresets Module', () => {
         'difficultyName',
         'startingCoins',
         'startingReputation',
-        'maxTurns',
         'winThreshold',
         'reputationScoreMultiplier',
         'challengeBonusPoints',
         'synergyBonusPerNeighbor',
         'challengesPerRun',
+        'incidentRepeatSpacing',
+        'incidentMaxStreak',
       ];
       for (const preset of [EASY_PRESET, MEDIUM_PRESET, HARD_PRESET]) {
         for (const key of requiredKeys) {
@@ -129,12 +132,13 @@ describe('DifficultyPresets Module', () => {
       const numericKeys: (keyof GameConfig)[] = [
         'startingCoins',
         'startingReputation',
-        'maxTurns',
         'winThreshold',
         'reputationScoreMultiplier',
         'challengeBonusPoints',
         'synergyBonusPerNeighbor',
         'challengesPerRun',
+        'incidentRepeatSpacing',
+        'incidentMaxStreak',
       ];
       for (const preset of [EASY_PRESET, MEDIUM_PRESET, HARD_PRESET]) {
         for (const key of numericKeys) {
@@ -153,10 +157,6 @@ describe('DifficultyPresets Module', () => {
 
     it('should match STARTING_REPUTATION', () => {
       expect(MEDIUM_PRESET.startingReputation).toBe(STARTING_REPUTATION);
-    });
-
-    it('should match MAX_TURNS', () => {
-      expect(MEDIUM_PRESET.maxTurns).toBe(MAX_TURNS);
     });
 
     it('should match WIN_THRESHOLD', () => {
@@ -189,10 +189,6 @@ describe('DifficultyPresets Module', () => {
       expect(EASY_PRESET.startingReputation).toBeGreaterThan(MEDIUM_PRESET.startingReputation);
     });
 
-    it('should have more turns', () => {
-      expect(EASY_PRESET.maxTurns).toBeGreaterThan(MEDIUM_PRESET.maxTurns);
-    });
-
     it('should have lower win threshold', () => {
       expect(EASY_PRESET.winThreshold).toBeLessThan(MEDIUM_PRESET.winThreshold);
     });
@@ -217,10 +213,6 @@ describe('DifficultyPresets Module', () => {
       expect(HARD_PRESET.startingReputation).toBeLessThan(MEDIUM_PRESET.startingReputation);
     });
 
-    it('should have fewer turns', () => {
-      expect(HARD_PRESET.maxTurns).toBeLessThan(MEDIUM_PRESET.maxTurns);
-    });
-
     it('should have higher win threshold', () => {
       expect(HARD_PRESET.winThreshold).toBeGreaterThan(MEDIUM_PRESET.winThreshold);
     });
@@ -241,6 +233,82 @@ describe('DifficultyPresets Module', () => {
       for (const preset of [EASY_PRESET, MEDIUM_PRESET, HARD_PRESET]) {
         expect(preset.positiveIncidentMultiplier).toBeGreaterThanOrEqual(1);
       }
+    });
+  });
+
+  describe('incident balance limits (CG-0MSL0OU1E005WFJB)', () => {
+    describe('preset values', () => {
+      it('Easy defines incidentRepeatSpacing=4 and incidentMaxStreak=2', () => {
+        expect(EASY_PRESET.incidentRepeatSpacing).toBe(4);
+        expect(EASY_PRESET.incidentMaxStreak).toBe(2);
+      });
+
+      it('Medium defines incidentRepeatSpacing=3 and incidentMaxStreak=2', () => {
+        expect(MEDIUM_PRESET.incidentRepeatSpacing).toBe(3);
+        expect(MEDIUM_PRESET.incidentMaxStreak).toBe(2);
+      });
+
+      it('Hard defines incidentRepeatSpacing=2 and incidentMaxStreak=3', () => {
+        expect(HARD_PRESET.incidentRepeatSpacing).toBe(2);
+        expect(HARD_PRESET.incidentMaxStreak).toBe(3);
+      });
+
+      it('Medium limits equal the engine defaults (backward-compat invariant)', () => {
+        expect(MEDIUM_PRESET.incidentRepeatSpacing).toBe(DEFAULT_INCIDENT_REPEAT_SPACING);
+        expect(MEDIUM_PRESET.incidentMaxStreak).toBe(DEFAULT_INCIDENT_MAX_STREAK);
+      });
+    });
+
+    describe('setup wiring into state.incidentBalance', () => {
+      it.each([
+        ['Easy', 4, 2],
+        ['Medium', 3, 2],
+        ['Hard', 2, 3],
+      ] as const)(
+        '%s state.incidentBalance matches the preset limits (N=%i, M=%i)',
+        (difficulty, n, m) => {
+          const state = createTestState('wiring-' + difficulty, difficulty);
+          expect(state.incidentBalance.repeatSpacing).toBe(n);
+          expect(state.incidentBalance.maxStreak).toBe(m);
+        },
+      );
+    });
+
+    describe('seeded determinism per difficulty', () => {
+      it('same seed + same difficulty => identical incident-queue name sequences', () => {
+        for (const difficulty of ['Easy', 'Medium', 'Hard'] as const) {
+          const a = createTestState('incident-determ', difficulty);
+          const b = createTestState('incident-determ', difficulty);
+          expect(a.incidentQueue.map(c => c.name)).toEqual(b.incidentQueue.map(c => c.name));
+        }
+      });
+
+      it('Medium incident-queue sequence is unchanged from default-limit behavior', () => {
+        // Default (no difficulty) also resolves to the Medium preset; both use
+        // N=3/M=2, so the seeded queue must be identical for the same seed.
+        const medium = createTestState('medium-seq-invariant', 'Medium');
+        const defaulted = createTestState('medium-seq-invariant');
+        expect(medium.incidentQueue.map(c => c.name)).toEqual(
+          defaulted.incidentQueue.map(c => c.name),
+        );
+      });
+    });
+
+    describe('omitted-field fallback (legacy saves)', () => {
+      it('config missing the new fields falls back to defaults with no crash', () => {
+        // structuredClone mirrors deserializeMainStreetState's restore path
+        // (config: structuredClone(saved.config)); a save predating the
+        // incident-limit feature lacks both fields.
+        const legacyConfig = structuredClone(MEDIUM_PRESET) as unknown as Record<string, unknown>;
+        delete legacyConfig.incidentRepeatSpacing;
+        delete legacyConfig.incidentMaxStreak;
+        const balance = createIncidentBalanceState({
+          repeatSpacing: legacyConfig.incidentRepeatSpacing as number,
+          maxStreak: legacyConfig.incidentMaxStreak as number,
+        });
+        expect(balance.repeatSpacing).toBe(DEFAULT_INCIDENT_REPEAT_SPACING);
+        expect(balance.maxStreak).toBe(DEFAULT_INCIDENT_MAX_STREAK);
+      });
     });
   });
 
@@ -387,10 +455,9 @@ describe('Engine uses config values', () => {
       state.challengesCompleted = [];
       state.activeChallenges = [];
       const ended = checkEndConditions(state);
-      if (ended) {
-        // Only end if turn limit
-        expect(state.endReason).not.toBe('score_threshold');
-      }
+      // Default presets impose no turn limit (CG-0MSLXJCHH001DLIO), so a
+      // sub-threshold score can never end the game via any reason.
+      expect(ended).toBe(false);
     });
 
     it('should win when score meets Easy winThreshold', () => {
@@ -416,48 +483,76 @@ describe('Engine uses config values', () => {
       state.activeChallenges = [];
       checkEndConditions(state);
       // The score is EASY_PRESET.winThreshold + 1*5 = 125
-      // That's below Hard's 180 threshold
-      if (state.turn < HARD_PRESET.maxTurns) {
-        expect(state.endReason).not.toBe('score_threshold');
+      // That's below Hard's 180 threshold; no turn limit applies.
+      expect(state.endReason).not.toBe('score_threshold');
+    });
+  });
+
+  describe('no turn-based end conditions by default (CG-0MSLXJCHH001DLIO)', () => {
+    it.each(['Easy', 'Medium', 'Hard'] as const)(
+      '%s preset never ends via a turn-based reason over a 200-turn horizon',
+      (difficulty) => {
+        const state = createTestState('unlimited-horizon-' + difficulty, difficulty);
+        // Keep the game structurally unable to end except via the turn limit:
+        // coins >= 0 (no bankruptcy), rep > 0 (no reputation collapse), score
+        // below winThreshold (no score_threshold), no active challenges.
+        state.resourceBank.coins = 50;
+        state.resourceBank.reputation = 5;
+        state.challengesCompleted = [];
+        state.activeChallenges = [];
+
+        for (let turn = 1; turn <= 200; turn++) {
+          state.turn = turn;
+          state.phase = 'EndCheck';
+          const ended = checkEndConditions(state);
+          expect(ended, `ended at turn ${turn}`).toBe(false);
+        }
+        expect(state.gameResult).toBe('playing');
+        expect(state.endReason).toBeNull();
+      },
+    );
+
+    it('default presets have no maxTurns field (undefined = unlimited)', () => {
+      for (const preset of [EASY_PRESET, MEDIUM_PRESET, HARD_PRESET]) {
+        expect(preset.maxTurns).toBeUndefined();
       }
     });
   });
 
-  describe('checkEndConditions uses config.maxTurns', () => {
-    it('should not end at Easy maxTurns - 1', () => {
-      const state = createTestState('turns-easy', 'Easy');
+  describe('explicit maxTurns remains opt-in (CG-0MSLXJCHH001DLIO)', () => {
+    it('ends via turn_limit_victory at exactly maxTurns when rep > 0 and coins >= 0', () => {
+      const state = createTestState('explicit-limit');
+      state.config = { ...state.config, maxTurns: 8 };
       state.phase = 'EndCheck';
-      state.turn = EASY_PRESET.maxTurns - 1;
-      state.resourceBank.coins = 5;
-      state.resourceBank.reputation = 1;
+      state.resourceBank.coins = 10;
+      state.resourceBank.reputation = 3;
+      state.challengesCompleted = [];
       state.activeChallenges = [];
-      const ended = checkEndConditions(state);
-      // Score is 5 + 5 = 10, below threshold; turn not maxed
-      expect(ended).toBe(false);
-    });
 
-    it('should end at Easy maxTurns with positive rep as turn_limit_victory', () => {
-      const state = createTestState('turns-easy-end', 'Easy');
-      state.phase = 'EndCheck';
-      state.turn = EASY_PRESET.maxTurns;
-      state.resourceBank.coins = 5;
-      state.resourceBank.reputation = 1;
-      state.activeChallenges = [];
+      state.turn = 7;
+      expect(checkEndConditions(state)).toBe(false);
+
+      state.turn = 8;
       const ended = checkEndConditions(state);
       expect(ended).toBe(true);
+      expect(state.gameResult).toBe('win');
       expect(state.endReason).toBe('turn_limit_victory');
     });
 
-    it('should end at Hard maxTurns (15) not Medium maxTurns (20)', () => {
-      const state = createTestState('turns-hard', 'Hard');
+    it('ends via turn_exhaustion at maxTurns when the victory condition is not met', () => {
+      const state = createTestState('explicit-limit-exhaust');
+      state.config = { ...state.config, maxTurns: 1 };
       state.phase = 'EndCheck';
-      state.turn = HARD_PRESET.maxTurns; // 15
-      state.resourceBank.coins = 5;
-      state.resourceBank.reputation = 1;
+      state.turn = 1; // turn-1 guard: reputation collapse is not checked on turn 1
+      state.resourceBank.coins = 10;
+      state.resourceBank.reputation = 0; // <= 0: not a turn-limit victory
+      state.challengesCompleted = [];
       state.activeChallenges = [];
+
       const ended = checkEndConditions(state);
       expect(ended).toBe(true);
-      // Turn 15 is maxTurns for Hard
+      expect(state.gameResult).toBe('loss');
+      expect(state.endReason).toBe('turn_exhaustion');
     });
   });
 });

@@ -66,7 +66,7 @@ function runGreedyGame(seed: string, maxTurns = 30): {
       actions.push({ type: 'buy-business', cardId: card.id, slotIndex: slot });
     }
 
-    if (state.heldEvent !== null) {
+    if ((state.hand ?? []).some(c => c.family === 'event')) {
       actions.push({ type: 'play-event' });
     }
 

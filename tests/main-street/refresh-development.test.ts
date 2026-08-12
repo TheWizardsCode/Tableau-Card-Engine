@@ -138,16 +138,16 @@ describe('Development refresh leaves investments untouched (AC2)', () => {
     expect(s.discards.event).toEqual(evtDiscardBefore);
   });
 
-  it('should not change the held event card', () => {
+  it('should not change the player hand', () => {
     const s = createTestState('refresh-dev-ac2c');
     s.phase = 'MarketPhase';
     s.resourceBank.coins = REFRESH_DEVELOPMENT_COST + 10;
 
-    const heldBefore = s.heldEvent;
+    const handBefore = s.hand;
 
     refreshDevelopment(s);
 
-    expect(s.heldEvent).toBe(heldBefore);
+    expect(s.hand).toBe(handBefore);
   });
 });
 
