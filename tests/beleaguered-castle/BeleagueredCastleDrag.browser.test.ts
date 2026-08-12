@@ -11,6 +11,10 @@
  *    move;
  *  - an illegal drop (wrong foundation / own column) snap-backs the card
  *    to its origin and does NOT change the game state;
+ *  - a release outside any drop zone snap-backs the card to its origin;
+ *  - reduced-motion mode restores the origin synchronously (no tween);
+ *  - interaction-blocked (auto-complete in flight) vetoes pickup so the
+ *    card never leaves its origin;
  *  - a click without drag still triggers the existing click-to-select flow
  *    (click-vs-drag coexistence).
  *
@@ -298,5 +302,120 @@ describe('Beleaguered Castle drag-to-move (browser)', () => {
       () => (scene as any).selectedCol === colIndex,
       'column selection after click',
     );
+  });
+
+  it('snap-backs the card when released outside any drop zone (out-of-zone drop)', async () => {
+    game = await bootGame();
+    const scene = getScene(game);
+    await waitForDeal(scene);
+
+    const colIndex = 0;
+    const src = topSprite(scene, colIndex);
+    const originX = src.x;
+    const originY = src.y;
+    const moveCountBefore = scene.getGameState().moveCount;
+
+    // Drop far outside every registered drop zone: top-left corner is well
+    // above the tableau zones and left of the foundation zones.
+    await simulateDrag(src.x, src.y, 10, 10);
+
+    // No move executed; the card snap-backed to its origin.
+    expect(scene.getGameState().moveCount).toBe(moveCountBefore);
+    expect(scene.getUndoManager().canUndo()).toBe(false);
+    await waitForCondition(
+      () => Math.abs(src.x - originX) < 2 && Math.abs(src.y - originY) < 2,
+      'snap-back to origin after out-of-zone drop',
+    );
+  });
+
+  it('restores the card instantly in reduced-motion mode (synchronous snap-back)', async () => {
+    game = await bootGame();
+    const scene = getScene(game);
+    await waitForDeal(scene);
+
+    // bootGame() forces reduced motion via __BC_TEST_REDUCED_MOTION__; the
+    // drag-drop manager was created with reducedMotion=true, so snap-back
+    // must restore the origin synchronously instead of tweening.
+    expect((scene as any).bcRenderer.reducedMotion).toBe(true);
+
+    const colIndex = 0;
+    const src = topSprite(scene, colIndex);
+    const originX = src.x;
+    const originY = src.y;
+    const moveCountBefore = scene.getGameState().moveCount;
+
+    // Drag to an illegal drop (wrong foundation), then release.
+    const state: BeleagueredCastleState = scene.getGameState();
+    let fromCol = -1;
+    let illegalFoundation = -1;
+    for (let c = 0; c < 8 && illegalFoundation === -1; c++) {
+      if (state.tableau[c].isEmpty()) continue;
+      for (let fi = 0; fi < 4; fi++) {
+        if (!isLegalFoundationMove(state, c, fi).legal) {
+          fromCol = c;
+          illegalFoundation = fi;
+          break;
+        }
+      }
+    }
+    expect(fromCol).toBeGreaterThanOrEqual(0);
+    const zone = scene.foundationDropZones[illegalFoundation] as Phaser.GameObjects.Zone;
+
+    dispatchMouse('mousedown', src.x, src.y);
+    await wait(30);
+    dispatchMouse('mousemove', src.x + 6, src.y);
+    await wait(30);
+    dispatchMouse('mousemove', zone.x, zone.y);
+    await wait(80);
+    dispatchMouse('mouseup', zone.x, zone.y);
+    // Reduced-motion snap-back is synchronous (restoreOrigin, no tween).
+    // Assert restoration completes well within SNAP_BACK_DURATION (200ms):
+    // at ~60% of a 200ms Power2 tween the card would still be ~30px from
+    // its origin, so a sub-150ms restore proves the no-tween path.
+    await waitForCondition(
+      () => Math.abs(src.x - originX) < 2 && Math.abs(src.y - originY) < 2,
+      'instant (synchronous) snap-back in reduced motion',
+      150,
+    );
+
+    expect(Math.abs(src.x - originX)).toBeLessThan(2);
+    expect(Math.abs(src.y - originY)).toBeLessThan(2);
+    expect(scene.getGameState().moveCount).toBe(moveCountBefore);
+    expect(scene.getUndoManager().canUndo()).toBe(false);
+  });
+
+  it('vetoes pickup while interaction is blocked (auto-complete running)', async () => {
+    game = await bootGame();
+    const scene = getScene(game);
+    await waitForDeal(scene);
+
+    // Simulate an in-flight auto-complete: the turn controller raises the
+    // flag and the scene disables the drag manager (syncDragEnabled).
+    (scene as any).turnController.autoCompleting = true;
+    (scene as any).syncDragEnabled();
+
+    const colIndex = 0;
+    const src = topSprite(scene, colIndex);
+    const originX = src.x;
+    const originY = src.y;
+    const moveCountBefore = scene.getGameState().moveCount;
+
+    // Full drag gesture to a foundation zone; the disabled manager must
+    // veto the pickup so the card never leaves its origin.
+    const moves = getLegalMoves(scene.getGameState());
+    const fMove = moves.find((m) => m.kind === 'tableau-to-foundation');
+    const destX = fMove ? (scene.foundationDropZones[fMove.toFoundation] as Phaser.GameObjects.Zone).x : src.x + 6;
+    const destY = fMove ? (scene.foundationDropZones[fMove.toFoundation] as Phaser.GameObjects.Zone).y : src.y;
+    await simulateDrag(src.x, src.y, destX, destY);
+
+    // Pickup vetoed: card stays at origin, no move executes.
+    expect(Math.abs(src.x - originX)).toBeLessThan(2);
+    expect(Math.abs(src.y - originY)).toBeLessThan(2);
+    expect(scene.getGameState().moveCount).toBe(moveCountBefore);
+    expect(scene.getUndoManager().canUndo()).toBe(false);
+
+    // Restore interaction state for teardown cleanliness.
+    (scene as any).turnController.autoCompleting = false;
+    (scene as any).syncDragEnabled();
   });
 });
