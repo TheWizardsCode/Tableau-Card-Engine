@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.1.12 (2026-08-12)
+### Features
+- Full test suite now runs reliably in any environment, with clear setup instructions if something's missing. (CG-0MSJ7ZXD5005N9E5)
+- Add a harder Citadel mode to Beleaguered Castle where you must uncover and move aces yourself. (CG-0MLTDXG3H0WCXMUV)
+- Rewrote the Main Street tutorial with clearer, shorter steps and a smoother flow. (CG-0MSKSJ9SS0069ZWT)
+- Upcoming events now avoid repeats and long good/bad streaks for fairer gameplay. (CG-0MSL0OP040043KKZ)
+- Cards now slide from your hand to the street when placed. (CG-0MSOKUOUE005LQFZ)
+- Difficulty now changes how often events repeat and how long lucky or unlucky streaks last. (CG-0MSL0OU1E005WFJB)
+- Library now triggers Culture synergy bonuses when placed next to Bookshops. (CG-0MSKS963N000ZSTU)
+- Joker chips in the color picker now show the color you've assigned them. (CG-0MSJIWIC0009EJ8M)
+- All hand cards now appear in one neat row, with no limit on event cards. (CG-0MSKU0BE5003I2ZD)
+- Drag a business card from the Development row onto an empty street slot to buy and place it in one move. (CG-0MSKSAREE007AYSZ)
+### Bug Fixes
+- Clicking an empty street slot now correctly places your business. (CG-0MSN8ZZX2000B9UP)
+- Fixed the Library tutorial so you can drag it onto the street and it must be placed next to the Bookshop to continue. (CG-0MSOKXF5L000MORU)
+- Restored the missing Main Street thumbnail so the game loads without errors. (CG-0MSPZE99B003JB5K)
+- Fixed tutorial highlights so they now point at the right buttons and cards. (CG-0MSN848GN003FWE0)
+### Other
+- Updated developer docs clarify which tests to run when, from quick per-game checks to full test suites. (CG-0MSJ7ZXDB002CX97)
+- Beleaguered Castle drag-and-drop now uses the same smooth system as Main Street. (CG-0MSKSLDXQ008F5Y3)
+
 ## v0.1.11 (2026-08-08)
 ### Features
 - Coloretto (set-building tableau) (CG-0MLSDXY9F1FSGQ38)
