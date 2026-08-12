@@ -335,6 +335,12 @@ describe('MainStreetScene browser tests', () => {
       // Now place the business on the target slot.
       scene.onSlotClick(targetSlot);
 
+      // Animated placement (AC 2 + AC 3): state is NOT committed
+      // synchronously and the source card is hidden from the hand during
+      // the flight (the hidden-count reflects the hand source card).
+      expect(state.streetGrid[targetSlot]).toBeNull();
+      expect(scene.getHiddenTransferSourceCardCountForTest()).toBe(1);
+
       await waitForCondition(
         () => state.streetGrid[targetSlot]?.id === business.id,
         { timeoutMs: 6000, label: 'business transfer completion' },

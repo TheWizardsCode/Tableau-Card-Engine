@@ -241,4 +241,52 @@ describe('MainStreet click-to-place via real pointer events (browser)', () => {
     // Back in the market phase for further play (placement completed).
     expect(scene.uiPhase).toBe('market');
   });
+
+  it('places the held business instantly (no animation) with reduced motion enabled', async () => {
+    game = await bootGame();
+    const scene = getScene(game);
+    await waitForMarketReady(scene);
+    await waitForSettled(scene);
+
+    // Plenty of coins so affordability is not a factor.
+    scene.state.resourceBank.coins = 100;
+    // Reduced-motion mode (AC 5): the transfer animation is skipped, so
+    // placement must commit well under the 1500ms animation duration.
+    // SettingsPanel.reducedMotion is getter-only — override it per-instance.
+    Object.defineProperty(scene.settingsPanel, 'reducedMotion', {
+      get() { return true; },
+      configurable: true,
+    });
+
+    const targetSlot = getEmptySlots(scene.state)[0];
+    expect(targetSlot).toBeGreaterThanOrEqual(0);
+    const business = scene.state.market.development.find((c: any) =>
+      c && canPurchaseBusiness(scene.state, c.id, targetSlot).legal,
+    );
+    expect(business).toBeTruthy();
+
+    scene.onBusinessCardClick(business);
+
+    await waitForCondition(
+      () => scene.uiPhase === 'placing-from-hand',
+      'business bought to hand (placing-from-hand phase)',
+    );
+    const handBusiness = (scene.state.hand ?? []).find((c: any) => c.id === business.id);
+    expect(handBusiness).toBeTruthy();
+
+    await wait(120);
+    const slotCenter = scene.getStreetSlotCenter(targetSlot);
+    expect(scene.state.streetGrid[targetSlot]).toBeNull();
+    await clickAt(slotCenter.x, slotCenter.y);
+
+    // Short timeout (1s ≪ 1500ms animation): placement must complete
+    // without waiting for the full tween when reduced motion is on.
+    await waitForCondition(
+      () => scene.state.streetGrid[targetSlot]?.id === business.id,
+      'business placed instantly with reduced motion',
+      1000,
+    );
+    expect(scene.state.streetGrid[targetSlot]?.id).toBe(business.id);
+    expect(scene.uiPhase).toBe('market');
+  });
 });

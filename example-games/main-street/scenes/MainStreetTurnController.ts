@@ -611,26 +611,59 @@ export class MainStreetTurnController {
     // ── New flow: place from hand ──────────────────────────────
     if (s.pendingHandIndex !== null) {
       const handIndex = s.pendingHandIndex;
-      s.pendingHandIndex = null;
-      s.uiPhase = 'animating';
-      s.refreshAll();
-
-      try {
-        placeFromHand(s.state, handIndex, slotIndex);
-        try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'place', handIndex, slotIndex }, description: `Placed from hand to slot ${slotIndex}` }); } catch (_) {}
-        try { s.gameEvents?.emit('card:placed', { handIndex, slotIndex }); } catch (_) {}
-        s.instructionText.setText(`Placed on slot ${slotIndex}`);
-      } catch (e) {
-        console.error('[MS] placeFromHand failed', e);
-        s.instructionText.setText(`Error: ${(e as Error).message}`);
+      const handCard = (s.state.hand ?? [])[handIndex];
+      if (!handCard) {
+        s.pendingHandIndex = null;
+        s.uiPhase = 'market';
+        s.instructionText.setText('Card no longer in hand.');
+        return;
       }
 
-      s.uiPhase = 'market';
+      const cardId = handCard.id;
+      const cardName = handCard.name;
+
+      // Capture the hand card's resting position (excludes selection-raise)
+      const handPos = s.msRenderer?.handView?.getBasePosition(handIndex);
+      const source = handPos
+        ? { x: handPos.x, y: handPos.y }
+        : { x: s.layout.handX + s.layout.handCardW / 2, y: s.layout.handY + s.layout.handCardH / 2 };
+
+      s.pendingHandIndex = null;
+      s.hiddenTransferSourceCardIds.add(cardId);
+      s.uiPhase = 'animating';
+      s.instructionText.setText(`Placing "${cardName}"...`);
       s.refreshAll();
-      // Tutorial: mark place-business step complete if active
-      try {
-        (s.msLifecycleManager as any).onTutorialActionComplete?.('place-business' as TutorialActionType);
-      } catch (_) { /* ignore */ }
+
+      const afterTransfer = (): void => {
+        try {
+          placeFromHand(s.state, handIndex, slotIndex);
+          try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'place', handIndex, slotIndex }, description: `Placed from hand to slot ${slotIndex}` }); } catch (_) {}
+          try { s.gameEvents?.emit('card:placed', { handIndex, slotIndex }); } catch (_) {}
+          s.instructionText.setText(`Placed "${cardName}" on slot ${slotIndex}`);
+        } catch (e) {
+          console.error('[MS] placeFromHand failed', e);
+          s.instructionText.setText(`Error: ${(e as Error).message}`);
+        }
+
+        s.hiddenTransferSourceCardIds.delete(cardId);
+        s.uiPhase = 'market';
+        s.refreshAll();
+        s.refreshStreetGrid();
+        s.refreshActionButtons();
+        // Tutorial: mark place-business step complete if active
+        try {
+          (s.msLifecycleManager as any).onTutorialActionComplete?.('place-business' as TutorialActionType);
+        } catch (_) { /* ignore */ }
+      };
+
+      void s.animateTransferFromMarket({
+        cardId,
+        family: 'business',
+        row: 'development',
+        slotIndex: handIndex,
+        source,
+        destination: s.getStreetSlotCenter(slotIndex),
+      }).then(afterTransfer);
       return;
     }
 
