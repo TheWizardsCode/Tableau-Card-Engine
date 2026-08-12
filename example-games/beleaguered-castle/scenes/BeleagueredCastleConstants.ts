@@ -93,3 +93,12 @@ export const RESUME_INFO_Y_OFFSET = -15;
 export const RESUME_BUTTON_Y_OFFSET = 50;
 export const RESUME_BUTTON_SPACING = 110;
 export const RESUME_INFO_FONT_SIZE = '18px';
+
+// ── Variant selection popup ─────────────────────────────────
+export const VARIANT_TITLE_FONT_SIZE = '34px';
+export const VARIANT_TITLE_Y_OFFSET = -90;
+export const VARIANT_INFO_Y_OFFSET = -45;
+export const VARIANT_BUTTON_Y_OFFSET = 20;
+export const VARIANT_BUTTON_SPACING = 150;
+export const VARIANT_DESC_Y_OFFSET = 60;
+export const VARIANT_HIGHLIGHT_COLOR = '#ffdd88';

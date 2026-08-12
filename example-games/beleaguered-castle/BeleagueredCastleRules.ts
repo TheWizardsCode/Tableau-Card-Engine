@@ -14,6 +14,12 @@
  * - Empty columns accept any card.
  * - Win: all 52 cards on foundations (13 each).
  * - Loss: no legal moves remain.
+ *
+ * Citadel variant (optional deal):
+ * - All 52 cards are dealt to the 8 tableau columns (4 columns of 7 +
+ *   4 columns of 6) and all four foundations start empty. The player
+ *   must uncover aces in the tableau and promote them manually.
+ * - All other rules are identical to classic.
  */
 
 import type { Card, Rank, Suit } from '../../src/card-system/Card';
@@ -67,31 +73,68 @@ export { createSeededRng } from '../../src/core-engine/SeededRng';
 // ── Deal ────────────────────────────────────────────────────
 
 /**
+ * Beleaguered Castle deal variant.
+ *
+ * - `classic`: aces are pre-placed on foundations, 48 cards dealt to the
+ *   tableau (8 columns of 6).
+ * - `citadel`: all 52 cards are dealt to the tableau (4 columns of 7 +
+ *   4 columns of 6), all foundations start empty.
+ */
+export type BCVariant = 'classic' | 'citadel';
+
+/** The supported deal variants, in display order. */
+export const BC_VARIANTS: readonly BCVariant[] = ['classic', 'citadel'] as const;
+
+/** Options controlling how a Beleaguered Castle game is dealt. */
+export interface BCDealOptions {
+  /** Deal variant. Defaults to `classic` when omitted. */
+  variant?: BCVariant;
+}
+
+/** Number of cards dealt to a given tableau column in the Citadel variant. */
+export function citadelColumnSize(colIndex: number): number {
+  return colIndex < 4 ? 7 : 6;
+}
+
+/**
  * Deal a new Beleaguered Castle game.
  *
+ * Classic deal:
  * 1. Create and shuffle a standard 52-card deck.
  * 2. Remove the 4 aces and place them on their respective foundations.
  * 3. Deal the remaining 48 cards into 8 columns of 6, all face-up.
  *
+ * Citadel deal (`{ variant: 'citadel' }`):
+ * 1. Create and shuffle a standard 52-card deck.
+ * 2. Deal all 52 cards into 8 tableau columns (4 columns of 7 +
+ *    4 columns of 6), all face-up.
+ * 3. All four foundations start empty.
+ *
  * @param seedOrOptions  Numeric seed for deterministic shuffling,
- *                       or a `BaseSetupOptions` object with an injected RNG.
- *                       When omitted, uses `Math.random`.
+ *                       or an options object with an injected RNG and
+ *                       an optional deal variant. When omitted, uses
+ *                       `Math.random` with the classic variant.
+ * @param options        Deal options (only valid with a numeric seed).
  * @returns              A fresh BeleagueredCastleState.
  */
-export function deal(seed: number): BeleagueredCastleState;
-export function deal(options?: BaseSetupOptions): BeleagueredCastleState;
+export function deal(seed: number, options?: BCDealOptions): BeleagueredCastleState;
+export function deal(options?: BaseSetupOptions & BCDealOptions): BeleagueredCastleState;
 export function deal(
-  seedOrOptions?: number | BaseSetupOptions,
+  seedOrOptions?: number | (BaseSetupOptions & BCDealOptions),
+  options?: BCDealOptions,
 ): BeleagueredCastleState {
   let rng: () => number;
   let seed: number;
+  let variant: BCVariant = 'classic';
 
   if (typeof seedOrOptions === 'number') {
     seed = seedOrOptions;
     rng = createSeededRng(seed);
+    variant = options?.variant ?? 'classic';
   } else {
     seed = 0;
     rng = resolveBaseSetupOptions(seedOrOptions ?? {}).rng;
+    variant = seedOrOptions?.variant ?? 'classic';
   }
 
   const deck = shuffle(createStandardDeck(), rng);
@@ -101,7 +144,32 @@ export function deal(
     card.faceUp = true;
   }
 
-  // Separate aces from the rest
+  // Foundations (indexed by suit), empty for Citadel.
+  const foundations: [Pile, Pile, Pile, Pile] = [
+    new Pile(),
+    new Pile(),
+    new Pile(),
+    new Pile(),
+  ];
+
+  if (variant === 'citadel') {
+    // Citadel: deal all 52 cards into the tableau; foundations stay empty.
+    const tableau: Pile[] = [];
+    let offset = 0;
+    for (let col = 0; col < TABLEAU_COUNT; col++) {
+      const size = citadelColumnSize(col);
+      tableau.push(new Pile(deck.slice(offset, offset + size)));
+      offset += size;
+    }
+    return {
+      foundations,
+      tableau,
+      seed,
+      moveCount: 0,
+    };
+  }
+
+  // Classic: separate aces from the rest
   const aces: Card[] = [];
   const remaining: Card[] = [];
   for (const card of deck) {
@@ -113,12 +181,6 @@ export function deal(
   }
 
   // Place aces on foundations (indexed by suit)
-  const foundations: [Pile, Pile, Pile, Pile] = [
-    new Pile(),
-    new Pile(),
-    new Pile(),
-    new Pile(),
-  ];
   for (const ace of aces) {
     const idx = foundationIndex(ace.suit);
     foundations[idx].push(ace);
@@ -186,7 +248,9 @@ export function isLegalFoundationMove(
 
   const topFoundationCard = foundation.peek();
   if (!topFoundationCard) {
-    // Foundation is empty; only Ace goes here (but aces are pre-placed)
+    // Foundation is empty; only an Ace can start it. In classic deal the
+    // aces are pre-placed, so this only occurs in the Citadel variant
+    // (or after an undo), where the player must promote aces manually.
     return card.rank === 'A'
       ? { legal: true }
       : { legal: false, reason: `Only Ace can start a foundation, got ${card.rank}` };

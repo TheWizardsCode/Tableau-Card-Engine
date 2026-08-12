@@ -13,6 +13,8 @@ import {
   getLegalMoves,
   isWon,
 } from '../BeleagueredCastleRules';
+import type { BCVariant } from '../BeleagueredCastleRules';
+import { getBcVariant, setBcVariant } from '../BeleagueredCastleVariant';
 import { BeleagueredCastleAiPlayer, SolverStrategy } from '../BeleagueredCastleAi';
 import { BCTranscriptRecorder } from '../GameTranscript';
 import type { BCGameTranscript, BoardSnapshot } from '../GameTranscript';
@@ -41,6 +43,10 @@ import {
   RESUME_BUTTON_SPACING, RESUME_BUTTON_Y_OFFSET,
   SNAP_BACK_DURATION, DRAG_DEPTH,
   HINT_BUTTON_WIDTH, HINT_BAR_Y_OFFSET,
+  VARIANT_TITLE_FONT_SIZE, VARIANT_TITLE_Y_OFFSET,
+  VARIANT_INFO_Y_OFFSET, VARIANT_BUTTON_Y_OFFSET,
+  VARIANT_BUTTON_SPACING, VARIANT_DESC_Y_OFFSET,
+  VARIANT_HIGHLIGHT_COLOR,
 } from './BeleagueredCastleConstants';
 import { BeleagueredCastleRenderer } from './BeleagueredCastleRenderer';
 import type { BCTopCardDragData, BCZoneDragData } from './BeleagueredCastleRenderer';
@@ -100,6 +106,13 @@ export class BeleagueredCastleScene extends CardGameScene {
   private onNewGame?: () => void;
   private onRestart?: () => void;
   private onUndoLast?: () => void;
+
+  /**
+   * True once click-to-move zones and keyboard listeners are wired.
+   * Guards against duplicate input registration when the deal path runs
+   * more than once in a scene lifetime (e.g. variant popup re-deal).
+   */
+  private inputWired = false;
 
   constructor() {
     super({ key: 'BeleagueredCastleScene' });
@@ -646,7 +659,10 @@ export class BeleagueredCastleScene extends CardGameScene {
     // destroys the game while the load is in flight). Guard every callback
     // against that so we never touch a torn-down scene (CG-0MSBZ7ZW500521ZH).
     this.checkpointManager.checkAndResume(
-      () => { if (this.isSceneAlive()) this.startFreshGame(); },
+      // No checkpoint: ask the player for the deal variant (Classic or
+      // Citadel) before the deal animation runs. The popup re-deals the
+      // placeholder state with the chosen variant, then deals the tableau.
+      () => { if (this.isSceneAlive()) this.showVariantPopup(); },
       (state) => { if (this.isSceneAlive()) this.restoreFromCheckpoint(state); },
       (state, onResume) => { if (this.isSceneAlive()) this.showResumeOverlay(state, onResume); },
     ).catch((err) => {
@@ -774,8 +790,7 @@ export class BeleagueredCastleScene extends CardGameScene {
     this.refreshUndoRedoButtons(this.turnController.canUndo, this.turnController.canRedo);
 
     // Wire up interactions (no deal animation since dealComplete is already true)
-    this.setupClickToMove();
-    this.setupKeyboard();
+    this.wireInput();
   }
 
   /**
@@ -784,8 +799,140 @@ export class BeleagueredCastleScene extends CardGameScene {
    */
   private startFreshGame(): void {
     this.bcRenderer.dealTableauAnimated();
+    this.wireInput();
+  }
+
+  /**
+   * Wire click-to-move zones and keyboard listeners exactly once per scene
+   * lifetime. The variant-selection popup may re-deal the board after the
+   * initial `startFreshGame` (e.g. in browser tests), so both `startFreshGame`
+   * and `restoreFromCheckpoint` route through here to avoid registering
+   * duplicate pointerdown/keydown handlers.
+   */
+  private wireInput(): void {
+    if (this.inputWired) return;
+    this.inputWired = true;
     this.setupClickToMove();
     this.setupKeyboard();
+  }
+
+  // ── Variant selection ────────────────────────────────────
+  /**
+   * Show the pre-game variant selection popup (Classic vs Citadel).
+   *
+   * Called when no saved checkpoint exists, before the deal animation.
+   * The persisted variant (if any) is highlighted so the player can either
+   * confirm it with one click or switch. Choosing a variant persists it to
+   * browser storage and re-deals the board accordingly.
+   */
+  private showVariantPopup(): void {
+    const BUTTON_DEPTH = OVERLAY_DEPTH + 1;
+    const selected = getBcVariant();
+    const cx = GAME_W / 2;
+    const cy = GAME_H / 2;
+
+    this.overlayManager.showOverlay({
+      type: 'custom',
+      backgroundOptions: { depth: OVERLAY_DEPTH, alpha: OVERLAY_BG_ALPHA },
+    });
+
+    const title = this.add.text(cx, cy + VARIANT_TITLE_Y_OFFSET, 'Choose a Variant', {
+      fontSize: VARIANT_TITLE_FONT_SIZE,
+      color: '#ffcc00',
+      fontFamily: FONT_FAMILY,
+      fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(BUTTON_DEPTH);
+    this.overlayManager.add(title);
+
+    const info = this.add.text(cx, cy + VARIANT_INFO_Y_OFFSET,
+      'Pick how this game is dealt. Your choice is remembered for next time.',
+      { fontSize: RESUME_INFO_FONT_SIZE, color: '#cccccc', fontFamily: FONT_FAMILY, align: 'center' },
+    ).setOrigin(0.5).setDepth(BUTTON_DEPTH);
+    this.overlayManager.add(info);
+
+    const classicBtn = createOverlayButton(this, cx - VARIANT_BUTTON_SPACING, cy + VARIANT_BUTTON_Y_OFFSET, '[ Classic ]', BUTTON_DEPTH);
+    classicBtn.on('pointerdown', () => this.chooseVariant('classic'));
+    this.overlayManager.add(classicBtn);
+
+    const citadelBtn = createOverlayButton(this, cx + VARIANT_BUTTON_SPACING, cy + VARIANT_BUTTON_Y_OFFSET, '[ Citadel ]', BUTTON_DEPTH);
+    citadelBtn.on('pointerdown', () => this.chooseVariant('citadel'));
+    this.overlayManager.add(citadelBtn);
+
+    // Description of each variant under its button.
+    const classicDesc = this.add.text(cx - VARIANT_BUTTON_SPACING, cy + VARIANT_DESC_Y_OFFSET,
+      'Aces start on the foundations',
+      { fontSize: '14px', color: '#aacccc', fontFamily: FONT_FAMILY, align: 'center' },
+    ).setOrigin(0.5).setDepth(BUTTON_DEPTH);
+    this.overlayManager.add(classicDesc);
+
+    const citadelDesc = this.add.text(cx + VARIANT_BUTTON_SPACING, cy + VARIANT_DESC_Y_OFFSET,
+      'All 52 cards dealt — uncover the aces',
+      { fontSize: '14px', color: '#aacccc', fontFamily: FONT_FAMILY, align: 'center' },
+    ).setOrigin(0.5).setDepth(BUTTON_DEPTH);
+    this.overlayManager.add(citadelDesc);
+
+    // Highlight the persisted selection so the player can confirm with a click.
+    (selected === 'citadel' ? citadelBtn : classicBtn).setColor(VARIANT_HIGHLIGHT_COLOR);
+  }
+
+  /**
+   * Apply the chosen variant: persist it, re-deal the placeholder state,
+   * dismiss the popup, and run the deal animation.
+   */
+  private chooseVariant(variant: BCVariant): void {
+    setBcVariant(variant);
+    this.overlayManager.dismiss();
+    this.redealForVariant(variant);
+    this.startFreshGame();
+  }
+
+  /**
+   * Replace the placeholder game state with a fresh deal of the given
+   * variant, mutating the existing piles in place so the renderer and turn
+   * controller (which hold references to the original state) stay in sync.
+   *
+   * The turn controller is rebuilt with a fresh recorder and undo stack
+   * because `BCTranscriptRecorder` snapshots the initial board at
+   * construction — a transcript must describe the chosen variant's deal,
+   * not the classic placeholder state created in `create()`.
+   */
+  private redealForVariant(variant: BCVariant): void {
+    const fresh = deal(this.seed, { variant });
+    for (let i = 0; i < FOUNDATION_COUNT; i++) {
+      this.gameState.foundations[i].clear();
+      for (const card of fresh.foundations[i].toArray()) {
+        this.gameState.foundations[i].push(card);
+      }
+    }
+    for (let i = 0; i < TABLEAU_COUNT; i++) {
+      this.gameState.tableau[i].clear();
+      for (const card of fresh.tableau[i].toArray()) {
+        this.gameState.tableau[i].push(card);
+      }
+    }
+    this.gameState.moveCount = 0;
+    this.bcRenderer.refreshFoundations();
+
+    // Rebuild the turn controller with a fresh recorder + undo stack so the
+    // transcript's initialState matches the chosen variant's deal.
+    const recorder = new BCTranscriptRecorder(this.seed, this.gameState);
+    this.turnController = new BeleagueredCastleTurnController(this.gameState, recorder, {
+      onRefresh: () => this.refreshAll(),
+      onCheckGameEnd: () => this.handleGameEnd(),
+      onAutoCompleteVisual: (moves, moveCards, isSafeAutoMove) => this.runAutoCompleteVisuals(moves, moveCards, isSafeAutoMove),
+      onAutoCompleteDone: () => this.handleAutoCompleteDone(),
+      onSoundEvent: (event, data) => this.handleSoundEvent(event, data),
+      onSaveCheckpoint: () => this.saveCheckpoint(),
+    });
+
+    // Reassign callbacks that reference the new turn controller
+    this.initUndoRedoButtons(
+      () => this.turnController.performUndo(),
+      () => this.turnController.performRedo(),
+    );
+    this.onNewGame = () => { this.seed = Date.now(); this.scene.restart(); };
+    this.onRestart = () => this.scene.restart();
+    this.onUndoLast = () => { this.overlayManager.dismiss(); this.gameEnded = false; this.resumeTimer(); this.turnController.performUndo(); };
   }
 
   // ── Save/Load ───────────────────────────────────────────
