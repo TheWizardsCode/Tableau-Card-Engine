@@ -159,6 +159,25 @@ Card-level highlight zones (`laundromatCard`, `festivalCard`) are resolved throu
 `resolveMarketCardAnchor()` in `MainStreetTutorialHints.ts` using the deterministic
 tutorial-scenario market slots, not hardcoded pixel positions.
 
+### Scenario budget (Easy / 16 coins)
+
+The tutorial runs the **Easy** preset with a **16-coin starting budget** (raised
+from the standard Easy 12 for the 16-step flow). The walkthrough spends exactly:
+
+| Step | Action | Coins In | Coins Out | Balance |
+|------|--------|----------|-----------|---------|
+| T1   | Start (Easy, 16 coins) | 16 | 0 | 16 |
+| T3   | Buy Laundromat ($4) | 0 | 4 | 12 |
+| T7   | End Turn + income | 0.625 | 0 | 12.625 |
+| T9   | Buy Local Festival ($3) | 0 | 3 | 9.625 |
+| T10  | Buy-and-place Bookshop ($3) | 0 | 3 | 6.625 |
+| T11  | End Turn + income | 1.25 | 0 | 7.875 |
+| T12  | Buy Library ($7) | 0 | 7 | 0.875 |
+
+T13+ are confirm-only steps (no cost), so the balance never drops below 0.875.
+The authoritative walkthrough lives in the `Coin Budget (Easy / 16 coins)` table
+in `example-games/main-street/TutorialScenario.ts`.
+
 ### Changing existing text
 
 1. Open [`i18n/tutorial-en.ts`](../../example-games/main-street/i18n/tutorial-en.ts).
