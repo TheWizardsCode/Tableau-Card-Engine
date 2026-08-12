@@ -174,8 +174,9 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
   [tutorialKey('T10', 'title')]:
     'Optimizing for Events',
   // {cardName}/{cost} resolved from card-data.csv (biz-bookshop) at render time.
+  // Revised to clarify drag-and-drop as a one-step buy-and-place option (CG-0MSOKG7HE001NMMM).
   [tutorialKey('T10', 'body')]:
-    'The **{cardName}** is a Culture business. Culture businesses make your festival stronger. Click it and drag it to an empty spot on your street.',
+    'The **{cardName}** is a Culture business. Culture businesses make your festival stronger. Drag it to an empty spot on your street to buy and place it in one action — or click to buy it first, then place it later.',
 
   // ── T11: End this turn ────────────────────────────────────
   [tutorialKey('T11', 'title')]:
