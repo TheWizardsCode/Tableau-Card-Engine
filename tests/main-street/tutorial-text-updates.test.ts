@@ -128,6 +128,17 @@ describe('Tutorial text updates (16-step restructure)', () => {
     });
   });
 
+  describe('T11 End this turn (AC: wait for a more opportune moment)', () => {
+    it('says we could play the card now but wait for a more opportune moment', () => {
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T11')!).body;
+      expect(body).toMatch(/(wait|hold).*(opportune|moment)/i);
+    });
+    it('resolves {cardName} from card data (no raw placeholder tokens)', () => {
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T11')!).body;
+      expect(body).not.toMatch(/\{[A-Za-z_]+\}/);
+    });
+  });
+
   describe('T12 Build a Library (AC: running cost vs reputation, Culture adjacency)', () => {
     it('mentions running costs and reputation', () => {
       const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T12')!).body;

@@ -182,8 +182,9 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
   [tutorialKey('T11', 'title')]:
     'End this turn',
   // {cardName} resolved from card-data.csv (evt-festival) at render time.
+  // Emphasizes deliberately holding the festival for a more opportune moment (CG-0MSOKG89N001LDT4).
   [tutorialKey('T11', 'body')]:
-    'You could play the **{cardName}** now. But first, end this turn.',
+    'We could play the **{cardName}** now, but we\'re going to wait for a more opportune moment. End this turn for now.',
 
   // ── T12: Build a Library ───────────────────────────────────
   [tutorialKey('T12', 'title')]:
