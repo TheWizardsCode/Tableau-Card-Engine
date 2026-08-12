@@ -43,6 +43,8 @@ The Tableau Card Engine (TCE) builds increasingly complex card games as "spikes"
 
 The project is organized as a **flat monorepo** -- a single `package.json` at the root, shared engine code under `src/`, and standalone example games under `example-games/`.
 
+**How the engine was built:** for a narrative walkthrough of the project's evolution from first commit to present day -- the spike-driven phases, the architectural decisions, and the lessons learned -- see the [video series outline](docs/video-series-outline.md).
+
 ## Repository Layout
 
 ```
