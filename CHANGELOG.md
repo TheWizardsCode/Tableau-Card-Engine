@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.1.12 (2026-08-12)
+### Features
+- Browser tests now run reliably in any environment, with clear setup instructions if something's missing. (CG-0MSJ7ZXD5005N9E5)
+- Rewrote the Main Street tutorial with shorter, clearer steps and a smoother flow. (CG-0MSKSJ9SS0069ZWT)
+- Upcoming events now feel fairer—no repeats too soon and no long bad-luck streaks. (CG-0MSL0OP040043KKZ)
+- Difficulty now changes event pacing, not just numbers—Hard hits harder with tighter card repeats and longer luck streaks. (CG-0MSL0OU1E005WFJB)
+- Library now boosts adjacent Bookshops with a Culture synergy bonus again. (CG-0MSKS963N000ZSTU)
+- Joker chips now show the color you pick for them at a glance. (CG-0MSJIWIC0009EJ8M)
+- All hand cards now appear in one neat row, so you can see everything at a glance. (CG-0MSKU0BE5003I2ZD)
+- Drag a business card from the Development row onto an empty street slot to buy and place it in one move. (CG-0MSKSAREE007AYSZ)
+### Bug Fixes
+- Clicking an empty street slot now correctly places your business card. (CG-0MSN8ZZX2000B9UP)
+- Fixed the Library tutorial so you can drag and place it next to the Bookshop without getting stuck. (CG-0MSOKXF5L000MORU)
+- Fixed tutorial highlights so they now point at the right buttons and cards. (CG-0MSN848GN003FWE0)
+### Other
+- Updated dev docs to clarify when to run targeted vs full test suites. (CG-0MSJ7ZXDB002CX97)
+- Drag-and-drop now feels smoother and more consistent across all games. (CG-0MSKSLDXQ008F5Y3)
+
 ## v0.1.11 (2026-08-08)
 ### Features
 - Coloretto (set-building tableau) (CG-0MLSDXY9F1FSGQ38)
