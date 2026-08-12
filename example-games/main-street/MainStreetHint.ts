@@ -140,7 +140,8 @@ export function buildRationale(
     }
 
     case 'play-event': {
-      const cardName = state.heldEvent?.name ?? 'held event';
+      const eventCard = (state.hand ?? []).find(c => c.family === 'event') as EventCard | undefined;
+      const cardName = eventCard?.name ?? 'held event';
       return `Play ${cardName} now for immediate benefit`;
     }
 

@@ -9,6 +9,7 @@ import {
 import type { SelectionController, SingleSelectionManager } from '../../../src/ui';
 import { SaveLoadStore, CheckpointManager } from '../../../src/core-engine';
 import { UndoRedoManager } from '../../../src/core-engine';
+import type { DragDropManager } from '../../../src/ui';
 import type { MainStreetSerializedState } from '../MainStreetState';
 import { MainStreetRenderer } from './MainStreetRenderer';
 import { MainStreetAnimator } from './MainStreetAnimator';
@@ -125,6 +126,9 @@ export class MainStreetScene extends CardGameScene {
 
   // Undo/Redo manager for market actions (per-scene)
   public undoManager!: UndoRedoManager;
+
+  // Drag-and-drop buy-to-slot (business cards → street slots)
+  public dragDropManager?: DragDropManager;
 
   constructor(config?: Partial<Phaser.Types.Scenes.SettingsConfig>) {
     super({ key: 'MainStreetScene', ...(config ?? {}) });
@@ -266,20 +270,19 @@ export class MainStreetScene extends CardGameScene {
   /**
    * Predicted resting position for a business card bought into the hand at the
    * given insert index. Single source of truth for market→hand transfer
-   * animation targets — delegates to the business HandView's
+   * animation targets — delegates to the merged HandView's
    * `getInsertionPosition` so the animation always ends exactly where the
    * rendered card will rest (the hand is centred on `handCenterX`).
    */
   public getBusinessHandInsertionPosition(insertIndex: number): { x: number; y: number } {
-    return this.msRenderer.handBusinessView.getInsertionPosition(insertIndex);
+    return this.msRenderer.handView.getInsertionPosition(insertIndex);
   }
 
   /**
-   * Predicted resting position for a card bought as the held event at the
+   * Predicted resting position for an event card bought into the hand at the
    * given insert index. Single source of truth for market→hand transfer
-   * animation targets — delegates to the event HandView's
-   * `getInsertionPosition` so the animation always ends exactly where the
-   * rendered held-event card will rest (centred on `handCenterX`).
+   * animation targets — delegates to the merged HandView's
+   * `getInsertionPosition` (events share the single horizontal hand row).
    */
   public getEventHandInsertionPosition(insertIndex: number): { x: number; y: number } {
     return this.msRenderer.handView.getInsertionPosition(insertIndex);

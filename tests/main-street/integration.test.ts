@@ -63,10 +63,14 @@ function playGreedyTurn(state: MainStreetState): { actions: PlayerAction[]; resu
 /**
  * Runs a full game with a greedy strategy until it ends or hits a safety limit.
  * Returns array of turn records.
+ *
+ * The maxTurns cap is a harness-only termination guard (CG-0MSLXJCHH001DLIO):
+ * default presets impose no turn limit, so long-running simulations need an
+ * explicit bound to terminate deterministically.
  */
 function playFullGame(
   state: MainStreetState,
-  maxTurns = 25,
+  maxTurns = 60,
 ): { turnResults: TurnResult[]; totalTurns: number } {
   const turnResults: TurnResult[] = [];
   let count = 0;
@@ -181,14 +185,16 @@ describe('Integration: Full Game', () => {
     expect(['win', 'loss']).toContain(state.gameResult);
     expect(state.endReason).not.toBeNull();
     expect(totalTurns).toBeGreaterThanOrEqual(1);
-    expect(totalTurns).toBeLessThanOrEqual(21); // MAX_TURNS + 1 safety
+    // Harness termination guard: default presets are unlimited, so this is a
+    // bound on the simulation loop, not a game mechanic (CG-0MSLXJCHH001DLIO).
+    expect(totalTurns).toBeLessThanOrEqual(60);
     expect(turnResults.length).toBe(totalTurns);
 
     // Final score should be computed
     expect(state.finalScore).toBe(computeScore(state));
   });
 
-  it('reaches turn 20 limit with enough income to survive', () => {
+  it('reaches score threshold with enough income to survive', () => {
     // Manually set up a state with high coins to survive
     const state = setupMainStreetGame({ seed: 'integration-survive' });
     state.resourceBank.coins = 100;
@@ -196,12 +202,11 @@ describe('Integration: Full Game', () => {
 
     const { totalTurns: _totalTurns } = playFullGame(state);
 
-    // With high starting resources and reputation, game should reach turn 20
-    // and end with either score_threshold win or turn_limit_victory
-    expect(state.gameResult).not.toBe('playing');
-    if (state.gameResult === 'win') {
-      expect(['score_threshold', 'turn_limit_victory']).toContain(state.endReason);
-    }
+    // With high starting resources and reputation, the game ends via the
+    // score threshold (default presets impose no turn limit, so
+    // turn_limit_victory is not reachable — CG-0MSLXJCHH001DLIO).
+    expect(state.gameResult).toBe('win');
+    expect(state.endReason).toBe('score_threshold');
   });
 
   it('ends in bankruptcy when coins go below 0', () => {
@@ -210,8 +215,8 @@ describe('Integration: Full Game', () => {
     state.resourceBank.coins = 1;
     state.resourceBank.reputation = 5; // Avoid rep collapse
 
-    // Put a tax event into heldEvent to trigger bankruptcy when played
-    state.heldEvent = {
+    // Put a tax event into the hand to trigger bankruptcy when played
+    state.hand = [{
       family: 'event',
       id: 'evt-tax-test',
       name: 'Heavy Tax',
@@ -221,7 +226,7 @@ describe('Integration: Full Game', () => {
       coinDelta: -10,
       reputationDelta: 0,
       cost: 0,
-    };
+    }];
 
     executeDayStart(state);
     // Player actively plays the held event during MarketPhase
@@ -239,7 +244,7 @@ describe('Integration: Full Game', () => {
     state.turn = 2; // Must be past turn 1 for rep collapse check
 
     // Add an event that drops reputation to 0
-    state.heldEvent = {
+    state.hand = [{
       family: 'event',
       id: 'evt-scandal-test',
       name: 'Scandal',
@@ -249,7 +254,7 @@ describe('Integration: Full Game', () => {
       coinDelta: 0,
       reputationDelta: -1,
       cost: 0,
-    };
+    }];
 
     executeDayStart(state);
     // Player actively plays the held event during MarketPhase
@@ -486,8 +491,8 @@ describe('Integration: Held Investment Event', () => {
     state.resourceBank.coins = 50;
     state.resourceBank.reputation = 5;
 
-    // Give the player a held Investment event
-    state.heldEvent = {
+    // Give the player a held Investment event (in hand)
+    state.hand = [{
       family: 'event',
       id: 'evt-held-auto',
       name: 'Auto Festival',
@@ -497,15 +502,14 @@ describe('Integration: Held Investment Event', () => {
       coinDelta: 3,
       reputationDelta: 0,
       cost: 3,
-    };
+    }];
 
     executeDayStart(state);
     // Don't play the event during MarketPhase — just end turn
     const result = processEndOfTurn(state);
 
-    // heldEvent should NOT have been auto-resolved — it persists
-    expect(state.heldEvent).not.toBeNull();
-    expect(state.heldEvent!.id).toBe('evt-held-auto');
+    // The event should NOT have been auto-resolved — it persists in hand
+    expect((state.hand ?? []).some(c => c.family === 'event' && c.id === 'evt-held-auto')).toBe(true);
     // Coins should NOT include the +3 from the event (event was not played)
     // Income and incident effects still apply, but the event delta should not
     expect(result).toBeDefined();
@@ -516,8 +520,8 @@ describe('Integration: Held Investment Event', () => {
     state.resourceBank.coins = 50;
     state.resourceBank.reputation = 5;
 
-    // Give the player a held Investment event
-    state.heldEvent = {
+    // Give the player a held Investment event (in hand)
+    state.hand = [{
       family: 'event',
       id: 'evt-held-play',
       name: 'Manual Festival',
@@ -527,13 +531,13 @@ describe('Integration: Held Investment Event', () => {
       coinDelta: 5,
       reputationDelta: 0,
       cost: 3,
-    };
+    }];
 
     executeDayStart(state);
 
     // Play the event during MarketPhase
     executeAction(state, { type: 'play-event' });
-    expect(state.heldEvent).toBeNull();
+    expect((state.hand ?? []).some(c => c.family === 'event')).toBe(false);
 
     const coinsAfterPlay = state.resourceBank.coins;
     // Reputation multiplier: rep=5, divisor=20 → 1 + 5/20 = 1.25
@@ -546,8 +550,8 @@ describe('Integration: Held Investment Event', () => {
     // The +5 should only have been applied once (during play-event, not again during auto-resolve)
     // Income phase adds income, incident phase subtracts — but the event shouldn't double-apply
     expect(result).toBeDefined();
-    // heldEvent is still null
-    expect(state.heldEvent).toBeNull();
+    // Hand still has no event
+    expect((state.hand ?? []).some(c => c.family === 'event')).toBe(false);
   });
 
   it('purchasing an Investment event during one turn and playing it the next', () => {
@@ -572,13 +576,11 @@ describe('Integration: Held Investment Event', () => {
     // Turn 1: buy the event
     executeDayStart(state);
     executeAction(state, { type: 'buy-event', cardId: 'evt-buy-then-play' });
-    expect(state.heldEvent).not.toBeNull();
-    expect(state.heldEvent!.id).toBe('evt-buy-then-play');
+    expect((state.hand ?? []).some(c => c.family === 'event' && c.id === 'evt-buy-then-play')).toBe(true);
 
     // End turn 1 — held event persists (no longer auto-resolved)
     const result1 = processEndOfTurn(state);
-    expect(state.heldEvent).not.toBeNull(); // Persists across turns
-    expect(state.heldEvent!.id).toBe('evt-buy-then-play');
+    expect((state.hand ?? []).some(c => c.family === 'event' && c.id === 'evt-buy-then-play')).toBe(true); // Persists across turns
     expect(result1).toBeDefined();
 
     if (state.gameResult !== 'playing') return; // Game ended
@@ -587,7 +589,7 @@ describe('Integration: Held Investment Event', () => {
     executeDayStart(state);
     const coinsBeforePlay = state.resourceBank.coins;
     executeAction(state, { type: 'play-event' });
-    expect(state.heldEvent).toBeNull(); // Now resolved
+    expect((state.hand ?? []).some(c => c.family === 'event')).toBe(false); // Now resolved
     // Reputation multiplier: rep=5, divisor=20 → 1 + 5/20 = 1.25
     // floor(4 * 1.25) = floor(5.0) = 5
     expect(state.resourceBank.coins).toBe(coinsBeforePlay + 5); // +4 base scaled to +5 by rep

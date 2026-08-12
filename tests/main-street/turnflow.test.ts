@@ -256,20 +256,19 @@ describe('MainStreetEngine', () => {
       });
 
       expect(result).not.toBeNull();
-      expect(state.heldEvent).not.toBeNull();
-      expect(state.heldEvent!.id).toBe('inv-evt-1');
+      expect(state.hand.some(c => c.family === 'event' && c.id === 'inv-evt-1')).toBe(true);
     });
 
     it('should execute play-event action when an Investment is held', () => {
       const state = createTestState();
       state.phase = 'MarketPhase';
-      state.heldEvent = makeInvestmentEvent({ id: 'play-action-1', coinDelta: 4 });
+      state.hand = [makeInvestmentEvent({ id: 'play-action-1', coinDelta: 4 })];
       const coinsBefore = state.resourceBank.coins;
 
       const result = executeAction(state, { type: 'play-event' });
 
       expect(result).toBeNull();
-      expect(state.heldEvent).toBeNull();
+      expect(state.hand.some(c => c.family === 'event')).toBe(false);
       // CG-0MRER3RE300418SG: event coinDelta is now multiplied by reputation and not floored
       // Medium preset rep=3 → multiplier=1.15, 4 * 1.15 = 4.6 (was 4 before fix)
       expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 4.6);
@@ -341,14 +340,14 @@ describe('MainStreetEngine', () => {
   describe('resolveHeldInvestment', () => {
     it('should resolve the held Investment event and clear it', () => {
       const state = createTestState();
-      state.heldEvent = makeInvestmentEvent({ id: 'e1', coinDelta: 5 });
+      state.hand = [makeInvestmentEvent({ id: 'e1', coinDelta: 5 })];
       const coinsBefore = state.resourceBank.coins;
 
       const resolved = resolveHeldInvestment(state);
 
       expect(resolved).not.toBeNull();
       expect(resolved!.id).toBe('e1');
-      expect(state.heldEvent).toBeNull();
+      expect(state.hand.some(c => c.family === 'event')).toBe(false);
       // CG-0MRER3RE300418SG: event coinDelta scaled by reputation, not floored
       // 5 * 1.15 = 5.75 (was 5 before fix)
       expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 5.75);
@@ -364,12 +363,12 @@ describe('MainStreetEngine', () => {
   describe('playHeldEvent', () => {
     it('should resolve the held event and clear it', () => {
       const state = createTestState();
-      state.heldEvent = makeInvestmentEvent({ id: 'play-1', coinDelta: 3 });
+      state.hand = [makeInvestmentEvent({ id: 'play-1', coinDelta: 3 })];
       const coinsBefore = state.resourceBank.coins;
 
       playHeldEvent(state);
 
-      expect(state.heldEvent).toBeNull();
+      expect(state.hand.some(c => c.family === 'event')).toBe(false);
       // CG-0MRER3RE300418SG: event coinDelta scaled by reputation, not floored
       // 3 * 1.15 = 3.45 (was 3 before fix)
       expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 3.45);
@@ -574,8 +573,11 @@ describe('MainStreetEngine', () => {
     });
 
     it('should detect turn-limit victory (positive reputation, coins >= 0)', () => {
+      // Turn-based end conditions are opt-in via an explicit config.maxTurns
+      // (CG-0MSLXJCHH001DLIO); default presets impose no turn limit.
       const state = createTestState();
-      state.turn = MAX_TURNS;
+      state.config = { ...state.config, maxTurns: 20 };
+      state.turn = 20;
       state.resourceBank.coins = 10;
       state.resourceBank.reputation = 5;
 
@@ -584,49 +586,20 @@ describe('MainStreetEngine', () => {
       expect(state.endReason).toBe('turn_limit_victory');
     });
 
-    it('should detect turn exhaustion (no win conditions met at turn limit)', () => {
+    it('should detect turn exhaustion (turn limit reached without victory)', () => {
+      // turn_exhaustion is only reachable when the turn-limit check runs before
+      // the immediate-loss checks: on turn 1 the reputation-collapse guard is
+      // skipped, so rep <= 0 at turn >= maxTurns (maxTurns = 1 here) falls
+      // through to turn_exhaustion instead of reputation_collapse.
       const state = createTestState();
-      state.turn = MAX_TURNS;
-      state.resourceBank.coins = 5;
-      state.resourceBank.reputation = 0;
-      // Turn 20 with reputation 0 -> not turn limit victory
-      // Score = 5 < 150 -> not score threshold
-      // After turn 1 with reputation 0 -> actually, let's set turn > 1
-      // But wait: reputation 0 on turn 20 would trigger reputation_collapse first
-      // Let's use reputation -1 to trigger bankruptcy first... no, let's think
-      // Actually, turn 20, reputation 0 -> checkImmediateLoss triggers reputation_collapse
-      // We need reputation > 0 but score < threshold to get turn_exhaustion
-      // Hmm, that would be turn_limit_victory. Let's use negative reputation
-      state.resourceBank.reputation = -1;
-      // coins >= 0 but reputation < 0 -> reputation_collapse first
+      state.config = { ...state.config, maxTurns: 1 };
+      state.turn = 1;
+      state.resourceBank.coins = 10;
+      state.resourceBank.reputation = 0; // <= 0: not a turn-limit victory
 
-      // To test turn_exhaustion: coins < 0 -> bankruptcy first
-      // Actually turn_exhaustion needs: turn >= MAX_TURNS, no win, no immediate loss
-      // The immediate loss checks (bankruptcy, rep collapse) run first
-      // If coins >= 0 and rep > 0 at turn 20, that's turn_limit_victory
-      // turn_exhaustion only happens if coins >= 0 and rep <= 0 at turn 20
-      // But rep <= 0 after turn 1 is rep_collapse...
-      // Actually wait - the order in checkEndConditions is:
-      // 1. checkImmediateLoss -> bankruptcy or rep_collapse
-      // 2. score threshold
-      // 3. turn limit victory (rep > 0, coins >= 0)
-      // 4. turn exhaustion (catch-all at turn limit)
-      // So turn_exhaustion happens when: turn >= MAX, coins >= 0, but rep <= 0 on turn > 1
-      // But that triggers rep_collapse first! Unless... turn is 1? No, MAX_TURNS is 20
-      // Let me re-read the code: checkImmediateLoss checks turn > 1 for rep collapse
-      // So at turn 20, rep 0 -> checkImmediateLoss returns true (rep collapse)
-      // turn_exhaustion can never actually fire because rep <= 0 at turn 20 always triggers rep_collapse
-      // Unless we disable rep collapse... Let me just test a case where score < threshold but rep > 0
-      // Wait, rep > 0 and coins >= 0 at MAX_TURNS = turn_limit_victory
-      // So turn_exhaustion is for: rep > 0 but score < threshold... no, that's still victory
-      // Actually reading more carefully: turn_limit_victory requires rep > 0 AND coins >= 0
-      // If coins < 0 that's bankruptcy (checked first)
-      // So the only way to get turn_exhaustion is if we somehow have coins >= 0, rep > 0 but...
-      // That's always turn_limit_victory. Let me check if turn_exhaustion is even reachable.
-      // Hmm, the PRD says: "Loss triggers at turn 20 if win conditions are not met (turn exhaustion)"
-      // I think turn_exhaustion should cover the case where: coins >= 0, rep <= 0 (after turn 1)
-      // But that triggers rep_collapse. So effectively turn_exhaustion may be unreachable with
-      // current loss conditions. Let me skip this edge case and test a simpler scenario.
+      expect(checkEndConditions(state)).toBe(true);
+      expect(state.gameResult).toBe('loss');
+      expect(state.endReason).toBe('turn_exhaustion');
     });
 
     it('should return false when game should continue (no conditions met)', () => {

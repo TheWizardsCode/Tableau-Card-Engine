@@ -28,7 +28,7 @@ interface MarketActionSnapshot {
   market: any | null;
   decks: any | null;
   resourceBank: any | null;
-  heldEvent: any | null;
+  hand: any | null;
   incidentQueue: any | null;
   activityLog: any | null;
   soldSlots: boolean[] | null;
@@ -55,7 +55,7 @@ function captureSnapshot(state: MainStreetState): MarketActionSnapshot {
     market: safeClone(state.market),
     decks: safeClone(state.decks),
     resourceBank: safeClone(state.resourceBank),
-    heldEvent: safeClone(state.heldEvent),
+    hand: safeClone(state.hand ?? []),
     incidentQueue: safeClone(state.incidentQueue),
     activityLog: safeClone(state.activityLog),
     soldSlots: safeClone(state.soldSlots ?? new Array(10).fill(false)) as boolean[],
@@ -71,7 +71,7 @@ function restoreSnapshot(state: MainStreetState, snap: MarketActionSnapshot): vo
   state.market = snap.market as any;
   state.decks = snap.decks as any;
   state.resourceBank = snap.resourceBank as any;
-  state.heldEvent = snap.heldEvent as any;
+  state.hand = snap.hand as any;
   state.incidentQueue = snap.incidentQueue as any;
   state.activityLog = snap.activityLog as any;
   state.soldSlots = snap.soldSlots ?? new Array(10).fill(false);
@@ -159,12 +159,12 @@ export function buyEventCommand(
   );
 }
 
-/** Command: Play Held Investment Event */
-export function playEventCommand(state: MainStreetState) {
+/** Command: Play Investment Event from Hand */
+export function playEventCommand(state: MainStreetState, handIndex?: number) {
   return toCommand(
     state,
     snapshotAction(
-      (s) => playHeldEvent(s),
+      (s) => playHeldEvent(s, handIndex),
       'PlayHeldEvent',
     ),
   );

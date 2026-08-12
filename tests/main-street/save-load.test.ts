@@ -135,7 +135,7 @@ describe('Main Street save/load integration', () => {
         break;
       }
 
-      if (state.heldEvent !== null) {
+      if ((state.hand ?? []).some(c => c.family === 'event')) {
         actions.push({ type: 'play-event' });
       }
 

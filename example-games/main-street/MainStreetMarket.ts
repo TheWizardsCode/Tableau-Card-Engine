@@ -25,6 +25,8 @@ import {
   MARKET_INVESTMENT_EVENT_COUNT,
   REFRESH_DEVELOPMENT_COST,
   REFRESH_INVESTMENTS_COST,
+  findConstrainedIncidentIndex,
+  recordIncidentDraw,
 } from './MainStreetCards';
 import { shuffleArray } from '../../src/card-system';
 import { updateNeighborsOnPlacement, updateNeighborsOnSale } from './MainStreetAdjacency';
@@ -212,8 +214,9 @@ export function canPurchaseUpgrade(
 /**
  * Checks whether the player can purchase an Event card from the market.
  *
- * Investment events are purchased from the market and held (max 1 at a time)
- * until the player chooses to play them during the MarketPhase.
+ * Investment events are purchased from the market and added to the player's
+ * hand (any mix of business and event cards, up to `maxHandSize` total) until
+ * the player chooses to play them during the MarketPhase.
  * Incident events are drawn automatically (not purchased).
  *
  * @param state   Current game state.
@@ -237,9 +240,10 @@ export function canPurchaseEvent(
     return { legal: false, reason: 'Incident events cannot be purchased; they are drawn automatically.' };
   }
 
-  // Only one held Investment at a time
-  if (state.heldEvent !== null) {
-    return { legal: false, reason: 'Already holding an Investment event. Play or discard it before buying another.' };
+  // Hand capacity is the only limit — no separate "max 1 held Investment" rule
+  const handCheck = canAddToHand(state);
+  if (!handCheck.legal) {
+    return handCheck;
   }
 
   // Check coins
@@ -486,23 +490,34 @@ export function cycleMarketCards(state: MainStreetState): void {
  * Tops up the incident queue to INCIDENT_QUEUE_SIZE by drawing
  * Incident-trigger cards from the event deck. If the deck has no
  * remaining Incident cards, the queue stays at its current size.
+ *
+ * Draws are constraint-aware (CG-0MSL0OP040043KKZ): every pick routes
+ * through `findConstrainedIncidentIndex`, honoring the runtime-mutable
+ * repeat-spacing window and good/bad streak limits from
+ * `state.incidentBalance`. The reshuffle paths (deck exhausted / no
+ * Incident-trigger cards left) also route through the selector, so AC1's
+ * "every point the next incident is selected" is covered.
  */
 export function refillIncidentQueue(state: MainStreetState): void {
   // If the event deck is empty but incident discards exist, reshuffle them.
   reshuffleIfNeeded(state, state.decks.event, state.discards.event, 'event');
 
   while (state.incidentQueue.length < INCIDENT_QUEUE_SIZE) {
-    let idx = state.decks.event.findIndex(e => e.trigger === 'Incident');
+    let idx = findConstrainedIncidentIndex(state.decks.event, state.incidentBalance);
     if (idx === -1) {
       // Attempt a reshuffle in case the deck was empty earlier
       reshuffleIfNeeded(state, state.decks.event, state.discards.event, 'event');
       // If the deck still has cards but none are Incident-trigger,
       // force a reshuffle from discards (e.g. only Investments remain).
       forceReshuffleFromDiscards(state, state.decks.event, state.discards.event, 'event');
-      idx = state.decks.event.findIndex(e => e.trigger === 'Incident');
+      idx = findConstrainedIncidentIndex(state.decks.event, state.incidentBalance);
       if (idx === -1) break;
     }
-    state.incidentQueue.push(state.decks.event.splice(idx, 1)[0]);
+    const card = state.decks.event.splice(idx, 1)[0];
+    state.incidentQueue.push(card);
+    // Track the draw so subsequent selections respect the repeat/streak
+    // constraints (history mirrors the sequence the player resolves).
+    recordIncidentDraw(state.incidentBalance, card);
   }
 }
 
@@ -694,8 +709,8 @@ export function purchaseUpgrade(
 }
 
 /**
- * Purchases an Investment-trigger Event card from the market and holds it
- * for the player to play later during the MarketPhase.
+ * Purchases an Investment-trigger Event card from the market and adds it to
+ * the player's hand for the player to play later during the MarketPhase.
  *
  * @param state   Current game state (mutated in-place).
  * @param cardId  ID of the Event card in the market.
@@ -722,14 +737,14 @@ export function purchaseEvent(
   // Remove from market
   state.market.investments.splice(marketIndex, 1);
 
-  // Hold the Investment event (max 1)
-  state.heldEvent = card;
+  // Add the event to the shared hand (appended like any other card)
+  state.hand.push(card);
 
   // Note: market is not refilled immediately. Replenishment occurs at start of next turn.
   const refilled = false;
 
   const costLabel = card.cost > 0 ? ` (-€${card.cost})` : '';
-  addLog(state, `Bought event: ${card.name}${costLabel} (held)`, 'neutral');
+  addLog(state, `Bought event: ${card.name}${costLabel} (to hand)`, 'neutral');
 
   return { card, cost: card.cost, refilled };
 }

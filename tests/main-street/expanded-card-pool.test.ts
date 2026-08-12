@@ -543,7 +543,7 @@ describe('Expanded Card Pool: Seeded Deck Resolution', () => {
     const eventTotal = state.market.investments.filter(c => c.family === 'event').length
       + state.decks.event.length
       + state.incidentQueue.length
-      + (state.heldEvent ? 1 : 0);
+      + (state.hand ?? []).filter(c => c.family === 'event').length;
     const multiplier = getPreset(undefined).positiveIncidentMultiplier;
     expect(eventTotal).toBe(createEventDeck(3, undefined, _rng, multiplier).length);
 

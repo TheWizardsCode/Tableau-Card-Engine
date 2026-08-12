@@ -22,7 +22,10 @@ import {
   OverlayManager,
   audioPathWithFallback,
   createGameOverOverlay,
+  createDragDropManager,
+  DEFAULT_DRAG_DISTANCE_THRESHOLD,
 } from '../../../src/ui';
+import type { DragDropManager, DragDropPayload } from '../../../src/ui';
 import type { EventSoundMapping } from '../../../src/core-engine/SoundManager';
 import type { HelpSection } from '../../../src/ui';
 import helpContent from '../help-content.json';
@@ -36,10 +39,11 @@ import {
   RESUME_TITLE_FONT_SIZE, RESUME_TITLE_Y_OFFSET,
   RESUME_INFO_FONT_SIZE, RESUME_INFO_Y_OFFSET,
   RESUME_BUTTON_SPACING, RESUME_BUTTON_Y_OFFSET,
-  SNAP_BACK_DURATION,
+  SNAP_BACK_DURATION, DRAG_DEPTH,
   HINT_BUTTON_WIDTH, HINT_BAR_Y_OFFSET,
 } from './BeleagueredCastleConstants';
 import { BeleagueredCastleRenderer } from './BeleagueredCastleRenderer';
+import type { BCTopCardDragData, BCZoneDragData } from './BeleagueredCastleRenderer';
 import { BeleagueredCastleTurnController } from './BeleagueredCastleTurnController';
 import { moveGameObject, cardTextureKey } from '../../../src/ui';
 import { shakeIllegalMove } from '../../../src/ui/shakeIllegalMove';
@@ -90,6 +94,8 @@ export class BeleagueredCastleScene extends CardGameScene {
   private hintBtn: Phaser.GameObjects.Container | null = null;
   /** Shared hint bar showing the suggested-move description. */
   private hintBar: HintBar | null = null;
+  /** Reusable core-engine drag-drop manager (created in create). */
+  private dragDropManager: DragDropManager | null = null;
 
   private onNewGame?: () => void;
   private onRestart?: () => void;
@@ -171,11 +177,13 @@ export class BeleagueredCastleScene extends CardGameScene {
     this.bcRenderer.onDealCard = (info) => this.gameEvents.emit('deal-card', info);
     this.bcRenderer.onDealComplete = () => {
       this.dealComplete = true;
-      this.bcRenderer.makeDraggable(this.interactionBlocked);
+      this.syncDragEnabled();
+      this.bcRenderer.makeDraggable();
       this.refreshUndoRedoButtons(this.turnController.canUndo, this.turnController.canRedo);
       this.saveCheckpoint();
     };
     this.bcRenderer.onCardClick = (col) => this.handleCardClick(col);
+    this.bcRenderer.onCardDragDrop = (payload) => this.handleDrop(payload);
 
     if (!this.replayMode) {
       this.initHUDContainer();
@@ -205,6 +213,7 @@ export class BeleagueredCastleScene extends CardGameScene {
       if ((window as any).__BC_TEST_REDUCED_MOTION__) {
         this.bcRenderer.reducedMotion = true;
       }
+      this.initDragDrop();
       this.initUndoRedoButtons(
         () => this.turnController.performUndo(),
         () => this.turnController.performRedo(),
@@ -233,68 +242,88 @@ export class BeleagueredCastleScene extends CardGameScene {
   }
 
   // ── Input handling ──────────────────────────────────────
-  private setupDragAndDrop(): void {
-    this.input.on('dragstart', (_pointer: Phaser.Input.Pointer, gameObject: Phaser.GameObjects.Image) => {
-      if (this.interactionBlocked) return;
-      const data = gameObject.getData('cardData');
-      if (!data) return;
-      this.deselectColumn();
-      data.originX = gameObject.x;
-      data.originY = gameObject.y;
-      data.originDepth = gameObject.depth;
-      gameObject.setDepth(1000);
-      const col = this.gameState.tableau[data.colIndex];
-      const topCard = col.peek();
-      if (topCard) this.gameEvents.emit('card-pickup', { suit: topCard.suit, rank: topCard.rank, source: 'tableau' });
-      this.bcRenderer.showValidDropHighlights(data.colIndex, () => getLegalMoves(this.gameState));
+  /**
+   * Create the reusable core-engine drag-drop manager and register the
+   * foundation + tableau drop zones. Tableau top cards are registered as
+   * draggables by the renderer (makeDraggable) on every board render.
+   *
+   * The whole drag lifecycle (origin capture, depth raise, valid-drop
+   * highlights, snap-back, illegal feedback) is delegated to the shared
+   * module (src/ui/dragDrop.ts) — the scene registers no bespoke
+   * dragstart/drag/dragend/drop handlers.
+   */
+  private initDragDrop(): void {
+    if (this.dragDropManager) return;
+    // Headless guard: unit tests may boot without a full input plugin.
+    if (!this.input || typeof this.input.on !== 'function') return;
+
+    this.dragDropManager = createDragDropManager({
+      scene: this,
+      dragDistanceThreshold: DEFAULT_DRAG_DISTANCE_THRESHOLD,
+      // BC's timing/depth constants stay authoritative for the module.
+      dragDepth: DRAG_DEPTH,
+      snapBackDuration: SNAP_BACK_DURATION,
+      reducedMotion: this.bcRenderer.reducedMotion,
+      onDragStart: (payload) => {
+        const data = payload.data as BCTopCardDragData;
+        this.deselectColumn();
+        const col = this.gameState.tableau[data.colIndex];
+        const topCard = col.peek();
+        if (topCard) {
+          this.gameEvents.emit('card-pickup', { suit: topCard.suit, rank: topCard.rank, source: 'tableau' });
+        }
+        this.bcRenderer.showValidDropHighlights(data.colIndex, () => getLegalMoves(this.gameState));
+      },
+      onDragEnd: () => this.bcRenderer.clearDropHighlights(),
     });
+    // Hand the manager to the renderer so makeDraggable can register the
+    // tableau top cards as draggables on every board render.
+    this.bcRenderer.dragDropManager = this.dragDropManager;
 
-    this.input.on('drag', (_pointer: Phaser.Input.Pointer, gameObject: Phaser.GameObjects.Image, dragX: number, dragY: number) => {
-      if (this.interactionBlocked) return;
-      gameObject.x = dragX;
-      gameObject.y = dragY;
-    });
-
-    this.input.on('dragend', (_pointer: Phaser.Input.Pointer, gameObject: Phaser.GameObjects.Image, dropped: boolean) => {
-      if (this.interactionBlocked) return;
-      this.bcRenderer.clearDropHighlights();
-      if (!dropped) {
-        this.bcRenderer.snapBack(gameObject);
-        this.time.delayedCall(SNAP_BACK_DURATION, () => {
-          shakeIllegalMove({ scene: this, target: gameObject });
-        });
-      }
-    });
-
-    this.input.on('drop', (_pointer: Phaser.Input.Pointer, gameObject: Phaser.GameObjects.Image, dropZone: Phaser.GameObjects.Zone) => {
-      if (this.interactionBlocked) return;
-      this.handleDrop(gameObject, dropZone);
-    });
-  }
-
-  private handleDrop(sprite: Phaser.GameObjects.Image, zone: Phaser.GameObjects.Zone): void {
-    const data = sprite.getData('cardData');
-    if (!data) { this.bcRenderer.snapBack(sprite); return; }
-
-    const fromCol = data.colIndex;
-    const zoneType = zone.getData('type') as string;
-    const zoneIndex = zone.getData('index') as number;
-    let move: BCMove | null = null;
-
-    if (zoneType === 'foundation' && isLegalFoundationMove(this.gameState, fromCol, zoneIndex).legal) {
-      move = { kind: 'tableau-to-foundation', fromCol, toFoundation: zoneIndex };
-    } else if (zoneType === 'tableau' && zoneIndex !== fromCol && isLegalTableauMove(this.gameState, fromCol, zoneIndex).legal) {
-      move = { kind: 'tableau-to-tableau', fromCol, toCol: zoneIndex };
-    }
-
-    if (move) {
-      this.turnController.executePlayerMove(move);
-    } else {
-      this.bcRenderer.snapBack(sprite);
-      this.time.delayedCall(SNAP_BACK_DURATION, () => {
-        shakeIllegalMove({ scene: this, target: sprite });
+    for (let fi = 0; fi < FOUNDATION_COUNT; fi++) {
+      this.dragDropManager.registerDropZone({
+        zone: this.bcRenderer.foundationDZs[fi],
+        data: { type: 'foundation', index: fi } satisfies BCZoneDragData,
+        canAccept: (payload) => {
+          const fromCol = (payload.data as BCTopCardDragData).colIndex;
+          return isLegalFoundationMove(this.gameState, fromCol, fi).legal;
+        },
       });
     }
+    for (let col = 0; col < TABLEAU_COUNT; col++) {
+      this.dragDropManager.registerDropZone({
+        zone: this.bcRenderer.tableauDZs[col],
+        data: { type: 'tableau', index: col } satisfies BCZoneDragData,
+        canAccept: (payload) => {
+          const fromCol = (payload.data as BCTopCardDragData).colIndex;
+          return col !== fromCol && isLegalTableauMove(this.gameState, fromCol, col).legal;
+        },
+      });
+    }
+  }
+
+  /**
+   * Execute an accepted drag-drop move. The drag-drop module only invokes
+   * this for drops on registered zones whose canAccept passed; rejected
+   * drops snap back with illegal feedback automatically.
+   */
+  private handleDrop(payload: DragDropPayload): void {
+    const data = payload.data as BCTopCardDragData;
+    const zoneData = payload.zoneData as BCZoneDragData;
+    const move: BCMove = zoneData.type === 'foundation'
+      ? { kind: 'tableau-to-foundation', fromCol: data.colIndex, toFoundation: zoneData.index }
+      : { kind: 'tableau-to-tableau', fromCol: data.colIndex, toCol: zoneData.index };
+    this.turnController.executePlayerMove(move);
+  }
+
+  /**
+   * Keep the drag-drop manager's enabled state in sync with interaction
+   * blocking (deal in progress, game ended, auto-complete running) — the
+   * module's handlers return silently while disabled, matching the bespoke
+   * handlers' early-return behaviour.
+   */
+  private syncDragEnabled(): void {
+    this.dragDropManager?.setEnabled(!this.interactionBlocked);
   }
 
   private setupClickToMove(): void {
@@ -454,6 +483,7 @@ export class BeleagueredCastleScene extends CardGameScene {
 
   // ── Game end ────────────────────────────────────────────
   private handleGameEnd(): void {
+    this.syncDragEnabled();
     if (isWon(this.gameState)) {
       this.gameEnded = true;
       this.stopTimer();
@@ -472,6 +502,7 @@ export class BeleagueredCastleScene extends CardGameScene {
   }
 
   private handleAutoCompleteDone(): void {
+    this.syncDragEnabled();
     if (isWon(this.gameState)) {
       this.gameEnded = true;
       this.stopTimer();
@@ -482,6 +513,8 @@ export class BeleagueredCastleScene extends CardGameScene {
   }
 
   private runAutoCompleteVisuals(moves: BCMove[], moveCards: Array<{ suit: string; rank: string; foundationIndex: number }>, isSafeAutoMove?: boolean): void {
+    // Block drags while the auto-complete animation is running.
+    this.syncDragEnabled();
     const STAGGER_MS = AUTO_COMPLETE_STAGGER_MS;
 
 
@@ -735,12 +768,12 @@ export class BeleagueredCastleScene extends CardGameScene {
     this.onRestart = () => this.scene.restart();
     this.onUndoLast = () => { this.overlayManager.dismiss(); this.gameEnded = false; this.resumeTimer(); this.turnController.performUndo(); };
 
-    // Refresh the renderer with the restored state
-    this.bcRenderer.refreshAll(true, false);
+    // Refresh the renderer with the restored state (re-registers draggables
+    // via makeDraggable; syncDragEnabled runs inside refreshAll)
+    this.bcRenderer.refreshAll(true);
     this.refreshUndoRedoButtons(this.turnController.canUndo, this.turnController.canRedo);
 
     // Wire up interactions (no deal animation since dealComplete is already true)
-    this.setupDragAndDrop();
     this.setupClickToMove();
     this.setupKeyboard();
   }
@@ -751,7 +784,6 @@ export class BeleagueredCastleScene extends CardGameScene {
    */
   private startFreshGame(): void {
     this.bcRenderer.dealTableauAnimated();
-    this.setupDragAndDrop();
     this.setupClickToMove();
     this.setupKeyboard();
   }
@@ -778,7 +810,8 @@ export class BeleagueredCastleScene extends CardGameScene {
 
   // ── Refresh ─────────────────────────────────────────────
   private refreshAll(): void {
-    this.bcRenderer.refreshAll(this.dealComplete, this.interactionBlocked);
+    this.syncDragEnabled();
+    this.bcRenderer.refreshAll(this.dealComplete);
     this.refreshUndoRedoButtons(this.turnController.canUndo, this.turnController.canRedo);
     // The suggestion is tied to the current board state; hide it once the
     // board changes (move, undo, redo, auto-complete).
@@ -836,6 +869,11 @@ export class BeleagueredCastleScene extends CardGameScene {
     this.hintBar?.destroy();
     this.hintBar = null;
     this.overlayManager.dismiss();
+    // Release the drag-drop module's input listeners and registrations.
+    if (this.dragDropManager) {
+      try { this.dragDropManager.destroy(); } catch { /* ignore */ }
+      this.dragDropManager = null;
+    }
     this.shutdownBase();
   }
 

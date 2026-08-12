@@ -7,6 +7,7 @@ This document covers everything you need to develop, test, and build the Tableau
 - [Environment Setup](#environment-setup)
 - [Running Locally](#running-locally)
 - [Building for Production](#building-for-production)
+- [Electron Launcher / Desktop Packaging](#electron-launcher--desktop-packaging)
 - [Testing](#testing)
 - [ToneForge Audio Generation](#toneforge-audio-generation)
 - [Project Structure](#project-structure)
@@ -97,6 +98,73 @@ npm run preview
 
 See [RELEASE.md](../RELEASE.md) for the full release workflow, checklist, and verification steps. The CI workflow is `.github/workflows/deploy.yml`.
 
+## Electron Launcher / Desktop Packaging
+
+TCE also ships as a native desktop app (Steam distribution) via an **Electron** launcher in `electron/` that boots the same Vite-built web app in a desktop window. The launcher works without Steam during development; Steam integration (DLC management) is designed for later addition behind a small provider interface.
+
+### Build modes
+
+`vite.config.ts` gates the production `base` on the Vite `mode`:
+
+| Mode | `base` | Used by |
+|------|--------|---------|
+| `production` | `/Tableau-Card-Engine/` | GitHub Pages (`npm run build`) — unchanged |
+| `electron` | `./` (relative, `file://`-safe) | Desktop launcher (`npm run build:electron`) |
+| dev/server | `/` | `npm run dev`, tests |
+
+### Prerequisites
+
+- Node.js 20+ (matches CI).
+- Playwright Chromium for the browser tests (`npx playwright install chromium`).
+- The Electron smoke test needs a display: on headless Linux run it under **xvfb** (`apt install xvfb`); macOS/Windows use their native display. The CI ubuntu runner ships xvfb.
+
+### Build & run the desktop app
+
+```bash
+npm run build:electron     # electron-mode Vite build -> dist/ (relative asset URLs)
+npm run build:electron-main # compile electron/*.ts -> dist-electron/ + copy preload.cjs
+npm run start:electron     # both builds + launch `electron .`
+```
+
+`electron .` reads `package.json` `"main": "dist-electron/main.js"`. The main process (ESM) creates the `BrowserWindow`, loads the resolved content entry via `loadFile`, and exposes read-only host info (resolved content dir, app version, runtime versions) to the renderer through the preload context bridge (`window.tce`) with `contextIsolation` on and `nodeIntegration` off.
+
+### Packaging a binary
+
+```bash
+npm run package        # host platform (Windows NSIS on Windows, AppImage/tar.gz on Linux, dmg on macOS)
+npm run package:win    # Windows NSIS installer + win-unpacked (primary Steam artifact)
+npm run package:linux  # AppImage + tar.gz
+npm run package:mac    # dmg
+```
+
+Output goes to the gitignored `release/` directory. Config: `electron-builder.yml` (app id `com.thewizardscode.tableaucardengine`, asar containing only `dist/` + `dist-electron/` + `package.json` — the renderer and Phaser are Vite-bundled, so no `node_modules` are needed). Packaging runs with `--publish never` (private repo; binaries are uploaded to Steam manually). The Windows binary is also built reproducibly by CI on every push to `main` (`.github/workflows/package.yml`) and uploaded as a workflow artifact.
+
+### DLC content directory (Steam model)
+
+Game content defaults to the bundled `dist/` inside the app. For Steam DLC (option a), the launcher reads game content from an external content root — a Steam-managed DLC install directory containing `index.html` + assets — supplied via:
+
+```bash
+npm run start:electron -- --content-dir /path/to/dlc
+# or
+TCE_CONTENT_DIR=/path/to/dlc npm run start:electron
+```
+
+The resolution lives in `electron/content-locator.ts` (pure Node, unit-tested) behind the `ContentDirectoryProvider` interface, so a future Steamworks-backed provider (option b, programmatic DLC management) can be added without changing the launcher's load path. Missing/invalid directories are rejected with a structured `ContentLocatorError` (clear message + exit code).
+
+### Electron smoke test
+
+The Playwright-Electron launch test (`tests/electron/launch-smoke.test.ts`) launches the real Electron app and asserts the Game Selector renders, the preload bridge is exposed, and clicking a selector card boots a game scene. It runs in its own vitest project so it never slows the regular suites:
+
+```bash
+# dev-build mode (rebuilds the electron-mode bundle first)
+npx vitest run --project electron        # needs a display (xvfb on headless Linux)
+
+# packaged-binary mode (CI packaging job uses this)
+TCE_SMOKE_BINARY=/path/to/binary npx vitest run --project electron
+```
+
+`npm test` includes this stage and skips it automatically when no display and no `xvfb-run` are available (see `scripts/run-ci-tests.sh`).
+
 ## Testing
 
 ```bash
@@ -144,8 +212,8 @@ Tests use [Vitest](https://vitest.dev/) with projects configured inline in `vite
 |---------|-------------|-------------|---------|
 | `unit` | Node.js | `tests/**/*.test.ts` (excludes `replay-*.test.ts`) | Logic, data, and integration tests — runs in parallel (worker pool capped at `maxWorkers: 4`; see contention mitigation below) |
 | `replay-e2e` | Node.js (fork pool) | `tests/e2e/replay-*.test.ts` | Playwright-driven replay e2e tests. Runs in its own fork (`singleFork: true`) after unit tests to avoid Vite cold-start CPU contention |
-| `browser` | Chromium (Playwright) | `tests/**/*.browser.test.ts` (excludes tutorial E2E) | Phaser UI and rendering tests |
-| `tutorial-part1..6` | Chromium (Playwright, one per part) | `tests/e2e/main-street-tutorial-e2e-part{1-6}.browser.test.ts` | Main Street tutorial E2E tests (each in own browser instance) |
+| `browser` | Chromium (Playwright) | `tests/**/*.browser.test.ts` (excludes tutorial E2E) | Phaser UI and rendering tests (requires [browser test setup](#browser-test-setup)) |
+| `tutorial-part1..6` | Chromium (Playwright, one per part) | `tests/e2e/main-street-tutorial-e2e-part{1-6}.browser.test.ts` | Main Street tutorial E2E tests (each in own browser instance; requires [browser test setup](#browser-test-setup)) |
 
 All projects run via `npm test`. The browser and tutorial projects run in headless Chromium using `@vitest/browser` with the Playwright provider.
 
@@ -247,11 +315,36 @@ The Main Street tutorial E2E tests are defined in `tests/e2e/main-street-tutoria
 - **Diagnostic tracking:** `bootGameWithTutorial` tracks boot cycles and provides detailed error messages if canvas context is null, including the cycle number, remaining canvas count, and CanvasPool state.
 - **New project:** `scripts/run-ci-tests.sh` orchestrates the full CI test suite (unit → browser → tutorial E2E).
 
-**Browser test dependencies:**
+### Browser test setup
 
-- `@vitest/browser` (matches vitest version)
-- `playwright` (provides Chromium browser)
-- Install Chromium: `npx playwright install chromium`
+The `browser` and `tutorial-part1..6` projects run in headless Chromium via Playwright. On a clean checkout, the browser binary must be installed once before any browser test can run.
+
+**Required dependencies** (already in `package.json` devDependencies):
+
+- `playwright` — Playwright driver that launches Chromium
+- `@vitest/browser` — Vitest browser-mode provider (must match the `vitest` version)
+
+**Install Chromium:**
+
+```bash
+npx playwright install chromium
+```
+
+On Linux, Playwright also needs a set of system libraries. Install them with the system-dependencies variant (prepend `sudo` if your user lacks write access for the package manager):
+
+```bash
+npx playwright install --with-deps chromium
+```
+
+**Verify the installation:**
+
+```bash
+npx playwright install --list
+```
+
+This lists the installed browsers and their expected locations (e.g. `chromium-1208`).
+
+**Fast-fail pre-check:** `npm test` (`scripts/run-ci-tests.sh`) and a direct `bash scripts/run-tutorial-tests.sh` run `scripts/check-browser-test-env.ts` first. The pre-check detects a missing Chromium binary launch-free (via `chromium.executablePath()` + `fs.existsSync()`, under 2 seconds) and aborts with the exact remediation command above — instead of failing minutes later with an opaque Vitest browser error. CI (`.github/workflows/pr-checks.yml`) installs Chromium before `npm test`, so the pre-check passes there.
 
 ## ToneForge Audio Generation
 
@@ -586,7 +679,7 @@ For non-standard card models (tokens, resource icons, expedition cards), use the
 
 ## Animation & Sound Feedback for Player and AI Actions
 
-**Requirement:** Every player **and** AI action that uses a core engine animation/feedback helper — `dealCard`, `discardCard`, `flipCard`, `placeCard`, `moveGameObject`, `shakeIllegalMove`, `popTextOrIcon`, and any future helpers — must be rendered with the corresponding animation and wired with a sound effect (SFX), so the action is both animated and audible. Each helper accepts a `soundManager` + `sfx` (`start`/`move`/`end`) options map (see [UI Animation Helpers](ui-animations.md)); pass both so the action is never silent or instant by default. SFX keys must follow the shared `sfx-` prefix convention — `COMMON_SFX_KEYS` from `src/core-engine/SoundManager.ts`, detailed in [docs/SFX_CONVENTION.md](SFX_CONVENTION.md); no game-scoped string literals. (`shakeIllegalMove` plays `COMMON_SFX_KEYS.ILLEGAL_MOVE` automatically; `popTextOrIcon()` is the lightweight score/notification popup.)
+**Requirement:** Every player **and** AI action that uses a core engine animation/feedback helper — `dealCard`, `discardCard`, `flipCard`, `placeCard`, `moveGameObject`, `shakeIllegalMove`, `popTextOrIcon`, `createDragDropManager`, and any future helpers — must be rendered with the corresponding animation and wired with a sound effect (SFX), so the action is both animated and audible. Each helper accepts a `soundManager` + `sfx` (`start`/`move`/`end`) options map (see [UI Animation Helpers](ui-animations.md)); pass both so the action is never silent or instant by default. SFX keys must follow the shared `sfx-` prefix convention — `COMMON_SFX_KEYS` from `src/core-engine/SoundManager.ts`, detailed in [docs/SFX_CONVENTION.md](SFX_CONVENTION.md); no game-scoped string literals. (`shakeIllegalMove` plays `COMMON_SFX_KEYS.ILLEGAL_MOVE` automatically; `popTextOrIcon()` is the lightweight score/notification popup; `createDragDropManager` — the reusable drag-and-drop lifecycle in `src/ui/dragDrop.ts`, see [drag-and-drop lifecycle](ui-animations.md#createdragdropmanager-drag-and-drop-lifecycle) — plays the illegal feedback sound on pickup veto and invalid drops.)
 
 **AI actions:** AI turns must be animated with a brief delay so the player can see and hear what the AI did (e.g. card placement / row take). Coloretto is the in-repo precedent — `example-games/coloretto/scenes/ColorettoScene.ts` runs AI turns via `time.delayedCall` (750ms, 150ms under reduced motion) then executes the AI's action through the same animated/sounded path as a human turn.
 
@@ -618,7 +711,7 @@ Open `http://localhost:3000` and click the desired game card. Each game also has
 | Feudalism | `example-games/feudalism/` | Resource management (gem tokens), tiered development cards with costs/bonuses, noble attraction, multi-action turns (take/reserve/purchase), checkpoint autosave after each turn (human + AI) with startup recovery | `tests/feudalism/` (4 files) |
 | Lost Cities | `example-games/lost-cities/` | Two-player expeditions, two-phase turn model (play/discard then draw), ascending-play rules, investment multipliers (x2/x3/x4), multi-round match scoring, procedurally generated SVG card assets | `tests/lost-cities/` (6 files) |
 | Main Street | `example-games/main-street/` | Single-player tableau builder, responsive 2x5 grid layout, SLL integration, ToneForge audio adapter, Monte Carlo balance testing, tutorial scene | `tests/main-street/` |
-| Coloretto | `example-games/coloretto/` | Set-building tableau (take-a-row mechanic), custom card types, canonical set-collection scoring (1=1,2=3,3=6,4=10,5=15,6+=21) with positive/negative color selection, wild joker cards (declared per-joker to a color at scoring) and flat +2 bonus cards in the full 49-card deck, multi-round cumulative scoring with canonical winner tie-breaks (most single-round wins, then highest single-round score), randomized turn order with the canonical per-round start-player rule (most cards taken; ties to the most recent row take), Random/Heuristic AI strategies, SLL layout, transcript recording | `tests/coloretto/` (7 files) |
+| Coloretto | `example-games/coloretto/` | Set-building tableau (take-a-row mechanic), custom card types, canonical set-collection scoring (1=1,2=3,3=6,4=10,5=15,6+=21) with positive/negative color selection, wild joker cards (declared per-joker to a color at scoring, with colour-coded declaration chips in the round-end picker) and flat +2 bonus cards in the full 49-card deck, multi-round cumulative scoring with canonical winner tie-breaks (most single-round wins, then highest single-round score), randomized turn order with the canonical per-round start-player rule (most cards taken; ties to the most recent row take), Random/Heuristic AI strategies, SLL layout, transcript recording | `tests/coloretto/` (7 files) |
 
 ### Lost Cities card assets
 
@@ -2313,7 +2406,8 @@ To verify production safety:
 - Verify browser test files match `tests/**/*.browser.test.ts`
 
 **Browser tests fail or time out:**
-- Ensure Playwright's Chromium is installed: `npx playwright install chromium`
+- Check the [browser test setup](#browser-test-setup) section — the most common cause is missing Playwright Chromium: `npx playwright install chromium` (add `--with-deps` on Linux for system libraries)
+- `npm test` runs a fast-fail pre-check (`scripts/check-browser-test-env.ts`) that prints the exact remediation command if Chromium is missing; verify the install with `npx playwright install --list`
 - Check that `@vitest/browser` version matches `vitest` version
 - Browser tests boot a real Phaser game and may take 8-10 seconds each
 - If tests hang, check for unresolved game instances (ensure `afterEach` destroys the game)

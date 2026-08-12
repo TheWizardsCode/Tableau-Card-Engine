@@ -11,17 +11,31 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { LOCK_FILE_PATH } from '../../scripts/dev-server-utils';
 
 // ── Helpers ─────────────────────────────────────────────────
 
+/**
+ * Per-file unique lock path. The production `LOCK_FILE_PATH` (tmp/dev-server-lock.json)
+ * is shared with `dev-server-utils.test.ts`, which writes a different PID to the
+ * same path. When the full suite runs both files in parallel Vitest workers, the
+ * stale-lock assertions below could read the other file's PID (e.g. 12345, which
+ * may be alive) instead of the dead PID this file wrote, making
+ * `expect(isAlive(lock.pid)).toBe(false)` intermittently fail. Using a unique
+ * temp path per file removes the cross-file race while still exercising the same
+ * lock-file write/read/cleanup logic.
+ */
+const TEST_LOCK_PATH = path.join(
+  fs.mkdtempSync(path.join(os.tmpdir(), 'dev-server-cleanup-test-')),
+  'dev-server-lock.json',
+);
+
 function createLockFile(pid: number): void {
-  const dir = path.dirname(LOCK_FILE_PATH);
+  const dir = path.dirname(TEST_LOCK_PATH);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
   fs.writeFileSync(
-    LOCK_FILE_PATH,
+    TEST_LOCK_PATH,
     JSON.stringify({ pid }),
     'utf-8',
   );
@@ -29,7 +43,7 @@ function createLockFile(pid: number): void {
 
 function removeLockFileDirectly(): void {
   try {
-    fs.unlinkSync(LOCK_FILE_PATH);
+    fs.unlinkSync(TEST_LOCK_PATH);
   } catch {
     // ignore
   }
@@ -49,7 +63,7 @@ describe('dev server stale lock file cleanup', () => {
   it('detects a stale lock file when PID is not alive (high PID that does not exist)', () => {
     // Create a lock file with a PID that almost certainly doesn't exist
     createLockFile(99999999);
-    expect(fs.existsSync(LOCK_FILE_PATH)).toBe(true);
+    expect(fs.existsSync(TEST_LOCK_PATH)).toBe(true);
 
     // The PID won't be alive, so this simulates a stale lock
     const isAlive = (pid: number): boolean => {
@@ -65,18 +79,18 @@ describe('dev server stale lock file cleanup', () => {
 
   it('clears stale lock file on cleanup', () => {
     createLockFile(99999999);
-    expect(fs.existsSync(LOCK_FILE_PATH)).toBe(true);
+    expect(fs.existsSync(TEST_LOCK_PATH)).toBe(true);
 
     // Simulate stale cleanup
     removeLockFileDirectly();
-    expect(fs.existsSync(LOCK_FILE_PATH)).toBe(false);
+    expect(fs.existsSync(TEST_LOCK_PATH)).toBe(false);
   });
 
   it('preserves valid lock file for an alive PID (self-test)', () => {
     // Use current process PID which is alive
     const currentPid = process.pid;
     createLockFile(currentPid);
-    expect(fs.existsSync(LOCK_FILE_PATH)).toBe(true);
+    expect(fs.existsSync(TEST_LOCK_PATH)).toBe(true);
 
     // Verify the PID is alive (process.kill with signal 0)
     const isAlive = (pid: number): boolean => {
@@ -91,14 +105,14 @@ describe('dev server stale lock file cleanup', () => {
   });
 
   it('handles missing lock file gracefully on cleanup', () => {
-    expect(fs.existsSync(LOCK_FILE_PATH)).toBe(false);
+    expect(fs.existsSync(TEST_LOCK_PATH)).toBe(false);
     // Should not throw
     removeLockFileDirectly();
   });
 
   it('detects lock file with missing refCount (simplified format)', () => {
     createLockFile(12345);
-    const raw = fs.readFileSync(LOCK_FILE_PATH, 'utf-8');
+    const raw = fs.readFileSync(TEST_LOCK_PATH, 'utf-8');
     const lock = JSON.parse(raw);
     expect(lock.pid).toBe(12345);
     // New simplified format has no refCount
@@ -118,10 +132,10 @@ describe('dev server crash resilience', () => {
   it('handles stale lock file from previously crashed server', () => {
     // Simulate: previous server crashed, leaving a lock file with a dead PID
     createLockFile(99999998);
-    expect(fs.existsSync(LOCK_FILE_PATH)).toBe(true);
+    expect(fs.existsSync(TEST_LOCK_PATH)).toBe(true);
 
     // On next startup, the stale lock should be detected and cleaned
-    const lock = JSON.parse(fs.readFileSync(LOCK_FILE_PATH, 'utf-8'));
+    const lock = JSON.parse(fs.readFileSync(TEST_LOCK_PATH, 'utf-8'));
     const isAlive = (pid: number): boolean => {
       try {
         process.kill(pid, 0);
@@ -134,7 +148,7 @@ describe('dev server crash resilience', () => {
 
     // Clean up
     removeLockFileDirectly();
-    expect(fs.existsSync(LOCK_FILE_PATH)).toBe(false);
+    expect(fs.existsSync(TEST_LOCK_PATH)).toBe(false);
   });
 
   it('handles multiple stale lock file cleanups gracefully', () => {
@@ -142,7 +156,7 @@ describe('dev server crash resilience', () => {
     removeLockFileDirectly();
     removeLockFileDirectly();
     removeLockFileDirectly();
-    expect(fs.existsSync(LOCK_FILE_PATH)).toBe(false);
+    expect(fs.existsSync(TEST_LOCK_PATH)).toBe(false);
   });
 
   it('schedules cleanup handlers on process exit signals', () => {

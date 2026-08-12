@@ -57,7 +57,7 @@ When a card's cost changes, its reward fields (baseIncome, coinDelta, synergy bo
 |------|----------|
 | **Pawn Shop** | No synergy bonuses; cost reduced by 2 from curve estimate |
 | **Clinic** | reputationPerTurn = +0.2 factored into cost calculation (weight × 30) |
-| **Library (`cs-library`)** | Community-space curve formula **excludes `ongoingCost`**. The Library's 0.25 coins/turn running cost is not part of the cost formula; its cost was hand-set to the tier-1 formula result (4 base + 0.1 rep × 30 = 7, Standard band) per planning Q6. The Library is synergy-neutral with explicit `synergyCoinBonus = 0` and `synergyRepBonus = 0` (Pawn Shop pattern) — undefined would default to a 0.5 coin synergy rate. Community spaces with a running cost may need manual review. |
+| **Library (`cs-library`)** | Community-space curve formula **excludes `ongoingCost`**. The Library's 0.25 coins/turn running cost is not part of the cost formula; its cost was hand-set to the tier-1 formula result (4 base + 0.1 rep × 30 = 7, Standard band) per planning Q6. The Library participates in Culture synergy with default rates (empty `synergyCoinBonus` → 0.5 coin rate, `synergyRepBonus` → 0, Park model) — it contributes to adjacent Culture businesses' synergy and can receive rep synergy from rep-bonus neighbours (reversed from synergy-neutral by CG-0MSKS963N000ZSTU). Community spaces with a running cost may need manual review. |
 
 ## Per-Family Strategy
 

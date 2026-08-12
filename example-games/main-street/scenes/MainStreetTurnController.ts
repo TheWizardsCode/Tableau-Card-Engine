@@ -1,10 +1,12 @@
 import { addLog } from '../MainStreetState';
 import { executeDayStart, processEndOfTurn, placeFromHand, type TurnResult } from '../MainStreetEngine';
+import { turnLabel } from '../MainStreetFormatting';
 import {
   findTargetBusinessSlot,
   canAddToHand,
   canPurchaseUpgrade,
   canPurchaseEvent,
+  canPurchaseBusiness,
   canRefreshDevelopment,
   canRefreshInvestments,
   canSellBusiness,
@@ -13,7 +15,12 @@ import type { BusinessCard, EventCard, UpgradeCard } from '../MainStreetCards';
 import { buyBusinessCommand, buyBusinessToHandCommand, buyUpgradeCommand, buyEventCommand, playEventCommand, refreshDevelopmentCommand, refreshInvestmentsCommand } from '../MainStreetCommands';
 import { recordMainStreetEvent, finalizeMainStreetTranscript } from '../MainStreetTranscript';
 import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
-import { getCurrentStep, type TutorialActionType } from '../TutorialFlow';
+import {
+  createDragDropManager,
+  DEFAULT_DRAG_DISTANCE_THRESHOLD,
+  type DragDropPayload,
+} from '../../../src/ui/dragDrop';
+import { getCurrentStep, isSynergyAdjacentPlacement, resolveTutorialCardParams, type TutorialActionType } from '../TutorialFlow';
 
 /**
  * Match a card ID against a requiredCardId using prefix matching.
@@ -75,7 +82,7 @@ export class MainStreetTurnController {
       });
 
     s.instructionText.setText(
-      `Turn ${s.state.turn} / ${s.state.config.maxTurns} -- Buy cards from the market or End Turn`,
+      `${turnLabel(s.state.config, s.state.turn)} -- Buy cards from the market or End Turn`,
     );
   }
 
@@ -210,21 +217,43 @@ export class MainStreetTurnController {
     });
   }
 
-  public onPlayHeldEvent(): void {
+  public onPlayHeldEvent(handIndex?: number): void {
     const s = this.scene;
     if (s.uiPhase !== 'market') return;
-    if (!s.state.heldEvent) return;
 
-    console.debug('[MS] onPlayHeldEvent: attempting PlayEvent', { heldEventId: s.state.heldEvent?.id, coinsBefore: s.state.resourceBank.coins });
+    // Tutorial gating: only allow play-event if it's the required action or
+    // the tutorial is inactive (T13 "Triggering Events" uses this gate).
+    const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('play-event' as TutorialActionType);
+    if (check && !check.allowed) {
+      s.instructionText.setText(check.reason ?? 'Complete the highlighted step first.');
+      return;
+    }
+
+    // Resolve the event card to play: an explicit hand index (from clicking a
+    // specific event card in the merged hand) or the first event in the hand.
+    const hand = s.state.hand ?? [];
+    let index = handIndex;
+    if (index === undefined) {
+      index = hand.findIndex((c: any) => c.family === 'event');
+    }
+    if (index === undefined || index < 0 || index >= hand.length) return;
+    const card = hand[index];
+    if (card.family !== 'event') return;
+
+    console.debug('[MS] onPlayHeldEvent: attempting PlayEvent', { eventId: card.id, coinsBefore: s.state.resourceBank.coins });
     try {
-      const cmd = playEventCommand(s.state);
+      const cmd = playEventCommand(s.state, index);
       s.undoManager.execute(cmd);
       // Record action event
       try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'play-event' }, description: cmd.description }); } catch (_) {}
-      try { s.gameEvents?.emit('card:placed', { action: 'play-event', heldEventId: s.state.heldEvent?.id ?? null }); } catch (_) {}
+      try { s.gameEvents?.emit('card:placed', { action: 'play-event', heldEventId: card.id }); } catch (_) {}
       s.instructionText.setText('Played held Investment event!');
       addLog(s.state, 'Played held event (via UI)', 'neutral');
-      console.debug('[MS] PlayEvent executed', { coinsAfter: s.state.resourceBank.coins, heldEventAfter: s.state.heldEvent?.id ?? null });
+      console.debug('[MS] PlayEvent executed', { coinsAfter: s.state.resourceBank.coins });
+      // Tutorial: mark play-event step complete if active
+      try {
+        (s.msLifecycleManager as any).onTutorialActionComplete?.('play-event' as TutorialActionType);
+      } catch (_) { /* ignore */ }
     } catch (e) {
       console.error('[MS] PlayEvent failed', e);
       s.instructionText.setText(`Error: ${(e as Error).message}`);
@@ -359,11 +388,190 @@ export class MainStreetTurnController {
         family: 'business',
         row: 'development',
         slotIndex: sourceIndex,
-        // Animate to the exact resting position in the business hand — the
+        // Animate to the exact resting position in the merged hand — the
         // HandView-predicted insertion position (single source of truth),
         // not a left-edge slot estimate that would make the card snap
         // sideways when the hand re-renders centred on handCenterX.
         destination: s.getBusinessHandInsertionPosition(handIndex),
+      }).then(afterTransfer);
+    } else {
+      afterTransfer();
+    }
+  }
+
+  // ── Drag-and-drop buy-to-slot (business cards) ─────────────
+  //
+  // Wire the reusable core-engine drag-drop module (src/ui/dragDrop.ts)
+  // to Main Street: business cards in the Development row become draggable
+  // during the market phase and can be dropped straight onto an empty
+  // street slot to buy + place in one undoable step.
+  //
+  // Hand-vs-direct-to-slot semantics: the click flow buys to hand (max
+  // hand size 2) then places; the drag flow buys DIRECTLY to the slot,
+  // bypassing the hand entirely. This matches the one-gesture request.
+
+  /**
+   * Initialise the reusable drag-drop manager for the market phase.
+   *
+   * Business cards in the Development row are registered as draggables by
+   * the renderer; empty street slots are registered as drop zones. The
+   * existing click-to-buy → click-to-place flow is preserved via
+   * `dragDistanceThreshold` (a pointerup without a drag still reaches the
+   * click path).
+   */
+  public initDragDrop(): void {
+    const s = this.scene;
+    if (s.dragDropManager) return;
+    // Guard: in headless unit tests the scene may have no input plugin.
+    if (!s.input || typeof s.input.on !== 'function') return;
+
+    s.dragDropManager = createDragDropManager({
+      scene: s,
+      dragDistanceThreshold: DEFAULT_DRAG_DISTANCE_THRESHOLD,
+      reducedMotion: !!s.settingsPanel?.reducedMotion,
+      onDragStart: () => {
+        try { s.msRenderer?.showDragHighlights?.(); } catch (_) { /* ignore */ }
+      },
+      onDragEnd: () => {
+        try { s.msRenderer?.clearDragHighlights?.(); } catch (_) { /* ignore */ }
+      },
+    });
+  }
+
+  /**
+   * Drag-pickup validation (dragstart veto → illegal-card feedback).
+   *
+   * A business or community-space card (both live in the Development row)
+   * may only be picked up when the player can afford it, there is at least
+   * one empty street slot to drop it on, and the tutorial allows the
+   * `select-business` action (including requiredCardId matching for tutorial
+   * steps that gate a specific card). Events and upgrades are NOT draggable
+   * (click-only).
+   */
+  public canPickUpBusinessCard(cardId: string): boolean {
+    const s = this.scene;
+    if (s.uiPhase !== 'market') return false;
+    const card = s.state.market.development.find((c: any) => c.id === cardId);
+    if (!card) return false;
+    // Drag support covers business AND community-space cards (general change,
+    // operator decision A for the T12 Library bug). Events/upgrades stay
+    // click-only (they are not part of the drag-drop module's dev-row model).
+    if (card.family !== 'business' && card.family !== 'community-space') return false;
+    if (s.state.resourceBank.coins < card.cost) return false;
+    if (!s.state.streetGrid.some((slot: any) => slot === null)) return false;
+
+    // Tutorial gating: only allow select-business if it is the required
+    // action or the tutorial is inactive.
+    const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('select-business' as TutorialActionType);
+    if (check && !check.allowed) return false;
+
+    // Tutorial: enforce specific card purchase if requiredCardId is set on
+    // the current step (same prefix-matching rule as the click path).
+    const controller = (s as any).tutorialController as any;
+    if (controller?.isActive) {
+      const step = controller.currentStepIndex >= 0
+        ? getCurrentStep(controller)
+        : null;
+      if (step?.requiredCardId && !matchesRequiredCard(card.id, step.requiredCardId)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Drop-zone acceptance validation.
+   *
+   * The target slot must pass `canPurchaseBusiness` (card still in the
+   * Development row, enough coins, empty slot, in bounds) and the tutorial
+   * must allow the `place-business` action. During a composite buy-and-place
+   * step with a synergy partner (T12: Library next to the Bookshop), the
+   * target must also pass `isSynergyAdjacentPlacement`. A rejected drop
+   * snap-backs the card to the Development row with illegal-move feedback.
+   */
+  public canDropBusinessCard(cardId: string, slotIndex: number): boolean {
+    const s = this.scene;
+    const legality = canPurchaseBusiness(s.state, cardId, slotIndex);
+    if (!legality.legal) return false;
+
+    const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('place-business' as TutorialActionType);
+    if (check && !check.allowed) return false;
+
+    // Tutorial: synergy adjacency for composite buy-and-place steps (T12).
+    const controller = (s as any).tutorialController as any;
+    if (controller?.isActive) {
+      const step = controller.currentStepIndex >= 0
+        ? getCurrentStep(controller)
+        : null;
+      if (step && !isSynergyAdjacentPlacement(step, s.state.streetGrid, slotIndex)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Execute a drag-drop buy-and-place.
+   *
+   * Buys the dragged business card directly to the drop slot in a single
+   * undoable `buyBusinessCommand` (the same direct buy-to-slot path used by
+   * the AI strategy), with the animated market→street transfer + SFX
+   * matching the click flow's feedback. Note: unlike the click flow (which
+   * buys to hand), the drag flow bypasses the hand entirely.
+   */
+  public onDragDropBusiness(payload: DragDropPayload): void {
+    const s = this.scene;
+    const cardId = payload.data as string;
+    const slotIndex = payload.zoneData as number;
+    const sourceIndex = s.state.market.development.findIndex((c: any) => c.id === cardId);
+    const card = s.state.market.development.find((c: any) => c.id === cardId);
+    if (!card || sourceIndex < 0 || slotIndex == null) return;
+
+    // The dragged container follows the pointer, so its position at drop
+    // time IS the drop location. Capture it BEFORE refreshAll() recreates
+    // the market card at its slot origin, then start the transfer
+    // animation from there (not from the market row).
+    const dropSource = { x: payload.gameObject?.x ?? 0, y: payload.gameObject?.y ?? 0 };
+
+    const cardName = card.name;
+    s.tooltipManager?.hide();
+    s.clearMarketSelection();
+    s.hiddenTransferSourceCardIds.add(cardId);
+    s.uiPhase = 'animating';
+    s.instructionText.setText(`Buying "${cardName}"...`);
+    s.refreshAll();
+
+    const afterTransfer = (): void => {
+      try {
+        const cmd = buyBusinessCommand(s.state, cardId, slotIndex);
+        s.undoManager.execute(cmd);
+        try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'buy-business', cardId, slotIndex }, description: cmd.description }); } catch (_) {}
+        try { s.gameEvents?.emit('card:placed', { cardId, slotIndex }); } catch (_) {}
+        s.instructionText.setText(`Placed "${cardName}" on slot ${slotIndex}`);
+      } catch (e) {
+        console.error('[MS] DragBuyBusiness failed', e);
+        s.instructionText.setText(`Error: ${(e as Error).message}`);
+      }
+
+      s.hiddenTransferSourceCardIds.delete(cardId);
+      s.uiPhase = 'market';
+      s.refreshAll();
+      s.refreshStreetGrid();
+      s.refreshActionButtons();
+      // Tutorial: mark place-business step complete if active
+      try {
+        (s.msLifecycleManager as any).onTutorialActionComplete?.('place-business' as TutorialActionType);
+      } catch (_) { /* ignore */ }
+    };
+
+    if (sourceIndex >= 0) {
+      void s.animateTransferFromMarket({
+        cardId,
+        family: 'business',
+        row: 'development',
+        slotIndex: sourceIndex,
+        source: dropSource,
+        destination: s.getStreetSlotCenter(slotIndex),
       }).then(afterTransfer);
     } else {
       afterTransfer();
@@ -384,29 +592,78 @@ export class MainStreetTurnController {
     // Ensure stale hover tooltip is cleared when a card is placed.
     s.tooltipManager?.hide();
 
+    // Tutorial: synergy adjacency for composite buy-and-place steps (T12 —
+    // the Library must be built next to the Bookshop). A non-adjacent click
+    // placement is rejected with a data-driven instruction message and the
+    // phase stays 'placing-from-hand' so the player can retry.
+    const tutController = (s as any).tutorialController as any;
+    const step = tutController?.isActive && tutController.currentStepIndex >= 0
+      ? getCurrentStep(tutController)
+      : null;
+    if (step && !isSynergyAdjacentPlacement(step, s.state.streetGrid, slotIndex)) {
+      const params = resolveTutorialCardParams(step);
+      const cardName = params?.cardName ?? 'this card';
+      const synergyName = params?.synergyCardName ?? 'the partner card';
+      s.instructionText.setText(`Place ${cardName} next to ${synergyName} for a Culture bonus.`);
+      return;
+    }
+
     // ── New flow: place from hand ──────────────────────────────
     if (s.pendingHandIndex !== null) {
       const handIndex = s.pendingHandIndex;
-      s.pendingHandIndex = null;
-      s.uiPhase = 'animating';
-      s.refreshAll();
-
-      try {
-        placeFromHand(s.state, handIndex, slotIndex);
-        try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'place', handIndex, slotIndex }, description: `Placed from hand to slot ${slotIndex}` }); } catch (_) {}
-        try { s.gameEvents?.emit('card:placed', { handIndex, slotIndex }); } catch (_) {}
-        s.instructionText.setText(`Placed on slot ${slotIndex}`);
-      } catch (e) {
-        console.error('[MS] placeFromHand failed', e);
-        s.instructionText.setText(`Error: ${(e as Error).message}`);
+      const handCard = (s.state.hand ?? [])[handIndex];
+      if (!handCard) {
+        s.pendingHandIndex = null;
+        s.uiPhase = 'market';
+        s.instructionText.setText('Card no longer in hand.');
+        return;
       }
 
-      s.uiPhase = 'market';
+      const cardId = handCard.id;
+      const cardName = handCard.name;
+
+      // Capture the hand card's resting position (excludes selection-raise)
+      const handPos = s.msRenderer?.handView?.getBasePosition(handIndex);
+      const source = handPos
+        ? { x: handPos.x, y: handPos.y }
+        : { x: s.layout.handX + s.layout.handCardW / 2, y: s.layout.handY + s.layout.handCardH / 2 };
+
+      s.pendingHandIndex = null;
+      s.hiddenTransferSourceCardIds.add(cardId);
+      s.uiPhase = 'animating';
+      s.instructionText.setText(`Placing "${cardName}"...`);
       s.refreshAll();
-      // Tutorial: mark place-business step complete if active
-      try {
-        (s.msLifecycleManager as any).onTutorialActionComplete?.('place-business' as TutorialActionType);
-      } catch (_) { /* ignore */ }
+
+      const afterTransfer = (): void => {
+        try {
+          placeFromHand(s.state, handIndex, slotIndex);
+          try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'place', handIndex, slotIndex }, description: `Placed from hand to slot ${slotIndex}` }); } catch (_) {}
+          try { s.gameEvents?.emit('card:placed', { handIndex, slotIndex }); } catch (_) {}
+          s.instructionText.setText(`Placed "${cardName}" on slot ${slotIndex}`);
+        } catch (e) {
+          console.error('[MS] placeFromHand failed', e);
+          s.instructionText.setText(`Error: ${(e as Error).message}`);
+        }
+
+        s.hiddenTransferSourceCardIds.delete(cardId);
+        s.uiPhase = 'market';
+        s.refreshAll();
+        s.refreshStreetGrid();
+        s.refreshActionButtons();
+        // Tutorial: mark place-business step complete if active
+        try {
+          (s.msLifecycleManager as any).onTutorialActionComplete?.('place-business' as TutorialActionType);
+        } catch (_) { /* ignore */ }
+      };
+
+      void s.animateTransferFromMarket({
+        cardId,
+        family: 'business',
+        row: 'development',
+        slotIndex: handIndex,
+        source,
+        destination: s.getStreetSlotCenter(slotIndex),
+      }).then(afterTransfer);
       return;
     }
 
@@ -546,15 +803,16 @@ export class MainStreetTurnController {
     };
 
     if (sourceIndex >= 0) {
+      const handIndex = (s.state.hand ?? []).length;
       void s.animateTransferFromMarket({
         cardId: card.id,
         family: 'event',
         row: 'investments',
         slotIndex: sourceIndex,
-        // Animate to the exact resting position of the held event card — the
-        // HandView-predicted position (single source of truth), centred on
-        // handCenterX rather than the left-anchored slot estimate.
-        destination: s.getEventHandInsertionPosition(0),
+        // Animate to the exact resting position of the appended hand card — the
+        // merged HandView-predicted position (single source of truth), centred
+        // on handCenterX rather than the left-anchored slot estimate.
+        destination: s.getEventHandInsertionPosition(handIndex),
       }).then(afterTransfer);
     } else {
       afterTransfer();
@@ -705,6 +963,9 @@ export class MainStreetTurnController {
     const s = this.scene;
     const hand = s.state.hand ?? [];
     if (index < 0 || index >= hand.length) return;
+
+    // Event cards are played (via onPlayHeldEvent), never placed on the street.
+    if (hand[index].family === 'event') return;
 
     // Tutorial gating: only allow if it's the required action or tutorial is inactive
     const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('select-hand-card' as any);

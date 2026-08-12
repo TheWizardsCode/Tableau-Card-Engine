@@ -60,8 +60,16 @@ export interface GameConfig extends DifficultyConfig {
   readonly startingReputation: number;
 
   // ── Turn Structure ──────────────────────────────────────
-  /** Maximum number of turns before the game ends. */
-  readonly maxTurns: number;
+  /**
+   * Maximum number of turns before the game ends (opt-in).
+   *
+   * Undefined (the default) means **unlimited**: the game ends only via
+   * score threshold, all challenges complete, bankruptcy, or reputation
+   * collapse. When set, the turn-based end path in `checkEndConditions`
+   * fires at `turn >= maxTurns` (turn_limit_victory / turn_exhaustion).
+   * Default presets do not set this field (CG-0MSLXJCHH001DLIO).
+   */
+  readonly maxTurns?: number;
 
   // ── Scoring ─────────────────────────────────────────────
   /** Score required for a win via score threshold. */
@@ -85,6 +93,23 @@ export interface GameConfig extends DifficultyConfig {
   /** Multiplier to increase positive Incident frequency (1.0 = baseline). */
   readonly positiveIncidentMultiplier: number;
 
+  // ── Incident Draw Balance ─────────────────────────────
+  /**
+   * Repeat-spacing window N for constrained incident draws: a card name
+   * cannot reappear within the last `N - 1` drawn cards (default 3).
+   * Larger N = fewer same-card repeats (calmer variety); smaller N = cards
+   * can recur sooner (tighter pacing). Wired into `incidentBalance` at game
+   * setup; see `createIncidentBalanceState` in MainStreetCards.ts.
+   */
+  readonly incidentRepeatSpacing: number;
+  /**
+   * Max consecutive same-polarity (good/bad) incident cards M before the
+   * selector forces a polarity change (default 2). Larger M = longer luck
+   * runs (higher variance); smaller M = gentler, more even pacing. Wired
+   * into `incidentBalance` at game setup.
+   */
+  readonly incidentMaxStreak: number;
+
   // ── Reputation-based Coin Multiplier ───────────────────
   /**
    * Divisor used in the reputation coin multiplier formula:
@@ -105,33 +130,37 @@ export interface GameConfig extends DifficultyConfig {
 // ── Preset Definitions ──────────────────────────────────────
 
 /**
- * Easy preset: generous resources, more turns, lower win threshold.
- * Designed for new players learning the mechanics.
+ * Easy preset: generous resources, lower win threshold.
+ * Designed for new players learning the mechanics. No turn limit
+ * (CG-0MSLXJCHH001DLIO — turn limits are opt-in via explicit `maxTurns`).
  */
 export const EASY_PRESET: Readonly<GameConfig> = {
   difficultyName: 'Easy',
   startingCoins: 12,
   startingReputation: 5,
-  maxTurns: 25,
   winThreshold: 120,
   reputationScoreMultiplier: 5,
   challengeBonusPoints: 15,
   synergyBonusPerNeighbor: 1.5,
   challengesPerRun: 2,
   positiveIncidentMultiplier: 1.2,
+  // Incident pacing: widest repeat spacing (N=4) = fewest same-card
+  // repeats, calmer variety; standard bad-run protection (M=2).
+  incidentRepeatSpacing: 4,
+  incidentMaxStreak: 2,
   reputationCoinDivisor: 20,
   maxReputationCoinMultiplier: 3.0,
 };
 
 /**
  * Medium preset: matches the original hard-coded constants exactly.
- * This is the default and the baseline for balance.
+ * This is the default and the baseline for balance. No turn limit
+ * (CG-0MSLXJCHH001DLIO — turn limits are opt-in via explicit `maxTurns`).
  */
 export const MEDIUM_PRESET: Readonly<GameConfig> = {
   difficultyName: 'Medium',
   startingCoins: 8,
   startingReputation: 3,
-  maxTurns: 20,
   winThreshold: 150,
   reputationScoreMultiplier: 5,
   challengeBonusPoints: 10,
@@ -140,25 +169,35 @@ export const MEDIUM_PRESET: Readonly<GameConfig> = {
   // Increase positive incident frequency by 50% for the Medium baseline
   // as requested by work item CG-0MMLR20XP1IPPD03.
   positiveIncidentMultiplier: 1.5,
+  // Incident pacing equals the engine defaults (N=3, M=2), preserving the
+  // "Medium = original hard-coded constants" backward-compat invariant.
+  incidentRepeatSpacing: 3,
+  incidentMaxStreak: 2,
   reputationCoinDivisor: 20,
   maxReputationCoinMultiplier: 3.0,
 };
 
 /**
- * Hard preset: tight resources, fewer turns, higher win threshold.
- * Designed for experienced players seeking a challenge.
+ * Hard preset: tight resources, higher win threshold.
+ * Designed for experienced players seeking a challenge. No turn limit
+ * (CG-0MSLXJCHH001DLIO — turn limits are opt-in via explicit `maxTurns`).
  */
 export const HARD_PRESET: Readonly<GameConfig> = {
   difficultyName: 'Hard',
   startingCoins: 5,
   startingReputation: 2,
-  maxTurns: 15,
   winThreshold: 180,
   reputationScoreMultiplier: 5,
   challengeBonusPoints: 8,
   synergyBonusPerNeighbor: 0.75,
   challengesPerRun: 4,
   positiveIncidentMultiplier: 1,
+  // Incident pacing: minimal repeat guarantee (N=2) = cards can recur
+  // sooner, leaving fewer "safe gaps"; longer streaks (M=3) = higher
+  // variance and harsher bad runs, matching the game's overall
+  // "longer good streaks on Hard" profile.
+  incidentRepeatSpacing: 2,
+  incidentMaxStreak: 3,
   reputationCoinDivisor: 20,
   maxReputationCoinMultiplier: 3.0,
 };

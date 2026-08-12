@@ -88,6 +88,17 @@ The deploy workflow lives at: .github/workflows/deploy.yml
 - Monte Carlo artifacts (from the monte-carlo job) are uploaded to the Actions artifacts for inspection.
 - The build-and-deploy job uploads dist/ as a Pages artifact and calls actions/deploy-pages@v4 to publish.
 
+Windows binary (Steam artifact)
+-------------------------------
+A second workflow, `.github/workflows/package.yml`, runs on every push to `main` (and `v*` tags, or manually via workflow_dispatch) and builds the **Windows binary** on a `windows-latest` runner:
+
+1. Checkout + Node 20, `npm ci`
+2. `npm run package:win` -- electron-mode Vite build + electron-builder NSIS packaging
+3. Smoke-tests the packaged `win-unpacked` executable with the Playwright-Electron launch test
+4. Uploads the installer (`release/TCE-Setup-<version>.exe`) as the `tce-windows-installer` workflow artifact (downloadable from the Actions run, ~90-day retention)
+
+Windows is the primary Steam target; this is how the binary is produced reproducibly without a Windows dev machine. The GitHub Pages deploy workflow is unaffected by this job. To produce the artifact for a manual release, run the workflow from the Actions tab (Run workflow) or push a `v*` tag.
+
 If you want help
 ----------------
 I can:
