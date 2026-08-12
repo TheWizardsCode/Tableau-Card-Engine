@@ -341,6 +341,17 @@ describe('MainStreetScene browser tests', () => {
       expect(state.streetGrid[targetSlot]).toBeNull();
       expect(scene.getHiddenTransferSourceCardCountForTest()).toBe(1);
 
+      // AC 3 (visual): the hand slot must not render the card face during
+      // the flight — only an empty placeholder — so no duplicate card is
+      // visible in the hand while the transfer visual flies mid-air.
+      const handIdx = (state.hand ?? []).findIndex((c: any) => c.id === business.id);
+      const handSprite = (scene.msRenderer?.handView?.getSpriteAt(handIdx) ?? null) as any;
+      expect(handSprite).toBeTruthy();
+      const cardFaceChildren = (handSprite?.list ?? []).filter(
+        (child: any) => child.type === 'Image',
+      );
+      expect(cardFaceChildren.length).toBe(0);
+
       await waitForCondition(
         () => state.streetGrid[targetSlot]?.id === business.id,
         { timeoutMs: 6000, label: 'business transfer completion' },

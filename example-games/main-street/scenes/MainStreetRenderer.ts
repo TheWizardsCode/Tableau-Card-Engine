@@ -144,6 +144,20 @@ export class MainStreetRenderer {
         const renderW = Math.max(1, Math.round(handCardW - 4));
         const renderH = Math.max(1, Math.round(handCardH - 4));
 
+        // Transfer-animation hiding (AC 3): while a card is flying from the
+        // hand (hand → street placement), render an empty placeholder
+        // instead of the card face so the player never sees a duplicate
+        // card, and the hand layout doesn't shift. Mirrors the
+        // market-renderer pattern (hiddenTransferSourceCardIds check).
+        if (s.hiddenTransferSourceCardIds.has(card.id)) {
+          const placeholder = s.add.rectangle(
+            0, 0, renderW, renderH, 0x222211, 0.3,
+          );
+          placeholder.setStrokeStyle(1, 0x333322);
+          container.add(placeholder);
+          return container;
+        }
+
         // Render SVG card via shared adapter
         mainStreetRenderCardSvg(s, container, card.id, renderW, renderH);
 
