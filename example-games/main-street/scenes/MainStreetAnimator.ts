@@ -270,12 +270,20 @@ export class MainStreetAnimator {
     family: 'business' | 'community-space' | 'event' | 'upgrade';
     row: 'development' | 'investments';
     slotIndex: number;
+    /**
+     * Optional start position for the transfer visual. When omitted the
+     * visual originates at the market card's slot centre (click/AI flows,
+     * where the card still sits in the market). Drag-and-drop flows pass
+     * the drop location so the animation continues from where the card was
+     * released instead of jumping back to the market row.
+     */
+    source?: { x: number; y: number };
     destination: { x: number; y: number };
   }): Promise<void> {
     const s = this.scene;
     if (s.settingsPanel?.reducedMotion) return Promise.resolve();
 
-    const source = this.getMarketCardCenter(options.row, options.slotIndex);
+    const source = options.source ?? this.getMarketCardCenter(options.row, options.slotIndex);
     if (!source) return Promise.resolve();
 
     const visual = this.createTransferCardVisual(options.cardId, options.family, source.x, source.y);

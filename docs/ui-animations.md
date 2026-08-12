@@ -11,6 +11,7 @@ The Tableau Card Engine provides reusable animation helpers in `src/ui/` for com
 | `discardCard` | Card discard animation with fade/shrink | 400ms |
 | `flipCard` | Two-phase card flip (scaleX → 0 → texture swap → scaleX → 1) | 300ms |
 | `moveGameObject` | Positional movement tween | 700ms |
+| `createDragDropManager` | Reusable drag-and-drop lifecycle (dragstart/drag/dragend/drop, snap-back, drop-zone hit-testing) | n/a |
 
 ## dealCard
 
@@ -202,6 +203,110 @@ import { moveGameObject } from '@ui/moveGameObject';
 | `onComplete` | `function` | undefined | Called after movement completes |
 | `reducedMotion` | `boolean` | undefined | When true, target snaps to destination instantly |
 | `sfx` | `object` | undefined | Optional SFX configuration (start/move/end keys) |
+
+## createDragDropManager (drag-and-drop lifecycle)
+
+Encapsulates the Phaser drag lifecycle into a single configurable core-engine
+module — extracted from Beleaguered Castle's bespoke `setupDragAndDrop`
+(`example-games/beleaguered-castle/scenes/BeleagueredCastleScene.ts`). Register
+draggable game objects (Images **or** Containers) with optional pickup
+validation, register drop zones with hit-testing and acceptance validation,
+and get origin capture + depth raise, valid-drop highlighting, snap-back
+animation, and illegal-move feedback for free.
+
+### Import
+
+```ts
+import { createDragDropManager } from '@ui/dragDrop';
+```
+
+### Usage (Main Street drag-to-buy)
+
+Main Street wires the module so a business card can be dragged from the
+Development row onto an empty street slot to buy + place it in one step
+(`example-games/main-street/scenes/MainStreetTurnController.ts`):
+
+```ts
+this.dragDropManager = createDragDropManager({
+  scene: this,
+  dragDistanceThreshold: 5,          // click-vs-drag coexistence
+  reducedMotion: !!this.settingsPanel?.reducedMotion,
+  onDragStart: () => this.renderer.showDragHighlights(),
+  onDragEnd: () => this.renderer.clearDragHighlights(),
+});
+
+this.dragDropManager.registerDraggable({
+  gameObject: marketCardContainer,
+  data: card.id,
+  hitArea: new Phaser.Geom.Rectangle(-w / 2, -h / 2, w, h), // local coords
+  canPickUp: (payload) => controller.canPickUpBusinessCard(payload.data),
+  onDrop: (payload) => controller.onDragDropBusiness(payload),
+});
+
+this.dragDropManager.registerDropZone({
+  zone,                                  // created via setRectangleDropZone
+  data: slotIndex,
+  canAccept: (payload) => controller.canDropBusinessCard(payload.data, slotIndex),
+});
+```
+
+Beleaguered Castle also consumes the module for its tableau drag-to-move
+(`example-games/beleaguered-castle/scenes/BeleagueredCastleScene.ts`): the
+scene creates the manager and registers the foundation/tableau drop zones
+(`initDragDrop`), while the renderer registers each column's top card as a
+draggable on every board render (`makeDraggable`).
+
+### Options (`DragDropManagerConfig`)
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `scene` | `Phaser.Scene` | required | Scene whose input plugin drives the drag lifecycle |
+| `dragDepth` | `number` | 1000 | Depth applied to the dragged object while dragging |
+| `snapBackDuration` | `number` | 200 | Snap-back tween duration in ms |
+| `reducedMotion` | `boolean` | false | Skip snap-back tween (instant reposition) |
+| `dragDistanceThreshold` | `number` | 5 | Pointer movement (px) before a drag starts — preserves click-vs-drag coexistence |
+| `onDragStart` | `(payload) => void` | — | Fired after pickup validation passes (show valid-drop highlights) |
+| `onDragEnd` | `(payload) => void` | — | Fired when a drag ends, regardless of outcome (clear highlights) |
+| `onIllegal` | `(payload) => void` | default | Illegal-feedback hook (shake + `sfx-illegal-move`) |
+
+### `DragDropObjectConfig`
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `gameObject` | `Image | Container` | required | The object to make draggable |
+| `data` | `unknown` | — | Caller data (e.g. card id) exposed via the payload |
+| `hitArea` | `Phaser.Geom.Rectangle` | texture frame | Local-coordinate hit area (required for Containers) |
+| `canPickUp` | `(payload) => boolean` | — | Pickup veto: `false` keeps the object at its origin and fires illegal feedback |
+| `onDrop` | `(payload) => void` | — | Called when dropped on an accepting zone |
+
+### `DragDropZoneConfig`
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `zone` | `Phaser.GameObjects.Zone` | required | A drop zone (created via `setRectangleDropZone`) |
+| `data` | `unknown` | — | Caller zone data (e.g. slot index) via `payload.zoneData` |
+| `canAccept` | `(payload) => boolean` | — | Zone acceptance: `false` snap-backs + illegal feedback |
+
+### Behaviour
+
+- **Pickup veto** (`canPickUp` returns `false`): the object stays at its origin
+  and the illegal-feedback hook fires — the "cannot drag this card" case.
+- **Valid drop**: the object's depth is restored and `onDrop` fires (the caller
+  performs the game action).
+- **Invalid drop** (no zone, rejected `canAccept`, or released outside any
+  zone): the object snap-backs to its captured origin (position **and** depth)
+  with illegal feedback — the "illegal move" case.
+- **Illegal feedback**: defaults to `shakeIllegalMove` (objects with `setTint`)
+  or a container-safe position shake + `safePlaySound`
+  (`COMMON_SFX_KEYS.ILLEGAL_MOVE` = `sfx-illegal-move`) for Containers.
+- **Reduced motion**: snap-back restores position/depth instantly (no tween);
+  runtime toggling via `setReducedMotion()`.
+
+### Manager API
+
+`registerDraggable`, `unregisterDraggable`, `registerDropZone`,
+`unregisterDropZone`, `clearDropZones`, `getDropZoneData`, `setEnabled`,
+`setReducedMotion`, `destroy` — see `src/ui/dragDrop.ts` for signatures.
 
 ## popTextOrIcon
 

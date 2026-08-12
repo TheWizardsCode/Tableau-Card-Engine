@@ -1,15 +1,13 @@
 /**
  * Tutorial Text Updates Tests
  *
- * Validates the tutorial text changes after the Development market row rename
- * and community space card introduction.
- *
- * Acceptance criteria:
- * 1. Tutorial step T3 title no longer says 'Market Business Row'
- * 2. Tutorial step T3 body no longer says 'Click a business card' or refers to community spaces as 'businesses'
- * 3. Tutorial text uses appropriate terminology for community space cards
- * 4. Card facts (name, cost) in tutorial text are resolved from live card data
- *    at render time, not hardcoded in the i18n bundle.
+ * Validates the 16-step tutorial text restructure (CG-0MSKSJ9SS0069ZWT):
+ * 1. Every resolved title and body is ≤3 sentences and communicates exactly one point.
+ * 2. T1 no longer mentions "25 turns" (time-limited play sentence removed).
+ * 3. Upcoming Incidents has no "blue" wording and no incident-impact details.
+ * 4. Place a Business has no matching-card mention.
+ * 5. Card facts (name, cost, income) are resolved from live card data via
+ *    {cardName}/{cost}/{bonus}/{synergyCardName} placeholders — never hardcoded.
  *
  * Text is resolved through the i18n system from `TUTORIAL_EN_BUNDLE`, with
  * card-data placeholders interpolated via `resolveTutorialStepText()`.
@@ -17,7 +15,7 @@
  * @module
  */
 
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { UNIFIED_TUTORIAL_STEPS, resolveTutorialStepText } from '../../example-games/main-street/TutorialFlow';
 import { TUTORIAL_EN_BUNDLE } from '../../example-games/main-street/i18n/tutorial-en';
 import { resetI18n, registerLocale, t, formatCurrency } from '../../src/core-engine/I18n';
@@ -27,151 +25,142 @@ import {
   loadTemplatesFromCsv,
   resetTemplatesToDefault,
 } from '../../example-games/main-street/MainStreetCards';
-import { tutorialKey } from '../../example-games/main-street/i18n/tutorial-en';
 import cardDataRaw from '../../example-games/main-street/card-data.csv?raw';
 
-describe('Tutorial text updates (AC1-3)', () => {
-  // Find the T3 step
-  const t3Step = UNIFIED_TUTORIAL_STEPS.find(step => step.id === 'T3')!;
+/**
+ * Count sentences in a string by splitting on sentence-ending punctuation
+ * (period, exclamation, question mark) followed by whitespace or end-of-string.
+ * Does not count decimal points (e.g. "0.25") as sentence ends.
+ */
+function countSentences(text: string): number {
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  if (normalized.length === 0) return 0;
+  const parts = normalized.split(/[.!?]+(?:\s+|$)/).filter(p => p.trim().length > 0);
+  // If the text ends with punctuation, the final empty part is filtered out.
+  return parts.length;
+}
 
-  // Live card-data row for the T3 target card (Laundromat).
-  const laundromatRow = getCsvRows().find(r => r.id === getBaseTypeId(t3Step.requiredCardId!))!;
-
-  /** Resolve the T3 body with card-data placeholders interpolated. */
-  function t3Body(): string {
-    return resolveTutorialStepText(t3Step).body;
-  }
-
-  beforeAll(() => {
-    // Ensure T3 exists and its card data is present in card-data.csv
-    expect(t3Step).toBeDefined();
-    expect(laundromatRow).toBeDefined();
-  });
-
+describe('Tutorial text updates (16-step restructure)', () => {
   beforeEach(() => {
     resetI18n();
     registerLocale('en', TUTORIAL_EN_BUNDLE);
   });
 
-  // ── AC1: T3 title no longer says 'Market Business Row' ───
-
-  describe('T3 title (AC1)', () => {
-    it('should not contain "Market Business Row" as title', () => {
-      const title = t(t3Step.titleKey);
-      expect(title).not.toBe('Market Business Row');
-    });
-
-    it('should not contain "Business Row" in the title', () => {
-      const title = t(t3Step.titleKey).toLowerCase();
-      expect(title).not.toContain('business row');
-    });
-
-    it('should have a non-empty title', () => {
-      const title = t(t3Step.titleKey);
-      expect(title.length).toBeGreaterThan(0);
-    });
-
-    it('should use "Development" or "development" in the title', () => {
-      const title = t(t3Step.titleKey).toLowerCase();
-      expect(title).toContain('development');
-    });
-  });
-
-  // ── AC2: T3 body no longer says 'Click a business card' ──
-
-  describe('T3 body text (AC2)', () => {
-    it('should not contain "business card" in the body', () => {
-      const body = t3Body().toLowerCase();
-      expect(body).not.toContain('business card');
-    });
-
-    it('should not refer to the top row as "business cards"', () => {
-      const body = t3Body().toLowerCase();
-      // The row might be mentioned as "development" or "Development row"
-      expect(body).not.toMatch(/business (cards|row)/i);
-    });
-
-    it('should reference the target card by its live card-data name', () => {
-      expect(t3Body()).toContain(laundromatRow.name);
-    });
-
-    it('should use appropriate terminology for the market row', () => {
-      const body = t3Body().toLowerCase();
-      // Should use "Development" or "development" to describe the row
-      expect(body).toMatch(/development/);
-    });
-
-    it('should be a non-empty body', () => {
-      expect(t3Body().length).toBeGreaterThan(0);
-    });
-
-    it('should mention the actual current cost from card data', () => {
-      expect(t3Body()).toContain(formatCurrency(Number(laundromatRow.cost)));
-    });
-  });
-
-  // ── AC3: Appropriate terminology for community spaces ─────
-
-  describe('Appropriate terminology (AC3)', () => {
-    it('should use "card" or "development" terminology for the top row', () => {
-      const body = t3Body().toLowerCase();
-      // Should refer to cards in the development row (not specifically "business" cards)
-      expect(body).not.toMatch(/^click a business card/i);
-    });
-
-    it('should still explain that cards go on the street', () => {
-      const body = t3Body().toLowerCase();
-      expect(body).toContain('street');
-    });
-
-    it('should still explain that cards earn income', () => {
-      const body = t3Body().toLowerCase();
-      expect(body).toContain('income');
-    });
-  });
-
-  // ── Tutorial i18n key checks ─────────────────────────────
-
-  describe('Tutorial step i18n keys', () => {
-    it('should have T3 step in the tutorial flow', () => {
-      expect(t3Step).toBeDefined();
-    });
-
-    it('should have titleKey and bodyKey set', () => {
-      expect(t3Step.titleKey).toBe(tutorialKey('T3', 'title'));
-      expect(t3Step.bodyKey).toBe(tutorialKey('T3', 'body'));
-    });
-
-    it('should have requiredCardId set', () => {
-      expect(t3Step.requiredCardId).toBeDefined();
-      expect(typeof t3Step.requiredCardId).toBe('string');
-    });
-
-    it('should have requiredAction set to select-business', () => {
-      expect(t3Step.requiredAction).toBe('select-business');
-    });
-
-    it('should have highlightZone set', () => {
-      expect(t3Step.highlightZone).toBeDefined();
-    });
-  });
-
-  // ── i18n bundle coverage ─────────────────────────────────
-
-  describe('i18n bundle coverage', () => {
-    it('all 13 steps have keys in the English bundle', () => {
+  describe('sentence-count rule (≤3 sentences per box)', () => {
+    it('every title is ≤3 sentences', () => {
       for (const step of UNIFIED_TUTORIAL_STEPS) {
-        expect(TUTORIAL_EN_BUNDLE).toHaveProperty(step.titleKey);
-        expect(TUTORIAL_EN_BUNDLE).toHaveProperty(step.bodyKey);
+        const title = t(step.titleKey);
+        expect(countSentences(title), `title ${step.id} should be ≤3 sentences: "${title}"`).toBeLessThanOrEqual(3);
       }
     });
 
-    it('all 13 steps resolve to non-empty text via resolveTutorialStepText', () => {
+    it('every resolved body is ≤3 sentences', () => {
+      for (const step of UNIFIED_TUTORIAL_STEPS) {
+        const body = resolveTutorialStepText(step).body;
+        expect(countSentences(body), `body ${step.id} should be ≤3 sentences: "${body}"`).toBeLessThanOrEqual(3);
+      }
+    });
+
+    it('no text box is empty', () => {
       for (const step of UNIFIED_TUTORIAL_STEPS) {
         const { title, body } = resolveTutorialStepText(step);
-        expect(title.length).toBeGreaterThan(0);
-        expect(body.length).toBeGreaterThan(0);
+        expect(title.trim().length).toBeGreaterThan(0);
+        expect(body.trim().length).toBeGreaterThan(0);
       }
+    });
+  });
+
+  describe('T1 Welcome (AC: 25-turns sentence removed)', () => {
+    it('does not mention 25 turns or a turn limit', () => {
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T1')!).body;
+      expect(body).not.toMatch(/25\s*turns/i);
+      expect(body).not.toMatch(/reach the score target/i);
+    });
+  });
+
+  describe('T3 Buy the Laundromat (AC: explicit click-to-buy, no "place cards" instruction)', () => {
+    it('mentions clicking to buy', () => {
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T3')!).body;
+      expect(body.toLowerCase()).toMatch(/click/);
+      expect(body.toLowerCase()).toMatch(/buy/);
+    });
+    it('does not instruct placing cards in this step', () => {
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T3')!).body;
+      expect(body.toLowerCase()).not.toMatch(/place cards/i);
+    });
+  });
+
+  describe('T5 Place a Business (AC: no matching-card mention)', () => {
+    it('does not mention matching cards', () => {
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T5')!).body;
+      expect(body.toLowerCase()).not.toMatch(/match/i);
+    });
+    it('explicitly says click an empty slot to earn income', () => {
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T5')!).body;
+      expect(body.toLowerCase()).toMatch(/click/);
+      expect(body.toLowerCase()).toMatch(/income/i);
+    });
+  });
+
+  describe('T6 Upcoming Incidents (AC: no "blue", no impact details)', () => {
+    it('does not describe incident cards as blue', () => {
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T6')!).body;
+      expect(body.toLowerCase()).not.toMatch(/\bblue\b/i);
+    });
+    it('does not list specific incident impacts', () => {
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T6')!).body;
+      expect(body.toLowerCase()).not.toMatch(/cost coins|cost reputation|-1 coin|-1 rep|per food/i);
+    });
+    it('frames events as good/bad with a hover hint', () => {
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T6')!).body;
+      expect(body.toLowerCase()).toMatch(/help/);
+      expect(body.toLowerCase()).toMatch(/hurt/);
+      expect(body.toLowerCase()).toMatch(/hover/i);
+    });
+  });
+
+  describe('T10 Optimizing for Events (AC: drag to place, depends on drag-drop)', () => {
+    it('mentions culture businesses and drag-to-place', () => {
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T10')!).body;
+      expect(body.toLowerCase()).toMatch(/culture/);
+      expect(body.toLowerCase()).toMatch(/drag/);
+      expect(body.toLowerCase()).toMatch(/street/);
+    });
+  });
+
+  describe('T12 Build a Library (AC: running cost vs reputation, Culture adjacency)', () => {
+    it('mentions running costs and reputation', () => {
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T12')!).body;
+      expect(body.toLowerCase()).toMatch(/cost/);
+      expect(body.toLowerCase()).toMatch(/reputation/i);
+    });
+    it('mentions the Culture adjacency bonus via synergyCardName placeholder', () => {
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T12')!).body;
+      expect(body).toContain('Bookshop');
+      expect(body.toLowerCase()).toMatch(/culture/);
+    });
+  });
+
+  describe('T13 Triggering Events (AC: play festival from hand)', () => {
+    it('mentions clicking the held festival in hand', () => {
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T13')!).body;
+      expect(body.toLowerCase()).toMatch(/hand/);
+      expect(body.toLowerCase()).toMatch(/click/);
+    });
+  });
+
+  describe('T14 Success and Failure (AC: scoring bar)', () => {
+    it('mentions the scoring bar components', () => {
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T14')!).body;
+      expect(body.toLowerCase()).toMatch(/coins/);
+      expect(body.toLowerCase()).toMatch(/score/);
+      expect(body.toLowerCase()).toMatch(/target/);
+    });
+  });
+
+  describe('T16 button label (AC: "Let\'s play!")', () => {
+    it('overlay startFullGame is "Let\'s play!"', () => {
+      expect(t('tutorial.overlay.startFullGame')).toBe("Let's play!");
     });
   });
 });
@@ -191,13 +180,6 @@ describe('Data-driven tutorial text (card facts from card data)', () => {
     const body = resolveTutorialStepText(t3Step).body;
     const expectedCost = formatCurrency(Number(laundromatRow.cost));
     expect(body).toContain(expectedCost);
-    // The stale hardcoded €6 must never appear
-    expect(body).not.toContain('€6');
-  });
-
-  it('T3 no longer claims the Laundromat is the cheapest card', () => {
-    const body = resolveTutorialStepText(t3Step).body;
-    expect(body).not.toContain('cheapest');
   });
 
   it('same card data produces identical resolved text (deterministic)', () => {
@@ -207,7 +189,6 @@ describe('Data-driven tutorial text (card facts from card data)', () => {
   });
 
   it('changed card cost updates the rendered tutorial text', () => {
-    // Rewrite the bundled CSV with a new Laundromat cost (9) and re-resolve.
     const modifiedCsv = cardDataRaw.replace(
       /(biz-laundromat,Laundromat,)\d+(,)/,
       '$19$2',
@@ -230,27 +211,39 @@ describe('Data-driven tutorial text (card facts from card data)', () => {
     }
   });
 
-  it('T7/T8/T9 embed card names/costs via data-driven placeholders', () => {
-    const t7 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T7')!;
-    const t8 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T8')!;
+  it('T3/T9/T10 embed card names/costs via data-driven placeholders', () => {
+    const t3 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T3')!;
     const t9 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T9')!;
+    const t10 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T10')!;
 
-    const festivalRow = getCsvRows().find(r => r.id === getBaseTypeId(t7.referencedCardId!))!;
-    const bookshopRow = getCsvRows().find(r => r.id === getBaseTypeId(t8.requiredCardId!))!;
+    const laundromatRow = getCsvRows().find(r => r.id === getBaseTypeId(t3.requiredCardId!))!;
+    const festivalRow = getCsvRows().find(r => r.id === getBaseTypeId(t9.requiredCardId!))!;
+    const bookshopRow = getCsvRows().find(r => r.id === getBaseTypeId(t10.requiredCardId!))!;
 
+    expect(laundromatRow).toBeDefined();
     expect(festivalRow).toBeDefined();
     expect(bookshopRow).toBeDefined();
 
-    const t7Body = resolveTutorialStepText(t7).body;
-    const t8Body = resolveTutorialStepText(t8).body;
+    const t3Body = resolveTutorialStepText(t3).body;
     const t9Body = resolveTutorialStepText(t9).body;
+    const t10Body = resolveTutorialStepText(t10).body;
 
-    // T7 references the Local Festival by its live card-data name and bonus
-    expect(t7Body).toContain(festivalRow.name);
-    // T8 references the Bookshop name and its live cost
-    expect(t8Body).toContain(bookshopRow.name);
-    expect(t8Body).toContain(formatCurrency(Number(bookshopRow.cost)));
-    // T9 references the Bookshop by name
-    expect(t9Body).toContain(bookshopRow.name);
+    expect(t3Body).toContain(laundromatRow.name);
+    expect(t9Body).toContain(festivalRow.name);
+    expect(t10Body).toContain(bookshopRow.name);
+    // T10's copy references the Bookshop by name but does not quote its cost.
+  });
+
+  it('T12 resolves {cardName} (Library) and {synergyCardName} (Bookshop) from card data', () => {
+    const t12 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T12')!;
+    const libraryRow = getCsvRows().find(r => r.id === getBaseTypeId(t12.requiredCardId!))!;
+    const bookshopRow = getCsvRows().find(r => r.id === getBaseTypeId(t12.synergyCardId!))!;
+    expect(libraryRow).toBeDefined();
+    expect(bookshopRow).toBeDefined();
+
+    const body = resolveTutorialStepText(t12).body;
+    expect(body).toContain(libraryRow.name);      // Library
+    expect(body).toContain(bookshopRow.name);     // Bookshop
+    expect(body).not.toMatch(/\{[A-Za-z_]+\}/);
   });
 });

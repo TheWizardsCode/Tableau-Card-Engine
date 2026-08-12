@@ -103,7 +103,7 @@ The tutorial offer modal and overlay button labels are also externalized:
 | `tutorial.overlay.dismiss` | Dismiss overlay button | `Dismiss` |
 | `tutorial.overlay.next` | Next step button | `Next >` |
 | `tutorial.overlay.exit` | Exit tutorial button | `Exit Tutorial` |
-| `tutorial.overlay.startFullGame` | Start full game button | `Start Full Game` |
+| `tutorial.overlay.startFullGame` | Start full game button | `Let's play!` |
 
 Helper functions:
 
@@ -121,10 +121,62 @@ overlayKey('dismiss'); // → 'tutorial.overlay.dismiss'
 Tutorial text follows these editorial principles:
 
 - **Reading level:** ~10-year-old reading level (Flesch-Kincaid Grade Level ≤ 5-6)
+- **Sentence limit:** **≤3 sentences per text box** (titles and bodies), each box
+  communicating **exactly one point** (16-step flow editorial rule)
 - **Word count:** Each step body under 50 words (soft boundary — conciseness preferred)
 - **Concepts:** At most 1–2 distinct gameplay concepts per step (soft boundary)
 - **Plain language:** Short sentences, common words, active voice, no jargon without explanation
 - **Consistency:** Use consistent terminology across all steps (e.g. "Coins" not "gold", "turns" not "days")
+
+### Content rules for the 16-step flow
+
+- Do NOT mention time-limited play (the "25 turns" sentence was removed from T1).
+- Do NOT describe incident cards as "blue" or list their impacts in Upcoming Incidents.
+- Do NOT mention matching cards in the Place a Business step.
+
+### Step flow (16 steps, T1–T16)
+
+| # | ID | Title | Gate | Highlight zone |
+|---|----|-------|------|----------------|
+| 1 | T1 | Welcome to Main Street | confirm | centerModal |
+| 2 | T2 | Development Row | confirm | developmentRow (dev row only) |
+| 3 | T3 | Buy the Laundromat | action (select-business) | laundromatCard (card-level) |
+| 4 | T4 | Your Hand | confirm | hand |
+| 5 | T5 | Place a Business | action (place-business) | streetGrid |
+| 6 | T6 | Upcoming Incidents | confirm | incidentQueue |
+| 7 | T7 | End Turn | action (end-turn) | endTurnButton |
+| 8 | T8 | Investments | confirm | investmentsRow |
+| 9 | T9 | Buy the Local Festival | action (buy-event) | festivalCard (card-level) |
+| 10 | T10 | Optimizing for Events | action (buy-and-place) | developmentRow |
+| 11 | T11 | End this turn | action (end-turn) | endTurnButton |
+| 12 | T12 | Build a Library | action (buy-and-place) | developmentRow |
+| 13 | T13 | Triggering Events | action (play-event) | hand |
+| 14 | T14 | Success and Failure | confirm | hud (scoring bar) |
+| 15 | T15 | Challenges | confirm | challengePanel |
+| 16 | T16 | Tutorial Complete | confirm | completionModal |
+
+Card-level highlight zones (`laundromatCard`, `festivalCard`) are resolved through
+`resolveMarketCardAnchor()` in `MainStreetTutorialHints.ts` using the deterministic
+tutorial-scenario market slots, not hardcoded pixel positions.
+
+### Scenario budget (Easy / 16 coins)
+
+The tutorial runs the **Easy** preset with a **16-coin starting budget** (raised
+from the standard Easy 12 for the 16-step flow). The walkthrough spends exactly:
+
+| Step | Action | Coins In | Coins Out | Balance |
+|------|--------|----------|-----------|---------|
+| T1   | Start (Easy, 16 coins) | 16 | 0 | 16 |
+| T3   | Buy Laundromat ($4) | 0 | 4 | 12 |
+| T7   | End Turn + income | 0.625 | 0 | 12.625 |
+| T9   | Buy Local Festival ($3) | 0 | 3 | 9.625 |
+| T10  | Buy-and-place Bookshop ($3) | 0 | 3 | 6.625 |
+| T11  | End Turn + income | 1.25 | 0 | 7.875 |
+| T12  | Buy Library ($7) | 0 | 7 | 0.875 |
+
+T13+ are confirm-only steps (no cost), so the balance never drops below 0.875.
+The authoritative walkthrough lives in the `Coin Budget (Easy / 16 coins)` table
+in `example-games/main-street/TutorialScenario.ts`.
 
 ### Changing existing text
 

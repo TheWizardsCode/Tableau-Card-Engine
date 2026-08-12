@@ -75,6 +75,9 @@ npm run build        # TypeScript check + production build to dist/
 npm run preview      # Serve production build locally
 npm run monte-carlo  # Run Main Street Monte Carlo harness (JSON + CSV)
 npm run tf:generate  # Generate ToneForge audio artifacts into build/tf-synths/
+npm run build:electron   # Electron-mode Vite build (relative base, file://-safe) for the desktop launcher
+npm run start:electron   # Build + launch the Electron desktop app locally
+npm run package          # Package a desktop binary for the host platform (package:win/linux/mac variants)
 ```
 
 ### Quality Gates
@@ -85,6 +88,31 @@ Before pushing any change to the git origin you must have ensured that:
 2. `npm run build` succeeds -- TypeScript compilation and Vite production build must complete without errors.
 
 Each example game should have its own set of tests to ensure that the game mechanics work as expected and to prevent regressions as the engine evolves. Additionally, the core engine should have comprehensive tests covering all critical functionalities.
+
+#### When to run which tests
+
+`npm test` runs the full suite via `scripts/run-ci-tests.sh` in three stages, in this order:
+
+1. **Unit tests** (`--project unit`, Node.js) — logic, data, and integration tests in `tests/**/*.test.ts`. Fast (seconds); run them frequently during implementation.
+2. **Non-tutorial browser tests** (`--project browser`, headless Chromium) — Phaser UI/rendering tests in `tests/**/*.browser.test.ts`. Phaser needs a real browser (WebGL/Canvas) and cannot run under Node/JSDOM.
+3. **Tutorial E2E tests** (`scripts/run-tutorial-tests.sh`) — Main Street tutorial flows in `tests/e2e/main-street-tutorial-e2e-part{1-6}.browser.test.ts`, each part in its own browser instance to avoid Phaser 4 canvas/GPU context exhaustion.
+
+The unit and browser stages run through `scripts/vitest-run-with-retry.ts`, which retries once on Vitest's transient contention-induced failures (worker RPC timeout, browser WebSocket drop) only when every file actually passed. A `replay-e2e` project (`tests/e2e/replay-*.test.ts`) is also defined for Playwright-driven replay checks. See `docs/DEVELOPER.md#testing` for the full project table, CPU-contention mitigations, and guidance on writing unit and browser tests.
+
+- **During implementation** — prefer targeted runs for fast feedback (seconds, not minutes):
+  - Unit: `npx vitest run --project unit tests/<game>/` or `npx vitest run --project unit tests/<game>/<name>.test.ts`
+  - Browser: `npx vitest run --project browser tests/<game>/<name>.browser.test.ts`
+- **Before any push to origin** — always run the full `npm test` and `npm run build` (see the quality gates above).
+
+#### Browser tests
+
+- Cover Phaser UI/rendering and interactions: `tests/**/*.browser.test.ts` (non-tutorial).
+- Run in headless Chromium via Playwright; one-time prerequisite: `npx playwright install chromium`.
+- Slower than unit tests (~8-10s each) — use targeted `--project browser` runs while developing, not the full suite.
+
+#### Audit test-cache interaction
+
+A full-suite green run at the current commit via the test skill (`/skill:test`, quiet mode, triaged) populates the per-repo **read-only test cache** (`.worklog/cache/`, 2-hour TTL). Audits of that same git state consume the cache without executing anything (`query_cached()`); when every suite command has a cached exit-0 entry at the matching commit, execution-dependent acceptance criteria (e.g. "full test suite passes") are auto-verified. So before requesting an audit, run the full suite green at the commit under review.
 
 ### Example Games
 
@@ -406,8 +434,6 @@ All Gym demo scenes extend `GymSceneBase` (`example-games/gym/scenes/GymSceneBas
 - `docs/gym/GYM_INDEX.md` — Complete scene-to-API mapping with source paths and test references
 - `docs/DEVELOPER.md` — Subsystem-specific deep-dive guidance (SLL, HUD, card system, etc.)
 - [UI Best Practices: Creating Modal Dialogs](#ui-best-practices-creating-modal-dialogs) — Depth-ordering convention and overlay implementation patterns
-
-<!-- Start base Worklog AGENTS.md file -->
 
 ## Worklog Rules
 

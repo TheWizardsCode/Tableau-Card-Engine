@@ -123,9 +123,10 @@ const LAYOUT = {
 };
 
 /**
- * Creates a minimal mock MainStreet scene with real HandView instances that
- * mirror the renderer's `handBusinessView` / `handView` configuration, plus
- * the scene delegations the turn controller uses for destination prediction.
+ * Creates a minimal mock Main Street scene with a real HandView instance that
+ * mirrors the renderer's merged `handView` configuration (single horizontal
+ * row holding any mix of business and event cards), plus the scene
+ * delegations the turn controller uses for destination prediction.
  *
  * `animateTransferFromMarket` returns a never-resolving promise so the
  * transfer-completion callback (which mutates state) never runs — tests focus
@@ -135,8 +136,8 @@ function createMockScene(): any {
   const phaser = createPhaserMock();
   const state = setupMainStreetGame({ seed: 'buy-transfer-dest' });
 
-  // Business hand — mirrors handBusinessView in MainStreetRenderer.
-  const handBusinessView = new HandView(phaser, {
+  // Merged hand — mirrors handView in MainStreetRenderer.
+  const handView = new HandView(phaser, {
     baseX: LAYOUT.handX + LAYOUT.handCardW / 2,
     baseY: LAYOUT.handY,
     centerX: LAYOUT.handCenterX,
@@ -147,23 +148,10 @@ function createMockScene(): any {
     clickEnabled: true,
   });
 
-  // Held-event hand — mirrors handView in MainStreetRenderer.
-  const handView = new HandView(phaser, {
-    baseX: LAYOUT.handX + LAYOUT.handCardW / 2,
-    baseY: LAYOUT.handY + LAYOUT.handCardH / 2,
-    centerX: LAYOUT.handCenterX,
-    spacing: LAYOUT.handCardW + 10,
-    cardWidth: LAYOUT.handCardW,
-    showLabels: false,
-    selectionEnabled: false,
-    clickEnabled: false,
-  });
-
   const scene: any = {
     state,
     uiPhase: 'market',
     layout: LAYOUT,
-    handBusinessView,
     handView,
     msLifecycleManager: {
       isTutorialActionAllowed: vi.fn().mockReturnValue({ allowed: true }),
@@ -195,9 +183,9 @@ function createMockScene(): any {
     // Never resolve — keeps the test focused on the transfer destination.
     animateTransferFromMarket: vi.fn(() => new Promise(() => {})),
     // Scene delegations mirroring MainStreetScene.getBusinessHandInsertionPosition /
-    // getEventHandInsertionPosition.
+    // getEventHandInsertionPosition (both delegate to the single merged view).
     getBusinessHandInsertionPosition: (insertIndex: number) =>
-      handBusinessView.getInsertionPosition(insertIndex),
+      handView.getInsertionPosition(insertIndex),
     getEventHandInsertionPosition: (insertIndex: number) =>
       handView.getInsertionPosition(insertIndex),
   };
@@ -213,20 +201,20 @@ describe('Buy transfer destinations (market → hand)', () => {
   });
 
   describe('business buy to hand', () => {
-    it('hand size 0: animates to the exact handBusinessView resting position', () => {
+    it('hand size 0: animates to the exact merged handView resting position', () => {
       const scene = createMockScene();
       const card = scene.state.market.development[0];
       expect(card).toBeTruthy();
 
       // Empty hand — keep the renderer HandView in sync with the state.
-      scene.handBusinessView.setCards(scene.state.hand ?? []);
+      scene.handView.setCards(scene.state.hand ?? []);
 
       const controller = new MainStreetTurnController(scene);
       controller.onBusinessCardClick(card);
 
       expect(scene.animateTransferFromMarket).toHaveBeenCalledTimes(1);
       const opts = scene.animateTransferFromMarket.mock.calls[0][0];
-      const predicted = scene.handBusinessView.getInsertionPosition(0);
+      const predicted = scene.handView.getInsertionPosition(0);
 
       expect(opts.destination.x).toBeCloseTo(predicted.x, 5);
       expect(opts.destination.y).toBeCloseTo(predicted.y, 5);
@@ -244,7 +232,7 @@ describe('Buy transfer destinations (market → hand)', () => {
       expect(second).toBeTruthy();
 
       scene.state.hand = [card];
-      scene.handBusinessView.setCards(scene.state.hand);
+      scene.handView.setCards(scene.state.hand);
 
       const controller = new MainStreetTurnController(scene);
       controller.onBusinessCardClick(second);
@@ -252,7 +240,7 @@ describe('Buy transfer destinations (market → hand)', () => {
       expect(scene.animateTransferFromMarket).toHaveBeenCalledTimes(1);
       const opts = scene.animateTransferFromMarket.mock.calls[0][0];
       // Append index = current hand length (1).
-      const predicted = scene.handBusinessView.getInsertionPosition(1);
+      const predicted = scene.handView.getInsertionPosition(1);
 
       expect(opts.destination.x).toBeCloseTo(predicted.x, 5);
       expect(opts.destination.y).toBeCloseTo(predicted.y, 5);
@@ -268,7 +256,7 @@ describe('Buy transfer destinations (market → hand)', () => {
       const third = scene.state.market.development[2];
 
       scene.state.hand = [card, second];
-      scene.handBusinessView.setCards(scene.state.hand);
+      scene.handView.setCards(scene.state.hand);
 
       const controller = new MainStreetTurnController(scene);
       controller.onBusinessCardClick(third);
@@ -281,8 +269,8 @@ describe('Buy transfer destinations (market → hand)', () => {
     });
   });
 
-  describe('event buy (held event)', () => {
-    it('animates to the exact handView resting position for the held event', () => {
+  describe('event buy (shared hand)', () => {
+    it('animates to the exact merged handView resting position for the appended event', () => {
       const scene = createMockScene();
       const eventCard = scene.state.market.investments.find(
         (c: any) => c && c.family === 'event' && canPurchaseEvent(scene.state, c.id).legal,
@@ -294,15 +282,17 @@ describe('Buy transfer destinations (market → hand)', () => {
 
       expect(scene.animateTransferFromMarket).toHaveBeenCalledTimes(1);
       const opts = scene.animateTransferFromMarket.mock.calls[0][0];
-      // The held event renders via handView.setCards([held]) — insertion at 0.
-      const predicted = scene.handView.getInsertionPosition(0);
+      // The event is appended to the shared hand — insertion at current hand
+      // length (0 for an empty hand).
+      const handIndex = (scene.state.hand ?? []).length;
+      const predicted = scene.handView.getInsertionPosition(handIndex);
 
       expect(opts.destination.x).toBeCloseTo(predicted.x, 5);
       expect(opts.destination.y).toBeCloseTo(predicted.y, 5);
       // Centred on handCenterX, NOT the old left-anchored getHandCardCenter.
       expect(opts.destination.x).toBeCloseTo(LAYOUT.handCenterX, 5);
       expect(opts.destination.x).not.toBeCloseTo(LAYOUT.handX + LAYOUT.handCardW / 2, 5);
-      expect(opts.destination.y).toBeCloseTo(LAYOUT.handY + LAYOUT.handCardH / 2, 5);
+      expect(opts.destination.y).toBeCloseTo(LAYOUT.handY, 5);
     });
   });
 });

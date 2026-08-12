@@ -13,6 +13,7 @@ import {
   enumerateLegalActions,
   scoreAction,
   enumerateAndScoreActions,
+  aiPlanningHorizon,
   RandomStrategy,
   GreedyStrategy,
   MainStreetAiPlayer,
@@ -138,10 +139,10 @@ describe('enumerateLegalActions', () => {
     }
   });
 
-  it('includes play-event when player holds an Investment event', () => {
+  it('includes play-event when player holds an Investment event in hand', () => {
     const state = createTestState();
-    // Inject a held event
-    state.heldEvent = {
+    // Inject a held event into the hand
+    state.hand = [{
       family: 'event',
       id: 'test-event',
       name: 'Test Event',
@@ -151,21 +152,21 @@ describe('enumerateLegalActions', () => {
       target: 'All',
       coinDelta: 2,
       reputationDelta: 0,
-    };
+    }];
     const actions = enumerateLegalActions(state);
     expect(actions.some(a => a.type === 'play-event')).toBe(true);
   });
 
   it('excludes play-event when no event is held', () => {
     const state = createTestState();
-    state.heldEvent = null;
+    state.hand = [];
     const actions = enumerateLegalActions(state);
     expect(actions.some(a => a.type === 'play-event')).toBe(false);
   });
 
   it('excludes buy-event when player already holds an event', () => {
     const state = createTestState();
-    state.heldEvent = {
+    state.hand = [{
       family: 'event',
       id: 'held-event',
       name: 'Held Event',
@@ -175,7 +176,19 @@ describe('enumerateLegalActions', () => {
       target: 'All',
       coinDelta: 2,
       reputationDelta: 0,
-    };
+    }];
+    const actions = enumerateLegalActions(state);
+    // Hand holds one card (< maxHandSize 2), so another event purchase is legal.
+    expect(actions.some(a => a.type === 'buy-event')).toBe(true);
+  });
+
+  it('excludes buy-event when the hand is full', () => {
+    const state = createTestState();
+    // Fill the hand to maxHandSize (2) so no further purchases are legal.
+    state.hand = [
+      { family: 'event', id: 'held-1', name: 'Event 1', trigger: 'Investment', cost: 0, effect: 'x', target: 'All', coinDelta: 1, reputationDelta: 0 },
+      { family: 'event', id: 'held-2', name: 'Event 2', trigger: 'Investment', cost: 0, effect: 'x', target: 'All', coinDelta: 1, reputationDelta: 0 },
+    ];
     const actions = enumerateLegalActions(state);
     expect(actions.some(a => a.type === 'buy-event')).toBe(false);
   });
@@ -323,7 +336,7 @@ describe('GreedyStrategy', () => {
     // Remove all market cards and events
     state.market.development = [];
     state.market.investments = [];
-    state.heldEvent = null;
+    state.hand = [];
     const rng = makeRng();
     const action = GreedyStrategy.chooseAction(state, rng);
     expect(action.type).toBe('end-turn');
@@ -394,7 +407,7 @@ describe('scoreAction', () => {
 
   it('scores play-event as a fixed positive value', () => {
     const state = createTestState();
-    state.heldEvent = {
+    state.hand = [{
       family: 'event',
       id: 'test-event',
       name: 'Test Event',
@@ -404,12 +417,12 @@ describe('scoreAction', () => {
       target: 'All',
       coinDelta: 2,
       reputationDelta: 0,
-    };
+    }];
     const score = scoreAction(state, { type: 'play-event' });
     expect(score).toBeGreaterThan(0);
   });
 
-  it('scores buy-upgrade using incomeBonus * remainingTurns - cost', () => {
+  it('scores buy-upgrade using incomeBonus * horizon - cost', () => {
     const state = createTestState();
     const upgradeCard: UpgradeCard = {
       family: 'upgrade',
@@ -423,15 +436,15 @@ describe('scoreAction', () => {
       requiredLevel: 0,
     };
     state.market.investments.push(upgradeCard);
-    const remainingTurns = state.config.maxTurns - state.turn;
-    const expected = upgradeCard.incomeBonus * remainingTurns - upgradeCard.cost;
+    // Horizon is derived from distance to the win threshold (CG-0MSLXJCHH001DLIO)
+    const expected = upgradeCard.incomeBonus * aiPlanningHorizon(state) - upgradeCard.cost;
     const actual = scoreAction(state, { type: 'buy-upgrade', cardId: upgradeCard.id, targetSlot: 0 });
     expect(actual).toBe(expected);
   });
 
   it('scores buy-event using coinDelta + reputationDelta * reputationScoreMultiplier - cost', () => {
     const state = createTestState();
-    state.heldEvent = null;
+    state.hand = [];
     const eventCard = state.market.investments.find(c => c.family === 'event');
     if (!eventCard) return; // skip if no event in market for this seed
 
@@ -449,6 +462,83 @@ describe('scoreAction', () => {
   it('returns 0 for buy-business with unknown cardId', () => {
     const state = createTestState();
     expect(scoreAction(state, { type: 'buy-business', cardId: 'nonexistent', slotIndex: 0 })).toBe(0);
+  });
+});
+
+// ── aiPlanningHorizon (CG-0MSLXJCHH001DLIO) ─────────────────
+
+describe('aiPlanningHorizon', () => {
+  it('is always within [floor=5, cap=25]', () => {
+    const state = createTestState();
+    for (const score of [0, 5, 40, 75, 120, 145, 149, 150, 200]) {
+      state.resourceBank.coins = score;
+      state.resourceBank.reputation = 0;
+      state.challengesCompleted = [];
+      const h = aiPlanningHorizon(state);
+      expect(h).toBeGreaterThanOrEqual(5);
+      expect(h).toBeLessThanOrEqual(25);
+    }
+  });
+
+  it('is > 0 even when the score is at/near the win threshold (floor)', () => {
+    const state = createTestState();
+    state.resourceBank.coins = state.config.winThreshold;
+    state.resourceBank.reputation = 0;
+    state.challengesCompleted = [];
+    expect(aiPlanningHorizon(state)).toBe(5);
+  });
+
+  it('is larger early in the game (far from threshold) than near the threshold', () => {
+    const state = createTestState();
+    // Far from threshold
+    state.resourceBank.coins = 0;
+    state.resourceBank.reputation = 0;
+    state.challengesCompleted = [];
+    const early = aiPlanningHorizon(state);
+
+    // Near threshold
+    state.resourceBank.coins = state.config.winThreshold - 10;
+    state.resourceBank.reputation = 0;
+    state.challengesCompleted = [];
+    const late = aiPlanningHorizon(state);
+
+    expect(early).toBeGreaterThan(late);
+    expect(late).toBe(5); // clamped at the floor
+  });
+
+  it('derives the horizon from distance to the threshold (documented formula)', () => {
+    const state = createTestState();
+    state.resourceBank.coins = 70;
+    state.resourceBank.reputation = 0;
+    state.challengesCompleted = [];
+    // Medium winThreshold=150, scorePace=8: ceil((150-70)/8) = ceil(10) = 10
+    expect(aiPlanningHorizon(state)).toBe(10);
+  });
+
+  it('prefers early-game upgrades over near-threshold ones (behavioural sanity)', () => {
+    const state = createTestState();
+    const upgradeCard: UpgradeCard = {
+      family: 'upgrade',
+      id: 'test-upgrade-horizon',
+      name: 'Test Upgrade Horizon',
+      targetBusiness: 'Bakery',
+      cost: 3,
+      incomeBonus: 2,
+      synergyRangeBonus: 0,
+      description: 'Test',
+      requiredLevel: 0,
+    };
+    state.market.investments.push(upgradeCard);
+
+    const scoreEarly = scoreAction(state, { type: 'buy-upgrade', cardId: upgradeCard.id, targetSlot: 0 });
+
+    // Near the threshold the same upgrade is valued over fewer turns.
+    state.resourceBank.coins = state.config.winThreshold - 10;
+    state.resourceBank.reputation = 0;
+    state.challengesCompleted = [];
+    const scoreLate = scoreAction(state, { type: 'buy-upgrade', cardId: upgradeCard.id, targetSlot: 0 });
+
+    expect(scoreEarly).toBeGreaterThan(scoreLate);
   });
 });
 

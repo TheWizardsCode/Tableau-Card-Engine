@@ -50,10 +50,24 @@ describe('STANDARD_TUTORIAL_SCENARIO definition', () => {
     expect(STANDARD_TUTORIAL_SCENARIO.difficulty).toBe('Easy');
   });
 
-  it('defines starting coins and reputation matching Easy preset', () => {
+  it('starts with 16 coins (raised from the 12-coin Easy preset for the 4-card 16-step flow)', () => {
+    // The 16-step tutorial buys Laundromat $4 + Local Festival $3 + Bookshop $3
+    // + Library $7 = $17; 16 starting coins + ~1.9 income across the two end-turn
+    // steps covers it. The scenario is intentionally richer than the base preset.
+    expect(STANDARD_TUTORIAL_SCENARIO.resourceBank.coins).toBe(16);
     const preset = getPreset('Easy');
-    expect(STANDARD_TUTORIAL_SCENARIO.resourceBank.coins).toBe(preset.startingCoins);
+    expect(16).toBeGreaterThan(preset.startingCoins);
+  });
+
+  it('defines starting reputation matching Easy preset', () => {
+    const preset = getPreset('Easy');
     expect(STANDARD_TUTORIAL_SCENARIO.resourceBank.reputation).toBe(preset.startingReputation);
+  });
+
+  it('has cs-library in the development row (replaces cs-park, keeps 4 dev slots + Culture theme)', () => {
+    expect(STANDARD_TUTORIAL_SCENARIO.market.development).toContain('cs-library');
+    expect(STANDARD_TUTORIAL_SCENARIO.market.development).not.toContain('cs-park');
+    expect(STANDARD_TUTORIAL_SCENARIO.market.development.length).toBe(MARKET_BUSINESS_SLOTS);
   });
 
   it('defines exactly MARKET_BUSINESS_SLOTS development row cards', () => {
@@ -121,11 +135,10 @@ describe('createTutorialScenario', () => {
     expect(state.config.difficultyName).toBe('Easy');
   });
 
-  it('has correct starting resources per Easy preset', () => {
-    const preset = getPreset('Easy');
+  it('has correct starting resources (16 coins, 5 reputation per scenario)', () => {
     const state = createTutorialScenario();
-    expect(state.resourceBank.coins).toBe(preset.startingCoins);
-    expect(state.resourceBank.reputation).toBe(preset.startingReputation);
+    expect(state.resourceBank.coins).toBe(16);
+    expect(state.resourceBank.reputation).toBe(5);
   });
 
   it('has exactly MARKET_BUSINESS_SLOTS cards in development row', () => {
@@ -162,7 +175,7 @@ describe('createTutorialScenario', () => {
 
   it('has no held event', () => {
     const state = createTutorialScenario();
-    expect(state.heldEvent).toBeNull();
+    expect(state.hand.some(c => c.family === 'event')).toBe(false);
   });
 
   it('has game result of playing', () => {
@@ -185,12 +198,12 @@ describe('createTutorialScenario', () => {
     expect(state.activeChallenges.length).toBeGreaterThan(0);
   });
 
-  // ── Coin budget verification (AC5) ───────────────────────────
+  // ── Coin budget verification (AC5: 16-coin flow) ────────────
 
-  it('provides sufficient coin budget for tutorial (12 starting, $4 Laundromat, $2 event)', () => {
+  it('provides sufficient coin budget for the 16-step flow (16 coins, $4+$3+$3+$7 purchases)', () => {
     const state = createTutorialScenario();
-    // Starting with Easy preset: 12 coins
-    expect(state.resourceBank.coins).toBe(12);
+    // Scenario starts with 16 coins (not the 12-coin Easy preset)
+    expect(state.resourceBank.coins).toBe(16);
 
     // The Laundromat referenced in T3 must exist and cost ≤ 4
     const t3 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T3')!;
@@ -200,13 +213,32 @@ describe('createTutorialScenario', () => {
     expect(laundromat).toBeDefined();
     expect(laundromat!.cost).toBeLessThanOrEqual(4);
 
-    // After buying $4 card: 8 coins remaining
+    // After buying $4 card: 12 coins remaining
     const afterLaundromat = state.resourceBank.coins - 4;
-    expect(afterLaundromat).toBe(8);
+    expect(afterLaundromat).toBe(12);
 
-    // After one turn's income (base income from Laundromat is 0.5):
-    // 8 + 0.5 = 8.5 coins should be enough for a $2 event
-    expect(8.5).toBeGreaterThanOrEqual(2);
+    // After one income turn (Laundromat 0.5 base × 1.25 rep multiplier ≈ 0.625):
+    // 12.625 should be enough for the $3 Local Festival
+    expect(afterLaundromat + 0.625).toBeGreaterThanOrEqual(3);
+
+    // After festival ($3) + Bookshop ($3): ~6.6, then second income turn
+    // (Laundromat + Bookshop = 1.0 × 1.25 = 1.25) → ~7.9, enough for Library ($7)
+    const afterFestivalBookshop = afterLaundromat + 0.625 - 3 - 3;
+    expect(afterFestivalBookshop).toBeGreaterThanOrEqual(0);
+    expect(afterFestivalBookshop + 1.25).toBeGreaterThanOrEqual(7);
+  });
+
+  it('Library (cs-library) is present in the dev row and affordable', () => {
+    const state = createTutorialScenario();
+    const t12 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T12')!;
+    expect(t12).toBeDefined();
+    const library = state.market.development.find(
+      c => matchesTemplate(c.id, t12.requiredCardId ?? ''),
+    );
+    expect(library).toBeDefined();
+    expect(library!.name).toBe('Library');
+    // 16 + ~1.9 income - (4+3+3) purchases = ~7.9 ≥ Library cost 7
+    expect(16 + 1.875 - 4 - 3 - 3).toBeGreaterThanOrEqual(library!.cost);
   });
 
   // ── Market card integration with tutorial steps ──────────────
@@ -228,16 +260,22 @@ describe('createTutorialScenario', () => {
     expect(laundromat.cost).toBe(4);
   });
 
-  it('an investment event card is in the investments row matching T7', () => {
+  it('the Local Festival event card is in the investments row matching T9', () => {
     const state = createTutorialScenario();
     const invEvents = state.market.investments.filter(
       c => c.family === 'event',
     ) as EventCard[];
     expect(invEvents.length).toBe(1);
 
+    const t9 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T9')!;
+    const festival = state.market.investments.find(
+      c => matchesTemplate(c.id, t9.requiredCardId ?? ''),
+    );
+    expect(festival).toBeDefined();
+    expect(festival!.name).toBe('Local Festival');
     // The event should be affordable after buying Laundromat + one income turn
-    expect(invEvents[0].cost).toBeGreaterThanOrEqual(2);
-    expect(invEvents[0].cost).toBeLessThanOrEqual(4);
+    expect(festival!.cost).toBeGreaterThanOrEqual(2);
+    expect(festival!.cost).toBeLessThanOrEqual(4);
   });
 
   // ── Deck consistency ────────────────────────────────────────

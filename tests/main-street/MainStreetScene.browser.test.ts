@@ -228,7 +228,7 @@ describe('MainStreetScene browser tests', () => {
     const templateId = String(eventCard.id).replace(/-\d+$/, '');
     scene.cardSvgSources.set(templateId, '<svg xmlns="http://www.w3.org/2000/svg" width="140" height="80" viewBox="0 0 140 80"><rect width="140" height="80" fill="#8B4513"/><text x="70" y="44" font-size="14" text-anchor="middle" fill="#fff">Held</text></svg>');
 
-    state.heldEvent = eventCard;
+    state.hand = [eventCard];
 
     scene.refreshAll();
     await new Promise((resolve) => setTimeout(resolve, 30));
@@ -335,6 +335,23 @@ describe('MainStreetScene browser tests', () => {
       // Now place the business on the target slot.
       scene.onSlotClick(targetSlot);
 
+      // Animated placement (AC 2 + AC 3): state is NOT committed
+      // synchronously and the source card is hidden from the hand during
+      // the flight (the hidden-count reflects the hand source card).
+      expect(state.streetGrid[targetSlot]).toBeNull();
+      expect(scene.getHiddenTransferSourceCardCountForTest()).toBe(1);
+
+      // AC 3 (visual): the hand slot must not render the card face during
+      // the flight — only an empty placeholder — so no duplicate card is
+      // visible in the hand while the transfer visual flies mid-air.
+      const handIdx = (state.hand ?? []).findIndex((c: any) => c.id === business.id);
+      const handSprite = (scene.msRenderer?.handView?.getSpriteAt(handIdx) ?? null) as any;
+      expect(handSprite).toBeTruthy();
+      const cardFaceChildren = (handSprite?.list ?? []).filter(
+        (child: any) => child.type === 'Image',
+      );
+      expect(cardFaceChildren.length).toBe(0);
+
       await waitForCondition(
         () => state.streetGrid[targetSlot]?.id === business.id,
         { timeoutMs: 6000, label: 'business transfer completion' },
@@ -351,7 +368,7 @@ describe('MainStreetScene browser tests', () => {
         scene.onEventCardClick(eventCard);
 
         // Event should not appear in hand immediately while transfer is playing
-        expect(state.heldEvent).toBeNull();
+        expect((state.hand ?? []).some((c: any) => c.id === eventCard.id)).toBe(false);
         expect(scene.getHiddenTransferSourceCardCountForTest()).toBeGreaterThan(0);
 
         await waitForCondition(
@@ -360,7 +377,7 @@ describe('MainStreetScene browser tests', () => {
         );
 
         await waitForCondition(
-          () => state.heldEvent?.id === eventCard.id,
+          () => (state.hand ?? []).some((c: any) => c.id === eventCard.id),
           { timeoutMs: 6000, label: 'event transfer completion' },
         );
         expect(scene.getHiddenTransferSourceCardCountForTest()).toBe(0);
@@ -432,7 +449,7 @@ describe('MainStreetScene browser tests', () => {
         { timeoutMs: 6000, label: 'second business materialized in hand' },
       );
       const bizIndex = state.hand.findIndex((c: any) => c.id === biz2.id);
-      const bizRendered = scene.msRenderer.handBusinessView.getCardCenters()[bizIndex];
+      const bizRendered = scene.msRenderer.handView.getCardCenters()[bizIndex];
       expect(Math.abs(bizDest.x - bizRendered.x)).toBeLessThanOrEqual(2);
       expect(Math.abs(bizDest.y - bizRendered.y)).toBeLessThanOrEqual(2);
 
@@ -450,10 +467,10 @@ describe('MainStreetScene browser tests', () => {
         const eventDest = (transferSpy.mock.calls[beforeEvent][0] as any).destination;
 
         await waitForCondition(
-          () => state.heldEvent?.id === eventCard.id,
+          () => (state.hand ?? []).some((c: any) => c.id === eventCard.id),
           { timeoutMs: 6000, label: 'event materialized' },
         );
-        const eventRendered = scene.msRenderer.handView.getCardCenters()[0];
+        const eventRendered = scene.msRenderer.handView.getCardCenters()[state.hand.findIndex((c: any) => c.id === eventCard.id)];
         expect(Math.abs(eventDest.x - eventRendered.x)).toBeLessThanOrEqual(2);
         expect(Math.abs(eventDest.y - eventRendered.y)).toBeLessThanOrEqual(2);
       }

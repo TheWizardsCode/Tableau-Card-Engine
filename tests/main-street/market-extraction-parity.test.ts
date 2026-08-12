@@ -377,20 +377,13 @@ describe('MarketOfferEngine — negative-path buy eligibility', () => {
       }
     });
 
-    it('should reject when the player is already holding an Investment event', () => {
+    it('should reject when the hand is full', () => {
       const state = createTestState();
-      // Set a held event
-      state.heldEvent = {
-        family: 'event',
-        id: 'evt-held-parity',
-        name: 'Held Event',
-        trigger: 'Investment',
-        effect: 'test',
-        target: 'All',
-        coinDelta: 0,
-        reputationDelta: 0,
-        cost: 0,
-      };
+      // Fill the hand to maxHandSize (2) so no further purchases are legal.
+      state.hand = [
+        { family: 'event', id: 'evt-held-parity', name: 'Held Event', trigger: 'Investment', effect: 'test', target: 'All', coinDelta: 0, reputationDelta: 0, cost: 0 } as any,
+        { family: 'event', id: 'evt-held-parity-2', name: 'Held Event 2', trigger: 'Investment', effect: 'test', target: 'All', coinDelta: 0, reputationDelta: 0, cost: 0 } as any,
+      ];
       // Find an Investment event in investments row
       const investmentEvent = state.market.investments.find(
         c => c.family === 'event' && (c as EventCard).trigger === 'Investment',
@@ -401,7 +394,7 @@ describe('MarketOfferEngine — negative-path buy eligibility', () => {
       const result = canPurchaseEvent(state, investmentEvent.id);
       expect(result.legal).toBe(false);
       if (!result.legal) {
-        expect(result.reason).toContain('Already holding');
+        expect(result.reason).toContain('Hand is full');
       }
     });
   });
@@ -509,7 +502,7 @@ describe('MarketOfferEngine — positive-path purchase results', () => {
   });
 
   describe('purchaseEvent — success', () => {
-    it('should set heldEvent and remove event from investments row', () => {
+    it('should add event to hand and remove it from investments row', () => {
       const state = createTestState();
       const investmentEvt: EventCard = {
         family: 'event',
@@ -528,8 +521,7 @@ describe('MarketOfferEngine — positive-path purchase results', () => {
 
       purchaseEvent(state, investmentEvt.id);
 
-      expect(state.heldEvent).not.toBeNull();
-      expect(state.heldEvent!.id).toBe(investmentEvt.id);
+      expect(state.hand.some(c => c.family === 'event' && c.id === investmentEvt.id)).toBe(true);
       expect(state.resourceBank.coins).toBe(coinsBefore - investmentEvt.cost);
       expect(state.market.investments).toHaveLength(0);
     });

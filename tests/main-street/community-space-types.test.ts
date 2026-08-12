@@ -344,13 +344,14 @@ describe('Library card design and stats (AC5)', () => {
     expect(library!.reputationPerTurn).toBe(0.1);
   });
 
-  it('Library should be synergy-neutral (explicit zero synergy bonuses)', () => {
+  it('Library should participate in Culture synergy (Park model, default rates)', () => {
     const library = communitySpaceDeck.find(c => c.name === 'Library');
     expect(library).toBeDefined();
-    // Explicit 0/0 (Pawn Shop pattern) opts the card out of the synergy system
-    // entirely — undefined would default to a 0.5 coin synergy rate.
-    expect(library!.synergyCoinBonus).toBe(0);
-    expect(library!.synergyRepBonus).toBe(0);
+    // Empty synergy fields (Park pattern) default to a 0.5 coin synergy rate —
+    // the Library contributes to neighbours' Culture synergy and receives
+    // reputation synergy from rep-bonus neighbours (reversed by CG-0MSKS963N000ZSTU).
+    expect(library!.synergyCoinBonus).toBeUndefined();
+    expect(library!.synergyRepBonus).toBeUndefined();
   });
 
   it('Library description should mention the running cost and reputation', () => {

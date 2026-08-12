@@ -88,7 +88,7 @@ export interface CombinationResult {
 export interface RunAllCombinationsOptions {
   /** Seeds to run for each combination. */
   seeds: readonly string[];
-  /** Max turns per seed (default: 30). */
+  /** Max turns per seed (default: 60). */
   maxTurns?: number;
   /**
    * Optional filter: only run these strategies.
@@ -134,7 +134,7 @@ function chooseDemoGreedyActions(state: MainStreetState): PlayerAction[] {
     break;
   }
 
-  if (state.heldEvent !== null) {
+  if ((state.hand ?? []).some(c => c.family === 'event')) {
     actions.push({ type: 'play-event' });
   }
 
@@ -300,8 +300,19 @@ function runSeed(seed: string, maxTurns: number, strategy: MonteCarloStrategy): 
   };
 }
 
+/**
+ * Default harness termination cap for Monte Carlo runs (CG-0MSLXJCHH001DLIO).
+ *
+ * This is a harness-only guard, not a game mechanic: default presets impose
+ * no turn limit, so simulations need an explicit bound to terminate
+ * deterministically. 60 turns is generous enough that market-greedy runs on
+ * Medium reach a definite result (score threshold, bankruptcy, or reputation
+ * collapse) before the cap; see the balance guardrail tests.
+ */
+const DEFAULT_MONTE_CARLO_MAX_TURNS = 60;
+
 export function runMonteCarlo(options: RunMonteCarloOptions): MonteCarloResult {
-  const maxTurns = options.maxTurns ?? 30;
+  const maxTurns = options.maxTurns ?? DEFAULT_MONTE_CARLO_MAX_TURNS;
   const strategy = options.strategy ?? 'market-greedy';
   const runs = options.seeds.map(seed => runSeed(seed, maxTurns, strategy));
 
@@ -333,7 +344,7 @@ export function runMonteCarlo(options: RunMonteCarloOptions): MonteCarloResult {
  * @returns Array of `CombinationResult` for each combination.
  */
 export function runAllCombinations(options: RunAllCombinationsOptions): CombinationResult[] {
-  const maxTurns = options.maxTurns ?? 30;
+  const maxTurns = options.maxTurns ?? DEFAULT_MONTE_CARLO_MAX_TURNS;
   const strategies = options.strategies ?? ALL_STRATEGIES;
   const difficulties = options.difficulties ?? ALL_DIFFICULTIES;
 

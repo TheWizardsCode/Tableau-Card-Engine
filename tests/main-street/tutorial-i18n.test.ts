@@ -67,9 +67,14 @@ describe('Tutorial i18n: English bundle registration', () => {
     expect(t(step.bodyKey)).toContain('Build the best Main Street');
   });
 
-  it('T3 title resolves to "Development Row"', () => {
+  it('T1 body no longer mentions 25 turns (time-limited play removed)', () => {
+    const step = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T1')!;
+    expect(t(step.bodyKey)).not.toMatch(/25\s*turns/i);
+  });
+
+  it('T3 title resolves to "Buy the Laundromat"', () => {
     const step = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T3')!;
-    expect(t(step.titleKey)).toBe('Development Row');
+    expect(t(step.titleKey)).toBe('Buy the Laundromat');
   });
 
   it('T3 body contains the card name and data-driven cost', () => {
@@ -80,9 +85,18 @@ describe('Tutorial i18n: English bundle registration', () => {
     expect(body).toContain(formatCurrency(Number(row.cost)));
   });
 
-  it('T14 title resolves to "Tutorial Complete"', () => {
+  it('T14 title resolves to "Success and Failure"', () => {
     const step = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T14')!;
+    expect(t(step.titleKey)).toBe('Success and Failure');
+  });
+
+  it('T16 title resolves to "Tutorial Complete"', () => {
+    const step = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T16')!;
     expect(t(step.titleKey)).toBe('Tutorial Complete');
+  });
+
+  it('overlay startFullGame resolves to "Let\'s play!"', () => {
+    expect(t('tutorial.overlay.startFullGame')).toBe("Let's play!");
   });
 
   // ── AC3: i18n key naming convention ────────────────────────
@@ -161,11 +175,11 @@ describe('Tutorial i18n: resolveTutorialStepText', () => {
     const row = getCsvRows().find(r => r.id === getBaseTypeId(step.requiredCardId!))!;
     const { title, body } = resolveTutorialStepText(step);
 
-    expect(title).toBe('Development Row');
+    expect(title).toBe('Buy the Laundromat');
     expect(body).toContain(row.name);
   });
 
-  it('works for all 14 steps', () => {
+  it('works for all 16 steps', () => {
     for (const step of UNIFIED_TUTORIAL_STEPS) {
       const { title, body } = resolveTutorialStepText(step);
       expect(title.length).toBeGreaterThan(0);

@@ -1,0 +1,51 @@
+# Build and package the Windows binary (primary Steam artifact).
+#
+# Runs on push to main and version tags (and manually via workflow_dispatch).
+# Windows is the primary Steam target; the Linux/macOS dev machines cannot
+# produce it, so CI builds it reproducibly. The GitHub Pages deploy workflow
+# (deploy.yml) is intentionally untouched.
+#
+# Artifact: NSIS installer (TCE-Setup-<version>.exe). Before upload, the
+# win-unpacked binary is smoke-tested in-job via the Playwright-Electron
+# launch test (tests/electron/launch-smoke.test.ts, TCE_SMOKE_BINARY mode).
+name: Package Windows Binary
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  package-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Package Windows binary
+        run: npm run package:win
+
+      - name: Smoke test packaged binary
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem "release\win-unpacked\*.exe" | Select-Object -First 1
+          if (-not $exe) { throw "No executable found in release\win-unpacked" }
+          $env:TCE_SMOKE_BINARY = $exe.FullName
+          npx vitest run --project electron
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: tce-windows-installer
+          path: release/TCE-Setup-*.exe
+          if-no-files-found: error

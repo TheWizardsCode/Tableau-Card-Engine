@@ -120,8 +120,11 @@ export class MainStreetSvgTextureManager {
       if (biz) visibleTemplates.add(this.templateIdFromCardId(biz.id));
     }
 
-    if (s.state.heldEvent) {
-      visibleTemplates.add(this.templateIdFromCardId(s.state.heldEvent.id));
+    // Include event cards in the player's hand in the visible template set
+    for (const card of s.state.hand ?? []) {
+      if (card.family === 'event') {
+        visibleTemplates.add(this.templateIdFromCardId(card.id));
+      }
     }
 
     const dpr = this.getCurrentDevicePixelRatio();

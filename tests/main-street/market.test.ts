@@ -297,20 +297,13 @@ describe('MainStreetMarket', () => {
       expect(result.legal).toBe(false);
     });
 
-    it('should reject purchase when heldEvent is already occupied', () => {
+    it('should reject purchase when the hand is full', () => {
       const state = createTestState();
-      // Set a held event
-      state.heldEvent = {
-        family: 'event',
-        id: 'held-evt',
-        name: 'Held Event',
-        trigger: 'Investment',
-        effect: 'test',
-        target: 'All',
-        coinDelta: 0,
-        reputationDelta: 0,
-        cost: 0,
-      };
+      // Fill the hand to maxHandSize (2) so no further purchases are legal.
+      state.hand = [
+        { family: 'event', id: 'held-evt', name: 'Held Event', trigger: 'Investment', effect: 'test', target: 'All', coinDelta: 0, reputationDelta: 0, cost: 0 } as any,
+        { family: 'event', id: 'held-evt2', name: 'Held Event 2', trigger: 'Investment', effect: 'test', target: 'All', coinDelta: 0, reputationDelta: 0, cost: 0 } as any,
+      ];
       // Find an Investment event in investments row
       const investmentEvent = state.market.investments.find(
         c => c.family === 'event' && (c as import('../../example-games/main-street/MainStreetCards').EventCard).trigger === 'Investment',
@@ -319,14 +312,30 @@ describe('MainStreetMarket', () => {
         const result = canPurchaseEvent(state, investmentEvent.id);
         expect(result.legal).toBe(false);
         if (!result.legal) {
-          expect(result.reason).toContain('Already holding');
+          expect(result.reason).toContain('Hand is full');
         }
+      }
+    });
+
+    it('should allow buying a second event while holding one (no max-1-event rule)', () => {
+      const state = createTestState();
+      // Hand holds one event (under maxHandSize 2), so another purchase is legal.
+      state.hand = [
+        { family: 'event', id: 'held-evt', name: 'Held Event', trigger: 'Investment', effect: 'test', target: 'All', coinDelta: 0, reputationDelta: 0, cost: 0 } as any,
+      ];
+      const investmentEvent = state.market.investments.find(
+        c => c.family === 'event' && (c as import('../../example-games/main-street/MainStreetCards').EventCard).trigger === 'Investment',
+      );
+      if (investmentEvent) {
+        state.resourceBank.coins = 100;
+        const result = canPurchaseEvent(state, investmentEvent.id);
+        expect(result.legal).toBe(true);
       }
     });
   });
 
   describe('purchaseEvent', () => {
-    it('should hold event as heldEvent and not refill market immediately', () => {
+    it('should add event to hand and not refill market immediately', () => {
       const state = createTestState();
       // Ensure we have an Investment event by injecting into the investments row
       const investmentTemplate = {
@@ -347,8 +356,7 @@ describe('MainStreetMarket', () => {
 
       purchaseEvent(state, 'evt-festival-test');
 
-      expect(state.heldEvent).not.toBeNull();
-      expect(state.heldEvent!.id).toBe('evt-festival-test');
+      expect(state.hand.some(c => c.family === 'event' && c.id === 'evt-festival-test')).toBe(true);
       // Market should have one fewer visible investment until end of turn
       expect(state.market.investments).toHaveLength(beforeLen - 1);
     });
@@ -464,9 +472,8 @@ describe('MainStreetMarket', () => {
 
       purchaseEvent(state, 'evt-test-purchase');
 
-      // heldEvent should be set
-      expect(state.heldEvent).not.toBeNull();
-      expect(state.heldEvent!.id).toBe('evt-test-purchase');
+      // Event should be in the hand
+      expect(state.hand.some(c => c.family === 'event' && c.id === 'evt-test-purchase')).toBe(true);
 
       // Market should have one fewer visible event until end of turn
       const events = state.market.investments.filter(c => c.family === 'event');
@@ -609,7 +616,7 @@ describe('MainStreetMarket', () => {
 
       // Clear investments row so refill must draw
       state.market.investments = [];
-      state.heldEvent = null;
+      state.hand = [];
       refillInvestmentsMarket(state);
 
       // Should have drawn an Investment event from the reshuffled discards

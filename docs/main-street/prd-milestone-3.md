@@ -110,7 +110,7 @@ Deliver AI auto-play, a player-facing hint system, and undo/redo functionality f
 
 **Acceptance Criteria:**
 - [ ] AC-2.1: `GreedyStrategy` implements `MainStreetAiStrategy` and evaluates all legal actions using a scoring function.
-- [ ] AC-2.2: Greedy strategy follows the priority chain: upgrade (if available and affordable) > buy business (best placement score) > buy event (positive ROI) > play held event > end turn.
+- [ ] AC-2.2: Greedy strategy follows the priority chain: upgrade (if available and affordable) > buy business (best placement score) > buy event (positive ROI) > play event from hand > end turn.
 - [ ] AC-2.3: Business placement scoring considers adjacency synergy bonus for each candidate slot.
 - [ ] AC-2.4: Given 100 different seeds, `GreedyStrategy` achieves a higher win rate than `RandomStrategy`.
 - [ ] AC-2.5: Given the same seed, Greedy strategy produces identical game outcomes across repeated runs (deterministic).
@@ -124,7 +124,7 @@ Deliver AI auto-play, a player-facing hint system, and undo/redo functionality f
 **Acceptance Criteria:**
 - [ ] AC-3.1: A "Hint" button is visible during the MarketPhase.
 - [ ] AC-3.2: Pressing Hint queries the Greedy strategy for the recommended action.
-- [ ] AC-3.3: The recommended card is highlighted in the market (or held-event area) and the target slot is highlighted on the street grid (for buy-business actions).
+- [ ] AC-3.3: The recommended card is highlighted in the market (or in the player hand) and the target slot is highlighted on the street grid (for buy-business actions).
 - [ ] AC-3.4: A one-line rationale is displayed (e.g., "Buy Cafe and place at slot 5 for 50% synergy bonus").
 - [ ] AC-3.5: If the recommended action is "end turn", the hint displays "No good buys available -- end your turn."
 - [ ] AC-3.6: The hint does not auto-execute the action; the player must act manually.
@@ -140,7 +140,7 @@ Deliver AI auto-play, a player-facing hint system, and undo/redo functionality f
 **Acceptance Criteria:**
 - [ ] AC-4.1: An "Undo" button is visible during the MarketPhase.
 - [ ] AC-4.2: Pressing Undo reverses the last executed action: the purchased card is returned to the market, coins are refunded, and the business/upgrade/event is removed from its target.
-- [ ] AC-4.3: Undo correctly restores all state mutations from the action, including: street grid, resource bank, market slots, held event, activity log entries, and applied upgrades.
+- [ ] AC-4.3: Undo correctly restores all state mutations from the action, including: street grid, resource bank, market slots, hand, activity log entries, and applied upgrades.
 - [ ] AC-4.4: The Undo button is disabled when the undo stack is empty (no actions to undo).
 - [ ] AC-4.5: Undo/redo stack is cleared when the turn ends (processEndOfTurn). Actions during Income/Incident/EndCheck phases are not undoable.
 - [ ] AC-4.6: Undo actions are recorded in the game transcript.
@@ -240,7 +240,7 @@ The Greedy strategy follows a priority chain, evaluating all legal actions and s
 
 **Priority 3: Buy Event** -- If an affordable Investment event has positive expected value (`coinDelta + reputationDelta * reputationScoreMultiplier > cost`), buy it. Score = `expectedValue - cost`.
 
-**Priority 4: Play Held Event** -- If the player holds an Investment event, play it. Score = a fixed bonus (ensures held events are played before end-of-turn auto-resolution).
+**Priority 4: Play Event from Hand** -- If the player holds an Investment event card in hand, play it. Score = a fixed bonus (ensures events are played before end-of-turn).
 
 **Priority 5: End Turn** -- If no action scores positively, end the turn. Score = 0.
 
@@ -290,8 +290,8 @@ UI updates to reflect new state
 
 - `BuyBusinessCommand` -- snapshots: coins, market business slot, grid slot, activity log length
 - `BuyUpgradeCommand` -- snapshots: coins, market investment slot, target business card state (level, incomeBonus, synergyRangeBonus, appliedUpgrades), activity log length. Wrapped as `CompoundCommand` since it modifies both market and business.
-- `BuyEventCommand` -- snapshots: coins, market investment slot, heldEvent, activity log length
-- `PlayEventCommand` -- snapshots: heldEvent, coins, reputation, activity log length
+- `BuyEventCommand` -- snapshots: coins, market investment slot, hand, activity log length
+- `PlayEventCommand` -- snapshots: hand, coins, reputation, activity log length
 
 **Lifecycle:**
 - `UndoRedoManager` instance is created per game (stored on scene or state).
@@ -508,7 +508,7 @@ export type MonteCarloStrategy =
 
 ### 6.1 Existing Baseline
 
-The M2 Monte Carlo harness (`MainStreetMonteCarlo.ts`) runs 200 seeds x 25 turns with two built-in strategies (`market-greedy` and `demo-greedy`). The `market-greedy` strategy buys the cheapest affordable business each turn. The `demo-greedy` strategy additionally plays held events, buys investment events, and attempts upgrades.
+The M2 Monte Carlo harness (`MainStreetMonteCarlo.ts`) runs 200 seeds x 25 turns with two built-in strategies (`market-greedy` and `demo-greedy`). The `market-greedy` strategy buys the cheapest affordable business each turn. The `demo-greedy` strategy additionally plays events from hand, buys investment events, and attempts upgrades.
 
 **M2 balance targets (Medium difficulty):**
 - Win rate: 30-60% (market-greedy)
@@ -717,7 +717,7 @@ Only consider events with positive score (i.e., expected value exceeds cost).
 #### Play Held Event
 
 ```
-score = 5  (fixed bonus to ensure held events are played before auto-resolution)
+score = 5  (fixed bonus to ensure events are played from hand)
 ```
 
 #### End Turn

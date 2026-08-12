@@ -95,7 +95,7 @@ export const GAMES: GameEntry[] = [
     sceneKey: 'MainStreetScene',
     title: 'Main Street',
     description:
-      'Single-player tableau builder. Purchase businesses, place them along a 10-slot street for synergy bonuses, manage coins and reputation, and build the highest-scoring Main Street in 20 turns.',
+      'Single-player tableau builder. Purchase businesses, place them along a 10-slot street for synergy bonuses, manage coins and reputation, and build the highest-scoring Main Street — no turn limit (games end via score threshold, all challenges, bankruptcy, or reputation collapse).',
     thumbnail: 'games/main-street/thumbnail',
   },
   {

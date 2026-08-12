@@ -7,6 +7,8 @@
 
 > This document specifies Main Street's 5-tier meta-progression system. It defines the unlock framework, tier thresholds, card pool expansion, campaign persistence data model, and Save/Load integration pattern. Additional M2 PRD sections (expanded card pool, challenge system, difficulty presets, etc.) will be added as separate work items under the parent M2 epic.
 
+> **Status update (CG-0MSLXJCHH001DLIO):** This historical PRD's Difficulty Presets section (US-16) originally specified per-preset `maxTurns` values (25 > 20 > 15). Default difficulty presets no longer impose a turn limit — games end via score threshold, all challenges, bankruptcy, or reputation collapse; a turn limit is opt-in via an explicit `maxTurns` config. See `docs/main-street/core-rules-and-mechanics.md` for the current rules.
+
 ---
 
 ## Table of Contents
@@ -620,7 +622,7 @@ createEventDeck(3, campaign.unlockedCardIds, createSeededRng(42) /* rng is requi
 createUpgradeDeck(2, campaign.unlockedCardIds)
     |
     v
-Normal game play (20 turns or until win/loss)
+Normal game play (until win/loss — no default turn limit; see status update above)
     |
     v
 EndCheck phase: evaluateChallenges() -> computeScore() -> determine gameResult
@@ -1063,20 +1065,22 @@ Challenge-based unlock paths are designed to be achievable by skilled players wh
 
 **As a player**, I want to choose from at least 3 difficulty presets (Easy, Medium, Hard) **so that** I can adjust the challenge to my skill level.
 
+> **Superseded by CG-0MSLXJCHH001DLIO:** The `maxTurns` assertions below (25 > 20 > 15, `state.config.maxTurns === 25`) describe the original design. Default presets no longer set `maxTurns` — turn limits are opt-in via an explicit `maxTurns` config; `state.config.maxTurns` is `undefined` for Easy/Medium/Hard presets.
+
 **Acceptance Criteria:**
 
 1. At least 3 named difficulty presets exist: Easy, Medium, Hard.
-2. Each preset configures the game via a `GameConfig` object that adjusts: startingCoins, maxTurns, winThreshold, synergyBonusPerNeighbor, and challengesPerRun.
+2. Each preset configures the game via a `GameConfig` object that adjusts: startingCoins, ~~maxTurns,~~ winThreshold, synergyBonusPerNeighbor, and challengesPerRun. (maxTurns removed per CG-0MSLXJCHH001DLIO.)
 3. The selected preset's configuration is stored in `state.config` and used by the engine throughout the run.
-4. Presets produce measurably different game experiences (e.g., Easy has more starting coins and turns than Hard).
+4. Presets produce measurably different game experiences (e.g., Easy has more starting coins than Hard).
 
 **Testable Conditions:**
 
 - `getPresetNames(MAIN_STREET_PRESETS)` returns an array containing `'easy'`, `'medium'`, and `'hard'`.
 - `EASY_CONFIG.startingCoins > MEDIUM_CONFIG.startingCoins > HARD_CONFIG.startingCoins` (12 > 8 > 5).
-- `EASY_CONFIG.maxTurns > MEDIUM_CONFIG.maxTurns > HARD_CONFIG.maxTurns` (25 > 20 > 15).
+- ~~`EASY_CONFIG.maxTurns > MEDIUM_CONFIG.maxTurns > HARD_CONFIG.maxTurns` (25 > 20 > 15).~~ Removed per CG-0MSLXJCHH001DLIO.
 - `EASY_CONFIG.winThreshold < MEDIUM_CONFIG.winThreshold < HARD_CONFIG.winThreshold` (120 < 150 < 180).
-- Given a game initialized with `difficulty: 'easy'`, `state.config.startingCoins === 12` and `state.config.maxTurns === 25`.
+- ~~Given a game initialized with `difficulty: 'easy'`, `state.config.startingCoins === 12` and `state.config.maxTurns === 25`.~~ `state.config.maxTurns` is `undefined` for all default presets per CG-0MSLXJCHH001DLIO.
 
 ### US-17: Difficulty Affects Gameplay
 

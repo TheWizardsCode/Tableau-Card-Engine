@@ -80,7 +80,7 @@ describe('MainStreetSvgTextureManager cache invalidation', () => {
         market: { development: [{ id: 'biz-bakery-0' }], investments: [] },
         incidentQueue: [],
         streetGrid: [],
-        heldEvent: undefined,
+        hand: [],
       },
       layout: {
         marketCardW: 100,

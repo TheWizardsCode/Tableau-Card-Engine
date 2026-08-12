@@ -958,5 +958,80 @@ describe('MainStreet Place/Sell System', () => {
       expect(state.streetGrid).toHaveLength(GRID_SIZE);
       expect(state.market.development.length).toBeGreaterThan(0);
     });
+
+    it('rejects placing an event card from hand onto the street (CG-0MSKU0BE5003I2ZD)', async () => {
+      const state = createTestState();
+      executeDayStart(state);
+
+      // Put an event card in the hand
+      state.hand = [{
+        family: 'event',
+        id: 'evt-place-guard',
+        name: 'Place Guard Event',
+        trigger: 'Investment',
+        effect: 'test',
+        target: 'All',
+        coinDelta: 0,
+        reputationDelta: 0,
+        cost: 0,
+      }];
+      const slot = findEmptySlot(state);
+      if (slot < 0) return;
+
+      const engine = await import('../../example-games/main-street/MainStreetEngine');
+      expect(() => (engine as any).placeFromHand(state, 0, slot)).toThrow(/Event cards cannot be placed/);
+      // The event must remain in hand and the slot must stay empty
+      expect(state.hand).toHaveLength(1);
+      expect(state.streetGrid[slot]).toBeNull();
+    });
+
+    it('rejects selling an event card from hand (CG-0MSKU0BE5003I2ZD)', async () => {
+      const state = createTestState();
+      executeDayStart(state);
+
+      state.hand = [{
+        family: 'event',
+        id: 'evt-sell-guard',
+        name: 'Sell Guard Event',
+        trigger: 'Investment',
+        effect: 'test',
+        target: 'All',
+        coinDelta: 0,
+        reputationDelta: 0,
+        cost: 0,
+      }];
+
+      const engine = await import('../../example-games/main-street/MainStreetEngine');
+      expect(() => (engine as any).sellFromHand(state, 0)).toThrow(/Event cards cannot be sold/);
+      expect(state.hand).toHaveLength(1);
+    });
+
+    it('reports illegal legality results for placing/selling an event card from hand (CG-0MSKU0BE5003I2ZD)', async () => {
+      const state = createTestState();
+      executeDayStart(state);
+
+      state.hand = [{
+        family: 'event',
+        id: 'evt-legality-guard',
+        name: 'Legality Guard Event',
+        trigger: 'Investment',
+        effect: 'test',
+        target: 'All',
+        coinDelta: 0,
+        reputationDelta: 0,
+        cost: 0,
+      }];
+      const slot = findEmptySlot(state);
+      if (slot < 0) return;
+
+      const engine = await import('../../example-games/main-street/MainStreetEngine');
+      const placeCheck = (engine as any).canPlaceFromHand(state, 0, slot);
+      expect(placeCheck.legal).toBe(false);
+      expect(placeCheck.reason).toContain('Event cards cannot be placed');
+
+      const sellCheck = (engine as any).canSellFromHand(state, 0);
+      expect(sellCheck.legal).toBe(false);
+      expect(sellCheck.reason).toContain('Event cards cannot be sold');
+    });
   });
 });
