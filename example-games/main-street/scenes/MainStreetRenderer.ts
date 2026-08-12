@@ -1403,32 +1403,11 @@ export class MainStreetRenderer {
     const hand = s.state.hand ?? [];
     this.handView.setCards(hand);
 
-    // During an active transfer animation, hide the source card in the hand
-    // and render an empty placeholder so the hand layout doesn't shift.
-    // This mirrors the market-renderer pattern: when uiPhase is 'animating'
-    // and pendingHandIndex points to the card being moved to the street, we
-    // set its sprite alpha to 0 and draw a subtle rectangle in its slot.
-    if (s.uiPhase === 'animating' && s.pendingHandIndex !== null) {
-      const idx = s.pendingHandIndex;
-      const sprite = this.handView.getSpriteAt(idx);
-      if (sprite && 'setAlpha' in sprite) {
-        (sprite as any).setAlpha(0);
-      }
-      const basePos = this.handView.getBasePosition(idx);
-      if (basePos) {
-        const placeholder = s.add.rectangle(
-          basePos.x,
-          basePos.y,
-          s.layout.handCardW,
-          s.layout.handCardH,
-          0x222211,
-          0.3,
-        );
-        placeholder.setStrokeStyle(1, 0x333322);
-        placeholder.setDepth(idx);
-        s.handContainer.add(placeholder);
-      }
-    }
+    // Transfer-animation hiding is handled in the hand renderCard callback
+    // via hiddenTransferSourceCardIds (see above) — the old alpha=0 branch
+    // here was dead code: pendingHandIndex is nulled before refreshAll() in
+    // onSlotClick, so uiPhase==='animating' && pendingHandIndex!==null never
+    // held (CG-0MSOKUOUE005LQFZ audit AC3).
 
     // Restore selection highlight when in placing-from-hand phase
     if (s.uiPhase === 'placing-from-hand' && s.pendingHandIndex !== null) {
