@@ -660,8 +660,8 @@ describe('MainStreetMarket', () => {
       const uniqueTemplateIds = new Set(
         state.decks.event.map(e => e.id.replace(/-\d+$/, '')),
       );
-      // 45 = 37 + 8 Group C investment events
-      expect(uniqueTemplateIds.size).toBe(45);
+      // 55 = 37 + 8 Group C investment events + 10 Group D incidents
+      expect(uniqueTemplateIds.size).toBe(55);
     });
   });
 });

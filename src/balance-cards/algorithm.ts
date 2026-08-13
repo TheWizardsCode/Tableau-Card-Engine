@@ -185,6 +185,9 @@ export function assignTierBands(
 
 // ── Cost spread enforcement ────────────────────────────────────────────
 // Ensures no single cost value exceeds 1/3 of cards in a family.
+// Incident-trigger events are excluded: they are free (cost 0) by design
+// (CG-0MSL0OP040043KKZ / Group D, CG-0MSQJ7QLM0076FTD) — spreading their
+// costs would make them purchasable and break the incident-balance system.
 
 function enforceCostSpread(
   rows: CsvRow[],
@@ -196,9 +199,10 @@ function enforceCostSpread(
 
   const threshold = Math.ceil(familyRows.length / 3);
 
-  // Count cost frequencies
+  // Count cost frequencies (incident events never count toward the spread).
   const freq = new Map<number, CsvRow[]>();
   for (const row of familyRows) {
+    if (row.family === 'event' && csvVal(row, 'trigger') === 'Incident') continue;
     const cost = parseFloat(csvVal(row, 'cost')) || 0;
     if (!freq.has(cost)) freq.set(cost, []);
     freq.get(cost)!.push(row);

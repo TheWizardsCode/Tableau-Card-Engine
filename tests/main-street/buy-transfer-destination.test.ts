@@ -135,6 +135,9 @@ const LAYOUT = {
 function createMockScene(): any {
   const phaser = createPhaserMock();
   const state = setupMainStreetGame({ seed: 'buy-transfer-dest' });
+  // Coin cushion so the seeded investments row always contains a purchasable
+  // event regardless of which cards the expanded pool draws.
+  state.resourceBank.coins = 100;
 
   // Merged hand — mirrors handView in MainStreetRenderer.
   const handView = new HandView(phaser, {

@@ -77,8 +77,8 @@ describe('Group C investment-event expansion: template count (AC1)', () => {
   const rng = createSeededRng(42);
   const deck = createEventDeck(1, undefined, rng, 1);
 
-  it('grows total event templates from 37 to exactly 45', () => {
-    expect(deck).toHaveLength(45);
+  it('grows total event templates (55 after Group D incidents)', () => {
+    expect(deck).toHaveLength(55);
   });
 
   it('grows investment-event templates from 13 to exactly 21', () => {
@@ -328,8 +328,8 @@ describe('Group C: existing negative income-multiplier (regression)', () => {
 describe('Group C: deck generation & balance guardrails (AC6)', () => {
   const rng = createSeededRng(42);
 
-  it('builds a 135-card event deck at the default 3 copies', () => {
-    expect(createEventDeck(3, undefined, createSeededRng(1), 1)).toHaveLength(135);
+  it('builds a 165-card event deck at the default 3 copies', () => {
+    expect(createEventDeck(3, undefined, createSeededRng(1), 1)).toHaveLength(165);
   });
 
   it('includes every new card in a 1-copy (template) deck', () => {
@@ -352,8 +352,10 @@ describe('Group C: deck generation & balance guardrails (AC6)', () => {
     }
   });
 
-  it('keeps the event cost spread within the 1/3 rule', () => {
-    const events = getCsvRows().filter(r => r.family === 'event');
+  it('keeps the non-incident event cost spread within the 1/3 rule', () => {
+    // Incident events are free (cost 0) by design and excluded from the cost
+    // spread (see src/balance-cards/algorithm.ts enforceCostSpread).
+    const events = getCsvRows().filter(r => r.family === 'event' && r.trigger !== 'Incident');
     const threshold = Math.ceil(events.length / 3);
     const freq = new Map<number, number>();
     for (const r of events) {

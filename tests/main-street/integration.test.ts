@@ -204,11 +204,13 @@ describe('Integration: Full Game', () => {
 
     const { totalTurns: _totalTurns } = playFullGame(state);
 
-    // With high starting resources and reputation, the game ends via the
-    // score threshold (default presets impose no turn limit, so
-    // turn_limit_victory is not reachable — CG-0MSLXJCHH001DLIO).
+    // With high starting resources and reputation, the game reaches a win
+    // (default presets impose no turn limit, so turn_limit_victory is not
+    // reachable — CG-0MSLXJCHH001DLIO). The specific win path is
+    // seed-dependent: score_threshold or all_challenges (the expanded
+    // incident pool shifts challenge-completion timing).
     expect(state.gameResult).toBe('win');
-    expect(state.endReason).toBe('score_threshold');
+    expect(['score_threshold', 'all_challenges']).toContain(state.endReason);
   });
 
   it('ends in bankruptcy when coins go below 0', () => {

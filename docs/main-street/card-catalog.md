@@ -12,7 +12,7 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
 | Family        | Templates | Copies each | Total cards |
 |---------------|-----------|-------------|-------------|
 | Business      | 30        | 3           | 90          |
-| Event         | 45        | 3           | 135         |
+| Event         | 55        | 3           | 165         |
 | Upgrade       | 27        | 2           | 54          |
 | Community Space | 8       | 3           | 24          |
 | Staff         | 3         | 3           | 9           |
@@ -24,11 +24,11 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
 | Snapshot | Business | Event | Upgrade | Community Space | Staff | Total templates |
 |---|---:|---:|---:|---:|---:|---:|
 | Tier 1 baseline (`docs/main-street/card-catalog-baseline.json`) | 6 | 6 | 8 | — | — | 20 |
-| Current catalog (`card-data.csv`) | 30 | 45 | 27 | 8 | 3 | 113 |
-| Net increase | +24 | +39 | +19 | +8 | +3 | +93 |
+| Current catalog (`card-data.csv`) | 30 | 55 | 27 | 8 | 3 | 123 |
+| Net increase | +24 | +49 | +19 | +8 | +3 | +103 |
 
 - 2x target from baseline: `>= 40` templates
-- Current total: `113` templates (`5.65x` baseline)
+- Current total: `123` templates (`6.15x` baseline)
 - Business family grew from 18 to 30 with the Group A expansion (CG-0MSQJ1XIB0004QVN):
   12 new cards including the first Health bridge cards (Juice Bar, Yoga Studio,
   Physiotherapy), mid-tier (T2/T3) singles, and the T5 Grand Hotel flagship.
@@ -40,6 +40,10 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
   8 new Investment events (investment events 13 → 21) covering every synergy,
   plus two NEW duration effect types — positive `income-multiplier` (Tourist
   Season 1.15×/3 turns) and `rep-multiplier` (Community Renovation 1.2×/4 turns).
+- Incident events grew from 24 to 34 with the Group D expansion (CG-0MSQJ7QLM0076FTD):
+  10 new incidents (4 good / 3 bad / 3 neutral under the streak system's net-delta
+  formula) covering under-served synergies, including the duration incident
+  Labor Shortage (income-multiplier 0.9×/3 turns).
 - Non-baseline card IDs are tracked in `docs/main-street/expanded-card-manifest.json`
 
 ### Guidance: adding more cards safely
