@@ -137,7 +137,8 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
           expect(typeof tpl.cost).toBe('number');
           expect(typeof tpl.handSlotsAdded).toBe('number');
           expect(tpl.handSlotsAdded).toBeGreaterThanOrEqual(1);
-          expect(tpl.handSlotsAdded).toBeLessThanOrEqual(3);
+          // 4 = Executive premium slot capacity (Group F, CG-0MSQJ7VL9009JHF4).
+          expect(tpl.handSlotsAdded).toBeLessThanOrEqual(4);
 
           // ongoingCost should exist (0 is acceptable for cheap staff)
           expect(typeof tpl.ongoingCost).toBe('number');

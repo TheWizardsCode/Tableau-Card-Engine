@@ -251,6 +251,6 @@ describe('Group A business expansion: balance guardrails (AC4)', () => {
     expect(createCommunitySpaceDeck(1).length).toBe(8); // +6 Group B community-space cards
     expect(createEventDeck(1, undefined, createSeededRng(42), 1).length).toBe(55); // +8 Group C, +10 Group D
     expect(createUpgradeDeck(1).length).toBe(39); // +12 Group E upgrades
-    expect(createStaffDeck(1).length).toBe(3);
+    expect(createStaffDeck(1).length).toBe(7); // +4 Group F staff
   });
 });

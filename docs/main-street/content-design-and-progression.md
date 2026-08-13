@@ -98,6 +98,20 @@ Community-space cards are placed on the street grid like businesses but generate
 
 ---
 
+### 1.4 Staff Cards
+
+Staff cards expand hand capacity at an ongoing per-turn coin cost. *(Group F, CG-0MSQJ7VL9009JHF4, grew this family from 3 to 7 cards.)*
+
+| Name | Cost | Ongoing/turn | Slots+ | Ability | Description |
+|------|------|--------------|--------|---------|-------------|
+| Apprentice | 2 | 0.5 | +1 | — | A budget hire who frees up a hand slot. *(Group F.)* |
+| Assistant | 3 | 1 | +1 | — | Hire an assistant to help manage your hand. |
+| Manager | 7 | 2.5 | +2 | — | A skilled manager keeps things organised. |
+| Socialite | 8 | 1.5 | +1 | +0.1 rep/turn | A charming socialite adds hand capacity and reputation. *(Group F.)* |
+| Accountant | 8 | 1.5 | +1 | refresh −1 | Makes investment refreshes cost 1 less. *(Group F.)* |
+| Director | 14 | 4 | +3 | — | An experienced director oversees your operations. |
+| Executive | 20 | 5 | +4 | — | An experienced executive adds major hand capacity. *(Group F.)* |
+
 ## 2. Recipes / Blueprints
 
 Main Street does **not** feature crafting or combination mechanics. The game revolves around purchasing, placing, and upgrading business cards. Therefore, the **Recipes / Blueprints** section is **N/A** for this title.

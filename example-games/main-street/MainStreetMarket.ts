@@ -342,10 +342,25 @@ export function canRefreshInvestments(state: MainStreetState): LegalityResult {
   if (state.phase !== 'MarketPhase') {
     return { legal: false, reason: 'Refresh investments is only allowed during MarketPhase.' };
   }
-  if (state.resourceBank.coins < REFRESH_INVESTMENTS_COST) {
-    return { legal: false, reason: `Not enough coins. Need ${REFRESH_INVESTMENTS_COST}, have ${state.resourceBank.coins}.` };
+  const cost = refreshInvestmentsCost(state);
+  if (state.resourceBank.coins < cost) {
+    return { legal: false, reason: `Not enough coins. Need ${cost}, have ${state.resourceBank.coins}.` };
   }
   return { legal: true };
+}
+
+/**
+ * Effective cost to refresh the investments row, after staff discounts
+ * (e.g. the Accountant's "refresh costs 1 less" ability — Group F,
+ * CG-0MSQJ7VL9009JHF4). Discounts are summed across hired staff and the
+ * result is clamped at 0 (never negative).
+ */
+export function refreshInvestmentsCost(state: MainStreetState): number {
+  const discount = (state.staffCards ?? []).reduce(
+    (sum, card) => sum + (card.refreshCostDiscount ?? 0),
+    0,
+  );
+  return Math.max(0, REFRESH_INVESTMENTS_COST - discount);
 }
 
 /**
@@ -357,8 +372,8 @@ export function refreshInvestments(state: MainStreetState): RefreshResult {
   const legality = canRefreshInvestments(state);
   if (!legality.legal) throw new Error(legality.reason);
 
-  // Deduct cost
-  state.resourceBank.coins -= REFRESH_INVESTMENTS_COST;
+  // Deduct cost (after staff refresh discounts, e.g. Accountant)
+  state.resourceBank.coins -= refreshInvestmentsCost(state);
 
   // Move visible investment cards to discard piles
   const removed: AnyCard[] = state.market.investments.slice();

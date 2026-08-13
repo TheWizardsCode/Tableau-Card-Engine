@@ -665,6 +665,11 @@ export function applyIncome(state: MainStreetState): IncomeResult {
     if (!card) continue;
     repPerTurn += card.currentReputationPerTurn ?? 0;
   }
+  // Staff reputation abilities (e.g. the Socialite's +0.1 rep/turn —
+  // Group F, CG-0MSQJ7VL9009JHF4) also accrue during the income phase.
+  for (const staff of state.staffCards ?? []) {
+    repPerTurn += staff.reputationPerTurn ?? 0;
+  }
   // Apply active effect rep modifiers (e.g. Community Renovation's
   // rep-multiplier 1.2x — Group C, CG-0MSQJ244M0055X7S). Multipliers are
   // composed multiplicatively, matching the income-multiplier behaviour.

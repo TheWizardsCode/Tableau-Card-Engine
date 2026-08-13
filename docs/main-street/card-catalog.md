@@ -15,7 +15,7 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
 | Event         | 55        | 3           | 165         |
 | Upgrade       | 39        | 2           | 78          |
 | Community Space | 8       | 3           | 24          |
-| Staff         | 3         | 3           | 9           |
+| Staff         | 7         | 3           | 21          |
 
 **Synergy types:** Food, Culture, Commerce, Service (M2), Entertainment (M2), Health (M2)
 
@@ -24,11 +24,11 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
 | Snapshot | Business | Event | Upgrade | Community Space | Staff | Total templates |
 |---|---:|---:|---:|---:|---:|---:|
 | Tier 1 baseline (`docs/main-street/card-catalog-baseline.json`) | 6 | 6 | 8 | — | — | 20 |
-| Current catalog (`card-data.csv`) | 30 | 55 | 39 | 8 | 3 | 135 |
-| Net increase | +24 | +49 | +31 | +8 | +3 | +115 |
+| Current catalog (`card-data.csv`) | 30 | 55 | 39 | 8 | 7 | 139 |
+| Net increase | +24 | +49 | +31 | +8 | +7 | +119 |
 
 - 2x target from baseline: `>= 40` templates
-- Current total: `135` templates (`6.75x` baseline)
+- Current total: `139` templates (`6.95x` baseline)
 - Business family grew from 18 to 30 with the Group A expansion (CG-0MSQJ1XIB0004QVN):
   12 new cards including the first Health bridge cards (Juice Bar, Yoga Studio,
   Physiotherapy), mid-tier (T2/T3) singles, and the T5 Grand Hotel flagship.
@@ -49,6 +49,10 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
   (targets raised to maxLevel 1 so the upgrades are applicable), including
   reputation-bonus upgrade variants (Tea Lounge, Adventure Park, Orchard,
   Grand Fountain, Health Center).
+- Staff grew from 3 to 7 with the Group F expansion (CG-0MSQJ7VL9009JHF4):
+  Apprentice (budget) and Executive (+4 slots premium) cost points, plus two
+  NEW ability mechanics — the Socialite's +0.1 rep/turn and the Accountant's
+  investments-refresh discount of 1 (StaffCard optional ability fields).
 - Non-baseline card IDs are tracked in `docs/main-street/expanded-card-manifest.json`
 
 ### Guidance: adding more cards safely
@@ -430,3 +434,18 @@ This writes per-run and aggregate metrics to:
 - **[Balancing Methodology](balancing-methodology.md)** — Technical description of the `run-balance-cards` balancing algorithm.
 - **[Monte Carlo Sample Results](monte-carlo-sample-results.md)** — Example output from the Monte Carlo simulation harness.
 - **[Playtest Scenarios](playtest-scenarios.md)** — Curated deterministic seeds for manual balance validation.
+
+
+## Staff Cards
+
+Staff cards are a separate card family (`family: 'staff'`) that expand hand capacity at an ongoing per-turn coin cost. They do not occupy hand slots, have no tier, and are purchased from a dedicated staff-card market.
+
+| ID | Name | Cost | Ongoing/turn | Slots+ | Ability | Description | Rationale |
+|----|------|------|--------------|--------|---------|-------------|-----------|
+| `staff-apprentice` | Apprentice | 2 | 0.5 | +1 | — | A budget hire who frees up a hand slot with a small ongoing cost. | Budget entry point *(Group F).* |
+| `staff-assistant` | Assistant | 3 | 1 | +1 | — | Hire an assistant to help manage your hand. | Original M2 staff. |
+| `staff-manager` | Manager | 7 | 2.5 | +2 | — | A skilled manager keeps things organised. | Mid-tier capacity. |
+| `staff-socialite` | Socialite | 8 | 1.5 | +1 | +0.1 rep/turn | A charming socialite adds +1 hand slot and +0.1 reputation per turn. | **NEW** reputation ability *(Group F).* |
+| `staff-accountant` | Accountant | 8 | 1.5 | +1 | Refresh −1 | A meticulous accountant makes investment refreshes cost 1 less. | **NEW** economy ability *(Group F).* |
+| `staff-director` | Director | 14 | 4 | +3 | — | An experienced director oversees your operations. | Premium capacity. |
+| `staff-executive` | Executive | 20 | 5 | +4 | — | An experienced executive adds major hand capacity at a high ongoing cost. | Premium slot capacity *(Group F).* |

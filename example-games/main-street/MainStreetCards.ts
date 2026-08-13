@@ -201,6 +201,8 @@ function rebuildTemplateArrays(rows: Record<string, string>[]): void {
       ongoingCost: Number(r.ongoingCost) || 0,
       handSlotsAdded: Number(r.handSlotsAdded) || 0,
       description: r.description,
+      reputationPerTurn: r.reputationPerTurn ? Number(r.reputationPerTurn) : undefined,
+      refreshCostDiscount: r.refreshCostDiscount ? Number(r.refreshCostDiscount) : undefined,
     });
   }
 }
@@ -393,6 +395,18 @@ export interface StaffCard {
   readonly ongoingCost: number;
   readonly handSlotsAdded: number;
   readonly description: string;
+  /**
+   * Optional reputation granted per turn during the income phase
+   * (e.g. the Socialite's +0.1 rep/turn ability — Group F,
+   * CG-0MSQJ7VL9009JHF4).
+   */
+  readonly reputationPerTurn?: number;
+  /**
+   * Optional flat coin discount applied to each investment-row refresh
+   * (e.g. the Accountant's "refresh costs 1 less" ability — Group F,
+   * CG-0MSQJ7VL9009JHF4).
+   */
+  readonly refreshCostDiscount?: number;
 }
 
 /** Union of all card types in Main Street. */
