@@ -1317,6 +1317,23 @@ export class MainStreetRenderer {
     return container;
   }
 
+  /**
+   * Centre of the front incident-queue card, mirroring `refreshIncidentQueue`
+   * layout math (panel title 22px + 8px pad, card centred horizontally in
+   * the panel). Used as the origin of the incident-reveal flight.
+   * Keep in sync with `refreshIncidentQueue` if the queue layout changes.
+   */
+  public getFrontIncidentCardCenter(): { x: number; y: number } {
+    const s = this.scene;
+    const { logX, logW, queueTop, queueCardH } = s.layout;
+    const titleH = 22; // mirrors refreshIncidentQueue
+    const pad = 8;     // mirrors refreshIncidentQueue
+    return {
+      x: logX + logW / 2,
+      y: queueTop + titleH + pad + queueCardH / 2,
+    };
+  }
+
   public refreshIncidentQueue(): void {
     const s = this.scene;
     s.incidentQueueContainer.removeAll(true);

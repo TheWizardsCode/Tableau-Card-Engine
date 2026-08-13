@@ -95,6 +95,10 @@ export interface TurnResult {
   income: IncomeResult | null;
   /** Incident event drawn and resolved (if any). */
   incident: EventCard | null;
+  /** Net coin delta from the resolved incident (negative = loss). */
+  incidentCoinChange: number;
+  /** Net reputation delta from the resolved incident (negative = loss). */
+  incidentRepChange: number;
   /** Current game result after the turn. */
   gameResult: 'playing' | 'win' | 'loss';
   /** Current final score. */
@@ -627,6 +631,8 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
     return {
       income: null,
       incident: null,
+      incidentCoinChange: 0,
+      incidentRepChange: 0,
       gameResult: state.gameResult,
       finalScore: state.finalScore,
       newlyCompletedChallenges: [],
@@ -645,13 +651,21 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
 
   // Phase: IncidentPhase
   state.phase = 'IncidentPhase';
+  // Capture the incident's own resource deltas (negative = loss) for the
+  // incident-reveal presentation (dramatic sting + damage feedback).
+  const coinsBeforeIncident = state.resourceBank.coins;
+  const repBeforeIncident = state.resourceBank.reputation;
   const incident = resolveIncident(state);
+  const incidentCoinChange = state.resourceBank.coins - coinsBeforeIncident;
+  const incidentRepChange = state.resourceBank.reputation - repBeforeIncident;
 
   // Check for immediate loss after incident
   if (checkImmediateLoss(state)) {
     return {
       income,
       incident,
+      incidentCoinChange,
+      incidentRepChange,
       gameResult: state.gameResult,
       finalScore: state.finalScore,
       newlyCompletedChallenges: [],
@@ -687,6 +701,8 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
   return {
     income,
     incident,
+    incidentCoinChange,
+    incidentRepChange,
     gameResult: state.gameResult,
     finalScore: state.finalScore,
     newlyCompletedChallenges,

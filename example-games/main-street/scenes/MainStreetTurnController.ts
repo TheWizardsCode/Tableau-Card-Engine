@@ -241,6 +241,26 @@ export class MainStreetTurnController {
           s.instructionText.setText(`Incident: ${result.incident.name}`);
         }
         s.refreshAll();
+        // Incident reveal presentation (AGENTS.md rule 8): non-blocking VFX —
+        // the resolved incident card flies from the Upcoming queue to the
+        // board centre with a red flash pulse, warning sting SFX, explicit
+        // HUD loss pops and a warning-indicator pulse. Runs after the final
+        // render; reduced-motion keeps the pops + sound, replay/headless
+        // skips everything (handled inside the animator). Never blocks the
+        // turn advance.
+        if (result.incident) {
+          try {
+            s.msAnimator.animateIncidentReveal({
+              cardId: result.incident.id,
+              incidentName: result.incident.name,
+              coinChange: result.incidentCoinChange,
+              repChange: result.incidentRepChange,
+              from: s.msRenderer.getFrontIncidentCardCenter(),
+            });
+          } catch (_) {
+            // presentation-only — ignore
+          }
+        }
         // Tutorial: mark end-turn step complete if active
         (s.msLifecycleManager as any).onTutorialActionComplete?.('end-turn' as TutorialActionType);
         s.time.delayedCall(800, () => this.startDayPhase());

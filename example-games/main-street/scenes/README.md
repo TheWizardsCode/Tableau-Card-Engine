@@ -10,6 +10,10 @@ This folder uses reusable UI helpers from `src/ui`:
   (day-start refill and Discover/Research row swaps: incoming cards deal in
   with a staggered deal SFX; outgoing row cards fade/shrink out).
   Triggered by `MainStreetTurnController` after the final market render.
+- `MainStreetAnimator.animateMarketDealIn` for the market deal-in animation
+  (day-start refill and Discover/Research row swaps: incoming cards deal in
+  with a staggered deal SFX; outgoing row cards fade/shrink out).
+  Triggered by `MainStreetTurnController` after the final market render.
 
 ## End-of-turn income collection
 
@@ -22,6 +26,21 @@ counter, and a final `+total` pop lands when collection completes. See
 
 - Reduced motion: flights skipped; the HUD refresh shows the single final
   pop + income sound.
+
+## Incident reveal presentation
+
+`MainStreetAnimator.animateIncidentReveal({ cardId, incidentName, coinChange,
+repChange, from })` animates an end-of-turn incident resolution: a snapshot
+card visual flies from the Upcoming queue to the board centre, a brief red
+flash pulses, the warning sting plays (`sfx-income-negative`), the incident's
+coin/rep losses pop on the HUD, and the ⚠ active-effects indicator pulses
+once. The resource deltas come from `TurnResult.incidentCoinChange` /
+`incidentRepChange` (surfaced by `processEndOfTurn`). Triggered by
+`MainStreetTurnController.endTurn()`; see
+`docs/main-street/ux-visual-audio.md` for the design notes.
+
+- Reduced motion: sting + HUD loss pops retained; flight, flash, and
+  indicator pulse skipped.
 - Replay/headless: returns immediately (documented exemption, AGENTS.md
   rule 8) — presentation-only, never mutates state or transcript.
 

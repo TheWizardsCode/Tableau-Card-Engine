@@ -396,6 +396,144 @@ export class MainStreetAnimator {
     });
   }
 
+  /**
+   * Animates the end-of-turn incident reveal: a dramatic sting with damage
+   * feedback so the most negative event in the game reads clearly.
+   *
+   * Full effect (reduced-motion OFF):
+   * 1. A snapshot card visual flies from the front incident-queue slot to
+   *    the centre of the board (`createTransferCardVisual`, event family).
+   * 2. A brief, subtle red vignette flash pulses over the scene.
+   * 3. The warning sting SFX (`SFX_KEYS.INCOME_NEGATIVE`) plays.
+   * 4. The incident's coin/reputation loss pops on the HUD with
+   *    negative-colour `popTextOrIcon` (explicit, so the deltas are visible
+   *    even while the income-collection animation suppresses the generic
+   *    HUD delta pop).
+   * 5. The active-effects warning indicator (⚠ lines in the Upcoming panel)
+   *    pulses once.
+   *
+   * Accessibility (reduced motion): the flight, flash, and indicator pulse
+   * are skipped, but the warning SFX and the HUD loss pops are retained
+   * (AC3 — "keep the pop text + sound").
+   *
+   * Headless/replay exemption (AGENTS.md rule 8): presentation-only effect;
+   * returns immediately in replay/headless mode (`scene.replayMode`) — no
+   * rendering, no audio. Never mutates game state or the transcript, and
+   * never blocks the turn flow (fire-and-forget tweens).
+   *
+   * @param params  Resolved incident (card id/name), its resource deltas
+   *                (negative = loss) and the queue origin for the flight.
+   */
+  public animateIncidentReveal(params: {
+    cardId: string;
+    incidentName: string;
+    /** Net coin delta from the incident (negative = loss). */
+    coinChange: number;
+    /** Net reputation delta from the incident (negative = loss). */
+    repChange: number;
+    /** Origin of the flight: the front incident-queue card centre. */
+    from: { x: number; y: number };
+  }): void {
+    const s = this.scene;
+
+    // Headless/replay exemption: no rendering or audio in those modes.
+    if (s.replayMode) return;
+    const reducedMotion = s.settingsPanel?.reducedMotion === true;
+
+    // 3. Warning sting — retained under reduced motion (AC3).
+    try { s.soundManager?.play(SFX_KEYS.INCOME_NEGATIVE); } catch (_) { /* ignore */ }
+
+    if (!reducedMotion) {
+      // 1. Flight from the queue to the board centre.
+      const to = { x: s.layout.gameW / 2, y: s.layout.gameH / 2 };
+      const visual = this.createTransferCardVisual(params.cardId, 'event', params.from.x, params.from.y);
+      s.tweens.add({
+        targets: visual,
+        x: to.x,
+        y: to.y,
+        scaleX: 1.12,
+        scaleY: 1.12,
+        duration: 550,
+        ease: 'Quad.easeOut',
+        onComplete: () => {
+          visual.destroy();
+        },
+      });
+
+      // 2. Red vignette flash pulse (subtle, brief). Sits above the
+      // gameplay containers (depth 95) and below the HUD (1000+).
+      const flash = s.add.rectangle(to.x, to.y, s.layout.gameW, s.layout.gameH, 0xff2222, 1)
+        .setDepth(95)
+        .setAlpha(0);
+      s.tweens.add({
+        targets: flash,
+        alpha: 0.22,
+        duration: 130,
+        yoyo: true,
+        hold: 80,
+        onComplete: () => {
+          flash.destroy();
+        },
+      });
+
+      // 5. Active-effects warning indicator pulses once.
+      this.pulseActiveEffectsIndicator();
+    }
+
+    // 4. Explicit HUD loss pops for the incident's resource deltas.
+    const hudY = s.layout.hudY;
+    const coinX = s.layout.gameW * 0.25 + 70;  // mirrors refreshHud strip geometry
+    const repX = s.layout.gameW * 0.5;
+    const popLoss = (x: number, delta: number): void => {
+      if (delta === 0) return;
+      const text = s.add.text(x, hudY - 6, `${delta > 0 ? '+' : ''}${delta}`, {
+        fontSize: '16px',
+        fontStyle: 'bold',
+        color: delta < 0 ? '#ff7777' : '#ffdd66',
+        fontFamily: FONT_FAMILY,
+      }).setOrigin(0.5).setDepth(500);
+      void popTextOrIcon({
+        scene: s,
+        target: text,
+        duration: 1500,
+        riseY: 22,
+        scale: 1.2,
+        reducedMotion,
+      });
+    };
+    popLoss(coinX, params.coinChange);
+    popLoss(repX, params.repChange);
+  }
+
+  /**
+   * Pulses the ⚠ active-effects warning indicator texts in the Upcoming
+   * panel once (quick scale yoyo) to draw the eye to ongoing modifiers.
+   * No-op when no active effects are rendered. Presentation-only.
+   */
+  private pulseActiveEffectsIndicator(): void {
+    const s = this.scene;
+    const warnChar = String.fromCodePoint(0x26A0);
+    const list = s.incidentQueueContainer?.list ?? [];
+    for (const obj of list) {
+      const textObj = obj as { type?: string; text?: string; scaleX?: number; scaleY?: number; setScale?: (x: number, y?: number) => void };
+      if (textObj.type === 'Text' && typeof textObj.text === 'string' && textObj.text.startsWith(warnChar)) {
+        const baseScaleX = textObj.scaleX ?? 1;
+        const baseScaleY = textObj.scaleY ?? 1;
+        s.tweens.add({
+          targets: textObj,
+          scaleX: 1.5,
+          scaleY: 1.5,
+          duration: 120,
+          yoyo: true,
+          hold: 60,
+          onComplete: () => {
+            textObj.setScale?.(baseScaleX, baseScaleY);
+          },
+        });
+      }
+    }
+  }
+
   public getMarketCardCenter(row: 'development' | 'investments', slotIndex: number): { x: number; y: number } | null {
     const s = this.scene;
     if (slotIndex < 0) return null;

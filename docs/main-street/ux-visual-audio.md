@@ -89,6 +89,33 @@ void popTextOrIcon({
 - Headless/replay exemption: returns immediately in replay/headless mode
   (`replayMode`) — presentation-only, never mutates game state or the
   transcript, and never blocks the turn flow.
+### Incident reveal (dramatic sting + damage feedback)
+
+- Helper: `MainStreetAnimator.animateIncidentReveal()`.
+- Trigger: `MainStreetTurnController.endTurn()` when `TurnResult.incident` is
+  non-null (after the final render, inside the existing turn-advance window).
+- Resource deltas: `processEndOfTurn` now surfaces the incident's own coin /
+  reputation deltas on `TurnResult` (`incidentCoinChange` /
+  `incidentRepChange`), captured around `resolveIncident()`.
+- Behavior (reduced-motion OFF):
+  1. A snapshot card visual (`createTransferCardVisual`, event family) flies
+     from the front incident-queue card centre
+     (`MainStreetRenderer.getFrontIncidentCardCenter()`) to the board centre.
+  2. A brief, subtle red vignette flash pulses over the scene (depth 95,
+     alpha 0.22 yoyo).
+  3. The warning sting SFX plays — reused `SFX_KEYS.INCOME_NEGATIVE`
+     (`sfx-income-negative`); no new SFX key (ToneForge pipeline untouched).
+  4. The incident's coin/reputation losses pop explicitly on the HUD with
+     negative-colour `popTextOrIcon` (visible even while the income-collection
+     animation suppresses the generic HUD delta pop).
+  5. The ⚠ active-effects warning indicator in the Upcoming panel pulses once.
+- Accessibility (reduced motion): flight, flash, and indicator pulse are
+  skipped; the warning sting SFX and the HUD loss pops are retained.
+- Headless/replay exemption (AGENTS.md rule 8): presentation-only — returns
+  immediately in replay/headless mode (`scene.replayMode`), never mutates
+  state or transcript, never blocks the turn flow.
+- Reuse: `createTransferCardVisual` + `SoundManager` + `popTextOrIcon`;
+  no new engine infrastructure.
 
 ## Scene Transitions
 
