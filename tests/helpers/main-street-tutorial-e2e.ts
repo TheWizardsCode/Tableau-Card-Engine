@@ -580,6 +580,42 @@ function dispatchCanvasMouse(type: string, worldX: number, worldY: number): void
 }
 
 /**
+ * Dispatch a real pointer click at a street slot while a card is pending
+ * WITHOUT asserting that it was placed — used to verify illegal-placement
+ * rejection during the tutorial (e.g. T12: the Library must be built next
+ * to the Bookshop).
+ *
+ * Mirrors `clickStreetSlot`'s setup (placing phase + street-grid refresh +
+ * native mousedown/mouseup through Phaser's actual input pipeline) so the
+ * rejection path is exercised end-to-end. The caller asserts the resulting
+ * user-facing feedback (instruction message naming the synergy partner,
+ * slot still empty, card still in hand, tutorial step not advanced).
+ */
+export async function clickStreetSlotExpectRejected(
+  scene: Phaser.Scene,
+  slotIdx: number,
+): Promise<void> {
+  const s = scene as any;
+  if (s.pendingHandIndex === null && (s.state?.hand ?? []).length > 0) {
+    s.pendingHandIndex = 0;
+  }
+  s.uiPhase =
+    s.pendingHandIndex !== null ? 'placing-from-hand' : 'placing-business';
+  // Rebuild the street grid so the empty-slot rectangles are interactive
+  // with the correct phase (same rationale as clickStreetSlot).
+  try { s.refreshStreetGrid(); } catch { /* ignore */ }
+  await new Promise((r) => setTimeout(r, 100));
+
+  const center = s.getStreetSlotCenter(slotIdx);
+  dispatchCanvasMouse('mousedown', center.x, center.y);
+  await new Promise((r) => setTimeout(r, 120)); // separate frames, even under CI contention
+  dispatchCanvasMouse('mouseup', center.x, center.y);
+
+  // Let the rejection handler run and set the blocked-move feedback text.
+  await new Promise((r) => setTimeout(r, 300));
+}
+
+/**
  * End the current turn and advance the tutorial.
  */
 

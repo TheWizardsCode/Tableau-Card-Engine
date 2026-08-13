@@ -17,6 +17,7 @@ import {
   clickRequiredBusinessCard,
   clickRequiredEventCard,
   clickStreetSlot,
+  clickStreetSlotExpectRejected,
   clickEndTurn,
   saveScreenshot,
 } from '../helpers/main-street-tutorial-e2e';
@@ -138,5 +139,50 @@ describe('Main Street Tutorial E2E — T11-T12', () => {
     expect(getStepIndex(scene)).toBe(12); // T13 Triggering Events
     expect(s.state.streetGrid[5]?.id.startsWith('cs-library')).toBe(true);
     await saveScreenshot('t12-diagonal-t13');
+  }, 30_000);
+
+  it('T12: non-adjacent placement is rejected with feedback and does not soft-lock', async () => {
+    const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
+    await walkToT11(scene);
+    await clickEndTurn(scene);
+    await waitForOverlayVisible(10_000);
+    expect(getStepIndex(scene)).toBe(11);
+
+    const s = scene as any;
+    await clickRequiredBusinessCard(scene);
+    await waitForOverlayVisible(5_000);
+    expect(getStepIndex(scene)).toBe(11); // still T12
+    expect(s.state.hand.some((c: any) => c.id.startsWith('cs-library'))).toBe(true);
+
+    // Bookshop is at slot 1 (from T10). Slot 4 is EMPTY but neither
+    // orthogonally nor diagonally adjacent (Chebyshev distance 3) — the
+    // click must be rejected with the synergy-partner instruction message
+    // (blocked-move feedback, CG-0MSP26K6U001PXT8 AC-2).
+    expect(s.state.streetGrid[4]).toBeNull();
+    await clickStreetSlotExpectRejected(scene, 4);
+
+    // User-facing blocked-move feedback names the synergy partner card.
+    const start = Date.now();
+    while (
+      Date.now() - start < 5_000 &&
+      !String(s.instructionText?.text ?? '').includes('next to')
+    ) {
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    expect(String(s.instructionText?.text ?? '')).toContain('next to');
+
+    // No soft-lock regression: the slot stays empty, the Library stays in
+    // hand, and the tutorial is still on T12 so the player can retry.
+    expect(s.state.streetGrid[4]).toBeNull();
+    expect(s.state.hand.some((c: any) => c.id.startsWith('cs-library'))).toBe(true);
+    expect(getStepIndex(scene)).toBe(11);
+
+    // Retry on a valid DIAGONAL slot (7, Chebyshev neighbour of slot 1)
+    // completes T12 — proving the rejection did not break the flow.
+    await clickStreetSlot(scene, 7);
+    await waitForOverlayVisible(5_000);
+    expect(getStepIndex(scene)).toBe(12); // T13 Triggering Events
+    expect(s.state.streetGrid[7]?.id.startsWith('cs-library')).toBe(true);
+    await saveScreenshot('t12-reject-retry');
   }, 30_000);
 });
