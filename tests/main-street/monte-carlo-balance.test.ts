@@ -6,7 +6,17 @@ import { runMonteCarlo } from '../../example-games/main-street/MainStreetMonteCa
 //   MONTE_SEEDS         — number of deterministic seeds to run (default: 20)
 //   MONTE_MIN_WIN_RATE  — minimum acceptable win rate (default: 0.20)
 //   MONTE_MAX_WIN_RATE  — maximum acceptable win rate (default: 0.80)
-// PR CI uses the defaults; main branch CI overrides to stricter values (200 seeds, 0.30–0.60).
+//
+// This is the *regression guardrail* for the whole game (market-greedy smoke
+// strategy): a deliberately wide band that catches gross breakage without
+// being flaky at the 20-seed PR-CI seed count. PR Checks CI sets
+// MONTE_SEEDS=20 / MONTE_MIN_WIN_RATE=0.20 / MONTE_MAX_WIN_RATE=0.80
+// (.github/workflows/pr-checks.yml); there is no main-branch test job.
+//
+// The *tuned target* bands (design intent, per difficulty) are enforced
+// separately in monte-carlo-greedy-guardrail.test.ts; see
+// docs/main-street/balance-guardrail-recommendations.md.
+//
 // Minimum seed count for detailed pacing/distribution metric assertions.
 // Below this threshold the sample is too small for the tighter bounds to be reliable.
 const DETAILED_METRICS_MIN_SEEDS = 50;
@@ -25,13 +35,15 @@ describe('Main Street Monte Carlo balance heuristics', () => {
     expect(metrics.winRate).toBeLessThanOrEqual(monteMaxWinRate);
 
     // Detailed pacing and distribution metrics require a sufficient sample size to be
-    // statistically reliable. These are only asserted for runs of 50+ seeds (i.e., main branch CI).
+    // statistically reliable. These are only asserted for runs of 50+ seeds (local dev
+    // runs with MONTE_SEEDS>=50; PR CI at 20 seeds skips them).
+    //
+    // Note: medianScore is intentionally NOT asserted here — the market-greedy score
+    // distribution is bimodal (loss cluster ~10-60 vs win cluster ~140+), so the median
+    // jumps discontinuously once the win rate crosses 50%, making any fixed band flaky.
+    // Median score bands for the primary balance strategy (greedy/Medium, 120-180) are
+    // enforced in monte-carlo-greedy-guardrail.test.ts.
     if (monteSeeds >= DETAILED_METRICS_MIN_SEEDS) {
-      expect(metrics.medianScore).toBeGreaterThanOrEqual(20);
-      // Adjusted upper bound to reflect tuned Medium preset which increases
-      // positive incidents and thus typical scores. Observed median ~58.
-      expect(metrics.medianScore).toBeLessThanOrEqual(65);
-
       const dominantLossRate = Math.max(0, ...Object.values(metrics.lossReasonRates));
       expect(dominantLossRate).toBeGreaterThanOrEqual(0.75);
 

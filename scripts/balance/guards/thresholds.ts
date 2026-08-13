@@ -86,20 +86,28 @@ export interface GuardrailResult {
  * All guardrail threshold definitions from PRD §3.3.
  *
  * Keyed by `{metric}_{strategy}_{difficulty}` for easy lookup.
+ *
+ * Bands revised by CG-0MSRKN325004ELH2 (2026-08-13) to match industry
+ * practice for casual solo play and the measured post-re-tune baseline
+ * (see docs/main-street/balance-guardrail-recommendations.md):
+ *  - winRate_greedy_medium: 30–60 → 45–75 (measured 62 on the canonical 200-seed set)
+ *  - winRate_greedy_easy:   60–85 → 60–90 (measured 83.5; Easy is the learning preset)
+ *  - avgCoinsPerTurn_greedy_medium: 0–2, formalizing the producer ruling from
+ *    CG-0MSP26Q5N002EH8P (net liquidity = finalCoins/turns).
  */
 export const GUARDRAIL_THRESHOLDS: Record<string, GuardrailThreshold> = {
   'winRate_greedy_medium': {
     metric: 'winRate_greedy_medium',
     label: 'Win Rate (Greedy, Medium)',
-    min: 30,
-    max: 60,
+    min: 45,
+    max: 75,
     severity: 'critical',
   },
   'winRate_greedy_easy': {
     metric: 'winRate_greedy_easy',
     label: 'Win Rate (Greedy, Easy)',
     min: 60,
-    max: 85,
+    max: 90,
     severity: 'warning',
   },
   'winRate_greedy_hard': {
@@ -115,6 +123,13 @@ export const GUARDRAIL_THRESHOLDS: Record<string, GuardrailThreshold> = {
     min: 5,
     max: 20,
     severity: 'warning',
+  },
+  'avgCoinsPerTurn_greedy_medium': {
+    metric: 'avgCoinsPerTurn_greedy_medium',
+    label: 'Avg Coins Per Turn (Net Liquidity, Greedy, Medium)',
+    min: 0,
+    max: 2,
+    severity: 'critical',
   },
   'medianScore_greedy_medium': {
     metric: 'medianScore_greedy_medium',

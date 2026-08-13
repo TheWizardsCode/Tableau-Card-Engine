@@ -3,7 +3,7 @@
 **Work Item:** CG-0MRBDPFPH009Y8M0
 **Status:** IMPLEMENTED (Phase 2: Core Analysis Library)
 **Date:** 2026-07-23
-**Last Updated:** 2026-07-25 (Phase 2 implementation complete)
+**Last Updated:** 2026-08-13 (guardrail bands revised — see [balance-guardrail-recommendations.md](balance-guardrail-recommendations.md))
 
 > **Implementation Status:** Phase 2 (Core Analysis Library) is complete. The balance analysis library lives at `scripts/balance/` with the full API documented at `docs/main-street/balance-analysis-api.md`. See §10 for updated file paths.
 
@@ -128,16 +128,27 @@ The following guardrails define normal operating ranges. Values outside these ra
 
 | Metric | Strategy | Difficulty | Guardrail Range | Severity |
 |--------|----------|------------|-----------------|----------|
-| Win rate | Greedy | Medium | 30–60% | Critical |
-| Win rate | Greedy | Easy | 60–85% | Warning |
+| Win rate | Greedy | Medium | 45–75% | Critical |
+| Win rate | Greedy | Easy | 60–90% | Warning |
 | Win rate | Greedy | Hard | 15–40% | Warning |
 | Win rate | Random | Medium | 5–20% | Warning |
+| Avg coins per turn (net liquidity) | Greedy | Medium | 0–2 | Critical |
 | Median score | Greedy | Medium | 120–180 | Warning |
 | Avg turns | Greedy | Medium | 14–22 | Info |
 | Bankruptcy rate | Greedy | Medium | 40–70% of losses | Info |
 | Reputation collapse rate | Greedy | Medium | 20–40% of losses | Info |
 | Timeout rate | Greedy | Medium | < 15% of losses | Warning |
 | Gini coefficient (card usage) | Greedy | Medium | 0.3–0.6 | Info |
+
+> **Band revision (CG-0MSRKN325004ELH2, 2026-08-13):** the win-rate bands for
+> Greedy/Medium (30–60 → **45–75**) and Greedy/Easy (60–85 → **60–90**) were revised,
+> and the net-liquidity row (0–2, producer ruling from CG-0MSP26Q5N002EH8P) was
+> added. Rationale, measured baseline, and industry references:
+> [balance-guardrail-recommendations.md](balance-guardrail-recommendations.md).
+> These bands are the **tuned targets** (design intent) and are enforced by
+> `tests/main-street/monte-carlo-greedy-guardrail.test.ts`; catch-breakage
+> **regression** guardrails (baseline drift, wide smoke band) live in
+> `monte-carlo-guardrails.test.ts` and `monte-carlo-balance.test.ts`.
 
 ### 3.4 Decision Gate Definitions
 
@@ -381,8 +392,8 @@ For each strategy `s` in `{market-greedy, demo-greedy, greedy, random}` and diff
 **Data Sources:** Monte Carlo metrics output (already available in `MonteCarloMetrics.winRate`).
 
 **Interpretation:**
-- Greedy on Medium should be 30–60% (CI guardrail).
-- Greedy on Easy should be 60–85%.
+- Greedy on Medium should be 45–75% (critical guardrail; revised from 30–60% by CG-0MSRKN325004ELH2 — see [balance-guardrail-recommendations.md](balance-guardrail-recommendations.md)).
+- Greedy on Easy should be 60–90% (learning preset).
 - Greedy on Hard should be 15–40%.
 - Random should always be lower than Greedy (validates strategy quality).
 - If two strategies converge, the heuristic-based strategy may be degenerate.
@@ -404,7 +415,7 @@ metrics: median, mean, Q1, Q3, IQR, skewness, min, max, standardDeviation
 - Wide IQR (> 80 points) suggests high variance — strategy quality or card draw luck dominates.
 - Narrow IQR (< 40 points) suggests deterministic gameplay — tuning matters more than luck.
 - Positive skew (tail to the right) means a few blowout wins; negative skew means frequent near-wins with occasional collapses.
-- Median score for Greedy/Medium should be 120–180.
+- Median score for Greedy/Medium should be 120–180 (enforced in `monte-carlo-greedy-guardrail.test.ts`).
 
 **Feasibility:** Already available from existing Monte Carlo output. Just need distribution computation.
 
@@ -426,7 +437,7 @@ metrics: median, mean, Q1, Q3, IQR, skewness, min, max, standardDeviation
 
 **Interpretation (re-tuned by CG-0MSP26Q5N002EH8P, 2026-08-13):**
 - **Gross** average coins per turn (totalCoinsEarned/totalTurns) for Greedy/Medium: target range 4–8.
-- **Net** liquidity per turn (`avgCoinsPerTurn` = finalCoins/turns, the harness's focus metric): target range **0–2** (producer ruling). Measured values: 1.82 (25-turn harness) / 1.85 (60-turn baseline) on the re-tuned Medium preset (6 starting coins, 0.35 synergy/neighbor).
+- **Net** liquidity per turn (`avgCoinsPerTurn` = finalCoins/turns, the harness's focus metric): target range **0–2** (producer ruling; codified as a critical guardrail in §3.3 and enforced by `monte-carlo-greedy-guardrail.test.ts`). Measured values: 1.85 (60-turn baseline) on the re-tuned Medium preset (6 starting coins, 0.35 synergy/neighbor).
 - Bankruptcy rate should decline after turn 5 (early game is hardest).
 - At least 2 turns per run should have "can't afford anything" (decision tension).
 - Economy tightness index < 50 means players are cash-constrained most turns.
@@ -1060,7 +1071,7 @@ The current CSV schema is sufficient for all proposed metrics. The following cha
 |------|---------|---------------|
 | `example-games/main-street/MainStreetMonteCarlo.ts` | Core harness | `MonteCarloMetrics`, `MonteCarloRunSummary`, `MonteCarloResult`, `monteCarloStrategy` |
 | `scripts/monte-carlo.ts` | CLI entry point | `--runs`, `--seed-prefix`, `--strategy`, `--max-turns`, `--out`, `--csv-out` |
-| `tests/main-street/monte-carlo-guardrails.test.ts` | CI guardrail test | Asserts win rate for greedy/Medium within 30–60% range |
+| `tests/main-street/monte-carlo-guardrails.test.ts` | CI guardrail test | Asserts win-rate/coin drift vs committed baseline (Medium + per-difficulty matrix) |
 | `docs/main-street/monte-carlo-sample-results.md` | Docs | Sample results interpretation |
 
 ### 11.2 Card Data
@@ -1097,7 +1108,9 @@ The current CSV schema is sufficient for all proposed metrics. The following cha
 
 | File | Purpose |
 |------|---------|
-| `tests/main-street/monte-carlo-guardrails.test.ts` | CI guardrail test (win rate range assertions) |
+| `tests/main-street/monte-carlo-greedy-guardrail.test.ts` | CI guardrail test (per-difficulty design intent) |
+| `tests/main-street/monte-carlo-guardrails.test.ts` | CI guardrail test (win-rate/coin drift vs baseline) |
+| `tests/main-street/monte-carlo-balance.test.ts` | Balance heuristics test (wide smoke band, pacing) |
 | `tests/main-street/smoke-scenario.test.ts` | Smoke test with deterministic seed |
 
 ---

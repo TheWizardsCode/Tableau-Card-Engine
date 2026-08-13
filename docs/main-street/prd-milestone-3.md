@@ -514,6 +514,13 @@ The M2 Monte Carlo harness (`MainStreetMonteCarlo.ts`) runs 200 seeds x 25 turns
 - Win rate: 30-60% (market-greedy)
 - Median score: 120-180
 
+> **Superseded (CG-0MSRKN325004ELH2, 2026-08-13):** this milestone document's
+> balance targets are historical planning values. The current enforced guardrail
+> bands live in PRD §3.3 and
+> [balance-guardrail-recommendations.md](balance-guardrail-recommendations.md)
+> (greedy per difficulty: Easy 60-90%, Medium 45-75%, Hard 15-40%; net
+> liquidity 0–2; median score 120–180).
+
 ### 6.2 M3 Extension
 
 M3 adds the `random` and `greedy` AI strategies to the Monte Carlo harness:
@@ -557,6 +564,12 @@ The following targets validate M2's economy across difficulty presets:
 | Medium | Random | 5-20% | 60-120 | 15-25 |
 
 These targets are guidelines, not hard gates. If results fall outside ranges, they indicate areas for economy tuning rather than test failures. The Monte Carlo test suite should include a "CI guardrail" test that fails only if Greedy win rate on Medium is outside 20-80% (wide band to catch regressions, not tune balance).
+
+> **Implemented status (2026-08-13):** the guardrail suite now enforces the
+> per-difficulty tuned bands (`monte-carlo-greedy-guardrail.test.ts`), baseline
+> drift (`monte-carlo-guardrails.test.ts`), and a wide 20-80% regression smoke
+> band (`monte-carlo-balance.test.ts`). See
+> [balance-guardrail-recommendations.md](balance-guardrail-recommendations.md).
 
 > **See also:** The **[Balance Process & Tooling PRD](prd-balance-process-and-tooling.md)** extends this section with 7 micro-level and 8 macro-level metrics, CLI tools for structured balance analysis, and a baseline management strategy.
 

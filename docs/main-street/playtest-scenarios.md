@@ -177,23 +177,30 @@ The player opens with two Parks and two Cafes (Food+Culture bridges), creating a
 
 ## Balance Heuristics Checklist
 
+> **Updated 2026-08-13 (CG-0MSRKN325004ELH2).** This checklist predates the
+> difficulty presets; the win-rate/median-score heuristics below are superseded
+> by the per-difficulty design-intent bands enforced in the guardrail suite
+> (see [balance-guardrail-recommendations.md](balance-guardrail-recommendations.md)
+> and PRD §3.3).
+
 Use these heuristics when evaluating card changes or rule adjustments:
 
 ### Win Rate
 
-- **Target:** Greedy strategy should win 90-97% of games (currently ~96.5% over 200 seeds).
-- **If win rate drops below 85%:** Negative incidents may be too harsh; reduce coin penalties or incident frequency.
-- **If win rate exceeds 99%:** Consider increasing difficulty (lower starting coins, higher win threshold, more incidents).
+- **Target (design intent, greedy AI):** Easy 60-90%, Medium 45-75%, Hard 15-40%. Measured (200 seeds, 60 turns): Easy ~83.5%, Medium ~62%, Hard ~22%.
+- **If Medium drops below 45%** (or Hard below 15%): negative incidents may be too harsh; reduce coin penalties or incident frequency.
+- **If Easy exceeds 90%** (or Medium exceeds 75%): consider increasing difficulty (lower starting coins, higher win threshold, more incidents).
 
 ### Loss Vectors
 
-- **Bankruptcy** should account for ~50-60% of losses (currently ~57%).
-- **Reputation collapse** should account for ~30-40% of losses (currently ~29%).
-- **Timeout** (turn 20 without reaching 150) should be rare (~10% of losses).
+- **Bankruptcy** should dominate losses (~50-60%+ of losses; currently ~100% of greedy/Medium losses).
+- **Reputation collapse** should account for a meaningful share on harder presets (~30-40% target on Hard; currently ~8%).
+- **Timeout** (harness 60-turn cap) should be rare (< 15% of losses); currently 0% at 60 turns.
+  Note: turn limits are opt-in (CG-0MSLXJCHH001DLIO); presets impose no turn limit.
 
 ### Score Distribution
 
-- **Median score:** 160-170 range (with greedy strategy).
+- **Median score (greedy/Medium):** 120-180 band (PRD §3.3); measured ~153.
 - **Fast wins** (turn <= 10): ~30% of wins -- indicates strong early draws.
 - **Late wins** (turn >= 15): ~15% of wins -- indicates tough early game.
 
