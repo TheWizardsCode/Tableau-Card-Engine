@@ -76,6 +76,13 @@ export class MainStreetTurnController {
       .then(() => {
         try {
           s.refreshAll();
+          // Market deal-in animation: the final refresh is the one the player
+          // sees, so animate after it. Skipped on checkpoint resume
+          // (skipMarketRefill) where the market is preserved, not refilled.
+          if (!skipMarketRefill) {
+            this.animateMarketDealIn('development');
+            this.animateMarketDealIn('investments');
+          }
         } catch {
           // scene may be shutting down
         }
@@ -857,12 +864,17 @@ export class MainStreetTurnController {
     s.instructionText.setText('Discovering new development opportunities...');
     s.refreshAll();
 
+    // Capture the outgoing row before the command replaces it — the swap
+    // animation fades these cards out from their current slot positions.
+    const outgoingRow = s.state.market.development.slice();
+    let refreshed = false;
     try {
       const cmd = refreshDevelopmentCommand(s.state);
       s.undoManager.execute(cmd);
       try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'refresh-development' }, description: cmd.description }); } catch (_) {}
       s.instructionText.setText('Refreshed development');
       addLog(s.state, 'Refreshed development (via UI)', 'neutral');
+      refreshed = true;
     } catch (e) {
       console.error('[MS] RefreshDevelopment failed', e);
       s.instructionText.setText(`Error: ${(e as Error).message}`);
@@ -870,6 +882,8 @@ export class MainStreetTurnController {
 
     s.uiPhase = 'market';
     s.refreshAll();
+    // Market swap animation (only when the refresh actually succeeded).
+    if (refreshed) this.animateMarketSwap('development', outgoingRow);
   }
 
   public onRefreshInvestmentsClick(): void {
@@ -886,12 +900,17 @@ export class MainStreetTurnController {
     s.instructionText.setText('Refreshing investments...');
     s.refreshAll();
 
+    // Capture the outgoing row before the command replaces it — the swap
+    // animation fades these cards out from their current slot positions.
+    const outgoingRow = s.state.market.investments.slice();
+    let refreshed = false;
     try {
       const cmd = refreshInvestmentsCommand(s.state);
       s.undoManager.execute(cmd);
       try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'refresh-investments' }, description: cmd.description }); } catch (_) {}
       s.instructionText.setText('Refreshed investments');
       addLog(s.state, 'Refreshed investments (via UI)', 'neutral');
+      refreshed = true;
     } catch (e) {
       console.error('[MS] RefreshInvestments failed', e);
       s.instructionText.setText(`Error: ${(e as Error).message}`);
@@ -899,6 +918,50 @@ export class MainStreetTurnController {
 
     s.uiPhase = 'market';
     s.refreshAll();
+    // Market swap animation (only when the refresh actually succeeded).
+    if (refreshed) this.animateMarketSwap('investments', outgoingRow);
+  }
+
+  /**
+   * Deal-in animation for a market row refill (day start).
+   * Presentation-only; never throws (tween targets may be re-rendered away
+   * by a later refresh).
+   */
+  private animateMarketDealIn(row: 'development' | 'investments'): void {
+    const s = this.scene;
+    try {
+      s.msAnimator.animateMarketDealIn({
+        row,
+        cards: s.msRenderer.getMarketRowCards(row),
+      });
+    } catch (_) {
+      // presentation-only — ignore
+    }
+  }
+
+  /**
+   * Swap animation for a Discover/Research row replacement: outgoing cards
+   * (captured before the refresh) fade/shrink out from their old slots while
+   * the incoming row deals in. Presentation-only; never throws.
+   */
+  private animateMarketSwap(
+    row: 'development' | 'investments',
+    outgoingRow: Array<{ id: string; family: 'business' | 'community-space' | 'event' | 'upgrade' }>,
+  ): void {
+    const s = this.scene;
+    try {
+      s.msAnimator.animateMarketDealIn({
+        row,
+        cards: s.msRenderer.getMarketRowCards(row),
+        outgoing: outgoingRow.map((card, i) => ({
+          cardId: card.id,
+          family: card.family,
+          ...s.msRenderer.getMarketSlotCenter(row, i),
+        })),
+      });
+    } catch (_) {
+      // presentation-only — ignore
+    }
   }
 
   public onUpgradeCardClick(card: UpgradeCard): void {

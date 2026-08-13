@@ -6,6 +6,10 @@ This folder uses reusable UI helpers from `src/ui`:
 - `moveGameObject` for card transfer animations from market to street/hand
 - `attachSelection` + `createSingleSelectionManager` for persistent card selection highlights
 - `runSceneTransition` helper exists in `src/ui`, but scene fades are currently disabled in Main Street
+- `MainStreetAnimator.animateMarketDealIn` for the market deal-in animation
+  (day-start refill and Discover/Research row swaps: incoming cards deal in
+  with a staggered deal SFX; outgoing row cards fade/shrink out).
+  Triggered by `MainStreetTurnController` after the final market render.
 
 ## End-of-turn income collection
 

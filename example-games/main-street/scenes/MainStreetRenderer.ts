@@ -92,6 +92,12 @@ export class MainStreetRenderer {
   private dragDropRegistered = new Set<Phaser.GameObjects.Container>();
   /** Outline rectangles shown on empty street slots while a drag is active. */
   private dragHighlightRects = new Set<Phaser.GameObjects.Rectangle>();
+  /**
+   * Rendered market card containers per row ('development' | 'investments'),
+   * in slot order. Rebuilt on every refreshMarket; consumed by the market
+   * deal-in animation (`MainStreetAnimator.animateMarketDealIn`).
+   */
+  private marketRowCards = new Map<string, Phaser.GameObjects.Container[]>();
 
   constructor(private readonly scene: any) {}
 
@@ -841,6 +847,8 @@ export class MainStreetRenderer {
 
   public refreshMarket(): void {
     const s = this.scene;
+    // Rebuild the per-row card registry for the deal-in animation.
+    this.marketRowCards.clear();
     // Unregister market-card draggables before the containers are destroyed
     // so the drag-drop manager never holds stale game-object references.
     this.unregisterDragDraggables();
@@ -942,6 +950,9 @@ export class MainStreetRenderer {
       if (card && !s.hiddenTransferSourceCardIds.has(card.id)) {
         const cardObj = this.drawMarketCard(cx, y, card, onClick, rowKey, i);
         s.marketContainer.add(cardObj);
+        const rowCards = this.marketRowCards.get(rowKey) ?? [];
+        rowCards.push(cardObj);
+        this.marketRowCards.set(rowKey, rowCards);
       } else {
         // Empty slot
         const empty = s.add.rectangle(
@@ -1105,6 +1116,44 @@ export class MainStreetRenderer {
         // ignore UI errors in tests
       }
     }
+  }
+
+  /**
+   * Rendered market card containers for a row, in slot order.
+   *
+   * The containers are rebuilt by every `refreshMarket()`; call this AFTER
+   * the final refresh of a deal-in flow so the animation targets the
+   * currently-visible cards.
+   */
+  public getMarketRowCards(rowKey: 'development' | 'investments'): Phaser.GameObjects.Container[] {
+    return this.marketRowCards.get(rowKey) ?? [];
+  }
+
+  /**
+   * Centre of a market row slot, mirroring `drawMarketRow`'s layout math
+   * (devStartX / boxCenter centring, 4 dev slots + 3 investment slots).
+   *
+   * Used by the Discover/Research swap animation to place outgoing-card
+   * snapshot visuals at the positions the leaving cards were rendered.
+   * Keep in sync with `drawMarketRow` if the market layout changes.
+   */
+  public getMarketSlotCenter(
+    rowKey: 'development' | 'investments',
+    slotIndex: number,
+  ): { x: number; y: number } {
+    const s = this.scene;
+    const { marketTop, marketRowH, marketRowGap, logX, marketCardW, marketCardGap } = s.layout;
+    const boxCenter = (20 + logX - 20) / 2;
+    const rowMaxSlots = rowKey === 'development' ? MARKET_BUSINESS_SLOTS : MARKET_INVESTMENT_SLOTS;
+    const totalCardsW = rowMaxSlots * marketCardW + (rowMaxSlots - 1) * marketCardGap;
+    const startX = Math.round(boxCenter - totalCardsW / 2);
+    const rowTop = rowKey === 'development'
+      ? marketTop + 6
+      : marketTop + 6 + marketRowH + marketRowGap;
+    return {
+      x: startX + slotIndex * (marketCardW + marketCardGap) + marketCardW / 2,
+      y: rowTop + s.layout.marketCardH / 2,
+    };
   }
 
   public drawMarketCard(

@@ -62,6 +62,34 @@ void popTextOrIcon({
 - Reuse: `moveGameObject` + `SoundManager` + `popTextOrIcon`, `SFX_KEYS`
   (`COMMON_SFX_KEYS` convention); no new SFX keys or engine infrastructure.
 
+### Market deal-in (day-start refill / Discover / Research swap)
+
+- Helper: `MainStreetAnimator.animateMarketDealIn()`.
+- Trigger points (`MainStreetTurnController`):
+  - `startDayPhase()` — after the final (post-prewarm) market render, both
+    the development and investments rows deal in. Skipped on checkpoint
+    resume (`skipMarketRefill`), where the saved market is preserved.
+  - `onRefreshDevelopmentClick()` / `onRefreshInvestmentsClick()` — after a
+    successful Discover/Research, the outgoing row cards fade/shrink out from
+    their old slot positions (snapshot visuals via `createTransferCardVisual`)
+    while the incoming row deals in.
+- Behavior:
+  - Incoming cards enter a "dealt" state synchronously in the same frame as
+    the draw (scale 0.6, alpha 0.35, raised 24px — no flicker), then tween
+    to full size/opacity with a staggered 80ms launch per card.
+  - Each incoming card plays the shared deal SFX (`SFX_KEYS.DEAL`) via the
+    scene `SoundManager` at launch.
+  - Outgoing snapshots launch first (60ms stagger) and fade/shrink out over
+    300ms, then are destroyed.
+- Source positions: `MainStreetRenderer.getMarketSlotCenter()` mirrors
+  `drawMarketRow`'s layout math; the rendered cards themselves come from
+  `MainStreetRenderer.getMarketRowCards()` (rebuilt every `refreshMarket`).
+- Accessibility: animation is skipped when Reduced Motion is enabled (cards
+  appear instantly).
+- Headless/replay exemption: returns immediately in replay/headless mode
+  (`replayMode`) — presentation-only, never mutates game state or the
+  transcript, and never blocks the turn flow.
+
 ## Scene Transitions
 
 - Main Street scene-level fade transitions are currently disabled.

@@ -211,6 +211,7 @@ export class MainStreetAnimator {
    *                and per-slot reputation contributions (pip sources).
    */
   public animateIncomeCollection(params: {
+
     /** Income result from `processEndOfTurn` (pre-multiplier totals). */
     income: {
       total: number;
@@ -299,6 +300,99 @@ export class MainStreetAnimator {
     });
     params.repSources.forEach((slot, i) => {
       launch(this.getStreetSlotCenter(slot.slotIndex), { x: repX, y: hudY }, 'rep', (coinSources.length + i) * staggerMs);
+    });
+  }
+
+  /**
+   * Animates market cards dealing in after a refill (day start) or a
+   * Discover/Research row swap.
+   *
+   * Incoming cards start in a "dealt" state (small, faint, raised) and
+   * animate to full size/opacity with a staggered deal SFX
+   * (`SFX_KEYS.DEAL`). For row swaps, outgoing cards first fade/shrink out
+   * as lightweight snapshot visuals so the replacement feels like a swap
+   * rather than an instant cut.
+   *
+   * Accessibility (reduced motion): cards appear instantly (the current
+   * behaviour) — no transform is applied and nothing is scheduled.
+   *
+   * Headless/replay exemption (AGENTS.md rule 8): presentation-only effect;
+   * returns immediately in replay/headless mode (`scene.replayMode`), no
+   * rendering or audio. Never mutates game state or the transcript.
+   *
+   * Non-blocking: tweens are fire-and-forget; market interaction remains
+   * available (the dealt state is applied synchronously in the same frame
+   * as the draw, so no flicker).
+   *
+   * @param params  Row being animated, the rendered incoming card containers
+   *                (slot order), and optional outgoing-card snapshots.
+   */
+  public animateMarketDealIn(params: {
+    row: 'development' | 'investments';
+    /** Rendered card containers for the row, in slot order — these deal in. */
+    cards: Phaser.GameObjects.Container[];
+    /**
+     * Cards leaving the row (Discover/Research): snapshot visuals at their
+     * old slot positions fade/shrink out before the incoming cards deal in.
+     */
+    outgoing?: Array<{
+      cardId: string;
+      family: 'business' | 'community-space' | 'event' | 'upgrade';
+      x: number;
+      y: number;
+    }>;
+  }): void {
+    const s = this.scene;
+
+    // Headless/replay exemption: no rendering or audio in those modes.
+    if (s.replayMode) return;
+    // Reduced motion: cards appear instantly (current behaviour).
+    if (s.settingsPanel?.reducedMotion) return;
+
+    const { cards, outgoing } = params;
+    if (cards.length === 0 && (outgoing?.length ?? 0) === 0) return;
+
+    const outgoingStaggerMs = 60;
+    const incomingStaggerMs = 80;
+    const outgoingLeadMs = (outgoing?.length ?? 0) * outgoingStaggerMs;
+
+    // 1. Outgoing cards: snapshot visual fades/shrinks out (staggered).
+    outgoing?.forEach((o, i) => {
+      s.time.delayedCall(i * outgoingStaggerMs, () => {
+        const visual = this.createTransferCardVisual(o.cardId, o.family, o.x, o.y);
+        s.tweens.add({
+          targets: visual,
+          alpha: 0,
+          scaleX: 0.3,
+          scaleY: 0.3,
+          duration: 300,
+          ease: 'Cubic.easeIn',
+          onComplete: () => {
+            visual.destroy();
+          },
+        });
+      });
+    });
+
+    // 2. Incoming cards: dealt state now (same frame as the draw), then a
+    // staggered deal-in tween with the shared deal SFX.
+    cards.forEach((card, i) => {
+      const baseY = card.y;
+      card.setScale(0.6, 0.6);
+      card.setAlpha(0.35);
+      card.y = baseY - 24;
+      s.time.delayedCall(outgoingLeadMs + i * incomingStaggerMs, () => {
+        try { s.soundManager?.play(SFX_KEYS.DEAL); } catch (_) { /* ignore */ }
+        s.tweens.add({
+          targets: card,
+          y: baseY,
+          scaleX: 1,
+          scaleY: 1,
+          alpha: 1,
+          duration: 350,
+          ease: 'Back.easeOut',
+        });
+      });
     });
   }
 
