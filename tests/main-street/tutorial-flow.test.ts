@@ -147,17 +147,20 @@ describe('isSynergyAdjacentPlacement', () => {
     return grid as unknown as (BusinessCard | CommunitySpaceCard | null)[];
   };
 
-  it('returns true when the target slot is a Manhattan neighbor of the synergy card', () => {
-    // Bookshop (T12 synergyCardId) on slot 1. Neighbors: 0, 2 (same row), 6 (below).
+  it('returns true when the target slot is an 8-way neighbor of the synergy card', () => {
+    // Bookshop (T12 synergyCardId) on slot 1. 8-way neighbors: 0, 2 (same row),
+    // 5 (diagonal), 6, 7 (below) — CG-0MSP1HCAS00785MP Chebyshev adjacency.
     const grid = gridWith({ 1: 'biz-bookshop-0' });
     expect(isSynergyAdjacentPlacement(t12, grid, 2)).toBe(true);
     expect(isSynergyAdjacentPlacement(t12, grid, 6)).toBe(true);
+    expect(isSynergyAdjacentPlacement(t12, grid, 5)).toBe(true); // diagonal
+    expect(isSynergyAdjacentPlacement(t12, grid, 7)).toBe(true); // diagonal
   });
 
   it('rejects non-adjacent target slots', () => {
     const grid = gridWith({ 1: 'biz-bookshop-0' });
     expect(isSynergyAdjacentPlacement(t12, grid, 3)).toBe(false); // same row, distance 2
-    expect(isSynergyAdjacentPlacement(t12, grid, 5)).toBe(false); // distance 3
+    expect(isSynergyAdjacentPlacement(t12, grid, 8)).toBe(false); // Chebyshev distance 2
     expect(isSynergyAdjacentPlacement(t12, grid, 1)).toBe(false); // the synergy slot itself
   });
 

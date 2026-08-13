@@ -4,7 +4,7 @@
  * Implements the adjacency resolver for the 2x5 street grid
  * (stored as a 10-slot row-major array) and income computation
  * (base income + synergy bonuses). Upgrades can extend synergy
- * range beyond the default 1-cell Manhattan adjacency.
+ * range beyond the default 1-cell 8-way (Chebyshev) adjacency.
  *
  * @module
  */
@@ -27,8 +27,10 @@ import { applyActiveEffectMultiplier } from '../../src/core-engine/ActiveEffect'
  *   row 0: 0..4
  *   row 1: 5..9
  *
- * Default range is 1 (orthogonal neighbors at Manhattan distance 1).
- * Upgrades can extend this radius.
+ * Adjacency is 8-way (Chebyshev distance: max(|dx|, |dy|) <= range),
+ * so diagonally adjacent slots count at every range. Default range is 1
+ * (the 8 surrounding slots); upgrades extend this radius as larger
+ * 8-way squares.
  *
  * @param index  The slot index to find neighbors for.
  * @param range  How far to look in each direction (default 1).
@@ -52,7 +54,12 @@ export function neighbors(index: number, range: number = 1): number[] {
   for (let i = 0; i < GRID_SIZE; i++) {
     if (i === index) continue;
     const p = toGridPosition(i);
-    const distance = Math.abs(origin.x - p.x) + Math.abs(origin.y - p.y);
+    // 8-way (Chebyshev) distance: diagonally adjacent slots count at range 1,
+    // and range upgrades expand as larger 8-way squares (CG-0MSP1HCAS00785MP).
+    const distance = Math.max(
+      Math.abs(origin.x - p.x),
+      Math.abs(origin.y - p.y),
+    );
     if (distance <= range) {
       result.push(i);
     }

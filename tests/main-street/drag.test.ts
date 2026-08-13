@@ -280,12 +280,13 @@ describe('MainStreet drag-to-buy wiring', () => {
       scene.state.streetGrid[0] = { id: 'biz-laundromat-0', family: 'business' } as any;
       scene.state.streetGrid[1] = { id: 'biz-bookshop-0', family: 'business' } as any;
 
-      // Adjacent slots (2 and 6 are Manhattan neighbors of slot 1) are accepted.
+      // Adjacent slots (2, 6 orthogonal; 5 diagonal — 8-way/Chebyshev) are accepted.
       expect(controller.canDropBusinessCard(cs.id, 2)).toBe(true);
       expect(controller.canDropBusinessCard(cs.id, 6)).toBe(true);
+      expect(controller.canDropBusinessCard(cs.id, 5)).toBe(true); // diagonal
       // Non-adjacent slots are rejected (drag snap-back + illegal feedback).
       expect(controller.canDropBusinessCard(cs.id, 3)).toBe(false);
-      expect(controller.canDropBusinessCard(cs.id, 5)).toBe(false);
+      expect(controller.canDropBusinessCard(cs.id, 8)).toBe(false);
       // The synergy slot itself (occupied) is also rejected.
       expect(controller.canDropBusinessCard(cs.id, 1)).toBe(false);
     });

@@ -458,9 +458,9 @@ export function shouldAllowAction(
  *
  * The rule ONLY applies to composite `buy-and-place` steps that declare a
  * `synergyCardId`. For every other step the helper returns `true` (no-op).
- * "Next to" means orthogonal Manhattan adjacency (distance ≤ 1) via the
- * shared `neighbors()` resolver from `MainStreetAdjacency` — the same
- * semantics the synergy bonus system uses.
+ * "Next to" means 8-way adjacency (Chebyshev distance ≤ 1, diagonals
+ * included) via the shared `neighbors()` resolver from `MainStreetAdjacency`
+ * — the same semantics the synergy bonus system uses.
  *
  * The synergy card's slot is resolved dynamically from the live grid (the
  * operator explicitly rejected a hardcoded slot — "don't assume the player
