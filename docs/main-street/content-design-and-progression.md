@@ -46,6 +46,7 @@ Event cards are split into two trigger types:
 | Tourist Season | Investment (duration) | All businesses generate 115% income for 3 turns. *(Group C — new positive income-multiplier.)* |
 | Community Renovation | Investment (duration) | All reputation income boosted to 120% for 4 turns. *(Group C — new rep-multiplier.)* |
 | Graffiti | Incident | -1 coin to all businesses and -1 reputation. *(Group D.)* |
+| Graffiti Art | Incident | +1 coin to all businesses and +1 reputation. *(Good reverse of Graffiti, CG-0MSRC9UR9006FBXC.)* |
 | Water Main Break | Incident | -2 coins per Service business. *(Group D.)* |
 | Parking Enforcement | Incident | -1 coin per Commerce business. *(Group D.)* |
 | Labor Shortage | Incident (duration) | All businesses generate 90% income for 3 turns. *(Group D.)* |

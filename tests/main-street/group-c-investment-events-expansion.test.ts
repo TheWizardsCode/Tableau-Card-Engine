@@ -77,8 +77,8 @@ describe('Group C investment-event expansion: template count (AC1)', () => {
   const rng = createSeededRng(42);
   const deck = createEventDeck(1, undefined, rng, 1);
 
-  it('grows total event templates (55 after Group D incidents)', () => {
-    expect(deck).toHaveLength(55);
+  it('grows total event templates (56 after Group D + Graffiti Art)', () => {
+    expect(deck).toHaveLength(56); // +1 Graffiti Art (CG-0MSRC9UR9006FBXC)
   });
 
   it('grows investment-event templates from 13 to exactly 21', () => {
@@ -257,6 +257,11 @@ describe('Group C: rep-multiplier (Community Renovation)', () => {
 describe('Group C: duration expiry (AC2)', () => {
   it('income-multiplier and rep-multiplier effects expire after their duration', () => {
     const state = setupMainStreetGame({ seed: 'group-c-expiry' });
+    // Drain the pre-filled incident queue: the seeded draw can now include the
+    // duration incident (Labor Shortage), which would add an unrelated active
+    // effect and break the expiry window assertion. This test is scoped to the
+    // two manually-resolved duration effects.
+    state.incidentQueue = [];
     state.streetGrid[0] = makeBiz({ baseIncome: 10, id: 'biz-test-exp' });
     state.streetGrid[0].reputationPerTurn = 0.1;
     state.streetGrid[0].currentReputationPerTurn = 0.1;
@@ -329,7 +334,7 @@ describe('Group C: deck generation & balance guardrails (AC6)', () => {
   const rng = createSeededRng(42);
 
   it('builds a 165-card event deck at the default 3 copies', () => {
-    expect(createEventDeck(3, undefined, createSeededRng(1), 1)).toHaveLength(165);
+    expect(createEventDeck(3, undefined, createSeededRng(1), 1)).toHaveLength(168); // 56 x 3 (+1 Graffiti Art)
   });
 
   it('includes every new card in a 1-copy (template) deck', () => {

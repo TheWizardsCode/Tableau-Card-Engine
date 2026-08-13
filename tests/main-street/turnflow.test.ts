@@ -226,19 +226,26 @@ describe('MainStreetEngine', () => {
       state.phase = 'MarketPhase';
       state.resourceBank.coins = 100;
 
-      // Place a target business
-      const upgrade = state.market.investments.find(c => c.family === 'upgrade') as import('../../example-games/main-street/MainStreetCards').UpgradeCard;
+      // Place a target business. The seeded investments row may draw an
+      // upgrade whose target is a community space (Group E) rather than a
+      // business, so pick the first upgrade whose target exists in the
+      // business deck — the test must not depend on the draw order.
+      const upgrades = state.market.investments.filter(
+        c => c.family === 'upgrade',
+      ) as import('../../example-games/main-street/MainStreetCards').UpgradeCard[];
+      expect(upgrades.length).toBeGreaterThan(0);
+      const upgrade = upgrades.find(u => state.decks.business.some(b => b.name === u.targetBusiness));
       expect(upgrade).toBeDefined();
-      const biz = state.decks.business.find(b => b.name === upgrade.targetBusiness);
+      const biz = state.decks.business.find(b => b.name === upgrade!.targetBusiness);
       expect(biz).toBeDefined();
       // Place the business at the upgrade's required level so eligibility does
       // not depend on which upgrade the seeded investments row draws.
-      const placedLevel = upgrade.requiredLevel ?? 0;
+      const placedLevel = upgrade!.requiredLevel ?? 0;
       state.streetGrid[0] = { ...biz!, level: placedLevel };
 
       const result = executeAction(state, {
         type: 'buy-upgrade',
-        cardId: upgrade.id,
+        cardId: upgrade!.id,
       });
 
       expect(result).not.toBeNull();

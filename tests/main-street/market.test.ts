@@ -661,7 +661,7 @@ describe('MainStreetMarket', () => {
         state.decks.event.map(e => e.id.replace(/-\d+$/, '')),
       );
       // 55 = 37 + 8 Group C investment events + 10 Group D incidents
-      expect(uniqueTemplateIds.size).toBe(55);
+      expect(uniqueTemplateIds.size).toBe(56); // +1 Graffiti Art (CG-0MSRC9UR9006FBXC)
     });
   });
 });

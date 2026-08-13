@@ -4,7 +4,7 @@
  * Validates the 10 new incident-event cards added by the "Main Street: design
  * 50+ new cards of varying types" epic (CG-0MSQE2NLX003ADIY), Group D:
  *
- * - Incident template count grows from 24 to 34 (AC1).
+ * - Incident template count grows from 24 to 34 (AC1) (+1 Graffiti Art since).
  * - Polarity balance is constraint-compatible with the incident-balance
  *   system (AC2): the net-delta formula classifies 4 good / 3 bad / 3 neutral
  *   (duration incidents like Labor Shortage classify neutral, matching the
@@ -76,9 +76,9 @@ describe('Group D incident expansion: template count (AC1)', () => {
   const rng = createSeededRng(42);
   const deck = createEventDeck(1, undefined, rng, 1);
 
-  it('grows incident templates from 24 to exactly 34', () => {
+  it('grows incident templates from 24 to exactly 35 (+1 Graffiti Art)', () => {
     const incidents = deck.filter(c => c.trigger === 'Incident');
-    expect(incidents).toHaveLength(34);
+    expect(incidents).toHaveLength(35); // +1 Graffiti Art (CG-0MSRC9UR9006FBXC)
   });
 
   it('adds exactly the 10 contracted card IDs', () => {
@@ -89,7 +89,7 @@ describe('Group D incident expansion: template count (AC1)', () => {
   });
 
   it('grows total event templates from 45 to exactly 55', () => {
-    expect(deck).toHaveLength(55);
+    expect(deck).toHaveLength(56); // +1 Graffiti Art
   });
 });
 
@@ -249,7 +249,7 @@ describe('Group D: deck generation & balance guardrails (AC6)', () => {
   const rng = createSeededRng(42);
 
   it('builds a 165-card event deck at the default 3 copies', () => {
-    expect(createEventDeck(3, undefined, createSeededRng(1), 1)).toHaveLength(165);
+    expect(createEventDeck(3, undefined, createSeededRng(1), 1)).toHaveLength(168); // 56 x 3 (+1 Graffiti Art)
   });
 
   it('includes every new card in a 1-copy (template) deck', () => {

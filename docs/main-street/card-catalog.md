@@ -12,7 +12,7 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
 | Family        | Templates | Copies each | Total cards |
 |---------------|-----------|-------------|-------------|
 | Business      | 30        | 3           | 90          |
-| Event         | 55        | 3           | 165         |
+| Event         | 56        | 3           | 168         |
 | Upgrade       | 39        | 2           | 78          |
 | Community Space | 8       | 3           | 24          |
 | Staff         | 7         | 3           | 21          |
@@ -24,11 +24,11 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
 | Snapshot | Business | Event | Upgrade | Community Space | Staff | Total templates |
 |---|---:|---:|---:|---:|---:|---:|
 | Tier 1 baseline (`docs/main-street/card-catalog-baseline.json`) | 6 | 6 | 8 | — | — | 20 |
-| Current catalog (`card-data.csv`) | 30 | 55 | 39 | 8 | 7 | 139 |
+| Current catalog (`card-data.csv`) | 30 | 56 | 39 | 8 | 7 | 140 |
 | Net increase | +24 | +49 | +31 | +8 | +7 | +119 |
 
 - 2x target from baseline: `>= 40` templates
-- Current total: `139` templates (`6.95x` baseline)
+- Current total: `140` templates (`7x` baseline)
 - Business family grew from 18 to 30 with the Group A expansion (CG-0MSQJ1XIB0004QVN):
   12 new cards including the first Health bridge cards (Juice Bar, Yoga Studio,
   Physiotherapy), mid-tier (T2/T3) singles, and the T5 Grand Hotel flagship.
@@ -40,10 +40,13 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
   8 new Investment events (investment events 13 → 21) covering every synergy,
   plus two NEW duration effect types — positive `income-multiplier` (Tourist
   Season 1.15×/3 turns) and `rep-multiplier` (Community Renovation 1.2×/4 turns).
-- Incident events grew from 24 to 34 with the Group D expansion (CG-0MSQJ7QLM0076FTD):
+- Incident events grew from 24 to 34 with the Group D expansion (CG-0MSQJ7QLM0076FTD),
   10 new incidents (4 good / 3 bad / 3 neutral under the streak system's net-delta
   formula) covering under-served synergies, including the duration incident
   Labor Shortage (income-multiplier 0.9×/3 turns).
+- Graffiti Art (evt-graffiti-art, CG-0MSRC9UR9006FBXC) adds a tier-1 good
+  incident — the exact reverse of Graffiti (+1 coin to all businesses and
+  +1 reputation), raising incidents to 35 and event templates to 56.
 - Upgrades grew from 27 to 39 with the Group E expansion (CG-0MSQJ7SYD008U3EE):
   12 new upgrades covering every Group A business and Group B community space
   (targets raised to maxLevel 1 so the upgrades are applicable), including

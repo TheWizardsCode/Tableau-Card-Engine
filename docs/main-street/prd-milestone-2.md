@@ -793,7 +793,7 @@ The following items are explicitly excluded from this spec:
 | Snapshot | Business | Event | Upgrade | Total templates |
 |---|---:|---:|---:|---:|
 | Tier 1 baseline | 6 | 6 | 8 | 20 |
-| Current catalog | 30 | 55 | 39 | 124 |
+| Current catalog | 30 | 56 | 39 | 125 |
 | Net increase | +24 | +49 | +31 | +104 |
 
 Verification artifacts:

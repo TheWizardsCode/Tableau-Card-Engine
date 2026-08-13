@@ -184,6 +184,6 @@ describe('Group E: deck generation & balance guardrails (AC5/AC6)', () => {
   it('keeps other families unchanged in count (data-driven scope)', () => {
     expect(createBusinessDeck(1).length).toBe(30);
     expect(createCommunitySpaceDeck(1).length).toBe(8);
-    expect(createEventDeck(1, undefined, createSeededRng(42), 1).length).toBe(55);
+    expect(createEventDeck(1, undefined, createSeededRng(42), 1).length).toBe(56); // +1 Graffiti Art
   });
 });
