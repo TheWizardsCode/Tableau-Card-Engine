@@ -166,9 +166,9 @@ describe('Synergy Pairs for Visual Lines', () => {
 
     it('respects extended range from upgrades (range >= 2 pairs)', () => {
       const grid = emptyGrid();
-      // Card at index 0 has range bonus so it sees Manhattan distance 2
+      // Card at index 0 has range bonus so it sees Chebyshev distance 2
       grid[0] = makeBiz({ id: 'biz-a', synergyTypes: ['Food'], synergyRangeBonus: 1 });
-      // Index 2 is Manhattan distance 2 from index 0
+      // Index 2 is Chebyshev distance 2 from index 0 (same row)
       grid[2] = makeBiz({ id: 'biz-b', synergyTypes: ['Food'] });
       const pairs = computeSynergyPairs(grid);
       expect(pairs).toHaveLength(1);

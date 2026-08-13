@@ -249,7 +249,7 @@ synergyUtilization = actualAdjacencyBonusesReceived / maxPossibleAdjacencyBonuse
 
 Where:
 - `actualAdjacencyBonusesReceived`: Number of adjacency bonus triggers actually received per run (from the income log)
-- `maxPossibleAdjacencyBonuses`: For a given card, the maximum number of adjacency bonuses possible given its synergy types and surrounding slots (e.g., 8 adjacent slots in a 4×3 grid)
+- `maxPossibleAdjacencyBonuses`: For a given card, the maximum number of adjacency bonuses possible given its synergy types and surrounding slots. Adjacency is 8-way (Chebyshev): an interior slot of the 2×5 street grid has up to **8 surrounding slots** (orthogonal + diagonal); edge/corner slots have fewer
 
 **Data Sources:**
 - Per-run income log (which bonuses were triggered per turn)

@@ -333,7 +333,8 @@ export class MainStreetLifecycleManager {
         render: (scene, container, x, y, maxWidth) => {
           const paragraph =
             'Adjacent matching synergy types yield bonus income. ' +
-            'Synergy checks are performed for left/right neighbors and stack additively. ' +
+            'Adjacency is 8-way: orthogonal AND diagonally adjacent slots count (including diagonal). ' +
+            'Synergy bonuses stack additively per matching neighbor. ' +
             'Some cards bridge multiple synergy types and count for both. ' +
             'Upgrades can increase range and value. ' +
             'Plan placements to cluster synergies for higher returns.';

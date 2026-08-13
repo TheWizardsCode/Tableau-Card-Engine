@@ -141,6 +141,27 @@ This document consolidates all balancing methodology content previously scattere
 
 The origin documents now contain cross-references to this document.
 
+## 8-Way Adjacency Re-Tune (CG-0MSP1HCAS00785MP / CG-0MSP26Q5N002EH8P)
+
+The adjacency metric was changed from **Manhattan (orthogonal-only)** to **Chebyshev (8-way)**:
+diagonally adjacent slots now count as neighbors on the 2×5 street grid. The Monte Carlo
+harness (200 seeds, greedy strategy, 25 turns) was re-run before and after the change:
+
+| Metric | Before (Manhattan) | After (8-way / Chebyshev) |
+|---|---:|---:|
+| Win rate | 64.5% | 65.0% |
+| Median final score | 154.4 | 157.0 |
+| Avg coins/turn (liquidity) | 2.557 | 2.745 |
+| Approx. income/turn (positive deltas) | 4.38 | 4.63 |
+
+**Verdict: no re-tuning required.** Income/turn rises ~5.7% but both values stay within the
+documented **4–8 coins/turn** design band, and the median score stays within the 120–180 target
+band. The tuning levers in [Balance Process & Tooling](prd-balance-process-and-tooling.md)
+(difficulty presets, card data) are only needed when a band is missed, so `card-data.csv` and
+the `MainStreetDifficulty` presets (1.5 / 1.0 / 0.75) were left unchanged. The committed
+baseline in [`monte-carlo-baseline.json`](monte-carlo-baseline.json) reflects the current dev
+state (which includes a concurrent card-data rebalance by CG-0MSQJ7VL9009JHF4).
+
 ## See Also
 
 - **[Balance Process & Tooling PRD](prd-balance-process-and-tooling.md)** — Defines the structured balance review process, micro/macro metrics, and CLI tool specifications that build on this balancing algorithm.

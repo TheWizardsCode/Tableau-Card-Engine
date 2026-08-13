@@ -725,7 +725,8 @@ export interface SynergyPair {
  * Computes all synergy pairs on the street grid for visual line rendering.
  *
  * A pair exists when two occupied slots share at least one SynergyType and
- * are within Manhattan distance range (1 + card's synergyRangeBonus). Each pair
+ * are within 8-way / Chebyshev distance range (1 + card's synergyRangeBonus) —
+ * diagonally adjacent slots count (CG-0MSP1HCAS00785MP). Each pair
  * is reported only once (fromIndex < toIndex).
  *
  * Community-space cards are included in the same manner as business cards.

@@ -192,9 +192,10 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
   // {cardName} = cs-library, {synergyCardName} = biz-bookshop — resolved from
   // card-data.csv at render time. The Library costs coins to run each turn but
   // builds reputation; placing it next to the Bookshop (a Culture business)
-  // earns the Culture adjacency bonus.
+  // earns the Culture adjacency bonus. Adjacency is 8-way (Chebyshev): placing
+  // the Library diagonally next to the Bookshop counts just as much as orthogonally.
   [tutorialKey('T12', 'body')]:
-    'Some businesses cost coins to run but bring in customers. The **{cardName}** builds your reputation. Place it next to **{synergyCardName}** for a Culture bonus.',
+    'Some businesses cost coins to run but bring in customers. The **{cardName}** builds your reputation. Place it next to **{synergyCardName}** — orthogonally or diagonally — for a Culture bonus.',
 
   // ── T13: Triggering Events ─────────────────────────────────
   [tutorialKey('T13', 'title')]:

@@ -138,7 +138,7 @@ describe('MainStreetAdjacency (2x5 grid, percentage-based synergy)', () => {
     it('respects extended range from upgrades', () => {
       const grid = emptyGrid();
       grid[0] = makeBiz({ id: 'origin', synergyTypes: ['Food'], synergyRangeBonus: 1 }); // range=2
-      grid[2] = makeBiz({ id: 'far', synergyTypes: ['Food'] }); // manhattan distance 2
+      grid[2] = makeBiz({ id: 'far', synergyTypes: ['Food'] }); // Chebyshev distance 2 (same row)
       expect(computeSynergyBonus(grid, 0)).toBe(SYNERGY_BONUS_PER_NEIGHBOR);
     });
 
