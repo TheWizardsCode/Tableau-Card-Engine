@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
-import { CARD_TEMPLATE_NAMES } from '../MainStreetCards';
+import { CARD_TEMPLATE_NAMES, synergyColor } from '../MainStreetCards';
 import { FONT_FAMILY, popTextOrIcon, moveGameObject } from '../../../src/ui';
-import type { SlotIncome } from '../MainStreetAdjacency';
+import type { SlotIncome, SynergyPair } from '../MainStreetAdjacency';
 import { SFX_KEYS } from './MainStreetConstants';
 
 /** MainStreetAnimator -- animation and HUD-delta helper for Main Street scene. */
@@ -532,6 +532,138 @@ export class MainStreetAnimator {
         });
       }
     }
+  }
+
+  /**
+   * Animates a newly-formed synergy link: the line draws in, the two paired
+   * cards pulse in the synergy colour, a "Synergy!" pop appears at the
+   * midpoint, and a chime SFX plays.
+   *
+   * Geometry mirrors `MainStreetRenderer.drawSynergyLines()` (slot centres
+   * from the same layout math) and the line uses `synergyColor` for the
+   * shared synergy type. The overlay line sits at depth 10, above the street
+   * container, matching where the static lines render.
+   *
+   * Accessibility (reduced motion): the line draw-in, spark, and card pulse
+   * are skipped; the chime SFX and a minimal "Synergy!" pop are retained
+   * (spec AC5 — "skip pulse/pop or keep a minimal pop").
+   *
+   * Headless/replay exemption (AGENTS.md rule 8): presentation-only effect;
+   * returns immediately in replay/headless mode (`scene.replayMode`) — no
+   * rendering, no audio. Never mutates game state or the transcript.
+   *
+   * @param pair  The newly-formed synergy pair (slot indices + shared type).
+   */
+  public animateSynergyFormation(pair: SynergyPair): void {
+    const s = this.scene;
+
+    // Headless/replay exemption: no rendering or audio in those modes.
+    if (s.replayMode) return;
+
+    const reducedMotion = s.settingsPanel?.reducedMotion === true;
+    const { streetX, streetTop, slotW, slotGap, slotH, streetCols, streetRowGap } = s.layout;
+    const slotCenter = (idx: number): { x: number; y: number } => ({
+      x: streetX + (idx % streetCols) * (slotW + slotGap) + slotW / 2,
+      y: streetTop + Math.floor(idx / streetCols) * (slotH + streetRowGap) + slotH / 2,
+    });
+    const a = slotCenter(pair.fromIndex);
+    const b = slotCenter(pair.toIndex);
+    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    const color = synergyColor(pair.sharedSynergy);
+
+    // Chime SFX — plays in both modes (minimal feedback retained).
+    try { s.soundManager?.play(SFX_KEYS.INCOME_POSITIVE); } catch (_) { /* ignore */ }
+
+    if (reducedMotion) {
+      // Minimal pop only.
+      this.popSynergyText(mid, color);
+      return;
+    }
+
+    // 1. Line draws in: fade in the same geometry drawSynergyLines uses.
+    const line = s.add.graphics();
+    line.lineStyle(3, color, 0.7);
+    line.beginPath();
+    line.moveTo(a.x, a.y);
+    line.lineTo(b.x, b.y);
+    line.strokePath();
+    line.setDepth(10);
+    line.setAlpha(0);
+    s.tweens.add({
+      targets: line,
+      alpha: 0.7,
+      duration: 250,
+      ease: 'Quad.easeOut',
+    });
+
+    // Draw-in accent: a spark that expands and fades at the midpoint.
+    const spark = s.add.circle(mid.x, mid.y, 6, color, 0.9).setDepth(11);
+    s.tweens.add({
+      targets: spark,
+      radius: 14,
+      alpha: 0,
+      duration: 400,
+      ease: 'Quad.easeOut',
+      onComplete: () => {
+        spark.destroy();
+      },
+    });
+
+    // 2. The two paired cards pulse (brief scale bounce).
+    for (const idx of [pair.fromIndex, pair.toIndex]) {
+      const card = this.findStreetCardContainer(idx);
+      if (!card) continue;
+      const baseX = card.scaleX;
+      const baseY = card.scaleY;
+      s.tweens.add({
+        targets: card,
+        scaleX: 1.15,
+        scaleY: 1.15,
+        duration: 120,
+        yoyo: true,
+        hold: 80,
+        onComplete: () => {
+          card.setScale(baseX, baseY);
+        },
+      });
+    }
+
+    // 3. "Synergy!" pop at the pair midpoint.
+    this.popSynergyText(mid, color);
+  }
+
+  /**
+   * "Synergy!" pop text at a position (reused by the full and reduced-motion
+   * paths). The pop itself respects reduced motion via `popTextOrIcon`.
+   */
+  private popSynergyText(at: { x: number; y: number }, _color: number): void {
+    const s = this.scene;
+    const text = s.add.text(at.x, at.y - 10, 'Synergy!', {
+      fontSize: '16px',
+      fontStyle: 'bold',
+      color: '#ffffff',
+      fontFamily: FONT_FAMILY,
+    }).setOrigin(0.5).setDepth(500);
+    void popTextOrIcon({
+      scene: s,
+      target: text,
+      duration: 1200,
+      riseY: 26,
+      scale: 1.3,
+      reducedMotion: s.settingsPanel?.reducedMotion === true,
+    });
+  }
+
+  /** Finds the rendered street card container tagged with a slot index. */
+  private findStreetCardContainer(slotIndex: number): Phaser.GameObjects.Container | null {
+    const s = this.scene;
+    for (const obj of s.streetContainer?.list ?? []) {
+      const candidate = obj as { getData?: (key: string) => unknown };
+      if (candidate.getData?.('streetSlotIndex') === slotIndex) {
+        return obj as Phaser.GameObjects.Container;
+      }
+    }
+    return null;
   }
 
   public getMarketCardCenter(row: 'development' | 'investments', slotIndex: number): { x: number; y: number } | null {

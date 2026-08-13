@@ -794,6 +794,21 @@ export function computeSynergyPairs(
   return pairs.sort((a, b) => a.fromIndex - b.fromIndex || a.toIndex - b.toIndex);
 }
 
+/**
+ * Returns the synergy pairs in `after` that are not present in `before`
+ * (same slot pair), i.e. the newly-formed connections after a placement.
+ *
+ * Used by the synergy-formation animation trigger so only NEW pairs animate
+ * (pre-existing pairs never re-trigger on a plain refresh).
+ */
+export function diffNewSynergyPairs(before: SynergyPair[], after: SynergyPair[]): SynergyPair[] {
+  return after.filter(
+    (pair) => !before.some(
+      (b) => b.fromIndex === pair.fromIndex && b.toIndex === pair.toIndex,
+    ),
+  );
+}
+
 // ── Result Types ────────────────────────────────────────────
 
 /** Per-slot income breakdown. */

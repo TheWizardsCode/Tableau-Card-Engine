@@ -117,6 +117,32 @@ void popTextOrIcon({
 - Reuse: `createTransferCardVisual` + `SoundManager` + `popTextOrIcon`;
   no new engine infrastructure.
 
+### Synergy link formation
+
+- Helper: `MainStreetAnimator.animateSynergyFormation()`.
+- Trigger: `MainStreetTurnController` placement paths (`onDragDropBusiness`,
+  `onSlotClick` place-from-hand, and the legacy direct-buy path) — each
+  captures `computeSynergyPairs()` before the placement command and animates
+  `diffNewSynergyPairs(before, after)` — ONLY newly-formed pairs animate;
+  pre-existing pairs never re-trigger on a plain refresh.
+- Behavior (reduced-motion OFF):
+  1. The new synergy line fades in (same geometry/colour as
+     `MainStreetRenderer.drawSynergyLines()`, depth 10, alpha 0 → 0.7).
+  2. A spark expands and fades at the pair midpoint.
+  3. The two paired cards pulse (brief scale bounce) — street card
+     containers are tagged with their slot index
+     (`setData('streetSlotIndex', …)`) so the animator can find them.
+  4. A "Synergy!" pop appears at the midpoint (`popTextOrIcon`).
+  5. A chime SFX plays — reused `SFX_KEYS.INCOME_POSITIVE`
+     (`sfx-income-positive`); no new SFX key (ToneForge pipeline untouched).
+- Accessibility (reduced motion): the line draw-in, spark, and card pulse
+  are skipped; the chime SFX and a minimal "Synergy!" pop are retained.
+- Headless/replay exemption (AGENTS.md rule 8): presentation-only — returns
+  immediately in replay/headless mode (`scene.replayMode`), never mutates
+  state or transcript.
+- Reuse: `synergyColor` + `SoundManager` + `popTextOrIcon`; no new engine
+  infrastructure.
+
 ## Scene Transitions
 
 - Main Street scene-level fade transitions are currently disabled.

@@ -41,6 +41,19 @@ once. The resource deltas come from `TurnResult.incidentCoinChange` /
 
 - Reduced motion: sting + HUD loss pops retained; flight, flash, and
   indicator pulse skipped.
+
+## Synergy link formation
+
+`MainStreetAnimator.animateSynergyFormation({ fromIndex, toIndex,
+sharedSynergy })` animates a newly-formed synergy link: the line fades in,
+a spark expands at the midpoint, the paired cards pulse, a "Synergy!" pop
+appears, and a chime plays (`sfx-income-positive`). The placement paths in
+`MainStreetTurnController` diff `computeSynergyPairs()` before/after the
+placement (`diffNewSynergyPairs`) so ONLY new pairs animate. See
+`docs/main-street/ux-visual-audio.md` for the design notes.
+
+- Reduced motion: chime + minimal "Synergy!" pop retained; line, spark, and
+  pulse skipped.
 - Replay/headless: returns immediately (documented exemption, AGENTS.md
   rule 8) — presentation-only, never mutates state or transcript.
 

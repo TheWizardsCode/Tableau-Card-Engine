@@ -12,6 +12,7 @@ import {
   canSellBusiness,
 } from '../MainStreetMarket';
 import type { BusinessCard, EventCard, UpgradeCard } from '../MainStreetCards';
+import { computeSynergyPairs, diffNewSynergyPairs, type SynergyPair } from '../MainStreetAdjacency';
 import { buyBusinessCommand, buyBusinessToHandCommand, buyUpgradeCommand, buyEventCommand, playEventCommand, refreshDevelopmentCommand, refreshInvestmentsCommand } from '../MainStreetCommands';
 import { recordMainStreetEvent, finalizeMainStreetTranscript } from '../MainStreetTranscript';
 import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
@@ -593,6 +594,9 @@ export class MainStreetTurnController {
     s.refreshAll();
 
     const afterTransfer = (): void => {
+      // Capture synergy pairs before the placement mutates the grid so only
+      // NEWLY formed pairs animate (pre-existing pairs never re-trigger).
+      const beforePairs = computeSynergyPairs(s.state.streetGrid, s.state.soldSlots ?? []);
       try {
         const cmd = buyBusinessCommand(s.state, cardId, slotIndex);
         s.undoManager.execute(cmd);
@@ -609,6 +613,8 @@ export class MainStreetTurnController {
       s.refreshAll();
       s.refreshStreetGrid();
       s.refreshActionButtons();
+      // Synergy-formation animation for any new pairs (non-blocking).
+      this.animateNewSynergyPairs(beforePairs);
       // Tutorial: mark place-business step complete if active
       try {
         (s.msLifecycleManager as any).onTutorialActionComplete?.('place-business' as TutorialActionType);
@@ -686,6 +692,9 @@ export class MainStreetTurnController {
       s.refreshAll();
 
       const afterTransfer = (): void => {
+        // Capture synergy pairs before the placement mutates the grid so only
+        // NEWLY formed pairs animate.
+        const beforePairs = computeSynergyPairs(s.state.streetGrid, s.state.soldSlots ?? []);
         try {
           placeFromHand(s.state, handIndex, slotIndex);
           try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'place', handIndex, slotIndex }, description: `Placed from hand to slot ${slotIndex}` }); } catch (_) {}
@@ -701,6 +710,8 @@ export class MainStreetTurnController {
         s.refreshAll();
         s.refreshStreetGrid();
         s.refreshActionButtons();
+        // Synergy-formation animation for any new pairs (non-blocking).
+        this.animateNewSynergyPairs(beforePairs);
         // Tutorial: mark place-business step complete if active
         try {
           (s.msLifecycleManager as any).onTutorialActionComplete?.('place-business' as TutorialActionType);
@@ -748,6 +759,9 @@ export class MainStreetTurnController {
     s.refreshAll();
 
     const afterTransfer = (): void => {
+      // Capture synergy pairs before the placement mutates the grid so only
+      // NEWLY formed pairs animate.
+      const beforePairs = computeSynergyPairs(s.state.streetGrid, s.state.soldSlots ?? []);
       try {
         const cmd = buyBusinessCommand(s.state, pendingCardId, slotIndex);
         s.undoManager.execute(cmd);
@@ -762,6 +776,8 @@ export class MainStreetTurnController {
       s.hiddenTransferSourceCardIds.delete(pendingCardId);
       s.uiPhase = 'market';
       s.refreshAll();
+      // Synergy-formation animation for any new pairs (non-blocking).
+      this.animateNewSynergyPairs(beforePairs);
       (s.msLifecycleManager as any).onTutorialActionComplete?.('place-business' as TutorialActionType);
     };
 
@@ -979,6 +995,27 @@ export class MainStreetTurnController {
           ...s.msRenderer.getMarketSlotCenter(row, i),
         })),
       });
+    } catch (_) {
+      // presentation-only — ignore
+    }
+  }
+
+  /**
+   * Synergy-formation trigger (presentation-only): after a placement that
+   * changed the street grid, animates any NEWLY formed synergy pairs
+   * (`MainStreetAnimator.animateSynergyFormation`) — line draw-in, card
+   * pulse, "Synergy!" pop, chime. Pre-existing pairs never re-trigger on a
+   * plain refresh (the diff is against the pairs captured before the
+   * placement command). Never throws; reduced-motion and replay/headless
+   * handling live inside the animator.
+   */
+  private animateNewSynergyPairs(beforePairs: SynergyPair[]): void {
+    const s = this.scene;
+    try {
+      const afterPairs = computeSynergyPairs(s.state.streetGrid, s.state.soldSlots ?? []);
+      for (const pair of diffNewSynergyPairs(beforePairs, afterPairs)) {
+        s.msAnimator.animateSynergyFormation(pair);
+      }
     } catch (_) {
       // presentation-only — ignore
     }

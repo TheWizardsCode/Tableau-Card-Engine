@@ -602,6 +602,11 @@ export class MainStreetRenderer {
     const cardContainer = s.add.container(Math.round(x + slotW / 2), Math.round(y + slotH / 2));
     mainStreetRenderCardSvg(s, cardContainer, biz.id, renderW, renderH);
 
+    // Tag the container with its slot index so the synergy-formation
+    // animation (`MainStreetAnimator.animateSynergyFormation`) can find and
+    // pulse the paired cards.
+    cardContainer.setData('streetSlotIndex', _index);
+
     // Apply upgrade overlays (level badge, income, name, border)
     this.applyUpgradeOverlays(cardContainer, biz, renderW, renderH);
 
