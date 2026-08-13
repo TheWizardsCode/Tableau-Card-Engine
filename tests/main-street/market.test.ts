@@ -654,14 +654,14 @@ describe('MainStreetMarket', () => {
   });
 
   describe('unique event templates', () => {
-    it('should have doubled unique event templates (36 instead of 18)', () => {
+    it('should have 45 unique event templates in the event deck', () => {
       const state = createTestState();
       // Count unique event templates by stripping the copy-number suffix
       const uniqueTemplateIds = new Set(
         state.decks.event.map(e => e.id.replace(/-\d+$/, '')),
       );
-      // Should now have 37 unique event templates (one added: Recession)
-      expect(uniqueTemplateIds.size).toBe(37);
+      // 45 = 37 + 8 Group C investment events
+      expect(uniqueTemplateIds.size).toBe(45);
     });
   });
 });

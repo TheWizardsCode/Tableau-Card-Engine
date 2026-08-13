@@ -36,7 +36,7 @@ import { DEFAULT_CHALLENGES_PER_RUN } from '../../example-games/main-street/Main
 // Upgrade:   3 (M1) + 14 (M2) + 4 branching + 4 level-2 + 1 (Community Hub) = 26 templates
 // Community: 2 (Park, Library) = 2 templates
 const BUSINESS_TEMPLATE_COUNT = 30;
-const EVENT_TEMPLATE_COUNT = 37;
+const EVENT_TEMPLATE_COUNT = 45;
 const UPGRADE_TEMPLATE_COUNT = 27;
 const DEFAULT_BUSINESS_COPIES = 3;
 const DEFAULT_EVENT_COPIES = 3;

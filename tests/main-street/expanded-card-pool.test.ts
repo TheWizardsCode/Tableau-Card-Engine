@@ -61,8 +61,8 @@ describe('Expanded Card Pool: Template Completeness', () => {
     expect(businessDeck).toHaveLength(30);
   });
 
-  it('should have exactly 37 event templates', () => {
-    expect(eventDeck).toHaveLength(37);
+  it('should have exactly 45 event templates', () => {
+    expect(eventDeck).toHaveLength(45);
   });
 
   it('should have exactly 27 upgrade templates', () => {
@@ -399,7 +399,11 @@ describe('Expanded Card Pool: Event Card Fields', () => {
   it('Investment events should have net-positive effects', () => {
     const investments = eventDeck.filter(e => e.trigger === 'Investment');
     for (const evt of investments) {
+      // Duration events (e.g. Tourist Season, Community Renovation) carry
+      // zero one-shot deltas — their value comes from the ActiveEffect
+      // multiplier, so they are excluded from the delta assertion.
       const netValue = evt.coinDelta + evt.reputationDelta;
+      if (netValue === 0 && 'duration' in evt) continue;
       expect(netValue).toBeGreaterThanOrEqual(1);
     }
   });
@@ -452,8 +456,8 @@ describe('Expanded Card Pool: Deck Building', () => {
     expect(createBusinessDeck(3)).toHaveLength(90);
   });
 
-    it('event deck with 3 copies should have 111 cards', () => {
-    expect(createEventDeck(3, undefined, _rng, 1)).toHaveLength(111);
+    it('event deck with 3 copies should have 135 cards', () => {
+    expect(createEventDeck(3, undefined, _rng, 1)).toHaveLength(135);
   });
 
   it('upgrade deck with 2 copies should have 54 cards', () => {

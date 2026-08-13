@@ -37,6 +37,14 @@ Event cards are split into two trigger types:
 | Name | Trigger | Effect |
 |------|---------|--------|
 | Local Festival | Investment | +2 coins per Culture business and +1 reputation. |
+| Health Carnival | Investment | +2 coins to all Health businesses and +1 reputation. *(Group C.)* |
+| Food Tasting Tour | Investment | +2 coins to all Food businesses and +1 reputation. *(Group C.)* |
+| Art Sale | Investment | +2 coins to all Culture businesses and +1 reputation. *(Group C.)* |
+| Shopping Spree | Investment | +2.5 coins to all Commerce businesses. *(Group C.)* |
+| Summer Fest | Investment | +2 coins to all Entertainment businesses and +1 reputation. *(Group C.)* |
+| Service Week | Investment | +2 coins to all Service businesses and +1 reputation. *(Group C.)* |
+| Tourist Season | Investment (duration) | All businesses generate 115% income for 3 turns. *(Group C — new positive income-multiplier.)* |
+| Community Renovation | Investment (duration) | All reputation income boosted to 120% for 4 turns. *(Group C — new rep-multiplier.)* |
 | Tax Audit | Incident | Lose 3 coins. |
 | Rainy Day | Incident | -1 coin per Food business this turn. |
 | Community Award | Incident | +2 reputation from community recognition. |

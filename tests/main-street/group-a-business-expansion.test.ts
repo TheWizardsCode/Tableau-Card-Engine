@@ -249,7 +249,7 @@ describe('Group A business expansion: balance guardrails (AC4)', () => {
 
   it('keeps other families unchanged in count (data-driven scope)', () => {
     expect(createCommunitySpaceDeck(1).length).toBe(8); // +6 Group B community-space cards
-    expect(createEventDeck(1, undefined, createSeededRng(42), 1).length).toBe(37);
+    expect(createEventDeck(1, undefined, createSeededRng(42), 1).length).toBe(45); // +8 Group C investment events
     expect(createUpgradeDeck(1).length).toBe(27);
     expect(createStaffDeck(1).length).toBe(3);
   });

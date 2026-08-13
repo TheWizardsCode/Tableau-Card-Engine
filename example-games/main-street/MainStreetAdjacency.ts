@@ -665,8 +665,16 @@ export function applyIncome(state: MainStreetState): IncomeResult {
     if (!card) continue;
     repPerTurn += card.currentReputationPerTurn ?? 0;
   }
-  if (repPerTurn !== 0) {
-    state.resourceBank.reputation += repPerTurn;
+  // Apply active effect rep modifiers (e.g. Community Renovation's
+  // rep-multiplier 1.2x — Group C, CG-0MSQJ244M0055X7S). Multipliers are
+  // composed multiplicatively, matching the income-multiplier behaviour.
+  const modifiedRepPerTurn = applyActiveEffectMultiplier(
+    state.activeEffects,
+    'rep-multiplier',
+    repPerTurn,
+  );
+  if (modifiedRepPerTurn !== 0) {
+    state.resourceBank.reputation += modifiedRepPerTurn;
   }
 
   // Hand card synergy is still computed fresh each turn (it is not adjacency-based

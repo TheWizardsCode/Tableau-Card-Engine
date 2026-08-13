@@ -12,7 +12,7 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
 | Family        | Templates | Copies each | Total cards |
 |---------------|-----------|-------------|-------------|
 | Business      | 30        | 3           | 90          |
-| Event         | 37        | 3           | 111         |
+| Event         | 45        | 3           | 135         |
 | Upgrade       | 27        | 2           | 54          |
 | Community Space | 8       | 3           | 24          |
 | Staff         | 3         | 3           | 9           |
@@ -24,11 +24,11 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
 | Snapshot | Business | Event | Upgrade | Community Space | Staff | Total templates |
 |---|---:|---:|---:|---:|---:|---:|
 | Tier 1 baseline (`docs/main-street/card-catalog-baseline.json`) | 6 | 6 | 8 | — | — | 20 |
-| Current catalog (`card-data.csv`) | 30 | 37 | 27 | 8 | 3 | 105 |
-| Net increase | +24 | +31 | +19 | +8 | +3 | +85 |
+| Current catalog (`card-data.csv`) | 30 | 45 | 27 | 8 | 3 | 113 |
+| Net increase | +24 | +39 | +19 | +8 | +3 | +93 |
 
 - 2x target from baseline: `>= 40` templates
-- Current total: `105` templates (`5.25x` baseline)
+- Current total: `113` templates (`5.65x` baseline)
 - Business family grew from 18 to 30 with the Group A expansion (CG-0MSQJ1XIB0004QVN):
   12 new cards including the first Health bridge cards (Juice Bar, Yoga Studio,
   Physiotherapy), mid-tier (T2/T3) singles, and the T5 Grand Hotel flagship.
@@ -36,6 +36,10 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
   6 new reputation assets across five synergies (Playground, Community Garden,
   Town Fountain, Health Kiosk, Community Shelter, Public Art), including the
   first ongoing-cost community-space bridge card (Public Art).
+- Event family grew from 37 to 45 with the Group C expansion (CG-0MSQJ244M0055X7S):
+  8 new Investment events (investment events 13 → 21) covering every synergy,
+  plus two NEW duration effect types — positive `income-multiplier` (Tourist
+  Season 1.15×/3 turns) and `rep-multiplier` (Community Renovation 1.2×/4 turns).
 - Non-baseline card IDs are tracked in `docs/main-street/expanded-card-manifest.json`
 
 ### Guidance: adding more cards safely
@@ -218,6 +222,30 @@ Events fall into two categories:
 | `evt-viral-review` | Viral Review | Incident | 0 | All | -- | +2 | +1 | +2 coins, +1 rep from online fame. | Positive windfall; universal. |
 | `evt-vandalism` | Vandalism | Incident | 0 | All | -- | -1 | -1 | -1 coin, -1 rep. | Dual-penalty universal disruption. |
 | `evt-flu-outbreak` | Flu Outbreak | Incident | 0 | All | -- | 0 | 0 | 80% income for 5 turns. Duration reduced by Clinic/Medical Center. | Duration-based modifier (see ActiveEffect system). |
+
+### M3 Event Templates (8) — Group C expansion (CG-0MSQJ244M0055X7S)
+
+Gives every synergy a mid-tier Investment option and introduces two new duration effect types.
+
+#### Investment Events (6)
+
+| ID | Name | Cost | Target | Coins/biz | Rep | Tier | Effect | Rationale |
+|----|------|------|--------|-----------|-----|------|--------|-----------|
+| `evt-health-carnival` | Health Carnival | 5 | Health | +2 | +1 | 3 | +2 coins to all Health businesses and +1 reputation. | Health counterpart to Local Festival. |
+| `evt-food-tasting` | Food Tasting Tour | 5 | Food | +2 | +1 | 3 | +2 coins to all Food businesses and +1 reputation. | Food boost. |
+| `evt-art-sale` | Art Sale | 5 | Culture | +2 | +1 | 3 | +2 coins to all Culture businesses and +1 reputation. | Culture boost. |
+| `evt-shopping-spree` | Shopping Spree | 7 | Commerce | +2.5 | 0 | 4 | +2.5 coins to all Commerce businesses. | Commerce boost. |
+| `evt-summer-fest` | Summer Fest | 7 | Entertainment | +2 | +1 | 4 | +2 coins to all Entertainment businesses and +1 reputation. | Entertainment boost. |
+| `evt-service-week` | Service Week | 7 | Service | +2 | +1 | 4 | +2 coins to all Service businesses and +1 reputation. | Service boost. |
+
+#### Duration Events (2) — new effect types
+
+| ID | Name | Cost | Target | Tier | Duration | Effect Type | Multiplier | Effect | Rationale |
+|----|------|------|--------|------|----------|-------------|-----------|--------|-----------|
+| `evt-tourist-season` | Tourist Season | 10 | All | 5 | 3 | `income-multiplier` | 1.15 | All businesses generate 115% income for 3 turns. | **NEW**: positive income-multiplier (previously only negative cuts existed). |
+| `evt-community-renovation` | Community Renovation | 10 | All | 5 | 4 | `rep-multiplier` | 1.2 | All reputation income boosted to 120% for 4 turns. | **NEW**: rep-multiplier effect type (scales per-turn reputation income). |
+
+> Positive duration effects are NOT shortened by Clinic/Medical Center coverage — the reduction applies only to negative multipliers (Group C design decision, CG-0MSQJ244M0055X7S).
 
 ### Event Balance Summary
 

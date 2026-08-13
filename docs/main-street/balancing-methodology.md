@@ -49,7 +49,7 @@ When a card's cost changes, its reward fields (baseIncome, coinDelta, synergy bo
 
 | Rule | Cards Affected | Rationale |
 |------|---------------|-----------|
-| **Incidents remain free** | All 23 Incident-trigger events | Incidents are negative events; cost would make them purchaseable, changing game balance |
+| **Incidents remain free** | All 24 Incident-trigger events | Incidents are negative events; cost would make them purchaseable, changing game balance |
 
 ### 6. Special Cases
 
@@ -71,13 +71,19 @@ When a card's cost changes, its reward fields (baseIncome, coinDelta, synergy bo
 - **Inputs**: baseIncome, synergyCount, synergy bonuses, reputation, tier
 - **Algorithm**: Curve-fitted cost + tier-driven base → clamped to tier bands → spread enforcement
 
-### Investment Events (13 of 37 events)
+### Investment Events (21 of 45 events)
+
+> Investment events grew from 13 to 21 in the Group C expansion
+> (CG-0MSQJ244M0055X7S), adding per-synergy mid-tier options plus two new
+> duration effect types (positive `income-multiplier`, `rep-multiplier`).
+> Duration events carry zero one-shot deltas; their cost is curve-fitted from
+> tier only.
 
 - **Goal**: Cost range wider than current 2–4 (target: range ≥ 3)
 - **Inputs**: coinDelta, reputationDelta, target scope (All vs SpecificSynergy)
 - **Scope multiplier**: All = 1.0×, SpecificSynergy = 1.2×
 
-### Incidents (24 of 37 events)
+### Incidents (24 of 45 events)
 
 - **Not adjusted** — all remain at cost 0
 

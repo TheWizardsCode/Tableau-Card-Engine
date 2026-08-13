@@ -259,7 +259,7 @@ describe('Group B community-space expansion: balance guardrails (AC5)', () => {
 
   it('keeps other families unchanged in count (data-driven scope)', () => {
     expect(createBusinessDeck(1).length).toBe(30);
-    expect(createEventDeck(1, undefined, createSeededRng(42), 1).length).toBe(37);
+    expect(createEventDeck(1, undefined, createSeededRng(42), 1).length).toBe(45); // +8 Group C investment events
     expect(createUpgradeDeck(1).length).toBe(27);
   });
 });

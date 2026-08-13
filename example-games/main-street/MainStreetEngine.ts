@@ -239,12 +239,23 @@ function classifyEffect(coinChange: number, repChange: number): 'gain' | 'loss' 
  * - Clinic (biz-clinic) reduces duration by 2
  * - Only the stronger reduction applies (Medical Center > Clinic)
  * - Minimum duration floor is 1
+ * - Reduction applies ONLY to negative effects (multiplier < 1): a Clinic
+ *   should shorten a harmful income cut, not a positive boost like
+ *   Tourist Season / Community Renovation (Group C, CG-0MSQJ244M0055X7S).
  *
  * @param baseDuration  Base duration before reductions
  * @param state         Current game state (street grid is scanned)
+ * @param multiplier    The effect's multiplier; < 1 = negative effect
  * @returns Effective duration after reductions (min 1).
  */
-function computeDurationWithClinicReduction(baseDuration: number, state: MainStreetState): number {
+function computeDurationWithClinicReduction(
+  baseDuration: number,
+  state: MainStreetState,
+  multiplier: number,
+): number {
+  // Positive effects (>= 1) are not shortened by medical coverage.
+  if (multiplier >= 1) return baseDuration;
+
   let hasMedicalCenter = false;
   let hasClinic = false;
 
@@ -278,8 +289,9 @@ export function resolveEvent(state: MainStreetState, event: EventCard): void {
   if (isDurationEventCard(event)) {
     const dEvent = event as DurationEventCard;
 
-    // Compute effective duration (check clinic/medical center for duration mitigation)
-    let effectiveDuration = computeDurationWithClinicReduction(dEvent.duration, state);
+    // Compute effective duration (check clinic/medical center for duration
+    // mitigation — negative effects only; positive effects keep full duration).
+    let effectiveDuration = computeDurationWithClinicReduction(dEvent.duration, state, dEvent.multiplier);
 
     // Create the ActiveEffect
     const effect = createActiveEffect(
@@ -291,9 +303,13 @@ export function resolveEvent(state: MainStreetState, event: EventCard): void {
     );
     state.activeEffects.push(effect);
 
-    // Log the onset
+    // Log the onset (generic wording covering both negative cuts and
+    // positive boosts — Group C adds positive income-multiplier and
+    // rep-multiplier effects).
+    const multiplierLabel = Math.round(dEvent.multiplier * 100);
+    const what = dEvent.effectType === 'rep-multiplier' ? 'Reputation' : 'Income';
     const logText = effectiveDuration > 0
-      ? `${dEvent.name}: Income reduced to ${Math.round(dEvent.multiplier * 100)}% for ${effectiveDuration} turns`
+      ? `${dEvent.name}: ${what} multiplier ${multiplierLabel}% for ${effectiveDuration} turns`
       : `${dEvent.name}: Resolved with no effect (fully neutralized)`;
     addLog(state, logText, 'loss');
 

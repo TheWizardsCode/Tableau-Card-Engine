@@ -166,10 +166,10 @@ describe('Meta-Progression System', () => {
       }
     });
 
-    it('Tier 5 cumulative pool covers full catalog (102 tiered templates)', () => {
-      // 102 = 96 (post-Group-A) + 6 Group B community-space cards
+    it('Tier 5 cumulative pool covers full catalog (110 tiered templates)', () => {
+      // 110 = 102 (post-Group-B) + 8 Group C investment events
       // (staff cards carry no tier, per convention).
-      expect(TIER_DEFINITIONS['tier-5'].cumulativeCardIds).toHaveLength(102);
+      expect(TIER_DEFINITIONS['tier-5'].cumulativeCardIds).toHaveLength(110);
     });
 
     it('cumulative card IDs are actually cumulative', () => {
@@ -692,9 +692,9 @@ describe('Meta-Progression System', () => {
       }
     });
 
-    it('Tier 5 pool yields all 94 unique template IDs across all deck builders', () => {
-      // 94 = business (30, +12 Group A) + event (37) + upgrade (27);
-      // community-space (2) and staff (3) are not part of these builders.
+    it('Tier 5 pool yields all 102 unique template IDs across all deck builders', () => {
+      // 102 = business (30, +12 Group A) + event (45, +8 Group C) + upgrade (27);
+      // community-space (8) and staff (3) are not part of these builders.
       const tier5CardIds = TIER_DEFINITIONS['tier-5'].cumulativeCardIds;
 
       const bizDeck = createBusinessDeck(1, tier5CardIds);
@@ -707,7 +707,7 @@ describe('Meta-Progression System', () => {
         ...upgDeck.map((c) => c.id.replace(/-\d+$/, '')),
       ]);
 
-      expect(allBaseIds.size).toBe(94);
+      expect(allBaseIds.size).toBe(102);
     });
   });
 
@@ -1071,9 +1071,9 @@ describe('Meta-Progression System', () => {
       expect(ids).toHaveLength(38); // 21 (T1) + 17 (T2: 15 Group A + 2 Group B cs)
     });
 
-    it('returns all 102 cards for all 5 tiers', () => {
+    it('returns all 110 cards for all 5 tiers', () => {
       const ids = deriveUnlockedCardIds(['tier-1', 'tier-2', 'tier-3', 'tier-4', 'tier-5']);
-      expect(ids).toHaveLength(102);
+      expect(ids).toHaveLength(110);
     });
 
     it('handles empty array', () => {
