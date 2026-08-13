@@ -200,7 +200,10 @@ describe('MainStreetMarket', () => {
       const state = createTestState();
       const upgrade = state.market.investments.find(c => c.family === 'upgrade') as UpgradeCard | undefined;
       if (!upgrade) return;
-      // Street is empty, no targets
+      // Street is empty, no targets. Use a large coin balance so the only
+      // rejection reason is the missing-eligible-target one (the seed's
+      // investment-row upgrade can be unaffordable at the 8 starting coins).
+      state.resourceBank.coins = 100;
       const result = canPurchaseUpgrade(state, upgrade.id);
       expect(result.legal).toBe(false);
       if (!result.legal) {

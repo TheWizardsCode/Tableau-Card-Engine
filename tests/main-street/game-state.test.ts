@@ -35,7 +35,7 @@ import { DEFAULT_CHALLENGES_PER_RUN } from '../../example-games/main-street/Main
 // Event:     5 (M1) + 12 (M2) + 18 (M3) + 1 (Evt Recession) = 36 templates  (actual array length: 37)
 // Upgrade:   3 (M1) + 14 (M2) + 4 branching + 4 level-2 + 1 (Community Hub) = 26 templates
 // Community: 2 (Park, Library) = 2 templates
-const BUSINESS_TEMPLATE_COUNT = 18;
+const BUSINESS_TEMPLATE_COUNT = 30;
 const EVENT_TEMPLATE_COUNT = 37;
 const UPGRADE_TEMPLATE_COUNT = 27;
 const DEFAULT_BUSINESS_COPIES = 3;

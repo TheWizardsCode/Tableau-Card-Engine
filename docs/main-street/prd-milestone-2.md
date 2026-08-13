@@ -792,9 +792,9 @@ The following items are explicitly excluded from this spec:
 
 | Snapshot | Business | Event | Upgrade | Total templates |
 |---|---:|---:|---:|---:|
-| Tier 1 baseline | 7 | 6 | 5 | 18 |
-| Current catalog | 17 | 17 | 25 | 59 |
-| Net increase | +10 | +11 | +20 | +41 |
+| Tier 1 baseline | 6 | 6 | 8 | 20 |
+| Current catalog | 30 | 37 | 27 | 94 |
+| Net increase | +24 | +31 | +19 | +74 |
 
 Verification artifacts:
 - `docs/main-street/card-catalog-baseline.json`

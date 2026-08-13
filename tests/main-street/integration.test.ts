@@ -588,11 +588,13 @@ describe('Integration: Held Investment Event', () => {
     // Turn 2: play the held event manually
     executeDayStart(state);
     const coinsBeforePlay = state.resourceBank.coins;
+    // Reputation multiplier: 1 + rep/20. Turn 1's incident phase can change
+    // reputation (seed-dependent incident queue), so compute from the live
+    // value rather than assuming rep stayed at 5.
+    const repMultiplier = 1 + state.resourceBank.reputation / 20;
     executeAction(state, { type: 'play-event' });
     expect((state.hand ?? []).some(c => c.family === 'event')).toBe(false); // Now resolved
-    // Reputation multiplier: rep=5, divisor=20 → 1 + 5/20 = 1.25
-    // floor(4 * 1.25) = floor(5.0) = 5
-    expect(state.resourceBank.coins).toBe(coinsBeforePlay + 5); // +4 base scaled to +5 by rep
+    expect(state.resourceBank.coins).toBeCloseTo(coinsBeforePlay + 4 * repMultiplier); // +4 base scaled by rep
 
     const result2 = processEndOfTurn(state);
     expect(result2).toBeDefined();

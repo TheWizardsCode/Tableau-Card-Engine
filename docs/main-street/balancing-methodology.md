@@ -61,19 +61,23 @@ When a card's cost changes, its reward fields (baseIncome, coinDelta, synergy bo
 
 ## Per-Family Strategy
 
-### Business (18 cards) and Community Space (2 cards)
+### Business (30 cards) and Community Space (2 cards)
+
+> Business grew from 18 to 30 in the Group A expansion (CG-0MSQJ1XIB0004QVN):
+> 12 new cards (Health bridges, T2/T3 singles, T5 Grand Hotel flagship). The
+> 1/3 cost-spread rule now applies to 30 cards (threshold 10).
 
 - **Goal**: Wider cost spread (target: range increase ≥ 30%)
 - **Inputs**: baseIncome, synergyCount, synergy bonuses, reputation, tier
 - **Algorithm**: Curve-fitted cost + tier-driven base → clamped to tier bands → spread enforcement
 
-### Investment Events (13 of 36 events)
+### Investment Events (13 of 37 events)
 
 - **Goal**: Cost range wider than current 2–4 (target: range ≥ 3)
 - **Inputs**: coinDelta, reputationDelta, target scope (All vs SpecificSynergy)
 - **Scope multiplier**: All = 1.0×, SpecificSynergy = 1.2×
 
-### Incidents (23 of 36 events)
+### Incidents (24 of 37 events)
 
 - **Not adjusted** — all remain at cost 0
 

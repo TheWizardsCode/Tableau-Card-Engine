@@ -1,6 +1,6 @@
 {
   "source": "Generated from MainStreetCards.ts and Tier 1 IDs from MainStreetTiers.ts",
-  "generatedAt": "2026-07-25T23:50:00.000Z",
+  "generatedAt": "2026-08-13T00:13:59.452Z",
   "baselineTier1CardIds": [
     "biz-bakery",
     "biz-bookshop",
@@ -31,12 +31,24 @@
       "biz-cafe",
       "biz-cinema",
       "biz-clinic",
+      "biz-craft-shop",
+      "biz-delicatessen",
+      "biz-dentist",
       "biz-florist",
       "biz-food-truck",
       "biz-gallery",
+      "biz-gym",
+      "biz-hotel",
+      "biz-juice-bar",
+      "biz-music-store",
       "biz-pharmacy",
+      "biz-physio",
       "biz-private-clinic",
-      "biz-spa"
+      "biz-spa",
+      "biz-tailor",
+      "biz-teahouse",
+      "biz-toy-store",
+      "biz-yoga-studio"
     ],
     "event": [
       "evt-block-party",

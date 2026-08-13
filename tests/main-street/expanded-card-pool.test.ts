@@ -57,8 +57,8 @@ const upgradeDeck = createUpgradeDeck(1);
 // ── Template Completeness ───────────────────────────────────
 
 describe('Expanded Card Pool: Template Completeness', () => {
-  it('should have exactly 18 business templates', () => {
-    expect(businessDeck).toHaveLength(18);
+  it('should have exactly 30 business templates', () => {
+    expect(businessDeck).toHaveLength(30);
   });
 
   it('should have exactly 37 event templates', () => {
@@ -448,8 +448,8 @@ describe('Expanded Card Pool: Event Card Fields', () => {
 // ── Deck Building ───────────────────────────────────────────
 
 describe('Expanded Card Pool: Deck Building', () => {
-  it('business deck with 3 copies should have 54 cards', () => {
-    expect(createBusinessDeck(3)).toHaveLength(54);
+  it('business deck with 3 copies should have 90 cards', () => {
+    expect(createBusinessDeck(3)).toHaveLength(90);
   });
 
     it('event deck with 3 copies should have 111 cards', () => {
@@ -564,11 +564,16 @@ describe('Expanded Card Pool: Synergy Coverage', () => {
     }
   });
 
-  it('no synergy type should have more than 6 business cards', () => {
-    const types: SynergyType[] = ['Food', 'Culture', 'Commerce', 'Service', 'Entertainment'];
+  it('no synergy type should exceed 10 business cards (expansion cap)', () => {
+    // Bound relaxed from 6 to 10 by Group A (CG-0MSQJ1XIB0004QVN): the Health
+    // bridge expansion adds 5 Health cards (8 total), Food and Culture reach 7
+    // each, while Commerce/Service/Entertainment stay at 5-6. The cap keeps
+    // any single type from dominating the pool while allowing the contracted
+    // bridge cards (which count toward two types each).
+    const types: SynergyType[] = ['Food', 'Culture', 'Commerce', 'Service', 'Entertainment', 'Health'];
     for (const st of types) {
       const count = businessDeck.filter(c => c.synergyTypes.includes(st)).length;
-      expect(count).toBeLessThanOrEqual(6);
+      expect(count).toBeLessThanOrEqual(10);
     }
   });
 

@@ -164,7 +164,7 @@ describe('enumerateLegalActions', () => {
     expect(actions.some(a => a.type === 'play-event')).toBe(false);
   });
 
-  it('excludes buy-event when player already holds an event', () => {
+  it('allows buy-event when player already holds an event (no max-1 rule)', () => {
     const state = createTestState();
     state.hand = [{
       family: 'event',
@@ -177,6 +177,9 @@ describe('enumerateLegalActions', () => {
       coinDelta: 2,
       reputationDelta: 0,
     }];
+    // Generous coins so affordability does not depend on which event the
+    // seeded market draws (the expanded pool shifted the seed's row).
+    state.resourceBank.coins = 100;
     const actions = enumerateLegalActions(state);
     // Hand holds one card (< maxHandSize 2), so another event purchase is legal.
     expect(actions.some(a => a.type === 'buy-event')).toBe(true);

@@ -11,8 +11,8 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
 
 | Family        | Templates | Copies each | Total cards |
 |---------------|-----------|-------------|-------------|
-| Business      | 18        | 3           | 54          |
-| Event         | 36        | 3           | 108         |
+| Business      | 30        | 3           | 90          |
+| Event         | 37        | 3           | 111         |
 | Upgrade       | 27        | 2           | 54          |
 | Community Space | 2       | 3           | 6           |
 | Staff         | 3         | 3           | 9           |
@@ -23,12 +23,15 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
 
 | Snapshot | Business | Event | Upgrade | Community Space | Staff | Total templates |
 |---|---:|---:|---:|---:|---:|---:|
-| Tier 1 baseline (`docs/main-street/card-catalog-baseline.json`) | 7 | 6 | 5 | — | — | 18 |
-| Current catalog (`card-data.csv`) | 18 | 36 | 27 | 2 | 3 | 86 |
-| Net increase | +11 | +30 | +22 | +2 | +3 | +68 |
+| Tier 1 baseline (`docs/main-street/card-catalog-baseline.json`) | 6 | 6 | 8 | — | — | 20 |
+| Current catalog (`card-data.csv`) | 30 | 37 | 27 | 2 | 3 | 99 |
+| Net increase | +24 | +31 | +19 | +2 | +3 | +79 |
 
-- 2x target from baseline: `>= 36` templates
-- Current total: `86` templates (`4.78x` baseline)
+- 2x target from baseline: `>= 40` templates
+- Current total: `99` templates (`4.95x` baseline)
+- Business family grew from 18 to 30 with the Group A expansion (CG-0MSQJ1XIB0004QVN):
+  12 new cards including the first Health bridge cards (Juice Bar, Yoga Studio,
+  Physiotherapy), mid-tier (T2/T3) singles, and the T5 Grand Hotel flagship.
 - Non-baseline card IDs are tracked in `docs/main-street/expanded-card-manifest.json`
 
 ### Guidance: adding more cards safely
@@ -104,6 +107,37 @@ Bridge cards belong to two synergy types simultaneously, enabling cross-type adj
 | `biz-gallery` | Art Gallery | 4 | 2 | Culture + Entertainment | Art Gallery | Showcases local artists. | Connects M1 Culture with new Entertainment. |
 | `biz-spa` | Day Spa | 5 | 3 | Service + Entertainment | Day Spa | Relaxation and pampering. | Premium bridge; high synergy potential across 2 new types. |
 | `biz-florist` | Florist | 2 | 1 | Commerce + Culture | Florist | Arrangements for every occasion. | Budget bridge linking Commerce and Culture. |
+
+### M3 Business Templates (12) — Group A expansion (CG-0MSQJ1XIB0004QVN)
+
+Adds the first **Health bridge cards**, mid-tier (T2/T3) singles across every synergy, and a T5 flagship.
+
+#### Health bridges (new)
+
+| ID | Name | Cost | Income | Synergy | Tier | Rep/turn | Description | Rationale |
+|----|------|------|--------|---------|------|----------|-------------|-----------|
+| `biz-juice-bar` | Juice Bar | 5 | 0.5 | Food + Health | 2 | — | Fresh juices and smoothies. Bridges Food and Health synergies. | First Health bridge; connects the existing Food cluster to Health. |
+| `biz-yoga-studio` | Yoga Studio | 8 | 1 | Culture + Health | 3 | — | Calm practice space for mind and body. Bridges Culture and Health synergies. | Culture–Health bridge; mid-tier wellness option. |
+| `biz-physio` | Physiotherapy | 10 | 1 | Health + Service | 4 | 0.1 | Recovery and rehabilitation care. Bridges Health and Service synergies. Provides +0.1 reputation per turn. | Health–Service bridge with a small reputation perk. |
+
+#### Singles (mid-tier depth)
+
+| ID | Name | Cost | Income | Synergy | Tier | Rep/turn | Description | Rationale |
+|----|------|------|--------|---------|------|----------|-------------|-----------|
+| `biz-tailor` | Tailor | 5 | 0.75 | Service | 2 | — | Custom tailoring and repairs. Gains 50% of base income per adjacent Service business. | Mid Service single; smooths T2. |
+| `biz-gym` | Gym | 8 | 1 | Health | 3 | — | Fitness training for the whole street. Gains 50% of base income per adjacent Health business. | Health single; T3 anchor. |
+| `biz-dentist` | Dentist | 12 | 1.5 | Health | 4 | — | Smiles for the whole street. Gains 50% of base income per adjacent Health business. | Premium Health single. |
+| `biz-toy-store` | Toy Store | 5 | 0.75 | Commerce | 2 | — | Toys and games for young shoppers. Gains 50% of base income per adjacent Commerce business. | Commerce depth at T2. |
+| `biz-music-store` | Music Store | 8 | 1 | Entertainment | 3 | — | Records and instruments for every taste. Gains 50% of base income per adjacent Entertainment business. | Entertainment depth at T3. |
+| `biz-delicatessen` | Delicatessen | 5 | 0.75 | Food | 2 | — | Fine meats and cheeses. Gains 50% of base income per adjacent Food business. | Food depth at T2. |
+| `biz-craft-shop` | Craft Shop | 5 | 0.75 | Culture | 2 | — | Handmade goods by local makers. Gains 50% of base income per adjacent Culture business. | Culture single (only Bookshop existed before). |
+
+#### Flagship
+
+| ID | Name | Cost | Income | Synergy | Tier | Rep/turn | Description | Rationale |
+|----|------|------|--------|---------|------|----------|-------------|-----------|
+| `biz-hotel` | Grand Hotel | 16 | 2.5 | Service | 5 | 0.1 | Premier lodging on Main Street. Gains 50% of base income per adjacent Service business. Provides +0.1 reputation per turn. | T5 flagship; highest income in the pool. Cost exceeds the flagship band's 14 cap to reflect premium positioning (documented balance rationale). |
+| `biz-teahouse` | Teahouse | 7 | 0.75 | Food + Culture | 3 | — | Loose-leaf teas and quiet corners. Bridges Food and Culture synergies. | Second Food–Culture bridge (alongside Cafe). |
 
 ---
 

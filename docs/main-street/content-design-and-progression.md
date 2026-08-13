@@ -14,7 +14,18 @@ The **Main Street** game uses three distinct card families. Below is the current
 | Bookshop | 4 | 2 | Culture | Bookshop → Reader's Café | Sells books. Gains 50% of base income per adjacent Culture business. |
 | Park | 2 | 1 | Culture | Park → Garden | Offers leisure. Gains 50% of base income per adjacent Culture business or community space. |
 | Hardware Store | 5 | 3 | Commerce | Hardware Store → Home Improvement | Supplies tools. Gains 50% of base income per adjacent Commerce business. |
-| ... *(additional business cards may be added later)* |
+| Juice Bar | 5 | 0.5 | Food, Health | — | Fresh juices and smoothies. Bridges Food and Health synergies. *(Group A: first Health bridge.)* |
+| Yoga Studio | 8 | 1 | Culture, Health | — | Calm practice space for mind and body. Bridges Culture and Health synergies. *(Group A.)* |
+| Physiotherapy | 10 | 1 | Health, Service | — | Recovery and rehabilitation care. Bridges Health and Service synergies; +0.1 rep/turn. *(Group A.)* |
+| Tailor | 5 | 0.75 | Service | — | Custom tailoring and repairs. Gains 50% of base income per adjacent Service business. *(Group A.)* |
+| Gym | 8 | 1 | Health | — | Fitness training for the whole street. Gains 50% of base income per adjacent Health business. *(Group A.)* |
+| Dentist | 12 | 1.5 | Health | — | Smiles for the whole street. Gains 50% of base income per adjacent Health business. *(Group A.)* |
+| Toy Store | 5 | 0.75 | Commerce | — | Toys and games for young shoppers. Gains 50% of base income per adjacent Commerce business. *(Group A.)* |
+| Music Store | 8 | 1 | Entertainment | — | Records and instruments for every taste. Gains 50% of base income per adjacent Entertainment business. *(Group A.)* |
+| Delicatessen | 5 | 0.75 | Food | — | Fine meats and cheeses. Gains 50% of base income per adjacent Food business. *(Group A.)* |
+| Craft Shop | 5 | 0.75 | Culture | — | Handmade goods by local makers. Gains 50% of base income per adjacent Culture business. *(Group A.)* |
+| Grand Hotel | 16 | 2.5 | Service | — | Premier lodging on Main Street. Gains 50% of base income per adjacent Service business; +0.1 rep/turn. *(Group A T5 flagship.)* |
+| Teahouse | 7 | 0.75 | Food, Culture | — | Loose-leaf teas and quiet corners. Bridges Food and Culture synergies. *(Group A.)* |
 
 ### 1.2 Event Cards
 

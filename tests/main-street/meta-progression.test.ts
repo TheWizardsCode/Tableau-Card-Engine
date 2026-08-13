@@ -165,8 +165,10 @@ describe('Meta-Progression System', () => {
       }
     });
 
-    it('Tier 5 cumulative pool covers full catalog (84 templates)', () => {
-      expect(TIER_DEFINITIONS['tier-5'].cumulativeCardIds).toHaveLength(84);
+    it('Tier 5 cumulative pool covers full catalog (96 tiered templates)', () => {
+      // 96 = 87 original tiered templates + 12 Group A business cards
+      // (staff cards carry no tier, per convention).
+      expect(TIER_DEFINITIONS['tier-5'].cumulativeCardIds).toHaveLength(96);
     });
 
     it('cumulative card IDs are actually cumulative', () => {
@@ -689,7 +691,9 @@ describe('Meta-Progression System', () => {
       }
     });
 
-    it('Tier 5 pool yields all 82 unique template IDs across all deck builders', () => {
+    it('Tier 5 pool yields all 94 unique template IDs across all deck builders', () => {
+      // 94 = business (30, +12 Group A) + event (37) + upgrade (27);
+      // community-space (2) and staff (3) are not part of these builders.
       const tier5CardIds = TIER_DEFINITIONS['tier-5'].cumulativeCardIds;
 
       const bizDeck = createBusinessDeck(1, tier5CardIds);
@@ -702,7 +706,7 @@ describe('Meta-Progression System', () => {
         ...upgDeck.map((c) => c.id.replace(/-\d+$/, '')),
       ]);
 
-      expect(allBaseIds.size).toBe(82);
+      expect(allBaseIds.size).toBe(94);
     });
   });
 
@@ -1063,12 +1067,12 @@ describe('Meta-Progression System', () => {
 
     it('returns cumulative cards for ["tier-1", "tier-2"]', () => {
       const ids = deriveUnlockedCardIds(['tier-1', 'tier-2']);
-      expect(ids).toHaveLength(30); // 20 + 10
+      expect(ids).toHaveLength(35); // 20 + 15 (T2 grew by 5 Group A businesses)
     });
 
-    it('returns all 84 cards for all 5 tiers', () => {
+    it('returns all 96 cards for all 5 tiers', () => {
       const ids = deriveUnlockedCardIds(['tier-1', 'tier-2', 'tier-3', 'tier-4', 'tier-5']);
-      expect(ids).toHaveLength(84);
+      expect(ids).toHaveLength(96);
     });
 
     it('handles empty array', () => {
