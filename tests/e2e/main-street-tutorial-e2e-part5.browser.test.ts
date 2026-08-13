@@ -107,11 +107,36 @@ describe('Main Street Tutorial E2E — T11-T12', () => {
     expect(s.state.hand.some((c: any) => c.id.startsWith('cs-library'))).toBe(true);
 
     // Place the Library next to the Bookshop (slot 1 from T10 → slot 2 is
-    // its Manhattan neighbor; non-adjacent slots are rejected during T12).
+    // its orthogonal neighbor; non-adjacent slots are rejected during T12).
     await clickStreetSlot(scene, 2);
     await waitForOverlayVisible(5_000);
     expect(getStepIndex(scene)).toBe(12); // T13 Triggering Events
     expect(s.state.streetGrid[2]?.id.startsWith('cs-library')).toBe(true);
     await saveScreenshot('t12-t13');
+  }, 30_000);
+
+  it('T12: diagonal placement next to the Bookshop is accepted (8-way adjacency)', async () => {
+    const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
+    await walkToT11(scene);
+    await clickEndTurn(scene);
+    await waitForOverlayVisible(10_000);
+    expect(getStepIndex(scene)).toBe(11);
+
+    const s = scene as any;
+    const library = s.state.market.development.find((c: any) => c.id.startsWith('cs-library'));
+    expect(library).toBeTruthy();
+
+    await clickRequiredBusinessCard(scene);
+    await waitForOverlayVisible(5_000);
+    expect(getStepIndex(scene)).toBe(11); // still T12
+    expect(s.state.hand.some((c: any) => c.id.startsWith('cs-library'))).toBe(true);
+
+    // Bookshop is at slot 1 (from T10). Slot 5 is diagonal (row 1, col 0) —
+    // Chebyshev distance 1, so the 8-way "next to" rule accepts it.
+    await clickStreetSlot(scene, 5);
+    await waitForOverlayVisible(5_000);
+    expect(getStepIndex(scene)).toBe(12); // T13 Triggering Events
+    expect(s.state.streetGrid[5]?.id.startsWith('cs-library')).toBe(true);
+    await saveScreenshot('t12-diagonal-t13');
   }, 30_000);
 });
