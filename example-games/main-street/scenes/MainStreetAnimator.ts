@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { CARD_TEMPLATE_NAMES } from '../MainStreetCards';
 import { FONT_FAMILY, popTextOrIcon, moveGameObject } from '../../../src/ui';
+import type { SlotIncome } from '../MainStreetAdjacency';
 import { SFX_KEYS } from './MainStreetConstants';
 
 /** MainStreetAnimator -- animation and HUD-delta helper for Main Street scene. */
@@ -24,23 +25,30 @@ export class MainStreetAnimator {
     }
 
     const reducedMotion = s.settingsPanel?.reducedMotion;
+    // While the end-of-turn income collection animation is running, the
+    // immediate HUD delta pop is suppressed — the collection's final
+    // "+total" pop (animateIncomeCollection) is the single landing
+    // feedback. The income sound/event routing below is still performed.
+    const suppressDeltaPop = s.incomeCollectionActive === true;
 
     if (coins !== s.previousCoins) {
       const delta = coins - s.previousCoins;
-      const text = s.add.text(coinX, hudY - 6, `${delta > 0 ? '+' : ''}${delta}`, {
-        fontSize: '16px',
-        fontStyle: 'bold',
-        color: delta >= 0 ? '#ffdd66' : '#ff7777',
-        fontFamily: FONT_FAMILY,
-      }).setOrigin(0.5).setDepth(500);
-      void popTextOrIcon({
-        scene: s,
-        target: text,
-        duration: 1500,
-        riseY: 22,
-        scale: 1.2,
-        reducedMotion,
-      });
+      if (!suppressDeltaPop) {
+        const text = s.add.text(coinX, hudY - 6, `${delta > 0 ? '+' : ''}${delta}`, {
+          fontSize: '16px',
+          fontStyle: 'bold',
+          color: delta >= 0 ? '#ffdd66' : '#ff7777',
+          fontFamily: FONT_FAMILY,
+        }).setOrigin(0.5).setDepth(500);
+        void popTextOrIcon({
+          scene: s,
+          target: text,
+          duration: 1500,
+          riseY: 22,
+          scale: 1.2,
+          reducedMotion,
+        });
+      }
       try {
         if (delta > 0) {
           try { s.gameEvents?.emit('income-gained', { amount: delta }); } catch (_) {}
@@ -54,20 +62,22 @@ export class MainStreetAnimator {
 
     if (reputation !== s.previousReputation) {
       const delta = reputation - s.previousReputation;
-      const text = s.add.text(repX, hudY - 6, `${delta > 0 ? '+' : ''}${delta}`, {
-        fontSize: '16px',
-        fontStyle: 'bold',
-        color: delta >= 0 ? '#99ccff' : '#ff8899',
-        fontFamily: FONT_FAMILY,
-      }).setOrigin(0.5).setDepth(500);
-      void popTextOrIcon({
-        scene: s,
-        target: text,
-        duration: 1500,
-        riseY: 22,
-        scale: 1.2,
-        reducedMotion,
-      });
+      if (!suppressDeltaPop) {
+        const text = s.add.text(repX, hudY - 6, `${delta > 0 ? '+' : ''}${delta}`, {
+          fontSize: '16px',
+          fontStyle: 'bold',
+          color: delta >= 0 ? '#99ccff' : '#ff8899',
+          fontFamily: FONT_FAMILY,
+        }).setOrigin(0.5).setDepth(500);
+        void popTextOrIcon({
+          scene: s,
+          target: text,
+          duration: 1500,
+          riseY: 22,
+          scale: 1.2,
+          reducedMotion,
+        });
+      }
     }
 
     s.previousCoins = coins;
@@ -169,6 +179,126 @@ export class MainStreetAnimator {
       scale: 2,
       riseY: 40,
       style: { fontSize: '18px', fontStyle: 'bold', color: '#ffdd44' },
+    });
+  }
+
+  /**
+   * Animates end-of-turn income collection.
+   *
+   * Each producing street slot emits a coin icon that arcs to the HUD coins
+   * counter with a staggered coin-pop SFX (`SFX_KEYS.COIN_POP`);
+   * reputation-earning cards emit a reputation pip that flies to the
+   * reputation HUD value. When every flight has landed a final "+total" pop
+   * lands at the coin counter and `scene.incomeCollectionActive` clears.
+   *
+   * Accessibility (reduced motion): all flights are skipped and the method
+   * returns immediately — the caller's HUD refresh path
+   * (`refreshHud()` → `animateHudValueChanges()`) still provides the single
+   * final "+total" pop + income sound, per the proposal's AC3.
+   *
+   * Headless/replay exemption (AGENTS.md rule 8): this is a
+   * presentation-only effect — it never mutates game state, the transcript,
+   * or the turn flow. In replay/headless mode (`scene.replayMode`) it
+   * returns immediately (no rendering, no audio), which is the documented
+   * exemption for those modes.
+   *
+   * HUD targets mirror `MainStreetRenderer.refreshHud()` strip geometry:
+   * stripWidth = gameW * 0.5, stripLeft = gameW * 0.25; the coins label sits
+   * at stripLeft + 70 and the reputation label at the strip centre. Keep the
+   * two in sync if the HUD strip geometry changes.
+   *
+   * @param params  Income result (per-slot breakdown = coin flight sources)
+   *                and per-slot reputation contributions (pip sources).
+   */
+  public animateIncomeCollection(params: {
+    /** Income result from `processEndOfTurn` (pre-multiplier totals). */
+    income: {
+      total: number;
+      breakdown: SlotIncome[];
+    };
+    /** Per-slot reputation contributions (`currentReputationPerTurn > 0`). */
+    repSources: Array<{ slotIndex: number; rep: number }>;
+  }): void {
+    const s = this.scene;
+
+    // Headless/replay exemption: no rendering or audio in those modes.
+    if (s.replayMode) return;
+
+    // Reduced motion: skip flights; the HUD refresh path provides the
+    // single final pop + income sound.
+    if (s.settingsPanel?.reducedMotion) return;
+
+    const coinSources = params.income.breakdown.filter((b) => b.total > 0);
+    if (coinSources.length === 0 && params.repSources.length === 0) return;
+
+    const { gameW, hudY } = s.layout;
+    const coinX = gameW * 0.25 + 70;
+    const repX = gameW * 0.5;
+    const flightMs = 600;
+    const staggerMs = 50;
+
+    s.incomeCollectionActive = true;
+    let remaining = coinSources.length + params.repSources.length;
+
+    const completeOne = (): void => {
+      remaining -= 1;
+      if (remaining > 0) return;
+      // All flights landed — final "+total" pop at the coin counter.
+      const totalText = s.add.text(coinX, hudY - 8, `+${params.income.total}`, {
+        fontSize: '18px',
+        fontStyle: 'bold',
+        color: '#ffdd66',
+        fontFamily: FONT_FAMILY,
+      }).setOrigin(0.5).setDepth(500);
+      void popTextOrIcon({
+        scene: s,
+        target: totalText,
+        duration: 1000,
+        riseY: 24,
+        scale: 1.3,
+        reducedMotion: false, // collection only runs when reduced motion is off
+      });
+      s.incomeCollectionActive = false;
+    };
+
+    const launch = (
+      from: { x: number; y: number },
+      to: { x: number; y: number },
+      kind: 'coin' | 'rep',
+      delayMs: number,
+    ): void => {
+      s.time.delayedCall(delayMs, () => {
+        const visual = s.add.circle(
+          from.x,
+          from.y,
+          kind === 'coin' ? 6 : 5,
+          kind === 'coin' ? 0xffcc44 : 0x88bbff,
+          1,
+        );
+        visual.setDepth(3000);
+        moveGameObject({
+          scene: s,
+          target: visual,
+          destX: to.x,
+          destY: to.y,
+          duration: flightMs,
+          ease: 'Quad.easeIn',
+          soundManager: s.soundManager,
+          // Coin flights pop; reputation pips are silent (no coin sound).
+          sfx: kind === 'coin' ? { start: SFX_KEYS.COIN_POP } : undefined,
+          onComplete: () => {
+            visual.destroy();
+            completeOne();
+          },
+        });
+      });
+    };
+
+    coinSources.forEach((slot, i) => {
+      launch(this.getStreetSlotCenter(slot.slotIndex), { x: coinX, y: hudY }, 'coin', i * staggerMs);
+    });
+    params.repSources.forEach((slot, i) => {
+      launch(this.getStreetSlotCenter(slot.slotIndex), { x: repX, y: hudY }, 'rep', (coinSources.length + i) * staggerMs);
     });
   }
 

@@ -133,6 +133,30 @@ export class MainStreetTurnController {
       s.state.skipMarketCycleOnEndTurn = false;
     }
 
+    // ── Income Collection Animation ────────────────────────────
+    // Presentation-only VFX (AGENTS.md rule 8): each producing slot emits a
+    // coin that arcs to the HUD coins counter with staggered coin-pop SFX,
+    // reputation-earning cards emit a pip to the rep counter, and a final
+    // "+total" pop lands when collection completes. Skipped under reduced
+    // motion and in replay/headless modes (handled inside the animator).
+    // Runs inside the existing 400ms→800ms turn-advance window so turn
+    // timing is unchanged; never mutates state or transcript — failures are
+    // swallowed so the turn always advances.
+    try {
+      if (result.income && result.income.total > 0) {
+        const grid: Array<{ currentReputationPerTurn?: number } | null> = s.state.streetGrid ?? [];
+        const repSources = grid
+          .map((card, slotIndex) => ({ slotIndex, rep: card?.currentReputationPerTurn ?? 0 }))
+          .filter((src) => src.rep > 0);
+        s.msAnimator.animateIncomeCollection({
+          income: result.income,
+          repSources,
+        });
+      }
+    } catch (_) {
+      // Presentation-only: never block the turn on animation failures.
+    }
+
     // Save checkpoint after each completed turn (fire-and-forget)
     try { this.onSaveCheckpoint?.(); } catch (e) { /* ignore */ }
 

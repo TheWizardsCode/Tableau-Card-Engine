@@ -36,6 +36,32 @@ void popTextOrIcon({
 });
 ```
 
+### End-of-turn income collection (coin fly-to-HUD)
+
+- Trigger: `MainStreetTurnController.endTurn()` after `processEndOfTurn()`
+  resolves with `income.total > 0` (CG-0MSRGTUSK003GDGE).
+- Helper: `MainStreetAnimator.animateIncomeCollection()` — launches one coin
+  icon per producing street slot (from `IncomeResult.breakdown`) that arcs to
+  the HUD coins counter, plus one reputation pip per rep-earning card to the
+  reputation HUD value.
+- SFX: staggered `SFX_KEYS.COIN_POP` (`sfx-coin-pop`) per flight, played via
+  the scene `SoundManager` through `moveGameObject`'s `sfx.start`.
+- Landing: when every flight completes, a final `+total` pop
+  (`popTextOrIcon`) lands at the coin counter. While collection is running
+  (`scene.incomeCollectionActive === true`) the immediate HUD delta pop is
+  suppressed so the final pop is the single landing feedback — the income
+  sound/event routing (`income-gained` → `sfx-income-positive`) still runs.
+- Timing budget: flights run inside the existing 400ms → 800ms turn-advance
+  window (600ms flight, 50ms stagger — ≤1050ms for a full 10-slot street),
+  so turn timing is unchanged and the effect is non-blocking.
+- Accessibility (reduced motion): flights are skipped entirely; the HUD
+  refresh path still provides the single final pop + income sound.
+- Headless/replay exemption (AGENTS.md rule 8): presentation-only — never
+  mutates state or transcript; returns immediately in replay/headless mode
+  (`scene.replayMode`), no rendering or audio.
+- Reuse: `moveGameObject` + `SoundManager` + `popTextOrIcon`, `SFX_KEYS`
+  (`COMMON_SFX_KEYS` convention); no new SFX keys or engine infrastructure.
+
 ## Scene Transitions
 
 - Main Street scene-level fade transitions are currently disabled.

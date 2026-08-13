@@ -102,6 +102,15 @@ export class MainStreetScene extends CardGameScene {
   // HUD animation state
   public previousCoins: number | null = null;
   public previousReputation: number | null = null;
+
+  /**
+   * True while the end-of-turn income collection animation is running
+   * (coins/pips flying to the HUD). Suppresses the immediate HUD delta pop
+   * in `animateHudValueChanges` so the collection's final "+total" pop is
+   * the single landing feedback. Set/reset by `MainStreetAnimator`; always
+   * false under reduced motion and in replay/headless modes.
+   */
+  public incomeCollectionActive = false;
   public transferAnimationCount = 0;
   public activeTransferTweens = new Set<Phaser.Tweens.Tween>();
   public activeTransferVisuals = new Set<Phaser.GameObjects.GameObject>();
