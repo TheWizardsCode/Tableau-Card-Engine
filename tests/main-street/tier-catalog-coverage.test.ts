@@ -38,7 +38,7 @@ describe('Main Street tier catalog coverage', () => {
     const expandedCountInTier1 = TIER_DEFINITIONS['tier-1'].newCardIds.filter(id => !baselineM1.has(id)).length;
 
     expect(expanded.length).toBeGreaterThan(0);
-    // 24 tier-1 cards - 13 fixed M1 baseline = 11 (cs-playground + 3 Group D incidents)
-    expect(expandedCountInTier1).toBe(11);
+    // 25 tier-1 cards - 13 fixed M1 baseline = 12 (+cs-playground, 3 Group D, upg-adventure-park)
+    expect(expandedCountInTier1).toBe(12);
   });
 });

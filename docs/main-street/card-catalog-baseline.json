@@ -1,16 +1,16 @@
 {
   "source": "Tier 1 baseline from example-games/main-street/MainStreetTiers.ts",
-  "capturedAt": "2026-08-13T02:48:47.334Z",
+  "capturedAt": "2026-08-13T03:19:49.306Z",
   "perTier": {
     "tier1": {
       "business": 6,
       "event": 9,
-      "upgrade": 9,
-      "total": 24
+      "upgrade": 10,
+      "total": 25
     }
   },
   "totals": {
-    "baselineTotal": 24,
-    "targetAtLeast": 48
+    "baselineTotal": 25,
+    "targetAtLeast": 50
   }
 }

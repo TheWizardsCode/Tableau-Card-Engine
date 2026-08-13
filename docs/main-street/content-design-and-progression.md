@@ -83,7 +83,18 @@ Community-space cards are placed on the street grid like businesses but generate
 | Upgrade to Patisserie | Bakery | 4 | +1 | +1 (adjacency range) | Turns a Bakery into a Patisserie, increasing income and allowing synergy with businesses two slots away. |
 | Upgrade to Bistro | Diner | 4 | +1 | +1 | Turns a Diner into a Bistro with higher foot‑traffic. |
 | Upgrade to Reader's Café | Bookshop | 3 | +1 | 0 | Transforms the Bookshop into a Reader's Café, blending books with café culture for +0.1 reputation per turn. |
-| ... *(more upgrades as new businesses are introduced)* |
+| Upgrade to Smoothie Bar | Juice Bar | 4 | +1 | 0 | Turns a Juice Bar into a Smoothie Bar. *(Group E.)* |
+| Upgrade to Wellness Retreat | Yoga Studio | 5 | +1.5 | +1 | Expands the Yoga Studio into a Wellness Retreat. *(Group E.)* |
+| Upgrade to Fitness Center | Gym | 5 | +1.5 | +1 | Expands the Gym into a Fitness Center. *(Group E.)* |
+| Upgrade to Dental Clinic | Dentist | 7 | +2 | +1 | Expands the Dentist into a Dental Clinic. *(Group E.)* |
+| Upgrade to Bespoke Tailor | Tailor | 4 | +1 | 0 | Elevates the Tailor into a Bespoke Tailor. *(Group E.)* |
+| Upgrade to Toy Warehouse | Toy Store | 4 | +1 | +1 | Scales the Toy Store into a Toy Warehouse. *(Group E.)* |
+| Upgrade to Tea Lounge | Teahouse | 4 | +1 | 0 | Tea Lounge variant with +0.1 rep/turn. *(Group E.)* |
+| Upgrade to Gourmet Deli | Delicatessen | 4 | +1.5 | 0 | Elevates the Delicatessen into a Gourmet Deli. *(Group E.)* |
+| Upgrade to Adventure Park | Playground | 3 | 0 | 0 | Community-space upgrade; +0.05 rep/turn. *(Group E.)* |
+| Upgrade to Orchard | Community Garden | 3 | 0 | 0 | Community-space upgrade; +0.05 rep/turn. *(Group E.)* |
+| Upgrade to Grand Fountain | Town Fountain | 3 | 0 | 0 | Community-space upgrade; +0.05 rep/turn. *(Group E.)* |
+| Upgrade to Health Center | Health Kiosk | 4 | 0 | 0 | Community-space upgrade; +0.05 rep/turn. *(Group E.)* |
 
 ---
 

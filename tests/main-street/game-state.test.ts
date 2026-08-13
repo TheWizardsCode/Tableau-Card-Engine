@@ -37,7 +37,7 @@ import { DEFAULT_CHALLENGES_PER_RUN } from '../../example-games/main-street/Main
 // Community: 2 (Park, Library) = 2 templates
 const BUSINESS_TEMPLATE_COUNT = 30;
 const EVENT_TEMPLATE_COUNT = 55;
-const UPGRADE_TEMPLATE_COUNT = 27;
+const UPGRADE_TEMPLATE_COUNT = 39;
 const DEFAULT_BUSINESS_COPIES = 3;
 const DEFAULT_EVENT_COPIES = 3;
 const DEFAULT_UPGRADE_COPIES = 2;

@@ -13,7 +13,7 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
 |---------------|-----------|-------------|-------------|
 | Business      | 30        | 3           | 90          |
 | Event         | 55        | 3           | 165         |
-| Upgrade       | 27        | 2           | 54          |
+| Upgrade       | 39        | 2           | 78          |
 | Community Space | 8       | 3           | 24          |
 | Staff         | 3         | 3           | 9           |
 
@@ -24,11 +24,11 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
 | Snapshot | Business | Event | Upgrade | Community Space | Staff | Total templates |
 |---|---:|---:|---:|---:|---:|---:|
 | Tier 1 baseline (`docs/main-street/card-catalog-baseline.json`) | 6 | 6 | 8 | — | — | 20 |
-| Current catalog (`card-data.csv`) | 30 | 55 | 27 | 8 | 3 | 123 |
-| Net increase | +24 | +49 | +19 | +8 | +3 | +103 |
+| Current catalog (`card-data.csv`) | 30 | 55 | 39 | 8 | 3 | 135 |
+| Net increase | +24 | +49 | +31 | +8 | +3 | +115 |
 
 - 2x target from baseline: `>= 40` templates
-- Current total: `123` templates (`6.15x` baseline)
+- Current total: `135` templates (`6.75x` baseline)
 - Business family grew from 18 to 30 with the Group A expansion (CG-0MSQJ1XIB0004QVN):
   12 new cards including the first Health bridge cards (Juice Bar, Yoga Studio,
   Physiotherapy), mid-tier (T2/T3) singles, and the T5 Grand Hotel flagship.
@@ -44,6 +44,11 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
   10 new incidents (4 good / 3 bad / 3 neutral under the streak system's net-delta
   formula) covering under-served synergies, including the duration incident
   Labor Shortage (income-multiplier 0.9×/3 turns).
+- Upgrades grew from 27 to 39 with the Group E expansion (CG-0MSQJ7SYD008U3EE):
+  12 new upgrades covering every Group A business and Group B community space
+  (targets raised to maxLevel 1 so the upgrades are applicable), including
+  reputation-bonus upgrade variants (Tea Lounge, Adventure Park, Orchard,
+  Grand Fountain, Health Center).
 - Non-baseline card IDs are tracked in `docs/main-street/expanded-card-manifest.json`
 
 ### Guidance: adding more cards safely
@@ -177,6 +182,25 @@ Adds reputation assets across five synergies, including the family's first bridg
 | `cs-health-kiosk` | Health Kiosk | 6 | 0 | 0.15 | Health | 3 | 0.15 | A walk-up health advice kiosk. Costs 0.15 coins/turn to run; +0.15 rep/turn. | Health reputation asset; deepens the Health family. |
 | `cs-shelter` | Community Shelter | 6 | 0 | 0 | Service | 3 | 0.15 | A warm shelter for those in need. Provides +0.15 reputation per turn. | Service reputation asset. |
 | `cs-public-art` | Public Art | 8 | 0 | 0.25 | Culture + Entertainment | 4 | 0.2 | A vibrant public sculpture. Costs 0.25 coins/turn to run; +0.2 rep/turn. Bridges Culture and Entertainment community spaces. | Bridge community space; highest ongoing cost and rep yield. |
+
+### M3 Upgrade Templates (12) — Group E expansion (CG-0MSQJ7SYD008U3EE)
+
+Every Group A business and Group B community space gets an upgrade path (targets raised to maxLevel 1).
+
+| ID | Name | Target | Cost | Income+ | Range+ | Req Lvl | Rep+ | Description |
+|----|------|--------|------|---------|--------|--------|------|-------------|
+| `upg-smoothie-bar` | Upgrade to Smoothie Bar | Juice Bar | 4 | +1 | 0 | 0 | — | Turns a Juice Bar into a Smoothie Bar with higher income. |
+| `upg-wellness-retreat` | Upgrade to Wellness Retreat | Yoga Studio | 5 | +1.5 | +1 | 0 | — | Expands the Yoga Studio into a full Wellness Retreat. |
+| `upg-fitness-center` | Upgrade to Fitness Center | Gym | 5 | +1.5 | +1 | 0 | — | Expands the Gym into a full Fitness Center. |
+| `upg-dental-clinic` | Upgrade to Dental Clinic | Dentist | 7 | +2 | +1 | 0 | — | Expands the Dentist into a full Dental Clinic. |
+| `upg-bespoke-tailor` | Upgrade to Bespoke Tailor | Tailor | 4 | +1 | 0 | 0 | — | Elevates the Tailor into a Bespoke Tailor. |
+| `upg-toy-warehouse` | Upgrade to Toy Warehouse | Toy Store | 4 | +1 | +1 | 0 | — | Scales the Toy Store into a Toy Warehouse with wider reach. |
+| `upg-tea-lounge` | Upgrade to Tea Lounge | Teahouse | 4 | +1 | 0 | 0 | +0.1 | Turns the Teahouse into a Tea Lounge with a reputation boost. |
+| `upg-gourmet-deli` | Upgrade to Gourmet Deli | Delicatessen | 4 | +1.5 | 0 | 0 | — | Elevates the Delicatessen into a Gourmet Deli. |
+| `upg-adventure-park` | Upgrade to Adventure Park | Playground | 3 | 0 | 0 | 0 | +0.05 | Community-space upgrade; +0.05 rep/turn. |
+| `upg-orchard` | Upgrade to Orchard | Community Garden | 3 | 0 | 0 | 0 | +0.05 | Community-space upgrade; +0.05 rep/turn. |
+| `upg-grand-fountain` | Upgrade to Grand Fountain | Town Fountain | 3 | 0 | 0 | 0 | +0.05 | Community-space upgrade; +0.05 rep/turn. |
+| `upg-health-center` | Upgrade to Health Center | Health Kiosk | 4 | 0 | 0 | 0 | +0.05 | Community-space upgrade; +0.05 rep/turn. |
 
 ### Community Space Upgrades
 

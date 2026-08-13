@@ -65,8 +65,8 @@ describe('Expanded Card Pool: Template Completeness', () => {
     expect(eventDeck).toHaveLength(55);
   });
 
-  it('should have exactly 27 upgrade templates', () => {
-    expect(upgradeDeck).toHaveLength(27);
+  it('should have exactly 39 upgrade templates', () => {
+    expect(upgradeDeck).toHaveLength(39);
   });
 
   it('should have unique business IDs', () => {
@@ -460,8 +460,8 @@ describe('Expanded Card Pool: Deck Building', () => {
     expect(createEventDeck(3, undefined, _rng, 1)).toHaveLength(165);
   });
 
-  it('upgrade deck with 2 copies should have 54 cards', () => {
-    expect(createUpgradeDeck(2)).toHaveLength(54);
+  it('upgrade deck with 2 copies should have 78 cards', () => {
+    expect(createUpgradeDeck(2)).toHaveLength(78);
   });
 
   it('deck copies should have distinct IDs', () => {

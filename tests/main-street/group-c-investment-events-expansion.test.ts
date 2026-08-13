@@ -375,6 +375,6 @@ describe('Group C: deck generation & balance guardrails (AC6)', () => {
   it('keeps other families unchanged in count (data-driven scope)', () => {
     expect(createBusinessDeck(1).length).toBe(30);
     expect(createCommunitySpaceDeck(1).length).toBe(8);
-    expect(createUpgradeDeck(1).length).toBe(27);
+    expect(createUpgradeDeck(1).length).toBe(39); // +12 Group E upgrades
   });
 });

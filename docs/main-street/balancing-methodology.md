@@ -87,7 +87,10 @@ When a card's cost changes, its reward fields (baseIncome, coinDelta, synergy bo
 
 - **Not adjusted** — all remain at cost 0
 
-### Upgrades (27 cards)
+### Upgrades (39 cards)
+
+> Upgrades grew from 27 to 39 in the Group E expansion (CG-0MSQJ7SYD008U3EE),
+> covering every Group A business and Group B community space.
 
 - **Goal**: Wider cost spread (target: range ≥ 6)
 - **Inputs**: incomeBonus, synergyRangeBonus, requiredLevel, reputationBonus, tier

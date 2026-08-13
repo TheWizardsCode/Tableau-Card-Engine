@@ -1,6 +1,6 @@
 {
   "source": "Generated from MainStreetCards.ts and Tier 1 IDs from MainStreetTiers.ts",
-  "generatedAt": "2026-08-13T02:48:46.066Z",
+  "generatedAt": "2026-08-13T03:19:48.032Z",
   "baselineTier1CardIds": [
     "biz-bakery",
     "biz-bookshop",
@@ -20,6 +20,7 @@
     "evt-rainy",
     "evt-street-cleaning",
     "evt-tax",
+    "upg-adventure-park",
     "upg-bistro",
     "upg-community-hub",
     "upg-garden",
@@ -103,27 +104,38 @@
       "evt-wellness-fair"
     ],
     "upgrade": [
+      "upg-bespoke-tailor",
       "upg-bread-factory",
+      "upg-dental-clinic",
       "upg-designer-store",
       "upg-drive-in",
       "upg-dry-cleaners",
       "upg-fast-food",
+      "upg-fitness-center",
       "upg-gaming-lounge",
       "upg-garden-center",
+      "upg-gourmet-deli",
       "upg-gourmet-truck",
       "upg-grand-bakehouse",
+      "upg-grand-fountain",
+      "upg-health-center",
       "upg-home-improvement",
       "upg-imax",
       "upg-luxury-retreat",
       "upg-medical-center",
       "upg-multiplex",
       "upg-museum",
+      "upg-orchard",
       "upg-private-medical-center",
       "upg-resort-spa",
       "upg-restaurant",
       "upg-roastery",
       "upg-salon",
-      "upg-wellness-center"
+      "upg-smoothie-bar",
+      "upg-tea-lounge",
+      "upg-toy-warehouse",
+      "upg-wellness-center",
+      "upg-wellness-retreat"
     ]
   }
 }
