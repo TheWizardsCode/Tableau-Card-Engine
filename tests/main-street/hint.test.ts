@@ -184,6 +184,24 @@ describe('buildRationale', () => {
     expect(rationale).not.toContain('+1');
   });
 
+  it('rationale for buy-business counts diagonal synergy (8-way adjacency)', () => {
+    const state = makeMarketState('rationale-diagonal-synergy');
+    // Bakery at slot 0; Diner proposed at slot 6, which is diagonally adjacent
+    // (row 1, col 1 - Chebyshev distance 1).
+    const bakery = createBusinessDeck(1).find(c => c.id === 'biz-bakery-0') as BusinessCard;
+    const diner = createBusinessDeck(1).find(c => c.id === 'biz-diner-0') as BusinessCard;
+    expect(bakery).toBeDefined();
+    expect(diner).toBeDefined();
+    state.market.development = [bakery, diner];
+    state.streetGrid[0] = { ...bakery };
+
+    const action: BuyBusinessAction = { type: 'buy-business', cardId: diner.id, slotIndex: 6 };
+    const rationale = buildRationale(action, 10, state);
+
+    expect(rationale).toContain('50%');
+    expect(rationale).toContain('synergy bonus');
+  });
+
   it('rationale for buy-upgrade includes business name and income bonus', () => {
     const state = makeMarketState('rationale-upgrade');
     const upgradeCards = state.market.investments.filter(

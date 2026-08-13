@@ -276,6 +276,16 @@ describe('Reputation Per Turn (Income Phase)', () => {
     expect(computeBusinessIncome(grid, 1)).toBe(1.5);
   });
 
+  it('Health synergy counts diagonal neighbors (8-way adjacency)', () => {
+    const grid = emptyGrid();
+    // index 6 is diagonal from index 0 (row 1, col 1) - Chebyshev distance 1
+    grid[0] = { ...findBizTemplate('biz-private-clinic')!, level: 0, incomeBonus: 0, synergyRangeBonus: 0 };
+    grid[6] = { ...findBizTemplate('biz-pharmacy')!, level: 0, incomeBonus: 0, synergyRangeBonus: 0 };
+    // Same values as the orthogonal case: diagonal Health neighbors synergize.
+    expect(computeBusinessIncome(grid, 0)).toBe(3.75);
+    expect(computeBusinessIncome(grid, 6)).toBe(1.5);
+  });
+
   it('applyIncome should add reputation from Clinic reputationPerTurn', () => {
     // Create a state with a Clinic on the grid
     const state = setupMainStreetGame({ seed: 'rep-test' });

@@ -73,7 +73,7 @@ describe('Synergy Pairs for Visual Lines', () => {
       });
     });
 
-    it('returns a pair for diagonally adjacent businesses (within Manhattan range 1)', () => {
+    it('returns a pair for vertically adjacent businesses', () => {
       // index 0 (row 0, col 0) and index 5 (row 1, col 0) are vertical neighbors
       const grid = emptyGrid();
       grid[0] = makeBiz({ id: 'biz-a', synergyTypes: ['Food'] });
@@ -109,13 +109,18 @@ describe('Synergy Pairs for Visual Lines', () => {
       expect(pairs[0].sharedSynergy).toBe('Culture');
     });
 
-    it('does not include diagonal-only pairs (Manhattan distance > 1)', () => {
+    it('includes diagonal-only pairs (8-way adjacency)', () => {
       const grid = emptyGrid();
       grid[0] = makeBiz({ id: 'biz-a', synergyTypes: ['Food'] });
-      // index 6 is diagonal from index 0 (row 1, col 1) - Manhattan distance 2
+      // index 6 is diagonal from index 0 (row 1, col 1) - Chebyshev distance 1
       grid[6] = makeBiz({ id: 'biz-b', synergyTypes: ['Food'] });
       const pairs = computeSynergyPairs(grid);
-      expect(pairs).toHaveLength(0);
+      expect(pairs).toHaveLength(1);
+      expect(pairs[0]).toEqual({
+        fromIndex: 0,
+        toIndex: 6,
+        sharedSynergy: 'Food',
+      });
     });
 
     it('excludes Pawn Shop from contributing to synergy pairs', () => {
@@ -216,12 +221,13 @@ describe('Synergy Pairs for Visual Lines', () => {
       grid[9] = makeBiz({ id: 'biz-j', synergyTypes: ['Entertainment'] });
 
       const pairs = computeSynergyPairs(grid);
-      // Expected pairs:
+      // Expected pairs (8-way / Chebyshev):
       // Row 0 horizontal: (0,1), (2,3) = 2
       // Row 1 horizontal: (5,6), (7,8) = 2
       // Vertical: (0,5), (1,6), (2,7), (3,8), (4,9) = 5
-      // Total = 9
-      expect(pairs).toHaveLength(9);
+      // Diagonal (Chebyshev 1): (0,6), (1,5), (2,8), (3,7) = 4
+      // Total = 13 (orthogonal 9 + diagonal 4)
+      expect(pairs).toHaveLength(13);
     });
   });
 });

@@ -23,6 +23,7 @@ import {
 } from '../../example-games/main-street/MainStreetCards';
 import {
   applyIncome,
+  recalculateCard,
 } from '../../example-games/main-street/MainStreetAdjacency';
 import {
   executeDayStart,
@@ -104,6 +105,20 @@ describe('Multi-Use Card Economy Integration', () => {
 
       // Hand synergy should be reported
       expect(result.handSynergyTotal).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should include diagonal-only synergy in income (8-way adjacency)', () => {
+      const state = createTestState();
+      // Two Food businesses placed diagonally (slots 0 and 6).
+      state.streetGrid[0] = makeBiz({ id: 'biz-bakery-0', name: 'Bakery', baseIncome: 2, synergyTypes: ['Food'], synergyCoinBonus: 0.5 });
+      state.streetGrid[6] = makeBiz({ id: 'biz-diner-0', name: 'Diner', baseIncome: 2, synergyTypes: ['Food'], synergyCoinBonus: 0.5 });
+      recalculateCard(state, 0);
+      recalculateCard(state, 6);
+
+      const result = applyIncome(state);
+
+      // Each gains 50% synergy from the diagonal partner: 2 + (2*0.5) = 3 each.
+      expect(result.total).toBeCloseTo(6, 5);
     });
 
     it('should complete multiple turns with mixed tableau and hand purchases', () => {

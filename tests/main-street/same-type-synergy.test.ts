@@ -132,6 +132,17 @@ describe('Same-type synergy nullification', () => {
       expect(computeSynergyBonus(grid, 2)).toBe(0);
     });
 
+    // AC: 8-way adjacency — same-type diagonal neighbors nullify synergy
+    it('nullifies synergy between same-type businesses placed diagonally (8-way)', () => {
+      const grid = emptyGrid();
+      // index 6 is diagonal from index 0 (row 1, col 1) - Chebyshev distance 1
+      grid[0] = makeBiz({ id: 'biz-bakery-0', synergyTypes: ['Food'] });
+      grid[6] = makeBiz({ id: 'biz-bakery-1', synergyTypes: ['Food'] });
+
+      expect(computeSynergyBonus(grid, 0)).toBe(0);
+      expect(computeSynergyBonus(grid, 6)).toBe(0);
+    });
+
     // AC #5: Mixed scenario — same-type and different-type neighbors
     it('gets synergy only from different-type neighbor when both same-type and different-type are adjacent', () => {
       const grid = emptyGrid();
@@ -283,6 +294,18 @@ describe('Same-type synergy nullification', () => {
       // Not adjacent, so no penalty
       expect(computeBusinessIncome(grid, 0)).toBe(2);
       expect(computeBusinessIncome(grid, 2)).toBe(2);
+    });
+
+    // AC: 8-way adjacency — diagonal-only same-type placement triggers the penalty
+    it('triggers the 0.6 multiplier via diagonal-only same-type adjacency', () => {
+      const grid = emptyGrid();
+      // index 6 is diagonal from index 0 (row 1, col 1) - Chebyshev distance 1
+      grid[0] = makeBiz({ id: 'biz-bakery-0', baseIncome: 2, synergyTypes: ['Food'] });
+      grid[6] = makeBiz({ id: 'biz-bakery-1', baseIncome: 2, synergyTypes: ['Food'] });
+
+      // Same-type diagonal neighbor -> base = 2 * 0.6 = 1.2, synergy = 0
+      expect(computeBusinessIncome(grid, 0)).toBeCloseTo(1.2);
+      expect(computeBusinessIncome(grid, 6)).toBeCloseTo(1.2);
     });
 
     // AC #5: Mixed same-type and different-type — 0.6 multiplier applies
