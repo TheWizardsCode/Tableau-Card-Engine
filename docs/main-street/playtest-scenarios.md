@@ -72,7 +72,7 @@ All step text lives in the English locale bundle (`example-games/main-street/i18
 
 ### What happens
 
-The player buys an Art Gallery (cost 4) and Block Party investment (cost 4), spending all 8 starting coins. The Tax Audit incident then hits for -3 coins, pushing the balance to -1. Bankruptcy is declared immediately.
+The player buys an Art Gallery (cost 4) and Block Party investment (cost 4), spending all 6 starting coins (Medium preset, re-tuned by CG-0MSP26Q5N002EH8P) plus income reserve. The Tax Audit incident then hits for -3 coins, pushing the balance to -1. Bankruptcy is declared immediately.
 
 ### Balance observations
 

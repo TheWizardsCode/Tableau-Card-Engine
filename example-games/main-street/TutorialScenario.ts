@@ -134,7 +134,7 @@ export interface TutorialScenario {
  */
 export const STANDARD_TUTORIAL_SCENARIO: TutorialScenario = {
   difficulty: 'Easy',
-  // 16 starting coins (vs. Easy preset's 12): the 16-step flow buys four
+  // 16 starting coins (vs. Easy preset's 10 after the CG-0MSP26Q5N002EH8P re-tune): the 16-step flow buys four
   // cards (Laundromat $4 + Local Festival $3 + Bookshop $3 + Library $7 = $17)
   // and earns ~1.9 income across T7 and T11, so 16 + ~2 ≥ 17. The tutorial
   // scenario's coin budget is intentionally higher than the base preset.

@@ -1090,7 +1090,7 @@ Challenge-based unlock paths are designed to be achievable by skilled players wh
 
 1. Easy mode gives more starting resources (coins and reputation) and more turns than Medium.
 2. Hard mode gives fewer starting resources, fewer turns, and a higher win threshold than Medium.
-3. Easy mode applies a higher synergy multiplier per neighbor (1.5x vs 1.0x) and higher challenge bonus points (15 vs 10).
+3. Easy mode applies a higher synergy multiplier per neighbor (0.5x vs 0.35x, re-tuned by CG-0MSP26Q5N002EH8P) and higher challenge bonus points (15 vs 10).
 4. Hard mode assigns more challenges per run (4 vs 3) to increase the difficulty of the `all_challenges` win condition.
 5. The game engine reads all configured values from `state.config` rather than hardcoded constants.
 

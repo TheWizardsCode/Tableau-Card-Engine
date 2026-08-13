@@ -424,8 +424,9 @@ metrics: median, mean, Q1, Q3, IQR, skewness, min, max, standardDeviation
 
 **Data Sources:** Economy Ledger (`src/rule-engine/EconomyLedger.ts`) — per-run coin and reputation history.
 
-**Interpretation:**
-- Average coins per turn for Greedy/Medium: target range 4–8.
+**Interpretation (re-tuned by CG-0MSP26Q5N002EH8P, 2026-08-13):**
+- **Gross** average coins per turn (totalCoinsEarned/totalTurns) for Greedy/Medium: target range 4–8.
+- **Net** liquidity per turn (`avgCoinsPerTurn` = finalCoins/turns, the harness's focus metric): target range **0–2** (producer ruling). Measured values: 1.82 (25-turn harness) / 1.85 (60-turn baseline) on the re-tuned Medium preset (6 starting coins, 0.35 synergy/neighbor).
 - Bankruptcy rate should decline after turn 5 (early game is hardest).
 - At least 2 turns per run should have "can't afford anything" (decision tension).
 - Economy tightness index < 50 means players are cash-constrained most turns.
@@ -860,10 +861,12 @@ mc-balance-002,greedy,medium,loss,bankruptcy,67,0,7,4,7,0
 
 ### 7.4 Difficulty Presets (`MainStreetDifficulty.ts`)
 
-**Current capabilities:**
-- Easy: 12 starting coins, 25 max turns, 100 win threshold
-- Medium: 8 starting coins, 25 max turns, 150 win threshold
-- Hard: 5 starting coins, 20 max turns, 175 win threshold
+**Current capabilities (re-tuned by CG-0MSP26Q5N002EH8P, 2026-08-13):**
+- Easy: 10 starting coins, no turn limit, 120 win threshold, 0.5 synergy bonus/neighbor
+- Medium: 6 starting coins, no turn limit, 150 win threshold, 0.35 synergy bonus/neighbor
+- Hard: 4 starting coins, no turn limit, 180 win threshold, 0.25 synergy bonus/neighbor
+
+> Turn limits are opt-in via explicit `maxTurns` (CG-0MSLXJCHH001DLIO); the harness caps runs itself.
 
 **Integration:**
 - Balance reports should be filterable by difficulty.

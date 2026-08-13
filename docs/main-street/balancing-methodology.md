@@ -145,7 +145,15 @@ The origin documents now contain cross-references to this document.
 
 The adjacency metric was changed from **Manhattan (orthogonal-only)** to **Chebyshev (8-way)**:
 diagonally adjacent slots now count as neighbors on the 2×5 street grid. The Monte Carlo
-harness (200 seeds, greedy strategy, 25 turns) was re-run before and after the change:
+harness (200 seeds, greedy strategy) was re-run before and after the change.
+
+**Metric semantics (producer ruling, 2026-08-13):** the harness's `avgCoinsPerTurn`
+(= finalCoins/turns, **net liquidity**) is the focus metric for the economy band, and its
+target band is **0–2**. The 4–8 band in
+[`prd-balance-process-and-tooling.md`](prd-balance-process-and-tooling.md) targets **gross**
+income per turn (`totalCoinsEarned/totalTurns`) and is not the `avgCoinsPerTurn` target.
+
+### Initial F3 measurement (pre-re-tune, 200 seeds / 25 turns)
 
 | Metric | Before (Manhattan) | After (8-way / Chebyshev) |
 |---|---:|---:|
@@ -154,13 +162,33 @@ harness (200 seeds, greedy strategy, 25 turns) was re-run before and after the c
 | Avg coins/turn (liquidity) | 2.557 | 2.745 |
 | Approx. income/turn (positive deltas) | 4.38 | 4.63 |
 
-**Verdict: no re-tuning required.** Income/turn rises ~5.7% but both values stay within the
-documented **4–8 coins/turn** design band, and the median score stays within the 120–180 target
-band. The tuning levers in [Balance Process & Tooling](prd-balance-process-and-tooling.md)
-(difficulty presets, card data) are only needed when a band is missed, so `card-data.csv` and
-the `MainStreetDifficulty` presets (1.5 / 1.0 / 0.75) were left unchanged. The committed
-baseline in [`monte-carlo-baseline.json`](monte-carlo-baseline.json) reflects the current dev
-state (which includes a concurrent card-data rebalance by CG-0MSQJ7VL9009JHF4).
+### Economy re-tune (CG-0MSP26Q5N002EH8P, 2026-08-13)
+
+After the concurrent card-data rebalance (CG-0MSQJ7VL9009JHF4) landed on dev, the Medium/Greedy
+`avgCoinsPerTurn` measured **4.118** — well above the 0–2 net-liquidity band. Per the lever
+order (difficulty presets first, card data only for outliers), the `MainStreetDifficulty.ts`
+presets were re-tuned:
+
+| Preset | startingCoins before → after | synergyBonusPerNeighbor before → after |
+|---|---:|---:|
+| Easy | 12 → 10 | 1.5 → 0.5 |
+| Medium | 8 → 6 | 1.0 → 0.35 |
+| Hard | 5 → 4 | 0.75 → 0.25 |
+
+`card-data.csv` was **not** changed (band reached with presets alone). Resulting harness
+metrics (200 seeds, greedy):
+
+| Metric | Before re-tune | After re-tune |
+|---|---:|---:|
+| avgCoinsPerTurn (25 turns) | 4.118 | **1.82** ✓ (0–2 band) |
+| avgCoinsPerTurn (60-turn baseline) | 4.118 | **1.85** ✓ (0–2 band) |
+| Win rate (25 turns) | 81.5% | 60.5% |
+| Median final score (25 turns) | 168.3 | 152.5 |
+
+Guardrail tests (`monte-carlo-guardrails`, `monte-carlo-greedy-guardrail`,
+`monte-carlo-balance`) pass on the re-tuned presets; the committed baseline in
+[`monte-carlo-baseline.json`](monte-carlo-baseline.json) and
+`results/main-street-monte-carlo.json/.csv` were regenerated to the new values.
 
 ## See Also
 

@@ -389,7 +389,7 @@ describe('AC4: Scenario-built state produces consistent market indices (backward
     // turn limit (maxTurns is optional and unset — CG-0MSLXJCHH001DLIO).
     expect(state.config.difficultyName).toBe('Easy');
     expect(state.config.maxTurns).toBeUndefined();
-    expect(state.config.startingCoins).toBe(12);
+    expect(state.config.startingCoins).toBe(10);
     expect(state.config.startingReputation).toBe(5);
 
     // State has all four decks

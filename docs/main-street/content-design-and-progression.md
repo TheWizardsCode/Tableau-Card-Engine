@@ -128,7 +128,7 @@ The core economic loop consists of two primary resources:
 
 **Flow of Resources**:
 - At the start of each **Day Phase**, the player may spend coins to acquire cards.
-- During the **Income Phase**, each placed Business generates `effectiveBase + synergyBonus` coins. Synergy is computed as a percentage of base income per matching adjacent Business sharing a Synergy Type: `synergyBonus = effectiveBase * synergyCoinBonus * bonusPerNeighbor * matchingNeighborCount`, where `synergyCoinBonus` defaults to 0.5 (50%) and `bonusPerNeighbor` is the difficulty preset multiplier (1.5 Easy / 1.0 Medium / 0.75 Hard).
+- During the **Income Phase**, each placed Business generates `effectiveBase + synergyBonus` coins. Synergy is computed as a percentage of base income per matching adjacent Business sharing a Synergy Type: `synergyBonus = effectiveBase * synergyCoinBonus * bonusPerNeighbor * matchingNeighborCount`, where `synergyCoinBonus` defaults to 0.5 (50%) and `bonusPerNeighbor` is the difficulty preset multiplier (0.5 Easy / 0.35 Medium / 0.25 Hard, re-tuned by CG-0MSP26Q5N002EH8P).
 - **Event Cards** may grant or remove coins/reputation immediately.
 - **Upgrade Cards** increase future income and may extend synergy range.
 - At the end of each turn, the player's **coin balance** and **reputation** are persisted in the **ResourceBank**.

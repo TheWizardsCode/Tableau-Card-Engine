@@ -475,8 +475,9 @@ export class MainStreetLifecycleManager {
               // shuffling. This guarantees exactly which cards appear in
               // the market and incident queue, independent of deck
               // composition. The tutorial always uses Easy difficulty
-              // (12 starting coins, 5 starting reputation) for sufficient
-              // coin budget throughout all 13 steps.
+              // (10 starting coins after CG-0MSP26Q5N002EH8P re-tune, 5
+              // starting reputation); the scenario overrides the coin
+              // budget to 16 for the tutorial's fixed buy plan.
               //
               // The scenario system uses the STANDARD_TUTORIAL_SCENARIO
               // definition which references only Tier-1 cards, ensuring

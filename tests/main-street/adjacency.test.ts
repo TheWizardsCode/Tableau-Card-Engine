@@ -284,13 +284,14 @@ describe('MainStreetAdjacency (2x5 grid, percentage-based synergy)', () => {
       const coinsBefore = state.resourceBank.coins;
       const result = applyIncome(state);
 
-      // Percentage-based formula:
-      // slot 0: base=3, rate=0.5, N=1, synergy=1.5, total=4.5
-      // slot 1: base=2, rate=0.5, N=1, synergy=1, total=3
-      expect(result.total).toBe(7.5); // 4.5 + 3 pre-multiplier
+      // Percentage-based formula (Medium synergy multiplier re-tuned 1.0 → 0.35
+      // by CG-0MSP26Q5N002EH8P):
+      // slot 0: base=3, rate=0.5, N=1, synergy=0.525, total=3.525
+      // slot 1: base=2, rate=0.5, N=1, synergy=0.35, total=2.35
+      expect(result.total).toBeCloseTo(5.875); // 3.525 + 2.35 pre-multiplier
       // CG-0MRER3RE300418SG: Math.floor removed; fractional values preserved.
-      // 7.5 * 1.15 = 8.625
-      expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 8.625);
+      // 5.875 * 1.15 = 6.75625
+      expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 6.75625);
     });
   });
 });

@@ -52,7 +52,7 @@
 }
 ```
 
-> **Display note:** Business/community-space synergy descriptions use the `{SYNERGY_RATE}` token, resolved at render time to the **effective percentage** — the card's `synergyCoinBonus` (default 0.5) × the difficulty preset multiplier `synergyBonusPerNeighbor` (Easy 1.5 / Medium 1.0 / Hard 0.75). For example, a default-rate Bakery shows 75% on Easy, 50% on Medium, and 37.5% on Hard. Event-card effects ("+1 coin per X business") are genuine `coinDelta` effects and always remain absolute; reputation synergy (`synergyRepBonus`) also remains absolute by design.
+> **Display note:** Business/community-space synergy descriptions use the `{SYNERGY_RATE}` token, resolved at render time to the **effective percentage** — the card's `synergyCoinBonus` (default 0.5) × the difficulty preset multiplier `synergyBonusPerNeighbor` (Easy 0.5 / Medium 0.35 / Hard 0.25, re-tuned by CG-0MSP26Q5N002EH8P). For example, a default-rate Bakery shows 25% on Easy, 17.5% on Medium, and 12.5% on Hard. Event-card effects ("+1 coin per X business") are genuine `coinDelta` effects and always remain absolute; reputation synergy (`synergyRepBonus`) also remains absolute by design.
 
 ### 3.2 Event Card
 

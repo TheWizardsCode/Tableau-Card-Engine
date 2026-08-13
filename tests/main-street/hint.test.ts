@@ -178,8 +178,9 @@ describe('buildRationale', () => {
     const action: BuyBusinessAction = { type: 'buy-business', cardId: diner.id, slotIndex: 1 };
     const rationale = buildRationale(action, 10, state);
 
-    // Medium difficulty: default rate 0.5 x 1.0 = 50% (no absolute coin value).
-    expect(rationale).toContain('50%');
+    // Medium difficulty: default rate 0.5 x 0.35 = 17.5% (no absolute coin value).
+    // Multiplier re-tuned 1.0 → 0.35 by CG-0MSP26Q5N002EH8P.
+    expect(rationale).toContain('17.5%');
     expect(rationale).toContain('synergy bonus');
     expect(rationale).not.toContain('+1');
   });
@@ -198,7 +199,7 @@ describe('buildRationale', () => {
     const action: BuyBusinessAction = { type: 'buy-business', cardId: diner.id, slotIndex: 6 };
     const rationale = buildRationale(action, 10, state);
 
-    expect(rationale).toContain('50%');
+    expect(rationale).toContain('17.5%');
     expect(rationale).toContain('synergy bonus');
   });
 

@@ -651,8 +651,8 @@ export const MAX_TURNS = 20;
 /** Score required for a win via score threshold. */
 export const WIN_THRESHOLD = 150;
 
-/** Starting coin balance. */
-export const STARTING_COINS = 8;
+/** Starting coin balance (Medium preset default). */
+export const STARTING_COINS = 6;
 
 /** Starting reputation. */
 export const STARTING_REPUTATION = 3;
