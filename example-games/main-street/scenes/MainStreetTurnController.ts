@@ -1056,12 +1056,14 @@ export class MainStreetTurnController {
 
     const afterTransfer = (): void => {
       console.debug('[MS] onUpgradeCardClick: attempting BuyUpgrade', { cardId: card.id, targetSlot, coinsBefore: s.state.resourceBank.coins, marketBefore: s.state.market.investments.map((c: any)=>c.id), streetBefore: s.state.streetGrid.map((slot: any)=>slot?.id ?? null) });
+      let upgraded = false;
       try {
         const cmd = buyUpgradeCommand(s.state, card.id, targetSlot);
         s.undoManager.execute(cmd);
         try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'buy-upgrade', cardId: card.id, targetSlot }, description: cmd.description }); } catch (_) {}
         try { s.gameEvents?.emit('card:placed', { cardId: card.id, targetSlot }); } catch (_) {}
         s.instructionText.setText(`Applied upgrade: "${card.name}"`);
+        upgraded = true;
       } catch (e) {
         console.error('[MS] BuyUpgrade failed', e);
         s.instructionText.setText(`Error: ${(e as Error).message}`);
@@ -1070,6 +1072,19 @@ export class MainStreetTurnController {
       s.hiddenTransferSourceCardIds.delete(card.id);
       s.uiPhase = 'market';
       s.refreshAll();
+      // Level-up burst on the upgraded business when the upgrade actually
+      // landed (non-blocking presentation; reduced-motion / replay handling
+      // lives inside the animator).
+      if (upgraded && targetSlot >= 0) {
+        try {
+          const target = s.state.streetGrid[targetSlot] as { level?: number } | null;
+          if (target) {
+            s.msAnimator.animateLevelUp({ slotIndex: targetSlot, level: target.level ?? 1 });
+          }
+        } catch (_) {
+          // presentation-only — ignore
+        }
+      }
       // Tutorial: mark apply-upgrade step complete if active
       (s.msLifecycleManager as any).onTutorialActionComplete?.('apply-upgrade' as TutorialActionType);
     };

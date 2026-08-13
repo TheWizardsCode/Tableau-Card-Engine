@@ -141,6 +141,30 @@ void popTextOrIcon({
   immediately in replay/headless mode (`scene.replayMode`), never mutates
   state or transcript.
 - Reuse: `synergyColor` + `SoundManager` + `popTextOrIcon`; no new engine
+### Upgrade level-up burst
+
+- Helper: `MainStreetAnimator.animateLevelUp()`.
+- Trigger: `MainStreetTurnController.onUpgradeCardClick()` — the `afterTransfer`
+  hook fires `animateLevelUp({ slotIndex: targetSlot, level })` only when the
+  `buyUpgradeCommand` actually succeeded (upgraded flag), after the final
+  `refreshAll` (the newly-rendered level badge is visible underneath).
+- Behavior (reduced-motion OFF):
+  1. A small gold sparkle burst (six fixed-direction sparks, `0xffd700`)
+     tweens outward and fades on the upgraded business card — deterministic
+     directions, no RNG, so tests and replays are stable.
+  2. A "Level N" pop text appears over the card (`popTextOrIcon`, gold).
+  3. Arrival chime: the upgrade transfer's existing end SFX
+     (`SFX_KEYS.UPGRADE_END`, played by `animateTransferFromMarket` on
+     landing) IS the arrival chime — `animateLevelUp` deliberately does NOT
+     replay it, so there is no double sound and no new SFX key (ToneForge
+     pipeline untouched).
+- Accessibility (reduced motion): the sparkle burst is skipped; the
+  "Level N" pop text is retained (spec AC2 — "skip the burst, keep the pop
+  text").
+- Headless/replay exemption (AGENTS.md rule 8): presentation-only — returns
+  immediately in replay/headless mode (`scene.replayMode`), never mutates
+  state or transcript.
+- Reuse: `popTextOrIcon` + `getStreetSlotCenter`; no new engine
   infrastructure.
 
 ## Scene Transitions

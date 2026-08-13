@@ -77,3 +77,15 @@ void popTextOrIcon({
 });
 ```
 
+
+## Upgrade level-up burst
+
+`MainStreetAnimator.animateLevelUp({ slotIndex, level })` fires when an
+upgrade lands on a business: a gold sparkle burst on the card plus a
+"Level N" pop text. Triggered by `MainStreetTurnController.onUpgradeCardClick()`
+in the transfer's `afterTransfer` hook (only when the upgrade command
+succeeded). The arrival chime is the transfer's existing end SFX
+(`sfx-upgrade-end`) — not replayed, so no double sound. See
+`docs/main-street/ux-visual-audio.md` for the design notes.
+
+- Reduced motion: "Level N" pop retained; sparkle burst skipped.

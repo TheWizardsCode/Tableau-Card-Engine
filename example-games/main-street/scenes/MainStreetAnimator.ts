@@ -689,6 +689,77 @@ export class MainStreetAnimator {
   }
 
   /**
+   * Level-up feedback on the target business when an upgrade lands: a small
+   * gold sparkle burst on the card plus a "Level N" pop text.
+   *
+   * The arrival chime is the upgrade transfer's existing end SFX
+   * (`SFX_KEYS.UPGRADE_END`, played by `animateTransferFromMarket` on
+   * landing) — this helper deliberately does NOT replay it, so no double
+   * sound. Under reduced motion the transfer itself is skipped (no sound),
+   * and only the "Level N" pop is kept.
+   *
+   * Accessibility (reduced motion): the sparkle burst is skipped; the
+   * "Level N" pop text is retained (spec AC2 — "skip the burst, keep the
+   * pop text").
+   *
+   * Headless/replay exemption (AGENTS.md rule 8): presentation-only effect;
+   * returns immediately in replay/headless mode (`scene.replayMode`) — no
+   * rendering, no audio. Never mutates game state or the transcript.
+   *
+   * @param params  Target street slot and the new upgrade level.
+   */
+  public animateLevelUp(params: { slotIndex: number; level: number }): void {
+    const s = this.scene;
+
+    // Headless/replay exemption: no rendering or audio in those modes.
+    if (s.replayMode) return;
+
+    if (params.slotIndex < 0) return;
+    const reducedMotion = s.settingsPanel?.reducedMotion === true;
+    const { x, y } = this.getStreetSlotCenter(params.slotIndex);
+
+    if (!reducedMotion) {
+      // Gold sparkle burst: small sparks tween outward and fade. Fixed
+      // directions (deterministic — no RNG) so tests and replays are stable.
+      const directions = [
+        { dx: -22, dy: -14 }, { dx: 22, dy: -14 }, { dx: 0, dy: -26 },
+        { dx: -18, dy: 16 }, { dx: 18, dy: 16 }, { dx: 0, dy: 26 },
+      ];
+      for (const dir of directions) {
+        const spark = s.add.circle(x, y, 3, 0xffd700, 0.95).setDepth(400);
+        s.tweens.add({
+          targets: spark,
+          x: x + dir.dx,
+          y: y + dir.dy,
+          alpha: 0,
+          scale: 0.4,
+          duration: 420,
+          ease: 'Quad.easeOut',
+          onComplete: () => {
+            spark.destroy();
+          },
+        });
+      }
+    }
+
+    // "Level N" pop text over the card (kept under reduced motion).
+    const text = s.add.text(x, y - 18, `Level ${params.level}`, {
+      fontSize: '16px',
+      fontStyle: 'bold',
+      color: '#ffd700',
+      fontFamily: FONT_FAMILY,
+    }).setOrigin(0.5).setDepth(500);
+    void popTextOrIcon({
+      scene: s,
+      target: text,
+      duration: 1200,
+      riseY: 24,
+      scale: 1.25,
+      reducedMotion,
+    });
+  }
+
+  /**
    * Hand-anchored slot centre (left edge of the hand zone + half a card).
    *
    * Kept for backward compatibility only — buy-transfer animations now use
