@@ -284,6 +284,9 @@ describe('MainStreetMarket', () => {
   describe('canPurchaseEvent', () => {
     it('should allow purchase of Investment-trigger events', () => {
       const state = createTestState();
+      // Generous coins so affordability does not depend on which event the
+      // seeded investments row draws (the expanded pool shifted the seed's row).
+      state.resourceBank.coins = 100;
       // Find an Investment-trigger event in investments row
       const investmentEvent = state.market.investments.find(
         c => c.family === 'event' && (c as import('../../example-games/main-street/MainStreetCards').EventCard).trigger === 'Investment',

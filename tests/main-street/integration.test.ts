@@ -22,6 +22,7 @@ import {
   type PlayerAction,
   type TurnResult,
 } from '../../example-games/main-street/MainStreetEngine';
+import { updateNeighborsOnPlacement } from '../../example-games/main-street/MainStreetAdjacency';
 import {
   getAffordableBusinessCards,
   getEmptySlots,
@@ -29,6 +30,7 @@ import {
 import {
   INCIDENT_QUEUE_SIZE,
   CHALLENGE_BONUS_POINTS,
+  createBusinessDeck,
   type EventCard,
 } from '../../example-games/main-street/MainStreetCards';
 import {
@@ -362,23 +364,24 @@ describe('Integration: Income & Synergy', () => {
     s.resourceBank.coins = 50;
     s.resourceBank.reputation = 5;
 
-    // Turn 1: Place first Food business
+    // Deterministically place two different-template Food cards in adjacent
+    // slots (0 and 1 on the 2x5 grid). The same-type rule excludes
+    // same-template neighbors, so Bakery (Food) + Cafe (Food|Culture) both
+    // gain a real synergy bonus — no dependence on the seeded market.
+    const bakery = createBusinessDeck(1).find(c => c.name === 'Bakery')!;
+    const cafe = createBusinessDeck(1).find(c => c.name === 'Cafe')!;
+    s.streetGrid[0] = { ...bakery, level: 0, incomeBonus: 0, synergyRangeBonus: 0, reputationBonus: 0, appliedUpgrades: [] };
+    updateNeighborsOnPlacement(s, 0);
+
     executeDayStart(s);
-    const food1 = s.market.development.find(c => c.synergyTypes.includes('Food'));
-    if (!food1) return; // Skip if no food card available
-    executeAction(s, { type: 'buy-business', cardId: food1.id, slotIndex: 4 });
     const result1 = processEndOfTurn(s);
-    const income1 = result1.income?.total ?? 0;
+    const income1 = result1.income?.total ?? 0; // Bakery alone: 0.5
 
-    if (s.gameResult !== 'playing') return; // Game ended
-
-    // Turn 2: Place second Food business adjacent
+    s.streetGrid[1] = { ...cafe, level: 0, incomeBonus: 0, synergyRangeBonus: 0, reputationBonus: 0, appliedUpgrades: [] };
+    updateNeighborsOnPlacement(s, 1);
     executeDayStart(s);
-    const food2 = s.market.development.find(c => c.synergyTypes.includes('Food'));
-    if (!food2) return;
-    executeAction(s, { type: 'buy-business', cardId: food2.id, slotIndex: 5 });
     const result2 = processEndOfTurn(s);
-    const income2 = result2.income?.total ?? 0;
+    const income2 = result2.income?.total ?? 0; // + Cafe and both synergy bonuses
 
     // Income should increase due to synergy bonus between adjacent Food businesses
     expect(income2).toBeGreaterThan(income1);

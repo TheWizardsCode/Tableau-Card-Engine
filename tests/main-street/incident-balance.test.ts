@@ -487,14 +487,17 @@ describe('serialization and legacy restore', () => {
     expect(restored.incidentBalance).toEqual(state.incidentBalance);
     expect(restored.incidentQueue.map(c => c.id)).toEqual(state.incidentQueue.map(c => c.id));
 
-    // Constrained draws continue to honor the restored limits
+    // Constrained draws continue to honor the restored limits.
+    // maxStreak=3 means "never MORE than 3 consecutive same-polarity" — so a
+    // 3-in-a-row is legal; the invariant violated is a 4-in-a-row (M+1).
     const { polarities } = resolveMany(restored, 8);
-    for (let i = 2; i < polarities.length; i++) {
-      const a = polarities[i - 2];
-      const b = polarities[i - 1];
-      const c = polarities[i];
-      if (a !== 'neutral' && b !== 'neutral' && c !== 'neutral') {
-        expect(a === b && b === c).toBe(false);
+    for (let i = 3; i < polarities.length; i++) {
+      const a = polarities[i - 3];
+      const b = polarities[i - 2];
+      const c = polarities[i - 1];
+      const d = polarities[i];
+      if (a !== 'neutral' && b !== 'neutral' && c !== 'neutral' && d !== 'neutral') {
+        expect(a === b && b === c && c === d).toBe(false);
       }
     }
   });

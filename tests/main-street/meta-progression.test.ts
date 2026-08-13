@@ -154,9 +154,10 @@ describe('Meta-Progression System', () => {
       }
     });
 
-    it('Tier 1 has baseline plus early expanded sample plus community space cards (20 cards total)', () => {
-      expect(TIER_DEFINITIONS['tier-1'].newCardIds).toHaveLength(20);
-      expect(TIER_DEFINITIONS['tier-1'].cumulativeCardIds).toHaveLength(20);
+    it('Tier 1 has baseline plus early expanded sample plus community space cards (21 cards total)', () => {
+      // 21 = 20 + cs-playground (Group B tier-1 community space).
+      expect(TIER_DEFINITIONS['tier-1'].newCardIds).toHaveLength(21);
+      expect(TIER_DEFINITIONS['tier-1'].cumulativeCardIds).toHaveLength(21);
     });
 
     it('each subsequent tier adds additional cards', () => {
@@ -165,10 +166,10 @@ describe('Meta-Progression System', () => {
       }
     });
 
-    it('Tier 5 cumulative pool covers full catalog (96 tiered templates)', () => {
-      // 96 = 87 original tiered templates + 12 Group A business cards
+    it('Tier 5 cumulative pool covers full catalog (102 tiered templates)', () => {
+      // 102 = 96 (post-Group-A) + 6 Group B community-space cards
       // (staff cards carry no tier, per convention).
-      expect(TIER_DEFINITIONS['tier-5'].cumulativeCardIds).toHaveLength(96);
+      expect(TIER_DEFINITIONS['tier-5'].cumulativeCardIds).toHaveLength(102);
     });
 
     it('cumulative card IDs are actually cumulative', () => {
@@ -721,10 +722,10 @@ describe('Meta-Progression System', () => {
       expect(campaign.schemaVersion).toBe(2);
     });
 
-    it('default campaign has tier-1 unlocked with 20 card IDs', () => {
+    it('default campaign has tier-1 unlocked with 21 card IDs', () => {
       const campaign = createDefaultCampaignProgress();
       expect(campaign.unlockedTiers).toEqual(['tier-1']);
-      expect(campaign.unlockedCardIds).toHaveLength(20);
+      expect(campaign.unlockedCardIds).toHaveLength(21);
       expect(campaign.milestoneHistory).toEqual([]);
     });
 
@@ -1061,18 +1062,18 @@ describe('Meta-Progression System', () => {
   describe('deriveUnlockedCardIds', () => {
     it('returns tier-1 cards for ["tier-1"]', () => {
       const ids = deriveUnlockedCardIds(['tier-1']);
-      expect(ids).toHaveLength(20);
-      expect(new Set(ids).size).toBe(20); // no duplicates
+      expect(ids).toHaveLength(21);
+      expect(new Set(ids).size).toBe(21); // no duplicates
     });
 
     it('returns cumulative cards for ["tier-1", "tier-2"]', () => {
       const ids = deriveUnlockedCardIds(['tier-1', 'tier-2']);
-      expect(ids).toHaveLength(35); // 20 + 15 (T2 grew by 5 Group A businesses)
+      expect(ids).toHaveLength(38); // 21 (T1) + 17 (T2: 15 Group A + 2 Group B cs)
     });
 
-    it('returns all 96 cards for all 5 tiers', () => {
+    it('returns all 102 cards for all 5 tiers', () => {
       const ids = deriveUnlockedCardIds(['tier-1', 'tier-2', 'tier-3', 'tier-4', 'tier-5']);
-      expect(ids).toHaveLength(96);
+      expect(ids).toHaveLength(102);
     });
 
     it('handles empty array', () => {
@@ -1082,7 +1083,7 @@ describe('Meta-Progression System', () => {
 
     it('ignores unknown tier IDs gracefully', () => {
       const ids = deriveUnlockedCardIds(['tier-1', 'tier-99']);
-      expect(ids).toHaveLength(20); // only tier-1 cards
+      expect(ids).toHaveLength(21); // only tier-1 cards
     });
 
     it('does not produce duplicates even if tiers are listed twice', () => {

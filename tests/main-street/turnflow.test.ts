@@ -231,7 +231,10 @@ describe('MainStreetEngine', () => {
       expect(upgrade).toBeDefined();
       const biz = state.decks.business.find(b => b.name === upgrade.targetBusiness);
       expect(biz).toBeDefined();
-      state.streetGrid[0] = { ...biz! };
+      // Place the business at the upgrade's required level so eligibility does
+      // not depend on which upgrade the seeded investments row draws.
+      const placedLevel = upgrade.requiredLevel ?? 0;
+      state.streetGrid[0] = { ...biz!, level: placedLevel };
 
       const result = executeAction(state, {
         type: 'buy-upgrade',
@@ -239,7 +242,7 @@ describe('MainStreetEngine', () => {
       });
 
       expect(result).not.toBeNull();
-      expect(state.streetGrid[0]!.level).toBe(1);
+      expect(state.streetGrid[0]!.level).toBe(placedLevel + 1);
     });
 
     it('should execute buy-event action for Investment events', () => {

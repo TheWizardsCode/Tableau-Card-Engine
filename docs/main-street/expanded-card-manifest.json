@@ -1,6 +1,6 @@
 {
   "source": "Generated from MainStreetCards.ts and Tier 1 IDs from MainStreetTiers.ts",
-  "generatedAt": "2026-08-13T00:13:59.452Z",
+  "generatedAt": "2026-08-13T01:45:44.265Z",
   "baselineTier1CardIds": [
     "biz-bakery",
     "biz-bookshop",
@@ -10,6 +10,7 @@
     "biz-pawnshop",
     "cs-library",
     "cs-park",
+    "cs-playground",
     "evt-award",
     "evt-festival",
     "evt-grand-opening",

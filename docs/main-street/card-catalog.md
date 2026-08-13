@@ -14,7 +14,7 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
 | Business      | 30        | 3           | 90          |
 | Event         | 37        | 3           | 111         |
 | Upgrade       | 27        | 2           | 54          |
-| Community Space | 2       | 3           | 6           |
+| Community Space | 8       | 3           | 24          |
 | Staff         | 3         | 3           | 9           |
 
 **Synergy types:** Food, Culture, Commerce, Service (M2), Entertainment (M2), Health (M2)
@@ -24,14 +24,18 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
 | Snapshot | Business | Event | Upgrade | Community Space | Staff | Total templates |
 |---|---:|---:|---:|---:|---:|---:|
 | Tier 1 baseline (`docs/main-street/card-catalog-baseline.json`) | 6 | 6 | 8 | — | — | 20 |
-| Current catalog (`card-data.csv`) | 30 | 37 | 27 | 2 | 3 | 99 |
-| Net increase | +24 | +31 | +19 | +2 | +3 | +79 |
+| Current catalog (`card-data.csv`) | 30 | 37 | 27 | 8 | 3 | 105 |
+| Net increase | +24 | +31 | +19 | +8 | +3 | +85 |
 
 - 2x target from baseline: `>= 40` templates
-- Current total: `99` templates (`4.95x` baseline)
+- Current total: `105` templates (`5.25x` baseline)
 - Business family grew from 18 to 30 with the Group A expansion (CG-0MSQJ1XIB0004QVN):
   12 new cards including the first Health bridge cards (Juice Bar, Yoga Studio,
   Physiotherapy), mid-tier (T2/T3) singles, and the T5 Grand Hotel flagship.
+- Community Space grew from 2 to 8 with the Group B expansion (CG-0MSQJ210I00491ZZ):
+  6 new reputation assets across five synergies (Playground, Community Garden,
+  Town Fountain, Health Kiosk, Community Shelter, Public Art), including the
+  first ongoing-cost community-space bridge card (Public Art).
 - Non-baseline card IDs are tracked in `docs/main-street/expanded-card-manifest.json`
 
 ### Guidance: adding more cards safely
@@ -152,6 +156,19 @@ alongside business cards.
 |----|------|------|--------|---------|--------------|-------------|-----------|
 | `cs-park` | Park | 4 | 0 | Culture | Park | Offers leisure space. Gains 50% of base income per adjacent Culture business or community space (scales with difficulty). | Reclassified from M1 Business; cheapest community space; synergy filler. |
 | `cs-library` | Library | 7 | 0 | Culture | Library | Quiet community space for reading and learning. Costs 0.25 coins/turn to run; +0.1 rep/turn. | Reputation asset: no income; small running cost for steady reputation. Full Culture synergy participation (Park model) — contributes to adjacent Culture businesses' synergy and receives rep synergy from rep-bonus neighbours (reversed by CG-0MSKS963N000ZSTU). |
+
+### M3 Community Space Templates (6) — Group B expansion (CG-0MSQJ210I00491ZZ)
+
+Adds reputation assets across five synergies, including the family's first bridge card.
+
+| ID | Name | Cost | Income | Ongoing | Synergy | Tier | Rep/turn | Description | Rationale |
+|----|------|------|--------|---------|---------|------|----------|-------------|-----------|
+| `cs-playground` | Playground | 4 | 0 | 0 | Entertainment | 1 | 0.05 | A safe place for kids to play. Provides +0.05 reputation per turn. | Cheap early reputation asset. |
+| `cs-community-garden` | Community Garden | 5 | 0 | 0.1 | Food | 2 | 0.1 | A shared garden plot for the neighbourhood. Costs 0.1 coins/turn to run; +0.1 rep/turn. | Food reputation asset with a small running cost. |
+| `cs-fountain` | Town Fountain | 5 | 0 | 0 | Culture | 2 | 0.1 | A gathering spot around the fountain. Provides +0.1 reputation per turn. | Culture reputation asset. |
+| `cs-health-kiosk` | Health Kiosk | 6 | 0 | 0.15 | Health | 3 | 0.15 | A walk-up health advice kiosk. Costs 0.15 coins/turn to run; +0.15 rep/turn. | Health reputation asset; deepens the Health family. |
+| `cs-shelter` | Community Shelter | 6 | 0 | 0 | Service | 3 | 0.15 | A warm shelter for those in need. Provides +0.15 reputation per turn. | Service reputation asset. |
+| `cs-public-art` | Public Art | 8 | 0 | 0.25 | Culture + Entertainment | 4 | 0.2 | A vibrant public sculpture. Costs 0.25 coins/turn to run; +0.2 rep/turn. Bridges Culture and Entertainment community spaces. | Bridge community space; highest ongoing cost and rep yield. |
 
 ### Community Space Upgrades
 

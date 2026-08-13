@@ -44,6 +44,21 @@ Event cards are split into two trigger types:
 
 **Deck composition:** 5 event templates × 3 copies = 15 cards total (3 Investment, 12 Incident). At game start, the Investments market row draws 1 Investment event and the incident queue draws 2 Incidents from the shuffled event deck.
 
+### 1.2b Community Space Cards
+
+Community-space cards are placed on the street grid like businesses but generate **reputation per turn** instead of income (some carry a small ongoing coin cost). They appear in the Development market row alongside businesses. *(Group B, CG-0MSQJ210I00491ZZ, grew this family from 2 to 8 cards.)*
+
+| Name | Cost (coins) | Ongoing/turn | Synergy | Tier | Rep/turn | Description |
+|------|--------------|--------------|---------|------|----------|-------------|
+| Park | 3 | 0 | Culture | 1 | 0 | Offers leisure space. Full Culture synergy participation. |
+| Playground | 4 | 0 | Entertainment | 1 | 0.05 | A safe place for kids to play. *(Group B.)* |
+| Community Garden | 5 | 0.1 | Food | 2 | 0.1 | A shared garden plot for the neighbourhood. *(Group B.)* |
+| Town Fountain | 5 | 0 | Culture | 2 | 0.1 | A gathering spot around the fountain. *(Group B.)* |
+| Health Kiosk | 6 | 0.15 | Health | 3 | 0.15 | A walk-up health advice kiosk. *(Group B.)* |
+| Community Shelter | 6 | 0 | Service | 3 | 0.15 | A warm shelter for those in need. *(Group B.)* |
+| Library | 7 | 0.25 | Culture | 1 | 0.1 | Quiet community space for reading and learning. |
+| Public Art | 8 | 0.25 | Culture, Entertainment | 4 | 0.2 | A vibrant public sculpture. Bridges Culture and Entertainment community spaces. *(Group B.)* |
+
 ### 1.3 Upgrade Cards
 | Name | Target Business | Cost (coins) | Income Bonus | Synergy Range Bonus | Description |
 |------|----------------|--------------|--------------|----------------------|-------------|

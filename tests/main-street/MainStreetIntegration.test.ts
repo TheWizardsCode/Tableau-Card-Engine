@@ -123,6 +123,9 @@ describe('Multi-Use Card Economy Integration', () => {
 
     it('should complete multiple turns with mixed tableau and hand purchases', () => {
       const state = createTestState();
+      // Coin cushion so buying the first affordable card never bankrupts the
+      // player mid-test (the expanded pool shifted which card that is).
+      state.resourceBank.coins = 50;
 
       for (let turn = 0; turn < 3 && state.gameResult === 'playing'; turn++) {
         executeDayStart(state);

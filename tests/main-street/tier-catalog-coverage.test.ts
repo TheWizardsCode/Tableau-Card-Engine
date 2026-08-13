@@ -38,6 +38,7 @@ describe('Main Street tier catalog coverage', () => {
     const expandedCountInTier1 = TIER_DEFINITIONS['tier-1'].newCardIds.filter(id => !baselineM1.has(id)).length;
 
     expect(expanded.length).toBeGreaterThan(0);
-    expect(expandedCountInTier1).toBe(7); // rebalanced: 5 after tier reshuffle
+    // 21 tier-1 cards - 13 fixed M1 baseline = 8 (cs-playground joined tier-1 in Group B)
+    expect(expandedCountInTier1).toBe(8);
   });
 });
