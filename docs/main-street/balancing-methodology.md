@@ -96,11 +96,12 @@ When a card's cost changes, its reward fields (baseIncome, coinDelta, synergy bo
 - **Inputs**: incomeBonus, synergyRangeBonus, requiredLevel, reputationBonus, tier
 - **Minimum cost**: 2
 
-### Staff (3 cards)
+### Staff (7 cards)
 
 - **Goal**: Cost spread maintained (target: range ≥ 9)
 - **Inputs**: ongoingCost, handSlotsAdded
 - **Ongoing cost adjusted proportionally**: Higher purchase cost → proportionally higher ongoing cost
+- **`refreshCostDiscount`** (staff ability, e.g. Accountant): recognized and validated as a numeric CSV column (CG-0MSREC65T004J5SS), but **excluded from the cost curve** — like `reputationPerTurn` for staff, it is an ability field tracked outside the curve model.
 
 ## Rationale Codes
 
