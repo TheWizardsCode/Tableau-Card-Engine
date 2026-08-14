@@ -1895,6 +1895,34 @@ When creating a new tutorial layout file:
 
 See `example-games/main-street/layouts/main-street-tutorial.layout.json` for a complete example.
 
+#### Tutorial tooltip input routing (DOM pass-through prevention)
+
+The tutorial tooltip is rendered as a Phaser **DOMElement** (`s.add.dom`) so it can draw above
+DOM-based card elements. Phaser 4 (RC.7) enables `input.windowEvents` by default: the
+MouseManager and TouchManager register `mousedown`/`mouseup` and `touchstart`/`touchend`
+listeners on `window.top` that process ANY event whose `event.target` is not the canvas —
+guarded only by `!event.defaultPrevented` (see `node_modules/phaser/src/input/mouse/MouseManager.js`
+and `touch/TouchManager.js`). Without interception, a pointer down/up on the tooltip (a button or
+the box itself) would ALSO dispatch `pointerdown`/`pointerup` to whatever interactive game object
+lies beneath the tooltip (hand card, market card, street slot, End Turn), corrupting game state
+mid-tutorial.
+
+`MainStreetTutorialHints.showStep()` therefore attaches `stopPropagation` listeners for
+`pointerdown`, `pointerup`, `mousedown`, `mouseup`, `touchstart`, `touchend` and `touchcancel` on
+the tooltip container, so those events never reach Phaser's window-level listeners. This is the
+only place in the repo that creates interactive Phaser DOM elements. `stopPropagation` (rather
+than `preventDefault`) is used deliberately:
+
+- it does NOT cancel the browser's default actions, so touch scrolling of the `overflow: auto`
+  tooltip body keeps working, and
+- it does NOT suppress the DOM `click` event, so the buttons' `onclick` handlers (Next / Exit
+  Tutorial / Let's play!) still fire.
+
+Regression coverage: `tests/main-street/TutorialOverlayClickThrough.browser.test.ts` dispatches
+real pointer events at a tutorial button (and the tooltip box) positioned over an interactive
+market card and asserts the game state beneath is untouched while the button's own action fires.
+See CG-0MSTB03U6009J2WV for the original bug report.
+
 ### Related follow-up scope
 
 - Tutorial-specific layout migration remains tracked separately in work item **Adapt tutorial system to use layout description (CG-0MP7IZ4RK008065O)**.

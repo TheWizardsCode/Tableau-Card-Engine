@@ -383,6 +383,42 @@ export class MainStreetTutorialHints {
       container.style.overflow = 'auto';
       container.style.pointerEvents = 'auto';
 
+      // ── Pointer pass-through guard (CG-0MSTB03U6009J2WV) ──────────
+      // Phaser 4 (RC.7) enables `input.windowEvents` by default, so the
+      // MouseManager/TouchManager register `mousedown`/`mouseup` and
+      // `touchstart`/`touchend` listeners on `window.top` that process ANY
+      // event whose `event.target` is not the canvas — guarded only by
+      // `!event.defaultPrevented`. Without interception, a real pointer
+      // down/up on this DOM tooltip (a button or the box itself) would ALSO
+      // dispatch `pointerdown`/`pointerup` to whatever interactive game
+      // object lies beneath (hand card, market card, street slot, End
+      // Turn), corrupting game state mid-tutorial.
+      //
+      // The `pointerEvents: 'auto'` above only stops the canvas-targeted
+      // listeners; the window-level listeners are the actual leak. We stop
+      // the propagation of every pointer-ish event at the container so they
+      // never reach Phaser's window listeners.
+      //
+      // `stopPropagation` (rather than `preventDefault`) is deliberate:
+      // - it does NOT cancel the browser's default actions, so touch
+      //   scrolling of the `overflow: auto` tooltip body keeps working;
+      // - it does NOT suppress the DOM `click` event, so the buttons'
+      //   `onclick` handlers (Next / Exit Tutorial / Let's play!) fire.
+      const stopTooltipPropagation = (ev: Event): void => {
+        ev.stopPropagation();
+      };
+      for (const evt of [
+        'pointerdown',
+        'pointerup',
+        'mousedown',
+        'mouseup',
+        'touchstart',
+        'touchend',
+        'touchcancel',
+      ] as const) {
+        container.addEventListener(evt, stopTooltipPropagation);
+      }
+
       const titleEl = document.createElement('div');
       titleEl.style.fontWeight = '700';
       titleEl.style.color = '#aaffaa';
