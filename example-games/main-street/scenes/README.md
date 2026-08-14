@@ -103,3 +103,15 @@ Triggered by `MainStreetOverlayContent.showSellConfirmation()`'s Sell button
 
 - Reduced motion: single "+€refund" pop + coin SFX retained; demolition and
   coin flight skipped.
+
+## Day transition banner
+
+`MainStreetAnimator.animateDayBanner({ day })` plays at each day start: a
+non-interactive "Day N" banner fades in at the board centre (~250ms), holds,
+and fades out (~800ms total) with a day-chime SFX (reused `sfx-click`).
+Triggered by `MainStreetTurnController.startDayPhase()` (including day 1);
+skipped while the tutorial is active and on checkpoint resume. It never
+intercepts pointer events, never shifts layout, and leaves the market fully
+interactive. See `docs/main-street/ux-visual-audio.md` for the design notes.
+
+- Reduced motion: skipped entirely (instruction text remains the cue).

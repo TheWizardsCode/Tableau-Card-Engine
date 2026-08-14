@@ -71,6 +71,16 @@ export class MainStreetTurnController {
 
     s.refreshAll();
 
+    // Day transition banner: non-interactive "Day N" reveal at the board
+    // centre (skipped under reduced motion / replay — handled inside the
+    // animator). Skipped while the tutorial is active (its step overlays
+    // carry the guidance) and on checkpoint resume (skipMarketRefill — the
+    // same day continues, so it is not a new-day transition).
+    const tutController = (s as any).tutorialController as { isActive?: boolean } | undefined;
+    if (!skipMarketRefill && !tutController?.isActive) {
+      try { s.msAnimator.animateDayBanner({ day: s.state.turn }); } catch (_) { /* presentation-only — ignore */ }
+    }
+
     // Prewarm currently-visible cards after market/queue are populated.
     void s.cardSvgLoadPromise
       .then(() => s.prewarmVisibleCardTextures())

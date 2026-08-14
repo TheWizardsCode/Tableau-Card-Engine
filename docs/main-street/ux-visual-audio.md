@@ -195,6 +195,36 @@ void popTextOrIcon({
 - Reuse: `createTransferCardVisual` + `moveGameObject` + `popTextOrIcon` +
   `SFX_KEYS.COIN_POP`; no new engine infrastructure.
 
+### Day transition banner
+
+- Helper: `MainStreetAnimator.animateDayBanner()`.
+- Trigger: `MainStreetTurnController.startDayPhase()` — fires
+  `animateDayBanner({ day: state.turn })` synchronously after the day-start
+  refresh (the banner plays over the freshly-rendered board). Skipped on
+  checkpoint resume (`skipMarketRefill` — the same day continues, not a new
+  day) and while the tutorial is active (`tutorialController.isActive` —
+  its step overlays carry the guidance). Includes day 1 (first-turn boot).
+- Behavior (reduced-motion OFF):
+  1. A "Day N" banner (dark rounded box + gold "Day N" text) fades in at
+     the board centre (`Back.easeOut`, ~250ms), holds (~300ms), and fades
+     out (`Quad.easeIn`, ~250ms) before being destroyed (~800ms total).
+  2. A day-chime SFX plays — reused `SFX_KEYS.CLICK` (no new ToneForge
+     key; the `sfx-` prefix convention is untouched).
+  3. The banner is NON-interactive (never calls `setInteractive`) at depth
+     600 — above the street/market cards, below the HUD container (1000)
+     and any modal overlay (>1000) — so it never intercepts pointer
+     events, never shifts layout, and leaves the market fully interactive
+     (tutorial E2E safe; AC2).
+- Accessibility (reduced motion): skipped entirely — the current behaviour
+  (instruction text only) is preserved (spec AC3).
+- Headless/replay exemption (AGENTS.md rule 8): presentation-only — returns
+  immediately in replay/headless mode (`scene.replayMode`), never mutates
+  state or transcript.
+- Non-blocking: tweens are fire-and-forget; the market is interactive the
+  whole time.
+- Reuse: `SFX_KEYS.CLICK` + `popTextOrIcon` (via tween helpers); no new
+  engine infrastructure.
+
 ## Scene Transitions
 
 - Main Street scene-level fade transitions are currently disabled.

@@ -679,6 +679,86 @@ export class MainStreetAnimator {
     };
   }
 
+  /**
+   * Day transition banner: a "Day N" banner animates in (scale/fade from
+   * the board centre, ~800ms total) and fades out.
+   *
+   * The banner is a NON-interactive visual (no input handling) added to the
+   * scene root at depth 600 — above the street/market cards, below the HUD
+   * container (1000) and any modal overlay (>1000) — so it never intercepts
+   * pointer events, never shifts layout, and is destroyed after the fade-out
+   * (no persistent UI change). The tutorial flow is therefore never delayed
+   * and its highlighted-card clicks still land (AC2).
+   *
+   * Day-chime SFX: reuses `SFX_KEYS.CLICK` (no new ToneForge key; the
+   * sfx- prefix convention is untouched).
+   *
+   * Accessibility (reduced motion): skipped entirely — the current
+   * behaviour (instruction text only) is preserved (spec AC3).
+   *
+   * Headless/replay exemption (AGENTS.md rule 8): presentation-only effect;
+   * returns immediately in replay/headless mode (`scene.replayMode`) — no
+   * rendering, no audio. Never mutates game state or the transcript.
+   *
+   * Non-blocking: tweens are fire-and-forget; the market is interactive the
+   * whole time (the banner never blocks input).
+   *
+   * @param params  The day being announced (e.g. `state.turn`).
+   */
+  public animateDayBanner(params: { day: number }): void {
+    const s = this.scene;
+
+    // Headless/replay exemption: no rendering or audio in those modes.
+    if (s.replayMode) return;
+
+    // Reduced motion: keep the current behaviour (instruction text only).
+    if (s.settingsPanel?.reducedMotion) return;
+
+    const cx = s.layout.gameW / 2;
+    const cy = s.layout.gameH / 2;
+    const banner = s.add.container(cx, cy);
+    const bg = s.add.rectangle(0, 0, 280, 76, 0x000000, 0.85);
+    bg.setStrokeStyle(3, 0xffdd88, 0.9);
+    banner.add(bg);
+    const dayText = s.add.text(0, 0, `Day ${params.day}`, {
+      fontSize: '36px',
+      fontStyle: 'bold',
+      color: '#ffdd88',
+      fontFamily: FONT_FAMILY,
+    }).setOrigin(0.5);
+    banner.add(dayText);
+    banner.setDepth(600);
+    banner.setAlpha(0);
+    banner.setScale(0.6);
+
+    try { s.soundManager?.play(SFX_KEYS.CLICK); } catch (_) { /* ignore */ }
+
+    // Fade in (~250ms), hold (~300ms), fade out (~250ms).
+    s.tweens.add({
+      targets: banner,
+      alpha: 1,
+      scaleX: 1,
+      scaleY: 1,
+      duration: 250,
+      ease: 'Back.easeOut',
+      onComplete: () => {
+        s.time.delayedCall(300, () => {
+          s.tweens.add({
+            targets: banner,
+            alpha: 0,
+            scaleX: 0.85,
+            scaleY: 0.85,
+            duration: 250,
+            ease: 'Quad.easeIn',
+            onComplete: () => {
+              banner.destroy();
+            },
+          });
+        });
+      },
+    });
+  }
+
   public getStreetSlotCenter(slotIndex: number): { x: number; y: number } {
     const s = this.scene;
     const col = slotIndex % s.layout.streetCols;
