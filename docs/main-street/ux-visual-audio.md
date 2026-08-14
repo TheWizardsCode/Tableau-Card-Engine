@@ -167,6 +167,34 @@ void popTextOrIcon({
 - Reuse: `popTextOrIcon` + `getStreetSlotCenter`; no new engine
   infrastructure.
 
+### Sell demolition + refund coin fly
+
+- Helper: `MainStreetAnimator.animateSell()`.
+- Trigger: `MainStreetOverlayContent.showSellConfirmation()` — the Sell
+  button handler fires `animateSell({ slotIndex, refund, cardId, family })`
+  only when `sellBusinessCommand` succeeded (sold flag), after the overlay
+  dismiss + synchronous `refreshAll` (the dimmed SOLD state renders
+  immediately, hidden beneath the demolition snapshot).
+- Behavior (reduced-motion OFF):
+  1. Demolition: a pre-sold card snapshot (`createTransferCardVisual`,
+     depth 10000 — above the SOLD overlay) shrinks and fades over ~380ms
+     (`Cubic.easeIn`) so the dimmed SOLD state is visually revealed only
+     AFTER the demolition.
+  2. Refund coin flies from the sold slot to the HUD coins counter (same
+     geometry as `animateIncomeCollection`: `coinX = gameW * 0.25 + 70`,
+     `hudY`) with `SFX_KEYS.COIN_POP` via `moveGameObject`.
+  3. A "+€refund" pop lands at the HUD counter (`popTextOrIcon`) and the
+     coin SFX pops on landing.
+- Accessibility (reduced motion): demolition + coin flight are skipped; a
+  single "+€refund" pop + coin SFX remain (spec AC2).
+- Headless/replay exemption (AGENTS.md rule 8): presentation-only — the
+  returned promise resolves immediately in replay/headless mode
+  (`scene.replayMode`), never mutates state or transcript.
+- Non-blocking: fire-and-forget for the caller; the sold state and refund
+  are already committed to game state.
+- Reuse: `createTransferCardVisual` + `moveGameObject` + `popTextOrIcon` +
+  `SFX_KEYS.COIN_POP`; no new engine infrastructure.
+
 ## Scene Transitions
 
 - Main Street scene-level fade transitions are currently disabled.

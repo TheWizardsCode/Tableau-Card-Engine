@@ -89,3 +89,17 @@ succeeded). The arrival chime is the transfer's existing end SFX
 `docs/main-street/ux-visual-audio.md` for the design notes.
 
 - Reduced motion: "Level N" pop retained; sparkle burst skipped.
+
+## Sell demolition + refund coin fly
+
+`MainStreetAnimator.animateSell({ slotIndex, refund, cardId, family })`
+plays when a sale is confirmed: a brief demolition on the sold card (a
+pre-sold card snapshot shrinks/fades over ~380ms, revealing the dimmed SOLD
+state after), then a refund coin flies from the sold slot to the HUD coins
+counter with `sfx-coin-pop` and a "+€refund" pop lands at the counter.
+Triggered by `MainStreetOverlayContent.showSellConfirmation()`'s Sell button
+(only when the sell command succeeded). See
+`docs/main-street/ux-visual-audio.md` for the design notes.
+
+- Reduced motion: single "+€refund" pop + coin SFX retained; demolition and
+  coin flight skipped.

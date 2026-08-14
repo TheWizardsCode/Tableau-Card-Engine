@@ -326,6 +326,7 @@ export class MainStreetOverlayContent {
     if (s.hudContainer) s.hudContainer.add(sellBtn);
     sellBtn.on('pointerdown', () => {
       // Execute the sell
+      let sold = false;
       try {
         const cmd = sellBusinessCommand(s.state, slotIndex);
         // Execute via undo manager if available, otherwise direct
@@ -336,6 +337,7 @@ export class MainStreetOverlayContent {
         }
         addLog(s.state, `Sold ${cardName} from slot ${slotIndex} for +${refund} coins`, 'gain');
         s.instructionText?.setText(`Sold ${cardName} for +€${refund}`);
+        sold = true;
       } catch (e) {
         console.error('[Sell] Failed:', e);
         s.instructionText?.setText(`Error selling: ${(e as Error).message}`);
@@ -345,6 +347,22 @@ export class MainStreetOverlayContent {
       dismissOverlay(s.overlayObjects);
       s.overlayObjects = [];
       s.refreshAll();
+      // Sell demolition + refund coin fly when the sale succeeded
+      // (presentation-only; the dimmed SOLD state renders synchronously
+      // above and the animator's snapshot reveals it after the demolition).
+      if (sold) {
+        const soldCard = s.state.streetGrid[slotIndex];
+        try {
+          void s.msAnimator.animateSell({
+            slotIndex,
+            refund,
+            cardId: soldCard?.id ?? '',
+            family: soldCard?.family === 'community-space' ? 'community-space' : 'business',
+          });
+        } catch (_) {
+          // presentation-only — ignore
+        }
+      }
     });
     s.overlayObjects.push(sellBtn);
 

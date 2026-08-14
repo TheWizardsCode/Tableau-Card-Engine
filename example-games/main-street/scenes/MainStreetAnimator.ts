@@ -760,6 +760,116 @@ export class MainStreetAnimator {
   }
 
   /**
+   * Sell feedback: a brief demolition on the sold card followed by a refund
+   * coin flying from the sold slot to the HUD coins counter.
+   *
+   * The caller already rendered the dimmed SOLD state (synchronous
+   * `refreshAll`); this helper draws a pre-sold card snapshot at the slot
+   * (depth 10000, above the SOLD overlay) and shrinks/fades it over ~380ms
+   * so the SOLD state is visually revealed only AFTER the demolition.
+   * Then a gold coin flies from the slot to the HUD counter (the same
+   * geometry as `animateIncomeCollection`: `coinX = gameW * 0.25 + 70`,
+   * `hudY`) with `SFX_KEYS.COIN_POP`, and a "+€refund" pop lands at the
+   * counter.
+   *
+   * Accessibility (reduced motion): the demolition and coin flight are
+   * skipped; a single "+€refund" pop + coin SFX remain (spec AC2).
+   *
+   * Headless/replay exemption (AGENTS.md rule 8): presentation-only effect;
+   * returns a resolved promise in replay/headless mode (`scene.replayMode`) —
+   * no rendering, no audio. Never mutates game state or the transcript.
+   *
+   * Non-blocking: the returned promise is fire-and-forget for the caller;
+   * the sold state and refund are already committed to game state.
+   *
+   * @param params  Sold street slot, refund amount, and the sold card's
+   *                identity (for the demolition snapshot's family colour).
+   * @returns Promise resolving when the presentation completes.
+   */
+  public animateSell(params: {
+    slotIndex: number;
+    refund: number;
+    cardId: string;
+    family: 'business' | 'community-space';
+  }): Promise<void> {
+    const s = this.scene;
+
+    // Headless/replay exemption: no rendering or audio in those modes.
+    if (s.replayMode) return Promise.resolve();
+
+    const reducedMotion = s.settingsPanel?.reducedMotion === true;
+    const coinX = s.layout.gameW * 0.25 + 70;
+    const hudY = s.layout.hudY;
+    const { x, y } = this.getStreetSlotCenter(params.slotIndex);
+
+    // Refund-delivered feedback: "+€refund" pop at the HUD counter + coin
+    // SFX. Sound is kept in both modes (sound is not motion).
+    const playRefundFeedback = (): void => {
+      const text = s.add.text(coinX, hudY - 8, `+€${params.refund}`, {
+        fontSize: '16px',
+        fontStyle: 'bold',
+        color: '#44ff88',
+        fontFamily: FONT_FAMILY,
+      }).setOrigin(0.5).setDepth(500);
+      void popTextOrIcon({
+        scene: s,
+        target: text,
+        duration: 1100,
+        riseY: 20,
+        scale: 1.2,
+        reducedMotion,
+      });
+      try { s.soundManager?.play(SFX_KEYS.COIN_POP); } catch (_) { /* ignore */ }
+    };
+
+    if (reducedMotion) {
+      playRefundFeedback();
+      return Promise.resolve();
+    }
+
+    // 1. Demolition: pre-sold card snapshot shrinks and fades (~380ms).
+    //    `createTransferCardVisual` already sets the snapshot depth above
+    //    the street/SOLD overlay.
+    return new Promise<void>((resolveDemolition) => {
+      const demo = this.createTransferCardVisual(params.cardId, params.family, x, y) as unknown as {
+        destroy: () => void;
+      };
+      s.tweens.add({
+        targets: demo,
+        scaleX: 0.25,
+        scaleY: 0.25,
+        alpha: 0,
+        duration: 380,
+        ease: 'Cubic.easeIn',
+        onComplete: () => {
+          demo.destroy();
+          resolveDemolition();
+        },
+      });
+    }).then(() => {
+      // 2. Refund coin flies from the sold slot to the HUD counter.
+      return new Promise<void>((resolveFlight) => {
+        const coin = s.add.circle(x, y, 6, 0xffcc44, 1).setDepth(3000);
+        moveGameObject({
+          scene: s,
+          target: coin,
+          destX: coinX,
+          destY: hudY,
+          duration: 600,
+          ease: 'Quad.easeIn',
+          soundManager: s.soundManager,
+          sfx: { start: SFX_KEYS.COIN_POP },
+          onComplete: () => {
+            coin.destroy();
+            playRefundFeedback();
+            resolveFlight();
+          },
+        });
+      });
+    });
+  }
+
+  /**
    * Hand-anchored slot centre (left edge of the hand zone + half a card).
    *
    * Kept for backward compatibility only — buy-transfer animations now use
