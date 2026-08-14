@@ -250,6 +250,34 @@ void popTextOrIcon({
 - Reuse: `popTextOrIcon` + tweened circles (same deterministic pattern as
   `animateLevelUp`) + `SFX_KEYS.EVENT_CHEER`; no new engine infrastructure.
 
+### Game-over celebration / loss sting
+
+- Helper: `MainStreetAnimator.animateGameOver()`.
+- Trigger: `MainStreetOverlayContent.showGameOverOverlay()` — fires right
+  after the overlay backdrop is created, with `win` derived from
+  `result.gameResult`.
+- Behavior (reduced-motion OFF):
+  1. **Win:** a confetti burst (24 coloured rectangles) falls across the
+     whole board, spinning + fading with a stagger (`Quad.easeIn`), plus the
+     victory fanfare WAV (`SFX_KEYS.GAME_WIN` ← `assets/audio/default/game-win.wav`).
+     Confetti depth 100.5 — above the overlay backdrop/box (100), below the
+     panel text/buttons (101), so it stays bright against the dim without
+     covering the panel content.
+  2. **Loss:** a brief full-board dark pulse (the "sting beat", depth 99.5 —
+     under the backdrop, so only the board dims) plus the low sting WAV
+     (`SFX_KEYS.GAME_LOST` ← `assets/audio/default/game-lost.wav`). The
+     overlay backdrop keeps the board dimmed afterwards.
+- Accessibility (reduced motion): plays only the fanfare/sting sound — no
+  particles/visuals (spec AC3).
+- Headless/replay exemption (AGENTS.md rule 8): presentation-only — returns
+  immediately in replay/headless mode (`scene.replayMode`), never mutates
+  state or transcript.
+- Non-blocking: fire-and-forget tweens; the game-over state is already
+  committed before the feedback plays.
+- Reuse: convention keys `sfx-game-win` / `sfx-game-lost` (documented in
+  `docs/SFX_CONVENTION.md`; Golf uses the same keys) loaded from the shared
+  default audio dir — no new ToneForge factory.
+
 ## Scene Transitions
 
 - Main Street scene-level fade transitions are currently disabled.

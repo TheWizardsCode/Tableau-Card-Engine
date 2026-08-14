@@ -56,6 +56,11 @@ export const SFX_KEYS = {
   EVENT_CHEER: 'sfx-event-cheer',
   CELEBRATE: 'sfx-challenge-complete',
   ILLEGAL_MOVE: COMMON_SFX_KEYS.ILLEGAL_MOVE,
+  // Game-over fanfare/sting — convention keys documented in
+  // docs/SFX_CONVENTION.md; WAVs live in the shared default audio dir
+  // (`assets/audio/default/game-win.wav` / `game-lost.wav`).
+  GAME_WIN: 'sfx-game-win',
+  GAME_LOST: 'sfx-game-lost',
 } as const;
 
 // Activity Log panel layout

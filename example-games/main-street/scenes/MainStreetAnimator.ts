@@ -759,6 +759,85 @@ export class MainStreetAnimator {
     });
   }
 
+  /**
+   * Game-over celebration / loss sting (AGENTS.md rule 8).
+   *
+   * Called from `MainStreetOverlayContent.showGameOverOverlay` after the
+   * overlay backdrop is in place:
+   *
+   * - **Win:** a confetti burst falls across the whole board (24 deterministic
+   *   coloured rectangles, staggered, spinning + fading) with the victory
+   *   fanfare WAV (`SFX_KEYS.GAME_WIN`). Depth 100.5 — above the overlay
+   *   backdrop/box (100), below the overlay text and buttons (101), so the
+   *   confetti is bright against the dim but never covers the panel content.
+   * - **Loss:** a brief full-board dark pulse (the "sting beat", depth 99.5 —
+   *   under the backdrop so only the board dims, not the panel) plus the low
+   *   sting WAV (`SFX_KEYS.GAME_LOST`). The overlay backdrop keeps the board
+   *   dimmed afterwards.
+   *
+   * Reduced motion: plays only the fanfare/sting sound (sound is not motion).
+   * Replay/headless: returns immediately — presentation-only, documented
+   * exemption (AGENTS.md rule 8). Non-blocking: fire-and-forget tweens; the
+   * game-over state is already committed.
+   */
+  public animateGameOver(params: { win: boolean; width: number; height: number }): void {
+    const s = this.scene;
+    if (s.replayMode) return;
+    const reducedMotion = s.settingsPanel?.reducedMotion === true;
+
+    try {
+      s.soundManager?.play(params.win ? SFX_KEYS.GAME_WIN : SFX_KEYS.GAME_LOST);
+    } catch (_) { /* ignore */ }
+
+    if (reducedMotion) return;
+
+    if (params.win) {
+      // Confetti: fixed count (24) with bounded random scatter — stable in
+      // tests (count/depth/tween contract is deterministic) while looking
+      // organic on screen.
+      const confettiColors = [0xffdd44, 0x44ff44, 0x44aaff, 0xff6644, 0xdd88ff];
+      for (let i = 0; i < 24; i++) {
+        const color = confettiColors[i % confettiColors.length];
+        const x = 40 + Math.random() * Math.max(1, params.width - 80);
+        const conf = s.add.rectangle(x, -20, 8, 14, color, 1).setDepth(100.5);
+        s.tweens.add({
+          targets: conf,
+          y: params.height + 30,
+          rotation: (Math.random() - 0.5) * 4 * Math.PI,
+          alpha: 0,
+          duration: 1200 + Math.random() * 800,
+          delay: i * 60,
+          ease: 'Quad.easeIn',
+          onComplete: () => {
+            try { conf.destroy(); } catch (_) { /* ignore */ }
+          },
+        });
+      }
+      return;
+    }
+
+    // Loss: brief dark pulse over the board only (depth 99.5, below the
+    // backdrop at 100). The overlay backdrop then keeps the board dimmed.
+    const dim = s.add.rectangle(
+      params.width / 2,
+      params.height / 2,
+      params.width,
+      params.height,
+      0x000000,
+      0,
+    ).setDepth(99.5);
+    s.tweens.add({
+      targets: dim,
+      alpha: 0.35,
+      duration: 120,
+      yoyo: true,
+      ease: 'Quad.easeInOut',
+      onComplete: () => {
+        try { dim.destroy(); } catch (_) { /* ignore */ }
+      },
+    });
+  }
+
   public getStreetSlotCenter(slotIndex: number): { x: number; y: number } {
     const s = this.scene;
     const col = slotIndex % s.layout.streetCols;

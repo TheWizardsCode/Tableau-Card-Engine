@@ -86,6 +86,11 @@ export class MainStreetLifecycleManager {
         // shakeIllegalMove) — same pattern as Beleaguered Castle.
         s.load.audio(`${ns}:${SFX_KEYS.ILLEGAL_MOVE}`, 'assets/audio/default/illegal-move.wav');
         s.load.audio(SFX_KEYS.ILLEGAL_MOVE, 'assets/audio/default/illegal-move.wav');
+        // Game-over fanfare/sting: the default game-win / game-lost WAVs
+        // live in the shared default audio dir (same pattern as
+        // ILLEGAL_MOVE above — convention keys per docs/SFX_CONVENTION.md).
+        s.load.audio(`${ns}:${SFX_KEYS.GAME_WIN}`, 'assets/audio/default/game-win.wav');
+        s.load.audio(`${ns}:${SFX_KEYS.GAME_LOST}`, 'assets/audio/default/game-lost.wav');
       } catch (e) {
         // Some test environments may lack an audio loader; ignore preload failures
       }

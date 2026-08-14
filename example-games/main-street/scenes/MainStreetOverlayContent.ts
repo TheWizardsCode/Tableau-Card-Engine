@@ -64,6 +64,16 @@ export class MainStreetOverlayContent {
     }
     s.overlayObjects.push(...overlay.objects);
 
+    // Game-over feedback (AGENTS.md rule 8): win → confetti burst + victory
+    // fanfare; loss → low sting + brief board dim pulse. Non-blocking; the
+    // animator skips itself in replay/headless mode and plays sound only
+    // under reduced motion.
+    s.msAnimator?.animateGameOver({
+      win: isWin,
+      width: s.layout.gameW,
+      height: s.layout.gameH,
+    });
+
     // Vertical anchor: centre of the panel
     const panelTop = s.layout.gameH / 2 - panelH / 2;
 

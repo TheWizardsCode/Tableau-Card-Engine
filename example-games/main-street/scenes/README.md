@@ -127,3 +127,20 @@ before the hand re-renders). See `docs/main-street/ux-visual-audio.md` for
 the design notes.
 
 - Reduced motion: pop + cheer SFX retained; spark burst skipped.
+
+## Game-over win celebration / loss sting
+
+`MainStreetAnimator.animateGameOver({ win, width, height })` plays when
+`MainStreetOverlayContent.showGameOverOverlay()` reveals the final panel:
+
+- **Win** (`gameResult: 'win'`): a confetti burst (24 coloured rectangles)
+  falls across the board (depth 100.5 — above the overlay backdrop, below
+  the panel text) with the victory fanfare `sfx-game-win`.
+- **Loss** (`gameResult: 'loss'`): a brief full-board dark pulse (depth 99.5,
+  under the backdrop — only the board dims) with the low sting `sfx-game-lost`.
+
+Both SFX keys are convention keys (`docs/SFX_CONVENTION.md`) loaded from the
+shared default audio dir (`assets/audio/default/game-win.wav` /
+`game-lost.wav`); no new ToneForge factory. Reduced motion plays sound only;
+replay/headless skips everything (presentation-only). Non-blocking
+fire-and-forget. See `docs/main-street/ux-visual-audio.md` for design notes.

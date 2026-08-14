@@ -145,6 +145,8 @@ this.initSoundSystem(Object.values(SFX_KEYS), mapping, { namespace: 'my-game' })
 
 Main Street uses ToneForge-generated synth audio in addition to WAV fallbacks. The synth key mapping is defined in `example-games/main-street/sfx-tf-mapping.ts` and uses the same `sfx-` prefix convention.
 
+Main Street also uses the two shared **game-over** convention keys (`sfx-game-win` / `sfx-game-lost`) directly from the default audio dir (`public/assets/audio/default/game-win.wav` / `game-lost.wav` — see the [Audio Asset Organization](#audio-asset-organization) tree above). They are loaded in `MainStreetLifecycleManager.preload()` and played by `MainStreetAnimator.animateGameOver()`; they are **not** synth-mapped (no ToneForge factory), so playback falls through to the Phaser WAV assets.
+
 ## Testing
 
 - Run `npm test` to verify all SFX-related tests pass.
