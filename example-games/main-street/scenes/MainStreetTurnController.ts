@@ -303,9 +303,17 @@ export class MainStreetTurnController {
     if (card.family !== 'event') return;
 
     console.debug('[MS] onPlayHeldEvent: attempting PlayEvent', { eventId: card.id, coinsBefore: s.state.resourceBank.coins });
+
+    // Capture the played card's position BEFORE the hand re-renders — the
+    // card leaves the hand on `refreshAll`, so its sprite must be read now.
+    const handSprite = s.msRenderer?.handView?.getSpriteAt?.(index) as { x: number; y: number } | undefined;
+    const playedPos = handSprite ? { x: handSprite.x, y: handSprite.y } : undefined;
+
+    let played = false;
     try {
       const cmd = playEventCommand(s.state, index);
       s.undoManager.execute(cmd);
+      played = true;
       // Record action event
       try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'play-event' }, description: cmd.description }); } catch (_) {}
       try { s.gameEvents?.emit('card:placed', { action: 'play-event', heldEventId: card.id }); } catch (_) {}
@@ -322,6 +330,15 @@ export class MainStreetTurnController {
     }
 
     s.refreshAll();
+
+    // Burst + cheer SFX + event-name pop at the played card's position
+    // (only when the play succeeded). Reduced motion / replay handled
+    // inside the animator.
+    if (played && playedPos) {
+      try {
+        s.msAnimator.animateEventPlayed({ x: playedPos.x, y: playedPos.y, eventName: card.name });
+      } catch (_) { /* presentation-only — ignore */ }
+    }
   }
 
   public performUndo(): void {

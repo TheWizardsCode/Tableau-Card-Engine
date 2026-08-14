@@ -225,6 +225,31 @@ void popTextOrIcon({
 - Reuse: `SFX_KEYS.CLICK` + `popTextOrIcon` (via tween helpers); no new
   engine infrastructure.
 
+### Held-event play burst
+
+- Helper: `MainStreetAnimator.animateEventPlayed()`.
+- Trigger: `MainStreetTurnController.onPlayHeldEvent()` — captures the
+  played card's hand sprite position BEFORE the hand re-renders (the card
+  leaves the hand on `refreshAll`), then fires
+  `animateEventPlayed({ x, y, eventName })` after the play command
+  succeeds (guarded by a `played` flag — no burst on failed plays).
+- Behavior (reduced-motion OFF):
+  1. An 8-spark burst in the event colour (`0xffdd88`) plays at the card's
+     hand position as it leaves the hand (fixed deterministic directions,
+     `Quad.easeOut`, ~400ms — no RNG, stable in tests/replays).
+  2. The event name pops above the position (`popTextOrIcon`, riseY 28)
+     and the cheer SFX plays — reused `SFX_KEYS.EVENT_CHEER` (already
+     loaded via `sfx-tf-mapping.ts`; no new ToneForge key).
+- Accessibility (reduced motion): the spark burst is skipped; a brief
+  name pop + cheer SFX remain (spec AC2).
+- Headless/replay exemption (AGENTS.md rule 8): presentation-only — returns
+  immediately in replay/headless mode (`scene.replayMode`), never mutates
+  state or transcript.
+- Non-blocking: fire-and-forget; the event effect is already committed to
+  game state.
+- Reuse: `popTextOrIcon` + tweened circles (same deterministic pattern as
+  `animateLevelUp`) + `SFX_KEYS.EVENT_CHEER`; no new engine infrastructure.
+
 ## Scene Transitions
 
 - Main Street scene-level fade transitions are currently disabled.

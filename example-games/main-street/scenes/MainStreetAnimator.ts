@@ -958,6 +958,85 @@ export class MainStreetAnimator {
    * helpers, which target the actual centred hand layout (`handCenterX`)
    * instead of this left-anchored estimate.
    */
+  /**
+   * Held-event play feedback: when a held event card is played from the
+   * hand, a burst/pop plays at the card's position as it leaves the hand
+   * (8 event-coloured sparks tween outward + fade) and the event name pops
+   * with the cheer SFX (`SFX_KEYS.EVENT_CHEER` — already loaded via
+   * `sfx-tf-mapping.ts`, reuse-first).
+   *
+   * The caller passes the played card's PRE-refresh hand position (the
+   * card is gone from the hand by the time this helper runs).
+   *
+   * Accessibility (reduced motion): the spark burst is skipped; a brief
+   * name pop + cheer SFX remain (spec AC2).
+   *
+   * Headless/replay exemption (AGENTS.md rule 8): presentation-only
+   * effect; returns immediately in replay/headless mode
+   * (`scene.replayMode`) — no rendering, no audio. Never mutates game
+   * state or the transcript.
+   *
+   * Non-blocking: fire-and-forget; the event effect is already committed
+   * to game state by the caller.
+   *
+   * @param params  World position of the played card in the hand, and its
+   *                display name for the pop text.
+   */
+  public animateEventPlayed(params: { x: number; y: number; eventName: string }): void {
+    const s = this.scene;
+
+    // Headless/replay exemption: no rendering or audio in those modes.
+    if (s.replayMode) return;
+    const reducedMotion = s.settingsPanel?.reducedMotion === true;
+
+    // Cheer SFX — retained under reduced motion (spec AC2).
+    try { s.soundManager?.play(SFX_KEYS.EVENT_CHEER); } catch (_) { /* ignore */ }
+
+    if (!reducedMotion) {
+      // Event burst: 8 event-coloured sparks tween outward and fade.
+      // Fixed directions (deterministic — no RNG) so tests and replays
+      // are stable. Sits above the hand containers (per-index depths) and
+      // below the HUD (1000).
+      const directions = [
+        { dx: -24, dy: -16 }, { dx: 24, dy: -16 }, { dx: 0, dy: -28 },
+        { dx: -20, dy: 18 }, { dx: 20, dy: 18 }, { dx: 0, dy: 28 },
+        { dx: -12, dy: -30 }, { dx: 12, dy: -30 },
+      ];
+      for (const dir of directions) {
+        const spark = s.add.circle(params.x, params.y, 3, 0xffdd88, 0.95).setDepth(400);
+        s.tweens.add({
+          targets: spark,
+          x: params.x + dir.dx,
+          y: params.y + dir.dy,
+          alpha: 0,
+          scale: 0.4,
+          duration: 400,
+          ease: 'Quad.easeOut',
+          onComplete: () => {
+            spark.destroy();
+          },
+        });
+      }
+    }
+
+    // Event name pop at the played card's position (kept under reduced
+    // motion).
+    const text = s.add.text(params.x, params.y - 20, params.eventName, {
+      fontSize: '16px',
+      fontStyle: 'bold',
+      color: '#ffdd88',
+      fontFamily: FONT_FAMILY,
+    }).setOrigin(0.5).setDepth(500);
+    void popTextOrIcon({
+      scene: s,
+      target: text,
+      duration: 1400,
+      riseY: 28,
+      scale: 1.3,
+      reducedMotion,
+    });
+  }
+
   public getHandCardCenter(): { x: number; y: number } {
     const s = this.scene;
     return {

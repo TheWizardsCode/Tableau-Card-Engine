@@ -115,3 +115,15 @@ intercepts pointer events, never shifts layout, and leaves the market fully
 interactive. See `docs/main-street/ux-visual-audio.md` for the design notes.
 
 - Reduced motion: skipped entirely (instruction text remains the cue).
+
+## Held-event play burst
+
+`MainStreetAnimator.animateEventPlayed({ x, y, eventName })` plays when a
+held event card is played from the hand: an 8-spark event-coloured burst at
+the card's position as it leaves the hand plus an event-name pop with
+`sfx-event-cheer`. Triggered by `MainStreetTurnController.onPlayHeldEvent()`
+(only when the play command succeeded; the card's hand position is captured
+before the hand re-renders). See `docs/main-street/ux-visual-audio.md` for
+the design notes.
+
+- Reduced motion: pop + cheer SFX retained; spark burst skipped.
