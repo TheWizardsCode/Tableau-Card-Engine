@@ -144,3 +144,15 @@ shared default audio dir (`assets/audio/default/game-win.wav` /
 `game-lost.wav`); no new ToneForge factory. Reduced motion plays sound only;
 replay/headless skips everything (presentation-only). Non-blocking
 fire-and-forget. See `docs/main-street/ux-visual-audio.md` for design notes.
+
+## Undo/redo feedback notification
+
+`MainStreetAnimator.animateUndoRedo({ action, description })` plays when
+`MainStreetTurnController.performUndo()` / `performRedo()` reverse or
+reapply a command: a brief "Undid: <action>" / "Redid: <action>" pop above
+the hint bar (`popTextOrIcon`, riseY −16) plus the UI click SFX
+(`sfx-ui-click`). The action label reuses the command's `description`
+(already captured for the transcript). Reduced motion uses the pop
+fallback only (SFX retained); replay/headless skips everything
+(presentation-only). See `docs/main-street/ux-visual-audio.md` for design
+notes.

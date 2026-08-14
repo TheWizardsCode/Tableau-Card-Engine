@@ -351,6 +351,12 @@ export class MainStreetTurnController {
       addLog(s.state, 'Undo', 'neutral');
       try { if (cmd) recordMainStreetEvent({ type: 'undo', turn: s.state.turn, reversedAction: { description: cmd.description } }); } catch (_) {}
       s.refreshAll();
+      // Undo feedback (AGENTS.md rule 8): "Undid: <action>" pop above the
+      // hint bar + UI click SFX. Reduced motion / replay handled inside the
+      // animator; non-blocking, presentation-only.
+      if (cmd) {
+        try { s.msAnimator?.animateUndoRedo({ action: 'undo', description: cmd.description }); } catch (_) { /* presentation-only — ignore */ }
+      }
     } catch (e) {
       console.error('Undo failed:', e);
     }
@@ -366,6 +372,12 @@ export class MainStreetTurnController {
       addLog(s.state, 'Redo', 'neutral');
       try { if (cmd) recordMainStreetEvent({ type: 'redo', turn: s.state.turn, reappliedAction: { description: cmd.description } }); } catch (_) {}
       s.refreshAll();
+      // Redo feedback (AGENTS.md rule 8): "Redid: <action>" pop above the
+      // hint bar + UI click SFX. Reduced motion / replay handled inside the
+      // animator; non-blocking, presentation-only.
+      if (cmd) {
+        try { s.msAnimator?.animateUndoRedo({ action: 'redo', description: cmd.description }); } catch (_) { /* presentation-only — ignore */ }
+      }
     } catch (e) {
       console.error('Redo failed:', e);
     }

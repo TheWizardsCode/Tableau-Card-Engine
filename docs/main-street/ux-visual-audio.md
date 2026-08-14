@@ -278,6 +278,27 @@ void popTextOrIcon({
   `docs/SFX_CONVENTION.md`; Golf uses the same keys) loaded from the shared
   default audio dir — no new ToneForge factory.
 
+### Undo/redo feedback notification
+
+- Helper: `MainStreetAnimator.animateUndoRedo()`.
+- Trigger: `MainStreetTurnController.performUndo()` / `performRedo()` —
+  fires after the command was successfully reversed/reapplied, reusing the
+  command's `description` (already captured for the transcript) as the
+  action label.
+- Behavior (reduced-motion OFF): a brief "Undid: <action>" / "Redid:
+  <action>" pop appears just above the hint bar (bottom-centre,
+  `popTextOrIcon` riseY −16) with a UI click SFX (`SFX_KEYS.CLICK`).
+- Accessibility (reduced motion): the pop helper's reduced-motion fallback
+  is used (no extra motion); the click SFX still plays (sound is not
+  motion).
+- Headless/replay exemption (AGENTS.md rule 8): presentation-only — returns
+  immediately in replay/headless mode (`scene.replayMode`), never mutates
+  state or transcript.
+- Non-blocking: fire-and-forget; the undo/redo is already committed to
+  game state.
+- Reuse: `popTextOrIcon` + `SFX_KEYS.CLICK` (both already loaded); no new
+  engine infrastructure.
+
 ## Scene Transitions
 
 - Main Street scene-level fade transitions are currently disabled.

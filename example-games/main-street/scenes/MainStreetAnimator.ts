@@ -838,6 +838,41 @@ export class MainStreetAnimator {
     });
   }
 
+  /**
+   * Undo/redo feedback notification (AGENTS.md rule 8).
+   *
+   * Called from `MainStreetTurnController.performUndo` / `performRedo` after
+   * the command was reversed/reapplied. Shows a brief "Undid: <action>" /
+   * "Redid: <action>" pop just above the hint bar (bottom-centre) with a UI
+   * click SFX (`SFX_KEYS.CLICK`).
+   *
+   * Reduced motion: the pop helper's reduced-motion fallback is used (no
+   * extra motion); the click SFX still plays (sound is not motion).
+   * Replay/headless: returns immediately — presentation-only, documented
+   * exemption (AGENTS.md rule 8). Non-blocking: fire-and-forget.
+   */
+  public animateUndoRedo(params: { action: 'undo' | 'redo'; description: string }): void {
+    const s = this.scene;
+    if (s.replayMode) return;
+    const reducedMotion = s.settingsPanel?.reducedMotion === true;
+
+    try {
+      s.soundManager?.play(SFX_KEYS.CLICK);
+    } catch (_) { /* ignore */ }
+
+    void popTextOrIcon({
+      scene: s,
+      label: `${params.action === 'undo' ? 'Undid' : 'Redid'}: ${params.description}`,
+      x: s.layout.gameW / 2,
+      y: s.layout.gameH - 60,
+      duration: 1200,
+      riseY: -16,
+      scale: 1.1,
+      reducedMotion,
+      style: { fontSize: '14px', fontStyle: 'bold', color: '#ffdd88', fontFamily: FONT_FAMILY },
+    });
+  }
+
   public getStreetSlotCenter(slotIndex: number): { x: number; y: number } {
     const s = this.scene;
     const col = slotIndex % s.layout.streetCols;
