@@ -7,7 +7,7 @@
  *    pickup, affordability, empty-slot availability, phase, tutorial gating
  *    and requiredCardId;
  *  - drop-zone validation (`canDropBusinessCard`): canPurchaseBusiness plus
- *    tutorial place-business gating and T12 synergy adjacency enforcement;
+ *    tutorial place-business gating and T13 synergy adjacency enforcement;
  *  - drag → buy+place (`onDragDropBusiness`): single undoable
  *    buyBusinessCommand, state mutation, events, tutorial completion;
  *  - module wiring: pickup veto keeps the card in place with illegal
@@ -256,12 +256,12 @@ describe('MainStreet drag-to-buy wiring', () => {
       expect(controller.canDropBusinessCard(card.id, slot)).toBe(false);
     });
 
-    it('enforces synergy adjacency during T12 (Library must be next to the Bookshop)', () => {
-      const t12Index = UNIFIED_TUTORIAL_STEPS.findIndex((s) => s.id === 'T12');
-      expect(t12Index).toBeGreaterThanOrEqual(0);
+    it('enforces synergy adjacency during T13 (Library must be next to the Bookshop)', () => {
+      const t13Index = UNIFIED_TUTORIAL_STEPS.findIndex((s) => s.id === 'T13');
+      expect(t13Index).toBeGreaterThanOrEqual(0);
       scene.tutorialController = {
         isActive: true,
-        currentStepIndex: t12Index,
+        currentStepIndex: t13Index,
         lastCompletedStepId: null,
         exited: false,
       };
@@ -292,10 +292,10 @@ describe('MainStreet drag-to-buy wiring', () => {
     });
 
     it('does not enforce adjacency when the synergy card is not on the street', () => {
-      const t12Index = UNIFIED_TUTORIAL_STEPS.findIndex((s) => s.id === 'T12');
+      const t13Index = UNIFIED_TUTORIAL_STEPS.findIndex((s) => s.id === 'T13');
       scene.tutorialController = {
         isActive: true,
-        currentStepIndex: t12Index,
+        currentStepIndex: t13Index,
         lastCompletedStepId: null,
         exited: false,
       };

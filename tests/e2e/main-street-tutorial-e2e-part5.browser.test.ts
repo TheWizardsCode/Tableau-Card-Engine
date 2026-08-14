@@ -1,8 +1,10 @@
 /**
- * Main Street Tutorial E2E test — T11: End this turn, T12: Build a Library.
+ * Main Street Tutorial E2E test — T11: End this turn, T12: Costs and
+ * Reputation (informative), T13: Build a Library (synergy buy-and-place).
  *
  * Walks the new flow: after the buy-and-place (T10), the player ends the turn
- * (T11) then buys the Library (cs-library) from the dev row (T12).
+ * (T11), confirms the informative Library step (T12), then buys the Library
+ * (cs-library) from the dev row and places it next to the Bookshop (T13).
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Phaser from 'phaser';
@@ -61,7 +63,7 @@ async function walkToT11(scene: Phaser.Scene): Promise<void> {
   await waitForOverlayVisible(5_000);
 }
 
-describe('Main Street Tutorial E2E — T11-T12', () => {
+describe('Main Street Tutorial E2E — T11-T13', () => {
   beforeEach(async () => {
     game = await bootGameWithTutorial();
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
@@ -78,50 +80,60 @@ describe('Main Street Tutorial E2E — T11-T12', () => {
     game = null;
   });
 
-  it('T11: End this turn advances to T12', async () => {
+  it('T11: End this turn advances to T12, then Next advances to T13', async () => {
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
     await walkToT11(scene);
     expect(getStepIndex(scene)).toBe(10); // T11 End this turn
     await clickEndTurn(scene);
     await waitForOverlayVisible(10_000);
-    expect(getStepIndex(scene)).toBe(11); // T12 Build a Library
-    await saveScreenshot('t11-t12');
+    // T12 is now the informative Costs and Reputation step (confirm gate).
+    expect(getStepIndex(scene)).toBe(11); // T12 Costs and Reputation
+    await clickOverlayButtonByText('Next >'); // T12 -> T13
+    await waitForOverlayVisible(5_000);
+    expect(getStepIndex(scene)).toBe(12); // T13 Build a Library
+    await saveScreenshot('t11-t13');
   }, 30_000);
 
-  it('T12: Build a Library — buy then place next to the Bookshop advances to T13', async () => {
+  it('T13: Build a Library — buy then place next to the Bookshop advances to T14', async () => {
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
     await walkToT11(scene);
     await clickEndTurn(scene);
     await waitForOverlayVisible(10_000);
-    expect(getStepIndex(scene)).toBe(11);
+    expect(getStepIndex(scene)).toBe(11); // T12 (informative)
+    await clickOverlayButtonByText('Next >'); // T12 -> T13
+    await waitForOverlayVisible(5_000);
+    expect(getStepIndex(scene)).toBe(12);
 
     // Verify the Library is in the dev row (cs-library replaces cs-park)
     const s = scene as any;
     const library = s.state.market.development.find((c: any) => c.id.startsWith('cs-library'));
     expect(library).toBeTruthy();
 
-    // T12 is a composite buy-and-place step: buying the Library to hand
+    // T13 is a composite buy-and-place step: buying the Library to hand
     // keeps the step active (no more click-to-buy soft-lock advance).
     await clickRequiredBusinessCard(scene);
     await waitForOverlayVisible(5_000);
-    expect(getStepIndex(scene)).toBe(11); // still T12
+    expect(getStepIndex(scene)).toBe(12); // still T13
     expect(s.state.hand.some((c: any) => c.id.startsWith('cs-library'))).toBe(true);
 
     // Place the Library next to the Bookshop (slot 1 from T10 → slot 2 is
-    // its orthogonal neighbor; non-adjacent slots are rejected during T12).
+    // its orthogonal neighbor; non-adjacent slots are rejected during T13).
     await clickStreetSlot(scene, 2);
     await waitForOverlayVisible(5_000);
-    expect(getStepIndex(scene)).toBe(12); // T13 Triggering Events
+    expect(getStepIndex(scene)).toBe(13); // T14 Triggering Events
     expect(s.state.streetGrid[2]?.id.startsWith('cs-library')).toBe(true);
-    await saveScreenshot('t12-t13');
+    await saveScreenshot('t13-t14');
   }, 30_000);
 
-  it('T12: diagonal placement next to the Bookshop is accepted (8-way adjacency)', async () => {
+  it('T13: diagonal placement next to the Bookshop is accepted (8-way adjacency)', async () => {
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
     await walkToT11(scene);
     await clickEndTurn(scene);
     await waitForOverlayVisible(10_000);
-    expect(getStepIndex(scene)).toBe(11);
+    expect(getStepIndex(scene)).toBe(11); // T12 (informative)
+    await clickOverlayButtonByText('Next >'); // T12 -> T13
+    await waitForOverlayVisible(5_000);
+    expect(getStepIndex(scene)).toBe(12);
 
     const s = scene as any;
     const library = s.state.market.development.find((c: any) => c.id.startsWith('cs-library'));
@@ -129,29 +141,32 @@ describe('Main Street Tutorial E2E — T11-T12', () => {
 
     await clickRequiredBusinessCard(scene);
     await waitForOverlayVisible(5_000);
-    expect(getStepIndex(scene)).toBe(11); // still T12
+    expect(getStepIndex(scene)).toBe(12); // still T13
     expect(s.state.hand.some((c: any) => c.id.startsWith('cs-library'))).toBe(true);
 
     // Bookshop is at slot 1 (from T10). Slot 5 is diagonal (row 1, col 0) —
     // Chebyshev distance 1, so the 8-way "next to" rule accepts it.
     await clickStreetSlot(scene, 5);
     await waitForOverlayVisible(5_000);
-    expect(getStepIndex(scene)).toBe(12); // T13 Triggering Events
+    expect(getStepIndex(scene)).toBe(13); // T14 Triggering Events
     expect(s.state.streetGrid[5]?.id.startsWith('cs-library')).toBe(true);
-    await saveScreenshot('t12-diagonal-t13');
+    await saveScreenshot('t13-diagonal-t14');
   }, 30_000);
 
-  it('T12: non-adjacent placement is rejected with feedback and does not soft-lock', async () => {
+  it('T13: non-adjacent placement is rejected with feedback and does not soft-lock', async () => {
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
     await walkToT11(scene);
     await clickEndTurn(scene);
     await waitForOverlayVisible(10_000);
-    expect(getStepIndex(scene)).toBe(11);
+    expect(getStepIndex(scene)).toBe(11); // T12 (informative)
+    await clickOverlayButtonByText('Next >'); // T12 -> T13
+    await waitForOverlayVisible(5_000);
+    expect(getStepIndex(scene)).toBe(12);
 
     const s = scene as any;
     await clickRequiredBusinessCard(scene);
     await waitForOverlayVisible(5_000);
-    expect(getStepIndex(scene)).toBe(11); // still T12
+    expect(getStepIndex(scene)).toBe(12); // still T13
     expect(s.state.hand.some((c: any) => c.id.startsWith('cs-library'))).toBe(true);
 
     // Bookshop is at slot 1 (from T10). Slot 4 is EMPTY but neither
@@ -172,17 +187,17 @@ describe('Main Street Tutorial E2E — T11-T12', () => {
     expect(String(s.instructionText?.text ?? '')).toContain('next to');
 
     // No soft-lock regression: the slot stays empty, the Library stays in
-    // hand, and the tutorial is still on T12 so the player can retry.
+    // hand, and the tutorial is still on T13 so the player can retry.
     expect(s.state.streetGrid[4]).toBeNull();
     expect(s.state.hand.some((c: any) => c.id.startsWith('cs-library'))).toBe(true);
-    expect(getStepIndex(scene)).toBe(11);
+    expect(getStepIndex(scene)).toBe(12);
 
     // Retry on a valid DIAGONAL slot (7, Chebyshev neighbour of slot 1)
-    // completes T12 — proving the rejection did not break the flow.
+    // completes T13 — proving the rejection did not break the flow.
     await clickStreetSlot(scene, 7);
     await waitForOverlayVisible(5_000);
-    expect(getStepIndex(scene)).toBe(12); // T13 Triggering Events
+    expect(getStepIndex(scene)).toBe(13); // T14 Triggering Events
     expect(s.state.streetGrid[7]?.id.startsWith('cs-library')).toBe(true);
-    await saveScreenshot('t12-reject-retry');
+    await saveScreenshot('t13-reject-retry');
   }, 30_000);
 });

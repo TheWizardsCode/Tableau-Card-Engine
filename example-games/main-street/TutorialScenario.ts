@@ -38,8 +38,9 @@
  * | T9   | Buy Local Festival ($3)    | 0        | 3         | 9.625   |
  * | T10  | Buy-and-place Bookshop ($3)| 0        | 3         | 6.625   |
  * | T11  | End Turn + income (~1.25)  | 1.25     | 0         | 7.875   |
- * | T12  | Buy Library ($7)           | 0        | 7         | 0.875   |
- * | T13+ | Confirm steps (no cost)    | 0        | 0         | ≥0.875  |
+ * | T12  | Confirm (no cost)          | 0        | 0         | 7.875   |
+ * | T13  | Buy Library ($7)           | 0        | 7         | 0.875   |
+ * | T14+ | Confirm steps (no cost)    | 0        | 0         | ≥0.875  |
  *
  * @module
  */
@@ -115,7 +116,7 @@ export interface TutorialScenario {
  * **Development Row (4 slots):**
  *   - `biz-bakery` (Bakery, $3, Food)
  *   - `biz-laundromat` (Laundromat, $4, Service) — T3 purchase target
- *   - `cs-library` (Library, $7, Culture) — T12 purchase target
+ *   - `cs-library` (Library, $7, Culture) — T13 purchase target
  *   - `biz-bookshop` (Bookshop, $3, Culture) — T10 buy-and-place target
  *
  * **Investments Row (3 slots: 2 upgrades + 1 investment event):**
@@ -129,12 +130,12 @@ export interface TutorialScenario {
  *
  * **Coin Budget:** 16 starting coins (Easy preset raised for the tutorial),
  * $4 Laundromat (T3) + $3 Local Festival (T9) + $3 Bookshop (T10) + $7 Library
- * (T12) = $17, covered by 16 + ~1.9 income across the two end-turn steps
+ * (T13) = $17, covered by 16 + ~1.9 income across the two end-turn steps
  * (T7: Laundromat ~0.625; T11: Laundromat + Bookshop ~1.25). RNG-independent.
  */
 export const STANDARD_TUTORIAL_SCENARIO: TutorialScenario = {
   difficulty: 'Easy',
-  // 16 starting coins (vs. Easy preset's 10 after the CG-0MSP26Q5N002EH8P re-tune): the 16-step flow buys four
+  // 16 starting coins (vs. Easy preset's 10 after the CG-0MSP26Q5N002EH8P re-tune): the 17-step flow buys four
   // cards (Laundromat $4 + Local Festival $3 + Bookshop $3 + Library $7 = $17)
   // and earns ~1.9 income across T7 and T11, so 16 + ~2 ≥ 17. The tutorial
   // scenario's coin budget is intentionally higher than the base preset.

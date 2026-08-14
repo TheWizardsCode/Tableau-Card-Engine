@@ -276,7 +276,7 @@ export class MainStreetTutorialHints {
    * Complete the tutorial: dismiss the overlay and call onComplete
    * to persist tutorial completion state.
    *
-   * This is only called when the player reaches the final step (T16)
+   * This is only called when the player reaches the final step (T17)
    * and clicks "Let's play!", or when nextStep() reaches the end.
    */
   public completeDismiss(): void {

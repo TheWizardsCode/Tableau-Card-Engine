@@ -1249,7 +1249,7 @@ export class MainStreetRenderer {
       // draggable (drag-to-buy/place). Events and upgrades stay click-only:
       // they live in the investments row and are not part of the drag-drop
       // module's dev-row model (CG-0MSKSAREE007AYSZ + operator decision A
-      // for the T12 Library drag support).
+      // for the T13 Library drag support).
       const isDraggableCard =
         (card.family === 'business' || card.family === 'community-space') &&
         !!s.dragDropManager && !s.replayMode;

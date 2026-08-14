@@ -122,19 +122,19 @@ Tutorial text follows these editorial principles:
 
 - **Reading level:** ~10-year-old reading level (Flesch-Kincaid Grade Level ≤ 5-6)
 - **Sentence limit:** **≤3 sentences per text box** (titles and bodies), each box
-  communicating **exactly one point** (16-step flow editorial rule)
+  communicating **exactly one point** (17-step flow editorial rule)
 - **Word count:** Each step body under 50 words (soft boundary — conciseness preferred)
 - **Concepts:** At most 1–2 distinct gameplay concepts per step (soft boundary)
 - **Plain language:** Short sentences, common words, active voice, no jargon without explanation
 - **Consistency:** Use consistent terminology across all steps (e.g. "Coins" not "gold", "turns" not "days")
 
-### Content rules for the 16-step flow
+### Content rules for the 17-step flow
 
 - Do NOT mention time-limited play (the "25 turns" sentence was removed from T1).
 - Do NOT describe incident cards as "blue" or list their impacts in Upcoming Incidents.
 - Do NOT mention matching cards in the Place a Business step.
 
-### Step flow (16 steps, T1–T16)
+### Step flow (17 steps, T1–T17)
 
 | # | ID | Title | Gate | Highlight zone |
 |---|----|-------|------|----------------|
@@ -149,11 +149,17 @@ Tutorial text follows these editorial principles:
 | 9 | T9 | Buy the Local Festival | action (buy-event) | festivalCard (card-level) |
 | 10 | T10 | Optimizing for Events | action (buy-and-place) | developmentRow |
 | 11 | T11 | End this turn | action (end-turn) | endTurnButton |
-| 12 | T12 | Build a Library | action (buy-and-place) | developmentRow |
-| 13 | T13 | Triggering Events | action (play-event) | hand |
-| 14 | T14 | Success and Failure | confirm | hud (scoring bar) |
-| 15 | T15 | Challenges | confirm | challengePanel |
-| 16 | T16 | Tutorial Complete | confirm | completionModal |
+| 12 | T12 | Costs and Reputation | confirm (informative) | developmentRow |
+| 13 | T13 | Build a Library | action (buy-and-place + synergy) | developmentRow |
+| 14 | T14 | Triggering Events | action (play-event) | hand |
+| 15 | T15 | Success and Failure | confirm | hud (scoring bar) |
+| 16 | T16 | Challenges | confirm | challengePanel |
+| 17 | T17 | Tutorial Complete | confirm | completionModal |
+
+T12 (Costs and Reputation) is an informative step that introduces the Library's
+running cost vs reputation trade-off; the buy-and-place action and the Culture
+synergy rule (place the Library next to the Bookshop) moved to T13. Gate
+count: 9 confirm + 8 action = 17.
 
 Card-level highlight zones (`laundromatCard`, `festivalCard`) are resolved through
 `resolveMarketCardAnchor()` in `MainStreetTutorialHints.ts` using the deterministic
@@ -162,7 +168,7 @@ tutorial-scenario market slots, not hardcoded pixel positions.
 ### Scenario budget (Easy / 16 coins)
 
 The tutorial runs the **Easy** preset with a **16-coin starting budget** (raised
-from the standard Easy 12 for the 16-step flow). The walkthrough spends exactly:
+from the standard Easy 12 for the 17-step flow). The walkthrough spends exactly:
 
 | Step | Action | Coins In | Coins Out | Balance |
 |------|--------|----------|-----------|---------|
@@ -172,9 +178,10 @@ from the standard Easy 12 for the 16-step flow). The walkthrough spends exactly:
 | T9   | Buy Local Festival ($3) | 0 | 3 | 9.625 |
 | T10  | Buy-and-place Bookshop ($3) | 0 | 3 | 6.625 |
 | T11  | End Turn + income | 1.25 | 0 | 7.875 |
-| T12  | Buy Library ($7) | 0 | 7 | 0.875 |
+| T12  | Confirm (no cost) | 0 | 0 | 7.875 |
+| T13  | Buy Library ($7) | 0 | 7 | 0.875 |
 
-T13+ are confirm-only steps (no cost), so the balance never drops below 0.875.
+T14+ are confirm-only steps (no cost), so the balance never drops below 0.875.
 The authoritative walkthrough lives in the `Coin Budget (Easy / 16 coins)` table
 in `example-games/main-street/TutorialScenario.ts`.
 

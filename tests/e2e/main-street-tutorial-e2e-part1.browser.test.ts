@@ -1,7 +1,7 @@
 /**
  * Main Street Tutorial E2E browser test — Part 1 (Tests 1-6).
  *
- * Walks the new 16-step tutorial flow (CG-0MSKSJ9SS0069ZWT):
+ * Walks the new 17-step tutorial flow (CG-0MSKSJ9SS0069ZWT):
  * T1 Welcome → T2 Development Row → T3 Buy the Laundromat → T4 Your Hand.
  *
  * Stays under Phaser 4 RC's ~8-cycle game create/destroy limit per browser
@@ -59,7 +59,7 @@ describe('Main Street Tutorial E2E — Part 1', () => {
     expect(devCards).toBeTruthy();
     expect(devCards.length).toBe(4);
     expect(devCards[0].id).toBe('biz-bakery-0');
-    // cs-library replaces cs-park in the dev row (16-step flow)
+    // cs-library replaces cs-park in the dev row (17-step flow)
     expect(devCards.some((c: any) => c.id.startsWith('cs-library'))).toBe(true);
     expect(s.state.resourceBank.coins).toBe(16);
     const investments = s.state?.market?.investments;

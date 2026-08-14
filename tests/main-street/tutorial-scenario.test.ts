@@ -50,8 +50,8 @@ describe('STANDARD_TUTORIAL_SCENARIO definition', () => {
     expect(STANDARD_TUTORIAL_SCENARIO.difficulty).toBe('Easy');
   });
 
-  it('starts with 16 coins (raised from the 12-coin Easy preset for the 4-card 16-step flow)', () => {
-    // The 16-step tutorial buys Laundromat $4 + Local Festival $3 + Bookshop $3
+  it('starts with 16 coins (raised from the 12-coin Easy preset for the 4-card 17-step flow)', () => {
+    // The 17-step tutorial buys Laundromat $4 + Local Festival $3 + Bookshop $3
     // + Library $7 = $17; 16 starting coins + ~1.9 income across the two end-turn
     // steps covers it. The scenario is intentionally richer than the base preset.
     expect(STANDARD_TUTORIAL_SCENARIO.resourceBank.coins).toBe(16);
@@ -200,7 +200,7 @@ describe('createTutorialScenario', () => {
 
   // ── Coin budget verification (AC5: 16-coin flow) ────────────
 
-  it('provides sufficient coin budget for the 16-step flow (16 coins, $4+$3+$3+$7 purchases)', () => {
+  it('provides sufficient coin budget for the 17-step flow (16 coins, $4+$3+$3+$7 purchases)', () => {
     const state = createTutorialScenario();
     // Scenario starts with 16 coins (not the 12-coin Easy preset)
     expect(state.resourceBank.coins).toBe(16);
@@ -230,10 +230,10 @@ describe('createTutorialScenario', () => {
 
   it('Library (cs-library) is present in the dev row and affordable', () => {
     const state = createTutorialScenario();
-    const t12 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T12')!;
-    expect(t12).toBeDefined();
+    const t13 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T13')!;
+    expect(t13).toBeDefined();
     const library = state.market.development.find(
-      c => matchesTemplate(c.id, t12.requiredCardId ?? ''),
+      c => matchesTemplate(c.id, t13.requiredCardId ?? ''),
     );
     expect(library).toBeDefined();
     expect(library!.name).toBe('Library');

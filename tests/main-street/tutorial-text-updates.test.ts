@@ -1,7 +1,7 @@
 /**
  * Tutorial Text Updates Tests
  *
- * Validates the 16-step tutorial text restructure (CG-0MSKSJ9SS0069ZWT):
+ * Validates the 17-step tutorial text restructure (CG-0MSKSJ9SS0069ZWT):
  * 1. Every resolved title and body is ≤3 sentences and communicates exactly one point.
  * 2. T1 no longer mentions "25 turns" (time-limited play sentence removed).
  * 3. Upcoming Incidents has no "blue" wording and no incident-impact details.
@@ -40,7 +40,7 @@ function countSentences(text: string): number {
   return parts.length;
 }
 
-describe('Tutorial text updates (16-step restructure)', () => {
+describe('Tutorial text updates (17-step restructure)', () => {
   beforeEach(() => {
     resetI18n();
     registerLocale('en', TUTORIAL_EN_BUNDLE);
@@ -139,30 +139,51 @@ describe('Tutorial text updates (16-step restructure)', () => {
     });
   });
 
-  describe('T12 Build a Library (AC: running cost vs reputation, Culture adjacency)', () => {
+  describe('T12 Costs and Reputation (AC: running cost vs reputation only — no synergy)', () => {
     it('mentions running costs and reputation', () => {
       const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T12')!).body;
       expect(body.toLowerCase()).toMatch(/cost/);
       expect(body.toLowerCase()).toMatch(/reputation/i);
     });
-    it('mentions the Culture adjacency bonus via synergyCardName placeholder', () => {
+    it('does NOT mention Culture adjacency, the Bookshop, or a bonus (informative split)', () => {
       const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T12')!).body;
-      expect(body).toContain('Bookshop');
-      expect(body.toLowerCase()).toMatch(/culture/);
+      expect(body.toLowerCase()).not.toMatch(/culture/);
+      expect(body).not.toContain('Bookshop');
+      expect(body.toLowerCase()).not.toMatch(/bonus/);
+    });
+    it('resolves {cardName} from card data (no raw placeholder tokens)', () => {
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T12')!).body;
+      expect(body).toContain('Library');
+      expect(body).not.toMatch(/\{[A-Za-z_]+\}/);
     });
   });
 
-  describe('T13 Triggering Events (AC: play festival from hand)', () => {
-    it('mentions clicking the held festival in hand', () => {
+  describe('T13 Build a Library (AC: synergy system, Culture adjacency)', () => {
+    it('mentions the Culture bonus via synergyCardName placeholder', () => {
       const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T13')!).body;
+      expect(body).toContain('Bookshop');
+      expect(body.toLowerCase()).toMatch(/culture/);
+      expect(body.toLowerCase()).toMatch(/bonus/);
+    });
+    it('tells the player to buy and place the Library next to the Bookshop', () => {
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T13')!).body;
+      expect(body.toLowerCase()).toMatch(/buy/);
+      expect(body.toLowerCase()).toMatch(/place/);
+      expect(body.toLowerCase()).toMatch(/next to/);
+    });
+  });
+
+  describe('T14 Triggering Events (AC: play festival from hand)', () => {
+    it('mentions clicking the held festival in hand', () => {
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T14')!).body;
       expect(body.toLowerCase()).toMatch(/hand/);
       expect(body.toLowerCase()).toMatch(/click/);
     });
   });
 
-  describe('T14 Success and Failure (AC: scoring bar)', () => {
+  describe('T15 Success and Failure (AC: scoring bar)', () => {
     it('mentions the scoring bar components', () => {
-      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T14')!).body;
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T15')!).body;
       expect(body.toLowerCase()).toMatch(/coins/);
       expect(body.toLowerCase()).toMatch(/score/);
       expect(body.toLowerCase()).toMatch(/target/);
@@ -245,14 +266,14 @@ describe('Data-driven tutorial text (card facts from card data)', () => {
     // T10's copy references the Bookshop by name but does not quote its cost.
   });
 
-  it('T12 resolves {cardName} (Library) and {synergyCardName} (Bookshop) from card data', () => {
-    const t12 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T12')!;
-    const libraryRow = getCsvRows().find(r => r.id === getBaseTypeId(t12.requiredCardId!))!;
-    const bookshopRow = getCsvRows().find(r => r.id === getBaseTypeId(t12.synergyCardId!))!;
+  it('T13 resolves {cardName} (Library) and {synergyCardName} (Bookshop) from card data', () => {
+    const t13 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T13')!;
+    const libraryRow = getCsvRows().find(r => r.id === getBaseTypeId(t13.requiredCardId!))!;
+    const bookshopRow = getCsvRows().find(r => r.id === getBaseTypeId(t13.synergyCardId!))!;
     expect(libraryRow).toBeDefined();
     expect(bookshopRow).toBeDefined();
 
-    const body = resolveTutorialStepText(t12).body;
+    const body = resolveTutorialStepText(t13).body;
     expect(body).toContain(libraryRow.name);      // Library
     expect(body).toContain(bookshopRow.name);     // Bookshop
     expect(body).not.toMatch(/\{[A-Za-z_]+\}/);

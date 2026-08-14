@@ -1,7 +1,7 @@
 /**
  * Main Street: Unified Tutorial Flow
  *
- * Defines the unified T1-T16 tutorial steps (16 steps) that teach the core
+ * Defines the unified T1-T17 tutorial steps (17 steps) that teach the core
  * Main Street loop (buy → hand → place; invest → optimize → trigger). Each
  * step has a gate type:
  *
@@ -36,15 +36,16 @@
  * | T9   | Buy Local Festival ($3)          | 0        | 3         | 9.625   |
  * | T10  | Buy-and-place Bookshop ($3)      | 0        | 3         | 6.625   |
  * | T11  | End Turn + income (~1.25 coins)  | 1.25     | 0         | 7.875   |
- * | T12  | Buy Library ($7)                 | 0        | 7         | 0.875   |
- * | T13  | Play held event (free)           | 0        | 0         | ~1      |
- * | T14+ | Confirm steps (no cost)          | 0        | 0         | ~1      |
+ * | T12  | Confirm (no cost)                | 0        | 0         | 7.875   |
+ * | T13  | Buy Library ($7)                 | 0        | 7         | 0.875   |
+ * | T14  | Play held event (free)           | 0        | 0         | ~1      |
+ * | T15+ | Confirm steps (no cost)          | 0        | 0         | ~1      |
  *
  * **Conclusion:** Even with worst-case incidents, the budget is sufficient
  * for all tutorial actions. Laundromat ($4) + Local Festival ($3) + Bookshop
  * ($3) + Library ($7) = $17 is covered by 16 starting coins plus ~1.9 income
  * across the two end-turn steps. The Bookshop (Culture business) and Library
- * (Culture community space) enable the Local Festival bonus when played in T13.
+ * (Culture community space) enable the Local Festival bonus when played in T14.
  *
  * @module
  */
@@ -108,7 +109,7 @@ export type TutorialActionType =
 export type TutorialGateType = 'confirm' | 'action';
 
 /**
- * A single unified tutorial step definition (16 steps total T1-T16).
+ * A single unified tutorial step definition (17 steps total T1-T17).
  *
  * Confirm steps only need `gate: 'confirm'`; they do not have a
  * `requiredAction` field because the only way to advance is by
@@ -118,7 +119,7 @@ export type TutorialGateType = 'confirm' | 'action';
  * specifies the in-game action the player must perform.
  */
 export interface UnifiedTutorialStepDef {
-  /** Step identifier (T1, T2, ..., T16). */
+  /** Step identifier (T1, T2, ..., T17). */
   id: string;
   /**
    * i18n key for the short title shown in the overlay.
@@ -163,23 +164,25 @@ export interface UnifiedTutorialStepDef {
    *
    * Used for steps whose body references TWO cards — the purchased card (via
    * `requiredCardId`, feeding `{cardName}`) and the synergy partner card (via
-   * `synergyCardId`, feeding `{synergyCardName}`). E.g. T12 builds the Library
+   * `synergyCardId`, feeding `{synergyCardName}`). E.g. T13 builds the Library
    * next to the Bookshop for a Culture adjacency bonus.
    */
   synergyCardId?: string;
 }
 
-// ── Unified Tutorial Script (T1-T13) ────────────────────────
+// ── Unified Tutorial Script (T1-T17) ────────────────────────
 
 /**
- * The unified set of 16 tutorial steps, in sequential order.
+ * The unified set of 17 tutorial steps, in sequential order.
  *
  * The flow teaches one concept per step: buy → hand → place; invest →
- * optimize → trigger. See the parent work item's T1–T16 mapping for the
- * full rationale (steps dropped, split, renamed, and inserted).
+ * optimize → trigger. T12 was split into an informative cost/reputation
+ * step (new T12) and the synergy-focused buy-and-place step (T13). See the
+ * parent work item's T1–T17 mapping for the full rationale (steps dropped,
+ * split, renamed, and inserted).
  *
- * Gate type distribution: 8 confirm + 8 action
- * (action steps: T3, T5, T7, T9, T10, T11, T12, T13).
+ * Gate type distribution: 9 confirm + 8 action
+ * (action steps: T3, T5, T7, T9, T10, T11, T13, T14).
  */
 export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
   {
@@ -286,6 +289,18 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     id: 'T12',
     titleKey: tutorialKey('T12', 'title'),
     bodyKey: tutorialKey('T12', 'body'),
+    // Informative cost-vs-reputation step: highlights the dev row (like T2)
+    // and references cs-library so {cardName}/{cost} resolve from live card
+    // data. No action required and NO synergy mention — the buy-and-place
+    // action and the synergy rule live on T13.
+    highlightZone: 'developmentRow',
+    gate: 'confirm',
+    referencedCardId: 'cs-library',
+  },
+  {
+    id: 'T13',
+    titleKey: tutorialKey('T13', 'title'),
+    bodyKey: tutorialKey('T13', 'body'),
     // Composite buy-and-place step (like T10): the player buys cs-library
     // from the dev row (drag or click-to-buy) and places it on the street.
     // The step completes only on the terminal place-business drop; the
@@ -298,9 +313,9 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     synergyCardId: 'biz-bookshop-0',
   },
   {
-    id: 'T13',
-    titleKey: tutorialKey('T13', 'title'),
-    bodyKey: tutorialKey('T13', 'body'),
+    id: 'T14',
+    titleKey: tutorialKey('T14', 'title'),
+    bodyKey: tutorialKey('T14', 'body'),
     // Triggering Events: play the held Local Festival from the hand.
     highlightZone: 'hand',
     gate: 'action',
@@ -308,31 +323,31 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     referencedCardId: 'evt-festival-0',
   },
   {
-    id: 'T14',
-    titleKey: tutorialKey('T14', 'title'),
-    bodyKey: tutorialKey('T14', 'body'),
-    // Success and Failure: the scoring bar (HUD).
-    highlightZone: 'hud',
-    gate: 'confirm',
-  },
-  {
     id: 'T15',
     titleKey: tutorialKey('T15', 'title'),
     bodyKey: tutorialKey('T15', 'body'),
-    highlightZone: 'challengePanel',
+    // Success and Failure: the scoring bar (HUD).
+    highlightZone: 'hud',
     gate: 'confirm',
   },
   {
     id: 'T16',
     titleKey: tutorialKey('T16', 'title'),
     bodyKey: tutorialKey('T16', 'body'),
+    highlightZone: 'challengePanel',
+    gate: 'confirm',
+  },
+  {
+    id: 'T17',
+    titleKey: tutorialKey('T17', 'title'),
+    bodyKey: tutorialKey('T17', 'body'),
     highlightZone: 'completionModal',
     gate: 'confirm',
   },
 ] as const;
 
 /** Total number of unified tutorial steps. */
-export const UNIFIED_TUTORIAL_STEP_COUNT = UNIFIED_TUTORIAL_STEPS.length; // 16
+export const UNIFIED_TUTORIAL_STEP_COUNT = UNIFIED_TUTORIAL_STEPS.length; // 17
 
 export const INVALID_ACTION_MESSAGE = 'Complete the highlighted step first.';
 
@@ -443,7 +458,7 @@ export function shouldAllowAction(
 
 /**
  * Pure placement rule for composite buy-and-place steps with a synergy
- * partner (currently T12: the Library must be built next to the Bookshop
+ * partner (currently T13: the Library must be built next to the Bookshop
  * for the Culture adjacency bonus).
  *
  * Enforced by both the drag path (`MainStreetTurnController.canDropBusinessCard`
@@ -468,7 +483,7 @@ export function shouldAllowAction(
  * template (copy-suffix stripped) so any copy of the synergy template
  * satisfies the rule. If the synergy card is NOT on the street, the rule
  * cannot be enforced and returns `true` (allowed) — the partner is
- * guaranteed to be present when T12 is reached (T10's buy-and-place
+ * guaranteed to be present when T13 is reached (T10's buy-and-place
  * completes only on placement), but the helper stays robust regardless.
  */
 export function isSynergyAdjacentPlacement(
@@ -553,7 +568,7 @@ export function resolveTutorialCardParams(
   };
 
   // Resolve the synergy-partner card ({synergyCardName}) when the step
-  // references a second card (e.g. T12 builds the Library next to the Bookshop).
+  // references a second card (e.g. T13 builds the Library next to the Bookshop).
   if (step.synergyCardId) {
     const synergyBaseId = getBaseTypeId(step.synergyCardId);
     const synergyRow = getCsvRows().find(r => r.id === synergyBaseId);

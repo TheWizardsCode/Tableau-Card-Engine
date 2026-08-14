@@ -2,7 +2,7 @@
  * Main Street Tutorial — English locale bundle.
  *
  * Contains all user-facing string values for:
- * - T1–T16 tutorial step titles and bodies
+ * - T1–T17 tutorial step titles and bodies
  * - Tutorial offer modal (title, body, skip/start buttons)
  * - Tutorial overlay buttons (dismiss, next, exit, start full game)
  *
@@ -11,7 +11,7 @@
  * - Modal: `tutorial.modal.<field>`
  * - Overlay: `tutorial.overlay.<field>`
  *
- * ## Editorial rules (16-step flow)
+ * ## Editorial rules (17-step flow)
  *
  * - **≤3 sentences per text box** (titles and bodies), exactly one point per box.
  * - Do NOT mention time-limited play (the "25 turns" sentence was removed).
@@ -32,7 +32,7 @@
  * - `{cost}` — the card's `cost` column, formatted via `formatCurrency()`.
  * - `{bonus}` — an event card's `coinDelta` as `+N coins` (used by T9).
  * - `{synergyCardName}` — a second card's name, when the step references a
- *   synergy partner (used by T12: Library next to Bookshop).
+ *   synergy partner (used by T13: Library next to Bookshop).
  *
  * To add a new language variant:
  *  1. Create `tutorial-<lang>.ts` with the translated bundle (keeping the
@@ -87,7 +87,7 @@ export function overlayKey(field: string): string {
 }
 
 /**
- * English locale bundle for all 16 tutorial step strings.
+ * English locale bundle for all 17 tutorial step strings.
  *
  * Maps i18n keys (e.g. `tutorial.T1.title`) to English string values.
  */
@@ -186,40 +186,50 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
   [tutorialKey('T11', 'body')]:
     'We could play the **{cardName}** now, but we\'re going to wait for a more opportune moment. End this turn for now.',
 
-  // ── T12: Build a Library ───────────────────────────────────
+  // ── T12: Costs and Reputation ──────────────────────────────
   [tutorialKey('T12', 'title')]:
+    'Costs and Reputation',
+  // {cardName} = cs-library — resolved from card-data.csv at render time.
+  // Informative step (confirm gate): focuses exclusively on the Library's
+  // running cost vs reputation trade-off. NO synergy mention here — the
+  // Culture adjacency bonus is taught by the T13 action step.
+  [tutorialKey('T12', 'body')]:
+    'Some businesses cost coins to run but bring in customers. The **{cardName}** builds your reputation.',
+
+  // ── T13: Build a Library ───────────────────────────────────
+  [tutorialKey('T13', 'title')]:
     'Build a Library',
   // {cardName} = cs-library, {synergyCardName} = biz-bookshop — resolved from
-  // card-data.csv at render time. The Library costs coins to run each turn but
-  // builds reputation; placing it next to the Bookshop (a Culture business)
-  // earns the Culture adjacency bonus. Adjacency is 8-way (Chebyshev): placing
-  // the Library diagonally next to the Bookshop counts just as much as orthogonally.
-  [tutorialKey('T12', 'body')]:
-    'Some businesses cost coins to run but bring in customers. The **{cardName}** builds your reputation. Place it next to **{synergyCardName}** — orthogonally or diagonally — for a Culture bonus.',
+  // card-data.csv at render time. The synergy system: placing the Library next
+  // to the Bookshop (a Culture business) earns the Culture adjacency bonus.
+  // Adjacency is 8-way (Chebyshev): placing the Library diagonally next to the
+  // Bookshop counts just as much as orthogonally.
+  [tutorialKey('T13', 'body')]:
+    'The **{cardName}** brings a Culture bonus when placed next to other Culture cards. Buy it and place it next to **{synergyCardName}** — orthogonally or diagonally — to gain the bonus.',
 
-  // ── T13: Triggering Events ─────────────────────────────────
-  [tutorialKey('T13', 'title')]:
+  // ── T14: Triggering Events ─────────────────────────────────
+  [tutorialKey('T14', 'title')]:
     'Triggering Events',
   // {cardName} resolved from card-data.csv (evt-festival) at render time.
-  [tutorialKey('T13', 'body')]:
+  [tutorialKey('T14', 'body')]:
     'Two Culture businesses on your street power the festival. Click the **{cardName}** in your hand to play it.',
 
-  // ── T14: Success and Failure ───────────────────────────────
-  [tutorialKey('T14', 'title')]:
+  // ── T15: Success and Failure ───────────────────────────────
+  [tutorialKey('T15', 'title')]:
     'Success and Failure',
-  [tutorialKey('T14', 'body')]:
+  [tutorialKey('T15', 'body')]:
     'The bar shows your coins, reputation, score, and target. Hover each to see how it is calculated.',
 
-  // ── T15: Challenges ────────────────────────────────────────
-  [tutorialKey('T15', 'title')]:
+  // ── T16: Challenges ────────────────────────────────────────
+  [tutorialKey('T16', 'title')]:
     'Challenges',
-  [tutorialKey('T15', 'body')]:
+  [tutorialKey('T16', 'body')]:
     'Each game gives you challenges for bonus points. See them in the Challenge Tracker. Completing challenges unlocks new cards for future games!',
 
-  // ── T16: Tutorial Complete ─────────────────────────────────
-  [tutorialKey('T16', 'title')]:
+  // ── T17: Tutorial Complete ─────────────────────────────────
+  [tutorialKey('T17', 'title')]:
     'Tutorial Complete',
-  [tutorialKey('T16', 'body')]:
+  [tutorialKey('T17', 'body')]:
     'Great job! You are ready to play a full game. Find the tutorial again in the settings menu.',
 } as const;
 

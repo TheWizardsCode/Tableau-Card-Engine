@@ -274,7 +274,7 @@ export class MainStreetTurnController {
     if (s.uiPhase !== 'market') return;
 
     // Tutorial gating: only allow play-event if it's the required action or
-    // the tutorial is inactive (T13 "Triggering Events" uses this gate).
+    // the tutorial is inactive (T14 "Triggering Events" uses this gate).
     const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('play-event' as TutorialActionType);
     if (check && !check.allowed) {
       s.instructionText.setText(check.reason ?? 'Complete the highlighted step first.');
@@ -506,7 +506,7 @@ export class MainStreetTurnController {
     const card = s.state.market.development.find((c: any) => c.id === cardId);
     if (!card) return false;
     // Drag support covers business AND community-space cards (general change,
-    // operator decision A for the T12 Library bug). Events/upgrades stay
+    // operator decision A for the T13 Library bug). Events/upgrades stay
     // click-only (they are not part of the drag-drop module's dev-row model).
     if (card.family !== 'business' && card.family !== 'community-space') return false;
     if (s.state.resourceBank.coins < card.cost) return false;
@@ -537,7 +537,7 @@ export class MainStreetTurnController {
    * The target slot must pass `canPurchaseBusiness` (card still in the
    * Development row, enough coins, empty slot, in bounds) and the tutorial
    * must allow the `place-business` action. During a composite buy-and-place
-   * step with a synergy partner (T12: Library next to the Bookshop), the
+   * step with a synergy partner (T13: Library next to the Bookshop), the
    * target must also pass `isSynergyAdjacentPlacement`. A rejected drop
    * snap-backs the card to the Development row with illegal-move feedback.
    */
@@ -549,7 +549,7 @@ export class MainStreetTurnController {
     const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('place-business' as TutorialActionType);
     if (check && !check.allowed) return false;
 
-    // Tutorial: synergy adjacency for composite buy-and-place steps (T12).
+    // Tutorial: synergy adjacency for composite buy-and-place steps (T13).
     const controller = (s as any).tutorialController as any;
     if (controller?.isActive) {
       const step = controller.currentStepIndex >= 0
@@ -649,7 +649,7 @@ export class MainStreetTurnController {
     // Ensure stale hover tooltip is cleared when a card is placed.
     s.tooltipManager?.hide();
 
-    // Tutorial: synergy adjacency for composite buy-and-place steps (T12 —
+    // Tutorial: synergy adjacency for composite buy-and-place steps (T13 —
     // the Library must be built next to the Bookshop). A non-adjacent click
     // placement is rejected with a data-driven instruction message and the
     // phase stays 'placing-from-hand' so the player can retry.

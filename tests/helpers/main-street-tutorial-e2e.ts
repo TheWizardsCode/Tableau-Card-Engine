@@ -582,7 +582,7 @@ function dispatchCanvasMouse(type: string, worldX: number, worldY: number): void
 /**
  * Dispatch a real pointer click at a street slot while a card is pending
  * WITHOUT asserting that it was placed — used to verify illegal-placement
- * rejection during the tutorial (e.g. T12: the Library must be built next
+ * rejection during the tutorial (e.g. T13: the Library must be built next
  * to the Bookshop).
  *
  * Mirrors `clickStreetSlot`'s setup (placing phase + street-grid refresh +
@@ -635,7 +635,7 @@ export async function clickEndTurn(scene: Phaser.Scene): Promise<void> {
 }
 
 /**
- * Play the held investment event from the hand (T13 "Triggering Events").
+ * Play the held investment event from the hand (T14 "Triggering Events").
  * Finds the first event-family card in the player's hand and calls
  * onPlayHeldEvent with its index, then waits for the event to leave the hand.
  */

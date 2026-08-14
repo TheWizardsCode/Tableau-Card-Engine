@@ -13,15 +13,15 @@
  * highlight zones must match these targets, otherwise the highlights land on
  * empty space instead of on their target element.
  *
- * Unified step mapping for the alignment checks (16 steps):
+ * Unified step mapping for the alignment checks (17 steps):
  *   T2 (developmentRow, index 1)  T3 (laundromatCard, index 2)
  *   T4 (hand, index 3)  T5 (streetGrid, index 4)
  *   T6 (incidentQueue, index 5)  T7 (endTurnButton, index 6)
  *   T8 (investmentsRow, index 7)  T9 (festivalCard, index 8)
  *   T10 (developmentRow, index 9)  T11 (endTurnButton, index 10)
- *   T12 (developmentRow, index 11)  T13 (hand, index 12)
- *   T14 (hud, index 13)  T15 (challengePanel, index 14)
- *   T16 (completionModal, index 15)
+ *   T12 (developmentRow, index 11)  T13 (developmentRow, index 12)
+ *   T14 (hand, index 13)  T15 (hud, index 14)
+ *   T16 (challengePanel, index 15)  T17 (completionModal, index 16)
  *
  * Screenshots are still captured for visual regression review (red reference
  * rects are drawn at depth 250 as diagnostics), but geometry is now asserted.
@@ -376,7 +376,7 @@ describe('Tutorial overlay highlight alignment (renderer geometry)', () => {
     destroyGame();
   });
 
-  /** All 16 steps with their highlight zones (null zones have no rect). */
+  /** All 17 steps with their highlight zones (null zones have no rect). */
   const alignmentSteps = UNIFIED_TUTORIAL_STEPS
     .map((step, index) => ({ id: step.id, stepIndex: index, zone: step.highlightZone }))
     .filter((s) => !NULL_ZONES.has(s.zone));
@@ -417,7 +417,7 @@ describe('Tutorial overlay highlight alignment (renderer geometry)', () => {
     60_000,
   );
 
-  it('completionModal (T16) draws no highlight', async () => {
+  it('completionModal (T17) draws no highlight', async () => {
     const mgr = scene.tutorialOverlay as {
       showStep?: (index: number) => void;
       dismiss?: () => void;
@@ -427,7 +427,7 @@ describe('Tutorial overlay highlight alignment (renderer geometry)', () => {
       if (typeof mgr.dismiss === 'function') {
         mgr.dismiss();
       }
-      mgr.showStep(15); // T16 = completionModal (confirm gate)
+      mgr.showStep(16); // T17 = completionModal (confirm gate)
       await new Promise((r) => setTimeout(r, 50));
 
       const highlights = scene.children.list.filter(

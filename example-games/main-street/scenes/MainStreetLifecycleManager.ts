@@ -493,7 +493,7 @@ export class MainStreetLifecycleManager {
               } catch (_) { /* ignore */ }
               // Start the day phase so the market populates
               s.startDayPhase();
-              // Start the action-gated tutorial flow (T1-T12)
+              // Start the action-gated tutorial flow (T1-T17)
               const controller = (s as any).tutorialController as TutorialControllerState | undefined;
               if (controller) {
                 Object.assign(s, { tutorialController: startTutorial(controller) });
@@ -715,10 +715,10 @@ export class MainStreetLifecycleManager {
     const { newState } = completeCurrentStep(controller);
     Object.assign(s, { tutorialController: newState });
 
-    // T12 is a composite buy-and-place step (like T10): the terminal
+    // T13 is a composite buy-and-place step (like T10): the terminal
     // place-business completes it and already returns the scene to the
     // market phase with pendingHandIndex cleared. This reset for play-event
-    // steps (T13) is therefore a defensive no-op today, but it is kept so
+    // steps (T14) is therefore a defensive no-op today, but it is kept so
     // the held event card is always clickable in the hand (event clicks are
     // only wired while uiPhase === 'market').
     const nextStep = getCurrentStep(newState);
