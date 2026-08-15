@@ -139,6 +139,29 @@ npm run package:mac    # dmg
 
 Output goes to the gitignored `release/` directory. Config: `electron-builder.yml` (app id `com.thewizardscode.tableaucardengine`, asar containing only `dist/` + `dist-electron/` + `package.json` — the renderer and Phaser are Vite-bundled, so no `node_modules` are needed). Packaging runs with `--publish never` (private repo; binaries are uploaded to Steam manually). The Windows binary is also built reproducibly by CI on every push to `main` (`.github/workflows/package.yml`) and uploaded as a workflow artifact.
 
+### Skill: release-windows
+
+`.pi/skills/release-windows/` provides a repo-local skill (`/skill:release-windows`) that promotes the latest CI-built Windows installer to a **draft** GitHub Release — the operator's approval gate is the draft itself (review + publish in the GitHub UI; no pre-approval is requested to create the draft).
+
+**Prerequisites:** `gh` CLI authenticated with `repo` scope. Invoke from the repo root.
+
+**Invocation:**
+
+```bash
+node .pi/skills/release-windows/scripts/promote-windows-release.mjs --dry-run   # print exact commands, touch nothing
+node .pi/skills/release-windows/scripts/promote-windows-release.mjs             # create the draft release
+```
+
+**What it does:**
+
+1. Resolves the latest successful `Package Windows Binary` run (`.github/workflows/package.yml`) via `gh run list` — stops with a clear message if none exists.
+2. Downloads the `tce-windows-installer` artifact (`gh run download`) and locates `TCE-Setup-<version>.exe`.
+3. Derives `v<version>` from the artifact filename and extracts the matching `CHANGELOG.md` section as release notes; falls back to `gh release create --generate-notes` (with an explicit notice) when the section is missing.
+4. Creates a **draft only** release (`gh release create v<version> <exe> --draft`) — never publishes, never marks pre-release. An existing `v<version>` tag is reused by `gh`; if a release already exists the skill skips and reports its URL (idempotent, exit 0).
+5. Prints the draft URL and reminds the operator to review and publish it in the GitHub UI.
+
+**Exit codes:** `0` success/skip; non-zero fatal (no successful run, download failure, missing installer, release creation failure). Windows Setup only — Linux/macOS assets are out of scope. See `SKILL.md` in that directory for the full workflow, error paths, and conventions.
+
 ### DLC content directory (Steam model)
 
 Game content defaults to the bundled `dist/` inside the app. For Steam DLC (option a), the launcher reads game content from an external content root — a Steam-managed DLC install directory containing `index.html` + assets — supplied via:
