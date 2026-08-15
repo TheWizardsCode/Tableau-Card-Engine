@@ -149,7 +149,7 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
   [tutorialKey('T6', 'title')]:
     'Upcoming Incidents',
   [tutorialKey('T6', 'body')]:
-    'Events here happen at the end of each turn. Some help you, some hurt you. Hover one for details.',
+    'The event at the top happens at the end of this turn; the ones below happen next turn. Some help you, some hurt you. Hover one for details.',
 
   // ── T7: End Turn ───────────────────────────────────────────
   [tutorialKey('T7', 'title')]:
