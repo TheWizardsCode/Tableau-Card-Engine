@@ -230,7 +230,7 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
   [tutorialKey('T17', 'title')]:
     'Tutorial Complete',
   [tutorialKey('T17', 'body')]:
-    'Great job! You are ready to play a full game. Find the tutorial again in the settings menu.',
+    'There are many more things to discover as you play, but you have the basics now. Let\'s play.',
 } as const;
 
 // Re-export helpers
