@@ -1227,6 +1227,16 @@ export class MainStreetAnimator {
      */
     source?: { x: number; y: number };
     destination: { x: number; y: number };
+    /**
+     * Optional explicit animation duration (ms). When omitted the transfer
+     * keeps the fixed 1500ms default used by click-to-buy / place-from-hand
+     * / upgrade / event / AI flows. The drag-and-drop buy path passes a
+     * distance-proportional duration (see `computeDragTransferDuration` in
+     * MainStreetConstants.ts) so a card dropped near its slot settles
+     * quickly. Reduced-motion behaviour is unchanged: the animation is
+     * skipped entirely before this option is consulted.
+     */
+    duration?: number;
   }): Promise<void> {
     const s = this.scene;
     if (s.settingsPanel?.reducedMotion) return Promise.resolve();
@@ -1256,7 +1266,7 @@ export class MainStreetAnimator {
         target: visual,
         destX: options.destination.x,
         destY: options.destination.y,
-        duration: 1500,
+        duration: options.duration ?? 1500,
         ease: 'Cubic.easeInOut',
         soundManager: s.soundManager,
         sfx,

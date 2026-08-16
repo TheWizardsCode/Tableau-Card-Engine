@@ -22,6 +22,7 @@ import {
   type DragDropPayload,
 } from '../../../src/ui/dragDrop';
 import { getCurrentStep, isSynergyAdjacentPlacement, resolveTutorialCardParams, type TutorialActionType } from '../TutorialFlow';
+import { computeDragTransferDuration } from './MainStreetConstants';
 
 /**
  * Match a card ID against a requiredCardId using prefix matching.
@@ -661,13 +662,20 @@ export class MainStreetTurnController {
     };
 
     if (sourceIndex >= 0) {
+      // Transfer duration proportional to the drop-to-slot distance: a card
+      // released next to its slot settles quickly instead of taking the
+      // fixed 1500ms market→slot flight (click/AI flows keep 1500ms via the
+      // shared default). See computeDragTransferDuration (CG-0MST2LS3E004BTPO).
+      const destination = s.getStreetSlotCenter(slotIndex);
+      const distancePx = Math.hypot(destination.x - dropSource.x, destination.y - dropSource.y);
       void s.animateTransferFromMarket({
         cardId,
         family: 'business',
         row: 'development',
         slotIndex: sourceIndex,
         source: dropSource,
-        destination: s.getStreetSlotCenter(slotIndex),
+        destination,
+        duration: computeDragTransferDuration(distancePx),
       }).then(afterTransfer);
     } else {
       afterTransfer();

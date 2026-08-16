@@ -14,6 +14,13 @@ This document captures the current implementation-level guidance for Main Street
   - Investment events animate from the market row to the player hand.
   - Upgrades animate from the market row to the upgraded street slot.
 - Accessibility: transfer animation is skipped when Reduced Motion is enabled.
+- Duration:
+  - Click-to-buy / place-from-hand / upgrade / event / AI flows use a fixed
+    `1500ms` transfer (unchanged).
+  - The drag-and-drop buy path derives its duration from the drop-to-slot
+    distance via `computeDragTransferDuration()` (clamped to 250–1500ms,
+    4ms per px), so a card released next to its slot settles into place
+    quickly instead of taking the full fixed flight (CG-0MST2LS3E004BTPO).
 
 ### Resource pop feedback (coins / reputation)
 

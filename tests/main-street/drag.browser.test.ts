@@ -181,7 +181,7 @@ function cardContainer(scene: Scene, cardId: string): Phaser.GameObjects.Contain
 }
 
 /** Simulate a full drag gesture from (sx,sy) to (dx,dy). */
-async function simulateDrag(sx: number, sy: number, dx: number, dy: number): Promise<void> {
+async function simulateDrag(sx: number, sy: number, dx: number, dy: number, settleMs = 300): Promise<void> {
   dispatchMouse('mousedown', sx, sy);
   await wait(30);
   // First move just past the drag distance threshold (5px) so dragstart fires.
@@ -191,7 +191,7 @@ async function simulateDrag(sx: number, sy: number, dx: number, dy: number): Pro
   dispatchMouse('mousemove', dx, dy);
   await wait(80);
   dispatchMouse('mouseup', dx, dy);
-  await wait(300); // allow dragend / snap-back / illegal feedback processing
+  await wait(settleMs); // allow dragend / snap-back / illegal feedback processing
 }
 
 describe('MainStreet drag-to-buy/place (browser)', () => {
@@ -219,13 +219,16 @@ describe('MainStreet drag-to-buy/place (browser)', () => {
     const container = cardContainer(scene, card.id);
     const target = scene.getStreetSlotCenter(slot);
     const originY = container.y; // market row Y (the card's slot origin)
-    await simulateDrag(container.x, container.y, target.x, target.y);
+    await simulateDrag(container.x, container.y, target.x, target.y, 40);
 
     // Transfer visual must start at the DROP LOCATION (the card follows the
     // pointer, so it was released at the street slot) — not at the market
-    // row origin. ~300ms into the 1500ms tween the visual is still near its
-    // source, so a y near the slot end (and far from the market row)
-    // proves the animation did not jump back to the market row.
+    // row origin. The drop lands on the slot centre, so the transfer is
+    // distance-proportional (clamped to 250ms — well under the fixed
+    // 1500ms); we sample the visual right after release while the short
+    // tween is still running, and a y near the slot end (far from the
+    // market row) proves the animation did not jump back to the market row
+    // (CG-0MST2LS3E004BTPO).
     const visuals = [...(scene.activeTransferVisuals ?? [])];
     expect(visuals.length).toBe(1);
     const spread = Math.abs(originY - target.y);

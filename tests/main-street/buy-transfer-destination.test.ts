@@ -225,6 +225,9 @@ describe('Buy transfer destinations (market → hand)', () => {
       // left-edge estimate (handX + handCardW/2).
       expect(opts.destination.x).toBeCloseTo(LAYOUT.handCenterX, 5);
       expect(opts.destination.x).not.toBeCloseTo(LAYOUT.handX + LAYOUT.handCardW / 2, 5);
+      // Click-to-buy flow keeps the fixed default — no duration override
+      // (drag-and-drop is the only flow that passes a proportional duration).
+      expect(opts.duration).toBeUndefined();
     });
 
     it('hand size 1: animates to the append position of a 2-card hand', () => {

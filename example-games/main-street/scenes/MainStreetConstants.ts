@@ -78,6 +78,31 @@ export const LOG_COLORS: Record<string, string> = {
   'turn-header': '#ffdd44',
 };
 
+// ── Drag-and-drop transfer animation timing ──────────────────
+// The drag-and-drop buy path derives its transfer duration from the
+// distance between the drop location and the target slot centre, so a card
+// released next to its slot settles into place quickly instead of taking
+// the fixed 1500ms market→slot flight used by click/AI flows.
+// See `computeDragTransferDuration` below (CG-0MST2LS3E004BTPO).
+export const DRAG_TRANSFER_MS_PER_PX = 4;
+export const DRAG_TRANSFER_DURATION_MIN_MS = 250;
+export const DRAG_TRANSFER_DURATION_MAX_MS = 1500;
+
+/**
+ * Compute the transfer-animation duration (ms) for a drag-and-drop
+ * placement from the drop-to-slot distance in pixels.
+ *
+ * Pure function (no Phaser dependency) so it is unit-testable headless:
+ * returns `clamp(distance * DRAG_TRANSFER_MS_PER_PX, MIN, MAX)`. A card
+ * dropped almost directly on its slot still gets a brief animated transfer
+ * (the minimum), and the duration never exceeds the fixed 1500ms default
+ * used by the non-drag transfer flows.
+ */
+export function computeDragTransferDuration(distancePx: number): number {
+  const raw = distancePx * DRAG_TRANSFER_MS_PER_PX;
+  return Math.min(DRAG_TRANSFER_DURATION_MAX_MS, Math.max(DRAG_TRANSFER_DURATION_MIN_MS, raw));
+}
+
 // Challenge Tracker panel layout
 export const CHALLENGE_LINE_H = 20;
 export const CHALLENGE_PAD = 6;

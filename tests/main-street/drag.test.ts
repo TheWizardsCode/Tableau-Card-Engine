@@ -23,6 +23,7 @@ import { MainStreetTurnController } from '../../example-games/main-street/scenes
 import { UndoRedoManager } from '../../src/core-engine/UndoRedoManager';
 import { COMMON_SFX_KEYS } from '../../src/core-engine/SoundManager';
 import { UNIFIED_TUTORIAL_STEPS } from '../../example-games/main-street/TutorialFlow';
+import { DRAG_TRANSFER_DURATION_MIN_MS, DRAG_TRANSFER_DURATION_MAX_MS } from '../../example-games/main-street/scenes/MainStreetConstants';
 
 // ── Mocks ──────────────────────────────────────────────────
 
@@ -334,6 +335,13 @@ describe('MainStreet drag-to-buy wiring', () => {
       expect(opts.row).toBe('development');
       expect(opts.source).toEqual({ x: 412, y: 331 });
       expect(opts.destination).toEqual(scene.getStreetSlotCenter(slot));
+
+      // Distance-proportional duration: the drop is close to the slot
+      // centre (mock slot centre is (500+slot, 260)), so the duration is
+      // well below the fixed 1500ms default and respects the clamp bounds.
+      expect(opts.duration).toBeDefined();
+      expect(opts.duration).toBeLessThan(DRAG_TRANSFER_DURATION_MAX_MS);
+      expect(opts.duration).toBeGreaterThanOrEqual(DRAG_TRANSFER_DURATION_MIN_MS);
 
       // Flush the transfer-completion microtask (mock resolves immediately).
       await new Promise((resolve) => setTimeout(resolve, 0));
