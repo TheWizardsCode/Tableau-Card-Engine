@@ -6,6 +6,13 @@
 **Date:** 2026-03-12
 **Status:** DRAFT -- Awaiting Producer Review
 
+> **Status update (CG-0MSLXJCHH001DLIO):** This historical PRD describes the
+> original AI-scoring design. Default difficulty presets no longer impose a
+> turn limit — games end via score threshold, all challenges, bankruptcy,
+> or reputation collapse; a turn limit is opt-in via an explicit
+> `maxTurns` config. See `docs/main-street/core-rules-and-mechanics.md`
+> for the current rules.
+
 ---
 
 ## Executive Summary
@@ -689,6 +696,14 @@ The following tasks represent a suggested implementation order. Each task should
 ---
 
 ## Appendix A: Move Evaluation Heuristics
+
+> **Superseded by CG-0MSLXJCHH001DLIO:** The scoring formulas below use
+> `remainingTurns = config.maxTurns - state.turn`, which describes the
+> original turn-limited design. The AI planning horizon is now derived from
+> distance to the win threshold — `aiPlanningHorizon(state)` computes
+> `clamp(ceil((winThreshold - score) / scorePace), floor, cap)` with floor 5,
+> cap 25, scorePace 8 — and `config.maxTurns` is `undefined` for all default
+> presets (turn limits are opt-in). See `example-games/main-street/MainStreetAiStrategy.ts`.
 
 ### A.1 Action Scoring Functions
 
