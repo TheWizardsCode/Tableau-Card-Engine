@@ -26,4 +26,4 @@
 - [[sources/tutorial-i18n-already-implemented]] — Main Street tutorial i18n externalization already implemented *(created: 2026-06-24)*
 
 ---
-*Last updated: 2026-08-09T16:17:41.062Z* | *Total pages: 20*
+*Last updated: 2026-08-15T17:53:51.065Z* | *Total pages: 20*
