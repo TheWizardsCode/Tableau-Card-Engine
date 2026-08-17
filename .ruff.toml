@@ -1,0 +1,6 @@
+# Exclude auto-generated LLM wiki metadata from linting.
+# These are JSON/JSONL files that ruff incorrectly parses as Python.
+exclude = [
+    ".llm-wiki/meta/events.jsonl",
+    ".llm-wiki/meta/registry.json",
+]

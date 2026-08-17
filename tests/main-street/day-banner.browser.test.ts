@@ -38,6 +38,31 @@ async function bootGame(options: { width?: number; height?: number } = {}): Prom
   return game;
 }
 
+/**
+ * Boot the game with the tutorial offer deterministically forced on
+ * (?tutorial=1 → forceShowOffer, the same mechanism the E2E helper uses).
+ * Used by the tests that verify the day banner stays silent while the modal
+ * waits for the player's choice.
+ */
+async function bootGameWithTutorialOffer(): Promise<Phaser.Game> {
+  // Isolate from any checkpoint/tutorial state a previous test may have left.
+  try { localStorage.clear(); } catch { /* ignore */ }
+  let container = document.getElementById('game-container');
+  if (container) container.remove();
+  container = document.createElement('div');
+  container.id = 'game-container';
+  document.body.appendChild(container);
+
+  const url = new URL(window.location.href);
+  url.searchParams.set('tutorial', '1');
+  window.history.replaceState({}, '', url.toString());
+
+  const { createMainStreetGame } = await import('../../example-games/main-street/createMainStreetGame');
+  const game = createMainStreetGame({});
+  await waitForScene(game, 'MainStreetScene');
+  return game;
+}
+
 function destroyGame(game: Phaser.Game | null): void {
   if (game) {
     game.destroy(true, false);
@@ -144,5 +169,63 @@ describe('MainStreet day banner', () => {
 
     await waitForCondition(() => calls.length >= 1, { timeoutMs: 5000, label: 'day banner trigger (reduced motion)' });
     expect(calls).toHaveLength(1);
+  }, 30_000);
+
+  it('does NOT fire the banner at boot while the tutorial offer modal is waiting for a choice', async () => {
+    // Boot with the tutorial offer forced on (?tutorial=1 — same mechanism as
+    // the E2E helper) so the modal deterministically appears.
+    game = await bootGameWithTutorialOffer();
+    const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
+
+    // Spy AFTER boot: with this fix the boot-time startDayPhase calls are
+    // banner-suppressed and the deferred banner stays pending until the
+    // player chooses how to start.
+    const { calls } = spyOnDayBanner(scene);
+
+    // Wait for the first-launch offer modal — the decision point before
+    // which the banner must never play.
+    await waitForCondition(() => {
+      const modal = scene.tutorialOfferModal as unknown as { isVisible?: boolean } | undefined;
+      return modal?.isVisible === true;
+    }, { timeoutMs: 20_000, label: 'tutorial offer modal visible' });
+
+    // Give any (incorrect) async boot-time banner a chance to fire.
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(calls).toHaveLength(0);
+  }, 30_000);
+
+  it('fires the deferred banner only once the player skips the tutorial offer', async () => {
+    game = await bootGameWithTutorialOffer();
+    const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
+
+    const { calls } = spyOnDayBanner(scene);
+
+    await waitForCondition(() => {
+      const modal = scene.tutorialOfferModal as unknown as { isVisible?: boolean } | undefined;
+      return modal?.isVisible === true;
+    }, { timeoutMs: 20_000, label: 'tutorial offer modal visible' });
+    expect(calls).toHaveLength(0);
+
+    // Click [ Skip ] → free play begins → the deferred Day banner plays.
+    const skipBtn = (scene as unknown as {
+      tutorialOfferModal?: { overlayObjects: Phaser.GameObjects.GameObject[] };
+    }).tutorialOfferModal?.overlayObjects.find(
+      (obj): obj is Phaser.GameObjects.Text =>
+        obj instanceof Phaser.GameObjects.Text && obj.text === '[ Skip ]',
+    );
+    expect(skipBtn).toBeTruthy();
+    skipBtn!.emit('pointerdown', {
+      x: skipBtn!.x,
+      y: skipBtn!.y,
+      worldX: skipBtn!.x,
+      worldY: skipBtn!.y,
+    });
+
+    await waitForCondition(() => calls.length >= 1, {
+      timeoutMs: 5000,
+      label: 'deferred day banner trigger',
+    });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].day).toBe((scene.state as { turn: number }).turn);
   }, 30_000);
 });
