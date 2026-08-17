@@ -659,8 +659,8 @@ export const STARTING_REPUTATION = 3;
 
 /**
  * Total number of cards visible in the single-row marketplace.
- * Replaces the two-row `MARKET_BUSINESS_SLOTS` / `MARKET_INVESTMENT_SLOTS`
- * model (CG-0MSTOATDT009BRX2): the market is one line of exactly 3 cards.
+ * The market is one line of exactly 3 cards (CG-0MSTOATDT009BRX2 replaced
+ * the legacy two-row model: 4 business slots + 3 investment slots).
  */
 export const MARKET_TOTAL_SLOTS = 3;
 
@@ -676,61 +676,15 @@ export const MARKET_UPGRADE_MAX = 1;
 /** Maximum number of event cards in the single-row market. */
 export const MARKET_EVENT_MAX = 1;
 
-/**
- * @deprecated Two-row market removed (CG-0MSTOATDT009BRX2). Kept only for
- * save-format migration of old two-row saves.
- */
-export const MARKET_BUSINESS_SLOTS = 4;
-
-/**
- * @deprecated Two-row market removed (CG-0MSTOATDT009BRX2). Kept only for
- * save-format migration of old two-row saves.
- */
-export const MARKET_INVESTMENT_SLOTS = 3;
-
-/**
- * @deprecated Two-row market removed (CG-0MSTOATDT009BRX2).
- */
-export const MARKET_INVESTMENT_UPGRADE_COUNT = 2;
-
-/**
- * @deprecated Two-row market removed (CG-0MSTOATDT009BRX2).
- */
-export const MARKET_INVESTMENT_EVENT_COUNT = 1;
-
-/**
- * @deprecated Use MARKET_INVESTMENT_SLOTS-related constants instead.
- * Kept temporarily for backward-compat during UI migration.
- */
-export const MARKET_EVENT_SLOTS = MARKET_INVESTMENT_EVENT_COUNT;
-
-/**
- * @deprecated Use MARKET_INVESTMENT_SLOTS-related constants instead.
- * Kept temporarily for backward-compat during UI migration.
- */
-export const MARKET_UPGRADE_SLOTS = MARKET_INVESTMENT_UPGRADE_COUNT;
-
 /** Number of Incident cards visible in the incident queue at game start. */
 export const INCIDENT_QUEUE_SIZE = 2;
 
 /**
- * Fixed coin cost to re-roll the single-row market (CG-0MSTOATDT009BRX2).
- * Replaces both `REFRESH_DEVELOPMENT_COST` and `REFRESH_INVESTMENTS_COST`.
+ * Fixed coin cost to re-roll the single-row market (CG-0MSTOATDT009BRX2),
+ * replacing the legacy per-row refresh costs (€2 each).
  * The Accountant's `refreshCostDiscount` (Group F) applies to this cost.
  */
 export const REFRESH_MARKET_COST = 5;
-
-/**
- * @deprecated Two-row market removed (CG-0MSTOATDT009BRX2); use `REFRESH_MARKET_COST`.
- * Kept only for legacy constants/tests.
- */
-export const REFRESH_INVESTMENTS_COST = 2;
-
-/**
- * @deprecated Two-row market removed (CG-0MSTOATDT009BRX2); use `REFRESH_MARKET_COST`.
- * Kept only for legacy constants/tests.
- */
-export const REFRESH_DEVELOPMENT_COST = 2;
 
 /**
  * @deprecated Synergy is now percentage-based. Each BusinessCard and
