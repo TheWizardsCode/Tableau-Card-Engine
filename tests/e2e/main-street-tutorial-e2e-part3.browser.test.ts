@@ -71,7 +71,7 @@ describe('Main Street Tutorial E2E — Coin Budget (16 coins)', () => {
     const s = scene as any;
     // 16 coins (raised from the 12-coin Easy preset for the 4-card flow)
     expect(s.state?.resourceBank?.coins).toBe(16);
-    const laundromat = s.state.market.development.find((c: any) => c.id.startsWith('biz-laundromat'));
+    const laundromat = s.state.market.cards.find((c: any) => c.id.startsWith('biz-laundromat'));
     expect(laundromat).toBeTruthy();
     expect(laundromat.cost).toBeLessThanOrEqual(4);
   }, 30_000);

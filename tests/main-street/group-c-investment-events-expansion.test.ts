@@ -348,7 +348,7 @@ describe('Group C: deck generation & balance guardrails (AC6)', () => {
     const state = setupMainStreetGame({ seed: 'group-c-expansion' });
     const allIds = new Set([
       ...state.decks.event.map(c => c.id.replace(/-\d+$/, '')),
-      ...state.market.investments.map(c => c.id.replace(/-\d+$/, '')),
+      ...state.market.cards.map(c => c.id.replace(/-\d+$/, '')),
       ...state.incidentQueue.map(c => c.id.replace(/-\d+$/, '')),
       ...(state.hand ?? []).map(c => c.id.replace(/-\d+$/, '')),
     ]);

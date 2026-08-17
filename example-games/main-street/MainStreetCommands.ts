@@ -13,14 +13,16 @@ import { toCommand, type ReversibleAction } from '../../src/core-engine/ActionCo
 import type { MainStreetState } from './MainStreetState';
 import {
   purchaseBusiness,
-  purchaseBusinessToHand,
+  moveToHand,
   purchaseUpgrade,
   purchaseEvent,
-  refreshDevelopment,
-  refreshInvestments,
+  refreshMarket,
   sellBusiness,
+  playBusinessFromHand,
+  playUpgradeFromHand,
+  playEventFromHand,
+  discardFromHand,
 } from './MainStreetMarket';
-import { playHeldEvent } from './MainStreetEngine';
 
 /** Snapshot of the portions of state affected by market actions. */
 interface MarketActionSnapshot {
@@ -131,16 +133,16 @@ export function buyUpgradeCommand(
   );
 }
 
-/** Command: Buy Business to Hand */
-export function buyBusinessToHandCommand(
+/** Command: Move market card to hand (free; pay on play) */
+export function moveToHandCommand(
   state: MainStreetState,
   cardId: string,
 ) {
   return toCommand(
     state,
     snapshotAction(
-      (s) => purchaseBusinessToHand(s, cardId),
-      `BuyBusinessToHand ${cardId}`,
+      (s) => moveToHand(s, cardId),
+      `MoveToHand ${cardId}`,
     ),
   );
 }
@@ -164,19 +166,66 @@ export function playEventCommand(state: MainStreetState, handIndex?: number) {
   return toCommand(
     state,
     snapshotAction(
-      (s) => playHeldEvent(s, handIndex),
-      'PlayHeldEvent',
+      (s) => {
+        const idx = handIndex ?? (s.hand ?? []).findIndex(c => c.family === 'event');
+        return playEventFromHand(s, idx);
+      },
+      'PlayEventFromHand',
     ),
   );
 }
 
-/** Command: Refresh Development Row */
-export function refreshDevelopmentCommand(state: MainStreetState) {
+/** Command: Play Business from Hand (cost-at-play) */
+export function playBusinessFromHandCommand(
+  state: MainStreetState,
+  handIndex: number,
+  slotIndex: number,
+) {
   return toCommand(
     state,
     snapshotAction(
-      (s) => refreshDevelopment(s),
-      'RefreshDevelopment',
+      (s) => playBusinessFromHand(s, handIndex, slotIndex),
+      `PlayBusinessFromHand ${handIndex} -> slot ${slotIndex}`,
+    ),
+  );
+}
+
+/** Command: Play Upgrade from Hand (cost-at-play) */
+export function playUpgradeFromHandCommand(
+  state: MainStreetState,
+  handIndex: number,
+  targetSlot?: number,
+) {
+  return toCommand(
+    state,
+    snapshotAction(
+      (s) => playUpgradeFromHand(s, handIndex, targetSlot),
+      `PlayUpgradeFromHand ${handIndex}`,
+    ),
+  );
+}
+
+/** Command: Discard card from hand (free) */
+export function discardFromHandCommand(
+  state: MainStreetState,
+  handIndex: number,
+) {
+  return toCommand(
+    state,
+    snapshotAction(
+      (s) => discardFromHand(s, handIndex),
+      `DiscardFromHand ${handIndex}`,
+    ),
+  );
+}
+
+/** Command: Re-roll the single-row market */
+export function refreshMarketCommand(state: MainStreetState) {
+  return toCommand(
+    state,
+    snapshotAction(
+      (s) => refreshMarket(s),
+      'RefreshMarket',
     ),
   );
 }
@@ -195,17 +244,6 @@ export function sellBusinessCommand(
   );
 }
 
-/** Command: Refresh Investments Row */
-export function refreshInvestmentsCommand(state: MainStreetState) {
-  return toCommand(
-    state,
-    snapshotAction(
-      (s) => refreshInvestments(s),
-      'RefreshInvestments',
-    ),
-  );
-}
-
 // Re-export renamed symbols for backward compatibility
 /** @deprecated Use buyBusinessCommand() instead. */
 export const BuyBusinessCommand = buyBusinessCommand;
@@ -215,5 +253,7 @@ export const BuyUpgradeCommand = buyUpgradeCommand;
 export const BuyEventCommand = buyEventCommand;
 /** @deprecated Use playEventCommand() instead. */
 export const PlayEventCommand = playEventCommand;
-/** @deprecated Use refreshInvestmentsCommand() instead. */
-export const BuyRefreshInvestmentsCommand = refreshInvestmentsCommand;
+/** @deprecated Use moveToHandCommand() instead. */
+export const BuyBusinessToHandCommand = moveToHandCommand;
+/** @deprecated Use refreshMarketCommand() instead. */
+export const BuyRefreshInvestmentsCommand = refreshMarketCommand;

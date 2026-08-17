@@ -214,12 +214,12 @@ describe('Group A business expansion: deck generation', () => {
 
   it('initialises a full game with the expanded pool (market + decks consistent)', () => {
     const state = setupMainStreetGame({ seed: 'group-a-expansion' });
-    const bizTotal = state.market.development.length + state.decks.business.length;
+    const bizTotal = state.market.cards.filter(c => c.family === 'business').length + state.decks.business.length;
     expect(bizTotal).toBe(createBusinessDeck().length);
     // New cards must be reachable somewhere in the pool (deck or market).
     const allIds = new Set([
       ...state.decks.business.map(c => c.id.replace(/-\d+$/, '')),
-      ...state.market.development.map(c => c.id.replace(/-\d+$/, '')),
+      ...state.market.cards.map(c => c.id.replace(/-\d+$/, '')),
     ]);
     for (const c of NEW_BUSINESS_CONTRACTS) {
       expect(allIds.has(c.id), `${c.id} unreachable in the game pool`).toBe(true);

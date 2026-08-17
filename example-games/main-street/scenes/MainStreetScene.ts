@@ -363,13 +363,9 @@ export class MainStreetScene extends CardGameScene {
     return (this.msRenderer as any).refreshActionButtons.apply(this.msRenderer, args);
   }
 
-  // Refresh investments proxy (forward to turn controller)
-  public onRefreshDevelopmentClick(...args: any[]): any {
-    return (this.msTurnController as any).onRefreshDevelopmentClick.apply(this.msTurnController, args);
-  }
-
-  public onRefreshInvestmentsClick(...args: any[]): any {
-    return (this.msTurnController as any).onRefreshInvestmentsClick.apply(this.msTurnController, args);
+  // Refresh market proxy (forward to turn controller)
+  public onRefreshMarketClick(...args: any[]): any {
+    return (this.msTurnController as any).onRefreshMarketClick.apply(this.msTurnController, args);
   }
 
   /**

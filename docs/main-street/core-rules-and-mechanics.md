@@ -15,10 +15,10 @@
 | **Slot** | A single cell in the 10‑slot **Street Grid** (rendered as a 2‑row × 5‑column layout) where a Business card may be placed. Slots are indexed 0‑9.
 | **Business Card** | A card representing a shop or service. It has a cost, a base income, one or more **Synergy Types**, and optional **Upgrade Paths**.
 | **Synergy Type** | A tag (e.g., *Food*, *Culture*, *Commerce*) that determines adjacency bonuses. When two adjacent businesses — orthogonally or **diagonally adjacent** (8‑way / Chebyshev adjacency, default range 1) — share a synergy type and are of **different base types** (different template IDs), each gains a **Synergy Bonus** equal to a percentage of its own effective base income per matching neighbor. The per-card synergy rate defaults to 50% (0.5) and is configurable via `synergyCoinBonus`. Same-type adjacent businesses do not receive synergy from each other.
-| **Market** | The face‑up cards the player may purchase each turn. It has two rows: a **Business** row (4 slots) and a mixed **Investments** row (2 Upgrade cards + 1 Investment event card = 3 slots). Incidents are not purchasable; they populate a visible FIFO **Incident Queue** instead.
+| **Market** | The face‑up cards the player may purchase each turn. A single row of exactly **3 cards** (CG-0MSTOATDT009BRX2): 1–2 Business/Community‑Space cards, 0–1 Upgrade, 0–1 Investment event (combinations 2B+1U, 2B+1E, or 1B+1U+1E). Incidents are not purchasable; they populate a visible FIFO **Incident Queue** instead.
 | **Resource Bank** | Holds the player's **Coins** (currency) and **Reputation** (score multiplier). Coins start at 8 and Reputation starts at 3.
 | **Turn** | A full day/night cycle consisting of several phases (see Section 5). Turn number increments after the **Night Phase**.
-| **Event Card** | A card that triggers a one‑off effect (e.g., Festival, Tax, Storm). **Investment** events are player‑bought from the Investments row and held until played; **Incident** events resolve automatically from the incident queue.
+| **Event Card** | A card that triggers a one‑off effect (e.g., Festival, Tax, Storm). **Investment** events are taken from the single market row (free) and held until played (cost at play); **Incident** events resolve automatically from the incident queue.
 | **Incident Queue** | A visible FIFO queue of 2 face‑up Incident cards. Each turn the front card is resolved and a replacement is drawn from the event deck. The player can see upcoming incidents and plan accordingly.
 | **Upgrade Card** | A card that modifies a specific Business card (e.g., upgrade a Bakery to a Patisserie, increasing income and synergy range).
 | **Challenge** | A optional meta‑goal (e.g., *Build a Foodie Row*) that grants a bonus score at the end of the game if satisfied.
@@ -127,8 +127,7 @@ interface GameState {
   phase: DayPhase; // DayStart | MarketPhase | InvestmentResolution | IncomePhase | IncidentPhase | EndCheck
   streetGrid: (BusinessCard | CommunitySpaceCard | null)[]; // length = GRID_SIZE (default 10)
   market: {
-    development: (BusinessCard | CommunitySpaceCard)[];  // 4 face-up slots (business + community space)
-    investments: (UpgradeCard | EventCard)[];   // 2 upgrades + 1 investment event = 3 slots
+    cards: (BusinessCard | CommunitySpaceCard | UpgradeCard | EventCard)[]; // single row, exactly 3 slots
   };
   incidentQueue: EventCard[];  // Visible FIFO queue of upcoming Incidents (size 2)
   resourceBank: {
@@ -141,8 +140,8 @@ interface GameState {
     event: EventCard[];    // Contains both Investment and Incident cards
     upgrade: UpgradeCard[];
   };
-  hand: (BusinessCard | EventCard)[]; // merged hand: any mix, up to maxHandSize
-  maxHandSize: number;                 // starts at 2, growable via staff upgrade cards
+  hand: (BusinessCard | CommunitySpaceCard | UpgradeCard | EventCard)[]; // merged hand: any mix, up to maxHandSize
+  maxHandSize: number;                 // starts at 3, growable via staff handSlotsAdded (no hard cap)
   challengesCompleted: string[]; // IDs of achieved challenges
 }
 ```
@@ -150,7 +149,7 @@ interface GameState {
 **Key components**
 - **Grid<T>** – generic NxM grid (used here as 1x10), now using the reusable `@core-engine` `Grid` type.
 - **AdjacencyResolver** – computes synergy bonuses based on shared `synergyTypes` and proximity (8‑way / Chebyshev adjacency: orthogonal **and diagonal** neighbors at default range 1, extendable by upgrades) via `@core-engine/SpatialRules`.
-- **Market** – two rows: Development row (4 face‑up cards from the Business and Community Space decks) and Investments row (2 Upgrades + 1 Investment event = 3 slots). Cards are replenished after purchase.
+- **Market** – a single row of 3 face‑up cards drawn from the Business, Community Space, Upgrade, and Event (Investment‑trigger) decks, always with ≥1 Business/Community‑Space card. The row is refilled at day start; taking a card to hand is **free** (CG-0MSTOATDT009BRX2), and the listed cost is paid when the card is played or placed.
 - **Incident Queue** – visible FIFO queue of 2 Incident cards drawn from the event deck. The front card resolves each turn during IncidentPhase; a replacement is drawn from the deck afterward. If the deck runs out, the queue shrinks naturally.
 - **ActiveEffect System** – some events (e.g. `evt-flu-outbreak`) create duration-based modifiers instead of one-shot deltas. ActiveEffects are tracked in `state.activeEffects: ActiveEffect[]` and decay each turn during EndCheck. See [ActiveEffect System](#-activeeffect-system) below.
 - **ResourceBank** – tracks `coins` (start 8) and `reputation` (start 3). Reputation can increase during the IncomePhase via `reputationPerTurn` from certain Health-synergy cards (e.g. Clinic provides +0.2 rep/turn). Reputation is also a multiplier applied at final score calculation (`finalScore = coins + reputation * 5 + challengeBonuses`).
@@ -168,7 +167,7 @@ The turn follows a deterministic state‑machine that repeats each day/night cyc
 ```mermaid
 stateDiagram-v2
     [*] --> DayStart
-    DayStart --> MarketPhase: Show market (4 Business, 2 Upgrade + 1 Investment event)
+    DayStart --> MarketPhase: Show market (single 3-card row, always ≥1 business)
     MarketPhase --> ActionPhase: Player purchases/places/upgrades (+ play held Investment)
     ActionPhase --> InvestmentResolution: Auto‑resolve held Investment if not played
     InvestmentResolution --> IncomePhase: Collect Base Income + Synergy Bonuses
@@ -178,12 +177,12 @@ stateDiagram-v2
 ```
 
 **Phase details**
-1. **DayStart** – Increment `turn` counter, reset temporary flags, replenish market.
-2. **MarketPhase** – The market shows 4 Business cards and 3 Investments (2 Upgrades + 1 Investment event). The player may purchase any combination as long as they have enough coins.
+1. **DayStart** – Increment `turn` counter, reset temporary flags, refill the single market row.
+2. **MarketPhase** – The market shows one 3‑card row (1–2 Business/Community‑Space, 0–1 Upgrade, 0–1 Investment event). Taking a card to hand is **free** (bounded only by hand capacity); the card's cost is paid when placed/played (cost‑at‑play).
 3. **ActionPhase** – The player resolves purchases:
    - **Buy Business** → `resourceBank.coins -= cost` → place card into a chosen empty slot.
    - **Buy Upgrade** → `resourceBank.coins -= cost` → apply upgrade effects to the targeted Business.
-   - **Buy Event (Investment)** → add the event card to the player's hand (any mix of business/event cards up to `maxHandSize`). The player may play it during MarketPhase via a `play-event` action.
+   - **Take Event (Investment)** → add the event card to the player's hand for free (bounded by `maxHandSize`). The player may play it during MarketPhase via a `play-event` action, paying its cost then.
    - **Play Event (from hand)** → resolve an Investment event card from the hand immediately and remove it.
 4. **InvestmentResolution** – Reserved phase; Investment events are **not** auto‑resolved here. Unplayed events persist in the hand until the player plays them during a later MarketPhase.
 5. **IncomePhase** – For each placed Business, compute:
@@ -250,8 +249,8 @@ Loss conditions are evaluated at the end of the **Night Income** phase before ch
 
 | Aspect | Random Source | Visibility |
 |--------|----------------|------------|
-| **Market Draw** | Seeded RNG draws from the Business, Community Space, Upgrade, and Event decks to fill the Development row (4 slots) and Investments row (2 Upgrades + 1 Investment event). | Face‑up – player sees all options before purchasing.
-| **Event Cards** | Incident events populate a visible FIFO queue (2 cards, face‑up) so the player can plan ahead. Investment events appear in the Investments market row and are purchased/held until played. | Incidents: face‑up in queue. Investments: face‑up in market, then held.
+| **Market Draw** | Seeded RNG draws from the Business, Community Space, Upgrade, and Event decks to fill a single 3‑card market row (always ≥1 Business/Community‑Space card; 0–1 Upgrade; 0–1 Investment event). | Face‑up – player sees all options before taking.
+| **Event Cards** | Incident events populate a visible FIFO queue (2 cards, face‑up) so the player can plan ahead. Investment events appear in the single market row and are taken to hand (free) and held until played (cost paid at play). | Incidents: face‑up in queue. Investments: face‑up in market, then held.
 | **Challenge Generation** | Fixed set defined in `challenges.md`; no randomness.
 | **RNG Seed** | Determined by the **Game Engine** on startup (`Math.seedrandom(seedString)`). | The seed is displayed on the title screen for reproducibility.
 
@@ -266,7 +265,7 @@ Below is a high‑level flowchart that captures the complete game loop, useful f
 ```mermaid
 flowchart TD
     Start((Start Game)) --> TurnStart[Turn Start]
-    TurnStart --> Market[Show Market: Business + Investments rows]
+    TurnStart --> Market[Show Market: single 3-card row]
     Market --> Actions[Player Actions]
     Actions --> ResolveInvestment[Resolve Held Investment]
     ResolveInvestment --> Income[Collect Income & Synergy]

@@ -19,7 +19,7 @@ import {
 } from '../../example-games/main-street/MainStreetState';
 import {
   type BusinessCard,
-  MARKET_BUSINESS_SLOTS,
+  MARKET_TOTAL_SLOTS,
 } from '../../example-games/main-street/MainStreetCards';
 import {
   applyIncome,
@@ -33,7 +33,7 @@ import {
 } from '../../example-games/main-street/MainStreetEngine';
 import {
   purchaseBusiness,
-  purchaseBusinessToHand,
+  moveToHand,
   purchaseStaffCard,
 } from '../../example-games/main-street/MainStreetMarket';
 
@@ -82,12 +82,12 @@ describe('Multi-Use Card Economy Integration', () => {
       executeDayStart(state);
 
       // Buy a card to hand
-      const card = state.market.development.find(c => c.cost <= state.resourceBank.coins);
+      const card = state.market.cards.find(c => c.cost <= state.resourceBank.coins);
       if (!card) return;
 
-      purchaseBusinessToHand(state, card.id);
+      moveToHand(state, card.id);
       expect(state.hand.length).toBe(1);
-      expect(state.market.development.length).toBe(MARKET_BUSINESS_SLOTS - 1);
+      expect(state.market.cards.length).toBe(MARKET_TOTAL_SLOTS - 1);
 
       // End turn - should process income, cycling, etc.
       const result = processEndOfTurn(state);
@@ -133,9 +133,9 @@ describe('Multi-Use Card Economy Integration', () => {
         executeDayStart(state);
 
         // Buy to hand if possible
-        const card = state.market.development.find(c => c.cost <= state.resourceBank.coins);
+        const card = state.market.cards.find(c => c.cost <= state.resourceBank.coins);
         if (card && state.hand.length < state.maxHandSize) {
-          purchaseBusinessToHand(state, card.id);
+          moveToHand(state, card.id);
         } else if (card) {
           // Buy to tableau if hand is full
           const slot = state.streetGrid.findIndex(s => s === null);
@@ -220,9 +220,9 @@ describe('Multi-Use Card Economy Integration', () => {
         executeDayStart(state);
 
         // Buy a card to stimulate cycling
-        const card = state.market.development.find(c => c.cost <= state.resourceBank.coins);
+        const card = state.market.cards.find(c => c.cost <= state.resourceBank.coins);
         if (card && state.hand.length < state.maxHandSize) {
-          purchaseBusinessToHand(state, card.id);
+          moveToHand(state, card.id);
         } else if (card) {
           const slot = state.streetGrid.findIndex(s => s === null);
           if (slot >= 0) {
@@ -234,7 +234,7 @@ describe('Multi-Use Card Economy Integration', () => {
       }
 
       // Market should be refilled each turn
-      expect(state.market.development.length).toBeGreaterThan(0);
+      expect(state.market.cards.length).toBeGreaterThan(0);
       expect(state.gameResult).toBeDefined();
     });
   });
@@ -348,7 +348,7 @@ describe('Multi-Use Card Economy Integration', () => {
 
       // Should have defaults
       expect(restored.hand).toEqual([]);
-      expect(restored.maxHandSize).toBe(2);
+      expect(restored.maxHandSize).toBe(3);
       expect(restored.discardPile).toEqual([]);
       expect(restored.staffCards).toEqual([]);
       expect(restored.staffCardMarket).toEqual([]);
@@ -377,16 +377,16 @@ describe('Multi-Use Card Economy Integration', () => {
 
       // Turn 1: hand purchase
       executeDayStart(state);
-      const card1 = state.market.development.find(c => c.cost <= state.resourceBank.coins);
+      const card1 = state.market.cards.find(c => c.cost <= state.resourceBank.coins);
       if (card1 && state.hand.length < state.maxHandSize) {
-        purchaseBusinessToHand(state, card1.id);
+        moveToHand(state, card1.id);
       }
       processEndOfTurn(state);
 
       // Turn 2: tableau purchase
       if (state.gameResult === 'playing') {
         executeDayStart(state);
-        const card2 = state.market.development.find(c => c.cost <= state.resourceBank.coins);
+        const card2 = state.market.cards.find(c => c.cost <= state.resourceBank.coins);
         if (card2) {
           const slot = state.streetGrid.findIndex(s => s === null);
           if (slot >= 0) {
@@ -410,7 +410,7 @@ describe('Multi-Use Card Economy Integration', () => {
 
       // Game should be in valid state after 3 turns
       expect(state.gameResult).toBeDefined();
-      expect(state.market.development.length).toBeGreaterThan(0);
+      expect(state.market.cards.length).toBeGreaterThan(0);
     });
   });
 });

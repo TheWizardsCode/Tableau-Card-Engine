@@ -1871,11 +1871,11 @@ The tutorial layout defines these zones (all use normalized coordinates with opt
 | Zone ID | Description | Uses dimensions |
 |---------|-------------|-----------------|
 | `hud` | HUD strip (top bar with coins, reputation, score) | Yes (full-width bounding box) |
-| `marketBusinessRow` | Business card row in the market area | Yes |
+| `marketBusinessRow` | Legacy full-market-area zone (single row now drawn in the same band) | No (informational) |
 | `streetGrid` | The 2×5 street grid for placing businesses | Yes (stops before right column) |
 | `endTurnButton` | End Turn action button area | Yes |
 | `incidentQueue` | Scrollable incident cards queue | Yes |
-| `investmentsRow` | Investment/upgrade card row | Yes |
+| `investmentsRow` | ALIAS of `developmentRow` — the market rows were merged into one (CG-0MSTOATDT009BRX2); upgrade/event steps highlight the same single row | Yes |
 | `helpButton` | Help/settings button area | Yes |
 
 Zones that return `null` for highlighting (no bounding box needed):

@@ -21,8 +21,8 @@ describe('Main Street expanded cards are included in runtime market/decks', () =
       const state = setupMainStreetGame({ seed });
 
       const marketIds = [
-        ...state.market.development.map(card => card.id),
-        ...state.market.investments.map(card => card.id),
+        ...state.market.cards.map(card => card.id),
+        ...state.market.cards.map(card => card.id),
         ...state.incidentQueue.map(card => card.id),
       ];
 

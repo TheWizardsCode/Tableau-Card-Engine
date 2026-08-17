@@ -14,7 +14,12 @@
 
 import { describe, it, expect } from 'vitest';
 import { UNIFIED_TUTORIAL_STEPS } from '../../example-games/main-street/TutorialFlow';
-import { STANDARD_TUTORIAL_SCENARIO } from '../../example-games/main-street/TutorialScenario';
+import {
+  STANDARD_TUTORIAL_SCENARIO,
+  ensureTutorialMarketForUpcomingSteps,
+} from '../../example-games/main-street/TutorialScenario';
+import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
+import type { TutorialControllerState } from '../../example-games/main-street/TutorialFlow';
 
 /**
  * Strips the copy/serial suffix from a card ID to obtain the base template ID.
@@ -35,17 +40,17 @@ function stripSerialSuffix(cardId: string): string {
  */
 function buildScenarioMarketTemplateIds(): Set<string> {
   const ids = new Set<string>();
-  for (const templateId of STANDARD_TUTORIAL_SCENARIO.market.development) {
+  for (const templateId of STANDARD_TUTORIAL_SCENARIO.market.cards) {
     ids.add(templateId);
   }
-  for (const templateId of STANDARD_TUTORIAL_SCENARIO.market.investments) {
+  for (const templateId of STANDARD_TUTORIAL_SCENARIO.market.cards) {
     ids.add(templateId);
   }
   return ids;
 }
 
 describe('Scenario Validation: requiredCardId references', () => {
-  it('every requiredCardId in UNIFIED_TUTORIAL_STEPS is present in the tutorial scenario market', () => {
+  it('every requiredCardId in UNIFIED_TUTORIAL_STEPS is either in the day-1 scenario market or guaranteed by the day-start hook', () => {
     const marketIds = buildScenarioMarketTemplateIds();
     const stepsWithRequiredCardId = UNIFIED_TUTORIAL_STEPS.filter(
       (step) => step.requiredCardId !== undefined,
@@ -54,11 +59,18 @@ describe('Scenario Validation: requiredCardId references', () => {
     // There must be at least one step with a requiredCardId
     expect(stepsWithRequiredCardId.length).toBeGreaterThan(0);
 
+    // The single-row market (CG-0MSTOATDT009BRX2) holds only 3 cards, but the
+    // tutorial needs four purchase targets across three days. Day-1 targets
+    // (T3 Laundromat, T9 Local Festival) are scenario-placed; day-2/3 targets
+    // (T10 Bookshop, T13 Library) are forced into the visible line at day
+    // start by ensureTutorialMarketForUpcomingSteps. Both paths are valid.
+    const hookCovered = new Set(['biz-bookshop', 'cs-library']);
+
     const missing: { stepId: string; requiredCardId: string; templateId: string }[] = [];
 
     for (const step of stepsWithRequiredCardId) {
       const templateId = stripSerialSuffix(step.requiredCardId!);
-      if (!marketIds.has(templateId)) {
+      if (!marketIds.has(templateId) && !hookCovered.has(templateId)) {
         missing.push({
           stepId: step.id,
           requiredCardId: step.requiredCardId!,
@@ -80,10 +92,25 @@ describe('Scenario Validation: requiredCardId references', () => {
         `The following requiredCardId references are not present in the tutorial scenario market:\n${details}\n\n` +
         'Expected all requiredCardId values to reference cards defined in the scenario market. ' +
         'If a card has been renamed or removed, update both the TutorialFlow step definition and the scenario market.\n' +
-        `Scenario market development row: [${STANDARD_TUTORIAL_SCENARIO.market.development.join(', ')}]\n` +
-        `Scenario market investments row: [${STANDARD_TUTORIAL_SCENARIO.market.investments.join(', ')}]`,
+        `Scenario market row: [${STANDARD_TUTORIAL_SCENARIO.market.cards.join(', ')}]`,
       );
     }
+  });
+
+  it('the day-start hook actually guarantees the hook-covered targets appear in the row', () => {
+    // Day-3 start: T13 (Library) is upcoming; the hook must put cs-library
+    // into the visible row.
+    const t13Index = UNIFIED_TUTORIAL_STEPS.findIndex(s => s.id === 'T13');
+    const controller: TutorialControllerState = {
+      isActive: true,
+      currentStepIndex: t13Index - 1,
+      lastCompletedStepId: 'T12',
+      exited: false,
+    };
+    const state = setupMainStreetGame({ seed: 'scenario-hook-validation' });
+    ensureTutorialMarketForUpcomingSteps(state, controller);
+    expect(state.market.cards.some(c => stripSerialSuffix(c.id) === 'cs-library')).toBe(true);
+    expect(state.market.cards).toHaveLength(3);
   });
 
   it('no confirm-gate step has a requiredCardId (consistency check)', () => {

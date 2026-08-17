@@ -121,29 +121,31 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
 
   // ── T2: Development Row (informative) ──────────────────────
   [tutorialKey('T2', 'title')]:
-    'Development Row',
+    'The Market Row',
   [tutorialKey('T2', 'body')]:
-    'This row shows businesses you can buy. Hover a card for more details.',
+    'This row shows the cards on offer this week. Hover a card for more details.',
 
   // ── T3: Buy the Laundromat ─────────────────────────────────
   [tutorialKey('T3', 'title')]:
     'Buy the Laundromat',
   // {cardName}/{cost} are resolved from card-data.csv at render time via
   // resolveTutorialStepText() — do NOT hardcode the card name or price here.
+  // Cost-at-play (CG-0MSTOATDT009BRX2): picking the card up is free; the
+  // price is paid when the card is placed on the street.
   [tutorialKey('T3', 'body')]:
-    'Click the **{cardName}** card to buy it for {cost}.',
+    "Click the **{cardName}** card to buy it — it's free to take now, and you pay **{cost}** when you place it.",
 
   // ── T4: Your Hand ──────────────────────────────────────────
   [tutorialKey('T4', 'title')]:
     'Your Hand',
   [tutorialKey('T4', 'body')]:
-    'Cards you buy wait here in your hand. You can play them any time. They earn nothing until placed.',
+    'Cards you take wait here in your hand. You can play them any time. They earn nothing until placed.',
 
   // ── T5: Place a Business ───────────────────────────────────
   [tutorialKey('T5', 'title')]:
     'Place a Business',
   [tutorialKey('T5', 'body')]:
-    'Click an empty slot to open the business. It starts earning income right away.',
+    'Click an empty slot to open the business and pay its cost. It starts earning income right away.',
 
   // ── T6: Upcoming Incidents ─────────────────────────────────
   [tutorialKey('T6', 'title')]:
@@ -159,16 +161,16 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
 
   // ── T8: Investments ────────────────────────────────────────
   [tutorialKey('T8', 'title')]:
-    'Investments',
+    'More than Businesses',
   [tutorialKey('T8', 'body')]:
-    'Upgrade cards improve businesses you own. Event cards boost your street when played.',
+    'The market row can also hold upgrade cards, which improve businesses you own, and event cards, which boost your street when played.',
 
   // ── T9: Buy the Local Festival ─────────────────────────────
   [tutorialKey('T9', 'title')]:
     'Buy the Local Festival',
   // {cardName}/{cost}/{bonus} resolved from card-data.csv (evt-festival) at render time.
   [tutorialKey('T9', 'body')]:
-    'Click the **{cardName}** card to buy it for {cost}. It waits in your hand for the right moment.',
+    'Click the **{cardName}** card to add it to your hand — free now, and you pay **{cost}** when you play it. It waits in your hand for the right moment.',
 
   // ── T10: Optimizing for Events ─────────────────────────────
   [tutorialKey('T10', 'title')]:
@@ -176,7 +178,7 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
   // {cardName}/{cost} resolved from card-data.csv (biz-bookshop) at render time.
   // Revised to clarify drag-and-drop as a one-step buy-and-place option (CG-0MSOKG7HE001NMMM).
   [tutorialKey('T10', 'body')]:
-    'The **{cardName}** is a Culture business. Culture businesses make your festival stronger. Drag it to an empty spot on your street to buy and place it in one action — or click to buy it first, then place it later.',
+    'The **{cardName}** is a Culture business. Culture businesses make your festival stronger. Drag it to an empty spot on your street to buy and place it in one action — or click to take it now, then place it later.',
 
   // ── T11: End this turn ────────────────────────────────────
   [tutorialKey('T11', 'title')]:

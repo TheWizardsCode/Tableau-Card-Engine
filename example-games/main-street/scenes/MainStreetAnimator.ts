@@ -328,7 +328,7 @@ export class MainStreetAnimator {
    *                (slot order), and optional outgoing-card snapshots.
    */
   public animateMarketDealIn(params: {
-    row: 'development' | 'investments';
+    row: 'market';
     /** Rendered card containers for the row, in slot order — these deal in. */
     cards: Phaser.GameObjects.Container[];
     /**
@@ -666,12 +666,10 @@ export class MainStreetAnimator {
     return null;
   }
 
-  public getMarketCardCenter(row: 'development' | 'investments', slotIndex: number): { x: number; y: number } | null {
+  public getMarketCardCenter(_row: 'market', slotIndex: number): { x: number; y: number } | null {
     const s = this.scene;
     if (slotIndex < 0) return null;
-    const rowTop = row === 'development'
-      ? s.layout.marketTop + 6
-      : s.layout.marketTop + 6 + s.layout.marketRowH + s.layout.marketRowGap;
+    const rowTop = s.layout.marketTop + 6;
     const cardX = s.layout.marketLabelW + 50 + slotIndex * (s.layout.marketCardW + s.layout.marketCardGap);
     return {
       x: cardX + s.layout.marketCardW / 2,
@@ -1216,7 +1214,7 @@ export class MainStreetAnimator {
   public animateTransferFromMarket(options: {
     cardId: string;
     family: 'business' | 'community-space' | 'event' | 'upgrade';
-    row: 'development' | 'investments';
+    row: 'market';
     slotIndex: number;
     /**
      * Optional start position for the transfer visual. When omitted the

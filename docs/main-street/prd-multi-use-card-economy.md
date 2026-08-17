@@ -87,7 +87,7 @@ Staff cards are a new card family (`family: 'staff'`) that expand the player's h
 - Insufficient coins for ongoing cost: deducts what's available (down to 0)
 - **Staff abilities** (optional fields on `StaffCard`, Group F): `reputationPerTurn`
   (e.g. Socialite +0.1 rep/turn, applied in the income phase) and
-  `refreshCostDiscount` (e.g. Accountant −1 to the investments refresh cost,
+  `refreshCostDiscount` (e.g. Accountant −1 to the market refresh cost,
   clamped at 0). Staff without abilities behave exactly as before.
 
 #### Market

@@ -237,7 +237,7 @@ describe('Community Hub upgrade (upg-community-hub)', () => {
 
     // Put the Community Hub upgrade into the investments row
     const communityHub = createUpgradeDeck(1).find(u => u.targetBusiness === 'Library')!;
-    state.market.investments.push(communityHub);
+    state.market.cards.push(communityHub);
 
     const slot = state.streetGrid.indexOf(library);
     purchaseUpgrade(state, communityHub.id, slot);

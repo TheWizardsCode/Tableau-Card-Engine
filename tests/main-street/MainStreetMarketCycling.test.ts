@@ -22,7 +22,7 @@ import {
 import {
   type BusinessCard,
   type CommunitySpaceCard,
-  MARKET_BUSINESS_SLOTS,
+  MARKET_TOTAL_SLOTS,
 } from '../../example-games/main-street/MainStreetCards';
 import {
   executeDayStart,
@@ -31,7 +31,7 @@ import {
   cycleMarketCards,
 } from '../../example-games/main-street/MainStreetEngine';
 import {
-  refillAllMarkets,
+  refillMarket,
 } from '../../example-games/main-street/MainStreetMarket';
 
 // ── Feature Detection ───────────────────────────────────────
@@ -57,8 +57,8 @@ function createTestState(seed: string = 'market-cycling-test'): MainStreetState 
  */
 function getMarketIDs(state: MainStreetState): string[] {
   return [
-    ...state.market.development.map(c => c.id),
-    ...state.market.investments.map(c => c.id),
+    ...state.market.cards.map(c => c.id),
+    ...state.market.cards.map(c => c.id),
   ];
 }
 
@@ -124,7 +124,7 @@ describe('MainStreet Market Cycling', () => {
       executeDayStart(state);
 
       // Buy a card and place on tableau
-      const card = state.market.development.find(
+      const card = state.market.cards.find(
         c => c.cost <= state.resourceBank.coins,
       );
       if (!card) return;
@@ -151,13 +151,13 @@ describe('MainStreet Market Cycling', () => {
       if (HAND_FEATURE_AVAILABLE) {
         const hand = (state as any).hand;
         if (Array.isArray(hand)) {
-          const card = state.market.development.find(
+          const card = state.market.cards.find(
             c => c.cost <= state.resourceBank.coins,
           );
           if (card) {
             hand.push({ ...card });
-            const idx = state.market.development.findIndex(c => c.id === card.id);
-            if (idx >= 0) state.market.development.splice(idx, 1);
+            const idx = state.market.cards.findIndex(c => c.id === card.id);
+            if (idx >= 0) state.market.cards.splice(idx, 1);
           }
         }
       }
@@ -178,7 +178,7 @@ describe('MainStreet Market Cycling', () => {
       const state = createTestState();
 
       // Initially full
-      expect(state.market.development.length).toBe(MARKET_BUSINESS_SLOTS);
+      expect(state.market.cards.length).toBe(MARKET_TOTAL_SLOTS);
 
       // Run a full turn
       executeDayStart(state);
@@ -187,7 +187,7 @@ describe('MainStreet Market Cycling', () => {
       // Next day start refills
       if (state.phase === 'DayStart') {
         executeDayStart(state);
-        expect(state.market.development.length).toBe(MARKET_BUSINESS_SLOTS);
+        expect(state.market.cards.length).toBe(MARKET_TOTAL_SLOTS);
       }
     });
 
@@ -203,7 +203,7 @@ describe('MainStreet Market Cycling', () => {
         cycleMarketCards(state);
 
         // Refill
-        refillAllMarkets(state);
+        refillMarket(state);
 
         const secondMarketIds = getMarketIDs(state);
 
@@ -245,7 +245,7 @@ describe('MainStreet Market Cycling', () => {
         const totalDiscarded = bizCards.length + csCards.length;
 
         // Refill should reshuffle from discards
-        refillAllMarkets(state);
+        refillMarket(state);
 
         // Either deck got cards or discard got smaller
         const inDeck = state.decks.business.length + state.decks.communitySpace.length;
@@ -284,7 +284,7 @@ describe('MainStreet Market Cycling', () => {
           executeDayStart(state);
 
           // Buy a card if possible
-          const card = state.market.development.find(
+          const card = state.market.cards.find(
             c => c.cost <= state.resourceBank.coins,
           );
           if (card) {
@@ -312,13 +312,19 @@ describe('MainStreet Market Cycling', () => {
       const state = createTestState();
       const discardBefore = getTotalDiscardCount(state);
 
-      // Manually add a card to discard (simulating sell)
-      if (state.market.development.length > 0) {
-        const card = state.market.development.pop()!;
-        if (card.family === 'business') {
-          state.discards.business.push(card as BusinessCard);
-        } else if (card.family === 'community-space') {
-          state.discards.communitySpace.push(card as CommunitySpaceCard);
+      // Manually add a sellable (business/community-space) card to discard.
+      // The single row may hold event/upgrade cards too, so locate a
+      // business-family card rather than popping blindly.
+      const sellable = state.market.cards.find(
+        c => c.family === 'business' || c.family === 'community-space',
+      );
+      if (sellable) {
+        const idx = state.market.cards.indexOf(sellable);
+        state.market.cards.splice(idx, 1);
+        if (sellable.family === 'business') {
+          state.discards.business.push(sellable as BusinessCard);
+        } else {
+          state.discards.communitySpace.push(sellable as CommunitySpaceCard);
         }
       }
 
@@ -333,8 +339,8 @@ describe('MainStreet Market Cycling', () => {
       const state = createTestState();
       executeDayStart(state);
 
-      state.market.development.length = 0;
-      state.market.investments.length = 0;
+      state.market.cards.length = 0;
+      state.market.cards.length = 0;
 
       expect(() => processEndOfTurn(state)).not.toThrow();
     });
@@ -358,7 +364,7 @@ describe('MainStreet Market Cycling', () => {
 
       if (state.phase === 'DayStart') {
         executeDayStart(state);
-        expect(state.market.development.length).toBeGreaterThan(0);
+        expect(state.market.cards.length).toBeGreaterThan(0);
       }
     });
 

@@ -50,7 +50,7 @@ Example (T3 body in `tutorial-en.ts`):
 
 1. `resolveTutorialStepText(step)` in `TutorialFlow.ts` calls
    `resolveTutorialCardParams(step)`.
-2. The step's `requiredCardId` (purchase-gated steps like T3/T8) or
+2. The step's `requiredCardId` (purchase-gated steps like T3/T9) or
    `referencedCardId` (text-only references like T7/T9) provides the card
    lookup key (e.g. `biz-laundromat-0`).
 3. `getBaseTypeId()` strips the copy suffix (`biz-laundromat`) and
@@ -139,13 +139,13 @@ Tutorial text follows these editorial principles:
 | # | ID | Title | Gate | Highlight zone |
 |---|----|-------|------|----------------|
 | 1 | T1 | Welcome to Main Street | confirm | centerModal |
-| 2 | T2 | Development Row | confirm | developmentRow (dev row only) |
+| 2 | T2 | The Market Row | confirm | developmentRow (single market row) |
 | 3 | T3 | Buy the Laundromat | action (select-business) | laundromatCard (card-level) |
 | 4 | T4 | Your Hand | confirm | hand |
 | 5 | T5 | Place a Business | action (place-business) | streetGrid |
 | 6 | T6 | Upcoming Incidents | confirm | incidentQueue |
 | 7 | T7 | End Turn | action (end-turn) | endTurnButton |
-| 8 | T8 | Investments | confirm | investmentsRow |
+| 8 | T8 | More than Businesses | confirm | investmentsRow (aliases the single market row) |
 | 9 | T9 | Buy the Local Festival | action (buy-event) | festivalCard (card-level) |
 | 10 | T10 | Optimizing for Events | action (buy-and-place) | developmentRow |
 | 11 | T11 | End this turn | action (end-turn) | endTurnButton |
@@ -274,7 +274,7 @@ registerLocale('fr', {
 });
 setLocale('fr');
 t(tutorialKey('T1', 'title')); // → 'Bienvenue à Main Street'
-t(tutorialKey('T2', 'title')); // → 'Resource HUD' (English fallback)
+t(tutorialKey('T2', 'title')); // → 'The Market Row' (English fallback)
 ```
 
 > **Note:** fallback strings that contain placeholder tokens (e.g. a partial

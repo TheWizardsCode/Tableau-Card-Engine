@@ -21,12 +21,10 @@ import {
   purchaseBusiness,
   purchaseUpgrade,
   purchaseEvent,
-  refillDevelopmentMarket,
-  refillInvestmentsMarket,
-  refillIncidentQueue,
-  refillAllMarkets,
-  canRefreshInvestments,
-  refreshInvestments,
+      refillIncidentQueue,
+  refillMarket,
+  canRefreshMarket,
+  refreshMarket,
   findTargetBusinessSlot,
   getAffordableUpgradeCards,
   getEmptySlots,
@@ -36,11 +34,10 @@ import {
 import { executeDayStart, processEndOfTurn, executeAction } from '../../example-games/main-street/MainStreetEngine';
 import {
   GRID_SIZE,
-  MARKET_BUSINESS_SLOTS,
-  MARKET_INVESTMENT_SLOTS,
-  MARKET_INVESTMENT_UPGRADE_COUNT,
+  MARKET_TOTAL_SLOTS,
+  MARKET_UPGRADE_MAX,
   INCIDENT_QUEUE_SIZE,
-  REFRESH_INVESTMENTS_COST,
+  REFRESH_MARKET_COST,
   type UpgradeCard,
   type EventCard,
 } from '../../example-games/main-street/MainStreetCards';
@@ -57,7 +54,7 @@ describe('MarketOfferEngine — row retrieval', () => {
   describe('findTargetBusinessSlot', () => {
     it('should return the slot index of a matching business at the required level', () => {
       const state = createTestState();
-      const upgrade = state.market.investments.find(
+      const upgrade = state.market.cards.find(
         c => c.family === 'upgrade',
       ) as UpgradeCard | undefined;
       if (!upgrade) return;
@@ -73,7 +70,7 @@ describe('MarketOfferEngine — row retrieval', () => {
 
     it('should return -1 when no matching business exists on the street', () => {
       const state = createTestState();
-      const upgrade = state.market.investments.find(
+      const upgrade = state.market.cards.find(
         c => c.family === 'upgrade',
       ) as UpgradeCard | undefined;
       if (!upgrade) return;
@@ -85,7 +82,7 @@ describe('MarketOfferEngine — row retrieval', () => {
 
     it('should return -1 when the matching business is at a different level', () => {
       const state = createTestState();
-      const upgrade = state.market.investments.find(
+      const upgrade = state.market.cards.find(
         c => c.family === 'upgrade',
       ) as UpgradeCard | undefined;
       if (!upgrade) return;
@@ -101,7 +98,7 @@ describe('MarketOfferEngine — row retrieval', () => {
 
     it('should return -1 when the matching business is already at maxLevel', () => {
       const state = createTestState();
-      const upgrade = state.market.investments.find(
+      const upgrade = state.market.cards.find(
         c => c.family === 'upgrade',
       ) as UpgradeCard | undefined;
       if (!upgrade) return;
@@ -141,7 +138,7 @@ describe('MarketOfferEngine — row retrieval', () => {
 
     it('should return the first matching slot when multiple candidates exist', () => {
       const state = createTestState();
-      const upgrade = state.market.investments.find(
+      const upgrade = state.market.cards.find(
         c => c.family === 'upgrade',
       ) as UpgradeCard | undefined;
       if (!upgrade) return;
@@ -162,7 +159,7 @@ describe('MarketOfferEngine — row retrieval', () => {
     it('should return upgrades the player can afford with valid targets', () => {
       const state = createTestState();
       // Place a business that can be upgraded
-      const upgrade = state.market.investments.find(
+      const upgrade = state.market.cards.find(
         c => c.family === 'upgrade',
       ) as UpgradeCard | undefined;
       if (!upgrade) return;
@@ -179,7 +176,7 @@ describe('MarketOfferEngine — row retrieval', () => {
 
     it('should exclude upgrades when player cannot afford them', () => {
       const state = createTestState();
-      const upgrade = state.market.investments.find(
+      const upgrade = state.market.cards.find(
         c => c.family === 'upgrade',
       ) as UpgradeCard | undefined;
       if (!upgrade) return;
@@ -211,7 +208,7 @@ describe('MarketOfferEngine — row retrieval', () => {
 
     it('should exclude upgrades targeting businesses already at maxLevel', () => {
       const state = createTestState();
-      const upgrade = state.market.investments.find(
+      const upgrade = state.market.cards.find(
         c => c.family === 'upgrade',
       ) as UpgradeCard | undefined;
       if (!upgrade) return;
@@ -235,7 +232,7 @@ describe('MarketOfferEngine — negative-path buy eligibility', () => {
   describe('canPurchaseBusiness — insufficient coins', () => {
     it('should reject when coins equal cost minus 1', () => {
       const state = createTestState();
-      const card = state.market.development[0];
+      const card = state.market.cards[0];
       state.resourceBank.coins = card.cost - 1;
       const result = canPurchaseBusiness(state, card.id, 0);
       expect(result.legal).toBe(false);
@@ -248,7 +245,7 @@ describe('MarketOfferEngine — negative-path buy eligibility', () => {
     it('should reject when coins are exactly zero and card costs more than zero', () => {
       const state = createTestState();
       state.resourceBank.coins = 0;
-      const card = state.market.development.find(c => c.cost > 0);
+      const card = state.market.cards.find(c => c.cost > 0);
       if (!card) return;
       const result = canPurchaseBusiness(state, card.id, 0);
       expect(result.legal).toBe(false);
@@ -258,7 +255,7 @@ describe('MarketOfferEngine — negative-path buy eligibility', () => {
   describe('canPurchaseUpgrade — insufficient coins', () => {
     it('should reject upgrade purchase when coins are less than card cost', () => {
       const state = createTestState();
-      const upgrade = state.market.investments.find(
+      const upgrade = state.market.cards.find(
         c => c.family === 'upgrade',
       ) as UpgradeCard | undefined;
       if (!upgrade) return;
@@ -284,7 +281,7 @@ describe('MarketOfferEngine — negative-path buy eligibility', () => {
       const incidentEvent = state.decks.event.find(e => e.trigger === 'Incident');
       if (!incidentEvent) return;
 
-      state.market.investments = [incidentEvent as EventCard];
+      state.market.cards = [incidentEvent as EventCard];
       state.resourceBank.coins = 100;
 
       const result = canPurchaseEvent(state, incidentEvent.id);
@@ -297,7 +294,7 @@ describe('MarketOfferEngine — negative-path buy eligibility', () => {
 
     it('should reject event purchase when coins are insufficient', () => {
       const state = createTestState();
-      const investmentEvent = state.market.investments.find(
+      const investmentEvent = state.market.cards.find(
         c => c.family === 'event' && (c as EventCard).trigger === 'Investment',
       ) as EventCard | undefined;
       if (!investmentEvent) return;
@@ -312,13 +309,13 @@ describe('MarketOfferEngine — negative-path buy eligibility', () => {
     });
   });
 
-  describe('canRefreshInvestments — negative paths', () => {
+  describe('canRefreshMarket — negative paths', () => {
     it('should reject refresh outside MarketPhase', () => {
       const state = createTestState();
       state.phase = 'DayStart';
-      state.resourceBank.coins = REFRESH_INVESTMENTS_COST + 10;
+      state.resourceBank.coins = REFRESH_MARKET_COST + 10;
 
-      const result = canRefreshInvestments(state);
+      const result = canRefreshMarket(state);
       expect(result.legal).toBe(false);
       if (!result.legal) {
         expect(result.reason).toContain('MarketPhase');
@@ -328,18 +325,18 @@ describe('MarketOfferEngine — negative-path buy eligibility', () => {
     it('should reject refresh when coins exactly equal cost minus 1', () => {
       const state = createTestState();
       state.phase = 'MarketPhase';
-      state.resourceBank.coins = REFRESH_INVESTMENTS_COST - 1;
+      state.resourceBank.coins = REFRESH_MARKET_COST - 1;
 
-      const result = canRefreshInvestments(state);
+      const result = canRefreshMarket(state);
       expect(result.legal).toBe(false);
     });
 
     it('should allow refresh when coins exactly equal cost', () => {
       const state = createTestState();
       state.phase = 'MarketPhase';
-      state.resourceBank.coins = REFRESH_INVESTMENTS_COST;
+      state.resourceBank.coins = REFRESH_MARKET_COST;
 
-      const result = canRefreshInvestments(state);
+      const result = canRefreshMarket(state);
       expect(result.legal).toBe(true);
     });
   });
@@ -383,9 +380,10 @@ describe('MarketOfferEngine — negative-path buy eligibility', () => {
       state.hand = [
         { family: 'event', id: 'evt-held-parity', name: 'Held Event', trigger: 'Investment', effect: 'test', target: 'All', coinDelta: 0, reputationDelta: 0, cost: 0 } as any,
         { family: 'event', id: 'evt-held-parity-2', name: 'Held Event 2', trigger: 'Investment', effect: 'test', target: 'All', coinDelta: 0, reputationDelta: 0, cost: 0 } as any,
+        { family: 'business', id: 'biz-held-parity', name: 'Held Biz', cost: 0, baseIncome: 0, synergyTypes: [], upgradePath: '', maxLevel: 1, description: '', level: 1 } as any,
       ];
       // Find an Investment event in investments row
-      const investmentEvent = state.market.investments.find(
+      const investmentEvent = state.market.cards.find(
         c => c.family === 'event' && (c as EventCard).trigger === 'Investment',
       ) as EventCard | undefined;
       if (!investmentEvent) return;
@@ -406,7 +404,7 @@ describe('MarketOfferEngine — positive-path buy eligibility', () => {
   describe('canPurchaseBusiness — success', () => {
     it('should allow purchase when player has enough coins and slot is empty', () => {
       const state = createTestState();
-      const card = state.market.development[0];
+      const card = state.market.cards[0];
       state.resourceBank.coins = card.cost;
       const result = canPurchaseBusiness(state, card.id, 0);
       expect(result.legal).toBe(true);
@@ -416,7 +414,7 @@ describe('MarketOfferEngine — positive-path buy eligibility', () => {
   describe('canPurchaseUpgrade — success', () => {
     it('should allow upgrade purchase when player can afford and target exists', () => {
       const state = createTestState();
-      const upgrade = state.market.investments.find(
+      const upgrade = state.market.cards.find(
         c => c.family === 'upgrade',
       ) as UpgradeCard | undefined;
       if (!upgrade) return;
@@ -434,7 +432,7 @@ describe('MarketOfferEngine — positive-path buy eligibility', () => {
   describe('canPurchaseEvent — success', () => {
     it('should allow purchase of an Investment-trigger event when player can afford', () => {
       const state = createTestState();
-      const investmentEvent = state.market.investments.find(
+      const investmentEvent = state.market.cards.find(
         c => c.family === 'event' && (c as EventCard).trigger === 'Investment',
       ) as EventCard | undefined;
       if (!investmentEvent) return;
@@ -452,7 +450,7 @@ describe('MarketOfferEngine — positive-path purchase results', () => {
   describe('purchaseBusiness — success', () => {
     it('should deduct coins, place card in slot, and remove from market', () => {
       const state = createTestState();
-      const card = state.market.development[0];
+      const card = state.market.cards[0];
       state.resourceBank.coins = 100;
       const coinsBefore = state.resourceBank.coins;
 
@@ -463,22 +461,22 @@ describe('MarketOfferEngine — positive-path purchase results', () => {
       expect(state.resourceBank.coins).toBe(coinsBefore - card.cost);
       expect(state.streetGrid[0]).not.toBeNull();
       expect(state.streetGrid[0]!.id).toBe(card.id);
-      expect(state.market.development.map(c => c.id)).not.toContain(card.id);
+      expect(state.market.cards.map(c => c.id)).not.toContain(card.id);
     });
 
     it('should not refill the market immediately after purchase', () => {
       const state = createTestState();
-      const card = state.market.development[0];
+      const card = state.market.cards[0];
       state.resourceBank.coins = 100;
       purchaseBusiness(state, card.id, 0);
-      expect(state.market.development).toHaveLength(MARKET_BUSINESS_SLOTS - 1);
+      expect(state.market.cards).toHaveLength(MARKET_TOTAL_SLOTS - 1);
     });
   });
 
   describe('purchaseUpgrade — success', () => {
     it('should deduct coins and level up the target business', () => {
       const state = createTestState();
-      const upgrade = state.market.investments.find(
+      const upgrade = state.market.cards.find(
         c => c.family === 'upgrade',
       ) as UpgradeCard | undefined;
       if (!upgrade) return;
@@ -515,7 +513,7 @@ describe('MarketOfferEngine — positive-path purchase results', () => {
         reputationDelta: 0,
         cost: 3,
       };
-      state.market.investments = [investmentEvt];
+      state.market.cards = [investmentEvt];
       state.resourceBank.coins = investmentEvt.cost;
       const coinsBefore = state.resourceBank.coins;
 
@@ -523,26 +521,29 @@ describe('MarketOfferEngine — positive-path purchase results', () => {
 
       expect(state.hand.some(c => c.family === 'event' && c.id === investmentEvt.id)).toBe(true);
       expect(state.resourceBank.coins).toBe(coinsBefore - investmentEvt.cost);
-      expect(state.market.investments).toHaveLength(0);
+      expect(state.market.cards).toHaveLength(0);
     });
   });
 
-  describe('refreshInvestments — success', () => {
+  describe('refreshMarket — success', () => {
     it('should deduct cost, discard current investments, and refill the row', () => {
       const state = createTestState();
       state.phase = 'MarketPhase';
-      state.resourceBank.coins = REFRESH_INVESTMENTS_COST + 10;
+      state.resourceBank.coins = REFRESH_MARKET_COST + 10;
 
-      const invBefore = state.market.investments.map(c => c.id).slice();
+      const invBefore = state.market.cards.map(c => c.id).slice();
       expect(invBefore.length).toBeGreaterThan(0);
       const coinsBefore = state.resourceBank.coins;
 
-      const result: RefreshResult = refreshInvestments(state);
+      const result: RefreshResult = refreshMarket(state);
 
-      expect(result.cost).toBe(REFRESH_INVESTMENTS_COST);
-      expect(state.resourceBank.coins).toBe(coinsBefore - REFRESH_INVESTMENTS_COST);
-      // All previously visible cards should be discarded
+      expect(result.cost).toBe(REFRESH_MARKET_COST);
+      expect(state.resourceBank.coins).toBe(coinsBefore - REFRESH_MARKET_COST);
+      // All previously visible cards should be discarded (single row may hold
+      // any family, so scan every discard pile).
       const discardedIds = [
+        ...state.discards.business.map(c => c.id),
+        ...state.discards.communitySpace.map(c => c.id),
         ...state.discards.upgrade.map(c => c.id),
         ...state.discards.event.map(c => c.id),
       ];
@@ -550,9 +551,9 @@ describe('MarketOfferEngine — positive-path purchase results', () => {
         expect(discardedIds).toContain(id);
       }
       // Investments row refilled within slot limits
-      expect(state.market.investments.length).toBeLessThanOrEqual(MARKET_INVESTMENT_SLOTS);
+      expect(state.market.cards.length).toBeLessThanOrEqual(MARKET_TOTAL_SLOTS);
       // No duplicate IDs in the refreshed row
-      const refreshedIds = state.market.investments.map(c => c.id);
+      const refreshedIds = state.market.cards.map(c => c.id);
       expect(new Set(refreshedIds).size).toBe(refreshedIds.length);
     });
   });
@@ -564,21 +565,21 @@ describe('MarketOfferEngine — negative-path invalid row/slot', () => {
   describe('purchaseBusiness — invalid slot', () => {
     it('should throw when slot index equals GRID_SIZE', () => {
       const state = createTestState();
-      const card = state.market.development[0];
+      const card = state.market.cards[0];
       state.resourceBank.coins = 100;
       expect(() => purchaseBusiness(state, card.id, GRID_SIZE)).toThrow('Invalid slot');
     });
 
     it('should throw when slot index is negative', () => {
       const state = createTestState();
-      const card = state.market.development[0];
+      const card = state.market.cards[0];
       state.resourceBank.coins = 100;
       expect(() => purchaseBusiness(state, card.id, -1)).toThrow('Invalid slot');
     });
 
     it('should throw when slot is occupied', () => {
       const state = createTestState();
-      const card = state.market.development[0];
+      const card = state.market.cards[0];
       state.resourceBank.coins = 100;
       state.streetGrid[0] = state.decks.business[0];
       expect(() => purchaseBusiness(state, card.id, 0)).toThrow('occupied');
@@ -588,7 +589,7 @@ describe('MarketOfferEngine — negative-path invalid row/slot', () => {
   describe('purchaseUpgrade — invalid targeting', () => {
     it('should throw when purchasing upgrade with insufficient coins', () => {
       const state = createTestState();
-      const upgrade = state.market.investments.find(
+      const upgrade = state.market.cards.find(
         c => c.family === 'upgrade',
       ) as UpgradeCard | undefined;
       if (!upgrade) return;
@@ -603,7 +604,7 @@ describe('MarketOfferEngine — negative-path invalid row/slot', () => {
 
     it('should throw when targeting a specific slot with a non-matching business (but another valid target exists)', () => {
       const state = createTestState();
-      const upgrade = state.market.investments.find(
+      const upgrade = state.market.cards.find(
         c => c.family === 'upgrade',
       ) as UpgradeCard | undefined;
       if (!upgrade) return;
@@ -628,7 +629,7 @@ describe('MarketOfferEngine — negative-path invalid row/slot', () => {
   describe('purchaseEvent — insufficient coins', () => {
     it('should throw when buying event with insufficient coins', () => {
       const state = createTestState();
-      const investmentEvent = state.market.investments.find(
+      const investmentEvent = state.market.cards.find(
         c => c.family === 'event' && (c as EventCard).trigger === 'Investment',
       ) as EventCard | undefined;
       if (!investmentEvent) return;
@@ -638,13 +639,13 @@ describe('MarketOfferEngine — negative-path invalid row/slot', () => {
     });
   });
 
-  describe('refreshInvestments — insufficient coins', () => {
+  describe('refreshMarket — insufficient coins', () => {
     it('should throw when refreshing with insufficient coins', () => {
       const state = createTestState();
       state.phase = 'MarketPhase';
-      state.resourceBank.coins = REFRESH_INVESTMENTS_COST - 1;
+      state.resourceBank.coins = REFRESH_MARKET_COST - 1;
 
-      expect(() => refreshInvestments(state)).toThrow('Not enough coins');
+      expect(() => refreshMarket(state)).toThrow('Not enough coins');
     });
   });
 });
@@ -711,59 +712,64 @@ describe('MarketOfferEngine — refill policy: incident queue', () => {
 // ── Refill Policy — Deck Exhaustion Edge Cases ──────────────
 
 describe('MarketOfferEngine — refill policy: exhaustion edge cases', () => {
-  describe('refillInvestmentsMarket — dual exhaustion', () => {
-    it('should produce empty investments row when both upgrade and event decks are empty', () => {
+  describe('— dual exhaustion', () => {
+    it('fills the single row with business-only cards when upgrade and event decks are empty', () => {
       const state = createTestState();
-      state.market.investments = [];
+      state.market.cards = [];
       state.decks.upgrade = [];
       state.decks.event = [];
       state.discards.upgrade = [];
       state.discards.event = [];
 
-      refillInvestmentsMarket(state);
-      expect(state.market.investments).toHaveLength(0);
+      refillMarket(state);
+      // No upgrades/events exist anywhere — the row must still satisfy the
+      // ≥1-business contract, up to the available business supply.
+      expect(state.market.cards.length).toBeGreaterThan(0);
+      for (const card of state.market.cards) {
+        expect(['business', 'community-space']).toContain(card.family);
+      }
     });
 
     it('should only fill upgrades when event deck has no Investment-trigger cards', () => {
       const state = createTestState();
-      state.market.investments = [];
+      state.market.cards = [];
       state.decks.event = state.decks.event.filter(e => e.trigger !== 'Investment');
       // Ensure upgrade deck has cards
-      expect(state.decks.upgrade.length).toBeGreaterThanOrEqual(MARKET_INVESTMENT_UPGRADE_COUNT);
+      expect(state.decks.upgrade.length).toBeGreaterThanOrEqual(MARKET_UPGRADE_MAX);
 
-      refillInvestmentsMarket(state);
+      refillMarket(state);
 
-      const upgrades = state.market.investments.filter(c => c.family === 'upgrade');
-      const events = state.market.investments.filter(c => c.family === 'event');
-      expect(upgrades.length).toBe(MARKET_INVESTMENT_UPGRADE_COUNT);
+      const upgrades = state.market.cards.filter(c => c.family === 'upgrade');
+      const events = state.market.cards.filter(c => c.family === 'event');
+      expect(upgrades.length).toBe(MARKET_UPGRADE_MAX);
       expect(events.length).toBe(0);
     });
   });
 
-  describe('refillDevelopmentMarket — complete exhaustion', () => {
+  describe('— complete exhaustion', () => {
     it('should leave market partially empty when deck and discard are both empty', () => {
       const state = createTestState();
-      state.market.development = [];
+      state.market.cards = [];
       state.decks.business = [];
       state.discards.business = [];
       state.decks.communitySpace = [];
       state.discards.communitySpace = [];
 
-      refillDevelopmentMarket(state);
-      expect(state.market.development).toHaveLength(0);
+      refillMarket(state);
+      expect(state.market.cards).toHaveLength(0);
     });
   });
 
-  describe('refillAllMarkets — idempotency', () => {
+  describe('refillMarket — idempotency', () => {
     it('should not change a fully-refilled market when called again', () => {
       const state = createTestState();
-      const bizBefore = state.market.development.map(c => c.id).slice();
-      const invBefore = state.market.investments.map(c => c.id).slice();
+      const bizBefore = state.market.cards.map(c => c.id).slice();
+      const invBefore = state.market.cards.map(c => c.id).slice();
 
-      refillAllMarkets(state);
+      refillMarket(state);
 
-      expect(state.market.development.map(c => c.id)).toEqual(bizBefore);
-      expect(state.market.investments.map(c => c.id)).toEqual(invBefore);
+      expect(state.market.cards.map(c => c.id)).toEqual(bizBefore);
+      expect(state.market.cards.map(c => c.id)).toEqual(invBefore);
     });
   });
 });
@@ -782,9 +788,9 @@ describe('MarketOfferEngine — refill policy: reshuffle from discard', () => {
       state.decks.communitySpace.length = 0;
       state.discards.communitySpace.length = 0;
       // Clear visible market so refill must draw from reshuffled deck
-      state.market.development = [];
-      refillDevelopmentMarket(state);
-      expect(state.market.development.length).toBeGreaterThan(0);
+      state.market.cards = [];
+      refillMarket(state);
+      expect(state.market.cards.length).toBeGreaterThan(0);
       expect(state.discards.business.length).toBe(0);
     });
 
@@ -794,9 +800,9 @@ describe('MarketOfferEngine — refill policy: reshuffle from discard', () => {
       state.discards.business = [];
       state.decks.communitySpace = [];
       state.discards.communitySpace = [];
-      state.market.development = [];
-      refillDevelopmentMarket(state);
-      expect(state.market.development).toHaveLength(0);
+      state.market.cards = [];
+      refillMarket(state);
+      expect(state.market.cards).toHaveLength(0);
     });
   });
 
@@ -806,11 +812,15 @@ describe('MarketOfferEngine — refill policy: reshuffle from discard', () => {
       const moved = state.decks.upgrade.splice(0, 2);
       state.discards.upgrade.push(...moved);
       state.decks.upgrade.length = 0;
-      state.market.investments = [];
-      refillInvestmentsMarket(state);
-      // Upgrades should have been drawn from the reshuffled discard
+      state.market.cards = [];
+      refillMarket(state);
+      // The reshuffled discard must have been consumed (nothing left there),
+      // and the non-business slot is filled from it (upgrade or event).
       expect(state.discards.upgrade.length).toBe(0);
-      expect(state.market.investments.filter(c => c.family === 'upgrade').length).toBeGreaterThan(0);
+      const nonBusiness = state.market.cards.filter(
+        c => c.family === 'upgrade' || c.family === 'event',
+      );
+      expect(nonBusiness.length).toBeGreaterThan(0);
     });
   });
 
@@ -839,12 +849,14 @@ describe('MarketOfferEngine — refill policy: reshuffle from discard', () => {
       // Ensure we have Investment events in discards
       const investInDiscard = state.discards.event.filter(e => e.trigger === 'Investment').length;
       if (investInDiscard === 0) return; // Skip if no Investment events available
-      state.market.investments = [];
-      // Ensure upgrade deck has cards so we can test event reshuffle
-      expect(state.decks.upgrade.length).toBeGreaterThanOrEqual(MARKET_INVESTMENT_UPGRADE_COUNT);
-      refillInvestmentsMarket(state);
+      state.market.cards = [];
+      // Empty the upgrade deck so the non-business slot must come from the
+      // reshuffled Investment-event discards.
+      state.decks.upgrade = [];
+      state.discards.upgrade = [];
+      refillMarket(state);
       // Events should have been drawn from reshuffled discards
-      const events = state.market.investments.filter(c => c.family === 'event');
+      const events = state.market.cards.filter(c => c.family === 'event');
       expect(events.length).toBeGreaterThan(0);
     });
   });
@@ -873,18 +885,18 @@ describe('MarketOfferEngine — multi-turn market flow parity', () => {
 
       // Day 1: buy a business
       executeDayStart(state);
-      expect(state.market.development).toHaveLength(MARKET_BUSINESS_SLOTS);
-      const card = state.market.development[0];
+      expect(state.market.cards).toHaveLength(MARKET_TOTAL_SLOTS);
+      const card = state.market.cards[0];
       executeAction(state, { type: 'buy-business', cardId: card.id, slotIndex: 0 });
       // After purchase, market should have one fewer card (no immediate refill)
-      expect(state.market.development).toHaveLength(MARKET_BUSINESS_SLOTS - 1);
+      expect(state.market.cards).toHaveLength(MARKET_TOTAL_SLOTS - 1);
 
       // End turn → Day 2: market should be refilled
       processEndOfTurn(state);
       executeDayStart(state);
       // Market should be refilled to capacity (or deck limit)
-      expect(state.market.development.length).toBeGreaterThanOrEqual(1);
-      expect(state.market.development.length).toBeLessThanOrEqual(MARKET_BUSINESS_SLOTS);
+      expect(state.market.cards.length).toBeGreaterThanOrEqual(1);
+      expect(state.market.cards.length).toBeLessThanOrEqual(MARKET_TOTAL_SLOTS);
     });
 
     it('should refill the investments row at DayStart after purchasing an upgrade', () => {
@@ -892,7 +904,7 @@ describe('MarketOfferEngine — multi-turn market flow parity', () => {
       state.resourceBank.coins = 100;
 
       // Place a target business
-      const upgrade = state.market.investments.find(
+      const upgrade = state.market.cards.find(
         c => c.family === 'upgrade',
       ) as UpgradeCard | undefined;
       if (!upgrade) return;
@@ -902,19 +914,19 @@ describe('MarketOfferEngine — multi-turn market flow parity', () => {
 
       // Day 1
       executeDayStart(state);
-      const invBefore = state.market.investments.length;
+      const invBefore = state.market.cards.length;
       executeAction(state, { type: 'buy-upgrade', cardId: upgrade.id });
       // After purchase, investments row has one fewer card
-      expect(state.market.investments.length).toBe(invBefore - 1);
+      expect(state.market.cards.length).toBe(invBefore - 1);
 
       // End turn → Day 2: investments should be refilled
       processEndOfTurn(state);
       executeDayStart(state);
-      const upgCount = state.market.investments.filter(c => c.family === 'upgrade').length;
-      const evtCount = state.market.investments.filter(c => c.family === 'event').length;
+      const upgCount = state.market.cards.filter(c => c.family === 'upgrade').length;
+      const evtCount = state.market.cards.filter(c => c.family === 'event').length;
       expect(upgCount).toBeGreaterThanOrEqual(0);
       expect(evtCount).toBeGreaterThanOrEqual(0);
-      expect(state.market.investments.length).toBeLessThanOrEqual(MARKET_INVESTMENT_SLOTS);
+      expect(state.market.cards.length).toBeLessThanOrEqual(MARKET_TOTAL_SLOTS);
     });
 
     it('should maintain no duplicate card IDs in the business market across 5 turns', () => {
@@ -925,10 +937,10 @@ describe('MarketOfferEngine — multi-turn market flow parity', () => {
         if (state.gameResult !== 'playing') break;
         playGreedyTurn(state);
 
-        const ids = state.market.development.map(c => c.id);
+        const ids = state.market.cards.map(c => c.id);
         const uniqueIds = new Set(ids);
         expect(uniqueIds.size, `Turn ${turn + 1}: duplicate IDs found`).toBe(ids.length);
-        expect(state.market.development.length).toBeLessThanOrEqual(MARKET_BUSINESS_SLOTS);
+        expect(state.market.cards.length).toBeLessThanOrEqual(MARKET_TOTAL_SLOTS);
       }
     });
 
@@ -940,10 +952,10 @@ describe('MarketOfferEngine — multi-turn market flow parity', () => {
         if (state.gameResult !== 'playing') break;
         playGreedyTurn(state);
 
-        const ids = state.market.investments.map(c => c.id);
+        const ids = state.market.cards.map(c => c.id);
         const uniqueIds = new Set(ids);
         expect(uniqueIds.size, `Turn ${turn + 1}: duplicate IDs found`).toBe(ids.length);
-        expect(state.market.investments.length).toBeLessThanOrEqual(MARKET_INVESTMENT_SLOTS);
+        expect(state.market.cards.length).toBeLessThanOrEqual(MARKET_TOTAL_SLOTS);
       }
     });
 
@@ -976,11 +988,11 @@ describe('MarketOfferEngine — multi-turn market flow parity', () => {
         playGreedyTurn(state1);
         playGreedyTurn(state2);
 
-        expect(state1.market.development.map(c => c.id)).toEqual(
-          state2.market.development.map(c => c.id),
+        expect(state1.market.cards.map(c => c.id)).toEqual(
+          state2.market.cards.map(c => c.id),
         );
-        expect(state1.market.investments.map(c => c.id)).toEqual(
-          state2.market.investments.map(c => c.id),
+        expect(state1.market.cards.map(c => c.id)).toEqual(
+          state2.market.cards.map(c => c.id),
         );
         expect(state1.incidentQueue.map(c => c.id)).toEqual(
           state2.incidentQueue.map(c => c.id),

@@ -14,7 +14,16 @@
 
 import { GreedyStrategy, scoreAction } from './MainStreetAiStrategy';
 import type { MainStreetState } from './MainStreetState';
-import type { PlayerAction, BuyBusinessAction, BuyUpgradeAction, BuyEventAction } from './MainStreetEngine';
+import type {
+  PlayerAction,
+  BuyBusinessAction,
+  BuyUpgradeAction,
+  BuyEventAction,
+  MoveToHandAction,
+  PlayBusinessFromHandAction,
+  PlayUpgradeFromHandAction,
+  PlayEventFromHandAction,
+} from './MainStreetEngine';
 import { computeSynergyBonus } from './MainStreetAdjacency';
 import { formatSynergyRate } from './MainStreetFormatting';
 import type { BusinessCard, UpgradeCard, EventCard } from './MainStreetCards';
@@ -89,7 +98,7 @@ export function buildRationale(
   switch (action.type) {
     case 'buy-business': {
       const a = action as BuyBusinessAction;
-      const card = state.market.development.find(c => c.id === a.cardId) as BusinessCard | undefined;
+      const card = state.market.cards.find(c => c.id === a.cardId) as BusinessCard | undefined;
       const cardName = card?.name ?? a.cardId;
 
       // Compute projected synergy bonus at the candidate slot
@@ -112,7 +121,7 @@ export function buildRationale(
 
     case 'buy-upgrade': {
       const a = action as BuyUpgradeAction;
-      const card = state.market.investments.find(c => c.id === a.cardId) as UpgradeCard | undefined;
+      const card = state.market.cards.find(c => c.id === a.cardId) as UpgradeCard | undefined;
       const targetBusiness = card?.targetBusiness ?? 'business';
       const incomeBonus = card?.incomeBonus ?? 0;
 
@@ -126,7 +135,7 @@ export function buildRationale(
 
     case 'buy-event': {
       const a = action as BuyEventAction;
-      const card = state.market.investments.find(c => c.id === a.cardId) as EventCard | undefined;
+      const card = state.market.cards.find(c => c.id === a.cardId) as EventCard | undefined;
       const cardName = card?.name ?? a.cardId;
       const coinDelta = card?.coinDelta ?? 0;
       const repDelta = card?.reputationDelta ?? 0;
@@ -145,9 +154,36 @@ export function buildRationale(
       return `Play ${cardName} now for immediate benefit`;
     }
 
-    case 'buy-business-to-hand':
-      return 'Buy business card to hand for later placement';
+    case 'move-to-hand': {
+      const a = action as MoveToHandAction;
+      const card = state.market.cards.find(c => c.id === a.cardId);
+      return `Move ${card?.name ?? a.cardId} to hand for free (pay on play)`;
+    }
+
+    case 'play-business-from-hand': {
+      const a = action as PlayBusinessFromHandAction;
+      const card = (state.hand ?? [])[a.handIndex] as BusinessCard | undefined;
+      const cardName = card?.name ?? 'hand card';
+      return `Play ${cardName} from hand into slot ${a.slotIndex}`;
+    }
+
+    case 'play-upgrade-from-hand': {
+      const a = action as PlayUpgradeFromHandAction;
+      const card = (state.hand ?? [])[a.handIndex] as UpgradeCard | undefined;
+      return `Play upgrade ${card?.name ?? 'from hand'} for +${card?.incomeBonus ?? 0}/turn income`;
+    }
+
+    case 'play-event-from-hand': {
+      const a = action as PlayEventFromHandAction;
+      const card = (state.hand ?? [])[a.handIndex] as EventCard | undefined;
+      return `Play ${card?.name ?? 'held event'} from hand now for immediate benefit`;
+    }
+
+    case 'discard-from-hand':
+      return 'Discard a card from hand to free capacity';
     case 'end-turn':
       return 'No good buys available -- end your turn';
+    default:
+      return 'Take an action';
   }
 }

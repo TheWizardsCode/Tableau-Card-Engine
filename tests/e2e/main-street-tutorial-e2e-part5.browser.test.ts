@@ -104,9 +104,10 @@ describe('Main Street Tutorial E2E — T11-T13', () => {
     await waitForOverlayVisible(5_000);
     expect(getStepIndex(scene)).toBe(12);
 
-    // Verify the Library is in the dev row (cs-library replaces cs-park)
+    // Verify the Library is on the single market row (forced in by the
+    // day-start tutorial market-guarantee hook, CG-0MSTOATDT009BRX2).
     const s = scene as any;
-    const library = s.state.market.development.find((c: any) => c.id.startsWith('cs-library'));
+    const library = s.state.market.cards.find((c: any) => c.id.startsWith('cs-library'));
     expect(library).toBeTruthy();
 
     // T13 is a composite buy-and-place step: buying the Library to hand
@@ -136,7 +137,7 @@ describe('Main Street Tutorial E2E — T11-T13', () => {
     expect(getStepIndex(scene)).toBe(12);
 
     const s = scene as any;
-    const library = s.state.market.development.find((c: any) => c.id.startsWith('cs-library'));
+    const library = s.state.market.cards.find((c: any) => c.id.startsWith('cs-library'));
     expect(library).toBeTruthy();
 
     await clickRequiredBusinessCard(scene);

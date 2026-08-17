@@ -182,7 +182,7 @@ describe('MainStreetEngine', () => {
     it('should execute a buy-business action in MarketPhase', () => {
       const state = createTestState();
       state.phase = 'MarketPhase';
-      const card = state.market.development[0];
+      const card = state.market.cards[0];
       state.resourceBank.coins = 100;
 
       const result = executeAction(state, {
@@ -226,15 +226,20 @@ describe('MainStreetEngine', () => {
       state.phase = 'MarketPhase';
       state.resourceBank.coins = 100;
 
-      // Place a target business. The seeded investments row may draw an
-      // upgrade whose target is a community space (Group E) rather than a
-      // business, so pick the first upgrade whose target exists in the
-      // business deck — the test must not depend on the draw order.
-      const upgrades = state.market.investments.filter(
+      // Place a target business. The single 3-card row may not contain an
+      // upgrade at all (CG-0MSTOATDT009BRX2), so pick the first upgrade from
+      // the row OR the deck whose target exists in the business deck — the
+      // test must not depend on the seeded draw.
+      type UpgradeCardT = import('../../example-games/main-street/MainStreetCards').UpgradeCard;
+      const rowUpgrades = state.market.cards.filter(
         c => c.family === 'upgrade',
-      ) as import('../../example-games/main-street/MainStreetCards').UpgradeCard[];
-      expect(upgrades.length).toBeGreaterThan(0);
-      const upgrade = upgrades.find(u => state.decks.business.some(b => b.name === u.targetBusiness));
+      ) as UpgradeCardT[];
+      const upgrade = rowUpgrades.find(u => state.decks.business.some(b => b.name === u.targetBusiness))
+        ?? state.decks.upgrade.find(u => state.decks.business.some(b => b.name === u.targetBusiness));
+      if (!upgrade) return; // no eligible upgrade in this seed — nothing to test
+      if (!rowUpgrades.includes(upgrade)) {
+        state.market.cards.push(upgrade);
+      }
       expect(upgrade).toBeDefined();
       const biz = state.decks.business.find(b => b.name === upgrade!.targetBusiness);
       expect(biz).toBeDefined();
@@ -258,7 +263,7 @@ describe('MainStreetEngine', () => {
 
       // Put an Investment event in the investments row
       const investmentEvent = makeInvestmentEvent({ id: 'inv-evt-1' });
-      state.market.investments = [investmentEvent];
+      state.market.cards = [investmentEvent];
 
       const result = executeAction(state, {
         type: 'buy-event',
@@ -277,10 +282,13 @@ describe('MainStreetEngine', () => {
 
       const result = executeAction(state, { type: 'play-event' });
 
-      expect(result).toBeNull();
+      // CG-0MSTOATDT009BRX2: play-event now returns the PurchaseResult (the
+      // held event's cost is charged at play time) instead of null.
+      expect(result).not.toBeNull();
       expect(state.hand.some(c => c.family === 'event')).toBe(false);
       // CG-0MRER3RE300418SG: event coinDelta is now multiplied by reputation and not floored
       // Medium preset rep=3 → multiplier=1.15, 4 * 1.15 = 4.6 (was 4 before fix)
+      // makeInvestmentEvent defaults cost to 0, so only the delta applies.
       expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 4.6);
     });
 
@@ -648,11 +656,11 @@ describe('MainStreetEngine', () => {
 
     it('should refill the market', () => {
       const state = createTestState();
-      state.market.development = state.market.development.slice(0, 2);
+      state.market.cards = state.market.cards.slice(0, 2);
 
       executeDayStart(state);
 
-      expect(state.market.development.length).toBeGreaterThanOrEqual(3);
+      expect(state.market.cards.length).toBeGreaterThanOrEqual(3);
     });
 
     it('should throw if not in DayStart phase', () => {
@@ -695,7 +703,7 @@ describe('MainStreetEngine', () => {
       const state = createTestState();
       state.resourceBank.coins = 100;
 
-      const card = state.market.development[0];
+      const card = state.market.cards[0];
       const actions: PlayerAction[] = [
         { type: 'buy-business', cardId: card.id, slotIndex: 0 },
         { type: 'end-turn' },
@@ -785,7 +793,7 @@ describe('MainStreetEngine', () => {
           executeDayStart(state);
         }
 
-        const card = state.market.development[0];
+        const card = state.market.cards[0];
         const emptySlot = state.streetGrid.findIndex(s => s === null);
         if (card && emptySlot !== -1) {
           actions.push({
@@ -819,7 +827,7 @@ describe('MainStreetEngine', () => {
           if (s.gameResult !== 'playing') break;
           executeDayStart(s);
 
-          const card = s.market.development[0];
+          const card = s.market.cards[0];
           const slot = s.streetGrid.findIndex(sl => sl === null);
           if (card && slot !== -1) {
             executeAction(s, { type: 'buy-business', cardId: card.id, slotIndex: slot });

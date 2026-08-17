@@ -73,13 +73,13 @@ void popTextOrIcon({
 
 - Helper: `MainStreetAnimator.animateMarketDealIn()`.
 - Trigger points (`MainStreetTurnController`):
-  - `startDayPhase()` — after the final (post-prewarm) market render, both
-    the development and investments rows deal in. Skipped on checkpoint
-    resume (`skipMarketRefill`), where the saved market is preserved.
-  - `onRefreshDevelopmentClick()` / `onRefreshInvestmentsClick()` — after a
-    successful Discover/Research, the outgoing row cards fade/shrink out from
-    their old slot positions (snapshot visuals via `createTransferCardVisual`)
-    while the incoming row deals in.
+  - `startDayPhase()` — after the final (post-prewarm) market render, the
+    single market row deals in (CG-0MSTOATDT009BRX2 merged the two rows).
+    Skipped on checkpoint resume (`skipMarketRefill`), where the saved market
+    is preserved.
+  - `onRefreshMarketClick()` — after a successful refresh, the outgoing row
+    cards fade/shrink out from their old slot positions (snapshot visuals via
+    `createTransferCardVisual`) while the incoming row deals in.
 - Behavior:
   - Incoming cards enter a "dealt" state synchronously in the same frame as
     the draw (scale 0.6, alpha 0.35, raised 24px — no flicker), then tween

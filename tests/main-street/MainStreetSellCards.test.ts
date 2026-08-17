@@ -88,17 +88,17 @@ function createTestState(seed: string = 'sell-cards-test'): MainStreetState {
  */
 function placeCardOnGrid(state: MainStreetState, slotIndex: number): BusinessCard | CommunitySpaceCard | null {
   // Find an affordable business card in the market
-  const card = state.market.development.find(
+  const card = state.market.cards.find(
     c => c.cost <= state.resourceBank.coins && c.family === 'business',
   ) as BusinessCard | undefined;
   if (!card) return null;
 
   // Purchase and place directly
-  const marketIndex = state.market.development.findIndex(c => c.id === card.id);
+  const marketIndex = state.market.cards.findIndex(c => c.id === card.id);
   if (marketIndex < 0) return null;
 
   state.resourceBank.coins -= card.cost;
-  state.market.development.splice(marketIndex, 1);
+  state.market.cards.splice(marketIndex, 1);
   state.streetGrid[slotIndex] = { ...card };
   return state.streetGrid[slotIndex] as BusinessCard;
 }
@@ -115,7 +115,7 @@ function isSlotSold(state: MainStreetState, slotIndex: number): boolean {
  * Gets an affordable business card from the development market.
  */
 function getAffordableCard(state: MainStreetState): BusinessCard | undefined {
-  return state.market.development.find(
+  return state.market.cards.find(
     c => c.cost <= state.resourceBank.coins && c.family === 'business',
   ) as BusinessCard | undefined;
 }
@@ -294,15 +294,15 @@ describe('MainStreet Sell Cards', () => {
       'should refund correctly for community-space cards',
       async () => {
         // Find or place a community-space card
-        const csCard = state.market.development.find(
+        const csCard = state.market.cards.find(
           c => c.family === 'community-space' && c.cost <= state.resourceBank.coins,
         ) as CommunitySpaceCard | undefined;
         if (!csCard) return;
 
         const slot = 0;
-        const marketIndex = state.market.development.findIndex(c => c.id === csCard.id);
+        const marketIndex = state.market.cards.findIndex(c => c.id === csCard.id);
         state.resourceBank.coins -= csCard.cost;
-        state.market.development.splice(marketIndex, 1);
+        state.market.cards.splice(marketIndex, 1);
         state.streetGrid[slot] = { ...csCard };
 
         const coinsBefore = state.resourceBank.coins;
@@ -391,10 +391,10 @@ describe('MainStreet Sell Cards', () => {
         const card2 = getAffordableCard(state);
         if (!card2) return;
 
-        const marketIdx = state.market.development.findIndex(c => c.id === card2.id);
+        const marketIdx = state.market.cards.findIndex(c => c.id === card2.id);
         if (marketIdx < 0) return;
         state.resourceBank.coins -= card2.cost;
-        state.market.development.splice(marketIdx, 1);
+        state.market.cards.splice(marketIdx, 1);
         state.streetGrid[1] = { ...card2 } as BusinessCard;
 
         const market = await import('../../example-games/main-street/MainStreetMarket');
@@ -448,10 +448,10 @@ describe('MainStreet Sell Cards', () => {
         const card2 = getAffordableCard(state);
         if (!card2) return;
 
-        const marketIdx = state.market.development.findIndex(c => c.id === card2.id);
+        const marketIdx = state.market.cards.findIndex(c => c.id === card2.id);
         if (marketIdx < 0) return;
         state.resourceBank.coins -= card2.cost;
-        state.market.development.splice(marketIdx, 1);
+        state.market.cards.splice(marketIdx, 1);
         state.streetGrid[1] = { ...card2 } as BusinessCard;
 
         // Sell the first card

@@ -105,7 +105,10 @@ describe('Per-card incremental income/reputation tracking', () => {
 
     it('cached values are undefined on market cards until placement and recalculation', () => {
       const state = setupMainStreetGame({ seed: 'field-init' });
-      const card = state.market.development[0];
+      const card = state.market.cards[0] as (BusinessCard & {
+        currentIncome?: number;
+        currentReputationPerTurn?: number;
+      }) | undefined;
       if (card) {
         // Before placement, cached values are not set (undefined)
         expect(card.currentIncome).toBeUndefined();
@@ -483,7 +486,7 @@ describe('Per-card incremental income/reputation tracking', () => {
       const state = createRichState('purchase-recalc');
       executeDayStart(state);
 
-      const card = state.market.development[0];
+      const card = state.market.cards[0];
       if (!card) return;
 
       executeAction(state, { type: 'buy-business', cardId: card.id, slotIndex: 0 });
@@ -503,8 +506,11 @@ describe('Per-card incremental income/reputation tracking', () => {
       // Now purchase a second card adjacent via the market
       executeDayStart(state);
       // Look for a Food synergy card that won't be same-type as biz-cafe-0
-      const foodCard = state.market.development.find(
-        c => c.synergyTypes.includes('Food') && c.id.startsWith('biz-diner'),
+      const foodCard = state.market.cards.find(
+        (c): c is BusinessCard =>
+          (c.family === 'business' || c.family === 'community-space') &&
+          c.synergyTypes.includes('Food') &&
+          c.id.startsWith('biz-diner'),
       );
       if (!foodCard) return; // skip if no suitable card available
 
@@ -579,14 +585,14 @@ describe('Per-card incremental income/reputation tracking', () => {
       // Run game 1
       const state1 = createRichState(seed);
       executeDayStart(state1);
-      const card1 = state1.market.development[0];
+      const card1 = state1.market.cards[0];
       if (card1) executeAction(state1, { type: 'buy-business', cardId: card1.id, slotIndex: 0 });
       processEndOfTurn(state1);
 
       // Run game 2 with same seed
       const state2 = createRichState(seed);
       executeDayStart(state2);
-      const card2 = state2.market.development[0];
+      const card2 = state2.market.cards[0];
       if (card2) executeAction(state2, { type: 'buy-business', cardId: card2.id, slotIndex: 0 });
       processEndOfTurn(state2);
 

@@ -59,7 +59,7 @@ describe('Main Street save/load integration', () => {
     const state = setupMainStreetGame({ seed: 'save-load-turn-start' });
 
     executeDayStart(state);
-    const card = state.market.development.find(c => c.cost <= state.resourceBank.coins)!;
+    const card = state.market.cards.find(c => c.cost <= state.resourceBank.coins)!;
     executeAction(state, { type: 'buy-business', cardId: card.id, slotIndex: 0 });
     processEndOfTurn(state);
 
@@ -69,7 +69,7 @@ describe('Main Street save/load integration', () => {
 
     const expected = setupMainStreetGame({ seed: 'save-load-turn-start' });
     executeDayStart(expected);
-    const expectedCard = expected.market.development.find(c => c.cost <= expected.resourceBank.coins)!;
+    const expectedCard = expected.market.cards.find(c => c.cost <= expected.resourceBank.coins)!;
     executeAction(expected, { type: 'buy-business', cardId: expectedCard.id, slotIndex: 0 });
     processEndOfTurn(expected);
 
@@ -139,7 +139,7 @@ describe('Main Street save/load integration', () => {
         actions.push({ type: 'play-event' });
       }
 
-      for (const card of state.market.investments) {
+      for (const card of state.market.cards) {
         if (card.family !== 'event') continue;
         if (canPurchaseEvent(state, card.id).legal) {
           actions.push({ type: 'buy-event', cardId: card.id });

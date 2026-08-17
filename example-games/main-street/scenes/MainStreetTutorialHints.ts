@@ -43,7 +43,7 @@ import {
   CHALLENGE_LINE_H,
   CHALLENGE_PAD,
 } from './MainStreetConstants';
-import { MARKET_BUSINESS_SLOTS } from '../MainStreetCards';
+import { MARKET_TOTAL_SLOTS } from '../MainStreetCards';
 import { STANDARD_TUTORIAL_SCENARIO } from '../TutorialScenario';
 
 /*
@@ -58,11 +58,13 @@ import { STANDARD_TUTORIAL_SCENARIO } from '../TutorialScenario';
  * computed by MainStreetLayoutAdapter/`computeMainStreetLayoutWithSll()` and
  * MainStreetRenderer (source of truth). At the canonical 1280×720 viewport:
  *   - hud            (320, 36, 640, 28)  — strip centred at (gameW/2, hudY)
- *   - developmentRow (20, 96, 920, 94)   — marketTop + 6
- *   - investmentsRow (20, 200, 920, 94)  — marketTop + 6 + marketRowH + gap
+ *   - developmentRow (20, 96, 920, 94)   — marketTop + 6 (single market row)
+ *   - investmentsRow — ALIAS of developmentRow: the two-row market was merged
+ *                      into one row (CG-0MSTOATDT009BRX2), so upgrade/event
+ *                      steps highlight the same single market row.
  *   - streetGrid     (20, 337, 780, 172) — streetTop, 5×140 + 4×20, 2×80 + 12
  *   - hand           (266, 620, 288, 80) — centred on handCenterX (410), max
- *                                         2 cards (2×140 + 8 gap)
+ *                                          3 cards (3×140 + 16 gap)
  *   - endTurnButton  (1116, 652, 140, 34) — gameW-24-140, actionY + 4
  *   - incidentQueue  (960, 408, 300, 194) — queueTop, boot-time panel (2 cards,
  *                                         0 active effects: 22+8+156+8)
@@ -134,9 +136,7 @@ export function resolveMarketCardAnchor(
   if (!templateId) return null;
 
   // Deterministic scenario slot index (source of truth for tutorial steps).
-  const devIdx = STANDARD_TUTORIAL_SCENARIO.market.development.indexOf(templateId);
-  const invIdx = STANDARD_TUTORIAL_SCENARIO.market.investments.indexOf(templateId);
-  const rowIndex = devIdx >= 0 ? devIdx : invIdx;
+  const rowIndex = STANDARD_TUTORIAL_SCENARIO.market.cards.indexOf(templateId);
   if (rowIndex < 0) return null;
 
   const layout = scene.layout ?? {};
@@ -152,25 +152,18 @@ export function resolveMarketCardAnchor(
     { policy: 'sceneWins' },
   );
 
-  // Both rows align their first card to the dev row's startX (the renderer
-  // passes devStartX as the investments row's alignmentStartX). Compute
-  // devStartX from the developmentRow zone rect and shared card constants.
-  const devRect = composed.zones.developmentRow?.rect;
-  if (!devRect) return null;
-  const devTotalCardsW =
-    MARKET_BUSINESS_SLOTS * BASE_MARKET_CARD_W +
-    (MARKET_BUSINESS_SLOTS - 1) * BASE_MARKET_CARD_GAP;
-  const startX = Math.round(devRect.x + ((devRect.width ?? 0) - devTotalCardsW) / 2);
-
-  const rowRect =
-    devIdx >= 0
-      ? devRect
-      : composed.zones.investmentsRow?.rect;
-  if (!rowRect) return null;
+  // Single row: the market row zone rect + shared card constants give the
+  // slot positions (the renderer centres the row inside the market box).
+  const marketRect = composed.zones.developmentRow?.rect;
+  if (!marketRect) return null;
+  const totalCardsW =
+    MARKET_TOTAL_SLOTS * BASE_MARKET_CARD_W +
+    (MARKET_TOTAL_SLOTS - 1) * BASE_MARKET_CARD_GAP;
+  const startX = Math.round(marketRect.x + ((marketRect.width ?? 0) - totalCardsW) / 2);
 
   return {
     x: startX + rowIndex * (BASE_MARKET_CARD_W + BASE_MARKET_CARD_GAP),
-    y: Math.round(rowRect.y),
+    y: Math.round(marketRect.y),
     w: BASE_MARKET_CARD_W,
     h: BASE_MARKET_CARD_H,
   };
@@ -203,7 +196,14 @@ export function resolveZoneToAnchor(
     { policy: 'sceneWins' },
   );
 
-  const resolvedZone = composed.zones[zone];
+  // Single-row market (CG-0MSTOATDT009BRX2): the investments/dev row split no
+  // longer exists, so upgrade/event steps (investmentsRow) highlight the same
+  // market row as business steps (developmentRow). The stale second-row zone
+  // rect in the layout JSON would otherwise mislead the player with a
+  // highlight on empty space.
+  const zoneKey = zone === 'investmentsRow' ? 'developmentRow' : zone;
+
+  const resolvedZone = composed.zones[zoneKey];
   if (!resolvedZone) {
     return null;
   }

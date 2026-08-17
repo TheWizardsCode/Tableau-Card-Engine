@@ -141,11 +141,11 @@ function getScene(game: Phaser.Game): Scene {
   return game.scene.getScene('MainStreetScene') as Scene;
 }
 
-/** Wait until the market development row is populated (campaign load + day start). */
+/** Wait until the market row is populated (campaign load + day start). */
 async function waitForMarketReady(scene: Scene): Promise<void> {
   await waitForCondition(
-    () => scene.state?.market?.development?.length > 0,
-    'market development row populated',
+    () => scene.state?.market?.cards?.length > 0,
+    'market row populated',
   );
 }
 
@@ -206,7 +206,7 @@ describe('MainStreet click-to-place via real pointer events (browser)', () => {
     // empty slot rectangles interactive (the state under test).
     const targetSlot = getEmptySlots(scene.state)[0];
     expect(targetSlot).toBeGreaterThanOrEqual(0);
-    const business = scene.state.market.development.find((c: any) =>
+    const business = scene.state.market.cards.find((c: any) =>
       c && canPurchaseBusiness(scene.state, c.id, targetSlot).legal,
     );
     expect(business).toBeTruthy();
@@ -260,7 +260,7 @@ describe('MainStreet click-to-place via real pointer events (browser)', () => {
 
     const targetSlot = getEmptySlots(scene.state)[0];
     expect(targetSlot).toBeGreaterThanOrEqual(0);
-    const business = scene.state.market.development.find((c: any) =>
+    const business = scene.state.market.cards.find((c: any) =>
       c && canPurchaseBusiness(scene.state, c.id, targetSlot).legal,
     );
     expect(business).toBeTruthy();

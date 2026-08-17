@@ -55,7 +55,7 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
 - Staff grew from 3 to 7 with the Group F expansion (CG-0MSQJ7VL9009JHF4):
   Apprentice (budget) and Executive (+4 slots premium) cost points, plus two
   NEW ability mechanics — the Socialite's +0.1 rep/turn and the Accountant's
-  investments-refresh discount of 1 (StaffCard optional ability fields).
+  market-refresh discount of 1 (StaffCard optional ability fields).
 - Non-baseline card IDs are tracked in `docs/main-street/expanded-card-manifest.json`
 
 ### Guidance: adding more cards safely
@@ -449,6 +449,6 @@ Staff cards are a separate card family (`family: 'staff'`) that expand hand capa
 | `staff-assistant` | Assistant | 3 | 1 | +1 | — | Hire an assistant to help manage your hand. | Original M2 staff. |
 | `staff-manager` | Manager | 7 | 2.5 | +2 | — | A skilled manager keeps things organised. | Mid-tier capacity. |
 | `staff-socialite` | Socialite | 8 | 1.5 | +1 | +0.1 rep/turn | A charming socialite adds +1 hand slot and +0.1 reputation per turn. | **NEW** reputation ability *(Group F).* |
-| `staff-accountant` | Accountant | 8 | 1.5 | +1 | Refresh −1 | A meticulous accountant makes investment refreshes cost 1 less. | **NEW** economy ability *(Group F).* |
+| `staff-accountant` | Accountant | 8 | 1.5 | +1 | Refresh −1 | A meticulous accountant makes market refreshes cost 1 less. | **NEW** economy ability *(Group F).* |
 | `staff-director` | Director | 14 | 4 | +3 | — | An experienced director oversees your operations. | Premium capacity. |
 | `staff-executive` | Executive | 20 | 5 | +4 | — | An experienced executive adds major hand capacity at a high ongoing cost. | Premium slot capacity *(Group F).* |

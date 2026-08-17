@@ -109,7 +109,7 @@ Staff cards expand hand capacity at an ongoing per-turn coin cost. *(Group F, CG
 | Assistant | 3 | 1 | +1 | — | Hire an assistant to help manage your hand. |
 | Manager | 7 | 2.5 | +2 | — | A skilled manager keeps things organised. |
 | Socialite | 8 | 1.5 | +1 | +0.1 rep/turn | A charming socialite adds hand capacity and reputation. *(Group F.)* |
-| Accountant | 8 | 1.5 | +1 | refresh −1 | Makes investment refreshes cost 1 less. *(Group F.)* |
+| Accountant | 8 | 1.5 | +1 | refresh −1 | Makes market refreshes cost 1 less. *(Group F.)* |
 | Director | 14 | 4 | +3 | — | An experienced director oversees your operations. |
 | Executive | 20 | 5 | +4 | — | An experienced executive adds major hand capacity. *(Group F.)* |
 

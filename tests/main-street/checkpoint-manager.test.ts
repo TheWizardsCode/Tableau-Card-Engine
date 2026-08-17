@@ -140,7 +140,7 @@ describe('Main Street CheckpointManager integration', () => {
     state.resourceBank.coins = 100;
 
     executeDayStart(state);
-    const card = state.market.development[0];
+    const card = state.market.cards[0];
     executeAction(state, { type: 'buy-business', cardId: card.id, slotIndex: 0 });
     processEndOfTurn(state);
 

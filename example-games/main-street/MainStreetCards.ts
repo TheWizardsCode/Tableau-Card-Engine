@@ -657,16 +657,45 @@ export const STARTING_COINS = 6;
 /** Starting reputation. */
 export const STARTING_REPUTATION = 3;
 
-/** Number of Business card slots visible in the market. */
+/**
+ * Total number of cards visible in the single-row marketplace.
+ * Replaces the two-row `MARKET_BUSINESS_SLOTS` / `MARKET_INVESTMENT_SLOTS`
+ * model (CG-0MSTOATDT009BRX2): the market is one line of exactly 3 cards.
+ */
+export const MARKET_TOTAL_SLOTS = 3;
+
+/** Minimum number of business cards in the single-row market (community-space counts as business). */
+export const MARKET_BUSINESS_MIN = 1;
+
+/** Maximum number of business cards in the single-row market (community-space counts as business). */
+export const MARKET_BUSINESS_MAX = 2;
+
+/** Maximum number of upgrade cards in the single-row market. */
+export const MARKET_UPGRADE_MAX = 1;
+
+/** Maximum number of event cards in the single-row market. */
+export const MARKET_EVENT_MAX = 1;
+
+/**
+ * @deprecated Two-row market removed (CG-0MSTOATDT009BRX2). Kept only for
+ * save-format migration of old two-row saves.
+ */
 export const MARKET_BUSINESS_SLOTS = 4;
 
-/** Total number of Investment row slots (upgrades + investment events). */
+/**
+ * @deprecated Two-row market removed (CG-0MSTOATDT009BRX2). Kept only for
+ * save-format migration of old two-row saves.
+ */
 export const MARKET_INVESTMENT_SLOTS = 3;
 
-/** Number of upgrade cards in the investment row. */
+/**
+ * @deprecated Two-row market removed (CG-0MSTOATDT009BRX2).
+ */
 export const MARKET_INVESTMENT_UPGRADE_COUNT = 2;
 
-/** Number of investment event cards in the investment row. */
+/**
+ * @deprecated Two-row market removed (CG-0MSTOATDT009BRX2).
+ */
 export const MARKET_INVESTMENT_EVENT_COUNT = 1;
 
 /**
@@ -684,10 +713,23 @@ export const MARKET_UPGRADE_SLOTS = MARKET_INVESTMENT_UPGRADE_COUNT;
 /** Number of Incident cards visible in the incident queue at game start. */
 export const INCIDENT_QUEUE_SIZE = 2;
 
-/** Fixed coin cost to refresh the investments row (buy new opportunities). */
+/**
+ * Fixed coin cost to re-roll the single-row market (CG-0MSTOATDT009BRX2).
+ * Replaces both `REFRESH_DEVELOPMENT_COST` and `REFRESH_INVESTMENTS_COST`.
+ * The Accountant's `refreshCostDiscount` (Group F) applies to this cost.
+ */
+export const REFRESH_MARKET_COST = 5;
+
+/**
+ * @deprecated Two-row market removed (CG-0MSTOATDT009BRX2); use `REFRESH_MARKET_COST`.
+ * Kept only for legacy constants/tests.
+ */
 export const REFRESH_INVESTMENTS_COST = 2;
 
-/** Fixed coin cost to refresh the development row (discover new opportunities). */
+/**
+ * @deprecated Two-row market removed (CG-0MSTOATDT009BRX2); use `REFRESH_MARKET_COST`.
+ * Kept only for legacy constants/tests.
+ */
 export const REFRESH_DEVELOPMENT_COST = 2;
 
 /**
