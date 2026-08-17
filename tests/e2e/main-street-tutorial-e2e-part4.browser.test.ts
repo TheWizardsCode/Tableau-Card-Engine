@@ -81,7 +81,7 @@ describe('Main Street Tutorial E2E — T10 Optimizing for Events', () => {
     // Pickup: select the Bookshop (buy to hand). The composite gate allows
     // select-business but the step must NOT complete on pickup.
     const s = scene as any;
-    const bookshop = s.state.market.development.find((c: any) => c.id.startsWith('biz-bookshop'));
+    const bookshop = s.state.market.cards.find((c: any) => c.id.startsWith('biz-bookshop'));
     expect(bookshop).toBeTruthy();
     await clickRequiredBusinessCard(scene); // buys the required Bookshop
     await new Promise((r) => setTimeout(r, 500));

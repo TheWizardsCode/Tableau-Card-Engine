@@ -681,8 +681,11 @@ describe('Meta-Progression System', () => {
       const bizBaseIds = new Set(state.decks.business.map((c) => c.id.replace(/-\d+$/, '')));
       const tier1BizIds = tier1CardIds.filter((id) => id.startsWith('biz-'));
 
-      // All market business cards should also be from tier-1
-      for (const card of state.market.development) {
+      // All market business-family cards should also be from tier-1 (the
+      // single row may hold community-space/upgrade/event cards too, which
+      // belong to their own tier pools, CG-0MSTOATDT009BRX2).
+      for (const card of state.market.cards) {
+        if (card.family !== 'business') continue;
         const baseId = card.id.replace(/-\d+$/, '');
         expect(tier1BizIds).toContain(baseId);
       }
@@ -1148,7 +1151,7 @@ describe('Meta-Progression System', () => {
         const baseId = card.id.replace(/-\d+$/, '');
         expect(allowedIds.has(baseId)).toBe(true);
       }
-      for (const card of nextRun.market.development) {
+      for (const card of nextRun.market.cards) {
         const baseId = card.id.replace(/-\d+$/, '');
         expect(allowedIds.has(baseId)).toBe(true);
       }

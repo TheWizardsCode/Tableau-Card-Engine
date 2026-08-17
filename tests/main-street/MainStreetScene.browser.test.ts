@@ -221,7 +221,7 @@ describe('MainStreetScene browser tests', () => {
     const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;
     const state = scene.state;
 
-    const eventCard = state.market.investments.find((card: any) => card && card.family === 'event');
+    const eventCard = state.market.cards.find((card: any) => card && card.family === 'event');
     expect(eventCard).toBeTruthy();
 
     // Ensure the held card has an SVG source available so rasterized textures can be generated.
@@ -302,7 +302,7 @@ describe('MainStreetScene browser tests', () => {
       expect(emptySlots.length).toBeGreaterThan(0);
       const targetSlot = emptySlots[0];
 
-      const business = state.market.development.find((card: any) =>
+      const business = state.market.cards.find((card: any) =>
         card && canPurchaseBusiness(state, card.id, targetSlot).legal,
       );
       expect(business).toBeTruthy();
@@ -359,7 +359,7 @@ describe('MainStreetScene browser tests', () => {
       expect(scene.getHiddenTransferSourceCardCountForTest()).toBe(0);
       expect(hideSpy).toHaveBeenCalled();
 
-      const eventCard = state.market.investments.find((card: any) =>
+      const eventCard = state.market.cards.find((card: any) =>
         card && card.family === 'event' && canPurchaseEvent(state, card.id).legal,
       );
 
@@ -418,7 +418,7 @@ describe('MainStreetScene browser tests', () => {
 
       // ── Business: buy into a NON-empty hand (hand 1 → 2) ──
       // First purchase (hand 0 → 1) so the second buy starts with a non-empty hand.
-      const biz1 = state.market.development.find((c: any) =>
+      const biz1 = state.market.cards.find((c: any) =>
         c && canPurchaseBusiness(state, c.id, 0).legal);
       expect(biz1).toBeTruthy();
 
@@ -431,7 +431,7 @@ describe('MainStreetScene browser tests', () => {
 
       // Second purchase (hand 1 → 2) — the transfer target must equal the
       // rendered resting position of the appended card.
-      const biz2 = state.market.development.find((c: any) =>
+      const biz2 = state.market.cards.find((c: any) =>
         c && c.id !== biz1.id && canPurchaseBusiness(state, c.id, 0).legal);
       expect(biz2).toBeTruthy();
 
@@ -454,7 +454,7 @@ describe('MainStreetScene browser tests', () => {
       expect(Math.abs(bizDest.y - bizRendered.y)).toBeLessThanOrEqual(2);
 
       // ── Event: held-event buy destination equals rendered position ──
-      const eventCard = state.market.investments.find((c: any) =>
+      const eventCard = state.market.cards.find((c: any) =>
         c && c.family === 'event' && canPurchaseEvent(state, c.id).legal);
       if (eventCard) {
         const beforeEvent = transferSpy.mock.calls.length;

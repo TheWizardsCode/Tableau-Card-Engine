@@ -473,7 +473,7 @@ describe('EconomyLedger — Main Street integration parity', () => {
       const ledger = ledgerFromState(state);
 
       const coinsBefore = state.resourceBank.coins;
-      const businessCard = state.market.development.find(c => c.cost <= coinsBefore);
+      const businessCard = state.market.cards.find(c => c.cost <= coinsBefore);
       expect(businessCard).toBeDefined();
       purchaseBusiness(state, businessCard!.id, 0);
 
@@ -485,7 +485,7 @@ describe('EconomyLedger — Main Street integration parity', () => {
       const state = setupMainStreetGame({ seed: 'ledger-purchase-upgrade' });
 
       // Place a matching business for the first upgrade in market
-      const upgradeCard = state.market.investments.find(
+      const upgradeCard = state.market.cards.find(
         c => c.family === 'upgrade',
       ) as UpgradeCard | undefined;
       if (!upgradeCard) {
@@ -513,7 +513,7 @@ describe('EconomyLedger — Main Street integration parity', () => {
     it('purchaseEvent: ledger matches state after event purchase', () => {
       const state = setupMainStreetGame({ seed: 'ledger-purchase-event' });
 
-      const eventCard = state.market.investments.find(
+      const eventCard = state.market.cards.find(
         c => c.family === 'event' && (c as EventCard).trigger === 'Investment',
       ) as EventCard | undefined;
       if (!eventCard) {

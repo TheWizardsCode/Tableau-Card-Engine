@@ -99,7 +99,7 @@ describe('Integration: Full Turn Cycle', () => {
     // Execute DayStart
     executeDayStart(state);
     expect(state.phase).toBe('MarketPhase');
-    expect(state.market.development.length).toBeGreaterThan(0);
+    expect(state.market.cards.length).toBeGreaterThan(0);
 
     // Buy the first affordable business
     const affordable = getAffordableBusinessCards(state);
@@ -311,8 +311,8 @@ describe('Integration: Seeded Determinism', () => {
     const state2 = setupMainStreetGame({ seed: 'seed-B' });
 
     // Markets should differ (different shuffle order)
-    const market1Ids = state1.market.development.map(c => c.id).sort().join(',');
-    const market2Ids = state2.market.development.map(c => c.id).sort().join(',');
+    const market1Ids = state1.market.cards.map(c => c.id).sort().join(',');
+    const market2Ids = state2.market.cards.map(c => c.id).sort().join(',');
 
     // While it's theoretically possible for two different seeds to produce
     // the same shuffle, it's extremely unlikely. We check that at least
@@ -547,7 +547,8 @@ describe('Integration: Held Investment Event', () => {
     const coinsAfterPlay = state.resourceBank.coins;
     // Reputation multiplier: rep=5, divisor=20 → 1 + 5/20 = 1.25
     // CG-0MRER3RE300418SG: Math.floor removed; 5 * 1.25 = 6.25 (was 6 before fix)
-    expect(coinsAfterPlay).toBeCloseTo(50 + 6.25); // Event delta scaled by reputation multiplier
+    // CG-0MSTOATDT009BRX2: cost-at-play — playing the event charges its cost (3).
+    expect(coinsAfterPlay).toBeCloseTo(50 - 3 + 6.25); // -cost + delta scaled by reputation multiplier
 
     // End turn — InvestmentResolution should have nothing to auto-resolve
     const result = processEndOfTurn(state);
@@ -576,7 +577,7 @@ describe('Integration: Held Investment Event', () => {
       reputationDelta: 0,
       cost: 3,
     };
-    state.market.investments.push(investmentEvt);
+    state.market.cards.push(investmentEvt);
 
     // Turn 1: buy the event
     executeDayStart(state);
@@ -599,7 +600,9 @@ describe('Integration: Held Investment Event', () => {
     const repMultiplier = 1 + state.resourceBank.reputation / 20;
     executeAction(state, { type: 'play-event' });
     expect((state.hand ?? []).some(c => c.family === 'event')).toBe(false); // Now resolved
-    expect(state.resourceBank.coins).toBeCloseTo(coinsBeforePlay + 4 * repMultiplier); // +4 base scaled by rep
+    // CG-0MSTOATDT009BRX2: cost-at-play — the $3 cost is charged when the
+    // held event is played.
+    expect(state.resourceBank.coins).toBeCloseTo(coinsBeforePlay - 3 + 4 * repMultiplier); // -cost + +4 base scaled by rep
 
     const result2 = processEndOfTurn(state);
     expect(result2).toBeDefined();

@@ -47,8 +47,23 @@ function actionsEqual(a: PlayerAction, b: PlayerAction): boolean {
   if (a.type === 'buy-event' && b.type === 'buy-event') {
     return a.cardId === b.cardId;
   }
-  // play-event and end-turn have no additional fields; matching type is sufficient
+  if (a.type === 'move-to-hand' && b.type === 'move-to-hand') {
+    return a.cardId === b.cardId;
+  }
   if (a.type === 'play-event' && b.type === 'play-event') return true;
+  if (a.type === 'play-business-from-hand' && b.type === 'play-business-from-hand') {
+    return a.handIndex === b.handIndex && a.slotIndex === b.slotIndex;
+  }
+  if (a.type === 'play-upgrade-from-hand' && b.type === 'play-upgrade-from-hand') {
+    return a.handIndex === b.handIndex && a.targetSlot === b.targetSlot;
+  }
+  if (a.type === 'play-event-from-hand' && b.type === 'play-event-from-hand') {
+    return a.handIndex === b.handIndex;
+  }
+  if (a.type === 'discard-from-hand' && b.type === 'discard-from-hand') {
+    return a.handIndex === b.handIndex;
+  }
+  // end-turn has no additional fields; matching type is sufficient
   if (a.type === 'end-turn' && b.type === 'end-turn') return true;
   return false;
 }
@@ -107,7 +122,18 @@ describe('generateHint', () => {
   });
 
   it('hint action is always a legal action type', () => {
-    const legalTypes = ['buy-business', 'buy-upgrade', 'buy-event', 'play-event', 'end-turn'];
+    const legalTypes = [
+      'buy-business',
+      'buy-upgrade',
+      'buy-event',
+      'move-to-hand',
+      'play-business-from-hand',
+      'play-upgrade-from-hand',
+      'play-event-from-hand',
+      'discard-from-hand',
+      'play-event',
+      'end-turn',
+    ];
     for (const seed of ['seed1', 'seed2', 'seed3', 'seed4', 'seed5']) {
       const state = makeMarketState(seed);
       const result = generateHint(state);
@@ -116,10 +142,13 @@ describe('generateHint', () => {
     }
   });
 
-  it('returns end-turn hint when no affordable cards exist', () => {
+  it('returns end-turn hint when no action remains (empty market + empty hand)', () => {
     const state = makeMarketState('no-coins');
-    // Drain all coins so no purchase is affordable
+    // Drain all coins so no purchase/play is affordable, and clear the market
+    // and hand so the free move-to-hand / discard actions are also unavailable.
     state.resourceBank.coins = 0;
+    state.market.cards = [];
+    state.hand = [];
     const result = generateHint(state);
     expect(result).not.toBeNull();
     expect(result!.action.type).toBe('end-turn');
@@ -153,7 +182,7 @@ describe('buildRationale', () => {
 
   it('rationale for buy-business includes card name and slot (Appendix B.2)', () => {
     const state = makeMarketState('rationale-biz');
-    const businessCards = state.market.development as BusinessCard[];
+    const businessCards = state.market.cards as BusinessCard[];
     if (businessCards.length === 0) return; // skip if no business cards
 
     const card = businessCards[0];
@@ -172,7 +201,7 @@ describe('buildRationale', () => {
     const diner = createBusinessDeck(1).find(c => c.id === 'biz-diner-0') as BusinessCard;
     expect(bakery).toBeDefined();
     expect(diner).toBeDefined();
-    state.market.development = [bakery, diner];
+    state.market.cards = [bakery, diner];
     state.streetGrid[0] = { ...bakery };
 
     const action: BuyBusinessAction = { type: 'buy-business', cardId: diner.id, slotIndex: 1 };
@@ -193,7 +222,7 @@ describe('buildRationale', () => {
     const diner = createBusinessDeck(1).find(c => c.id === 'biz-diner-0') as BusinessCard;
     expect(bakery).toBeDefined();
     expect(diner).toBeDefined();
-    state.market.development = [bakery, diner];
+    state.market.cards = [bakery, diner];
     state.streetGrid[0] = { ...bakery };
 
     const action: BuyBusinessAction = { type: 'buy-business', cardId: diner.id, slotIndex: 6 };
@@ -205,7 +234,7 @@ describe('buildRationale', () => {
 
   it('rationale for buy-upgrade includes business name and income bonus', () => {
     const state = makeMarketState('rationale-upgrade');
-    const upgradeCards = state.market.investments.filter(
+    const upgradeCards = state.market.cards.filter(
       c => c.family === 'upgrade',
     ) as UpgradeCard[];
     if (upgradeCards.length === 0) return;
@@ -220,7 +249,7 @@ describe('buildRationale', () => {
 
   it('rationale for buy-upgrade with target slot includes business name from grid', () => {
     const state = makeMarketState('rationale-upgrade-slot');
-    const upgradeCards = state.market.investments.filter(
+    const upgradeCards = state.market.cards.filter(
       c => c.family === 'upgrade',
     ) as UpgradeCard[];
     if (upgradeCards.length === 0) return;
@@ -243,7 +272,7 @@ describe('buildRationale', () => {
 
   it('rationale for buy-event includes event name', () => {
     const state = makeMarketState('rationale-event');
-    const eventCards = state.market.investments.filter(
+    const eventCards = state.market.cards.filter(
       c => c.family === 'event' && (c as EventCard).trigger === 'Investment',
     ) as EventCard[];
     if (eventCards.length === 0) return;

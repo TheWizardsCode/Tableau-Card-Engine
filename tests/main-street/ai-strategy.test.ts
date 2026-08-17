@@ -79,7 +79,7 @@ describe('enumerateLegalActions', () => {
     const actions = enumerateLegalActions(state);
     const buyBusiness = actions.filter(a => a.type === 'buy-business') as { type: 'buy-business'; cardId: string; slotIndex: number }[];
     for (const action of buyBusiness) {
-      const card = state.market.development.find(c => c.id === action.cardId) as BusinessCard;
+      const card = state.market.cards.find(c => c.id === action.cardId) as BusinessCard;
       expect(card).toBeDefined();
       expect(card.cost).toBeLessThanOrEqual(state.resourceBank.coins);
     }
@@ -109,10 +109,10 @@ describe('enumerateLegalActions', () => {
     // Set up a state where an upgrade is available
     const state = createTestState('upgrade-test');
     // Place a Bakery on slot 0 so an upgrade card can target it
-    const bakery = (state.market.development as BusinessCard[]).find(c => c.name === 'Bakery');
+    const bakery = (state.market.cards as BusinessCard[]).find(c => c.name === 'Bakery');
     if (bakery) {
       state.streetGrid[0] = { ...bakery };
-      state.market.development = state.market.development.filter(c => c.id !== bakery.id);
+      state.market.cards = state.market.cards.filter(c => c.id !== bakery.id);
     }
 
     const actions = enumerateLegalActions(state);
@@ -121,7 +121,7 @@ describe('enumerateLegalActions', () => {
       if (action.targetSlot !== undefined) {
         const biz = state.streetGrid[action.targetSlot];
         expect(biz).not.toBeNull();
-        const card = state.market.investments.find(c => c.id === action.cardId) as UpgradeCard;
+        const card = state.market.cards.find(c => c.id === action.cardId) as UpgradeCard;
         expect(card).toBeDefined();
         expect(biz!.name).toBe(card.targetBusiness);
         expect(biz!.level).toBeLessThan(biz!.maxLevel);
@@ -154,14 +154,14 @@ describe('enumerateLegalActions', () => {
       reputationDelta: 0,
     }];
     const actions = enumerateLegalActions(state);
-    expect(actions.some(a => a.type === 'play-event')).toBe(true);
+    expect(actions.some(a => a.type === 'play-event-from-hand')).toBe(true);
   });
 
   it('excludes play-event when no event is held', () => {
     const state = createTestState();
     state.hand = [];
     const actions = enumerateLegalActions(state);
-    expect(actions.some(a => a.type === 'play-event')).toBe(false);
+    expect(actions.some(a => a.type === 'play-event-from-hand')).toBe(false);
   });
 
   it('allows buy-event when player already holds an event (no max-1 rule)', () => {
@@ -312,7 +312,7 @@ describe('GreedyStrategy', () => {
     };
     state.streetGrid[0] = bakery;
     // Clear the development market so no business purchases are available
-    state.market.development = [];
+    state.market.cards = [];
 
     // Add an affordable upgrade card for the Bakery to the investments row
     const upgradeCard: UpgradeCard = {
@@ -326,7 +326,7 @@ describe('GreedyStrategy', () => {
       description: 'Test',
       requiredLevel: 0,
     };
-    state.market.investments.push(upgradeCard);
+    state.market.cards.push(upgradeCard);
     state.resourceBank.coins = 10;
 
     const rng = makeRng();
@@ -337,8 +337,8 @@ describe('GreedyStrategy', () => {
   it('ends turn when no beneficial actions are available', () => {
     const state = createTestState();
     // Remove all market cards and events
-    state.market.development = [];
-    state.market.investments = [];
+    state.market.cards = [];
+    state.market.cards = [];
     state.hand = [];
     const rng = makeRng();
     const action = GreedyStrategy.chooseAction(state, rng);
@@ -438,7 +438,7 @@ describe('scoreAction', () => {
       description: 'Test',
       requiredLevel: 0,
     };
-    state.market.investments.push(upgradeCard);
+    state.market.cards.push(upgradeCard);
     // Horizon is derived from distance to the win threshold (CG-0MSLXJCHH001DLIO)
     const expected = upgradeCard.incomeBonus * aiPlanningHorizon(state) - upgradeCard.cost;
     const actual = scoreAction(state, { type: 'buy-upgrade', cardId: upgradeCard.id, targetSlot: 0 });
@@ -448,7 +448,7 @@ describe('scoreAction', () => {
   it('scores buy-event using coinDelta + reputationDelta * reputationScoreMultiplier - cost', () => {
     const state = createTestState();
     state.hand = [];
-    const eventCard = state.market.investments.find(c => c.family === 'event');
+    const eventCard = state.market.cards.find(c => c.family === 'event');
     if (!eventCard) return; // skip if no event in market for this seed
 
     const { coinDelta, reputationDelta, cost } = eventCard as import('../../example-games/main-street/MainStreetCards').EventCard;
@@ -531,7 +531,7 @@ describe('aiPlanningHorizon', () => {
       description: 'Test',
       requiredLevel: 0,
     };
-    state.market.investments.push(upgradeCard);
+    state.market.cards.push(upgradeCard);
 
     const scoreEarly = scoreAction(state, { type: 'buy-upgrade', cardId: upgradeCard.id, targetSlot: 0 });
 

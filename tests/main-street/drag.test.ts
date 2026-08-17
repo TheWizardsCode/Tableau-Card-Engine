@@ -119,7 +119,7 @@ function createMockScene(overrides: Record<string, unknown> = {}): any {
 
 /** First business card in the development row, made affordable deterministically. */
 function pickAffordableBusiness(state: any): any {
-  const card = state.market.development.find((c: any) => c.family === 'business');
+  const card = state.market.cards.find((c: any) => c.family === 'business');
   if (!card) throw new Error('No business card in development row for test');
   // Ensure the player can afford it regardless of seed.
   if (state.resourceBank.coins < card.cost) state.resourceBank.coins = card.cost;
@@ -153,10 +153,10 @@ describe('MainStreet drag-to-buy wiring', () => {
     });
 
     it('allows an affordable community-space card (general drag support)', () => {
-      let cs = scene.state.market.development.find((c: any) => c.family === 'community-space');
+      let cs = scene.state.market.cards.find((c: any) => c.family === 'community-space');
       if (!cs) {
         // Deterministic: manufacture a community-space card in the row.
-        cs = scene.state.market.development[0];
+        cs = scene.state.market.cards[0];
         cs.family = 'community-space';
       }
       if (scene.state.resourceBank.coins < cs.cost) scene.state.resourceBank.coins = cs.cost;
@@ -165,7 +165,7 @@ describe('MainStreet drag-to-buy wiring', () => {
     });
 
     it('rejects non-business/community-space families (event/upgrade stay click-only)', () => {
-      const card = scene.state.market.development[0];
+      const card = scene.state.market.cards[0];
       if (scene.state.resourceBank.coins < card.cost) scene.state.resourceBank.coins = card.cost;
       card.family = 'event';
       expect(controller.canPickUpBusinessCard(card.id)).toBe(false);
@@ -268,9 +268,9 @@ describe('MainStreet drag-to-buy wiring', () => {
       };
 
       // Deterministic cs-library card in the dev row, affordable.
-      let cs = scene.state.market.development.find((c: any) => c.family === 'community-space');
+      let cs = scene.state.market.cards.find((c: any) => c.family === 'community-space');
       if (!cs) {
-        cs = scene.state.market.development[0];
+        cs = scene.state.market.cards[0];
         cs.family = 'community-space';
       }
       cs.id = 'cs-library-0';
@@ -300,9 +300,9 @@ describe('MainStreet drag-to-buy wiring', () => {
         lastCompletedStepId: null,
         exited: false,
       };
-      let cs = scene.state.market.development.find((c: any) => c.family === 'community-space');
+      let cs = scene.state.market.cards.find((c: any) => c.family === 'community-space');
       if (!cs) {
-        cs = scene.state.market.development[0];
+        cs = scene.state.market.cards[0];
         cs.family = 'community-space';
       }
       cs.id = 'cs-library-0';
@@ -332,7 +332,7 @@ describe('MainStreet drag-to-buy wiring', () => {
       expect(scene.animateTransferFromMarket).toHaveBeenCalledTimes(1);
       const opts = scene.animateTransferFromMarket.mock.calls[0][0];
       expect(opts.cardId).toBe(card.id);
-      expect(opts.row).toBe('development');
+      expect(opts.row).toBe('market');
       expect(opts.source).toEqual({ x: 412, y: 331 });
       expect(opts.destination).toEqual(scene.getStreetSlotCenter(slot));
 
@@ -347,7 +347,7 @@ describe('MainStreet drag-to-buy wiring', () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
 
       // afterTransfer ran → buy executed.
-      expect(scene.state.market.development.find((c: any) => c.id === card.id)).toBeUndefined();
+      expect(scene.state.market.cards.find((c: any) => c.id === card.id)).toBeUndefined();
       expect(scene.state.streetGrid[slot]?.id).toBe(card.id);
       expect(scene.state.resourceBank.coins).toBe(coinsBefore - card.cost);
       expect(scene.uiPhase).toBe('market');
@@ -358,7 +358,7 @@ describe('MainStreet drag-to-buy wiring', () => {
       // Single undo step reverses the whole buy+place.
       expect(scene.undoManager.canUndo()).toBe(true);
       scene.undoManager.undo();
-      expect(scene.state.market.development.find((c: any) => c.id === card.id)).toBeTruthy();
+      expect(scene.state.market.cards.find((c: any) => c.id === card.id)).toBeTruthy();
       expect(scene.state.streetGrid[slot]).toBeNull();
       expect(scene.state.resourceBank.coins).toBe(coinsBefore);
       expect(scene.undoManager.canUndo()).toBe(false);
@@ -472,7 +472,7 @@ describe('MainStreet drag-to-buy wiring', () => {
       expect(container.y).toBe(150);
       expect(container.depth).toBe(5);
       expect(scene.sound.play).toHaveBeenCalledWith(COMMON_SFX_KEYS.ILLEGAL_MOVE);
-      expect(scene.state.market.development.find((c: any) => c.id === card.id)).toBeTruthy();
+      expect(scene.state.market.cards.find((c: any) => c.id === card.id)).toBeTruthy();
       expect(scene.state.streetGrid[slot]?.id).toBe('other-biz');
     });
   });

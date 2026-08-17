@@ -414,7 +414,7 @@ export class MainStreetLifecycleManager {
         body:
           'Hint: get a suggested move (once per turn).\n' +
           'Undo / Redo: step back or forward through market actions.\n' +
-          'Refresh Investments: swap the investment row (costs coins).\n' +
+          'Refresh Market: re-roll the market row for coins (5, less with the Accountant).\n' +
           'Keyboard shortcuts: End Turn key configurable in Settings.',
       },
     ];
@@ -1016,7 +1016,7 @@ export class MainStreetLifecycleManager {
         // Rebuild renderer and start day phase from checkpoint state.
         // Pass skipMarketRefill=true to preserve the saved market state
         // (the saved state already has the correct market from save time;
-        // calling refillAllMarkets would replace it with fresh deck draws).
+        // calling refillMarket would replace it with fresh deck draws).
         try { s.refreshAll(); } catch (_) { /* ignore */ }
         try { s.startDayPhase(true); } catch (_) { /* ignore */ }
 

@@ -166,7 +166,7 @@ describe('Tutorial tooltip click-through isolation (CG-0MSTB03U6009J2WV)', () =>
       expect(s.state.resourceBank.coins).toBe(START_COINS);
       expect(s.pendingHandIndex).toBeNull();
       expect(s.pendingBusinessCard).toBeNull();
-      const laundromat = s.state.market.development.find(
+      const laundromat = s.state.market.cards.find(
         (c: any) => c.id.startsWith('biz-laundromat'),
       );
       expect(laundromat).toBeTruthy();
@@ -494,7 +494,7 @@ function assertNoPassThrough(scene: Phaser.Scene): void {
   expect(s.state.resourceBank.coins).toBe(START_COINS);
   expect(s.pendingHandIndex).toBeNull();
   expect(s.pendingBusinessCard).toBeNull();
-  const laundromat = s.state.market.development.find(
+  const laundromat = s.state.market.cards.find(
     (c: any) => c.id.startsWith('biz-laundromat'),
   );
   expect(laundromat).toBeTruthy();

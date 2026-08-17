@@ -179,7 +179,7 @@ describe('Group B community-space expansion: deck generation', () => {
     // Community-space cards appear in the development row (mixed with business).
     const allIds = new Set([
       ...state.decks.communitySpace.map(c => c.id.replace(/-\d+$/, '')),
-      ...state.market.development.map(c => c.id.replace(/-\d+$/, '')),
+      ...state.market.cards.map(c => c.id.replace(/-\d+$/, '')),
     ]);
     for (const c of NEW_COMMUNITY_SPACE_CONTRACTS) {
       expect(allIds.has(c.id), `${c.id} unreachable in the game pool`).toBe(true);

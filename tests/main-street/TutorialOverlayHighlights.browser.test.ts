@@ -17,7 +17,9 @@
  *   T2 (developmentRow, index 1)  T3 (laundromatCard, index 2)
  *   T4 (hand, index 3)  T5 (streetGrid, index 4)
  *   T6 (incidentQueue, index 5)  T7 (endTurnButton, index 6)
- *   T8 (investmentsRow, index 7)  T9 (festivalCard, index 8)
+ *   T8 (investmentsRow, index 7)  T9 (festivalCard, index 8)  ← T8's
+ *     investmentsRow highlight now aliases the SINGLE market row
+ *     (CG-0MSTOATDT009BRX2 — the two market rows were merged)
  *   T10 (developmentRow, index 9)  T11 (endTurnButton, index 10)
  *   T12 (developmentRow, index 11)  T13 (developmentRow, index 12)
  *   T14 (hand, index 13)  T15 (hud, index 14)
@@ -36,7 +38,7 @@ import {
   type TutorialHighlightZone,
 } from '../../example-games/main-street/TutorialFlow';
 import { STANDARD_TUTORIAL_SCENARIO } from '../../example-games/main-street/TutorialScenario';
-import { MARKET_BUSINESS_SLOTS } from '../../example-games/main-street/MainStreetCards';
+import { MARKET_TOTAL_SLOTS } from '../../example-games/main-street/MainStreetCards';
 import {
   CHALLENGE_LINE_H,
   CHALLENGE_PAD,
@@ -106,8 +108,8 @@ function computeDevStartX(layout: Record<string, number>): number {
   const boxRight = (layout.logX ?? 0) - 20;
   const boxCenter = (boxLeft + boxRight) / 2;
   const devTotalCardsW =
-    MARKET_BUSINESS_SLOTS * layout.marketCardW +
-    (MARKET_BUSINESS_SLOTS - 1) * layout.marketCardGap;
+    MARKET_TOTAL_SLOTS * layout.marketCardW +
+    (MARKET_TOTAL_SLOTS - 1) * layout.marketCardGap;
   return Math.round(boxCenter - devTotalCardsW / 2);
 }
 
@@ -136,13 +138,9 @@ function computeTargetRect(
       return { x: 20, y: layout.marketTop + 6, w: layout.logX - 40, h: layout.marketRowH };
     }
     case 'investmentsRow': {
-      // Investments row: same strip, top at marketTop + 6 + rowH + gap
-      return {
-        x: 20,
-        y: layout.marketTop + 6 + layout.marketRowH + layout.marketRowGap,
-        w: layout.logX - 40,
-        h: layout.marketRowH,
-      };
+      // Single-row market (CG-0MSTOATDT009BRX2): upgrade/event steps alias
+      // the developmentRow zone — both highlight the one market row strip.
+      return { x: 20, y: layout.marketTop + 6, w: layout.logX - 40, h: layout.marketRowH };
     }
     case 'streetGrid': {
       // Street slots: 5×140 + 4×20 wide, 2 rows of 80 + 12 gap
@@ -204,21 +202,16 @@ function computeTargetRect(
     }
     case 'laundromatCard':
     case 'festivalCard': {
-      // Card-level zones: deterministic scenario slots (dev slot 1 /
-      // investments slot 2), same math as resolveMarketCardAnchor().
+      // Card-level zones: deterministic single-row scenario slots, same math
+      // as resolveMarketCardAnchor() — every card sits on the one market row.
       const templateId = CARD_LEVEL_TEMPLATES[zone];
       if (!templateId) return null;
-      const devIdx = STANDARD_TUTORIAL_SCENARIO.market.development.indexOf(templateId);
-      const invIdx = STANDARD_TUTORIAL_SCENARIO.market.investments.indexOf(templateId);
-      const rowIndex = devIdx >= 0 ? devIdx : invIdx;
+      const rowIndex = STANDARD_TUTORIAL_SCENARIO.market.cards.indexOf(templateId);
       if (rowIndex < 0) return null;
       const devStartX = computeDevStartX(layout);
       return {
         x: devStartX + rowIndex * (layout.marketCardW + layout.marketCardGap),
-        y:
-          devIdx >= 0
-            ? layout.marketTop + 6
-            : layout.marketTop + 6 + layout.marketRowH + layout.marketRowGap,
+        y: layout.marketTop + 6,
         w: layout.marketCardW,
         h: layout.marketCardH,
       };

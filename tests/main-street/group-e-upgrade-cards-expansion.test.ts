@@ -156,7 +156,7 @@ describe('Group E: deck generation & balance guardrails (AC5/AC6)', () => {
     const state = setupMainStreetGame({ seed: 'group-e-expansion' });
     const allIds = new Set([
       ...state.decks.upgrade.map(c => c.id.replace(/-\d+$/, '')),
-      ...state.market.investments.map(c => c.id.replace(/-\d+$/, '')),
+      ...state.market.cards.map(c => c.id.replace(/-\d+$/, '')),
     ]);
     for (const c of NEW_UPGRADE_CONTRACTS) {
       expect(allIds.has(c.id), `${c.id} unreachable in the game pool`).toBe(true);

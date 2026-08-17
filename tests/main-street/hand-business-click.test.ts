@@ -124,7 +124,7 @@ describe('Hand business card click', () => {
       scene.startDayPhase();
 
       // Add cards to hand
-      const bizCard = scene.state.market.development[0];
+      const bizCard = scene.state.market.cards[0];
       if (!bizCard) return; // skip if no market card available
       scene.state.hand = [bizCard];
       scene.pendingHandIndex = null;
@@ -145,7 +145,7 @@ describe('Hand business card click', () => {
       const scene = createMockScene();
       scene.startDayPhase();
 
-      const bizCard = scene.state.market.development[0];
+      const bizCard = scene.state.market.cards[0];
       if (!bizCard) return;
       scene.state.hand = [bizCard];
       scene.pendingHandIndex = null;
@@ -165,7 +165,7 @@ describe('Hand business card click', () => {
       const scene = createMockScene();
       scene.startDayPhase();
 
-      const bizCard = scene.state.market.development[0];
+      const bizCard = scene.state.market.cards[0];
       if (!bizCard) return;
       scene.state.hand = [bizCard];
       scene.pendingHandIndex = null;
@@ -182,7 +182,7 @@ describe('Hand business card click', () => {
       const scene = createMockScene();
       scene.startDayPhase();
 
-      const bizCard = scene.state.market.development[0];
+      const bizCard = scene.state.market.cards[0];
       if (!bizCard) return;
       scene.state.hand = [bizCard];
       scene.pendingHandIndex = null;
@@ -199,9 +199,13 @@ describe('Hand business card click', () => {
       const scene = createMockScene();
       scene.startDayPhase();
 
-      // Add two cards to hand
-      const bizCard1 = scene.state.market.development[0];
-      const bizCard2 = scene.state.market.development[1];
+      // Add two business-family cards to hand (the single row can also hold
+      // event/upgrade cards, which are not placeable on the street).
+      const bizCards = scene.state.market.cards.filter(
+        (c: any) => c.family === 'business' || c.family === 'community-space',
+      );
+      const bizCard1 = bizCards[0];
+      const bizCard2 = bizCards[1];
       if (!bizCard1 || !bizCard2) return;
       scene.state.hand = [bizCard1, bizCard2];
       scene.pendingHandIndex = 0;
@@ -222,7 +226,7 @@ describe('Hand business card click', () => {
       const scene = createMockScene();
       scene.startDayPhase();
 
-      const bizCard = scene.state.market.development[0];
+      const bizCard = scene.state.market.cards[0];
       if (!bizCard) return;
       scene.state.hand = [bizCard];
       scene.pendingHandIndex = null;
@@ -246,7 +250,7 @@ describe('Hand business card click', () => {
       const scene = createMockScene();
       scene.startDayPhase();
 
-      const bizCard = scene.state.market.development[0];
+      const bizCard = scene.state.market.cards[0];
       if (!bizCard) return;
       scene.state.hand = [bizCard];
       scene.pendingHandIndex = null;
@@ -276,7 +280,7 @@ describe('Hand business card click', () => {
       const scene = createMockScene();
       scene.startDayPhase();
 
-      const bizCard = scene.state.market.development[0];
+      const bizCard = scene.state.market.cards[0];
       if (!bizCard) return;
       scene.state.hand = [bizCard];
       scene.pendingHandIndex = null;

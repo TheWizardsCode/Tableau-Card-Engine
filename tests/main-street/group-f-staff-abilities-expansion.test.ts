@@ -30,7 +30,7 @@ import {
 import { validateCsvRows } from '../../src/balance-cards';
 import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
 import { applyIncome, recalculateCard } from '../../example-games/main-street/MainStreetAdjacency';
-import { canRefreshInvestments, refreshInvestments, refreshInvestmentsCost } from '../../example-games/main-street/MainStreetMarket';
+import { canRefreshMarket, refreshMarket, refreshMarketCost } from '../../example-games/main-street/MainStreetMarket';
 import { createSeededRng } from '../../src/core-engine';
 import type { BusinessCard } from '../../example-games/main-street/MainStreetCards';
 
@@ -173,31 +173,31 @@ describe('Group F: Socialite reputation ability (AC2)', () => {
 // ── AC2: Accountant refresh discount ──────────────────────────────────
 
 describe('Group F: Accountant refresh discount (AC2)', () => {
-  it('reduces the investments refresh cost by 1', () => {
+  it('reduces the market refresh cost by 1', () => {
     const state = setupMainStreetGame({ seed: 'group-f-accountant' });
     state.phase = 'MarketPhase';
 
-    // Baseline: 2 coins per refresh.
-    expect(refreshInvestmentsCost(state)).toBe(2);
+    // Baseline: REFRESH_MARKET_COST (5) per refresh (CG-0MSTOATDT009BRX2).
+    expect(refreshMarketCost(state)).toBe(5);
 
     const accountant = findStaff(createStaffDeck(1), 'staff-accountant')!;
     state.staffCards.push({ ...accountant });
 
-    expect(refreshInvestmentsCost(state)).toBe(1);
+    expect(refreshMarketCost(state)).toBe(4);
   });
 
   it('allows a refresh and deducts only the discounted cost', () => {
     const state = setupMainStreetGame({ seed: 'group-f-accountant-deduct' });
     state.phase = 'MarketPhase';
-    state.resourceBank.coins = 1;
+    state.resourceBank.coins = 4;
 
     const accountant = findStaff(createStaffDeck(1), 'staff-accountant')!;
     state.staffCards.push({ ...accountant });
 
-    // 1 coin is enough with the discount (base 2 - 1).
-    expect(canRefreshInvestments(state).legal).toBe(true);
+    // 4 coins is exactly enough with the discount (base 5 - 1).
+    expect(canRefreshMarket(state).legal).toBe(true);
 
-    refreshInvestments(state);
+    refreshMarket(state);
     expect(state.resourceBank.coins).toBe(0);
   });
 
@@ -206,8 +206,8 @@ describe('Group F: Accountant refresh discount (AC2)', () => {
     state.phase = 'MarketPhase';
     state.resourceBank.coins = 1;
 
-    expect(canRefreshInvestments(state).legal).toBe(false);
-    expect(refreshInvestmentsCost(state)).toBe(2);
+    expect(canRefreshMarket(state).legal).toBe(false);
+    expect(refreshMarketCost(state)).toBe(5);
   });
 });
 

@@ -106,7 +106,7 @@ describe('MainStreet undo/redo feedback', () => {
 
     // Populate the market (the booted game waits for the player to start the day).
     const state = s.state as MainStreetState;
-    if (state.market.development.length === 0) {
+    if (state.market.cards.length === 0) {
       state.phase = 'DayStart';
       const { executeDayStart } = await import('../../example-games/main-street/MainStreetEngine');
       executeDayStart(state);
@@ -114,7 +114,7 @@ describe('MainStreet undo/redo feedback', () => {
 
     const emptySlot = state.streetGrid.findIndex((cell) => cell === null);
     expect(emptySlot).toBeGreaterThanOrEqual(0);
-    const affordable = state.market.development.find((b) => b.cost <= state.resourceBank.coins);
+    const affordable = state.market.cards.find((b) => b.cost <= state.resourceBank.coins);
     expect(affordable).toBeDefined();
 
     // Execute a real purchase through the scene's own undo manager (the same

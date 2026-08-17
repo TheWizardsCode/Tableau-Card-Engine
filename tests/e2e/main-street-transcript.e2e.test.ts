@@ -15,7 +15,7 @@ function makeSampleTranscript() {
     initialState: {
       seed: 'e2e-sample-0',
       streetGrid: Array(10).fill(null),
-      market: { businesses: [], investments: [] },
+      market: { cards: [, ].filter(Boolean) },
     },
     events: [
       { type: 'ai-action', turn: 1, strategy: 'Greedy', action: { type: 'buy-business', cardId: 'cafe-1', slotIndex: 2 } },

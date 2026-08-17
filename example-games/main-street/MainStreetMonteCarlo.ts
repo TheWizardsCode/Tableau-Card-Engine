@@ -138,7 +138,7 @@ function chooseDemoGreedyActions(state: MainStreetState): PlayerAction[] {
     actions.push({ type: 'play-event' });
   }
 
-  for (const card of state.market.investments) {
+  for (const card of state.market.cards) {
     if (card.family !== 'event') continue;
     const result = canPurchaseEvent(state, card.id);
     if (result.legal) {
@@ -217,10 +217,7 @@ function runSeed(seed: string, maxTurns: number, strategy: MonteCarloStrategy): 
     executeDayStart(state);
 
     // Record all card IDs currently in the market as offers for this turn.
-    for (const card of state.market.development) {
-      marketOfferSet.add(card.id);
-    }
-    for (const card of state.market.investments) {
+    for (const card of state.market.cards) {
       marketOfferSet.add(card.id);
     }
 
@@ -383,10 +380,7 @@ function runSeedWithDifficulty(
   while (state.gameResult === 'playing' && turns < maxTurns) {
     executeDayStart(state);
 
-    for (const card of state.market.development) {
-      marketOfferSet.add(card.id);
-    }
-    for (const card of state.market.investments) {
+    for (const card of state.market.cards) {
       marketOfferSet.add(card.id);
     }
 

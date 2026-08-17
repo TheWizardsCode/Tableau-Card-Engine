@@ -9,7 +9,7 @@
  * @module
  */
 
-import type { BusinessCard, CommunitySpaceCard, EventCard, SynergyType } from './MainStreetCards';
+import type { BusinessCard, CommunitySpaceCard, EventCard, UpgradeCard, SynergyType } from './MainStreetCards';
 import { getBaseTypeId } from './MainStreetCards';
 import { GRID_SIZE } from './MainStreetCards';
 import type { MainStreetState } from './MainStreetState';
@@ -445,7 +445,7 @@ export function updateNeighborsOnSale(
  */
 export function computeHandCardSynergyBonus(
   grid: (BusinessCard | CommunitySpaceCard | null)[],
-  hand: (BusinessCard | EventCard)[],
+  hand: (BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard)[],
   soldSlots: boolean[] = [],
 ): number {
   if (!hand || hand.length === 0) return 0;
@@ -453,8 +453,8 @@ export function computeHandCardSynergyBonus(
   let total = 0;
 
   for (const handCard of hand) {
-    // Event cards have no synergy types — only business cards contribute.
-    if (handCard.family === 'event') continue;
+    // Event and upgrade cards have no synergy types — only business cards contribute.
+    if (handCard.family === 'event' || handCard.family === 'upgrade') continue;
     if (!handCard.synergyTypes || handCard.synergyTypes.length === 0) continue;
 
     // Each hand card provides floor(baseIncome/3) to each matching synergy business

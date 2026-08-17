@@ -73,7 +73,7 @@ export type TutorialHighlightZone =
   | 'centerModal'
   | 'hud'
   | 'marketBusinessRow'
-  | 'developmentRow'   // dev row only (informative Dev Row / Optimizing for Events / Build a Library)
+  | 'developmentRow'   // the single market row (business steps; investmentsRow aliases it)
   | 'streetGrid'
   | 'endTurnButton'
   | 'incidentQueue'
@@ -82,8 +82,8 @@ export type TutorialHighlightZone =
   | 'helpButton'
   | 'completionModal'
   | 'hand'             // hand area (Your Hand / Triggering Events)
-  | 'laundromatCard'   // card-level: Laundromat in the dev row (T3)
-  | 'festivalCard';    // card-level: Local Festival in the investments row (T9)
+  | 'laundromatCard'   // card-level: Laundromat on the market row (T3)
+  | 'festivalCard';    // card-level: Local Festival on the market row (T9)
 
 /**
  * The type of player action expected to complete an action-gated step.
@@ -95,7 +95,7 @@ export type TutorialActionType =
   | 'place-business'     // Place a business on the street grid
   | 'end-turn'           // Click End Turn
   | 'acknowledge-queue'  // Click incident queue
-  | 'buy-event'          // Buy an event card from investments row
+  | 'buy-event'          // Buy an event card from the market row
   | 'apply-upgrade'      // Buy/apply an upgrade
   | 'play-event'         // Play a held investment event from the hand
   | 'buy-and-place'      // Composite: drag a business card and drop it on the street
@@ -204,7 +204,7 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     id: 'T3',
     titleKey: tutorialKey('T3', 'title'),
     bodyKey: tutorialKey('T3', 'body'),
-    // Card-level highlight on the Laundromat in the dev row (scenario slot 2).
+    // Card-level highlight on the Laundromat on the market row (scenario slot 0).
     highlightZone: 'laundromatCard',
     gate: 'action',
     requiredAction: 'select-business',
@@ -255,19 +255,19 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     id: 'T9',
     titleKey: tutorialKey('T9', 'title'),
     bodyKey: tutorialKey('T9', 'body'),
-    // Card-level highlight on the Local Festival in the investments row (slot 3).
+    // Card-level highlight on the Local Festival on the market row (slot 2).
     highlightZone: 'festivalCard',
     gate: 'action',
     requiredAction: 'buy-event',
     // The TutorialScenario system puts Local Festival (evt-festival, $3)
-    // in the investments row, affordable after the T3 purchase + T7 income.
+    // on the market row, affordable after the T3 placement + T7 income.
     requiredCardId: 'evt-festival-0',
   },
   {
     id: 'T10',
     titleKey: tutorialKey('T10', 'title'),
     bodyKey: tutorialKey('T10', 'body'),
-    // Composite buy-and-place step: drag the Bookshop from the dev row onto
+    // Composite buy-and-place step: drag the Bookshop from the market row onto
     // an empty street slot (drag-drop buy-and-place, landed via CG-0MSKSAREE007AYSZ).
     highlightZone: 'developmentRow',
     gate: 'action',
@@ -289,7 +289,7 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     id: 'T12',
     titleKey: tutorialKey('T12', 'title'),
     bodyKey: tutorialKey('T12', 'body'),
-    // Informative cost-vs-reputation step: highlights the dev row (like T2)
+    // Informative cost-vs-reputation step: highlights the market row (like T2)
     // and references cs-library so {cardName}/{cost} resolve from live card
     // data. No action required and NO synergy mention — the buy-and-place
     // action and the synergy rule live on T13.
@@ -302,7 +302,7 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     titleKey: tutorialKey('T13', 'title'),
     bodyKey: tutorialKey('T13', 'body'),
     // Composite buy-and-place step (like T10): the player buys cs-library
-    // from the dev row (drag or click-to-buy) and places it on the street.
+    // from the market row (drag or click-to-take) and places it on the street.
     // The step completes only on the terminal place-business drop; the
     // Library must be placed NEXT TO the Bookshop (synergyCardId) for the
     // Culture adjacency bonus — see isSynergyAdjacentPlacement().

@@ -55,15 +55,13 @@ describe('Main Street Tutorial E2E — Part 1', () => {
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
     expect(getStepIndex(scene)).toBe(0);
     const s = scene as any;
-    const devCards = s.state?.market?.development;
-    expect(devCards).toBeTruthy();
-    expect(devCards.length).toBe(4);
-    expect(devCards[0].id).toBe('biz-bakery-0');
-    // cs-library replaces cs-park in the dev row (17-step flow)
-    expect(devCards.some((c: any) => c.id.startsWith('cs-library'))).toBe(true);
+    // Single market row (CG-0MSTOATDT009BRX2): all three cards share one row.
+    const marketCards = s.state?.market?.cards;
+    expect(marketCards).toBeTruthy();
+    expect(marketCards.length).toBe(3);
+    expect(marketCards[0].id).toBe('biz-bakery-0');
     expect(s.state.resourceBank.coins).toBe(16);
-    const investments = s.state?.market?.investments;
-    const localFestival = investments?.find((c: any) => c.name === 'Local Festival');
+    const localFestival = marketCards.find((c: any) => c.name === 'Local Festival');
     expect(localFestival).toBeTruthy();
     expect(localFestival.cost).toBe(3);
   }, 30_000);
@@ -103,7 +101,7 @@ describe('Main Street Tutorial E2E — Part 1', () => {
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
     expect(getStepIndex(scene)).toBe(2);
     const s = scene as any;
-    const wrongCard = s.state.market.development[0]; // Bakery — not the Laundromat
+    const wrongCard = s.state.market.cards[0]; // Bakery — not the Laundromat
     if (s.uiPhase !== 'market') { s.uiPhase = 'market'; }
     try { s.onBusinessCardClick(wrongCard); } catch (_) { /* ignore */ }
     expect(getStepIndex(scene)).toBe(2);

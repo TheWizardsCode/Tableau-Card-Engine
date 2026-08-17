@@ -130,11 +130,11 @@ describe('MainStreet synergy formation animation', () => {
     // Partner already on slot 0; the new card comes from the market row.
     const state = scene.state as {
       streetGrid: Array<BusinessCard | null>;
-      market: { development: Array<BusinessCard | null> };
+      market: { cards: Array<BusinessCard | null> };
       resourceBank: { coins: number };
     };
     state.streetGrid[0] = cardA;
-    state.market.development[0] = cardB;
+    state.market.cards[0] = cardB;
     state.resourceBank.coins = 100;
     (scene as unknown as { refreshAll: () => void }).refreshAll();
 
@@ -169,11 +169,11 @@ describe('MainStreet synergy formation animation', () => {
 
     const state = scene.state as {
       streetGrid: Array<BusinessCard | null>;
-      market: { development: Array<BusinessCard | null> };
+      market: { cards: Array<BusinessCard | null> };
       resourceBank: { coins: number };
     };
     state.streetGrid[0] = cardA;
-    state.market.development[0] = cardB;
+    state.market.cards[0] = cardB;
     state.resourceBank.coins = 100;
     (scene as unknown as { settingsPanel: { reducedMotion: boolean } }).settingsPanel = { reducedMotion: true };
     (scene as unknown as { refreshAll: () => void }).refreshAll();

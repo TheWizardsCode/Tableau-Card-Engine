@@ -7,13 +7,12 @@ import {
   canPurchaseUpgrade,
   canPurchaseEvent,
   canPurchaseBusiness,
-  canRefreshDevelopment,
-  canRefreshInvestments,
+  canRefreshMarket,
   canSellBusiness,
 } from '../MainStreetMarket';
 import type { BusinessCard, EventCard, UpgradeCard } from '../MainStreetCards';
 import { computeSynergyPairs, diffNewSynergyPairs, type SynergyPair } from '../MainStreetAdjacency';
-import { buyBusinessCommand, buyBusinessToHandCommand, buyUpgradeCommand, buyEventCommand, playEventCommand, refreshDevelopmentCommand, refreshInvestmentsCommand } from '../MainStreetCommands';
+import { buyBusinessCommand, moveToHandCommand, buyUpgradeCommand, playEventCommand, refreshMarketCommand } from '../MainStreetCommands';
 import { recordMainStreetEvent, finalizeMainStreetTranscript } from '../MainStreetTranscript';
 import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
 import {
@@ -22,6 +21,7 @@ import {
   type DragDropPayload,
 } from '../../../src/ui/dragDrop';
 import { getCurrentStep, isSynergyAdjacentPlacement, resolveTutorialCardParams, type TutorialActionType } from '../TutorialFlow';
+import { ensureTutorialMarketForUpcomingSteps } from '../TutorialScenario';
 import { computeDragTransferDuration } from './MainStreetConstants';
 
 /**
@@ -65,6 +65,17 @@ export class MainStreetTurnController {
     executeDayStart(s.state, skipMarketRefill);
     s.uiPhase = 'market';
 
+    // Tutorial: the single-row market only holds 3 cards, so force the
+    // upcoming steps' required purchase targets into the line (days 2+).
+    const dayStartTut = (s as any).tutorialController as any;
+    if (dayStartTut?.isActive) {
+      try {
+        ensureTutorialMarketForUpcomingSteps(s.state, dayStartTut);
+      } catch (_) {
+        // robustness — never block day start on scenario bookkeeping
+      }
+    }
+
     // Reset hint state for the new turn
     s.hintUsedThisTurn = false;
     s.hintedCardId = null;
@@ -81,8 +92,6 @@ export class MainStreetTurnController {
     if (!skipMarketRefill && !tutController?.isActive) {
       try { s.msAnimator.animateDayBanner({ day: s.state.turn }); } catch (_) { /* presentation-only — ignore */ }
     }
-
-    // Prewarm currently-visible cards after market/queue are populated.
     void s.cardSvgLoadPromise
       .then(() => s.prewarmVisibleCardTextures())
       .then(() => {
@@ -92,8 +101,7 @@ export class MainStreetTurnController {
           // sees, so animate after it. Skipped on checkpoint resume
           // (skipMarketRefill) where the market is preserved, not refilled.
           if (!skipMarketRefill) {
-            this.animateMarketDealIn('development');
-            this.animateMarketDealIn('investments');
+            this.animateMarketDealIn('market');
           }
         } catch {
           // scene may be shutting down
@@ -405,7 +413,7 @@ export class MainStreetTurnController {
         : null;
       if (step?.requiredCardId && !matchesRequiredCard(card.id, step.requiredCardId)) {
         // Find the card name from the market for the error message
-        const requiredCard = s.state.market.development.find(
+        const requiredCard = s.state.market.cards.find(
           (c: any) => matchesRequiredCard(c.id, step.requiredCardId!)
         );
         const requiredName = requiredCard?.name ?? 'the specified card';
@@ -430,8 +438,8 @@ export class MainStreetTurnController {
       return;
     }
 
-    // ── Buy to hand (all purchases now go through hand) ─────
-    const sourceIndex = s.state.market.development.findIndex((c: any) => c.id === card.id);
+    // ── Move to hand (free; cost paid at play) ────────────────
+    const sourceIndex = s.state.market.cards.findIndex((c: any) => c.id === card.id);
     const cardName = card.name;
 
     // Ensure stale hover tooltip is cleared
@@ -439,17 +447,17 @@ export class MainStreetTurnController {
 
     s.clearMarketSelection();
     s.uiPhase = 'animating';
-    s.instructionText.setText(`Buying "${cardName}"...`);
+    s.instructionText.setText(`Moving "${cardName}" to hand...`);
     s.hiddenTransferSourceCardIds.add(card.id);
     s.refreshAll();
 
     const afterTransfer = () => {
       try {
-        const cmd = buyBusinessToHandCommand(s.state, card.id);
+        const cmd = moveToHandCommand(s.state, card.id);
         s.undoManager.execute(cmd);
-        try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'buy-business-to-hand', cardId: card.id }, description: cmd.description }); } catch (_) {}
+        try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'move-to-hand', cardId: card.id }, description: cmd.description }); } catch (_) {}
         try { s.gameEvents?.emit('card:placed', { cardId: card.id }); } catch (_) {}
-        s.instructionText.setText(`"${cardName}" bought to hand!`);
+        s.instructionText.setText(`"${cardName}" moved to hand (free)!`);
 
         // Set pending hand index for placement (last card added to hand)
         const hand = s.state.hand ?? [];
@@ -478,7 +486,7 @@ export class MainStreetTurnController {
       void s.animateTransferFromMarket({
         cardId: card.id,
         family: 'business',
-        row: 'development',
+        row: 'market',
         slotIndex: sourceIndex,
         // Animate to the exact resting position in the merged hand — the
         // HandView-predicted insertion position (single source of truth),
@@ -543,7 +551,7 @@ export class MainStreetTurnController {
   public canPickUpBusinessCard(cardId: string): boolean {
     const s = this.scene;
     if (s.uiPhase !== 'market') return false;
-    const card = s.state.market.development.find((c: any) => c.id === cardId);
+    const card = s.state.market.cards.find((c: any) => c.id === cardId);
     if (!card) return false;
     // Drag support covers business AND community-space cards (general change,
     // operator decision A for the T13 Library bug). Events/upgrades stay
@@ -615,8 +623,8 @@ export class MainStreetTurnController {
     const s = this.scene;
     const cardId = payload.data as string;
     const slotIndex = payload.zoneData as number;
-    const sourceIndex = s.state.market.development.findIndex((c: any) => c.id === cardId);
-    const card = s.state.market.development.find((c: any) => c.id === cardId);
+    const sourceIndex = s.state.market.cards.findIndex((c: any) => c.id === cardId);
+    const card = s.state.market.cards.find((c: any) => c.id === cardId);
     if (!card || sourceIndex < 0 || slotIndex == null) return;
 
     // The dragged container follows the pointer, so its position at drop
@@ -630,7 +638,7 @@ export class MainStreetTurnController {
     s.clearMarketSelection();
     s.hiddenTransferSourceCardIds.add(cardId);
     s.uiPhase = 'animating';
-    s.instructionText.setText(`Buying "${cardName}"...`);
+    s.instructionText.setText(`Moving "${cardName}" to hand...`);
     s.refreshAll();
 
     const afterTransfer = (): void => {
@@ -671,7 +679,7 @@ export class MainStreetTurnController {
       void s.animateTransferFromMarket({
         cardId,
         family: 'business',
-        row: 'development',
+        row: 'market',
         slotIndex: sourceIndex,
         source: dropSource,
         destination,
@@ -768,7 +776,7 @@ export class MainStreetTurnController {
       void s.animateTransferFromMarket({
         cardId,
         family: 'business',
-        row: 'development',
+        row: 'market',
         slotIndex: handIndex,
         source,
         destination: s.getStreetSlotCenter(slotIndex),
@@ -832,7 +840,7 @@ export class MainStreetTurnController {
       void s.animateTransferFromMarket({
         cardId: pendingCardId,
         family: 'business',
-        row: 'development',
+        row: 'market',
         slotIndex: sourceIndex,
         destination: s.getStreetSlotCenter(slotIndex),
       }).then(afterTransfer);
@@ -860,7 +868,7 @@ export class MainStreetTurnController {
         ? getCurrentStep(evtController)
         : null;
       if (step?.requiredCardId && !matchesRequiredCard(card.id, step.requiredCardId)) {
-        const requiredCard = s.state.market.investments.find(
+        const requiredCard = s.state.market.cards.find(
           (c: any) => matchesRequiredCard(c.id, step.requiredCardId!)
         );
         const requiredName = requiredCard?.name ?? 'the specified event card';
@@ -887,23 +895,23 @@ export class MainStreetTurnController {
       return;
     }
 
-    const sourceIndex = s.state.market.investments.findIndex((c: any) => c.id === card.id);
+    const sourceIndex = s.state.market.cards.findIndex((c: any) => c.id === card.id);
 
     s.uiPhase = 'animating';
-    s.instructionText.setText(`Buying event "${card.name}"...`);
+    s.instructionText.setText(`Moving event "${card.name}" to hand...`);
     s.hiddenTransferSourceCardIds.add(card.id);
     s.refreshAll();
 
     const afterTransfer = (): void => {
-      console.debug('[MS] onEventCardClick: attempting BuyEvent', { cardId: card.id, coinsBefore: s.state.resourceBank.coins, marketBefore: s.state.market.investments.map((c: any)=>c.id) });
+      console.debug('[MS] onEventCardClick: attempting BuyEvent', { cardId: card.id, coinsBefore: s.state.resourceBank.coins, marketBefore: s.state.market.cards.map((c: any)=>c.id) });
       try {
-        const cmd = buyEventCommand(s.state, card.id);
+        const cmd = moveToHandCommand(s.state, card.id);
         s.undoManager.execute(cmd);
         try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'buy-event', cardId: card.id }, description: cmd.description }); } catch (_) {}
         try { s.gameEvents?.emit('card:placed', { cardId: card.id }); } catch (_) {}
-        s.instructionText.setText(`Bought event: "${card.name}"`);
+        s.instructionText.setText(`Moved event to hand (free): "${card.name}"`);
       } catch (e) {
-        console.error('[MS] BuyEvent failed', e);
+        console.error('[MS] MoveEventToHand failed', e);
         s.instructionText.setText(`Error: ${(e as Error).message}`);
       }
 
@@ -921,7 +929,7 @@ export class MainStreetTurnController {
       void s.animateTransferFromMarket({
         cardId: card.id,
         family: 'event',
-        row: 'investments',
+        row: 'market',
         slotIndex: sourceIndex,
         // Animate to the exact resting position of the appended hand card — the
         // merged HandView-predicted position (single source of truth), centred
@@ -933,76 +941,40 @@ export class MainStreetTurnController {
     }
   }
 
-  public onRefreshDevelopmentClick(): void {
+  public onRefreshMarketClick(): void {
     const s = this.scene;
     if (s.uiPhase !== 'market') return;
 
-    const legality = canRefreshDevelopment(s.state);
+    const legality = canRefreshMarket(s.state);
     if (!legality.legal) {
-      s.instructionText.setText(`Cannot refresh: ${legality.reason ?? 'unknown'}`);
+      s.instructionText.setText(`Cannot re-roll: ${legality.reason ?? 'unknown'}`);
       return;
     }
 
     s.uiPhase = 'animating';
-    s.instructionText.setText('Discovering new development opportunities...');
+    s.instructionText.setText('Re-rolling the market...');
     s.refreshAll();
 
     // Capture the outgoing row before the command replaces it — the swap
     // animation fades these cards out from their current slot positions.
-    const outgoingRow = s.state.market.development.slice();
+    const outgoingRow = s.state.market.cards.slice();
     let refreshed = false;
     try {
-      const cmd = refreshDevelopmentCommand(s.state);
+      const cmd = refreshMarketCommand(s.state);
       s.undoManager.execute(cmd);
-      try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'refresh-development' }, description: cmd.description }); } catch (_) {}
-      s.instructionText.setText('Refreshed development');
-      addLog(s.state, 'Refreshed development (via UI)', 'neutral');
+      try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'refresh-market' }, description: cmd.description }); } catch (_) {}
+      s.instructionText.setText('Market re-rolled');
+      addLog(s.state, 'Re-rolled market (via UI)', 'neutral');
       refreshed = true;
     } catch (e) {
-      console.error('[MS] RefreshDevelopment failed', e);
+      console.error('[MS] RefreshMarket failed', e);
       s.instructionText.setText(`Error: ${(e as Error).message}`);
     }
 
     s.uiPhase = 'market';
     s.refreshAll();
     // Market swap animation (only when the refresh actually succeeded).
-    if (refreshed) this.animateMarketSwap('development', outgoingRow);
-  }
-
-  public onRefreshInvestmentsClick(): void {
-    const s = this.scene;
-    if (s.uiPhase !== 'market') return;
-
-    const legality = canRefreshInvestments(s.state);
-    if (!legality.legal) {
-      s.instructionText.setText(`Cannot refresh: ${legality.reason ?? 'unknown'}`);
-      return;
-    }
-
-    s.uiPhase = 'animating';
-    s.instructionText.setText('Refreshing investments...');
-    s.refreshAll();
-
-    // Capture the outgoing row before the command replaces it — the swap
-    // animation fades these cards out from their current slot positions.
-    const outgoingRow = s.state.market.investments.slice();
-    let refreshed = false;
-    try {
-      const cmd = refreshInvestmentsCommand(s.state);
-      s.undoManager.execute(cmd);
-      try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'refresh-investments' }, description: cmd.description }); } catch (_) {}
-      s.instructionText.setText('Refreshed investments');
-      addLog(s.state, 'Refreshed investments (via UI)', 'neutral');
-      refreshed = true;
-    } catch (e) {
-      console.error('[MS] RefreshInvestments failed', e);
-      s.instructionText.setText(`Error: ${(e as Error).message}`);
-    }
-
-    s.uiPhase = 'market';
-    s.refreshAll();
-    // Market swap animation (only when the refresh actually succeeded).
-    if (refreshed) this.animateMarketSwap('investments', outgoingRow);
+    if (refreshed) this.animateMarketSwap('market', outgoingRow);
   }
 
   /**
@@ -1010,7 +982,7 @@ export class MainStreetTurnController {
    * Presentation-only; never throws (tween targets may be re-rendered away
    * by a later refresh).
    */
-  private animateMarketDealIn(row: 'development' | 'investments'): void {
+  private animateMarketDealIn(row: 'market'): void {
     const s = this.scene;
     try {
       s.msAnimator.animateMarketDealIn({
@@ -1028,7 +1000,7 @@ export class MainStreetTurnController {
    * the incoming row deals in. Presentation-only; never throws.
    */
   private animateMarketSwap(
-    row: 'development' | 'investments',
+    row: 'market',
     outgoingRow: Array<{ id: string; family: 'business' | 'community-space' | 'event' | 'upgrade' }>,
   ): void {
     const s = this.scene;
@@ -1089,7 +1061,7 @@ export class MainStreetTurnController {
       return;
     }
 
-    const sourceIndex = s.state.market.investments.findIndex((c: any) => c.id === card.id);
+    const sourceIndex = s.state.market.cards.findIndex((c: any) => c.id === card.id);
 
     // Determine which business slot this upgrade targets (first eligible match)
     const targetSlot = findTargetBusinessSlot(s.state, card);
@@ -1102,7 +1074,7 @@ export class MainStreetTurnController {
     s.refreshAll();
 
     const afterTransfer = (): void => {
-      console.debug('[MS] onUpgradeCardClick: attempting BuyUpgrade', { cardId: card.id, targetSlot, coinsBefore: s.state.resourceBank.coins, marketBefore: s.state.market.investments.map((c: any)=>c.id), streetBefore: s.state.streetGrid.map((slot: any)=>slot?.id ?? null) });
+      console.debug('[MS] onUpgradeCardClick: attempting BuyUpgrade', { cardId: card.id, targetSlot, coinsBefore: s.state.resourceBank.coins, marketBefore: s.state.market.cards.map((c: any)=>c.id), streetBefore: s.state.streetGrid.map((slot: any)=>slot?.id ?? null) });
       let upgraded = false;
       try {
         const cmd = buyUpgradeCommand(s.state, card.id, targetSlot);
@@ -1140,7 +1112,7 @@ export class MainStreetTurnController {
       void s.animateTransferFromMarket({
         cardId: card.id,
         family: 'upgrade',
-        row: 'investments',
+        row: 'market',
         slotIndex: sourceIndex,
         destination: s.getStreetSlotCenter(targetSlot),
       }).then(afterTransfer);

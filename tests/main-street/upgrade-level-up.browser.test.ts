@@ -126,11 +126,11 @@ describe('MainStreet upgrade level-up animation', () => {
     // Business on slot 0 at level 0; upgrade in the investments market.
     const state = scene.state as {
       streetGrid: Array<BusinessCard | null>;
-      market: { investments: Array<UpgradeCard | null> };
+      market: { cards: Array<UpgradeCard | null> };
       resourceBank: { coins: number };
     };
     state.streetGrid[0] = biz;
-    state.market.investments[0] = upgrade;
+    state.market.cards[0] = upgrade;
     state.resourceBank.coins = 100;
     (scene as unknown as { refreshAll: () => void }).refreshAll();
 
@@ -148,7 +148,7 @@ describe('MainStreet upgrade level-up animation', () => {
     // The upgrade actually applied (level incremented on the target).
     expect(state.streetGrid[0]?.level).toBe(1);
     // The upgrade card left the market (splice — the row may have shifted).
-    expect(state.market.investments.some((c) => c?.id === upgrade.id)).toBe(false);
+    expect(state.market.cards.some(c => c !== null && c.id === upgrade.id)).toBe(false);
   }, 30_000);
 
   it('still fires the level-up trigger under reduced motion (animator degrades internally)', async () => {
@@ -158,11 +158,11 @@ describe('MainStreet upgrade level-up animation', () => {
 
     const state = scene.state as {
       streetGrid: Array<BusinessCard | null>;
-      market: { investments: Array<UpgradeCard | null> };
+      market: { cards: Array<UpgradeCard | null> };
       resourceBank: { coins: number };
     };
     state.streetGrid[0] = biz;
-    state.market.investments[0] = upgrade;
+    state.market.cards[0] = upgrade;
     state.resourceBank.coins = 100;
     (scene as unknown as { settingsPanel: { reducedMotion: boolean } }).settingsPanel = { reducedMotion: true };
     (scene as unknown as { refreshAll: () => void }).refreshAll();

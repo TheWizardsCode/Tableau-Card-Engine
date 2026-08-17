@@ -193,13 +193,13 @@ describe('buildCoinsTooltip', () => {
     const state = setupMainStreetGame({ seed: 'test-sold-income' });
 
     // Place a business card on the grid
-    const card = state.market.development.find(
+    const card = state.market.cards.find(
       c => c.cost <= state.resourceBank.coins && c.family === 'business',
     );
-    if (!card) return;
-    const marketIdx = state.market.development.findIndex(c => c.id === card.id);
+    if (!card || card.family !== 'business') return;
+    const marketIdx = state.market.cards.findIndex(c => c.id === card.id);
     state.resourceBank.coins -= card.cost;
-    state.market.development.splice(marketIdx, 1);
+    state.market.cards.splice(marketIdx, 1);
     state.streetGrid[0] = { ...card };
     state.streetGrid[0]!.currentIncome = card.baseIncome;
 

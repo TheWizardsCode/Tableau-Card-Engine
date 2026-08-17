@@ -151,7 +151,7 @@ describe('MainStreetAnimator.animateMarketDealIn', () => {
     const cardA = createMockCard(200);
     const cardB = createMockCard(200);
 
-    animator.animateMarketDealIn({ row: 'development', cards: toContainers([cardA, cardB]) });
+    animator.animateMarketDealIn({ row: 'market', cards: toContainers([cardA, cardB]) });
 
     // Dealt state applied in the same frame as the draw (no flicker).
     expect(cardA.setScale).toHaveBeenCalledWith(0.6, 0.6);
@@ -183,7 +183,7 @@ describe('MainStreetAnimator.animateMarketDealIn', () => {
     const spyOnVisual = vi.spyOn(animator, 'createTransferCardVisual');
 
     animator.animateMarketDealIn({
-      row: 'development',
+      row: 'market',
       cards: toContainers([incoming]),
       outgoing: [{ cardId: 'old-1', family: 'business', x: 60, y: 150 }],
     });
@@ -217,7 +217,7 @@ describe('MainStreetAnimator.animateMarketDealIn', () => {
     const { scene, scheduled, tweens } = createMockScene();
     const animator = new MainStreetAnimator(scene);
 
-    animator.animateMarketDealIn({ row: 'investments', cards: [] });
+    animator.animateMarketDealIn({ row: 'market', cards: [] });
 
     expect(scheduled).toHaveLength(0);
     expect(tweens).toHaveLength(0);
@@ -232,7 +232,7 @@ describe('MainStreetAnimator.animateMarketDealIn', () => {
     const card = createMockCard(200);
 
     animator.animateMarketDealIn({
-      row: 'development',
+      row: 'market',
       cards: toContainers([card]),
       outgoing: [{ cardId: 'old-1', family: 'event', x: 60, y: 150 }],
     });
@@ -250,7 +250,7 @@ describe('MainStreetAnimator.animateMarketDealIn', () => {
     const animator = new MainStreetAnimator(scene);
     const card = createMockCard(200);
 
-    animator.animateMarketDealIn({ row: 'development', cards: toContainers([card]) });
+    animator.animateMarketDealIn({ row: 'market', cards: toContainers([card]) });
 
     expect(card.setScale).not.toHaveBeenCalled();
     expect(scheduled).toHaveLength(0);

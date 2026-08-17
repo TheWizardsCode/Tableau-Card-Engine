@@ -520,8 +520,8 @@ describe('Expanded Card Pool: Seeded Deck Resolution', () => {
     const state2 = setupMainStreetGame({ seed: 'expanded-pool-test' });
 
     // Market should be identical
-    expect(state1.market.development.map(c => c.id)).toEqual(state2.market.development.map(c => c.id));
-    expect(state1.market.investments.map(c => c.id)).toEqual(state2.market.investments.map(c => c.id));
+    expect(state1.market.cards.map(c => c.id)).toEqual(state2.market.cards.map(c => c.id));
+    expect(state1.market.cards.map(c => c.id)).toEqual(state2.market.cards.map(c => c.id));
     expect(state1.incidentQueue.map(c => c.id)).toEqual(state2.incidentQueue.map(c => c.id));
   });
 
@@ -530,10 +530,10 @@ describe('Expanded Card Pool: Seeded Deck Resolution', () => {
     const state2 = setupMainStreetGame({ seed: 'seed-beta' });
 
     // At least one market row should differ
-    const biz1 = state1.market.development.map(c => c.id).join(',');
-    const biz2 = state2.market.development.map(c => c.id).join(',');
-    const inv1 = state1.market.investments.map(c => c.id).join(',');
-    const inv2 = state2.market.investments.map(c => c.id).join(',');
+    const biz1 = state1.market.cards.map(c => c.id).join(',');
+    const biz2 = state2.market.cards.map(c => c.id).join(',');
+    const inv1 = state1.market.cards.map(c => c.id).join(',');
+    const inv2 = state2.market.cards.map(c => c.id).join(',');
 
     expect(biz1 !== biz2 || inv1 !== inv2).toBe(true);
   });
@@ -541,17 +541,17 @@ describe('Expanded Card Pool: Seeded Deck Resolution', () => {
   it('setup should account for all cards (market + deck + queue = total)', () => {
     const state = setupMainStreetGame({ seed: 'accounting-test' });
 
-    const bizTotal = state.market.development.length + state.decks.business.length;
+    const bizTotal = state.market.cards.filter(c => c.family === 'business').length + state.decks.business.length;
     expect(bizTotal).toBe(createBusinessDeck().length);
 
-    const eventTotal = state.market.investments.filter(c => c.family === 'event').length
+    const eventTotal = state.market.cards.filter(c => c.family === 'event').length
       + state.decks.event.length
       + state.incidentQueue.length
       + (state.hand ?? []).filter(c => c.family === 'event').length;
     const multiplier = getPreset(undefined).positiveIncidentMultiplier;
     expect(eventTotal).toBe(createEventDeck(3, undefined, _rng, multiplier).length);
 
-    const upgTotal = state.market.investments.filter(c => c.family === 'upgrade').length
+    const upgTotal = state.market.cards.filter(c => c.family === 'upgrade').length
       + state.decks.upgrade.length;
     expect(upgTotal).toBe(createUpgradeDeck().length);
   });

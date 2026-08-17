@@ -324,7 +324,7 @@ describe('TutorialOverlayManager highlight zones', () => {
 
   // ── AC 8: Investments row highlight (T8) ────────────────────
 
-  it('Investments row highlight (T8) covers the bottom market row', async () => {
+  it('Investments row highlight (T8) covers the single market row', async () => {
     const layout = scene.layout as {
       marketTop: number;
       marketRowH: number;
@@ -338,16 +338,17 @@ describe('TutorialOverlayManager highlight zones', () => {
     const bounds = getHighlightBounds(highlight!);
     expect(bounds).toBeTruthy();
 
-    // The investments row is the second (bottom) market row, drawn at
-    // marketTop + 6 + marketRowH + marketRowGap (see MainStreetRenderer)
-    const expectedTopY = layout!.marketTop + 6 + layout!.marketRowH + layout!.marketRowGap;
+    // Single-row market (CG-0MSTOATDT009BRX2): the investmentsRow zone aliases
+    // the developmentRow zone, so T8 highlights the one market row drawn at
+    // marketTop + 6 (see MainStreetRenderer).
+    const expectedTopY = layout!.marketTop + 6;
     expect(bounds!.y).toBeLessThanOrEqual(expectedTopY + 4);
     expect(bounds!.y).toBeGreaterThanOrEqual(layout!.marketTop - 10);
   });
 
   // ── AC 9: Local Festival card highlight (T9, buy step) ──────
 
-  it('Local Festival card highlight (T9) draws a card-sized rect in the investments row', async () => {
+  it('Local Festival card highlight (T9) draws a card-sized rect on the single market row', async () => {
     const layout = scene.layout as { marketTop: number; marketRowH: number } | undefined;
     expect(layout).toBeTruthy();
 
@@ -363,8 +364,10 @@ describe('TutorialOverlayManager highlight zones', () => {
     expect(bounds!.h).toBeGreaterThan(50);
     expect(bounds!.h).toBeLessThan(110);
 
-    // In the investments row band (below the dev row)
-    expect(bounds!.y).toBeGreaterThanOrEqual(layout!.marketTop + layout!.marketRowH - 20);
+    // Single-row market (CG-0MSTOATDT009BRX2): the festival card sits on the
+    // one market row at marketTop + 6 — same band as the dev-row cards.
+    expect(bounds!.y).toBeGreaterThanOrEqual(layout!.marketTop - 10);
+    expect(bounds!.y).toBeLessThanOrEqual(layout!.marketTop + layout!.marketRowH + 6);
   });
 
   // ── AC 10: Development Row highlight (T10, buy-and-place) ──

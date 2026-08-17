@@ -4,9 +4,9 @@
  * Verifies the market deal-in animation end to end in a real Phaser scene:
  *
  * 1. Starting a new day (`startDayPhase`) refills the market and triggers
- *    `MainStreetAnimator.animateMarketDealIn` for both the development and
- *    investments rows. The rendered cards enter a "dealt" state (scale 0.6,
- *    faint) synchronously and tween back to full scale.
+ *    `MainStreetAnimator.animateMarketDealIn` for the single market row. The
+ *    rendered cards enter a "dealt" state (scale 0.6, faint) synchronously
+ *    and tween back to full scale.
  * 2. Under reduced motion the animation is skipped entirely — cards appear
  *    at full scale instantly and no transforms are applied.
  *
@@ -114,24 +114,23 @@ describe('MainStreet market deal-in animation', () => {
     game = null;
   });
 
-  it('deals the refilled market in on day start (both rows, staggered, back to full scale)', async () => {
+  it('deals the refilled market in on day start (single row, staggered, back to full scale)', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
 
     const { calls } = spyOnMarketDealIn(scene);
 
     // Day 2 start: executeDayStart requires the DayStart phase, then refills
-    // both market rows; the deal-in animation runs after the final
+    // the market row; the deal-in animation runs after the final
     // (post-prewarm) render.
     (scene.state as { phase: string }).phase = 'DayStart';
     (scene.msTurnController as unknown as { startDayPhase: (skipMarketRefill?: boolean) => void }).startDayPhase();
 
-    // Both rows deal in, with the rendered cards captured at call time.
-    await waitForCondition(() => calls.length >= 2, { label: 'deal-in calls for both market rows' });
+    // The single market row deals in, with the rendered cards captured at call time.
+    await waitForCondition(() => calls.length >= 1, { label: 'deal-in call for the market row' });
 
     const rows = calls.map((c) => c.row);
-    expect(rows).toContain('development');
-    expect(rows).toContain('investments');
+    expect(rows).toContain('market');
 
     for (const call of calls) {
       expect(call.cards.length).toBeGreaterThan(0);
@@ -140,11 +139,11 @@ describe('MainStreet market deal-in animation', () => {
     }
 
     // The staggered deal-in tweens complete: cards return to full scale.
-    const devCall = calls.find((c) => c.row === 'development');
-    expect(devCall).toBeDefined();
-    await waitForCondition(() => (devCall!.cards[0]?.scaleX ?? 0) >= 0.99, {
+    const marketCall = calls.find((c) => c.row === 'market');
+    expect(marketCall).toBeDefined();
+    await waitForCondition(() => (marketCall!.cards[0]?.scaleX ?? 0) >= 0.99, {
       timeoutMs: 5000,
-      label: 'first development card to return to full scale',
+      label: 'first market card to return to full scale',
     });
   }, 30_000);
 
@@ -160,7 +159,7 @@ describe('MainStreet market deal-in animation', () => {
     (scene.state as { phase: string }).phase = 'DayStart';
     (scene.msTurnController as unknown as { startDayPhase: (skipMarketRefill?: boolean) => void }).startDayPhase();
 
-    await waitForCondition(() => calls.length >= 2, { label: 'deal-in calls (reduced motion)' });
+    await waitForCondition(() => calls.length >= 1, { label: 'deal-in call (reduced motion)' });
 
     for (const call of calls) {
       // The animator is still called (the trigger point is unchanged) but

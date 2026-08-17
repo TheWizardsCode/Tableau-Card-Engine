@@ -127,7 +127,9 @@ describe('MainStreet held-event play burst', () => {
 
     const { getEventTemplates } = await import('../../example-games/main-street/MainStreetCards');
     const templates = getEventTemplates();
-    const eventCard = templates[1] ?? templates[0];
+    // Pick a playable (non-incident) event: incident events are auto-resolved
+    // at draw and cannot be played from hand (playEventFromHand rejects them).
+    const eventCard = templates.find((t) => t.trigger !== 'Incident') ?? templates[0];
     (scene.state as { hand: unknown[] }).hand.push({ ...eventCard });
     (scene as unknown as { refreshAll: () => void }).refreshAll();
 
