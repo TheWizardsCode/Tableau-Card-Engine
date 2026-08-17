@@ -159,6 +159,10 @@ export class MainStreetLifecycleManager {
 
     // Reset
     s.uiPhase = 'idle';
+    // The "Day N" banner must not play before the player has chosen how to
+    // start the game; boot-time startDayPhase calls suppress it and it is
+    // presented via playDeferredDayBanner() once the game actually begins.
+    s.deferredDayBanner = true;
     s.pendingBusinessCard = null;
     s.overlayObjects = [];
     s.previousCoins = null;
@@ -496,6 +500,9 @@ export class MainStreetLifecycleManager {
                 const recorder = new MainStreetTranscriptRecorder(initialSnapshot);
                 setMainStreetRecorder(recorder);
               } catch (_) { /* ignore */ }
+              // The player chose to start — the deferred boot-time banner is
+              // no longer needed (startDayPhase below plays it for Day 1).
+              s.deferredDayBanner = false;
               // Start the day phase so the market populates
               s.startDayPhase();
               // Start the action-gated tutorial flow (T1-T17)
@@ -508,8 +515,12 @@ export class MainStreetLifecycleManager {
             } catch (_) { /* ignore */ }
           },
           onSkip: () => {
-            // Normal gameplay begins; the DayStart -> MarketPhase flow
-            // is already in motion from startDayPhase() called below.
+            // Normal (tutorial-skipped) gameplay begins; the DayStart ->
+            // MarketPhase flow is already in motion from the boot
+            // startDayPhase calls. The boot-time "Day N" banner was deferred
+            // (it must not play before the player has chosen how to start) —
+            // present it now that free play begins.
+            s.playDeferredDayBanner?.();
           },
         },
       );
@@ -577,8 +588,12 @@ export class MainStreetLifecycleManager {
       } catch (_) { /* ignore */ }
     });
 
-    // Start first turn
-    s.startDayPhase();
+    // Start first turn. The day banner is suppressed here (and in the
+    // async campaign-load path inside loadCampaignAndSetup) because the
+    // player has not yet chosen how to start (tutorial / resume / new
+    // game) — it plays via startDayPhase() once they do, or via
+    // playDeferredDayBanner() when no offer modal appears.
+    s.startDayPhase(false, true);
   }
 
   public handleResize(): void {
@@ -807,13 +822,17 @@ export class MainStreetLifecycleManager {
           // phase is synchronised.  Without this, the engine stays in
           // DayStart while the UI shows market controls, blocking all
           // player actions and causing End Turn to hang.
-          try { s.startDayPhase(); } catch (_) { /* ignore */ }
+          // Banner suppressed: boot-time start, presented once the player
+          // starts (or discarded on resume).
+          try { s.startDayPhase(false, true); } catch (_) { /* ignore */ }
         } else {
           // Even with no saved campaign, startDayPhase() must be called so
           // the game transitions from DayStart -> MarketPhase and the market
           // is populated. Without this the tutorial offer modal shows but
           // the market is empty, making interactive tutorial steps impossible.
-          try { s.startDayPhase(); } catch (_) { /* ignore */ }
+          // Banner suppressed: boot-time start, presented once the player
+          // starts (or discarded on resume).
+          try { s.startDayPhase(false, true); } catch (_) { /* ignore */ }
         }
         // Check for a saved run checkpoint. If one exists, the resume overlay
         // takes priority over the tutorial offer modal.
@@ -821,26 +840,26 @@ export class MainStreetLifecycleManager {
           s.checkForSavedCheckpoint(tutorialOpts);
         } catch (e) {
           // If checkpoint check fails, fall through to tutorial offer
-          try {
-            const legacySeen = s.campaign ? (s.campaign as any).tutorialSeen : undefined;
-            (s as any).tutorialOfferModal?.showIfEligible(tutorialOpts, legacySeen);
-          } catch (_) { /* ignore */ }
+          this.showTutorialOfferOrDeferredBanner(
+            tutorialOpts,
+            s.campaign ? (s.campaign as any).tutorialSeen : undefined,
+          );
         }
         return saved;
       }).catch(() => {
         // If load fails, continue with defaults and show offer modal
-        try {
-          const legacySeen = s.campaign ? (s.campaign as any).tutorialSeen : undefined;
-          (s as any).tutorialOfferModal?.showIfEligible(tutorialOpts, legacySeen);
-        } catch (e) { console.error('[MainStreet] tutorial offer fallback failed', e); }
+        this.showTutorialOfferOrDeferredBanner(
+          tutorialOpts,
+          s.campaign ? (s.campaign as any).tutorialSeen : undefined,
+        );
         return null;
       });
     } else {
       // No saveStore: show tutorial offer modal if eligible (best-effort)
-      try {
-        const legacySeen = s.campaign ? (s.campaign as any).tutorialSeen : undefined;
-        (s as any).tutorialOfferModal?.showIfEligible(tutorialOpts, legacySeen);
-      } catch (_) { /* ignore */ }
+      this.showTutorialOfferOrDeferredBanner(
+        tutorialOpts,
+        s.campaign ? (s.campaign as any).tutorialSeen : undefined,
+      );
     }
   }
 
@@ -990,6 +1009,29 @@ export class MainStreetLifecycleManager {
     }
   }
 
+  /**
+   * Shows the tutorial offer modal when eligible; otherwise presents the
+   * deferred boot-time "Day N" banner (the fresh game is starting now, so
+   * the banner finally plays for existing players who skip straight in).
+   *
+   * Call sites that previously called `tutorialOfferModal.showIfEligible(...)`
+   * use this so the deferred banner is presented whenever no offer modal
+   * appears. On modal-creation failure the banner is presented as well.
+   */
+  private showTutorialOfferOrDeferredBanner(
+    opts: TutorialVisibilityOptions,
+    legacySeen?: boolean,
+  ): void {
+    const s = this.scene;
+    try {
+      const shown = (s as any).tutorialOfferModal?.showIfEligible(opts, legacySeen);
+      if (!shown) s.playDeferredDayBanner?.();
+    } catch (_) {
+      // Modal creation failed — treat as not shown and present the banner.
+      try { s.playDeferredDayBanner?.(); } catch (_) { /* ignore */ }
+    }
+  }
+
   public checkForSavedCheckpoint(tutorialOpts: TutorialVisibilityOptions): void {
     const s = this.scene;
     if (!s.checkpointManager) return;
@@ -997,10 +1039,10 @@ export class MainStreetLifecycleManager {
     s.checkpointManager.checkAndResume(
       // No checkpoint — show tutorial offer (if eligible)
       () => {
-        try {
-          const legacySeen = s.campaign ? (s.campaign as any).tutorialSeen : undefined;
-          (s as any).tutorialOfferModal?.showIfEligible(tutorialOpts, legacySeen);
-        } catch (_) { /* ignore */ }
+        this.showTutorialOfferOrDeferredBanner(
+          tutorialOpts,
+          s.campaign ? (s.campaign as any).tutorialSeen : undefined,
+        );
         // New game: check if static SVGs match current CSV
         this.checkForCsvMismatchAndRegenerate().catch(() => {});
       },
@@ -1019,6 +1061,9 @@ export class MainStreetLifecycleManager {
         // calling refillMarket would replace it with fresh deck draws).
         try { s.refreshAll(); } catch (_) { /* ignore */ }
         try { s.startDayPhase(true); } catch (_) { /* ignore */ }
+        // Discard any deferred boot-time banner: a resumed checkpoint
+        // continues the same day, so it is not a new-day transition.
+        s.deferredDayBanner = false;
 
         // Load game: compare saved checksum against current CSV
         this.checkForCsvMismatchAndRegenerate(savedChecksum).catch(() => {});
@@ -1029,10 +1074,10 @@ export class MainStreetLifecycleManager {
       },
     ).catch(() => {
       // On error (e.g., storage unavailable), show tutorial offer
-      try {
-        const legacySeen = s.campaign ? (s.campaign as any).tutorialSeen : undefined;
-        (s as any).tutorialOfferModal?.showIfEligible(tutorialOpts, legacySeen);
-      } catch (_) { /* ignore */ }
+      this.showTutorialOfferOrDeferredBanner(
+        tutorialOpts,
+        s.campaign ? (s.campaign as any).tutorialSeen : undefined,
+      );
     });
   }
 }

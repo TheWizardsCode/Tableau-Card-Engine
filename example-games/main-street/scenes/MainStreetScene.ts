@@ -243,6 +243,35 @@ export class MainStreetScene extends CardGameScene {
   }
 
   // ── Day flow ────────────────────────────────────────────
+  /**
+   * Deferred boot-time "Day N" banner.
+   *
+   * The day banner must NOT play before the player has chosen how to start
+   * the game (run tutorial / resume / new game). Boot-time `startDayPhase`
+   * calls therefore run with `suppressDayBanner=true`; once the player
+   * actually begins playing — skipping the tutorial offer or starting a
+   * fresh game without an offer modal — `playDeferredDayBanner()` presents
+   * the banner for the current day. On checkpoint resume the deferral is
+   * cleared without playing (the same day continues, so it is not a
+   * new-day transition).
+   */
+  public deferredDayBanner = true;
+
+  /**
+   * Plays the deferred boot-time day banner now that the game has actually
+   * started. No-op when nothing was deferred. Presentation-only; never
+   * throws (reduced-motion / replay handling lives in the animator).
+   */
+  public playDeferredDayBanner(): void {
+    if (!this.deferredDayBanner) return;
+    this.deferredDayBanner = false;
+    try {
+      this.msAnimator.animateDayBanner({ day: this.state.turn });
+    } catch (_) {
+      // presentation-only — ignore
+    }
+  }
+
   public startDayPhase(...args: any[]): any {
     return (this.msTurnController as any).startDayPhase.apply(this.msTurnController, args);
   }
