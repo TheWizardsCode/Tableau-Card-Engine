@@ -27,15 +27,6 @@ import { ensureTutorialMarketForUpcomingSteps } from '../TutorialScenario';
 import { computeDragTransferDuration } from './MainStreetConstants';
 
 /**
- * Match a card ID against a requiredCardId using prefix matching.
- *
- * Card IDs include a copy-number suffix (e.g. `biz-laundromat-2`). The
- * `requiredCardId` in tutorial steps is the template ID with a specific copy
- * number (e.g. `biz-laundromat-0`). This helper strips trailing `-<number>`
- * from both IDs and compares the template prefix, so any copy of the required
- * card template satisfies the requirement.
- */
-/**
  * Play illegal-move sound and shake animation on a card target.
  *
  * Wraps {@link shakeIllegalMove} with a container-safe fallback:
@@ -71,8 +62,7 @@ function playIllegalFeedback(target: Phaser.GameObjects.Container | Phaser.GameO
 
   if (isContainer) {
     // Container-safe shake: position oscillation only (no tint).
-    // Sound is played separately (Containers don't support tint).
-    safePlaySound(scene as any, COMMON_SFX_KEYS.ILLEGAL_MOVE);
+    // Sound is already played above (Containers don't support tint).
     const originalX = (target as any).x;
     scene.tweens.add({
       targets: target,
@@ -89,6 +79,15 @@ function playIllegalFeedback(target: Phaser.GameObjects.Container | Phaser.GameO
   }
 }
 
+/**
+ * Match a card ID against a requiredCardId using prefix matching.
+ *
+ * Card IDs include a copy-number suffix (e.g. `biz-laundromat-2`). The
+ * `requiredCardId` in tutorial steps is the template ID with a specific copy
+ * number (e.g. `biz-laundromat-0`). This helper strips trailing `-<number>`
+ * from both IDs and compares the template prefix, so any copy of the required
+ * card template satisfies the requirement.
+ */
 function matchesRequiredCard(cardId: string, requiredCardId: string): boolean {
   const stripCopy = (id: string): string => id.replace(/-\d+$/, '');
   return stripCopy(cardId) === stripCopy(requiredCardId);
