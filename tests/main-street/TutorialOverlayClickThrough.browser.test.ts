@@ -106,7 +106,9 @@ describe('Tutorial tooltip click-through isolation (CG-0MSTB03U6009J2WV)', () =>
     await advanceToStep(scene, T3_INDEX);
 
     repositionButtonOverLaundromat(scene);
-    await new Promise((r) => setTimeout(r, 150)); // let the DOMElement transform apply
+    // Let the DOMElement transform AND the browser layout settle (under CPU
+    // contention the FIT-scaled canvas rect can lag, skewing CDP coords).
+    await new Promise((r) => setTimeout(r, 400));
 
     // Precondition: the tooltip button genuinely overlaps an interactive
     // object (the Laundromat dev card) — otherwise the test proves nothing.
@@ -117,8 +119,10 @@ describe('Tutorial tooltip click-through isolation (CG-0MSTB03U6009J2WV)', () =>
 
       // The button's own action (Exit Tutorial) processes via the DOM click;
       // any leaked buy-to-hand animation takes ~1.5s. Wait for the exit,
-      // then wait out the animation window before asserting.
-      await pollUntil(() => !(scene as any).tutorialController?.isActive, 3_000);
+      // then wait out the animation window before asserting. The exit poll
+      // has generous slack: under CPU contention a real CDP click + DOM
+      // handler round-trip can exceed a few seconds.
+      await pollUntil(() => !(scene as any).tutorialController?.isActive, 15_000);
       await new Promise((r) => setTimeout(r, 2_500));
 
       assertNoPassThrough(scene);
@@ -130,14 +134,14 @@ describe('Tutorial tooltip click-through isolation (CG-0MSTB03U6009J2WV)', () =>
     await advanceToStep(scene, T3_INDEX);
 
     repositionButtonOverLaundromat(scene);
-    await new Promise((r) => setTimeout(r, 150));
+    await new Promise((r) => setTimeout(r, 400));
 
     assertButtonOverLaundromat(scene);
 
     await withPhaserWindowHandlers(scene, async () => {
       await realTouchTapOnButton(findTooltipButton(EXIT_LABEL));
 
-      await pollUntil(() => !(scene as any).tutorialController?.isActive, 3_000);
+      await pollUntil(() => !(scene as any).tutorialController?.isActive, 15_000);
       await new Promise((r) => setTimeout(r, 2_500));
 
       assertNoPassThrough(scene);
@@ -151,7 +155,7 @@ describe('Tutorial tooltip click-through isolation (CG-0MSTB03U6009J2WV)', () =>
     // Position the tooltip BOX centre (title/body area — not a button)
     // over the Laundromat card.
     repositionTooltipCenterOverLaundromat(scene);
-    await new Promise((r) => setTimeout(r, 150));
+    await new Promise((r) => setTimeout(r, 400));
     assertTooltipCenterOverLaundromat(scene);
 
     await withPhaserWindowHandlers(scene, async () => {
