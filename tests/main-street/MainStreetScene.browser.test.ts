@@ -221,7 +221,32 @@ describe('MainStreetScene browser tests', () => {
     const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;
     const state = scene.state;
 
-    const eventCard = state.market.cards.find((card: any) => card && card.family === 'event');
+    // The market populates asynchronously during boot. Asserting on it
+    // immediately raced the boot (state.market.cards empty on slow machines)
+    // and flaked ~1/3 of runs — wait deterministically for it instead.
+    await waitForCondition(
+      () => (state.market.cards ?? []).length > 0,
+      { timeoutMs: 15_000, intervalMs: 50, label: 'market populated at boot' },
+    );
+
+    let eventCard = state.market.cards.find((card: any) => card && card.family === 'event');
+    if (!eventCard) {
+      // The boot draw does not guarantee an event card; this test exercises
+      // the held-event RENDERING path (not the draw), so inject a valid
+      // synthetic event card into the state when the draw lacked one.
+      eventCard = {
+        family: 'event',
+        id: 'ms-ev-held-test',
+        name: 'Held Test Event',
+        trigger: 'investment',
+        cost: 1,
+        effect: 'test',
+        target: 'player',
+        coinDelta: 0,
+        reputationDelta: 0,
+      };
+      state.market.cards.push(eventCard);
+    }
     expect(eventCard).toBeTruthy();
 
     // Ensure the held card has an SVG source available so rasterized textures can be generated.
