@@ -37,6 +37,11 @@ const WIN_RATE_BANDS: Record<'Easy' | 'Medium' | 'Hard', { min: number; max: num
 };
 
 describe('Main Street greedy AI per-difficulty design-intent guardrails', () => {
+  // The 200-seed x 3-difficulty greedy simulation is CPU-heavy (~4s isolated;
+  // much slower under CI/parallel CPU contention — see CG-0MSCI73RH004VPCE).
+  // Give it an explicit generous timeout instead of relying on the 15s unit
+  // project default, which the simulation can exceed under contended cores,
+  // tripping a misleading timeout (CG-0MSY2KLJ0007JSGV).
   it('greedy win rate stays within the tuned band on Easy, Medium and Hard', () => {
     const results = runAllCombinations({
       seeds: SEEDS,
@@ -52,7 +57,7 @@ describe('Main Street greedy AI per-difficulty design-intent guardrails', () => 
       expect(combo.metrics.winRate).toBeGreaterThanOrEqual(band.min);
       expect(combo.metrics.winRate).toBeLessThanOrEqual(band.max);
     }
-  });
+  }, 120_000);
 
   it('greedy Medium economy: net liquidity 0–2 and median score 120–180', () => {
     const [medium] = runAllCombinations({
