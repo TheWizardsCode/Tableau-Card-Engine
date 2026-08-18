@@ -18,7 +18,7 @@
 import type { MainStreetState, DayPhase } from './MainStreetState';
 import { PHASE_ORDER, addLog, syncResourceBankToLedger } from './MainStreetState';
 import type { EventCard, SynergyType } from './MainStreetCards';
-import { SELL_VALUE_RATIO, isDurationEventCard, type DurationEventCard } from './MainStreetCards';
+import { SELL_VALUE_RATIO, GRID_SIZE, isDurationEventCard, type DurationEventCard, type BusinessCard } from './MainStreetCards';
 import { createActiveEffect, decayActiveEffects } from '../../src/core-engine/ActiveEffect';
 import { recordMainStreetEvent } from './MainStreetTranscript';
 import { applyIncome, type IncomeResult, updateNeighborsOnPlacement, updateNeighborsOnSale } from './MainStreetAdjacency';
@@ -35,6 +35,7 @@ import {
   playEventFromHand,
   discardFromHand,
   sellBusiness,
+  purchaseStaffCard,
   canSellBusiness as canSellBusinessFromMarket,
   type PurchaseResult,
 } from './MainStreetMarket';
@@ -104,6 +105,19 @@ export interface DiscardFromHandAction {
   handIndex: number;
 }
 
+/** Directly buy a business from the market and place it on the street (costs 50% more). */
+export interface BuyAndPlaceAction {
+  type: 'buy-and-place';
+  cardId: string;
+  slotIndex: number;
+}
+
+/** Hire a staff card from the staff market. */
+export interface HireStaffAction {
+  type: 'hire-staff';
+  cardId: string;
+}
+
 /** End the current market/action phase. */
 export interface EndTurnAction {
   type: 'end-turn';
@@ -119,6 +133,8 @@ export type PlayerAction =
   | PlayUpgradeFromHandAction
   | PlayEventFromHandAction
   | DiscardFromHandAction
+  | BuyAndPlaceAction
+  | HireStaffAction
   | PlayEventAction
   | EndTurnAction;
 
@@ -219,16 +235,30 @@ export function executeAction(
   }
 
   switch (action.type) {
-    case 'buy-business':
-      return purchaseBusiness(state, action.cardId, action.slotIndex);
     case 'move-to-hand':
+      if (state.actionsRemaining <= 0) throw new Error('No actions remaining today. End your turn to start a new day.');
+      state.actionsRemaining -= 1;
       return moveToHand(state, action.cardId);
+    case 'buy-business':
+      if (state.actionsRemaining <= 0) throw new Error('No actions remaining today. End your turn to start a new day.');
+      state.actionsRemaining -= 1;
+      return purchaseBusiness(state, action.cardId, action.slotIndex);
+    case 'play-business-from-hand':
+      if (state.actionsRemaining <= 0) throw new Error('No actions remaining today. End your turn to start a new day.');
+      state.actionsRemaining -= 1;
+      return playBusinessFromHand(state, action.handIndex, action.slotIndex);
+    case 'buy-and-place':
+      if (state.actionsRemaining <= 0) throw new Error('No actions remaining today. End your turn to start a new day.');
+      state.actionsRemaining -= 1;
+      return buyAndPlaceBusiness(state, action.cardId, action.slotIndex);
+    case 'hire-staff':
+      if (state.actionsRemaining <= 0) throw new Error('No actions remaining today. End your turn to start a new day.');
+      state.actionsRemaining -= 1;
+      return hireStaffCard(state, action.cardId);
     case 'buy-upgrade':
       return purchaseUpgrade(state, action.cardId, action.targetSlot);
     case 'buy-event':
       return purchaseEvent(state, action.cardId);
-    case 'play-business-from-hand':
-      return playBusinessFromHand(state, action.handIndex, action.slotIndex);
     case 'play-upgrade-from-hand':
       return playUpgradeFromHand(state, action.handIndex, action.targetSlot);
     case 'play-event-from-hand':
@@ -645,6 +675,11 @@ export function executeDayStart(state: MainStreetState, skipMarketRefill: boolea
 
   // Log turn header
   addLog(state, `Turn ${state.turn}`, 'turn-header');
+
+  // Action economy: reset daily action budget.
+  // Base 1 action + sum of actionsPerTurn from employed staff cards.
+  const gmBonus = (state.staffCards ?? []).reduce((sum, card) => sum + (card.actionsPerTurn ?? 0), 0);
+  state.actionsRemaining = 1 + gmBonus;
 
   state.phase = 'MarketPhase';
 }
@@ -1207,4 +1242,78 @@ export function layoffStaffCard(
 
   // Return the staff card to the market
   state.staffCardMarket.push({ ...card });
+}
+
+// ── Action Economy (CG-0MSTOF1N5005PK2R) ────────────────────
+
+/**
+ * Directly buys a business/community-space card from the market and places
+ * it on the street grid in a single action, paying a 50% premium over the
+ * listed cost (CG-0MSTOF1N5005PK2R). Consumes one daily action.
+ *
+ * Premium pricing: `Math.ceil(cost * 1.5 * 2) / 2` — the listed cost × 1.5,
+ * rounded up to the nearest 0.5 (e.g. 3 → 4.5, 7 → 10.5).
+ *
+ * @param state     Current game state (mutated in-place).
+ * @param cardId    ID of the card in the market.
+ * @param slotIndex Target street grid slot (0-based).
+ * @returns PurchaseResult on success.
+ * @throws Error if the action is illegal.
+ */
+export function buyAndPlaceBusiness(
+  state: MainStreetState,
+  cardId: string,
+  slotIndex: number,
+): PurchaseResult {
+  const marketIndex = state.market.cards.findIndex(c => c.id === cardId);
+  if (marketIndex === -1) {
+    throw new Error(`Card ${cardId} not found in the market.`);
+  }
+
+  const card = state.market.cards[marketIndex];
+  if (card.family === 'upgrade' || card.family === 'event') {
+    throw new Error('Buy-and-place only applies to business and community-space cards.');
+  }
+  if (slotIndex < 0 || slotIndex >= GRID_SIZE) {
+    throw new Error(`Invalid slot index: ${slotIndex}. Must be 0-${GRID_SIZE - 1}.`);
+  }
+  if (state.streetGrid[slotIndex] !== null) {
+    throw new Error(`Slot ${slotIndex} is already occupied.`);
+  }
+
+  const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
+  if (state.resourceBank.coins < premiumCost) {
+    throw new Error(`Not enough coins to buy-and-place ${card.name}. Need ${premiumCost}, have ${state.resourceBank.coins}.`);
+  }
+
+  state.resourceBank.coins -= premiumCost;
+  state.market.cards.splice(marketIndex, 1);
+  state.streetGrid[slotIndex] = card as BusinessCard;
+
+  // Incrementally update the new card's and all affected neighbors' cached values
+  updateNeighborsOnPlacement(state, slotIndex);
+
+  addLog(state, `Bought & placed ${card.name} in slot ${slotIndex} (-€${premiumCost}, 50% premium)`, 'loss');
+
+  return { card, cost: premiumCost, refilled: false };
+}
+
+/**
+ * Hires a staff card from the staff market (CG-0MSTOF1N5005PK2R).
+ * Consumes one daily action; delegates to purchaseStaffCard for the
+ * coin deduction and hand-size mechanics.
+ *
+ * @param state  Current game state (mutated in-place).
+ * @param cardId ID of the staff card in the staff market.
+ * @returns PurchaseResult describing the hire.
+ * @throws Error if the card is not found or player cannot afford it.
+ */
+export function hireStaffCard(state: MainStreetState, cardId: string): PurchaseResult {
+  const marketIndex = state.staffCardMarket.findIndex(c => c.id === cardId);
+  const card = state.staffCardMarket[marketIndex];
+  if (!card) {
+    throw new Error(`Staff card ${cardId} not found in the market.`);
+  }
+  purchaseStaffCard(state, cardId);
+  return { card, cost: card.cost, refilled: false };
 }

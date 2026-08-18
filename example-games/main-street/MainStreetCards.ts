@@ -203,6 +203,7 @@ function rebuildTemplateArrays(rows: Record<string, string>[]): void {
       description: r.description,
       reputationPerTurn: r.reputationPerTurn ? Number(r.reputationPerTurn) : undefined,
       refreshCostDiscount: r.refreshCostDiscount ? Number(r.refreshCostDiscount) : undefined,
+      actionsPerTurn: r.actionsPerTurn ? Number(r.actionsPerTurn) : undefined,
     });
   }
 }
@@ -407,6 +408,11 @@ export interface StaffCard {
    * CG-0MSQJ7VL9009JHF4).
    */
   readonly refreshCostDiscount?: number;
+  /**
+   * Optional additional actions granted per turn.
+   * (e.g. the General Manager's +1 action per day — CG-0MSTOF1N5005PK2R).
+   */
+  readonly actionsPerTurn?: number;
 }
 
 /** Union of all card types in Main Street. */

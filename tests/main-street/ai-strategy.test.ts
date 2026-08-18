@@ -180,6 +180,20 @@ describe('enumerateLegalActions', () => {
     // Generous coins so affordability does not depend on which event the
     // seeded market draws (the expanded pool shifted the seed's row).
     state.resourceBank.coins = 100;
+    // Inject an affordable event into the market so the enumeration has one
+    // to consider regardless of the seeded row composition (the General
+    // Manager card addition shifted the seed's market draw).
+    state.market.cards.push({
+      family: 'event',
+      id: 'buyable-event',
+      name: 'Buyable Event',
+      trigger: 'Investment',
+      cost: 1,
+      effect: 'Test',
+      target: 'All',
+      coinDelta: 1,
+      reputationDelta: 0,
+    } as never);
     const actions = enumerateLegalActions(state);
     // Hand holds one card (< maxHandSize 2), so another event purchase is legal.
     expect(actions.some(a => a.type === 'buy-event')).toBe(true);

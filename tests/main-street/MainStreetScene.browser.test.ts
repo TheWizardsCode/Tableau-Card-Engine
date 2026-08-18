@@ -323,6 +323,10 @@ describe('MainStreetScene browser tests', () => {
       const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;
       const state = scene.state;
 
+      // Generous coins so an affordable business always exists in the row
+      // regardless of the random seed's market draw.
+      state.resourceBank.coins = 100;
+
       const emptySlots = getEmptySlots(state);
       expect(emptySlots.length).toBeGreaterThan(0);
       const targetSlot = emptySlots[0];

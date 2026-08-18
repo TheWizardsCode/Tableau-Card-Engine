@@ -231,49 +231,55 @@ describe('MainStreetMarket', () => {
   });
 
   describe('purchaseUpgrade', () => {
+    /** Injects a seeded upgrade into the market so it always has one. */
+    function injectUpgrade(state: ReturnType<typeof createTestState>): UpgradeCard {
+      const upgrade = state.decks.upgrade.find(u => state.decks.business.some(b => b.name === u.targetBusiness));
+      if (!upgrade) throw new Error('No upgrade targeting a business in the deck');
+      state.market.cards.unshift({ ...upgrade } as UpgradeCard);
+      return upgrade;
+    }
+
     it('should apply income and synergy bonuses to the target business', () => {
       const state = createTestState();
-      const upgrade = state.market.cards.find(c => c.family === 'upgrade') as UpgradeCard | undefined;
-      expect(upgrade).toBeDefined();
-      const targetName = upgrade!.targetBusiness;
+      const upgrade = injectUpgrade(state);
+      const targetName = upgrade.targetBusiness;
 
       // Place a matching business
       const biz = state.decks.business.find(b => b.name === targetName);
       expect(biz).toBeDefined();
       // Ensure the placed business meets the upgrade's requiredLevel
-      state.streetGrid[0] = { ...biz!, level: (upgrade!.requiredLevel ?? 0) };
+      state.streetGrid[0] = { ...biz!, level: (upgrade.requiredLevel ?? 0) };
       state.resourceBank.coins = 100;
 
       const incomeBefore = state.streetGrid[0]!.incomeBonus;
       const rangeBefore = state.streetGrid[0]!.synergyRangeBonus;
       const levelBefore = state.streetGrid[0]!.level;
 
-      purchaseUpgrade(state, upgrade!.id);
+      purchaseUpgrade(state, upgrade.id);
 
       expect(state.streetGrid[0]!.level).toBe(levelBefore + 1);
-      expect(state.streetGrid[0]!.incomeBonus).toBe(incomeBefore + upgrade!.incomeBonus);
-      expect(state.streetGrid[0]!.synergyRangeBonus).toBe(rangeBefore + upgrade!.synergyRangeBonus);
+      expect(state.streetGrid[0]!.incomeBonus).toBe(incomeBefore + upgrade.incomeBonus);
+      expect(state.streetGrid[0]!.synergyRangeBonus).toBe(rangeBefore + upgrade.synergyRangeBonus);
     });
 
     it('should target a specific slot when provided', () => {
       const state = createTestState();
-      const upgrade = state.market.cards.find(c => c.family === 'upgrade') as UpgradeCard | undefined;
-      expect(upgrade).toBeDefined();
-      const targetName = upgrade!.targetBusiness;
+      const upgrade = injectUpgrade(state);
+      const targetName = upgrade.targetBusiness;
 
       // Place matching businesses in slots 2 and 5
       const biz = state.decks.business.find(b => b.name === targetName);
       expect(biz).toBeDefined();
       // Ensure placed businesses meet the upgrade's requiredLevel so the
       // purchase is legal regardless of which upgrade variant appears in the market.
-      state.streetGrid[2] = { ...biz!, id: 'target-2', level: (upgrade!.requiredLevel ?? 0) };
-      state.streetGrid[5] = { ...biz!, id: 'target-5', level: (upgrade!.requiredLevel ?? 0) };
+      state.streetGrid[2] = { ...biz!, id: 'target-2', level: (upgrade.requiredLevel ?? 0) };
+      state.streetGrid[5] = { ...biz!, id: 'target-5', level: (upgrade.requiredLevel ?? 0) };
       state.resourceBank.coins = 100;
 
       const level2Before = state.streetGrid[2]!.level;
       const level5Before = state.streetGrid[5]!.level;
 
-      purchaseUpgrade(state, upgrade!.id, 5);
+      purchaseUpgrade(state, upgrade.id, 5);
 
       // Slot 5 should be incremented by 1, slot 2 should remain unchanged
       expect(state.streetGrid[5]!.level).toBe(level5Before + 1);
@@ -307,21 +313,24 @@ describe('MainStreetMarket', () => {
 
     it('should reject purchase when the hand is full', () => {
       const state = createTestState();
-      // Fill the hand to maxHandSize (2) so no further purchases are legal.
+      // Fill the hand to maxHandSize (3 since the base hand grew, CG-0MSTOATDT009BRX2)
+      // so no further purchases are legal.
       state.hand = [
         { family: 'event', id: 'held-evt', name: 'Held Event', trigger: 'Investment', effect: 'test', target: 'All', coinDelta: 0, reputationDelta: 0, cost: 0 } as any,
         { family: 'event', id: 'held-evt2', name: 'Held Event 2', trigger: 'Investment', effect: 'test', target: 'All', coinDelta: 0, reputationDelta: 0, cost: 0 } as any,
+        { family: 'event', id: 'held-evt3', name: 'Held Event 3', trigger: 'Investment', effect: 'test', target: 'All', coinDelta: 0, reputationDelta: 0, cost: 0 } as any,
       ];
-      // Find an Investment event in investments row
-      const investmentEvent = state.market.cards.find(
-        c => c.family === 'event' && (c as import('../../example-games/main-street/MainStreetCards').EventCard).trigger === 'Investment',
-      );
-      if (investmentEvent) {
-        const result = canPurchaseEvent(state, investmentEvent.id);
-        expect(result.legal).toBe(false);
-        if (!result.legal) {
-          expect(result.reason).toContain('Hand is full');
-        }
+      // Inject a free event into the market so the hand-capacity check (not
+      // affordability) is the first failure — the seeded row may not contain
+      // an affordable event after pool shifts.
+      state.market.cards.push({
+        family: 'event', id: 'free-evt', name: 'Free Event', trigger: 'Investment',
+        effect: 'test', target: 'All', coinDelta: 0, reputationDelta: 0, cost: 0,
+      } as any);
+      const result = canPurchaseEvent(state, 'free-evt');
+      expect(result.legal).toBe(false);
+      if (!result.legal) {
+        expect(result.reason).toContain('Hand is full');
       }
     });
 
@@ -633,8 +642,11 @@ describe('MainStreetMarket', () => {
       expect(state.decks.event.length).toBeGreaterThan(0);
       expect(state.discards.event.length).toBeGreaterThan(0);
 
-      // Clear investments row so refill must draw
+      // Clear the row and empty the upgrade deck so the only legal third draw
+      // is an event (composition: ≥1 business, then a guaranteed event slot),
+      // making the reshuffle assertion independent of the seeded RNG picks.
       state.market.cards = [];
+      state.decks.upgrade = [];
       state.hand = [];
       refillMarket(state);
 

@@ -60,8 +60,8 @@ function findStaff(deck: readonly StaffCard[], id: string): StaffCard | undefine
 // ── AC1: Template count ───────────────────────────────────────────────
 
 describe('Group F staff expansion: template count (AC1)', () => {
-  it('grows staff templates from 3 to exactly 7', () => {
-    expect(createStaffDeck(1)).toHaveLength(7);
+  it('grows staff templates from 3 to exactly 8 (incl. General Manager)', () => {
+    expect(createStaffDeck(1)).toHaveLength(8);
   });
 
   it('adds exactly the 4 contracted card IDs', () => {

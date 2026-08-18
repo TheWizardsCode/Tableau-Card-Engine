@@ -258,6 +258,11 @@ export interface MainStreetState {
    * false = card is active (default).
    */
   soldSlots: boolean[];
+  /**
+   * Remaining actions the player can take this turn.
+   * Resets at DayStart to 1 + sum(actionsPerTurn for employed staff).
+   */
+  actionsRemaining: number;
 }
 
 export interface MainStreetSerializedState {
@@ -327,6 +332,8 @@ export interface MainStreetSerializedState {
    * true = card in this slot has been sold (non-functional).
    */
   soldSlots: boolean[];
+  /** Remaining actions the player can take this turn. */
+  actionsRemaining: number;
 }
 
 /** Record of a single milestone (tier unlock) achievement. */
@@ -685,6 +692,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     staffCardMarket: staffDeck,
     skipMarketCycleOnEndTurn: false,
     soldSlots: new Array<boolean>(GRID_SIZE).fill(false),
+    actionsRemaining: 1,
   };
 
   // Refill the single-row market with its initial composition.
@@ -771,6 +779,7 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
     soldSlots: [...state.soldSlots],
     csvChecksum: CSV_CHECKSUM,
     csvData: CARD_DATA_RAW,
+    actionsRemaining: state.actionsRemaining,
   };
 }
 
@@ -921,6 +930,11 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
     (saved as Record<string, unknown>).soldSlots = new Array<boolean>(GRID_SIZE).fill(false);
   }
 
+  // ── actionsRemaining: backfill default for legacy saves ──
+  if (!('actionsRemaining' in saved)) {
+    (saved as Record<string, unknown>).actionsRemaining = 1;
+  }
+
   // ── incidentBalance (CG-0MSL0OP040043KKZ): backfill from the queue for ──
   // legacy saves that predate the balance state. The queue cards are recorded
   // in draw order so subsequent constrained draws see the actual sequence.
@@ -1051,6 +1065,7 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
     staffCardMarket: structuredClone(saved.staffCardMarket),
     skipMarketCycleOnEndTurn: saved.skipMarketCycleOnEndTurn ?? false,
     soldSlots: saved.soldSlots ?? new Array<boolean>(GRID_SIZE).fill(false),
+    actionsRemaining: saved.actionsRemaining ?? 1,
   };
 
   return state;

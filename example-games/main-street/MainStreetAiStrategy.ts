@@ -140,6 +140,14 @@ export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
   const hand = state.hand ?? [];
   const emptySlots = getEmptySlots(state);
 
+  // Action economy (CG-0MSTOF1N5005PK2R): when the daily action budget is
+  // spent, only end-turn is legal. Free operations (refresh/sell/hint/
+  // discard/end-turn) stay available to the player, but the AI simply ends
+  // the day rather than cycling through non-actions.
+  if ((state.actionsRemaining ?? 1) <= 0) {
+    return [{ type: 'end-turn' }];
+  }
+
   // ── buy-business (direct buy-and-place, pays immediately) ──
   for (const card of state.market.cards) {
     if (card.family !== 'business' && card.family !== 'community-space') continue;
@@ -568,6 +576,13 @@ export function scoreAction(state: MainStreetState, action: PlayerAction): numbe
       return 0;
     case 'end-turn':
       return 0;
+    // Action economy actions (CG-0MSTOF1N5005PK2R). Minimal scoring for now;
+    // the AI strategy child (CG-0MSX41S7I009MMZN) refines budget-aware scoring.
+    case 'buy-and-place':
+      return scoreBusinessAction(state, { type: 'buy-business', cardId: action.cardId, slotIndex: action.slotIndex });
+    case 'hire-staff':
+      // Net value of expanded hand slots vs. cost + ongoing cost (rough estimate).
+      return 2;
   }
 }
 

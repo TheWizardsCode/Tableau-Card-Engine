@@ -168,7 +168,11 @@ async function waitForSettled(scene: Scene): Promise<void> {
 
 /** First business card in the development row. */
 function firstBusinessCard(scene: Scene): any {
-  const card = scene.state.market.cards.find((c: any) => c.family === 'business');
+  // Community-space cards are grid-placeable too; accept either family so
+  // the test does not depend on the seeded row's exact composition.
+  const card = scene.state.market.cards.find(
+    (c: any) => c.family === 'business' || c.family === 'community-space',
+  );
   expect(card).toBeTruthy();
   return card;
 }
