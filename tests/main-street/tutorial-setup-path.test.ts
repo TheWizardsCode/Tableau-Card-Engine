@@ -102,8 +102,8 @@ describe('AC1: Tutorial setup uses scenario factory (not seed-based setupWithSee
       state2.market.cards.map(c => c.id),
     );
     // Incident queue cards are identical
-    expect(state1.incidentQueue.map(c => c.id)).toEqual(
-      state2.incidentQueue.map(c => c.id),
+    expect(state1.incidentDeck.map(c => c.id)).toEqual(
+      state2.incidentDeck.map(c => c.id),
     );
     // Resource bank is identical
     expect(state1.resourceBank.coins).toBe(state2.resourceBank.coins);
@@ -130,7 +130,7 @@ describe('AC1: Tutorial setup uses scenario factory (not seed-based setupWithSee
     expect(invTemplateIds).toEqual(STANDARD_TUTORIAL_SCENARIO.market.cards);
 
     // Incident queue base template IDs match
-    const incidentTemplateIds = state.incidentQueue.map(c => stripSerialSuffix(c.id));
+    const incidentTemplateIds = state.incidentDeck.map(c => stripSerialSuffix(c.id));
     expect(incidentTemplateIds).toEqual(STANDARD_TUTORIAL_SCENARIO.incidentQueue);
   });
 
@@ -314,14 +314,14 @@ describe('AC4: Scenario-built state produces consistent market indices (backward
 
     const firstDev = runs[0].market.cards.map(c => c.id);
     const firstInv = runs[0].market.cards.map(c => c.id);
-    const firstInc = runs[0].incidentQueue.map(c => c.id);
+    const firstInc = runs[0].incidentDeck.map(c => c.id);
     const firstCoins = runs[0].resourceBank.coins;
     const firstRep = runs[0].resourceBank.reputation;
 
     for (let i = 1; i < runs.length; i++) {
       expect(runs[i].market.cards.map(c => c.id)).toEqual(firstDev);
       expect(runs[i].market.cards.map(c => c.id)).toEqual(firstInv);
-      expect(runs[i].incidentQueue.map(c => c.id)).toEqual(firstInc);
+      expect(runs[i].incidentDeck.map(c => c.id)).toEqual(firstInc);
       expect(runs[i].resourceBank.coins).toBe(firstCoins);
       expect(runs[i].resourceBank.reputation).toBe(firstRep);
     }
@@ -343,7 +343,7 @@ describe('AC4: Scenario-built state produces consistent market indices (backward
     expect(state).toHaveProperty('challengesCompleted');
     expect(state).toHaveProperty('activeChallenges');
     expect(state).toHaveProperty('hand');
-    expect(state).toHaveProperty('incidentQueue');
+    expect(state).toHaveProperty('incidentDeck');
     expect(state).toHaveProperty('gameResult');
     expect(state).toHaveProperty('endReason');
     expect(state).toHaveProperty('finalScore');
@@ -373,8 +373,8 @@ describe('AC4: Scenario-built state produces consistent market indices (backward
     expect(upgrades.length).toBe(0);
 
     // Incident queue: exactly INCIDENT_QUEUE_SIZE Incident-trigger events
-    expect(state.incidentQueue.length).toBe(INCIDENT_QUEUE_SIZE);
-    for (const card of state.incidentQueue) {
+    expect(state.incidentDeck.length).toBe(INCIDENT_QUEUE_SIZE);
+    for (const card of state.incidentDeck) {
       expect(card.family).toBe('event');
       expect(card.trigger).toBe('Incident');
     }

@@ -78,7 +78,7 @@ describe('MainStreetSvgTextureManager cache invalidation', () => {
       },
       state: {
         market: { cards: [{ id: 'biz-bakery-0' }, ].filter(Boolean) },
-        incidentQueue: [],
+        incidentDeck: [],
         streetGrid: [],
         hand: [],
       },

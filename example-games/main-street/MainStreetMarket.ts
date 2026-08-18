@@ -18,47 +18,12 @@ import { addLog } from './MainStreetState';
 import type { BusinessCard, CommunitySpaceCard, UpgradeCard, EventCard, AnyCard } from './MainStreetCards';
 import {
   GRID_SIZE,
-  INCIDENT_QUEUE_SIZE,
   REFRESH_MARKET_COST,
-  findConstrainedIncidentIndex,
-  recordIncidentDraw,
 } from './MainStreetCards';
 import { shuffleArray } from '../../src/card-system';
 import { updateNeighborsOnPlacement, updateNeighborsOnSale } from './MainStreetAdjacency';
 import { refillSingleRowMarket } from './MainStreetState';
 import { resolveEvent } from './MainStreetEngine';
-
-// Shared reshuffle helper: when a draw/refill needs cards and the deck is
-// empty but the matching discard pile is non-empty, shuffle the discard
-// into the deck using the game's seeded RNG and continue.
-function reshuffleIfNeeded<T>(state: MainStreetState, deck: T[], discard: T[], name: string): void {
-  if (deck.length === 0 && discard.length > 0) {
-    // Shuffle the discard pile deterministically using the game's RNG
-    shuffleArray(discard, state.rng);
-    // Move all shuffled cards into the deck (draw from end = top)
-    while (discard.length > 0) {
-      deck.push(discard.pop()!);
-    }
-    // Log the reshuffle for visibility in tests and UI
-    addLog(state, `Reshuffled ${name} discard into deck`, 'neutral');
-  }
-}
-
-/**
- * Force-reshuffles the discard pile into the deck regardless of whether the
- * deck is empty. Used when the deck still holds cards but none of the required
- * trigger type (e.g. only Incident cards remain when we need an Investment),
- * and reshuffleIfNeeded (which requires deck.length === 0) was insufficient.
- */
-function forceReshuffleFromDiscards<T>(state: MainStreetState, deck: T[], discard: T[], name: string): void {
-  if (discard.length > 0) {
-    shuffleArray(discard, state.rng);
-    while (discard.length > 0) {
-      deck.push(discard.pop()!);
-    }
-    addLog(state, `Reshuffled ${name} discard into deck`, 'neutral');
-  }
-}
 
 // ── Result Types ────────────────────────────────────────────
 
@@ -343,38 +308,36 @@ export function cycleMarketCards(state: MainStreetState): void {
 }
 
 /**
- * Tops up the incident queue to INCIDENT_QUEUE_SIZE by drawing
- * Incident-trigger cards from the event deck. If the deck has no
- * remaining Incident cards, the queue stays at its current size.
+ * Replenishes the face-down incident deck when it is exhausted: gathers
+ * remaining Incident-trigger cards from the event deck and event discards,
+ * shuffles them with the game's seeded RNG, and pushes them onto the deck
+ * (existing reshuffle convention — CG-0MSTOATDP000JNHH).
  *
- * Draws are constraint-aware (CG-0MSL0OP040043KKZ): every pick routes
- * through `findConstrainedIncidentIndex`, honoring the runtime-mutable
- * repeat-spacing window and good/bad streak limits from
- * `state.incidentBalance`. The reshuffle paths (deck exhausted / no
- * Incident-trigger cards left) also route through the selector, so AC1's
- * "every point the next incident is selected" is covered.
+ * No visible refill loop: the deck is face-down and only its remaining
+ * count is shown. Called by `resolveIncident` when `incidentDeck` is empty.
+ * Does nothing when no Incident-trigger cards are available anywhere.
  */
-export function refillIncidentQueue(state: MainStreetState): void {
-  // If the event deck is empty but incident discards exist, reshuffle them.
-  reshuffleIfNeeded(state, state.decks.event, state.discards.event, 'event');
+export function replenishIncidentDeck(state: MainStreetState): void {
+  if (state.incidentDeck.length > 0) return;
 
-  while (state.incidentQueue.length < INCIDENT_QUEUE_SIZE) {
-    let idx = findConstrainedIncidentIndex(state.decks.event, state.incidentBalance);
-    if (idx === -1) {
-      // Attempt a reshuffle in case the deck was empty earlier
-      reshuffleIfNeeded(state, state.decks.event, state.discards.event, 'event');
-      // If the deck still has cards but none are Incident-trigger,
-      // force a reshuffle from discards (e.g. only Investments remain).
-      forceReshuffleFromDiscards(state, state.decks.event, state.discards.event, 'event');
-      idx = findConstrainedIncidentIndex(state.decks.event, state.incidentBalance);
-      if (idx === -1) break;
+  const pool: EventCard[] = [];
+  const eventDeck = state.decks.event;
+  for (let i = eventDeck.length - 1; i >= 0; i--) {
+    if (eventDeck[i].trigger === 'Incident') {
+      pool.push(eventDeck.splice(i, 1)[0]);
     }
-    const card = state.decks.event.splice(idx, 1)[0];
-    state.incidentQueue.push(card);
-    // Track the draw so subsequent selections respect the repeat/streak
-    // constraints (history mirrors the sequence the player resolves).
-    recordIncidentDraw(state.incidentBalance, card);
   }
+  const eventDiscards = state.discards.event;
+  for (let i = eventDiscards.length - 1; i >= 0; i--) {
+    if (eventDiscards[i].trigger === 'Incident') {
+      pool.push(eventDiscards.splice(i, 1)[0]);
+    }
+  }
+  if (pool.length === 0) return;
+
+  shuffleArray(pool, state.rng);
+  state.incidentDeck.push(...pool);
+  addLog(state, 'Reshuffled incident deck from event cards', 'neutral');
 }
 
 // ── Purchase Execution ──────────────────────────────────────

@@ -129,8 +129,8 @@ describe('createTutorialScenario', () => {
     expect(state1.market.cards.map(c => c.id)).toEqual(
       state2.market.cards.map(c => c.id),
     );
-    expect(state1.incidentQueue.map(c => c.id)).toEqual(
-      state2.incidentQueue.map(c => c.id),
+    expect(state1.incidentDeck.map(c => c.id)).toEqual(
+      state2.incidentDeck.map(c => c.id),
     );
     // Same resource bank
     expect(state1.resourceBank.coins).toBe(state2.resourceBank.coins);
@@ -164,12 +164,12 @@ describe('createTutorialScenario', () => {
 
   it('has exactly INCIDENT_QUEUE_SIZE cards in incident queue', () => {
     const state = createTutorialScenario();
-    expect(state.incidentQueue.length).toBe(INCIDENT_QUEUE_SIZE);
+    expect(state.incidentDeck.length).toBe(INCIDENT_QUEUE_SIZE);
   });
 
   it('has all incident cards as Incident-trigger events', () => {
     const state = createTutorialScenario();
-    for (const card of state.incidentQueue) {
+    for (const card of state.incidentDeck) {
       expect(card.family).toBe('event');
       expect((card as EventCard).trigger).toBe('Incident');
     }
@@ -303,7 +303,7 @@ describe('createTutorialScenario', () => {
     const state = createTutorialScenario();
     const devIds = new Set(state.market.cards.map(c => c.id));
     const invIds = new Set(state.market.cards.map(c => c.id));
-    const incidentIds = new Set(state.incidentQueue.map(c => c.id));
+    const incidentIds = new Set(state.incidentDeck.map(c => c.id));
 
     // Check business deck doesn't contain development row cards
     for (const card of state.decks.business) {
@@ -338,7 +338,7 @@ describe('createTutorialScenario', () => {
       ...state.discards.upgrade,
       ...state.market.cards,
       ...state.market.cards,
-      ...state.incidentQueue,
+      ...state.incidentDeck,
     ];
     // Dedup by base template ID
     const templateIdsUsed = new Set(

@@ -282,7 +282,7 @@ describe('DifficultyPresets Module', () => {
         for (const difficulty of ['Easy', 'Medium', 'Hard'] as const) {
           const a = createTestState('incident-determ', difficulty);
           const b = createTestState('incident-determ', difficulty);
-          expect(a.incidentQueue.map(c => c.name)).toEqual(b.incidentQueue.map(c => c.name));
+          expect(a.incidentDeck.map(c => c.name)).toEqual(b.incidentDeck.map(c => c.name));
         }
       });
 
@@ -291,8 +291,8 @@ describe('DifficultyPresets Module', () => {
         // N=3/M=2, so the seeded queue must be identical for the same seed.
         const medium = createTestState('medium-seq-invariant', 'Medium');
         const defaulted = createTestState('medium-seq-invariant');
-        expect(medium.incidentQueue.map(c => c.name)).toEqual(
-          defaulted.incidentQueue.map(c => c.name),
+        expect(medium.incidentDeck.map(c => c.name)).toEqual(
+          defaulted.incidentDeck.map(c => c.name),
         );
       });
     });

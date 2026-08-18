@@ -264,7 +264,7 @@ describe('Group D: deck generation & balance guardrails (AC6)', () => {
     const allIds = new Set([
       ...state.decks.event.map(c => c.id.replace(/-\d+$/, '')),
       ...state.market.cards.map(c => c.id.replace(/-\d+$/, '')),
-      ...state.incidentQueue.map(c => c.id.replace(/-\d+$/, '')),
+      ...state.incidentDeck.map(c => c.id.replace(/-\d+$/, '')),
       ...(state.hand ?? []).map(c => c.id.replace(/-\d+$/, '')),
     ]);
     for (const c of NEW_INCIDENT_CONTRACTS) {

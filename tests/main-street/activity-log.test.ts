@@ -308,7 +308,7 @@ describe('Activity Log', () => {
       executeDayStart(state);
 
       // Inject an Incident event into the queue
-      state.incidentQueue = [
+      state.incidentDeck = [
         makeIncidentEvent({ id: 'ne-1', name: 'Rainy Day', coinDelta: -1, reputationDelta: 0 }),
       ];
 
@@ -327,7 +327,7 @@ describe('Activity Log', () => {
       executeDayStart(state);
 
       // Empty the incident queue
-      state.incidentQueue = [];
+      state.incidentDeck = [];
 
       state.phase = 'IncidentPhase';
       const logBefore = state.activityLog.length;

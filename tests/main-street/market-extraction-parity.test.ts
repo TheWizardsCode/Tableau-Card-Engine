@@ -3,7 +3,7 @@
  *
  * Tests that lock in current Market Offer behavior before extraction
  * from Main Street to shared `src/card-system`. These tests cover:
- *  - Market row retrieval helpers (findTargetBusinessSlot, refillIncidentQueue)
+ *  - Market row retrieval helpers (findTargetBusinessSlot, replenishIncidentDeck)
  *  - Buy eligibility negative paths (insufficient coins, incident events, wrong phase)
  *  - Purchase result edge cases
  *  - Refill policy behaviors (incident queue, deck exhaustion)
@@ -21,7 +21,7 @@ import {
   purchaseBusiness,
   purchaseUpgrade,
   purchaseEvent,
-      refillIncidentQueue,
+      replenishIncidentDeck,
   refillMarket,
   canRefreshMarket,
   refreshMarket,
@@ -36,7 +36,6 @@ import {
   GRID_SIZE,
   MARKET_TOTAL_SLOTS,
   MARKET_UPGRADE_MAX,
-  INCIDENT_QUEUE_SIZE,
   REFRESH_MARKET_COST,
   type UpgradeCard,
   type EventCard,
@@ -652,59 +651,67 @@ describe('MarketOfferEngine — negative-path invalid row/slot', () => {
 
 // ── Refill Policy — Incident Queue ──────────────────────────
 
-describe('MarketOfferEngine — refill policy: incident queue', () => {
-  describe('refillIncidentQueue', () => {
-    it('should fill the incident queue to INCIDENT_QUEUE_SIZE when deck has enough incidents', () => {
+describe('MarketOfferEngine — refill policy: incident deck', () => {
+  describe('replenishIncidentDeck', () => {
+    it('should move all Incident-trigger cards into the deck at setup', () => {
       const state = createTestState();
-      state.incidentQueue = [];
-
-      const availableIncidents = state.decks.event.filter(e => e.trigger === 'Incident').length;
-      if (availableIncidents >= INCIDENT_QUEUE_SIZE) {
-        refillIncidentQueue(state);
-        expect(state.incidentQueue.length).toBe(INCIDENT_QUEUE_SIZE);
-      }
+      // Deck is fully populated at setup; no Incident cards remain in decks.event.
+      expect(state.decks.event.filter(e => e.trigger === 'Incident').length).toBe(0);
+      expect(state.incidentDeck.length).toBeGreaterThan(0);
+      expect(state.incidentDeck.every(c => c.trigger === 'Incident')).toBe(true);
     });
 
-    it('should only draw Incident-trigger cards into the queue', () => {
+    it('should only draw Incident-trigger cards into the deck', () => {
       const state = createTestState();
-      state.incidentQueue = [];
-      refillIncidentQueue(state);
 
-      for (const card of state.incidentQueue) {
+      for (const card of state.incidentDeck) {
         expect(card.trigger).toBe('Incident');
       }
     });
 
-    it('should not add duplicates to the incident queue', () => {
+    it('should not add duplicates to the incident deck', () => {
       const state = createTestState();
-      const beforeIds = state.incidentQueue.map(c => c.id);
-      refillIncidentQueue(state);
-      const afterIds = state.incidentQueue.map(c => c.id);
-
-      // New cards should not duplicate existing queue cards
-      const newCards = afterIds.filter(id => !beforeIds.includes(id));
-      const uniqueNewCards = new Set(newCards);
-      expect(uniqueNewCards.size).toBe(newCards.length);
+      const ids = state.incidentDeck.map(c => c.id);
+      const unique = new Set(ids);
+      expect(unique.size).toBe(ids.length);
     });
 
-    it('should stop filling when no more Incident cards are available', () => {
+    it('should leave the deck empty when no more Incident cards are available', () => {
       const state = createTestState();
       // Remove all Incident cards from deck and discards
       state.decks.event = state.decks.event.filter(e => e.trigger !== 'Incident');
       state.discards.event = state.discards.event.filter(e => e.trigger !== 'Incident');
-      state.incidentQueue = [];
+      state.incidentDeck = [];
 
-      refillIncidentQueue(state);
-      expect(state.incidentQueue.length).toBe(0);
+      replenishIncidentDeck(state);
+      expect(state.incidentDeck.length).toBe(0);
     });
 
     it('should not remove Investment events from the event deck', () => {
       const state = createTestState();
       const investmentCountBefore = state.decks.event.filter(e => e.trigger === 'Investment').length;
-      state.incidentQueue = [];
-      refillIncidentQueue(state);
+      // Move incidents into discards (the only place replenish can gather
+      // them from in the new model — decks.event holds investments only).
+      const incidentCountBefore = state.incidentDeck.length;
+      state.discards.event.push(...state.incidentDeck);
+      state.incidentDeck = [];
+      replenishIncidentDeck(state);
       const investmentCountAfter = state.decks.event.filter(e => e.trigger === 'Investment').length;
       expect(investmentCountAfter).toBe(investmentCountBefore);
+      expect(state.incidentDeck.length).toBe(incidentCountBefore);
+    });
+  });
+
+  describe('reshuffle from discard', () => {
+    it('should reshuffle event discards into the incident deck when replenishing', () => {
+      const state = createTestState();
+      // Move some incident cards into event discards and empty the incident deck.
+      const incidentCards = state.incidentDeck.slice(0, 2);
+      state.incidentDeck = [];
+      state.discards.event.push(...incidentCards);
+      replenishIncidentDeck(state);
+      expect(state.incidentDeck.length).toBeGreaterThan(0);
+      expect(state.discards.event.length).toBe(0);
     });
   });
 });
@@ -824,17 +831,14 @@ describe('MarketOfferEngine — refill policy: reshuffle from discard', () => {
     });
   });
 
-  describe('reshuffleIfNeeded — event deck for incident queue', () => {
-    it('should reshuffle event discards into deck when filling incident queue', () => {
+  describe('reshuffleIfNeeded — event deck for incident deck', () => {
+    it('should reshuffle event discards into deck when replenishing the incident deck', () => {
       const state = createTestState();
-      // Pull out some incident cards and put them into discards
-      const incidentCards = state.decks.event.filter(e => e.trigger === 'Incident').slice(0, 2);
-      // Empty the event deck and place incident cards into discards
-      state.decks.event = [];
-      state.discards.event.push(...incidentCards);
-      state.incidentQueue = [];
-      refillIncidentQueue(state);
-      expect(state.incidentQueue.length).toBeGreaterThan(0);
+      // Move incident cards into discards and empty the incident deck.
+      state.discards.event.push(...state.incidentDeck);
+      state.incidentDeck = [];
+      replenishIncidentDeck(state);
+      expect(state.incidentDeck.length).toBeGreaterThan(0);
       expect(state.discards.event.length).toBe(0);
     });
   });
@@ -959,7 +963,7 @@ describe('MarketOfferEngine — multi-turn market flow parity', () => {
       }
     });
 
-    it('should maintain incident queue integrity across 5 turns', () => {
+    it('should maintain incident deck integrity across 5 turns', () => {
       const state = createTestState('flow-queue-integrity');
       state.resourceBank.coins = 200;
 
@@ -967,12 +971,13 @@ describe('MarketOfferEngine — multi-turn market flow parity', () => {
         if (state.gameResult !== 'playing') break;
         playGreedyTurn(state);
 
-        expect(state.incidentQueue.length).toBeLessThanOrEqual(INCIDENT_QUEUE_SIZE);
-        for (const card of state.incidentQueue) {
+        // The incident deck only shrinks as incidents resolve (no visible
+        // refill loop); it never regrows above its setup size.
+        for (const card of state.incidentDeck) {
           expect(card.trigger).toBe('Incident');
         }
-        // No duplicates in queue
-        const ids = state.incidentQueue.map(c => c.id);
+        // No duplicates in deck
+        const ids = state.incidentDeck.map(c => c.id);
         const uniqueIds = new Set(ids);
         expect(uniqueIds.size).toBe(ids.length);
       }
@@ -994,8 +999,8 @@ describe('MarketOfferEngine — multi-turn market flow parity', () => {
         expect(state1.market.cards.map(c => c.id)).toEqual(
           state2.market.cards.map(c => c.id),
         );
-        expect(state1.incidentQueue.map(c => c.id)).toEqual(
-          state2.incidentQueue.map(c => c.id),
+        expect(state1.incidentDeck.map(c => c.id)).toEqual(
+          state2.incidentDeck.map(c => c.id),
         );
       }
     });

@@ -261,7 +261,7 @@ describe('Group C: duration expiry (AC2)', () => {
     // duration incident (Labor Shortage), which would add an unrelated active
     // effect and break the expiry window assertion. This test is scoped to the
     // two manually-resolved duration effects.
-    state.incidentQueue = [];
+    state.incidentDeck = [];
     state.streetGrid[0] = makeBiz({ baseIncome: 10, id: 'biz-test-exp' });
     state.streetGrid[0].reputationPerTurn = 0.1;
     state.streetGrid[0].currentReputationPerTurn = 0.1;
@@ -349,7 +349,7 @@ describe('Group C: deck generation & balance guardrails (AC6)', () => {
     const allIds = new Set([
       ...state.decks.event.map(c => c.id.replace(/-\d+$/, '')),
       ...state.market.cards.map(c => c.id.replace(/-\d+$/, '')),
-      ...state.incidentQueue.map(c => c.id.replace(/-\d+$/, '')),
+      ...state.incidentDeck.map(c => c.id.replace(/-\d+$/, '')),
       ...(state.hand ?? []).map(c => c.id.replace(/-\d+$/, '')),
     ]);
     for (const c of NEW_EVENT_CONTRACTS) {

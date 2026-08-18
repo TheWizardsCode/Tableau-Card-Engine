@@ -15,7 +15,6 @@ import { setupMainStreetGame, type MainStreetState } from '../../example-games/m
 import { createSeededRng } from '../../src/core-engine';
 import {
   refillMarket,
-  refillIncidentQueue,
   getAffordableBusinessCards,
   getEmptySlots,
 } from '../../example-games/main-street/MainStreetMarket';
@@ -26,7 +25,6 @@ import {
 } from '../../example-games/main-street/MainStreetEngine';
 import {
   MARKET_TOTAL_SLOTS,
-  INCIDENT_QUEUE_SIZE,
   createBusinessDeck,
   createEventDeck,
   createUpgradeDeck,
@@ -133,31 +131,25 @@ describe('Market Refill Integration (Expanded Pool)', () => {
     });
   });
 
-  describe('incident queue integrity', () => {
-    it('incident queue refills to INCIDENT_QUEUE_SIZE when deck has incidents', () => {
+  describe('incident deck integrity', () => {
+    it('incident deck is fully populated at setup (face-down, no refill loop)', () => {
       const state = createState('queue-refill-int');
-      // Drain queue
-      state.incidentQueue = [];
-      refillIncidentQueue(state);
-
-      const incidentsInDeck = state.decks.event.filter(e => e.trigger === 'Incident').length;
-      if (incidentsInDeck >= INCIDENT_QUEUE_SIZE) {
-        expect(state.incidentQueue.length).toBe(INCIDENT_QUEUE_SIZE);
-      } else {
-        // Queue should be however many incidents remain
-        expect(state.incidentQueue.length).toBeLessThanOrEqual(INCIDENT_QUEUE_SIZE);
-      }
+      // All Incident-trigger cards are moved out of decks.event into
+      // incidentDeck at setup (no visible refill loop).
+      expect(state.decks.event.filter(e => e.trigger === 'Incident').length).toBe(0);
+      expect(state.incidentDeck.length).toBeGreaterThan(0);
+      expect(state.incidentDeck.every(c => c.trigger === 'Incident')).toBe(true);
     });
 
-    it('incident queue has no duplicate ids', () => {
+    it('incident deck has no duplicate ids', () => {
       const state = createState('queue-dupes');
-      const dupes = hasDuplicateIds(state.incidentQueue);
+      const dupes = hasDuplicateIds(state.incidentDeck);
       expect(dupes).toEqual([]);
     });
 
-    it('incident queue contains only Incident-trigger cards', () => {
+    it('incident deck contains only Incident-trigger cards', () => {
       const state = createState('queue-trigger-check');
-      for (const card of state.incidentQueue) {
+      for (const card of state.incidentDeck) {
         expect(card.trigger).toBe('Incident');
       }
     });
@@ -179,7 +171,7 @@ describe('Market Refill Integration (Expanded Pool)', () => {
     const _rng = createSeededRng(42);
     const totalEventCards = createEventDeck(3, undefined, _rng, multiplier).length;
       const inDeck = state.decks.event.length;
-      const inQueue = state.incidentQueue.length;
+      const inQueue = state.incidentDeck.length;
       const investmentEvents = state.market.cards.filter(c => c.family === 'event').length;
       expect(inDeck + inQueue + investmentEvents).toBe(totalEventCards);
     });
@@ -224,8 +216,9 @@ describe('Monte Carlo: Market Refill Stability', () => {
           if (state.market.cards.length > MARKET_TOTAL_SLOTS) {
             failures.push(`seed=${seed} turn=${turnCount}: investments overflow (${state.market.cards.length})`);
           }
-          if (state.incidentQueue.length > INCIDENT_QUEUE_SIZE) {
-            failures.push(`seed=${seed} turn=${turnCount}: incident queue overflow (${state.incidentQueue.length})`);
+          const incDupes = hasDuplicateIds(state.incidentDeck);
+          if (incDupes.length > 0) {
+            failures.push(`seed=${seed} turn=${turnCount}: incident deck duplicates: ${incDupes.join(',')}`);
           }
 
           const bizDupes = hasDuplicateIds(state.market.cards);

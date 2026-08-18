@@ -14,7 +14,7 @@ import {
   purchaseUpgrade,
   purchaseEvent,
       refillMarket,
-  refillIncidentQueue,
+  replenishIncidentDeck,
   getAffordableBusinessCards,
   getEmptySlots,
 } from '../../example-games/main-street/MainStreetMarket';
@@ -605,16 +605,14 @@ describe('MainStreetMarket', () => {
       expect(state.discards.upgrade.length).toBe(0);
     });
 
-    it('should reshuffle event discards into event deck for incident queue filling', () => {
+    it('should replenish incident deck from event discards when exhausted', () => {
       const state = createTestState();
-      // Pull out some incident cards and put them into discards
-      const incidentCards = state.decks.event.filter(e => e.trigger === 'Incident').slice(0, 2);
-      // Empty the event deck and place incident cards into discards so reshuffle is required
-      state.decks.event = [];
-      state.discards.event.push(...incidentCards);
-      state.incidentQueue = [];
-      refillIncidentQueue(state);
-      expect(state.incidentQueue.length).toBeGreaterThan(0);
+      // Move ALL incident cards into event discards and empty the deck.
+      state.discards.event.push(...state.incidentDeck);
+      state.incidentDeck = [];
+      replenishIncidentDeck(state);
+      // The deck regains the discarded incidents (shuffled back in)
+      expect(state.incidentDeck.length).toBeGreaterThan(0);
       expect(state.discards.event.length).toBe(0);
     });
 
@@ -629,17 +627,13 @@ describe('MainStreetMarket', () => {
       expect(state.market.cards.length).toBe(0);
     });
 
-    it('should reshuffle event discards when no Investment events remain in deck (but Incident cards still exist)', () => {
+    it('should reshuffle event discards when no Investment events remain in the event deck', () => {
       const state = createTestState();
-      // Remove all Investment-trigger events from the deck, but keep Incidents
+      // Remove all Investment-trigger events from the deck into discards
       const investmentEvents = state.decks.event.filter(e => e.trigger === 'Investment');
-      // Put some into discards (simulating refresh-investments) and remove the rest
-      state.discards.event.push(...investmentEvents.slice(0, 2));
-      // The rest of investment events are removed (purchased/resolved)
-      state.decks.event = state.decks.event.filter(e => e.trigger !== 'Investment');
-      // Deck now has only Incident cards, discards have some Investment cards
-      expect(state.decks.event.every(e => e.trigger === 'Incident')).toBe(true);
-      expect(state.decks.event.length).toBeGreaterThan(0);
+      state.decks.event = [];
+      state.discards.event.push(...investmentEvents);
+      expect(state.decks.event.length).toBe(0);
       expect(state.discards.event.length).toBeGreaterThan(0);
 
       // Clear the row and empty the upgrade deck so the only legal third draw
@@ -655,38 +649,36 @@ describe('MainStreetMarket', () => {
       expect(investEvents.length).toBe(1);
     });
 
-    it('should reshuffle event discards when no Incident events remain in deck (but Investment cards still exist)', () => {
+    it('should replenish incident deck from event discards when deck is empty', () => {
       const state = createTestState();
-      // Remove all Incident-trigger events from the deck, but keep Investments
-      const incidentEvents = state.decks.event.filter(e => e.trigger === 'Incident');
-      // Put some into discards
-      state.discards.event.push(...incidentEvents.slice(0, 2));
-      // Remove the rest of incident events
-      state.decks.event = state.decks.event.filter(e => e.trigger !== 'Incident');
-      // Deck now has only Investment cards, discards have some Incident cards
-      expect(state.decks.event.every(e => e.trigger === 'Investment')).toBe(true);
-      expect(state.decks.event.length).toBeGreaterThan(0);
+      // Remove all Incident-trigger events from the deck into discards.
+      const incidentEvents = state.incidentDeck.slice();
+      state.incidentDeck = [];
+      state.discards.event.push(...incidentEvents);
+      // Deck now empty, discards have Incident cards
+      expect(state.incidentDeck.length).toBe(0);
       expect(state.discards.event.length).toBeGreaterThan(0);
 
-      // Clear incident queue so refill must draw
-      state.incidentQueue = [];
-      refillIncidentQueue(state);
+      // Empty incident deck so replenish must gather from discards
+      replenishIncidentDeck(state);
 
       // Should have drawn Incident events from the reshuffled discards
-      expect(state.incidentQueue.length).toBeGreaterThan(0);
+      expect(state.incidentDeck.length).toBeGreaterThan(0);
       expect(state.discards.event.length).toBe(0);
     });
   });
 
   describe('unique event templates', () => {
-    it('should have 45 unique event templates in the event deck', () => {
+    it('should have 56 unique event templates across the event deck and incident deck', () => {
       const state = createTestState();
-      // Count unique event templates by stripping the copy-number suffix
-      const uniqueTemplateIds = new Set(
-        state.decks.event.map(e => e.id.replace(/-\d+$/, '')),
-      );
-      // 55 = 37 + 8 Group C investment events + 10 Group D incidents
-      expect(uniqueTemplateIds.size).toBe(56); // +1 Graffiti Art (CG-0MSRC9UR9006FBXC)
+      // Count unique event templates by stripping the copy-number suffix.
+      // Incidents live in incidentDeck; Investment-trigger events in decks.event.
+      const uniqueTemplateIds = new Set([
+        ...state.decks.event.map(e => e.id.replace(/-\d+$/, '')),
+        ...state.incidentDeck.map(e => e.id.replace(/-\d+$/, '')),
+      ]);
+      // 56 = 37 + 8 Group C investment events + 10 Group D incidents + 1 Graffiti Art (CG-0MSRC9UR9006FBXC)
+      expect(uniqueTemplateIds.size).toBe(56);
     });
   });
 });

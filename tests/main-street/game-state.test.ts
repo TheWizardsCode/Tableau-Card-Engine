@@ -19,7 +19,6 @@ import {
   STARTING_COINS,
   STARTING_REPUTATION,
   MARKET_TOTAL_SLOTS,
-  INCIDENT_QUEUE_SIZE,
   createBusinessDeck,
   createCommunitySpaceDeck,
   createEventDeck,
@@ -167,7 +166,7 @@ describe('MainStreetState', () => {
       expect(state.decks.business.length + businessInMarket).toBe(totalBusiness);
       // Event: total - investment events in market - incident queue = remaining in deck
       const investmentEventsInMarket = state.market.cards.filter(c => c.family === 'event').length;
-      const eventAccountedFor = investmentEventsInMarket + state.decks.event.length + state.incidentQueue.length;
+      const eventAccountedFor = investmentEventsInMarket + state.decks.event.length + state.incidentDeck.length;
       // Account for positiveIncidentMultiplier in runtime preset
       const multiplier = (state.config && 'positiveIncidentMultiplier' in state.config)
         ? state.config.positiveIncidentMultiplier
@@ -199,10 +198,10 @@ describe('MainStreetState', () => {
       expect(state.hand.some(c => c.family === 'event')).toBe(false);
     });
 
-    it('should have incident queue pre-filled with Incident-trigger events', () => {
+    it('should have incident deck pre-filled with Incident-trigger events', () => {
       const state = createTestState();
-      expect(state.incidentQueue.length).toBe(INCIDENT_QUEUE_SIZE);
-      for (const card of state.incidentQueue) {
+      expect(state.incidentDeck.length).toBeGreaterThan(0);
+      for (const card of state.incidentDeck) {
         expect(card.family).toBe('event');
         expect(card.trigger).toBe('Incident');
       }
@@ -265,8 +264,8 @@ describe('MainStreetState', () => {
       );
 
       // Incident queue should have same cards in same order
-      expect(state1.incidentQueue.map(c => c.id)).toEqual(
-        state2.incidentQueue.map(c => c.id),
+      expect(state1.incidentDeck.map(c => c.id)).toEqual(
+        state2.incidentDeck.map(c => c.id),
       );
 
       // Active challenges should be identical for same seed
@@ -334,7 +333,7 @@ describe('MainStreetState', () => {
     it('should have all market + deck + queue cards equal total deck size (event)', () => {
       const state = createTestState();
       const investmentEventsInMarket = state.market.cards.filter(c => c.family === 'event').length;
-      const total = investmentEventsInMarket + state.decks.event.length + state.incidentQueue.length;
+      const total = investmentEventsInMarket + state.decks.event.length + state.incidentDeck.length;
       const multiplier = (state.config && 'positiveIncidentMultiplier' in state.config)
         ? state.config.positiveIncidentMultiplier
         : 1;
@@ -356,7 +355,7 @@ describe('MainStreetState', () => {
         ...state.decks.communitySpace.map(c => c.id),
         ...state.decks.event.map(c => c.id),
         ...state.decks.upgrade.map(c => c.id),
-        ...state.incidentQueue.map(c => c.id),
+        ...state.incidentDeck.map(c => c.id),
       ];
       const uniqueIds = new Set(allIds);
       expect(uniqueIds.size).toBe(allIds.length);

@@ -31,7 +31,7 @@ interface MarketActionSnapshot {
   decks: any | null;
   resourceBank: any | null;
   hand: any | null;
-  incidentQueue: any | null;
+  incidentDeck: any | null;
   activityLog: any | null;
   soldSlots: boolean[] | null;
 }
@@ -58,7 +58,7 @@ function captureSnapshot(state: MainStreetState): MarketActionSnapshot {
     decks: safeClone(state.decks),
     resourceBank: safeClone(state.resourceBank),
     hand: safeClone(state.hand ?? []),
-    incidentQueue: safeClone(state.incidentQueue),
+    incidentDeck: safeClone(state.incidentDeck),
     activityLog: safeClone(state.activityLog),
     soldSlots: safeClone(state.soldSlots ?? new Array(10).fill(false)) as boolean[],
   };
@@ -74,7 +74,7 @@ function restoreSnapshot(state: MainStreetState, snap: MarketActionSnapshot): vo
   state.decks = snap.decks as any;
   state.resourceBank = snap.resourceBank as any;
   state.hand = snap.hand as any;
-  state.incidentQueue = snap.incidentQueue as any;
+  state.incidentDeck = snap.incidentDeck as any;
   state.activityLog = snap.activityLog as any;
   state.soldSlots = snap.soldSlots ?? new Array(10).fill(false);
 }

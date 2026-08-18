@@ -18,7 +18,7 @@
 import type { MainStreetState, DayPhase } from './MainStreetState';
 import { PHASE_ORDER, addLog, syncResourceBankToLedger } from './MainStreetState';
 import type { EventCard, SynergyType } from './MainStreetCards';
-import { SELL_VALUE_RATIO, GRID_SIZE, isDurationEventCard, type DurationEventCard, type BusinessCard } from './MainStreetCards';
+import { SELL_VALUE_RATIO, GRID_SIZE, isDurationEventCard, recordIncidentDraw, type DurationEventCard, type BusinessCard } from './MainStreetCards';
 import { createActiveEffect, decayActiveEffects } from '../../src/core-engine/ActiveEffect';
 import { recordMainStreetEvent } from './MainStreetTranscript';
 import { applyIncome, type IncomeResult, updateNeighborsOnPlacement, updateNeighborsOnSale } from './MainStreetAdjacency';
@@ -28,7 +28,7 @@ import {
   purchaseUpgrade,
   purchaseEvent,
   refillMarket,
-  refillIncidentQueue,
+  replenishIncidentDeck,
   cycleMarketCards,
   playBusinessFromHand,
   playUpgradeFromHand,
@@ -519,14 +519,26 @@ export function resolveHeldInvestment(state: MainStreetState): EventCard | null 
 }
 
 /**
- * Resolves the front Incident event from the incident queue (FIFO).
- * After resolving, draws a replacement Incident from the event deck.
- * Returns the resolved event or null if the queue is empty.
+ * Resolves the front Incident event from the face-down incident deck
+ * (front = next to resolve). Records the draw in the incident-draw balance
+ * history so subsequent constrained draws (deck rebuilds) see the resolved
+ * sequence. When the deck is exhausted, Incident cards from the event deck
+ * / discards reshuffle back in. Returns the resolved event or null if no
+ * incident is available.
  */
 export function resolveIncident(state: MainStreetState): EventCard | null {
-  // Pop front of the incident queue
-  if (state.incidentQueue.length === 0) return null;
-  const event = state.incidentQueue.shift()!;
+  // Deck exhausted: reshuffle incident cards back in from the event deck /
+  // event discards (existing reshuffle convention).
+  if (state.incidentDeck.length === 0) {
+    replenishIncidentDeck(state);
+  }
+  if (state.incidentDeck.length === 0) return null;
+
+  // Pop the top card of the incident deck (front = next to resolve).
+  const event = state.incidentDeck.shift()!;
+  // Track the draw so the balance history mirrors the resolved sequence
+  // (AC3: recordIncidentDraw history still tracks the resolved sequence).
+  recordIncidentDraw(state.incidentBalance, event);
 
   const coinsBefore = state.resourceBank.coins;
   const repBefore = state.resourceBank.reputation;
@@ -538,9 +550,6 @@ export function resolveIncident(state: MainStreetState): EventCard | null {
     `Incident: ${event.name} (${describeEventEffects(coinChange, repChange)})`,
     classifyEffect(coinChange, repChange),
   );
-
-  // Draw replacement from deck (only Incident-trigger cards)
-  refillIncidentQueue(state);
 
   return event;
 }

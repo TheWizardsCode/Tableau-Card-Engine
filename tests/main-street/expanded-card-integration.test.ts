@@ -23,7 +23,7 @@ describe('Main Street expanded cards are included in runtime market/decks', () =
       const marketIds = [
         ...state.market.cards.map(card => card.id),
         ...state.market.cards.map(card => card.id),
-        ...state.incidentQueue.map(card => card.id),
+        ...state.incidentDeck.map(card => card.id),
       ];
 
       const deckIds = [

@@ -258,10 +258,12 @@ export function createTutorialScenario(
     }
   }
 
-  // Incident queue: from event deck
-  const incidentQueue: EventCard[] = [];
+  // Incident deck (face-down): scenario-placed incidents at the front
+  // (next to resolve). Exactly the scenario's INCIDENT_QUEUE_SIZE cards for
+  // the tutorial flow (full-deck tutorial rework: CG-0MSXOXY11005CO1N).
+  const incidentDeck: EventCard[] = [];
   for (const templateId of scenario.incidentQueue) {
-    incidentQueue.push(findCardByTemplate(eventDeck, templateId));
+    incidentDeck.push(findCardByTemplate(eventDeck, templateId));
   }
 
   // ── Setup deterministic RNG ───────────────────────────────
@@ -313,11 +315,11 @@ export function createTutorialScenario(
     },
     challengesCompleted: [],
     activeChallenges: [],
-    incidentQueue,
-    // Backfill the balance history from the scenario-defined queue so
-    // subsequent constrained refills see the actual resolved sequence
+    incidentDeck,
+    // Backfill the balance history from the scenario-defined deck so
+    // subsequent constrained rebuilds see the actual sequence
     // (CG-0MSL0OP040043KKZ).
-    incidentBalance: createIncidentBalanceFromQueue(incidentQueue),
+    incidentBalance: createIncidentBalanceFromQueue(incidentDeck),
     gameResult: 'playing',
     endReason: null,
     finalScore: 0,

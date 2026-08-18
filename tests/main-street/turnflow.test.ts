@@ -440,11 +440,11 @@ describe('MainStreetEngine', () => {
   });
 
   describe('resolveIncident', () => {
-    it('should resolve the front Incident event from the queue', () => {
+    it('should resolve the front Incident event from the deck', () => {
       const state = createTestState();
-      // Set up incident queue with a known event at the front
+      // Set up incident deck with a known event at the front
       const incidentEvt = makeIncidentEvent({ coinDelta: -2 });
-      state.incidentQueue = [incidentEvt];
+      state.incidentDeck = [incidentEvt];
       const coinsBefore = state.resourceBank.coins;
 
       const result = resolveIncident(state);
@@ -454,88 +454,81 @@ describe('MainStreetEngine', () => {
       expect(state.resourceBank.coins).toBe(coinsBefore - 2);
     });
 
-    it('should return null when the incident queue is empty', () => {
+    it('should return null when the incident deck is empty', () => {
       const state = createTestState();
-      state.incidentQueue = [];
+      state.incidentDeck = [];
 
       const result = resolveIncident(state);
 
       expect(result).toBeNull();
     });
 
-    it('should refill the queue from the deck after resolving', () => {
+    it('should pop the top card from the deck (no visible refill)', () => {
       const state = createTestState();
       const incidentEvt = makeIncidentEvent({ id: 'front-incident', coinDelta: -1 });
       const deckIncident = makeIncidentEvent({ id: 'deck-incident', coinDelta: -2 });
-      state.incidentQueue = [incidentEvt];
-      state.decks.event = [deckIncident];
+      state.incidentDeck = [incidentEvt, deckIncident];
 
       resolveIncident(state);
 
-      // Queue should have been refilled with the deck incident
-      expect(state.incidentQueue.length).toBe(1);
-      expect(state.incidentQueue[0].id).toBe('deck-incident');
-      expect(state.decks.event.length).toBe(0);
+      // The deck is consumed one card at a time; no topping-up to a fixed size.
+      expect(state.incidentDeck.length).toBe(1);
+      expect(state.incidentDeck[0].id).toBe('deck-incident');
     });
 
-    it('should not refill when deck has no Incident cards', () => {
+    it('should record the resolved draw in the balance history', () => {
       const state = createTestState();
-      const incidentEvt = makeIncidentEvent({ coinDelta: -1 });
-      state.incidentQueue = [incidentEvt];
-      // Only Investment events in deck
-      state.decks.event = state.decks.event.filter(e => e.trigger !== 'Incident');
+      const incidentEvt = makeIncidentEvent({ id: 'history-incident', coinDelta: -1 });
+      state.incidentDeck = [incidentEvt];
+      state.incidentBalance.recentNames = [];
+      state.incidentBalance.polarityRun = null;
 
       resolveIncident(state);
 
-      expect(state.incidentQueue.length).toBe(0);
+      expect(state.incidentBalance.recentNames[0]).toBe('Test Incident Event');
+      expect(state.incidentDeck.length).toBe(0);
     });
 
-    it('should resolve multiple items in FIFO order (A -> B -> C)', () => {
+    it('should resolve multiple items in deck order (A -> B -> C)', () => {
       const state = createTestState();
       const evtA = makeIncidentEvent({ id: 'inc-A', coinDelta: -1 });
       const evtB = makeIncidentEvent({ id: 'inc-B', coinDelta: -2 });
       const evtC = makeIncidentEvent({ id: 'inc-C', coinDelta: -3 });
-      state.incidentQueue = [evtA, evtB, evtC];
-      state.decks.event = []; // No refills
+      state.incidentDeck = [evtA, evtB, evtC];
       state.resourceBank.coins = 100;
 
       const first = resolveIncident(state);
       expect(first!.id).toBe('inc-A');
-      expect(state.incidentQueue.length).toBe(2);
+      expect(state.incidentDeck.length).toBe(2);
 
       const second = resolveIncident(state);
       expect(second!.id).toBe('inc-B');
-      expect(state.incidentQueue.length).toBe(1);
+      expect(state.incidentDeck.length).toBe(1);
 
       const third = resolveIncident(state);
       expect(third!.id).toBe('inc-C');
-      expect(state.incidentQueue.length).toBe(0);
+      expect(state.incidentDeck.length).toBe(0);
 
       // Cumulative effect: -1 + -2 + -3 = -6
       expect(state.resourceBank.coins).toBe(100 - 6);
     });
 
-    it('should refill queue back to INCIDENT_QUEUE_SIZE after resolution', () => {
+    it('should replenish the deck from event cards when exhausted', () => {
       const state = createTestState();
-      state.incidentQueue = [
+      state.incidentDeck = [
         makeIncidentEvent({ id: 'front-1', coinDelta: -1 }),
         makeIncidentEvent({ id: 'front-2', coinDelta: -1 }),
       ];
-      // Stock the deck with enough Incident cards
-      state.decks.event = [
-        makeIncidentEvent({ id: 'deck-1', coinDelta: -1 }),
-        makeIncidentEvent({ id: 'deck-2', coinDelta: -1 }),
-      ];
+      // No remaining Incident cards in the event deck; exhaustion leaves the
+      // deck empty and further resolutions return null (no crash).
+      state.decks.event = state.decks.event.filter(e => e.trigger !== 'Incident');
       state.resourceBank.coins = 100;
 
-      // Resolve the front item
+      resolveIncident(state);
       resolveIncident(state);
 
-      // Queue should be back to INCIDENT_QUEUE_SIZE (2)
-      expect(state.incidentQueue.length).toBe(2);
-      // Front should now be 'front-2', back should be 'deck-1'
-      expect(state.incidentQueue[0].id).toBe('front-2');
-      expect(state.incidentQueue[1].id).toBe('deck-1');
+      expect(state.incidentDeck.length).toBe(0);
+      expect(resolveIncident(state)).toBeNull();
     });
   });
 
@@ -755,7 +748,7 @@ describe('MainStreetEngine', () => {
       const state = createTestState();
       state.resourceBank.coins = 1;
       // Ensure the incident queue has a negative event that causes bankruptcy
-      state.incidentQueue = [
+      state.incidentDeck = [
         {
           family: 'event',
           id: 'evt-bankruptcy-test',

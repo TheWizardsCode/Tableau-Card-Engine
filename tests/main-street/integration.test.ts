@@ -28,7 +28,6 @@ import {
   getEmptySlots,
 } from '../../example-games/main-street/MainStreetMarket';
 import {
-  INCIDENT_QUEUE_SIZE,
   CHALLENGE_BONUS_POINTS,
   createBusinessDeck,
   type EventCard,
@@ -390,68 +389,73 @@ describe('Integration: Income & Synergy', () => {
   });
 });
 
-// ── Incident Queue Integration ──────────────────────────────
+// ── Incident Deck Integration ───────────────────────────────
 
-describe('Integration: Incident Queue', () => {
-  it('drains and refills the incident queue across multiple turns', () => {
+describe('Integration: Incident Deck', () => {
+  it('resolves the front incident card from the deck across multiple turns', () => {
     const state = setupMainStreetGame({ seed: 'queue-drain' });
     state.resourceBank.coins = 100;
     state.resourceBank.reputation = 10;
 
-    // Record initial queue IDs
-    const initialQueueIds = state.incidentQueue.map(c => c.id);
-    expect(initialQueueIds).toHaveLength(INCIDENT_QUEUE_SIZE);
+    // Record initial deck IDs
+    const initialDeckIds = state.incidentDeck.map(c => c.id);
+    expect(initialDeckIds.length).toBeGreaterThan(0);
 
-    // Turn 1: resolve front incident, queue should refill
+    // Turn 1: resolve front incident; the deck shrinks by one (no refill)
     executeDayStart(state);
     const result1 = processEndOfTurn(state);
     expect(result1.incident).not.toBeNull();
-    expect(result1.incident!.id).toBe(initialQueueIds[0]);
+    expect(result1.incident!.id).toBe(initialDeckIds[0]);
+    expect(state.incidentDeck.length).toBe(initialDeckIds.length - 1);
 
     if (state.gameResult !== 'playing') return;
-
-    // After turn 1, queue should still have INCIDENT_QUEUE_SIZE if deck has incidents
-    const incidentsInDeck1 = state.decks.event.filter(e => e.trigger === 'Incident').length;
-    if (incidentsInDeck1 > 0) {
-      expect(state.incidentQueue.length).toBe(INCIDENT_QUEUE_SIZE);
-    }
 
     // Turn 2: next front resolved
     executeDayStart(state);
     const result2 = processEndOfTurn(state);
     expect(result2.incident).not.toBeNull();
     // The second resolved should be the card that was at position [1] initially
-    // (or a deck-drawn card that replaced it — either way it's a valid Incident)
+    expect(result2.incident!.id).toBe(initialDeckIds[1]);
     expect(result2.incident!.trigger).toBe('Incident');
   });
 
-  it('queue shrinks naturally when deck runs out of incident cards', () => {
+  it('deck drains naturally when no incident cards remain', () => {
     const state = setupMainStreetGame({ seed: 'queue-exhaust' });
     state.resourceBank.coins = 100;
     state.resourceBank.reputation = 10;
 
-    // Remove all Incident cards from the deck
-    state.decks.event = state.decks.event.filter(e => e.trigger !== 'Incident');
+    // Replace the incident deck with a single known card.
+    state.incidentDeck = [{
+      family: 'event',
+      id: 'only-incident',
+      name: 'Only Incident',
+      trigger: 'Incident',
+      effect: '-1 coin',
+      target: 'All',
+      coinDelta: -1,
+      reputationDelta: 0,
+      cost: 0,
+    }];
 
-    // Queue should still have its initial cards
-    const queueSizeBefore = state.incidentQueue.length;
-    expect(queueSizeBefore).toBe(INCIDENT_QUEUE_SIZE);
+    const queueSizeBefore = state.incidentDeck.length;
+    expect(queueSizeBefore).toBe(1);
 
     // Resolve all queued incidents
     for (let i = 0; i < queueSizeBefore; i++) {
-      if (state.incidentQueue.length === 0) break;
+      if (state.incidentDeck.length === 0) break;
       resolveIncident(state);
     }
 
-    // Queue should be empty — no deck cards to refill
-    expect(state.incidentQueue.length).toBe(0);
+    // Deck is empty — no cards to replenish (no refill loop)
+    expect(state.incidentDeck.length).toBe(0);
+    expect(resolveIncident(state)).toBeNull();
   });
 
   it('resolveIncident draws only Incident-trigger cards, not Investment-trigger', () => {
     const state = setupMainStreetGame({ seed: 'queue-filter' });
     state.resourceBank.coins = 100;
 
-    // Set up: queue with 1 incident, deck has only Investment events
+    // Set up: deck with 1 incident; event deck has only Investment events
     const incident: EventCard = {
       family: 'event',
       id: 'test-incident-only',
@@ -463,7 +467,7 @@ describe('Integration: Incident Queue', () => {
       reputationDelta: 0,
       cost: 0,
     };
-    state.incidentQueue = [incident];
+    state.incidentDeck = [incident];
     state.decks.event = [
       {
         family: 'event',
@@ -480,9 +484,9 @@ describe('Integration: Incident Queue', () => {
 
     resolveIncident(state);
 
-    // Queue should NOT have the Investment card
-    expect(state.incidentQueue.length).toBe(0);
-    // Investment card should still be in the deck
+    // Deck should NOT have the Investment card
+    expect(state.incidentDeck.length).toBe(0);
+    // Investment card should still be in the event deck
     expect(state.decks.event.length).toBe(1);
     expect(state.decks.event[0].trigger).toBe('Investment');
   });

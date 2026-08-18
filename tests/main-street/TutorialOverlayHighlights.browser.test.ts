@@ -171,7 +171,7 @@ function computeTargetRect(
     case 'incidentQueue': {
       // Incident queue panel — mirror refreshIncidentQueue() panel math with
       // the LIVE queue/effects (boot: 2 cards, 0 effects → 194px).
-      const queue = s?.state?.incidentQueue ?? [];
+      const queue = s?.state?.incidentDeck ?? [];
       const effects = s?.state?.activeEffects ?? [];
       const titleH = 22;
       const pad = 8;

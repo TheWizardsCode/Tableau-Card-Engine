@@ -257,7 +257,7 @@ describe('processEndOfTurn incident deltas', () => {
   it('surfaces the incident coin/reputation deltas on TurnResult', () => {
     const state: MainStreetState = setupMainStreetGame({ seed: 'incident-delta-test' });
     const incidentEvt = makeIncidentEvent({ coinDelta: -2, reputationDelta: -1 });
-    state.incidentQueue = [incidentEvt];
+    state.incidentDeck = [incidentEvt];
     state.phase = 'MarketPhase';
 
     const result = processEndOfTurn(state);
@@ -269,7 +269,7 @@ describe('processEndOfTurn incident deltas', () => {
 
   it('reports zero deltas when no incident resolves', () => {
     const state: MainStreetState = setupMainStreetGame({ seed: 'incident-delta-none' });
-    state.incidentQueue = [];
+    state.incidentDeck = [];
     state.phase = 'MarketPhase';
 
     const result = processEndOfTurn(state);

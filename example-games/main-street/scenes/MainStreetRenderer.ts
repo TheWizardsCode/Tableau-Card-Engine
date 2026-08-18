@@ -1246,7 +1246,7 @@ export class MainStreetRenderer {
     const s = this.scene;
     s.incidentQueueContainer.removeAll(true);
 
-    const queue = s.state.incidentQueue;
+    const queue = s.state.incidentDeck;
     const deckRemaining = s.state.decks.event.length;
     const activeEffects = s.state.activeEffects;
 

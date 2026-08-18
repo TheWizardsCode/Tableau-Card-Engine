@@ -30,14 +30,11 @@ import {
   MARKET_BUSINESS_MAX,
   MARKET_UPGRADE_MAX,
   MARKET_EVENT_MAX,
-  INCIDENT_QUEUE_SIZE,
   loadTemplatesFromCsv,
   resetTemplatesToDefault,
   type IncidentBalanceState,
   createIncidentBalanceState,
   createIncidentBalanceFromQueue,
-  findConstrainedIncidentIndex,
-  recordIncidentDraw,
 } from './MainStreetCards';
 import {
   type ActiveChallenge,
@@ -209,8 +206,8 @@ export interface MainStreetState {
   challengesCompleted: string[];
   /** Active challenges for this run (selected at setup, evaluated each EndCheck). */
   activeChallenges: ActiveChallenge[];
-  /** Visible FIFO queue of upcoming Incident events (front = next to resolve). */
-  incidentQueue: EventCard[];
+  /** Face-down incident deck: cards are popped from the top (end of array) at end-of-turn. */
+  incidentDeck: EventCard[];
   /**
    * Runtime-mutable incident-draw balance: repeat-spacing window, streak
    * limit, and the recent-draw history needed to enforce them. Limits can be
@@ -290,7 +287,8 @@ export interface MainStreetSerializedState {
     challengeId: string;
     completed: boolean;
   }[];
-  incidentQueue: EventCard[];
+  /** Face-down incident deck at the time of save (migrated from old incidentQueue by the loader). */
+  incidentDeck: EventCard[];
   /** Incident-draw balance limits + recent-draw history (see MainStreetState). */
   incidentBalance: IncidentBalanceState;
   gameResult: GameResult;
@@ -617,29 +615,31 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
   // assembled (it needs state.rng / decks / discards wired up).
   const market: MarketState = { cards: [] };
 
-  // Pre-draw incident cards into the visible FIFO queue (constraint-aware,
-  // CG-0MSL0OP040043KKZ). The balance state carries the repeat-spacing window,
-  // streak limit, and recent-draw history; every draw goes through
-  // findConstrainedIncidentIndex so the initial queue satisfies the same
-  // constraints as later refills. No RNG is consumed here — deck order
-  // (seeded shuffle) is the source of determinism.
+  // Build the face-down incident deck: move every Incident-trigger card from
+  // the seeded event deck into `incidentDeck` (front = next to resolve). The
+  // remaining Investment-trigger cards stay in the event deck for the market.
+  // Deck order is deterministic (same seed ⇒ same shuffle ⇒ same deck); the
+  // constraint-aware ordering (repeat spacing / streak) is applied at deck
+  // build/reshuffle time by orderIncidentDeck (CG-0MSXOVQFL007G3VH).
   // Incident-draw balance limits come from the difficulty preset's config
   // (per-difficulty tuning, CG-0MSL0OU1E005WFJB). Configs that omit the
   // fields (legacy saves) fall back to the engine defaults N=3, M=2 via ??
-  // in createIncidentBalanceState. Applied before the pre-draw below so the
-  // initial queue already honors the tuned limits.
+  // in createIncidentBalanceState.
   const incidentBalance = createIncidentBalanceState({
     repeatSpacing: config.incidentRepeatSpacing,
     maxStreak: config.incidentMaxStreak,
   });
-  const incidentQueue: EventCard[] = [];
-  for (let i = 0; i < INCIDENT_QUEUE_SIZE; i++) {
-    const idx = findConstrainedIncidentIndex(eventDeck, incidentBalance);
-    if (idx === -1) break;
-    const card = eventDeck.splice(idx, 1)[0];
-    incidentQueue.push(card);
-    recordIncidentDraw(incidentBalance, card);
+  const incidentDeck: EventCard[] = [];
+  const remainingEventCards: EventCard[] = [];
+  for (const card of eventDeck) {
+    if (card.trigger === 'Incident') {
+      incidentDeck.push(card);
+    } else {
+      remainingEventCards.push(card);
+    }
   }
+  eventDeck.length = 0;
+  eventDeck.push(...remainingEventCards);
 
   // Build initial state -- use config values instead of hard-coded constants
   const initCoins = config.startingCoins;
@@ -674,7 +674,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     },
     challengesCompleted: [],
     activeChallenges: [],
-    incidentQueue,
+    incidentDeck,
     incidentBalance,
     gameResult: 'playing',
     endReason: null,
@@ -760,7 +760,7 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
       challengeId: ac.challenge.id,
       completed: ac.completed,
     })),
-    incidentQueue: structuredClone(state.incidentQueue),
+    incidentDeck: structuredClone(state.incidentDeck),
     incidentBalance: structuredClone(state.incidentBalance),
     gameResult: state.gameResult,
     endReason: state.endReason,
@@ -943,6 +943,31 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
     (saved as Record<string, unknown>).incidentBalance = createIncidentBalanceFromQueue(queue);
   }
 
+  // ── incidentQueue → incidentDeck (CG-0MSTOATDP000JNHH) ──────────
+  // Old saves stored up to 2 pre-drawn Incident cards in `incidentQueue`
+  // (front = next to resolve) with the remaining incidents still in the
+  // event deck. The new model is a single face-down `incidentDeck`: the
+  // queue cards first (they are the next to resolve), then the remaining
+  // Incident-trigger cards from the event deck in their existing order.
+  // Incident cards are removed from the event deck — they now live solely
+  // in the incident deck.
+  if ('incidentQueue' in saved && !('incidentDeck' in saved)) {
+    const queue = (saved.incidentQueue as EventCard[] | undefined) ?? [];
+    delete (saved as Record<string, unknown>).incidentQueue;
+    const eventDeck = (saved.decks as Record<string, unknown> | undefined)?.event as EventCard[] | undefined;
+    const remainingIncidents: EventCard[] = [];
+    const remainingEvents: EventCard[] = [];
+    for (const card of eventDeck ?? []) {
+      if (card.trigger === 'Incident') remainingIncidents.push(card);
+      else remainingEvents.push(card);
+    }
+    if (eventDeck) {
+      eventDeck.length = 0;
+      eventDeck.push(...remainingEvents);
+    }
+    (saved as Record<string, unknown>).incidentDeck = [...queue, ...remainingIncidents];
+  }
+
   // ── currentIncome / currentReputationPerTurn: add missing fields for legacy saves ─
   // These fields were introduced by CG-0MRV84ZT60069PW6 (per-card incremental tracking).
   // Legacy saves won't have them. We leave them as undefined so the income phase
@@ -1045,10 +1070,13 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
         completed: ac.completed,
       };
     }),
-    incidentQueue: structuredClone(saved.incidentQueue),
+    incidentDeck: structuredClone(saved.incidentDeck),
     incidentBalance: saved.incidentBalance
       ? structuredClone(saved.incidentBalance)
-      : createIncidentBalanceFromQueue(saved.incidentQueue ?? []),
+      // New-format saves always carry incidentBalance; this fallback only
+      // fires for malformed saves. History tracks the RESOLVED sequence, so
+      // a fresh (empty) balance is correct — never backfill from the deck.
+      : createIncidentBalanceState({}),
     gameResult: saved.gameResult,
     endReason: saved.endReason,
     finalScore: saved.finalScore,

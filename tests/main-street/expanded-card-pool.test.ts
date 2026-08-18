@@ -522,7 +522,7 @@ describe('Expanded Card Pool: Seeded Deck Resolution', () => {
     // Market should be identical
     expect(state1.market.cards.map(c => c.id)).toEqual(state2.market.cards.map(c => c.id));
     expect(state1.market.cards.map(c => c.id)).toEqual(state2.market.cards.map(c => c.id));
-    expect(state1.incidentQueue.map(c => c.id)).toEqual(state2.incidentQueue.map(c => c.id));
+    expect(state1.incidentDeck.map(c => c.id)).toEqual(state2.incidentDeck.map(c => c.id));
   });
 
   it('should produce different deck ordering for different seeds', () => {
@@ -546,7 +546,7 @@ describe('Expanded Card Pool: Seeded Deck Resolution', () => {
 
     const eventTotal = state.market.cards.filter(c => c.family === 'event').length
       + state.decks.event.length
-      + state.incidentQueue.length
+      + state.incidentDeck.length
       + (state.hand ?? []).filter(c => c.family === 'event').length;
     const multiplier = getPreset(undefined).positiveIncidentMultiplier;
     expect(eventTotal).toBe(createEventDeck(3, undefined, _rng, multiplier).length);

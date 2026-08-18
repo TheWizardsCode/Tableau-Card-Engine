@@ -67,7 +67,7 @@ describe('Flu event: full lifecycle integration', () => {
       multiplier: 0.8,
     } as unknown as EventCard;
 
-    state.incidentQueue.unshift(fluEvent);
+    state.incidentDeck.unshift(fluEvent);
 
     // Resolve the flu incident
     const resolvedEvent = resolveIncident(state);
@@ -131,7 +131,7 @@ describe('Flu event: full lifecycle integration', () => {
       effectType: 'income-multiplier',
       multiplier: 0.8,
     } as unknown as EventCard;
-    state.incidentQueue.unshift(fluEvent);
+    state.incidentDeck.unshift(fluEvent);
 
     resolveIncident(state);
 
@@ -159,7 +159,7 @@ describe('Flu event: full lifecycle integration', () => {
       effectType: 'income-multiplier',
       multiplier: 0.8,
     } as unknown as EventCard;
-    state.incidentQueue.unshift(fluEvent);
+    state.incidentDeck.unshift(fluEvent);
 
     resolveIncident(state);
 
@@ -185,7 +185,7 @@ describe('Flu event: full lifecycle integration', () => {
       effectType: 'income-multiplier',
       multiplier: 0.8,
     } as unknown as EventCard;
-    state.incidentQueue.unshift(fluEvent);
+    state.incidentDeck.unshift(fluEvent);
 
     const logBefore = state.activityLog.length;
     resolveIncident(state);

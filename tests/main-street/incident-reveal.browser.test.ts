@@ -128,7 +128,7 @@ describe('MainStreet incident reveal presentation', () => {
 
     // Queue a negative incident for resolution at end of turn.
     const incident = makeLossIncident();
-    (scene.state as { incidentQueue: EventCard[] }).incidentQueue = [incident];
+    (scene.state as { incidentDeck: EventCard[] }).incidentDeck = [incident];
 
     // Spy on the flight visual factory to observe the reveal's rendering.
     const createVisualSpy = vi.spyOn(scene.msAnimator as unknown as { createTransferCardVisual: (...a: unknown[]) => unknown }, 'createTransferCardVisual');
@@ -166,7 +166,7 @@ describe('MainStreet incident reveal presentation', () => {
     game = await bootGame();
     const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
 
-    (scene.state as { incidentQueue: EventCard[] }).incidentQueue = [makeLossIncident()];
+    (scene.state as { incidentDeck: EventCard[] }).incidentDeck = [makeLossIncident()];
     // Force reduced motion on the settings panel.
     (scene as unknown as { settingsPanel: { reducedMotion: boolean } }).settingsPanel = { reducedMotion: true };
 
