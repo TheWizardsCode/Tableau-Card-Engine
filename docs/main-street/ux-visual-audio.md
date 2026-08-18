@@ -132,9 +132,18 @@ void popTextOrIcon({
   captures `computeSynergyPairs()` before the placement command and animates
   `diffNewSynergyPairs(before, after)` — ONLY newly-formed pairs animate;
   pre-existing pairs never re-trigger on a plain refresh.
+- Geometry (CG-0MSVM3WCD007BRQP): both the static lines and the draw-in
+  line use the shared `synergyLineEndpoints(pair, layout)` helper
+  (`example-games/main-street/scenes/synergyLineEndpoints.ts`) — the
+  centre-to-centre segment is clipped to the two SLOT rects, so lines run
+  edge-to-edge for orthogonally adjacent slots and visually corner-to-corner
+  for diagonally adjacent slots (extended-range pairs are clipped to the card
+  boundaries; the straight line still crosses intermediate cells). There is
+  no duplicated geometry to drift.
 - Behavior (reduced-motion OFF):
-  1. The new synergy line fades in (same geometry/colour as
-     `MainStreetRenderer.drawSynergyLines()`, depth 10, alpha 0 → 0.7).
+  1. The new synergy line fades in (same clipped edge/corner endpoints and
+     colour as `MainStreetRenderer.drawSynergyLines()`, depth 10,
+     alpha 0 → 0.7).
   2. A spark expands and fades at the pair midpoint.
   3. The two paired cards pulse (brief scale bounce) — street card
      containers are tagged with their slot index

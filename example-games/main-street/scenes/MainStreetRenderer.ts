@@ -12,6 +12,7 @@ import {
 import {
   computeSynergyPairs,
 } from '../MainStreetAdjacency';
+import { synergyLineEndpoints } from './synergyLineEndpoints';
 import {
   formatSynergyRate,
   buildCardTooltipInfo,
@@ -484,39 +485,37 @@ export class MainStreetRenderer {
    * Draws visual lines between adjacent businesses that share a synergy type.
    * Each line uses the colour of the shared synergy type (from synergyColor).
    * Lines are drawn over the street grid but behind tooltip zones.
+   *
+   * Geometry (CG-0MSVM3WCD007BRQP): each line is the centre-to-centre
+   * segment clipped to the two SLOT rects via the shared `synergyLineEndpoints`
+   * helper — edge-to-edge for orthogonally adjacent slots, visually
+   * corner-to-corner for diagonally adjacent slots, and clipped to the card
+   * boundaries for extended-range pairs (the straight line still crosses
+   * intermediate cells). Endpoints target the slot rect (the visual card is
+   * inset 2px, `renderW/H = slotW − 4`) so the lines sit on the slot grid.
+   * The main 3px stroke and the 6px/0.2-alpha glow share the SAME clipped
+   * endpoints (drawn back-to-back on one Graphics object).
    */
   private drawSynergyLines(): void {
     const s = this.scene;
-    const { streetX, streetTop, slotW, slotGap, slotH, streetCols, streetRowGap } = s.layout;
-
-    const soldSlots: boolean[] = s.state.soldSlots ?? [];
-    const pairs = computeSynergyPairs(s.state.streetGrid, soldSlots);
+    const pairs = computeSynergyPairs(s.state.streetGrid, s.state.soldSlots ?? []);
 
     for (const pair of pairs) {
-      const fromCol = pair.fromIndex % streetCols;
-      const fromRow = Math.floor(pair.fromIndex / streetCols);
-      const toCol = pair.toIndex % streetCols;
-      const toRow = Math.floor(pair.toIndex / streetCols);
-
-      const x1 = streetX + fromCol * (slotW + slotGap) + slotW / 2;
-      const y1 = streetTop + fromRow * (slotH + streetRowGap) + slotH / 2;
-      const x2 = streetX + toCol * (slotW + slotGap) + slotW / 2;
-      const y2 = streetTop + toRow * (slotH + streetRowGap) + slotH / 2;
-
+      const { p1, p2 } = synergyLineEndpoints(pair, s.layout);
       const color = synergyColor(pair.sharedSynergy);
 
       const line = s.add.graphics();
       line.lineStyle(3, color, 0.7);
       line.beginPath();
-      line.moveTo(x1, y1);
-      line.lineTo(x2, y2);
+      line.moveTo(p1.x, p1.y);
+      line.lineTo(p2.x, p2.y);
       line.strokePath();
 
-      // Add a subtle outer glow by drawing a thicker, more transparent line underneath
+      // Subtle outer glow: thicker, more transparent line, same endpoints.
       line.lineStyle(6, color, 0.2);
       line.beginPath();
-      line.moveTo(x1, y1);
-      line.lineTo(x2, y2);
+      line.moveTo(p1.x, p1.y);
+      line.lineTo(p2.x, p2.y);
       line.strokePath();
 
       s.streetContainer.add(line);

@@ -35,6 +35,7 @@ vi.mock('../../src/ui', () => ({
 
 import { MainStreetAnimator } from '../../example-games/main-street/scenes/MainStreetAnimator';
 import { SFX_KEYS } from '../../example-games/main-street/scenes/MainStreetConstants';
+import { synergyLineEndpoints } from '../../example-games/main-street/scenes/synergyLineEndpoints';
 import { diffNewSynergyPairs, type SynergyPair } from '../../example-games/main-street/MainStreetAdjacency';
 
 // ── Mock scene helpers ──────────────────────────────────────
@@ -57,6 +58,9 @@ interface TweenConfig {
 function createMockScene(overrides: Record<string, unknown> = {}) {
   const tweens: TweenConfig[] = [];
   const createdTexts: Array<{ x: number; y: number; label: string }> = [];
+  // Records each graphics object's stroke path (moveTo/lineTo), in creation
+  // order, for endpoint-parity assertions (CG-0MSVM3WCD007BRQP).
+  const graphicsStrokeCalls: Array<{ moveTo: number[]; lineTo: number[] }> = [];
 
   const scene = {
     layout: {
@@ -79,15 +83,26 @@ function createMockScene(overrides: Record<string, unknown> = {}) {
       }),
     },
     add: {
-      graphics: vi.fn(() => ({
-        lineStyle: vi.fn().mockReturnThis(),
-        beginPath: vi.fn().mockReturnThis(),
-        moveTo: vi.fn().mockReturnThis(),
-        lineTo: vi.fn().mockReturnThis(),
-        strokePath: vi.fn().mockReturnThis(),
-        setDepth: vi.fn().mockReturnThis(),
-        setAlpha: vi.fn().mockReturnThis(),
-      })),
+      graphics: vi.fn(() => {
+        const stroke = { moveTo: [] as number[], lineTo: [] as number[] };
+        graphicsStrokeCalls.push(stroke);
+        const g = {
+          lineStyle: vi.fn().mockReturnThis(),
+          beginPath: vi.fn().mockReturnThis(),
+          moveTo: vi.fn((x: number, y: number) => {
+            stroke.moveTo = [x, y];
+            return g;
+          }),
+          lineTo: vi.fn((x: number, y: number) => {
+            stroke.lineTo = [x, y];
+            return g;
+          }),
+          strokePath: vi.fn().mockReturnThis(),
+          setDepth: vi.fn().mockReturnThis(),
+          setAlpha: vi.fn().mockReturnThis(),
+        };
+        return g;
+      }),
       circle: vi.fn(() => ({
         setDepth: vi.fn().mockReturnThis(),
         destroy: vi.fn(),
@@ -101,7 +116,7 @@ function createMockScene(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 
-  return { scene, tweens, createdTexts };
+  return { scene, tweens, createdTexts, graphicsStrokeCalls };
 }
 
 /** A tagged street card container as rendered by drawBusinessSlot. */
@@ -184,6 +199,30 @@ describe('MainStreetAnimator.animateSynergyFormation', () => {
     expect(scene.soundManager.play).not.toHaveBeenCalled();
     expect(tweens).toHaveLength(0);
     expect(createdTexts).toHaveLength(0);
+  });
+
+  it('strokes the draw-in line between the shared clipped endpoints (parity with the static renderer)', () => {
+    const cardA = taggedCard(0);
+    const cardB = taggedCard(1);
+    const { scene, graphicsStrokeCalls } = createMockScene({
+      streetContainer: { list: [cardA, cardB] },
+    });
+    const animator = new MainStreetAnimator(scene);
+    const endpoints = synergyLineEndpoints(
+      { fromIndex: 0, toIndex: 1, sharedSynergy: 'Culture' },
+      scene.layout,
+    );
+
+    animator.animateSynergyFormation({ fromIndex: 0, toIndex: 1, sharedSynergy: 'Culture' });
+
+    // The animated line uses the SAME clipped endpoints as the static
+    // renderer (CG-0MSVM3WCD007BRQP) — edge-to-edge, not slot-centres.
+    expect(graphicsStrokeCalls).toHaveLength(1);
+    expect(graphicsStrokeCalls[0].moveTo).toEqual([endpoints.p1.x, endpoints.p1.y]);
+    expect(graphicsStrokeCalls[0].lineTo).toEqual([endpoints.p2.x, endpoints.p2.y]);
+    // And those endpoints are NOT the slot centres (90,140) / (250,140).
+    expect(graphicsStrokeCalls[0].moveTo).not.toEqual([90, 140]);
+    expect(graphicsStrokeCalls[0].lineTo).not.toEqual([250, 140]);
   });
 
   it('skips the card pulse when the paired containers are not on screen (no crash)', () => {

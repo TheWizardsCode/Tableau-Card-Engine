@@ -3,6 +3,7 @@ import { CARD_TEMPLATE_NAMES, synergyColor } from '../MainStreetCards';
 import { FONT_FAMILY, popTextOrIcon, moveGameObject } from '../../../src/ui';
 import type { SlotIncome, SynergyPair } from '../MainStreetAdjacency';
 import { SFX_KEYS } from './MainStreetConstants';
+import { synergyLineEndpoints } from './synergyLineEndpoints';
 
 /** MainStreetAnimator -- animation and HUD-delta helper for Main Street scene. */
 export class MainStreetAnimator {
@@ -539,10 +540,14 @@ export class MainStreetAnimator {
    * cards pulse in the synergy colour, a "Synergy!" pop appears at the
    * midpoint, and a chime SFX plays.
    *
-   * Geometry mirrors `MainStreetRenderer.drawSynergyLines()` (slot centres
-   * from the same layout math) and the line uses `synergyColor` for the
-   * shared synergy type. The overlay line sits at depth 10, above the street
-   * container, matching where the static lines render.
+   * Geometry comes from the shared `synergyLineEndpoints` helper — the SAME
+   * clipped edge/corner endpoints the static renderer
+   * (`MainStreetRenderer.drawSynergyLines()`) uses, so the draw-in line can
+   * never drift from the persistent line (the old "mirrors the renderer"
+   * duplication is removed, CG-0MSVM3WCD007BRQP). The line uses
+   * `synergyColor` for the shared synergy type. The overlay line sits at
+   * depth 10, above the street container, matching where the static lines
+   * render.
    *
    * Accessibility (reduced motion): the line draw-in, spark, and card pulse
    * are skipped; the chime SFX and a minimal "Synergy!" pop are retained
@@ -561,14 +566,9 @@ export class MainStreetAnimator {
     if (s.replayMode) return;
 
     const reducedMotion = s.settingsPanel?.reducedMotion === true;
-    const { streetX, streetTop, slotW, slotGap, slotH, streetCols, streetRowGap } = s.layout;
-    const slotCenter = (idx: number): { x: number; y: number } => ({
-      x: streetX + (idx % streetCols) * (slotW + slotGap) + slotW / 2,
-      y: streetTop + Math.floor(idx / streetCols) * (slotH + streetRowGap) + slotH / 2,
-    });
-    const a = slotCenter(pair.fromIndex);
-    const b = slotCenter(pair.toIndex);
-    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    // Shared clipped geometry: same endpoints as the static renderer uses
+    // (edge-to-edge / corner-to-corner, CG-0MSVM3WCD007BRQP).
+    const { p1: a, p2: b, mid } = synergyLineEndpoints(pair, s.layout);
     const color = synergyColor(pair.sharedSynergy);
 
     // Chime SFX — plays in both modes (minimal feedback retained).
