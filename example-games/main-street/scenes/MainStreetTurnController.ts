@@ -15,6 +15,8 @@ import { computeSynergyPairs, diffNewSynergyPairs, type SynergyPair } from '../M
 import { buyBusinessCommand, moveToHandCommand, buyUpgradeCommand, playEventCommand, refreshMarketCommand } from '../MainStreetCommands';
 import { recordMainStreetEvent, finalizeMainStreetTranscript } from '../MainStreetTranscript';
 import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
+import { COMMON_SFX_KEYS, safePlaySound } from '../../../src/core-engine/SoundManager';
+import { shakeIllegalMove } from '../../../src/ui/shakeIllegalMove';
 import {
   createDragDropManager,
   DEFAULT_DRAG_DISTANCE_THRESHOLD,
@@ -33,6 +35,60 @@ import { computeDragTransferDuration } from './MainStreetConstants';
  * from both IDs and compares the template prefix, so any copy of the required
  * card template satisfies the requirement.
  */
+/**
+ * Play illegal-move sound and shake animation on a card target.
+ *
+ * Wraps {@link shakeIllegalMove} with a container-safe fallback:
+ * sprites are shaken directly (with red tint + x-oscillation), while
+ * container objects (market cards) receive a simple x-oscillation
+ * tween without tint (Containers don't have setTint).
+ *
+ * Sound plays via `safePlaySound` so mute/volume settings apply
+ * and missing audio assets are silently ignored.
+ * Reduced-motion is respected: when `scene.settingsPanel.reducedMotion`
+ * is true the shake distance is halved and duration shortened.
+ *
+ * Safe in headless / replay / transcript modes — if the target is
+ * null/undefined no tween is created and no sound is attempted.
+ *
+ * @param target  - Sprite (hand cards) or Container (market cards).
+ * @param scene   - Phaser scene for tween + sound plumbing.
+ */
+function playIllegalFeedback(target: Phaser.GameObjects.Container | Phaser.GameObjects.Image | Phaser.GameObjects.Sprite | null | undefined, scene: any): void {
+  // Always attempt to play the sound (safe even with no audio asset).
+  safePlaySound(scene as any, COMMON_SFX_KEYS.ILLEGAL_MOVE);
+
+  if (!target) return;
+
+  const reducedMotion = scene.settingsPanel?.reducedMotion ?? false;
+  const shakeDistance = reducedMotion ? 3 : 5;
+  const shakeDuration = reducedMotion ? 30 : 50;
+  const shakeRepeats = reducedMotion ? 1 : 2;
+
+  // Duck-typed Container detection: Containers lack setTint (they're
+  // plain groups), while Sprites/Images have setTint/clearTint.
+  const isContainer = (target as any).setTint === undefined;
+
+  if (isContainer) {
+    // Container-safe shake: position oscillation only (no tint).
+    // Sound is played separately (Containers don't support tint).
+    safePlaySound(scene as any, COMMON_SFX_KEYS.ILLEGAL_MOVE);
+    const originalX = (target as any).x;
+    scene.tweens.add({
+      targets: target,
+      x: originalX - shakeDistance,
+      duration: shakeDuration,
+      yoyo: true,
+      repeat: shakeRepeats,
+      ease: 'Sine.inOut',
+      onComplete: () => { (target as any).x = originalX; },
+    });
+  } else {
+    // Sprite/Image shake with red tint + sound via shakeIllegalMove.
+    shakeIllegalMove({ scene, target: target as Phaser.GameObjects.Image | Phaser.GameObjects.Sprite, shakeDistance, duration: shakeDuration, repeat: shakeRepeats });
+  }
+}
+
 function matchesRequiredCard(cardId: string, requiredCardId: string): boolean {
   const stripCopy = (id: string): string => id.replace(/-\d+$/, '');
   return stripCopy(cardId) === stripCopy(requiredCardId);
@@ -315,8 +371,9 @@ export class MainStreetTurnController {
 
     // Capture the played card's position BEFORE the hand re-renders — the
     // card leaves the hand on `refreshAll`, so its sprite must be read now.
-    const handSprite = s.msRenderer?.handView?.getSpriteAt?.(index) as { x: number; y: number } | undefined;
-    const playedPos = handSprite ? { x: handSprite.x, y: handSprite.y } : undefined;
+    const handSpriteSprite = s.msRenderer?.handView?.getSpriteAt?.(index) as Phaser.GameObjects.Sprite | undefined;
+    const handSprite = handSpriteSprite ? { x: handSpriteSprite.x, y: handSpriteSprite.y } : undefined;
+    const playedPos = handSprite;
 
     let played = false;
     try {
@@ -334,8 +391,13 @@ export class MainStreetTurnController {
         (s.msLifecycleManager as any).onTutorialActionComplete?.('play-event' as TutorialActionType);
       } catch (_) { /* ignore */ }
     } catch (e) {
+      const msg = (e as Error).message;
       console.error('[MS] PlayEvent failed', e);
-      s.instructionText.setText(`Error: ${(e as Error).message}`);
+      // Insufficient-coins rejection → play illegal-move feedback.
+      if (msg.toLowerCase().includes('not enough coins')) {
+        playIllegalFeedback(handSpriteSprite, s);
+      }
+      s.instructionText.setText(`Error: ${msg}`);
     }
 
     s.refreshAll();
@@ -756,8 +818,14 @@ export class MainStreetTurnController {
           try { s.gameEvents?.emit('card:placed', { handIndex, slotIndex }); } catch (_) {}
           s.instructionText.setText(`Placed "${cardName}" on slot ${slotIndex}`);
         } catch (e) {
+          const msg = (e as Error).message;
           console.error('[MS] placeFromHand failed', e);
-          s.instructionText.setText(`Error: ${(e as Error).message}`);
+          // Insufficient-coins rejection → play illegal-move feedback.
+          if (msg.toLowerCase().includes('not enough coins')) {
+            const handSprite = s.msRenderer?.handView?.getSpriteAt?.(handIndex);
+            playIllegalFeedback(handSprite, s);
+          }
+          s.instructionText.setText(`Error: ${msg}`);
         }
 
         s.hiddenTransferSourceCardIds.delete(cardId);
@@ -891,6 +959,14 @@ export class MainStreetTurnController {
 
     const legality = canPurchaseEvent(s.state, card.id);
     if (!legality.legal) {
+      const reason = (legality.reason ?? '').toLowerCase();
+      // Insufficient-coins rejection → play illegal-move feedback.
+      if (reason.includes('not enough coins')) {
+        const containers = s.msRenderer?.getMarketRowCards?.();
+        const cardIndex = s.state.market.cards.findIndex((c: any) => c.id === card.id);
+        const target = containers?.[cardIndex] ?? null;
+        playIllegalFeedback(target, s);
+      }
       s.instructionText.setText(`Cannot buy event: ${legality.reason ?? 'unknown'}`);
       return;
     }
@@ -1057,6 +1133,14 @@ export class MainStreetTurnController {
 
     const legality = canPurchaseUpgrade(s.state, card.id);
     if (!legality.legal) {
+      const reason = (legality.reason ?? '').toLowerCase();
+      // Insufficient-coins rejection → play illegal-move feedback.
+      if (reason.includes('not enough coins')) {
+        const containers = s.msRenderer?.getMarketRowCards?.();
+        const cardIndex = s.state.market.cards.findIndex((c: any) => c.id === card.id);
+        const target = containers?.[cardIndex] ?? null;
+        playIllegalFeedback(target, s);
+      }
       s.instructionText.setText(`Cannot buy upgrade: ${legality.reason ?? 'unknown'}`);
       return;
     }
