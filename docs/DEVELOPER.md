@@ -2455,6 +2455,32 @@ To verify production safety:
 
 ## Troubleshooting
 
+**Vite dev server memory growth / heap OOM (CG-0MSXL0A25009WZVK):**
+
+- **Symptoms:** the `npm run dev` process aborts after minutes of use with
+  `FATAL ERROR: Ineffective mark-compacts near heap limit - JavaScript heap
+  out of memory` (V8 old-space near the 4 GB default cap; native stack in
+  `libnode.so`, `Aborted (core dumped)`). Seen on the Main Street game-over
+  screen and in the vitest browser stage.
+- **Root cause:** the dev server's transcript pipeline wrote each
+  game-over transcript as a new file inside the Vite-watched root
+  (`data/transcripts/`), and Vite (which does **not** consult `.gitignore`
+  for watching) retained a permanent inotify watcher + path strings per
+  file (~10-43 KB/file, unbounded over a dev session). The middleware also
+  buffered request bodies with an unbounded O(n²) concat. On an
+  `--host`-exposed server either path can balloon the heap.
+- **Fix applied:** bounded request bodies (413 over 5 MiB), a 1/s write
+  rate limit (429), chunk-array body accumulation, and a watcher ignore
+  list for the dev-output trees — see
+  [Dev-server transcript persistence: memory-safety bounds](#dev-server-transcript-persistence-memory-safety-bounds).
+- **Monitoring tips (profiling a dev server):** run with
+  `node --max-old-space-size=4096 --trace-gc --heapsnapshot-near-heap-limit=2
+  node_modules/vite/bin/vite.js`, sample `grep VmRSS /proc/<pid>/status`
+  and watcher growth (`cat /proc/<pid>/fdinfo/* | grep -c ino:` — a growing
+  watch count while writing files means the ignore list is missing a
+  write target); capture a heap snapshot over CDP
+  (`HeapProfiler.takeHeapSnapshot` on the `--inspect` port).
+
 **Vite dev server won't start:**
 - Check port 3000 is not already in use: `lsof -i :3000`
 - Try `npm run dev -- --port 3001` for an alternate port
