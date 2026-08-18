@@ -284,6 +284,16 @@ The helper module at `tests/helpers/main-street-tutorial-e2e.ts` contains shared
 
 During Vitest runs, the dev-only transcript persistence middleware (`POST /api/transcripts`) is intentionally disabled even though Vitest browser mode uses an internal Vite server. This prevents file-system side effects and reduces harness noise/flakiness during test execution.
 
+### Dev-server transcript persistence: memory-safety bounds
+
+When running `npm run dev`, the dev server exposes `POST /api/transcripts` (via `scripts/vite-transcript-plugin.ts`) so the browser can persist game transcripts to `data/transcripts/<game>/`. Three bounds keep this endpoint from growing the dev-server process without limit (fix for CG-0MSXL0A25009WZVK):
+
+1. **Body size cap** — request bodies larger than 5 MiB are rejected with `413`. Transcripts are at most ~2.4 MB (largest fixture), so real saves are never rejected; the cap prevents a client from buffering an unbounded body in server memory (the previous `body += chunk.toString()` concat had no limit and ran in O(n²)).
+2. **Write rate limit** — at most one accepted write per second (subsequent requests receive `429`). This prevents a misbehaving save loop from flooding the watched tree with new files.
+3. **Watcher ignore list** — `server.watch.ignored` in `vite.config.ts` excludes the dev-output trees (`**/data/**`, `**/tmp/**`, `**/results/**`, `**/dist/**`, `**/dist-electron/**` via `DEV_WATCH_IGNORE_PATTERNS`). Vite does **not** consult `.gitignore` for watching, and every new file written into a watched directory previously created a permanently-retained inotify watcher + path strings in the dev server (measured ~10-43 KB/file of unbounded growth), which contributed to dev-server heap OOMs during long sessions/play-throughs.
+
+The on-disk contract is unchanged: transcripts land at `data/transcripts/<gameType>/<gameType>-<ISO-timestamp>.json`, so `scripts/replay.ts` and `scripts/export-transcripts.ts` keep working without modification. The middleware's bounded-input behaviour is unit-tested in `tests/scripts/vite-transcript-plugin.test.ts`, and the watcher-ignore wiring in `tests/scripts/vite-transcript-plugin.test.ts` (config contract).
+
 ### Writing unit tests
 
 - Place test files in `tests/` following the `*.test.ts` pattern
@@ -762,6 +772,8 @@ data/transcripts/<gameType>/<gameType>-<ISO-timestamp>.json
 This happens via a fire-and-forget POST from `TranscriptStore.save()`. If the POST fails (e.g. the production build is being served instead of the dev server), a `console.warn` is emitted but gameplay is not disrupted.
 
 The `data/` directory is gitignored, so persisted transcripts remain local to your machine.
+
+The dev-server middleware enforces memory-safety bounds (body-size cap → 413, write rate limit → 429, and a Vite watcher ignore list for dev-output trees) — see [Dev-server transcript persistence: memory-safety bounds](#dev-server-transcript-persistence-memory-safety-bounds) under Testing. These bounds prevent the transcript write path from growing the dev-server process without limit (CG-0MSXL0A25009WZVK).
 
 ### CLI Batch Export
 
